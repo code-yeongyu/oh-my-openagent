@@ -67,8 +67,11 @@ describe.skipIf(!runsJobHelperRows)("T1: every process of one memory git command
       const parents = parentPids()
       const images = new Map(members.map((pid) => [pid, processImage(pid) ?? "?"]))
       const launcher = members.find((pid) => parents.get(pid) === entry.helper.pid)
-      const mingwGit = members.find((pid) => /\\mingw64\\bin\\git\.exe$/i.test(images.get(pid) ?? ""))
-      const chain = { launcher, mingwGit, hookShell: hook.ppid, backgroundChild: grandchild.ppid, hookBun: hook.pid, bunGrandchild: grandchild.pid }
+      // Git for Windows ships the real git under one MSYS2 toolchain dir (mingw64 or ucrt64 on x64 -
+      // windows-latest measured ucrt64 - and clangarm64 on arm64). PATH may resolve the launcher to the Git\cmd shim or straight to that real git.
+      const realGitImage = /\\(mingw64|ucrt64|clangarm64)\\bin\\git\.exe$/i
+      const realGit = members.find((pid) => realGitImage.test(images.get(pid) ?? ""))
+      const chain = { launcher, realGit, hookShell: hook.ppid, backgroundChild: grandchild.ppid, hookBun: hook.pid, bunGrandchild: grandchild.pid }
       receipt = JSON.stringify({ job: entry.job, helper: entry.helper.pid, active, members: [...images], chain })
       console.log(`[T1] ${receipt}`)
 
@@ -76,8 +79,8 @@ describe.skipIf(!runsJobHelperRows)("T1: every process of one memory git command
       expect(active, receipt).toBe(members.length)
       expect(launcher, receipt).toBeDefined()
       expect(basename(images.get(launcher ?? 0) ?? "").toLowerCase(), receipt).toBe("git.exe")
-      expect(images.get(launcher ?? 0), receipt).not.toMatch(/\\mingw64\\/i)
-      expect(mingwGit, receipt).toBeDefined()
+      expect(realGit, receipt).toBeDefined()
+      if (realGit !== launcher) expect(images.get(launcher ?? 0), receipt).toMatch(/\\cmd\\git\.exe$/i)
       expect(processImage(hook.ppid) ?? "", receipt).toMatch(/\\(sh|bash)\.exe$/i)
       expect(processImage(grandchild.ppid) ?? "", receipt).toMatch(/\\(sh|bash)\.exe$/i)
       expect(processImage(grandchild.pid) ?? "", receipt).toMatch(/\\bun\.exe$/i)
