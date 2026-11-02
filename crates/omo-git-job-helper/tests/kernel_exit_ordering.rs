@@ -1,117 +1,33 @@
 //! Kernel exit ordering (omo#10391, design v4.2 R2 and R6): on a job this test owns, with the root image H spawns in
 //! the done-latency row (a console process, so its conhost joins too), each job message is stamped at dequeue
-//! together with the job's `ActiveProcesses` and the member's handle state, read before anything else runs. This is
-//! the ordering H's `done` decision depends on.
+//! together with the job's `ActiveProcesses` and the member's handle state, read before anything else runs, and each
+//! member's handle signal is stamped with the count read at once. H re-reads F's count on a member's handle signal,
+//! so the row asserts the count no longer includes a member whose handle has signaled.
 #![cfg(windows)]
 
 mod support;
 
 use std::collections::HashMap;
-use std::path::Path;
-use std::ptr::{null, null_mut};
+use std::ptr::null_mut;
 use std::sync::{Arc, Mutex};
+use std::thread::JoinHandle;
 use std::time::Duration;
 
 use support::observer::Observer;
+use support::owned_job::{kernel_job, spawn_into, KernelJob};
 use support::timeline::{member_label, Timeline};
-use support::win::{command_line, last_error, wide, Owned};
+use support::win::{last_error, Owned};
 use support::{example, job, process, unique, Receipt};
-use windows_sys::Win32::Foundation::{HANDLE, INVALID_HANDLE_VALUE, WAIT_OBJECT_0};
-use windows_sys::Win32::System::JobObjects::{
-    AssignProcessToJobObject, CreateJobObjectW, JobObjectAssociateCompletionPortInformation,
-    JobObjectExtendedLimitInformation, SetInformationJobObject, JOBOBJECTINFOCLASS,
-    JOBOBJECT_ASSOCIATE_COMPLETION_PORT, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
-    JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
-};
+use windows_sys::Win32::Foundation::WAIT_OBJECT_0;
 use windows_sys::Win32::System::SystemServices::{
     JOB_OBJECT_MSG_ABNORMAL_EXIT_PROCESS, JOB_OBJECT_MSG_ACTIVE_PROCESS_ZERO,
     JOB_OBJECT_MSG_EXIT_PROCESS, JOB_OBJECT_MSG_NEW_PROCESS,
 };
-use windows_sys::Win32::System::Threading::{
-    CreateProcessW, ResumeThread, WaitForSingleObject, CREATE_NO_WINDOW, CREATE_SUSPENDED,
-    PROCESS_INFORMATION, STARTUPINFOW,
-};
-use windows_sys::Win32::System::IO::{CreateIoCompletionPort, GetQueuedCompletionStatus};
+use windows_sys::Win32::System::Threading::WaitForSingleObject;
+use windows_sys::Win32::System::IO::GetQueuedCompletionStatus;
 
 const ITERATIONS: usize = 20;
 const BOUND: Duration = Duration::from_secs(30);
-const KEY: usize = 7;
-
-struct KernelJob {
-    job: Owned,
-    port: Owned,
-}
-
-fn set<T>(job: HANDLE, class: JOBOBJECTINFOCLASS, value: &T) {
-    let size = u32::try_from(std::mem::size_of::<T>()).unwrap_or(0);
-    // SAFETY: `value` is the C struct this information class expects and is readable for `size` bytes.
-    let ok = unsafe { SetInformationJobObject(job, class, std::ptr::from_ref(value).cast(), size) };
-    assert!(ok != 0, "SetInformationJobObject {class} {}", last_error());
-}
-
-/// Kill-on-close only so a failed row leaves nothing behind; the port receives every job message.
-fn kernel_job() -> KernelJob {
-    // SAFETY: an unnamed job with default security.
-    let job = Owned::new(unsafe { CreateJobObjectW(null(), null()) }).expect("CreateJobObjectW");
-    // SAFETY: a plain C struct for which all-zero is valid.
-    let mut limits: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = unsafe { std::mem::zeroed() };
-    limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-    set(job.raw(), JobObjectExtendedLimitInformation, &limits);
-    // SAFETY: a new port with one concurrent thread; no file handle is associated.
-    let port =
-        Owned::new(unsafe { CreateIoCompletionPort(INVALID_HANDLE_VALUE, null_mut(), 0, 1) })
-            .expect("CreateIoCompletionPort");
-    let association = JOBOBJECT_ASSOCIATE_COMPLETION_PORT {
-        CompletionKey: std::ptr::without_provenance_mut(KEY),
-        CompletionPort: port.raw(),
-    };
-    set(
-        job.raw(),
-        JobObjectAssociateCompletionPortInformation,
-        &association,
-    );
-    KernelJob { job, port }
-}
-
-/// Creates `exe args` suspended with `CREATE_NO_WINDOW` (as H spawns git), assigns it, then resumes it, so the
-/// conhost its console start creates joins the job too.
-fn spawn_into(job: HANDLE, exe: &Path, args: &[&str]) -> (Owned, u32) {
-    let exe_text = exe.to_string_lossy();
-    let mut line_args = vec![exe_text.as_ref()];
-    line_args.extend_from_slice(args);
-    let application = wide(&exe_text);
-    let mut line = wide(&command_line(&line_args));
-    // SAFETY: plain C structs for which all-zero is valid.
-    let mut startup: STARTUPINFOW = unsafe { std::mem::zeroed() };
-    startup.cb = u32::try_from(std::mem::size_of::<STARTUPINFOW>()).unwrap_or(0);
-    // SAFETY: as above.
-    let mut info: PROCESS_INFORMATION = unsafe { std::mem::zeroed() };
-    // SAFETY: both strings are NUL-terminated and outlive the call; `line` is writable as the API requires.
-    let ok = unsafe {
-        CreateProcessW(
-            application.as_ptr(),
-            line.as_mut_ptr(),
-            null(),
-            null(),
-            0,
-            CREATE_SUSPENDED | CREATE_NO_WINDOW,
-            null(),
-            null(),
-            &startup,
-            &mut info,
-        )
-    };
-    assert!(ok != 0, "CreateProcessW {}", last_error());
-    let process = Owned::new(info.hProcess).expect("process handle");
-    let thread = Owned::new(info.hThread).expect("thread handle");
-    // SAFETY: both handles are live; the child has not run an instruction yet.
-    let assigned = unsafe { AssignProcessToJobObject(job, process.raw()) };
-    assert!(assigned != 0, "AssignProcessToJobObject {}", last_error());
-    // SAFETY: the primary thread handle is live and was suspended once at creation.
-    let resumed = unsafe { ResumeThread(thread.raw()) };
-    assert!(resumed != u32::MAX, "ResumeThread {}", last_error());
-    (process, info.dwProcessId)
-}
 
 fn message_name(message: u32) -> String {
     match message {
@@ -172,11 +88,48 @@ fn drain(job: &Owned, port: &Owned, members: &Members, timeline: &Timeline) -> V
     }
 }
 
+type Signal = Option<(Duration, Option<u32>)>;
+
+fn watch_with_count(
+    kernel: &Arc<KernelJob>,
+    timeline: &Arc<Timeline>,
+    handle: Owned,
+    label: String,
+) -> JoinHandle<Signal> {
+    let (kernel, timeline) = (Arc::clone(kernel), Arc::clone(timeline));
+    std::thread::spawn(move || {
+        process::signaled_within(handle.raw(), BOUND).then(|| {
+            let active = job::accounting(kernel.job.raw()).map(|info| info.ActiveProcesses);
+            let at = timeline.mark(format!("{label} signaled active {active:?}"));
+            (at, active)
+        })
+    })
+}
+
+/// Signals in observed order: the k-th one read the count after every earlier member had signaled, so a count above
+/// `members - k` still included a signaled member.
+fn stale_at_signal(signals: &[Signal], members: usize) -> Option<usize> {
+    let mut observed: Vec<(Duration, Option<u32>)> =
+        signals.iter().copied().collect::<Option<_>>()?;
+    observed.sort_by_key(|(at, _)| *at);
+    Some(
+        observed
+            .iter()
+            .enumerate()
+            .filter(|(rank, (_, active))| {
+                let left = u32::try_from(members.saturating_sub(rank + 1)).unwrap_or(0);
+                active.is_none_or(|active| active > left)
+            })
+            .count(),
+    )
+}
+
 #[derive(Default)]
 struct Tally {
     exits: usize,
     stale: usize,
     unsignaled: usize,
+    signals: usize,
 }
 
 #[test]
@@ -215,15 +168,18 @@ fn kernel_member_exit_messages_against_the_active_count() {
             let label = member_label(watched.raw(), pid);
             labels.push(label.clone());
             members.lock().expect("members").insert(pid, probe);
-            waiters.push(timeline.watch_exit(watched, label, BOUND));
+            waiters.push(watch_with_count(&kernel, &timeline, watched, label));
         }
         let release = timeline.mark("release");
         observer.stop();
         let dequeued = drainer.join().expect("drainer");
-        for waiter in waiters {
-            waiter.join().expect("waiter");
-        }
+        let signals: Vec<Signal> = waiters
+            .into_iter()
+            .map(|waiter| waiter.join().expect("waiter"))
+            .collect();
         let member_count = members.lock().expect("members").len();
+        let stale_signals = stale_at_signal(&signals, member_count);
+        tally.signals += signals.len();
         let mut seen = 0usize;
         for entry in dequeued.iter().filter(|entry| is_exit(entry.message)) {
             seen += 1;
@@ -246,10 +202,16 @@ fn kernel_member_exit_messages_against_the_active_count() {
             seen, member_count,
             "iteration {index}: one exit message per member\n{receipt}"
         );
+        assert_eq!(
+            stale_signals,
+            Some(0),
+            "iteration {index}: a member's handle signaled while the count still included it\n{receipt}"
+        );
     }
     receipt.line(format!(
         "summary: {ITERATIONS} iterations; {} member-exit messages; dequeued while ActiveProcesses still counted the \
-         member {}; dequeued before the member's handle signaled {}",
-        tally.exits, tally.stale, tally.unsignaled
+         member {}; dequeued before the member's handle signaled {}; {} handle signals, every one read with the \
+         member already out of the count",
+        tally.exits, tally.stale, tally.unsignaled, tally.signals
     ));
 }

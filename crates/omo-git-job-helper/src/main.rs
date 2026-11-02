@@ -32,6 +32,8 @@ mod control;
 #[cfg(windows)]
 mod job;
 #[cfg(windows)]
+mod members;
+#[cfg(windows)]
 mod probe;
 #[cfg(windows)]
 mod run;

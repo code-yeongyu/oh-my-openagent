@@ -17,6 +17,7 @@ pub mod job;
 pub mod lines;
 pub mod observer;
 pub mod op;
+pub mod owned_job;
 pub mod pipe;
 pub mod process;
 pub mod receipt;
