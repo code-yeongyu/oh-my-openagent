@@ -91,6 +91,28 @@ describe("resolveRoster", () => {
     })
   })
 
+  it("#given a category models chain #when resolving roster #then the row shows the chain head that dispatch uses (#9287)", () => {
+    withIsolatedConfig("category-models", (root) => {
+      // given
+      const project = join(root, "project")
+      writeJson(join(project, ".omo", "omo.jsonc"), {
+        "[opencode]": {
+          categories: {
+            artistry: { models: ["wasabi/deepseek/deepseek-flash", "zhipu/glm-5.3"] },
+            "deep-low": { models: [{ model: "zhipu/glm-5.3" }] },
+          },
+        },
+      })
+
+      // when
+      const rows = resolveRoster(project)
+
+      // then
+      expect(rows).toContainEqual({ label: "artistry", model: "deepseek-flash" })
+      expect(rows).toContainEqual({ label: "deep-low", model: "glm-5.3" })
+    })
+  })
+
   it("#given disabled_agents config #when resolving roster #then it excludes disabled builtin agents", () => {
     withIsolatedConfig("disabled-agents", (root) => {
       // given

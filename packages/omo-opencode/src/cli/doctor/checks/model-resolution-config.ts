@@ -16,6 +16,7 @@ function modelConfig(config: ReturnType<typeof validatePluginConfig>["config"]):
     const entry = {
       ...(category.model === undefined ? {} : { model: category.model }),
       ...(category.variant === undefined ? {} : { variant: category.variant }),
+      ...(category.models === undefined ? {} : { models: category.models }),
     }
     return Object.keys(entry).length === 0 ? [] : [[name, entry]]
   }))

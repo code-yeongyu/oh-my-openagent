@@ -19,6 +19,7 @@ type AgentModelConfig = {
 type CategoryModelConfig = {
   model?: string
   variant?: string
+  models?: ReadonlyArray<string | { model: string }>
 }
 
 function formatModelLabel(model: string): string {
@@ -48,6 +49,7 @@ function pickCategoryModelConfig(category: CategoryModelConfig): CategoryModelCo
   const picked: CategoryModelConfig = {}
   if (category.model !== undefined) picked.model = category.model
   if (category.variant !== undefined) picked.variant = category.variant
+  if (category.models !== undefined) picked.models = category.models
   return picked
 }
 
