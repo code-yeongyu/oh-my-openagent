@@ -20,6 +20,7 @@ export type RecordOverrides = {
   readonly notify_on_terminal?: boolean
   readonly run_epoch?: number
   readonly notified_epoch?: number
+  readonly notification_failed_epoch?: number
   readonly residency_state?: TaskRecord["residency_state"]
 }
 
@@ -43,6 +44,9 @@ export function makeRecord(overrides: RecordOverrides = {}): TaskRecord {
     notification: {
       run_epoch: overrides.run_epoch ?? 0,
       notified_epoch: overrides.notified_epoch ?? -1,
+      ...(overrides.notification_failed_epoch === undefined
+        ? {}
+        : { notification_failed_epoch: overrides.notification_failed_epoch }),
     },
     ...(overrides.name !== undefined ? { name: overrides.name } : {}),
     ...(overrides.resolved_model === undefined ? {} : { resolved_model: overrides.resolved_model }),

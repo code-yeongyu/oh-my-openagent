@@ -180,8 +180,6 @@ describe("event-bridge session_compact", () => {
     expect(forgottenTaskOutputSessions).toEqual(["parent-session"])
   })
 })
-  })
-})
 
 describe("event-bridge session_shutdown", () => {
   it("#given a session_shutdown with a reason and a captured session id #when the event fires #then it suspends with parentSessionId and reason", async () => {

@@ -202,6 +202,37 @@ describe("task_output polling guard", () => {
     if (repeated.details.kind === "no_progress") expect(repeated.details.reason).toContain("Await its completion notification")
   })
 
+  test("#given an unchanged legacy terminal task with a failed delivery #when status is polled again #then it directs the caller to await the retry", async () => {
+    const record = makeRecord({
+      task_id: "st_legacy_failed_delivery",
+      name: "worker",
+      status: "completed",
+      notify_on_terminal: false,
+      run_epoch: 2,
+      notified_epoch: 0,
+      notification_failed_epoch: 2,
+    })
+    const manager: OutputManager = {
+      get: () => record,
+      list: () => [{ record }],
+    }
+    const output = createTaskOutputTool({
+      manager,
+      stateDir: "/tmp/state",
+      transcriptReader: () => ({ entries: [], source: "none" }),
+    })
+    const execute = () =>
+      output.execute("call", { task_id: record.task_id }, undefined, undefined, context("session-a"))
+
+    await execute()
+    const repeated = await execute()
+    expect(repeated.details.kind).toBe("no_progress")
+    if (repeated.details.kind === "no_progress") {
+      expect(repeated.details.reason).toContain("Await its completion notification")
+      expect(repeated.details.reason).not.toContain("will not send a completion notification")
+    }
+  })
+
   test("#given an unchanged opted-in background task #when status is polled again before it is terminal #then it directs the caller to await its future notification", async () => {
     for (const status of ["pending", "running"] as const) {
       const record = makeRecord({ task_id: `st_live_${status}`, name: "worker", status, notify_on_terminal: true })
