@@ -524,6 +524,9 @@ describe("checkExtensionCurrent", () => {
     expect(main).toContain('import("#memory-external-projection")')
     // The <external_projection> renderer (its legend is the marker) ships in the recall-store sidecar, not the entry.
     expect(main).not.toContain("stand for similar names")
+    expect(main).toContain('import("#memory-reflection-merge")')
+    // The reflection merge and its stranded-merge repair (the marker file name) ship in the recall-store sidecar.
+    expect(main).not.toContain("omo-stranded-reflection-merge")
     expect(main).toContain('import("#omo-telemetry-posthog-runtime")')
     expect(main).toContain('import("#omo-telemetry-otlp-runtime")')
     expect(main).toContain('import("#omo-thread-client-runtime")')
@@ -547,6 +550,7 @@ describe("checkExtensionCurrent", () => {
       "#omo-session-history-runtime": "./extensions/omo-session-history.js",
       "#omo-recall-store-runtime": "./extensions/omo-recall-store.js",
       "#memory-external-projection": "./extensions/omo-recall-store.js",
+      "#memory-reflection-merge": "./extensions/omo-recall-store.js",
       "#omo-telemetry-posthog-runtime": "./extensions/omo-telemetry-posthog.js",
       "#omo-telemetry-otlp-runtime": "./extensions/omo-telemetry-otlp.js",
       "#omo-memory-sync-runtime": "./extensions/omo-memory-sync.js",
