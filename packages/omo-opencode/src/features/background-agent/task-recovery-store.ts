@@ -44,9 +44,9 @@ export class TaskRecoveryError extends Error {
 }
 
 export class TaskRecoveryStore {
-  private readonly root = join(getDataDir(), "omo", "background-owners")
+  readonly root = join(getDataDir(), "omo", "background-owners")
 
-  private path(sessionId: string): string {
+  path(sessionId: string): string {
     return join(this.root, `${createHash("sha256").update(sessionId).digest("hex")}.json`)
   }
 
@@ -72,6 +72,12 @@ export class TaskRecoveryStore {
         if (!(cleanupError instanceof Error && "code" in cleanupError && cleanupError.code === "ENOENT")) throw cleanupError
       }
       throw error
+    }
+  }
+
+  remove(sessionId: string): void {
+    try { unlinkSync(this.path(sessionId)) } catch (error) {
+      if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error
     }
   }
 

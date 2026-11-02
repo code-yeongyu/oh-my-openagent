@@ -479,6 +479,7 @@ Control parallel agent execution and concurrency limits. `background_task` (came
 | `sessionGoneTimeoutMs`      | `60000`   | Timeout when a task session disappears (min: 10000)                   |
 | `taskCleanupDelayMs`        | `600000`  | Delay before terminal tasks are removed (min: 60000)                  |
 | `syncPollTimeoutMs`         | -         | Synchronous polling timeout in milliseconds (min: 60000)             |
+| `recoverySweepMinAgeMs`     | `86400000` | Age before the hourly sweep examines a background-owners recovery file; it removes only records whose owner is dead and child session is gone (min: 3600000) |
 | `maxToolCalls`              | `4000`    | Maximum tool calls per subagent task (min: 10)                        |
 | `circuitBreaker`            | -         | Circuit-breaker object: `enabled` (default `true`), `maxToolCalls`, `consecutiveThreshold` |
 

@@ -3,9 +3,15 @@ import { z } from "zod"
 import { dispatchInternalPrompt, releasePromptAsyncReservation } from "../../shared/prompt-async-gate"
 import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failure-classifier"
 import { createPromptTimeoutContext, PROMPT_TIMEOUT_MS } from "../../shared/prompt-timeout-context"
+import { log } from "../../shared/logger"
 import type { OpencodeClient } from "./constants"
 import type { BackgroundTask } from "./types"
 import { TaskRecoveryError, TaskRecoveryStore, type TaskRecoveryRecord } from "./task-recovery-store"
+import { openChildSessionPresence } from "./child-session-presence"
+import {
+  DEFAULT_RECOVERY_SWEEP_MIN_AGE_MS, RECOVERY_SWEEP_BUDGET, RECOVERY_SWEEP_INTERVAL_MS,
+  RECOVERY_SWEEP_START_DELAY_MS, sweepTaskRecoveryRecords,
+} from "./task-recovery-sweep"
 import { probeTaskOwner, TaskWorkerOwnership } from "./task-worker-ownership"
 
 const RecoverableSessionSchema = z.object({
@@ -22,13 +28,58 @@ export class TaskRecovery {
   private readonly generations = new Map<string, string>()
   private closed = false
   private readonly worker: TaskWorkerOwnership
+  private sweepTimer?: ReturnType<typeof setTimeout>
 
-  constructor(private readonly client: OpencodeClient, private readonly canDispatch: () => boolean) {
+  constructor(
+    private readonly client: OpencodeClient,
+    private readonly canDispatch: () => boolean,
+    private readonly config?: { readonly recoverySweepMinAgeMs?: number },
+  ) {
     this.worker = new TaskWorkerOwnership(async (sessionId, generation) => {
       if (!this.owns(sessionId, generation) || !this.generations.has(sessionId)) return "unknown"
       const response = await this.client.session.status()
       return response.error ? "unknown" : "owned"
     })
+    this.scheduleSweep(RECOVERY_SWEEP_START_DELAY_MS)
+  }
+
+  private scheduleSweep(delayMs: number): void {
+    if (this.closed) return
+    this.sweepTimer = setTimeout(() => { void this.sweep() }, delayMs)
+    this.sweepTimer.unref?.()
+  }
+
+  private async sweep(): Promise<void> {
+    const sessions = await openChildSessionPresence()
+    try {
+      const result = await sweepTaskRecoveryRecords({
+        store: this.store,
+        minAgeMs: this.config?.recoverySweepMinAgeMs ?? DEFAULT_RECOVERY_SWEEP_MIN_AGE_MS,
+        intervalMs: RECOVERY_SWEEP_INTERVAL_MS,
+        budget: RECOVERY_SWEEP_BUDGET,
+        childPresence: async (sessionId) => sessions?.lookup(sessionId) ?? "unknown",
+        shouldContinue: () => !this.closed,
+      })
+      if (result.removed.length > 0) {
+        log("[background-agent] Removed stale task recovery files:", { examined: result.examined, removed: result.removed })
+      }
+    } catch (error) {
+      if (!(error instanceof Error)) throw error
+      log("[background-agent] Task recovery sweep failed:", { error: error.message })
+    } finally {
+      sessions?.close()
+      this.scheduleSweep(RECOVERY_SWEEP_INTERVAL_MS)
+    }
+  }
+
+  async forget(sessionId: string): Promise<void> {
+    this.generations.delete(sessionId)
+    try {
+      await this.store.locked(sessionId, async () => { this.store.remove(sessionId) })
+    } catch (error) {
+      if (!(error instanceof Error)) throw error
+      log("[background-agent] Kept task recovery record of a deleted session:", { sessionId, error: error.message })
+    }
   }
 
   generation(sessionId: string): string | undefined { return this.generations.get(sessionId) }
@@ -132,5 +183,9 @@ export class TaskRecovery {
     }
   }
 
-  close(): void { this.closed = true; this.worker.close() }
+  close(): void {
+    this.closed = true
+    clearTimeout(this.sweepTimer)
+    this.worker.close()
+  }
 }

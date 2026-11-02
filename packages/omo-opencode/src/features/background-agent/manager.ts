@@ -299,7 +299,7 @@ export class BackgroundManager {
     this.pendingNotifications = new Map()
     this.pendingByParent = new Map()
     this.client = pluginContext.client
-    this.taskRecovery = new TaskRecovery(this.client, () => !this.shutdownTriggered)
+    this.taskRecovery = new TaskRecovery(this.client, () => !this.shutdownTriggered, options.config)
     this.directory = pluginContext.directory
     this.concurrencyManager = new ConcurrencyManager(options.config)
     this.config = options.config
@@ -1923,6 +1923,7 @@ The fallback retry session is now created and can be inspected directly.
     if (event.type === "session.deleted") {
       const sessionID = resolveSessionEventID(props)
       if (!sessionID) return
+      void this.taskRecovery.forget(sessionID)
       this.clearSessionOutputObserved(sessionID)
       this.clearSessionTodoObservation(sessionID)
 

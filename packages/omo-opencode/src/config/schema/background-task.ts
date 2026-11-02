@@ -23,6 +23,8 @@ export const BackgroundTaskConfigSchema = z.object({
   /** Delay before removing completed/cancelled/errored tasks from memory in milliseconds (default: 600000 = 10 minutes, minimum: 60000 = 1 minute). */
   taskCleanupDelayMs: z.number().min(60000).optional(),
   syncPollTimeoutMs: z.number().min(60000).optional(),
+  /** Minimum age of a background-owners recovery file before the hourly sweep examines it, in milliseconds (default: 86400000 = 24 hours, minimum: 3600000 = 1 hour). The sweep removes a record only when its owner is dead and its child session is gone, plus abandoned lock and temp files. */
+  recoverySweepMinAgeMs: z.number().min(3600000).optional(),
   /** Maximum tool calls per subagent task before circuit breaker triggers (default: 200, minimum: 10). Prevents runaway loops from burning unlimited tokens. */
   maxToolCalls: z.number().int().min(10).optional(),
   circuitBreaker: CircuitBreakerConfigSchema.optional(),
