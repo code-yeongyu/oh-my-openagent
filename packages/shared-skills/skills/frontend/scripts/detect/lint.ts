@@ -35,7 +35,7 @@ export function lintSnapshot(snapshot: PageSnapshot, options: LintOptions = {}):
 				ruleId: rule.meta.id,
 				name: rule.meta.name,
 				category: rule.meta.category,
-				severity: overridden ? severity : (hit.severity ?? severity),
+				severity: hit.severityFixed && hit.severity ? hit.severity : overridden ? severity : (hit.severity ?? severity),
 				message: hit.message,
 				fixHint: rule.meta.fixHint,
 				snippet: hit.snippet,

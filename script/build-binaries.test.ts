@@ -1,6 +1,3 @@
-// script/build-binaries.test.ts
-// Tests for platform binary build configuration
-
 import { describe, expect, it } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
@@ -9,8 +6,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// Import PLATFORMS from build-binaries.ts
-// We need to export it first, but for now we'll test the expected structure
 const EXPECTED_BASELINE_TARGETS = [
   "bun-linux-x64-baseline",
   "bun-linux-x64-musl-baseline",
@@ -41,7 +36,7 @@ describe("build-binaries", () => {
     it("includes baseline variants for non-AVX2 CPU support", async () => {
       // given
       const module = await import("./build-binaries.ts");
-      const platforms = (module as { PLATFORMS: { target: string }[] }).PLATFORMS;
+      const platforms = module.PLATFORMS;
       const targets = platforms.map((p) => p.target);
 
       // when
@@ -59,7 +54,7 @@ describe("build-binaries", () => {
     it("uses exact package names as platform package directories", async () => {
       // given
       const module = await import("./build-binaries.ts");
-      const platforms = (module as { PLATFORMS: { packageName: string; packageDir: string }[] }).PLATFORMS;
+      const platforms = module.PLATFORMS;
 
       // when
       const packageNames = platforms.map((p) => p.packageName);
@@ -77,7 +72,7 @@ describe("build-binaries", () => {
     it("includes a windows-arm64 entry for Windows-on-ARM hosts", async () => {
       // given
       const module = await import("./build-binaries.ts");
-      const platforms = (module as { PLATFORMS: { platform: string; packageName: string; packageDir: string }[] }).PLATFORMS;
+      const platforms = module.PLATFORMS;
 
       // when
       const windowsArm64 = platforms.find((p) => p.platform === "windows-arm64");
@@ -90,7 +85,7 @@ describe("build-binaries", () => {
     it("uses JavaScript launcher names for baseline platforms", async () => {
       // given
       const module = await import("./build-binaries.ts");
-      const platforms = (module as { PLATFORMS: { packageDir: string; target: string; binary: string }[] }).PLATFORMS;
+      const platforms = module.PLATFORMS;
 
       // when
       const windowsBaseline = platforms.find((p) => p.target === "bun-windows-x64-baseline");
@@ -104,7 +99,7 @@ describe("build-binaries", () => {
     it("launcher can print lazycodex help when Bun is unavailable", async () => {
       // given
       const module = await import("./build-binaries.ts");
-      const createPlatformLauncherSource = (module as { createPlatformLauncherSource: () => string }).createPlatformLauncherSource;
+      const createPlatformLauncherSource = module.createPlatformLauncherSource;
       const root = fileURLToPath(new URL("..", import.meta.url));
       const tempDir = await mkdtemp(join(tmpdir(), "lazycodex-launcher-"));
       const launcherPath = join(tempDir, "oh-my-opencode.js");
@@ -131,7 +126,7 @@ describe("build-binaries", () => {
     it("launcher routes omo codex-only install through the Node installer before requiring Bun", async () => {
       // given
       const module = await import("./build-binaries.ts");
-      const createPlatformLauncherSource = (module as { createPlatformLauncherSource: () => string }).createPlatformLauncherSource;
+      const createPlatformLauncherSource = module.createPlatformLauncherSource;
       const tempDir = await mkdtemp(join(tmpdir(), "omo-codex-only-launcher-"));
       const launcherPath = join(tempDir, "oh-my-opencode.js");
       const installerPath = join(tempDir, "packages", "omo-codex", "scripts", "install-local.mjs");
@@ -168,7 +163,7 @@ describe("build-binaries", () => {
     it("launcher preserves lazycodex explicit both-platform install on the Bun CLI path", async () => {
       // given
       const module = await import("./build-binaries.ts");
-      const createPlatformLauncherSource = (module as { createPlatformLauncherSource: () => string }).createPlatformLauncherSource;
+      const createPlatformLauncherSource = module.createPlatformLauncherSource;
       const tempDir = await mkdtemp(join(tmpdir(), "lazycodex-both-launcher-"));
       const launcherPath = join(tempDir, "oh-my-opencode.js");
       const installerPath = join(tempDir, "packages", "omo-codex", "scripts", "install-local.mjs");
@@ -200,7 +195,7 @@ describe("build-binaries", () => {
     it("launcher routes lazycodex ulw-loop through the Bun CLI instead of the installer", async () => {
       // given
       const module = await import("./build-binaries.ts");
-      const createPlatformLauncherSource = (module as { createPlatformLauncherSource: () => string }).createPlatformLauncherSource;
+      const createPlatformLauncherSource = module.createPlatformLauncherSource;
       const tempDir = await mkdtemp(join(tmpdir(), "lazycodex-ulw-loop-launcher-"));
       const launcherPath = join(tempDir, "oh-my-opencode.js");
       await writeFile(launcherPath, createPlatformLauncherSource());
@@ -228,7 +223,7 @@ describe("build-binaries", () => {
     it("has descriptions mentioning no AVX2 for baseline platforms", async () => {
       // given
       const module = await import("./build-binaries.ts");
-      const platforms = (module as { PLATFORMS: { target: string; description: string }[] }).PLATFORMS;
+      const platforms = module.PLATFORMS;
 
       // when
       const baselinePlatforms = platforms.filter((p) => p.target.includes("baseline"));

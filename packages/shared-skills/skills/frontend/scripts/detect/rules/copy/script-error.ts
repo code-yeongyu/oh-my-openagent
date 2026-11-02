@@ -13,6 +13,7 @@ export const scriptError: PageRule = {
 				message: "Script errors were not captured: this renderer could not install its error probe before the page's scripts",
 				snippet: snapshot.url,
 				severity: "advisory",
+				severityFixed: true,
 			}]
 		}
 		const counts = new Map<string, number>()

@@ -11,7 +11,7 @@ const OPUS_ZEN = "opencode/claude-opus-5-5"
 const OPUS_API = "anthropic-api/claude-opus-5-5"
 const FABLE = "anthropic-subscription/claude-fable-5-1"
 const FABLE_ZEN = "opencode/claude-fable-5-1"
-const KIMI = "moonshotai/kimi-k3"
+const KIMI = "moonshotai/kimi-k3.1-pro"
 const FLASH = "deepseek/deepseek-flash"
 const LUNA = "openai/gpt-5.6-luna-fast"
 const SOL_FAST = "chatgpt-subscription/gpt-6-sol-fast"
@@ -37,7 +37,7 @@ describe("resolveModelProfile", () => {
       kind: "resolved",
       profile: DAILY_NORMAL,
       provider: "moonshotai",
-      modelId: "kimi-k3",
+      modelId: "kimi-k3.1-pro",
       reasoning: "max",
       skipped: [OPUS_SUBSCRIPTION],
     })
@@ -134,7 +134,7 @@ describe("resolveModelProfile", () => {
     expect(result).toEqual({
       kind: "unavailable",
       profile: DAILY_NORMAL,
-      chain: [OPUS_SUBSCRIPTION, "kimi-coding/kimi-k3", "zai/glm-5.3"],
+      chain: [OPUS_SUBSCRIPTION, "kimi-coding/kimi-k3.1-pro", "zai/glm-5.3"],
     })
   })
 

@@ -40,3 +40,9 @@ test("#given a renderer that could not install the error probe #then one advisor
 	expect(lintSnapshot(snapshot, { rules: [scriptError] }).map((f) => [f.severity, f.location.kind])).toEqual([["advisory", "page"]])
 	expect(lintSnapshot(buildSnapshot([]), { rules: [scriptError] })).toHaveLength(0)
 })
+
+test("#given a project override that raises script-error #then the not-captured notice stays advisory and off still drops it", () => {
+	const snapshot = buildSnapshot([], { scriptErrorsCaptured: false })
+	expect(lintSnapshot(snapshot, { rules: [scriptError], config: { rules: { "script-error": "error" } } }).map((f) => f.severity)).toEqual(["advisory"])
+	expect(lintSnapshot(snapshot, { rules: [scriptError], config: { rules: { "script-error": "off" } } })).toHaveLength(0)
+})

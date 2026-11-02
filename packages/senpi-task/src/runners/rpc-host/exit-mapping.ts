@@ -75,7 +75,7 @@ export function unreachableSessionExitClassification(value: never): never {
   throw new Error(`unhandled session exit classification: ${JSON.stringify(value)}`)
 }
 
-function isParkingReason(reason: string | undefined): reason is HostParkCause {
+export function isParkingReason(reason: string | undefined): reason is HostParkCause {
   return PARKING_REASONS.some((parking) => parking === reason)
 }
 

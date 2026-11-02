@@ -131,9 +131,6 @@
   "packages/omo-native/test/setup-summary.test.ts": {
     "typescript/no-explicit-any": 1
   },
-  "packages/omo-opencode/src/agents/gpt-prompt-identity.ts": {
-    "typescript/no-non-null-assertion": 1
-  },
   "packages/omo-opencode/src/cli/run/continuation-state.json-backend.test.ts": {
     "typescript/no-explicit-any": 1
   },
@@ -198,9 +195,6 @@
   },
   "packages/omo-opencode/src/features/tmux-subagent/manager.test.ts": {
     "typescript/no-non-null-assertion": 3
-  },
-  "packages/omo-opencode/src/hooks/agent-usage-reminder/hook.ts": {
-    "typescript/no-non-null-assertion": 1
   },
   "packages/omo-opencode/src/hooks/anthropic-context-window-limit-recovery/recovery-deduplication.test.ts": {
     "typescript/no-non-null-assertion": 1

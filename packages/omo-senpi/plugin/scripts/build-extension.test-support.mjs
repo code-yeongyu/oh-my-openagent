@@ -28,6 +28,7 @@ export function outputPathsIn(root) {
     threadClientOutputPath: join(root, "omo-thread-client.js"),
     telemetryRecoveryOutputPath: join(root, "omo-telemetry-recovery.js"),
     feedbackOutputPath: join(root, "omo-feedback.js"),
+    desktopToolkitOutputPath: join(root, "omo-desktop-toolkit.js"),
     claimReceiptOutputPath: join(root, "omo-claim-receipt.js"),
     computerUseOutputPath: join(root, "omo-computer-use.js"),
     gatewayStoreWorkerOutputPath: join(root, "gateway-store-worker.mjs"),

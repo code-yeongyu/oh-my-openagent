@@ -41,6 +41,8 @@ pub(crate) struct Worker {
     pub(crate) control: Option<crate::grant::ControlGrant>,
     /// Whether this backend's watch of the user's own input was started.
     pub(crate) watching_user_input: bool,
+    /// The user's input into the apps this session works in (#11459).
+    pub(crate) intervention: crate::intervention::Intervention,
 }
 
 /// A mutating request's reply and the audit event it emitted.
@@ -74,6 +76,7 @@ impl Worker {
             instance: crate::grant::next_instance(),
             control: None,
             watching_user_input: false,
+            intervention: crate::intervention::Intervention::new(),
         };
         worker.refresh_capabilities();
         worker
@@ -99,6 +102,7 @@ impl Worker {
         }
         self.backend = self.factory.create(&options);
         self.watching_user_input = false;
+        self.intervention = crate::intervention::Intervention::new();
         self.emergency = self.backend.as_ref().ok().and_then(|backend| backend.emergency_release());
         if let Some(release) = &self.emergency {
             if let Err(error) = self.safety.supervisor.register_emergency_release(release) {
@@ -144,7 +148,13 @@ impl Worker {
         self.maybe_gc();
         if crate::user_input_watch::reads_or_acts_on_an_app(&op) {
             self.watch_user_input();
+            self.attach_user_input_feed();
+            self.drain_user_input();
         }
+        self.serve(op, cancelled)
+    }
+
+    fn serve(&mut self, op: Op, cancelled: &dyn Fn() -> bool) -> CoreResult<Response> {
         let served = |audited: CoreResult<Audited>| audited.map(|(response, _audit)| response);
         // Every mutating request goes through `mutate`; reads bypass it.
         match op {
@@ -174,6 +184,7 @@ impl Worker {
             Op::AxSetValue(params) => served(self.ax_set_value(&params.ref_, &params.value, cancelled)),
             Op::AxFocus(params) => served(self.ax_focus(&params.ref_, cancelled)),
             Op::AxClick(params) => served(self.ax_click(&params, cancelled)),
+            Op::AxTypeText(params) => served(self.ax_type_text(&params, cancelled)),
             Op::ClipboardRead => self.clipboard_read(),
             Op::ClipboardWrite(params) => served(self.clipboard_write(&params, cancelled)),
             Op::ControlGrant(params) => self.control_grant(&params),

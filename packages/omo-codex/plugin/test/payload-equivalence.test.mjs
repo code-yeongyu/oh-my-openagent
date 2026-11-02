@@ -46,6 +46,8 @@ async function readTelemetryCoreDefaultPostHogConstants() {
 
 test("payload-equivalence: #given telemetry-core and component shim #when session_start is captured #then payload schema matches telemetry-core", async () => {
 	const stateDir = mkdtempSync(join(tmpdir(), "omo-codex-payload-equivalence-"));
+	const savedTermProgram = process.env.TERM_PROGRAM;
+	process.env.TERM_PROGRAM = "/home/sentinel-user/bin/x";
 	const previousShell = process.env.SHELL;
 	// A login shell path can carry the user's name; only the program name may be sent.
 	process.env.SHELL = "/home/payload-user/.nix-profile/bin/zsh";
@@ -93,13 +95,16 @@ test("payload-equivalence: #given telemetry-core and component shim #when sessio
 					runtime_version: process.version,
 					shell: "zsh",
 					source: "plugin",
-					terminal: process.env.TERM_PROGRAM,
+					terminal: "other",
 					timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
 					total_memory_gb: 16,
 				},
 			},
 		]);
+		assert.doesNotMatch(JSON.stringify(componentMessages), /sentinel-user/);
 	} finally {
+		if (savedTermProgram === undefined) delete process.env.TERM_PROGRAM;
+		else process.env.TERM_PROGRAM = savedTermProgram;
 		if (previousShell === undefined) delete process.env.SHELL;
 		else process.env.SHELL = previousShell;
 		rmSync(stateDir, { recursive: true, force: true });

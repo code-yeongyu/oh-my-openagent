@@ -61,6 +61,9 @@ export function startWireServer(options: WireServerOptions): WireServer {
     failNext: null as number | null,
   }
   const server = Bun.serve({
+    // Bound to the exact address the client dials: on a wildcard bind another process may bind
+    // 127.0.0.1 on the same port and answer this fixture's requests.
+    hostname: "127.0.0.1",
     port: options.port ?? 0,
     idleTimeout: 0,
     async fetch(req) {

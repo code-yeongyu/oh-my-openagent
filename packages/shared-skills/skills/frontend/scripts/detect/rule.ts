@@ -6,6 +6,8 @@ export type PageHit = {
 	readonly snippet: string
 	/** Overrides the rule's default severity for this hit; a project override in config.rules still wins. */
 	readonly severity?: Severity
+	/** Keeps `severity` even when the project overrides the rule's severity in config.rules (a rule set to "off" still drops the hit). For notices about missing evidence, which an override must not turn into a failure. */
+	readonly severityFixed?: boolean
 }
 
 export type PageContext = {

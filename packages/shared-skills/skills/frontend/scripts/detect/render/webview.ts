@@ -5,15 +5,14 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 import { collectPageSnapshot, SCRIPT_ERROR_PROBE } from "../snapshot/collect"
 import { STYLE_PROPS } from "../snapshot/style-props"
 import type { PageSnapshot } from "../types"
+import { insertAfterProlog } from "./probe-placement"
 import { CONTENT_STRESS_SCRIPT, RenderError, type RenderRequest, type RenderTarget, type Renderer } from "./renderer"
 
 const MAX_ELEMENTS = 20_000
 const SETTLE_FRAMES = "new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true)))))"
 
 function withProbe(html: string, baseHref?: string): string {
-	const probe = `${baseHref ? `<base href="${baseHref}">` : ""}<script>${SCRIPT_ERROR_PROBE}</script>`
-	if (/<head(\s[^>]*)?>/i.test(html)) return html.replace(/<head(\s[^>]*)?>/i, (m) => `${m}${probe}`)
-	return `${probe}${html}`
+	return insertAfterProlog(html, `${baseHref ? `<base href="${baseHref}">` : ""}<script>${SCRIPT_ERROR_PROBE}</script>`)
 }
 
 function isSnapshot(value: unknown): value is PageSnapshot {
