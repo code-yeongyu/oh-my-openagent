@@ -18,8 +18,8 @@ import { createHandleListeners } from "../rpc-host/handle-listeners"
 import { isHarmlessRpcShutdownError, type RpcProtocolClient } from "./protocol-client"
 import { terminateRpcChild } from "./terminate"
 import { exitTurnOutcome, extractAssistantText, promptFailureOutcome } from "./turn-outcome"
-import { createTurnSettlement, sessionIsIdle, type TurnSettlementScheduler } from "./turn-settlement"
-import { createTurnWakeSources } from "./turn-wake-sources"
+import { sessionIsIdle, type TurnSettlementScheduler } from "./turn-settlement"
+import { createTurnTracking } from "./turn-tracking"
 import { createInputEffects } from "../input-effects"
 import { readStdioAdmissions } from "../input-admission-read"
 import { createInputDelivery } from "../input-delivery"
@@ -79,8 +79,7 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     for (const waiter of outcomeWaiters.splice(0)) waiter(settled)
   }
 
-  const wakeSources = createTurnWakeSources()
-  const settlement = createTurnSettlement({
+  const tracking = createTurnTracking({
     settle: settleTurn,
     abortedByUser: () => abortedByUser,
     baseline: () => turnBaseline,
@@ -91,10 +90,10 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
       return response.success === true && response.command === "get_state" ? (response.data as object) : undefined
     },
     settleConfirmMs: heartbeatIntervalMs,
-    wakeSourcesLive: () => wakeSources.hasLiveWakeSources(),
     disposed: () => tornDown,
     scheduleConfirmation: options.settlementScheduler,
   })
+  const settlement = tracking.settlement
 
   const resumedListeners = new Set<() => void>()
   const claims = createTurnClaim()
@@ -119,14 +118,9 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
         finalText = terminal.text ?? finalText
       }
     }
-    settlement.observe(event)
-    // Goal/monitor wake records ride the SAME stream as agent events here: the protocol client
-    // only diverts permission-shaped extension events, so a raw `extension_event` reaches this
-    // funnel. The tracker reads `name`; a record that names nothing it tracks is ignored.
-    if ((event as { readonly type?: string }).type === "extension_event") {
-      wakeSources.observe(event)
-      settlement.reconfirmHeld()
-    }
+    // The protocol client only diverts permission-shaped extension events, so raw wake records and
+    // `session_lifecycle` records reach this funnel with the agent events.
+    tracking.observe(event)
   })
   // Subscribers run after the handle has recorded the event (as on dev, and as the host handle does), so a
   // live observer reads current state and one that throws cannot keep the handle from settling a turn.
@@ -143,6 +137,7 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     onState: (response) => {
       lastSeenAt = now()
       sessionId = readSessionId(response) ?? sessionId
+      if (response.command === "get_state" && response.success) tracking.observeState(response.data)
     },
     onFailure: (error) => {
       if (!isHarmlessRpcShutdownError(error)) log("senpi-task heartbeat get_state failed", { taskId, error: String(error) })
@@ -199,7 +194,7 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     terminalAssistantMessage = undefined
     abortedByUser = false
     turnBaseline = finalText
-    wakeSources.resetTurn()
+    tracking.resetTurn()
   }
 
   const delivery = createInputDelivery({

@@ -2,8 +2,8 @@ import { log } from "@oh-my-opencode/utils"
 
 import type { RunnerOutcome } from "../in-process/child-handle"
 import { exitTurnOutcome, promptFailureOutcome } from "../rpc/turn-outcome"
-import { createTurnSettlement, sessionIsIdle } from "../rpc/turn-settlement"
-import { createTurnWakeSources } from "../rpc/turn-wake-sources"
+import { sessionIsIdle } from "../rpc/turn-settlement"
+import { createTurnTracking } from "../rpc/turn-tracking"
 import type { ChildEventListener, ChildExitOutcome, RpcTerminalAssistantMessage } from "../types"
 import { classifySessionExit, isParkingReason, type SessionCloseIntent, type SessionExitCause } from "./exit-mapping"
 import { bindHostSessionPort } from "./handle-client-binding"
@@ -79,17 +79,17 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     waiters.settleTurn(settled)
   }
 
-  const wakeSources = createTurnWakeSources()
-  const settlement = createTurnSettlement({
+  const tracking = createTurnTracking({
     settle: settleTurn,
     abortedByUser: () => abortedByUser,
     baseline: () => turnBaseline,
     finalText: () => finalText,
     probe: () => client.getState(),
     settleConfirmMs: heartbeatIntervalMs,
-    wakeSourcesLive: () => wakeSources.hasLiveWakeSources(),
     disposed: () => tornDown,
+    scheduleConfirmation: options.settlementScheduler,
   })
+  const settlement = tracking.settlement
   let continuationState: "none" | "pending_delivery" | "awaiting_start" = "none"
   const reconciliation = createHandleReconciliation({
     lastInputId: () => options.inputStore?.load(taskId)?.last_effect_id,
@@ -116,13 +116,9 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
         finalText = terminal.text ?? finalText
       }
     }
-    settlement.observe(event)
-    // The host's loose boundary parse fans every tagged record - raw `extension_event` records
-    // included - into this same funnel (see `session-wire.ts` isAgentSessionEvent).
-    if ((event as { readonly type?: string }).type === "extension_event") {
-      wakeSources.observe(event)
-      settlement.reconfirmHeld()
-    }
+    // The host's loose boundary parse fans every tagged record - raw `extension_event` and
+    // `session_lifecycle` records included - into this same funnel (session-wire.ts isAgentSessionEvent).
+    tracking.observe(event)
   }
 
   const unresponsiveClose = createUnresponsiveClose({
@@ -144,6 +140,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     onState: (state) => {
       lastSeenAt = now()
       identity.observeDurableId(state.sessionId)
+      tracking.observeState(state)
     },
     onStatus: (status) => { closingUnresponsive = status.state === "terminal-pending" },
     close: unresponsiveClose.close,
@@ -281,7 +278,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     terminalAssistantMessage = undefined
     abortedByUser = false
     turnBaseline = finalText
-    wakeSources.resetTurn()
+    tracking.resetTurn()
   }
 
   const delivery = createInputDelivery({
