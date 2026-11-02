@@ -1,24 +1,31 @@
 //! Member-exit wakes for RUNNING and LINGERING (design v4.2 section 7.2): each F member's process handle gets a
 //! one-shot wait whose callback posts a packet to H's port, so the loop re-reads F's count when a member's process
-//! object signals. A member's `EXIT_PROCESS` message arrives before F's count drops; its handle signals after.
+//! object signals. A member's `EXIT_PROCESS` message arrives before F's count drops, and its handle can signal just
+//! before the drop too; nothing is posted after it (kernel exit ordering row).
 use std::ffi::c_void;
 use std::ptr::null;
+use std::time::{Duration, Instant};
 
-use windows_sys::Win32::Foundation::{HANDLE, INVALID_HANDLE_VALUE};
+use windows_sys::Win32::Foundation::{HANDLE, INVALID_HANDLE_VALUE, WAIT_OBJECT_0};
 use windows_sys::Win32::System::Threading::{
-    OpenProcess, RegisterWaitForSingleObject, UnregisterWaitEx, INFINITE, PROCESS_SYNCHRONIZE,
-    WT_EXECUTEONLYONCE,
+    OpenProcess, RegisterWaitForSingleObject, UnregisterWaitEx, WaitForSingleObject, INFINITE,
+    PROCESS_SYNCHRONIZE, WT_EXECUTEONLYONCE,
 };
 use windows_sys::Win32::System::IO::PostQueuedCompletionStatus;
 
+use crate::job::JoinedJob;
 use crate::win::Owned;
 
-/// Distinct from run.rs's job (1) and pipe (2) keys; `running` treats this packet as a plain wake.
-const MEMBER_KEY: usize = 3;
+/// Distinct from run.rs's job (1) and pipe (2) keys.
+pub const MEMBER_KEY: usize = 3;
+/// How long a member-exit wake re-reads F's count when every watched member has exited but the count has not dropped
+/// yet. The drop follows within microseconds (kernel exit ordering row) and posts nothing; past this bound the loop
+/// falls back to `RECHECK_MS`.
+const SETTLE: Duration = Duration::from_millis(20);
 
 struct Watch {
     wait: HANDLE,
-    _process: Owned,
+    process: Owned,
 }
 
 /// The registered waits; dropping it unregisters each one and waits for a running callback, so no callback can post
@@ -61,11 +68,27 @@ impl MemberWaits {
             )
         } != 0;
         if registered {
-            self.watches.push(Watch {
-                wait,
-                _process: process,
-            });
+            self.watches.push(Watch { wait, process });
         }
+    }
+
+    /// After a member-exit wake that leaves no watched member alive, re-reads F's count until it reaches 1 or
+    /// `SETTLE` passes. With a member still alive the count stays above 1 and nothing is re-read.
+    pub fn settle(&self, floor: &JoinedJob) {
+        if !self.all_exited() {
+            return;
+        }
+        let deadline = Instant::now() + SETTLE;
+        while floor.active() != Ok(1) && Instant::now() < deadline {
+            std::thread::yield_now();
+        }
+    }
+
+    fn all_exited(&self) -> bool {
+        self.watches.iter().all(|watch| {
+            // SAFETY: a zero-timeout wait on a live process handle.
+            unsafe { WaitForSingleObject(watch.process.raw(), 0) == WAIT_OBJECT_0 }
+        })
     }
 }
 

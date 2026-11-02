@@ -15,7 +15,7 @@ use crate::cli::{Exit, OpId, LINGER_KILL_CODE};
 use crate::control::{self, Control};
 use crate::frames::{ExecRequest, Frame, FrameReader};
 use crate::job::{self, JobError, JoinedJob};
-use crate::members::MemberWaits;
+use crate::members::{MemberWaits, MEMBER_KEY};
 use crate::security;
 use crate::spawn::{self, Root};
 use crate::win::{creation_time, last_error, Owned};
@@ -36,6 +36,7 @@ enum Event {
         message: u32,
         pid: usize,
     },
+    MemberExited,
     Other,
     PortFailed,
 }
@@ -55,6 +56,8 @@ fn next_event(port: HANDLE, control: &Control, timeout: u32) -> Event {
     }
     if key == PIPE_KEY && control.is_read(overlapped) {
         Event::Pipe { ok, transferred }
+    } else if key == MEMBER_KEY {
+        Event::MemberExited
     } else if key == JOB_KEY {
         Event::Job {
             message: transferred,
@@ -86,7 +89,7 @@ fn await_go(control: &mut Control, port: HANDLE, reader: &mut FrameReader) -> En
             } if transferred > 0 => reader.push(control.received(transferred)),
             Event::Pipe { .. } => return Ended::Eof,
             Event::PortFailed => return Ended::PortFailed,
-            Event::Job { .. } | Event::Other => continue,
+            Event::Job { .. } | Event::MemberExited | Event::Other => continue,
         }
         while let Some(frame) = reader.next_frame() {
             match frame {
@@ -225,6 +228,7 @@ fn running(
                     members.watch(pid);
                 }
             }
+            Event::MemberExited => members.settle(floor),
             Event::Pipe { .. } | Event::Job { .. } | Event::Other => {}
             Event::PortFailed => {
                 // Ends the operation and this process with the PortFailed code. Should the call fail, the return
