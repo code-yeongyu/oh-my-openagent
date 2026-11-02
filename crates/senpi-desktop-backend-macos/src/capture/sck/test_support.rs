@@ -3,9 +3,31 @@
 use std::cell::RefCell;
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
+use std::sync::mpsc::Receiver;
+use std::time::{Duration, Instant};
 
 thread_local! {
     static PROGRAM: RefCell<Option<PathBuf>> = const { RefCell::new(None) };
+    static CAPTURE_EXPIRY: RefCell<Option<Receiver<()>>> = const { RefCell::new(None) };
+}
+
+/// Install before capture starts; the real deadline comparison still decides
+/// the timeout, but no host scheduling delay can expire it before the event.
+pub(crate) fn expire_capture_on(event: Receiver<()>) {
+    CAPTURE_EXPIRY.with_borrow_mut(|slot| {
+        assert!(slot.is_none(), "capture expiry gates must not overlap");
+        *slot = Some(event);
+    });
+}
+
+pub(super) fn capture_deadline(deadline: Instant) -> Instant {
+    CAPTURE_EXPIRY.with_borrow_mut(|slot| match slot.take() {
+        Some(event) => {
+            event.recv_timeout(Duration::from_secs(40)).expect("test permits capture expiry");
+            Instant::now()
+        },
+        None => deadline,
+    })
 }
 
 pub(super) fn program() -> Option<PathBuf> {

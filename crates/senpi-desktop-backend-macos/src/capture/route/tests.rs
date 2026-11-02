@@ -296,21 +296,8 @@ fn a_stalled_helper_start_does_not_hold_the_capture_lock() {
     session.join().unwrap();
 }
 
-#[test]
-fn a_stalled_capture_under_the_lock_lets_a_concurrent_capture_through() {
-    // Given: a warm helper that receives the capture request and then stalls
-    let dir = tempfile::tempdir().unwrap();
-    let lock = dir.path().join("capture.lock");
-    let (fifo, signalled) = started_signal(&dir);
-    let helper = signalling_helper(&dir, &fifo, "ready()\nsys.stdin.readline()\nsignal()\ntime.sleep(30)");
-    let session = capture_on_session_thread(helper, lock.clone(), Duration::from_secs(30));
-    signalled.recv_timeout(Duration::from_secs(40)).expect("capture request reached the helper");
-    // When: another session captures while the stalled capture holds the lock
-    let other = concurrent_capture(&lock);
-    // Then: the in-lock budget ends the stall inside the other session's wait
-    assert!(other.is_ok(), "{other:?}");
-    session.join().unwrap();
-}
+#[path = "capture_budget_tests.rs"]
+mod capture_budget_tests;
 
 fn fake_timed_out(_requests: &[SckTargetRequest]) -> Result<Vec<SckFrame>, SckCaptureError> {
     Err(SckCaptureError::TimedOut(DesktopError::timeout("budget exceeded")))
