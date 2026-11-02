@@ -171,7 +171,8 @@ describe("goldenHostLeaks", () => {
 	const notice =
 		"OmO Native sends anonymous usage telemetry (no prompts, code, file paths, or account data) to PostHog in the United States to improve the product.";
 
-	test("#given observations with the telemetry notice and terminal restore events #when scanned #then each leak is named with its path", () => {
+	test("#given observations with the telemetry notice, terminal restore events and a computer launch-context refusal #when scanned #then each leak is named with its path", () => {
+		const refusal = "COMPUTER_LAUNCH_CONTEXT_REQUIRED: Computer use cannot start safely from this host's current macOS launch context.";
 		const observations = {
 			O6: [
 				{
@@ -179,6 +180,11 @@ describe("goldenHostLeaks", () => {
 						{ type: "extension_event", name: "terminal_monitor_state" },
 						{ type: "extension_ui_request", method: "notify", message: notice },
 						{ type: "extension_event", name: "wake_source_state" },
+						{
+							type: "tool_execution_end",
+							error: refusal,
+							result: { details: { value: { code: "COMPUTER_LAUNCH_CONTEXT_REQUIRED" } } },
+						},
 					],
 				},
 			],
@@ -188,11 +194,24 @@ describe("goldenHostLeaks", () => {
 			{ path: "$.O6[0].turn[0].name", reason: "terminal_monitor_state event" },
 			{ path: "$.O6[0].turn[1].message", reason: "telemetry notice" },
 			{ path: "$.O6[0].turn[2].name", reason: "wake_source_state event" },
+			{ path: "$.O6[0].turn[3].error", reason: "computer launch-context refusal" },
+			{ path: "$.O6[0].turn[3].result.details.value.code", reason: "computer launch-context refusal" },
 		]);
 	});
 
 	test("#given observations that only mention the markers inside other text #when scanned #then nothing is reported", () => {
-		const observations = { O1: [{ body: { messages: [{ content: "the terminal_monitor_state event is internal" }] } }] };
+		const observations = {
+			O1: [
+				{
+					body: {
+						messages: [
+							{ content: "the terminal_monitor_state event is internal" },
+							{ content: "a refusal carries the code COMPUTER_LAUNCH_CONTEXT_REQUIRED" },
+						],
+					},
+				},
+			],
+		};
 
 		expect(goldenHostLeaks(observations)).toEqual([]);
 	});

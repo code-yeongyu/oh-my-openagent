@@ -54,10 +54,19 @@ export function statusCounts(observations) {
 /**
  * Rows the recording host leaked into an observation (#12015, #12054): the OmO Native telemetry consent notice, which the
  * driver's telemetry opt-out keeps out of every case, and the terminal extension's monitor/wake restore events, which
- * only appear when host terminal state reaches the sandbox. A golden carrying either describes the recording machine,
- * not the engine, so the recorder refuses to write it and the committed goldens are checked for it.
+ * only appear when host terminal state reaches the sandbox. Also the desktop engine's macOS launch-context refusal
+ * (#12171): the engine refuses to start when the recorder runs as its own responsible process (a launchd job, a detached
+ * shell), so E21's computer call fails on that host instead of driving the fake desktop. A golden carrying any of these
+ * describes the recording machine, not the engine, so the recorder refuses to write it and the committed goldens are
+ * checked for it.
  */
+const LAUNCH_CONTEXT_REFUSAL = "COMPUTER_LAUNCH_CONTEXT_REQUIRED";
 const HOST_LEAK_MARKERS = [
+	{
+		reason: "computer launch-context refusal",
+		test: (value) =>
+			typeof value === "string" && (value === LAUNCH_CONTEXT_REFUSAL || value.startsWith(`${LAUNCH_CONTEXT_REFUSAL}: `)),
+	},
 	{ reason: "telemetry notice", test: (value) => typeof value === "string" && value.includes("OmO Native sends anonymous usage telemetry") },
 	{ reason: "terminal_monitor_state event", test: (value) => value === "terminal_monitor_state" },
 	{ reason: "wake_source_state event", test: (value) => value === "wake_source_state" },
