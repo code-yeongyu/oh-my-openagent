@@ -42,14 +42,20 @@ export type {
 import type { ExecutionResult, ReflectionRunResult, ReflectionRunner, SenpiSubprocessRunnerOptions } from "./runner-types"
 
 // missing_providers rides the failure detail so the health fingerprint and the remediation hint
-// can name what to connect; the fingerprint truncates at 60 chars, keeping it stable.
+// can name what to connect; the fingerprint truncates at 60 chars, keeping it stable. The roster
+// names every designated model tried and why, since no other model runs in its place (#12081).
 function categoryUnavailableDetail(
   category: string,
   resolution: Extract<ReflectionModelResolution, { readonly kind: "category_unavailable" }>,
 ): string {
   const base = `Reflection category "${category}" could not resolve a usable model (cause: ${resolution.cause})`
   const providers = resolution.missingProviders?.join(", ")
-  return providers === undefined || providers.length === 0 ? base : `${base}; missing providers: ${providers}`
+  const attempts = resolution.attempts?.map((attempt) => `${attempt.model}(${attempt.why})`).join(",")
+  return [
+    base,
+    providers === undefined || providers.length === 0 ? undefined : `missing providers: ${providers}`,
+    attempts === undefined || attempts.length === 0 ? undefined : `attempted:${attempts}`,
+  ].filter((part): part is string => part !== undefined).join("; ")
 }
 
 export class SenpiSubprocessRunner implements ReflectionRunner {
@@ -72,10 +78,7 @@ export class SenpiSubprocessRunner implements ReflectionRunner {
     const reflection = resolveAgentReflectionSettings(loaded.config.memory, this.options.identity.id)
     const category = reflection.category
     const registry = this.options.resolveModelRegistry()
-    const sessionModel = this.options.resolveSessionModel?.()
-    const resolution = resolveReflectionModel(category, loaded.config, registry, {
-      ...(sessionModel === undefined ? {} : { sessionModel }),
-    })
+    const resolution = resolveReflectionModel(category, loaded.config, registry)
 
     if (resolution.kind === "category_unavailable") {
       this.notifyCategoryUnavailable(loaded.config, resolution)
@@ -86,7 +89,7 @@ export class SenpiSubprocessRunner implements ReflectionRunner {
       }, startedAt, resolution, true)
     }
 
-    const route = this.chooseLaunchRoute(run, resolution, registry, sessionModel)
+    const route = this.chooseLaunchRoute(run, resolution, registry, this.options.resolveSessionModel?.())
 
     const execution = await executeReflectionRun({
       run,
@@ -103,9 +106,10 @@ export class SenpiSubprocessRunner implements ReflectionRunner {
     return this.settle(run, execution, startedAt, resolution, false)
   }
 
-  // Fork-vs-quick is orthogonal to category resolution: even a user with a working quick chain
-  // should fork when the session model's cache reads are cheap and the job is short. The resolved
-  // quick candidate is compared against fork+inherit on measured per-turn cost; facts never forks.
+  // Fork-vs-quick is orthogonal to category resolution and never changes the model: both routes run
+  // the resolved designated model (#12081). Forking onto the parent's context can still be cheaper
+  // for a short job, and the parent's cache only counts when the parent ran that same model; facts
+  // never forks.
   private chooseLaunchRoute(
     run: ReservedRun,
     resolution: Extract<ReflectionModelResolution, { readonly kind: "resolved" }>,

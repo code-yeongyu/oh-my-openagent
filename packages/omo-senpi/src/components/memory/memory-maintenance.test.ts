@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { execFileSync } from "node:child_process"
 import { existsSync, realpathSync } from "node:fs"
-import { mkdir, mkdtemp, utimes, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -112,6 +112,41 @@ describe("createMemoryMaintenance", () => {
     // then
     expect(looseObjects(repo.dir)).toBe(looseAfterNewCommits)
     expect(log.info).toEqual([])
+  }, 60_000)
+
+  // #9962: a reflection/dream run fails completion validation when the repo's shared .git/config changes
+  // under it, so the maintenance stamp must not live there.
+  test("#given a maintenance pass comes due #when it runs #then the memory repo's shared git config is byte-identical and the pass still packs (#9962)", async () => {
+    // given
+    const { context, repo } = await identityWithHistory(20)
+    const configBefore = await readFile(join(repo.dir, ".git", "config"), "utf8")
+    const looseBefore = looseObjects(repo.dir)
+    const maintenance = createMemoryMaintenance({ delayMs: 0, minLooseObjects: 10 })
+
+    // when
+    maintenance.schedule(context)
+    await maintenance.settled()
+
+    // then
+    expect(await readFile(join(repo.dir, ".git", "config"), "utf8")).toBe(configBefore)
+    expect(looseObjects(repo.dir)).toBeLessThan(looseBefore)
+  }, 60_000)
+
+  test("#given a recent stamp left in the repo config by an older build #when maintenance comes due #then it honours that interval and leaves the config alone (#9962)", async () => {
+    // given
+    const { context, repo } = await identityWithHistory(20)
+    execFileSync("git", ["config", "omo.maintenanceAt", String(Date.now())], { cwd: repo.dir })
+    const configBefore = await readFile(join(repo.dir, ".git", "config"), "utf8")
+    const looseBefore = looseObjects(repo.dir)
+    const maintenance = createMemoryMaintenance({ delayMs: 0, minLooseObjects: 10 })
+
+    // when
+    maintenance.schedule(context)
+    await maintenance.settled()
+
+    // then
+    expect(looseObjects(repo.dir)).toBe(looseBefore)
+    expect(await readFile(join(repo.dir, ".git", "config"), "utf8")).toBe(configBefore)
   }, 60_000)
 
   test("#given an identity whose repo does not exist yet #when maintenance is scheduled #then it does nothing and logs no failure", async () => {

@@ -1228,8 +1228,6 @@
       "packages/omo-senpi/src/components/memory/worker/entry-renderers.ts": ["FIELD_SEPARATOR", "fit", "runLabel", "joinRendererTokens"],
       // pre-existing at origin dev 4686e425b5: unused export(s) MODEL_UNREACHABLE_MARKER
       "packages/omo-senpi/src/components/memory/worker/memory-model-attempts.ts": ["MODEL_UNREACHABLE_MARKER"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) estimateFreshCost, estimateInheritCost
-      "packages/omo-senpi/src/components/memory/worker/model-cost.ts": ["estimateFreshCost", "estimateInheritCost"],
       // pre-existing at origin dev 4686e425b5: unused export(s) renderReflectionParkedEntry
       "packages/omo-senpi/src/components/memory/worker/park-alert.ts": ["renderReflectionParkedEntry"],
       // pre-existing at origin dev 4686e425b5: unused export(s) probeUntil

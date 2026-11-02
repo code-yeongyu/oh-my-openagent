@@ -143,6 +143,8 @@ function publicMessage(
       return "The child could not be resumed."
     case "model_chain_exhausted":
       return "Every designated model for this task was refused, and a child never runs on any other model."
+    case "async_work_pending":
+      return "The child ended its turn while its own async work was still pending."
     default:
       return assertNever(kind)
   }

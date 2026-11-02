@@ -159,8 +159,16 @@ export function resolveSenpiExecutable(runtime: RpcSpawnRuntime): string | null 
   return scanPathForExecutable(binaryName, runtime.parentEnv.PATH, acceptParity)
 }
 
+const SCRIPT_EXTENSIONS = [".js", ".mjs", ".cjs"]
+
 function normalizeSenpiLauncher(executable: string, runtime: RpcSpawnRuntime): SenpiLauncher | null {
-  if (runtime.platform !== "win32" || executable.toLowerCase().endsWith(".exe")) {
+  const lower = executable.toLowerCase()
+  // #9963: a package install's bin canonicalizes to the `#!/usr/bin/env node` script, which fails with
+  // exit 127 when the parent runs on Bun without `node` on PATH. Run it on the parent's own runtime.
+  if (SCRIPT_EXTENSIONS.some((extension) => lower.endsWith(extension))) {
+    return { command: runtime.execPath, prefixArgs: [executable] }
+  }
+  if (runtime.platform !== "win32" || lower.endsWith(".exe")) {
     return { command: executable, prefixArgs: [] }
   }
   const shimDir = dirname(executable)

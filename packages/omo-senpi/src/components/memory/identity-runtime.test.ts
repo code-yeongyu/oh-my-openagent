@@ -464,9 +464,8 @@ describe("memory identity runtime binds every launch to its own run (#10339)", (
     const runtime = createIdentityRuntime(identity, {
       loadConfig: () => loadedMemoryConfig(memorySettings()),
       cwd: () => root,
-      resolveModelRegistry: () => undefined,
-      // The runner resolves the session model at the start of every launch: record the scope it runs in.
-      resolveSessionModel: () => {
+      // The runner resolves the model registry at the start of every launch: record the scope it runs in.
+      resolveModelRegistry: () => {
         seen.push(currentLaunchScope())
         return undefined
       },
