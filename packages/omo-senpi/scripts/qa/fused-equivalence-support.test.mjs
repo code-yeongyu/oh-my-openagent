@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { createHash } from "node:crypto";
 import {
 	existsSync,
 	lstatSync,
@@ -22,6 +23,18 @@ import {
 	statusCounts,
 	stopSandboxProcesses,
 } from "./fused-equivalence-support.mjs";
+
+/** The senpi engine the EQ.omo driver runs: the package Node's lookup finds walking up from omo-senpi (resolveEngine). */
+function installedSenpiEngine(qaDir) {
+	for (let dir = join(qaDir, "..", ".."); ; dir = dirname(dir)) {
+		const manifest = join(dir, "node_modules", "@code-yeongyu", "senpi", "package.json");
+		if (existsSync(manifest)) {
+			const { name, version } = JSON.parse(readFileSync(manifest, "utf8"));
+			return `${name}@${version}`;
+		}
+		if (dir === dirname(dir)) throw new Error("@code-yeongyu/senpi is not installed: run bun install");
+	}
+}
 
 const status = (key, text) => ({ type: "extension_ui_request", method: "setStatus", statusKey: key, statusText: text });
 const turnEvent = (type) => ({ type });
@@ -230,5 +243,33 @@ describe("goldenHostLeaks", () => {
 		);
 
 		expect(leaks).toEqual([]);
+	});
+});
+
+// Cross-platform recorded-artifact contract (#12171): hosted CI compares only the linux-x64 goldens, so a driver change
+// or senpi pin bump re-recorded on one platform leaves another platform's goldens stale with nothing failing. Every
+// platform's baseline must name the driver and engine the cases run today; re-recording that platform clears it.
+describe("EQ.omo golden baselines", () => {
+	test("#given every platform's golden set #when its baseline is read #then it names the current driver hash and the pinned senpi engine", () => {
+		const qaDir = dirname(fileURLToPath(import.meta.url));
+		const root = join(qaDir, "fused-equivalence-golden");
+		const driver = `sha256:${createHash("sha256").update(readFileSync(join(qaDir, "fused-equivalence-e2e.mjs"))).digest("hex")}`;
+		const engine = `${installedSenpiEngine(qaDir)} (pinned)`;
+		const platforms = readdirSync(root);
+		expect(platforms.length).toBeGreaterThan(0);
+
+		const stale = platforms.flatMap((platform) => {
+			const path = join(root, platform, "baseline.json");
+			if (!existsSync(path)) return [`${platform}: no baseline.json`];
+			const baseline = JSON.parse(readFileSync(path, "utf8"));
+			return [
+				...(baseline.hashes?.driver === driver ? [] : [`${platform}: hashes.driver ${baseline.hashes?.driver}, current ${driver}`]),
+				...(baseline.runtimes?.child?.endsWith(` ${engine}`)
+					? []
+					: [`${platform}: runtimes.child ${baseline.runtimes?.child}, pinned ${engine}`]),
+			];
+		});
+
+		expect(stale).toEqual([]);
 	});
 });
