@@ -29,6 +29,9 @@ const MACHINERY = [
   /^(?:path|syscall|errno|code|dest|address|port|erroredSysCall)\s*:/i, // Bun error property rows
   /^Bun v\d/, // Bun's runtime footer
   /^\[truncated to last \d+ bytes\]$/, // our own readTail marker
+  // Bun on win32 prints this about its own host once per terminated worker thread, ahead of anything the
+  // child says, so as the first line it hid every real cause and collapsed distinct failures into one (#10333).
+  /^child reaper unavailable under \S+/,
 ] as const
 
 /** A line that names the failure: `ENOENT: ...`, `TypeError: ...`, `error: ...`. */
