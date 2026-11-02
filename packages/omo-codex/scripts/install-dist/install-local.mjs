@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:abf881c6fac36716d9aac5c0e9c760022a5f9d75232ffc9b127fab608c1d3a1b:88ac34f2585ea77f643db4b9c64efc9c969af98c466174acccf89a26f2ee08e8
+// omo-codex-install:fa35e8ab40c8f7085d400adec57b7aef71514fe63bac75abb085a7547850e2f3:d50e2a8cbb33cdf626e88311d3b52748bd4957b43c4db16fb224f53a731b0f27
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -19731,7 +19731,11 @@ var OmoCategoryConfigObjectSchema = object({
   disable: boolean2().optional(),
   warn_unavailable: boolean2().optional()
 }).strict();
-var OmoCategoryConfigSchema = preprocess((value) => isRecord4(value) ? normalizeLegacyModelFields(value) : value, OmoCategoryConfigObjectSchema);
+function withoutRetiredCategoryKeys(entry) {
+  const { provider_lock: _retired, ...rest } = entry;
+  return rest;
+}
+var OmoCategoryConfigSchema = preprocess((value) => isRecord4(value) ? withoutRetiredCategoryKeys(normalizeLegacyModelFields(value)) : value, OmoCategoryConfigObjectSchema);
 var OmoCategoriesConfigSchema = record(string2(), OmoCategoryConfigSchema);
 
 // packages/omo-config-core/src/schema/computer.ts
