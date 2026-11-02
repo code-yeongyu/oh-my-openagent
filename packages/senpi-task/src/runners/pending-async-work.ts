@@ -74,7 +74,7 @@ export function pendingWorkSignature(work: PendingAsyncWork): string {
   return JSON.stringify([work.children, work.sources.map((source) => [source.source, source.activeCount, source.labels])])
 }
 
-export function describePendingAsyncWork(work: PendingAsyncWork): string {
+function describePendingAsyncWork(work: PendingAsyncWork): string {
   const parts = work.sources.map((source) => {
     const labels = source.labels.length === 0 ? "" : ` [${source.labels.slice(0, 3).join(", ")}${source.labels.length > 3 ? ", ..." : ""}]`
     return `${source.source}: ${source.activeCount}${labels}`
@@ -83,13 +83,11 @@ export function describePendingAsyncWork(work: PendingAsyncWork): string {
   return parts.join("; ")
 }
 
-export const ASYNC_WORK_PENDING_KIND = "async_work_pending"
-
 export function asyncWorkPendingOutcome(work: PendingAsyncWork, why: string): RunnerOutcome {
   return {
     status: "error",
     failure: {
-      kind: ASYNC_WORK_PENDING_KIND,
+      kind: "async_work_pending",
       message: `The child ended its turn while its own async work was still pending (${describePendingAsyncWork(work)}); ${why}. Its last reply was a progress note, not its result.`,
     },
   }

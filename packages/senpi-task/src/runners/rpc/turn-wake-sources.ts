@@ -31,7 +31,7 @@ export type TurnWakeSources = {
   readonly resetTurn: () => void
 }
 
-import { waitItemLabels, type PendingAsyncWork, type PendingAsyncWorkSource } from "../pending-async-work"
+import { isPendingWorkSource, waitItemLabels, type PendingAsyncWork, type PendingAsyncWorkSource } from "../pending-async-work"
 
 type WakeSourceRecord = { readonly name?: unknown; readonly data?: unknown }
 
@@ -62,7 +62,7 @@ function wakeSourceSnapshot(data: unknown): PendingAsyncWorkSource | undefined {
   if (typeof data !== "object" || data === null) return undefined
   const source = (data as { readonly source?: unknown }).source
   const count = (data as { readonly activeCount?: unknown }).activeCount
-  if (typeof source !== "string" || source.length === 0) return undefined
+  if (typeof source !== "string" || source.length === 0 || !isPendingWorkSource(source)) return undefined
   if (typeof count !== "number" || !Number.isInteger(count) || count < 0) return undefined
   return { source, activeCount: count, labels: waitItemLabels((data as { readonly items?: unknown }).items) }
 }

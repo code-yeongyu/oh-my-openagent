@@ -4,7 +4,7 @@ import { asyncWorkPendingOutcome, pendingWorkSignature, type PendingAsyncWork } 
 export type AsyncWorkTimerHandle = { readonly cancel: () => void }
 export type AsyncWorkScheduler = (run: () => void, delayMs: number) => AsyncWorkTimerHandle
 
-export const DEFAULT_ASYNC_WORK_STALE_LIMIT_MS = 60 * 60_000
+const DEFAULT_ASYNC_WORK_STALE_LIMIT_MS = 60 * 60_000
 
 type CompletedOutcome = Extract<RunnerOutcome, { readonly status: "completed" }>
 
