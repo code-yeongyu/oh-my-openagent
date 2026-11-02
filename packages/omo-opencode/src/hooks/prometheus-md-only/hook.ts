@@ -6,6 +6,10 @@ import { getAgentFromSession } from "./agent-resolution"
 import { isPrometheusAgent } from "./agent-matcher"
 import { resolveAllowedFile } from "./path-policy"
 import { parsePatch } from "./vendor/opencode-patch-parser"
+import { guardPrometheusDelegation } from "./delegation-guard"
+
+// omo#10008: off until the owner picks the delegation policy; flipping it ships option B.
+export const PROMETHEUS_DELEGATION_GUARD_ENABLED = false
 
 const TASK_TOOLS = ["task", "call_omo_agent"]
 
@@ -101,6 +105,10 @@ export function createPrometheusMdOnlyHook(ctx: PluginInput) {
       // Inject planning-only warning for task tools called by Prometheus
        if (TASK_TOOLS.includes(toolName)) {
          const prompt = output.args.prompt as string | undefined
+         if (PROMETHEUS_DELEGATION_GUARD_ENABLED && prompt !== undefined) {
+           replaceToolArgs(output, { prompt: guardPrometheusDelegation(output.args, prompt) })
+           return
+         }
          if (prompt && !prompt.includes(PLANNING_CONTEXT_OPEN)) {
            replaceToolArgs(output, { prompt: PLANNING_CONSULT_WARNING + prompt })
           log(`[${HOOK_NAME}] Injected planning warning to ${toolName}`, {
