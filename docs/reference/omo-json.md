@@ -227,6 +227,12 @@ To leave the co-author trailer out:
 }
 ```
 
+Attribution can also be turned off, or the built-in footer turned on, without editing this file:
+- Git config: `git config omo.attribution false` (or `sisyphus.attribution`); `true` turns the footer on
+- Environment: `NO_AI_ATTRIBUTION=1`, `OMO_NO_COMMIT_ATTRIBUTION=1` or `OMO_GIT_ATTRIBUTION=0` turn it off; `OMO_GIT_ATTRIBUTION=1` turns the footer on
+
+Turning it off drops both the footer and the co-author trailer. Turning it on enables the footer and leaves `include_co_authored_by` as configured.
+
 The block may live at the shared top level, in `[native]`, or in profile layers, and follows the normal resolution order. The OpenCode plugin keeps its own `git_master` key inside the freeform `[opencode]` block (see [configuration.md](./configuration.md)); this typed section applies to the Native harness.
 
 ### `side_panel` (Senpi harness)

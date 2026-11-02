@@ -51,7 +51,7 @@ function runInRepo(repo: string, command: string): void {
 describe("omo-senpi git-master attribution directive", () => {
   test("#given default settings #when the example commit command runs in a real repository #then the commit is the message plus exactly one sisyphus-dev-ai trailer under the git env prefix", () => {
     // given
-    const directive = buildGitMasterAttributionDirective(OmoGitMasterSettingsSchema.parse({}), "GIT_MASTER=1") ?? ""
+    const directive = buildGitMasterAttributionDirective(OmoGitMasterSettingsSchema.parse({}), { gitCommandPrefix: "GIT_MASTER=1" }) ?? ""
     const repo = scratchRepo()
     const command = exampleCommitCommand(directive)
 

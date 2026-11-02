@@ -6,12 +6,14 @@ import { OmoGitMasterSettingsSchema, type OmoGitMasterSettings } from "@oh-my-op
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import type { ComponentContext, ComponentLogger } from "../../extension/types"
 import { createGitMasterAttributionComponent } from "./index"
+import { buildGitMasterAttributionDirective } from "./directive"
 
 const TRAILER = "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"
 
 function occurrences(text: string, needle: string): number {
   return text.split(needle).length - 1
 }
+
 
 function createTestContext(pi: FakeExtensionAPI): ComponentContext {
   const logger: ComponentLogger = {
@@ -297,4 +299,35 @@ describe("omo-senpi git-master attribution component", () => {
     if (transform === undefined) return
     expect(appendedTextOf(transform)).toContain("Ultraworked with")
   })
+
+  it("#given git config omo.attribution false #when building directive #then directive is undefined", () => {
+    const directive = buildGitMasterAttributionDirective(defaultSettings(), {
+      env: {},
+      gitConfigReader: (key) => (key === "omo.attribution" ? "false" : undefined),
+    })
+    expect(directive).toBeUndefined()
+  })
+
+  it("#given NO_AI_ATTRIBUTION=1 #when building directive #then directive is undefined", () => {
+    const directive = buildGitMasterAttributionDirective(defaultSettings(), {
+      env: { NO_AI_ATTRIBUTION: "1" },
+      gitConfigReader: () => undefined,
+    })
+    expect(directive).toBeUndefined()
+  })
+
+  it("#given custom footer with NO_AI_ATTRIBUTION=1 #when building directive #then custom footer is kept and the co-author trailer is turned off", () => {
+    const directive = buildGitMasterAttributionDirective(
+      OmoGitMasterSettingsSchema.parse({ commit_footer: "Custom Co." }),
+      {
+        env: { NO_AI_ATTRIBUTION: "1" },
+        gitConfigReader: () => undefined,
+      },
+    )
+    expect(directive).toBeDefined()
+    expect(directive).toContain("Custom Co.")
+    expect(directive).toContain("Do NOT add a Co-authored-by trailer.")
+    expect(directive).not.toContain("sisyphus-dev-ai")
+  })
 })
+
