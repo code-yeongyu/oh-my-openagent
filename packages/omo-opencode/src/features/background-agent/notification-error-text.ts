@@ -1,4 +1,4 @@
-export const MAX_NOTIFICATION_ERROR_CHARS = 2_000
+const MAX_NOTIFICATION_ERROR_CHARS = 2_000
 
 export function formatNotificationError(error: string): string {
   if (error.length <= MAX_NOTIFICATION_ERROR_CHARS) return error
