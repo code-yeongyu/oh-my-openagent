@@ -63,7 +63,7 @@ export function createToolExecuteAfterHandler(args: {
       tool: input.tool,
       sessionID: input.sessionID,
       callID: input.callID ?? input.callId ?? input.call_id ?? "",
-      args: input.args ?? {},
+      ...(input.args === undefined ? {} : { args: input.args }),
     }
 
     const nativeSessionId = getMetadataString(output.metadata, ["sessionId", "sessionID", "session_id"])
