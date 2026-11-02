@@ -22,18 +22,24 @@ export const readProcessStartIdentity: ProcessStartReader = async (pid) => {
   return await getProcessStartIdentity(pid)
 }
 
-export function createOwnerProcessView(read: ProcessStartReader): OwnerProcessView {
-  // A failed read keeps the last identity seen: that process held the pid when it was read, so a
-  // conflict against it is still evidence, and the absence of a read is never evidence of death.
-  const starts = new Map<number, string>()
+// An observation is evidence only for the check it was taken for. Callers that check without observing
+// (TTL retention) must not be judged against an identity read long ago, so they keep the owner.
+const OBSERVATION_FRESH_MS = 5_000
+
+export function createOwnerProcessView(read: ProcessStartReader, now: () => number = () => performance.now()): OwnerProcessView {
+  // An identity has no order: an entry left from an earlier holder of the pid would contradict every
+  // later owner's stamp. So a failed read clears the entry, and an old one is not evidence.
+  const starts = new Map<number, { readonly start: string; readonly at: number }>()
   return {
     async observe(pid) {
       const start = await read(pid).catch(() => null)
-      if (start !== null) starts.set(pid, start)
+      if (start === null) starts.delete(pid)
+      else starts.set(pid, { start, at: now() })
     },
     startDiffers(pid, claimedStart) {
-      const actual = starts.get(pid)
-      return actual !== undefined && startIdentitiesConflict(claimedStart, actual)
+      const seen = starts.get(pid)
+      if (seen === undefined || now() - seen.at > OBSERVATION_FRESH_MS) return false
+      return startIdentitiesConflict(claimedStart, seen.start)
     },
   }
 }

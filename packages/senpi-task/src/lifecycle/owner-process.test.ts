@@ -57,6 +57,33 @@ describe("owner liveness from the claim stamp", () => {
     expect(await aliveWith("proc-start-epoch:5", claimed({ pid: OWNER, at: new Date().toISOString(), start: STAMPED }))).toBe(true)
   })
 
+  // #12078 review: an identity has no order, so a stale entry from an earlier holder of the pid would
+  // contradict every later owner's stamp. Only a fresh, successful read is evidence.
+  test("#given an earlier holder's identity was seen and the next read fails #when a live owner is checked #then it stays the owner", async () => {
+    let actual: string | null = "linux-proc-start-ticks:100"
+    const view = createOwnerProcessView(async () => actual)
+    await view.observe(OWNER)
+    actual = null
+    await view.observe(OWNER)
+    expect(recordOwnerAlive(() => true, view, claimed({ pid: OWNER, at: new Date().toISOString(), start: "linux-proc-start-ticks:900" }))).toBe(true)
+  })
+
+  test("#given an identity observed long before the check #when a caller checks without observing #then a live pid stays the owner", async () => {
+    let clock = 0
+    const view = createOwnerProcessView(async () => "linux-proc-start-ticks:100", () => clock)
+    await view.observe(OWNER)
+    clock = 60_000
+    expect(recordOwnerAlive(() => true, view, claimed({ pid: OWNER, at: new Date().toISOString(), start: "linux-proc-start-ticks:900" }))).toBe(true)
+  })
+
+  test("#given an identity observed just before the check #when it differs from the stamp #then the owner is dead", async () => {
+    let clock = 0
+    const view = createOwnerProcessView(async () => "linux-proc-start-ticks:100", () => clock)
+    await view.observe(OWNER)
+    clock = 50
+    expect(recordOwnerAlive(() => true, view, claimed({ pid: OWNER, at: new Date().toISOString(), start: "linux-proc-start-ticks:900" }))).toBe(false)
+  })
+
   test("#given the start cannot be read now #when checked #then a live pid stays the owner", async () => {
     expect(await aliveWith(null, claimed({ pid: OWNER, at: new Date().toISOString(), start: STAMPED }))).toBe(true)
   })

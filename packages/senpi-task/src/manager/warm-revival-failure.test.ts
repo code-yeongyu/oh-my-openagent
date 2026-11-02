@@ -50,6 +50,7 @@ describe("warm revival whose prompt the live child refuses", () => {
   const intruders = [
     { name: "a cancel", change: { status: "cancelled" as const }, expected: { status: "cancelled" } },
     { name: "a new owner", change: { host_pid: 777_001 }, expected: { status: "running", host_pid: 777_001 } },
+    { name: "a newer epoch on the same host", change: { notification: { run_epoch: 2 } }, expected: { status: "running" }, epoch: 2 },
   ]
   for (const intruder of intruders) {
     test(`#given ${intruder.name} lands while the refused revival prompt is in flight #when the refusal returns #then the finished run is not restored over it`, async () => {
@@ -64,7 +65,10 @@ describe("warm revival whose prompt the live child refuses", () => {
       fake.settle({ status: "completed", finalResponse: "first" })
       await first
       spyOn(fake.handle, "followUp").mockImplementationOnce(() => {
-        store.mutate(started.task_id, (fresh) => ({ ...fresh, ...intruder.change }))
+        store.mutate(started.task_id, (fresh) => {
+          const { notification, ...rest } = intruder.change as { notification?: { run_epoch: number } }
+          return { ...fresh, ...rest, ...(notification === undefined ? {} : { notification: { ...fresh.notification, ...notification } }) }
+        })
         return Promise.reject(new Error("Cannot submit a prompt while compaction is in progress."))
       })
 
@@ -73,7 +77,7 @@ describe("warm revival whose prompt the live child refuses", () => {
 
       // then
       expect(refused.kind).toBe("not_continuable")
-      expect(store.load(started.task_id)).toMatchObject({ ...intruder.expected, notification: { run_epoch: 1 } })
+      expect(store.load(started.task_id)).toMatchObject({ ...intruder.expected, notification: { run_epoch: intruder.epoch ?? 1 } })
     })
   }
 })
