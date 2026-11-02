@@ -27,4 +27,5 @@ windows-sys = { workspace = true, features = [
     "Win32_System_Pipes",
     "Win32_System_SystemServices",
     "Win32_System_Threading",
+    "Win32_System_WindowsProgramming",
 ] }

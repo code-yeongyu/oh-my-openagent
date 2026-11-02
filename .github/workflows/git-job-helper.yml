@@ -72,7 +72,7 @@ jobs:
         env:
           RUST_BACKTRACE: "1"
         run: |
-          cargo test -p omo-git-job-helper --locked \
+          cargo test -p omo-git-job-helper --locked --no-fail-fast \
             --test n1_control --test n2_kill_on_close --test n3_ordering --test n4_fresh_creation \
             --test n5_limits --test n6_handle_hygiene --test n7_classification --test n8_n9_tokens \
             --test n10_await_go --test run_mode -- --nocapture
