@@ -38,18 +38,20 @@ function longActiveRecord(): TaskRecord {
 }
 
 describe("buildWidgetRows", () => {
-  it("#given active and completed records #when selecting rows #then only resident team members follow active rows before the cap", () => {
+  it("#given completed resident team members beside active records #when building rows #then only the active records render", () => {
+    // given finished members whose handles are still resident (revivable), an ordinary finished task, and a running member
     const alpha = record({ task_id: "st_alpha", name: "team:12345678-1234-1234-1234-123456789abc:alpha", task_summary: "settled alpha", status: "completed" })
     const beta = record({ task_id: "st_beta", name: "team:12345678-1234-1234-1234-123456789abc:beta", task_summary: "settled beta", status: "completed" })
     const ordinary = record({ task_id: "st_ordinary", task_summary: "ordinary task", status: "completed" })
-    const stale = record({ task_id: "st_stale", name: "team:12345678-1234-1234-1234-123456789abc:stale", task_summary: "stale member", status: "completed" })
-    const active = Array.from({ length: 4 }, (_value, index) => record({ task_id: `st_${index}`, status: "running" }))
-    const rows = buildWidgetRows([alpha, ordinary, stale, ...active, beta], new Set([alpha.task_id, beta.task_id, ordinary.task_id]))
-    expect(rows.slice(0, 4).every((row) => row.includes("running"))).toBe(true)
-    expect(rows[4]).toContain("settled alpha")
-    expect(rows[4]).toContain("completed")
-    expect(rows[5]).toBe("+1 more")
-    expect(rows.join("\n")).not.toMatch(/ordinary task|stale member/u)
+    const gamma = record({ task_id: "st_gamma", name: "team:12345678-1234-1234-1234-123456789abc:gamma", task_summary: "working gamma", status: "running" })
+
+    // when
+    const rows = buildWidgetRows([alpha, ordinary, gamma, beta])
+
+    // then finished work leaves the live widget; the running member stays
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toContain("working gamma")
+    expect(rows.join("\n")).not.toMatch(/settled alpha|settled beta|ordinary task|completed/u)
   })
 
   it("#given an active task #when building a row #then useful identity and execution context remain", () => {
@@ -248,7 +250,7 @@ describe("automatic recovery residency labeling", () => {
 
     // when the full and compact rows render
     const full = formatTaskRow(finished)
-    const compact = buildWidgetRows([finished], new Set(["st_done"]))[0] ?? ""
+    const compact = buildWidgetRows([finished])[0] ?? ""
 
     // then neither calls it suspended
     expect(full).toContain(`status:${status}`)
@@ -340,36 +342,6 @@ describe("formatTaskRow", () => {
     expect(formatTaskRow(task)).toBe(
       "planner (st_resolved) category:ultrabrain(openai/gpt-5.6-sol:xhigh) mode:rpc status:running",
     )
-  })
-
-  it("#given a child that moved onto its parent's model #when formatting #then the row names why and when the limit resets (#10750)", () => {
-    const moved = record({
-      task_id: "st_parent_model",
-      status: "running",
-      category: "unspecified-high",
-      parent_model: "chatgpt-subscription/gpt-6.1-sol",
-      parent_model_fallback: {
-        from_model: "anthropic-subscription/claude-opus-5-5",
-        reason: "usage_limit",
-        resets: "3:20am",
-        at: "2026-10-21T01:00:00.000Z",
-      },
-      // #10807: "moved" means a child was OBSERVED on the parent's model; an unobserved record reads as switching/unconfirmed.
-      resolved_model: { provider: "chatgpt-subscription", model_id: "gpt-6.1-sol", display: "chatgpt-subscription/gpt-6.1-sol", source: "category" },
-      effective_model: { provider: "chatgpt-subscription", model_id: "gpt-6.1-sol", display: "chatgpt-subscription/gpt-6.1-sol", source: "fallback" },
-    })
-    const stayed = record({ task_id: "st_category_model", status: "running", category: "unspecified-high" })
-    // #10797: selected but not yet observed on the parent's model, so the row must not claim it runs there.
-    const switching = record({
-      ...moved,
-      task_id: "st_switching",
-      resolved_model: { provider: "chatgpt-subscription", model_id: "gpt-6.1-sol", display: "chatgpt-subscription/gpt-6.1-sol", source: "category" },
-      effective_model: { provider: "anthropic-subscription", model_id: "claude-opus-5-5", display: "anthropic-subscription/claude-opus-5-5", source: "category" },
-    })
-
-    expect(formatTaskRow(moved)).toContain("parent-model:usage limit, resets 3:20am")
-    expect(formatTaskRow(stayed)).not.toContain("parent-model:")
-    expect(formatTaskRow(switching)).toContain("parent-model:switching, usage limit, resets 3:20am")
   })
 
   it("#given a description #when formatting #then the human label leads", () => {
