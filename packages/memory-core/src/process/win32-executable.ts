@@ -126,6 +126,6 @@ function windowsGitInstallCandidates(environment: NodeJS.ProcessEnv): string[] {
 
 /** git from PATH, then the Git for Windows install roots; undefined when neither has it. */
 export function resolveWin32Git(environment: NodeJS.ProcessEnv, isFile: IsFile = existingFile): string | undefined {
-  // #12146 open question 2: an absolute-path override, if approved, is consulted here before PATH.
+  // No override (#12146 Q2): an override would reopen the working-directory lookup this closes; adding one needs its own security review.
   return resolveWin32Executable("git", environment, isFile) ?? windowsGitInstallCandidates(environment).find((candidate) => isFile(candidate))
 }
