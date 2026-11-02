@@ -20,7 +20,9 @@ const config = JSON.parse(process.argv[2] ?? "{}") as WriterConfig
 const lines = createInterface({ input: process.stdin })
 const nextLine = (): Promise<string> => new Promise((resolve) => lines.once("line", resolve))
 
-const record = await createLockRecord("memory-write")
+// The same helper at both seams, as production resolves one helper for both: the record's claim runs and caches the
+// `selftest` here, before `ready`, so the first git run spawns only the run helper (design v4.2 sections 3, 6.3).
+const record = await createLockRecord("memory-write", { jobHelper: config.helper })
 const writerLock = memoryWriterLockPath(config.locks)
 if (config.holdWriterLock) {
   await acquireLock(writerLock, record, { waitTimeoutMs: 5_000 })
