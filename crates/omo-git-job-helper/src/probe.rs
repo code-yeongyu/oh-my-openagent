@@ -77,9 +77,7 @@ fn job(op: &OpId) -> Job {
         };
     };
     let floor = crate::job::FloorJob::from_query_handle(handle);
-    floor
-        .active()
-        .map_or_else(|| Job::Unknown(last_error()), Job::Active)
+    floor.active().map_or_else(Job::Unknown, Job::Active)
 }
 
 /// The decision rule of section 1, as one output line.

@@ -29,10 +29,9 @@ pub fn selftest() -> Exit {
             return Exit::SecurityDescriptor;
         }
     };
-    let joined =
-        job::create(&name, &attributes).and_then(|floor| floor.join_self().map(|()| floor));
-    let floor = match joined {
-        Ok(floor) => floor,
+    // A failed verification leaves F open (`job::JoinedJob`), so the failure line and exit code below still land.
+    match job::create(&name, &attributes).and_then(job::FloorJob::join_self) {
+        Ok(_joined) => {}
         Err(error) => {
             let (detail, exit) = error.describe();
             emit(&format!("selftest failed {detail}"));
@@ -48,11 +47,5 @@ pub fn selftest() -> Exit {
             "selftest ok elevated=unknown integrity=unknown:{error}"
         )),
     }
-    // Exit while F is held, as `run` does: dropping its only handle first would let kill-on-close end this
-    // process with code 0.
-    hold_and_exit(&floor)
-}
-
-fn hold_and_exit(_floor: &job::FloorJob) -> Exit {
-    std::process::exit(Exit::Ok.code())
+    Exit::Ok
 }

@@ -13,7 +13,7 @@ use windows_sys::Win32::System::IO::{CreateIoCompletionPort, GetQueuedCompletion
 use crate::cli::{Exit, OpId, LINGER_KILL_CODE};
 use crate::control::{self, Control};
 use crate::frames::{ExecRequest, Frame, FrameReader};
-use crate::job::{self, FloorJob, JobError};
+use crate::job::{self, JobError, JoinedJob};
 use crate::security;
 use crate::spawn::{self, Root};
 use crate::win::{creation_time, last_error, Owned};
@@ -86,7 +86,9 @@ fn await_go(control: &mut Control, port: HANDLE, reader: &mut FrameReader) -> En
     }
 }
 
-fn prepare(op: &OpId, control: &Control) -> Result<(FloorJob, Owned), (String, Exit)> {
+/// Everything up to and including the join. A failure before the join drops a F that never held this process; a
+/// failed verification after it leaves F open (`JoinedJob`), so the caller's report and exit code always land.
+fn prepare(op: &OpId, control: &Control) -> Result<(JoinedJob, Owned), (String, Exit)> {
     let attributes = security::job_attributes()
         .map_err(|error| (format!("sd-failed {error}"), Exit::SecurityDescriptor))?;
     let floor = job::create(&op.job_name(), &attributes).map_err(|error| error.describe())?;
@@ -100,14 +102,8 @@ fn prepare(op: &OpId, control: &Control) -> Result<(FloorJob, Owned), (String, E
     control
         .associate(port.raw(), PIPE_KEY)
         .map_err(|error| JobError::Port(error).describe())?;
-    floor.join_self().map_err(|error| error.describe())?;
-    Ok((floor, port))
-}
-
-/// Ends the process while F is still held: dropping the only handle first would let kill-on-close terminate H itself
-/// (exit code 0) before its own code is set. Process rundown then closes F with nothing else left to kill.
-fn exit_holding(_floor: &FloorJob, exit: Exit) -> ! {
-    std::process::exit(exit.code())
+    let joined = floor.join_self().map_err(|error| error.describe())?;
+    Ok((joined, port))
 }
 
 pub fn run(op: &OpId, linger_ms: u32) -> Exit {
@@ -127,36 +123,35 @@ pub fn run(op: &OpId, linger_ms: u32) -> Exit {
         }
     };
     if !control.report(&format!("joined {pid} {created}")) {
-        exit_holding(&floor, Exit::Cancelled);
+        return Exit::Cancelled;
     }
     let mut reader = FrameReader::default();
     let request = match await_go(&mut control, port.raw(), &mut reader) {
         Ended::Go(request) => request,
         Ended::Cancel => {
             control.report("cancelled");
-            exit_holding(&floor, Exit::Cancelled);
+            return Exit::Cancelled;
         }
-        Ended::Eof => exit_holding(&floor, Exit::Cancelled),
-        Ended::PortFailed => exit_holding(&floor, Exit::PortFailed),
+        Ended::Eof => return Exit::Cancelled,
+        Ended::PortFailed => return Exit::PortFailed,
     };
     let root = match spawn::spawn_root(&request) {
         Ok(root) => root,
         Err(error) => {
             control.report(&format!("spawn-failed {error}"));
-            exit_holding(&floor, Exit::SpawnFailed);
+            return Exit::SpawnFailed;
         }
     };
     control.report(&format!("spawned {} {}", root.pid, root.created));
     spawn::close_standard_handles();
-    let exit = running(
+    running(
         &mut control,
         &floor,
         port.raw(),
         &root,
         &mut reader,
         linger_ms,
-    );
-    exit_holding(&floor, exit)
+    )
 }
 
 fn handle_frames(reader: &mut FrameReader, root: &Root) {
@@ -182,7 +177,7 @@ fn root_exit_code(root: &Root) -> Option<u32> {
 /// RUNNING and LINGERING (section 7.2): never waits on the writer; reports go out best-effort.
 fn running(
     control: &mut Control,
-    floor: &FloorJob,
+    floor: &JoinedJob,
     port: HANDLE,
     root: &Root,
     reader: &mut FrameReader,
@@ -204,13 +199,15 @@ fn running(
             }
             Event::Pipe { .. } | Event::Other => {}
             Event::PortFailed => {
-                floor.terminate(1);
+                // Ends the operation and this process with the PortFailed code. Should the call fail, the return
+                // below exits with that code and process rundown closes F, whose kill-on-close ends the rest.
+                let _ended = floor.terminate(Exit::PortFailed.status());
                 return Exit::PortFailed;
             }
         }
         if let Some(code) = root_exit_code(root).filter(|_| !exited) {
             exited = true;
-            let lingering = floor.active() != Some(1);
+            let lingering = floor.active() != Ok(1);
             control.report(&format!(
                 "exit {code} {}",
                 if lingering { "lingering" } else { "empty" }
@@ -218,14 +215,16 @@ fn running(
             deadline =
                 lingering.then(|| Instant::now() + Duration::from_millis(u64::from(linger_ms)));
         }
-        if exited && floor.active() == Some(1) {
+        if exited && floor.active() == Ok(1) {
             control.report("done");
             return Exit::Ok;
         }
         if deadline.is_some_and(|at| Instant::now() >= at) {
             control.report("linger-expired");
-            floor.terminate(LINGER_KILL_CODE);
-            return Exit::LingerKillFailed;
+            if let Err(error) = floor.terminate(LINGER_KILL_CODE) {
+                control.report(&format!("linger-kill-failed {error}"));
+            }
+            return Exit::LingerKill;
         }
     }
 }

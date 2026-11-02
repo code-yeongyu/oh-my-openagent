@@ -2,8 +2,12 @@
 
 pub const DEFAULT_LINGER_MS: u32 = 600_000;
 
-/// Exit codes the writer and the contract rows read. `LingerKill` is never returned: at linger expiry
-/// `TerminateJobObject` ends the helper with `LINGER_KILL_CODE` (design section 6.1).
+/// Exit codes the writer and the contract rows read. Every code is observable: after the join, F's handle is never
+/// closed before exit (`job::JoinedJob`), and the two job-wide kills terminate with the code they stand for.
+/// `LingerKill` is `LINGER_KILL_CODE`: `TerminateJobObject(F, LINGER_KILL_CODE)` normally ends the helper with it
+/// first, and if that call fails the helper exits with the same code and process rundown closes F, which
+/// kill-on-close turns into the same kill. A separate "kill failed" code would describe an outcome no observer
+/// can tell apart, so there is none.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Exit {
     Ok,
@@ -21,7 +25,7 @@ pub enum Exit {
     Cancelled,
     SpawnFailed,
     PortFailed,
-    LingerKillFailed,
+    LingerKill,
 }
 
 pub const LINGER_KILL_CODE: u32 = 0xC0DE_0001;
@@ -44,8 +48,13 @@ impl Exit {
             Self::Cancelled => 20,
             Self::SpawnFailed => 21,
             Self::PortFailed => 22,
-            Self::LingerKillFailed => 23,
+            Self::LingerKill => i32::from_ne_bytes(LINGER_KILL_CODE.to_ne_bytes()),
         }
+    }
+
+    /// The same code as the unsigned process exit status Windows reports (`TerminateJobObject`, `GetExitCodeProcess`).
+    pub const fn status(self) -> u32 {
+        u32::from_ne_bytes(self.code().to_ne_bytes())
     }
 }
 

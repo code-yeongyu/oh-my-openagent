@@ -16,6 +16,11 @@ impl Owned {
     pub const fn raw(&self) -> HANDLE {
         self.0
     }
+
+    /// Gives up ownership: the handle stays open and nothing in this process closes it.
+    pub fn into_raw(self) -> HANDLE {
+        std::mem::ManuallyDrop::new(self).0
+    }
 }
 
 impl Drop for Owned {

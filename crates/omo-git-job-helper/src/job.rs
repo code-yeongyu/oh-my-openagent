@@ -64,17 +64,57 @@ pub fn create(name: &str, attributes: &JobAttributes) -> Result<FloorJob, JobErr
     // SAFETY: a plain C struct for which all-zero is valid.
     let mut limits: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = unsafe { std::mem::zeroed() };
     limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-    job.set(JobObjectExtendedLimitInformation, &limits)
-        .map_err(JobError::Limits)?;
+    set(job.0.raw(), JobObjectExtendedLimitInformation, &limits).map_err(JobError::Limits)?;
     // SAFETY: as above.
     let mut read_back: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = unsafe { std::mem::zeroed() };
-    job.query(JobObjectExtendedLimitInformation, &mut read_back)
-        .map_err(JobError::Limits)?;
+    query(
+        job.0.raw(),
+        JobObjectExtendedLimitInformation,
+        &mut read_back,
+    )
+    .map_err(JobError::Limits)?;
     let flags = read_back.BasicLimitInformation.LimitFlags;
     if flags != JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE {
         return Err(JobError::LimitsMismatch(flags));
     }
     Ok(job)
+}
+
+fn set<T>(job: HANDLE, class: JOBOBJECTINFOCLASS, value: &T) -> Result<(), u32> {
+    // SAFETY: `value` is the C struct this information class expects and is readable for its size.
+    let ok = unsafe {
+        SetInformationJobObject(job, class, std::ptr::from_ref(value).cast(), size_of::<T>())
+    };
+    if ok == 0 {
+        Err(last_error())
+    } else {
+        Ok(())
+    }
+}
+
+fn query<T>(job: HANDLE, class: JOBOBJECTINFOCLASS, value: &mut T) -> Result<(), u32> {
+    // SAFETY: `value` is the C struct this information class fills and is writable for its size.
+    let ok = unsafe {
+        QueryInformationJobObject(
+            job,
+            class,
+            std::ptr::from_mut(value).cast(),
+            size_of::<T>(),
+            null_mut(),
+        )
+    };
+    if ok == 0 {
+        Err(last_error())
+    } else {
+        Ok(())
+    }
+}
+
+/// F's active process count, or the error code read in the same frame as the failed query.
+fn active(job: HANDLE) -> Result<u32, u32> {
+    // SAFETY: a plain C struct for which all-zero is valid.
+    let mut info: JOBOBJECT_BASIC_ACCOUNTING_INFORMATION = unsafe { std::mem::zeroed() };
+    query(job, JobObjectBasicAccountingInformation, &mut info).map(|()| info.ActiveProcesses)
 }
 
 impl FloorJob {
@@ -83,77 +123,59 @@ impl FloorJob {
         Self(handle)
     }
 
-    fn set<T>(&self, class: JOBOBJECTINFOCLASS, value: &T) -> Result<(), u32> {
-        // SAFETY: `value` is the C struct this information class expects and is readable for its size.
-        let ok = unsafe {
-            SetInformationJobObject(
-                self.0.raw(),
-                class,
-                std::ptr::from_ref(value).cast(),
-                size_of::<T>(),
-            )
-        };
-        if ok == 0 {
-            Err(last_error())
-        } else {
-            Ok(())
-        }
-    }
-
-    fn query<T>(&self, class: JOBOBJECTINFOCLASS, value: &mut T) -> Result<(), u32> {
-        // SAFETY: `value` is the C struct this information class fills and is writable for its size.
-        let ok = unsafe {
-            QueryInformationJobObject(
-                self.0.raw(),
-                class,
-                std::ptr::from_mut(value).cast(),
-                size_of::<T>(),
-                null_mut(),
-            )
-        };
-        if ok == 0 {
-            Err(last_error())
-        } else {
-            Ok(())
-        }
-    }
-
     pub fn associate_port(&self, port: HANDLE, key: usize) -> Result<(), JobError> {
         let association = JOBOBJECT_ASSOCIATE_COMPLETION_PORT {
             CompletionKey: std::ptr::without_provenance_mut(key),
             CompletionPort: port,
         };
-        self.set(JobObjectAssociateCompletionPortInformation, &association)
-            .map_err(JobError::Port)
+        set(
+            self.0.raw(),
+            JobObjectAssociateCompletionPortInformation,
+            &association,
+        )
+        .map_err(JobError::Port)
+    }
+
+    pub fn active(&self) -> Result<u32, u32> {
+        active(self.0.raw())
     }
 
     /// Joins this process, then verifies membership and that it is F's only process (section 6.1 Join, Verify).
-    pub fn join_self(&self) -> Result<(), JobError> {
+    /// From a successful assignment on, the handle is a `JoinedJob` that this process never closes, so a failed
+    /// verification still leaves F open and the caller reports and exits with its own code.
+    pub fn join_self(self) -> Result<JoinedJob, JobError> {
         // SAFETY: both handles are live; the pseudo-handle names this process.
         if unsafe { AssignProcessToJobObject(self.0.raw(), GetCurrentProcess()) } == 0 {
             return Err(JobError::Assign(last_error()));
         }
+        let joined = JoinedJob(self.0.into_raw());
         let mut member = 0;
         // SAFETY: `member` is a writable BOOL.
-        let checked =
-            unsafe { IsProcessInJob(GetCurrentProcess(), self.0.raw(), &mut member) } != 0;
-        if !checked || member == 0 || self.active() != Some(1) {
+        let checked = unsafe { IsProcessInJob(GetCurrentProcess(), joined.0, &mut member) } != 0;
+        if !checked || member == 0 || joined.active() != Ok(1) {
             return Err(JobError::Verify);
         }
-        Ok(())
+        Ok(joined)
+    }
+}
+
+/// F once this process is a member. It holds F's only handle and has no `Drop`: closing that handle would let
+/// kill-on-close end this process before its exit code is set, so only process rundown closes it (I4; design 6.1
+/// Done). Every return path after the join therefore exits with the code it chose.
+pub struct JoinedJob(HANDLE);
+
+impl JoinedJob {
+    pub fn active(&self) -> Result<u32, u32> {
+        active(self.0)
     }
 
-    pub fn active(&self) -> Option<u32> {
-        // SAFETY: a plain C struct for which all-zero is valid.
-        let mut info: JOBOBJECT_BASIC_ACCOUNTING_INFORMATION = unsafe { std::mem::zeroed() };
-        self.query(JobObjectBasicAccountingInformation, &mut info)
-            .ok()
-            .map(|()| info.ActiveProcesses)
-    }
-
-    /// Ends every member, this process included.
-    pub fn terminate(&self, code: u32) {
-        // SAFETY: the job handle is live and carries JOB_OBJECT_TERMINATE (creator's full-access handle).
-        unsafe { TerminateJobObject(self.0.raw(), code) };
+    /// Ends every member, this process included, with `code`.
+    pub fn terminate(&self, code: u32) -> Result<(), u32> {
+        // SAFETY: the handle is live and carries JOB_OBJECT_TERMINATE (the creator's full-access handle).
+        if unsafe { TerminateJobObject(self.0, code) } == 0 {
+            Err(last_error())
+        } else {
+            Ok(())
+        }
     }
 }

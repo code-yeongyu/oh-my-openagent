@@ -1,19 +1,29 @@
 //! The writer's control pipe, client side (design v4.2 section 6.1 Control channel). Reads complete on the
-//! completion port; writes are synchronous and never post to it.
+//! completion port; writes wait on their own event, bounded, and never post to it.
+use std::cell::Cell;
 use std::ptr::{null, null_mut};
 
-use windows_sys::Win32::Foundation::{ERROR_IO_PENDING, GENERIC_READ, GENERIC_WRITE, HANDLE};
+use windows_sys::Win32::Foundation::{
+    ERROR_IO_PENDING, GENERIC_READ, GENERIC_WRITE, HANDLE, WAIT_OBJECT_0,
+};
 use windows_sys::Win32::Storage::FileSystem::{
-    CreateFileW, ReadFile, WriteFile, FILE_FLAG_OVERLAPPED, OPEN_EXISTING,
+    CreateFileW, ReadFile, WriteFile, FILE_FLAG_OVERLAPPED, OPEN_EXISTING, SECURITY_IDENTIFICATION,
+    SECURITY_SQOS_PRESENT,
 };
 use windows_sys::Win32::System::Pipes::{SetNamedPipeHandleState, PIPE_READMODE_BYTE};
-use windows_sys::Win32::System::Threading::CreateEventW;
-use windows_sys::Win32::System::IO::{CreateIoCompletionPort, GetOverlappedResult, OVERLAPPED};
+use windows_sys::Win32::System::Threading::{CreateEventW, WaitForSingleObject};
+use windows_sys::Win32::System::IO::{
+    CancelIoEx, CreateIoCompletionPort, GetOverlappedResult, OVERLAPPED,
+};
 
 use crate::cli::OpId;
 use crate::win::{last_error, wide, Owned};
 
 const READ_SIZE: usize = 4096;
+/// The longest one report may wait for the writer to take it. A writer's inbound buffer normally absorbs a report at
+/// once; one that stopped reading costs at most this long, and every later report is dropped, so no report can hold
+/// the linger deadline or any other exit hostage.
+const REPORT_WRITE_MS: u32 = 5_000;
 
 /// One outstanding read. Boxed so its address is stable while the kernel owns it.
 struct PendingRead {
@@ -25,10 +35,13 @@ pub struct Control {
     pipe: Owned,
     write_event: Owned,
     read: Box<PendingRead>,
+    stalled: Cell<bool>,
 }
 
 pub fn connect(op: &OpId) -> Result<Control, u32> {
     let name = wide(&op.pipe_name());
+    // SECURITY_IDENTIFICATION: the pipe's server may identify this process but never act with its token.
+    let flags = FILE_FLAG_OVERLAPPED | SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION;
     // SAFETY: `name` is NUL-terminated; the handle is created non-inheritable (no security attributes).
     let raw = unsafe {
         CreateFileW(
@@ -37,7 +50,7 @@ pub fn connect(op: &OpId) -> Result<Control, u32> {
             0,
             null(),
             OPEN_EXISTING,
-            FILE_FLAG_OVERLAPPED,
+            flags,
             null_mut(),
         )
     };
@@ -59,6 +72,7 @@ pub fn connect(op: &OpId) -> Result<Control, u32> {
         pipe,
         write_event,
         read,
+        stalled: Cell::new(false),
     })
 }
 
@@ -73,8 +87,12 @@ impl Control {
         }
     }
 
-    /// Writes one report frame and waits for it. False when the writer is gone; reports after `go` ignore that.
+    /// Writes one report frame and waits for it, at most `REPORT_WRITE_MS`. False when the writer is gone or stopped
+    /// reading; after the first stalled write every later report returns false at once. Reports after `go` ignore it.
     pub fn report(&self, frame: &str) -> bool {
+        if self.stalled.get() {
+            return false;
+        }
         let bytes = format!("{frame}\n");
         let Ok(length) = u32::try_from(bytes.len()) else {
             return false;
@@ -83,7 +101,7 @@ impl Control {
         let mut overlapped: OVERLAPPED = unsafe { std::mem::zeroed() };
         // The low-order bit keeps this completion off the port (GetQueuedCompletionStatus documentation).
         overlapped.hEvent = self.write_event.raw().map_addr(|address| address | 1);
-        // SAFETY: `bytes` and `overlapped` outlive the wait below, which completes the operation.
+        // SAFETY: `bytes` and `overlapped` outlive the operation, which completes or is cancelled and drained below.
         let started = unsafe {
             WriteFile(
                 self.pipe.raw(),
@@ -96,11 +114,20 @@ impl Control {
         if !started && last_error() != ERROR_IO_PENDING {
             return false;
         }
+        // SAFETY: a bounded wait on this write's own event, which WriteFile reset when it started.
+        let in_time = unsafe { WaitForSingleObject(self.write_event.raw(), REPORT_WRITE_MS) }
+            == WAIT_OBJECT_0;
+        if !in_time {
+            // SAFETY: cancels this exact write; the drain below completes it before `overlapped` goes away.
+            unsafe { CancelIoEx(self.pipe.raw(), &overlapped) };
+        }
         let mut written = 0u32;
-        // SAFETY: waits for this exact operation; `overlapped` is still alive.
+        // SAFETY: waits for this operation to finish (completed or cancelled); `overlapped` is still alive.
         let done =
             unsafe { GetOverlappedResult(self.pipe.raw(), &overlapped, &mut written, 1) } != 0;
-        done && written == length
+        let delivered = done && written == length;
+        self.stalled.set(!delivered && !in_time);
+        delivered
     }
 
     /// Issues the next read; its completion arrives on the port. False when the pipe is already broken (EOF).

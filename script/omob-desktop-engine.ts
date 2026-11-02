@@ -21,8 +21,23 @@ export function desktopEngineCargoArgs(rustTarget: string): string[] {
 
 // One cargo call per package, as the release workflows build them: a shared call would unify
 // dependency features across both packages (resolver 2) and build an engine release never ships.
-function desktopEngineCargoCalls(rustTarget: string, helperPackages: readonly string[]): string[][] {
-	return [desktopEngineCargoArgs(rustTarget), ...helperPackages.map((name) => ["build", "--release", "-p", name, "--locked", "--target", rustTarget])]
+interface CargoCall {
+	readonly args: readonly string[]
+	readonly rustflags?: string
+}
+
+/** Per-package RUSTFLAGS the release workflows build with (publish-platform.yml); every other package gets none. */
+const RELEASE_RUSTFLAGS: Readonly<Record<string, string>> = { "omo-git-job-helper": "-C target-feature=+crt-static" }
+
+function desktopEngineCargoCalls(rustTarget: string, helperPackages: readonly string[]): CargoCall[] {
+	return [
+		{ args: desktopEngineCargoArgs(rustTarget) },
+		...helperPackages.map((name) => ({ args: ["build", "--release", "-p", name, "--locked", "--target", rustTarget], rustflags: RELEASE_RUSTFLAGS[name] })),
+	]
+}
+
+function describeCall(call: CargoCall): string {
+	return call.rustflags === undefined ? call.args.join(" ") : `RUSTFLAGS=${call.rustflags} ${call.args.join(" ")}`
 }
 
 /**
@@ -34,7 +49,7 @@ export function desktopEngineFingerprint(repoRoot: string, rustTarget: string, h
 	if (result.error !== undefined) throw result.error
 	if (result.status !== 0) throw new Error(`git ls-tree failed in ${repoRoot}: ${result.stderr.trim()}`)
 	if (result.stdout.trim() === "") throw new Error(`no desktop engine sources (${DESKTOP_ENGINE_SOURCE_PATHS.join(", ")}) at HEAD in ${repoRoot}`)
-	const calls = desktopEngineCargoCalls(rustTarget, helperPackages).map((args) => args.join(" ")).join("\n")
+	const calls = desktopEngineCargoCalls(rustTarget, helperPackages).map(describeCall).join("\n")
 	return createHash("sha256").update(calls).update("\n").update(result.stdout).digest("hex")
 }
 
@@ -106,10 +121,12 @@ export function ensureDesktopEngine(
 	}
 	rmSync(stampPath, { force: true })
 	const calls = desktopEngineCargoCalls(rustTarget, helperPackages)
-	for (const args of calls) {
-		log(`[omob] building desktop engine: cargo ${args.join(" ")}`)
+	for (const call of calls) {
+		const args = [...call.args]
+		log(`[omob] building desktop engine: cargo ${describeCall(call)}`)
 		// build-omo-binary stages from <repoRoot>/target; a caller's CARGO_TARGET_DIR would build elsewhere.
-		const result = spawnSync("cargo", args, { cwd: repoRoot, stdio: "inherit", env: { ...env, CARGO_TARGET_DIR: join(repoRoot, "target") } })
+		const callEnv = { ...env, CARGO_TARGET_DIR: join(repoRoot, "target"), ...(call.rustflags === undefined ? {} : { RUSTFLAGS: call.rustflags }) }
+		const result = spawnSync("cargo", args, { cwd: repoRoot, stdio: "inherit", env: callEnv })
 		if (result.error !== undefined) {
 			if ((result.error as NodeJS.ErrnoException).code === "ENOENT") {
 				throw new Error(`omob needs a Rust toolchain to build the desktop engine for ${target}: cargo is not on PATH (install Rust from https://rustup.rs)`)
