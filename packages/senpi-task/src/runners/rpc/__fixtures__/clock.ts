@@ -1,4 +1,4 @@
-import { spyOn } from "bun:test"
+import { expect, spyOn } from "bun:test"
 import { AsyncLocalStorage } from "node:async_hooks"
 
 /**
@@ -13,12 +13,13 @@ export function fakeClock() {
   owner.enterWith(true)
   const owned = () => owner.getStore() === true
   let now = 0
-  const timers = new Map<object, { at: number; interval?: number; callback: () => void }>()
+  const timers = new Map<object, { at: number; delay: number; stack: string; interval?: number; callback: () => void }>()
   const fakeIds = new WeakSet<object>()
   const install = (callback: () => void, ms: number, interval?: number) => {
     const id = { unref() {} }
     fakeIds.add(id)
-    timers.set(id, { at: now + ms, interval, callback })
+    const stack = (new Error().stack ?? "").split("\n").slice(1, 9).join("\n")
+    timers.set(id, { at: now + ms, delay: ms, stack, interval, callback })
     return id
   }
   const clear = (id: unknown, clearReal: (id: never) => void) => {
@@ -39,6 +40,12 @@ export function fakeClock() {
   return {
     now: () => now,
     pending: () => timers.size,
+    assertNoPendingTimers() {
+      const details = [...timers.values()].map((timer) =>
+        `${timer.interval === undefined ? "timeout" : "interval"} delay=${timer.delay}ms\n${timer.stack}`,
+      ).join("\n")
+      expect(timers.size, details).toBe(0)
+    },
     async advance(ms: number) {
       const end = now + ms
       for (;;) {
