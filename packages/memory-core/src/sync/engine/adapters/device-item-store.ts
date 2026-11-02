@@ -17,6 +17,7 @@ import {
   type ItemDevice,
   type ItemFrontier,
   isLive,
+  isSyncItemKey,
   itemFrontier,
   openItemDevice,
   recordMaterialized,
@@ -42,6 +43,10 @@ export interface DeviceItemStoreOptions {
 }
 
 const fileOf = (key: string): string => createHash("sha256").update(key).digest("hex")
+
+// docs.json and baselines.json written by an older build may hold keys the grammar refuses
+// (#12147); they are dropped on load and never written back, so no such key reaches a capture.
+const syncable = (key: string): boolean => isSyncItemKey(key) === null
 
 export function createDeviceItemStore(options: DeviceItemStoreOptions): ItemStore {
   /**
@@ -90,10 +95,10 @@ export function createDeviceItemStore(options: DeviceItemStoreOptions): ItemStor
         ...(options.machineId === undefined ? {} : { machineId: options.machineId }),
       })
       const index = await readJson<Record<string, Baseline>>(join(crdt, "baselines.json"), {})
-      baselines = new Map(Object.entries(index))
+      baselines = new Map(Object.entries(index).filter(([key]) => syncable(key)))
       // Every persisted doc's key, materialised or not: an item applied from a verified batch has
       // CRDT state before it has a baseline, and a crash in between must not drop that state.
-      const docKeys = await readJson<string[]>(join(crdt, "docs.json"), [])
+      const docKeys = (await readJson<string[]>(join(crdt, "docs.json"), [])).filter(syncable)
       docs.clear()
       const names = await readdir(join(crdt, "docs")).catch(() => [] as string[])
       const { LoroDoc } = await loadLoroRuntime()
@@ -146,6 +151,7 @@ export function createDeviceItemStore(options: DeviceItemStoreOptions): ItemStor
     },
     async applySnapshot(payload: BatchPayload) {
       for (const item of payload.items) {
+        if (!syncable(item.key)) continue
         const doc = await docOf(item.key)
         doc.import(item.ops)
         dirty.add(item.key)
@@ -154,11 +160,11 @@ export function createDeviceItemStore(options: DeviceItemStoreOptions): ItemStor
     async persist() {
       for (const key of dirty) {
         const doc = docs.get(key)
-        if (doc !== undefined) await writeAtomic(join(crdt, "docs", `${fileOf(key)}.loro`), doc.export({ mode: "snapshot" }))
+        if (doc !== undefined && syncable(key)) await writeAtomic(join(crdt, "docs", `${fileOf(key)}.loro`), doc.export({ mode: "snapshot" }))
       }
       dirty.clear()
-      await writeJson(join(crdt, "docs.json"), [...docs.keys()].sort())
-      await writeJson(join(crdt, "baselines.json"), Object.fromEntries(baselines))
+      await writeJson(join(crdt, "docs.json"), [...docs.keys()].filter(syncable).sort())
+      await writeJson(join(crdt, "baselines.json"), Object.fromEntries([...baselines].filter(([key]) => syncable(key))))
     },
   }
 }

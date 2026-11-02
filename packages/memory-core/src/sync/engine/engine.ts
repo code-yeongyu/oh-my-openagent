@@ -34,6 +34,8 @@ interface Failing {
 export interface CycleReport {
   readonly applied: number
   readonly refused: number
+  /** Received items this cycle dropped because their key may never reach this device's files. */
+  readonly rejectedItems: number
   readonly pushed: boolean
   readonly snapshot: number | null
 }
@@ -266,6 +268,7 @@ export class SyncEngine {
     if (refused === 0) await journal.updateState({ lastSyncedAt: deps.clock.now(), updatedWhileOffline: memories })
     this.appliedMirror = (await journal.state()).applied
     this.cyclesRun += 1
-    return { applied, refused, pushed, snapshot }
+    const rejectedItems = (await journal.state()).rejectedItems - before.rejectedItems
+    return { applied, refused, rejectedItems, pushed, snapshot }
   }
 }
