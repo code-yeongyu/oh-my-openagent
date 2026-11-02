@@ -13,8 +13,6 @@ import {
   runGit as run,
   type IndexLockRetry,
 } from "./worktree-integration-git"
-import { healStrandedMerge } from "./worktree-integration-heal"
-import { mergeValidatedTip } from "./worktree-integration-merge"
 
 export type { IndexLockRetry } from "./worktree-integration-git"
 
@@ -96,6 +94,9 @@ export async function integrateValidatedReflection(
 ): Promise<ReflectionIntegrationResult> {
   const retry = input.indexLockRetry ?? DEFAULT_INDEX_LOCK_RETRY
   return input.withWriterLock(async () => {
+    // The merge and its stranded-merge repair are a lazy sidecar in bundles that map
+    // `#memory-reflection-merge` (omo-senpi's omo.js); every other consumer resolves memory-core's own source.
+    const { healStrandedMerge, mergeValidatedTip } = await import("#memory-reflection-merge")
     await healStrandedMerge(worktree, retry)
     const existing = await probeReflectionIntegration(worktree, {
       mode: input.mode,

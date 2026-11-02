@@ -1,6 +1,8 @@
 import { NO_AUTO_MAINTENANCE } from "../git/no-auto-maintenance"
 import type { ReflectionWorktree } from "./worktree"
 import { recordStrandedMerge } from "./worktree-integration-heal"
+
+export { healStrandedMerge } from "./worktree-integration-heal"
 import {
   gitOrThrow,
   isAncestor,
