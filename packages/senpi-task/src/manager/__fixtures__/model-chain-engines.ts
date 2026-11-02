@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url"
 import { RpcHostRunner } from "../../runners/rpc-host"
 import { HostSessionClient } from "../../runners/rpc-host/session-client"
 import { buildRpcSpawn } from "../../runners/rpc/spawn"
+import { buildSandboxChildEnv } from "../../runners/rpc/__fixtures__/sandbox-child-env"
 import { RpcProcessRunner } from "../../runners/rpc-process"
 import { createRpcManagedRunner } from "../runner"
 import type { ManagedRunner } from "../types"
@@ -45,7 +46,7 @@ export async function startEngineRunner(kind: EngineRunnerKind, input: EngineInp
   copyFileSync(input.settingsPath, join(agentDir, "settings.json"))
   writeFileSync(join(agentDir, "models.json"), providers.modelsJson)
   writeFileSync(join(agentDir, "auth.json"), JSON.stringify(Object.fromEntries(Object.keys(ENGINE_MODELS).map((provider) => [provider, { type: "api_key", key: "test-key" }]))), { mode: 0o600 })
-  const env = { PATH: process.env["PATH"] ?? "", HOME: home, SENPI_CODING_AGENT_DIR: agentDir, BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0" }
+  const env = { ...buildSandboxChildEnv({ parent: process.env, home }), SENPI_CODING_AGENT_DIR: agentDir, BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0" }
   try {
     const engine = kind === "process" ? processEngine(env) : await hostEngine(input.root, env)
     return {
