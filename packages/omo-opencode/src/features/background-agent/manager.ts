@@ -100,6 +100,7 @@ import {
 import { isActiveSessionStatus, isTerminalSessionStatus } from "./session-status-classifier"
 import { buildFallbackBody, FALLBACK_AGENT, isAgentNotFoundError } from "./spawner"
 import { invokeTmuxSessionCreatedCallback } from "./spawner/tmux-callback-invoker"
+import { formatNotificationError } from "./notification-error-text"
 import {
   createSubagentDepthLimitError,
   createSubagentDescendantLimitError,
@@ -887,7 +888,7 @@ export class BackgroundManager {
         : ""
       const failedError = previousAttempt?.error ?? task.retryNotification.failedError
       const failedErrorLine = failedError
-        ? `\n- Error: ${failedError}`
+        ? `\n- Error: ${formatNotificationError(failedError)}`
         : ""
       const retryModel = formatAttemptModelSummary(boundAttempt) ?? task.retryNotification.nextModel
       const parentPromptContext = await this.resolveParentWakePromptContext(task)
@@ -2286,7 +2287,7 @@ The fallback retry session is now created and can be inspected directly.
         const failedSessionLine = previousAttempt?.sessionId ? `\n- Failed session: \`${previousAttempt.sessionId}\`` : ""
         const failedModel = formatAttemptModelSummary(previousAttempt)
         const failedModelLine = failedModel ? `\n- Failed model: \`${failedModel}\`` : ""
-        const failedErrorLine = previousAttempt?.error ? `\n- Error: ${previousAttempt.error}` : ""
+        const failedErrorLine = previousAttempt?.error ? `\n- Error: ${formatNotificationError(previousAttempt.error)}` : ""
         const nextModel = formatAttemptModelSummary(currentAttempt)
         retryingNotification = `<system-reminder>
 [BACKGROUND TASK RETRYING]

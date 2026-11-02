@@ -1048,6 +1048,82 @@ describe("BackgroundManager retry observability", () => {
     expect(retryingCall?.[2]).toEqual({})
   })
 
+  test("bounds a huge provider error in the retrying and retry-ready notifications (#8325)", async () => {
+    //#given
+    const hugeError = `Forbidden: Selected provider is forbidden ${"x".repeat(600_000)}`
+    const queuePendingParentWake = mock(() => {})
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: tmpdir() } }),
+        create: async () => ({ data: { id: "ses_retry_bound_created" } }),
+        messages: async () => [],
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    ;(cast<{
+      queuePendingParentWake: (
+        sessionId: string,
+        notification: string,
+        promptContext: Record<string, unknown>,
+        shouldReply: boolean,
+        delayMs?: number,
+      ) => void
+    }>(manager)).queuePendingParentWake = queuePendingParentWake
+    const task = createMockTask({
+      id: "bg_retry_bound",
+      parentSessionId: "parent-session",
+      fallbackChain: [{ model: "claude-haiku-4-5", providers: ["anthropic"] }],
+      attemptCount: 0,
+      status: "running",
+      attempts: [
+        {
+          attemptId: "att_retry_bound",
+          attemptNumber: 1,
+          sessionId: "ses_retry_bound",
+          providerId: "google",
+          modelId: "flash",
+          status: "running",
+        },
+      ],
+      currentAttemptID: "att_retry_bound",
+    })
+    getTaskMap(manager).set(task.id, task)
+
+    //#when
+    await (cast<{
+      tryFallbackRetry: (task: BackgroundTask, errorInfo: { name?: string; message?: string }, source: string) => Promise<boolean>
+    }>(manager)).tryFallbackRetry(task, { name: "APIError", message: hugeError }, "promptAsync.launch")
+    const retryAttemptID = task.currentAttemptID ?? ""
+    await (cast<{
+      startTask: (queueItem: { task: BackgroundTask; input: Record<string, unknown>; attemptID: string }) => Promise<void>
+    }>(manager)).startTask({
+      task,
+      input: {
+        description: task.description,
+        prompt: task.prompt,
+        agent: task.agent,
+        parentSessionId: task.parentSessionId,
+        parentMessageId: task.parentMessageId,
+        model: task.model,
+        fallbackChain: task.fallbackChain,
+      },
+      attemptID: retryAttemptID,
+    })
+
+    //#then
+    const notifications = cast<Array<[string, string]>>(queuePendingParentWake.mock.calls).map((call) => call[1])
+    const retrying = notifications.find((notification) => notification.includes("[BACKGROUND TASK RETRYING]"))
+    const retryReady = notifications.find((notification) => notification.includes("[BACKGROUND TASK RETRY SESSION READY]"))
+    for (const notification of [retrying, retryReady]) {
+      expect(notification).toBeDefined()
+      expect(notification?.length ?? Number.POSITIVE_INFINITY).toBeLessThan(5_000)
+      expect(notification).toContain("- Error: Forbidden: Selected provider is forbidden xxx")
+      expect(notification).toContain(`(truncated, ${hugeError.length} chars)`)
+    }
+  })
+
   test("queues a second parent-visible notification once the retry session ID is created", async () => {
     //#given
     const queuePendingParentWake = mock(() => {})
