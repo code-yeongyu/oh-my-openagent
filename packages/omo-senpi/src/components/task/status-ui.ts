@@ -32,7 +32,6 @@ type TimerHandle = ReturnType<typeof setTimeout> | number
 export interface StatusUiManager {
   list(scope: ListScope): readonly ListedTask[]
   // The public live-handle seams. Optional preserves the narrow list-only seam used by legacy tests.
-  residentTaskIds?(): readonly string[]
   wasBackground?(taskId: string): boolean
   subscribeChild?(taskId: string, listener: (event: ManagedChildEvent) => void): () => void
   // In-flight turns/tools/tok-s for a live child; absent rows simply omit the stats tokens.
@@ -148,10 +147,9 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
     const renderedAt = now()
     const liveStats = deps.manager.runStatsSnapshot?.bind(deps.manager)
     const terminalWidth = deps.terminalWidth?.() ?? process.stdout.columns
-    const residentTaskIds = new Set(deps.manager.residentTaskIds?.() ?? [])
     const rows = deps.manager.wasBackground === undefined
-      ? buildWidgetRows(records, residentTaskIds)
-      : backgroundWidgetRows(background, liveActivity, renderedAt, liveStats, terminalWidth, residentTaskIds)
+      ? buildWidgetRows(records)
+      : backgroundWidgetRows(background, liveActivity, renderedAt, liveStats, terminalWidth)
     if (rows.length === 0) {
       clearLiveRefresh()
       ui.setWidget(UI_KEY, undefined)

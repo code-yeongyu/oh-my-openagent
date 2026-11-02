@@ -65,6 +65,13 @@ async function spawnSenpi(args, withExtension) {
   await spawnNode(senpi.cliPath, finalArgs, handoff ?? { env })
 }
 
+// `omo remote attach`: the engine's attach TUI runs as a signal-forwarding child, never an execve replacement,
+// because this process serves the endpoint the TUI is attached to until the TUI exits.
+export async function runAttachTui(args) {
+  const senpi = preparedSenpi()
+  await spawnNode(senpi.cliPath, args, { env: senpiEnvironment(senpi.packageRoot) })
+}
+
 // Routine launch notices go straight to stderr: Bun renders every console.error line red on a
 // color terminal, which made a healthy startup look like a failure (#8442).
 function notice(line) {

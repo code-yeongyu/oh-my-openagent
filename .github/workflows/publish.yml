@@ -509,6 +509,9 @@ jobs:
           # freshness marker digests that file; rebuild it too or codex-install-bundle-freshness
           # rejects the release commit as stale (v5.0.0-beta.83 release-state PR).
           bun run build:codex-install
+          # The committed service-auth bundle inlines packages/omo-native/package.json's version;
+          # rebuild it too or script/build-service-auth.test.ts rejects the release commit as stale (#12046).
+          bun script/build-service-auth.ts
 
           git config --global user.email "code.yeon.gyu@gmail.com"
           git config --global user.name "YeonGyu-Kim"
@@ -520,6 +523,7 @@ jobs:
           git add -f packages/omo-senpi/plugin/extensions
           git add -u packages/omo-senpi/plugin/runtime
           git add packages/omo-codex/scripts/install-dist/install-local.mjs
+          git add -u packages/omo-native/bin/lib
           git diff --cached --quiet || git commit -m "release: v${VERSION}"
 
           echo "needs_push=true" >> "$GITHUB_OUTPUT"
