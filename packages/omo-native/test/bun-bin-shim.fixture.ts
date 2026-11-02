@@ -131,8 +131,7 @@ export function launchEntry(fixture: Fixture, args: string[], env: Record<string
 /**
  * Turns the fixture into what `bun add -g` leaves behind before it runs the package's own scripts:
  * the real postinstall line, and an engine tree that postinstall can prepare (the RPC serializer it
- * patches comes from the installed engine and the pi-ai file it floors is bundled, as in
- * senpi-patch.test.ts).
+ * patches comes from the installed engine).
  */
 export function stageInstalledPackage(fixture: Fixture): void {
   const manifestPath = join(fixture.packageRoot, "package.json")
