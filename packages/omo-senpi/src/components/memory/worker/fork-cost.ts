@@ -81,7 +81,8 @@ export type MemoryLaunchRoute = {
 export type MemoryLaunchRouteInput = {
   readonly surface: MemoryLaunchSurface
   readonly quick?: MemoryRouteCandidate
-  readonly session?: MemoryRouteCandidate
+  /** The designated model forked onto the parent's context; never the parent session's model. */
+  readonly fork?: MemoryRouteCandidate
   readonly parentContextTokens?: number
   readonly payloadTokens?: number
   readonly turns: number
@@ -89,28 +90,28 @@ export type MemoryLaunchRouteInput = {
 }
 
 export function chooseMemoryLaunchRoute(input: MemoryLaunchRouteInput): MemoryLaunchRoute {
-  const { surface, quick, session } = input
+  const { surface, quick, fork } = input
   if (quick === undefined) {
-    if (session === undefined) throw new Error("chooseMemoryLaunchRoute requires a quick candidate")
-    return pick("fork", session, "only_candidate")
+    if (fork === undefined) throw new Error("chooseMemoryLaunchRoute requires a quick candidate")
+    return pick("fork", fork, "only_candidate")
   }
   if (surface === "facts") return pick("quick", quick, "surface_excluded")
-  if (session === undefined) return pick("quick", quick, "only_candidate")
-  if (session.cost === undefined) return pick("quick", quick, "no_pricing")
+  if (fork === undefined) return pick("quick", quick, "only_candidate")
+  if (fork.cost === undefined) return pick("quick", quick, "no_pricing")
   if (input.parentContextTokens === undefined) return pick("quick", quick, "unknown_context")
 
   // The only-candidate fork branch above intentionally remains unconditional: without a quick
   // candidate there is no safer route to choose. When both routes exist, reject a fork that cannot
   // fit the inherited parent, injected prompt, payload, and expected working turns.
-  if (session.contextWindow !== undefined
+  if (fork.contextWindow !== undefined
     && input.parentContextTokens + INJECTED_PROMPT_TOKENS + (input.payloadTokens ?? 0) + PER_TURN_NEW_TOKENS * input.turns
-      > FORK_WINDOW_FIT_RATIO * session.contextWindow) {
+      > FORK_WINDOW_FIT_RATIO * fork.contextWindow) {
     return pick("quick", quick, "window_unfit")
   }
 
   const profile = MEMORY_WORKLOAD_PROFILES[surface]
   const forkCost = estimateForkCost({
-    pricing: session.cost,
+    pricing: fork.cost,
     parentContextTokens: input.parentContextTokens,
     turns: input.turns,
     outputTokens: profile.outputTokens,
@@ -121,7 +122,7 @@ export function chooseMemoryLaunchRoute(input: MemoryLaunchRouteInput): MemoryLa
     : estimateQuickCost({ pricing: quick.cost, profile })
   if (quickCost === undefined) return pick("quick", quick, "no_pricing")
   if (forkCost < quickCost) {
-    return { ...pick("fork", session, "cheaper"), forkCost, quickCost }
+    return { ...pick("fork", fork, "cheaper"), forkCost, quickCost }
   }
   return { ...pick("quick", quick, "cheaper"), forkCost, quickCost }
 }

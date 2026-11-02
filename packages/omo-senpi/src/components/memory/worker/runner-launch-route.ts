@@ -26,9 +26,13 @@ export function reflectionPayloadTokens(
 }
 
 /**
- * Assemble the pure route inputs from the runner's registry lookups. Both candidates carry their
- * context window because fork inherits the parent's whole context (`--fork <parentSessionFile>`),
- * so a window that cannot hold parent + payload + working turns must lose before cost is compared.
+ * Assemble the pure route inputs from the runner's registry lookups. Both routes run the designated
+ * model (#12081): the fork candidate is that same model forked onto the parent's context, never the
+ * parent session's model. The session model is read only to decide whether the parent's provider
+ * cache can be replayed, which requires the fork to run the exact model the parent ran. Both
+ * candidates carry their context window because fork inherits the parent's whole context
+ * (`--fork <parentSessionFile>`), so a window that cannot hold parent + payload + working turns must
+ * lose before cost is compared.
  */
 export function memoryLaunchRouteInput(input: {
   readonly surface: MemoryLaunchSurface
@@ -50,28 +54,16 @@ export function memoryLaunchRouteInput(input: {
     ...(quickWindow === undefined ? {} : { contextWindow: quickWindow }),
   }
   const sessionModel = input.sessionModel
-  const sessionEntry = sessionModel === undefined || input.registry === undefined
-    ? undefined
-    : input.registry.find(sessionModel.provider, sessionModel.id)
-  const sessionCost = readModelPricing(sessionEntry)
-  const sessionWindow = readModelContextWindow(sessionEntry)
+  const parentRanDesignated = sessionModel !== undefined
+    && `${sessionModel.provider}/${sessionModel.id}` === input.quickModel
   return {
     surface: input.surface,
     quick,
-    ...(sessionModel === undefined || sessionCost === undefined
-      ? {}
-      : {
-          session: {
-            model: `${sessionModel.provider}/${sessionModel.id}`,
-            ...(sessionModel.thinking === undefined ? {} : { thinking: sessionModel.thinking }),
-            cost: sessionCost,
-            ...(sessionWindow === undefined ? {} : { contextWindow: sessionWindow }),
-          },
-        }),
+    ...(sessionModel === undefined || quickCost === undefined ? {} : { fork: quick }),
     ...(input.parentContextTokens === undefined ? {} : { parentContextTokens: input.parentContextTokens }),
     payloadTokens: input.payloadTokens,
     turns: MEMORY_WORKLOAD_PROFILES[input.surface].turns,
-    cacheHit: input.cacheHit,
+    cacheHit: input.cacheHit && parentRanDesignated,
   }
 }
 

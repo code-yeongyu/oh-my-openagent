@@ -46,7 +46,8 @@ describe("resolveReflectionModel", () => {
     expect(result.kind).toBe("category_unavailable")
     if (result.kind === "category_unavailable") {
       expect(result.category).toBe("quick")
-      expect(result.attemptedChain?.length).toBeGreaterThan(0)
+      expect(result.attempts?.length).toBeGreaterThan(0)
+      expect(result.attempts?.every((attempt) => attempt.why === "provider_not_connected")).toBe(true)
     }
   })
 
@@ -232,85 +233,12 @@ describe("resolveReflectionModel", () => {
       }
     })
 
-    test("#when a pricier session model is also present #then the registry candidate still wins the ladder", () => {
-      // when: session runs the expensive pro model, registry still exposes the cheap flash
-      const result = resolveReflectionModel("quick", { categories: {} }, liveRegistry, {
-        sessionModel: { provider: "google", id: "gemini-3.1-pro" },
-      })
-
-      // then
-      expect(result.kind).toBe("resolved")
-      if (result.kind === "resolved") {
-        expect(result.model).toBe("google/gemini-3.6-flash")
-        expect(result.source).toBe("registry_fallback")
-      }
-    })
-
-    test("#when the session model is cheaper than every registry candidate #then the cost chooser inherits it", () => {
-      // given: only a pricey registry candidate is connected, session runs a cheaper model
-      const pricey = {
-        provider: "google",
-        id: "gemini-3.1-pro",
-        cost: { input: 2, output: 12, cacheRead: 0.2 },
-        contextWindow: 1_000_000,
-      }
-      const cheapSession = {
-        provider: "google",
-        id: "gemini-3.6-flash",
-        cost: { input: 0.3, output: 2.5, cacheRead: 0.03 },
-        contextWindow: 1_000_000,
-      }
-      const pricedRegistry = {
-        getAvailable: () => [pricey],
-        find: (provider: string, modelId: string) =>
-          [pricey, cheapSession].find((entry) => entry.provider === provider && entry.id === modelId),
-      }
-
+    test("#when no registry is available #then it fails closed instead of reaching for any other model", () => {
       // when
-      const result = resolveReflectionModel("quick", { categories: {} }, pricedRegistry, {
-        sessionModel: { provider: "google", id: "gemini-3.6-flash" },
-      })
+      const result = resolveReflectionModel("quick", { categories: {} }, undefined)
 
       // then
-      expect(result.kind).toBe("resolved")
-      if (result.kind === "resolved") {
-        expect(result.model).toBe("google/gemini-3.6-flash")
-        expect(result.source).toBe("session_inherit")
-      }
-    })
-
-    test("#when the registry scan finds nothing but a session model exists #then reflection inherits the session model", () => {
-      // given
-      const emptyRegistry = { getAvailable: () => [], find: () => undefined }
-
-      // when
-      const result = resolveReflectionModel("quick", { categories: {} }, emptyRegistry, {
-        sessionModel: { provider: "anthropic", id: "claude-opus-5-5", thinking: "low" },
-      })
-
-      // then
-      expect(result).toEqual({
-        kind: "resolved",
-        category: "quick",
-        model: "anthropic/claude-opus-5-5",
-        thinking: "low",
-        source: "session_inherit",
-        fallbacks: [],
-      })
-    })
-
-    test("#when even the registry object is missing #then the session model still resolves", () => {
-      // when
-      const result = resolveReflectionModel("quick", { categories: {} }, undefined, {
-        sessionModel: { provider: "anthropic", id: "claude-opus-5-5" },
-      })
-
-      // then
-      expect(result.kind).toBe("resolved")
-      if (result.kind === "resolved") {
-        expect(result.model).toBe("anthropic/claude-opus-5-5")
-        expect(result.source).toBe("session_inherit")
-      }
+      expect(result).toEqual({ kind: "category_unavailable", category: "quick", cause: "no_registry" })
     })
 
     test("#when an explicitly pinned model is unresolvable but other models exist #then the fallback keeps reflection alive", () => {
@@ -331,7 +259,7 @@ describe("resolveReflectionModel", () => {
       }
     })
 
-    test("#when neither registry nor session model can help #then it still fails closed", () => {
+    test("#when the registry offers no candidate #then it fails closed", () => {
       // when
       const result = resolveReflectionModel("quick", { categories: {} }, { getAvailable: () => [], find: () => undefined })
 

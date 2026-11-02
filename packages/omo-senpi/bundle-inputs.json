@@ -1084,7 +1084,6 @@
     "packages/omo-senpi/src/components/memory/worker/memory-launch-preflight.ts",
     "packages/omo-senpi/src/components/memory/worker/memory-model-attempts.ts",
     "packages/omo-senpi/src/components/memory/worker/memory-run-supervisor.ts",
-    "packages/omo-senpi/src/components/memory/worker/model-cost.ts",
     "packages/omo-senpi/src/components/memory/worker/model-miss.ts",
     "packages/omo-senpi/src/components/memory/worker/model-preflight.ts",
     "packages/omo-senpi/src/components/memory/worker/park-alert.ts",
