@@ -18,7 +18,9 @@ interface Harness {
   readonly fetchHeaders: Record<string, string>[]
   readonly childRequests: AdvisorChildRequest[]
   readonly entries: unknown[]
+  readonly warnings: string[]
   nextEntry(): Promise<unknown>
+  nextWarning(match: string): Promise<string>
 }
 
 function setup(input: {
@@ -45,7 +47,16 @@ function setup(input: {
     fetchHeaders.push(init?.headers as Record<string, string>)
     return new Response(JSON.stringify({ answers: { stuck: { type: "noul", noul: input.probability ?? 0.9 }, kind: { type: "choice", choice: "error_streak", confidence: 0.9 } }, usage: { input_tokens: 42 } }))
   }) as typeof fetch
-  const ctx: ComponentContext = { logger: { info() {}, warn() {}, error() {} }, config: { getFlag: (name) => pi.getFlag(name) } }
+  const warnings: string[] = []
+  const warningWaiters: Array<{ match: string; resolve: (line: string) => void }> = []
+  const warn = (message: string): void => {
+    warnings.push(message)
+    for (const waiter of warningWaiters.splice(0)) {
+      if (message.includes(waiter.match)) waiter.resolve(message)
+      else warningWaiters.push(waiter)
+    }
+  }
+  const ctx: ComponentContext = { logger: { info() {}, warn, error() {} }, config: { getFlag: (name) => pi.getFlag(name) } }
   createAdvisorComponent({
     env: input.key === undefined ? {} : { [KEY_ENV]: input.key },
     loadConfig: () => ({ advisor: { api_key_env: KEY_ENV, ...input.advisor } }) as unknown as OmoConfig,
@@ -63,7 +74,15 @@ function setup(input: {
     })
     return Promise.race([entry, timeout]).finally(() => clearTimeout(timer))
   }
-  return { pi, fetchBodies, fetchHeaders, childRequests, entries, nextEntry }
+  const nextWarning = (match: string): Promise<string> => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const warning = new Promise<string>((resolve) => warningWaiters.push({ match, resolve }))
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`waited 5s for a warning containing "${match}", none was logged`)), 5000)
+    })
+    return Promise.race([warning, timeout]).finally(() => clearTimeout(timer))
+  }
+  return { pi, fetchBodies, fetchHeaders, childRequests, entries, warnings, nextEntry, nextWarning }
 }
 
 const SESSION = { cwd: "/repo", sessionManager: { getSessionId: () => "s-1" } }
@@ -140,5 +159,31 @@ describe("advisor component", () => {
     await toolResults(h.pi, 1)
     expect(await entry).toMatchObject({ triggered: true, advice: { kind: "failed", reason: "timeout" } })
     expect(h.pi.messages).toHaveLength(0)
+  })
+
+  it("#given sendMessage rejects #when the advice is delivered #then the failure is logged and no rejection escapes", async () => {
+    const h = setup({ advisor: { enabled: true, min_calls: 1 }, key: "k" })
+    const unhandled: unknown[] = []
+    const onUnhandled = (reason: unknown) => unhandled.push(reason)
+    process.on("unhandledRejection", onUnhandled)
+    try {
+      Object.assign(h.pi, { sendMessage: () => Promise.reject(new Error("context retired")) })
+      const failed = h.nextWarning("consult failed")
+      await toolResults(h.pi, 1)
+      expect(await failed).toContain("consult failed")
+      expect(unhandled).toEqual([])
+    } finally {
+      process.off("unhandledRejection", onUnhandled)
+    }
+  })
+
+  it("#given a secret in a tool result #when the gate is asked #then the state carries it redacted", async () => {
+    const h = setup({ advisor: { enabled: true, min_calls: 1 }, probability: 0.1, key: "k" })
+    const entry = h.nextEntry()
+    await h.pi.dispatch("tool_result", { type: "tool_result", toolName: "bash", input: { command: "cat .env" }, content: [{ type: "text", text: "OPENAI_API_KEY=sk-live-abc123" }], isError: false }, SESSION)
+    await entry
+    const state = JSON.stringify(h.fetchBodies[0]?.["state"])
+    expect(state).not.toContain("sk-live-abc123")
+    expect(state).toContain("OPENAI_API_KEY=[REDACTED]")
   })
 })

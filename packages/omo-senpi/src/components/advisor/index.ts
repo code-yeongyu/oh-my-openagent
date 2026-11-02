@@ -39,6 +39,7 @@ interface SessionRecord {
   readonly config: OmoConfig
   readonly cwd: string
   readonly window: AdvisorSessionWindow
+  readonly shutdown: AbortController
   registry: ChildModelRegistry | undefined
 }
 
@@ -79,7 +80,9 @@ export function createAdvisorComponent(options: AdvisorComponentOptions = {}): O
           sessions.set(sessionId, null)
           return undefined
         }
-        const record = settings.enabled ? { settings, config, cwd, window: createAdvisorSessionWindow(now()), registry: undefined } : null
+        const record = settings.enabled
+          ? { settings, config, cwd, window: createAdvisorSessionWindow(now()), shutdown: new AbortController(), registry: undefined }
+          : null
         sessions.set(sessionId, record)
         return record ?? undefined
       }
@@ -107,15 +110,19 @@ export function createAdvisorComponent(options: AdvisorComponentOptions = {}): O
         recordToolResult(window, payload["toolName"], payload["input"], payload["isError"] === true, payload["content"], record.settings.window)
         if (!shouldAskGate(window, record.settings)) return undefined
         window.inFlight = true
-        void consult(sessionId, record).finally(() => {
-          window.inFlight = false
-        })
+        void consult(sessionId, record)
+          .catch((error: unknown) => ctx.logger.warn("omo-senpi advisor consult failed", { sessionId, error: describe(error) }))
+          .finally(() => {
+            window.inFlight = false
+          })
         return undefined
       })
 
       pi.on("session_shutdown", (_payload, eventCtx) => {
         const sessionId = sessionIdOf(eventCtx)
-        if (sessionId !== undefined) sessions.delete(sessionId)
+        if (sessionId === undefined) return
+        sessions.get(sessionId)?.shutdown.abort()
+        sessions.delete(sessionId)
       })
 
       async function consult(sessionId: string, record: SessionRecord): Promise<void> {
@@ -127,8 +134,10 @@ export function createAdvisorComponent(options: AdvisorComponentOptions = {}): O
           apiKey: env[settings.api_key_env],
           state: buildGateState(window, now()),
           timeoutMs: GATE_TIMEOUT_MS,
+          signal: record.shutdown.signal,
           ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
         })
+        if (record.shutdown.signal.aborted) return
         if (gate.kind !== "judged") {
           ctx.logger.warn("omo-senpi advisor gate unavailable", { sessionId, outcome: gate.kind, ...("reason" in gate ? { reason: gate.reason } : {}) })
           pi.appendEntry?.(ADVISOR_GATE_ENTRY_TYPE, { version: 1, atToolResult, gate })
@@ -155,7 +164,9 @@ export function createAdvisorComponent(options: AdvisorComponentOptions = {}): O
           registry: record.registry,
           prompt: renderAdvisorPrompt(window, judgement),
           timeoutMs: settings.timeout_seconds * 1000,
+          signal: record.shutdown.signal,
         }, options.childSeams)
+        if (record.shutdown.signal.aborted) return
         if (outcome.kind === "advice") {
           await pi.sendMessage(
             { customType: ADVISOR_ADVICE_TYPE, content: renderAdviceMessage(outcome.text, judgement), display: false, details: { model: outcome.model, ...judgement } },

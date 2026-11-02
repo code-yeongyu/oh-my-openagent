@@ -76,6 +76,7 @@ export interface DecisionGateRequest {
   readonly apiKey: string | undefined
   readonly state: GateState
   readonly timeoutMs: number
+  readonly signal?: AbortSignal
   readonly fetch?: typeof fetch
 }
 
@@ -88,7 +89,7 @@ export async function askDecisionGate(request: DecisionGateRequest): Promise<Dec
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${request.apiKey}` },
       body: JSON.stringify({ model: request.model, state: request.state, questions: GATE_QUESTIONS }),
-      signal: AbortSignal.timeout(request.timeoutMs),
+      signal: request.signal === undefined ? AbortSignal.timeout(request.timeoutMs) : AbortSignal.any([AbortSignal.timeout(request.timeoutMs), request.signal]),
     })
   } catch (error) {
     return { kind: "failed", reason: error instanceof Error ? error.name : "fetch_failed" }

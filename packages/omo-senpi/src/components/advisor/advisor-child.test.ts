@@ -111,4 +111,19 @@ describe("runAdvisorChild", () => {
     expect(String(outcome.kind === "failed" ? outcome.reason : "")).toContain("anthropic/claude-opus-5-5: model unavailable")
     expect(specs).toHaveLength(1)
   })
+
+  it("#given runner.start never settles #when the timeout passes #then it fails as timeout instead of hanging", async () => {
+    const runner = { start: () => new Promise<never>(() => {}) } as unknown as InProcessRunnerLike
+    expect(await runAdvisorChild({ ...REQUEST, timeoutMs: 10 }, { createRunner: () => runner })).toMatchObject({ kind: "failed", reason: "timeout" })
+  })
+
+  it("#given the session shuts down while the child runs #when the signal aborts #then the child is aborted and nothing is returned as advice", async () => {
+    const fake = fakeRunner({ hang: true })
+    const shutdown = new AbortController()
+    const pending = runAdvisorChild({ ...REQUEST, timeoutMs: 60_000, signal: shutdown.signal }, { createRunner: () => fake.runner })
+    shutdown.abort()
+    expect(await pending).toMatchObject({ kind: "failed", reason: "session_shutdown" })
+    expect(fake.aborted()).toBe(true)
+    expect(fake.disposed()).toBe(true)
+  })
 })

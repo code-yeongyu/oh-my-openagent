@@ -1,3 +1,5 @@
+import { redactSensitiveOutput } from "../memory/kibitzer/sensitive-output"
+
 const TASK_CHARS = 4000
 const ARGS_CHARS = 400
 const RESULT_CHARS = 1200
@@ -26,15 +28,16 @@ export function createAdvisorSessionWindow(now: number): AdvisorSessionWindow {
 }
 
 export function recordToolResult(window: AdvisorSessionWindow, tool: string, input: unknown, isError: boolean, content: unknown, limit: number): void {
-  const args = clip(stringify(input), ARGS_CHARS)
-  window.calls.push({ tool, args, result: clip(textOf(content), RESULT_CHARS), isError, isWait: WAIT_TOOLS.has(tool) || /\bsleep\s+\d/.test(args) })
+  const args = clip(redactSensitiveOutput(stringify(input)), ARGS_CHARS)
+  const result = clip(redactSensitiveOutput(textOf(content)), RESULT_CHARS)
+  window.calls.push({ tool, args, result, isError, isWait: WAIT_TOOLS.has(tool) || /\bsleep\s+\d/.test(args) })
   if (window.calls.length > limit) window.calls.splice(0, window.calls.length - limit)
   window.toolResults += 1
 }
 
 export function rememberTask(window: AdvisorSessionWindow, prompt: string): void {
   if (window.task !== undefined) return
-  const text = prompt.trim()
+  const text = redactSensitiveOutput(prompt).trim()
   if (text.length > 0) window.task = text.length > TASK_CHARS ? `${text.slice(0, TASK_CHARS)}...` : text
 }
 

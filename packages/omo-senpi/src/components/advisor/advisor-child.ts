@@ -4,6 +4,7 @@ import type { ChildModelRegistry, ChildSpec, CreateChildSession, InProcessRunner
 import { childModelChainSpec, type ChildModelChainSpec } from "../memory/memory-child-model-chain"
 import { resolveKibitzerSidecarModel } from "../memory/kibitzer/sidecar-model"
 import { loadKibitzerTaskRuntime, type KibitzerTaskRuntime } from "../memory/kibitzer/task-runtime"
+import { runBoundedChild, type BoundedChildOutcome } from "./bounded-child"
 import { ADVISOR_SYSTEM_PROMPT } from "./prompt"
 
 type AdvisorTaskRuntime = Pick<KibitzerTaskRuntime, "createInProcessJudgeRunner" | "findModelReference">
@@ -27,6 +28,7 @@ export interface AdvisorChildRequest {
   readonly registry: ChildModelRegistry | undefined
   readonly prompt: string
   readonly timeoutMs: number
+  readonly signal?: AbortSignal
 }
 
 export interface AdvisorChildSeams {
@@ -54,16 +56,11 @@ export async function runAdvisorChild(request: AdvisorChildRequest, seams: Advis
   if (runner === undefined) return { kind: "unavailable", reason: "runtime_unavailable" }
   const failures: string[] = []
   for (const candidate of advisorCandidates(request)) {
-    const spec = buildSpec(request, candidate, runtime)
-    let handle: Awaited<ReturnType<InProcessRunnerLike["start"]>>
-    const startedAt = Date.now()
-    try {
-      handle = await runner.start(spec)
-    } catch (error) {
-      failures.push(`${candidate.model}: ${describe(error)}`)
+    const outcome = await runBoundedChild(runner, buildSpec(request, candidate, runtime), candidate.model, request.timeoutMs, request.signal)
+    if (outcome.kind === "start_failed") {
+      failures.push(`${candidate.model}: ${outcome.reason}`)
       continue
     }
-    const outcome = await awaitAdvice(handle, candidate.model, request.timeoutMs, startedAt)
     if (!isEmptyReply(outcome) || !canRetryLower(candidate.thinking)) return outcome
     return retryAtLowerThinking(runner, request, candidate, runtime)
   }
@@ -72,7 +69,7 @@ export async function runAdvisorChild(request: AdvisorChildRequest, seams: Advis
 
 const RETRY_THINKING: ThinkingLevel = "off"
 
-function isEmptyReply(outcome: AdvisorChildOutcome): boolean {
+function isEmptyReply(outcome: BoundedChildOutcome): outcome is { readonly kind: "failed"; readonly reason: string; readonly model?: string } {
   return outcome.kind === "failed" && outcome.reason === "empty"
 }
 
@@ -92,14 +89,9 @@ async function retryAtLowerThinking(
 ): Promise<AdvisorChildOutcome> {
   const lowered: AdvisorCandidate = { ...candidate, thinking: RETRY_THINKING }
   const spec = { ...buildSpec(request, lowered, runtime), taskId: `advisor-${request.sessionId}-${request.sequence}-retry` }
-  const startedAt = Date.now()
-  try {
-    const handle = await runner.start(spec)
-    const outcome = await awaitAdvice(handle, candidate.model, request.timeoutMs, startedAt)
-    return outcome.kind === "failed" ? { ...outcome, reason: `empty at ${candidate.thinking}, then ${outcome.reason} at ${RETRY_THINKING}` } : outcome
-  } catch (error) {
-    return { kind: "failed", reason: `empty at ${candidate.thinking}, then start_failed at ${RETRY_THINKING}: ${describe(error)}`, model: candidate.model }
-  }
+  const outcome = await runBoundedChild(runner, spec, candidate.model, request.timeoutMs, request.signal)
+  if (outcome.kind === "advice") return outcome
+  return { kind: "failed", reason: `empty at ${candidate.thinking}, then ${outcome.reason} at ${RETRY_THINKING}`, model: candidate.model }
 }
 
 function advisorCandidates(request: AdvisorChildRequest): readonly AdvisorCandidate[] {
@@ -129,31 +121,6 @@ function buildSpec(request: AdvisorChildRequest, candidate: AdvisorCandidate, ru
     promptEnvelope: "bare",
     completion: "turn",
     prompt: request.prompt,
-  }
-}
-
-async function awaitAdvice(handle: Awaited<ReturnType<InProcessRunnerLike["start"]>>, model: string, timeoutMs: number, startedAt: number): Promise<AdvisorChildOutcome> {
-  let timer: ReturnType<typeof setTimeout> | undefined
-  try {
-    const timedOut = new Promise<"timeout">((resolve) => {
-      timer = setTimeout(() => resolve("timeout"), timeoutMs)
-      timer.unref?.()
-    })
-    const finished = await Promise.race([handle.waitForIdle(), timedOut])
-    if (finished === "timeout") {
-      await handle.abort().catch(() => undefined)
-      return { kind: "failed", reason: "timeout", model }
-    }
-    if (finished.status === "error") return { kind: "failed", reason: `${finished.failure.kind}: ${finished.failure.message}`, model }
-    if (finished.status !== "completed") return { kind: "failed", reason: finished.status, model }
-    const text = handle.lastAssistantText()?.trim()
-    if (text === undefined || text.length === 0) return { kind: "failed", reason: "empty", model }
-    return { kind: "advice", text, model, ms: Date.now() - startedAt }
-  } catch (error) {
-    return { kind: "failed", reason: describe(error), model }
-  } finally {
-    if (timer !== undefined) clearTimeout(timer)
-    await Promise.resolve(handle.dispose()).catch(() => undefined)
   }
 }
 
