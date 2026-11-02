@@ -5,7 +5,7 @@ import { createTaskRecordStore, type TaskRecordStore } from "../store"
 import type { ResolvedModelRecord, TaskRecord } from "../state"
 import { createTaskManager } from "./manager"
 import { createUsageLimitMemory } from "./usage-limit-memory"
-import { baseSpec, cleanupProjects, FakeRunner, settings, tempProject } from "./__fixtures__/manager-fakes"
+import { baseSpec, cleanupProjects, type FakeHandle, FakeRunner, settings, tempProject } from "./__fixtures__/manager-fakes"
 import type { ManagedStartSpec } from "./types"
 import { resolveChildSessionDir } from "../runners/rpc/spawn"
 
@@ -103,6 +103,53 @@ test("a warm revival resumes its transcript on an unspent alternative", async ()
     expect(f.runner.startedSpecs.at(-1)?.model).toBe(other.display)
     expect(fake.followUpCalls).toHaveLength(0)
     expect(f.runner.handles.get(result.task_id)?.followUpCalls).toEqual(["continue"])
+  } finally { f.manager.workpools.dispose() }
+})
+
+const FABLE_LIMIT = "You've hit your Fable weekly limit for this model · Resets at 2099-10-29T04:27:07Z"
+
+function hopInSession(fake: FakeHandle, from: string, to: string, message: string): void {
+  fake.emit({ type: "message_end", message: { role: "assistant", stopReason: "error", errorMessage: message, content: [] } })
+  const hop = { type: "retry_fallback_applied", from, to, chainKey: from, reason: "hard-error" }
+  fake.emit(hop)
+}
+
+test("a usage limit the engine hops past in-session is remembered for a later task until its reset", async () => {
+  let now = 1000
+  const f = fixture([next], () => now)
+  try {
+    const one = await f.manager.start(baseSpec())
+    if (one.kind !== "started") throw new Error("expected start")
+    const fake = present(f.runner.handles.get(one.task_id))
+    await fake.waitForSubscription()
+    hopInSession(fake, primary.display, next.display, FABLE_LIMIT)
+    const done = f.manager.waitFor(one.task_id)
+    fake.settle({ status: "completed", finalResponse: "done on the next rung" })
+    await done
+
+    const two = await f.manager.start(baseSpec())
+    if (two.kind !== "started") throw new Error("expected start")
+    expect(f.runner.startedSpecs.map((spec) => spec.model)).toEqual([primary.display, next.display])
+    expect(f.memory.spentReason(primary.provider, primary.model_id)).toBe(FABLE_LIMIT)
+    expect(f.memory.familySpent(next.provider, next.model_id)).toBe(false)
+
+    now = Date.parse("2099-10-29T04:27:07Z")
+    expect(f.memory.familySpent(primary.provider, primary.model_id)).toBe(false)
+  } finally { f.manager.workpools.dispose() }
+})
+
+test("an in-session hop off a model outside the designated chain is not remembered", async () => {
+  const f = fixture([next])
+  try {
+    const one = await f.manager.start(baseSpec())
+    if (one.kind !== "started") throw new Error("expected start")
+    const fake = present(f.runner.handles.get(one.task_id))
+    await fake.waitForSubscription()
+    hopInSession(fake, "parent/gpt", next.display, "You've hit your weekly limit for this model")
+    const done = f.manager.waitFor(one.task_id)
+    fake.settle({ status: "completed", finalResponse: "done" })
+    await done
+    expect(f.memory.familySpent("parent", "gpt")).toBe(false)
   } finally { f.manager.workpools.dispose() }
 })
 
