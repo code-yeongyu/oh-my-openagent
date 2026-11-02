@@ -1,5 +1,6 @@
 // Sandbox wiring every EQ.omo case shares (fused-equivalence-e2e.mjs): the built plugin's trust, every config/state
-// root inside the case sandbox, the telemetry opt-out, and the omo config the case runs with.
+// root inside the case sandbox, the telemetry opt-out, and the omo config the case runs with. Nothing here turns a
+// plugin surface off.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { withTelemetryOptOut } from "./telemetry-opt-out-env.mjs";
@@ -30,15 +31,8 @@ export function prepareCaseSandbox(run, omoConfig) {
 	mkdirSync(tmp, { recursive: true });
 	for (const name of ["TMPDIR", "TMP", "TEMP"]) run.env[name] = tmp;
 	writeFileSync(join(run.box.agentDir, "trust.json"), `${JSON.stringify({ [run.box.cwd]: true }, null, 2)}\n`);
-	// The plugin's two remote MCP servers would reach the network, and its local `_ast_grep` server connects on its own
-	// schedule: whether that connect lands before or after the host records the session's first loaded-surfaces digest
-	// decides whether a `loaded_surfaces_changed` is announced at all (both seen in B0 runs on darwin and linux). The user
-	// mcp.json switch the plugin documents turns all three off, so no case depends on a connect race; none of E21-E24
-	// exercises an MCP tool.
-	writeFileSync(
-		join(run.box.agentDir, "mcp.json"),
-		`${JSON.stringify({ mcpServers: { context7: { enabled: false }, grep_app: { enabled: false }, _ast_grep: { enabled: false } } }, null, 2)}\n`,
-	);
+	// No mcp.json: the plugin's MCP declarations (`_ast_grep`, `context7`, `grep_app`) load exactly as in a normal
+	// session, the two remote ones over the real network.
 	mkdirSync(join(run.box.cwd, ".omo"), { recursive: true });
 	writeFileSync(join(run.box.cwd, ".omo", "omo.json"), `${JSON.stringify(omoConfig, null, 2)}\n`);
 }
