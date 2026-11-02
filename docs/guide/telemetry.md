@@ -27,7 +27,7 @@ OmO sends pseudonymous usage data so we can see which features people use and wh
 
 ## How you are counted
 
-OmO creates random, pseudonymous install ids on your computer and stores them there; only a one-way hash of an id is sent. They are not built from your name, your computer's name, hardware or accounts. Session ids are scrambled on your computer before they are sent, so sessions can't be matched across machines. No personal profile is built. The data goes to PostHog, Inc. in the United States, which works out an approximate country from the connection and then discards the address.
+OmO creates random, pseudonymous install ids on your computer and stores them there; only a one-way hash of an id is sent. The once-a-day activity event is also keyed by a one-way hash of the identifier your operating system assigns to the computer, so one computer is counted once across updates and reinstalls; that identifier itself is never sent or stored by OmO, and none of these values is built from your name, your computer's name or your accounts. `OMO_TELEMETRY_DEVICE_ID=off` keeps only the install hash. Session ids are scrambled on your computer before they are sent, so sessions can't be matched across machines. No personal profile is built. The data goes to PostHog, Inc. in the United States, which works out an approximate country from the connection and then discards the address.
 
 ## Turn it off
 

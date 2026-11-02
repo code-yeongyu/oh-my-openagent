@@ -10,11 +10,11 @@ The Codex adapter emits one PostHog event:
 | ----- | ----- |
 | Event name | `omo_codex_daily_active` |
 | Product platform | `omo-codex` |
-| Distinct ID | `sha256(install id)`, where the install id is a random value created on this computer |
+| Distinct ID | The device hash, `sha256("omo:device:v1\0" + the OS machine id)`; `sha256(install id)` when the OS exposes no machine id or `OMO_TELEMETRY_DEVICE_ID=off` |
 | Daily limit | At most once per UTC day per machine |
 | Person profiles | Disabled with `$process_person_profile: false` |
 
-The install id is a random 64-hex value created on the first send and stored next to the daily deduplication state (see Local State). It is not derived from the hostname, user name, hardware or accounts, and only its hash is sent.
+The install id is a random 64-hex value created on the first send and stored next to the daily deduplication state (see Local State). It is not derived from the hostname, user name, hardware or accounts, and only its hash is sent, as the `install_hash` property (and as the distinct id when there is no device hash). The machine id behind the device hash (`IOPlatformUUID`, `/etc/machine-id` or `MachineGuid`) is read on the send path only and never stored or sent; `id_scheme` says which of the two is the distinct id.
 
 ## Sources
 
