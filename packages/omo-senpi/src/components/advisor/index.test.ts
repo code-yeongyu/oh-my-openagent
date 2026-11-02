@@ -3,95 +3,9 @@
 import { describe, expect, it } from "bun:test"
 
 import { LATEST_MODEL_BY_FAMILY } from "@oh-my-opencode/model-core/latest-models"
-import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 
-import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import type { ComponentContext } from "../../extension/types"
-import type { AdvisorChildOutcome, AdvisorChildRequest } from "./advisor-child"
-import { ADVISOR_ADVICE_TYPE, ADVISOR_GATE_ENTRY_TYPE, createAdvisorComponent } from "./index"
-
-const KEY_ENV = "TEST_ADVISOR_KEY"
-
-interface Harness {
-  readonly pi: FakeExtensionAPI
-  readonly fetchBodies: Record<string, unknown>[]
-  readonly fetchHeaders: Record<string, string>[]
-  readonly childRequests: AdvisorChildRequest[]
-  readonly entries: unknown[]
-  readonly warnings: string[]
-  nextEntry(): Promise<unknown>
-  nextWarning(match: string): Promise<string>
-}
-
-function setup(input: {
-  readonly advisor?: Record<string, unknown>
-  readonly probability?: number
-  readonly key?: string
-  readonly child?: AdvisorChildOutcome
-}): Harness {
-  const pi = new FakeExtensionAPI()
-  const fetchBodies: Record<string, unknown>[] = []
-  const fetchHeaders: Record<string, string>[] = []
-  const childRequests: AdvisorChildRequest[] = []
-  const entries: unknown[] = []
-  const waiters: Array<(entry: unknown) => void> = []
-  Object.assign(pi, {
-    appendEntry: (customType: string, data: unknown) => {
-      if (customType !== ADVISOR_GATE_ENTRY_TYPE) return
-      entries.push(data)
-      waiters.shift()?.(data)
-    },
-  })
-  const fakeFetch = (async (_url: unknown, init?: RequestInit) => {
-    fetchBodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>)
-    fetchHeaders.push(init?.headers as Record<string, string>)
-    return new Response(JSON.stringify({ answers: { stuck: { type: "noul", noul: input.probability ?? 0.9 }, kind: { type: "choice", choice: "error_streak", confidence: 0.9 } }, usage: { input_tokens: 42 } }))
-  }) as typeof fetch
-  const warnings: string[] = []
-  const warningWaiters: Array<{ match: string; resolve: (line: string) => void }> = []
-  const warn = (message: string): void => {
-    warnings.push(message)
-    for (const waiter of warningWaiters.splice(0)) {
-      if (message.includes(waiter.match)) waiter.resolve(message)
-      else warningWaiters.push(waiter)
-    }
-  }
-  const ctx: ComponentContext = { logger: { info() {}, warn, error() {} }, config: { getFlag: (name) => pi.getFlag(name) } }
-  createAdvisorComponent({
-    env: input.key === undefined ? {} : { [KEY_ENV]: input.key },
-    loadConfig: () => ({ advisor: { api_key_env: KEY_ENV, ...input.advisor } }) as unknown as OmoConfig,
-    fetch: fakeFetch,
-    runChild: async (request) => {
-      childRequests.push(request)
-      return input.child ?? { kind: "advice", text: "ROOT CAUSE: the header path is wrong. DO THIS: 1. read the first error.", model: "anthropic/claude-opus-5-5", ms: 5 }
-    },
-  }).register(pi, ctx)
-  const nextEntry = (): Promise<unknown> => {
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const entry = new Promise<unknown>((resolve) => waiters.push(resolve))
-    const timeout = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error("waited 5s for an advisor gate entry, none was appended")), 5000)
-    })
-    return Promise.race([entry, timeout]).finally(() => clearTimeout(timer))
-  }
-  const nextWarning = (match: string): Promise<string> => {
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const warning = new Promise<string>((resolve) => warningWaiters.push({ match, resolve }))
-    const timeout = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error(`waited 5s for a warning containing "${match}", none was logged`)), 5000)
-    })
-    return Promise.race([warning, timeout]).finally(() => clearTimeout(timer))
-  }
-  return { pi, fetchBodies, fetchHeaders, childRequests, entries, warnings, nextEntry, nextWarning }
-}
-
-const SESSION = { cwd: "/repo", sessionManager: { getSessionId: () => "s-1" } }
-
-async function toolResults(pi: FakeExtensionAPI, count: number): Promise<void> {
-  for (let index = 0; index < count; index += 1) {
-    await pi.dispatch("tool_result", { type: "tool_result", toolName: "bash", input: { command: "make" }, content: [{ type: "text", text: "error: x" }], isError: true }, SESSION)
-  }
-}
+import { setup, SESSION, toolResults } from "./advisor.test-support"
+import { ADVISOR_ADVICE_TYPE } from "./index"
 
 describe("advisor component", () => {
   it("#given the default config #when the component registers #then it registers no hook at all", () => {
@@ -129,6 +43,8 @@ describe("advisor component", () => {
     expect(await entry).toMatchObject({ triggered: true, advice: { kind: "advice" } })
     expect(h.childRequests[0]).toMatchObject({ model: "openai/gpt-x", thinking: "medium" })
     expect(h.childRequests[0]?.prompt).toContain("label=error_streak")
+    expect(h.pi.messages).toHaveLength(0)
+    await toolResults(h.pi, 1)
     expect(h.pi.messages).toHaveLength(1)
     expect(h.pi.messages[0]?.message).toMatchObject({ customType: ADVISOR_ADVICE_TYPE, display: false })
     expect(String(h.pi.messages[0]?.message["content"])).toContain("ROOT CAUSE: the header path is wrong")
@@ -161,21 +77,6 @@ describe("advisor component", () => {
     expect(h.pi.messages).toHaveLength(0)
   })
 
-  it("#given sendMessage rejects #when the advice is delivered #then the failure is logged and no rejection escapes", async () => {
-    const h = setup({ advisor: { enabled: true, min_calls: 1 }, key: "k" })
-    const unhandled: unknown[] = []
-    const onUnhandled = (reason: unknown) => unhandled.push(reason)
-    process.on("unhandledRejection", onUnhandled)
-    try {
-      Object.assign(h.pi, { sendMessage: () => Promise.reject(new Error("context retired")) })
-      const failed = h.nextWarning("consult failed")
-      await toolResults(h.pi, 1)
-      expect(await failed).toContain("consult failed")
-      expect(unhandled).toEqual([])
-    } finally {
-      process.off("unhandledRejection", onUnhandled)
-    }
-  })
 
   it("#given a secret in a tool result #when the gate is asked #then the state carries it redacted", async () => {
     const h = setup({ advisor: { enabled: true, min_calls: 1 }, probability: 0.1, key: "k" })
@@ -186,4 +87,9 @@ describe("advisor component", () => {
     expect(state).not.toContain("sk-live-abc123")
     expect(state).toContain("OPENAI_API_KEY=[REDACTED]")
   })
+
+
+
+
+
 })

@@ -16,11 +16,12 @@ import { loadSenpiOmoConfig } from "../config-resolution"
 import { resolveMemoryModelRegistry } from "../memory/model-registry-resolver"
 import { runAdvisorChild, type AdvisorChildOutcome, type AdvisorChildSeams } from "./advisor-child"
 import { askDecisionGate, buildGateState, gateFires } from "./decision-gate"
+import { deliverHeldPlan, dropHeldPlan, type HeldPlan } from "./plan-delivery"
 import { renderAdviceMessage, renderAdvisorPrompt } from "./prompt"
 import { shouldAskGate } from "./schedule"
 import { createAdvisorSessionWindow, recordToolResult, rememberTask, textOf, type AdvisorSessionWindow } from "./session-window"
 
-export const ADVISOR_ADVICE_TYPE = "omo-advisor:advice"
+export { ADVISOR_ADVICE_TYPE, ADVISOR_DELIVERY_ENTRY_TYPE } from "./plan-delivery"
 export const ADVISOR_GATE_ENTRY_TYPE = "omo-advisor:gate"
 const GATE_TIMEOUT_MS = 20_000
 const DEFAULT_ADVISOR_MODEL = `anthropic/${LATEST_MODEL_BY_FAMILY.claudeOpus}`
@@ -41,6 +42,7 @@ interface SessionRecord {
   readonly window: AdvisorSessionWindow
   readonly shutdown: AbortController
   registry: ChildModelRegistry | undefined
+  heldPlan: HeldPlan | undefined
 }
 
 export function createAdvisorComponent(options: AdvisorComponentOptions = {}): OmoSenpiComponent {
@@ -81,7 +83,7 @@ export function createAdvisorComponent(options: AdvisorComponentOptions = {}): O
           return undefined
         }
         const record = settings.enabled
-          ? { settings, config, cwd, window: createAdvisorSessionWindow(now()), shutdown: new AbortController(), registry: undefined }
+          ? { settings, config, cwd, window: createAdvisorSessionWindow(now()), shutdown: new AbortController(), registry: undefined, heldPlan: undefined }
           : null
         sessions.set(sessionId, record)
         return record ?? undefined
@@ -90,9 +92,17 @@ export function createAdvisorComponent(options: AdvisorComponentOptions = {}): O
       pi.on("before_agent_start", (payload, eventCtx) => {
         if (isRecord(payload) && payload["preview"] === true) return undefined
         const record = recordFor(eventCtx)
-        if (record !== undefined && isRecord(payload) && typeof payload["prompt"] === "string") rememberTask(record.window, payload["prompt"])
+        if (record === undefined || !isRecord(payload) || typeof payload["prompt"] !== "string") return undefined
+        dropHeldPlan(pi, record, "new_prompt")
+        rememberTask(record.window, payload["prompt"])
         return undefined
       }, { previewSafe: true })
+
+      pi.on("agent_settled", (_payload, eventCtx) => {
+        const sessionId = sessionIdOf(eventCtx)
+        const record = sessionId === undefined ? undefined : sessions.get(sessionId)
+        if (record) dropHeldPlan(pi, record, "settled")
+      })
 
       pi.on("message_end", (payload, eventCtx) => {
         const record = recordFor(eventCtx)
@@ -108,7 +118,9 @@ export function createAdvisorComponent(options: AdvisorComponentOptions = {}): O
         if (registry !== undefined) record.registry = registry
         const window = record.window
         recordToolResult(window, payload["toolName"], payload["input"], payload["isError"] === true, payload["content"], record.settings.window)
-        if (!shouldAskGate(window, record.settings)) return undefined
+        void deliverHeldPlan(pi, record, eventCtx, ctx.logger)
+          .catch((error: unknown) => ctx.logger.warn("omo-senpi advisor delivery failed", { sessionId, error: describe(error) }))
+        if (record.heldPlan !== undefined || !shouldAskGate(window, record.settings)) return undefined
         window.inFlight = true
         void consult(sessionId, record)
           .catch((error: unknown) => ctx.logger.warn("omo-senpi advisor consult failed", { sessionId, error: describe(error) }))
@@ -148,7 +160,6 @@ export function createAdvisorComponent(options: AdvisorComponentOptions = {}): O
           return
         }
         window.advices += 1
-        window.lastAdviceAt = atToolResult
         const judgement = { trouble: gate.trouble, stuck: gate.stuck }
         const agentDir = resolveAgentHome({ env })
         const outcome: AdvisorChildOutcome = await runChild({
@@ -168,12 +179,9 @@ export function createAdvisorComponent(options: AdvisorComponentOptions = {}): O
         }, options.childSeams)
         if (record.shutdown.signal.aborted) return
         if (outcome.kind === "advice") {
-          await pi.sendMessage(
-            { customType: ADVISOR_ADVICE_TYPE, content: renderAdviceMessage(outcome.text, judgement), display: false, details: { model: outcome.model, ...judgement } },
-            { deliverAs: "steer" },
-          )
-          ctx.logger.info("omo-senpi advisor advice delivered", { sessionId, model: outcome.model, ...judgement })
+          record.heldPlan = { content: renderAdviceMessage(outcome.text, judgement), model: outcome.model, judgement, firedAt: atToolResult }
         } else {
+          window.lastAdviceAt = atToolResult
           ctx.logger.warn("omo-senpi advisor child produced no advice", { sessionId, outcome: outcome.kind, reason: outcome.reason })
         }
         pi.appendEntry?.(ADVISOR_GATE_ENTRY_TYPE, { version: 1, atToolResult, gate, triggered: true, advice: outcome })

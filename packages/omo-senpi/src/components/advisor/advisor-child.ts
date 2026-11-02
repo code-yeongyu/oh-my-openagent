@@ -55,14 +55,15 @@ export async function runAdvisorChild(request: AdvisorChildRequest, seams: Advis
   const runner = seams.createRunner?.({}) ?? runtime?.createInProcessJudgeRunner({})
   if (runner === undefined) return { kind: "unavailable", reason: "runtime_unavailable" }
   const failures: string[] = []
+  const deadline = Date.now() + request.timeoutMs
   for (const candidate of advisorCandidates(request)) {
-    const outcome = await runBoundedChild(runner, buildSpec(request, candidate, runtime), candidate.model, request.timeoutMs, request.signal)
+    const outcome = await runBoundedChild(runner, buildSpec(request, candidate, runtime), candidate.model, remaining(deadline), request.signal)
     if (outcome.kind === "start_failed") {
       failures.push(`${candidate.model}: ${outcome.reason}`)
       continue
     }
     if (!isEmptyReply(outcome) || !canRetryLower(candidate.thinking)) return outcome
-    return retryAtLowerThinking(runner, request, candidate, runtime)
+    return retryAtLowerThinking(runner, request, candidate, runtime, deadline)
   }
   return { kind: "failed", reason: `start_failed: ${failures.join("; ") || "no candidate"}` }
 }
@@ -86,10 +87,12 @@ async function retryAtLowerThinking(
   request: AdvisorChildRequest,
   candidate: AdvisorCandidate,
   runtime: AdvisorTaskRuntime | undefined,
+  deadline: number,
 ): Promise<AdvisorChildOutcome> {
+  if (remaining(deadline) === 0) return { kind: "failed", reason: `empty at ${candidate.thinking}, no time left to retry`, model: candidate.model }
   const lowered: AdvisorCandidate = { ...candidate, thinking: RETRY_THINKING }
   const spec = { ...buildSpec(request, lowered, runtime), taskId: `advisor-${request.sessionId}-${request.sequence}-retry` }
-  const outcome = await runBoundedChild(runner, spec, candidate.model, request.timeoutMs, request.signal)
+  const outcome = await runBoundedChild(runner, spec, candidate.model, remaining(deadline), request.signal)
   if (outcome.kind === "advice") return outcome
   return { kind: "failed", reason: `empty at ${candidate.thinking}, then ${outcome.reason} at ${RETRY_THINKING}`, model: candidate.model }
 }
@@ -122,6 +125,10 @@ function buildSpec(request: AdvisorChildRequest, candidate: AdvisorCandidate, ru
     completion: "turn",
     prompt: request.prompt,
   }
+}
+
+function remaining(deadline: number): number {
+  return Math.max(0, deadline - Date.now())
 }
 
 function describe(error: unknown): string {

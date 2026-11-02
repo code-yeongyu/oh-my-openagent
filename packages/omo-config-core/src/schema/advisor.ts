@@ -38,7 +38,7 @@ const OmoAdvisorSettingsShape = {
   max_per_session: z.number().int().min(0).max(50),
   /** Recent tool calls kept per session; the gate reads the last 8, the advisor the last 12 (default: 24). */
   window: z.number().int().min(12).max(200),
-  /** Upper bound for one advisor child, in seconds (default: 180). */
+  /** Upper bound for one advice, including the empty-reply retry, in seconds (default: 180). */
   timeout_seconds: z.number().int().min(10).max(900),
 }
 

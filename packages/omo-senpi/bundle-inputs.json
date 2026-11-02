@@ -726,6 +726,7 @@
     "packages/omo-senpi/src/components/advisor/bounded-child.ts",
     "packages/omo-senpi/src/components/advisor/decision-gate.ts",
     "packages/omo-senpi/src/components/advisor/index.ts",
+    "packages/omo-senpi/src/components/advisor/plan-delivery.ts",
     "packages/omo-senpi/src/components/advisor/prompt.ts",
     "packages/omo-senpi/src/components/advisor/schedule.ts",
     "packages/omo-senpi/src/components/advisor/session-window.ts",
