@@ -30,7 +30,7 @@ const FULL_CHAIN_MODELS: readonly FakeModel[] = [
 ]
 
 describe("unspecified-low chain order", () => {
-  test("#given every rung of the chain is served at once #when unspecified-low resolves #then the claude-sonnet-5-5 medium head rung wins", () => {
+  test("#given every rung of the chain is served at once #when unspecified-low resolves #then the claude-sonnet-5-5 high head rung wins", () => {
     // given / when
     const result = resolveCategory("unspecified-low", {}, registry(FULL_CHAIN_MODELS))
 
@@ -40,7 +40,7 @@ describe("unspecified-low chain order", () => {
     expect(result.spec).toMatchObject({
       provider: "anthropic",
       modelId: "claude-sonnet-5-5",
-      variant: "medium",
+      variant: "high",
     })
   })
 
@@ -61,7 +61,7 @@ describe("unspecified-low chain order", () => {
     })
   })
 
-  test("#given the sonnet-5-5 and mimo-v2.6-pro rungs are absent but every later rung is served #when unspecified-low resolves #then the grok-4.7 xhigh rung wins", () => {
+  test("#given the sonnet-5-5 and mimo-v2.6-pro rungs are absent but every later rung is served #when unspecified-low resolves #then the grok-4.7 high rung wins", () => {
     // given
     const models = FULL_CHAIN_MODELS.filter((model) => model.id !== "claude-sonnet-5-5" && model.id !== "mimo-v2.6-pro")
 
@@ -74,7 +74,7 @@ describe("unspecified-low chain order", () => {
     expect(result.spec).toMatchObject({
       provider: "xai",
       modelId: "grok-4.7",
-      variant: "xhigh",
+      variant: "high",
     })
   })
 
