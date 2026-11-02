@@ -41,11 +41,12 @@ test("POSIX leaves the decision to its own path probe, so the Windows limit neve
   expect(commitPathProblem("/Users/ann/.omo/memory", key, "darwin")).toBeNull()
 })
 
-test("a POSIX landing still accepts a key past the Windows limit", async () => {
+test("a landing follows this platform's git capacity", async () => {
   const root = await mkdtemp(join(tmpdir(), "omo-sync-landing-"))
   try {
     const key = grammarValidKeyOfLength(300)
-    expect(await prepareLanding(root, key)).toEqual({ path: key, working: null })
+    // POSIX decides through its own probe and accepts this path; Windows reaches the same key past MAX_PATH, where git could not stage it, so it is refused before anything is written.
+    expect(await prepareLanding(root, key)).toEqual(process.platform === "win32" ? { refused: "git-path-too-long" } : { path: key, working: null })
   } finally {
     await rm(root, { recursive: true, force: true })
   }
