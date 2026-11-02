@@ -280,3 +280,121 @@ describe("experimental.compaction.autocontinue handler", () => {
     expect(restoreTodosMock).toHaveBeenCalledTimes(2)
   })
 })
+
+type FixtureMessage = {
+  info: Record<string, unknown>
+  parts: Array<Record<string, unknown>>
+}
+
+const userPrompt: FixtureMessage = {
+  info: { id: "msg_1", role: "user", agent: "sisyphus" },
+  parts: [{ type: "text", text: "what is 2+2?" }],
+}
+const compactionTrigger: FixtureMessage = {
+  info: { id: "msg_3", role: "user", agent: "sisyphus" },
+  parts: [{ type: "compaction", auto: true }],
+}
+const compactionSummary: FixtureMessage = {
+  info: { id: "msg_4", role: "assistant", agent: "compaction", summary: true, finish: "stop", parentID: "msg_3" },
+  parts: [{ type: "text", text: "## Summary" }],
+}
+
+function assistantTurn(info: Record<string, unknown>, parts: Array<Record<string, unknown>> = []): FixtureMessage {
+  return {
+    info: { id: "msg_2", role: "assistant", agent: "sisyphus", parentID: "msg_1", ...info },
+    parts: [{ type: "text", text: "The answer is 4." }, ...parts],
+  }
+}
+
+function sessionClient(messages: FixtureMessage[], todos: Array<Record<string, unknown>> = []) {
+  return {
+    session: {
+      messages: mock(async () => ({ data: messages })),
+      todo: mock(async () => ({ data: todos })),
+    },
+  }
+}
+
+describe("experimental.compaction.autocontinue pre-compaction turn gate (#12118)", () => {
+  it("vetoes the synthetic continue when the compacted turn was a completed answer, and still restores", async () => {
+    //#given
+    const restoreContextMock = mock(async () => true)
+    const restoreTodosMock = mock(async () => {})
+    const client = sessionClient([userPrompt, assistantTurn({ finish: "stop" }), compactionTrigger, compactionSummary])
+    const handler = createCompactionAutocontinueHandler(
+      {
+        compactionContextInjector: { restore: restoreContextMock },
+        compactionTodoPreserver: { restore: restoreTodosMock },
+      },
+      { client },
+    )
+    const output = { enabled: true }
+
+    //#when
+    await handler({ sessionID: "ses_done", agent: "sisyphus", message: compactionTrigger.info }, output)
+
+    //#then
+    expect(output.enabled).toBe(false)
+    expect(restoreContextMock).toHaveBeenCalledWith("ses_done")
+    expect(restoreTodosMock).toHaveBeenCalledWith("ses_done")
+    expect(client.session.messages).toHaveBeenCalledWith({ path: { id: "ses_done" } })
+  })
+
+  it.each([
+    ["a tool-calls finish", [userPrompt, assistantTurn({ finish: "tool-calls" }, [{ type: "tool", state: { status: "completed" } }]), compactionTrigger, compactionSummary]],
+    ["a running tool call under a stop finish", [userPrompt, assistantTurn({ finish: "stop" }, [{ type: "tool", state: { status: "running" } }]), compactionTrigger, compactionSummary]],
+    ["an unknown finish", [userPrompt, assistantTurn({ finish: "unknown" }), compactionTrigger, compactionSummary]],
+    ["no finish (interrupted step)", [userPrompt, assistantTurn({}), compactionTrigger, compactionSummary]],
+    ["an aborted turn", [userPrompt, assistantTurn({ finish: "stop", error: { name: "MessageAbortedError" } }), compactionTrigger, compactionSummary]],
+    ["an unanswered user prompt", [userPrompt, compactionTrigger, compactionSummary]],
+  ])("keeps the synthetic continue when the compacted turn ended with %s", async (_label, messages) => {
+    //#given
+    const handler = createCompactionAutocontinueHandler({}, { client: sessionClient(messages) })
+    const output = { enabled: true }
+
+    //#when
+    await handler({ sessionID: "ses_mid_work", agent: "sisyphus", message: compactionTrigger.info }, output)
+
+    //#then
+    expect(output.enabled).toBe(true)
+  })
+
+  it("keeps the synthetic continue after a completed answer while todos are still incomplete", async () => {
+    //#given
+    const client = sessionClient(
+      [userPrompt, assistantTurn({ finish: "stop" }), compactionTrigger, compactionSummary],
+      [
+        { id: "t1", content: "done", status: "completed", priority: "high" },
+        { id: "t2", content: "next", status: "pending", priority: "high" },
+      ],
+    )
+    const handler = createCompactionAutocontinueHandler({}, { client })
+    const output = { enabled: true }
+
+    //#when
+    await handler({ sessionID: "ses_todos", agent: "sisyphus", message: compactionTrigger.info }, output)
+
+    //#then
+    expect(output.enabled).toBe(true)
+  })
+
+  it("keeps the synthetic continue when the session messages cannot be read", async () => {
+    //#given
+    const client = {
+      session: {
+        messages: mock(async () => {
+          throw new Error("server unavailable")
+        }),
+        todo: mock(async () => ({ data: [] })),
+      },
+    }
+    const handler = createCompactionAutocontinueHandler({}, { client })
+    const output = { enabled: true }
+
+    //#when
+    await handler({ sessionID: "ses_lookup_failed", agent: "sisyphus", message: compactionTrigger.info }, output)
+
+    //#then
+    expect(output.enabled).toBe(true)
+  })
+})
