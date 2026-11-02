@@ -6,6 +6,7 @@ import { join, posix } from "node:path"
 import fixtureExpected from "./2026-08-reasoning-unification/fixture-expected.json"
 import fixtureInput from "./2026-08-reasoning-unification/fixture-input.json"
 import { createLegacyConfigMigrationPlans, executeLegacyConfigMigrationPlan } from "./index"
+import { validatePluginConfig } from "../config/validate"
 import {
   REASONING_UNIFICATION_MIGRATION_ID,
   transformReasoningUnification,
@@ -80,6 +81,82 @@ describe("2026-08 reasoning unification migration", () => {
       expect(readdirSync(join(homeDir, ".omo")).some((name) => name.startsWith("omo.jsonc.bak."))).toBe(true)
     } finally {
       rmSync(root, { force: true, recursive: true })
+    }
+  })
+
+  test("#given opencode agent and category fallback_models #when migrated #then agent fallback stays and category fallback becomes models", () => {
+    // given
+    const originalHome = process.env.HOME
+    const originalConfigDir = process.env.OPENCODE_CONFIG_DIR
+    const root = mkdtempSync(join(tmpdir(), "omo-reasoning-agent-fallback-"))
+    const homeDir = join(root, "home")
+    const projectDir = join(homeDir, "project")
+    const targetPath = join(homeDir, ".omo", "omo.jsonc")
+    mkdirSync(projectDir, { recursive: true })
+    mkdirSync(join(homeDir, ".omo"), { recursive: true })
+    writeFileSync(targetPath, JSON.stringify({
+      "[opencode]": {
+        agents: {
+          oracle: {
+            model: "openai/gpt-5.6-sol",
+            models: ["openai/gpt-5.6-luna"],
+            fallback_models: ["openai/gpt-5.6-terra"],
+          },
+        },
+        categories: {
+          deep: {
+            model: "openai/gpt-5.6-sol",
+            fallback_models: ["openai/gpt-5.6-terra"],
+          },
+        },
+      },
+    }, null, 2))
+
+    try {
+      process.env.HOME = homeDir
+      delete process.env.OPENCODE_CONFIG_DIR
+      const plans = createLegacyConfigMigrationPlans({
+        backupTimestamp: "2026-08-01T00-00-00-000Z",
+        cwd: projectDir,
+        environment: { HOME: homeDir },
+        homeDir,
+        pathOperations: posix,
+        platform: "linux",
+      })
+      const plan = plans.find((candidate) => candidate.id === REASONING_UNIFICATION_MIGRATION_ID)
+      if (plan === undefined) throw new Error("Expected reasoning migration plan")
+
+      // when
+      const migrated = executeLegacyConfigMigrationPlan(plan, { env: { HOME: homeDir } })
+      const document = JSON.parse(readFileSync(targetPath, "utf-8")) as Record<string, unknown>
+      const validation = validatePluginConfig(projectDir)
+
+      // then
+      expect(migrated.status).toBe("migrated")
+      expect(document).toMatchObject({
+        "[opencode]": {
+          agents: {
+            oracle: {
+              model: "openai/gpt-5.6-sol",
+              models: ["openai/gpt-5.6-luna"],
+              fallback_models: ["openai/gpt-5.6-terra"],
+            },
+          },
+          categories: {
+            deep: {
+              models: ["openai/gpt-5.6-sol", "openai/gpt-5.6-terra"],
+            },
+          },
+        },
+      })
+      expect(validation.valid).toBe(true)
+      expect(validation.messages).toEqual([])
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+      if (originalHome === undefined) delete process.env.HOME
+      else process.env.HOME = originalHome
+      if (originalConfigDir === undefined) delete process.env.OPENCODE_CONFIG_DIR
+      else process.env.OPENCODE_CONFIG_DIR = originalConfigDir
     }
   })
 
