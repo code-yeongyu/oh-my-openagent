@@ -41,6 +41,9 @@ export type SenpiStartupMigrationOptions = {
 export type SenpiStartupMigrationResult = {
   readonly error?: string
   readonly journalResumed: boolean
+  // A live peer host (e.g. a warmed spare starting beside the primary) holds the migration lock and
+  // is migrating this same home, so this host has nothing to report (#12115). Never a warning.
+  readonly peerMigrating?: true
   readonly migratedFrom: readonly string[]
   readonly results: readonly MigrationRunResult[]
 }
@@ -115,7 +118,7 @@ export function runSenpiStartupMigration(options: SenpiStartupMigrationOptions):
       ],
     })
     return {
-      ...(batch.status === "locked" ? { error: "Configuration migration is already running" } : {}),
+      ...(batch.status === "locked" ? { peerMigrating: true as const } : {}),
       journalResumed: batch.journalResumed,
       migratedFrom: migratedSources(batch.results),
       results: batch.results,
@@ -154,6 +157,7 @@ export function createConfigStartupComponent(options: ConfigStartupComponentOpti
       if (isMetadataOnlyLaunch(argv)) return
       const cwd = resolveCwd()
       const migration = runMigration({ cwd })
+      if (migration.peerMigrating === true) ctx.logger.debug?.("OmO Native: configuration migration skipped; another host holds the migration lock")
       const config = loadConfig({ cwd })
       const notices = notificationMessages(migration, config)
       let reported = false

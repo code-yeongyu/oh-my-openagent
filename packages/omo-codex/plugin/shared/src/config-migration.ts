@@ -43,6 +43,8 @@ export type CodexConfigMigrationOptions = {
 export type CodexConfigMigrationResult = {
 	readonly error?: string
 	readonly journalResumed: boolean
+	// A live peer process holds the migration lock and is migrating this same home (#12115). Never a warning.
+	readonly peerMigrating?: true
 	readonly migratedFrom: readonly string[]
 	readonly results: readonly MigrationRunResult[]
 }
@@ -145,7 +147,7 @@ export function runCodexConfigMigration(options: CodexConfigMigrationOptions): C
 			...(options.pid === undefined ? {} : { pid: options.pid }),
 		})
 		return {
-			...(batch.status === "locked" ? { error: "Configuration migration is already running" } : {}),
+			...(batch.status === "locked" ? { peerMigrating: true as const } : {}),
 			journalResumed: batch.journalResumed,
 			migratedFrom: migratedSources(batch.results),
 			results: batch.results,

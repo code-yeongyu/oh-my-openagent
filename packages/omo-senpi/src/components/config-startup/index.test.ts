@@ -183,6 +183,52 @@ describe("runSenpiStartupMigration", () => {
       "2026-08-reasoning-unification",
     ])
   })
+
+  // #12115: a desktop starts its primary engine host and a warmed spare against one home at once.
+  test("#given two Senpi hosts starting against one home #when the second finds the first holding the lock #then it reports no warning and the first still migrates", () => {
+    // given
+    const fileSystem = memoryFileSystem()
+    fileSystem.files.set("/home/alice/.config/opencode/oh-my-openagent.jsonc", '{"agents":{"finder":{"model":"provider/finder"}}}')
+    const options = migrationOptions(fileSystem)
+    let spare: SenpiStartupMigrationResult | undefined
+
+    // when the spare host starts while the primary holds the migration lock
+    const primary = withProcessPlatform("win32", () => runSenpiStartupMigration({
+      ...options,
+      onBoundary: (boundary) => {
+        if (boundary !== "journal-written" || spare !== undefined) return
+        spare = runSenpiStartupMigration({ ...options, pid: 42 })
+      },
+    }))
+
+    // then
+    if (spare === undefined) throw new Error("Expected the spare host's startup result")
+    expect(spare.peerMigrating).toBe(true)
+    expect(spare.error).toBeUndefined()
+    expect(notificationMessages(spare, { config: {}, diagnostics: [], layers: [], sources: [] })).toEqual([])
+    expect(primary.peerMigrating).toBeUndefined()
+    expect(primary.results.filter((entry) => entry.status === "migrated")).toHaveLength(2)
+  })
+
+  test("#given a lock whose holder process is gone #when Senpi starts #then it reclaims the lock and migrates instead of reporting a peer", () => {
+    // given a stale lock left by a dead host
+    const fileSystem = memoryFileSystem()
+    fileSystem.files.set("/home/alice/.config/opencode/oh-my-openagent.jsonc", '{"agents":{"finder":{"model":"provider/finder"}}}')
+    const options = migrationOptions(fileSystem)
+    withProcessPlatform("win32", () => runSenpiStartupMigration({
+      ...options,
+      onBoundary: (boundary) => {
+        if (boundary === "journal-written") throw new Error("host died mid-migration")
+      },
+    }))
+
+    // when
+    const result = withProcessPlatform("win32", () => runSenpiStartupMigration({ ...options, isProcessAlive: () => false, pid: 43 }))
+
+    // then
+    expect(result.peerMigrating).toBeUndefined()
+    expect(result.journalResumed).toBe(true)
+  })
 })
 
 function context(logs: string[]): ComponentContext {
