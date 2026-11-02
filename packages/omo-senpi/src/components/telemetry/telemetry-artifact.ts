@@ -197,6 +197,21 @@ function turnGenAiAttributes(): [string, ArtifactAttribute][] {
   ]
 }
 
+/**
+ * The OTLP sender's own spool-loss report (telemetry-core otlp-sender-core.ts): one record per cause with a count,
+ * emitted by the transport rather than captured, so it has no entry in OMO_NATIVE_EVENT_SCHEMAS. The causes are
+ * telemetry-core's DropReason; the key is `cause` because the collector forbids the `reason` suffix.
+ */
+const CLIENT_DROPPED_CAUSES = ["evicted", "expired", "rejected", "corrupt", "write_failed"] as const
+
+function clientDroppedAttributes(): AttributeMap {
+  return sortedObject<ArtifactAttribute>([
+    ["log.record.uid", { type: "string", pattern: UUID_PATTERN, required: true, posthog_name: "event_id" }],
+    ["omo.dropped.cause", { type: "string", values: CLIENT_DROPPED_CAUSES, required: true, posthog_name: "dropped_cause" }],
+    ["omo.dropped.count", { type: "number", integer: true, min: 0, max: 1e9, required: true, posthog_name: "dropped_count" }],
+  ])
+}
+
 function turnSpanAttributes(): AttributeMap {
   const providers = OMO_NATIVE_EVENT_SCHEMAS.turn_completed.provider.values
   return sortedObject<ArtifactAttribute>([
@@ -304,6 +319,7 @@ export function buildTelemetryArtifacts(
       }
     }
   }
+  events["omo.client_dropped"] = clientDroppedAttributes()
   return PRODUCTS.map((spec) => {
     const body = {
       artifact_format: 1 as const,

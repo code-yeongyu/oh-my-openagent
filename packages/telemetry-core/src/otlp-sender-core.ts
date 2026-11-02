@@ -214,7 +214,8 @@ class OtlpSender {
       const count = this.#unreported[reason]
       if (count === 0) continue
       this.#unreported[reason] = 0
-      this.#emit("client_dropped", { "omo.dropped.count": count, "omo.dropped.reason": reason })
+      // `cause`, not `reason`: the collector's field-name rule forbids the `reason` suffix
+      this.#emit("client_dropped", { "omo.dropped.count": count, "omo.dropped.cause": reason })
     }
   }
 

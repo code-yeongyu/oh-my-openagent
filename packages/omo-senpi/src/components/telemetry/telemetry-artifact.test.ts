@@ -198,6 +198,14 @@ describe("telemetry schema artifacts", () => {
     }
   })
 
+  test("#given the OTLP sender's client_dropped report #when checked against the artifact #then count and cause are declared, required and closed", () => {
+    // telemetry-core otlp-sender-core.ts emits this record itself; the collector refuses any key the pin does not declare.
+    const dropped = SENPI.events["omo.client_dropped"] ?? {}
+    expect(Object.keys(dropped).sort()).toEqual(["log.record.uid", "omo.dropped.cause", "omo.dropped.count"])
+    expect(dropped["omo.dropped.cause"]).toMatchObject({ type: "string", required: true, values: ["evicted", "expired", "rejected", "corrupt", "write_failed"] })
+    expect(dropped["omo.dropped.count"]).toMatchObject({ type: "number", integer: true, min: 0, max: 1e9, required: true })
+  })
+
   test("#then the scope list, the SDK-name enum and the version pattern are in every artifact, and a path or an email is not an SDK name", () => {
     for (const artifact of ARTIFACTS) {
       expect(artifact.scope.name.length).toBeGreaterThan(0)

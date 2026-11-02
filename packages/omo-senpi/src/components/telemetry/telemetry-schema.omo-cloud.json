@@ -716,6 +716,34 @@
         "posthog_name": "$session_id"
       }
     },
+    "omo.client_dropped": {
+      "log.record.uid": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        "required": true,
+        "posthog_name": "event_id"
+      },
+      "omo.dropped.cause": {
+        "type": "string",
+        "values": [
+          "evicted",
+          "expired",
+          "rejected",
+          "corrupt",
+          "write_failed"
+        ],
+        "required": true,
+        "posthog_name": "dropped_cause"
+      },
+      "omo.dropped.count": {
+        "type": "number",
+        "integer": true,
+        "min": 0,
+        "max": 1000000000,
+        "required": true,
+        "posthog_name": "dropped_count"
+      }
+    },
     "omo.computer_use_activation": {
       "log.record.uid": {
         "type": "string",
@@ -3846,5 +3874,5 @@
       }
     }
   },
-  "sha256": "5c6d03d2200ea313bcc13af54281419073a0bd74b0d284f391d5127b0baa18c7"
+  "sha256": "88ce654a85b6ce1636e95c263b3d832cd0ecc6119f83006ac3036c3231a1542c"
 }
