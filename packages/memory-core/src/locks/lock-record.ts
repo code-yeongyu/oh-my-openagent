@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { hostname } from "node:os"
 
+import { GIT_ACTIVITY_JOB_PROTOCOL, claimedGitJobHelper, type GitJobHelperRuntime } from "../git/job-helper"
 import { osFileLockAvailable } from "./os-file-lock"
 import { getProcessStartIdentity } from "./process-identity"
 
@@ -15,10 +16,15 @@ export type LockRecord = {
   // This process runs its memory-core git under the kernel git-activity lock (omo #10322), so an
   // idle activity lock proves none of its git processes outlived it.
   readonly git_activity_lock?: true
+  // win32 (omo #10391): this process runs its memory-core git in floor jobs through a helper whose selftest passed, so
+  // "helper dead and job gone" proves none of its git processes outlived it (design v4.2 sections 6.3, 13).
+  readonly git_activity_job?: typeof GIT_ACTIVITY_JOB_PROTOCOL
 }
 
 export type CreateLockRecordOptions = {
   readonly runId?: string
+  /** The helper whose selftest decides the win32 claim; absent means the production location. */
+  readonly jobHelper?: GitJobHelperRuntime
 }
 
 function isNonEmptyString(value: unknown): value is string {
@@ -52,7 +58,12 @@ export function parseLockRecord(content: string): LockRecord | null {
     purpose: candidate.purpose,
     ...(candidate.run_id === undefined ? {} : { run_id: candidate.run_id }),
     ...(candidate.git_activity_lock === true ? { git_activity_lock: true as const } : {}),
+    ...(candidate.git_activity_job === GIT_ACTIVITY_JOB_PROTOCOL ? { git_activity_job: GIT_ACTIVITY_JOB_PROTOCOL } : {}),
   }
+}
+
+async function claimsGitActivityJob(jobHelper: GitJobHelperRuntime | undefined): Promise<boolean> {
+  return process.platform === "win32" && (await claimedGitJobHelper(jobHelper)) !== null
 }
 
 export async function createLockRecord(
@@ -70,5 +81,6 @@ export async function createLockRecord(
     purpose,
     ...(options.runId === undefined ? {} : { run_id: options.runId }),
     ...((await osFileLockAvailable()) ? { git_activity_lock: true as const } : {}),
+    ...((await claimsGitActivityJob(options.jobHelper)) ? { git_activity_job: GIT_ACTIVITY_JOB_PROTOCOL } : {}),
   }
 }

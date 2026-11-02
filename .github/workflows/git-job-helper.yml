@@ -1,12 +1,16 @@
 name: Git job helper
 
 # The memory-core git floor-job helper (omo#10391, design v4.2): the native contract rows N1..N10 plus the run-mode
-# rows on real Windows, on both architectures. N2(b) is the release gate for any `win32-job-v1` claim.
+# rows on real Windows, on both architectures. N2(b) is the release gate for any `win32-job-v1` claim. The
+# memory-core job runs the writer's production-path rows (T1, T6-T8, T12, T14, T15) through createNodeGitExec and the
+# helper built here. The stacked writer PR targets the helper PR's branch, which is listed so it gets this run.
 on:
   pull_request:
-    branches: [master, dev]
+    branches: [master, dev, fix/10391-windows-job-helper-native]
     paths:
       - "crates/omo-git-job-helper/**"
+      - "packages/memory-core/src/git/**"
+      - "packages/memory-core/src/locks/lock-record.ts"
       - "Cargo.toml"
       - "Cargo.lock"
       - "rust-toolchain.toml"
@@ -15,6 +19,8 @@ on:
     branches: [master, dev]
     paths:
       - "crates/omo-git-job-helper/**"
+      - "packages/memory-core/src/git/**"
+      - "packages/memory-core/src/locks/lock-record.ts"
       - "Cargo.toml"
       - "Cargo.lock"
       - "rust-toolchain.toml"
@@ -108,4 +114,57 @@ jobs:
             - N2(b): at least 200 kill-during-creation iterations; refutation of I7 is criterion (1) or (3) only.
             - Release build with a static CRT and its selftest.
           JOB_SUMMARY_NEXT: Start with the first failing row; every row prints its receipt before it asserts.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  memory-core-windows-rows:
+    name: memory-core job-helper rows (windows-latest)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - name: Setup Rust
+        shell: bash
+        run: |
+          toolchain=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)
+          rustup toolchain install "$toolchain" --profile minimal
+          rustup default "$toolchain"
+          rustup target add x86_64-pc-windows-msvc
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build release helper (static CRT)
+        shell: bash
+        env:
+          RUSTFLAGS: -C target-feature=+crt-static
+        run: cargo build --release -p omo-git-job-helper --locked --target x86_64-pc-windows-msvc
+
+      - name: Install dependencies
+        shell: bash
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      # A missing helper or a non-Windows host fails these rows instead of skipping them (design v4.2 section 20).
+      - name: Production-path rows through createNodeGitExec
+        shell: bash
+        env:
+          OMO_GIT_JOB_HELPER_REQUIRED: "1"
+          OMO_GIT_JOB_HELPER_TARGET_DIR: ${{ github.workspace }}\target\x86_64-pc-windows-msvc\release
+        run: bun test --timeout 20000 packages/memory-core/src/git/exec-job-helper packages/memory-core/src/git/win32-command-line
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: memory-core job-helper rows (windows-latest)
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - T1 chain membership, T6 entry ordering, T7 never-started, T8 fence, T12 exec parity, T14 degraded, T15 latency report.
+            - Every row runs through createNodeGitExec with the release helper injected through jobHelper.path.
+          JOB_SUMMARY_NEXT: Read the [T1]/[T7(c)]/[T15] receipt lines in the test log; the first failing row names its receipt.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

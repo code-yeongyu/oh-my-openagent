@@ -2,8 +2,12 @@ import { spawn } from "node:child_process"
 import { existsSync } from "../fs/resilient"
 import { win32 } from "node:path"
 import { GitAbortedError, GitNotFoundError, GitTimeoutError } from "./errors"
-import { holdGitActivityShared } from "./git-activity-lock"
+import { runGitThroughJobHelper } from "./exec-job-helper"
+import { gitActivityLocksDir, holdGitActivityShared } from "./git-activity-lock"
+import { claimedGitJobHelper, type GitJobHelperRuntime } from "./job-helper"
 import { recordGitTimeout } from "./timeout-diagnostics"
+
+export type { GitJobHelperRuntime } from "./job-helper"
 
 export interface GitExecOptions {
   cwd: string
@@ -55,6 +59,8 @@ export interface NodeGitExecRuntime {
     options: GitExecOptions,
     environment: NodeJS.ProcessEnv,
   ) => Promise<GitExecResult>
+  /** The Windows floor-job helper (omo #10391, design v4.2 section 3); absent means the production location. */
+  jobHelper?: GitJobHelperRuntime
 }
 
 const WINDOWS_GIT_CANDIDATES = [
@@ -238,6 +244,17 @@ function spawnGitCommand(
   })
 }
 
+// win32 (omo #10391): on a host that claims the floor-job protocol, every git in an identity repository runs through
+// the helper and never untracked; anywhere else it runs as before. POSIX never reaches this (design row T16).
+function win32GitCommand(jobHelper: GitJobHelperRuntime | undefined): NonNullable<NodeGitExecRuntime["runCommand"]> {
+  return async (executable, argv, options, environment) => {
+    const helper = await claimedGitJobHelper(jobHelper)
+    const locksDirectory = helper === null ? null : await gitActivityLocksDir(options.cwd)
+    if (helper === null || locksDirectory === null) return runGitCommand(executable, argv, options, environment)
+    return runGitThroughJobHelper(executable, argv, options, environment, helper, locksDirectory)
+  }
+}
+
 // Any index-reading command (`status`, `add`, `diff`), not only commit, starts the builtin fsmonitor
 // daemon when a user's config enables it; the daemon then outlives git, holds the activity fd and
 // keeps the repo busy (#10391). Command-line `-c` outranks every config file and reaches hooks too.
@@ -245,7 +262,7 @@ const NO_FSMONITOR = ["-c", "core.fsmonitor=false"] as const
 
 export function createNodeGitExec(runtime: NodeGitExecRuntime = {}): GitExec {
   const platform = runtime.platform ?? process.platform
-  const runCommand = runtime.runCommand ?? runGitCommand
+  const runCommand = runtime.runCommand ?? (platform === "win32" ? win32GitCommand(runtime.jobHelper) : runGitCommand)
 
   return {
     async run(callerArgv, options) {
