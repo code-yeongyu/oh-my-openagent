@@ -5,7 +5,7 @@ import { log } from "@oh-my-opencode/utils"
 
 import { acquireSessionAdmissionLease, type AdmissionLeaseTiming } from "./admission-lease"
 import { isRevivalCandidate, isUnboundedResidency, residentsOf, selectRevivalBatch } from "./revival-selection"
-import { nowIso, reconciliationActive, TERMINAL_STATUSES, type LifecycleContext } from "./context"
+import { claimantAlive, nowIso, reconciliationActive, TERMINAL_STATUSES, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
 import { AgentLimitReached } from "./errors"
 import { parkHandlelessResident } from "./park-terminal-resident"
@@ -199,7 +199,7 @@ export function reclaimOrphanedResident(context: LifecycleContext, observed: Tas
       fresh.host_pid === observed.host_pid &&
       fresh.residency_claim === observed.residency_claim &&
       fresh.notification.run_epoch === observed.notification.run_epoch &&
-      (fresh.host_pid === undefined || fresh.host_pid === context.hostPid || !context.signaller.isAlive(fresh.host_pid)) &&
+      (fresh.host_pid === undefined || fresh.host_pid === context.hostPid || !claimantAlive(context, fresh)) &&
       fresh.updated_at === observed.updated_at,
   )
 }

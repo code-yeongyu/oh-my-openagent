@@ -1,3 +1,5 @@
+import { getProcessStartIdentity } from "@oh-my-opencode/memory-core/process-identity"
+
 import type { EffectiveModelChange, EffectiveModelChangeKind, EffectiveModelSource, TaskRecord, TaskStatus } from "../state"
 import { EFFECTIVE_MODEL_CHANGE_KINDS } from "../state"
 
@@ -23,8 +25,35 @@ export function storedStatus(status: TaskStatus): { readonly status: Exclude<Tas
   return status === "paused" ? { status: "running", paused: true } : { status }
 }
 
+// Only the owner itself can say which process took a record: a write naming this process as host
+// stamps it once with this process's own start identity, bound to this pid. The identity is read
+// once, off the write path; a write before it is known stamps without it (no evidence either way)
+// and the next write adds it. A stamp under this pid from before this process began came from an
+// earlier holder of the pid, so it is replaced.
+let ownStart: string | undefined
+let ownStartRequested = false
+
+function ownStartIdentity(): string | undefined {
+  if (!ownStartRequested) {
+    ownStartRequested = true
+    void getProcessStartIdentity(process.pid).then(
+      (identity) => { ownStart = identity ?? undefined },
+      () => { ownStartRequested = false },
+    )
+  }
+  return ownStart
+}
+
+function withHostClaim(record: TaskRecord): TaskRecord {
+  if (record.host_pid !== process.pid) return record
+  const start = ownStartIdentity()
+  const claim = record.host_claim
+  if (claim?.pid === process.pid && Date.parse(claim.at) >= performance.timeOrigin && claim.start === start) return record
+  return { ...record, host_claim: { pid: process.pid, at: new Date().toISOString(), ...(start === undefined ? {} : { start }) } }
+}
+
 export function toStorableTaskRecord(record: TaskRecord): TaskRecord & StoredPausedMarker {
-  const stored = storableEffectiveModel(record)
+  const stored = storableEffectiveModel(withHostClaim(record))
   return stored.status === "paused" ? { ...stored, ...storedStatus(stored.status) } : stored
 }
 

@@ -1,7 +1,8 @@
 import { log } from "@oh-my-opencode/utils"
 
 import type { TaskRecord } from "../state"
-import { reconciliationActive, TERMINAL_STATUSES, type LifecycleContext } from "./context"
+import { claimantAlive, reconciliationActive, TERMINAL_STATUSES, type LifecycleContext } from "./context"
+import { observeRecordOwners } from "./owner-process"
 import { retriesStopped } from "./deferred-revival"
 import { isHostSessionRecord } from "./host-session"
 import { reconcileLegacyRecord } from "./reconcile"
@@ -79,7 +80,9 @@ async function retryOwner(
       || fresh.host_pid !== observed.host_pid || fresh.residency_claim !== observed.residency_claim
       || fresh.notification.run_epoch !== observed.notification.run_epoch
       || context.registry.get(fresh.task_id) !== undefined) return
-    if (fresh.host_pid !== undefined && context.signaller.isAlive(fresh.host_pid)) continue
+    const observing = observeRecordOwners(context.ownerProcesses, [fresh], context.hostPid)
+    if (observing !== undefined) await observing
+    if (claimantAlive(context, fresh)) continue
     // Reclamation revalidates the owner under the record lock. Terminal writes that win before
     // that claim or while destruction awaits are preserved by the normal reconciliation reducer.
     const outcome = await (fresh.provisional_exit === undefined

@@ -138,6 +138,10 @@ export type TaskRecordInput = {
   readonly host_session?: HostSessionIdentity
 }
 
+// `start` is the claimant's own OS start identity (memory-core process-identity), compared only as a
+// value; stamps without it carry no evidence against a live pid.
+export type HostClaim = { readonly pid: number; readonly at: string; readonly start?: string }
+
 export type RecordedRunPause = {
   readonly parent_session_id: string
   readonly parent_pause_seq: number
@@ -162,6 +166,8 @@ export type TaskRecord = TaskRecordInput & TaskStartFailureRecordFields & {
   readonly terminal_at?: string
   readonly pid?: number
   readonly host_pid?: number
+  /** Stamped by the process named in `pid` when it writes a record it owns; see lifecycle/owner-process.ts. */
+  readonly host_claim?: HostClaim
   readonly child_session_id?: string
   readonly spawn_spec?: TaskSpawnSpec
   /** Mirrors TaskRecordInput.effective_model; see there. */

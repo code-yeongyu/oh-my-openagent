@@ -44,6 +44,7 @@ for (const path of ["park", "missing-session", "normal", "missing-session-runnin
         task_id: "st_000000b7", parent_session_id: "sibling-7",
         status: "running", host_pid: process.pid,
       })
+      const siblingStored = store.load(sibling.task_id)
       registry.add({
         task_id: record.task_id, kind: "rpc", pid: child.pid,
         abort: async () => {},
@@ -80,7 +81,7 @@ for (const path of ["park", "missing-session", "normal", "missing-session-runnin
       expect(store.load(record.task_id)?.status).toBe(record.status)
       expect(store.load(record.task_id)?.residency_state).toBe("rpc_detached")
       expect(store.load(record.task_id)?.killed).not.toBe(true)
-      expect(store.load(sibling.task_id)).toEqual(sibling)
+      expect(store.load(sibling.task_id)).toEqual(siblingStored)
     } finally {
       lifecycle.dispose?.()
       await terminateRpcChild(child, { sigkillDelayMs: 100 })

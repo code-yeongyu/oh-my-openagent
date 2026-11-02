@@ -401,6 +401,7 @@
       "dependencies": {
         "@oh-my-opencode/delegate-core": "workspace:*",
         "@oh-my-opencode/isolation-core": "workspace:*",
+        "@oh-my-opencode/memory-core": "workspace:*",
         "@oh-my-opencode/model-core": "workspace:*",
         "@oh-my-opencode/omo-config-core": "workspace:*",
         "@oh-my-opencode/skills-loader-core": "workspace:*",

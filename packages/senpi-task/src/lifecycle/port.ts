@@ -1,3 +1,4 @@
+import type { OwnerProcessView } from "./owner-process"
 import type { OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 import type { TeardownStepDeadline } from "./teardown-budget"
 
@@ -211,6 +212,7 @@ export type LifecycleDeps = {
   readonly config: OmoTaskSettings
   readonly now?: () => number
   readonly signaller?: ProcessSignaller
+  readonly ownerProcesses?: OwnerProcessView
   // Row 17: reclaims stale clones and salvages a crashed host's isolated deltas at session start.
   readonly isolation?: IsolationRuntime
   readonly isolationProbe?: OwnerProbe
