@@ -273,9 +273,9 @@ describe("createNodeGitExec", () => {
       return SUCCESS
     })
 
-    await exec.run(["-c", "user.name=omo", "status", "--porcelain"], execOptions({ ProgramFiles: "C:\\Program Files" }))
+    await exec.run(["-c", "user.name=fixture-writer", "status", "--porcelain"], execOptions({ ProgramFiles: "C:\\Program Files" }))
 
-    const expected = ["-c", "core.fsmonitor=false", "-c", "user.name=omo", "status", "--porcelain"]
+    const expected = ["-c", "core.fsmonitor=false", "-c", "user.name=fixture-writer", "status", "--porcelain"]
     expect(argvs).toEqual([expected, expected])
   })
 
