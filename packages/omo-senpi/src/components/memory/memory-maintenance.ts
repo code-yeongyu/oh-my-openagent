@@ -1,4 +1,6 @@
-import { existsSync } from "@oh-my-opencode/memory-core/fs"
+import { dirname, join } from "node:path"
+
+import { existsSync, mkdir, readFile, rename, writeFile } from "@oh-my-opencode/memory-core/fs"
 
 import {
   GitMemoryRepo,
@@ -42,7 +44,11 @@ export interface MemoryMaintenance {
   settled(): Promise<void>
 }
 
-const STAMP_KEY = "omo.maintenanceAt"
+// Read-only: older builds stamped the repo's shared .git/config, which a reflection or dream run snapshots
+// and validates at completion, so a pass overlapping a run failed it (#9962). The stamp now lives in the
+// identity's runtime dir; a recent legacy value still holds the interval.
+const LEGACY_STAMP_KEY = "omo.maintenanceAt"
+const STAMP_FILE = "maintenance-at"
 const DEFAULT_DELAY_MS = 30_000
 const DEFAULT_INTERVAL_MS = 12 * 60 * 60 * 1000
 // git's own gc.auto default is 6,700; packing earlier keeps history walks fast on slower disks.
@@ -66,6 +72,25 @@ const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000
  * - Empty transcript journals left by older builds (#9737) are swept once per identity per process, at
  *   once rather than behind the delay: control sessions exit within seconds and dispose() would cancel it.
  */
+async function readStamp(path: string): Promise<number> {
+  try {
+    const value = Number((await readFile(path, "utf8")).trim())
+    return Number.isFinite(value) ? value : Number.NEGATIVE_INFINITY
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return Number.NEGATIVE_INFINITY
+    throw error
+  }
+}
+
+// Written under the maintenance lock; the rename keeps a crash from leaving a torn value (a torn or
+// missing stamp only means the next pass comes due early).
+async function writeStamp(path: string, value: number): Promise<void> {
+  await mkdir(dirname(path), { recursive: true })
+  const temp = `${path}.${process.pid}.tmp`
+  await writeFile(temp, String(value))
+  await rename(temp, path)
+}
+
 export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}): MemoryMaintenance {
   const createRepo = options.createRepo
     ?? ((context: MemoryIdentityContext) => new GitMemoryRepo({ dir: context.identityPaths.repo, agentId: context.identity }))
@@ -104,9 +129,11 @@ export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}):
       await withLock(memoryMaintenanceLockPath(context.identityPaths.locks), record, async () => {
         signal.throwIfAborted()
         const repo = createRepo(context)
-        const last = Number(await repo.configGet(STAMP_KEY) ?? Number.NaN)
+        const stampPath = join(context.identityPaths.runtime, STAMP_FILE)
+        const legacy = Number(await repo.configGet(LEGACY_STAMP_KEY) ?? Number.NaN)
+        const last = Math.max(await readStamp(stampPath), Number.isFinite(legacy) ? legacy : Number.NEGATIVE_INFINITY)
         if (Number.isFinite(last) && now() - last < intervalMs) return
-        await repo.configSet(STAMP_KEY, String(now()))
+        await writeStamp(stampPath, now())
         const result = await repo.maintain({ minLooseObjects, timeoutMs, signal })
         if (result.status === "packed") {
           options.logger?.info("omo-senpi memory repo packed", {
