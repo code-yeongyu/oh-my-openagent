@@ -183,6 +183,7 @@ export async function executeSyncTask(
       }
       scheduleSyncSessionDeletion(client, syncSessionID, taskCleanupDelayMs)
     }
+    spawnReservation?.release()
     if (concurrencyAcquired && typeof manager?.releaseSyncSubagentConcurrency === "function") {
       manager.releaseSyncSubagentConcurrency(concurrencyModel)
     }

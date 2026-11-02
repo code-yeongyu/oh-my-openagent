@@ -371,6 +371,7 @@ export class BackgroundManager {
     descendantCount: number
     commit: () => number
     rollback: () => void
+    release: () => void
   }> {
     const spawnContext = await this.assertCanSpawn(parentSessionID)
     const maxDescendants = getMaxLiveDescendantsPerRoot(this.config)
@@ -385,6 +386,12 @@ export class BackgroundManager {
     }
     const descendantCount = this.registerRootDescendant(spawnContext.rootSessionID)
     let settled = false
+    let released = false
+    const releaseSlot = (): void => {
+      if (released) return
+      released = true
+      this.unregisterRootDescendant(spawnContext.rootSessionID)
+    }
 
     return {
       spawnContext,
@@ -396,7 +403,13 @@ export class BackgroundManager {
       rollback: () => {
         if (settled) return
         settled = true
-        this.unregisterRootDescendant(spawnContext.rootSessionID)
+        releaseSlot()
+      },
+      // A blocking caller holds the slot only while its child runs: no background task carries
+      // it, so no lifecycle path ever unregisters it (#10101). Idempotent, and safe after rollback.
+      release: () => {
+        settled = true
+        releaseSlot()
       },
     }
   }
