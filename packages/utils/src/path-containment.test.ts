@@ -2,7 +2,7 @@ import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import * as fs from "node:fs"
 import { tmpdir } from "node:os"
 import { join, win32 } from "node:path"
-import { containedRelativePath, isDarwinAutomountTriggerPath, isPathInside } from "./path-containment"
+import { containedRelativePath, isDarwinAutomountTriggerPath, isPathInside, resolveSegmentwise } from "./path-containment"
 
 const shortHome = String.raw`C:\Users\RUNNER~1`
 const longHome = String.raw`C:\Users\runneradmin`
@@ -167,4 +167,84 @@ describe("isDarwinAutomountTriggerPath (#11545)", () => {
   test.each(cases)("%s %o -> %p", (path, options, expected) => {
     expect(isDarwinAutomountTriggerPath(path, options)).toBe(expected)
   })
+})
+
+describe("resolveSegmentwise resolves in the order open(2) does", () => {
+  const directory = () => ({ isDirectory: () => true })
+
+  test("a relative target is anchored at the working directory, not at the filesystem root", () => {
+    const realpath = (path: string) => (path === "." ? "/base" : path)
+    // Without the anchor the walk starts at "/" and names "/note.md", which is not the file the opener reaches.
+    expect(resolveSegmentwise("note.md", { realpath, lstat: directory })).toBe("/base/note.md")
+  })
+
+  test("win32 refuses a missing remainder only when the caller needs an existing path", () => {
+    const root = "C:\\"
+    const enoent = (path: string): never => {
+      throw Object.assign(new Error(`missing: ${path}`), { code: "ENOENT" })
+    }
+    const realpath = (path: string) => (path === root ? path : enoent(path))
+    const lstat = (path: string) => (path === root ? directory() : enoent(path))
+    const target = `${root}nope\\note.md`
+    expect(resolveSegmentwise(target, { platform: "win32", realpath, lstat })).toBe(win32.resolve(target))
+    expect(() => resolveSegmentwise(target, { platform: "win32", realpath, lstat, allowMissing: false })).toThrow(
+      /unresolvable remainder/,
+    )
+  })
+
+  test("win32 throws ENOTDIR when a resolved file path ends in a slash", () => {
+    const root = "C:\\"
+    const realpath = (path: string) => win32.normalize(path)
+    const lstat = (path: string) => ({ isDirectory: () => path === root })
+    const target = `${root}note.md\\`
+    expect(pathErrorCode(() => resolveSegmentwise(target, { platform: "win32", realpath, lstat }))).toBe("ENOTDIR")
+  })
+})
+
+const pathErrorCode = (operation: () => unknown): unknown => {
+  try {
+    operation()
+  } catch (error) {
+    if (error instanceof Error && "code" in error) return error.code
+  }
+  return undefined
+}
+
+test("#given an empty path #when segment-wise resolution runs #then it throws ENOENT", () => {
+  expect(pathErrorCode(() => resolveSegmentwise(""))).toBe("ENOENT")
+})
+
+test.each(["/", "/.", "/.."])("#given a regular file #when its POSIX path ends with %s #then resolution throws ENOTDIR", (suffix) => {
+  const { inside } = symlinkFixture()
+  const file = join(inside, "workspace", "note.md")
+
+  expect(pathErrorCode(() => resolveSegmentwise(`${file}${suffix}`))).toBe("ENOTDIR")
+})
+
+test.if(process.platform !== "win32")("#given a directory #when its POSIX path ends in slash #then resolution succeeds", () => {
+  const { inside } = symlinkFixture()
+  const directory = join(inside, "workspace")
+
+  expect(resolveSegmentwise(`${directory}/`)).toBe(fs.realpathSync.native(directory))
+})
+
+test("#given an injected resolver for complete paths #when containment compares child and parent #then both inputs are resolved whole", () => {
+  const child = "/virtual/repo/note.md"
+  const parent = "/virtual/repo"
+  const canonicalPaths = new Map([
+    [child, "/canonical/repo/note.md"],
+    [parent, "/canonical/repo"],
+  ])
+  const calls: string[] = []
+  const realpath = (input: string): string => {
+    calls.push(input)
+    const canonical = canonicalPaths.get(input)
+    if (canonical === undefined) throw Object.assign(new Error(`unexpected resolver input: ${input}`), { code: "EINVAL" })
+    return canonical
+  }
+
+  const relative = containedRelativePath(child, parent, { platform: "linux", realpath })
+
+  expect(relative).toBe("note.md")
+  expect(calls).toEqual([child, parent])
 })
