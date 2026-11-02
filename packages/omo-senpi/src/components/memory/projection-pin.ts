@@ -4,7 +4,10 @@
 // changed after the pin reaches the model as a line of the late <memory_notice> message instead.
 // The pin is a session entry, so a resume, a host restart or a runtime reload reproduces the same
 // bytes. It moves only where the prompt cache is already cold or the user asked for it: after a
-// compaction, on /recompile, or when a history rewrite took the pinned commit away.
+// compaction, on /recompile, or when a history rewrite took the pinned commit away. A compaction
+// the turn already sent requests past (mid-turn) re-cached the pinned bytes, so moving the pin then
+// would cost a second full cache write (#10059): the pin keeps its revision and the notice
+// re-announces everything since it, because the compaction summarized the earlier notices away.
 
 import {
   isEmptyProjectedChanges,
@@ -86,12 +89,16 @@ export function createProjectionPins(options: ProjectionPinsOptions = {}): Proje
   const resolve = async (repo: GitMemoryRepo, sessionId: string, branch: readonly unknown[], head: string | null) => {
     const compactionId = latestCompactionId(branch)
     const cached = live.get(sessionId)
-    const state = cached?.record ?? readPinRecord(branch, sessionId)
+    const stored = cached?.record ?? readPinRecord(branch, sessionId)
+    const carried = stored !== undefined && stored.compactionId !== compactionId && requestSentAfterLatestCompaction(branch)
+      ? { ...stored, compactionId, noticedThrough: stored.revision }
+      : undefined
+    const state = carried ?? stored
     const staleByRefresh = cached === undefined
       ? state !== undefined && state.pinnedAtMs < refreshRequestedAtMs
       : cached.epoch < refreshEpoch
     const reason = staleByRefresh ? "refresh" : await repinReason(repo, state, cached === undefined, compactionId, head)
-    return { compactionId, state, reason }
+    return { compactionId, state, reason, carried: carried !== undefined }
   }
 
   return {
@@ -113,7 +120,7 @@ export function createProjectionPins(options: ProjectionPinsOptions = {}): Proje
       record(noticed)
     },
     async advance({ repo, sessionId, branch, head, record }): Promise<ProjectionTurn> {
-      const { compactionId, state, reason } = await resolve(repo, sessionId, branch, head)
+      const { compactionId, state, reason, carried } = await resolve(repo, sessionId, branch, head)
       const nowMs = now()
       if (state === undefined || reason !== undefined) {
         const fresh: ProjectionPinRecord = {
@@ -136,7 +143,10 @@ export function createProjectionPins(options: ProjectionPinsOptions = {}): Proje
         expiryNoticedThroughMs: state.expiryNoticedThroughMs ?? state.pinnedAtMs,
         nowMs,
       }
-      if (state.noticedThrough === head) return pinned
+      if (state.noticedThrough === head) {
+        if (carried) record(state)
+        return pinned
+      }
       let rangeCommits: readonly MemoryCommit[] = []
       const changes = await projectedChangesBetween(repo, state.noticedThrough, head, {
         excludeSessionId: sessionId,
@@ -220,6 +230,18 @@ function parsePinRecord(value: unknown): ProjectionPinRecord | undefined {
   const record = { version: 1 as const, sessionId: value.sessionId, revision, noticedThrough, compactionId, pinnedAtMs }
   const noticed = value.expiryNoticedThroughMs
   return typeof noticed === "number" && Number.isFinite(noticed) ? { ...record, expiryNoticedThroughMs: noticed } : record
+}
+
+/** Whether the turn went on to send a request after the latest compaction, re-caching the prompt it had. */
+function requestSentAfterLatestCompaction(branch: readonly unknown[]): boolean {
+  let requestSent = false
+  for (let index = branch.length - 1; index >= 0; index -= 1) {
+    const entry = branch[index]
+    if (!isRecord(entry)) continue
+    if (entry.type === "compaction") return requestSent
+    if (entry.type === "message" && isRecord(entry.message) && entry.message.role === "assistant") requestSent = true
+  }
+  return false
 }
 
 function latestCompactionId(branch: readonly unknown[]): string | null {

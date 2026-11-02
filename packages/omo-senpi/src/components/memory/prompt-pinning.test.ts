@@ -66,6 +66,14 @@ function pinnedHandler(
   return { dispatch, records, repins }
 }
 
+/** A compaction that applied mid-turn: the turn went on to send a request on the compacted context. */
+function midTurnCompactedBranch(): readonly unknown[] {
+  return [
+    ...compactedBranch(2),
+    { type: "message", id: "after-1", message: { role: "assistant", content: [{ type: "text", text: "after compaction" }] } },
+  ]
+}
+
 function pinEntry(record: ProjectionPinRecord | undefined): Record<string, unknown> {
   return { type: "custom", id: "pin-entry", customType: PROJECTION_PIN_ENTRY_TYPE, data: record }
 }
@@ -191,6 +199,59 @@ describe("session-pinned memory projection", () => {
     expect(afterCompaction?.systemPrompt).toContain("second")
     expect(afterCompaction?.message?.content ?? "").not.toContain(MEMORY_CHANGES_METADATA_TOKEN)
     expect(repins).toEqual(["compaction"])
+  }, 30_000)
+
+  test("#given a compaction applied mid-turn and the turn kept sending requests #when the next turn runs #then the system prompt keeps its pinned bytes and the change is announced", async () => {
+    // given
+    const { repo, context } = await fixture()
+    const { dispatch, records, repins } = pinnedHandler(repo, context)
+    const first = await dispatch(liveBranch(1))
+    const pinnedRevision = records.at(-1)?.revision
+    await commitAs(repo, "other-session", "system/persona.md", "second")
+
+    // when
+    const afterCompaction = await dispatch(midTurnCompactedBranch())
+
+    // then
+    expect(afterCompaction?.systemPrompt).toBe(first?.systemPrompt)
+    expect(afterCompaction?.message?.content).toContain("updated system/persona.md")
+    expect(repins).toEqual([])
+    expect(records.at(-1)).toMatchObject({ revision: pinnedRevision, compactionId: "c1" })
+  }, 30_000)
+
+  test("#given a change was announced before a mid-turn compaction summarized that notice away #when the next turns run #then the change is announced again once", async () => {
+    // given
+    const { repo, context } = await fixture()
+    const { dispatch } = pinnedHandler(repo, context)
+    await dispatch(liveBranch(1))
+    await commitAs(repo, "other-session", "reference/new.md", "new")
+    const announced = await dispatch(liveBranch(2))
+
+    // when
+    const afterCompaction = await dispatch(midTurnCompactedBranch())
+    const later = await dispatch(midTurnCompactedBranch())
+
+    // then
+    expect(announced?.message?.content).toContain("added reference/new.md")
+    expect(afterCompaction?.message?.content).toContain("added reference/new.md")
+    expect(later?.message?.content ?? "").not.toContain(MEMORY_CHANGES_METADATA_TOKEN)
+  }, 30_000)
+
+  test("#given a mid-turn compaction was carried by a session #when the session resumes in a new process #then it keeps the pinned bytes", async () => {
+    // given
+    const { repo, context } = await fixture()
+    const original = pinnedHandler(repo, context)
+    const first = await original.dispatch(liveBranch(1))
+    await commitAs(repo, "other-session", "system/persona.md", "second")
+    await original.dispatch(midTurnCompactedBranch())
+    const resumed = pinnedHandler(repo, context)
+
+    // when
+    const afterResume = await resumed.dispatch([...midTurnCompactedBranch(), pinEntry(original.records.at(-1))])
+
+    // then
+    expect(afterResume?.systemPrompt).toBe(first?.systemPrompt)
+    expect(resumed.repins).toEqual([])
   }, 30_000)
 
   test("#given /recompile requested a refresh #when the next turn runs #then the session repins to HEAD", async () => {
