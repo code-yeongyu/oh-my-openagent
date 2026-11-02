@@ -520,3 +520,70 @@ describe("ConcurrencyManager.cleanup", () => {
     await p
   })
 })
+
+describe("ConcurrencyManager.tryAcquire", () => {
+  test("takes a slot immediately when the group has a free slot", () => {
+    // given
+    const manager = new ConcurrencyManager({ defaultConcurrency: 2 })
+
+    // when
+    const taken = manager.tryAcquire("model-a")
+
+    // then
+    expect(taken).toBe(true)
+    expect(manager.getCount("model-a")).toBe(1)
+    expect(manager.getQueueLength("model-a")).toBe(0)
+  })
+
+  test("returns false without holding anything when the group is full", () => {
+    // given
+    const manager = new ConcurrencyManager({ defaultConcurrency: 1 })
+    expect(manager.tryAcquire("model-a")).toBe(true)
+
+    // when
+    const taken = manager.tryAcquire("model-a")
+
+    // then
+    expect(taken).toBe(false)
+    expect(manager.getCount("model-a")).toBe(1)
+    expect(manager.getQueueLength("model-a")).toBe(0)
+  })
+
+  test("respects the provider-level limit after key normalization", () => {
+    // given
+    const manager = new ConcurrencyManager({ providerConcurrency: { anthropic: 1 } })
+    expect(manager.tryAcquire("anthropic/claude-opus-4-7")).toBe(true)
+
+    // when / then: a different model in the same provider group is refused
+    expect(manager.tryAcquire("anthropic/claude-sonnet-4-6")).toBe(false)
+  })
+
+  test("takes no slot and reports true for an unlimited group", () => {
+    // given: a limit of 0 means unlimited
+    const manager = new ConcurrencyManager({ defaultConcurrency: 0 })
+
+    // when / then
+    expect(manager.tryAcquire("model-a")).toBe(true)
+    expect(manager.getCount("model-a")).toBe(0)
+  })
+
+  test("does not disturb a queued waiter when it returns false", async () => {
+    // given
+    const manager = new ConcurrencyManager({ defaultConcurrency: 1 })
+    expect(manager.tryAcquire("model-a")).toBe(true)
+    const queued = manager.acquire("model-a", "task-1").catch(() => {})
+    await Promise.resolve() // let it queue
+    expect(manager.getQueueLength("model-a")).toBe(1)
+
+    // when
+    const taken = manager.tryAcquire("model-a")
+
+    // then
+    expect(taken).toBe(false)
+    expect(manager.getQueueLength("model-a")).toBe(1)
+
+    // cleanup
+    manager.cancelWaiters("model-a")
+    await queued
+  })
+})

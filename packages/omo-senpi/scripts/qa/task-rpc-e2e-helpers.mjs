@@ -5,7 +5,7 @@ import { createHash } from "node:crypto"
 import { existsSync, readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 
-// The isolation guarantee the driver GATES on (Metis #7/#8): the real agent dir's credential/config files
+// The isolation guarantee the driver GATES on (plan-consultant #7/#8): the real agent dir's credential/config files
 // are never read or rewritten - a child must resolve auth/models from the SANDBOX agent dir. These are
 // byte-stable across a run, unlike the whole-dir digest which a live dev machine churns through ambient
 // senpi activity (other sessions' JSONL, the global ~/.senpi/agent/senpi-debug.log that ignores
@@ -137,21 +137,4 @@ export function pidAlive(pid) {
   } catch {
     return false
   }
-}
-
-export function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-// Poll the on-disk task records until one matches, or the deadline passes. Used by the kill and
-// reconcile scenarios to catch the child WHILE it is still a live, non-terminal process (a hanging
-// mock turn keeps status="running" so there is a real pid to signal / reconcile).
-export async function pollRecord(stateDir, predicate, timeoutMs = 20_000) {
-  const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
-    const match = readRecords(stateDir).find(predicate)
-    if (match !== undefined) return match
-    await sleep(200)
-  }
-  return undefined
 }

@@ -1,14 +1,14 @@
 #!/usr/bin/env node
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, rmSync, watch, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { delimiter, dirname, extname, isAbsolute, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const { digestDirectory } = await import(pathToFileURL(join(scriptDir, "drive.mjs")).href)
-const { CREDENTIAL_FILES, digestCredentialFiles, parseEvents, readRecords, analyzeSpawn, analyzeRpcRouting, eventsMentionSteerAck, statusSnapshots, liveRecordRpcChildPids, recordRpcChildPids, sleep } =
+const { CREDENTIAL_FILES, digestCredentialFiles, parseEvents, readRecords, analyzeSpawn, analyzeRpcRouting, eventsMentionSteerAck, statusSnapshots, liveRecordRpcChildPids, recordRpcChildPids } =
   await import(pathToFileURL(join(scriptDir, "task-rpc-e2e-helpers.mjs")).href)
-const { SCENARIO_A_STEPS, prepareScenarioSandbox, driveSenpi, runKillCheck, runReconcileCheck } =
+const { SCENARIO_A_STEPS, bindTasksDir, prepareScenarioSandbox, driveSenpi, runKillCheck, runReconcileCheck, waitForProcessCompletion } =
   await import(pathToFileURL(join(scriptDir, "task-rpc-e2e-scenarios.mjs")).href)
 const realSenpiAgentDir = join(homedir(), ".senpi", "agent")
 
@@ -45,7 +45,7 @@ function resolveSenpi() {
 
 async function runChecks(senpiBin, sandbox, sessionDir, stateDir) {
   const checks = []
-  const a = driveSenpi(senpiBin, sandbox, sessionDir, SCENARIO_A_STEPS)
+  const a = await driveSenpi(senpiBin, sandbox, sessionDir, bindTasksDir(SCENARIO_A_STEPS, stateDir))
   const aEvents = parseEvents(a.stdout)
   const aRecords = readRecords(stateDir)
   if (aRecords.length === 0) {
@@ -78,13 +78,16 @@ async function runChecks(senpiBin, sandbox, sessionDir, stateDir) {
     reason: spawn.pass ? (steerFact ? undefined : "no steer ack observed") : "blocked: no rpc child spawned (see spawn_process)",
   })
 
-  const completed = readRecords(stateDir).some((r) => r.status === "completed" && r.execution_mode === "process")
+  // Waits for the completion write rather than reading once: it can land just after the session returns (#9481).
+  const completion = spawn.pass ? await waitForProcessCompletion(stateDir) : { completed: false, lastStatuses: [] }
   const snaps = statusSnapshots(aEvents)
   checks.push({
     check: "completion_push_arrives",
-    verdict: spawn.pass && completed ? "PASS" : "FAIL",
-    reason: spawn.pass ? (completed ? undefined : "no completion recorded") : "blocked: no rpc child spawned (see spawn_process)",
-    facts: { statusSnapshotCount: snaps.length },
+    verdict: spawn.pass && completion.completed ? "PASS" : "FAIL",
+    reason: spawn.pass
+      ? (completion.completed ? undefined : `no completion recorded before the deadline; last status: ${completion.lastStatuses.join(",") || "none"}`)
+      : "blocked: no rpc child spawned (see spawn_process)",
+    facts: { statusSnapshotCount: snaps.length, ...(completion.completed ? {} : { lastStatuses: completion.lastStatuses }) },
   })
 
   checks.push(await runKillCheck(senpiBin))
@@ -97,13 +100,45 @@ async function runChecks(senpiBin, sandbox, sessionDir, stateDir) {
 }
 
 async function waitForRecordedPidsToExit(stateDir, timeoutMs = 5_000) {
-  const deadline = Date.now() + timeoutMs
-  let livePids = liveRecordRpcChildPids(readRecords(stateDir))
-  while (livePids.length > 0 && Date.now() < deadline) {
-    await sleep(200)
-    livePids = liveRecordRpcChildPids(readRecords(stateDir))
+  const tasksDir = join(stateDir, "tasks")
+  const logsDir = join(stateDir, "logs")
+  const findLivePids = () => {
+    try {
+      return liveRecordRpcChildPids(readRecords(stateDir))
+    } catch (error) {
+      if (error?.code === "ENOENT" || error instanceof SyntaxError) return []
+      throw error
+    }
   }
-  return livePids
+  const initial = findLivePids()
+  if (initial.length === 0) return initial
+  return new Promise((resolve, reject) => {
+    let settled = false
+    const finish = (livePids) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      closeWatchers()
+      resolve(livePids)
+    }
+    const watchers = [tasksDir, logsDir].map((dir) => watch(dir, { persistent: false }, () => {
+      const livePids = findLivePids()
+      if (livePids.length === 0) finish(livePids)
+    }))
+    const closeWatchers = () => watchers.forEach((watcher) => watcher.close())
+    const timeout = setTimeout(() => finish(findLivePids()), timeoutMs)
+    for (const watcher of watchers) {
+      watcher.on("error", (error) => {
+        if (settled) return
+        settled = true
+        clearTimeout(timeout)
+        closeWatchers()
+        reject(error)
+      })
+    }
+    const livePids = findLivePids()
+    if (livePids.length === 0) finish(livePids)
+  })
 }
 
 async function main() {

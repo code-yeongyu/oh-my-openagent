@@ -6,7 +6,7 @@
 
 Codex `SubagentStop` hook component: the evidence gate for the ultrawork implementation workers (`lazycodex-worker-low|medium|high`). When a worker stops without a valid evidence receipt, the hook emits `{"decision": "block", "reason": <directive>}` and Codex sends it back to work. Matcher is `^lazycodex-worker-(low|medium|high)$`; read-only roles like `lazycodex-qa-executor` and `lazycodex-gate-reviewer` (same `ultrawork/agents/` family) are NOT gated by this hook. (The historical `lazycodex-executor` agent was removed; this component keeps its name.)
 
-Valid receipt: `last_assistant_message` contains `EVIDENCE_RECORDED: <path>` where `<path>` resolves to a non-empty regular file strictly inside `<cwd>/.omo/evidence/`. Symlinks and directories rejected; containment checked on realpaths (file inside evidence root inside cwd, traversal-safe). A valid receipt clears attempt state and exits silently.
+Valid receipt: `last_assistant_message` contains `EVIDENCE_RECORDED: <path>` where `<path>` resolves to a regular file strictly inside `<cwd>/.omo/evidence/` with at least 40 characters after trimming whitespace. When `transcript_path` can be stat'ed, the receipt's `mtimeMs` must be at least the transcript's `birthtimeMs` (fallback: `ctimeMs`); an unstatable transcript skips freshness validation. Short or stale receipts are blocked with `placeholder` or `stale` in the reason. Symlinks and directories rejected; containment checked on realpaths (file inside evidence root inside cwd, traversal-safe). A valid receipt clears attempt state and exits silently.
 
 Escape hatches: after 3 blocked attempts (`MAX_ATTEMPTS`) the stop passes and state clears; a transcript containing a context-pressure marker ("context compacted", "context_length_exceeded", ...) passes immediately. Malformed stdin, unknown events, unrelated agents: silent exit 0 (fail-open).
 
@@ -28,7 +28,7 @@ Escape hatches: after 3 blocked attempts (`MAX_ATTEMPTS`) the stop passes and st
 | Task | Location |
 |------|----------|
 | Change the block message | `directive.md`; keep both `{{...}}` placeholders and the literal `EVIDENCE_RECORDED: <path>` final-line contract |
-| Change receipt validation | `src/codex-hook.ts` (`hasValidEvidenceReceipt`, `extractEvidencePath`, `isNonEmptyFileInsideEvidenceRoot`) |
+| Change receipt validation | `src/codex-hook.ts` (`getEvidenceReceiptFailure`, `extractEvidencePath`, `getEvidenceFileFailure`) |
 | Change the retry budget | `src/state.ts` `MAX_ATTEMPTS` |
 | Worker-side contract | `../ultrawork/agents/lazycodex-worker-{low,medium,high}.toml` instruct the final `EVIDENCE_RECORDED: <path>` line this hook parses |
 | Plugin-level wiring | `../../hooks/subagent-stop-verifying-lazycodex-executor-evidence.json` (adds `commandWindows` via `../bootstrap/scripts/node-dispatch.ps1`) |

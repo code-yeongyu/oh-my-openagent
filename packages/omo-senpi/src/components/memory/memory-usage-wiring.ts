@@ -39,8 +39,8 @@ export function registerMemoryUsage(
     return tracker
   }
 
-  pi.on("tool_call", (payload): void => {
-    const context = options.resolveContext(payload)
+  pi.on("tool_call", (payload, eventContext): void => {
+    const context = options.resolveContext(eventContext)
     if (context === undefined) return
 
     const event = readToolCall(payload)

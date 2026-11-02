@@ -1,12 +1,6 @@
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { hasActiveArchitectCategory, type GateRegistry } from "./architect-gate"
-import {
-  formatModelSelector,
-  isFableFiveModel,
-  isMessageEndEvent,
-  isModelSelectEvent,
-  isRefusalLikeMessage,
-} from "./detection"
+import { formatModelSelector, isMessageEndEvent, isModelSelectEvent, isRefusalLikeMessage } from "./detection"
 import {
   buildFallbackArchitectDirective,
   buildFallbackArchitectReminder,
@@ -61,16 +55,20 @@ export function createFallbackArchitectComponent(
       pi.on("model_select", (payload: unknown, eventCtx: unknown): void => {
         if (isDisabled() || !isModelSelectEvent(payload)) return
 
-        // Back on fable 5 (manual switch, session restore, or senpi reverting the fallback):
-        // the weaker-model advice no longer applies.
-        if (isFableFiveModel(payload.model) || payload.source === "fallback-revert") {
+        const selected = formatModelSelector(payload.model)
+        // Back on the model that was refused (manual switch, session restore) or senpi reverting
+        // the fallback: the weaker-model advice no longer applies.
+        if (payload.source === "fallback-revert" || state.active?.from === selected) {
           state.active = undefined
           state.refusalPending = false
           return
         }
 
         if (payload.source !== "fallback") return
-        if (!isFableFiveModel(payload.previousModel) || !state.refusalPending) return
+        // Any model pushed off its turn by a refusal arms the nudge: the signal that makes the
+        // architect consult worth suggesting is the refusal, not which model produced it (#8513).
+        const previousModel = payload.previousModel
+        if (previousModel === undefined || !state.refusalPending) return
 
         const cwd = extractCwd(eventCtx) ?? process.cwd()
         if (!hasArchitectCategory(cwd, extractRegistry(eventCtx))) {
@@ -79,8 +77,8 @@ export function createFallbackArchitectComponent(
           return
         }
 
-        const from = formatModelSelector(payload.previousModel)
-        const to = formatModelSelector(payload.model)
+        const from = formatModelSelector(previousModel)
+        const to = selected
         pi.sendMessage({
           customType: FALLBACK_ARCHITECT_DIRECTIVE_TYPE,
           content: buildFallbackArchitectDirective({ from, to }),

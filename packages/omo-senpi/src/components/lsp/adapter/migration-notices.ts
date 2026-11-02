@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
-import { join, resolve } from "node:path"
+import { resolve } from "node:path"
+
+import { projectLspConfigPaths, userLspConfigPath } from "../config-paths.js"
 
 interface LspEntry {
   readonly disabled?: boolean
@@ -40,9 +42,10 @@ export function getConfigNotices(): readonly ConfigNotice[] {
 }
 
 function getConfigPaths(): { readonly project: string; readonly user: string } {
+  const projectPaths = projectLspConfigPaths(process.cwd())
   return {
-    project: join(process.cwd(), ".pi", "lsp-client.json"),
-    user: join(resolve(process.env.HOME?.trim() || homedir()), ".pi", "lsp-client.json"),
+    project: projectPaths.find((path) => existsSync(path)) ?? projectPaths[0] ?? "",
+    user: userLspConfigPath(resolve(process.env.HOME?.trim() || homedir())),
   }
 }
 

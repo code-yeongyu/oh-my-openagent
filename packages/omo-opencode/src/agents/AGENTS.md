@@ -5,7 +5,15 @@ description: Developer reference for all 11 Oh My OpenAgent agent definitions, f
 
 # src/agents/ — 11 Agent Definitions
 
-**Generated:** 2026-05-15
+**Prompt ownership updated:** shared Native builders (PR #9856).
+
+Model-specific system cores come from `@code-yeongyu/senpi/prompt-presets` through
+`native-model-prompt.ts`. Existing OpenCode role builders and artifacts retain
+their instructions and runtime context. `native-prompt-frame.ts` lets system-transform rebuild
+the generated core for the actual request model without replacing user appends.
+Do not add copies of Native model bodies. Existing role variants are separate
+from Native model calibration. Explore, librarian and multimodal-looker keep
+their original prompts without a Native core.
 
 ## OVERVIEW
 
@@ -19,14 +27,14 @@ Modes verified from each agent file's `const MODE: AgentMode = ...` and (for Pro
 
 | Agent | Default Model | Temp | Mode | Fallback (after default) | Purpose |
 |-------|---------------|------|------|--------------------------|---------|
-| **Sisyphus** | claude-opus-5 max | (model default) | primary | kimi-k3 → gpt-5.6-sol medium → glm-5.2 → big-pickle | Main orchestrator, plans + delegates; `thinking: { type: "enabled", budgetTokens: 32000 }` |
-| **Hephaestus** | gpt-5.6-sol medium | (model default) | primary | GPT-5.6 Sol only (`requiresProvider`: openai \| openai-codex \| github-copilot \| opencode) | Autonomous deep worker |
-| **Oracle** | gpt-5.6-sol xhigh (high on Copilot) | 0.1 | subagent | gemini-3.1-pro high → claude-opus-5 max → glm-5.2 | Read-only consultation |
-| **Librarian** | gpt-5.6-luna-fast | 0.1 | subagent | qwen3.7-plus → minimax-m3 → minimax-m2.7 → claude-haiku-4-5 → gpt-5.4-nano | External docs/code search |
-| **Explore** | gpt-5.6-luna-fast | 0.1 | subagent | qwen3.7-plus → minimax-m3 → minimax-m2.7 → claude-haiku-4-5 → gpt-5.4-nano | Contextual grep |
+| **Sisyphus** | claude-opus-5-5 max | (model default) | primary | kimi-k3 → gpt-5.6-sol medium → glm-5.2 → big-pickle | Main orchestrator, plans + delegates; `thinking: { type: "enabled", budgetTokens: 32000 }` |
+| **Hephaestus** | gpt-5.6-sol medium | (model default) | primary | GPT-5.6 Sol only (`requiresProvider`: openai \| chatgpt-subscription \| github-copilot \| opencode) | Autonomous deep worker |
+| **Oracle** | gpt-5.6-sol xhigh (high on Copilot) | 0.1 | subagent | gemini-4-argon high → gemini-3.1-pro high → claude-opus-5-5 max → glm-5.2 | Read-only consultation |
+| **Librarian** | gpt-6-luna-fast | 0.1 | subagent | claude-haiku-5-5 medium → qwen3.7-plus → minimax-m3 → minimax-m2.7 → gpt-5.4-nano | External docs/code search |
+| **Explore** | gpt-6-luna-fast | 0.1 | subagent | claude-haiku-5-5 medium → qwen3.7-plus → minimax-m3 → minimax-m2.7 → gpt-5.4-nano | Contextual grep |
 | **Multimodal-Looker** | gpt-5.6-sol low | 0.1 | subagent | kimi-k3 → glm-4.6v → gpt-5-nano | PDF/image analysis |
-| **Metis** | claude-opus-5 high | **0.3** | subagent | kimi-k3 low | Pre-planning consultant |
-| **Momus** | gpt-5.6-terra high | 0.1 | subagent | gpt-5.6-sol xhigh (high on Copilot) → claude-opus-5 max → gemini-3.1-pro high → glm-5.2 | Plan reviewer |
+| **Metis** | claude-fable-5-1 max | **0.3** | subagent | claude-opus-5-5 max → kimi-k3 max | Pre-planning consultant |
+| **Momus** | gpt-5.6-terra high | 0.1 | subagent | gpt-5.6-sol xhigh (high on Copilot) → claude-opus-5-5 max → gemini-4-argon high → gemini-3.1-pro high → glm-5.2 | Plan reviewer |
 | **Atlas** | claude-sonnet-5 | 0.1 | primary | kimi-k3 → gpt-5.6-sol medium → minimax-m3 → MiniMax-M3 → minimax-m2.7 | Todo-list orchestrator |
 | **Prometheus** | claude-fable-5 xhigh | (override-only) | primary | kimi-k3 max | Strategic planner (interview); built via `buildPrometheusAgentConfig` (not in `agentSources`) |
 | **Sisyphus-Junior** | claude-sonnet-5 | 0.1 (`SISYPHUS_JUNIOR_DEFAULTS`) | subagent | kimi-k3 → gpt-5.6-sol medium → minimax-m3 → MiniMax-M3 → minimax-m2.7 → big-pickle | Category-spawned executor |
@@ -62,10 +70,7 @@ Read-only agents are rejected at TeamSpec parse time. For those, the lead delega
 ```
 agents/
 ├── sisyphus.ts                                # Main orchestrator router
-├── sisyphus/                                  # Model-specific variant prompts
-│   ├── default.ts, gemini.ts, gpt-5-4.ts, gpt-5-5.ts
 ├── hephaestus.ts                              # Routes to model variant
-├── hephaestus/                                # gpt.ts, gpt-5-4.ts, gpt-5-5.ts, gpt-5-6.ts
 ├── oracle.ts                                  # Read-only consultant
 ├── librarian.ts                               # External search
 ├── explore.ts                                 # Codebase grep
@@ -93,11 +98,17 @@ agents/
 const createXXXAgent: AgentFactory = (model: string) => ({
   instructions: "...",
   model,
-  temperature: 0.1,
+  // Set temperature only when this agent pins a role-specific default.
   // ...config
 })
 createXXXAgent.mode = "subagent" // or "primary" or "all"
 ```
+
+Temperature is opt-in per agent. Most consultant and helper agents pin
+`0.1`, Metis pins `0.3`, and coordinator / role agents intentionally
+leave temperature unset when they should use the selected model's
+default. Sisyphus, Hephaestus, and Prometheus leave temperature unset
+unless an override or category config supplies one.
 
 Model resolution: 4-step pipeline → override → category-default → provider-fallback → system-default. Defined in [`shared/model-resolution-pipeline.ts`](../shared/model-resolution-pipeline.ts).
 
@@ -115,7 +126,7 @@ Definition (from [`src/agents/types.ts`](types.ts)):
 
 ## DYNAMIC PROMPT BUILDER
 
-`dynamic-agent-prompt-builder.ts` composes per-agent system prompts at runtime by stitching:
+`dynamic-agent-prompt-builder.ts` supplies reusable OpenCode role-context sections:
 - Core sections (identity, mode, restrictions)
 - Policy sections (citation, verification, anti-patterns)
 - Tool categorization (per-domain tool guidance)

@@ -5,7 +5,7 @@ import {
   type MemoryModelChain,
 } from "./memory-model-attempts"
 import { preflightMemoryModels } from "./model-preflight"
-import { resolveSenpiLaunch } from "./senpi-command"
+import { resolveSenpiLaunch, withoutForeignPackageDirEnv } from "./senpi-command"
 import type { ReflectionModelCandidate } from "./resolve-model"
 import type { RunAttempt } from "./run-artifacts"
 
@@ -39,15 +39,12 @@ export const resolveAndPreflightMemoryLaunch: ResolveAndPreflightMemoryLaunch = 
     candidates: input.candidates,
     launch,
     env: {
-      ...input.env,
+      ...withoutForeignPackageDirEnv(input.env, launch),
       [input.envFlag]: "1",
       SENPI_PTY_FORCE_PIPE: "1",
     },
     configSources: input.configSources,
     warn: input.warn,
   })
-  if (preflight.kind === "none_visible") {
-    throw new Error(`No ${input.surfaceName} model candidate is visible to the discovery-disabled child: ${preflight.rejected.map((item) => `${item.model} (${item.cause})`).join(", ")}`)
-  }
   return runMemoryModelAttempts(preflight.candidates, input.attempt)
 }

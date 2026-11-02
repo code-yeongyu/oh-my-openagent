@@ -14,6 +14,7 @@ import {
   memberTaskId,
   parseEvents,
   readText,
+  runtimeDir,
   seedCrashReservation,
 } from "./team-e2e-support.mjs"
 import { analyzeMain, injectionEvidence, teamMessageEnqueues, verdict } from "./team-e2e-analysis.mjs"
@@ -103,7 +104,7 @@ async function runMain(senpiBin, outDir) {
     let observation
     try {
       observation = await pollUntil(
-        () => Promise.resolve(mainInjectionObserved(sandbox.cwd, obsDir)),
+        () => Promise.resolve(mainInjectionObserved(sandbox, obsDir)),
         (value) => value.memberEnvelopeEchoed && value.memberToLeadInjected && value.leadInbox.unread === 0 && value.leadInbox.reserved === 0,
         MAIN_INJECTION_TIMEOUT_MS,
       )
@@ -120,10 +121,10 @@ async function runMain(senpiBin, outDir) {
   }
 }
 
-function mainInjectionObserved(cwd, obsDir) {
-  const runId = discoverRunIds(cwd)[0]
-  const quickTask = runId === undefined ? undefined : memberTaskId(cwd, runId, "quick")
-  return injectionEvidence(cwd, runId, quickTask, "LEAD2QUICK", obsDir)
+function mainInjectionObserved(sandbox, obsDir) {
+  const runId = discoverRunIds(sandbox)[0]
+  const quickTask = runId === undefined ? undefined : memberTaskId(sandbox, runId, "quick")
+  return injectionEvidence(sandbox, runId, quickTask, "LEAD2QUICK", obsDir)
 }
 
 async function runDuraRevive(senpiBin, outDir) {
@@ -135,7 +136,7 @@ async function runDuraRevive(senpiBin, outDir) {
     let state
     try {
       state = await pollUntil(
-        () => Promise.resolve(readDuraInboxState(sandbox.cwd)),
+        () => Promise.resolve(readDuraInboxState(sandbox)),
         (value) => value.counts.unread === 0
           && value.counts.reserved === 0
           && value.counts.processed >= DURA_EXPECTED_PROCESSED,
@@ -162,11 +163,11 @@ async function runDuraRevive(senpiBin, outDir) {
   }
 }
 
-function readDuraInboxState(cwd) {
-  const runId = discoverRunIds(cwd)[0]
+function readDuraInboxState(sandbox) {
+  const runId = discoverRunIds(sandbox)[0]
   const counts = runId === undefined
     ? { unread: -1, reserved: -1, processed: -1 }
-    : inboxCounts(memberInboxDir(cwd, runId, "dura"))
+    : inboxCounts(memberInboxDir(sandbox, runId, "dura"))
   return { runId, counts }
 }
 
@@ -176,9 +177,9 @@ async function runReclaim(senpiBin, outDir) {
     seedProject(sandbox)
     const seed = await runSenpi({ senpiBin, sandbox, prompt: "seed an active team for reclaim", script: DURA_SEED_SCRIPT })
     writeFileSync(join(outDir, "reclaim-seed-stdout.json.log"), seed.stdout)
-    const runId = discoverRunIds(sandbox.cwd)[0]
+    const runId = discoverRunIds(sandbox)[0]
     if (runId === undefined) return { reclaimReservationRestored: false, reclaimNoLeak: false }
-    const inbox = memberInboxDir(sandbox.cwd, runId, "rcl")
+    const inbox = memberInboxDir(sandbox, runId, "rcl")
     const reservation = seedCrashReservation(inbox, STALE_TTL_MS * 2, "rcl")
     const before = inboxCounts(inbox)
     const reclaim = await runSenpi({ senpiBin, sandbox, prompt: "boot a fresh session so session_start reclaims", script: NOOP_SCRIPT })
@@ -283,10 +284,11 @@ function verifyMainInjectionHelper() {
   const root = mkdtempSync(join(tmpdir(), "omo-senpi-team-e2e-self-test-"))
   try {
     const runId = "self-test-run"
-    const runtime = join(root, ".omo", "senpi-task", "teams", "runtime", runId)
+    const fixture = { cwd: join(root, "project"), agentDir: join(root, "agent") }
+    const runtime = runtimeDir(fixture, runId)
     mkdirSync(runtime, { recursive: true })
     writeFileSync(join(runtime, "senpi-task-members.json"), JSON.stringify({ quick: "st_self_test" }))
-    const observed = mainInjectionObserved(root, join(root, "obs"))
+    const observed = mainInjectionObserved(fixture, join(root, "obs"))
     if (observed.quickTask !== "st_self_test") throw new Error("self-test: member task lookup failed")
   } finally {
     rmSync(root, { recursive: true, force: true })

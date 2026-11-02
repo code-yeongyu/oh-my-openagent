@@ -22,35 +22,73 @@ export const REVIEWER_ROLES_BY_SURFACE: Readonly<Record<UlwLoopToolkitSurface, U
 		gateReview: "lazycodex-gate-reviewer",
 	},
 	"omo-senpi": {
-		codeReview: "omo-senpi-code-reviewer",
-		manualQa: "omo-senpi-qa-executor",
-		gateReview: "omo-senpi-gate-reviewer",
+		codeReview: "omo-native-code-reviewer",
+		manualQa: "omo-native-qa-executor",
+		gateReview: "omo-native-gate-reviewer",
 	},
 };
 
-export const GATE_REVIEWER_AGENT_NAMES: ReadonlySet<string> = new Set(
-	Object.values(REVIEWER_ROLES_BY_SURFACE).map((roles) => roles.gateReview),
-);
+// The reviewer agents were renamed omo-senpi-* -> omo-native-*. The retired spellings stay
+// resolvable for one release line so a caller that still names one is recognized rather than
+// silently treated as a non-review spawn.
+export const LEGACY_REVIEWER_AGENT_ALIASES: Readonly<Record<string, string>> = {
+	"omo-senpi-code-reviewer": REVIEWER_ROLES_BY_SURFACE["omo-senpi"].codeReview,
+	"omo-senpi-qa-executor": REVIEWER_ROLES_BY_SURFACE["omo-senpi"].manualQa,
+	"omo-senpi-gate-reviewer": REVIEWER_ROLES_BY_SURFACE["omo-senpi"].gateReview,
+};
+
+export function canonicalReviewerAgentName(reviewer: string): string {
+	return LEGACY_REVIEWER_AGENT_ALIASES[reviewer] ?? reviewer;
+}
+
+const CANONICAL_GATE_REVIEW_NAMES = Object.values(REVIEWER_ROLES_BY_SURFACE).map((roles) => roles.gateReview);
+
+export const GATE_REVIEWER_AGENT_NAMES: ReadonlySet<string> = new Set([
+	...CANONICAL_GATE_REVIEW_NAMES,
+	...Object.entries(LEGACY_REVIEWER_AGENT_ALIASES)
+		.filter(([, canonical]) => CANONICAL_GATE_REVIEW_NAMES.includes(canonical))
+		.map(([legacy]) => legacy),
+]);
 
 export type UlwLoopGateSection = "codeReview" | "manualQa" | "gateReview" | "iteration" | "criteriaCoverage";
 
 export const REQUIRED_GATE_SECTIONS_BY_SURFACE: Readonly<Record<UlwLoopToolkitSurface, readonly UlwLoopGateSection[]>> =
 	{
-		lazycodex: ["codeReview", "manualQa", "gateReview", "iteration", "criteriaCoverage"],
+		lazycodex: ["manualQa", "gateReview", "iteration", "criteriaCoverage"],
 		"omo-senpi": ["manualQa", "gateReview", "iteration", "criteriaCoverage"],
+	};
+
+export const OPTIONAL_GATE_SECTIONS_BY_SURFACE: Readonly<Record<UlwLoopToolkitSurface, readonly UlwLoopGateSection[]>> =
+	{
+		lazycodex: ["codeReview"],
+		"omo-senpi": [],
 	};
 
 export const GATE_SECTION_BY_ACCEPTOR: Readonly<
 	Record<UlwLoopToolkitSurface, Readonly<Partial<Record<UlwLoopGateSection, readonly string[]>>>>
 > = {
 	lazycodex: {
-		codeReview: [REVIEWER_ROLES_BY_SURFACE.lazycodex.codeReview],
-		manualQa: [REVIEWER_ROLES_BY_SURFACE.lazycodex.manualQa],
-		gateReview: [REVIEWER_ROLES_BY_SURFACE.lazycodex.gateReview],
+		codeReview: [REVIEWER_ROLES_BY_SURFACE.lazycodex.codeReview, "main-session"],
+		manualQa: [REVIEWER_ROLES_BY_SURFACE.lazycodex.manualQa, "main-session"],
+		gateReview: [
+			REVIEWER_ROLES_BY_SURFACE.lazycodex.gateReview,
+			"category:deep-high",
+			"category:deep-low",
+			"category:deep",
+			"category:unspecified-high",
+			"category:unspecified-low",
+			"main-session",
+		],
 	},
 	"omo-senpi": {
 		manualQa: ["main-session"],
-		gateReview: ["category:deep", "category:unspecified-high", "category:unspecified-low"],
+		gateReview: [
+			"category:deep-high",
+			"category:deep-low",
+			"category:deep",
+			"category:unspecified-high",
+			"category:unspecified-low",
+		],
 	},
 };
 

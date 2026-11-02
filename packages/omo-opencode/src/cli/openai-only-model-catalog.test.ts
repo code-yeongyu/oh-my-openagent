@@ -44,8 +44,8 @@ describe("generateModelConfig OpenAI-only model catalog", () => {
     const result = generateModelConfig(config)
 
     // #then
-    expect(result.agents?.explore).toEqual({ model: "openai/gpt-5.6-luna-fast", variant: "low" })
-    expect(result.agents?.librarian).toEqual({ model: "openai/gpt-5.6-luna-fast", variant: "low" })
+    expect(result.agents?.explore).toEqual({ model: "openai/gpt-6-luna-fast", variant: "low" })
+    expect(result.agents?.librarian).toEqual({ model: "openai/gpt-6-luna-fast", variant: "low" })
   })
 
   test("fills remaining OpenAI-only category gaps with OpenAI models", () => {
@@ -57,9 +57,9 @@ describe("generateModelConfig OpenAI-only model catalog", () => {
 
     // #then
     expect(result.categories?.artistry).toEqual({ model: "openai/gpt-5.6-sol", variant: "xhigh" })
-    expect(result.categories?.quick).toEqual({ model: "openai/gpt-5.6-luna-fast" })
+    expect(result.categories?.quick).toEqual({ model: "openai/gpt-6-luna-fast" })
     expect(result.categories?.["visual-engineering"]).toEqual({ model: "openai/gpt-5.6-sol", variant: "high" })
-    expect(result.categories?.writing).toEqual({ model: "openai/gpt-5.6-sol", variant: "medium" })
+    expect(result.categories?.writing).toBeUndefined()
   })
 
   test("does not apply OpenAI-only overrides when OpenCode Go is also available", () => {
@@ -70,11 +70,17 @@ describe("generateModelConfig OpenAI-only model catalog", () => {
     const result = generateModelConfig(config)
 
     // #then
-    expect(result.agents?.explore).toMatchObject({ model: "openai/gpt-5.6-luna-fast", variant: "low" })
-    expect(result.agents?.librarian).toMatchObject({ model: "openai/gpt-5.6-luna-fast", variant: "low" })
+    expect(result.agents?.explore).toMatchObject({ model: "openai/gpt-6-luna-fast", variant: "low" })
+    expect(result.agents?.librarian).toMatchObject({ model: "openai/gpt-6-luna-fast", variant: "low" })
     expect(result.agents?.explore).not.toMatchObject({ variant: "medium" })
     expect(result.agents?.librarian).not.toMatchObject({ variant: "medium" })
-    expect(result.categories?.quick).toMatchObject({ model: "opencode-go/minimax-m3", variant: "high" })
+    // The builtin quick chain (Luna low, then the OpenCode Go rungs) wins, not the OpenAI-only override,
+    // which would be a bare `{ model: "openai/gpt-6-luna-fast" }` with no variant and no fallbacks.
+    expect(result.categories?.quick).toMatchObject({
+      model: "openai/gpt-6-luna-fast",
+      variant: "low",
+      fallback_models: [{ model: "opencode-go/minimax-m3", variant: "high" }, { model: "opencode-go/minimax-m2.7", variant: "high" }],
+    })
   })
 
   for (const { name, overrides } of mixedProviderCases) {

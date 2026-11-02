@@ -1,23 +1,36 @@
 import type { MemoryCommit } from "./repo-types"
 
 export function parseLogOutput(output: string): MemoryCommit[] {
+  return output.split("\x1e").slice(1).map((record) => parseRecord(record.split("\x1f")))
+}
+
+/**
+ * `git log --name-only -z` output for the same format: each record's last field is the commit date,
+ * a NUL, then the commit's paths, each NUL-terminated and the first one led by a newline.
+ */
+export function parseLogOutputWithPaths(output: string): MemoryCommit[] {
   return output.split("\x1e").slice(1).map((record) => {
-    const [sha = "", subject = "", body = "", authorName = "", authorEmail = "", committedAt = ""] = record.split("\x1f")
-    const normalizedBody = body.replace(/\r?\n$/, "")
+    const fields = record.split("\x1f")
+    const [committedAt = "", ...paths] = (fields.pop() ?? "").split("\0")
     return {
-      sha,
-      subject,
-      body: normalizedBody,
-      authorName,
-      authorEmail,
-      committedAt: committedAt.trim(),
-      trailers: parseTrailers(normalizedBody),
+      ...parseRecord([...fields, committedAt]),
+      paths: paths.map((path) => path.replace(/^\n/, "")).filter(Boolean),
     }
   })
 }
 
-export function parseNulPaths(output: string): string[] {
-  return output.split("\0").filter(Boolean)
+function parseRecord(fields: readonly string[]): MemoryCommit {
+  const [sha = "", subject = "", body = "", authorName = "", authorEmail = "", committedAt = ""] = fields
+  const normalizedBody = body.replace(/\r?\n$/, "")
+  return {
+    sha,
+    subject,
+    body: normalizedBody,
+    authorName,
+    authorEmail,
+    committedAt: committedAt.trim(),
+    trailers: parseTrailers(normalizedBody),
+  }
 }
 
 function parseTrailers(body: string): Readonly<Record<string, string>> {

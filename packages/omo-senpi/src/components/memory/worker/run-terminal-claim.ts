@@ -39,6 +39,14 @@ export interface RunTerminalClaim {
   readonly claimantPid: number
 }
 
+/** The claim file can be neither read nor replaced, so no process can ever settle this run through it. */
+export class RunTerminalClaimUnrecoverableError extends Error {
+  constructor(readonly runDir: string, options?: ErrorOptions) {
+    super(`Run terminal claim cannot be recovered in ${runDir}`, options)
+    this.name = "RunTerminalClaimUnrecoverableError"
+  }
+}
+
 export function runTerminalClaimPath(runDir: string): string {
   return join(runDir, "terminal-claim.json")
 }
@@ -61,13 +69,18 @@ export async function claimRunTerminal(
   let discarded = 0
   for (;;) {
     if (createExclusiveClaim(path, requested)) return requested
-    const snapshot = readClaimSnapshot(path)
+    let snapshot: ClaimSnapshot | undefined
+    try {
+      snapshot = readClaimSnapshot(path)
+    } catch (error) {
+      throw new RunTerminalClaimUnrecoverableError(runDir, { cause: error })
+    }
     if (snapshot === undefined) continue
     const existing = snapshot.claim
     if (existing === undefined) {
       // A claim only becomes visible complete, so an unreadable one authorized
       // nothing and is discarded rather than stranding the run forever.
-      if (discarded > 0) throw new TypeError("Invalid run terminal claim")
+      if (discarded > 0) throw new RunTerminalClaimUnrecoverableError(runDir)
       discarded += 1
       await seams.beforeRecovery?.("invalid")
       const replacement = await recoverClaim(runDir, path, snapshot, "invalid", identity, seams)

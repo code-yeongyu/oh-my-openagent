@@ -1,5 +1,5 @@
-import { describe, expect, test } from "bun:test"
-import { mkdtempSync, writeFileSync } from "node:fs"
+import { describe, expect, onTestFinished, test } from "bun:test"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -7,7 +7,9 @@ import { run, runImageDiff, runTuiCheck } from "./cli"
 import { encodeRgbaPng, solidRgba } from "./png-synth"
 
 function tempDir(): string {
-	return mkdtempSync(join(tmpdir(), "visual-qa-"))
+	const dir = mkdtempSync(join(tmpdir(), "visual-qa-"))
+	onTestFinished(() => rmSync(dir, { recursive: true, force: true }))
+	return dir
 }
 
 describe("runImageDiff", () => {

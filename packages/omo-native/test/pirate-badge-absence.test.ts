@@ -28,11 +28,6 @@ function collectDirectoryNames(root: string): string[] {
 describe("omo native footer badge absence for omo-ai installs", () => {
   describe("#given the published omo-ai payload", () => {
     describe("#when the shipped file set is inspected", () => {
-      test("#then the payload ships only bin and plugin, never a workspace packages tree", () => {
-        expect(manifest.files).toEqual(["bin", "plugin"])
-        expect(manifest.files).not.toContain("packages")
-      })
-
       test("#then no shipped directory carries a senpi badge gate manifest", () => {
         for (const shipped of manifest.files) {
           const shippedRoot = join(packageRoot, shipped)

@@ -4,10 +4,10 @@ The opinionated, audited-in-prod stack for 2026 Rust. Every entry has a one-line
 
 ## Async runtime — `tokio`
 
-The default. Use `tokio` for new work. Multi-thread runtime unless you have a measured reason to go single-thread.
+The default. Use `tokio` for new work. Multi-thread runtime with the default worker count unless you have a measured reason otherwise ([async-tokio.md](async-tokio.md)).
 
 ```rust
-#[tokio::main(flavor = "multi_thread", worker_threads = 8)]
+#[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     run().await
@@ -49,7 +49,7 @@ pub enum ParseError {
 }
 ```
 
-`#[non_exhaustive]` on enums prevents downstream `match` from breaking when you add variants. `#[error(transparent)]` on a wrapper variant forwards Display + cause to the inner error.
+`#[non_exhaustive]` on enums prevents downstream `match` from breaking when you add variants. `#[error(transparent)]` on a wrapper variant forwards Display + cause to the inner error. Keep the cause chain: a variant that wraps another error marks it `#[from]` or `#[source]` so `anyhow`'s `{error:#}` and reporters print every layer. Error messages are lowercase with no trailing period, because they get composed into `context: cause` chains.
 
 ## CLI — `clap` with derive
 
@@ -108,7 +108,7 @@ fn init_tracing() {
         .init();
 }
 
-#[instrument(skip(db), fields(user_id = %user.id))]
+#[instrument(skip_all, fields(user_id = %user.id))]
 async fn process_user(db: &Pool, user: &User) -> anyhow::Result<()> {
     info!("processing user");
     if user.is_banned() {
@@ -121,6 +121,8 @@ async fn process_user(db: &Pool, user: &User) -> anyhow::Result<()> {
 ```
 
 Replace `println!` with `info!`/`warn!`/`error!`. Replace `eprintln!` with `tracing::error!`.
+
+`#[instrument]` records every argument it does not skip with `Debug`, so a `&User` argument lands in the span whole, PII included. Default to `skip_all` and whitelist fields explicitly, as above; secrets live in `secrecy::SecretString` so a stray `?value` prints `[REDACTED]`. A **library** emits `tracing` events and spans but never installs a subscriber (`tracing_subscriber::…::init()`): only the binary chooses the output format and filter.
 
 ## Error reporting (binaries) — `color-eyre`
 
@@ -141,19 +143,29 @@ Library code stays on `anyhow`/`thiserror`. `color-eyre` is purely a display lay
 The default for any data crossing a process boundary (file, network, IPC, database column).
 
 ```rust
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+// Input we own the schema of (config, our own API): reject typos.
+#[derive(Debug, serde::Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
-pub struct ApiResponse {
+pub struct CreateUser {
+    pub email: Email,                       // validated newtype, see type-state.md
+    #[serde(default)]
+    pub display_name: Option<String>,
+}
+
+// Payload a newer peer may extend: keep unknown fields instead of rejecting them.
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct Event {
     pub user_id: UserId,
     pub created_at: jiff::Timestamp,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub display_name: Option<String>,
     #[serde(flatten)]
     pub extra: HashMap<String, serde_json::Value>,
 }
 ```
 
-`deny_unknown_fields` catches typos in inputs. `rename_all = "snake_case"` aligns with REST/JSON conventions while keeping idiomatic Rust field names. `#[serde(flatten)]` for forward-compatible extra fields.
+Choose per type: `deny_unknown_fields` for input whose schema you own (a typoed config key fails loudly), `#[serde(flatten)]` catch-all for payloads a newer peer may extend. The two do not combine: serde does not support `deny_unknown_fields` on a struct with a `flatten` field. `rename_all` matches the wire schema you are given, not a house style. Enums get an explicit representation (`#[serde(tag = "type")]`, or `tag` + `content`); `#[serde(untagged)]` tries variants in order and reports only "did not match any variant", so reserve it for shapes that are unambiguous by construction. Validated newtypes deserialize through their checked constructor with `#[serde(try_from = "...")]` ([type-state.md](type-state.md)). For a field whose wire format differs from its Rust type (a duration as seconds, a timestamp as a string), use `#[serde(with = "module")]` or the type's own serde feature instead of a hand-written parallel struct.
 
 Alternatives:
 - `serde_yaml` (YAML — note: YAML's "deserialize anything" surface is a security trap; prefer JSON/TOML where possible)
@@ -306,7 +318,7 @@ type WorldPoint  = Point2D<f32, WorldSpace>;
 let cursor: ScreenPoint = Point2D::new(120.0, 240.0);
 let player: WorldPoint  = Point2D::new(3.5, 1.2);
 
-// let mistake = cursor + player; // ❌ type error
+// let mistake = cursor + player; // compile error: different coordinate spaces
 ```
 
 Generalize the pattern to your own domains (see `references/type-state.md`).
@@ -350,11 +362,12 @@ fn serializes_well() {
 Stable Rust friendly (no nightly `#[bench]`).
 
 ```rust
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
+use std::hint::black_box;
 
 fn bench_parse(c: &mut Criterion) {
-    let input = std::fs::read_to_string("samples/large.txt").unwrap();
-    c.bench_function("parse_large", |b| b.iter(|| parse(black_box(&input))));
+    let input = include_str!("../samples/large.txt");
+    c.bench_function("parse_large", |b| b.iter(|| parse(black_box(input))));
 }
 
 criterion_group!(benches, bench_parse);
@@ -362,6 +375,8 @@ criterion_main!(benches);
 ```
 
 Run with `cargo bench`. HTML reports under `target/criterion/`. Pair with `cargo bench -- --save-baseline main` then `--baseline main` for comparison.
+
+**Profile first, then optimize.** A change made for speed ships with its measurement: the benchmark or profile (`cargo flamegraph`, `samply`) that located the hot spot, and the before/after numbers on a representative input. Source shape alone proves nothing: iterator chains, `#[inline]`, bounds checks, and `Iterator::chain` usually compile to the same code as the "optimized" rewrite. Attributes like `#[inline(always)]` and `#[cold]` go in only when a measurement shows they help, and the `std::hint::black_box` above keeps the compiler from deleting the work being timed.
 
 ## Concurrency model — `loom`
 
@@ -378,7 +393,7 @@ let s: &str = bump.alloc_str("hello");
 // All allocations freed at once when `bump` drops.
 ```
 
-For parser nodes, AST construction, per-request scratch. Outperforms heap allocation for short-lived owned data by an order of magnitude.
+For parser nodes, AST construction, per-request scratch: one bump pointer per allocation and one free for the whole arena. Measure the gain on your workload before claiming one.
 
 ## Web client (browser, WASM-bound) — `gloo` ecosystem
 
@@ -386,26 +401,21 @@ If targeting WASM browser, use `gloo-net` for fetch and `gloo-storage` for local
 
 ## Lazy statics — `std::sync::LazyLock` (since 1.80)
 
-```rust
-use std::sync::LazyLock;
-static CONFIG: LazyLock<Config> = LazyLock::new(|| Config::load_from_env().unwrap());
-```
+`LazyLock` for values that cannot fail at runtime (a compiled literal regex, a static table); fallible setup such as loading config belongs in `main`, where `?` reports it. Pattern → [concurrency.md](concurrency.md#once-init-primitives). Avoid `lazy_static!` (macro-heavy, predates std), `once_cell` (now in std as `LazyLock`/`OnceLock`).
 
-Avoid `lazy_static!` (macro-heavy, predates std), `once_cell` (now in std as `LazyLock`/`OnceLock`).
-
-## Hash maps — `std::collections::HashMap` + `ahash` for hot paths
+## Hash maps — `std::collections::HashMap`, a faster hasher only where measured
 
 ```rust
 use std::collections::HashMap;
-use ahash::RandomState;
 
-type FastMap<K, V> = HashMap<K, V, RandomState>;
+// Keys come from trusted code and a profile shows hashing is hot:
+type FastMap<K, V> = HashMap<K, V, foldhash::fast::RandomState>;
 let mut counters: FastMap<String, u64> = FastMap::default();
 ```
 
-`HashMap` defaults to SipHash (DoS-resistant). For internal hot loops where you trust the keys, `ahash` is 2-5x faster.
+std's default hasher (SipHash-1-3 with a random key) resists hash-flooding from attacker-chosen keys; keep it for any map fed by input. For trusted keys on a measured hot path, `foldhash` (the hasher `hashbrown` defaults to) or `rustc-hash` (`FxHashMap`, integer keys) are faster; `rustc-hash` is predictable, so never feed it untrusted keys. Update-or-insert goes through `map.entry(key).or_insert(..)` / `.and_modify(..)`, one lookup instead of `get` + `insert`.
 
-For sorted iteration, use `BTreeMap`. For small keys with known small N, `Vec<(K, V)>` may beat both.
+For sorted iteration, use `BTreeMap`; for insertion order that is part of the contract, `indexmap::IndexMap`. For small keys with known small N, `Vec<(K, V)>` may beat both.
 
 ## File I/O — `tokio::fs` (async) or `std::fs` (sync utility)
 
@@ -413,7 +423,7 @@ For sorted iteration, use `BTreeMap`. For small keys with known small N, `Vec<(K
 let contents = tokio::fs::read_to_string("data.json").await?;
 ```
 
-For large files: `tokio::fs::File` + `tokio::io::BufReader`. For random access, `memmap2` (with the unsafe-discipline wrappers).
+For large files: `tokio::fs::File` + `tokio::io::BufReader`. For random access, `memmap2` (with the unsafe-discipline wrappers). Many small reads or writes (line by line, record by record) go through `BufReader` / `BufWriter`, sync or async. Call `flush()` on a `BufWriter` before dropping it: `Drop` flushes too but has to discard the error.
 
 ## Decision tree
 

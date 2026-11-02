@@ -18,7 +18,7 @@ function record(overrides: Partial<TaskRecord> = {}): TaskRecord {
     root_session_id: "parent-1",
     depth: 0,
     execution_mode: "in-process",
-    model: "anthropic/claude-opus-5",
+    model: "anthropic/claude-opus-5-5",
     notify_on_terminal: false,
     created_at: "2026-08-21T00:00:00.000Z",
     updated_at: "2026-08-21T00:01:00.000Z",

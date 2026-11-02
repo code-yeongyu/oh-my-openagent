@@ -7,6 +7,7 @@ import { mergeSkillDefinitions } from "./merger/skill-definition-merger"
 import { normalizeSkillsConfig } from "./merger/skills-config-normalizer"
 import { SCOPE_PRIORITY } from "./merger/scope-priority"
 import { isDisabledSkillAlias } from "./skill-discovery"
+import { getSkillSourceProvenance } from "./config-source-discovery"
 
 export interface MergeSkillsOptions {
   configDir?: string
@@ -62,7 +63,7 @@ export function mergeSkills(
 
     if (entry.disable) continue
 
-    const loaded = configEntryToLoadedSkill(name, entry, options.configDir)
+    const loaded = configEntryToLoadedSkill(name, entry, options.configDir, getSkillSourceProvenance(config))
     if (loaded) {
       const existing = skillMap.get(name)
       if (existing && !entry.template && !entry.from) {

@@ -11,13 +11,21 @@ import { terminateRpcChild } from "../../runners/rpc/terminate"
 import { spawnFakeChild } from "../../runners/rpc/__fixtures__/spawn-fake"
 import { RpcProcessRunner } from "../../runners/rpc-process"
 import { createMemberSelfPoller } from "./self-poller"
+import { realColdRevive } from "../../lifecycle/__fixtures__/real-cold-revive"
+import { createColdReviveTrace, type ColdReviveTrace } from "../../lifecycle/__fixtures__/cold-revive-trace"
 
 const TEAM_RUN_ID = "11111111-1111-4111-8111-111111111111"
 const MESSAGE_ID = "22222222-2222-4222-8222-222222222222"
 const roots: string[] = []
 const children: ChildProcess[] = []
+let activeTrace: ColdReviveTrace | undefined
 
 afterEach(async () => {
+  // Bun's test deadline does not reject the awaited fixture promise. Preserve its last stage
+  // from the hook as well, including when the dangling child is killed by the test runner.
+  const expired = activeTrace
+  activeTrace = undefined
+  if (expired) throw expired.failure("Residency test exceeded its 20000ms budget")
   while (children.length > 0) {
     const child = children.pop()
     if (child !== undefined) await terminateRpcChild(child, { sigkillDelayMs: 100 })
@@ -26,6 +34,15 @@ afterEach(async () => {
 })
 
 describe("member injection residency", () => {
+  test("#given configured TTL and a real process member #when parked then messaged by task id #then detach_rpc resumes one acknowledged turn", async () => {
+    const trace = createColdReviveTrace()
+    activeTrace = trace
+    const result = await realColdRevive("process", false, { idleTimeoutMs: 37, team: true, trace }).finally(() => {
+      if (activeTrace === trace) activeTrace = undefined
+    })
+    expect(result).toMatchObject({ cadenceMs: 37, parked: "rpc_detached", memberExtensionRestored: true, messageCount: 1, status: "completed", leaseReleased: true })
+  }, 20000)
+
   test("#given a member whose initial turn ended without a wait #when lead mail is injected #then its resident RPC session revives into a working turn", async () => {
     // given an ended but resident member session
     const root = mkdtempSync(join(tmpdir(), "senpi-member-residency-"))

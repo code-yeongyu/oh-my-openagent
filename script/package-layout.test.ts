@@ -13,8 +13,6 @@ const codexMaterializedRuntimePayloadPaths = [
   "packages/omo-codex/plugin/components/bootstrap/dist/cli.js",
   "packages/omo-codex/plugin/components/bootstrap/scripts/bootstrap.ps1",
   "packages/omo-codex/plugin/components/bootstrap/scripts/node-dispatch.ps1",
-  "packages/omo-codex/plugin/components/codegraph/dist/cli.js",
-  "packages/omo-codex/plugin/components/codegraph/dist/serve.js",
   "packages/omo-codex/plugin/components/comment-checker/dist/cli.js",
   "packages/omo-codex/plugin/components/git-bash/dist/cli.js",
   "packages/omo-codex/plugin/components/lazycodex-executor-verify/dist/cli.js",

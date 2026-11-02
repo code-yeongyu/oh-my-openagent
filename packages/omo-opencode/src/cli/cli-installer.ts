@@ -1,4 +1,5 @@
 import { createInterface } from "node:readline/promises"
+import { TELEMETRY_INSTALL_DISCLOSURE_LINES } from "@oh-my-opencode/telemetry-core/install-disclosure"
 import color from "picocolors"
 import { PLUGIN_NAME, PUBLISHED_PACKAGE_NAME } from "../shared"
 import type { InstallArgs, InstallPlatform } from "./types"
@@ -25,10 +26,13 @@ import {
 } from "./install-validators"
 import { getUnsupportedOpenCodeVersionMessage } from "./minimum-opencode-version"
 import { runCodexInstaller } from "./install-codex"
-import { runSenpiInstaller } from "./install-senpi"
+import { runNativeDevInstaller } from "./install-native-dev"
+import { nativeInstallFailureLines, nativeInstallSuccessLine, runNativeInstall } from "./install-native"
+import { NATIVE_EDITION_HINT_TITLE, nativeEditionHintLines, shouldShowNativeEditionHint } from "./native-edition-hint"
 import { starGitHubRepositories } from "./star-request"
 import { getNoModelProvidersWarning, hasAnyConfiguredProvider } from "./provider-availability"
 import { ensureTuiPluginEntry } from "./config-manager/add-tui-plugin-to-tui-config"
+import { refreshOpenCodePluginSandboxes } from "./config-manager/refresh-opencode-plugin-sandbox"
 import * as astGrepInstall from "./install-ast-grep-sg"
 
 export async function runCliInstaller(args: InstallArgs, version: string): Promise<number> {
@@ -117,6 +121,25 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
       const message = error instanceof Error ? error.message : String(error)
       printWarning(`Could not update OpenCode TUI config: ${message}`)
     }
+    // OpenCode's Npm.add() never re-resolves a tag while its per-spec sandbox
+    // exists, so a stale sandbox would keep serving the previous version even
+    // after this install. Remove the sandboxes for the spec(s) just written;
+    // the next OpenCode start reinstalls the current channel version (#5367).
+    try {
+      const { removed, deferred, failed } = refreshOpenCodePluginSandboxes()
+      if (removed.length > 0) {
+        printInfo("Refreshed the OpenCode plugin cache; the next OpenCode start loads the installed version.")
+      }
+      if (deferred.length > 0) {
+        printInfo("OpenCode is running from its plugin cache; it refreshes when the last OpenCode window closes. Restart OpenCode to load the installed version.")
+      }
+      for (const { dir, message } of failed) {
+        printWarning(`Could not refresh the OpenCode plugin cache at ${dir} (${message}). Close OpenCode and delete that directory, or OpenCode keeps loading the previous version.`)
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      printWarning(`Could not refresh the OpenCode plugin cache: ${message}`)
+    }
 
     printStep(step++, totalSteps, `Writing ${PLUGIN_NAME} configuration...`)
     const omoResult = writeOmoConfig(config)
@@ -159,27 +182,40 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
         return 1
       }
       printWarning(`Codex install failed (OpenCode install is still complete): ${message}`)
+      printInfo(
+        `The Codex harness is NOT installed. Fix the error above, then re-run: ${color.cyan("bunx oh-my-openagent install --platform=codex")}`,
+      )
     }
     console.log()
   }
 
-  if (config.hasSenpi) {
-    printInfo("Installing Senpi harness adapter...")
+  if (config.hasNative) {
+    printInfo("Installing OmO Native...")
+    const outcome = await runNativeInstall()
+    for (const note of outcome.notes) printInfo(note)
+    for (const warning of outcome.warnings) printWarning(warning)
+    if (outcome.failure) {
+      for (const line of nativeInstallFailureLines(outcome.failure)) printError(line)
+      return 1
+    }
+    printSuccess(nativeInstallSuccessLine(outcome.verified))
+    console.log()
+  }
+
+  if (config.hasNativeDev) {
+    printInfo("Installing the OmO Native development adapter...")
     try {
-      const senpiResult = await runSenpiInstaller()
-      printSuccess(`Senpi adapter installed ${SYMBOLS.arrow} ${color.dim(senpiResult.settingsPath)}`)
+      const nativeDevResult = await runNativeDevInstaller()
+      printSuccess(`OmO Native development adapter installed ${SYMBOLS.arrow} ${color.dim(nativeDevResult.settingsPath)}`)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      printError(`Senpi install failed: ${message}`)
+      printError(`OmO Native development adapter install failed: ${message}`)
       return 1
     }
     console.log()
   }
 
-  printInfo(
-    "Anonymous telemetry is enabled by default. Disable it with OMO_SEND_ANONYMOUS_TELEMETRY=0 or OMO_DISABLE_POSTHOG=1.",
-  )
-  printInfo("Docs: docs/legal/privacy-policy.md and docs/legal/terms-of-service.md")
+  for (const line of TELEMETRY_INSTALL_DISCLOSURE_LINES) printInfo(line)
   console.log()
 
   printBox(
@@ -188,6 +224,14 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
       `deep exploration, and relentless execution until completion.`,
     "The Magic Word",
   )
+
+  if (shouldShowNativeEditionHint(config)) {
+    printInfo(color.bold(NATIVE_EDITION_HINT_TITLE))
+    for (const line of nativeEditionHintLines({ command: color.cyan, link: color.underline })) {
+      console.log(`    ${line}`)
+    }
+    console.log()
+  }
 
   if (args.tui) {
     await maybePromptForGitHubStars(config.platform)

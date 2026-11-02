@@ -6,6 +6,7 @@ import { describe, expect, test } from "bun:test"
 import type { RpcChildHandle } from "../types"
 import { createRpcChildHandle } from "./handle"
 import type { RpcProtocolClient } from "./protocol-client"
+import { createChildExtensionEvents } from "../child-extension-events"
 
 type RpcHandleWithTerminalFacts = RpcChildHandle & {
   terminalAssistantMessage():
@@ -21,6 +22,7 @@ function createHarness(): {
   const child = Object.assign(new EventEmitter(), { pid: 4242 }) as unknown as ChildProcess
   const listeners = new Set<(event: AgentSessionEvent) => void>()
   const client = {
+    extensionEvents: createChildExtensionEvents(),
     stderrTail: "",
     send: () => Promise.resolve({ success: true }),
     onEvent: (listener: (event: AgentSessionEvent) => void) => {
@@ -64,6 +66,7 @@ describe("createRpcChildHandle terminal turn observation", () => {
       },
     }))
     harness.emit(event({ type: "agent_end", willRetry: false }))
+    harness.emit(event({ type: "agent_idle" }))
     await harness.handle.waitForIdle()
 
     // then
@@ -97,6 +100,7 @@ describe("createRpcChildHandle terminal turn observation", () => {
       message: { role: "assistant", content: [{ type: "text", text: "first" }], stopReason: "stop" },
     }))
     harness.emit(event({ type: "agent_end", willRetry: false }))
+    harness.emit(event({ type: "agent_idle" }))
     await harness.handle.waitForIdle()
 
     // when

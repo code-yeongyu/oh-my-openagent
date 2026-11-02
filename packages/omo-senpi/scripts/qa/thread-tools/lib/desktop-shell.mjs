@@ -22,6 +22,7 @@ export async function startDesktopShell({ cwd, prefix }) {
     `${D}/persistence/Layers/OrchestrationCommandReceipts.ts`,
   )
   const { OrchestrationEventStoreLive } = await desktopModule(`${D}/persistence/Layers/OrchestrationEventStore.ts`)
+  const { DurableSessionThreadRepositoryLive } = await desktopModule(`${D}/persistence/Layers/DurableSessionThreads.ts`)
   const { SqlitePersistenceMemory } = await desktopModule(`${D}/persistence/Layers/Sqlite.ts`)
   const RepositoryIdentityResolver = await desktopModule(`${D}/project/RepositoryIdentityResolver.ts`)
   const { OrchestrationEngineLive } = await desktopModule(`${D}/orchestration/Layers/OrchestrationEngine.ts`)
@@ -29,6 +30,7 @@ export async function startDesktopShell({ cwd, prefix }) {
   const { OrchestrationProjectionSnapshotQueryLive } = await desktopModule(
     `${D}/orchestration/Layers/ProjectionSnapshotQuery.ts`,
   )
+  const SessionProjectResolution = await desktopModule(`${D}/orchestration/Layers/SessionProjectResolution.ts`)
   const ThreadBackgroundLiveness = await desktopModule(`${D}/orchestration/ThreadBackgroundLiveness.ts`)
   const ThreadPlanProgress = await desktopModule(`${D}/orchestration/ThreadPlanProgress.ts`)
   const { OrchestrationEngineService } = await desktopModule(`${D}/orchestration/Services/OrchestrationEngine.ts`)
@@ -41,10 +43,13 @@ export async function startDesktopShell({ cwd, prefix }) {
       Layer.provide(OrchestrationProjectionPipelineLive),
     ),
     OrchestrationProjectionSnapshotQueryLive,
+    // The session mirror (`makeOmoSessionMirror`) reads these three services directly, as the desktop's own mirror tests do.
+    SessionProjectResolution.layer,
+    DurableSessionThreadRepositoryLive,
   ).pipe(
     Layer.provide(ThreadBackgroundLiveness.layer),
     Layer.provide(ThreadPlanProgress.layer),
-    Layer.provide(OrchestrationEventStoreLive),
+    Layer.provideMerge(OrchestrationEventStoreLive),
     Layer.provide(OrchestrationCommandReceiptRepositoryLive),
     Layer.provide(RepositoryIdentityResolver.layer),
     Layer.provide(SqlitePersistenceMemory),

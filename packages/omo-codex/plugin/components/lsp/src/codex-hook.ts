@@ -35,15 +35,19 @@ export interface CodexPostCompactInput {
 interface DiagnosticBlock {
 	filePath: string;
 	diagnostics: string;
+	blocking: boolean;
 }
 
-interface PostToolUseHookOutput {
-	decision: "block";
-	reason: string;
+interface PostToolUseHookContext {
 	hookSpecificOutput: {
 		hookEventName: "PostToolUse";
 		additionalContext: string;
 	};
+}
+
+interface PostToolUseHookOutput extends PostToolUseHookContext {
+	decision: "block";
+	reason: string;
 }
 
 const DIAGNOSTIC_START_PATTERN = /(?:error|warning|information|hint)\[[^\]\r\n]+\] \(\d+\) at \d+:\d+:/g;
@@ -70,18 +74,34 @@ function postEditOutcomeFromDaemonResult(result: {
 	readonly content: readonly { readonly type: string; readonly text?: string }[];
 	readonly details?: unknown;
 }): PostEditDiagnosticsOutcome {
-	const availability = notConfiguredAvailability(result.details);
-	if (availability !== undefined) return { kind: "not_configured", extension: availability.extension };
-	return result.content.map((block) => block.text).join("\n");
+	const text = result.content.map((block) => block.text).join("\n");
+	const availability = availabilityDetails(result.details);
+	if (availability === undefined) return text;
+	if (availability["kind"] === "not_configured") {
+		const extension = availability["extension"];
+		return typeof extension === "string" && extension.length > 0 ? { kind: "not_configured", extension } : text;
+	}
+	if (availability["kind"] === "not_installed") return notInstalledOutcome(availability, text) ?? text;
+	return text;
 }
 
-function notConfiguredAvailability(details: unknown): { readonly extension: string } | undefined {
+function availabilityDetails(details: unknown): Record<string, unknown> | undefined {
 	if (!isRecord(details)) return undefined;
 	const availability = details["availability"];
-	if (!isRecord(availability)) return undefined;
-	if (availability["kind"] !== "not_configured") return undefined;
-	const extension = availability["extension"];
-	return typeof extension === "string" && extension.length > 0 ? { extension } : undefined;
+	return isRecord(availability) ? availability : undefined;
+}
+
+function notInstalledOutcome(
+	availability: Record<string, unknown>,
+	text: string,
+): PostEditDiagnosticsOutcome | undefined {
+	const serverId = availability["serverId"];
+	const installDecisionTool = availability["installDecisionTool"];
+	if (typeof serverId !== "string" || serverId.length === 0 || typeof installDecisionTool !== "boolean")
+		return undefined;
+	const decision = availability["decision"];
+	const base = { kind: "not_installed", serverId, installDecisionTool, text } as const;
+	return decision === "declined" || decision === "allowed" ? { ...base, decision } : base;
 }
 
 export function codexLspRequestContext(
@@ -116,14 +136,12 @@ export async function runLspPostToolUseHook(
 
 	const rawReason = blocks.map(formatDiagnosticBlock).join("\n\n");
 	const reason = limitHookText(rawReason, hookFeedbackLimit(input.transcript_path));
-	const output: PostToolUseHookOutput = {
-		decision: "block",
-		reason,
-		hookSpecificOutput: {
-			hookEventName: "PostToolUse",
-			additionalContext: reason,
-		},
+	const context: PostToolUseHookContext = {
+		hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: reason },
 	};
+	// Missing-server guidance alone is a note for the model; only real diagnostics block the edit.
+	if (!blocks.some((block) => block.blocking)) return `${JSON.stringify(context)}\n`;
+	const output: PostToolUseHookOutput = { decision: "block", reason, ...context };
 	return `${JSON.stringify(output)}\n`;
 }
 

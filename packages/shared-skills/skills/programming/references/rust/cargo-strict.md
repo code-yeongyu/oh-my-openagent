@@ -32,6 +32,8 @@ non_ascii_idents = "deny"
 trivial_numeric_casts = "warn"
 unused_lifetimes = "warn"
 single_use_lifetimes = "warn"
+# every custom cfg is declared here; a typo like cfg(feture = "x") fails the build
+unexpected_cfgs = { level = "deny", check-cfg = ["cfg(loom)"] }
 
 [lints.clippy]
 # Groups
@@ -66,7 +68,9 @@ mutex_atomic = "warn"
 rc_buffer = "warn"
 rc_mutex = "warn"
 exit = "warn"
-allow_attributes_without_reason = "warn"
+allow_attributes = "deny"                 # silence with #[expect(lint, reason)], never #[allow]
+allow_attributes_without_reason = "deny"
+let_underscore_must_use = "deny"          # `let _ = fallible()` drops the error
 dbg_macro = "warn"
 print_stderr = "warn"
 print_stdout = "warn"
@@ -75,10 +79,8 @@ use_debug = "warn"
 # Stylistic relaxations (project-wide opinions only)
 module_name_repetitions = "allow"
 must_use_candidate = "allow"
-missing_errors_doc = "allow"  # we use anyhow::Result with .context() everywhere; doc rule is noisy
 
 # Restriction lints - opt-in soundness rails
-unreachable = "deny"
 mod_module_files = "warn"      # prefer foo.rs over foo/mod.rs
 empty_drop = "warn"
 empty_structs_with_brackets = "warn"
@@ -88,6 +90,8 @@ exhaustive_structs = "warn"
 ```
 
 The `priority = -1` trick: group-level levels are weak; specific lints below them win. This lets us deny `unwrap_used` while still allowing `pedantic` group warnings instead of denies.
+
+A lint is silenced only with `#[expect(clippy::lint_name, reason = "...")]` on the smallest item that needs it. Unlike `#[allow]`, `#[expect]` fails the build once the lint stops firing, so stale exceptions cannot pile up; `allow_attributes` and `allow_attributes_without_reason` enforce both halves. `missing_errors_doc` / `missing_panics_doc` stay on (pedantic): public fallible APIs document their `# Errors`.
 
 ## `Cargo.toml` — release profile
 
@@ -116,6 +120,8 @@ opt-level = 1
 overflow-checks = true
 ```
 
+`-C target-cpu=native` and PGO are deployment decisions, not defaults: a `native` binary faults on older CPUs, and PGO only pays with a representative training workload. Apply either only with a before/after measurement.
+
 ## `Cargo.toml` — workspace level
 
 ```toml
@@ -124,14 +130,22 @@ resolver = "3"
 
 [workspace.package]
 edition = "2024"
-rust-version = "1.83"   # bump only when a needed feature lands
+rust-version = "1.85"   # the 2024 edition floor; raise only when a needed feature lands
 license = "Apache-2.0 OR MIT"
 
 [workspace.lints]
 # Then in each member crate:
 # [lints]
 # workspace = true
+
+[workspace.dependencies]
+# one version per dependency; members write `serde = { workspace = true }`
 ```
+
+## Features and build scripts
+
+- **Features are additive.** Enabling a feature never removes an API or changes another feature's behavior, and `--all-features` always builds. Optional dependencies use `dep:` (`serde = ["dep:serde"]`) so no implicit feature leaks. Truly exclusive backends fail loudly: `#[cfg(all(feature = "a", feature = "b"))] compile_error!("features `a` and `b` are mutually exclusive");`.
+- **`build.rs` is deterministic.** Declare every input with `cargo::rerun-if-changed=` / `cargo::rerun-if-env-changed=`, write only under `OUT_DIR`, and never touch the network. A build script that reads undeclared inputs produces stale builds that pass locally and fail in CI.
 
 ## `rustfmt.toml`
 
@@ -156,11 +170,11 @@ Most options come from stable rustfmt. `imports_granularity` and `group_imports`
 # Reduce cognitive load thresholds.
 cognitive-complexity-threshold = 25
 type-complexity-threshold = 250
-too-many-arguments-threshold = 6
+too-many-arguments-threshold = 3   # SKILL.md Smell 2: more than 3 parameters is a smell
 too-many-lines-threshold = 100
 
 # msrv - keeps clippy from suggesting features past our MSRV
-msrv = "1.83"
+msrv = "1.85"
 
 # Avoid `panic` lint complaining about derived Debug impls calling unreachable_unchecked etc.
 allow-unwrap-in-tests = true
@@ -169,7 +183,7 @@ allow-panic-in-tests = true
 allow-dbg-in-tests = true
 allow-print-in-tests = true
 
-# Force named arguments above N params
+# At most 4 single-character bindings in scope
 single-char-binding-names-threshold = 4
 ```
 
@@ -257,6 +271,25 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@nextest
       - run: cargo nextest run --all-targets --all-features --workspace
+      - run: cargo test --doc --all-features --workspace   # nextest does not run doctests
+
+  doc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - env:
+          RUSTDOCFLAGS: "-D warnings"   # broken intra-doc links fail the build
+        run: cargo doc --no-deps --all-features --workspace
+
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.85   # = rust-version
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --all-features --workspace
 
   miri:
     runs-on: ubuntu-latest
@@ -269,6 +302,9 @@ jobs:
       - uses: taiki-e/install-action@nextest
       - env:
           MIRIFLAGS: "-Zmiri-strict-provenance -Zmiri-symbolic-alignment-check"
+        run: cargo +nightly miri nextest run --all-features --workspace
+      - env:
+          MIRIFLAGS: "-Zmiri-tree-borrows -Zmiri-strict-provenance -Zmiri-symbolic-alignment-check"
         run: cargo +nightly miri nextest run --all-features --workspace
 
   machete:
@@ -312,6 +348,6 @@ After every change:
 ```bash
 cargo fmt --all -- --check && \
 cargo clippy --all-targets --all-features -- -D warnings && \
-cargo nextest run && \
+cargo nextest run && cargo test --doc && \
 cargo +nightly miri nextest run    # only if unsafe is involved
 ```

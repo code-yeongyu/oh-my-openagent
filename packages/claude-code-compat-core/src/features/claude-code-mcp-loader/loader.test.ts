@@ -1,9 +1,9 @@
 /// <reference types="bun-types" />
 
-import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test"
+import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from "bun:test"
 import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from "fs"
 import { join } from "path"
-import { tmpdir } from "os"
+import { homedir, tmpdir } from "os"
 
 // mkdtempSync, never a clock-derived name: consecutive Date.now() calls in one process
 // return the same millisecond, so sibling suites sharing this prefix collided on one
@@ -74,36 +74,36 @@ describe("getSystemMcpServerNames", () => {
     }
   })
 
-  it("returns server names from the default ambient paths in an isolated child process", async () => {
+  it("uses the default ambient context when called without options", async () => {
     writeFileSync(join(TEST_DIR, ".mcp.json"), JSON.stringify({
       mcpServers: {
         ambient: { command: "npx", args: ["ambient-mcp"] },
       },
     }))
 
-    const child = Bun.spawn([
-      process.execPath,
-      "-e",
-      `import { getSystemMcpServerNames } from ${JSON.stringify(join(import.meta.dir, "loader.ts"))}; console.log(JSON.stringify([...getSystemMcpServerNames()]))`,
-    ], {
-      cwd: TEST_DIR,
-      env: {
-        HOME: TEST_HOME,
-        USERPROFILE: TEST_HOME,
-        CLAUDE_CONFIG_DIR: join(TEST_HOME, ".claude"),
-      },
-      stdout: "pipe",
-      stderr: "pipe",
+    const loader = await import("./loader")
+    const resolveContext = spyOn(loader.mcpLoaderInternals, "resolveMcpLoaderContext")
+      .mockReturnValue({
+        cwd: TEST_DIR,
+        homeDir: TEST_HOME,
+        claudeConfigDir: join(TEST_HOME, ".claude"),
+      })
+
+    const names = loader.getSystemMcpServerNames()
+
+    expect(resolveContext).toHaveBeenCalledWith({})
+    expect(names).toEqual(new Set(["ambient"]))
+  })
+
+  it("resolves the real ambient context without options", async () => {
+    const { resolveMcpLoaderContext } = await import("./loader")
+    const expectedHome = process.env.HOME || process.env.USERPROFILE || homedir()
+
+    expect(resolveMcpLoaderContext({})).toEqual({
+      cwd: process.cwd(),
+      homeDir: expectedHome,
+      claudeConfigDir: process.env.CLAUDE_CONFIG_DIR || join(expectedHome, ".claude"),
     })
-
-    expect(child.exitCode).toBeNull()
-    const [output, exitCode] = await Promise.all([
-      new Response(child.stdout).text(),
-      child.exited,
-    ])
-
-    expect(exitCode).toBe(0)
-    expect(JSON.parse(output.trim())).toEqual(["ambient"])
   })
 
   it("returns server names from .claude/.mcp.json", async () => {

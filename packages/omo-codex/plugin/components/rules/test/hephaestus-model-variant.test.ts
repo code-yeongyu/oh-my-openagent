@@ -1,12 +1,13 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { findPluginBundledCandidates } from "@oh-my-opencode/rules-engine/engine";
+import { findPluginBundledCandidates, parseRule } from "@oh-my-opencode/rules-engine/engine";
 import { afterEach, describe, expect, it } from "vitest";
 import { type CodexSessionStartInput, runSessionStartHook } from "../src/codex-hook.js";
 
 const GPT_55_VARIANT_PATH = "bundled-rules/hephaestus/gpt-5.5.md";
 const GPT_56_VARIANT_PATH = "bundled-rules/hephaestus/gpt-5.6.md";
+const GPT_6_VARIANT_PATH = "bundled-rules/hephaestus/gpt-6.md";
 const BUNDLED_ONLY_ENV = {
 	CODEX_RULES_ENABLED_SOURCES: "plugin-bundled",
 };
@@ -67,6 +68,41 @@ describe("Hephaestus bundled rule model variants", () => {
 		expect(paths).not.toContain(GPT_55_VARIANT_PATH);
 	});
 
+	it.each(["gpt-6-astra", "gpt-6-astra-fast"])(
+		"#given packaged bundled rules #when discovering with %s #then only the gpt-6 variant is included",
+		(model) => {
+			const candidates = findPluginBundledCandidates({ pluginRoot: process.cwd(), model });
+			const paths = candidates.map((candidate) => candidate.relativePath);
+
+			expect(paths.filter((path) => path.startsWith("bundled-rules/hephaestus/"))).toEqual([GPT_6_VARIANT_PATH]);
+		},
+	);
+
+	it.each(["gpt-6-astra", "gpt-6-astra-fast"])(
+		"#given a %s session #when SessionStart runs #then the shipped gpt-6 body is injected in full",
+		async (model) => {
+			const { root, pluginData } = makeProject();
+			const variantPath = findPluginBundledCandidates({ pluginRoot: process.cwd(), model }).find(
+				(candidate) => candidate.relativePath === GPT_6_VARIANT_PATH,
+			)?.path;
+			expect(variantPath).toBeDefined();
+			if (!variantPath) throw new Error("expected gpt-6 Hephaestus variant path");
+
+			const output = await runSessionStartHook(sessionStartInput(root, model), {
+				pluginDataRoot: pluginData,
+				env: BUNDLED_ONLY_ENV,
+			});
+
+			expect(output).toContain(`Instructions from: ${variantPath}`);
+			expect(output).not.toContain(GPT_55_VARIANT_PATH);
+			expect(output).not.toContain(GPT_56_VARIANT_PATH);
+			const context = JSON.parse(output).hookSpecificOutput.additionalContext;
+			const shipped = parseRule(readFileSync(variantPath, "utf8"));
+			expect(shipped.frontmatter.alwaysApply).toBe(true);
+			expect(context).toContain(shipped.body.trim());
+		},
+	);
+
 	it("#given packaged bundled rules #when discovering without a model #then the gpt-5.5 variant is the fallback", () => {
 		const candidates = findPluginBundledCandidates({ pluginRoot: process.cwd() });
 		const paths = candidates.map((candidate) => candidate.relativePath);
@@ -101,5 +137,22 @@ describe("Hephaestus bundled rule model variants", () => {
 		expect(output).toContain("based on GPT-5.6");
 		expect(output).not.toContain("based on GPT-5.5");
 		expect(output).not.toContain("[Truncated. Full:");
+	});
+});
+
+// #9538: a format example written as a markdown quote line made replies render as blockquotes.
+describe("Bundled rule format examples", () => {
+	it("#given every shipped bundled rule #when reading it #then no format example is a markdown quote line", () => {
+		const files = readdirSync(join(process.cwd(), "bundled-rules"), { recursive: true })
+			.map(String)
+			.filter((path) => path.endsWith(".md"));
+		expect(files.length).toBeGreaterThan(0);
+
+		for (const path of files) {
+			const quoted = readFileSync(join(process.cwd(), "bundled-rules", path), "utf8")
+				.split("\n")
+				.filter((line) => /^\s*>.*\[[^\]]+\]/.test(line));
+			expect({ path, quoted }).toEqual({ path, quoted: [] });
+		}
 	});
 });

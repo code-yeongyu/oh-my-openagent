@@ -1,7 +1,6 @@
 import { $ } from "bun"
 import { z } from "zod"
-
-const NPM_PACKAGES = ["oh-my-opencode", "oh-my-openagent", "lazycodex-ai"] as const
+import { NPM_PACKAGES } from "../packages/web/lib/npm-downloads"
 const POSTHOG_CAPTURE_URL = "https://us.i.posthog.com/capture/"
 const GITHUB_REPOSITORY = "code-yeongyu/oh-my-openagent"
 

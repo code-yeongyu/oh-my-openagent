@@ -127,7 +127,15 @@ export function parseQuery(query: string): ParsedQuery {
 
 /** Returns the letta score, or null when any term or phrase is absent. */
 export function matchScore(text: string, query: ParsedQuery): number | null {
-  const haystack = normalizeText(text)
+  return matchScoreNormalized(normalizeText(text), query)
+}
+
+/**
+ * `matchScore` for callers that already hold `normalizeText(text)`. Recall scores one haystack
+ * against several queries per corpus revision, and normalizing it per call dominated selection
+ * (#8335); the scoring body below is the one matchScore has always run.
+ */
+export function matchScoreNormalized(haystack: string, query: ParsedQuery): number | null {
   if (!haystack) return null
 
   let score = 0

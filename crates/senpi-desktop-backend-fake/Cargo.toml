@@ -1,0 +1,16 @@
+[package]
+name = "senpi-desktop-backend-fake"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+image.workspace = true
+parking_lot.workspace = true
+senpi-desktop-core = { path = "../senpi-desktop-core" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true

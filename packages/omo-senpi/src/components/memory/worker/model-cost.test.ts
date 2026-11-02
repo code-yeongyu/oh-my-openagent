@@ -4,7 +4,7 @@ import { chooseReflectionLaunchModel } from "./model-cost"
 
 const cheapFresh = { model: "google/gemini-3.6-flash", cost: { input: 0.3, cacheRead: 0.03 } }
 const expensiveFresh = { model: "openai/gpt-5.6-sol", cost: { input: 1.75, cacheRead: 0.175 } }
-const sessionOpus = { model: "anthropic/claude-opus-5", cost: { input: 5, cacheRead: 0.5 } }
+const sessionOpus = { model: "anthropic/claude-opus-5-5", cost: { input: 5, cacheRead: 0.5 } }
 const sessionHaiku = { model: "anthropic/claude-haiku-4-5", cost: { input: 0.8, cacheRead: 0.08 } }
 
 describe("chooseReflectionLaunchModel", () => {
@@ -48,7 +48,7 @@ describe("chooseReflectionLaunchModel", () => {
       // given: fresh = 200k * 0.3 = 60_000; inherit = 190k * 0.01 + 10k * 5 = 51_900
       const decision = chooseReflectionLaunchModel({
         fresh: cheapFresh,
-        session: { model: "anthropic/claude-opus-5", cost: { input: 5, cacheRead: 0.01 } },
+        session: { model: "anthropic/claude-opus-5-5", cost: { input: 5, cacheRead: 0.01 } },
         prefixTokens: 190_000,
         workloadTokens: 200_000,
         cacheReusable: true,
@@ -62,7 +62,7 @@ describe("chooseReflectionLaunchModel", () => {
       // when
       const decision = chooseReflectionLaunchModel({
         fresh: cheapFresh,
-        session: { model: "anthropic/claude-opus-5", cost: { input: 5, cacheRead: 0.01 } },
+        session: { model: "anthropic/claude-opus-5-5", cost: { input: 5, cacheRead: 0.01 } },
         prefixTokens: 190_000,
         workloadTokens: 200_000,
         cacheReusable: false,

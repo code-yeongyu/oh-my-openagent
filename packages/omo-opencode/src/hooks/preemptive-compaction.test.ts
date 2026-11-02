@@ -482,14 +482,97 @@ describe("preemptive-compaction", () => {
     expect(ctx.client.session.summarize).not.toHaveBeenCalled()
   })
 
+  it("should not admit a second compaction while the timed-out summarize is still pending", async () => {
+    //#given a summarize request that remains pending after its timeout
+    const restoreTimeouts = setupImmediateTimeouts()
+    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const sessionID = "ses_timeout_overlap"
+    let resolvePendingSummarize: () => void = () => undefined
+    const pendingSummarize = new Promise<void>((resolve) => {
+      resolvePendingSummarize = resolve
+    })
+    ctx.client.session.summarize
+      .mockImplementationOnce(() => pendingSummarize)
+      .mockResolvedValueOnce({})
+
+    try {
+      await hook.event({
+        event: {
+          type: "message.updated",
+          properties: {
+            info: {
+              role: "assistant",
+              sessionID,
+              providerID: "anthropic",
+              modelID: "claude-sonnet-4-6",
+              finish: true,
+              tokens: {
+                input: 800000,
+                output: 0,
+                reasoning: 0,
+                cache: { read: 10000, write: 0 },
+              },
+            },
+          },
+        },
+      })
+
+      //#when the timeout expires and another compaction is requested after cooldown
+      await hook["tool.execute.after"](
+        { tool: "bash", sessionID, callID: "call_timeout_overlap_1" },
+        { title: "", output: "test", metadata: null },
+      )
+      const originalNow = Date.now
+      Date.now = () => originalNow() + 61_000
+      try {
+        await hook.event({
+          event: {
+            type: "message.updated",
+            properties: {
+              info: {
+                role: "assistant",
+                sessionID,
+                providerID: "anthropic",
+                modelID: "claude-sonnet-4-6",
+                finish: true,
+                tokens: {
+                  input: 800000,
+                  output: 0,
+                  reasoning: 0,
+                  cache: { read: 10000, write: 0 },
+                },
+              },
+            },
+          },
+        })
+        await hook["tool.execute.after"](
+          { tool: "bash", sessionID, callID: "call_timeout_overlap_2" },
+          { title: "", output: "test", metadata: null },
+        )
+
+        //#then the pending summarize still owns admission for the session
+        expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
+        resolvePendingSummarize()
+      } finally {
+        Date.now = originalNow
+      }
+    } finally {
+      restoreTimeouts()
+    }
+  })
+
   it("should clear in-progress lock when summarize times out", async () => {
     //#given
     const restoreTimeouts = setupImmediateTimeouts()
     const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
     const sessionID = "ses_timeout"
+    let resolvePendingSummarize: () => void = () => undefined
+    const pendingSummarize = new Promise<void>((resolve) => {
+      resolvePendingSummarize = resolve
+    })
 
     ctx.client.session.summarize
-      .mockImplementationOnce(() => new Promise(() => {}))
+      .mockImplementationOnce(() => pendingSummarize)
       .mockResolvedValueOnce({})
 
     try {
@@ -522,6 +605,7 @@ describe("preemptive-compaction", () => {
 
       //#then - first call timed out
       expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
+      resolvePendingSummarize()
       expect(logMock).toHaveBeenCalledWith("[preemptive-compaction] Compaction failed", {
         sessionID,
         providerID: "anthropic",

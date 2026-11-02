@@ -77,10 +77,8 @@ describe("build-omo-schema-document", () => {
           default_concurrency: 3,
         },
       },
-      "[codex]": {
-        codegraph: {
-          daemon: false,
-        },
+      telemetry: {
+        enabled: false,
       },
       profiles: {
         kimi: {
@@ -99,10 +97,8 @@ describe("build-omo-schema-document", () => {
               default_concurrency: 2,
             },
           },
-          "[codex]": {
-            codegraph: {
-              enabled: false,
-            },
+          telemetry: {
+            enabled: false,
           },
         },
       },

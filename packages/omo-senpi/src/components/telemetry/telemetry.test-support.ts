@@ -35,6 +35,9 @@ export function createEnabledEnv(agentDir: string): TelemetryEnv {
   return {
     POSTHOG_API_KEY: "test-api-key",
     SENPI_CODING_AGENT_DIR: agentDir,
+    HOME: agentDir,
+    USERPROFILE: agentDir,
+    OMO_TELEMETRY_ALLOW_AUTOMATION: "1",
   }
 }
 

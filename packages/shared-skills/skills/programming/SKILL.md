@@ -1,6 +1,6 @@
 ---
 name: programming
-description: "MUST USE for ANY work on .py .pyi .rs .ts .tsx .mts .cts .go files. One philosophy: strict types, modern stacks (Pydantic v2 / serde+thiserror / Zod / gin+sqlc+pgx+slog), modern toolchains (uv+basedpyright+ruff / cargo+clippy+miri / Bun+Biome+tsc / gofumpt+golangci-lint v2+nilaway+go-race), parse-don't-validate, exhaustive match, typed errors, no any/unwrap/panic, 250 LOC ceiling, TDD, consumer-routed logging. Routes to references/{python,rust,typescript,rust-ub,go}/ + references/logging.md. Triggers: write/edit Python/Rust/TypeScript/Go code, new project, gin server, bubbletea TUI, CJK IME, connect-go RPC, sqlc pgx, branded ids, exhaustive match, unsafe Rust, miri, oversized file, refactor, TDD, e2e test, logging, log levels, structured logging, observability, arena, allocator, bumpalo, const fn, const generics, comptime, zero-alloc, bitfield, repr, scopeguard, errdefer, Zig-like, zerocopy, packed struct."
+description: "Applies strict, modern language practice (typed errors, exhaustive match, tests that can fail) for Python, Rust, TypeScript, JavaScript, and Go. Use for work on .py, .rs, .ts, .js, or .go files, and whenever a test or spec file is written, reshaped, reviewed, or deleted: the four-question test authoring gate and the junk-test classes live here."
 ---
 
 # Programming
@@ -22,8 +22,9 @@ This skill is an index. The hard per-language rules live under `references/`. Lo
    |---|---|
    | `.py`, `.pyi`, "Python" | `references/python/README.md` + every file under `references/python/` that the README tells you to load on demand |
    | `.rs`, `Cargo.toml`, "Rust" | `references/rust/README.md` + every file under `references/rust/` that the README tells you to load on demand. **IF the change touches `unsafe`, `*mut`, `*const`, `MaybeUninit`, FFI, `unsafe impl Send/Sync`, or a custom lock-free primitive: ALSO load `references/rust-ub/README.md` plus every file under `references/rust-ub/`.** |
-   | `.ts`, `.tsx`, `.mts`, `.cts`, "TypeScript" | `references/typescript/README.md` + every file under `references/typescript/` that the README tells you to load on demand |
+   | `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs`, `.cjs`, "TypeScript" / "JavaScript" | `references/typescript/README.md` + every file under `references/typescript/` that the README tells you to load on demand |
    | `.go`, `go.mod`, `go.sum`, `.golangci.yml`, `*.proto` next to a Go module, "Go" / "Golang" | `references/go/README.md` + every file under `references/go/` that the README tells you to load on demand |
+   | any test file (`*.test.*`, `*.spec.*`, `*_test.go`, `test_*.py`, `*_test.py`, under `test/`, `tests/` or `__tests__/`), or a change that adds, reshapes, or deletes a test | the language row above PLUS `references/testing/README.md` (the authoring gate) and `references/testing/junk-classes.md` (the table the gate reviewer applies) |
 
 3. Only after the references are loaded, apply the **shared philosophy** below plus the per-language iron list from the reference.
 
@@ -31,7 +32,7 @@ This skill is an index. The hard per-language rules live under `references/`. Lo
 
 ---
 
-## Shared philosophy (all three languages)
+## Shared philosophy (all four languages)
 
 These are not style preferences. They are the seven axioms every recipe in `references/` derives from.
 
@@ -47,90 +48,22 @@ These are not style preferences. They are the seven axioms every recipe in `refe
 
 5. **Trust framework guarantees. Validate only at boundaries.** No null checks for values the type system already proves non-null. No `try/except` around code that cannot raise. No `unwrap`/`!`/`as` to paper over a contract you should have encoded in types. No defensive layer for a scenario you cannot name.
 
-6. **Test-driven, with the right shape of test.** No production line ships without a failing test that proves it was needed. Behavior is locked by tests, not by hope. See the TDD discipline below.
+6. **Tests are the behavior of record, and only tests that can fail count.** READ the tests covering the area BEFORE you change it: do they encode the intent, cover this path, pass? One wrong before your change is a FINDING — never edit it green. Reproduce a bug before fixing it. The run proves the change; add a test ONLY where the repository keeps tests for this behavior AND a regression would otherwise pass unnoticed — sized like its neighbors, never restating the change. The authoring gate and the junk-class table are in `references/testing/`.
 
 ---
 
-## TDD DISCIPLINE — NON-NEGOTIABLE
+## TEST DISCIPLINE
 
-**Every change follows the red → green → refactor loop.** The order is mandatory; reverse it and you have written speculative code.
+Tests are code: the language gate above applies to them, plus [`references/testing/README.md`](references/testing/README.md) (the contract every language's recipes assume) and [`references/testing/junk-classes.md`](references/testing/junk-classes.md) (the table the gate reviewer applies to every test in a diff). Read both before adding, reshaping, or deleting a test.
 
-### The order
+**The authoring gate.** Before a test exists, answer all four; a missing answer means do not add it yet.
 
-1. **Red.** Write a failing test that names the behavior in `Given / When / Then`. Run it. *Confirm it fails for the right reason* — not a typo, not an import error. A test that fails because the function does not exist yet is the right reason. A test that fails because of a missing import is not.
-2. **Green.** Write the minimum code to make the test pass. Resist adding the second case until the first passes. The second case is the next red.
-3. **Refactor.** With the test green, restructure ruthlessly. The test is your safety net. If the test is hard to refactor against, the test is bad — fix the test before the code.
+1. What observable behavior, invariant, or independent contract does it protect?
+2. What credible regression makes it fail?
+3. Why does existing coverage not already catch that failure? One primary owner per contract, at the strongest boundary; extend a table row before adding a near-duplicate, a copy in another package, or a replay through a wrapper.
+4. Does it need a production seam (export, flag, getter, wrapper, injection hook) no production caller needs? Then test at the real boundary instead.
 
-### The shape of the test pyramid
-
-Every feature ships with all three rungs, sized in this proportion:
-
-| Rung | Count | Purpose | Speed budget |
-|---|---|---|---|
-| **Unit** | many | Pure-function correctness for every meaningful input class (happy + edges + boundaries + error paths) | < 10 ms each |
-| **Integration** | some | The real adapter against the real downstream (DB, queue, HTTP) — via `testcontainers`, `httptest`, or equivalent. NEVER a unit test pretending to be integration. | < 1 s each |
-| **E2E scenario** | few | One narrative per user-visible outcome. Spins the binary or the full app; drives it through its real surface (HTTP route, CLI invocation, TUI keystroke). Asserts the *observable outcome*, not internal state. | seconds, run on CI |
-
-If a feature has zero E2E coverage, it is undone — even if every unit test passes.
-
-### Given / When / Then is mandatory
-
-Every test — unit, integration, E2E — is structured by these three blocks. Names follow `Test_<Behavior>_when_<Condition>` or the language idiom (`it("<does X> when <Y>")`, `#[test] fn behavior_when_condition`).
-
-```
-Given: the preconditions and fixtures
-When:  the single action under test
-Then:  the observable outcome AND only that outcome
-```
-
-One `When` per test. Multiple `When`s = multiple tests. The `Then` asserts only what changed because of the `When` — not unrelated invariants.
-
-### Less mock, the better
-
-Mocks are a last resort, not a default. The priority order:
-
-1. **Real object.** Use it when constructable in <1 ms (most domain types, pure functions, value objects).
-2. **In-memory fake.** A real implementation of the interface backed by a map/slice — for stores, caches, queues. The fake has its OWN test that proves it behaves like the real one.
-3. **Testcontainer / sandbox.** Real Postgres, real Redis, real S3-compatible (MinIO), via `testcontainers`. Slow but truthful.
-4. **HTTP-level fake.** `httptest.Server` (Go), `respx` (Python), `msw` (TS) — fake at the wire, not at the SDK.
-5. **Mock.** Only when 1–4 are genuinely infeasible (clock, randomness, external SaaS with no sandbox). Then mock the **narrowest** seam — never an entire service. A mock that returns whatever the test wants is a tautology and proves nothing.
-
-**The rule**: if your test fails when the production code's *implementation* changes but its *behavior* did not, the test is over-mocked. Delete the mock; assert on observable outputs.
-
-### Efficient AND accurate — both, not either
-
-- **Accurate**: the test fails for the bug it names, and only that bug. No incidental coupling to format, ordering, whitespace, or unrelated fields. Assert on the *contract*, not on the dump.
-- **Efficient**: the whole unit suite runs in < 30 seconds on a developer laptop. The whole integration suite in < 5 minutes. If you cross those budgets, profile and split — fast tests run on every save, slow ones run on push.
-- **Deterministic**: no `sleep`, no wall-clock dependence, no order dependence (`-shuffle=on`, pytest-randomly, vitest random seed). Inject a `Clock`. Subscribe to the event, do not poll for it. Time-based flake is a bug, not a test issue.
-- **Isolated**: every test starts from a known fixture and tears down. `t.TempDir()`, `t.Setenv()`, transactional rollback for DB tests. Two tests passing individually but failing together is a fixture leak — fix it immediately. Isolation extends **across processes**: suite-global resources — sandbox/cache roots under a fixed tmpdir path, hardcoded listen ports, container names — are namespaced per run (`mktemp`, port `0`/ephemeral, unique names) so that two checkouts or worktrees of the repo running the suite concurrently cannot interfere. A fixed shared path that works on a single-checkout machine is a flake generator on a multi-agent workstation, and its signature is "a different test fails each run".
-
-### Prompt tests: NEVER assert prose
-
-**FORBIDDEN — NO EXCEPTIONS: a test MUST NOT assert natural-language prompt text.** `expect(prompt).toContain("based on GPT-5.6")`, `not.toContain("old wording")`, `toMatchSnapshot()` on prose, grepping a sentence fragment — every one of these is pretend-coverage. It stays green while the behavior it claims to guard breaks, then blocks every legitimate rewording until someone bumps the pinned string. A reviewer MUST block it as HIGH; deleting such a test is a fix, not a coverage loss. "A nearby test already does it" is not a defense — that test is the disease, not the convention.
-
-Assert ONLY what a machine consumes:
-
-- the builder's routing decision — `expect(getPromptSource(model)).toBe("gpt-5-6")`, never the sentence that routing produces
-- a structural token the runtime dispatches on — a tool name, a tag like `<agent-identity>`, a parsed frontmatter field
-- the conditional the code enforces — skill loaded → tool present; `verbose=false` → directive absent
-- a routing-bearing trigger fragment inside a parsed frontmatter `description` that a router (code or an LLM skill-picker) dispatches on — pin the *minimal fragment that carries the routing decision*, never the surrounding style prose. Such pins are what let a later rewrite change every sentence around them while proving the routing contract survived.
-
-If no machine consumes the text, there is no seam: write NO test and say so in the PR; review guards prose. When you DELEGATE test-writing, hand the child the behavior the test must distinguish ("fails if override precedence breaks"), never a ready-made assertion string, prompt fragment, or marker to copy — a prescribed mechanism that is wrong gets implemented faithfully, and the error ships with a green suite.
-
-### Anti-patterns the skill rejects
-
-| Anti-pattern | Why it fails | Fix |
-|---|---|---|
-| Writing code first, tests "to add later" | Tests-after rationalize the existing design, even when wrong. | Red first. Always. |
-| One mega-test asserting 12 things | First failure hides the next 11. | Split by `Then` clause — one assertion class per test. |
-| Mocking every collaborator | Test passes regardless of real behavior. | Use a fake or the real thing. Mock only true unmockables. |
-| `time.sleep(0.1)` to "let it finish" | Flake guaranteed. | Subscribe to the completion signal; bounded await. |
-| Snapshot tests for everything | Locks formatting, not behavior. | Snapshots for *structure* (CLI help, JSON shape). Assertions for *behavior*. |
-| Removing a failing test to "unblock CI" | You just deleted a bug report. | Fix the code or fix the test — never delete to silence. |
-| `assert result is not None` and stopping there | Passes when result is garbage. | Assert the *value*, not its existence. |
-| Expected value derived from the output under test (`expect(config.prompt).toBe(getPrompt(config.model))` when the criterion is about `config.prompt`) | Recomputes a projection of the output and compares it to itself — passes even when the artifact is built from the wrong input. | Derive the expected value from the test's *input*: `expect(config.prompt).toBe(getPrompt(inputModel))` (independent known-good builder fed the fixture's input), or a stable builder routing decision. |
-| Override/precedence fixture equal to its fallback (override == system default) | The assertion passes whether or not the code honored the override — precedence is never exercised. | Make every value the code must select, preserve, or override differ from its fallback. Prove it: temporarily force the regression the test names, watch it fail, revert. |
-| Single happy-path E2E, no edges | Most bugs live on edges. | Edges are unit-test territory — but include at least one E2E that exercises an error path. |
+The README owns the shape (Given / When / Then, the pyramid, the mock ladder, determinism, isolation, the prompt-test rule) and the "test your test" step: break the production owner, watch the test go red for the intended reason, restore byte for byte. A test that fails on the unchanged base is a bug to fix at its owner; one your own change turns red is fixed at the code or at the test; neither is deleted or edited green to unblock a run.
 
 ---
 
@@ -143,7 +76,7 @@ Apply unless the per-language reference overrides with something stricter.
 | Immutable by default | `@dataclass(frozen=True, slots=True)` / Pydantic `frozen=True` | every binding is `let` (not `let mut`) unless mutation is the documented purpose | every field is `readonly`; arrays are `readonly T[]` | value types, unexported fields, no mutation methods unless mutation is the purpose |
 | Branded primitives | `UserId = NewType("UserId", int)` | `struct UserId(u64);` (newtype tuple) | `type UserId = Brand<string, "UserId">` | `type UserID string` + smart constructor with unexported field |
 | Exhaustive variant matching | `match` + `assert_never` | `match` (compiler-enforced) | `switch` + `assertNever` | sealed interface + type switch + **`exhaustive` linter** (the compiler will not help) |
-| No untyped escape hatches | no `Any` in public sigs, no `cast`, no `# type: ignore` | no `unwrap`/`expect` outside `main`/tests, no `as` for narrowing, no `#[allow]` to silence real warnings | no `any`, no `as` (except `as const`, `satisfies`), no `!`, no `@ts-ignore`, no `@ts-expect-error` | no `interface{}` / bare `any` in domain sigs; no `_ = err`; no `//nolint` without reason |
+| No untyped escape hatches | no `Any` in public sigs, no `cast`, no `# type: ignore` | no `unwrap`/`expect` outside tests (invariant `expect` only behind `#[expect(clippy::expect_used, reason)]`), no numeric `as`, no `#[allow]` (silence with `#[expect(lint, reason)]`) | no `any`, no `as` (except `as const`, `satisfies`), no `!`, no `@ts-ignore`, no `@ts-expect-error` | no `interface{}` / bare `any` in domain sigs; no `_ = err`; no `//nolint` without reason |
 | No bare error strings | typed exception dataclass with `__str__` | `thiserror` enum (lib) or `anyhow` with `.context(...)` (app) | `Error` subclass with typed fields | sentinel `errors.New` + typed `*XError` struct; wrap with `%w`; check via `errors.Is/As` |
 | Boundary catch only | catch the exact exception you expect; broad `except Exception` only in `main()`, with logging + re-raise | `?` everywhere; never `panic!` in library code | `catch` must narrow with `instanceof` and re-throw or convert; no empty catch | every `(T, error)` checked; `panic` only in `main`/tests; one `httperr.Write` funnel in handlers |
 | Resources via RAII | `with` (sync) / `async with` (async) | `Drop` impl or RAII guard | `using`/`await using` (TC39 explicit resource management) | `defer x.Close()` immediately after acquisition; `bodyclose`/`sqlclosecheck` linters enforce |
@@ -184,12 +117,14 @@ A bare default constructor for any of these (no timeouts, no pool tuning, no sch
 |---|---|---|---|---|
 | Package / project manager | **uv** (NEVER pip/poetry/conda) | **cargo** + `cargo-nextest` + `cargo-machete` + `cargo-deny` | **Bun** (runtime + package manager); pnpm if Node is forced | **`go modules`** + `go work` for monorepos |
 | Type checker | **basedpyright** with `typeCheckingMode = "all"` | the Rust compiler with `-D warnings` + clippy `pedantic` + `nursery` + `cargo` groups | `tsc --noEmit` (or `tsgo` when available) with `strict` + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes` + `verbatimModuleSyntax` | the Go compiler + **`golangci-lint v2`** with the strict bundle + **`nilaway`** (nil-deref static analysis) |
-| Linter + formatter | **ruff** with `select = ["ALL"]` | `clippy` + `rustfmt` | **Biome** (single binary - replaces ESLint + Prettier) | **`gofumpt`** (stricter gofmt) + `goimports -local` + `golangci-lint v2` |
+| Linter + formatter | **ruff** with `select = ["ALL"]` | `clippy` + `rustfmt` | **oxlint + oxfmt**, with the local copy and suppression-reason rules | **`gofumpt`** (stricter gofmt) + `goimports -local` + `golangci-lint v2` |
 | Test runner | **pytest** | **cargo-nextest** | `bun test` / `vitest` | stdlib `go test -race -shuffle=on -count=1` + `goleak` |
 | UB / soundness gate | (n/a) | **nightly miri** with strict provenance + Tree Borrows pass | (n/a) | **`nilaway`** + `-race` detector + `goleak` are the equivalent gate |
 | Disposable scripts | **PEP 723** inline metadata + `uv run script.py` | **rust-script** with inline `Cargo.toml` block | `bun run script.ts` | `//go:build ignore` + `go run script.go` |
-| Bootstrap a new project | `scripts/python/new-project.py` | `scripts/rust/new-project.py` | `scripts/typescript/new-project.ts` | `scripts/go/new-project.py` |
-| Pre-commit / CI gate | `ruff check . && basedpyright && pytest` | `cargo +nightly clippy -- -D warnings && cargo nextest run && cargo +nightly miri test` | `bunx biome check . && bunx tsc --noEmit && bun test` | `gofumpt -l . && golangci-lint run ./... && nilaway ./... && go test -race -shuffle=on -count=1 ./...` |
+| Bootstrap a new project | `bun run scripts/python/new-project.ts` | `bun run scripts/rust/new-project.ts` | `bun run scripts/typescript/new-project.ts` | `bun run scripts/go/new-project.ts` |
+| Pre-commit / CI gate | `ruff check . && basedpyright && pytest` | `cargo clippy --all-targets -- -D warnings && cargo nextest run && cargo test --doc && cargo +nightly miri nextest run` | `bunx oxlint --type-aware --deny-warnings && bunx oxfmt --check && bunx tsc --noEmit && bun test` | `gofumpt -l . && golangci-lint run ./... && nilaway ./... && go test -race -shuffle=on -count=1 ./...` |
+
+For TS/JS, **use oxlint + oxfmt with these two rules by default**: `no-em-dash-copy` and `require-suppression-reason`. Strongly prefer this OXC toolchain for new projects; retain ESLint, Prettier, or Biome only when the repository already uses them. Load [`references/typescript/oxc-lint.md`](references/typescript/oxc-lint.md) for the complete configs, plugin, and type-aware support requirements. Rewrite paired em dashes as asides using parentheses or commas, not colon chains.
 
 A `tsconfig.json` with `"strict": true` alone is **not** strict. The reference enumerates the additional flags. Same for `pyproject.toml` and `Cargo.toml` - the references contain the canonical full configuration.
 
@@ -264,6 +199,8 @@ uv run scripts/python/check-no-excuse-rules.py <changed paths>
 bash scripts/rust/check-no-excuse-rules.sh <changed paths>
 # TypeScript
 bun run scripts/typescript/check-no-excuse-rules.ts <changed paths>
+# Any language, test files you touched: the junk classes a regex can see (candidates for "test your test")
+bun run scripts/typescript/check-test-junk.ts <changed test paths>
 ```
 
 ### Step 2 — interpret
@@ -281,10 +218,10 @@ After every code-writing session, answer these out loud (in your reply) before d
 1. **Single responsibility?** Can I name what this file owns in one short noun phrase? If the answer needs the word "and", split.
 2. **Boundary purity?** Did I parse untrusted input into a typed value at the boundary, or did I pass `dict[str, Any]` / `serde_json::Value` / `unknown` past the boundary? If the latter, fix it.
 3. **Variant discrimination?** Did I use `if`/`elif`/`else` (or `switch` without `assertNever`, or `match` without `assert_never`) anywhere to discriminate on a tagged type or enum? If yes, rewrite as exhaustive match.
-4. **Escape hatches?** Any `Any`, `# type: ignore`, `unwrap`, `expect` outside `main`/tests, `as` numeric cast, `!`, `@ts-ignore`, `@ts-expect-error`, `#[allow]` on a real warning? If yes, fix the type or document why with a comment.
+4. **Escape hatches?** Any `Any`, `# type: ignore`, `unwrap`, `expect` outside tests, `as` numeric cast, `!`, `@ts-ignore`, `@ts-expect-error`, a Rust `#[allow]` instead of `#[expect(lint, reason)]`? If yes, fix the type or document why with a comment.
 5. **Defensive layer?** Any null check, try/except, or `isinstance` guarding a value the type system already proves? If yes, delete.
 6. **Helpers for one-off?** Any function, class, or trait introduced for a single caller that will never get a second caller? If yes, inline — axiom 0 should have caught it pre-write; this is the backstop.
-7. **Tests?** Is the behavior I just introduced locked by a test that would fail if I revert this commit?
+7. **Tests?** Does every test I added or reshaped answer the four-question authoring gate (`references/testing/README.md`), go red when I break its production owner, and match no row of `references/testing/junk-classes.md`? Where the repository keeps tests for a behavior I introduced and a regression would otherwise pass unnoticed, is it covered at its owner, not by a copy or a change certificate?
 8. **Parameter bloat?** Any function I wrote or modified that takes more than 3 parameters — or smuggles them through a dict/kwargs/`...args`/throwaway options object? If yes, group related params into a typed value object. See [Smell 2](references/code-smells.md#smell-2--function-with-more-than-3-parameters).
 9. **Redundant verification?** Did I perform a destructive action (delete, remove, clear) and then immediately re-query to "confirm" it worked? Did I call a setter then a getter to "verify"? If yes, delete the verification — the operation's contract IS the proof. See [Smell 3](references/code-smells.md#smell-3--redundant-verification-after-a-destructive-action).
 10. **Negative naming?** Any variable, function, or flag named by the absence of a quality (`isNotValid`, `noErrors`, `DisableX`) when a positive name (`isValid`, `isClean`, `EnableX`) would work? If yes, rename to positive form and invert the branch. See [Smell 4](references/code-smells.md#smell-4--negative-form-names-and-conditions).
@@ -306,7 +243,7 @@ These two skills are not optional cosmetics. They are the recovery path for the 
 | Trigger | Skill to load | Why |
 |---|---|---|
 | Any [code smell](#code-smells--automatic-review-triggers) fires (250+ LOC, >3 params, redundant verification), OR the post-write loop surfaces 2+ issues, OR the user says "reshape this", "extract this", "clean this up" | `refactor` | Safe codemap-driven multi-step refactor with LSP + tests after each step. Never improvise a structural change. |
-| Recent branch contains AI-authored patterns (broad except, dead helpers, vague comments, oversized files, redundant post-action verification), OR the user says "remove slop", "clean AI code", "deslop" | `remove-ai-slops` | Tests pinned FIRST, then categorized parallel cleanup, then quality gates. Behavior-preserving. |
+| Recent branch contains AI-authored patterns (broad except, dead helpers, vague comments, oversized files, redundant post-action verification, junk tests), OR the user says "remove slop", "clean AI code", "deslop" | `remove-ai-slops` | Behavior locked by gate-passing tests FIRST, then categorized parallel cleanup (junk tests included, each cut proven by a mutation), then quality gates. Behavior-preserving. |
 | Rust code touches `unsafe`, `*mut`, `*const`, `MaybeUninit`, FFI, `unsafe impl Send/Sync`, or a custom lock-free primitive | `references/rust-ub/` | Full UB taxonomy + Miri strictness escalation. Every `unsafe` block must survive Miri Level 3 (strict provenance + symbolic alignment + preemption) before it ships. |
 
 ---
@@ -349,18 +286,21 @@ These two skills are not optional cosmetics. They are the recovery path for the 
 | Concurrency primitives (locks, atomics, channels, loom) | `references/rust/concurrency.md` |
 | axum + sqlx + tracing + tower HTTP stack | `references/rust/axum-stack.md` |
 | clap + color-eyre + tracing + indicatif CLI stack | `references/rust/clap-stack.md` |
-| Property tests (proptest) + snapshot tests (insta) | `references/rust/proptest-insta.md` |
+| Public API design (naming, conversions, traits, rustdoc sections) | `references/rust/api-design.md` |
+| Declarative and procedural macros | `references/rust/macros.md` |
+| Property tests (proptest) + snapshot tests (insta), test placement, doctests | `references/rust/proptest-insta.md` |
 | Disposable `rust-script` scripts | `references/rust/one-liners.md` |
 | Canonical library defaults | `references/rust/libraries.md` |
 | **ANY `unsafe` / FFI / `MaybeUninit` / lock-free work** | **`references/rust-ub/` (full directory)** |
 
-### TypeScript (`.ts`, `.tsx`, `.mts`, `.cts`)
+### TypeScript / JavaScript (`.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs`, `.cjs`)
 
 **READ `references/typescript/README.md` FIRST.** Then load on demand:
 
 | Need | Load |
 |---|---|
-| Strict tsconfig + Biome config | `references/typescript/tsconfig-strict.md` |
+| Strict tsconfig | `references/typescript/tsconfig-strict.md` |
+| Default oxlint + oxfmt configs and copy rules | `references/typescript/oxc-lint.md` |
 | Type patterns (branded types, `as const`, `satisfies`, narrowing, `assertNever`) | `references/typescript/type-patterns.md` |
 | Data modeling (type vs interface vs Zod, readonly, parse-don't-validate) | `references/typescript/data-modeling.md` |
 | Error handling (Result, typed errors, union vs throw, AbortSignal timeouts) | `references/typescript/error-handling.md` |
@@ -392,6 +332,6 @@ These two skills are not optional cosmetics. They are the recovery path for the 
 
 ## Activation
 
-This skill activates whenever you are writing or modifying any `.py`, `.pyi`, `.rs`, `.ts`, `.tsx`, `.mts`, `.cts`, `.go` file, or any project manifest (`pyproject.toml`, `Cargo.toml`, `package.json`, `tsconfig.json`, `biome.json`, `go.mod`, `go.sum`, `.golangci.yml`, `Taskfile.yml`, `buf.yaml`, `sqlc.yaml`). **Even one-off scripts get the full treatment** - that is the whole point of `uv run` + PEP 723, `rust-script`, `bun run`, and `go run` + `//go:build ignore`: production hygiene with throwaway ergonomics.
+This skill activates whenever you are writing or modifying any `.py`, `.pyi`, `.rs`, `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs`, `.cjs`, `.go` file, any test or spec file in those languages, or any project manifest (`pyproject.toml`, `Cargo.toml`, `package.json`, `tsconfig.json`, `.oxlintrc.json`, `.oxfmtrc.json`, `go.mod`, `go.sum`, `.golangci.yml`, `Taskfile.yml`, `buf.yaml`, `sqlc.yaml`). **Even one-off scripts get the full treatment** - that is the whole point of `uv run` + PEP 723, `rust-script`, `bun run`, and `go run` + `//go:build ignore`: production hygiene with throwaway ergonomics.
 
 The references contain the recipes. **Read them before writing code. Re-read them when the model drifts.** The post-write review loop is non-negotiable.

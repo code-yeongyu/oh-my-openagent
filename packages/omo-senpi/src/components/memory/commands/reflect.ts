@@ -4,7 +4,6 @@
 // reserves a run immediately or writes the single pending request slot. There is
 // deliberately no --auto selector.
 
-import type { SenpiExtensionAPI } from "../../../extension/types"
 import { resolveReflectionTriggerConfig } from "../trigger-wiring"
 import { parseCommandArgs } from "./args"
 import {
@@ -14,6 +13,7 @@ import {
   type MemoryCommandContext,
   type MemoryCommandDeps,
 } from "./types"
+import { LAZY_MEMORY_COMMANDS, type MemoryCommandPort } from "./metadata"
 
 function parseConversationIds(value: string | true | undefined): string[] | undefined {
   if (value === undefined || value === true) return undefined
@@ -21,10 +21,9 @@ function parseConversationIds(value: string | true | undefined): string[] | unde
   return ids.length > 0 ? ids : undefined
 }
 
-export function registerReflectCommand(pi: SenpiExtensionAPI, deps: MemoryCommandDeps): void {
+export function registerReflectCommand(pi: MemoryCommandPort, deps: MemoryCommandDeps): void {
   pi.registerCommand("reflect", {
-    description: "Request a memory reflection run now, optionally scoped and focused.",
-    argumentHint: "[--recent N | --conversation <ids>] [focus]",
+    ...LAZY_MEMORY_COMMANDS.reflect,
     handler: async (args: string, ctx: MemoryCommandContext): Promise<string> => {
       const identity = requireIdentity(deps, ctx)
       if (typeof identity === "string") return respond(ctx, identity, "error")
@@ -67,12 +66,17 @@ export function registerReflectCommand(pi: SenpiExtensionAPI, deps: MemoryComman
       ].filter((part): part is string => part !== undefined)
       const suffix = scope.length > 0 ? ` (${scope.join("; ")})` : ""
 
-      return respond(
-        ctx,
-        receipt.disposition === "reserved"
-          ? `reflection run ${receipt.runId} reserved${suffix}; it starts at the next idle boundary`
-          : `reflection request queued as ${receipt.runId}${suffix}; a run is already active and this request runs next`,
-      )
+      if (receipt.disposition === "reserved") {
+        return respond(ctx, `reflection run ${receipt.runId} reserved${suffix}; it starts at the next idle boundary`)
+      }
+      if (receipt.recoveredRunId !== undefined) {
+        return respond(
+          ctx,
+          `reflection request queued as ${receipt.runId}${suffix}; the previous run ${receipt.recoveredRunId} had stopped without releasing its lock, so it was settled and this request runs next`,
+        )
+      }
+      const queued = `reflection request queued as ${receipt.runId}${suffix}; a run is already active and this request runs next`
+      return receipt.stuck === undefined ? respond(ctx, queued) : respond(ctx, `${queued}. ${receipt.stuck}`, "warning")
     },
   })
 }

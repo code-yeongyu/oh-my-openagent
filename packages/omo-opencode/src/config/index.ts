@@ -11,7 +11,6 @@ export type {
   AgentName,
   HookName,
   BuiltinCommandName,
-  CodegraphConfig,
   SisyphusAgentConfig,
   ContextBudgetConfig,
   ExperimentalConfig,

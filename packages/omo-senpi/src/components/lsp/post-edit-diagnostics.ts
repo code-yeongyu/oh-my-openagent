@@ -4,6 +4,7 @@ import {
 	createPostEditNotConfiguredCache,
 	resetPostEditNotConfiguredCache,
 	type PostEditDiagnosticsOutcome,
+	type PostEditFileLocation,
 	type PostEditNotConfiguredCache,
 } from "@oh-my-opencode/lsp-core/post-edit";
 
@@ -80,6 +81,7 @@ export async function appendPostEditDiagnostics(
 	event: ToolResultLike,
 	runDiagnostics: DiagnosticsRunner,
 	cache?: PostEditNotConfiguredCache,
+	locateFile?: (filePath: string) => PostEditFileLocation,
 ): Promise<PostEditDiagnosticsResult | undefined> {
 	if (!shouldRunPostEditDiagnostics(event)) return undefined;
 
@@ -91,6 +93,7 @@ export async function appendPostEditDiagnostics(
 		runDiagnostics,
 		cache,
 		maxConcurrency: POST_EDIT_DIAGNOSTICS_CONCURRENCY,
+		...(locateFile === undefined ? {} : { locateFile }),
 	});
 	const blocks: readonly DiagnosticBlock[] = result.blocks;
 

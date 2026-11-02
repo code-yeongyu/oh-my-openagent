@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test"
+import { locales } from "../i18n/config"
 
 const VIEWPORTS = [
   { name: "iphone-se", width: 375, height: 667 },
@@ -9,7 +10,7 @@ const VIEWPORTS = [
   { name: "desktop-1920", width: 1920, height: 1080 },
 ] as const
 
-const LOCALES = ["en", "ko", "ja", "zh"] as const
+const LOCALES = locales
 
 async function assertNoHorizontalOverflow(page: Page) {
   const result = await page.evaluate(() => {
@@ -72,6 +73,35 @@ test.describe("Responsive QA matrix — landing", () => {
         await assertNoHorizontalOverflow(page)
       })
     }
+  }
+
+  for (const reducedMotion of ["reduce", "no-preference"] as const) {
+    test(`iphone-14-pro skills ticker keeps its rows inside its card (${reducedMotion} motion)`, async ({
+      page,
+    }) => {
+      // given
+      await page.emulateMedia({ reducedMotion })
+      await page.setViewportSize({ width: 393, height: 852 })
+      await page.goto("/")
+
+      // when
+      const ticker = page.locator('[data-section="skills"] .ticker')
+      await ticker.scrollIntoViewIfNeeded()
+      const layout = await ticker.evaluate((node) => {
+        const card = node.getBoundingClientRect()
+        const list = node.querySelector("ul")?.getBoundingClientRect()
+        const next = document.querySelector('[data-section="crafted"]')?.getBoundingClientRect()
+        const clipped = getComputedStyle(node).overflow === "hidden"
+        return {
+          rowsSpillPastCard: !clipped && (list?.bottom ?? 0) - card.bottom > 1,
+          nextSectionOverlap: Math.round(card.bottom - (next?.top ?? Infinity)),
+        }
+      })
+
+      // then
+      expect(layout.rowsSpillPastCard, JSON.stringify(layout)).toBe(false)
+      expect(layout.nextSectionOverlap, JSON.stringify(layout)).toBeLessThanOrEqual(0)
+    })
   }
 
   /*

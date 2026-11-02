@@ -79,7 +79,7 @@ describe("memory write notice wiring", () => {
     const rendered = lines(renderResult)
 
     // then
-    expect(rendered.join("\n")).toContain("Memory updated · 2nd entry today")
+    expect(rendered.join("\n")).toContain("Remembered · 2nd entry today")
     expect(rendered.join("\n")).not.toContain("committed locally")
   }, 30_000)
 

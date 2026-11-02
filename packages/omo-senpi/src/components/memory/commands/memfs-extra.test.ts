@@ -14,11 +14,12 @@ import {
 } from "./commands.test-support"
 import { backupTimestamp } from "./backup"
 import { registerMemfsCommand } from "./memfs"
+import { removeTree } from "../../../../../../test-support/remove-tree"
 
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })))
 })
 
 const SEEDS = [
@@ -38,6 +39,9 @@ async function harness(options: { readonly hasUI?: boolean } = {}): Promise<Harn
   const { root, identity } = await tempIdentity()
   tempDirs.push(root)
   await seededRepo(identity, SEEDS)
+  // Hooks are generated-fixture implementation detail, not part of the backup contract. Keeping
+  // them out of this recursive-copy fixture avoids copying dozens of irrelevant files on win32.
+  await rm(join(identity.identityPaths.repo, ".git", "hooks"), { recursive: true, force: true })
   const deps = fakeDeps(identity)
   const pi = new MemoryFakeExtensionAPI()
   registerMemfsCommand(pi, deps)
