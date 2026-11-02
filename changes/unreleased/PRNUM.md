@@ -1,0 +1,3 @@
+### Fixed
+
+- A language server that needs longer to start than one LSP request waits (JetBrains' Kotlin server takes 40-90 s) now finishes starting instead of being stopped on every attempt. When the request that started a server times out or is cancelled, the shared LSP manager keeps the server initializing under its own startup budget, and the next request attaches to it or reuses it once it is ready. A server whose startup fails is still stopped once and replaced on the next request. Thanks to @cerebrotecnologico for the report ([code-yeongyu/senpi#4208](https://github.com/code-yeongyu/senpi/issues/4208))
