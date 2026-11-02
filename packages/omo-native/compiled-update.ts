@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process"
-import { chmodSync, realpathSync, renameSync, rmSync } from "node:fs"
+import { realpathSync } from "node:fs"
 import { isPrintOnlyUpdate, updateUsageAnswer } from "./bin/lib/update-args.js"
 
 export const RELEASES_URL = "https://github.com/code-yeongyu/oh-my-openagent/releases"
@@ -69,34 +69,6 @@ export function replaceCommand(url: string, destination: string, platform: NodeJ
   }
   const next = posixQuote(`${destination}.new`)
   return `curl -fsSL ${posixQuote(url)} -o ${next} && chmod +x ${next} && mv -f ${next} ${posixQuote(destination)}`
-}
-
-/**
- * What `replaceCommand` does, in-process: download next to the binary, prove the download is the release
- * it claims to be by running its `--version`, then swap it in by rename (never overwrite a running
- * executable). A failure before the swap leaves the installed binary untouched.
- */
-export const downloadAndSwapBinary: ReplaceBinary = async (url, destination, platform, version) => {
-  const next = `${destination}.new`
-  try {
-    const response = await fetch(url, { headers: { "User-Agent": "omo" }, signal: AbortSignal.timeout(600_000) })
-    if (!response.ok) throw new Error(`download answered ${response.status}`)
-    await Bun.write(next, response)
-    chmodSync(next, 0o755)
-    // An inherited BUN_BE_BUN (exported by the `bun` CLI to its children) makes a compiled binary answer as bun.
-    const { BUN_BE_BUN: _asBun, ...env } = process.env
-    const probe = spawnSync(next, ["--version"], { encoding: "utf8", env, timeout: 120_000, windowsHide: true })
-    if (probe.status !== 0 || !probe.stdout.startsWith(`omo ${version} `)) {
-      throw new Error(`the downloaded binary did not report omo ${version} (${(probe.stdout || probe.stderr || String(probe.error ?? "")).trim().split("\n")[0]})`)
-    }
-    if (platform === "win32") {
-      rmSync(`${destination}.old`, { force: true })
-      renameSync(destination, `${destination}.old`)
-    }
-    renameSync(next, destination)
-  } finally {
-    rmSync(next, { force: true })
-  }
 }
 
 const runOwnerQuery: RunOwnerQuery = (command, args) => {
