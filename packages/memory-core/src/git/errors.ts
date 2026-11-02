@@ -44,6 +44,12 @@ export class GitNotFoundError extends GitError {
   }
 }
 
+/** The Windows job helper could not run a command (design v4.2 section 7.3): spawn, handshake or job setup failed. */
+export class GitHelperError extends GitError {}
+
+/** The Windows job helper died after `joined` while the writer was alive (design v4.2 sections 6.4, 7.3). */
+export class GitHelperCrashedError extends GitError {}
+
 export class DirtyRepoError extends GitError {
   constructor(readonly porcelain: string, readonly encodingDiagnostics: readonly string[]) {
     const encoding = encodingDiagnostics.length > 0

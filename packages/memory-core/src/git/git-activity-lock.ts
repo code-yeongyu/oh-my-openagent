@@ -62,12 +62,23 @@ async function mkdirIfMissing(dir: string): Promise<void> {
 
 // Never recursive: a git run that outlives its memory home (a removed identity, a test root torn down)
 // must not recreate it, so a missing identity directory means there is no activity lock to hold.
-async function openActivityLock(repoDir: string): Promise<FileHandle | null> {
+async function ensureIdentityLocksDir(repoDir: string): Promise<string | null> {
   const locksDir = identityLocksDirForRepo(repoDir)
   if (locksDir === null) return null
   try {
     await mkdirIfMissing(dirname(locksDir))
     await mkdirIfMissing(locksDir)
+    return locksDir
+  } catch (error) {
+    if (errorCode(error) === "ENOENT") return null
+    throw error
+  }
+}
+
+async function openActivityLock(repoDir: string): Promise<FileHandle | null> {
+  const locksDir = await ensureIdentityLocksDir(repoDir)
+  if (locksDir === null) return null
+  try {
     return await open(join(locksDir, GIT_ACTIVITY_LOCK_NAME), constants.O_RDWR | constants.O_CREAT, 0o600)
   } catch (error) {
     if (errorCode(error) === "ENOENT") return null
@@ -80,6 +91,16 @@ async function openActivityLock(repoDir: string): Promise<FileHandle | null> {
 function cannotWriteMemoryHome(error: unknown): boolean {
   const code = errorCode(error)
   return code === "EROFS" || code === "EACCES" || code === "EPERM"
+}
+
+/** The identity's locks directory for a git run in `repoDir`, or null exactly where the POSIX activity lock is skipped. */
+export async function gitActivityLocksDir(repoDir: string): Promise<string | null> {
+  try {
+    return await ensureIdentityLocksDir(repoDir)
+  } catch (error) {
+    if (cannotWriteMemoryHome(error)) return null
+    throw error
+  }
 }
 
 /** Held around one git run in `repoDir`; null when the repo is outside the identity layout or the host has no kernel lock. */

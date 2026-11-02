@@ -147,7 +147,7 @@ async function takeAnySlot(locksDirectory: string, record: LockRecord, maxConcur
         const staging = `${lockPath}.handoff-${record.nonce}`
         try {
           await writeFile(staging, `${JSON.stringify({
-            ...record, pid, process_start: processStart ?? "unavailable", git_activity_lock: undefined,
+            ...record, pid, process_start: processStart ?? "unavailable", git_activity_lock: undefined, git_activity_job: undefined,
           })}\n`, { mode: 0o600 })
           await rename(staging, lockPath)
         } finally {

@@ -25,7 +25,7 @@ export function jobHelperPath(): string {
   return join(targetDirectory ?? "", "omo-git-job-helper.exe")
 }
 
-export const PARK_SCRIPT = fileURLToPath(new URL("./job-helper-park.test-support.ts", import.meta.url))
+const PARK_SCRIPT = fileURLToPath(new URL("./job-helper-park.test-support.ts", import.meta.url))
 export const WRITER_SCRIPT = fileURLToPath(new URL("./job-helper-writer.test-support.ts", import.meta.url))
 const STUB_SOURCE = fileURLToPath(new URL("./job-helper-stub.test-support.ts", import.meta.url))
 
