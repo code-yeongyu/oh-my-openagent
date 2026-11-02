@@ -9,8 +9,18 @@ export type SyncDevicesRequest = Readonly<Record<string, never>>
 export type PendingId = string
 export type PairingCode = string
 
+/** Service refusals a client can act on; `refused` carries one only for these (#12123). */
+export type SyncServiceCode =
+  | "not_available"
+  | "entitlement_required"
+  | "access_not_open"
+  | "device_revoked"
+  | "reauth_required"
+  | "account_deleted"
+  | "client_update_required"
+
 export type SyncRpcProblem =
-  | { readonly kind: "refused"; readonly reason: string }
+  | { readonly kind: "refused"; readonly reason: string; readonly code?: SyncServiceCode }
   | { readonly kind: "unavailable"; readonly reason: string }
 
 export interface JoinProgress {
