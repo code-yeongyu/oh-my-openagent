@@ -170,7 +170,8 @@ export class HostSessionClient {
     this.extensionEvents.clear()
     const client = this.client
     const routingId = this.routingId
-    this.client = undefined
+    // Keep the transport reachable by detach() while close_session is in flight. A bounded
+    // handle teardown can give up waiting for its acknowledgement and must still release it.
     this.routingId = undefined
     if (client === undefined) return false
     let answered = false
@@ -180,6 +181,7 @@ export class HostSessionClient {
         answered = true
       }
     } finally {
+      if (this.client === client) this.client = undefined
       // A stop failure after the host answered must not erase that answer (omo#11765).
       await client.stop().catch((error: unknown) => {
         if (!answered) throw error
