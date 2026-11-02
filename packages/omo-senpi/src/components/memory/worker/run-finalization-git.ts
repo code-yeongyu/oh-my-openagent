@@ -161,6 +161,13 @@ export async function resolveFinalizationDecision(
     summary: `${ledger.trigger} ${ledger.runId}`,
     validated,
     withWriterLock: (operation) => writerLock(context, operation),
+    // A rebased tip is checkpointed before its merge, so a resumed finalize probes the tip that lands.
+    onRebased: async (rebased) => {
+      await updateRunLedger(ledgerPath, {
+        validatedTipSha: rebased.tipSha,
+        validatedChangedPaths: rebased.changedPaths,
+      })
+    },
   })
   maybeKillAt("after-merge")
   const budget = integrated.outcome === "merged"

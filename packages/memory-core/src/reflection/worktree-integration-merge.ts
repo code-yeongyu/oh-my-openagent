@@ -1,4 +1,5 @@
 import { NO_AUTO_MAINTENANCE } from "../git/no-auto-maintenance"
+import { boundDetail, describeMergeConflict, listLines } from "./merge-conflict-detail"
 import type { ReflectionWorktree } from "./worktree"
 import { recordStrandedMerge } from "./worktree-integration-heal"
 import {
@@ -57,9 +58,11 @@ export async function mergeValidatedTip(worktree: ReflectionWorktree, request: M
     if (merge.code === 0 || await isAncestor(exec, dir, request.tipSha, "HEAD")) {
       return { outcome: "merged", integrationSha: await head(worktree) }
     }
-    const detail = merge.stderr.trim() || "Reflection merge failed"
+    const failure = boundDetail(merge.stderr) || "Reflection merge failed"
     const landedMergeHead = await optionalRevision(exec, dir, "MERGE_HEAD")
-    const unmerged = await runGit(exec, dir, ["diff", "--name-only", "--diff-filter=U"])
+    const unmerged = listLines((await runGit(exec, dir, ["diff", "--name-only", "--diff-filter=U"])).stdout)
+    const conflicted = landedMergeHead === request.tipSha || unmerged.length > 0
+    const detail = conflicted ? describeMergeConflict(unmerged, merge.stdout, merge.stderr) : failure
     const restored = await restoreParent(worktree, startHead, request.retry)
     if (!restored.ok) {
       await recordStrandedMerge(worktree, { head: startHead, tipSha: request.tipSha, runId: request.runId })
@@ -72,7 +75,7 @@ export async function mergeValidatedTip(worktree: ReflectionWorktree, request: M
       await request.retry.sleep(request.retry.delayMs * attempt)
       continue
     }
-    if (landedMergeHead === request.tipSha || unmerged.stdout.trim()) return { outcome: "merge_conflict", detail }
+    if (conflicted) return { outcome: "merge_conflict", detail }
     return { outcome: "failed", detail }
   }
 }

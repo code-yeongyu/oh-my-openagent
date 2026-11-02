@@ -3,6 +3,7 @@ import { rm } from "../fs/resilient"
 import { resolve } from "node:path"
 import type { GitExec } from "../git"
 import { STABLE_LOG_OUTPUT } from "../git/stable-log-output"
+import { boundDetail } from "./merge-conflict-detail"
 import type { ReflectionCleanupReceipt, ReflectionWorktree } from "./worktree"
 import {
   DEFAULT_INDEX_LOCK_RETRY,
@@ -15,8 +16,11 @@ import {
 } from "./worktree-integration-git"
 import { healStrandedMerge } from "./worktree-integration-heal"
 import { mergeValidatedTip } from "./worktree-integration-merge"
+import { rebaseValidatedTip } from "./worktree-rebase-recovery"
 
 export type { IndexLockRetry } from "./worktree-integration-git"
+
+const MAX_REBASE_ATTEMPTS = 2
 
 export interface ValidatedReflectionTip {
   readonly tipSha: string
@@ -41,6 +45,8 @@ export interface ReflectionIntegrationResult {
   readonly outcome: "merged" | "parent_dirty" | "merge_conflict" | "failed"
   readonly integrationSha?: string
   readonly detail?: string
+  /** The rebased tip that was merged, when the input tip conflicted and was replayed onto the parent. */
+  readonly validated?: ValidatedReflectionTip
 }
 
 export type WriterLock = <T>(operation: () => Promise<T>) => Promise<T>
@@ -59,6 +65,8 @@ export interface IntegrateValidatedReflectionInput {
   readonly withWriterLock: WriterLock
   /** How long a held index.lock is waited out; tests inject the sleep. */
   readonly indexLockRetry?: IndexLockRetry
+  /** Persists a rebased tip before it is merged, so a resumed run probes the tip that actually lands. */
+  readonly onRebased?: (validated: ValidatedReflectionTip) => Promise<void>
 }
 
 /** Legacy-only recovery for auto runs that predate durable validated-tip checkpoints. */
@@ -113,7 +121,7 @@ export async function integrateValidatedReflection(
     if (mergeHead === input.validated.tipSha) {
       const aborted = await retryOnIndexLock(retry, () => run(worktree.exec, worktree.parent.dir, ["merge", "--abort"]))
       if (aborted.code !== 0) {
-        return { outcome: "failed", detail: aborted.stderr.trim() || "Owned reflection merge could not be aborted" }
+        return { outcome: "failed", detail: boundDetail(aborted.stderr) || "Owned reflection merge could not be aborted" }
       }
     } else if (mergeHead !== null) {
       return { outcome: "parent_dirty", detail: "Parent repository contains another interrupted merge" }
@@ -123,12 +131,23 @@ export async function integrateValidatedReflection(
       return { outcome: "parent_dirty" }
     }
 
-    return mergeValidatedTip(worktree, {
-      runId: input.runId,
-      summary: input.summary,
-      tipSha: input.validated.tipSha,
-      retry,
-    })
+    let validated = input.validated
+    for (let attempt = 0; ; attempt += 1) {
+      const merged = await mergeValidatedTip(worktree, {
+        runId: input.runId,
+        summary: input.summary,
+        tipSha: validated.tipSha,
+        retry,
+      })
+      if (merged.outcome === "merged") {
+        return { ...merged, ...(validated === input.validated ? {} : { validated }) }
+      }
+      if (merged.outcome !== "merge_conflict" || attempt >= MAX_REBASE_ATTEMPTS) return merged
+      const rebased = await rebaseValidatedTip(worktree, validated, merged.detail ?? "")
+      if (rebased.status === "refused") return rebased.result
+      await input.onRebased?.(rebased.validated)
+      validated = rebased.validated
+    }
   })
 }
 
