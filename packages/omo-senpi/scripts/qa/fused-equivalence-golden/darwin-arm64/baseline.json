@@ -1,15 +1,15 @@
 {
  "repo": {
-  "head": "a2fe39783766f80d16d16440d88eceb233f46bf8",
+  "head": "7ee7aa2de8f619f827cd61f92d2ed1ef9f502ff9",
   "harness": "5ab795e3392325c961596d7944a1740f4d0a9e20"
  },
  "platform": "darwin-arm64",
  "runtimes": {
-  "harness": "node@24.22.1",
-  "child": "bun@1.4.4 @code-yeongyu/senpi@2026.10.27-1 (pinned)"
+  "harness": "node@24.22.0",
+  "child": "bun@1.4.4 @code-yeongyu/senpi@2026.10.31-2 (pinned)"
  },
  "hashes": {
-  "driver": "sha256:521cee4390885697b713ba8e118fc81ce1bbde3fba6c0547eb1b66d5fdf8a98a",
+  "driver": "sha256:951217c73c424ea0f6b2fdb9868f0524d2e0a0fc5c8ae092fd61fcdf691400a9",
   "normalizer": "sha256:7d676cd57a4ba44323a5997bb81b7ffb7e70b0d1df7de05d08325c6901ca2dd9",
   "fakeModelServer": "sha256:cab5b6866b7854287218de51d1fafcc242a8602b2c83fb85572abe332f9f6560",
   "collectors": "sha256:f084a278fe05fa9e3603e95ab86bd3988e4a2c500a3174a2e72521a0d4038bdd"
