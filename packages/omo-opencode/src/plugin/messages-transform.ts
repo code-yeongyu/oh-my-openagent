@@ -205,9 +205,28 @@ function createAssistantPrefillRecoveryMessage(
   }
 }
 
+// A finished client-side tool's result is sent as a user tool_result turn after the assistant, so the request
+// already ends on a user turn. Provider-executed tools stay inside the assistant message on the wire.
+function isFinishedClientToolPart(part: unknown): boolean {
+  if (!isRecord(part) || part["type"] !== "tool") {
+    return false
+  }
+  const metadata = part["metadata"]
+  if (isRecord(metadata) && metadata["providerExecuted"] === true) {
+    return false
+  }
+  const state = part["state"]
+  return isRecord(state) && (state["status"] === "completed" || state["status"] === "error")
+}
+
 function ensureUserTurnAfterAssistantTail(output: MessagesTransformOutput): void {
   const lastMessage = output.messages.at(-1)
   if (!lastMessage || lastMessage.info.role !== "assistant") {
+    return
+  }
+
+  // #10208: appending here would rewrite the newest tool_result on every tool-loop step and break the prompt cache.
+  if (lastMessage.parts.some(isFinishedClientToolPart)) {
     return
   }
 
