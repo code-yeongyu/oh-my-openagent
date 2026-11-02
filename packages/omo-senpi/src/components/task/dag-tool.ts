@@ -73,12 +73,7 @@ function requireRunId(params: DagToolInput): string | undefined {
   return runId !== undefined && runId.trim().length > 0 ? runId.trim() : undefined
 }
 
-// The slice of senpi's tool context the workflow tool reads: the model the parent session runs now.
-export type DagToolContext = {
-  readonly model?: { readonly provider: string; readonly id: string } | undefined
-}
-
-async function startAction(deps: DagToolDeps, params: DagToolInput, context: DagToolContext | undefined): Promise<DagToolResult> {
+async function startAction(deps: DagToolDeps, params: DagToolInput): Promise<DagToolResult> {
   const input = params.definition
   if (input === undefined) {
     return failure("invalid_definition", "action=start requires a definition. Provide definition.key, definition.name, and definition.nodes.")
@@ -93,7 +88,6 @@ async function startAction(deps: DagToolDeps, params: DagToolInput, context: Dag
     definition: toDefinition(input),
     parentSessionId: deps.parentSessionId(),
     rootSessionId: deps.rootSessionId(),
-    ...(context?.model === undefined ? {} : { parentModel: `${context.model.provider}/${context.model.id}` }),
   })
   const verb = result.reused ? "Reused" : "Started"
   const warningText =
@@ -160,9 +154,9 @@ async function cancelAction(deps: DagToolDeps, runId: string, reason?: string): 
   })
 }
 
-export async function runDagTool(deps: DagToolDeps, params: DagToolInput, context?: DagToolContext): Promise<DagToolResult> {
+export async function runDagTool(deps: DagToolDeps, params: DagToolInput): Promise<DagToolResult> {
   try {
-    if (params.action === "start") return await startAction(deps, params, context)
+    if (params.action === "start") return await startAction(deps, params)
 
     const runId = requireRunId(params)
     if (runId === undefined) {
@@ -228,6 +222,6 @@ export function createDagTool(deps: DagToolDeps): ToolDefinition<typeof DagToolP
     label: "Workflow",
     description: DESCRIPTION,
     parameters: DagToolParams,
-    execute: (_toolCallId, params, _signal, _onUpdate, ctx) => runDagTool(deps, params, ctx),
+    execute: (_toolCallId, params) => runDagTool(deps, params),
   }
 }
