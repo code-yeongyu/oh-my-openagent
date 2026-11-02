@@ -21,6 +21,7 @@ pub mod pipe;
 pub mod process;
 pub mod receipt;
 pub mod sddl;
+pub mod timeline;
 
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
