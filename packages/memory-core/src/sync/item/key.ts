@@ -48,7 +48,8 @@ const MAX_KEY_BYTES = 4096
 const MAX_SEGMENT_BYTES = 255
 const FORBIDDEN_CODE_POINT = /[\p{Cc}\p{Cf}\p{Cn}\p{Co}\p{Cs}\uFEFF]/u
 const RESERVED_CHARACTER = /[<>:"|?*]/
-const RESERVED_DEVICE = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])$/i
+// Win32 also reserves the superscript-digit ports and the console input/output devices.
+const RESERVED_DEVICE = /^(?:con|prn|aux|nul|com[1-9\u00b9\u00b2\u00b3]|lpt[1-9\u00b9\u00b2\u00b3]|conin\$|conout\$)$/i
 // Defence in depth until git is resolved by absolute path at every exec site (#12146).
 const GIT_EXECUTABLE = /^git\.(?:com|exe|bat|cmd|vbs|vbe|js|jse|wsf|wsh|msc|ps1)$/i
 const GIT_SHORT_NAME = /^git~\d+$/
