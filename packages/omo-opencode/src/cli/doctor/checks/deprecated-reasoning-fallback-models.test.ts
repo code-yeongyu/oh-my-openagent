@@ -48,6 +48,7 @@ describe("deprecated fallback_models key check", () => {
 
       //#then only the category fallback_models key is reported
       expect(result.status).toBe("warn")
+      expect(result.issues.map((issue) => issue.severity)).toEqual(["warning"])
       expect(result.issues.map((issue) => issue.description)).toEqual([
         `${configPath}: categories.deep.fallback_models`,
       ])
