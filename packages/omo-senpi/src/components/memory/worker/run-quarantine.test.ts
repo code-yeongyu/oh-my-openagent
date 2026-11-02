@@ -130,6 +130,21 @@ describe("quarantine of runs reconciliation cannot recover", () => {
     expect((await item.store.readState()).active).toBeUndefined()
   }, 30_000)
 
+  test("#given a schema-unparseable ledger whose dead supervisor recorded no start identity #when reconciled #then the run is quarantined and the lock is released", async () => {
+    // given: deadline mismatch makes the ledger fail parseReservationRunLedger, and the
+    // recorded supervisor pid is dead but its processStart field is missing (#11920)
+    const item = await fixture()
+    await writeRunJsonAtomic(join(item.runDir, "ledger.json"), { ...item.ledger, deadlineAt: 9_999, pid: 4242 })
+
+    // when
+    const results = await reconcileReflectionRuns({ identity: item.identity, reservation: item.store, ...deadLauncher() })
+
+    // then
+    expect(results).toEqual([{ runId: "run-orphan", outcome: "failed" }])
+    expect(await quarantine(item)).toMatchObject({ runId: "run-orphan", reason: "ledger_unreadable" })
+    expect((await item.store.readState()).active).toBeUndefined()
+  }, 30_000)
+
   test("#given an unreadable ledger under a launcher that is still alive #when reconciled #then nothing is quarantined and nothing is written", async () => {
     // given
     const item = await fixture()

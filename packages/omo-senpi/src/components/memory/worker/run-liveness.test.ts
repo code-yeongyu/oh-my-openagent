@@ -56,6 +56,30 @@ describe("run process liveness across start-identity schemes", () => {
     expect(verdict).toBe("alive")
   })
 
+  test("#given a dead pid whose ledger recorded no start identity #when classified #then it is dead, not unknown", async () => {
+    // given a ledger that lost its processStart fields (see #11920)
+
+    // when
+    const verdict = await classifyRunProcess(222, undefined, {
+      getPidLiveness: dead,
+      getProcessStartIdentity: async () => null,
+    })
+
+    // then
+    expect(verdict).toBe("dead")
+  })
+
+  test("#given a live pid whose ledger recorded no start identity #when classified #then it stays unknown, never dead", async () => {
+    // when
+    const verdict = await classifyRunProcess(222, undefined, {
+      getPidLiveness: alive,
+      getProcessStartIdentity: async () => "proc-start-epoch:1789452000",
+    })
+
+    // then
+    expect(verdict).toBe("unknown")
+  })
+
   test("#given a pid the kernel no longer knows #when classified #then it is dead regardless of the recorded scheme", async () => {
     // when
     const verdict = await classifyRunProcess(222, "ps-lstart:Tue Sep 15 14:59:03 2026", {

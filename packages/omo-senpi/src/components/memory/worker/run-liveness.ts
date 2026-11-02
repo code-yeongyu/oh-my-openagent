@@ -28,7 +28,12 @@ export async function classifyRunProcess(
   seams: RunLivenessSeams,
 ): Promise<RunProcessVerdict> {
   if (pid === undefined) return "absent"
-  if (recordedStart === undefined) return "unknown"
+  if (recordedStart === undefined) {
+    // No recorded identity to compare against (#11920): a pid the kernel no longer knows
+    // is dead regardless, but a live pid without an identity can never be proven reused.
+    const liveness = (seams.getPidLiveness ?? readPidLiveness)(pid)
+    return liveness === "dead" ? "dead" : "unknown"
+  }
   const liveness = (seams.getPidLiveness ?? readPidLiveness)(pid)
   if (liveness === "dead") return "dead"
   if (liveness === "unknown") return "unknown"
