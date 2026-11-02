@@ -1,4 +1,4 @@
-## 2026-11-02 - Finished team members leave the task widget (#12159)
+## 2026-11-02 - Finished team members leave the task widget (#12160)
 
 The below-editor task widget now shows only running or parked work. A team member that completes its turn leaves the widget even while its handle stays resident, instead of lingering as a `process completed` row until the team shuts down. `/tasks` still lists it, `task_send` still revives it, and its row returns while it runs again. Task lifecycle, residency and messaging are unchanged.
 
