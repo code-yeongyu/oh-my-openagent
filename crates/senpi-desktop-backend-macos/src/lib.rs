@@ -16,6 +16,8 @@ mod overlay;
 mod release_helper;
 mod responsible;
 mod input;
+#[cfg(test)]
+mod partial_coverage_tests;
 mod skylight;
 mod stop_path;
 
@@ -39,4 +41,15 @@ pub fn run_cursor_overlay() -> std::io::Result<()> {
 /// The refusal: not started by the engine whose pid and token its argv name.
 pub fn run_release_helper() -> Result<(), String> {
     release_helper::run()
+}
+
+/// The keyboard-layout helper this engine executable starts to type into a
+/// remote screen (`--keymap-helper <file>`, #11466): Text Input Sources must
+/// run on a main thread, so the read happens in this re-executed copy.
+///
+/// # Errors
+/// The exit status to end with: 3 when the layout has no Unicode key layout
+/// data, 74 when the file cannot be written.
+pub fn run_keymap_helper(path: &std::path::Path) -> Result<(), i32> {
+    input::run_keymap_helper(path)
 }

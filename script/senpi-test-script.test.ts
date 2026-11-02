@@ -219,7 +219,7 @@ describe("Senpi compatibility test script", () => {
     // #when
     const expectedCommands = [
       "bun run build:senpi-plugin",
-      "tsgo --noEmit -p packages/omo-senpi/tsconfig.json",
+      "bun check --no-script --all -p packages/omo-senpi/tsconfig.json",
       "bun test --timeout 20000 packages/omo-senpi",
     ]
     const commandIndexes = expectedCommands.map((command) => script.indexOf(command))
@@ -252,11 +252,11 @@ describe("Senpi compatibility test script", () => {
     expect(senpiJob).toContain("bun run build:senpi-plugin")
     expect(senpiJob).toContain("npm pack --pack-destination")
     expect(senpiJob).toContain("npm --prefix packages/lsp-daemon test -- test/daemon-roundtrip.test.ts")
-    expect(senpiJob).toContain("tsgo --noEmit -p packages/omo-senpi/tsconfig.json")
+    expect(senpiJob).toContain("bun check --no-script --all -p packages/omo-senpi/tsconfig.json")
     expect(posixScript).toContain("bun run build:senpi-plugin")
     expect(posixScript).toContain("npm pack --pack-destination")
     expect(posixScript).toContain("npm --prefix packages/lsp-daemon test -- test/daemon-roundtrip.test.ts")
-    expect(posixScript).toContain("tsgo --noEmit -p packages/omo-senpi/tsconfig.json")
+    expect(posixScript).toContain("bun check --no-script --all -p packages/omo-senpi/tsconfig.json")
     expect(posixScript).toContain("bun test ./.agents/skills/senpi-qa/scripts/resolve-evidence-dir.test.mjs")
     expect(posixScript).toContain("bun test --timeout 20000 packages/omo-senpi")
     expect(senpiJob).not.toContain("senpi install")

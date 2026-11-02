@@ -23,8 +23,9 @@ test("real Bun TLS certificate rejection preserves a retryable sign-in before an
   const store = memorySecrets().store(api)
   const original = { ...grant, ...privateKeys, accessTokenExpiresAt: "2000-01-01T00:00:00Z" }
   await store.write(original)
+  const persisted = await store.read()
   const error: unknown = await createSession({ api, store, home: await temporaryHome() }).accessToken().catch(error => error)
   expect(error).toMatchObject({ notSent: true, retryable: true })
-  expect(await store.read()).toEqual(original)
+  expect(await store.read()).toEqual(persisted)
   expect(requests).toBe(0)
 })

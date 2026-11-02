@@ -6,7 +6,7 @@ use crate::WINDOW;
 
 /// Every mutating method (pointer, keyboard, window, menu, AX, clipboard
 /// write) with parseable params.
-pub fn input_calls() -> [(&'static str, Value); 13] {
+pub fn input_calls() -> [(&'static str, Value); 14] {
     let at = json!({"target": "desktop", "x": 10.0, "y": 10.0});
     [
         ("click", at.clone()),
@@ -27,6 +27,7 @@ pub fn input_calls() -> [(&'static str, Value); 13] {
         ("ax.setValue", json!({"ref": "e1", "value": "hi"})),
         ("ax.focus", json!({"ref": "e1"})),
         ("ax.click", json!({"ref": "e1"})),
+        ("ax.typeText", json!({"ref": "e1", "text": "hi"})),
         ("clipboard.write", json!({"text": "hi"})),
     ]
 }

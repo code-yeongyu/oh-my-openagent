@@ -2,9 +2,10 @@ use std::cell::{Cell, RefCell};
 
 use objc2_application_services::AXError;
 use objc2_core_foundation::{CFString, CFType};
-use senpi_desktop_core::error::{DesktopError, ErrorCode};
+use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode};
 
 use super::{focus, perform_requested, request_result, write_value, AxRequests};
+use crate::skylight::reporting_partial;
 
 /// An element that answers every request with `reply` and records what it
 /// was asked; `date` is what its `AXValue` reads as a `CFDate`.
@@ -164,6 +165,45 @@ fn a_focus_write_without_a_reply_is_unconfirmed() {
     // Then
     assert_unconfirmed(&error, "setting AXFocused=true");
     assert_eq!(element.requests(), ["set AXFocused"]);
+}
+
+/// The code of a refusal that follows `request` inside one background call.
+fn refusal_after(request: impl FnOnce()) -> ErrorCode {
+    reporting_partial(|| -> CoreResult<()> {
+        request();
+        Err(DesktopError::background_unavailable("the next step was refused; nothing was sent"))
+    })
+    .unwrap_err()
+    .code
+}
+
+#[test]
+fn an_action_or_value_write_that_may_have_landed_marks_the_call_sent() {
+    // Given: requests the app took or left unanswered
+    let element = ScriptedElement::replying;
+    // When
+    let refusals = [
+        refusal_after(|| assert!(perform_requested(&element(AXError::Success), "press").is_ok())),
+        refusal_after(|| assert!(perform_requested(&element(AXError::CannotComplete), "press").is_err())),
+        refusal_after(|| assert!(write_value(&element(AXError::Success), "hello").is_ok())),
+        refusal_after(|| assert!(write_value(&element(AXError::CannotComplete), "hello").is_err())),
+    ];
+    // Then: a later refusal may not be rerun as if nothing was sent
+    assert_eq!(refusals, [ErrorCode::InputFailed; 4]);
+}
+
+#[test]
+fn a_refused_request_or_a_focus_write_leaves_the_call_unsent() {
+    // Given: requests the app refused, and a focus write that only prepares input
+    let element = ScriptedElement::replying;
+    // When
+    let refusals = [
+        refusal_after(|| assert!(perform_requested(&element(AXError::IllegalArgument), "press").is_err())),
+        refusal_after(|| assert!(write_value(&element(AXError::AttributeUnsupported), "hello").is_err())),
+        refusal_after(|| assert!(focus(&element(AXError::Success)).is_ok())),
+    ];
+    // Then
+    assert_eq!(refusals, [ErrorCode::BackgroundUnavailable; 3]);
 }
 
 #[test]

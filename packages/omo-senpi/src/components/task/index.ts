@@ -35,6 +35,9 @@ import { composeTaskEngine, type TaskEngine } from "./engine"
 import { registerEvalHandleHost } from "./eval-handle-host"
 import { TASK_USAGE_HINT_FLAG, wireEventBridge, type EventBridge } from "./event-bridge"
 import { wireHostPrewarm } from "./host-prewarm"
+import { installJobWidgetAuthor } from "./job-widget-author"
+import { loadJobWidgetHost, type JobWidgetHostApi } from "./job-widget-host"
+import { createTaskJobWidgetFeed } from "./job-widget-sources"
 import { createLeadPollerLifecycle, type LeadPollerLifecycle } from "./lead-poller-lifecycle"
 import { TEAM_MEMBER_LIVENESS_MESSAGE_TYPE } from "./member-liveness"
 import { TASK_COMPLETION_MESSAGE_TYPE } from "./parent-notifier"
@@ -61,6 +64,7 @@ export interface TaskComponentOptions {
   readonly loadConfig?: typeof loadSenpiOmoConfig
   readonly loadSkills?: SkillLoader
   readonly resolveCwd?: () => string
+  readonly loadJobWidgetHost?: () => Promise<JobWidgetHostApi>
 }
 
 export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenpiComponent {
@@ -187,6 +191,8 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
         }),
         (error) => ctx.logger.warn("omo-senpi DAG attach after reconcile failed", { error: String(error) }),
       )
+
+      wireJobWidgets(pi, engine, cwd, await readJobWidgetHost(options.loadJobWidgetHost ?? loadJobWidgetHost, ctx))
     },
   }
 }
@@ -198,6 +204,34 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
 // hosts that predate `cwd` on the extension API.
 function sessionCwd(pi: SenpiExtensionAPI): string {
   return typeof pi.cwd === "string" && pi.cwd.length > 0 ? pi.cwd : process.cwd()
+}
+
+async function readJobWidgetHost(load: () => Promise<JobWidgetHostApi>, ctx: ComponentContext): Promise<JobWidgetHostApi> {
+  try {
+    return await load()
+  } catch (error) {
+    ctx.logger.warn("omo-senpi job widgets unavailable: senpi module could not be read", {
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return {}
+  }
+}
+
+// The widget author writes specs on omo's `quick` category model; background tasks offer their
+// children's tool calls as widget sources. A senpi without the job-widget API leaves both unwired.
+function wireJobWidgets(pi: SenpiExtensionAPI, engine: TaskEngine, cwd: string, host: JobWidgetHostApi): void {
+  if (host.setAuthorResolver === undefined && host.sources === undefined) return
+  const releaseAuthor = installJobWidgetAuthor(host, cwd, engine.omoConfig)
+  const feed = host.sources === undefined
+    ? undefined
+    : createTaskJobWidgetFeed({ sources: host.sources, manager: engine.manager, sessionId: () => engine.runtime.sessionId() })
+  const stopObserving = feed === undefined ? undefined : engine.onStoreMutation((change) => feed.observe(change))
+  pi.on("session_start", () => feed?.sync())
+  pi.on("session_shutdown", () => {
+    stopObserving?.()
+    feed?.dispose()
+    releaseAuthor()
+  })
 }
 
 function registerRemovedTeamWaitHint(pi: SenpiExtensionAPI): void {
