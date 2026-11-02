@@ -28,6 +28,9 @@ import {
   OuterJob,
   closeHandle,
   exitCodeOf,
+  jobAccounting,
+  jobProcessIds,
+  processCommandLine,
   processImage,
   signaledWithin,
   watchProcess,
@@ -101,8 +104,16 @@ async function holdGate(locks: string): Promise<GitActivityGate> {
   return { release }
 }
 
-async function helperCreated(outer: OuterJob, image: string): Promise<{ readonly pid: number; readonly handle: bigint }> {
-  const created = await outer.next(({ message, pid }) => message === JOB_MSG_NEW_PROCESS && basename(processImage(pid) ?? "").toLowerCase() === image.toLowerCase(), 60_000)
+/** `message:pid:image:command line` of one process, resolved now (null fields when it is gone). */
+function describeProcess(message: number, pid: number): string {
+  return `${message}:${pid}:${basename(processImage(pid) ?? "?")}:${processCommandLine(pid) ?? "?"}`
+}
+
+async function helperCreated(outer: OuterJob, image: string, seen: string[] = []): Promise<{ readonly pid: number; readonly handle: bigint }> {
+  const created = await outer.next(({ message, pid }) => {
+    seen.push(describeProcess(message, pid))
+    return message === JOB_MSG_NEW_PROCESS && basename(processImage(pid) ?? "").toLowerCase() === image.toLowerCase()
+  }, 60_000)
   const handle = watchProcess(created.pid)
   if (handle === null) throw new Error(`helper ${created.pid} exited before the test could watch it`)
   cleanups.push(() => closeHandle(handle))
@@ -134,14 +145,19 @@ describe.skipIf(!runsJobHelperRows)("T7(c)(d) and T8: the writer never lets git 
 
     // #when
     const outer = await admit(writer)
-    const helper = await helperCreated(outer, basename(jobHelperPath()))
+    const seen: string[] = []
+    const helper = await helperCreated(outer, basename(jobHelperPath()), seen)
+    const atMatch = { writer: writer.child.pid, members: jobProcessIds(outer.job).map((pid) => describeProcess(0, pid)), accounting: jobAccounting(outer.job) }
     writer.child.kill()
 
     // #then
     expect(await signaledWithin(helper.handle, 30_000)).toBe(true)
     const code = exitCodeOf(helper.handle)
+    // Receipt: which process matched, whether anything (git) entered the job after it, and how each member left.
+    const after = outer.drain().map(({ message, pid }) => describeProcess(message, pid))
+    const tagged = gitSucceeds(repo.paths.repo, ["rev-parse", "--verify", "--quiet", "refs/tags/t7c"])
+    console.log(`[T7(c)] ${JSON.stringify({ helper: helper.pid, exit: code, seen, atMatch, after, accounting: jobAccounting(outer.job), tagged, entries: await gitOpEntries(repo.paths.locks) })}`)
     gate.release()
-    console.log(`[T7(c)] helper ${helper.pid} exit ${String(code)}`)
     expect([11, 20]).toContain(code ?? -1)
     expect(gitSucceeds(repo.paths.repo, ["rev-parse", "--verify", "--quiet", "refs/tags/t7c"])).toBe(false)
     expect(await gitOpEntries(repo.paths.locks)).toEqual([])

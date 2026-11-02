@@ -52,6 +52,14 @@ function k32() {
   return kernel32
 }
 
+let ntdll: ReturnType<typeof loadNtdll> | undefined
+
+function loadNtdll() {
+  return dlopen("ntdll.dll", { NtQueryInformationProcess: { args: [u64, i32, ptr, u32, ptr], returns: i32 } }).symbols
+}
+
+const PROCESS_COMMAND_LINE_INFORMATION = 60
+
 function wide(text: string): Buffer {
   return Buffer.from(`${text}\0`, "utf16le")
 }
@@ -105,6 +113,26 @@ export function processImage(pid: number): string | null {
     if (k32().QueryFullProcessImageNameW(handle, 0, buffer, size) === 0) return null
     return Buffer.from(buffer.buffer, 0, (size[0] ?? 0) * 2).toString("utf16le")
   })
+}
+
+/** The process's command line (ProcessCommandLineInformation: a UNICODE_STRING followed by its text), or null. */
+export function processCommandLine(pid: number): string | null {
+  return withProcess(pid, PROCESS_QUERY_LIMITED_INFORMATION, (handle) => {
+    ntdll ??= loadNtdll()
+    const buffer = new Uint8Array(8192)
+    const returned = new Uint32Array(1)
+    if (ntdll.NtQueryInformationProcess(handle, PROCESS_COMMAND_LINE_INFORMATION, buffer, buffer.byteLength, returned) !== 0) return null
+    const length = new DataView(buffer.buffer).getUint16(0, true)
+    return Buffer.from(buffer.buffer, 16, Math.min(length, buffer.byteLength - 16)).toString("utf16le")
+  })
+}
+
+/** TotalProcesses, ActiveProcesses and TotalTerminatedProcesses of JOBOBJECT_BASIC_ACCOUNTING_INFORMATION. */
+export function jobAccounting(job: bigint): { readonly total: number; readonly active: number; readonly terminated: number } {
+  const info = new BigUint64Array(6)
+  if (k32().QueryInformationJobObject(job, JOB_BASIC_ACCOUNTING, info, 48, null) === 0) throw new Error("job accounting query failed")
+  const view = new DataView(info.buffer)
+  return { total: view.getUint32(36, true), active: view.getUint32(40, true), terminated: view.getUint32(44, true) }
 }
 
 export function parentPids(): Map<number, number> {
@@ -182,6 +210,18 @@ export class OuterJob {
     }, boundMs, 10)
     if (!arrived || found === undefined) throw new Error(`no matching job message within ${boundMs} ms`)
     return found
+  }
+
+  /** Every message already queued, without waiting. */
+  drain(): JobMessage[] {
+    const bytes = new Uint32Array(1)
+    const key = new BigUint64Array(1)
+    const overlapped = new BigUint64Array(1)
+    const messages: JobMessage[] = []
+    while (k32().GetQueuedCompletionStatus(this.port, bytes, key, overlapped, 0) !== 0) {
+      messages.push({ message: bytes[0] ?? 0, pid: Number(overlapped[0] ?? 0n) })
+    }
+    return messages
   }
 
   close(): void {
