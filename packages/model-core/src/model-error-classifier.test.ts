@@ -242,6 +242,24 @@ describe("model-error-classifier", () => {
     expect(result).toBe(false)
   })
 
+  test("an authentication failure reported as a generic API error moves to the next fallback (#9320)", () => {
+    //#given
+    const errors = [
+      {
+        name: "AI_APICallError",
+        message:
+          "Claude Code returned an error result: Failed to authenticate: OAuth session expired and could not be refreshed",
+      },
+      { name: "APIError", message: "Authentication failed for provider anthropic" },
+    ]
+
+    //#when
+    const results = errors.map((error) => isRetryableModelError(error))
+
+    //#then
+    expect(results).toEqual([true, true])
+  })
+
   test("rate limit message without statusCode still works (backward compat)", () => {
     //#given
     const error = { message: "rate limit reached for requests" }
