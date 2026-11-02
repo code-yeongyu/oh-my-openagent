@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.1.58] - 2026-11-02
+
+Runs on senpi 2026.11.2-1: Claude subscription sign-in works again. ([#12126](https://github.com/code-yeongyu/oh-my-openagent/pull/12126))
+
+**A timed-out or cancelled ultimate-browsing template gives its browser a graceful quit.** On macOS/Linux the executor runs each Playwright template in its own session and, on timeout or cancellation (Ctrl-C), sends SIGTERM to the template's process group and waits up to 5 s before SIGKILL, so Chrome can quit cleanly and remove its macOS code-sign clone and temp profile instead of being orphaned. The bundled omowright browser engine is pinned at the release whose pipe-launched browsers also get a graceful quit (SIGTERM, then SIGKILL after a grace period) when the engine closes them. ([#12068](https://github.com/code-yeongyu/oh-my-openagent/pull/12068))
+
+### Fixed
+
+- The builtin `dev-browser` skill's macOS/Linux standalone command now runs a release step before `server.sh`. When nothing answers on 9222, it sends SIGTERM to whatever holds 9223, waits up to 5 s, and sends SIGKILL only to survivors. dev-browser's `start-server.ts` then finds the port free and never reaches its `kill -9`, so a browser gets its clean exit and does not leak per-launch state such as the macOS Chrome code-sign clone. A running server on 9222 is left alone, and the step does nothing when `curl` or `lsof` is missing. It works the same under bash and zsh. The upstream fix is SawyerHood/dev-browser#146. ([#12071](https://github.com/code-yeongyu/oh-my-openagent/pull/12071), part of [#12067](https://github.com/code-yeongyu/oh-my-openagent/issues/12067))
+- A delegated task now runs only on the models designated for it (its category's or agent's model chain). It never falls back to the parent session's model, whatever the failure: a usage limit, a missing or rejected sign-in, a content-policy refusal or an overload on every designated model ends the task with `failure_kind: "model_chain_exhausted"` and an error listing each model it tried and why, including any reset time the provider reported. This applies to every category and to workflow nodes. A `categories.<name>.provider_lock` key left in `omo.json` is ignored. ([#12006](https://github.com/code-yeongyu/oh-my-openagent/issues/12006), [#11781](https://github.com/code-yeongyu/oh-my-openagent/issues/11781)) ([#12010](https://github.com/code-yeongyu/oh-my-openagent/pull/12010))
+- Keep an unacknowledged task-host session close reachable by teardown so detaching
+  releases its transport instead of leaving the connection open until the RPC deadline. ([#11931](https://github.com/code-yeongyu/oh-my-openagent/pull/11931))
+
+### Changed
+
+- The macOS (darwin-arm64) EQ.omo goldens for E21-E24 are re-recorded against senpi 2026.10.31-2, and recording now refuses a golden that carries the telemetry notice or a host-only terminal event, so a machine-specific row can no longer be committed as the expected output. ([#12056](https://github.com/code-yeongyu/oh-my-openagent/pull/12056), fixes [#12054](https://github.com/code-yeongyu/oh-my-openagent/issues/12054))
+
+### Added
+
+- The device service SDK (`@oh-my-opencode/device-service-core`) can download, verify and install the OmO device service and run its start-up bootstrap: the release signature is checked with the repository's strict Ed25519 helper against a compiled-in release key, every file against the signed checksums, and the release lands in the service's state dir only after every check passed. Nothing calls it yet, and the release key is a placeholder until it is published. ([#12052](https://github.com/code-yeongyu/oh-my-openagent/pull/12052))
+
 ## [5.1.57] - 2026-11-01
 
 Runs on senpi 2026.10.31-2: Claude subscription sign-in now goes through the Claude Code CLI (accounts from the old sign-in are asked once to sign in again, keeping their name, pin and order), `/gpt-account unblock <id>` clears a usage-limit block after you reset it on the provider side, a finished turn no longer sits at "Working" while an extension's settle handler is slow, and startup warns when a skills root's ignore file hides a skill folder. A Claude OAuth token given to the plain `anthropic` provider is now refused with a pointer at `/login anthropic-subscription` instead of being sent as Claude Code, so omo no longer rewrites the engine's Claude Code version at install; every skill a prompt invokes now loads instead of stopping at five. ([#11983](https://github.com/code-yeongyu/oh-my-openagent/pull/11983))
