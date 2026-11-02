@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
-import { describe, expect, test } from "bun:test"
-import { writeFileSync, mkdtempSync } from "node:fs"
+import { describe, expect, onTestFinished, test } from "bun:test"
+import { rmSync, writeFileSync, mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -34,6 +34,7 @@ describe("resolveDshAuth", () => {
   test("#given an opencode-go key in the auth store #when resolved #then the opencode-go endpoint defaults are used", () => {
     // given
     const dir = mkdtempSync(join(tmpdir(), "dsh-auth-"))
+    onTestFinished(() => rmSync(dir, { recursive: true, force: true }))
     const authPath = writeFakeAuth(dir)
 
     // when
