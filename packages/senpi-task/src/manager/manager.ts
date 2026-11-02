@@ -1457,6 +1457,8 @@ class TaskManagerImpl implements TaskManager {
         if (status.state === "running") void this.#steering.notifyStarted(taskId)
       },
       onLivenessNotice: (record, status) => this.#options.onChildLiveness?.(record, status),
+      // The engine hopped past a spent designated rung in-session: remember it like a failed turn (#11383).
+      onUsageLimitHop: (provider, modelId, message) => this.#limits.settle(taskId, provider, modelId, message),
       onExtensionEvent: (event) => {
         const record = this.#tryLoad(taskId)
         if (record != null && record.host_pid === this.#hostPid) this.#options.onChildExtensionEvent?.(event, record)

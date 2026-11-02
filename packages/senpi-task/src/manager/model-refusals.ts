@@ -91,13 +91,19 @@ export function withRefusal<Record extends Pick<TaskRecord, "model_refusals">>(r
 /**
  * Record each designated model the child's own in-session fallback walks past. The failed turn that caused
  * the hop is remembered from its error message, so the entry carries the provider's words and reset time.
+ * A usage limit the engine hopped past on a rung of this run's designated chain is also handed to
+ * `onUsageLimitHop`, so later tasks skip that rung until its reset (#11383).
  */
 export function observeModelRefusals(input: {
   readonly store: TaskRecordStore
   readonly taskId: string
   readonly now: () => number
+  readonly onUsageLimitHop?: (provider: string, modelId: string, message: string) => void
 }): (event: ManagedChildEvent) => void {
   const { store, taskId, now } = input
+  // The chain as this run starts: the hop event lands after the record already moved to the next rung.
+  const start = store.load(taskId)
+  const chain = start == null ? [] : [start.resolved_model, ...(start.fallback_models ?? [])]
   let failed: string | undefined
   return (event) => {
     if (event.type === "message_end" && isAssistant(event.message)) {
@@ -113,8 +119,15 @@ export function observeModelRefusals(input: {
       ...(failed === undefined ? {} : { message: failed }),
       at: new Date(now()).toISOString(),
     })
+    const message = failed
     failed = undefined
     store.mutate(taskId, (fresh) => withRefusal(fresh, refusal))
+    const hopped = readString(event, "from")
+    const from = hopped === undefined ? undefined : baseSelector(hopped)
+    const rung = chain.find((model) => model !== undefined && `${model.provider}/${model.model_id}` === from)
+    if (rung !== undefined && message !== undefined && usageLimitScope(message) !== undefined) {
+      input.onUsageLimitHop?.(rung.provider, rung.model_id, message)
+    }
   }
 }
 
