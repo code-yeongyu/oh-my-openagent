@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test"
 import { appendFile, readFile, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
+import { getProcessStartIdentity } from "@oh-my-opencode/memory-core/process-identity"
 
 import { publishLockRecord } from "./lock-publish"
 import { createTempDirectory, runLockContenders } from "./lock-test-support"
@@ -25,7 +26,7 @@ test("#given a held lock #when it is handed to a live child and restored #then t
 
   // then
   const lines = observed.handed.split("\n").filter((line) => line.length > 0)
-  expect(lines).toHaveLength(4)
+  expect(lines).toHaveLength(5)
   expect(lines[1]).toBe(String(child.pid))
   expect(lines[3]).not.toBe(observed.original.split("\n")[3])
   expect(observed.restored).toBe(observed.original)
@@ -33,6 +34,37 @@ test("#given a held lock #when it is handed to a live child and restored #then t
   child.stdin.end()
   await child.exited
   await rm(root, { recursive: true, force: true })
+})
+
+test("#given a lock handed to a live child #when the child's pid is reused by another process #then the handed-over record is judged stale", async () => {
+  // given
+  const root = await createTempDirectory("lock-lease-reused-pid-")
+  const lockPath = join(root, "lock")
+  const child = spawnChild()
+
+  try {
+    const handed = await withLock(lockPath, async (lease) => {
+      await lease.handOver(child.pid)
+      return await readFile(lockPath, "utf8")
+    }, { staleAfterMs: Number.POSITIVE_INFINITY })
+    const lines = handed.split("\n").filter((line) => line.length > 0)
+    const liveStart = await getProcessStartIdentity(child.pid)
+    expect(liveStart).not.toBeNull()
+    const scheme = String(liveStart).slice(0, String(liveStart).indexOf(":"))
+
+    // when
+    const reusedStart = `${scheme}:${Date.now()}`
+    await writeFile(lockPath, `${[...lines.slice(0, 4), reusedStart].join("\n")}\n`)
+
+    // then
+    expect(lines[4]).toBe(liveStart ?? "unavailable")
+    expect(await detectStaleLock(lockPath, Number.POSITIVE_INFINITY)).toBe(true)
+    expect(await reapStaleLock(lockPath, Number.POSITIVE_INFINITY)).toBe("removed")
+  } finally {
+    child.stdin.end()
+    await child.exited
+    await rm(root, { recursive: true, force: true })
+  }
 })
 
 test("#given a lock handed to a live child #when anyone tries to take or reap it #then it stays held, and contenders enter only after release", async () => {
