@@ -20,6 +20,8 @@ use support::{example, process, scratch, unique, Receipt};
 const ITERATIONS: usize = 20;
 /// Far below the helper's 250 ms recheck and far above scheduling noise on a hosted runner.
 const DONE_BOUND: Duration = Duration::from_millis(50);
+/// An iteration this slow waited out the helper's 250 ms recheck: a member exit that woke nothing.
+const RECHECK_WAIT: Duration = Duration::from_millis(200);
 const BOUND: Duration = Duration::from_secs(30);
 
 struct Iteration {
@@ -133,12 +135,15 @@ fn done_follows_the_last_member_exit_without_waiting_out_the_recheck() {
         gaps.push(gap);
     }
     let max = gaps.iter().copied().max().unwrap_or_default();
+    let waited = gaps.iter().filter(|&&gap| gap >= RECHECK_WAIT).count();
     let median = median(&mut gaps);
     receipt.line(format!(
-        "summary: {ITERATIONS} iterations; done after last member exit median {:.3}ms max {:.3}ms (bound {:.0}ms)",
+        "summary: {ITERATIONS} iterations; done after last member exit median {:.3}ms max {:.3}ms (bound {:.0}ms); \
+         iterations that waited out the recheck {waited}",
         ms(median),
         ms(max),
         ms(DONE_BOUND)
     ));
     assert!(median < DONE_BOUND, "{receipt}");
+    assert_eq!(waited, 0, "{receipt}");
 }

@@ -1,8 +1,9 @@
 //! Kernel exit ordering (omo#10391, design v4.2 R2 and R6): on a job this test owns, with the root image H spawns in
 //! the done-latency row (a console process, so its conhost joins too), each job message is stamped at dequeue
-//! together with the job's `ActiveProcesses` and the member's handle state, read before anything else runs, and each
-//! member's handle signal is stamped with the count read at once. H re-reads F's count on a member's handle signal,
-//! so the row asserts the count no longer includes a member whose handle has signaled.
+//! together with the job's `ActiveProcesses` and the member's handle state, read before anything else runs; each
+//! member's handle signal is stamped with the count read at once, and a poller stamps every count change. H re-reads
+//! F's count after a member's handle signals, for at most its 20 ms settle bound, so the row asserts the count drops
+//! within that bound of each signal.
 #![cfg(windows)]
 
 mod support;
@@ -11,7 +12,7 @@ use std::collections::HashMap;
 use std::ptr::null_mut;
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use support::observer::Observer;
 use support::owned_job::{kernel_job, spawn_into, KernelJob};
@@ -28,6 +29,8 @@ use windows_sys::Win32::System::IO::GetQueuedCompletionStatus;
 
 const ITERATIONS: usize = 20;
 const BOUND: Duration = Duration::from_secs(30);
+/// H's `SETTLE` (src/run.rs).
+const SETTLE: Duration = Duration::from_millis(20);
 
 fn message_name(message: u32) -> String {
     match message {
@@ -106,22 +109,55 @@ fn watch_with_count(
     })
 }
 
-/// Signals in observed order: the k-th one read the count after every earlier member had signaled, so a count above
-/// `members - k` still included a signaled member.
-fn stale_at_signal(signals: &[Signal], members: usize) -> Option<usize> {
+type Change = (Duration, u32);
+
+fn poll_count(kernel: &Arc<KernelJob>, timeline: &Arc<Timeline>) -> JoinHandle<Vec<Change>> {
+    let (kernel, timeline) = (Arc::clone(kernel), Arc::clone(timeline));
+    std::thread::spawn(move || {
+        let (mut changes, mut last) = (Vec::new(), None);
+        let deadline = Instant::now() + BOUND;
+        while Instant::now() < deadline {
+            let Some(active) = job::accounting(kernel.job.raw()).map(|info| info.ActiveProcesses)
+            else {
+                break;
+            };
+            if last != Some(active) {
+                changes.push((timeline.mark(format!("count {active}")), active));
+                last = Some(active);
+            }
+            if active == 0 {
+                break;
+            }
+            std::thread::yield_now();
+        }
+        changes
+    })
+}
+
+/// For the k-th signal in observed order (every earlier member had signaled before its read), whether the count
+/// still included the member at the signal, and how long after the signal the count first read `members - k` or less.
+fn drop_lags(
+    signals: &[Signal],
+    changes: &[Change],
+    members: usize,
+) -> Option<Vec<(bool, Duration)>> {
     let mut observed: Vec<(Duration, Option<u32>)> =
         signals.iter().copied().collect::<Option<_>>()?;
     observed.sort_by_key(|(at, _)| *at);
-    Some(
-        observed
-            .iter()
-            .enumerate()
-            .filter(|(rank, (_, active))| {
-                let left = u32::try_from(members.saturating_sub(rank + 1)).unwrap_or(0);
-                active.is_none_or(|active| active > left)
-            })
-            .count(),
-    )
+    observed
+        .iter()
+        .enumerate()
+        .map(|(rank, (at, active))| {
+            let left = u32::try_from(members.saturating_sub(rank + 1)).unwrap_or(0);
+            if active.is_some_and(|active| active <= left) {
+                return Some((false, Duration::ZERO));
+            }
+            changes
+                .iter()
+                .find(|(_, count)| *count <= left)
+                .map(|(dropped, _)| (true, dropped.saturating_sub(*at)))
+        })
+        .collect()
 }
 
 #[derive(Default)]
@@ -130,6 +166,8 @@ struct Tally {
     stale: usize,
     unsignaled: usize,
     signals: usize,
+    stale_signals: usize,
+    max_lag: Duration,
 }
 
 #[test]
@@ -170,6 +208,7 @@ fn kernel_member_exit_messages_against_the_active_count() {
             members.lock().expect("members").insert(pid, probe);
             waiters.push(watch_with_count(&kernel, &timeline, watched, label));
         }
+        let poller = poll_count(&kernel, &timeline);
         let release = timeline.mark("release");
         observer.stop();
         let dequeued = drainer.join().expect("drainer");
@@ -177,9 +216,14 @@ fn kernel_member_exit_messages_against_the_active_count() {
             .into_iter()
             .map(|waiter| waiter.join().expect("waiter"))
             .collect();
+        let changes = poller.join().expect("poller");
         let member_count = members.lock().expect("members").len();
-        let stale_signals = stale_at_signal(&signals, member_count);
+        let lags = drop_lags(&signals, &changes, member_count);
         tally.signals += signals.len();
+        for (stale, lag) in lags.iter().flatten() {
+            tally.stale_signals += usize::from(*stale);
+            tally.max_lag = tally.max_lag.max(*lag);
+        }
         let mut seen = 0usize;
         for entry in dequeued.iter().filter(|entry| is_exit(entry.message)) {
             seen += 1;
@@ -202,16 +246,15 @@ fn kernel_member_exit_messages_against_the_active_count() {
             seen, member_count,
             "iteration {index}: one exit message per member\n{receipt}"
         );
-        assert_eq!(
-            stale_signals,
-            Some(0),
-            "iteration {index}: a member's handle signaled while the count still included it\n{receipt}"
+        assert!(
+            lags.is_some_and(|lags| lags.iter().all(|(_, lag)| *lag < SETTLE)),
+            "iteration {index}: a member signaled and the count did not drop within {SETTLE:?}\n{receipt}"
         );
     }
     receipt.line(format!(
         "summary: {ITERATIONS} iterations; {} member-exit messages; dequeued while ActiveProcesses still counted the \
-         member {}; dequeued before the member's handle signaled {}; {} handle signals, every one read with the \
-         member already out of the count",
-        tally.exits, tally.stale, tally.unsignaled, tally.signals
+         member {}; dequeued before the member's handle signaled {}; {} handle signals, {} read while the count \
+         still included the member; longest signal-to-drop lag {:?}",
+        tally.exits, tally.stale, tally.unsignaled, tally.signals, tally.stale_signals, tally.max_lag
     ));
 }
