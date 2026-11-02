@@ -24,7 +24,8 @@ const { ANTHROPIC_SUBSCRIPTION_PROVIDER_ID } = await import(pathToFileURL(join(
 )).href) as { ANTHROPIC_SUBSCRIPTION_PROVIDER_ID: string }
 
 test("#given the installed Senpi pin #when builtin providers are derived #then the provider map is exact", () => {
-  expect(senpiManifest.version).toBe(omoNativeManifest.dependencies["@code-yeongyu/senpi"])
+  // The tarball's own manifest may keep a zero-padded calver ("2026.11.02-1") that the registry normalizes to the pinned "2026.11.2-1".
+  expect(Bun.semver.order(senpiManifest.version, omoNativeManifest.dependencies["@code-yeongyu/senpi"])).toBe(0)
 
   const expectedProviderIds = builtinProviders().map(({ id }) => id).sort()
 
