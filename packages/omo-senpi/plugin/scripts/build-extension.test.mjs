@@ -416,6 +416,22 @@ describe("checkExtensionCurrent", () => {
     expect(await readFile(recallStoreOutputPath, "utf8")).not.toContain("#omo-recall-store-runtime")
   })
 
+  test("#given the split extension build #when reflection inputs are inspected #then the machine-id host identity loads only from the recall-store sidecar", async () => {
+    const { mainInputs, recallStoreInputs, outputPath } = await sharedOutputs()
+    for (const suffix of [
+      "packages/memory-core/src/reflection/host-identity.ts",
+      "packages/memory-core/src/sync/item/machine-id.ts",
+    ]) {
+      expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
+      expect(recallStoreInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
+    }
+    const main = await readFile(outputPath, "utf8")
+    expect(main).toContain('import("#memory-host-identity")')
+    // Package architecture contract: the hash domain and the platform id probe mark the code this lazy boundary keeps out of the entry.
+    expect(main).not.toContain("omo-reflection-host:")
+    expect(main).not.toContain("IOPlatformUUID")
+  })
+
   test("#given the split extension build #when telemetry inputs are inspected #then PostHog lives only in its lazy sidecar", async () => {
     const { mainInputs, telemetryPosthogInputs, telemetryPosthogOutputPath } = await sharedOutputs()
     expect(mainInputs.some(input => /node_modules\/posthog-(?:node|core)\//.test(toPortableBuildPath(input)))).toBe(false)
@@ -547,6 +563,7 @@ describe("checkExtensionCurrent", () => {
       "#omo-session-history-runtime": "./extensions/omo-session-history.js",
       "#omo-recall-store-runtime": "./extensions/omo-recall-store.js",
       "#memory-external-projection": "./extensions/omo-recall-store.js",
+      "#memory-host-identity": "./extensions/omo-recall-store.js",
       "#omo-telemetry-posthog-runtime": "./extensions/omo-telemetry-posthog.js",
       "#omo-telemetry-otlp-runtime": "./extensions/omo-telemetry-otlp.js",
       "#omo-memory-sync-runtime": "./extensions/omo-memory-sync.js",

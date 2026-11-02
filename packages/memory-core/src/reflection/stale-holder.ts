@@ -11,7 +11,7 @@ import { join } from "node:path"
 
 import { readFile } from "../fs/resilient"
 import { getPidLiveness, getProcessStartIdentity, startIdentitiesComparable, type ProcessLiveness } from "../locks/process-identity"
-import { classifyHostIdentity, readCurrentMachineHash } from "./host-identity"
+import { classifyHostIdentity } from "./host-identity-lazy"
 
 export type ReflectionLockVerdict =
   | { readonly state: "none" }
@@ -98,18 +98,18 @@ export async function classifyReflectionLockHolder(
   const runId = typeof fields.runId === "string" ? fields.runId : "unknown"
   const launcherPid = typeof fields.launcherPid === "number" ? fields.launcherPid : undefined
   const launcherHostname = typeof fields.launcherHostname === "string" ? fields.launcherHostname : undefined
-  const launcherMachineHash = typeof fields.launcherMachineHash === "string" ? fields.launcherMachineHash : undefined
   if (launcherPid === undefined || launcherHostname === undefined) return stuck(runId, "its launcher identity is missing") // rule:launcher-identity
   const identity = await classifyHostIdentity({
-    recordedHostname: launcherHostname,
-    recordedMachineHash: launcherMachineHash,
-    currentHostname: (probe.hostname ?? readHostname)(),
-    currentMachineHash: probe.machineHash ?? readCurrentMachineHash,
+    launcherHostname,
+    launcherMachineHash: fields.launcherMachineHash,
+    hostname: (probe.hostname ?? readHostname)(),
+    machineHash: probe.machineHash,
   })
   if (identity.state === "foreign") {
-    return identity.viaMachineId
-      ? stuck(runId, `it is owned by a different machine (host ${identity.recordedHostname}), which cannot be checked from here`) // rule:machine-id
-      : stuck(runId, `it is owned by host ${identity.recordedHostname}, which cannot be checked from here`) // rule:other-host
+    const owner = identity.viaMachineId
+      ? `a different machine (host ${launcherHostname})` // rule:machine-id
+      : `host ${launcherHostname}` // rule:other-host
+    return stuck(runId, `it is owned by ${owner}, which cannot be checked from here`)
   }
   const launcher = await launcherLiveness(launcherPid, fields.launcherProcessStart, probe)
   if (launcher === "alive") return { state: "live", runId } // rule:launcher-alive

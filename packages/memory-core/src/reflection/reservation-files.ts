@@ -4,7 +4,7 @@ import { dirname, join } from "node:path"
 
 import { mkdir, readFile, readdir, rename, unlink, writeFile } from "../fs/resilient"
 import { getProcessStartIdentity } from "../locks"
-import { readCurrentMachineHash } from "./host-identity"
+import { readCurrentMachineHash } from "./host-identity-lazy"
 import type { ReflectionRequest, ReservedRun } from "./machine"
 
 export interface ReflectionLauncherIdentity {

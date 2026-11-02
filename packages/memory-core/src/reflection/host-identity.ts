@@ -57,37 +57,33 @@ export function createMachineHashReader(query: PlatformMachineIdQuery): () => Pr
 /** The process-wide reader of this machine's reflection host hash. */
 export const readCurrentMachineHash: () => Promise<string | null> = createMachineHashReader(platformMachineId)
 
+/**
+ * The holder's fields as recorded in the lock (callers pass the record as-is, so the entry bundle carries
+ * no per-field parsing) beside this machine's hostname and an optional machine-hash reader.
+ */
 export interface HostIdentityFacts {
-  readonly recordedHostname: string
-  readonly recordedMachineHash: string | undefined
-  readonly currentHostname: string
-  readonly currentMachineHash: () => Promise<string | null>
+  readonly launcherHostname?: string | undefined
+  readonly launcherMachineHash?: unknown
+  readonly hostname: string
+  readonly machineHash?: (() => Promise<string | null>) | undefined
 }
 
 export type HostIdentityVerdict =
   | { readonly state: "local" }
-  | { readonly state: "foreign"; readonly recordedHostname: string; readonly viaMachineId: boolean }
+  | { readonly state: "foreign"; readonly viaMachineId: boolean }
 
 /**
- * The one shared rule. When the record carries a machine hash and the current lookup resolves, the
- * hashes decide; otherwise exact hostname equality decides. The machine id is looked up only when the
- * record actually carries a hash, so legacy records and an absent lock never touch the platform query.
+ * The one shared rule. A record without a launcher hostname belongs to no host this machine can check.
+ * When the record carries a machine hash (a string) and the current lookup resolves, the hashes decide;
+ * otherwise exact hostname equality decides. The machine id is looked up only when the record actually
+ * carries a hash, so legacy records and an absent lock never touch the platform query.
  */
 export async function classifyHostIdentity(facts: HostIdentityFacts): Promise<HostIdentityVerdict> {
-  if (facts.recordedMachineHash === undefined) {
-    return hostnameVerdict(facts.recordedHostname, facts.currentHostname)
-  }
-  const currentMachineHash = await facts.currentMachineHash()
+  if (facts.launcherHostname === undefined) return { state: "foreign", viaMachineId: false }
+  const recordedMachineHash = typeof facts.launcherMachineHash === "string" ? facts.launcherMachineHash : null
+  const currentMachineHash = recordedMachineHash === null ? null : await (facts.machineHash ?? readCurrentMachineHash)()
   if (currentMachineHash === null) {
-    return hostnameVerdict(facts.recordedHostname, facts.currentHostname)
+    return facts.launcherHostname === facts.hostname ? { state: "local" } : { state: "foreign", viaMachineId: false }
   }
-  return facts.recordedMachineHash === currentMachineHash
-    ? { state: "local" }
-    : { state: "foreign", recordedHostname: facts.recordedHostname, viaMachineId: true }
-}
-
-function hostnameVerdict(recordedHostname: string, currentHostname: string): HostIdentityVerdict {
-  return recordedHostname === currentHostname
-    ? { state: "local" }
-    : { state: "foreign", recordedHostname, viaMachineId: false }
+  return recordedMachineHash === currentMachineHash ? { state: "local" } : { state: "foreign", viaMachineId: true }
 }

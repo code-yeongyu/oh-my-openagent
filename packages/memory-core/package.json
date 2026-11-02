@@ -37,10 +37,14 @@
     },
     "./external-projection": {
       "import": "./src/compile/external-projection.ts"
+    },
+    "./host-identity": {
+      "import": "./src/reflection/host-identity.ts"
     }
   },
   "imports": {
-    "#memory-external-projection": "./src/compile/external-projection.ts"
+    "#memory-external-projection": "./src/compile/external-projection.ts",
+    "#memory-host-identity": "./src/reflection/host-identity.ts"
   },
   "scripts": {
     "typecheck": "tsgo --noEmit -p tsconfig.json",

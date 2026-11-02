@@ -5,7 +5,6 @@ import { join } from "node:path"
 
 import {
   LockContentionError,
-  readCurrentMachineHash,
   type MemoryIdentity,
   type ProcessLiveness,
   type ReservedRun,
@@ -57,7 +56,7 @@ export interface ReflectionRunReconciliationOptions {
   readonly warn?: ReceiptWarn
 }
 
-export type ReconcileContext = Required<Pick<ReflectionRunReconciliationOptions, "now" | "hostname" | "machineHash">>
+export type ReconcileContext = Required<Pick<ReflectionRunReconciliationOptions, "now" | "hostname">>
   & ReflectionRunReconciliationOptions
 
 export async function reconcileReflectionRuns(
@@ -67,7 +66,6 @@ export async function reconcileReflectionRuns(
     ...options,
     now: options.now ?? Date.now,
     hostname: options.hostname ?? readHostname,
-    machineHash: options.machineHash ?? readCurrentMachineHash,
   }
   try {
     context.signal?.throwIfAborted()

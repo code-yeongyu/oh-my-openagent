@@ -5,14 +5,8 @@ import { mkdir, readFile, rm, utimes, writeFile } from "node:fs/promises"
 import { hostname } from "node:os"
 import { join } from "node:path"
 
-import {
-  appendMemoryReceiptOnce,
-  createMachineHashReader,
-  readMemoryReceipts,
-  receiptIdentity,
-  reflectionHostHash,
-  type MemoryReceiptInput,
-} from "@oh-my-opencode/memory-core"
+import { appendMemoryReceiptOnce, readMemoryReceipts, receiptIdentity, type MemoryReceiptInput } from "@oh-my-opencode/memory-core"
+import { createMachineHashReader, reflectionHostHash } from "@oh-my-opencode/memory-core/host-identity"
 
 import type { MemoryReceiptsPort } from "../receipts-port"
 import { writeRunJsonAtomic } from "./run-artifacts"

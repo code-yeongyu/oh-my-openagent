@@ -28,19 +28,12 @@ export interface PrelaunchReconcile {
 
 /**
  * Decides whether an active reservation belongs to a different machine, using the one shared host
- * identity rule (memory-core reflection/host-identity.ts). Legacy records without a machine id and
- * a null current lookup both fall back to exact hostname equality, so the platform id is never read
- * unless the record actually carries one.
+ * identity rule (memory-core reflection/host-identity.ts). A record without a launcher hostname is
+ * foreign; legacy records without a machine id and a null current lookup both fall back to exact
+ * hostname equality, so the platform id is never read unless the record actually carries one.
  */
 async function holderIsForeign(context: ReconcileContext, active: ReservedRun): Promise<boolean> {
-  if (active.launcherHostname === undefined) return true
-  const verdict = await classifyHostIdentity({
-    recordedHostname: active.launcherHostname,
-    recordedMachineHash: active.launcherMachineHash,
-    currentHostname: context.hostname(),
-    currentMachineHash: context.machineHash,
-  })
-  return verdict.state === "foreign"
+  return (await classifyHostIdentity({ ...active, hostname: context.hostname(), machineHash: context.machineHash })).state === "foreign"
 }
 
 export async function reconcilePrelaunch(context: ReconcileContext): Promise<PrelaunchReconcile> {
