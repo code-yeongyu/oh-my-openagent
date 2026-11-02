@@ -3,7 +3,7 @@ import { AGENT_MODEL_REQUIREMENTS } from "./model-requirements"
 import { FABLE_55_RELEASED } from "./fable-55-launch"
 
 describe("AGENT_MODEL_REQUIREMENTS", () => {
-  test("oracle has gpt-5.6-sol xhigh as primary", () => {
+  test("oracle has gpt-5.6-sol high as primary", () => {
     // given
     const oracle = AGENT_MODEL_REQUIREMENTS["oracle"]
 
@@ -16,7 +16,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary).toEqual({
           providers: ["openai", "chatgpt-subscription", "opencode"],
           model: "gpt-5.6-sol",
-          variant: "xhigh",
+          variant: "high",
         })
     expect(oracle.fallbackChain[1]).toEqual({
           providers: ["github-copilot"],
@@ -51,7 +51,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(solFallback).toEqual({
           providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
           model: "gpt-5.6-sol",
-          variant: "medium",
+          variant: "high",
         })
     expect(fourth?.providers[0]).toBe("zai-coding-plan")
     expect(fourth?.model).toBe("glm-5.2")
@@ -60,7 +60,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
   })
 
   for (const agent of ["librarian", "explore"] as const) {
-    test(`${agent} runs no-thinking Kimi HighSpeed, Luna Fast, Haiku 5.5 medium, DeepSeek V4.1 Flash, Qwen 3.7 Plus, then M2.7`, () => {
+    test(`${agent} runs no-thinking Kimi HighSpeed, Luna Fast, Haiku 5.5 high, DeepSeek V4.1 Flash, Qwen 3.7 Plus, then M2.7`, () => {
       // given
       const requirement = AGENT_MODEL_REQUIREMENTS[agent]
 
@@ -68,7 +68,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
       expect(requirement.fallbackChain).toEqual([
         { providers: ["kimi-for-coding"], model: "kimi-for-coding-highspeed", variant: "off" },
         { providers: ["openai", "chatgpt-subscription"], model: "gpt-6-luna-fast", variant: "low" },
-        { providers: ["anthropic", "github-copilot"], model: "claude-haiku-5-5", variant: "medium" },
+        { providers: ["anthropic", "github-copilot"], model: "claude-haiku-5-5", variant: "high" },
         { providers: ["deepseek"], model: "deepseek-flash", variant: "max" },
         { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.7-plus" },
         { providers: ["opencode-go"], model: "minimax-m2.7" },
@@ -101,7 +101,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
         })
   })
 
-  test("prometheus uses Fable 5.5 (once released) then 5.1 xhigh, then Opus 5.5 max, before Kimi K3.1 Pro max and Kimi K3 max", () => {
+  test("prometheus uses Fable 5.5 (once released) then 5.1 high, then Opus 5.5 max, before Kimi K3.1 Pro max and Kimi K3 max", () => {
     // given
     const prometheus = AGENT_MODEL_REQUIREMENTS["prometheus"]
 
@@ -116,13 +116,13 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
       expect(chain[0]).toEqual({
           providers: ["anthropic", "github-copilot", "opencode"],
           model: "claude-fable-5-5",
-          variant: "xhigh",
+          variant: "high",
         })
     }
     expect(fableFallback).toEqual({
           providers: ["anthropic", "github-copilot", "opencode"],
           model: "claude-fable-5-1",
-          variant: "xhigh",
+          variant: "high",
         })
     expect(opusFallback).toEqual({
           providers: ["anthropic", "github-copilot", "opencode"],
@@ -181,7 +181,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
         })
   })
 
-  test("momus leads with native gpt-6-astra xhigh before the Copilot and opencode Astra rungs", () => {
+  test("momus leads with native gpt-6-astra high before the Copilot and opencode Astra rungs", () => {
     // given
     const momus = AGENT_MODEL_REQUIREMENTS["momus"]
 
@@ -193,7 +193,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary).toEqual({
           providers: ["openai", "chatgpt-subscription"],
           model: "gpt-6-astra",
-          variant: "xhigh",
+          variant: "high",
         })
     expect(copilot).toEqual({
           providers: ["github-copilot"],
@@ -229,7 +229,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(solFallback).toEqual({
           providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
           model: "gpt-5.6-sol",
-          variant: "medium",
+          variant: "high",
         })
     expect(fourth?.model).toBe("minimax-m3")
     expect(fourth?.providers[0]).toBe("opencode-go")
@@ -278,7 +278,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(hephaestus.requiresAnyModel).toBe(true)
   })
 
-  test("hephaestus leads with one merged gpt-6-sol medium rung over its gpt-5.6-sol predecessor", () => {
+  test("hephaestus leads with one merged gpt-6-sol high rung over its gpt-5.6-sol predecessor", () => {
     // given
     const hephaestus = AGENT_MODEL_REQUIREMENTS["hephaestus"]
 
@@ -290,12 +290,12 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary).toEqual({
           providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
           model: "gpt-6-sol",
-          variant: "medium",
+          variant: "high",
         })
     expect(fallback).toEqual({
           providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
           model: "gpt-5.6-sol",
-          variant: "medium",
+          variant: "high",
         })
   })
 
