@@ -16,6 +16,8 @@ Harness-neutral PostHog telemetry: env-gated opt-out, SHA256-hashed random insta
 | `env.ts` | `shouldDisableTelemetry`, `getTelemetryApiKey/Host`, `hasTelemetryApiKey` |
 | `machine-id.ts` | `getDefaultTelemetryOsProvider` (OS metadata for shared properties; never an identity) |
 | `install-id.ts` | `getTelemetryInstallDistinctId(stateDir)`: sha256 of a random 64-hex `install-id` file (0600) created on first send in the product's state dir |
+| `device-id.ts` | `getTelemetryDeviceHash()`: `sha256("omo:device:v1\0" + OS machine id)` (macOS `IOPlatformUUID` via ioreg, Linux `/etc/machine-id`, Windows `MachineGuid`), memoized per process, never persisted; `OMO_TELEMETRY_DEVICE_ID` = hex override or `off` |
+| `identity.ts` | `getTelemetryIdentity(stateDir)`: the daily-active ping identity — device hash as distinct id (else the install hash) plus `installHash` and `idScheme` (#12151) |
 | `events.ts` | `createEventTelemetryClient` — typed event capture wrapper (see NOTES) + `EventTelemetryClient`, `EventPropertyAllowlist`, `CreateEventTelemetryClientInput`, … |
 | `diagnostics.ts` | `writeTelemetryDiagnostic`, `cleanupTelemetryDiagnostics` |
 | `consent-gated-fetch.ts` | `createConsentGatedFetch` — the PostHog `fetch` option gated on consent at send time; every SDK flush (interval, batch size, shutdown) goes through it, and a dropped batch answers 200 so it leaves the queue unsent |
@@ -56,7 +58,7 @@ The collector transport (telemetry-collector plan, todo 21). Kept off the main b
 
 - **At most once per UTC day per machine.** `getDailyActiveCaptureState` compares last-active UTC day in the state file; same day → `captureDaily: false`, nothing sent.
 - **`$process_person_profile: false`** hardcoded on every capture — no PostHog person profiles.
-- **Distinct id = `sha256(install id)`**, a random id created lazily on the send path (after every consent check). No identifier is derived from the hostname, user name, home path or any machine attribute.
+- **Daily-active distinct id = the device hash** (`getTelemetryIdentity`): `sha256` of a domain prefix plus the OS-assigned machine id, falling back to `sha256(install id)` when none is readable; every ping also carries `install_hash` and `id_scheme`. Both are created/read lazily on the send path (after every consent check). No identifier is derived from the hostname, user name or home path.
 - **Opt-out env matrix:** `${PREFIX}_DISABLE_POSTHOG` (truthy `1/true/yes`) OR `${PREFIX}_SEND_ANONYMOUS_TELEMETRY` (opt-out `0/false/no/yes`); global `OMO_` prefix also checked; plus the standard unprefixed `DO_NOT_TRACK`.
 - **NO_OP_CLIENT** returned when disabled or transport init fails (`enabled: false`, all methods no-op). Transport + OS provider are injectable for tests.
 - **Diagnostics** JSONL: 7-day retention, 256 KB cap, cleanup on every write.

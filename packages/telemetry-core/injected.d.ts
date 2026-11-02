@@ -23,6 +23,8 @@ export {
   getDefaultTelemetryOsProvider,
   TELEMETRY_INSTALL_ID_FILE_NAME,
   getTelemetryInstallDistinctId,
+  hashDeviceId,
+  getTelemetryIdentity,
   resolveTelemetryStateDir,
   getTelemetryActivityStateFilePath,
   getDailyActiveCaptureState,

@@ -1,6 +1,6 @@
 import { getDailyActiveCaptureState } from "./activity-state"
 import { createTelemetryClient, isTelemetryClientEnabled } from "./injected-client"
-import { getTelemetryInstallDistinctId } from "./install-id"
+import { getTelemetryIdentity } from "./identity"
 import type {
   TelemetryDiagnosticInput,
   TelemetryEnv,
@@ -51,9 +51,12 @@ export async function recordDailyActive(input: RecordDailyActiveInput): Promise<
     return
   }
 
+  const identity = getTelemetryIdentity(input.stateDir, { env: input.env })
   client.trackActive({
     dayUTC: activityState.dayUTC,
-    distinctId: getTelemetryInstallDistinctId(input.stateDir),
+    distinctId: identity.distinctId,
+    idScheme: identity.idScheme,
+    installHash: identity.installHash,
     reason: input.reason,
   })
   try {

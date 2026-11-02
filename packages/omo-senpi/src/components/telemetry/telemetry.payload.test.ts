@@ -4,7 +4,8 @@ import {
   DEFAULT_POSTHOG_API_KEY,
   DEFAULT_POSTHOG_HOST,
   createTelemetryClient,
-  getTelemetryInstallDistinctId,
+  getTelemetryIdentity,
+  hashDeviceId,
   type TelemetryCaptureMessage,
 } from "@oh-my-opencode/telemetry-core"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
@@ -32,7 +33,8 @@ describe("omo-senpi telemetry payloads", () => {
       const pi = new FakeExtensionAPI()
       const componentTransport = createTransportRecorder()
       const coreTransport = createTransportRecorder()
-      const env = createEnabledEnv(agentDir)
+      const deviceIdOverride = "5a1f2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
+      const env = { ...createEnabledEnv(agentDir), OMO_TELEMETRY_DEVICE_ID: deviceIdOverride }
       const osProvider = createOsProvider("senpi-payload-host")
       createSenpiTelemetryComponent({
         env,
@@ -51,9 +53,12 @@ describe("omo-senpi telemetry payloads", () => {
 
       // when
       await pi.dispatch("session_start", {})
+      const identity = getTelemetryIdentity(getSenpiTelemetryStateDir(env), { env })
       coreClient.trackActive({
         dayUTC: "2026-07-03",
-        distinctId: getTelemetryInstallDistinctId(getSenpiTelemetryStateDir(env)),
+        distinctId: identity.distinctId,
+        idScheme: identity.idScheme,
+        installHash: identity.installHash,
         reason: "session_start",
       })
       await coreClient.flush()
@@ -70,6 +75,10 @@ describe("omo-senpi telemetry payloads", () => {
         productName: "omo-senpi",
       })
       expect(componentTransport.messages).toEqual(coreTransport.messages)
+      expect(componentTransport.messages[0]).toMatchObject({
+        distinctId: hashDeviceId(deviceIdOverride),
+        properties: { id_scheme: "device", install_hash: identity.installHash },
+      })
     })
   })
 

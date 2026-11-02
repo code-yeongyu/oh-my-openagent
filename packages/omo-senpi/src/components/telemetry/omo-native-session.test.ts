@@ -6,6 +6,7 @@ import { describe, expect, it } from "bun:test"
 
 import {
   getTelemetryActivityStateFilePath,
+  hashDeviceId,
   type TelemetryCaptureMessage,
   type TelemetryDiagnosticInput,
   type TelemetryTransportFactory,
@@ -244,12 +245,13 @@ describe("OmO Native session telemetry", () => {
     })
   })
 
-  it("#given a persisted install id #when native events are captured #then distinct_id is sha256(install id), install_hash mirrors it, the raw id never ships and the legacy event uses its own random install id", async () => {
+  it("#given a persisted install id #when native events are captured #then distinct_id is sha256(install id), install_hash mirrors it, the raw id never ships and the legacy event is keyed by the device hash with its own install hash attached", async () => {
     await withTempAgentDir(async (agentDir) => {
       // given
       writeInventory(agentDir)
       const recorder = createRecorder()
-      const pi = register(agentDir, recorder)
+      const deviceIdOverride = "5a1f2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
+      const pi = register(agentDir, recorder, { env: { ...createEnabledEnv(agentDir), OMO_TELEMETRY_DEVICE_ID: deviceIdOverride } })
 
       // when
       await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, sessionCtx("identity"))
@@ -269,7 +271,11 @@ describe("OmO Native session telemetry", () => {
       const legacy = recorder.messages.find(({ event }) => event === SENPI_TELEMETRY_EVENT_NAME)
       const legacyInstallId = readFileSync(join(getSenpiTelemetryStateDir(createEnabledEnv(agentDir)), "install-id"), "utf8").trim()
       expect(legacyInstallId).toMatch(/^[0-9a-f]{64}$/)
-      expect(legacy?.distinctId).toBe(createHash("sha256").update(legacyInstallId).digest("hex"))
+      expect(legacy?.distinctId).toBe(hashDeviceId(deviceIdOverride))
+      expect(legacy?.properties).toMatchObject({
+        id_scheme: "device",
+        install_hash: createHash("sha256").update(legacyInstallId).digest("hex"),
+      })
       expect(legacy?.distinctId).not.toBe(installHash)
     })
   })

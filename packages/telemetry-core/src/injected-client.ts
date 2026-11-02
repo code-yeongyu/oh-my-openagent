@@ -55,7 +55,7 @@ export function createTelemetryClient(input: CreateTelemetryClientInput): Teleme
 
   return {
     enabled: true,
-    trackActive: ({ dayUTC, distinctId, reason }) => {
+    trackActive: ({ dayUTC, distinctId, reason, installHash, idScheme }) => {
       try {
         transport.capture({
           distinctId,
@@ -65,6 +65,8 @@ export function createTelemetryClient(input: CreateTelemetryClientInput): Teleme
             $process_person_profile: false,
             day_utc: dayUTC,
             reason,
+            ...(installHash === undefined ? {} : { install_hash: installHash }),
+            ...(idScheme === undefined ? {} : { id_scheme: idScheme }),
           },
         })
       } catch (error) {

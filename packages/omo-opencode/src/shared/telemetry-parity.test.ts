@@ -114,9 +114,10 @@ afterEach(() => {
 })
 
 describe("telemetry before/after parity", () => {
-  it("pins event name, install-id distinct ID, state file path, env matrix, and payload keys", async () => {
+  it("pins event name, the install-id distinct ID when no device id is available, state file path, env matrix, and payload keys", async () => {
     // given
     resetTelemetryEnv()
+    process.env.OMO_TELEMETRY_DEVICE_ID = "off"
     const captured: CapturedPostHogMessage[] = []
     const xdgDataHome = join(tmpdir(), `telemetry-parity-${Date.now()}-${Math.random()}`)
     process.env.XDG_DATA_HOME = xdgDataHome
@@ -150,6 +151,7 @@ describe("telemetry before/after parity", () => {
     const installId = readFileSync(join(xdgDataHome, "oh-my-opencode", "install-id"), "utf8").trim()
     expect(installId).toMatch(/^[0-9a-f]{64}$/)
     expect(dailyEvent.distinctId).toBe(createHash("sha256").update(installId).digest("hex"))
+    expect(dailyEvent.properties).toMatchObject({ id_scheme: "install", install_hash: dailyEvent.distinctId })
     const payloadKeys = Object.keys(dailyEvent.properties ?? {}).sort()
     expect(payloadKeys).toContain("plugin_name")
     expect(payloadKeys).toContain("product_name")

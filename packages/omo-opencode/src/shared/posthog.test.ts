@@ -3,11 +3,12 @@
 // allow: SIZE_OK - PostHog telemetry tests share one client/env fixture; this release adds telemetry config regressions and future additions should split by capture path.
 
 import { afterEach, beforeEach, describe, expect, it } from "bun:test"
-import { mkdtempSync, readdirSync, rmSync } from "node:fs"
+import { createHash } from "node:crypto"
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { isolateTelemetryEnv } from "../../../../test-support/telemetry-env.test-helpers"
-import { TELEMETRY_INSTALL_ID_FILE_NAME } from "@oh-my-opencode/telemetry-core"
+import { TELEMETRY_INSTALL_ID_FILE_NAME, hashDeviceId } from "@oh-my-opencode/telemetry-core"
 import type {
   TelemetryCaptureMessage,
   TelemetryTransportFactory,
@@ -34,11 +35,20 @@ function removeDataHome(): void {
 
 // Privacy-notice contract (#11583): the install id file exists only once telemetry is on.
 function installIdFileCount(): number {
-  if (dataHome === undefined) throw new Error("XDG_DATA_HOME is not isolated")
-  return readdirSync(dataHome, { recursive: true }).filter(
-    (entry) => String(entry).split(/[\\/]/).at(-1) === TELEMETRY_INSTALL_ID_FILE_NAME,
-  ).length
+  return installIdFiles().length
 }
+
+function installIdFiles(): string[] {
+  if (dataHome === undefined) throw new Error("XDG_DATA_HOME is not isolated")
+  const root = dataHome
+  return readdirSync(root, { recursive: true })
+    .map((entry) => String(entry))
+    .filter((entry) => entry.split(/[\\/]/).at(-1) === TELEMETRY_INSTALL_ID_FILE_NAME)
+    .map((entry) => join(root, entry))
+}
+
+// The device override keeps the distinct id deterministic across hosts (#12151).
+const DEVICE_ID_OVERRIDE = "5a1f2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
 
 async function importPostHogModule(): Promise<typeof import("./posthog")> {
   return import(`./posthog?test=${Date.now()}-${Math.random()}`)
@@ -315,6 +325,7 @@ describe("posthog trackActive emission contract", () => {
   it("emits exactly one omo_daily_active and never omo_hourly_active when captureDaily is true", async () => {
     // given
     enableTelemetryEnv()
+    process.env.OMO_TELEMETRY_DEVICE_ID = DEVICE_ID_OVERRIDE
     const captured: CapturedPostHogMessage[] = []
     const posthogModule = usePostHogModule(await importPostHogModule())
     posthogModule.__setTransportFactoryForTesting(createCapturingTransportFactory(captured))
@@ -346,9 +357,17 @@ describe("posthog trackActive emission contract", () => {
       throw new Error("Expected daily event")
     }
     expect(dailyEvent?.event).toBe("omo_daily_active")
-    expect(dailyEvent?.distinctId).toMatch(/^[0-9a-f]{64}$/)
+    // The distinct id is the device hash and the install hash rides along as a property, so the device
+    // can still be matched to the ids it sent before 5.1.51's successor (#12151).
+    expect(dailyEvent?.distinctId).toBe(hashDeviceId(DEVICE_ID_OVERRIDE))
+    const [installIdFile] = installIdFiles()
+    const installId = readFileSync(installIdFile ?? "", "utf8").trim()
+    expect(dailyEvent.properties).toMatchObject({
+      id_scheme: "device",
+      install_hash: createHash("sha256").update(installId).digest("hex"),
+    })
     const properties = dailyEvent.properties ?? {}
-    const expectedPropertyKeys = ["$os", "$os_version", "$process_person_profile", "ci", "cpu_count", "cpu_model", "day_utc", "locale", "os_arch", "os_type", "package_name", "package_version", "platform", "plugin_name", "product_name", "reason", "runtime", "runtime_version", "shell", "source", "terminal", "timezone", "total_memory_gb"]
+    const expectedPropertyKeys = ["$os", "$os_version", "$process_person_profile", "ci", "cpu_count", "cpu_model", "day_utc", "id_scheme", "install_hash", "locale", "os_arch", "os_type", "package_name", "package_version", "platform", "plugin_name", "product_name", "reason", "runtime", "runtime_version", "shell", "source", "terminal", "timezone", "total_memory_gb"]
     expect(Object.keys(properties).sort()).toEqual(expectedPropertyKeys.sort())
     expect(properties).toMatchObject({
       platform: "oh-my-opencode",
