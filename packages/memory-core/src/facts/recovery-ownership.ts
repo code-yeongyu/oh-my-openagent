@@ -4,20 +4,25 @@ import type { FactsApplyRecovery } from "./mutation-plan"
 
 export type FactsOwnedState = ReadonlyMap<string, GitPathState>
 
+export function computeForeignParentLines(dirtyStatus: string, allowedPaths: ReadonlySet<string>): string[] {
+  const dirty = dirtyStatus.split(/\r?\n/).filter(Boolean)
+  return dirty
+    .filter((line) => {
+      const path = parsePorcelainPath(line)
+      return path === null || !allowedPaths.has(path)
+    })
+    .map((line) => parsePorcelainPath(line) ?? line)
+}
+
 export async function captureOwnedFactsState(
   repo: GitMemoryRepo,
   recovery: FactsApplyRecovery,
 ): Promise<FactsOwnedState | undefined> {
   if ((await repo.head()) !== recovery.headBeforeApply) return undefined
   const allowed = new Set(recovery.paths.map((entry) => entry.path))
-  const dirty = (await repo.status()).split(/\r?\n/).filter(Boolean)
-  if (
-    dirty.some((line) => {
-      const path = parsePorcelainPath(line)
-      return path === null || !allowed.has(path)
-    })
-  )
-    return undefined
+  const dirty = await repo.status()
+  const foreign = computeForeignParentLines(dirty, allowed)
+  if (foreign.length > 0) return undefined
   const current = await repo.pathState.captureAll([...allowed])
   return recovery.paths.every((entry) => {
     const state = current.get(entry.path)
@@ -41,11 +46,8 @@ export async function describeForeignParentState(
 ): Promise<string[]> {
   if (await repo.head() !== recovery.headBeforeApply) return ["parent HEAD moved"]
   const allowed = new Set(recovery.paths.map((entry) => entry.path))
-  const dirty = (await repo.status()).split(/\r?\n/).filter(Boolean)
-  const foreign = dirty.filter((line) => {
-    const path = parsePorcelainPath(line)
-    return path === null || !allowed.has(path)
-  })
+  const dirty = await repo.status()
+  const foreign = computeForeignParentLines(dirty, allowed)
   return foreign.length > 0 ? foreign : ["owned paths drifted from their pre state"]
 }
 

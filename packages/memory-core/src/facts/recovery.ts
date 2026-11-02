@@ -4,20 +4,16 @@ import { join } from "node:path"
 import { agreementItemsOf, readAgreementsAt, readAgreementsWorktree } from "../agreements/ledger-file"
 import { AGREEMENTS_PATH } from "../agreements/types"
 import type { GitCommitAuthor, GitMemoryRepo, MemoryCommit } from "../git"
+import { formatParentDirtyDetail } from "../git"
 import { PROVENANCE_STRIPPED_TRAILER, strippedLegacyUserHeader } from "../tools/claim-frontmatter"
 import type { FactsApplyRecovery } from "./mutation-plan"
 import { FactsMutationTransaction, FactsOwnershipLostError } from "./recovery-mutation"
 import { captureOwnedFactsState, describeForeignParentState, sameFactsOwnedState } from "./recovery-ownership"
 import { upgradeAgreementRecovery, type AgreementRecoveryInput } from "./agreement-recovery"
 
-const PARENT_DIRTY_DETAIL_MAX_LINES = 5
-
 async function describeParentDirty(repo: GitMemoryRepo, recovery: FactsApplyRecovery): Promise<string> {
   const lines = await describeForeignParentState(repo, recovery)
-  const shown = lines.slice(0, PARENT_DIRTY_DETAIL_MAX_LINES).join("; ")
-  return lines.length > PARENT_DIRTY_DETAIL_MAX_LINES
-    ? `${shown}; +${lines.length - PARENT_DIRTY_DETAIL_MAX_LINES} more`
-    : shown
+  return formatParentDirtyDetail(lines)
 }
 
 export type FactsRecoveryResult =

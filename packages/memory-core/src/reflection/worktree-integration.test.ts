@@ -280,6 +280,28 @@ describe("reflection worktree integration", () => {
     expect(result.detail).toContain("foreign-draft.md")
   })
 
+  it("#given many untracked files in the parent #when auto integration runs #then detail truncates with remainder count", async () => {
+    const { parentDir, worktree } = await fixture("dirty-truncation")
+    await commit(worktree, "target.md", "target\n")
+    const validation = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
+    if (validation.status !== "valid") throw new Error("expected valid reflection")
+    for (let i = 1; i <= 7; i++) {
+      await writeFile(join(parentDir, `foreign-draft-${i}.md`), `draft ${i}\n`)
+    }
+
+    const result = await integrateValidatedReflection(worktree, {
+      mode: "auto",
+      runId: "dirty-truncation",
+      summary: "must truncate paths",
+      validated: validation,
+      withWriterLock: unlocked,
+    })
+
+    expect(result.outcome).toBe("parent_dirty")
+    if (result.outcome !== "parent_dirty") throw new Error("expected parent_dirty")
+    expect(result.detail).toContain("; +2 more")
+  })
+
   it("#given present then absent resources #when cleanup repeats #then both receipts confirm absence", async () => {
     const { parentDir, worktree } = await fixture("cleanup")
 
