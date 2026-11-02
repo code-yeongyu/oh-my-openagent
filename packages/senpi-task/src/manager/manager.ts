@@ -6,8 +6,7 @@ import { log } from "@oh-my-opencode/utils"
 
 import type { DagTaskOwner, DagTaskOwnerKey, OwnedStartResult } from "../dag/owner"
 import { endFallbackHandoff, forgetClosedChild, handOffToNextRung, isFallbackHandoff } from "../lifecycle/fallback-handoff"
-import { isParentModelRung, withParentModelRung } from "./parent-model-rung"
-import { buildParentModelFallback, reasonOfFailure, startFallbackToParent, type FailedTurn } from "./parent-model-fallback"
+import { describeExhaustedChain, isChainWalkable, MODEL_CHAIN_EXHAUSTED, refusalOf, withRefusal } from "./model-refusals"
 import { registerLifecycleReattachPorts, type ReattachResult, type RespawnResult } from "../lifecycle/port"
 import { RunnerError } from "../runners/in-process/runner-error"
 import { RpcProcessRunner } from "../runners/rpc-process"
@@ -21,7 +20,7 @@ import type { CancelOptions, CancelOutcome, DestructionPort, InterruptOutcome, R
 import { discardManagedHandle, releaseOnDispose, releaseSupersededHandle, type ManagedChildHandle, type ManagedChildListener } from "./child-handle"
 import { TaskConcurrency } from "./concurrency"
 import { failOwnedRun, launchRunOf, ownsRun } from "./launch-fence"
-import { chainAfterHop, runtimeFallbackCandidates } from "./credential-failure"
+import { runtimeFallbackCandidates } from "./credential-failure"
 import { chainWithoutRefusingProvider, startCredentialsRefusal } from "./start-credentials-refusal"
 import { createWorkpoolAdmission } from "./workpool-admission"
 import { withResidentStart } from "./resident-start"
@@ -184,7 +183,6 @@ class TaskManagerImpl implements TaskManager {
   // succeeds releases them.
   readonly #cleanupOwners = new Map<string, ManagedChildHandle>()
   readonly #nativeFallbackExhaustions = new WeakSet<ManagedChildHandle>()
-  readonly #failedTurns = new WeakMap<ManagedChildHandle, FailedTurn>()
   // Callers can subscribe before a queued task owns a handle. Each entry is attached exactly once
   // when #launch promotes it, and its returned cleanup owns both pending and live subscriptions.
   readonly #childSubscribers = new Map<string, Map<ManagedChildListener, () => void>>()
@@ -528,8 +526,7 @@ class TaskManagerImpl implements TaskManager {
     const registration = requestedRegistration ?? this.#names.register(spec.parent_session_id, undefined, claimed.task_id)
     spec.admission?.bind(claimed.task_id)
     const admission = admitSpill(plan, this.#concurrency, claimed.task_id, claimed.notification.run_epoch)
-    const routed = withParentModelRung(admission.plan, spec)
-    const effectivePlan = routed.plan
+    const effectivePlan = admission.plan
     const lease = admission.lease
     let finalRecord: TaskRecord
     let managedSpec: ManagedStartSpec
@@ -552,7 +549,6 @@ class TaskManagerImpl implements TaskManager {
         model: effectivePlan.model,
         ...(effectivePlan.resolved_model === undefined ? {} : { resolved_model: effectivePlan.resolved_model }),
         ...(effectivePlan.fallback_models === undefined ? {} : { fallback_models: effectivePlan.fallback_models }),
-        ...(routed.parentModel === undefined ? {} : { parent_model: routed.parentModel }),
         ...(isolation === undefined ? {} : { isolation: isolation.spec }),
       }
       managedSpec = buildManagedSpec({
@@ -1172,8 +1168,8 @@ class TaskManagerImpl implements TaskManager {
   }
 
   #recordStartFailure(record: TaskRecord, error: unknown): ReturnType<typeof describeStartFailure> {
-    const original = describeStartFailure(error)
     const fresh = this.#tryLoad(record.task_id)
+    const original = this.#describeStartFailure(fresh, error)
     const queued = fresh?.pending_steering?.length ?? 0
     const park = queued > 0 && (fresh?.host_session !== undefined
       || newestSessionPath({ store: this.#options.store }, record.task_id) !== undefined)
@@ -1188,6 +1184,21 @@ class TaskManagerImpl implements TaskManager {
     })
     else if (queued > 0) this.#steering.dropPending(record.task_id, "target_gone")
     return failure
+  }
+
+  // A start refusal that ends a walked chain fails typed and lists every designated model it tried.
+  #describeStartFailure(record: TaskRecord | null, error: unknown): ReturnType<typeof describeStartFailure> {
+    const described = describeStartFailure(error)
+    const walked = record?.model_refusals ?? []
+    if (record == null || walked.length === 0 || !RunnerError.is(error)) return described
+    if (error.failure.kind !== "model_unavailable" && startCredentialsRefusal(error) === undefined) return described
+    const final = refusalOf(record, error.failure.message, nowIso(this.#now))
+    return {
+      ...described,
+      errorMessage: `${described.errorMessage}\n${describeExhaustedChain(record, [...walked, final])}`,
+      failureKind: MODEL_CHAIN_EXHAUSTED,
+      eventFacts: { ...described.eventFacts, failure_kind: MODEL_CHAIN_EXHAUSTED },
+    }
   }
 
   /**
@@ -1220,7 +1231,7 @@ class TaskManagerImpl implements TaskManager {
 
     const nextEpoch = nextRunEpoch(record)
     const nextRecord: TaskRecord = {
-      ...record,
+      ...withRefusal(record, refusalOf(record, error.failure.message, nowIso(this.#now))),
       model: nextModel.display,
       resolved_model: nextModel,
       fallback_models: chain.slice(1),
@@ -1231,9 +1242,6 @@ class TaskManagerImpl implements TaskManager {
       updated_at: nowIso(this.#now),
       notification: { ...record.notification, run_epoch: nextEpoch },
       ...(isFallbackHandoff(record) ? { fallback_handoff_epoch: nextEpoch } : {}),
-      ...(isParentModelRung(record, nextModel) ? { parent_model_fallback: credentials === undefined
-        ? startFallbackToParent(record, error.failure.message, nowIso(this.#now))
-        : buildParentModelFallback({ fromModel: record.model, reason: "not_signed_in", at: nowIso(this.#now) }) } : {}),
     }
     let advanced = false
     this.#options.store.mutate(record.task_id, (fresh) => {
@@ -1407,7 +1415,7 @@ class TaskManagerImpl implements TaskManager {
   #subscribeChildFacts(handle: ManagedChildHandle, taskId: string): () => void {
     return subscribeChildFacts({
       handle, taskId, store: this.#options.store, now: this.#now,
-      runStats: this.#runStats, fallbackExhaustions: this.#nativeFallbackExhaustions, failedTurns: this.#failedTurns,
+      runStats: this.#runStats, fallbackExhaustions: this.#nativeFallbackExhaustions,
       reopen: () => reopenSelfResumedTurn(this.#selfResumedPorts, taskId, handle),
       onMotion: () => this.#clearAwaitingInput(taskId),
       onLiveness: (status) => {
@@ -1431,15 +1439,7 @@ class TaskManagerImpl implements TaskManager {
     readonly timestamp: string
   }): Promise<boolean> {
     if (this.workpools.ownsTask(input.taskId)) return false
-    if (
-      input.outcome.status !== "error"
-      || input.outcome.killed === true
-      || (
-        input.outcome.failure.kind !== "child-turn-failed"
-        && input.outcome.failure.kind !== "child-prompt-failed"
-      )
-      || (input.runStats?.tool_calls ?? 0) > 0
-    ) {
+    if (input.outcome.status !== "error" || !isChainWalkable(input.outcome, input.runStats)) {
       return false
     }
 
@@ -1480,7 +1480,6 @@ class TaskManagerImpl implements TaskManager {
     // reclaim as an orphan (the 2026-09-26 `omo -p` hang). Fenced on this outcome's epoch and owner.
     const handoff: { record?: TaskRecord; closed?: ChildIdentity; stopped?: boolean } = {}
     const failureMessage = input.outcome.failure.message
-    const interruptedTools = this.#failedTurns.get(input.handle)?.tools
     this.#options.store.mutate(input.taskId, (fresh) => {
       if (fresh.notification.run_epoch !== input.epoch || fresh.host_pid !== record.host_pid) return fresh
       // A cancel or interrupt that landed first stands: its own teardown ends the failed rung.
@@ -1489,23 +1488,11 @@ class TaskManagerImpl implements TaskManager {
         return fresh
       }
       handoff.closed = childIdentityOf(fresh)
-      const next = handOffToNextRung(fresh, {
+      handoff.record = handOffToNextRung(withRefusal(fresh, refusalOf(fresh, failureMessage, input.timestamp)), {
         model: nextModel,
-        remaining: chainAfterHop(candidates),
+        remaining: candidates.remaining.slice(1),
         timestamp: input.timestamp,
       })
-      handoff.record = isParentModelRung(fresh, nextModel)
-        ? {
-            ...next,
-            parent_model_fallback: buildParentModelFallback({
-              fromModel: fresh.model,
-              reason: reasonOfFailure(failureMessage, fresh.resolved_model?.model_id),
-              message: failureMessage,
-              ...(interruptedTools === undefined ? {} : { interruptedTools }),
-              at: input.timestamp,
-            }),
-          }
-        : next
       return handoff.record
     })
     const nextRecord = handoff.record
