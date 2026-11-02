@@ -220,6 +220,11 @@ function spawnGitCommand(
   })
 }
 
+// Any index-reading command (`status`, `add`, `diff`), not only commit, starts the builtin fsmonitor
+// daemon when a user's config enables it; the daemon then outlives git, holds the activity fd and
+// keeps the repo busy (#10391). Command-line `-c` outranks every config file and reaches hooks too.
+const NO_FSMONITOR = ["-c", "core.fsmonitor=false"] as const
+
 export function createNodeGitExec(runtime: NodeGitExecRuntime = {}): GitExec {
   const platform = runtime.platform ?? process.platform
   const runCommand = runtime.runCommand ?? runGitCommand
@@ -239,7 +244,8 @@ export function createNodeGitExec(runtime: NodeGitExecRuntime = {}): GitExec {
   }
 
   return {
-    async run(argv, options) {
+    async run(callerArgv, options) {
+      const argv = [...NO_FSMONITOR, ...callerArgv]
       const environment = options.env ?? process.env
       if (platform !== "win32") return await runCommand("git", argv, options, environment)
 

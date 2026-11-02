@@ -117,7 +117,7 @@ describe("memory git exec win32 console suppression", () => {
         })
 
         expect(captured.map((call) => call.executable)).toEqual(["C:\\Windows\\System32\\cmd.exe"])
-        expect(captured[0]?.argv).toEqual(["/d", "/s", "/c", "\"\"C:\\Wrap\\git.cmd\" \"status\"\""])
+        expect(captured[0]?.argv).toEqual(["/d", "/s", "/c", "\"\"C:\\Wrap\\git.cmd\" \"-c\" \"core.fsmonitor=false\" \"status\"\""])
         expect(captured[0]?.options).toMatchObject({ windowsHide: true, windowsVerbatimArguments: true })
       })
     })

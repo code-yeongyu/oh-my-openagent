@@ -64,6 +64,18 @@ describe("createNodeGitExec on win32", () => {
     expect(attempts).toEqual([PATH_GIT])
   })
 
+  test("#given git resolved from an install root #when git runs #then the absolute spawn carries the fsmonitor override ahead of the caller argv", async () => {
+    const argvs: Array<readonly string[]> = []
+    const exec = createHermeticExec(async (_executable, argv) => {
+      argvs.push(argv)
+      return SUCCESS
+    }, files(PROGRAM_FILES_GIT).isFile)
+
+    await exec.run(["-c", "user.name=fixture-writer", "status", "--porcelain"], execOptions({ ProgramFiles: "C:\\Program Files" }))
+
+    expect(argvs).toEqual([["-c", "core.fsmonitor=false", "-c", "user.name=fixture-writer", "status", "--porcelain"]])
+  })
+
   test("#given no git on PATH #when git runs #then the first existing install root is spawned by absolute path", async () => {
     const attempts: string[] = []
     const fs = files(SECOND_ROOT_GIT)
