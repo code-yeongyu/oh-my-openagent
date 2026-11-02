@@ -26,6 +26,8 @@ export type FakeHandle = {
   readonly handle: ManagedChildHandle
   readonly steerCalls: string[]
   readonly followUpCalls: string[]
+  /** The id each steer or follow-up was sent under, in call order; `undefined` where none was given. */
+  readonly inputIds: Array<string | undefined>
   readonly abortCalls: number[]
   setLastAssistantText(text: string | undefined): void
 }
@@ -46,6 +48,7 @@ export type FakeHandleOptions = {
 export function makeFakeHandle(taskId: string, flavor: RunnerFlavor, options: FakeHandleOptions = {}): FakeHandle {
   const steerCalls: string[] = []
   const followUpCalls: string[] = []
+  const inputIds: Array<string | undefined> = []
   const abortCalls: number[] = []
   let lastText: string | undefined
   let followUpIndex = 0
@@ -53,11 +56,13 @@ export function makeFakeHandle(taskId: string, flavor: RunnerFlavor, options: Fa
     task_id: taskId,
     sessionId: `sess-${taskId}`,
     pid: flavor === "rpc" ? 4321 : undefined,
-    steer: async (text) => {
+    steer: async (text, identity) => {
       steerCalls.push(text)
+      inputIds.push(identity?.clientMessageId)
     },
-    followUp: async (text) => {
+    followUp: async (text, identity) => {
       followUpCalls.push(text)
+      inputIds.push(identity?.clientMessageId)
       options.onFollowUpStart?.()
       const gate = options.followUpGates?.[followUpIndex++] ?? options.followUpGate
       await gate
@@ -75,6 +80,7 @@ export function makeFakeHandle(taskId: string, flavor: RunnerFlavor, options: Fa
     handle,
     steerCalls,
     followUpCalls,
+    inputIds,
     abortCalls,
     setLastAssistantText: (text) => {
       lastText = text

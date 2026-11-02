@@ -9,7 +9,7 @@ import { destroyResidentTask } from "./destroy"
 import { attemptInFlight, holdAttempt } from "./expunge-attempts"
 import { endClosingFallbackChild } from "./fallback-closing-child"
 import { isHostSessionRecord } from "./host-session"
-import { closeHostSession } from "./host-session-close"
+import { clearHostSessionEnd, endHostSessionChild } from "./host-session-end"
 import type { CleanupResult } from "./types"
 import { expireSuspendedChild } from "./suspended-expiry"
 
@@ -136,10 +136,12 @@ async function finishExpunge(
     } else {
       result.retained.push(taskId)
     }
+    clearHostSessionEnd(context, taskId)
     return
   }
   if (ended === false) {
     context.store.restoreExpunging(taskId, owner)
+    clearHostSessionEnd(context, taskId)
     result.retained.push(taskId)
     return
   }
@@ -160,6 +162,8 @@ async function settleDeferred(context: LifecycleContext, taskId: string, pending
     if (context.store.completeExpunge(taskId, owner)) context.kernelToolBindings?.release(taskId)
   } catch (error) {
     log("senpi-task TTL expunge could not settle after a late close; the next sweep retries", { taskId, error: String(error) })
+  } finally {
+    clearHostSessionEnd(context, taskId)
   }
 }
 
@@ -198,9 +202,8 @@ function isLiveAttempt(context: LifecycleContext, owner: ExpungeOwner): boolean 
 // answered yet comes back as the promise of its answer.
 async function endExpiredChild(context: LifecycleContext, record: TaskRecord): Promise<ChildEnd> {
   if (isHostSessionRecord(record)) {
-    if (!(await context.hostSessionProbe.sessionLive(record.host_session))) return true
-    const closed = await closeHostSession(context, record.task_id, record.host_session, record.spawn_spec?.cwd)
-    return closed.kind === "pending" ? { pending: closed.settled } : closed.kind === "closed"
+    const end = await endHostSessionChild(context, record)
+    return end.kind === "pending" ? { pending: end.settled } : end.kind === "ended"
   }
   const orphanPid = record.execution_mode === "process" ? record.pid : undefined
   if (orphanPid !== undefined && context.signaller.isAlive(orphanPid)) {

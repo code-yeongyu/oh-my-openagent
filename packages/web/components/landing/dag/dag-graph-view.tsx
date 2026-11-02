@@ -3,6 +3,7 @@
 import { LocateFixed, Maximize } from "lucide-react"
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react"
 
+import { Tooltip } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 
 import { DagEdgeLayer } from "./dag-edge-layer"
@@ -141,7 +142,7 @@ export function DagGraphView({
   )
 
   const toolbarButton =
-    "text-text-mid hover:bg-ink-3 hover:text-text-hi focus-visible:outline-accent ease-standard flex size-11 cursor-pointer items-center justify-center transition-colors duration-[var(--dur-micro)] focus-visible:outline-2 focus-visible:outline-offset-2 disabled:pointer-events-none disabled:opacity-40"
+    "text-text-mid hover:bg-ink-3 hover:text-text-hi ease-standard flex size-11 cursor-pointer items-center justify-center transition-colors duration-[var(--dur-micro)] focus-ring disabled:pointer-events-none disabled:opacity-40"
 
   return (
     <div
@@ -239,31 +240,33 @@ export function DagGraphView({
         className="border-line bg-ink-1 absolute right-2 bottom-2 z-10 flex flex-col gap-0.5 border p-1"
         onPointerDown={(event) => event.stopPropagation()}
       >
-        <button
-          type="button"
-          aria-label={labels.fit}
-          title={labels.fit}
-          className={toolbarButton}
-          onClick={camera.fit}
-        >
-          <Maximize aria-hidden="true" className="size-4" />
-        </button>
-        <button
-          type="button"
-          aria-label={labels.center}
-          title={labels.center}
-          disabled={activeWave === null}
-          className={toolbarButton}
-          onClick={() => {
-            if (activeWave === null) return
-            camera.centerWave(
-              activeWave,
-              layout.nodes.filter((n) => n.waveIndex === activeWave).map((n) => n.y),
-            )
-          }}
-        >
-          <LocateFixed aria-hidden="true" className="size-4" />
-        </button>
+        <Tooltip label={labels.fit}>
+          <button
+            type="button"
+            aria-label={labels.fit}
+            className={toolbarButton}
+            onClick={camera.fit}
+          >
+            <Maximize aria-hidden="true" className="size-4" />
+          </button>
+        </Tooltip>
+        <Tooltip label={labels.center}>
+          <button
+            type="button"
+            aria-label={labels.center}
+            disabled={activeWave === null}
+            className={toolbarButton}
+            onClick={() => {
+              if (activeWave === null) return
+              camera.centerWave(
+                activeWave,
+                layout.nodes.filter((n) => n.waveIndex === activeWave).map((n) => n.y),
+              )
+            }}
+          >
+            <LocateFixed aria-hidden="true" className="size-4" />
+          </button>
+        </Tooltip>
       </div>
     </div>
   )

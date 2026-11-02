@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 
 import type { TaskRecordStore } from "../store"
 import type { TaskStatus } from "../state"
@@ -21,6 +23,8 @@ function stoppedOwnerWorld(child: {
   afterSnapshot?: AfterSnapshot
   // Runs when the shutdown dequeues the pending child: a launch admitting it right then.
   onDequeue?: (store: TaskRecordStore, registry: FakeRegistry, order: CallLog) => void
+  // Runs right after the cancel transition lands, before the queue is cleared: a send arriving then.
+  afterCancel?: AfterSnapshot
 }) {
   const store = tempStore()
   seedRecord(store, {
@@ -45,10 +49,18 @@ function stoppedOwnerWorld(child: {
   const dequeued: string[] = []
   const snapshot = store.list()
   child.afterSnapshot?.(store)
-  const viewedStore = child.afterSnapshot !== undefined
+  const viewedStore = child.afterSnapshot !== undefined || child.afterCancel !== undefined
     ? new Proxy(store, {
       get: (target, key) => {
-        if (key === "list") return () => snapshot
+        if (key === "list" && child.afterSnapshot !== undefined) return () => snapshot
+        if (key === "transition" && child.afterCancel !== undefined) {
+          const afterCancel = child.afterCancel
+          return (...args: Parameters<TaskRecordStore["transition"]>) => {
+            const result = target.transition(...args)
+            if (args[1].type === "cancel") afterCancel(target)
+            return result
+          }
+        }
         const value: unknown = Reflect.get(target, key)
         return typeof value === "function" ? value.bind(target) : value
       },
@@ -62,6 +74,15 @@ function stoppedOwnerWorld(child: {
     },
   })
   return { store, order, dequeued, lifecycle }
+}
+
+function steerDroppedCounts(store: TaskRecordStore): number[] {
+  return readFileSync(join(store.stateDir, "logs", `${CHILD}.jsonl`), "utf8")
+    .split("\n")
+    .filter((line) => line.length > 0)
+    .map((line) => JSON.parse(line) as { type: string; payload?: { count?: number } })
+    .filter((event) => event.type === "steer_dropped")
+    .map((event) => event.payload?.count ?? -1)
 }
 
 describe("stopped owner's children at the record level", () => {
@@ -101,6 +122,25 @@ describe("stopped owner's children at the record level", () => {
     expect(record?.status).toBe("cancelled")
     expect(record?.pending_steering).toBeUndefined()
     expect(readEvents(store, CHILD)).toEqual(expect.arrayContaining(["steer_dropped", "cancelled"]))
+  })
+
+  // #10866: a message queued between the cancel's read and the mutate that clears the queue is dropped
+  // too, so the cancel message and the steer_dropped event must both count it.
+  test("#given a message queued right after the cancel lands #when the stopped owner's session shuts down #then the cancel message and steer_dropped count the same dropped messages", async () => {
+    const { store, lifecycle } = stoppedOwnerWorld({
+      status: "running", live: true, queued: 2,
+      afterCancel: (current) => {
+        current.mutate(CHILD, (fresh) => ({
+          ...fresh,
+          pending_steering: [...(fresh.pending_steering ?? []), { id: "late", message: "late", deliver_as: "followUp" as const }],
+        }))
+      },
+    })
+
+    await lifecycle.suspendOnSessionShutdown({ parentSessionId: PARENT_SESSION, reason: "quit" })
+
+    expect(store.load(CHILD)?.error_message).toContain("3 queued messages were not delivered.")
+    expect(steerDroppedCounts(store)).toEqual([3])
   })
 
   test("#given a launch admits the pending child while it is being dequeued #when the stopped owner's session shuts down #then the now-live child is marked stopping", async () => {

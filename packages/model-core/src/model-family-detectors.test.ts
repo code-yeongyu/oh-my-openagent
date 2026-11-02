@@ -20,6 +20,7 @@ import {
   isKimiK27Model,
   isKimiK28Model,
   isKimiK3Model,
+  isKimiK31Model,
   isMiniMaxModel,
   isSWE2Model,
 } from "./model-family-detectors"
@@ -131,11 +132,21 @@ describe("model family detectors", () => {
     expect(isKimiK3Model("opencode-go/kimi-k3")).toBe(true)
     expect(isKimiK3Model("moonshotai/kimi-k3-202607")).toBe(true)
     expect(isKimiK3Model("kimi-for-coding/k3p1")).toBe(true)
+    expect(isKimiK3Model("kimi-coding/k3.1-pro")).toBe(true)
     expect(isKimiK3Model("opencode/k3")).toBe(true)
     expect(isKimiK3Model("opencode-go/kimi-k2.7")).toBe(false)
     expect(isKimiK3Model("kimi-for-coding/k2p7")).toBe(false)
     expect(isKimiK3Model("kimi-for-coding/k2p5")).toBe(false)
     expect(isKimiK3Model("anthropic/claude-opus-4-7")).toBe(false)
+  })
+
+  test("#given Kimi K3.1 model ids #then detects K3.1 and leaves K3 alone", () => {
+    for (const id of ["kimi-coding/k3.1-pro", "kimi-for-coding/k3.1-pro-highspeed", "moonshotai/kimi-k3.1-pro", "openrouter/moonshotai/kimi-k3.1-pro-highspeed", "venice/kimi-k3-1-pro", "kimi-for-coding/k3p1", "Kimi K3.1 Pro"]) {
+      expect({ id, k31: isKimiK31Model(id) }).toEqual({ id, k31: true })
+    }
+    for (const id of ["opencode-go/kimi-k3", "kimi-coding/k3", "kimi-coding/k3-256k", "moonshotai/kimi-k3-202607", "moonshotai/kimi-k3-128k", "opencode-go/kimi-k2.7"]) {
+      expect({ id, k31: isKimiK31Model(id) }).toEqual({ id, k31: false })
+    }
   })
 
   test("#given Devin selectors #then only an explicit devin SWE-2 id outside the served lanes is unserved", () => {

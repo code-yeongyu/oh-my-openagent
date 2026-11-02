@@ -1,5 +1,6 @@
 import type { AgentLimitReached } from "./errors"
 import type { TaskRecord } from "../state"
+import type { HostSessionCancelPort } from "./host-session"
 import type { HostSessionParkOptions, HostSessionParkOutcome } from "./host-session-revive"
 import type { DestroyCause, DetachedRevivalRollbackResult } from "./port"
 
@@ -36,6 +37,8 @@ export type ReconcileDeferredReason =
   // The child ran in a copy-on-write clone that is already settled and reclaimed; respawning it
   // would resume against a directory that no longer exists, so it is refused at every boundary.
   | "isolated_not_revivable"
+  // The child's run is stopped: it waits for the run's Resume, which no retry budget may end.
+  | "run_paused"
 
 export type ReconcileOutcome = {
   readonly task_id: string
@@ -82,10 +85,12 @@ export type TaskLifecycle = {
   reclaimIdleResidents?(): Promise<readonly string[]>
   // Release a finished child still resident here (task_cancel on a terminal task, omo#9785); false when there is none.
   parkTerminalResident(taskId: string): Promise<boolean>
+  // A cancel of a daemon-hosted child this process holds no handle for (omo#11765): its confirmed end, and its retry driver.
+  hostSessionCancel?: HostSessionCancelPort
   // Stop the unref'd idle resident reclaimer when its owning session is disposed.
   dispose?(): void
   admitResident(parentSessionId: string): Promise<AdmissionResult>
-  reconcileOnSessionStart(parentSessionId?: string): Promise<ReconcileResult>
+  reconcileOnSessionStart(parentSessionId?: string, signal?: AbortSignal): Promise<ReconcileResult>
   // The daemon hosting this child went away: park the record and retry the reconcile on a bounded
   // backoff. Giving up leaves it suspended (rpc_detached) - never lost, never signalled.
   parkHostSessionOnDaemonLoss(taskId: string, options?: HostSessionParkOptions): Promise<HostSessionParkOutcome>

@@ -56,8 +56,8 @@ export function fixtureEnv(fixture: Fixture, env: Record<string, string> = {}): 
   return { ...inherited, ...env }
 }
 
-export function createFixture(): Fixture {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "omo-bin-shim-")))
+export function createFixture(label = ""): Fixture {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), `omo-bin-shim-${label}-`)))
   roots.push(root)
   const bunInstall = join(root, "buninstall")
   const packageRoot = join(bunInstall, "install", "global", "node_modules", "omo-ai")
@@ -92,7 +92,7 @@ process.exit(Number(process.env.FAKE_EXIT ?? 0))
   const markerFile = join(root, "fake-bun.marker")
   const bunBinary = join(bunInstall, "bin", "bun")
   mkdirSync(join(bunInstall, "bin"), { recursive: true })
-  writeFileSync(bunBinary, `#!/bin/sh\nif [ "$1" = "--version" ]; then echo 1.4.2; exit 0; fi\nprintf fake-bun-ran > '${markerFile}'\nexit 42\n`, { mode: 0o755 })
+  writeFileSync(bunBinary, `#!/bin/sh\nif [ "$1" = "--version" ]; then echo 1.4.2; exit 0; fi\nprintf fake-bun-ran > '${markerFile.replaceAll("'", "'\\''")}'\nexit 42\n`, { mode: 0o755 })
   symlinkSync(stockLinkTarget(), join(bunInstall, "bin", "omo"))
   mkdirSync(join(root, "home"), { recursive: true })
   return {
@@ -131,8 +131,7 @@ export function launchEntry(fixture: Fixture, args: string[], env: Record<string
 /**
  * Turns the fixture into what `bun add -g` leaves behind before it runs the package's own scripts:
  * the real postinstall line, and an engine tree that postinstall can prepare (the RPC serializer it
- * patches comes from the installed engine and the pi-ai file it floors is bundled, as in
- * senpi-patch.test.ts).
+ * patches comes from the installed engine).
  */
 export function stageInstalledPackage(fixture: Fixture): void {
   const manifestPath = join(fixture.packageRoot, "package.json")
@@ -143,9 +142,6 @@ export function stageInstalledPackage(fixture: Fixture): void {
   const rpcMode = join(senpiRoot, "dist", "modes", "rpc", "rpc-mode.js")
   mkdirSync(dirname(rpcMode), { recursive: true })
   writeFileSync(rpcMode, readFileSync(new URL("./modes/rpc/rpc-mode.js", import.meta.resolve("@code-yeongyu/senpi")), "utf8"))
-  const anthropicMessages = join(senpiRoot, "node_modules", "@earendil-works", "pi-ai", "dist", "api", "anthropic-messages.js")
-  mkdirSync(dirname(anthropicMessages), { recursive: true })
-  writeFileSync(anthropicMessages, 'const claudeCodeVersion = "2.1.75";\nexport { claudeCodeVersion }\n')
 }
 
 /** A PATH that reaches bun and the system shell but no node, like a launchd job or a bun-only box. */

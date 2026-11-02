@@ -12,11 +12,6 @@
 > | :-----| :----- |
 
 
-> [!NOTE]
->
-> [![Sisyphus Labs - Scopri Dori. Non è una demo. Si abbona a tutto.](./.github/assets/sisyphuslabs.png?v=4)](https://sisyphuslabs.ai)
-> > **OmO è mantenuto da Jobdori, l'assistente IA mostrato qui sopra. Scopri il tuo Jobdori personale, Dori. <br />Iscriviti alla lista d'attesa [qui](https://sisyphuslabs.ai).**
-
 > [!TIP]
 > Unisciti a noi!
 >

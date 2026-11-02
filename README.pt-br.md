@@ -12,11 +12,6 @@
 > | :-----| :----- |
 
 
-> [!NOTE]
->
-> [![Sisyphus Labs - Conheça Dori. Não é uma demo. Assina tudo.](./.github/assets/sisyphuslabs.png?v=4)](https://sisyphuslabs.ai)
-> > **O OmO é mantido por Jobdori, o assistente de IA mostrado acima. Conheça seu próprio Jobdori, Dori. <br />Entre na lista de espera [aqui](https://sisyphuslabs.ai).**
-
 > [!TIP]
 > Junte-se a nós!
 >

@@ -85,7 +85,7 @@ describe("dead-chain category disabling", () => {
   describe("#given a registry with one kimi-coding model", () => {
     test("#when a chain rung needs the kimi transform #then the transformed id keeps the category alive", () => {
       // given
-      const models = registry([model("kimi-coding", "k3")])
+      const models = registry([model("kimi-coding", "k3.1-pro")])
 
       // when
       const result = resolveCategory("unspecified-high", {}, models)

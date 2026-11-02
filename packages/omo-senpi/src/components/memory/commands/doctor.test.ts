@@ -409,7 +409,7 @@ describe("/doctor", () => {
     const text = await invoke(pi, "doctor", "", ctx)
 
     // then
-    expect(text).toMatch(/^\[ok\] projection: \d+ entries shown, 0 omitted, \d+ bytes \(limits 40\/dir, 24576 bytes\)$/m)
+    expect(text).toMatch(/^\[ok\] projection: \d+ entries shown, 0 omitted, \d+ bytes \(limits no per-directory limit, 40960 bytes\)$/m)
   })
 
   test("#given commit times that cannot be read #when doctor runs #then the projection check warns that names fell back to name order", async () => {
@@ -422,7 +422,7 @@ describe("/doctor", () => {
     const text = await invoke(pi, "doctor", "", ctx).finally(() => commitTimes.mockRestore())
 
     // then
-    expect(text).toMatch(/^\[warn\] projection: 1 entries shown, 0 omitted, \d+ bytes \(limits 40\/dir, 24576 bytes\); commit times unreadable, names listed in name order$/m)
+    expect(text).toMatch(/^\[warn\] projection: 1 entries shown, 0 omitted, \d+ bytes \(limits no per-directory limit, 40960 bytes\); commit times unreadable, names listed in name order$/m)
   })
 
   test("#given more names than the per-directory limit #when doctor runs #then the omitted count is a warning", async () => {
@@ -503,6 +503,36 @@ describe("/doctor", () => {
     expect(factsLines).toHaveLength(1)
     expect(factsLines[0]).toContain("1 parked")
     expect(factsLines[0]).toContain("/facts retry")
+  })
+
+  test("#given a parked batch whose child timed out #when doctor runs #then the facts line names the timeout and the run log path", async () => {
+    // given: the newest failure id is a batch id, so the run dir is found via its ledger,
+    // not by joining the failure id into a path
+    const { identity, pi, ctx } = await harness()
+    const store = new FactsFailureStore({ identityPaths: identity.identityPaths })
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await store.recordFailure({
+        targets: [{ conversationId: "conv-a", endMessageId: "msg-a", endSnapshotLine: 2 }],
+        failureId: `facts-run-${attempt}`,
+        reason: "deadline_exceeded",
+      })
+    }
+    const runDir = join(identity.identityPaths.facts, "runs", "facts-abcdef-1")
+    await mkdir(runDir, { recursive: true })
+    await writeFile(
+      join(runDir, "ledger.json"),
+      `${JSON.stringify({ version: 1, runId: "facts-abcdef-1", kind: "facts", batchId: "facts-run-4", queued: [] }, null, 2)}\n`,
+      "utf8",
+    )
+
+    // when
+    const text = await invoke(pi, "doctor", "", ctx)
+
+    // then
+    const factsLines = text.split("\n").filter((line) => line.includes("] facts:"))
+    expect(factsLines).toHaveLength(1)
+    expect(factsLines[0]).toContain("cause: timeout x1")
+    expect(factsLines[0]).toContain(runDir)
   })
 
   test("#given no facts failures #when doctor runs #then no facts advisory line is rendered", async () => {

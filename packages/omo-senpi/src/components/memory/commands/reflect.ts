@@ -66,12 +66,17 @@ export function registerReflectCommand(pi: MemoryCommandPort, deps: MemoryComman
       ].filter((part): part is string => part !== undefined)
       const suffix = scope.length > 0 ? ` (${scope.join("; ")})` : ""
 
-      return respond(
-        ctx,
-        receipt.disposition === "reserved"
-          ? `reflection run ${receipt.runId} reserved${suffix}; it starts at the next idle boundary`
-          : `reflection request queued as ${receipt.runId}${suffix}; a run is already active and this request runs next`,
-      )
+      if (receipt.disposition === "reserved") {
+        return respond(ctx, `reflection run ${receipt.runId} reserved${suffix}; it starts at the next idle boundary`)
+      }
+      if (receipt.recoveredRunId !== undefined) {
+        return respond(
+          ctx,
+          `reflection request queued as ${receipt.runId}${suffix}; the previous run ${receipt.recoveredRunId} had stopped without releasing its lock, so it was settled and this request runs next`,
+        )
+      }
+      const queued = `reflection request queued as ${receipt.runId}${suffix}; a run is already active and this request runs next`
+      return receipt.stuck === undefined ? respond(ctx, queued) : respond(ctx, `${queued}. ${receipt.stuck}`, "warning")
     },
   })
 }

@@ -2,6 +2,8 @@ import { detectInstall, type InstallClient } from "./install-targets"
 
 export const DOWNLOAD_HOST = "get.omo.dev"
 export const DEFAULT_DOWNLOAD_BASE_URL = `https://${DOWNLOAD_HOST}`
+/** The public desktop beta page (no sign-in): where /download and the hero point while this site's own page is off. */
+export const PUBLIC_DESKTOP_BETA_URL = `https://${DOWNLOAD_HOST}/desktop/beta/`
 const DOCS_HOSTS: ReadonlySet<string> = new Set([DOWNLOAD_HOST, "omo.dev"])
 const DEFAULT_LAUNCH_AT = "2026-11-10T00:00:00.000Z"
 const FETCH_TIMEOUT_MS = 5000

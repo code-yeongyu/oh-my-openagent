@@ -14,7 +14,6 @@ import {
   type ConfigMigrationDiscoveryFileSystem,
   type ConfigMigrationPathOperations,
 } from "./config-migration"
-import { doriSectionRename } from "./config-migration/dori-section-rename"
 
 export type OpenCodeStartupMigrationOptions = {
   readonly afterMigrations?: (results: readonly MigrationRunResult[]) => void
@@ -91,7 +90,6 @@ export function runOpenCodeStartupMigration(
         ...(options.backupTimestamp === undefined ? {} : { backupTimestamp: options.backupTimestamp }),
         cwd: options.cwd,
         ...(options.discoveryFileSystem === undefined ? {} : { fileSystem: options.discoveryFileSystem }),
-        doriSectionRename,
         environment: options.environment ?? process.env,
         homeDir,
         pathOperations: options.pathOperations ?? posix,

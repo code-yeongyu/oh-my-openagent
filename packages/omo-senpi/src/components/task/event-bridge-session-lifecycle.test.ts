@@ -23,6 +23,8 @@ describe("event-bridge session_start recovery chain", () => {
       "capture",
       "onSessionStart",
       "reconcile",
+      // Admission's status sync runs while the background recovery continues (#11335).
+      "statusSync",
       "liveness:task-revived",
       "resumptionStart:2",
       "reclaim",
@@ -49,6 +51,7 @@ describe("event-bridge session_start recovery chain", () => {
       "capture",
       "onSessionStart",
       "reconcile",
+      "statusSync",
       "resumptionStart:0",
       "reclaim",
       "cleanup:start",

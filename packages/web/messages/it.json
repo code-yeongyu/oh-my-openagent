@@ -12,7 +12,8 @@
     "githubStars": "{count} stelle su GitHub",
     "openMenu": "Apri menu",
     "closeMenu": "Chiudi menu",
-    "primary": "Principale"
+    "primary": "Principale",
+    "skipToContent": "Vai al contenuto"
   },
   "footer": {
     "brand": "OmO",
@@ -38,6 +39,7 @@
       "getStarted": "Inizia",
       "readManifesto": "Leggi il manifesto",
       "downloadDesktop": "Scarica l'app desktop",
+      "downloadDesktopBeta": "Scarica la beta desktop",
       "installLabel": "Un comando, uno strumento"
     },
     "command": {
@@ -180,13 +182,6 @@
       "installNow": "Installa ora",
       "readTheDocs": "Leggi la documentazione"
     },
-    "dori": {
-      "eyebrow": "Spoiler",
-      "title": "Qualcuno ha lavorato mentre dormivi.",
-      "body": "Non OmO. Un nuovo assunto dallo stesso team. Non stacca mai e lo paghi in token.",
-      "cta": "Conosci Dori",
-      "alt": "Dori, un cane bianco dei cartoni con una pietra in mano, che fa capolino dal fondo della pagina"
-    },
     "dag": {
       "region": "OmO desktop con il grafo del workflow aperto",
       "windowTitle": "OmO — ricerca di mercato, 12k fonti",
@@ -213,6 +208,8 @@
   "docs": {
     "mobileHeader": "Docs di OmO",
     "searchPlaceholder": "Cerca nei docs...",
+    "searchLabel": "Filtra le sezioni della documentazione",
+    "sectionsLabel": "Sezioni della documentazione",
     "install": {
       "title": "Installa OmO",
       "description": "Installa OmO con un solo comando su macOS, Linux, WSL e Windows."
@@ -517,5 +514,10 @@
       "discord": "Chiedi su Discord"
     },
     "privacy": "Questa pagina non salva la tua segnalazione, ma è stata inviata a omo.dev tramite il link aperto dall'app. Arriva su GitHub solo quando invii personalmente la issue."
+  },
+  "notFound": {
+    "title": "Impossibile trovare questa pagina.",
+    "body": "Il link potrebbe essere vecchio o la pagina potrebbe essere stata spostata.",
+    "home": "Torna alla home"
   }
 }

@@ -1,8 +1,9 @@
 import { transitionTaskRecord, type TaskRecord } from "../state"
-import { delay, nowIso, type LifecycleContext } from "./context"
+import { delay, nowIso, reconciliationActive, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
 import { newestSessionPath } from "./session-path"
 import type { ReconcileOutcome } from "./types"
+import { holdsClaim } from "./revive-rollback"
 
 export async function reconcileLegacyTerminal(context: LifecycleContext, record: TaskRecord): Promise<ReconcileOutcome> {
   if (record.status === "lost" || record.status === "cancelled") {
@@ -28,6 +29,7 @@ export async function detachTerminalResident(
 ): Promise<ReconcileOutcome> {
   if (record.execution_mode === "process" && record.pid !== undefined) {
     const terminated = await terminateClaimedPid(context, record)
+    if (!reconciliationActive(context)) return { task_id: record.task_id, kind: "deferred", reason: "session_unavailable" }
     if (!terminated) {
       return {
         task_id: record.task_id,
@@ -67,6 +69,9 @@ export async function terminateClaimedPid(context: LifecycleContext, record: Tas
   context.signaller.signal(pid, "SIGTERM")
   context.store.appendEvent(record.task_id, { type: "reconcile_terminated", payload: { pid, signal: "SIGTERM" } })
   await delay(context.orphanKillDelayMs)
+  const fresh = context.store.load(record.task_id)
+  if (!reconciliationActive(context)
+    || (context.reconcileActive !== undefined && (fresh === null || !holdsClaim(context, fresh, record)))) return false
   if (context.signaller.isAlive(pid)) {
     context.signaller.signal(pid, "SIGKILL")
     context.store.appendEvent(record.task_id, { type: "reconcile_terminated", payload: { pid, signal: "SIGKILL" } })

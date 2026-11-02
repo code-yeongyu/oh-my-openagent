@@ -23,6 +23,11 @@ const installGuidePaths = new Set([
 
 const desktopPaths = new Set(["desktop"])
 
+// Shipped desktop builds link https://omo.dev/download (reinstall screen, deb update pill). While this
+// site's own download page is off, that path goes to the public beta download page instead of a 404.
+// Temporary (307), not permanent: a browser must not keep skipping this site's page once it is enabled.
+const PUBLIC_DESKTOP_DOWNLOAD_PAGE = "https://get.omo.dev/desktop/beta/"
+
 function getLocaleSegment(segment: string | undefined): Locale | null {
   if (!segment) return null
   return locales.find((locale) => locale === segment) ?? null
@@ -58,7 +63,17 @@ function getDownloadPath(pathname: string): string | null {
   return locale ? `/${locale}/download` : "/download"
 }
 
+function isDownloadPath(pathname: string): boolean {
+  const segments = pathname.split("/").filter(Boolean)
+  const routeSegments = getLocaleSegment(segments[0]) ? segments.slice(1) : segments
+  return routeSegments.join("/") === "download"
+}
+
 export default function proxy(request: NextRequest): NextResponse {
+  if (!desktopDownloadEnabled() && isDownloadPath(request.nextUrl.pathname)) {
+    return NextResponse.redirect(PUBLIC_DESKTOP_DOWNLOAD_PAGE, 307)
+  }
+
   const forwardedHost = request.headers.get("x-forwarded-host")
   const requestHost = request.headers.get("host")
   const hostname = (forwardedHost ?? requestHost ?? request.nextUrl.hostname).split(":")[0]

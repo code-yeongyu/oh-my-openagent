@@ -69,3 +69,37 @@ test("#given a tracked top-level input #when the engine handles it without a tur
   expect(activity.has(SESSION)).toBe(false)
   expect(activity.hasInput(SESSION)).toBe(false)
 })
+
+test("#given concurrent settles #when rebind retires their reconciliation #then one pass runs and its late completion cannot mark the new session reconciled", async () => {
+  const pi = new MemoryFakeExtensionAPI()
+  const activity = createMemoryUserActivity({})
+  activity.register(pi)
+  await pi.dispatch("input", { source: "rpc", inputId: "user-input", text: "Remember." }, eventCtx)
+  await pi.dispatch("input_disposition", { inputId: "user-input", disposition: "started" }, eventCtx)
+  const gate = Promise.withResolvers<void>()
+  const entered = Promise.withResolvers<void>()
+  let calls = 0
+  const reconcile = () => { calls += 1; entered.resolve(); return gate.promise }
+  const first = activity.reconcileOnce(SESSION, reconcile)
+  const second = activity.reconcileOnce(SESSION, reconcile)
+  await entered.promise
+  activity.reset(SESSION)
+  gate.resolve()
+  await Promise.all([first, second])
+  expect(calls).toBe(1)
+  expect(activity.hasReconciled(SESSION)).toBe(false)
+})
+
+test("#given a scheduled reconciliation #when rebind resets before it starts #then the retired callback never runs", async () => {
+  const pi = new MemoryFakeExtensionAPI()
+  const activity = createMemoryUserActivity({})
+  activity.register(pi)
+  await pi.dispatch("input", { source: "rpc", inputId: "user-input", text: "Remember." }, eventCtx)
+  await pi.dispatch("input_disposition", { inputId: "user-input", disposition: "started" }, eventCtx)
+  let calls = 0
+  const pending = activity.reconcileOnce(SESSION, async () => { calls += 1 })
+  activity.reset(SESSION)
+  await pending
+  expect(calls).toBe(0)
+  expect(activity.hasReconciled(SESSION)).toBe(false)
+})

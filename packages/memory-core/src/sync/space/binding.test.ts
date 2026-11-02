@@ -49,7 +49,7 @@ describe("canonicalRemoteUrl (sync-design §3)", () => {
 
 describe("namedBinding", () => {
   test("is the trimmed, NFC-normalised profile value", () => {
-    expect(namedBinding("  Dori \n")).toBe("named:Dori")
+    expect(namedBinding("  Demo \n")).toBe("named:Demo")
     expect(namedBinding("Ångström")).toBe(namedBinding("Ångström"))
   })
 
@@ -80,7 +80,7 @@ describe("localBinding", () => {
 
 describe("parseBinding", () => {
   test("round-trips every kind", () => {
-    expect(parseBinding("named:Dori")).toEqual({ kind: "named", value: "Dori" })
+    expect(parseBinding("named:Demo")).toEqual({ kind: "named", value: "Demo" })
     expect(parseBinding("repo:github.com/a/b")).toEqual({ kind: "repo", value: "github.com/a/b" })
     expect(parseBinding(`local:${"0".repeat(32)}`)).toEqual({ kind: "local", value: "0".repeat(32) })
   })
@@ -97,7 +97,7 @@ describe("parseBinding", () => {
 describe("spaceIdForBinding", () => {
   test("is the sha-256 of the binding key truncated to 128 bits", () => {
     expect(spaceIdForBinding("repo:github.com/a/b")).toBe("88c3c57d6699688f3cdd91b31b7e9f4d")
-    expect(spaceIdForBinding("named:Dori")).toBe("852b47fac13bd6a2f0d23f5b5d4fa103")
+    expect(spaceIdForBinding("named:Demo")).toBe("6d38310f719ef126e78fa655f5d57d60")
     expect(spaceIdForBinding(`local:${"0".repeat(32)}`)).toBe("d3da1211bd7facd874d5837d6caa380c")
   })
 

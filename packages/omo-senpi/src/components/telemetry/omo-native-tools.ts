@@ -1,4 +1,5 @@
 import { realpathSync } from "node:fs"
+import { isDarwinAutomountTriggerPath } from "@oh-my-opencode/utils/path-containment"
 import { isAbsolute, relative, resolve, sep, win32 } from "node:path"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
@@ -102,7 +103,10 @@ function builtinSkillName(rawPath: unknown, eventContext: unknown, skillsRoot: s
   try {
     const root = realpathSync(skillsRoot)
     const cwd = isRecord(eventContext) && typeof eventContext.cwd === "string" ? eventContext.cwd : process.cwd()
-    const target = realpathSync(resolve(cwd, rawPath))
+    const lexical = resolve(cwd, rawPath)
+    // A macOS automount trigger is never a shipped skill, and resolving it can park the host loop (#11545).
+    if (isDarwinAutomountTriggerPath(lexical)) return undefined
+    const target = realpathSync(lexical)
     return builtinSkillNameFromCanonicalPaths(root, target, { isAbsolute, relative, sep })
   } catch {
     return undefined

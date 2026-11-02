@@ -1,10 +1,12 @@
 import { agreementId, normalizeAgreementText, sortAgreements } from "./format"
+import { agreementEventKey, legacyAgreementEvents } from "./events"
 import type { AgreementExtractionRecord, AgreementItem, AgreementScope, AgreementsPolicy } from "./types"
 
 export interface AgreementsMutation {
   readonly items: readonly AgreementItem[]
   readonly newlyFlagged: readonly string[]
   readonly events: readonly AgreementEvent[]
+  readonly receipts: readonly string[]
 }
 
 export type AgreementEvent =
@@ -16,11 +18,33 @@ export function applyAgreementRecords(
   existing: readonly AgreementItem[],
   records: readonly AgreementExtractionRecord[],
   policy: AgreementsPolicy,
+  priorReceipts: readonly string[] = [],
 ): AgreementsMutation {
   let items = [...existing]
   const committed = new Set(existing.map((item) => item.id))
   const flagged = new Set<string>()
   const events: AgreementEvent[] = []
+  const receipts = new Set(priorReceipts.length === 0 ? legacyAgreementEvents(existing) : priorReceipts)
+  const known = new Set(receipts)
+  const claim = (id: string, record: AgreementExtractionRecord): boolean => {
+    // Rewording preserves the original id. A "new" record matching that wording must also
+    // remain recognizable after drop, when only its text-derived target id is available.
+    const ids = record.action === "new" ? [...new Set([id, agreementId(record.text)])] : [id]
+    const keys = ids.map((target) => agreementEventKey(target, record))
+    const duplicate = keys.some((key) => known.has(key))
+    if (duplicate) {
+      for (const key of keys) {
+        known.add(key)
+        receipts.add(key)
+      }
+      return false
+    }
+    for (const receipt of keys) {
+      known.add(receipt)
+      receipts.add(receipt)
+    }
+    return true
+  }
   const bump = (at: number, date: string, text: string | undefined): void => {
     const found = items[at]
     if (found === undefined) return
@@ -34,14 +58,16 @@ export function applyAgreementRecords(
     if (record.action === "reaffirm") {
       const at = items.findIndex((item) => item.id === record.id)
       if (at < 0) events.push({ kind: "stale-reaffirm", date: record.date, id: record.id })
-      else bump(at, record.date, record.text)
+      else if (claim(record.id, record)) bump(at, record.date, record.text)
       continue
     }
     const at = findAgreement(items, record.text)
     if (at >= 0) {
-      bump(at, record.date, undefined)
+      const found = items[at]
+      if (found !== undefined && claim(found.id, record)) bump(at, record.date, undefined)
       continue
     }
+    if (known.has(agreementEventKey(agreementId(record.text), record))) continue
     const status = 1 >= policy.needsHumanThreshold ? "needs-human" : "active"
     const created: AgreementItem = {
       id: agreementId(record.text), scope: record.applies, by: "agent", text: record.text,
@@ -57,9 +83,10 @@ export function applyAgreementRecords(
       events.push({ kind: "evicted", date: record.date, item: victim, forText: record.text })
     }
     if (status === "needs-human") flagged.add(created.id)
+    claim(created.id, record)
     items.push(created)
   }
-  return { items: sortAgreements(items), newlyFlagged: [...flagged], events }
+  return { items: sortAgreements(items), newlyFlagged: [...flagged], events, receipts: [...receipts] }
 }
 
 /** At the cap only a committed agent item that was never reaffirmed and is not flagged may go: the oldest one. */

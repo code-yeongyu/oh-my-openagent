@@ -45,8 +45,17 @@ type Failure = { readonly kind: "error"; readonly error: ThreadToolFailure }
 type Scoped = { readonly all_scope?: boolean }
 type Keyed = { readonly idempotency_key?: string }
 type Relayed<K extends keyof GatewayRelay> = Promise<Awaited<ReturnType<GatewayRelay[K]>> | Failure>
-/** A report as the SDK answers it: the arm's sequence number stays inside the gateway. */
-type Reported = Promise<RelayResult<Omit<ReportOpResult, "arm_seq"> & { readonly deduplicated: boolean }> | Failure>
+/**
+ * Whether an armed completion's wake reached the running session. When it did not, the durable arm is
+ * picked up at the session's next start: `no_live_endpoint` (nothing lists the session live),
+ * `not_routable` (its host lists no live session under the durable id), `unreachable` (the wake failed).
+ */
+export type ArmWake =
+  | { readonly reached: true }
+  | { readonly reached: false; readonly reason: "no_live_endpoint" | "not_routable" | "unreachable"; readonly detail?: string }
+
+/** A report as the SDK answers it: the arm's sequence number stays inside the gateway; an armed completion says whether its wake reached the session. */
+type Reported = Promise<RelayResult<Omit<ReportOpResult, "arm_seq"> & { readonly deduplicated: boolean; readonly wake?: ArmWake }> | Failure>
 
 /** Where a session lives right now, as `omo daemon adopt` needs it. */
 export type LocatedThread = Pick<AddressEntry, "thread_id" | "title" | "cwd" | "status" | "session_path" | "endpoint" | "surface" | "alive">
@@ -120,10 +129,22 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
   const resolveForExtension = createGatewayResolver(surface, () => hostView(surface, { offline: true }))
 
   // A running session writes a completion only once it knows of the arm; the arm is durable, so a
-  // wake that does not get through leaves it to the session's next start instead.
-  async function wakeForArm(durableId: string): Promise<void> {
-    const endpoint = await locate(durableId).catch(() => null)
-    if (endpoint !== null) await endpoints.wake(endpoint, []).catch(() => undefined)
+  // wake that does not get through leaves it to the session's next start, and the report says so.
+  async function wakeForArm(durableId: string): Promise<ArmWake> {
+    const unreachable = (error: unknown): ArmWake => ({ reached: false, reason: "unreachable", detail: error instanceof Error ? error.message : String(error) })
+    let endpoint: Awaited<ReturnType<typeof locate>>
+    try {
+      endpoint = await locate(durableId)
+    } catch (error) {
+      return unreachable(error)
+    }
+    if (endpoint === null) return { reached: false, reason: "no_live_endpoint" }
+    try {
+      const reply = await endpoints.wake(endpoint, [])
+      return reply.unroutable === undefined ? { reached: true } : { reached: false, reason: "not_routable" }
+    } catch (error) {
+      return unreachable(error)
+    }
   }
 
   async function sessionId(address: string, allScope: boolean | undefined): Promise<{ readonly id: string } | Failure> {
@@ -213,8 +234,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
       if (reported.kind !== "ok") return reported
       // The arm's sequence number is the running session's settle watermark, read back on the wake; not part of the result.
       const { arm_seq: _armSeq, ...result } = reported
-      if (result.armed) await wakeForArm(session.id)
-      return result
+      return result.armed ? { ...result, wake: await wakeForArm(session.id) } : result
     }),
     outbox: (request) => guarded(() => relay.outbox(request)),
     ack: (request) => guarded(() => relay.ack(request)),

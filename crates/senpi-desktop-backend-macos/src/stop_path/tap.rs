@@ -65,6 +65,19 @@ unsafe extern "C" {
     fn CFRelease(cf: *const c_void);
 }
 
+#[link(name = "Carbon", kind = "framework")]
+unsafe extern "C" {
+    fn IsSecureEventInputEnabled() -> u8;
+}
+
+/// Whether any process has Secure Event Input on. While it is, the window
+/// server hides key events from every event tap (Apple TN2150), so the tap
+/// stays enabled and beating but cannot hear the stop chord.
+pub(super) fn secure_input_enabled() -> bool {
+    // SAFETY: [FFI] takes no arguments and only reads session state.
+    unsafe { IsSecureEventInputEnabled() != 0 }
+}
+
 /// How one tap lifetime ended.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum TapRun {

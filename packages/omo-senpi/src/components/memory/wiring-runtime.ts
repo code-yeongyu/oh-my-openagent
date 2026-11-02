@@ -227,7 +227,8 @@ export function createMemoryRuntimeWiring(
       ledger: identity.ledger,
       enabled: resolveReflectionTriggerConfig(settings, identity.identity).enabled,
       engine: {
-        evaluate: async (conversationId, event) => {
+        evaluate: async (conversationId, event, signal) => {
+          signal?.throwIfAborted()
           lastEventCtx.current = eventCtx
           // Snapshot this session's facts while its ctx is live; a failed read only loses the snapshot
           // (the launch then reads the current ctx), it never blocks the reservation.
@@ -236,6 +237,9 @@ export function createMemoryRuntimeWiring(
           if (result?.status === "active") {
             const run = result.run
             void withLaunchScope({ conversationIds: run.request.conversationIds, ...(facts === undefined ? {} : { snapshot: facts }) }, () => runtime.launch(run))
+            // Reservation admission transfers ownership to the identity. Its committed launch
+            // must finish even if the observer retires, but a retired observer cannot publish UI.
+            signal?.throwIfAborted()
             await hooks.onLaunch?.(identity.identity, result.run)
           }
           return result

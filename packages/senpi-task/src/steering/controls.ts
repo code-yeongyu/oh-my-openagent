@@ -1,7 +1,9 @@
 import { log } from "@oh-my-opencode/utils"
+import { isHostSessionRecord } from "../lifecycle/host-session"
 import { defaultTeardownStepDeadline, withinTeardownBudget } from "../lifecycle/teardown-budget"
 import type { ManagedChildHandle } from "../manager/child-handle"
 import type { TaskRecord } from "../state"
+import { createUnhandledHostSessionCancel } from "./host-session-cancel"
 import { runMoved, staleCancel } from "./stale-run"
 import { withDroppedSteeringNotice } from "../state/queued-steering"
 import type { CancelOptions, CancelOutcome, InterruptOutcome, SteeringPort } from "./types"
@@ -14,6 +16,7 @@ export function createSteeringControls(
   clearPersistedQueue: (taskId: string) => void,
 ) {
   const nowIso = (): string => new Date(port.now()).toISOString()
+  const cancelUnhandledHostSession = createUnhandledHostSessionCancel({ port, clearPersistedQueue, cancelPending })
 
   // A child that never answers its abort must not hold the cancel or interrupt forever (omo#9791): past the
   // budget the caller moves on, and for a cancel the destruction that follows terminates the child (SIGKILL
@@ -75,7 +78,7 @@ export function createSteeringControls(
       return { kind: "cancelled", task_id: record.task_id, previous_status: "pending",
         ...((record.pending_steering?.length ?? 0) > 0 ? { undelivered_messages: record.pending_steering?.length } : {}) }
     }
-    if (record.status !== "running") {
+    if (record.status !== "running" && record.status !== "paused") {
       // A finished child can still hold its process or session (omo#9785); cancel is the way to release it.
       const undelivered = options?.abort === "skip" ? 0 : record.pending_steering?.length ?? 0
       if (undelivered > 0) clearPersistedQueue(record.task_id)
@@ -89,6 +92,7 @@ export function createSteeringControls(
       return { kind: "noop", task_id: record.task_id, status: record.status, reason: reasonText }
     }
     const reachable = port.liveHandle(record.task_id)
+    if (reachable === undefined && isHostSessionRecord(record)) return cancelUnhandledHostSession(record, reason, expected)
     const recovering = reachable?.transportRecovering?.() === true
     // The stop already waiting on this child's connection is the cancel; a repeat joins it.
     if (record.cancel_requested !== undefined && recovering) return cancelPending(record)
@@ -125,7 +129,7 @@ export function createSteeringControls(
         })
       }
     }
-    port.store.appendEvent(record.task_id, { type: "cancelled", payload: { previous_status: "running", ...(reason !== undefined ? { reason } : {}) } })
+    port.store.appendEvent(record.task_id, { type: "cancelled", payload: { previous_status: record.status, ...(reason !== undefined ? { reason } : {}) } })
     // Active in-process sessions reach their exact outcome boundary before deferred DAG disposal;
     // RPC children still terminate immediately. Lifecycle remains the sole destruction writer.
     if (options?.abort === "skip" && handle !== undefined && handle.terminate === undefined) {
@@ -133,7 +137,7 @@ export function createSteeringControls(
     } else {
       await port.destruction.destroyResidentTask(record.task_id, destructionCause)
     }
-    return { kind: "cancelled", task_id: record.task_id, previous_status: "running",
+    return { kind: "cancelled", task_id: record.task_id, previous_status: record.status,
       ...((record.pending_steering?.length ?? 0) > 0 ? { undelivered_messages: record.pending_steering?.length } : {}) }
   }
 
@@ -185,8 +189,8 @@ export function createSteeringControls(
     return cancelPending(record)
   }
 
-  function cancelPending(record: TaskRecord): CancelOutcome {
-    return { kind: "cancel_pending", task_id: record.task_id, previous_status: "running", reason: CANCEL_PENDING_REASON,
+  function cancelPending(record: TaskRecord, reason: string = CANCEL_PENDING_REASON): CancelOutcome {
+    return { kind: "cancel_pending", task_id: record.task_id, previous_status: "running", reason,
       ...((record.pending_steering?.length ?? 0) > 0 ? { undelivered_messages: record.pending_steering?.length } : {}) }
   }
 

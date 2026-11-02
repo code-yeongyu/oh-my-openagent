@@ -802,6 +802,7 @@ describe("dag tool control verb refusal vocabulary", () => {
     { code: "node_not_found", message: 'unknown dag node "ghost"' },
     { code: "node_not_retryable", message: 'dag node "plan" already completed' },
     { code: "node_not_continuable", message: 'dag node "plan" cannot be continued' },
+    { code: "node_unresponsive", message: "HOST_STATUS_SENTINEL" },
     { code: "run_still_active", message: "run is still active" },
     { code: "invalid_arguments", message: "a retry prompt override requires exactly one explicit node id" },
   ] as const
@@ -903,7 +904,7 @@ describe("dag tool control verb refusal vocabulary", () => {
 })
 
 describe("dag tool control verb schema", () => {
-  test("#given the shipped tool #when its action union is read #then retry, send, and amend are offered with verb-teaching descriptions", () => {
+  test("#given the shipped tool #when its action union is read #then retry, send, amend, resume, cancel_node, and guide are offered", () => {
     // given
     const { manager } = fixture()
 
@@ -921,6 +922,9 @@ describe("dag tool control verb schema", () => {
       "retry",
       "send",
       "amend",
+      "resume",
+      "cancel_node",
+      "guide",
     ])
     expect(action.description).toContain("retry")
     expect(action.description).toContain("send")

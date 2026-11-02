@@ -18,6 +18,12 @@ export function abortableSleep(ms: number, abort: AbortSignal): Promise<void> {
   })
 }
 
+export function everyUnref(run: () => Promise<void>, ms: number): { readonly cancel: () => void } {
+  const timer = setInterval(() => void run(), ms)
+  timer.unref?.()
+  return { cancel: () => clearInterval(timer) }
+}
+
 export function delay(ms: number): { readonly elapsed: Promise<void>; readonly cancel: () => void } {
   let timer: ReturnType<typeof setTimeout> | undefined
   const elapsed = new Promise<void>((resolve) => {

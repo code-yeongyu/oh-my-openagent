@@ -1,8 +1,10 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
+import { isDarwinAutomountTriggerPath } from "@oh-my-opencode/utils/path-containment"
 import { basename, extname, relative, resolve } from "node:path"
 import { spawn } from "node:child_process"
 import { execFileSync } from "node:child_process"
-import { createSpawnCommand, resolveServerBinary } from "@oh-my-opencode/lsp-core"
+import { createSpawnCommand } from "@oh-my-opencode/lsp-core/lsp/process"
+import { resolveServerBinary } from "@oh-my-opencode/lsp-core/lsp/server-installation"
 import { resolveBunProjectCommand } from "@oh-my-opencode/lsp-core/lsp/bun-project-checks"
 import { callPackagedDaemonTool } from "../lsp/daemon-tool-client"
 import { extractMutatedFilePaths, MUTATION_TOOL_NAMES, runSingleFlight, type PostMutationEvent } from "../post-mutation/post-mutation"
@@ -58,6 +60,8 @@ export function createFormatterStep(options: FormatterStepOptions = {}) {
     let requiredError: string | undefined
     for (const rawPath of extractMutatedFilePaths(event)) {
       const filePath = resolve(cwd, rawPath)
+      // A file behind a macOS automount trigger is not formatted: probing it can park the host loop (#11545).
+      if (isDarwinAutomountTriggerPath(filePath)) continue
       if (!existsSync(filePath) || isGitIgnored(filePath, cwd)) continue
       if (readFileSync(filePath).byteLength > config.maxFileBytes) continue
       const markerNames = options.markers?.(cwd) ?? []

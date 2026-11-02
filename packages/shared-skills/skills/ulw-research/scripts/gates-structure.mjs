@@ -9,7 +9,7 @@ import { join } from "node:path"
 import { proseText } from "./html-lite.mjs"
 
 const MIN_SECTION_PROSE = 120
-const UNCHECKED_KINDS = new Set(["closing", "sources", "toc", "appendix", "glossary"])
+export const UNCHECKED_KINDS = new Set(["closing", "sources", "toc", "appendix", "glossary"])
 const DEFINITION_TAGS = new Set(["p", "li", "dd", "dt", "td"])
 const DEFINITION_LINE = /^\[(S|Source\s*)(\d+)\]/i
 const MIN_DEFINITIONS = 3

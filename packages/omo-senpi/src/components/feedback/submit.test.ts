@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { buildDraft, type UploadRedactor } from "./draft"
+import { buildDraft, FEEDBACK_SECTION_IDS, type UploadRedactor } from "./draft"
 import { submitReport, type ReportTransport } from "./submit"
 import { expectUserOnly, readWindowsAcl, unexpectedWindowsReaders } from "./report-file.test-support"
 
@@ -122,6 +122,28 @@ describe("submitReport", () => {
       transport,
     })
 
+    expect(result).toEqual({ kind: "refused", reason: "secret-detected", sectionId: "logs" })
+  })
+
+  test.each([
+    "description", "identity", "environment", "session", "logs", "crash", "config",
+    undefined, null, "", "unknown", "LOGS", 1, {}, [],
+  ])("#given a secret refusal naming section %j #when submitted #then only a valid section id is returned", async (sectionId) => {
+    const { transport } = recordingTransport(400, { error: { code: "secret_detected", detail: { sectionId } } })
+    const result = await submitReport({
+      draft, kind: "bug", description: "synthetic", redact: redactTokens, client, env: {},
+      stateDir: tempDir(), apiOrigin: "https://api.example.test", accessToken: null, transport,
+    })
+    const section = FEEDBACK_SECTION_IDS.find(id => id === sectionId)
+    expect(result).toEqual({ kind: "refused", reason: "secret-detected", ...(section === undefined ? {} : { sectionId: section }) })
+  })
+
+  test.each([undefined, null, "logs", 1, []])("#given malformed secret refusal detail %j #when submitted #then the codeless refusal stays compatible", async (detail) => {
+    const { transport } = recordingTransport(400, { error: { code: "secret_detected", detail } })
+    const result = await submitReport({
+      draft, kind: "bug", description: "synthetic", redact: redactTokens, client, env: {},
+      stateDir: tempDir(), apiOrigin: "https://api.example.test", accessToken: null, transport,
+    })
     expect(result).toEqual({ kind: "refused", reason: "secret-detected" })
   })
 
@@ -147,10 +169,13 @@ describe("submitReport", () => {
   })
 
   test.each([
-    [413, "too-large"],
-    [429, "rate-limited"],
-    [503, "unavailable"],
-  ] as const)("#given the service answers %i #when the report is submitted #then it is refused as %s", async (status, reason) => {
+    [401, { kind: "refused", reason: "sign-in-required" }],
+    [403, { kind: "refused", reason: "sign-in-required" }],
+    [413, { kind: "refused", reason: "too-large" }],
+    [429, { kind: "refused", reason: "rate-limited" }],
+    [418, { kind: "refused", reason: "service-rejected", code: "unknown" }],
+    [503, { kind: "refused", reason: "service-unavailable", code: "unknown" }],
+  ] as const)("#given an answer %i without a known error code #when the report is submitted #then it is refused as %o", async (status, refusal) => {
     const { transport } = recordingTransport(status, { error: { code: "x" } })
 
     const result = await submitReport({
@@ -166,7 +191,7 @@ describe("submitReport", () => {
       transport,
     })
 
-    expect(result).toEqual({ kind: "refused", reason })
+    expect(result).toEqual(refusal)
   })
 
   test("#given the report folder cannot be created #when uploads are off and the report is saved #then the user gets a refusal instead of a crash", async () => {
@@ -268,7 +293,7 @@ describe("submitReport", () => {
       transport,
     })
 
-    expect(result).toEqual({ kind: "refused", reason: "unavailable" })
+    expect(result).toEqual({ kind: "refused", reason: "service-rejected", code: "conflict" })
   })
 })
 

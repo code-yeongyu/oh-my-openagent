@@ -28,7 +28,13 @@ import {
 } from "./runtime-loader"
 import { resolveOmoComputerSettings } from "./settings"
 import { watchFullAccess } from "./full-access"
-import { initialComputerState, skillStatusLine, toolActivatedNames, wireComputerControlEvents } from "./registration-support"
+import {
+  computerFailureText,
+  initialComputerState,
+  skillStatusLine,
+  toolActivatedNames,
+  wireComputerControlEvents,
+} from "./registration-support"
 import { createComputerUseTelemetry } from "./telemetry"
 import { wireComputerPermissionEvents } from "./permission-events"
 
@@ -36,7 +42,14 @@ type ComputerExecute = ComputerUseRuntime["computerTool"]["execute"]
 type ComputerActionsExecute = ComputerUseRuntime["computerActionsTool"]["execute"]
 
 export const COMPUTER_USE_COMPONENT_NAME = "computer-use"
-export const COMPUTER_UNAVAILABLE = "Computer use is unavailable in this session."
+export type ComputerUnavailableReason = "unsupported_host" | "host_api_missing" | "disabled" | "invalid_settings"
+
+export const COMPUTER_UNAVAILABLE_MESSAGE = {
+  unsupported_host: "Computer use isn't supported on this system.",
+  host_api_missing: "This omo release can't run computer use. Run `omo update`, then start a new session.",
+  disabled: "Computer use is off. Set computer.enabled in omo.json, then start a new session.",
+  invalid_settings: "Computer use is off: its settings in omo.json are invalid. Fix them, then start a new session.",
+} as const satisfies Record<ComputerUnavailableReason, string>
 
 interface CommandContext extends ComputerHostContext {
   readonly hasUI: boolean
@@ -101,25 +114,26 @@ export function createComputerUseComponent(options: ComputerUseComponentOptions 
     register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
       const reportPermission = wireComputerPermissionEvents(pi, options.env ?? process.env, ctx.logger)
       const api = hostApi(pi)
-      const available = (() => {
-        if (!isSupportedHost(platform)) return undefined
+      const availability = ((): { host: ComputerHostApi; settings: ComputerSettings } | ComputerUnavailableReason => {
+        if (!isSupportedHost(platform)) return "unsupported_host"
         if (api === undefined) {
           ctx.logger.warn("computer-use skipped: host lacks getActiveTools/setActiveTools/executeTool", {
             component: COMPUTER_USE_COMPONENT_NAME,
           })
-          return undefined
+          return "host_api_missing"
         }
         try {
           const settings = loadSettings(pi.cwd ?? process.cwd(), platform)
-          return settings.enabled ? { host: api, settings } : undefined
+          return settings.enabled ? { host: api, settings } : "disabled"
         } catch (error) {
           ctx.logger.warn("computer-use skipped: invalid computer settings", {
             component: COMPUTER_USE_COMPONENT_NAME,
             error: error instanceof Error ? error.message : String(error),
           })
-          return undefined
+          return "invalid_settings"
         }
       })()
+      const available = typeof availability === "string" ? undefined : availability
 
       const state = initialComputerState()
       const runtime =
@@ -147,10 +161,11 @@ export function createComputerUseComponent(options: ComputerUseComponentOptions 
             label: name,
           })),
         handler: async (args: string, commandCtx: CommandContext) => {
-          if (available === undefined || runtime === undefined) {
-            commandCtx.ui.notify(COMPUTER_UNAVAILABLE, "warning")
+          if (typeof availability === "string") {
+            commandCtx.ui.notify(COMPUTER_UNAVAILABLE_MESSAGE[availability], "warning")
             return
           }
+          if (available === undefined || runtime === undefined) return
           const command = args.trim().toLowerCase() || "status"
           state.telemetryContext = commandCtx
           try {
@@ -189,7 +204,7 @@ export function createComputerUseComponent(options: ComputerUseComponentOptions 
             if (commandCtx.hasUI === false) process.stderr.write(`${status}\n`)
           } catch (error) {
             if (!(error instanceof Error)) throw error
-            commandCtx.ui.notify(`/computer ${args.trim()}: ${error.message}`, "error")
+            commandCtx.ui.notify(`/computer ${args.trim()}: ${computerFailureText(error)}`, "error")
           }
         },
       })

@@ -2,15 +2,14 @@ import { createHash, randomBytes } from "node:crypto"
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { fileURLToPath } from "node:url"
-import { dirname, join } from "node:path"
+import { dirname, join, sep } from "node:path"
 import {
   DEFAULT_POSTHOG_HOST,
-  getTelemetryDistinctId,
   type TelemetryEnv,
-  type TelemetryOsProvider,
   type TelemetryProductConfig,
 } from "@oh-my-opencode/telemetry-core/injected"
 import { AGENT_DIR_ENV_NAMES, resolveAgentHome } from "../agent-home/resolve-agent-home"
+import { type BundledSkillsOverrideLogger, resolveBundledSkillsOverride } from "../bundled-skills/override"
 import { ALL_KNOWN_MODEL_IDS, KNOWN_MODELS, KNOWN_PROVIDERS, type KnownProvider } from "./model-vocabulary"
 
 export const OMO_NATIVE_POSTHOG_API_KEY = "phc_r6UYQzNZcGYSzKw4PxCiVrZepGqV3dw9qcvcKtRNUWAn"
@@ -20,13 +19,8 @@ export const OMO_NATIVE_POSTHOG_API_KEY = "phc_r6UYQzNZcGYSzKw4PxCiVrZepGqV3dw9q
 // v3: every event additionally carries the shared attribution properties `surface` (cli | desktop)
 // and `install_id` (random per-installation id shared by CLI and Desktop through the agent home).
 // v4: `distinct_id` is `install_hash` = sha256(install id), the raw `install_id` property is gone,
-// `machine_hash` (the v3 distinct id) rides along until MACHINE_HASH_SUNSET, and `ci` marks CI runs.
+// and `ci` marks CI runs.
 export const OMO_NATIVE_SCHEMA_VERSION = 4
-
-// The first UTC day `machine_hash` no longer ships (exclusive; the last day it ships is 2026-12-14):
-// the 60-day window that joins pre-v4 rows to their install.
-export const MACHINE_HASH_SUNSET = "2026-12-15"
-const MACHINE_HASH_SUNSET_MS = Date.parse(`${MACHINE_HASH_SUNSET}T00:00:00.000Z`)
 
 export { ALL_KNOWN_MODEL_IDS, KNOWN_MODELS, KNOWN_PROVIDERS } from "./model-vocabulary"
 export type { KnownProvider } from "./model-vocabulary"
@@ -62,7 +56,6 @@ export function createOmoNativeProductConfig(): TelemetryProductConfig {
     defaultApiKey: OMO_NATIVE_POSTHOG_API_KEY,
     defaultHost: DEFAULT_POSTHOG_HOST,
     eventName: "daily_active",
-    machineIdPrefix: "omo-senpi:",
     packageName: "@oh-my-opencode/omo-senpi",
     packageVersion: PACKAGE_VERSION,
     platform: "omo-senpi",
@@ -75,7 +68,17 @@ export function getOmoNativeStateDir(env: TelemetryEnv = process.env): string {
   return join(resolveAgentHome({ env }), "omo-senpi", "omo-native")
 }
 
-export function getBuiltinSkillsRoot(): string {
+/**
+ * The bundled skills directory, ending in a path separator (callers append `<skill>/SKILL.md`). A valid
+ * OMO_BUNDLED_SKILLS_DIR wins through the bundled-skills loader's own resolver, so both name the same tree; an
+ * invalid value is reported once per process by that resolver and falls back to the plugin's skills.
+ */
+export function getBuiltinSkillsRoot(
+  env: Record<string, string | undefined> = process.env,
+  logger?: BundledSkillsOverrideLogger,
+): string {
+  const override = resolveBundledSkillsOverride(env, logger)
+  if (override !== undefined) return override.endsWith(sep) || override.endsWith("/") ? override : `${override}${sep}`
   // Source entrypoints and generated plugin bundles have different directory depths.
   return fileURLToPath(new URL(import.meta.url.endsWith(".ts") ? "../../../skills/" : "../skills/", import.meta.url))
 }
@@ -110,9 +113,6 @@ export type OmoNativeAttributionInput = {
   readonly env?: TelemetryEnv
   /** Injected by tests; defaults to the runtime's resolved agent home. */
   readonly stateDir?: string
-  /** Decides whether `machine_hash` is still inside its transition window. */
-  readonly now?: Date
-  readonly osProvider?: TelemetryOsProvider
 }
 
 /**
@@ -128,7 +128,6 @@ export function getOmoNativeAttribution(input: OmoNativeAttributionInput = {}): 
   readonly surface: OmoNativeSurface
   readonly install_hash: string
   readonly ci: boolean
-  readonly machine_hash?: string
 } {
   const env = input.env ?? process.env
   const surface: OmoNativeSurface = env["OMO_NATIVE_SURFACE"]?.trim() === "desktop" ? "desktop" : "cli"
@@ -138,14 +137,10 @@ export function getOmoNativeAttribution(input: OmoNativeAttributionInput = {}): 
     : input.stateDir !== undefined
       ? readOrCreateInstallId(join(input.stateDir, INSTALL_ID_FILE_NAME))
       : resolveUserInstallId(env)
-  const now = input.now ?? new Date()
   return {
     surface,
     install_hash: createHash("sha256").update(installId).digest("hex"),
     ci: isCiEnv(env["CI"]),
-    ...(now.getTime() < MACHINE_HASH_SUNSET_MS
-      ? { machine_hash: getTelemetryDistinctId(createOmoNativeProductConfig().machineIdPrefix, input.osProvider) }
-      : {}),
   }
 }
 

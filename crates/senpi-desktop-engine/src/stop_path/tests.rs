@@ -84,3 +84,25 @@ fn successful_start_clears_the_previous_global_failure() {
     assert_eq!(supervisor.status().global_failure, None);
     assert_eq!(status.reason, None);
 }
+
+#[test]
+fn a_deaf_global_listener_reports_secure_input_as_the_stop_reason() {
+    struct Deaf;
+    impl StopPathListener for Deaf {
+        fn start(&mut self, _: &Chord, sup: Arc<Supervisor>) -> Result<(), StopPathError> {
+            sup.set_deaf_probe(Some(Arc::new(|| Some(StopPathFailure::SecureInput))));
+            sup.set_live(senpi_desktop_safety::StopPathId::Global, true);
+            Ok(())
+        }
+        fn is_live(&self) -> bool { false }
+        fn restart(&mut self) {}
+    }
+    let supervisor = Arc::new(Supervisor::new(Arc::new(FakeClock::new(0))));
+    let paths = StopPaths::new(supervisor, &BackendSelection::Platform, ResumeToken::new("test".into()));
+    paths.state.lock().global = Some(Box::new(Deaf));
+    let status = paths.start(&Chord::parse("ctrl+alt+shift+escape").unwrap());
+    assert!(!status.global_live);
+    assert_eq!(status.reason.as_deref(), Some("secure-input-active"));
+    let capabilities = paths.report();
+    assert_eq!(capabilities.stop_reason.as_deref(), Some("secure-input-active"));
+}

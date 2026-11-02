@@ -60,7 +60,7 @@ describe("SkillMcpManager post-request OAuth retry", () => {
     const result = await manager.callTool(createInfo(), createContext(), "test-tool", {})
 
     // then
-    expect(result).toEqual([{ type: "text", text: "success" }])
+    expect(result).toEqual({ content: [{ type: "text", text: "success" }] })
     expect(refresh).toHaveBeenCalledTimes(1)
     expect(callTool).toHaveBeenCalledTimes(2)
   })
@@ -88,7 +88,7 @@ describe("SkillMcpManager post-request OAuth retry", () => {
     const result = await manager.callTool(createInfo(), createContext(), "test-tool", {})
 
     // then
-    expect(result).toEqual([{ type: "text", text: "success" }])
+    expect(result).toEqual({ content: [{ type: "text", text: "success" }] })
     expect(refresh).toHaveBeenCalledTimes(1)
     expect(callTool).toHaveBeenCalledTimes(2)
   })

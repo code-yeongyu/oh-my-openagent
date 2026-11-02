@@ -4,7 +4,7 @@ import { log } from "@oh-my-opencode/utils"
 import type { RpcChildHandle, RpcRunnerSpec } from "./types"
 import { RunnerError } from "./in-process/runner-error"
 import { childRetryFallbackProfile } from "./retry-fallback-profile"
-import { createRpcChildHandle } from "./rpc/handle"
+import { createRpcChildHandle, type CreateRpcChildHandleOptions } from "./rpc/handle"
 import { createRpcModelAdmission, type RpcModelAdmission } from "./rpc/model-admission"
 import { type MalformedLineHandler, RpcProtocolClient } from "./rpc/protocol-client"
 import { type RpcSpawnDescriptor, buildRpcSpawn } from "./rpc/spawn"
@@ -19,6 +19,7 @@ const RETRY_FALLBACK_COMMAND_CAPABILITY = "retry_fallback_command"
 const DEFAULT_FALLBACK_CHAIN_DEADLINE_MS = 10_000
 
 export type RpcProcessRunnerOptions = {
+  readonly terminateChild?: CreateRpcChildHandleOptions["terminateChild"]
   readonly spawnChild?: (descriptor: RpcSpawnDescriptor) => ChildProcess
   readonly spawnProcess?: (command: string, args: readonly string[], options: SpawnOptions) => ChildProcess
   readonly buildSpawn?: (spec: RpcRunnerSpec) => RpcSpawnDescriptor
@@ -52,8 +53,11 @@ export class RpcProcessRunner {
   private readonly onWarning: (message: string) => void | (() => void)
   private readonly fallbackChainDeadlineMs: number
   private fallbackChainUnsupportedNoticed = false
+  private readonly pendingTeardowns = new Set<Promise<void>>()
+  private readonly terminateChild: CreateRpcChildHandleOptions["terminateChild"]
 
   constructor(options: RpcProcessRunnerOptions = {}) {
+    this.terminateChild = options.terminateChild
     this.spawnChild =
       options.spawnChild ??
       ((descriptor) => defaultSpawnChild(descriptor, options.spawnProcess ?? spawn))
@@ -86,6 +90,7 @@ export class RpcProcessRunner {
       heartbeatIntervalMs: this.heartbeatIntervalMs,
       now: this.now,
       childEnv: descriptor.env,
+      terminateChild: this.terminateChild,
     })
     let resume: ReturnType<RpcProtocolClient["switchSession"]> | undefined
     try {
@@ -105,7 +110,14 @@ export class RpcProcessRunner {
       // termination must never be recorded as the cause of the rejection.
       const exitOutcome = handle.exitOutcome()
       try {
-        await discardUnstartedRpcHandle(handle)
+        const onFailure = (cleanupError: unknown): void => {
+          log("senpi-task rpc start cleanup failed", { taskId: spec.task_id, error: String(cleanupError) })
+        }
+        if (spec.resumeSessionPath === undefined) {
+          void discardUnstartedRpcHandle(handle, { pending: this.pendingTeardowns, onFailure })
+        } else {
+          await discardUnstartedRpcHandle(handle)
+        }
       } catch (cleanupError) {
         log("senpi-task rpc start cleanup failed", { taskId: spec.task_id, error: String(cleanupError) })
       }
@@ -141,6 +153,10 @@ export class RpcProcessRunner {
     })
   }
 
+  async settleTeardowns(): Promise<void> {
+    await Promise.all(this.pendingTeardowns)
+  }
+
   // The child's own chain reaches its process as `set_retry_fallback`, held in memory there and never
   // written to a settings file (#9582). An engine without the command keeps the manager's fallback before
   // any tool call; the in-session switch after a tool call is what it loses, so say so once.
@@ -169,8 +185,8 @@ export class RpcProcessRunner {
     }
     const reason = outcome === "timeout" ? `no answer within ${this.fallbackChainDeadlineMs} ms` : outcome.refused
     this.onWarning(
-      `task ${spec.task_id}: its fallback chain was not applied (${reason}), so it switches to a fallback model ` +
-        "only when a turn fails before any tool call",
+      `task ${spec.task_id}: its fallback chain was not applied (${reason}), so it is not held to its designated ` +
+        "models (the engine's own fallback settings apply)",
     )
   }
 
@@ -194,7 +210,7 @@ export class RpcProcessRunner {
     this.fallbackChainUnsupportedNoticed = true
     this.onWarning(
       "this senpi engine cannot take a task child's fallback chain (no retry_fallback_command), so children " +
-        "started as their own process switch to their fallback models only when a turn fails before any tool call",
+        "started as their own process are not held to their designated models (the engine's own fallback settings apply)",
     )
   }
 }

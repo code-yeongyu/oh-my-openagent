@@ -140,12 +140,22 @@ def skill_root() -> Path:
     return script_dir().parent
 
 
+def cache_bin_dir() -> Path:
+    """Where install.sh / install.ps1 drop a downloaded binary; never inside the skill (#11373)."""
+    override = os.environ.get("OMO_AST_GREP_BIN_DIR")
+    if override:
+        return Path(override).expanduser()
+    if os.name == "nt":
+        return Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local") / "omo-ast-grep" / "bin"
+    return Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "omo-ast-grep" / "bin"
+
+
 def cached_binary() -> Optional[Path]:
-    """Look in <skill_root>/bin/ for a previously downloaded binary."""
+    """Look in cache_bin_dir() for a previously downloaded binary."""
     binname = "sg.exe" if os.name == "nt" else "sg"
     altname = "ast-grep.exe" if os.name == "nt" else "ast-grep"
     for name in (binname, altname):
-        p = skill_root() / "bin" / name
+        p = cache_bin_dir() / name
         if p.is_file() and os.access(p, os.X_OK):
             return p
     return None
@@ -248,7 +258,7 @@ def resolve_binary() -> Optional[Path]:
 
     1. OMO_AST_GREP_SG_PATH override
     2. OMO runtime dirs
-    3. Cached binary in <skill>/bin/
+    3. Cached binary in cache_bin_dir()
     4. PATH (via shutil.which)
     5. Homebrew default paths
     """

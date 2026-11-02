@@ -1,5 +1,5 @@
 import { normalizeReasoning } from "@oh-my-opencode/model-core"
-import type { GetModelCapabilitiesInput } from "@oh-my-opencode/model-core"
+import type { FallbackEntry, GetModelCapabilitiesInput } from "@oh-my-opencode/model-core"
 import type { OhMyOpenCodeConfig } from "../config"
 import { stripInvisibleAgentCharacters } from "./agent-display-names"
 import { getModelCapabilities } from "./model-capabilities"
@@ -9,13 +9,6 @@ type ReasoningConfig = {
   reasoning?: string
   variant?: string
   category?: string
-}
-
-type ChainEntry = {
-  providers: string[]
-  model: string
-  reasoning?: string
-  variant?: string
 }
 
 type OpenCodeReasoningEffort = "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max"
@@ -53,7 +46,7 @@ function findAgentOverride(
   agentName: string,
 ): ReasoningConfig | undefined {
   const stripped = stripInvisibleAgentCharacters(agentName)
-  const agentOverrides = config.agents as Record<string, ReasoningConfig> | undefined
+  const agentOverrides = config.agents
   return agentOverrides
     ? agentOverrides[stripped]
       ?? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === stripped.toLowerCase())?.[1]
@@ -92,9 +85,9 @@ export function resolveVariantForModel(
   const agentOverride = findAgentOverride(config, agentName)
   const categoryName = agentOverride?.category
   const categoryConfig = getCategoryConfig(config, categoryName)
-  const agentChain = AGENT_MODEL_REQUIREMENTS[stripped]?.fallbackChain as ChainEntry[] | undefined
+  const agentChain = AGENT_MODEL_REQUIREMENTS[stripped]?.fallbackChain
   const categoryChain = categoryName
-    ? CATEGORY_MODEL_REQUIREMENTS[categoryName]?.fallbackChain as ChainEntry[] | undefined
+    ? CATEGORY_MODEL_REQUIREMENTS[categoryName]?.fallbackChain
     : undefined
   const agentChainEntry = findEntryInChain(agentChain, currentModel)
   const categoryChainEntry = findEntryInChain(categoryChain, currentModel)
@@ -110,9 +103,9 @@ export function resolveVariantForModel(
 }
 
 function findEntryInChain(
-  fallbackChain: ChainEntry[] | undefined,
+  fallbackChain: FallbackEntry[] | undefined,
   currentModel: { providerID: string; modelID: string },
-): ChainEntry | undefined {
+): FallbackEntry | undefined {
   if (!fallbackChain) return undefined
 
   const exactMatch = fallbackChain.find((entry) => (
