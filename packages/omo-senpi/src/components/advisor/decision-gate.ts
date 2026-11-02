@@ -10,10 +10,10 @@ const GATE_TASK_CHARS = 800
 const GATE_ARGS_CHARS = 160
 const GATE_RESULT_TAIL = 240
 
-export const TROUBLE_KINDS = ["same_call", "repoll_unchanged", "wait_misuse", "error_streak", "wandering", "none"] as const
+const TROUBLE_KINDS = ["same_call", "repoll_unchanged", "wait_misuse", "error_streak", "wandering", "none"] as const
 export type TroubleKind = (typeof TROUBLE_KINDS)[number]
 
-export const GATE_QUESTIONS = {
+const GATE_QUESTIONS = {
   stuck: {
     type: "noul",
     instructions:

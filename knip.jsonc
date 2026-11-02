@@ -2948,6 +2948,10 @@
       "ignoreFiles": [
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/expect-exit.mjs",
+        // live QA driver run by hand through the senpi-qa skill; senpi loads the mock provider with -e
+        "scripts/qa/advisor-e2e.mjs",
+        // loaded by advisor-e2e.mjs through senpi -e, never imported
+        "scripts/qa/advisor-mock-provider.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/agent-toolkit-catalog-qa.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
