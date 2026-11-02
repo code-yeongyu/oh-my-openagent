@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:ad1e37a6451ee56a41b378267392c6dd9f025d6a1bad09874a1598e6e8e2c113:fe376ecf665a54e10a845935e2e967ce5f86cece036190144c1bd3cf47d87dd5
+// omo-codex-install:abf881c6fac36716d9aac5c0e9c760022a5f9d75232ffc9b127fab608c1d3a1b:88ac34f2585ea77f643db4b9c64efc9c969af98c466174acccf89a26f2ee08e8
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -19508,7 +19508,7 @@ var OmoAdvisorSettingsShape = {
 var OmoAdvisorSettingsLayerSchema = object(OmoAdvisorSettingsShape).partial().strict();
 var OmoAdvisorSettingsSchema = OmoAdvisorSettingsLayerSchema.extend({
   enabled: boolean2().default(false),
-  thinking: OmoAdvisorThinkingSchema.default("medium"),
+  thinking: OmoAdvisorThinkingSchema.default("high"),
   category: string2().min(1).default("ultrabrain"),
   decision_url: string2().url().default("https://apis.opengateway.ai/v1/decisions"),
   decision_model: string2().min(1).default("sionic-ai/jev-omni"),

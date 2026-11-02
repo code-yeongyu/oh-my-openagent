@@ -14,7 +14,7 @@ describe("advisor settings", () => {
 
   it("#given a partial layer #when resolved #then defaults fill the rest", () => {
     const settings = resolveOmoAdvisorSettings({ advisor: { enabled: true, model: "openai/gpt-x" } })
-    expect(settings).toMatchObject({ enabled: true, model: "openai/gpt-x", thinking: "medium", threshold: 0.7, min_calls: 3, check_every: 1, cooldown: 5, max_per_session: 10 })
+    expect(settings).toMatchObject({ enabled: true, model: "openai/gpt-x", thinking: "high", threshold: 0.7, min_calls: 3, check_every: 1, cooldown: 5, max_per_session: 10 })
   })
 
   it("#given a key value instead of an env name #when the config is parsed #then it is rejected", () => {

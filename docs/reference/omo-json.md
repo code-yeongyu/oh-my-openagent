@@ -342,7 +342,7 @@ A decision model decides whether to step in; it never writes the advice. From th
 |-----|---------|---------|
 | `enabled` | `false` | Run the advisor. |
 | `model` | the newest Claude Opus on `anthropic` | Advisor model, `provider/model`. |
-| `thinking` | `"medium"` | Advisor thinking level. |
+| `thinking` | `"high"` | Advisor thinking level. |
 | `category` | `"ultrabrain"` | Category whose chain answers when `model` cannot start. |
 | `decision_url` | `"https://apis.opengateway.ai/v1/decisions"` | Decision endpoint. |
 | `decision_model` | `"sionic-ai/jev-omni"` | Decision model id. |
@@ -361,7 +361,7 @@ A decision model decides whether to step in; it never writes the advice. From th
   "advisor": {
     "enabled": true,
     "model": "anthropic/claude-opus-5-5",
-    "thinking": "medium"
+    "thinking": "high"
   }
 }
 ```

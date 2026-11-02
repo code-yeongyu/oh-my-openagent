@@ -41,7 +41,7 @@ describe("advisor component", () => {
     const entry = h.nextEntry()
     await toolResults(h.pi, 2)
     expect(await entry).toMatchObject({ triggered: true, advice: { kind: "advice" } })
-    expect(h.childRequests[0]).toMatchObject({ model: "openai/gpt-x", thinking: "medium" })
+    expect(h.childRequests[0]).toMatchObject({ model: "openai/gpt-x", thinking: "high" })
     expect(h.childRequests[0]?.prompt).toContain("label=error_streak")
     expect(h.pi.messages).toHaveLength(0)
     await toolResults(h.pi, 1)

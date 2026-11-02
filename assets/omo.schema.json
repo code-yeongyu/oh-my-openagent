@@ -2505,7 +2505,7 @@
           "minLength": 1
         },
         "thinking": {
-          "default": "medium",
+          "default": "high",
           "type": "string",
           "enum": [
             "off",
