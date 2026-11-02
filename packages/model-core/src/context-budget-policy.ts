@@ -31,7 +31,7 @@ const DEFAULT_WARMUP_FRACTION = 0.75
 const DEFAULT_TARGET_ACTIVE_FRACTION = 0.60
 const LARGE_WINDOW_THRESHOLD = 500_000
 
-export function isLargeContextModel(physicalContextWindow: number): boolean {
+function isLargeContextModel(physicalContextWindow: number): boolean {
   return physicalContextWindow >= LARGE_WINDOW_THRESHOLD
 }
 
