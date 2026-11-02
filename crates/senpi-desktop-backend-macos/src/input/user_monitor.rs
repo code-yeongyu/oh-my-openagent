@@ -13,7 +13,7 @@ use std::time::Instant;
 
 use parking_lot::Mutex;
 use senpi_desktop_core::types::InterventionWatch;
-use senpi_desktop_core::user_input::{UserPress, UserPressKind, UserPresses};
+use senpi_desktop_core::user_input::{UserInputFeed, UserPress, UserPressKind, UserPresses};
 
 use super::cgevent::ENGINE_EVENT_TAG;
 
@@ -217,7 +217,17 @@ impl UserInputWatch {
             Watch::NotStarted | Watch::Off => UserPresses::default(),
         }
     }
+
+    /// The running watch's log as the session's feed; `None` while off.
+    pub(crate) fn feed(&self) -> Option<Arc<dyn UserInputFeed>> {
+        match &self.0 {
+            Watch::On { log, .. } => Some(Arc::new(feed::Feed(Arc::clone(log)))),
+            Watch::NotStarted | Watch::Off => None,
+        }
+    }
 }
+
+mod feed;
 
 #[cfg(test)]
 #[path = "user_monitor/tests.rs"]

@@ -1,3 +1,4 @@
+import { buildNativeAgentPrompt } from "./native-model-prompt"
 import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode, AgentPromptMetadata } from "./types";
 import { buildClaudeThinkingConfig, isGpt5_5Model, isGpt5_6Model, isGpt6Model, isGptModel } from "./types";
@@ -423,14 +424,14 @@ export function createOracleAgent(model: string): AgentConfig {
     model,
     temperature: 0.1,
     ...restrictions,
-    prompt: ORACLE_DEFAULT_PROMPT,
+    prompt: buildNativeAgentPrompt(model, ORACLE_DEFAULT_PROMPT),
   } as AgentConfig;
 
   if (isGpt5_6Model(model) || isGpt6Model(model)) {
     return {
       ...base,
-      prompt: ORACLE_GPT_5_5_PROMPT,
-      reasoningEffort: "xhigh",
+      prompt: buildNativeAgentPrompt(model, ORACLE_GPT_5_5_PROMPT),
+      reasoningEffort: "high",
       textVerbosity: "high",
     } as AgentConfig;
   }
@@ -438,8 +439,8 @@ export function createOracleAgent(model: string): AgentConfig {
   if (isGpt5_5Model(model)) {
     return {
       ...base,
-      prompt: ORACLE_GPT_5_5_PROMPT,
-      reasoningEffort: "medium",
+      prompt: buildNativeAgentPrompt(model, ORACLE_GPT_5_5_PROMPT),
+      reasoningEffort: "high",
       textVerbosity: "high",
     } as AgentConfig;
   }
@@ -447,8 +448,8 @@ export function createOracleAgent(model: string): AgentConfig {
   if (isGptModel(model)) {
     return {
       ...base,
-      prompt: ORACLE_GPT_PROMPT,
-      reasoningEffort: "medium",
+      prompt: buildNativeAgentPrompt(model, ORACLE_GPT_PROMPT),
+      reasoningEffort: "high",
       textVerbosity: "high",
     } as AgentConfig;
   }

@@ -240,6 +240,7 @@ describe("createHostSessionHandle over a daemon session", () => {
       .filter((type) => type === "abort" || type === "close_session")
     expect(issued).toEqual(["abort", "close_session"])
     expect(handle.exitOutcome()).toEqual({ kind: "killed", facts: facts("terminated") })
+    expect(handle.hostEndAnswered()).toBe(true)
     await handle.dispose()
   })
 
@@ -261,6 +262,7 @@ describe("createHostSessionHandle over a daemon session", () => {
     expect(elapsedMs).toBeLessThan(closeGraceMs + 2_000 + 1_000)
     expect(host.commands.filter((command) => command.type === "close_session")).toHaveLength(1)
     expect(handle.exitOutcome()).toEqual({ kind: "killed", facts: facts("terminated") })
+    expect(handle.hostEndAnswered()).toBe(false)
     await handle.dispose()
   })
 
@@ -280,8 +282,28 @@ describe("createHostSessionHandle over a daemon session", () => {
     // then
     expect(handle.exitOutcome()).toEqual({ kind: "killed", facts: facts("terminated") })
     expect(handle.attached).toBe(false)
+    expect(handle.hostEndAnswered()).toBe(false)
     await handle.dispose()
   })
+
+  for (const [reason, answered] of [["client_close", true], ["error", true], ["handoff_parked", false], ["idle_evicted", false]] as const) {
+    test(`#given the host closes the session with reason ${reason} #when the cancel asks whether the host ended it #then it answers ${answered}`, async () => {
+      // given
+      const host = await fakeHost()
+      const client = hostClient(host)
+      const handle = await openHostSessionHandle({ client, sessionPath: `/tmp/sessions/answered-${reason}.jsonl` })
+
+      const settled = answered ? handle.waitForExit() : new Promise<void>((resolve) => { handle.onParked(() => resolve()) })
+
+      // when
+      host.closeSession(handle.hostSession.routingId, reason)
+      await settled
+
+      // then
+      expect(handle.hostEndAnswered()).toBe(answered)
+      await handle.dispose()
+    })
+  }
 
   test("#given a parent shutting down #when the handle detaches #then the session stays open on the daemon with no exit", async () => {
     // given

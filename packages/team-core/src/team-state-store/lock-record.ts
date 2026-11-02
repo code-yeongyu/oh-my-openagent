@@ -1,13 +1,9 @@
 import { randomUUID } from "node:crypto"
 import { readFile, stat } from "node:fs/promises"
+import { getPidLiveness, getProcessStartIdentity, startIdentitiesConflict } from "@oh-my-opencode/memory-core/process-identity"
 
-/** Distinguishes this process from a predecessor that reused the same pid. */
-export const lockOwnerInstanceId = randomUUID()
-
-// Exact records this process currently holds or is publishing. Every record carries a fresh
-// nonce, so a record stamped with this process's instance id that is absent here is a leftover
-// whose release unlink failed: released, not held.
-const heldLockRecords = new Set<string>()
+import { isWorkerLockReleased, lockOwnerInstanceId, registerLockWorker } from "./lock-worker-lifetime"
+export { lockOwnerInstanceId, markLockRecordHeld, markLockRecordReleased, forgetLockRecord } from "./lock-worker-lifetime"
 
 export type ObservedLockRecord = {
   readonly content: string
@@ -18,18 +14,13 @@ type LockOwner = {
   readonly ownerPid: number
   readonly acquiredAtEpochMs: number
   readonly instanceId: string | null
+  readonly processStart: string | null
 }
 
-export function buildLockRecord(ownerTag: string): string {
-  return `${ownerTag} ${randomUUID()}\n${process.pid}\n${Date.now()}\n${lockOwnerInstanceId}\n`
-}
-
-export function markLockRecordHeld(content: string): void {
-  heldLockRecords.add(content)
-}
-
-export function markLockRecordReleased(content: string): void {
-  heldLockRecords.delete(content)
+export async function buildLockRecord(ownerTag: string): Promise<string> {
+  await registerLockWorker()
+  const processStart = await getProcessStartIdentity(process.pid)
+  return `${ownerTag} ${randomUUID()}\n${process.pid}\n${Date.now()}\n${lockOwnerInstanceId}\n${processStart ?? "unavailable"}\n`
 }
 
 export function errorCode(error: unknown): string | null {
@@ -44,7 +35,7 @@ export function isPathAbsenceError(error: unknown): boolean {
 
 function parseLockOwner(content: string): LockOwner | null {
   const lines = content.split(/\r?\n/).filter((line) => line.length > 0)
-  if (lines.length !== 3 && lines.length !== 4) return null
+  if (lines.length !== 3 && lines.length !== 4 && lines.length !== 5) return null
 
   const ownerPid = Number.parseInt(lines[1] ?? "", 10)
   const acquiredAtEpochMs = Number.parseInt(lines[2] ?? "", 10)
@@ -54,19 +45,8 @@ function parseLockOwner(content: string): LockOwner | null {
   return {
     ownerPid,
     acquiredAtEpochMs,
-    instanceId: lines.length === 4 ? (lines[3] ?? null) : null,
-  }
-}
-
-function isPidAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch (error) {
-    if (!(error instanceof Error)) {
-      throw error
-    }
-    return false
+    instanceId: lines[3] ?? null,
+    processStart: lines[4] ?? null,
   }
 }
 
@@ -88,17 +68,21 @@ export async function readLockRecord(lockPath: string): Promise<ObservedLockReco
  * checked: an unparseable record (a live owner writes its record right after the exclusive
  * create, so it is torn only after a crash) and a legacy 3-line record whose pid is dead.
  */
-export function isLockRecordStale(record: ObservedLockRecord, staleAfterMs: number): boolean {
+export async function isLockRecordStale(record: ObservedLockRecord, staleAfterMs: number): Promise<boolean> {
   const owner = parseLockOwner(record.content)
   if (owner === null) return Date.now() - record.modifiedAtEpochMs > staleAfterMs
 
-  // Our pid with a foreign instance id is this process number recycled after the previous
-  // owner died; our own instance id is live only while that exact record is held here.
-  if (owner.instanceId !== null && owner.ownerPid === process.pid) {
-    return owner.instanceId !== lockOwnerInstanceId || !heldLockRecords.has(record.content)
+  const liveness = getPidLiveness(owner.ownerPid)
+  if (liveness === "dead") {
+    return owner.instanceId !== null || Date.now() - owner.acquiredAtEpochMs > staleAfterMs
   }
-
-  if (isPidAlive(owner.ownerPid)) return false
-  if (owner.instanceId !== null) return true
-  return Date.now() - owner.acquiredAtEpochMs > staleAfterMs
+  if (liveness === "unknown") return false
+  if (owner.processStart !== null) {
+    const actual = await getProcessStartIdentity(owner.ownerPid)
+    if (actual !== null && startIdentitiesConflict(owner.processStart, actual)) return true
+  }
+  if (owner.instanceId !== null && owner.ownerPid === process.pid) {
+    return await isWorkerLockReleased(owner.instanceId, record.content)
+  }
+  return false
 }

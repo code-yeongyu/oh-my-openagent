@@ -175,31 +175,31 @@ const scenarios = [
         : "FAIL",
     }),
   })),
-  // #10750: every model the child's category names is spent, and the parent session runs on another
-  // account. The child must finish on the parent's model, say why on its record, and leave settings alone;
-  // after a tool call the parent's model continues the same turn, so the tool runs exactly once.
+  // #12006 / #11781: every model the child's category names is spent while the parent session runs on another,
+  // working account. The child must never run on the parent's model: it fails typed and names the spent model
+  // and its reset; after a tool call the tool still ran exactly once. Settings stay untouched. The user's own
+  // retry.fallbackChains chain the spent model to the parent's and to a healthy model, so a runner that lets the
+  // child's engine apply the user's settings is caught moving it.
   ...[
-    { name: "parent-model-limit", category: "limitsolo", model: "omo-fallback-mock/limit-fable", toolRuns: 0 },
-    { name: "parent-model-after-tool", category: "toolsolo", model: "omo-fallback-mock/limit-after-tool", toolRuns: 1 },
+    { name: "designated-only-limit", category: "limitsolo", model: "omo-fallback-mock/limit-fable", toolRuns: 0 },
+    { name: "designated-only-after-tool", category: "toolsolo", model: "omo-fallback-mock/limit-after-tool", toolRuns: 1 },
   ].map((solo) => ({
     name: solo.name,
     parent: { provider: "omo-fallback-parent", model: "parent-gpt" },
+    userSettings: {
+      retry: { fallbackChains: { [solo.model]: ["omo-fallback-parent/parent-gpt", "omo-fallback-healthy/healthy-fallback"] } },
+    },
     omoConfig: { categories: { [solo.category]: { model: solo.model } } },
-    checks: (artifacts, stdoutText) => ({
-      final_text: stdoutText.includes(finalText) ? "PASS" : "FAIL",
-      fallback_event: fallbackRecorded(artifacts.log),
-      final_model: artifacts.task?.model === "omo-fallback-parent/parent-gpt" ? "PASS" : "FAIL",
-      // #10797: a handoff no longer writes the next rung as observed, so the child itself must report it.
-      effective_model_observed: artifacts.task?.effective_model?.provider === "omo-fallback-parent"
-        && artifacts.task?.effective_model?.model_id === "parent-gpt"
+    checks: (artifacts) => ({
+      task_failed: artifacts.task?.status === "error" ? "PASS" : "FAIL",
+      failure_kind: artifacts.task?.failure_kind === "model_chain_exhausted" ? "PASS" : "FAIL",
+      never_on_parent: artifacts.task?.model === solo.model
+        && artifacts.task?.effective_model?.provider !== "omo-fallback-parent"
+        && !artifacts.log.includes("omo-fallback-parent/parent-gpt")
         ? "PASS"
         : "FAIL",
-      parent_model_recorded: artifacts.task?.parent_model === "omo-fallback-parent/parent-gpt" ? "PASS" : "FAIL",
-      parent_model_reason: artifacts.task?.parent_model_fallback?.reason === "usage_limit"
-        && artifacts.task?.parent_model_fallback?.from_model === solo.model
-        && artifacts.task?.parent_model_fallback?.resets === "3pm (Asia/Seoul)"
-        ? "PASS"
-        : "FAIL",
+      user_chain_unused: !artifacts.log.includes("omo-fallback-healthy/healthy-fallback") ? "PASS" : "FAIL",
+      refusal_listed: (artifacts.task?.error_message ?? "").includes(`${solo.model}: usage limit`) ? "PASS" : "FAIL",
       tool_runs: (artifacts.log.match(/"type":"tool_execution","payload":\{"tool":"bash"/g) ?? []).length === solo.toolRuns ? "PASS" : "FAIL",
       settings_byte_identical: artifacts.settingsBefore !== undefined && artifacts.settingsBefore === artifacts.settingsAfter
         ? "PASS"
@@ -243,6 +243,13 @@ function seedDaemonPlugin(sandbox) {
   const settingsPath = join(sandbox.agentDir, "settings.json")
   const settings = JSON.parse(readFileSync(settingsPath, "utf8"))
   writeFileSync(settingsPath, `${JSON.stringify({ ...settings, packages: [sandboxPlugin] }, null, 2)}\n`)
+}
+
+// The user's own settings, written before the run the way a user configures them.
+function mergeUserSettings(sandbox, userSettings) {
+  const settingsPath = join(sandbox.agentDir, "settings.json")
+  const settings = existsSync(settingsPath) ? JSON.parse(readFileSync(settingsPath, "utf8")) : {}
+  writeFileSync(settingsPath, `${JSON.stringify({ ...settings, ...userSettings }, null, 2)}\n`)
 }
 
 // The user's settings file as the parent and every child see it; a per-session fallback chain must
@@ -365,6 +372,7 @@ async function runScenario(scenario, runner, outDir) {
   try {
     seedSandbox(sandbox)
     if (runner.daemon === true) seedDaemonPlugin(sandbox)
+    if (scenario.userSettings !== undefined) mergeUserSettings(sandbox, scenario.userSettings)
     const omoDir = join(sandbox.cwd, ".omo")
     mkdirSync(omoDir, { recursive: true })
     const omoConfig = { ...scenario.omoConfig, task: runner.task }

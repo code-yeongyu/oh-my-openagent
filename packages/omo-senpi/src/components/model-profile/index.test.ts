@@ -24,7 +24,7 @@ type FakeModel = { readonly provider: string; readonly id: string }
 
 const FABLE: FakeModel = { provider: "anthropic", id: "claude-fable-5-1" }
 const OPUS: FakeModel = { provider: "anthropic", id: "claude-opus-5-5" }
-const KIMI: FakeModel = { provider: "moonshotai", id: "kimi-k3" }
+const KIMI: FakeModel = { provider: "moonshotai", id: "kimi-k3.1-pro" }
 const GLM: FakeModel = { provider: "zai", id: "glm-5.3" }
 const SOL: FakeModel = { provider: "github-copilot", id: "gpt-6-sol" }
 const SOL_56_COPILOT: FakeModel = { provider: "github-copilot", id: "gpt-5.6-sol" }
@@ -36,7 +36,7 @@ const API_ASTRA: FakeModel = { provider: "openai", id: "gpt-6-astra" }
 const UNRELATED: FakeModel = { provider: "example", id: "nothing-in-any-chain" }
 const SUBSCRIPTION_OPUS: FakeModel = { provider: "anthropic-subscription", id: "claude-opus-5-5" }
 const GATEWAY_OPUS: FakeModel = { provider: "opengateway", id: "anthropic/claude-opus-5-5" }
-const CODING_KIMI: FakeModel = { provider: "kimi-coding", id: "kimi-k3" }
+const CODING_KIMI: FakeModel = { provider: "kimi-coding", id: "kimi-k3.1-pro" }
 
 type FakeCredential = { readonly accounts?: readonly { readonly name: string }[]; readonly pinned?: string }
 type FakeGetAuth = (target: string | FakeModel, overrides?: { readonly slotName?: string }) => Promise<unknown>
@@ -207,14 +207,14 @@ describe("createModelProfileComponent", () => {
     await start(STARTUP)
 
     expect(pi.sessionModels).toEqual([OPUS])
-    expect(pi.sessionThinkingLevels).toEqual(["medium"])
+    expect(pi.sessionThinkingLevels).toEqual(["high"])
     expect(pi.entries).toHaveLength(1)
     expect(recordedOutcome(pi)).toMatchObject({
       customType: MODEL_PROFILE_APPLIED_TYPE,
-      details: { profile: "daily-normal", model: "anthropic/claude-opus-5-5", reasoning: "medium", skipped: [] },
+      details: { profile: "daily-normal", model: "anthropic/claude-opus-5-5", reasoning: "high", skipped: [] },
     })
     expect(appliedContent(pi)).toContain('"daily-normal" (Daily · Normal)')
-    expect(appliedContent(pi)).toContain("anthropic/claude-opus-5-5 medium")
+    expect(appliedContent(pi)).toContain("anthropic/claude-opus-5-5 high")
     expect(notices).toEqual([])
   })
 
@@ -224,7 +224,7 @@ describe("createModelProfileComponent", () => {
     await start(STARTUP)
 
     expect(pi.sessionModels).toEqual([OPUS])
-    expect(pi.sessionThinkingLevels).toEqual(["medium"])
+    expect(pi.sessionThinkingLevels).toEqual(["high"])
     expect(recordedOutcome(pi)).toMatchObject({ customType: MODEL_PROFILE_APPLIED_TYPE, details: { profile: "daily-normal" } })
   })
 
@@ -236,7 +236,7 @@ describe("createModelProfileComponent", () => {
     expect(pi.sessionModels).toEqual([CODING_KIMI])
     expect(pi.sessionThinkingLevels).toEqual(["max"])
     expect(recordedOutcome(pi)).toMatchObject({
-      details: { profile: "daily-normal", model: "kimi-coding/kimi-k3", reasoning: "max" },
+      details: { profile: "daily-normal", model: "kimi-coding/kimi-k3.1-pro", reasoning: "max" },
     })
   })
 
@@ -246,7 +246,7 @@ describe("createModelProfileComponent", () => {
     await start(STARTUP)
 
     expect(pi.sessionModels).toEqual([SUBSCRIPTION_OPUS])
-    expect(pi.sessionThinkingLevels).toEqual(["medium"])
+    expect(pi.sessionThinkingLevels).toEqual(["high"])
   })
 
   test("#given unset with GPT-6.1 Sol and GPT-6 Sol connected beside GLM #when the session starts #then Daily · Normal's GLM rung is applied", async () => {
@@ -267,9 +267,9 @@ describe("createModelProfileComponent", () => {
     await start(STARTUP)
 
     expect(pi.sessionModels).toEqual([SOL_61])
-    expect(pi.sessionThinkingLevels).toEqual(["medium"])
+    expect(pi.sessionThinkingLevels).toEqual(["high"])
     expect(recordedOutcome(pi)).toMatchObject({
-      details: { profile: "geeky-normal", model: "chatgpt-subscription/gpt-6.1-sol", reasoning: "medium" },
+      details: { profile: "geeky-normal", model: "chatgpt-subscription/gpt-6.1-sol", reasoning: "high" },
     })
   })
 
@@ -344,66 +344,66 @@ describe("createModelProfileComponent", () => {
       customType: MODEL_PROFILE_APPLIED_TYPE,
       details: {
         profile: "daily-normal",
-        model: "moonshotai/kimi-k3",
+        model: "moonshotai/kimi-k3.1-pro",
         reasoning: "max",
         skipped: ["anthropic-subscription/claude-opus-5-5"],
       },
     })
-    expect(appliedContent(pi)).toContain("moonshotai/kimi-k3 max")
+    expect(appliedContent(pi)).toContain("moonshotai/kimi-k3.1-pro max")
     expect(appliedContent(pi)).toContain("skipped: anthropic-subscription/claude-opus-5-5")
     expect(existsSync(join(agentDir, "settings.json"))).toBe(false)
   })
 
-  test("#given daily-heavy #when the session starts #then fable xhigh is applied", async () => {
+  test("#given daily-heavy #when the session starts #then fable high is applied", async () => {
     const { pi, start } = harness({ model_profile: "daily-heavy" })
 
     await start(STARTUP)
 
     expect(pi.sessionModels).toEqual([FABLE])
-    expect(pi.sessionThinkingLevels).toEqual(["xhigh"])
+    expect(pi.sessionThinkingLevels).toEqual(["high"])
     expect(appliedContent(pi)).toContain('"daily-heavy" (Daily · Heavy)')
-    expect(appliedContent(pi)).toContain("anthropic/claude-fable-5-1 xhigh")
+    expect(appliedContent(pi)).toContain("anthropic/claude-fable-5-1 high")
   })
 
-  test("#given geeky-normal with GPT-6 Astra beside the Sol tiers #when the session starts #then gpt-6-astra medium is applied", async () => {
+  test("#given geeky-normal with GPT-6 Astra beside the Sol tiers #when the session starts #then gpt-6-astra high is applied", async () => {
     const { pi, start } = harness({ model_profile: "geeky-normal" }, [ASTRA, SOL_61, SOL_61_FAST, SOL_56_COPILOT, UNRELATED])
 
     await start(STARTUP)
 
     expect(pi.sessionModels).toEqual([ASTRA])
-    expect(pi.sessionThinkingLevels).toEqual(["medium"])
-    expect(appliedContent(pi)).toContain("chatgpt-subscription/gpt-6-astra medium")
+    expect(pi.sessionThinkingLevels).toEqual(["high"])
+    expect(appliedContent(pi)).toContain("chatgpt-subscription/gpt-6-astra high")
     expect(appliedContent(pi)).toContain("**NOT RECOMMENDED FOR WRITING OR EVERYDAY WORK.**")
   })
 
-  test("#given geeky-normal without GPT-6 Astra, with GPT-6.1 Sol Fast and GPT-6.1 Sol connected #when the session starts #then gpt-6.1-sol-fast medium is applied", async () => {
+  test("#given geeky-normal without GPT-6 Astra, with GPT-6.1 Sol Fast and GPT-6.1 Sol connected #when the session starts #then gpt-6.1-sol-fast high is applied", async () => {
     const { pi, start } = harness({ model_profile: "geeky-normal" }, [SOL_61, SOL_61_FAST, SOL_56_COPILOT, UNRELATED])
 
     await start(STARTUP)
 
     expect(pi.sessionModels).toEqual([SOL_61_FAST])
-    expect(pi.sessionThinkingLevels).toEqual(["medium"])
-    expect(appliedContent(pi)).toContain("chatgpt-subscription/gpt-6.1-sol-fast medium")
+    expect(pi.sessionThinkingLevels).toEqual(["high"])
+    expect(appliedContent(pi)).toContain("chatgpt-subscription/gpt-6.1-sol-fast high")
   })
 
-  test("#given geeky-normal with neither GPT-6 Astra nor the GPT-6.1 Sol Fast tier #when the session starts #then plain gpt-6.1-sol medium is applied", async () => {
+  test("#given geeky-normal with neither GPT-6 Astra nor the GPT-6.1 Sol Fast tier #when the session starts #then plain gpt-6.1-sol high is applied", async () => {
     const { pi, start } = harness({ model_profile: "geeky-normal" }, [SOL_56_COPILOT, SOL_61, UNRELATED])
 
     await start(STARTUP)
 
     expect(pi.sessionModels).toEqual([SOL_61])
-    expect(pi.sessionThinkingLevels).toEqual(["medium"])
-    expect(appliedContent(pi)).toContain("chatgpt-subscription/gpt-6.1-sol medium")
+    expect(pi.sessionThinkingLevels).toEqual(["high"])
+    expect(appliedContent(pi)).toContain("chatgpt-subscription/gpt-6.1-sol high")
   })
 
-  test("#given geeky-normal with only Copilot GPT-5.6 Sol, no Astra or 6.1 Sol #when the session starts #then gpt-5.6-sol medium is applied", async () => {
+  test("#given geeky-normal with only Copilot GPT-5.6 Sol, no Astra or 6.1 Sol #when the session starts #then gpt-5.6-sol high is applied", async () => {
     const { pi, start } = harness({ model_profile: "geeky-normal" }, [SOL_56_COPILOT, SOL, UNRELATED])
 
     await start(STARTUP)
 
     expect(pi.sessionModels).toEqual([SOL_56_COPILOT])
-    expect(pi.sessionThinkingLevels).toEqual(["medium"])
-    expect(appliedContent(pi)).toContain("github-copilot/gpt-5.6-sol medium")
+    expect(pi.sessionThinkingLevels).toEqual(["high"])
+    expect(appliedContent(pi)).toContain("github-copilot/gpt-5.6-sol high")
   })
 
   test("#given geeky-heavy #when the session starts #then astra high is applied", async () => {
@@ -443,7 +443,7 @@ describe("createModelProfileComponent", () => {
     expect(appliedContent(pi)).toContain('"daily-normal" (Daily · Normal)')
     expect(appliedContent(pi)).toContain("model registry")
     expect(appliedContent(pi)).toContain("anthropic-subscription/claude-opus-5-5")
-    expect(appliedContent(pi)).toContain("kimi-k3")
+    expect(appliedContent(pi)).toContain("kimi-k3.1-pro")
     expect(appliedContent(pi).toLowerCase()).not.toContain("connected")
   })
 
@@ -538,7 +538,7 @@ describe("createModelProfileComponent", () => {
     const { pi, start } = harness(
       {
         model_profile: "night-shift",
-        model_profiles: { "night-shift": { display_name: "Night shift", models: ["moonshotai/kimi-k3"] } },
+        model_profiles: { "night-shift": { display_name: "Night shift", models: ["moonshotai/kimi-k3.1-pro"] } },
       },
       [KIMI],
     )
@@ -663,7 +663,7 @@ describe("createModelProfileComponent", () => {
       model: "zai/glm-5.3",
       authFailed: [
         { provider: "anthropic", model: "claude-opus-5-5", reason: "refresh" },
-        { provider: "moonshotai", model: "kimi-k3", reason: "refresh" },
+        { provider: "moonshotai", model: "kimi-k3.1-pro", reason: "refresh" },
       ],
     })
     expect(appliedContent(pi)).toContain("skipped anthropic:")
@@ -685,7 +685,7 @@ describe("createModelProfileComponent", () => {
       profile: "daily-normal",
       authFailed: [
         { provider: "anthropic", model: "claude-opus-5-5", reason: "refresh" },
-        { provider: "moonshotai", model: "kimi-k3", reason: "refresh" },
+        { provider: "moonshotai", model: "kimi-k3.1-pro", reason: "refresh" },
       ],
     })
     expect(appliedContent(pi)).toContain("no model whose credentials resolve")
@@ -937,7 +937,7 @@ describe("model profile diagnostics through the composed default logger", () => 
       const probe = authProbe({ dead: ["anthropic"], broken: ["zai/glm-5.3"] })
       const config: OmoConfig = {
         model_profile: "qa",
-        model_profiles: { qa: { models: ["anthropic/claude-opus-5-5", "zai/glm-5.3", "moonshotai/kimi-k3"] } },
+        model_profiles: { qa: { models: ["anthropic/claude-opus-5-5", "zai/glm-5.3", "moonshotai/kimi-k3.1-pro"] } },
       }
       await composeOmoSenpiExtension([
         createModelProfileComponent({ loadConfig: () => ({ config, diagnostics: [], layers: [], sources: [] }) }),

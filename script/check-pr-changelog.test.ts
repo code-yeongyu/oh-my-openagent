@@ -119,6 +119,42 @@ describe("changelog gate CLI", () => {
     expect(result.status, result.stderr).toBe(status)
     expect(result.stdout).toMatch(verdict)
   })
+
+  // #11704: publish.yml reuses any open PR on its fixed branch, so the author does not identify the release-state PR.
+  test.each([
+    { name: "a marked release PR opened by a maintainer account passes", actor: "maintainer", release: "1", title: "release: v5.1.51", status: 0 },
+    { name: "a marked release PR opened by the release bot passes", actor: "sisyphus-dev-ai", release: "1", title: "release: v5.1.51", status: 0 },
+    { name: "a hand-made release branch without the marker still fails", actor: "sisyphus-dev-ai", release: "1", title: "chore: stamp the changelog", status: 1 },
+    { name: "a marked release branch whose head is not in this repository still fails", actor: "maintainer", release: "0", title: "release: v5.1.51", status: 1 },
+  ])("$name", ({ actor, release, title, status }) => {
+    // given: a release commit that stamps the changelog and a package log and consumes the only fragment
+    const { root, git, write } = fixture()
+    write("packages/fixture/changes.md", "# fixture\n")
+    write("changes/unreleased/1.md", "Fragment. (#1)\n")
+    git("add", ".")
+    git("commit", "-qm", "cut")
+    const base = git("rev-parse", "HEAD")
+    git("rm", "-q", "changes/unreleased/1.md")
+    write("CHANGELOG.md", changelog.replace("## [Unreleased]\n", "## [Unreleased]\n\n## [5.1.51] - 2026-10-31\n\nFragment. (#1)\n"))
+    write("packages/fixture/changes.md", "# fixture\n\n## 2026-10-31 - Stamped\n")
+    git("commit", "-qam", "release: v5.1.51")
+
+    // when: the gate judges the PR with the facts the workflow passes
+    const result = runGate(root, {
+      CHANGELOG_GATE_BASE: base,
+      CHANGELOG_GATE_PR: "11672",
+      CHANGELOG_GATE_BRANCH: "release/v5.1.51-source-state",
+      CHANGELOG_GATE_ACTOR: actor,
+      CHANGELOG_GATE_RELEASE: release,
+      CHANGELOG_GATE_TITLE: title,
+      CHANGELOG_GATE_BODY: "Automated release-state PR for v5.1.51. This must merge before npm publication starts.",
+    })
+
+    // then: the release marker decides, for the changelog and the package logs alike
+    expect(result.status, result.stdout + result.stderr).toBe(status)
+    if (status === 0) expect(result.stdout).toMatch(/changelog-gate: PASS[\s\S]*package logs PASS/)
+    else expect(result.stdout).toMatch(/only the release PR may edit the changelog[\s\S]*package logs FAIL/)
+  })
 })
 
 function runGate(cwd: string, env: Record<string, string>) {

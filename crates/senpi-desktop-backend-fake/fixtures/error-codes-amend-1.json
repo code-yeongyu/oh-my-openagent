@@ -1,0 +1,146 @@
+{
+  "displays": [
+    {
+      "id": "1",
+      "name": "Built-in Display",
+      "x": 0,
+      "y": 0,
+      "width": 1920,
+      "height": 1080,
+      "scale": 1,
+      "pixelX": 0,
+      "pixelY": 0,
+      "pixelWidth": 1920,
+      "pixelHeight": 1080,
+      "isPrimary": true
+    }
+  ],
+  "windows": [
+    {
+      "id": "101",
+      "title": "Untitled - Notes",
+      "app": "Notes",
+      "pid": 4242,
+      "x": 100,
+      "y": 120,
+      "width": 800,
+      "height": 600,
+      "focused": true,
+      "elevated": null
+    }
+  ],
+  "fail_next": [
+    {
+      "method": "displays",
+      "code": "PermissionDenied"
+    },
+    {
+      "method": "displays",
+      "code": "CaptureFailed"
+    },
+    {
+      "method": "displays",
+      "code": "InputFailed"
+    },
+    {
+      "method": "displays",
+      "code": "BackgroundUnavailable"
+    },
+    {
+      "method": "displays",
+      "code": "WindowNotFound"
+    },
+    {
+      "method": "displays",
+      "code": "InvalidTarget"
+    },
+    {
+      "method": "displays",
+      "code": "InvalidKey"
+    },
+    {
+      "method": "displays",
+      "code": "InvalidCoordinateFrame"
+    },
+    {
+      "method": "displays",
+      "code": "StaleRef"
+    },
+    {
+      "method": "displays",
+      "code": "AxUnsupported"
+    },
+    {
+      "method": "displays",
+      "code": "AxFailed"
+    },
+    {
+      "method": "displays",
+      "code": "Timeout"
+    },
+    {
+      "method": "displays",
+      "code": "Closed"
+    },
+    {
+      "method": "displays",
+      "code": "Internal"
+    },
+    {
+      "method": "displays",
+      "code": "StopPathUnavailable"
+    },
+    {
+      "method": "displays",
+      "code": "Suspended"
+    },
+    {
+      "method": "displays",
+      "code": "ScreenLocked"
+    },
+    {
+      "method": "displays",
+      "code": "Cancelled"
+    },
+    {
+      "method": "displays",
+      "code": "CursorRestoreFailed"
+    },
+    {
+      "method": "displays",
+      "code": "FocusRestoreFailed"
+    },
+    {
+      "method": "displays",
+      "code": "TransactionFailed"
+    },
+    {
+      "method": "displays",
+      "code": "InputBusy"
+    },
+    {
+      "method": "displays",
+      "code": "ControlRequired"
+    },
+    {
+      "method": "displays",
+      "code": "CaptureUnavailable"
+    },
+    {
+      "method": "displays",
+      "code": "UserIntervened"
+    },
+    {
+      "method": "displays",
+      "code": "AxUnconfirmed"
+    },
+    {
+      "method": "displays",
+      "code": "SpaceUnsupported"
+    },
+    {
+      "method": "displays",
+      "code": "SpaceMoveDenied"
+    }
+  ]
+}
