@@ -60,7 +60,7 @@ export function createTaskChildPlanner(
     }
 
     if (spec.model !== undefined && spec.model.length > 0) {
-      const pin = resolveExplicitPin(spec.model, resolveRegistry, resolveDefaultRoute, omoConfig.exclude_models)
+      const pin = resolveExplicitPin(spec.model, resolveRegistry, resolveDefaultRoute, liveConfig.exclude_models)
       if (pin.kind !== "resolved") return { kind: "error", error: pin.error }
       return {
         kind: "resolved",
@@ -103,8 +103,9 @@ export function createTaskChildPlanner(
     const resolution = planChild(spec)
     if (resolution.kind !== "resolved") return resolution
     const fast = inheritParentFastMode(resolution.plan, resolveRegistry(), resolveParentServiceTier())
+    const liveConfig = typeof omoConfig === "function" ? omoConfig() : omoConfig
     // The -fast sibling is a different model: exclude_models can keep it out while the planned one runs.
-    return { kind: "resolved", plan: isExcludedModel(fast.model, omoConfig.exclude_models) ? resolution.plan : fast }
+    return { kind: "resolved", plan: isExcludedModel(fast.model, liveConfig.exclude_models) ? resolution.plan : fast }
   }
 }
 
