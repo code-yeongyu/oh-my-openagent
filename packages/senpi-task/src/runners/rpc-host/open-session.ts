@@ -151,7 +151,7 @@ function sessionFailureReason(error: unknown): TaskStartFailureReason | undefine
   return undefined
 }
 
-/** A child without a chain sends no profile, so the host keeps applying its own settings' fallback. */
+/** Every child with a model sends its designated chain, so the host's own settings never extend it. */
 function childRetryFallback(spec: RpcRunnerSpec): { readonly retryFallback?: HostRetryFallbackProfile } {
   const retryFallback = childRetryFallbackProfile(spec)
   return retryFallback === undefined ? {} : { retryFallback }
