@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:363583c8dfc7cc2c5a4d654d211276b757e109c3a70afb80c92a707c7da1fccf:8668e84b23c97e29948d55c77e11d2392663946effb62e64fd3f2e3bd4e9449a
+// omo-codex-install:e6dc4b2a3f5241ff9999bc7eef65456420390b5a0066d12b93ead546a81a7d24:4eb0776bb3a37d119ca5b3fccdcab7d8b2f3f3840b6d11cf3d50263f3af0ec27
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -10205,7 +10205,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "5.1.56",
+    version: "5.1.57",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -19693,7 +19693,11 @@ var OmoCategoryConfigObjectSchema = object({
   disable: boolean2().optional(),
   warn_unavailable: boolean2().optional()
 }).strict();
-var OmoCategoryConfigSchema = preprocess((value) => isRecord4(value) ? normalizeLegacyModelFields(value) : value, OmoCategoryConfigObjectSchema);
+function withoutRetiredCategoryKeys(entry) {
+  const { provider_lock: _retired, ...rest } = entry;
+  return rest;
+}
+var OmoCategoryConfigSchema = preprocess((value) => isRecord4(value) ? withoutRetiredCategoryKeys(normalizeLegacyModelFields(value)) : value, OmoCategoryConfigObjectSchema);
 var OmoCategoriesConfigSchema = record(string2(), OmoCategoryConfigSchema);
 
 // packages/omo-config-core/src/schema/computer.ts
