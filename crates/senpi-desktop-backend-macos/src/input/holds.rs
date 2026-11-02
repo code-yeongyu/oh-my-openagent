@@ -57,19 +57,18 @@ impl MacInput {
                 let window = resolve_window(capture, id)?;
                 let (pid, wid) = window_identity(&window)?;
                 match mode {
-                    DeliveryMode::Background => {
-                        self.ensure_background_ready()?;
+                    DeliveryMode::Background => self.background(|this| {
                         guard::guard(&window, if mouse.is_some() { "click" } else { "keyboard" },
                             mouse.map(|hold| hold.button))?;
                         if mouse.is_none_or(|hold| !hold.keys.is_empty()) {
                             guard::prepare_keys(&window, pid, wid, capture)?;
-                            self.last_activated = Some((pid, wid));
+                            this.last_activated = Some((pid, wid));
                         } else if !window.focused {
                             skylight::activate_without_raise(pid, wid)?;
-                            self.last_activated = Some((pid, wid));
+                            this.last_activated = Some((pid, wid));
                         }
-                        action(self, KeyRoute::Process(pid), Some(&window))
-                    }
+                        action(this, KeyRoute::Process(pid), Some(&window))
+                    }),
                     DeliveryMode::Foreground => skylight::with_foreground(pid, || {
                         crate::ax::prepare_foreground_input(&window)?;
                         if let Some(hold) = mouse {

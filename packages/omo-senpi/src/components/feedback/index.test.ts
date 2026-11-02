@@ -76,9 +76,22 @@ const sessionCtx = {
 }
 
 describe("feedback component", () => {
+  test.each(["description", "identity", "environment", "session", "logs", "crash", "config", undefined, "unknown"])("#given a secret refusal naming %j #when submitted over RPC #then the runtime preserves the validated section", async (sectionId) => {
+    const { api, handlers, component } = host({
+      withRedactor: true,
+      response: () => Response.json({ error: { code: "secret_detected", detail: { sectionId } } }, { status: 400 }),
+    })
+    await component.register(api, { logger: console, config: { getFlag: () => undefined } })
+    const draft = await handlers.get(FEEDBACK_PREPARE_RPC_METHOD)?.({}) as FeedbackDraft
+    const result = await handlers.get(FEEDBACK_SUBMIT_RPC_METHOD)?.({ draftId: draft.draftId, description: "synthetic" })
+    const valid = sectionId !== undefined && sectionId !== "unknown"
+    expect(result).toEqual({ kind: "refused", reason: "secret-detected", ...(valid ? { sectionId } : {}) })
+  })
+
   test("#given no usable OS credential store #when /bug sends #then anonymous reporting remains available", async () => {
     const { pi, api, component, requests } = host({ withRedactor: true, credentialStore: {
       read: async () => { throw new KeychainLockedError("locked") },
+      readAuthoritative: async () => { throw new KeychainLockedError("locked") },
       write: async () => { throw new Error("must not write") },
       clear: async () => { throw new Error("must not clear") },
     } })
@@ -111,6 +124,9 @@ describe("feedback component", () => {
       ? { ...grant, ...privateKeys, accessTokenExpiresAt: "2000-01-01T00:00:00.000Z" }
       : { ...grant, ...privateKeys, refreshState: "uncertain" as const }
     await store.write(credentials)
+    const stored = await store.read()
+    expect(stored).toMatchObject(credentials)
+    expect(typeof stored?.credentialGeneration).toBe("string")
     await component.register(api, { logger: console, config: { getFlag: () => undefined } })
     const levels: (string | undefined)[] = []
     const ctx = { ...sessionCtx, ui: { input: async () => undefined, select: async () => "Send report", notify: (_message: string, level?: string) => levels.push(level) } }
@@ -120,7 +136,7 @@ describe("feedback component", () => {
     expect(new Headers(requests[0]?.headers).has("authorization")).toBe(false)
     expect(levels).toEqual(["warning", "info"])
     expect(refreshes).toEqual([])
-    expect(await store.read()).toEqual(credentials)
+    expect(await store.read()).toEqual(stored)
   })
 
   test.each([401, 403, "network"] as const)("#given a %s failure #when /bug sends #then authentication and network actions stay distinct", async (failure) => {

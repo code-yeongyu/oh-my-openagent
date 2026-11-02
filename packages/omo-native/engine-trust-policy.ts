@@ -205,10 +205,18 @@ export function selectEngineTrust(facts: EngineTrustFacts): EngineTrustSelection
     default: unreachable(facts)
   }
   for (const root of S) anchors.add(root)
+  // macOS reports a BasicX509 chain (design revision 12, option C), so the EKU rule covers every certificate
+  // on the path; a member the facts do not describe cannot be checked and excludes the intermediate.
+  // Windows' CryptoAPI SSL verdict already applies usage, and its path may name bundled roots.
+  const described = new Map<string, TrustCertificate>(facts.certificates.map((cert): [string, TrustCertificate] => [cert.sha256, cert]))
+  const pathUsable = (path: readonly CertificateId[]): boolean => facts.os !== "macos" || path.every((id) => {
+    const member = described.get(id.sha256)
+    return member !== undefined && serverAuth(member.eku)
+  })
   for (const cert of intermediates) {
     const chain = cert.chain
     if (chain && chain.anchor !== null && anchors.has(chain.anchor.sha256) && !isDenied(chain.anchor)
-      && !chain.explicitDistrust && !isDenied(cert) && !chain.path.some(isDenied)
+      && !chain.explicitDistrust && !isDenied(cert) && !chain.path.some(isDenied) && pathUsable(chain.path)
       && serverAuth(cert.eku) && !S.has(cert.sha256)) I.add(cert.sha256)
   }
   return {

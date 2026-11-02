@@ -434,6 +434,7 @@ A record of agent name to definition (`schema/agent.ts`).
 | `prompt` | string | |
 | `model` | string | Sugar for a single-entry `models` list. |
 | `models` | model entries | Ordered chain; each entry is a bare string or `{ model, reasoning?, temperature?, top_p?, max_tokens?, provider_options? }`. |
+| `models_distribution` | `sequential \| round_robin` | Starting model policy for new tasks; defaults to `sequential`. Also supported on categories. |
 | `reasoning` | `off \| minimal \| low \| medium \| high \| xhigh \| max \| auto` \| string | Canonical reasoning field. |
 | `tools` | record<string, boolean> | |
 | `execution_mode` | `in-process \| process` | overrides `task.default_execution_mode`; curated builtin agents remain in-process |
@@ -444,6 +445,38 @@ A record of agent name to definition (`schema/agent.ts`).
 | `max_turns` | int >= 0 | |
 | `temperature` | number 0..2 | |
 | `disable` | boolean | |
+
+#### Distributing task models
+
+Set `models_distribution` next to `models` on a category or agent.
+`sequential` (the default) preserves the existing order. `round_robin` starts
+successive new children at successive entries: `[A, B, C]`, then `[B, C, A]`,
+then `[C, A, B]`. Parallel spawns reserve separate turns. Each category and agent
+has its own in-memory cursor within the task planner; restarting it resets the
+cursor. Inspection does not advance it.
+
+The choice is made once at spawn, not between messages or when resuming a
+child, so prompt caching is not disturbed. Unavailable models are still skipped,
+and error fallback and cooldowns still apply in the rotated order, without
+trying a model twice. This distributes model entries, not accounts within a
+provider.
+
+```jsonc
+{
+  "categories": {
+    "distributed": {
+      "models": ["provider-a/model-a", "provider-b/model-b", "provider-c/model-c"],
+      "models_distribution": "round_robin"
+    }
+  },
+  "agents": {
+    "researcher": {
+      "models": ["provider-a/model-a", "provider-b/model-b"],
+      "models_distribution": "round_robin"
+    }
+  }
+}
+```
 
 Deprecated keys accepted for back-compat and rewritten by migration:
 

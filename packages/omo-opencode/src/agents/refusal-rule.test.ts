@@ -1,85 +1,55 @@
 import { describe, expect, test } from "bun:test"
-import { type AtlasPromptSource, createAtlasAgent, getAtlasPromptSource } from "./atlas/agent"
-import { getHephaestusPrompt, getHephaestusPromptSource, type HephaestusPromptSource } from "./hephaestus/agent"
+import { PROMPT_PRESET_MODEL_CASES } from "@code-yeongyu/senpi/prompt-presets"
+import { createAtlasAgent } from "./atlas/agent"
+import { getHephaestusPrompt, isHephaestusSupportedModel } from "./hephaestus/agent"
+import { reconcileNativeModelPrompts } from "./native-model-prompt"
 import { REFUSAL_IS_FINAL_RULE } from "./refusal-rule"
-import { createSisyphusAgent, resolveSisyphusPromptFamily, type SisyphusPromptFamily } from "./sisyphus-agent-factory"
-import {
-  buildSisyphusJuniorPrompt,
-  getSisyphusJuniorPromptSource,
-  type SisyphusJuniorPromptSource,
-} from "./sisyphus-junior/agent"
+import { createSisyphusAgent } from "./sisyphus-agent-factory"
+import { buildSisyphusJuniorPrompt } from "./sisyphus-junior/agent"
 
-// Record<Union, model> makes the route list exhaustive at compile time: a new prompt route without a
-// model here fails typecheck, so no route can miss the rule.
-const SISYPHUS_ROUTES: Record<SisyphusPromptFamily, string> = {
-  "kimi-k3-1": "kimi-coding/k3.1-pro",
-  "kimi-k3": "opencode-go/kimi-k3",
-  "kimi-k2-7": "kimi-for-coding/k2p7",
-  "kimi-k2-6": "moonshotai/kimi-k2.6",
-  "gpt-5-5": "openai/gpt-5.5",
-  "gpt-5-4": "openai/gpt-5.4",
-  "claude-fable-5": "anthropic/claude-fable-5",
-  "claude-opus-5": "anthropic/claude-opus-5",
-  "claude-opus-4-8": "anthropic/claude-opus-4-8",
-  "claude-opus-4-7": "anthropic/claude-opus-4-7",
-  "glm-5-2": "zai/glm-5.2",
-  "grok-4": "xai/grok-4.5",
-  fallback: "anthropic/claude-sonnet-4-6",
-}
+// One model per Native preset (senpi's own case table) plus an uncatalogued model for the default core,
+// so a new preset is covered without editing this file.
+const ROUTES = [
+  ...PROMPT_PRESET_MODEL_CASES.map((entry) => ({ model: `${entry.providerID}/${entry.modelID}`, preset: entry.preset })),
+  { model: "synthetic/vendor/uncatalogued-model", preset: "default" },
+]
 
-const JUNIOR_ROUTES: Record<SisyphusJuniorPromptSource, string> = {
-  default: "anthropic/claude-sonnet-5",
-  "kimi-k2": "moonshotai/kimi-k2.6",
-  "kimi-k2-7": "kimi-for-coding/k2p7",
-  "kimi-k3": "opencode-go/kimi-k3",
-  "kimi-k3-1": "kimi-coding/k3.1-pro",
-  gpt: "openai/gpt-5.2",
-  "gpt-5-5": "openai/gpt-5.5",
-  "gpt-5-4": "openai/gpt-5.4",
-  gemini: "google/gemini-3.1-pro",
-  "glm-5-2": "zai/glm-5.2",
-}
+const once = (prompt: string | undefined) => (prompt ?? "").split(REFUSAL_IS_FINAL_RULE).length - 1
 
-const HEPHAESTUS_ROUTES: Record<HephaestusPromptSource, string> = {
-  "gpt-5-6": "openai/gpt-6-astra",
-  "gpt-5-5": "openai/gpt-5.5",
-  "gpt-5-4": "openai/gpt-5.4",
-  gpt: "openai/gpt-5.3-codex",
-}
-
-const ATLAS_ROUTES: Record<AtlasPromptSource, string> = {
-  default: "anthropic/claude-sonnet-4-6",
-  gpt: "openai/gpt-5.5",
-  gemini: "google/gemini-3.1-pro",
-  kimi: "moonshotai/kimi-k2.6",
-  "kimi-k3": "opencode-go/kimi-k3",
-  "kimi-k3-1": "kimi-coding/k3.1-pro",
-  "kimi-k2-7": "kimi-for-coding/k2p7",
-  "opus-4-7": "anthropic/claude-opus-4-7",
-  glm: "zai/glm-5.2",
-}
-
-const once = (prompt: string) => prompt.split(REFUSAL_IS_FINAL_RULE).length - 1
+const agents = [
+  { name: "sisyphus", render: (model: string) => createSisyphusAgent(model).prompt },
+  { name: "sisyphus-junior", render: (model: string) => buildSisyphusJuniorPrompt(model, false) },
+  { name: "sisyphus-junior/tasks", render: (model: string) => buildSisyphusJuniorPrompt(model, true) },
+  { name: "atlas", render: (model: string) => createAtlasAgent({ model }).prompt },
+  { name: "hephaestus", render: (model: string) => getHephaestusPrompt(model), permits: isHephaestusSupportedModel },
+]
 
 describe("every agent prompt route carries the refusal-is-final rule exactly once", () => {
-  test.each(Object.entries(SISYPHUS_ROUTES))("#given Sisyphus route %s #then its prompt carries the rule", (family, model) => {
-    expect(resolveSisyphusPromptFamily(model)).toBe(family as SisyphusPromptFamily)
-    expect(once(createSisyphusAgent(model).prompt ?? "")).toBe(1)
+  test("the route table covers more than one preset", () => {
+    expect(new Set(ROUTES.map((route) => route.preset)).size).toBeGreaterThan(1)
   })
 
-  test.each(Object.entries(JUNIOR_ROUTES))("#given Sisyphus-Junior route %s #then its prompt carries the rule", (source, model) => {
-    expect(getSisyphusJuniorPromptSource(model)).toBe(source as SisyphusJuniorPromptSource)
-    expect(once(buildSisyphusJuniorPrompt(model, false))).toBe(1)
-    expect(once(buildSisyphusJuniorPrompt(model, true, "appended by the user"))).toBe(1)
-  })
+  for (const agent of agents) {
+    test(`${agent.name} carries the rule once on every route and after a runtime model switch`, () => {
+      const routes = ROUTES.filter((route) => !agent.permits || agent.permits(route.model))
+      expect(routes.length).toBeGreaterThan(0)
+      const wrong: string[] = []
+      for (const route of routes) {
+        const prompt = agent.render(route.model)
+        if (once(prompt) !== 1) wrong.push(route.model)
+        const target = routes.find((other) => other.preset !== route.preset) ?? route
+        const switched = [prompt ?? ""]
+        reconcileNativeModelPrompts(switched, target.model)
+        if (once(switched[0]) !== 1) wrong.push(`${route.model} -> ${target.model}`)
+      }
+      expect(wrong).toEqual([])
+    })
+  }
 
-  test.each(Object.entries(HEPHAESTUS_ROUTES))("#given Hephaestus route %s #then its prompt carries the rule", (source, model) => {
-    expect(getHephaestusPromptSource(model)).toBe(source as HephaestusPromptSource)
-    expect(once(getHephaestusPrompt(model))).toBe(1)
-  })
-
-  test.each(Object.entries(ATLAS_ROUTES))("#given Atlas route %s #then its prompt carries the rule", (source, model) => {
-    expect(getAtlasPromptSource(model)).toBe(source as AtlasPromptSource)
-    expect(once(createAtlasAgent({ model }).prompt ?? "")).toBe(1)
+  test("sisyphus-junior keeps the user's prompt_append after the rule", () => {
+    const prompt = buildSisyphusJuniorPrompt("anthropic/claude-sonnet-5", false, "APPENDED_BY_THE_USER")
+    expect(once(prompt)).toBe(1)
+    expect(prompt.endsWith("APPENDED_BY_THE_USER")).toBe(true)
+    expect(prompt.indexOf(REFUSAL_IS_FINAL_RULE)).toBeLessThan(prompt.indexOf("APPENDED_BY_THE_USER"))
   })
 })

@@ -79,13 +79,43 @@ export function desktopEngineTarget(target: string): DesktopEngineTarget {
   return entry
 }
 
-/** Only the exact Rust target output is eligible; no host release fallback. */
-export function stageCompiledDesktopEngine(
+const ENGINE_TRUST_HELPER = "omo-engine-trust-helper"
+
+export type EngineTrustHelperTarget = {
+  readonly target: string
+  readonly available: boolean
+  readonly host: string | null
+  /** Path inside the downloaded desktop-engine-<host> artifact. */
+  readonly asset: string | null
+  readonly source: string | null
+  readonly payload: string | null
+}
+
+/**
+ * The engine CA importer's fact helper (omo#10762) ships beside the desktop engine on the Darwin and Windows
+ * hosts; Linux reads its trust store from files and ships none. Baseline targets reuse their x64 host build.
+ */
+export function engineTrustHelperTarget(target: string): EngineTrustHelperTarget {
+  const { host } = desktopEngineTarget(target)
+  if (host === null || !(host.startsWith("darwin-") || host.startsWith("win32-"))) {
+    return { target, available: false, host: null, asset: null, source: null, payload: null }
+  }
+  const binary = host.startsWith("win32-") ? `${ENGINE_TRUST_HELPER}.exe` : ENGINE_TRUST_HELPER
+  return {
+    target, available: true, host,
+    asset: `engine-trust-helper-${host}/${binary}`,
+    source: `target/${desktopEngineRustTarget(host)}/release/${binary}`,
+    payload: `native/prebuilds/${host}/${binary}`,
+  }
+}
+
+function stageCompiledExecutable(
+  what: string,
   target: string,
+  entry: { readonly source: string | null; readonly payload: string | null },
   stageDir: string,
-  sourceRoot: string = resolve(dirname(import.meta.dir)),
+  sourceRoot: string,
 ): string | null {
-  const entry = desktopEngineTarget(target)
   if (entry.source === null || entry.payload === null) return null
   const source = join(sourceRoot, entry.source)
   let stats
@@ -93,11 +123,11 @@ export function stageCompiledDesktopEngine(
     stats = statSync(source)
   } catch (error) {
     if (error instanceof Error && "code" in error && error.code === "ENOENT") {
-      throw new Error(`missing required desktop engine for ${target}: ${source}`)
+      throw new Error(`missing required ${what} for ${target}: ${source}`)
     }
     throw error
   }
-  if (!stats.isFile()) throw new Error(`missing required desktop engine for ${target}: ${source}`)
+  if (!stats.isFile()) throw new Error(`missing required ${what} for ${target}: ${source}`)
   const destination = join(stageDir, entry.payload)
   mkdirSync(dirname(destination), { recursive: true })
   copyFileSync(source, destination)
@@ -105,14 +135,32 @@ export function stageCompiledDesktopEngine(
   return entry.payload
 }
 
+/** Only the exact Rust target output is eligible; no host release fallback. */
+export function stageCompiledDesktopEngine(
+  target: string,
+  stageDir: string,
+  sourceRoot: string = resolve(dirname(import.meta.dir)),
+): string | null {
+  return stageCompiledExecutable("desktop engine", target, desktopEngineTarget(target), stageDir, sourceRoot)
+}
+
+/** Same contract as the engine: an available target without its exact Rust output fails closed. */
+export function stageCompiledEngineTrustHelper(
+  target: string,
+  stageDir: string,
+  sourceRoot: string = resolve(dirname(import.meta.dir)),
+): string | null {
+  return stageCompiledExecutable("engine trust helper", target, engineTrustHelperTarget(target), stageDir, sourceRoot)
+}
+
 if (import.meta.main) {
   const [flag, target, extra] = process.argv.slice(2)
-  if (flag !== "--target" || target === undefined || extra !== undefined) {
-    console.error("usage: bun script/release-desktop-engine-target.ts --target <platform>")
+  if ((flag !== "--target" && flag !== "--trust-helper-target") || target === undefined || extra !== undefined) {
+    console.error("usage: bun script/release-desktop-engine-target.ts --target <platform> | --trust-helper-target <platform>")
     process.exitCode = 2
   } else {
     try {
-      console.log(JSON.stringify(desktopEngineTarget(target)))
+      console.log(JSON.stringify(flag === "--target" ? desktopEngineTarget(target) : engineTrustHelperTarget(target)))
     } catch (error) {
       console.error(error instanceof Error ? error.message : String(error))
       process.exitCode = 1

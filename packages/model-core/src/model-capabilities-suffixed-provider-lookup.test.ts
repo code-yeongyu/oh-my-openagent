@@ -47,9 +47,9 @@ describe("getModelCapabilities provider lookup for suffixed model ids", () => {
       readConnectedProvidersCache: () => null,
       findProviderModelMetadata: (_providerID: string, modelID: string) =>
         modelID === "o3:high"
-          ? ({ id: "o3:high", temperature: false } as ModelMetadata)
+          ? { id: "o3:high", temperature: false }
           : modelID === "o3"
-            ? ({ id: "o3", temperature: true } as ModelMetadata)
+            ? { id: "o3", temperature: true }
             : undefined,
     }
 

@@ -15,7 +15,7 @@ use super::Mutation;
 use crate::request::Op;
 use crate::test_support::{click_window, harness, Harness};
 
-mod requests;
+pub(crate) mod requests;
 use requests::request_for;
 
 fn click_desktop_mutation() -> Mutation<'static> {

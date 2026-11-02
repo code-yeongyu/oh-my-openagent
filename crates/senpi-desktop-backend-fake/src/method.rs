@@ -38,6 +38,7 @@ pub enum FakeMethod {
     AxPerform,
     AxSetValue,
     AxFocus,
+    AxTypeText,
     AxElementAt,
     AxFocusedElement,
     AxAttributes,
@@ -55,6 +56,8 @@ pub enum AxWrite {
     AxPerform,
     AxSetValue,
     AxFocus,
+    /// The insertion write of `ax.typeText` into a native text field.
+    AxTypeText,
 }
 
 impl AxWrite {
@@ -63,6 +66,7 @@ impl AxWrite {
             Self::AxPerform => FakeMethod::AxPerform,
             Self::AxSetValue => FakeMethod::AxSetValue,
             Self::AxFocus => FakeMethod::AxFocus,
+            Self::AxTypeText => FakeMethod::AxTypeText,
         }
     }
 }

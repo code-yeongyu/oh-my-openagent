@@ -3,7 +3,7 @@ import type { GitMemoryRepo } from "../git"
 import type { CompiledBlockStore } from "./block-persist"
 import { compileMemoryBlockWithReads, type CompileMemoryBlockOptions, type MemoryExpiry } from "./compile"
 import { expirySlot } from "./expiry-slot"
-import { DEFAULT_EXTERNAL_PROJECTION_LIMITS } from "./external-projection"
+import { DEFAULT_EXTERNAL_PROJECTION_LIMITS } from "./external-projection-limits"
 
 export const MEMORY_TEMPLATE_STRUCTURE_VERSION = "senpi-memory-v2"
 
