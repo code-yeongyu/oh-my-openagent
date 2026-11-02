@@ -110,6 +110,8 @@ const fixtures = [
   { id: "long-comment-cr", text: rootPem + `${"x".repeat(230)}\rtext\n`, expected: dropped("pem-noncanonical", 1, true) },
   { id: "long-comment-high-byte", text: rootPem + `${"x".repeat(230)}\u00fftext\n`, expected: dropped("pem-noncanonical", 1, true) },
   { id: "long-comment-dashes", text: rootPem + `${"x".repeat(230)} ----- text\n`, expected: dropped("pem-noncanonical", 1, true) },
+  // A "-----" run straddling BIO_gets' 253-byte read boundary: no single read starts with it, the whole line holds it.
+  { id: "dashes-across-split", text: rootPem + `${"x".repeat(250)}-----BEGIN OTHER-----\n`, expected: dropped("pem-noncanonical", 1, true) },
   // Inside a block the cap stays: a body line is read by BIO_gets too, and the gate keeps every block line short.
   { id: "long-block-line", text: rootPem + `-----BEGIN OTHER-----\n${"A".repeat(204)}\n-----END OTHER-----\n`, expected: dropped("pem-noncanonical", 1, true) },
 ]
@@ -297,7 +299,7 @@ test.skipIf(process.platform === "win32")("never imports R beyond real Bun's acc
     console.log(`oracle narrowings: ${narrowings.join(", ")}`)
     expect([...narrowings].sort()).toEqual(["c4", ...exposed, "long-label", "mid-cr", "form-feed", "high-byte",
       "lowercase-label", "blank-body", "space-only-header-line", "long-comment-cr", "long-comment-high-byte",
-      "long-comment-dashes", "long-block-line"].sort())
+      "long-comment-dashes", "long-block-line", "dashes-across-split"].sort())
   } finally {
     const closed = once(server, "close", { signal: AbortSignal.timeout(10_000) })
     server.closeAllConnections()
