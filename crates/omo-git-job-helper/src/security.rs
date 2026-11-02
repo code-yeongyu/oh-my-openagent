@@ -39,17 +39,22 @@ fn own_token() -> Result<Owned, u32> {
     Owned::new(token).ok_or(0)
 }
 
-/// `GetTokenInformation` into an aligned buffer large enough for every class read here.
-fn token_info(token: &Owned, class: TOKEN_INFORMATION_CLASS) -> Result<[u64; 64], u32> {
+/// `GetTokenInformation` into an aligned 512-byte buffer, passing `length`: fixed-size classes such as
+/// TokenElevation refuse any other length with ERROR_BAD_LENGTH.
+fn token_info(
+    token: &Owned,
+    class: TOKEN_INFORMATION_CLASS,
+    length: u32,
+) -> Result<[u64; 64], u32> {
     let mut buffer = [0u64; 64];
     let mut returned = 0u32;
-    // SAFETY: `buffer` is 512 aligned, writable bytes.
+    // SAFETY: `buffer` is 512 aligned, writable bytes and the length passed never exceeds that.
     if unsafe {
         GetTokenInformation(
             token.raw(),
             class,
             buffer.as_mut_ptr().cast(),
-            512,
+            length.min(512),
             &mut returned,
         )
     } == 0
@@ -60,7 +65,7 @@ fn token_info(token: &Owned, class: TOKEN_INFORMATION_CLASS) -> Result<[u64; 64]
 }
 
 fn user_sid_text(token: &Owned) -> Result<String, u32> {
-    let buffer = token_info(token, TokenUser)?;
+    let buffer = token_info(token, TokenUser, 512)?;
     let mut text = null_mut();
     // SAFETY: the buffer starts with a TOKEN_USER whose SID lives inside the same buffer.
     if unsafe {
@@ -111,10 +116,11 @@ pub fn job_attributes() -> Result<JobAttributes, u32> {
 /// (TokenElevation, integrity RID). Integrity is the reliable fact for a restricted token (round-3 note 8).
 pub fn token_facts() -> Result<(bool, u32), u32> {
     let token = own_token()?;
-    let elevation = token_info(&token, TokenElevation)?;
+    let elevation_size = u32::try_from(std::mem::size_of::<TOKEN_ELEVATION>()).unwrap_or(4);
+    let elevation = token_info(&token, TokenElevation, elevation_size)?;
     // SAFETY: the buffer starts with a TOKEN_ELEVATION.
     let elevated = unsafe { (*elevation.as_ptr().cast::<TOKEN_ELEVATION>()).TokenIsElevated != 0 };
-    let label = token_info(&token, TokenIntegrityLevel)?;
+    let label = token_info(&token, TokenIntegrityLevel, 512)?;
     // SAFETY: the buffer starts with a TOKEN_MANDATORY_LABEL whose SID lives inside the same buffer; the last
     // sub-authority of a mandatory-label SID is the integrity RID.
     let integrity = unsafe {

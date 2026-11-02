@@ -31,7 +31,7 @@ pub fn selftest() -> Exit {
     };
     let joined =
         job::create(&name, &attributes).and_then(|floor| floor.join_self().map(|()| floor));
-    let _floor = match joined {
+    let floor = match joined {
         Ok(floor) => floor,
         Err(error) => {
             let (detail, exit) = error.describe();
@@ -48,5 +48,11 @@ pub fn selftest() -> Exit {
             "selftest ok elevated=unknown integrity=unknown:{error}"
         )),
     }
-    Exit::Ok
+    // Exit while F is held, as `run` does: dropping its only handle first would let kill-on-close end this
+    // process with code 0.
+    hold_and_exit(&floor)
+}
+
+fn hold_and_exit(_floor: &job::FloorJob) -> Exit {
+    std::process::exit(Exit::Ok.code())
 }

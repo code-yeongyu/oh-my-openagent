@@ -104,6 +104,12 @@ fn prepare(op: &OpId, control: &Control) -> Result<(FloorJob, Owned), (String, E
     Ok((floor, port))
 }
 
+/// Ends the process while F is still held: dropping the only handle first would let kill-on-close terminate H itself
+/// (exit code 0) before its own code is set. Process rundown then closes F with nothing else left to kill.
+fn exit_holding(_floor: &FloorJob, exit: Exit) -> ! {
+    std::process::exit(exit.code())
+}
+
 pub fn run(op: &OpId, linger_ms: u32) -> Exit {
     // SAFETY: plain queries about this process.
     let (pid, created) = unsafe { (GetCurrentProcessId(), creation_time(GetCurrentProcess())) };
@@ -121,35 +127,36 @@ pub fn run(op: &OpId, linger_ms: u32) -> Exit {
         }
     };
     if !control.report(&format!("joined {pid} {created}")) {
-        return Exit::Cancelled;
+        exit_holding(&floor, Exit::Cancelled);
     }
     let mut reader = FrameReader::default();
     let request = match await_go(&mut control, port.raw(), &mut reader) {
         Ended::Go(request) => request,
         Ended::Cancel => {
             control.report("cancelled");
-            return Exit::Cancelled;
+            exit_holding(&floor, Exit::Cancelled);
         }
-        Ended::Eof => return Exit::Cancelled,
-        Ended::PortFailed => return Exit::PortFailed,
+        Ended::Eof => exit_holding(&floor, Exit::Cancelled),
+        Ended::PortFailed => exit_holding(&floor, Exit::PortFailed),
     };
     let root = match spawn::spawn_root(&request) {
         Ok(root) => root,
         Err(error) => {
             control.report(&format!("spawn-failed {error}"));
-            return Exit::SpawnFailed;
+            exit_holding(&floor, Exit::SpawnFailed);
         }
     };
     control.report(&format!("spawned {} {}", root.pid, root.created));
     spawn::close_standard_handles();
-    running(
+    let exit = running(
         &mut control,
         &floor,
         port.raw(),
         &root,
         &mut reader,
         linger_ms,
-    )
+    );
+    exit_holding(&floor, exit)
 }
 
 fn handle_frames(reader: &mut FrameReader, root: &Root) {
