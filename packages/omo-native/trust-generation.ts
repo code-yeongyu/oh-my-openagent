@@ -149,7 +149,12 @@ async function immutableFile(directory: string, prefix: string, text: string): P
   const sha256 = digest(text)
   const file = join(directory, `${prefix}${sha256}.pem`)
   try {
-    if (await readOwnedTrustFile(file) === text) return { file, sha256 }
+    if (await readOwnedTrustFile(file) === text) {
+      // Reuse is use: retention ranks by mtime, and the caller is about to hand this path out (5.3).
+      const now = new Date()
+      await fs.utimes(file, now, now).catch(() => {})
+      return { file, sha256 }
+    }
   } catch (error) {
     if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error
   }
@@ -226,16 +231,23 @@ export async function createTrustDefaults(directory: string) {
   return defaults
 }
 
-export async function leaseTrustGeneration(marker: EngineTrustMarker): Promise<TrustDiagnosticEntry[]> {
+type GenerationName = Pick<EngineTrustMarker, "file" | "sha256">
+
+/** 5.3: `leases/<sha256>.<pid>` holding `{ v, pid, bootAtMs }`, renamed into place, so the same pid replaces its lease. */
+export async function leaseTrustGeneration(marker: GenerationName, pid = process.pid): Promise<TrustDiagnosticEntry[]> {
   const directory = dirname(marker.file)
   try {
     await createPrivateDirectory(join(directory, "leases"))
-    const path = join(directory, "leases", `${marker.sha256}.${process.pid}`)
-    await atomicWrite(path, JSON.stringify({ v: 1, pid: process.pid, bootAtMs }))
-    if (leases.size === 0) process.once("exit", () => {
-      for (const lease of leases) { try { unlinkSync(lease) } catch {} }
-    })
-    leases.add(path)
+    const path = join(directory, "leases", `${marker.sha256}.${pid}`)
+    await atomicWrite(path, JSON.stringify({ v: 1, pid, bootAtMs }))
+    // Only this process's own leases end with it. A lease written for another pid (`trust ensure
+    // --lease-pid`) must outlive this process; it dies when that pid does.
+    if (pid === process.pid) {
+      if (leases.size === 0) process.once("exit", () => {
+        for (const lease of leases) { try { unlinkSync(lease) } catch {} }
+      })
+      leases.add(path)
+    }
     const now = new Date()
     await fs.utimes(marker.file, now, now)
     return []
@@ -244,6 +256,6 @@ export async function leaseTrustGeneration(marker: EngineTrustMarker): Promise<T
   }
 }
 
-export async function retainTrustGeneration(marker: EngineTrustMarker): Promise<void> {
+export async function retainTrustGeneration(marker: GenerationName): Promise<void> {
   await sweepTrustRetention({ directory: dirname(marker.file), current: marker.sha256, bootAtMs, isPidAlive: pidAnswersSignalZero })
 }
