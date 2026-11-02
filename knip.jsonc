@@ -2930,6 +2930,8 @@
         "src/components/memory/commands/runtime.ts",
         "src/components/memory/device-session/account-runtime.ts",
         // spawned by path from tests: a child process or Worker entry, never imported
+        // compiled by path with `bun build --compile` in channel-compiled.test.ts
+        "src/components/memory/desktop-sync/channel-compiled.fixture.ts",
         "src/components/memory/desktop-sync/hostSelection.fixture.ts",
         "src/components/memory/device-session/sibling-writer.fixture.ts",
         "src/components/memory/index-engine.fixture.ts",
