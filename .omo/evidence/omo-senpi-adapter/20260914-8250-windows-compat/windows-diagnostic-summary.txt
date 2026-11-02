@@ -1,4 +1,0 @@
-Windows diagnostic summary: run 34804691478
-identity probes: 2063 total; 2061 current PID; 2 foreign PID
-elapsed: 661.9s cumulative; median 305.1ms; p95 409.4ms; max 2416.6ms
-replacement fixture: rename failed EPERM while report handle was open

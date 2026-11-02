@@ -1,1 +1,0 @@
-export { createDirectoryAgentsInjectorHook } from "./hook";
