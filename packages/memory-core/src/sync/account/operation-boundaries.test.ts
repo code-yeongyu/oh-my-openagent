@@ -3,6 +3,7 @@ import * as fs from "node:fs/promises"
 import { basename } from "node:path"
 import * as journal from "../../journal/fsync.ts"
 import { renameWithContentionRetry } from "../../fs/rename-contention.ts"
+import { landsIn } from "../../fs/spy-scope.test-support.ts"
 import { signedAppend } from "../recovery/keyring-append.ts"
 import { pinTrustAnchor, loadTrustAnchor } from "../crypto/trust-pin.ts"
 import { walk, EMPTY_HEAD } from "../genesis/vector.test-support.ts"
@@ -76,7 +77,11 @@ test("published pin finishes parent fsync and readback even when its owner retir
   if (!result.ok || result.state.pin === null) throw new Error("fixture walk")
   const { controller, operation } = operationScope()
   const original = fs.rename
-  const renamed = spyOn(fs, "rename").mockImplementation(async (from, to) => { await original(from, to); controller.abort() })
+  const renamed = spyOn(fs, "rename").mockImplementation(async (from, to) => {
+    if (!landsIn(f.input.pinDir, String(to))) return original(from, to)
+    await original(from, to)
+    controller.abort()
+  })
   cleanup.push(() => renamed.mockRestore())
   const synced: string[] = []
   const sync = journal.syncJournalDirectory
@@ -153,6 +158,7 @@ test("published intent finishes durability after cancellation and resumes withou
   const { controller, operation } = operationScope()
   const original = fs.rename
   const renamed = spyOn(fs, "rename").mockImplementation(async (from, to) => {
+    if (!landsIn(f.input.pinDir, String(to))) return original(from, to)
     await original(from, to)
     if (String(to).split(/[\\/]/).includes("genesis-intent")) controller.abort()
   })
