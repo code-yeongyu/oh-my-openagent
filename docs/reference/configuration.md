@@ -981,7 +981,7 @@ skill execution paths, not new values of `browser_automation_engine.provider`.
 
 ### Tmux Integration
 
-Run background subagents in separate tmux panes. Requires running inside tmux with `opencode --port <port>`.
+Run background subagents in separate tmux panes. Requires running inside tmux with `opencode --port <port>`. With `multiplexer: "herdr"` the same subagent panes render as herdr tabs instead (see `multiplexer` below) and no tmux session is required — only a `herdr` binary on PATH (or `HERDR_BIN_PATH`).
 
 ```json
 {
@@ -997,14 +997,16 @@ Run background subagents in separate tmux panes. Requires running inside tmux wi
 }
 ```
 
-#### `multiplexer` — team visualization backend
+#### `multiplexer` — visualization backend
 
-Selects which multiplexer renders team-mode visualization panes:
+Selects which multiplexer renders team-mode and subagent panes:
 
 - `"tmux"` (default): panes live in tmux windows/sessions; requires running inside tmux.
 - `"herdr"`: one [Herdr](https://herdr.dev) workspace per team (`omo-team-<teamRunId>`), one tab per member running the same `opencode attach` line. Works from any terminal (no tmux session required); the headless `herdr server` is started on demand and members keep running in it. Env override: `OMO_TMUX_MULTIPLEXER=herdr`.
 
-Team runtime state stores herdr pane ids (`wN:pM`, alphanumeric past `w9`) in the same `tmuxLayout` fields; teardown and the stale-workspace sweep branch on that id grammar. The tmux-subagent pane manager remains tmux-only for now.
+On `herdr`, background subagent panes follow the same model: one workspace per omo process (`omo-agents-<pid>[-<managerId>]`, mirroring the tmux isolated-session naming) with one tab per subagent, the attach command delivered at spawn. Every `isolation` mode maps to that tab shape, the environment gate is herdr binary presence instead of a tmux session, and a stale sweep closes `omo-agents-<pid>` workspaces whose owning process is gone (skipping any that still host a live agent).
+
+Team runtime state stores herdr pane ids (`wN:pM`, alphanumeric past `w9`) in the same `tmuxLayout` fields; teardown and the stale-workspace sweep branch on that id grammar.
 ```
 
 | Option                 | Default         | Description                                                                         |
@@ -1015,6 +1017,7 @@ Team runtime state stores herdr pane ids (`wN:pM`, alphanumeric past `w9`) in th
 | `main_pane_min_width`  | `120`           | Min main pane columns                                                               |
 | `agent_pane_min_width` | `40`            | Min agent pane columns                                                              |
 | `isolation`            | `inline`        | `inline` / `window` / `session`                                                     |
+| `multiplexer`          | `tmux`          | `tmux` / `herdr` — herdr renders subagent and team panes as tabs, no tmux needed     |
 
 ### Git Master
 
