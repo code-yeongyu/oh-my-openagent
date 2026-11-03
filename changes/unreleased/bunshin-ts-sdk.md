@@ -1,0 +1,3 @@
+### Added
+
+- omo Native eval cells can reach this user's machines through the bunshin TypeScript SDK: the plugin bundles `@bunshin/bunshin-ts` and `@sisyphuslabs/bunshin-ts-relay` into `runtime/bunshin-ts/sdk.js`, publishes its directory as `OMO_BUNSHIN_TS_SDK_ROOT` at activation, and the installer requires it. `pickTransport` (`BUNSHIN_TS_TRANSPORT` = `auto`, `relay` or `hub`) uses the local device service when it reports connected; this build bundles no hub transport. A `bunshin` skill pointer and removed-tool hint teach the import. ([#12251](https://github.com/code-yeongyu/oh-my-openagent/issues/12251))

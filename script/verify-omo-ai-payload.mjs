@@ -28,6 +28,8 @@ const REQUIRED_ARTIFACTS = [
   "plugin/runtime/ast-grep-mcp/cli.js",
   "plugin/runtime/dag/sdk.js",
   "plugin/runtime/agent-toolkit-sdk/sdk.js",
+  // Eval cells import the fleet SDK from OMO_BUNSHIN_TS_SDK_ROOT; the installer requires it too.
+  "plugin/runtime/bunshin-ts/sdk.js",
   // omo thread and omo daemon adopt import it (bin/lib/thread.js).
   "plugin/runtime/thread-sdk/sdk.js",
   // omo doctor / omo setup classify task-category coverage through it (bin/lib/category-coverage.js).

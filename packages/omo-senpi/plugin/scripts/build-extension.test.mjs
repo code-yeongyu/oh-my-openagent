@@ -557,6 +557,7 @@ describe("checkExtensionCurrent", () => {
       "#omo-telemetry-recovery-runtime": "./extensions/omo-telemetry-recovery.js",
       "#telemetry-immediate-send": "./extensions/omo-telemetry-recovery.js",
       "#omo-agent-toolkit-sdk": "./runtime/agent-toolkit-sdk/sdk.js",
+      "#bunshin-ts": "./runtime/bunshin-ts/sdk.js",
     })
   })
 })

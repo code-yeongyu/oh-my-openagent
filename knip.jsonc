@@ -2921,6 +2921,8 @@
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
         "scripts/qa/fused-equivalence-e2e.mjs",
+        // run by path as the bunshin-ts eval SDK's live QA driver (scripts/qa/AGENTS.md)
+        "scripts/qa/bunshin-ts-eval-sdk-qa.mjs",
         "src/components/claim-receipt/runtime.ts",
         "src/components/computer-use/runtime.ts",
         "src/components/feedback/runtime.ts",
