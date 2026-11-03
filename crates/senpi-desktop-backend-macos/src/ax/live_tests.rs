@@ -69,6 +69,7 @@ fn open_textedit_document(dir: &tempfile::TempDir) -> DesktopWindow {
     };
     // `window_root` matches by CGWindowID first, so the frame is not needed.
     DesktopWindow {
+        identity: None,
         id: id.to_string(),
         title,
         app: "TextEdit".to_string(),

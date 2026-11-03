@@ -12,6 +12,7 @@ use crate::WindowIds;
 
 pub(crate) fn window() -> DesktopWindow {
     DesktopWindow {
+        identity: None,
         id: "atspi::1.10:/org/a11y/atspi/accessible/10".into(),
         title: "notes.txt - gedit".into(),
         app: "gedit".into(),

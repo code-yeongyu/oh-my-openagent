@@ -66,6 +66,7 @@ fn every_input(target: &str, frame_id: &str) -> Vec<(&'static str, Op)> {
         (
             "keyChord",
             Op::KeyChord(KeyChordParams {
+                force: false,
                 target: target.to_owned(),
                 keys: vec!["cmd".to_owned(), "a".to_owned()],
                 opts: None,

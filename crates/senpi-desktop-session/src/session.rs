@@ -9,6 +9,7 @@ use std::time::Duration;
 use parking_lot::Mutex;
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::holds::reports_release_failure;
+use senpi_desktop_core::report::ReportMode;
 use senpi_desktop_core::types::{DesktopCapabilities, DesktopSessionOptions};
 use tokio::time::{timeout_at, Instant};
 
@@ -50,6 +51,9 @@ pub struct Session {
     holds: Mutex<Vec<Weak<senpi_desktop_safety::HoldSignal>>>,
     capabilities: Arc<Mutex<DesktopCapabilities>>,
     timeouts: SessionTimeouts,
+    /// `reportMode` of the last enqueued `open`: the queue is FIFO, so it is
+    /// the mode every later request is served under.
+    report_mode: Mutex<ReportMode>,
 }
 
 impl Session {
@@ -99,6 +103,7 @@ impl Session {
             holds: Mutex::new(Vec::new()),
             capabilities,
             timeouts,
+            report_mode: Mutex::new(ReportMode::Null),
         })
     }
 
@@ -113,7 +118,16 @@ impl Session {
     /// backend, refs, frames, stop latch and control grant.
     /// The reply is [`Response::Capabilities`].
     pub fn open(&self, options: DesktopSessionOptions) -> Pending {
-        self.enqueue(|reply| Message::Open { options, reply })
+        let mode = options.report_mode;
+        let pending = self.enqueue(|reply| Message::Open { options, reply });
+        *self.report_mode.lock() = mode;
+        pending
+    }
+
+    /// The `reportMode` requests submitted from now on are served under.
+    #[must_use]
+    pub fn report_mode(&self) -> ReportMode {
+        *self.report_mode.lock()
     }
 
     /// Enqueues `op` behind every earlier request.

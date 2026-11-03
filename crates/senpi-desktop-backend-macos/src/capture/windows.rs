@@ -38,6 +38,7 @@ pub(crate) fn enumerate() -> CoreResult<Vec<DesktopWindow>> {
             continue;
         }
         result.push(DesktopWindow {
+            identity: None,
             id: id.to_string(),
             title,
             app,

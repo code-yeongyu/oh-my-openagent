@@ -12,6 +12,7 @@ mod grant;
 mod intervention;
 mod mutate;
 mod pointer;
+mod report;
 mod request;
 mod restore;
 mod selection;
