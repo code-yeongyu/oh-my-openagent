@@ -155,11 +155,6 @@ export class SyncJournal {
     return records.sort((a, b) => a.seq - b.seq)
   }
 
-  /** The seq the next render record of this cycle takes (records are append-only). */
-  async nextRenderSeq(id: string): Promise<number> {
-    return ((await this.renders(id)).at(-1)?.seq ?? 0) + 1
-  }
-
   appendRender(id: string, record: RenderRecord): Promise<void> {
     return writeJson(join(this.rendersDir(id), `${String(record.seq).padStart(8, "0")}.json`), record)
   }
