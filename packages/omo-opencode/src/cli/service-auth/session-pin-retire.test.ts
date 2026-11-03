@@ -95,4 +95,37 @@ describe("the credential write seam retires the sync pin (#12280)", () => {
     expect(s.current()).toBeNull()
     expect(await h.pins()).toEqual({ live: 0, retired: 1 })
   })
+
+  // #12303 review HIGH: a sign-in that names no account is the usual case (it never ran `omo sync`), so
+  // discarding it is silent.
+  test("#given a sign-in that names no account and no pin to retire #when it is logged out #then nothing is logged and the service sees only the revoke", async () => {
+    const h = await pinnedHome()
+    const calls: string[] = []
+    const api = fakeApi((request) => {
+      calls.push(`${request.method} ${new URL(request.url).pathname}`)
+      return new Response(null, { status: 204 })
+    })
+    const s = memoryStore({ ...grant, ...privateKeys })
+    const hook = retireSyncPinOnDiscard({ pinDir: () => join(h.home, "elsewhere"), log: (line) => h.logs.push(line) })
+    await createSession({ api, store: s.store, home: h.home, beforeKeysDiscarded: hook }).logout()
+    expect(s.current()).toBeNull()
+    expect(h.logs).toEqual([])
+    expect(calls).toEqual(["DELETE /v1/devices/device-1"])
+  })
+
+  // #12303 review LOW: a pin earned by `omo sync` before the account was stamped on the credential.
+  test("#given a legacy sign-in with no account and a live pin #when it is logged out #then the account is read before the revoke and its pin is retired", async () => {
+    const h = await pinnedHome()
+    const calls: string[] = []
+    const api = fakeApi((request) => {
+      const path = new URL(request.url).pathname
+      calls.push(`${request.method} ${path}`)
+      return path === "/v1/me" ? Response.json({ user: { id: "user-1" }, account: { id: ACCOUNT } }) : new Response(null, { status: 204 })
+    })
+    const s = memoryStore({ ...grant, ...privateKeys })
+    await createSession({ api, store: s.store, home: h.home, beforeKeysDiscarded: h.hook }).logout()
+    expect(calls).toEqual(["GET /v1/me", "DELETE /v1/devices/device-1"])
+    expect(await h.pins()).toEqual({ live: 0, retired: 1 })
+    expect(h.logs).toEqual([])
+  })
 })
