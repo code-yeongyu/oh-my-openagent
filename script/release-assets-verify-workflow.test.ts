@@ -160,8 +160,9 @@ describe("Verify uploaded assets compares the release with what the run built (R
 
 describe("a rerun without a new darwin build keeps the capability file only through the restore (RULING-77)", () => {
   // The real restore step and the real verify step run back to back. SHA256SUMS stays in the built set because the upload
-  // step between them regenerates it over omo-* and it then equals the published one.
-  const restoreThenVerify = `${restoreStep}\n${verifyStep}`
+  // step between them regenerates it over omo-* and it then equals the published one. Each runs in its own subshell, as each
+  // CI step runs in its own shell: one shell would let the verify step's EXIT trap replace the restore step's.
+  const restoreThenVerify = `(\n${restoreStep}\n)\n(\n${verifyStep}\n)`
 
   test("#given the earlier run published it #when this run built no darwin runtime #then it is restored from SHA256SUMS and Verify passes", () => {
     const published = withCapabilities()
