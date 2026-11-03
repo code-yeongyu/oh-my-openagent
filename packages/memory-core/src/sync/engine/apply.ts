@@ -24,6 +24,7 @@ import { syncJournalDirectory } from "../../journal/fsync"
 import { isSyncItemKey } from "../item"
 import { removeAtomic, writeAtomic } from "./atomic"
 import type { EngineDeps } from "./engine-deps"
+import { bodyDiffFor } from "./body-diff"
 import { acceptedItems, acceptedKeys, rejectItem } from "./item-keys"
 import { type CycleRecord, fromBase64, type RenderRecord, type SyncJournal, toBase64, type WireItem } from "./journal"
 import { fsRefusal, prepareLanding, readWorking, throughSymlink } from "./landing"
@@ -104,12 +105,13 @@ export async function capture(deps: EngineDeps, journal: SyncJournal, resuming: 
   const keys = [...new Set([...known, ...files.byKey.keys()])].sort()
   const captured: WireItem[] = []
   const texts = new Map<string, string | null>()
+  const bodyDiff = bodyDiffFor(deps.census?.others() ?? null, (await journal.state()).heard)
   for (const key of keys) {
     const path = landingPath(files, key)
     if (path === null) continue
     const text = await readCaptured(deps, journal, key, path, files.byKey.has(key))
     if (text === undefined) continue
-    const ops = await deps.store.capture(key, text)
+    const ops = await deps.store.capture(key, text, bodyDiff)
     if (ops === null) continue
     captured.push({ key, ops: toBase64(ops) })
     texts.set(key, text)

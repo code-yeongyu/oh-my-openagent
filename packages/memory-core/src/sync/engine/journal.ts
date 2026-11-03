@@ -11,6 +11,7 @@ import { existsSync, readdir, rename, rm } from "../../fs/resilient"
 import { join } from "node:path"
 
 import { readJson, removeAtomic, TEMP_MARK, writeJson } from "./atomic"
+import type { Heard } from "./body-diff"
 import type { PulledEntry, RefusalCode } from "./ports"
 
 export type IncomingStage = "downloaded" | "verified"
@@ -70,6 +71,8 @@ export interface EngineState {
   readonly updatedWhileOffline: number
   /** The device peer this journal was created under. */
   readonly peer: string | null
+  /** Per member principal, its newest verified batch and whether it advertised the body line diff. */
+  readonly heard: Readonly<Record<string, Heard>>
 }
 
 export interface OutgoingBatch {
@@ -100,6 +103,7 @@ const EMPTY_STATE: EngineState = {
   lastSyncedAt: null,
   updatedWhileOffline: 0,
   peer: null,
+  heard: {},
 }
 const EMPTY_PENDING: PendingOps = { items: [], outgoing: null }
 

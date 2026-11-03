@@ -51,6 +51,14 @@ export async function openAccountSession(options: AccountSessionOptions): Promis
     session: {
       transport: options.transport ?? createHttpTransport({ baseUrl: options.baseUrl, token: options.token, ...(options.fetch === undefined ? {} : { fetch: options.fetch }) }),
       verifier: createChainVerifier({ chain, spaceId: options.spaceId, rejections }),
+      census: {
+        others: () => {
+          const authority = chain.state().authority
+          if (authority === null) return null
+          const self = options.keyring.principal().id
+          return [...authority.members.keys()].filter((member) => member !== self)
+        },
+      },
       sealer: createChainSealer({ chain, keyring: options.keyring, spaceId: options.spaceId, ...(options.peer === undefined ? {} : { peer: options.peer }), ...(options.now === undefined ? {} : { now: options.now }) }),
     },
   }

@@ -15,7 +15,7 @@ import type { FmValue } from "./frontmatter"
 import { splitItem } from "./frontmatter"
 import { analyzeHistory } from "./history"
 import { applyKey, clearKey } from "./key-writers"
-import { updateTextByLine } from "./line-update"
+import { type BodyDiff, updateBodyText } from "./line-update"
 import { renderDocContent } from "./render"
 import { transplantContent } from "./transplant"
 
@@ -28,10 +28,11 @@ export function captureItem(
   baseText: string,
   baseFrontier: ItemFrontier,
   workingText: string,
+  bodyDiff: BodyDiff = "char",
   commitMessage?: string,
 ): Uint8Array | null {
   const current = isCurrentFrontier(doc, baseFrontier)
-  const merged = current ? null : mergeOntoCurrent(doc, baseText, baseFrontier, workingText)
+  const merged = current ? null : mergeOntoCurrent(doc, baseText, baseFrontier, workingText, bodyDiff)
   if (!current && merged === null) return null
   const target = doc.fork()
   try {
@@ -42,9 +43,9 @@ export function captureItem(
       if (renderDocContent(target) !== baseText) {
         throw new CaptureBaselineError("captureItem: baseText is not the item's render at baseFrontier")
       }
-      applyWorkingText(target, workingText)
+      applyWorkingText(target, workingText, bodyDiff)
     } else {
-      transplantContent(target, merged)
+      transplantContent(target, merged, bodyDiff)
     }
     target.commit(commitMessage === undefined ? undefined : { message: commitMessage })
     const from = doc.oplogVersion()
@@ -68,6 +69,7 @@ function mergeOntoCurrent(
   baseText: string,
   baseFrontier: ItemFrontier,
   workingText: string,
+  bodyDiff: BodyDiff,
 ): LoroDoc | null {
   const scratch = doc.forkAt(baseFrontier)
   try {
@@ -75,7 +77,7 @@ function mergeOntoCurrent(
     if (renderDocContent(scratch) !== baseText) {
       throw new CaptureBaselineError("captureItem: baseText is not the item's render at baseFrontier")
     }
-    applyWorkingText(scratch, workingText)
+    applyWorkingText(scratch, workingText, bodyDiff)
     scratch.commit()
     const from = scratch.frontiersToVV(baseFrontier)
     if (scratch.oplogVersion().compare(from) === 0) return null
@@ -91,7 +93,7 @@ function mergeOntoCurrent(
 const NONE: ReadonlySet<string> = new Set()
 
 // The fork is the user's own view (their baseline), so every tag in it is seen: nothing is unseen.
-function applyWorkingText(fork: LoroDoc, workingText: string): void {
+function applyWorkingText(fork: LoroDoc, workingText: string, bodyDiff: BodyDiff): void {
   const parsed = splitItem(workingText)
   const history = analyzeHistory(fork)
   const wanted = new Map<string, FmValue>()
@@ -108,5 +110,5 @@ function applyWorkingText(fork: LoroDoc, workingText: string): void {
   // The body never carries the BOM, frontmatter or not: it is an encoding marker (review d58391c9b3).
   const bodyTarget = parsed.body
   const bodyCurrent = fork.hasContainer("cid:root-body:Text") ? fork.getText("body").toString() : ""
-  if (bodyCurrent !== bodyTarget) updateTextByLine(fork.getText("body"), bodyTarget)
+  if (bodyCurrent !== bodyTarget) updateBodyText(fork.getText("body"), bodyTarget, bodyDiff)
 }

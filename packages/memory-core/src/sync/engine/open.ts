@@ -14,7 +14,7 @@ import { createLockRecord } from "../../locks/lock-record"
 import { createDeviceItemStore } from "./adapters/device-item-store"
 import { createGitSyncRepo } from "./adapters/git-sync-repo"
 import { type EngineStatus, SyncEngine } from "./engine"
-import type { Clock, Sealer, Transport, Verifier, WriterLock } from "./ports"
+import type { Census, Clock, Sealer, Transport, Verifier, WriterLock } from "./ports"
 
 /** How long an apply waits for a memory tool write to finish before the cycle is retried. */
 const WRITER_WAIT_MS = 30_000
@@ -23,6 +23,7 @@ export interface SyncSession {
   readonly transport: Transport
   readonly verifier: Verifier
   readonly sealer: Sealer
+  readonly census?: Census
 }
 
 export interface OpenDeviceSyncOptions {

@@ -8,25 +8,25 @@
 
 import type { LoroDoc } from "../../crdt/loro-runtime"
 
-import { updateTextByLine } from "./line-update"
+import { type BodyDiff, updateBodyText } from "./line-update"
 import { BODY_NAME, cidRoot } from "./state"
 import { newTag } from "./tag"
 
 const FM_PREFIX = "fm\x1f"
 
-export function transplantContent(target: LoroDoc, merged: LoroDoc): void {
+export function transplantContent(target: LoroDoc, merged: LoroDoc, bodyDiff: BodyDiff): void {
   for (const [name, cid] of Object.entries(merged.getShallowValue())) {
     if (name !== BODY_NAME && !name.startsWith(FM_PREFIX)) continue
     if (typeof cid !== "string") continue
-    if (cid.endsWith(":Text")) transplantText(target, merged, name)
+    if (cid.endsWith(":Text")) transplantText(target, merged, name, bodyDiff)
     else if (cid.endsWith(":Map")) transplantMap(target, merged, name)
   }
 }
 
-function transplantText(target: LoroDoc, merged: LoroDoc, name: string): void {
+function transplantText(target: LoroDoc, merged: LoroDoc, name: string, bodyDiff: BodyDiff): void {
   const want = merged.getText(name).toString()
   const have = target.hasContainer(cidRoot(name, "Text")) ? target.getText(name).toString() : ""
-  if (want !== have) updateTextByLine(target.getText(name), want)
+  if (want !== have) updateBodyText(target.getText(name), want, bodyDiff)
 }
 
 function transplantMap(target: LoroDoc, merged: LoroDoc, name: string): void {

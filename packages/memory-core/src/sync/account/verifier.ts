@@ -12,8 +12,9 @@ import type { SyncObjectRecord } from "../crypto/vendor/sync-format/object-types
 import { b64urlDecode } from "../crypto/vendor/sync-format/jcs.ts"
 import type { BatchPayload, PulledEntry, RefusalCode, SnapshotRef, Verdict, Verifier } from "../engine/ports.ts"
 import type { AccountChain } from "./account-chain.ts"
+import { advertisesBodyLine, MANIFEST_RECORD } from "./capability.ts"
 
-export const OPS_RECORD = 1
+export const OPS_RECORD = 1 as const
 
 const CHAIN_REFUSALS: Partial<Record<ChainRejection, RefusalCode>> = {
   link_mismatch: "chain_link",
@@ -77,7 +78,10 @@ export function createChainVerifier(input: {
             rejections,
           )
           if (!opened.ok) return refuse(OPEN_REFUSALS[opened.reason] ?? "malformed")
-          return { ok: true, payload: spaceItems(opened.records, spaceId, OPS_RECORD), batchId: opened.batchId }
+          // Any space's manifest record counts: the marker is a property of the author's build (PR #12295).
+          const manifests = opened.records.filter((record) => record.type === MANIFEST_RECORD).map((record) => record.body)
+          const advertises = { author: batch.authorId, bodyLine: await advertisesBodyLine(manifests, batch.authorId) }
+          return { ok: true, payload: spaceItems(opened.records, spaceId, OPS_RECORD), batchId: opened.batchId, advertises }
         }
       }
     },
