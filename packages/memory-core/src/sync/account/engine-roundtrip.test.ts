@@ -90,3 +90,21 @@ test("two members on this build merge a same-line edit as two whole lines", asyn
   expect(onA).toBe(onB)
   expect(onA.slice(head.length).split("\n").sort()).toEqual(["", "keep me", "the meeting moved to Thursday", "the meeting moved to Tuesday"])
 }, GIT_TEST_TIMEOUT * 3)
+
+// Re-review of #12295: a member that has only pulled since the note was written edits the same line
+// as the member that wrote it. Whatever either device has heard, no op may touch the untouched line.
+test("a member that has only pulled and one that pushed edit the same line: the untouched line stays whole", async () => {
+  const [a, b] = await twoMembers("acct-pull-only")
+  const head = "---\ndescription: synced\n---\n"
+  await writeFile(join(a.repo, "note.md"), `${head}the meeting moved to Monday\nkeep me\n`)
+  await a.sync.engine.runCycle()
+  await b.sync.engine.runCycle()
+  await writeFile(join(a.repo, "note.md"), `${head}the meeting moved to Tuesday\nkeep me\n`)
+  await writeFile(join(b.repo, "note.md"), `${head}the meeting moved to Thursday\nkeep me\n`)
+  await a.sync.engine.runCycle()
+  await b.sync.engine.runCycle()
+  await a.sync.engine.runCycle()
+  const [onA, onB] = [await readFile(join(a.repo, "note.md"), "utf8"), await readFile(join(b.repo, "note.md"), "utf8")]
+  expect(onA).toBe(onB)
+  expect(onA.slice(head.length).split("\n").sort()).toEqual(["", "keep me", "the meeting moved to Thursday", "the meeting moved to Tuesday"])
+}, GIT_TEST_TIMEOUT * 3)
