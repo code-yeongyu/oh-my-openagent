@@ -1424,6 +1424,7 @@
     "packages/omo-senpi/src/components/task/judge-runner.ts",
     "packages/omo-senpi/src/components/task/late-send-outcome.ts",
     "packages/omo-senpi/src/components/task/lead-poller-lifecycle.ts",
+    "packages/omo-senpi/src/components/task/live-config-provider.ts",
     "packages/omo-senpi/src/components/task/member-liveness.ts",
     "packages/omo-senpi/src/components/task/memory-reporter.ts",
     "packages/omo-senpi/src/components/task/model-error-text.ts",
