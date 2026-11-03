@@ -47,25 +47,56 @@ function modelIDForProvider(provider: string, model: string): string {
   return model.startsWith(prefix) ? model.slice(prefix.length) : model
 }
 
-function modelIDOf(model: string): string {
+function splitModelReference(model: string): { readonly provider: string; readonly modelID: string } | undefined {
   const separator = model.indexOf("/")
-  return separator === -1 ? model : model.slice(separator + 1)
+  if (separator <= 0 || separator === model.length - 1) {
+    return undefined
+  }
+  return { provider: model.slice(0, separator), modelID: model.slice(separator + 1) }
+}
+
+/**
+ * Provider ids that serve the same catalog under a different name. Only ids known to be the
+ * same lane belong here: two providers that happen to publish the same model id are NOT
+ * interchangeable, because the user may reach one and not the other.
+ */
+const PROVIDER_ALIASES: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  "opencode-go": ["opencode"],
+})
+
+function providersNameTheSameCatalog(left: string, right: string): boolean {
+  if (left === right) {
+    return true
+  }
+  return PROVIDER_ALIASES[left]?.includes(right) === true
+    || PROVIDER_ALIASES[right]?.includes(left) === true
 }
 
 /**
  * Unavailability must be positively established before an explicit user primary is demoted.
  * A fuzzy match that returns null is only "inconclusive" (provider alias, format or
  * normalization edge), so the primary counts as present when it is an exact member of the
- * available set or when any available model carries the same model id under another
- * provider prefix (`opencode-go/kimi-k3` vs `opencode/kimi-k3`).
+ * available set, or when a known alias of its provider serves the same model id
+ * (`opencode-go/kimi-k3` vs `opencode/kimi-k3`).
+ *
+ * The same model id on an unrelated provider is NOT presence: the primary's own provider is
+ * still unreachable there, and treating it as present would suppress the user's fallback in
+ * the most common setup, a model pinned per provider.
  */
 function isModelVerifiablyAbsent(primaryModel: string, availableModels: ReadonlySet<string>): boolean {
-  const primaryModelID = modelIDOf(primaryModel)
+  const primary = splitModelReference(primaryModel)
   for (const available of availableModels) {
     if (available === primaryModel) {
       return false
     }
-    if (modelIDOf(available) === primaryModelID) {
+    if (primary === undefined) {
+      continue
+    }
+    const candidate = splitModelReference(available)
+    if (candidate === undefined) {
+      continue
+    }
+    if (candidate.modelID === primary.modelID && providersNameTheSameCatalog(candidate.provider, primary.provider)) {
       return false
     }
   }

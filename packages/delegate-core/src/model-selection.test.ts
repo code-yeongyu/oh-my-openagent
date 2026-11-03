@@ -103,6 +103,45 @@ describe("resolveModelForDelegateTask", () => {
     })
   })
 
+  test("#given a disconnected primary whose model id another provider serves #when a fallback is exactly reachable #then the fallback is promoted", () => {
+    //#given the primary quotio/claude-opus-4-7 is unreachable, and anthropic serves the same
+    // model id on a different, unrelated lane, so its presence there says nothing about the
+    // primary provider
+    const input = {
+      userModel: "quotio/claude-opus-4-7",
+      userFallbackModels: ["anthropic/claude-opus-4-7"],
+      availableModels: new Set(["anthropic/claude-opus-4-7"]),
+    }
+
+    //#when
+    const result = resolveModelForDelegateTask(input, noCacheDeps)
+
+    //#then
+    expect(result).toEqual({
+      model: "anthropic/claude-opus-4-7",
+      matchedFallback: true,
+    })
+  })
+
+  test("#given a disconnected primary whose model id another provider serves #when the user fallback is a different model #then that fallback is promoted", () => {
+    //#given the primary quotio/claude-opus-4-7 is unreachable, the same model id is present on
+    // anthropic, and the user chose openai/gpt-5.4 as the fallback
+    const input = {
+      userModel: "quotio/claude-opus-4-7",
+      userFallbackModels: ["openai/gpt-5.4"],
+      availableModels: new Set(["openai/gpt-5.4", "anthropic/claude-opus-4-7"]),
+    }
+
+    //#when
+    const result = resolveModelForDelegateTask(input, noCacheDeps)
+
+    //#then
+    expect(result).toEqual({
+      model: "openai/gpt-5.4",
+      matchedFallback: true,
+    })
+  })
+
   test("#given connected providers cache #when fallback chain starts disconnected #then selects first connected provider", () => {
     const result = resolveModelForDelegateTask({
       availableModels: new Set(),
