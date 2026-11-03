@@ -9,7 +9,7 @@ import type { EngineDeps } from "./engine-deps"
 import { describeSyncFailure, isFailureShown, type SyncFailure } from "./failure"
 import { batchBound, heldShown, recordHeld } from "./held"
 import { type EngineState, SyncJournal } from "./journal"
-import { capture } from "./local-capture"
+import { type CaptureHolds, capture } from "./local-capture"
 import { push, staleBackoffMs } from "./push"
 import type { RefusalCode } from "./ports"
 import { receive } from "./receive"
@@ -245,14 +245,14 @@ export class SyncEngine {
       this.loaded = true
     }
     const before = await journal.updateState({ eventHead: Math.max(this.eventHead, (await journal.state()).eventHead) })
-    let held: ReadonlyMap<string, string> = new Map()
+    let holds: CaptureHolds = { held: new Map(), withheld: new Set() }
     if (before.cycle !== null) {
       const resumed = before.cycle
       await deps.lock.withLock(async () => {
         // A cycle resumed at merged re-renders its keys over the working files: capture any edit made
         // since the crash first, so it merges into the doc instead of being overwritten.
-        if (resumed.stage === "merged") held = await capture(deps, journal, resumed)
-        await advance(deps, journal, resumed, new Set(held.keys()))
+        if (resumed.stage === "merged") holds = await capture(deps, journal, resumed)
+        await advance(deps, journal, resumed, new Set(holds.held.keys()))
       })
     }
     let applied = 0
@@ -264,8 +264,8 @@ export class SyncEngine {
       refused += got.refused
       snapshot = got.snapshot ?? snapshot
       const done = await deps.lock.withLock(async () => {
-        held = await capture(deps, journal)
-        return applyVerified(deps, journal, new Set(held.keys()))
+        holds = await capture(deps, journal)
+        return applyVerified(deps, journal, new Set(holds.held.keys()))
       })
       applied += done.batches
       memories += done.memories
@@ -273,7 +273,7 @@ export class SyncEngine {
     await inbound()
     let pushed = false
     for (let attempt = 0; attempt < PUSH_ATTEMPTS; attempt += 1) {
-      const outcome = await push(deps, journal, deps.batchBytes)
+      const outcome = await push(deps, journal, deps.batchBytes, holds.withheld)
       if (outcome !== "stale") {
         pushed = outcome === "pushed"
         break
@@ -281,7 +281,7 @@ export class SyncEngine {
       await this.sleep(staleBackoffMs(attempt, deps.random))
       await inbound()
     }
-    const heldKeys = await recordHeld(deps, journal, held)
+    const heldKeys = await recordHeld(deps, journal, holds.held, holds.withheld)
     const heldNow = (await journal.state()).held
     this.nextHeldKey = heldNow === null ? null : failureKey(heldShown(heldNow, batchBound(deps)).failure)
     if (refused === 0) await journal.updateState({ lastSyncedAt: deps.clock.now(), updatedWhileOffline: memories })

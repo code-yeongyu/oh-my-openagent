@@ -160,6 +160,13 @@ export interface ItemStore {
    * ops cannot be attributed to this device (undecodable, or no op of its peer): nothing changes.
    */
   rewind(key: string, ops: readonly Uint8Array[]): Promise<"rewound" | "kept">
+  /**
+   * Finishes the import a crash between journaling and importing one of this device's captures left
+   * owed (#12284): "held" when the doc already has `ops`; "imported" when it imported them and set the
+   * baseline to what that capture recorded; "refused" when they are not this device's to import (no op
+   * of its peer, missing deps, undecodable or refused by the doc), with the doc left as it was. Never throws.
+   */
+  adoptJournaled(key: string, ops: Uint8Array): Promise<"held" | "imported" | "refused">
 }
 
 /** The memory writer lock: network work never runs while it is held. */

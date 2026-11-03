@@ -25,9 +25,12 @@ export const heldShown = (held: HeldItems, limitBytes: number): { readonly failu
 export const heldPrint = (text: string | null, version: string): string =>
   `${createHash("sha256").update(text === null ? "\u0000absent" : `t:${text}`).digest("hex")}@${version}`
 
-/** Records this cycle's held keys (`captured`, by fingerprint, plus the stuck pending ops) and returns them. */
-export async function recordHeld(deps: EngineDeps, journal: SyncJournal, captured: ReadonlyMap<string, string>): Promise<readonly string[]> {
-  const stuck = [...new Set(planBatches((await journal.pending()).items, batchBound(deps)).held.map((item) => item.key))].sort()
+/**
+ * Records this cycle's held keys and returns them: `captured` by fingerprint, plus the stuck ones (pending
+ * ops no batch can carry and this device could not wind back, and the `withheld` keys it must not send).
+ */
+export async function recordHeld(deps: EngineDeps, journal: SyncJournal, captured: ReadonlyMap<string, string>, withheld: ReadonlySet<string>): Promise<readonly string[]> {
+  const stuck = [...new Set([...planBatches((await journal.pending()).items, batchBound(deps), withheld).held.map((item) => item.key), ...withheld])].sort()
   const keys = [...new Set([...captured.keys(), ...stuck])].sort()
   const previous = (await journal.state()).held
   const held = keys.length === 0

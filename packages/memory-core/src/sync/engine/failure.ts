@@ -75,7 +75,9 @@ export function describeOversizedItems(keys: readonly string[], limitBytes: numb
     keys,
     stuck,
     limitBytes,
-    reason: keys.length === 1
+    reason: fixable.length === 0
+      ? `A change queued on this device for ${keys.length === 1 ? "one memory file" : `${keys.length} memory files`} cannot be sent from it. Every other memory keeps syncing.`
+      : keys.length === 1
       ? `A change to one memory file is larger than the ${limit} sync limit, so that file is not synced. Every other memory keeps syncing.`
       : `Changes to ${keys.length} memory files are larger than the ${limit} sync limit, so those files are not synced. Every other memory keeps syncing.`,
     action: [shrink, kept].filter((part) => part !== "").join(" "),

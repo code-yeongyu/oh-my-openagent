@@ -16,12 +16,13 @@ export interface PushPlan {
  * Splits pending items between items, in capture order, so no batch exceeds `limit` plaintext
  * bytes. An item that alone exceeds the bound is never sliced, truncated or sent: it is held back
  * whole, and so is every later op of its key, which builds on it (#12284). Every other item is
- * still batched, so one oversized item never stops the rest of the device's changes.
+ * still batched, so one oversized item never stops the rest of the device's changes. `withheld` keys
+ * (ops this device must not send) are held the same way, from their first op on.
  */
-export function planBatches(items: readonly WireItem[], limit = MAX_BATCH_BYTES): PushPlan {
+export function planBatches(items: readonly WireItem[], limit = MAX_BATCH_BYTES, withheld: ReadonlySet<string> = new Set()): PushPlan {
   const batches: WireItem[][] = []
   const held: WireItem[] = []
-  const heldKeys = new Set<string>()
+  const heldKeys = new Set<string>(withheld)
   let current: WireItem[] = []
   let size = 0
   for (const item of items) {

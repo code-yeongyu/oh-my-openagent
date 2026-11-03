@@ -3,6 +3,7 @@
 // never journaled, sliced or truncated (#12284); an older build's queued ops of that size are wound
 // back into their files first, so they follow the same hold-until-it-fits path (review M1).
 
+import { isSyncItemKey } from "../item"
 import { adoptLandedRenders } from "./apply"
 import { itemBytes, planBatches } from "./batches"
 import type { EngineDeps } from "./engine-deps"
@@ -79,13 +80,43 @@ async function rewindQueued(deps: EngineDeps, journal: SyncJournal): Promise<voi
 }
 
 /**
+ * Finishes imports a crash between journaling and importing a capture left owed (#12284, gate rounds
+ * 2-3): each pending op the push would send is imported into its doc with the baseline its capture
+ * recorded, so the next capture journals nothing new. Returns the keys of ops this device must not
+ * import (foreign, missing deps, undecodable): they stay pending, are withheld from the push with every
+ * later op of their key, and are named stuck. Oldest first; never throws.
+ */
+async function adoptJournaled(deps: EngineDeps, journal: SyncJournal): Promise<ReadonlySet<string>> {
+  const sendable = planBatches((await journal.pending()).items, batchBound(deps)).batches.flat()
+  const withheld = new Set<string>()
+  let imported = false
+  for (const item of sendable) {
+    if (withheld.has(item.key) || isSyncItemKey(item.key) !== null) continue
+    const outcome = await deps.store.adoptJournaled(item.key, fromBase64(item.ops))
+    if (outcome === "imported") imported = true
+    if (outcome !== "refused") continue
+    withheld.add(item.key)
+    deps.log?.(`sync.item.stuck len=${keyLength(item.key)} ops=1`)
+  }
+  if (imported) await deps.store.persist()
+  return withheld
+}
+
+/** What a capture held back: keys too large to send (by fingerprint), and keys whose queued ops this device must withhold. */
+export interface CaptureHolds {
+  readonly held: ReadonlyMap<string, string>
+  readonly withheld: ReadonlySet<string>
+}
+
+/**
  * Journals every local edit as pending ops, and returns the keys it held back instead, each with the
  * fingerprint of what it held (#12284): an edit larger than one batch may carry is never journaled,
  * applied or made the baseline, so it syncs once it fits. A key held last cycle whose file and doc are
  * unchanged (same fingerprint) is held again without diffing it again (review L4).
  */
-export async function capture(deps: EngineDeps, journal: SyncJournal, resuming: CycleRecord | null = null): Promise<ReadonlyMap<string, string>> {
+export async function capture(deps: EngineDeps, journal: SyncJournal, resuming: CycleRecord | null = null): Promise<CaptureHolds> {
   await rewindQueued(deps, journal)
+  const withheld = await adoptJournaled(deps, journal)
   const files = await workingFiles(deps, journal)
   // Resuming a cycle at merged: every render that landed is the base of any edit made since.
   if (resuming !== null) await adoptLandedRenders(deps, journal, resuming, files)
@@ -114,7 +145,7 @@ export async function capture(deps: EngineDeps, journal: SyncJournal, resuming: 
     captured.push(item)
     texts.set(key, text)
   }
-  if (captured.length === 0) return held
+  if (captured.length === 0) return { held, withheld }
   const pending = await journal.pending()
   const fresh = captured.filter((c) => !pending.items.some((p) => sameItem(p, c)))
   await journal.setPending({ ...pending, items: [...pending.items, ...fresh] })
@@ -127,5 +158,5 @@ export async function capture(deps: EngineDeps, journal: SyncJournal, resuming: 
   }
   await deps.store.persist()
   deps.fault?.("persisted")
-  return held
+  return { held, withheld }
 }

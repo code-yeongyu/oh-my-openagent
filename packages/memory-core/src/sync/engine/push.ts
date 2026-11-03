@@ -45,21 +45,22 @@ async function seal(deps: EngineDeps, journal: SyncJournal, items: readonly Wire
   return out
 }
 
-export async function push(deps: EngineDeps, journal: SyncJournal, batchBytes = MAX_BATCH_BYTES): Promise<PushOutcome> {
+/** `withheld`: keys whose queued ops this device must not send (#12284); they stay pending. */
+export async function push(deps: EngineDeps, journal: SyncJournal, batchBytes = MAX_BATCH_BYTES, withheld: ReadonlySet<string> = new Set()): Promise<PushOutcome> {
   let outcome: PushOutcome = "idle"
   for (;;) {
-    const step = await pushOne(deps, journal, batchBytes)
+    const step = await pushOne(deps, journal, batchBytes, withheld)
     if (step === "idle") return outcome
     if (step === "stale") return "stale"
     outcome = "pushed"
   }
 }
 
-async function pushOne(deps: EngineDeps, journal: SyncJournal, batchBytes: number): Promise<PushOutcome> {
+async function pushOne(deps: EngineDeps, journal: SyncJournal, batchBytes: number, withheld: ReadonlySet<string>): Promise<PushOutcome> {
   const pending = await journal.pending()
   let out = pending.outgoing
   if (out === null) {
-    const plan = planBatches(pending.items, batchBytes)
+    const plan = planBatches(pending.items, batchBytes, withheld)
     // Only ops this device could not wind back are left here (#12284 review L4): never sent, always said.
     for (const key of new Set(plan.held.map((item) => item.key))) deps.log?.(`sync.item.held side=push len=${Buffer.byteLength(key, "utf8")}`)
     const first = plan.batches[0]
