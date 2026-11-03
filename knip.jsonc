@@ -314,8 +314,6 @@
       "packages/memory-core/src/sync/engine/engine-harness.test-support.ts": ["ManualClock", "inProcessLock"],
       // pre-existing at origin dev 4686e425b5: unused export(s) POLL_MS
       "packages/memory-core/src/sync/engine/engine.ts": ["POLL_MS"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) sha256Hex
-      "packages/memory-core/src/sync/engine/fake-server.test-support.ts": ["sha256Hex"],
       // pre-existing at origin dev 4686e425b5: unused export(s) createHttpTransport, SyncHttpError, SyncEngine
       "packages/memory-core/src/sync/engine/index.ts": ["createHttpTransport", "SyncHttpError", "SyncEngine"],
       // pre-existing at origin dev 4686e425b5: unused export(s) MAX_RECEIPTS
@@ -1542,8 +1540,6 @@
       "packages/senpi-task/src/lifecycle/revive-policy.ts": ["ACTIVE_REVIVE_DRIFT_POLICY"],
       // pre-existing at origin dev 4686e425b5: unused export(s) HOST_PID
       "packages/senpi-task/src/manager/__fixtures__/fallback-launch-fakes.ts": ["HOST_PID"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) QUOTA_ERROR
-      "packages/senpi-task/src/manager/__fixtures__/parent-model-world.ts": ["QUOTA_ERROR"],
       // pre-existing at origin dev 4686e425b5: unused export(s) holdsInChild
       "packages/senpi-task/src/manager/held-send.ts": ["holdsInChild"],
       // pre-existing at origin dev 4686e425b5: unused export(s) TaskConcurrency, decideDepthPolicy, NameRegistry, AUTO_HOST_CAPABILITIES, adaptInProcessHandle, adaptRpcHandle, TASK_AWAITING_INPUT_EVENT, TRANSCRIPT_ASSISTANT_EVENT, TRANSCRIPT_TOOL_EVENT, logTranscriptEvent and 1 more
@@ -3914,6 +3910,7 @@
         "test/fixtures/provisioned-handoff/entry.ts",
         "test/fixtures/senpi-hooks-state-child.mjs",
         "test/fixtures/senpi-hooks-state-consumer.mjs",
+        "test/fixtures/trust-ensure-probe.ts",
         "test/fixtures/trust-stage-probe.ts",
         "test/packed-consumer.mjs",
         "test/teardown.test-support.ts",
