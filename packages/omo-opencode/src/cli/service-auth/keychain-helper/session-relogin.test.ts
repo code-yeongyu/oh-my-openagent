@@ -127,8 +127,8 @@ describe("#11589 review folds", () => {
     const keychain = fakeKeychain({ failReadWhenMissing: true })
     keychain.put(A, stored, "helper", "none")
     keychain.put(`${A}.old.5`, stored, "helper", "none")
-    const { session } = await helperSession(keychain)
-    await session.update(async (_current, view) => view.clear())
+    const { store, session } = await helperSession(keychain)
+    await session.update(async () => store.clear())
     // Recovery may already remove the reported slot; what matters is that clear() attempted every one of the 8 names.
     expect(new Set(keychain.events.filter(event => event.startsWith("remove .old"))).size).toBe(8)
     expect(keychain.items.has(`${A}.old.5`)).toBe(false)

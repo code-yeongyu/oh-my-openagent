@@ -1,4 +1,6 @@
 import { dirname, join } from "node:path"
+import { bunFile } from "../../../shared/bun-file-shim"
+import { spawn } from "../../../shared/bun-spawn-shim"
 import type { RequirementCheck } from "./signature"
 import { runtimeDeclaresKeychainHandoff } from "./runtime-capabilities"
 import { verifyWithSecurityFramework } from "./signature"
@@ -27,7 +29,7 @@ export function desktopRuntimeCandidates(home: string, arch: string = process.ar
 export type BundleCheck = (app: string, requirement: string) => Promise<boolean>
 
 const verifyBundle: BundleCheck = async (app, requirement) => {
-  const child = Bun.spawn(["/usr/bin/codesign", "--verify", "--deep", "--strict", `-R=${requirement}`, app], {
+  const child = spawn(["/usr/bin/codesign", "--verify", "--deep", "--strict", `-R=${requirement}`, app], {
     stdin: "ignore",
     stdout: "ignore",
     stderr: "ignore",
@@ -38,11 +40,16 @@ const verifyBundle: BundleCheck = async (app, requirement) => {
 export type HandOffRunner = (path: string, args: readonly string[], env: Record<string, string>, deadlineMs: number) => Promise<number | null>
 
 const runBounded: HandOffRunner = async (path, args, env, deadlineMs) => {
-  const child = Bun.spawn([path, ...args], { cwd: dirname(path), stdin: "ignore", stdout: "ignore", stderr: "ignore", env })
-  const timer = setTimeout(() => child.kill("SIGKILL"), deadlineMs)
+  const child = spawn([path, ...args], { cwd: dirname(path), stdin: "ignore", stdout: "ignore", stderr: "ignore", env })
+  let killed = false
+  const timer = setTimeout(() => {
+    killed = true
+    child.kill("SIGKILL")
+  }, deadlineMs)
   try {
+    // Any other signal surfaces as 128 + signal through the shim, never 0.
     const code = await child.exited
-    return child.signalCode === null ? code : null
+    return killed ? null : code
   } finally {
     clearTimeout(timer)
   }
@@ -73,7 +80,7 @@ export function createCreatorHandOff(options: {
     const declaresHandOff = options.declaresHandOff ?? runtimeDeclaresKeychainHandoff
     const self = options.selfPath ?? process.execPath
     for (const { app, runtime } of options.candidates) {
-      if (runtime === self || !(await Bun.file(runtime).exists())) continue
+      if (runtime === self || !(await bunFile(runtime).exists())) continue
       // RULING-74: only a runtime that declares the hand-off contract itself (its capability file, inside the sealed
       // bundle) is asked; an already-shipped runtime would ignore the marker and show its own dialog.
       const verified = await Promise.resolve()

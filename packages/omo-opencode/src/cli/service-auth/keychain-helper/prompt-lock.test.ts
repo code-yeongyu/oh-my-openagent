@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { getProcessStartIdentity } from "@oh-my-opencode/memory-core/process-identity"
 import { keychainProcessState } from "./process-state"
 import { promptLockAt } from "./prompt-lock"
 
@@ -38,7 +39,12 @@ describe("machine-wide prompt lock (#11262 design 3.6 R4; rows 12, 13)", () => {
 
   test("#given a leftover record carrying this pid from another instance #when taking the lock #then it is reaped and granted, never refused for the process lifetime", async () => {
     const path = lockPath()
-    writeFileSync(path, `keychain-prompt leftover\n${process.pid}\n${Date.now()}\nrecycled-instance\n`)
+    // A recycled pid is proven by its recorded process start (team-core lock record line 5); an unknown instance of this
+    // pid without that proof may be a live worker thread, which team-core never reaps.
+    const start = await getProcessStartIdentity(process.pid)
+    if (start === null) throw new Error("process-start identity unavailable")
+    const priorStart = `${start.slice(0, start.indexOf(":"))}:0`
+    writeFileSync(path, `keychain-prompt leftover\n${process.pid}\n${Date.now()}\nrecycled-instance\n${priorStart}\n`)
     const release = await promptLockAt(path)()
     expect(release).not.toBeNull()
     expect(readFileSync(path, "utf8")).not.toContain("recycled-instance")
