@@ -139,8 +139,14 @@ export function createCredentialStore(
   }
   return {
     // Under the lock every read is the helper view's own: fresh, and never one that may open a dialog.
-    read: async () => (await held())?.read() ?? store.read(),
-    readAuthoritative: async () => (await held())?.read() ?? store.readAuthoritative(),
+    read: async () => {
+      const view = await held()
+      return view === null ? store.read() : view.read()
+    },
+    readAuthoritative: async () => {
+      const view = await held()
+      return view === null ? store.readAuthoritative() : view.read()
+    },
     write: (value, intent) => locked(view => view.write(value, intent), () => store.write(value)),
     clear: () => locked(view => view.clear(), store.clear),
     ...(store.prepare === undefined ? {} : { prepare: store.prepare }),

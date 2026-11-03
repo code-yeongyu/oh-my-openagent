@@ -62,6 +62,22 @@ describe("the keychain helper path under dev's credential contracts", () => {
     expect(keychain.stats).toEqual({ approves: 0, unleasedMutations: 0 })
   })
 
+  test("#given no sign-in item #when a locked section reads #then only the locked view reads it, never the outside-lock reader as well", async () => {
+    const keychain = fakeKeychain()
+    const { store, session } = await helperSession(keychain)
+    const reads = () => keychain.events.filter(event => event.startsWith("read ")).length
+    const { inside, plain, authoritative } = await session.transaction(async () => {
+      const before = reads()
+      const value = await store.read()
+      const between = reads()
+      await store.readAuthoritative()
+      return { inside: between - before, plain: value, authoritative: reads() - between }
+    })
+    expect(plain).toBeNull()
+    expect(inside).toBe(1)
+    expect(authoritative).toBe(1)
+  })
+
   test("#given an unreadable helper-owned item #when read #then dev's recovery text (omo account forget)", async () => {
     const keychain = fakeKeychain()
     keychain.put(A, "{not json", "helper")
