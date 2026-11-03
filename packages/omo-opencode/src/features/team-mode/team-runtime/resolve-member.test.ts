@@ -3,6 +3,8 @@ declare const require: (name: string) => any
 const { describe, expect, mock, test, beforeEach } = require("bun:test")
 import type { ExecutorContext } from "../../../tools/delegate-task/executor-types"
 import type { Member } from "../types"
+import { replaceProjectAgentProvenance } from "../final-open-code-agent-registry"
+import { unsafeTestValue } from "../../../../../../test-support/unsafe-test-value"
 
 const resolveCategoryExecutionMock = mock()
 const resolveSubagentExecutionMock = mock()
@@ -165,8 +167,23 @@ describe("resolveMember", () => {
 
     // then
     await expect(result).rejects.toBeInstanceOf(TeamMemberResolutionError)
-    await expect(result).rejects.toThrow("Failed to resolve member 'unknown': unknown agent")
+    await expect(result).rejects.toThrow("no config-time provenance")
     expect(resolveCategoryExecutionMock).not.toHaveBeenCalled()
+  })
+
+  test("preserves exact project agent model and leaves its prompt to OpenCode", async () => {
+    const ctx = createExecutorContext()
+    replaceProjectAgentProvenance(ctx.directory, ["repository-reviewer"])
+    ctx.client = unsafeTestValue({ app: { agents: async () => [{
+      name: "repository-reviewer", mode: "subagent", native: false,
+      model: { providerID: "qa", modelID: "exact" }, variant: "high",
+      permission: [{ permission: "*", pattern: "*", action: "allow" }],
+    }] } })
+    const member = { name: "reviewer", kind: "subagent_type", subagent_type: "repository-reviewer", backendType: "in-process", isActive: true } satisfies Member
+    const result = await resolveMember(member, ctx, "", "lead")
+    expect(result).toEqual({ memberName: "reviewer", agentToUse: "repository-reviewer", model: { providerID: "qa", modelID: "exact", variant: "high" }, fallbackChain: undefined, systemContent: undefined })
+    expect(resolveSubagentExecutionMock).not.toHaveBeenCalled()
+    expect(buildSystemContentMock).not.toHaveBeenCalled()
   })
 
   test("reuses buildSystemContent for both resolution kinds without custom prompt concatenation", async () => {
