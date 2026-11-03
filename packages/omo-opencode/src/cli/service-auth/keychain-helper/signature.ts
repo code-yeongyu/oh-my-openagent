@@ -73,7 +73,7 @@ async function verifyWithCodesign(path: string, requirement: string): Promise<bo
 }
 
 /** bun:ffi first, `/usr/bin/codesign --verify --strict -R=<DR>` when the framework cannot be loaded. */
-export const verifyWithSecurityFramework: RequirementCheck = async (path, requirement) => {
+const verifyWithSecurityFramework: RequirementCheck = async (path, requirement) => {
   const loaded = await loadSecurity()
   return loaded === null ? verifyWithCodesign(path, requirement) : loaded.check(path, requirement)
 }

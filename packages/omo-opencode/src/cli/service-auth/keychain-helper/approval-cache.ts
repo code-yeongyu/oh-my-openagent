@@ -3,7 +3,7 @@ export type ApprovalEntry = ItemAttributes & { readonly value: string; readonly 
 export type ApprovalAnswer = { readonly kind: "approved"; readonly value: string; readonly attributes: ItemAttributes } | { readonly kind: "denied" } | { readonly kind: "missing" }
 
 export type ApprovalClock = { readonly nowSeconds: () => number; readonly sleepMs: (ms: number) => Promise<void> }
-export const systemClock: ApprovalClock = { nowSeconds: () => Date.now() / 1_000, sleepMs: ms => Bun.sleep(ms) }
+const systemClock: ApprovalClock = { nowSeconds: () => Date.now() / 1_000, sleepMs: ms => Bun.sleep(ms) }
 
 /**
  * A cached `approve` answer serves a read only while `<A>` is exactly the item that answer read: equal `cdat` and `mdat`,
@@ -85,6 +85,3 @@ export function createApprovalCache(clock: ApprovalClock = systemClock) {
     },
   }
 }
-
-let processCache: ApprovalCache | undefined
-export const processApprovalCache = (): ApprovalCache => (processCache ??= createApprovalCache())

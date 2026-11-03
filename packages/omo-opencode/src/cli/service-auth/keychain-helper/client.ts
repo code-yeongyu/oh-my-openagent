@@ -5,7 +5,7 @@ export type HelperCall = { readonly verb: HelperVerb; readonly account: string; 
 
 const MUTATING: ReadonlySet<HelperVerb> = new Set(["write", "stage", "retire", "promote", "remove"])
 
-export const helperReplySchema = z
+const helperReplySchema = z
   .object({
     owned: z.boolean(),
     value: z.string(),
