@@ -98,7 +98,11 @@ function resolveOne(
 
   if (accounts.length > 0) {
     const pinnedName = nonEmptyString(node["pinned"])
-    const pinned = accounts.find((account) => nonEmptyString(account["name"]) === pinnedName) ?? accounts[0]
+    const pinnedStored = accounts.find((account) => nonEmptyString(account["name"]) === pinnedName)
+    // A pin that names no stored account is an env token slot (it never appears in accounts[]); the
+    // engine serves that slot, so no stored account is named and its own record is drawn instead.
+    if (pinnedName !== undefined && pinnedStored === undefined) return undefined
+    const pinned = pinnedStored ?? accounts[0]
     const healthy = accounts.find((account) => health(account) === "ok" && canServe(account))
     // A stale OAuth token still serves: the endpoint's 401 is what lets the column say
     // "auth stale - run /login". A cooldown is different - the pool has explicitly stopped

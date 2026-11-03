@@ -262,4 +262,14 @@ describe("claude CLI accounts (senpi#4436)", () => {
     // then
     expect(credential).toEqual({ state: "ok", account: "my", pinnedAccount: "old" })
   })
+  test("#given a pinned env token account next to claude CLI accounts #when resolved #then no stored account is named for it", () => {
+    // given the engine pins the env slot, which never appears in auth.json accounts[]
+    const file = cliAuth("env", [cli("my"), cli("work")])
+
+    // when
+    const credential = resolveUsageCredentialFrom(file, undefined, ["anthropic-subscription"], NOW)
+
+    // then the engine-source falls back to the env record or the latest one
+    expect(credential).toBeUndefined()
+  })
 })
