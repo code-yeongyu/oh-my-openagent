@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { connectDeviceService, deviceServiceStateDir, type DeviceService, LocalApiError, type RemoteAttachEvent } from "../src/index.ts"
 import { writeToken } from "../src/local-api/access.ts"
 import { connectLocalApi } from "../src/local-api/client.ts"
+import { validateWelcome } from "../src/local-api/validate.ts"
 import { startFakeOwner, type FakeOwner } from "./local-api/conformance/fake-owner.ts"
 import { defaultWorld, OFFLINE_PEER, PEER, SESSION_ID, type World } from "./local-api/conformance/world.ts"
 import { testSecure } from "./local-api/support.ts"
@@ -200,5 +201,34 @@ describe("DeviceService", () => {
     const error = await service.attach(PEER, "bm8tc3VjaC1zZXNzaW9u").catch((e: unknown) => e)
     expect(error).toBeInstanceOf(LocalApiError)
     expect((error as LocalApiError).code).toBe("session_not_found")
+  })
+})
+
+// D1 (#12051): the host attach setting is the per-device remote-control opt-out; a service advertises it as `control`.
+describe("the host attach control", () => {
+  test("a fresh service reads attached, and a set is stored and read back with its time", async () => {
+    const { service } = await serviceFor()
+    expect(service.capabilities).toContain("control")
+    expect(await service.attachControl()).toEqual({ attached: true, changedAt: "" })
+    const detached = await service.setAttachControl(false)
+    expect(detached.attached).toBe(false)
+    expect(Number.isNaN(Date.parse(detached.changedAt))).toBe(false)
+    expect(await service.attachControl()).toEqual(detached)
+  })
+
+  test("a welcome that also lists the optional machine capability is accepted; an unknown one is not", () => {
+    const welcome = {
+      type: "welcome",
+      v: 1,
+      service_version: "0.1.0",
+      owner: "service",
+      server_proof: "a".repeat(64),
+      server_nonce: "b".repeat(64),
+      state: defaultWorld().status,
+    }
+    expect(validateWelcome({ ...welcome, capabilities: ["sessions", "control", "machine"] })).toMatchObject({
+      capabilities: ["sessions", "control", "machine"],
+    })
+    expect(() => validateWelcome({ ...welcome, capabilities: ["sessions", "telepathy"] })).toThrow()
   })
 })

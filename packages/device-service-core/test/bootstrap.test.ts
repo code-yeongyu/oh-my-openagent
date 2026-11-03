@@ -96,6 +96,18 @@ describe("device service bootstrap", () => {
     expect([...(owner?.state.endpoints ?? [])]).toEqual([AGENT_DIR])
   })
 
+  // D1 (#12051): the per-device opt-out belongs to the user; starting omo must never turn remote control back on.
+  test("a connected bootstrap leaves a detached host detached", async () => {
+    const stateDir = home()
+    const owner = await ownerAt(stateDir, PIN)
+    const { deps } = harness(stateDir)
+    const setter = await deps.connect()
+    await setter.setAttachControl(false)
+    expect(await bootstrapDeviceService(deps)).toMatchObject({ kind: "connected" })
+    expect(owner.state.attach.attached).toBe(false)
+    expect(owner.state.log.filter(type => type === "control.attach.set")).toHaveLength(1)
+  })
+
   test("acquisition runs again when welcome.service_version is older than the pin", async () => {
     const stateDir = home()
     const old = await ownerAt(stateDir, "1.3.9")
