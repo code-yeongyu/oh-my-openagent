@@ -259,6 +259,8 @@ function isStatusTransitionAllowed(current: TaskStatus, transition: TaskTransiti
       return current === "running"
     case "fail":
       return current === "running" || (current === "pending" && transition.failure_kind === "suspended_unresumable")
+        // A paused child its run's Resume could not restore ends here instead of staying paused (#12249).
+        || (current === "paused" && transition.failure_kind === "session_unavailable")
     case "lose":
       return false
     case "evict":

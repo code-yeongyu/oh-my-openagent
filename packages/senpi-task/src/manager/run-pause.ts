@@ -36,6 +36,7 @@ export type TaskPauseMethods = {
   holdTaskInput(taskId: string, input: HeldTaskInput): Promise<EngineHoldInputResult>
   observeTaskHold(taskId: string, parentSessionId: string): Promise<ObservedHold | undefined>
   resumeLostTask(taskId: string, request: LostResumeRequest): Promise<LostResumeResult>
+  endLostPausedTask(taskId: string, reason: string): boolean
 }
 
 export type HeldTaskInput = { readonly inputId: string; readonly revision: number; readonly text: string }
@@ -261,6 +262,22 @@ export function createTaskRunPause(ports: {
     return ack
   }
 
+  // A paused child the run's Resume could not reach, with no live handle left: its run ends as an
+  // error the parent is told about, and its transcript stays for task_send to revive (#12249).
+  function endLostPausedTask(taskId: string, reason: string): boolean {
+    const record = ports.store.load(taskId)
+    if (record === null || record === undefined || record.status !== "paused" || ports.liveHandle(taskId) !== undefined) return false
+    forget(taskId)
+    ports.concurrency.releaseTask(taskId)
+    ports.store.mutate(taskId, ({ run_pause: _ended, ...fresh }) => fresh)
+    return ports.store.transition(taskId, {
+      type: "fail",
+      timestamp: new Date(ports.now()).toISOString(),
+      error_message: `The run's Resume could not restore this paused child (${reason}). Its transcript is kept: task_send revives it.`,
+      failure_kind: "session_unavailable",
+    }).applied
+  }
+
   function forget(taskId: string): void {
     owners.delete(taskId)
     intents.clear(taskId)
@@ -271,5 +288,5 @@ export function createTaskRunPause(ports: {
     resumed.delete(taskId)
   }
 
-  return { pauseTask, resumePausedTask, holdTaskInput, observeTaskHold, resumeLostTask, joinIdlePause, park, forget, settlement: (taskId: string, epoch: number) => intents.settlement(taskId, epoch) }
+  return { pauseTask, resumePausedTask, holdTaskInput, observeTaskHold, resumeLostTask, endLostPausedTask, joinIdlePause, park, forget, settlement: (taskId: string, epoch: number) => intents.settlement(taskId, epoch) }
 }

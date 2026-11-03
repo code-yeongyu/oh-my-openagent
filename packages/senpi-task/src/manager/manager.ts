@@ -387,6 +387,17 @@ class TaskManagerImpl implements TaskManager {
     return this.#runPause.holdTaskInput(taskId, input)
   }
 
+  endLostPausedTask(taskId: string, reason: string): boolean {
+    const record = this.#tryLoad(taskId)
+    const owner = record?.host_pid
+    const alive = this.#options.isProcessAlive ?? defaultSignaller.isAlive
+    // A paused child a live foreign host still holds is that host's to resume; it is never ended here.
+    if (owner !== undefined && owner !== this.#hostPid && alive(owner)) return false
+    const ended = this.#runPause.endLostPausedTask(taskId, reason)
+    if (ended) this.#settleWaiters(taskId)
+    return ended
+  }
+
   async startOwned(spec: ManagerStartSpec, owner: DagTaskOwner): Promise<OwnedStartResult> {
     return this.#startAdmissions.run(spec, { kind: "dag", id: owner.runId },
       admitted => this.#startOwnedAdmitted(admitted, owner), spec.resumeCredential)

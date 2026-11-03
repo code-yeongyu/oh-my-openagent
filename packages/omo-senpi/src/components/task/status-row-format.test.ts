@@ -165,7 +165,7 @@ describe("run-paused children", () => {
     // when the footer renders it without live activity, with and without stats
     const rows = [
       ...backgroundWidgetRows([paused], new Map(), now, undefined, 220),
-      ...backgroundWidgetRows([paused], new Map(), now, () => ({ turns: 0, tool_calls: 0 }), 220),
+      ...backgroundWidgetRows([paused], new Map(), now, () => ({ runtime_ms: 0, turns: 0, tool_calls: 0 }), 220),
       ...backgroundWidgetRows([paused], new Map([["st_paused", "running"]]), now, undefined, 220),
     ]
 
