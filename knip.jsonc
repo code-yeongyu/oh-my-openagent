@@ -308,8 +308,6 @@
       "packages/memory-core/src/sync/crypto/vendor/sync-format/stream.ts": ["PLAINTEXT_LIMIT"],
       // pre-existing at origin dev 4686e425b5: unused export(s) SyncCommitError
       "packages/memory-core/src/sync/engine/adapters/git-sync-repo.ts": ["SyncCommitError"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) OversizedItemError
-      "packages/memory-core/src/sync/engine/batches.ts": ["OversizedItemError"],
       // pre-existing at origin dev 4686e425b5: unused export(s) ManualClock, inProcessLock
       "packages/memory-core/src/sync/engine/engine-harness.test-support.ts": ["ManualClock", "inProcessLock"],
       // pre-existing at origin dev 4686e425b5: unused export(s) POLL_MS
