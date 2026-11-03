@@ -137,7 +137,10 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
           ),
         ...(ctx.idleCoordinator === undefined ? {} : { coordinator: ctx.idleCoordinator }),
       })
-      registerTaskTools(pi, engine, teamTools.service, teamTools.leadPollers.resolveDefaultTeamRunId, skillInvocations, dagRuntime, ctx.idleCoordinator)
+      const { forgetTaskOutputReads } = registerTaskTools(
+        pi, engine, teamTools.service, teamTools.leadPollers.resolveDefaultTeamRunId,
+        skillInvocations, dagRuntime, ctx.idleCoordinator,
+      )
       registerTeamTools(pi, teamTools)
       registerRemovedTeamWaitHint(pi)
       registerTaskCommands(pi, engine.manager)
@@ -184,6 +187,7 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
           reconcileTeamMailbox: teamTools.reconcileTeamMailbox,
           leadPollers: teamTools.leadPollers,
           resumptionChannels,
+          forgetTaskOutputReads,
           dagReloadSource: createDagReloadSource({
             manager: dagRuntime.manager,
             sessionId: () => engine.runtime.sessionId(),
@@ -265,7 +269,7 @@ function registerTaskTools(
   skillInvocations: SkillInvocationTracker,
   dagRuntime: DagRuntime,
   coordinator?: IdleInjectionCoordinator,
-): void {
+): { forgetTaskOutputReads: (sessionId: string) => void } {
   const resolveCallerSessionId = defaultResolveCallerSessionId
   const manager = engine.manager
   pi.registerTool({
@@ -280,12 +284,15 @@ function registerTaskTools(
     }),
   })
   pi.registerTool({ ...createTaskCancelTool({ manager }) })
-  pi.registerTool({
-    ...createTaskOutputTool({ manager, stateDir: engine.stateDir, resolveCallerSessionId, notices: engine.host.notices.list }),
+  const output = createTaskOutputTool({
+    manager, stateDir: engine.stateDir, resolveCallerSessionId, notices: engine.host.notices.list,
   })
+  const { forgetSession, ...outputTool } = output
+  pi.registerTool({ ...outputTool })
   registerDagTool(pi, engine, dagRuntime)
   registerWorkpoolTool(pi, engine, skillInvocations, coordinator)
   registerEvalHandleHost(pi, engine)
+  return { forgetTaskOutputReads: forgetSession }
 }
 
 

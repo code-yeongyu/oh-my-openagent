@@ -3,10 +3,13 @@
 // Single forward scan with indexOf (no whole-document regex, no backtracking). Produces a
 // LiteNode tree: { tag, attrs, children, parent, line, text, raw }. Text nodes carry
 // tag "#text"; <style>/<script>/<svg> keep their inner source in `raw` and have no parsed
-// children. The "#document" root also carries `ids` (id -> occurrence count) so
-// selectorPath can tell whether an id is unique. Plain Node ESM, no dependencies.
+// children, except an <svg> node also gains its <foreignObject> subtrees as parsed children
+// (see html-foreign-object.mjs; the rest of the svg stays raw). The "#document"
+// root also carries `ids` (id -> occurrence count) so selectorPath can tell whether an id
+// is unique. Plain Node ESM, no dependencies.
 
 import { decodeEntities } from "./entities.mjs"
+import { attachForeignObjects } from "./html-foreign-object.mjs"
 
 export { decodeEntities }
 
@@ -25,7 +28,7 @@ const SAFE_ID = /^[A-Za-z_][\w-]*$/
 export const PROSE_TAGS = new Set(["p", "li", ...HEADINGS, "td", "th", "figcaption", "blockquote", "dd", "dt"])
 export const PROSE_BREAKS = new Set([...P_CLOSERS, ...PROSE_TAGS, "br", "tr"])
 
-function makeNode(tag, attrs, parent, line) {
+export function makeNode(tag, attrs, parent, line) {
 	return { tag, attrs, children: [], parent, line, text: "", raw: null }
 }
 
@@ -181,6 +184,7 @@ export function parseHtml(source) {
 				if (!tag.selfClosing) {
 					const [innerEnd, resume] = findRawClose(src, tag.end, tag.name)
 					node.raw = src.slice(tag.end, innerEnd)
+					if (tag.name === "svg") attachForeignObjects(node, lineAt(starts, tag.end), parseHtml)
 					at = textStart = resume
 				}
 			} else if (!VOID_TAGS.has(tag.name)) {
