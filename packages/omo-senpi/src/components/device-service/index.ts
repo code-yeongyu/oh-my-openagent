@@ -1,6 +1,7 @@
 import { isAbsolute } from "node:path"
 
 import { isOmoDeviceServiceEnabled, type OmoDeviceServiceConfigView } from "@oh-my-opencode/omo-config-core"
+import { OMO_SENPI_TASK_RPC_CHILD } from "@oh-my-opencode/senpi-task/rpc-spawn"
 
 import { deferUntilAfterFirstPaint } from "../../extension/startup-deferral"
 import type { ComponentLogger, OmoSenpiComponent } from "../../extension/types"
@@ -43,9 +44,10 @@ function processLatch(): ProcessLatch {
   return latch
 }
 
-// Print runs, RPC hosts and task children have no UI: only an interactive start bootstraps.
+// Only the top-level interactive TUI bootstraps, identified by senpi's own run mode: RPC mode binds a real UI context
+// too (hasUI is true there), so hasUI alone would also start a bootstrap in every RPC host and task child.
 function interactiveSurface(eventCtx: unknown): NoticeSurface | undefined {
-  if (!isRecord(eventCtx) || eventCtx.hasUI !== true || !isRecord(eventCtx.ui)) return undefined
+  if (!isRecord(eventCtx) || eventCtx.mode !== "tui" || eventCtx.hasUI !== true || !isRecord(eventCtx.ui)) return undefined
   const notify: unknown = eventCtx.ui.notify
   if (typeof notify !== "function") return undefined
   return { cwd: eventCtx.cwd, ui: { notify: (message, type) => Reflect.apply(notify, eventCtx.ui, [message, type]) } }
@@ -56,12 +58,16 @@ const isCi = (env: Readonly<Record<string, string | undefined>>): boolean => {
   return ci !== undefined && ci !== "" && ci !== "0" && ci !== "false"
 }
 
+// Stops that are not the user's to act on at start-up: signed out, or no credential store to tell whether anyone is
+// signed in at all (a machine without a keyring must not warn on every start).
+const QUIET_STOPS: ReadonlySet<string> = new Set(["signed_out", "store_unavailable"])
+
 function surfaceReport(report: BootstrapReport | undefined, surface: NoticeSurface, logger: ComponentLogger): void {
   if (report === undefined) {
     logger.warn("device service bootstrap answered no report")
     return
   }
-  if (!("notice" in report) || report.state === "signed_out") return
+  if (!("notice" in report) || QUIET_STOPS.has(report.state)) return
   surface.ui.notify(report.notice, "warning")
 }
 
@@ -71,8 +77,9 @@ export function createDeviceServiceComponent(options: DeviceServiceComponentOpti
     register(pi, ctx): void {
       const env = options.env ?? process.env
       const omoBin = env.OMO_BIN
-      // Only an omo launcher sets OMO_BIN for its engine: a bare senpi, a test or a CI run has nothing to bootstrap.
-      if (omoBin === undefined || !isAbsolute(omoBin) || isCi(env)) return
+      // Only an omo launcher sets OMO_BIN for its engine: a bare senpi, a test or a CI run has nothing to bootstrap. A task
+      // child (team members included) inherits OMO_BIN from its parent, which already ran the bootstrap.
+      if (omoBin === undefined || !isAbsolute(omoBin) || isCi(env) || env[OMO_SENPI_TASK_RPC_CHILD] === "1") return
       const latch = options.latch ?? processLatch()
       const loadConfig = options.loadConfig ?? loadSenpiOmoConfig
       const run = options.run ?? runBootstrapWorker
