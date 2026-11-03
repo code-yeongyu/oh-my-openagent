@@ -28,6 +28,7 @@
 | Configuration field reference | [docs/reference/configuration.md](reference/configuration.md) |
 | Harness-neutral `omo.json` config reference | [docs/reference/omo-json.md](reference/omo-json.md) |
 | Native `computer` tool contract | [docs/reference/computer.md](reference/computer.md) |
+| `computer.run` QuickJS sandbox threat model and compatibility matrix | [docs/reference/computer-run-sandbox-threat-model.md](reference/computer-run-sandbox-threat-model.md) |
 | Feature-by-feature reference | [docs/reference/features.md](reference/features.md) |
 | CLI command reference | [docs/reference/cli.md](reference/cli.md) |
 | Engine hosts per session, `omo daemon`, migration and rollback | [docs/reference/omo-daemon.md](reference/omo-daemon.md) |
