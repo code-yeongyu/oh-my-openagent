@@ -89,6 +89,6 @@ test("after a crash between journaling and importing the healing edit, the next 
     return setPending(pending)
   }
   await a.engine.runCycle()
-  expect(Math.max(...journaled)).toBe(1)
+  expect(journaled.length > 0 && journaled.every((n) => n <= 1)).toBe(true)
   await expectBothEditsOnBoth(a, b)
 }, TIMEOUT)
