@@ -28,6 +28,7 @@ import { createLateSendOutcomeDeliverer } from "./late-send-outcome"
 import { CATEGORY_UNAVAILABLE_MESSAGE_TYPE } from "./category-unavailable-warning"
 import { registerTaskCommands } from "./commands"
 import { registerDagCommands } from "./dag-commands"
+import { createLiveConfigProvider } from "./live-config-provider"
 import { createDagReloadSource } from "./dag-reload-source"
 import { createDagRuntime, type DagRuntime } from "./dag-runtime"
 import { registerDagTool } from "./register-workflow-tool"
@@ -105,12 +106,20 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
       const loaded = loadConfig({ cwd })
       const loadSkills = options.loadSkills ?? createTaskSkillLoader({ logger: ctx.logger })
 
+      const getLiveOmoConfig = createLiveConfigProvider({
+        cwd,
+        loadConfig,
+        initialResult: loaded,
+        logger: ctx.logger,
+      })
+
       const engine = composeTaskEngine({
         pi,
         omoConfig: loaded.config,
         // Re-read the user/project chain per plan so mid-session omo.json(c) category edits
-        // reach the planner seam instead of pinning the register-time snapshot forever.
-        getOmoConfig: () => loadConfig({ cwd }).config,
+        // reach the planner seam instead of pinning the register-time snapshot forever, while
+        // caching within the plan window and retaining the last good config on diagnostics.
+        getOmoConfig: getLiveOmoConfig,
         cwd,
         loadSkills,
         sharedParentTools: () => ctx.getCapturedTools?.() ?? [],
