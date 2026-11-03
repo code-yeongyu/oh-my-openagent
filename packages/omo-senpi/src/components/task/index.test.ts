@@ -42,7 +42,13 @@ const TASK_EVENTS = [
   "agent_end",
 ]
 const SKILL_INVOCATION_TRACKER_EVENTS = ["input", "tool_result", "session_start", "session_shutdown"]
-const DAG_LIFECYCLE_EVENTS = ["session_start", "session_shutdown", "session_shutdown"]
+const DAG_LIFECYCLE_EVENTS = [
+  "session_start",
+  "session_shutdown",
+  "before_agent_start",
+  "session_resumed",
+  "session_shutdown",
+]
 const TASK_COMMANDS = ["dag", "task-kill", "tasks"]
 
 interface RecordedLog {
@@ -278,6 +284,7 @@ describe("omo-senpi task component wiring", () => {
         dispose: () => {
           order.push("dag-dispose")
         },
+        resend: () => {},
       },
       () => {
         pi.on("session_start", () => {

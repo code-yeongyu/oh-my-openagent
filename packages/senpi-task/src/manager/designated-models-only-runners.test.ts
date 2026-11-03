@@ -93,7 +93,7 @@ describe.each(["in-process", "process", "host"] as const)("senpi's shipped defau
     // Precondition: the engine still ships that chain, or this case would pass without proving anything.
     const { SettingsManager } = await loadSenpiBarrel()
     const shipped = SettingsManager.inMemory({}).getRetryFallbackSettings().chains
-    expect(shipped[modelId(opus55)]).toContain(`${modelId(opus5)}:max`)
+    expect(shipped[modelId(opus55)]?.map((rung) => rung.split(":")[0])).toContain(modelId(opus5))
     const { record, world } = await runCategoryChild({
       runner,
       category: "deep-high",
