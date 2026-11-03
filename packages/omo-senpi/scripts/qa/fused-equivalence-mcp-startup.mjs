@@ -13,8 +13,12 @@ const STARTUP_SETTLE_MS = 60_000;
 
 const surfaces = async (run) => (await run.send({ type: "get_loaded_surfaces" })).data.mcpServers ?? [];
 const connecting = (servers) => servers.filter((server) => server.status === "connecting").map((server) => server.name);
-/** A server that settled `connected`, or `idle` (a cached lazy server that needs no startup connect). */
-const SETTLED_OK = new Set(["connected", "idle"]);
+/**
+ * A server that settled `connected`, `idle` (a cached lazy server that needs no startup connect), or `disabled` (the
+ * driver turns the remote `context7` and `grep_app` off in the sandbox mcp.json so no third party's live
+ * instructions reach the goldens, #12256).
+ */
+const SETTLED_OK = new Set(["connected", "idle", "disabled"]);
 
 /**
  * A server that settled in any other state (degraded, failed) would leave its instructions out of the prompts and
