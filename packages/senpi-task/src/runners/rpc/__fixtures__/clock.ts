@@ -23,9 +23,11 @@ export function fakeClock() {
     pending: () => timers.size,
     async advance(ms: number) {
       const end = now + ms
+      let fired = 0
       for (;;) {
         const next = [...timers].filter(([, timer]) => timer.at <= end).sort((a, b) => a[1].at - b[1].at)[0]
         if (next === undefined) break
+        if (++fired > 10_000) throw new Error("fake clock fired more than 10000 timers in one advance: a timer keeps rescheduling itself")
         const [id, timer] = next
         now = timer.at
         if (timer.interval === undefined) timers.delete(id)
