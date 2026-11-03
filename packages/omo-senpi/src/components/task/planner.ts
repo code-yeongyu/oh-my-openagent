@@ -50,10 +50,7 @@ export function createTaskChildPlanner(
 ): ChildPlanner {
   const distributeModels = createModelDistributor()
   const availableAgents = listAvailableAgents(agents)
-  const planChild = (spec: Parameters<ChildPlanner>[0]): PlanResolution => {
-    // Mid-session omo.json(c) edits must reach new plans: resolve the config per plan instead of
-    // closing over the composition-time snapshot (a stale object silently pins old category models).
-    const liveConfig = typeof omoConfig === "function" ? omoConfig() : omoConfig
+  const planChild = (spec: Parameters<ChildPlanner>[0], liveConfig: OmoConfig): PlanResolution => {
     if (spec.subagent_type !== undefined) {
       const agentResolution = resolveAgentTarget(spec.subagent_type, spec.model, agents, resolveRegistry, liveConfig, distributeModels, resolveDefaultRoute)
       return agentResolution ?? unresolvableAgentTarget(spec.subagent_type, availableAgents, resolveRegistry, liveConfig)
@@ -100,10 +97,12 @@ export function createTaskChildPlanner(
     return plan
   }
   return (spec): PlanResolution => {
-    const resolution = planChild(spec)
+    // Mid-session omo.json(c) edits must reach new plans: resolve the config per plan instead of
+    // closing over the composition-time snapshot (a stale object silently pins old category models).
+    const liveConfig = typeof omoConfig === "function" ? omoConfig() : omoConfig
+    const resolution = planChild(spec, liveConfig)
     if (resolution.kind !== "resolved") return resolution
     const fast = inheritParentFastMode(resolution.plan, resolveRegistry(), resolveParentServiceTier())
-    const liveConfig = typeof omoConfig === "function" ? omoConfig() : omoConfig
     // The -fast sibling is a different model: exclude_models can keep it out while the planned one runs.
     return { kind: "resolved", plan: isExcludedModel(fast.model, liveConfig.exclude_models) ? resolution.plan : fast }
   }
