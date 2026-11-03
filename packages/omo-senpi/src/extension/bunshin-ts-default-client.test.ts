@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import type { BunshinClient, StandaloneMachine } from "@bunshin/bunshin-ts"
+import type { BunshinClient, StandaloneMachine } from "@sisyphuslabs/bunshin-ts"
 
 import { createLazyBunshinClient } from "./bunshin-ts-default-client"
 

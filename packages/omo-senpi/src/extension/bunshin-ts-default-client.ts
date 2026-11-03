@@ -1,4 +1,4 @@
-import { connect, FanoutRun, type BunshinClient, type FleetEvent, type FleetEventSource } from "@bunshin/bunshin-ts"
+import { connect, FanoutRun, type BunshinClient, type FleetEvent, type FleetEventSource } from "@sisyphuslabs/bunshin-ts"
 
 import { pickTransport } from "./bunshin-ts-pick-transport"
 

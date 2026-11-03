@@ -67,7 +67,7 @@ describe("omo-senpi bundle purity", () => {
       const bunshinTsInputs = built.bunshinTsInputs.map(input => input.replaceAll("\\", "/"))
       expect(bunshinTsInputs.filter(input => !input.includes("node_modules/") && !/src\/extension\/bunshin-ts-[a-z-]+\.ts$/.test(input))).toEqual([])
       expect(bunshinTsInputs.filter(input => /node_modules\/(@code-yeongyu\/senpi|@earendil-works|@mariozechner)\//.test(input))).toEqual([])
-      expect(bunshinTsInputs.some(input => input.includes("node_modules/@bunshin/bunshin-ts/"))).toBe(true)
+      expect(bunshinTsInputs.some(input => input.includes("node_modules/@sisyphuslabs/bunshin-ts/"))).toBe(true)
       expect(bunshinTsInputs.some(input => input.includes("node_modules/@sisyphuslabs/bunshin-ts-relay/"))).toBe(true)
       // The sidecar gets the PostHog class from the main bundle; its gzip/Sentry top-level code must not come along.
       const { telemetryRecoveryInputs } = built

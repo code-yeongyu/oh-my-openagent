@@ -1,4 +1,4 @@
-import type { MachineHubTransport } from "@bunshin/bunshin-ts"
+import type { MachineHubTransport } from "@sisyphuslabs/bunshin-ts"
 import { createRelayTransport, relayStatus } from "@sisyphuslabs/bunshin-ts-relay"
 
 const TRANSPORT_CHOICE_ENV = "BUNSHIN_TS_TRANSPORT"

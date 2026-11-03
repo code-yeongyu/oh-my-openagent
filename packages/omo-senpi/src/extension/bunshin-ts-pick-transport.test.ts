@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import type { MachineHubTransport } from "@bunshin/bunshin-ts"
+import type { MachineHubTransport } from "@sisyphuslabs/bunshin-ts"
 
 import { BunshinSessionError, pickTransport, type PickTransportDeps } from "./bunshin-ts-pick-transport"
 

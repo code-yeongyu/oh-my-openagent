@@ -1,4 +1,4 @@
-export * from "@bunshin/bunshin-ts"
+export * from "@sisyphuslabs/bunshin-ts"
 export { createRelayTransport, relayStatus, RelayTransportError } from "@sisyphuslabs/bunshin-ts-relay"
 export { BunshinSessionError, pickTransport } from "./bunshin-ts-pick-transport"
 export { bunshin } from "./bunshin-ts-default-client"
