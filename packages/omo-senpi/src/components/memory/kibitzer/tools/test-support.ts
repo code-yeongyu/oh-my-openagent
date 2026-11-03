@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
-import { GitMemoryRepo, renderMemoryFile, type GitCommitAuthor, type RecallNudge } from "@oh-my-opencode/memory-core"
+import { GitMemoryRepo, RecallCorpusCache, renderMemoryFile, type GitCommitAuthor, type RecallNudge } from "@oh-my-opencode/memory-core"
 
 import { rmEfaultTolerant } from "../../teardown.test-support"
 import { createWakeToolBudget, type WakeToolBudget } from "./budget"
@@ -14,9 +14,17 @@ import { createSessionBranchSnapshot } from "./session-read"
 export const IDENTITY = "agent-kibitzer-tools-test"
 export const AUTHOR: GitCommitAuthor = { agentId: IDENTITY, authorName: "Kibitzer Tools Test Agent" }
 
+// The recall cache saves a repository's terms into its `.git` after the tool call returns; removing the root
+// while that save runs leaves the root behind, so every root waits for this test's caches first.
+const caches = new Set<RecallCorpusCache>()
+
 export async function tempRoot(prefix = "omo-kibitzer-tools-"): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), prefix))
-  onTestFinished(() => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 30, retryDelay: 200 }))
+  onTestFinished(async () => {
+    await Promise.all([...caches].map((cache) => cache.settled()))
+    caches.clear()
+    await rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 30, retryDelay: 200 })
+  })
   return root
 }
 
@@ -73,10 +81,12 @@ export function harness(options: HarnessOptions): Harness {
   const offered = new Set<string>()
   const surfaced = new Set<string>()
   const snapshot = createSessionBranchSnapshot()
+  const cache = new RecallCorpusCache()
+  caches.add(cache)
   const created = createKibitzerSidecarTools({
     workspaceRoot: options.workspaceRoot,
     session: snapshot,
-    memory: { repo: options.repo, ...(options.queryExpansion === undefined ? {} : { queryExpansion: options.queryExpansion }) },
+    memory: { repo: options.repo, cache, ...(options.queryExpansion === undefined ? {} : { queryExpansion: options.queryExpansion }) },
     nudge: { offered, surfaced, maxItems: options.maxItems ?? 2, accepted: () => accepted },
     budget: () => budget,
     ...(options.caps === undefined ? {} : { caps: options.caps }),

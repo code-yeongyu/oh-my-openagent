@@ -6,6 +6,8 @@ import { destroyResidentTask } from "./destroy"
 import { endClosingFallbackChild } from "./fallback-closing-child"
 import { DEFAULT_HOST_SESSION_RETRY_POLICY, isHostSessionRecord } from "./host-session"
 import { terminateOldRpc } from "./revive-rollback"
+import { recoveryFailureNotice } from "../completion/recovery-failure-notice"
+import { withDroppedSteeringNotice } from "../state/queued-steering"
 
 type StopRetry = { token: string; attempt: number; retryAt: number }
 const stopRetries = new WeakMap<LifecycleContext, Map<string, StopRetry>>()
@@ -122,16 +124,15 @@ export async function expireSuspendedChild(
     (fresh.status !== "pending" && fresh.status !== "running")
   )
     return
-  const undelivered = fresh.pending_steering?.length ?? 0
-  const closureMessage = closed
-    ? `${reason}\nThe child could not be resumed (${cause}); its stop is confirmed.`
-    : `${reason}\nThe child could not be resumed (${cause}). Its old session may still be running on an unreachable host; closing it is being retried. There is no at-most-once guarantee if you re-dispatch: the work may run twice while the old run is still live. Check side-effecting work before re-running.`
-  const message = undelivered === 0 ? closureMessage
-    : `${closureMessage}\n${undelivered} queued message${undelivered === 1 ? " was" : "s were"} not delivered.`
+  const closureMessage = recoveryFailureNotice(fresh, closed)
+  // The failure message and the steer_dropped event count the same queue: the one this mutate clears (#10866).
+  let undelivered = 0
   context.store.mutate(record.task_id, (current) => {
+    undelivered = current.pending_steering?.length ?? 0
     const { pending_steering: _undelivered, ...rest } = current
     return rest
   })
+  const message = withDroppedSteeringNotice(closureMessage, undelivered)
   if (undelivered > 0) context.store.appendEvent(record.task_id, {
     type: "steer_dropped", payload: { count: undelivered, reason: "target_gone" },
   })

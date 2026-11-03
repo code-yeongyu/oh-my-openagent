@@ -2,6 +2,18 @@ import { COMPUTER_SKILL_NAME } from "@oh-my-opencode/senpi-desktop-tool/registra
 import type { ContributedSkill } from "../bundled-skills/contributed-skill"
 import type { ComputerUseRuntime } from "./runtime-loader"
 
+/** The registration shell's mutable state: the engine backend, telemetry context, and contributed skill. */
+export interface ComputerComponentState {
+  backend: string
+  telemetryContext: unknown
+  activationReported: boolean
+  skill: ContributedSkill | undefined
+}
+
+export function initialComputerState(): ComputerComponentState {
+  return { backend: "unavailable", telemetryContext: undefined, activationReported: false, skill: undefined }
+}
+
 export function skillStatusLine(skill: ContributedSkill | undefined): string {
   if (skill?.kind !== "yielded") return ""
   const where = skill.ownerPath === undefined ? "" : ` (${skill.ownerPath})`
@@ -33,4 +45,16 @@ export function wireComputerControlEvents(pi: { on(event: string, handler: (payl
   pi.on("session_shutdown", async () => {
     await revokeStarted()
   })
+}
+
+/**
+ * What `/computer` tells the user about a failure: the senpi user-facing `message` and `action` when the error
+ * carries them (read structurally, so the lazily loaded engine classes stay out of this eager module).
+ */
+export function computerFailureText(error: Error): string {
+  const userFacing: unknown = "userFacing" in error ? error.userFacing : undefined
+  if (typeof userFacing !== "object" || userFacing === null) return error.message
+  if (!("message" in userFacing) || typeof userFacing.message !== "string") return error.message
+  const action = "action" in userFacing && typeof userFacing.action === "string" ? ` ${userFacing.action}` : ""
+  return `${userFacing.message}${action}`
 }

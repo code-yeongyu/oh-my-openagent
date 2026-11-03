@@ -127,8 +127,10 @@ function resolveStdio(options: SpawnOptions): StdioTuple {
 }
 
 // Bun applies windowsHide only on Windows, so the flag is set unconditionally, as for the Node path.
+// Bun's spawn without env gives the child the environment the process started with, not the current process.env
+// (Node's child_process uses the current one). Pass it explicitly so both runtimes see runtime changes (#11259).
 export function createBunSpawnOptions(options: SpawnOptions): BunSpawnOptions {
-  return { ...options, windowsHide: true }
+  return { ...options, env: options.env ?? process.env, windowsHide: true }
 }
 
 export function createNodeSpawnOptions(

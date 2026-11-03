@@ -16,8 +16,15 @@ Detect the user's language from their message and respond in that language for t
 conversation. The skill is written in English; your output is not. Match them exactly, including
 tone.
 
-Use Senpi-native tools only: `read`, `bash`, `edit`, `write`, the `memory` tools, and skill
-invocations. Never assume a tool from another agent product exists here.
+Use Senpi-native tools only: `read`, `bash`, `edit`, `write`, the `memory` tools, the
+`onboarding_session_history`, `onboarding_understand` and `onboarding_memory_apply` tools, and skill invocations.
+
+Your context carries the `Onboarding scan` block: the engine already ran the one scan the desktop
+app and `omo setup` use, with one row per item it found on this computer (sign-ins, providers, MCP
+servers, skills, model choices) and a `Value summary` line. Recent sessions are not in it: they
+arrive on a later turn as a short background summary, and `onboarding_session_history` has more. When you
+show the user what omo found, print those rows, one per item, and quote the value summary as
+computed; never recount by hand. Never assume a tool from another agent product exists here.
 
 Be concrete, never generic. "omo caches your context" is a failure of this skill. "Your last week
 of Claude Code sessions read 4.7M tokens from cache at a 78% hit rate; here is what that would
@@ -98,30 +105,39 @@ memory tools as you learn it.
 Ask whether the user is coming from another coding agent and would like their setup carried over.
 This lane is opt-in. If they say no, skip to lane 3.
 
-If they say yes, scrape their existing configuration from as many sources as exist on this
-machine. Check at least:
+If they say yes, start from the migration inventory that arrived with this skill's context (the
+`Migration inventory` sentence): the engine already ran the same detection `omo setup` uses, and it
+lists every sign-in it found (API keys to import, OAuth logins to sign in again, unmapped
+providers), every custom provider, every global skill, and every MCP server from the sources it
+covers - OpenCode, the oh-my-pi and gajae-code credential stores, and the engine's own files. For
+those sources the inventory is the source of truth - do not re-read their config files by hand to
+rebuild it. Show the user what `omo setup --dry-run` would do with it.
 
-- Claude Code: `~/.claude/settings.json`, project and global `CLAUDE.md` files, MCP server
+The scan does not know every harness. When the user is coming from one it does not detect, read
+that harness's own files by hand and fold what you find into the same plan:
+
+- Claude Code: `~/.claude/settings.json`, global and project `CLAUDE.md` files, MCP server
   definitions in `.mcp.json` or settings.
-- Co&#x64;ex: <code>~/.co&#x64;ex/config.toml</code>, any `AGENTS.md` files it manages.
-- OpenCode / oh-my-openagent: `~/.config/opencode/opencode.json`,
-  `~/.config/opencode/oh-my-opencode.jsonc`, project `.mcp.json`, and existing `AGENTS.md` files.
-- Anything else the user names.
+- Another coding agent the user names: its own config file in its home folder (often a `config.toml`)
+  and any `AGENTS.md` files it manages.
+- Anything else the user names that the inventory does not cover (for example a project
+  `.mcp.json`, or an `AGENTS.md` another agent manages).
+
+Hand-read only what the inventory does not cover; never re-derive its categories by hand.
 
 Global OpenCode MCP servers and global OpenCode skills are not yours to move by hand. `omo setup`
 imports them: MCP servers from `~/.config/opencode/opencode.json[c]` into the engine's global
 `~/.omo/agent/mcp.json`, and skills from `~/.config/opencode/skills/` into `~/.omo/agent/skills/`,
 converted to the shapes omo reads, consent-gated, and never overwriting a name that already exists.
-Run `omo setup --dry-run` to show the user exactly what would land. Once they accept, run
-`omo setup --yes`: your shell is not a terminal, so plain `omo setup` stops at its consent prompt
-and imports nothing.
+Once they accept, run `omo setup --yes`: your shell is not a terminal, so plain `omo setup` stops
+at its consent prompt and imports nothing.
 Copying a global server into a project `.mcp.json` yourself is a bug: it disappears the moment the
 user opens any other directory.
 
-Read what you find, then present one concrete migration plan: which settings map to
-`~/.omo/omo.json[c]`, which MCP servers `omo setup` carries over globally and which project-only
-servers still belong in that project's `.mcp.json`, which `CLAUDE.md` content becomes project
-`AGENTS.md` content, and which personal facts belong in memory instead of files.
+Present one concrete migration plan from the inventory and anything the user named: which settings
+map to `~/.omo/omo.json[c]`, which MCP servers `omo setup` carries over globally and which
+project-only servers still belong in that project's `.mcp.json`, which `CLAUDE.md` content becomes
+project `AGENTS.md` content, and which personal facts belong in memory instead of files.
 Show the plan and WAIT for the user to accept it. Apply nothing before they say yes. If they accept
 part of it, apply that part only. Record their agent-product history and migration choices through
 the memory tools.
@@ -132,9 +148,22 @@ Ask the user, in your own voice and their language, a question that means: "may 
 your previous coding-agent sessions?" Phrase it naturally; do not read that sentence out like a
 script. This lane is opt-in. If they say no, skip to lane 4 and base it on nothing.
 
-If they say yes, drive the `coding-agent-sessions` skill: read its SKILL.md and follow it. Use the
-bundled finder to list sessions across every platform present on the machine, then go deep on the
-interesting ones. Mine for:
+If they say yes, call `onboarding_understand` with `consent: true` (find it through `tool_search`
+if it is not in your tool list). It reads the scan's session digests with the current model and
+returns candidate facts with ids; it saves nothing. Show every candidate as a numbered list and ask
+which ones to remember. Then call `onboarding_memory_apply` with exactly the ids they picked: it
+writes only those, as one memory commit, through the same writer the background facts extractor
+uses. Never write a candidate the user did not pick, and never re-write candidates through the
+`memory` tools. If the understanding falls back to the scan only, say so and continue.
+
+For the patterns below, call the `onboarding_session_history` tool as well. It is the engine's one session-history scan, the same one the desktop app
+uses: it lists the projects found in the local agent histories, newest first, with the found / read
+/ cap counts per source, and a digest for every recent session (first request, tools used, files
+changed, outcome). Digests stay on this machine; the tool output names the file holding all of
+them, so `read` it when more digests exist than the output shows. Pass `workspace_root` to focus
+one project or `recent_days` to widen the window. Do not open or grep the raw transcript files
+under the agents' home directories yourself: the scan already applies the caps and exclusions, and
+hand reading is slow and gives different results each run. Mine the digests for:
 
 - how they actually work: hands-on-the-wheel back-and-forth versus long one-shot delegations,
 - their planning stance, feeding the seed described in lane 5: opening-message shape (requirements
@@ -154,11 +183,14 @@ durable finding about the user through the memory tools as you go.
 
 ## 4. Value mapping + savings
 
-From the session data gathered in lane 3, give the user quantified estimates of what omo's caching
+Open with the scan's `Value summary` line as it was computed. Then, from the session data gathered
+in lane 3, give the user quantified estimates of what omo's caching
 would have been worth on their real workload. Compute, do not guess:
 
 - Quantify token and cost savings only from Senpi JSONL v3 sessions. Use other agent stores for
   session counts, duration, concurrency, and qualitative work-pattern analysis, not token savings.
+  The lane 3 digests carry no token usage; locate the Senpi session files with the
+  `coding-agent-sessions` skill's finder for this lane only.
 - Fetch `https://models.dev/api.json`. Treat its top level as the provider map. Each provider owns
   a `models` object, and each model cost uses `input`, `output`, `cache_read`, and `cache_write`
   USD prices per one million tokens. If the API is unavailable, every session has insufficient
@@ -200,9 +232,10 @@ If the user skipped lane 3, skip this lane too; there is no data to map.
 
 ## 5. Memory recording
 
-This lane has no fixed position: it runs through the entire flow. Whenever any lane teaches you
-something durable about the user, write it through the `memory` tools at that moment, not in a
-batch at the end. Worth recording:
+This lane has no fixed position: it runs through the entire flow. Nothing is written before the
+user chooses it: facts from the session history go through the lane 3 selection, and anything
+else you learn is proposed in one line and written through the `memory` tools only after the user
+agrees. Worth recording:
 
 - their host and machine facts relevant to future work,
 - their language and communication style,

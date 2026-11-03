@@ -39,10 +39,7 @@ export async function PainPointsSection(): Promise<JSX.Element> {
         </p>
 
         <p className="text-text-mid leading-[1.6]">
-          <Link
-            href="/"
-            className="text-accent underline-grow focus-visible:outline-accent-32 focus-visible:outline-2 focus-visible:outline-offset-2"
-          >
+          <Link href="/" className="text-accent underline-grow focus-ring">
             {t("premiseLinkText")}
           </Link>{" "}
           {t("premise", { linkText: "" })}

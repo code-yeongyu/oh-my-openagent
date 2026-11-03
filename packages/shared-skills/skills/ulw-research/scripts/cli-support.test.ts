@@ -1,10 +1,10 @@
 import { describe, expect, onTestFinished, test } from "bun:test"
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 
-import { CliError, exitCodeFor, parseArgs, readJsonFile, writeJsonAtomic } from "./cli-support.mjs"
+import { CliError, exitCodeFor, parseArgs, readJsonFile, writeJsonAtomic, writeTextAtomic } from "./cli-support.mjs"
 import { isCliEntry } from "./entry-guard.mjs"
 
 function tempDir() {
@@ -63,6 +63,17 @@ describe("JSON files", () => {
 		expect(readJsonFile(file)).toEqual({ fresh: 1 })
 		const leftovers = readdirSync(dir).filter((name) => name !== "state.json")
 		expect(leftovers).toEqual([])
+	})
+
+	test("#given a target the rename cannot replace #when written atomically #then the write throws and no temp file is left", () => {
+		// given: a non-empty directory where the file should go
+		const dir = tempDir()
+		const target = join(dir, "calibration.jsonl")
+		mkdirSync(target)
+		writeFileSync(join(target, "keep"), "x")
+		// when / then
+		expect(() => writeTextAtomic(target, "line\n")).toThrow()
+		expect(readdirSync(dir)).toEqual(["calibration.jsonl"])
 	})
 
 	test("#given a missing or malformed file #when read #then a CliError names the path", () => {

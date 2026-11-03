@@ -24,6 +24,7 @@ use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::methods::Method;
 use senpi_desktop_core::protocol_params::ControlGrantParams;
 use senpi_desktop_core::protocol_results::ControlStateResult;
+use senpi_desktop_core::types::Target;
 use senpi_desktop_safety::MutatingAction;
 
 use crate::request::Response;
@@ -95,6 +96,24 @@ pub(crate) fn admits(delivery: DeliveryMode, live: bool) -> bool {
     delivery == DeliveryMode::Background || live
 }
 
+/// Pointer and keyboard input on the `desktop` or a `display:*` target: every
+/// backend posts it globally (the user's own pointer and frontmost app), so it
+/// needs the grant whatever delivery was requested (#10788).
+fn posts_globally(mutation: &crate::mutate::Mutation<'_>) -> bool {
+    let input = matches!(
+        mutation.action,
+        MutatingAction::Click
+            | MutatingAction::MoveMouse
+            | MutatingAction::Drag
+            | MutatingAction::Scroll
+            | MutatingAction::TypeText
+            | MutatingAction::KeyChord
+            | MutatingAction::HoldKeys
+            | MutatingAction::HoldMouse
+    );
+    input && !matches!(Target::parse(&mutation.target), Target::Window(_))
+}
+
 impl Worker {
     /// Refuses a foreground mutation without this session's live grant whose
     /// stop epoch is still current. Runs after the fail-closed gate and before
@@ -104,8 +123,16 @@ impl Worker {
             .control
             .as_ref()
             .is_some_and(|grant| grant.stop_epoch == self.stop_epoch());
-        if admits(mutation.delivery, live) {
+        let global = posts_globally(mutation);
+        if admits(mutation.delivery, live) && (live || !global) {
             return Ok(());
+        }
+        if global {
+            return Err(DesktopError::control_required(
+                "input on the desktop or a display lands on your real pointer and frontmost app: target a \
+                 window for background delivery, or approve the grant (computer.control.acquire asks the \
+                 human first)",
+            ));
         }
         if mutation.action == MutatingAction::RaiseWindow {
             return Err(DesktopError::control_required(

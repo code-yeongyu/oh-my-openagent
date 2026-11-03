@@ -21,6 +21,13 @@ export type ControlTimeoutScheduler = (onTimeout: () => void, timeoutMs: number)
 export interface ControlConfirmOptions {
   readonly timeoutMs?: number
   readonly scheduleTimeout?: ControlTimeoutScheduler
+  /** True when the session runs in full access: the grant needs no confirm (#10022). */
+  readonly fullAccess?: () => boolean
+}
+
+/** The in-session note shown when full access grants foreground control without asking. */
+export function fullAccessControlNote(reason: string): string {
+  return `Computer use is taking foreground control (full access, no confirm needed): ${reason}`
 }
 
 const realScheduler: ControlTimeoutScheduler = (onTimeout, timeoutMs) => {
@@ -29,7 +36,8 @@ const realScheduler: ControlTimeoutScheduler = (onTimeout, timeoutMs) => {
 }
 
 /**
- * The human confirm behind `computer.control.acquire` (#9651 B5b). Headless contexts never prompt;
+ * The human confirm behind `computer.control.acquire` (#9651 B5b). Headless contexts never prompt or grant;
+ * a full-access session grants without asking and says so in the session (#10022);
  * a refusal, a timeout, or an abort means no grant. Mirrors senpi's RPC `createDialogPromise`
  * contract (abort or a client that never answers resolves the default `false`) so the run always
  * settles instead of hanging on the human.
@@ -38,8 +46,14 @@ export async function confirmComputerControl(
   request: ControlConfirmRequest,
   options: ControlConfirmOptions = {},
 ): Promise<boolean> {
+  if (request.context.hasUI === false || request.signal.aborted) return false
+  const notify = request.context.ui?.notify
+  if (options.fullAccess?.() === true && request.context.hasUI === true && notify !== undefined) {
+    notify(fullAccessControlNote(request.reason), "info")
+    return true
+  }
   const confirm = request.context.ui?.confirm
-  if (request.context.hasUI === false || confirm === undefined || request.signal.aborted) return false
+  if (confirm === undefined) return false
   // The facade refuses `acquire` before asking when too little run time is left to answer (#9967 M2).
   const timeoutMs = Math.min(options.timeoutMs ?? CONTROL_CONFIRM_TIMEOUT_MS, request.budgetMs ?? Number.POSITIVE_INFINITY)
   const scheduleTimeout = options.scheduleTimeout ?? realScheduler

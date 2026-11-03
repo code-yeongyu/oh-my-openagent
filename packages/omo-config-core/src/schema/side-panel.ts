@@ -47,7 +47,10 @@ const OmoSidePanelSettingsShape = {
   min_columns: z.number().int().min(60).max(400),
   /** Paint file and subagent rows as clickable links (default: true). */
   clickable: z.boolean(),
-  /** Subscription usage refresh interval in seconds; the cache is shared across sessions (default: 150). */
+  /**
+   * Retired: senpi now polls subscription usage itself on the provider's cadence (senpi#3684), so this
+   * value is ignored. Still accepted so an existing omo.json keeps loading under the strict schema.
+   */
   usage_poll_seconds: z.number().int().min(60).max(3600),
   /** Per-section switches. Every section except `usage` is on while the panel is on. */
   sections: OmoSidePanelSectionsLayerSchema,

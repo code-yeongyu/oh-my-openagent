@@ -65,11 +65,69 @@ fn bounded_keys_append_release_failure_without_replacing_primary() {
 }
 
 #[test]
+fn bounded_keys_release_all_attempts_when_second_press_panics() {
+    // Given a native panic after the second press may have been delivered.
+    let mut harness = harness(&json!({}));
+    harness.faults.panic_after(FakeMethod::KeyPress, 1);
+    // When the real shared hold guard handles that backend unwind.
+    let error = harness.process(keys(0.0)).unwrap_err();
+    // Then both attempted keys release in reverse and the third is untouched.
+    assert_eq!(error.code, ErrorCode::Internal);
+    assert_eq!(transitions(&harness), [
+        (KeyName::Ctrl, true), (KeyName::Shift, true),
+        (KeyName::Shift, false), (KeyName::Ctrl, false),
+    ]);
+}
+
+#[test]
+fn bounded_keys_release_first_press_when_interrupted_between_presses() {
+    for stop in [false, true] {
+        // Given an interruption fired inside the first backend press.
+        let mut harness = harness(&json!({}));
+        let signal = harness.supervisor.hold_signal();
+        harness.worker.hold_signal = Some(signal.clone());
+        let supervisor = harness.supervisor.clone();
+        let (committed_tx, committed) = std::sync::mpsc::channel();
+        harness.faults.on_next(FakeMethod::KeyPress, move || {
+            if stop {
+                // A stop arrives from the tap or API thread, never from the worker:
+                // the stop waits for this very hold to release its input. Refuse
+                // input first, as trigger_stop does, so the next press sees it.
+                supervisor.suspend_input();
+                let supervisor = supervisor.clone();
+                let committed_tx = committed_tx.clone();
+                std::thread::spawn(move || {
+                    supervisor.trigger_stop(senpi_desktop_safety::StopSource::Hotkey);
+                    committed_tx.send(()).unwrap_or(());
+                });
+            } else {
+                signal.cancel();
+            }
+        });
+        // When the next press checks the real request signal.
+        let error = harness.process(keys(0.0)).unwrap_err();
+        if stop {
+            committed
+                .recv_timeout(std::time::Duration::from_secs(5))
+                .expect("the stop commits once the first key is released");
+        }
+        // Then neither later key is pressed, and the first one releases.
+        assert_eq!(error.code, if stop { ErrorCode::Suspended } else { ErrorCode::Cancelled });
+        assert_eq!(transitions(&harness), [(KeyName::Ctrl, true), (KeyName::Ctrl, false)]);
+    }
+}
+
+#[test]
 fn invalid_hold_duration_and_empty_keys_send_no_input() {
     for duration in [f64::NAN, f64::INFINITY, -0.1, 100.1] {
         let mut harness = harness(&json!({}));
-        assert_eq!(harness.process(keys(duration)).unwrap_err().code, ErrorCode::InputFailed);
+        let Op::HoldKeys(params) = keys(duration) else { unreachable!() };
+        let parsed = serde_json::from_value::<HoldKeysParams>(serde_json::to_value(&params).unwrap());
+        assert!(parsed.is_err(), "invalid duration reached the session boundary");
+        // In-process callers bypassing serde still fail before mutate/release_all.
+        assert_eq!(harness.process(Op::HoldKeys(params)).unwrap_err().code, ErrorCode::Internal);
         assert!(transitions(&harness).is_empty());
+        assert!(!harness.sink.ops().contains(&SinkOp::ReleaseAll));
     }
     let mut harness = harness(&json!({}));
     let Op::HoldKeys(mut params) = keys(0.0) else { unreachable!() };

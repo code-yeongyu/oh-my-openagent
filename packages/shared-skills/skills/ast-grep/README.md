@@ -11,7 +11,7 @@ git clone https://github.com/code-yeongyu/ast-grep-skill ~/.agents/skills/ast-gr
 bash ~/.agents/skills/ast-grep/install.sh        # installs the ast-grep binary
 ```
 
-That is it. The wrapper script is single-file Python 3 stdlib; no `pip install` needed. The installer tries `brew` → `npm` → `cargo` → `pip` → `nix` → `mise` → GitHub release in priority order, picks the first that works, and falls back to a cached binary at `<skill>/bin/sg`.
+That is it. The wrapper script is single-file Python 3 stdlib; no `pip install` needed. The installer tries `brew` → `npm` → `cargo` → `pip` → `nix` → `mise` → GitHub release in priority order, picks the first that works, and falls back to a cached binary in a user cache folder (`~/.cache/omo-ast-grep/bin/sg`, or `%LOCALAPPDATA%\omo-ast-grep\bin\sg.exe` on Windows), never inside the skill.
 
 ### Symlink for active development
 

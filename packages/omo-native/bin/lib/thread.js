@@ -230,7 +230,8 @@ export async function runThreadCommand(args, options) {
   }
   const loaded = await loadThreadSdk(options)
   if (loaded.error !== undefined && loaded.code === "internal_error") {
-    refuse(options, json, "internal_error", `omo thread: ${loaded.error}`, "Reinstall omo (omo update), then retry.")
+    // `omo update` installs nothing on an install already at the latest version, so the step is the caller's reinstall.
+    refuse(options, json, "internal_error", `omo thread: ${loaded.error}`, options.reinstall ?? "Reinstall omo, then retry.")
     return THREAD_EXIT.failed
   }
   if (loaded.error !== undefined) {

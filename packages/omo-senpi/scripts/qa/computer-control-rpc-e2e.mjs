@@ -7,6 +7,8 @@
 //   no-answer   the client never answers: the confirm times out, the run reports no grant, and the
 //               engine never sees control.grant (what a desktop app that drops the dialog must mean)
 //   declined    the client answers confirmed:false: no grant
+//   full-access senpi runs with --permission-preset full-access: no confirm reaches the client, the grant
+//               is audited with an in-session note, and the end of the task revokes it (#10022)
 //   approved    the client answers confirmed:true: the grant is audited and the end of the task
 //               revokes it (control.revoke on agent_end); the positive control that keeps the other
 //               two from passing vacuously
@@ -101,7 +103,7 @@ const acquireRun = {
 }
 
 // Plays the rpc client: sends one prompt, answers (or not) the confirm, resolves on agent_end.
-function runScenario({ name, answer }) {
+function runScenario({ name, answer, senpiArgs = [] }) {
   const sandbox = createSandbox()
   seedSandbox(sandbox)
   mkdirSync(join(sandbox.cwd, ".omo"), { recursive: true })
@@ -116,7 +118,7 @@ function runScenario({ name, answer }) {
   writeFileSync(join(sandbox.cwd, "mock-script.json"), `${JSON.stringify({ steps }, null, 2)}\n`)
   return new Promise((resolvePromise) => {
     const started = Date.now()
-    const child = spawn(senpiBin, ["-e", mockProviderEntry, "--mode", "rpc", "--provider", "omo-mock", "--model", "mock-1"], {
+    const child = spawn(senpiBin, ["-e", mockProviderEntry, "--mode", "rpc", "--provider", "omo-mock", "--model", "mock-1", ...senpiArgs], {
       cwd: sandbox.cwd,
       env: {
         ...isolatedChildEnv(scrubbedEnv(), sandbox.agentDir),
@@ -142,6 +144,7 @@ function runScenario({ name, answer }) {
     let ended = false
     let finished = false
     const confirms = []
+    const notes = []
     const finish = (reason) => {
       if (finished) return
       finished = true
@@ -160,7 +163,7 @@ function runScenario({ name, answer }) {
       settled = true
       const results = toolResults(sandbox.agentDir)
       const audits = auditActions(sandbox.root)
-      const outcome = { name, reason, ended, elapsedMs: Date.now() - started, confirms, results, audits }
+      const outcome = { name, reason, ended, elapsedMs: Date.now() - started, confirms, notes, results, audits }
       if (evidenceDir !== undefined) {
         writeFileSync(
           join(evidenceDir, `${name}.json`),
@@ -186,9 +189,10 @@ function runScenario({ name, answer }) {
             child.stdin.write(`${JSON.stringify({ type: "extension_ui_response", id: event.id, confirmed: answer })}\n`)
           }
         }
+        if (event.type === "extension_ui_request" && event.method === "notify") notes.push(event.message)
         if (event.type === "agent_end" && !ended) {
           ended = true
-          if (answer !== true) {
+          if (answer !== true && senpiArgs.length === 0) {
             finish("agent_end")
             continue
           }
@@ -232,6 +236,18 @@ const scenarios = [
       ["the turn ended", outcome.ended],
       ["the run reported no grant", resultText(computerResult(outcome)).includes('"active":false')],
       ["the engine never saw control.grant", !outcome.audits.includes("control.grant")],
+    ],
+  },
+  {
+    name: "full-access",
+    senpiArgs: ["--permission-preset", "full-access"],
+    verify: (outcome) => [
+      ["no confirm reached the client", outcome.confirms.length === 0],
+      ["the session noted the grant with the model's reason", outcome.notes.some((note) => note?.includes(REASON))],
+      ["the turn ended", outcome.ended],
+      ["the run reported an active grant", resultText(computerResult(outcome)).includes('"active":true')],
+      ["the engine audited control.grant", outcome.audits.includes("control.grant")],
+      ["the end of the task revoked it", outcome.audits.includes("control.revoke")],
     ],
   },
   {

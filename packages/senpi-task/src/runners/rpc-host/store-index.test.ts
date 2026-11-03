@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, statSync, utimesSync, writeFileSync } f
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 
-import { DURABLE_JSON_FS } from "./durable-json"
+import { DURABLE_JSON_FS, DURABLE_JSON_FS_ASYNC, DURABLE_JSON_LOCK_OPTIONS } from "./durable-json"
 import {
   pruneMissingStoreIndexEntries,
   pruneMissingStoreIndexEntriesSync,
@@ -64,6 +64,63 @@ describe("registerStoreIndex", () => {
     const after = statSync(path)
     expect({ ino: after.ino, mtimeMs: after.mtimeMs }).toEqual({ ino: before.ino, mtimeMs: before.mtimeMs })
   })
+
+  test("#given a new store #when it is admitted #then the index write yields to the event loop instead of running its fsyncs on it", async () => {
+    // given - admission runs on the session's event loop; a durable write done there with fsyncSync holds every
+    // timer, socket and prompt for as long as the disk takes (95 s on a VM disk flushing other containers, #10846).
+    // A write whose syscalls run on the libuv pool lets a macrotask queued beside it run before it settles.
+    const path = indexPath()
+    let admissionSettled = false
+    let loopRanFirst: boolean | undefined
+    const loopTurn = new Promise<void>((resolveTurn) =>
+      setImmediate(() => {
+        loopRanFirst = !admissionSettled
+        resolveTurn()
+      }),
+    )
+
+    // when
+    await registerStoreIndex({ indexPath: path, storeDir: "/p1/.omo/senpi-task", now: Date.now }).then(() => {
+      admissionSettled = true
+    })
+    await loopTurn
+
+    // then
+    expect(loopRanFirst).toBe(true)
+    expect(Object.keys(readTaskStoreIndex(path).stores)).toEqual([resolve("/p1/.omo/senpi-task")])
+  })
+
+  posixHostRunnerTest("#given a same-process admission whose durable write outlasts the lock's holder budget #when a second store is admitted from this process #then it waits for the first and both land", async () => {
+    // given - the time is the behavior: the index lock's holder budget (10 s) bounds how long a waiter spins on
+    // another holder. A same-process second admission (pre-warm plus an auto spawn's gate) must wait for the first
+    // one instead, as it did when that write froze the loop, not fail with store_index_unavailable (#10868).
+    const path = indexPath()
+    const writeStarted = Promise.withResolvers<void>()
+    const releaseWrite = Promise.withResolvers<void>()
+    const slowFs = {
+      read: DURABLE_JSON_FS_ASYNC.read,
+      write: async (target: string, text: string) => {
+        writeStarted.resolve()
+        await releaseWrite.promise
+        await DURABLE_JSON_FS_ASYNC.write(target, text)
+      },
+    }
+    const first = registerStoreIndex({ indexPath: path, storeDir: "/p1/.omo/senpi-task", now: Date.now, fs: slowFs })
+    await writeStarted.promise
+
+    // when - the second admission starts while the first holds the lock, and the first outlasts the holder budget
+    const second = registerStoreIndex({ indexPath: path, storeDir: "/p2/.omo/senpi-task", now: Date.now }).then(
+      () => "admitted",
+      (error: unknown) => error,
+    )
+    await new Promise((resolveWait) => setTimeout(resolveWait, DURABLE_JSON_LOCK_OPTIONS.holderWaitMs + 1_000))
+    releaseWrite.resolve()
+    await first
+
+    // then
+    expect(await second).toBe("admitted")
+    expect(Object.keys(readTaskStoreIndex(path).stores).sort()).toEqual([resolve("/p1/.omo/senpi-task"), resolve("/p2/.omo/senpi-task")].sort())
+  }, 30_000)
 
   test("#given a write whose read-back does not contain the store #when registering #then it is unavailable", async () => {
     // given - the write lands nowhere: every read returns the empty index

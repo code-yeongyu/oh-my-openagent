@@ -38,7 +38,7 @@ Defines the senpi `computer` tool: its permission tiers, settings, the `/compute
   - `on` and `off` override `computer.enabled` for this session only. `off` closes the engine, and later activations fail with `ComputerDisabledError`.
   - `cursor on|off` overrides only the display-only virtual cursor for this session. It never activates computer use, rearms input, changes delivery mode, or changes a control grant.
   - `status` prints `enabled`, `active`, the engine state, the capabilities (`stopPath=`, `focusGuard=`, and the capture, input, and AX permissions), and the permission tiers. It never starts an engine.
-- `isSupportedHost(platform)` is true on darwin, linux, and win32 (any arch). A missing prebuild, such as on Windows arm64, surfaces through the engine locator's `native-unavailable` diagnostic.
+- `isSupportedHost(platform)` is true on darwin, linux, and win32 (any arch). A missing prebuild, such as on musl Linux, surfaces through the engine locator's `native-unavailable` diagnostic.
 
 ## Session snapshot
 

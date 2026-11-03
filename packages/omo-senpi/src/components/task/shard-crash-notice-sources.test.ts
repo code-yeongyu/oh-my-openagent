@@ -14,28 +14,32 @@ import {
   rootResolution,
 } from "../../../../senpi-task/src/runners/rpc-host.test-support"
 import { buildProcessChildRunner, buildRespawnRunner, type RunnerBuildContext } from "./engine-runners"
-import { createEngineHostRuntime, createHostNotices } from "./host-execution-mode"
-import { TaskRuntimeContext, type CapturedUi } from "./runtime-context"
+import { createEngineHostRuntime } from "./host-execution-mode"
+import { TaskRuntimeContext } from "./runtime-context"
 import { createShardCrashNotices, readNewestHostCrash, SHARD_CRASH_DONE_TOKEN, SHARD_CRASH_TOKEN } from "./shard-crash-notice"
-import { doneCounts, linesWith, reattachingCount, SOCKET_A, uiRecorder } from "./shard-crash-notice.test-support"
+import { SOCKET_A, uiRecorder } from "./shard-crash-notice.test-support"
 
 // Where the crash notice's facts come from: the session's host runtime, the real host runner's
 // recovery reports, and the endpoint's daemon directory as the engine itself names it.
 
 describe("session host runtime", () => {
-  test("#given a session with a captured UI #when its routing's shard events report a crash #then the session's notice list and UI both get it", () => {
+  test("#given a session with a captured UI #when its routing reports a crash #then only its diagnostic log gets it", () => {
     // given
     const { ui, notified } = uiRecorder()
     const runtime = new TaskRuntimeContext("/tmp/dh-t10-project")
     runtime.captureFrom({ ui, sessionManager: { getSessionId: () => "01a0e4ae-parent" } })
-    const host = createEngineHostRuntime(OmoTaskSettingsSchema.parse({}), runtime, {}, { agentDir: "/tmp/dh-t10-agent", env: {} })
+    const logs: string[] = []
+    const host = createEngineHostRuntime(OmoTaskSettingsSchema.parse({}), runtime, {}, {
+      agentDir: "/tmp/dh-t10-agent", env: {}, crashLog: (event) => logs.push(event),
+    })
 
     // when
     host.routing.shardEvents.onTransportLost?.({ taskId: "st_a", socket: SOCKET_A, instanceId: "gen-1", turnWasInFlight: true })
 
     // then
-    expect(linesWith(host.notices.list(), SHARD_CRASH_TOKEN)).toHaveLength(1)
-    expect(notified.map((call) => call.type)).toEqual(["warning"])
+    expect(host.notices.list()).toEqual([])
+    expect(notified).toEqual([])
+    expect(logs).toEqual([SHARD_CRASH_TOKEN])
   })
 })
 
@@ -45,18 +49,18 @@ describe("host runner feeding the crash notice", () => {
     await release()
   })
 
-  test("#given two children mid-turn on one host #when the host dies and comes back #then the warning counts 2 and the done line says 2 continued", async () => {
+  test("#given two children mid-turn on one host #when it recovers #then logs count both and no notice is emitted", async () => {
     // given
     const host = await fakeHost()
-    const notices = createHostNotices(() => undefined)
     const closed = Promise.withResolvers<void>()
-    const ui: CapturedUi = {
-      ...uiRecorder().ui,
-      notify: (_text, type) => {
-        if (type === "info") closed.resolve()
+    const logs: Array<{ event: string; facts: Record<string, unknown> }> = []
+    const events = createShardCrashNotices({
+      agentDir: join(tmpdir(), "dh-t10-no-records"),
+      log: (event, facts) => {
+        logs.push({ event, facts })
+        if (event === SHARD_CRASH_DONE_TOKEN) closed.resolve()
       },
-    }
-    const events = createShardCrashNotices({ agentDir: join(tmpdir(), "dh-t10-no-records"), notices, ui: () => ui })
+    })
     const runner = runnerOver(host, {
       reattachDelaysMs: [0, 0, 0],
       sleep: () => Promise.resolve(),
@@ -71,26 +75,22 @@ describe("host runner feeding the crash notice", () => {
     await closed.promise
 
     // then
-    const warnings = linesWith(notices.list(), SHARD_CRASH_TOKEN)
-    expect(warnings).toHaveLength(1)
-    expect(reattachingCount(warnings[0] ?? "")).toBe(2)
-    expect(doneCounts(linesWith(notices.list(), SHARD_CRASH_DONE_TOKEN)[0] ?? "")).toEqual({ reattached: 2, lost: 0, cancelled: 0 })
+    expect(logs).toMatchObject([
+      { event: SHARD_CRASH_TOKEN, facts: { members: 2 } },
+      { event: SHARD_CRASH_DONE_TOKEN, facts: { reattached: 2, lost: 0, cancelled: 0 } },
+    ])
     await first.terminate()
     await second.terminate()
   })
 
-  test("#given one session's spawned child and revived child on one host generation #when the host dies and comes back #then the ONE warning counts both and matches the done line", async () => {
+  test("#given spawned and revived children on one generation #when it recovers #then one diagnostic episode counts both silently", async () => {
     // given - the spawn runner and the respawn runner exactly as the engine builds them for one session
     const host = await fakeHost()
     const agentDir = mkdtempSync(join(tmpdir(), "dh-t10-wiring-"))
     wiringDirs.push(agentDir)
     const closed = Promise.withResolvers<void>()
-    const ui: CapturedUi = {
-      ...uiRecorder().ui,
-      notify: (_text, type) => {
-        if (type === "info") closed.resolve()
-      },
-    }
+    const { ui, notified } = uiRecorder()
+    const logs: Array<{ event: string; facts: Record<string, unknown> }> = []
     const runtime = new TaskRuntimeContext(agentDir)
     runtime.captureFrom({ ui, sessionManager: { getSessionId: () => "01a0e4ae-parent" } })
     const settings = OmoTaskSettingsSchema.parse({})
@@ -99,6 +99,10 @@ describe("host runner feeding the crash notice", () => {
       env: {},
       ensureDaemon: () => Promise.resolve({ ...ensuredDaemon(host.socketPath), instanceId: host.instanceId }),
       probeHost: () => host.probeProtocolInfo(),
+      crashLog: (event, facts) => {
+        logs.push({ event, facts })
+        if (event === SHARD_CRASH_DONE_TOKEN) closed.resolve()
+      },
     })
     const build: RunnerBuildContext = {
       runtime,
@@ -118,10 +122,12 @@ describe("host runner feeding the crash notice", () => {
     await closed.promise
 
     // then
-    const warnings = linesWith(session.notices.list(), SHARD_CRASH_TOKEN)
-    expect(warnings).toHaveLength(1)
-    expect(reattachingCount(warnings[0] ?? "")).toBe(2)
-    expect(doneCounts(linesWith(session.notices.list(), SHARD_CRASH_DONE_TOKEN)[0] ?? "")).toEqual({ reattached: 2, lost: 0, cancelled: 0 })
+    expect(session.notices.list()).toEqual([])
+    expect(notified).toEqual([])
+    expect(logs).toMatchObject([
+      { event: SHARD_CRASH_TOKEN, facts: { members: 2 } },
+      { event: SHARD_CRASH_DONE_TOKEN, facts: { reattached: 2, lost: 0, cancelled: 0 } },
+    ])
     await spawned.terminate()
     await revived.terminate()
   })

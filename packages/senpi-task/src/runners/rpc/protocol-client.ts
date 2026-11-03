@@ -8,8 +8,10 @@ import { createChildExtensionEvents } from "../child-extension-events"
 import { RpcCommandError, RpcRequestTimeout } from "./errors"
 import { tailStderr } from "./exit-mapping"
 import { buildAutoUiResponse } from "./ui-auto-answer"
+import type { TaskParentCommand } from "../task-parent-control"
 
 const STDERR_BUFFER_CAP = 16_384
+const WRITE_EXIT_GRACE_MS = 100
 
 export type MalformedLineHandler = (line: string, error: unknown) => void
 
@@ -44,6 +46,8 @@ export class RpcProtocolClient {
   private stderrBuffer = ""
   private nextRequestId = 0
   private isExited = false
+  private writeErrorTimer: ReturnType<typeof setTimeout> | undefined
+  private processExited = false
 
   constructor(options: RpcProtocolClientOptions) {
     this.child = options.child
@@ -71,8 +75,18 @@ export class RpcProtocolClient {
   }
 
   send(command: RpcCommand, options: { readonly deadlineMs?: number } = {}): Promise<RpcResponse> {
+    return this.request(command, options)
+  }
+
+  // The task-parent run hold commands (senpi#3811) are omo's contract with the child engine, typed
+  // apart from the pinned engine's RpcCommand; an older child answers them with an error response.
+  sendTaskParent(command: TaskParentCommand): Promise<RpcResponse> {
+    return this.request(command, {})
+  }
+
+  private request(command: { readonly type: string; readonly id?: string }, options: { readonly deadlineMs?: number }): Promise<RpcResponse> {
     const stdin = this.child.stdin
-    if (this.isExited || stdin === null || stdin === undefined || stdin.writableEnded || stdin.destroyed) {
+    if (this.isExited || stdin === null || stdin === undefined) {
       return Promise.reject(new Error(`RPC process is not running. Stderr: ${this.stderrTail}`))
     }
     const id = command.id ?? `senpi-task_${++this.nextRequestId}`
@@ -98,13 +112,7 @@ export class RpcProtocolClient {
         },
       }
       this.pending.set(id, pending)
-      stdin.write(`${JSON.stringify({ ...command, id })}\n`, (error) => {
-        if (!error) {
-          return
-        }
-        this.pending.delete(id)
-        pending.reject(error)
-      })
+      this.write(`${JSON.stringify({ ...command, id })}\n`)
     })
   }
 
@@ -136,6 +144,7 @@ export class RpcProtocolClient {
   }
 
   detach(): void {
+    clearTimeout(this.writeErrorTimer)
     for (const [id, pending] of this.pending) {
       this.pending.delete(id)
       pending.reject(new Error("RPC client detached"))
@@ -153,13 +162,10 @@ export class RpcProtocolClient {
       this.stderrBuffer = (this.stderrBuffer + chunk).slice(-STDERR_BUFFER_CAP)
     })
     this.child.stdin?.on("error", (error) => {
-      if (isHarmlessRpcShutdownError(error)) {
-        this.finalize()
-        return
-      }
-      this.finalize(error)
+      this.writeFailed(error)
     })
     this.child.once("error", (error) => this.finalize(error))
+    this.child.once("exit", () => { this.processExited = true })
     this.child.once("close", () => this.finalize())
   }
 
@@ -222,14 +228,42 @@ export class RpcProtocolClient {
     }
     const answer = buildAutoUiResponse(request)
     if (answer) {
-      this.child.stdin?.write(`${JSON.stringify(answer)}\n`)
+      this.write(`${JSON.stringify(answer)}\n`)
     }
+  }
+
+  private write(payload: string): void {
+    try {
+      this.child.stdin?.write(payload, (error) => {
+        if (error) this.writeFailed(error)
+      })
+    } catch (error) {
+      this.writeFailed(error instanceof Error ? error : new Error(String(error)))
+    }
+  }
+
+  private writeFailed(error: Error): void {
+    if (this.isExited) return
+    if (!isHarmlessRpcShutdownError(error)) {
+      this.finalize(error)
+      return
+    }
+    // Callback, error event and throw can describe the same failed write (#6396).
+    // Keep its requests pending until close supplies stderr and the handle's exit
+    // facts (#11096); a live child past the bound still fails with the write error.
+    if (this.writeErrorTimer !== undefined) return
+    this.writeErrorTimer = setTimeout(() => {
+      // Exit can precede close while stderr drains. Only a still-live process
+      // loses to the bound; an observed exit must keep its own outcome.
+      if (!this.processExited && this.child.exitCode == null && this.child.signalCode == null) this.finalize(error)
+    }, WRITE_EXIT_GRACE_MS)
   }
 
   private finalize(error?: Error): void {
     if (this.isExited) {
       return
     }
+    clearTimeout(this.writeErrorTimer)
     this.isExited = true
     const failure = error ?? new Error(`RPC process exited. Stderr: ${this.stderrTail}`)
     for (const [id, pending] of this.pending) {
@@ -247,9 +281,10 @@ export function isHarmlessRpcShutdownError(error: unknown): boolean {
   return error.code === "EPIPE"
     || error.code === "ERR_STREAM_DESTROYED"
     || error.code === "ERR_STREAM_WRITE_AFTER_END"
+    || error.code === "EOF"
 }
 
 function commandError(response: RpcResponse, expectedCommand: string): RpcCommandError {
-  if (!response.success) return new RpcCommandError(expectedCommand, response.error)
+  if (!response.success) return new RpcCommandError(expectedCommand, response.error, response)
   return new RpcCommandError(expectedCommand, `unexpected response command: ${response.command}`)
 }

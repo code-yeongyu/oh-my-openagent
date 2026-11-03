@@ -9,6 +9,7 @@ import { dirname, join, resolve } from "node:path"
 import { createInterface } from "node:readline"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { createSandbox, seedSandbox, credentialDigest } from "./drive.mjs"
+import { withTelemetryOptOut } from "./telemetry-opt-out-env.mjs"
 import { engineDependencyDir } from "../../../omo-native/bin/lib/engine-dependency.js"
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -202,7 +203,7 @@ async function scenario(lane, failure, context) {
     const address = server.address()
     assert(address && typeof address === "object")
     // Deliberate allowlist: provider credentials, caller agent dirs and task/session env never inherit.
-    const env = {
+    const env = withTelemetryOptOut({
       PATH: process.env.PATH, HOME: sandbox.homeDir, USERPROFILE: sandbox.homeDir,
       TMPDIR: sandbox.root, XDG_CONFIG_HOME: sandbox.xdgConfigHome, XDG_DATA_HOME: sandbox.xdgDataHome,
       XDG_CACHE_HOME: sandbox.xdgCacheHome, XDG_STATE_HOME: join(sandbox.root, "state"),
@@ -210,7 +211,7 @@ async function scenario(lane, failure, context) {
       OMO_AGENT_TOOLKIT_BIN: toolkit, OMO_POLICY_QA_TRACE: traceFile, OMO_POLICY_QA_LANE: lane,
       OMO_POLICY_QA_ENDPOINT: `http://127.0.0.1:${address.port}`, PI_OFFLINE: "1", OMO_SENPI_QA: "1",
       OMO_POLICY_QA_CONTEXT_WINDOW: String(contextWindowFor(failure)),
-    }
+    })
     child = spawn(process.execPath, [cli, "--mode", "rpc", "--no-extensions", "--no-skills", "--no-prompt-templates",
       "-e", extension, "--provider", "omo-policy-qa", "--model", "qa"], { cwd: sandbox.cwd, env, stdio: "pipe" })
     const bus = new EventEmitter()

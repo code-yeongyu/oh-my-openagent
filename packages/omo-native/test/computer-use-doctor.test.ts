@@ -243,15 +243,25 @@ describe("computer use doctor probe", () => {
       .toEqual(["engine.hello", "capabilities"])
   })
 
-  test.each(["linux", "win32"])("#given no engine built for %s-arm64 #when inspected #then doctor reports unavailable", async (platform) => {
+  test.each([["linux", "riscv64"], ["win32", "ia32"]])("#given no engine built for %s-%s #when inspected #then doctor reports unavailable", async (platform, arch) => {
+    const home = mkdtempSync(join(tmpdir(), "omo-computer-doctor-host-"))
+    roots.push(home)
+    const report = await computerUseDoctorReport({
+      cwd: home, env: { HOME: home }, version: "5.1.4",
+      packageRoot: join(home, "package"), platform, arch,
+    })
+    expect(report.kind).toBe("unavailable")
+    expect(report).toMatchObject({ diagnostic: { reason: "no-release-asset", host: `${platform}-${arch}` } })
+  })
+
+  test.each(["linux", "win32"])("#given a released engine for %s-arm64 not yet downloaded #when inspected #then doctor reports not-installed", async (platform) => {
     const home = mkdtempSync(join(tmpdir(), "omo-computer-doctor-host-"))
     roots.push(home)
     const report = await computerUseDoctorReport({
       cwd: home, env: { HOME: home }, version: "5.1.4",
       packageRoot: join(home, "package"), platform, arch: "arm64",
     })
-    expect(report.kind).toBe("unavailable")
-    expect(report).toMatchObject({ diagnostic: { reason: "no-release-asset", host: `${platform}-arm64` } })
+    expect(report.kind).toBe("not-installed")
   })
 
   test("#given an explicit engine path in the effective Native config #when probed #then only hello and capabilities run before EOF", async () => {

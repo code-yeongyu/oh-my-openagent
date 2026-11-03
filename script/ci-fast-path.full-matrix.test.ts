@@ -151,14 +151,13 @@ describe("full-matrix classification", () => {
     })
   })
 
-  describe("#given a pull request that touches code a test can load", () => {
+  describe("#given a pull request that touches code a test can load but no platform-specific path", () => {
     test.each([
       ["a package source file (the #7676 shape)", "packages/omo-config-core/src/display/format-path.ts"],
       ["a prompt or skill shipped from a package src tree", "packages/omo-opencode/src/agents/prompts/README.md"],
-      ["a package test outside src", "packages/omo-native/test/payload.test.ts"],
+      ["a package test outside src", "packages/memory-core/test/store.test.ts"],
       ["a skill payload outside src", "packages/shared-skills/skills/frontend/SKILL.md"],
       ["a root script", "script/build.ts"],
-      ["a CI helper script the legs run", ".github/scripts/write-job-summary.sh"],
       ["the root manifest", "package.json"],
       ["the lockfile", "bun.lock"],
       ["a root bunfig", "bunfig.root.toml"],
@@ -167,8 +166,11 @@ describe("full-matrix classification", () => {
       ["an unusual extension at the root", "pipeline.weird"],
       ["a script named like a doc", "script/agents.ts"],
       ["a doc-like name with an unknown extension", "packages/utils/README.rst"],
-      ["an unlisted .github file", ".github/actions/setup/action.yml"],
-    ])("#then %s runs every OS leg without a label", (_name, changedPath) => {
+      ["an unlisted .github file", ".github/CODEOWNERS"],
+      ["an in-process senpi-task runner", "packages/senpi-task/src/runners/in-process.ts"],
+      ["a Codex plugin source file", "packages/omo-codex/plugin/src/index.ts"],
+      ["an omo-opencode hook", "packages/omo-opencode/src/hooks/session-start.ts"],
+    ])("#then %s runs heavy validation on ubuntu only", (_name, changedPath) => {
       // given / when
       const mode = classify({
         eventName: "pull_request",
@@ -178,7 +180,7 @@ describe("full-matrix classification", () => {
 
       // then
       expect(mode.runtimeTouching).toBe(true)
-      expect(mode.fullMatrix).toBe(true)
+      expect(mode.fullMatrix).toBe(false)
       expect(mode.runHeavy).toBe(true)
     })
   })
@@ -231,14 +233,14 @@ describe("full-matrix classification", () => {
     })
   })
 
-  describe("#given the ci:full-matrix label", () => {
-    test("#then the full matrix is forced on an otherwise neutral pull request", () => {
+  describe("#given a full-matrix label", () => {
+    test.each(["ci:full-matrix", "run-full-ci"])("#then %s forces the full matrix on a runtime pull request", (label) => {
       // given / when
       const mode = classify({
         eventName: "pull_request",
-        headRef: "feature/tidy-docs",
-        changedPaths: ["README.md"],
-        labels: ["bug", "ci:full-matrix"],
+        headRef: "feature/runtime-change",
+        changedPaths: ["packages/utils/src/index.ts"],
+        labels: ["bug", label],
       })
 
       // then
@@ -258,6 +260,36 @@ describe("full-matrix classification", () => {
       ["windows rpc-host panic retry runner", "script/bun-panic-retry.ts"],
       ["shared serial quarantine", "script/root-test-serial-quarantine.ts"],
       ["reply-listener process identity (win32 branch)", "packages/openclaw-core/src/reply-listener-process.ts"],
+      ["the label-triggered full-matrix workflow", ".github/workflows/ci-full-matrix-label.yml"],
+      ["the platform package publish workflow", ".github/workflows/publish-platform.yml"],
+      ["a CI helper script the legs run", ".github/scripts/write-job-summary.sh"],
+      ["a native crate source", "crates/senpi-desktop-engine/src/lib.rs"],
+      ["the Cargo workspace manifest", "Cargo.toml"],
+      ["the Cargo lockfile", "Cargo.lock"],
+      ["the Rust toolchain pin", "rust-toolchain.toml"],
+      ["the native launcher package", "packages/omo-native/compile-entry.ts"],
+      ["a darwin platform package", "packages/oh-my-opencode-darwin-arm64/package.json"],
+      ["a windows platform package", "packages/oh-my-opencode-windows-x64/package.json"],
+      ["the platform binary postinstall", "postinstall.mjs"],
+      ["the standalone binary builder", "script/build-omo-binary.ts"],
+      ["the native payload builder", "script/build-omo-native.ts"],
+      ["the native parity smoke", "script/qa/omo-native-parity-smoke.mjs"],
+      ["a macOS desktop QA script", "script/qa/desktop/macos/run.sh"],
+      ["a Codex local installer script", "packages/omo-codex/scripts/install-local.mjs"],
+      ["a platform-suffixed test", "packages/omo-opencode/src/cli/cli-installer.platform.test.ts"],
+      ["the launcher platform detection", "bin/platform.js"],
+      ["the launcher entry", "bin/oh-my-opencode.js"],
+      ["the platform launcher package generator", "script/build-binaries.ts"],
+      ["the Windows Git Bash runtime", "packages/git-bash-mcp/src/index.ts"],
+      ["the Codex installer source", "packages/omo-codex/src/install/codex-agent-config.ts"],
+      ["a Codex platform smoke test", "packages/omo-codex/plugin/test/node-install-surface.test.mjs"],
+      ["the other Codex platform smoke test", "packages/omo-codex/plugin/test/install-time-build-runtime.test.mjs"],
+      ["a composite action the legs could use", ".github/actions/setup/action.yml"],
+      ["the senpi-task RPC host the Windows shard isolates", "packages/senpi-task/src/runners/rpc-host/host.ts"],
+      ["the senpi-task RPC child process", "packages/senpi-task/src/runners/rpc-process.ts"],
+      ["the senpi-task record lock", "packages/senpi-task/src/store/record-lock.ts"],
+      ["basename contains darwin", "packages/utils/src/open-darwin.ts"],
+      ["basename contains macos", "script/macos-signing-workflow.test.ts"],
     ])("#then %s forces the full matrix", (_name, changedPath) => {
       // given / when
       const mode = classify({

@@ -165,7 +165,7 @@ describe("compiled omo entry launcher parity", () => {
       const handled = await runCompiledLauncher(["app-server", "--listen", "stdio://"], execDir)
       expect({ handled, exitCode: process.exitCode }).toEqual({ handled: true, exitCode: 2 })
     } finally {
-      process.exitCode = savedExitCode
+      process.exitCode = savedExitCode ?? 0
     }
   })
 
@@ -408,7 +408,7 @@ describe("embedded runtime provisioning", () => {
       await runCompiledLauncher(["doctor"], root, "2026.8.28", root)
     } finally {
       console.log = originalLog
-      process.exitCode = originalExitCode
+      process.exitCode = originalExitCode ?? 0
     }
     expect(output.join("\n")).toContain("PASS plugin manifest: plugin/package.json")
     expect(output.join("\n")).toContain("INFO omo 9.2.1 (engine: senpi 2026.8.28; scheme nodef)")
@@ -442,7 +442,7 @@ describe("embedded runtime provisioning", () => {
       })
     } finally {
       console.log = originalLog
-      process.exitCode = originalExitCode
+      process.exitCode = originalExitCode ?? 0
     }
     const warning = output.join("\n").split("\n").find((line) => line.startsWith("WARN more than one OmO install is on PATH:"))
     expect(warning).toContain("(standalone omo binary 9.2.1) runs when you type omo")

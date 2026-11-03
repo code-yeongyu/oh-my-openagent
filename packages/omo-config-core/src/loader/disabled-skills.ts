@@ -13,8 +13,10 @@ function toRecord(value: unknown): Record<string, unknown> | undefined {
   return value as Record<string, unknown>
 }
 
-function namesAt(record: Record<string, unknown> | undefined): readonly string[] {
-  const value = record?.["disabled_skills"]
+type UnionedListKey = "disabled_skills" | "exclude_models"
+
+function namesAt(record: Record<string, unknown> | undefined, key: UnionedListKey): readonly string[] {
+  const value = record?.[key]
   if (!Array.isArray(value)) return []
   return value.filter((entry): entry is string => typeof entry === "string" && entry.trim() !== "")
 }
@@ -42,6 +44,18 @@ function scopesOf(config: Record<string, unknown>, harness: string | undefined):
  * The shared base, the `[harness]` block, and the selected profile's copies of both all count.
  */
 export function collectDisabledSkills(options: CollectDisabledSkillsOptions): readonly string[] {
+  return collectUnionedList("disabled_skills", options)
+}
+
+/**
+ * The `exclude_models` denylist across every loaded layer, unioned by the same rule as
+ * `disabled_skills`: a project layer cannot let back in a model the user layer keeps out.
+ */
+export function collectExcludedModels(options: CollectDisabledSkillsOptions): readonly string[] {
+  return collectUnionedList("exclude_models", options)
+}
+
+function collectUnionedList(key: UnionedListKey, options: CollectDisabledSkillsOptions): readonly string[] {
   const names = new Set<string>()
   for (const layer of options.layers) {
     const config = toRecord(layer.config)
@@ -52,7 +66,7 @@ export function collectDisabledSkills(options: CollectDisabledSkillsOptions): re
       ...(profile === undefined ? [] : scopesOf(profile, options.harness)),
     ]
     for (const scope of scopes) {
-      for (const name of namesAt(scope)) names.add(name.trim())
+      for (const name of namesAt(scope, key)) names.add(name.trim())
     }
   }
   return [...names]

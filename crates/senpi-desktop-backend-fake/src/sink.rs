@@ -3,6 +3,7 @@ use std::sync::{mpsc, Arc};
 use parking_lot::Mutex;
 use senpi_desktop_core::backend::{DeliveryMode, Modifiers, MouseButton, PointerEvent};
 use senpi_desktop_core::keys::KeyName;
+use senpi_desktop_core::protocol_results::AxInputMethod;
 use senpi_desktop_core::types::{DesktopPoint, FrontWindow, Target};
 
 /// A pointer event as the fake received it (global logical coordinates).
@@ -128,6 +129,12 @@ pub enum SinkOp {
     AxFocus {
         node: u64,
     },
+    AxTypeText {
+        node: u64,
+        text: String,
+        method: AxInputMethod,
+        mode: DeliveryMode,
+    },
     MenuSelect {
         window: String,
         path: Vec<String>,
@@ -141,10 +148,24 @@ pub enum SinkOp {
 pub struct RecordingSink {
     ops: Arc<Mutex<Vec<SinkOp>>>,
     subscribers: Arc<Mutex<Vec<mpsc::Sender<SinkOp>>>>,
+    held: Arc<Mutex<Vec<SinkOp>>>,
 }
 
 impl RecordingSink {
     pub(crate) fn record(&self, op: SinkOp) {
+        {
+            let mut held = self.held.lock();
+            match &op {
+                SinkOp::HeldKey { down: true, .. } | SinkOp::HeldButton { down: true, .. } => held.push(op.clone()),
+                SinkOp::HeldKey { target, key, down: false, mode } => held.retain(|held| {
+                    !matches!(held, SinkOp::HeldKey { target: t, key: k, mode: m, .. } if t == target && k == key && m == mode)
+                }),
+                SinkOp::HeldButton { target, button, down: false, mode, .. } => held.retain(|held| {
+                    !matches!(held, SinkOp::HeldButton { target: t, button: b, mode: m, .. } if t == target && b == button && m == mode)
+                }),
+                _ => {}
+            }
+        }
         self.ops.lock().push(op.clone());
         self.subscribers.lock().retain(|subscriber| subscriber.send(op.clone()).is_ok());
     }
@@ -160,5 +181,25 @@ impl RecordingSink {
     /// Snapshot of every recorded op, oldest first.
     pub fn ops(&self) -> Vec<SinkOp> {
         self.ops.lock().clone()
+    }
+
+    pub(crate) fn release_held(&self) {
+        let held = self.held.lock().clone();
+        // Preparation has emitted no HeldKey/HeldButton down, so it adds no
+        // entries and is skipped without touching or waiting for that scope.
+        for mut op in held {
+            match &mut op {
+                SinkOp::HeldKey { down, .. } | SinkOp::HeldButton { down, .. } => *down = false,
+                _ => unreachable!("held contains only input downs"),
+            }
+            self.record(op);
+        }
+    }
+}
+
+impl senpi_desktop_core::backend::EmergencyRelease for RecordingSink {
+    fn release_all(&self) -> senpi_desktop_core::error::CoreResult<()> {
+        self.release_held();
+        Ok(())
     }
 }

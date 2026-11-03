@@ -119,7 +119,12 @@ async function chordLatches(ctx: Context, stage: X11Stage, observe: X11Observer)
 		await observe.activate(stage.other);
 		const frame = await captureTarget(engine, stage);
 		const before = { ...observe.pastes(), globalLive: stop.globalLive ?? null };
+		// An XTEST chord (xdotool, like any program) must be ignored: only a physical keyboard stops
+		// input (#10444). The status read after xdotool exits is a round trip behind the raw events.
 		const posted = await ctx.procs.run(["xdotool", "key", "ctrl+alt+shift+Escape"], stage.env);
+		const afterInjected = asObject(await engine.result("stopPath.status"));
+		// The user's other stop, `/computer stop`, reaches the engine as a host-relay stop.
+		const stopped = await engine.call("stopPath.stop", { source: "host-relay" });
 		const changed = await latched(engine);
 		const refused = outcome(await engine.exec("click", clickParams(stage, frame, "background")));
 		// Control: an independent XTEST middle click proves the target still records pastes, so an
@@ -135,12 +140,14 @@ async function chordLatches(ctx: Context, stage: X11Stage, observe: X11Observer)
 			{
 				global_listener_live: stop.globalLive === true,
 				xdotool_posted_chord: posted.code === 0,
+				xtest_chord_ignored: afterInjected.suspended === false,
+				host_stop_sent: stopped.error === undefined,
 				engine_latched: changed.suspended === true,
 				click_refused_suspended: refused === "Suspended",
 				control_click_delivered: control.code === 0,
 				engine_delivered_nothing: pasted.count === before.count + 1,
 			},
-			{ display: stage.display, chord: "ctrl+alt+shift+Escape", refused, stopPathChanged: changed },
+			{ display: stage.display, chord: "ctrl+alt+shift+Escape", refused, afterInjected, stopPathChanged: changed },
 			{ before, after },
 		);
 	} finally {

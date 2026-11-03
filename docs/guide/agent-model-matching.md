@@ -1,23 +1,29 @@
 # Agent-Model Matching Guide
 
+## Launch-gated Fable 5.5 preparation
+
+Claude Fable 5.5 is not released. `claude-fable-5-5` is a provisional ID, not a verified catalog entry. The builtin chains prepare 5.5 immediately ahead of 5.1 at the same effort and on the same providers. While `FABLE_55_RELEASED` is false (`packages/model-core/src/fable-55-launch.ts`), those rungs are skipped on every routing path, including a cold provider-models cache, so 5.1 stays the model that runs. The tables on this page show that routing as it is today. Only after release does 5.5 take the rung ahead of each 5.1 rung and the 5.1 defaults of `architect`, `artistry` and `plan-consultant`, and only then does the `architect` gate accept `claude-fable-5-5`. After release, a rung still needs the adopted senpi catalog to list the model. No 5.5 pricing, limits, accepted efforts or prompt preset are claimed here.
+
+Launch data lives in `packages/model-core/src/fable-55-launch.ts` (`FABLE_55_LAUNCH`). Set its ID, capability flags, modalities and context/input/output limits from the live listing, set `FABLE_55_EFFORTS` to the efforts the listing accepts (the max/xhigh on the 5.5 rungs are carried over from 5.1), and adopt the matching senpi release before enabling the routing commit. Recognition and routing are separate commits so recognition can land without promoting 5.5 if evaluation does not justify it.
+
 > **For agents and users**: the four model-profile lanes that pick the main agent's model, which models carry tuned prompt presets, how curated agents and categories keep their own chains, and how to change any of it without breaking things.
 
-**OmO Native sets all of this up on its own, so you can probably skip this page.** With nothing in `omo.json`, a fresh session starts on Daily · Normal (Claude Opus 5.5, then Kimi K3, then GLM 5.3, whichever you have connected), or on the first other lane that resolves, and every category and curated agent picks its model from its own chain against the providers you are logged in to. A category that none of your providers can serve is left off the main agent's list, so it is never picked and then fails. Read on when you want to change a default, or when you want to know why a session landed on the model it did.
+**OmO Native sets all of this up on its own, so you can probably skip this page.** With nothing in `omo.json`, a fresh session starts on Daily · Normal (Claude Opus 5.5, then Kimi K3.1 Pro, then GLM 5.3, whichever you have connected), or on the first other lane that resolves, and every category and curated agent picks its model from its own chain against the providers you are logged in to. A category that none of your providers can serve is left off the main agent's list, so it is never picked and then fails. Read on when you want to change a default, or when you want to know why a session landed on the model it did.
 
 ---
 
 ## Four lanes pick the main agent's model
 
-The main agent thinks with your session model. The easiest way to choose it is a **model profile**: a named, ordered chain you pick by lane (Daily or Geeky, Normal or Heavy). At session start omo walks the chain and applies the first model your connected providers serve. Chains live in [`packages/omo-senpi/src/components/model-profile/builtin-profiles.ts`](../../packages/omo-senpi/src/components/model-profile/builtin-profiles.ts); every rung lists each provider that serves the model, so a Copilot-only or gateway-only account resolves the same way a direct API key does.
+The main agent thinks with your session model. The easiest way to choose it is a **model profile**: a named, ordered chain you pick by lane (Daily or Obsessive, Normal or Heavy). At session start omo walks the chain and applies the first model your connected providers serve. Chains live in [`packages/omo-senpi/src/components/model-profile/builtin-profiles.ts`](../../packages/omo-senpi/src/components/model-profile/builtin-profiles.ts); every rung lists each provider that serves the model, so a Copilot-only or gateway-only account resolves the same way a direct API key does.
 
 | Lane | Id | Pick it for | Chain |
 | --- | --- | --- | --- |
-| Daily · Normal | `daily-normal` | Gets any task done without fuss. | `anthropic-subscription\|anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (medium)` -> `kimi-coding\|kimi-for-coding\|moonshotai\|opencode-go/kimi-k3 (max)` -> `zai-coding-plan\|opencode-go/glm-5.3 (max)` |
+| Daily · Normal | `daily-normal` | Gets any task done without fuss. | `anthropic-subscription\|anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (medium)` -> `kimi-coding\|kimi-for-coding\|moonshotai\|opencode-go/kimi-k3.1-pro (max)` -> `zai-coding-plan\|opencode-go/glm-5.3 (max)` |
 | Daily · Heavy | `daily-heavy` | Gets any task done, after thinking it over from more sides. | same Claude providers `/claude-fable-5-1 (xhigh)` |
-| Geeky · Normal | `geeky-normal` | Works on one task and thinks it through. | `chatgpt-subscription\|openai/gpt-6.1-sol-fast (medium)` -> `chatgpt-subscription\|openai/gpt-6.1-sol (medium)` -> `chatgpt-subscription\|openai\|github-copilot\|opencode/gpt-5.6-sol (medium)` |
-| Geeky · Heavy | `geeky-heavy` | Works on one task and thinks it over from every side. | `chatgpt-subscription\|openai\|github-copilot\|opencode/gpt-6-astra (high)` |
+| Obsessive · Normal | `geeky-normal` | Obsessive focus on one hard task. Caution: NOT RECOMMENDED FOR WRITING OR EVERYDAY WORK. | `chatgpt-subscription\|openai\|github-copilot\|opencode/gpt-6-astra (medium)` -> `chatgpt-subscription\|openai/gpt-6.1-sol-fast (medium)` -> `chatgpt-subscription\|openai/gpt-6.1-sol (medium)` -> `chatgpt-subscription\|openai\|github-copilot\|opencode/gpt-5.6-sol (medium)` |
+| Obsessive · Heavy | `geeky-heavy` | Obsessive focus on one hard task, checked from every side. Caution: NOT RECOMMENDED FOR WRITING OR EVERYDAY WORK. | `chatgpt-subscription\|openai\|github-copilot\|opencode/gpt-6-astra (high)` |
 
-With no `model_profile` at all, a fresh desktop or headless session starts on **Daily · Normal**. When none of its rungs resolves on the connected providers, the first of Daily · Heavy, Geeky · Normal and Geeky · Heavy that does is used instead, so a ChatGPT-only setup starts on Geeky · Normal. Every rung is served only by its ranked providers (Claude subscription, then the Anthropic API, Copilot, OpenCode; Kimi Code, then Moonshot and OpenCode Go; ChatGPT subscription, then the OpenAI API, Copilot, OpenCode, except GPT-6.1 Sol, which only the ChatGPT subscription and the OpenAI API serve; Z.ai Coding Plan, then OpenCode Go), and gateway aggregators such as OpenGateway and OpenRouter are never picked. There is no separate Recommended profile: Daily is OmO's recommendation.
+With no `model_profile` at all, a fresh desktop or headless session starts on **Daily · Normal**. When none of its rungs resolves on the connected providers, the first of Daily · Heavy, Obsessive · Normal and Obsessive · Heavy that does is used instead, so a ChatGPT-only setup starts on Obsessive · Normal. Every rung is served only by its ranked providers (Claude subscription, then the Anthropic API, Copilot, OpenCode; Kimi Code, then Moonshot and OpenCode Go; ChatGPT subscription, then the OpenAI API, Copilot, OpenCode, except GPT-6.1 Sol, which only the ChatGPT subscription and the OpenAI API serve; Z.ai Coding Plan, then OpenCode Go), and gateway aggregators such as OpenGateway and OpenRouter are never picked. There is no separate Recommended profile: Daily is OmO's recommendation.
 
 Activate a lane with a single key in `omo.json`:
 
@@ -39,7 +45,7 @@ You can still pick with `/model` and switch mid-session; the main agent switches
 
 ### The recommended models
 
-We tune the orchestration prompt against Claude Opus 5.5, Claude Fable 5.1, Kimi K3, GPT-6 Astra, GPT-6.1 Sol, GPT-6 Sol and GLM 5.3, in that order of preference. The Daily lanes and Geeky · Heavy are slices of it; Geeky · Normal runs GPT-6.1 Sol Fast at medium, then plain GPT-6.1 Sol, falling back to GPT-5.6 Sol where 6.1 Sol isn't served.
+We tune the orchestration prompt against Claude Opus 5.5, Claude Fable 5.1, Kimi K3, GPT-6 Astra, GPT-6.1 Sol, GPT-6 Sol and GLM 5.3, in that order of preference. The Daily lanes and Obsessive · Heavy are slices of it; Obsessive · Normal runs GPT-6 Astra at medium, falling back to GPT-6.1 Sol Fast, plain GPT-6.1 Sol and GPT-5.6 Sol where Astra isn't served.
 
 - **Claude Opus 5.5 and Claude Fable 5.1** are the reference configuration for the orchestration prompt: long nested todos, delegation tables, many tool calls in a row.
 - **GPT-6 Astra, GPT-6.1 Sol and GPT-6 Sol** get the GPT-native `gpt-6-astra` preset, built for autonomous, principle-driven work. Over-orchestration on small bounded tasks is a known risk on GPT; give it a goal, not a recipe.
@@ -62,8 +68,8 @@ The harness ships a prompt preset per model family. When your session model matc
 | `claude-opus-5-5` | Claude Opus 5.5 | Current best Opus. Steerable and literal. The reference configuration. |
 | `claude-opus-5` | Other Claude Opus 5 ids | The Opus 5 core. |
 | `claude-opus-4-5` and later 4.x presets | The Claude Opus 4.x line | One preset per 4.x release; `claude-opus-4-6` is still the second `writing` rung. |
-| `gpt-6-astra` | Every GPT-6 model: Astra, Sol, Sol Fast, GPT-6.1 Sol, Luna | The GPT-6 family shares one prompting guide, so they share one preset. This is what Geeky · Heavy, Geeky · Normal's GPT-6.1 Sol rungs, and the `ultrabrain`, `deep-low`, `deep-high` and `quick` categories run. |
-| `gpt-5.6` / `gpt-5.5` | GPT-5.6 ids (Sol, Terra) and GPT-5.5 | GPT-native prompt: concise principles, explicit decision criteria. Geeky · Normal's GPT-5.6 Sol fallback runs on it. |
+| `gpt-6-astra` | Every GPT-6 model: Astra, Sol, Sol Fast, GPT-6.1 Sol, Luna | The GPT-6 family shares one prompting guide, so they share one preset. This is what Obsessive · Heavy, Obsessive · Normal's Astra and GPT-6.1 Sol rungs, and the `ultrabrain`, `deep-low`, `deep-high` and `quick` categories run. |
+| `gpt-5.6` / `gpt-5.5` | GPT-5.6 ids (Sol, Terra) and GPT-5.5 | GPT-native prompt: concise principles, explicit decision criteria. Obsessive · Normal's GPT-5.6 Sol fallback runs on it. |
 | `gpt-5.4`, `gpt-5.3-codex` and older GPT-5 presets | Older GPT-5 ids | Kept for configs that still pin them. |
 | `kimi-k3` | Kimi K3 (`k3` on Kimi Code) and Devin SWE-2 | Instruction-following mirrors Claude closely. The preset is calibrated to stop overthinking and keep work moving, so expect thinking-token cost. |
 | `kimi-k2-8` / `kimi-k2-7` / `kimi-k2-6` | Kimi K2.8 (including `kimi-for-coding`), K2.7 (including `kimi-for-coding-highspeed`, the `explore` and `librarian` head), K2.6 | Older Kimi line. Not a recommended main-agent configuration. |
@@ -101,8 +107,8 @@ Delegation goes through the `task` tool. Four curated read-only agents have thei
 | --- | --- | --- | --- |
 | `explore` | Fast codebase grep and pattern discovery | `kimi-for-coding-highspeed` (off) | `kimi-coding\|kimi-for-coding/kimi-for-coding-highspeed (off)` -> `chatgpt-subscription\|openai/gpt-6-luna-fast (low)` -> `anthropic-subscription\|anthropic\|github-copilot/claude-haiku-5-5 (medium)` -> `deepseek/deepseek-flash (max)` -> `opencode-go\|bailian-coding-plan/qwen3.7-plus` -> `opencode-go/minimax-m2.7` |
 | `librarian` | Documentation and OSS code search | `kimi-for-coding-highspeed` (off) | Same chain as `explore`. |
-| `plan-consultant` | Pre-planning gap analysis for `/ulw-plan` | `claude-fable-5-1` (max) | `anthropic-subscription\|anthropic\|github-copilot\|opencode/claude-fable-5-1 (max)` -> `anthropic-subscription\|anthropic\|github-copilot\|opencode/claude-opus-5-5 (max)` -> `opencode-go\|kimi-for-coding\|moonshotai\|opencode/kimi-k3 (max)` |
-| `plan-reviewer` | One-shot plan review against clarity, verification, and context criteria | `gpt-6-astra` (xhigh) | `chatgpt-subscription\|openai/gpt-6-astra (xhigh)` -> `github-copilot/gpt-6-astra (high)` -> `chatgpt-subscription\|openai\|opencode/gpt-6-astra (high)` -> `anthropic-subscription\|anthropic\|github-copilot\|opencode/claude-opus-5-5 (max)` -> one lower rung listed in the source file -> `opencode-go/glm-5.2` |
+| `plan-consultant` | Pre-planning gap analysis for `/ulw-plan` | `claude-fable-5-1` (max) | `anthropic-subscription\|anthropic\|github-copilot\|opencode/claude-fable-5-1 (max)` -> `anthropic-subscription\|anthropic\|github-copilot\|opencode/claude-opus-5-5 (max)` -> `opencode-go\|kimi-for-coding\|moonshotai/kimi-k3.1-pro (max)` -> `opencode/kimi-k3 (max)` |
+| `plan-reviewer` | One-shot plan review against clarity, verification, and context criteria | `gpt-6-astra` (xhigh) | `chatgpt-subscription\|openai/gpt-6-astra (xhigh)` -> `github-copilot/gpt-6-astra (high)` -> `chatgpt-subscription\|openai\|opencode/gpt-6-astra (high)` -> `anthropic-subscription\|anthropic\|github-copilot\|opencode/claude-opus-5-5 (max)` -> two lower rungs listed in the source file -> `opencode-go/glm-5.2` |
 
 The utility rungs elided above are cheap fast models; read the source file for the exact list. They exist so the system degrades gracefully when you don't hold every subscription. If you have a paid tier connected, it's always preferred.
 
@@ -124,7 +130,7 @@ If one premium model is quota-limited while your other models are effectively un
 2. **Prefer a low-frequency, high-leverage role.** `plan-consultant` contributes one gap-analysis pass per plan generation. High-accuracy planning runs one `plan-reviewer` pass per round and repeats after any rejection. Both are far cheaper places for a rare model than the main agent, which runs throughout the workflow.
 3. **Avoid execution-heavy slots.** The category worker, `explore`, and `librarian` are high-volume. They're usually poor homes for the rarest model.
 
-Claude Fable 5.1 is the first rung of `plan-consultant`, of the `architect`, `visual-engineering` and `artistry` categories, and of Daily · Heavy. With a tight Fable allocation, move the categories off it first, since each runs once per delegated task of its kind, and keep `plan-consultant`, which runs once per plan, at a lower effort. `architect` has no fallback rung, so it disappears when Fable is missing unless you configure it yourself.
+Provisional Claude Fable 5.5 precedes Fable 5.1 in `plan-consultant`, `architect`, `artistry` and Daily · Heavy. In `visual-engineering`, both Fable rungs follow Argon at low. With a tight Fable allocation, move the categories off it first, since each runs once per delegated task of its kind, and keep `plan-consultant`, which runs once per plan, at a lower effort. `architect` falls back only to Fable 5.1, so it disappears when both Fable generations are missing unless you configure it yourself.
 
 ```jsonc
 {
@@ -147,15 +153,15 @@ When the main agent delegates implementation work, it doesn't pick a model name.
 | Category | Used for | Default | Chain |
 | --- | --- | --- | --- |
 | `architect` | Big-picture system design; proposes, doesn't implement (the architect consult lane) | `anthropic/claude-fable-5-1 (max)` | `anthropic-subscription\|anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (max)` |
-| `visual-engineering` | Frontend, UI/UX, CSS, animation, design systems | `anthropic/claude-fable-5-1 (max)` | `claude-fable-5-1 (max)` -> `claude-opus-5-5 (max)` -> `kimi-coding\|kimi-for-coding\|moonshotai\|opencode-go/kimi-k3 (max)` |
+| `visual-engineering` | Frontend, UI/UX, CSS, animation, design systems | `google/gemini-4-argon (low)` | `google\|google-vertex\|opencode/gemini-4-argon (low)` -> `claude-fable-5-1 (max)` -> `claude-opus-5-5 (max)` -> `kimi-coding\|kimi-for-coding\|moonshotai\|opencode-go/kimi-k3.1-pro (max)`; the Argon rung resolves once the engine catalog carries the model |
 | `ultrabrain` | Genuinely hard, logic-heavy tasks; goals only, no step-by-step | `chatgpt-subscription/gpt-6-astra (max)` | `gpt-6-astra (max)` across `chatgpt-subscription`, `openai`, `github-copilot`, `opencode` -> `gpt-5.6-sol (max)` across the same providers |
 | `deep-low` | Default deep lane: 3D graphics, computer use, browser use, backend, algorithms, multimodal work; decisions settled from evidence | `chatgpt-subscription/gpt-6.1-sol (medium)` | `chatgpt-subscription\|openai/gpt-6.1-sol (medium)` -> `chatgpt-subscription\|openai/gpt-6.1-sol-fast (medium)` -> `chatgpt-subscription\|openai\|github-copilot\|opencode/gpt-5.6-sol (medium)` -> `chatgpt-subscription\|openai/gpt-5.6-sol-fast (medium)` |
 | `deep-high` | Escalation deep lane: a central decision evidence cannot settle | `chatgpt-subscription/gpt-6-astra (high)` | `chatgpt-subscription\|openai\|github-copilot\|opencode/gpt-6-astra (high)`, no fallback |
-| `artistry` | Unconventional, creative problem-solving | `anthropic/claude-fable-5-1 (max)` | `claude-fable-5-1 (max)` -> `claude-opus-5-5 (max)` -> `kimi-k3 (max)` |
+| `artistry` | Unconventional, creative problem-solving | `anthropic/claude-fable-5-1 (max)` | `claude-fable-5-1 (max)` -> `claude-opus-5-5 (max)` -> `kimi-k3.1-pro (max)` |
 | `quick` | Trivial tasks: single-file changes, typos | `chatgpt-subscription/gpt-6-luna-fast (low)` | `chatgpt-subscription\|openai/gpt-6-luna-fast (low)` -> `claude-haiku-5-5 (medium)` -> `deepseek/deepseek-flash (off)` -> `qwen3.6-flash (low)` -> cheaper utility rungs -> `xai/grok-4.20-0309-non-reasoning` -> `zai\|zai-coding-cn/glm-5.3-flash (low)` -> `xiaomi/mimo-v2.6-flash (low)` |
-| `unspecified-low` | Doesn't fit elsewhere, low effort | `anthropic/claude-sonnet-5-5 (medium)` | `claude-sonnet-5-5 (medium)` -> `xiaomi\|opencode-go/mimo-v2.6-pro (max)` -> `xai\|github-copilot\|opencode-go/grok-4.7 (xhigh)` -> `openai\|chatgpt-subscription/gpt-6.1-sol (medium)` -> `gpt-5.6-sol (medium)` -> `claude-sonnet-5 (low)` -> `qwen3.8-max-preview (max)` -> `deepseek\|opencode-go/deepseek-v4-pro (max)` -> `xiaomi\|opencode-go/mimo-v2.5-pro (max)` |
-| `unspecified-high` | Doesn't fit elsewhere, high effort | `anthropic/claude-opus-5-5 (medium)` | `claude-opus-5-5 (medium)` -> `zai-coding-plan\|opencode-go/glm-5.3 (max)` -> `kimi-k3 (max)` |
-| `writing` | Documentation, prose, technical writing | `anthropic/claude-opus-5-5 (low)` | `claude-opus-5-5 (low)` -> `claude-opus-4-6 (max)`; unavailable when none of these is connected, with no fallback to another family |
+| `unspecified-low` | Doesn't fit elsewhere, low effort | `anthropic/claude-sonnet-5-5 (medium)` | `claude-sonnet-5-5 (medium)` -> `xiaomi\|opencode-go/mimo-v2.6-pro (max)` -> `xai\|github-copilot\|opencode-go/grok-4.7 (xhigh)` -> `zai-coding-plan\|opencode-go/glm-5.3 (high)` -> `openai\|chatgpt-subscription/gpt-6.1-sol (medium)` -> `gpt-5.6-sol (medium)` -> `claude-sonnet-5 (low)` -> `qwen3.8-max-preview (max)` -> `deepseek\|opencode-go/deepseek-v4-pro (max)` -> `xiaomi\|opencode-go/mimo-v2.5-pro (max)` |
+| `unspecified-high` | Doesn't fit elsewhere, high effort | `anthropic/claude-opus-5-5 (medium)` | `claude-opus-5-5 (medium)` -> `zai-coding-plan\|opencode-go/glm-5.3 (max)` -> `kimi-k3.1-pro (max)` |
+| `writing` | Documentation, prose, technical writing | `google/gemini-4-argon (low)` | `google\|google-vertex\|opencode/gemini-4-argon (low)` -> `claude-opus-5-5 (low)` -> `claude-opus-4-6 (max)`; unavailable when none of these is connected, with no fallback to another family |
 
 Every Claude rung is headed by `anthropic-subscription` and every GPT rung by `chatgpt-subscription`, so a subscription login always outranks an API key for the same model.
 
@@ -235,11 +241,11 @@ Because this is your own configuration, `deep-low` stays on the list even on a m
 
 **Safe**, same family and role shape:
 
-- Main agent: Daily · Normal or Daily · Heavy for the generalist lanes; Geeky · Normal or Geeky · Heavy for the GPT lanes.
+- Main agent: Daily · Normal or Daily · Heavy for the generalist lanes; Obsessive · Normal or Obsessive · Heavy for the GPT lanes.
 - `plan-consultant`: any Claude-family model, Kimi K3, GLM 5.2 / 5.3.
 - `plan-reviewer`: GPT-6 Astra at xhigh or high; Claude Opus 5.5 at max as a communicative fallback.
-- `visual-engineering`, `artistry`: swap among Claude Fable 5.1, Claude Opus 5.5, and Kimi K3.
-- `writing`: Claude Opus 5.5 or Claude Opus 4.6.
+- `visual-engineering`: Argon at low, then Claude Fable 5.1, Claude Opus 5.5, and Kimi K3; `artistry`: swap among Claude Fable 5.1, Claude Opus 5.5, and Kimi K3.
+- `writing`: Argon at low, then Claude Opus 5.5 or Claude Opus 4.6.
 
 **Lower-confidence**, works but thinly validated:
 
@@ -264,7 +270,7 @@ For the main agent, resolution happens once, at session start (`packages/omo-sen
 1. --model flag or scoped model    -> kept as is; the profile never runs
 2. model_profile = provider/model  -> the pin; that exact model, if the registry serves it
 3. model_profile = <profile id>    -> builtins overlaid with model_profiles; first rung the registry serves
-4. model_profile unset            -> Daily · Normal, else the first lane that resolves (Daily · Heavy, Geeky · Normal, Geeky · Heavy)
+4. model_profile unset            -> Daily · Normal, else the first lane that resolves (Daily · Heavy, Obsessive · Normal, Obsessive · Heavy)
 5. No profile candidate available  -> notice; retain Senpi's selected model
 ```
 

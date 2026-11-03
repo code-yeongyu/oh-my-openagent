@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test"
 import {
   rmEfaultTolerant,
   rmSyncEfaultTolerant,
+  rmWhenReleased,
   TEARDOWN_FAILURE_PREFIX,
   type RmAsyncFn,
   type RmSyncFn,
@@ -152,5 +153,51 @@ describe("rmEfaultTolerant", () => {
     expect(thrown).toBeInstanceOf(Error)
     expect((thrown as Error).message.startsWith(TEARDOWN_FAILURE_PREFIX)).toBe(true)
     expect(calls).toBe(3)
+  })
+})
+
+describe("rmWhenReleased (omo #10445)", () => {
+  test("#given a directory that stays EBUSY for 2.5 s, longer than one rmEfaultTolerant budget #when teardown waits for its release #then it retries until the holder lets go and removes it", async () => {
+    let clock = 0
+    let calls = 0
+    const rm: RmAsyncFn = async () => {
+      calls += 1
+      if (clock < 2_500) throw errno("EBUSY", "resource busy or locked")
+    }
+
+    await rmWhenReleased("/tmp/omo-teardown-busy", { recursive: true, force: true }, {
+      rm,
+      now: () => clock,
+      sleep: async (ms) => {
+        clock += ms
+      },
+    })
+
+    expect(clock).toBeGreaterThanOrEqual(2_500)
+    expect(calls).toBeGreaterThan(3)
+  })
+
+  test("#given a directory that never releases #when the release deadline passes #then the teardown failure is rethrown", async () => {
+    let clock = 0
+    const rm: RmAsyncFn = async () => {
+      throw errno("EBUSY", "resource busy or locked")
+    }
+
+    let thrown: unknown
+    try {
+      await rmWhenReleased("/tmp/omo-teardown-never", { recursive: true, force: true }, {
+        rm,
+        releaseTimeoutMs: 1_000,
+        now: () => clock,
+        sleep: async (ms) => {
+          clock += ms
+        },
+      })
+    } catch (caught) {
+      thrown = caught
+    }
+
+    expect(thrown instanceof Error && thrown.message.startsWith(TEARDOWN_FAILURE_PREFIX)).toBe(true)
+    expect(clock).toBeGreaterThanOrEqual(1_000)
   })
 })

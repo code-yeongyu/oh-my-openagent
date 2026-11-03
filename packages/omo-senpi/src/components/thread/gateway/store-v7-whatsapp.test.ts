@@ -14,13 +14,16 @@ const BINDING_ROW = (id: string, platform: string, seq?: number) =>
   `INSERT INTO bindings (${seq === undefined ? "" : "seq, "}binding_id, revision, status, platform, account_id, chat_id, thread_id, session_realm_id, session_durable_id, direction_inbound, direction_outbound, inbound_mode, outbound_events, policy_id, created_at, updated_at, lease_started_at)
    VALUES (${seq === undefined ? "" : `${seq}, `}'${id}', 1, 'active', '${platform}', 'acct', 'c1', 't1', 'realm', 'S-${id}', 1, 1, 'auto', '[]', 'default', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`
 
+/** Schema v6: the version right before the v7 bindings rebuild. Pinned, not `length - 1`, because later migrations append after v7. */
+const V6 = 6
+
 /** A real v6 store: the v1..v6 migrations applied to a fresh DB, with one binding whose newest row is then deleted. */
 function v6Fixture(path: string, extra: readonly string[]): void {
   mkdirSync(dirname(path), { recursive: true })
   const db = new Database(path)
   db.exec("PRAGMA foreign_keys = ON")
   db.exec("BEGIN")
-  const v6 = GATEWAY_MIGRATIONS.slice(0, -1)
+  const v6 = GATEWAY_MIGRATIONS.slice(0, V6)
   for (const step of v6) for (const statement of step) db.exec(statement)
   db.exec(`PRAGMA user_version = ${v6.length}`)
   db.exec("COMMIT")
@@ -134,7 +137,7 @@ test("#given an extension row orphaned on bindings (a pre-existing violation) #w
   const db = new Database(path)
   db.exec("PRAGMA busy_timeout = 0")
   try {
-    expect((db.query("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(GATEWAY_MIGRATIONS.length - 1)
+    expect((db.query("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(V6)
     expect(db.query("SELECT * FROM alpha_refs").all()).toEqual([{ id: 1, binding_seq: 99 }])
   } finally { db.close() }
 })

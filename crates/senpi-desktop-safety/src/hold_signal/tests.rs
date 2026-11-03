@@ -42,17 +42,16 @@ fn cancellation_and_stop_wake_a_waiting_hold() {
         // Given an interruption registered before starting the worker.
         let supervisor = supervisor();
         let signal = supervisor.hold_signal();
-        let (started, starting) = mpsc::channel();
+        let starting = supervisor.subscribe_hold_wait_for_test();
         let (done, completed) = mpsc::channel();
         let worker_signal = Arc::clone(&signal);
         let worker_supervisor = Arc::clone(&supervisor);
         let worker = thread::spawn(move || {
-            started.send(()).unwrap();
             done.send(worker_signal.wait(&worker_supervisor, Duration::from_secs(100)))
                 .unwrap();
         });
         starting.recv_timeout(Duration::from_secs(2)).unwrap();
-        // When either interruption lands, before or during the atomic wait.
+        // When either interruption lands only after the atomic park handshake.
         if stop {
             supervisor.trigger_stop(StopSource::Hotkey);
         } else {
@@ -85,4 +84,33 @@ fn completed_requests_do_not_accumulate_strong_stop_subscriptions() {
     // Then the supervisor did not retain the finished request.
     assert!(weak.upgrade().is_none());
     assert_eq!(next.check(&supervisor).unwrap_err().code, ErrorCode::Suspended);
+}
+
+#[test]
+fn r2_m3_physical_scope_finishes_before_commit_and_reply_waits_for_publication() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    // given
+    let released = Arc::new(AtomicBool::new(false));
+    let observed = Arc::new(AtomicBool::new(false));
+    let at_commit = Arc::clone(&released);
+    let observation = Arc::clone(&observed);
+    let supervisor = Arc::new(Supervisor::with_stop_commit(Arc::new(FakeClock::new(0)), false, move || {
+        observation.store(at_commit.load(Ordering::SeqCst), Ordering::SeqCst);
+    }));
+    let signal = supervisor.hold_signal();
+    let worker_supervisor = Arc::clone(&supervisor);
+    let (started, ready) = mpsc::channel();
+    let worker = thread::spawn(move || signal.with_input(&worker_supervisor, || {
+        started.send(()).unwrap();
+        let result = signal.wait(&worker_supervisor, Duration::from_secs(100));
+        // Models the backend's release-on-return contract.
+        released.store(true, Ordering::SeqCst);
+        result
+    }));
+    ready.recv_timeout(Duration::from_secs(5)).unwrap();
+    // when
+    supervisor.trigger_stop(StopSource::Hotkey);
+    // then
+    assert_eq!(worker.join().unwrap().unwrap_err().code, ErrorCode::Suspended);
+    assert!(observed.load(Ordering::SeqCst), "durable write started before physical release");
 }

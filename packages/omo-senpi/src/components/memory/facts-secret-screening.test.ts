@@ -14,7 +14,7 @@ describe("facts secret screening", () => {
     const runner = new FactsExtractorRunner(runnerOptions(root, identity, queue, "fact", {
       createRunner: () => ({
         start: async (spec) => {
-          const tool = createFactsRecordTool({ extractionPath: join(spec.cwd, "extraction.jsonl") })
+          const tool = createFactsRecordTool({ exchanges: [], extractionPath: join(spec.cwd, "extraction.jsonl") })
           await tool.execute("fact-1", {
             scope: "project",
             text: "the token is ghp_Ab3dEf5hJ7kL9mN1pQ3rS5tU7vW9xY1zB3C5",

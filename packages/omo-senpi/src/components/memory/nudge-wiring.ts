@@ -3,6 +3,7 @@ import type { GitMemoryRepo, MemoryToolProvenance } from "@oh-my-opencode/memory
 
 import type { MemoryExtensionAPI } from "./capabilities"
 import type { MemoryIdentityContext } from "./context"
+import { activeBranchEntries, memoryToolProvenance } from "./memory-tool-provenance"
 import {
   MEMORY_TOOL_NAME,
 } from "./tool-metadata"
@@ -154,22 +155,20 @@ export function createMemoryNudgeWiring(options: MemoryNudgeWiringOptions): Memo
 
       pi.on("tool_call", (payload, eventCtx) => {
         if (!isRecord(payload) || !isMemoryToolName(payload.toolName) || !isRecord(payload.input)) return
-        const sessionId = readSessionId(eventCtx)
-        if (sessionId === undefined) return
-        const context = options.resolveContext(sessionId)
-        const state = sessions.get(sessionId)
+        delete payload.input.provenance
+        const session = readSession(eventCtx)
+        if (session === undefined) return
+        const context = options.resolveContext(session.id)
+        const state = sessions.get(session.id)
         if (context === undefined || state === undefined) return
-        payload.input.provenance = {
-          sessionId,
+        payload.input.provenance = memoryToolProvenance({
+          sessionId: session.id,
           userTurns: state.priorUserTurns,
-          identityId: context.identity,
-          repoPath: context.identityPaths.repo,
-          // The receipt key for the IC-17 outbound half: unforgeable because the bridge
-          // overwrites the whole provenance object; never read from model arguments.
-          ...(typeof payload.toolCallId === "string" && payload.toolCallId.length > 0
-            ? { toolCallId: payload.toolCallId }
-            : {}),
-        }
+          context,
+          toolCallId: payload.toolCallId,
+          input: payload.input,
+          entries: activeBranchEntries(eventCtx) ?? session.entries,
+        })
       })
     },
 

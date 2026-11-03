@@ -1,13 +1,15 @@
 import { createHash, randomBytes } from "node:crypto"
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { homedir } from "node:os"
 import { fileURLToPath } from "node:url"
-import { dirname, join } from "node:path"
+import { dirname, join, sep } from "node:path"
 import {
   DEFAULT_POSTHOG_HOST,
   type TelemetryEnv,
   type TelemetryProductConfig,
-} from "@oh-my-opencode/telemetry-core"
-import { resolveAgentHome } from "../agent-home/resolve-agent-home"
+} from "@oh-my-opencode/telemetry-core/injected"
+import { AGENT_DIR_ENV_NAMES, resolveAgentHome } from "../agent-home/resolve-agent-home"
+import { type BundledSkillsOverrideLogger, resolveBundledSkillsOverride } from "../bundled-skills/override"
 import { ALL_KNOWN_MODEL_IDS, KNOWN_MODELS, KNOWN_PROVIDERS, type KnownProvider } from "./model-vocabulary"
 
 export const OMO_NATIVE_POSTHOG_API_KEY = "phc_r6UYQzNZcGYSzKw4PxCiVrZepGqV3dw9qcvcKtRNUWAn"
@@ -16,7 +18,9 @@ export const OMO_NATIVE_POSTHOG_API_KEY = "phc_r6UYQzNZcGYSzKw4PxCiVrZepGqV3dw9q
 // clients half-apply a bump: a session row and a task row would disagree about their own schema.
 // v3: every event additionally carries the shared attribution properties `surface` (cli | desktop)
 // and `install_id` (random per-installation id shared by CLI and Desktop through the agent home).
-export const OMO_NATIVE_SCHEMA_VERSION = 3
+// v4: `distinct_id` is `install_hash` = sha256(install id), the raw `install_id` property is gone,
+// and `ci` marks CI runs.
+export const OMO_NATIVE_SCHEMA_VERSION = 4
 
 export { ALL_KNOWN_MODEL_IDS, KNOWN_MODELS, KNOWN_PROVIDERS } from "./model-vocabulary"
 export type { KnownProvider } from "./model-vocabulary"
@@ -32,6 +36,7 @@ export {
   COMPUTER_USE_PERMISSION_SCOPES,
   COMPUTER_USE_PLATFORMS,
   CURATED_AGENTS,
+  OMO_NATIVE_COMMON_PROPERTY_SCHEMAS,
   OMO_NATIVE_EVENT_SCHEMAS,
   OMO_NATIVE_PROPERTY_ALLOWLISTS,
 } from "./event-schemas"
@@ -51,7 +56,6 @@ export function createOmoNativeProductConfig(): TelemetryProductConfig {
     defaultApiKey: OMO_NATIVE_POSTHOG_API_KEY,
     defaultHost: DEFAULT_POSTHOG_HOST,
     eventName: "daily_active",
-    machineIdPrefix: "omo-senpi:",
     packageName: "@oh-my-opencode/omo-senpi",
     packageVersion: PACKAGE_VERSION,
     platform: "omo-senpi",
@@ -64,7 +68,17 @@ export function getOmoNativeStateDir(env: TelemetryEnv = process.env): string {
   return join(resolveAgentHome({ env }), "omo-senpi", "omo-native")
 }
 
-export function getBuiltinSkillsRoot(): string {
+/**
+ * The bundled skills directory, ending in a path separator (callers append `<skill>/SKILL.md`). A valid
+ * OMO_BUNDLED_SKILLS_DIR wins through the bundled-skills loader's own resolver, so both name the same tree; an
+ * invalid value is reported once per process by that resolver and falls back to the plugin's skills.
+ */
+export function getBuiltinSkillsRoot(
+  env: Record<string, string | undefined> = process.env,
+  logger?: BundledSkillsOverrideLogger,
+): string {
+  const override = resolveBundledSkillsOverride(env, logger)
+  if (override !== undefined) return override.endsWith(sep) || override.endsWith("/") ? override : `${override}${sep}`
   // Source entrypoints and generated plugin bundles have different directory depths.
   return fileURLToPath(new URL(import.meta.url.endsWith(".ts") ? "../../../skills/" : "../skills/", import.meta.url))
 }
@@ -102,23 +116,37 @@ export type OmoNativeAttributionInput = {
 }
 
 /**
- * Shared attribution for every omo-native event. `install_id` is a random 64-hex id stored next to
+ * Shared attribution for every omo-native event. The install id is a random 64-hex id stored next to
  * the session-id salt, so the CLI and the Desktop-bundled runtime on one machine converge on one id
  * without deriving anything from the machine itself. A valid `OMO_NATIVE_INSTALL_ID` env override
  * wins, because a Desktop host pins a remote (SSH/WSL) runtime to ITS local installation id.
- * `OMO_NATIVE_SURFACE=desktop` is set by the Desktop host; anything else is the CLI.
+ * `OMO_NATIVE_SURFACE=desktop` is set by the Desktop host; anything else is the CLI. `ci` marks a
+ * process running under a CI runner (`CI` set to anything but empty, `0` or `false`), so automated
+ * traffic can be separated from people at query time.
  */
 export function getOmoNativeAttribution(input: OmoNativeAttributionInput = {}): {
   readonly surface: OmoNativeSurface
-  readonly install_id: string
+  readonly install_hash: string
+  readonly ci: boolean
 } {
   const env = input.env ?? process.env
   const surface: OmoNativeSurface = env["OMO_NATIVE_SURFACE"]?.trim() === "desktop" ? "desktop" : "cli"
   const envInstallId = env["OMO_NATIVE_INSTALL_ID"]?.trim() ?? ""
-  const install_id = INSTALL_ID_PATTERN.test(envInstallId)
+  const installId = INSTALL_ID_PATTERN.test(envInstallId)
     ? envInstallId
-    : readOrCreateInstallId(join(input.stateDir ?? getOmoNativeStateDir(env), INSTALL_ID_FILE_NAME))
-  return { surface, install_id }
+    : input.stateDir !== undefined
+      ? readOrCreateInstallId(join(input.stateDir, INSTALL_ID_FILE_NAME))
+      : resolveUserInstallId(env)
+  return {
+    surface,
+    install_hash: createHash("sha256").update(installId).digest("hex"),
+    ci: isCiEnv(env["CI"]),
+  }
+}
+
+function isCiEnv(value: string | undefined): boolean {
+  const normalized = value?.trim().toLowerCase() ?? ""
+  return normalized !== "" && normalized !== "0" && normalized !== "false"
 }
 
 /** Attach the shared attribution to a product config; the fixed identity keys still win downstream. */
@@ -167,6 +195,45 @@ function readOrCreateSalt(path: string): Buffer {
       return salt
     }
   }
+}
+
+/**
+ * One anonymous id per user, whatever agent home a process resolves (#10934). The id lives at the path OmO Desktop
+ * uses, `<user home>/.omo/agent/omo-senpi/omo-native/install-id`, so an agent-dir override (an orchestrator's
+ * isolated agent dir per run) or a pre-unification flat `~/.omo` layout no longer mints a new person. An id an older
+ * release wrote under the resolved agent home is adopted once into that path, so an existing install keeps its id.
+ */
+export function getOmoNativeInstallIdPath(env: TelemetryEnv = process.env): string {
+  return join(userHome(env), ".omo", "agent", "omo-senpi", "omo-native", INSTALL_ID_FILE_NAME)
+}
+
+function resolveUserInstallId(env: TelemetryEnv): string {
+  const canonical = getOmoNativeInstallIdPath(env)
+  // The legacy id is the one the user's own install wrote, so an orchestrator's agent-dir override is ignored here:
+  // otherwise its first post-upgrade run would mint the permanent id instead of adopting the real one.
+  const legacy = join(resolveAgentHome({ env: withoutAgentDirOverrides(env), homeDir: userHome(env) }), "omo-senpi", "omo-native", INSTALL_ID_FILE_NAME)
+  if (legacy === canonical) return readOrCreateInstallId(canonical)
+  const shared = readInstallId(canonical)
+  if (shared !== undefined) return shared
+  const adopted = readInstallId(legacy)
+  if (adopted === undefined) return readOrCreateInstallId(canonical)
+  try {
+    mkdirSync(dirname(canonical), { recursive: true })
+    writeFileSync(canonical, `${adopted}\n`, { flag: "wx", mode: 0o600 })
+  } catch {
+    // A concurrent writer (the Desktop, or another CLI process) may have created it first; its id wins below.
+  }
+  return readInstallId(canonical) ?? adopted
+}
+
+function withoutAgentDirOverrides(env: TelemetryEnv): TelemetryEnv {
+  const names: readonly string[] = AGENT_DIR_ENV_NAMES
+  return Object.fromEntries(Object.entries(env).filter(([name]) => !names.includes(name)))
+}
+
+function userHome(env: TelemetryEnv): string {
+  const fromEnv = (process.platform === "win32" ? env["USERPROFILE"] : env["HOME"])?.trim()
+  return fromEnv ? fromEnv : homedir()
 }
 
 function readOrCreateInstallId(path: string): string {

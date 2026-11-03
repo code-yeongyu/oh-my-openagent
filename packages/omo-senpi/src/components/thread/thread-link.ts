@@ -14,12 +14,14 @@ export function threadLinkUrl(threadId: string): string {
 
 /**
  * `[label](omo-thread://v1/<id>)`, ready to paste into a message. The label is a session name, which
- * users and peer agents set, so `\`, `[`, `]` (link syntax) and `<`, `>` (autolinks and raw HTML)
- * are escaped: no name can end the link early or render a second link inside it.
+ * users and peer agents set, so `\`, `[`, `]` (link syntax), `<`, `>` (autolinks and raw HTML), `&`
+ * (entities) and `` ` `` (code spans) are escaped: no name can end the link early, render a second link
+ * inside it, or pull it into a code span. Emphasis characters are left alone. Desktop's
+ * `formatThreadLink` escapes the same set.
  */
 export function threadLink(threadId: string, label: string | null | undefined): string {
   const text = label?.replace(/\s+/g, " ").trim() || FALLBACK_LABEL
-  return `[${text.replace(/[\\[\]<>]/g, (char) => `\\${char}`)}](${threadLinkUrl(threadId)})`
+  return `[${text.replace(/[\\[\]<>&`]/g, (char) => `\\${char}`)}](${threadLinkUrl(threadId)})`
 }
 
 /** The thread id a link names, or null for anything that is not a v1 thread link. */

@@ -19,6 +19,11 @@ test("#given a session name shaped like an autolink or raw HTML #when the markdo
   expect(threadLink("t1", "see <a href=\"https://evil.example\">here</a>")).toBe("[see \\<a href=\"https://evil.example\"\\>here\\</a\\>](omo-thread://v1/t1)")
 })
 
+test("#given a session name with an entity or a backtick #when the markdown link is built #then & and ` are escaped so the label displays as typed and cannot open a code span", () => {
+  expect(threadLink("t1", "&#x5D;(https://evil.example)")).toBe("[\\&#x5D;(https://evil.example)](omo-thread://v1/t1)")
+  expect(threadLink("t1", "a ` b")).toBe("[a \\` b](omo-thread://v1/t1)")
+})
+
 test("#given anything that is not a v1 thread link #when parsed #then it is null", () => {
   for (const url of ["https://example.com", "omo-thread://v2/t1", "omo-thread://v1/", "omo-thread://v1/a/b", "omo-thread://v1/%E0%A4%A", "omo-thread://v1/a?x", "omo-thread://v1/a#frag"]) {
     expect(parseThreadLinkUrl(url)).toBeNull()

@@ -5,7 +5,6 @@ import {
   formatStatusTarget,
   formatTargetWithModel,
   normalizeRendererText,
-  parseTeamMemberTaskIdentity,
   rendererVisibleWidth,
   selectLiveActivityVerb,
   taskIdentityLabel,
@@ -61,6 +60,7 @@ function recordStatusTarget(record: TaskRecord): string {
     category: record.category,
     agentType: record.agent_type,
     resolvedModel: record.resolved_model,
+    effectiveModel: record.effective_model,
     model: record.model,
     fallbackCount: record.fallback_attempts?.length,
   }) ?? "task"
@@ -84,18 +84,15 @@ export function formatTaskRow(record: TaskRecord): string {
   return parts.join(" ")
 }
 
-function selectWidgetRecords(records: readonly TaskRecord[], residentTaskIds: ReadonlySet<string>): TaskRecord[] {
-  const active = records.filter((record) => !isTerminal(record.status))
-  const completedResidentMembers = records.filter((record) =>
-    record.status === "completed"
-    && residentTaskIds.has(record.task_id)
-    && parseTeamMemberTaskIdentity(record) !== undefined,
-  )
-  return [...active, ...completedResidentMembers]
+// The live widget shows work that is still running or parked. A finished child leaves it even when
+// its handle stays resident (a team member waiting for mail): `/tasks` lists it and `task_send`
+// revives it, and a revived child is non-terminal again, so its row returns (#12159).
+function selectWidgetRecords(records: readonly TaskRecord[]): TaskRecord[] {
+  return records.filter((record) => !isTerminal(record.status))
 }
 
-export function buildWidgetRows(records: readonly TaskRecord[], residentTaskIds: ReadonlySet<string> = new Set()): string[] {
-  const selected = selectWidgetRecords(records, residentTaskIds)
+export function buildWidgetRows(records: readonly TaskRecord[]): string[] {
+  const selected = selectWidgetRecords(records)
   if (selected.length === 0) return []
   const shown = selected.slice(0, MAX_WIDGET_ROWS).map((record) => formatCompactTaskRow(record, WIDGET_LINE_MAX, true))
   const overflow = selected.length - MAX_WIDGET_ROWS
@@ -204,17 +201,14 @@ export function backgroundWidgetRows(
   now: number,
   liveStats?: (taskId: string) => TaskRunStats | undefined,
   maxWidth = LIVE_WIDGET_LINE_MAX,
-  residentTaskIds: ReadonlySet<string> = new Set(),
 ): string[] {
-  const selected = selectWidgetRecords(records, residentTaskIds)
+  const selected = selectWidgetRecords(records)
   if (selected.length === 0) return []
   const boundedWidth = Number.isFinite(maxWidth) && maxWidth > 0
     ? Math.min(LIVE_WIDGET_LINE_MAX, Math.floor(maxWidth))
     : LIVE_WIDGET_LINE_MAX
   const shown = selected.slice(0, MAX_WIDGET_ROWS).map((record) =>
-    record.status === "completed"
-      ? formatCompactTaskRow(record, boundedWidth, true)
-      : formatLiveBackgroundRow(record, activity.get(record.task_id), now, boundedWidth, liveStats?.(record.task_id)),
+    formatLiveBackgroundRow(record, activity.get(record.task_id), now, boundedWidth, liveStats?.(record.task_id)),
   )
   const overflow = selected.length - MAX_WIDGET_ROWS
   if (overflow > 0) shown.push(`+${overflow} more`)

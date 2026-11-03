@@ -18,6 +18,14 @@ mod selftest;
 mod serve;
 mod settle;
 mod stop_path;
+#[cfg(any(test, target_os = "macos"))]
+mod sessions;
+#[cfg(target_os = "macos")]
+mod xpc;
+#[cfg(target_os = "macos")]
+mod stop_latch;
+#[cfg(all(test, target_os = "macos"))]
+mod xpc_test_harness;
 
 use clap::Parser;
 use std::process::ExitCode;
@@ -29,14 +37,45 @@ use crate::engine::Engine;
 
 const USAGE_ERROR: u8 = 2;
 
+#[cfg(test)]
+#[path = "sessions/tests.rs"]
+mod xpc_tests;
+
 fn main() -> ExitCode {
+    // This exact, opt-in transport alone uses message authentication instead
+    // of inherited responsibility. Clap rejects all combinations with old modes.
+    if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("--xpc-agent")) {
+        return match Cli::parse().mode() {
+            Mode::XpcAgent { name } => run_xpc(&name),
+            _ => fail("invalid XPC agent mode"),
+        };
+    }
+    // The #10207 gate runs before every mode, the private overlay helper included.
+    if let Err(refusal) = check_launch() {
+        return fail(&refusal);
+    }
     // The private helper must own the main thread before Tokio or a session
     // starts. It is not a desktop RPC method and creates no input backend.
     if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("--cursor-overlay")) {
         return cursor_overlay();
     }
+    // The private release helper (#11466): an input request's copy of this
+    // engine that releases its held input if the engine dies.
+    if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("--release-helper")) {
+        return release_helper();
+    }
+    // The private keyboard-layout helper (#11466): reads the current layout on
+    // its main thread for typing into a remote screen.
+    if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("--keymap-helper")) {
+        return keymap_helper();
+    }
     match Cli::parse().mode() {
+        Mode::XpcAgent { .. } => fail("--xpc-agent must be the first argument"),
         Mode::Schema => print_schema(),
+        Mode::DaemonDisabled { flag } => {
+            eprintln!("senpi-desktop-engine: {flag} is off by default; pass --enable-daemon to use it");
+            ExitCode::from(USAGE_ERROR)
+        }
         Mode::Oneshot { endpoint, serve_args } => match endpoint.map_or_else(client::default_endpoint, Ok) {
             Ok(endpoint) => {
                 match oneshot::run(|request| client::exchange_or_start(&endpoint, &serve_args, request)) {
@@ -98,6 +137,29 @@ fn main() -> ExitCode {
 }
 
 #[cfg(target_os = "macos")]
+fn run_xpc(name: &str) -> ExitCode {
+    block_on(xpc::run(name))
+}
+
+#[cfg(not(target_os = "macos"))]
+fn run_xpc(_: &str) -> ExitCode {
+    fail("XPC agent mode requires macOS 13 or newer")
+}
+
+#[cfg(target_os = "macos")]
+fn check_launch() -> Result<(), String> {
+    senpi_desktop_backend_macos::check_launch().map_err(|refusal| {
+        eprintln!("{}", refusal.record());
+        refusal.to_string()
+    })
+}
+
+#[cfg(not(target_os = "macos"))]
+const fn check_launch() -> Result<(), String> {
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
 fn cursor_overlay() -> ExitCode {
     match senpi_desktop_backend_macos::run_cursor_overlay() {
         Ok(()) => ExitCode::SUCCESS,
@@ -108,6 +170,35 @@ fn cursor_overlay() -> ExitCode {
 #[cfg(not(target_os = "macos"))]
 fn cursor_overlay() -> ExitCode {
     fail("cursor overlay is unavailable on this platform")
+}
+
+#[cfg(target_os = "macos")]
+fn release_helper() -> ExitCode {
+    match senpi_desktop_backend_macos::run_release_helper() {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => fail(&format!("release helper: {error}")),
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn release_helper() -> ExitCode {
+    fail("the input release helper is unavailable on this platform")
+}
+
+#[cfg(target_os = "macos")]
+fn keymap_helper() -> ExitCode {
+    let Some(path) = std::env::args_os().nth(2) else {
+        return ExitCode::from(64);
+    };
+    match senpi_desktop_backend_macos::run_keymap_helper(std::path::Path::new(&path)) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(status) => ExitCode::from(u8::try_from(status).unwrap_or(1)),
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn keymap_helper() -> ExitCode {
+    fail("the keyboard layout helper is unavailable on this platform")
 }
 
 fn print_schema() -> ExitCode {

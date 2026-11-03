@@ -163,11 +163,7 @@ export function GraphHero({ className }: { readonly className?: string }) {
         tabIndex={0}
         role="region"
         aria-label={t("title")}
-        className="absolute inset-0 outline-offset-2 focus-visible:outline-2 focus-visible:outline-[var(--accent-32)]"
-        style={{
-          opacity: state === "live" ? 1 : 0,
-          transition: "opacity 400ms var(--ease-standard)",
-        }}
+        className="focus-ring-inset absolute inset-0"
         onPointerDown={interact}
         onPointerMove={interact}
         onKeyDown={(event) => {
@@ -180,18 +176,27 @@ export function GraphHero({ className }: { readonly className?: string }) {
           if (event.key === "Enter") setFocusRequest((value) => value + 1)
         }}
       >
-        {(state === "mounting" || state === "live") && (
-          <SceneBoundary onFailure={() => setState("fallback")}>
-            <GraphScene
-              mobile={mobile}
-              active={visible && tabVisible && !resting}
-              rotation={rotation}
-              focusRequest={focusRequest}
-              onReady={() => setState("live")}
-              onFailure={() => setState("fallback")}
-            />
-          </SceneBoundary>
-        )}
+        {/* The fade lives on this wrapper, not the focus region, so the region's ring stays visible in poster state. */}
+        <div
+          className="absolute inset-0"
+          style={{
+            opacity: state === "live" ? 1 : 0,
+            transition: "opacity 400ms var(--ease-standard)",
+          }}
+        >
+          {(state === "mounting" || state === "live") && (
+            <SceneBoundary onFailure={() => setState("fallback")}>
+              <GraphScene
+                mobile={mobile}
+                active={visible && tabVisible && !resting}
+                rotation={rotation}
+                focusRequest={focusRequest}
+                onReady={() => setState("live")}
+                onFailure={() => setState("fallback")}
+              />
+            </SceneBoundary>
+          )}
+        </div>
       </div>
     </div>
   )

@@ -148,6 +148,7 @@ export function classifyRuntimeFallbackError(error: unknown): RuntimeFallbackErr
     /billing.?(?:hard.?)?limit/i.test(message) ||
     /exhausted\s+your\s+capacity/i.test(message) ||
     /resource.?exhausted/i.test(message) ||
+    /\bcapacity_limit\b/i.test(message) ||
     /out\s+of\s+credits?/i.test(message) ||
     /payment.?required/i.test(message) ||
     /usage\s+limit/i.test(message) ||

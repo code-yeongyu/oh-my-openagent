@@ -1,3 +1,136 @@
+## 2026-11-02 - A child runs only on its designated models; the parent-model rung is gone (#12006, #11781)
+
+`withParentModelRung` (#10750) and the workflow node copy of it (#10783/#11439) are deleted, with `parent_model`, `parent_model_fallback`, `DagRunRecordV1.parentModel`, the `model_note:` line and the `parent-model:` status token. The runtime and start-time walks only ever hop along the record's own `fallback_models`. Each hop appends a `model_refusals` entry (model, reason, first error line, reset); when a recognized refusal ends the chain the task fails with `failure_kind: "model_chain_exhausted"` and lists them (`manager/model-refusals.ts`). Records and runs persisted with the removed fields load unchanged and ignore them.
+
+Every runner now hands the child the same pinned fallback policy (`runners/designated-fallback-profile.ts`): the child's chain keyed by its model, plus an empty chain (senpi's tombstone) for every designated model's base. A one-model child gets `modelFallback: false`. The process runner sends it as `set_retry_fallback` and the host runner as `open_session.retryFallback` for every child with a model, not only for children with fallback models. Before this, a one-model child on those runners kept the user's `retry.fallbackChains` and senpi's shipped chains, and on every runner a chain whose last rung has a shipped default (`claude-opus-5-5` -> `claude-opus-5:max`) walked on past its last rung.
+
+## 2026-10-30 - Rotate configured category and agent model chains (#11905)
+
+Resolve round-robin chains from their reserved starting entry, preserve tuning and availability checks, and carry the remaining ordered models into runtime fallback. Keep omitted and sequential policies unchanged.
+
+## 2026-10-29 - Confirm a host-session child's end before recording a cancel (#11783)
+
+A cancel of a daemon-hosted child this process holds no handle for is written durably, then cancelled only after `endHostSessionChild` confirms the end: a close the host answered, or the three-part proof that the generation the record names is gone (serving listing without the path, no handover-parked entry, a second listing). The pending-cancel finish and the TTL sweep no longer read "not listed on the recorded socket" as ended. A retry driver re-drives an unconfirmed cancel on the deferred backoff with explicit exits, all entrants share one in-flight pass per task, and a handle's end counts only when its port's close was answered (`HostSessionPort.close(): Promise<boolean>`).
+
+## 2026-10-25 - Record child session spawn ancestry (#11298)
+
+Thread parent, root, and task identity through child-session creation and
+respawn paths. `runners/engine-spawned-by.ts` holds the minimum engine
+(`2026.10.24-4`, senpi#4205) and compares versions field by field. The
+standalone `--spawned-by` argument follows the version of the engine actually
+launched (`resolveSenpiLaunchTarget`: the running engine for the compiled engine
+and the rpc-entry fallback, the launched package manifest for SENPI_BIN, sibling,
+PATH and Windows shim targets), and the host path drops `open_session.spawnedBy`
+unless the host's `get_protocol_info.engineVersion` meets the same minimum. An
+absent or unparseable version sends nothing.
+
+## 2026-10-27 - Workflow category nodes keep the parent model as their last rung (#11439)
+
+A DAG run records the parent session's model at start (`DagRunRecordV1.parentModel`), and scheduler admission, node retry and crash/resume recovery pass it as `parent_model`, so `withParentModelRung` adds the same last rung a task child gets (#10750). Runs persisted before this change behave as before.
+
+## 2026-10-27 - A queued steer reaches the child under its own id; a lost acknowledgment is read before any resend (desktop #2838 step 4) (#11427)
+
+`drainPending` sends each `pending_steering` entry with `{ clientMessageId: entry.id }`, and every handle
+layer (`ManagedChildHandle` and both adapters, the in-process handle, both RPC runners, `input-delivery`)
+passes that identity to the engine; `input-effects` sends a caller's own id as it is and mints one only when
+none is given. A drain repeated after a lost acknowledgment or a parent restart therefore replays the same id
+on the child instead of delivering a second copy.
+
+An unacknowledged input is resolved through the child's `get_pending_inputs` read (senpi#3549) before
+anything is sent again: `admitted` settles it, `not_admitted` resends the same id, a failed read keeps it
+uncertain. An earlier run's uncertain input is still never sent into a later run, but it now fails as
+`superseded_by_new_run` only when the read says it was not admitted; admitted settles it and a failed read
+keeps it uncertain. The run an uncertain input was sent in is stored on it (`run_epoch`), since a queue
+entry's id carries no epoch. A child that cannot answer the read keeps the previous same-id resend.
+
+Not in this change: TTL/terminal retention of queued entries (T45/T46) and the engine's custody receipt on
+`steer`/`prompt` answers (senpi#4383).
+
+An error answer other than an unknown command, and an id the child leaves out of its answer, both count as unreadable, so nothing is sent on them.
+
+## 2026-10-26 - Keep parent Resume independent of a failed child restore (#11401)
+
+The run controller records resume-effect failures for acknowledged participants as well as participants already outside custody. A persisted acknowledgement supplies the retry cutoff when the failed child's engine is unavailable. A newer Stop still supersedes the failed old Resume.
+
+## 2026-10-25 - Keep unresponsive sessions owned until confirmed closed (#11317)
+
+Add deterministic stalled-host coverage, authoritative post-close absence checks, bounded heartbeat backoff, same-session steering recovery, and session liveness status observations. Keep probes active during streaming and release turn waiters on every exit.
+
+## 2026-10-23 - Report refused starts before teardown (#10402)
+
+First-prompt refusals settle the launch without waiting for child termination and
+disposal. Both RPC runners retain detached cleanup until it finishes, and the
+manager includes that cleanup in its existing shutdown deadline. Failed process
+resumes still await cleanup before permitting a retry against the same session.
+The `started` result with `starting: true` keeps its existing contract.
+
+## 2026-10-19 - Retry infrastructure-failed DAG nodes before cascading skips (#10605)
+
+The shared DAG scheduler retries an infrastructure-failed node at most twice, with
+1 s and 2 s backoff. Both automatic and manual retries use the node-retry journal
+reset, including its execution-owner fingerprint bump and descendant restoration.
+The automatic attempt count and delay are journaled on `dag.node.retried`; a node
+diagnostic reports `retried after infra failure (n/2)`. A fresh scheduler restores
+the count and any outstanding backoff from those events.
+
+Classification uses typed task failure fields: `child-unresponsive`,
+`host_unavailable`, `suspended_unresumable`, and `session_unavailable` with
+`host_draining` or `host_memory_pressure`. Untyped transport losses retain their
+existing behavior. Task failures, user-cancelled tasks, and pending cancellation
+requests are not retried. After exhaustion the existing quiescent cascade skips
+only descendants of the failed node; independent branches continue.
+
+The scheduler is split by admission, task attachment, projection, cancellation,
+frontier execution, and shared context to keep each touched source file below
+250 pure LOC. Scheduler tests cover the seven-root/54-dependent incident,
+exhaustion, misleading task error text, cancellation, typed host refusal, and
+budget/backoff restoration across scheduler re-entry. Manual retry after
+exhaustion still accepts a prompt override, journals the amendment before the
+retry, and rejects already-completed work before applying an amendment.
+
+## 2026-10-18 - A quit-suspended child records why it is still running (senpi#3493)
+
+Quitting the owning session parks every live child - resident RPC handles park `rpc_detached`,
+pending children park `persisted_only` - but the record keeps `status: running` by design (a
+later session can still revive it). Nothing recorded WHY it was parked, so a status check after a
+restart that never resumed that session showed a running task nothing would move, and no surface
+could explain it.
+
+`lifecycle/shutdown.ts` now stamps `suspension_reason: "session_quit"` when - and only when - the
+shutdown reason is `quit`: once per parked handle and once per parked pending record. Other
+reasons keep today's behavior: a `reload` parks the same way and the new generation revives
+through reconcile (a marker would misdescribe a suspension that resolves itself), and the
+dispose opt-out ends the run outright.
+
+`state/types.ts` adds the reason to `SuspensionReason`; `state/recovery-presentation.ts` maps it
+to "session quit", so `task_output` renders the existing "resuming (session quit)" phrase instead
+of the bare raw token. `lifecycle/host-session-record.ts` `markRevivalDeferred` now supersedes a
+stale `session_quit` marker with the deferral's own reason: the resume feeding that deferral IS
+the revival the marker was waiting for, so keeping it would promise a resume that already
+happened (the same reasoning as omo#9498).
+
+Keep the stamping on the quit path only, and keep the supersession narrow to `session_quit`: a
+more specific recorded reason (a parked host, a draining generation) still wins, and
+`clearSuspensionReason`/TTL behavior is untouched.
+
+`host-session-teardown.test.ts` pins the quit marker on both park paths and the absence of a
+marker on a `reload` shutdown; `snapshot-suspension.test.ts` pins the phrase;
+`reconcile-revival.test.ts` pins the supersession; `parked-recovery.test.ts` still pins the
+auto-resume after a parent restart - now with the marker present, the resume is unchanged.
+
+## 2026-10-16 - Argon (high) ahead of the previous pro rung in plan-reviewer (#10180)
+
+- `agents/builtin/fallback-chains.ts` (mirrored from `model-core/src/agent-model-requirements.ts`, where `oracle` and `momus` get the same rung): a `{google, google-vertex, opencode}/gemini-4-argon` rung at `high` goes directly before the `gemini-3.1-pro` rung of `plan-reviewer`. The previous rung stays for Copilot (off the Argon rung until code-yeongyu/senpi#3379) and for engine pins without the Argon row. The GPT heads are unchanged: a blind eval put Argon ahead of the previous pro model in 16/16 judgments but behind the GPT heads on correctness, with a median latency of 57 s vs 15 s.
+- `agents/builtin/argon-plan-reviewer.test.ts` resolves the chain against Google, Vertex, pre-Argon and Copilot-only registries.
+- `omo-senpi` telemetry vocabulary gains `qwen3.7-plus` on `opencode-go` and `bailian-coding-plan`, the one agent-chain rung that exported as `custom`; `telemetry/agent-chain-vocabulary.test.ts` now covers every agent-chain rung the way `product-identity.test.ts` covers the category chains.
+
+## 2026-10-15 - Argon (low) leads visual-engineering and writing (#10187)
+
+- `category/fallback-chains.ts`, `model-core/src/category-model-requirements.ts`: a `{google, google-vertex, opencode}/gemini-4-argon` rung at `low` (the catalog maps `off`/`minimal` to null for this model) is prepended to both chains; every existing rung keeps its order. Copilot is left off the rung until code-yeongyu/senpi#3379 verifies its thinking control. `category/google-categories.ts` / `kimi-categories.ts` (and the omo-opencode mirrors) move both defaults to `google/gemini-4-argon` at `low`.
+- Stacking: the pinned engine (2026.10.15 after #10183; 2026.10.13 before) carries no google `gemini-4-argon` catalog row yet (the release predates code-yeongyu/senpi#3293), so on Senpi the rung is unresolvable and both categories resolve to the previous head until a pin adopts #3293 (plus #3382, #3384). The OpenCode edition reads OpenCode's own provider list and resolves Argon as soon as Google is connected. `category/argon-tier1.test.ts` runs the real pinned catalog and asserts whichever branch applies, and asserts the primary hit on a registry that serves the model.
+- `omo-senpi` telemetry vocabulary lists `gemini-4-argon` on google, google-vertex, github-copilot and opencode so the rung never exports as `custom`; `category_config` depth suffixes for the two categories shift by one until adoption (the previous head is now rung two).
+- `omo-opencode/src/generated/model-capabilities.generated.json` gains the models.dev `gemini-4-argon` entry only (the snapshot-backed guard requires every chain model).
+
 ## 2026-10-14 - A terminal provider error ends the task even when agent_idle never arrives (#3262)
 
 A turn that ended on a terminal provider error (a stream-start timeout, a permanent 4xx, an

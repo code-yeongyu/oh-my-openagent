@@ -18,8 +18,8 @@ async function letGoOfRejected(handle: ManagedChildHandle): Promise<void> {
 
 /**
  * Bind a freshly respawned handle back onto its record: verify this host still holds the claim,
- * refuse a task that already has a live handle, then either refresh a terminal record's launch
- * facts or open a NEW run epoch for a continuing one. Every failure path tears the handle down, so
+ * refuse a task that already has a live handle, then refresh a terminal or paused record's launch
+ * facts or open a NEW run epoch for an ordinary continuing one. Every failure path tears the handle down, so
  * a rejected reattach never leaves a child nobody owns.
  */
 export async function reattachManagedTask(input: {
@@ -37,7 +37,7 @@ export async function reattachManagedTask(input: {
   // answered) and idle: the new run is stamped "resumed, waiting for input" (senpi#3266).
   readonly awaitingInput?: { readonly reason: AwaitingInputReason }
 }): Promise<ReattachResult> {
-  const fresh = input.store.load(input.record.task_id)
+  let fresh = input.store.load(input.record.task_id)
   if (fresh?.host_pid !== input.hostPid || fresh.residency_state !== "resident" || fresh.killed === true) {
     await letGoOfRejected(input.handle)
     return { ok: false, kind: "failed", reason: "task ownership claim is not held by this host" }
@@ -64,9 +64,12 @@ export async function reattachManagedTask(input: {
   try {
     unsubscribe = input.attachLive(fresh, input.handle)
     attached = true
-    if (isTerminalRecord(fresh)) {
-      // The result stays, but the child now lives behind THIS handle: a daemon session reopened on a
-      // newer generation answers under a new instance and routing id, so its identity is restamped.
+    const reconciled = input.store.load(fresh.task_id)
+    if (reconciled !== null) fresh = reconciled
+    if (isTerminalRecord(fresh) || fresh.status === "paused") {
+      // Binding a paused child only restores control. Run Resume owns its next
+      // turn and subscription; observing the aborted old turn here would end it.
+      // A daemon reopened on a newer generation also needs its identity restamped.
       const identity = childIdentityOf(input.handle)
       const sessionId = input.handle.sessionId
       const childSession = sessionId === undefined || sessionId.length === 0 ? {} : { child_session_id: sessionId }
@@ -78,6 +81,7 @@ export async function reattachManagedTask(input: {
     const {
       error_message: _error,
       failure_kind: _failureKind,
+      interrupt_cause: _interruptCause,
       failure_reason: _failureReason,
       final_response: _final,
       killed: _killed,

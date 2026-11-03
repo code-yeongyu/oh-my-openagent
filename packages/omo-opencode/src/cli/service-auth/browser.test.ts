@@ -19,7 +19,7 @@ test.each(["darwin", "win32", "linux"] as const)("browser child on %s receives n
 
 test("auth commands expose device, no-browser, and service overrides", () => {
   const program = new Command()
-  configureServiceAuthCommands(program)
+  configureServiceAuthCommands(program, true)
   expect(program.commands.map(command => command.name())).toEqual(["login", "logout", "whoami"])
   const login = program.commands.find(command => command.name() === "login")
   expect(login?.options.map(option => option.long)).toEqual(["--device", "--no-browser", "--api", "--accounts"])

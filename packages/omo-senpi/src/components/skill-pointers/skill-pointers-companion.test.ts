@@ -28,7 +28,7 @@ describe("omo-senpi skill-pointers companion", () => {
       expect(companion).toContain('load_skills: ["ultimate-browsing"]')
     })
 
-    it("#when the prompt is a raw /skill:ulw-research command #then only the companion is injected", async () => {
+    it("#when the prompt is a raw /skill:ulw-research command #then the research mode block binds with its companions (#10822)", async () => {
       // given
       const pi = new FakeExtensionAPI()
       await registerSkillPointers(pi)
@@ -37,7 +37,7 @@ describe("omo-senpi skill-pointers companion", () => {
       const result = await dispatchInput(pi, "/skill:ulw-research the gateway options")
 
       // then
-      expectPointerInjections(pi, result, [BROWSER, COMPANION])
+      expectPointerInjections(pi, result, [{ ...RESEARCH, mode: true }, BROWSER, COMPANION])
     })
 
     it("#when the prompt carries an expanded ulw-research block #then only the companion is injected", async () => {
@@ -78,15 +78,15 @@ describe("omo-senpi skill-pointers companion", () => {
       await registerSkillPointers(pi)
 
       // when
-      const result = await dispatchInput(pi, "ulw research the gateway options", "interactive", "followUp")
+      const result = await dispatchInput(pi, "use ulw research to compare the gateway options", "interactive", "followUp")
 
       // then
       expect(pi.messages).toHaveLength(0)
       if (result.action !== "transform") {
         throw new Error("expected the queued prompt to be transformed")
       }
-      expect(result.text.startsWith("ulw research the gateway options\n")).toBe(true)
-      expect(result.text.indexOf("<omo-ulw-research-pointer>")).toBeLessThan(result.text.indexOf("<omo-browser-pointer>"))
+      expect(result.text.startsWith("use ulw research to compare the gateway options\n")).toBe(true)
+      expect(result.text.indexOf("<omo-ulw-research-mode>")).toBeLessThan(result.text.indexOf("<omo-browser-pointer>"))
       expect(result.text.indexOf("<omo-browser-pointer>")).toBeLessThan(result.text.indexOf("<omo-ultimate-browsing-pointer>"))
       expect(result.text).toContain("browser/SKILL.md")
       expect(result.text).toContain("ultimate-browsing/SKILL.md")

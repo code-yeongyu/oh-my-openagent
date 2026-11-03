@@ -30,7 +30,7 @@ const FULL_CHAIN_MODELS: readonly FakeModel[] = [
 ]
 
 describe("unspecified-low chain order", () => {
-  test("#given every rung of the chain is served at once #when unspecified-low resolves #then the claude-sonnet-5-5 medium head rung wins", () => {
+  test("#given every rung of the chain is served at once #when unspecified-low resolves #then the claude-sonnet-5-5 high head rung wins", () => {
     // given / when
     const result = resolveCategory("unspecified-low", {}, registry(FULL_CHAIN_MODELS))
 
@@ -40,7 +40,7 @@ describe("unspecified-low chain order", () => {
     expect(result.spec).toMatchObject({
       provider: "anthropic",
       modelId: "claude-sonnet-5-5",
-      variant: "medium",
+      variant: "high",
     })
   })
 
@@ -61,7 +61,7 @@ describe("unspecified-low chain order", () => {
     })
   })
 
-  test("#given the sonnet-5-5 and mimo-v2.6-pro rungs are absent but every later rung is served #when unspecified-low resolves #then the grok-4.7 xhigh rung wins", () => {
+  test("#given the sonnet-5-5 and mimo-v2.6-pro rungs are absent but every later rung is served #when unspecified-low resolves #then the grok-4.7 high rung wins", () => {
     // given
     const models = FULL_CHAIN_MODELS.filter((model) => model.id !== "claude-sonnet-5-5" && model.id !== "mimo-v2.6-pro")
 
@@ -74,7 +74,7 @@ describe("unspecified-low chain order", () => {
     expect(result.spec).toMatchObject({
       provider: "xai",
       modelId: "grok-4.7",
-      variant: "xhigh",
+      variant: "high",
     })
   })
 
@@ -84,5 +84,23 @@ describe("unspecified-low chain order", () => {
 
     // then: grok-4.6 left the chain entirely, so its sole presence must not resolve the category
     expect(result.kind).toBe("model_unavailable")
+  })
+
+  test("#given only Claude, ChatGPT and Z.ai are connected and the sonnet-5-5 head is absent #when unspecified-low resolves #then the glm-5.3 high rung wins ahead of GPT", () => {
+    // given: the reported setup (#10306) with Sonnet 5.5 unavailable, so neither mimo nor grok can resolve
+    const models: readonly FakeModel[] = [
+      { provider: "zai", id: "glm-5.3" },
+      { provider: "chatgpt-subscription", id: "gpt-6.1-sol" },
+      { provider: "chatgpt-subscription", id: "gpt-5.6-sol" },
+      { provider: "anthropic-subscription", id: "claude-sonnet-5" },
+    ]
+
+    // when
+    const result = resolveCategory("unspecified-low", {}, registry(models))
+
+    // then
+    expect(result.kind).toBe("resolved")
+    if (result.kind !== "resolved") throw new Error("Expected unspecified-low to resolve")
+    expect(result.spec).toMatchObject({ provider: "zai", modelId: "glm-5.3", variant: "high" })
   })
 })

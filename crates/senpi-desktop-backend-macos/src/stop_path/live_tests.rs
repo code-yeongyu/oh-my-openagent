@@ -73,8 +73,23 @@ fn post(events: &[CGEvent]) {
 }
 
 #[test]
+#[ignore = "live: waits for a person (or a USB HID device such as a KVM) to press the chord"]
+fn a_physical_hotkey_latches_the_supervisor() {
+    // Given: a live tap
+    let supervisor = supervisor();
+    let listener = started(&supervisor);
+    println!("READY: press Control+Option+Command+Escape on a physical keyboard");
+    // When: the chord arrives from hardware (source pid 0)
+    wait_for(shared(&listener), |control| control.stops > 0);
+    // Then
+    let after = supervisor.status();
+    println!("suspended={} stopped_by={:?}", after.suspended, after.stopped_by);
+    assert!(after.suspended);
+}
+
+#[test]
 #[ignore = "live: posts the kill-switch chord; needs Accessibility for the launcher"]
-fn synthetic_hotkey_latches_supervisor() {
+fn a_posted_hotkey_never_latches_the_supervisor() {
     // Given: a live tap
     let supervisor = supervisor();
     let listener = started(&supervisor);
@@ -87,20 +102,25 @@ fn synthetic_hotkey_latches_supervisor() {
     );
     assert!(before.global_live && !before.suspended);
     let chord = default_chord_events();
-    // When
+    // When: this process posts the chord, as an agent or another app could
     let posted = Instant::now();
     post(&chord);
-    wait_for(shared(&listener), |control| control.stops > 0);
+    // The tap saw the key-down (so the check below is not vacuous) and
+    // ignored it, because a process posted it.
+    wait_for(shared(&listener), |control| control.hooks.posted_ignored > 0);
     let elapsed = posted.elapsed();
     // Then
     let after = supervisor.status();
+    let stops = shared(&listener).control.lock().stops;
     println!(
-        "suspended={} stopped_by={:?} elapsed_ms={}",
+        "posted_ignored_after_ms={} suspended={} stops={stops} globalLive={}",
+        elapsed.as_millis(),
         after.suspended,
-        after.stopped_by,
-        elapsed.as_millis()
+        after.global_live
     );
-    assert!(after.suspended);
+    assert!(!after.suspended, "a posted chord stopped input");
+    assert_eq!(stops, 0);
+    assert!(after.global_live, "the tap must stay armed");
     assert!(elapsed <= STOP_LATENCY);
 }
 

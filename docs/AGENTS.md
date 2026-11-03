@@ -37,6 +37,7 @@
 | Shared core multi-PR extraction QA | [docs/reference/shared-core-multi-pr.md](reference/shared-core-multi-pr.md) |
 | Re-export shim inventory | [docs/reference/re-export-shim-inventory.md](reference/re-export-shim-inventory.md) |
 | Release process | [docs/reference/release-process.md](reference/release-process.md) |
+| Changelog fragments (per-PR `changes/unreleased/<n>.md`, migration, batches) | [docs/reference/changelog-fragments.md](reference/changelog-fragments.md) |
 | GitHub PR evidence attachments | [docs/reference/github-attachment-upload.md](reference/github-attachment-upload.md) |
 | Claiming the lazycodex npm name | [docs/reference/lazycodex-npm-reservation.md](reference/lazycodex-npm-reservation.md) |
 | Rules-injector cross-module comparison | [docs/reference/rules-injection-cross-module-comparison.md](reference/rules-injection-cross-module-comparison.md) |
@@ -71,7 +72,7 @@ docs/
 
 ## CONVENTIONS
 
-- **CI matrix label:** adding `ci:full-matrix` launches a separate run with optional `full-matrix / ...` checks that do not gate merge. Keep the label and push a commit or reopen the PR to run the full matrix in the required checks.
+- **CI matrix label:** adding `run-full-ci` or `ci:full-matrix` launches a separate run with optional `full-matrix / ...` checks that do not gate merge. Keep the label and push a commit or reopen the PR to run the full matrix in the required checks.
 - **User-facing language only in `guide/` and `reference/`.** No `OmO` internal jargon without explanation.
 - **Path links** use the `file://` scheme so OpenCode renders them in TUI. Use absolute paths.
 - **No HTML.** Markdown only. No `<details>` / `<summary>` (causes rendering issues in some terminals).

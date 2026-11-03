@@ -112,11 +112,12 @@ describe("parked recovery contract (#9861)", () => {
     expect(f.messages).toHaveLength(1)
   })
 
-  test("a shutdown park without a reason resumes automatically after parent restart", async () => {
+  test("a quit shutdown park is marked session_quit and resumes automatically after parent restart", async () => {
     const f = fixture()
     const id = await f.start()
     await f.lifecycle.suspendOnSessionShutdown({ parentSessionId: "parent-1", reason: "quit" })
-    expect(f.store.load(id)?.suspension_reason).toBeUndefined()
+    // senpi#3493: the park records WHY the row still says running; the auto-resume below must not change.
+    expect(f.store.load(id)?.suspension_reason).toBe("session_quit")
     expect(f.manager.concurrency?.leaseState(id, 0)).not.toBe("held")
     f.restart()
     f.state.revivable = true
@@ -146,7 +147,7 @@ describe("parked recovery contract (#9861)", () => {
       f.advance(295_000)
       await ended
       expect(f.store.load(id)?.status).toBe("error")
-      expect(f.store.load(id)?.error_message).toContain(reason)
+      expect(f.recordedEvents.find((event) => event.type === "suspended_unresumable")?.payload).toMatchObject({ cause: reason })
       expect(f.store.load(id)?.fallback_closing_child?.requires_confirmation).toBe(true)
       expect(f.messages).toHaveLength(1)
       expect(f.recordedEvents.find((event) => event.type === "suspended_unresumable")?.payload).toMatchObject({ confirmed_stop: false })
@@ -163,7 +164,7 @@ describe("parked recovery contract (#9861)", () => {
       f.park(id)
       await ended
       expect(f.store.load(id)?.status).toBe("error")
-      expect(f.store.load(id)?.error_message).toContain(reason)
+      expect(f.recordedEvents.find((event) => event.type === "suspended_unresumable")?.payload).toMatchObject({ cause: reason })
       expect(f.messages).toHaveLength(1)
       expect(f.state.respawns).toBe(1)
     })

@@ -105,6 +105,25 @@ describe("TaskManager outcome guards", () => {
     expect(record?.final_response).toBeUndefined()
   })
 
+  test("#given a running child aborted by another client #when the runner settles interrupted with the partial text #then the record ends interrupted with no failure", async () => {
+    // given
+    const { manager, store, inProcess } = makeManager({})
+    const started = await manager.start(baseSpec())
+    if (started.kind !== "started") throw new Error("expected started")
+    const taskId = started.task_id
+
+    // when - a foreign user abort: agent_end { aborted: true, abortSource: "user" } with no local abort
+    inProcess.handles.get(taskId)?.settle({ status: "interrupted", finalResponse: "partial work before the abort" })
+    await flush()
+
+    // then
+    const record = store.load(taskId)
+    expect(record?.status).toBe("interrupted")
+    expect(record?.final_response).toBe("partial work before the abort")
+    expect(record?.error_message).toBeUndefined()
+    expect(await manager.waitFor(taskId)).toMatchObject({ status: "interrupted" })
+  })
+
   test("#given a running child #when its outcome settles in the gap after forget but before persist_only lands #then the record is still untouched", async () => {
     // given
     const { manager, store, inProcess } = makeManager({})

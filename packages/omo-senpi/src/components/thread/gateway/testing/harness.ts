@@ -86,13 +86,13 @@ export function createGatewayHarness(options: { readonly startAt?: number } = {}
       cwd: session.cwd,
       created_at: new Date(0).toISOString(),
       updated_at: new Date(0).toISOString(),
-      endpoint: { kind: "tui" as const, socket: `fake:${session.id}`, routing_id: null },
+      endpoint: { kind: "tui" as const, socket: `fake:${session.id}`, routing_id: null, durable_session_id: session.id },
       liveness: session.online ? ("routable" as const) : ("dead" as const),
     }))]
   }
 
   function engineFor(target: GatewayStore, cwd: string = agentDir): GatewayEngine {
-    return createGatewayEngine({ store: target, endpoints, resolve: resolveFromEntries(entries, () => cwd), now })
+    return createGatewayEngine({ store: target, endpoints, resolve: resolveFromEntries(entries, () => cwd), now, senderProvenance: async () => ({ workspace: "unclassified", project: "fixture" }) })
   }
 
   const endpoints: GatewayEndpointPort = {

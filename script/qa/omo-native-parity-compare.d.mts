@@ -20,3 +20,4 @@ export function compareLines(label: string, binaryLines: readonly string[], npmL
 export const BINARY_ONLY_REQUIRED_STEPS: readonly string[]
 export function binaryOnlyFailures(label: string, run: ParityRun): string[]
 export function compareRuns(binary: ParityRun, npm: ParityRun): string[]
+export function memoryReceiptFailures(side: string, run: ParityRun): string[]

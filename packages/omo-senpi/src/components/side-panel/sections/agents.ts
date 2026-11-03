@@ -12,7 +12,7 @@ const GLYPH: Record<PanelChildStatus, string> = {
   ending: "‖",
   finished: "✓",
   failed: "✗",
-  cancelled: "—",
+  cancelled: "-",
 }
 
 const COLOR: Record<PanelChildStatus, PanelRow["color"]> = {

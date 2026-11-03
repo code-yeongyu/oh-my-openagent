@@ -5,6 +5,7 @@ import { run } from "./run"
 import { getLocalVersion } from "./get-local-version"
 import { doctor, resolveDoctorTarget } from "./doctor"
 import { createMcpOAuthCommand } from "./mcp-oauth"
+import { configureAccountKeysCommands } from "./account-keys/commands"
 import { configureServiceAuthCommands } from "./service-auth/commands"
 import { resolveInstallArgs, type InstallCommandOptions } from "./install-command-options"
 import { configureRuntimeCommands } from "./runtime-commands"
@@ -86,7 +87,7 @@ Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > Baili
   Copilot       github-copilot/ models (fallback)
   OpenCode Zen  opencode/ models (opencode/claude-opus-5, etc.)
   Z.ai          zai-coding-plan/glm-5.2 (visual-engineering fallback)
-  Kimi          kimi-for-coding/kimi-k3 (Sisyphus/Prometheus fallback)
+  Kimi          kimi-for-coding/kimi-k3.1-pro (Sisyphus/Prometheus fallback)
   Bailian       bailian-coding-plan/ models (Qwen, GLM, Kimi fallback)
   MiniMax       minimax-coding-plan/MiniMax-M3 (utility fallback)
   MiniMax CN    minimax-cn-coding-plan/MiniMax-M3 (utility fallback)
@@ -233,6 +234,7 @@ configureRuntimeCommands(program)
 
 program.addCommand(createMcpOAuthCommand())
 configureServiceAuthCommands(program)
+configureAccountKeysCommands(program)
 
 export function runCli(): void {
   program.parse()

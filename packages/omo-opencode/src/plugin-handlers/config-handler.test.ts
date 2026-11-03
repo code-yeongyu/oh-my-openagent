@@ -942,7 +942,7 @@ describe("Prometheus category config resolution", () => {
 
     // then
     expect(config).toBeDefined()
-    expect(config?.model).toBe("anthropic/claude-fable-5-1")
+    expect(config?.model).toBe("google/gemini-4-argon")
   })
 
   test("user categories override default categories", () => {

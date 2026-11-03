@@ -122,6 +122,32 @@ describe("replaceTmuxPane runner integration", () => {
 		expect(getRespawnCommand()).not.toContain("opencode attach")
 	})
 
+	it("#given a description holding tmux format syntax #when the pane title is set #then # is doubled so tmux keeps it literal and runs nothing (#10228)", async () => {
+		// given
+		const replaceTmuxPane = await loadReplaceTmuxPane()
+		const directory = "/tmp/omo-project/(replace)"
+
+		// when
+		const result = await replaceTmuxPane("%42", "session-1", "#(touch x)#{pane_id} and more", enabledTmuxConfig, "http://127.0.0.1:1234", directory, createDeps())
+
+		// then
+		const sendKeysCall = getRunTmuxCommandCall(0)
+		const respawnCall = getRunTmuxCommandCall(1)
+		const selectPaneCall = getRunTmuxCommandCall(2)
+		expect(result).toEqual({ success: true, paneId: "%42" })
+		expect(sendKeysCall[1]).toEqual(["send-keys", "-t", "%42", "C-c"])
+		const targetIndex = respawnCall[1].indexOf("-t")
+		if (targetIndex === -1) {
+			throw new Error("Expected respawn-pane target argument")
+		}
+		expect(respawnCall[1].slice(0, 2)).toEqual(["respawn-pane", "-k"])
+		expect(respawnCall[1].slice(targetIndex, targetIndex + 2)).toEqual(["-t", "%42"])
+		expect(selectPaneCall[1]).toEqual(["select-pane", "-t", "%42", "-T", "omo-subagent-##(touch x)##{pane_id}"])
+		expect(getRespawnCommand()).toContain("Focus this pane to attach.")
+		expect(getRespawnCommand()).toContain("while :; do sleep 86400; done")
+		expect(getRespawnCommand()).not.toContain("opencode attach")
+	})
+
 	it("#given description with spaces #when replaceTmuxPane called #then includes it in the placeholder", async () => {
 		// given
 		const replaceTmuxPane = await loadReplaceTmuxPane()

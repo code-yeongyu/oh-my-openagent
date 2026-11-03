@@ -10,7 +10,7 @@ export function put(tx, args) {
 }
 
 export function sql(tx, args) {
-  return args.columns ? tx.all(args.columns, args.sql, args.params) : tx.exec(args.sql, args.params)
+  return args.columns ? tx.all(args.columns, args.sql, args.params, args.orderBy) : tx.exec(args.sql, args.params)
 }
 
 export function swallow(tx, args) {

@@ -14,6 +14,8 @@ import { homedir, tmpdir } from "node:os"
 import { delimiter, dirname, join, relative, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
+import { withTelemetryOptOut } from "../../../omo-senpi/scripts/qa/telemetry-opt-out-env.mjs"
+
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const packageRoot = resolve(scriptDir, "..", "..")
 const repoRoot = resolve(packageRoot, "..", "..")
@@ -264,7 +266,7 @@ function runSenpiProbe(fixture, pathValue, senpiBin, workRoot, evidenceDir) {
     {
       cwd: fixture.root,
       encoding: "utf8",
-      env: {
+      env: withTelemetryOptOut({
         ...process.env,
         PATH: pathValue,
         HOME: homeDir,
@@ -275,7 +277,7 @@ function runSenpiProbe(fixture, pathValue, senpiBin, workRoot, evidenceDir) {
         SENPI_CODING_AGENT_DIR: agentDir,
         SENPI_CODING_AGENT_SESSION_DIR: sessionDir,
         OMO_SENPI_QA: "1",
-      },
+      }),
       timeout: 180_000,
       maxBuffer: 64 * 1024 * 1024,
     },

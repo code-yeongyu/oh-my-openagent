@@ -32,8 +32,20 @@ describe("desktop engine target fixture", () => {
     expect(targets).toEqual(DESKTOP_ENGINE_TARGETS)
     expect(targets.filter((entry) => entry.available).map((entry) => entry.target)).toEqual([
       "darwin-arm64", "darwin-x64", "darwin-x64-baseline",
-      "linux-x64", "linux-x64-baseline", "windows-x64", "windows-x64-baseline",
+      "linux-x64", "linux-x64-baseline", "linux-arm64", "windows-x64", "windows-x64-baseline", "windows-arm64",
     ])
+    expect(desktopEngineTarget("linux-arm64")).toEqual({
+      target: "linux-arm64", available: true, host: "linux-arm64",
+      asset: "senpi-desktop-engine-linux-arm64",
+      source: "target/aarch64-unknown-linux-gnu/release/senpi-desktop-engine",
+      payload: "native/prebuilds/linux-arm64/senpi-desktop-engine",
+    })
+    expect(desktopEngineTarget("windows-arm64")).toEqual({
+      target: "windows-arm64", available: true, host: "win32-arm64",
+      asset: "senpi-desktop-engine-win32-arm64.exe",
+      source: "target/aarch64-pc-windows-msvc/release/senpi-desktop-engine.exe",
+      payload: "native/prebuilds/win32-arm64/senpi-desktop-engine.exe",
+    })
     expect(targets.filter((entry) => !entry.available).every((entry) =>
       entry.host === null && entry.asset === null && entry.source === null && entry.payload === null,
     )).toBe(true)
@@ -59,7 +71,7 @@ describe("desktop engine target fixture", () => {
     const cli = join(import.meta.dir, "release-desktop-engine-target.ts")
     // When a workflow queries each target.
     const baseline = spawnSync("bun", [cli, "--target", "darwin-x64-baseline"], { encoding: "utf8", timeout: SUBPROCESS_SPAWN_TIMEOUT_MS })
-    const unavailable = spawnSync("bun", [cli, "--target", "linux-arm64"], { encoding: "utf8", timeout: SUBPROCESS_SPAWN_TIMEOUT_MS })
+    const unavailable = spawnSync("bun", [cli, "--target", "linux-arm64-musl"], { encoding: "utf8", timeout: SUBPROCESS_SPAWN_TIMEOUT_MS })
 
     // Then the machine-consumed host, asset and Rust source are explicit.
     expect(baseline.status).toBe(0)
@@ -71,7 +83,7 @@ describe("desktop engine target fixture", () => {
     })
     expect(unavailable.status).toBe(0)
     expect(JSON.parse(unavailable.stdout)).toEqual({
-      target: "linux-arm64", available: false, host: null, asset: null, source: null, payload: null,
+      target: "linux-arm64-musl", available: false, host: null, asset: null, source: null, payload: null,
     })
     expect(spawnSync("bun", [cli, "--target", "surprise"], { encoding: "utf8", timeout: SUBPROCESS_SPAWN_TIMEOUT_MS }).status).toBe(1)
   }, SUBPROCESS_TEST_TIMEOUT_MS)
@@ -120,7 +132,7 @@ describe("compiled desktop engine staging", () => {
       expect(() => stageCompiledDesktopEngine("linux-x64", stageDir, root))
         .toThrow(/missing required desktop engine for linux-x64:.*x86_64-unknown-linux-gnu/)
       expect(existsSync(stageDir)).toBe(false)
-      expect(stageCompiledDesktopEngine("linux-arm64", stageDir, root)).toBeNull()
+      expect(stageCompiledDesktopEngine("linux-arm64-musl", stageDir, root)).toBeNull()
       expect(existsSync(stageDir)).toBe(false)
     } finally {
       rmSync(root, { recursive: true, force: true })

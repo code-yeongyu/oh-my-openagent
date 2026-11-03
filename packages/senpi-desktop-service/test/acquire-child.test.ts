@@ -60,16 +60,16 @@ describe("acquiringEngineChildFactory", () => {
 			path: null,
 			diagnostic: {
 				code: "native-unavailable",
-				host: "linux-arm64",
+				host: "linux-arm64-musl",
 				attemptedPaths: [],
-				message: "No senpi-desktop-engine binary is available for linux-arm64.",
-				cause: "No desktop engine release asset exists for linux-arm64.",
+				message: "No senpi-desktop-engine binary is available for linux-arm64-musl.",
+				cause: "No desktop engine release asset exists for linux-arm64-musl.",
 			},
 		};
 		const spawned: string[] = [];
 		const factory = acquiringEngineChildFactory({
 			version: "5.0.2",
-			host: "linux-arm64",
+			host: "linux-arm64-musl",
 			acquire: async () => unavailable,
 			spawnEngine: (enginePath) => {
 				spawned.push(enginePath);

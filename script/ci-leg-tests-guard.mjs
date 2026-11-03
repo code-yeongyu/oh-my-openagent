@@ -10,7 +10,7 @@ import { pathToFileURL } from "node:url"
 
 const ranOutcomes = new Set(["success", "failure", "cancelled"])
 
-export function judgeLeg({ outcomes, os, runHeavy, fullMatrix, runtimeTouching, jobStatus }) {
+export function judgeLeg({ outcomes, os, runHeavy, fullMatrix, jobStatus }) {
   if (outcomes.some((outcome) => ranOutcomes.has(outcome))) {
     return { exitCode: 0, level: "none", message: `Tests ran on ${os}.` }
   }
@@ -23,16 +23,18 @@ export function judgeLeg({ outcomes, os, runHeavy, fullMatrix, runtimeTouching, 
   }
   // run_heavy=false is the classifier's deliberate skip (web-only change or a
   // generated release merge, whose version bumps still touch runtime paths).
-  const required = runHeavy && (runtimeTouching || os === "ubuntu-latest" || fullMatrix)
+  // Outside the full matrix a pull request proves macOS and Windows on the
+  // post-merge push instead (#10856), so only ubuntu is required here.
+  const required = runHeavy && (os === "ubuntu-latest" || fullMatrix)
   if (required) {
     return {
       exitCode: 1,
       level: "error",
-      message: `tests not run: this change needs the tests on ${os}, but every test step of this leg was skipped. Add ci:full-matrix for a separate diagnostic run with optional full-matrix / ... checks that do not gate merge. Keep the label and push a commit or reopen the PR to rerun required checks.`,
+      message: `tests not run: this change needs the tests on ${os}, but every test step of this leg was skipped. Add run-full-ci or ci:full-matrix for a separate diagnostic run with optional full-matrix / ... checks that do not gate merge. Keep the label and push a commit or reopen the PR to rerun required checks.`,
     }
   }
   const message = runHeavy
-    ? `tests intentionally not run on ${os}: no runtime path changed, so only ubuntu runs the tests. Add ci:full-matrix for a separate run with optional full-matrix / ... checks that do not gate merge. Keep the label and push a commit or reopen the PR to run the full matrix in required checks.`
+    ? `tests intentionally not run on ${os}: no platform-specific path changed, so this pull request runs the tests on ubuntu only and the post-merge push runs every OS. Add run-full-ci or ci:full-matrix for a separate run with optional full-matrix / ... checks that do not gate merge. Keep the label and push a commit or reopen the PR to run the full matrix in required checks.`
     : `tests intentionally not run on ${os}: the change is web or docs only, or a generated release merge, so no leg runs the heavy tests.`
   return { exitCode: 0, level: "notice", message }
 }
@@ -75,7 +77,6 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
     os: required(values, "os"),
     runHeavy: flag("run-heavy"),
     fullMatrix: flag("full-matrix"),
-    runtimeTouching: flag("runtime-touching"),
     jobStatus: required(values, "job-status"),
   })
   if (verdict.level !== "none") {

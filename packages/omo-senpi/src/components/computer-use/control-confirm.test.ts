@@ -5,6 +5,7 @@ import type { ComputerHostContext } from "@oh-my-opencode/senpi-desktop-tool"
 
 import {
   CONTROL_CONFIRM_TIMEOUT_MS,
+  fullAccessControlNote,
   CONTROL_CONFIRM_TITLE,
   confirmComputerControl,
   controlConfirmBody,
@@ -14,15 +15,102 @@ import {
 function hostContext(options: {
   readonly hasUI?: boolean
   readonly confirm?: (title: string, body: string, opts?: { signal?: AbortSignal; timeout?: number }) => Promise<boolean>
+  readonly notify?: (message: string, level: "info" | "warning" | "error") => void
 }): ComputerHostContext {
   return {
     cwd: "/work",
     model: undefined,
     sessionManager: { getSessionId: () => "session-1", getSessionDir: () => "/tmp/omo-computer-use-test" },
     ...(options.hasUI === undefined ? {} : { hasUI: options.hasUI }),
-    ...(options.confirm === undefined ? {} : { ui: { confirm: options.confirm } }),
+    ...(options.confirm === undefined && options.notify === undefined
+      ? {}
+      : {
+          ui: {
+            ...(options.confirm === undefined ? {} : { confirm: options.confirm }),
+            ...(options.notify === undefined ? {} : { notify: options.notify }),
+          },
+        }),
   }
 }
+
+describe("confirmComputerControl in full access (#10022)", () => {
+  test("#given a full-access session #when acquiring #then it grants without prompting and notes why", async () => {
+    // given
+    let prompts = 0
+    const notes: Array<{ message: string; level: string }> = []
+    const context = hostContext({
+      hasUI: true,
+      confirm: () => {
+        prompts += 1
+        return Promise.resolve(false)
+      },
+      notify: (message, level) => notes.push({ message, level }),
+    })
+
+    // when
+    const approved = await confirmComputerControl(
+      { context, reason: "click Run", signal: new AbortController().signal },
+      { fullAccess: () => true },
+    )
+
+    // then
+    expect({ approved, prompts, notes }).toEqual({
+      approved: true,
+      prompts: 0,
+      notes: [{ message: fullAccessControlNote("click Run"), level: "info" }],
+    })
+  })
+
+  test("#given a default-preset session #when acquiring #then it still asks", async () => {
+    // given
+    let prompts = 0
+    const context = hostContext({
+      hasUI: true,
+      confirm: () => {
+        prompts += 1
+        return Promise.resolve(true)
+      },
+    })
+
+    // when
+    const approved = await confirmComputerControl(
+      { context, reason: "click Run", signal: new AbortController().signal },
+      { fullAccess: () => false },
+    )
+
+    // then
+    expect({ approved, prompts }).toEqual({ approved: true, prompts: 1 })
+  })
+
+  test("#given a full-access context that cannot show the note #when acquiring #then it falls back to the confirm path and never grants", async () => {
+    // given
+    const request = { context: hostContext({}), reason: "click Run", signal: new AbortController().signal }
+
+    // when
+    const approved = await confirmComputerControl(request, { fullAccess: () => true })
+
+    // then
+    expect(approved).toBe(false)
+  })
+
+  test("#given a headless full-access run #when acquiring #then it never grants", async () => {
+    // given
+    const notes: string[] = []
+
+    // when
+    const approved = await confirmComputerControl(
+      {
+        context: hostContext({ hasUI: false, notify: (message) => notes.push(message) }),
+        reason: "click Run",
+        signal: new AbortController().signal,
+      },
+      { fullAccess: () => true },
+    )
+
+    // then
+    expect({ approved, notes }).toEqual({ approved: false, notes: [] })
+  })
+})
 
 describe("confirmComputerControl (#9651 B5b)", () => {
   test("#given hasUI false #when acquiring #then it never prompts and never grants", async () => {

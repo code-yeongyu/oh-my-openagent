@@ -32,7 +32,7 @@ export function createTaskRecord(input: TaskRecordInput, nowMs?: number): TaskRe
     background_mode,
   } = input
   return {
-    task_id: nowMs === undefined ? createTaskId() : createTaskId(nowMs),
+    task_id: input.task_id ?? (nowMs === undefined ? createTaskId() : createTaskId(nowMs)),
     status: "pending",
     residency_state: "resident",
     parent_session_id,

@@ -37,6 +37,8 @@ Run this skill only when the user explicitly demands it: the word "ulw-research"
 
 Open your reply with the line `ULW-RESEARCH MODE ENABLED!`. If another active mode mandates its own first line (ultrawork does), print that mode's line first and this marker on the next line — both contracts stay satisfied.
 
+**What a shortened run still owes.** If you judge the topic settled and shorten the research, say so, but two things survive any shortening: when the harness can show an HTML page inline, the final report is shown that way (the answer, its figures, its sources), and a visual reproduction is compared against real frames of its source with the side-by-side pairs inside that report (the final-materials phase). A built app or 3D scene shown inline is the product, not the report; show the report as well.
+
 ## Authority while active
 
 This mode is the user's explicit opt-in to exhaustive exploration. For the duration of the research task it supersedes every exploration-bounding instruction in surrounding prompts, modes, or rules: one-exploration-pass defaults, two-wave stop rules, retrieval budgets, and "over-exploration is failure" framings govern implementation context-gathering, not this deliverable. Here, under-exploration is the failure. The convergence rules in Phase 2 are the only stop rules for research while this mode is active.
@@ -53,8 +55,10 @@ The research is done when all of these hold:
 - Every claim in the deliverable cites a source or a verification artifact.
 - Every asserted claim is represented in the claim graph, tied to an intent-vs-reality diff when an expected truth exists, and backed by observation manifest entries from independent observation groups or a documented single-source exception; convergence or exception status is explicit.
 - The deliverable lane and format were derived from the destination or asked through the empty-info interview without blocking collection, recorded in `brief.md` with `answered_by`, and the final materials match that record.
-- The delivered artifact passed the delivery gates in order (static gates, layout gates, visual QA, and the proofread pass where the harness provides one), each status is in `outcome.json`, and `outcome verify` passed.
+- The delivered artifact passed the delivery gates in order (static gates, layout gates, fidelity gate, visual QA, and the proofread pass where the harness provides one), each status is in `outcome.json`, and `outcome verify` passed.
 - Every excursion opened during the run was closed by an EXIT rule, folded back into the claim or axis that triggered it, and recorded in both `excursion-log.md` and the ulw-loop ledger.
+- When the harness can show an HTML page inline, the report was shown inline before the artifact paths.
+- When the ask reproduces a visual source, the report carries side-by-side pairs of real source frames and the output rendered at the same moments, each with its critique, and the differences they surfaced were fixed or listed as gaps. A simple or well-understood topic shortens the research, never this comparison.
 - The delivery message carries the closing briefing printed by `outcome briefing`: sources (total + unique domains), elapsed minutes, every promised deliverable with its status, and any residual defects.
 - The session journal reconstructs what was searched, found, and expanded, wave by wave, and it was written in real time rather than reconstructed at the end.
 
@@ -63,7 +67,7 @@ The research is done when all of these hold:
 Saturation is not just more searching; it is a knowledge-production protocol. The session journal must make the path from observation to claim to verdict auditable. The orchestrator owns these artifacts:
 
 - `intent-diff.md` — one row per expected truth derived from the user intent, design/spec text, branch history, or authoritative docs. Required fields: `intent_id`, expected truth, observed reality, diff, violated invariant, intent source, supporting observations, status (`true`, `violated`, or `unknown`), and linked claim ids.
-- `claim-graph.md` — the single claim store; one node per claim. Required fields: `claim_id`, statement, claim type, risk tier, scope, intent ids, supporting observations, contradicting observations, independent observation groups, convergence status, counter-search result, primary source backing, dependencies, status (`supported`, `partial`, `refuted`, or `unresolved`), and final synthesis location. High-risk non-code nodes that clear the Phase 3b gate are mirrored into a `verified-claims` digest section at the top of the file — the sole allowlist the synthesis draws non-code claims from.
+- `claim-graph.md` — the single claim store; one node per claim. Required fields: `claim_id`, statement, claim type, risk tier, scope, intent ids, supporting observations, contradicting observations, independent observation groups, convergence status, counter-search result, primary source backing, dependencies, status (`supported`, `partial`, `refuted`, or `unresolved`), `fact_ids` (the ledger rows the claim rests on), and final synthesis location. High-risk non-code nodes that clear the Phase 3b gate are mirrored into a `verified-claims` digest section at the top of the file — the sole allowlist the synthesis draws non-code claims from.
 - `observation-manifest.md` — one row per observation. Required fields: `observation_id`, source path or URL, evidence layer, observer group, independence basis, observer, `observed_at`, `valid_at` or `claim_valid_at`, artifact path, quote or line anchor, and contamination notes.
 - `verification-economics.md` — one row per proof decision. Required fields: claim, risk, error cost, verification cost/time, chosen verification path, defer/verify decision, outcome, and residual risk.
 - `cause-disappearance.md` — one row per causal finding. Required fields: cause id, expected truth, previous observation, `last_seen`, disconfirming observation, replacement cause if any, current status, and whether the violation is no longer observed.
@@ -111,204 +115,11 @@ Every research spawn message contains, in order:
 
 A worker with nothing to expand writes `## EXPAND` followed by `none — <one-line reason>`. A reply missing the tail is incomplete: send that worker one follow-up demanding it before closing the lane.
 
-## Phase 0 — Decompose and open the journal
+## Execution references
 
-Before spawning anything, decompose the query. Start from "what must be true if the user's intent/spec is true?", not "what looks broken?" Seed `intent-diff.md` with those expected truths before treating code, current docs, or web results as the source of truth:
+Read [research-collection.md](references/research-collection.md) before scoping or collecting sources, then [research-delivery.md](references/research-delivery.md) before verification, synthesis, and delivery. These references continue this skill in phase order; their requirements remain binding.
 
-```
-<analysis>
-Core question: <the actual information need>
-Axes (3+ orthogonal): <axis — what to search, where, why> ...
-Codebase relevant: <yes/no> · External: <yes/no> · Collection: <search-only | browser> · Verification likely: <yes/no>
-Scale: <axis count, source territories, target document length> · Precision demand: <what a wrong claim costs here> → lifecycle: <single team | research team then refinement team>
-</analysis>
-```
-
-`Collection` is `search-only` only when a result snippet settles every axis (a date, a version, a spec value); anything that needs reading a source is `browser`.
-
-Then create the session directory:
-
-```bash
-mkdir -p .omo/ulw-research/$(date +%Y%m%d-%H%M%S)
-```
-
-This is `$SESSION_DIR`. The orchestrator owns the journal: you write every file in it; workers never do (a mass-research dag node writes only its own `waves/<run-key>/<node-id>.md` handoff file, which carries its EXPAND tail and claim candidates; you journal from it). Maintain:
-
-- `brief.md` — the analysis block, the axis list, the expected truths, and the `## Deliverable` record from the interview below (lane, state, formats, each field with `answered_by`).
-- `sources-ledger.md` — one line per source the moment it is read: `[S<n>] <url> — <what it is>`. The closing briefing counts sources and domains from this file.
-- `wave-<N>-<kind>-<axis>.md` — your digest of each worker return: key findings, sources with URLs, and the worker's EXPAND markers verbatim.
-- `expansion-log.md` — per wave: workers spawned, markers gained, leads opened and closed.
-- `excursion-log.md` — one ENTER row and one EXIT row per excursion: `excursion_id`, parent claim or axis, ENTER trigger, depth, workers spent, the EXIT rule that closed it, what it changed in the top-level answer (`none` is a valid, required answer), and the ulw-loop steer/evidence id it was mirrored into.
-- `intent-diff.md` — orchestrator-owned expected-truth ledger comparing intent/spec/history to observed reality.
-- `claim-graph.md` — orchestrator-owned claim graph linking every final assertion to observations, counterevidence, dependencies, and verdict.
-- `observation-manifest.md` — orchestrator-owned observation manifest with `observed_at`, temporal validity, artifact paths, and contamination notes.
-- `verification-economics.md` — proof-cost ledger mapping claim risk to verification path, deferral decisions, and residual risk.
-- `cause-disappearance.md` — cause ledger tracking expected truth, previous observation, `last_seen`, disconfirming observation, and whether the violation is no longer observed.
-- `verify-<slug>.md`, `SYNTHESIS.md`, `REPORT.*` from later phases.
-
-Append each digest the moment its worker returns, not in a batch at the end — the journal is your recovery point after context loss and the user's audit trail.
-
-### Run it as a loop, and journal in real time
-
-ulw-loop is ON by default for this mode: when the `ulw-loop` skill is available, register the research axes as loop goals so the run has durable state and survives a compaction. The session directory's timestamp is the run's start clock — the closing briefing is computed from it, so create it once and never rename it. From that point every finding, source, quote, number, and lead is written into `$SESSION_DIR` **the instant it lands** — never held in the conversation for an end-of-run dump. After any context loss, re-read the brief and the journal before doing anything else, then resume from the open wave.
-
-### Deliverable lane, format, and the empty-info interview
-
-Never block collection on the shape of the deliverable, and never guess it either. Read [references/deliverable-phase.md](references/deliverable-phase.md) sections 1-6 before writing the brief, then:
-
-1. **Derive first.** Name the lane (`template-strict`, `template-vibe`, `no-format`, `edit-existing`) and the promised formats from the request and its destination (the reference's section 3). When the request refers to an existing deliverable, decide its state with `node "$SKILL_DIR/scripts/report-tools.mjs" outcome state --deliverable <path> --session-dir "$SESSION_DIR"`: `partial` resumes the skeleton on disk, `complete` means edit-existing and never a regenerated report. `$SKILL_DIR` is this skill's own directory, the folder containing this SKILL.md.
-2. **Read the requester's format memory** with the memory tool when the harness exposes one: the pointer `system/human/report-style.md`, then `reference/human-report-style.md`; take the choice recorded for the most similar context (same destination kind and audience) as the first option.
-3. **Ask only what is still missing**: at most the reference's three questions (destination and format, audience and length, template lineage) in one call to the harness question tool (`ask_user_question` or `request_user_input`), non-blocking where the harness supports it, each with its default first, a free-text "describe the format" path, and "don't care, you decide". Collection starts without waiting; a late answer is folded in until the assembly worker starts, and after that it becomes a re-render request.
-4. **Record it.** Write `## Deliverable` into `brief.md` (lane, state, formats, destination, audience, template, format description, each with `answered_by: user|default|request`) and open the manifest in the same step: `node "$SKILL_DIR/scripts/report-tools.mjs" outcome init --promised <formats> --lane <lane> --session-dir "$SESSION_DIR"`.
-
-Phase 5 opens by turning the recorded fields into `design-spec.md`.
-
-## Phase 1 — Saturation wave
-
-**When the user asked for MASS research, the wave is sized by the topic's angles, not by the roster ceiling.** "mass ulw research", "mulw research", "ulw mass research" — in any language — order over-collection that a team of 8 cannot produce. Where the harness has a dependency-graph surface (the `mass-ulw` skill and its `references/planning.md`), run collection through it instead: 60+ angles covering every angle the topic has, routed across the whole difficulty ladder — mechanical sweeps and per-item harvest batches on the cheapest tier, judgment-shaped angles a step up, cross-territory angles a step above that, and the deepest tier reserved for genuinely hairy contradictions. Define each angle as a harvest -> expand -> verify chain before the run starts, each stage reading the previous stage's handoff file; open leads re-enter as new chains in each cluster of angles the moment that cluster settles, and the synthesis reduces through per-cluster architect-tier slice reducers into ONE architect-tier reducer (the strongest reasoning tier substitutes wherever no architect tier exists). Absent that surface, run the same per-angle chains with background workers, pasting each worker's reply into its angle's next-stage prompt the moment it reports. Everything else in this skill still binds: the deliverable interview, the journal, the claim graph, the convergence rules, and the delivery gates.
-
-Otherwise launch the entire first wave in one turn — every axis at once, as team members if you formed a team, else as background workers. Sequential launches and "start with one and see" defeat the mode.
-
-Scaling floor — more angles always justify more workers:
-
-| Query scope | explore | web | repo-dive | floor |
-|---|---|---|---|---|
-| Single topic, codebase only | 3 | 0 | 0 | 3 |
-| Single topic, web only | 0 | 5 | 1 | 6 |
-| Single topic, both | 2 | 4 | 1 | 7 |
-| Multi-faceted | 4 | 8 | 2 | 14 |
-| Full due diligence | 4 | 9 | 2 | 15 |
-
-**Disambiguate before you expand.** When the topic names something that could resolve several ways — a product, a person, a codename, a version — the first wave settles WHICH entity before any worker researches its history, benchmarks, or controversies: canonical name, first-party URL or account, whether it exists in the claimed category, and a confidence line. An unresolved entity never becomes a premise in a later wave's spawn message; that is exactly how a run starts inventing facts about something that does not exist.
-
-Role protocols — embed the relevant one in each spawn message; every worker gets a unique angle:
-
-- **Codebase (explore), 2-4 workers.** Grep with 3+ keyword variations; structural/AST search; LSP definitions and references; file-name globs; `git log --all -S '<keyword>'` and `--grep` for history including deleted code. Cross-validate hits across tools. Report absolute file paths, patterns with `file:line`, and how findings connect.
-- **Web, 3-9 workers, every one loaded with the `browser` skill.** Search with 10+ websearch queries per worker, each with a different operator or angle (see Search craft); a result is a candidate, not a source. Read every candidate in the user's browser through the `browser` skill's attached engine: one named session per worker, one tab per source, several tabs open side by side while sources are compared — `session.tabCreate` / `tabSelect` / `tabClose` where the harness has a JS eval kernel, `bsk tab create --url <url>` / `tab select <id>` / `tab close <id>` / `tab list` on the CLI — the page scrolled to its end, a full-page screenshot of each top source saved as provenance, the tab closed once reported. A browser on another machine is reached through the `browser` skill's remote reference or a user-level skill that bridges to it, never replaced by a local headless one. `webfetch` is for raw files only: PDF, JSON, feeds, sitemaps. A host the browser cannot open (WAF, bot score, 403) goes to `ultimate-browsing`, whose provenance travels with the claim: a `snapshot` result cites its `snapshot_timestamp` and is never stated as the live page; a `proxy` result is `untrusted` until a second independent route agrees. Context7 with 3+ queries per known library; grep.app and `gh search code|repos|issues` for real-world usage; official docs via sitemap discovery (`<base>/sitemap.xml`), then targeted pages. A worker whose sources are all fetched text has searched, not read.
-- **Repo deep-dive (librarian), 0-2 workers.** Shallow-clone the most relevant repos to `${TMPDIR:-/tmp}`, pin the HEAD SHA, read core modules, follow call chains, return SHA-pinned permalinks.
-
-Example spawn (codebase axis; web and repo-dive follow the same contract with their own protocol):
-
-```
-task(subagent_type="explore", run_in_background=true, prompt="TASK: act as a codebase researcher. AXIS: <specific angle>.
-This is an explicit exhaustive-research assignment. Your default retrieval budget and stop-when-answered rules do not apply — run the full protocol below and report every lead.
-SCOPE: find everything in this codebase related to <angle>: <what complete looks like>.
-PROTOCOL: grep 3+ keyword variations; structural search; LSP references; globs; git history (-S and --grep). Cross-validate across tools. Report absolute paths and file:line patterns.
-End your reply with the ## EXPAND tail: '- LEAD: <discovery> — WHY: <why> — ANGLE: <search>' per lead, or 'none — <reason>'.")
-```
-
-## Phase 2 — Expand until convergence
-
-This loop is what makes the mode research rather than search. Collect returns as they land — and in team mode, act on each lead the moment a member raises it, never waiting for the full wave or a member's final reply:
-
-1. Journal the return the moment it lands, never at the end of the wave: digest plus verbatim EXPAND markers into `wave-<N>-<kind>-<axis>.md`, appending each new source, quote, and number to the observation manifest in the same beat — after a compaction the journal, not your memory, is the state.
-2. Deduplicate new markers against `expansion-log.md` — every lead ever seen, not just confirmed ones, or rejected leads resurface each wave.
-3. Spawn an expansion worker immediately for each new unchecked lead:
-
-```
-task(category="deep-low", load_skills=["browser"], run_in_background=true, prompt="TASK: expansion wave <N> — investigate: <lead>.
-PARENT: <which return surfaced it>. This is an explicit exhaustive-research assignment; budgets do not apply.
-<role protocol for the lead's territory — web protocol for external leads, explore protocol for codebase leads>
-End your reply with the ## EXPAND tail.")
-```
-
-### Excursions — dive deep on a new find, then surface back out
-
-The Phase 0 core question is the fixed goal of the run and never drifts. An excursion is a BOUNDED detour off the wave plan to chase something a return surfaced — you go deep, settle it, and come back up to the question you were hired to answer.
-
-**ENTER (dive) only on a trigger.** One of these must hold, and you name which one:
-
-1. The find contradicts a claim already locked in `claim-graph.md`.
-2. It would change the final answer or a recommendation if it turned out to be true.
-3. It exposes a source territory no axis owns, so nobody else will ever reach it.
-4. The user's steering points at it — their words are the trigger, quoted verbatim.
-
-Interest alone is not a trigger. Anything without one stays a queued lead in `expansion-log.md`, and the wave plan continues.
-
-**Budget the dive before you take it.** State the worker count and the probe count for this level in the ENTER row. An excursion may spawn at most ONE nested sub-excursion; a third level means the thing has become its own research question — surface immediately and either promote it to a real axis with its own worker or record it as an out-of-scope gap in `SYNTHESIS.md`. When the `ulw-loop` skill is driving the run, a promotion is `omo-agent-toolkit ulw-loop steer --kind add_subgoal --title "<axis>" --objective "<what it must answer>" --evidence "<what surfaced it>" --rationale "<why the plan changes>"`.
-
-**EXIT (surface) the moment any of these holds** — you do not need all of them:
-
-- The ENTER trigger is resolved: the claim is confirmed, refuted, or its dependency is closed.
-- Two consecutive probes changed nothing in the parent answer.
-- The finding stops moving any claim's status — diminishing return is an exit, not a reason to push harder.
-- The level's stated budget is spent.
-
-**Fold back on the way out.** Every EXIT writes one line saying what the excursion changed in the top-level answer, and `none — <reason>` is a legitimate, required outcome; an excursion whose result is silently dropped is a lost run. Update the parent claim node or axis digest with the result, then mirror the whole excursion into the loop ledger — `omo-agent-toolkit ulw-loop steer --kind annotate_ledger --evidence "<what the excursion observed>" --rationale "<what it changed, or none>"`, and `omo-agent-toolkit ulw-loop record-evidence --goal-id <id> --criterion-id <id> --status pass|fail|blocked --evidence "<artifact>"` when it settled a criterion. After a compaction, `omo-agent-toolkit ulw-loop status --json` plus `excursion-log.md` tell you which excursions are still open.
-
-**Anti-drift.** After every EXIT, re-read the core question in the journal and confirm the run still answers it. Three consecutive excursions that changed nothing end excursions for the run: converge on what you have.
-
-4. Record the wave in `expansion-log.md`: spawned, markers gained, leads opened/closed.
-5. **Relay the user's steering to everyone.** When the user changes scope, cadence, target sources, language, or format mid-run, broadcast it to every live worker and member immediately and record the exact wording in `expansion-log.md`. Steering only you saw silently splits the swarm's assignment from the user's actual ask.
-
-**Convergence — the only stop rules while this mode is active.** Run at least 2 expansion waves on any multi-faceted query before claiming convergence; then stop only when one holds:
-
-- Zero unchecked leads remain — each investigated or closed as duplicate/dead end.
-- 3 consecutive waves produced no new actionable leads.
-- Expansion depth reached 5 waves — pause, show the open leads, and ask the user whether to extend.
-
-**Never end the run on a worker's completion.** Workers finishing is not the deliverable; your synthesis is. Reserve the last fifth of the run's context and time for Phases 4-5 and stop opening waves the moment that reserve is threatened. A converged answer with two open leads beats nine finished workers and no report.
-
-## Phase 3 — Verify contested claims by running code
-
-Settle with executed code, not judgment, whenever sources disagree, a behavior is undocumented, a claim is performance- or compatibility-shaped, or the honest answer is "it should work". Spawn one verification worker per claim:
-
-```
-task(category="deep-low", run_in_background=true, prompt="TASK: verify by execution: <claim>.
-SOURCE: <where it came from>; CONTRADICTION: <opposing source, if any>.
-Write a minimal self-contained script that tests the claim; run it (uv run --with <deps> python / bun / direct compile); capture full stdout+stderr; pin versions.
-Reply with: the exact code, the full output, environment (OS, runtime, dependency versions), and a verdict — CONFIRMED / REFUTED / PARTIAL — grounded in the output.")
-```
-
-Journal each verdict to `verify-<slug>.md`.
-
-## Phase 3b — Lock non-code claims through the claim graph
-
-Code settles code-shaped claims (Phase 3). Numeric, market-share, legal, dated, causal, and financial claims cannot be run — so they pass through a data-flow-lock instead (the verification idea adapted from fivetaku/insane-research): the synthesis may assert a high-risk non-code claim **only** if it cleared this gate, and the gate's output is the sole allowlist the synthesis draws from. Skip the gate and there is nothing to synthesize — the lock is self-enforcing.
-
-The claim graph is orchestrator-owned. Workers only return verified-claim markers, observation candidates, and claim candidates as message text, the same channel as EXPAND markers — never a file (except a mass-research dag node's handoff file). As leads resolve, you record one node per asserted claim in `claim-graph.md` and compute its status; workers report claim candidates in their replies, and you decide. The graph is the single claim store: final synthesis may not draw from free-form claims that skipped it.
-
-A high-risk claim clears the gate to `verified-claims` only when all hold:
-
-- **>= 2 independent source domains** corroborate it (two pages on the same domain count once).
-- **>= 2 independent observation groups** converge on it, unless the graph records why a primary-only source is the correct single-source exception.
-- **One counter-search** actively looked for a refutation and did not find a stronger one.
-- **A primary source** (the standard, filing, dataset, or first-party doc) backs it, not only secondary commentary.
-- **Temporal evidence is explicit**: each supporting observation records `observed_at` and either `valid_at` or `claim_valid_at`, so branch-only, historical, release, and current-runtime claims cannot be conflated.
-
-Anything that fails goes to an `Unresolved` (insufficient evidence) or `Refuted` (counter-search won) annex — abstention is a correct outcome, not a gap to paper over. Record each gate outcome on the claim node itself — risk tier, independent source domains, counter-search result, primary source backing, and status — and mirror the cleared nodes into the `verified-claims` digest section at the top of `claim-graph.md`. Worker reply marker (message text, same channel as EXPAND):
-
-```
-## CLAIMS
-- CLAIM: <non-code assertion> — RISK: high|normal — SOURCES: <domain1, domain2> — COUNTER: <refutation search result> — PRIMARY: <primary source or none>
-```
-
-## Phase 4 — Synthesize
-
-After convergence and all verifications, re-read the whole journal, start from `intent-diff.md`, `claim-graph.md`, and `observation-manifest.md`, then write `SYNTHESIS.md`:
-
-```
-# ULW-Research Synthesis: <query>
-Workers: <total> · Waves: <count> · Excursions: <count> · Sources: <count> (<unique domains> domains) · Verifications: <count> · Elapsed: <minutes> min
-
-## Executive summary        — 2-3 paragraphs answering the core question
-## Findings by theme        — per theme: consensus, evidence links, key quote (<20 words, attributed), verified yes/no
-## Codebase findings        — absolute paths with line references
-## Sources (ranked)         — URL, what it contains, reliability, access date
-## Verified claims          — code: claim | verdict | verify-<slug>.md · non-code: only rows cleared into verified-claims
-## Epistemic instrumentation — intent-vs-reality diff closure, claim graph coverage, observation manifest coverage, independent-observation convergence, verification economics summary, cause-disappearance records
-## Contradictions           — source A vs source B, resolution with evidence
-## Gaps                     — what saturation could not answer · unresolved/refuted claim-graph nodes
-## Expansion trace          — per wave: workers → markers; convergence reason
-```
-
-`SYNTHESIS.md` is the citation source of truth for final materials: every claim carries inline `[Source N]` citations, and every high-risk non-code claim you assert must be a verified-claims row from Phase 3b. Assert nothing the gate left in the unresolved/refuted annex.
-
-**Write the skeleton early and fill it as claims lock.** The moment the brief records the deliverable, create the deliverable file with its section headings and a `STATUS: draft — <n> sections open` line as line 2 (an HTML comment in HTML); that line is the partial-state marker `outcome state` reads, removed only when the deliverable is complete. An interrupted run must leave a partial report on disk, never an empty directory and a lost conversation.
-
-**Keep sourced numbers, assumptions, and derived results visibly apart.** Every quantitative claim carries its lineage: `MEASURED` (a number a source states, cited), `ASSUMED` (a coefficient, distribution, or scope you chose — say why), `DERIVED` (computed from those, showing the formula), plus a sensitivity line whenever the assumption moves the answer. Presenting a derived estimate with the confidence of a measured one is the most damaging thing this mode can ship.
-
-**Search in English, deliver in the user's language.** Retrieval stays English-first (Search craft), but the synthesis and every final material are written in the language the user wrote to you in unless they ask otherwise — and a translated report still quotes its original-language sources verbatim.
+`source snapshot --html` and `--url` probe their own conversion and print the numbers it altered (a footnote digit glued onto a value, a merged table cell); `fact add` then refuses those numbers with `conversion_altered_number`, so write a verified text of that source and replace the snapshot with `source snapshot --id S<n> --text <verified.txt> --replace` (refused while an active row cites the id: retract those rows first or use a new id), then add the fact from it. When you convert a document yourself, run `node "$SKILL_DIR/scripts/report-tools.mjs" source probe-conversion <raw-file> <converted-file>` and snapshot a verified `--text` instead before adding any number it lists as `altered`; `lost` is a warning only.
 
 ## Phase 5 — Final materials
 
@@ -321,95 +132,67 @@ The promised formats recorded in `brief.md` and `outcome.json` are binding; `pdf
 | Slides / deck | `uv run --with python-pptx python` — one claim per slide, a chart or diagram per claim. |
 | Standalone HTML / Markdown | The authored source itself. |
 
+**Every reader-facing edition is filled and verified.** The main report, the inline edition, LaTeX sections, and slide sources are all filled by `fact fill` from the same placeholder source, and each is verified on its own by `fact verify`; PDF and DOCX are renders of a verified source (`pandoc <report.html> -o <out.docx>` when the DOCX comes from the filled HTML). Fill and verify HTML or Markdown sources (`fact verify --format html|md`, with a fill map for Markdown); verify LaTeX through its Markdown source, since direct `--format tex` verification exits 2. Record a delivered edition with `outcome set <format> delivered --path <file> --verified-by <record>`, where `<record>` is the `fact verify` output whose `artifact_sha256` equals the sha256 of the delivered source; a PDF or DOCX adds `--rendered-from <source>` and is matched against that source. `outcome verify` refuses a delivered row without a matching record (`edition_unverified`).
+
 **Write `design-spec.md` the moment the deliverable is recorded — before any asset worker spawns.** When a document was pointed at, extract it instead of retyping its stylesheet: `node "$SKILL_DIR/scripts/report-tools.mjs" format-extract <reference> --out "$SESSION_DIR/design-spec.md"` (`--from-url` for a URL), then fill every `TODO: ask` from the interview answers, never by guessing. It is the one design contract every asset and assembly worker receives: template family (absent a reference, the clean analyst-report register — one accent over neutral tones, generous margins, styled section headings, no emoji, no clipart), palette tokens, body/heading fonts (a real gothic CJK webfont — Pretendard, Noto Sans KR — when the report language needs one, with `word-break: keep-all` for Korean), responsive breakpoints and HTML/CSS charts for web deliverables, the figure standard below, and the lineage mode on its own line: `Lineage: inline` (analyst default: every unit-bearing number tagged MEASURED / ASSUMED / DERIVED or cited in the same element) or `Lineage: section` (web and blog register: every section cited, lineage in the figure captions). The reference's section 6 lists the full defaults. One font family and one palette govern prose, charts, Mermaid, and generated images alike; a diagram rendering in a random default font inside a styled report is a defect, not a style choice.
 
 **The figure standard — binding for every image, chart, and diagram.** Each figure sits in a fixed-size container styled from the spec (border, background, caption); the image scales to fit entirely inside it with its original aspect ratio preserved — object-fit: contain semantics — never stretched, never cropped, never spilling out. Every chart carries a title, axis labels, units, and value labels in the report's language; a bare number the reader cannot name is a defect.
 
 Asset workers (background, parallel, each fed `design-spec.md`) — visuals are the DEFAULT deliverable of this phase, not garnish the user must ask for; a delivered report without figures is an incomplete run:
 
-- **Charts for every quantitative finding, computed from real data.** Pull the numbers into an actual table first (CSV/JSON under `$SESSION_DIR`), then plot from that table, never from prose. Follow the data-scientist tool doctrine — numpy always, Polars for filtering/sorting/transforms, DuckDB for joins/aggregations/window functions, never pandas — and load the `data-scientist` skill when this session has it: `uv run --with numpy --with polars --with duckdb --with pyarrow --with matplotlib python`. Keep `pyarrow` in that set — the DuckDB-to-Polars handoff (`.pl()`) fails without it, and `.df()` fails without pandas, so hand data across through `.pl()`, never `.df()`. Save to `$SESSION_DIR/assets/`.
+- **Charts for every quantitative finding, computed from real data.** Pull the numbers into an actual table first (CSV/JSON under `$SESSION_DIR`), then plot from that table, never from prose. Follow the data-scientist tool doctrine — numpy always, Polars for filtering/sorting/transforms, DuckDB for joins/aggregations/window functions, never pandas — and load the `data-scientist` skill when this session has it: `uv run --with numpy --with polars --with duckdb --with pyarrow --with matplotlib python`. Keep `pyarrow` in that set — the DuckDB-to-Polars handoff (`.pl()`) fails without it, and `.df()` fails without pandas, so hand data across through `.pl()`, never `.df()`. Save to `$SESSION_DIR/assets/`. Plot ONLY from the ledger: export the rows with `node "$SKILL_DIR/scripts/report-tools.mjs" fact export --csv --out "$SESSION_DIR/assets/<chart>.csv" --session-dir "$SESSION_DIR"` and draw from that CSV; every chart figure carries `data-chart-source="assets/<chart>.csv"`, and its axis tick labels sit inside a `<g class="ticks" data-tick-step=".." data-tick-min=".." data-tick-max="..">` group, so the fidelity gate can check every plotted value and tick (the deliverable reference's section 6 tick rule).
 - **Mermaid graphs** for process, architecture, argument, timeline, and evidence-flow structure, themed to the spec's fonts and palette. Render each to SVG and confirm the file exists before the document references it.
 - **Generated visuals through the imagegen skill whenever the session has it:** a cover plus a concept illustration per major theme, prompted from the spec's style, palette, and mood — document-styled illustration, never generic stock art dropped into a designed page.
 - **Full-page screenshots** of the top 5-10 sources, saved by the web workers while reading, as provenance you can show.
 
+**Every final report is visual — binding.** It carries at least one data visualization of the run's own findings (a chart drawn from the data table, next to the claim it supports), a diagram wherever structure matters, and the topic's own screenshots and video, embedded or linked with attribution; every figure is captioned, sourced, and given alt text. Mermaid for flows, timelines, and relations; generated charts for numbers; image generation only where an illustration genuinely helps; PlotNeuralNet for paper-format reports that describe model architectures. Every asset lane reads [references/report-visualization.md](references/report-visualization.md) first: which tool fits which finding, the render commands, the quality bar, and the checklist the gates apply. A light-tier post still carries one visual when it reports numbers or structure.
+
+**Visual reproductions are compared against the source — binding.** When the ask is to recreate, reproduce, or rebuild something visual (a clip in 3D, an interface from a screenshot, a figure), real frames or captures from the source are the reference: extract them at the moments that define the source, render the output at the same moments and viewpoints, compose side-by-side pairs, critique every pair by looking at it, fix the largest differences, and compare again within the repair bound. The final pairs, and the first-round pairs in the correction log, go into the report. Procedure: [references/report-visualization.md](references/report-visualization.md), section 3, Reference compare. A reproduction checked only against itself is unverified.
+
 **Verify the asset manifest before rendering.** List every asset the document references, assert each file exists and is non-empty on disk, and re-render whatever is missing. A document that renders with three broken diagrams is a document you will publish twice.
 
-Assembly worker — `task(category="deep-low", load_skills=["frontend", "visual-qa", "open-design", "data-scientist", "imagegen", "ulw-loop"], run_in_background=true, ...)`: before writing, read every available design and visualization skill and apply it — the report is a designed artifact, not a text dump; the worker's prompt carries `design-spec.md`. Use the template the user approved; absent a stronger house style the default skeleton is executive summary → key findings by theme → detailed analysis (quotes under 20 words with attribution, charts, Mermaid graphs, generated visuals, SHA-pinned permalinks, verification results) → comparative analysis when options compete → numbered sources with access dates → methodology appendix (workers, waves, searches, verifications, debate rounds) → correction log naming what verification overturned. Write it long and specific: every claim cites `[Source N]`, and the sources section lists every source the run actually used rather than a curated few.
+Assembly worker — `task(category="deep-low", load_skills=["frontend", "visual-qa", "open-design", "data-scientist", "imagegen", "ulw-loop"], run_in_background=true, ...)`: before writing, read every available design and visualization skill and apply it — the report is a designed artifact, not a text dump; the worker's prompt carries `design-spec.md`. Use the template the user approved; absent a stronger house style the default skeleton is executive summary → key findings by theme → detailed analysis (quotes under 20 words with attribution, charts, Mermaid graphs, generated visuals, SHA-pinned permalinks, verification results) → comparative analysis when options compete → numbered sources with access dates → methodology appendix (workers, waves, searches, verifications, debate rounds) → correction log naming what verification overturned. Write it long and specific: every claim cites `[Source N]`, and the sources section lists every source the run actually used rather than a curated few. The assembly worker writes `report.src.html` with placeholders, never typed values; the orchestrator runs `node "$SKILL_DIR/scripts/report-tools.mjs" fact fill "$SESSION_DIR/report.src.html" --out "$SESSION_DIR/report.html" --session-dir "$SESSION_DIR"` and gates the filled file. The inline edition for a PDF, DOCX, or oversized HTML deliverable comes from the same source (`fact fill "$SESSION_DIR/report.src.html" --inline --out "$SESSION_DIR/report.inline.html"`, which inlines local stylesheets and makes image paths absolute on the filled output), never from a hand copy.
 
 ### The delivery gates — every gate for the QA tier must PASS, in order
 
-Nothing reaches the user until the gates pass. Record each result with `node "$SKILL_DIR/scripts/report-tools.mjs" outcome gate <static|layout|visual|proofread> <pass|fail|not_run> --session-dir "$SESSION_DIR"`; a gate this harness does not provide is recorded `not_run`. A chat or post answer (light tier) runs the static gates and one render; every paginated or web deliverable runs them all (the reference's sections 3 and 7).
+Nothing reaches the user until the gates pass. Record each result with `node "$SKILL_DIR/scripts/report-tools.mjs" outcome gate <static|fidelity|layout|visual|proofread> <pass|fail|not_run> --session-dir "$SESSION_DIR"`; a gate this harness does not provide is recorded `not_run --reason "<why>"` (`fidelity not_run` refuses without the reason). A chat or post answer (light tier) runs the static gates and one render; every paginated or web deliverable runs them all (the reference's sections 3 and 7).
 
-1. **Static gates (always, before anyone looks at pixels).** `node "$SKILL_DIR/scripts/report-tools.mjs" check "$SESSION_DIR/report.html" --design-spec "$SESSION_DIR/design-spec.md" > "$SESSION_DIR/defects.json"`: keep-all, palette tokens, emoji, em dashes, heading length, unsourced numbers, figure containers, chart text, gothic-only fonts, citations, the closing and sources sections, broken assets. Codes and fixes: [references/report-gates.md](references/report-gates.md).
-2. **Layout gates.** Print the probe with `node "$SKILL_DIR/scripts/report-tools.mjs" layout-probe --json`, evaluate its `source` in the rendered page through the `browser` skill's owned headless engine, save the result as `$SESSION_DIR/boxes.json`, and re-run `check` with `--layout "$SESSION_DIR/boxes.json"` (overflow, clipped text, distorted images, overlapping siblings).
-3. **Visual QA.** Render the produced artifact back to images — PDF pages to PNG, the HTML through the browser skill at desktop and phone widths — and look at them: missing or broken figures, images stretched or spilling their containers, diagram or chart text rendered off the spec's font or palette, clipped tables, overflowing CJK text, blank pages, unlabeled chart values, wrong page breaks. Reading the source markup is not visual QA; inspect the pixels.
-4. **Proofread gate — `task(category="writing", ...)`.** Hand the final text to a dedicated `writing` worker whose only job is language: grammar, spelling, punctuation, terminology consistency, and whether the prose reads NATIVELY in the report's own language. It proofreads only and never composes. It returns a defect list; fix every item and re-run the gate on the delta. Deliver only on a clean pass — this gate runs BEFORE the first delivery, not after the user finds the typo.
+1. **Static gates (always, before anyone looks at pixels).** `node "$SKILL_DIR/scripts/report-tools.mjs" check "$SESSION_DIR/report.html" --design-spec "$SESSION_DIR/design-spec.md" > "$SESSION_DIR/defects.json"`: keep-all, palette tokens, emoji, em dashes, heading length, unsourced numbers, figure containers, chart text, a report with no visual, images without alt text, gothic-only fonts, citations, the closing and sources sections, broken assets. Codes and fixes: [references/report-gates.md](references/report-gates.md).
+2. **Fidelity gate.** `node "$SKILL_DIR/scripts/report-tools.mjs" fact verify "$SESSION_DIR/report.html" --session-dir "$SESSION_DIR"` checks every number, quote, chart value, and sentence binding against the ledger, the snapshots, `claims.json`, and the locked `## Fidelity` block of `brief.md`, and writes `$SESSION_DIR/fidelity-defects.json` with the verified file's `artifact_sha256`. Exit `1` on any blocker or major defect: record `outcome gate fidelity fail` and repair; minors alone exit `0` and are listed. Verify every other edition the same way into its own record (`--out "$SESSION_DIR/fidelity-inline.json"`). Codes and fixes: [references/report-gates.md](references/report-gates.md); grammar: [references/deliverable-phase.md](references/deliverable-phase.md), Fidelity gate.
 
-**Repair is bounded.** After every gate run that found defects, ask `node "$SKILL_DIR/scripts/report-tools.mjs" repair decide --state "$SESSION_DIR/repair-state.json" --defects "$SESSION_DIR/defects.json" --artifact-bytes <bytes> --renders <pages> --session-dir "$SESSION_DIR"` and obey it: `repair` means fix and re-run; `deliver` means stop and ship with the residual defects the manifest now lists; `block` means a content-integrity defect remains (or there is no usable artifact), so do not deliver: tell the user what blocks it and record the row as `failed` with the reason. Never repair past a stop decision (3 attempts, a 2-attempt plateau, an oscillation, or 15 minutes; the reference's section 8).
+**Meaning verifier (a separate session reads every sentence against its source).** When the brief's `meaning check` is `on`, run it after the fidelity gate passes; when it is `off`, `fact pairs` writes `{"skipped": true}` and the step ends there. `node "$SKILL_DIR/scripts/report-tools.mjs" fact pairs "$SESSION_DIR/report.html" --session-dir "$SESSION_DIR"` writes `$SESSION_DIR/pairs.json`: one pair per distinct source quote a findings sentence cites, per sentence bound only by `data-claim` (against the claim's statement), and per `data-translates` span, with `force_strong` set where the lexicon or the hedge position says a strong reader must look. Then spawn one reader worker on the cheapest category, `task(category="quick", ...)`, whose prompt carries ONLY the path of `pairs.json` and the verdict schema, in exactly this text:
 
-Then resolve every manifest row (`outcome set <format> delivered --path <file>` or `blocked_capability` / `skipped` / `failed` with `--reason`) and deliver: the artifact plus a compact chat-readable summary of what it says — the answer in a few sentences, the numbers that matter, and what to look at first. The document is the deliverable; the summary is what gets it read.
+```text
+TASK: meaning reader, <cheap|strong> tier. Read ONLY the pair file <SESSION_DIR>/<pairs.json or pairs-strong.json> and the verdict schema in this prompt. Do not open, search, or fetch any other file, page, or tool output: not the report, the ledger, the sources, or the claim graph.
+For each pair, compare `sentence` with `quote` (with `statement` for a claim pair) and decide whether the sentence says something its source does not.
+Write <SESSION_DIR>/meaning-<cheap|strong>.json as {"model_tier": "<cheap|strong>", "verdicts": [...]} with one verdict per pair_id: {"pair_id": "P<n>", "verdict": "ok" or "drift", "drift_kind": ..., "fragment": ..., "source_fragment": ..., "explanation": "<one sentence>"}.
+drift_kind is exactly one of: subject_changed, scope_widened, hedge_dropped, certainty_added, causality_added, direction_flipped, population_changed, evidence_grade_raised, other.
+fragment is copied verbatim from the sentence and source_fragment verbatim from the quote or statement: the shortest exact substrings that show the drift, never paraphrased, never empty. A verdict whose fragments are not found word for word is discarded.
+A sentence that shortens, summarizes, or translates its source without changing subject, scope, certainty, causality, direction, population, or evidence grade is ok. Do not rewrite anything; return verdicts only.
+```
+
+Next, write `$SESSION_DIR/pairs-strong.json` (the same file, keeping only the pairs the cheap reader flagged plus every `force_strong` pair) and spawn one reader on the strong category, `task(category="ultrabrain", ...)`, with the same prompt for the strong tier. Then `node "$SKILL_DIR/scripts/report-tools.mjs" fact meaning-check --pairs "$SESSION_DIR/pairs.json" --verdicts "$SESSION_DIR/meaning-cheap.json" --verdicts "$SESSION_DIR/meaning-strong.json" --edition html --session-dir "$SESSION_DIR"` writes `$SESSION_DIR/fidelity-meaning-defects.html.json`, the meaning record of that edition (repeat `fact pairs` and the readers with `--edition <format>` for every other delivered edition whose source bytes differ): both tiers naming the same `drift_kind` (never `other`) is `meaning_drift_confirmed` (major, exit `1`); one tier alone is `meaning_drift_warn` (minor); a verdict whose fragments are not in the pair is dropped and counted. Repair every confirmed drift by rewriting the sentence from its quote, re-fill, re-verify, and re-read only the changed sentences (`fact pairs ... --changed-since <the new fill map>`); or, when the sentence is right, dispute it with `--dispute P<n> --reason "<why>"`, which keeps the defect for this run and logs the dispute. Pass the record to `repair decide` as one more `--defects` file and list the warnings in the closing briefing. Each flagged pair adds one line to `$SESSION_DIR/fidelity-calibration.jsonl`, whose header records the promotion criterion: `meaning_drift_confirmed` moves from major to an integrity code only after at least 20 runs with disputed-to-confirmed below 10 percent and no more than 2 report-level false blocks in the last 20 runs. These are starting values, changed only with evidence; the scripts never call a model.
+
+3. **Layout gates.** Print the probe with `node "$SKILL_DIR/scripts/report-tools.mjs" layout-probe --json`, evaluate its `source` in the rendered page through the `browser` skill's owned headless engine, save the result as `$SESSION_DIR/boxes.json`, and re-run `check` with `--layout "$SESSION_DIR/boxes.json"` (overflow, clipped text, distorted images, overlapping siblings).
+4. **Visual QA.** Render the produced artifact back to images — PDF pages to PNG, the HTML through the browser skill at desktop and phone widths — and look at them: missing or broken figures, images stretched or spilling their containers, diagram or chart text rendered off the spec's font or palette, clipped tables, overflowing CJK text, blank pages, unlabeled chart values, wrong page breaks. Reading the source markup is not visual QA; inspect the pixels.
+5. **Proofread gate: `task(category="writing", ...)`.** Hand the final text to a dedicated `writing` worker whose only job is language: grammar, spelling, punctuation, terminology consistency, and whether the prose reads NATIVELY in the report's own language. It proofreads only and never composes, and it never edits the file: it returns `$SESSION_DIR/polish-edits.json`, an array of `{"before": ..., "after": ..., "reason": ...}` where `before` is the exact current text of one or more adjacent sentences. Edits change text only; an edit whose before/after would alter any tag, attribute, comment, or script/style content is rejected, and markup changes go through the full fidelity gates instead. Apply it with `node "$SKILL_DIR/scripts/report-tools.mjs" fact polish-apply "$SESSION_DIR/report.html" --edits "$SESSION_DIR/polish-edits.json" --out "$SESSION_DIR/report.polished.html" --session-dir "$SESSION_DIR"`: each edit is applied alone, and an edit that changes a fact span, a numeral, a link, or a claim id, or drops a hedge or qualifier the source carries, is `polish_edit_rejected` (a `before` not found exactly once is `polish_edit_unlocated`) and leaves its text unchanged. Send the rejected and unlocated edits back to the same worker with their reasons, plus `$SESSION_DIR/polish-defects.json` and the pre-polish `report.html` the backstop compared against, so the worker sees why each edit was refused; it returns either a rewritten sentence or a new edit list, and the repair round re-runs `fact polish-apply` with `"$SESSION_DIR/report.polished.html"` as both input and output, within the repair budget. Then run the backstop `fact polish-diff --before "$SESSION_DIR/report.html" --after "$SESSION_DIR/report.polished.html" --session-dir "$SESSION_DIR"` (exit `1` on `polish_diff_fail`), `fact verify` on `report.polished.html`, and `fact pairs "$SESSION_DIR/report.polished.html" --changed-since "$SESSION_DIR/report.html.fill-map.json" --session-dir "$SESSION_DIR"`, which keeps only the quote and claim pairs whose sentence text changed during polish; run the meaning readers above (cheap, then strong on the flagged pairs) on exactly those pairs and `fact meaning-check` before recording `outcome gate fidelity`. A rewording that keeps every number, hedge, qualifier, and link but swaps who did what to whom therefore still reaches a meaning reader on the delivered text. `report.polished.html` is the report that is delivered. Deliver only on a clean pass. This gate runs BEFORE the first delivery, not after the user finds the typo. Edits must not span entities (such as &amp; or &lt;) or markup; narrow the edit to the surrounding words instead, and a rejected edit comes back with the reason to act on.
+
+**Repair is bounded.** After every gate run that found defects, ask `node "$SKILL_DIR/scripts/report-tools.mjs" repair decide --state "$SESSION_DIR/repair-state.json" --defects "$SESSION_DIR/defects.json" --defects "$SESSION_DIR/fidelity-defects.json" --artifact-bytes <bytes> --renders <pages> --session-dir "$SESSION_DIR"` and obey it: `repair` means fix and re-run; `deliver` means stop and ship with the residual defects the manifest now lists; `block` means a content-integrity defect remains (or there is no usable artifact), so do not deliver: tell the user what blocks it and record the row as `failed` with the reason. Never repair past a stop decision (3 attempts, a 2-attempt plateau, an oscillation, or 15 minutes; the reference's section 8). Fidelity defects ride the same loop (`--defects "$SESSION_DIR/defects.json" --defects "$SESSION_DIR/fidelity-defects.json"`), but a `deliver` decision does not release them: while `fidelity-defects.json` lists `untraceable_number`, `value_mismatch`, `unit_mismatch`, `quote_not_verbatim`, `quote_unbound`, `unbound_sentence`, or `chart_value_untraceable`, `outcome verify` fails with `fidelity_unresolved` and `outcome finish` refuses, even with the repair budget spent. The only ways out are a ledger row, an `assumed` row with its rationale, or removing the sentence.
+
+Then resolve every manifest row (`outcome set <format> delivered --path <file> --verified-by <record>` (plus `--rendered-from <source>` for a PDF or DOCX) or `blocked_capability` / `skipped` / `failed` with `--reason`) and deliver. **Show the report inline first when the harness can.** When this session has a tool that shows an HTML page inline in the conversation (`show_html_page`, `html_render`), the requester's first view of the result is the report itself: the gated `report.html` when it fits the tool, otherwise an inline edition built from the same synthesis and assets, with the reference-compare pairs when the run has them ([references/deliverable-phase.md](references/deliverable-phase.md), section 9, Showing the report inline). Then give the artifact paths and a compact chat-readable summary of what the report says — the answer in a few sentences, the numbers that matter, and what to look at first. This holds on every tier, a chat answer included, and when the thing built is itself a page (an app, a 3D scene), showing it does not replace the report page. Without an inline page tool, deliver the artifact paths plus that summary. The document is the deliverable; the summary is what gets it read.
 
 ### The closing briefing — every run ends with it
 
 The last thing the user reads states, in one compact block, what the answer is made of:
 
 - **The printed block.** `node "$SKILL_DIR/scripts/report-tools.mjs" outcome verify --session-dir "$SESSION_DIR" && node "$SKILL_DIR/scripts/report-tools.mjs" outcome finish --session-dir "$SESSION_DIR" && node "$SKILL_DIR/scripts/report-tools.mjs" outcome briefing --session-dir "$SESSION_DIR"`: sources and distinct domains counted from `sources-ledger.md`, elapsed minutes from the session directory's own timestamp, every promised deliverable with its status, the gate results, the residual defects, and the repair summary. A failing `verify` means the run is not done.
-- **Effort.** Workers, waves, excursions, and verifications — the same counters as the `SYNTHESIS.md` header — plus how many sources were primary and how many claims went to the unresolved/refuted annex.
+- **Effort.** Workers, waves, excursions, and verifications — the same counters as the `SYNTHESIS.md` header — plus how many sources were primary and how many claims went to the unresolved/refuted annex. `fact export` also prints a coverage line (`N of M sources snapshotted, by extractor: ...`); paste it into the briefing's effort line.
 
 Never ship the artifact without this block, and never fill it from memory — paste the printed block and read the rest off the journal.
 
 **Record the format choice.** After delivery, when the harness exposes a memory tool and the run qualifies (the user declared a preference, or made the same unsolicited choice on 2+ runs), append one episode line to `reference/human-report-style.md` in the grammar of the reference's section 5, and update the `system/human/report-style.md` pointer when a generalization changed.
  If you stood up a team, disband it and confirm every worker is terminal before the final answer.
 
-## Search craft
+## Snapshot and locator contract
 
-English first: run every search in English by default — it is the largest, most authoritative corpus on every engine, GitHub, and documentation site. Add a secondary local-language sweep (1-2 librarians) only after the English sweep, when the topic is inherently local, or when the user asks for sources in a specific language.
-
-Vary operators on every query — same query twice wastes a worker:
-
-| Operator | Example | Use |
-|---|---|---|
-| `site:` | `site:github.com <topic>` | Restrict to a domain |
-| `filetype:` | `filetype:pdf <topic> survey` | Papers, specs |
-| `intitle:` / `inurl:` | `intitle:benchmark <topic>` | Targeted pages |
-| `"exact"` / `-term` | `"<exact phrase>" -tutorial` | Precision, exclusion |
-| `OR` | `<a> OR <b> <topic>` | Coverage |
-| `before:` / `after:` | `<topic> after:2025-06-01` | Recency control |
-
-High-yield combinations: official docs (`site:<docs domain>`), GitHub implementations (`site:github.com`), recent discussion (`site:reddit.com OR site:news.ycombinator.com after:<date>`), academic (`site:arxiv.org OR filetype:pdf survey`), changelog hunting (`changelog OR "release notes" <version>`), alternatives (`vs OR alternative OR comparison`).
-
-## Failure modes
-
-| Failure | Correction |
-|---|---|
-| Sequential spawning, or trimming the first wave | All first-wave workers in one turn, background, scaling floor respected |
-| A team member hoards leads for one final dump | Raise law — every lead, finding, and dead end broadcast the moment it surfaces |
-| Worker reply without the EXPAND tail | One follow-up demanding it; the lane stays open until it lands |
-| Stopping after wave 1 because "enough was found" | Convergence rules only: 2+ expansion waves, leads run dry |
-| Obeying a surrounding "stop exploring" rule mid-research | Authority section — those rules do not bind this mode |
-| Asking a worker to write journal or session files | Workers are read-only (except a mass-research dag node's handoff file); you journal every return |
-| Two workers given the same angle | One unique angle per worker, always |
-| A web worker that returned only fetched text, or a `Collection: browser` run whose workers never opened a tab | Sources are read in the user's browser through the `browser` skill; `webfetch` is for raw files; every web worker carries the skill from the first wave |
-| Contested claim settled by judgment | Phase 3 — run code, capture output, verdict |
-| Deliverable claims without citations | Every claim cites a source or a verification artifact |
-| Guessing the deliverable format | Derive it from the request and destination; ask the empty-info interview only for what is still missing, and record `answered_by` for every field |
-| Blocking the collection wave on the format question | Ask non-blocking and start collecting; unanswered fields run on the shown defaults |
-| A roster smaller than the harness ceiling | Fill every member slot; split the broadest axis until the team is full |
-| One tier across the whole roster | Mixed tiers by design — cheap breadth, premium attack |
-| Silently re-routing a "quick"/"fast" instruction | Routing words are literal; journal requested -> spawned -> fallback per slot |
-| A worker or member that starts its own research swarm | Members research one axis and report; orchestration is yours alone |
-| Expanding on an entity the first wave never disambiguated | Settle canonical identity and first-party source before any later spawn asserts it |
-| Batching findings into an end-of-run journal dump | Journal each return as it lands; the journal is what survives a compaction |
-| Ending the run because every worker finished | Reserve the final fifth of the run for synthesis and materials |
-| A derived estimate presented as a measured number | MEASURED / ASSUMED / DERIVED lineage on every quantitative claim, plus a sensitivity line |
-| Delivering before the delivery gates pass | Static and layout gates, visual QA on rendered pages, plus the harness's proofread gate — a typo the user finds means a gate did not run |
-| Skipping the static gates | `report-tools check` runs before any pixel review; its defects are cheaper than a visual pass |
-| Delivering with a pending manifest row | `outcome verify` must pass; every promised format ends `delivered`, `blocked_capability`, `skipped`, or `failed` with a reason |
-| Repairing past the tracker's stop decision | `repair decide` owns the budget; `deliver` ships with the residual list, `block` stops delivery |
-| Guessing a design-spec value the extractor marked `TODO: ask` | Fill it from the interview answers or the reference's defaults, never by guessing |
-| Referencing an asset that is not on disk | Verify the asset manifest before rendering; re-render whatever is missing |
-| A figure stretched, cropped, or styled off the report's design language | `design-spec.md` binds every asset: fixed containers, contain-fit with aspect preserved, spec fonts and palette in charts and Mermaid |
-| Chasing an interesting find with no ENTER trigger | Excursions need a named trigger; everything else stays a queued lead |
-| An excursion that never came back, or drifted into a new mission | EXIT rules are unconditional; depth 3 means promote it to an axis or record it as a gap |
-| An excursion whose result was never folded back | Every EXIT writes what it changed in the top-level answer, `none` included, and mirrors into the loop ledger |
-| Delivering without the closing briefing | Paste the block `outcome briefing` prints; never compute or recall its numbers by hand |
+- `sources/` and `fact-ledger.json` — one directory per source snapshot and the ledger built from them. The snapshot and locator contract (raw bytes, converted-only sources, byte locators, `source refresh`) is defined once, in [fact-ledger.md](references/fact-ledger.md#snapshot-and-locator-contract); every number and quotation reaches the report through a ledger placeholder.

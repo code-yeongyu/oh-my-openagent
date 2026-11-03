@@ -10,7 +10,10 @@ const repoRoot = join(import.meta.dir, "..")
 // This contract is machine-consumed review policy: every edition's full-workflow.md must
 // carry the same bounded convergence contract JSON. #8773 added the ideal-state category: an
 // IS row no todo closes or no QA scenario proves, or an approach that cannot reach it for the
-// named user, is blocker-eligible in every edition.
+// named user, is blocker-eligible in every edition. #10378 replaced the fixed 5-round cap, which stopped
+// reviews that were still making progress: another round runs while the previous one raised a new
+// blocker-eligible finding or closed at least one ledger blocker, and a round with neither stops the review
+// (the non-convergence guard; it terminates because the ledger is frozen after round 1).
 const surfaces = [
 	{
 		name: "shared (OpenCode Ultimate)",
@@ -59,13 +62,15 @@ describe("#given the ulw-plan high-accuracy review protocol across all three edi
 		describe(`#when the ${surface.name} full-workflow.md declares its review convergence contract`, () => {
 			const workflow = readFileSync(surface.workflowPath, "utf8")
 
-			test("#then it carries a bounded round cap with a user-facing cap action", () => {
+			test("#then rounds continue on new eligible findings or closed ledger blockers and stop with a user-facing action otherwise", () => {
 				const contract = readJsonContract(workflow, "ulw-plan-review-convergence-contract")
-				expect(Number.isInteger(contract.max_rounds)).toBe(true)
-				expect(contract.max_rounds as number).toBeGreaterThanOrEqual(2)
-				expect(contract.max_rounds as number).toBeLessThanOrEqual(5)
-				expect(contract.max_rounds_override).toBe("explicit_user_request_only")
-				expect(contract.on_cap_reached).toBe("stop_report_outstanding_blockers_ask_user")
+				expect(contract.max_rounds).toBeNull()
+				expect(contract.continue_while).toBe(
+					"previous_round_raised_new_blocker_eligible_finding_or_closed_ledger_blocker",
+				)
+				expect(contract.stop_on).toBe("round_without_new_blocker_eligible_finding_or_ledger_blocker_closure")
+				expect(contract.on_stop_without_approval).toBe("stop_report_outstanding_blockers_ask_user")
+				expect(contract).not.toHaveProperty("max_rounds_override")
 			})
 
 			test("#then only evidence-backed findings are blocker-eligible and the rest are non-blocking notes", () => {

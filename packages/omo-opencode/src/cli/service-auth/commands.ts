@@ -1,9 +1,10 @@
 import { Command } from "commander"
 import { isCancel, select, confirm } from "@clack/prompts"
+import { serviceAccountsOpen } from "./accounts-gate"
 import { openSignInBrowser } from "./browser"
 import { deviceName, devicePlatform } from "./device-name"
 import { loginDevice } from "./device-flow"
-import { createCredentialStore } from "./keystore"
+import { createCredentialStore, INTERACTIVE_READ_WAIT } from "./keystore"
 import { BrowserUnavailable, loginLoopback } from "./loopback"
 import { type ChooseDevice, type ListedDevice, RequestFailure, serviceOrigin, SignInError } from "./protocol"
 import { createSession, type Session } from "./session"
@@ -60,7 +61,7 @@ async function run(action: "login" | "logout" | "whoami", options: Options): Pro
   process.once("SIGTERM", cancel)
   try {
     const api = serviceOrigin(options.api ?? process.env.OMO_SERVICE_API_URL ?? "https://api.omo.dev")
-    const store = createCredentialStore(api)
+    const store = createCredentialStore(api, { wait: INTERACTIVE_READ_WAIT })
     const session = createSession({ api, store, signal: controller.signal })
     if (action === "logout") {
       const revoked = await session.logout()
@@ -100,7 +101,7 @@ async function run(action: "login" | "logout" | "whoami", options: Options): Pro
     console.log("Signed in to OmO.")
   } catch (error) {
     console.error(controller.signal.aborted ? "Sign-in cancelled."
-      : error instanceof SignInError ? error.message : "Unable to complete OmO sign-in. Check the OS credential store and try again.")
+      : error instanceof SignInError ? error.message : "OmO sign-in stopped on an unexpected error. Run the command again, and report it with /bug if it keeps failing.")
     process.exitCode = 1
   } finally {
     process.removeListener("SIGINT", cancel)
@@ -108,7 +109,35 @@ async function run(action: "login" | "logout" | "whoami", options: Options): Pro
   }
 }
 
-export function configureServiceAuthCommands(program: Command): void {
+export { SERVICE_ACCOUNTS_OPEN } from "./accounts-gate"
+
+export const SERVICE_ACCOUNTS_CLOSED_MESSAGE =
+  "Signing in from the terminal isn't available yet. Sign in from the OmO desktop app on this computer; omo uses that sign-in."
+
+const SERVICE_AUTH_COMMANDS = ["login", "logout", "whoami"] as const
+
+function refuseClosedServiceAuth(): never {
+  console.error(SERVICE_ACCOUNTS_CLOSED_MESSAGE)
+  process.exit(1)
+}
+
+function configureClosedServiceAuthCommands(program: Command): void {
+  for (const name of SERVICE_AUTH_COMMANDS) {
+    const command = program.command(name, { hidden: true }).helpOption(false).allowUnknownOption().allowExcessArguments()
+      .action(() => {
+        console.error(SERVICE_ACCOUNTS_CLOSED_MESSAGE)
+        process.exitCode = 1
+      })
+    // `omo help <name>` calls the subcommand's help() directly, bypassing its action.
+    command.help = refuseClosedServiceAuth
+  }
+}
+
+export function configureServiceAuthCommands(program: Command, open = serviceAccountsOpen()): void {
+  if (!open) {
+    configureClosedServiceAuthCommands(program)
+    return
+  }
   program.command("login").description("Sign in to OmO using the OS credential store")
     .option("--device", "Use a device code instead of a browser callback")
     .option("--no-browser", "Sign in by device code without opening a browser")

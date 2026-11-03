@@ -105,6 +105,8 @@ describe("OMO Senpi plugin manifest", () => {
       "NOTICE",
       "LICENSE",
       "daemon-launch-spec.json",
+      "telemetry-schema.json",
+      "telemetry-schema.omo-cloud.json",
     ])
   })
 

@@ -1958,8 +1958,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "709fe137109bd1e8b5a99390f77a7d8b2961dafc1a1c5db8f2e60329ad6d895a"
 dependencies = [
  "bitflags",
+ "block2",
+ "libc",
  "objc2",
  "objc2-core-foundation",
+]
+
+[[package]]
+name = "omo-engine-trust-helper"
+version = "0.0.0"
+dependencies = [
+ "libc",
+ "objc2-core-foundation",
+ "objc2-security",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2548,6 +2563,7 @@ version = "0.0.0"
 dependencies = [
  "clap",
  "core-graphics",
+ "libc",
  "objc2-app-kit",
  "parking_lot",
  "schemars",
@@ -2559,9 +2575,11 @@ dependencies = [
  "senpi-desktop-core",
  "senpi-desktop-safety",
  "senpi-desktop-session",
+ "senpi-desktop-xpc",
  "serde",
  "serde_json",
  "sha2",
+ "tempfile",
  "thiserror",
  "tokio",
  "ulid",
@@ -2571,9 +2589,12 @@ dependencies = [
 name = "senpi-desktop-safety"
 version = "0.0.0"
 dependencies = [
+ "libc",
  "parking_lot",
+ "senpi-desktop-backend-fake",
  "senpi-desktop-core",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]
@@ -2597,6 +2618,26 @@ dependencies = [
  "thiserror",
  "tokio",
  "ulid",
+]
+
+[[package]]
+name = "senpi-desktop-xpc"
+version = "0.0.0"
+dependencies = [
+ "block2",
+ "flume",
+ "libc",
+ "objc2-core-foundation",
+ "parking_lot",
+ "senpi-desktop-backend-fake",
+ "senpi-desktop-core",
+ "senpi-desktop-safety",
+ "senpi-desktop-session",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror",
+ "tokio",
 ]
 
 [[package]]

@@ -47,10 +47,10 @@ const nodeError: DagNodeError = {
 }
 
 describe("dagEventLane", () => {
-  describe("#given all 14 journaled event types", () => {
+  describe("#given all 26 journaled event types", () => {
     test("#then every one classifies as boundary without throwing", () => {
       // given / when / then
-      expect(DAG_RUN_EVENT_TYPES).toHaveLength(17)
+      expect(DAG_RUN_EVENT_TYPES).toHaveLength(26)
       for (const type of DAG_RUN_EVENT_TYPES) {
         let lane: string | undefined
         expect(() => {

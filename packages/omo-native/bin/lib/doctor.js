@@ -10,6 +10,7 @@ import { migrationReport } from "./doctor-migration.js"
 import { launchSpecDoctorLines } from "./launch-spec-mode.js"
 import { piConfigReport } from "./doctor-pi-config.js"
 import { needsSetupSuggestion } from "./setup-detect.js"
+import { sameVersion } from "./same-version.js"
 
 export function installedDistTag(version) {
   return releaseChannel(version)
@@ -401,7 +402,7 @@ export function runDoctor(inventory, args = [], options = {}) {
     try {
       const expected = packageManifest().dependencies["@code-yeongyu/senpi"]
       const installed = readJson(join(senpi.packageRoot, "package.json")).version
-      if (installed === expected) pass(lines, `senpi version ${installed}`)
+      if (sameVersion(installed, expected)) pass(lines, `senpi version ${installed}`)
       else {
         fail(lines, `senpi version: expected ${expected}, found ${installed}`)
         failed = true
@@ -423,12 +424,12 @@ export function runDoctor(inventory, args = [], options = {}) {
   lines.push(...staleEngineReport(options))
   lines.push(...retiredPayloadReport(options))
   lines.push(...transientMemoryReport(options))
+  lines.push(...(options.reflectionLock ?? []))
   const launchSpec = launchSpecDoctorLines(options.pluginRoot ?? join(packageRoot, "plugin"), options.launchSpecIo)
   if (launchSpec.some((line) => line.startsWith("FAIL "))) failed = true
   lines.push(...launchSpec)
-  lines.push(...daemonReport(options), ...(options.computerUse ?? []), ...(options.categoryCoverage ?? []), ...(options.gateway ?? []))
+  lines.push(...daemonReport(options), ...(options.computerUse ?? []), ...(options.categoryCoverage ?? []))
   if ((options.computerUse ?? []).some((line) => line.startsWith("FAIL "))) failed = true
-  if ((options.gateway ?? []).some((line) => line.startsWith("FAIL "))) failed = true
   if (needsSetupSuggestion(inventory)) {
     lines.push("INFO no credentials found; run omo setup to review sibling stores")
   }

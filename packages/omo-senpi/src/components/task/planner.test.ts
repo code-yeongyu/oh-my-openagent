@@ -665,7 +665,7 @@ describe("createTaskChildPlanner plan variant", () => {
     // then
     const resolved = expectResolved(result)
     expect(resolved.plan.model).toBe("openai/gpt-6-astra")
-    expect(resolved.plan.variant).toBe("xhigh")
+    expect(resolved.plan.variant).toBe("high")
   })
 })
 
@@ -737,7 +737,7 @@ describe("createTaskChildPlanner reviewer category routing", () => {
     // then
     const resolved = expectResolved(result)
     expect(resolved.plan.model).toBe("anthropic/claude-opus-5-5")
-    expect(resolved.plan.variant).toBe("medium")
+    expect(resolved.plan.variant).toBe("high")
   })
 })
 

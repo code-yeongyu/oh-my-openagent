@@ -35,7 +35,7 @@ export function stageDesktopEngineReleaseAsset(
   return destination
 }
 
-/** Fails closed if any of the four promised release assets is missing. */
+/** Fails closed if any promised release asset (one per DESKTOP_ENGINE_RELEASE_HOSTS entry) is missing. */
 export function writeDesktopEngineChecksums(outDir: string): string {
   const lines = DESKTOP_ENGINE_RELEASE_HOSTS.map((host) => {
     const name = desktopEngineReleaseAssetName(host)

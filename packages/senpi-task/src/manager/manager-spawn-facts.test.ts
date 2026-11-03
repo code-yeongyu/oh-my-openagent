@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
 import type { TaskRecord } from "../state"
-import { FakeRunner, baseSpec, cleanupProjects, makeManager } from "./__fixtures__/manager-fakes"
+import type { ManagedChildHandle } from "./child-handle"
+import type { ManagedRunner } from "./types"
+import { FakeRunner, baseSpec, cleanupProjects, makeHandle, makeManager } from "./__fixtures__/manager-fakes"
 import { recordSpawnedChildSession, recordSpawnedPid } from "./manager-helpers"
 
 afterEach(cleanupProjects)
@@ -160,5 +162,64 @@ describe("TaskManager spawn-fact persistence", () => {
     expect(store.load(result.task_id)?.pid).toBe(4242)
     expect(handle?.sessionId).toBeDefined()
     expect(store.load(result.task_id)?.child_session_id).toBe(handle?.sessionId)
+  })
+
+  // A hosted child whose open could not read its state (#10873): no id at spawn, so the first
+  // heartbeat that learns it must still land on the record.
+  test("#given a hosted child with no durable id at spawn #when its handle later learns the id #then the record's child_session_id is stamped", async () => {
+    const learned = new Set<(id: string) => void>()
+    const runner: ManagedRunner = {
+      start: (spec) => {
+        const handle: ManagedChildHandle = {
+          ...makeHandle(spec.taskId, 4242).handle,
+          sessionId: undefined,
+          onDurableSessionId: (listener) => {
+            learned.add(listener)
+            return () => learned.delete(listener)
+          },
+        }
+        return Promise.resolve(handle)
+      },
+    }
+    const { manager, store } = makeManager({ process: runner })
+
+    const result = await manager.start(baseSpec({ execution_mode: "process" }))
+    if (result.kind !== "started") throw new Error("expected started")
+    expect(store.load(result.task_id)?.child_session_id).toBeUndefined()
+    for (const listener of [...learned]) listener("durable-learned-late")
+    expect(store.load(result.task_id)?.child_session_id).toBe("durable-learned-late")
+
+    // A later report never replaces a known id: that moves only through session_replaced.
+    for (const listener of [...learned]) listener("durable-stale")
+    expect(store.load(result.task_id)?.child_session_id).toBe("durable-learned-late")
+  })
+
+  // A relaunch onto a new transcript (#10892): the record still carries the predecessor run's id when
+  // this run's open read fails, so the id this run's handle learns must replace it, once.
+  test("#given a relaunched hosted child whose record still holds the predecessor's id #when its handle learns its own id #then that id replaces the predecessor's and a later report does not", async () => {
+    const learned = new Set<(id: string) => void>()
+    const runner: ManagedRunner = {
+      start: (spec) => {
+        const handle: ManagedChildHandle = {
+          ...makeHandle(spec.taskId, 4242).handle,
+          sessionId: undefined,
+          onDurableSessionId: (listener) => {
+            learned.add(listener)
+            return () => learned.delete(listener)
+          },
+        }
+        return Promise.resolve(handle)
+      },
+    }
+    const { manager, store } = makeManager({ process: runner })
+    const result = await manager.start(baseSpec({ execution_mode: "process" }))
+    if (result.kind !== "started") throw new Error("expected started")
+    store.mutate(result.task_id, (fresh) => ({ ...fresh, child_session_id: "durable-predecessor-run" }))
+
+    for (const listener of [...learned]) listener("durable-this-run")
+    expect(store.load(result.task_id)?.child_session_id).toBe("durable-this-run")
+
+    for (const listener of [...learned]) listener("durable-stale")
+    expect(store.load(result.task_id)?.child_session_id).toBe("durable-this-run")
   })
 })

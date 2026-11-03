@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 
-import { taskRecord, taskSnapshot } from "./event-bridge.test-fixtures"
+import { taskRecord, taskSnapshot , fakeTaskRpcTimers } from "./event-bridge.test-fixtures"
 import { wireHarness } from "./event-bridge.test-harness"
 
 describe("event-bridge native task RPC snapshots", () => {
@@ -80,6 +80,45 @@ describe("event-bridge native task RPC snapshots", () => {
 
     expect(harness.pi.rpc).toBeUndefined()
     expect(harness.pi.rpcEvents).toEqual([])
+  })
+
+  it("#given a running child with live progress and no store change #when the first client reattaches and session_resumed fires #then exactly one identical snapshot is re-emitted and progress keeps counting", async () => {
+    const running = taskRecord({ task_id: "st_resumed", status: "running" })
+    const clock = fakeTaskRpcTimers()
+    const { pi, emitChildEvent } = wireHarness("parent-session", {
+      records: { [running.task_id]: running },
+      withRpc: true,
+      taskRpcTimers: clock.timers,
+    })
+    await pi.dispatch("session_start", {}, {})
+    emitChildEvent(running.task_id, { type: "tool_execution_start", toolName: "read", args: { path: "a.ts" } })
+    clock.advance()
+    const beforeResume = pi.rpcEvents.at(-1)
+    if (beforeResume === undefined) throw new Error("expected a live-progress snapshot before the resume")
+    expect(beforeResume).toMatchObject({ data: { tasks: [{ live_progress: { tool_calls: 1 } }] } })
+    pi.rpcEvents.length = 0
+
+    await pi.dispatch("session_resumed", { type: "session_resumed" }, {})
+    expect(pi.rpcEvents).toEqual([beforeResume])
+
+    emitChildEvent(running.task_id, { type: "tool_execution_start", toolName: "read", args: { path: "b.ts" } })
+    clock.advance()
+    expect(pi.rpcEvents.at(-1)).toMatchObject({ data: { tasks: [{ live_progress: { tool_calls: 2 } }] } })
+  })
+
+  it("#given a session without children #when session_resumed fires #then exactly one empty snapshot is emitted", async () => {
+    const { pi } = wireHarness("parent-session", { withRpc: true })
+    await pi.dispatch("session_start", {}, {})
+    pi.rpcEvents.length = 0
+
+    await pi.dispatch("session_resumed", { type: "session_resumed" }, {})
+
+    expect(pi.rpcEvents).toEqual([
+      {
+        name: "omo.task.updated",
+        data: { parent_session_id: "parent-session", tasks: [] },
+      },
+    ])
   })
 
   it("#given an older host with emit but no request registration #when session_start fires #then snapshots still publish without handlers", async () => {

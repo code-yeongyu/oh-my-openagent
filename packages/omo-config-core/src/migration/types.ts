@@ -38,11 +38,15 @@ export type MigrationTransform = (
 ) => Readonly<Record<string, unknown>> | MigrationTransformResult
 
 export type MigrationTargetWriter = (input: {
+  readonly backupPath?: string
   readonly edits: readonly OmoConfigEdit[]
   readonly env: MigrationEnvironment
   readonly fileSystem: MigrationFileSystem
   readonly targetPath: string
-}) => void
+}) => MigrationTargetWriteResult | void
+
+/** The timestamped copy of the pre-write target the writer kept, when the target already existed. */
+export type MigrationTargetWriteResult = { readonly backupPath?: string }
 
 export type MigrationBoundary =
   | "journal-written"
@@ -76,6 +80,7 @@ export type RunMigrationOptions = {
   readonly mode?: "merge" | "replace-target"
   readonly onBoundary?: (boundary: MigrationBoundary) => void
   readonly pid?: number
+  readonly shouldRun?: MigrationPlan["shouldRun"]
   readonly sources: readonly MigrationSourceDescriptor[]
   readonly targetPath: string
   readonly transform: MigrationTransform
@@ -93,11 +98,13 @@ export type MigrationRunResult = {
   readonly journalResumed: boolean
   readonly preview?: MigrationPreview
   readonly status: "locked" | "migrated" | "planned" | "skipped"
+  /** Where the pre-migration target was backed up, for a run that rewrote an existing target. */
+  readonly targetBackupPath?: string
 }
 
 export type RunMigrationsOptions = Omit<
   RunMigrationOptions,
-  "id" | "mode" | "sources" | "targetPath" | "transform"
+  "id" | "mode" | "shouldRun" | "sources" | "targetPath" | "transform"
 > & {
   readonly afterMigrations?: (results: readonly MigrationRunResult[]) => void
   readonly discover: () => readonly MigrationPlan[]
@@ -106,6 +113,8 @@ export type RunMigrationsOptions = Omit<
 
 export type MigrationBatchRunResult = {
   readonly journalResumed: boolean
+  /** The pre-write copy a resumed journal's target write kept, when it rewrote an existing target. */
+  readonly resumedTargetBackupPath?: string
   readonly results: readonly MigrationRunResult[]
   readonly status: "completed" | "locked"
 }

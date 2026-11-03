@@ -13,7 +13,9 @@ import { resetLiveServerRouteForTesting } from "./packages/omo-opencode/src/shar
 import { installModuleMockLifecycle } from "./packages/omo-opencode/src/testing/module-mock-lifecycle"
 import { ensureVendoredLspDaemonBuilt } from "./script/ensure-vendored-lsp-daemon"
 import { installEnvironmentIntegrityCheck } from "./test-support/environment-integrity"
+import { installPostHogTestGuard } from "./test-support/posthog-test-guard"
 import { installHermeticHome } from "./test-hermetic-home"
+import { resetTestDeadline } from "./test-support/test-deadline"
 
 // Installer/doctor integration tests need the vendored lsp-daemon dist that CI builds
 // out-of-band before `bun test`; mirror that here so fresh clones/worktrees pass too.
@@ -66,6 +68,7 @@ function cleanupRulesInjectorStorage(): void {
 }
 
 beforeEach(() => {
+  resetTestDeadline()
   environmentSnapshot = { ...process.env }
   workingDirectorySnapshot = process.cwd()
   process.env.OMO_DISABLE_POSTHOG = "true"
@@ -124,3 +127,4 @@ afterEach(() => {
 })
 
 installEnvironmentIntegrityCheck()
+installPostHogTestGuard()

@@ -15,6 +15,13 @@
  *   - model scope (`request`): the provider credential resolved but this model's request
  *     configuration did not, so only that candidate is skipped and its siblings stay eligible.
  *
+ * A refresh that failed transiently (senpi's `OAuthRefreshUnavailableError`: connection refused,
+ * timeout, 408/429/5xx) says nothing about the sign-in, and the first turn retries it, so it never
+ * skips the provider: skipping would move the whole session to the next provider (for a GPT rung,
+ * the metered `openai` API lane) for its lifetime. The model-scope check still runs on that slot, so
+ * a model whose own request configuration fails is skipped as before; only a model probe that is
+ * itself cut short by the transient refresh leaves the candidate kept unchecked.
+ *
  * Limits: whether a rotating pool actually fails over on the first turn depends on how senpi's pool
  * classifier reads the rejection (a 401/unauthorized/invalid-key answer fails over; a plain
  * `invalid_grant` body does not), and a slot the pool sidecar has blocked still counts here.
@@ -38,6 +45,16 @@ export type AuthFailure = {
   readonly errorKind: string
   /** The thrown value, kept for opt-in diagnostics; never serialized into notices or details. */
   readonly error: unknown
+}
+
+/** A candidate kept although its login refresh failed transiently during the probe. */
+export type RefreshUnavailableKeep = {
+  readonly provider: string
+  readonly model: string
+  /** Class and code of senpi's transient-refresh error (for example `OAuthRefreshUnavailableError/oauth`). */
+  readonly errorKind: string
+  /** Closed transport fact from its cause chain (`ECONNREFUSED`, `http_503`, `TimeoutError`), or `unknown`. */
+  readonly causeKind: string
 }
 
 type AuthOverrides = { readonly slotName?: string }
@@ -84,16 +101,57 @@ function errorKind(error: unknown): string {
   return typeof code === "string" ? `${error.name}/${code}` : error.name
 }
 
+// senpi raises every credential-resolution failure as `ModelsError` (codes such as `auth`/`oauth`);
+// a model's configured header fails with a plain error. Matched by name, not `instanceof`, because
+// the host and this bundle can load different copies of the class.
+function isCredentialResolutionError(error: unknown): boolean {
+  return error instanceof Error && error.name === "ModelsError" && typeof (error as Error & { code?: unknown }).code === "string"
+}
+
 function providerFailureReason(error: unknown): AuthFailureReason {
-  // senpi maps every OAuth refresh failure (rejected token, network error, exchange timeout) onto
-  // `ModelsError` code "oauth"; the message is not inspected, so a transient failure is reported
-  // with the same neutral guidance as a rejected one.
+  // senpi maps every OAuth refresh failure onto `ModelsError` code "oauth"; a transient one never
+  // reaches here (see `isRefreshUnavailable`), so this is a refused refresh.
   return error instanceof Error && (error as Error & { code?: unknown }).code === "oauth" ? "refresh" : "credentials"
+}
+
+// senpi marks its transient refresh failure with this global symbol (not `instanceof`, because the
+// host and this bundle can load different copies of the class) and may wrap it, so the cause chain
+// is walked the way senpi's own `isOAuthRefreshUnavailableError` walks it.
+const REFRESH_UNAVAILABLE = Symbol.for("senpi.oauthRefreshUnavailable")
+const MAX_CAUSE_LINKS = 16
+
+function refreshUnavailableError(error: unknown): object | undefined {
+  const seen = new Set<unknown>()
+  let current = error
+  while (isRecord(current) && !seen.has(current) && seen.size < MAX_CAUSE_LINKS) {
+    seen.add(current)
+    if (Reflect.get(current, REFRESH_UNAVAILABLE) === true) return current
+    current = Reflect.get(current, "cause")
+  }
+  return undefined
+}
+
+// Only closed facts (an error code, an HTTP status, a timeout class) leave the cause chain; never a
+// message, URL or body.
+function transientCauseKind(marked: object): string {
+  const seen = new Set<unknown>()
+  let current: unknown = Reflect.get(marked, "cause")
+  while (isRecord(current) && !seen.has(current) && seen.size < MAX_CAUSE_LINKS) {
+    seen.add(current)
+    const code = Reflect.get(current, "code")
+    if (typeof code === "string" && /^[A-Za-z0-9_]{1,40}$/.test(code)) return code
+    const status = Reflect.get(current, "status")
+    if (typeof status === "number" && Number.isInteger(status)) return `http_${status}`
+    if (Reflect.get(current, "name") === "TimeoutError") return "TimeoutError"
+    current = Reflect.get(current, "cause")
+  }
+  return "unknown"
 }
 
 /**
  * Returns the failure that would stop the first turn on this candidate, or `undefined` when the
  * candidate is usable. `model` is the registry's model object for `provider`/`modelId`.
+ * `onRefreshUnavailable` hears about a candidate kept despite a transient refresh failure.
  */
 export async function probeRequestAuth(
   registry: ProbeRegistry,
@@ -102,6 +160,7 @@ export async function probeRequestAuth(
   provider: string,
   modelId: string,
   model: unknown,
+  onRefreshUnavailable?: (keep: RefreshUnavailableKeep) => void,
 ): Promise<AuthFailure | undefined> {
   const slots = credentialSlots(registry, provider)
   // The engine's selection: without rotation only the flat credential is used; with it, a pin is
@@ -116,6 +175,7 @@ export async function probeRequestAuth(
 
   let resolvedSlot: string | undefined
   let resolved = false
+  let unavailable: { readonly slot: string | undefined } | undefined
   let lastError: unknown
   for (const slot of candidates) {
     try {
@@ -127,17 +187,34 @@ export async function probeRequestAuth(
       break
     } catch (error) {
       lastError = error
+      const marked = refreshUnavailableError(error)
+      if (marked !== undefined && unavailable === undefined) unavailable = { slot }
     }
   }
-  if (!resolved) {
+  if (!resolved && unavailable === undefined) {
     return { provider, model: modelId, reason: providerFailureReason(lastError), errorKind: errorKind(lastError), error: lastError }
+  }
+  // A slot whose refresh is only temporarily unavailable may serve the first turn after its retry,
+  // so the provider stays eligible and the model-scope check runs on that slot.
+  const modelSlot = resolved ? resolvedSlot : unavailable?.slot
+  const keep = (marked: object): undefined => {
+    onRefreshUnavailable?.({ provider, model: modelId, errorKind: errorKind(marked), causeKind: transientCauseKind(marked) })
+    return undefined
   }
 
   try {
-    await runtime.getAuth(model, resolvedSlot === undefined ? {} : { slotName: resolvedSlot })
+    await runtime.getAuth(model, modelSlot === undefined ? {} : { slotName: modelSlot })
   } catch (error) {
-    return { provider, model: modelId, reason: "request", errorKind: errorKind(error), error }
+    const marked = refreshUnavailableError(error)
+    if (marked !== undefined) return keep(marked)
+    // After a transient provider probe the model probe re-runs the credential resolution; a failure
+    // there is still provider-scope (`refresh` or `credentials`), anything else is this model's
+    // request configuration.
+    const reason = !resolved && isCredentialResolutionError(error) ? providerFailureReason(error) : "request"
+    return { provider, model: modelId, reason, errorKind: errorKind(error), error }
   }
+  // The model probe resolved the credential itself, so a transient provider-probe refresh has since
+  // succeeded and nothing is left for the first turn to retry.
   return undefined
 }
 

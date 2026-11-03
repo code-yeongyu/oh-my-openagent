@@ -5,6 +5,7 @@ import {
   getDesktopEngineHost,
   launchDesktopEngine,
   type DesktopEngineLocateDiagnostic,
+  type DesktopLaunchRefusalReason,
 } from "@oh-my-opencode/senpi-desktop-engine"
 import type { DesktopCapabilities } from "@oh-my-opencode/senpi-desktop-protocol"
 import { isSupportedHost } from "@oh-my-opencode/senpi-desktop-tool"
@@ -13,6 +14,7 @@ import { resolveInstalledEngine } from "../omo-senpi/src/components/computer-use
 import {
   COMPUTER_USE_DOCTOR_TIMEOUT_MS,
   type EngineLauncher,
+  type EngineProbeResult,
   probeComputerUseEngine,
 } from "./computer-use-engine-probe"
 
@@ -60,8 +62,10 @@ export type ComputerUseDoctorReport =
       readonly enginePath: string
       readonly engineSource: string
       readonly launchedEnginePath?: string
-      readonly code: "abi-mismatch" | "handshake-failed" | "timeout"
+      readonly code: Extract<EngineProbeResult, { ok: false }>["code"]
       readonly message: string
+      readonly reason?: DesktopLaunchRefusalReason
+      readonly diagnostic?: string
     })
 
 export type ComputerUseDoctorInput = {
@@ -132,7 +136,10 @@ export async function computerUseDoctorReport(input: ComputerUseDoctorInput): Pr
     ...(launched.path === resolved.path ? {} : { launchedEnginePath: launched.path }),
   }
   if (!probed.ok) {
-    return { ...base, ...location, kind: "failed", code: probed.code, message: probed.message }
+    return {
+      ...base, ...location, kind: "failed", code: probed.code, message: probed.message,
+      ...(probed.code === "launch-context-unavailable" ? { reason: probed.reason, diagnostic: probed.diagnostic } : {}),
+    }
   }
   return {
     ...base,
