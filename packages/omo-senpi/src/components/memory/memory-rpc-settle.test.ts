@@ -253,6 +253,7 @@ async function publishBindAndOneTurn(order: "bind-first" | "settle-first"): Prom
     },
   }
   const runtime = { reconcile: async () => {} } as unknown as MemoryIdentityRuntime
+  const context = componentContext()
   let wiring: MemoryWiring | undefined
   let bound: Promise<void> | undefined
   let settling: Promise<unknown> | undefined
@@ -270,7 +271,7 @@ async function publishBindAndOneTurn(order: "bind-first" | "settle-first"): Prom
         })
         wiring.registerStatic(api, ctx)
       },
-    }], { logger: componentContext().logger })(pi)
+    }], { logger: context.logger })(pi)
     if (wiring === undefined) throw new Error("memory wiring was not registered")
     bound = wiring.afterBind(pi, sessionId, identity, eventCtx)
     if (order === "settle-first") await Promise.all([bindHeld.promise, bindJournalRead.promise])
@@ -284,6 +285,8 @@ async function publishBindAndOneTurn(order: "bind-first" | "settle-first"): Prom
     releaseBind.resolve()
     // Both await their full syncs: the bind's own build and the settle observer's queued one.
     await Promise.all([bound, settling])
+    // The observer finished its queued sync itself; a budget cut-off would log a stall instead.
+    expect(context.logs).not.toContainEqual(expect.objectContaining({ message: "extension_handler_stalled" }))
     return published
   } finally {
     releaseBind.resolve()
