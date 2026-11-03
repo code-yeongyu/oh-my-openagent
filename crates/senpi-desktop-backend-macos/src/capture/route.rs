@@ -223,6 +223,7 @@ impl MacCapture {
                 let (width, height) = (frame.image.width(), frame.image.height());
                 let (x, y, logical_width, logical_height) = frame.bounds;
                 let window = DesktopWindow {
+                    identity: None,
                     id: id.clone(),
                     title: String::new(),
                     app: String::new(),

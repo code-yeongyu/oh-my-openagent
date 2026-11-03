@@ -107,5 +107,10 @@ pub fn snapshot(
         text,
         node_count,
         truncated: state.truncated,
+        generation: None,
+        parent: None,
+        complete: None,
+        nodes_observed: None,
+        cuts: Vec::new(),
     })
 }

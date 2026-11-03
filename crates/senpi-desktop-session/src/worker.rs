@@ -109,7 +109,7 @@ impl Worker {
                 self.backend = Err(error);
             }
         }
-        self.registry = AxRegistry::default();
+        self.registry = AxRegistry::with_report_mode(options.report_mode);
         self.frames = FrameCache::default();
         self.options = Some(options);
         self.session_id = ulid::Ulid::generate().to_string();
@@ -155,7 +155,10 @@ impl Worker {
     }
 
     fn serve(&mut self, op: Op, cancelled: &dyn Fn() -> bool) -> CoreResult<Response> {
-        let served = |audited: CoreResult<Audited>| audited.map(|(response, _audit)| response);
+        let mode = self.registry.report_mode();
+        let served = |audited: CoreResult<Audited>| {
+            audited.map(|(response, audit)| crate::report::respond(mode, response, &audit))
+        };
         // Every mutating request goes through `mutate`; reads bypass it.
         match op {
             Op::Displays => Ok(Response::Displays(self.backend()?.displays()?)),
