@@ -6,7 +6,7 @@ Native Senpi skills authored directly against the Senpi tool surface (not ported
 
 | Skill | Role |
 |-------|------|
-| `mass-ulw/` | Chained-dag orchestration at repo scale (multi-run composition, size formula, node categories). `references/planning.md` is REQUIRED reading before building any dag: wave doctrine, node prompt contract, failure playbook. |
+| `mass-ulw/` | Dag orchestration at repo scale (one run per phase with every stage chained up front, file handoff between nodes, size formula, node categories). `references/planning.md` is REQUIRED reading before building any dag: stage doctrine, node prompt contract, failure playbook. |
 | `ultrawork/` | Senpi-native ultrawork directive source; its body is embedded into `src/components/ultrawork/generated-directive.ts` by `plugin/scripts/embed-directive.mjs` (build fails on non-senpi harness tokens). Blocks wrapped in `<!-- omo-ultrawork-astra:<name>:start/end -->` are swapped for the matching `## <name>` section of `references/astra-variant.md` in the GPT-6 Astra variant the ultrawork component selects by receiving model; the baseline strips only the marker lines, so every other model reads the skill body verbatim. |
 | `ulw-plan/` | Read-only planning lifecycle: draft -> plan with explicit approval; `scripts/scaffold-plan.mjs` scaffolds guarded `.omo` artifacts. |
 | `ulw-loop/` | Goal/QA lifecycle loop; component-owned native source, shipped verbatim. |
@@ -28,7 +28,7 @@ Native Senpi skills authored directly against the Senpi tool surface (not ported
 ## ANTI-PATTERNS
 
 - init-deep: the main session NEVER reads raw chunk reports or node outputs (ALWAYS-REDUCE); scanners never write AGENTS.md; existing files are read before overwrite; generated managed blocks are never hand-edited.
-- mass-ulw: no dag before reading `references/planning.md`; no dependency edges merely to pass data; no code-changing graph without a final verification node.
+- mass-ulw: no dag before reading `references/planning.md`; no dependency edge for a fact the orchestrator already knows (paste it into the prompt); no code-changing graph without a final verification node.
 - ulw-plan: no self-activation; no implementer dispatch (read-only lane); waits for explicit approval; never begins execution.
 - ulw-loop: no sleep/timed polling for async state. ultrawork: no `tmux capture-pane` as visual evidence; paired cleanup required.
 - Workers never edit outside the assigned scope and never commit.

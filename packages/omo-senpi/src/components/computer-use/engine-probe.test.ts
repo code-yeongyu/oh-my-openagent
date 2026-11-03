@@ -4,6 +4,7 @@ import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { createInterface } from "node:readline"
+import { fileURLToPath } from "node:url"
 import {
   COMPUTER_USE_DOCTOR_TIMEOUT_MS,
   launchEngineBinary,
@@ -11,6 +12,19 @@ import {
   type EngineLauncher,
   type EngineProbeResult,
 } from "./engine-probe"
+
+test("doctor accepts an older engine without cursorOverlay as unsupported", async () => {
+  // Given: the same real NDJSON engine fixture used by the desktop service.
+  const engine = fileURLToPath(new URL("../../../../senpi-desktop-service/test/fake-engine.mjs", import.meta.url))
+  // When: startup/doctor reads the older capability payload.
+  const result = await probeComputerUseEngine(
+    engine, { FAKE_ENGINE_CURSOR_OMITTED: "1" }, COMPUTER_USE_DOCTOR_TIMEOUT_MS,
+    (path, args, env) => launchEngineBinary(process.execPath, [path, ...args], env),
+  )
+  // Then: version skew does not turn a usable engine into malformed capabilities.
+  expect(result).toMatchObject({ ok: true })
+  if (result.ok) expect(result.value.capabilities.cursorOverlay).toBe(false)
+})
 
 test.skipIf(process.platform === "win32")(
   "#given an engine descendant retaining pipes #when the deadline expires #then the probe returns and the descendant is gone",

@@ -7,6 +7,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { expect, test } from "bun:test"
+import { windowsTreeKillArgs } from "../../../memory-core/src/concurrency/windows-process-tree.mjs"
 
 // Every task child on Windows runs as its own `senpi --mode rpc` process, so this is where a child's own
 // fallback chain (#9582) has to survive a usage limit after a tool call - including one that lands near
@@ -47,7 +48,9 @@ function scenarioDiagnostics(outDir: string, scenario: ScenarioVerdict): string 
 
 async function terminateProcessTree(child: ChildProcess): Promise<void> {
   if (child.exitCode !== null || child.signalCode !== null || child.pid === undefined) return
-  const killer = spawn("taskkill.exe", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true })
+  const args = windowsTreeKillArgs(child.pid)
+  if (args.length === 0) return
+  const killer = spawn("taskkill.exe", args, { stdio: "ignore", windowsHide: true })
   await Promise.race([once(killer, "close"), once(killer, "error")])
 }
 

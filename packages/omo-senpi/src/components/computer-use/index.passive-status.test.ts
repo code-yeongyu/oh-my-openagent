@@ -27,7 +27,7 @@ test.if(process.platform !== "win32")(`status passively probes permissions and r
 import { appendFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 const capabilities = { backend: "fake", capture: false, input: false, ax: false,
- backgroundWindowInput: false, deliveryModes: [], capturePermission: "denied",
+ backgroundWindowInput: false, cursorOverlay: false, deliveryModes: [], capturePermission: "denied",
  inputPermission: "denied", axPermission: "denied", displayCount: 0,
  focusGuard: true, stopPath: "none", screenLocked: false };
 createInterface({ input: process.stdin }).on("line", line => {

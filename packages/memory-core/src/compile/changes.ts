@@ -1,4 +1,4 @@
-import { GitCommandError, type GitMemoryRepo } from "../git"
+import { GitCommandError, type GitMemoryRepo, type MemoryCommit } from "../git"
 
 export const MEMORY_SESSION_TRAILER = "Omo-Session"
 
@@ -15,6 +15,8 @@ export interface ProjectedChanges {
 
 export interface ProjectedChangesOptions {
   readonly excludeSessionId?: string
+  /** Receives the commits of the range this call already read, so a caller needs no second log. */
+  readonly onCommits?: (commits: readonly MemoryCommit[]) => void
 }
 
 const NO_CHANGES: ProjectedChanges = { added: [], updated: [], removed: [] }
@@ -32,6 +34,7 @@ export async function projectedChangesBetween(
 ): Promise<ProjectedChanges> {
   if (head === null || base === head) return NO_CHANGES
   const commits = await repo.log({ range: base === null ? head : `${base}..${head}`, includePaths: true })
+  options.onCommits?.(commits)
   const touched = new Set<string>()
   for (const commit of commits) {
     if (options.excludeSessionId !== undefined && commit.trailers[MEMORY_SESSION_TRAILER] === options.excludeSessionId) continue

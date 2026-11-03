@@ -3,6 +3,7 @@ import { dirname, isAbsolute } from "node:path"
 import type { Socket } from "node:net"
 
 import type { FakeSessionTable } from "./fake-host-sessions"
+import type { FakeInputAdmissions } from "./fake-input-admissions"
 
 /**
  * The fake daemon's wire half: one JSONL line in, one response (or nothing, when a suite withholds
@@ -33,6 +34,7 @@ export type FakeHostWarmAnswer =
   | { readonly refuse: string }
 
 export interface FakeHostWirePorts {
+  readonly admissions: FakeInputAdmissions
   readonly table: FakeSessionTable
   readonly warm: FakeHostWarmAnswer
   /** Read per line so a handoff's rotated instance answers the very next probe. */
@@ -41,6 +43,8 @@ export interface FakeHostWirePorts {
   /** Mirror the engine: opening at a path whose directory does not exist fails with ENOENT. */
   readonly enforceSessionDir: boolean
   readonly withheld: ReadonlySet<string>
+  /** Commands whose reply is queued until the test releases it; the command itself is recorded at once. */
+  readonly held?: Map<string, Array<() => void>>
   /** Commands the host refuses, with the error it answers. */
   readonly failed: ReadonlyMap<string, string>
   readonly record: (command: FakeHostCommand) => void
@@ -50,13 +54,36 @@ export function writeFrame(socket: Socket, payload: unknown): void {
   socket.write(`${JSON.stringify(payload)}\n`)
 }
 
-export function handleWireLine(ports: FakeHostWirePorts, socket: Socket, line: string): void {
+export function handleWireLine(ports: FakeHostWirePorts, socket: Socket, line: string, replay = false): void {
   const parsed: unknown = JSON.parse(line)
   if (typeof parsed !== "object" || parsed === null) return
   const payload: Readonly<Record<string, unknown>> = { ...parsed }
   const type = typeof payload.type === "string" ? payload.type : "unknown"
   const routingId = typeof payload.sessionId === "string" ? payload.sessionId : undefined
-  ports.record({ type, sessionId: routingId, payload })
+  if (!replay) ports.record({ type, sessionId: routingId, payload })
+  const held = replay ? undefined : ports.held?.get(type)
+  if (held !== undefined) {
+    held.push(() => handleWireLine(ports, socket, line, true))
+    return
+  }
+  if (["prompt", "steer", "follow_up"].includes(type) && typeof payload.clientMessageId === "string") {
+    const session = ports.table.view().find(candidate => candidate.routingId === routingId)
+    const answer = ports.admissions.admit(session?.sessionPath ?? "", payload)
+    if (answer === "conflict") {
+      if (ports.withheld.has(type)) return
+      return writeFrame(socket, { type: "response", id: payload.id, command: type, success: false,
+        error: "client_message_id_conflict: different payload", errorCode: "client_message_id_conflict" })
+    }
+    if (!answer.replayed && routingId !== undefined && typeof payload.message === "string") {
+      ports.table.appendTranscript(routingId, { role: "user", content: payload.message })
+      if (type === "prompt") ports.table.setStreaming(routingId, true)
+    }
+    if (ports.withheld.has(type)) return
+    const failure = ports.failed.get(type)
+    if (failure !== undefined) return writeFrame(socket, { type: "response", id: payload.id, command: type, success: false, error: failure })
+    return writeFrame(socket, { type: "response", id: payload.id, command: type, success: true,
+      data: { disposition: answer.disposition, replayed: answer.replayed } })
+  }
   if (ports.withheld.has(type)) return
   const failure = ports.failed.get(type)
   if (failure !== undefined) {
@@ -89,6 +116,12 @@ export function handleWireLine(ports: FakeHostWirePorts, socket: Socket, line: s
         isStreaming: routingId !== undefined && ports.table.isStreaming(routingId),
         ...(model === undefined ? {} : { model }),
       })
+    }
+    case "set_session_context": {
+      const patch = typeof payload.patch === "object" && payload.patch !== null ? Object.fromEntries(Object.entries(payload.patch)) : {}
+      if (ports.table.patchContext(socket, routingId ?? "", patch)) return ok({})
+      return writeFrame(socket, { type: "response", id: payload.id, command: type, success: false,
+        error: "session_not_attached", errorCode: "session_not_attached" })
     }
     case "get_entries":
       return ok({ entries: [], leafId: null })

@@ -10,7 +10,7 @@ import {
 const recordOf = (value: unknown): Json => isRecord(value) ? value : {}
 const EXPECTED = {
   capturePermission: "granted", inputPermission: "granted", axPermission: "granted",
-  stopPath: "global", backgroundWindowInput: true,
+  stopPath: "global", backgroundWindowInput: true, cursorOverlay: true,
 } as const
 
 export async function preflight(options: RunOptions): Promise<ScenarioResult> {

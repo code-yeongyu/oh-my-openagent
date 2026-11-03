@@ -22,15 +22,22 @@ export interface EngineLog {
 	readonly message: string;
 }
 
+/**
+ * What a host reads for an audit `action` or `code` it does not know, sent by a newer engine: the event is kept,
+ * never dropped.
+ */
+export const UNKNOWN_AUDIT_VALUE = "unknown";
+export type UnknownAuditValue = typeof UNKNOWN_AUDIT_VALUE;
+
 /** The `audit` notification payload: one per mutating request, success or failure. */
 export interface AuditEvent {
-	readonly action: EngineMethod;
+	readonly action: EngineMethod | UnknownAuditValue;
 	readonly target: string;
 	/** `background` or `foreground`. */
 	readonly delivery: string;
 	readonly frameId?: string | null;
 	/** `null` when the request succeeded. */
-	readonly code?: ErrorCode | null;
+	readonly code?: ErrorCode | UnknownAuditValue | null;
 	readonly durationMs: number;
 	readonly focusRestored?: boolean | null;
 	readonly textLength?: number | null;
@@ -41,7 +48,7 @@ export interface AuditEvent {
 	readonly keys?: readonly string[] | null;
 }
 
-/** Runtime truth about what this host's backend can do right now (frozen field set). */
+/** Runtime truth about what this host's backend can do right now. */
 export interface DesktopCapabilities {
 	readonly backend: string;
 	readonly displayServer?: string | null;
@@ -49,6 +56,7 @@ export interface DesktopCapabilities {
 	readonly input: boolean;
 	readonly ax: boolean;
 	readonly backgroundWindowInput: boolean;
+	readonly cursorOverlay: boolean;
 	readonly deliveryModes: readonly string[];
 	readonly capturePermission: string;
 	readonly inputPermission: string;
@@ -63,4 +71,10 @@ export interface DesktopCapabilities {
 	/** Windows mandatory integrity level of the engine process. */
 	readonly integrityLevel?: string | null;
 	readonly screenLocked: boolean;
+	/** Captures run through the legacy `screencapture` path, not the ScreenCaptureKit worker (B9). */
+	readonly legacyCapture?: boolean;
+	/** The watch of the user's own key presses and clicks behind `UserIntervened`; absent on backends without one and on older engines. */
+	readonly interventionWatch?: "on" | "off" | "not_started" | null;
+	/** macOS: the display is asleep, so capture and input may fail; absent on older engines. */
+	readonly displayAsleep?: boolean | null;
 }

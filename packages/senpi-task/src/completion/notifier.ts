@@ -2,7 +2,7 @@ import { log } from "@oh-my-opencode/utils"
 
 import type { TaskRecord, TaskStatus } from "../state"
 import { buildCompletionDetails, buildCompletionMessage } from "./notification"
-import { routeCompletion, shouldNotifyStatus } from "./routing"
+import { routeCompletion, shouldNotifyRecord } from "./routing"
 import type {
   CompletionDetails,
   CompletionNotifier,
@@ -72,7 +72,7 @@ export function createCompletionNotifier(deps: CompletionNotifierDeps): Completi
     if (fresh === null) return finishRetryChain(entry)
     if (fresh.notification.run_epoch !== entry.epoch) return finishRetryChain(entry)
     if (!TERMINAL_STATUSES.has(fresh.status)) return finishRetryChain(entry)
-    if (!shouldNotifyStatus(fresh.status)) return finishRetryChain(entry)
+    if (!shouldNotifyRecord(fresh)) return finishRetryChain(entry)
     if (fresh.notification.notified_epoch >= entry.epoch) return finishRetryChain(entry)
 
     const decision = routeCompletion(getParentState())
@@ -115,7 +115,7 @@ export function createCompletionNotifier(deps: CompletionNotifierDeps): Completi
     if (!request.runInBackground) return { kind: "skipped", reason: "sync-task" }
     const record = deps.store.load(request.record.task_id) ?? request.record
     if (!TERMINAL_STATUSES.has(record.status)) return { kind: "skipped", reason: "not-terminal" }
-    if (!shouldNotifyStatus(record.status)) return { kind: "skipped", reason: "non-notifying-terminal" }
+    if (!shouldNotifyRecord(record)) return { kind: "skipped", reason: "non-notifying-terminal" }
 
     if (record.notification.notified_epoch >= record.notification.run_epoch) {
       return { kind: "skipped", reason: "already-notified" }
@@ -137,7 +137,7 @@ export function createCompletionNotifier(deps: CompletionNotifierDeps): Completi
       const fresh = deps.store.load(taskId)
       if (fresh === null) continue
       if (!TERMINAL_STATUSES.has(fresh.status)) continue
-      if (!shouldNotifyStatus(fresh.status)) continue
+      if (!shouldNotifyRecord(fresh)) continue
       const epoch = fresh.notification.run_epoch
       unpersistNotified(deps.store, taskId, epoch)
       recordFailure(deps.store, taskId, epoch, input.error)
@@ -185,7 +185,7 @@ export function createCompletionNotifier(deps: CompletionNotifierDeps): Completi
       if (record.parent_session_id !== input.sessionId) continue
       if (record.notification.notified_epoch >= epoch) continue
       if (!TERMINAL_STATUSES.has(record.status)) continue
-      if (!shouldNotifyStatus(record.status)) continue
+      if (!shouldNotifyRecord(record)) continue
       if (!owesNotification(record)) continue
       // A LIVE in-memory buffered entry already owns delivery of this (task_id, run_epoch) - the
       // next flush delivers it. Reconcile only recovers notifications whose buffer died with the

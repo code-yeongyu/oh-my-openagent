@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next"
+import { ogPalette } from "@/lib/og/palette"
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
@@ -8,7 +9,7 @@ export default function manifest(): MetadataRoute.Manifest {
       "The Best Agent Harness. Meet OmO: the batteries-included agent harness that codes like you.",
     start_url: "/",
     display: "standalone",
-    background_color: "#0a0a0a",
+    background_color: ogPalette.ink0,
     theme_color: "#00d4ff",
     icons: [
       {

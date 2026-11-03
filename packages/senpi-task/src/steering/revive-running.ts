@@ -1,9 +1,11 @@
 import type { ManagedChildHandle } from "../manager/child-handle"
+import { HostSessionDetachedError, SessionHeldElsewhereError } from "../runners/rpc-host/session-wire"
 import { getLifecycleDetachedRevival } from "../lifecycle/port"
 import type { TaskRecord } from "../state"
 import { evictionRefusal, lazyRevivalFailure } from "./engine-policy"
 import { bestEffortRollback } from "./revival-rollback"
 import type { SendOutcome, SteeringPort } from "./types"
+import { InputUncertainError, InputConflictError } from "../runners/input-effects"
 
 const UNUSED_RESERVATION = { ok: true as const, commit: (): void => undefined, release: (): void => undefined }
 
@@ -23,19 +25,21 @@ export async function reviveRunningOnSend(
   message: string,
   beginSend: (taskId: string) => boolean,
   endSend: (taskId: string) => void,
+  queueRecovery?: () => SendOutcome,
 ): Promise<SendOutcome> {
-  if (!beginSend(record.task_id)) return evictionRefusal(record.task_id)
+  if (!beginSend(record.task_id)) return queueRecovery?.() ?? evictionRefusal(record.task_id)
   try {
     const reviveDetached = port.reviveDetached ?? getLifecycleDetachedRevival(port.store)
-    if (reviveDetached === undefined) return lazyRevivalFailure(record, "revival is unavailable")
+    if (reviveDetached === undefined) return queueRecovery?.() ?? lazyRevivalFailure(record, "revival is unavailable")
     let revived: Awaited<ReturnType<typeof reviveDetached>>
     try {
       revived = await reviveDetached(record.task_id, UNUSED_RESERVATION)
     } catch (error) {
       await bestEffortRollback(port, record)
-      return lazyRevivalFailure(record, error instanceof Error ? error.message : String(error))
+      return queueRecovery?.() ?? lazyRevivalFailure(record, error instanceof Error ? error.message : String(error))
     }
     if (!revived.ok) {
+      if (queueRecovery !== undefined) return queueRecovery()
       return revived.code === undefined ? lazyRevivalFailure(record, revived.reason) : { kind: revived.code, task_id: record.task_id, reason: revived.reason }
     }
     const reopened = port.store.load(record.task_id)
@@ -45,7 +49,13 @@ export async function reviveRunningOnSend(
     try {
       await handle.followUp(message)
     } catch (error) {
-      return await refusedDelivery(port, record, handle, error)
+      if (error instanceof InputUncertainError) return { kind: "uncertain", task_id: record.task_id,
+        effect_id: error.effectId, reason: error.message }
+      if (error instanceof InputConflictError) return { kind: "failed", task_id: record.task_id,
+        effect_id: error.effectId, reason: error.reason, detail: error.detail, action: error.action }
+      const failed = await refusedDelivery(port, record, handle, error)
+      return (error instanceof HostSessionDetachedError || error instanceof SessionHeldElsewhereError)
+        && queueRecovery !== undefined ? queueRecovery() : failed
     }
     if (!stillReopened(port, port.store.load(record.task_id), reopened, handle)) {
       return lazyRevivalFailure(record, "revived run ended or changed ownership before delivery acknowledged")

@@ -187,7 +187,7 @@ describe("panel store parked children and session boundaries", () => {
   test("#given a parked child #when it resumes #then its card no longer carries the parked reason", () => {
     // given
     const store = createPanelStore(clock())
-    store.upsertChild({ id: "a", status: "suspended", parkedReason: "host draining" })
+    store.upsertChild({ id: "a", status: "resuming", parkedReason: "host draining" })
 
     // when
     const changed = store.upsertChild({ id: "a", status: "running" })
@@ -200,10 +200,10 @@ describe("panel store parked children and session boundaries", () => {
   test("#given a parked child #when only its reason changes #then the change is reported and kept", () => {
     // given
     const store = createPanelStore(clock())
-    store.upsertChild({ id: "a", status: "suspended", parkedReason: "detached" })
+    store.upsertChild({ id: "a", status: "resuming", parkedReason: "detached" })
 
     // when
-    const changed = store.upsertChild({ id: "a", status: "suspended", parkedReason: "daemon gone" })
+    const changed = store.upsertChild({ id: "a", status: "resuming", parkedReason: "daemon gone" })
 
     // then
     expect(changed).toBe(true)

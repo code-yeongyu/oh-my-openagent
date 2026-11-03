@@ -8,6 +8,7 @@ import { FakeSessionTable, type FakeDrainedSession, type FakeHostSession } from 
 import { fakeProtocolInfo, probeFakeHost, type FakeHostIdentityOptions } from "./fake-host-probe"
 import { fakeHostTransport, type FakeHostTransport } from "./fake-host-transport"
 import { handleWireLine, writeFrame, type FakeHostCommand, type FakeHostOpenFailure, type FakeHostWarmAnswer } from "./fake-host-wire"
+import { FakeInputAdmissions } from "./fake-input-admissions"
 
 /**
  * In-process unix-socket JSONL daemon: enough of the senpi multi-session wire for a child session
@@ -40,6 +41,7 @@ export interface FakeHostOptions extends FakeHostIdentityOptions {
 }
 
 export interface FakeHost {
+  readonly admissions: FakeInputAdmissions
   readonly socketPath: string
   readonly commands: readonly FakeHostCommand[]
   readonly connections: number
@@ -54,6 +56,8 @@ export interface FakeHost {
   withholdReply(type: string): void
   /** Answer the named command again from now on; a reply already withheld stays unanswered. */
   allowReply(type: string): void
+  /** Queue the named command's replies until the returned release is called; release sends them all, in order. */
+  holdReply(type: string): () => void
   /** Refuse the named command with this error from now on; `undefined` answers it normally again. */
   failReply(type: string, error: string | undefined): void
   requestUi(routingId: string, request: Readonly<Record<string, unknown>>): void
@@ -62,6 +66,12 @@ export interface FakeHost {
   stall(driftMs: number): void
   /** Finish the turn in flight with an assistant answer, exactly as a real session would. */
   completeTurn(routingId: string, text: string): void
+  /**
+   * The host-side abort of a turn in flight (a user escape, a forced stop, a replaced session): the transcript
+   * gains the aborted assistant row and the session goes idle, exactly as the real host leaves it. `abortCause`
+   * names a cause the host reported (senpi's `abortCause`).
+   */
+  abortTurn(routingId: string, text?: string, abortCause?: Readonly<Record<string, unknown>>): void
   evict(sessionPath: string): void
   closeSession(routingId: string, reason: string): void
   holdPath(sessionPath: string, ownerInstanceId: string): void
@@ -72,7 +82,8 @@ export interface FakeHost {
   cutConnections(): void
   crash(): void
   restart(): Promise<void>
-  waitForCommand(type: string): Promise<FakeHostCommand>
+  /** Subscribe before triggering; resolves on the `count`th future command of this type. */
+  waitForCommand(type: string, count?: number): Promise<FakeHostCommand>
   /** Resolve when exactly `count` connections are open - a detach observed, never polled for. */
   waitForConnections(count: number): Promise<void>
   stop(): Promise<void>
@@ -90,11 +101,13 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
   let transport: FakeHostTransport
   const drainRetryAfterMs = options.drainRetryAfterMs ?? 2_000
   const table = new FakeSessionTable({ transcripts: options.transcripts === true, sessionProcesses: options.sessionProcesses === true })
+  const admissions = new FakeInputAdmissions()
   const commands: FakeHostCommand[] = []
-  const waiters: Array<{ readonly type: string; readonly resolve: (command: FakeHostCommand) => void }> = []
+  const waiters: Array<{ readonly type: string; remaining: number; readonly resolve: (command: FakeHostCommand) => void }> = []
   const sockets = new Set<Socket>()
   const connectionWaiters: Array<{ readonly count: number; readonly resolve: () => void }> = []
   const withheld = new Set<string>()
+  const held = new Map<string, Array<() => void>>()
   const failed = new Map<string, string>()
   let identity = fakeProtocolInfo(options)
   let generation = typeof identity.generation === "number" ? identity.generation : 1
@@ -106,12 +119,13 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
     for (let index = waiters.length - 1; index >= 0; index--) {
       const waiter = waiters[index]
       if (waiter === undefined || waiter.type !== command.type) continue
+      if (--waiter.remaining > 0) continue
       waiters.splice(index, 1)
       waiter.resolve(command)
     }
   }
 
-  const ports = { table, warm: options.warm ?? { state: "warmed" as const }, identity: () => identity, openFailure: () => openFailure, enforceSessionDir: options.enforceSessionDir === true, withheld, failed, record }
+  const ports = { table, admissions, warm: options.warm ?? { state: "warmed" as const }, identity: () => identity, openFailure: () => openFailure, enforceSessionDir: options.enforceSessionDir === true, withheld, held, failed, record }
 
   const settleConnectionWaiters = (): void => {
     for (let index = connectionWaiters.length - 1; index >= 0; index--) {
@@ -177,6 +191,7 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
 
   return {
     socketPath,
+    admissions,
     commands,
     get connections() {
       return sockets.size
@@ -193,6 +208,14 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
     withholdReply: (type) => {
       withheld.add(type)
     },
+    holdReply: (type) => {
+      held.set(type, [])
+      return () => {
+        const queued = held.get(type) ?? []
+        held.delete(type)
+        for (const reply of queued) reply()
+      }
+    },
     allowReply: (type) => {
       withheld.delete(type)
     },
@@ -201,7 +224,10 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
       else failed.set(type, error)
     },
     requestUi: (routingId, request) => sendTo(routingId, { type: "extension_ui_request", ...request }),
-    emitRecord: (routingId, payload) => sendTo(routingId, payload),
+    emitRecord: (routingId, payload) => {
+      if (payload["type"] === "agent_start" && (payload["sessionId"] === undefined || payload["sessionId"] === routingId)) table.setStreaming(routingId, true)
+      sendTo(routingId, payload)
+    },
     stall: (driftMs) => {
       for (const socket of [...sockets]) writeFrame(socket, { type: "host_stalled", driftMs })
     },
@@ -211,6 +237,14 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
       table.setStreaming(routingId, false)
       sendTo(routingId, { type: "message_end", message })
       sendTo(routingId, { type: "agent_end", willRetry: false, messages: [message] })
+      sendTo(routingId, { type: "agent_idle" })
+    },
+    abortTurn: (routingId, text = "", abortCause) => {
+      const message = { role: "assistant", content: [{ type: "text", text }], stopReason: "aborted" }
+      table.appendTranscript(routingId, message)
+      table.setStreaming(routingId, false)
+      sendTo(routingId, { type: "message_end", message })
+      sendTo(routingId, { type: "agent_end", willRetry: false, messages: [message], aborted: true, abortSource: "user", ...(abortCause === undefined ? {} : { abortCause }) })
       sendTo(routingId, { type: "agent_idle" })
     },
     evict: (sessionPath) => {
@@ -248,9 +282,9 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
       await closeServer()
       await listen()
     },
-    waitForCommand: (type) =>
+    waitForCommand: (type, count = 1) =>
       new Promise<FakeHostCommand>((resolve) => {
-        waiters.push({ type, resolve })
+        waiters.push({ type, remaining: count, resolve })
       }),
     waitForConnections: (count) =>
       sockets.size === count

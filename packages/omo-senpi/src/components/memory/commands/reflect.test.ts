@@ -117,7 +117,7 @@ describe("/reflect", () => {
     const { deps, pi, ctx } = await harness({
       loadSettings: () => ({
         settings: memorySettings({
-          reflection: { enabled: false, trigger: { step_count: 25, on_compaction: true }, merge: "auto", category: "quick", timeout_minutes: 15, sandbox: "auto" },
+          reflection: { enabled: false, trigger: { step_count: 25, on_compaction: true }, merge: "auto", category: "quick", timeout_minutes: 15, max_concurrent_runs: 1, sandbox: "auto" },
         }),
         configPath: "/tmp/omo.jsonc",
       }),

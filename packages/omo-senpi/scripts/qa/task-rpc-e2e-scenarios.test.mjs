@@ -1,10 +1,20 @@
 import { expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { readRecords } from "./task-rpc-e2e-helpers.mjs"
-import { killSenpiHost, waitForProcessCompletion, waitForRunningRpcChild } from "./task-rpc-e2e-scenarios.mjs"
+import { killSenpiHost, prepareScenarioSandbox, waitForProcessCompletion, waitForRunningRpcChild } from "./task-rpc-e2e-scenarios.mjs"
+
+test("the PID-based RPC scenario selects the child-process runner on every platform", () => {
+  const { sandbox } = prepareScenarioSandbox()
+  try {
+    const config = JSON.parse(readFileSync(join(sandbox.cwd, ".omo", "omo.json"), "utf8"))
+    expect(config.task.process_runner).toBe("child-process")
+  } finally {
+    rmSync(sandbox.root, { recursive: true, force: true })
+  }
+})
 
 function makeStateDir() {
   const stateDir = mkdtempSync(join(tmpdir(), "omo-rpc-wait-"))

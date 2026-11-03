@@ -2,6 +2,7 @@ import { existsSync, rmSync } from "node:fs"
 import { basename, join, resolve } from "node:path"
 
 import { decorateEndpoints, formatEndpointLines, statusPayload } from "./daemon-status.js"
+import { hostStopBudgetMs } from "./daemon-stop-budget.js"
 
 export function parseEngineLine(stdout) {
   const line = stdout.trim().split("\n").filter(Boolean).pop()
@@ -172,7 +173,7 @@ export function runStopAll({ engine, agentDir, env, drain, wait, timeoutSeconds,
 }
 
 function waitForEndpoint(engine, socket, agentDir, env, timeoutSeconds, now, pause) {
-  const deadline = now() + timeoutSeconds * 1_000
+  const deadline = now() + Math.max(timeoutSeconds * 1_000, hostStopBudgetMs(env))
   let polls = 0
   let latest
   while (now() <= deadline) {
@@ -183,7 +184,7 @@ function waitForEndpoint(engine, socket, agentDir, env, timeoutSeconds, now, pau
     if (!alive && (latest?.claims_live ?? 0) === 0) return { done: true, polls }
     pause(250)
   }
-  const pid = latest?.pid ?? "?"
+  const pid = latest?.pid ?? latest?.generations?.find((generation) => generation.alive)?.pid ?? "?"
   const sessions = latest?.sessions?.total ?? 0
   const claims = latest?.claims_live ?? 0
   return { done: false, polls, summary: `pid ${pid}, ${sessions} sessions, ${claims} claims` }

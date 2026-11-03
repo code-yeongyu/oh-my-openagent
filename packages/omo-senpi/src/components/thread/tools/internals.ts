@@ -5,6 +5,7 @@ import type { ThreadToolName, ThreadToolResult, ThreadTranscriptItem } from "../
 import { threadToolFailure, type ThreadErrorCode } from "../errors"
 import { THREAD_TOOL_SEARCH_METADATA } from "../metadata"
 import { readSessionFacts, threadTitle } from "../session-facts"
+import { threadLink } from "../thread-link"
 import { UNKNOWN_CALLER, type ThreadHostSession, type ThreadHostView, type ThreadHostViewRequest, type ThreadSessionPort, type ThreadToolSurfaceOptions } from "./ports"
 import { sendView } from "./send-view"
 
@@ -29,6 +30,8 @@ export type ThreadToolSummary = Omit<ThreadHostSession, "name" | "status" | "cre
   readonly endpoint?: AddressEndpoint | null
   readonly surface?: ThreadSurface | null
   readonly alive?: boolean
+  /** `[title](omo-thread://v1/<thread_id>)` (`thread-link.ts`): paste it when telling the user about this thread. */
+  readonly link: string
 }
 
 export type ThreadToolMetadata = {
@@ -69,6 +72,7 @@ export function summary(session: ThreadHostSession, entry?: AddressEntry): Threa
     created_at: created,
     updated_at: entry === undefined ? (session.updated_at ?? session.updatedAt ?? created) : entry.updated_at,
     ...(entry === undefined ? {} : { endpoint: entry.endpoint, surface: entry.surface, alive: entry.alive }),
+    link: threadLink(id, entry?.title ?? threadTitle(session.name, null)),
   }
 }
 
@@ -140,6 +144,7 @@ export function degradedSummary(entry: AddressEntry): ThreadToolSummary & { read
     endpoint: entry.endpoint,
     surface: entry.surface,
     alive: entry.alive,
+    link: threadLink(entry.thread_id, entry.title),
     ...(entry.error_note === undefined ? {} : { error_note: entry.error_note }),
   }
 }

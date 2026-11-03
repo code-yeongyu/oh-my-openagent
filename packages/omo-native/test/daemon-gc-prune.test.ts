@@ -1,4 +1,5 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, onTestFinished, test } from "bun:test"
+import { rmSync } from "node:fs"
 import { join } from "node:path"
 
 import { runDaemonCommand } from "../bin/lib/daemon.js"
@@ -6,7 +7,8 @@ import { capture, scriptedEngine, workspace } from "./daemon-test-support"
 
 describe("omo daemon gc store-index pruning", () => {
   test("#given explicit store-index pruning #when gc runs #then the bundled locked runtime owns the rewrite", () => {
-    const { pluginRoot, agentDir } = workspace()
+    const { root, pluginRoot, agentDir } = workspace()
+    onTestFinished(() => rmSync(root, { recursive: true, force: true }))
     const requests: Record<string, unknown>[] = []
     const migration = {
       run(request: Record<string, unknown>) {

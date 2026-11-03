@@ -24,6 +24,14 @@ function reauthenticate(provider: string, mode: string | undefined): string {
     : `re-authenticate ${provider} in an interactive session with /login ${provider}`
 }
 
+// The same split for a profile none of whose models is available: sign in or pick a model where the
+// host offers it.
+function unavailableStep(mode: string | undefined): string {
+  return mode === "rpc"
+    ? "to use it, sign in to one of these providers in Provider authentication settings or choose a model in the composer"
+    : "to use it, log in to one of these providers in an interactive session with /login or start with --model"
+}
+
 function skippedNote(failure: AuthFailure, mode: string | undefined): string {
   switch (failure.reason) {
     case "refresh":
@@ -50,13 +58,14 @@ export function noticeContent(
       const reasoning = resolution.reasoning !== undefined ? ` ${resolution.reasoning}` : ""
       const skipped = resolution.skipped.length > 0 ? ` (skipped: ${resolution.skipped.join(", ")})` : ""
       const auth = authFailures.length > 0 ? `; ${authFailureNote(authFailures, mode)}` : ""
-      return `OmO Native: model profile ${profileLabel(resolution.profile)} selected ${model}${reasoning}${skipped}${auth}; ${MID_SESSION_NOTE}`
+      const caution = resolution.profile.caution !== undefined ? ` **${resolution.profile.caution}**` : ""
+      return `OmO Native: model profile ${profileLabel(resolution.profile)} selected ${model}${reasoning}${skipped}${auth}; ${MID_SESSION_NOTE}${caution}`
     }
     case "unavailable":
       if (authFailures.length > 0) {
         return `OmO Native: model profile ${profileLabel(resolution.profile)} has no model whose credentials resolve; ${authFailureNote(authFailures, mode)}; keeping senpi's default model`
       }
-      return `OmO Native: model profile ${profileLabel(resolution.profile)} has no available model; none of the chain is in this session's model registry (${resolution.chain.join(", ")}); keeping senpi's default model`
+      return `OmO Native: model profile ${profileLabel(resolution.profile)} has no available model; none of the chain is in this session's model registry (${resolution.chain.join(", ")}); keeping senpi's default model; ${unavailableStep(mode)}`
     case "empty":
       return `OmO Native: model profile ${profileLabel(resolution.profile)} defines no models; keeping senpi's default model`
     case "unknown":

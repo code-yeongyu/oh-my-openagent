@@ -28,6 +28,7 @@ import { daemonLaunchOptions, daemonLaunchProfileId } from "./launch-options"
 import { DAEMON_LAUNCH_SPEC_FILENAME, DaemonLaunchSpecError, readDaemonLaunchSpec } from "./launch-spec"
 import { shareDaemonEnsure } from "./daemon-single-flight"
 import { classifyEnsureFailure } from "./ensure-failure"
+import { ensureHostClaimingOwner } from "./owner-claim"
 import { writeStartedShardSidecar } from "./shard-sidecar"
 import { log } from "@oh-my-opencode/utils"
 
@@ -148,12 +149,13 @@ async function ensureTaskDaemonOnce(
   const request: EnsureHostInput = {
     socket,
     agentDir: input.agentDir,
+    ...(input.owner === undefined ? {} : { owner: "caller" }),
     hostArgs: launch.hostArgs,
     env: launch.env,
     upgrade: launch.upgrade,
     policy: launch.policy,
   }
-  const ensured = await host.ensureHost(request).catch((error: unknown) => {
+  const ensured = await ensureHostClaimingOwner(host, request).catch((error: unknown) => {
     throw new HostUnavailableError(classifyEnsureFailure(error), {
       fallbackAllowed: false,
       detail: sanitize(error),
@@ -163,7 +165,9 @@ async function ensureTaskDaemonOnce(
   // the caller learns what it can do without opening a second connection of its own. That probe is
   // this ensure's last use of the host, so the engine's attach hold (senpi #2242) ends with it: the
   // daemon is transient, and a hold kept for the life of this omo process would stop its idle exit.
-  // Children attach on their own connections; the idle window (minutes) covers the gap.
+  // Children attach on their own connections. For an unowned host the idle window (minutes) covers
+  // the gap; a caller-owned p-shard whose owner has already exited only gets the engine's short
+  // quiescence grace (seconds), so a non-owner ensuring after that exit may find the host gone.
   let answered: SenpiHostProtocolInfo | undefined = running
   try {
     answered ??= await host.probeHost({ socket: ensured.socket })

@@ -81,7 +81,7 @@ impl<'a> Burst<'a> {
         Ok(())
     }
 
-    fn motion(&mut self, device: &EiDevice, (x, y): (f64, f64)) -> CoreResult<()> {
+    pub(super) fn motion(&mut self, device: &EiDevice, (x, y): (f64, f64)) -> CoreResult<()> {
         let pointer = device
             .device
             .interface::<ei::PointerAbsolute>()
@@ -216,7 +216,7 @@ impl<'a> Burst<'a> {
     }
 }
 
-const fn button_code(button: MouseButton) -> u32 {
+pub(super) const fn button_code(button: MouseButton) -> u32 {
     match button {
         MouseButton::Left => 0x110,
         MouseButton::Right => 0x111,

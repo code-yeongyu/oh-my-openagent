@@ -39,10 +39,10 @@ export function recoveryClock() {
     clock,
     timers,
     scheduler,
-    advance: (ms: number) => {
+    advance: (ms: number, runTimers = true) => {
       clock.now += ms
       for (const timer of [...timers.values()])
-        if (timer.due <= clock.now) {
+        if (runTimers && timer.due <= clock.now) {
           timer.due = clock.now + timer.delay
           timer.callback()
         }

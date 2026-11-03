@@ -21,6 +21,9 @@ import * as taskComponentModule from "./index"
 import type { CapturedUi } from "./runtime-context"
 import { createSessionTransitionBridge } from "./session-transition-bridge"
 
+// This suite is not about job widgets: keep the task component off the real senpi job-widget host.
+const noJobWidgetHost = async (): Promise<Record<string, never>> => ({})
+
 const TASK_TOOL_NAMES = ["task", "task_send", "task_cancel", "task_output", "workflow", "workpool"]
 const TEAM_TOOL_NAMES = [
   "team_create",
@@ -34,7 +37,9 @@ const ALL_TOOL_NAMES = [...TASK_TOOL_NAMES, ...TEAM_TOOL_NAMES]
 const TASK_EVENTS = [
   "context",
   "session_start",
+  "session_hold_changed",
   "session_before_reload",
+  "session_resumed",
   "session_before_switch",
   "session_before_compact",
   "session_compact",
@@ -43,8 +48,8 @@ const TASK_EVENTS = [
   "before_agent_start",
   "agent_end",
 ]
-const SKILL_INVOCATION_TRACKER_EVENTS = ["input", "tool_result", "session_shutdown"]
-const DAG_LIFECYCLE_EVENTS = ["session_start", "session_shutdown", "session_shutdown"]
+const SKILL_INVOCATION_TRACKER_EVENTS = ["input", "tool_result", "session_start", "session_shutdown"]
+const DAG_LIFECYCLE_EVENTS = ["session_start", "session_shutdown", "before_agent_start", "session_resumed", "session_shutdown"]
 const TASK_COMMANDS = ["dag", "task-kill", "tasks"]
 
 interface RecordedLog {
@@ -92,7 +97,7 @@ function fakeUi(): CapturedUi {
   }
 }
 
-const noopStatusUi = { scheduleSync: () => {}, syncNow: () => {}, dispose: () => {} }
+const noopStatusUi = { scheduleSync: () => {}, syncNow: () => {}, observeRecord: () => {}, dispose: () => {} }
 const noopResumptionChannels = {
   emitSessionStart: () => Promise.resolve(),
   emitShutdown: () => Promise.resolve(),
@@ -100,7 +105,7 @@ const noopResumptionChannels = {
 
 // Build the real engine and wire its event bridge over a fake ExtensionAPI so tests can drive the
 // registered handlers and observe the captured-ui bridge (todo 18: cleared on switch/shutdown).
-function wiredBridge(): {
+function wiredBridge(onRecovered: () => void = () => {}): {
   pi: FakeExtensionAPI
   engine: ReturnType<typeof composeTaskEngine>
   reconcileCalls: { count: number }
@@ -121,6 +126,7 @@ function wiredBridge(): {
     leadPollers: {
       tick: () => {
         leadCalls.ticks += 1
+        onRecovered()
         return Promise.resolve()
       },
       shutdown: () => { leadCalls.shutdowns += 1 },
@@ -175,7 +181,7 @@ describe("omo-senpi task component wiring", () => {
     const pi = new FakeExtensionAPI()
     const logger = createLogger()
 
-    await createTaskComponent({ resolveCwd: () => project }).register(pi, ctxFor(pi, logger))
+    await createTaskComponent({ loadJobWidgetHost: noJobWidgetHost, resolveCwd: () => project }).register(pi, ctxFor(pi, logger))
     expect(readdirSync(project)).toEqual([])
 
     await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, {})
@@ -191,7 +197,7 @@ describe("omo-senpi task component wiring", () => {
 
     try {
       // when
-      await createTaskComponent({ resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
+      await createTaskComponent({ loadJobWidgetHost: noJobWidgetHost, resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
     } finally {
       if (previousMember === undefined) delete process.env.SENPI_TASK_MEMBER
       else process.env.SENPI_TASK_MEMBER = previousMember
@@ -210,7 +216,7 @@ describe("omo-senpi task component wiring", () => {
     const logger = createLogger()
 
     // when
-    await createTaskComponent({ resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
+    await createTaskComponent({ loadJobWidgetHost: noJobWidgetHost, resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
 
     expect(toolNames(pi)).toEqual([...ALL_TOOL_NAMES].sort())
     // the /tasks and /task-kill commands registered
@@ -242,18 +248,21 @@ describe("omo-senpi task component wiring", () => {
     const wireDagLifecycle = Reflect.get(taskComponentModule, "wireDagLifecycle")
     expect(typeof wireDagLifecycle).toBe("function")
     if (typeof wireDagLifecycle !== "function") return
-    wireDagLifecycle(pi, {
+    const wired = wireDagLifecycle(pi, {
       attach: async () => { order.push("dag-resume") },
       detach: () => { order.push("dag-detach") },
       pauseForShutdown: async () => { order.push("dag-pause") },
       dispose: () => { order.push("dag-dispose") },
+      resend: () => {},
     }, () => {
       pi.on("session_start", () => { order.push("task-reconcile") })
       pi.on("session_shutdown", () => { order.push("task-suspend") })
+      return { afterSessionStartReconcile: () => Promise.resolve(true) }
     })
 
     // when
     await pi.dispatch("session_start", {})
+    await wired.lastAttach()
     await pi.dispatch("session_before_switch", { reason: "resume" })
     expect(order).toEqual(["task-reconcile", "dag-resume"])
     await pi.dispatch("session_shutdown", {})
@@ -275,7 +284,7 @@ describe("omo-senpi task component wiring", () => {
     const logger = createLogger()
 
     // when
-    await createTaskComponent({ resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
+    await createTaskComponent({ loadJobWidgetHost: noJobWidgetHost, resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
 
     const registered = toolNames(pi)
     for (const teamTool of TEAM_TOOL_NAMES) expect(registered).toContain(teamTool)
@@ -292,7 +301,7 @@ describe("omo-senpi task component wiring", () => {
     const logger = createLogger()
 
     // when
-    await createTaskComponent({ resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
+    await createTaskComponent({ loadJobWidgetHost: noJobWidgetHost, resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
 
     // then
     expect(hints).toEqual([{
@@ -308,7 +317,7 @@ describe("omo-senpi task component wiring", () => {
     pi.setFlag("omo-task", false)
 
     // when
-    await createTaskComponent({ resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
+    await createTaskComponent({ loadJobWidgetHost: noJobWidgetHost, resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
 
     // then
     expect(pi.tools).toEqual([])
@@ -326,7 +335,7 @@ describe("omo-senpi task component wiring", () => {
     const logger = createLogger()
 
     // when
-    await createTaskComponent({ resolveCwd: () => project }).register(pi, ctxFor(pi, logger))
+    await createTaskComponent({ loadJobWidgetHost: noJobWidgetHost, resolveCwd: () => project }).register(pi, ctxFor(pi, logger))
 
     // then it never crashed: all tools still registered
     expect(toolNames(pi)).toEqual([...ALL_TOOL_NAMES].sort())
@@ -336,12 +345,16 @@ describe("omo-senpi task component wiring", () => {
 
   it("#given a wired bridge #when session_start fires repeatedly #then the team mailbox is reconciled on every start", async () => {
     // given
-    const { pi, reconcileCalls, leadCalls } = wiredBridge()
+    const [first, second] = [Promise.withResolvers<void>(), Promise.withResolvers<void>()]
+    let completed = 0
+    const { pi, reconcileCalls, leadCalls } = wiredBridge(() => [first, second][completed++]?.resolve())
     const liveCtx = { ui: fakeUi(), mode: "tui", sessionManager: { getSessionId: () => "session-a" } }
 
     // when the session starts twice
     await pi.dispatch("session_start", {}, liveCtx)
+    await first.promise
     await pi.dispatch("session_start", {}, liveCtx)
+    await second.promise
 
     // then
     expect(reconcileCalls.count).toBe(2)
@@ -355,6 +368,7 @@ describe("omo-senpi task component wiring", () => {
     const logger = createLogger()
     const base = composeTaskEngine({ pi, omoConfig: loadOmoConfig({ cwd }).config, cwd, sharedParentTools: () => [] })
     const order: string[] = []
+    const recovered = Promise.withResolvers<void>()
     const engine: TaskEngine = {
       ...base,
       lifecycle: {
@@ -382,6 +396,7 @@ describe("omo-senpi task component wiring", () => {
       leadPollers: {
         tick: () => {
           order.push("poll")
+          recovered.resolve()
           return Promise.resolve()
         },
         shutdown: () => undefined,
@@ -395,12 +410,14 @@ describe("omo-senpi task component wiring", () => {
       mode: "tui",
       sessionManager: { getSessionId: () => "session-a" },
     })
+    await recovered.promise
 
     // then
     expect(order).toEqual(["reattach:session-a", "reclaim", "notify", "cleanup", "poll"])
   })
 
   it("#given a terminal member owned by lead A #when lead B reconciles then lead A reconciles #then only the owning lead receives replay", async () => {
+    let recovered = Promise.withResolvers<void>()
     const cwd = tempProject()
     const teamRunId = await seedTeamRuntime(cwd, "lead-a")
     const terminal = terminalRecord(teamRunId)
@@ -423,23 +440,27 @@ describe("omo-senpi task component wiring", () => {
     const transitions = createSessionTransitionBridge({ runtime: engine.runtime, notifier: engine.notifier })
     wireEventBridge(pi, ctxFor(pi, logger), engine, noopStatusUi, transitions, {
       reconcileTeamMailbox: () => Promise.resolve(),
-      leadPollers: { tick: () => Promise.resolve(), shutdown: () => undefined },
+      leadPollers: { tick: async () => { recovered.resolve() }, shutdown: () => undefined },
       resumptionChannels: noopResumptionChannels,
     })
 
     await pi.dispatch("session_start", {}, {
       sessionManager: { getSessionId: () => "lead-b" },
     })
+    await recovered.promise
     expect(pi.messages).toEqual([])
 
+    recovered = Promise.withResolvers<void>()
     await pi.dispatch("session_start", {}, {
       sessionManager: { getSessionId: () => "lead-a" },
     })
+    await recovered.promise
     expect(pi.messages).toHaveLength(1)
     expect(pi.messages[0]?.message.customType).toBe("senpi-task.team-member-liveness")
   })
 
   it("#given a liveness send before host persistence #when the process crashes and restarts #then no early ack suppresses replay and agent_end later commits the exact persisted marker", async () => {
+    const recovered = Promise.withResolvers<void>()
     const cwd = tempProject()
     const teamRunId = await seedTeamRuntime(cwd, "lead-session")
     const terminal = terminalRecord(teamRunId)
@@ -482,7 +503,7 @@ describe("omo-senpi task component wiring", () => {
     const transitions = createSessionTransitionBridge({ runtime: engine.runtime, notifier: engine.notifier })
     wireEventBridge(replayPi, ctxFor(replayPi, logger), engine, noopStatusUi, transitions, {
       reconcileTeamMailbox: () => Promise.resolve(),
-      leadPollers: { tick: () => Promise.resolve(), shutdown: () => undefined },
+      leadPollers: { tick: async () => { recovered.resolve() }, shutdown: () => undefined },
       resumptionChannels: noopResumptionChannels,
     })
     const sessionFile = join(cwd, "lead-session.jsonl")
@@ -494,6 +515,7 @@ describe("omo-senpi task component wiring", () => {
     }
 
     await replayPi.dispatch("session_start", {}, liveContext)
+    await recovered.promise
     expect(replayPi.messages).toHaveLength(1)
     expect(store.load(terminal.task_id)?.notification.liveness_notified_epoch).toBeUndefined()
 
@@ -542,7 +564,7 @@ describe("omo-senpi task component wiring", () => {
     ;(pi as { registerMessageRenderer?: unknown }).registerMessageRenderer = undefined
 
     // when
-    await createTaskComponent({ resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
+    await createTaskComponent({ loadJobWidgetHost: noJobWidgetHost, resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
 
     // then no tools wired; only the unconditional hygiene sweep handler remains
     expect(pi.tools).toEqual([])

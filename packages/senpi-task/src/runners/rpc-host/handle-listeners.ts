@@ -1,6 +1,7 @@
 import type { ChildEventListener } from "../types"
 import { type ChildExtensionListener, createChildExtensionEvents } from "../child-extension-events"
 import type { HostSessionParked } from "./session-client"
+import type { HostSessionReplaced } from "./session-client-contract"
 
 type ChildEvent = Parameters<ChildEventListener>[0]
 
@@ -9,6 +10,9 @@ export interface ListenerRegistrations {
   subscribe(listener: ChildEventListener): () => boolean
   subscribeExtensionEvents(listener: ChildExtensionListener): () => void
   onParked(listener: (event: HostSessionParked) => void): () => boolean
+  onReplaced(listener: (event: HostSessionReplaced) => void): () => boolean
+  /** A durable session id learned after spawn (the open's own read failed); #10873. */
+  onDurableSessionId(listener: (id: string) => void): () => boolean
   onTurnResumed(listener: () => void): () => boolean
   onSelfResumed(listener: () => void): () => boolean
 }
@@ -18,6 +22,8 @@ export interface HandleListeners {
   readonly registrations: ListenerRegistrations
   emitEvent(event: ChildEvent): void
   emitParked(event: HostSessionParked): void
+  emitReplaced(event: HostSessionReplaced): void
+  emitDurableSessionId(id: string): void
   emitTurnResumed(): void
   emitSelfResumed(): void
   clearActive(): void
@@ -65,8 +71,11 @@ export function createHandleListeners(options: HandleListenersOptions = {}): Han
     if (earlyEvents !== undefined) replayed.add(listener)
   }
   const parkedListeners = new Set<(event: HostSessionParked) => void>()
+  const replacedListeners = new Set<(event: HostSessionReplaced) => void>()
+  const durableIdListeners = new Set<(id: string) => void>()
   const turnResumedListeners = new Set<() => void>()
   const resumedListeners = new Set<() => void>()
+  let earlyResume = false
 
   const registrations: ListenerRegistrations = {
     subscribe: (listener) => {
@@ -79,12 +88,24 @@ export function createHandleListeners(options: HandleListenersOptions = {}): Han
       parkedListeners.add(listener)
       return () => parkedListeners.delete(listener)
     },
+    onReplaced: (listener) => {
+      replacedListeners.add(listener)
+      return () => replacedListeners.delete(listener)
+    },
+    onDurableSessionId: (listener) => {
+      durableIdListeners.add(listener)
+      return () => durableIdListeners.delete(listener)
+    },
     onTurnResumed: (listener) => {
       turnResumedListeners.add(listener)
       return () => turnResumedListeners.delete(listener)
     },
     onSelfResumed: (listener) => {
       resumedListeners.add(listener)
+      if (earlyResume) {
+        queueMicrotask(listener)
+        queueMicrotask(() => { earlyResume = false })
+      }
       return () => resumedListeners.delete(listener)
     },
   }
@@ -103,10 +124,17 @@ export function createHandleListeners(options: HandleListenersOptions = {}): Han
     emitParked: (event) => {
       for (const listener of parkedListeners) listener(event)
     },
+    emitReplaced: (event) => {
+      for (const listener of replacedListeners) listener(event)
+    },
+    emitDurableSessionId: (id) => {
+      for (const listener of durableIdListeners) listener(id)
+    },
     emitTurnResumed: () => {
       for (const listener of turnResumedListeners) listener()
     },
     emitSelfResumed: () => {
+      if (resumedListeners.size === 0) earlyResume = true
       for (const listener of resumedListeners) listener()
     },
     clearActive: () => {

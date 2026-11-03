@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test"
+import { describe, expect, it, onTestFinished } from "bun:test"
 import type { PathLike } from "node:fs"
-import { mkdtemp, readFile, writeFile } from "node:fs/promises"
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -53,6 +53,7 @@ describe("rename under Windows contention", () => {
 
   it("#given the memory fs boundary #when it renames a real file #then the file moves", async () => {
     const dir = await mkdtemp(join(tmpdir(), "memory-rename-"))
+    onTestFinished(() => rm(dir, { recursive: true, force: true }))
     await writeFile(join(dir, "state.json.tmp"), "{}\n")
     await resilientRename(join(dir, "state.json.tmp"), join(dir, "state.json"))
     expect(await readFile(join(dir, "state.json"), "utf8")).toBe("{}\n")

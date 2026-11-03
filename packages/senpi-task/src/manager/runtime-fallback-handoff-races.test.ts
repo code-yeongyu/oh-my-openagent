@@ -94,7 +94,7 @@ function lane(kind: "host-session" | "in-process" = "host-session") {
     runner.finishClose.resolve()
     lifecycle.dispose?.()
     manager.workpools.dispose()
-    for (const taskId of manager.residentTaskIds()) manager.forget(taskId)
+    for (const taskId of manager.residentTaskIds()) manager.forget(taskId, { path: "end" })
   }
   return { runner, store, mutateHook, concurrency, manager, dispose }
 }

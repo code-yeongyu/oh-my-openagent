@@ -2,18 +2,16 @@
 // Drives a packaged omo binary through eval end to end with the source checkout hidden. The pieces live beside it:
 // the sandbox (omo-native-eval-smoke-sandbox), the host processes and source hiding (omo-native-eval-smoke-host),
 // one run and its result readers (omo-native-eval-smoke-run), and the per-leg checks (omo-native-eval-smoke-assertions).
-import { execFile } from "node:child_process"
 import { existsSync, readdirSync, realpathSync, renameSync, rmSync } from "node:fs"
 import { basename, dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
-import { promisify } from "node:util"
 import { assertEvalLegs } from "./omo-native-eval-smoke-assertions.mjs"
 import { ownedProcesses, renameAside } from "./omo-native-eval-smoke-host.mjs"
 import { drive } from "./omo-native-eval-smoke-run.mjs"
 import { createSandbox, isolatedEnvironment } from "./omo-native-eval-smoke-sandbox.mjs"
+import { stopSmokeHosts } from "./omo-native-eval-smoke-stop.mjs"
 
 const sourceTree = realpathSync(resolve(dirname(fileURLToPath(import.meta.url)), "../.."))
-const exec = promisify(execFile)
 
 function parseArgs(argv) {
   if (argv.length === 1) return resolve(argv[0])
@@ -44,14 +42,20 @@ async function main() {
     if (trees.some(existsSync)) throw new Error("source checkout remains accessible")
     const result = await drive(sandbox, controller.signal)
     if (process.platform !== "win32") {
-      const shutdown = await exec(sandbox.binary, ["daemon", "stop", "--all", "--wait", "--timeout", "30"], {
-        cwd: sandbox.cwd, env: isolatedEnvironment(sandbox), timeout: 60_000, signal: controller.signal,
+      const supervisors = (await ownedProcesses(sandbox.root))
+        .filter(({ command }) => command.includes("--internal-rpc-host-supervisor"))
+      await stopSmokeHosts(sandbox.binary, {
+        cwd: sandbox.cwd, env: isolatedEnvironment(sandbox), signal: controller.signal,
+      }, {
+        supervisors,
+        onDrained(shutdown) {
+          process.stderr.write(`SHUTDOWN ${shutdown.stdout.trim()}\n`)
+          for (const line of shutdown.stdout.split("\n")) {
+            const socket = line.match(/^(.+\.sock): drained/)?.[1]
+            if (socket) hostSockets.push(socket)
+          }
+        },
       })
-      process.stderr.write(`SHUTDOWN ${shutdown.stdout.trim()}\n`)
-      for (const line of shutdown.stdout.split("\n")) {
-        const socket = line.match(/^(.+\.sock): drained/)?.[1]
-        if (socket) hostSockets.push(socket)
-      }
     }
     if (result.code !== 0) throw new Error(`binary exited code=${result.code}\n${result.stderr.slice(-4000)}`)
     const passes = assertEvalLegs(sandbox, result)

@@ -6,10 +6,14 @@ import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { createCompletionTracker, type AgentEndFacts } from "./gateway/completion"
 import { SESSION_CONTROL_DELIVERY_TYPE } from "./gateway/constants"
 import { gatewayDatabasePath } from "./gateway/paths"
+import { loadProvenanceWorkspaces } from "./gateway/provenance-config"
+import { resolveProvenance } from "./gateway/provenance-resolver"
+import { registerInitialSkills } from "./initial-skills"
 import { controlSessionOf, createControlEndpointRegistrant, hostInstanceOf, sessionControlOf, type ControlEndpointRegistrantOptions, type SessionControlActionsPort } from "./gateway/registration"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { registerThreadTools, UNKNOWN_CALLER, type ThreadToolSurfaceOptions } from "./tools"
-import { createLiveThreadSurface, defaultThreadStateDirectory } from "./live-surface"
+import { createLazyLiveThreadSurface } from "./lazy-live-surface"
+import { defaultThreadStateDirectory } from "./live-surface-paths"
 
 /**
  * The longest the `agent_settled` handler waits for an armed completion's store write. senpi waits
@@ -157,6 +161,8 @@ function registerControlEndpoint(pi: SenpiExtensionAPI, ctx: ComponentContext, o
     if (session === undefined) return
     void registrant.start(session).catch((error: unknown) => ctx.logger.warn(`thread gateway: control endpoint registration failed: ${error instanceof Error ? error.message : String(error)}`))
   })
+  // A session thread_create opened runs on a host, so its initial skills ride with the control endpoint.
+  registerInitialSkills(pi, ctx)
   pi.on("session_before_compact", () => registrant.noteCompaction(true))
   pi.on("session_compact", () => registrant.noteCompaction(false))
   // A steer into a session waiting on a question is `not_steerable` (`decision.ts`): the answer comes
@@ -183,14 +189,16 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
   return {
     name: "thread",
     register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
-      const host = options.host ?? createLiveThreadSurface(pi)
+      const host = options.host ?? createLazyLiveThreadSurface(pi)
       const stateDirectory = options.stateDirectory ?? defaultThreadStateDirectory(pi)
       const agentDir = options.agentDir ?? (() => resolveAgentHome({ env: process.env }))
       const runtimeInstance = hostInstanceOf(pi)
       // The pre-gateway `thread_send` mailbox of this workspace: its undelivered items are imported
       // into the store once, when this session starts and the mailbox still exists on disk.
       const legacyMailbox = join(stateDirectory, "mailbox")
-      const store = options.store ?? createGatewayStore({ agentDir: agentDir(), legacyMailboxDirectories: [legacyMailbox], ...(runtimeInstance === undefined ? {} : { runtimeInstance }) })
+      const callerWorkspaceRoot = options.callerWorkspaceRoot ?? (() => pi.cwd ?? process.cwd())
+      const onProvenanceWarning = (message: string) => ctx.logger.warn(`thread gateway: ${message}`)
+      const store = options.store ?? createGatewayStore({ agentDir: agentDir(), senderProvenance: () => resolveProvenance({ cwd: callerWorkspaceRoot(), env: options.env, loadWorkspaces: loadProvenanceWorkspaces, onWarning: onProvenanceWarning }), legacyMailboxDirectories: [legacyMailbox], ...(runtimeInstance === undefined ? {} : { runtimeInstance }) })
       // Every store open retries an unreadable legacy mailbox, and an idle store reopens its worker on
       // the next call, so the same failure would repeat each time: it is reported once per session.
       const reportedInvalidMailboxes = new Set<string>()
@@ -213,18 +221,21 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         host,
         stateDirectory,
         store,
+        env: options.env,
+        loadProvenanceWorkspaces,
+        onProvenanceWarning,
         diskSessions: options.diskSessions,
         sessionsDirectory: options.sessionsDirectory ?? (() => join(agentDir(), "sessions")),
         ensureHost: options.ensureHost,
         callerSessionId: options.callerSessionId ?? (() => UNKNOWN_CALLER),
-        callerWorkspaceRoot: options.callerWorkspaceRoot ?? (() => pi.cwd ?? process.cwd()),
+        callerWorkspaceRoot,
         callerTurnId: () => (run.turn === 0 ? undefined : `turn-${run.turn}`),
         callerName: () => pi.getSessionName?.(),
         callerCause: () => run.cause,
         callerRunDeliveries: () => [...run.consumed],
         callerRunHasLocalInput: () => run.local,
         onCompletionArmed: (durableId, armSeq) => completions.arm(durableId, armSeq),
-      })
+      }, (line) => ctx.logger.warn(line))
       // A durable arm this runtime did not make itself - left by an earlier runtime (a restart, or a
       // crash before its write), or made by another process (`omo thread report ... completion`) - is
       // picked up at session_start and on a `wake` command, and written at this session's next settle.

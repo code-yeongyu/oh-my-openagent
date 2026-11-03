@@ -129,7 +129,7 @@ High-accuracy review is the default for every plan `/ulw-plan` produces; the onl
 - QA scenarios name the tool, the steps, and the expected result
 - No missing information would stop execution cold
 
-An approval whose remaining items are notes counts as approval. On a rejection the planner fixes every cited issue and resubmits. Rounds are capped at 5 unless you ask for more.
+An approval whose remaining items are notes counts as approval. On a rejection the planner fixes every cited issue and resubmits. Review keeps going while each round finds something new that matters or confirms an earlier blocker fixed, and stops to ask you when a round does neither but still does not approve. A round that approves with only notes left ends the review.
 
 The spawn is contract-driven: the harness replaces the `plan-reviewer` prompt with the canonical review contract (one `.omo/plans/*.md` path), so anything else in the prompt is discarded.
 
@@ -220,7 +220,7 @@ The delegation router used by `/ulw-execute`:
 | `writing` | documentation and prose |
 | `deep` | hairy debugging, research-heavy or subtle cross-module work |
 | `ultrabrain` | one genuinely hard, logic-heavy problem; hand it the goal, not steps |
-| `architect` | the architect consult lane: module boundaries, decomposition, trade-offs (advisory, read-only) |
+| `architect` | the architect lane: module boundaries, decomposition, trade-offs, and broad debugging across code, logs, history and docs; implements when the task needs it, advisory-only on request |
 
 Splittable work splits into a swarm of `quick`/`unspecified-low` workers in one burst. Cohesive hard work stays whole and goes to `deep` or `ultrabrain` as one delegation.
 

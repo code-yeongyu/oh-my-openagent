@@ -25,7 +25,7 @@ test("#given host inspect after a new manager on the same state dir #when the ke
   const store = createTaskRecordStore({ project_dir: f.root })
   const concurrency = new TaskConcurrency(config)
   const runner = { start: async (spec: { taskId: string }) => fixtureHandle(spec.taskId).handle }
-  const registry: ResidencyRegistry = { get: () => undefined, entries: () => [], forget: () => undefined, hasPendingSends: () => false, tryClaimEviction: () => false, releaseEviction: () => undefined }
+  const registry: ResidencyRegistry = { get: () => undefined, entries: () => [], forget: (_taskId, _options) => undefined, hasPendingSends: () => false, tryClaimEviction: () => false, releaseEviction: () => undefined }
   const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config })
   const manager = createTaskManager({ store, concurrency, runners: { "in-process": runner, process: runner }, config, cwd: f.root,
     planner: spec => ({ kind: "resolved", plan: { model: spec.model ?? "test/model" } }), destruction: lifecycle, admit: async () => ({ kind: "admitted" }) })

@@ -2,9 +2,11 @@ import { describe, expect, test } from "bun:test"
 import { AST_GREP_MCP_TOOLS, AST_GREP_REGISTERED, astGrepProbeCode, binaryOnlyFailures, compareRuns, normalizeText, PARITY_STEPS } from "./qa/omo-native-parity-compare.mjs"
 
 const REGISTERED = `${AST_GREP_REGISTERED}${AST_GREP_MCP_TOOLS.join(", ")}`
+const NOTE = '---\ndescription: parity note\nprovenance: "inferred, not a user decision"\n---'
 
 function run(overrides: Partial<Parameters<typeof compareRuns>[0]> = {}) {
-  const results = Object.fromEntries(PARITY_STEPS.map((step) => [step.id, { isError: false, text: step.id === "ast-grep" ? REGISTERED : `${step.id} ok` }]))
+  const text = (id: string): string => id === "ast-grep" ? REGISTERED : id === "memory-note" ? NOTE : `${id} ok`
+  const results = Object.fromEntries(PARITY_STEPS.map((step) => [step.id, { isError: false, text: text(step.id) }]))
   return {
     tools: ["eval", "read", "webfetch"],
     results,
@@ -29,6 +31,23 @@ describe("binary/npm parity comparison", () => {
     expect(differences.some((line) => line.startsWith("eval-js: binary error"))).toBe(true)
   })
 
+  test("#given both sides fail the memory write the same way #when compared #then it is reported (#10498: a hook rejected the provenance header on both)", () => {
+    const failing = { isError: true, text: "memory: git commit failed: unknown frontmatter key 'provenance'" }
+    const binary = run()
+    const npm = run()
+    binary.results["memory"] = failing
+    npm.results["memory"] = failing
+    const differences = compareRuns(binary, npm)
+    expect(differences.some((line) => line.startsWith("memory: binary failed"))).toBe(true)
+    expect(differences.some((line) => line.startsWith("memory: npm failed"))).toBe(true)
+  })
+
+  test("#given a memory note without the claim receipt header #when compared #then it is reported on that side", () => {
+    const binary = run()
+    binary.results["memory-note"] = { isError: false, text: "---\ndescription: parity note\n---" }
+    expect(compareRuns(binary, run()).some((line) => line.startsWith("memory-note: binary note has no provenance header"))).toBe(true)
+  })
+
   test("#given the binary doctor misses a section #when compared #then the missing section is reported", () => {
     const binary = run({ doctor: ["PASS extension: plugin/extensions/omo.js", "INFO Update: omo update"] })
     expect(compareRuns(binary, run())).toEqual(['doctor: npm prints "WARN task categories", the binary does not'])
@@ -38,6 +57,13 @@ describe("binary/npm parity comparison", () => {
     const npm = run({ doctor: [...run().doctor, "PASS senpi version 2026.9.29-5", "INFO computer use engine: not installed yet"] })
     const binary = run({ doctor: [...run().doctor, "INFO omo 5.1.4 (engine: senpi 2026.9.29-5)", "PASS computer use engine: native/senpi-desktop-engine", "INFO Claude Code 2.1.284: not downloaded yet"] })
     expect(compareRuns(binary, npm)).toEqual([])
+  })
+
+  test("#given a leftover shard running on one side and exited on the other #when compared #then it is not a difference (#12148)", () => {
+    const npm = run({ doctor: [...run().doctor, "INFO Shard p-<sha> (parent <sha>, s1.jsonl): running pid 15440 · engine 2026.11.2-1"] })
+    const binary = run({ doctor: [...run().doctor, "WARN Shard p-<sha> (parent <sha>, s2.jsonl): not running (retained state kept; run omo daemon gc)"] })
+    expect(compareRuns(binary, npm)).toEqual([])
+    expect(compareRuns(binary, run())).toEqual(['doctor: the binary prints "Shard", npm does not'])
   })
 
   test("#given an extension load failure on one side #when compared #then it is reported", () => {

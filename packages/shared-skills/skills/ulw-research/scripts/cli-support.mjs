@@ -1,7 +1,8 @@
 // cli-support.mjs - argument parsing, typed usage errors, exit-code mapping, and JSON file IO
 // shared by every report-tools subcommand. node: builtins only.
 
-import { readFileSync, renameSync, writeFileSync } from "node:fs"
+import { createHash } from "node:crypto"
+import { readFileSync, renameSync, rmSync, writeFileSync } from "node:fs"
 import { basename, dirname, join } from "node:path"
 
 /** A usage or input error: always exit code 2. */
@@ -87,11 +88,24 @@ export function readJsonFile(path) {
 	}
 }
 
-/** Write JSON through a sibling temp file + rename, so a crash never leaves a half-written file. */
-export function writeJsonAtomic(path, value) {
+/** The sha256 hex digest of a string or bytes: the one hash every record and receipt carries. */
+export const sha256Of = (content) => createHash("sha256").update(content).digest("hex")
+
+/** Write text through a sibling temp file + rename; a failed write removes the temp file. */
+export function writeTextAtomic(path, text) {
 	const temp = join(dirname(path), `.${basename(path)}.${process.pid}.${Date.now()}.tmp`)
-	writeFileSync(temp, `${JSON.stringify(value, null, 2)}\n`)
-	renameSync(temp, path)
+	try {
+		writeFileSync(temp, text)
+		renameSync(temp, path)
+	} catch (error) {
+		rmSync(temp, { force: true })
+		throw error
+	}
+}
+
+/** Write JSON through writeTextAtomic, so a crash never leaves a half-written file. */
+export function writeJsonAtomic(path, value) {
+	writeTextAtomic(path, `${JSON.stringify(value, null, 2)}\n`)
 }
 
 /** Print a result: JSON on stdout, one summary line on stderr. */

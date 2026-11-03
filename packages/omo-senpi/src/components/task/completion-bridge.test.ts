@@ -9,6 +9,7 @@ import {
   createTaskManager,
   createTaskRecordStore,
   markRecordLostForReconciliation,
+  RunnerError,
   type ManagedChildHandle,
   type ManagedRunner,
   type ParentNotifierMessage,
@@ -42,7 +43,11 @@ function pendingRunner(): ManagedRunner {
   }
 }
 
-function createHarness(options: { currentSessionId?: string | null } = {}): {
+function createHarness(options: {
+  currentSessionId?: string | null
+  runner?: ManagedRunner
+  onMessage?: (message: ParentNotifierMessage) => void
+} = {}): {
   readonly manager: TaskManager
   readonly messages: ParentNotifierMessage[]
   readonly complete: (taskId: string) => void
@@ -53,7 +58,7 @@ function createHarness(options: { currentSessionId?: string | null } = {}): {
   const backing = createTaskRecordStore({ project_dir: tempProject() })
   const messages: ParentNotifierMessage[] = []
   const completion = createCompletionNotifier({
-    notifier: { enqueue: (message) => messages.push(message) },
+    notifier: { enqueue: (message) => { messages.push(message); options.onMessage?.(message) } },
     store: backing,
   })
   let managerRef: TaskManager | undefined
@@ -65,7 +70,7 @@ function createHarness(options: { currentSessionId?: string | null } = {}): {
     wasBackground: (taskId) => managerRef?.wasBackground(taskId) ?? false,
     currentSessionId: () => (options.currentSessionId === null ? undefined : (options.currentSessionId ?? "parent-session")),
   })
-  const runner = pendingRunner()
+  const runner = options.runner ?? pendingRunner()
   const manager = createTaskManager({
     store,
     runners: { "in-process": runner, process: runner },
@@ -192,5 +197,39 @@ describe("completion bridge live background promotion", () => {
     // then
     expect(harness.manager.wasBackground(started.task_id)).toBe(false)
     expect(harness.messages).toHaveLength(0)
+  })
+
+  it("#given a background start the task host refuses after the caller stopped waiting #when the refusal lands #then the parent is notified exactly once (omo#10042)", async () => {
+    // given
+    const release = Promise.withResolvers<void>()
+    const refusing: ManagedRunner = {
+      start: () => release.promise.then(() => {
+        throw new RunnerError({ kind: "host_unavailable", reason: "host_busy", message: "the task host is not answering" })
+      }),
+    }
+    const arrived = Promise.withResolvers<ParentNotifierMessage>()
+    const harness = createHarness({ runner: refusing, onMessage: arrived.resolve })
+    const started = await harness.manager.start({
+      prompt: "work",
+      parent_session_id: "parent-session",
+      depth: 1,
+      category: "quick",
+      run_in_background: true,
+    })
+    if (started.kind !== "started") throw new Error("expected started task")
+    expect(started.starting).toBe(true)
+
+    // when
+    release.resolve()
+    const message = await Promise.race([
+      arrived.promise,
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("waited 2s for the start-failure notification, it never came")), 2_000)),
+    ])
+
+    // then
+    expect(message.details[0]?.task_id).toBe(started.task_id)
+    expect(message.details[0]?.status).toBe("error")
+    expect(harness.notifyCalls()).toBe(1)
+    expect(harness.messages).toHaveLength(1)
   })
 })

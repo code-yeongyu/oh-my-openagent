@@ -8,7 +8,7 @@ const scriptDir = dirname(fileURLToPath(import.meta.url))
 const { digestDirectory } = await import(pathToFileURL(join(scriptDir, "drive.mjs")).href)
 const { CREDENTIAL_FILES, digestCredentialFiles, parseEvents, readRecords, analyzeSpawn, analyzeRpcRouting, eventsMentionSteerAck, statusSnapshots, liveRecordRpcChildPids, recordRpcChildPids } =
   await import(pathToFileURL(join(scriptDir, "task-rpc-e2e-helpers.mjs")).href)
-const { SCENARIO_A_STEPS, prepareScenarioSandbox, driveSenpi, runKillCheck, runReconcileCheck, waitForProcessCompletion } =
+const { SCENARIO_A_STEPS, bindTasksDir, prepareScenarioSandbox, driveSenpi, runKillCheck, runReconcileCheck, waitForProcessCompletion } =
   await import(pathToFileURL(join(scriptDir, "task-rpc-e2e-scenarios.mjs")).href)
 const realSenpiAgentDir = join(homedir(), ".senpi", "agent")
 
@@ -45,7 +45,7 @@ function resolveSenpi() {
 
 async function runChecks(senpiBin, sandbox, sessionDir, stateDir) {
   const checks = []
-  const a = await driveSenpi(senpiBin, sandbox, sessionDir, SCENARIO_A_STEPS)
+  const a = await driveSenpi(senpiBin, sandbox, sessionDir, bindTasksDir(SCENARIO_A_STEPS, stateDir))
   const aEvents = parseEvents(a.stdout)
   const aRecords = readRecords(stateDir)
   if (aRecords.length === 0) {

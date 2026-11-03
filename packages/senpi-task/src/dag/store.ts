@@ -1,12 +1,13 @@
 // allow: SIZE_OK - crash-safe DAG persistence is kept in one module so WAL, checkpoint, lock, and GC invariants share one filesystem boundary.
 import { createHash, randomUUID } from "node:crypto"
 import * as fs from "node:fs"
-import { basename, dirname, join } from "node:path"
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
 
 import { defaultSignaller } from "../lifecycle/context"
 import { resolveStateDir } from "../store/state-dir"
-import { DAG_SETTINGS_DEFAULTS, type DagEventLane, type DagRunEvent, type DagRunId, type DagRunStatus, type DagSettings, isTerminalDagRunStatus } from "./types"
+import { DAG_SETTINGS_DEFAULTS, isSafeDagPathSegment, type DagEventLane, type DagRunEvent, type DagRunId, type DagRunStatus, type DagSettings, isTerminalDagRunStatus } from "./types"
 import type { DagRunEventType } from "./events"
+import { decodePausedNodes, decodePausedTransition, encodePausedNodes, encodePausedTransition } from "./paused-node-encoding"
 
 const SCHEMA_VERSION = 1
 const LOCK_RETRY_MS = 10
@@ -172,7 +173,7 @@ export function createDagFileStore(config: DagStoreConfig, options: StoreOptions
       fs.mkdirSync(dirname(path), { recursive: true })
       const fd = fs.openSync(path, "a")
       try {
-        fs.writeSync(fd, `${JSON.stringify(event)}\n`)
+        fs.writeSync(fd, `${JSON.stringify(encodePausedTransition(event))}\n`)
         if (fsyncWrites) fs.fsyncSync(fd)
       } finally {
         fs.closeSync(fd)
@@ -215,7 +216,7 @@ export function createDagFileStore(config: DagStoreConfig, options: StoreOptions
       writeCheckpointWithinSessionLimit(
         paths,
         runId,
-        checkpoint,
+        encodePausedNodes(checkpoint),
         maxRunsPerSession,
         platform,
         fsyncWrites,
@@ -229,7 +230,7 @@ export function createDagFileStore(config: DagStoreConfig, options: StoreOptions
       const value = readJsonFile(path, runId, now)
       if (value === null) return null
       assertSupportedSchema(value, path, runId, now)
-      return value as T
+      return decodePausedNodes(value as T)
     },
     writeKey(record) {
       assertSupportedSchema(record, paths.key(record.parentSessionId, record.runKey), record.runId, now)
@@ -319,7 +320,24 @@ function createPaths(stateDir: string): DagStorePaths {
     key: (parentSessionId, runKey) => join(keys, `${dagKeyHash(parentSessionId, runKey)}.json`),
     run: (runId) => join(runs, `${runId}.json`),
     event: (runId) => join(events, `${runId}.jsonl`),
-    result: (runId, nodeId) => join(results, runId, `${nodeId}.txt`),
+    // A node id becomes one path segment under the run's results directory. The store's own gate is
+    // the containment check below: it is structural, so a caller that bypasses
+    // writeResult/readResult (results.ts, scheduler.ts) cannot escape even if the shared deny-list is
+    // later weakened. The deny-list still runs after it for the hazards containment does not cover
+    // (a NUL byte, ":" alternate-data-stream), so the two layers are not one rule applied twice.
+    result: (runId, nodeId) => {
+      assertSafeSegment(runId, "run id")
+      const runDir = join(results, runId)
+      const outputPath = join(runDir, `${nodeId}.txt`)
+      const fromRunDir = relative(runDir, resolve(outputPath))
+      // An escape is ".." itself, or ".." followed by a separator; a plain "..name" is an ordinary
+      // filename (id "..." yields "....txt") and must stay allowed.
+      if (isAbsolute(fromRunDir) || fromRunDir === ".." || fromRunDir.startsWith(`..${sep}`)) {
+        throw new Error(`Unsafe dag result path: node id "${nodeId}" escapes the run results directory`)
+      }
+      assertSafeSegment(nodeId, "node id")
+      return outputPath
+    },
     runLock: (runId) => join(locks, `${runId}.lock`),
     keyLock: (parentSessionId, runKey) => join(locks, `key-${dagKeyHash(parentSessionId, runKey)}.lock`),
     taskOwnerLock: (taskOwner) => join(locks, `task-owner-${sha256(taskOwner)}.lock`),
@@ -532,7 +550,7 @@ function parseEvent(value: unknown, path: string, runId: DagRunId, now: () => nu
   if (!isRecord(value) || typeof value.seq !== "number" || typeof value.type !== "string") {
     throw corrupt(path, runId, "invalid DAG event envelope", now)
   }
-  return value as DagRunEvent
+  return decodePausedTransition(value as DagRunEvent)
 }
 
 function parseJson(text: string, path: string, runId?: DagRunId, now: () => number = Date.now): unknown {
@@ -906,7 +924,7 @@ function pruneRunArtifacts(
 }
 
 function assertSafeSegment(value: string, label: string): void {
-  if (value.length === 0 || value === "." || value === ".." || value.includes("/") || value.includes("\\") || value.includes("\0")) {
+  if (!isSafeDagPathSegment(value)) {
     throw new Error(`Invalid ${label}`)
   }
 }

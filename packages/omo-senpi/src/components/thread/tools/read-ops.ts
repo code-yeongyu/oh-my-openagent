@@ -1,6 +1,7 @@
 import { workspaceEntries } from "../addressing"
 import type { ThreadReadInput, ThreadToolResult } from "../contracts"
 import { readTranscript } from "../reader"
+import { threadLink } from "../thread-link"
 import { addressBook, degradedSummary, failure, resolution, resolveEntries, routingId, sessionPort, summary, targetSession, transcriptRole } from "./internals"
 import type { ThreadHostSession, ThreadHostView, ThreadToolSurfaceOptions } from "./ports"
 
@@ -43,6 +44,7 @@ export async function readThread(options: ThreadToolSurfaceOptions, current: Thr
   return {
     kind: "ok",
     thread_id: resolved.entry.thread_id,
+    link: threadLink(resolved.entry.thread_id, resolved.entry.name),
     items: live.items.map((item, index) => ({ seq: index + 1, role: transcriptRole(item.role), content: JSON.stringify(item.content ?? item) })),
     truncated: live.truncated,
     ...(live.next_cursor === null ? {} : { next_cursor: live.next_cursor }),
@@ -68,5 +70,5 @@ function readDegraded(options: ThreadToolSurfaceOptions, current: ThreadHostView
     return message.role === "user" || message.role === "assistant" || message.role === "toolResult" ? [message] : []
   })
   const items = messages.map((message, index) => ({ seq: index + 1, role: transcriptRole(message.role), content: JSON.stringify(message.content ?? message) }))
-  return { kind: "ok", thread_id: threadId, items, truncated: durable.truncated, ...(durable.next_cursor === null ? {} : { next_cursor: durable.next_cursor }), source: durable.source, source_incomplete: durable.source_incomplete, error_note: entry.error_note }
+  return { kind: "ok", thread_id: threadId, link: threadLink(threadId, entry.title), items, truncated: durable.truncated, ...(durable.next_cursor === null ? {} : { next_cursor: durable.next_cursor }), source: durable.source, source_incomplete: durable.source_incomplete, error_note: entry.error_note }
 }

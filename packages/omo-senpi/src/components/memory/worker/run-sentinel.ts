@@ -8,7 +8,7 @@ const RUN_STATE_RECHECK_INTERVAL_MS = 25
 async function waitForRunState(
   directory: string,
   isReady: () => boolean,
-  deadlineAt: number,
+  deadlineAt: number | (() => number | undefined),
   now: () => number,
   signal?: AbortSignal,
 ): Promise<SentinelWaitResult> {
@@ -17,6 +17,8 @@ async function waitForRunState(
   return await new Promise<SentinelWaitResult>((resolve) => {
     let settled = false
     let watcher: FSWatcher | undefined
+    let timeout: ReturnType<typeof setTimeout> | undefined
+    let armedDeadline: number | undefined
     const finish = (result: SentinelWaitResult) => {
       if (settled) return
       settled = true
@@ -29,15 +31,20 @@ async function waitForRunState(
     const onAbort = () => finish("timeout")
     // fs.watch can report the temporary rename source before the atomic destination is visible,
     // with no later event for the destination on Linux. Keep a bounded state recheck as fallback.
-    const recheck = setInterval(() => {
-      if (isReady()) finish("present")
-    }, RUN_STATE_RECHECK_INTERVAL_MS)
-    const timeout = setTimeout(() => finish("timeout"), Math.max(0, deadlineAt - now()))
+    const check = () => {
+      if (settled) return
+      if (isReady()) { finish("present"); return }
+      const deadline = typeof deadlineAt === "number" ? deadlineAt : deadlineAt()
+      if (deadline !== undefined && deadline <= now()) { finish("timeout"); return }
+      if (deadline === armedDeadline) return
+      clearTimeout(timeout)
+      armedDeadline = deadline
+      if (deadline !== undefined) timeout = setTimeout(check, Math.max(0, deadline - now()))
+    }
+    const recheck = setInterval(check, RUN_STATE_RECHECK_INTERVAL_MS)
     signal?.addEventListener("abort", onAbort, { once: true })
     try {
-      watcher = watch(directory, () => {
-        if (isReady()) finish("present")
-      })
+      watcher = watch(directory, check)
       watcher.once("error", () => {
         if (settled) return
         // The bounded state recheck remains authoritative when fs.watch is unavailable.
@@ -47,7 +54,7 @@ async function waitForRunState(
     } catch {
       // The bounded state recheck remains authoritative when fs.watch is unavailable.
     }
-    if (isReady()) finish("present")
+    check()
   })
 }
 
@@ -67,7 +74,7 @@ export async function waitForRunCompletion(
   outcomePath: string,
   launchPath: string,
   isMatchingOutcome: () => boolean,
-  deadlineAt: number,
+  deadlineAt: number | (() => number | undefined),
   now: () => number,
   signal?: AbortSignal,
 ): Promise<SentinelWaitResult> {

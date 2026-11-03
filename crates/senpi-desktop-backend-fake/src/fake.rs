@@ -4,11 +4,12 @@ use image::Rgba;
 use senpi_desktop_core::backend::DeliveryMode;
 use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode};
 use senpi_desktop_core::types::{DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, Target};
+use std::collections::BTreeMap;
 
 use crate::ax_tree::AxTree;
-use crate::faults::Faults;
-use crate::method::FakeMethod;
-use crate::scenario::{DelayMs, FakeScenario, ResizeWindow};
+use crate::faults::{Faults, Reply};
+use crate::method::{AxWrite, FakeMethod};
+use crate::scenario::{DelayMs, FakeMenuNode, FakeScenario, ResizeWindow};
 use crate::sink::{RecordingSink, SinkOp};
 
 /// Scripted headless `Backend` + `AxBackend`: serves a [`FakeScenario`],
@@ -27,9 +28,14 @@ pub struct FakeBackend {
     pub(crate) capture_color: Rgba<u8>,
     delays: DelayMs,
     pub(crate) resize_window: Option<ResizeWindow>,
+    pub(crate) legacy_capture: bool,
+    pub(crate) remote_screens: BTreeMap<u32, crate::remote_impl::FakeRemoteScreen>,
     pub(crate) ax_tree: AxTree,
     pub(crate) ax_owner_unknown: bool,
+    pub(crate) menus: BTreeMap<String, Vec<FakeMenuNode>>,
     pub(crate) sink: RecordingSink,
+    pub(crate) user_input: std::sync::Arc<crate::user_input_impl::FakeUserInput>,
+    pub(crate) user_input_feed: bool,
     faults: Faults,
 }
 
@@ -37,11 +43,24 @@ impl FakeBackend {
     pub fn new(scenario: FakeScenario) -> Self {
         let faults = Faults::default();
         for failure in &scenario.fail_next {
-            faults.fail_next(failure.method, failure.code);
+            let error = match &failure.reason {
+                Some(reason) => DesktopError::new(failure.code, format!("injected {:?} failure", failure.method))
+                    .with_capture_unavailable_reason(reason),
+                None => DesktopError::new(failure.code, format!("injected {:?} failure", failure.method)),
+            };
+            faults.fail_next_with(failure.method, error);
         }
+        for write in &scenario.ax_cannot_complete {
+            faults.cannot_complete_next(*write);
+        }
+        let user_input = std::sync::Arc::new(crate::user_input_impl::FakeUserInput::default());
+        user_input.script(scenario.user_presses);
         Self {
+            user_input,
+            user_input_feed: scenario.user_input_feed,
             ax_tree: AxTree::build(&scenario.ax),
             ax_owner_unknown: scenario.ax_owner_unknown,
+            menus: scenario.menus,
             displays: scenario.displays,
             windows: scenario.windows,
             capabilities: scenario.capabilities,
@@ -50,6 +69,8 @@ impl FakeBackend {
             capture_color: Rgba(scenario.capture_color),
             delays: scenario.delay_ms,
             resize_window: scenario.resize_window,
+            legacy_capture: scenario.legacy_capture,
+            remote_screens: scenario.remote_screens,
             sink: RecordingSink::default(),
             faults,
         }
@@ -72,10 +93,21 @@ impl FakeBackend {
 
     /// Entry of every fallible call: scripted delay, then a queued failure.
     pub(crate) fn begin(&self, method: FakeMethod) -> CoreResult<()> {
+        self.delay(method);
+        self.faults.take(method).map_or(Ok(()), Err)
+    }
+
+    /// [`Self::begin`] for an AX write: the reply to report once the write
+    /// has landed ([`Reply::confirm`]).
+    pub(crate) fn begin_write(&self, write: AxWrite) -> CoreResult<Reply> {
+        self.delay(write.method());
+        self.faults.take_write(write)
+    }
+
+    fn delay(&self, method: FakeMethod) {
         if let Some(delay) = self.delays.for_method(method) {
             std::thread::sleep(delay);
         }
-        self.faults.take(method).map_or(Ok(()), Err)
     }
 
     pub(crate) fn window(&self, id: &str) -> CoreResult<&DesktopWindow> {
@@ -86,6 +118,14 @@ impl FakeBackend {
     }
 
     /// Refuses input the scenario's capabilities say this host cannot deliver.
+    /// The window `target` names and the remote screen its process shows, if any.
+    pub(crate) fn remote_window(&self, target: &Target) -> Option<(DesktopWindow, crate::remote_impl::FakeRemoteScreen)> {
+        let Target::Window(id) = target else { return None };
+        let window = self.windows.iter().find(|window| &window.id == id)?;
+        let remote = *self.remote_screens.get(&window.pid?)?;
+        Some((window.clone(), remote))
+    }
+
     pub(crate) fn input_gate(&self, target: &Target, mode: DeliveryMode) -> CoreResult<()> {
         if !self.capabilities.input {
             return Err(DesktopError::input_failed(
@@ -107,7 +147,7 @@ impl FakeBackend {
             )));
         }
         match target {
-            Target::Desktop => Ok(()),
+            Target::Desktop | Target::Display(_) => Ok(()),
             Target::Window(id) => {
                 self.window(id)?;
                 if mode == DeliveryMode::Background && !self.capabilities.background_window_input {

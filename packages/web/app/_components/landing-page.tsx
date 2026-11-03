@@ -24,14 +24,14 @@ export async function generateLandingMetadata(): Promise<Metadata> {
   }
 
   return {
-    title: "OmO — Your tool for real work. But it's an agent.",
+    title: "OmO: Your tool for real work. But it's an agent.",
     description,
   }
 }
 
 export async function LandingPage(): Promise<JSX.Element> {
   return (
-    <div className="flex min-h-screen flex-col overflow-x-clip">
+    <div className="flex min-h-dvh flex-col overflow-x-clip">
       <HeroSection />
       <ProofStripSection />
       <SecretSection />

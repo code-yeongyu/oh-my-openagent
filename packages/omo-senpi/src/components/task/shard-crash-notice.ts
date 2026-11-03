@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs"
 import { basename, join } from "node:path"
+import { log } from "@oh-my-opencode/utils"
 
 import {
   parseShardBasename,
@@ -10,21 +11,9 @@ import {
 } from "@oh-my-opencode/senpi-task"
 
 import { hostDaemonDir } from "../../../../senpi-task/src/runners/rpc-host/host-daemon-dir"
-import type { HostNotices } from "./host-execution-mode"
-import type { CapturedUi } from "./runtime-context"
 
-/**
- * ONE parent-visible notice per task-host crash, and one closing line once its children are back.
- *
- * Every child that loses the same host generation (socket + instanceId) belongs to one episode - a
- * key, never a time window. Its members are every child the runner still had bound to that
- * generation when the first loss arrived, plus any that report a loss later. The episode is
- * announced at its first child that had a turn in flight (a host that dies with nothing running is
- * re-ensured silently by the next spawn) and closed when its last member reports how its recovery
- * ended. Both lines go to the session's notice
- * list (`task_output`) AND to `ui.notify`, which a host-attached session forwards as an
- * `extension_ui_request` notify the Desktop renders as a thread row.
- */
+// Generation-keyed crash accounting is diagnostic only. Exhausted child recovery reaches the
+// parent through the existing exactly-once completion notifier, never a second crash warning.
 
 export const SHARD_CRASH_TOKEN = "host_shard_crash"
 export const SHARD_CRASH_DONE_TOKEN = "host_shard_crash_done"
@@ -36,10 +25,9 @@ export interface ShardCrashFacts {
 
 export interface ShardCrashNoticeDeps {
   readonly agentDir: string
-  readonly notices: HostNotices
-  readonly ui: () => CapturedUi | undefined
   readonly now?: () => number
   readonly readCrash?: (agentDir: string, socket: string, instanceId: string, now: number) => ShardCrashFacts
+  readonly log?: (event: string, facts: Record<string, unknown>) => void
 }
 
 interface Episode {
@@ -51,31 +39,26 @@ interface Episode {
   announced: boolean
 }
 
-const subagents = (n: number): string => `${n} ${n === 1 ? "subagent" : "subagents"}`
-
 const count = (outcomes: readonly ReattachOutcome[], ...kinds: readonly ReattachOutcome[]): number =>
   outcomes.filter((outcome) => kinds.includes(outcome)).length
 
 export function createShardCrashNotices(deps: ShardCrashNoticeDeps): Required<HostShardEvents> {
   const readCrash = deps.readCrash ?? readNewestHostCrash
+  const record = deps.log ?? log
   const now = deps.now ?? Date.now
   const open = new Map<string, Episode>()
   const closed = new Set<string>()
   const episodeOfTask = new Map<string, Episode>()
 
-  const emit = (token: string, text: string, type: "warning" | "info"): void => {
-    deps.notices.add(text, token)
-    deps.ui()?.notify(text, type)
-  }
-
   const announce = (episode: Episode, info: TransportLostInfo): void => {
     episode.announced = true
     const crash = readCrash(deps.agentDir, info.socket, info.instanceId, now())
     const supervisorPid = info.supervisorPid ?? crash.supervisorPid
-    const pid = supervisorPid === undefined ? "pid unknown" : `supervisor pid ${supervisorPid}`
-    const n = episode.members.size
-    const text = `${SHARD_CRASH_TOKEN}:${episode.key} Background task host crashed (shard ${episode.key}, ${pid}, ${crash.cause ?? "cause unknown"}): reattaching ${subagents(n)}...`
-    emit(`${SHARD_CRASH_TOKEN}:${episode.id}`, text, "warning")
+    record(SHARD_CRASH_TOKEN, {
+      episode: episode.id, shard: episode.key, socket: info.socket, instanceId: info.instanceId,
+      supervisorPid, cause: crash.cause ?? "cause unknown", members: episode.members.size,
+      taskIds: [...episode.members], turnWasInFlight: info.turnWasInFlight,
+    })
   }
 
   // A child that left on its own during recovery is neither reattached nor lost: it is named apart.
@@ -86,11 +69,10 @@ export function createShardCrashNotices(deps: ShardCrashNoticeDeps): Required<Ho
     const cancelled = count(episode.outcomes, "cancelled")
     const lost = count(episode.outcomes, "lost", "host_incompatible")
     const reattached = count(episode.outcomes, "attached", "resumed", "continued")
-    // The Desktop parses this shape into its one "Task host restarted" row: the loss leads when there is one.
-    const counts =
-      lost === 0 ? `${subagents(reattached)} reattached, 0 lost` : `${subagents(lost)} lost (reattach failed), ${reattached} reattached`
-    const text = `${SHARD_CRASH_DONE_TOKEN}:${episode.key} ${counts}${cancelled === 0 ? "" : `, ${cancelled} cancelled`}`
-    emit(`${SHARD_CRASH_DONE_TOKEN}:${episode.id}`, text, "info")
+    record(SHARD_CRASH_DONE_TOKEN, {
+      episode: episode.id, shard: episode.key, taskIds: [...episode.members],
+      reattached, lost, cancelled, outcomes: episode.outcomes,
+    })
   }
 
   const enroll = (episode: Episode, taskId: string): void => {

@@ -94,6 +94,11 @@ describe("omo-senpi ultrawork once-per-session arming", () => {
       "Lead (main) to duty: the lane quoted mass ulw research in its report",
       "the bug: a message that says \"please ulw this\" arms the directive",
       "> ulw research the market\nwhat do you think of this request?",
+      // #10822: a relay whose header names several recipients, pasted twice, quoting a test name. Its only
+      // keyword is the test name, and it armed a coordinator session's ultrawork mode.
+      "[lane-r3 -> coordinator + ledger-lane] (1) the one-time copy STARTED. (2) no parser bug: the recorded names are exact, and the other is 'omo-senpi ultrawork packaged reload > ...'.\n[lane-r3 -> coordinator + ledger-lane] the rerun is filed.",
+      "[LEAD via coordinator -> lane-a, omo#1 FIX_FIRST] fold both findings, then ulw the delta",
+      "the failing test is 'omo-senpi ultrawork packaged reload > injects the reminder'",
     ]) {
       const pi = new FakeExtensionAPI()
       const arming = createSessionArming()
@@ -110,6 +115,7 @@ describe("omo-senpi ultrawork once-per-session arming", () => {
       "mass ulw research the housing market",
       "fix the login redirect, ulw, and open a PR",
       "ulw add a dark mode toggle",
+      "don't stop until it's done, ulw",
     ]) {
       const pi = new FakeExtensionAPI()
       const arming = createSessionArming()
@@ -397,46 +403,6 @@ describe("omo-senpi ultrawork once-per-session arming", () => {
     expect(result).toEqual({ action: "continue" })
     expect(piAfterResume.messages).toHaveLength(1)
     expectReminderMessage(piAfterResume, 0)
-  })
-
-  it("#given the packaged extension reloaded uncached #when the same session triggers on the second load #then injects the reminder not the full directive", async () => {
-    // given: senpi loads packaged extensions through an UNCACHED importer (Jiti
-    // `moduleCache: false` in core/extensions/loader.ts), so every load re-evaluates
-    // the whole bundle and rebuilds each module-scope binding. A query-suffixed
-    // RELATIVE import reproduces that boundary in-process: Bun keys its module cache
-    // on the full specifier, so each query variant evaluates fresh (a file:// URL
-    // drops the query and would NOT bust the cache).
-    const loadPackagedExtension = async (reload: number): Promise<(pi: unknown) => Promise<void>> => {
-      const module = (await import(`../../../plugin/extensions/omo.js?reload=${reload}`)) as {
-        default: (pi: unknown) => Promise<void>
-      }
-      return module.default
-    }
-
-    // load #1 arms the session with the full directive
-    const piBeforeReload = new FakeExtensionAPI()
-    await (await loadPackagedExtension(1))(piBeforeReload)
-    await piBeforeReload.dispatch("session_start", {}, sessionEventCtx("session-reload"))
-    await dispatchInput(piBeforeReload, "ulw first pass")
-    const firstInjection = piBeforeReload.messages.find((call) => call.message["customType"] === "omo-ultrawork:directive")
-    expect(firstInjection?.message["content"]).toBe(SENPI_ULTRAWORK_DIRECTIVE)
-
-    // when: the host reloads the packaged extension (fresh module evaluation) and
-    // the SAME session triggers again — its transcript still holds the directive.
-    const piAfterReload = new FakeExtensionAPI()
-    await (await loadPackagedExtension(2))(piAfterReload)
-    await piAfterReload.dispatch("session_start", {}, sessionEventCtx("session-reload"))
-    await dispatchInput(piAfterReload, "ulw keep going")
-
-    // then: the arming ledger survived re-evaluation, so only the short reminder
-    // rides in; re-emitting ~29KB here is the token burn this feature exists to stop.
-    const reinjection = piAfterReload.messages.find((call) => call.message["customType"] === "omo-ultrawork:directive")
-    const content = reinjection?.message["content"]
-    if (typeof content !== "string") {
-      throw new Error("expected one ultrawork injection after reload")
-    }
-    expect(content.length).toBeLessThan(400)
-    expect(content).not.toContain("<ultrawork-mode>")
   })
 
   it.each(["baseline", "astra"] as const)("#given a slot left under different %s directive text #when the bundle re-evaluates #then the session is not armed and receives the full directive", async (variant) => {

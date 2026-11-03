@@ -104,7 +104,7 @@ describe("task_cancel stops the child", () => {
     expect(stopped.status).toBe("cancelled")
     expect(recordAt(parent, 1).status).toBe("running")
     expect(concurrencyOf(parent).getCount(HOST_CHILD_MODEL)).toBe(1)
-    parent.manager.forget(child.task_id)
+    parent.manager.forget(child.task_id, { path: "end" })
     expect(concurrencyOf(parent).getCount(HOST_CHILD_MODEL)).toBe(1)
   })
 
@@ -121,7 +121,7 @@ describe("task_cancel stops the child", () => {
       const { host_pid: _owner, ...rest } = fresh
       return { ...rest, residency_state: "rpc_detached" }
     })
-    parent.manager.forget(child.task_id)
+    parent.manager.forget(child.task_id, { path: "park" })
     const mark = world.host.commands.length
 
     // when

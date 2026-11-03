@@ -8,6 +8,9 @@ import {
 	type StopPathStatus,
 } from "@oh-my-opencode/senpi-desktop-protocol";
 import { type ChildFactory, engineChildFactory } from "./child";
+import { ControlGrants } from "./control-grants";
+import { deadline } from "./deadline";
+import { FullAccessConsent, isGlobalInput } from "./global-input";
 import { type Listener, NotificationHub, type Unsubscribe } from "./notifications";
 import { isDesktopCapabilities, isStopPathStatus, parseHello, parseSessionOpened } from "./parse";
 import { type CallOptions, DesktopEngineRpcError, DesktopServiceError, RpcClient } from "./rpc-client";
@@ -15,42 +18,16 @@ import {
 	CAPABILITIES_TIMEOUT_MS,
 	CLOSE_TIMEOUT_MS,
 	HEARTBEAT_MS,
+	REVOKE_TIMEOUT_MS,
 	START_TIMEOUT_MESSAGE,
 	START_TIMEOUT_MS,
 } from "./timeouts";
-
-/** `session.open` params, forwarded verbatim; every policy they configure is enforced by the engine. */
-export interface DesktopSessionOpenParams {
-	readonly display?: string | null;
-	readonly macosCanary?: "session" | "off";
-	readonly allowHostRelayOnlyStop?: boolean;
-	readonly auditPath?: string | null;
-	readonly artifactDir?: string | null;
-	readonly screenshotGc?: { readonly staleMs?: number; readonly scanIntervalMs?: number };
-	readonly captureCaps?: {
-		readonly maxWidth?: number | null;
-		readonly maxHeight?: number | null;
-		readonly coordinateSafe?: boolean;
-		readonly maxBytes?: number;
-	};
-}
+import type { Connection, DesiredSession, DesktopSessionOpenParams } from "./session-state";
 
 export interface DesktopServiceOptions {
 	readonly createChild?: ChildFactory;
-}
-
-/** One live engine child. Mutable: the resume token, armed chord, and heartbeat belong to this child only. */
-interface Connection {
-	readonly rpc: RpcClient;
-	resumeToken: string;
-	armedChord: string | undefined;
-	heartbeat: NodeJS.Timeout | undefined;
-}
-
-/** What the host asked for; replayed onto a fresh child after a crash or grace kill. */
-interface DesiredSession {
-	readonly params: DesktopSessionOpenParams;
-	chord: string | undefined;
+	/** The session's live full-access decision (#10022); absent counts as not full access. */
+	readonly fullAccess?: () => boolean;
 }
 
 /**
@@ -63,12 +40,16 @@ export class DesktopService {
 	#lifecycle: Promise<unknown> = Promise.resolve();
 	#connection: Connection | undefined;
 	#desired: DesiredSession | undefined;
-	#lastStopPath: StopPathStatus | undefined;
+	readonly #grants = new ControlGrants();
+	readonly #consent: FullAccessConsent;
+	/** The user's stop, held by the host: only a stop sets it and only a successful resume clears it (#10788). */
+	#stopLatched = false;
 
 	constructor(options: DesktopServiceOptions = {}) {
 		this.#createChild = options.createChild ?? engineChildFactory();
+		this.#consent = new FullAccessConsent(this.#grants, options.fullAccess ?? (() => false));
 		this.#hub.onStopPathChange((status) => {
-			this.#lastStopPath = status;
+			if (status.suspended) this.#stopLatched = true;
 		});
 	}
 
@@ -80,6 +61,10 @@ export class DesktopService {
 		return this.#hub.onStopPathChange(listener);
 	}
 
+	/**
+	 * Failures no caller awaits: a malformed notification, a failed heartbeat or best-effort revoke, and
+	 * anything passed to `reportError`. A host must subscribe, or these are lost.
+	 */
 	onError(listener: Listener<Error>): Unsubscribe {
 		return this.#hub.onError(listener);
 	}
@@ -87,9 +72,10 @@ export class DesktopService {
 	/** Starts the engine when none runs, then opens (or reconfigures) the desktop session. */
 	open(params: DesktopSessionOpenParams): Promise<DesktopCapabilities> {
 		return this.#serialize(async () => {
-			this.#desired = { params, chord: this.#desired?.chord };
+			const normalized = { ...params, showCursor: params.showCursor ?? true };
+			this.#desired = { params: normalized, chord: this.#desired?.chord };
 			const live = this.#connection;
-			if (live?.rpc.alive === true) return this.#openSession(live, params);
+			if (live?.rpc.alive === true) return this.#openSession(live, normalized);
 			if (live !== undefined) this.#drop(live);
 			return (await this.#start(this.#desired)).capabilities;
 		});
@@ -109,13 +95,46 @@ export class DesktopService {
 
 	async call(method: EngineMethod, params: unknown, options: CallOptions = {}): Promise<unknown> {
 		const connection = await this.#live();
-		return connection.rpc.request(method, params, options);
+		await this.#consent.fence(connection);
+		const request = () => connection.rpc.request(method, params, options);
+		if (method === "control.grant") return this.#grants.grant(request, options.signal?.aborted === true);
+		if (method === "control.revoke") return this.#grants.revoke(request);
+		if (isGlobalInput(method, params)) return this.#consent.send(connection, method, params, options);
+		return request();
+	}
+
+	/** Reports a failure nobody awaits (a best-effort revoke) to `onError` listeners instead of dropping it. */
+	reportError(error: unknown): void {
+		this.#hub.emitError(error instanceof Error ? error : new Error(String(error)));
+	}
+
+	/**
+	 * `control.revoke`, best effort (#9651 B5b), sent only while a grant this service asked for may be
+	 * live (one sent and not yet covered by a revoke that succeeded), so a run or turn end without one
+	 * adds nothing to the engine's audit, and a revoke that failed or was dropped is sent again later. The request is written
+	 * before this returns, so it reaches the engine's serial queue ahead of anything sent afterwards;
+	 * callers need not wait for the reply. A failure is reported through the error hub, and
+	 * `session.close` stays the backstop that always releases the grant.
+	 */
+	revokeControl(): Promise<void> {
+		const connection = this.#connection;
+		if (connection === undefined || !connection.rpc.alive || !this.#grants.possiblyLive) return Promise.resolve();
+		return this.#grants.revoke(() => connection.rpc.request("control.revoke", {}, { timeoutMs: REVOKE_TIMEOUT_MS })).then(
+			() => undefined,
+			(error: unknown) => {
+				if (error instanceof DesktopServiceError || error instanceof DesktopEngineRpcError) {
+					this.#hub.emitError(error);
+					return;
+				}
+				throw error;
+			},
+		);
 	}
 
 	async capabilities(): Promise<DesktopCapabilities> {
 		const result = await this.call("capabilities", {}, { timeoutMs: CAPABILITIES_TIMEOUT_MS });
 		if (!isDesktopCapabilities(result)) throw malformed("capabilities");
-		return result;
+		return { ...result, cursorOverlay: result.cursorOverlay ?? false };
 	}
 
 	/** Reads the live stop-path state; it never arms or latches anything. */
@@ -129,7 +148,9 @@ export class DesktopService {
 
 	async resume(): Promise<StopPathStatus> {
 		const connection = await this.#live();
-		return this.#stopPath(connection, "stopPath.resume", { token: connection.resumeToken });
+		const status = await this.#stopPath(connection, "stopPath.resume", { token: connection.resumeToken });
+		if (!status.suspended) this.#stopLatched = false;
+		return status;
 	}
 
 	/** Closes the session and lets the engine exit at EOF; kills it after `CLOSE_TIMEOUT_MS`. */
@@ -142,6 +163,7 @@ export class DesktopService {
 			// A crashed or killed engine has no session left to close.
 			if (!connection.rpc.alive) return;
 			const graceful = async () => {
+				connection.rpc.cancelHolds();
 				await connection.rpc.request("session.close", {});
 				connection.rpc.end();
 				await connection.rpc.exited;
@@ -214,8 +236,8 @@ export class DesktopService {
 			await this.#stopPath(connection, "stopPath.start", { chord: desired.chord });
 			connection.armedChord = desired.chord;
 		}
-		if (this.#lastStopPath?.suspended === true) {
-			// A restart must not lift the user's stop latch.
+		if (this.#stopLatched) {
+			// A restart must not lift the user's stop latch; the new child's own status never clears it.
 			await this.#stopPath(connection, "stopPath.stop", { source: "host-relay" });
 		}
 		return capabilities;
@@ -233,7 +255,7 @@ export class DesktopService {
 	async #stopPath(connection: Connection, method: EngineMethod, params: object): Promise<StopPathStatus> {
 		const status = await connection.rpc.request(method, params);
 		if (!isStopPathStatus(status)) throw malformed(method);
-		this.#lastStopPath = status;
+		if (status.suspended) this.#stopLatched = true;
 		return status;
 	}
 
@@ -257,20 +279,4 @@ export class DesktopService {
 
 function malformed(method: string): DesktopServiceError {
 	return new DesktopServiceError("Internal", `desktop engine sent a malformed ${method} result`);
-}
-
-function deadline<T>(work: Promise<T>, ms: number, message: string): Promise<T> {
-	return new Promise((resolve, reject) => {
-		const timer = setTimeout(() => reject(new DesktopServiceError("Timeout", message)), ms);
-		work.then(
-			(value) => {
-				clearTimeout(timer);
-				resolve(value);
-			},
-			(error: unknown) => {
-				clearTimeout(timer);
-				reject(error);
-			},
-		);
-	});
 }

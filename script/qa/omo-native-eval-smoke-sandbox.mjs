@@ -3,6 +3,7 @@
 import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { withTelemetryOptOut } from "../../packages/omo-senpi/scripts/qa/telemetry-opt-out-env.mjs"
 import { evalSmokeProviderSource } from "./omo-native-eval-smoke-provider.mjs"
 
 // OMO_SMOKE_JS_ISOLATION=process runs the JavaScript cells in the process-isolated kernel.
@@ -16,7 +17,7 @@ export function isolatedEnvironment(sandbox) {
     if (/CODING_AGENT_(DIR|SESSION_DIR)$|TOKEN|SECRET|PASSWORD|COOKIE|CREDENTIAL|API_KEY/i.test(key)) continue
     env[key] = value
   }
-  return {
+  return withTelemetryOptOut({
     ...env, HOME: sandbox.home, USERPROFILE: sandbox.home,
     XDG_CONFIG_HOME: join(sandbox.home, "config"), XDG_DATA_HOME: join(sandbox.home, "data"),
     XDG_STATE_HOME: join(sandbox.home, "state"), XDG_CACHE_HOME: join(sandbox.home, "cache"),
@@ -24,7 +25,7 @@ export function isolatedEnvironment(sandbox) {
     OMO_CODING_AGENT_DIR: sandbox.agentDir, SENPI_CODING_AGENT_SESSION_DIR: sandbox.sessionDir,
     ...(processIsolation ? { SENPI_CODEMODE_JS_ISOLATION: "process" } : {}),
     PI_OFFLINE: "1", PI_TELEMETRY: "0",
-  }
+  })
 }
 
 export function createSandbox(binary) {

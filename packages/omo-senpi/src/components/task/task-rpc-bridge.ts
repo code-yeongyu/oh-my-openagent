@@ -1,4 +1,5 @@
 import {
+  awaitingInputDetails,
   createChildProgress,
   runTaskCancel,
   runTaskOutput,
@@ -14,6 +15,7 @@ import {
   invalidArguments,
   liveProgressSnapshot,
   parseTaskCancel,
+  parseTaskList,
   parseTaskOutput,
   parseTaskSend,
   taskSnapshot,
@@ -56,7 +58,9 @@ const globalTimers: TaskRpcTimers = {
 export interface TaskRpcBridge {
   attach(): void
   sync(): void
+  resend(): void
   detach(): void
+  forgetOutputReads(sessionId: string): void
   dispose(): void
 }
 
@@ -95,21 +99,23 @@ export function wireTaskRpcBridge(
     }
   }
 
-  const emit = (selection = activeSessionId === undefined ? undefined : recordsForSession(activeSessionId)): void => {
-    const sessionId = activeSessionId
-    if (disposed || sessionId === undefined || pi.rpc?.emit === undefined) return
-    if (selection === undefined) return
-    const data = {
-      parent_session_id: sessionId,
-      tasks: selection.records.map((record) =>
-        taskSnapshot(
-          record,
-          isLive(record) ? engine.manager.runStatsSnapshot?.(record.task_id) : undefined,
-          liveProgress.get(record.task_id),
-        ),
+  // ONE builder feeds both the pushed snapshot (omo.task.updated) and the pull request
+  // (omo.task.list), so a re-attached client reads exactly what a live subscriber sees.
+  const snapshotData = (sessionId: string, selection = recordsForSession(sessionId)) => ({
+    parent_session_id: sessionId,
+    tasks: selection.records.map((record) =>
+      taskSnapshot(
+        record,
+        isLive(record) ? engine.manager.runStatsSnapshot?.(record.task_id) : undefined,
+        liveProgress.get(record.task_id),
       ),
-      ...(selection.truncatedTasks === 0 ? {} : { truncated_tasks: selection.truncatedTasks }),
-    }
+    ),
+    ...(selection.truncatedTasks === 0 ? {} : { truncated_tasks: selection.truncatedTasks }),
+  })
+
+  const emit = (data = activeSessionId === undefined ? undefined : snapshotData(activeSessionId)): void => {
+    if (disposed || activeSessionId === undefined || pi.rpc?.emit === undefined) return
+    if (data === undefined) return
     const fingerprint = JSON.stringify(data)
     if (fingerprint === lastSnapshot) return
     lastSnapshot = fingerprint
@@ -156,6 +162,8 @@ export function wireTaskRpcBridge(
           model: record.model,
         },
         Date.parse(record.created_at),
+        Date.now,
+        { awaitingInput: awaitingInputDetails(record) !== undefined },
       )
       const unsubscribe = engine.manager.subscribeChild(record.task_id, (event: ManagedChildEvent) => {
         if (!progress.accept(event)) return
@@ -181,10 +189,12 @@ export function wireTaskRpcBridge(
     cancelPendingFlush()
     const selection = recordsForSession(sessionId)
     syncSubscriptions(selection.records)
-    emit(selection)
+    emit(snapshotData(sessionId, selection))
   }
 
-  registerTaskHandlers(pi, engine, () => (disposed ? undefined : activeSessionId))
+  const forgetOutputReads = registerTaskHandlers(
+    pi, engine, () => (disposed ? undefined : activeSessionId), snapshotData,
+  )
 
   return {
     attach() {
@@ -194,7 +204,14 @@ export function wireTaskRpcBridge(
       sync()
     },
     sync,
+    /** Push the full current snapshot again without touching child subscriptions or their live progress. */
+    resend() {
+      if (disposed || activeSessionId === undefined) return
+      lastSnapshot = undefined
+      sync()
+    },
     detach,
+    forgetOutputReads,
     dispose() {
       if (disposed) return
       disposed = true
@@ -207,9 +224,29 @@ function registerTaskHandlers(
   pi: SenpiExtensionAPI,
   engine: TaskEngine,
   currentSessionId: () => string | undefined,
-): void {
+  snapshot: (sessionId: string) => {
+    readonly parent_session_id: string
+    readonly tasks: readonly unknown[]
+    readonly truncated_tasks?: number
+  },
+): (sessionId: string) => void {
   const handle = pi.rpc?.handle
-  if (handle === undefined) return
+  const statusReads = new Map<string, string>()
+  const forgetSession = (sessionId: string): void => {
+    for (const key of statusReads.keys()) {
+      const parsed: unknown = JSON.parse(key)
+      if (Array.isArray(parsed) && parsed[0] === sessionId) statusReads.delete(key)
+    }
+  }
+  if (handle === undefined) return forgetSession
+  handle("omo.task.list", async (data) => {
+    const sessionId = currentSessionId()
+    if (sessionId === undefined) return unavailable()
+    const input = parseTaskList(data)
+    if ("error" in input) return invalidArguments(input.error)
+    if (input.value.parent_session_id !== sessionId) return { kind: "not_found", reason: "No such parent session on this connection." } as const
+    return snapshot(sessionId)
+  })
   handle("omo.task.send", async (data) => {
     const sessionId = currentSessionId()
     if (sessionId === undefined) return unavailable()
@@ -234,9 +271,10 @@ function registerTaskHandlers(
     const input = parseTaskOutput(data)
     if ("error" in input) return invalidArguments(input.error)
     return boundedTaskOutput((
-      await runTaskOutput({ manager: engine.manager, stateDir: engine.stateDir }, input.value, sessionId)
+      await runTaskOutput({ manager: engine.manager, stateDir: engine.stateDir }, input.value, sessionId, statusReads)
     ).details)
   })
+  return forgetSession
 }
 
 function isLive(record: TaskRecord): boolean {

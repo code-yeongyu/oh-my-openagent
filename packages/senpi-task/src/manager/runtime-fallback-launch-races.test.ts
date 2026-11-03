@@ -71,7 +71,7 @@ describe("runtime fallback: a stop that lands just before the handoff is written
         destruction: {
           destroyResidentTask: async (taskId) => {
             const handle = built.getResidentHandle(taskId)
-            built.forget(taskId)
+            built.forget(taskId, { path: "park" })
             await handle?.dispose()
           },
         },

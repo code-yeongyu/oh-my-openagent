@@ -39,7 +39,15 @@ export type ExternalOrigin = {
 
 export type EnvelopeOrigin = { readonly session: string } | { readonly external: ExternalOrigin }
 
+export type Provenance = {
+  readonly workspace: string
+  readonly project: string
+  readonly lane?: string
+  readonly session?: string
+}
+
 export type DeliveryEnvelope = {
+  readonly provenance: Provenance
   readonly origin: EnvelopeOrigin
   readonly actor: string
   readonly via: readonly string[]
@@ -48,13 +56,16 @@ export type DeliveryEnvelope = {
   readonly delivery_id: string
 }
 
+/** JSON written before provenance was recorded remains readable, never attributed to the receiver. */
+export type StoredDeliveryEnvelope = Omit<DeliveryEnvelope, "provenance"> & { readonly provenance?: Provenance }
+
 export type DeliveryRow = {
   readonly delivery_id: string
   readonly target_durable_id: string
   readonly seq: number
   readonly sender: string
   readonly sender_turn: string | null
-  readonly envelope: DeliveryEnvelope
+  readonly envelope: StoredDeliveryEnvelope
   readonly body: string
   readonly bytes: number
   readonly mode_requested: GatewayDeliveryMode
@@ -99,6 +110,7 @@ export type GatewaySender =
     }
 
 export type EnqueueRequest = {
+  readonly provenance: Provenance
   readonly now: number
   readonly delivery_id: string
   readonly target_durable_id: string
@@ -199,6 +211,8 @@ export type GatewayStoreEvent =
   | { readonly kind: "barrier"; readonly op: string }
   | { readonly kind: "legacy_mailbox_invalid"; readonly directory: string; readonly error: string }
   | { readonly kind: "legacy_mailbox_skipped"; readonly directory: string; readonly items: readonly LegacyMailboxSkip[] }
+  /** The worker closed the database after a failed open (a migration that rolled back); it exits next. */
+  | { readonly kind: "store_closed" }
 
 /** A legacy mailbox item that can never be delivered (its target is not a durable session id); it is reported, not imported. */
 export type LegacyMailboxSkip = { readonly message_seq: number; readonly target: string; readonly reason: "invalid_target" }

@@ -1,0 +1,99 @@
+{
+  "description": "a legacy-fallback capture reports legacyCapture: true on the capture result and a false/absent SCK capture reports it false.",
+  "scenario": "crates/senpi-desktop-backend-fake/fixtures/capture-legacy.json",
+  "env": {},
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "session.open",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayServer": null,
+                "capture": true,
+                "input": true,
+                "ax": true,
+                "backgroundWindowInput": true,
+                "cursorOverlay": false,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capturePermission": "granted",
+                "inputPermission": "granted",
+                "axPermission": "granted",
+                "displayCount": 2,
+                "focusGuard": true,
+                "stopPath": "none",
+                "stopReason": null,
+                "integrityLevel": null,
+                "screenLocked": false
+              },
+              "resumeToken": "per-process-random"
+            }
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "capture",
+        "params": {
+          "target": "desktop"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "mode": "inline-png",
+              "data": "iVBORw0KGgo=",
+              "mimeType": "image/png",
+              "artifactPath": null,
+              "width": 640,
+              "height": 360,
+              "sourceWidth": 2560,
+              "sourceHeight": 1440,
+              "scale": 0.25,
+              "target": "desktop",
+              "frameId": "frame-1",
+              "note": null,
+              "coordinateWidth": 640,
+              "coordinateHeight": 360,
+              "region": null,
+              "legacyCapture": true
+            }
+          },
+          "variable": [
+            "/result/data",
+            "/result/width",
+            "/result/height",
+            "/result/sourceWidth",
+            "/result/sourceHeight",
+            "/result/coordinateWidth",
+            "/result/coordinateHeight",
+            "/result/scale",
+            "/result/frameId"
+          ]
+        }
+      ]
+    }
+  ]
+}

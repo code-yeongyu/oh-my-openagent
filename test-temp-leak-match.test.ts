@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { reportOnlyEntryMatches, reportOnlyOwner } from "./test-temp-leak-match"
+import { isOsCreatedTempEntry, reportOnlyEntryMatches, reportOnlyOwner } from "./test-temp-leak-match"
 
 describe("reportOnlyEntryMatches (#9766)", () => {
   test.each([
@@ -15,6 +15,21 @@ describe("reportOnlyEntryMatches (#9766)", () => {
     [".omo$", ".omo-x", false],
   ])("entry %p against %p is %p", (entry, name, matches) => {
     expect(reportOnlyEntryMatches(entry, name)).toBe(matches)
+  })
+})
+
+describe("isOsCreatedTempEntry (#9766)", () => {
+  test.each([
+    ["__PSScriptPolicyTest_2d0tpjsq.gy5.ps1", true],
+    ["__PSScriptPolicyTest_b135vhjf.x1d.psm1", true],
+    ["__PSScriptPolicyTest_2d0tpjsq.gy5.ps1.bak", false],
+    ["x__PSScriptPolicyTest_2d0tpjsq.gy5.ps1", false],
+    ["__PSScriptPolicyTest_2d0tpjsq.ps1", false],
+    ["__PSScriptPolicyTest_2D0TPJSQ.GY5.ps1", false],
+    ["__PSScriptPolicyTest_2d0tpjsq.gy5.psd1", false],
+    ["__PSScriptPolicyTest_dir", false],
+  ])("%p is OS-created: %p", (name, expected) => {
+    expect(isOsCreatedTempEntry(name)).toBe(expected)
   })
 })
 

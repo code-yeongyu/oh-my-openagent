@@ -25,7 +25,7 @@ function fakeManager(): TaskManager {
     get: () => undefined,
     list: () => [],
     waitFor: () => notImplemented("waitFor"),
-    forget: () => {},
+    forget: (_taskId, _options) => {},
     getResidentHandle: () => undefined,
     subscribeChild: () => () => {},
     residentTaskIds: () => [],

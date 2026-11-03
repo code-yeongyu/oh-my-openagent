@@ -27,6 +27,13 @@ omo daemon handoff             # upgrade-gated handoff across every live endpoin
 omo daemon rollback-prepare [--store <dir>]... [--allow-missing-index] [--dry-run] [--json]
 ```
 
+With `stop --all --wait`, `--timeout <seconds>` sets the per-endpoint observation
+window (600 seconds when omitted), but can never shorten the engine's shutdown
+budget. A smaller value is raised to that budget: currently 97 seconds by default,
+including SIGTERM, SIGKILL and reap waits, and longer when
+`SENPI_RPC_CHILD_STALLED_STOP_MAX_MS` is raised. A normal stop returns as soon as its
+generations and claims end; the budget is a deadline, not a fixed delay.
+
 Bare `omo` never ensures the operator daemon on `rpc.sock`. Only `run` and `handoff` can
 bring it into existence (per-session hosts are started by the task
 engine ahead of a session's first child: on its first prompt by default, at session start or

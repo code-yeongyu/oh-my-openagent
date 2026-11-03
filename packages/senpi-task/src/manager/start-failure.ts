@@ -1,6 +1,7 @@
 import { homedir } from "node:os"
 
 import { RunnerError } from "../runners/in-process/runner-error"
+import { RpcRequestTimeout } from "../runners/rpc/errors"
 import {
   HOST_START_FAILURE_REASONS,
   SESSION_START_FAILURE_REASONS,
@@ -58,7 +59,9 @@ export function describeStartFailure(error: unknown): StartFailureDescription {
   const trusted = error.failure.reason === undefined
   const cause = trusted ? causeOf(failureKind, error.failure.cause) : undefined
   const exited = trusted && cause === undefined && rejectedWhile === "exited" ? exit : undefined
-  const errorMessage = namedSpec !== undefined
+  const errorMessage = trusted && error.failure.cause instanceof RpcRequestTimeout
+    ? `Child prompt failed to start: the child did not answer ${error.failure.cause.command} within ${error.failure.cause.deadlineMs} ms. Action: inspect task_output; run it again with task.`
+    : namedSpec !== undefined
     ? launchSpecInsecureMessage(namedSpec)
     : cause !== undefined
       ? causedMessage(failureKind, cause)
@@ -134,8 +137,12 @@ function publicMessage(
         : "The task host is unavailable."
     case "child-turn-failed":
       return GENERIC_START_FAILURE_MESSAGE
+    case "child-unresponsive":
+      return "The child stopped answering. Action: inspect task_output; run it again with task."
     case "suspended_unresumable":
-      return "The suspended child could not be resumed."
+      return "The child could not be resumed."
+    case "model_chain_exhausted":
+      return "Every designated model for this task was refused, and a child never runs on any other model."
     default:
       return assertNever(kind)
   }

@@ -214,10 +214,11 @@ describe("omo thread: exit codes", () => {
 })
 
 describe("omo thread: SDK loading", () => {
-  test("#given a plugin whose thread SDK cannot be imported #when a --json command runs #then stdout is one internal_error JSON value and the exit code is 5", async () => {
-    const result = await run(["list", "--json"], fakeSdk(), { importSdk: async () => { throw new Error("Cannot find module sdk.js") } })
+  test("#given a plugin whose thread SDK cannot be imported #when a --json command runs #then stdout is one internal_error JSON value naming the caller's reinstall step and the exit code is 5", async () => {
+    const reinstall = "Reinstall omo with: npm i -g omo-ai@beta, then retry."
+    const result = await run(["list", "--json"], fakeSdk(), { reinstall, importSdk: async () => { throw new Error("Cannot find module sdk.js") } })
     expect(result.exitCode).toBe(THREAD_EXIT.failed)
-    expect(JSON.parse(result.stdout)).toMatchObject({ kind: "error", error: { code: "internal_error" } })
+    expect(JSON.parse(result.stdout)).toMatchObject({ kind: "error", error: { code: "internal_error", next_action: reinstall } })
     expect(result.stdout.trim().split("\n")).toHaveLength(1)
   })
 

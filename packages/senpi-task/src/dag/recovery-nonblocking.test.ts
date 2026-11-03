@@ -170,7 +170,7 @@ class LongRunningTaskManager implements TaskManager {
   interruptTask(): Promise<never> { throw new Error("not implemented") }
   cancelTask(): Promise<never> { throw new Error("not implemented") }
   list(): readonly [] { return [] }
-  forget(): void {}
+  forget(_taskId: string, _options: Parameters<TaskManager["forget"]>[1]): void {}
   // The real manager settles `waitFor` only for a child it holds resident, so this fake answers
   // "held" from the same map its completions come from: a task it can still complete is held here.
   getResidentHandle(taskId: string): ManagedChildHandle | undefined {

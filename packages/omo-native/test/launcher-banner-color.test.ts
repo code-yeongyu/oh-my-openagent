@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
+import { CACHE_FILENAME, CACHE_VERSION, setupDetectInputStats } from "../bin/lib/setup-detect-cache.js"
 
 const SOURCE_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
 const TTY_DRIVER = resolve(fileURLToPath(new URL("tty-driver.py", import.meta.url)))
@@ -46,11 +47,30 @@ process.exit(0)
   ]) write(join(packageRoot, artifact), "fixture\n")
   const home = join(root, "home")
   mkdirSync(home, { recursive: true })
+  const agentDir = join(root, "senpi-agent")
   return {
+    home,
     launcher: join(packageRoot, "bin", "omo.js"),
     captureFile: join(root, "capture.txt"),
-    env: { HOME: home, SENPI_CODING_AGENT_DIR: join(root, "senpi-agent"), XDG_DATA_HOME: join(root, "xdg") },
+    cachePath: join(agentDir, CACHE_FILENAME),
+    env: { HOME: home, SENPI_CODING_AGENT_DIR: agentDir, XDG_DATA_HOME: join(root, "xdg") },
   }
+}
+
+/**
+ * A stale or missing setup-suggestion cache makes an interactive launch spawn a detached, unref'd
+ * refresh child that writes into the agent dir under the fixture root. Nothing can await it, so it
+ * could recreate the root after afterEach removed it (#10398). A fresh cache means no child at all.
+ */
+function seedFreshSetupCache(cachePath: string, env: NodeJS.ProcessEnv, home: string): string {
+  const entry = `${JSON.stringify({
+    version: CACHE_VERSION,
+    writtenAt: Date.now(),
+    inputs: setupDetectInputStats(env, home),
+    suggestion: false,
+  })}\n`
+  write(cachePath, entry)
+  return entry
 }
 
 describe("interactive launch banner styling (#8442)", () => {
@@ -61,11 +81,13 @@ describe("interactive launch banner styling (#8442)", () => {
     delete inherited.OMO_CODING_AGENT_DIR
     delete inherited.PI_CODING_AGENT_DIR
     delete inherited.NO_COLOR
+    const env = { ...inherited, ...fixture.env }
+    const cache = seedFreshSetupCache(fixture.cachePath, env, fixture.home)
 
     // when
     const result = spawnSync("python3", [TTY_DRIVER, "", "", process.execPath, fixture.launcher], {
       encoding: "utf8",
-      env: { ...inherited, ...fixture.env },
+      env,
     })
 
     // then
@@ -74,5 +96,7 @@ describe("interactive launch banner styling (#8442)", () => {
     expect(output).toContain("omo (omo-ai beta 1.2.3-test.0)")
     expect(output).not.toContain(ANSI_RED)
     expect(readFileSync(fixture.captureFile, "utf8")).toBe("spawned")
+    // The launch read the cache as fresh: no detached refresh child was spawned to rewrite it.
+    expect(readFileSync(fixture.cachePath, "utf8")).toBe(cache)
   })
 })

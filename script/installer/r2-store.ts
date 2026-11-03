@@ -1,5 +1,6 @@
 import { MirrorPlanError } from "./mirror-plan"
-import type { R2Credentials } from "./r2-signed-put"
+import { withRetry } from "./mirror-retry"
+import { putVerified, type R2Credentials } from "./r2-signed-put"
 
 export interface R2Store {
   exists(key: string): Promise<boolean>
@@ -40,7 +41,9 @@ export function createR2Store(credentials: R2Credentials, prefix: string): R2Sto
       return (await client.exists(full(key))) ? client.file(full(key)).text() : null
     },
     async write(key, body, contentType) {
-      await client.write(full(key), body, { type: contentType })
+      const file = new Blob([body], { type: contentType })
+      const hash = new Bun.CryptoHasher("sha256").update(body).digest("hex")
+      await withRetry(`write ${full(key)}`, () => putVerified(credentials, full(key), file, hash, { "content-type": contentType }))
     },
     async listReleaseVersions() {
       const versions = new Set<string>()

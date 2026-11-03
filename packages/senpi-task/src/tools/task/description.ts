@@ -47,7 +47,7 @@ export function buildTaskToolDescription(input: DescriptionInput): string {
 
 Choose exactly one input form:
 - Single: prompt
-- Batch: tasks (1-16 items); top-level target, model, and skills are inherited when an item omits them. An inherited model is rejected when the item's effective target is a category.
+- Batch: tasks (one or more items); top-level target, model, and skills are inherited when an item omits them. An inherited model is rejected when the item's effective target is a category.
 
 Each spawn MUST provide EITHER category OR subagent_type after inheritance. DO NOT provide both.
 

@@ -3,10 +3,13 @@
 // Single forward scan with indexOf (no whole-document regex, no backtracking). Produces a
 // LiteNode tree: { tag, attrs, children, parent, line, text, raw }. Text nodes carry
 // tag "#text"; <style>/<script>/<svg> keep their inner source in `raw` and have no parsed
-// children. The "#document" root also carries `ids` (id -> occurrence count) so
-// selectorPath can tell whether an id is unique. Plain Node ESM, no dependencies.
+// children, except an <svg> node also gains its <foreignObject> subtrees as parsed children
+// (see html-foreign-object.mjs; the rest of the svg stays raw). The "#document"
+// root also carries `ids` (id -> occurrence count) so selectorPath can tell whether an id
+// is unique. Plain Node ESM, no dependencies.
 
 import { decodeEntities } from "./entities.mjs"
+import { attachForeignObjects } from "./html-foreign-object.mjs"
 
 export { decodeEntities }
 
@@ -23,9 +26,9 @@ const PROSE_SKIP = new Set(["code", "pre", "kbd", "samp", "script", "style", "sv
 const SAFE_ID = /^[A-Za-z_][\w-]*$/
 
 export const PROSE_TAGS = new Set(["p", "li", ...HEADINGS, "td", "th", "figcaption", "blockquote", "dd", "dt"])
-const PROSE_BREAKS = new Set([...P_CLOSERS, ...PROSE_TAGS, "br", "tr"])
+export const PROSE_BREAKS = new Set([...P_CLOSERS, ...PROSE_TAGS, "br", "tr"])
 
-function makeNode(tag, attrs, parent, line) {
+export function makeNode(tag, attrs, parent, line) {
 	return { tag, attrs, children: [], parent, line, text: "", raw: null }
 }
 
@@ -54,8 +57,8 @@ function skipSpaces(source, at) {
 	return at
 }
 
-/** Read `<name attrs...>` starting just after `<`. */
-function readTag(source, start) {
+/** Read `<name attrs...>` starting just after `<`; the one attribute parser (any quoting). */
+export function readTag(source, start) {
 	const end = source.length
 	let at = start
 	while (at < end && !isSpace(source[at]) && source[at] !== ">" && source[at] !== "/") at++
@@ -130,6 +133,8 @@ export function parseHtml(source) {
 	const flushText = (to) => {
 		if (to > textStart) {
 			const node = makeNode("#text", {}, top(), lineAt(starts, textStart))
+			node.source_start = textStart
+			node.source_end = to
 			node.text = decodeEntities(src.slice(textStart, to))
 			top().children.push(node)
 		}
@@ -157,7 +162,7 @@ export function parseHtml(source) {
 			const tag = readTag(src, lt + 2)
 			if (tag.name !== "body" && tag.name !== "html") {
 				for (let k = stack.length - 1; k > 0; k--) {
-					if (stack[k].tag === tag.name) { stack.length = k; break }
+					if (stack[k].tag === tag.name) { stack[k].source_end = lt; stack.length = k; break }
 				}
 			}
 			at = textStart = tag.end
@@ -169,6 +174,8 @@ export function parseHtml(source) {
 			if (P_CLOSERS.has(tag.name)) closeWithin("p", P_SCOPE)
 			if (tag.name === "li") closeWithin("li", LI_SCOPE)
 			const node = makeNode(tag.name, tag.attrs, top(), lineAt(starts, lt))
+			node.source_start = tag.end
+			node.source_end = src.length
 			top().children.push(node)
 			if (tag.name === "body") sawBody = true
 			if (tag.attrs.id) root.ids.set(tag.attrs.id, (root.ids.get(tag.attrs.id) ?? 0) + 1)
@@ -177,6 +184,7 @@ export function parseHtml(source) {
 				if (!tag.selfClosing) {
 					const [innerEnd, resume] = findRawClose(src, tag.end, tag.name)
 					node.raw = src.slice(tag.end, innerEnd)
+					if (tag.name === "svg") attachForeignObjects(node, lineAt(starts, tag.end), parseHtml)
 					at = textStart = resume
 				}
 			} else if (!VOID_TAGS.has(tag.name)) {

@@ -82,6 +82,8 @@ export function createTeamMemberLivenessNotifier(
   }
 
   const notifyTerminal = (record: TaskRecord): void => {
+    const identity = parseTeamMemberTaskIdentity(record)
+    if (identity === undefined) return
     const details = livenessDetails(record)
     if (details === undefined || deps.wasDelivered?.(record) === true) return
     const key = `${DELIVERY_KEY_PREFIX}${record.task_id}:${record.notification.run_epoch}`
@@ -92,6 +94,7 @@ export function createTeamMemberLivenessNotifier(
     const injection = {
       key,
       source: "team-liveness" as const,
+      runRef: { kind: "team" as const, id: record.team_run_id ?? identity.teamRunId },
       customType: TEAM_MEMBER_LIVENESS_MESSAGE_TYPE,
       content: livenessContent(details),
       display: false,

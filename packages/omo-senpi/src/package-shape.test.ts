@@ -79,14 +79,14 @@ describe("omo-senpi package shape", () => {
     expect(readBoolean(manifest, "private")).toBe(true)
     expect(readString(manifest, "type")).toBe("module")
     expect(readString(manifest, "version")).toBe(readString(rootManifest, "version"))
-    expect(Object.keys(exportsMap).toSorted()).toEqual([".", "./agent-home", "./extension", "./install"])
+    expect(Object.keys(exportsMap).toSorted()).toEqual([".", "./agent-home", "./extension", "./install", "./onboarding/session-history"])
     expect(scripts).toMatchObject({
       typecheck: "tsgo --noEmit -p tsconfig.json",
       test: "bun test src/**/*.test.ts",
     })
-    expect(peerDependencies["@code-yeongyu/senpi"]).toBe("2026.10.10-10")
+    expect(peerDependencies["@code-yeongyu/senpi"]).toBe("2026.11.2-3")
     expect(peerDependenciesMeta["@code-yeongyu/senpi"]).toMatchObject({ optional: true })
-    expect(devDependencies["@code-yeongyu/senpi"]).toBe("2026.10.10-10")
+    expect(devDependencies["@code-yeongyu/senpi"]).toBe("2026.11.2-3")
     expect(dependencies).toMatchObject({
       "@oh-my-opencode/utils": "workspace:*",
       "@oh-my-opencode/comment-checker-core": "workspace:*",
@@ -131,6 +131,6 @@ describe("omo-senpi package shape", () => {
     expect(workspaces).toContain("packages/omo-senpi")
     expect(workspaces).not.toContain("packages/lsp-daemon")
     expect(devDependencies["@oh-my-opencode/omo-senpi"]).toBe("workspace:*")
-    expect(typecheckPackages).toContain("tsgo --noEmit -p packages/omo-senpi/tsconfig.json")
+    expect(typecheckPackages).toContain("bun check --no-script --all -p packages/omo-senpi/tsconfig.json")
   })
 })

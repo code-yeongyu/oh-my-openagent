@@ -121,3 +121,60 @@ fn reports_quartz_capabilities_with_active_displays() {
     println!("capabilities={capabilities:?}");
     assert!(capabilities.capture && capabilities.display_count >= 1);
 }
+
+// B9 legacy fallback, run against the real WindowServer (lead ruling
+// 2026-10-12): each reason must produce an image with no error, log once
+// per reason, and report legacyCapture. Run with `--ignored --nocapture`.
+
+#[test]
+#[ignore = "live: needs a Screen Recording grant; SCK worker present on macOS 14+"]
+fn sck_capture_reports_not_legacy_when_the_worker_runs() {
+    // Only meaningful on macOS 14+ with a staged helper: asserts the SCK
+    // path yields legacyCapture false.
+    let capture = MacCapture::new(DisplaySelector::All, Screencapture::system());
+    let primary = primary_display();
+    let (image, geometry) = capture
+        .capture(&Target::Display(format!("display:{}", primary.id)))
+        .unwrap();
+    println!("legacy_capture={} width={} height={}", geometry.is_legacy_capture(), image.width(), image.height());
+    assert!(!geometry.is_legacy_capture(), "SCK capture must not be legacy");
+    assert!(!capture.legacy_capture());
+}
+
+#[test]
+#[ignore = "live: helper start is forced to fail; needs a Screen Recording grant"]
+fn helper_start_failure_falls_back_and_reports_legacy() {
+    // Point the helper program at a non-executable so the start fails.
+    let dir = tempfile::tempdir().unwrap();
+    let bogus = dir.path().join("not-a-helper");
+    std::fs::write(&bogus, b"#!/bin/sh\nexit 126\n").unwrap();
+    std::fs::set_permissions(&bogus, std::fs::Permissions::from_mode(0o644)).unwrap();
+    std::env::set_var("SENPI_DESKTOP_CAPTURE_HELPER_PROGRAM", &bogus);
+    let capture = MacCapture::new(DisplaySelector::All, Screencapture::system());
+    let primary = primary_display();
+    let (image, geometry) = capture
+        .capture(&Target::Display(format!("display:{}", primary.id)))
+        .unwrap();
+    println!("legacy_capture={} reason=start_failed width={} height={}", geometry.is_legacy_capture(), image.width(), image.height());
+    assert!(geometry.is_legacy_capture(), "start failure must mark the capture legacy");
+    assert!(image.width() > 0 && image.height() > 0);
+    std::env::remove_var("SENPI_DESKTOP_CAPTURE_HELPER_PROGRAM");
+}
+
+/// Show a solid sRGB RGB(240, 80, 20) window and set
+/// SENPI_DESKTOP_QA_COLOUR_WINDOW_ID to its Quartz id. Its centre must be
+/// unobscured solid content, not title-bar chrome. The unequal red/blue
+/// channels distinguish the native bitmap layout from the wire decoder.
+#[test]
+#[ignore = "live: needs a known-colour window, Screen Recording and the SCK helper"]
+fn sck_known_colour_preserves_channel_order() {
+    let id = std::env::var("SENPI_DESKTOP_QA_COLOUR_WINDOW_ID")
+        .expect("show a solid sRGB RGB(240, 80, 20) window and set its Quartz id");
+    let capture = MacCapture::new(DisplaySelector::All, Screencapture::system());
+    let (image, geometry) = capture.capture(&Target::Window(id)).unwrap();
+    assert!(!geometry.is_legacy_capture(), "must exercise the native SCK writer");
+    let pixel = image.get_pixel(image.width() / 2, image.height() / 2).0;
+    for (actual, expected) in pixel.into_iter().zip([240u8, 80, 20, 255]) {
+        assert!(actual.abs_diff(expected) <= 2, "unexpected RGBA pixel: {pixel:?}");
+    }
+}

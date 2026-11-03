@@ -10,9 +10,12 @@
 
 mod chord;
 mod tap;
+mod worker;
 
 #[cfg(test)]
 mod live_tests;
+#[cfg(test)]
+mod secure_input_tests;
 #[cfg(test)]
 mod tests;
 
@@ -21,9 +24,11 @@ use std::thread;
 use std::time::Duration;
 
 use parking_lot::{Condvar, Mutex};
-use senpi_desktop_safety::{Chord, StopPathError, StopPathId, StopPathListener, StopSource, Supervisor};
+use senpi_desktop_safety::{
+    Chord, DeafProbe, StopPathError, StopPathFailure, StopPathId, StopPathListener, Supervisor,
+};
 
-use chord::Hotkey;
+use chord::{AtomicHotkey, Hotkey};
 pub use chord::DEFAULT_STOP_CHORD;
 
 const THREAD_NAME: &str = "senpi-desktop-killswitch";
@@ -79,19 +84,37 @@ enum Wake {
 
 struct Shared {
     supervisor: Arc<Supervisor>,
-    hotkey: Mutex<Hotkey>,
-    control: Mutex<Control>,
-    changed: Condvar,
+    hotkey: AtomicHotkey,
+    control: Arc<Mutex<Control>>,
+    changed: Arc<Condvar>,
+    stop_worker: worker::StopWorker,
+    /// Reads macOS Secure Event Input; injected only by unit tests.
+    secure_input: fn() -> bool,
 }
 
 impl Shared {
-    fn new(supervisor: Arc<Supervisor>, hotkey: Hotkey) -> Self {
-        Self {
+    fn new(supervisor: Arc<Supervisor>, hotkey: Hotkey) -> Result<Self, StopPathError> {
+        Self::with_secure_input(supervisor, hotkey, tap::secure_input_enabled)
+    }
+
+    fn with_secure_input(
+        supervisor: Arc<Supervisor>,
+        hotkey: Hotkey,
+        secure_input: fn() -> bool,
+    ) -> Result<Self, StopPathError> {
+        let control = Arc::new(Mutex::new(Control::default()));
+        let changed = Arc::new(Condvar::new());
+        let stop_worker = worker::StopWorker::start(
+            Arc::clone(&supervisor), Arc::clone(&control), Arc::clone(&changed),
+        )?;
+        Ok(Self {
             supervisor,
-            hotkey: Mutex::new(hotkey),
-            control: Mutex::new(Control::default()),
-            changed: Condvar::new(),
-        }
+            hotkey: AtomicHotkey::new(hotkey),
+            control,
+            changed,
+            stop_worker,
+            secure_input,
+        })
     }
 
     fn update(&self, change: impl FnOnce(&mut Control)) {
@@ -122,11 +145,18 @@ impl Shared {
         self.supervisor.heartbeat(StopPathId::Global);
     }
 
+    /// Reports Secure Event Input as deafness. The supervisor asks on every
+    /// status read, so the gate and each typed character see it at once; the
+    /// tap itself stays up and is not re-created when secure input ends.
+    fn deaf_probe(&self) -> DeafProbe {
+        let secure_input = self.secure_input;
+        Arc::new(move || secure_input().then_some(StopPathFailure::SecureInput))
+    }
+
     /// The tap saw a key-down; latches a stop when it is the chord.
     fn key_down(&self, keycode: i64, flags: u64) {
-        if self.hotkey.lock().matches_hotkey(keycode, flags) {
-            self.supervisor.trigger_stop(StopSource::Hotkey);
-            self.update(|control| control.stops = control.stops.saturating_add(1));
+        if self.hotkey.matches(keycode, flags) {
+            self.stop_worker.stop();
         }
     }
 
@@ -211,12 +241,13 @@ impl StopPathListener for CgEventTapListener {
             return Err(StopPathError::PermissionDenied(ACCESSIBILITY_REQUIRED.to_owned()));
         }
         let (shared, failures) = if let Some(shared) = &self.shared {
-            *shared.hotkey.lock() = hotkey;
+            shared.hotkey.store(hotkey);
             let failures = shared.control.lock().failures;
             shared.request_restart();
             (Arc::clone(shared), failures)
         } else {
-            let shared = Arc::new(Shared::new(sup, hotkey));
+            let shared = Arc::new(Shared::new(sup, hotkey)?);
+            shared.supervisor.set_deaf_probe(Some(shared.deaf_probe()));
             let listener = Arc::clone(&shared);
             thread::Builder::new()
                 .name(THREAD_NAME.to_owned())
@@ -252,6 +283,7 @@ impl StopPathListener for CgEventTapListener {
 impl Drop for CgEventTapListener {
     fn drop(&mut self) {
         if let Some(shared) = &self.shared {
+            shared.supervisor.set_deaf_probe(None);
             shared.update(|control| control.shutdown = true);
         }
     }

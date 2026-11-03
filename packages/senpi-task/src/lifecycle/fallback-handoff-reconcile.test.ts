@@ -85,7 +85,7 @@ function sweeperOverDaemon(store: TaskRecordStore) {
   })
   const dispose = async (taskId: string): Promise<void> => {
     await manager.getResidentHandle(taskId)?.dispose()
-    manager.forget(taskId)
+    manager.forget(taskId, { path: "end" })
     manager.workpools.dispose()
     lifecycle.dispose?.()
   }
@@ -166,7 +166,7 @@ describe("reconcile of a dead workpool worker", () => {
     if (event.task_id === undefined) throw new Error("the pool dispatched no worker")
     const taskId = event.task_id
     pool.manager.workpools.dispose()
-    pool.manager.forget(taskId)
+    pool.manager.forget(taskId, { path: "park" })
     pool.store.mutate(taskId, (record) => ({ ...record, host_pid: DEAD_OWNER }))
     const manager = createTaskManager({
       store: pool.store,

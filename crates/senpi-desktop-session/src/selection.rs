@@ -85,6 +85,7 @@ fn platform_backend(options: &DesktopSessionOptions) -> CoreResult<Box<dyn Backe
         MacosCanaryMode::Session => CanaryMode::Session,
         MacosCanaryMode::Off => CanaryMode::Off,
     });
+    backend.set_show_cursor(options.show_cursor);
     Ok(Box::new(backend))
 }
 
