@@ -184,10 +184,9 @@ Tests are strict too, with these exceptions (configure in `.oxlintrc.json` overr
 |---|---|
 | Use `expect()` assertions | That's how testing works |
 | Use magic numbers | Test data |
-| Access private members via bracket notation | Testing internals |
 | Skip readonly on test fixtures | Mutable setup/teardown |
 
-Tests still follow the iron list — branded types, typed errors, exhaustive switch.
+Tests still follow the iron list — branded types, typed errors, exhaustive switch — and the authoring gate in [`../testing/README.md`](../testing/README.md). Private members are reached through the public boundary, never by bracket notation: a test on internals is an implementation mirror that a behavior-preserving refactor breaks.
 
 ## Existing codebases
 

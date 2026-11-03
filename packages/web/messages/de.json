@@ -12,7 +12,8 @@
     "githubStars": "{count} Sterne auf GitHub",
     "openMenu": "Menü öffnen",
     "closeMenu": "Menü schließen",
-    "primary": "Hauptnavigation"
+    "primary": "Hauptnavigation",
+    "skipToContent": "Zum Inhalt springen"
   },
   "footer": {
     "brand": "OmO",
@@ -513,5 +514,10 @@
       "discord": "Auf Discord fragen"
     },
     "privacy": "Diese Seite speichert deinen Bericht nicht, er wurde aber über den von der App geöffneten Link an omo.dev übermittelt. An GitHub geht er erst, wenn du das Issue selbst absendest."
+  },
+  "notFound": {
+    "title": "Diese Seite wurde nicht gefunden.",
+    "body": "Der Link ist vielleicht veraltet, oder die Seite wurde verschoben.",
+    "home": "Zur Startseite"
   }
 }

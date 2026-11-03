@@ -108,7 +108,7 @@ describe("omo-codex posthog telemetry diagnostics", () => {
     posthog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-05-25", captureDaily: true }))
 
     // when
-    posthog.createCliPostHog().trackActive("distinct", "cli_run")
+    posthog.createCliPostHog().trackActive("cli_run")
 
     // then
     const diagnostics = readFileSync(getDiagnosticsFilePath(dataHomePath), "utf-8")
@@ -128,7 +128,7 @@ describe("omo-codex posthog telemetry diagnostics", () => {
     posthog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-05-25", captureDaily: true }))
 
     // when
-    posthog.createCliPostHog().trackActive("distinct", "cli_run")
+    posthog.createCliPostHog().trackActive("cli_run")
 
     // then
     const diagnostics = readFileSync(getDiagnosticsFilePath(dataHomePath), "utf-8")

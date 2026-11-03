@@ -32,7 +32,7 @@ for (const scenario of ["site-1", "site-1-rejection", "site-3", "site-3-close"])
 test("#given site-1 close is pending #when close detaches the client #then its heartbeat was already stopped", async () => {
   // given: observe timer cancellation at the exact point close drops the connection.
   const clock = fakeClock()
-  const release = Promise.withResolvers<void>()
+  const release = Promise.withResolvers<boolean>()
   let stoppedBeforeClose = false
   const port = {
     ...fakeSessionPort(),
@@ -53,7 +53,7 @@ test("#given site-1 close is pending #when close detaches the client #then its h
     expect(stoppedBeforeClose).toBe(true)
     expect(handle.hasExited()).toBe(false)
   } finally {
-    release.resolve()
+    release.resolve(true)
     await closing
     await handle.dispose()
     clock.restore()

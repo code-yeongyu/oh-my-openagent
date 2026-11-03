@@ -38,7 +38,7 @@ function showToast(ctx: PluginInput, sessionID: string, message: string): void {
 }
 
 function getNativeSisyphusGptVariant(model: { providerID: string; modelID: string }): string | undefined {
-  if (isGpt5_5Model(model.modelID)) return "medium"
+  if (isGpt5_5Model(model.modelID)) return "high"
   if (isGpt6Model(model.modelID)) return "high"
 
   const chain = AGENT_MODEL_REQUIREMENTS["sisyphus"]?.fallbackChain ?? []

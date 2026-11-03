@@ -9,6 +9,7 @@ mod audit;
 mod budget;
 mod cancel_on_drop;
 mod grant;
+mod intervention;
 mod mutate;
 mod pointer;
 mod request;
@@ -18,6 +19,7 @@ mod session;
 #[cfg(test)]
 mod test_support;
 mod timeouts;
+mod user_input_watch;
 mod worker;
 mod worker_ax;
 mod worker_capture;

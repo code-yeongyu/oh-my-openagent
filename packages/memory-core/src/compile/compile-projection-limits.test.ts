@@ -19,7 +19,7 @@ const projectionLine = (block: string, directory: string): string | undefined =>
   block.split("\n").find((line) => line.startsWith(`${directory}: `))
 
 describe("compileMemoryBlock projection limits", () => {
-  it("#given no limits passed #when compiled #then the default cap keeps the newest forty names per directory", async () => {
+  it("#given no limits passed and more than forty names in a directory #when compiled #then every name is listed, newest first", async () => {
     // given
     const notes = Array.from({ length: 41 }, (_, index) => ({
       relativePath: `reference/n${String(index).padStart(2, "0")}.md`,
@@ -33,8 +33,8 @@ describe("compileMemoryBlock projection limits", () => {
 
     // then
     const line = projectionLine(block, "reference/") ?? ""
-    expect(line.startsWith("reference/: n40.md, n00.md, n01.md")).toBe(true)
-    expect(line.endsWith(", n38.md (+1 more; read $MEMORY_DIR/reference/ to list)")).toBe(true)
+    expect(line.startsWith("reference/: n40, n00, n01")).toBe(true)
+    expect(line.endsWith(", n38, n39")).toBe(true)
   })
 
   it("#given limits of zero #when compiled #then every name is listed in name order", async () => {
@@ -47,7 +47,7 @@ describe("compileMemoryBlock projection limits", () => {
     const block = await compileMemoryBlock(repo, { agentId: "a", projection: { maxEntriesPerDirectory: 0, maxBytes: 0 } })
 
     // then
-    expect(projectionLine(block, "reference/")).toBe("reference/: a.md, b.md")
+    expect(projectionLine(block, "reference/")).toBe("reference/: a, b")
   })
 
   it("#given commit times that cannot be read #when compiled with limits #then the block still compiles, capped in name order", async () => {
@@ -62,7 +62,7 @@ describe("compileMemoryBlock projection limits", () => {
 
     // then
     expect(block).toContain("Person")
-    expect(projectionLine(block, "reference/")).toBe("reference/: a.md (+1 more; read $MEMORY_DIR/reference/ to list)")
+    expect(projectionLine(block, "reference/")).toBe("reference/: a (+1 more; read $MEMORY_DIR/reference/ to list)")
   })
 
   it("#given commit times that cannot be read #when the projection is measured #then the stats say the names fell back to name order", async () => {
@@ -96,8 +96,8 @@ describe("compileMemoryBlock projection limits", () => {
 
     // then
     expect(cache.size).toBe(2)
-    expect(projectionLine(capped, "reference/")).toBe("reference/: b.md (+1 more; read $MEMORY_DIR/reference/ to list)")
-    expect(projectionLine(open, "reference/")).toBe("reference/: a.md, b.md")
+    expect(projectionLine(capped, "reference/")).toBe("reference/: b (+1 more; read $MEMORY_DIR/reference/ to list)")
+    expect(projectionLine(open, "reference/")).toBe("reference/: a, b")
     expect(cappedAgain).toBe(capped)
   })
 })

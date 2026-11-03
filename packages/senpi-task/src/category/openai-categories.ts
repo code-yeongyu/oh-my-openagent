@@ -203,7 +203,7 @@ export const OPENAI_CATEGORIES = [
   },
   {
     name: "deep-low",
-    config: { model: `chatgpt-subscription/${LATEST_MODEL_BY_FAMILY.gptSol}`, variant: "medium" },
+    config: { model: `chatgpt-subscription/${LATEST_MODEL_BY_FAMILY.gptSol}`, variant: "high" },
     description: "Default deep lane: one goal, one deliverable, decisions the child can settle from what it reads; preferred over deep-high for 3D graphics, computer/browser use, CAPTCHA, multimodal, backend, logic, and algorithm work. Multiple goals fan out as parallel calls.",
     callerGuidance: DEEP_LOW_CATEGORY_CALLER_GUIDANCE,
     promptAppend: DEEP_LOW_CATEGORY_PROMPT_APPEND,
@@ -228,14 +228,14 @@ export const OPENAI_CATEGORIES = [
   },
   {
     name: "unspecified-low",
-    config: { model: `anthropic/${LATEST_MODEL_BY_FAMILY.claudeSonnet}`, variant: "medium" },
+    config: { model: `anthropic/${LATEST_MODEL_BY_FAMILY.claudeSonnet}`, variant: "high" },
     description: "Tasks that don't fit other categories, low effort required",
     callerGuidance: UNSPECIFIED_LOW_CATEGORY_CALLER_GUIDANCE,
     promptAppend: UNSPECIFIED_LOW_CATEGORY_PROMPT_APPEND,
   },
   {
     name: "unspecified-high",
-    config: { model: `anthropic/${LATEST_MODEL_BY_FAMILY.claudeOpus}`, variant: "medium" },
+    config: { model: `anthropic/${LATEST_MODEL_BY_FAMILY.claudeOpus}`, variant: "high" },
     description: "Tasks that don't fit other categories, high effort required",
     callerGuidance: UNSPECIFIED_HIGH_CATEGORY_CALLER_GUIDANCE,
     promptAppend: UNSPECIFIED_HIGH_CATEGORY_PROMPT_APPEND,

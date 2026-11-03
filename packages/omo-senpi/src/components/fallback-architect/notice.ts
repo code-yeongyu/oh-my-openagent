@@ -21,6 +21,8 @@ export interface FallbackArchitectNoticeDetails {
 // Display flavor only: unknown selectors fall through to their bare model id, so the copy never
 // blocks on this list being complete.
 const FRIENDLY_MODEL_NAMES: readonly (readonly [RegExp, string])[] = [
+  // Checked before the K3 label, which would also match `kimi-k3.1-pro`. Kimi Code spells it `k3.1-pro`.
+  [/k3[.-]1(?!\d)/i, "Kimi K3.1 Pro (max)"],
   [/kimi-k3/i, "Kimi K3 (max)"],
   [/claude-fable-5/i, "Fable 5"],
   [/claude-opus-5[-.]5/i, "Opus 5.5"],

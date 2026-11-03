@@ -1,9 +1,20 @@
 import { describe, expect, test } from "bun:test"
 import { randomUUID } from "node:crypto"
-import { createCredentialStore } from "./keystore"
+import { createCredentialStore, InvalidCredentialState } from "./keystore"
 import { grant, memorySecrets, privateKeys } from "./test-support"
 
 describe("OS credential storage", () => {
+  test.each(["read", "readAuthoritative"] as const)("%s reports corrupt credentials with the account-forget recovery error", async read => {
+    const store = createCredentialStore("https://api.omo.dev", { platform: "darwin", secrets: {
+      get: async () => "{",
+      set: async () => { throw new Error("unexpected write") },
+      delete: async () => { throw new Error("unexpected delete") },
+    } })
+    const error = await store[read]().catch(error => error)
+    expect(error).toBeInstanceOf(InvalidCredentialState)
+    expect(error.message).toBe("The OmO sign-in saved on this computer can't be read. Run omo account forget to remove it, then sign in again in the desktop app.")
+  })
+
   test.each(["darwin", "linux", "win32"] as const)("delegates %s storage exclusively to the in-process secret API", async platform => {
     const memory = memorySecrets()
     const store = createCredentialStore("https://api.omo.dev", { secrets: memory.api, platform, lockProbe: async () => "unlocked" })

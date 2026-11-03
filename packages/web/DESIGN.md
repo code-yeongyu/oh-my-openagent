@@ -145,7 +145,7 @@ All primitives live in `components/ui/*` (existing shadcn shells re-tokened) or 
 
 ### Nav (`components/nav-header.tsx`)
 
-- Sticky (`sticky-header`), height 60px, `--ink-0/72%` + `backdrop-filter: blur(12px)` after `scrollY > 24px` (transparent before), bottom hairline `--line`.
+- Sticky (`sticky-header`), height `--nav-h` (60px; the document `scroll-padding-top` keeps focused controls clear of it), `--ink-0/72%` + `backdrop-filter: blur(12px)` after `scrollY > 24px` (transparent before), bottom hairline `--line`.
 - Left: OmO mark (24px SVG from `.github/assets/omo-icon-light.svg` re-exported to `public/brand/omo-mark.svg`) + wordmark `OmO` (Geist 500 15px, -0.02em). The brand is `OmO` on every surface (nav, footer, titles, OG, JSON-LD); the old long-form name is never rendered.
 - Center/right: links `Features · Docs · Manifesto` in `--text-mid` mono 12px uppercase 0.12em; hover → `--text-hi` with a 1px underline growing `scaleX(0→1)` 320ms.
 - Right: GitHub chip (mono `★ 68.8k` live count, `--ink-1` fill, `--line` border) and primary button `Install` (sm size).

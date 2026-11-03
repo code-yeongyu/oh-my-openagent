@@ -69,6 +69,8 @@ export type ManagedChildHandle = {
   transportRecovering?(): boolean
   // A cancel was accepted: no transport recovery may bring this child back as running.
   markStopping?(): void
+  // Host-session: the host answered this child's end of its session (omo#11765).
+  hostEndAnswered?(): boolean
   // Host-session: publish `task_status` in the session's context while still attached (omo#10778).
   publishTaskStatus?(status: TaskStatus): Promise<void>
   // Stop it once reachable, before it runs anything else; resolves once it has ended on this side.
@@ -144,6 +146,7 @@ export function adaptRpcHandle(handle: RpcChildHandle): ManagedChildHandle {
           onDurableSessionId: (listener) => handle.onDurableSessionId(listener),
           transportRecovering: () => handle.transportRecovering(),
           markStopping: () => handle.markStopping(),
+          hostEndAnswered: () => handle.hostEndAnswered(),
           publishTaskStatus: (status: TaskStatus) => handle.publishTaskStatus(status),
           stopWhenReachable: () => handle.stopWhenReachable(),
           onReconciled: (listener: (notice: ReconciledTurnNotice) => void) => handle.onReconciled(listener),

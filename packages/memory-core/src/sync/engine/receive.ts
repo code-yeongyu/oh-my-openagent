@@ -7,6 +7,7 @@
 import { createHash } from "node:crypto"
 
 import type { EngineDeps } from "./engine-deps"
+import { acceptedItems } from "./item-keys"
 import { toBase64, type IncomingRecord, type SyncJournal } from "./journal"
 import type { PulledEntry, RefusalCode, SnapshotRef, Verdict } from "./ports"
 
@@ -28,7 +29,7 @@ async function takeSnapshot(deps: EngineDeps, journal: SyncJournal, entry: Pulle
   deps.fault?.("downloaded")
   const verdict = await deps.verifier.verifySnapshot(s, chunks)
   if (!verdict.ok) return verdict.code
-  const items = verdict.payload.items.map((i) => ({ key: i.key, ops: toBase64(i.ops) }))
+  const items = (await acceptedItems(deps, journal, "receive", verdict.payload.items)).map((i) => ({ key: i.key, ops: toBase64(i.ops) }))
   await journal.putIncoming({ entry, stage: "verified", items, snapshot: true })
   deps.fault?.("verified")
   return null
@@ -58,7 +59,9 @@ export async function receive(deps: EngineDeps, journal: SyncJournal): Promise<R
     if (entry.batchId !== null && verdict.batchId !== entry.batchId) return "object_binding"
     const elsewhere = index[verdict.batchId] ?? heldBatches.get(verdict.batchId)
     if (elsewhere !== undefined && elsewhere.seq !== entry.seq) return "replayed_content"
-    const items = verdict.payload.items.map((i) => ({ key: i.key, ops: toBase64(i.ops) }))
+    // A verified batch may still carry keys this device must never write: those items are dropped
+    // here, before the incoming record exists, and the rest of the batch applies (#12147).
+    const items = (await acceptedItems(deps, journal, "receive", verdict.payload.items)).map((i) => ({ key: i.key, ops: toBase64(i.ops) }))
     const named = { ...entry, batchId: verdict.batchId }
     await journal.putIncoming({ entry: named, stage: "verified", items, snapshot: false } satisfies IncomingRecord)
     deps.fault?.("verified")

@@ -20,27 +20,31 @@ function parseRows(stdout) {
   })
 }
 
-/** Explicit PID arguments only; a failed listing permits the owned root, never an unchecked tree. */
-export function windowsTreeKillArgs(rootPid, run = spawnSync, selfPid = process.pid) {
+/** rootPid belongs to a caller-owned child; rootStartedAt is its spawn-time UTC FILETIME lower bound. */
+export function windowsTreeKillArgs(rootPid, run = spawnSync, selfPid = process.pid, rootStartedAt) {
   if (!Number.isSafeInteger(rootPid) || rootPid <= 0 || rootPid === selfPid) return []
   const result = run("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", PROCESS_ROWS], {
     encoding: "utf8", windowsHide: true, timeout: 5_000, maxBuffer: 16 * 1024 * 1024,
   })
   if (result.error || result.status !== 0 || typeof result.stdout !== "string") {
-    return ["/F", "/PID", String(rootPid)]
+    // /T follows a live owned root downward, not into the caller's ancestors. If the root has
+    // already exited, taskkill cannot recover its orphans without a successful process listing.
+    return ["/F", "/T", "/PID", String(rootPid)]
   }
   const rows = parseRows(result.stdout)
   if (rows.length === 0) return ["/F", "/PID", String(rootPid)]
   const byPid = new Map(rows.map((row) => [row.pid, row]))
-  if (!byPid.has(rootPid)) return []
+  const rootExists = byPid.has(rootPid)
+  if (!rootExists && (typeof rootStartedAt !== "bigint" || rootStartedAt <= 0n)) return []
   const tree = new Set([rootPid])
   let grew = true
   while (grew) {
     grew = false
     for (const row of rows) {
       if (tree.has(row.pid) || !tree.has(row.parentPid)) continue
-      const parent = byPid.get(row.parentPid)
-      if (!parent || parent.createdAt === 0n || row.createdAt === 0n || row.createdAt < parent.createdAt) continue
+      const parentCreatedAt = byPid.get(row.parentPid)?.createdAt
+        ?? (row.parentPid === rootPid ? rootStartedAt : undefined)
+      if (parentCreatedAt === undefined || parentCreatedAt === 0n || row.createdAt === 0n || row.createdAt < parentCreatedAt) continue
       tree.add(row.pid)
       grew = true
     }
@@ -53,6 +57,8 @@ export function windowsTreeKillArgs(rootPid, run = spawnSync, selfPid = process.
     current = parent
   }
   const refused = [...tree].filter((pid) => ancestors.has(pid) || PROTECTED_IMAGES.has(byPid.get(pid)?.name.toLowerCase()))
-  const pids = refused.length === 0 ? [...tree] : refused.includes(rootPid) ? [] : [rootPid]
+  // The missing root is only a traversal anchor, never a kill target (its PID could be reused).
+  const pids = (refused.length === 0 ? [...tree] : refused.includes(rootPid) ? [] : [rootPid])
+    .filter((pid) => rootExists || pid !== rootPid)
   return pids.length === 0 ? [] : ["/F", ...pids.flatMap((pid) => ["/PID", String(pid)])]
 }

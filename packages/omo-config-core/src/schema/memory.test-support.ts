@@ -40,7 +40,7 @@ export const FULL_DEFAULTS: OmoMemorySettings = {
     query_expansion: false,
   },
   project_scope: { nudge: true, recall: true },
-  projection: { max_entries_per_directory: 40, max_bytes: 24576 },
+  projection: { max_entries_per_directory: 0, max_bytes: 40960 },
   compile_warn_tokens: 30000,
   agents: {},
 }
