@@ -1,7 +1,7 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, mock, spyOn, test } from "bun:test"
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
-import { homedir, tmpdir } from "node:os"
-import { join } from "node:path"
+import * as os from "node:os"
+import { dirname, join } from "node:path"
 
 import type { TaskDaemonHostPort } from "../lazy/senpi-barrel"
 import { FakeRunner, cleanupProjects, makeManager } from "../manager/__fixtures__/manager-fakes"
@@ -18,13 +18,14 @@ const scratch: string[] = []
 const posixOnly = test.skipIf(process.platform === "win32")
 
 afterEach(async () => {
+  mock.restore()
   cleanupProjects()
   await release()
   for (const root of scratch.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 
 function pluginSpec(mode: number): string {
-  const pluginRoot = mkdtempSync(join(tmpdir(), "rpc-host-launch-spec-"))
+  const pluginRoot = mkdtempSync(join(os.tmpdir(), "rpc-host-launch-spec-"))
   scratch.push(pluginRoot)
   mkdirSync(join(pluginRoot, "extensions"), { recursive: true })
   writeFileSync(join(pluginRoot, "extensions", MEMBER_EXTENSION_BUNDLE_NAME), "export {}\n")
@@ -92,8 +93,8 @@ describe("RpcHostRunner launch spec rejection (#9208)", () => {
   posixOnly("#given a group-writable launch spec #when a task and a team member start #then the record, the task error and the team error name the reason, the path and the fix", async () => {
     const host = await fakeHost()
     const specPath = pluginSpec(0o664)
-    const home = homedir()
-    const displaySpecPath = home !== "" && specPath.startsWith(`${home}/`) ? `~${specPath.slice(home.length)}` : specPath
+    spyOn(os, "homedir").mockReturnValue(dirname(specPath))
+    const displaySpecPath = "~/daemon-launch-spec.json"
     const runner = runnerOver(host, { ensureDaemon: realEnsure(host, specPath, []) })
     // The manager's process lane receives a ManagedStartSpec; production adapts it to an RPC child
     // spec before the real host runner, so this adapter does the same and keeps its real failure.
