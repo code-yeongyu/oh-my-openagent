@@ -13,6 +13,12 @@ changes must do and prove:
   restart path is pinned for v1 consumers. This is plan row 31.
 
 Paths are relative to `crates/` unless they start with `packages/` or `docs/`.
+A bare file name (`client.rs`, `connection.rs`, `engine.rs`, `main.rs`, ...)
+means `senpi-desktop-engine/src/<name>`, and a bare `tests/...` means
+`senpi-desktop-engine/tests/...`. Files in other crates carry their crate
+prefix (`senpi-desktop-xpc/src/...`, `senpi-desktop-session/src/...`), and
+the XPC-only files `peers.rs`, `native.rs`, `agent.rs`, `dictionary.rs`,
+`roles.rs` and `policy.rs` mean `senpi-desktop-xpc/src/<name>`.
 
 ## Assets
 
@@ -44,19 +50,30 @@ Paths are relative to `crates/` unless they start with `packages/` or `docs/`.
   components:
   - **The endpoint's parent:** not a symlink, owned by the caller's euid, and
     no group or other permission bits.
-  - **The grandparent:** either owned by the caller's euid, or sticky (like the
-    1777 `/tmp`). A non-sticky, other-writable grandparent is refused.
+  - **The grandparent:** owned by the caller's euid or by root, and not
+    writable by group or other unless it is sticky (like the 1777 `/tmp`).
+    Anything else is refused. This is one rule: a root-owned 0755 grandparent
+    passes, and a non-sticky group- or other-writable one fails.
 
   The rule binds every endpoint, including whatever bunshin passes as
   `--endpoint`. A sticky `/tmp` blocks swapping the victim's directory but not
   pre-creating it; the ownership check on the parent catches the
   pre-creation squat.
+
+  The rule checks two levels only. A writable ancestor three or more levels up
+  lets another uid swap the whole subtree between a path-based check and a
+  path-based `bind` or `connect`. That is why the directory rule is not the
+  last line on any platform: the server-uid check below (client side) is what
+  stops a client from talking to a swapped-in socket.
 - **P3b target, daemon side.** The daemon applies the rule through a directory
   fd, not by path:
   - It opens the parent with `O_DIRECTORY|O_NOFOLLOW` and `fstat`s that fd.
   - It binds through the fd (`/proc/self/fd/<n>/<name>` on Linux). macOS has
-    no fd-relative bind, so there the grandparent clause of the rule is what
-    holds.
+    no fd-relative bind, so there the bind goes by path after the fd check. A
+    subtree swap above the grandparent can then relocate the daemon's socket;
+    that degrades to denial of service, because the client's server-uid check
+    refuses any socket the daemon's euid does not serve, and the peer check
+    closes an attacker that reaches the relocated socket.
 
   Startup order:
   0. **Take the instance lock first.** The daemon takes an exclusive,
@@ -73,10 +90,22 @@ Paths are relative to `crates/` unless they start with `packages/` or `docs/`.
      - **Two daemons recovering one stale socket:** without the lock, both
        fail to `connect` and both unlink, so the second unlinks the first's
        fresh socket and orphans it. The lock admits only one.
-     - **Restart while the old daemon is exiting:** today the idle exit removes
-       the socket by path (`serve.rs:44`), which could delete a successor's
-       socket. The exiting daemon removes its socket and token only while it
-       still holds the lock, and releases the lock last.
+     - **Restart while the old daemon is exiting, or an orphan's idle exit:**
+       today the idle exit removes the socket by path
+       (`std::fs::remove_file(endpoint)`, `serve.rs:44`), which deletes a
+       live successor's socket. The exiting daemon removes its socket and
+       token only while it still holds the lock, only if the socket's inode
+       (device and inode from `lstat`) is still the one it bound, and it
+       releases the lock last. The same inode check holds whether or not the
+       lock was ever contested.
+
+     The lock is held across the probe `connect`, the stale-socket unlink, the
+     bind and the token write. Without it, two daemons auto-started after a
+     SIGKILL both fail `connect` on the stale file, both unlink it and both
+     bind, the second unlink removing the first's fresh socket. Both then
+     write the token, so the last writer wins, possibly for the daemon nobody
+     can reach, and `--resume` breaks. The orphan later idle-exits and removes
+     the successor's socket by path.
 
      The lock is the same-uid instance guard only. It is not a security
      boundary: a same-uid process can hold it to keep the daemon down, which
@@ -102,7 +131,9 @@ Paths are relative to `crates/` unless they start with `packages/` or `docs/`.
   service, not a boundary loss:
   - `O_EXCL|O_NOFOLLOW` keeps the token 0600 and owned by the victim.
   - The peer check closes an attacker that reaches a relocated socket.
-  - The client's fd check refuses an attacker-owned parent.
+  - The client's fd check refuses an attacker-owned parent (Linux), and on
+    every platform the client's server-uid check refuses a socket not served
+    by its own euid.
 
   If P3b shipped the daemon check without both the peer check and the client
   fd check, the race would become a boundary loss.
@@ -112,7 +143,18 @@ Paths are relative to `crates/` unless they start with `packages/` or `docs/`.
   stat-then-connect sequence. Open the directory with `O_DIRECTORY|O_NOFOLLOW`,
   `fstat` that fd, and connect relative to it (`/proc/self/fd/<n>/<name>` on
   Linux; `connectat` exists only on FreeBSD). macOS has no fd-relative
-  connect, so there the grandparent clause of the rule is what holds.
+  connect, so there the connect goes by path after the check.
+
+  **Server-uid check (every platform with UDS).** After `connect` and before
+  writing the first byte, the client reads the server's effective uid on the
+  connected socket (`getpeereid` on macOS/BSD, `SO_PEERCRED` on Linux). If it
+  is not the client's own euid, or the lookup fails, the client closes the
+  socket without sending anything and refuses to auto-start a daemon at that
+  endpoint. This check is on the connected socket itself, so a subtree swap
+  at any ancestor level cannot defeat it: a swapped-in socket is served by
+  the attacker's uid. It is the UDS counterpart of B3's Windows client-side
+  server check, and it is what keeps A6 (request content) from reaching
+  another uid when the directory rule is raced.
 - **Strength.** This stops other uids. It does not stop a different process
   running as the same uid: every same-uid peer is equally trusted.
 - **Method exposure is client-side.** The host-only filter (`session.open`,
@@ -282,14 +324,16 @@ covers an explicit `--serve` path or a loose directory.
   - **`session.open`.** It re-creates the backend with the caller's options,
     including `audit_path` and `artifact_dir`, so it can re-point the daemon's
     audit log. It also invalidates every client's refs and frames
-    (`senpi-desktop-session/src/worker.rs:85-120`).
+    (`senpi-desktop-session/src/worker.rs:85-120`), and rewrites the engine's
+    stop policy (`allow_host_relay_only`) for every client (`route.rs:56-61`).
   - **The resume token.** It can read the token file, or receive the token in
     a `session.open` reply (`engine.rs:171-177,221-224`, `stop_path.rs:5-7`),
     and resume a stop.
   - **Other clients' notifications.** It receives audit events and stop-path
     changes caused by other clients (session table, Notifications).
   - **Daemon restart.** It can kill and restart the daemon, which clears a UDS
-    stop (plan row 31 pins this as the v1 behavior).
+    stop even when nobody resumed it (plan row 31 pins this as the v1
+    behavior, T31-5).
   - **Shared content.** It can read every client's frames and refs.
   - **The engine binary.** It can start the engine directly.
 - **What still limits it on UDS.** Nothing at the protocol level. On macOS, TCC
@@ -354,6 +398,7 @@ covers an explicit `--serve` path or a loose directory.
 | Endpoint parent fails the same rule | Rust client and SDK `attach` client (P3b), fd-based | refuse before connecting or auto-starting | T25-13, T25-17 |
 | Second concurrent Windows pipe client | `serve.rs` (P3b) | refused; the first client continues | T25-8 |
 | Windows client facing an unverified pipe server | Windows follow-up (client) | refuse before sending | follow-up issue |
+| UDS client connected to a socket whose server euid != the client's euid, or whose server credential lookup fails | Rust client and SDK `attach` client (P3b) | close before sending a byte; no auto-start at that endpoint | T25-25 |
 | Host-only method through `--oneshot` / `--mcp` / SDK `attach` | client-side bridge (`oneshot.rs:18-31`) | `hostOnly` rejection | `tests/serve_oneshot.rs:143-154`, T25-12 |
 | XPC peer euid differs | `peers.rs:21-25` | connection cancelled | existing XPC tests |
 | XPC signature, role, team, hardening, entitlement or epoch failure | `policy.rs:98-164` | message rejected | `policy/tests` |
@@ -365,7 +410,7 @@ covers an explicit `--serve` path or a loose directory.
 | A second daemon racing a cold start | daemon start (P3b) | instance lock refused before bind; no token written; the first daemon's token is untouched | T25-19 |
 | A daemon started while one is already running (explicit `--serve` or a lost auto-start) | daemon start (P3b) | instance lock refused; exits non-zero; the live socket and token are untouched; clients use the live daemon | T25-22 |
 | Two daemons recovering the same stale socket | daemon start (P3b) | only the lock holder unlinks and binds; the other exits | T25-23 |
-| A daemon exiting while its successor starts | daemon exit (P3b) | the exiting daemon removes its socket and token only while it holds the lock | T25-24 |
+| A daemon exiting while its successor starts, or an orphan's idle exit | daemon exit (P3b) | the exiting daemon removes its socket and token only while it holds the lock and only if the socket's inode is the one it bound | T25-24 |
 | `spawn` inside an omo session | SDK | `ControlRequired{reason: "spawn_inside_session"}` (accident guard). The boundary is the eval permission gate, plus TCC only for a P4b out-of-process kernel without interpreter grants (M3) | SDK spawn tests |
 
 ## Residual risk
@@ -374,15 +419,17 @@ covers an explicit `--serve` path or a loose directory.
    - use every daemon method;
    - self-grant the foreground grant with no human;
    - re-point the audit log through `session.open`;
+   - rewrite the stop policy (`allow_host_relay_only`) for every client
+     through `session.open` (`route.rs:56-61`);
    - resume a stop, or restart the daemon to clear one;
    - read all shared frames;
    - receive audit events and stop-path changes caused by other clients.
 
    XPC code-signature auth is the only same-uid boundary, and kernels use
    neither transport. Accepted for daemon mode, whose consumers (bunshin
-   `--oneshot`, `--mcp`, Linux) run as the user. The self-grant and the
-   audit re-point are named here so that this acceptance is an explicit
-   decision.
+   `--oneshot`, `--mcp`, Linux) run as the user. The self-grant, the audit
+   re-point and the stop-policy rewrite are named here so that this
+   acceptance is an explicit decision.
 2. **Windows pipe.** Another account can squat the pipe name, read every
    request and forge replies, and SQOS impersonation is possible, until the
    Windows follow-up (B3) lands. The ACL is UNVERIFIED.
@@ -450,7 +497,9 @@ covers an explicit `--serve` path or a loose directory.
 | T25-21 | The SDK refuses `attach` with `ControlRequired{reason: "attach_inside_session"}` when `SENPI_DESKTOP_HOST=1` is set |
 | T25-22 | With a daemon already serving, a second `--serve` on the same endpoint (and an auto-start that finds it) exits non-zero; the live daemon's socket inode and token bytes are unchanged, and an existing client keeps being served |
 | T25-23 | Two daemons started together over a stale socket: exactly one binds; the socket that remains is the one the lock holder bound, and its token matches that daemon |
-| T25-24 | A daemon that idle-exits while a successor is starting never removes the successor's socket or token; the successor serves afterwards |
+| T25-24 | A daemon that idle-exits while a successor is starting, and an orphaned daemon that idle-exits after its socket was replaced, never removes the successor's socket or token (inode check); the successor serves afterwards |
+| T25-25 | The Rust client and the SDK `attach` client, connected to a socket served by another euid (injected through an in-crate `#[cfg(test)]` seam on the connected socket) or whose credential lookup fails, close before writing any byte and do not auto-start; no environment variable or flag in a non-test build reaches the seam |
+| T25-26 | After a SIGKILL, two concurrent auto-starts (two `--oneshot` clients at once) leave exactly one daemon bound, the token file matches that daemon, `--resume` works, and the losing daemon never unlinks the winner's socket |
 
 ### Stop-marker policy (plan row 31)
 
@@ -460,3 +509,4 @@ covers an explicit `--serve` path or a loose directory.
 | T31-2 | Stop-latch tests write no file under the real per-user directory (asserted) |
 | T31-3 | The doctor prints the INFO line saying stop persistence exists only on the XPC agent path |
 | T31-4 | `docs/reference/computer.md` says, in its stop paragraph, that persistence across restarts is XPC-agent-only |
+| T31-5 | UDS stop is cleared by a restart (the behavior M2 and residual risk 1 rely on): stop, no `--resume`, kill, restart `--serve`; then `desktop.stopPath.status` reports not suspended. T31-1 alone cannot prove this, because its stop is already lifted before the kill |
