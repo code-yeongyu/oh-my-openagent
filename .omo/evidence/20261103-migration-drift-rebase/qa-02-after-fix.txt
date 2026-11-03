@@ -1,0 +1,56 @@
+{
+  "error": null,
+  "plans": [
+    {
+      "status": "migrated",
+      "diagnostics": [
+        "removed: [codex].codegraph (retired configuration)",
+        "kept: agents.sisyphus.some_future_key (unknown to migration schema, pre-existing in target, preserved verbatim)"
+      ]
+    },
+    {
+      "status": "migrated",
+      "diagnostics": [
+        "kept: agents.sisyphus.some_future_key (unknown to migration schema, pre-existing in target, preserved verbatim)"
+      ]
+    },
+    {
+      "status": "skipped",
+      "diagnostics": []
+    },
+    {
+      "status": "skipped",
+      "diagnostics": []
+    },
+    {
+      "status": "skipped",
+      "diagnostics": []
+    }
+  ]
+}
+--- target after ---
+{
+  "agents": {
+    "sisyphus": {
+      "ultrawork": {
+        "model": "anthropic/claude-opus-5"
+      },
+      "compaction": {
+        "model": "anthropic/claude-sonnet-5"
+      },
+      "some_future_key": {
+        "deep": true
+      }
+    },
+    "hephaestus": {
+      "allow_non_gpt_model": true
+    }
+  },
+  "[codex]": {
+  },
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json",
+  "_migrations": [
+    "2026-07-opencode-config-unification",
+    "2026-08-reasoning-unification"
+  ]
+}

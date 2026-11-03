@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:00fcd516729a06a5b4c6c011662edd0382f55eee0b54a318ea2aad7da009a785:dc6523cbcc0b1a234dee5e4e808122583c5a5341eb73f5ea6bdf421e4d71585c
+// omo-codex-install:70787dd507ca090aa189d4c8e1e5d8db1d2b3b599412bd83ce94635f75e9d18c:404ecce6a326358a9586e685be224ec5f58d93e8aa31a78547226dd1f31132f2
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -19661,7 +19661,27 @@ var OmoAgentDefInputSchema = object({
   temperature: number2().min(0).max(2).optional(),
   disable: boolean2().optional(),
   permission: OmoAgentPermissionSchema.optional(),
-  prompt_append: string2().optional()
+  prompt_append: string2().optional(),
+  fallback_models: OmoFallbackModelsSchema.optional(),
+  category: string2().optional(),
+  skills: array(string2()).optional(),
+  top_p: number2().min(0).max(1).optional(),
+  mode: _enum(["subagent", "primary", "all"]).optional(),
+  color: string2().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+  displayName: string2().optional(),
+  max_tokens: number2().int().positive().optional(),
+  provider_options: record(string2(), unknown()).optional(),
+  ultrawork: object({
+    model: string2().optional(),
+    reasoning: OmoReasoningSchema.optional(),
+    variant: string2().optional()
+  }).optional(),
+  compaction: object({
+    model: string2().optional(),
+    reasoning: OmoReasoningSchema.optional(),
+    variant: string2().optional()
+  }).optional(),
+  allow_non_gpt_model: boolean2().optional()
 }).strict();
 var OmoAgentDefSchema = preprocess((value) => isRecord3(value) ? normalizeLegacyModelFields(value) : value, OmoAgentDefInputSchema);
 var OmoAgentsConfigSchema = record(string2(), OmoAgentDefSchema);

@@ -2,6 +2,7 @@ import * as z from "zod"
 
 import {
   OmoFallbackModelObjectSchema,
+  OmoFallbackModelsSchema,
   OmoReasoningEffortSchema,
   normalizeLegacyModelFields,
 } from "./fallback-models"
@@ -53,6 +54,35 @@ const OmoAgentDefInputSchema = z.object({
   disable: z.boolean().optional(),
   permission: OmoAgentPermissionSchema.optional(),
   prompt_append: z.string().optional(),
+  // Keys documented in docs/reference/configuration.md (per-agent table) and accepted by the
+  // OpenCode adapter's AgentOverrideConfigSchema. Drift guard: core-schema-parity.test.ts.
+  fallback_models: OmoFallbackModelsSchema.optional(),
+  category: z.string().optional(),
+  skills: z.array(z.string()).optional(),
+  top_p: z.number().min(0).max(1).optional(),
+  mode: z.enum(["subagent", "primary", "all"]).optional(),
+  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+  displayName: z.string().optional(),
+  // Canonical forms of the documented `maxTokens`, `providerOptions`, `thinking`, `textVerbosity`:
+  // normalizeLegacyModelFields folds those camelCase inputs into these two keys before parsing.
+  max_tokens: z.number().int().positive().optional(),
+  provider_options: z.record(z.string(), z.unknown()).optional(),
+  /** Per-message ultrawork model/reasoning override. */
+  ultrawork: z.object({
+    model: z.string().optional(),
+    reasoning: OmoReasoningSchema.optional(),
+    /** @deprecated Use reasoning. */
+    variant: z.string().optional(),
+  }).optional(),
+  /** Compaction model/reasoning override. */
+  compaction: z.object({
+    model: z.string().optional(),
+    reasoning: OmoReasoningSchema.optional(),
+    /** @deprecated Use reasoning. */
+    variant: z.string().optional(),
+  }).optional(),
+  /** Hephaestus-specific in the adapter; a shared file may carry it for any agent. */
+  allow_non_gpt_model: z.boolean().optional(),
 }).strict()
 
 export const OmoAgentDefSchema = z.preprocess(

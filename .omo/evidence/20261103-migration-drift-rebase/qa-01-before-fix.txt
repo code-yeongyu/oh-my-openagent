@@ -1,0 +1,28 @@
+{
+  "error": "Migration validation failed for /var/folders/v0/d6gm1vqd10z598__t0fpp4cc0000gp/T/migration-drift-qa-jSBFCZ/.omo/omo.jsonc: agents.sisyphus: Unrecognized keys: \"ultrawork\", \"compaction\", \"some_future_key\", agents.hephaestus: Unrecognized key: \"allow_non_gpt_model\"",
+  "plans": []
+}
+--- target after ---
+{
+  "agents": {
+    "sisyphus": {
+      "ultrawork": {
+        "model": "anthropic/claude-opus-5"
+      },
+      "compaction": {
+        "model": "anthropic/claude-sonnet-5"
+      },
+      "some_future_key": {
+        "deep": true
+      }
+    },
+    "hephaestus": {
+      "allow_non_gpt_model": true
+    }
+  },
+  "[codex]": {
+    "codegraph": {
+      "enabled": true
+    }
+  }
+}
