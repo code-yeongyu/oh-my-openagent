@@ -991,9 +991,20 @@ Run background subagents in separate tmux panes. Requires running inside tmux wi
     "main_pane_size": 60,
     "main_pane_min_width": 120,
     "agent_pane_min_width": 40,
-    "isolation": "inline"
+    "isolation": "inline",
+    "multiplexer": "tmux"
   }
 }
+```
+
+#### `multiplexer` — team visualization backend
+
+Selects which multiplexer renders team-mode visualization panes:
+
+- `"tmux"` (default): panes live in tmux windows/sessions; requires running inside tmux.
+- `"herdr"`: one [Herdr](https://herdr.dev) workspace per team (`omo-team-<teamRunId>`), one tab per member running the same `opencode attach` line. Works from any terminal (no tmux session required); the headless `herdr server` is started on demand and members keep running in it. Env override: `OMO_TMUX_MULTIPLEXER=herdr`.
+
+Team runtime state stores herdr pane ids (`wN:pM`, alphanumeric past `w9`) in the same `tmuxLayout` fields; teardown and the stale-workspace sweep branch on that id grammar. The tmux-subagent pane manager remains tmux-only for now.
 ```
 
 | Option                 | Default         | Description                                                                         |
