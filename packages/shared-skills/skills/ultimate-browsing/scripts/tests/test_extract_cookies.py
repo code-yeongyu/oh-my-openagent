@@ -226,7 +226,7 @@ class SecretHandling(unittest.TestCase):
         output.write_text("old\n")
         output.chmod(0o644)
 
-        def _dump(_cookies, f, indent: int) -> None:
+        def _dump(_cookies, f, indent: int = 2, **_kwargs) -> None:
             self.assertEqual(output.read_text(), "old\n")
             self.assertEqual(output.stat().st_mode & 0o777, 0o644)
             temp_files = list(base.glob(".cookies.json.*.tmp"))
@@ -284,13 +284,18 @@ class SecretHandling(unittest.TestCase):
         self.assertIn("secret-token", run.call_args.kwargs["input"])
 
     def test_write_cookie_file_handles_raw_bytes_value(self) -> None:
+        import json
+        import pathlib
         base = Path(tempfile.mkdtemp())
         self.addCleanup(lambda: shutil.rmtree(str(base), ignore_errors=True))
         output = base / "cookies.json"
-        write_cookie_file(output, [{"name": "BINARY_SID", "value": b"\x80\xff\xfe"}])
+        raw_val = b"\x80\xff\xfe"
+        write_cookie_file(output, [{"name": "BINARY_SID", "value": raw_val}])
         self.assertTrue(output.exists())
         text = output.read_text(encoding="utf-8")
         self.assertIn("BINARY_SID", text)
+        data = json.loads(text)
+        self.assertEqual(data[0]["value"], raw_val.decode("latin-1"))
 
 
 if __name__ == "__main__":

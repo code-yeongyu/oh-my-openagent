@@ -130,6 +130,12 @@ def _secure_cookie_db_copy(db_path: Path) -> Path:
         raise
 
 
+def _json_cookie_default(o: object) -> str:
+    if isinstance(o, (bytes, bytearray)):
+        return o.decode("latin-1")
+    raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
+
+
 def write_cookie_file(path: Path, cookies: list[CookieRecord]) -> None:
     if path.is_symlink():
         raise ValueError(f"refusing to write cookies through symlink: {path}")
@@ -139,7 +145,7 @@ def write_cookie_file(path: Path, cookies: list[CookieRecord]) -> None:
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             os.fchmod(f.fileno(), 0o600)
-            json.dump(cookies, f, indent=2, default=lambda o: o.decode("latin-1") if isinstance(o, bytes) else str(o))
+            json.dump(cookies, f, indent=2, default=_json_cookie_default)
             f.write("\n")
         os.replace(tmp_path, path)
     finally:
