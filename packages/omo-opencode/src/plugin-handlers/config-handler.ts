@@ -1,5 +1,7 @@
 import type { OhMyOpenCodeConfig } from "../config";
 import { applyRuntimeSkillSourceConfig } from "../features/opencode-runtime-skills"
+import { listProjectAgentProvenance, replaceProjectAgentProvenance } from "../features/team-mode/final-open-code-agent-registry";
+import { loadOpencodeProjectAgents } from "../features/claude-code-agent-loader";
 import { setAdditionalAllowedMcpEnvVars } from "../features/claude-code-mcp-loader";
 import { applyOpenGatewayProviderConfig } from "../features/opengateway-provider";
 import type { ModelCacheState } from "../plugin-state";
@@ -47,6 +49,7 @@ type AgentConfigSnapshot = {
   readonly configuredDefaultAgent: string | undefined;
   readonly defaultAgent: unknown;
   readonly agents: Record<string, unknown>;
+  readonly projectAgentNames: readonly string[];
 }
 
 function cloneConfigValue(value: unknown): unknown {
@@ -67,12 +70,23 @@ function cloneAgentConfig(agents: Record<string, unknown>): Record<string, unkno
   return cloneConfigValue(agents) as Record<string, unknown>
 }
 
-function createAgentConfigCacheKey(config: Record<string, unknown>): string {
+function canonicalizeConfigValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalizeConfigValue)
+  if (typeof value === "object" && value !== null) {
+    return Object.fromEntries(Object.entries(value)
+      .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
+      .map(([key, entry]) => [key, canonicalizeConfigValue(entry)]))
+  }
+  return value
+}
+
+function createAgentConfigCacheKey(config: Record<string, unknown>, directory: string): string {
   return JSON.stringify({
     agent: config.agent,
     default_agent: config.default_agent,
     model: config.model,
     skills: config.skills,
+    project_agent_source: canonicalizeConfigValue(loadOpencodeProjectAgents(directory)),
   })
 }
 
@@ -149,7 +163,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
 
     applyHookConfig({ pluginComponents });
 
-    const agentCacheKey = createAgentConfigCacheKey(config);
+    const agentCacheKey = createAgentConfigCacheKey(config, ctx.directory);
     let agentResult: Record<string, unknown>;
     if (!pluginComponentsLoadFailed && agentConfigSnapshot?.cacheKey === agentCacheKey) {
       config.agent = cloneAgentConfig(agentConfigSnapshot.agents);
@@ -157,6 +171,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         config.default_agent = agentConfigSnapshot.defaultAgent;
       }
       agentResult = config.agent as Record<string, unknown>;
+      replaceProjectAgentProvenance(ctx.directory, agentConfigSnapshot.projectAgentNames);
       replayAgentConfigSideEffects({
         agentResult,
         configuredDefaultAgent: agentConfigSnapshot.configuredDefaultAgent,
@@ -164,6 +179,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       })
     } else {
       const configuredDefaultAgent = getConfiguredDefaultAgent(config);
+      replaceProjectAgentProvenance(ctx.directory, []);
       agentResult = await applyAgentConfig({
         config,
         pluginConfig,
@@ -177,6 +193,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
             configuredDefaultAgent,
             defaultAgent: config.default_agent,
             agents: cloneAgentConfig(agentResult),
+            projectAgentNames: listProjectAgentProvenance(ctx.directory),
           };
     }
 
