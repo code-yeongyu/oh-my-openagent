@@ -91,6 +91,8 @@ export function createMemoryReflectionLiveWiring(
     resolveContext: (sessionId) => options.sessions.get(sessionId)?.context,
     isActive: (identity) => activeRuns.isActive(identity),
     ...(options.footerTimers === undefined ? {} : { timers: options.footerTimers }),
+    ...(options.now === undefined ? {} : { now: options.now }),
+    ...(options.createGitRepo === undefined ? {} : { createGitRepo: options.createGitRepo }),
     ...(options.syncStatus === undefined ? {} : { syncStatus: options.syncStatus }),
   })
   const syncNotifier = options.syncStatus === undefined ? undefined : createSyncStatusNotifier(options.syncStatus)
@@ -225,13 +227,18 @@ function refreshInitialStatus(
 ): Promise<unknown> | undefined {
   if (ui === undefined) return undefined
   const settings = resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory)
+  // The footer publish is owned by the footer-live segment path; this pass keeps only its
+  // advisory duties (pressure dream + notify), so a bind publishes exactly one memory line.
+  const repo = options.createGitRepo?.(identity.identityPaths.repo)
   return refreshMemoryStatus({
     context: identity,
     ui,
     compileWarnTokens: settings.compile_warn_tokens,
     alreadyNotified: false,
+    showFooter: false,
     requestPressureDream,
     sessionId,
+    ...(repo === undefined ? {} : { gitRepo: repo }),
     ...(options.syncStatus === undefined ? {} : { syncStatus: options.syncStatus }),
   })
 }

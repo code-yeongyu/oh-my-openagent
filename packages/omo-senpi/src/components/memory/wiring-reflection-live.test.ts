@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test"
 
-import { createReflectionCompletionApi } from "./wiring-reflection-live"
+import { buildIdentityPaths } from "@oh-my-opencode/memory-core"
+
+import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
+import { loadedMemoryConfig, memorySettings } from "./memory.test-support"
+import { formatMemoryStatusLine, MEMORY_STATUS_KEY, type GitRepoForStatus } from "./status"
+import { createMemoryReflectionLiveWiring, createReflectionCompletionApi } from "./wiring-reflection-live"
 import type { SenpiExtensionAPI } from "../../extension/types"
 
 function createFakePi(overrides: {
@@ -73,5 +78,119 @@ describe("createReflectionCompletionApi stale extension ctx guard (#7946)", () =
 
   test("#given a pi without memory capabilities #when created #then undefined is returned", () => {
     expect(createReflectionCompletionApi({} as SenpiExtensionAPI)).toBeUndefined()
+  })
+})
+
+describe("bind-time memory footer publish ownership (#12253)", () => {
+  const NOW_MS = 2_000_000_000
+  const COMMITTED_AT_SEC = (NOW_MS - 60_000) / 1000
+  const IDENTITY = "bind-owner-agent"
+
+  const expectedText = formatMemoryStatusLine(IDENTITY, "1m ago", {
+    dirty: false,
+    backlogSteps: 0,
+    streak: 0,
+    parked: false,
+  })
+
+  function statusRecorder(): {
+    readonly calls: Array<{ key: string; text: string | undefined }>
+    readonly eventCtx: unknown
+  } {
+    const calls: Array<{ key: string; text: string | undefined }> = []
+    return {
+      calls,
+      eventCtx: {
+        sessionManager: { getSessionId: () => "session-bind" },
+        ui: {
+          setStatus: (key: string, text: string | undefined) => calls.push({ key, text }),
+          notify: () => {},
+        },
+      },
+    }
+  }
+
+  function identity(): MemoryIdentityContext {
+    return createMemoryIdentityContext({
+      identity: IDENTITY,
+      identityPaths: buildIdentityPaths("/tmp/bind-owner-root", IDENTITY),
+      binding: { identity: IDENTITY, repoPathHash: "hash", boundAt: 1 },
+    })
+  }
+
+  function fastRepo(head: string | null = "head-sha-1", committedAtSec: number | null = COMMITTED_AT_SEC): GitRepoForStatus {
+    return {
+      head: async () => head,
+      headCommitTimestamp: async () => committedAtSec,
+      lsTree: async () => [],
+      show: async () => "",
+      status: async () => "",
+    }
+  }
+
+  function gatedHeadRepo(gate: Promise<void>): GitRepoForStatus {
+    return {
+      head: async () => {
+        await gate
+        return "head-sha-1"
+      },
+      headCommitTimestamp: async () => COMMITTED_AT_SEC,
+      lsTree: async () => [],
+      show: async () => "",
+      status: async () => "",
+    }
+  }
+
+  function wiring(bindTarget: MemoryIdentityContext, createGitRepo: (repoPath: string) => GitRepoForStatus): ReturnType<typeof createMemoryReflectionLiveWiring> {
+    return createMemoryReflectionLiveWiring({
+      sessions: new Map([["session-bind", { context: bindTarget }]]),
+      loadConfig: () => loadedMemoryConfig(memorySettings()),
+      cwd: () => "/tmp/bind-owner-root",
+      env: {},
+      now: () => NOW_MS,
+      createGitRepo,
+    }, { current: "session-bind" }, { current: undefined })
+  }
+
+  test("#given the initial-status git reads finish after the footer refresh #when the bind settles #then exactly one footer line is published", async () => {
+    const { calls, eventCtx } = statusRecorder()
+    const gate = Promise.withResolvers<void>()
+    const repos: GitRepoForStatus[] = []
+    const bindTarget = identity()
+    const w = wiring(bindTarget, () => {
+      const repo = repos.length === 0 ? gatedHeadRepo(gate.promise) : fastRepo()
+      repos.push(repo)
+      return repo
+    })
+
+    const bindCompletion = w.bind(createFakePi({}), "session-bind", bindTarget, eventCtx, () => {})
+    await bindCompletion
+    expect(calls).toEqual([{ key: MEMORY_STATUS_KEY, text: expectedText }])
+
+    gate.resolve()
+    await w.settled()
+    expect(calls).toEqual([{ key: MEMORY_STATUS_KEY, text: expectedText }])
+  })
+
+  test("#given the initial-status git reads finish first #when the bind settles #then the same single footer line is published", async () => {
+    const { calls, eventCtx } = statusRecorder()
+    const bindTarget = identity()
+    const w = wiring(bindTarget, () => fastRepo())
+
+    await w.bind(createFakePi({}), "session-bind", bindTarget, eventCtx, () => {})
+    await w.settled()
+    expect(calls).toEqual([{ key: MEMORY_STATUS_KEY, text: expectedText }])
+  })
+
+  test("#given an unreadable head or an unresolvable commit age #when the bind settles #then no footer line is published", async () => {
+    for (const repo of [fastRepo(null), fastRepo("head-sha-1", null)]) {
+      const { calls, eventCtx } = statusRecorder()
+      const bindTarget = identity()
+      const w = wiring(bindTarget, () => repo)
+
+      await w.bind(createFakePi({}), "session-bind", bindTarget, eventCtx, () => {})
+      await w.settled()
+      expect(calls).toEqual([])
+    }
   })
 })
