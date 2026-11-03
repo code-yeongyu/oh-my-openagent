@@ -2,7 +2,7 @@ import { expect, test } from "bun:test"
 
 import type { EngineStatus } from "@oh-my-opencode/memory-core/sync-engine"
 
-import { SYNC_RECOVERED_NOTICE, createSyncStatusNotifier, deliverSyncStatusChange } from "./sync-status-surface"
+import { SYNC_BLOCKED_NOTICE_PREFIX, SYNC_HELD_NOTICE_PREFIX, SYNC_RECOVERED_NOTICE, createSyncStatusNotifier, deliverSyncStatusChange } from "./sync-status-surface"
 
 const failing = (kind: "offline" | "auth_expired", reason: string, action: string): EngineStatus => ({
   kind: "failing",
@@ -133,4 +133,17 @@ test("#given a change for the active repo #when it is delivered #then the footer
   expect(calls).toEqual([])
   await deliver(true)
   expect(calls).toEqual(["footer", "rpc"])
+})
+
+test.each([
+  ["files held for being too large (#12284)", { kind: "failing", since: 0, attempts: 1, failure: { kind: "oversized_item", keys: ["big.md"], stuck: [], limitBytes: 8388608, reason: "r", action: "a" } } as const, SYNC_HELD_NOTICE_PREFIX],
+  ["files held while a refused entry pauses sync (#12284)", { kind: "paused", seq: 1, code: "signature", held: { since: 0, attempts: 1, failure: { kind: "oversized_item", keys: ["big.md"], stuck: [], limitBytes: 8388608, reason: "r", action: "a" } } } as const, SYNC_HELD_NOTICE_PREFIX],
+  ["a stranded lock", { kind: "failing", since: 0, attempts: 1, failure: { kind: "stranded_lock", paths: ["/m/.git/index.lock"], reason: "r", action: "a" } } as const, SYNC_BLOCKED_NOTICE_PREFIX],
+  ["an expired sign-in", failing("auth_expired", "r", "a"), SYNC_BLOCKED_NOTICE_PREFIX],
+])("#given %s #when the status changes #then the notice opens with the prefix for its kind", async (_name, status, prefix) => {
+  const notices: string[] = []
+  const notifier = createSyncStatusNotifier(async () => status)
+  await notifier.changed("/repo", { notify: (message) => notices.push(message) })
+  expect(notices).toHaveLength(1)
+  expect(notices[0]?.startsWith(`${prefix} `)).toBe(true)
 })

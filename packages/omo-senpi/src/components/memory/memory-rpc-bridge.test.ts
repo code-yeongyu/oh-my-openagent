@@ -714,6 +714,8 @@ describe("memory rpc bridge sync field (omo #10637)", () => {
     ["paused at a refused entry", async () => ({ kind: "paused", seq: 1, code: "signature" }), { state: "paused" }],
     ["unavailable on this device", async () => ({ kind: "sync-unavailable", reason: "Another process holds the engine." }), { state: "unavailable" }],
     ["off because its configuration is invalid", async () => ({ kind: "sync-config-invalid", variable: "OMO_SERVICE_API_URL", reason: "OMO_SERVICE_API_URL is not a valid service URL" }), { state: "unavailable" }],
+    ["holding files too large to sync (#12284)", async () => ({ kind: "failing", since: Date.parse("2026-10-22T10:00:00.000Z"), attempts: 2, failure: { kind: "oversized_item", keys: ["big.md", "old.md"], stuck: ["old.md"], limitBytes: 8388608, reason: "r", action: "a" } }), { state: "failing", failure: { kind: "oversized_item", reason: "r", action: "a", sinceISO: "2026-10-22T10:00:00.000Z", attempts: 2, keys: ["big.md", "old.md"], stuckKeys: ["old.md"], limitBytes: 8388608 } }],
+    ["paused at a refused entry while holding files (#12284)", async () => ({ kind: "paused", seq: 1, code: "signature", held: { since: Date.parse("2026-10-22T10:00:00.000Z"), attempts: 2, failure: { kind: "oversized_item", keys: ["big.md", "old.md"], stuck: ["old.md"], limitBytes: 8388608, reason: "r", action: "a" } } }), { state: "paused", failure: { kind: "oversized_item", reason: "r", action: "a", sinceISO: "2026-10-22T10:00:00.000Z", attempts: 2, keys: ["big.md", "old.md"], stuckKeys: ["old.md"], limitBytes: 8388608 } }],
     ["not syncing on this device", async () => null, undefined],
     ["a reader that throws", async () => Promise.reject(new Error("runner gone")), undefined],
   ]

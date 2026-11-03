@@ -84,3 +84,25 @@ test("a held file that has not changed since it was held is not diffed again eac
   expect(capturesOf()).toBe(2)
   captures.mockRestore()
 }, SMALL_SET_TIMEOUT)
+
+test("a refused entry is never hidden behind a held file: the pause carries the hold, which shows on its own once the refusal clears", async () => {
+  const server = new FakeSyncServer()
+  const a = await makeDevice(server, "a")
+  const b = await makeDevice(server, "b", undefined, { batchBytes: 1024 })
+  devices.push(a, b)
+  await a.write("one.md", "one\n")
+  await a.engine.runCycle()
+  b.verifier.failing.set(1, "signature")
+  await b.write("big.md", `${"q".repeat(4096)}\n`)
+  await b.engine.runCycle()
+  expect(await b.engine.status()).toMatchObject({
+    kind: "paused",
+    seq: 1,
+    code: "signature",
+    held: { failure: { kind: "oversized_item", keys: ["big.md"] } },
+  })
+  b.verifier.failing.clear()
+  await b.engine.runCycle()
+  expect(await b.engine.status()).toMatchObject({ kind: "failing", failure: { kind: "oversized_item", keys: ["big.md"] } })
+  expect(await b.read("one.md")).toBe("one\n")
+}, SMALL_SET_TIMEOUT)

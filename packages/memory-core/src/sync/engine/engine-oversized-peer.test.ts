@@ -11,7 +11,7 @@ import { FakeSyncServer } from "./fake-server.test-support"
 
 const TIMEOUT = 60_000
 const BOUND = 4096
-const RENDER_POINTS = ["merged", "staged", "render-intent", "render-key", "rendered", "git-commit", "committed", "checkpointed"] as const
+const RENDER_POINTS = ["captured", "persisted", "merged", "staged", "render-intent", "render-key", "rendered", "git-commit", "committed", "checkpointed"] as const
 
 const devices: Device[] = []
 afterEach(async () => {
@@ -58,6 +58,9 @@ test("once the held file fits, the peer's edit lands in the holding device's own
   await a.write("shared.md", note("first\nfrom a\n"))
   expect(await a.engine.runCycle()).toMatchObject({ pushed: true, held: [] })
   await expectBothEditsOnBoth(a, b)
+  const commits = (await a.syncCommits()).length
+  await a.engine.runCycle()
+  expect((await a.syncCommits()).length).toBe(commits)
 }, TIMEOUT)
 
 test.each([...RENDER_POINTS])("a crash at %s while the owed edit lands resumes to the same file with one more sync commit", async (point) => {

@@ -10,6 +10,7 @@ import { createMemoryIdentityContext } from "./context"
 import {
   MEMORY_STATUS_KEY,
   SYNC_BLOCKED_SEGMENT,
+  SYNC_HELD_SEGMENT,
   estimateSystemTokens,
   estimateSystemTokensCached,
   refreshMemoryStatus,
@@ -354,6 +355,28 @@ describe("refreshMemoryStatus segments", () => {
       { key: MEMORY_STATUS_KEY, text: `mem:${identity} 1m ago*${SYNC_BLOCKED_SEGMENT}` },
     ])
     expect(recorder.statusCalls[0]?.text?.length).toBeLessThanOrEqual(60)
+  }, 30_000)
+
+  const heldFailure = { kind: "oversized_item", keys: ["big.md"], stuck: [], limitBytes: 8388608, reason: "r", action: "a" } as const
+  test.each([
+    ["failing on held files", { kind: "failing", since: 0, attempts: 1, failure: heldFailure } as const],
+    ["paused at a refused entry while holding files", { kind: "paused", seq: 1, code: "signature", held: { since: 0, attempts: 1, failure: heldFailure } } as const],
+  ])("#given memory sync %s #when refresh runs #then the footer says sync held, never sync blocked (#12284)", async (_name, status) => {
+    const identity = "a".repeat(32)
+    const context = segmentContext({ identity, sessionId: "session-a" })
+    const recorder = recordingUi()
+    await refreshMemoryStatus({
+      context,
+      ui: recorder.ui,
+      compileWarnTokens: 30_000,
+      alreadyNotified: false,
+      gitRepo: segmentRepo({}),
+      now: () => SEGMENT_NOW,
+      checkAdvisory: false,
+      sessionId: "session-a",
+      syncStatus: async () => status,
+    })
+    expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: `mem:${identity} 1m ago${SYNC_HELD_SEGMENT}` }])
   }, 30_000)
 
   test("#given memory sync synced, idle, or a reader that throws #when refresh runs #then no sync segment renders (omo #10637)", async () => {

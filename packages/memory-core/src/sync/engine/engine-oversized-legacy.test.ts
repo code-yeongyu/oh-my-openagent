@@ -97,3 +97,43 @@ test("a crash right after the old build's edit is wound back and before the jour
   await b.engine.runCycle()
   expect(await b.read("legacy.md")).toBe(t.fits)
 }, TIMEOUT)
+
+test("after the wind-back the device's next delete of that file reaches the peer, under the device's own peer", async () => {
+  const { a, b } = await stuckDevice(true)
+  await a.write("legacy.md", null)
+  expect(await a.engine.runCycle()).toMatchObject({ pushed: true, held: [] })
+  await b.engine.runCycle()
+  expect(await b.read("legacy.md")).toBeNull()
+}, TIMEOUT)
+
+test("an op the old build journaled but never imported is dropped, and the file is captured afresh", async () => {
+  const server = new FakeSyncServer()
+  const a = await makeDevice(server, "a", undefined, { realStore: true, batchBytes: BOUND })
+  const b = await makeDevice(server, "b", undefined, { realStore: true, batchBytes: BOUND })
+  devices.push(a, b)
+  const t = texts(true)
+  await a.engine.runCycle()
+  await a.write("legacy.md", t.big)
+  const ops = await a.store.capture("legacy.md", t.big)
+  if (ops === null) throw new Error("emulation: nothing captured")
+  await a.engine.journal.setPending({ items: [{ key: "legacy.md", ops: toBase64(ops) }], outgoing: null })
+  await a.write("legacy.md", t.fits)
+  expect(await a.engine.runCycle()).toMatchObject({ pushed: true, held: [] })
+  expect(await pendingKeys(a)).toEqual([])
+  await b.engine.runCycle()
+  expect(await b.read("legacy.md")).toBe(t.fits)
+}, TIMEOUT)
+
+test("a queued op this device cannot attribute to itself stays queued and is named as stuck, never wound back", async () => {
+  const server = new FakeSyncServer()
+  const lines: string[] = []
+  const a = await makeDevice(server, "a", undefined, { realStore: true, batchBytes: BOUND, log: (line) => lines.push(line) })
+  devices.push(a)
+  await a.engine.runCycle()
+  const foreign = { key: "foreign.md", ops: toBase64(new Uint8Array(BOUND * 2).fill(7)) }
+  await a.engine.journal.setPending({ items: [foreign], outgoing: null })
+  expect(await a.engine.runCycle()).toMatchObject({ held: ["foreign.md"] })
+  expect((await a.engine.journal.pending()).items).toEqual([foreign])
+  expect(await a.engine.status()).toMatchObject({ kind: "failing", failure: { kind: "oversized_item", keys: ["foreign.md"], stuck: ["foreign.md"] } })
+  expect(lines.filter((line) => line.startsWith("sync.item.stuck"))).toEqual([`sync.item.stuck len=${Buffer.byteLength("foreign.md")} ops=1`])
+}, TIMEOUT)
