@@ -207,6 +207,7 @@
     "packages/memory-core/src/locks/sweep-memo.ts",
     "packages/memory-core/src/memfs/expiry.ts",
     "packages/memory-core/src/memfs/frontmatter-entries.ts",
+    "packages/memory-core/src/memfs/frontmatter-keys.ts",
     "packages/memory-core/src/memfs/frontmatter-scalar.ts",
     "packages/memory-core/src/memfs/frontmatter-validation.ts",
     "packages/memory-core/src/memfs/frontmatter.ts",
