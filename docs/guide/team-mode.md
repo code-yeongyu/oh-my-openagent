@@ -79,6 +79,16 @@ When both scopes define the same team name, project scope wins.
 
 The curated agents are read-only and in-process, so they can't write mailbox state. The reviewer trio is rejected because process-mode members drop reviewer instructions and tool allowlists. Route both groups through the `task` tool instead (`packages/senpi-task/src/team/member-validator.ts`).
 
+### OpenCode project-defined members
+
+In OpenCode, `subagent_type` can name an exact project role from `.opencode/agents/*.md`, such as `repository-reviewer`. Built-in member eligibility stays unchanged: `sisyphus`, `atlas`, `sisyphus-junior`, and conditionally `hephaestus`. Project roles are members only; they cannot replace the team lead.
+
+Admission requires project-file provenance captured during configuration and an exact match in OpenCode's final agent registry. The role must be visible, non-native, and use `subagent` or `all` mode. It must unconditionally allow `team_send_message`, `team_task_list`, `team_task_get`, `team_task_update`, `team_status`, and `call_omo_agent`. Its permissions must also permit the member launch restrictions: `task` and `question` are disabled. A direct role's unconditional `task: allow` can be narrowed to `task: false` for its member session.
+
+The nearest registered configuration snapshot in the active directory or a lexical ancestor determines provenance. An empty or nonmatching nearer snapshot blocks older ancestors. Global agents, sibling-prefix directories, later-source overrides, protected built-ins, and prototype names do not gain project membership. Rejected project members stop team creation before any child session starts.
+
+OpenCode keeps the project's exact agent name, model, variant, and agent prompt. Team task instructions are added separately. Named team specs and inline specs use the same runtime admission checks. An explicit lead session must belong to the invocation directory when project members are present.
+
 ## Lifecycle
 
 1. `team_create` — spawns team and member sessions.
