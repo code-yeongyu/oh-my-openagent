@@ -3065,6 +3065,7 @@
           "dag-library",
           "data-scientist",
           "debugging",
+          "eval-integrity",
           "frontend",
           "git-master",
           "give-me-tips",
@@ -3874,5 +3875,5 @@
       }
     }
   },
-  "sha256": "88ce654a85b6ce1636e95c263b3d832cd0ecc6119f83006ac3036c3231a1542c"
+  "sha256": "7b848f5bce6856010b6bcbd33ff010ce127dafa96b63847a63ed9aabe327d0cc"
 }
