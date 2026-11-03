@@ -1,3 +1,5 @@
+import { spawn } from "../../../shared/bun-spawn-shim"
+
 export type MarkerProbe = (
   service: string,
   account: string,
@@ -14,7 +16,7 @@ const ITEM_NOT_FOUND = 44
  */
 export const probeOwnerMarker: MarkerProbe = async (service, account, keychain) => {
   const args = ["find-generic-password", "-s", service, "-a", account, ...(keychain === undefined ? [] : [keychain])]
-  const child = Bun.spawn(["/usr/bin/security", ...args], {
+  const child = spawn(["/usr/bin/security", ...args], {
     stdout: "pipe",
     stderr: "ignore",
     env: process.env.HOME === undefined ? {} : { HOME: process.env.HOME },

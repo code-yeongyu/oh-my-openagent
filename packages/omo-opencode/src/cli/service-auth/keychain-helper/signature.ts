@@ -1,5 +1,8 @@
 import { stat } from "node:fs/promises"
 
+import { loadBunFfi } from "../../../shared/bun-ffi-shim"
+import { spawn } from "../../../shared/bun-spawn-shim"
+
 export const KEYCHAIN_HELPER_REQUIREMENT =
   'identifier "com.mengmota.omo-keychain-helper" and anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] ' +
   'and certificate leaf[field.1.2.840.113635.100.6.1.13] and certificate leaf[subject.OU] = "523JNR86LZ"'
@@ -22,7 +25,7 @@ let security: SecurityFunctions | null | undefined
 async function loadSecurity(): Promise<SecurityFunctions | null> {
   if (security !== undefined) return security
   try {
-    const { dlopen, FFIType, ptr } = await import("bun:ffi")
+    const { dlopen, FFIType, ptr } = await loadBunFfi()
     const cf = dlopen("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation", {
       CFStringCreateWithCString: { args: [FFIType.u64, FFIType.ptr, FFIType.u32], returns: FFIType.u64 },
       CFURLCreateFromFileSystemRepresentation: { args: [FFIType.u64, FFIType.ptr, FFIType.i64, FFIType.bool], returns: FFIType.u64 },
@@ -64,7 +67,7 @@ export async function signatureBackend(): Promise<"ffi" | "codesign"> {
 }
 
 async function verifyWithCodesign(path: string, requirement: string): Promise<boolean> {
-  const child = Bun.spawn(["/usr/bin/codesign", "--verify", "--strict", `-R=${requirement}`, path], {
+  const child = spawn(["/usr/bin/codesign", "--verify", "--strict", `-R=${requirement}`, path], {
     stdout: "ignore",
     stderr: "ignore",
     env: {},

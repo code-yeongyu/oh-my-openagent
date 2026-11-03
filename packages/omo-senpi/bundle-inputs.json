@@ -685,6 +685,7 @@
     "packages/omo-opencode/src/config-migration/types.ts",
     "packages/omo-opencode/src/shared/archive-entry-validator.ts",
     "packages/omo-opencode/src/shared/binary-downloader.ts",
+    "packages/omo-opencode/src/shared/bun-ffi-shim.ts",
     "packages/omo-opencode/src/shared/bun-file-shim.ts",
     "packages/omo-opencode/src/shared/bun-spawn-shim.ts",
     "packages/omo-opencode/src/shared/process-stream-reader.ts",

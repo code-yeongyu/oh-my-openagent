@@ -1,5 +1,7 @@
 import { z } from "zod"
 
+import { spawn } from "../../../shared/bun-spawn-shim"
+
 export type HelperVerb = "read" | "approve" | "write" | "stage" | "retire" | "promote" | "remove"
 export type HelperCall = { readonly verb: HelperVerb; readonly account: string; readonly value?: string }
 
@@ -54,25 +56,33 @@ async function firstLine(stream: ReadableStream<Uint8Array>): Promise<string | n
   }
 }
 
+function isFlushable(stream: NodeJS.WritableStream): stream is NodeJS.WritableStream & { flush(): unknown } {
+  return typeof (stream as { flush?: unknown }).flush === "function"
+}
+
 // Detached: the helper gets its own POSIX session, so a signal aimed at the client's process group never reaches it,
 // and a client killed mid-call leaves the helper to finish its native call, read EOF and exit (design 2, 3.6 R2).
 export const spawnDetachedHelper: HelperSpawner = path => {
-  const child = Bun.spawn([path], {
+  const child = spawn([path], {
     stdin: "pipe",
     stdout: "pipe",
     stderr: "ignore",
     detached: true,
     env: process.env.HOME === undefined ? {} : { HOME: process.env.HOME },
   })
+  const pid = child.pid
+  if (pid === undefined) throw new HelperProtocolError("The keychain helper did not start.")
+  const stdin = child.stdin
   return {
-    pid: child.pid,
+    pid,
     send: line => {
-      child.stdin.write(line)
-      child.stdin.flush()
+      stdin.write(line)
+      // Bun's pipe sink buffers until flushed; a Node stream writes through on its own.
+      if (isFlushable(stdin)) stdin.flush()
     },
     reply: firstLine(child.stdout),
     close: () => {
-      void child.stdin.end()
+      stdin.end()
     },
   }
 }
