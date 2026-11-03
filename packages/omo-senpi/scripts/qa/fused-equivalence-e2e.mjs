@@ -386,6 +386,8 @@ function summarizeDiffs(diffs) {
     )
 }
 
+const SANDBOX_MCP_CONFIG = { mcpServers: { context7: { enabled: false }, grep_app: { enabled: false } } }
+
 async function main() {
   const options = parseArgs(process.argv.slice(2))
   if (!existsSync(join(pluginRoot, "runtime", "lsp-daemon", "dist", "cli.js")))
@@ -436,6 +438,10 @@ async function main() {
           )
         for (let index = 0; index < options.repeat; index++) {
           const run = await startCaseRun({ ...testCase.spec(), label: `omo-${testCase.id.toLowerCase()}` })
+          // The builtin remote MCPs (context7, grep_app) inject their servers' live instructions into the system
+          // prompt, so a third party's wording change broke E21-E24 with no omo change (#12256). Turn them off in
+          // the sandbox's own mcp.json, the documented switch that wins over the extension declarations.
+          writeFileSync(join(run.box.agentDir, "mcp.json"), `${JSON.stringify(SANDBOX_MCP_CONFIG, null, 2)}\n`)
           // The checkout and engine locations are run-scoped prefixes, like the sandbox root.
           run.extraRoots.push(
             { prefix: repoRoot, token: "<omo-repo>" },

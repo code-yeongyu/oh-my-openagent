@@ -185,7 +185,7 @@ describe("createBuiltinAgents with model overrides", () => {
 
     // #then
     expect(agents.sisyphus.model).toBe("github-copilot/gpt-5.5")
-    expect(agents.sisyphus.reasoningEffort).toBe("high")
+    expect(agents.sisyphus.reasoningEffort).toBe("medium")
     expect(agents.sisyphus.thinking).toBeUndefined()
     providerModelsSpy.mockRestore()
     fetchSpy.mockRestore()
@@ -349,9 +349,9 @@ describe("createBuiltinAgents with model overrides", () => {
       undefined,
     )
 
-    // #then - oracle resolves via connected cache fallback to openai/gpt-5.6-sol high (not system default)
+    // #then - oracle resolves via connected cache fallback to openai/gpt-5.6-sol xhigh (not system default)
     expect(agents.oracle.model).toBe("openai/gpt-5.6-sol")
-    expect(agents.oracle.reasoningEffort).toBe("high")
+    expect(agents.oracle.reasoningEffort).toBe("xhigh")
     expect(agents.oracle.thinking).toBeUndefined()
     cacheSpy.mockRestore?.()
     providerModelsSpy.mockRestore()
@@ -394,7 +394,7 @@ describe("createBuiltinAgents with model overrides", () => {
 
     // #then
     expect(agents.oracle.model).toBe("openai/gpt-5.5")
-    expect(agents.oracle.reasoningEffort).toBe("high")
+    expect(agents.oracle.reasoningEffort).toBe("medium")
     expect(agents.oracle.textVerbosity).toBe("high")
     expect(agents.oracle.thinking).toBeUndefined()
     providerModelsSpy.mockRestore()
@@ -1208,7 +1208,7 @@ describe("createBuiltinAgents with requiresAnyModel gating (sisyphus)", () => {
       const agents = await createBuiltinAgents([], {}, undefined, undefined, undefined, undefined, [], {})
 
       // #then
-      expect(agents.atlas).toMatchObject({ model: "openai/gpt-5.6-sol", variant: "high" })
+      expect(agents.atlas).toMatchObject({ model: "openai/gpt-5.6-sol", variant: "medium" })
       expect(agents.metis).toBeDefined()
       expect(agents.metis.model).toBe(FABLE_55_RELEASED ? "anthropic/claude-fable-5-5" : "anthropic/claude-fable-5-1")
       expect(agents.metis.variant).toBe("max")
@@ -1279,7 +1279,7 @@ describe("buildAgent with category and skills", () => {
     const categories = {
       "custom-category": {
         model: "openai/gpt-5.5",
-        variant: "high",
+        variant: "xhigh",
       },
     }
 
@@ -1288,7 +1288,7 @@ describe("buildAgent with category and skills", () => {
 
     // #then
     expect(agent.model).toBe("openai/gpt-5.5")
-    expect(agent.variant).toBe("high")
+    expect(agent.variant).toBe("xhigh")
   })
 
   test("agent with skills has content prepended to prompt", () => {
@@ -1519,11 +1519,11 @@ describe("override.category expansion in createBuiltinAgents", () => {
   })
 
   test("standard agent override with category AND direct reasoningEffort - direct wins", async () => {
-    // #given - custom category has reasoningEffort=high, direct override says "low"
+    // #given - custom category has reasoningEffort=xhigh, direct override says "low"
     const categories = {
       "test-cat": {
         model: "openai/gpt-5.5",
-        reasoningEffort: "high" as const,
+        reasoningEffort: "xhigh" as const,
       },
     }
     const overrides = {
@@ -1688,7 +1688,7 @@ describe("Deadlock prevention - fetchAvailableModels must not receive client", (
     const providerModelsSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue(null)
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(new Set())
     const overrides = {
-      hephaestus: { variant: "high" },
+      hephaestus: { variant: "medium" },
     }
 
     // #when
@@ -1696,7 +1696,7 @@ describe("Deadlock prevention - fetchAvailableModels must not receive client", (
 
     // #then - user variant takes precedence over hardcoded "high"
     expect(agents.hephaestus).toBeDefined()
-    expect(agents.hephaestus.variant).toBe("high")
+    expect(agents.hephaestus.variant).toBe("medium")
     providerModelsSpy.mockRestore()
     fetchSpy.mockRestore()
   })
@@ -1711,9 +1711,9 @@ describe("Deadlock prevention - fetchAvailableModels must not receive client", (
     // #when
     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
 
-    // #then - default "high" variant is applied
+    // #then - default "medium" variant is applied
     expect(agents.hephaestus).toBeDefined()
-    expect(agents.hephaestus.variant).toBe("high")
+    expect(agents.hephaestus.variant).toBe("medium")
     providerModelsSpy.mockRestore()
     connectedSpy.mockRestore()
     fetchSpy.mockRestore()

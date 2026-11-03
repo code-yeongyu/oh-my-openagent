@@ -16,7 +16,7 @@ describe("AGENT_FALLBACK_CHAINS", () => {
         {
           providers: ["anthropic-subscription", "anthropic", "github-copilot"],
           model: "claude-haiku-5-5",
-          variant: "high",
+          variant: "medium",
         },
         { providers: ["deepseek"], model: "deepseek-flash", variant: "max" },
         { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.7-plus" },
@@ -28,7 +28,7 @@ describe("AGENT_FALLBACK_CHAINS", () => {
         {
           providers: ["anthropic-subscription", "anthropic", "github-copilot"],
           model: "claude-haiku-5-5",
-          variant: "high",
+          variant: "medium",
         },
         { providers: ["deepseek"], model: "deepseek-flash", variant: "max" },
         { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.7-plus" },
@@ -58,7 +58,7 @@ describe("AGENT_FALLBACK_CHAINS", () => {
         { providers: ["opencode"], model: "kimi-k3", variant: "max" },
       ],
       "plan-reviewer": [
-        { providers: ["chatgpt-subscription", "openai"], model: "gpt-6-astra", variant: "high" },
+        { providers: ["chatgpt-subscription", "openai"], model: "gpt-6-astra", variant: "xhigh" },
         { providers: ["github-copilot"], model: "gpt-6-astra", variant: "high" },
         { providers: ["chatgpt-subscription", "openai", "opencode"], model: "gpt-6-astra", variant: "high" },
         {

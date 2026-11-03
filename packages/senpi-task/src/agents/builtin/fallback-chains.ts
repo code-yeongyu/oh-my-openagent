@@ -22,7 +22,7 @@ export const AGENT_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFal
     {
       providers: ["anthropic-subscription", "anthropic", "github-copilot"],
       model: LATEST_MODEL_BY_FAMILY.claudeHaiku,
-      variant: "high",
+      variant: "medium",
     },
     { providers: ["deepseek"], model: "deepseek-flash", variant: "max" },
     { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.7-plus" },
@@ -34,7 +34,7 @@ export const AGENT_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFal
     {
       providers: ["anthropic-subscription", "anthropic", "github-copilot"],
       model: LATEST_MODEL_BY_FAMILY.claudeHaiku,
-      variant: "high",
+      variant: "medium",
     },
     { providers: ["deepseek"], model: "deepseek-flash", variant: "max" },
     { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.7-plus" },
@@ -64,7 +64,7 @@ export const AGENT_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFal
     { providers: ["opencode"], model: LATEST_MODEL_BY_FAMILY.kimiK3, variant: "max" },
   ]),
   "plan-reviewer": [
-    { providers: ["chatgpt-subscription", "openai"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "high" },
+    { providers: ["chatgpt-subscription", "openai"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "xhigh" },
     { providers: ["github-copilot"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "high" },
     {
       providers: ["chatgpt-subscription", "openai", "opencode"],

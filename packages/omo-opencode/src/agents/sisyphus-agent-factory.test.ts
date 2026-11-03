@@ -58,7 +58,7 @@ describe("createSisyphusAgent", () => {
         const agent = createSisyphusAgent(model)
 
         // then
-        expect(agent.reasoningEffort).toBe("high")
+        expect(agent.reasoningEffort).toBe("medium")
         expect(permissionValue(agent.permission, "apply_patch")).toBeUndefined()
         expect(agent.thinking).toBeUndefined()
       }

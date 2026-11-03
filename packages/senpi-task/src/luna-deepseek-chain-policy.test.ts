@@ -23,7 +23,7 @@ const KIMI_HIGHSPEED_OFF = {
 } satisfies DelegateFallbackEntry
 
 describe("Senpi Luna and DeepSeek chain policy", () => {
-  test("quick leads with Luna low, Haiku 5.5 high, then non-reasoning DeepSeek V4.1 Flash", () => {
+  test("quick leads with Luna low, Haiku 5.5 medium, then non-reasoning DeepSeek V4.1 Flash", () => {
     const quick = CATEGORY_FALLBACK_CHAINS["quick"]
 
     expect(quick?.map((entry) => entry.model)).not.toContain("kimi-for-coding-highspeed")
@@ -32,14 +32,14 @@ describe("Senpi Luna and DeepSeek chain policy", () => {
       {
         providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot"],
         model: "claude-haiku-5-5",
-        variant: "high",
+        variant: "medium",
       },
       DEEPSEEK_OFF,
     ])
   })
 
   test.each(["explore", "librarian"])(
-    "%s leads with no-thinking Kimi HighSpeed, Luna, Haiku 5.5 high, then max-reasoning DeepSeek V4.1 Flash",
+    "%s leads with no-thinking Kimi HighSpeed, Luna, Haiku 5.5 medium, then max-reasoning DeepSeek V4.1 Flash",
     (agentName) => {
       const chain = AGENT_FALLBACK_CHAINS[agentName]
 
@@ -49,7 +49,7 @@ describe("Senpi Luna and DeepSeek chain policy", () => {
         {
           providers: ["anthropic-subscription", "anthropic", "github-copilot"],
           model: "claude-haiku-5-5",
-          variant: "high",
+          variant: "medium",
         },
         DEEPSEEK_MAX,
       ])

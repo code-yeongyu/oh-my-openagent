@@ -38,7 +38,7 @@ const CURATED_GPT_CASES = [
 ] as const
 
 describe("resolveAgent openai lane policy", () => {
-  test("#given the kimi head plus an openai-only luna lane #when explore resolves #then the runtime fallback list tries openai/gpt-6-luna-fast before claude-haiku-5-5 high", () => {
+  test("#given the kimi head plus an openai-only luna lane #when explore resolves #then the runtime fallback list tries openai/gpt-6-luna-fast before claude-haiku-5-5 medium", () => {
     // given
     const models = registry([
       model("kimi-coding", "kimi-for-coding-highspeed"),
@@ -55,7 +55,7 @@ describe("resolveAgent openai lane policy", () => {
       "openai/gpt-6-luna-fast",
       "anthropic/claude-haiku-5-5",
     ])
-    expect(result.fallback_models?.[1]?.variant).toBe("high")
+    expect(result.fallback_models?.[1]?.variant).toBe("medium")
   })
 
   for (const { agent, modelId } of CURATED_GPT_CASES) {

@@ -425,7 +425,7 @@ export function createOracleAgent(model: string): AgentConfig {
     return {
       ...base,
       prompt: buildNativeAgentPrompt(model, ORACLE_GPT_5_5_PROMPT),
-      reasoningEffort: "high",
+      reasoningEffort: "xhigh",
       textVerbosity: "high",
     } as AgentConfig
   }
@@ -434,7 +434,7 @@ export function createOracleAgent(model: string): AgentConfig {
     return {
       ...base,
       prompt: buildNativeAgentPrompt(model, ORACLE_GPT_5_5_PROMPT),
-      reasoningEffort: "high",
+      reasoningEffort: "medium",
       textVerbosity: "high",
     } as AgentConfig
   }
@@ -443,7 +443,7 @@ export function createOracleAgent(model: string): AgentConfig {
     return {
       ...base,
       prompt: buildNativeAgentPrompt(model, ORACLE_GPT_PROMPT),
-      reasoningEffort: "high",
+      reasoningEffort: "medium",
       textVerbosity: "high",
     } as AgentConfig
   }

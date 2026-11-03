@@ -96,7 +96,7 @@ export function maybeCreateHephaestusConfig(input: {
     useTaskSystem,
   )
 
-  hephaestusConfig = { ...hephaestusConfig, variant: hephaestusResolvedVariant ?? "high" }
+  hephaestusConfig = { ...hephaestusConfig, variant: hephaestusResolvedVariant ?? "medium" }
 
   const hepOverrideCategory = (hephaestusOverride as Record<string, unknown> | undefined)?.category as
     string | undefined

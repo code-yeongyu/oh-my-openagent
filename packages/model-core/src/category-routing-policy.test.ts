@@ -64,18 +64,18 @@ describe("category routing policy", () => {
       },
     ])
     expect(low.fallbackChain).toEqual([
-      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.1-sol", variant: "high" },
-      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.1-sol-fast", variant: "high" },
+      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.1-sol", variant: "medium" },
+      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.1-sol-fast", variant: "medium" },
       {
         providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
         model: "gpt-5.6-sol",
-        variant: "high",
+        variant: "medium",
       },
-      { providers: ["openai", "chatgpt-subscription"], model: "gpt-5.6-sol-fast", variant: "high" },
+      { providers: ["openai", "chatgpt-subscription"], model: "gpt-5.6-sol-fast", variant: "medium" },
     ])
   })
 
-  test("quick prioritizes Luna low, Haiku 5.5 high, DeepSeek off, then the speed tier", () => {
+  test("quick prioritizes Luna low, Haiku 5.5 medium, DeepSeek off, then the speed tier", () => {
     // given
     const quick = CATEGORY_MODEL_REQUIREMENTS["quick"]
 
@@ -92,7 +92,7 @@ describe("category routing policy", () => {
       {
         providers: ["anthropic", "anthropic-api", "github-copilot"],
         model: "claude-haiku-5-5",
-        variant: "high",
+        variant: "medium",
       },
       {
         providers: ["deepseek"],
@@ -123,7 +123,7 @@ describe("category routing policy", () => {
     ])
   })
 
-  test("unspecified-low follows the approved chain headed by claude-sonnet-5-5 high", () => {
+  test("unspecified-low follows the approved chain headed by claude-sonnet-5-5 medium", () => {
     // given
     const unspecifiedLow = CATEGORY_MODEL_REQUIREMENTS["unspecified-low"]
 
@@ -136,7 +136,7 @@ describe("category routing policy", () => {
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-sonnet-5-5",
-        variant: "high",
+        variant: "medium",
       },
       {
         providers: ["xiaomi", "opencode-go"],
@@ -146,7 +146,7 @@ describe("category routing policy", () => {
       {
         providers: ["xai", "github-copilot", "opencode-go"],
         model: "grok-4.7",
-        variant: "high",
+        variant: "xhigh",
       },
       {
         providers: ["zai-coding-plan", "opencode-go"],
@@ -156,12 +156,12 @@ describe("category routing policy", () => {
       {
         providers: ["openai", "chatgpt-subscription"],
         model: "gpt-6.1-sol",
-        variant: "high",
+        variant: "medium",
       },
       {
         providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
         model: "gpt-5.6-sol",
-        variant: "high",
+        variant: "medium",
       },
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
@@ -202,7 +202,7 @@ describe("category routing policy", () => {
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-opus-5-5",
-        variant: "high",
+        variant: "medium",
       },
       {
         providers: ["zai-coding-plan", "opencode-go"],

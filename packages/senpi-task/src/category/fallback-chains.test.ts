@@ -83,14 +83,14 @@ describe("CATEGORY_FALLBACK_CHAINS", () => {
         { providers: ["chatgpt-subscription", "openai", "opencode"], model: "gpt-5.6-sol", variant: "max" },
       ],
       "deep-low": [
-        { providers: ["chatgpt-subscription", "openai"], model: "gpt-6.1-sol", variant: "high" },
-        { providers: ["chatgpt-subscription", "openai"], model: "gpt-6.1-sol-fast", variant: "high" },
+        { providers: ["chatgpt-subscription", "openai"], model: "gpt-6.1-sol", variant: "medium" },
+        { providers: ["chatgpt-subscription", "openai"], model: "gpt-6.1-sol-fast", variant: "medium" },
         {
           providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"],
           model: "gpt-5.6-sol",
-          variant: "high",
+          variant: "medium",
         },
-        { providers: ["chatgpt-subscription", "openai"], model: "gpt-5.6-sol-fast", variant: "high" },
+        { providers: ["chatgpt-subscription", "openai"], model: "gpt-5.6-sol-fast", variant: "medium" },
       ],
       "deep-high": [
         {
@@ -130,7 +130,7 @@ describe("CATEGORY_FALLBACK_CHAINS", () => {
         {
           providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot"],
           model: "claude-haiku-5-5",
-          variant: "high",
+          variant: "medium",
         },
         { providers: ["deepseek"], model: "deepseek-flash", variant: "off" },
         {
@@ -148,16 +148,16 @@ describe("CATEGORY_FALLBACK_CHAINS", () => {
         {
           providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
           model: "claude-sonnet-5-5",
-          variant: "high",
+          variant: "medium",
         },
         { providers: ["xiaomi", "opencode-go"], model: "mimo-v2.6-pro", variant: "high" },
-        { providers: ["xai", "github-copilot", "opencode-go"], model: "grok-4.7", variant: "high" },
+        { providers: ["xai", "github-copilot", "opencode-go"], model: "grok-4.7", variant: "xhigh" },
         { providers: ["zai", "zai-coding-cn", "opencode-go"], model: "glm-5.3", variant: "high" },
-        { providers: ["chatgpt-subscription", "openai"], model: "gpt-6.1-sol", variant: "high" },
+        { providers: ["chatgpt-subscription", "openai"], model: "gpt-6.1-sol", variant: "medium" },
         {
           providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"],
           model: "gpt-5.6-sol",
-          variant: "high",
+          variant: "medium",
         },
         {
           providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
@@ -176,7 +176,7 @@ describe("CATEGORY_FALLBACK_CHAINS", () => {
         {
           providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
           model: "claude-opus-5-5",
-          variant: "high",
+          variant: "medium",
         },
         { providers: ["zai", "zai-coding-cn", "opencode-go"], model: "glm-5.3", variant: "max" },
         {

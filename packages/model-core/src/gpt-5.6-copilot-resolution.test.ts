@@ -30,7 +30,7 @@ describe("GitHub Copilot GPT-5.6 and GPT-6 Astra resolution", () => {
         availableModels: withOpus,
         systemDefaultModel: "system/default",
       }),
-    ).toMatchObject({ model: "github-copilot/claude-opus-5-5", variant: "high" })
+    ).toMatchObject({ model: "github-copilot/claude-opus-5-5", variant: "medium" })
 
     const gptOnly = new Set(["github-copilot/gpt-6-astra", "github-copilot/gpt-5.6-sol"])
     expect(
@@ -42,7 +42,7 @@ describe("GitHub Copilot GPT-5.6 and GPT-6 Astra resolution", () => {
     ).toMatchObject({ model: "system/default" })
   })
 
-  test("ultrabrain falls back to Copilot GPT-5.6 Sol when Astra is absent and deep-low runs it at high, while deep-high never uses it", () => {
+  test("ultrabrain falls back to Copilot GPT-5.6 Sol when Astra is absent and deep-low runs it at medium, while deep-high never uses it", () => {
     const availableModels = new Set(["github-copilot/gpt-5.6-sol"])
     expect(
       resolveModelWithFallback({
@@ -57,7 +57,7 @@ describe("GitHub Copilot GPT-5.6 and GPT-6 Astra resolution", () => {
         availableModels,
         systemDefaultModel: "system/default",
       }),
-    ).toMatchObject({ model: "github-copilot/gpt-5.6-sol", variant: "high" })
+    ).toMatchObject({ model: "github-copilot/gpt-5.6-sol", variant: "medium" })
     expect(
       resolveModelWithFallback({
         fallbackChain: CATEGORY_MODEL_REQUIREMENTS["deep-high"].fallbackChain,
@@ -71,7 +71,7 @@ describe("GitHub Copilot GPT-5.6 and GPT-6 Astra resolution", () => {
       name: "hephaestus",
       requirement: AGENT_MODEL_REQUIREMENTS.hephaestus,
       expectedModel: "github-copilot/gpt-5.6-sol",
-      expectedVariant: "high",
+      expectedVariant: "medium",
     },
     {
       name: "momus",
@@ -89,7 +89,7 @@ describe("GitHub Copilot GPT-5.6 and GPT-6 Astra resolution", () => {
       name: "deep-low",
       requirement: CATEGORY_MODEL_REQUIREMENTS["deep-low"],
       expectedModel: "github-copilot/gpt-5.6-sol",
-      expectedVariant: "high",
+      expectedVariant: "medium",
     },
     {
       name: "deep-high",
@@ -101,7 +101,7 @@ describe("GitHub Copilot GPT-5.6 and GPT-6 Astra resolution", () => {
       name: "unspecified-low",
       requirement: CATEGORY_MODEL_REQUIREMENTS["unspecified-low"],
       expectedModel: "github-copilot/gpt-5.6-sol",
-      expectedVariant: "high",
+      expectedVariant: "medium",
     },
   ] as const
 
@@ -187,7 +187,7 @@ describe("GitHub Copilot GPT-5.6 and GPT-6 Astra resolution", () => {
     expect(copilotXhighEntries).toEqual([])
   })
 
-  test("momus prefers native Astra high over the Copilot Astra rung when both are available", () => {
+  test("momus prefers native Astra xhigh over the Copilot Astra rung when both are available", () => {
     // given
     const availableModels = new Set(["chatgpt-subscription/gpt-6-astra", "github-copilot/gpt-6-astra"])
 
@@ -202,7 +202,7 @@ describe("GitHub Copilot GPT-5.6 and GPT-6 Astra resolution", () => {
     expect(result).toEqual({
       model: "chatgpt-subscription/gpt-6-astra",
       source: "provider-fallback",
-      variant: "high",
+      variant: "xhigh",
     })
   })
 

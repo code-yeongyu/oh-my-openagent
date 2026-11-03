@@ -126,7 +126,7 @@ describe("resolveModelProfile", () => {
 
   it("carries a reasoning suffix written on a user chain entry", () => {
     const result = resolveModelProfile({
-      profiles: { pair: { models: [`${OPUS}:medium`] } },
+      profiles: { pair: { models: [`${OPUS}:high`] } },
       active: "pair",
       availableModels: [OPUS],
     })
@@ -135,7 +135,7 @@ describe("resolveModelProfile", () => {
       kind: "resolved",
       provider: "anthropic",
       modelId: "claude-opus-5-5",
-      reasoning: "medium",
+      reasoning: "high",
     })
   })
 
@@ -188,7 +188,7 @@ describe("builtin chain routing", () => {
       kind: "resolved",
       provider: "anthropic-subscription",
       modelId: FABLE_55_RELEASED ? "claude-fable-5-5" : "claude-fable-5-1",
-      reasoning: "high",
+      reasoning: "xhigh",
     })
   })
 
@@ -203,7 +203,7 @@ describe("builtin chain routing", () => {
       kind: "resolved",
       provider: "my-claude-proxy",
       modelId: "claude-opus-5-5",
-      reasoning: "high",
+      reasoning: "medium",
     })
   })
 
@@ -247,7 +247,7 @@ describe("builtin chain routing", () => {
       kind: "resolved",
       provider: "anthropic-subscription",
       modelId: "claude-fable-5-1",
-      reasoning: "high",
+      reasoning: "xhigh",
     })
   })
 
@@ -258,7 +258,7 @@ describe("builtin chain routing", () => {
       kind: "resolved",
       provider: "anthropic-subscription",
       modelId: "claude-opus-5-5",
-      reasoning: "high",
+      reasoning: "medium",
     })
   })
 
@@ -281,7 +281,7 @@ describe("builtin chain routing", () => {
       kind: "resolved",
       provider: "chatgpt-subscription",
       modelId: "gpt-6-astra",
-      reasoning: "high",
+      reasoning: "medium",
     })
   })
 
@@ -317,7 +317,7 @@ describe("builtin chain routing", () => {
       kind: "resolved",
       provider: "chatgpt-subscription",
       modelId: "gpt-6.1-sol",
-      reasoning: "high",
+      reasoning: "medium",
     })
   })
 
@@ -328,7 +328,7 @@ describe("builtin chain routing", () => {
       kind: "resolved",
       provider: "github-copilot",
       modelId: "gpt-5.6-sol",
-      reasoning: "high",
+      reasoning: "medium",
     })
   })
 
@@ -342,7 +342,7 @@ describe("builtin chain routing", () => {
       kind: "resolved",
       provider: "chatgpt-subscription",
       modelId: "gpt-5.6-sol",
-      reasoning: "high",
+      reasoning: "medium",
     })
   })
 
@@ -365,7 +365,7 @@ describe("builtin chain routing", () => {
       kind: "resolved",
       provider: "openai",
       modelId: "gpt-5.6-sol",
-      reasoning: "high",
+      reasoning: "medium",
     })
   })
 
@@ -424,7 +424,7 @@ describe("builtin chain routing", () => {
 
   it("does not silently take another provider when a user overlay names openai and openai is absent", () => {
     const result = resolveModelProfile({
-      profiles: { "geeky-normal": { models: [{ model: "openai/gpt-6-sol", reasoning: "high" }] } },
+      profiles: { "geeky-normal": { models: [{ model: "openai/gpt-6-sol", reasoning: "medium" }] } },
       active: "geeky-normal",
       availableModels: ["chatgpt-subscription/gpt-6-sol"],
     })
@@ -437,7 +437,7 @@ describe("builtin chain routing", () => {
       profiles: {
         "geeky-normal": {
           models: [
-            { model: "openai/gpt-6-sol", reasoning: "medium" },
+            { model: "openai/gpt-6-sol", reasoning: "high" },
             { model: "github-copilot/gpt-6-sol", reasoning: "medium" },
           ],
         },
@@ -456,7 +456,7 @@ describe("builtin chain routing", () => {
 
   it("still matches an unscoped user model through whichever registry provider serves it", () => {
     const result = resolveModelProfile({
-      profiles: { "geeky-normal": { models: [{ model: "gpt-6-sol", reasoning: "high" }] } },
+      profiles: { "geeky-normal": { models: [{ model: "gpt-6-sol", reasoning: "medium" }] } },
       active: "geeky-normal",
       availableModels: ["chatgpt-subscription/gpt-6-sol"],
     })
@@ -465,7 +465,7 @@ describe("builtin chain routing", () => {
       kind: "resolved",
       provider: "chatgpt-subscription",
       modelId: "gpt-6-sol",
-      reasoning: "high",
+      reasoning: "medium",
     })
   })
 

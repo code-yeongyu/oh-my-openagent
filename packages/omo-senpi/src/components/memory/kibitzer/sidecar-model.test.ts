@@ -142,7 +142,7 @@ describe("resolveKibitzerSidecarModel connected-first ordering (#9216)", () => {
       kind: "resolved",
       category: "quick",
       model: "anthropic/claude-haiku-5-5",
-      thinking: "high",
+      thinking: "medium",
     })
     if (resolution.kind !== "resolved") throw new Error("unreachable")
     expect(resolution.chain.selectedModel).toBe("anthropic/claude-haiku-5-5")

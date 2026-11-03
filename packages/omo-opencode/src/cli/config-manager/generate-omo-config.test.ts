@@ -65,7 +65,7 @@ describe("generateOmoConfig - model fallback system", () => {
     expect((result.agents as Record<string, { model: string }>).sisyphus).toBeUndefined()
   })
 
-  test("uses Haiku 5.5 high for librarian when Z.ai is available with Claude", () => {
+  test("uses Haiku 5.5 medium for librarian when Z.ai is available with Claude", () => {
     //#given
     const config: InstallConfig = {
       platform: "opencode",
@@ -91,7 +91,7 @@ describe("generateOmoConfig - model fallback system", () => {
     //#then
     expect((result.agents as Record<string, { model: string; variant: string }>).librarian).toEqual({
       model: "anthropic/claude-haiku-5-5",
-      variant: "high",
+      variant: "medium",
     })
     expect(JSON.stringify(result)).not.toContain("zai-coding-plan/glm-4.7")
     expect((result.agents as Record<string, { model: string }>).sisyphus.model).toBe("anthropic/claude-opus-5-5")
@@ -124,7 +124,7 @@ describe("generateOmoConfig - model fallback system", () => {
     const agents = result.agents as Record<string, { model: string; variant?: string }>
     expect(agents.sisyphus).toEqual({
       model: "openai/gpt-5.6-sol",
-      variant: "high",
+      variant: "medium",
     })
     expect(agents.oracle.model).toBe("openai/gpt-5.6-sol")
     expect(agents["multimodal-looker"]).toMatchObject({
@@ -177,22 +177,22 @@ describe("generateOmoConfig - model fallback system", () => {
     expect(agents.sisyphus.fallback_models).toEqual([
       {
         model: "openai/gpt-5.6-sol",
-        variant: "high",
+        variant: "medium",
       },
     ])
     expect(categories["deep-high"].model).toBe("openai/gpt-6-astra")
     expect(categories["deep-high"].variant).toBe("high")
     expect(categories["deep-high"].fallback_models ?? []).toEqual([])
     expect(categories["deep-low"].model).toBe("openai/gpt-6.1-sol")
-    expect(categories["deep-low"].variant).toBe("high")
+    expect(categories["deep-low"].variant).toBe("medium")
     expect(categories["deep-low"].fallback_models ?? []).toEqual([
-      { model: "openai/gpt-6.1-sol-fast", variant: "high" },
-      { model: "openai/gpt-5.6-sol", variant: "high" },
-      { model: "openai/gpt-5.6-sol-fast", variant: "high" },
+      { model: "openai/gpt-6.1-sol-fast", variant: "medium" },
+      { model: "openai/gpt-5.6-sol", variant: "medium" },
+      { model: "openai/gpt-5.6-sol-fast", variant: "medium" },
     ])
   })
 
-  test("uses Haiku 5.5 high for explore when Claude max20", () => {
+  test("uses Haiku 5.5 medium for explore when Claude max20", () => {
     //#given
     const config: InstallConfig = {
       platform: "opencode",
@@ -218,11 +218,11 @@ describe("generateOmoConfig - model fallback system", () => {
     //#then
     expect((result.agents as Record<string, { model: string; variant: string }>).explore).toEqual({
       model: "anthropic/claude-haiku-5-5",
-      variant: "high",
+      variant: "medium",
     })
   })
 
-  test("uses Haiku 5.5 high for explore regardless of max20 flag", () => {
+  test("uses Haiku 5.5 medium for explore regardless of max20 flag", () => {
     //#given
     const config: InstallConfig = {
       platform: "opencode",
@@ -248,7 +248,7 @@ describe("generateOmoConfig - model fallback system", () => {
     //#then
     expect((result.agents as Record<string, { model: string; variant: string }>).explore).toEqual({
       model: "anthropic/claude-haiku-5-5",
-      variant: "high",
+      variant: "medium",
     })
   })
 })

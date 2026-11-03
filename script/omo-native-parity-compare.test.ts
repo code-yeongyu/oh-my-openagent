@@ -82,6 +82,20 @@ describe("binary/npm parity comparison", () => {
     expect(compareRuns(binary, npm)).toEqual([])
   })
 
+  test("#given a leftover shard running on one side and exited on the other #when compared #then it is not a difference (#12148)", () => {
+    const npm = run({
+      doctor: [...run().doctor, "INFO Shard p-<sha> (parent <sha>, s1.jsonl): running pid 15440 · engine 2026.11.2-1"],
+    })
+    const binary = run({
+      doctor: [
+        ...run().doctor,
+        "WARN Shard p-<sha> (parent <sha>, s2.jsonl): not running (retained state kept; run omo daemon gc)",
+      ],
+    })
+    expect(compareRuns(binary, npm)).toEqual([])
+    expect(compareRuns(binary, run())).toEqual(['doctor: the binary prints "Shard", npm does not'])
+  })
+
   test("#given an extension load failure on one side #when compared #then it is reported", () => {
     const binary = run({ extensionFailures: ["Warning: Failed to load extension codemode"] })
     expect(compareRuns(binary, run())).toEqual(["binary: Warning: Failed to load extension codemode"])
