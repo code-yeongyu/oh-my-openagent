@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto"
 import { open, readdir, readFile, rename, rm } from "node:fs/promises"
 import { basename, dirname, join } from "node:path"
 
+import { lockProcessStartLine } from "./lock-record"
 import { withRecordGuard } from "./lock-reclaim"
 
 /** The lock record changed while it was handed to another process: the critical section must stop writing. */
@@ -17,7 +18,7 @@ export class LockLeaseLostError extends Error {
  *
  * `handOver(pid)` atomically replaces this process's record with one naming `pid` and a fresh instance id, so every
  * version of the lock treats the child as the live holder: no other process can acquire the lock while the child lives,
- * even if this process dies. When the child exits without a `restore`, its 4-line record is stale at once.
+ * even if this process dies. When the child exits without a `restore`, its 5-line record is stale at once.
  *
  * `restore()` is compare-and-restore under the reclaim guard of the handed-over record, the same guard every reaper of
  * that record takes: no reaper can remove the record between the compare and the rename, so a contender can never win
@@ -92,7 +93,8 @@ export function createLockLease(lockPath: string, ownerRecord: string, ownerTag:
       if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) throw new Error(`Cannot hand the lock to pid ${pid}.`)
       if ((await currentRecord(lockPath)) !== ownerRecord) throw new LockLeaseLostError(lockPath)
       await removeLeftoverTemps(lockPath)
-      const record = `${ownerTag} ${randomUUID()}\n${pid}\n${Date.now()}\n${randomUUID()}\n`
+      const processStart = await lockProcessStartLine(pid)
+      const record = `${ownerTag} ${randomUUID()}\n${pid}\n${Date.now()}\n${randomUUID()}\n${processStart}\n`
       await replaceRecord(lockPath, record)
       handedTo = record
     },
