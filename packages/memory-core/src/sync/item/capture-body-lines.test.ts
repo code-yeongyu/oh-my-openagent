@@ -41,8 +41,8 @@ describe("concurrent replacements of one body line (#12279)", () => {
       docB.import(docA.export({ mode: "update" }))
       const base = renderItem(docA) ?? ""
       const f1 = itemFrontier(docA)
-      const updA = captureItem(docA, base, f1, `${HDR}SAME-LINE version A\nline from m13-b EDITED-ON-B\n`)
-      const updB = captureItem(docB, base, f1, `${HDR}SAME-LINE version B\nline from m13-b EDITED-ON-B\n`)
+      const updA = captureItem(docA, base, f1, `${HDR}SAME-LINE version A\nline from m13-b EDITED-ON-B\n`, "line")
+      const updB = captureItem(docB, base, f1, `${HDR}SAME-LINE version B\nline from m13-b EDITED-ON-B\n`, "line")
       if (updA === null || updB === null) throw new Error("capture produced no update")
       const delivery = order === "A then B" ? [updA, updB] : [updB, updA]
       for (const doc of [docA, docB]) for (const update of delivery) doc.import(update)
@@ -89,8 +89,8 @@ describe("concurrent replacements of one body line (#12279)", () => {
     docB.import(docA.export({ mode: "update" }))
     const base = renderItem(docA) ?? ""
     const f1 = itemFrontier(docA)
-    const updA = captureItem(docA, base, f1, `${HDR}x\nA-last`)
-    const updB = captureItem(docB, base, f1, `${HDR}x\nlast\nnew`)
+    const updA = captureItem(docA, base, f1, `${HDR}x\nA-last`, "line")
+    const updB = captureItem(docB, base, f1, `${HDR}x\nlast\nnew`, "line")
     if (updA === null || updB === null) throw new Error("capture produced no update")
     for (const doc of [docA, docB]) for (const update of [updA, updB]) doc.import(update)
     expect(renderItem(docA)).toBe(renderItem(docB))
@@ -127,7 +127,7 @@ describe("concurrent replacements of one body line (#12279)", () => {
         const target = Math.floor(rand() * 2)
         const line = `item ${target}: the meeting moved to ${days[Math.floor(rand() * days.length)]} by d${i}`
         const working = original.map((l, k) => (k === target ? line : l))
-        const update = captureItem(doc, base, f1, `${HDR}${working.join("\n")}\n`)
+        const update = captureItem(doc, base, f1, `${HDR}${working.join("\n")}\n`, "line")
         if (update === null) throw new Error(`trial ${trial}: device ${i} captured nothing`)
         doc.import(update)
         updates.push(update)
@@ -150,7 +150,7 @@ async function fire(
   frontier: ItemFrontier,
   working: string,
 ): Promise<LoroDoc> {
-  const update = await captureOnDevice(device, "item.md", doc, base, frontier, working)
+  const update = await captureOnDevice(device, "item.md", doc, base, frontier, working, [], "line")
   if (update !== null) doc.import(update)
   return doc
 }
