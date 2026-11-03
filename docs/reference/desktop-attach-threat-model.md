@@ -59,9 +59,32 @@ Paths are relative to `crates/` unless they start with `packages/` or `docs/`.
     holds.
 
   Startup order:
-  1. **Bind first.** A stale socket file, left by a killed daemon (the socket is
+  0. **Take the instance lock first.** The daemon takes an exclusive,
+     non-blocking `flock` on a lock file opened with `openat` relative to the
+     parent fd (`O_CREAT|O_NOFOLLOW`, mode 0600). It holds that lock for its
+     whole life, and every step below runs under it. If the lock is held, a
+     daemon is already running or starting, so this one exits non-zero
+     without touching the socket or the token. This one rule covers every
+     start, not only a cold one:
+     - **Already-running daemon:** `--serve` on a live endpoint, or an
+       auto-start that lost to a live daemon, exits without unlinking the live
+       socket or overwriting the live token. The client then connects to the
+       live daemon.
+     - **Two daemons recovering one stale socket:** without the lock, both
+       fail to `connect` and both unlink, so the second unlinks the first's
+       fresh socket and orphans it. The lock admits only one.
+     - **Restart while the old daemon is exiting:** today the idle exit removes
+       the socket by path (`serve.rs:44`), which could delete a successor's
+       socket. The exiting daemon removes its socket and token only while it
+       still holds the lock, and releases the lock last.
+
+     The lock is the same-uid instance guard only. It is not a security
+     boundary: a same-uid process can hold it to keep the daemon down, which
+     is the M2 denial of service already conceded.
+  1. **Bind.** A stale socket file, left by a killed daemon (the socket is
      removed only at idle exit: `serve.rs:44`), is unlinked only after a
-     `connect` to it fails, and only inside the already-checked parent.
+     `connect` to it fails, and only inside the already-checked parent. A
+     killed daemon's lock is released by the kernel, so a restart can take it.
   2. **Write the resume token only after a successful bind.** The token is
      created with `openat` relative to the parent fd, using
      `O_CREAT|O_EXCL|O_NOFOLLOW` and mode 0600, after unlinking any existing
@@ -339,7 +362,10 @@ covers an explicit `--serve` path or a loose directory.
 | `--serve` / `--oneshot` / `--mcp` without `--enable-daemon` | `cli.rs:151` | usage error (accident guard only) | existing CLI tests |
 | `attach` inside an omo session | SDK | `ControlRequired{reason: "attach_inside_session"}` (accident guard, not a boundary; the boundary is the eval permission gate) | T25-21 |
 | Stale socket at the endpoint | daemon start (P3b) | unlinked only after a failed `connect`, inside the checked parent | T25-20 |
-| A second daemon racing a cold start | daemon start (P3b) | bind fails before any token is written; the first daemon's token is untouched | T25-19 |
+| A second daemon racing a cold start | daemon start (P3b) | instance lock refused before bind; no token written; the first daemon's token is untouched | T25-19 |
+| A daemon started while one is already running (explicit `--serve` or a lost auto-start) | daemon start (P3b) | instance lock refused; exits non-zero; the live socket and token are untouched; clients use the live daemon | T25-22 |
+| Two daemons recovering the same stale socket | daemon start (P3b) | only the lock holder unlinks and binds; the other exits | T25-23 |
+| A daemon exiting while its successor starts | daemon exit (P3b) | the exiting daemon removes its socket and token only while it holds the lock | T25-24 |
 | `spawn` inside an omo session | SDK | `ControlRequired{reason: "spawn_inside_session"}` (accident guard). The boundary is the eval permission gate, plus TCC only for a P4b out-of-process kernel without interpreter grants (M3) | SDK spawn tests |
 
 ## Residual risk
@@ -419,9 +445,12 @@ covers an explicit `--serve` path or a loose directory.
 | T25-16 | With a symlink or a pre-existing file at the token path, the daemon never writes through the symlink and never writes into the pre-existing inode; the new token file is 0600 and owned by the daemon's euid |
 | T25-17 | The Rust client (`--oneshot`, `--mcp`, `--resume`) refuses, and does not auto-start a daemon, when the endpoint's parent fails the same rule |
 | T25-18 | A notification (audit event, `stopPath.changed`) caused by client A reaches every live connection, not one arbitrary connection |
-| T25-19 | Two clients that find no daemon both auto-start: one daemon serves, the loser fails `bind` without writing a token, and `--resume` works with the surviving daemon's token |
-| T25-20 | After a daemon is SIGKILLed, a restart unlinks the stale socket (only after a failed `connect`, inside the checked parent) and binds |
+| T25-19 | Two clients that find no daemon both auto-start: one daemon serves, the loser is refused the instance lock without binding or writing a token, and `--resume` works with the surviving daemon's token |
+| T25-20 | After a daemon is SIGKILLed, a restart takes the released lock, unlinks the stale socket (only after a failed `connect`, inside the checked parent) and binds |
 | T25-21 | The SDK refuses `attach` with `ControlRequired{reason: "attach_inside_session"}` when `SENPI_DESKTOP_HOST=1` is set |
+| T25-22 | With a daemon already serving, a second `--serve` on the same endpoint (and an auto-start that finds it) exits non-zero; the live daemon's socket inode and token bytes are unchanged, and an existing client keeps being served |
+| T25-23 | Two daemons started together over a stale socket: exactly one binds; the socket that remains is the one the lock holder bound, and its token matches that daemon |
+| T25-24 | A daemon that idle-exits while a successor is starting never removes the successor's socket or token; the successor serves afterwards |
 
 ### Stop-marker policy (plan row 31)
 
