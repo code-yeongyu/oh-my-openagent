@@ -65,11 +65,11 @@ describe("installHooks", () => {
     const first = await readFile(hookPath, "utf8")
 
     // when
-    await writeFile(hookPath, "#!/bin/sh\nexit 1\n", "utf8")
+    await writeFile(hookPath, `${first}\nexit 1\n`, "utf8")
     const installed = installHooks(dir)
 
     // then
-    expect(installed.map((hook) => hook.name)).toEqual(["pre-commit", "commit-msg", "post-commit"])
+    expect(installed.map((hook) => [hook.name, hook.status])).toEqual([["pre-commit", "written"], ["commit-msg", "current"], ["post-commit", "current"]])
     expect(await readFile(hookPath, "utf8")).toBe(first)
     if (process.platform !== "win32") {
       for (const hook of installed) {
