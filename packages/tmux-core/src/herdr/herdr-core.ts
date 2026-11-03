@@ -19,9 +19,13 @@
  */
 
 import { existsSync, statSync } from "node:fs"
+import { delimiter, join } from "node:path"
 import { spawn } from "@oh-my-opencode/utils/runtime"
 
 export const HERDR_TEAM_WORKSPACE_LABEL_PREFIX = "omo-team-"
+
+/** Subagent panes get their own workspaces, mirroring tmux's `omo-agents-<pid>` sessions. */
+export const HERDR_AGENTS_WORKSPACE_LABEL_PREFIX = "omo-agents-"
 
 const HERDR_DEFAULT_EXEC_TIMEOUT_MS = 20_000
 const HERDR_SERVER_START_TIMEOUT_MS = 30_000
@@ -82,6 +86,22 @@ function exists(path: string): boolean {
   } catch {
     return false
   }
+}
+
+/**
+ * Synchronous eligibility probe for the herdr backend: is a herdr binary
+ * reachable at all? A pinned HERDR_BIN_PATH must exist; otherwise the plain
+ * `herdr` name must resolve on PATH. This gates the multiplexer=herdr paths
+ * the same way `isNativeTmux` gates the tmux ones (no tmux session required).
+ */
+export function isHerdrBinaryCallable(env: Record<string, string | undefined> = process.env): boolean {
+  const pinned = env["HERDR_BIN_PATH"]?.trim()
+  if (pinned && pinned.startsWith("/")) return exists(pinned)
+  for (const dir of (env["PATH"] ?? "").split(delimiter)) {
+    if (dir.length === 0) continue
+    if (exists(join(dir, "herdr"))) return true
+  }
+  return false
 }
 
 export function parseHerdrEnvelope(stdout: string):
@@ -337,6 +357,24 @@ export async function herdrClosePane(
   if (!result.success) throw new Error(result.error ?? "herdr pane close failed")
 }
 
+/**
+ * Close a pane, treating an already-dead pane as success. herdr answers a
+ * missing pane with the `pane_not_found` error code (verified against
+ * v0.9.5), which surfaces here as `result.code` from the JSON envelope.
+ * Throws on any other failure so callers can retry real errors.
+ */
+export async function herdrClosePaneIfExists(
+  paneId: string,
+  deps: HerdrOpsDeps = defaultHerdrOpsDeps,
+): Promise<"closed" | "gone"> {
+  const result = await deps.runHerdrCommand(["pane", "close", paneId])
+  if (result.success) return "closed"
+  if (result.code === "pane_not_found" || /pane_not_found|not found/i.test(result.error ?? "")) {
+    return "gone"
+  }
+  throw new Error(result.error ?? "herdr pane close failed")
+}
+
 export async function herdrCloseWorkspace(
   workspaceId: string,
   deps: HerdrOpsDeps = defaultHerdrOpsDeps,
@@ -345,14 +383,38 @@ export async function herdrCloseWorkspace(
   if (!result.success) throw new Error(result.error ?? "herdr workspace close failed")
 }
 
-/** List team workspaces by label prefix (the sweep source of truth). */
-export async function herdrListTeamWorkspaces(
+/** List workspaces whose label starts with the given prefix (sweep source of truth). */
+export async function herdrListWorkspacesByLabelPrefix(
+  prefix: string,
   deps: HerdrOpsDeps = defaultHerdrOpsDeps,
 ): Promise<Array<{ workspaceId: string; label: string }>> {
   const result = await deps.runHerdrCommand(["workspace", "list"])
   const listed = parseEnvelopeResult<{ workspaces?: Array<{ workspace_id?: string; label?: string }> }>(result)
   return (listed?.workspaces ?? [])
-    .filter((workspace) => (workspace.label ?? "").startsWith(HERDR_TEAM_WORKSPACE_LABEL_PREFIX))
+    .filter((workspace) => (workspace.label ?? "").startsWith(prefix))
     .map((workspace) => ({ workspaceId: workspace.workspace_id ?? "", label: workspace.label ?? "" }))
     .filter((workspace) => workspace.workspaceId.length > 0)
+}
+
+/** List team workspaces by label prefix (the sweep source of truth). */
+export async function herdrListTeamWorkspaces(
+  deps: HerdrOpsDeps = defaultHerdrOpsDeps,
+): Promise<Array<{ workspaceId: string; label: string }>> {
+  return herdrListWorkspacesByLabelPrefix(HERDR_TEAM_WORKSPACE_LABEL_PREFIX, deps)
+}
+
+const HERDR_PANE_AUTH_ENV_KEYS = ["OPENCODE_SERVER_PASSWORD", "OPENCODE_SERVER_PASSWORD_FILE", "OPENCODE_SERVER_PASSWORD_DIR", "OPENCODE_SERVER_USERNAME"] as const
+
+/**
+ * Pane-auth vars forwarded into herdr tabs via `tab create --env K=V`, so an
+ * authenticated opencode server works the same way it does for tmux panes
+ * (buildPaneAuthEnvironmentArgs).
+ */
+export function buildHerdrPaneAuthEnv(env: Record<string, string | undefined> = process.env): Record<string, string> {
+  const forwarded: Record<string, string> = {}
+  for (const key of HERDR_PANE_AUTH_ENV_KEYS) {
+    const value = env[key]
+    if (typeof value === "string" && value.length > 0) forwarded[key] = value
+  }
+  return forwarded
 }

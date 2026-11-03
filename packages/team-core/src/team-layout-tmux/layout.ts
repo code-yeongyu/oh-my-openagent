@@ -1,7 +1,7 @@
 import {
   buildPaneAuthEnvironmentArgs, withPaneAuth, escapeTmuxFormat, isServerRunning, runTmuxCommand,
   herdrCreateWorkspace, herdrCreateTab, herdrRunPaneCommand, herdrCloseWorkspace, herdrClosePane,
-  isHerdrPaneId, HERDR_TEAM_WORKSPACE_LABEL_PREFIX,
+  isHerdrPaneId, HERDR_TEAM_WORKSPACE_LABEL_PREFIX, buildHerdrPaneAuthEnv,
   defaultHerdrOpsDeps,
   type MultiplexerBackend, type TmuxCommandResult, type HerdrOpsDeps,
 } from "@oh-my-opencode/tmux-core"
@@ -261,17 +261,6 @@ function isTeamLayoutCleanupTarget(value: TmuxSessionManager | TeamLayoutCleanup
 // ---------------------------------------------------------------------------
 // Herdr backend
 // ---------------------------------------------------------------------------
-
-const HERDR_PANE_AUTH_ENV_KEYS = ["OPENCODE_SERVER_PASSWORD", "OPENCODE_SERVER_PASSWORD_FILE", "OPENCODE_SERVER_PASSWORD_DIR", "OPENCODE_SERVER_USERNAME"] as const
-
-function buildHerdrPaneAuthEnv(): Record<string, string> {
-  const env: Record<string, string> = {}
-  for (const key of HERDR_PANE_AUTH_ENV_KEYS) {
-    const value = process.env[key]
-    if (typeof value === "string" && value.length > 0) env[key] = value
-  }
-  return env
-}
 
 /**
  * Herdr visualization: one workspace per team, one tab per member, the same
