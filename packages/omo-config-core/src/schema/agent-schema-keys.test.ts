@@ -47,4 +47,35 @@ describe("agent schema permission and prompt_append keys", () => {
     // then
     expect(result.success).toBe(false)
   })
+
+  test("#given an agent carrying every key documented in the per-agent config table #when parsed #then all are accepted", () => {
+    // given — the per-agent table in docs/reference/configuration.md; keep in sync
+    const definition = {
+      fallback_models: ["anthropic/claude-opus-5"],
+      category: "ultrabrain",
+      skills: ["frontend"],
+      top_p: 0.9,
+      mode: "primary",
+      color: "#FF6600",
+      displayName: "Sisyphus",
+      maxTokens: 8192,
+      thinking: { type: "enabled", budgetTokens: 4096 },
+      textVerbosity: "high",
+      providerOptions: { anthropic: { cache: true } },
+      ultrawork: { model: "anthropic/claude-opus-5" },
+      compaction: { model: "anthropic/claude-sonnet-5" },
+      allow_non_gpt_model: true,
+    }
+
+    // when
+    const result = OmoAgentDefSchema.safeParse(definition)
+
+    // then
+    expect(result.success).toBe(true)
+    if (!result.success) throw new Error(result.error.message)
+    expect(result.data.ultrawork).toEqual({ model: "anthropic/claude-opus-5" })
+    expect(result.data.allow_non_gpt_model).toBe(true)
+    expect(result.data.max_tokens).toBe(8192)
+    expect(result.data.provider_options?.thinking).toEqual({ type: "enabled", budgetTokens: 4096 })
+  })
 })

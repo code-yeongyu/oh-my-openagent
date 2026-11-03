@@ -9,9 +9,9 @@ import { CategoryConfigSchema } from "../schema/categories"
  * addition on one side without the other fails this test.
  *
  * We assert only machine-consumed behavior via `safeParse` probes (no prose):
- * the two fields core owns (`permission`, `prompt_append`) and full category
- * parity. Core schemas are `z.preprocess` wrappers, so parity is probed by
- * parsing rather than introspecting `.shape`.
+ * the two fields core owns (`permission`, `prompt_append`), full agent parity,
+ * and full category parity. Core schemas are `z.preprocess` wrappers, so
+ * parity is probed by parsing rather than introspecting `.shape`.
  */
 
 function probeAcceptedKeys(schema: { readonly safeParse: (v: unknown) => { readonly success: boolean } }): Set<string> {
@@ -33,9 +33,26 @@ function probeValueFor(key: string): unknown {
     case "model":
     case "prompt_append":
     case "variant":
-    case "reasoningEffort":
-    case "textVerbosity":
       return "x"
+    case "reasoningEffort":
+      return "high"
+    case "textVerbosity":
+      return "high"
+    case "mode":
+      return "primary"
+    case "color":
+      return "#aabbcc"
+    case "skills":
+      return ["x"]
+    case "permission":
+      return { edit: "deny" }
+    case "providerOptions":
+      return {}
+    case "thinking":
+      return { type: "enabled" }
+    case "ultrawork":
+    case "compaction":
+      return {}
     case "models":
     case "fallback_models":
       return ["x"]
@@ -52,8 +69,6 @@ function probeValueFor(key: string): unknown {
     case "provider_options":
     case "tools":
       return {}
-    case "thinking":
-      return { type: "enabled" }
     case "is_unstable_agent":
     case "disable":
     case "warn_unavailable":
@@ -105,6 +120,17 @@ describe("core <-> adapter schema parity", () => {
     for (const key of adapterKeys) {
       const probe = { [key]: probeValueFor(key) }
       expect(OmoCategoryConfigSchema.safeParse(probe).success).toBe(true)
+    }
+  })
+
+  test("#given core and adapter agent schemas #when probing each adapter agent key #then core accepts every adapter key", () => {
+    // given
+    const adapterKeys = Object.keys(AgentOverrideConfigSchema.shape)
+
+    // when / then
+    for (const key of adapterKeys) {
+      const probe = { [key]: probeValueFor(key) }
+      expect(OmoAgentDefSchema.safeParse(probe).success).toBe(true)
     }
   })
 })
