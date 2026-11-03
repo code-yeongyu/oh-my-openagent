@@ -228,7 +228,9 @@ describe("spool recovery", () => {
 
     // then
     const dropped = calls.flatMap((c) => logRecordsOf(decodeLogs(c.body))).map((r) => attributeMap(r.attributes))
-    expect(dropped).toEqual([expect.objectContaining({ "omo.dropped.reason": "expired", "omo.dropped.count": 1 })])
+    expect(dropped).toEqual([expect.objectContaining({ "omo.dropped.cause": "expired", "omo.dropped.count": 1 })])
+    // the collector's field-name rule forbids the `reason` suffix: the old key must never be sent
+    expect(dropped[0]).not.toHaveProperty(["omo.dropped.reason"])
     expect(spoolNames(dir)).toEqual([])
   })
 
@@ -248,7 +250,7 @@ describe("spool recovery", () => {
     const records = calls.flatMap((c) => logRecordsOf(decodeLogs(c.body)))
     const reports = records.filter((r) => r.eventName === "omo.client_dropped").map((r) => attributeMap(r.attributes))
     expect(droppedBeforeSend).toBeGreaterThan(0)
-    expect(reports).toEqual([expect.objectContaining({ "omo.dropped.reason": "evicted", "omo.dropped.count": droppedBeforeSend })])
+    expect(reports).toEqual([expect.objectContaining({ "omo.dropped.cause": "evicted", "omo.dropped.count": droppedBeforeSend })])
     expect(records.length - 1 + droppedBeforeSend).toBe(2_000)
     expect(transport.droppedEvents()).toBe(0)
   }, 60_000)
