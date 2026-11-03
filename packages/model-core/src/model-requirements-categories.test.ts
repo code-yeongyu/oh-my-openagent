@@ -51,7 +51,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     ])
   })
 
-  test("deep-low leads with gpt-6.1-sol then gpt-6.1-sol-fast medium on the OpenAI lanes, keeps the gpt-5.6-sol rungs behind them, and carries no GPT-6 Sol rung", () => {
+  test("deep-low leads with gpt-6.1-sol then gpt-6.1-sol-fast high on the OpenAI lanes, keeps the gpt-5.6-sol rungs behind them, and carries no GPT-6 Sol rung", () => {
     // given
     const requirement = CATEGORY_MODEL_REQUIREMENTS["deep-low"]
 
@@ -60,14 +60,14 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
 
     // then
     expect(chain).toEqual([
-      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.1-sol", variant: "medium" },
-      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.1-sol-fast", variant: "medium" },
+      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.1-sol", variant: "high" },
+      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.1-sol-fast", variant: "high" },
       {
         providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
         model: "gpt-5.6-sol",
-        variant: "medium",
+        variant: "high",
       },
-      { providers: ["openai", "chatgpt-subscription"], model: "gpt-5.6-sol-fast", variant: "medium" }
+      { providers: ["openai", "chatgpt-subscription"], model: "gpt-5.6-sol-fast", variant: "high" }
     ])
   })
 
@@ -124,7 +124,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     ])
   })
 
-  test("quick follows the approved 9-rung chain with Haiku 5.5 medium after Luna Fast", () => {
+  test("quick follows the approved 9-rung chain with Haiku 5.5 high after Luna Fast", () => {
     // given
     const requirement = CATEGORY_MODEL_REQUIREMENTS["quick"]
 
@@ -141,7 +141,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
       {
         providers: ["anthropic", "anthropic-api", "github-copilot"],
         model: "claude-haiku-5-5",
-        variant: "medium",
+        variant: "high",
       },
       {
         providers: ["deepseek"],
@@ -172,7 +172,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     ])
   })
 
-  test("unspecified-low follows the approved chain headed by claude-sonnet-5-5 medium", () => {
+  test("unspecified-low follows the approved chain headed by claude-sonnet-5-5 high", () => {
     // given
     const requirement = CATEGORY_MODEL_REQUIREMENTS["unspecified-low"]
 
@@ -184,7 +184,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-sonnet-5-5",
-        variant: "medium",
+        variant: "high",
       },
       {
         providers: ["xiaomi", "opencode-go"],
@@ -194,7 +194,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
       {
         providers: ["xai", "github-copilot", "opencode-go"],
         model: "grok-4.7",
-        variant: "xhigh",
+        variant: "high",
       },
       {
         providers: ["zai-coding-plan", "opencode-go"],
@@ -204,12 +204,12 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
       {
         providers: ["openai", "chatgpt-subscription"],
         model: "gpt-6.1-sol",
-        variant: "medium",
+        variant: "high",
       },
       {
         providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
         model: "gpt-5.6-sol",
-        variant: "medium",
+        variant: "high",
       },
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
@@ -246,7 +246,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-opus-5-5",
-        variant: "medium",
+        variant: "high",
       },
       {
         providers: ["zai-coding-plan", "opencode-go"],

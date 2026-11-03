@@ -81,6 +81,7 @@ const PLAIN_CODES = [
   "trust-dir-unsafe",
   "trust-lease-failed",
   "trust-generation-recognized",
+  "trust-standalone-opt-in",
   ...(Object.keys(FALLBACK_ACTIONS) as FallbackReason[]),
   "openssl-default-file-malformed",
   ...MODULE_CODES,

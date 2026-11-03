@@ -1,0 +1,83 @@
+{
+  "request": "session.detach",
+  "cases": [
+    {
+      "name": "an attach detaches",
+      "outcome": "ok",
+      "steps": [
+        {
+          "send": {
+            "id": "att",
+            "type": "session.attach",
+            "device": "dev-peer-1",
+            "session_id": "c2Vzc2lvbi1rZXktMDAwMQ"
+          }
+        },
+        {
+          "expect": {
+            "id": "att",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "attach": "<capture:a>"
+            }
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "session.snapshot",
+            "attach": "<ref:a>",
+            "attach_id": 1
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "session.records",
+            "attach": "<ref:a>",
+            "attach_id": 1
+          }
+        },
+        {
+          "send": {
+            "id": "2",
+            "type": "session.detach",
+            "attach": "<ref:a>"
+          }
+        },
+        {
+          "expect": {
+            "id": "2",
+            "type": "response",
+            "ok": true,
+            "data": {}
+          }
+        }
+      ]
+    },
+    {
+      "name": "an unknown attach is refused not_attached",
+      "outcome": "refusal",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "session.detach",
+            "attach": "bm8tc3VjaC1hdHRhY2g"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "not_attached"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

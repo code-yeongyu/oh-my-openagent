@@ -47,6 +47,12 @@ impl MacInput {
         let wid = owner_window(element)?;
         let window = resolve_window(capture, &wid.to_string())?;
         let (pid, wid) = window_identity(&window)?;
+        // A remote screen shows another device: it takes no insertion, and its
+        // text goes out as the keys of the user's layout once the element holds
+        // focus (plan todo 22).
+        if let Some(remote) = super::remote::remote_screen(pid) {
+            return self.type_remote(&window, pid, wid, text, remote, mode, capture, check_stop, delivered, Some(element));
+        }
         let insert = || crate::ax::insert_into_element(element, text);
         match mode {
             // Insertion is an AX write like `ax.setValue`: it needs no SkyLight
@@ -133,7 +139,7 @@ pub(super) fn inserts_first(
 /// [`ELEMENT_FOCUS_POLL`] ([`keys_after_focus`]); nothing is focused once the
 /// user has pressed a key or clicked in the app since the call was admitted
 /// ([`check_press`]).
-fn element_keys(
+pub(super) fn element_keys(
     pid: libc::pid_t,
     element: &AXUIElement,
     send: impl FnOnce() -> CoreResult<()>,

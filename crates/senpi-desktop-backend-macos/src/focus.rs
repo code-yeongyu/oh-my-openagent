@@ -39,6 +39,19 @@ fn first_front_window(windows: &[WindowInfo], pid: u32) -> Option<u32> {
         .map(|window| window.window_number)
 }
 
+/// Refuses once `wid` of `pid` is no longer the front window: a foreground
+/// key press into a remote screen posts globally, so it must not reach
+/// whatever the user brought in front since the last press.
+pub(crate) fn require_front_window(pid: libc::pid_t, wid: u32) -> CoreResult<()> {
+    let front_pid = current_front_pid();
+    if front_pid == Some(pid) && front_window_id()? == Some(wid) {
+        return Ok(());
+    }
+    Err(DesktopError::input_failed(format!(
+        "window {wid} is no longer in front; keys sent before this may already have landed, and no further input was sent; read the window again before retrying"
+    )))
+}
+
 /// Capture needs only WindowServer identity; never sends Accessibility IPC to the front app.
 pub(crate) fn front_window_id() -> CoreResult<Option<u32>> {
     let Some(pid) = current_front_pid().and_then(|pid| u32::try_from(pid).ok()) else {
