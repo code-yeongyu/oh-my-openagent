@@ -57,8 +57,11 @@ export class EngineRunPauseBridge {
     if (state !== undefined && state.pauseSeq > event.pauseSeq) return Promise.resolve()
     const live = readEngineRunHold(event)
     if (event.change === "paused" && live.stopped) return this.#pause(parentSessionId, event.pauseSeq)
-    if (event.change === "resumed" && !live.stopped) return this.#resume(parentSessionId, event.pauseSeq)
-    return Promise.resolve()
+    if (event.change !== "resumed" || live.stopped) return Promise.resolve()
+    // The Stop's run fences are engine holds too, so the Resume event carries a seq past the Stop it
+    // releases (#12249). It releases the run's Stop at or below that seq, never a newer one.
+    const stop = this.controller.registry.load(parentSessionId)?.pauseSeq
+    return this.#resume(parentSessionId, stop !== undefined && stop <= event.pauseSeq ? stop : event.pauseSeq)
   }
 
   #pause(parentSessionId: string, pauseSeq: number): Promise<void> {
