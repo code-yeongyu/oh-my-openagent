@@ -1,7 +1,7 @@
 # computer.run sandbox: threat model and compatibility matrix (QuickJS)
 
 Status: design reference for the opt-in QuickJS run sandbox (#12230). Docs only: nothing here changes
-code or defaults. Line numbers are at `dev` 37c0448f4d.
+code or defaults. Line numbers are at `dev` 7ad7757ad9.
 
 `computer` runs (`{ action: "run", code }` and `computer.run(fn)` from the eval kernel) execute
 model-written JavaScript; the CUA adapter (`computer_actions`) also executes its batches as a run body that the
@@ -251,10 +251,10 @@ Model-facing contract text. The model reads these before it writes a run body, a
 | M11 | `packages/omo-senpi/scripts/qa/fused-equivalence-golden/darwin-arm64/E21.json:1911` | `wait`, `tool` (contract text) | recorded golden of the `code` parameter description (darwin-arm64) | see below |
 | M12 | `packages/omo-senpi/scripts/qa/fused-equivalence-golden/darwin-arm64/E21.json:3698` | `wait`, `tool` (contract text) | second recorded copy of the tool description (darwin-arm64) | see below |
 | M13 | `packages/omo-senpi/scripts/qa/fused-equivalence-golden/darwin-arm64/E21.json:3739` | `wait`, `tool` (contract text) | second recorded copy of the `code` parameter description (darwin-arm64) | see below |
-| M14 | `packages/omo-senpi/scripts/qa/fused-equivalence-golden/linux-x64/E21.json:1870` | `wait`, `tool` (contract text) | recorded golden of the tool description (linux-x64) | see below |
-| M15 | `packages/omo-senpi/scripts/qa/fused-equivalence-golden/linux-x64/E21.json:1911` | `wait`, `tool` (contract text) | recorded golden of the `code` parameter description (linux-x64) | see below |
-| M16 | `packages/omo-senpi/scripts/qa/fused-equivalence-golden/linux-x64/E21.json:3698` | `wait`, `tool` (contract text) | second recorded copy of the tool description (linux-x64) | see below |
-| M17 | `packages/omo-senpi/scripts/qa/fused-equivalence-golden/linux-x64/E21.json:3739` | `wait`, `tool` (contract text) | second recorded copy of the `code` parameter description (linux-x64) | see below |
+| M14 | `packages/omo-senpi/scripts/qa/fused-equivalence-golden/linux-x64/E21.json:1878` | `wait`, `tool` (contract text) | recorded golden of the tool description (linux-x64) | see below |
+| M15 | `packages/omo-senpi/scripts/qa/fused-equivalence-golden/linux-x64/E21.json:1919` | `wait`, `tool` (contract text) | recorded golden of the `code` parameter description (linux-x64) | see below |
+| M16 | `packages/omo-senpi/scripts/qa/fused-equivalence-golden/linux-x64/E21.json:3714` | `wait`, `tool` (contract text) | second recorded copy of the tool description (linux-x64) | see below |
+| M17 | `packages/omo-senpi/scripts/qa/fused-equivalence-golden/linux-x64/E21.json:3755` | `wait`, `tool` (contract text) | second recorded copy of the `code` parameter description (linux-x64) | see below |
 | M18 | `packages/omo-senpi/src/components/computer-use/published-parameters.fixture.json:42` | `wait`, `tool` (contract text) | frozen published `code` parameter description | see below |
 | M19 | `packages/senpi-desktop-tool/src/params.ts:41` | `wait`, `tool` (contract text) | `code` parameter description of the `run` action (published) | see below |
 | M20 | `packages/senpi-desktop-tool/src/params.ts:77` | `wait`, `tool` (contract text) | `code` parameter description of the flat schema (published) | see below |
@@ -408,7 +408,7 @@ other string literal of those files; one that fails to parse is still listed whe
 `wait(`, or a backticked `` `tool` `` / `` `wait` ``. Model-facing contract text (a backticked `desktop` followed
 by a backticked `wait` or `tool`) in source literals, Markdown lines and JSON lines (the fixture, the goldens) is
 a matrix row of its own (M9-M21). `.py` files are walked for `"action": "run"` dicts. The script and its full output are attached to the
-PR as evidence (#12230); its summary at 37c0448f4d:
+PR as evidence (#12230); its summary at 7ad7757ad9:
 
 ```text
 A  packages/senpi-desktop-service/test/run.test.ts  bodies=20  tool_or_wait=1
@@ -464,10 +464,10 @@ ROW B packages/omo-senpi/scripts/qa/fused-equivalence-golden/darwin-arm64/E21.js
 ROW B packages/omo-senpi/scripts/qa/fused-equivalence-golden/darwin-arm64/E21.json:1911 refs=tool,wait kind=contract text (json) :: "description": "run (required): JavaScript async function body; `desktop`, `wait`, `assert`, `tool` in scope [...]
 ROW B packages/omo-senpi/scripts/qa/fused-equivalence-golden/darwin-arm64/E21.json:3698 refs=tool,wait kind=contract text (json) :: "description": "Drive the user's real desktop (experimental): windows, screenshots, native mouse and keyboar [...]
 ROW B packages/omo-senpi/scripts/qa/fused-equivalence-golden/darwin-arm64/E21.json:3739 refs=tool,wait kind=contract text (json) :: "description": "run (required): JavaScript async function body; `desktop`, `wait`, `assert`, `tool` in scope [...]
-ROW B packages/omo-senpi/scripts/qa/fused-equivalence-golden/linux-x64/E21.json:1870 refs=tool,wait kind=contract text (json) :: "description": "Drive the user's real desktop (experimental): windows, screenshots, native mouse and keyboard i [...]
-ROW B packages/omo-senpi/scripts/qa/fused-equivalence-golden/linux-x64/E21.json:1911 refs=tool,wait kind=contract text (json) :: "description": "run (required): JavaScript async function body; `desktop`, `wait`, `assert`, `tool` in scope; ` [...]
-ROW B packages/omo-senpi/scripts/qa/fused-equivalence-golden/linux-x64/E21.json:3698 refs=tool,wait kind=contract text (json) :: "description": "Drive the user's real desktop (experimental): windows, screenshots, native mouse and keyboard i [...]
-ROW B packages/omo-senpi/scripts/qa/fused-equivalence-golden/linux-x64/E21.json:3739 refs=tool,wait kind=contract text (json) :: "description": "run (required): JavaScript async function body; `desktop`, `wait`, `assert`, `tool` in scope; ` [...]
+ROW B packages/omo-senpi/scripts/qa/fused-equivalence-golden/linux-x64/E21.json:1878 refs=tool,wait kind=contract text (json) :: "description": "Drive the user's real desktop (experimental): windows, screenshots, native mouse and keyboard i [...]
+ROW B packages/omo-senpi/scripts/qa/fused-equivalence-golden/linux-x64/E21.json:1919 refs=tool,wait kind=contract text (json) :: "description": "run (required): JavaScript async function body; `desktop`, `wait`, `assert`, `tool` in scope; ` [...]
+ROW B packages/omo-senpi/scripts/qa/fused-equivalence-golden/linux-x64/E21.json:3714 refs=tool,wait kind=contract text (json) :: "description": "Drive the user's real desktop (experimental): windows, screenshots, native mouse and keyboard i [...]
+ROW B packages/omo-senpi/scripts/qa/fused-equivalence-golden/linux-x64/E21.json:3755 refs=tool,wait kind=contract text (json) :: "description": "run (required): JavaScript async function body; `desktop`, `wait`, `assert`, `tool` in scope; ` [...]
 ROW B packages/omo-senpi/src/components/computer-use/published-parameters.fixture.json:42 refs=tool,wait kind=contract text (json) :: "description": "run (required): JavaScript async function body; `desktop`, `wait`, `assert`, `tool` in sco [...]
 ROW B packages/senpi-desktop-prelude/README.md:22 refs=wait kind=markdown entry :: - `{ action: "run", code, read_only?, timeout? }`: `code` is an async function body. `computer.run(fn, { args })` serializes `fn` and each argument (JSON dat [...]
 ROW B packages/senpi-desktop-prelude/src/prelude.js:132 refs=wait kind=generated code = ... :: return await (__SUB__)({ desktop, wait, assert }__SUB__);
