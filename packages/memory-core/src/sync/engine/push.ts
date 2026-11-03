@@ -70,7 +70,7 @@ async function pushOne(deps: EngineDeps, journal: SyncJournal, batchBytes: numbe
     }
     out = await seal(deps, journal, first, randomBytes(16).toString("base64url"))
   }
-  const bytes = await journal.outbox.readBatch(out.batchId)
+  const bytes = await journal.outbox.readBatch(out)
   if (out.stage === "sealed") {
     out = { ...out, uploadId: await deps.transport.reserve(bytes.length, out.digest), stage: "reserved" }
     await journal.setPending({ ...pending, outgoing: out })

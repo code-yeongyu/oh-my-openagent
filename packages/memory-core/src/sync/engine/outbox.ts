@@ -57,14 +57,27 @@ interface InlineItem {
   readonly key: string
   readonly ops: string
 }
-type InlineOutgoing = Omit<OutgoingBatch, "items"> & { readonly bytes: string; readonly items: readonly InlineItem[] }
-type StoredPending = { readonly items: readonly object[]; readonly outgoing: (object & { readonly items: readonly object[] }) | null }
+/**
+ * An entry as stored. An older build running against a converted journal (a rollback, or two
+ * versions taking turns on one repo) writes the index entries it read back untouched and appends
+ * its own captures inline, so one journal can hold both kinds.
+ */
+type StoredItem = PendingItem | InlineItem
+type StoredOutgoing = Omit<OutgoingBatch, "items"> & { readonly bytes?: string; readonly items: readonly StoredItem[] }
+interface StoredPending {
+  readonly items: readonly StoredItem[]
+  readonly outgoing: StoredOutgoing | null
+}
 
 const EMPTY: PendingOps = { items: [], outgoing: null }
 
-const isInline = (item: object): item is InlineItem => "ops" in item && typeof item.ops === "string"
+const isInline = (item: StoredItem): item is InlineItem => "ops" in item && typeof item.ops === "string"
+const isIndexed = (item: StoredItem): item is PendingItem => "digest" in item && typeof item.digest === "string" && "segment" in item && typeof item.segment === "string"
+const needsConversion = (stored: StoredPending): boolean =>
+  stored.items.some(isInline) || (stored.outgoing !== null && (stored.outgoing.bytes !== undefined || stored.outgoing.items.some(isInline)))
 
 const itemDigest = (key: string, ops: Uint8Array): string => createHash("sha256").update(key).update("\u0000").update(ops).digest("hex")
+const sha256Hex = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex")
 
 export class Outbox {
   private readonly index: string
@@ -77,8 +90,8 @@ export class Outbox {
 
   async read(): Promise<PendingOps> {
     const stored = await readJson<StoredPending>(this.index, EMPTY)
-    if (!stored.items.some(isInline) && (stored.outgoing === null || !("bytes" in stored.outgoing))) return stored as PendingOps
-    return this.upgrade(stored as { readonly items: readonly InlineItem[]; readonly outgoing: InlineOutgoing | null })
+    if (!needsConversion(stored)) return stored as PendingOps
+    return this.upgrade(stored)
   }
 
   write(pending: PendingOps): Promise<void> {
@@ -140,8 +153,11 @@ export class Outbox {
     return writeAtomic(this.batchPath(batchId), bytes)
   }
 
-  async readBatch(batchId: string): Promise<Uint8Array> {
-    return new Uint8Array(await readFile(this.batchPath(batchId)))
+  /** A sealed batch's bytes, checked against its digest: a damaged journal fails here, never on the wire. */
+  async readBatch(batch: Pick<OutgoingBatch, "batchId" | "digest">): Promise<Uint8Array> {
+    const bytes = new Uint8Array(await readFile(this.batchPath(batch.batchId)))
+    if (sha256Hex(bytes) !== batch.digest) throw new Error(`the sealed bytes of batch ${batch.batchId} do not match their digest`)
+    return bytes
   }
 
   /** Drops every file `pending` does not name: sent segments, finished batches, a crash's leftovers. */
@@ -156,19 +172,30 @@ export class Outbox {
     return join(this.dir, `batch-${batchId}.bin`)
   }
 
-  /** Moves an inline journal's ops and sealed bytes into files, then rewrites it as an index. */
-  private async upgrade(stored: { readonly items: readonly InlineItem[]; readonly outgoing: InlineOutgoing | null }): Promise<PendingOps> {
+  /**
+   * Moves every inline item's ops into a segment and an inline batch's bytes into a batch file, then
+   * rewrites the journal as an index. Converts per entry: index entries are kept as they are, and
+   * an item that repeats another (same key and ops, so the same digest) is kept once.
+   */
+  private async upgrade(stored: StoredPending): Promise<PendingOps> {
     const writer = this.segment()
-    const filed = new Map<string, PendingItem>()
-    const file = async (items: readonly InlineItem[]): Promise<PendingItem[]> => {
-      const out: PendingItem[] = []
+    const byDigest = new Map<string, PendingItem>()
+    const file = async (items: readonly StoredItem[]): Promise<PendingItem[]> => {
+      const out = new Map<string, PendingItem>()
       for (const item of items) {
-        const id = `${item.key}\u0000${item.ops}`
-        const known = filed.get(id) ?? (await writer.add(item.key, new Uint8Array(Buffer.from(item.ops, "base64"))))
-        filed.set(id, known)
-        out.push(known)
+        let indexed: PendingItem
+        if (isInline(item)) {
+          const ops = new Uint8Array(Buffer.from(item.ops, "base64"))
+          indexed = byDigest.get(itemDigest(item.key, ops)) ?? (await writer.add(item.key, ops))
+        } else if (isIndexed(item)) {
+          indexed = byDigest.get(item.digest) ?? item
+        } else {
+          throw new Error(`a pending journal entry has neither ops nor a location: ${JSON.stringify(item)}`)
+        }
+        byDigest.set(indexed.digest, indexed)
+        if (!out.has(indexed.digest)) out.set(indexed.digest, indexed)
       }
-      return out
+      return [...out.values()]
     }
     let pending: PendingOps
     try {
@@ -177,7 +204,7 @@ export class Outbox {
       if (stored.outgoing !== null) {
         const { bytes, items: carried, ...meta } = stored.outgoing
         outgoing = { ...meta, items: await file(carried) }
-        await this.putBatch(meta.batchId, new Uint8Array(Buffer.from(bytes, "base64")))
+        if (bytes !== undefined) await this.putBatch(meta.batchId, new Uint8Array(Buffer.from(bytes, "base64")))
       }
       pending = { items, outgoing }
       await writer.finish()

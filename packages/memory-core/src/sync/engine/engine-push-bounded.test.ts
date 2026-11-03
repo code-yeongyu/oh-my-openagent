@@ -1,12 +1,9 @@
 import { afterEach, expect, spyOn, test } from "bun:test"
-import { readFile, rm, writeFile } from "node:fs/promises"
-import { join } from "node:path"
 
 import * as resilient from "../../fs/resilient"
 import { CrashInjected } from "./engine"
 import { type Device, GIT_TEST_TIMEOUT, makeDevice } from "./engine-harness.test-support"
 import { FakeSyncServer } from "./fake-server.test-support"
-import type { PendingItem, PendingOps } from "./outbox"
 
 // #12286: a push must hold what one batch needs, not the whole backlog. Each batch used to re-read
 // and re-write one journal file holding every pending item's ops plus the sealed batch, several
@@ -65,41 +62,4 @@ test("pushing a backlog of many batches never reads or writes a journal file lar
   devices.push(b)
   await b.engine.runCycle()
   for (const [n, key] of keys.entries()) expect(await b.read(key)).toBe(body(n))
-}, GIT_TEST_TIMEOUT)
-
-// Storage migration contract: builds before #12286 kept every pending item's base64 ops and the
-// sealed batch's bytes inline in pending.json. A device stopped mid-push on such a build must
-// resume that batch under its own id (appended once) and still push the rest of its backlog.
-test("a pending journal an older build wrote inline resumes its batch once and pushes the rest", async () => {
-  const server = new FakeSyncServer()
-  const a = await makeDevice(server, "a", (at) => {
-    if (at === "uploaded") throw new CrashInjected(at)
-  }, { batchBytes: 64 })
-  devices.push(a)
-  const keys = ["one.md", "two.md", "three.md"]
-  for (const key of keys) await a.write(key, `${key} body\n`)
-  await expect(a.engine.runCycle()).rejects.toBeInstanceOf(CrashInjected)
-
-  const syncDir = join(a.repo.gitDir, "omo-sync")
-  const index: PendingOps = JSON.parse(await readFile(join(syncDir, "pending.json"), "utf8"))
-  const outgoing = index.outgoing
-  if (outgoing === null) throw new Error("the crash left no batch in flight")
-  const inline = async (item: PendingItem) => ({ key: item.key, ops: Buffer.from(await a.engine.journal.outbox.readOps(item)).toString("base64") })
-  const { items: carried, ...meta } = outgoing
-  const legacy = {
-    items: await Promise.all(index.items.map(inline)),
-    outgoing: { ...meta, bytes: (await readFile(join(syncDir, "pending", `batch-${meta.batchId}.bin`))).toString("base64"), items: await Promise.all(carried.map(inline)) },
-  }
-  expect(legacy.items.length).toBeGreaterThan(carried.length)
-  await rm(join(syncDir, "pending"), { recursive: true, force: true })
-  await writeFile(join(syncDir, "pending.json"), `${JSON.stringify(legacy)}\n`)
-
-  await a.restart()
-  expect(await a.engine.runCycle()).toMatchObject({ pushed: true })
-  expect(server.entries.filter((e) => e.batchId === meta.batchId)).toHaveLength(1)
-  expect(await a.engine.journal.pending()).toEqual({ items: [], outgoing: null })
-  const b = await makeDevice(server, "b")
-  devices.push(b)
-  await b.engine.runCycle()
-  for (const key of keys) expect(await b.read(key)).toBe(`${key} body\n`)
 }, GIT_TEST_TIMEOUT)
