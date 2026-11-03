@@ -84,7 +84,7 @@ describe("buildPrometheusAgentConfig", () => {
 
         // then - config should be produced (currentModel accepted as valid)
         expect(result).toBeDefined();
-        expect(result.variant).toBe("xhigh");
+        expect(result.variant).toBe("high");
         expect(resolveModelPipelineSpy).toHaveBeenCalledWith(
           expect.objectContaining({
             intent: expect.objectContaining({
