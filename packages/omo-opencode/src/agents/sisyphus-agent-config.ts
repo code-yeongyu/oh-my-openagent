@@ -37,7 +37,7 @@ export function buildGptSisyphusAgentConfig(
 ): AgentConfig {
   return {
     ...buildBaseSisyphusAgentConfig(mode, model, prompt),
-    reasoningEffort: "medium",
+    reasoningEffort: "high",
   };
 }
 
