@@ -5,6 +5,7 @@ import { join } from "node:path"
 
 import type { ThemeColor } from "@code-yeongyu/senpi"
 
+import { homeRelativePath } from "./child-log"
 import {
   emitReflectionHealthAlert,
   REFLECTION_HEALTH_ENTRY_TYPE,
@@ -74,9 +75,13 @@ describe("reflection health alert", () => {
     await emitReflectionHealthAlert(completions, "agent-test", harness.live, harness.once)
 
     // then
+    const expected = homeRelativePath(log)
     const entry = harness.api.entries.find((item) => item.customType === REFLECTION_HEALTH_ENTRY_TYPE)?.data as ReflectionHealthEntry
-    expect(entry.recommendation).toBe(`inspect ${log}`)
-    expect(harness.notifications[0]).toContain(log)
+    expect(entry.recommendation).toBe(`inspect ${expected}`)
+    expect(entry.recommendation).toContain("inspect ")
+    expect(entry.recommendation).toContain(join("runs", "run-2", "child-stderr.log"))
+    expect(entry.recommendation).not.toContain("<runId>")
+    expect(harness.notifications[0]).toContain(expected)
   })
 
   test("#given a child that died inside a Bun code frame #when the alert fires #then neither the notice nor the entry carries source lines", async () => {
