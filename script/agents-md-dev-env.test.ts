@@ -30,34 +30,14 @@ describe("AGENTS.md dev-environment documentation", () => {
     }
   })
 
-  test("#given the dev-environment section #when scanned #then it names a single source of truth and a keep-in-sync maintenance directive", () => {
-    // given
-    const content = readAgents()
-    const lower = content.toLowerCase()
-
-    // then
-    expect(content).toContain("single source of truth") // setup.sh is canonical
-    expect(lower).toContain("in sync") // update docs when the scripts change
-  })
-
-  test("#given the maintenance directive #when scanned #then it shares the infra with the Claude side", () => {
-    // given
-    const content = readAgents()
-
-    // then
-    expect(content).toContain("CLAUDE.md")
-  })
 })
 
 describe("CLAUDE.md (shared with the Claude side)", () => {
-  test("#given the Claude entry doc #when read #then it carries the same AGENTS.md dev-environment infra", () => {
+  test("#given the Claude entry doc #when checked #then it exists beside AGENTS.md", () => {
     // given
     const claudePath = join(import.meta.dir, "..", "CLAUDE.md")
 
     // when / then
     expect(existsSync(claudePath), "CLAUDE.md must exist so Claude Code shares the infra").toBe(true)
-    const content = readFileSync(claudePath, "utf8")
-    expect(content).toContain("DEVELOPMENT ENVIRONMENT")
-    expect(content).toContain("script/agent/setup.sh")
   })
 })

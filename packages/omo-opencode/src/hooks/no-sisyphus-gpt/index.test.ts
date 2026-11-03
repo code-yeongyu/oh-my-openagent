@@ -2,7 +2,7 @@
 
 import { describe, expect, spyOn, test } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
-import { _resetForTesting, updateSessionAgent } from "../../features/claude-code-session-state"
+import { _resetForTesting, registerAgentName, updateSessionAgent } from "../../features/claude-code-session-state"
 import { getAgentDisplayName } from "../../shared/agent-display-names"
 import { createNoSisyphusGptHook } from "./index"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
@@ -30,7 +30,9 @@ function createHookContext(showToast: (input: unknown) => Promise<unknown>): Plu
 
 describe("no-sisyphus-gpt hook", () => {
   test("shows toast on every chat.message when sisyphus uses unsupported gpt model", async () => {
-    // given - sisyphus (display name) with a GPT model that lacks native support
+    // given - sisyphus (display name) with a GPT model that lacks native support, Hephaestus registered
+    _resetForTesting()
+    registerAgentName("hephaestus")
     const showToast = spyOn({ fn: async () => ({}) }, "fn")
     const hook = createNoSisyphusGptHook(createHookContext(showToast))
 
@@ -117,10 +119,10 @@ describe("no-sisyphus-gpt hook", () => {
     // then Sisyphus remains selected with its configured Sol effort
     expect(showToast).toHaveBeenCalledTimes(0)
     expect(output.message.agent).toBeUndefined()
-    expect(output.message.variant).toBe("medium")
+    expect(output.message.variant).toBe("high")
   })
 
-  test("sets medium variant for gpt-5.5 model when native Sisyphus support is used", async () => {
+  test("sets high variant for gpt-5.5 model when native Sisyphus support is used", async () => {
     // given - sisyphus with gpt-5.5 model and no selected variant
     const showToast = spyOn({ fn: async () => ({}) }, "fn")
     const hook = createNoSisyphusGptHook(createHookContext(showToast))
@@ -137,7 +139,7 @@ describe("no-sisyphus-gpt hook", () => {
     // then - Sisyphus stays active and receives its configured GPT-5.5 variant
     expect(showToast).toHaveBeenCalledTimes(0)
     expect(output.message.agent).toBeUndefined()
-    expect(output.message.variant).toBe("medium")
+    expect(output.message.variant).toBe("high")
   })
 
   test("preserves selected variant for gpt-5.5 model when native Sisyphus support is used", async () => {
@@ -201,6 +203,7 @@ describe("no-sisyphus-gpt hook", () => {
   test("uses session agent fallback when input agent is missing", async () => {
     // given - session agent saved with display name (as OpenCode stores it)
     _resetForTesting()
+    registerAgentName("hephaestus")
     updateSessionAgent("ses_4", SISYPHUS_DISPLAY)
     const showToast = spyOn({ fn: async () => ({}) }, "fn")
     const hook = createNoSisyphusGptHook(createHookContext(showToast))

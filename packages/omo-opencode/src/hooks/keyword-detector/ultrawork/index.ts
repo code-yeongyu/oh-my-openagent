@@ -30,22 +30,14 @@ export {
   getDefaultUltraworkMessage,
 } from "./default";
 
-import { getUltraworkSource } from "./source-detector";
+import { getUltraworkSource, type UltraworkSource } from "./source-detector";
 import { getPlannerUltraworkMessage } from "./planner";
 import { getGptUltraworkMessage } from "./gpt";
 import { getDefaultUltraworkMessage } from "./default";
 import { getGeminiUltraworkMessage } from "./gemini";
 import { getGlmUltraworkMessage } from "./glm";
 
-/**
- * Gets the appropriate ultrawork message based on agent and model context.
- */
-export function getUltraworkMessage(
-  agentName?: string,
-  modelID?: string,
-): string {
-  const source = getUltraworkSource(agentName, modelID);
-
+export function getUltraworkMessageForSource(source: UltraworkSource): string {
   switch (source) {
     case "planner":
       return getPlannerUltraworkMessage();
@@ -59,4 +51,14 @@ export function getUltraworkMessage(
     default:
       return getDefaultUltraworkMessage();
   }
+}
+
+/**
+ * Gets the appropriate ultrawork message based on agent and model context.
+ */
+export function getUltraworkMessage(
+  agentName?: string,
+  modelID?: string,
+): string {
+  return getUltraworkMessageForSource(getUltraworkSource(agentName, modelID));
 }

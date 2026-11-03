@@ -63,7 +63,18 @@ export type {
   TeamShutdownRequestInput,
 } from "./shutdown"
 
-export function buildLeadTeamTools(deps: LeadTeamToolDeps): ToolDefinition[] {
+// Each factory is generically typed so its renderCall/renderResult keep the tool's own arg and
+// details types; that makes the definitions invariant against the bare ToolDefinition element type,
+// so the family is published as a union (registration spreads each one, as the task tools do).
+export type LeadTeamTool =
+  | ReturnType<typeof createTeamCreateTool>
+  | ReturnType<typeof createTeamDeleteTool>
+  | ReturnType<typeof createTeamTaskCreateTool>
+  | ReturnType<typeof createTeamTaskGetTool>
+  | ReturnType<typeof createTeamTaskListTool>
+  | ReturnType<typeof createTeamTaskUpdateTool>
+
+export function buildLeadTeamTools(deps: LeadTeamToolDeps): LeadTeamTool[] {
   return [
     createTeamCreateTool(deps),
     createTeamDeleteTool(deps),

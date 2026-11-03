@@ -13,6 +13,10 @@
       "types": "./src/atomic-write.ts",
       "import": "./src/atomic-write.ts"
     },
+    "./path-containment": {
+      "types": "./src/path-containment.ts",
+      "import": "./src/path-containment.ts"
+    },
     "./runtime": {
       "types": "./runtime.d.ts",
       "import": "./src/runtime/index.ts"
@@ -20,6 +24,10 @@
     "./xdg-data-dir": {
       "types": "./src/xdg-data-dir.ts",
       "import": "./src/xdg-data-dir.ts"
+    },
+    "./logger": {
+      "types": "./src/logger.ts",
+      "import": "./src/logger.ts"
     },
     "./record-type-guard": {
       "types": "./src/record-type-guard.ts",
@@ -32,14 +40,6 @@
     "./classify-path-environment": {
       "types": "./src/classify-path-environment.ts",
       "import": "./src/classify-path-environment.ts"
-    },
-    "./codegraph": {
-      "types": "./src/codegraph/index.ts",
-      "import": "./src/codegraph/index.ts"
-    },
-    "./codegraph/resolve": {
-      "types": "./src/codegraph/resolve.ts",
-      "import": "./src/codegraph/resolve.ts"
     },
     "./command-executor": {
       "types": "./src/command-executor.ts",
@@ -108,6 +108,10 @@
     "./zip-entry-listing/*": {
       "types": "./src/zip-entry-listing/*.ts",
       "import": "./src/zip-entry-listing/*.ts"
+    },
+    "./shell-quote": {
+      "types": "./src/shell-quote.ts",
+      "import": "./src/shell-quote.ts"
     }
   },
   "types": "./index.d.ts",
@@ -116,8 +120,9 @@
     "test": "bun test src/*.test.ts src/**/*.test.ts"
   },
   "dependencies": {
+    "@oh-my-opencode/model-core": "workspace:*",
     "@oh-my-opencode/omo-config-core": "workspace:*",
-    "js-yaml": "^5.0.0",
+    "js-yaml": "^5.4.2",
     "jsonc-parser": "^3.3.1"
   },
   "sideEffects": [

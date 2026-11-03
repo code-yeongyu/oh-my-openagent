@@ -30,7 +30,7 @@ interface Task {
 | File | Purpose |
 |------|---------|
 | `types.ts` | Task interface + status types |
-| `storage.ts` | `readJsonSafe()`, `writeJsonAtomic()`, `acquireLock()`, `generateTaskId()` |
+| `storage.ts` | `readJsonSafe()`, `writeJsonAtomic()`, `acquireLock()` (async, bounded wait), `generateTaskId()` |
 | `index.ts` | Barrel exports |
 
 ## STORAGE
@@ -38,5 +38,10 @@ interface Task {
 - Location: `.omo/tasks/` directory
 - Format: JSON files, one per task
 - Atomic writes: temp file → rename
-- Locking: file-based lock for concurrent access
+- Locking: file-based lock for concurrent access. `acquireLock()` is async and waits out ordinary
+  contention with jittered retry (default 5s budget, override with `OMO_TASK_LOCK_WAIT_TIMEOUT_MS`);
+  it reports `acquired: false` only once that budget is exhausted. A lock older than 30s is reclaimed
+  as stale regardless of the wait budget.
+- Critical section: only the atomic task-file write is done under the lock; Todo API sync happens
+  after release
 - Sync: Changes pushed to OpenCode Todo API after each update

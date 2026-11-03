@@ -10,7 +10,7 @@ Generated command:
 git ls-files packages/omo-opencode/src packages/omo-codex/src | grep '\.ts$' | sort | xargs awk 'FNR==1 && /^export (\*|\{).*from ["'"'"']@oh-my-opencode\// { print FILENAME }'
 ```
 
-Snapshot date: 2026-08-31. Total shim exports found: 256.
+Snapshot date: 2026-08-31. Total shim exports found: 226.
 
 ## Aggregate By Target Package
 
@@ -18,19 +18,18 @@ Snapshot date: 2026-08-31. Total shim exports found: 256.
 |---|---:|
 | `@oh-my-opencode/agents-md-core` | 2 |
 | `@oh-my-opencode/boulder-state` | 1 |
-| `@oh-my-opencode/claude-code-compat-core` | 36 |
+| `@oh-my-opencode/claude-code-compat-core` | 33 |
 | `@oh-my-opencode/delegate-core` | 1 |
 | `@oh-my-opencode/hashline-core` | 6 |
 | `@oh-my-opencode/mcp-client-core` | 21 |
 | `@oh-my-opencode/model-core` | 7 |
 | `@oh-my-opencode/omo-codex` | 41 |
-| `@oh-my-opencode/omo-senpi` | 1 |
-| `@oh-my-opencode/openclaw-core` | 30 |
+| `@oh-my-opencode/openclaw-core` | 22 |
 | `@oh-my-opencode/rules-engine` | 4 |
-| `@oh-my-opencode/skills-loader-core` | 65 |
-| `@oh-my-opencode/team-core` | 45 |
+| `@oh-my-opencode/skills-loader-core` | 61 |
+| `@oh-my-opencode/team-core` | 37 |
 | `@oh-my-opencode/tmux-core` | 3 |
-| `@oh-my-opencode/utils` | 53 |
+| `@oh-my-opencode/utils` | 47 |
 
 ## Exhaustive Shim Paths
 
@@ -78,7 +77,6 @@ Snapshot date: 2026-08-31. Total shim exports found: 256.
 | `packages/omo-opencode/src/cli/install-codex/lsp-daemon-reaper.ts` | `@oh-my-opencode/omo-codex` |
 | `packages/omo-opencode/src/cli/install-codex/toml-section-editor.ts` | `@oh-my-opencode/omo-codex` |
 | `packages/omo-opencode/src/cli/install-codex/types.ts` | `@oh-my-opencode/omo-codex` |
-| `packages/omo-opencode/src/cli/install-senpi/index.ts` | `@oh-my-opencode/omo-senpi` |
 | `packages/omo-opencode/src/cli/provider-model-id-transform.ts` | `@oh-my-opencode/model-core` |
 | `packages/omo-opencode/src/config/schema/git-env-prefix.ts` | `@oh-my-opencode/skills-loader-core` |
 | `packages/omo-opencode/src/config/schema/team-mode.ts` | `@oh-my-opencode/team-core` |
@@ -89,11 +87,8 @@ Snapshot date: 2026-08-31. Total shim exports found: 256.
 | `packages/omo-opencode/src/features/claude-code-agent-loader/index.ts` | `@oh-my-opencode/claude-code-compat-core` |
 | `packages/omo-opencode/src/features/claude-code-agent-loader/json-agent-loader.ts` | `@oh-my-opencode/claude-code-compat-core` |
 | `packages/omo-opencode/src/features/claude-code-agent-loader/loader.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-agent-loader/opencode-config-agents-reader.ts` | `@oh-my-opencode/claude-code-compat-core` |
 | `packages/omo-opencode/src/features/claude-code-agent-loader/types.ts` | `@oh-my-opencode/claude-code-compat-core` |
 | `packages/omo-opencode/src/features/claude-code-command-loader/index.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-command-loader/loader-cache.ts` | `@oh-my-opencode/claude-code-compat-core` |
-| `packages/omo-opencode/src/features/claude-code-command-loader/loader.ts` | `@oh-my-opencode/claude-code-compat-core` |
 | `packages/omo-opencode/src/features/claude-code-command-loader/types.ts` | `@oh-my-opencode/claude-code-compat-core` |
 | `packages/omo-opencode/src/features/claude-code-mcp-loader/configure-allowed-env-vars.ts` | `@oh-my-opencode/claude-code-compat-core` |
 | `packages/omo-opencode/src/features/claude-code-mcp-loader/index.ts` | `@oh-my-opencode/claude-code-compat-core` |
@@ -116,7 +111,6 @@ Snapshot date: 2026-08-31. Total shim exports found: 256.
 | `packages/omo-opencode/src/features/opencode-runtime-skills/skill-markdown.ts` | `@oh-my-opencode/skills-loader-core` |
 | `packages/omo-opencode/src/features/opencode-runtime-skills/source-server.ts` | `@oh-my-opencode/skills-loader-core` |
 | `packages/omo-opencode/src/features/opencode-skill-loader/allowed-tools-parser.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/opencode-skill-loader/config-source-discovery.ts` | `@oh-my-opencode/skills-loader-core` |
 | `packages/omo-opencode/src/features/opencode-skill-loader/git-master-template-injection.ts` | `@oh-my-opencode/skills-loader-core` |
 | `packages/omo-opencode/src/features/opencode-skill-loader/index.ts` | `@oh-my-opencode/skills-loader-core` |
 | `packages/omo-opencode/src/features/opencode-skill-loader/loaded-skill-from-path.ts` | `@oh-my-opencode/skills-loader-core` |
@@ -124,11 +118,9 @@ Snapshot date: 2026-08-31. Total shim exports found: 256.
 | `packages/omo-opencode/src/features/opencode-skill-loader/loader.ts` | `@oh-my-opencode/skills-loader-core` |
 | `packages/omo-opencode/src/features/opencode-skill-loader/merger.ts` | `@oh-my-opencode/skills-loader-core` |
 | `packages/omo-opencode/src/features/opencode-skill-loader/merger/builtin-skill-converter.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/opencode-skill-loader/merger/config-skill-entry-loader.ts` | `@oh-my-opencode/skills-loader-core` |
 | `packages/omo-opencode/src/features/opencode-skill-loader/merger/scope-priority.ts` | `@oh-my-opencode/skills-loader-core` |
 | `packages/omo-opencode/src/features/opencode-skill-loader/merger/skill-definition-merger.ts` | `@oh-my-opencode/skills-loader-core` |
 | `packages/omo-opencode/src/features/opencode-skill-loader/merger/skills-config-normalizer.ts` | `@oh-my-opencode/skills-loader-core` |
-| `packages/omo-opencode/src/features/opencode-skill-loader/opencode-config-skills-reader.ts` | `@oh-my-opencode/skills-loader-core` |
 | `packages/omo-opencode/src/features/opencode-skill-loader/skill-content.ts` | `@oh-my-opencode/skills-loader-core` |
 | `packages/omo-opencode/src/features/opencode-skill-loader/skill-deduplication.ts` | `@oh-my-opencode/skills-loader-core` |
 | `packages/omo-opencode/src/features/opencode-skill-loader/skill-definition-record.ts` | `@oh-my-opencode/skills-loader-core` |
@@ -150,11 +142,9 @@ Snapshot date: 2026-08-31. Total shim exports found: 256.
 | `packages/omo-opencode/src/features/skill-mcp-manager/stdio-client.ts` | `@oh-my-opencode/mcp-client-core` |
 | `packages/omo-opencode/src/features/skill-mcp-manager/types.ts` | `@oh-my-opencode/mcp-client-core` |
 | `packages/omo-opencode/src/features/team-mode/member-parser.ts` | `@oh-my-opencode/team-core` |
-| `packages/omo-opencode/src/features/team-mode/team-layout-tmux/close-team-member-pane.ts` | `@oh-my-opencode/team-core` |
 | `packages/omo-opencode/src/features/team-mode/team-layout-tmux/index.ts` | `@oh-my-opencode/team-core` |
 | `packages/omo-opencode/src/features/team-mode/team-layout-tmux/layout.ts` | `@oh-my-opencode/team-core` |
 | `packages/omo-opencode/src/features/team-mode/team-layout-tmux/rebalance-team-window.ts` | `@oh-my-opencode/team-core` |
-| `packages/omo-opencode/src/features/team-mode/team-layout-tmux/resolve-caller-tmux-session.ts` | `@oh-my-opencode/team-core` |
 | `packages/omo-opencode/src/features/team-mode/team-layout-tmux/sweep-stale-team-sessions.ts` | `@oh-my-opencode/team-core` |
 | `packages/omo-opencode/src/features/team-mode/team-mailbox/ack.ts` | `@oh-my-opencode/team-core` |
 | `packages/omo-opencode/src/features/team-mode/team-mailbox/inbox.ts` | `@oh-my-opencode/team-core` |
@@ -166,7 +156,6 @@ Snapshot date: 2026-08-31. Total shim exports found: 256.
 | `packages/omo-opencode/src/features/team-mode/team-registry/index.ts` | `@oh-my-opencode/team-core` |
 | `packages/omo-opencode/src/features/team-mode/team-registry/loader.ts` | `@oh-my-opencode/team-core` |
 | `packages/omo-opencode/src/features/team-mode/team-registry/paths.ts` | `@oh-my-opencode/team-core` |
-| `packages/omo-opencode/src/features/team-mode/team-registry/team-spec-input-normalizer.ts` | `@oh-my-opencode/team-core` |
 | `packages/omo-opencode/src/features/team-mode/team-registry/validator.ts` | `@oh-my-opencode/team-core` |
 | `packages/omo-opencode/src/features/team-mode/team-state-store/active-resume.ts` | `@oh-my-opencode/team-core` |
 | `packages/omo-opencode/src/features/team-mode/team-state-store/creating-resume.ts` | `@oh-my-opencode/team-core` |
@@ -181,14 +170,9 @@ Snapshot date: 2026-08-31. Total shim exports found: 256.
 | `packages/omo-opencode/src/features/team-mode/team-state-store/session-liveness.ts` | `@oh-my-opencode/team-core` |
 | `packages/omo-opencode/src/features/team-mode/team-state-store/store.ts` | `@oh-my-opencode/team-core` |
 | `packages/omo-opencode/src/features/team-mode/team-state-store/worker-resume-status.ts` | `@oh-my-opencode/team-core` |
-| `packages/omo-opencode/src/features/team-mode/team-tasklist/claim.ts` | `@oh-my-opencode/team-core` |
-| `packages/omo-opencode/src/features/team-mode/team-tasklist/dependencies.ts` | `@oh-my-opencode/team-core` |
-| `packages/omo-opencode/src/features/team-mode/team-tasklist/get.ts` | `@oh-my-opencode/team-core` |
 | `packages/omo-opencode/src/features/team-mode/team-tasklist/index.ts` | `@oh-my-opencode/team-core` |
 | `packages/omo-opencode/src/features/team-mode/team-tasklist/list.ts` | `@oh-my-opencode/team-core` |
-| `packages/omo-opencode/src/features/team-mode/team-tasklist/store.ts` | `@oh-my-opencode/team-core` |
 | `packages/omo-opencode/src/features/team-mode/team-tasklist/test-support.ts` | `@oh-my-opencode/team-core` |
-| `packages/omo-opencode/src/features/team-mode/team-tasklist/update.ts` | `@oh-my-opencode/team-core` |
 | `packages/omo-opencode/src/features/team-mode/team-worktree/cleanup.ts` | `@oh-my-opencode/team-core` |
 | `packages/omo-opencode/src/features/team-mode/team-worktree/index.ts` | `@oh-my-opencode/team-core` |
 | `packages/omo-opencode/src/features/team-mode/team-worktree/manager.ts` | `@oh-my-opencode/team-core` |
@@ -204,14 +188,9 @@ Snapshot date: 2026-08-31. Total shim exports found: 256.
 | `packages/omo-opencode/src/hooks/rules-injector/project-root-finder.ts` | `@oh-my-opencode/rules-engine` |
 | `packages/omo-opencode/src/hooks/rules-injector/rule-distance.ts` | `@oh-my-opencode/rules-engine` |
 | `packages/omo-opencode/src/hooks/rules-injector/rule-scan-cache.ts` | `@oh-my-opencode/rules-engine` |
-| `packages/omo-opencode/src/openclaw/config.ts` | `@oh-my-opencode/openclaw-core` |
 | `packages/omo-opencode/src/openclaw/daemon.ts` | `@oh-my-opencode/openclaw-core` |
-| `packages/omo-opencode/src/openclaw/dispatcher.ts` | `@oh-my-opencode/openclaw-core` |
-| `packages/omo-opencode/src/openclaw/gateway-url-validation.test.ts` | `@oh-my-opencode/openclaw-core` |
-| `packages/omo-opencode/src/openclaw/gateway-url-validation.ts` | `@oh-my-opencode/openclaw-core` |
 | `packages/omo-opencode/src/openclaw/index.ts` | `@oh-my-opencode/openclaw-core` |
 | `packages/omo-opencode/src/openclaw/reply-listener-discord.ts` | `@oh-my-opencode/openclaw-core` |
-| `packages/omo-opencode/src/openclaw/reply-listener-injection.ts` | `@oh-my-opencode/openclaw-core` |
 | `packages/omo-opencode/src/openclaw/reply-listener-log.ts` | `@oh-my-opencode/openclaw-core` |
 | `packages/omo-opencode/src/openclaw/reply-listener-paths.ts` | `@oh-my-opencode/openclaw-core` |
 | `packages/omo-opencode/src/openclaw/reply-listener-poll-loop.ts` | `@oh-my-opencode/openclaw-core` |
@@ -219,7 +198,6 @@ Snapshot date: 2026-08-31. Total shim exports found: 256.
 | `packages/omo-opencode/src/openclaw/reply-listener-signature.ts` | `@oh-my-opencode/openclaw-core` |
 | `packages/omo-opencode/src/openclaw/reply-listener-sleep.ts` | `@oh-my-opencode/openclaw-core` |
 | `packages/omo-opencode/src/openclaw/reply-listener-spawn.ts` | `@oh-my-opencode/openclaw-core` |
-| `packages/omo-opencode/src/openclaw/reply-listener-start.ts` | `@oh-my-opencode/openclaw-core` |
 | `packages/omo-opencode/src/openclaw/reply-listener-startup.ts` | `@oh-my-opencode/openclaw-core` |
 | `packages/omo-opencode/src/openclaw/reply-listener-state.ts` | `@oh-my-opencode/openclaw-core` |
 | `packages/omo-opencode/src/openclaw/reply-listener-status.ts` | `@oh-my-opencode/openclaw-core` |
@@ -231,8 +209,6 @@ Snapshot date: 2026-08-31. Total shim exports found: 256.
 | `packages/omo-opencode/src/openclaw/session-registry-paths.ts` | `@oh-my-opencode/openclaw-core` |
 | `packages/omo-opencode/src/openclaw/session-registry-storage.ts` | `@oh-my-opencode/openclaw-core` |
 | `packages/omo-opencode/src/openclaw/session-registry-types.ts` | `@oh-my-opencode/openclaw-core` |
-| `packages/omo-opencode/src/openclaw/session-registry.ts` | `@oh-my-opencode/openclaw-core` |
-| `packages/omo-opencode/src/openclaw/tmux.ts` | `@oh-my-opencode/openclaw-core` |
 | `packages/omo-opencode/src/openclaw/types.ts` | `@oh-my-opencode/openclaw-core` |
 | `packages/omo-opencode/src/shared/archive-entry-validator.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/bun-file-shim.ts` | `@oh-my-opencode/utils` |
@@ -250,17 +226,13 @@ Snapshot date: 2026-08-31. Total shim exports found: 256.
 | `packages/omo-opencode/src/shared/extract-semver.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/file-utils.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/frontmatter.ts` | `@oh-my-opencode/utils` |
-| `packages/omo-opencode/src/shared/git-worktree/collect-git-diff-stats.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/git-worktree/format-file-changes.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/git-worktree/index.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/git-worktree/parse-diff-numstat.ts` | `@oh-my-opencode/utils` |
-| `packages/omo-opencode/src/shared/git-worktree/parse-status-porcelain-line.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/git-worktree/parse-status-porcelain.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/git-worktree/types.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/internal-initiator-marker.ts` | `@oh-my-opencode/utils` |
-| `packages/omo-opencode/src/shared/migration/agent-names.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/migration/hook-names.ts` | `@oh-my-opencode/utils` |
-| `packages/omo-opencode/src/shared/migration/migrations-sidecar.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/migration/model-versions.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/model-format-normalizer.ts` | `@oh-my-opencode/model-core` |
 | `packages/omo-opencode/src/shared/model-normalization.ts` | `@oh-my-opencode/model-core` |
@@ -272,18 +244,15 @@ Snapshot date: 2026-08-31. Total shim exports found: 256.
 | `packages/omo-opencode/src/shared/record-type-guard.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/replace-tool-args.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/session-idle-settle.ts` | `@oh-my-opencode/utils` |
-| `packages/omo-opencode/src/shared/skill-path-resolver.ts` | `@oh-my-opencode/skills-loader-core` |
 | `packages/omo-opencode/src/shared/snake-case.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/tmux/cmux-detect.ts` | `@oh-my-opencode/tmux-core` |
 | `packages/omo-opencode/src/shared/tmux/runner.ts` | `@oh-my-opencode/tmux-core` |
 | `packages/omo-opencode/src/shared/tmux/tmux-utils/spawn-process.ts` | `@oh-my-opencode/tmux-core` |
 | `packages/omo-opencode/src/shared/tool-name.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/zip-entry-listing.ts` | `@oh-my-opencode/utils` |
-| `packages/omo-opencode/src/shared/zip-entry-listing/powershell-zip-entry-listing.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/zip-entry-listing/python-zip-entry-listing.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/zip-entry-listing/read-zip-symlink-target.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/shared/zip-entry-listing/tar-zip-entry-listing.ts` | `@oh-my-opencode/utils` |
-| `packages/omo-opencode/src/shared/zip-entry-listing/zipinfo-zip-entry-listing.ts` | `@oh-my-opencode/utils` |
 | `packages/omo-opencode/src/tools/hashline-edit/edit-deduplication.ts` | `@oh-my-opencode/hashline-core` |
 | `packages/omo-opencode/src/tools/hashline-edit/edit-ordering.ts` | `@oh-my-opencode/hashline-core` |
 | `packages/omo-opencode/src/tools/hashline-edit/file-text-canonicalization.ts` | `@oh-my-opencode/hashline-core` |

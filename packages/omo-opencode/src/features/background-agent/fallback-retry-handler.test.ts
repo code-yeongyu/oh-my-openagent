@@ -125,6 +125,28 @@ describe("tryFallbackRetry", () => {
   })
 
   describe("#given retryable error with fallback chain", () => {
+    test("includes the original task and latest continuation in a fresh-session retry", async () => {
+      // given
+      const args = createDefaultArgs({ prompt: "latest-continuation", originalPrompt: "original-task" })
+      // when
+      await tryFallbackRetry(args)
+      // then
+      const retry = [...args.queuesByKey.values()].flat()[0]
+      expect(retry.input.prompt).toContain("original-task")
+      expect(retry.input.prompt).toContain("latest-continuation")
+      expect(retry.input.prompt).toContain("[Note:")
+    })
+
+    test("leaves a never-resumed task's retry prompt without the retry note", async () => {
+      // given
+      const args = createDefaultArgs({ prompt: "test prompt" })
+      // when
+      await tryFallbackRetry(args)
+      // then
+      const retry = [...args.queuesByKey.values()].flat()[0]
+      expect(retry.input.prompt).toBe("test prompt")
+    })
+
     test("returns true and enqueues retry", async () => {
       const args = createDefaultArgs()
 
@@ -297,6 +319,20 @@ describe("tryFallbackRetry", () => {
       const retryInput = args.queuesByKey.get(key)?.[0]?.input
       expect(retryInput?.skillContent).toBe("delegated skill system")
       expect(retryInput?.sessionPermission).toEqual(QUESTION_DENIED_SESSION_PERMISSION)
+    })
+
+    test("retry input preserves task.cwd", async () => {
+      const args = createDefaultArgs({
+        teamRunId: "team-run-1",
+        onSessionCreated: mock(async () => {}),
+        cwd: "/lead-fix-1",
+      })
+
+      await tryFallbackRetry(args)
+
+      const key = `${args.task.model!.providerID}/${args.task.model!.modelID}`
+      const retryInput = args.queuesByKey.get(key)?.[0]?.input
+      expect(retryInput?.cwd).toBe("/lead-fix-1")
     })
 
     test("finalizes the failed attempt, creates a new pending attempt, and enqueues its explicit attemptID", async () => {

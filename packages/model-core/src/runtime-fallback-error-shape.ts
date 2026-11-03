@@ -5,7 +5,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function getRecordValue(record: Record<string, unknown> | undefined, key: string): unknown {
-  return record?.[key]
+  try {
+    return record?.[key]
+  } catch (cause) {
+    // Unknown inputs may use hostile Proxy traps, so property-read failures cannot escape this boundary.
+    if (!(cause instanceof Error)) {
+      void cause
+    }
+    return undefined
+  }
 }
 
 function getNestedRecord(record: Record<string, unknown> | undefined, key: string): Record<string, unknown> | undefined {

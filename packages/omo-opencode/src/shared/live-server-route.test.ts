@@ -1,8 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { subagentSessions } from "../features/claude-code-session-state/state"
 import {
-  LIVE_ROUTE_DISPATCH_LOG,
-  LIVE_ROUTE_UNAVAILABLE_LOG,
   _setLiveClientForTesting,
   _setFetchImplementationForTesting,
   initLiveServerRoute,
@@ -412,18 +410,6 @@ describe("live-server-route", () => {
       const after = await resolveDispatchClient(fakeInProcessClient, "ses_after")
       expect(after.route).toBe("in-process")
       expect(callCount2()).toBe(0)
-    })
-  })
-
-  describe("provenance log constants exported", () => {
-    test("#given module exports #when constants checked #then LIVE_ROUTE_DISPATCH_LOG and LIVE_ROUTE_UNAVAILABLE_LOG are non-empty strings", () => {
-      expect(typeof LIVE_ROUTE_DISPATCH_LOG).toBe("string")
-      expect(LIVE_ROUTE_DISPATCH_LOG.length).toBeGreaterThan(0)
-      expect(LIVE_ROUTE_DISPATCH_LOG).toContain("[live-server-route]")
-
-      expect(typeof LIVE_ROUTE_UNAVAILABLE_LOG).toBe("string")
-      expect(LIVE_ROUTE_UNAVAILABLE_LOG.length).toBeGreaterThan(0)
-      expect(LIVE_ROUTE_UNAVAILABLE_LOG).toContain("[live-server-route]")
     })
   })
 

@@ -11,8 +11,8 @@ function agentSet(): Readonly<Record<string, AgentDefinition>> {
   return {
     explore: { name: "explore", description: "Codebase search" },
     librarian: { name: "librarian", description: "Docs research" },
-    metis: { name: "metis", description: "Pre-planning consultant" },
-    momus: { name: "momus", description: "Plan reviewer" },
+    "plan-consultant": { name: "plan-consultant", description: "Pre-planning consultant" },
+    "plan-reviewer": { name: "plan-reviewer", description: "Plan reviewer" },
   }
 }
 
@@ -27,8 +27,8 @@ describe("buildTaskToolDescription plan-gated agents", () => {
     expect(description).toContain("ulw-execute")
     expect(description).toContain("user explicitly request")
     expect(description).toContain(".omo/plans")
-    expect(description).toContain("metis")
-    expect(description).toContain("momus")
+    expect(description).toContain("plan-consultant")
+    expect(description).toContain("plan-reviewer")
   })
 
   test("#given gated and plain agents #when built #then the plain available-agents line excludes the gated names", () => {
@@ -39,8 +39,8 @@ describe("buildTaskToolDescription plan-gated agents", () => {
     const availableLine = description.split("\n").find((line) => line.includes("Available agents:")) ?? ""
     expect(availableLine).toContain("explore")
     expect(availableLine).toContain("librarian")
-    expect(availableLine).not.toContain("metis")
-    expect(availableLine).not.toContain("momus")
+    expect(availableLine).not.toContain("plan-consultant")
+    expect(availableLine).not.toContain("plan-reviewer")
   })
 
   test("#given only plain agents #when built #then no plan-gated section is rendered", () => {

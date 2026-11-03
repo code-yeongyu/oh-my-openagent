@@ -9,7 +9,9 @@ import { buildIdentityPaths } from "@oh-my-opencode/memory-core"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
 import { registerMemoryGuard } from "./guard"
+import { TRANSIENT_DIRNAME } from "./transient-identity"
 import { componentContext } from "./memory.test-support"
+import { AUTOMOUNT_TRIGGER_CASES, withAutomountTrap } from "../../automount-trap.test-support"
 
 const roots: string[] = []
 
@@ -147,6 +149,22 @@ describe("memory cross-identity guard", () => {
     })
   })
 
+  test("#given dot-dot after a link in own memory #when an external read opens the raw relative path #then foreign memory is blocked", async () => {
+    const setup = fixture()
+    const foreignRepo = dirname(dirname(setup.foreignFile))
+    mkdirSync(join(foreignRepo, "subdir"))
+    symlinkSync(join(foreignRepo, "subdir"), join(setup.own.identityPaths.repo, "jump"), process.platform === "win32" ? "junction" : "dir")
+    const raw = relative(setup.workspace, setup.own.identityPaths.repo) + "/jump/../system/persona.md"
+
+    const result = await dispatch(setup, "vendor_read", { path: raw })
+
+    if (process.platform === "win32") expect(result).toBeUndefined()
+    else expect(result).toEqual({
+      block: true,
+      reason: `cross-identity memory access denied: vendor_read to ${raw} belongs to another memory identity`,
+    })
+  })
+
   test("#given the identities root and one of its ancestors #when enumeration tools target them #then cross-identity enumeration is blocked", async () => {
     const setup = fixture()
     const memoryRoot = dirname(setup.agentsRoot)
@@ -199,5 +217,81 @@ describe("memory cross-identity guard", () => {
       { sessionId: "session-a" },
       { sessionId: "session-b" },
     ])
+  })
+
+  test("#given an identity directory that is not on disk #when a file tool targets a path inside it #then it is blocked without enumerating the agents root", async () => {
+    const setup = fixture()
+    const ghost = join(setup.agentsRoot, "never-created", "repo", "system", "persona.md")
+
+    expect(await dispatch(setup, "read", { path: ghost })).toEqual({
+      block: true,
+      reason: `cross-identity memory access denied: read to ${ghost} belongs to another memory identity`,
+    })
+  })
+})
+
+describe("memory cross-identity guard for transient runs", () => {
+  test("#given a transient run root #when file tools target durable memory or another run #then only its own transient root is reachable", async () => {
+    const setup = transientFixture()
+
+    expect(await dispatch(setup, "write", { path: join(setup.own.identityPaths.transcripts, "stream", "transcript.jsonl") })).toBeUndefined()
+    expect(await dispatch(setup, "read", { path: setup.durableForeignFile })).toEqual({
+      block: true,
+      reason: `cross-identity memory access denied: read to ${setup.durableForeignFile} belongs to another memory identity`,
+    })
+    expect(await dispatch(setup, "read", { path: setup.otherRunFile })).toEqual({
+      block: true,
+      reason: `cross-identity memory access denied: read to ${setup.otherRunFile} belongs to another memory identity`,
+    })
+  })
+})
+
+function transientFixture(): GuardFixture & { readonly durableForeignFile: string; readonly otherRunFile: string } {
+  const memoryRoot = mkdtempSync(join(tmpdir(), "omo-memory-guard-transient-"))
+  const workspace = mkdtempSync(join(tmpdir(), "omo-memory-guard-transient-workspace-"))
+  roots.push(memoryRoot, workspace)
+
+  const durablePaths = buildIdentityPaths(memoryRoot, "own")
+  const foreignPaths = buildIdentityPaths(memoryRoot, "foreign")
+  const runPaths = buildIdentityPaths(join(memoryRoot, TRANSIENT_DIRNAME, "token-1"), "own")
+  const otherRunPaths = buildIdentityPaths(join(memoryRoot, TRANSIENT_DIRNAME, "token-2"), "other")
+  const durableForeignFile = join(foreignPaths.repo, "system", "persona.md")
+  const otherRunFile = join(otherRunPaths.transcripts, "stream", "transcript.jsonl")
+  const ownFile = join(runPaths.repo, "system", "persona.md")
+  for (const file of [durableForeignFile, otherRunFile, ownFile]) {
+    mkdirSync(dirname(file), { recursive: true })
+    writeFileSync(file, "fixture")
+  }
+
+  const own = createMemoryIdentityContext({
+    identity: "own",
+    identityPaths: runPaths,
+    durableRoot: durablePaths.root,
+    binding: { identity: "own", repoPathHash: "hash", boundAt: 1 },
+  })
+  const pi = new FakeExtensionAPI()
+  const context = componentContext()
+  registerMemoryGuard(pi, context, { getContext: () => own, resolveCwd: () => workspace })
+
+  return {
+    pi,
+    context,
+    own,
+    ownFile,
+    foreignFile: durableForeignFile,
+    agentsRoot: dirname(durablePaths.root),
+    workspace,
+    durableForeignFile,
+    otherRunFile,
+  }
+}
+
+describe("memory guard never resolves a macOS automount trigger (#11545)", () => {
+  test.each([...AUTOMOUNT_TRIGGER_CASES])("#given a tool path %s on darwin #when the guard classifies it #then it is allowed without resolving the trigger", async (path) => {
+    const setup = fixture()
+    const touched = await withAutomountTrap(async () => {
+      expect(await dispatch(setup, "read", { path })).toBeUndefined()
+    })
+    expect(touched).toEqual([])
   })
 })

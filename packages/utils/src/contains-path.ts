@@ -17,20 +17,24 @@ function findNearestExistingAncestor(resolvedPath: string): string {
   return candidatePath
 }
 
+function realpathNativeOrFallback(pathToNormalize: string): string {
+  try {
+    return realpathSync.native(pathToNormalize)
+  } catch {
+    return pathToNormalize
+  }
+}
+
 function toCanonicalPath(pathToNormalize: string): string {
   const resolvedPath = resolve(pathToNormalize)
 
   if (existsSync(resolvedPath)) {
-    try {
-      return normalize(realpathSync.native(resolvedPath))
-    } catch {
-      return normalize(resolvedPath)
-    }
+    return normalize(realpathNativeOrFallback(resolvedPath))
   }
 
   const nearestExistingAncestor = findNearestExistingAncestor(resolvedPath)
   const canonicalAncestor = existsSync(nearestExistingAncestor)
-    ? realpathSync.native(nearestExistingAncestor)
+    ? realpathNativeOrFallback(nearestExistingAncestor)
     : nearestExistingAncestor
   const relativePathFromAncestor = relative(nearestExistingAncestor, resolvedPath)
 

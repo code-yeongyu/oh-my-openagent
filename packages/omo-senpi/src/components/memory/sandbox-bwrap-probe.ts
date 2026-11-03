@@ -1,5 +1,3 @@
-import { spawnSync } from "node:child_process"
-
 /**
  * Whether a resolved sandbox executable can actually start a sandbox, not merely whether it exists.
  *
@@ -7,6 +5,8 @@ import { spawnSync } from "node:child_process"
  * and executable while every invocation dies with `bwrap: setting up uid map: Permission denied`,
  * so an existence check alone selects a sandbox that kills every child at spawn (issue #6873).
  */
+import { type ChildProcess, spawn } from "node:child_process"
+
 export type SandboxUsability =
   | { readonly usable: true }
   | { readonly usable: false; readonly reason: string }
@@ -34,34 +34,64 @@ export function classifyBwrapSmoke(result: BwrapSmokeResult): SandboxUsability {
   return unusable(`smoke test exited ${result.exitCode ?? "without an exit code"}`, result.stderr)
 }
 
-// One verdict per absolute executable path per process. The facts surface rebuilds its transform on
-// every launch, so an unmemoized probe would spawn a child per reflection trigger.
+// One verdict per absolute executable path per process. Memoizes both the result and the promise
+// to ensure a second call during a concurrent first spawn does not trigger a second spawn.
 const verdicts = new Map<string, SandboxUsability>()
+const pendingProbes = new Map<string, Promise<SandboxUsability>>()
 
-export function probeBwrapUsability(executable: string): SandboxUsability {
+export async function probeBwrapUsability(executable: string): Promise<SandboxUsability> {
   const memoized = verdicts.get(executable)
   if (memoized !== undefined) return memoized
-  const verdict = classifyBwrapSmoke(runBwrapSmoke(executable))
-  verdicts.set(executable, verdict)
-  return verdict
+
+  const pending = pendingProbes.get(executable)
+  if (pending !== undefined) return pending
+
+  const probePromise = (async () => {
+    try {
+      const result = await runBwrapSmoke(executable)
+      const verdict = classifyBwrapSmoke(result)
+      verdicts.set(executable, verdict)
+      return verdict
+    } finally {
+      pendingProbes.delete(executable)
+    }
+  })()
+
+  pendingProbes.set(executable, probePromise)
+  return probePromise
 }
 
-function runBwrapSmoke(executable: string): BwrapSmokeResult {
-  const smoke = spawnSync(executable, [...SMOKE_ARGS], {
-    timeout: SMOKE_TIMEOUT_MS,
-    encoding: "utf8",
-    windowsHide: true,
+async function runBwrapSmoke(executable: string): Promise<BwrapSmokeResult> {
+  // node's child_process rather than the Bun runtime API: the memory component runs inside the
+  // engine, and the default launcher starts that engine under node, where no `Bun` global exists.
+  return await new Promise<BwrapSmokeResult>((resolve) => {
+    let settled = false
+    const finish = (result: BwrapSmokeResult): void => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeoutHandle)
+      resolve(result)
+    }
+    let child: ChildProcess
+    try {
+      child = spawn(executable, [...SMOKE_ARGS], { stdio: ["ignore", "ignore", "pipe"], windowsHide: true })
+    } catch (error) {
+      finish({ exitCode: null, timedOut: false, errorMessage: error instanceof Error ? error.message : String(error), stderr: "" })
+      return
+    }
+    const stderrChunks: Buffer[] = []
+    child.stderr?.on("data", (chunk: Buffer) => stderrChunks.push(chunk))
+    const timeoutHandle = setTimeout(() => {
+      child.kill("SIGKILL")
+      finish({ exitCode: null, timedOut: true, stderr: "" })
+    }, SMOKE_TIMEOUT_MS)
+    child.once("error", (error) => finish({ exitCode: null, timedOut: false, errorMessage: error.message, stderr: "" }))
+    child.once("close", (code) => finish({ exitCode: code, timedOut: false, stderr: Buffer.concat(stderrChunks).toString("utf8") }))
   })
-  const stderr = typeof smoke.stderr === "string" ? smoke.stderr : ""
-  // Node reports a timeout kill as an ETIMEDOUT error alongside the terminating signal, so the
-  // error path alone would misreport a hung bwrap as "could not run".
-  const timedOut = smoke.error !== undefined && "code" in smoke.error && smoke.error.code === "ETIMEDOUT"
-  if (timedOut) return { exitCode: smoke.status, timedOut: true, stderr }
-  if (smoke.error !== undefined) return { exitCode: smoke.status, timedOut: false, errorMessage: smoke.error.message, stderr }
-  return { exitCode: smoke.status, timedOut: false, stderr }
 }
 
 function unusable(cause: string, stderr: string): SandboxUsability {
   const tail = stderr.trim().slice(-REASON_STDERR_CHARS)
   return { usable: false, reason: tail === "" ? cause : `${cause}: ${tail}` }
 }
+

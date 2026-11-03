@@ -2,6 +2,9 @@ import { clearBoulderState } from "../features/boulder-state"
 import { log } from "../shared"
 
 type StopContinuationHooks = {
+  readonly keywordDetector?: {
+    readonly clearSession?: (sessionID: string) => void
+  } | null
   readonly stopContinuationGuard?: {
     readonly stop?: (sessionID: string) => void
   } | null
@@ -19,6 +22,7 @@ export function stopContinuation(args: {
   readonly sessionID: string
 }): void {
   const { directory, hooks, sessionID } = args
+  hooks.keywordDetector?.clearSession?.(sessionID)
   hooks.stopContinuationGuard?.stop?.(sessionID)
   hooks.todoContinuationEnforcer?.cancelAllCountdowns()
   hooks.goal?.clearGoal(sessionID)

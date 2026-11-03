@@ -74,8 +74,8 @@ export function hasExecutableTokenUnderRootWithSuffix(command: string, root: str
 export function tokenLooksExecutable(command: string, tokenStart: number): boolean {
   let prefix = command.slice(0, tokenStart).trimEnd()
   if (prefix.length === 0) return true
-  // Skip runtime flags between the executable and the script — the real 1.4.1
-  // daemon runs as `<installDir>/node --liftoff-only <installDir>/lib/dist/bin/codegraph.js`.
+  // Skip runtime flags between the executable and the script — a launcher may
+  // run as `<installDir>/node --some-flag <installDir>/lib/dist/cli.js`.
   for (;;) {
     const previousTokenStart = findTokenStart(prefix, prefix.length - 1)
     const previousToken = prefix.slice(previousTokenStart)

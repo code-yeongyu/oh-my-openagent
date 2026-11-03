@@ -1,9 +1,13 @@
+import { createHash } from "node:crypto"
 import type { ToolDefinition } from "@code-yeongyu/senpi"
 import { Type } from "typebox"
 import type { Static } from "typebox"
 
+import { shouldNotifyStatus } from "../../completion/routing"
 import type { ListScope, ListedTask } from "../../manager"
 import type { TaskRecord } from "../../state"
+import { hostLivenessText } from "../../state/host-liveness"
+import { isolationLine } from "../../isolation/details"
 import { defaultResolveCallerSessionId, toolResult } from "../control"
 import { renderTaskOutputCall, renderTaskOutputResult, taskOutputModelText } from "./renderers"
 import { renderTranscript } from "./render"
@@ -27,11 +31,13 @@ export const TaskOutputParams = Type.Object({
 export type TaskOutputInput = Static<typeof TaskOutputParams>
 
 const DEFAULT_TAIL_LINES = 60
+const STOP_PENDING_EXPLANATION = "cancel requested, child unreachable: it is stopped on its host before it runs anything else"
+const MAX_STATUS_READS = 1024
 const BLOCKING_REMOVED_GUIDANCE = 'blocking removed - completion arrives as a notification; use mode:"tail" to peek.'
 
 const DESCRIPTION = [
-  "Read one child task, keyed by task_id or name. task_output always returns immediately: mode='status' (default) returns the record snapshot plus the final response once terminal.",
-  "mode='tail' returns the last tail_lines of the recorded transcript; mode='full' returns the whole transcript (capped, with a head/tail elision marker). Completion notifications already include the final result.",
+  "Read one child task, keyed by task_id or name. task_output always returns immediately: mode='status' (default) returns one record snapshot per observed progress state, then a short no_progress result until the task changes.",
+  "mode='tail' returns the last tail_lines of the recorded transcript; mode='full' returns the whole transcript (capped, with a head/tail elision marker). These explicit transcript modes do not consume the status peek. Completion notifications already include the final result.",
   "READ-ONLY: this never revives, steers, or otherwise touches the child. A lost task returns a status view with a lost explanation and pid/session-dir breadcrumbs.",
   "Only the current session's children are visible.",
 ].join(" ")
@@ -40,6 +46,7 @@ export function runTaskOutput(
   deps: TaskOutputDeps,
   params: TaskOutputInput,
   callerSessionId: string | undefined,
+  statusReads?: Map<string, string>,
 ): Promise<TaskOutputToolResult> {
   if (hasLegacyBlockingParam(params)) return Promise.resolve(invalidArguments(BLOCKING_REMOVED_GUIDANCE))
 
@@ -50,7 +57,36 @@ export function runTaskOutput(
   const record = resolveTarget(candidates, idOrName)
   if (record === undefined) return Promise.resolve(notFound(candidates, idOrName))
 
+  const mode = params.mode ?? "status"
+  if (statusReads !== undefined && callerSessionId !== undefined && mode === "status") {
+    const key = JSON.stringify([callerSessionId, record.task_id])
+    const fingerprint = JSON.stringify([
+      record.status,
+      record.residency_state,
+      record.updated_at,
+      record.notification.run_epoch,
+      record.pid ?? null,
+      record.host_pid ?? null,
+      record.child_session_id ?? null,
+      digestField(record.final_response),
+      digestField(record.error_message),
+      record.killed ?? null,
+      digestField(record.run_stats),
+    ])
+    if (statusReads.get(key) === fingerprint) return Promise.resolve(noProgress(record))
+    rememberStatusRead(statusReads, key, fingerprint)
+  }
+
   return Promise.resolve(outputForRecord(deps, record, params))
+}
+
+function rememberStatusRead(statusReads: Map<string, string>, key: string, fingerprint: string): void {
+  statusReads.delete(key)
+  statusReads.set(key, fingerprint)
+  if (statusReads.size <= MAX_STATUS_READS) return
+
+  const oldestKey = statusReads.keys().next().value
+  if (oldestKey !== undefined) statusReads.delete(oldestKey)
 }
 
 function hasLegacyBlockingParam(params: object): boolean {
@@ -59,11 +95,14 @@ function hasLegacyBlockingParam(params: object): boolean {
 
 function outputForRecord(deps: TaskOutputDeps, record: TaskRecord, params: TaskOutputInput): TaskOutputToolResult {
   const now = (deps.now ?? Date.now)()
-  const snapshot = buildTaskSnapshot(record, deps.stateDir, now)
+  const lease = deps.manager.concurrency?.leaseState(record.task_id, record.notification.run_epoch)
+  // Only a still-running child can be waiting on its cancel; a cancelled record says so itself.
+  const stop = record.status === "running" && record.cancel_requested !== undefined ? { stop: STOP_PENDING_EXPLANATION } : {}
+  const snapshot = { ...buildTaskSnapshot(record, deps.stateDir, now), ...(lease === undefined ? {} : { lease }), ...stop }
   const mode = params.mode ?? "status"
 
   if (mode === "status" || record.status === "lost") {
-    return toolResult(statusText(snapshot), { kind: "status", snapshot })
+    return toolResult(withNotices(statusText(snapshot), deps), { kind: "status", snapshot })
   }
 
   return transcriptResult(deps, record, snapshot, mode, params.tail_lines ?? DEFAULT_TAIL_LINES)
@@ -107,11 +146,23 @@ function resolveTarget(candidates: readonly TaskRecord[], idOrName: string): Tas
   return candidates.find((record) => record.task_id === idOrName) ?? candidates.find((record) => record.name === idOrName)
 }
 
+// Session-level runner notices ride the status view: one line each, after the record facts, so a
+// parent reading any child sees why its children are not daemon sessions.
+function withNotices(text: string, deps: TaskOutputDeps): string {
+  const notices = deps.notices?.() ?? []
+  return notices.length === 0 ? text : [text, ...notices.map((notice) => `note: ${notice}`)].join("\n")
+}
+
 function statusText(snapshot: TaskSnapshot): string {
   const parts = [`${snapshot.task_id} [${snapshot.status}] ${taskOutputModelText(snapshot)}`]
+  if (snapshot.host_liveness !== undefined && snapshot.host_liveness.state !== "running") parts.push(hostLivenessText(snapshot.host_liveness))
+  if (snapshot.lease !== undefined) parts.push(`lease: ${snapshot.lease}`)
   if (snapshot.suspended !== undefined) parts.push(snapshot.suspended.explanation)
+  if (snapshot.awaiting_input !== undefined) parts.push(snapshot.awaiting_input.explanation)
+  if (snapshot.stop !== undefined) parts.push(snapshot.stop)
   if (snapshot.pid !== undefined) parts.push(`pid ${snapshot.pid}`)
   if (snapshot.lost !== undefined) parts.push(snapshot.lost.explanation)
+  if (snapshot.isolation !== undefined) parts.push(isolationLine(snapshot.isolation))
   if (snapshot.error_message !== undefined) parts.push(`error: ${snapshot.error_message}`)
   if (snapshot.final_response !== undefined) parts.push(snapshot.final_response)
   return parts.join("\n")
@@ -127,15 +178,48 @@ function invalidArguments(reason: string): TaskOutputToolResult {
   return toolResult(reason, { kind: "invalid_arguments", reason })
 }
 
-export function createTaskOutputTool(deps: TaskOutputDeps): ToolDefinition<typeof TaskOutputParams, TaskOutputDetails> {
+function noProgress(record: TaskRecord): TaskOutputToolResult {
+  const notificationPending =
+    (record.notify_on_terminal && (record.status === "pending" || record.status === "running")) ||
+    (shouldNotifyStatus(record.status) &&
+      record.notification.notified_epoch < record.notification.run_epoch &&
+      (record.notify_on_terminal || record.notification.notification_failed_epoch !== undefined))
+  const reason = !notificationPending
+    ? `Task ${record.task_id} is ${record.status}. It will not send a completion notification; use mode:"tail" only for explicit transcript diagnosis.`
+    : `Task ${record.task_id} has not changed since the last status read. Await its completion notification; use mode:"tail" only for explicit transcript diagnosis.`
+  return toolResult(reason, {
+    kind: "no_progress",
+    task_id: record.task_id,
+    status: record.status,
+    reason,
+  })
+}
+
+export type TaskOutputTool = ToolDefinition<typeof TaskOutputParams, TaskOutputDetails> & {
+  forgetSession: (sessionId: string) => void
+}
+
+function digestField(value: unknown): string {
+  return createHash("sha256").update(JSON.stringify(value ?? null)).digest("hex")
+}
+
+export function createTaskOutputTool(deps: TaskOutputDeps): TaskOutputTool {
   const resolveCaller = deps.resolveCallerSessionId ?? defaultResolveCallerSessionId
+  const statusReads = new Map<string, string>()
   return {
     name: "task_output",
     label: "Task Output",
     description: DESCRIPTION,
     parameters: TaskOutputParams,
-    execute: (_toolCallId, params, _signal, _onUpdate, ctx) => runTaskOutput(deps, params, resolveCaller(ctx)),
+    execute: (_toolCallId, params, _signal, _onUpdate, ctx) =>
+      runTaskOutput(deps, params, resolveCaller(ctx), statusReads),
     renderCall: (args, theme) => renderTaskOutputCall(args, theme),
     renderResult: (result, options, theme) => renderTaskOutputResult(result, options, theme),
+    forgetSession: (sessionId: string) => {
+      for (const key of statusReads.keys()) {
+        const parsed: unknown = JSON.parse(key)
+        if (Array.isArray(parsed) && parsed[0] === sessionId) statusReads.delete(key)
+      }
+    },
   }
 }

@@ -4,18 +4,16 @@
 
 import { MirrorSync } from "@oh-my-opencode/memory-core"
 
-import type { SenpiExtensionAPI } from "../../../extension/types"
 import { parseCommandArgs } from "./args"
 import { requireExistingRepo } from "./memfs-shared"
 import { requireIdentity, respond, type MemoryCommandContext, type MemoryCommandDeps } from "./types"
+import { LAZY_MEMORY_COMMANDS, MEMORY_REPOSITORY_SUBCOMMANDS, type MemoryCommandPort } from "./metadata"
 
-const SUBCOMMANDS = ["set", "unset", "status", "push"] as const
 const NOT_CONFIGURED = "no memory repository configured; set one with /memory-repository set <url>"
 
-export function registerMemoryRepositoryCommand(pi: SenpiExtensionAPI, deps: MemoryCommandDeps): void {
+export function registerMemoryRepositoryCommand(pi: MemoryCommandPort, deps: MemoryCommandDeps): void {
   pi.registerCommand("memory-repository", {
-    description: "Configure the push-only mirror remote for the memory repository.",
-    argumentHint: `<${SUBCOMMANDS.join("|")}> [url]`,
+    ...LAZY_MEMORY_COMMANDS["memory-repository"],
     handler: async (args: string, ctx: MemoryCommandContext): Promise<string> => {
       const identity = requireIdentity(deps, ctx)
       if (typeof identity === "string") return respond(ctx, identity, "error")
@@ -23,7 +21,7 @@ export function registerMemoryRepositoryCommand(pi: SenpiExtensionAPI, deps: Mem
       const parsed = parseCommandArgs(args)
       const [subcommand, value] = parsed.positionals
       if (subcommand === undefined) {
-        return respond(ctx, `usage: /memory-repository <${SUBCOMMANDS.join("|")}> [url]`, "error")
+        return respond(ctx, `usage: /memory-repository <${MEMORY_REPOSITORY_SUBCOMMANDS.join("|")}> [url]`, "error")
       }
 
       const repo = requireExistingRepo(deps, identity)
@@ -72,7 +70,7 @@ export function registerMemoryRepositoryCommand(pi: SenpiExtensionAPI, deps: Mem
 
       return respond(
         ctx,
-        `unknown /memory-repository subcommand: ${subcommand}; expected one of ${SUBCOMMANDS.join(", ")}`,
+        `unknown /memory-repository subcommand: ${subcommand}; expected one of ${MEMORY_REPOSITORY_SUBCOMMANDS.join(", ")}`,
         "error",
       )
     },

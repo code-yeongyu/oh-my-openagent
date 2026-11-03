@@ -30,6 +30,8 @@ export {
   DAG_ACTIVITY_CHANNEL,
   DAG_EVENT_LANES,
   DAG_NODE_ERROR_CODES,
+  DAG_NODE_OUTPUT_PREVIEW_CHARS,
+  DAG_NODE_QUIET_AFTER_MS,
   DAG_NODE_STATES,
   DAG_NODE_TRANSITION_REASONS,
   DAG_ROUTE_KINDS,
@@ -121,6 +123,8 @@ export type { DagTaskOwner, DagTaskOwnerKey, OwnedStartResult } from "./owner"
 
 export { createDagRecovery } from "./recovery"
 export type { DagRecovery, DagRecoveryOptions, DagRecoveryOutcome } from "./recovery"
+export { createDagLeaseWatch, DAG_LEASE_WATCH_INTERVAL_MS } from "./recovery-lease-watch"
+export type { DagLeaseWatch, DagLeaseWatchOptions, DagLeaseWatchTimerHandle, DagLeaseWatchTimers } from "./recovery-lease-watch"
 
 export { resolveDagNodeExecutionMode } from "./execution-mode"
 export type { DagExecutionModeSources } from "./execution-mode"

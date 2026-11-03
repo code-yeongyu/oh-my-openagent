@@ -9,6 +9,11 @@ export function shouldNotifyStatus(status: TaskStatus): boolean {
   return notifyingStatuses.has(status)
 }
 
+/** A notifying status, or an interrupt the parent did not request (it has no tool result that told it). */
+export function shouldNotifyRecord(record: { readonly status: TaskStatus; readonly interrupt_cause?: string }): boolean {
+  return shouldNotifyStatus(record.status) || (record.status === "interrupted" && record.interrupt_cause !== undefined)
+}
+
 // Delivery is unconditional: an idle parent ALWAYS wakes and a streaming parent ALWAYS receives the
 // notification steered into its running turn at the next tool-call boundary - no config can suppress,
 // delay, or split it. Transient transitions buffer and flush on the next session_start/idle edge.

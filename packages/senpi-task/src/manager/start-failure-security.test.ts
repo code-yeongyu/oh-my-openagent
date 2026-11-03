@@ -254,6 +254,9 @@ describe("TaskManager start failure security", () => {
         resolved_model: resolvedModel,
         run_in_background: false,
         error_message: publicMessage,
+        // The closed RunnerFailure enum travels with the sanitized message so a caller can classify
+        // the refusal (a denied parent kernel-tool grant vs a generic failure) without parsing it.
+        failure_kind: kind,
       })
       expect(JSON.stringify(result)).not.toContain(ADVERSARIAL_ERROR)
     },

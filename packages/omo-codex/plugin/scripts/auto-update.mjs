@@ -31,7 +31,6 @@ import {
 	resolveReleaseNotes,
 } from "./auto-update-release-notes.mjs";
 import { migrateCodexConfig } from "./migrate-codex-config.mjs";
-import { migrateOmoSotConfig } from "./migrate-omo-sot.mjs";
 import { resolveSpawnInvocation } from "./spawn-command.mjs";
 
 const DEFAULT_INTERVAL_MS = 24 * 60 * 60 * 1_000;
@@ -225,6 +224,7 @@ export async function runAutoUpdateCheck({
 			const result = spawnSync(invocation.command, invocation.args, {
 				env: plan.env,
 				stdio: "ignore",
+				windowsHide: true,
 			});
 			const status = result.status ?? (result.error === undefined ? 0 : 1);
 			await appendUpdateLog(env, now, "finished", { status });
@@ -242,6 +242,7 @@ export async function runAutoUpdateCheck({
 			env: plan.env,
 			stdio: "ignore",
 			detached: true,
+			windowsHide: true,
 		});
 		await writeState(statePath, { lastAttemptedAt: now, lastStatus: "started", pendingNotice });
 		await recordUpdateStartedNotice({ env, now, notices, pendingNotice, releaseNotes, plan });
@@ -296,14 +297,6 @@ function resolveUpdateContext({ env }) {
 
 async function runConfigMigration({ env, sessionModel = null, requireSessionModel = false }) {
 	if (env.LAZYCODEX_CONFIG_MIGRATION_DISABLED === "1" || env.OMO_CODEX_CONFIG_MIGRATION_DISABLED === "1") return [];
-	// The two migrations are independent; a SoT seeding failure must never
-	// block the config.toml repair (which can be the difference between a
-	// working and a fully broken GPT-5.6 session).
-	try {
-		await migrateOmoSotConfig({ env, seed: true });
-	} catch (error) {
-		if (!(error instanceof Error)) throw error;
-	}
 	try {
 		const result = await migrateCodexConfig({ env, sessionModel, requireSessionModel });
 		if (result.modeChanged.length === 0) return [];

@@ -15,7 +15,7 @@ const HOOK_TARGETS = [
   "scripts/auto-update.mjs",
 ] as const
 const WINDOWS_HOOK_TARGET = "components/bootstrap/scripts/bootstrap.ps1"
-const MCP_TARGETS = ["components/codegraph/dist/serve.js", "components/context7/dist/cli.js", "components/lsp-daemon/dist/cli.js"] as const
+const MCP_TARGETS = ["components/context7/dist/cli.js", "components/lsp-daemon/dist/cli.js"] as const
 
 interface BootstrapStateFixture {
   readonly completedForVersion?: string
@@ -81,9 +81,8 @@ async function createInstalledFixture(options: FixtureOptions = {}): Promise<Fix
     ".mcp.json",
     JSON.stringify({
       mcpServers: {
-        codegraph: { command: "node", args: [join(pluginRoot, "components", "codegraph", "dist", "serve.js")] },
         context7: { command: "node", args: ["./components/context7/dist/cli.js", "mcp"] },
-        lsp: { command: "node", args: ["./components/lsp-daemon/dist/cli.js", "mcp"] },
+        lsp: { command: "node", args: [join(pluginRoot, "components", "lsp-daemon", "dist", "cli.js"), "mcp"] },
         grep_app: { url: "https://mcp.grep.app" },
       },
     }),
@@ -184,14 +183,14 @@ describe("codex components doctor check", () => {
 
   test("#given an absolute installed mcp dist target is missing #when checking components #then fails instead of treating the rewrite as drift", async () => {
     // given
-    const fixture = await createInstalledFixture({ omitTargets: ["components/codegraph/dist/serve.js"] })
+    const fixture = await createInstalledFixture({ omitTargets: ["components/lsp-daemon/dist/cli.js"] })
 
     // when
     const result = await checkCodexComponents(buildDeps(fixture))
 
     // then
     expect(result.status).toBe("fail")
-    const issue = result.issues.find((entry) => entry.title.includes("components/codegraph/dist/serve.js"))
+    const issue = result.issues.find((entry) => entry.title.includes("components/lsp-daemon/dist/cli.js"))
     expect(issue).toBeDefined()
     expect(issue?.severity).toBe("error")
     expect(issue?.description).toContain(".mcp.json")
@@ -275,7 +274,7 @@ describe("codex components doctor check", () => {
     expect(result.status).toBe("pass")
     expect(result.issues).toEqual([])
     expect(
-      result.details?.some((detail) => detail.includes("bootstrap pending — start a Codex session")),
+      result.details?.some((detail) => detail.includes("bootstrap pending: start a Codex session")),
     ).toBe(true)
     expect(result.details?.some((detail) => detail.includes("state none"))).toBe(true)
   })
@@ -291,7 +290,7 @@ describe("codex components doctor check", () => {
 
     // then
     expect(result.status).toBe("pass")
-    const pending = result.details?.find((detail) => detail.includes("bootstrap pending — start a Codex session"))
+    const pending = result.details?.find((detail) => detail.includes("bootstrap pending: start a Codex session"))
     expect(pending).toBeDefined()
     expect(pending).toContain(`installed ${PLUGIN_VERSION}`)
     expect(pending).toContain("state 4.0.0")
@@ -334,7 +333,7 @@ describe("codex components doctor check", () => {
     // then
     expect(result.status).toBe("pass")
     expect(
-      result.details?.some((detail) => detail.includes("bootstrap pending — start a Codex session")),
+      result.details?.some((detail) => detail.includes("bootstrap pending: start a Codex session")),
     ).toBe(true)
   })
 

@@ -2,7 +2,6 @@ import type { BuiltinSkill } from "./types"
 import type { BrowserAutomationProvider } from "../../types"
 
 import {
-  agentBrowserSkill,
   createPlaywrightSkill,
   playwrightSkill,
   playwrightCliSkill,
@@ -41,21 +40,16 @@ export function createBuiltinSkills(options: CreateBuiltinSkillsOptions = {}): B
     playwrightMcpArgs,
   } = options
 
-  let browserSkill: BuiltinSkill
-	if (browserProvider === "agent-browser") {
-		browserSkill = agentBrowserSkill
-	} else if (browserProvider === "dev-browser") {
-		browserSkill = devBrowserSkill
-	} else if (browserProvider === "playwright-cli") {
-		browserSkill = playwrightCliSkill
-	} else {
-		browserSkill = playwrightMcpArgs?.length
-			? createPlaywrightSkill({ mcp_args: playwrightMcpArgs })
-			: playwrightSkill
-	}
+  const browserSkills = {
+    "dev-browser": devBrowserSkill,
+    "playwright-cli": playwrightCliSkill,
+    playwright: playwrightMcpArgs?.length
+      ? createPlaywrightSkill({ mcp_args: playwrightMcpArgs })
+      : playwrightSkill,
+  } satisfies Record<BrowserAutomationProvider, BuiltinSkill>
 
 	const skills = [
-		browserSkill,
+		browserSkills[browserProvider],
 		frontendSkill,
 		gitMasterSkill,
 		reviewWorkSkill,

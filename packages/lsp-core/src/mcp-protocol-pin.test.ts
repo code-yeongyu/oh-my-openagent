@@ -3,6 +3,35 @@ import { Readable, Writable } from "node:stream";
 import { handleLspMcpRequest, runMcpStdioServer } from "./mcp";
 
 describe("lsp MCP protocol pins", () => {
+  for (const [requested, expected] of [
+    ["2025-06-18", "2025-06-18"],
+    ["2025-03-26", "2025-03-26"],
+    ["2024-11-05", "2024-11-05"],
+    ["2026-07-28", "2025-06-18"],
+    ["2025-11-25", "2025-06-18"],
+    ["unknown", "2025-06-18"],
+    ["", "2025-06-18"],
+    [null, "2025-06-18"],
+    [42, "2025-06-18"],
+    [undefined, "2025-06-18"],
+  ] as const) {
+    it(`negotiates ${String(requested)} as ${expected} over stdio`, async () => {
+      const out: string[] = [];
+      await runMcpStdioServer(Readable.from([`${JSON.stringify({
+        jsonrpc: "2.0", id: 7, method: "initialize",
+        params: { protocolVersion: requested },
+      })}\n`]), collectingWritable(out));
+      expect(JSON.parse(out.join(""))).toEqual({
+        jsonrpc: "2.0", id: 7,
+        result: {
+          capabilities: { tools: { listChanged: false } },
+          serverInfo: { name: "lsp", version: "0.1.0" },
+          protocolVersion: expected,
+        },
+      });
+    });
+  }
+
   it("#given initialize request #when handled #then exact server info and capabilities stay stable", async () => {
     const response = await handleLspMcpRequest({
       jsonrpc: "2.0",

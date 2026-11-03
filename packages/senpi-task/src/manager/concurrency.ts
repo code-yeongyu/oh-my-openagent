@@ -1,56 +1,35 @@
-export type TaskConcurrencyConfig = {
-  readonly default_concurrency?: number
-  readonly provider_concurrency?: Readonly<Record<string, number>>
-  readonly model_concurrency?: Readonly<Record<string, number>>
-  readonly global_concurrency?: number
-}
+import { TaskWaitQueue, type QueuedTaskAdmission, type TaskWaiter as Waiter } from "./concurrency-waiters"
+import { getTaskLimit, getTaskLaneKey, type TaskConcurrencyConfig } from "./concurrency-routing"
+import { ParkedLeases, type ParkedEntry, taskLeaseKey as leaseKeyOf } from "./parked-leases"
 
-type Waiter = {
-  readonly model: string
-  readonly laneKey: string
-  readonly taskId: string
-  readonly runEpoch: number
-  readonly sequence: number
-  readonly grant: () => void
-}
+export type { TaskConcurrencyConfig } from "./concurrency-routing"
 
-type Lease = {
-  readonly laneKey: string
-  readonly taskId: string
-  readonly runEpoch: number
-}
+type Lease = QueuedTaskAdmission
 
-const DEFAULT_LIMIT = 5
+export type ParkedLease = Lease
 
 // Synchronous lease allocator. Model/provider precedence is intentionally unchanged; global
 // capacity is independent, so even an unbounded lane consumes one global permit.
 export class TaskConcurrency {
   readonly #config: TaskConcurrencyConfig
   readonly #counts = new Map<string, number>()
-  readonly #queues = new Map<string, Waiter[]>()
+  readonly #queues = new TaskWaitQueue()
   readonly #leases = new Map<string, Lease>()
-  #enqueueSequence = 0
+  readonly #parked = new ParkedLeases()
   #legacyEpoch = -1
+  #granting: Waiter | undefined
+  #dispatching = false
 
   constructor(config: TaskConcurrencyConfig = {}) {
     this.#config = config
   }
 
   getLimit(model: string): number {
-    const modelLimit = ownNumber(this.#config.model_concurrency, model)
-    if (modelLimit !== undefined) return modelLimit === 0 ? Number.POSITIVE_INFINITY : modelLimit
-    const providerLimit = ownNumber(this.#config.provider_concurrency, providerOf(model))
-    if (providerLimit !== undefined) return providerLimit === 0 ? Number.POSITIVE_INFINITY : providerLimit
-    const defaultLimit = this.#config.default_concurrency
-    if (defaultLimit !== undefined) return defaultLimit === 0 ? Number.POSITIVE_INFINITY : defaultLimit
-    return DEFAULT_LIMIT
+    return getTaskLimit(this.#config, model)
   }
 
   getKey(model: string): string {
-    if (ownNumber(this.#config.model_concurrency, model) !== undefined) return model
-    const provider = providerOf(model)
-    if (ownNumber(this.#config.provider_concurrency, provider) !== undefined) return provider
-    return model
+    return getTaskLaneKey(this.#config, model)
   }
 
   hasFreeSlot(model: string): boolean {
@@ -60,9 +39,8 @@ export class TaskConcurrency {
 
   tryAcquire(model: string, taskId: string, runEpoch: number): boolean {
     const laneKey = this.getKey(model)
-    const leaseKey = leaseKeyOf(taskId, runEpoch)
-    if (this.#leases.has(leaseKey)) return false
-    if (this.#queues.has(laneKey)) return false
+    if (this.leaseState(taskId, runEpoch) !== undefined) return false
+    if (this.#queues.has(laneKey) && (this.#granting?.taskId !== taskId || this.#granting.runEpoch !== runEpoch)) return false
     if (!this.#laneHasRoom(model, laneKey) || !this.#globalHasRoom()) return false
     this.#recordLease(model, { laneKey, taskId, runEpoch })
     return true
@@ -93,44 +71,115 @@ export class TaskConcurrency {
       grant = runEpochOrGrant
     }
     const laneKey = this.getKey(model)
-    const queue = this.#queues.get(laneKey) ?? []
-    queue.push({ model, laneKey, taskId, runEpoch, sequence: this.#enqueueSequence, grant })
-    this.#enqueueSequence += 1
-    this.#queues.set(laneKey, queue)
-    return queue.length
+    return this.#queues.enqueue({ model, laneKey, taskId, runEpoch, grant })
   }
 
   queuePosition(model: string, taskId: string): number | undefined {
-    const queue = this.#queues.get(this.getKey(model))
-    if (queue === undefined) return undefined
-    const index = queue.findIndex((waiter) => waiter.taskId === taskId)
-    return index === -1 ? undefined : index + 1
+    return this.#queues.position(this.getKey(model), taskId)
   }
 
   remove(model: string, taskId: string): boolean {
-    const laneKey = this.getKey(model)
-    const queue = this.#queues.get(laneKey)
-    if (queue === undefined) return false
-    const index = queue.findIndex((waiter) => waiter.taskId === taskId)
-    if (index === -1) return false
-    queue.splice(index, 1)
-    if (queue.length === 0) this.#queues.delete(laneKey)
+    return this.#queues.take(this.getKey(model), taskId) !== undefined
+  }
+
+  withdraw(model: string, taskId: string, runEpoch: number): QueuedTaskAdmission | undefined {
+    return this.#queues.take(this.getKey(model), taskId, runEpoch)
+  }
+
+  requeue(admission: QueuedTaskAdmission, grant: () => void): number {
+    return this.#queues.enqueue({ ...admission, grant })
+  }
+
+  admission(taskId: string, runEpoch: number): (QueuedTaskAdmission & { readonly phase: "pre_grant" | "post_grant" | "parked" }) | undefined {
+    const key = leaseKeyOf(taskId, runEpoch)
+    const lease = this.#leases.get(key)
+    if (lease !== undefined) return { ...lease, phase: "post_grant" }
+    for (const lane of this.#parked.values()) {
+      const entry = lane.get(key)
+      if (entry !== undefined) return { ...entry.lease, phase: "parked" }
+    }
+    const queued = this.#queues.admission(taskId, runEpoch)
+    return queued === undefined ? undefined : { ...queued, phase: "pre_grant" }
+  }
+
+  leaseState(taskId: string, runEpoch: number): "held" | "parked" | undefined {
+    const key = leaseKeyOf(taskId, runEpoch)
+    if (this.#leases.has(key)) return "held"
+    for (const lane of this.#parked.values()) if (lane.has(key)) return "parked"
+    return undefined
+  }
+
+  park(taskId: string, runEpoch: number): ParkedLease | undefined {
+    const key = leaseKeyOf(taskId, runEpoch)
+    const lease = this.#leases.get(key)
+    if (lease === undefined) return undefined
+    this.#parked.store(lease)
+    this.#dropLease(lease)
+    this.#dispatch()
+    return lease
+  }
+
+  unpark(lease: ParkedLease | undefined, signal?: AbortSignal, options: { readonly overflow?: boolean } = {}): Promise<void> {
+    if (lease === undefined) return Promise.resolve()
+    const entry = this.#parked.get(lease.laneKey)?.get(leaseKeyOf(lease.taskId, lease.runEpoch))
+    // A stale token cannot resurrect a released task or resume a later parking of the same epoch.
+    if (entry?.lease !== lease) return Promise.resolve()
+    const abort = (): void => this.releaseLease(lease.taskId, lease.runEpoch)
+    if (signal?.aborted) {
+      abort()
+      return Promise.resolve()
+    }
+    signal?.addEventListener("abort", abort, { once: true })
+    entry.resumable = true
+    if (options.overflow === true) this.#resume(entry)
+    this.#dispatch()
+    return entry.resumed.finally(() => signal?.removeEventListener("abort", abort))
+  }
+
+  suspendUnpark(lease: ParkedLease): void { this.#parked.suspend(lease) }
+
+  releaseLease(taskId: string, runEpoch: number): void {
+    const key = leaseKeyOf(taskId, runEpoch)
+    const lease = this.#leases.get(key)
+    if (lease !== undefined) this.#dropLease(lease)
+    for (const lane of this.#parked.values()) {
+      const entry = lane.get(key)
+      if (entry !== undefined) this.#parked.remove(entry)
+    }
+    this.#dispatch()
+  }
+
+  // Re-key a held lease to the task's next run epoch without freeing its slot: a re-dispatch keeps
+  // the lane occupancy its abandoned run held, so no queued waiter can take the slot in between.
+  transferLease(taskId: string, fromEpoch: number, toEpoch: number): boolean {
+    const lease = this.#leases.get(leaseKeyOf(taskId, fromEpoch))
+    if (lease === undefined || this.leaseState(taskId, toEpoch) !== undefined) return false
+    this.#leases.delete(leaseKeyOf(taskId, fromEpoch))
+    this.#leases.set(leaseKeyOf(taskId, toEpoch), { ...lease, runEpoch: toEpoch })
     return true
   }
 
-  releaseLease(taskId: string, runEpoch: number): void {
-    const lease = this.#leases.get(leaseKeyOf(taskId, runEpoch))
-    if (lease === undefined) return
-    this.#dropLease(lease)
+  // Every lease a task holds or has parked, at any epoch: a task that can never run again (cancelled)
+  // owns no lane slot, whichever run took it (omo#9403).
+  releaseTask(taskId: string): void {
+    const owned = [...this.#leases.values()].filter((lease) => lease.taskId === taskId)
+    for (const lease of owned) this.#dropLease(lease)
+    for (const lane of [...this.#parked.values()]) {
+      for (const entry of [...lane.values()]) if (entry.lease.taskId === taskId) this.#parked.remove(entry)
+    }
     this.#dispatch()
+  }
+
+  #resume(entry: ParkedEntry): void {
+    this.#recordLease(entry.lease.model, entry.lease)
+    this.#parked.remove(entry)
   }
 
   release(model: string): void {
     const laneKey = this.getKey(model)
     const lease = this.#leases.values().find((candidate) => candidate.laneKey === laneKey)
-    if (lease === undefined) return
-    this.#dropLease(lease)
-    this.#dispatch()
+      ?? this.#parked.get(laneKey)?.values().next().value?.lease
+    if (lease !== undefined) this.releaseLease(lease.taskId, lease.runEpoch)
   }
 
   getCount(model: string): number {
@@ -141,9 +190,28 @@ export class TaskConcurrency {
     return { lanes: this.#counts.size, queues: this.#queues.size, leases: this.#leases.size }
   }
 
+  // Workpool pushes schedule this only after returning their durable item IDs.
+  drain(): void { this.#dispatch() }
+
   #dispatch(): void {
+    if (this.#dispatching) return
+    this.#dispatching = true
+    try { this.#drainEligible() } finally { this.#dispatching = false }
+  }
+
+  #drainEligible(): void {
     for (;;) {
       if (!this.#globalHasRoom()) return
+      // Existing owners resume before queue heads, without putting dormant parents in the FIFO.
+      let resumable: ParkedEntry | undefined
+      for (const [laneKey, lane] of this.#parked) {
+        resumable = lane.values().find((entry) => entry.resumable && this.#laneHasRoom(entry.lease.model, laneKey))
+        if (resumable !== undefined) break
+      }
+      if (resumable !== undefined) {
+        this.#resume(resumable)
+        continue
+      }
       let selected: Waiter | undefined
       for (const [laneKey, queue] of this.#queues) {
         const head = queue[0]
@@ -157,15 +225,22 @@ export class TaskConcurrency {
       if (selected === undefined) return
       const queue = this.#queues.get(selected.laneKey)
       if (queue === undefined) continue
+      this.#granting = selected
+      let acquired: boolean
+      try { acquired = this.tryAcquire(selected.model, selected.taskId, selected.runEpoch) }
+      finally { this.#granting = undefined }
+      // An advisory capacity observation is not a lease. Leave this waiter in place exactly
+      // once when the atomic acquisition loses; a release will drain it, never a retry loop.
+      if (!acquired) return
       queue.shift()
       if (queue.length === 0) this.#queues.delete(selected.laneKey)
-      this.#recordLease(selected.model, selected)
       selected.grant()
     }
   }
 
-  #recordLease(model: string, lease: Lease): void {
-    this.#leases.set(leaseKeyOf(lease.taskId, lease.runEpoch), lease)
+  #recordLease(model: string, lease: Omit<Lease, "model" | "sequence"> & { readonly sequence?: number }): void {
+    const sequence = lease.sequence ?? this.#granting?.sequence ?? this.#queues.reserveSequence()
+    this.#leases.set(leaseKeyOf(lease.taskId, lease.runEpoch), { ...lease, model, sequence })
     if (this.getLimit(model) === Number.POSITIVE_INFINITY) return
     this.#counts.set(lease.laneKey, (this.#counts.get(lease.laneKey) ?? 0) + 1)
   }
@@ -192,17 +267,4 @@ export class TaskConcurrency {
     this.#legacyEpoch -= 1
     return epoch
   }
-}
-
-function leaseKeyOf(taskId: string, runEpoch: number): string {
-  return `${taskId.length}:${taskId}:${runEpoch}`
-}
-
-function providerOf(model: string): string {
-  return model.split("/")[0] ?? model
-}
-
-function ownNumber(record: Readonly<Record<string, number>> | undefined, key: string): number | undefined {
-  if (record === undefined || !Object.hasOwn(record, key)) return undefined
-  return record[key]
 }

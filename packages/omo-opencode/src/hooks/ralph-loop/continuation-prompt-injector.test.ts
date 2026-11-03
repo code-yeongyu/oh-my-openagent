@@ -277,4 +277,65 @@ describe("ralph-loop continuation prompt injector", () => {
     })
     expect(promptBody?.variant).toBe("max")
   })
+
+  test("#given the newest assistant message carries a flat variant #when injecting continuation prompt #then promptAsync receives the variant as a top-level field", async () => {
+    // given
+    let promptBody:
+      | {
+          model?: { providerID: string; modelID: string }
+          variant?: string
+        }
+      | undefined
+    const ctx = {
+      client: {
+        session: {
+          messages: async () => ({
+            data: [
+              {
+                info: {
+                  role: "user",
+                  agent: "sisyphus",
+                  model: { providerID: "openai", modelID: "gpt-5.5", variant: "max" },
+                },
+              },
+              {
+                info: {
+                  role: "assistant",
+                  finish: "stop",
+                  agent: "sisyphus",
+                  providerID: "openai",
+                  modelID: "gpt-5.5",
+                  variant: "max",
+                },
+              },
+            ],
+          }),
+          promptAsync: async (input: {
+            body: {
+              model?: { providerID: string; modelID: string }
+              variant?: string
+            }
+          }) => {
+            promptBody = input.body
+            return {}
+          },
+        },
+      },
+    }
+
+    // when
+    await injectContinuationPrompt(ctx as never, {
+      sessionID: "ses_ralph_flat_variant",
+      prompt: "continue",
+      directory: "/tmp/test",
+      apiTimeoutMs: 50,
+    })
+
+    // then
+    expect(promptBody?.model).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5.5",
+    })
+    expect(promptBody?.variant).toBe("max")
+  })
 })

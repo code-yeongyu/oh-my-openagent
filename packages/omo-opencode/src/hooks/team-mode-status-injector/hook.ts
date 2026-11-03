@@ -101,7 +101,7 @@ function latestUserMessageRequestsTeamMode(
 function buildTeamModeStatusContent(): string {
   return `${TEAM_MODE_STATUS_MARKER}
 Team mode is ENABLED for this session. Presence of the team_* tools is authoritative proof; do not inspect config files to verify.
-Closure invariant: every team you open is yours to close. After each team_task_update that completes or fails a task, call team_task_list({ teamRunId }); if every task is terminal, run team_shutdown_request + team_approve_shutdown per active member, then team_delete — in the same turn, without waiting for the user to ask. Lingering teams are a defect.
+Closure invariant: every team you open is yours to close. After each team_task_update that completes or fails a task, call team_task_list({ teamRunId }); if every task is terminal, run team_shutdown_request + team_approve_shutdown per active member, then team_delete in the same turn, without waiting for the user to ask. Lingering teams are a defect.
 Load the team-mode skill for the full Closure Contract and Closure Sequence.
 </team_mode_status>`
 }

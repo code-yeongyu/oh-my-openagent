@@ -1,6 +1,8 @@
 import type { ModelCapabilitiesSnapshotEntry } from "./types"
+import { FABLE_55_LAUNCH } from "../fable-55-launch"
 
 export const SUPPLEMENTAL_MODEL_CAPABILITIES: Record<string, ModelCapabilitiesSnapshotEntry> = {
+	[FABLE_55_LAUNCH.id]: FABLE_55_LAUNCH,
 	"kimi-k3": {
 		id: "kimi-k3",
 		family: "kimi",
@@ -16,6 +18,38 @@ export const SUPPLEMENTAL_MODEL_CAPABILITIES: Record<string, ModelCapabilitiesSn
 			output: 262144,
 		},
 	},
+	// Kimi K3.1 Pro (Moonshot docs, 2026-10-27): 1M context, max_completion_tokens up to the full
+	// window (131072 by default), thinking always on, same parameter constraints as kimi-k3.
+	"kimi-k3.1-pro": {
+		id: "kimi-k3.1-pro",
+		family: "kimi",
+		reasoning: true,
+		temperature: true,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image", "video"],
+			output: ["text"],
+		},
+		limit: {
+			context: 1048576,
+			output: 1048576,
+		},
+	},
+	"kimi-k3.1-pro-highspeed": {
+		id: "kimi-k3.1-pro-highspeed",
+		family: "kimi",
+		reasoning: true,
+		temperature: true,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image", "video"],
+			output: ["text"],
+		},
+		limit: {
+			context: 1048576,
+			output: 1048576,
+		},
+	},
 	"kimi-k2.6": {
 		id: "kimi-k2.6",
 		family: "kimi",
@@ -29,6 +63,115 @@ export const SUPPLEMENTAL_MODEL_CAPABILITIES: Record<string, ModelCapabilitiesSn
 		limit: {
 			context: 262144,
 			output: 262144,
+		},
+	},
+	"claude-fable-5-1": {
+		id: "claude-fable-5-1",
+		family: "claude-fable",
+		reasoning: true,
+		temperature: false,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image", "pdf"],
+			output: ["text"],
+		},
+		limit: {
+			context: 1000000,
+			output: 128000,
+		},
+	},
+	"gpt-6-astra": {
+		id: "gpt-6-astra",
+		family: "gpt",
+		reasoning: true,
+		temperature: false,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 1050000,
+			input: 922000,
+			output: 128000,
+		},
+	},
+	"gpt-6-sol": {
+		id: "gpt-6-sol",
+		family: "gpt",
+		reasoning: true,
+		temperature: false,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 1050000,
+			input: 922000,
+			output: 128000,
+		},
+	},
+	"gpt-6-sol-fast": {
+		id: "gpt-6-sol-fast",
+		family: "gpt",
+		reasoning: true,
+		temperature: false,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 1050000,
+			input: 922000,
+			output: 128000,
+		},
+	},
+	"gpt-6.1-sol": {
+		id: "gpt-6.1-sol",
+		family: "gpt",
+		reasoning: true,
+		temperature: false,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 400000,
+			output: 128000,
+		},
+	},
+	"gpt-6.1-sol-fast": {
+		id: "gpt-6.1-sol-fast",
+		family: "gpt",
+		reasoning: true,
+		temperature: false,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 400000,
+			output: 128000,
+		},
+	},
+	"gpt-6-luna": {
+		id: "gpt-6-luna",
+		family: "gpt-nano",
+		reasoning: true,
+		temperature: false,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 1050000,
+			input: 922000,
+			output: 128000,
 		},
 	},
 	"gpt-5.6-sol": {
@@ -95,6 +238,38 @@ export const SUPPLEMENTAL_MODEL_CAPABILITIES: Record<string, ModelCapabilitiesSn
 			output: 128000,
 		},
 	},
+	// DeepSeek V4.1 Flash: official API id since 2026-09-10 (models.dev deepseek/deepseek-flash); multimodal input.
+	"deepseek-flash": {
+		id: "deepseek-flash",
+		family: "deepseek-flash",
+		reasoning: true,
+		temperature: true,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 1000000,
+			output: 384000,
+		},
+	},
+	"gpt-6-luna-fast": {
+		id: "gpt-6-luna-fast",
+		family: "gpt-nano",
+		reasoning: true,
+		temperature: false,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 1050000,
+			input: 922000,
+			output: 128000,
+		},
+	},
 	"gpt-5.6-luna-fast": {
 		id: "gpt-5.6-luna-fast",
 		family: "gpt-mini",
@@ -106,9 +281,205 @@ export const SUPPLEMENTAL_MODEL_CAPABILITIES: Record<string, ModelCapabilitiesSn
 			output: ["text"],
 		},
 		limit: {
-			context: 400000,
-			input: 272000,
+			// DevNewbie1826: thanks for catching the 1M Luna Fast capability gap.
+			context: 1050000,
+			input: 922000,
 			output: 128000,
+		},
+	},
+	"grok-4.5": {
+		id: "grok-4.5",
+		family: "grok",
+		reasoning: false,
+		temperature: true,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 500000,
+			output: 32768,
+		},
+	},
+	"xai/grok-4.5": {
+		id: "xai/grok-4.5",
+		family: "grok",
+		reasoning: false,
+		temperature: true,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 500000,
+			output: 32768,
+		},
+	},
+	"x-ai/grok-4.5": {
+		id: "x-ai/grok-4.5",
+		family: "grok",
+		reasoning: false,
+		temperature: true,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 500000,
+			output: 32768,
+		},
+	},
+	"grok-4.6": {
+		id: "grok-4.6",
+		family: "grok",
+		reasoning: false,
+		temperature: true,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 500000,
+			output: 32768,
+		},
+	},
+	"xai/grok-4.6": {
+		id: "xai/grok-4.6",
+		family: "grok",
+		reasoning: false,
+		temperature: true,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 500000,
+			output: 32768,
+		},
+	},
+	"claude-sonnet-5-5": {
+		id: "claude-sonnet-5-5",
+		family: "claude-sonnet",
+		reasoning: true,
+		temperature: false,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image", "pdf"],
+			output: ["text"],
+		},
+		limit: {
+			context: 1000000,
+			output: 128000,
+		},
+	},
+	"anthropic/claude-sonnet-5-5": {
+		id: "anthropic/claude-sonnet-5-5",
+		family: "claude-sonnet",
+		reasoning: true,
+		temperature: false,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image", "pdf"],
+			output: ["text"],
+		},
+		limit: {
+			context: 1000000,
+			output: 128000,
+		},
+	},
+	"grok-4.7": {
+		id: "grok-4.7",
+		family: "grok",
+		reasoning: false,
+		temperature: true,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 500000,
+			output: 32768,
+		},
+	},
+	"xai/grok-4.7": {
+		id: "xai/grok-4.7",
+		family: "grok",
+		reasoning: false,
+		temperature: true,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 500000,
+			output: 32768,
+		},
+	},
+	"xai/grok-build-0.1": {
+		id: "xai/grok-build-0.1",
+		family: "grok",
+		reasoning: false,
+		temperature: true,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 256000,
+			output: 32768,
+		},
+	},
+	"x-ai/grok-build-0.1": {
+		id: "x-ai/grok-build-0.1",
+		family: "grok",
+		reasoning: false,
+		temperature: true,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 256000,
+			output: 32768,
+		},
+	},
+	"mimo-v2.6-pro": {
+		id: "mimo-v2.6-pro",
+		family: "mimo",
+		reasoning: true,
+		temperature: true,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 1048576,
+			output: 131072,
+		},
+	},
+	"xiaomi/mimo-v2.6-pro": {
+		id: "xiaomi/mimo-v2.6-pro",
+		family: "mimo",
+		reasoning: true,
+		temperature: true,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
+			output: ["text"],
+		},
+		limit: {
+			context: 1048576,
+			output: 131072,
 		},
 	},
 }

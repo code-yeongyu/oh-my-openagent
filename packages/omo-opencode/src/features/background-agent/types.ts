@@ -50,10 +50,12 @@ export interface BackgroundTask {
   teamRunId?: string
   description: string
   prompt: string
+  originalPrompt?: string
   agent: string
   spawnDepth?: number
   status: BackgroundTaskStatus
   queuedAt?: Date
+  pendingResume?: object
   startedAt?: Date
   completedAt?: Date
   result?: string
@@ -79,6 +81,8 @@ export interface BackgroundTask {
   isUnstableAgent?: boolean
   /** Category used for this task (e.g., 'quick', 'visual-engineering') */
   category?: string
+  /** Directory the child session is created and prompted in; defaults to the parent session directory */
+  cwd?: string
   onSessionCreated?: (sessionId: string) => void | Promise<void>
   /** Pending retry notification details for the next spawned retry session */
   retryNotification?: {
@@ -99,6 +103,8 @@ export interface BackgroundTask {
   stablePolls?: number
   /** Number of consecutive polls where session was missing from status map */
   consecutiveMissedPolls?: number
+  /** Number of consecutive idle polls where the session still ended on an errored assistant turn */
+  consecutiveErroredIdlePolls?: number
 }
 
 export interface BackgroundTaskSnapshot {
@@ -128,6 +134,8 @@ export interface LaunchInput {
   skillContent?: string
   category?: string
   sessionPermission?: SessionPermissionRule[]
+  /** Directory the child session is created and prompted in; defaults to the parent session directory */
+  cwd?: string
   onSessionCreated?: (sessionId: string) => void | Promise<void>
   /** User tool overrides (ask/allow/deny) from category or agent config. Merged into launchTools before hardcoded restrictions. */
   userPermission?: Record<string, "ask" | "allow" | "deny">

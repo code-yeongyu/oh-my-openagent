@@ -1,7 +1,7 @@
 /// <reference path="../../../../bun-test.d.ts" />
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs"
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs"
 import { tmpdir } from "os"
 import { dirname, join } from "path"
 import { fileURLToPath, pathToFileURL } from "url"
@@ -161,36 +161,34 @@ describe("startReplyListener", () => {
     })
 
     let spawnCalls = 0
-    spawnImplementation = () => {
+    spawnImplementation = (_daemonScript, startupToken) => {
       spawnCalls += 1
       const nextPid = 4321
       livePids.add(nextPid)
       daemonPids.add(nextPid)
 
-      const markReady = (): void => {
-        if (!existsSync(stateFilePath)) {
-          setTimeout(markReady, 5)
-          return
-        }
-
-        const pendingState = JSON.parse(readFileSync(stateFilePath, "utf-8")) as Record<string, unknown>
-        writeFileSync(
-          stateFilePath,
-          JSON.stringify(
-            {
-              ...pendingState,
-              isRunning: true,
-              pid: nextPid,
-              lastPollAt: "2026-04-07T00:00:00.000Z",
-              messagesSeen: 2,
-            },
-            null,
-            2,
-          ),
-        )
-      }
-
-      setTimeout(markReady, 5)
+      // Startup persists the pending state before spawning. Publish readiness at that
+      // handoff, rather than racing a fixture timer against the startup deadline.
+      const pendingState = JSON.parse(readFileSync(stateFilePath, "utf-8")) as Record<string, unknown>
+      expect(pendingState.isRunning).toBe(false)
+      expect(pendingState.pid).toBeNull()
+      expect(pendingState.startupToken).toBe(startupToken)
+      expect(startupToken).not.toBe("existing")
+      expect(livePids.has(existingPid)).toBe(false)
+      writeFileSync(
+        stateFilePath,
+        JSON.stringify(
+          {
+            ...pendingState,
+            isRunning: true,
+            pid: nextPid,
+            lastPollAt: "2026-04-07T00:00:00.000Z",
+            messagesSeen: 2,
+          },
+          null,
+          2,
+        ),
+      )
 
       return {
         pid: nextPid,
@@ -202,7 +200,13 @@ describe("startReplyListener", () => {
     try {
       const result = await replyListenerModule.startReplyListener(createConfig())
 
-      expect(result.success).toBe(true)
+      expect({ success: result.success, error: result.error ?? result.state?.lastError }).toEqual({
+        success: true,
+        error: undefined,
+      })
+      expect(result.state?.isRunning).toBe(true)
+      expect(result.state?.pid).toBe(4321)
+      expect(result.state?.messagesSeen).toBe(2)
       expect(spawnCalls).toBe(1)
       expect(killSpy).toHaveBeenCalledWith(existingPid, "SIGTERM")
 

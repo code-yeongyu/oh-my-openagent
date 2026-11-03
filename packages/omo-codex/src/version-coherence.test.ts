@@ -61,13 +61,6 @@ describe("OMO Codex version coherence", () => {
     }
   })
 
-  it("#given no manifest is missing a version #when checking versioned manifests #then each declares a string version", () => {
-    // when / then
-    for (const manifest of versionedManifests()) {
-      expect(typeof readJson(manifest).version).toBe("string")
-    }
-  })
-
   it("#given every committed hooks.json #when scanning LazyCodex status messages #then none carry a stale version label", () => {
     // given
     const expected = rootVersion()

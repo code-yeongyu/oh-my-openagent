@@ -25,8 +25,8 @@ function oneIdleSession(): ChildSession {
   return {
     sessionId: "sess-race",
     prompt: () => idle,
-    steer: async () => {},
-    followUp: async () => {},
+    steer: async () => "handled",
+    followUp: async () => "handled",
     abort: async () => {
       fireIdle()
       await idle

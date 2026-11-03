@@ -1,0 +1,40 @@
+{
+  "command": [
+    "bun",
+    "script/qa/dependency-audit-capture.ts",
+    "--phase",
+    "baseline",
+    "--binary",
+    "$INPUT_BINARY",
+    "--out",
+    "$OUT"
+  ],
+  "machine": "darwin-arm64-20030cfa6181",
+  "versions": {
+    "bun": "1.4.2",
+    "node": "v26.7.0"
+  },
+  "exitCode": 0,
+  "timestamp": "2026-09-13T10:48:02.908Z",
+  "schemaVersion": 1,
+  "phase": "baseline",
+  "case": "bytes",
+  "binarySha256": "c593321c06beacd0af1a94cda7a93fc5d76608e0f62efeb7fc5bf324c6059d76",
+  "pass": true,
+  "size": 130850802,
+  "sha256": "c593321c06beacd0af1a94cda7a93fc5d76608e0f62efeb7fc5bf324c6059d76",
+  "target": "darwin-arm64",
+  "bunVersion": "1.4.2",
+  "commands": [
+    {
+      "command": [
+        "$SANDBOX/omo",
+        "--version"
+      ],
+      "exitCode": 0,
+      "stdout": "omob dev build\nomo   76e54b0a9bfa7bc730afefa877aea03f2c948b08 2026-09-13T12:03:49+09:00 (dev)\nsenpi 806f8e0ab4de7d4237e835c5f3cd4e2378c97f38 2026-09-13T01:17:58Z (main)\n",
+      "stderr": ""
+    }
+  ],
+  "cleanup": "isolated HOME, agent, copied binary, and temporary workspace removed"
+}

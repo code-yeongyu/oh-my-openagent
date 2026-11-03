@@ -225,7 +225,7 @@ test("#given test command override #when running check #then records state and l
 			toVersion: "1.0.1",
 		},
 	]);
-	assert.match(await readFile(join(env.CODEX_HOME, "config.toml"), "utf8"), /model = "gpt-5\.6-sol"/);
+	assert.match(await readFile(join(env.CODEX_HOME, "config.toml"), "utf8"), /model = "gpt-6-astra"/);
 });
 
 test("#given failed waited update #when retry window passes #then next update is not blocked by success throttle", async () => {
@@ -279,7 +279,7 @@ test("#given active lock #when running check #then skips concurrent update", asy
 
 	assert.equal(result.started, false);
 	assert.equal(result.reason, "locked");
-	assert.match(await readFile(join(root, "codex-home", "config.toml"), "utf8"), /model_context_window = 650000/);
+	assert.match(await readFile(join(root, "codex-home", "config.toml"), "utf8"), /model_context_window = 600000/);
 });
 
 test("#given stale lock #when running check #then removes lock and runs update", async () => {
@@ -415,6 +415,68 @@ test("#given marketplace flow with stale local cache state #when running check #
 		{ kind: "missing-marketplace-payload" },
 		{ kind: "dangling-managed-bin", binName: "ulw" },
 	]);
+});
+
+async function writeStaleCacheManifestWithConfig(codexHome, marketplaceBlock) {
+	await mkdir(join(codexHome, "plugins", "cache", "sisyphuslabs", ".agents", "plugins"), { recursive: true });
+	await writeFile(
+		join(codexHome, "plugins", "cache", "sisyphuslabs", ".agents", "plugins", "marketplace.json"),
+		JSON.stringify({
+			name: "sisyphuslabs",
+			plugins: [{ name: "omo", source: { source: "local", path: "./omo/1.0.1" } }],
+		}),
+	);
+	await writeFile(join(codexHome, "config.toml"), marketplaceBlock);
+}
+
+test("#given a Git marketplace in config and a stale cache manifest #when resolving plan #then no local repair starts", async () => {
+	const { root, pluginRoot } = await makeStorePluginRoot("lazycodex-auto-update-git-marketplace-");
+	const codexHome = join(root, "codex-home");
+	await writeStaleCacheManifestWithConfig(
+		codexHome,
+		'[marketplaces.sisyphuslabs]\nsource_type = "git"\nsource = "https://github.com/code-yeongyu/lazycodex.git"\n',
+	);
+	const env = marketplaceCheckEnv(root, pluginRoot, join(root, "spawn.log"), { CODEX_HOME: codexHome });
+
+	const plan = resolveAutoUpdatePlan({ env, now: 123_457, lastCheckedAt: 123_456, lastStatus: "success" });
+
+	assert.equal(plan.shouldRun, false);
+	assert.equal(plan.reason, "marketplace-flow");
+});
+
+test("#given a Git marketplace in config and a dangling managed bin #when resolving plan #then the bin still starts the repair", async () => {
+	const { root, pluginRoot } = await makeStorePluginRoot("lazycodex-auto-update-git-marketplace-bin-");
+	const codexHome = join(root, "codex-home");
+	const binDir = join(root, "bin");
+	await writeStaleCacheManifestWithConfig(
+		codexHome,
+		'[marketplaces.sisyphuslabs]\nsource_type = "git"\nsource = "https://github.com/code-yeongyu/lazycodex.git"\n',
+	);
+	await mkdir(binDir, { recursive: true });
+	await symlink(join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", "1.0.1", "components", "ulw-loop", "dist", "cli.js"), join(binDir, "ulw"));
+	const env = marketplaceCheckEnv(root, pluginRoot, join(root, "spawn.log"), { CODEX_HOME: codexHome, CODEX_LOCAL_BIN_DIR: binDir });
+
+	const plan = resolveAutoUpdatePlan({ env, now: 123_457, lastCheckedAt: 123_456, lastStatus: "success" });
+
+	assert.equal(plan.shouldRun, true);
+	assert.equal(plan.kind, "marketplace-local-repair");
+	assert.deepEqual(plan.repairReasons, [{ kind: "dangling-managed-bin", binName: "ulw" }]);
+});
+
+test("#given a local marketplace in config and a stale cache manifest #when resolving plan #then local repair still starts", async () => {
+	const { root, pluginRoot } = await makeStorePluginRoot("lazycodex-auto-update-local-marketplace-");
+	const codexHome = join(root, "codex-home");
+	await writeStaleCacheManifestWithConfig(
+		codexHome,
+		`[marketplaces.sisyphuslabs]\nsource_type = "local"\nsource = ${JSON.stringify(join(codexHome, "plugins", "cache", "sisyphuslabs"))}\n`,
+	);
+	const env = marketplaceCheckEnv(root, pluginRoot, join(root, "spawn.log"), { CODEX_HOME: codexHome });
+
+	const plan = resolveAutoUpdatePlan({ env, now: 123_457, lastCheckedAt: 123_456, lastStatus: "success" });
+
+	assert.equal(plan.shouldRun, true);
+	assert.equal(plan.kind, "marketplace-local-repair");
+	assert.deepEqual(plan.repairReasons, [{ kind: "missing-marketplace-payload" }]);
 });
 
 test("#given stale marketplace cache and recent success state #when resolving plan #then repair bypasses success throttle", async () => {
@@ -645,35 +707,10 @@ test("#given throttled updater and stale Codex config #when running check #then 
 	const content = await readFile(join(codexHome, "config.toml"), "utf8");
 	assert.equal(result.started, false);
 	assert.equal(result.reason, "throttled");
-	assert.match(content, /model = "gpt-5\.6-sol"/);
-	assert.match(content, /model_context_window = 650000/);
+	assert.match(content, /model = "gpt-6-astra"/);
+	assert.match(content, /model_context_window = 600000/);
 	assert.match(content, /model_reasoning_effort = "high"/);
 	assert.match(content, /plan_mode_reasoning_effort = "xhigh"/);
 	assert.doesNotMatch(content, /gpt-5\.2/);
 });
 
-test("#given throttled updater and no OMO SOT #when running check #then OMO SOT seed migration still runs", async () => {
-	const root = await mkdtemp(join(tmpdir(), "lazycodex-auto-update-omo-sot-"));
-	const statePath = join(root, "state.json");
-	const home = join(root, "home");
-	await writeFile(statePath, JSON.stringify({ lastCheckedAt: 99_999 }, null, 2));
-	await mkdir(join(root, "codex-home"), { recursive: true });
-
-	const result = await runAutoUpdateCheck({
-		env: {
-			CODEX_HOME: join(root, "codex-home"),
-			HOME: home,
-			CODEX_CODEGRAPH_ENABLED: "0",
-			LAZYCODEX_MODEL_CATALOG_STATE_PATH: join(root, "model-state.json"),
-			LAZYCODEX_AUTO_UPDATE_STATE_PATH: statePath,
-			LAZYCODEX_AUTO_UPDATE_LOG_PATH: join(root, "auto-update.log"),
-		},
-		now: 100_000,
-	});
-
-	const content = await readFile(join(home, ".omo", "config.jsonc"), "utf8");
-	assert.equal(result.started, false);
-	assert.equal(result.reason, "throttled");
-	assert.match(content, /"\[codex\]"/);
-	assert.match(content, /"\[opencode\]"/);
-});

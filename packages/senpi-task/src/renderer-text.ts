@@ -38,7 +38,7 @@ export function optionalRendererText(value: string | undefined): string | undefi
   return normalized.length > 0 ? normalized : undefined
 }
 
-function stripTerminalControls(value: string): string {
+export function stripTerminalControls(value: string, options: { preserveWhitespace?: boolean } = {}): string {
   let text = ""
   let index = 0
 
@@ -57,7 +57,9 @@ function stripTerminalControls(value: string): string {
       continue
     }
     if (code <= 0x1f || (code >= 0x7f && code <= 0x9f)) {
-      if (code >= 0x09 && code <= 0x0d) text += " "
+      if (options.preserveWhitespace && (code === 0x09 || code === 0x0a || code === 0x0d)) {
+        text += value.charAt(index)
+      } else if (code >= 0x09 && code <= 0x0d) text += " "
       index++
       continue
     }

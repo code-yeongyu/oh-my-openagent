@@ -1,0 +1,3 @@
+.media-card { position: relative; border-radius: 16px; overflow: hidden; }
+.media-card::after { content: ""; position: absolute; top: 0; bottom: 0; right: 0; width: 120px; background: #6366f1; }
+.subtle { border-radius: 8px; border-left: 1px solid #6366f1; }
