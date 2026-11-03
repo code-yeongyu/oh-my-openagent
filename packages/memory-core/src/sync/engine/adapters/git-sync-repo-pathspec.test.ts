@@ -26,15 +26,25 @@ async function repo(): Promise<string> {
   return root
 }
 
+/** `?` and `*` are illegal in a Windows file name, so the wildcard that platform can spell in a path is a character class; `[ab]` is glob magic to git, so the literal guarantee still has to hold there. */
+const GLOB_CASES =
+  process.platform === "win32"
+    ? { files: ["set[ab].md", "seta.md", "setb.md"], paths: ["set[ab].md"], committed: ["set[ab].md"], untracked: ["seta.md", "setb.md"] }
+    : {
+        files: ["notes?.md", "notes1.md", "star*.md", "starlight.md", "set[ab].md", "seta.md"],
+        paths: ["notes?.md", "star*.md", "set[ab].md"],
+        committed: ["notes?.md", "set[ab].md", "star*.md"],
+        untracked: ["notes1.md", "seta.md", "starlight.md"],
+      }
+
 test("sync paths with glob characters commit exactly the named files, never their pattern matches", async () => {
   const root = await repo()
   const sync = createGitSyncRepo({ root })
-  for (const name of ["notes?.md", "notes1.md", "star*.md", "starlight.md", "set[ab].md", "seta.md"]) await writeFile(join(root, name), `${name}\n`)
-  const paths = ["notes?.md", "star*.md", "set[ab].md"]
-  await sync.commit(paths, "sync: 3 memories updated\n\nSync-Seq: 1-1")
-  await sync.syncIndex(paths)
-  expect((await git(root, "show", "--name-only", "--format=", "HEAD")).split("\n").sort()).toEqual(["notes?.md", "set[ab].md", "star*.md"])
-  expect(await git(root, "status", "--porcelain", "--untracked-files=all")).toBe("?? notes1.md\n?? seta.md\n?? starlight.md")
+  for (const name of GLOB_CASES.files) await writeFile(join(root, name), `${name}\n`)
+  await sync.commit(GLOB_CASES.paths, `sync: ${GLOB_CASES.paths.length} memories updated\n\nSync-Seq: 1-1`)
+  await sync.syncIndex(GLOB_CASES.paths)
+  expect((await git(root, "show", "--name-only", "--format=", "HEAD")).split("\n").sort()).toEqual([...GLOB_CASES.committed].sort())
+  expect(await git(root, "status", "--porcelain", "--untracked-files=all")).toBe(GLOB_CASES.untracked.map((name) => `?? ${name}`).join("\n"))
 })
 
 test("a sync path spelled as pathspec magic is taken literally, so the person's edits stay out of the commit and the index", async () => {
