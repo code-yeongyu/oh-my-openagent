@@ -29,6 +29,7 @@
     "packages/omo-senpi/plugin/extensions/omo-computer-use.js",
     "packages/omo-senpi/plugin/extensions/omo-desktop-toolkit.js",
     "packages/omo-senpi/plugin/extensions/omo-device-account.js",
+    "packages/omo-senpi/plugin/extensions/omo-device-service.js",
     "packages/omo-senpi/plugin/extensions/omo-feedback.js",
     "packages/omo-senpi/plugin/extensions/omo-memory-commands.js",
     "packages/omo-senpi/plugin/extensions/omo-memory-doctor.js",

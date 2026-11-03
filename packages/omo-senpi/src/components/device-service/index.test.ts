@@ -65,13 +65,20 @@ describe("device-service start-up bootstrap", () => {
     expect([...h.runs, ...again.runs]).toEqual([OMO_BIN])
   })
 
-  test("a bootstrap that never settles never holds a later session start", async () => {
-    const h = harness({ run: () => new Promise<BootstrapReport | undefined>(() => {}) })
+  test("a bootstrap that never settles never holds a later session start, which starts no second worker", async () => {
+    const started: string[] = []
+    const h = harness({
+      run: omoBin => {
+        started.push(omoBin)
+        return new Promise<BootstrapReport | undefined>(() => {})
+      },
+    })
     h.component.register(h.pi, h.ctx)
     h.start()
     void h.deferred[0]?.()
     expect(h.start()).toEqual([undefined])
-    expect(h.deferred).toHaveLength(1)
+    await h.deferred[1]?.()
+    expect(started).toEqual([OMO_BIN])
   })
 
   test("device_service.enabled false runs nothing: no install, no connect", async () => {
