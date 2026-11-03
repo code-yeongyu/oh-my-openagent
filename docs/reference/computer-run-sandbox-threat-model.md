@@ -49,13 +49,13 @@ In scope (the QuickJS cell must stop these):
 | Id | Threat | Today (vm) | Required under quickjs |
 |---|---|---|---|
 | T1 | Realm escape through a host object (`x.constructor.constructor("return process")()`) | open | no host object ever enters the VM; every bridged value is copied (JSON) and every bridged function is a VM-realm stub |
-| T2 | Ambient host APIs: `process`, `require`, `import()`, `fetch`, `Bun`, `Deno`, `WebAssembly`, `SharedArrayBuffer`/`Atomics`, timers, file and socket access | reachable via T1 | absent: `typeof X === "undefined"`, use throws `ReferenceError`; `import()` rejects (no module loader) |
+| T2 | Ambient host APIs: `process`, `require`, `import()`, `fetch`, `Bun`, `Deno`, `WebAssembly`, `SharedArrayBuffer`/`Atomics`, timers, file and socket access | reachable via T1 | absent: `typeof X === "undefined"`, use throws `ReferenceError`; `import()` rejects (no module loader). The pinned engine defines `SharedArrayBuffer` itself (an inert buffer in wasm memory, `Atomics` absent); the cell prelude deletes `globalThis.SharedArrayBuffer` before user code so the absent list holds as stated |
 | T3 | Tool reach: `tool.<name>` calls any host tool | open by design | `tool` is not bridged (`ReferenceError`) |
 | T4 | Host DoS: infinite loop, heap growth, deep recursion, call flooding the engine | loop bounded; heap, stack and call count unbounded | wall, heap, stack and call-count limits, each a structured error (section 6); the host stays healthy and the next run works |
 | T5 | Host-object mutation / prototype pollution of shared facade objects, inside the VM or on the host side | possible (facade objects live in the host realm) | impossible in the VM: it holds stubs only, the host keeps its objects in a per-run handle table. On the host side, arguments from the VM are data: they are parsed from JSON and passed to the engine, never merged into host state (section 4) |
 | T6 | Work leaked past the run's end (pending promises, timers) resuming later | frozen by design (no drain after end) | the VM and its worker are destroyed at settle; nothing survives the run |
 | T7 | Oversized results/output exhausting host memory or the model context | `cloneSafe` copy, size unbounded | return value and output are serialized across the boundary and capped (section 6) |
-| T8 | Engine (QuickJS) memory-safety bug or trap | n/a | wasm linear memory in a worker thread: a crash or trap kills the worker, not the host, and the run settles at once with `unavailable` (section 5); the engine version is exact-pinned |
+| T8 | Engine (QuickJS) memory-safety bug or trap | n/a | wasm linear memory in a worker thread: a crash or trap kills the worker, not the host, and the run settles at once with `sandbox` (section 5); the engine version is exact-pinned |
 
 Out of scope (stated so nobody relies on the sandbox for them):
 
@@ -90,7 +90,7 @@ Reasons:
 2. It already does what section 6 needs and it is proven on Bun: `QuickJS.create({ memoryLimit,
    maxStackSize, interruptHandler })`, where the interrupt handler reads a `SharedArrayBuffer` flag the host
    sets, so a spinning script stops without the host thread being blocked. omo's native eval smoke asserts the
-   sandbox cell reports `quickjs`, has no `process` and no `fetch` (`script/qa/omo-native-eval-smoke-assertions.mjs:47-77`).
+   sandbox cell reports `quickjs`, has no `process` and no `fetch` (`script/qa/omo-native-eval-smoke-assertions.mjs:42-77`).
 3. `quickjs-emscripten` would be a new dependency with several build variants (sync vs asyncify), a
    larger payload, and no in-repo precedent; its asyncify variant is the only one that lets a host call be
    awaited synchronously, which we do not need (section 5 settles promises from the host instead).
@@ -101,7 +101,10 @@ Resolution (decided here for row 22): `senpi-desktop-service` takes `quickjs-was
 dependency (3.6.2, matching senpi-codemode's) and writes its own small worker. The service runtime ships inside
 the bundle `packages/omo-senpi/plugin/extensions/omo-computer-use.js` (163,697 bytes today, no QuickJS in it), so
 the bundle keeps `quickjs-wasi` external and the sidecar list gains an entry for the service's own copy with its
-`.wasm`. That is a second staged copy of about 0.9 MB (package plus wasm); row 22 measures it and puts the number
+`.wasm`. The sidecar rule stages the whole dependency directory
+(`script/engine-sidecar-sources.ts:116`): 1,524,119 bytes, of which `dist` plus `quickjs.wasm` are 946,844 and five
+`extensions/*.so` are 540,178 (not needed by the service; row 22 may exclude `extensions/` from its entry). Row 22
+measures the staged copy and puts the number
 and the bundle-size ceiling in its PR body. The alternative, loading the wasm through senpi-codemode's nested
 path, is rejected: it couples the service to another package's install layout. The service does not import
 senpi-codemode's vendored `pi-codemode` runtime either (another package's internal, with its own vendoring
@@ -130,9 +133,12 @@ Handles. The facade returns three handle kinds, and each becomes a VM stub:
 | element | `desktop.ref(...)`, `win.find(...)`, `el.children()` (`ElementHandle`, `run/handles.ts:111-119`) | `ELEMENT_METHODS` | `ref`, `role`, `nativeRole`, `title`, `description`, `enabled`, `focused`, `childCount` |
 | display | `desktop.display("all" \| "active" \| id)` (`InputTarget` over `DISPLAY_METHODS`, `run/facade.ts:58-63`) | `DISPLAY_METHODS` | `id` |
 
-A stub carries an opaque handle id plus its snapshot fields as plain JSON properties, so bodies that read
-`editor.title` or `el.role` synchronously (`run.test.ts:103` does) keep working. The host resolves the id in a
-per-run table and drops the table when the run settles.
+A stub carries its engine identity (window `id`, element `ref`, or `display:<selector>`, the same keys the
+facade already re-resolves on every call, `run/handles.ts:41,110`) plus its snapshot fields as plain JSON
+properties, so bodies that read `editor.title` or `el.role` synchronously (`run.test.ts:103` does) keep working.
+The host keeps no per-handle objects: a stub's call names its identity and the host re-resolves it exactly as the
+vm facade does, so a body that creates thousands of handles costs the host nothing between calls. An identity
+from an earlier run is refused like any unknown id/ref today.
 
 Values. Everything crosses as JSON: arguments host-ward, results VM-ward. Functions, `RegExp` and other
 non-JSON values are refused at the boundary with a `TypeError` in the VM (a facade method that needs a
@@ -141,6 +147,18 @@ and passes them to the engine request; it never `Object.assign`s or spreads a VM
 object that outlives the call (today's facade spreads caller params into the engine request object,
 `run/handles.ts:136`, which is safe only because that object is the request itself). A `"__proto__"` key in
 an argument stays an inert own property.
+
+Serialization rules, both directions (the builder of row 32 implements exactly these):
+
+- Host-ward arguments go through `JSON.stringify` with an explicit replacer that throws a VM `TypeError` on a
+  function, `RegExp`, symbol, `bigint`, `NaN` or `Infinity` (plain `JSON.stringify` would silently drop the first
+  two, turn the next into `{}` and the last two into `null`). `undefined` in an argument list is kept as an absent
+  trailing argument or an absent property, as JavaScript calls already treat it.
+- VM-ward results travel in an envelope `{ "ok": true, "value": <json> }`; an `undefined` result (for example
+  `el.value()`, `run/handles.ts:146-148`) is the envelope without `value`, and `pid` and other optional snapshot
+  fields are simply absent, so the VM sees `undefined`, not `null`.
+- Dotted method names in the tables (`clipboard.read`, `control.acquire`, `menu.items`, ...) become nested stub
+  namespaces (`computer.clipboard.read()`), exactly the shape the vm facade exposes.
 
 ## 5. Async host call queue
 
@@ -158,7 +176,10 @@ The VM is single-threaded and its host function cannot block, so a bridged call 
    `host.service.call`), so read-only refusal, the run signal, audit records and engine cancellation are
    shared, not reimplemented.
 6. A script that awaits nothing the host can ever settle (no call in flight, nothing queued, VM job queue
-   empty) fails at once as stalled instead of hanging to its wall deadline.
+   empty) fails at once with `stalled` instead of hanging to its wall deadline.
+7. One live worker per session: a second run in the same desktop session (`service.ts:35` allows concurrent
+   calls) waits FIFO for the first to settle, with its own `timeout` counted from submission, so parallel
+   `computer` calls never hold more than one 64 MiB VM per session.
 
 Abort and deadline: `worker.terminate()` is the wall enforcement of record. The host first sets the
 interrupt flag (QuickJS polls it at interpreter checkpoints, so it stops ordinary loops at once), cancels the
@@ -168,34 +189,38 @@ checkpoint, and terminate still ends it. The run settles with the error. The fai
 (`runtime.ts:199`) applies unchanged.
 
 Worker crash: a worker `error` or `exit` before the run settled (a wasm trap, an engine bug, T8) settles the
-run at once with `ComputerRunError("unavailable")`, cancels the in-flight call, revokes the grant, and the next
+run at once with `ComputerRunError("sandbox")`, cancels the in-flight call, revokes the grant, and the next
 run starts a fresh worker. A crash never leaves a run pending until its wall deadline.
 
 Result size, VM-ward: an engine result is checked against a per-result cap (8 MiB serialized) on the host
 before it is copied into the VM; over the cap, the bridged call rejects inside the VM with
-`ComputerRunError("memory")` naming the size, so the script can narrow the query (`observe({ since })`, a
+`ComputerRunError("payloadSize")` naming the size (the worker applies the same rule host-ward: an argument list
+over 1 MiB is rejected before it is posted), so the script can narrow the query (`observe({ since })`, a
 subtree) instead of the run dying on the 64 MiB heap.
 
 ## 6. Limits and structured errors
 
-All limits are per run. `ComputerRunErrorReason` gains three values; existing ones keep their meaning.
+All limits are per run. `ComputerRunErrorReason` (`run/context.ts:10`) gains six values: `calls`, `memory`,
+`stack`, `payloadSize`, `stalled`, `sandbox`. Existing values keep their meaning; in particular `unavailable`
+stays "this engine lacks the feature" (`run/observe.ts:33`, `run/hold-call.ts:10`) and is not reused for a crash.
 
-| Limit | Default | Enforced by | Error (`ComputerRunError.reason`) |
-|---|---|---|---|
-| Wall | the run's `timeout` (default 60 s, max 600 s, `senpi-desktop-tool/src/params.ts:3-5`) | host timer, interrupt flag, then `worker.terminate()` (section 5) | `timeout` (existing) |
-| Bridged calls | 1,000 per run | host call queue counter | `calls` (new) |
-| Heap | 64 MiB VM memory | `memoryLimit` | `memory` (new; QuickJS `InternalError: out of memory`) |
-| Stack | QuickJS `maxStackSize` guard | `maxStackSize` | `stack` (new; `RangeError: Maximum call stack size exceeded` inside the VM, reported by the host) |
-| Bridged result, VM-ward | 8 MiB serialized per result | host, before copying into the VM | `memory`, as a rejection of that call inside the VM (catchable) |
-| Worker crash | n/a | worker `error`/`exit` handler | `unavailable` (existing) |
-| Output + return value | 1 MiB serialized per run | worker, before posting | none: truncated (see note) |
+| Limit | Default | Enforced by | Error (`ComputerRunError.reason`) | Fatal to the run? |
+|---|---|---|---|---|
+| Wall | the run's `timeout` (default 60 s, max 600 s, `senpi-desktop-tool/src/params.ts:3-5`) | host timer, interrupt flag, then `worker.terminate()` (section 5) | `timeout` (existing) | yes |
+| Bridged calls | 1,000 per run | host call queue counter | `calls` | yes |
+| Heap | 64 MiB VM memory | `memoryLimit` | `memory` (QuickJS `InternalError: out of memory`) | yes |
+| Stack | QuickJS `maxStackSize` guard | `maxStackSize` | `stack` (QuickJS `RangeError: Maximum call stack size exceeded`, reported by the host) | yes |
+| Bridged payload, either direction | 8 MiB serialized per result (VM-ward), 1 MiB per argument list (host-ward) | host before copying a result in; worker before posting arguments out | `payloadSize`, as a rejection of that one call inside the VM | no: catchable, the body can narrow its query |
+| Stall | nothing in flight, nothing queued, VM job queue empty | host, after each drain | `stalled` | yes, at once |
+| Worker crash | n/a | worker `error`/`exit` handler | `sandbox` | yes, at once |
+| Output + return value | 1 MiB serialized per run | worker, before posting | none: truncated (see note) | no |
 
 Note on output: an oversized console stream is cut with a visible marker. An oversized return value is
 never handed to the model as broken JSON: it becomes a string holding the first part of its serialization
 followed by the marker `[return value truncated: N bytes, cap 1 MiB]`. Neither fails the run; the row exists
 so row 22 tests the cap, not to add an error code.
 
-Every limit error settles the run, revokes the control grant, leaves the host process and the desktop
+Every fatal limit error settles the run, revokes the control grant, leaves the host process and the desktop
 session usable, and the next run in the same session succeeds. The numbers are starting values for row 22;
 they are constants in one file, measured in the row 22 PR body, not settings.
 
@@ -212,7 +237,7 @@ counterpart that asserts the `ReferenceError` (row 32); no test is skipped.
 | M3 | `packages/senpi-desktop-prelude/docs/computer.md:54` | `wait` (doc) | guide entry: functions receive `{ desktop, wait, assert }`; "Not sandboxed" | when quickjs is selectable, the guide says functions receive `{ computer, desktop, assert }` under quickjs, `wait` -> `computer.verify`, and states the sandbox per setting (regenerated guide, P14) |
 | M4 | `packages/senpi-desktop-prelude/README.md:22` | `wait` (doc) | documents the serialized `computer.run(fn)` call `({ desktop, wait, assert }, ...args)` | same doc change as M3, in step with M5 |
 | M5 | `packages/senpi-desktop-prelude/src/prelude.js:132` | `wait` (generated) | `computer.run(fn)` serializes every function as `return await (fn)({ desktop, wait, assert }, ...args);` | **blocks every function-form run under quickjs**: the shorthand `wait` is a reference, so even a function that never uses `wait` throws `ReferenceError`. The generated call must stop naming absent globals (pass `{ desktop, computer: desktop, assert }` under quickjs, or one runtime-provided scope object). Owner: the prelude rows (P4a/P14), which must also regenerate the two tracked `assets.generated.json` copies and `test/assets.sha256.json` (plan row 26, `senpi-desktop-prelude/scripts/generate-assets.ts`); a prerequisite of the default flip; row 32's quickjs tests include a body in this generated shape |
-| M6 | `packages/senpi-desktop-tool/src/cua-actions.ts:147` | `wait` (generated) | `actionsScript()`: the CUA adapter's batch body; the published `wait` action runs `await wait(a.ms)` | host-generated from schema-validated JSON, not model-written JS, so sandboxing it gains nothing, ON CONDITION that every model-provided value enters the script only through `JSON.stringify` (`cua-actions.ts:147-148`: `actions` and `bounds`); any change that splices model text into the script any other way voids this exemption and moves the body to quickjs. The CUA adapter keeps running its batches under `vm` whatever `computer.run_sandbox` says, until P14 executes CUA actions directly through the SDK (where `wait` is a host sleep, no script). Published `computer_actions` parameters do not change |
+| M6 | `packages/senpi-desktop-tool/src/cua-actions.ts:147` | `wait` (generated) | `actionsScript()`: the CUA adapter's batch body; the published `wait` action runs `await wait(a.ms)` | host-generated from schema-validated JSON, not model-written JS, so sandboxing it gains nothing, ON CONDITION that every model-provided value enters the script only through `JSON.stringify` (`cua-actions.ts:147-148`: `actions` and `bounds`); any change that splices model text into the script any other way voids this exemption and moves the body to quickjs. The CUA adapter keeps running its batches under `vm` whatever `computer.run_sandbox` says. Mechanism (row 22): `ComputerRunRequest` (`run/runtime.ts:30`, internal, not a published parameter) gains `origin: "model" | "host"`, default `model`; the CUA adapter's path (`cua-adapter.ts:63-66` -> `tool.ts:98-110` -> `runComputerCode`) passes `host`, and the dispatcher sends every `host` run to `vm` (row 22 test 12). This holds until P14 executes CUA actions directly through the SDK (where `wait` is a host sleep, no script). Published `computer_actions` parameters do not change |
 | M7 | `packages/senpi-desktop-tool/test/control.test.ts:97` | `wait` | "sends control.revoke when the tool call is aborted mid-run while granted": holds the run with `wait(() => false, { timeout: 4000 })` | vm-only today (the test exercises vm); a quickjs counterpart holds the run with `computer.verify` once it exists |
 | M8 | `packages/senpi-desktop-tool/test/execute.test.ts:121` | `tool` | tool-level run that calls `tool.read` through the host pipeline | not available under quickjs; vm-only |
 
@@ -259,7 +284,7 @@ selectable after any default change.
 - Setting: `computer.run_sandbox: "vm" | "quickjs"`, native harness only, reserved by the settings row of the
   computer-use v2 plan; default `vm`.
 - Row 22 (P5b-i): QuickJS cell with limits and the escape battery, `assert` only; the setting selects the
-  path; default stays `vm`.
+  path for model-origin runs, host-origin (CUA) runs stay on `vm` (M6); default stays `vm`.
 - Row 32 (P5b-ii): `computer`/`desktop` + `assert` bridge through the host call queue; run.test.ts runs over
   both modes except M1; default stays `vm`.
 - Row 35 (P13b): the computer-use eval and bench. It does not select `computer.run_sandbox`, is not blocked by
@@ -282,7 +307,8 @@ Row 22 (`packages/senpi-desktop-service`, quickjs mode):
    `process.exit()`, `fetch("x")`, `Bun.file("x")`, `tool.computer({})`, `wait(1)`.
 2. Realm escape: `assert.constructor("return typeof process")()` returns `"undefined"` (the VM's own
    `Function`), and `Object.keys(globalThis)` holds no host name.
-3. `import("fs")` rejects; `WebAssembly`, `SharedArrayBuffer`, `Atomics`, `setTimeout` are undefined.
+3. `import("fs")` rejects; `WebAssembly`, `SharedArrayBuffer` (deleted by the cell prelude; the engine defines it),
+   `Atomics`, `setTimeout` are undefined.
 4. Limits, each with its reason: `while (true) {}` -> `timeout`; `const a = []; for (;;) a.push("x".repeat(1e6))`
    -> `memory`; `const f = () => f(); f()` -> `stack`; the host is healthy and the next run in the same
    session returns its value.
@@ -292,9 +318,13 @@ Row 22 (`packages/senpi-desktop-service`, quickjs mode):
 8. A single long builtin (`/(a+)+$/.test("a".repeat(40) + "b")`) under a short `timeout` settles with `timeout`
    by `worker.terminate()`; the next run works.
 9. Worker crash: a worker that exits before the run settles (test hook) settles the run at once with
-   `unavailable`, not at the wall deadline; the next run works.
+   `sandbox`, not at the wall deadline; the next run works.
 10. Output caps: a console stream past 1 MiB is cut with the marker; a return value past 1 MiB comes back as a
     string ending in the truncation marker, never as invalid JSON.
+11. Stall: `await new Promise(() => {})` settles with `stalled` well before a 30 s `timeout`.
+12. Host origin: with `computer.run_sandbox: "quickjs"`, a CUA batch containing a `wait` step runs (the request
+    carries `origin: "host"`, the dispatcher keeps it on `vm`, `details.sandbox === "vm"`), while a model `run`
+    of `wait(1)` in the same session throws `ReferenceError`.
 
 Row 32 (bridge):
 
@@ -317,8 +347,13 @@ Row 32 (bridge):
     `const el = await desktop.ref("e1"); return el.role` return the snapshot without an extra engine call.
 11. Arguments are data: a call whose argument object carries a `"__proto__"` key leaves `Object.prototype` on
     the host unchanged and the engine receives the key as an own property.
-12. VM-ward cap: a fake engine result past 8 MiB rejects that call inside the VM with `memory`; a `try/catch`
-    in the body can recover and the run returns normally.
+12. Payload caps: a fake engine result past 8 MiB, and an argument list past 1 MiB, each reject that call inside
+    the VM with `payloadSize`; a `try/catch` in the body recovers and the run returns normally.
+13. Serialization: `computer.windows(() => true)` and `computer.click(NaN, 1)` throw a VM `TypeError` before any
+    engine request; `(await computer.ref("e1")).value()` on an element with no value returns `undefined`;
+    `computer.clipboard.read` is a nested function.
+14. One worker per session: two concurrent `run` calls in one session execute one after the other (the fake engine
+    sees the second run's first request only after the first run settled), each within its own timeout.
 
 ## 10. How the matrix was built
 
