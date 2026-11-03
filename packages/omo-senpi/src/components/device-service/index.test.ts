@@ -94,7 +94,7 @@ describe("device-service start-up bootstrap", () => {
     expect(h.runs).toEqual([])
   })
 
-  test.each<[string, BootstrapReport | undefined, readonly Notice[], number]>([
+  test.each<[string, BootstrapReport | undefined, Notice[], number]>([
     ["a locked keychain", { state: "keychain_locked", notice: "Unlock it." }, [{ message: "Unlock it.", type: "warning" }], 0],
     ["an install this build refuses", { state: "update_required", notice: "Update OmO." }, [{ message: "Update OmO.", type: "warning" }], 0],
     ["a signed-out device", { state: "signed_out", notice: "Sign in to OmO first." }, [], 0],

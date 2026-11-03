@@ -3,7 +3,7 @@ import { chmodSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { connectDeviceService, deviceServiceStateDir, type DeviceService, LocalApiError, type RemoteAttachEvent } from "../src/index.ts"
-import { writeToken } from "../src/local-api/access.ts"
+import { mintNonce, writeToken } from "../src/local-api/access.ts"
 import { connectLocalApi } from "../src/local-api/client.ts"
 import { validateWelcome } from "../src/local-api/validate.ts"
 import { startFakeOwner, type FakeOwner } from "./local-api/conformance/fake-owner.ts"
@@ -222,13 +222,13 @@ describe("the host attach control", () => {
       v: 1,
       service_version: "0.1.0",
       owner: "service",
-      server_proof: "a".repeat(64),
-      server_nonce: "b".repeat(64),
+      server_proof: mintNonce(),
+      server_nonce: mintNonce(),
       state: defaultWorld().status,
     }
     expect(validateWelcome({ ...welcome, capabilities: ["sessions", "control", "machine"] })).toMatchObject({
       capabilities: ["sessions", "control", "machine"],
     })
-    expect(() => validateWelcome({ ...welcome, capabilities: ["sessions", "telepathy"] })).toThrow()
+    expect(() => validateWelcome({ ...welcome, capabilities: ["sessions", "telepathy"] })).toThrow("protocol_violation: capability")
   })
 })

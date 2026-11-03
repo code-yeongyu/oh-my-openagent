@@ -47,7 +47,7 @@ describe("the omo remote bootstrap worker", () => {
     expect(await runBootstrapWorker(launcherScript(body))).toBeUndefined()
   })
 
-  test("an omo binary that cannot start is no report", async () => {
-    expect(await runBootstrapWorker(join(scratch(), "missing-omo"))).toBeUndefined()
+  test("an omo binary that cannot start rejects with the spawn error", async () => {
+    await expect(runBootstrapWorker(join(scratch(), "missing-omo"))).rejects.toThrow("ENOENT")
   })
 })
