@@ -1,0 +1,12 @@
+bun test v1.4.4 (38afee6c8)
+
+packages/omo-opencode/src/cli/doctor/checks/bundled-assets.test.ts:
+(pass) bundled assets check > #given a complete package root #when evaluating bundled assets #then nothing is missing [8.72ms]
+(pass) bundled assets check > #given a package root missing a bundled skill file #when evaluating bundled assets #then exactly that asset is reported missing [0.25ms]
+(pass) bundled assets check > #given a null package root #when evaluating bundled assets #then the evaluation is empty [0.10ms]
+(pass) bundled assets check > fails with reinstall guidance when the cached install is incomplete [1.48ms]
+
+ 4 pass
+ 0 fail
+ 12 expect() calls
+Ran 4 tests across 1 file. [608.00ms]

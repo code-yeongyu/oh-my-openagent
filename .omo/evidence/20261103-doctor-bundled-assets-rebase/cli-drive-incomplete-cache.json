@@ -1,0 +1,236 @@
+{
+  "results": [
+    {
+      "name": "Browser Provider",
+      "status": "pass",
+      "message": "Browser provider configuration is valid",
+      "issues": [],
+      "duration": 20
+    },
+    {
+      "name": "System",
+      "status": "fail",
+      "message": "1 system issue(s) detected",
+      "details": [
+        "OpenCode: 2.2.5",
+        "Plugin expected: 9.9.9",
+        "Plugin loaded: 9.9.9",
+        "Bun: 1.4.4"
+      ],
+      "issues": [
+        {
+          "title": "oh-my-openagent is not registered",
+          "description": "Plugin entry is missing from OpenCode configuration.",
+          "fix": "Run: bunx oh-my-openagent install",
+          "severity": "error",
+          "affects": [
+            "all agents"
+          ]
+        }
+      ],
+      "duration": 1411
+    },
+    {
+      "name": "Bundled Assets",
+      "status": "fail",
+      "message": "1 of 3 required bundled assets are missing from /tmp/omo-doctor-qa-eArkoD/cache/opencode/packages/oh-my-openagent@9.9.9/node_modules/oh-my-openagent. The plugin likely fails during initialization while OpenCode keeps running with stock agents.",
+      "details": [
+        "missing: /tmp/omo-doctor-qa-eArkoD/cache/opencode/packages/oh-my-openagent@9.9.9/node_modules/oh-my-openagent/dist/skills/frontend/SKILL.md"
+      ],
+      "issues": [
+        {
+          "title": "Missing bundled plugin asset",
+          "description": "/tmp/omo-doctor-qa-eArkoD/cache/opencode/packages/oh-my-openagent@9.9.9/node_modules/oh-my-openagent/dist/skills/frontend/SKILL.md is missing from the installed plugin package. OpenCode can load a partially installed package without registering any OMO agents, tools, or hooks.",
+          "fix": "Delete the version-tagged directory for this package under ~/.cache/opencode/packages (or the path reported below), then restart OpenCode so it reinstalls the plugin, and run `bunx oh-my-openagent doctor` again.",
+          "affects": [
+            "all OMO agents",
+            "tools",
+            "hooks"
+          ],
+          "severity": "error"
+        }
+      ],
+      "duration": 16
+    },
+    {
+      "name": "Configuration",
+      "status": "pass",
+      "message": "No custom config found; defaults are used",
+      "issues": [],
+      "duration": 15
+    },
+    {
+      "name": "TUI Plugin",
+      "status": "skip",
+      "message": "Plugin not registered (server or TUI)",
+      "details": [
+        "tui.json: /tmp/omo-doctor-qa-eArkoD/config/tui.json"
+      ],
+      "issues": [],
+      "duration": 8
+    },
+    {
+      "name": "Configuration",
+      "status": "pass",
+      "message": "No deprecated config keys found",
+      "issues": [],
+      "duration": 8
+    },
+    {
+      "name": "Tools",
+      "status": "warn",
+      "message": "3 tools issue(s) detected",
+      "details": [
+        "AST-Grep CLI: no",
+        "Comment checker: no",
+        "LSP: 1 server(s)",
+        "GH CLI: installed",
+        "MCP: builtin=4, user=0"
+      ],
+      "issues": [
+        {
+          "title": "AST-Grep unavailable",
+          "description": "AST-Grep CLI is not available.",
+          "fix": "The ast-grep skill resolves sg automatically; run omo doctor or lazycodex-ai doctor to check provisioning.",
+          "severity": "warning",
+          "affects": [
+            "ast-grep skill"
+          ]
+        },
+        {
+          "title": "Comment checker unavailable",
+          "description": "Comment checker binary is not installed.",
+          "fix": "The hook downloads its pinned GitHub release automatically on first use. Allow access to github.com and restart OpenCode to retry.",
+          "severity": "warning",
+          "affects": [
+            "comment-checker hook"
+          ]
+        },
+        {
+          "title": "GitHub CLI not authenticated",
+          "description": "gh CLI is installed but not logged in.",
+          "fix": "Run: gh auth login",
+          "severity": "warning",
+          "affects": [
+            "GitHub automation"
+          ]
+        }
+      ],
+      "duration": 161
+    },
+    {
+      "name": "Models",
+      "status": "warn",
+      "message": "11 agents, 9 categories, 0 overrides",
+      "details": [
+        "═══ Available Models (from cache) ═══",
+        "",
+        "  ⚠ Cache not found. Run 'opencode' to populate.",
+        "",
+        "═══ Configured Models ═══",
+        "",
+        "Agents:",
+        "  ○ sisyphus: anthropic/claude-opus-5-5 (max) [capabilities: snapshot-backed]",
+        "  ○ hephaestus: openai/gpt-6-sol (high) [capabilities: snapshot-backed]",
+        "  ○ oracle: openai/gpt-5.6-sol (high) [capabilities: snapshot-backed]",
+        "  ○ librarian: kimi-for-coding/kimi-for-coding-highspeed (off) [capabilities: snapshot-backed]",
+        "  ○ explore: kimi-for-coding/kimi-for-coding-highspeed (off) [capabilities: snapshot-backed]",
+        "  ○ multimodal-looker: openai/gpt-5.6-sol (low) [capabilities: snapshot-backed]",
+        "  ○ prometheus: anthropic/claude-fable-5-1 (high) [capabilities: snapshot-backed]",
+        "  ○ metis: anthropic/claude-fable-5-1 (max) [capabilities: snapshot-backed]",
+        "  ○ momus: openai/gpt-6-astra (high) [capabilities: snapshot-backed]",
+        "  ○ atlas: anthropic/claude-sonnet-5 [capabilities: snapshot-backed]",
+        "  ○ sisyphus-junior: anthropic/claude-sonnet-5 [capabilities: snapshot-backed]",
+        "",
+        "Categories:",
+        "  ○ visual-engineering: google/gemini-4-argon (low) [capabilities: snapshot-backed]",
+        "  ○ ultrabrain: openai/gpt-6-astra (max) [capabilities: snapshot-backed]",
+        "  ○ deep-low: openai/gpt-6.1-sol (high) [capabilities: snapshot-backed]",
+        "  ○ deep-high: openai/gpt-6-astra (high) [capabilities: snapshot-backed]",
+        "  ○ artistry: anthropic/claude-fable-5-1 (max) [capabilities: snapshot-backed]",
+        "  ○ quick: openai/gpt-6-luna-fast (low) [capabilities: alias-backed]",
+        "  ○ unspecified-low: anthropic/claude-sonnet-5-5 (high) [capabilities: snapshot-backed]",
+        "  ○ unspecified-high: anthropic/claude-opus-5-5 (high) [capabilities: snapshot-backed]",
+        "  ○ writing: google/gemini-4-argon (low) [capabilities: snapshot-backed]",
+        "",
+        "● = user override, ○ = provider fallback"
+      ],
+      "issues": [
+        {
+          "title": "Model cache not found",
+          "description": "OpenCode model cache is missing, so model availability cannot be validated.",
+          "fix": "Run: opencode models --refresh",
+          "severity": "warning",
+          "affects": [
+            "model resolution"
+          ]
+        }
+      ],
+      "duration": 10
+    },
+    {
+      "name": "Telemetry",
+      "status": "pass",
+      "message": "Telemetry: enabled",
+      "details": [
+        "PostHog host: https://us.i.posthog.com",
+        "Last daily active date: never",
+        "State file: /tmp/omo-doctor-qa-eArkoD/data/oh-my-opencode/posthog-activity.json"
+      ],
+      "issues": [],
+      "duration": 5
+    },
+    {
+      "name": "Team Mode",
+      "status": "skip",
+      "message": "team_mode: disabled",
+      "issues": [],
+      "duration": 5
+    }
+  ],
+  "systemInfo": {
+    "opencodeVersion": "2.2.5",
+    "opencodePath": "/home/fqwqf/.nvm/versions/node/v24.20.0/bin/opencode",
+    "pluginVersion": "9.9.9",
+    "loadedVersion": "9.9.9",
+    "bunVersion": "1.4.4",
+    "configPath": null,
+    "configValid": true,
+    "isLocalDev": false
+  },
+  "tools": {
+    "lspServers": [
+      {
+        "id": "lsp-tools-mcp",
+        "extensions": [
+          "*"
+        ]
+      }
+    ],
+    "astGrepCli": false,
+    "commentChecker": false,
+    "ghCli": {
+      "installed": true,
+      "authenticated": false,
+      "username": null
+    },
+    "mcpBuiltin": [
+      "websearch",
+      "context7",
+      "grep_app",
+      "lsp"
+    ],
+    "mcpUser": []
+  },
+  "summary": {
+    "total": 10,
+    "passed": 4,
+    "failed": 2,
+    "warnings": 2,
+    "skipped": 2,
+    "duration": 1415
+  },
+  "exitCode": 1,
+  "target": "opencode",
+  "latestVersion": "5.1.59"
+}

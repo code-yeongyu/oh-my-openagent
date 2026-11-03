@@ -1,0 +1,270 @@
+bun test v1.4.4 (38afee6c8)
+
+packages/omo-opencode/src/cli/doctor/runner.test.ts:
+(pass) runner > runCheck > returns fail result with issue when check throws [22.22ms]
+(pass) runner > calculateSummary > counts statuses correctly [0.61ms]
+(pass) runner > determineExitCode > returns zero when no failures exist [0.23ms]
+(pass) runner > determineExitCode > returns one when any failure exists [0.18ms]
+(pass) runner > runDoctor > starts all checks and the registry lookup in parallel and returns collected result [1.51ms]
+
+packages/omo-opencode/src/cli/doctor/formatter.test.ts:
+(pass) formatDoctorOutput > #given default mode > shows the edition, installed, latest, and update command when no issues [0.29ms]
+(pass) formatDoctorOutput > #given default mode > shows issue count and details when issues exist [0.16ms]
+(pass) formatDoctorOutput > #given status mode > renders system version line [0.17ms]
+(pass) formatDoctorOutput > #given status mode > renders tool and MCP info [0.09ms]
+(pass) formatDoctorOutput > #given status mode > renders Codex plugin status for Codex target [0.12ms]
+(pass) formatDoctorOutput > #given verbose mode > includes all section headers [0.35ms]
+(pass) formatDoctorOutput > #given verbose mode > shows check summary counts [0.11ms]
+(pass) formatDoctorOutput > #given verbose mode > renders check details sections such as Models [0.14ms]
+(pass) formatDoctorOutput > #given verbose mode > renders Codex sections for Codex target [0.10ms]
+(pass) formatDoctorOutput > #given verbose mode > marks Codex marketplace as failing when config is missing the marketplace [0.10ms]
+(pass) formatDoctorOutput > formatJsonOutput > returns valid JSON [0.25ms]
+(pass) formatDoctorOutput > formatJsonOutput > preserves all result fields [0.09ms]
+
+packages/omo-opencode/src/cli/doctor/doctor-target.test.ts:
+(pass) resolveDoctorTarget > #given lazycodex invocation #when resolving doctor target #then selects Codex diagnostics [0.08ms]
+(pass) resolveDoctorTarget > #given lazycodex-ai invocation #when resolving doctor target #then selects Codex diagnostics [0.05ms]
+(pass) resolveDoctorTarget > #given opencode invocation #when resolving doctor target #then keeps OpenCode diagnostics [0.04ms]
+(pass) resolveDoctorTarget > #given explicit codex platform #when resolving doctor target #then selects Codex diagnostics [0.04ms]
+(pass) resolveDoctorTarget > #given explicit opencode platform from lazycodex invocation #when resolving doctor target #then explicit platform wins [0.04ms]
+(pass) OMO_EDITION doctor routing > #given OMO_EDITION=codex #when resolving a non-codex invocation name #then selects Codex diagnostics [0.08ms]
+(pass) OMO_EDITION doctor routing > #given OMO_EDITION=codex #when resolving a lazycodex invocation #then the env check wins before the name checks [0.06ms]
+(pass) OMO_EDITION doctor routing > #given OMO_EDITION=codex and an explicit opencode platform #when resolving doctor target #then explicit platform wins [0.06ms]
+(pass) OMO_EDITION doctor routing > #given a non-codex OMO_EDITION #when resolving doctor target #then name-based routing is unchanged [0.06ms]
+(pass) OMO_EDITION doctor routing > #given unset OMO_EDITION #when resolving doctor target #then today's name-based routing is kept exactly [0.05ms]
+
+packages/omo-opencode/src/cli/doctor/framework-import-boundary.test.ts:
+(pass) doctor framework import boundary > #given doctor framework files #when auditing imports #then framework never imports checks [0.33ms]
+
+packages/omo-opencode/src/cli/doctor/index.test.ts:
+(pass) formatDoctorFailure > surfaces the real error message and stack instead of blaming memory pressure [0.09ms]
+(pass) formatDoctorFailure > stringifies non-Error throwables without a stack [0.05ms]
+(pass) formatDoctorFailure > suggests the canonical doctor command [0.05ms]
+
+packages/omo-opencode/src/cli/doctor/format-default.test.ts:
+(pass) formatDefault > prints the OpenCode edition, installed, latest, and update command when no issues exist [0.10ms]
+(pass) formatDefault > prints 'could not check' for Latest when the OpenCode registry lookup failed [0.06ms]
+(pass) formatDefault > prints numbered issue list when issues exist [0.08ms]
+(pass) formatDefault > prints the Codex edition, installed, latest, and update command for Codex doctor results [0.08ms]
+(pass) formatDefault > prints 'could not check' for Latest when the Codex registry lookup failed [0.07ms]
+
+packages/omo-opencode/src/cli/doctor/spawn-with-timeout.test.ts:
+(pass) spawnWithTimeout > #given a command that completes quickly > returns stdout and exit code [4.05ms]
+(pass) spawnWithTimeout > #given a command that writes to stderr > captures stderr output [4.34ms]
+(pass) spawnWithTimeout > #given a command that fails > returns non-zero exit code without timing out [1.84ms]
+(pass) spawnWithTimeout > #given a command that exceeds timeout > returns timedOut true and kills the process [202.26ms]
+(pass) spawnWithTimeout > #given a nonexistent command > handles gracefully without hanging [0.50ms]
+(pass) spawnWithTimeout > #given a nonexistent command > does not consume process streams more than once [3.13ms]
+(pass) spawnWithTimeout > #given spawn throws a non-Error value > rethrows the unknown value [2.38ms]
+(pass) spawnWithTimeout > #given a spawned process exposes an already-used pipe > treats the pipe as empty output [0.72ms]
+
+packages/omo-opencode/src/cli/doctor/checks/codex-components.test.ts:
+(pass) codex components doctor check > #given a complete installed plugin #when checking components #then passes with sg source and completed bootstrap [12.28ms]
+(pass) codex components doctor check > #given a missing hook dist target #when checking components #then fails naming the relative path [3.68ms]
+(pass) codex components doctor check > #given a zero-byte mcp dist target #when checking components #then fails and reports the zero-byte state [3.16ms]
+(pass) codex components doctor check > #given an absolute installed mcp dist target is missing #when checking components #then fails instead of treating the rewrite as drift [2.73ms]
+(pass) codex components doctor check > #given a missing commandWindows target #when checking components #then the windows hook path is validated too [2.84ms]
+(pass) codex components doctor check > #given sg resolvable nowhere in the chain #when checking components #then warns with a bootstrap hint [3.03ms]
+(pass) codex components doctor check > #given an OMO_AST_GREP_SG_PATH override #when checking components #then reports the env override source [2.54ms]
+(pass) codex components doctor check > #given sg only resolvable through PATH #when checking components #then reports the PATH source [2.63ms]
+(pass) codex components doctor check > #given no bootstrap state file #when checking components #then surfaces bootstrap pending as info detail without issues [2.69ms]
+(pass) codex components doctor check > #given completedForVersion behind the installed version #when checking components #then reports bootstrap pending with both versions [2.75ms]
+(pass) codex components doctor check > #given a degraded bootstrap ledger #when checking components #then surfaces every degraded entry verbatim [2.77ms]
+(pass) codex components doctor check > #given malformed bootstrap state json #when checking components #then treats bootstrap as pending without crashing [3.62ms]
+(pass) codex components doctor check > #given a nested dev manifest pointing outside the bundle #when checking components #then out-of-bundle dev refs are tolerated [2.79ms]
+(pass) codex components doctor check > #given no installed plugin #when checking components #then skips instead of duplicating the codex check error [0.86ms]
+(pass) codex components doctor check > #given both a missing dist and missing sg #when checking components #then fail status wins and both surfaces report [2.40ms]
+
+packages/omo-opencode/src/cli/doctor/checks/tui-plugin-config-unresolvable.test.ts:
+(pass) tui-plugin-config unresolvable named entries > #given canonical TUI entry and no inspectable package #when checking config #then warns instead of false-passing [4.31ms]
+
+packages/omo-opencode/src/cli/doctor/checks/system-binary.test.ts:
+(pass) findOpenCodeBinary node fallback safety > #given doctor runs under node fallback #when check sources are audited #then they avoid raw Bun globals [1.23ms]
+(pass) extractSemverFromOutput > #given clean version output #when extractSemverFromOutput #then returns the semver token > plain semver [0.09ms]
+(pass) extractSemverFromOutput > #given clean version output #when extractSemverFromOutput #then returns the semver token > v-prefixed semver strips the prefix [0.07ms]
+(pass) extractSemverFromOutput > #given clean version output #when extractSemverFromOutput #then returns the semver token > trailing whitespace and newlines are tolerated [0.13ms]
+(pass) extractSemverFromOutput > #given clean version output #when extractSemverFromOutput #then returns the semver token > pre-release suffix is preserved [0.14ms]
+(pass) extractSemverFromOutput > #given clean version output #when extractSemverFromOutput #then returns the semver token > build metadata is preserved [0.16ms]
+(pass) extractSemverFromOutput > #given Electron log-polluted stdout #when extractSemverFromOutput #then ignores the timestamp and finds the version > regression for #3765: Electron desktop dumps log lines into stdout [0.13ms]
+(pass) extractSemverFromOutput > #given Electron log-polluted stdout #when extractSemverFromOutput #then ignores the timestamp and finds the version > multi-line stdout with log prefix and trailing version [0.11ms]
+(pass) extractSemverFromOutput > #given Electron log-polluted stdout #when extractSemverFromOutput #then ignores the timestamp and finds the version > timestamp-only stdout returns null [0.07ms]
+(pass) extractSemverFromOutput > #given empty or invalid output #when extractSemverFromOutput #then returns null > empty string [0.15ms]
+(pass) extractSemverFromOutput > #given empty or invalid output #when extractSemverFromOutput #then returns null > only whitespace [0.12ms]
+(pass) extractSemverFromOutput > #given empty or invalid output #when extractSemverFromOutput #then returns null > text without any semver-shaped token [0.13ms]
+(pass) extractSemverFromOutput > #given empty or invalid output #when extractSemverFromOutput #then returns null > incomplete semver (only major.minor) is rejected [0.10ms]
+
+packages/omo-opencode/src/cli/doctor/checks/latest-version.test.ts:
+(pass) gatherEditionDistTags > fetches the oh-my-openagent dist-tags for the OpenCode edition [0.29ms]
+(pass) gatherEditionDistTags > fetches the lazycodex-ai dist-tags for the Codex edition [0.23ms]
+(pass) resolveLatestVersion > returns the beta tag when the installed OpenCode plugin is on the beta channel [0.24ms]
+(pass) resolveLatestVersion > returns the latest tag when the installed OpenCode plugin is a stable release [0.15ms]
+(pass) resolveLatestVersion > falls back to the latest tag when the installed channel has no dist-tag [0.20ms]
+(pass) resolveLatestVersion > returns null when the registry lookup failed [0.15ms]
+(pass) resolveLatestVersion > selects the Codex channel from the installed lazycodex-ai package version [0.10ms]
+(pass) resolveLatestVersion > falls back to the Codex installer version when no distribution snapshot exists [0.15ms]
+
+packages/omo-opencode/src/cli/doctor/checks/tools.test.ts:
+(pass) buildToolIssues > #given no ast-grep CLI #when building issues #then references the ast-grep skill instead of MCP tool names [0.30ms]
+
+packages/omo-opencode/src/cli/doctor/checks/tools-gh.test.ts:
+(pass) getGhCliInfo > falls back to gh --version when the path resolver cannot find gh [0.40ms]
+
+packages/omo-opencode/src/cli/doctor/checks/dependencies.test.ts:
+(pass) dependencies check > checkAstGrepCli > returns valid dependency info [0.48ms]
+(pass) dependencies check > checkCommentChecker > returns valid dependency info [0.40ms]
+(pass) dependencies check > checkCommentChecker > returns installed=true when cached binary exists [0.50ms]
+(pass) dependencies check > findCommentCheckerPackageBinary > #given the package vendor binary exists #when resolving package binary #then returns vendor path [6.62ms]
+(pass) dependencies check > findCommentCheckerPackageBinary > #given the per-platform package is installed beside the package #when resolving package binary #then returns the platform package binary [0.62ms]
+(pass) dependencies check > findCommentCheckerPackageBinary > #given only the legacy bin binary exists #when resolving package binary #then returns bin path [0.26ms]
+(pass) dependencies check > findCommentCheckerPackageBinary > #given a zero-dependency install where require.resolve throws Bun's ResolveMessage #when resolving package binary #then returns null instead of crashing [0.26ms]
+
+packages/omo-opencode/src/cli/doctor/checks/model-resolution.test.ts:
+(pass) model-resolution check > parseProviderModel > splits chutes model IDs at the provider separator [0.35ms]
+(pass) model-resolution check > parseProviderModel > splits simple provider model IDs [0.17ms]
+(pass) model-resolution check > parseProviderModel > splits synthetic provider model IDs at the provider separator [0.17ms]
+(pass) model-resolution check > getModelResolutionInfo > returns agent requirements with provider chains [9.89ms]
+(pass) model-resolution check > getModelResolutionInfo > returns category requirements with provider chains [11.70ms]
+(pass) model-resolution check > getModelResolutionInfoWithOverrides > shows user override for agent when configured [3.48ms]
+(pass) model-resolution check > getModelResolutionInfoWithOverrides > shows user override for category when configured [2.99ms]
+(pass) model-resolution check > getModelResolutionInfoWithOverrides > shows provider fallback when no override exists [2.94ms]
+(pass) model-resolution check > getModelResolutionInfoWithOverrides > captures user variant for agent when configured [3.15ms]
+(pass) model-resolution check > getModelResolutionInfoWithOverrides > captures user variant for category when configured [2.96ms]
+(pass) model-resolution check > getModelResolutionInfoWithOverrides > attaches snapshot-backed capability diagnostics for built-in models [2.79ms]
+(pass) model-resolution check > getModelResolutionInfoWithOverrides > keeps provider-prefixed overrides for transport while capability diagnostics use pattern aliases [3.87ms]
+(pass) model-resolution check > getModelResolutionInfoWithOverrides > keeps provider-prefixed Claude overrides for transport while capability diagnostics canonicalize to bare IDs [3.38ms]
+(pass) model-resolution check > checkModelResolution > returns pass or warn status with agent and category counts [16.27ms]
+(pass) model-resolution check > checkModelResolution > includes resolution details in verbose mode details array [2.79ms]
+(pass) model-resolution check > checkModelResolution > collects warnings when configured models rely on compatibility fallback [2.42ms]
+(pass) model-resolution check > checkModelResolution > does not warn for known provider aliases used by current recommended models [2.79ms]
+(pass) model-resolution check > checkModelResolution > does not warn for OpenCode Go Qwen Max overrides with snapshot-backed diagnostics from refreshed models.dev [2.84ms]
+
+packages/omo-opencode/src/cli/doctor/checks/telemetry.test.ts:
+(pass) checkTelemetry > reports enabled status and last daily active date [1.03ms]
+(pass) checkTelemetry > reports disabled status when env disables PostHog [0.50ms]
+
+packages/omo-opencode/src/cli/doctor/checks/bundled-assets.test.ts:
+(pass) bundled assets check > #given a complete package root #when evaluating bundled assets #then nothing is missing [0.36ms]
+(pass) bundled assets check > #given a package root missing a bundled skill file #when evaluating bundled assets #then exactly that asset is reported missing [0.18ms]
+(pass) bundled assets check > #given a null package root #when evaluating bundled assets #then the evaluation is empty [0.07ms]
+(pass) bundled assets check > fails with reinstall guidance when the cached install is incomplete [0.71ms]
+
+packages/omo-opencode/src/cli/doctor/checks/codex.test.ts:
+(pass) codex doctor checks > #given installed LazyCodex cache and config #when gathering Codex summary #then reports package and plugin versions [1.46ms]
+(pass) codex doctor checks > #given missing Codex config #when checking Codex doctor #then fails with install guidance [0.53ms]
+(pass) codex doctor checks > #given another plugin is enabled #when LazyCodex is disabled #then Codex doctor reports OMO as disabled [0.75ms]
+(pass) codex doctor checks > #given LazyCodex marketplace is missing #when Codex doctor runs #then plugin loading fails [0.71ms]
+(pass) codex doctor checks > #given installed plugin without the omo-agent-toolkit runtime bin #when checking Codex doctor #then reports the missing canonical command [0.64ms]
+(pass) codex doctor checks > #given generated omo-agent-toolkit wrapper points at a deleted runtime target #when checking runtime wrapper #then warns with reinstall guidance [0.74ms]
+(pass) codex doctor checks > #given a marker-bearing legacy omo wrapper #when checking runtime wrapper #then warns with the self-cleaning reinstall command [0.44ms]
+(pass) codex doctor checks > #given an unmarked user-owned omo #when checking runtime wrapper #then stays silent about the legacy name [0.37ms]
+(pass) codex doctor checks > #given installed LazyCodex #when checking Codex doctor #then details include Codex-specific health surfaces [0.61ms]
+(pass) codex doctor checks > #given LazyCodex is primary and Codex Companion lifecycle hooks are configured #when checking Codex doctor #then warns without disabling anything [0.99ms]
+(pass) codex doctor checks > #given a stamped plugin bundle #when gathering Codex summary #then it reports the installer version and stamped state [0.51ms]
+(pass) codex doctor checks > #given an un-stamped placeholder plugin bundle with no install snapshot #when checking Codex doctor #then it warns and points at the installer version [0.69ms]
+(pass) codex doctor checks > #given malformed lazycodex install snapshot #when gathering Codex summary #then does not crash [0.56ms]
+(pass) codex doctor checks > #given installed LazyCodex #when reading config directly #then fixture is a real TOML-like file [0.28ms]
+
+packages/omo-opencode/src/cli/doctor/checks/config.test.ts:
+(pass) config check > checkConfig > returns a valid CheckResult [1.17ms]
+(pass) config check > checkConfig > includes issues array even when config is valid [0.36ms]
+(pass) config check > checkConfig > #given a user config with one invalid value #when running the config check #then it warns once, naming the file and the dotted key [3.48ms]
+(pass) config check > checkConfig > uses the OPENCODE_CONFIG_DIR profiles tail after module import [6.13ms]
+(pass) config check > checkConfig > reports invalid ancestor plugin config from the current directory [2.86ms]
+(pass) config check > checkConfig > does not flag configured custom providers as unavailable when they exist in opencode.json [3.97ms]
+(pass) config check > checkConfig > does not flag reasoningEffort: 'max' as an invalid configuration [3.68ms]
+
+packages/omo-opencode/src/cli/doctor/checks/tools-lsp.test.ts:
+(pass) getInstalledLspServers > #given an omo project view disabling lsp #when checking servers #then returns none [1.24ms]
+(pass) getInstalledLspServers > #given no lsp override #when checking servers #then exposes the bundled server [1.10ms]
+(pass) getInstalledLspServers > #given malformed omo config #when checking servers #then keeps the bundled server available [0.79ms]
+
+packages/omo-opencode/src/cli/doctor/checks/browser-provider.test.ts:
+(pass) browser provider doctor check > reports the removed provider in the active user layer [0.72ms]
+(pass) browser provider doctor check > reports the removed provider in the active project layer [0.30ms]
+(pass) browser provider doctor check > reports the removed provider in the active profile layer [0.29ms]
+(pass) browser provider doctor check > passes when the obsolete configuration key is removed [0.25ms]
+(pass) browser provider doctor check > runs as part of the shipped doctor registry [0.67ms]
+
+packages/omo-opencode/src/cli/doctor/checks/system.test.ts:
+(pass) system check > #given malformed config JSONC > marks the config invalid without throwing [0.47ms]
+(pass) system check > #given cache directory contains spaces > uses a quoted cache directory in mismatch fix command [0.27ms]
+(pass) system check > #given cache directory contains spaces > includes Bun postinstall trust guidance in the update fix command [0.18ms]
+(pass) system check > #given OpenCode plugin entry uses legacy package name > adds a warning for a bare legacy entry [0.09ms]
+(pass) system check > #given OpenCode plugin entry uses legacy package name > adds a warning for a version-pinned legacy entry [0.07ms]
+(pass) system check > #given OpenCode plugin entry uses legacy package name > does not warn for a canonical plugin entry [0.07ms]
+(pass) system check > #given OpenCode plugin entry uses legacy package name > does not warn for a local-dev legacy entry [0.06ms]
+
+packages/omo-opencode/src/cli/doctor/checks/tools-mcp.test.ts:
+(pass) getUserMcpInfo > loads valid project MCP servers [0.37ms]
+(pass) getUserMcpInfo > skips malformed MCP config files [0.22ms]
+(pass) getUserMcpInfo > marks non-object MCP server entries invalid [0.23ms]
+
+packages/omo-opencode/src/cli/doctor/checks/tui-plugin-config.test.ts:
+(pass) tui-plugin-config check > passes when both server and TUI package entries are registered [0.32ms]
+(pass) tui-plugin-config check > passes when tui.json contains the package entry and a tuple plugin entry [0.22ms]
+(pass) tui-plugin-config check > passes after ensureTuiPluginEntry adds the missing package TUI entry [0.44ms]
+(pass) tui-plugin-config check > warns when server is registered but TUI entry is missing [0.15ms]
+(pass) tui-plugin-config check > does not suggest a missing TUI entry when the installed package has no tui export [0.16ms]
+(pass) tui-plugin-config check > warns to remove an explicit TUI entry when the installed package has no tui export [0.20ms]
+(pass) tui-plugin-config check > warns to remove a package subpath TUI entry even when the package exports tui [0.24ms]
+(pass) tui-plugin-config check > does not warn for a file TUI entry when the server package has no tui export [0.27ms]
+(pass) tui-plugin-config check > uses the registered server package when canonical and legacy installs disagree [0.18ms]
+(pass) tui-plugin-config check > warns when server is registered but tui.json does not exist [0.12ms]
+(pass) tui-plugin-config check > passes when tui.json has a file: entry pointing at our package [0.19ms]
+(pass) tui-plugin-config check > warns when tui.json has our entry but server plugin is missing from opencode.json [0.15ms]
+(pass) tui-plugin-config check > skips when neither config registers the plugin [0.14ms]
+(pass) tui-plugin-config check > #given leftover @latest and bare entries #when checking #then it warns about the duplicate [0.19ms]
+(pass) tui-plugin-config check > #given leftover @latest and bare entries #when ensureTuiPluginEntry runs #then doctor passes [0.25ms]
+(pass) tui-plugin-config check > #given a tuple server entry and a tuple TUI entry #when checking #then both halves are detected [0.27ms]
+(pass) tui-plugin-config check > passes when legacy server entry is paired with legacy TUI package entry [0.13ms]
+
+packages/omo-opencode/src/cli/doctor/checks/model-resolution-cache.test.ts:
+(pass) loadAvailableModelsFromCache > returns cacheExists: false when no models.json and no custom providers [0.15ms]
+(pass) loadAvailableModelsFromCache > reads providers from models.json cache [0.15ms]
+(pass) loadAvailableModelsFromCache > includes custom providers from opencode.json even if not in cache [0.18ms]
+(pass) loadAvailableModelsFromCache > deduplicates providers that appear in both cache and opencode.json [0.15ms]
+(pass) loadAvailableModelsFromCache > returns custom providers even without models.json cache [0.11ms]
+(pass) loadAvailableModelsFromCache > reads from opencode.jsonc (JSONC variant) [0.15ms]
+(pass) loadAvailableModelsFromCache > ignores malformed opencode.json gracefully [0.15ms]
+
+packages/omo-opencode/src/cli/doctor/checks/tuple-plugin-entries.test.ts:
+(pass) getPluginInfo - tuple plugin entries > #given a config mixing a tuple entry and our entry #when reading plugin info #then our entry is still detected [0.28ms]
+(pass) getPluginInfo - tuple plugin entries > #given our plugin declared as a tuple #when reading plugin info #then the pinned version is read from the entry name [0.11ms]
+(pass) checkSystem - tuple plugin entries > #given a legacy tuple entry #when running the system check #then it warns about the legacy name without throwing [0.13ms]
+(pass) checkSystem - tuple plugin entries > #given a canonical tuple entry #when running the system check #then no legacy warning is raised [0.07ms]
+
+packages/omo-opencode/src/cli/doctor/checks/model-resolution-openai-fast-alias.test.ts:
+(pass) doctor OpenAI GPT fast capability diagnostics > preserves the configured model and variant while reporting alias-backed capabilities [7.41ms]
+
+packages/omo-opencode/src/cli/doctor/checks/deprecated-reasoning-keys.test.ts:
+(pass) deprecated reasoning keys check > reports deprecated reasoning keys with exact file and key path [0.61ms]
+(pass) deprecated reasoning keys check > ignores plugin-supported reasoning keys inside opencode harness blocks [0.33ms]
+(pass) deprecated reasoning keys check > ignores canonical provider_options passthrough keys while keeping accurate labels [0.30ms]
+(pass) deprecated reasoning keys check > #given fallback_models and the reasoning unification marker #when the check runs #then the fix explains models[0] is the primary and does not advertise config migrate [0.36ms]
+(pass) deprecated reasoning keys check > #given fallback_models and no migration marker #when the check runs #then the fix still suggests config migrate [0.26ms]
+
+packages/omo-opencode/src/cli/doctor/checks/legacy-config-leftovers.test.ts:
+(pass) legacy config leftovers doctor warning > #given a legacy OpenCode config #when doctor collects migration leftovers #then it emits a warning with the migrate command hint [0.59ms]
+
+packages/omo-opencode/src/cli/doctor/checks/system-loaded-version.test.ts:
+(pass) system loaded version > getLoadedPluginVersion > prefers the config directory when both installs exist [1.78ms]
+(pass) system loaded version > getLoadedPluginVersion > falls back to the cache directory for legacy installs [0.23ms]
+(pass) system loaded version > getLoadedPluginVersion > detects installs published under the canonical plugin name [0.15ms]
+(pass) system loaded version > getLoadedPluginVersion > detects installs under OpenCode's packages/<name>@<tag> directory [0.20ms]
+(pass) system loaded version > getLoadedPluginVersion > prefers the flat node_modules install over a packages/<name>@<tag> install in the same root [0.21ms]
+(pass) system loaded version > getLoadedPluginVersion > falls back to require.resolve when neither config nor cache directory has an install [0.83ms]
+(pass) system loaded version > getLoadedPluginVersion > prefers candidate install path over require.resolve fallback when candidate exists [0.15ms]
+(pass) system loaded version > getLoadedPluginVersion > returns null versions when selected package JSON files are invalid [0.17ms]
+(pass) system loaded version > getLoadedPluginVersion > #given no config or cache install #when resolving the loaded version #then the resolved manifest path is package.json-shaped and any existing manifest carries an accepted name [0.54ms]
+(pass) system loaded version > getLoadedPluginVersion > resolves symlinked config directories before selecting install path [0.21ms]
+(pass) system loaded version > getSuggestedInstallTag > returns prerelease channel when current version is prerelease [0.06ms]
+
+packages/omo-opencode/src/cli/doctor/checks/model-resolution-config.test.ts:
+(pass) model-resolution-config > #given a user omo config #when loading model settings #then reads its opencode view [1.03ms]
+Known temp leaks, report-only until their owners are fixed (#9766):
+  omo-opencode (28): omo-codex-components-doctor-HIhsIn omo-codex-components-doctor-KRmzNo omo-codex-components-doctor-KnPaeg omo-codex-components-doctor-SHvn14 omo-codex-components-doctor-Vjonko omo-codex-components-doctor-W99SMk omo-codex-components-doctor-aCiZac omo-codex-components-doctor-aOwrmw omo-codex-components-doctor-cfKigR omo-codex-components-doctor-dFXo6E omo-codex-components-doctor-lknx57 omo-codex-components-doctor-lmezgc omo-codex-components-doctor-omWmZ2 omo-codex-components-doctor-xS9AC6 omo-codex-doctor-1V2Nqx omo-codex-doctor-2Dlmzx omo-codex-doctor-3OhRrN omo-codex-doctor-3oqiWz omo-codex-doctor-9dgQBo omo-codex-doctor-Ifv4E3 omo-codex-doctor-OalCq2 omo-codex-doctor-QfA9Rt omo-codex-doctor-Vom2RF omo-codex-doctor-aN6nw4 omo-codex-doctor-cZ05uO omo-codex-doctor-missing-m4ZGkj omo-codex-doctor-oPsNKZ omo-codex-doctor-p9yylD
+
+ 200 pass
+ 0 fail
+ 532 expect() calls
+Ran 200 tests across 31 files. [1031.00ms]
