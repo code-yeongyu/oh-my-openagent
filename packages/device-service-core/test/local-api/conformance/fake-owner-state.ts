@@ -1,6 +1,6 @@
 import type {
   ClientInfo,
-  CommandRequest,
+  CommandRpc,
   EnforcementReport,
   ErrorCode,
   JsonObject,
@@ -26,7 +26,7 @@ export type OwnerState = {
   adoptions: number;
   readonly attaches: Map<string, WorldSession>;
   readonly bindings: Map<string, { readonly target: string; readonly sha256: string }>;
-  readonly commands: CommandRequest[];
+  readonly commands: CommandRpc[];
   readonly uploads: UploadAssembler;
   readonly endpoints: Set<string>;
   readonly reports: Omit<EnforcementReport, "id" | "type">[];

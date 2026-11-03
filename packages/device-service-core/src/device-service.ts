@@ -10,9 +10,12 @@ import { openAttach, type RemoteAttach } from "./remote-attach.ts"
 export type { ListingResult, ListingRevision, ReadPage, ReadPageEntry } from "./local-api/client-assembly.ts"
 export { LocalApiError } from "./local-api/errors.ts"
 export type {
+  CommandRpc,
+  CommandStateEvent,
   DetachReason,
   DeviceRef,
   DeviceRow,
+  JsonObject,
   ListingRow,
   RoundDeviceState,
   SessionFilter,

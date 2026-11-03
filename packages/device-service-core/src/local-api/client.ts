@@ -18,7 +18,7 @@ import { LocalApiError } from "./errors.ts";
 import { lineBytes, LOCAL_INLINE_MAX } from "./limits.ts";
 import type {
   ClientInfo,
-  CommandRequest,
+  CommandRpc,
   LocalEvent,
   RequestType,
   ResponseData,
@@ -52,11 +52,7 @@ export type LocalApiClient = {
     params: RequestParams<T>,
   ) => Promise<ResponseData[T]>;
   readonly onEvent: (listener: (event: LocalEvent) => void) => () => void;
-  readonly command: (
-    attach: string,
-    command: CommandRequest,
-    command_id?: string,
-  ) => Promise<string>;
+  readonly command: (attach: string, rpc: CommandRpc, command_id?: string) => Promise<string>;
   readonly list: (
     filter?: SessionFilter,
     onRevision?: (revision: ListingRevision) => void,
@@ -120,12 +116,12 @@ const handshake = (connection: ClientConnection, options: ConnectOptions): Promi
 const sendCommand = async (
   connection: ClientConnection,
   attach: string,
-  command: CommandRequest,
+  rpc: CommandRpc,
   command_id: string | undefined,
 ): Promise<string> => {
   // Always sent, minted here when the caller gave none: a command whose answer times out may still have been
-  // dispatched, and its outcome arrives as session.command_state for this id. A retry of the same op and text to the
-  // same target session under this id dispatches nothing more; anything else under it is command_id_conflict.
+  // dispatched, and its outcome arrives as session.command_state for this id. A retry of the same record to the same
+  // target session under this id dispatches nothing more; anything else under it is command_id_conflict.
   const sent = command_id ?? mintId();
   const id = { command_id: sent };
   const timedOut = (error: unknown): never => {
@@ -139,37 +135,32 @@ const sendCommand = async (
       );
     throw error;
   };
-  if (command.op === "prompt" || command.op === "steer") {
-    const verdict = checkCommandText(command.text);
-    if (verdict === "message_too_long")
-      throw new LocalApiError("message_too_long", "the text is over the engine limit", {
+  const draft = {
+    id: "x".repeat(REQUEST_ID_MAX_CHARS),
+    type: "session.command",
+    attach,
+    ...id,
+    rpc,
+  };
+  if (lineBytes(draft) > LOCAL_INLINE_MAX) {
+    // Too large for one line: the record's UTF-8 JSON goes as upload parts, held to the engine's own text limit.
+    const json = JSON.stringify(rpc);
+    if (checkCommandText(json) === "message_too_long")
+      throw new LocalApiError("message_too_long", "the command is over the engine limit", {
         limit_chars: MESSAGE_LIMIT_CHARS,
       });
-    if (verdict === "malformed")
-      throw new LocalApiError("invalid_request", "the text is not well-formed");
-    const draft = {
-      id: "x".repeat(REQUEST_ID_MAX_CHARS),
-      type: "session.command",
-      attach,
-      ...id,
-      command,
-    };
-    if (lineBytes(draft) > LOCAL_INLINE_MAX) {
-      const upload_id = mintId();
-      const parts = uploadParts(command.text).map((part) =>
-        connection.request("session.command_part", { attach, upload_id, ...part }),
-      );
-      // A part that times out leaves session.command unsent, so the command was never dispatched: that timeout is
-      // reported as it is, with no command_id, and a fresh retry is safe.
-      await Promise.all(parts);
-      return (
-        await connection
-          .request("session.command", { attach, ...id, upload_id, op: command.op })
-          .catch(timedOut)
-      ).command_id;
-    }
+    const upload_id = mintId();
+    const parts = uploadParts(json).map((part) =>
+      connection.request("session.command_part", { attach, upload_id, ...part }),
+    );
+    // A part that times out leaves session.command unsent, so the command was never dispatched: that timeout is
+    // reported as it is, with no command_id, and a fresh retry is safe.
+    await Promise.all(parts);
+    return (
+      await connection.request("session.command", { attach, ...id, upload_id }).catch(timedOut)
+    ).command_id;
   }
-  return (await connection.request("session.command", { attach, ...id, command }).catch(timedOut))
+  return (await connection.request("session.command", { attach, ...id, rpc }).catch(timedOut))
     .command_id;
 };
 
@@ -197,7 +188,7 @@ export const connectLocalApi = async (options: ConnectOptions): Promise<LocalApi
         listeners.delete(listener);
       };
     },
-    command: (attach, command, command_id) => sendCommand(connection, attach, command, command_id),
+    command: (attach, rpc, command_id) => sendCommand(connection, attach, rpc, command_id),
     list: (filter, onRevision) =>
       new Promise<ListingResult>((resolve, reject) => {
         const params = filter === undefined ? {} : { filter };

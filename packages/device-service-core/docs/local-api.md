@@ -122,7 +122,7 @@ value). Requests are answered in any order; clients correlate by `id`.
 | `sessions.list`              | `filter?` (`device`, `project`, `state`)                          | `{query_id}`                                                         | then the round and listing events                                     |
 | `session.attach`             | `device`, `session_id`                                            | `{attach}`                                                           | then the attach stream                                                |
 | `session.detach`             | `attach`                                                          | `{}`                                                                 | closing a connection detaches its attaches                            |
-| `session.command`            | `attach`, `command_id?`, `command` or `upload_id` + `op`          | `{command_id}`                                                       | then `session.command_state`                                          |
+| `session.command`            | `attach`, `command_id?`, `rpc` or `upload_id`                     | `{command_id}`                                                       | then `session.command_state`                                          |
 | `session.command_part`       | `attach`, `upload_id`, `index`, `count`, `b`                      | `{received: index}`                                                  | an upload part                                                        |
 | `session.read`               | `attach`, `before_entry_id?`, `tail?` (1-200)                     | `{query_id}`                                                         | then `session.read_result`                                            |
 | `enforcement.report`         | `generation`, `data_home`, `environments`, `complete`             | `{}`                                                                 | desktop clients only, for their own `data_home`                       |
@@ -137,9 +137,8 @@ refused `invalid_request`. The local API checks the shape only; the service chec
 non-negative integer counts; `complete` is true only when every environment of that home reported for `generation`.
 An empty list with `complete: true` is a legitimate report.
 
-Commands (`command`): `{op: "prompt" | "steer", text}`, `{op: "abort"}`,
-`{op: "permission", ui_request_id, confirmed}`, `{op: "question", ui_request_id, answers, comment?}` where `answers`
-maps a question id to `{selected: [label], text?}` (at most 64 answers of at most 64 labels).
+Commands (`rpc`): one engine RPC inbound record, a JSON object sent unchanged (decision 0011, #105). The local API
+checks only that it is a JSON object; the receiving host and its engine classify and decide it.
 
 ## Status
 
@@ -255,13 +254,13 @@ characters; without one the service mints one. A command_id binds once to its ta
 payload: a repeat with the same binding answers the same `command_id` and dispatches nothing more; any other repeat
 is `command_id_conflict`.
 
-The text of a prompt or steer must be at most 1,000,000 characters (the engine's limit, counted in UTF-16 code units)
-and 3,000,000 UTF-8 bytes; a longer text is refused `message_too_long {limit_chars: 1000000}` before anything leaves
+The record's JSON must be at most 1,000,000 characters (the engine's limit, counted in UTF-16 code units) and
+3,000,000 UTF-8 bytes; a longer record is refused `message_too_long {limit_chars: 1000000}` before anything leaves
 the device. A client checks this itself before sending any part.
 
-Uploads: when the inline `session.command` line would exceed `LOCAL_INLINE_MAX`, the client sends the UTF-8 text in
+Uploads: when the inline `session.command` line would exceed `LOCAL_INLINE_MAX`, the client sends the record's UTF-8 JSON in
 `session.command_part {attach, upload_id, index, count, b}` (every part but the last exactly `LOCAL_CHUNK_MAX` raw
-bytes; `count` at most 12) and then `session.command {attach, command_id?, upload_id, op}`. The same index with other
+bytes; `count` at most 12) and then `session.command {attach, command_id?, upload_id}`. The same index with other
 bytes, or another `count`, aborts the upload (`session.upload_abort {reason: "parts_conflict"}`); a command naming an
 upload that is not complete is refused `upload_incomplete`.
 
@@ -269,7 +268,8 @@ upload that is not complete is refused `upload_incomplete`.
 
 `session.command_state` reports, in order: `queued` (not every part is acknowledged yet), `transport_confirmed`
 (every part acknowledged), then the outcome on the session's device: `engine_dispatched`, `engine_applied`,
-`engine_refused {reason}` (`parts_conflict`, `peer_unauthorized`, `message_too_long`, `engine_capability_missing`),
+`engine_refused {reason}` (`parts_conflict`, `peer_unauthorized`, `message_too_long`, `engine_capability_missing`, and the host's refusals of a
+forwarded record: `malformed`, `method_unclassified`, `method_local_only`, `capability_missing`),
 `engine_stale`, or `uncertain {reason}` (`request_gone`, `no_receipt`, `engine_restarted`, `recipient_revoked`,
 `transport_expired`, `unconfirmed`).
 

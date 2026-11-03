@@ -221,7 +221,7 @@ describe("LA9 every event validates", () => {
       client,
       (e): e is LocalEvent => e.kind === "session.command_state" && e.state === "engine_applied",
     );
-    await client.command(attach, { op: "abort" });
+    await client.command(attach, { type: "abort" });
     await applied;
     await client.read(attach, { before_entry_id: "e-3" });
     for (const event of seen) expect(validateEvent(event)).toEqual(event);

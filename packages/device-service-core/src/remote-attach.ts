@@ -1,7 +1,17 @@
+import { randomBytes } from "node:crypto"
+
 import type { LocalApiClient } from "./local-api/client.ts"
 import type { ReadPage } from "./local-api/client-assembly.ts"
 import { LocalApiError } from "./local-api/errors.ts"
-import type { AttachPendingReason, DetachReason, JsonObject, LocalEvent, SnapshotBody } from "./local-api/protocol.ts"
+import type {
+  AttachPendingReason,
+  CommandRpc,
+  CommandStateEvent,
+  DetachReason,
+  JsonObject,
+  LocalEvent,
+  SnapshotBody,
+} from "./local-api/protocol.ts"
 
 /** How an attach ended: a service-reported reason, the connection closing, or this client's own detach. */
 export type AttachEnd = DetachReason | "closed" | "detached" | "listener_failed"
@@ -25,6 +35,12 @@ export type RemoteAttach = {
   readonly onEvent: (listener: (event: RemoteAttachEvent) => void) => () => void
   /** One page of older history; entries too large to fetch are marked `too_large`. */
   readonly read: (options?: { readonly before?: string; readonly tail?: number }) => Promise<ReadPage>
+  /**
+   * Sends one engine RPC record, unchanged, to the attached session's host (`session.command {attach, rpc}`) and
+   * settles with the first command state that is not a progress state; its state and reason are the host's or the
+   * engine's. Rejects with the local API's refusal, or when the attach ends first.
+   */
+  readonly command: (rpc: CommandRpc) => Promise<CommandStateEvent>
   /** Detaches; afterwards this attach holds no subscription on the connection and `detached` settles "detached". */
   readonly detach: () => Promise<void>
   /** The error a listener threw, which ended the attach with "listener_failed"; undefined otherwise. */
@@ -47,6 +63,9 @@ const attachEvent = (event: LocalEvent): AttachEvent | undefined => {
       return undefined
   }
 }
+
+// The sender ledger's progress states (local API command_state): every other state ends the command.
+const PROGRESS_STATES: ReadonlySet<CommandStateEvent["state"]> = new Set(["queued", "transport_confirmed", "engine_dispatched"])
 
 const toRemote = (event: AttachEvent): RemoteAttachEvent => {
   switch (event.kind) {
@@ -82,11 +101,13 @@ export function openAttach(client: LocalApiClient, device: string, sessionId: st
   })
   let ended = false
   let failure: unknown
+  const commands = new Set<(reason: AttachEnd) => void>()
   const finish = (reason: AttachEnd) => {
     if (ended) return
     ended = true
     stop()
     listeners.clear()
+    for (const end of [...commands]) end(reason)
     rejectSnapshot(new Error(`the attach ended before its snapshot: ${reason}`))
     resolveDetached(reason)
   }
@@ -132,6 +153,31 @@ export function openAttach(client: LocalApiClient, device: string, sessionId: st
           return () => listeners.delete(listener)
         },
         failure: () => failure,
+        command: rpc =>
+          new Promise<CommandStateEvent>((resolve, reject) => {
+            if (ended) return reject(new Error("the attach has ended"))
+            // Minted here, before sending, so a state that arrives ahead of the answer is not missed.
+            const commandId = randomBytes(16).toString("base64url")
+            const settle = (): void => {
+              stopState()
+              commands.delete(end)
+            }
+            const end = (reason: AttachEnd): void => {
+              settle()
+              reject(new Error(`the attach ended before the command settled: ${reason}`))
+            }
+            const stopState = client.onEvent(event => {
+              if (event.kind !== "session.command_state" || event.command_id !== commandId) return
+              if (PROGRESS_STATES.has(event.state)) return
+              settle()
+              resolve(event)
+            })
+            commands.add(end)
+            client.command(attach, rpc, commandId).catch((error: unknown) => {
+              settle()
+              reject(error)
+            })
+          }),
         read: (options = {}) =>
           client.read(attach, {
             ...(options.before === undefined ? {} : { before_entry_id: options.before }),

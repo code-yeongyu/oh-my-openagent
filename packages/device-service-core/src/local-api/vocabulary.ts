@@ -87,11 +87,9 @@ export type DetachReason = (typeof DETACH_REASONS)[number];
 export const ATTACH_PENDING_REASONS = ["stream_key_pending"] as const;
 export type AttachPendingReason = (typeof ATTACH_PENDING_REASONS)[number];
 
-// Commands: the ops, the sender-ledger states with the evidence rule, and the reasons (equal to the shared
-// command contract's lists; a drift test pins them). A command_id is exactly 22 base64url characters.
+// Commands: the sender-ledger states with the evidence rule, and the reasons (each one the shared command contract's;
+// a drift test pins them). A command_id is exactly 22 base64url characters.
 export const COMMAND_ID_CHARS = 22;
-export const COMMAND_OPS = ["prompt", "steer", "abort", "permission", "question"] as const;
-export type CommandOp = (typeof COMMAND_OPS)[number];
 export const COMMAND_STATES = [
   "queued",
   "transport_confirmed",
@@ -117,6 +115,11 @@ export const COMMAND_REFUSAL_REASONS = [
   "peer_unauthorized",
   "message_too_long",
   "engine_capability_missing",
+  // Decision 0011: the receiving endpoint's refusals of a forwarded engine RPC record, in its order (#105).
+  "malformed",
+  "method_unclassified",
+  "method_local_only",
+  "capability_missing",
 ] as const;
 export type CommandUncertainReason = (typeof COMMAND_UNCERTAIN_REASONS)[number];
 export type CommandRefusalReason = (typeof COMMAND_REFUSAL_REASONS)[number];

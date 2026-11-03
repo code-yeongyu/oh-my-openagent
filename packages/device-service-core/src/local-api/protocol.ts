@@ -71,18 +71,8 @@ export type SessionFilter = {
   readonly project?: string;
   readonly state?: SessionRowState;
 };
-export type CommandRequest =
-  | { readonly op: "prompt" | "steer"; readonly text: string }
-  | { readonly op: "abort" }
-  | { readonly op: "permission"; readonly ui_request_id: string; readonly confirmed: boolean }
-  | {
-      readonly op: "question";
-      readonly ui_request_id: string;
-      readonly answers: {
-        readonly [id: string]: { readonly selected: readonly string[]; readonly text?: string };
-      };
-      readonly comment?: string;
-    };
+// One engine RPC inbound record (decision 0011, #105): opaque here, classified by the receiving engine.
+export type CommandRpc = JsonObject;
 export type EnvironmentReport = {
   readonly environment_id: string;
   readonly revoked: number;
@@ -150,7 +140,7 @@ export type SessionCommand =
       readonly type: "session.command";
       readonly attach: string;
       readonly command_id?: string;
-      readonly command: CommandRequest;
+      readonly rpc: CommandRpc;
     }
   | {
       readonly id: string;
@@ -158,7 +148,6 @@ export type SessionCommand =
       readonly attach: string;
       readonly command_id?: string;
       readonly upload_id: string;
-      readonly op: "prompt" | "steer";
     };
 export type SessionCommandPart = {
   readonly id: string;

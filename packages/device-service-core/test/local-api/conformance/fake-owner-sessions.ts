@@ -1,7 +1,7 @@
 import { blobEvents, LOCAL_INLINE_MAX, lineBytes, sha256Hex } from "../../../src/local-api/chunking.ts";
 import { pageListing } from "../../../src/local-api/listing.ts";
 import type {
-  CommandRequest,
+  CommandRpc,
   JsonObject,
   ListingRow,
   SessionAttach,
@@ -12,8 +12,8 @@ import type {
   SessionRead,
   SessionsList,
 } from "../../../src/local-api/protocol.ts";
-import { checkCommandText, MESSAGE_LIMIT_CHARS } from "../../../src/local-api/upload.ts";
-import { assertNever } from "../../../src/local-api/validate-fields.ts";
+import { MESSAGE_LIMIT_CHARS } from "../../../src/local-api/upload.ts";
+import { assertNever, jsonObject } from "../../../src/local-api/validate-fields.ts";
 import { readPage } from "./fake-owner-history.ts";
 import {
   type Conn,
@@ -121,12 +121,26 @@ const sortedJson = (value: unknown): string =>
       : v,
   );
 
-const commandOf = (state: OwnerState, request: SessionCommand): CommandRequest | Outcome => {
-  if ("command" in request) return request.command;
+const uploadedRpc = (json: string): CommandRpc | undefined => {
+  try {
+    return jsonObject(JSON.parse(json), "rpc");
+  } catch {
+    return undefined;
+  }
+};
+
+type Resolved = { readonly rpc: CommandRpc } | { readonly refused: Outcome };
+const commandOf = (state: OwnerState, request: SessionCommand): Resolved => {
+  if ("rpc" in request) return { rpc: request.rpc };
   const taken = state.uploads.take(request.upload_id);
-  if (taken.kind === "text") return { op: request.op, text: taken.text };
-  if (taken.kind === "refused" && taken.reason === "message_too_long") return tooLong();
-  return refuse("upload_incomplete", "the upload is not complete");
+  if (taken.kind === "refused" && taken.reason === "message_too_long")
+    return { refused: tooLong() };
+  if (taken.kind !== "text")
+    return { refused: refuse("upload_incomplete", "the upload is not complete") };
+  const rpc = uploadedRpc(taken.text);
+  return rpc === undefined
+    ? { refused: refuse("invalid_request", "the upload is not one JSON object") }
+    : { rpc };
 };
 
 // A command_id binds once to (session, payload sha256): a repeat with the same binding answers the same id and
@@ -136,23 +150,18 @@ const command = (state: OwnerState, conn: Conn, request: SessionCommand): Outcom
   if (session === undefined || !conn.attaches.has(request.attach))
     return refuse("not_attached", "attach first");
   const resolved = commandOf(state, request);
-  if ("reply" in resolved) return resolved;
-  if (
-    (resolved.op === "prompt" || resolved.op === "steer") &&
-    checkCommandText(resolved.text) !== "ok"
-  )
-    return tooLong();
+  if ("refused" in resolved) return resolved.refused;
   const command_id = request.command_id ?? state.mint();
   const binding = {
     target: `${session.device}/${session.session_id}`,
-    sha256: sha256Hex(utf8(sortedJson(resolved))),
+    sha256: sha256Hex(utf8(sortedJson(resolved.rpc))),
   };
   const bound = state.bindings.get(command_id);
   if (bound !== undefined && (bound.target !== binding.target || bound.sha256 !== binding.sha256))
     return refuse("command_id_conflict", "the command_id is bound to another session or payload");
   if (bound !== undefined) return ok({ command_id });
   state.bindings.set(command_id, binding);
-  state.commands.push(resolved);
+  state.commands.push(resolved.rpc);
   return ok({ command_id }, () => {
     for (const outcome of session.outcome)
       conn.send(eventOf("session.command_state", { command_id, ...outcome }));
