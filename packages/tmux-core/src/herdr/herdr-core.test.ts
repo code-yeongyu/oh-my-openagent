@@ -122,22 +122,22 @@ describe("herdr ops", () => {
 describe("ensureHerdrServer", () => {
   test("starts the headless server on server_not_running and polls until ready", async () => {
     let probes = 0
-    let spawned: string[] | null = null
+    const spawnedBox: { argv?: string[] } = {}
     const state = await ensureHerdrServer({
       runHerdrCommand: async () => {
         probes += 1
         // first probe: down; after spawn: up
-        return spawned === null
+        return spawnedBox.argv === undefined
           ? { success: false, output: "", error: "no herdr server is running", code: "server_not_running" }
           : { success: true, output: envelope({ agents: [] }) }
       },
       spawnDetached: (bin, args) => {
-        spawned = [bin, ...args]
+        spawnedBox.argv = [bin, ...args]
       },
       sleep: async () => {},
     })
     expect(state).toBe("started")
-    expect(spawned).toEqual(["herdr", "server"])
+    expect(spawnedBox.argv).toEqual(["herdr", "server"])
     expect(probes).toBeGreaterThanOrEqual(2)
   })
 
