@@ -125,6 +125,28 @@ describe("tryFallbackRetry", () => {
   })
 
   describe("#given retryable error with fallback chain", () => {
+    test.each([
+      { reasoning: "high", reasoningEffort: "low", variant: "low", expectedVariant: undefined },
+      { reasoning: undefined, reasoningEffort: "high", variant: "low", expectedVariant: "low" },
+    ])("preserves fallback reasoning $reasoning and legacy effort $reasoningEffort (#6791)", async (settings) => {
+      // given - selected fallback tuning differs from the failed model
+      const args = createDefaultArgs({ fallbackChain: [{
+        model: "fallback-model", providers: ["provider-b"],
+        reasoning: settings.reasoning, reasoningEffort: settings.reasoningEffort, variant: settings.variant,
+      }] })
+
+      // when
+      expect(await tryFallbackRetry(args)).toBe(true)
+
+      // then - queued launch and persisted task keep the same selected tuning
+      const expected = {
+        providerID: "provider-b", modelID: "fallback-model", reasoning: settings.reasoning,
+        reasoningEffort: settings.reasoningEffort, variant: settings.expectedVariant,
+      }
+      expect([...args.queuesByKey.values()].flat()[0]?.input.model).toEqual(expected)
+      expect(args.task.model).toEqual(expected)
+    })
+
     test("includes the original task and latest continuation in a fresh-session retry", async () => {
       // given
       const args = createDefaultArgs({ prompt: "latest-continuation", originalPrompt: "original-task" })
