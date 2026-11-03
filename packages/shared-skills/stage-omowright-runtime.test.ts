@@ -49,6 +49,19 @@ describe("omowright runtime staging", () => {
     expect(await checkOmowrightRuntimeFresh({ sourceRoot, targetDir })).toMatchObject({ ok: true, version: "0.0.1-fixture" })
   })
 
+  test("#given an unchanged source #when staged twice #then the manifest is byte-identical", async () => {
+    const sourceRoot = await makeSourceFixture()
+    const targetParent = await mkdtemp(join(tmpdir(), "omowright-stage-target-"))
+    tempDirs.push(targetParent)
+    const targetDir = join(targetParent, "omowright")
+
+    await stageOmowrightRuntime({ sourceRoot, targetDir })
+    const first = await readFile(join(targetDir, "manifest.json"), "utf8")
+    await stageOmowrightRuntime({ sourceRoot, targetDir })
+
+    expect(await readFile(join(targetDir, "manifest.json"), "utf8")).toBe(first)
+  })
+
   test("#given a staged runtime #when the source changes #then the freshness check rejects it", async () => {
     const sourceRoot = await makeSourceFixture()
     const targetParent = await mkdtemp(join(tmpdir(), "omowright-stage-target-"))
