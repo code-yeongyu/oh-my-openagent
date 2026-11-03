@@ -33,6 +33,10 @@ const bindDarwinSignIn = (secrets: SecretApi) =>
   })
 
 describe("a launcher-injected Bun.secrets is never the real macOS store (#11262)", () => {
+  test("#given the preloaded hermetic Bun.secrets (test-hermetic-home.ts) #when a darwin sign-in store binds #then it is not helper-eligible", () => {
+    expect(bindDarwinSignIn(original).eligible).toBe(false)
+  })
+
   test("#given Bun.secrets replaced by a marked stand-in #when the darwin sign-in store binds #then it is not helper-eligible and keeps the stand-in", async () => {
     const standIn = installStandIn(true)
     const binding = bindDarwinSignIn(Bun.secrets)
