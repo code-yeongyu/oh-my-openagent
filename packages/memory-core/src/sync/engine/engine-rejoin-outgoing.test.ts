@@ -64,6 +64,7 @@ test("#given a journaled batch sealed by the machine's previous principal #when 
     const repo = join(root, "repo")
     await mkdir(repo, { recursive: true })
     await gitRepo(repo)
+    const logs: string[] = []
     const engineFor = async (keyring: DeviceKeyring, http: { baseUrl: string; token: () => string }, failFirstAppend: boolean) => {
       const opened = await openAccountSession({ ...http, account: ACCOUNT, keyring, pinDir, spaceId: new Uint8Array(16).fill(3) })
       if (!opened.ok) throw new Error(`session refused: ${opened.reason}`)
@@ -78,7 +79,7 @@ test("#given a journaled batch sealed by the machine's previous principal #when 
           return opened.session.transport.append(request)
         },
       }
-      const sync = await openDeviceSync({ repoDir: repo, stateDir: join(root, "state"), locksDir: join(root, "locks"), session: { ...opened.session, transport }, machineId: "machine" })
+      const sync = await openDeviceSync({ repoDir: repo, stateDir: join(root, "state"), locksDir: join(root, "locks"), session: { ...opened.session, transport }, machineId: "machine", log: (line) => logs.push(line) })
       if (sync === null) throw new Error("sync unavailable")
       return sync
     }
@@ -89,6 +90,11 @@ test("#given a journaled batch sealed by the machine's previous principal #when 
     await Bun.write(join(repo, "note.md"), "---\ndescription: sealed by the first principal\n---\nkept across the re-join\n")
     await expect(firstEngine.engine.runCycle()).rejects.toThrow("the connection dropped")
     await firstEngine.close()
+    // The same principal's own journaled batch is resent as sealed, never re-sealed.
+    const resent = await engineFor(first, firstHttp, true)
+    await expect(resent.engine.runCycle()).rejects.toThrow("the connection dropped")
+    await resent.close()
+    expect(logs.filter((line) => line.includes("re-sealing"))).toEqual([])
     // `omo account forget`: the first principal's keys are discarded and its pin retired; no revoke.
     await forgetTrustAnchor(pinDir, ACCOUNT)
 
@@ -97,6 +103,7 @@ test("#given a journaled batch sealed by the machine's previous principal #when 
     const secondEngine = await engineFor(second, secondHttp, false)
     close.push(() => secondEngine.close())
     expect((await secondEngine.engine.runCycle()).pushed).toBe(true)
+    expect(logs.filter((line) => line.includes("re-sealing"))).toHaveLength(1)
     const landed = f.entries.filter((entry) => entry.kind === "batch")
     expect(landed.map((entry) => entry.author.kind === "device" ? entry.author.id : "")).toEqual([second.principal().id])
   } finally {
