@@ -32,6 +32,11 @@ export type HelperBinding = {
 
 // One adapter per helper-backed account per process, so every store in the process shares the same pending read.
 const readers = new Map<DarwinBackend, SecretApi>()
+// A launcher-child preload that stands in for the OS store (cli-keystore, accounts-closed fixtures) replaces Bun.secrets
+// with a fake and marks it, so the fake never counts as the real macOS store and never reaches the signed helper or the
+// login Keychain (#11262: on darwin it took the helper path from a non-GUI test child and failed at the real Keychain).
+const INJECTED_SECRETS = Symbol.for("omo.test.injectedSecrets")
+const isInjectedSecrets = (api: SecretApi): boolean => (api as { readonly [INJECTED_SECRETS]?: unknown })[INJECTED_SECRETS] === true
 const backends = new Map<string, Promise<DarwinBackend | null>>()
 
 /**
@@ -50,7 +55,7 @@ export function bindKeychainHelper(input: {
 }): HelperBinding {
   const { secrets: real, key, options } = input
   const eligible =
-    input.platform === "darwin" && input.namespace === "omo-cli" && (options !== undefined || (typeof Bun !== "undefined" && real === Bun.secrets))
+    input.platform === "darwin" && input.namespace === "omo-cli" && (options !== undefined || (typeof Bun !== "undefined" && real === Bun.secrets && !isInjectedSecrets(real)))
   const secrets: SecretApi = !eligible
     ? real
     : {
