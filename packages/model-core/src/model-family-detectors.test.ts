@@ -134,6 +134,12 @@ describe("model family detectors", () => {
     expect(isKimiK3Model("kimi-for-coding/k3p1")).toBe(true)
     expect(isKimiK3Model("kimi-coding/k3.1-pro")).toBe(true)
     expect(isKimiK3Model("opencode/k3")).toBe(true)
+    expect(isKimiK3Model("kimi-for-coding/k3-256k")).toBe(true)
+    expect(isKimiK3Model("k3-256k")).toBe(true)
+    expect(isKimiK3Model("KIMI-FOR-CODING/K3-256K")).toBe(true)
+    for (const model of ["not-k3-256k", "somek3-256k", "k3-256kb", "k3-context-256k", "gpt-k3-256k", "k2-256k"]) {
+      expect(isKimiK3Model(model)).toBe(false)
+    }
     expect(isKimiK3Model("opencode-go/kimi-k2.7")).toBe(false)
     expect(isKimiK3Model("kimi-for-coding/k2p7")).toBe(false)
     expect(isKimiK3Model("kimi-for-coding/k2p5")).toBe(false)
