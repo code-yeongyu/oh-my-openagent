@@ -69,6 +69,30 @@ test("the held file is named in a shown, typed status on every cycle until it fi
   expect(await b.read("big.md")).toBe(note("now it fits\n"))
 }, SMALL_SET_TIMEOUT)
 
+test("a peer's edit to a held file never renders over the local edit sync could not take, and both meet once it fits", async () => {
+  const bound = 4096
+  const server = new FakeSyncServer()
+  const a = await makeDevice(server, "a", undefined, { realStore: true, batchBytes: bound })
+  const b = await makeDevice(server, "b", undefined, { realStore: true, batchBytes: bound })
+  devices.push(a, b)
+  const note = (body: string) => `---\ndescription: note\n---\n${body}`
+  await a.write("shared.md", note("first\n"))
+  await a.engine.runCycle()
+  await b.engine.runCycle()
+  const big = note(`first\n${"y".repeat(bound * 2)}\n`)
+  await a.write("shared.md", big)
+  await a.engine.runCycle()
+  await b.write("shared.md", note("first\nfrom b\n"))
+  await b.engine.runCycle()
+  expect(await a.engine.runCycle()).toMatchObject({ applied: 1, held: ["shared.md"] })
+  expect(await a.read("shared.md")).toBe(big)
+  await a.write("shared.md", note("first\nfrom a\n"))
+  expect(await a.engine.runCycle()).toMatchObject({ pushed: true, held: [] })
+  await b.engine.runCycle()
+  const merged = await b.read("shared.md")
+  for (const piece of ["first", "from a", "from b"]) expect(merged).toContain(piece)
+}, SMALL_SET_TIMEOUT)
+
 test("an oversized item an older build already journaled is held with every later op of its key, and the rest still pushes", async () => {
   const bound = 1024
   const server = new FakeSyncServer()

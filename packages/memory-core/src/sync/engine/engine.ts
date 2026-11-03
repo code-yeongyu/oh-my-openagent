@@ -6,7 +6,8 @@
 
 import { advance, applyVerified, capture } from "./apply"
 import type { EngineDeps } from "./engine-deps"
-import { describeSyncFailure, isFailureShown, type SyncFailure } from "./failure"
+import { describeOversizedItems, describeSyncFailure, isFailureShown, type SyncFailure } from "./failure"
+import { batchBound, recordHeld } from "./held"
 import { type EngineState, SyncJournal } from "./journal"
 import { push, staleBackoffMs } from "./push"
 import type { RefusalCode } from "./ports"
@@ -38,6 +39,8 @@ export interface CycleReport {
   readonly rejectedItems: number
   readonly pushed: boolean
   readonly snapshot: number | null
+  /** Keys held out of the push because one change to each exceeds the batch bound (#12284). */
+  readonly held: readonly string[]
 }
 
 export class SyncEngine {
@@ -63,6 +66,8 @@ export class SyncEngine {
   private failing: Failing | null = null
   /** The failure a UI shows: set once a failure crosses its visibility threshold, cleared only by a successful cycle. */
   private shown: Failing | null = null
+  /** The shown key of the items the last successful cycle held, mirrored for announcements. */
+  private heldKey: string | null = null
 
   constructor(private readonly deps: EngineDeps) {
     this.journal = new SyncJournal(deps.repo.gitDir)
@@ -72,11 +77,16 @@ export class SyncEngine {
     return this.journal.state()
   }
 
-  /** What a UI shows: a shown failure until a cycle succeeds, paused at a refused entry, else the last successful sync. */
+  /**
+   * What a UI shows: a shown failure until a cycle succeeds, the items held out of the push while any
+   * is, paused at a refused entry, else the last successful sync.
+   */
   async status(): Promise<EngineStatus> {
     // Failing outranks paused on purpose: while no cycle completes nothing moves at all, and a paused refusal shows again after the first good cycle.
     if (this.shown !== null) return { kind: "failing", ...this.shown }
     const s = await this.journal.state()
+    // A held item outranks paused too: a pause retries on its own, a held item waits for the person.
+    if (s.held !== null) return { kind: "failing", failure: describeOversizedItems(s.held.keys, batchBound(this.deps)), since: s.held.since, attempts: s.held.cycles }
     if (s.paused !== null) return { kind: "paused", seq: s.paused.seq, code: s.paused.code }
     if (s.lastSyncedAt === null) return { kind: "never_synced" }
     return { kind: "synced", at: s.lastSyncedAt, updatedWhileOffline: s.updatedWhileOffline }
@@ -129,6 +139,7 @@ export class SyncEngine {
         const shownBefore = this.shownKey()
         this.failing = null
         this.shown = null
+        this.heldKey = report.held.length === 0 ? null : failureKey(describeOversizedItems(report.held, batchBound(this.deps)))
         this.announceIfChanged(shownBefore)
         for (const w of waiters) w.resolve(report)
         if (this.running === run) this.running = null
@@ -149,7 +160,7 @@ export class SyncEngine {
         // successful cycle clears a shown failure.
         if (isFailureShown(failing.failure.kind, failing.attempts)) {
           const shown = this.shown
-          this.shown = shown !== null && shownBefore === `${failure.kind}\n${failure.action}`
+          this.shown = shown !== null && shownBefore === failureKey(failure)
             ? { failure, since: shown.since, attempts: shown.attempts + 1 }
             : failing
         }
@@ -166,9 +177,9 @@ export class SyncEngine {
     return run
   }
 
-  /** The shown failure's kind and action: a new stranded lock path changes the action, so it is a change too. */
+  /** The shown failure's kind and action: a new stranded lock path or held key changes the action, so it is a change too. */
   private shownKey(): string | null {
-    return this.shown === null ? null : `${this.shown.failure.kind}\n${this.shown.failure.action}`
+    return this.shown === null ? this.heldKey : failureKey(this.shown.failure)
   }
 
   /** Tells the owner when the shown failure appears, changes or clears; a repeat of the same one is silent. */
@@ -230,13 +241,14 @@ export class SyncEngine {
       this.loaded = true
     }
     const before = await journal.updateState({ eventHead: Math.max(this.eventHead, (await journal.state()).eventHead) })
+    let held: readonly string[] = []
     if (before.cycle !== null) {
       const resumed = before.cycle
       await deps.lock.withLock(async () => {
         // A cycle resumed at merged re-renders its keys over the working files: capture any edit made
         // since the crash first, so it merges into the doc instead of being overwritten.
-        if (resumed.stage === "merged") await capture(deps, journal, resumed)
-        await advance(deps, journal, resumed)
+        if (resumed.stage === "merged") held = await capture(deps, journal, resumed)
+        await advance(deps, journal, resumed, new Set(held))
       })
     }
     let applied = 0
@@ -248,8 +260,8 @@ export class SyncEngine {
       refused += got.refused
       snapshot = got.snapshot ?? snapshot
       const done = await deps.lock.withLock(async () => {
-        await capture(deps, journal)
-        return applyVerified(deps, journal)
+        held = await capture(deps, journal)
+        return applyVerified(deps, journal, new Set(held))
       })
       applied += done.batches
       memories += done.memories
@@ -265,10 +277,13 @@ export class SyncEngine {
       await this.sleep(staleBackoffMs(attempt, deps.random))
       await inbound()
     }
+    const heldKeys = await recordHeld(deps, journal, held)
     if (refused === 0) await journal.updateState({ lastSyncedAt: deps.clock.now(), updatedWhileOffline: memories })
     this.appliedMirror = (await journal.state()).applied
     this.cyclesRun += 1
     const rejectedItems = (await journal.state()).rejectedItems - before.rejectedItems
-    return { applied, refused, rejectedItems, pushed, snapshot }
+    return { applied, refused, rejectedItems, pushed, snapshot, held: heldKeys }
   }
 }
+
+const failureKey = (failure: SyncFailure): string => `${failure.kind}\n${failure.action}`

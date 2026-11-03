@@ -5,7 +5,7 @@
 
 import { createHash, randomBytes } from "node:crypto"
 
-import { MAX_BATCH_BYTES, splitBatches } from "./batches"
+import { MAX_BATCH_BYTES, planBatches } from "./batches"
 import type { EngineDeps } from "./engine-deps"
 import { fromBase64, type OutgoingBatch, type SyncJournal, toBase64, type WireItem } from "./journal"
 
@@ -59,7 +59,7 @@ async function pushOne(deps: EngineDeps, journal: SyncJournal, batchBytes: numbe
   const pending = await journal.pending()
   let out = pending.outgoing
   if (out === null) {
-    const first = splitBatches(pending.items, batchBytes)[0]
+    const first = planBatches(pending.items, batchBytes).batches[0]
     if (first === undefined) return "idle"
     out = await seal(deps, journal, first, randomBytes(16).toString("base64url"))
   }

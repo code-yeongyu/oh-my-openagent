@@ -1,6 +1,8 @@
 // Why a sync cycle failed, in the words a person reads in the TUI footer or the desktop: what kind
 // of failure it is, what happened, and what to do about it (omo #10637). The engine keeps the
 // latest failure until a cycle succeeds; the raw error text stays in the log, never in the status.
+// An item held out of the push (#12284) is shown the same way while it is held, though every other
+// item keeps syncing, because only the person can end it.
 
 import { StrandedGitLockError } from "../../git/repo-lock-sweep"
 import { SyncAuthError, SyncHttpError, SyncNetworkError } from "./adapters/http-transport"
@@ -10,6 +12,7 @@ export type SyncFailure =
   | { readonly kind: "auth_expired"; readonly reason: string; readonly action: string }
   | { readonly kind: "offline"; readonly reason: string; readonly action: string }
   | { readonly kind: "unknown"; readonly reason: string; readonly action: string }
+  | { readonly kind: "oversized_item"; readonly keys: readonly string[]; readonly limitBytes: number; readonly reason: string; readonly action: string }
 
 export type SyncFailureKind = SyncFailure["kind"]
 
@@ -39,6 +42,24 @@ const UNKNOWN: SyncFailure = {
   kind: "unknown",
   reason: "Memory sync stopped on an unexpected error.",
   action: "Sync retries on its own. If this stays, restart OmO; the error is in the memory log.",
+}
+
+const MIB = 1024 * 1024
+const sizeText = (bytes: number): string => (bytes % MIB === 0 ? `${bytes / MIB} MiB` : `${bytes} bytes`)
+
+/** The items sync holds back because one change to each is larger than a batch may carry. */
+export function describeOversizedItems(keys: readonly string[], limitBytes: number): SyncFailure {
+  const limit = sizeText(limitBytes)
+  const named = keys.length <= 3 ? keys.join(", ") : `${keys.slice(0, 3).join(", ")} and ${keys.length - 3} more`
+  return {
+    kind: "oversized_item",
+    keys,
+    limitBytes,
+    reason: keys.length === 1
+      ? `A change to one memory file is larger than the ${limit} sync limit, so that file is not synced. Every other memory keeps syncing.`
+      : `Changes to ${keys.length} memory files are larger than the ${limit} sync limit, so those files are not synced. Every other memory keeps syncing.`,
+    action: `Shrink or split ${named} to stay under ${limit}; ${keys.length === 1 ? "it syncs" : "each syncs"} on its own once it fits.`,
+  }
 }
 
 export function describeSyncFailure(error: unknown): SyncFailure {

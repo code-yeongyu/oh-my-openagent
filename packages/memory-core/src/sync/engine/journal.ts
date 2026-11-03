@@ -62,6 +62,11 @@ export interface EngineState {
   readonly refused: number
   /** Received items dropped because their key may never reach this device's files (#12147); never pauses. */
   readonly rejectedItems: number
+  /**
+   * Items the last cycle held out of the push because one change to each exceeds the batch bound
+   * (#12284), since the cycle that first held any, and for how many cycles in a row; null when none.
+   */
+  readonly held: { readonly keys: readonly string[]; readonly since: number; readonly cycles: number } | null
   readonly cycle: CycleRecord | null
   /** The entry the pull stopped at; cleared once a later pull verifies past it. */
   readonly paused: { readonly seq: number; readonly code: RefusalCode } | null
@@ -95,6 +100,7 @@ const EMPTY_STATE: EngineState = {
   eventHead: 0,
   refused: 0,
   rejectedItems: 0,
+  held: null,
   cycle: null,
   paused: null,
   lastSyncedAt: null,

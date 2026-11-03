@@ -23,7 +23,9 @@ import { dirname, join } from "node:path"
 import { syncJournalDirectory } from "../../journal/fsync"
 import { isSyncItemKey } from "../item"
 import { removeAtomic, writeAtomic } from "./atomic"
+import { itemBytes } from "./batches"
 import type { EngineDeps } from "./engine-deps"
+import { batchBound } from "./held"
 import { acceptedItems, acceptedKeys, rejectItem } from "./item-keys"
 import { type CycleRecord, fromBase64, type RenderRecord, type SyncJournal, toBase64, type WireItem } from "./journal"
 import { fsRefusal, prepareLanding, readWorking, throughSymlink } from "./landing"
@@ -96,13 +98,19 @@ async function adoptLandedRenders(deps: EngineDeps, journal: SyncJournal, cycle:
   await adoptLegacyRenders(deps, cycle, new Set(latest.keys()), (key) => readWorking(deps.repo.root, landingPath(paths, key) ?? key))
 }
 
-export async function capture(deps: EngineDeps, journal: SyncJournal, resuming: CycleRecord | null = null): Promise<number> {
+/**
+ * Journals every local edit as pending ops, and returns the keys it held back instead (#12284): an
+ * edit larger than one batch may carry is never journaled, applied or made the baseline, so every
+ * cycle diffs that file against the same baseline again and it syncs once it fits.
+ */
+export async function capture(deps: EngineDeps, journal: SyncJournal, resuming: CycleRecord | null = null): Promise<readonly string[]> {
   const files = await workingFiles(deps, journal)
   // Resuming a cycle at merged: every render that landed is the base of any edit made since.
   if (resuming !== null) await adoptLandedRenders(deps, journal, resuming, files)
   const known = await acceptedKeys(deps, journal, "capture", deps.store.keys())
   const keys = [...new Set([...known, ...files.byKey.keys()])].sort()
   const captured: WireItem[] = []
+  const held: string[] = []
   const texts = new Map<string, string | null>()
   for (const key of keys) {
     const path = landingPath(files, key)
@@ -111,10 +119,16 @@ export async function capture(deps: EngineDeps, journal: SyncJournal, resuming: 
     if (text === undefined) continue
     const ops = await deps.store.capture(key, text)
     if (ops === null) continue
-    captured.push({ key, ops: toBase64(ops) })
+    const item = { key, ops: toBase64(ops) }
+    if (itemBytes(item) > batchBound(deps)) {
+      held.push(key)
+      await rejectItem(deps, journal, "capture", key, "oversized")
+      continue
+    }
+    captured.push(item)
     texts.set(key, text)
   }
-  if (captured.length === 0) return 0
+  if (captured.length === 0) return held
   const pending = await journal.pending()
   const fresh = captured.filter((c) => !pending.items.some((p) => sameItem(p, c)))
   await journal.setPending({ ...pending, items: [...pending.items, ...fresh] })
@@ -127,13 +141,14 @@ export async function capture(deps: EngineDeps, journal: SyncJournal, resuming: 
   }
   await deps.store.persist()
   deps.fault?.("persisted")
-  return captured.length
+  return held
 }
 
-export async function applyVerified(deps: EngineDeps, journal: SyncJournal): Promise<Applied> {
+/** `held`: keys capture held back this cycle, whose working files must not be rendered over. */
+export async function applyVerified(deps: EngineDeps, journal: SyncJournal, held: ReadonlySet<string> = new Set()): Promise<Applied> {
   const resumed = (await journal.state()).cycle
   if (resumed !== null) {
-    await advance(deps, journal, resumed)
+    await advance(deps, journal, resumed, held)
     return { batches: 0, memories: resumed.keys.length }
   }
   const records = (await journal.incoming()).filter((r) => r.stage === "verified")
@@ -162,7 +177,7 @@ export async function applyVerified(deps: EngineDeps, journal: SyncJournal): Pro
   }
   await journal.updateState({ cycle })
   deps.fault?.("merged")
-  await advance(deps, journal, cycle)
+  await advance(deps, journal, cycle, held)
   return { batches: records.filter((r) => !r.snapshot).length, memories: keys.size }
 }
 
@@ -184,7 +199,7 @@ async function land(journal: SyncJournal, root: string, cycleId: string, record:
   await syncJournalDirectory(dirname(staged))
 }
 
-export async function advance(deps: EngineDeps, journal: SyncJournal, start: CycleRecord): Promise<void> {
+export async function advance(deps: EngineDeps, journal: SyncJournal, start: CycleRecord, held: ReadonlySet<string> = new Set()): Promise<void> {
   let cycle = start
   // A cycle an older build journaled may list a key the grammar refuses; it is dropped durably
   // before any stage runs, so every replay sees the same key set (invariant 6).
@@ -205,6 +220,14 @@ export async function advance(deps: EngineDeps, journal: SyncJournal, start: Cyc
   if (cycle.stage === "merged") {
     const latest = latestByKey(await journal.renders(cycle.id))
     for (const key of [...cycle.keys]) {
+      // A held key's file carries an edit capture could not take (#12284): rendering the doc over it
+      // would erase that edit, so the key leaves the cycle (durably) and its file stays as it is.
+      if (held.has(key)) {
+        cycle = { ...cycle, keys: cycle.keys.filter((k) => k !== key) }
+        await journal.updateState({ cycle })
+        deps.log?.(`sync.item.held side=render len=${Buffer.byteLength(key, "utf8")}`)
+        continue
+      }
       // Decided before any render record exists for the key, so a key this device cannot hold is
       // dropped from the cycle (durably) instead of failing it on every resume.
       const landing = await prepareLanding(deps.repo.root, landingPath(paths, key))
