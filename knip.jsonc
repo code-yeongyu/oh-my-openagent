@@ -2923,6 +2923,7 @@
         "scripts/qa/fused-equivalence-e2e.mjs",
         "src/components/claim-receipt/runtime.ts",
         "src/components/computer-use/runtime.ts",
+        "src/components/device-service/runtime.ts",
         "src/components/feedback/runtime.ts",
         "src/components/memory/commands/runtime.ts",
         "src/components/memory/device-session/account-runtime.ts",

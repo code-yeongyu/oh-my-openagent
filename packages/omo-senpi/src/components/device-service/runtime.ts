@@ -16,7 +16,7 @@ export interface ProcessLatch {
 }
 
 export interface DeviceServiceRuntimeOptions {
-  /** Claimed by the first bootstrap; this module is loaded once per process, so its own latch is the process latch. */
+  /** Claimed by the first bootstrap; the default lives on globalThis, so any copy of this module in the process shares it. */
   readonly latch?: ProcessLatch
   readonly env?: Readonly<Record<string, string | undefined>>
   readonly loadConfig?: (options: { readonly cwd: string }) => { readonly config: OmoDeviceServiceConfigView }
@@ -25,7 +25,19 @@ export interface DeviceServiceRuntimeOptions {
 
 type Notify = (message: string, type?: "info" | "warning" | "error") => void
 
-const PROCESS_LATCH: ProcessLatch = { claimed: false }
+const LATCH_KEY = Symbol.for("omo.device-service.bootstrap")
+
+const isLatch = (value: unknown): value is ProcessLatch => isRecord(value) && typeof value.claimed === "boolean"
+
+// One latch per process, keyed on globalThis: a second instance of this module (another plugin copy, a reload that
+// re-imports the sidecar) must not bootstrap again.
+function processLatch(): ProcessLatch {
+  const existing: unknown = Reflect.get(globalThis, LATCH_KEY)
+  if (isLatch(existing)) return existing
+  const latch: ProcessLatch = { claimed: false }
+  Reflect.set(globalThis, LATCH_KEY, latch)
+  return latch
+}
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
@@ -55,7 +67,7 @@ export async function bootstrapAtStart(eventCtx: unknown, logger: ComponentLogge
   const env = options.env ?? process.env
   const omoBin = env.OMO_BIN
   const notify = notifierOf(eventCtx)
-  const latch = options.latch ?? PROCESS_LATCH
+  const latch = options.latch ?? processLatch()
   if (latch.claimed || omoBin === undefined || !isAbsolute(omoBin) || isCi(env) || env[OMO_SENPI_TASK_RPC_CHILD] === "1" || notify === undefined) return
   latch.claimed = true
   const cwd = isRecord(eventCtx) && typeof eventCtx.cwd === "string" ? eventCtx.cwd : process.cwd()
