@@ -101,7 +101,7 @@ describe("sign-in through the signed keychain helper (#11262 design 3, addendum)
       },
     })
     await store.write(credentials)
-    expect(await store.read()).toEqual(credentials)
+    expect(await store.read()).toEqual({ ...credentials, credentialGeneration: expect.any(String) })
     expect(consulted).toBe(0)
     expect(keychain.events).toEqual([])
   })

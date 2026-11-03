@@ -273,18 +273,20 @@ export function createSealedStore<T>(
     if (raw === null) return null
     try { return schema.parse(JSON.parse(raw)) } catch { return null }
   }
-  const parsedRead = async (fresh: boolean): Promise<T | null> => {
+  const rawRead = async (fresh: boolean): Promise<string | null> => {
     await assertUsable()
     const backend = await helper.backend()
-    let value: string | null
     try {
       if (backend === null) await helper.guardHelperless()
-      value = await answered(backend === null ? secrets : helper.reader(backend), fresh)
+      return await answered(backend === null ? secrets : helper.reader(backend), fresh)
     } catch (error) {
       if (error instanceof KeychainApprovalPendingError) throw error
       if (error instanceof HelperMissingForOwnedItem) throw new CredentialStoreError(error.message)
       throw unavailable(error)
     }
+  }
+  const parsedRead = async (fresh: boolean): Promise<T | null> => {
+    const value = await rawRead(fresh)
     return value === null ? null : parseStored(value)
   }
   const lockedFailure = (error: unknown): unknown => {
@@ -297,8 +299,9 @@ export function createSealedStore<T>(
   return {
     read: () => parsedRead(false),
     readAuthoritative: () => parsedRead(true),
+    // Only the approval matters here: an unreadable value is the locked section's to report or replace (forget, --replace).
     async prepare() {
-      if ((await helper.backend()) !== null) await parsedRead(false)
+      if ((await helper.backend()) !== null) await rawRead(false)
     },
     async underLock(lease) {
       const backend = await helper.backend()

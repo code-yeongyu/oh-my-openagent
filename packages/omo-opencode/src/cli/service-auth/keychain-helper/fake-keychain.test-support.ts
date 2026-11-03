@@ -116,10 +116,10 @@ export function fakeKeychain(options: { readonly approve?: "allow" | "deny" | "l
   return { items, events, stats, secrets, access, put, cache }
 }
 
-export async function helperSession(keychain: ReturnType<typeof fakeKeychain>, background = false) {
+export async function helperSession(keychain: ReturnType<typeof fakeKeychain>, background = false, api = API) {
   const home = await mkdtemp(join(tmpdir(), "omo-helper-session-"))
   onTestFinished(() => rm(home, { recursive: true, force: true }))
-  const store = createCredentialStore(API, {
+  const store = createCredentialStore(api, {
     secrets: keychain.secrets,
     platform: "darwin",
     lockProbe: async () => "unlocked",
@@ -128,5 +128,5 @@ export async function helperSession(keychain: ReturnType<typeof fakeKeychain>, b
     home,
     keychainHelper: { access: async () => keychain.access, home, silently: run => run(), ownerMarker: async () => "absent", cache: keychain.cache },
   })
-  return { store, session: createSession({ api: API, store, home }), home }
+  return { store, session: createSession({ api, store, home }), home }
 }
