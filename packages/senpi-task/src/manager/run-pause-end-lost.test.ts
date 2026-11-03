@@ -29,7 +29,7 @@ function pausedChild(options: { readonly liveHandle: boolean }) {
   return { store, concurrency, pause, taskId: record.task_id, model: record.model }
 }
 
-test("#given a paused child the run's Resume could not restore #when its run is ended #then it is an error the parent hears about, with its lane slot freed", () => {
+test("#given a paused child the run's Resume could not restore #when its run is ended #then it is a session_unavailable error with its pause cleared and its lane slot freed", () => {
   const f = pausedChild({ liveHandle: false })
 
   const ended = f.pause.endLostPausedTask(f.taskId, "paused child restore failed (respawn_failed): rpc respawn failed")
@@ -41,6 +41,16 @@ test("#given a paused child the run's Resume could not restore #when its run is 
   expect(record?.run_pause).toBeUndefined()
   expect(f.concurrency.leaseState(f.taskId, 0)).toBeUndefined()
   expect(f.concurrency.tryAcquire(f.model, "st_0e1d0002", 0)).toBe(true)
+})
+
+test("#given a paused child another host took over #when ending its run is asked #then the ownership check on the fresh record keeps it paused", () => {
+  const f = pausedChild({ liveHandle: false })
+  f.store.mutate(f.taskId, fresh => ({ ...fresh, host_pid: 424242 }))
+
+  expect(f.pause.endLostPausedTask(f.taskId, "respawn_failed", fresh => fresh.host_pid !== 424242)).toBe(false)
+
+  expect(f.store.load(f.taskId)).toMatchObject({ status: "paused", run_pause: { parent_pause_seq: 16 } })
+  expect(f.concurrency.leaseState(f.taskId, 0)).toBe("held")
 })
 
 test("#given a paused child whose handle is still live #when ending its run is asked #then it stays paused for the next Resume", () => {

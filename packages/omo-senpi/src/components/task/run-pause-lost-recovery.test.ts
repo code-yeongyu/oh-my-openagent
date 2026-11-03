@@ -129,8 +129,8 @@ test("#12249: a retry that reaches the lost child resumes it and never ends its 
 
   await stopThenResume(h)
   await within(retried.promise, "the scheduled retry")
-  // A repeated Resume is serialized behind the scheduled retry, so the retry's state write has landed.
-  await h.bridge.changed(PARENT, { ...released(7), change: "resumed" })
+  // The recovery itself settles only after it either resumed every lost child or ended them.
+  await within(h.bridge.lostRecoverySettled(PARENT), "the lost-child recovery to settle")
 
   expect(h.registry.require(PARENT).participants.st_b?.state).toBe("resumed")
   expect(endedKeys).toEqual([])

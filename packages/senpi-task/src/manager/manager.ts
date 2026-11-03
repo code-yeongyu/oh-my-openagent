@@ -388,12 +388,11 @@ class TaskManagerImpl implements TaskManager {
   }
 
   endLostPausedTask(taskId: string, reason: string): boolean {
-    const record = this.#tryLoad(taskId)
-    const owner = record?.host_pid
     const alive = this.#options.isProcessAlive ?? defaultSignaller.isAlive
     // A paused child a live foreign host still holds is that host's to resume; it is never ended here.
-    if (owner !== undefined && owner !== this.#hostPid && alive(owner)) return false
-    const ended = this.#runPause.endLostPausedTask(taskId, reason)
+    // Checked on the fresh record inside the end's own locked write, never on an earlier read.
+    const ended = this.#runPause.endLostPausedTask(taskId, reason, (fresh) =>
+      fresh.host_pid === undefined || fresh.host_pid === this.#hostPid || !alive(fresh.host_pid))
     if (ended) this.#settleWaiters(taskId)
     return ended
   }

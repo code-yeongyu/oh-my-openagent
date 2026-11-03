@@ -6,7 +6,7 @@ import { ResumeCapacity, type ResumeAllocation } from "./resume-capacity"
 import { PendingPauses } from "./pending-pauses"
 import type { AdmissionBarrier, ResumeCredential } from "../pause/admission-barrier"
 import { buildRevived } from "../steering/engine-policy"
-import type { TaskRecord } from "../state"
+import { transitionTaskRecord, type TaskRecord, type TaskTransitionResult } from "../state"
 import { savedRunOwner } from "./paused-restore"
 
 export type ResumeTaskRequest = RunPauseOwner & {
@@ -263,19 +263,30 @@ export function createTaskRunPause(ports: {
   }
 
   // A paused child the run's Resume could not reach, with no live handle left: its run ends as an
-  // error the parent is told about, and its transcript stays for task_send to revive (#12249).
-  function endLostPausedTask(taskId: string, reason: string): boolean {
-    const record = ports.store.load(taskId)
-    if (record === null || record === undefined || record.status !== "paused" || ports.liveHandle(taskId) !== undefined) return false
+  // error the parent is told about; its transcript stays readable through task_output (#12249).
+  // The status check, the caller's ownership check and the end are one locked read-modify-write,
+  // so a host that takes the record over in between is never ended from here.
+  function endLostPausedTask(taskId: string, reason: string, mayEnd: (fresh: TaskRecord) => boolean = () => true): boolean {
+    if (ports.liveHandle(taskId) !== undefined) return false
+    let ended: TaskTransitionResult | undefined
+    ports.store.mutate(taskId, (fresh) => {
+      if (fresh.status !== "paused" || !mayEnd(fresh)) return fresh
+      const { run_pause: _ended, ...unpaused } = fresh
+      const result = transitionTaskRecord(unpaused, {
+        type: "fail",
+        timestamp: new Date(ports.now()).toISOString(),
+        error_message: `The run's Resume could not restore this paused child (${reason}), so its run ended. Its transcript is kept for task_output.`,
+        failure_kind: "session_unavailable",
+      })
+      if (!result.applied) return fresh
+      ended = result
+      return result.record
+    })
+    if (ended === undefined) return false
+    ports.store.appendEvent(taskId, { type: ended.audit.type, payload: ended.audit })
     forget(taskId)
     ports.concurrency.releaseTask(taskId)
-    ports.store.mutate(taskId, ({ run_pause: _ended, ...fresh }) => fresh)
-    return ports.store.transition(taskId, {
-      type: "fail",
-      timestamp: new Date(ports.now()).toISOString(),
-      error_message: `The run's Resume could not restore this paused child (${reason}). Its transcript is kept: task_send revives it.`,
-      failure_kind: "session_unavailable",
-    }).applied
+    return true
   }
 
   function forget(taskId: string): void {

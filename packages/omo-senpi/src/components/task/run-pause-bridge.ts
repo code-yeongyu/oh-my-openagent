@@ -16,6 +16,7 @@ export class EngineRunPauseBridge {
   readonly #pauses = new Map<string, { readonly seq: number; readonly pending: Promise<void> }>()
   readonly #resumes = new Map<string, { readonly seq: number; readonly pending: Promise<void> }>()
   readonly #retries = new Map<string, Promise<void>>()
+  readonly #recoveries = new Map<string, Promise<void>>()
 
   constructor(
     readonly controller: RunPauseController,
@@ -108,9 +109,11 @@ export class EngineRunPauseBridge {
       await this.afterReleased?.(parentSessionId)
       // Backgrounded: the hold-change handler must not wait out the retry schedule.
       if (this.lostRecovery !== undefined && this.controller.hasLost(parentSessionId, pauseSeq)) {
-        void this.#recoverLost(parentSessionId, pauseSeq, this.lostRecovery).catch((error: unknown) => {
+        const recovery = this.#recoverLost(parentSessionId, pauseSeq, this.lostRecovery).catch((error: unknown) => {
           log("[omo-senpi] run resume lost-participant recovery failed", { parentSessionId, pauseSeq, error: String(error) })
         })
+        this.#recoveries.set(parentSessionId, recovery)
+        void recovery.then(() => { if (this.#recoveries.get(parentSessionId) === recovery) this.#recoveries.delete(parentSessionId) })
       }
     }
   }
@@ -122,17 +125,28 @@ export class EngineRunPauseBridge {
       await this.#retryLost(parentSessionId, pauseSeq)
       if (!this.controller.hasLost(parentSessionId, pauseSeq)) return
     }
-    const failures = await this.controller.endLost(parentSessionId, pauseSeq)
-    if (failures.length > 0) log("[omo-senpi] run resume could not end lost participants", { parentSessionId, pauseSeq, failures })
+    await this.#serialized(parentSessionId, async () => {
+      const failures = await this.controller.endLost(parentSessionId, pauseSeq)
+      if (failures.length > 0) log("[omo-senpi] run resume could not end lost participants", { parentSessionId, pauseSeq, failures })
+    })
   }
 
-  // Serialized per parent, so overlapping retries never resume the same child twice.
+  /** Test observability: the parent's in-flight lost-child recovery, settled once every lost child is resumed or ended. */
+  lostRecoverySettled(parentSessionId: string): Promise<void> {
+    return this.#recoveries.get(parentSessionId) ?? Promise.resolve()
+  }
+
   #retryLost(parentSessionId: string, pauseSeq: number): Promise<void> {
-    const previous = this.#retries.get(parentSessionId) ?? Promise.resolve()
-    const next = previous.then(async () => {
+    return this.#serialized(parentSessionId, async () => {
       const failures = await this.controller.retryLost(parentSessionId, pauseSeq)
       if (failures.length > 0) log("[omo-senpi] run resume retry left participants outside the run", { parentSessionId, pauseSeq, failures })
     })
+  }
+
+  // Serialized per parent, so overlapping retries and the final end never act on the same child at once.
+  #serialized(parentSessionId: string, work: () => Promise<void>): Promise<void> {
+    const previous = this.#retries.get(parentSessionId) ?? Promise.resolve()
+    const next = previous.then(work)
     const settled = next.catch(() => undefined)
     this.#retries.set(parentSessionId, settled)
     void settled.then(() => { if (this.#retries.get(parentSessionId) === settled) this.#retries.delete(parentSessionId) })
