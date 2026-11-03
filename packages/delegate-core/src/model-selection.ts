@@ -47,6 +47,62 @@ function modelIDForProvider(provider: string, model: string): string {
   return model.startsWith(prefix) ? model.slice(prefix.length) : model
 }
 
+function splitModelReference(model: string): { readonly provider: string; readonly modelID: string } | undefined {
+  const separator = model.indexOf("/")
+  if (separator <= 0 || separator === model.length - 1) {
+    return undefined
+  }
+  return { provider: model.slice(0, separator), modelID: model.slice(separator + 1) }
+}
+
+/**
+ * Provider ids that serve the same catalog under a different name. Only ids known to be the
+ * same lane belong here: two providers that happen to publish the same model id are NOT
+ * interchangeable, because the user may reach one and not the other.
+ */
+const PROVIDER_ALIASES: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  "opencode-go": ["opencode"],
+})
+
+function providersNameTheSameCatalog(left: string, right: string): boolean {
+  if (left === right) {
+    return true
+  }
+  return PROVIDER_ALIASES[left]?.includes(right) === true
+    || PROVIDER_ALIASES[right]?.includes(left) === true
+}
+
+/**
+ * Unavailability must be positively established before an explicit user primary is demoted.
+ * A fuzzy match that returns null is only "inconclusive" (provider alias, format or
+ * normalization edge), so the primary counts as present when it is an exact member of the
+ * available set, or when a known alias of its provider serves the same model id
+ * (`opencode-go/kimi-k3` vs `opencode/kimi-k3`).
+ *
+ * The same model id on an unrelated provider is NOT presence: the primary's own provider is
+ * still unreachable there, and treating it as present would suppress the user's fallback in
+ * the most common setup, a model pinned per provider.
+ */
+function isModelVerifiablyAbsent(primaryModel: string, availableModels: ReadonlySet<string>): boolean {
+  const primary = splitModelReference(primaryModel)
+  for (const available of availableModels) {
+    if (available === primaryModel) {
+      return false
+    }
+    if (primary === undefined) {
+      continue
+    }
+    const candidate = splitModelReference(available)
+    if (candidate === undefined) {
+      continue
+    }
+    if (candidate.modelID === primary.modelID && providersNameTheSameCatalog(candidate.provider, primary.provider)) {
+      return false
+    }
+  }
+  return true
+}
+
 function isExplicitHighModel(model: string): boolean {
   return /(?:^|\/)[^/]+-high$/.test(model)
 }
@@ -104,7 +160,9 @@ export function resolveModelForDelegateTask(
     ) {
       const providerHint = parsed?.providerHint
       const primaryMatch = fuzzyMatchModel(userResult.model, new Set(input.availableModels), providerHint)
-      if (!primaryMatch) {
+      // The explicit primary wins unless its absence is positively established: a null fuzzy
+      // match alone is inconclusive and must never silently override user intent (#6869 review).
+      if (!primaryMatch && isModelVerifiablyAbsent(userResult.model, input.availableModels)) {
         for (const fallbackModel of userFallbackModels) {
           const parsedFallback = parseUserFallbackModel(fallbackModel)
           if (!parsedFallback) continue

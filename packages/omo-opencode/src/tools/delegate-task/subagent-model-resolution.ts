@@ -1,4 +1,4 @@
-import type { AgentOverrides } from "../../config/schema"
+import type { AgentOverrides, FallbackModelObject } from "../../config/schema"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { fuzzyMatchModel } from "../../shared/model-availability"
 import { buildFallbackChainFromModels, findMostSpecificFallbackEntry } from "../../shared/fallback-chain-from-models"
@@ -14,11 +14,37 @@ import { resolveEffectiveFallbackEntry } from "./fallback-entry-resolution"
 import { resolveModelForDelegateTask } from "./model-selection"
 import type { AgentInfo } from "./subagent-discovery"
 import type { ResolvedSubagentModel } from "./subagent-resolution-types"
+import type { DelegatedModelConfig } from "./types"
 import { distributeTaskModels } from "./models-distribution"
 
 function findAgentOverride(agentOverrides: AgentOverrides | undefined, agentConfigKey: string) {
   return agentOverrides?.[agentConfigKey]
     ?? Object.entries(agentOverrides ?? {}).find(([key]) => key.toLowerCase() === agentConfigKey)?.[1]
+}
+
+function modelStringFromEntry(entry: string | FallbackModelObject | undefined): string | undefined {
+  if (entry === undefined) return undefined
+  return typeof entry === "string" ? entry : entry.model
+}
+
+/**
+ * The first `models[]` entry is the primary, and an object entry carries the whole model
+ * contract (variant, reasoning, reasoningEffort, temperature, top_p, maxTokens, thinking).
+ * Reading only `entry.model` silently drops those settings (#6869 review), so the resolved
+ * config takes every field the entry defines. Applied after category params so the most
+ * specific source, the primary entry, wins.
+ */
+function applyPrimaryEntrySettings(base: DelegatedModelConfig, entry: FallbackModelObject): DelegatedModelConfig {
+  return {
+    ...base,
+    ...(entry.variant !== undefined ? { variant: entry.variant } : {}),
+    ...(entry.reasoning !== undefined ? { reasoning: entry.reasoning } : {}),
+    ...(entry.reasoningEffort !== undefined ? { reasoningEffort: entry.reasoningEffort } : {}),
+    ...(entry.temperature !== undefined ? { temperature: entry.temperature } : {}),
+    ...(entry.top_p !== undefined ? { top_p: entry.top_p } : {}),
+    ...(entry.maxTokens !== undefined ? { maxTokens: entry.maxTokens } : {}),
+    ...(entry.thinking !== undefined ? { thinking: entry.thinking } : {}),
+  }
 }
 
 export async function resolveSubagentModel(
@@ -44,15 +70,17 @@ export async function resolveSubagentModel(
         chainConfig.models,
         "round_robin",
       )]
-    : undefined
-  const firstEntry = canonicalModels?.[0]
-  const explicitModel = (typeof firstEntry === "string" ? firstEntry : firstEntry?.model)
+    : chainConfig?.models?.length
+      ? [...chainConfig.models]
+      : undefined
+  const primaryEntry = canonicalModels?.[0]
+  const explicitModel = modelStringFromEntry(primaryEntry)
     ?? agentOverride?.model ?? agentCategoryConfig?.model
   const hasExplicitUserModel = Boolean(explicitModel)
   const normalizedAgentFallbackModels = normalizeFallbackModels(
-    canonicalModels?.slice(1)
-    ?? agentOverride?.fallback_models
-    ?? agentCategoryConfig?.fallback_models
+    canonicalModels && canonicalModels.length > 1
+      ? canonicalModels.slice(1)
+      : (agentOverride?.fallback_models ?? agentCategoryConfig?.fallback_models)
   )
 
   const availableModels = await getAvailableModelsForDelegateTask(executorCtx.client)
@@ -93,6 +121,13 @@ export async function resolveSubagentModel(
           model: explicitModel,
         })
       }
+    }
+
+    // The primary entry's settings belong to the primary only: a promoted fallback keeps its
+    // own settings through applyFallbackEntrySettings below.
+    const promotedFallback = resolution !== undefined && !("skipped" in resolution) && resolution.matchedFallback === true
+    if (categoryModel && !promotedFallback && primaryEntry !== undefined && typeof primaryEntry !== "string") {
+      categoryModel = applyPrimaryEntrySettings(categoryModel, primaryEntry)
     }
 
     const defaultProviderID = categoryModel?.providerID
