@@ -86,7 +86,7 @@ export function createManagers(args: {
     deps.markServerRunningInProcessFn()
   }
   const tmuxSessionManager = new deps.TmuxSessionManagerClass(ctx, tmuxConfig, {
-    isInsideTmux: selectTmuxManagerEnvironmentPredicate(tmuxConfig.isolation),
+    isInsideTmux: selectTmuxManagerEnvironmentPredicate(tmuxConfig.isolation, tmuxConfig.multiplexer),
   }, {
     // Team-mode members get their tmux panes from team-layout-tmux, which
     // owns the lifecycle via runtimeState.tmuxLayout. Telling the subagent

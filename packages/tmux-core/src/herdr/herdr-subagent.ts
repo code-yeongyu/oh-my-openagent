@@ -154,12 +154,18 @@ export async function sweepStaleHerdrAgentsWorkspaces(
   currentPid: number = process.pid,
   deps: HerdrOpsDeps = defaultHerdrOpsDeps,
 ): Promise<string[]> {
-  return sweepStaleHerdrAgentsWorkspacesWith({
-    listWorkspaces: () => herdrListWorkspacesByLabelPrefix(HERDR_AGENTS_WORKSPACE_LABEL_PREFIX, deps),
-    listAgents: () => herdrListAgents(deps),
-    closeWorkspace: (workspaceId) => herdrCloseWorkspace(workspaceId, deps),
-    processAlive: isProcessAlive,
-    currentPid,
-    log: () => undefined,
-  })
+  try {
+    return await sweepStaleHerdrAgentsWorkspacesWith({
+      listWorkspaces: () => herdrListWorkspacesByLabelPrefix(HERDR_AGENTS_WORKSPACE_LABEL_PREFIX, deps),
+      listAgents: () => herdrListAgents(deps),
+      closeWorkspace: (workspaceId) => herdrCloseWorkspace(workspaceId, deps),
+      processAlive: isProcessAlive,
+      currentPid,
+      log: () => undefined,
+    })
+  } catch {
+    // herdr or its server absent — nothing to sweep (same policy as the
+    // tmux sweeps when not inside tmux).
+    return []
+  }
 }
