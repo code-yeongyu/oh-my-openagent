@@ -3,7 +3,8 @@
 // `<repo>/.git/omo-sync/crdt/` (sync-design §5: plaintext stays inside the repository's git dir),
 // written by temp file + rename. Capture is the device API's captureOnDevice against that
 // baseline; a deleted working file captures as the item's tombstone; render is renderForDisk, so
-// a file whose model did not change keeps its own frontmatter style byte for byte.
+// a file whose model did not change keeps its own frontmatter style byte for byte. The recovery
+// operations (revive, rewind, adoptJournaled) live in device-item-recovery.ts over the same state.
 
 import { createHash } from "node:crypto"
 import { join } from "node:path"
@@ -15,27 +16,16 @@ import {
   createDeviceItemDoc,
   deleteItem,
   type ItemDevice,
-  type ItemFrontier,
   isLive,
   isSyncItemKey,
   itemFrontier,
   openItemDevice,
-  recordMaterialized,
-  renderDocContent,
   renderForDisk,
-  readReceipts,
-  receiptLanded,
   renderItem,
-  sameFrontier,
-  writeReceipts,
 } from "../../item"
 import { readJson, writeAtomic, writeJson } from "../atomic"
 import type { BatchPayload, ItemStore } from "../ports"
-
-interface Baseline {
-  readonly text: string | null
-  readonly frontier: ItemFrontier
-}
+import { type Baseline, createItemRecovery } from "./device-item-recovery"
 
 export interface DeviceItemStoreOptions {
   /** The device's private state dir (peer + receipts), outside the synced memory root. */
@@ -54,31 +44,9 @@ const fileOf = (key: string): string => createHash("sha256").update(key).digest(
 const syncable = (key: string): boolean => isSyncItemKey(key) === null
 
 export function createDeviceItemStore(options: DeviceItemStoreOptions): ItemStore {
-  /**
-   * A person re-created a deleted item. The dead doc still holds its last content at its current
-   * frontier, so capture runs against exactly that (any new op past the tombstone makes the item
-   * live again). Re-created with that same content, the diff is empty, so one explicit no-change
-   * op revives it.
-   */
-  const revive = async (key: string, doc: LoroDoc, workingText: string): Promise<Uint8Array | null> => {
-    const ops = await captureOnDevice(theDevice(), key, doc, renderDocContent(doc), itemFrontier(doc), workingText)
-    if (ops !== null) return ops
-    const target = doc.fork()
-    try {
-      target.setPeerId(doc.peerId)
-      target.setRecordTimestamp(false)
-      const body = target.getText("body")
-      body.insert(0, "\u0000")
-      body.delete(0, 1)
-      target.commit()
-      return target.export({ mode: "update", from: doc.oplogVersion() })
-    } finally {
-      target.free()
-    }
-  }
   const crdt = join(options.syncDir, "crdt")
   const docs = new Map<string, LoroDoc>()
-  let baselines = new Map<string, Baseline>()
+  const baselines = new Map<string, Baseline>()
   const dirty = new Set<string>()
   let device: ItemDevice | null = null
   const theDevice = (): ItemDevice => {
@@ -92,21 +60,14 @@ export function createDeviceItemStore(options: DeviceItemStoreOptions): ItemStor
     docs.set(key, doc)
     return doc
   }
-  const materialize = async (key: string, text: string | null): Promise<void> => {
-    const doc = await docOf(key)
-    if (text !== null) await recordMaterialized(theDevice(), key, doc, itemFrontier(doc), text)
-    baselines.set(key, { text, frontier: itemFrontier(doc) })
-    dirty.add(key)
-  }
-  /** The doc back at `frontiers`, re-pinned to the device peer; the replaced doc is freed. */
-  const resetTo = (key: string, doc: LoroDoc, frontiers: ItemFrontier): LoroDoc => {
-    const fork = doc.forkAt([...frontiers])
-    fork.setPeerId(theDevice().peer)
-    fork.setRecordTimestamp(false)
-    docs.set(key, fork)
-    doc.free()
-    return fork
-  }
+  const recovery = createItemRecovery({
+    docs,
+    baselines,
+    dirty,
+    device: theDevice,
+    docOf,
+    ...(options.log === undefined ? {} : { log: options.log }),
+  })
   return {
     async load() {
       device = await openItemDevice({
@@ -115,7 +76,8 @@ export function createDeviceItemStore(options: DeviceItemStoreOptions): ItemStor
         ...(options.machineId === undefined ? {} : { machineId: options.machineId }),
       })
       const index = await readJson<Record<string, Baseline>>(join(crdt, "baselines.json"), {})
-      baselines = new Map(Object.entries(index).filter(([key]) => syncable(key)))
+      baselines.clear()
+      for (const [key, baseline] of Object.entries(index)) if (syncable(key)) baselines.set(key, baseline)
       // Every persisted doc's key, materialised or not: an item applied from a verified batch has
       // CRDT state before it has a baseline, and a crash in between must not drop that state.
       const docKeys = (await readJson<string[]>(join(crdt, "docs.json"), [])).filter(syncable)
@@ -146,7 +108,7 @@ export function createDeviceItemStore(options: DeviceItemStoreOptions): ItemStor
         dirty.add(key)
         return doc.export({ mode: "update", from })
       }
-      if (!isLive(doc) && doc.oplogVersion().toJSON().size > 0) return revive(key, doc, workingText)
+      if (!isLive(doc) && doc.oplogVersion().toJSON().size > 0) return recovery.revive(key, doc, workingText)
       return captureOnDevice(theDevice(), key, doc, base.text ?? "", base.frontier, workingText)
     },
     async apply(key, ops) {
@@ -163,51 +125,9 @@ export function createDeviceItemStore(options: DeviceItemStoreOptions): ItemStor
       const frontier = itemFrontier(await docOf(key)).map((id) => `${id.peer}:${id.counter}`).sort()
       return frontier.join(",")
     },
-    markMaterialized: materialize,
-    async adoptJournaled(key, ops) {
-      const peer = theDevice().peer
-      const { decodeImportBlobMeta } = await loadLoroRuntime()
-      let meta: ReturnType<typeof decodeImportBlobMeta>
-      try {
-        meta = decodeImportBlobMeta(ops, false)
-      } catch {
-        return "refused"
-      }
-      // A foreign op is never this device's to import or send (round 3 L-1): checked before anything else.
-      if (meta.partialStartVersionVector.get(peer) === undefined) return "refused"
-      const doc = await docOf(key)
-      const version = doc.oplogVersion()
-      if ([...meta.partialEndVersionVector.toJSON()].every(([p, end]) => (version.get(p) ?? 0) >= end)) return "held"
-      // Missing deps would queue the ops inside the doc and on every receiver (round 3 M-1).
-      if (!meta.startFrontiers.every(({ peer: p, counter }) => (version.get(p) ?? 0) > counter)) return "refused"
-      const before = itemFrontier(doc)
-      // A revive writes no receipt (device-item-store `revive`: captureItem on the dead doc, then a no-change op), and
-      // runs only when the working text equals the dead doc's content, so that content is what its capture recorded.
-      const revivedText = !isLive(doc) && doc.oplogVersion().toJSON().size > 0 ? renderDocContent(doc) : undefined
-      let pending = false
-      try {
-        pending = doc.import(ops).pending !== null
-      } catch {
-        pending = true
-      }
-      if (pending) {
-        resetTo(key, doc, before)
-        return "refused"
-      }
-      dirty.add(key)
-      // The baseline the crashed capture would have recorded: its landed receipt's text (round 3 M-2).
-      const now = docs.get(key) ?? doc
-      if (!isLive(now)) {
-        await materialize(key, null)
-        return "imported"
-      }
-      const base = baselines.get(key)?.frontier ?? []
-      const receipt = (await readReceipts(theDevice().stateDir, key)).find((r) => sameFrontier(r.base, base) && receiptLanded(now, r))
-      if (receipt !== undefined) await materialize(key, receipt.text)
-      else if (revivedText !== undefined) await materialize(key, revivedText)
-      else options.log?.(`sync.item.adopted-unreceipted len=${Buffer.byteLength(key, "utf8")}`)
-      return "imported"
-    },
+    markMaterialized: recovery.materialize,
+    adoptJournaled: recovery.adoptJournaled,
+    rewind: recovery.rewind,
     async applySnapshot(payload: BatchPayload) {
       for (const item of payload.items) {
         if (!syncable(item.key)) continue
@@ -215,43 +135,6 @@ export function createDeviceItemStore(options: DeviceItemStoreOptions): ItemStor
         doc.import(item.ops)
         dirty.add(item.key)
       }
-    },
-    async rewind(key, ops) {
-      const doc = docs.get(key)
-      const peer = theDevice().peer
-      const { decodeImportBlobMeta } = await loadLoroRuntime()
-      let start = Number.POSITIVE_INFINITY
-      for (const blob of ops) {
-        let counter: number | undefined
-        try {
-          counter = decodeImportBlobMeta(blob, false).partialStartVersionVector.get(peer)
-        } catch {
-          return "kept"
-        }
-        if (counter === undefined) return "kept"
-        start = Math.min(start, counter)
-      }
-      if (doc !== undefined) {
-        const version = doc.oplogVersion()
-        // Clamped: ops the doc never imported (a crash between journaling and importing) cut nothing.
-        if (start < (version.get(peer) ?? 0)) {
-          version.setEnd({ peer, counter: start })
-          resetTo(key, doc, doc.vvToFrontiers(version))
-        }
-      }
-      const now = docs.get(key)
-      if (now === undefined || now.oplogVersion().toJSON().size === 0) {
-        // Nothing of the item is left: it captures as a brand-new file.
-        now?.free()
-        docs.delete(key)
-        baselines.delete(key)
-      } else {
-        baselines.set(key, { text: isLive(now) ? renderDocContent(now) : null, frontier: itemFrontier(now) })
-        dirty.add(key)
-      }
-      // Receipts name captures of the wound-back ops; the counters they used are free again.
-      await writeReceipts(theDevice().stateDir, key, [])
-      return "rewound"
     },
     async persist() {
       for (const key of dirty) {
