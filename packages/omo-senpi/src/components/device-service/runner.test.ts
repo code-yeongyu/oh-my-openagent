@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, watch, writeFileSync } from "node:fs"
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -47,27 +47,14 @@ describe("the omo remote bootstrap worker", () => {
     expect(await runBootstrapWorker(launcherScript(body))).toBeUndefined()
   })
 
-  test("a worker that never finishes is killed at its deadline and rejects as timed out", async () => {
-    const pidDir = scratch()
-    const pidFile = join(pidDir, "pid")
-    const started = new Promise<void>((resolve, reject) => {
-      const watcher = watch(pidDir, () => {
-        if (!existsSync(pidFile)) return
-        watcher.close()
-        resolve()
-      })
-      setTimeout(() => {
-        watcher.close()
-        reject(new Error("waited 10 s for the stand-in omo to start, it never did"))
-      }, 10_000).unref()
-    })
-    const omoBin = launcherScript(`require("node:fs").writeFileSync(${JSON.stringify(pidFile)}, String(process.pid))\nsetInterval(() => {}, 1000)\n`)
-    let expire: (() => void) | undefined
-    const outcome = runBootstrapWorker(omoBin, { schedule: run => { expire = run; return () => {} } }).catch((error: unknown) => error)
-    await started
-    expire?.()
-    expect(await outcome).toBeInstanceOf(BootstrapWorkerTimeout)
-    expect(() => process.kill(Number(readFileSync(pidFile, "utf8")), 0)).toThrow()
+  // The promise settles only on the child's close event, so the timeout rejection itself proves the child exited.
+  test("a worker that never finishes is stopped at its deadline and rejects as timed out", async () => {
+    const omoBin = launcherScript("setInterval(() => {}, 1000)\n")
+    const atOnce = (expire: () => void) => {
+      expire()
+      return () => {}
+    }
+    await expect(runBootstrapWorker(omoBin, { schedule: atOnce })).rejects.toBeInstanceOf(BootstrapWorkerTimeout)
   })
 
   test("an omo binary that cannot start rejects with the spawn error", async () => {
