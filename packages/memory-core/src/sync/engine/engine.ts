@@ -4,11 +4,12 @@
 // journaled work, receives outside the lock, captures and applies under it, then pushes outside it;
 // a stale base receives first and retries.
 
-import { advance, applyVerified, capture } from "./apply"
+import { advance, applyVerified } from "./apply"
 import type { EngineDeps } from "./engine-deps"
-import { describeOversizedItems, describeSyncFailure, isFailureShown, type SyncFailure } from "./failure"
-import { batchBound, recordHeld } from "./held"
+import { describeSyncFailure, isFailureShown, type SyncFailure } from "./failure"
+import { batchBound, heldShown, recordHeld } from "./held"
 import { type EngineState, SyncJournal } from "./journal"
+import { capture } from "./local-capture"
 import { push, staleBackoffMs } from "./push"
 import type { RefusalCode } from "./ports"
 import { receive } from "./receive"
@@ -23,10 +24,10 @@ const PUSH_ATTEMPTS = 3
 export type EngineStatus =
   | { readonly kind: "never_synced" }
   | { readonly kind: "synced"; readonly at: number; readonly updatedWhileOffline: number }
-  | { readonly kind: "paused"; readonly seq: number; readonly code: RefusalCode }
+  | { readonly kind: "paused"; readonly seq: number; readonly code: RefusalCode; readonly held?: Failing }
   | { readonly kind: "failing"; readonly failure: SyncFailure; readonly since: number; readonly attempts: number }
 
-interface Failing {
+export interface Failing {
   readonly failure: SyncFailure
   readonly since: number
   readonly attempts: number
@@ -68,6 +69,8 @@ export class SyncEngine {
   private shown: Failing | null = null
   /** The shown key of the items the last successful cycle held, mirrored for announcements. */
   private heldKey: string | null = null
+  /** The held key the running cycle recorded, adopted when it succeeds. */
+  private nextHeldKey: string | null = null
 
   constructor(private readonly deps: EngineDeps) {
     this.journal = new SyncJournal(deps.repo.gitDir)
@@ -78,16 +81,17 @@ export class SyncEngine {
   }
 
   /**
-   * What a UI shows: a shown failure until a cycle succeeds, the items held out of the push while any
-   * is, paused at a refused entry, else the last successful sync.
+   * What a UI shows: a shown failure until a cycle succeeds, paused at a refused entry (carrying any
+   * held items along), the items held out of the push while any is, else the last successful sync.
    */
   async status(): Promise<EngineStatus> {
     // Failing outranks paused on purpose: while no cycle completes nothing moves at all, and a paused refusal shows again after the first good cycle.
     if (this.shown !== null) return { kind: "failing", ...this.shown }
     const s = await this.journal.state()
-    // A held item outranks paused too: a pause retries on its own, a held item waits for the person.
-    if (s.held !== null) return { kind: "failing", failure: describeOversizedItems(s.held.keys, batchBound(this.deps)), since: s.held.since, attempts: s.held.cycles }
-    if (s.paused !== null) return { kind: "paused", seq: s.paused.seq, code: s.paused.code }
+    const held = s.held === null ? null : heldShown(s.held, batchBound(this.deps))
+    // A refused entry is never hidden behind a held item (#12284 review L3); the pause carries the hold along.
+    if (s.paused !== null) return { kind: "paused", seq: s.paused.seq, code: s.paused.code, ...(held === null ? {} : { held }) }
+    if (held !== null) return { kind: "failing", ...held }
     if (s.lastSyncedAt === null) return { kind: "never_synced" }
     return { kind: "synced", at: s.lastSyncedAt, updatedWhileOffline: s.updatedWhileOffline }
   }
@@ -139,7 +143,7 @@ export class SyncEngine {
         const shownBefore = this.shownKey()
         this.failing = null
         this.shown = null
-        this.heldKey = report.held.length === 0 ? null : failureKey(describeOversizedItems(report.held, batchBound(this.deps)))
+        this.heldKey = this.nextHeldKey
         this.announceIfChanged(shownBefore)
         for (const w of waiters) w.resolve(report)
         if (this.running === run) this.running = null
@@ -241,14 +245,14 @@ export class SyncEngine {
       this.loaded = true
     }
     const before = await journal.updateState({ eventHead: Math.max(this.eventHead, (await journal.state()).eventHead) })
-    let held: readonly string[] = []
+    let held: ReadonlyMap<string, string> = new Map()
     if (before.cycle !== null) {
       const resumed = before.cycle
       await deps.lock.withLock(async () => {
         // A cycle resumed at merged re-renders its keys over the working files: capture any edit made
         // since the crash first, so it merges into the doc instead of being overwritten.
         if (resumed.stage === "merged") held = await capture(deps, journal, resumed)
-        await advance(deps, journal, resumed, new Set(held))
+        await advance(deps, journal, resumed, new Set(held.keys()))
       })
     }
     let applied = 0
@@ -261,7 +265,7 @@ export class SyncEngine {
       snapshot = got.snapshot ?? snapshot
       const done = await deps.lock.withLock(async () => {
         held = await capture(deps, journal)
-        return applyVerified(deps, journal, new Set(held))
+        return applyVerified(deps, journal, new Set(held.keys()))
       })
       applied += done.batches
       memories += done.memories
@@ -278,6 +282,8 @@ export class SyncEngine {
       await inbound()
     }
     const heldKeys = await recordHeld(deps, journal, held)
+    const heldNow = (await journal.state()).held
+    this.nextHeldKey = heldNow === null ? null : failureKey(heldShown(heldNow, batchBound(deps)).failure)
     if (refused === 0) await journal.updateState({ lastSyncedAt: deps.clock.now(), updatedWhileOffline: memories })
     this.appliedMirror = (await journal.state()).applied
     this.cyclesRun += 1

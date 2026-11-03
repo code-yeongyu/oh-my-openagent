@@ -37,6 +37,29 @@ export interface CycleRecord {
   readonly batches: readonly PulledEntry[]
   readonly keys: readonly string[]
   readonly treeId: string | null
+  /** Peers whose owed edits this cycle renders (#12284 review H1); absent in an older journal. */
+  readonly owedPrincipals?: readonly string[]
+}
+
+/** A key whose working file lags its item doc: a cycle skipped rendering over a held edit (#12284 review H1). */
+export interface OwedRender {
+  readonly key: string
+  /** The batch authors whose edit is owed, for the render commit's Sync-Principals. */
+  readonly principals: readonly string[]
+}
+
+/**
+ * Items held out of the push, since the cycle that first held any and for how many cycles in a row
+ * (#12284). `stuck` keys are queued ops this device cannot wind back, which shrinking will not fix;
+ * `prints` fingerprint each capture-held file (working text and doc version) so an unchanged one is
+ * not diffed again.
+ */
+export interface HeldItems {
+  readonly keys: readonly string[]
+  readonly stuck?: readonly string[]
+  readonly since: number
+  readonly cycles: number
+  readonly prints?: Readonly<Record<string, string>>
 }
 
 /**
@@ -66,7 +89,9 @@ export interface EngineState {
    * Items the last cycle held out of the push because one change to each exceeds the batch bound
    * (#12284), since the cycle that first held any, and for how many cycles in a row; null when none.
    */
-  readonly held: { readonly keys: readonly string[]; readonly since: number; readonly cycles: number } | null
+  readonly held: HeldItems | null
+  /** Keys whose file still owes a peer's edit; discharged by the cycle that renders them. */
+  readonly owed: readonly OwedRender[]
   readonly cycle: CycleRecord | null
   /** The entry the pull stopped at; cleared once a later pull verifies past it. */
   readonly paused: { readonly seq: number; readonly code: RefusalCode } | null
@@ -101,6 +126,7 @@ const EMPTY_STATE: EngineState = {
   refused: 0,
   rejectedItems: 0,
   held: null,
+  owed: [],
   cycle: null,
   paused: null,
   lastSyncedAt: null,

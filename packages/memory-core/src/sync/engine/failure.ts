@@ -12,7 +12,15 @@ export type SyncFailure =
   | { readonly kind: "auth_expired"; readonly reason: string; readonly action: string }
   | { readonly kind: "offline"; readonly reason: string; readonly action: string }
   | { readonly kind: "unknown"; readonly reason: string; readonly action: string }
-  | { readonly kind: "oversized_item"; readonly keys: readonly string[]; readonly limitBytes: number; readonly reason: string; readonly action: string }
+  | {
+      readonly kind: "oversized_item"
+      readonly keys: readonly string[]
+      /** The keys whose queued change this device cannot wind back: shrinking them will not help. */
+      readonly stuck: readonly string[]
+      readonly limitBytes: number
+      readonly reason: string
+      readonly action: string
+    }
 
 export type SyncFailureKind = SyncFailure["kind"]
 
@@ -47,18 +55,30 @@ const UNKNOWN: SyncFailure = {
 const MIB = 1024 * 1024
 const sizeText = (bytes: number): string => (bytes % MIB === 0 ? `${bytes / MIB} MiB` : `${bytes} bytes`)
 
-/** The items sync holds back because one change to each is larger than a batch may carry. */
-export function describeOversizedItems(keys: readonly string[], limitBytes: number): SyncFailure {
+const nameKeys = (keys: readonly string[]): string => (keys.length <= 3 ? keys.join(", ") : `${keys.slice(0, 3).join(", ")} and ${keys.length - 3} more`)
+
+/**
+ * The items sync holds back because one change to each is larger than a batch may carry. A stuck key
+ * (a queued change this device cannot wind back) gets an action that promises no recovery.
+ */
+export function describeOversizedItems(keys: readonly string[], limitBytes: number, stuck: readonly string[] = []): SyncFailure {
   const limit = sizeText(limitBytes)
-  const named = keys.length <= 3 ? keys.join(", ") : `${keys.slice(0, 3).join(", ")} and ${keys.length - 3} more`
+  const fixable = keys.filter((key) => !stuck.includes(key))
+  const shrink = fixable.length === 0
+    ? ""
+    : `Shrink or split ${nameKeys(fixable)} to stay under ${limit}; ${fixable.length === 1 ? "it syncs" : "each syncs"} on its own once it fits.`
+  const kept = stuck.length === 0
+    ? ""
+    : `${nameKeys(stuck)} cannot be sent from this device even if made smaller; the change stays on this device, and the memory log has the detail.`
   return {
     kind: "oversized_item",
     keys,
+    stuck,
     limitBytes,
     reason: keys.length === 1
       ? `A change to one memory file is larger than the ${limit} sync limit, so that file is not synced. Every other memory keeps syncing.`
       : `Changes to ${keys.length} memory files are larger than the ${limit} sync limit, so those files are not synced. Every other memory keeps syncing.`,
-    action: `Shrink or split ${named} to stay under ${limit}; ${keys.length === 1 ? "it syncs" : "each syncs"} on its own once it fits.`,
+    action: [shrink, kept].filter((part) => part !== "").join(" "),
   }
 }
 

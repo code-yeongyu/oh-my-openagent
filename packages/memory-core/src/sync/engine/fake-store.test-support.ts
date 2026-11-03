@@ -97,6 +97,24 @@ export class FakeItemStore implements ItemStore {
     this.materialized.set(key, text)
   }
 
+  /** Undoes the ops' adds and kills; the item's render becomes its baseline, as the Loro store's rewind does. */
+  async rewind(key: string, ops: readonly Uint8Array[]): Promise<"rewound" | "kept"> {
+    const item = this.items.get(key)
+    for (const op of ops) {
+      let parsed: ItemOps
+      try {
+        parsed = JSON.parse(decoder.decode(op)) as ItemOps
+      } catch {
+        return "kept"
+      }
+      for (const id of Object.keys(parsed.adds)) item?.adds.delete(id)
+      for (const id of parsed.kills) item?.killed.delete(id)
+    }
+    if (item !== undefined && item.adds.size === 0) this.items.delete(key)
+    this.materialized.set(key, this.render(key, null))
+    return "rewound"
+  }
+
   async applySnapshot(payload: BatchPayload): Promise<void> {
     for (const item of payload.items) await this.apply(item.key, item.ops)
   }

@@ -75,7 +75,7 @@ export function createMemoryFooterStatusLive(
         segments.backlogSteps,
         segments.streak,
         options.isActive(identity),
-        segments.syncBlocked === true ? "sync-blocked" : "sync-ok",
+        segments.syncBlocked === true ? "sync-blocked" : segments.syncHeld === true ? "sync-held" : "sync-ok",
       ].join("|")
     },
     refreshSegments: async (identity) => {

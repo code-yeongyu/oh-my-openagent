@@ -59,7 +59,10 @@ async function pushOne(deps: EngineDeps, journal: SyncJournal, batchBytes: numbe
   const pending = await journal.pending()
   let out = pending.outgoing
   if (out === null) {
-    const first = planBatches(pending.items, batchBytes).batches[0]
+    const plan = planBatches(pending.items, batchBytes)
+    // Only ops this device could not wind back are left here (#12284 review L4): never sent, always said.
+    for (const key of new Set(plan.held.map((item) => item.key))) deps.log?.(`sync.item.held side=push len=${Buffer.byteLength(key, "utf8")}`)
+    const first = plan.batches[0]
     if (first === undefined) return "idle"
     out = await seal(deps, journal, first, randomBytes(16).toString("base64url"))
   }

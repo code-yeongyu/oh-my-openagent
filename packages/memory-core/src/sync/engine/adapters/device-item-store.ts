@@ -24,6 +24,7 @@ import {
   renderDocContent,
   renderForDisk,
   renderItem,
+  writeReceipts,
 } from "../../item"
 import { readJson, writeAtomic, writeJson } from "../atomic"
 import type { BatchPayload, ItemStore } from "../ports"
@@ -156,6 +157,47 @@ export function createDeviceItemStore(options: DeviceItemStoreOptions): ItemStor
         doc.import(item.ops)
         dirty.add(item.key)
       }
+    },
+    async rewind(key, ops) {
+      const doc = docs.get(key)
+      const peer = theDevice().peer
+      const { decodeImportBlobMeta } = await loadLoroRuntime()
+      let start = Number.POSITIVE_INFINITY
+      for (const blob of ops) {
+        let counter: number | undefined
+        try {
+          counter = decodeImportBlobMeta(blob, false).partialStartVersionVector.get(peer)
+        } catch {
+          return "kept"
+        }
+        if (counter === undefined) return "kept"
+        start = Math.min(start, counter)
+      }
+      if (doc !== undefined) {
+        const version = doc.oplogVersion()
+        // Clamped: ops the doc never imported (a crash between journaling and importing) cut nothing.
+        if (start < (version.get(peer) ?? 0)) {
+          version.setEnd({ peer, counter: start })
+          const fork = doc.forkAt(doc.vvToFrontiers(version))
+          fork.setPeerId(peer)
+          fork.setRecordTimestamp(false)
+          docs.set(key, fork)
+          doc.free()
+        }
+      }
+      const now = docs.get(key)
+      if (now === undefined || now.oplogVersion().toJSON().size === 0) {
+        // Nothing of the item is left: it captures as a brand-new file.
+        now?.free()
+        docs.delete(key)
+        baselines.delete(key)
+      } else {
+        baselines.set(key, { text: isLive(now) ? renderDocContent(now) : null, frontier: itemFrontier(now) })
+        dirty.add(key)
+      }
+      // Receipts name captures of the wound-back ops; the counters they used are free again.
+      await writeReceipts(theDevice().stateDir, key, [])
+      return "rewound"
     },
     async persist() {
       for (const key of dirty) {

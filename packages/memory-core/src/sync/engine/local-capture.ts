@@ -1,0 +1,131 @@
+// The local half of a cycle's locked section: this device's edits become journaled pending ops
+// before anything remote lands (sync-design §5). An edit larger than one batch may carry is held,
+// never journaled, sliced or truncated (#12284); an older build's queued ops of that size are wound
+// back into their files first, so they follow the same hold-until-it-fits path (review M1).
+
+import { adoptLandedRenders } from "./apply"
+import { itemBytes, planBatches } from "./batches"
+import type { EngineDeps } from "./engine-deps"
+import { batchBound, heldPrint } from "./held"
+import { acceptedKeys, rejectItem } from "./item-keys"
+import { type CycleRecord, fromBase64, type SyncJournal, toBase64, type WireItem } from "./journal"
+import { fsRefusal, readWorking, throughSymlink } from "./landing"
+import { diskLister, type ItemPaths, itemPaths, landingPath, scanWorkingTree } from "./working-tree"
+
+const sameItem = (a: WireItem, b: WireItem): boolean => a.key === b.key && a.ops === b.ops
+const keyLength = (key: string): number => Buffer.byteLength(key, "utf8")
+
+/**
+ * Working files by item key (#12147), with a capture receipt for every symlink (never entered, so
+ * this device never sends a key a symlink here would make it refuse), every file whose name the key
+ * grammar refuses, and every key two files normalize to (neither is captured).
+ */
+async function workingFiles(deps: EngineDeps, journal: SyncJournal): Promise<ItemPaths> {
+  const tree = await scanWorkingTree(diskLister(deps.repo.root))
+  for (const link of tree.symlinks) await rejectItem(deps, journal, "capture", link, "symlink")
+  const paths = itemPaths(tree.files)
+  for (const { path, rule } of paths.problems) await rejectItem(deps, journal, "capture", path, rule)
+  for (const [key, path] of paths.byKey) {
+    if (path !== null && path !== key) deps.log?.(`sync.item.normalized side=capture len=${keyLength(path)}`)
+  }
+  return paths
+}
+
+/**
+ * The working text at `path`, or undefined (reported) when this device cannot read that path at all
+ * or, for a known item the walk did not list, when its path goes through a symlink.
+ */
+async function readCaptured(deps: EngineDeps, journal: SyncJournal, key: string, path: string, listed: boolean): Promise<string | null | undefined> {
+  try {
+    if (!listed && (await throughSymlink(deps.repo.root, path))) {
+      await rejectItem(deps, journal, "capture", key, "symlink")
+      return undefined
+    }
+    return await readWorking(deps.repo.root, path)
+  } catch (error) {
+    const code = fsRefusal(error)
+    if (code === null) throw error
+    await rejectItem(deps, journal, "capture", key, code.toLowerCase())
+    return undefined
+  }
+}
+
+/**
+ * Winds back queued ops no batch can carry (an older build journaled them before #12284). They never
+ * left the device: that build threw before sealing, and this one never batches them; an outgoing
+ * batch may already be on the server, so its items are never touched. The store moves first and the
+ * journal second, so a crash between them only repeats a rewind that is then a no-op.
+ */
+async function rewindQueued(deps: EngineDeps, journal: SyncJournal): Promise<void> {
+  const pending = await journal.pending()
+  const carried = pending.outgoing?.items ?? []
+  const queued = planBatches(pending.items.filter((item) => !carried.some((o) => sameItem(o, item))), batchBound(deps)).held
+  if (queued.length === 0) return
+  const rewound: WireItem[] = []
+  for (const key of [...new Set(queued.map((item) => item.key))]) {
+    const items = queued.filter((item) => item.key === key)
+    if ((await deps.store.rewind(key, items.map((item) => fromBase64(item.ops)))) === "kept") {
+      deps.log?.(`sync.item.stuck len=${keyLength(key)} ops=${items.length}`)
+      continue
+    }
+    rewound.push(...items)
+    deps.log?.(`sync.item.rewound len=${keyLength(key)} ops=${items.length}`)
+  }
+  if (rewound.length === 0) return
+  await deps.store.persist()
+  deps.fault?.("rewound")
+  const now = await journal.pending()
+  await journal.setPending({ ...now, items: now.items.filter((item) => !rewound.some((r) => sameItem(r, item))) })
+}
+
+/**
+ * Journals every local edit as pending ops, and returns the keys it held back instead, each with the
+ * fingerprint of what it held (#12284): an edit larger than one batch may carry is never journaled,
+ * applied or made the baseline, so it syncs once it fits. A key held last cycle whose file and doc are
+ * unchanged (same fingerprint) is held again without diffing it again (review L4).
+ */
+export async function capture(deps: EngineDeps, journal: SyncJournal, resuming: CycleRecord | null = null): Promise<ReadonlyMap<string, string>> {
+  await rewindQueued(deps, journal)
+  const files = await workingFiles(deps, journal)
+  // Resuming a cycle at merged: every render that landed is the base of any edit made since.
+  if (resuming !== null) await adoptLandedRenders(deps, journal, resuming, files)
+  const known = await acceptedKeys(deps, journal, "capture", deps.store.keys())
+  const keys = [...new Set([...known, ...files.byKey.keys()])].sort()
+  const prints = (await journal.state()).held?.prints ?? {}
+  const captured: WireItem[] = []
+  const held = new Map<string, string>()
+  const texts = new Map<string, string | null>()
+  for (const key of keys) {
+    const path = landingPath(files, key)
+    if (path === null) continue
+    const text = await readCaptured(deps, journal, key, path, files.byKey.has(key))
+    if (text === undefined) continue
+    const prior = prints[key]
+    const unchanged = prior !== undefined && prior === heldPrint(text, await deps.store.version(key))
+    const ops = unchanged ? null : await deps.store.capture(key, text)
+    if (ops === null && !unchanged) continue
+    const item = ops === null ? null : { key, ops: toBase64(ops) }
+    if (item === null || itemBytes(item) > batchBound(deps)) {
+      // The doc did not move (held ops are never imported), so this version is the one the next cycle compares.
+      held.set(key, unchanged && prior !== undefined ? prior : heldPrint(text, await deps.store.version(key)))
+      await rejectItem(deps, journal, "capture", key, "oversized")
+      continue
+    }
+    captured.push(item)
+    texts.set(key, text)
+  }
+  if (captured.length === 0) return held
+  const pending = await journal.pending()
+  const fresh = captured.filter((c) => !pending.items.some((p) => sameItem(p, c)))
+  await journal.setPending({ ...pending, items: [...pending.items, ...fresh] })
+  deps.fault?.("captured")
+  for (const item of captured) {
+    await deps.store.apply(item.key, fromBase64(item.ops))
+    // The captured text is now what the item's doc holds; without this the next capture sees the
+    // same edit again and pushes it again (and a restarted device would not reload the item).
+    await deps.store.markMaterialized(item.key, texts.get(item.key) ?? null)
+  }
+  await deps.store.persist()
+  deps.fault?.("persisted")
+  return held
+}
