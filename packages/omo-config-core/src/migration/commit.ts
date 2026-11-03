@@ -1,5 +1,5 @@
 import { basename, dirname, join, resolve } from "node:path"
-import { isPlainObject } from "../internal/plain-object"
+import { hasTamperedPrototype, isPlainObject, isUnsafeObjectKey } from "../internal/plain-object"
 import { parseJsoncSafe } from "../internal/jsonc-parse"
 import { toPosixPath } from "../internal/posix-path"
 import { resolveHomeDir } from "../loader"
@@ -80,10 +80,50 @@ function uniqueDiagnostics(diagnostics: readonly string[]): readonly string[] {
   return [...new Set(diagnostics)]
 }
 
-function validateTarget(targetPath: string, document: Readonly<Record<string, unknown>>): void {
+function containerInTarget(target: Readonly<Record<string, unknown>>, path: readonly string[]): Record<string, unknown> | null {
+  let container: Record<string, unknown> = target
+  for (const segment of path) {
+    const next = container[segment]
+    if (!isPlainObject(next)) return null
+    container = next
+  }
+  return container
+}
+
+/**
+ * Mirrors loader semantics: unrecognized keys the user already carries in the target are tolerated
+ * and reported as `kept:` diagnostics (the loader prunes unknown paths with a diagnostic instead of
+ * dropping the layer), while keys the migration additions introduce, unsafe keys, and prototype
+ * tampering stay fail-closed. Runs after stripRetiredCodegraph, so genuinely retired keys never
+ * reach the tolerance path — they are removed with `removed:` diagnostics before validation.
+ */
+function validateTarget(
+  targetPath: string,
+  document: Readonly<Record<string, unknown>>,
+  target: Readonly<Record<string, unknown>>,
+): readonly string[] {
   const result = OmoConfigSchema.safeParse(document)
-  if (result.success) return
-  const detail = result.error.issues.map((issue) => `${issue.path.map(String).join(".")}: ${issue.message}`).join(", ")
+  if (result.success) return []
+  const blocking: typeof result.error.issues = []
+  const kept: string[] = []
+  for (const issue of result.error.issues) {
+    if (issue.code === "unrecognized_keys" && !issue.keys.some((key) => isUnsafeObjectKey(key))) {
+      const path = issue.path.map((segment) => String(segment))
+      const container = containerInTarget(target, path)
+      if (container !== null && issue.keys.every((key) => Object.prototype.hasOwnProperty.call(container, key))) {
+        for (const key of issue.keys) {
+          kept.push(`kept: ${[...path, key].join(".")} (unknown to migration schema, pre-existing in target, preserved verbatim)`)
+        }
+        continue
+      }
+    }
+    blocking.push(issue)
+  }
+  if (blocking.length === 0) {
+    if (!hasTamperedPrototype(document)) return kept
+    throw new MigrationValidationError(targetPath, "the document contains prototype tampering")
+  }
+  const detail = blocking.map((issue) => `${issue.path.map(String).join(".")}: ${issue.message}`).join(", ")
   throw new MigrationValidationError(targetPath, detail)
 }
 
@@ -137,7 +177,7 @@ export function prepareTargetWrite(input: {
   const merged = mergeWithoutClobber(targetCleanup.document, additionsCleanup.document)
   const marker = markerValue(input.target, input.migrationId, input.targetPath)
   const document = { ...merged.merged, _migrations: marker }
-  validateTarget(input.targetPath, document)
+  const keptDiagnostics = validateTarget(input.targetPath, document, targetCleanup.document)
   // additionsCleanup strips codegraph from the migration transform output before merging.
   // Its edits are intentionally omitted here: migration transforms are source-controlled and
   // should never emit codegraph; even if they did, the merge would exclude it from the
@@ -148,7 +188,7 @@ export function prepareTargetWrite(input: {
     { path: ["_migrations"], value: marker },
   ]
   return {
-    diagnostics: uniqueDiagnostics([...merged.diagnostics, ...targetCleanup.diagnostics, ...additionsCleanup.diagnostics]),
+    diagnostics: uniqueDiagnostics([...merged.diagnostics, ...targetCleanup.diagnostics, ...additionsCleanup.diagnostics, ...keptDiagnostics]),
     document,
     edits,
   }
@@ -164,14 +204,14 @@ export function prepareTargetReplacement(input: {
   const documentCleanup = stripRetiredCodegraph(input.document)
   const marker = markerValue(input.target, input.migrationId, input.targetPath)
   const document = { ...documentCleanup.document, _migrations: marker }
-  validateTarget(input.targetPath, document)
+  const keptDiagnostics = validateTarget(input.targetPath, document, targetCleanup.document)
   const edits: { path: readonly string[]; value: unknown }[] = [
     ...targetCleanup.edits,
     ...diffEdits(withoutMarker(targetCleanup.document), withoutMarker(documentCleanup.document)),
     { path: ["_migrations"], value: marker },
   ]
   return {
-    diagnostics: uniqueDiagnostics([...targetCleanup.diagnostics, ...documentCleanup.diagnostics]),
+    diagnostics: uniqueDiagnostics([...targetCleanup.diagnostics, ...documentCleanup.diagnostics, ...keptDiagnostics]),
     document,
     edits,
   }
