@@ -830,6 +830,9 @@
           "AxUnconfirmed",
           "SpaceUnsupported",
           "SpaceMoveDenied",
+          "AmbiguousTarget",
+          "CaptureConsentRequired",
+          "ProtectedProcess",
           "native-unavailable",
           "quarantined",
           "abi-mismatch",
@@ -3854,5 +3857,5 @@
       }
     }
   },
-  "sha256": "73f6d314bf085df12f41f672ad6913bc6a9234d5f11a023d1fec20bde7eb3f7f"
+  "sha256": "77a2567eb70626bfbfc79838a559bce33102ef7112c3efd39846595ab943df20"
 }
