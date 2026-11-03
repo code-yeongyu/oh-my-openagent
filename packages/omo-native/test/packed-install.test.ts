@@ -72,14 +72,16 @@ describe("omo-ai packed install", () => {
       // The stamp is the precondition: a hardlinked Bun cache can already carry a rewritten rpc-mode.js.
       expect(existsSync(stamp)).toBe(false)
 
+      const env: NodeJS.ProcessEnv = { ...process.env, HOME: home, USERPROFILE: home, OMO_RUNTIME: "node", OMO_CODING_AGENT_DIR: join(home, ".omo", "agent") }
+      delete env.SENPI_RPC_INTERNAL_KEY_STDIN
       const launch = Bun.spawnSync(["node", join(installedPackageRoot, "bin", "omo.js"), "--help"], {
         cwd: consumer,
-        env: { ...process.env, HOME: home, USERPROFILE: home, OMO_RUNTIME: "node", OMO_CODING_AGENT_DIR: join(home, ".omo", "agent") },
+        env,
         stdout: "pipe",
         stderr: "pipe",
       })
       expect(new TextDecoder().decode(launch.stderr)).not.toContain("could not prepare the installed engine")
-      expect(launch.exitCode).toBe(0)
+      expect(launch.exitCode, new TextDecoder().decode(launch.stderr)).toBe(0)
       expect(readFileSync(rpcMode, "utf8")).toContain("invalid_stream_event")
       const omoVersion = JSON.parse(readFileSync(join(installedPackageRoot, "package.json"), "utf8")).version
       expect(readFileSync(stamp, "utf8").trim()).toBe(omoVersion)

@@ -44,7 +44,7 @@ function sandbox() {
   const socket = join(agentDir, "rpc", "shards", "p-aaaaaaaaaaaaaaaa.sock")
   expect(Buffer.byteLength(`${socket}.next-99`)).toBeLessThanOrEqual(103)
   mkdirSync(join(agentDir, "rpc", "shards"), { recursive: true })
-  const env = {
+  const env: NodeJS.ProcessEnv = {
     ...process.env,
     TMPDIR: agentDir,
     TEMP: agentDir,
@@ -54,6 +54,7 @@ function sandbox() {
     SENPI_CODING_AGENT_DIR: agentDir,
     PI_CODING_AGENT_DIR: agentDir,
   }
+  delete env.SENPI_RPC_INTERNAL_KEY_STDIN
   return { agentDir, socket, env }
 }
 
@@ -97,7 +98,7 @@ async function ensureShard(socket: string, env: NodeJS.ProcessEnv) {
     "--policy",
     "upgrade",
   ], env)
-  expect(result.exitCode).toBe(0)
+  expect(result.exitCode, result.stderr).toBe(0)
   const payload = JSON.parse(result.stdout) as { pid: number }
   ownedPids.add(payload.pid)
   return payload.pid
