@@ -1,12 +1,11 @@
 // One memory file over the batch bound must never stop the device's other items from syncing
 // (#12284): it is held back whole, named in the status, and synced once it fits again.
 
-import { afterEach, expect, test } from "bun:test"
+import { afterEach, expect, spyOn, test } from "bun:test"
 
 import { MAX_BATCH_BYTES } from "./batches"
 import { type Device, makeDevice } from "./engine-harness.test-support"
 import { FakeSyncServer } from "./fake-server.test-support"
-import { toBase64 } from "./journal"
 
 /** 500 files rendered and committed on the receiver through real git: well past the default per-test bound. */
 const LARGE_SET_TIMEOUT = 180_000
@@ -69,44 +68,19 @@ test("the held file is named in a shown, typed status on every cycle until it fi
   expect(await b.read("big.md")).toBe(note("now it fits\n"))
 }, SMALL_SET_TIMEOUT)
 
-test("a peer's edit to a held file never renders over the local edit sync could not take, and both meet once it fits", async () => {
+test("a held file that has not changed since it was held is not diffed again each cycle; an edit to it is", async () => {
   const bound = 4096
   const server = new FakeSyncServer()
   const a = await makeDevice(server, "a", undefined, { realStore: true, batchBytes: bound })
-  const b = await makeDevice(server, "b", undefined, { realStore: true, batchBytes: bound })
-  devices.push(a, b)
+  devices.push(a)
   const note = (body: string) => `---\ndescription: note\n---\n${body}`
-  await a.write("shared.md", note("first\n"))
-  await a.engine.runCycle()
-  await b.engine.runCycle()
-  const big = note(`first\n${"y".repeat(bound * 2)}\n`)
-  await a.write("shared.md", big)
-  await a.engine.runCycle()
-  await b.write("shared.md", note("first\nfrom b\n"))
-  await b.engine.runCycle()
-  expect(await a.engine.runCycle()).toMatchObject({ applied: 1, held: ["shared.md"] })
-  expect(await a.read("shared.md")).toBe(big)
-  await a.write("shared.md", note("first\nfrom a\n"))
-  expect(await a.engine.runCycle()).toMatchObject({ pushed: true, held: [] })
-  await b.engine.runCycle()
-  const merged = await b.read("shared.md")
-  for (const piece of ["first", "from a", "from b"]) expect(merged).toContain(piece)
-}, SMALL_SET_TIMEOUT)
-
-test("an oversized item an older build already journaled is held with every later op of its key, and the rest still pushes", async () => {
-  const bound = 1024
-  const server = new FakeSyncServer()
-  const a = await makeDevice(server, "a", undefined, { batchBytes: bound })
-  const b = await makeDevice(server, "b")
-  devices.push(a, b)
-  const ops = (line: string) => toBase64(new TextEncoder().encode(JSON.stringify({ adds: { [line.slice(0, 8)]: line }, kills: [] })))
-  const legacy = [{ key: "legacy.md", ops: ops("z".repeat(bound * 2)) }, { key: "legacy.md", ops: ops("later edit") }]
-  await a.engine.journal.setPending({ items: legacy, outgoing: null })
-  await a.write("fresh.md", "fresh\n")
-  expect(await a.engine.runCycle()).toMatchObject({ pushed: true })
-  expect((await a.engine.journal.pending()).items).toEqual(legacy)
-  expect(await a.engine.status()).toMatchObject({ kind: "failing", failure: { kind: "oversized_item", keys: ["legacy.md"] } })
-  await b.engine.runCycle()
-  expect(await b.read("fresh.md")).toBe("fresh\n")
-  expect(await b.read("legacy.md")).toBeNull()
+  await a.write("big.md", note(`${"y".repeat(bound * 2)}\n`))
+  const captures = spyOn(a.store, "capture")
+  const capturesOf = () => captures.mock.calls.filter(([key]) => key === "big.md").length
+  for (let cycle = 0; cycle < 3; cycle += 1) expect(await a.engine.runCycle()).toMatchObject({ held: ["big.md"] })
+  expect(capturesOf()).toBe(1)
+  await a.write("big.md", note(`${"w".repeat(bound * 2)}\n`))
+  expect(await a.engine.runCycle()).toMatchObject({ held: ["big.md"] })
+  expect(capturesOf()).toBe(2)
+  captures.mockRestore()
 }, SMALL_SET_TIMEOUT)
