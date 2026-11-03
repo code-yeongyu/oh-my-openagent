@@ -11,7 +11,8 @@ import type { PanelAccountState } from "./types"
  * decision, and that decision is this function.
  */
 export interface PanelUsageCredential {
-  readonly access: string
+  /** Absent for a claude CLI account: the CLI keeps its token, and the engine polls with it (senpi#4436). */
+  readonly access?: string
   readonly account?: string
   /** The account the user pinned, when the healthy one doing the work is a different slot. */
   readonly pinnedAccount?: string
@@ -98,20 +99,19 @@ function resolveOne(
   if (accounts.length > 0) {
     const pinnedName = nonEmptyString(node["pinned"])
     const pinned = accounts.find((account) => nonEmptyString(account["name"]) === pinnedName) ?? accounts[0]
-    const healthy = accounts.find((account) => health(account) === "ok" && usableToken(account["access"]))
+    const healthy = accounts.find((account) => health(account) === "ok" && canServe(account))
     // A stale OAuth token still serves: the endpoint's 401 is what lets the column say
     // "auth stale - run /login". A cooldown is different - the pool has explicitly stopped
     // serving that account, so offering it would bypass the engine's failover decision.
-    const pinnedServes = pinned !== undefined && health(pinned) === "ok" && usableToken(pinned["access"])
-    const stalePinned =
-      pinned !== undefined && health(pinned) === "stale" && usableToken(pinned["access"]) ? pinned : undefined
+    const pinnedServes = pinned !== undefined && health(pinned) === "ok" && canServe(pinned)
+    const stalePinned = pinned !== undefined && health(pinned) === "stale" && canServe(pinned) ? pinned : undefined
     const serving = pinnedServes ? pinned : (healthy ?? stalePinned)
-    const access = serving === undefined ? undefined : nonEmptyString(serving["access"])
-    if (serving !== undefined && access !== undefined && usableToken(access)) {
+    if (serving !== undefined) {
+      const access = nonEmptyString(serving["access"])
       const name = nonEmptyString(serving["name"])
       const pinnedLabel = pinned === undefined ? undefined : nonEmptyString(pinned["name"])
       return {
-        access,
+        ...(access !== undefined && usableToken(access) ? { access } : {}),
         state: health(serving),
         ...(name === undefined ? {} : { account: name }),
         ...(pinnedLabel === undefined || pinnedLabel === name ? {} : { pinnedAccount: pinnedLabel }),
@@ -152,6 +152,15 @@ function collectSlots(slots: Record<PropertyKey, unknown>, parsed: Record<string
       ...(typeof cooldownUntil === "number" ? { cooldownUntil } : {}),
     }
   }
+}
+
+/**
+ * Whether an account can be the one serving: a stored OAuth token, or a claude CLI account, which keeps its token
+ * in the CLI's own store (senpi#4436). An account the engine retired until it signs in again never serves.
+ */
+function canServe(account: Record<string, unknown>): boolean {
+  if (account["store"] === "claude-cli") return account["signInRequired"] === undefined
+  return usableToken(account["access"])
 }
 
 function usableToken(value: unknown): boolean {
