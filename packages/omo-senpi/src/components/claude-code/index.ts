@@ -65,6 +65,35 @@ export function claudeCodeProgressLine(pin: ClaudeCodePin, progress: ClaudeCodeD
   return `Downloading Claude Code ${pin.claudeCodeVersion ?? pin.version}: ${amount}`
 }
 
+// senpi's `provider_login_start` (awaited before a registered provider's OAuth login runs). Declared
+// structurally because the pinned senpi may predate the event; such a host never emits it.
+type ProviderLoginStart = {
+  readonly provider?: unknown
+  readonly signal?: AbortSignal
+  readonly progress?: (message: string) => void
+}
+
+// The login UI has one progress line, so the download notice, the percent lines and a failure all go there.
+function loginTurn(event: ProviderLoginStart): TurnContext {
+  return {
+    ui: {
+      notify: (message) => event.progress?.(message),
+      setStatus: (_key, text) => { if (text !== undefined) event.progress?.(text) },
+    },
+  }
+}
+
+// Stops waiting when the login is cancelled; the single-flight download keeps running for the next caller.
+function untilAborted(work: Promise<void>, signal: AbortSignal | undefined): Promise<void> {
+  if (signal === undefined) return work
+  if (signal.aborted) return Promise.resolve()
+  return new Promise<void>((resolve, reject) => {
+    const onAbort = () => resolve()
+    signal.addEventListener("abort", onAbort, { once: true })
+    work.then(resolve, reject).finally(() => signal.removeEventListener("abort", onAbort))
+  })
+}
+
 function isPreview(payload: unknown): boolean {
   return typeof payload === "object" && payload !== null && Reflect.get(payload, "preview") === true
 }
@@ -116,6 +145,13 @@ export function createClaudeCodeComponent(options: ClaudeCodeComponentOptions = 
       // A turn an extension starts (sendMessage triggerTurn) skips `input` and reaches before_agent_start.
       pi.on("input", onTurn)
       pi.on("before_agent_start", onTurn, { previewSafe: true })
+      // A Claude sign-in runs `claude auth login`, so the executable must exist before the login starts.
+      pi.on("provider_login_start", async (payload: unknown): Promise<undefined> => {
+        const event = payload as ProviderLoginStart
+        if (event.provider !== CLAUDE_CODE_PROVIDER || event.signal?.aborted) return undefined
+        await untilAborted(ensure(loginTurn(event)), event.signal)
+        return undefined
+      })
     },
   }
 }
