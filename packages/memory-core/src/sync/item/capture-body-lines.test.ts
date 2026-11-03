@@ -69,7 +69,10 @@ describe("concurrent replacements of one body line (#12279)", () => {
         if (when === "synced first") exchange([docA, docB])
         await fire(b, docB, seed, fB, `${HDR}the meeting moved to Thursday\nkeep me\n<X>\n`)
         exchange([docA, docB])
-        expectConverged([docA, docB], ["the meeting moved to Tuesday", "the meeting moved to Thursday", "keep me", "<X>"])
+        expectConverged(
+          [docA, docB],
+          ["the meeting moved to Tuesday", "the meeting moved to Thursday", "keep me", "<X>"],
+        )
         docA.free()
         docB.free()
       })
@@ -106,7 +109,10 @@ describe("concurrent replacements of one body line (#12279)", () => {
       const count = 2 + Math.floor(rand() * 2)
       const docs = await Promise.all(Array.from({ length: count }, (_, i) => newDoc(`${i + 1}`)))
       const lineCount = 3 + Math.floor(rand() * 4)
-      const original = Array.from({ length: lineCount }, (_, k) => `item ${k}: the meeting moved to ${days[k % days.length]}`)
+      const original = Array.from(
+        { length: lineCount },
+        (_, k) => `item ${k}: the meeting moved to ${days[k % days.length]}`,
+      )
       const [first, ...rest] = docs
       if (first === undefined) throw new Error("no doc")
       captureInto(first, "", [], `${HDR}${original.join("\n")}\n`)
@@ -116,7 +122,7 @@ describe("concurrent replacements of one body line (#12279)", () => {
       const replaced = new Set<number>()
       const added: string[] = []
       const updates: Uint8Array[] = []
-      docs.forEach((doc, i) => {
+      for (const [i, doc] of docs.entries()) {
         if (rand() < 0.5) for (const update of updates) doc.import(update)
         const target = Math.floor(rand() * 2)
         const line = `item ${target}: the meeting moved to ${days[Math.floor(rand() * days.length)]} by d${i}`
@@ -127,7 +133,7 @@ describe("concurrent replacements of one body line (#12279)", () => {
         updates.push(update)
         replaced.add(target)
         added.push(line)
-      })
+      }
       for (const doc of docs) for (const update of shuffled(updates, rand)) doc.import(update)
       const kept = original.filter((_, k) => !replaced.has(k))
       const want = [...kept, ...added, ""].sort()
@@ -137,7 +143,13 @@ describe("concurrent replacements of one body line (#12279)", () => {
   })
 })
 
-async function fire(device: ItemDevice, doc: LoroDoc, base: string, frontier: ItemFrontier, working: string): Promise<LoroDoc> {
+async function fire(
+  device: ItemDevice,
+  doc: LoroDoc,
+  base: string,
+  frontier: ItemFrontier,
+  working: string,
+): Promise<LoroDoc> {
   const update = await captureOnDevice(device, "item.md", doc, base, frontier, working)
   if (update !== null) doc.import(update)
   return doc
