@@ -203,7 +203,7 @@ describe("closed code set", () => {
     await fs.writeFile(bundlePath, "")
     await fs.truncate(bundlePath, 8 * 1024 * 1024 + 1)
     const bundle = await readLinuxBundle(bundlePath, { stat: (path) => fs.stat(path), open: (path, flags) => fs.open(path, flags) })
-    const defaultFile = readDefaultFileCandidates(new Uint8Array([0xff, 0x0a]), () => false)
+    const defaultFile = readDefaultFileCandidates(new Uint8Array([0x0c, 0x0a]), () => false)
     const hashDir = (await selectOpenSslHashDirectory({
       entries: async () => ["0123abcd.0"],
       open: async () => ({
