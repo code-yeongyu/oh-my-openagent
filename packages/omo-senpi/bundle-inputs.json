@@ -337,6 +337,7 @@
     "packages/memory-core/src/sync/engine/engine-deps.ts",
     "packages/memory-core/src/sync/engine/engine.ts",
     "packages/memory-core/src/sync/engine/failure.ts",
+    "packages/memory-core/src/sync/engine/held.ts",
     "packages/memory-core/src/sync/engine/index.ts",
     "packages/memory-core/src/sync/engine/item-keys.ts",
     "packages/memory-core/src/sync/engine/journal.ts",
