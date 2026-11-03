@@ -159,10 +159,6 @@ export interface DeviceOptions {
   readonly memoryFrom?: string
   /** Use the production item store over the #10203 device (Loro) instead of the line-set fake. */
   readonly realStore?: boolean
-  /** This device's batches advertise the body line diff (PR #12295). */
-  readonly advertise?: boolean
-  /** The other members of the account as this device's census reports them; absent = unknown. */
-  readonly census?: readonly string[]
   readonly onStatusChange?: () => void
   readonly log?: (line: string) => void
 }
@@ -187,8 +183,7 @@ export async function makeDevice(server: FakeSyncServer, name: string, fault?: E
       store,
       transport: lockGuarded(server.transport(`device:${name}`), lock),
       verifier,
-      sealer: new FakeSealer(ACCOUNT, { author: `device:${name}`, advertises: options.advertise === true }),
-      ...(options.census === undefined ? {} : { census: { others: () => options.census ?? null } }),
+      sealer: new FakeSealer(ACCOUNT),
       lock,
       clock,
       random: () => 0,

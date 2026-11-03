@@ -11,7 +11,6 @@ import { b64urlDecode, sha256B64 } from "../crypto/vendor/sync-format/jcs.ts"
 import type { DeviceKeyring } from "../keyring-port.ts"
 import type { BatchPayload, SealedBatch, Sealer } from "../engine/ports.ts"
 import type { AccountChain } from "./account-chain.ts"
-import { bodyLineAdvertisement, MANIFEST_RECORD } from "./capability.ts"
 import { OPS_RECORD } from "./verifier.ts"
 
 export class SealRefusedError extends Error {
@@ -50,10 +49,7 @@ export function createChainSealer(input: {
         batchId: b64urlDecode(batchId),
         salt: new Uint8Array(randomBytes(32)),
         createdAt: now(),
-        records: [
-          ...payload.items.map((item) => ({ type: OPS_RECORD, spaceId: new Uint8Array(spaceId), itemKey: item.key, body: new Uint8Array(item.ops) })),
-          { type: MANIFEST_RECORD, spaceId: new Uint8Array(spaceId), itemKey: "", body: new Uint8Array(await bodyLineAdvertisement(keyring.principal().id)) },
-        ],
+        records: payload.items.map((item) => ({ type: OPS_RECORD, spaceId: new Uint8Array(spaceId), itemKey: item.key, body: new Uint8Array(item.ops) })),
       })
       const digest = await sha256B64(bytes)
       const link = await nextLink(prior, digest)

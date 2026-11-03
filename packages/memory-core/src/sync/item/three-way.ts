@@ -1,13 +1,13 @@
-// Text three-way merge on Loro: the base is one insert, each side is a diff of the base in the
-// capture's body mode (updateBodyText, #12279), and merging the two sides keeps both sides' changes. Peers
+// Text three-way merge on Loro: the base is one insert, each side is a whole-line diff of the
+// base (updateBodyText, #12279), and merging the two sides keeps both sides' changes. Peers
 // are fixed, so the result is deterministic. Used to carry a user's further typing (ours) onto the
 // state an earlier capture of the same baseline already produced (theirs).
 
 import { loadLoroRuntime } from "../../crdt/loro-runtime"
 
-import { type BodyDiff, updateBodyText } from "./line-update"
+import { updateBodyText } from "./line-update"
 
-export async function mergeText(base: string, ours: string, theirs: string, bodyDiff: BodyDiff): Promise<string> {
+export async function mergeText(base: string, ours: string, theirs: string): Promise<string> {
   if (ours === base || ours === theirs) return theirs
   if (theirs === base) return ours
   const { LoroDoc } = await loadLoroRuntime()
@@ -20,10 +20,10 @@ export async function mergeText(base: string, ours: string, theirs: string, body
   const right = root.fork()
   try {
     left.setPeerId("2")
-    updateBodyText(left.getText("t"), ours, bodyDiff)
+    updateBodyText(left.getText("t"), ours)
     left.commit()
     right.setPeerId("3")
-    updateBodyText(right.getText("t"), theirs, bodyDiff)
+    updateBodyText(right.getText("t"), theirs)
     right.commit()
     left.import(right.export({ mode: "update", from: root.oplogVersion() }))
     return left.getText("t").toString()

@@ -9,34 +9,26 @@ interface Sealed {
   readonly batchId: string
   readonly baseSeq: number
   readonly items: readonly { readonly key: string; readonly ops: string }[]
-  /** The signer the sealed object names (the real verifier's chain-verified author), and whether its build advertises the body line diff (PR #12295). */
-  readonly author?: string
-  readonly advertises?: boolean
 }
 
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 
-export function encodePayload(account: string, batchId: string, baseSeq: number, payload: BatchPayload, signer?: { readonly author: string; readonly advertises: boolean }): Uint8Array {
+export function encodePayload(account: string, batchId: string, baseSeq: number, payload: BatchPayload): Uint8Array {
   const sealed: Sealed = {
     account,
     batchId,
     baseSeq,
     items: payload.items.map((i) => ({ key: i.key, ops: Buffer.from(i.ops).toString("base64") })),
-    ...signer,
   }
   return encoder.encode(JSON.stringify(sealed))
 }
 
 export class FakeSealer implements Sealer {
-  /** `signer`: the author the object names and whether its batches carry the body line advertisement. */
-  constructor(
-    private readonly account: string,
-    private readonly signer?: { readonly author: string; readonly advertises: boolean },
-  ) {}
+  constructor(private readonly account: string) {}
 
   async seal(batchId: string, baseSeq: number, payload: BatchPayload): Promise<SealedBatch> {
-    return { bytes: encodePayload(this.account, batchId, baseSeq, payload, this.signer), epoch: 1, link: "A".repeat(43), recordSig: "S".repeat(86) }
+    return { bytes: encodePayload(this.account, batchId, baseSeq, payload), epoch: 1, link: "A".repeat(43), recordSig: "S".repeat(86) }
   }
 }
 
@@ -58,8 +50,7 @@ export class FakeVerifier implements Verifier {
     // both match (a transport that cannot name the batch id leaves that half to the header).
     if (sealed.baseSeq !== entry.seq - 1) return this.refuse("object_binding")
     if (entry.batchId !== null && sealed.batchId !== entry.batchId) return this.refuse("object_binding")
-    const advertises = sealed.author === undefined ? {} : { advertises: { author: sealed.author, bodyLine: sealed.advertises === true } }
-    return { ok: true, payload: payloadOf(sealed), batchId: sealed.batchId, ...advertises }
+    return { ok: true, payload: payloadOf(sealed), batchId: sealed.batchId }
   }
 
   async verifySnapshot(_snapshot: SnapshotRef, chunks: readonly Uint8Array[]): Promise<Verdict> {

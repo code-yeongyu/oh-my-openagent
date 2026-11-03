@@ -31,7 +31,6 @@ import { assertDeviceDoc } from "./device"
 import type { ItemFrontier } from "./document"
 import { isLive } from "./document"
 import { applyUserDelta } from "./field-delta"
-import type { BodyDiff } from "./line-update"
 import { renderDocContent } from "./render"
 import { BODY_NAME } from "./state"
 
@@ -43,7 +42,6 @@ export async function captureOnDevice(
   baseFrontier: ItemFrontier,
   workingText: string,
   registerValues: readonly RegisterValue[] = [],
-  bodyDiff: BodyDiff = "char",
 ): Promise<Uint8Array | null> {
   assertDeviceDoc(device, doc)
   return serialized(`${device.stateDir}\0${itemKey}`, async () => {
@@ -59,8 +57,8 @@ export async function captureOnDevice(
     const captured = unchanged
       ? null
       : prior === undefined
-        ? captureItem(doc, baseText, baseFrontier, workingText, bodyDiff, message)
-        : await captureDrift(doc, prior, workingText, message, bodyDiff)
+        ? captureItem(doc, baseText, baseFrontier, workingText, message)
+        : await captureDrift(doc, prior, workingText, message)
     const update = withRegisterValues(doc, captured, registerValues, message)
     if (update === null) return null
     const seenBefore = unchanged ? mapTags(doc) : prior === undefined ? viewTags(doc, baseFrontier) : new Set(prior.seen)
@@ -95,14 +93,14 @@ export async function recordMaterialized(
   })
 }
 
-async function captureDrift(doc: LoroDoc, prior: CaptureReceipt, workingText: string, message: string, bodyDiff: BodyDiff): Promise<Uint8Array | null> {
+async function captureDrift(doc: LoroDoc, prior: CaptureReceipt, workingText: string, message: string): Promise<Uint8Array | null> {
   const target = doc.fork()
   try {
     target.setPeerId(doc.peerId)
     target.setRecordTimestamp(false)
     const seen = new Set(prior.seen)
     const unseen = new Set([...mapTags(target)].filter((tag) => !seen.has(tag)))
-    await applyUserDelta(target, prior.text, workingText, unseen, bodyDiff)
+    await applyUserDelta(target, prior.text, workingText, unseen)
     target.commit({ message })
     const from = doc.oplogVersion()
     if (target.oplogVersion().compare(from) === 0) return null

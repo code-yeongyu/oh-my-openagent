@@ -15,11 +15,11 @@ import { splitItem } from "./frontmatter"
 import type { ItemHistory } from "./history"
 import { analyzeHistory } from "./history"
 import { applyKey, assertNever, clearKey, editSet, writeNatural } from "./key-writers"
-import { type BodyDiff, updateBodyText } from "./line-update"
+import { updateBodyText } from "./line-update"
 import { BODY_NAME, cidRoot } from "./state"
 import { mergeText } from "./three-way"
 
-export async function applyUserDelta(target: LoroDoc, before: string, after: string, unseen: ReadonlySet<string>, bodyDiff: BodyDiff): Promise<void> {
+export async function applyUserDelta(target: LoroDoc, before: string, after: string, unseen: ReadonlySet<string>): Promise<void> {
   const b = splitItem(before)
   const a = splitItem(after)
   const beforeFields = fieldsOf(b.fm)
@@ -31,8 +31,8 @@ export async function applyUserDelta(target: LoroDoc, before: string, after: str
   const bodyAfter = a.body
   if (bodyBefore === bodyAfter) return
   const current = target.hasContainer(cidRoot(BODY_NAME, "Text")) ? target.getText(BODY_NAME).toString() : ""
-  const merged = await mergeText(bodyBefore, bodyAfter, current, bodyDiff)
-  if (merged !== current) updateBodyText(target.getText(BODY_NAME), merged, bodyDiff)
+  const merged = await mergeText(bodyBefore, bodyAfter, current)
+  if (merged !== current) updateBodyText(target.getText(BODY_NAME), merged)
 }
 
 function editField(

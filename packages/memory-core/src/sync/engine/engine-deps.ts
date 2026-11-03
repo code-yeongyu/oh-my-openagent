@@ -1,4 +1,4 @@
-import type { Census, Clock, ItemStore, Sealer, SyncRepo, Transport, Verifier, WriterLock } from "./ports"
+import type { Clock, ItemStore, Sealer, SyncRepo, Transport, Verifier, WriterLock } from "./ports"
 
 /** Where a crash can be injected: right after each journal marker, or between an effect and its marker. */
 export const INBOUND_POINTS = ["captured", "persisted", "downloaded", "verified", "merged", "staged", "render-intent", "render-key", "rendered", "git-commit", "committed", "checkpointed"] as const
@@ -19,8 +19,6 @@ export interface EngineDeps {
   readonly transport: Transport
   readonly verifier: Verifier
   readonly sealer: Sealer
-  /** Who else is on the account; absent means unknown, and captures keep the character diff. */
-  readonly census?: Census
   readonly lock: WriterLock
   readonly clock: Clock
   readonly fault?: EngineFault

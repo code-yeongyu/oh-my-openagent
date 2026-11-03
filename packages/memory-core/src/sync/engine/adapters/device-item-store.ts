@@ -11,7 +11,6 @@ import { join } from "node:path"
 import { loadLoroRuntime, type LoroDoc } from "../../../crdt/loro-runtime"
 import { readdir, readFile } from "../../../fs/resilient"
 import {
-  type BodyDiff,
   captureOnDevice,
   createDeviceItemDoc,
   deleteItem,
@@ -56,8 +55,8 @@ export function createDeviceItemStore(options: DeviceItemStoreOptions): ItemStor
    * live again). Re-created with that same content, the diff is empty, so one explicit no-change
    * op revives it.
    */
-  const revive = async (key: string, doc: LoroDoc, workingText: string, bodyDiff: BodyDiff): Promise<Uint8Array | null> => {
-    const ops = await captureOnDevice(theDevice(), key, doc, renderDocContent(doc), itemFrontier(doc), workingText, [], bodyDiff)
+  const revive = async (key: string, doc: LoroDoc, workingText: string): Promise<Uint8Array | null> => {
+    const ops = await captureOnDevice(theDevice(), key, doc, renderDocContent(doc), itemFrontier(doc), workingText)
     if (ops !== null) return ops
     const target = doc.fork()
     try {
@@ -116,7 +115,7 @@ export function createDeviceItemStore(options: DeviceItemStoreOptions): ItemStor
     },
     peer: () => theDevice().peer,
     keys: () => [...new Set([...docs.keys(), ...baselines.keys()])].sort(),
-    async capture(key, workingText, bodyDiff) {
+    async capture(key, workingText) {
       const doc = await docOf(key)
       const base = baselines.get(key) ?? { text: null, frontier: [] }
       if (workingText === base.text) return null
@@ -127,8 +126,8 @@ export function createDeviceItemStore(options: DeviceItemStoreOptions): ItemStor
         dirty.add(key)
         return doc.export({ mode: "update", from })
       }
-      if (!isLive(doc) && doc.oplogVersion().toJSON().size > 0) return revive(key, doc, workingText, bodyDiff)
-      return captureOnDevice(theDevice(), key, doc, base.text ?? "", base.frontier, workingText, [], bodyDiff)
+      if (!isLive(doc) && doc.oplogVersion().toJSON().size > 0) return revive(key, doc, workingText)
+      return captureOnDevice(theDevice(), key, doc, base.text ?? "", base.frontier, workingText)
     },
     async apply(key, ops) {
       const doc = await docOf(key)

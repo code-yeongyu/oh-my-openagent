@@ -69,9 +69,8 @@ test("two member devices converge through the real engine, account session and c
   expect(await a.sync.status()).toMatchObject({ kind: "synced" })
 }, GIT_TEST_TIMEOUT * 2)
 
-// PR #12295: through the production session, each member's sealed batches advertise the body line
-// diff and the chain census names the other member, so once both have pushed, concurrent replacements
-// of one line merge as two whole lines and the untouched line stays whole.
+// #12279: through the production session, concurrent replacements of one line by two members merge
+// as two whole lines and the untouched line stays whole.
 test("two members on this build merge a same-line edit as two whole lines", async () => {
   const [a, b] = await twoMembers("acct-line-diff")
   const head = "---\ndescription: synced\n---\n"

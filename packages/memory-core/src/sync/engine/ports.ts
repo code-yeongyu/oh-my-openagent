@@ -4,8 +4,6 @@
 // tested against deterministic fakes and the real implementations (todo 13 crypto, the #10203
 // item device, the HTTP transport) plug in without changing it.
 
-import type { BodyDiff } from "../item"
-
 /** One pulled sequence entry: a batch the server ordered, never its plaintext. */
 export interface PulledEntry {
   readonly seq: number
@@ -104,22 +102,8 @@ export type Verdict =
    * `batchId` is the one the sealed header names; the server's rows carry none, so the verifier
    * is the authority for at-most-once per (seq, batch id).
    */
-  | { readonly ok: true; readonly payload: BatchPayload; readonly batchId: string; readonly advertises?: Advertisement }
+  | { readonly ok: true; readonly payload: BatchPayload; readonly batchId: string }
   | { readonly ok: false; readonly code: RefusalCode }
-
-/**
- * What a verified ops batch says about its author's build (PR #12295): whether it advertises the
- * body line diff. Absent for keyring, vetoed and snapshot verdicts.
- */
-export interface Advertisement {
-  readonly author: string
-  readonly bodyLine: boolean
-}
-
-/** The verified account membership other than this device; null while the chain is not known. */
-export interface Census {
-  others(): readonly string[] | null
-}
 
 /**
  * Receiver checks of sync-design §6 in order (chain link, record signature, epoch, account
@@ -153,7 +137,7 @@ export interface ItemStore {
   /** Item keys the store knows, live or dead. */
   keys(): readonly string[]
   /** captureOnDevice: the working text against the item's materialised baseline; null = no edit. */
-  capture(key: string, workingText: string | null, bodyDiff: BodyDiff): Promise<Uint8Array | null>
+  capture(key: string, workingText: string | null): Promise<Uint8Array | null>
   /** Import a verified remote update (or this device's own captured ops). */
   apply(key: string, ops: Uint8Array): Promise<void>
   /**
