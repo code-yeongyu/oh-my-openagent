@@ -339,6 +339,7 @@ class TaskManagerImpl implements TaskManager {
       forget: (taskId, options) => this.forget(taskId, options),
       settleWaiters: (taskId, terminal) => this.#settleWaiters(taskId, terminal),
       tryRuntimeFallback: (input) => this.#tryRuntimeFallback(input),
+      usageLimits: this.#limits,
       stopSettlement: (taskId) => this.#stopsPending.settlement(taskId),
       pauseSettlement: (taskId, epoch) => this.#runPause.settlement(taskId, epoch),
       parkSlot: (taskId, epoch) => this.#runPause.park(taskId, epoch),
