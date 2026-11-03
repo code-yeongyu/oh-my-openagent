@@ -11,7 +11,7 @@ const SIGNED_IN_ENV = { OMO_BIN }
 
 type Notice = { readonly message: string; readonly type: string | undefined }
 
-function harness(options: Partial<DeviceServiceComponentOptions> & { readonly hasUI?: boolean } = {}) {
+function harness(options: Partial<DeviceServiceComponentOptions> & { readonly hasUI?: boolean; readonly mode?: string } = {}) {
   const pi = new FakeExtensionAPI()
   const deferred: StartupWork[] = []
   const warnings: string[] = []
@@ -25,6 +25,7 @@ function harness(options: Partial<DeviceServiceComponentOptions> & { readonly ha
   const eventCtx = {
     cwd: "/work/project",
     hasUI: options.hasUI ?? true,
+    mode: options.mode ?? "tui",
     ui: { notify: (message: string, type?: string) => notices.push({ message, type }) },
   }
   const component = createDeviceServiceComponent({
@@ -81,13 +82,19 @@ describe("device-service start-up bootstrap", () => {
     expect(h.runs).toEqual([])
   })
 
+  // Only the top-level interactive TUI bootstraps. senpi's RPC mode binds a real UI context (hasUI is true there), and
+  // every task child (team members included) inherits OMO_BIN, so neither hasUI nor OMO_BIN alone identifies it.
   test.each([
-    ["not an omo launch (no OMO_BIN)", {}, true],
-    ["a relative OMO_BIN", { OMO_BIN: "omo" }, true],
-    ["CI", { OMO_BIN, CI: "true" }, true],
-    ["a session without a UI (print, RPC hosts, task children)", { OMO_BIN }, false],
-  ])("%s runs nothing", async (_label, env, hasUI) => {
-    const h = harness({ env, hasUI })
+    ["not an omo launch (no OMO_BIN)", {}, true, "tui"],
+    ["a relative OMO_BIN", { OMO_BIN: "omo" }, true, "tui"],
+    ["CI", { OMO_BIN, CI: "true" }, true, "tui"],
+    ["a session without a UI", { OMO_BIN }, false, "tui"],
+    ["an RPC host or RPC task child with a bound UI context", { OMO_BIN }, true, "rpc"],
+    ["a JSON run", { OMO_BIN }, true, "json"],
+    ["a print run", { OMO_BIN }, false, "print"],
+    ["a task child that runs a TUI", { OMO_BIN, OMO_SENPI_TASK_RPC_CHILD: "1" }, true, "tui"],
+  ])("%s runs nothing", async (_label, env, hasUI, mode) => {
+    const h = harness({ env, hasUI, mode })
     h.component.register(h.pi, h.ctx)
     h.start()
     await h.flush()
@@ -98,6 +105,7 @@ describe("device-service start-up bootstrap", () => {
     ["a locked keychain", { state: "keychain_locked", notice: "Unlock it." }, [{ message: "Unlock it.", type: "warning" }], 0],
     ["an install this build refuses", { state: "update_required", notice: "Update OmO." }, [{ message: "Update OmO.", type: "warning" }], 0],
     ["a signed-out device", { state: "signed_out", notice: "Sign in to OmO first." }, [], 0],
+    ["no credential store to read a sign-in from", { state: "store_unavailable", notice: "The credential store is not available." }, [], 0],
     ["a connected device", { state: "connected" }, [], 0],
     ["a worker that answered nothing usable", undefined, [], 1],
   ])("%s ends with the notices the user can act on", async (_label, report, notices, warnings) => {

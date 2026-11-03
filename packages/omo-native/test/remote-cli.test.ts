@@ -7,6 +7,8 @@ import { join } from "node:path"
 import { connectDeviceService } from "../../device-service-core/src/index.ts"
 import { startFakeOwner, type FakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
 import { defaultWorld, OFFLINE_PEER, PEER, SESSION_ID } from "../../device-service-core/test/local-api/conformance/world.ts"
+import { createCredentialStore } from "../../omo-opencode/src/cli/service-auth/keystore"
+import { runAccountVerb } from "../account-cli"
 import { type BootstrapSetup, deviceServiceBootstrapSetup } from "../remote-bootstrap"
 import { prepareRemoteAttach, REMOTE_EXIT, runRemoteVerb } from "../remote-cli"
 import { ago } from "../remote-render"
@@ -202,6 +204,32 @@ describe("omo remote bootstrap", () => {
     const { code, out } = await run(["bootstrap", "--json"], owner.stateDir, { exitCode: 4, stdout: '{"signedIn":false}' })
     expect(code).toBe(REMOTE_EXIT.unavailable)
     expect(JSON.parse(out.join(""))).toMatchObject({ state: "signed_out" })
+    expect(owner.state.log).toEqual([])
+  })
+
+  // A Linux machine with no Secret Service (headless, WSL, containers) has no store, so nothing can prove a sign-in:
+  // the worker reports its own store_unavailable state, which the start-up component keeps quiet.
+  test("no credential store in an isolated HOME reports store_unavailable and touches no service", async () => {
+    const owner = await startFakeOwner({ stateDir: privateDir(), world: defaultWorld() })
+    owners.push(owner)
+    const home = privateDir()
+    const noSecretService = {
+      get: async () => {
+        throw new Error("Cannot autolaunch D-Bus without X11 $DISPLAY")
+      },
+      set: async () => {},
+      delete: async () => false,
+    }
+    const api = "https://api.omo.dev"
+    const store = createCredentialStore(api, { secrets: noSecretService, platform: "linux", lockProbe: async () => "unknown", home })
+    const lines: string[] = []
+    const exitCode = await runAccountVerb(
+      { api, store, home, pinDir: () => join(home, "pins"), readStdin: async () => "", output: line => lines.push(line), error: () => {} },
+      ["show"],
+    )
+    const { code, out } = await run(["bootstrap", "--json"], owner.stateDir, { exitCode, stdout: lines.join("\n") })
+    expect(code).toBe(REMOTE_EXIT.unavailable)
+    expect(JSON.parse(out.join(""))).toMatchObject({ state: "store_unavailable" })
     expect(owner.state.log).toEqual([])
   })
 
