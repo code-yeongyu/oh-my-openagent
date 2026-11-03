@@ -39,6 +39,7 @@ function joinDirective(variant: 0 | 1): string {
   return DIRECTIVE_PARTS.map((part) => (typeof part === "string" ? part : part[variant])).join("")
 }
 
-export const SENPI_ULTRAWORK_DIRECTIVE = joinDirective(0)
+// Pure: a bundle that imports this module without reading a directive drops the parts and both joins.
+export const SENPI_ULTRAWORK_DIRECTIVE = /* @__PURE__ */ joinDirective(0)
 
-export const SENPI_ASTRA_ULTRAWORK_DIRECTIVE = joinDirective(1)
+export const SENPI_ASTRA_ULTRAWORK_DIRECTIVE = /* @__PURE__ */ joinDirective(1)
