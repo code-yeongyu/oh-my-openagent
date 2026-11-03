@@ -89,7 +89,8 @@ export function createCliAccountSource(options: {
   readonly home?: string
   /** This host's trust-pin directory: a pin is retired when the keys that earned it are discarded (#12280); absent, none is. */
   readonly pinDir?: string
-  readonly log?: (line: string) => void
+  /** The host's logger: one warning per pin a discard could not retire. */
+  readonly logger?: { warn(line: string): void }
 }): () => Promise<CliDeviceAccount | null> {
   const configured = options.api === undefined ? options.env?.OMO_SERVICE_API_URL : undefined
   let api: string
@@ -102,7 +103,7 @@ export function createCliAccountSource(options: {
   const doFetch = options.fetch ?? fetch
   const pinDir = options.pinDir
   const beforeKeysDiscarded = pinDir === undefined ? async () => undefined
-    : retireSyncPinOnDiscard({ pinDir: () => pinDir, log: options.log ?? (() => undefined) })
+    : retireSyncPinOnDiscard({ pinDir: () => pinDir, log: (line) => options.logger?.warn(line) })
   let active: { readonly generation: string; readonly abort: AbortController } | undefined
   // A keychain waiting for its approval dialog is not a signed-out device: sync defers this pass and retries.
   return async () => {

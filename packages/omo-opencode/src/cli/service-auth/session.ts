@@ -30,7 +30,10 @@ export type DiscardedCredential =
     }
   | { readonly kind: "unreadable" }
 
-export type BeforeKeysDiscarded = (discarded: DiscardedCredential) => Promise<void>
+export type BeforeKeysDiscarded = ((discarded: DiscardedCredential) => Promise<void>) & {
+  /** Whether a sign-in that names no account should have it read before logout revokes the device. */
+  readonly wantsAccount?: () => Promise<boolean>
+}
 
 export const discardedOf = (credentials: Credentials, cause: "refused" | "forget" | "logout" | "replaced"): DiscardedCredential => ({
   kind: "credential", deviceId: credentials.device.id, accountId: credentials.accountId, owner: credentials.owner, cause,
@@ -61,6 +64,12 @@ export function createSession(options: {
     )
   }
   const request = (path: string, init: RequestInit) => requestApi(api, path, init, signal)
+  /** The account a token's sign-in belongs to; undefined when the service does not say (never blocks logout). */
+  const accountOf = async (access: string): Promise<string | undefined> => {
+    const body = await request("/v1/me", { headers: { authorization: `Bearer ${access}` } }).catch(() => null)
+    const id = typeof body === "object" && body !== null && "account" in body && typeof body.account === "object" && body.account !== null && "id" in body.account ? body.account.id : undefined
+    return typeof id === "string" && id !== "" ? id : undefined
+  }
   async function refreshed(current: Credentials): Promise<Credentials> {
     // Legacy state cannot prove the original key, identity and age. Only protocol-2's owned
     // transaction can recover; neither a draft key nor a new key authorizes a legacy resend.
@@ -150,11 +159,15 @@ export function createSession(options: {
     async logout(): Promise<boolean> {
       return locked(async () => {
         let current: Credentials | null = null
+        let account: string | undefined
         try {
           current = await store.readAuthoritative()
           if (current !== null) {
             if (current.refreshState === "uncertain") return false
             const access = Date.parse(current.accessTokenExpiresAt) <= now() ? (await refreshed(current)).accessToken : current.accessToken
+            if (current.accountId === undefined && current.owner === undefined && await beforeKeysDiscarded.wantsAccount?.() === true) {
+              account = await accountOf(access)
+            }
             await request(`/v1/devices/${encodeURIComponent(current.device.id)}`, {
               method: "DELETE", headers: { authorization: `Bearer ${access}` },
             })
@@ -170,7 +183,7 @@ export function createSession(options: {
           await writeSignedOutMarker(markerPath, current?.device.id ?? null)
           // A refresh refusal inside this logout already cleared the store (and retired the pin).
           const stored = current === null ? null : await store.read().catch(() => current)
-          if (stored !== null) await beforeKeysDiscarded(discardedOf(stored, "logout"))
+          if (stored !== null) await beforeKeysDiscarded(discardedOf(stored.accountId === undefined && account !== undefined ? { ...stored, accountId: account } : stored, "logout"))
           await store.clear()
         }
       })

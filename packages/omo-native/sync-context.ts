@@ -1,11 +1,12 @@
 import { resolveMemoryRoot } from "../memory-core/src/identity/layout"
 import { type AccountHttp, createAccountHttp, createPairingHttp, deviceKeyringFromMaterial, type PairingHttp } from "../memory-core/src/sync/account/index.ts"
 import type { DeviceKeyring } from "../memory-core/src/sync/keyring-port"
+import type { SyncOperationAuthority } from "../memory-core/src/sync/operation-authority"
 import { syncPinDir } from "../memory-core/src/sync/pin-dir"
 
 import { signInHint } from "../omo-opencode/src/cli/service-auth/accounts-gate"
 import { type CredentialStore, createCredentialStore, INTERACTIVE_READ_WAIT } from "../omo-opencode/src/cli/service-auth/keystore"
-import { ApiRefusal, serviceOrigin, SignInError } from "../omo-opencode/src/cli/service-auth/protocol"
+import { ApiRefusal, type Credentials, serviceOrigin, SignInError } from "../omo-opencode/src/cli/service-auth/protocol"
 import { createSession } from "../omo-opencode/src/cli/service-auth/session"
 import { retireSyncPinOnDiscard } from "../omo-opencode/src/cli/service-auth/sync-pin-retire"
 
@@ -17,6 +18,11 @@ export interface SyncContext {
   readonly pinDir: string
   readonly chain: AccountHttp
   readonly pairing: PairingHttp
+  /**
+   * Fences every admitted effect (the pin write above all) against the credential this context was
+   * built from: a logout or a different sign-in in another process retires the operation (#12303).
+   */
+  readonly authority: SyncOperationAuthority
 }
 
 export interface SyncContextOptions {
@@ -56,6 +62,22 @@ export async function signedInSyncContext(options: SyncContextOptions): Promise<
     if (current !== null && current.device.id === credentials.device.id && current.accountId === undefined) await store.write({ ...current, accountId: account })
   })
   const http = { baseUrl: api, token, ...(options.fetch === undefined ? {} : { fetch: options.fetch }) }
+  const retired = new AbortController()
+  const captured = (current: Credentials | null) =>
+    current !== null && current.device.id === credentials.device.id && current.signingPrivateKey === credentials.signingPrivateKey
+  const authority: SyncOperationAuthority = {
+    signal: retired.signal,
+    admit: (dispatch) => {
+      retired.signal.throwIfAborted()
+      return dispatch()
+    },
+    boundary: async (dispatch) => (await session.update(async (current) => {
+      if (!captured(current)) retired.abort(new Error("The signed-in device is no longer current."))
+      retired.signal.throwIfAborted()
+      // Box the value: the lock is released after the synchronous dispatch, not an in-flight request.
+      return { value: dispatch() }
+    })).value,
+  }
   return {
     account,
     serviceOrigin: api,
@@ -64,5 +86,6 @@ export async function signedInSyncContext(options: SyncContextOptions): Promise<
     pinDir,
     chain: createAccountHttp(http),
     pairing: createPairingHttp(http),
+    authority,
   }
 }

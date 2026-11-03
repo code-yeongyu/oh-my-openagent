@@ -8,7 +8,7 @@
 import { createHash, randomBytes } from "node:crypto"
 import { join } from "node:path"
 
-import { rename } from "../fs/resilient"
+import { readdir, rename } from "../fs/resilient"
 
 export { resolveMemoryRoot } from "../identity/layout"
 export { syncPinDir } from "./pin-dir"
@@ -16,6 +16,16 @@ export { syncPinDir } from "./pin-dir"
 export const trustAnchorRoot = (pinDir: string): string => join(pinDir, "trust-anchor")
 export const trustAnchorKey = (account: string): string => createHash("sha256").update(account, "utf8").digest("base64url")
 export const trustAnchorDir = (pinDir: string, account: string): string => join(trustAnchorRoot(pinDir), trustAnchorKey(account))
+
+/** Whether any account has a live (not retired) pin under `pinDir`. */
+export const hasLiveTrustAnchor = async (pinDir: string): Promise<boolean> => {
+  try {
+    return (await readdir(trustAnchorRoot(pinDir))).some((name) => !name.includes(".retired-"))
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return false
+    throw error
+  }
+}
 
 export const retireSyncDevice = async (input: { readonly pinDir: string; readonly account: string }): Promise<void> => {
   const dir = trustAnchorDir(input.pinDir, input.account)

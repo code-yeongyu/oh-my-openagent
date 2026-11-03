@@ -74,7 +74,7 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
       const syncStatusChanged: { current?: (repo: string) => void } = {}
       const memoryRoot = resolveMemoryRoot(env, cwd)
       const pinDir = syncPinDir(memoryRoot)
-      const deviceAccount = options.deviceAccount ?? lazyCliAccountSource({ env, pinDir, log: (line) => ctx.logger.warn(line) })
+      const deviceAccount = options.deviceAccount ?? lazyCliAccountSource({ env, pinDir, logger: ctx.logger })
       const syncRunner = options.syncRunner ?? createSyncRunner({
         logger: ctx.logger,
         onStatusChange: (repo) => syncStatusChanged.current?.(repo),

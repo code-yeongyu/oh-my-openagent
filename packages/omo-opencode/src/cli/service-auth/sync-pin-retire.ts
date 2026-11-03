@@ -4,9 +4,9 @@
 // retire is logged and the discard goes on (the degraded outcome is a stale pin, never a stalled
 // sign-out).
 
-import { retireSyncDevice } from "@oh-my-opencode/memory-core/sync-device-retire"
+import { hasLiveTrustAnchor, retireSyncDevice } from "@oh-my-opencode/memory-core/sync-device-retire"
 
-import type { BeforeKeysDiscarded } from "./session"
+import type { BeforeKeysDiscarded, DiscardedCredential } from "./session"
 
 const reason = (error: unknown): string =>
   error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : "unknown"
@@ -17,20 +17,20 @@ export function retireSyncPinOnDiscard(options: {
   /** The caller's own logger; one line per pin it could not retire. */
   readonly log: (line: string) => void
 }): BeforeKeysDiscarded {
-  return async (discarded) => {
+  const hook = async (discarded: DiscardedCredential) => {
     if (discarded.kind === "unreadable") {
       options.log("memory sync: a stored sign-in could not be read while it was replaced; its sync pin was left in place")
       return
     }
+    // A sign-in that names no account never ran `omo sync` here (the usual case): nothing to retire, silently.
     const account = discarded.owner?.accountId ?? discarded.accountId
-    if (account === undefined) {
-      options.log("memory sync: the discarded sign-in names no account; its sync pin was left in place")
-      return
-    }
+    if (account === undefined) return
     try {
       await retireSyncDevice({ pinDir: options.pinDir(), account })
     } catch (error) {
       options.log(`memory sync: the sync pin could not be retired (${reason(error)}); it was left in place`)
     }
   }
+  // A pin earned before the account was stamped on the credential: logout reads the account first.
+  return Object.assign(hook, { wantsAccount: () => hasLiveTrustAnchor(options.pinDir()).catch(() => false) })
 }

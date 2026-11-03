@@ -60,7 +60,7 @@ async function revokedDevice(code: string, options: { readonly onContract?: bool
   await writeFile(pinFile, `${JSON.stringify({ version: 1, account: ACCOUNT, genesis_digest: "x", pinned_by: "pairing", pinned_at: { seq: 2, keyring_link: "y" } })}\n`)
   const logs: string[] = []
   const source = createCliAccountSource({
-    api: `http://127.0.0.1:${http.port}`, store, home: join(root, "home"), pinDir, log: (line) => logs.push(line),
+    api: `http://127.0.0.1:${http.port}`, store, home: join(root, "home"), pinDir, logger: { warn: (line) => logs.push(line) },
     fetch: Object.assign((input: Parameters<typeof fetch>[0], init?: RequestInit) => fetch(input, init), { preconnect: fetch.preconnect }),
   })
   let tokenFn: (() => Promise<string>) | undefined
