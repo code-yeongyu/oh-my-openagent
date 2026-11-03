@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
+import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 
 import type { TaskDaemonHostPort } from "../lazy/senpi-barrel"
@@ -92,6 +92,8 @@ describe("RpcHostRunner launch spec rejection (#9208)", () => {
   posixOnly("#given a group-writable launch spec #when a task and a team member start #then the record, the task error and the team error name the reason, the path and the fix", async () => {
     const host = await fakeHost()
     const specPath = pluginSpec(0o664)
+    const home = homedir()
+    const displaySpecPath = home !== "" && specPath.startsWith(`${home}/`) ? `~${specPath.slice(home.length)}` : specPath
     const runner = runnerOver(host, { ensureDaemon: realEnsure(host, specPath, []) })
     // The manager's process lane receives a ManagedStartSpec; production adapts it to an RPC child
     // spec before the real host runner, so this adapter does the same and keeps its real failure.
@@ -120,12 +122,12 @@ describe("RpcHostRunner launch spec rejection (#9208)", () => {
 
     const message = result.failure?.message ?? ""
     expect(message).toStartWith("member 'echo' failed to start: ")
-    expect(message).toContain(`launch_spec_insecure: ${specPath}`)
-    expect(message).toContain(`chmod 644 ${specPath}`)
+    expect(message).toContain(`launch_spec_insecure: ${displaySpecPath}`)
+    expect(message).toContain(`chmod 644 ${displaySpecPath}`)
     const [record] = store.list().records
     expect(record?.failure_kind).toBe("host_unavailable")
     expect(record?.failure_reason).toBe("launch_spec_insecure")
-    expect(record?.error_message).toContain(`launch_spec_insecure: ${specPath}`)
-    expect(record?.error_message).toContain(`chmod 644 ${specPath}`)
+    expect(record?.error_message).toContain(`launch_spec_insecure: ${displaySpecPath}`)
+    expect(record?.error_message).toContain(`chmod 644 ${displaySpecPath}`)
   })
 })
