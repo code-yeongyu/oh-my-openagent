@@ -65,6 +65,20 @@ describe("createRuntimeFallbackSettings", () => {
     })
   })
 
+  test("#given a `-fast` priority alias primary with a chain #when settings are created #then the chain also answers under the base model senpi starts the alias on", () => {
+    // given / when - senpi runs `vendor/primary-fast` as `vendor/primary` and resolves the chain by the running model
+    const settings = createRuntimeFallbackSettings(caller({}), "vendor/primary-fast", [fallback])
+
+    // then
+    expect(settings.getRetryFallbackSettings()).toMatchObject({
+      modelFallback: true,
+      chains: {
+        "vendor/primary-fast": ["vendor/fallback"],
+        "vendor/primary": ["vendor/fallback"],
+      },
+    })
+  })
+
   test("#given a child retry budget beside the chain #when settings are created #then the same-model budget is overridden and the chain stays enabled", () => {
     // given / when
     const settings = createRuntimeFallbackSettings(caller({}), "vendor/primary", [fallback], { maxRetries: 1 })
