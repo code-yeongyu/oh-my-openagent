@@ -93,9 +93,12 @@ const memfsRepair: MemfsSubcommand = async ({ deps, ctx, identity }) => {
   const hooks = installHooks(repo.dir, { checker: memoryHookChecker() })
   const repaired = await repairMissingSkillNameFrontmatter(repo.dir)
   const report = formatSkillNameFrontmatterRepairReport(repaired)
+  const owned = hooks.filter(({ status }) => status !== "foreign")
+  const foreign = hooks.filter(({ status }) => status === "foreign")
   const lines = [
     `# Memfs repair: ${identity.identity}`,
-    `- reinstalled ${hooks.length} git hook${hooks.length === 1 ? "" : "s"}`,
+    `- reinstalled ${owned.length} git hook${owned.length === 1 ? "" : "s"}`,
+    ...foreign.map(({ name, path }) => `- left ${name} as it is: ${path} was not installed by omo, so omo's memory checks for that stage do not run`),
     `- scanned ${repaired.scanned} skill file${repaired.scanned === 1 ? "" : "s"}`,
   ]
   if (report.length > 0) lines.push(...report.split("\n").map((line) => `- ${line}`))

@@ -139,6 +139,8 @@ export const {
   readFileSync,
   readdirSync,
   realpathSync,
+  renameSync,
+  rmSync,
   statSync,
   unlinkSync,
   writeFileSync,
