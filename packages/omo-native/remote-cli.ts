@@ -22,6 +22,7 @@ import { syncPinDir } from "../memory-core/src/sync/pin-dir"
 import { createCredentialStore, type CredentialStore, SESSION_READ_WAIT } from "../omo-opencode/src/cli/service-auth/keystore"
 import { serviceOrigin } from "../omo-opencode/src/cli/service-auth/protocol"
 import { runAccountVerb } from "./account-cli"
+import { retireSyncPinOnDiscard } from "../omo-opencode/src/cli/service-auth/sync-pin-retire"
 import packageJson from "./package.json" with { type: "json" }
 import { serveRemoteAttach } from "./remote-attach"
 
@@ -247,6 +248,7 @@ async function inProcessAccountShow(): Promise<AccountShowResult> {
         return store
       },
       pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())),
+      beforeKeysDiscarded: retireSyncPinOnDiscard({ pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())), log: () => {} }),
       readStdin: async () => "",
       output: line => lines.push(line),
       error: () => {},

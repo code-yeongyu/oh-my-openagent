@@ -1,4 +1,4 @@
-import { loadTrustAnchor, TrustPinError } from "../crypto/trust-pin.ts"
+import { loadTrustAnchor, rootChangedSinceRetired, TrustPinError } from "../crypto/trust-pin.ts"
 import { creatorAnchor } from "../crypto/anchor.ts"
 import type { DeviceKeyring } from "../keyring-port.ts"
 import { checkSyncOperation, admitSyncOperation, syncOperationSignal, type SyncOperationOptions } from "../operation-authority.ts"
@@ -13,7 +13,7 @@ import { principalOf } from "./join.ts"
 import { accountOperation, pairingOperation } from "./operation-ports.ts"
 
 export type EnableOutcome =
-  | { readonly kind: "joined"; readonly created?: true }
+  | { readonly kind: "joined"; readonly created?: true; readonly rootChanged?: true }
   | { readonly kind: "join_required" }
   | { readonly kind: "needs_first_device" }
 
@@ -82,6 +82,7 @@ export async function enableSync(input: EnableSyncInput): Promise<EnableOutcome>
     }
     const result = await completeGenesis(captured, intent)
     checkSyncOperation(input)
-    return result === "created" ? { kind: "joined", created: true } : { kind: "join_required" }
+    if (result !== "created") return { kind: "join_required" }
+    return (await rootChangedSinceRetired(input.pinDir, input.account, intent.genesisDigest)) ? { kind: "joined", created: true, rootChanged: true } : { kind: "joined", created: true }
   })
 }
