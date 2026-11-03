@@ -2,7 +2,7 @@ import { readFile } from "../fs/resilient"
 import { join } from "node:path"
 
 import { refuseAgreementsViolation } from "./agreements-write-guard"
-import { NoEffectiveChangesError, MemorySecretError, type GitCommitAuthor, type GitMemoryRepo } from "../git"
+import { GitCommandError, NoEffectiveChangesError, MemorySecretError, type GitCommitAuthor, type GitMemoryRepo } from "../git"
 import { StrandedGitLockError } from "../git/repo-lock-sweep"
 import { SOUL_EDIT_RESULT_LINE, touchesSoulPath } from "../soul"
 import type { LockDomain } from "../locks"
@@ -10,7 +10,7 @@ import { claimReceiptTrailers } from "../provenance"
 import type { MemoryToolProvenance } from "./memory"
 import { provenanceStrippedTrailers } from "./claim-frontmatter"
 import { undoBehindKeptLock } from "./rollback-behind-lock"
-import { MemoryToolError } from "./tool-errors"
+import { MemoryToolError, MemoryWriteRefusedError } from "./tool-errors"
 
 export interface CommitMemoryWriteOptions {
   readonly repo: GitMemoryRepo
@@ -52,6 +52,7 @@ export async function commitMemoryWrite(options: CommitMemoryWriteOptions): Prom
     const violation = writer === "memory-tool" ? await refuseAgreementsViolation(repo, paths) : undefined
     if (violation !== undefined) throw new MemoryToolError(violation)
     let result
+    const headBefore = await repo.head()
     try {
       result = await repo.commitWrite(paths, memoryCommitMessage(reason, provenance, writer, provenanceStrippedTrailers(applied.strippedPaths ?? [])), author)
     } catch (error) {
@@ -63,6 +64,11 @@ export async function commitMemoryWrite(options: CommitMemoryWriteOptions): Prom
         throw new MemoryToolError(error.message, { cause: error })
       }
       if (error instanceof StrandedGitLockError) return undoBehindKeptLock(repo, paths, error)
+      // A hook refused the commit: undo this write so one refusal never leaves the repo dirty for every later write.
+      if (error instanceof GitCommandError && error.argv.includes("commit") && (await repo.head()) === headBefore) {
+        await repo.restorePaths(paths)
+        throw new MemoryWriteRefusedError(`the repository's commit hook refused this write, so nothing was saved: ${(error.stdout + error.stderr).trim()}`, { cause: error })
+      }
       throw error
     }
     const shortSha = result.sha.slice(0, 7)

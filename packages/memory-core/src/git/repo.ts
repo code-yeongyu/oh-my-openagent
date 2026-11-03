@@ -18,6 +18,7 @@ import { assertNoUnrelatedChanges } from "./repo-status"
 import { settlePendingRollback } from "./pending-rollback"
 import { assertNoSecretLikeStaging } from "./repo-secret-staging"
 import { withSerializedGitWorktreeMutation } from "./worktree-mutation-queue"
+import { migrateMemoryHooks } from "../memfs/hooks"
 import type {
   GitCommitAuthor,
   GitCommitResult,
@@ -65,7 +66,8 @@ export class GitMemoryRepo {
     this.agentId = options.agentId
     this.exec = options.exec ?? createNodeGitExec()
     this.pathState = new GitPathStateStore(this.dir, this.exec)
-    this.hookInstaller = options.installHooks ?? (() => undefined)
+    // Every writer migrates the omo hooks an older release left behind before it commits (#12221).
+    this.hookInstaller = options.installHooks ?? ((dir) => { migrateMemoryHooks(dir) })
     this.commitTimeoutMs = options.commitTimeoutMs ?? COMMIT_TIMEOUT_MS
     this.reads = new GitRevisionReads({
       dir: this.dir,

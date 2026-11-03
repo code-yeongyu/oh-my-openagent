@@ -1,4 +1,5 @@
 import { getPostCommitHookScript } from "../sync/mirror"
+import { MEMORY_FRONTMATTER_KEYS } from "./frontmatter-keys"
 
 /**
  * Git hook scripts installed into memory repositories, kept as data so the
@@ -83,7 +84,7 @@ export const PRE_COMMIT_HOOK_SCRIPT = `#!/bin/sh
 
 # provenance is the claim receipt the memory tool stamps (#10488); its value is always a quoted JSON string.
 # expires is the instant a file stops being projected (#11450); an unreadable value means no expiry, never a rejection.
-ALL_KNOWN_KEYS="description read_only limit kind aliases provenance expires"
+ALL_KNOWN_KEYS="${MEMORY_FRONTMATTER_KEYS.join(" ")}"
 TAB=$(printf '\\t')
 
 fm_value() {
