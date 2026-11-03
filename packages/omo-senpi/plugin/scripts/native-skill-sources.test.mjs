@@ -51,7 +51,16 @@ describe("createNativeSkillSources", () => {
     assert.deepEqual(withSharedAssets, ["ulw-research"])
 
     const ulwResearch = sources.find(({ name }) => name === "ulw-research")
-    assert.deepEqual(ulwResearch?.sharedAssets, ["scripts", "references/report-gates.md", "references/deliverable-phase.md", "references/report-visualization.md", "references/fact-ledger-grammar.md", "references/fidelity-claim-kinds.md", "references/unit-rules.md", "references/fact-ledger.md"])
+    assert.deepEqual(ulwResearch?.sharedAssets, [
+      "scripts",
+      "references/report-gates.md",
+      "references/deliverable-phase.md",
+      "references/report-visualization.md",
+      "references/fact-ledger-grammar.md",
+      "references/fidelity-claim-kinds.md",
+      "references/unit-rules.md",
+      "references/fact-ledger.md",
+    ])
   })
 
   test("#given each sharedAssets path #when resolved against the shared skill #then it is relative, contained, and exists", () => {
@@ -69,14 +78,26 @@ describe("createNativeSkillSources", () => {
 describe("sharedAssetSourceFor", () => {
   test("#given a path inside a native skill's shared asset #when resolved #then it maps to the shared source it is overlaid from", () => {
     const shipped = join(nativeSkillsRoot, "ulw-research", "references", "report-gates.md")
-    assert.equal(sharedAssetSourceFor(repoRoot, shipped), join(sharedSkillsRoot, "ulw-research", "references", "report-gates.md"))
+    assert.equal(
+      sharedAssetSourceFor(repoRoot, shipped),
+      join(sharedSkillsRoot, "ulw-research", "references", "report-gates.md"),
+    )
     const script = join(nativeSkillsRoot, "ulw-research", "scripts", "report-tools.mjs")
-    assert.equal(sharedAssetSourceFor(repoRoot, script), join(sharedSkillsRoot, "ulw-research", "scripts", "report-tools.mjs"))
+    assert.equal(
+      sharedAssetSourceFor(repoRoot, script),
+      join(sharedSkillsRoot, "ulw-research", "scripts", "report-tools.mjs"),
+    )
   })
 
   test("#given a path outside every shared asset #when resolved #then it is null", () => {
-    assert.equal(sharedAssetSourceFor(repoRoot, join(nativeSkillsRoot, "ulw-research", "references", "missing.md")), null)
-    assert.equal(sharedAssetSourceFor(repoRoot, join(nativeSkillsRoot, "ulw-plan", "references", "report-gates.md")), null)
+    assert.equal(
+      sharedAssetSourceFor(repoRoot, join(nativeSkillsRoot, "ulw-research", "references", "missing.md")),
+      null,
+    )
+    assert.equal(
+      sharedAssetSourceFor(repoRoot, join(nativeSkillsRoot, "ulw-plan", "references", "report-gates.md")),
+      null,
+    )
     assert.equal(sharedAssetSourceFor(repoRoot, join(repoRoot, "omo-senpi", "README.md")), null)
   })
 })

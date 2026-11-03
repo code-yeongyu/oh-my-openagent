@@ -3,7 +3,14 @@
 // the task summary and the last cursor - inside a whole-envelope bound, so a restart never
 // re-explodes the context it is escaping.
 
-import { escapeText, openTag, renderContract, renderTask, resolveCaps, type KibitzerFieldCaps } from "./sidecar-prompt-blocks"
+import {
+  escapeText,
+  openTag,
+  renderContract,
+  renderTask,
+  resolveCaps,
+  type KibitzerFieldCaps,
+} from "./sidecar-prompt-blocks"
 
 /** Bound on a whole reseed envelope: a restart must never re-explode the context it is escaping. */
 export const KIBITZER_RESEED_MAX_CHARS = 4000
@@ -49,7 +56,11 @@ export function renderKibitzerReseedPrompt(input: KibitzerReseedInput): string {
   const delivered = input.deliveredPaths.map((path) => `<path>${escapeText(path)}</path>`)
   // The fixed part is measured with the largest omitted counts the lists can produce, so the
   // rendered envelope can only be shorter than the length this budget was computed from.
-  const fixed = reseedEnvelope(head, { lines: [], total: rejected.length }, { lines: [], total: delivered.length }).length
+  const fixed = reseedEnvelope(
+    head,
+    { lines: [], total: rejected.length },
+    { lines: [], total: delivered.length },
+  ).length
   const budget = bound - fixed
   const keptRejected = fitLines(rejected, Math.floor(budget / 2))
   const keptDelivered = fitLines(delivered, budget - keptRejected.used)
@@ -75,7 +86,10 @@ function reseedEnvelope(
 }
 
 function renderPathList(tag: string, lines: readonly string[], total: number): string {
-  const open = openTag(tag, [["count", lines.length], ["omitted", total - lines.length]])
+  const open = openTag(tag, [
+    ["count", lines.length],
+    ["omitted", total - lines.length],
+  ])
   return lines.length === 0 ? `${open}</${tag}>` : [open, ...lines, `</${tag}>`].join("\n")
 }
 

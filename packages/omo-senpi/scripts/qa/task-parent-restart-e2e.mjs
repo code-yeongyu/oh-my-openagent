@@ -21,10 +21,7 @@ import {
   seedResumeProject,
   startResumeRun,
 } from "./resume-e2e-runtime.mjs"
-import {
-  MIDTURN_CONTINUED_TOKEN,
-  resumeOmoConfig,
-} from "./task-resume-e2e-scenarios.mjs"
+import { MIDTURN_CONTINUED_TOKEN, resumeOmoConfig } from "./task-resume-e2e-scenarios.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(scriptDir, "../../../..")
@@ -51,10 +48,7 @@ function crashRunScript(sentinel) {
 
 function replacementRunScript(sentinel) {
   return {
-    parentSteps: [
-      bash(waitForFileEventCommand(sentinel)),
-      text("replacement parent settled"),
-    ],
+    parentSteps: [bash(waitForFileEventCommand(sentinel)), text("replacement parent settled")],
   }
 }
 
@@ -100,7 +94,8 @@ async function runScenario(options) {
     const initialRecordPromise = waitForState(
       sandbox.root,
       () => findTaskByName(sandbox, "restartchild"),
-      (record) => record !== undefined && record.status === "running" && childSessionHasAssistant(sandbox, record.task_id),
+      (record) =>
+        record !== undefined && record.status === "running" && childSessionHasAssistant(sandbox, record.task_id),
       DEFAULT_TIMEOUT_MS,
       stateAbort.signal,
     )

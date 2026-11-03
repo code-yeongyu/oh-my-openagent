@@ -10,9 +10,16 @@ describe("the root types entry declares every diagnostic the runtime emits", () 
     const project = join(packageDir, "test-fixtures", "root-types", "tsconfig.json")
 
     // when
-    const result = Bun.spawnSync([process.execPath, tsgo, "--noEmit", "-p", project], { cwd: packageDir, stdout: "pipe", stderr: "pipe" })
+    const result = Bun.spawnSync([process.execPath, tsgo, "--noEmit", "-p", project], {
+      cwd: packageDir,
+      stdout: "pipe",
+      stderr: "pipe",
+    })
 
     // then
-    expect({ exitCode: result.exitCode, output: `${result.stdout.toString()}${result.stderr.toString()}` }).toEqual({ exitCode: 0, output: "" })
+    expect({ exitCode: result.exitCode, output: `${result.stdout.toString()}${result.stderr.toString()}` }).toEqual({
+      exitCode: 0,
+      output: "",
+    })
   }, 60_000)
 })

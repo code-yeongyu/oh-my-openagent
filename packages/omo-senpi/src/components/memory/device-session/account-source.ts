@@ -20,7 +20,12 @@ import { deviceKeyringFromMaterial } from "@oh-my-opencode/memory-core/sync-acco
 import { cliAccountOperation, scopedCliKeyring } from "./cli-account-operation"
 
 import type { DeviceKeyMaterial, DeviceKeyring } from "@oh-my-opencode/memory-core/keyring"
-import type { DesktopSyncDescriptor, SyncOperationAuthority, DesktopSyncOperation, DesktopSyncAccount } from "@oh-my-opencode/memory-core/sync-engine"
+import type {
+  DesktopSyncDescriptor,
+  SyncOperationAuthority,
+  DesktopSyncOperation,
+  DesktopSyncAccount,
+} from "@oh-my-opencode/memory-core/sync-engine"
 
 import { SyncConfigError } from "../sync-config-error"
 import { SyncSessionDeferredError } from "../sync-session-deferred"
@@ -43,12 +48,23 @@ export interface CliDeviceAccount {
   readonly isCurrent: () => Promise<boolean>
 }
 
-export type { DesktopSyncDescriptor, SyncDevice, SyncOperationAuthority, DesktopSyncOperation, DesktopSyncAccount } from "@oh-my-opencode/memory-core/sync-engine"
+export type {
+  DesktopSyncDescriptor,
+  SyncDevice,
+  SyncOperationAuthority,
+  DesktopSyncOperation,
+  DesktopSyncAccount,
+} from "@oh-my-opencode/memory-core/sync-engine"
 
 /** A desktop host whose private sync channel is missing or refused: sync stays idle and diagnosable, never the CLI. */
 export interface DesktopSyncUnavailable {
   readonly kind: "unavailable"
-  readonly reason: "private_channel_unavailable" | "platform_not_supported" | "port_absent" | "selection_failed" | "host_bootstrap_absent"
+  readonly reason:
+    | "private_channel_unavailable"
+    | "platform_not_supported"
+    | "port_absent"
+    | "selection_failed"
+    | "host_bootstrap_absent"
 }
 
 export type DeviceAccount = CliDeviceAccount | DesktopSyncAccount | DesktopSyncUnavailable
@@ -58,7 +74,8 @@ export const DEFAULT_SERVICE_API = "https://api.omo.dev"
 
 const base64url = (base64: string): string => Buffer.from(base64, "base64").toString("base64url")
 
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value)
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
 
 async function accountIdOf(api: string, token: string, doFetch: typeof fetch): Promise<string> {
   const response = await doFetch(`${api}/v1/me`, { headers: { authorization: `Bearer ${token}` } })
@@ -77,8 +94,10 @@ async function currentDeviceOf(api: string, token: string, doFetch: typeof fetch
   return currentServiceDevice(await response.json())
 }
 
-const sameKeys = (a: Credentials, b: Credentials): boolean => a.device.id === b.device.id
-  && a.signingPrivateKey === b.signingPrivateKey && a.sealingPrivateKey === b.sealingPrivateKey
+const sameKeys = (a: Credentials, b: Credentials): boolean =>
+  a.device.id === b.device.id &&
+  a.signingPrivateKey === b.signingPrivateKey &&
+  a.sealingPrivateKey === b.sealingPrivateKey
 
 export function createCliAccountSource(options: {
   readonly api?: string
@@ -112,7 +131,12 @@ export function createCliAccountSource(options: {
     try {
       // A host runs under a TUI: the CLI's keyring-fallback notice must not write over it, and the fallback is
       // the same libsecret path the CLI uses (#10658 review).
-      store = options.store ?? createCredentialStore(api, { notice: quietNotice, ...(options.home === undefined ? {} : { home: options.home }) })
+      store =
+        options.store ??
+        createCredentialStore(api, {
+          notice: quietNotice,
+          ...(options.home === undefined ? {} : { home: options.home }),
+        })
       credentials = await store.read()
     } catch (error) {
       if (error instanceof KeychainApprovalPendingError) throw error
@@ -121,36 +145,42 @@ export function createCliAccountSource(options: {
       if (error instanceof SignInError) return null
       throw error
     }
-    if (credentials === null) { active?.abort.abort(); active = undefined; return null }
+    if (credentials === null) {
+      active?.abort.abort()
+      active = undefined
+      return null
+    }
     const session = createSession({ api, store, ...(options.home === undefined ? {} : { home: options.home }) })
     // One credential transaction captures a concrete generation before the first token or identity await: a legacy
     // credential is stamped and re-read under the lock, so an absent generation is never a wildcard afterwards.
-    const initial = await session.update(async current => {
+    const initial = await session.update(async (current) => {
       if (current === null || current.credentialGeneration !== undefined) return current
       await store.write({ ...current, credentialGeneration: randomUUID() })
       return store.readAuthoritative()
     })
     if (initial === null || initial.credentialGeneration === undefined) return null
     const generation = initial.credentialGeneration
-    const sameGeneration = (current: Credentials): boolean => sameKeys(current, initial) && current.credentialGeneration === generation
+    const sameGeneration = (current: Credentials): boolean =>
+      sameKeys(current, initial) && current.credentialGeneration === generation
     let accountId: string
     try {
       const token = await session.accessToken(sameGeneration)
       accountId = await accountIdOf(api, token, doFetch)
       // The token must authenticate the captured device; another generation's reply is discarded, never persisted.
-      if (await currentDeviceOf(api, token, doFetch) !== initial.device.id) return null
+      if ((await currentDeviceOf(api, token, doFetch)) !== initial.device.id) return null
     } catch (error) {
       if (error instanceof CredentialIdentityChanged) return null
       throw error
     }
-    credentials = await session.update(async current => {
+    credentials = await session.update(async (current) => {
       if (current === null || !sameGeneration(current)) return null
       if (current.accountId === accountId) return current
       if (current.accountId !== undefined) return null
       await store.write({ ...current, accountId })
       return store.readAuthoritative()
     })
-    if (credentials === null || credentials.credentialGeneration !== generation || credentials.accountId !== accountId) return null
+    if (credentials === null || credentials.credentialGeneration !== generation || credentials.accountId !== accountId)
+      return null
     const captured = credentials
     // A refusal aborts only the operations that saw it: a capture that re-reads the same generation and keys under the
     // lock gets a live controller, so one transiently empty read never leaves sync off until restart (#11812).
@@ -159,17 +189,20 @@ export function createCliAccountSource(options: {
       active = { generation, abort: new AbortController() }
     }
     const abort = active.abort
-    const sameCaptured = (current: Credentials | null): boolean => current !== null && current.accountId === accountId
-      && current.credentialGeneration === generation && sameKeys(current, captured)
+    const sameCaptured = (current: Credentials | null): boolean =>
+      current !== null &&
+      current.accountId === accountId &&
+      current.credentialGeneration === generation &&
+      sameKeys(current, captured)
     const isCurrent = async (): Promise<boolean> => {
       if (abort.signal.aborted) return false
-      const current = await session.update(async stored => stored)
+      const current = await session.update(async (stored) => stored)
       const same = sameCaptured(current)
       if (!same) abort.abort()
       return same && !abort.signal.aborted
     }
     const boundary = async <T>(dispatch: () => T): Promise<T> => {
-      const result = await session.update(current => {
+      const result = await session.update((current) => {
         if (abort.signal.aborted || !sameCaptured(current)) {
           abort.abort()
           throw new Error("The CLI sync account is no longer current.")
@@ -179,7 +212,9 @@ export function createCliAccountSource(options: {
       })
       return result.value
     }
-    const check = async () => { if (!await isCurrent()) throw new Error("The CLI sync account is no longer current.") }
+    const check = async () => {
+      if (!(await isCurrent())) throw new Error("The CLI sync account is no longer current.")
+    }
     const accessToken = async () => {
       await check()
       let token: string
@@ -192,28 +227,50 @@ export function createCliAccountSource(options: {
       await check()
       return token
     }
-    const material = { signingPrivatePkcs8: base64url(captured.signingPrivateKey), sealingPrivatePkcs8: base64url(captured.sealingPrivateKey) }
+    const material = {
+      signingPrivatePkcs8: base64url(captured.signingPrivateKey),
+      sealingPrivatePkcs8: base64url(captured.sealingPrivateKey),
+    }
     const raw = await deviceKeyringFromMaterial(material)
     await check()
     const descriptor: DesktopSyncDescriptor = {
-      genesis: "unsupported", rpId: null, userName: null,
-      serviceOrigin: api, accountId, serviceDeviceId: captured.device.id,
-      syncPrincipalId: raw.principal().id, publicKeys: raw.publicKeys(), generation, incarnation: "cli",
+      genesis: "unsupported",
+      rpId: null,
+      userName: null,
+      serviceOrigin: api,
+      accountId,
+      serviceDeviceId: captured.device.id,
+      syncPrincipalId: raw.principal().id,
+      publicKeys: raw.publicKeys(),
+      generation,
+      incarnation: "cli",
     }
     const authority: SyncOperationAuthority = {
       signal: abort.signal,
-      admit: effect => { abort.signal.throwIfAborted(); return effect() },
+      admit: (effect) => {
+        abort.signal.throwIfAborted()
+        return effect()
+      },
     }
     return {
       kind: "cli",
       descriptor,
       signal: abort.signal,
       boundary,
-      forOperation: owner => cliAccountOperation({ descriptor, lifetime: abort.signal, isCurrent, boundary, accessToken, keyring: raw, fetch: doFetch }, owner),
+      forOperation: (owner) =>
+        cliAccountOperation(
+          { descriptor, lifetime: abort.signal, isCurrent, boundary, accessToken, keyring: raw, fetch: doFetch },
+          owner,
+        ),
       api,
       accountId,
       serviceDeviceId: captured.device.id,
-      keyring: async build => { await check(); const keyring = await build(material); await check(); return scopedCliKeyring(keyring, check, authority, boundary) },
+      keyring: async (build) => {
+        await check()
+        const keyring = await build(material)
+        await check()
+        return scopedCliKeyring(keyring, check, authority, boundary)
+      },
       accessToken,
       isCurrent,
       signedOut: async () => {

@@ -5,16 +5,12 @@ import { basename, dirname, join } from "node:path"
 import { rmSyncEfaultTolerant } from "./teardown.test-support"
 
 import type { ReflectionSpawnArgs } from "./worker/spawn"
-import {
-  buildSandboxTransform,
-  SandboxUnavailableError,
-  type SandboxPolicy,
-  type SandboxUsability,
-} from "./sandbox"
+import { buildSandboxTransform, SandboxUnavailableError, type SandboxPolicy, type SandboxUsability } from "./sandbox"
 
 const roots: string[] = []
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  for (const root of roots.splice(0))
+    rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
 /**
@@ -71,11 +67,14 @@ function spawnArgs(worktree: string): ReflectionSpawnArgs {
   }
 }
 
-function build(policy: SandboxPolicy, options: {
-  readonly platform?: NodeJS.Platform
-  readonly which?: (command: string) => string | undefined
-  readonly probe?: (executable: string) => SandboxUsability
-} = {}) {
+function build(
+  policy: SandboxPolicy,
+  options: {
+    readonly platform?: NodeJS.Platform
+    readonly which?: (command: string) => string | undefined
+    readonly probe?: (executable: string) => SandboxUsability
+  } = {},
+) {
   const setup = fixture()
   return {
     setup,
@@ -132,10 +131,20 @@ describe("reflection worker OS sandbox", () => {
       const denied = join(setup.parentRepo, "denied.txt")
 
       // when
-      const allowedRun = unwrapTransformResult(transform({ ...spawnArgs(setup.worktree), args: ["-c", `echo allowed > '${allowed}'`] }))
-      const allowedResult = Bun.spawnSync([allowedRun.command, ...allowedRun.args], { cwd: allowedRun.cwd, env: allowedRun.env })
-      const deniedRun = unwrapTransformResult(transform({ ...spawnArgs(setup.worktree), args: ["-c", `echo denied > '${denied}'`] }))
-      const deniedResult = Bun.spawnSync([deniedRun.command, ...deniedRun.args], { cwd: deniedRun.cwd, env: deniedRun.env })
+      const allowedRun = unwrapTransformResult(
+        transform({ ...spawnArgs(setup.worktree), args: ["-c", `echo allowed > '${allowed}'`] }),
+      )
+      const allowedResult = Bun.spawnSync([allowedRun.command, ...allowedRun.args], {
+        cwd: allowedRun.cwd,
+        env: allowedRun.env,
+      })
+      const deniedRun = unwrapTransformResult(
+        transform({ ...spawnArgs(setup.worktree), args: ["-c", `echo denied > '${denied}'`] }),
+      )
+      const deniedResult = Bun.spawnSync([deniedRun.command, ...deniedRun.args], {
+        cwd: deniedRun.cwd,
+        env: deniedRun.env,
+      })
 
       // then
       expect(allowedResult.exitCode).toBe(0)
@@ -169,7 +178,9 @@ describe("reflection worker OS sandbox", () => {
 
     // then
     expect(profile).toContain("(allow default)")
-    expect(profile).toContain(`(allow file-read* (literal ${JSON.stringify(realpathSync(setup.payloadPaths[0] ?? ""))}))`)
+    expect(profile).toContain(
+      `(allow file-read* (literal ${JSON.stringify(realpathSync(setup.payloadPaths[0] ?? ""))}))`,
+    )
     expect(profile).toContain(`(deny file-read* (subpath ${JSON.stringify(realpathSync(foreignRoot))}))`)
     expect(transformed.env.TMPDIR).toBe(join(realpathSync(dirname(setup.payloadPaths[0] ?? "")), ".sandbox-tmp"))
   }, 30_000)
@@ -210,13 +221,26 @@ describe("reflection worker OS sandbox", () => {
     expect(transform.wasSandboxed).toBe(true)
     expect(transformed.command).toBe("/usr/bin/bwrap")
     expect(transformed.args).toEqual([
-      "--ro-bind", "/", "/",
-      "--dev-bind", "/dev", "/dev",
-      "--tmpfs", "/tmp",
-      "--bind", realpathSync(setup.worktree), realpathSync(setup.worktree),
-      "--bind", realpathSync(setup.gitCommonDir), realpathSync(setup.gitCommonDir),
-      "--chdir", setup.worktree,
-      "--", "/bin/sh", "-c", "exit 0",
+      "--ro-bind",
+      "/",
+      "/",
+      "--dev-bind",
+      "/dev",
+      "/dev",
+      "--tmpfs",
+      "/tmp",
+      "--bind",
+      realpathSync(setup.worktree),
+      realpathSync(setup.worktree),
+      "--bind",
+      realpathSync(setup.gitCommonDir),
+      realpathSync(setup.gitCommonDir),
+      "--chdir",
+      setup.worktree,
+      "--",
+      "/bin/sh",
+      "-c",
+      "exit 0",
     ])
   }, 30_000)
 
@@ -279,16 +303,17 @@ describe("reflection worker OS sandbox", () => {
     const setup = fixture()
 
     // when
-    const buildRequired = () => buildSandboxTransform({
-      policy: "required",
-      worktreeDir: setup.worktree,
-      gitCommonDir: setup.gitCommonDir,
-      payloadPaths: setup.payloadPaths,
-      command: "/bin/sh",
-      env: { PATH: process.env.PATH },
-      platform: "linux",
-      which: () => undefined,
-    })
+    const buildRequired = () =>
+      buildSandboxTransform({
+        policy: "required",
+        worktreeDir: setup.worktree,
+        gitCommonDir: setup.gitCommonDir,
+        payloadPaths: setup.payloadPaths,
+        command: "/bin/sh",
+        env: { PATH: process.env.PATH },
+        platform: "linux",
+        which: () => undefined,
+      })
 
     // then
     expect(buildRequired).toThrow(SandboxUnavailableError)
@@ -306,12 +331,19 @@ describe("reflection worker OS sandbox", () => {
     // then
     expect(transformed).toBe(original)
     expect(transform.wasSandboxed).toBe(false)
-    expect(transform.warning).toBe("reflection sandbox unavailable on linux: bwrap not found; running unsandboxed because policy is auto")
+    expect(transform.warning).toBe(
+      "reflection sandbox unavailable on linux: bwrap not found; running unsandboxed because policy is auto",
+    )
   }, 30_000)
 
   test("#given off policy #when the transform is built and used #then detection is skipped and spawn arguments pass through", () => {
     // given
-    const { setup, transform } = build("off", { platform: "linux", which: () => { throw new Error("must not detect") } })
+    const { setup, transform } = build("off", {
+      platform: "linux",
+      which: () => {
+        throw new Error("must not detect")
+      },
+    })
     const original = spawnArgs(setup.worktree)
 
     // when
@@ -348,17 +380,18 @@ describe("reflection worker OS sandbox", () => {
     const setup = fixture()
 
     // when
-    const buildRequired = () => buildSandboxTransform({
-      policy: "required",
-      worktreeDir: setup.worktree,
-      gitCommonDir: setup.gitCommonDir,
-      payloadPaths: setup.payloadPaths,
-      command: "/bin/sh",
-      env: { PATH: process.env.PATH },
-      platform: "linux",
-      which: () => "/usr/bin/bwrap",
-      probe: () => ({ usable: false, reason: "smoke test exited 1: bwrap: setting up uid map: Permission denied" }),
-    })
+    const buildRequired = () =>
+      buildSandboxTransform({
+        policy: "required",
+        worktreeDir: setup.worktree,
+        gitCommonDir: setup.gitCommonDir,
+        payloadPaths: setup.payloadPaths,
+        command: "/bin/sh",
+        env: { PATH: process.env.PATH },
+        platform: "linux",
+        which: () => "/usr/bin/bwrap",
+        probe: () => ({ usable: false, reason: "smoke test exited 1: bwrap: setting up uid map: Permission denied" }),
+      })
 
     // then
     expect(buildRequired).toThrow(SandboxUnavailableError)
@@ -387,7 +420,9 @@ describe("reflection worker OS sandbox", () => {
     const { setup, transform } = build("off", {
       platform: "linux",
       which: () => "/usr/bin/bwrap",
-      probe: () => { throw new Error("must not probe when policy is off") },
+      probe: () => {
+        throw new Error("must not probe when policy is off")
+      },
     })
     const original = spawnArgs(setup.worktree)
 
@@ -404,7 +439,9 @@ describe("reflection worker OS sandbox", () => {
     const { setup, transform } = build("auto", {
       platform: "linux",
       which: () => undefined,
-      probe: () => { throw new Error("must not probe an unresolved executable") },
+      probe: () => {
+        throw new Error("must not probe an unresolved executable")
+      },
     })
     const original = spawnArgs(setup.worktree)
 
@@ -421,7 +458,9 @@ describe("reflection worker OS sandbox", () => {
     const { setup, transform } = build("required", {
       platform: "darwin",
       which: () => "/usr/bin/sandbox-exec",
-      probe: () => { throw new Error("must not probe on darwin") },
+      probe: () => {
+        throw new Error("must not probe on darwin")
+      },
     })
 
     // when

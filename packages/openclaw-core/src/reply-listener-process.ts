@@ -71,10 +71,7 @@ type ProcessProbe = {
 }
 
 type ReplyListenerProcessDeps = {
-  readonly spawn: (
-    command: string[],
-    options: { readonly stdout: "pipe"; readonly stderr: "ignore" },
-  ) => ProcessProbe
+  readonly spawn: (command: string[], options: { readonly stdout: "pipe"; readonly stderr: "ignore" }) => ProcessProbe
   readonly platform?: typeof process.platform
   readonly readProcCmdline?: (pid: number) => string
 }
@@ -114,8 +111,7 @@ export async function isReplyListenerDaemonProcessWithDeps(
     const platform = deps.platform ?? process.platform
     if (platform === "linux") {
       const readProcCmdline =
-        deps.readProcCmdline ??
-        ((targetPid) => readFileSync(`/proc/${targetPid}/cmdline`, "utf-8"))
+        deps.readProcCmdline ?? ((targetPid) => readFileSync(`/proc/${targetPid}/cmdline`, "utf-8"))
       const cmdline = readProcCmdline(pid)
       return cmdline.includes(REPLY_LISTENER_DAEMON_IDENTITY_MARKER)
     }

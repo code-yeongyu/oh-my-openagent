@@ -8,14 +8,42 @@ const AT = "2026-09-06T00:00:00.000Z"
 
 export function seedRun(stateDir, runId, owner, holder) {
   const prompt = "Synthetic already-completed work; no child execution required."
-  const definition = { key: runId, name: runId, nodes: [{ id: "done", prompt, effectivePrompt: prompt, category: "quick" }] }
+  const definition = {
+    key: runId,
+    name: runId,
+    nodes: [{ id: "done", prompt, effectivePrompt: prompt, category: "quick" }],
+  }
   const record = {
-    schemaVersion: 1, checkpointSeq: 0, runId, runKey: runId, name: runId,
-    parentSessionId: owner, rootSessionId: owner, definitionFingerprint: "synthetic-settled-fixture",
-    definition, status: "paused", generation: 1, createdAt: AT, updatedAt: AT,
-    nodes: [{ id: "done", prompt, route: { kind: "category", category: "quick" }, dependsOn: [],
-      state: "completed", attempt: 1, createdAt: AT, completedAt: AT }],
-    edges: [], waves: [{ index: 0, nodeIds: ["done"] }], criticalPath: ["done"], bottlenecks: [], diagnostics: [],
+    schemaVersion: 1,
+    checkpointSeq: 0,
+    runId,
+    runKey: runId,
+    name: runId,
+    parentSessionId: owner,
+    rootSessionId: owner,
+    definitionFingerprint: "synthetic-settled-fixture",
+    definition,
+    status: "paused",
+    generation: 1,
+    createdAt: AT,
+    updatedAt: AT,
+    nodes: [
+      {
+        id: "done",
+        prompt,
+        route: { kind: "category", category: "quick" },
+        dependsOn: [],
+        state: "completed",
+        attempt: 1,
+        createdAt: AT,
+        completedAt: AT,
+      },
+    ],
+    edges: [],
+    waves: [{ index: 0, nodeIds: ["done"] }],
+    criticalPath: ["done"],
+    bottlenecks: [],
+    diagnostics: [],
     ...(holder === undefined ? {} : { previousLeaseHolderPid: holder }),
   }
   for (const [path, body] of [
@@ -43,17 +71,31 @@ export function snapshot(stateDir) {
     for (const entry of readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
       const path = join(dir, entry.name)
       if (entry.isDirectory()) visit(path)
-      else if (entry.isFile()) files[toPosixKey(relative(stateDir, path))] = createHash("sha256").update(readFileSync(path)).digest("hex")
+      else if (entry.isFile())
+        files[toPosixKey(relative(stateDir, path))] = createHash("sha256").update(readFileSync(path)).digest("hex")
     }
   }
   visit(stateDir)
   const runsDir = join(stateDir, "dag", "runs")
-  const runs = existsSync(runsDir) ? readdirSync(runsDir).filter((name) => name.endsWith(".json"))
-    .map((name) => JSON.parse(readFileSync(join(runsDir, name), "utf8"))) : []
-  const events = Object.fromEntries(runs.map((run) => {
-    const path = join(stateDir, "dag", "events", `${run.runId}.jsonl`)
-    return [run.runId, existsSync(path) ? readFileSync(path, "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line)) : []]
-  }))
+  const runs = existsSync(runsDir)
+    ? readdirSync(runsDir)
+        .filter((name) => name.endsWith(".json"))
+        .map((name) => JSON.parse(readFileSync(join(runsDir, name), "utf8")))
+    : []
+  const events = Object.fromEntries(
+    runs.map((run) => {
+      const path = join(stateDir, "dag", "events", `${run.runId}.jsonl`)
+      return [
+        run.runId,
+        existsSync(path)
+          ? readFileSync(path, "utf8")
+              .split("\n")
+              .filter(Boolean)
+              .map((line) => JSON.parse(line))
+          : [],
+      ]
+    }),
+  )
   return { files, runs, events }
 }
 
@@ -66,7 +108,10 @@ export async function registerFixture(pi, createTaskComponent) {
     const current = ctx.sessionManager.getSessionId()
     const phase = event.reason === "fork" ? "fork" : config.phase
     const ids = []
-    const seed = (id, owner, holder) => { seedRun(config.stateDir, id, owner, holder); ids.push(id) }
+    const seed = (id, owner, holder) => {
+      seedRun(config.stateDir, id, owner, holder)
+      ids.push(id)
+    }
     if (phase === "unrelated") {
       seed("a-dead", SESSION_A, config.deadPid)
       seed("a-self", SESSION_A, process.pid)
@@ -90,13 +135,15 @@ export async function registerFixture(pi, createTaskComponent) {
     before = { phase, event, current, ids: state.runs.map((run) => run.runId), seededIds: ids, state }
     emit({ kind: "before", ...before })
   })
-  const logger = Object.fromEntries(["info", "warn", "error", "debug"].map((level) =>
-    [level, (...args) => emit({ kind: "log", level, args })]))
+  const logger = Object.fromEntries(
+    ["info", "warn", "error", "debug"].map((level) => [level, (...args) => emit({ kind: "log", level, args })]),
+  )
   await createTaskComponent().register(pi, { logger })
   pi.on("session_start", () => {
     emit({ kind: "after", phase: before.phase, state: snapshot(config.stateDir) })
     // RPC replacement responses precede deferred binding; signal only after the real hook settles.
-    if (config.readyFd !== undefined) writeSync(config.readyFd, `${JSON.stringify({ type: "qa_scope_ready", phase: before.phase })}\n`)
+    if (config.readyFd !== undefined)
+      writeSync(config.readyFd, `${JSON.stringify({ type: "qa_scope_ready", phase: before.phase })}\n`)
   })
   pi.registerCommand("qa-owner-ready", {
     description: "Local synthetic DAG scope QA readiness check",

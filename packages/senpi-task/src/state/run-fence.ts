@@ -34,5 +34,5 @@ export const LEGACY_RUN_START_EPOCH = -1
 
 // The run_start_epoch of the record's current run, or LEGACY_RUN_START_EPOCH for a pre-field record.
 export function currentRunStartEpoch(record: TaskRecord | null): number | undefined {
-  return record === null ? undefined : record.run_start_epoch ?? LEGACY_RUN_START_EPOCH
+  return record === null ? undefined : (record.run_start_epoch ?? LEGACY_RUN_START_EPOCH)
 }

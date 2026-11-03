@@ -8,7 +8,9 @@ mock.module("../shared/logger", () => ({
   log: logMock,
 }))
 
-afterAll(() => { mock.restore() })
+afterAll(() => {
+  mock.restore()
+})
 
 const { createPreemptiveCompactionHook } = await import("./preemptive-compaction")
 
@@ -51,11 +53,7 @@ function appendAssistantHistory(
   })
 }
 
-function buildAssistantUpdate(input: {
-  sessionID: string
-  id: string
-  parts: unknown[]
-}) {
+function buildAssistantUpdate(input: { sessionID: string; id: string; parts: unknown[] }) {
   return {
     event: {
       type: "message.updated",

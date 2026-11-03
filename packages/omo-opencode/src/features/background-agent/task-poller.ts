@@ -20,12 +20,7 @@ import { isActiveSessionStatus } from "./session-status-classifier"
 import { getSessionActivityFromClient, type SessionActivityResolver } from "./session-activity"
 import { refreshTaskActivityFromSession } from "./task-activity-refresh"
 
-const TERMINAL_TASK_STATUSES = new Set<BackgroundTask["status"]>([
-  "completed",
-  "error",
-  "cancelled",
-  "interrupt",
-])
+const TERMINAL_TASK_STATUSES = new Set<BackgroundTask["status"]>(["completed", "error", "cancelled", "interrupt"])
 
 export function pruneStaleTasksAndNotifications(args: {
   tasks: Map<string, BackgroundTask>
@@ -81,12 +76,9 @@ export function pruneStaleTasksAndNotifications(args: {
       continue
     }
 
-    const lastActivity = task.status === "running" && task.progress?.lastUpdate
-      ? task.progress.lastUpdate.getTime()
-      : undefined
-    const timestamp = task.status === "pending"
-      ? task.queuedAt?.getTime()
-      : (lastActivity ?? task.startedAt?.getTime())
+    const lastActivity =
+      task.status === "running" && task.progress?.lastUpdate ? task.progress.lastUpdate.getTime() : undefined
+    const timestamp = task.status === "pending" ? task.queuedAt?.getTime() : (lastActivity ?? task.startedAt?.getTime())
 
     if (!timestamp) continue
 
@@ -94,9 +86,10 @@ export function pruneStaleTasksAndNotifications(args: {
     if (age <= effectiveTtl) continue
 
     const ttlMinutes = Math.round(effectiveTtl / 60000)
-    const errorMessage = task.status === "pending"
-      ? `Task timed out while queued (${ttlMinutes} minutes)`
-      : `Task timed out after ${ttlMinutes} minutes of inactivity`
+    const errorMessage =
+      task.status === "pending"
+        ? `Task timed out while queued (${ttlMinutes} minutes)`
+        : `Task timed out after ${ttlMinutes} minutes of inactivity`
 
     onTaskPruned(taskId, task, errorMessage)
   }
@@ -217,8 +210,8 @@ export async function checkAndInterruptStaleTasks(args: {
   const now = Date.now()
 
   const messageStalenessMs = config?.messageStalenessTimeoutMs ?? DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS
-  const getSessionActivity = args.getSessionActivity
-    ?? ((id: string) => getSessionActivityFromClient(client, id, directory))
+  const getSessionActivity =
+    args.getSessionActivity ?? ((id: string) => getSessionActivityFromClient(client, id, directory))
   const staleInterruptions: Array<Promise<void>> = []
 
   for (const task of tasks) {
@@ -240,9 +233,8 @@ export async function checkAndInterruptStaleTasks(args: {
 
     const sessionGone = sessionMissing && (task.consecutiveMissedPolls ?? 0) >= MIN_SESSION_GONE_POLLS
     const shouldSkipInactivityTimeout = task.teamRunId !== undefined && !sessionGone
-    const shouldRefreshFromSessionActivity = !sessionGone
-      && sessionStatus !== undefined
-      && isActiveSessionStatus(sessionStatus)
+    const shouldRefreshFromSessionActivity =
+      !sessionGone && sessionStatus !== undefined && isActiveSessionStatus(sessionStatus)
 
     if (!task.progress?.lastUpdate) {
       if (shouldSkipInactivityTimeout) continue
@@ -297,8 +289,9 @@ export async function checkAndInterruptStaleTasks(args: {
     if (shouldRefreshFromSessionActivity) {
       const activityRefresh = await refreshTaskActivityFromSession(task, getSessionActivity)
       if (activityRefresh.type === "unavailable") continue
-      const refreshedLastUpdate = task.progress?.lastUpdate.getTime()
-        ?? (activityRefresh.type === "activity" ? activityRefresh.activityTime : undefined)
+      const refreshedLastUpdate =
+        task.progress?.lastUpdate.getTime() ??
+        (activityRefresh.type === "activity" ? activityRefresh.activityTime : undefined)
       if (refreshedLastUpdate !== undefined && now - refreshedLastUpdate <= effectiveStaleTimeout) continue
       if (refreshedLastUpdate !== undefined) {
         timeSinceLastUpdate = now - refreshedLastUpdate

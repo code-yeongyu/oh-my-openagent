@@ -14,7 +14,11 @@ import type { AdoptionPlan } from "./adopt"
  */
 export function applyPlan(doc: LoroDoc, base: string, plan: AdoptionPlan): void {
   if (plan.action !== "capture") return
-  const update = withRegisterValues(doc, captureItem(doc, base, itemFrontier(doc), plan.workingText), plan.extraRegisterValues)
+  const update = withRegisterValues(
+    doc,
+    captureItem(doc, base, itemFrontier(doc), plan.workingText),
+    plan.extraRegisterValues,
+  )
   if (update !== null) doc.import(update)
 }
 
@@ -76,7 +80,8 @@ export function holdsValue(facts: ReadonlyMap<string, RenderedFact>, key: string
   if (Array.isArray(wanted) && wanted.length === 0) return true
   const fact = facts.get(key)
   if (fact === undefined) return false
-  if (fact.set && Array.isArray(wanted)) return wanted.every((element) => fact.values.some((held) => Bun.deepEquals(held, element)))
+  if (fact.set && Array.isArray(wanted))
+    return wanted.every((element) => fact.values.some((held) => Bun.deepEquals(held, element)))
   return fact.values.some((held) => Bun.deepEquals(held, wanted))
 }
 

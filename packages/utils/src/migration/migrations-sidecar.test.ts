@@ -88,9 +88,7 @@ describe("migrations sidecar", () => {
   describe("writeAppliedMigrations", () => {
     test("creates the sidecar with the given migration keys", () => {
       const configPath = join(workdir, "oh-my-openagent.json")
-      const migrations = new Set([
-        "model-version:openai/gpt-5.4->openai/gpt-5.5",
-      ])
+      const migrations = new Set(["model-version:openai/gpt-5.4->openai/gpt-5.5"])
 
       const ok = writeAppliedMigrations(configPath, migrations)
 
@@ -103,20 +101,12 @@ describe("migrations sidecar", () => {
 
     test("writes entries in sorted order for stable diffs", () => {
       const configPath = join(workdir, "oh-my-openagent.json")
-      const migrations = new Set([
-        "model-version:z->y",
-        "model-version:a->b",
-        "model-version:m->n",
-      ])
+      const migrations = new Set(["model-version:z->y", "model-version:a->b", "model-version:m->n"])
 
       writeAppliedMigrations(configPath, migrations)
 
       const body = JSON.parse(readFileSync(getSidecarPath(configPath), "utf-8"))
-      expect(body.appliedMigrations).toEqual([
-        "model-version:a->b",
-        "model-version:m->n",
-        "model-version:z->y",
-      ])
+      expect(body.appliedMigrations).toEqual(["model-version:a->b", "model-version:m->n", "model-version:z->y"])
     })
 
     test("creates parent directories if they do not exist yet", () => {

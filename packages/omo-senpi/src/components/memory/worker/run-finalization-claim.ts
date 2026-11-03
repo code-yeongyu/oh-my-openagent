@@ -44,16 +44,11 @@ export async function withRunFinalizationClaim<T>(
   } catch (error) {
     if (!(error instanceof LockContentionError)) throw error
     const terminal = await readTerminalRun(runDir, runId)
-    return terminal === undefined
-      ? { status: "busy" }
-      : { status: "terminal", value: terminal }
+    return terminal === undefined ? { status: "busy" } : { status: "terminal", value: terminal }
   }
 }
 
-async function readTerminalRun(
-  runDir: string,
-  runId: string,
-): Promise<FinalizationTerminalResult | undefined> {
+async function readTerminalRun(runDir: string, runId: string): Promise<FinalizationTerminalResult | undefined> {
   const finalPath = join(runDir, "final.json")
   if (existsSync(finalPath)) {
     const value = await readRunJson<Record<string, unknown>>(finalPath)
@@ -72,12 +67,14 @@ async function readTerminalRun(
 }
 
 function isReflectionOutcome(value: unknown): value is ReflectionOutcome {
-  return value === "merged"
-    || value === "no_changes"
-    || value === "parent_dirty"
-    || value === "dirty_uncommitted"
-    || value === "merge_conflict"
-    || value === "admin_tamper"
-    || value === "timed_out"
-    || value === "failed"
+  return (
+    value === "merged" ||
+    value === "no_changes" ||
+    value === "parent_dirty" ||
+    value === "dirty_uncommitted" ||
+    value === "merge_conflict" ||
+    value === "admin_tamper" ||
+    value === "timed_out" ||
+    value === "failed"
+  )
 }

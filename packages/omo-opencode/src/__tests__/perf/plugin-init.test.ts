@@ -57,10 +57,7 @@ async function measureInitMetrics(directory: string): Promise<InitMetrics> {
   }
 }
 
-async function measureScenario(
-  label: string,
-  populateDirectory: (directory: string) => void,
-): Promise<InitMetrics> {
+async function measureScenario(label: string, populateDirectory: (directory: string) => void): Promise<InitMetrics> {
   const rootDirectory = mkdtempSync(join(tmpdir(), "perf-d09-"))
   const projectDirectory = join(rootDirectory, label)
   const configDirectory = join(rootDirectory, "opencode-config")

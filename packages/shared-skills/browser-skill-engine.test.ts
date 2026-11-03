@@ -45,7 +45,17 @@ function fakeHost(answer?: (args: Json) => Json) {
   }
 }
 
-const RAW_EXPORTS = ["connectBrowserSkill", "connectPipe", "connectCloakProfile", "connect", "createCua", "emulate", "bskSnapshot", "bskDoctor", "DEVICE_PRESETS"] as const
+const RAW_EXPORTS = [
+  "connectBrowserSkill",
+  "connectPipe",
+  "connectCloakProfile",
+  "connect",
+  "createCua",
+  "emulate",
+  "bskSnapshot",
+  "bskDoctor",
+  "DEVICE_PRESETS",
+] as const
 
 describe("inside OmO Desktop the library is the terminal's, plus the app's built-in browser", () => {
   test("#given no OMO_BROWSER_ENGINE #when the library loads #then it is the raw library", () => {
@@ -58,7 +68,10 @@ describe("inside OmO Desktop the library is the terminal's, plus the app's built
     test(`#given OMO_BROWSER_ENGINE=${engine} #when the library loads #then every export is the terminal's own, and connectBuiltinBrowser is added`, () => {
       const raw = fakeRaw()
 
-      const library = guardOmowright(raw, { env: { OMO_BROWSER_ENGINE: engine }, host: fakeHost() }) as unknown as Record<string, unknown>
+      const library = guardOmowright(raw, {
+        env: { OMO_BROWSER_ENGINE: engine },
+        host: fakeHost(),
+      }) as unknown as Record<string, unknown>
 
       for (const name of RAW_EXPORTS) expect(library[name]).toBe(raw[name])
       expect(typeof library.connectBuiltinBrowser).toBe("function")
@@ -72,7 +85,10 @@ describe("inside OmO Desktop the library is the terminal's, plus the app's built
       expect(await library.connectPipe({ headless: true })).toEqual({ from: "connectPipe" })
       expect(await library.connectBrowserSkill({ name: "task" })).toEqual({ from: "connectBrowserSkill" })
 
-      expect(raw.calls).toEqual([["connectPipe", { headless: true }], ["connectBrowserSkill", { name: "task" }]])
+      expect(raw.calls).toEqual([
+        ["connectPipe", { headless: true }],
+        ["connectBrowserSkill", { name: "task" }],
+      ])
       expect(host.log).toEqual([])
     })
   }
@@ -84,34 +100,60 @@ describe("the app's built-in browser", () => {
     try {
       const tokenFile = join(dir, "browser.token")
       writeFileSync(tokenFile, "test-token")
-      for (const reason of ["user_stopped", "permission_denied", "toString", "unavailable", "timeout", "invalid_grant"]) {
+      for (const reason of [
+        "user_stopped",
+        "permission_denied",
+        "toString",
+        "unavailable",
+        "timeout",
+        "invalid_grant",
+      ]) {
         for (const refresh of [false, true]) {
           let acquireCount = 0
           let authorizer: { resolveAuthorization: (options: { forceRefresh: boolean }) => Promise<string> } | undefined
-          const capture = (options: { authorizer: typeof authorizer }) => { authorizer = options.authorizer }
+          const capture = (options: { authorizer: typeof authorizer }) => {
+            authorizer = options.authorizer
+          }
           const raw = {
             ...fakeRaw(),
-            connect: async (_url: string, options: { client: { authorizer: typeof authorizer } }) => { capture(options.client); return {} },
-            CdpClient: class {
-              constructor(options: { authorizer: typeof authorizer }) { capture(options) }
+            connect: async (_url: string, options: { client: { authorizer: typeof authorizer } }) => {
+              capture(options.client)
+              return {}
             },
-            BrowserConnection: class { async initialize() { return this } },
+            CdpClient: class {
+              constructor(options: { authorizer: typeof authorizer }) {
+                capture(options)
+              }
+            },
+            BrowserConnection: class {
+              async initialize() {
+                return this
+              }
+            },
           }
           const host = fakeHost(() => ({
-            details: refresh && acquireCount++ === 0
-              ? { ok: true, grant: { endpoint: "http://127.0.0.1:41234/toolkit/browser", tokenFile } }
-              : { ok: false, reason },
+            details:
+              refresh && acquireCount++ === 0
+                ? { ok: true, grant: { endpoint: "http://127.0.0.1:41234/toolkit/browser", tokenFile } }
+                : { ok: false, reason },
           }))
           const library = guardOmowright(raw, { env: { OMO_BROWSER_ENGINE: "builtin" }, host })
-          const error = await (refresh
-            ? library.connectBuiltinBrowser().then(() => {
-              if (authorizer === undefined) throw new Error("no authorizer attached")
-              return authorizer.resolveAuthorization({ forceRefresh: true })
-            })
-            : library.connectBuiltinBrowser()).then(() => undefined, (cause: unknown) => cause)
+          const error = await (
+            refresh
+              ? library.connectBuiltinBrowser().then(() => {
+                  if (authorizer === undefined) throw new Error("no authorizer attached")
+                  return authorizer.resolveAuthorization({ forceRefresh: true })
+                })
+              : library.connectBuiltinBrowser()
+          ).then(
+            () => undefined,
+            (cause: unknown) => cause,
+          )
           expect(error).toBeInstanceOf(BuiltinBrowserUnavailableError)
           expect((error as BuiltinBrowserUnavailableError).reason).toBe(reason)
-          expect(/connectBrowserSkill|connectPipe/.test((error as Error).message)).toBe(["unavailable", "timeout", "invalid_grant"].includes(reason))
+          expect(/connectBrowserSkill|connectPipe/.test((error as Error).message)).toBe(
+            ["unavailable", "timeout", "invalid_grant"].includes(reason),
+          )
         }
       }
     } finally {
@@ -125,9 +167,14 @@ describe("the app's built-in browser", () => {
       // Reading a directory is rejected even under a privileged test user, unlike chmod-based fixtures.
       for (const tokenFile of [join(dir, "missing.token"), dir]) {
         const raw = fakeRaw()
-        const host = fakeHost(() => ({ details: { ok: true, grant: { endpoint: "http://127.0.0.1:41234/toolkit/browser", tokenFile } } }))
+        const host = fakeHost(() => ({
+          details: { ok: true, grant: { endpoint: "http://127.0.0.1:41234/toolkit/browser", tokenFile } },
+        }))
         const library = guardOmowright(raw, { env: { OMO_BROWSER_ENGINE: "builtin" }, host })
-        const error = await library.connectBuiltinBrowser().then(() => undefined, (cause: unknown) => cause)
+        const error = await library.connectBuiltinBrowser().then(
+          () => undefined,
+          (cause: unknown) => cause,
+        )
         expect(error).toBeInstanceOf(BuiltinBrowserUnavailableError)
         expect((error as BuiltinBrowserUnavailableError).reason).toBe("invalid_grant")
         expect(raw.calls).toEqual([])
@@ -150,9 +197,13 @@ describe("the app's built-in browser", () => {
           let acquireCount = 0
           const cdpUrls: unknown[] = []
           let authorize: (options?: { forceRefresh?: boolean }) => Promise<string> = async () => ""
-          const host = fakeHost(() => ({ details: { ok: true, grant: onRefresh && acquireCount++ === 0
-            ? { endpoint: goodEndpoint, tokenFile }
-            : { endpoint, tokenFile } } }))
+          const host = fakeHost(() => ({
+            details: {
+              ok: true,
+              grant:
+                onRefresh && acquireCount++ === 0 ? { endpoint: goodEndpoint, tokenFile } : { endpoint, tokenFile },
+            },
+          }))
           const raw = {
             ...fakeRaw(),
             CdpClient: class {
@@ -160,15 +211,25 @@ describe("the app's built-in browser", () => {
                 cdpUrls.push(options.cdpUrl)
                 authorize = options.authorizer.resolveAuthorization
               }
-              set cdpUrl(value: unknown) { cdpUrls.push(value) }
+              set cdpUrl(value: unknown) {
+                cdpUrls.push(value)
+              }
             },
-            BrowserConnection: class { async initialize() { return { connected: true } } },
+            BrowserConnection: class {
+              async initialize() {
+                return { connected: true }
+              }
+            },
           }
           const library = guardOmowright(raw, { env: { OMO_BROWSER_ENGINE: "builtin" }, host })
-          const error = await (onRefresh
-            ? library.connectBuiltinBrowser().then(() => authorize({ forceRefresh: true }))
-            : library.connectBuiltinBrowser()
-          ).then(() => undefined, (cause: unknown) => cause)
+          const error = await (
+            onRefresh
+              ? library.connectBuiltinBrowser().then(() => authorize({ forceRefresh: true }))
+              : library.connectBuiltinBrowser()
+          ).then(
+            () => undefined,
+            (cause: unknown) => cause,
+          )
           expect(error).toBeInstanceOf(BuiltinBrowserUnavailableError)
           expect((error as BuiltinBrowserUnavailableError).reason).toBe("invalid_grant")
           expect(cdpUrls).toEqual(onRefresh ? [goodEndpoint] : [])
@@ -194,11 +255,15 @@ describe("the app's built-in browser", () => {
         { endpoint: "http://127.0.0.1:43000/toolkit/browser", tokenFile: thirdToken },
       ]
       let release: () => void = () => {}
-      const held = new Promise<void>((resolve) => { release = resolve })
+      const held = new Promise<void>((resolve) => {
+        release = resolve
+      })
       let acquireCount = 0
       const host = {
         log: [] as Json[],
-        async listTools(): Promise<string[]> { return ["omo_desktop_toolkit"] },
+        async listTools(): Promise<string[]> {
+          return ["omo_desktop_toolkit"]
+        },
         async callTool(_tool: string, args: Json): Promise<Json> {
           host.log.push(args)
           const grant = grants[acquireCount++]
@@ -215,9 +280,15 @@ describe("the app's built-in browser", () => {
             endpoint = options.cdpUrl
             authorize = options.authorizer.resolveAuthorization
           }
-          set cdpUrl(value: unknown) { endpoint = value }
+          set cdpUrl(value: unknown) {
+            endpoint = value
+          }
         },
-        BrowserConnection: class { async initialize() { return { connected: true } } },
+        BrowserConnection: class {
+          async initialize() {
+            return { connected: true }
+          }
+        },
       }
       const library = guardOmowright(raw, { env: { OMO_BROWSER_ENGINE: "builtin" }, host })
       await library.connectBuiltinBrowser()
@@ -246,9 +317,15 @@ describe("the app's built-in browser", () => {
         let authorize: (options?: { forceRefresh?: boolean }) => Promise<string> = async () => ""
         const initialEndpoint = "http://127.0.0.1:41234/toolkit/browser"
         const refreshedEndpoint = "http://127.0.0.1:42345/toolkit/browser"
-        const host = fakeHost(() => ({ details: { ok: true, grant: acquireCount++ === 0
-          ? { endpoint: initialEndpoint, tokenFile: firstToken }
-          : { endpoint: refreshedEndpoint, tokenFile: nextToken } } }))
+        const host = fakeHost(() => ({
+          details: {
+            ok: true,
+            grant:
+              acquireCount++ === 0
+                ? { endpoint: initialEndpoint, tokenFile: firstToken }
+                : { endpoint: refreshedEndpoint, tokenFile: nextToken },
+          },
+        }))
         const initialize = async () => {
           if (duringConnect) {
             expect(await authorize({ forceRefresh: true })).toBe("Bearer next-token")
@@ -258,7 +335,10 @@ describe("the app's built-in browser", () => {
         }
         const raw = {
           ...fakeRaw(),
-          connect: async (url: string, options: { client: { authorizer: { resolveAuthorization: typeof authorize } } }) => {
+          connect: async (
+            url: string,
+            options: { client: { authorizer: { resolveAuthorization: typeof authorize } } },
+          ) => {
             endpoint = url
             authorize = options.client.authorizer.resolveAuthorization
             return await initialize()
@@ -268,9 +348,13 @@ describe("the app's built-in browser", () => {
               endpoint = options.cdpUrl
               authorize = options.authorizer.resolveAuthorization
             }
-            set cdpUrl(value: string) { endpoint = value }
+            set cdpUrl(value: string) {
+              endpoint = value
+            }
           },
-          BrowserConnection: class { initialize = initialize },
+          BrowserConnection: class {
+            initialize = initialize
+          },
         }
         const library = guardOmowright(raw, { env: { OMO_BROWSER_ENGINE: "builtin" }, host })
         expect(await library.connectBuiltinBrowser()).toEqual({ connected: true })
@@ -292,17 +376,31 @@ describe("the app's built-in browser", () => {
       writeFileSync(tokenFile, "first-token\n", { mode: 0o600 })
       const grant = { endpoint: "http://127.0.0.1:41234/toolkit/browser", tokenFile }
       const host = fakeHost(() => ({ details: { ok: true, grant } }))
-      const attached: Array<{ url: string; options: { client: { authorizer: { resolveAuthorization: (o?: { forceRefresh?: boolean }) => Promise<string> } } } }> = []
+      const attached: Array<{
+        url: string
+        options: {
+          client: { authorizer: { resolveAuthorization: (o?: { forceRefresh?: boolean }) => Promise<string> } }
+        }
+      }> = []
       const raw = {
         ...fakeRaw(),
         CdpClient: class {
-          constructor(options: { cdpUrl: string; authorizer: typeof attached[number]["options"]["client"]["authorizer"] }) {
+          constructor(options: {
+            cdpUrl: string
+            authorizer: (typeof attached)[number]["options"]["client"]["authorizer"]
+          }) {
             attached.push({ url: options.cdpUrl, options: { client: { authorizer: options.authorizer } } })
           }
         },
-        BrowserConnection: class { async initialize() { return { kind: "connection" } } },
+        BrowserConnection: class {
+          async initialize() {
+            return { kind: "connection" }
+          }
+        },
       }
-      const library = guardOmowright(raw, { env: { OMO_BROWSER_ENGINE: "connected" }, host }) as unknown as { connectBuiltinBrowser: () => Promise<unknown> }
+      const library = guardOmowright(raw, { env: { OMO_BROWSER_ENGINE: "connected" }, host }) as unknown as {
+        connectBuiltinBrowser: () => Promise<unknown>
+      }
 
       expect(await library.connectBuiltinBrowser()).toEqual({ kind: "connection" })
       expect(attached[0]?.url).toBe(grant.endpoint)
@@ -328,11 +426,17 @@ describe("the app's built-in browser", () => {
       [undefined, "unavailable"],
     ] as const) {
       const raw = fakeRaw()
-      const library = guardOmowright(raw, { env: { OMO_BROWSER_ENGINE: "builtin" }, host: fakeHost(() => (details === undefined ? {} : { details })) }) as unknown as {
+      const library = guardOmowright(raw, {
+        env: { OMO_BROWSER_ENGINE: "builtin" },
+        host: fakeHost(() => (details === undefined ? {} : { details })),
+      }) as unknown as {
         connectBuiltinBrowser: () => Promise<unknown>
       }
 
-      const error = await library.connectBuiltinBrowser().then(() => undefined, (cause: unknown) => cause)
+      const error = await library.connectBuiltinBrowser().then(
+        () => undefined,
+        (cause: unknown) => cause,
+      )
 
       expect((error as { code?: string }).code).toBe("browser_builtin_unavailable")
       expect((error as { reason?: string }).reason).toBe(reason)
@@ -342,9 +446,14 @@ describe("the app's built-in browser", () => {
 
   test("#given a kernel without the app's toolkit #when connectBuiltinBrowser runs #then the same plain error, nothing attached", async () => {
     const raw = fakeRaw()
-    const library = guardOmowright(raw, { env: { OMO_BROWSER_ENGINE: "builtin" }, host: undefined }) as unknown as { connectBuiltinBrowser: () => Promise<unknown> }
+    const library = guardOmowright(raw, { env: { OMO_BROWSER_ENGINE: "builtin" }, host: undefined }) as unknown as {
+      connectBuiltinBrowser: () => Promise<unknown>
+    }
 
-    const error = await library.connectBuiltinBrowser().then(() => undefined, (cause: unknown) => cause)
+    const error = await library.connectBuiltinBrowser().then(
+      () => undefined,
+      (cause: unknown) => cause,
+    )
 
     expect((error as { code?: string }).code).toBe("browser_builtin_unavailable")
     expect(raw.calls).toEqual([])

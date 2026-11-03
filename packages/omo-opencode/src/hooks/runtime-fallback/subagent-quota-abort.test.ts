@@ -94,9 +94,7 @@ describe("createMessageUpdateHandler subagent quota abort", () => {
     await handler({ info: { sessionID, ...QUOTA_INFO } })
 
     // then
-    expect(abortCalls).toEqual([
-      { sessionID, source: "message.updated.subagent-quota-no-fallback" },
-    ])
+    expect(abortCalls).toEqual([{ sessionID, source: "message.updated.subagent-quota-no-fallback" }])
   })
 
   it("#given a non-subagent (user) session hits the same quota error #when the assistant error event fires #then the user session is NOT aborted", async () => {

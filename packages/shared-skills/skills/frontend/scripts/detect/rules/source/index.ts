@@ -16,4 +16,21 @@ import { overusedFont } from "./overused-font"
 import { radialHalo } from "./radial-halo"
 import { sideTab } from "./side-tab"
 
-export const SOURCE_RULES: readonly SourceRule[] = [sideTab, borderAccentOnRounded, overusedFont, gradientText, grayOnColor, aiColorPalette, bounceEasing, brokenImage, codexGridBackground, monotonousSpacing, emDashOveruse, marketingBuzzword, aphoristicCadence, darkGlow, radialHalo, marquee]
+export const SOURCE_RULES: readonly SourceRule[] = [
+  sideTab,
+  borderAccentOnRounded,
+  overusedFont,
+  gradientText,
+  grayOnColor,
+  aiColorPalette,
+  bounceEasing,
+  brokenImage,
+  codexGridBackground,
+  monotonousSpacing,
+  emDashOveruse,
+  marketingBuzzword,
+  aphoristicCadence,
+  darkGlow,
+  radialHalo,
+  marquee,
+]

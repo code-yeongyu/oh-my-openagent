@@ -17,9 +17,7 @@ const T0 = new Date("2026-08-16T00:00:00.000Z")
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(
-    tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })),
-  )
+  await Promise.all(tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })))
 })
 
 async function identityFixture(): Promise<MemoryIdentityPaths> {
@@ -78,7 +76,7 @@ describe("facts failure store persistence", () => {
     await rm(probePath, { force: true })
     // Exact mode enforcement is asserted when the filesystem represents POSIX bits; otherwise
     // compare the ledger with the platform's representable owner/group/other capabilities.
-    const representableMask = (~(probeMode ^ 0o600)) & 0o777
+    const representableMask = ~(probeMode ^ 0o600) & 0o777
     expect(info.mode & representableMask).toBe(0o600 & representableMask)
     expect((await readdir(layout.queueDir)).filter((name) => name.includes(".tmp"))).toEqual([])
   })

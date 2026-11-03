@@ -12,8 +12,14 @@ async function makeSourceFixture(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "omowright-stage-source-"))
   tempDirs.push(root)
   await mkdir(join(root, "src"), { recursive: true })
-  await writeFile(join(root, "package.json"), JSON.stringify({ name: "omowright", version: "0.0.1-fixture", type: "module" }))
-  await writeFile(join(root, "src", "page-bundle.js"), "(function(){ globalThis.__omowright = { fixture: true } })();\n")
+  await writeFile(
+    join(root, "package.json"),
+    JSON.stringify({ name: "omowright", version: "0.0.1-fixture", type: "module" }),
+  )
+  await writeFile(
+    join(root, "src", "page-bundle.js"),
+    "(function(){ globalThis.__omowright = { fixture: true } })();\n",
+  )
   await writeFile(join(root, "src", "core.js"), "export const core = 'fixture'\n")
   await writeFile(
     join(root, "src", "index.js"),
@@ -46,7 +52,10 @@ describe("omowright runtime staging", () => {
     expect(loaded.pageBundle).toContain("globalThis.__omowright")
     const manifest = JSON.parse(await readFile(join(targetDir, "manifest.json"), "utf8"))
     expect(Object.keys(manifest.files).sort()).toEqual(["index.js", "page-bundle.js"])
-    expect(await checkOmowrightRuntimeFresh({ sourceRoot, targetDir })).toMatchObject({ ok: true, version: "0.0.1-fixture" })
+    expect(await checkOmowrightRuntimeFresh({ sourceRoot, targetDir })).toMatchObject({
+      ok: true,
+      version: "0.0.1-fixture",
+    })
   })
 
   test("#given a staged runtime #when the source changes #then the freshness check rejects it", async () => {

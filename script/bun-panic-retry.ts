@@ -46,7 +46,10 @@ function classifyAttempt(outcome: AttemptOutcome): AttemptVerdict {
 }
 
 function crashLines(output: string): readonly string[] {
-  return output.split(/\r?\n/).map((line) => line.trim()).filter(isPanicLine)
+  return output
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(isPanicLine)
 }
 
 async function pump(stream: ReadableStream<Uint8Array>, sink: NodeJS.WriteStream, chunks: string[]): Promise<void> {
@@ -73,15 +76,21 @@ async function runWithPanicRetry(args: readonly string[]): Promise<number> {
     const verdict = classifyAttempt(outcome)
     if (verdict === "passed") return 0
     if (verdict === "test-failure") {
-      console.log(`\n[bun-panic-retry] attempt ${attempt} failed with test failures (exit ${outcome.exitCode}); not retried`)
+      console.log(
+        `\n[bun-panic-retry] attempt ${attempt} failed with test failures (exit ${outcome.exitCode}); not retried`,
+      )
       return outcome.exitCode
     }
     const summary = crashLines(outcome.output).join(" | ")
     if (attempt >= MAX_ATTEMPTS) {
-      console.log(`\n::error title=Bun crashed again (${UPSTREAM_ISSUE})::attempt ${attempt} of ${MAX_ATTEMPTS} crashed: ${summary}`)
+      console.log(
+        `\n::error title=Bun crashed again (${UPSTREAM_ISSUE})::attempt ${attempt} of ${MAX_ATTEMPTS} crashed: ${summary}`,
+      )
       return outcome.exitCode
     }
-    console.log(`\n::warning title=Bun crashed (${UPSTREAM_ISSUE})::attempt ${attempt} crashed: ${summary}; retrying this invocation once`)
+    console.log(
+      `\n::warning title=Bun crashed (${UPSTREAM_ISSUE})::attempt ${attempt} crashed: ${summary}; retrying this invocation once`,
+    )
   }
 }
 

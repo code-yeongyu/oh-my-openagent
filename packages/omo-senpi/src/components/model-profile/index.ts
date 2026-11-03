@@ -122,7 +122,12 @@ function extractNotify(eventCtx: unknown): ((message: string, level: "info" | "w
 // streams is delivered as a steer that costs a request of its own. The outcome is kept as a session
 // entry, which no request carries; as startup bookkeeping it leaves no file behind for a session that
 // never gets a conversation.
-function recordOutcome(pi: SenpiExtensionAPI, customType: string, content: string, details?: Record<string, unknown>): void {
+function recordOutcome(
+  pi: SenpiExtensionAPI,
+  customType: string,
+  content: string,
+  details?: Record<string, unknown>,
+): void {
   pi.appendEntry?.(customType, details === undefined ? { content } : { content, details }, { startupBookkeeping: true })
 }
 
@@ -169,12 +174,15 @@ function providerOf(selector: string): string {
 
 function logSkippedCandidate(ctx: ComponentContext, failure: AuthFailure): void {
   const candidate = `${failure.provider}/${failure.model}`
-  ctx.logger.warn(`omo-senpi: model profile skipped ${candidate}: request auth did not resolve (${failure.reason}, ${failure.errorKind})`, {
-    provider: failure.provider,
-    model: failure.model,
-    reason: failure.reason,
-    errorKind: failure.errorKind,
-  })
+  ctx.logger.warn(
+    `omo-senpi: model profile skipped ${candidate}: request auth did not resolve (${failure.reason}, ${failure.errorKind})`,
+    {
+      provider: failure.provider,
+      model: failure.model,
+      reason: failure.reason,
+      errorKind: failure.errorKind,
+    },
+  )
   if (process.env.OMO_DEBUG) {
     ctx.logger.info(`omo-senpi: model profile skipped ${candidate}: ${sanitizedAuthErrorDetail(failure.error)}`)
   }
@@ -189,7 +197,11 @@ function logKeptOnTransientRefresh(ctx: ComponentContext, keep: RefreshUnavailab
   )
 }
 
-type ProbedResolution = { readonly resolution: ModelProfileResolution; readonly model: unknown; readonly failures: AuthFailure[] }
+type ProbedResolution = {
+  readonly resolution: ModelProfileResolution
+  readonly model: unknown
+  readonly failures: AuthFailure[]
+}
 
 // Each failed probe removes at least one selector (the whole provider for a credential failure,
 // the one model for a request-configuration failure), so the walk ends after at most one pass per
@@ -224,8 +236,14 @@ async function resolveWithRequestAuth(
   while (resolution.kind === "resolved") {
     model = registry.find(resolution.provider, resolution.modelId)
     if (model === undefined || resolution.profile.source === "pin" || runtime === undefined) break
-    const failure = await probeRequestAuth(registry, runtime, mayRotate, resolution.provider, resolution.modelId, model, (keep) =>
-      logKeptOnTransientRefresh(ctx, keep),
+    const failure = await probeRequestAuth(
+      registry,
+      runtime,
+      mayRotate,
+      resolution.provider,
+      resolution.modelId,
+      model,
+      (keep) => logKeptOnTransientRefresh(ctx, keep),
     )
     if (failure === undefined) break
     failures.push(failure)
@@ -288,7 +306,15 @@ export function createModelProfileComponent(options: ModelProfileComponentOption
         const mode = extractMode(eventCtx)
         const probes = newProbeState()
         const resolveFor = (profileId: string) =>
-          resolveWithRequestAuth(ctx, registry, extractAgentDir(eventCtx), config.model_profiles, profileId, config.exclude_models, probes)
+          resolveWithRequestAuth(
+            ctx,
+            registry,
+            extractAgentDir(eventCtx),
+            config.model_profiles,
+            profileId,
+            config.exclude_models,
+            probes,
+          )
         const { resolution, model, failures } =
           explicit === undefined ? await resolveDefaultModelProfile(resolveFor) : await resolveFor(explicit)
         const content = noticeContent(resolution, failures, mode)

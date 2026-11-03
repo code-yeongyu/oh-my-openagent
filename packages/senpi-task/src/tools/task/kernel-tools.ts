@@ -36,9 +36,10 @@ export async function resolveTaskKernelTools(
     const target = taskTargetOf(item)
     // A category target carries no persona, so its child keeps the full shared surface; a named
     // agent's literal allow/deny rules decide the nested-host-scope rule for this grant.
-    const agent = item.kind === "subagent_type"
-      ? { agentType: item.subagentType, ...agentToolPolicy(deps.agents[item.subagentType]) }
-      : {}
+    const agent =
+      item.kind === "subagent_type"
+        ? { agentType: item.subagentType, ...agentToolPolicy(deps.agents[item.subagentType]) }
+        : {}
     const resolved = await resolveKernelToolGrant({
       requestedNames: requested,
       capability,
@@ -49,7 +50,11 @@ export async function resolveTaskKernelTools(
     if (resolved.kind === "denied") {
       return {
         kind: "denied",
-        detail: { requested: [...requested], status: "refused", error: { code: resolved.code, message: resolved.message } },
+        detail: {
+          requested: [...requested],
+          status: "refused",
+          error: { code: resolved.code, message: resolved.message },
+        },
       }
     }
     if (resolved.kind === "granted") grant = resolved.grant

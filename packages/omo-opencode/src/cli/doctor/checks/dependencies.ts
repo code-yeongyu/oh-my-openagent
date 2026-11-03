@@ -12,9 +12,7 @@ import { getCachedBinaryPath } from "../../../hooks/comment-checker/downloader"
 import { bunWhich } from "../../../shared/bun-which-shim"
 import { isModuleResolutionFailure } from "../../../shared/module-resolution-failure"
 
-type BinaryCheck =
-  | { exists: true; path: string }
-  | { exists: false; path: null }
+type BinaryCheck = { exists: true; path: string } | { exists: false; path: null }
 
 async function checkBinaryExists(binary: string): Promise<BinaryCheck> {
   try {
@@ -49,7 +47,8 @@ export async function checkAstGrepCli(): Promise<DependencyInfo> {
       installed: false,
       version: null,
       path: null,
-      installHint: "Provisioned automatically by the bundled ast-grep skill; reinstall or start a new OpenCode session to retry.",
+      installHint:
+        "Provisioned automatically by the bundled ast-grep skill; reinstall or start a new OpenCode session to retry.",
     }
   }
 
@@ -75,7 +74,8 @@ export function findCommentCheckerPackageBinary(
 ): string | null {
   const binaryName = process.platform === "win32" ? "comment-checker.exe" : "comment-checker"
   try {
-    const packageJsonPath = baseDirOverride === undefined ? resolvePackageJsonPath() : join(baseDirOverride, "package.json")
+    const packageJsonPath =
+      baseDirOverride === undefined ? resolvePackageJsonPath() : join(baseDirOverride, "package.json")
     return findInstalledCommentChecker({ packageJsonPath, binaryName, existsSync })
   } catch (error) {
     if (!(error instanceof Error) && !isModuleResolutionFailure(error)) throw error

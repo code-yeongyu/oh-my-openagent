@@ -36,9 +36,13 @@ export function duplicateFrontmatterKeys(content: string): string[] {
 // that reads as `canonical` but is not spelled exactly so (`Provenance`, `"provenance"`, `\u0440rovenance`,
 // `provenance\u200b`) is a look-alike.
 export function normalizedFrontmatterKey(key: string): string {
-  return lookAlikeSkeleton(key).replace(/^["']+|["']+$/g, "").trim()
+  return lookAlikeSkeleton(key)
+    .replace(/^["']+|["']+$/g, "")
+    .trim()
 }
 
 export function lookAlikeFrontmatterKeys(content: string, canonical: string): string[] {
-  return (contentFrontmatterEntries(content) ?? []).map((entry) => entry.key).filter((key) => key !== canonical && normalizedFrontmatterKey(key) === canonical)
+  return (contentFrontmatterEntries(content) ?? [])
+    .map((entry) => entry.key)
+    .filter((key) => key !== canonical && normalizedFrontmatterKey(key) === canonical)
 }

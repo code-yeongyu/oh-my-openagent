@@ -2,11 +2,7 @@
 
 import { describe, expect, test } from "bun:test"
 
-import {
-  assembleWaves,
-  MAX_TRACKED_CALLS,
-  type ToolExecutionObservation,
-} from "./wave-assembler"
+import { assembleWaves, MAX_TRACKED_CALLS, type ToolExecutionObservation } from "./wave-assembler"
 
 function start(toolCallId: string, atMs: number, toolName = "bash"): ToolExecutionObservation {
   return { kind: "start", toolCallId, toolName, atMs }
@@ -16,11 +12,18 @@ function end(toolCallId: string, atMs: number, toolName = "bash"): ToolExecution
   return { kind: "end", toolCallId, toolName, atMs }
 }
 
-function pair(toolCallId: string, startMs: number, endMs: number, toolName = "bash"): readonly ToolExecutionObservation[] {
+function pair(
+  toolCallId: string,
+  startMs: number,
+  endMs: number,
+  toolName = "bash",
+): readonly ToolExecutionObservation[] {
   return [start(toolCallId, startMs, toolName), end(toolCallId, endMs, toolName)]
 }
 
-function waveShape(result: ReturnType<typeof assembleWaves>): readonly { size: number; spanMs: number; maxConcurrency: number }[] {
+function waveShape(
+  result: ReturnType<typeof assembleWaves>,
+): readonly { size: number; spanMs: number; maxConcurrency: number }[] {
   return result.waves.map((wave) => ({
     size: wave.calls.length,
     spanMs: wave.spanMs,
@@ -32,11 +35,7 @@ describe("wave assembler", () => {
   describe("#given tool executions that overlap in time", () => {
     describe("#when the observations are assembled", () => {
       test("#then all three calls join one wave carrying a span", () => {
-        const result = assembleWaves([
-          ...pair("a", 0, 500),
-          ...pair("b", 100, 600),
-          ...pair("c", 200, 400),
-        ])
+        const result = assembleWaves([...pair("a", 0, 500), ...pair("b", 100, 600), ...pair("c", 200, 400)])
 
         expect(waveShape(result)).toEqual([{ size: 3, spanMs: 600, maxConcurrency: 3 }])
         expect(result.waves[0]?.calls.map((call) => call.toolCallId)).toEqual(["a", "b", "c"])
@@ -47,11 +46,7 @@ describe("wave assembler", () => {
   describe("#given tool executions that never overlap", () => {
     describe("#when the observations are assembled", () => {
       test("#then every call forms its own single-call wave", () => {
-        const result = assembleWaves([
-          ...pair("a", 0, 100),
-          ...pair("b", 200, 300),
-          ...pair("c", 400, 500),
-        ])
+        const result = assembleWaves([...pair("a", 0, 100), ...pair("b", 200, 300), ...pair("c", 400, 500)])
 
         expect(waveShape(result)).toEqual([
           { size: 1, spanMs: 100, maxConcurrency: 1 },
@@ -65,11 +60,7 @@ describe("wave assembler", () => {
   describe("#given a mix of overlapping and sequential executions", () => {
     describe("#when the observations are assembled", () => {
       test("#then the overlap forms one wave and the isolated call forms another", () => {
-        const result = assembleWaves([
-          ...pair("a", 0, 300),
-          ...pair("b", 100, 200),
-          ...pair("lonely", 900, 950),
-        ])
+        const result = assembleWaves([...pair("a", 0, 300), ...pair("b", 100, 200), ...pair("lonely", 900, 950)])
 
         expect(waveShape(result)).toEqual([
           { size: 2, spanMs: 300, maxConcurrency: 2 },

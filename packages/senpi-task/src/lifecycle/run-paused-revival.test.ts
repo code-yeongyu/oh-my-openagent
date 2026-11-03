@@ -8,7 +8,14 @@ import { AdmissionBarrier } from "../pause/admission-barrier"
 import { resolveChildSessionDir } from "../runners/rpc/spawn"
 import { createTaskLifecycle } from "./create"
 import { NO_HOST_ENDPOINT } from "./host-session"
-import { cleanupProjects, FakeRegistry, readEvents, seedRecord, settings, tempStore } from "./__fixtures__/lifecycle-fakes"
+import {
+  cleanupProjects,
+  FakeRegistry,
+  readEvents,
+  seedRecord,
+  settings,
+  tempStore,
+} from "./__fixtures__/lifecycle-fakes"
 import { liveParentFixture } from "./__fixtures__/live-parent-fakes"
 
 const fixtures: ReturnType<typeof liveParentFixture>[] = []
@@ -25,7 +32,11 @@ describe("revival of a child whose run is stopped", () => {
     const store = tempStore()
     const taskId = "st_0000a0b1"
     const seeded = seedRecord(store, {
-      task_id: taskId, status: "running", residency_state: "resident", execution_mode: "process", pid: 900,
+      task_id: taskId,
+      status: "running",
+      residency_state: "resident",
+      execution_mode: "process",
+      pid: 900,
       updated_at: new Date(now() - 1_000).toISOString(),
     })
     store.replace({ ...seeded, spawn_spec: { cwd: "/tmp/project", extensions: [], member_env: {} } })
@@ -34,19 +45,33 @@ describe("revival of a child whose run is stopped", () => {
     writeFileSync(join(sessions, "2026-10-21_child.jsonl"), "{}\n")
     const barrier = new AdmissionBarrier()
     createTaskManager({
-      store, admissionBarrier: barrier, cwd: "/tmp/project",
+      store,
+      admissionBarrier: barrier,
+      cwd: "/tmp/project",
       runners: { "in-process": new FakeRunner(), process: new FakeRunner() },
       planner: () => ({ kind: "resolved", plan: { model: "anthropic/claude" } }),
       config: settings({ default_concurrency: 5 }),
-      rpcRespawnRunner: { start: async () => { throw new Error("a stopped run must never launch its child") } },
+      rpcRespawnRunner: {
+        start: async () => {
+          throw new Error("a stopped run must never launch its child")
+        },
+      },
     })
     barrier.close(seeded.root_session_id ?? seeded.parent_session_id, 2)
     const lifecycle = createTaskLifecycle({
-      hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings(), now,
-      signaller: { isAlive: () => false, signal: () => undefined }, orphanKillDelayMs: 0,
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry: new FakeRegistry(),
+      config: settings(),
+      now,
+      signaller: { isAlive: () => false, signal: () => undefined },
+      orphanKillDelayMs: 0,
     })
     const result = await lifecycle.reconcileOnSessionStart()
-    expect(result.outcomes.find(outcome => outcome.task_id === taskId)).toMatchObject({ kind: "deferred", reason: "run_paused" })
+    expect(result.outcomes.find((outcome) => outcome.task_id === taskId)).toMatchObject({
+      kind: "deferred",
+      reason: "run_paused",
+    })
     expect(store.load(taskId)?.status).toBe("running")
     expect(readEvents(store, taskId)).not.toContain("reconcile_lost")
   })

@@ -73,9 +73,12 @@ function findFileReferences(text: string): FileMatch[] {
 }
 
 export function resolveFilePath(filePath: string, cwd: string): string {
-  const expanded = filePath.replace(/\$\{(\w+)\}|\$(\w+)/g, (match, braced: string | undefined, bare: string | undefined) => {
-    return expandEnvironmentVariable(match, braced ?? bare)
-  })
+  const expanded = filePath.replace(
+    /\$\{(\w+)\}|\$(\w+)/g,
+    (match, braced: string | undefined, bare: string | undefined) => {
+      return expandEnvironmentVariable(match, braced ?? bare)
+    },
+  )
 
   if (isAbsolute(expanded) || isPosixAbsolutePath(expanded) || isWindowsAbsolutePath(expanded)) {
     return resolvePathForInput(expanded, cwd)
@@ -103,7 +106,7 @@ export async function resolveFileReferencesInText(
   text: string,
   cwd: string = process.cwd(),
   depth: number = 0,
-  maxDepth: number = 3
+  maxDepth: number = 3,
 ): Promise<string> {
   if (depth >= maxDepth) {
     return text

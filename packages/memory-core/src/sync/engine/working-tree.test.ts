@@ -3,9 +3,24 @@ import { describe, expect, test } from "bun:test"
 import { TEMP_MARK } from "./atomic"
 import { itemPaths, landingPath, type ListDir, scanWorkingTree, type TreeEntry } from "./working-tree"
 
-const file = (name: string): TreeEntry => ({ name, isFile: () => true, isDirectory: () => false, isSymbolicLink: () => false })
-const dir = (name: string): TreeEntry => ({ name, isFile: () => false, isDirectory: () => true, isSymbolicLink: () => false })
-const link = (name: string): TreeEntry => ({ name, isFile: () => false, isDirectory: () => false, isSymbolicLink: () => true })
+const file = (name: string): TreeEntry => ({
+  name,
+  isFile: () => true,
+  isDirectory: () => false,
+  isSymbolicLink: () => false,
+})
+const dir = (name: string): TreeEntry => ({
+  name,
+  isFile: () => false,
+  isDirectory: () => true,
+  isSymbolicLink: () => false,
+})
+const link = (name: string): TreeEntry => ({
+  name,
+  isFile: () => false,
+  isDirectory: () => false,
+  isSymbolicLink: () => true,
+})
 
 const NFD = "re\u0301sume\u0301.md"
 const NFC = NFD.normalize("NFC")
@@ -22,7 +37,16 @@ function lister(tree: Readonly<Record<string, readonly TreeEntry[]>>): { list: L
 describe("scanWorkingTree", () => {
   test("lists regular files, reports symlinks without entering them, and skips repository metadata and temp files", async () => {
     const { list, listed } = lister({
-      "": [file(".gitkeep"), dir(".git"), file("a.md"), dir("real"), link("alias"), link("gone"), link("f-link.md"), file(`x${TEMP_MARK}1`)],
+      "": [
+        file(".gitkeep"),
+        dir(".git"),
+        file("a.md"),
+        dir("real"),
+        link("alias"),
+        link("gone"),
+        link("f-link.md"),
+        file(`x${TEMP_MARK}1`),
+      ],
       real: [file("x.md"), dir("deeper")],
       "real/deeper": [file(NFD)],
       alias: [file("never.md")],

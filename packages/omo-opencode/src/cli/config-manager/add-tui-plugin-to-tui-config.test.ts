@@ -132,7 +132,10 @@ describe("ensureTuiPluginEntry", () => {
     const dir = tempConfigDir()
     writeConfig(dir, "opencode.json", { plugin: [PLUGIN_NAME] })
     writeConfig(dir, "tui.json", {
-      plugin: [["some-other/tui", { enabled: true }], [`${PLUGIN_NAME}@beta`, { enabled: true }]],
+      plugin: [
+        ["some-other/tui", { enabled: true }],
+        [`${PLUGIN_NAME}@beta`, { enabled: true }],
+      ],
     })
 
     // when

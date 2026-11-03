@@ -12,7 +12,11 @@ export interface AnswerVerdicts {
   readonly flagged: ClaimVerdict[]
 }
 
-export function evaluateAnswer(branch: readonly unknown[], answerAt: number, content: unknown): AnswerVerdicts | undefined {
+export function evaluateAnswer(
+  branch: readonly unknown[],
+  answerAt: number,
+  content: unknown,
+): AnswerVerdicts | undefined {
   const claims = classifyClaims(contentText(content))
   if (claims.length === 0) return undefined
   const verdicts = matchClaims(buildTimeline(branch), claims, answerAt)

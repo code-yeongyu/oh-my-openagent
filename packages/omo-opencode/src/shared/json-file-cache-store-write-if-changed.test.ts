@@ -9,7 +9,10 @@ import { createJsonFileCacheStore } from "./json-file-cache-store"
 type Snapshot = { models: Record<string, unknown>; generatedAt: string }
 
 const snapshotA: Snapshot = { models: { "provider/model-a": { reasoning: true } }, generatedAt: "2026-10-12T00:00:00Z" }
-const snapshotB: Snapshot = { models: { "provider/model-a": { reasoning: false } }, generatedAt: "2026-10-12T01:00:00Z" }
+const snapshotB: Snapshot = {
+  models: { "provider/model-a": { reasoning: false } },
+  generatedAt: "2026-10-12T01:00:00Z",
+}
 
 describe("json-file-cache-store writeIfChanged", () => {
   let cacheDir: string

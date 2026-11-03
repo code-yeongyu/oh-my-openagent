@@ -163,26 +163,30 @@ describe("sg probe contract: a failing probe never wins", () => {
     rmSync(root, { force: true, recursive: true })
   })
 
-  it("#given a PATH ast-grep that hangs #when the 5s probe times out #then it is rejected and the next candidate wins", () => {
-    // given: an `ast-grep`-named stub that never returns, and a working `sg` behind it on PATH
-    const root = tempDir("contract-timeout")
-    const hangingAstGrep = writeStub(join(root, "path", binaryName("ast-grep")), "#!/bin/sh\nsleep 60\n")
-    const workingSg = workingAstGrep(join(root, "path", binaryName("sg")))
-    const startedAt = Date.now()
+  it(
+    "#given a PATH ast-grep that hangs #when the 5s probe times out #then it is rejected and the next candidate wins",
+    () => {
+      // given: an `ast-grep`-named stub that never returns, and a working `sg` behind it on PATH
+      const root = tempDir("contract-timeout")
+      const hangingAstGrep = writeStub(join(root, "path", binaryName("ast-grep")), "#!/bin/sh\nsleep 60\n")
+      const workingSg = workingAstGrep(join(root, "path", binaryName("sg")))
+      const startedAt = Date.now()
 
-    // when
-    const result = resolveSgBinarySync(
-      isolated({ which: (commandName) => (commandName === "ast-grep" ? hangingAstGrep : workingSg) }),
-    )
-    const elapsedMs = Date.now() - startedAt
+      // when
+      const result = resolveSgBinarySync(
+        isolated({ which: (commandName) => (commandName === "ast-grep" ? hangingAstGrep : workingSg) }),
+      )
+      const elapsedMs = Date.now() - startedAt
 
-    // then: the hung probe is bounded and never selected
-    expect(result.found ? result.path : null).toBe(workingSg)
-    if (process.platform !== "win32") expect(elapsedMs).toBeGreaterThanOrEqual(4_000)
-    expect(elapsedMs).toBeLessThan(20_000)
+      // then: the hung probe is bounded and never selected
+      expect(result.found ? result.path : null).toBe(workingSg)
+      if (process.platform !== "win32") expect(elapsedMs).toBeGreaterThanOrEqual(4_000)
+      expect(elapsedMs).toBeLessThan(20_000)
 
-    rmSync(root, { force: true, recursive: true })
-  }, { timeout: 30_000 })
+      rmSync(root, { force: true, recursive: true })
+    },
+    { timeout: 30_000 },
+  )
 
   it("#given every probe throws #when resolving #then no tier is exempt and BINARY_NOT_FOUND is returned", () => {
     // given: candidates in every tier exist as files, but no probe can run
@@ -214,13 +218,12 @@ describe("sg probe contract: a failing probe never wins", () => {
   it("#given an ast-grep-named candidate whose probe reports another tool #when resolving #then the name grants no exemption", () => {
     // given
     const root = tempDir("contract-name-exemption")
-    const impostor = writeStub(
-      join(root, "path", binaryName("ast-grep")),
-      "#!/bin/sh\nprintf 'ripgrep 14.1.0\\n'\n",
-    )
+    const impostor = writeStub(join(root, "path", binaryName("ast-grep")), "#!/bin/sh\nprintf 'ripgrep 14.1.0\\n'\n")
 
     // when
-    const result = resolveSgBinarySync(isolated({ which: (commandName) => (commandName === "ast-grep" ? impostor : null) }))
+    const result = resolveSgBinarySync(
+      isolated({ which: (commandName) => (commandName === "ast-grep" ? impostor : null) }),
+    )
 
     // then
     expect(result.found).toBe(false)

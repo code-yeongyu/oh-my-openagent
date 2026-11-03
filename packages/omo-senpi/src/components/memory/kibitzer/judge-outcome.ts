@@ -33,17 +33,22 @@ export function classifyJudgeTurn(outcome: RunnerOutcome, accepted: readonly Rec
   const reason = normalizeGateReason(outcome.failure.message)
   if (reason === EMPTY_RESPONSE_TWICE) return accepted.length > 0 ? { status: "completed" } : { status: "empty" }
   if (reason === undefined) return { status: "failed", cause: "child_failed" }
-  return { status: "failed", cause: UPSTREAM_FAILURE_PATTERN.test(reason) ? "child_failed_upstream" : "child_failed", reason }
+  return {
+    status: "failed",
+    cause: UPSTREAM_FAILURE_PATTERN.test(reason) ? "child_failed_upstream" : "child_failed",
+    reason,
+  }
 }
 
 const UPSTREAM_FAILURE_PATTERN = /\b503\b|auth[_ -]?unavailable|overloaded/iu
 
 export function normalizeGateReason(message: string | undefined): string | undefined {
   if (message === undefined) return undefined
-  const text = message.replace(/[\u0000-\u001F\u007F-\u009F]/gu, "").replace(/\s+/gu, " ").trim()
+  const text = message
+    .replace(/[\u0000-\u001F\u007F-\u009F]/gu, "")
+    .replace(/\s+/gu, " ")
+    .trim()
   if (text.length === 0) return undefined
   if (containsSecretLikeMaterial(text)) return "redacted"
-  return text.length > GATE_REASON_MAX_CHARS
-    ? `${text.slice(0, GATE_REASON_MAX_CHARS - 1)}…`
-    : text
+  return text.length > GATE_REASON_MAX_CHARS ? `${text.slice(0, GATE_REASON_MAX_CHARS - 1)}…` : text
 }

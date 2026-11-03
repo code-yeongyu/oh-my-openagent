@@ -11,15 +11,21 @@ describe("skill tool - nativeSkills integration", () => {
       includeSkillsInDescription: true,
       nativeSkills: {
         all() {
-          return [{
-            name: "native-visible-skill",
-            description: "Native skill exposed from config",
-            location: "/external/skills/native-visible-skill/SKILL.md",
-            content: "Native visible skill body",
-          }]
+          return [
+            {
+              name: "native-visible-skill",
+              description: "Native skill exposed from config",
+              location: "/external/skills/native-visible-skill/SKILL.md",
+              content: "Native visible skill body",
+            },
+          ]
         },
-        get() { return undefined },
-        dirs() { return [] },
+        get() {
+          return undefined
+        },
+        dirs() {
+          return []
+        },
       },
     })
 
@@ -53,8 +59,12 @@ describe("skill tool - nativeSkills integration", () => {
             },
           ]
         },
-        get() { return undefined },
-        dirs() { return [] },
+        get() {
+          return undefined
+        },
+        dirs() {
+          return []
+        },
       },
     })
 
@@ -71,15 +81,21 @@ describe("skill tool - nativeSkills integration", () => {
       skills: [],
       nativeSkills: {
         async all() {
-          return [{
-            name: "external-plugin-skill",
-            description: "Skill from config.skills.paths",
-            location: "/external/skills/external-plugin-skill/SKILL.md",
-            content: "External plugin skill body",
-          }]
+          return [
+            {
+              name: "external-plugin-skill",
+              description: "Skill from config.skills.paths",
+              location: "/external/skills/external-plugin-skill/SKILL.md",
+              content: "External plugin skill body",
+            },
+          ]
         },
-        async get() { return undefined },
-        async dirs() { return [] },
+        async get() {
+          return undefined
+        },
+        async dirs() {
+          return []
+        },
       },
     })
 
@@ -97,15 +113,21 @@ describe("skill tool - nativeSkills integration", () => {
       includeSkillsInDescription: true,
       nativeSkills: {
         all() {
-          return [{
-            name: "blocked-native-skill",
-            description: "Blocked native skill from config.skills.paths",
-            location: "/external/skills/blocked-native-skill/SKILL.md",
-            content: "BYPASS_CONFIRMED",
-          }]
+          return [
+            {
+              name: "blocked-native-skill",
+              description: "Blocked native skill from config.skills.paths",
+              location: "/external/skills/blocked-native-skill/SKILL.md",
+              content: "BYPASS_CONFIRMED",
+            },
+          ]
         },
-        get() { return undefined },
-        dirs() { return [] },
+        get() {
+          return undefined
+        },
+        dirs() {
+          return []
+        },
       },
     })
 

@@ -8,12 +8,7 @@ type TestMessage = {
   parts: Part[]
 }
 
-function userMessage(input: {
-  id: string
-  sessionID: string
-  providerID: string
-  modelID: string
-}): Message {
+function userMessage(input: { id: string; sessionID: string; providerID: string; modelID: string }): Message {
   return {
     id: input.id,
     sessionID: input.sessionID,
@@ -135,24 +130,28 @@ describe("messages transform assistant prefill alias repair", () => {
             providerID: scenario.providerID,
             modelID: scenario.modelID,
           }),
-          parts: [textPart({
-            id: `part_user_${scenario.providerID}`,
-            sessionID: `ses_${scenario.providerID}`,
-            messageID: `msg_user_${scenario.providerID}`,
-            text: scenario.name,
-          })],
+          parts: [
+            textPart({
+              id: `part_user_${scenario.providerID}`,
+              sessionID: `ses_${scenario.providerID}`,
+              messageID: `msg_user_${scenario.providerID}`,
+              text: scenario.name,
+            }),
+          ],
         },
         {
           info: assistantMessage({
             id: `msg_assistant_${scenario.providerID}`,
             sessionID: `ses_${scenario.providerID}`,
           }),
-          parts: [textPart({
-            id: `part_assistant_${scenario.providerID}`,
-            sessionID: `ses_${scenario.providerID}`,
-            messageID: `msg_assistant_${scenario.providerID}`,
-            text: "done",
-          })],
+          parts: [
+            textPart({
+              id: `part_assistant_${scenario.providerID}`,
+              sessionID: `ses_${scenario.providerID}`,
+              messageID: `msg_assistant_${scenario.providerID}`,
+              text: "done",
+            }),
+          ],
         },
       ]
 
@@ -193,24 +192,28 @@ describe("messages transform assistant prefill alias repair", () => {
             providerID: scenario.providerID,
             modelID: scenario.modelID,
           }),
-          parts: [textPart({
-            id: `part_user_${scenario.providerID}`,
-            sessionID: `ses_${scenario.providerID}`,
-            messageID: `msg_user_${scenario.providerID}`,
-            text: scenario.name,
-          })],
+          parts: [
+            textPart({
+              id: `part_user_${scenario.providerID}`,
+              sessionID: `ses_${scenario.providerID}`,
+              messageID: `msg_user_${scenario.providerID}`,
+              text: scenario.name,
+            }),
+          ],
         },
         {
           info: assistantMessage({
             id: `msg_assistant_${scenario.providerID}`,
             sessionID: `ses_${scenario.providerID}`,
           }),
-          parts: [textPart({
-            id: `part_assistant_${scenario.providerID}`,
-            sessionID: `ses_${scenario.providerID}`,
-            messageID: `msg_assistant_${scenario.providerID}`,
-            text: "completed assistant answer",
-          })],
+          parts: [
+            textPart({
+              id: `part_assistant_${scenario.providerID}`,
+              sessionID: `ses_${scenario.providerID}`,
+              messageID: `msg_assistant_${scenario.providerID}`,
+              text: "completed assistant answer",
+            }),
+          ],
         },
       ]
 

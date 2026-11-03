@@ -23,7 +23,8 @@ const stateDir = (): string => {
   dirs.push(dir)
   return dir
 }
-const pinPath = (dir: string, account = ACCOUNT): string => join(dir, "trust-anchor", createHash("sha256").update(account).digest("base64url"), "pin.json")
+const pinPath = (dir: string, account = ACCOUNT): string =>
+  join(dir, "trust-anchor", createHash("sha256").update(account).digest("base64url"), "pin.json")
 
 const provenCandidate = async (): Promise<PinCandidate> => {
   const outcome = await appendEntries(emptyChain(ACCOUNT, fixtureAnchor()), mainChain(), createRejectionCounter())
@@ -34,7 +35,11 @@ const provenCandidate = async (): Promise<PinCandidate> => {
 const otherCandidate = async (): Promise<PinCandidate> => {
   const keyring = await newDeviceKeyring()
   const other = await genesisEntry(ACCOUNT, keyring, "W".repeat(43), newRecoveryCredential())
-  const walked = await appendEntries(emptyChain(ACCOUNT, creatorAnchor(ACCOUNT, keyring)), [other], createRejectionCounter())
+  const walked = await appendEntries(
+    emptyChain(ACCOUNT, creatorAnchor(ACCOUNT, keyring)),
+    [other],
+    createRejectionCounter(),
+  )
   if (!walked.ok || walked.state.pin === null) throw new Error("other root walk")
   return walked.state.pin
 }
@@ -52,13 +57,20 @@ describe("the pinned root: set once from a proven walk, then the only root", () 
     const loaded = await loadTrustAnchor(dir, ACCOUNT)
     expect(loaded.ok && loaded.anchor.genesisDigest).toBe(record("genesis").digest)
     if (!loaded.ok) return
-    expect((await appendEntries(emptyChain(ACCOUNT, loaded.anchor), mainChain(), createRejectionCounter())).ok).toBe(true)
+    expect((await appendEntries(emptyChain(ACCOUNT, loaded.anchor), mainChain(), createRejectionCounter())).ok).toBe(
+      true,
+    )
     expect(anchor.genesisDigest).toBe(loaded.anchor.genesisDigest)
   })
 
   test("a candidate no verified walk minted is never pinned", async () => {
     const dir = stateDir()
-    const handBuilt = { account: ACCOUNT, genesisDigest: record("genesis").digest, pinnedBy: "creator" as const, at: { seq: 1, keyring_link: record("genesis").keyring_link } }
+    const handBuilt = {
+      account: ACCOUNT,
+      genesisDigest: record("genesis").digest,
+      pinnedBy: "creator" as const,
+      at: { seq: 1, keyring_link: record("genesis").keyring_link },
+    }
     // @ts-expect-error only a walk that met its anchor mints a PinCandidate
     await expect(pinTrustAnchor(dir, ACCOUNT, handBuilt)).rejects.toMatchObject({ problem: "not_verified" })
     await expectNoAnchor(dir, "no_pin")
@@ -70,7 +82,11 @@ describe("the pinned root: set once from a proven walk, then the only root", () 
     const before = readFileSync(pinPath(dir), "utf8")
     const keyring = await newDeviceKeyring()
     const other = await genesisEntry(ACCOUNT, keyring, "W".repeat(43), newRecoveryCredential())
-    const walked = await appendEntries(emptyChain(ACCOUNT, creatorAnchor(ACCOUNT, keyring)), [other], createRejectionCounter())
+    const walked = await appendEntries(
+      emptyChain(ACCOUNT, creatorAnchor(ACCOUNT, keyring)),
+      [other],
+      createRejectionCounter(),
+    )
     if (!walked.ok || walked.state.pin === null) throw new Error("other root walk")
     await expect(pinTrustAnchor(dir, ACCOUNT, walked.state.pin)).rejects.toBeInstanceOf(TrustPinError)
     expect(readFileSync(pinPath(dir), "utf8")).toBe(before)
@@ -108,7 +124,9 @@ describe("a pin file that is missing or does not parse is no anchor, never a fal
     const accountDir = dirname(pinPath(dir))
     mkdirSync(accountDir, { recursive: true })
     await expectNoAnchor(dir, "corrupt_pin")
-    await expect(pinTrustAnchor(dir, ACCOUNT, await provenCandidate())).rejects.toMatchObject({ problem: "corrupt_pin" })
+    await expect(pinTrustAnchor(dir, ACCOUNT, await provenCandidate())).rejects.toMatchObject({
+      problem: "corrupt_pin",
+    })
     expect(readdirSync(accountDir)).toEqual([])
   })
 
@@ -116,7 +134,10 @@ describe("a pin file that is missing or does not parse is no anchor, never a fal
     ["truncated", (pin: string) => pin.slice(0, pin.length / 2)],
     ["garbage", () => "\u0000\u00ff not json"],
     ["wrong version", (pin: string) => JSON.stringify({ ...JSON.parse(pin), version: 2 })],
-    ["an inner account that is not the expected one", (pin: string) => JSON.stringify({ ...JSON.parse(pin), account: "another-account" })],
+    [
+      "an inner account that is not the expected one",
+      (pin: string) => JSON.stringify({ ...JSON.parse(pin), account: "another-account" }),
+    ],
     ["a malformed root digest", (pin: string) => JSON.stringify({ ...JSON.parse(pin), genesis_digest: "short" })],
     ["an extra field", (pin: string) => JSON.stringify({ ...JSON.parse(pin), trust: "server" })],
   ])("%s", async (_name, mutate) => {
@@ -124,7 +145,9 @@ describe("a pin file that is missing or does not parse is no anchor, never a fal
     await pinned(dir)
     writeFileSync(pinPath(dir), mutate(readFileSync(pinPath(dir), "utf8")))
     await expectNoAnchor(dir, "corrupt_pin")
-    await expect(pinTrustAnchor(dir, ACCOUNT, await provenCandidate())).rejects.toMatchObject({ problem: "corrupt_pin" })
+    await expect(pinTrustAnchor(dir, ACCOUNT, await provenCandidate())).rejects.toMatchObject({
+      problem: "corrupt_pin",
+    })
   })
 
   test("a crash before the publishing rename leaves no pin, and the next load removes the candidate", async () => {
@@ -146,7 +169,11 @@ describe("publishing the pin is durable, and a lost race is decided by the winne
     const root = join(dir, "trust-anchor")
     const [syncFile, syncDirectory, rename] = [durable.syncJournalFile, durable.syncJournalDirectory, resilient.rename]
     const calls: string[] = []
-    const name = (path: unknown) => (relative(root, String(path)) || ".").split(sep).join("/").replace(/\.\d+\.[0-9a-f]{12}\.tmp/, ".tmp")
+    const name = (path: unknown) =>
+      (relative(root, String(path)) || ".")
+        .split(sep)
+        .join("/")
+        .replace(/\.\d+\.[0-9a-f]{12}\.tmp/, ".tmp")
     spyOn(durable, "syncJournalFile").mockImplementation(async (path) => {
       calls.push(`file ${name(path)}`)
       await syncFile(path)

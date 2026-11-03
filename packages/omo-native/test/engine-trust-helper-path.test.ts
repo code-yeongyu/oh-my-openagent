@@ -9,14 +9,18 @@ describe("resolveEngineTrustHelperPath", () => {
   test("returns the payload path under OMO_PACKAGE_DIR on the four Darwin and Windows hosts", () => {
     const env = { OMO_PACKAGE_DIR: runtimeDir }
 
-    expect(resolveEngineTrustHelperPath(env, "darwin", "arm64"))
-      .toBe(join(runtimeDir, "native", "prebuilds", "darwin-arm64", "omo-engine-trust-helper"))
-    expect(resolveEngineTrustHelperPath(env, "darwin", "x64"))
-      .toBe(join(runtimeDir, "native", "prebuilds", "darwin-x64", "omo-engine-trust-helper"))
-    expect(resolveEngineTrustHelperPath(env, "win32", "x64"))
-      .toBe(join(runtimeDir, "native", "prebuilds", "win32-x64", "omo-engine-trust-helper.exe"))
-    expect(resolveEngineTrustHelperPath(env, "win32", "arm64"))
-      .toBe(join(runtimeDir, "native", "prebuilds", "win32-arm64", "omo-engine-trust-helper.exe"))
+    expect(resolveEngineTrustHelperPath(env, "darwin", "arm64")).toBe(
+      join(runtimeDir, "native", "prebuilds", "darwin-arm64", "omo-engine-trust-helper"),
+    )
+    expect(resolveEngineTrustHelperPath(env, "darwin", "x64")).toBe(
+      join(runtimeDir, "native", "prebuilds", "darwin-x64", "omo-engine-trust-helper"),
+    )
+    expect(resolveEngineTrustHelperPath(env, "win32", "x64")).toBe(
+      join(runtimeDir, "native", "prebuilds", "win32-x64", "omo-engine-trust-helper.exe"),
+    )
+    expect(resolveEngineTrustHelperPath(env, "win32", "arm64")).toBe(
+      join(runtimeDir, "native", "prebuilds", "win32-arm64", "omo-engine-trust-helper.exe"),
+    )
   })
 
   test("returns null on hosts that ship no helper", () => {

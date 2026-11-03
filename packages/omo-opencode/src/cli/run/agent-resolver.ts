@@ -34,9 +34,7 @@ const isAgentDisabled = (agentConfigKey: string, config: OhMyOpenCodeConfig): bo
   if (lowered === DEFAULT_AGENT && config.sisyphus_agent?.disabled === true) {
     return true
   }
-  return (config.disabled_agents ?? []).some(
-    (disabled) => getAgentConfigKey(disabled) === lowered
-  )
+  return (config.disabled_agents ?? []).some((disabled) => getAgentConfigKey(disabled) === lowered)
 }
 
 const pickFallbackAgent = (config: OhMyOpenCodeConfig): CoreAgentKey => {
@@ -51,13 +49,12 @@ const pickFallbackAgent = (config: OhMyOpenCodeConfig): CoreAgentKey => {
 export const resolveRunAgent = (
   options: RunOptions,
   pluginConfig: OhMyOpenCodeConfig,
-  env: EnvVars = process.env
+  env: EnvVars = process.env,
 ): string => {
   const cliAgent = normalizeAgentName(options.agent)
   const envAgent = normalizeAgentName(env.OPENCODE_DEFAULT_AGENT)
   const configAgent = normalizeAgentName(pluginConfig.default_run_agent)
-  const resolved =
-    cliAgent ??
+  const resolved = cliAgent ??
     envAgent ??
     configAgent ?? {
       configKey: DEFAULT_AGENT,
@@ -71,15 +68,13 @@ export const resolveRunAgent = (
     if (fallbackDisabled) {
       console.log(
         pc.yellow(
-          `Requested agent "${resolved.resolvedName}" is disabled and no enabled core agent was found. Proceeding with "${fallbackDisplayName}".`
-        )
+          `Requested agent "${resolved.resolvedName}" is disabled and no enabled core agent was found. Proceeding with "${fallbackDisplayName}".`,
+        ),
       )
       return fallback
     }
     console.log(
-      pc.yellow(
-        `Requested agent "${resolved.resolvedName}" is disabled. Falling back to "${fallbackDisplayName}".`
-      )
+      pc.yellow(`Requested agent "${resolved.resolvedName}" is disabled. Falling back to "${fallbackDisplayName}".`),
     )
     return fallback
   }

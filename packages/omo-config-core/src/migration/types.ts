@@ -49,11 +49,7 @@ export type MigrationTargetWriter = (input: {
 export type MigrationTargetWriteResult = { readonly backupPath?: string }
 
 export type MigrationBoundary =
-  | "journal-written"
-  | "target-written"
-  | "target-recorded"
-  | "source-moved"
-  | "source-recorded"
+  "journal-written" | "target-written" | "target-recorded" | "source-moved" | "source-recorded"
 
 export type MigrationPlan = {
   readonly id: string
@@ -122,7 +118,10 @@ export type MigrationBatchRunResult = {
 export class MigrationValidationError extends Error {
   override readonly name = "MigrationValidationError"
 
-  constructor(readonly targetPath: string, message: string) {
+  constructor(
+    readonly targetPath: string,
+    message: string,
+  ) {
     super(`Migration validation failed for ${targetPath}: ${message}`)
   }
 }

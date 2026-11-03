@@ -35,8 +35,12 @@ export function spawnScript(count, childSteps, prefix = "c") {
 // parent turn open until the driver has captured its fact and explicitly kills that parent.
 export function holdParent(script) {
   script.parentSteps.splice(-1, 0, {
-    type: "tool_call", name: "eval", arguments: {
-      language: "js", summary: "keep the QA parent active until observation completes", timeout: 1_200,
+    type: "tool_call",
+    name: "eval",
+    arguments: {
+      language: "js",
+      summary: "keep the QA parent active until observation completes",
+      timeout: 1_200,
       code: `var fs = await import("node:fs"); await new Promise((resolve, reject) => {
         var finish = () => { if (!fs.existsSync(".omo/parent-release")) return;
           clearTimeout(timer); watcher.close(); resolve(); };
@@ -63,19 +67,19 @@ export function holdParent(script) {
 // 100% of the host loop and starved every other open), and `eval` aborts at startup in a
 // mock-provider child. `read` completes; the mock's delayMs supplies the time `sleep 2` used to.
 export const CHILD_BUSY = [
-	...Array.from({ length: 2 }, () => ({
-		type: "tool_call",
-		name: "read",
-		// NOT mock-script.json: it carries the prompts, so every tool result would echo the child's
-		// own prompt and B would read its own fixture as a prompt replay.
-		arguments: { path: ".omo/omo.json" },
-		// Long enough that a child is still mid-turn when B kills the parent. It does NOT guarantee
-		// that all 32 of A's children open inside any particular observe budget: on a loaded machine
-		// they keep opening for minutes, which is why A observes with its own larger budget and
-		// `TASK_HOST_E2E_OBSERVE_MS` exists.
-		delayMs: 1_000,
-	})),
-	{ type: "text", text: "host child mock work complete" },
+  ...Array.from({ length: 2 }, () => ({
+    type: "tool_call",
+    name: "read",
+    // NOT mock-script.json: it carries the prompts, so every tool result would echo the child's
+    // own prompt and B would read its own fixture as a prompt replay.
+    arguments: { path: ".omo/omo.json" },
+    // Long enough that a child is still mid-turn when B kills the parent. It does NOT guarantee
+    // that all 32 of A's children open inside any particular observe budget: on a loaded machine
+    // they keep opening for minutes, which is why A observes with its own larger budget and
+    // `TASK_HOST_E2E_OBSERVE_MS` exists.
+    delayMs: 1_000,
+  })),
+  { type: "text", text: "host child mock work complete" },
 ]
 
 export const CHILD_DONE = [{ type: "text", text: "host child mock work complete" }]
@@ -99,28 +103,42 @@ export function childSessionFiles(sandbox, taskId) {
     join(sandbox.stateDir, "sessions", taskId),
   ]
   return dirs.flatMap((dir) =>
-    existsSync(dir) ? readdirSync(dir).filter((file) => file.endsWith(".jsonl")).map((file) => join(dir, file)) : [])
+    existsSync(dir)
+      ? readdirSync(dir)
+          .filter((file) => file.endsWith(".jsonl"))
+          .map((file) => join(dir, file))
+      : [],
+  )
 }
 
 export function jsonlLines(path) {
   if (!existsSync(path)) return []
-  return readFileSync(path, "utf8").split("\n").filter((line) => line.trim().length > 0)
+  return readFileSync(path, "utf8")
+    .split("\n")
+    .filter((line) => line.trim().length > 0)
 }
 
 export function toolDetails(stdout, name) {
   return stdout.split("\n").flatMap((line) => {
     let event
-    try { event = JSON.parse(line) } catch { return [] }
+    try {
+      event = JSON.parse(line)
+    } catch {
+      return []
+    }
     return event.type === "tool_execution_end" && event.toolName === name && !event.isError
-      ? [event.result?.details].filter(Boolean) : []
+      ? [event.result?.details].filter(Boolean)
+      : []
   })
 }
 
 export function transcriptSizes(sandbox, records) {
-  return Object.fromEntries(records.map((record) => [
-    record.task_id,
-    childSessionFiles(sandbox, record.task_id).reduce((total, file) => total + jsonlLines(file).length, 0),
-  ]))
+  return Object.fromEntries(
+    records.map((record) => [
+      record.task_id,
+      childSessionFiles(sandbox, record.task_id).reduce((total, file) => total + jsonlLines(file).length, 0),
+    ]),
+  )
 }
 
 export function failureTokens(text) {
@@ -138,7 +156,9 @@ export function recordFailureTokens(records) {
  */
 export function childStartDiagnosis(sandbox, records) {
   const failed = records.filter((record) => record.status === "error")
-  const sessionsDir = [join(sandbox.stateDir, "children"), join(sandbox.stateDir, "sessions")].find((dir) => existsSync(dir))
+  const sessionsDir = [join(sandbox.stateDir, "children"), join(sandbox.stateDir, "sessions")].find((dir) =>
+    existsSync(dir),
+  )
   return {
     total: records.length,
     running: records.filter((record) => record.status === "running").length,
@@ -150,4 +170,3 @@ export function childStartDiagnosis(sandbox, records) {
     executionModes: [...new Set(records.map((record) => record.execution_mode))],
   }
 }
-

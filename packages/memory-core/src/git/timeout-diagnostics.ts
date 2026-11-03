@@ -13,31 +13,57 @@ export const GIT_TIMEOUT_DIAGNOSTICS_ENV = "OMO_GIT_TIMEOUT_DIAGNOSTICS_DIR"
 const SNAPSHOT_TIMEOUT_MS = 15_000
 
 function processSnapshot(pid: number): string {
-  const command = process.platform === "win32"
-    ? spawnSync("powershell", ["-NoProfile", "-Command", [
-      "Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,CreationDate,CommandLine | Format-Table -AutoSize -Wrap | Out-String -Width 400",
-      // Thread states for the git and every child it started, in case the stalled work runs in a child.
-      `@(${pid}) + @(Get-CimInstance Win32_Process -Filter "ParentProcessId=${pid}" | ForEach-Object { $_.ProcessId }) | ForEach-Object { "threads of $_"; (Get-Process -Id $_ -ErrorAction SilentlyContinue).Threads | Group-Object ThreadState,WaitReason -NoElement | Format-Table -AutoSize | Out-String }`,
-    ].join("; ")], { encoding: "utf8", timeout: SNAPSHOT_TIMEOUT_MS, windowsHide: true })
-    : spawnSync("ps", ["-axo", "pid,ppid,stat,wchan,etime,command"], { encoding: "utf8", timeout: SNAPSHOT_TIMEOUT_MS, windowsHide: true })
+  const command =
+    process.platform === "win32"
+      ? spawnSync(
+          "powershell",
+          [
+            "-NoProfile",
+            "-Command",
+            [
+              "Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,CreationDate,CommandLine | Format-Table -AutoSize -Wrap | Out-String -Width 400",
+              // Thread states for the git and every child it started, in case the stalled work runs in a child.
+              `@(${pid}) + @(Get-CimInstance Win32_Process -Filter "ParentProcessId=${pid}" | ForEach-Object { $_.ProcessId }) | ForEach-Object { "threads of $_"; (Get-Process -Id $_ -ErrorAction SilentlyContinue).Threads | Group-Object ThreadState,WaitReason -NoElement | Format-Table -AutoSize | Out-String }`,
+            ].join("; "),
+          ],
+          { encoding: "utf8", timeout: SNAPSHOT_TIMEOUT_MS, windowsHide: true },
+        )
+      : spawnSync("ps", ["-axo", "pid,ppid,stat,wchan,etime,command"], {
+          encoding: "utf8",
+          timeout: SNAPSHOT_TIMEOUT_MS,
+          windowsHide: true,
+        })
   if (command.error) return `process snapshot failed: ${command.error.message}`
   return `${command.stdout}${command.stderr}`
 }
 
-export function recordGitTimeout(environment: NodeJS.ProcessEnv, pid: number | undefined, argv: readonly string[], cwd: string, timeoutMs: number): void {
+export function recordGitTimeout(
+  environment: NodeJS.ProcessEnv,
+  pid: number | undefined,
+  argv: readonly string[],
+  cwd: string,
+  timeoutMs: number,
+): void {
   const directory = environment[GIT_TIMEOUT_DIAGNOSTICS_ENV]
   if (!directory || pid === undefined) return
   try {
     mkdirSync(directory, { recursive: true })
-    writeFileSync(join(directory, `git-timeout-${pid}-${Date.now()}.json`), `${JSON.stringify({
-      at: new Date().toISOString(),
-      pid,
-      cwd,
-      timeoutMs,
-      argv: argv.slice(0, 12),
-      argCount: argv.length,
-      processes: processSnapshot(pid),
-    }, null, 2)}\n`)
+    writeFileSync(
+      join(directory, `git-timeout-${pid}-${Date.now()}.json`),
+      `${JSON.stringify(
+        {
+          at: new Date().toISOString(),
+          pid,
+          cwd,
+          timeoutMs,
+          argv: argv.slice(0, 12),
+          argCount: argv.length,
+          processes: processSnapshot(pid),
+        },
+        null,
+        2,
+      )}\n`,
+    )
   } catch (error) {
     process.stderr.write(`git timeout diagnostics could not be written to ${directory}: ${String(error)}\n`)
   }

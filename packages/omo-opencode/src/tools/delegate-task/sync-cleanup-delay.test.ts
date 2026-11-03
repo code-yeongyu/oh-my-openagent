@@ -16,7 +16,12 @@ type RecordedTimer = {
   readonly handle: ReturnType<typeof setTimeout>
 }
 
-const SESSION_IDS = ["ses_cleanup_custom", "ses_cleanup_default", "ses_cleanup_resume", "ses_cleanup_prompt_fail"] as const
+const SESSION_IDS = [
+  "ses_cleanup_custom",
+  "ses_cleanup_default",
+  "ses_cleanup_resume",
+  "ses_cleanup_prompt_fail",
+] as const
 const parentContext = { sessionID: "parent-session", messageID: "parent-message" }
 const toolContext: ToolContextWithMetadata = {
   ...parentContext,
@@ -69,22 +74,23 @@ describe("sync cleanup delay threading", () => {
   let timerSpy: ReturnType<typeof spyOn<typeof globalThis, "setTimeout">>
   let clearTimerSpy: ReturnType<typeof spyOn<typeof globalThis, "clearTimeout">>
 
-  const pendingTimers = (): RecordedTimer[] => recordedTimers.filter(
-    (timer) => !clearTimerSpy.mock.calls.some(([handle]) => handle === timer.handle),
-  )
+  const pendingTimers = (): RecordedTimer[] =>
+    recordedTimers.filter((timer) => !clearTimerSpy.mock.calls.some(([handle]) => handle === timer.handle))
 
   beforeEach(() => {
     recordedTimers = []
     const originalSetTimeout = globalThis.setTimeout
-    timerSpy = spyOn(globalThis, "setTimeout").mockImplementation(unsafeTestValue<typeof setTimeout>(
-      (callback: (...args: unknown[]) => void, delay?: number, ...args: unknown[]) => {
-        const handle = originalSetTimeout(callback, delay, ...args)
-        if (delay !== undefined && delay >= 60000) {
-          recordedTimers.push({ delay, callback: () => callback(...args), handle })
-        }
-        return handle
-      },
-    ))
+    timerSpy = spyOn(globalThis, "setTimeout").mockImplementation(
+      unsafeTestValue<typeof setTimeout>(
+        (callback: (...args: unknown[]) => void, delay?: number, ...args: unknown[]) => {
+          const handle = originalSetTimeout(callback, delay, ...args)
+          if (delay !== undefined && delay >= 60000) {
+            recordedTimers.push({ delay, callback: () => callback(...args), handle })
+          }
+          return handle
+        },
+      ),
+    )
     clearTimerSpy = spyOn(globalThis, "clearTimeout")
   })
 
@@ -102,8 +108,15 @@ describe("sync cleanup delay threading", () => {
 
     await executeSyncTask(
       { description: "test task", prompt: "test prompt", run_in_background: false, load_skills: [] },
-      toolContext, createExecutorContext(client, 120000), parentContext,
-      "test-agent", undefined, undefined, undefined, undefined, createSyncTaskDeps(sessionID),
+      toolContext,
+      createExecutorContext(client, 120000),
+      parentContext,
+      "test-agent",
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      createSyncTaskDeps(sessionID),
     )
 
     const deletionTimer = pendingTimers().slice(-1)[0]
@@ -118,8 +131,15 @@ describe("sync cleanup delay threading", () => {
 
     await executeSyncTask(
       { description: "test task", prompt: "test prompt", run_in_background: false, load_skills: [] },
-      toolContext, createExecutorContext(client), parentContext,
-      "test-agent", undefined, undefined, undefined, undefined, createSyncTaskDeps(sessionID),
+      toolContext,
+      createExecutorContext(client),
+      parentContext,
+      "test-agent",
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      createSyncTaskDeps(sessionID),
     )
 
     expect(pendingTimers().slice(-1)[0]?.delay).toBe(TASK_CLEANUP_DELAY_MS)
@@ -132,8 +152,17 @@ describe("sync cleanup delay threading", () => {
     const earlierTimer = recordedTimers[0]
 
     await executeSyncContinuation(
-      { task_id: sessionID, description: "test continuation", prompt: "continue", run_in_background: false, load_skills: [] },
-      toolContext, createExecutorContext(client, 120000), parentContext, continuationDeps,
+      {
+        task_id: sessionID,
+        description: "test continuation",
+        prompt: "continue",
+        run_in_background: false,
+        load_skills: [],
+      },
+      toolContext,
+      createExecutorContext(client, 120000),
+      parentContext,
+      continuationDeps,
     )
 
     expect(clearTimerSpy).toHaveBeenCalledWith(earlierTimer?.handle)
@@ -142,11 +171,24 @@ describe("sync cleanup delay threading", () => {
 
   test("#when a continuation prompt fails #then deletion is re-armed with the configured delay", async () => {
     const sessionID = SESSION_IDS[3]
-    const { client } = createClient(mock(async () => { throw new Error("Session not found") }))
+    const { client } = createClient(
+      mock(async () => {
+        throw new Error("Session not found")
+      }),
+    )
 
     await executeSyncContinuation(
-      { task_id: sessionID, description: "test continuation", prompt: "continue", run_in_background: false, load_skills: [] },
-      toolContext, createExecutorContext(client, 120000), parentContext, continuationDeps,
+      {
+        task_id: sessionID,
+        description: "test continuation",
+        prompt: "continue",
+        run_in_background: false,
+        load_skills: [],
+      },
+      toolContext,
+      createExecutorContext(client, 120000),
+      parentContext,
+      continuationDeps,
     )
 
     expect(pendingTimers().slice(-1)[0]?.delay).toBe(120000)

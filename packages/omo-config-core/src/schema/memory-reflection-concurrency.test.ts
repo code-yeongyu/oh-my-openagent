@@ -6,9 +6,11 @@ test("reflection concurrency defaults to one and remains configurable through a 
   const layer = OmoMemorySettingsLayerSchema.parse({ reflection: { max_concurrent_runs: 2 } })
   expect(layer).toEqual({ reflection: { max_concurrent_runs: 2 } })
   expect(OmoMemorySettingsSchema.parse(layer).reflection.max_concurrent_runs).toBe(2)
-  expect(OmoMemorySettingsSchema.safeParse({
-    agents: { writer: { reflection: { max_concurrent_runs: 2 } } },
-  }).success).toBe(false)
+  expect(
+    OmoMemorySettingsSchema.safeParse({
+      agents: { writer: { reflection: { max_concurrent_runs: 2 } } },
+    }).success,
+  ).toBe(false)
 })
 
 test.each([0, -1, 1.5, Number.POSITIVE_INFINITY, "2"])("invalid concurrency %s cannot reach a supervisor", (value) => {

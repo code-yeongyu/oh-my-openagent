@@ -65,9 +65,7 @@ describe("parallelism eval e2e analysis", () => {
   })
 
   test("#given inconsistent nested statuses #when analyzed #then exact nested accounting fails", () => {
-    const checks = analyzeParallelismRequests([
-      request(properties({ eval_nested_tool_call_ok_count: 1 })),
-    ])
+    const checks = analyzeParallelismRequests([request(properties({ eval_nested_tool_call_ok_count: 1 }))])
 
     expect(checks.nestedCountsExact).toBe(false)
   })

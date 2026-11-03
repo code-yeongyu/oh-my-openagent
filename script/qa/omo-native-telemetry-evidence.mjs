@@ -30,14 +30,17 @@ export function redactEvents(events) {
 
 export function sanitizeTranscript(text, sandboxes) {
   let sanitized = text
-  for (const sandbox of sandboxes) sanitized = sanitized.replaceAll(sandbox.root, `<temp-${basename(sandbox.root).split("-").at(-2) ?? "sandbox"}>`)
+  for (const sandbox of sandboxes)
+    sanitized = sanitized.replaceAll(sandbox.root, `<temp-${basename(sandbox.root).split("-").at(-2) ?? "sandbox"}>`)
   sanitized = sanitized.replaceAll(repoRoot, "<repo-root>")
   sanitized = sanitized.replaceAll(pluginRoot, "<plugin-root>")
   return sanitized
 }
 
 export function evidenceMarkdown(input) {
-  const assertionLines = input.checks.map((check) => `- PASS ${check.name}: ${redactEvidenceText(check.detail)}`).join("\n")
+  const assertionLines = input.checks
+    .map((check) => `- PASS ${check.name}: ${redactEvidenceText(check.detail)}`)
+    .join("\n")
   return `# Task 14: OmO Native telemetry real-surface QA
 
 ## Result

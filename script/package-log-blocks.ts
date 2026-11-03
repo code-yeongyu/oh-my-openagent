@@ -22,7 +22,11 @@ const DATED_HEADING = /^## \d{4}-\d{2}-\d{2} (?:-|—) \S/
 const CONFLICT_MARKER = /^(?:<{7}|\|{7}|={7}|>{7})(?:\s|$)/m
 
 export type Block = { readonly log: string; readonly body: string }
-export type SplitFragment = { readonly preamble: string; readonly blocks: readonly Block[]; readonly reasons: readonly string[] }
+export type SplitFragment = {
+  readonly preamble: string
+  readonly blocks: readonly Block[]
+  readonly reasons: readonly string[]
+}
 
 export const markerLine = (log: string): string => `<!-- changes-log: ${log} -->`
 
@@ -40,10 +44,12 @@ export function splitFragment(content: string): SplitFragment {
   const blocks = raw.map(({ log, lines: body }) => ({ log, body: body.join("\n").trim() }))
   const seen = new Set<string>()
   for (const block of blocks) {
-    if (!CHANGE_LOG.test(block.log)) reasons.push(`\`${block.log}\` is not a change log (changes.md or packages/<name>/changes.md)`)
+    if (!CHANGE_LOG.test(block.log))
+      reasons.push(`\`${block.log}\` is not a change log (changes.md or packages/<name>/changes.md)`)
     if (seen.has(block.log)) reasons.push(`\`${block.log}\` has two blocks; write one`)
     seen.add(block.log)
-    if (!DATED_HEADING.test(block.body.split("\n")[0] ?? "")) reasons.push(`the block for \`${block.log}\` must start with \`## YYYY-MM-DD - <title>\``)
+    if (!DATED_HEADING.test(block.body.split("\n")[0] ?? ""))
+      reasons.push(`the block for \`${block.log}\` must start with \`## YYYY-MM-DD - <title>\``)
   }
   return { preamble: preamble.join("\n").trim(), blocks, reasons }
 }
@@ -81,7 +87,10 @@ export type CompileResult = {
 }
 
 /** All-or-nothing: any invalid fragment or missing log throws before anything is written. */
-export function compileBlocks(fragments: readonly { readonly pr: number; readonly content: string }[], readLog: (path: string) => string | null): CompileResult {
+export function compileBlocks(
+  fragments: readonly { readonly pr: number; readonly content: string }[],
+  readLog: (path: string) => string | null,
+): CompileResult {
   const byLog = new Map<string, string[]>()
   const kept = new Map<number, string | null>()
   for (const fragment of [...fragments].sort((left, right) => right.pr - left.pr)) {

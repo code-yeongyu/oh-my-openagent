@@ -1,11 +1,7 @@
 import { constants, closeSync, openSync, writeSync } from "fs"
 import { getRegistryPath, MAX_AGE_MS, SECURE_FILE_MODE } from "./session-registry-paths"
 import { withRegistryLock, withRegistryLockOrWait } from "./session-registry-lock"
-import {
-  ensureRegistryDir,
-  readAllMappingsUnsafe,
-  rewriteRegistryUnsafe,
-} from "./session-registry-storage"
+import { ensureRegistryDir, readAllMappingsUnsafe, rewriteRegistryUnsafe } from "./session-registry-storage"
 import type { SessionMapping } from "./session-registry-types"
 
 export type { SessionMapping } from "./session-registry-types"
@@ -28,9 +24,7 @@ export function registerMessage(mapping: SessionMapping): boolean {
       return true
     },
     () => {
-      console.warn(
-        "[notifications] session registry lock unavailable; skipping reply correlation write",
-      )
+      console.warn("[notifications] session registry lock unavailable; skipping reply correlation write")
       return false
     },
   )

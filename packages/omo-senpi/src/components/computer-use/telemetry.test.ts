@@ -50,14 +50,16 @@ describe("computer-use telemetry projection", () => {
     })
 
     // then
-    expect(recorded.observations).toEqual([{
-      kind: "activation",
-      sessionId: "session-secret",
-      active: true,
-      source: "tool_call",
-      platform: "other",
-      backend: "other",
-    }])
+    expect(recorded.observations).toEqual([
+      {
+        kind: "activation",
+        sessionId: "session-secret",
+        active: true,
+        source: "tool_call",
+        platform: "other",
+        backend: "other",
+      },
+    ])
   })
 
   test("#given unavailable OS capabilities #when inspected #then capture input and ax emit without permission labels", () => {
@@ -120,41 +122,43 @@ describe("computer-use telemetry projection", () => {
     for (const code of ERROR_CODES) {
       telemetry.engineError(
         context(),
-        engineErrorCode(new DesktopEngineRpcError("capture", {
-          code: -32_000,
-          message: "private engine message",
-          data: { code, hint: "private recovery hint" },
-        })),
+        engineErrorCode(
+          new DesktopEngineRpcError("capture", {
+            code: -32_000,
+            message: "private engine message",
+            data: { code, hint: "private recovery hint" },
+          }),
+        ),
         "quartz",
       )
     }
     telemetry.engineError(
       context(),
-      engineErrorCode(new DesktopEngineUnavailableError({
-        code: "native-unavailable",
-        host: "private-host",
-        attemptedPaths: ["/private/path"],
-        message: "private missing binary message",
-        cause: "private cause",
-      })),
+      engineErrorCode(
+        new DesktopEngineUnavailableError({
+          code: "native-unavailable",
+          host: "private-host",
+          attemptedPaths: ["/private/path"],
+          message: "private missing binary message",
+          cause: "private cause",
+        }),
+      ),
       "unavailable",
     )
     telemetry.engineError(
       context(),
-      engineErrorCode(new DesktopEngineAbiMismatchError("/private/engine", { abi: "private", protocolVersion: "private" })),
+      engineErrorCode(
+        new DesktopEngineAbiMismatchError("/private/engine", { abi: "private", protocolVersion: "private" }),
+      ),
       "unavailable",
     )
     telemetry.engineError(context(), engineErrorCode(new DesktopServiceError("Timeout", "private timeout")), "x11")
     telemetry.engineError(context(), engineErrorCode(new Error("private unknown")), "private-backend")
 
     // then
-    expect(recorded.observations.map((observation) => observation.kind === "engine_error" ? observation.code : "")).toEqual([
-      ...ERROR_CODES,
-      "native-unavailable",
-      "abi-mismatch",
-      "Timeout",
-      "other",
-    ])
+    expect(
+      recorded.observations.map((observation) => (observation.kind === "engine_error" ? observation.code : "")),
+    ).toEqual([...ERROR_CODES, "native-unavailable", "abi-mismatch", "Timeout", "other"])
     const serialized = JSON.stringify(recorded.observations)
     expect(serialized).not.toContain("private engine message")
     expect(serialized).not.toContain("/private/")
@@ -173,54 +177,67 @@ describe("computer-use telemetry projection", () => {
       toolName: "computer",
       args: { action: "run", code: "private typed text" },
     })
-    telemetry.permissionTierDenied({
-      type: "tool_execution_end",
-      toolCallId: "call-1",
-      toolName: "computer",
-      isError: true,
-      result: {
-        content: [{ type: "text", text: "The user rejected permission to use this specific tool call." }],
+    telemetry.permissionTierDenied(
+      {
+        type: "tool_execution_end",
+        toolCallId: "call-1",
+        toolName: "computer",
+        isError: true,
+        result: {
+          content: [{ type: "text", text: "The user rejected permission to use this specific tool call." }],
+        },
       },
-    }, context(), "win32")
+      context(),
+      "win32",
+    )
 
     // then
-    expect(recorded.observations).toEqual([{
-      kind: "permission_denied",
-      sessionId: "session-secret",
-      scope: "tier",
-      permission: "exec",
-      platform: "win32",
-      backend: "win32",
-    }])
+    expect(recorded.observations).toEqual([
+      {
+        kind: "permission_denied",
+        sessionId: "session-secret",
+        scope: "tier",
+        permission: "exec",
+        platform: "win32",
+        backend: "win32",
+      },
+    ])
     expect(JSON.stringify(recorded.observations)).not.toContain("private typed text")
   })
 
   test.each([
     "The user rejected permission to use this specific tool call. Treat this as final for what the call was meant to do.",
     "The user has specified a rule which prevents you from using this specific tool call. Denied by project permission rule bash:* = deny (project settings.json).",
-  ])("#given a refusal with guidance after its first sentence #when the tier denial is recorded #then it is a permission denial (%#)", (text) => {
-    // given
-    const recorded = recorder()
-    const telemetry = createComputerUseTelemetry({ platform: "win32", observers: recorded.observers })
+  ])(
+    "#given a refusal with guidance after its first sentence #when the tier denial is recorded #then it is a permission denial (%#)",
+    (text) => {
+      // given
+      const recorded = recorder()
+      const telemetry = createComputerUseTelemetry({ platform: "win32", observers: recorded.observers })
 
-    // when
-    telemetry.toolExecutionStarted({
-      type: "tool_execution_start",
-      toolCallId: "call-1",
-      toolName: "computer",
-      args: { action: "run", code: "private typed text" },
-    })
-    telemetry.permissionTierDenied({
-      type: "tool_execution_end",
-      toolCallId: "call-1",
-      toolName: "computer",
-      isError: true,
-      result: { content: [{ type: "text", text }] },
-    }, context(), "win32")
+      // when
+      telemetry.toolExecutionStarted({
+        type: "tool_execution_start",
+        toolCallId: "call-1",
+        toolName: "computer",
+        args: { action: "run", code: "private typed text" },
+      })
+      telemetry.permissionTierDenied(
+        {
+          type: "tool_execution_end",
+          toolCallId: "call-1",
+          toolName: "computer",
+          isError: true,
+          result: { content: [{ type: "text", text }] },
+        },
+        context(),
+        "win32",
+      )
 
-    // then
-    expect(recorded.observations.map((observation) => observation.kind)).toEqual(["permission_denied"])
-  })
+      // then
+      expect(recorded.observations.map((observation) => observation.kind)).toEqual(["permission_denied"])
+    },
+  )
 
   test("#given an engine spawn EACCES #when the failed result mentions permission denied #then it is not mislabeled as a tier denial", () => {
     // given
@@ -234,18 +251,24 @@ describe("computer-use telemetry projection", () => {
       toolName: "computer",
       args: { action: "run", code: "await desktop.click(1, 1)" },
     })
-    telemetry.permissionTierDenied({
-      type: "tool_execution_end",
-      toolCallId: "call-2",
-      toolName: "computer",
-      isError: true,
-      result: {
-        content: [{
-          type: "text",
-          text: "desktop engine exited; spawn: EACCES: permission denied, posix_spawn '/private/engine'",
-        }],
+    telemetry.permissionTierDenied(
+      {
+        type: "tool_execution_end",
+        toolCallId: "call-2",
+        toolName: "computer",
+        isError: true,
+        result: {
+          content: [
+            {
+              type: "text",
+              text: "desktop engine exited; spawn: EACCES: permission denied, posix_spawn '/private/engine'",
+            },
+          ],
+        },
       },
-    }, context(), "unavailable")
+      context(),
+      "unavailable",
+    )
 
     // then
     expect(recorded.observations).toEqual([])

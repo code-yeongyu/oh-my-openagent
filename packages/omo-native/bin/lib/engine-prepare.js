@@ -32,16 +32,31 @@ function isPreparedFor(senpiRoot, omoVersion) {
  * of omo-ai under a loose umask rewrites the plugin while the engine tree keeps its stamp (#9208).
  * Fail-open like the engine preparation: a failure warns with the manual fix and never blocks.
  */
-export function preparePluginLaunchSpec({ pluginRoot, report = (line) => { process.stderr.write(line) }, io = {} }) {
+export function preparePluginLaunchSpec({
+  pluginRoot,
+  report = (line) => {
+    process.stderr.write(line)
+  },
+  io = {},
+}) {
   try {
     normalizeLaunchSpecMode(pluginRoot, io)
   } catch (error) {
     const path = join(pluginRoot, LAUNCH_SPEC_FILENAME)
-    report(`omo: could not make ${path} private (${error.message}); task children and teams need it, run: chmod 644 ${path}\n`)
+    report(
+      `omo: could not make ${path} private (${error.message}); task children and teams need it, run: chmod 644 ${path}\n`,
+    )
   }
 }
 
-export function ensureEnginePrepared({ senpiRoot, omoVersion, reinstallCommand, report = (line) => { process.stderr.write(line) } }) {
+export function ensureEnginePrepared({
+  senpiRoot,
+  omoVersion,
+  reinstallCommand,
+  report = (line) => {
+    process.stderr.write(line)
+  },
+}) {
   if (isPreparedFor(senpiRoot, omoVersion)) return
   try {
     prepareInstalledEngine(senpiRoot)

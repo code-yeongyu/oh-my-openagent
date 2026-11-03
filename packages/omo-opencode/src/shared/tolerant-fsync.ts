@@ -5,12 +5,7 @@ import { classifyPathEnvironment } from "./classify-path-environment"
 import { recordFsyncSkip } from "./fsync-skip-tracker"
 import { log } from "./logger"
 
-const TOLERATED_FSYNC_CODES: ReadonlySet<string> = new Set([
-  "EPERM",
-  "EACCES",
-  "ENOTSUP",
-  "EINVAL",
-])
+const TOLERATED_FSYNC_CODES: ReadonlySet<string> = new Set(["EPERM", "EACCES", "ENOTSUP", "EINVAL"])
 
 export function isToleratedFsyncError(error: unknown): boolean {
   if (!(error instanceof Error)) return false
@@ -25,10 +20,7 @@ function extractPathFromContextLabel(contextLabel: string): string {
   return contextLabel.slice(separatorIndex + 1)
 }
 
-export async function tolerantFsync(
-  fileHandle: FileHandle,
-  contextLabel: string,
-): Promise<void> {
+export async function tolerantFsync(fileHandle: FileHandle, contextLabel: string): Promise<void> {
   try {
     await fileHandle.sync()
   } catch (error) {

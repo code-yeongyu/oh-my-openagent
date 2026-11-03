@@ -10,9 +10,16 @@ export interface PostMutationEvent {
 
 export function extractMutatedFilePaths(event: PostMutationEvent): string[] {
   const paths = new Set<string>()
-  const add = (value: unknown) => { if (typeof value === "string" && value) paths.add(value) }
-  const addArray = (value: unknown) => { if (Array.isArray(value)) value.forEach(add) }
-  add(event.input.path); add(event.input.filePath); addArray(event.input.paths); addArray(event.input.filePaths)
+  const add = (value: unknown) => {
+    if (typeof value === "string" && value) paths.add(value)
+  }
+  const addArray = (value: unknown) => {
+    if (Array.isArray(value)) value.forEach(add)
+  }
+  add(event.input.path)
+  add(event.input.filePath)
+  addArray(event.input.paths)
+  addArray(event.input.filePaths)
   for (const edit of extractApplyPatchEdits(event.details, event.input)) add(edit.filePath)
   if (typeof event.input.input === "string") {
     for (const line of event.input.input.split(/\r?\n/)) {
@@ -23,10 +30,14 @@ export function extractMutatedFilePaths(event: PostMutationEvent): string[] {
   }
   for (const key of ["files", "changes"]) {
     const value = event.input[key]
-    if (Array.isArray(value)) for (const item of value) if (typeof item === "object" && item) {
-      const record = item as Record<string, unknown>
-      add(record.path); add(record.filePath); add(record.movePath)
-    }
+    if (Array.isArray(value))
+      for (const item of value)
+        if (typeof item === "object" && item) {
+          const record = item as Record<string, unknown>
+          add(record.path)
+          add(record.filePath)
+          add(record.movePath)
+        }
   }
   return [...paths]
 }
@@ -45,10 +56,16 @@ export function createPostMutationSessionState() {
   return {
     shouldNotice(key: string, sessionId = "anonymous"): boolean {
       let set = notices.get(sessionId)
-      if (!set) { set = new Set(); notices.set(sessionId, set) }
+      if (!set) {
+        set = new Set()
+        notices.set(sessionId, set)
+      }
       if (set.has(key)) return false
-      set.add(key); return true
+      set.add(key)
+      return true
     },
-    reset(sessionId?: string): void { if (sessionId) notices.delete(sessionId) },
+    reset(sessionId?: string): void {
+      if (sessionId) notices.delete(sessionId)
+    },
   }
 }

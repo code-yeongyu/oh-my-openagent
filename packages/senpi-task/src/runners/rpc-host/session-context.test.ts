@@ -101,7 +101,9 @@ describe("buildChildContext", () => {
     const result = buildChildContext({ ...baseSpec, treeKey: key, shardKey: key })
 
     // then
-    expect(new Set(Object.keys(result.context))).toEqual(new Set(["role", "task_id", "state_dir", "tree_key", "shard_key"]))
+    expect(new Set(Object.keys(result.context))).toEqual(
+      new Set(["role", "task_id", "state_dir", "tree_key", "shard_key"]),
+    )
     expect(result.context.tree_key).toBe(key)
     expect(result.context.shard_key).toBe(key)
   })
@@ -161,7 +163,12 @@ describe("resolveChildSessionPath", () => {
 
   test("#given a path #when resolved #then it is absolute on this platform", () => {
     // when
-    const path = resolveChildSessionPath("/tmp/.omo/senpi-task", "st_abc123", new Date(), "550e8400-e29b-41d4-a716-446655440000")
+    const path = resolveChildSessionPath(
+      "/tmp/.omo/senpi-task",
+      "st_abc123",
+      new Date(),
+      "550e8400-e29b-41d4-a716-446655440000",
+    )
 
     // then
     expect(isAbsolute(path)).toBe(true)

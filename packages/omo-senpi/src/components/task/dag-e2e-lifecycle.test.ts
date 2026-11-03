@@ -19,12 +19,7 @@ import type { DagRunEvent, DagRunId } from "../../../../senpi-task/src/dag/types
 import { IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createDagRuntime, type DagRuntime } from "./dag-runtime"
-import type {
-  DagRpcEnvelope,
-  DagRpcEvent,
-  DagRpcHistoryPage,
-  DagRpcSubscribeHandshake,
-} from "./dag-rpc-handlers"
+import type { DagRpcEnvelope, DagRpcEvent, DagRpcHistoryPage, DagRpcSubscribeHandshake } from "./dag-rpc-handlers"
 import { runDagTool } from "./dag-tool"
 import { composeTaskEngine, type TaskEngine, type TaskRunnerFactories } from "./engine"
 import { createTeamServiceTestModelRegistry } from "./team-service-test-model-registry"
@@ -44,7 +39,9 @@ afterEach(() => {
 
 function deferred<T>() {
   let resolve = (_value: T): void => undefined
-  const promise = new Promise<T>((done) => { resolve = done })
+  const promise = new Promise<T>((done) => {
+    resolve = done
+  })
   return { promise, resolve }
 }
 
@@ -210,7 +207,10 @@ type RuntimeFixture = {
   readonly bridgeTimers: ManualTimers
   readonly statusTimers: ManualTimers
   readonly widgetCalls: Array<string[] | undefined>
-  readonly start: (key: string, nodes?: readonly { readonly id: string; readonly dependsOn?: readonly string[] }[]) => Promise<DagRunId>
+  readonly start: (
+    key: string,
+    nodes?: readonly { readonly id: string; readonly dependsOn?: readonly string[] }[],
+  ) => Promise<DagRunId>
 }
 
 function captureUnhandledRejections(): {
@@ -218,7 +218,9 @@ function captureUnhandledRejections(): {
   readonly stop: () => void
 } {
   const reasons: unknown[] = []
-  const listener = (reason: unknown): void => { reasons.push(reason) }
+  const listener = (reason: unknown): void => {
+    reasons.push(reason)
+  }
   process.on("unhandledRejection", listener)
   return { reasons, stop: () => process.off("unhandledRejection", listener) }
 }
@@ -249,7 +251,8 @@ async function runtimeFixture(options: RuntimeFixtureOptions = {}): Promise<Runt
   const bridgeTimers = new ManualTimers()
   const statusTimers = new ManualTimers()
   const createStore = spyOn(dagEngine, "createDagFileStore").mockImplementation((config, storeOptions = {}) =>
-    createFileStore(config, { ...storeOptions, fsync: false }))
+    createFileStore(config, { ...storeOptions, fsync: false }),
+  )
   let runtime: DagRuntime
   try {
     runtime = createDagRuntime({
@@ -277,23 +280,20 @@ async function runtimeFixture(options: RuntimeFixtureOptions = {}): Promise<Runt
     statusTimers,
     widgetCalls,
     async start(key, nodes = [{ id: "work" }]) {
-      const started = await runDagTool(
-        toolDeps(runtime),
-        {
-          action: "start",
-          definition: {
-            key,
-            name: key.replaceAll("-", " "),
-            nodes: nodes.map((node) => ({
-              id: node.id,
-              prompt: `do ${node.id}`,
-              subagent_type: "explore",
-              model: "omo-mock/mock-1",
-              ...(node.dependsOn === undefined ? {} : { dependsOn: [...node.dependsOn] }),
-            })),
-          },
+      const started = await runDagTool(toolDeps(runtime), {
+        action: "start",
+        definition: {
+          key,
+          name: key.replaceAll("-", " "),
+          nodes: nodes.map((node) => ({
+            id: node.id,
+            prompt: `do ${node.id}`,
+            subagent_type: "explore",
+            model: "omo-mock/mock-1",
+            ...(node.dependsOn === undefined ? {} : { dependsOn: [...node.dependsOn] }),
+          })),
         },
-      )
+      })
       if (started.details.kind !== "started") throw new Error(`expected dag start, received ${started.details.kind}`)
       return started.details.run_id as DagRunId
     },
@@ -368,12 +368,14 @@ class ReferenceDagViewer {
     this.applyPage(handshake.page.events)
     let page = handshake.page
     while (page.hasMore) {
-      page = expectOk<DagRpcHistoryPage>(await this.rpc.call("omo.dag.history", {
-        runId: this.runId,
-        sinceSeq: page.nextSinceSeq,
-        throughSeq: handshake.highWaterSeq,
-        limit: 2,
-      }))
+      page = expectOk<DagRpcHistoryPage>(
+        await this.rpc.call("omo.dag.history", {
+          runId: this.runId,
+          sinceSeq: page.nextSinceSeq,
+          throughSeq: handshake.highWaterSeq,
+          limit: 2,
+        }),
+      )
       this.applyPage(page.events)
     }
     for (const event of this.#buffer.splice(0).sort((left, right) => left.seq - right.seq)) this.apply(event)
@@ -392,12 +394,14 @@ class ReferenceDagViewer {
   private async applyLive(event: DagRpcEvent): Promise<void> {
     if (this.seen.has(this.key(event))) return
     if (event.seq > this.lastSeq() + 1) {
-      const page = expectOk<DagRpcHistoryPage>(await this.rpc.call("omo.dag.history", {
-        runId: this.runId,
-        sinceSeq: this.lastSeq(),
-        throughSeq: event.seq - 1,
-        limit: 256,
-      }))
+      const page = expectOk<DagRpcHistoryPage>(
+        await this.rpc.call("omo.dag.history", {
+          runId: this.runId,
+          sinceSeq: this.lastSeq(),
+          throughSeq: event.seq - 1,
+          limit: 256,
+        }),
+      )
       this.applyPage(page.events)
     }
     this.apply(event)
@@ -475,10 +479,12 @@ describe("assembled DAG lifecycle end to end", () => {
     const store = createFileStore({ project_dir: project }, { fsync: false })
     const paused = store.readCheckpoint<DagRunRecordV1 & { readonly previousLeaseHolderPid?: number }>(runId)
     expect(paused?.status).toBe("paused")
-    expect(store.readEvents(runId, 0, { limit: 256 }).events.at(-1)).toEqual(expect.objectContaining({
-      type: "dag.run.paused",
-      reason: "session_shutdown",
-    }))
+    expect(store.readEvents(runId, 0, { limit: 256 }).events.at(-1)).toEqual(
+      expect.objectContaining({
+        type: "dag.run.paused",
+        reason: "session_shutdown",
+      }),
+    )
 
     // given a restart whose predecessor lease holder is dead
     if (paused === null) throw new Error("expected paused checkpoint")
@@ -516,12 +522,19 @@ describe("assembled DAG lifecycle end to end", () => {
     const previousSessionFile = join(project, "fork-source.jsonl")
     fs.writeFileSync(previousSessionFile, JSON.stringify({ type: "session", id: sessionId }) + "\n")
     const adopterSessionFile = join(project, "fork-adopter.jsonl")
-    fs.writeFileSync(adopterSessionFile, JSON.stringify({ type: "session", id: "session-adopter", parentSession: previousSessionFile }) + "\n")
+    fs.writeFileSync(
+      adopterSessionFile,
+      JSON.stringify({ type: "session", id: "session-adopter", parentSession: previousSessionFile }) + "\n",
+    )
 
     // when a real fork from the paused source attaches under a new id
     const adopterRunner = new ControlledRunner()
     const adopter = await runtimeFixture({
-      project, runner: adopterRunner, sessionId: "session-adopter", sessionFile: adopterSessionFile, awaitAttach: false,
+      project,
+      runner: adopterRunner,
+      sessionId: "session-adopter",
+      sessionFile: adopterSessionFile,
+      awaitAttach: false,
       startEvent: { reason: "fork", previousSessionFile },
     })
     const adopted = await Promise.race([
@@ -560,16 +573,16 @@ describe("assembled DAG lifecycle end to end", () => {
     const fixture = await runtimeFixture({ project, runner, attach: false })
     const statusOf = (event: { readonly name: string; readonly data: unknown }): string | undefined => {
       if (event.name !== "omo.dag.updated") return undefined
-      const payload = event.data as { readonly runs?: ReadonlyArray<{ readonly run_id?: string; readonly status?: string }> }
+      const payload = event.data as {
+        readonly runs?: ReadonlyArray<{ readonly run_id?: string; readonly status?: string }>
+      }
       return payload.runs?.find((run) => run.run_id === runId)?.status
     }
 
     // when the bridge flush window fires while recovery is still reconciling (#7316 defect 1)
     const attaching = fixture.runtime.attach()
     fixture.bridgeTimers.flush(50)
-    const preRecovery = fixture.rpc.events
-      .map(statusOf)
-      .filter((status): status is string => status !== undefined)
+    const preRecovery = fixture.rpc.events.map(statusOf).filter((status): status is string => status !== undefined)
 
     await runner.whenStarted(1)
     runner.children[0]?.settle("first snapshot output")
@@ -578,9 +591,7 @@ describe("assembled DAG lifecycle end to end", () => {
 
     // then no consumer ever observed the stale pre-recovery pause, and the final snapshot is live
     expect(preRecovery).not.toContain("paused")
-    const statuses = fixture.rpc.events
-      .map(statusOf)
-      .filter((status): status is string => status !== undefined)
+    const statuses = fixture.rpc.events.map(statusOf).filter((status): status is string => status !== undefined)
     expect(statuses.length).toBeGreaterThan(0)
     expect(statuses.at(-1)).toBe("completed")
     fixture.runtime.dispose()
@@ -612,10 +623,7 @@ describe("assembled DAG lifecycle end to end", () => {
     const fixture = await runtimeFixture({
       runner: new ControlledRunner(new DOMException("intentional child abort", "AbortError")),
     })
-    const runId = await fixture.start("handle-cancel", [
-      { id: "live" },
-      { id: "after", dependsOn: ["live"] },
-    ])
+    const runId = await fixture.start("handle-cancel", [{ id: "live" }, { id: "after", dependsOn: ["live"] }])
     await fixture.runner.whenStarted(1)
     const handle = fixture.runtime.manager.attach(runId, sessionId)
     const before = handle.done()
@@ -645,8 +653,14 @@ describe("assembled DAG lifecycle end to end", () => {
     const scheduled: Array<() => void> = []
     const deliveries: Array<{ readonly content: string; readonly deliverAs: string }> = []
     const coordinator = new IdleInjectionCoordinator(
-      (message, options) => { deliveries.push({ content: message.content, deliverAs: options.deliverAs }) },
-      { scheduleFlush: (flush) => { scheduled.push(flush) } },
+      (message, options) => {
+        deliveries.push({ content: message.content, deliverAs: options.deliverAs })
+      },
+      {
+        scheduleFlush: (flush) => {
+          scheduled.push(flush)
+        },
+      },
     )
     const fixture = await runtimeFixture({ coordinator, idle: false })
     const first = await fixture.start("wake-first")
@@ -656,10 +670,7 @@ describe("assembled DAG lifecycle end to end", () => {
     // when
     fixture.runner.children[0]?.settle("first output")
     fixture.runner.children[1]?.settle("second output")
-    await Promise.all([
-      fixture.runtime.wait(first, sessionId),
-      fixture.runtime.wait(second, sessionId),
-    ])
+    await Promise.all([fixture.runtime.wait(first, sessionId), fixture.runtime.wait(second, sessionId)])
 
     // then
     expect(scheduled).toHaveLength(1)
@@ -676,8 +687,14 @@ describe("assembled DAG lifecycle end to end", () => {
     const scheduled: Array<() => void> = []
     const deliveries: Array<{ readonly content: string; readonly deliverAs: string }> = []
     const coordinator = new IdleInjectionCoordinator(
-      (message, options) => { deliveries.push({ content: message.content, deliverAs: options.deliverAs }) },
-      { scheduleFlush: (flush) => { scheduled.push(flush) } },
+      (message, options) => {
+        deliveries.push({ content: message.content, deliverAs: options.deliverAs })
+      },
+      {
+        scheduleFlush: (flush) => {
+          scheduled.push(flush)
+        },
+      },
     )
     const fixture = await runtimeFixture({ coordinator, idle: false })
     const runId = await fixture.start("wake-detached")
@@ -715,10 +732,7 @@ describe("assembled DAG lifecycle end to end", () => {
   test("#given the reference viewer attached to a live adapter run #when the run completes #then catch-up and live delivery contain zero gaps and zero duplicates", async () => {
     // given
     const fixture = await runtimeFixture()
-    const runId = await fixture.start("viewer-live", [
-      { id: "plan" },
-      { id: "build", dependsOn: ["plan"] },
-    ])
+    const runId = await fixture.start("viewer-live", [{ id: "plan" }, { id: "build", dependsOn: ["plan"] }])
     await fixture.runner.whenStarted(1)
     const viewer = new ReferenceDagViewer(fixture.rpc, runId)
 
@@ -734,9 +748,7 @@ describe("assembled DAG lifecycle end to end", () => {
     const head = fixture.runtime.manager.snapshot(runId, sessionId).lastSeq
     expect(handshake.highWaterSeq).toBeGreaterThan(0)
     expect(viewer.gaps).toEqual([])
-    expect(viewer.applied.map((event) => event.seq)).toEqual(
-      Array.from({ length: head }, (_, index) => index + 1),
-    )
+    expect(viewer.applied.map((event) => event.seq)).toEqual(Array.from({ length: head }, (_, index) => index + 1))
     expect(viewer.seen.size).toBe(viewer.applied.length)
   })
 
@@ -765,46 +777,54 @@ describe("assembled DAG lifecycle end to end", () => {
 })
 
 describe("assembled DAG retry lifecycle end to end", () => {
-  test("#given a diamond run whose middle node fails #when the dag TOOL retries it #then wait settles completed and the untouched nodes keep their original children", async () => {
-    // given
-    const fixture = await runtimeFixture()
-    const runId = await fixture.start("retry-diamond", [
-      { id: "root" },
-      { id: "left", dependsOn: ["root"] },
-      { id: "right", dependsOn: ["root"] },
-      { id: "join", dependsOn: ["left", "right"] },
-    ])
-    await fixture.runner.whenStarted(1)
-    fixture.runner.children[0]?.settle("root output")
-    await fixture.runner.whenStarted(3)
-    const byNode = (index: number): string => String(fixture.runner.children[index]?.spec.taskId)
-    const rootTaskId = byNode(0)
-    // left fails, right completes: the join node is skipped by the dependent cascade
-    fixture.runner.children[1]?.fail("left blew up")
-    fixture.runner.children[2]?.settle("right output")
-    const failed = await fixture.runtime.wait(runId, sessionId)
-    expect(failed.status).toBe("failed")
-    expect(failed.nodes.join).toEqual(expect.objectContaining({ state: "skipped" }))
-    const rightTaskId = byNode(2)
+  test(
+    "#given a diamond run whose middle node fails #when the dag TOOL retries it #then wait settles completed and the untouched nodes keep their original children",
+    async () => {
+      // given
+      const fixture = await runtimeFixture()
+      const runId = await fixture.start("retry-diamond", [
+        { id: "root" },
+        { id: "left", dependsOn: ["root"] },
+        { id: "right", dependsOn: ["root"] },
+        { id: "join", dependsOn: ["left", "right"] },
+      ])
+      await fixture.runner.whenStarted(1)
+      fixture.runner.children[0]?.settle("root output")
+      await fixture.runner.whenStarted(3)
+      const byNode = (index: number): string => String(fixture.runner.children[index]?.spec.taskId)
+      const rootTaskId = byNode(0)
+      // left fails, right completes: the join node is skipped by the dependent cascade
+      fixture.runner.children[1]?.fail("left blew up")
+      fixture.runner.children[2]?.settle("right output")
+      const failed = await fixture.runtime.wait(runId, sessionId)
+      expect(failed.status).toBe("failed")
+      expect(failed.nodes.join).toEqual(expect.objectContaining({ state: "skipped" }))
+      const rightTaskId = byNode(2)
 
-    // when the tool retries the failed node
-    const retried = await runDagTool(toolDeps(fixture.runtime), { action: "retry", run_id: runId })
-    expect(retried.details.kind).toBe("retried")
-    await fixture.runner.whenStarted(4)
-    fixture.runner.children[3]?.settle("left retried")
-    await fixture.runner.whenStarted(5)
-    fixture.runner.children[4]?.settle("join output")
-    const waited = await runDagTool(toolDeps(fixture.runtime), { action: "wait", run_id: runId, detach: false })
+      // when the tool retries the failed node
+      const retried = await runDagTool(toolDeps(fixture.runtime), { action: "retry", run_id: runId })
+      expect(retried.details.kind).toBe("retried")
+      await fixture.runner.whenStarted(4)
+      fixture.runner.children[3]?.settle("left retried")
+      await fixture.runner.whenStarted(5)
+      fixture.runner.children[4]?.settle("join output")
+      const waited = await runDagTool(toolDeps(fixture.runtime), { action: "wait", run_id: runId, detach: false })
 
-    // then
-    if (waited.details.kind !== "waited") throw new Error(`expected wait, received ${waited.details.kind}`)
-    expect(waited.details.result.status).toBe("completed")
-    expect(waited.details.result.nodes.left).toEqual(expect.objectContaining({ state: "completed", output: "left retried" }))
-    expect(waited.details.result.nodes.join).toEqual(expect.objectContaining({ state: "completed", output: "join output" }))
-    const record = fixture.runtime.manager.record(runId, sessionId)
-    expect(record.nodes.find((node) => String(node.id) === "root")?.taskId).toBe(rootTaskId)
-    expect(record.nodes.find((node) => String(node.id) === "right")?.taskId).toBe(rightTaskId)
-    expect(events(fixture, runId).some((event) => event.type === "dag.node.retried")).toBe(true)
-    fixture.runtime.dispose()
-  }, { timeout: 20_000 })
+      // then
+      if (waited.details.kind !== "waited") throw new Error(`expected wait, received ${waited.details.kind}`)
+      expect(waited.details.result.status).toBe("completed")
+      expect(waited.details.result.nodes.left).toEqual(
+        expect.objectContaining({ state: "completed", output: "left retried" }),
+      )
+      expect(waited.details.result.nodes.join).toEqual(
+        expect.objectContaining({ state: "completed", output: "join output" }),
+      )
+      const record = fixture.runtime.manager.record(runId, sessionId)
+      expect(record.nodes.find((node) => String(node.id) === "root")?.taskId).toBe(rootTaskId)
+      expect(record.nodes.find((node) => String(node.id) === "right")?.taskId).toBe(rightTaskId)
+      expect(events(fixture, runId).some((event) => event.type === "dag.node.retried")).toBe(true)
+      fixture.runtime.dispose()
+    },
+    { timeout: 20_000 },
+  )
 })

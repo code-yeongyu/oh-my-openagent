@@ -1,8 +1,4 @@
-import type {
-  KeyEvent,
-  TuiPluginApi,
-  TuiPromptRef,
-} from "@opencode-ai/plugin/tui"
+import type { KeyEvent, TuiPluginApi, TuiPromptRef } from "@opencode-ai/plugin/tui"
 import type { KeyInputContext } from "@opentui/keymap"
 
 import { log } from "../../shared/logger"
@@ -13,11 +9,7 @@ import { createBtwEscapeReturn } from "./tui-escape-return"
 type BtwSideController = ReturnType<typeof createBtwSideController>
 
 function isBtwPickerKey(event: KeyEvent): boolean {
-  return (
-    event.eventType === "press" &&
-    event.ctrl &&
-    (event.name === "/" || event.name === "_" || event.name === "7")
-  )
+  return event.eventType === "press" && event.ctrl && (event.name === "/" || event.name === "_" || event.name === "7")
 }
 
 export type BtwSideKeymapRegistration = {
@@ -49,7 +41,8 @@ export function registerBtwSideKeymap(args: {
     })
     escapeReturn.reset()
     args.api.keymap.clearPendingSequence?.()
-    void args.openPicker()
+    void args
+      .openPicker()
       .catch((error) => {
         log("[btw-side] Failed to open picker from keyboard shortcut", {
           error,
@@ -88,16 +81,12 @@ export function registerBtwSideKeymap(args: {
       },
     })
   }
-  internalKeyInput?.prependListener?.(
-    "keypress",
-    handleGlobalKeypress,
-  )
+  internalKeyInput?.prependListener?.("keypress", handleGlobalKeypress)
   const unregisterGlobalKeypress = (): void => {
     internalKeyInput?.off?.("keypress", handleGlobalKeypress)
   }
   const handleStdinData = (data: string | Buffer): void => {
-    const sequence =
-      typeof data === "string" ? data : data.toString("utf8")
+    const sequence = typeof data === "string" ? data : data.toString("utf8")
     // xterm emits every Ctrl slash alias as 0x1f, which OpenTUI drops pre-keymap.
     if (sequence !== "\u001f") return
     openPickerFromShortcut("ctrl+/")
@@ -120,15 +109,9 @@ export function registerBtwSideKeymap(args: {
     ) ?? (() => undefined)
   const unregisterEscape = internalKeyInput
     ? () => undefined
-    : (
-        args.api.keymap.intercept?.(
-          "key",
-          interceptKey,
-          {
-            priority: Number.MAX_SAFE_INTEGER,
-          },
-        ) ?? (() => undefined)
-      )
+    : (args.api.keymap.intercept?.("key", interceptKey, {
+        priority: Number.MAX_SAFE_INTEGER,
+      }) ?? (() => undefined))
   const unregisterCommandLayer = args.api.keymap.registerLayer({
     priority: 20_000,
     commands: [
@@ -225,4 +208,3 @@ export function registerBtwSideKeymap(args: {
     resetEscapeSequence: escapeReturn.reset,
   }
 }
-

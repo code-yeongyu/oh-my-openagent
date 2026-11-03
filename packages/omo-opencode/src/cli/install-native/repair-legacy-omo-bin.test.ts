@@ -46,9 +46,7 @@ describe("repairLegacyOmoBins", () => {
     expect(existsSync(join(npm.binDir, "oh-my-openagent"))).toBe(true)
     expect(existsSync(join(npm.binDir, "lazycodex"))).toBe(true)
     expect(existsSync(join(npm.packageDir, "package.json"))).toBe(true)
-    expect(repair.removed).toEqual([
-      { binPath: npm.binPath, packageName: "oh-my-openagent", packageVersion: "4.19.4" },
-    ])
+    expect(repair.removed).toEqual([{ binPath: npm.binPath, packageName: "oh-my-openagent", packageVersion: "4.19.4" }])
     expect(repair.failures).toEqual([])
     expect(repair.notes.join("\n")).toContain("oh-my-openagent@4.19.4")
     expect(repair.notes.join("\n")).toContain(npm.binPath)
@@ -70,22 +68,29 @@ describe("repairLegacyOmoBins", () => {
   })
 
   // chmod-based write denial is POSIX-only: Windows ignores the mode bits, so the unlink succeeds there.
-  test.skipIf(process.platform === "win32")("#given the bin directory cannot be written #when repairing #then the failure is reported with the manual command", () => {
-    // given
-    const npm = writeGlobalPackageBin({ root: root("repair-denied"), packageName: "oh-my-opencode", version: "4.19.4" })
-    const entries = legacyOmoBins(scanOmoBins(environmentOf([npm.binDir])))
-    chmodSync(npm.binDir, 0o500)
+  test.skipIf(process.platform === "win32")(
+    "#given the bin directory cannot be written #when repairing #then the failure is reported with the manual command",
+    () => {
+      // given
+      const npm = writeGlobalPackageBin({
+        root: root("repair-denied"),
+        packageName: "oh-my-opencode",
+        version: "4.19.4",
+      })
+      const entries = legacyOmoBins(scanOmoBins(environmentOf([npm.binDir])))
+      chmodSync(npm.binDir, 0o500)
 
-    // when
-    const repair = repairLegacyOmoBins(entries, { isWindows: false })
+      // when
+      const repair = repairLegacyOmoBins(entries, { isWindows: false })
 
-    // then
-    expect(existsSync(npm.binPath)).toBe(true)
-    expect(repair.removed).toEqual([])
-    expect(repair.failures).toHaveLength(1)
-    expect(repair.warnings.join("\n")).toContain(npm.binPath)
-    expect(repair.warnings.join("\n")).toContain("npm uninstall -g oh-my-opencode")
-  })
+      // then
+      expect(existsSync(npm.binPath)).toBe(true)
+      expect(repair.removed).toEqual([])
+      expect(repair.failures).toHaveLength(1)
+      expect(repair.warnings.join("\n")).toContain(npm.binPath)
+      expect(repair.warnings.join("\n")).toContain("npm uninstall -g oh-my-opencode")
+    },
+  )
 })
 
 describe("repairLegacyOmoBins with a Codex Light runtime wrapper", () => {

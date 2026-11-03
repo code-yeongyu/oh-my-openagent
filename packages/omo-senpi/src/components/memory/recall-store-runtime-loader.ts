@@ -8,13 +8,18 @@ import { reinstallStep } from "../reinstall/reinstall-step"
 export const RECALL_STORE_RUNTIME_ARTIFACT = "extensions/omo-recall-store.js"
 
 /** One shared import per process; a failed import is not cached, so the next corpus load retries. */
-export function createRecallStoreRuntimeLoader(importRuntime: () => Promise<RecallTermStoreModule>): () => Promise<RecallTermStoreModule> {
+export function createRecallStoreRuntimeLoader(
+  importRuntime: () => Promise<RecallTermStoreModule>,
+): () => Promise<RecallTermStoreModule> {
   let pending: Promise<RecallTermStoreModule> | undefined
   return () => {
     pending ??= importRuntime().catch((error: unknown) => {
       pending = undefined
       const cause = error instanceof Error ? error.message : String(error)
-      throw new Error(`The persisted recall terms are unavailable: ${RECALL_STORE_RUNTIME_ARTIFACT} failed to load: ${cause}. Recall still works by tokenizing; ${reinstallStep()} to restore the faster first recall.`, { cause: error })
+      throw new Error(
+        `The persisted recall terms are unavailable: ${RECALL_STORE_RUNTIME_ARTIFACT} failed to load: ${cause}. Recall still works by tokenizing; ${reinstallStep()} to restore the faster first recall.`,
+        { cause: error },
+      )
     })
     return pending
   }

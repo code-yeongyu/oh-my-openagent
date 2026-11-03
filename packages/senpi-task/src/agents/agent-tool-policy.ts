@@ -15,8 +15,8 @@ export type AgentToolPolicy = {
  */
 export function agentToolPolicy(definition: AgentDefinition | undefined): AgentToolPolicy {
   if (definition === undefined) return {}
-  const literalToolRules = definition.tools?.filter((rule) =>
-    !rule.pattern.includes(" ") && !rule.pattern.includes("*")
+  const literalToolRules = definition.tools?.filter(
+    (rule) => !rule.pattern.includes(" ") && !rule.pattern.includes("*"),
   )
   const toolAllowlist = literalToolRules?.filter((rule) => rule.allow).map((rule) => rule.pattern)
   const toolRuleDenylist = literalToolRules?.filter((rule) => !rule.allow).map((rule) => rule.pattern)

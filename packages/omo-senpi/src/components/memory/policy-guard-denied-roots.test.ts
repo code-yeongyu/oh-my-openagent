@@ -2,17 +2,13 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { rmSyncEfaultTolerant } from "./teardown.test-support"
 
 import { registerMemoryFilesystemPolicy } from "./policy-guard"
-import {
-  canonical,
-  durableSibling,
-  policyFixture,
-  registeredPolicy,
-} from "./policy-guard.test-support"
+import { canonical, durableSibling, policyFixture, registeredPolicy } from "./policy-guard.test-support"
 
 const roots: string[] = []
 
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  for (const root of roots.splice(0))
+    rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
 // `deniedRoots` is metadata no built-in tool consults, so the enumeration behind it is deferred to

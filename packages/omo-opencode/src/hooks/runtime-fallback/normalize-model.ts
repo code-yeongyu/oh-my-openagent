@@ -20,11 +20,8 @@ export function normalizeModelToCanonicalString(model: unknown): string | undefi
 
   if (isRecord(model)) {
     const providerID = typeof model.providerID === "string" ? model.providerID.trim() : undefined
-    const rawModelID = typeof model.id === "string"
-      ? model.id
-      : typeof model.modelID === "string"
-        ? model.modelID
-        : undefined
+    const rawModelID =
+      typeof model.id === "string" ? model.id : typeof model.modelID === "string" ? model.modelID : undefined
     const modelID = rawModelID?.trim()
     if (providerID && modelID) {
       const variant = typeof model.variant === "string" ? model.variant.trim() : undefined

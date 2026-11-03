@@ -11,7 +11,9 @@ function requireFresh<T>(modulePath: string): T {
   return require(modulePath) as T
 }
 
-function discoverCommandsSync(...args: Parameters<typeof import("./command-discovery").discoverCommandsSync>): ReturnType<typeof import("./command-discovery").discoverCommandsSync> {
+function discoverCommandsSync(
+  ...args: Parameters<typeof import("./command-discovery").discoverCommandsSync>
+): ReturnType<typeof import("./command-discovery").discoverCommandsSync> {
   return requireFresh<typeof import("./command-discovery")>("./command-discovery").discoverCommandsSync(...args)
 }
 
@@ -50,19 +52,11 @@ describe("opencode project command discovery", () => {
       "Deploy to staging",
       "Run the staged deploy.",
     )
-    writeCommand(
-      join(repositoryDir, ".opencode", "command", "release.md"),
-      "Release command",
-      "Run the release.",
-    )
-    writeCommand(
-      join(tempDir, ".opencode", "commands", "outside.md"),
-      "Outside command",
-      "Should not be discovered.",
-    )
+    writeCommand(join(repositoryDir, ".opencode", "command", "release.md"), "Release command", "Run the release.")
+    writeCommand(join(tempDir, ".opencode", "commands", "outside.md"), "Outside command", "Should not be discovered.")
 
     // when
-    const names = discoverCommandsSync(nestedDirectory).map(command => command.name)
+    const names = discoverCommandsSync(nestedDirectory).map((command) => command.name)
 
     // then
     expect(names).toContain("deploy/staging")

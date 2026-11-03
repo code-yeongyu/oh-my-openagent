@@ -50,7 +50,7 @@ Skill body.
 
       try {
         const skills = await discoverSkills({ includeClaudeCodePaths: false })
-        const skill = skills.find(s => s.name === "space-separated-tools")
+        const skill = skills.find((s) => s.name === "space-separated-tools")
 
         // then
         expect(skill).toBeDefined()
@@ -78,7 +78,7 @@ Skill body.
 
       try {
         const skills = await discoverSkills({ includeClaudeCodePaths: false })
-        const skill = skills.find(s => s.name === "yaml-inline-array")
+        const skill = skills.find((s) => s.name === "yaml-inline-array")
 
         // then
         expect(skill).toBeDefined()
@@ -110,7 +110,7 @@ Skill body.
 
       try {
         const skills = await discoverSkills({ includeClaudeCodePaths: false })
-        const skill = skills.find(s => s.name === "yaml-multiline-array")
+        const skill = skills.find((s) => s.name === "yaml-multiline-array")
 
         // then
         expect(skill).toBeDefined()
@@ -137,7 +137,7 @@ Skill body.
 
       try {
         const skills = await discoverSkills({ includeClaudeCodePaths: false })
-        const skill = skills.find(s => s.name === "no-allowed-tools")
+        const skill = skills.find((s) => s.name === "no-allowed-tools")
 
         // then
         expect(skill).toBeDefined()

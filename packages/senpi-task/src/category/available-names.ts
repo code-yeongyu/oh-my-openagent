@@ -6,13 +6,17 @@ import { parseAvailableModels } from "./registry-models"
 import type { SenpiModelPort, SenpiModelRegistryPort } from "./types"
 
 export function availableCategoryNames(config: OmoConfig, availableModels?: ReadonlySet<string>): readonly string[] {
-  const names = Array.from(new Set([...Object.keys(DEFAULT_CATEGORIES), ...Object.keys(config.categories ?? {})])).sort()
+  const names = Array.from(
+    new Set([...Object.keys(DEFAULT_CATEGORIES), ...Object.keys(config.categories ?? {})]),
+  ).sort()
   if (availableModels === undefined) return names
   const userCategories = config.categories ?? {}
   return names.filter((name) => {
     const hasExplicitUserConfig = Object.hasOwn(userCategories, name) && userCategories[name] !== undefined
-    return isCategoryGateSatisfied(name, hasExplicitUserConfig, availableModels)
-      && isCategoryChainViable(name, hasExplicitUserConfig, availableModels)
+    return (
+      isCategoryGateSatisfied(name, hasExplicitUserConfig, availableModels) &&
+      isCategoryChainViable(name, hasExplicitUserConfig, availableModels)
+    )
   })
 }
 

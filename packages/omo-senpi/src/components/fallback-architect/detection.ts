@@ -70,7 +70,11 @@ export function isRefusalLikeMessage(message: unknown): boolean {
   if (!REFUSAL_ELIGIBLE_STOP_REASONS.has(stopReason) && !isDemotedEmptyToolUse(message, stopReason)) return false
 
   const stopDetails = message["stopDetails"]
-  if (isRecord(stopDetails) && typeof stopDetails["type"] === "string" && REFUSAL_STOP_DETAIL_TYPES.has(stopDetails["type"])) {
+  if (
+    isRecord(stopDetails) &&
+    typeof stopDetails["type"] === "string" &&
+    REFUSAL_STOP_DETAIL_TYPES.has(stopDetails["type"])
+  ) {
     return true
   }
 
@@ -82,7 +86,9 @@ export function isDemotedEmptyToolUse(message: Record<string, unknown>, stopReas
   if (stopReason !== "stop") return false
   const diagnostics = message["diagnostics"]
   if (!Array.isArray(diagnostics)) return false
-  return diagnostics.some((diagnostic) => isRecord(diagnostic) && diagnostic["type"] === EMPTY_TOOL_USE_DEMOTION_DIAGNOSTIC)
+  return diagnostics.some(
+    (diagnostic) => isRecord(diagnostic) && diagnostic["type"] === EMPTY_TOOL_USE_DEMOTION_DIAGNOSTIC,
+  )
 }
 
 /**

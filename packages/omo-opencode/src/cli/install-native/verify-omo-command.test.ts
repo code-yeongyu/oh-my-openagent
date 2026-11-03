@@ -51,8 +51,16 @@ describe("verifyOmoCommand", () => {
 
   test("#given another omo still resolves first #when verifying #then it fails with the PATH-order fix", async () => {
     // given
-    const npm = writeGlobalPackageBin({ root: root("verify-shadow"), packageName: "oh-my-openagent", version: "4.19.4" })
-    const bun = writeGlobalPackageBin({ root: root("verify-shadowed"), packageName: "omo-ai", version: "5.0.0-0.beta.89" })
+    const npm = writeGlobalPackageBin({
+      root: root("verify-shadow"),
+      packageName: "oh-my-openagent",
+      version: "4.19.4",
+    })
+    const bun = writeGlobalPackageBin({
+      root: root("verify-shadowed"),
+      packageName: "omo-ai",
+      version: "5.0.0-0.beta.89",
+    })
     const { probeVersion } = probeReturning({ exitCode: 0, stdout: "4.19.4\n" })
 
     // when
@@ -71,7 +79,11 @@ describe("verifyOmoCommand", () => {
 
   test("#given omo-ai landed in a directory that is not on PATH #when verifying #then it fails with the PATH fix for that directory", async () => {
     // given
-    const bun = writeGlobalPackageBin({ root: root("verify-offpath"), packageName: "omo-ai", version: "5.0.0-0.beta.89" })
+    const bun = writeGlobalPackageBin({
+      root: root("verify-offpath"),
+      packageName: "omo-ai",
+      version: "5.0.0-0.beta.89",
+    })
     const { calls, probeVersion } = probeReturning({ exitCode: 0, stdout: "omo 5.0.0-0.beta.89\n" })
 
     // when
@@ -85,7 +97,11 @@ describe("verifyOmoCommand", () => {
 
   test("#given the omo command itself fails #when verifying #then the output is reported", async () => {
     // given
-    const bun = writeGlobalPackageBin({ root: root("verify-broken"), packageName: "omo-ai", version: "5.0.0-0.beta.89" })
+    const bun = writeGlobalPackageBin({
+      root: root("verify-broken"),
+      packageName: "omo-ai",
+      version: "5.0.0-0.beta.89",
+    })
     const { probeVersion } = probeReturning({ exitCode: 1, stdout: "omo: engine missing\n" })
 
     // when

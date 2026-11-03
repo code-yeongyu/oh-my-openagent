@@ -18,8 +18,10 @@ describe("omo-senpi ulw-loop runtime", () => {
   it("#given a real session plan #when input arrives with the default reader #then in-process status activates steering for its owner only", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "omo-senpi-ulw-runtime-"))
     try {
-      const seeded = await createAgentToolkit({ cwd, sessionId: TEST_SESSION_ID, surface: "omo-senpi" })
-        .createGoals({ brief: "- alpha goal", force: true })
+      const seeded = await createAgentToolkit({ cwd, sessionId: TEST_SESSION_ID, surface: "omo-senpi" }).createGoals({
+        brief: "- alpha goal",
+        force: true,
+      })
       expect(seeded.ok).toBe(true)
       const status = await readUlwLoopStatusInProcess(cwd, TEST_SESSION_ID)
       expect(status.code).toBe(0)
@@ -28,10 +30,18 @@ describe("omo-senpi ulw-loop runtime", () => {
       const pi = new FakeExtensionAPI()
       await createUlwLoopComponent().register(pi, { logger: createLogger(), config: { getFlag: () => false } })
       const input = { type: "input", text: "continue", source: "interactive", streamingBehavior: "steer" }
-      expect(await pi.dispatch("input", input, sessionEventCtx(cwd))).toEqual([expect.objectContaining({ action: "transform" })])
-      expect(await pi.dispatch("input", input, sessionEventCtx(cwd, {
-        sessionManager: { getSessionId: () => "unrelated-session" },
-      }))).toEqual([{ action: "continue" }])
+      expect(await pi.dispatch("input", input, sessionEventCtx(cwd))).toEqual([
+        expect.objectContaining({ action: "transform" }),
+      ])
+      expect(
+        await pi.dispatch(
+          "input",
+          input,
+          sessionEventCtx(cwd, {
+            sessionManager: { getSessionId: () => "unrelated-session" },
+          }),
+        ),
+      ).toEqual([{ action: "continue" }])
     } finally {
       rmSync(cwd, { recursive: true, force: true })
     }
@@ -45,13 +55,23 @@ describe("omo-senpi ulw-loop runtime", () => {
       planExists: () => true,
       readStatus: async (cwd, sessionId) => {
         calls.push({ cwd, sessionId })
-        return { code: 1, stdout: JSON.stringify({ ok: false, error: { code: "ULW_LOOP_PLAN_MISSING", message: "plan not found" } }) }
+        return {
+          code: 1,
+          stdout: JSON.stringify({ ok: false, error: { code: "ULW_LOOP_PLAN_MISSING", message: "plan not found" } }),
+        }
       },
     }).register(pi, { logger, config: { getFlag: () => false } })
 
-    const results = await pi.dispatch("input", {
-      type: "input", text: "continue", source: "interactive", streamingBehavior: "steer",
-    }, sessionEventCtx("/repo"))
+    const results = await pi.dispatch(
+      "input",
+      {
+        type: "input",
+        text: "continue",
+        source: "interactive",
+        streamingBehavior: "steer",
+      },
+      sessionEventCtx("/repo"),
+    )
 
     expect(calls).toEqual([{ cwd: "/repo", sessionId: TEST_SESSION_ID }])
     expect(results).toEqual([{ action: "continue" }])
@@ -69,9 +89,16 @@ describe("omo-senpi ulw-loop runtime", () => {
       }),
     }).register(pi, { logger, config: { getFlag: () => false } })
 
-    const results = await pi.dispatch("input", {
-      type: "input", text: "continue", source: "interactive", streamingBehavior: "steer",
-    }, sessionEventCtx("/repo"))
+    const results = await pi.dispatch(
+      "input",
+      {
+        type: "input",
+        text: "continue",
+        source: "interactive",
+        streamingBehavior: "steer",
+      },
+      sessionEventCtx("/repo"),
+    )
 
     expect(results).toEqual([{ action: "continue" }])
     expect(logger.entries).toContainEqual({

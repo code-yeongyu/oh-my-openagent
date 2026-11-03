@@ -17,7 +17,10 @@ beforeEach(() => {
   engineLog = join(bin, "calls.log")
   const cli = join(bin, "node_modules", "@code-yeongyu", "senpi", "dist", "cli.js")
   mkdirSync(dirname(cli), { recursive: true })
-  writeFileSync(cli, `require("node:fs").appendFileSync(${JSON.stringify(engineLog)}, process.argv.slice(2).join(" ") + "\\n")\nprocess.stdout.write('{"endpoints":[]}\\n')\n`)
+  writeFileSync(
+    cli,
+    `require("node:fs").appendFileSync(${JSON.stringify(engineLog)}, process.argv.slice(2).join(" ") + "\\n")\nprocess.stdout.write('{"endpoints":[]}\\n')\n`,
+  )
   const engine = join(bin, "senpi")
   writeFileSync(engine, `#!/bin/sh\nexec ${JSON.stringify(process.execPath)} ${JSON.stringify(cli)} "$@"\n`)
   chmodSync(engine, 0o755)
@@ -28,17 +31,27 @@ afterEach(() => {
   else process.env.SENPI_BIN = previousBin
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
 })
-const engineCalls = () => (existsSync(engineLog) ? readFileSync(engineLog, "utf8").split("\n").filter(Boolean).length : 0)
+const engineCalls = () =>
+  existsSync(engineLog) ? readFileSync(engineLog, "utf8").split("\n").filter(Boolean).length : 0
 
 function agentWithSession(durableId: string, name: string): string {
   const agentDir = mkdtempSync(join(tmpdir(), "ext-resolver-"))
   dirs.push(agentDir)
   const sessions = join(agentDir, "sessions", "--work--")
   mkdirSync(sessions, { recursive: true })
-  writeFileSync(join(sessions, `2026-10-03_${durableId}.jsonl`), [
-    JSON.stringify({ type: "session", version: 3, id: durableId, timestamp: "2026-10-03T00:00:00.000Z", cwd: agentDir }),
-    JSON.stringify({ type: "session_info", name }),
-  ].join("\n") + "\n")
+  writeFileSync(
+    join(sessions, `2026-10-03_${durableId}.jsonl`),
+    [
+      JSON.stringify({
+        type: "session",
+        version: 3,
+        id: durableId,
+        timestamp: "2026-10-03T00:00:00.000Z",
+        cwd: agentDir,
+      }),
+      JSON.stringify({ type: "session_info", name }),
+    ].join("\n") + "\n",
+  )
   return agentDir
 }
 

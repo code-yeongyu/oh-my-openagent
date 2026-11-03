@@ -12,18 +12,21 @@ function model(provider: string, id: string): QaModel {
 }
 
 function throwingProviderAccessorModel(message: string): object {
-  return Object.defineProperties({}, {
-    provider: {
-      enumerable: true,
-      get() {
-        throw new Error(message)
+  return Object.defineProperties(
+    {},
+    {
+      provider: {
+        enumerable: true,
+        get() {
+          throw new Error(message)
+        },
+      },
+      id: {
+        enumerable: true,
+        value: "gpt-6-luna-fast",
       },
     },
-    id: {
-      enumerable: true,
-      value: "gpt-6-luna-fast",
-    },
-  })
+  )
 }
 
 function registry(models: readonly QaModel[]): SenpiModelRegistryPort<QaModel> {
@@ -157,12 +160,9 @@ requireCondition(hardcodedFallback.spec.modelId === "gpt-6-luna-fast", "hardcode
 requireCondition(hardcodedFallback.spec.variant === "low", "hardcoded fallback variant is not low")
 requireCondition(hardcodedFallback.modelSelection.matchedFallback, "hardcoded fallback was not marked as fallback")
 
-const systemDefault = resolveCategory(
-  "quick",
-  {},
-  registry([model("local", "system-default")]),
-  { systemDefaultModel: "local/system-default" },
-)
+const systemDefault = resolveCategory("quick", {}, registry([model("local", "system-default")]), {
+  systemDefaultModel: "local/system-default",
+})
 requireCondition(systemDefault.kind === "resolved", "system default scenario did not resolve")
 if (systemDefault.kind !== "resolved") {
   throw new Error("system default scenario did not resolve")
@@ -206,26 +206,34 @@ const throwingAvailable = resolveCategory(
     find: () => undefined,
   },
 )
-requireCondition(throwingAvailable.kind === "model_unavailable", "throwing available accessor did not return model_unavailable")
+requireCondition(
+  throwingAvailable.kind === "model_unavailable",
+  "throwing available accessor did not return model_unavailable",
+)
 if (throwingAvailable.kind !== "model_unavailable") {
   throw new Error("throwing available accessor did not return model_unavailable")
 }
 requireCondition(throwingAvailable.availableModels.length === 0, "throwing available accessor leaked available models")
-requireCondition(!JSON.stringify(throwingAvailable).includes(throwingAvailableMarker), "throwing available accessor marker leaked")
+requireCondition(
+  !JSON.stringify(throwingAvailable).includes(throwingAvailableMarker),
+  "throwing available accessor marker leaked",
+)
 
 const secretFindResults = [
   { provider: "openai", id: "gpt-6-luna-fast", password: "hidden" },
   { provider: "openai", id: "gpt-6-luna-fast", accessToken: "hidden" },
   { provider: "openai", id: "gpt-6-luna-fast", privateToken: "hidden" },
 ]
-const secretFind = secretFindResults.map((findResult) => resolveCategory(
-  "quick",
-  {},
-  {
-    getAvailable: () => [model("openai", "gpt-6-luna-fast")],
-    find: () => findResult,
-  },
-))
+const secretFind = secretFindResults.map((findResult) =>
+  resolveCategory(
+    "quick",
+    {},
+    {
+      getAvailable: () => [model("openai", "gpt-6-luna-fast")],
+      find: () => findResult,
+    },
+  ),
+)
 for (const result of secretFind) {
   requireCondition(result.kind === "model_unavailable", "secret find result did not return model_unavailable")
   requireCondition(!JSON.stringify(result).includes("hidden"), "secret find result leaked a private field")
@@ -236,14 +244,16 @@ const identityFindResults = [
   { provider: "evil", id: "other", name: "mismatched identity" },
   { provider: "openai", id: "", name: "empty model id" },
 ]
-const identityFind = identityFindResults.map((findResult) => resolveCategory(
-  "quick",
-  {},
-  {
-    getAvailable: () => [model("openai", "gpt-6-luna-fast")],
-    find: () => findResult,
-  },
-))
+const identityFind = identityFindResults.map((findResult) =>
+  resolveCategory(
+    "quick",
+    {},
+    {
+      getAvailable: () => [model("openai", "gpt-6-luna-fast")],
+      find: () => findResult,
+    },
+  ),
+)
 for (const result of identityFind) {
   requireCondition(result.kind === "model_unavailable", "identity find result did not return model_unavailable")
   if (result.kind !== "model_unavailable") {
@@ -285,8 +295,14 @@ const inheritedIdentity = resolveCategory(
     find: () => inheritedIdentityModel,
   },
 )
-requireCondition(inheritedIdentity.kind === "model_unavailable", "inherited identity model did not return model_unavailable")
-requireCondition(!JSON.stringify(inheritedIdentity).includes("hidden"), "inherited identity model leaked prototype data")
+requireCondition(
+  inheritedIdentity.kind === "model_unavailable",
+  "inherited identity model did not return model_unavailable",
+)
+requireCondition(
+  !JSON.stringify(inheritedIdentity).includes("hidden"),
+  "inherited identity model leaked prototype data",
+)
 
 const nonArrayAvailable = resolveCategory(
   "quick",
@@ -296,7 +312,10 @@ const nonArrayAvailable = resolveCategory(
     find: () => model("openai", "gpt-6-luna-fast"),
   },
 )
-requireCondition(nonArrayAvailable.kind === "model_unavailable", "non-array getAvailable did not return model_unavailable")
+requireCondition(
+  nonArrayAvailable.kind === "model_unavailable",
+  "non-array getAvailable did not return model_unavailable",
+)
 if (nonArrayAvailable.kind !== "model_unavailable") {
   throw new Error("non-array getAvailable did not return model_unavailable")
 }
@@ -305,28 +324,34 @@ requireCondition(nonArrayAvailable.availableModels.length === 0, "non-array getA
 const prototypeName = resolveCategory("__proto__", {}, registry([model("openai", "gpt-6-luna-fast")]))
 requireCondition(prototypeName.kind === "not_found", "prototype-shaped category did not return not_found")
 
-console.log(JSON.stringify({
-  happy,
-  quickPrimary,
-  visualPrimary,
-  visualKimiFallback,
-  artistryPrimary,
-  artistryKimiFallback,
-  artistryOpusFallback,
-  unspecifiedHighPrimary,
-  deepSolRegistry,
-  deepGated,
-  disabled,
-  unavailable,
-  hardcodedFallback,
-  systemDefault,
-  headerBearing,
-  malformed,
-  throwingAvailable,
-  secretFind,
-  identityFind,
-  throwingFind,
-  inheritedIdentity,
-  nonArrayAvailable,
-  prototypeName,
-}, null, 2))
+console.log(
+  JSON.stringify(
+    {
+      happy,
+      quickPrimary,
+      visualPrimary,
+      visualKimiFallback,
+      artistryPrimary,
+      artistryKimiFallback,
+      artistryOpusFallback,
+      unspecifiedHighPrimary,
+      deepSolRegistry,
+      deepGated,
+      disabled,
+      unavailable,
+      hardcodedFallback,
+      systemDefault,
+      headerBearing,
+      malformed,
+      throwingAvailable,
+      secretFind,
+      identityFind,
+      throwingFind,
+      inheritedIdentity,
+      nonArrayAvailable,
+      prototypeName,
+    },
+    null,
+    2,
+  ),
+)

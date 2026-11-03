@@ -1,8 +1,4 @@
-import {
-  MAX_METADATA_RECORDS_PER_TRANSCRIPT,
-  MAX_TRANSCRIPT_SCAN_BYTES,
-  METADATA_READ_BYTES,
-} from "./constants"
+import { MAX_METADATA_RECORDS_PER_TRANSCRIPT, MAX_TRANSCRIPT_SCAN_BYTES, METADATA_READ_BYTES } from "./constants"
 import type { SessionHistoryFile, SessionHistoryFs } from "./session-history-fs"
 import type { TranscriptCandidate } from "./transcript-discovery"
 import { extractCwdFromLine } from "./transcript-records"
@@ -99,7 +95,10 @@ export async function groupTranscriptsByCwd(
   transcripts: ReadonlyArray<TranscriptCandidate>,
   budget: MetadataReadBudget,
 ): Promise<Array<CwdGroup>> {
-  const groups = new Map<string, { cwd: string; homePath: string; lastActiveAtMs: number; transcripts: Array<TranscriptCandidate> }>()
+  const groups = new Map<
+    string,
+    { cwd: string; homePath: string; lastActiveAtMs: number; transcripts: Array<TranscriptCandidate> }
+  >()
   for (const transcript of transcripts) {
     const cwd = await readTranscriptCwd(fs, transcript, budget)
     if (cwd === null) continue
@@ -109,7 +108,12 @@ export async function groupTranscriptsByCwd(
       existing.lastActiveAtMs = Math.max(existing.lastActiveAtMs, transcript.mtimeMs)
       existing.transcripts.push(transcript)
     } else {
-      groups.set(key, { cwd, homePath: transcript.homePath, lastActiveAtMs: transcript.mtimeMs, transcripts: [transcript] })
+      groups.set(key, {
+        cwd,
+        homePath: transcript.homePath,
+        lastActiveAtMs: transcript.mtimeMs,
+        transcripts: [transcript],
+      })
     }
   }
   return Array.from(groups.values())

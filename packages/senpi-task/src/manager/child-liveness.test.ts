@@ -3,7 +3,14 @@ import { fakeClock } from "../runners/rpc/__fixtures__/clock"
 import type { HostLivenessStatus } from "../state/host-liveness"
 import { createTaskRecordStore } from "../store"
 import { runTaskSend } from "../tools/control/send"
-import { baseSpec, categoryPlanner, cleanupProjects, makeHandle, settings, tempProject } from "./__fixtures__/manager-fakes"
+import {
+  baseSpec,
+  categoryPlanner,
+  cleanupProjects,
+  makeHandle,
+  settings,
+  tempProject,
+} from "./__fixtures__/manager-fakes"
 import { createTaskManager } from "./manager"
 
 let clock: ReturnType<typeof fakeClock>
@@ -21,24 +28,33 @@ async function observedChild() {
   const notices: string[] = []
   const runner = {
     start: async (spec: { taskId: string }) => ({
-      ...fake.handle, task_id: spec.taskId,
+      ...fake.handle,
+      task_id: spec.taskId,
       liveness: () => current,
       onLiveness: (listener: (status: HostLivenessStatus) => void) => {
         observers.add(listener)
-        return () => { observers.delete(listener) }
+        return () => {
+          observers.delete(listener)
+        }
       },
     }),
   }
   const manager = createTaskManager({
     store: createTaskRecordStore({ project_dir: project }),
     runners: { "in-process": runner, process: runner },
-    planner: categoryPlanner(), config: settings(), cwd: project,
-    onChildLiveness: (_record, status) => { notices.push(status.state) },
+    planner: categoryPlanner(),
+    config: settings(),
+    cwd: project,
+    onChildLiveness: (_record, status) => {
+      notices.push(status.state)
+    },
   })
   const started = await manager.start(baseSpec({ run_in_background: true, execution_mode: "process" }))
   if (started.kind !== "started") throw new Error("expected a started child")
   return {
-    manager, taskId: started.task_id, notices,
+    manager,
+    taskId: started.task_id,
+    notices,
     status: (status: HostLivenessStatus) => {
       current = status
       for (const listener of observers) listener(status)

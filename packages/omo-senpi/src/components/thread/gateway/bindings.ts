@@ -11,7 +11,16 @@ import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto
 import type { ExternalAuthor, StoreRefusal } from "./types"
 
 export const BINDING_SCHEMA_VERSION = 1
-export const BINDING_PLATFORMS = ["discord", "telegram", "slack", "notion", "feishu", "herdr", "custom", "whatsapp"] as const
+export const BINDING_PLATFORMS = [
+  "discord",
+  "telegram",
+  "slack",
+  "notion",
+  "feishu",
+  "herdr",
+  "custom",
+  "whatsapp",
+] as const
 export const OUTBOUND_EVENTS = ["milestone", "report", "question", "completion"] as const
 export const BINDING_STATUSES = ["active", "detached", "expired"] as const
 export const INBOUND_MODES = ["auto", "follow_up"] as const
@@ -132,11 +141,13 @@ function refusal(message: string): StoreRefusal {
 
 function identifier(field: string, value: unknown): string | StoreRefusal {
   if (typeof value !== "string" || value.trim().length === 0) return refusal(`${field} must be a non-empty string.`)
-  if (value.length > IDENTIFIER_MAX_LENGTH) return refusal(`${field} is longer than ${IDENTIFIER_MAX_LENGTH} characters.`)
+  if (value.length > IDENTIFIER_MAX_LENGTH)
+    return refusal(`${field} is longer than ${IDENTIFIER_MAX_LENGTH} characters.`)
   // C0 and C1 controls, DEL, and the Unicode line and paragraph separators: an identifier lands in the
   // provenance header (`actor=`), whose whitespace class does not cover NEL (U+0085).
   // biome-ignore lint/suspicious/noControlCharactersInRegex: identifiers are rejected when they carry control characters.
-  if (/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/.test(value)) return refusal(`${field} carries a control character or a line separator.`)
+  if (/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/.test(value))
+    return refusal(`${field} carries a control character or a line separator.`)
   return value
 }
 
@@ -149,7 +160,8 @@ function isRefusal(value: unknown): value is StoreRefusal {
 }
 
 export function normalizeBindInput(input: BindInput): BindRequest | StoreRefusal {
-  if (!(BINDING_PLATFORMS as readonly string[]).includes(input.platform)) return refusal(`platform must be one of ${BINDING_PLATFORMS.join(", ")}.`)
+  if (!(BINDING_PLATFORMS as readonly string[]).includes(input.platform))
+    return refusal(`platform must be one of ${BINDING_PLATFORMS.join(", ")}.`)
   const fields = {
     account_id: identifier("account_id", input.account_id),
     chat_id: identifier("chat_id", input.chat_id),
@@ -161,16 +173,22 @@ export function normalizeBindInput(input: BindInput): BindRequest | StoreRefusal
   }
   for (const value of Object.values(fields)) if (isRefusal(value)) return value
   const direction = input.direction ?? { inbound: true, outbound: true }
-  if (direction.inbound !== true && direction.outbound !== true) return refusal("A binding needs at least one direction: inbound, outbound, or both.")
+  if (direction.inbound !== true && direction.outbound !== true)
+    return refusal("A binding needs at least one direction: inbound, outbound, or both.")
   const inboundMode = input.inbound_mode ?? "auto"
-  if (!(INBOUND_MODES as readonly string[]).includes(inboundMode)) return refusal(`inbound_mode must be one of ${INBOUND_MODES.join(", ")}.`)
+  if (!(INBOUND_MODES as readonly string[]).includes(inboundMode))
+    return refusal(`inbound_mode must be one of ${INBOUND_MODES.join(", ")}.`)
   const events = input.outbound_events ?? (direction.outbound ? OUTBOUND_EVENTS : [])
-  if (events.some((event) => !(OUTBOUND_EVENTS as readonly string[]).includes(event))) return refusal(`outbound_events may only name ${OUTBOUND_EVENTS.join(", ")}.`)
+  if (events.some((event) => !(OUTBOUND_EVENTS as readonly string[]).includes(event)))
+    return refusal(`outbound_events may only name ${OUTBOUND_EVENTS.join(", ")}.`)
   if (new Set(events).size !== events.length) return refusal("outbound_events must not repeat an event.")
-  if (direction.outbound && events.length === 0) return refusal("An outbound binding needs at least one outbound event.")
+  if (direction.outbound && events.length === 0)
+    return refusal("An outbound binding needs at least one outbound event.")
   const ttl = input.ttl_seconds === undefined ? BINDING_DEFAULT_TTL_SECONDS : input.ttl_seconds
   if (ttl !== null && (!Number.isInteger(ttl) || ttl < 1 || ttl > BINDING_MAX_TTL_SECONDS)) {
-    return refusal(`ttl_seconds must be an integer from 1 to ${BINDING_MAX_TTL_SECONDS}, or null for a binding that never expires.`)
+    return refusal(
+      `ttl_seconds must be an integer from 1 to ${BINDING_MAX_TTL_SECONDS}, or null for a binding that never expires.`,
+    )
   }
   return {
     platform: input.platform as BindingPlatform,
@@ -192,7 +210,11 @@ function canonicalJson(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "null"
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`
   const record = value as Record<string, unknown>
-  return `{${Object.keys(record).filter((key) => record[key] !== undefined).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(record[key])}`).join(",")}}`
+  return `{${Object.keys(record)
+    .filter((key) => record[key] !== undefined)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${canonicalJson(record[key])}`)
+    .join(",")}}`
 }
 
 /** Idempotency fingerprint of a call's arguments: key order and absent fields do not change it. */
@@ -224,7 +246,11 @@ export function decodeBindingsCursor(cursor: string): BindingsCursor | null {
     const parsed = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as Partial<BindingsCursor>
     if (parsed.v !== 1 || typeof parsed.as_of !== "number" || !Number.isInteger(parsed.as_of)) return null
     const after = parsed.after
-    if (after !== null && !(Array.isArray(after) && after.length === 2 && after.every((part) => typeof part === "string"))) return null
+    if (
+      after !== null &&
+      !(Array.isArray(after) && after.length === 2 && after.every((part) => typeof part === "string"))
+    )
+      return null
     return { v: 1, as_of: parsed.as_of, after: after as readonly [string, string] | null }
   } catch {
     return null
@@ -245,16 +271,34 @@ export type ReplyTokenFields = {
   readonly ui_request_id: string
 }
 
-type ReplyTokenPayload = { readonly b: string; readonly r: number; readonly s: string; readonly i: string | null; readonly q: string; readonly n: string }
+type ReplyTokenPayload = {
+  readonly b: string
+  readonly r: number
+  readonly s: string
+  readonly i: string | null
+  readonly q: string
+  readonly n: string
+}
 
 const REPLY_TOKEN_PREFIX = "rt1"
 
 function mac(secret: string, payload: string): string {
-  return createHmac("sha256", secret).update(`${REPLY_TOKEN_PREFIX}.${payload}`).digest().subarray(0, 16).toString("base64url")
+  return createHmac("sha256", secret)
+    .update(`${REPLY_TOKEN_PREFIX}.${payload}`)
+    .digest()
+    .subarray(0, 16)
+    .toString("base64url")
 }
 
 export function mintReplyToken(secret: string, fields: ReplyTokenFields): string {
-  const payload: ReplyTokenPayload = { b: fields.binding_id, r: fields.revision, s: fields.session_durable_id, i: fields.incarnation, q: fields.ui_request_id, n: randomUUID() }
+  const payload: ReplyTokenPayload = {
+    b: fields.binding_id,
+    r: fields.revision,
+    s: fields.session_durable_id,
+    i: fields.incarnation,
+    q: fields.ui_request_id,
+    n: randomUUID(),
+  }
   const encoded = base64url(JSON.stringify(payload))
   return `${REPLY_TOKEN_PREFIX}.${encoded}.${mac(secret, encoded)}`
 }
@@ -268,9 +312,21 @@ export function readReplyToken(secret: string, token: string): ReplyTokenFields 
   if (expected.length !== given.length || !timingSafeEqual(expected, given)) return null
   try {
     const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8")) as Partial<ReplyTokenPayload>
-    if (typeof payload.b !== "string" || typeof payload.r !== "number" || typeof payload.s !== "string" || typeof payload.q !== "string") return null
+    if (
+      typeof payload.b !== "string" ||
+      typeof payload.r !== "number" ||
+      typeof payload.s !== "string" ||
+      typeof payload.q !== "string"
+    )
+      return null
     if (payload.i !== null && typeof payload.i !== "string") return null
-    return { binding_id: payload.b, revision: payload.r, session_durable_id: payload.s, incarnation: payload.i ?? null, ui_request_id: payload.q }
+    return {
+      binding_id: payload.b,
+      revision: payload.r,
+      session_durable_id: payload.s,
+      incarnation: payload.i ?? null,
+      ui_request_id: payload.q,
+    }
   } catch {
     return null
   }

@@ -107,7 +107,12 @@ function rawRegion(text: string, bodyLength: number): RawRegion | null {
   const source = text.slice(openLength, end + 1)
   const parsed = parseDocument(source, { schema: "core", merge: true })
   if (parsed.errors.length > 0 || !isMap(parsed.contents)) return null
-  return { open: text.slice(0, openLength), source, close: text.slice(end + 1, bodyStart), items: parsed.contents.items }
+  return {
+    open: text.slice(0, openLength),
+    source,
+    close: text.slice(end + 1, bodyStart),
+    items: parsed.contents.items,
+  }
 }
 
 interface PairSpan {

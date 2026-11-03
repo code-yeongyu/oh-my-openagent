@@ -44,9 +44,7 @@ function shouldRegisterReplyCorrelation(result: WakeResult, params: DispatchOpen
   return true
 }
 
-export async function dispatchOpenClawEvent(
-  params: DispatchOpenClawEventParams,
-): Promise<WakeResult | null> {
+export async function dispatchOpenClawEvent(params: DispatchOpenClawEventParams): Promise<WakeResult | null> {
   let result: WakeResult | null = null
 
   if (params.config.enabled) {
@@ -66,7 +64,13 @@ export async function dispatchOpenClawEvent(
   if (shouldRegisterReplyCorrelation(result ?? { gateway: "", success: false }, params)) {
     const tmuxSession = params.context.tmuxSession ?? getCurrentTmuxSession()
     const platform = normalizePlatform(result?.platform)
-    if (tmuxSession && platform && params.context.sessionId && params.context.projectPath && params.context.tmuxPaneId) {
+    if (
+      tmuxSession &&
+      platform &&
+      params.context.sessionId &&
+      params.context.projectPath &&
+      params.context.tmuxPaneId
+    ) {
       registerMessage({
         sessionId: params.context.sessionId,
         tmuxSession,

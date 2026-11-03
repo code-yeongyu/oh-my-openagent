@@ -10,7 +10,12 @@ import type { DesktopSyncEngineWire } from "./desktopSyncAccount"
 import { DesktopSyncEvent, DesktopSyncRefused, DesktopSyncRequest, decodeSyncHandle } from "./desktopSyncProtocol"
 
 const MEMORY_SYNC_CHANNEL = "memory-sync"
-export type UnavailableReason = "private_channel_unavailable" | "platform_not_supported" | "port_absent" | "selection_failed" | "host_bootstrap_absent"
+export type UnavailableReason =
+  | "private_channel_unavailable"
+  | "platform_not_supported"
+  | "port_absent"
+  | "selection_failed"
+  | "host_bootstrap_absent"
 
 export interface InheritedPrivateChannels {
   declared(name: string): boolean
@@ -32,7 +37,9 @@ export interface HostMemorySync {
 export const MEMORY_SYNC_WORKER_DATA = "omo.memory-sync.v1"
 
 /** The create() for senpi provideSessionWorkerData(MEMORY_SYNC_WORKER_DATA, ...): one private port per session Worker. */
-export function memorySyncWorkerData(host: HostMemorySync): () => { value: MessagePort; transfer: readonly MessagePort[]; dispose(): void } {
+export function memorySyncWorkerData(
+  host: HostMemorySync,
+): () => { value: MessagePort; transfer: readonly MessagePort[]; dispose(): void } {
   return () => {
     const { port1, port2 } = new MessageChannel()
     host.attachWorker(port1)
@@ -40,14 +47,29 @@ export function memorySyncWorkerData(host: HostMemorySync): () => { value: Messa
   }
 }
 
-const reason = z.enum(["private_channel_unavailable", "platform_not_supported", "port_absent", "selection_failed", "host_bootstrap_absent"])
+const reason = z.enum([
+  "private_channel_unavailable",
+  "platform_not_supported",
+  "port_absent",
+  "selection_failed",
+  "host_bootstrap_absent",
+])
 const HostToWorker = z.union([
   z.strictObject({ kind: z.literal("outcome"), outcome: z.union([z.literal("cli"), z.literal("desktop"), reason]) }),
-  z.strictObject({ kind: z.literal("reply"), id: z.number().int().positive(), ok: z.boolean(), value: z.unknown().optional() }),
+  z.strictObject({
+    kind: z.literal("reply"),
+    id: z.number().int().positive(),
+    ok: z.boolean(),
+    value: z.unknown().optional(),
+  }),
   z.strictObject({ kind: z.literal("event"), event: DesktopSyncEvent }),
   z.strictObject({ kind: z.literal("retired") }),
 ])
-const WorkerToHost = z.strictObject({ kind: z.literal("request"), id: z.number().int().positive(), request: DesktopSyncRequest })
+const WorkerToHost = z.strictObject({
+  kind: z.literal("request"),
+  id: z.number().int().positive(),
+  request: DesktopSyncRequest,
+})
 type HostToWorker = z.infer<typeof HostToWorker>
 
 const HOST_KEY = Symbol.for("omo.memory-sync.host-selection.v10")
@@ -64,7 +86,7 @@ export function selectHostMemorySyncSource(options: {
   const host = globalThis as HostGlobal
   if (host[HOST_KEY] !== undefined) return host[HOST_KEY]
   const selection = select(options)
-  const created: HostMemorySync = { selection, attachWorker: port => serveWorker(selection, port) }
+  const created: HostMemorySync = { selection, attachWorker: (port) => serveWorker(selection, port) }
   host[HOST_KEY] = created
   return created
 }
@@ -75,11 +97,18 @@ async function select(options: Parameters<typeof selectHostMemorySyncSource>[0])
     if (!declared) return { kind: "cli" }
     const pending = options.attach(options.inherited.take(MEMORY_SYNC_CHANNEL))
     let timer: ReturnType<typeof setTimeout> | undefined
-    const expired = new Promise<"expired">(resolve => { timer = setTimeout(() => resolve("expired"), options.attachDeadlineMs ?? 10_000) })
+    const expired = new Promise<"expired">((resolve) => {
+      timer = setTimeout(() => resolve("expired"), options.attachDeadlineMs ?? 10_000)
+    })
     const attached = await Promise.race([pending, expired]).finally(() => clearTimeout(timer))
     if (attached === "expired") {
       // A late attachment is discarded: close it so the claimed channel cannot outlive the unavailable answer.
-      void pending.then(late => { if (late.kind === "connected") late.channel.close() }, () => undefined)
+      void pending.then(
+        (late) => {
+          if (late.kind === "connected") late.channel.close()
+        },
+        () => undefined,
+      )
       return { kind: "unavailable", reason: "private_channel_unavailable" }
     }
     return attached.kind === "connected" ? { kind: "desktop", channel: attached.channel } : attached
@@ -91,25 +120,29 @@ async function select(options: Parameters<typeof selectHostMemorySyncSource>[0])
 function serveWorker(selection: Promise<MemorySyncSelection>, port: MessagePort): void {
   const owned = new Set<string>()
   let closed = false
-  const post = (message: HostToWorker) => { if (!closed) port.postMessage(message) }
+  const post = (message: HostToWorker) => {
+    if (!closed) port.postMessage(message)
+  }
   let stopEvents = () => {}
   port.on("close", () => {
     closed = true
     stopEvents()
-    void selection.then(settled => {
+    void selection.then((settled) => {
       if (settled.kind !== "desktop") return
       for (const handle of owned) {
-        void settled.channel.request({ op: "operationCancel", handle })
-          .finally(() => settled.channel.request({ op: "operationEnd", handle })).catch(() => undefined)
+        void settled.channel
+          .request({ op: "operationCancel", handle })
+          .finally(() => settled.channel.request({ op: "operationEnd", handle }))
+          .catch(() => undefined)
       }
       owned.clear()
     })
   })
-  void selection.then(settled => {
+  void selection.then((settled) => {
     post({ kind: "outcome", outcome: settled.kind === "unavailable" ? settled.reason : settled.kind })
     if (settled.kind !== "desktop") return
     const channel = settled.channel
-    stopEvents = channel.onEvent(event => {
+    stopEvents = channel.onEvent((event) => {
       if (event.event !== "retired" && owned.has(event.handle)) post({ kind: "event", event })
     })
     if (channel.signal.aborted) post({ kind: "retired" })
@@ -119,7 +152,7 @@ function serveWorker(selection: Promise<MemorySyncSelection>, port: MessagePort)
     const parsed = WorkerToHost.safeParse(raw)
     if (!parsed.success) return
     const { id, request } = parsed.data
-    void selection.then(async settled => {
+    void selection.then(async (settled) => {
       const foreign = "handle" in request && !owned.has(request.handle)
       if (settled.kind !== "desktop" || settled.channel.signal.aborted || foreign) {
         post({ kind: "reply", id, ok: false })
@@ -168,7 +201,7 @@ export function workerMemorySyncSource(value: unknown): Promise<MemorySyncSelect
     },
     close: retire,
   }
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     let answered = false
     port.on("close", () => {
       retire()

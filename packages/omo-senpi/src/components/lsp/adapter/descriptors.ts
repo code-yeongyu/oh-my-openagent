@@ -13,8 +13,18 @@ import type {
 import type { ApplyResult } from "@oh-my-opencode/lsp-core/lsp/workspace-edit-types"
 
 import { renderDiagnosticsCall, renderDiagnosticsResult } from "./renderers-diagnostics.js"
-import { renderFindReferencesCall, renderFindReferencesResult, renderGotoDefinitionCall, renderGotoDefinitionResult } from "./renderers-navigation.js"
-import { renderPrepareRenameCall, renderPrepareRenameResult, renderRenameCall, renderRenameResult } from "./renderers-rename.js"
+import {
+  renderFindReferencesCall,
+  renderFindReferencesResult,
+  renderGotoDefinitionCall,
+  renderGotoDefinitionResult,
+} from "./renderers-navigation.js"
+import {
+  renderPrepareRenameCall,
+  renderPrepareRenameResult,
+  renderRenameCall,
+  renderRenameResult,
+} from "./renderers-rename.js"
 import { renderSymbolsCall, renderSymbolsResult } from "./renderers-symbols.js"
 import { defineTool, Type } from "./schema.js"
 

@@ -41,24 +41,32 @@ export const LspHealthSchema = z
 
 export const SystemHealthSchema = z
   .object({
-    opencode: z.object({
-      version: z.string().describe("OpenCode version"),
-      running: z.boolean().describe("Whether the server is running"),
-      uptime: z.number().describe("Server uptime in seconds"),
-    }).describe("OpenCode server health"),
-    sessions: z.object({
-      total: z.number().describe("Total session count"),
-      active: z.number().describe("Active session count"),
-      statuses: z.record(z.string(), SessionStatusSchema).optional().describe("Per-session statuses"),
-    }).describe("Session overview"),
+    opencode: z
+      .object({
+        version: z.string().describe("OpenCode version"),
+        running: z.boolean().describe("Whether the server is running"),
+        uptime: z.number().describe("Server uptime in seconds"),
+      })
+      .describe("OpenCode server health"),
+    sessions: z
+      .object({
+        total: z.number().describe("Total session count"),
+        active: z.number().describe("Active session count"),
+        statuses: z.record(z.string(), SessionStatusSchema).optional().describe("Per-session statuses"),
+      })
+      .describe("Session overview"),
     providers: z.array(ProviderHealthSchema).describe("Provider connection statuses"),
     mcps: z.array(McpHealthSchema).describe("MCP server statuses"),
     lsps: z.array(LspHealthSchema).describe("LSP server statuses"),
-    plugins: z.array(z.object({
-      name: z.string().describe("Plugin name"),
-      version: z.string().nullable().describe("Plugin version"),
-      enabled: z.boolean().describe("Whether the plugin is loaded"),
-    })).describe("Loaded plugins"),
+    plugins: z
+      .array(
+        z.object({
+          name: z.string().describe("Plugin name"),
+          version: z.string().nullable().describe("Plugin version"),
+          enabled: z.boolean().describe("Whether the plugin is loaded"),
+        }),
+      )
+      .describe("Loaded plugins"),
   })
   .meta({ ref: "SystemHealth" })
 

@@ -3,7 +3,14 @@ import { delimiter, isAbsolute, join, relative, sep } from "node:path"
 import { canonicalAgentDir } from "./agent-dir.js"
 import { OMO_BRAND_LOGO } from "./brand-logo.generated.js"
 import { HERDR_AGENT_MARKER } from "./herdr-agent-hint.js"
-import { nearestNodeBin, packageManifest, packageRoot, readJson, releaseChannel, updateTarget } from "./package-paths.js"
+import {
+  nearestNodeBin,
+  packageManifest,
+  packageRoot,
+  readJson,
+  releaseChannel,
+  updateTarget,
+} from "./package-paths.js"
 
 // Identity the engine adopts for this install: what the user sees, where state lives, which
 // environment prefix is read first, what goes on the wire, and which channel to check for

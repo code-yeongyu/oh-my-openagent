@@ -15,8 +15,13 @@ describe("reattached continuation failure", () => {
       return Promise.reject(cause)
     })
     const handle = createHostSessionHandle({
-      client: original, session: FAKE_SESSION, taskId: "st_rejected_continuation",
-      heartbeatIntervalMs: 60_000, now: () => 0, closeGraceMs: 0, openDisposition: "attached",
+      client: original,
+      session: FAKE_SESSION,
+      taskId: "st_rejected_continuation",
+      heartbeatIntervalMs: 60_000,
+      now: () => 0,
+      closeGraceMs: 0,
+      openDisposition: "attached",
       reattach: async () => ({ client: reopened, session: FAKE_SESSION, attached: false }),
     })
     const parked: string[] = []
@@ -31,9 +36,12 @@ describe("reattached continuation failure", () => {
       // then
       expect(parked).toEqual([])
       expect(await bounded(outcome)).toMatchObject({
-        status: "error", failure: { kind: "child-prompt-failed", message: cause.message, cause },
+        status: "error",
+        failure: { kind: "child-prompt-failed", message: cause.message, cause },
       })
-    } finally { await handle.dispose() }
+    } finally {
+      await handle.dispose()
+    }
   })
 
   for (const failure of ["transport", "expiry", "client-timeout", "detach-stall"] as const) {
@@ -58,8 +66,13 @@ describe("reattached continuation failure", () => {
         }
       }
       const handle = createHostSessionHandle({
-        client: original, session: FAKE_SESSION, taskId: "st_parked_continuation",
-        heartbeatIntervalMs: 60_000, now: () => 0, closeGraceMs: 0, openDisposition: "attached",
+        client: original,
+        session: FAKE_SESSION,
+        taskId: "st_parked_continuation",
+        heartbeatIntervalMs: 60_000,
+        now: () => 0,
+        closeGraceMs: 0,
+        openDisposition: "attached",
         transportRecovery: { clock },
         reattach: async () => ({ client: reopened, session: FAKE_SESSION, attached: false }),
       })
@@ -71,7 +84,8 @@ describe("reattached continuation failure", () => {
         original.loseTransport()
         await bounded(promptSent.promise)
         if (failure === "expiry") clock.expire()
-        else if (failure === "client-timeout") acknowledgement.reject(new Error("Timeout waiting for response to prompt. Stderr: "))
+        else if (failure === "client-timeout")
+          acknowledgement.reject(new Error("Timeout waiting for response to prompt. Stderr: "))
         else acknowledgement.reject(Object.assign(new Error("connection closed"), { code: "rpc_transport_gone" }))
         await bounded(parked.promise)
         if (failure === "detach-stall") {

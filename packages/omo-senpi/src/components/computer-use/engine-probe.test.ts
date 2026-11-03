@@ -18,7 +18,9 @@ test("doctor accepts an older engine without cursorOverlay as unsupported", asyn
   const engine = fileURLToPath(new URL("../../../../senpi-desktop-service/test/fake-engine.mjs", import.meta.url))
   // When: startup/doctor reads the older capability payload.
   const result = await probeComputerUseEngine(
-    engine, { FAKE_ENGINE_CURSOR_OMITTED: "1" }, COMPUTER_USE_DOCTOR_TIMEOUT_MS,
+    engine,
+    { FAKE_ENGINE_CURSOR_OMITTED: "1" },
+    COMPUTER_USE_DOCTOR_TIMEOUT_MS,
     (path, args, env) => launchEngineBinary(process.execPath, [path, ...args], env),
   )
   // Then: version skew does not turn a usable engine into malformed capabilities.
@@ -32,14 +34,17 @@ test.skipIf(process.platform === "win32")(
     // given: time is the contract under test; no synthetic child events or pipe mocks.
     const root = mkdtempSync(join(tmpdir(), "omo-probe-descendant-"))
     const engine = join(root, "engine")
-    writeFileSync(engine, `#!${process.execPath}
+    writeFileSync(
+      engine,
+      `#!${process.execPath}
 import { spawn } from "node:child_process";
 const descendant = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
   stdio: ["ignore", "inherit", "inherit"]
 });
 descendant.on("spawn", () => process.stderr.write(String(descendant.pid) + "\\n"));
 process.stdin.resume();
-`)
+`,
+    )
     chmodSync(engine, 0o755)
     let descendant = 0
     let child: ReturnType<EngineLauncher> | undefined
@@ -47,7 +52,9 @@ process.stdin.resume();
     const launch: EngineLauncher = (...args) => {
       child = launchEngineBinary(...args)
       exited = once(child, "exit")
-      createInterface({ input: child.stderr }).once("line", (line) => { descendant = Number(line) })
+      createInterface({ input: child.stderr }).once("line", (line) => {
+        descendant = Number(line)
+      })
       return child
     }
     let watchdog: ReturnType<typeof setTimeout> | undefined
@@ -121,7 +128,9 @@ test.skipIf(process.platform === "win32")(
       throw Object.assign(new Error("kill() failed: EPERM: Operation not permitted"), { code: "EPERM" })
     })
     const uncaught: unknown[] = []
-    const onUncaught = (error: unknown) => { uncaught.push(error) }
+    const onUncaught = (error: unknown) => {
+      uncaught.push(error)
+    }
     process.on("uncaughtException", onUncaught)
     try {
       // when

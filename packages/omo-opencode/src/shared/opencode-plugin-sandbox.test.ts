@@ -176,7 +176,9 @@ describe("getPluginSandboxDir", () => {
 
     // when / then
     expect(getPluginSandboxDir(cacheDir, "oh-my-openagent")).toBe(join("/cache", "packages", "oh-my-openagent@latest"))
-    expect(getPluginSandboxDir(cacheDir, "oh-my-openagent@beta")).toBe(join("/cache", "packages", "oh-my-openagent@beta"))
+    expect(getPluginSandboxDir(cacheDir, "oh-my-openagent@beta")).toBe(
+      join("/cache", "packages", "oh-my-openagent@beta"),
+    )
     expect(getPluginSandboxDir(cacheDir, "third-party")).toBeNull()
   })
 })

@@ -8,7 +8,10 @@ import { join } from "node:path"
 
 import { runBlock, sliceWorkflowSection } from "./release-workflow-test-steps"
 
-const workflow = readFileSync(new URL("../.github/workflows/publish-platform.yml", import.meta.url), "utf8").replace(/\r\n/g, "\n")
+const workflow = readFileSync(new URL("../.github/workflows/publish-platform.yml", import.meta.url), "utf8").replace(
+  /\r\n/g,
+  "\n",
+)
 const engine = sliceWorkflowSection(workflow, "  desktop-engine:\n", "  build:\n")
 const helperMarker = "      - name: Build and sign Darwin capture helper\n"
 const engineMarker = "      - name: Build desktop engine\n"
@@ -25,8 +28,17 @@ describe("embedded macOS capture helper release workflow", () => {
     expect(helper).toContain("if: startsWith(matrix.host, 'darwin-')")
     expect(helper).toContain("CLANG_ARCH: ${{ matrix.clang_arch }}")
     expect(run).toContain('/usr/bin/clang -arch "$CLANG_ARCH"')
-    for (const flag of ["-x objective-c", "-std=c11", "-fobjc-arc", "-O2", "-Wall", "-mmacosx-version-min=13.0",
-      "-framework AppKit", "-framework ScreenCaptureKit", "-framework CoreVideo"]) {
+    for (const flag of [
+      "-x objective-c",
+      "-std=c11",
+      "-fobjc-arc",
+      "-O2",
+      "-Wall",
+      "-mmacosx-version-min=13.0",
+      "-framework AppKit",
+      "-framework ScreenCaptureKit",
+      "-framework CoreVideo",
+    ]) {
       expect(run).toContain(flag)
     }
     expect(run).toContain("crates/senpi-desktop-backend-macos/native/senpi-desktop-capture-helper.m")
@@ -53,11 +65,13 @@ describe("embedded macOS capture helper release workflow", () => {
     expect(sign).toBeGreaterThan(run.indexOf("/usr/bin/clang"))
     expect(run).toMatch(/--sign-only \\\n\s*--identifier ai\.sisyphuslabs\.senpi-desktop-engine "\$HELPER"/)
     expect(run).toContain('grep -qx "Identifier=ai.sisyphuslabs.senpi-desktop-engine"')
-    expect(run).not.toContain("senpi-desktop-capture-helper\" --")
+    expect(run).not.toContain('senpi-desktop-capture-helper" --')
     expect(signEngine).toContain("--identifier ai.sisyphuslabs.senpi-desktop-engine")
     expect(verify).toBeGreaterThan(sign)
     expect(exported).toBeGreaterThan(verify)
-    expect(engine).toContain('run: cargo build --release -p senpi-desktop-engine --locked --target "${{ matrix.rust_target }}"')
+    expect(engine).toContain(
+      'run: cargo build --release -p senpi-desktop-engine --locked --target "${{ matrix.rust_target }}"',
+    )
     expect(engine.indexOf(engineMarker)).toBeLessThan(engine.indexOf(signingMarker))
   })
 
@@ -65,8 +79,11 @@ describe("embedded macOS capture helper release workflow", () => {
     const buildScript = readFileSync(new URL("../crates/senpi-desktop-backend-macos/build.rs", import.meta.url), "utf8")
     const devIdentifier = buildScript.match(/\.arg\("--identifier"\)\s*\.arg\("([^"]+)"\)/)?.[1]
     const helperIdentifier = runBlock(engine, helperMarker, engineMarker).match(/--identifier (\S+) "\$HELPER"/)?.[1]
-    const engineIdentifier = sliceWorkflowSection(engine, signingMarker, "      - name: Upload desktop engine artifact\n")
-      .match(/--identifier (\S+) "\$ASSET"/)?.[1]
+    const engineIdentifier = sliceWorkflowSection(
+      engine,
+      signingMarker,
+      "      - name: Upload desktop engine artifact\n",
+    ).match(/--identifier (\S+) "\$ASSET"/)?.[1]
 
     expect(devIdentifier).toBeDefined()
     expect(helperIdentifier).toBe(devIdentifier)
@@ -82,10 +99,19 @@ describe("embedded macOS capture helper release workflow", () => {
       delete env[missing]
       writeFileSync(binary, "unsigned helper")
       try {
-        const script = readFileSync(new URL("../.github/scripts/macos-sign-and-notarize.sh", import.meta.url), "utf8").replace(/\r\n/g, "\n")
-        const result = spawnSync("bash", ["-s", "--", "--sign-only", "--identifier", "ai.sisyphuslabs.senpi-desktop-engine", binary], {
-          input: script, env, encoding: "utf8",
-        })
+        const script = readFileSync(
+          new URL("../.github/scripts/macos-sign-and-notarize.sh", import.meta.url),
+          "utf8",
+        ).replace(/\r\n/g, "\n")
+        const result = spawnSync(
+          "bash",
+          ["-s", "--", "--sign-only", "--identifier", "ai.sisyphuslabs.senpi-desktop-engine", binary],
+          {
+            input: script,
+            env,
+            encoding: "utf8",
+          },
+        )
 
         expect(result.status, result.stderr).toBe(1)
         expect(result.stderr).toContain(`signing material is missing: ${missing}`)

@@ -64,7 +64,10 @@ describe("events a process child emits before the manager subscribes", () => {
     await Promise.resolve()
     const late: string[] = []
     const queued = new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error("waited 5s for the follow-up's queue_update, never arrived")), 5_000)
+      const timer = setTimeout(
+        () => reject(new Error("waited 5s for the follow-up's queue_update, never arrived")),
+        5_000,
+      )
       handle.subscribe((event) => {
         late.push(event.type)
         if (event.type === "queue_update") {

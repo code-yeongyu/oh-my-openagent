@@ -35,13 +35,17 @@ function comparisonPath(path: string, options: ConfigMigrationDiscoveryOptions):
 
 export function canonicalPath(path: string, options: ConfigMigrationDiscoveryOptions): string {
   const normalized = options.pathOperations.normalize(path)
-  const resolved = usesWindowsPathSemantics(options) && win32.isAbsolute(normalized)
-    ? normalized
-    : options.pathOperations.resolve(normalized)
+  const resolved =
+    usesWindowsPathSemantics(options) && win32.isAbsolute(normalized)
+      ? normalized
+      : options.pathOperations.resolve(normalized)
   try {
     return discoveryFileSystem(options).realpathSync(resolved)
   } catch (error) {
-    if (error instanceof Error && (Reflect.get(error, "code") === "ENOENT" || Reflect.get(error, "code") === "ENOTDIR")) {
+    if (
+      error instanceof Error &&
+      (Reflect.get(error, "code") === "ENOENT" || Reflect.get(error, "code") === "ENOTDIR")
+    ) {
       return resolved
     }
     throw error
@@ -53,9 +57,9 @@ export function pathKey(path: string, options: ConfigMigrationDiscoveryOptions):
 }
 
 export function configPaths(directory: string, options: ConfigMigrationDiscoveryOptions): readonly string[] {
-  return CONFIG_FILE_NAMES
-    .map((fileName) => options.pathOperations.join(directory, fileName))
-    .filter((path) => discoveryFileSystem(options).existsSync(path))
+  return CONFIG_FILE_NAMES.map((fileName) => options.pathOperations.join(directory, fileName)).filter((path) =>
+    discoveryFileSystem(options).existsSync(path),
+  )
 }
 
 export function profileDirectories(root: string, options: ConfigMigrationDiscoveryOptions): readonly string[] {
@@ -63,7 +67,8 @@ export function profileDirectories(root: string, options: ConfigMigrationDiscove
   try {
     return discoveryFileSystem(options).readdirSync(directory)
   } catch (error) {
-    if (error instanceof Error && (Reflect.get(error, "code") === "ENOENT" || Reflect.get(error, "code") === "ENOTDIR")) return []
+    if (error instanceof Error && (Reflect.get(error, "code") === "ENOENT" || Reflect.get(error, "code") === "ENOTDIR"))
+      return []
     throw error
   }
 }

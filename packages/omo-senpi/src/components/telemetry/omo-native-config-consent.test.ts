@@ -6,10 +6,12 @@ import { isOmoNativeTelemetryConfigEnabled } from "./omo-native-session"
 function readWith(env: Record<string, string | undefined>, selection?: Record<string, string>) {
   const seen: Array<Record<string, string | undefined>> = []
   const enabled = isOmoNativeTelemetryConfigEnabled(
-    { isConfigEnabled: (_cwd, readEnv) => {
-      seen.push({ ...readEnv })
-      return readEnv.OMO_PROFILE === "work"
-    } },
+    {
+      isConfigEnabled: (_cwd, readEnv) => {
+        seen.push({ ...readEnv })
+        return readEnv.OMO_PROFILE === "work"
+      },
+    },
     { cwd: "/repo" },
     env,
     "/home/account",

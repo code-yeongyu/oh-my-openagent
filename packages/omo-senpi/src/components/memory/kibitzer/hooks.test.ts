@@ -23,7 +23,12 @@ function context(sessionId: string): { readonly ctx: Record<string, unknown>; di
     isIdle: () => false,
     alive: () => alive,
   }
-  return { ctx, dispose: () => { alive = false } }
+  return {
+    ctx,
+    dispose: () => {
+      alive = false
+    },
+  }
 }
 
 interface Recorder {
@@ -32,7 +37,9 @@ interface Recorder {
   readonly log: string[]
 }
 
-function recorder(overrides: { readonly sink?: Partial<KibitzerHookSink>; readonly delivery?: Partial<Recorder["delivery"]> } = {}): Recorder {
+function recorder(
+  overrides: { readonly sink?: Partial<KibitzerHookSink>; readonly delivery?: Partial<Recorder["delivery"]> } = {},
+): Recorder {
   const log: string[] = []
   const alive = (eventCtx: unknown): string => {
     const probe = (eventCtx as { alive?: () => boolean } | undefined)?.alive
@@ -41,19 +48,39 @@ function recorder(overrides: { readonly sink?: Partial<KibitzerHookSink>; readon
   return {
     log,
     sink: {
-      onPrompt: (payload, eventCtx) => { log.push(`sink:prompt:${alive(eventCtx)}:${String((payload as { prompt?: string }).prompt)}`) },
-      onToolCall: (payload, eventCtx) => { log.push(`sink:tool_call:${alive(eventCtx)}:${String((payload as { toolName?: string }).toolName)}`) },
-      onToolResult: (payload, eventCtx) => { log.push(`sink:tool_result:${alive(eventCtx)}:${String((payload as { toolName?: string }).toolName)}`) },
-      onSettled: (eventCtx) => { log.push(`sink:settled:${alive(eventCtx)}`) },
+      onPrompt: (payload, eventCtx) => {
+        log.push(`sink:prompt:${alive(eventCtx)}:${String((payload as { prompt?: string }).prompt)}`)
+      },
+      onToolCall: (payload, eventCtx) => {
+        log.push(`sink:tool_call:${alive(eventCtx)}:${String((payload as { toolName?: string }).toolName)}`)
+      },
+      onToolResult: (payload, eventCtx) => {
+        log.push(`sink:tool_result:${alive(eventCtx)}:${String((payload as { toolName?: string }).toolName)}`)
+      },
+      onSettled: (eventCtx) => {
+        log.push(`sink:settled:${alive(eventCtx)}`)
+      },
       ...overrides.sink,
     },
     delivery: {
-      onToolResult: async (sessionId, _context, eventCtx) => { log.push(`delivery:tool_result:${alive(eventCtx)}:${sessionId}`) },
-      markRunning: (sessionId) => { log.push(`delivery:running:${sessionId}`) },
-      markSettled: (sessionId) => { log.push(`delivery:settled:${sessionId}`) },
-      markToolStarted: (sessionId, toolCallId) => { log.push(`delivery:tool_started:${sessionId}:${toolCallId}`) },
-      markToolFinished: (sessionId, toolCallId) => { log.push(`delivery:tool_finished:${sessionId}:${toolCallId}`) },
-      markTurnEnded: (sessionId) => { log.push(`delivery:turn_ended:${sessionId}`) },
+      onToolResult: async (sessionId, _context, eventCtx) => {
+        log.push(`delivery:tool_result:${alive(eventCtx)}:${sessionId}`)
+      },
+      markRunning: (sessionId) => {
+        log.push(`delivery:running:${sessionId}`)
+      },
+      markSettled: (sessionId) => {
+        log.push(`delivery:settled:${sessionId}`)
+      },
+      markToolStarted: (sessionId, toolCallId) => {
+        log.push(`delivery:tool_started:${sessionId}:${toolCallId}`)
+      },
+      markToolFinished: (sessionId, toolCallId) => {
+        log.push(`delivery:tool_finished:${sessionId}:${toolCallId}`)
+      },
+      markTurnEnded: (sessionId) => {
+        log.push(`delivery:turn_ended:${sessionId}`)
+      },
       ...overrides.delivery,
     },
   }
@@ -82,9 +109,23 @@ describe("registerKibitzerHooks", () => {
 
     const results: unknown[][] = []
     results.push(await pi.dispatch("before_agent_start", beforeAgentStart("recall this"), host.ctx))
-    results.push(await pi.dispatch("tool_call", { toolName: "read", toolCallId: "call-1", input: { path: "README.md" } }, host.ctx))
-    results.push(await pi.dispatch("tool_result", { toolName: "read", toolCallId: "call-1", content: [{ type: "text", text: "# readme" }] }, host.ctx))
-    results.push(await pi.dispatch("turn_end", { type: "turn_end", turnIndex: 0, message: {}, toolResults: [] }, host.ctx))
+    results.push(
+      await pi.dispatch(
+        "tool_call",
+        { toolName: "read", toolCallId: "call-1", input: { path: "README.md" } },
+        host.ctx,
+      ),
+    )
+    results.push(
+      await pi.dispatch(
+        "tool_result",
+        { toolName: "read", toolCallId: "call-1", content: [{ type: "text", text: "# readme" }] },
+        host.ctx,
+      ),
+    )
+    results.push(
+      await pi.dispatch("turn_end", { type: "turn_end", turnIndex: 0, message: {}, toolResults: [] }, host.ctx),
+    )
     results.push(await pi.dispatch("agent_settled", {}, host.ctx))
     host.dispose()
 
@@ -111,17 +152,20 @@ describe("registerKibitzerHooks", () => {
     const host = context("session-1")
 
     // when
-    const preview = await pi.dispatch("before_agent_start", { type: "before_agent_start", prompt: "recall this", preview: true }, host.ctx)
+    const preview = await pi.dispatch(
+      "before_agent_start",
+      { type: "before_agent_start", prompt: "recall this", preview: true },
+      host.ctx,
+    )
     expect(preview).toEqual([undefined])
     expect(r.log).toEqual([])
     const real = await pi.dispatch("before_agent_start", beforeAgentStart("recall this"), host.ctx)
 
     // then
-    expect(pi.handlers.find((registration) => registration.event === "before_agent_start")?.options).toEqual({ previewSafe: true })
-    expect(r.log).toEqual([
-      "delivery:running:session-1",
-      "sink:prompt:live:recall this",
-    ])
+    expect(pi.handlers.find((registration) => registration.event === "before_agent_start")?.options).toEqual({
+      previewSafe: true,
+    })
+    expect(r.log).toEqual(["delivery:running:session-1", "sink:prompt:live:recall this"])
     expect(real).toEqual([undefined])
   })
 
@@ -136,22 +180,25 @@ describe("registerKibitzerHooks", () => {
     expect(r.log).toEqual([])
   })
 
-  test.each(["SENPI_MEMORY_REFLECTION", "SENPI_MEMORY_FACTS"])("#given a %s child process #when hooks dispatch #then no event reaches the sidecar", async (sentinel) => {
-    const pi = new FakeExtensionAPI()
-    const r = recorder()
-    registerKibitzerHooks(pi, options(r, { env: { [sentinel]: "1" } }))
-    const host = context("child")
+  test.each(["SENPI_MEMORY_REFLECTION", "SENPI_MEMORY_FACTS"])(
+    "#given a %s child process #when hooks dispatch #then no event reaches the sidecar",
+    async (sentinel) => {
+      const pi = new FakeExtensionAPI()
+      const r = recorder()
+      registerKibitzerHooks(pi, options(r, { env: { [sentinel]: "1" } }))
+      const host = context("child")
 
-    const results = [
-      await pi.dispatch("before_agent_start", beforeAgentStart("recall this"), host.ctx),
-      await pi.dispatch("tool_call", { toolName: "read", input: { path: "README.md" } }, host.ctx),
-      await pi.dispatch("tool_result", { toolName: "read", content: [] }, host.ctx),
-      await pi.dispatch("agent_settled", {}, host.ctx),
-    ]
+      const results = [
+        await pi.dispatch("before_agent_start", beforeAgentStart("recall this"), host.ctx),
+        await pi.dispatch("tool_call", { toolName: "read", input: { path: "README.md" } }, host.ctx),
+        await pi.dispatch("tool_result", { toolName: "read", content: [] }, host.ctx),
+        await pi.dispatch("agent_settled", {}, host.ctx),
+      ]
 
-    expect(results).toEqual([[undefined], [undefined], [undefined], [undefined]])
-    expect(r.log.filter((line) => line.startsWith("sink:"))).toEqual([])
-  })
+      expect(results).toEqual([[undefined], [undefined], [undefined], [undefined]])
+      expect(r.log.filter((line) => line.startsWith("sink:"))).toEqual([])
+    },
+  )
 
   test("#given a tool_result for an unbound session #when dispatched #then the event is still captured and delivery is skipped", async () => {
     const pi = new FakeExtensionAPI()
@@ -166,8 +213,25 @@ describe("registerKibitzerHooks", () => {
   test("#given a sink that throws on tool_call #when dispatched #then the handler resolves undefined and warns once", async () => {
     const pi = new FakeExtensionAPI()
     const warnings: unknown[][] = []
-    const r = recorder({ sink: { onToolCall: () => { throw new Error("boom") } } })
-    registerKibitzerHooks(pi, options(r, { logger: { warn: (...args) => { warnings.push(args) }, info: () => {}, error: () => {} } }))
+    const r = recorder({
+      sink: {
+        onToolCall: () => {
+          throw new Error("boom")
+        },
+      },
+    })
+    registerKibitzerHooks(
+      pi,
+      options(r, {
+        logger: {
+          warn: (...args) => {
+            warnings.push(args)
+          },
+          info: () => {},
+          error: () => {},
+        },
+      }),
+    )
 
     const result = await pi.dispatch("tool_call", { toolName: "read", input: {} }, context("session-warning").ctx)
 
@@ -179,8 +243,25 @@ describe("registerKibitzerHooks", () => {
   test("#given a delivery whose onToolResult rejects #when tool_result dispatches #then the capture still happened, the handler resolves undefined and a warning is logged", async () => {
     const pi = new FakeExtensionAPI()
     const warnings: unknown[][] = []
-    const r = recorder({ delivery: { onToolResult: async () => { throw new Error("boom") } } })
-    registerKibitzerHooks(pi, options(r, { logger: { warn: (...args) => { warnings.push(args) }, info: () => {}, error: () => {} } }))
+    const r = recorder({
+      delivery: {
+        onToolResult: async () => {
+          throw new Error("boom")
+        },
+      },
+    })
+    registerKibitzerHooks(
+      pi,
+      options(r, {
+        logger: {
+          warn: (...args) => {
+            warnings.push(args)
+          },
+          info: () => {},
+          error: () => {},
+        },
+      }),
+    )
 
     const result = await pi.dispatch("tool_result", { toolName: "read", content: [] }, context("session-warning").ctx)
 
@@ -194,10 +275,21 @@ describe("registerKibitzerHooks", () => {
     const pi = new FakeExtensionAPI()
     const warnings: unknown[] = []
     const r = recorder()
-    registerKibitzerHooks(pi, options(r, {
-      resolveSessionId: () => { throw new Error("stale context") },
-      logger: { warn: (_message, details) => { warnings.push(details) }, info: () => {}, error: () => {} },
-    }))
+    registerKibitzerHooks(
+      pi,
+      options(r, {
+        resolveSessionId: () => {
+          throw new Error("stale context")
+        },
+        logger: {
+          warn: (_message, details) => {
+            warnings.push(details)
+          },
+          info: () => {},
+          error: () => {},
+        },
+      }),
+    )
 
     const result = await pi.dispatch("before_agent_start", beforeAgentStart("recall this"), context("stale").ctx)
 

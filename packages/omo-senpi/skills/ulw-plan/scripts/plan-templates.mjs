@@ -6,30 +6,30 @@
 // The canonical AI-plan section headers, in order. references/full-workflow.md
 // documents this exact list; the two must never drift.
 export const PLAN_SECTION_HEADERS = [
-	"## TL;DR (For humans)",
-	"## Scope",
-	"## Verification strategy",
-	"## Execution strategy",
-	"## Todos",
-	"## Final verification wave",
-	"## Commit strategy",
-	"## Success criteria",
-];
+  "## TL;DR (For humans)",
+  "## Scope",
+  "## Verification strategy",
+  "## Execution strategy",
+  "## Todos",
+  "## Final verification wave",
+  "## Commit strategy",
+  "## Success criteria",
+]
 
 export const FINAL_VERIFICATION_ITEMS = [
-	"F1. Plan compliance audit",
-	"F2. Code quality review",
-	"F3. Real manual QA",
-	"F4. Ideal-state fidelity",
-];
+  "F1. Plan compliance audit",
+  "F2. Code quality review",
+  "F3. Real manual QA",
+  "F4. Ideal-state fidelity",
+]
 
 export function buildDraft(slug, intent, { reviewRequired = false } = {}) {
-	const assumptionsNote =
-		intent === "unclear"
-			? "Intent is UNCLEAR: research resolves ambiguity, defaults are adopted (not asked), and each is surfaced in the plan's human TL;DR for veto."
-			: "Record any default you adopt instead of asking, so the user can veto it at the gate.";
-	const reviewState = reviewRequired
-		? `review_required: true
+  const assumptionsNote =
+    intent === "unclear"
+      ? "Intent is UNCLEAR: research resolves ambiguity, defaults are adopted (not asked), and each is surfaced in the plan's human TL;DR for veto."
+      : "Record any default you adopt instead of asking, so the user can veto it at the gate."
+  const reviewState = reviewRequired
+    ? `review_required: true
 plan_path: .omo/plans/${slug}.md
 plan_sha256: null
 review_round_id: null
@@ -46,9 +46,9 @@ review:
     launch_id: null
     session: null
     result: null`
-		: `review_required: false
-pending-action: write .omo/plans/${slug}.md`;
-	return `---
+    : `review_required: false
+pending-action: write .omo/plans/${slug}.md`
+  return `---
 slug: ${slug}
 status: drafting
 intent: ${intent}
@@ -85,15 +85,15 @@ approach: <fill: the approach you intend to plan>
 status: drafting
 <!-- When exploration is exhausted and unknowns are answered, set status: awaiting-approval. -->
 <!-- That durable record is the loop guard: on a later turn read it and resume at the gate instead of re-running exploration. -->
-`;
+`
 }
 
 export function buildPlanSkeleton(slug, intent) {
-	const decisionsLine =
-		intent === "unclear"
-			? "**Decisions I made for you:** <fill last - the best-practice defaults you adopted; the user vetoes any here>"
-			: "**Decisions to sanity-check:** <fill last - the few choices worth a human glance>";
-	return `# ${slug} - Work Plan
+  const decisionsLine =
+    intent === "unclear"
+      ? "**Decisions I made for you:** <fill last - the best-practice defaults you adopted; the user vetoes any here>"
+      : "**Decisions to sanity-check:** <fill last - the few choices worth a human glance>"
+  return `# ${slug} - Work Plan
 
 ## TL;DR (For humans)
 <!-- Fill this LAST, after the detailed plan below is written, so it summarizes the REAL plan. -->
@@ -167,5 +167,5 @@ ${FINAL_VERIFICATION_ITEMS.map((item) => `- [ ] ${item}`).join("\n")}
 | IS | Delivering todo(s) | Proving QA scenario | Evidence |
 | --- | --- | --- | --- |
 | IS-1 | <N> | <scenario name from todo N> | <attemptDir>/task-<N>-${slug}.<ext> |
-`;
+`
 }

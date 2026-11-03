@@ -2,7 +2,11 @@ import { describe, expect, test } from "bun:test"
 
 import { MonitorOutputInjector } from "./output-injector"
 import type { MonitorCounters, MonitorRecord, OutputBatch } from "./types"
-import type { InternalPromptDispatchResult, PromptAsyncInput, PromptDispatchClient } from "@oh-my-opencode/utils/prompt-async-gate/types"
+import type {
+  InternalPromptDispatchResult,
+  PromptAsyncInput,
+  PromptDispatchClient,
+} from "@oh-my-opencode/utils/prompt-async-gate/types"
 
 type DispatchCall = {
   source: string
@@ -55,12 +59,14 @@ function createBatch(batchSeq: number, text = `line-${batchSeq}`): OutputBatch {
   }
 }
 
-function createHarness(opts: {
-  active?: boolean
-  messages?: FakeMessage[]
-  dispatchResults?: InternalPromptDispatchResult[]
-  now?: number
-} = {}): {
+function createHarness(
+  opts: {
+    active?: boolean
+    messages?: FakeMessage[]
+    dispatchResults?: InternalPromptDispatchResult[]
+    now?: number
+  } = {},
+): {
   injector: MonitorOutputInjector
   calls: DispatchCall[]
   setActive(active: boolean): void
@@ -70,7 +76,7 @@ function createHarness(opts: {
   let active = opts.active ?? false
   let messages = opts.messages ?? []
   const calls: DispatchCall[] = []
-  const dispatchResults = [...opts.dispatchResults ?? []]
+  const dispatchResults = [...(opts.dispatchResults ?? [])]
   const client = {
     session: {
       status: async () => ({ data: { "parent-1": { type: active ? "busy" : "idle" } } }),
@@ -190,10 +196,7 @@ describe("MonitorOutputInjector", () => {
       await injector.flushMonitor(record.id)
 
       // then
-      expect(calls.map((call) => call.source)).toEqual([
-        "monitor-output:mon_1:batch-3",
-        "monitor-output:mon_1:batch-4",
-      ])
+      expect(calls.map((call) => call.source)).toEqual(["monitor-output:mon_1:batch-3", "monitor-output:mon_1:batch-4"])
     })
   })
 
@@ -236,7 +239,8 @@ describe("MonitorOutputInjector", () => {
       // given
       const record = createRecord()
       const batch = createBatch(7)
-      const acceptedText = "[OMO MONITOR OUTPUT]\nmonitor_id: mon_1\nbatch: 7\n<!-- OMO_INTERNAL_INITIATOR -->\n<!-- OMO_INTERNAL_NOREPLY -->"
+      const acceptedText =
+        "[OMO MONITOR OUTPUT]\nmonitor_id: mon_1\nbatch: 7\n<!-- OMO_INTERNAL_INITIATOR -->\n<!-- OMO_INTERNAL_NOREPLY -->"
       const { injector, calls } = createHarness({
         dispatchResults: [{ status: "failed", error: new Error("unexpected eof"), dispatchAttempted: true }],
         messages: [{ role: "user", time: { created: 1_000 }, parts: [{ type: "text", text: acceptedText }] }],
@@ -277,7 +281,12 @@ describe("MonitorOutputInjector", () => {
       const priorNoReplyMonitorMessage = {
         role: "user",
         time: { created: 900 },
-        parts: [{ type: "text", text: "[OMO MONITOR OUTPUT]\nmonitor_id: mon_1\nbatch: 1\n<!-- OMO_INTERNAL_INITIATOR -->\n<!-- OMO_INTERNAL_NOREPLY -->" }],
+        parts: [
+          {
+            type: "text",
+            text: "[OMO MONITOR OUTPUT]\nmonitor_id: mon_1\nbatch: 1\n<!-- OMO_INTERNAL_INITIATOR -->\n<!-- OMO_INTERNAL_NOREPLY -->",
+          },
+        ],
       }
       const batch = createBatch(12)
       const { injector, calls } = createHarness({ messages: [priorNoReplyMonitorMessage], now: 1_000 })
@@ -311,10 +320,7 @@ describe("MonitorOutputInjector", () => {
 
       // then
       expect(pendingAfterReserve).toBe(batch)
-      expect(calls.map((call) => call.source)).toEqual([
-        "monitor-output:mon_1:batch-8",
-        "monitor-output:mon_1:batch-8",
-      ])
+      expect(calls.map((call) => call.source)).toEqual(["monitor-output:mon_1:batch-8", "monitor-output:mon_1:batch-8"])
     })
   })
 })

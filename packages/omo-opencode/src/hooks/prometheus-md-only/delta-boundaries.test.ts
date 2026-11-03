@@ -1,7 +1,16 @@
 /// <reference types="bun-types" />
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { randomUUID } from "node:crypto"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
@@ -27,8 +36,12 @@ let headerNamesSupported = true
 try {
   writeFileSync(join(nameProbe, "line\n***\r:break.md"), "")
 } catch (error) {
-  if (!(error instanceof Error) || !("code" in error) ||
-      !["EINVAL", "ENOTSUP", "EILSEQ", "ENOENT"].includes(String(error.code))) throw error
+  if (
+    !(error instanceof Error) ||
+    !("code" in error) ||
+    !["EINVAL", "ENOTSUP", "EILSEQ", "ENOENT"].includes(String(error.code))
+  )
+    throw error
   headerNamesSupported = false
   console.warn(`Skipping native patch-name cases: filesystem rejects LF/CR/header filename bytes (${error.code})`)
 } finally {
@@ -52,23 +65,33 @@ describe("planner delta serialization and physical boundaries", () => {
   })
 
   function invoke(tool: string, args: Record<string, unknown>, workspace = root) {
-    return invokeBefore(createPrometheusMdOnlyHook({ directory: workspace, client: {} } as never),
-      { tool, sessionID, callID: "delta" }, { args },
+    return invokeBefore(
+      createPrometheusMdOnlyHook({ directory: workspace, client: {} } as never),
+      { tool, sessionID, callID: "delta" },
+      { args },
     )
   }
 
   for (const delimiter of ["\n", "\r"]) {
     for (const header of ["Add File", "Update File", "Move to"]) {
       for (const field of ["patchText", "input", "patch"]) {
-        test.skipIf(!headerNamesSupported)(`SC-1 rejects ${JSON.stringify(delimiter)} physical ${header} through ${field} (filesystem capability)`, async () => {
-          const target = join(root, ".omo", `benign.md${delimiter}*** Add File:src`, `outside.ts${delimiter}+INJECTED${delimiter}*** Add File:tail.md`)
-          mkdirSync(dirname(target), { recursive: true })
-          writeFileSync(target, "before\n")
-          writeFileSync(join(root, ".omo/source.md"), "before\n")
-          symlinkSync(target, join(root, ".omo/alias.md"))
-          const args = { [field]: patchText(header, ".omo/alias.md") }
-          await expect(invoke("apply_patch", args)).rejects.toThrow("Attempted to modify: .omo/alias.md.")
-        })
+        test.skipIf(!headerNamesSupported)(
+          `SC-1 rejects ${JSON.stringify(delimiter)} physical ${header} through ${field} (filesystem capability)`,
+          async () => {
+            const target = join(
+              root,
+              ".omo",
+              `benign.md${delimiter}*** Add File:src`,
+              `outside.ts${delimiter}+INJECTED${delimiter}*** Add File:tail.md`,
+            )
+            mkdirSync(dirname(target), { recursive: true })
+            writeFileSync(target, "before\n")
+            writeFileSync(join(root, ".omo/source.md"), "before\n")
+            symlinkSync(target, join(root, ".omo/alias.md"))
+            const args = { [field]: patchText(header, ".omo/alias.md") }
+            await expect(invoke("apply_patch", args)).rejects.toThrow("Attempted to modify: .omo/alias.md.")
+          },
+        )
       }
     }
   }
@@ -82,15 +105,18 @@ describe("planner delta serialization and physical boundaries", () => {
     ])
   })
 
-  test.skipIf(!headerNamesSupported)("SC-1 ordinary content writes retain LF filename bytes without patch serialization", async () => {
-    mkdirSync(join(root, ".omo"))
-    const physical = join(root, ".omo", "line\nbreak.md")
-    writeFileSync(physical, "before")
-    symlinkSync(physical, join(root, ".omo/alias.md"))
-    const args = { filePath: ".omo/alias.md" }
-    await invoke("write", args)
-    expect(args.filePath).toBe(physical)
-  })
+  test.skipIf(!headerNamesSupported)(
+    "SC-1 ordinary content writes retain LF filename bytes without patch serialization",
+    async () => {
+      mkdirSync(join(root, ".omo"))
+      const physical = join(root, ".omo", "line\nbreak.md")
+      writeFileSync(physical, "before")
+      symlinkSync(physical, join(root, ".omo/alias.md"))
+      const args = { filePath: ".omo/alias.md" }
+      await invoke("write", args)
+      expect(args.filePath).toBe(physical)
+    },
+  )
 
   test("SC-1 preserves grammar-representable internal whitespace and Unicode", async () => {
     mkdirSync(join(root, ".omo"))
@@ -108,10 +134,14 @@ describe("planner delta serialization and physical boundaries", () => {
       symlinkSync(root, alias, "dir")
       symlinkSync("deep/one/two", join(root, "redirect"), "dir")
       const physical = join(realpathSync.native(root), ".omo/new.md")
-      const filePath = spelling === "relative" ? ".omo/new.md"
-        : spelling === "alias-absolute" ? `${alias}/.omo/new.md`
-        : spelling === "safe-dotdot" ? "redirect/../../../.omo/new.md"
-        : physical
+      const filePath =
+        spelling === "relative"
+          ? ".omo/new.md"
+          : spelling === "alias-absolute"
+            ? `${alias}/.omo/new.md`
+            : spelling === "safe-dotdot"
+              ? "redirect/../../../.omo/new.md"
+              : physical
       const args = { filePath }
       await invoke("write", args, alias)
       expect(args.filePath).toBe(physical)
@@ -137,7 +167,14 @@ describe("planner delta serialization and physical boundaries", () => {
   }
 
   describe("every denial is logged with its specific reason", () => {
-    const denials: { name: string; tool: string; args: Record<string, unknown>; frozen?: boolean; reason: string; setup?: () => void }[] = [
+    const denials: {
+      name: string
+      tool: string
+      args: Record<string, unknown>
+      frozen?: boolean
+      reason: string
+      setup?: () => void
+    }[] = [
       {
         name: "content write through a link leaving .omo",
         tool: "write",
@@ -162,7 +199,10 @@ describe("planner delta serialization and physical boundaries", () => {
       {
         name: "patch whose executable targets differ from the authorized ones",
         tool: "apply_patch",
-        args: { patchText: "*** Begin Patch\n*** Add File:.omo/new.md\n+ORIGINAL\n*** End Patch\n*** Delete File:.omo/ignored.md" },
+        args: {
+          patchText:
+            "*** Begin Patch\n*** Add File:.omo/new.md\n+ORIGINAL\n*** End Patch\n*** Delete File:.omo/ignored.md",
+        },
         reason: "(patch target round trip)",
       },
       {
@@ -185,12 +225,26 @@ describe("planner delta serialization and physical boundaries", () => {
         denial.setup?.()
         const logDir = join(fixture, "log")
         mkdirSync(logDir)
-        const child = Bun.spawn([
-          process.execPath, "run", join(import.meta.dir, "fixtures/denial-log.ts"),
-          denial.tool, JSON.stringify(denial.args), ...(denial.frozen ? ["frozen"] : []),
-        ], { cwd: root, stdout: "pipe", stderr: "pipe", env: { ...process.env, TMPDIR: logDir, TEMP: logDir, TMP: logDir } })
+        const child = Bun.spawn(
+          [
+            process.execPath,
+            "run",
+            join(import.meta.dir, "fixtures/denial-log.ts"),
+            denial.tool,
+            JSON.stringify(denial.args),
+            ...(denial.frozen ? ["frozen"] : []),
+          ],
+          {
+            cwd: root,
+            stdout: "pipe",
+            stderr: "pipe",
+            env: { ...process.env, TMPDIR: logDir, TEMP: logDir, TMP: logDir },
+          },
+        )
         const [stdout, stderr, code] = await Promise.all([
-          new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited,
+          new Response(child.stdout).text(),
+          new Response(child.stderr).text(),
+          child.exited,
         ])
         expect(code, stderr).toBe(0)
         const result = JSON.parse(stdout) as { error?: string; blocked: string[] }
@@ -271,8 +325,10 @@ describe("planner delta serialization and physical boundaries", () => {
       mkdirSync(join(root, ".omo"))
       writeFileSync(join(root, ".omo/real.md"), "before\n")
       symlinkSync("real.md", join(root, ".omo/alias.md"))
-      const text = header === "Delete File" ? patchText(header, ".omo/alias.md")
-        : "*** Begin Patch\n*** Update File:.omo/alias.md\n*** Move to:.omo/moved.md\n@@\n-before\n+after\n*** End Patch"
+      const text =
+        header === "Delete File"
+          ? patchText(header, ".omo/alias.md")
+          : "*** Begin Patch\n*** Update File:.omo/alias.md\n*** Move to:.omo/moved.md\n@@\n-before\n+after\n*** End Patch"
       const args = { patchText: text }
       await invoke("apply_patch", args)
       expect(parsePatch(args.patchText).hunks[0].path).toBe(join(root, ".omo/alias.md"))

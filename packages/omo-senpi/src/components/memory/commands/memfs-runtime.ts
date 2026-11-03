@@ -16,10 +16,7 @@ import { parseCommandArgs } from "./args"
 import { createRepoBackup } from "./backup"
 import { memfsBackup, memfsDiff, memfsRestore, memfsTokens } from "./memfs-extra"
 import { requireExistingRepo, type MemfsSubcommand, type MemfsSubcommandInput } from "./memfs-shared"
-import {
-  formatSkillNameFrontmatterRepairReport,
-  repairMissingSkillNameFrontmatter,
-} from "./skill-frontmatter"
+import { formatSkillNameFrontmatterRepairReport, repairMissingSkillNameFrontmatter } from "./skill-frontmatter"
 import { hasGitRepo, openRepo, shortSha } from "./repo"
 import {
   identityForInit,
@@ -49,7 +46,12 @@ const memfsStatus: MemfsSubcommand = async ({ deps, ctx, identity }) => {
     `Mirror: ${mirror.redactedUrl ?? "not configured"}${mirror.url === undefined ? "" : ` (${mirror.aheadCount} ahead)`}`,
   ]
   if (dirty) {
-    lines.push("", ...porcelain, "", "uncommitted changes present; inspect with /memfs diff or commit through the memory tools")
+    lines.push(
+      "",
+      ...porcelain,
+      "",
+      "uncommitted changes present; inspect with /memfs diff or commit through the memory tools",
+    )
   }
   const skillsBlock = await renderSkillsUsage(identity.identityPaths.runtime)
   if (skillsBlock !== undefined) lines.push(skillsBlock)
@@ -75,11 +77,7 @@ const memfsSync: MemfsSubcommand = async ({ deps, ctx, identity }) => {
   const mirror = new MirrorSync({ repo, ...(deps.exec === undefined ? {} : { exec: deps.exec }) })
   const status = await mirror.status()
   if (status.url === undefined) {
-    return respond(
-      ctx,
-      "no memory repository mirror configured; set one with /memory-repository set <url>",
-      "error",
-    )
+    return respond(ctx, "no memory repository mirror configured; set one with /memory-repository set <url>", "error")
   }
   const result = await mirror.pushNow()
   if (!result.pushed) return respond(ctx, `push to ${status.redactedUrl} failed: ${result.detail}`, "error")
@@ -168,26 +166,22 @@ const HANDLERS: Record<string, MemfsSubcommand> = {
 }
 
 export async function runMemfs(deps: MemoryCommandDeps, args: string, ctx: MemoryCommandContext): Promise<string> {
-const parsed = parseCommandArgs(args, { booleans: ["force"] })
-const [subcommand] = parsed.positionals
-if (subcommand === undefined) {
-  return respond(ctx, `usage: /memfs <${SUBCOMMANDS.join("|")}>`, "error")
-}
-const handler = HANDLERS[subcommand]
-if (handler === undefined) {
-  return respond(
-    ctx,
-    `unknown /memfs subcommand: ${subcommand}; expected one of ${SUBCOMMANDS.join(", ")}`,
-    "error",
-  )
-}
+  const parsed = parseCommandArgs(args, { booleans: ["force"] })
+  const [subcommand] = parsed.positionals
+  if (subcommand === undefined) {
+    return respond(ctx, `usage: /memfs <${SUBCOMMANDS.join("|")}>`, "error")
+  }
+  const handler = HANDLERS[subcommand]
+  if (handler === undefined) {
+    return respond(ctx, `unknown /memfs subcommand: ${subcommand}; expected one of ${SUBCOMMANDS.join(", ")}`, "error")
+  }
 
-const identity = subcommand === "init" ? identityForInit(deps, ctx) : requireIdentity(deps, ctx)
-if (identity === undefined) {
-  return respond(ctx, "no memory identity resolved; check the memory config for this project", "error")
-}
-if (typeof identity === "string") return respond(ctx, identity, "error")
+  const identity = subcommand === "init" ? identityForInit(deps, ctx) : requireIdentity(deps, ctx)
+  if (identity === undefined) {
+    return respond(ctx, "no memory identity resolved; check the memory config for this project", "error")
+  }
+  if (typeof identity === "string") return respond(ctx, identity, "error")
 
-const input: MemfsSubcommandInput = { deps, ctx, parsed, identity }
-return handler(input)
+  const input: MemfsSubcommandInput = { deps, ctx, parsed, identity }
+  return handler(input)
 }

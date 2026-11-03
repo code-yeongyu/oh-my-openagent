@@ -6,7 +6,14 @@ import type { KeyringEntry } from "../crypto/entry.ts"
 import { createRejectionCounter } from "../crypto/rejection.ts"
 import { loadTrustAnchor, pinTrustAnchor } from "../crypto/trust-pin.ts"
 import type { SyncSession } from "../engine/open.ts"
-import { approve, createWorld, freshStateDir, newDevice, removeWorldStateDirs, type World } from "../recovery/testing/world.test-support.ts"
+import {
+  approve,
+  createWorld,
+  freshStateDir,
+  newDevice,
+  removeWorldStateDirs,
+  type World,
+} from "../recovery/testing/world.test-support.ts"
 import { openAccountChain } from "./account-chain.ts"
 import { createAccountHttp } from "./http.ts"
 import { openAccountSession } from "./session.ts"
@@ -22,7 +29,11 @@ afterEach(async () => {
 afterAll(removeWorldStateDirs)
 
 async function pinnedDir(world: World): Promise<string> {
-  const walked = await appendEntries(emptyChain(world.account, creatorAnchor(world.account, world.owner.keyring)), world.server.chain(world.account), createRejectionCounter())
+  const walked = await appendEntries(
+    emptyChain(world.account, creatorAnchor(world.account, world.owner.keyring)),
+    world.server.chain(world.account),
+    createRejectionCounter(),
+  )
   if (!walked.ok || walked.state.pin === null) throw new Error("the fixture genesis does not anchor")
   const dir = freshStateDir()
   await pinTrustAnchor(dir, world.account, walked.state.pin)
@@ -31,11 +42,21 @@ async function pinnedDir(world: World): Promise<string> {
 
 async function push(session: SyncSession, baseSeq: number, text: string): Promise<number> {
   const batchId = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64url")
-  const sealed = await session.sealer.seal(batchId, baseSeq, { items: [{ key: "notes/a.md", ops: encoder.encode(text) }] })
+  const sealed = await session.sealer.seal(batchId, baseSeq, {
+    items: [{ key: "notes/a.md", ops: encoder.encode(text) }],
+  })
   const digest = new Bun.CryptoHasher("sha256").update(sealed.bytes).digest("hex")
   const uploadId = await session.transport.reserve(sealed.bytes.length, digest)
   await session.transport.upload(uploadId, sealed.bytes)
-  const appended = await session.transport.append({ uploadId, digest, baseSeq, batchId, epoch: sealed.epoch, link: sealed.link, recordSig: sealed.recordSig })
+  const appended = await session.transport.append({
+    uploadId,
+    digest,
+    baseSeq,
+    batchId,
+    epoch: sealed.epoch,
+    link: sealed.link,
+    recordSig: sealed.recordSig,
+  })
   if (!appended.ok) throw new Error("the append was refused as stale")
   return appended.seq
 }
@@ -47,7 +68,14 @@ async function fourRowAccount() {
   servers.push(server)
   const token = server.tokenFor({ ...world.owner.principal })
   const pinDir = await pinnedDir(world)
-  const opened = await openAccountSession({ baseUrl: server.url, token: () => token, account: world.account, keyring: world.owner.keyring, pinDir, spaceId: SPACE })
+  const opened = await openAccountSession({
+    baseUrl: server.url,
+    token: () => token,
+    account: world.account,
+    keyring: world.owner.keyring,
+    pinDir,
+    spaceId: SPACE,
+  })
   if (!opened.ok) throw new Error(`no session: ${opened.reason}`)
   await push(opened.session, 1, "before")
   await approve(world, await newDevice())
@@ -63,9 +91,12 @@ function servedHttp(input: { url: string; token: string; page?: number }) {
   const knobs = { badKeyringSeq: null as number | null }
   const http = {
     ...real,
-    listEntriesAfter: async (after: number) => (await real.listEntriesAfter(after))?.slice(0, input.page ?? Number.MAX_SAFE_INTEGER) ?? null,
+    listEntriesAfter: async (after: number) =>
+      (await real.listEntriesAfter(after))?.slice(0, input.page ?? Number.MAX_SAFE_INTEGER) ?? null,
     listKeys: async () =>
-      (await real.listKeys())?.map((entry): KeyringEntry => (entry.seq === knobs.badKeyringSeq ? { ...entry, digest: `${entry.digest}x` } : entry)) ?? null,
+      (await real.listKeys())?.map((entry): KeyringEntry =>
+        entry.seq === knobs.badKeyringSeq ? { ...entry, digest: `${entry.digest}x` } : entry,
+      ) ?? null,
   }
   return { http, knobs }
 }
@@ -75,7 +106,13 @@ async function openChain(world: World, pinDir: string, http: ReturnType<typeof s
   if (!pin.ok) throw new Error(`no pin: ${pin.reason}`)
   const lines: string[] = []
   const rejections = createRejectionCounter((line) => lines.push(line))
-  const chain = await openAccountChain({ account: world.account, anchor: pin.anchor, keyring: world.owner.keyring, http, rejections })
+  const chain = await openAccountChain({
+    account: world.account,
+    anchor: pin.anchor,
+    keyring: world.owner.keyring,
+    http,
+    rejections,
+  })
   return { chain, rejections, lines }
 }
 
@@ -103,7 +140,13 @@ describe("account chain over served pages", () => {
     const { world, server, token, pinDir } = await fourRowAccount()
     const { http } = servedHttp({ url: server.url, token })
     let garbled = true
-    const reading = { ...http, listEntriesAfter: async (after: number) => (await http.listEntriesAfter(after))?.map((row) => (garbled && row.seq === 3 ? { ...row, seq: "three" } : row)) ?? null }
+    const reading = {
+      ...http,
+      listEntriesAfter: async (after: number) =>
+        (await http.listEntriesAfter(after))?.map((row) =>
+          garbled && row.seq === 3 ? { ...row, seq: "three" } : row,
+        ) ?? null,
+    }
     const { chain, lines } = await openChain(world, pinDir, reading as typeof http)
 
     expect((await chain.reach(2)).kind).toBe("batch")

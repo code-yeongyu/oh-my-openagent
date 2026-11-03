@@ -1,8 +1,4 @@
-import type {
-  UserPromptSubmitInput,
-  PostToolUseOutput,
-  ClaudeHooksConfig,
-} from "./types"
+import type { UserPromptSubmitInput, PostToolUseOutput, ClaudeHooksConfig } from "./types"
 import { findMatchingHooks, log } from "../../shared"
 import { isRealUserTextPart } from "../../shared/internal-initiator-marker"
 import { dispatchHook, getHookIdentifier } from "./dispatch-hook"
@@ -37,7 +33,7 @@ export interface UserPromptSubmitResult {
 export async function executeUserPromptSubmitHooks(
   ctx: UserPromptSubmitContext,
   config: ClaudeHooksConfig | null,
-  extendedConfig?: PluginExtendedConfig | null
+  extendedConfig?: PluginExtendedConfig | null,
 ): Promise<UserPromptSubmitResult> {
   const modifiedParts = ctx.parts
   const messages: string[] = []
@@ -53,14 +49,9 @@ export async function executeUserPromptSubmitHooks(
 
   // Check if hook tags are in the current user input only (not in injected context)
   // by checking only the text parts that were provided in this message
-  const userInputText = realUserTextParts
-    .map((p) => p.text ?? "")
-    .join("\n")
+  const userInputText = realUserTextParts.map((p) => p.text ?? "").join("\n")
 
-  if (
-    userInputText.includes(USER_PROMPT_SUBMIT_TAG_OPEN) &&
-    userInputText.includes(USER_PROMPT_SUBMIT_TAG_CLOSE)
-  ) {
+  if (userInputText.includes(USER_PROMPT_SUBMIT_TAG_OPEN) && userInputText.includes(USER_PROMPT_SUBMIT_TAG_CLOSE)) {
     return { block: false, modifiedParts, messages }
   }
 
@@ -83,10 +74,10 @@ export async function executeUserPromptSubmitHooks(
     hook_source: "opencode-plugin",
   }
 
-   for (const matcher of matchers) {
-     if (!matcher.hooks || matcher.hooks.length === 0) continue
-     for (const hook of matcher.hooks) {
-       if (hook.type !== "command" && hook.type !== "http") continue
+  for (const matcher of matchers) {
+    if (!matcher.hooks || matcher.hooks.length === 0) continue
+    for (const hook of matcher.hooks) {
+      if (hook.type !== "command" && hook.type !== "http") continue
 
       const hookName = getHookIdentifier(hook)
       if (isHookCommandDisabled("UserPromptSubmit", hookName, extendedConfig ?? null)) {

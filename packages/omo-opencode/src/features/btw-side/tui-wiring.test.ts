@@ -46,10 +46,7 @@ type TestNode = {
 }
 
 type TestSlotRegistration = {
-  slots: Record<
-    string,
-    (context: unknown, value: Record<string, unknown>) => unknown
-  >
+  slots: Record<string, (context: unknown, value: Record<string, unknown>) => unknown>
 }
 
 type TestDialogOption = {
@@ -168,8 +165,7 @@ function createPickerHarness(
         directory: "/tmp/project",
       },
       session: {
-        get: (sessionID: string) =>
-          sessions.find((session) => session.id === sessionID),
+        get: (sessionID: string) => sessions.find((session) => session.id === sessionID),
         messages: () => parentMessages,
         status: () => ({
           type: "idle",
@@ -230,9 +226,7 @@ function createPickerHarness(
       on: () => () => undefined,
     },
     ui: {
-      Prompt: (props: {
-        ref?: (ref: typeof promptRef | undefined) => void
-      }) => {
+      Prompt: (props: { ref?: (ref: typeof promptRef | undefined) => void }) => {
         props.ref?.(promptRef)
         return {
           tag: "prompt",
@@ -348,14 +342,10 @@ describe("registerBtwSideTui", () => {
       controller,
       activePromptRef: () => {
         promptLookupCount += 1
-        return promptLookupCount === 1
-          ? undefined
-          : harness.promptRef
+        return promptLookupCount === 1 ? undefined : harness.promptRef
       },
     })
-    const newSide = harness.dialogSelections[0]?.options.find(
-      (option) => option.title === "New BTW",
-    )
+    const newSide = harness.dialogSelections[0]?.options.find((option) => option.title === "New BTW")
     harness.api.route.navigate("session", {
       sessionID: "ses_other",
     })
@@ -367,9 +357,7 @@ describe("registerBtwSideTui", () => {
 
     // then
     expect(startFromPrompt).not.toHaveBeenCalled()
-    expect(harness.toasts).toContain(
-      "BTW is unavailable before the session starts.",
-    )
+    expect(harness.toasts).toContain("BTW is unavailable before the session starts.")
   })
 
   it("#given the parent prompt remounts while its picker stays open #when New BTW is selected #then creation uses the active replacement prompt", async () => {
@@ -399,9 +387,7 @@ describe("registerBtwSideTui", () => {
       submit: () => undefined,
     })
     activePromptRef = replacementPromptRef
-    const newSide = harness.dialogSelections[0]?.options.find(
-      (option) => option.title === "New BTW",
-    )
+    const newSide = harness.dialogSelections[0]?.options.find((option) => option.title === "New BTW")
 
     // when
     if (newSide) {
@@ -417,11 +403,14 @@ describe("registerBtwSideTui", () => {
     // given
     const harness = createPickerHarness()
     await registerBtwSideTui(harness.api, harness.solid)
-    harness.slots[0]?.slots.session_prompt?.({}, {
-      session_id: "ses_parent",
-      visible: true,
-      disabled: false,
-    })
+    harness.slots[0]?.slots.session_prompt?.(
+      {},
+      {
+        session_id: "ses_parent",
+        visible: true,
+        disabled: false,
+      },
+    )
     const openCommand = harness.layers
       .flatMap((layer) => layer.commands ?? [])
       .find((command) => command.name === "omo.btw.open")
@@ -450,11 +439,14 @@ describe("registerBtwSideTui", () => {
     // given
     const harness = createPickerHarness()
     await registerBtwSideTui(harness.api, harness.solid)
-    harness.slots[0]?.slots.session_prompt?.({}, {
-      session_id: "ses_parent",
-      visible: true,
-      disabled: false,
-    })
+    harness.slots[0]?.slots.session_prompt?.(
+      {},
+      {
+        session_id: "ses_parent",
+        visible: true,
+        disabled: false,
+      },
+    )
     const openCommand = harness.layers
       .flatMap((layer) => layer.commands ?? [])
       .find((command) => command.name === "omo.btw.open")
@@ -463,9 +455,7 @@ describe("registerBtwSideTui", () => {
     await openCommand?.run?.()
 
     // then
-    expect(
-      harness.dialogSelections[0]?.options.map((option) => option.title),
-    ).toEqual([
+    expect(harness.dialogSelections[0]?.options.map((option) => option.title)).toEqual([
       expect.stringContaining("Main"),
       expect.stringContaining("BTW #1"),
       expect.stringContaining("BTW #2"),
@@ -477,11 +467,14 @@ describe("registerBtwSideTui", () => {
     // given
     const harness = createPickerHarness()
     await registerBtwSideTui(harness.api, harness.solid)
-    harness.slots[0]?.slots.session_prompt?.({}, {
-      session_id: "ses_parent",
-      visible: true,
-      disabled: false,
-    })
+    harness.slots[0]?.slots.session_prompt?.(
+      {},
+      {
+        session_id: "ses_parent",
+        visible: true,
+        disabled: false,
+      },
+    )
     const openCommand = harness.layers
       .flatMap((layer) => layer.commands ?? [])
       .find((command) => command.name === "omo.btw.open")
@@ -507,11 +500,14 @@ describe("registerBtwSideTui", () => {
       return catalog.promise
     })
     await registerBtwSideTui(harness.api, harness.solid)
-    harness.slots[0]?.slots.session_prompt?.({}, {
-      session_id: "ses_parent",
-      visible: true,
-      disabled: false,
-    })
+    harness.slots[0]?.slots.session_prompt?.(
+      {},
+      {
+        session_id: "ses_parent",
+        visible: true,
+        disabled: false,
+      },
+    )
     const openCommand = harness.layers
       .flatMap((layer) => layer.commands ?? [])
       .find((command) => command.name === "omo.btw.open")
@@ -529,27 +525,26 @@ describe("registerBtwSideTui", () => {
     await opening
 
     // then
-    expect(harness.promptInput()).toBe(
-      "new draft typed while loading",
-    )
+    expect(harness.promptInput()).toBe("new draft typed while loading")
   })
 
   it("#given retained BTW options #when a side is selected #then the dialog clears and that session opens", async () => {
     // given
     const harness = createPickerHarness()
     await registerBtwSideTui(harness.api, harness.solid)
-    harness.slots[0]?.slots.session_prompt?.({}, {
-      session_id: "ses_parent",
-      visible: true,
-      disabled: false,
-    })
+    harness.slots[0]?.slots.session_prompt?.(
+      {},
+      {
+        session_id: "ses_parent",
+        visible: true,
+        disabled: false,
+      },
+    )
     const openCommand = harness.layers
       .flatMap((layer) => layer.commands ?? [])
       .find((command) => command.name === "omo.btw.open")
     await openCommand?.run?.()
-    const secondSide = harness.dialogSelections[0]?.options.find(
-      (option) => option.title.includes("BTW #2"),
-    )
+    const secondSide = harness.dialogSelections[0]?.options.find((option) => option.title.includes("BTW #2"))
 
     // when
     if (secondSide) {
@@ -564,18 +559,19 @@ describe("registerBtwSideTui", () => {
     // given
     const harness = createPickerHarness()
     await registerBtwSideTui(harness.api, harness.solid)
-    harness.slots[0]?.slots.session_prompt?.({}, {
-      session_id: "ses_parent",
-      visible: true,
-      disabled: false,
-    })
+    harness.slots[0]?.slots.session_prompt?.(
+      {},
+      {
+        session_id: "ses_parent",
+        visible: true,
+        disabled: false,
+      },
+    )
     const openCommand = harness.layers
       .flatMap((layer) => layer.commands ?? [])
       .find((command) => command.name === "omo.btw.open")
     await openCommand?.run?.()
-    const newSide = harness.dialogSelections[0]?.options.find(
-      (option) => option.title === "New BTW",
-    )
+    const newSide = harness.dialogSelections[0]?.options.find((option) => option.title === "New BTW")
     expect(harness.createSession).not.toHaveBeenCalled()
 
     // when
@@ -601,18 +597,19 @@ describe("registerBtwSideTui", () => {
       },
     })
     await registerBtwSideTui(harness.api, harness.solid)
-    harness.slots[0]?.slots.session_prompt?.({}, {
-      session_id: "ses_parent",
-      visible: true,
-      disabled: false,
-    })
+    harness.slots[0]?.slots.session_prompt?.(
+      {},
+      {
+        session_id: "ses_parent",
+        visible: true,
+        disabled: false,
+      },
+    )
     const openCommand = harness.layers
       .flatMap((layer) => layer.commands ?? [])
       .find((command) => command.name === "omo.btw.open")
     await openCommand?.run?.()
-    const newSide = harness.dialogSelections[0]?.options.find(
-      (option) => option.title === "New BTW",
-    )
+    const newSide = harness.dialogSelections[0]?.options.find((option) => option.title === "New BTW")
     harness.api.route.navigate("session", {
       sessionID: "ses_other",
     })
@@ -624,27 +621,26 @@ describe("registerBtwSideTui", () => {
 
     // then
     expect(harness.createSession).not.toHaveBeenCalled()
-    expect(harness.toasts).toContain(
-      "BTW is unavailable before the session starts.",
-    )
+    expect(harness.toasts).toContain("BTW is unavailable before the session starts.")
   })
 
   it("#given New BTW cannot establish a stable boundary #when selected #then the picker stays open for another choice", async () => {
     // given
     const harness = createPickerHarness("/btw", [])
     await registerBtwSideTui(harness.api, harness.solid)
-    harness.slots[0]?.slots.session_prompt?.({}, {
-      session_id: "ses_parent",
-      visible: true,
-      disabled: false,
-    })
+    harness.slots[0]?.slots.session_prompt?.(
+      {},
+      {
+        session_id: "ses_parent",
+        visible: true,
+        disabled: false,
+      },
+    )
     const openCommand = harness.layers
       .flatMap((layer) => layer.commands ?? [])
       .find((command) => command.name === "omo.btw.open")
     await openCommand?.run?.()
-    const newSide = harness.dialogSelections[0]?.options.find(
-      (option) => option.title === "New BTW",
-    )
+    const newSide = harness.dialogSelections[0]?.options.find((option) => option.title === "New BTW")
 
     // when
     if (newSide) {
@@ -654,30 +650,27 @@ describe("registerBtwSideTui", () => {
     // then
     expect(harness.createSession).not.toHaveBeenCalled()
     expect(harness.dialogClears()).toBe(0)
-    expect(harness.toasts).toContain(
-      "BTW is unavailable before the session starts.",
-    )
+    expect(harness.toasts).toContain("BTW is unavailable before the session starts.")
   })
 
   it("#given a deleted picker row #when it is selected #then a precise warning appears and the picker refreshes", async () => {
     // given
     const harness = createPickerHarness()
     await registerBtwSideTui(harness.api, harness.solid)
-    harness.slots[0]?.slots.session_prompt?.({}, {
-      session_id: "ses_parent",
-      visible: true,
-      disabled: false,
-    })
+    harness.slots[0]?.slots.session_prompt?.(
+      {},
+      {
+        session_id: "ses_parent",
+        visible: true,
+        disabled: false,
+      },
+    )
     const openCommand = harness.layers
       .flatMap((layer) => layer.commands ?? [])
       .find((command) => command.name === "omo.btw.open")
     await openCommand?.run?.()
-    const deletedSide = harness.dialogSelections[0]?.options.find(
-      (option) => option.title.includes("BTW #2"),
-    )
-    const deletedIndex = harness.sessions.findIndex(
-      (session) => session.id === "ses_side_2",
-    )
+    const deletedSide = harness.dialogSelections[0]?.options.find((option) => option.title.includes("BTW #2"))
+    const deletedIndex = harness.sessions.findIndex((session) => session.id === "ses_side_2")
     harness.sessions.splice(deletedIndex, 1)
 
     // when
@@ -687,14 +680,10 @@ describe("registerBtwSideTui", () => {
 
     // then
     expect(harness.currentSessionID()).toBe("ses_parent")
-    expect(harness.toasts).toContain(
-      "BTW session ses_side_2 no longer exists. Refreshing the list.",
-    )
+    expect(harness.toasts).toContain("BTW session ses_side_2 no longer exists. Refreshing the list.")
     expect(harness.dialogSelections).toHaveLength(2)
     expect(
-      harness.dialogSelections[1]?.options.some(
-        (option) => option.title.includes("second retained question"),
-      ),
+      harness.dialogSelections[1]?.options.some((option) => option.title.includes("second retained question")),
     ).toBe(false)
   })
 
@@ -731,9 +720,7 @@ describe("registerBtwSideTui", () => {
       focus: () => undefined,
       submit: () => undefined,
     }
-    const promptRefCallbacks: Array<
-      (ref: typeof promptRef | undefined) => void
-    > = []
+    const promptRefCallbacks: Array<(ref: typeof promptRef | undefined) => void> = []
     const api = unsafeTestValue({
       state: {
         path: {
@@ -826,9 +813,7 @@ describe("registerBtwSideTui", () => {
         on: () => () => undefined,
       },
       ui: {
-        Prompt: (props: {
-          ref?: (ref: typeof promptRef | undefined) => void
-        }) => {
+        Prompt: (props: { ref?: (ref: typeof promptRef | undefined) => void }) => {
           if (props.ref) promptRefCallbacks.push(props.ref)
           props.ref?.(promptRef)
           return {
@@ -873,14 +858,15 @@ describe("registerBtwSideTui", () => {
     // when
     await registerBtwSideTui(api, solid)
     const slotRegistration = slots[0]
-    slotRegistration?.slots.session_prompt?.({}, {
-      session_id: "ses_parent",
-      visible: true,
-      disabled: false,
-    })
-    const inlineLayer = layers.find((layer) =>
-      layer.bindings?.some((binding) => binding.key === "enter,return"),
+    slotRegistration?.slots.session_prompt?.(
+      {},
+      {
+        session_id: "ses_parent",
+        visible: true,
+        disabled: false,
+      },
     )
+    const inlineLayer = layers.find((layer) => layer.bindings?.some((binding) => binding.key === "enter,return"))
     const openCommand = layers
       .flatMap((layer) => layer.commands ?? [])
       .find((command) => command.name === "omo.btw.open")
@@ -944,18 +930,20 @@ describe("registerBtwSideTui", () => {
     expect(promptInput).toBe("")
     expect(toasts).toEqual([])
 
-    const parentStatus = slotRegistration?.slots.session_prompt_right?.({}, {
-      session_id: "ses_parent",
-    }) as TestNode
-    const sideStatus = slotRegistration?.slots.session_prompt_right?.({}, {
-      session_id: "ses_side",
-    }) as TestNode
-    expect(parentStatus.children).toContain(
-      "BTW retained · ctrl+/ picker",
-    )
-    expect(sideStatus.children).toContain(
-      "BTW side · main ready · esc esc return · ctrl+/ picker · ctrl+c delete",
-    )
+    const parentStatus = slotRegistration?.slots.session_prompt_right?.(
+      {},
+      {
+        session_id: "ses_parent",
+      },
+    ) as TestNode
+    const sideStatus = slotRegistration?.slots.session_prompt_right?.(
+      {},
+      {
+        session_id: "ses_side",
+      },
+    ) as TestNode
+    expect(parentStatus.children).toContain("BTW retained · ctrl+/ picker")
+    expect(sideStatus.children).toContain("BTW side · main ready · esc esc return · ctrl+/ picker · ctrl+c delete")
     expect(disposers).toHaveLength(1)
     expect(deleteSession).not.toHaveBeenCalled()
 

@@ -40,9 +40,7 @@ function createPromptCaptureHarness() {
           return { data: {} }
         },
         messages: async () => ({
-          data: [
-            { info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "analyzed" }] },
-          ],
+          data: [{ info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "analyzed" }] }],
         }),
       },
     },
@@ -202,15 +200,19 @@ describe("look-at tool", () => {
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_test_prompt_fail" } }),
-          prompt: async () => { throw new Error("Network connection failed") },
+          prompt: async () => {
+            throw new Error("Network connection failed")
+          },
           messages: async () => ({ data: [] }),
         },
       }
 
-      const tool = createLookAt(unsafeTestValue({
-        client: mockClient,
-        directory: "/project",
-      }))
+      const tool = createLookAt(
+        unsafeTestValue({
+          client: mockClient,
+          directory: "/project",
+        }),
+      )
 
       const toolContext: ToolContext = {
         sessionID: "parent-session",
@@ -223,10 +225,7 @@ describe("look-at tool", () => {
         ask: async () => {},
       }
 
-      const result = await tool.execute(
-        { file_path: "/test/file.png", goal: "analyze image" },
-        toolContext,
-      )
+      const result = await tool.execute({ file_path: "/test/file.png", goal: "analyze image" }, toolContext)
       expect(result).toContain("Error")
       expect(result).toContain("multimodal-looker")
     })
@@ -244,10 +243,12 @@ describe("look-at tool", () => {
         },
       }
 
-      const tool = createLookAt(unsafeTestValue({
-        client: mockClient,
-        directory: "/project",
-      }))
+      const tool = createLookAt(
+        unsafeTestValue({
+          client: mockClient,
+          directory: "/project",
+        }),
+      )
 
       const toolContext: ToolContext = {
         sessionID: "parent-session",
@@ -260,10 +261,7 @@ describe("look-at tool", () => {
         ask: async () => {},
       }
 
-      const result = await tool.execute(
-        { file_path: "/test/file.pdf", goal: "extract text" },
-        toolContext,
-      )
+      const result = await tool.execute({ file_path: "/test/file.pdf", goal: "extract text" }, toolContext)
       expect(result).toContain("Error")
       expect(result).toContain("multimodal-looker")
     })
@@ -281,10 +279,12 @@ describe("look-at tool", () => {
         },
       }
 
-      const tool = createLookAt(unsafeTestValue({
-        client: mockClient,
-        directory: "/project",
-      }))
+      const tool = createLookAt(
+        unsafeTestValue({
+          client: mockClient,
+          directory: "/project",
+        }),
+      )
 
       const toolContext: ToolContext = {
         sessionID: "parent-session",
@@ -297,10 +297,7 @@ describe("look-at tool", () => {
         ask: async () => {},
       }
 
-      const result = await tool.execute(
-        { file_path: "/test/file.png", goal: "analyze" },
-        toolContext,
-      )
+      const result = await tool.execute({ file_path: "/test/file.png", goal: "analyze" }, toolContext)
       expect(result).toContain("Error")
       expect(result).toContain("session")
     })
@@ -311,7 +308,9 @@ describe("look-at tool", () => {
     // when LookAt tool executed
     // then model info should be passed to sync prompt
     test("passes multimodal-looker model to sync prompt when available", async () => {
-      setVisionCapableModelsCache(new Map([["google/gemini-3-flash", { providerID: "google", modelID: "gemini-3-flash" }]]))
+      setVisionCapableModelsCache(
+        new Map([["google/gemini-3-flash", { providerID: "google", modelID: "gemini-3-flash" }]]),
+      )
 
       let promptBody!: LookAtPromptBody
 
@@ -335,17 +334,17 @@ describe("look-at tool", () => {
             return { data: {} }
           },
           messages: async () => ({
-            data: [
-              { info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "done" }] },
-            ],
+            data: [{ info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "done" }] }],
           }),
         },
       }
 
-      const tool = createLookAt(unsafeTestValue({
-        client: mockClient,
-        directory: "/project",
-      }))
+      const tool = createLookAt(
+        unsafeTestValue({
+          client: mockClient,
+          directory: "/project",
+        }),
+      )
 
       const toolContext: ToolContext = {
         sessionID: "parent-session",
@@ -358,10 +357,7 @@ describe("look-at tool", () => {
         ask: async () => {},
       }
 
-      await tool.execute(
-        { file_path: "/test/file.png", goal: "analyze image" },
-        toolContext
-      )
+      await tool.execute({ file_path: "/test/file.png", goal: "analyze image" }, toolContext)
 
       expect(promptBody.model).toEqual({
         providerID: "google",
@@ -390,17 +386,17 @@ describe("look-at tool", () => {
           promptAsync: asyncPrompt,
           status: statusFn,
           messages: async () => ({
-            data: [
-              { info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "result" }] },
-            ],
+            data: [{ info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "result" }] }],
           }),
         },
       }
 
-      const tool = createLookAt(unsafeTestValue({
-        client: mockClient,
-        directory: "/project",
-      }))
+      const tool = createLookAt(
+        unsafeTestValue({
+          client: mockClient,
+          directory: "/project",
+        }),
+      )
 
       const toolContext: ToolContext = {
         sessionID: "parent-session",
@@ -413,10 +409,7 @@ describe("look-at tool", () => {
         ask: async () => {},
       }
 
-      const result = await tool.execute(
-        { file_path: "/test/file.png", goal: "analyze" },
-        toolContext,
-      )
+      const result = await tool.execute({ file_path: "/test/file.png", goal: "analyze" }, toolContext)
 
       expect(result).toBe("result")
       expect(syncPrompt).toHaveBeenCalledTimes(1)
@@ -447,17 +440,22 @@ describe("look-at tool", () => {
             callOrder.push("messages")
             return {
               data: [
-                { info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "eof-ambiguity-result-sentinel" }] },
+                {
+                  info: { role: "assistant", time: { created: 1 } },
+                  parts: [{ type: "text", text: "eof-ambiguity-result-sentinel" }],
+                },
               ],
             }
           },
         },
       }
 
-      const tool = createLookAt(unsafeTestValue({
-        client: mockClient,
-        directory: "/project",
-      }))
+      const tool = createLookAt(
+        unsafeTestValue({
+          client: mockClient,
+          directory: "/project",
+        }),
+      )
 
       const toolContext: ToolContext = {
         sessionID: "parent-session",
@@ -470,10 +468,7 @@ describe("look-at tool", () => {
         ask: async () => {},
       }
 
-      const result = await tool.execute(
-        { file_path: "/test/file.png", goal: "analyze" },
-        toolContext,
-      )
+      const result = await tool.execute({ file_path: "/test/file.png", goal: "analyze" }, toolContext)
 
       expect(result).toBe("eof-ambiguity-result-sentinel")
       expect(callOrder).toEqual(["prompt", "status", "messages"])
@@ -490,17 +485,21 @@ describe("look-at tool", () => {
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_sync_no_msg" } }),
-          prompt: async () => { throw new Error("Connection refused") },
+          prompt: async () => {
+            throw new Error("Connection refused")
+          },
           promptAsync: async () => ({}),
           status: async () => ({ data: {} }),
           messages: async () => ({ data: [] }),
         },
       }
 
-      const tool = createLookAt(unsafeTestValue({
-        client: mockClient,
-        directory: "/project",
-      }))
+      const tool = createLookAt(
+        unsafeTestValue({
+          client: mockClient,
+          directory: "/project",
+        }),
+      )
 
       const toolContext: ToolContext = {
         sessionID: "parent-session",
@@ -513,10 +512,7 @@ describe("look-at tool", () => {
         ask: async () => {},
       }
 
-      const result = await tool.execute(
-        { file_path: "/test/file.png", goal: "analyze" },
-        toolContext,
-      )
+      const result = await tool.execute({ file_path: "/test/file.png", goal: "analyze" }, toolContext)
 
       expect(result).toContain("Error")
       expect(result).toContain("multimodal-looker")
@@ -542,19 +538,20 @@ describe("look-at tool", () => {
       const mockClient = {
         session: {
           get: async () => ({ data: { directory: "/project" } }),
-          create: async () => { throw new Error("ECONNREFUSED: connection refused") },
+          create: async () => {
+            throw new Error("ECONNREFUSED: connection refused")
+          },
         },
       }
 
-      const tool = createLookAt(unsafeTestValue({
-        client: mockClient,
-        directory: "/project",
-      }))
-
-      const result = await tool.execute(
-        { file_path: "/test/file.png", goal: "analyze" },
-        createToolContext(),
+      const tool = createLookAt(
+        unsafeTestValue({
+          client: mockClient,
+          directory: "/project",
+        }),
       )
+
+      const result = await tool.execute({ file_path: "/test/file.png", goal: "analyze" }, createToolContext())
       expect(result).toContain("Error")
       expect(result).toContain("ECONNREFUSED")
     })
@@ -562,37 +559,42 @@ describe("look-at tool", () => {
     // given session.messages throws unexpectedly
     // when LookAt tool executed
     // then returns error string instead of crashing
-    test("catches session.messages throw and returns error string", async () => {
-      let statusCalls = 0
-      const mockClient = {
-        app: {
-          agents: async () => ({ data: [] }),
-        },
-        session: {
-          get: async () => ({ data: { directory: "/project" } }),
-          create: async () => ({ data: { id: "ses_msg_throw" } }),
-          promptAsync: async () => ({}),
-          status: async () => {
-            statusCalls++
-            return { data: { ses_msg_throw: { type: statusCalls <= 1 ? "busy" : "idle" } } }
+    test(
+      "catches session.messages throw and returns error string",
+      async () => {
+        let statusCalls = 0
+        const mockClient = {
+          app: {
+            agents: async () => ({ data: [] }),
           },
-          messages: async () => { throw new Error("unexpected-server-error-sentinel") },
-          abort: async () => ({ data: {} }),
-        },
-      }
+          session: {
+            get: async () => ({ data: { directory: "/project" } }),
+            create: async () => ({ data: { id: "ses_msg_throw" } }),
+            promptAsync: async () => ({}),
+            status: async () => {
+              statusCalls++
+              return { data: { ses_msg_throw: { type: statusCalls <= 1 ? "busy" : "idle" } } }
+            },
+            messages: async () => {
+              throw new Error("unexpected-server-error-sentinel")
+            },
+            abort: async () => ({ data: {} }),
+          },
+        }
 
-      const tool = createLookAt(unsafeTestValue({
-        client: mockClient,
-        directory: "/project",
-      }))
+        const tool = createLookAt(
+          unsafeTestValue({
+            client: mockClient,
+            directory: "/project",
+          }),
+        )
 
-      const result = await tool.execute(
-        { file_path: "/test/file.png", goal: "analyze" },
-        createToolContext(),
-      )
-      expect(result).toContain("Error")
-      expect(result).toContain("unexpected-server-error-sentinel")
-    }, { timeout: 15000 })
+        const result = await tool.execute({ file_path: "/test/file.png", goal: "analyze" }, createToolContext())
+        expect(result).toContain("Error")
+        expect(result).toContain("unexpected-server-error-sentinel")
+      },
+      { timeout: 15000 },
+    )
 
     // given a non-Error object is thrown
     // when LookAt tool executed
@@ -601,19 +603,20 @@ describe("look-at tool", () => {
       const mockClient = {
         session: {
           get: async () => ({ data: { directory: "/project" } }),
-          create: async () => { throw "string-error-thrown-sentinel" },
+          create: async () => {
+            throw "string-error-thrown-sentinel"
+          },
         },
       }
 
-      const tool = createLookAt(unsafeTestValue({
-        client: mockClient,
-        directory: "/project",
-      }))
-
-      const result = await tool.execute(
-        { file_path: "/test/file.png", goal: "analyze" },
-        createToolContext(),
+      const tool = createLookAt(
+        unsafeTestValue({
+          client: mockClient,
+          directory: "/project",
+        }),
       )
+
+      const result = await tool.execute({ file_path: "/test/file.png", goal: "analyze" }, createToolContext())
       expect(result).toContain("Error")
       expect(result).toContain("string-error-thrown-sentinel")
     })
@@ -636,28 +639,27 @@ describe("look-at tool", () => {
             return { data: {} }
           },
           messages: async () => ({
-            data: [
-              { info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "ok" }] },
-            ],
+            data: [{ info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "ok" }] }],
           }),
         },
       }
 
       try {
-        const tool = createLookAt(unsafeTestValue({
-          client: mockClient,
-          directory: temporaryDirectory,
-        }))
-
-        const result = await tool.execute(
-          { file_path: jsonPath, goal: "summarize json" },
-          createToolContext(),
+        const tool = createLookAt(
+          unsafeTestValue({
+            client: mockClient,
+            directory: temporaryDirectory,
+          }),
         )
+
+        const result = await tool.execute({ file_path: jsonPath, goal: "summarize json" }, createToolContext())
 
         expect(result).toBe("ok")
         expect(promptBody).toBeDefined()
         expect(promptBody?.parts.some((part) => part.type === "file" && part.mime === "application/json")).toBe(false)
-        expect(promptBody?.parts.some((part) => part.type === "text" && part.text?.includes('{"hello":"world"}'))).toBe(true)
+        expect(promptBody?.parts.some((part) => part.type === "text" && part.text?.includes('{"hello":"world"}'))).toBe(
+          true,
+        )
       } finally {
         rmSync(temporaryDirectory, { recursive: true, force: true })
       }
@@ -683,17 +685,17 @@ describe("look-at tool", () => {
             return { data: {} }
           },
           messages: async () => ({
-            data: [
-              { info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "analyzed" }] },
-            ],
+            data: [{ info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "analyzed" }] }],
           }),
         },
       }
 
-      const tool = createLookAt(unsafeTestValue({
-        client: mockClient,
-        directory: "/project",
-      }))
+      const tool = createLookAt(
+        unsafeTestValue({
+          client: mockClient,
+          directory: "/project",
+        }),
+      )
 
       const toolContext: ToolContext = {
         sessionID: "parent-session",
@@ -706,10 +708,7 @@ describe("look-at tool", () => {
         ask: async () => {},
       }
 
-      await tool.execute(
-        { image_data: "data:image/png;base64,iVBORw0KGgo=", goal: "describe this image" },
-        toolContext
-      )
+      await tool.execute({ image_data: "data:image/png;base64,iVBORw0KGgo=", goal: "describe this image" }, toolContext)
 
       const filePart = promptBody.parts.find((p: LookAtPart) => p.type === "file")!
       expect(filePart).toBeDefined()
@@ -736,17 +735,17 @@ describe("look-at tool", () => {
             return { data: {} }
           },
           messages: async () => ({
-            data: [
-              { info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "analyzed" }] },
-            ],
+            data: [{ info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "analyzed" }] }],
           }),
         },
       }
 
-      const tool = createLookAt(unsafeTestValue({
-        client: mockClient,
-        directory: "/project",
-      }))
+      const tool = createLookAt(
+        unsafeTestValue({
+          client: mockClient,
+          directory: "/project",
+        }),
+      )
 
       const toolContext: ToolContext = {
         sessionID: "parent-session",
@@ -759,10 +758,7 @@ describe("look-at tool", () => {
         ask: async () => {},
       }
 
-      await tool.execute(
-        { image_data: "iVBORw0KGgo=", goal: "analyze" },
-        toolContext
-      )
+      await tool.execute({ image_data: "iVBORw0KGgo=", goal: "analyze" }, toolContext)
 
       const filePart = promptBody.parts.find((p: LookAtPart) => p.type === "file")!
       expect(filePart).toBeDefined()
@@ -786,9 +782,7 @@ describe("look-at tool", () => {
             return { data: {} }
           },
           messages: async () => ({
-            data: [
-              { info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "ok" }] },
-            ],
+            data: [{ info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "ok" }] }],
           }),
         },
       }
@@ -812,15 +806,14 @@ describe("look-at tool", () => {
     test("instructs agent to analyze attached file when Read is disabled (file_path mode)", async () => {
       const { mockClient, captured } = captureLastPromptBody()
 
-      const tool = createLookAt(unsafeTestValue({
-        client: mockClient,
-        directory: "/project",
-      }))
-
-      await tool.execute(
-        { file_path: "/test/file.png", goal: "describe contents" },
-        buildToolContext(),
+      const tool = createLookAt(
+        unsafeTestValue({
+          client: mockClient,
+          directory: "/project",
+        }),
       )
+
+      await tool.execute({ file_path: "/test/file.png", goal: "describe contents" }, buildToolContext())
 
       expect(captured.body.tools.read).toBe(false)
     })
@@ -831,10 +824,12 @@ describe("look-at tool", () => {
     test("instructs agent to analyze attached image when image_data is provided", async () => {
       const { mockClient, captured } = captureLastPromptBody()
 
-      const tool = createLookAt(unsafeTestValue({
-        client: mockClient,
-        directory: "/project",
-      }))
+      const tool = createLookAt(
+        unsafeTestValue({
+          client: mockClient,
+          directory: "/project",
+        }),
+      )
 
       await tool.execute(
         { image_data: "data:image/png;base64,iVBORw0KGgo=", goal: "describe image" },
@@ -843,28 +838,30 @@ describe("look-at tool", () => {
 
       expect(captured.body.tools.read).toBe(false)
     })
-
   })
 
   describe("createLookAt multi-file processing", () => {
     test("schema exposes file_paths as an optional string array", () => {
       const lookAtTool = createLookAt({ client: {}, directory: "/project" } as never)
       const filePathsSchema = lookAtTool.args.file_paths
-      const filePathsDef = typeof filePathsSchema === "object" && filePathsSchema !== null
-        ? Reflect.get(filePathsSchema, "def")
-        : undefined
-      const filePathsInnerType = typeof filePathsDef === "object" && filePathsDef !== null
-        ? Reflect.get(filePathsDef, "innerType")
-        : undefined
-      const filePathsInnerDef = typeof filePathsInnerType === "object" && filePathsInnerType !== null
-        ? Reflect.get(filePathsInnerType, "def")
-        : undefined
-      const filePathsElement = typeof filePathsInnerDef === "object" && filePathsInnerDef !== null
-        ? Reflect.get(filePathsInnerDef, "element")
-        : undefined
-      const filePathsElementDef = typeof filePathsElement === "object" && filePathsElement !== null
-        ? Reflect.get(filePathsElement, "def")
-        : undefined
+      const filePathsDef =
+        typeof filePathsSchema === "object" && filePathsSchema !== null
+          ? Reflect.get(filePathsSchema, "def")
+          : undefined
+      const filePathsInnerType =
+        typeof filePathsDef === "object" && filePathsDef !== null ? Reflect.get(filePathsDef, "innerType") : undefined
+      const filePathsInnerDef =
+        typeof filePathsInnerType === "object" && filePathsInnerType !== null
+          ? Reflect.get(filePathsInnerType, "def")
+          : undefined
+      const filePathsElement =
+        typeof filePathsInnerDef === "object" && filePathsInnerDef !== null
+          ? Reflect.get(filePathsInnerDef, "element")
+          : undefined
+      const filePathsElementDef =
+        typeof filePathsElement === "object" && filePathsElement !== null
+          ? Reflect.get(filePathsElement, "def")
+          : undefined
 
       expect(filePathsSchema).toBeDefined()
       expect(Reflect.get(filePathsDef as object, "type")).toBe("optional")
@@ -875,21 +872,26 @@ describe("look-at tool", () => {
     test("schema exposes image_data_list as an optional string array", () => {
       const lookAtTool = createLookAt({ client: {}, directory: "/project" } as never)
       const imageDataListSchema = lookAtTool.args.image_data_list
-      const imageDataListDef = typeof imageDataListSchema === "object" && imageDataListSchema !== null
-        ? Reflect.get(imageDataListSchema, "def")
-        : undefined
-      const imageDataListInnerType = typeof imageDataListDef === "object" && imageDataListDef !== null
-        ? Reflect.get(imageDataListDef, "innerType")
-        : undefined
-      const imageDataListInnerDef = typeof imageDataListInnerType === "object" && imageDataListInnerType !== null
-        ? Reflect.get(imageDataListInnerType, "def")
-        : undefined
-      const imageDataListElement = typeof imageDataListInnerDef === "object" && imageDataListInnerDef !== null
-        ? Reflect.get(imageDataListInnerDef, "element")
-        : undefined
-      const imageDataListElementDef = typeof imageDataListElement === "object" && imageDataListElement !== null
-        ? Reflect.get(imageDataListElement, "def")
-        : undefined
+      const imageDataListDef =
+        typeof imageDataListSchema === "object" && imageDataListSchema !== null
+          ? Reflect.get(imageDataListSchema, "def")
+          : undefined
+      const imageDataListInnerType =
+        typeof imageDataListDef === "object" && imageDataListDef !== null
+          ? Reflect.get(imageDataListDef, "innerType")
+          : undefined
+      const imageDataListInnerDef =
+        typeof imageDataListInnerType === "object" && imageDataListInnerType !== null
+          ? Reflect.get(imageDataListInnerType, "def")
+          : undefined
+      const imageDataListElement =
+        typeof imageDataListInnerDef === "object" && imageDataListInnerDef !== null
+          ? Reflect.get(imageDataListInnerDef, "element")
+          : undefined
+      const imageDataListElementDef =
+        typeof imageDataListElement === "object" && imageDataListElement !== null
+          ? Reflect.get(imageDataListElement, "def")
+          : undefined
 
       expect(imageDataListSchema).toBeDefined()
       expect(Reflect.get(imageDataListDef as object, "type")).toBe("optional")

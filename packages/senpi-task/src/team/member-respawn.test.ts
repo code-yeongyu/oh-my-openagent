@@ -3,10 +3,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { loadRuntimeState } from "@oh-my-opencode/team-core/team-state-store"
 
 import { normalizeSenpiTeamSpec } from "./normalize"
-import {
-  TeamMemberRespawnLaunchError,
-  createTeamMemberRespawnLaunchResolver,
-} from "./member-respawn"
+import { TeamMemberRespawnLaunchError, createTeamMemberRespawnLaunchResolver } from "./member-respawn"
 import { createTeam } from "./runtime"
 import { toTeamCoreConfig } from "./runtime-config"
 import { approveShutdown, requestShutdown, type ShutdownOutboundMessage } from "./shutdown"

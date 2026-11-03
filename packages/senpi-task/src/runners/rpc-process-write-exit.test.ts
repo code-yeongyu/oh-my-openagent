@@ -10,7 +10,9 @@ describe("RPC stdin write and child exit ordering (#11096)", () => {
   test("a live child past the exit bound retains the original write error", async () => {
     const stdin = new PassThrough()
     const child = Object.assign(new EventEmitter(), {
-      stdin, stderr: new PassThrough(), stdout: new PassThrough(),
+      stdin,
+      stderr: new PassThrough(),
+      stdout: new PassThrough(),
     }) as unknown as ChildProcess
     const error = Object.assign(new Error("synthetic closed pipe"), { code: "EPIPE" })
     Object.defineProperty(stdin, "write", {
@@ -34,7 +36,9 @@ describe("RPC stdin write and child exit ordering (#11096)", () => {
       const stdin = new PassThrough()
       const stdout = new PassThrough()
       const child = Object.assign(new EventEmitter(), {
-        stdin, stdout, stderr: new PassThrough(),
+        stdin,
+        stdout,
+        stderr: new PassThrough(),
       }) as unknown as ChildProcess
       const error = Object.assign(new Error("synthetic closed pipe"), { code: "EPIPE" })
       Object.defineProperty(stdin, "write", {
@@ -66,7 +70,11 @@ describe("RPC stdin write and child exit ordering (#11096)", () => {
           const stdin = new PassThrough()
           const stderr = new PassThrough()
           const child = Object.assign(new EventEmitter(), {
-            stdin, stderr, stdout: new PassThrough(), exitCode: null as number | null, signalCode: null,
+            stdin,
+            stderr,
+            stdout: new PassThrough(),
+            exitCode: null as number | null,
+            signalCode: null,
           })
           const error = Object.assign(new Error("synthetic closed pipe"), { code })
           const close = (): void => {
@@ -94,14 +102,20 @@ describe("RPC stdin write and child exit ordering (#11096)", () => {
             buildSpawn: (spec) => ({ command: "unused", args: [], cwd: spec.cwd, env: {} }),
           })
 
-          const failure = await runner.start({
-            task_id: "st_write_exit", cwd: process.cwd(), state_dir: process.cwd(),
-            prompt: "hello", model: "prov/ghost",
-          }).catch((caught: unknown) => caught)
+          const failure = await runner
+            .start({
+              task_id: "st_write_exit",
+              cwd: process.cwd(),
+              state_dir: process.cwd(),
+              prompt: "hello",
+              model: "prov/ghost",
+            })
+            .catch((caught: unknown) => caught)
 
           expect(failure).toMatchObject({
             failure: {
-              kind: "model_unavailable", rejected_while: "exited",
+              kind: "model_unavailable",
+              rejected_while: "exited",
               exit: { kind: "crashed", code: 1, signal: null },
             },
           })

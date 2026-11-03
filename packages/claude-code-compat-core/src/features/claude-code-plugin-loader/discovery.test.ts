@@ -997,11 +997,7 @@ describe("discoverInstalledPlugins", () => {
       const malformedSibling = join(pluginRoot, "0.1.0")
       const configuredInstallPath = join(pluginRoot, "unknown")
       mkdirSync(join(malformedSibling, ".claude-plugin"), { recursive: true })
-      writeFileSync(
-        join(malformedSibling, ".claude-plugin", "plugin.json"),
-        "{ this is not valid json",
-        "utf-8",
-      )
+      writeFileSync(join(malformedSibling, ".claude-plugin", "plugin.json"), "{ this is not valid json", "utf-8")
 
       writeDatabase(pluginsHome, {
         version: 2,

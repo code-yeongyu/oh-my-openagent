@@ -22,9 +22,16 @@ for (const transcript of [false, true]) {
     if (transcript) {
       const dir = resolveChildSessionDir(join(h.store.stateDir, "children", second.task_id), second.task_id)
       mkdirSync(dir, { recursive: true })
-      writeFileSync(join(dir, "started.jsonl"), `${JSON.stringify({
-        type: "session", version: 3, id: "queued-start", timestamp: new Date(0).toISOString(), cwd: h.project,
-      })}\n`)
+      writeFileSync(
+        join(dir, "started.jsonl"),
+        `${JSON.stringify({
+          type: "session",
+          version: 3,
+          id: "queued-start",
+          timestamp: new Date(0).toISOString(),
+          cwd: h.project,
+        })}\n`,
+      )
     }
     const finished = Promise.withResolvers<void>()
     const append = h.store.appendEvent.bind(h.store)
@@ -43,17 +50,22 @@ for (const transcript of [false, true]) {
     if (record === null) throw new Error("failed record vanished")
     expect(record.status).toBe("error")
     if (transcript) {
-      expect(record.pending_steering?.map(entry => entry.message)).toEqual(["Q1"])
+      expect(record.pending_steering?.map((entry) => entry.message)).toEqual(["Q1"])
       expect(isColdRevivalCandidate(record)).toBe(true)
       expect(newestSessionPath({ store: h.store }, second.task_id)).toBeDefined()
       expect(events.mock.calls.filter(([, event]) => event.type === "steer_dropped")).toEqual([])
     } else {
       expect(record.pending_steering).toBeUndefined()
-      expect(record.error_message).toBe(withDroppedSteeringNotice(describeStartFailure(h.inProcess.startError).errorMessage, 1))
-      expect(events.mock.calls.find(([id, event]) => id === second.task_id && event.type === "task_start_failed")?.[1].payload)
-        .toMatchObject({ error_message: record.error_message })
-      expect(events.mock.calls.filter(([, event]) => event.type === "steer_dropped").map(([, event]) => event.payload))
-        .toEqual([{ count: 1, reason: "target_gone" }])
+      expect(record.error_message).toBe(
+        withDroppedSteeringNotice(describeStartFailure(h.inProcess.startError).errorMessage, 1),
+      )
+      expect(
+        events.mock.calls.find(([id, event]) => id === second.task_id && event.type === "task_start_failed")?.[1]
+          .payload,
+      ).toMatchObject({ error_message: record.error_message })
+      expect(
+        events.mock.calls.filter(([, event]) => event.type === "steer_dropped").map(([, event]) => event.payload),
+      ).toEqual([{ count: 1, reason: "target_gone" }])
     }
   })
 }

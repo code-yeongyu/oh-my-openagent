@@ -37,7 +37,8 @@ export async function acquireWithoutDirectorySweep(
   const retryDelayMs = options.retryDelayMs ?? 25
   const incompleteLockGraceMs = options.incompleteLockGraceMs ?? INCOMPLETE_LOCK_GRACE_MS
   const now = options.now ?? Date.now
-  if (waitTimeoutMs < 0 || retryDelayMs <= 0 || incompleteLockGraceMs < 0) throw new Error("lock wait options must be positive")
+  if (waitTimeoutMs < 0 || retryDelayMs <= 0 || incompleteLockGraceMs < 0)
+    throw new Error("lock wait options must be positive")
   const deadline = now() + waitTimeoutMs
 
   try {
@@ -64,7 +65,12 @@ function forfeitDeadOwnerProof(lockPath: string, record: LockRecord, recoveredDe
   return false
 }
 
-async function acquireLoop(lockPath: string, record: LockRecord, options: AcquireLockOptions, timing: LoopTiming): Promise<AcquireOutcome> {
+async function acquireLoop(
+  lockPath: string,
+  record: LockRecord,
+  options: AcquireLockOptions,
+  timing: LoopTiming,
+): Promise<AcquireOutcome> {
   const { retryDelayMs, incompleteLockGraceMs, now, deadline } = timing
   let sawOtherOwner = false
   let recoveredDeadOwner = false

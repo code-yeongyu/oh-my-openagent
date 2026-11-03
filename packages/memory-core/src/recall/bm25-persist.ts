@@ -50,7 +50,12 @@ const FINGERPRINT_PROBES = [
 let fingerprint: string | undefined
 
 function tokenizerFingerprint(terms: RecallTermIndex["terms"]): string {
-  fingerprint ??= sha1(JSON.stringify({ version: TOKENIZER_VERSION, probes: FINGERPRINT_PROBES.map((body) => terms({ path: "", description: "", body })) }))
+  fingerprint ??= sha1(
+    JSON.stringify({
+      version: TOKENIZER_VERSION,
+      probes: FINGERPRINT_PROBES.map((body) => terms({ path: "", description: "", body })),
+    }),
+  )
   return fingerprint
 }
 
@@ -168,7 +173,11 @@ export class RecallTermPersistence {
       const document = documents[position]
       if (document !== undefined) keyed.set(documentKey(document), terms)
     })
-    const bytes = encodeRecallTermStore({ fingerprint: tokenizerFingerprint(this.index.terms), terms: snapshot.terms, documents: keyed })
+    const bytes = encodeRecallTermStore({
+      fingerprint: tokenizerFingerprint(this.index.terms),
+      terms: snapshot.terms,
+      documents: keyed,
+    })
     if (isRecallTermSaveExcluded(this.dir)) return
     await sweepStaleTemps(path)
     const temp = `${path}.${process.pid}.${randomUUID()}.tmp`

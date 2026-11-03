@@ -15,48 +15,52 @@ afterEach(async () => {
   for (const d of devices.splice(0)) await d.dispose()
 }, GIT_TEST_TIMEOUT)
 
-test("the unlink of a staged path is fsynced before the render step writes anything", async () => {
-  const server = new FakeSyncServer()
-  const a = await makeDevice(server, "a")
-  const b = await makeDevice(server, "b")
-  devices.push(a, b)
-  await a.write("x.md", "one\n")
-  await a.engine.runCycle()
+test(
+  "the unlink of a staged path is fsynced before the render step writes anything",
+  async () => {
+    const server = new FakeSyncServer()
+    const a = await makeDevice(server, "a")
+    const b = await makeDevice(server, "b")
+    devices.push(a, b)
+    await a.write("x.md", "one\n")
+    await a.engine.runCycle()
 
-  const events: string[] = []
-  const realRm = resilient.rm
-  const realWriteFile = resilient.writeFile
-  const realRename = resilient.rename
-  const realSyncDir = fsync.syncJournalDirectory
-  const spies = [
-    spyOn(resilient, "rm").mockImplementation((path, options) => {
-      events.push(`rm ${String(path)}`)
-      return realRm(path, options)
-    }),
-    spyOn(resilient, "writeFile").mockImplementation((file, data, options) => {
-      events.push(`write ${String(file)}`)
-      return realWriteFile(file, data, options)
-    }),
-    spyOn(resilient, "rename").mockImplementation((from, to) => {
-      events.push(`rename ${String(from)}`)
-      return realRename(from, to)
-    }),
-    spyOn(fsync, "syncJournalDirectory").mockImplementation((dir) => {
-      events.push(`syncdir ${dir}`)
-      return realSyncDir(dir)
-    }),
-  ]
-  try {
-    await b.engine.runCycle()
-  } finally {
-    for (const spy of spies) spy.mockRestore()
-  }
+    const events: string[] = []
+    const realRm = resilient.rm
+    const realWriteFile = resilient.writeFile
+    const realRename = resilient.rename
+    const realSyncDir = fsync.syncJournalDirectory
+    const spies = [
+      spyOn(resilient, "rm").mockImplementation((path, options) => {
+        events.push(`rm ${String(path)}`)
+        return realRm(path, options)
+      }),
+      spyOn(resilient, "writeFile").mockImplementation((file, data, options) => {
+        events.push(`write ${String(file)}`)
+        return realWriteFile(file, data, options)
+      }),
+      spyOn(resilient, "rename").mockImplementation((from, to) => {
+        events.push(`rename ${String(from)}`)
+        return realRename(from, to)
+      }),
+      spyOn(fsync, "syncJournalDirectory").mockImplementation((dir) => {
+        events.push(`syncdir ${dir}`)
+        return realSyncDir(dir)
+      }),
+    ]
+    try {
+      await b.engine.runCycle()
+    } finally {
+      for (const spy of spies) spy.mockRestore()
+    }
 
-  expect(await b.read("x.md")).toBe("one\n")
-  const unlinks = events.flatMap((e, i) => (e.startsWith("rm ") && e.endsWith(".staged") ? [i] : []))
-  expect(unlinks.length).toBeGreaterThan(0)
-  for (const i of unlinks) {
-    const staged = events[i]?.slice("rm ".length) ?? ""
-    expect(events[i + 1]).toBe(`syncdir ${dirname(staged)}`)
-  }
-}, GIT_TEST_TIMEOUT)
+    expect(await b.read("x.md")).toBe("one\n")
+    const unlinks = events.flatMap((e, i) => (e.startsWith("rm ") && e.endsWith(".staged") ? [i] : []))
+    expect(unlinks.length).toBeGreaterThan(0)
+    for (const i of unlinks) {
+      const staged = events[i]?.slice("rm ".length) ?? ""
+      expect(events[i + 1]).toBe(`syncdir ${dirname(staged)}`)
+    }
+  },
+  GIT_TEST_TIMEOUT,
+)

@@ -14,18 +14,8 @@ import type { ObservationGroup, PeopleLimits } from "@oh-my-opencode/memory-core
 import type { PalacePeople, PalacePeopleNode } from "../palace"
 import { collectPeople } from "../palace/people"
 import { parseCommandArgs } from "./args"
-import {
-  parsePeopleCardLines,
-  parsePeopleObservations,
-  renderPersonCard,
-  renderRoster,
-} from "./people-render"
-import {
-  ABSTENTION_LINE,
-  createPeopleAskRunner,
-  hasNoEvidence,
-  type PeopleAskEvidence,
-} from "./people-ask"
+import { parsePeopleCardLines, parsePeopleObservations, renderPersonCard, renderRoster } from "./people-render"
+import { ABSTENTION_LINE, createPeopleAskRunner, hasNoEvidence, type PeopleAskEvidence } from "./people-ask"
 import { resolvePersonQuery } from "./people-query"
 import { collectPersonSearchHits } from "./people-search"
 import { openRepo } from "./repo"
@@ -71,7 +61,11 @@ export async function selectObservations(
   })
 }
 
-export async function runPeopleCommand(deps: MemoryCommandDeps, args: string, ctx: MemoryCommandContext): Promise<string> {
+export async function runPeopleCommand(
+  deps: MemoryCommandDeps,
+  args: string,
+  ctx: MemoryCommandContext,
+): Promise<string> {
   const identity = requireIdentity(deps, ctx)
   if (typeof identity === "string") return respond(ctx, identity, "error")
 
@@ -91,7 +85,8 @@ export async function runPeopleCommand(deps: MemoryCommandDeps, args: string, ct
 
   const resolved = resolvePersonQuery(graph.nodes, name)
   if (resolved.kind === "miss") {
-    const close = resolved.close.length === 0 ? "no people records exist yet" : `closest slugs: ${resolved.close.join(", ")}`
+    const close =
+      resolved.close.length === 0 ? "no people records exist yet" : `closest slugs: ${resolved.close.join(", ")}`
     return respond(ctx, `no person matches "${name}"; ${close}`, "error")
   }
 

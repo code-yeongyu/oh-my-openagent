@@ -26,22 +26,24 @@ export function createGoalController(options: GoalControllerOptions) {
   const baseDir = join(projectDir, ".omo", "goal")
 
   const storeRef = (sessionID: string) => ({ baseDir, sessionID })
-  const tuiMirrorPath = (sessionID: string) =>
-    join(projectDir, ".omo", "ulw-loop", sessionID, "goals.json")
+  const tuiMirrorPath = (sessionID: string) => join(projectDir, ".omo", "ulw-loop", sessionID, "goals.json")
 
   const writeTuiMirror = (sessionID: string, goal: Goal | null): void => {
     const path = tuiMirrorPath(sessionID)
     const snapshot: TuiLoopSnapshot = {
       version: 1,
       activeGoalId: goal?.id,
-      goals: goal === null
-        ? []
-        : [{
-            id: goal.id,
-            title: goal.objective,
-            status: goalStatusForTui(goal.status),
-            successCriteria: [],
-          }],
+      goals:
+        goal === null
+          ? []
+          : [
+              {
+                id: goal.id,
+                title: goal.objective,
+                status: goalStatusForTui(goal.status),
+                successCriteria: [],
+              },
+            ],
     }
     mkdirSync(dirname(path), { recursive: true })
     writeFileSync(path, `${JSON.stringify(snapshot, null, 2)}\n`, "utf-8")

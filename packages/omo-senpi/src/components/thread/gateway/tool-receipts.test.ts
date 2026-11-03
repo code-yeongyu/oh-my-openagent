@@ -34,7 +34,10 @@ describe("tool receipts in the gateway store (replay, conflict, in_progress, unc
     expect(await a.toolReceiptBegin({ ...scope("k-1"), now, args_hash: "h-1" })).toEqual({ kind: "in_progress" })
     expect(await a.toolReceiptBegin({ ...scope("k-1"), now, args_hash: "h-2" })).toEqual({ kind: "conflict" })
     expect(await a.toolReceiptSettle({ ...scope("k-1"), now, result: { thread_id: "t-1", seq: 1 } })).toBe(true)
-    expect(await b.toolReceiptBegin({ ...scope("k-1"), now, args_hash: "h-1" })).toEqual({ kind: "replay", result: { thread_id: "t-1", seq: 1 } })
+    expect(await b.toolReceiptBegin({ ...scope("k-1"), now, args_hash: "h-1" })).toEqual({
+      kind: "replay",
+      result: { thread_id: "t-1", seq: 1 },
+    })
     expect(await b.toolReceiptBegin({ ...scope("k-1"), now, args_hash: "h-2" })).toEqual({ kind: "conflict" })
   })
 
@@ -54,7 +57,9 @@ describe("tool receipts in the gateway store (replay, conflict, in_progress, unc
     const { a, b } = twoInstances()
     const now = Date.now()
     expect(await a.toolReceiptBegin({ ...scope("k-3"), now, args_hash: "h-1" })).toEqual({ kind: "accepted" })
-    expect(await a.toolReceiptSettle({ ...scope("k-3"), now, error_note: "transport exploded mid-delivery" })).toBe(true)
+    expect(await a.toolReceiptSettle({ ...scope("k-3"), now, error_note: "transport exploded mid-delivery" })).toBe(
+      true,
+    )
     const expected = { kind: "uncertain" as const, error_note: "transport exploded mid-delivery" }
     expect(await a.toolReceiptBegin({ ...scope("k-3"), now, args_hash: "h-1" })).toEqual(expected)
     expect(await b.toolReceiptBegin({ ...scope("k-3"), now, args_hash: "h-1" })).toEqual(expected)
@@ -66,7 +71,10 @@ describe("tool receipts in the gateway store (replay, conflict, in_progress, unc
     expect(await a.toolReceiptBegin({ ...scope("k-4"), now: clock, args_hash: "h-1" })).toEqual({ kind: "accepted" })
     await a.toolReceiptSettle({ ...scope("k-4"), now: clock, result: { ok: true } })
     clock += GATEWAY_RECEIPT_RETENTION_MS - 1
-    expect(await a.toolReceiptBegin({ ...scope("k-4"), now: clock, args_hash: "h-1" })).toEqual({ kind: "replay", result: { ok: true } })
+    expect(await a.toolReceiptBegin({ ...scope("k-4"), now: clock, args_hash: "h-1" })).toEqual({
+      kind: "replay",
+      result: { ok: true },
+    })
     clock += 2
     expect(await a.toolReceiptBegin({ ...scope("k-4"), now: clock, args_hash: "h-1" })).toEqual({ kind: "accepted" })
   })

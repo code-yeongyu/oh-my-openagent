@@ -3,10 +3,7 @@ import { describe, expect, test } from "bun:test"
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 import type { SenpiModelPort } from "@oh-my-opencode/senpi-task"
 
-import {
-  createCategoryConfigGenerations,
-  createGenerationObservingPlanner,
-} from "./category-config-generation"
+import { createCategoryConfigGenerations, createGenerationObservingPlanner } from "./category-config-generation"
 import { createTaskChildPlanner, type TaskModelRegistry } from "./planner"
 
 type FakeModel = SenpiModelPort
@@ -14,7 +11,8 @@ type FakeModel = SenpiModelPort
 function registry(models: readonly FakeModel[]): TaskModelRegistry {
   return {
     getAvailable: () => models,
-    find: (provider, modelId) => models.find((candidate) => candidate.provider === provider && candidate.id === modelId),
+    find: (provider, modelId) =>
+      models.find((candidate) => candidate.provider === provider && candidate.id === modelId),
   }
 }
 

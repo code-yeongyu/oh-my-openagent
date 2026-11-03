@@ -11,9 +11,7 @@ import { resolveSenpiLaunch, type SenpiLaunchRuntime, withoutForeignPackageDirEn
 const SENPI_BINARY = process.platform === "win32" ? "senpi.exe" : "senpi"
 
 const roots: string[] = []
-afterEach(async () => Promise.all(roots.splice(0).map((root) =>
-  rm(root, { recursive: true, force: true })
-)))
+afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))))
 
 async function tempRoot(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "memory-senpi-launch-"))
@@ -46,7 +44,9 @@ describe("withoutForeignPackageDirEnv", () => {
     // when
     const next = withoutForeignPackageDirEnv(env, {
       command: "/usr/local/bin/bun",
-      prefixArgs: [join("/home", "u", ".bun", "install", "global", "node_modules", "@code-yeongyu", "senpi", "dist", "cli.js")],
+      prefixArgs: [
+        join("/home", "u", ".bun", "install", "global", "node_modules", "@code-yeongyu", "senpi", "dist", "cli.js"),
+      ],
     })
 
     // then
@@ -134,10 +134,13 @@ describe("resolveSenpiLaunch", () => {
     await writeFile(cli, "console.log('senpi')\n")
 
     // when
-    const launch = resolveSenpiLaunch({ SENPI_BIN: shim, PATH: "" }, runtime({
-      platform: "win32",
-      execPath: "C:\\node.exe",
-    }))
+    const launch = resolveSenpiLaunch(
+      { SENPI_BIN: shim, PATH: "" },
+      runtime({
+        platform: "win32",
+        execPath: "C:\\node.exe",
+      }),
+    )
 
     // then
     expect(launch).toEqual({ command: "C:\\node.exe", prefixArgs: [realpathSync.native(cli)] })
@@ -150,9 +153,12 @@ describe("resolveSenpiLaunch", () => {
     await writeFile(cli, "console.log('senpi')\n")
 
     // when
-    const launch = resolveSenpiLaunch({ PATH: "" }, runtime({
-      resolveInstalledCli: () => cli,
-    }))
+    const launch = resolveSenpiLaunch(
+      { PATH: "" },
+      runtime({
+        resolveInstalledCli: () => cli,
+      }),
+    )
 
     // then
     expect(launch).toEqual({ command: process.execPath, prefixArgs: [cli] })
@@ -165,9 +171,12 @@ describe("resolveSenpiLaunch", () => {
     await writeFile(entry, "console.log('senpi')\n")
 
     // when
-    const launch = resolveSenpiLaunch({ PATH: "" }, runtime({
-      argv: [process.execPath, entry],
-    }))
+    const launch = resolveSenpiLaunch(
+      { PATH: "" },
+      runtime({
+        argv: [process.execPath, entry],
+      }),
+    )
 
     // then
     expect(launch).toEqual({ command: process.execPath, prefixArgs: [entry] })
@@ -175,9 +184,13 @@ describe("resolveSenpiLaunch", () => {
 
   test("#given no executable installed CLI or current entry #when resolved #then it fails instead of launching a bare interpreter", () => {
     // given
-    const resolve = () => resolveSenpiLaunch({ PATH: "" }, runtime({
-      argv: [process.execPath],
-    }))
+    const resolve = () =>
+      resolveSenpiLaunch(
+        { PATH: "" },
+        runtime({
+          argv: [process.execPath],
+        }),
+      )
 
     // when / then
     expect(resolve).toThrow("Unable to resolve a runnable Senpi launcher")
@@ -193,11 +206,25 @@ describe("resolveSenpiLaunch", () => {
     if (probe.exitCode !== 0) throw new Error(`node -p process.execPath failed: ${probe.stderr.toString()}`)
     const node = probe.stdout.toString().trim()
     const nodeDir = dirname(node)
-    const cli = join(import.meta.dir, "..", "..", "..", "..", "node_modules", "@code-yeongyu", "senpi", "dist", "cli.js")
-    const launch = resolveSenpiLaunch({ PATH: nodeDir }, runtime({
-      execPath: node,
-      resolveInstalledCli: () => cli,
-    }))
+    const cli = join(
+      import.meta.dir,
+      "..",
+      "..",
+      "..",
+      "..",
+      "node_modules",
+      "@code-yeongyu",
+      "senpi",
+      "dist",
+      "cli.js",
+    )
+    const launch = resolveSenpiLaunch(
+      { PATH: nodeDir },
+      runtime({
+        execPath: node,
+        resolveInstalledCli: () => cli,
+      }),
+    )
 
     // when
     const child = Bun.spawnSync([launch.command, ...launch.prefixArgs, "--version"], {
@@ -206,8 +233,6 @@ describe("resolveSenpiLaunch", () => {
 
     // then
     expect(child.exitCode).toBe(0)
-    expect(child.stdout.toString().trim()).toMatch(
-      /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/,
-    )
+    expect(child.stdout.toString().trim()).toMatch(/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/)
   }, 30_000)
 })

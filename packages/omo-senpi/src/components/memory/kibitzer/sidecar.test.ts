@@ -6,9 +6,22 @@ import { OmoMemoryRecallSchema } from "@oh-my-opencode/omo-config-core"
 
 import { resolveKibitzerSidecarSettings } from "./settings"
 import { KibitzerSidecarStartError } from "./sidecar-model"
-import { KIBITZER_RESEED_FRACTION, KIBITZER_SIDECAR_MAX_TOKENS, KIBITZER_WAKE_DEADLINE_MS, KIBITZER_WAKE_TOOL_BUDGET } from "./sidecar"
+import {
+  KIBITZER_RESEED_FRACTION,
+  KIBITZER_SIDECAR_MAX_TOKENS,
+  KIBITZER_WAKE_DEADLINE_MS,
+  KIBITZER_WAKE_TOOL_BUDGET,
+} from "./sidecar"
 import { KIBITZER_WAKE_MAX_TOTAL_MS } from "./sidecar-contract"
-import { candidate, fakeChild, fakeWakeSlot, sidecarHarness, withinMs, type FakeChild, type SidecarHarness } from "./sidecar.test-support"
+import {
+  candidate,
+  fakeChild,
+  fakeWakeSlot,
+  sidecarHarness,
+  withinMs,
+  type FakeChild,
+  type SidecarHarness,
+} from "./sidecar.test-support"
 
 const K8S = "reference/kubernetes-rollouts.md"
 const HELM = "reference/helm-values.md"
@@ -69,7 +82,16 @@ describe("KibitzerSidecar lifecycle", () => {
     child.consume(steer)
     child.settle(completed)
     const outcome = await harness.nextWake()
-    expect(outcome).toMatchObject({ wake: 1, generation: 1, status: "completed", steered: 1, nudges: [], toolCalls: 0, diagnostic: false, model: "omo-mock/mock-1" })
+    expect(outcome).toMatchObject({
+      wake: 1,
+      generation: 1,
+      status: "completed",
+      steered: 1,
+      nudges: [],
+      toolCalls: 0,
+      diagnostic: false,
+      model: "omo-mock/mock-1",
+    })
     expect(harness.sidecar.state()).toBe("idle")
     expect(child.disposed).toBe(false)
     // One wake, one machine-wide lease: taken before the seed, handed back at settlement.
@@ -213,7 +235,13 @@ describe("KibitzerSidecar lifecycle", () => {
     const outcome = await harness.nextWake()
 
     expect(child.aborts).toBe(1)
-    expect(outcome).toMatchObject({ wake: 1, status: "deadline", diagnostic: false, toolCalls: 1, nudges: [{ path: K8S, hint: HINT }] })
+    expect(outcome).toMatchObject({
+      wake: 1,
+      status: "deadline",
+      diagnostic: false,
+      toolCalls: 1,
+      nudges: [{ path: K8S, hint: HINT }],
+    })
     expect(harness.delivered).toEqual([[{ path: K8S, hint: HINT }]])
     expect(harness.sidecar.state()).toBe("idle")
     expect(child.disposed).toBe(false)
@@ -265,7 +293,13 @@ describe("KibitzerSidecar lifecycle", () => {
     const outcome = await harness.nextWake()
 
     expect(child.aborts).toBe(1)
-    expect(outcome).toMatchObject({ wake: 1, status: "tool_budget_exceeded", diagnostic: false, toolCalls: 8, nudges: [{ path: K8S, hint: HINT }] })
+    expect(outcome).toMatchObject({
+      wake: 1,
+      status: "tool_budget_exceeded",
+      diagnostic: false,
+      toolCalls: 8,
+      nudges: [{ path: K8S, hint: HINT }],
+    })
     expect(harness.delivered).toEqual([[{ path: K8S, hint: HINT }]])
     expect(harness.sidecar.state()).toBe("idle")
     expect(child.disposed).toBe(false)
@@ -333,7 +367,14 @@ describe("KibitzerSidecar lifecycle", () => {
     harness.toolCall(4)
     expect(await harness.offer([candidate("reference/argo.md")])).toEqual({ action: "followed_up", wake: 4 })
     expect(harness.sidecar.state()).toBe("turn_running")
-    child.emit({ type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "" }], usage: { input: 4_500, cacheRead: 600, output: 5 } } })
+    child.emit({
+      type: "message_end",
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: "" }],
+        usage: { input: 4_500, cacheRead: 600, output: 5 },
+      },
+    })
     child.settle(completed)
     const outcome = await harness.nextWake()
 
@@ -438,10 +479,14 @@ describe("KibitzerSidecar lifecycle", () => {
     const harness = sidecarHarness({
       startChild: async (input) => {
         if (!connected) {
-          throw new KibitzerSidecarStartError("category_unavailable", "Kibitzer sidecar model unavailable: quick (category_unavailable)", {
-            category: "quick",
-            missingProviders: ["chatgpt-subscription", "openai"],
-          })
+          throw new KibitzerSidecarStartError(
+            "category_unavailable",
+            "Kibitzer sidecar model unavailable: quick (category_unavailable)",
+            {
+              category: "quick",
+              missingProviders: ["chatgpt-subscription", "openai"],
+            },
+          )
         }
         const child = fakeChild(input)
         started.push(child)
@@ -460,7 +505,11 @@ describe("KibitzerSidecar lifecycle", () => {
       status: "failed",
       cause: "start_failed",
       diagnostic: false,
-      configuration: { category: "quick", cause: "category_unavailable", missingProviders: ["chatgpt-subscription", "openai"] },
+      configuration: {
+        category: "quick",
+        cause: "category_unavailable",
+        missingProviders: ["chatgpt-subscription", "openai"],
+      },
     })
     expect(harness.children).toHaveLength(0)
     expect(harness.slot.held()).toBe(0)
@@ -483,7 +532,10 @@ describe("KibitzerSidecar wake governance", () => {
     // Thirty hooks ten seconds apart: a five-minute outage seen from one session.
     for (let cursor = 2; cursor <= 31; cursor += 1) {
       harness.toolCall(cursor)
-      expect(await harness.offer([candidate(`reference/topic-${cursor}.md`)])).toEqual({ action: "buffered", reason: "slot_busy" })
+      expect(await harness.offer([candidate(`reference/topic-${cursor}.md`)])).toEqual({
+        action: "buffered",
+        reason: "slot_busy",
+      })
       harness.clock.now += 10_000
     }
 
@@ -506,7 +558,9 @@ describe("KibitzerSidecar wake governance", () => {
     expect(harness.slot.acquisitions).toBe(1)
     expect(harness.slot.held()).toBe(1)
     expect(child.input.prompt).toContain('<digest cursor-from="1" cursor-to="12" folded="12">')
-    expect(cursorsOf(child.input.prompt)).toEqual([13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32])
+    expect(cursorsOf(child.input.prompt)).toEqual([
+      13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
+    ])
     expect(candidatePathsOf(child.input.prompt)).toEqual([K8S])
     child.settle(completed)
     await harness.nextWake()
@@ -574,7 +628,15 @@ describe("KibitzerSidecar wake governance", () => {
     harness.timers.fire()
     const outcome = await harness.nextWake()
 
-    expect(outcome).toMatchObject({ wake: 1, generation: 1, status: "deadline", diagnostic: false, toolCalls: 0, nudges: [], durationMs: KIBITZER_WAKE_DEADLINE_MS })
+    expect(outcome).toMatchObject({
+      wake: 1,
+      generation: 1,
+      status: "deadline",
+      diagnostic: false,
+      toolCalls: 0,
+      nudges: [],
+      durationMs: KIBITZER_WAKE_DEADLINE_MS,
+    })
     // The machine-wide slot goes back while the start is still pending: no other session waits on it.
     expect(harness.slot.held()).toBe(0)
     expect(harness.sidecar.state()).toBe("idle")
@@ -636,13 +698,15 @@ describe("KibitzerSidecar wake governance", () => {
   })
 
   test("#given the configured recall settings #when the sidecar is built from them #then tool_budget, event_caps and sidecar_max_tokens govern the wake instead of the defaults", async () => {
-    const settings = resolveKibitzerSidecarSettings(OmoMemoryRecallSchema.parse({
-      category: "deep",
-      tool_budget: 3,
-      sidecar_max_tokens: 500,
-      max_concurrent_wakes: 1,
-      event_caps: { tool_args: 400, result_head: 600, assistant: 1500, prompt: 12 },
-    }))
+    const settings = resolveKibitzerSidecarSettings(
+      OmoMemoryRecallSchema.parse({
+        category: "deep",
+        tool_budget: 3,
+        sidecar_max_tokens: 500,
+        max_concurrent_wakes: 1,
+        event_caps: { tool_args: 400, result_head: 600, assistant: 1500, prompt: 12 },
+      }),
+    )
     expect(settings).toEqual({
       category: "deep",
       toolBudget: 3,
@@ -651,7 +715,11 @@ describe("KibitzerSidecar wake governance", () => {
       eventCaps: { toolArgs: 400, resultHead: 600, assistant: 1500, prompt: 12 },
       queryExpansion: false,
     })
-    const harness = sidecarHarness({ toolBudget: settings.toolBudget, sidecarMaxTokens: settings.sidecarMaxTokens, eventCaps: settings.eventCaps })
+    const harness = sidecarHarness({
+      toolBudget: settings.toolBudget,
+      sidecarMaxTokens: settings.sidecarMaxTokens,
+      eventCaps: settings.eventCaps,
+    })
     harness.prompt(1, "how do we handle kubernetes rollouts")
     expect(await harness.offer([candidate(K8S)])).toEqual({ action: "seeded", wake: 1 })
     const child = harness.children[0]
@@ -666,7 +734,12 @@ describe("KibitzerSidecar wake governance", () => {
     expect(child.aborts).toBe(0)
     await child.nudge(K8S, HINT)
     const outcome = await harness.nextWake()
-    expect(outcome).toMatchObject({ status: "tool_budget_exceeded", toolCalls: 3, diagnostic: false, nudges: [{ path: K8S, hint: HINT }] })
+    expect(outcome).toMatchObject({
+      status: "tool_budget_exceeded",
+      toolCalls: 3,
+      diagnostic: false,
+      nudges: [{ path: K8S, hint: HINT }],
+    })
     // sidecar_max_tokens: with no provider usage the char/4 fallback (the seed alone is well over 1_200
     // characters) already exceeds 60% of 500 tokens, so the child is replaced before its next turn.
     expect(outcome.contextTokens).toBe(Math.ceil(child.input.prompt.length / 4))
@@ -682,7 +755,14 @@ describe("KibitzerSidecar wake governance", () => {
     const child = await seeded(harness)
 
     // 5_999 of 10_000: below the line, the child stays resident.
-    child.emit({ type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "" }], usage: { input: 5_000, cacheRead: 999, output: 5 } } })
+    child.emit({
+      type: "message_end",
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: "" }],
+        usage: { input: 5_000, cacheRead: 999, output: 5 },
+      },
+    })
     child.settle(completed)
     expect(await harness.nextWake()).toMatchObject({ wake: 1, contextTokens: 5_999 })
     expect(harness.sidecar.state()).toBe("idle")
@@ -691,7 +771,14 @@ describe("KibitzerSidecar wake governance", () => {
     // 6_000 of 10_000: exactly 60%, the wake settles and the child is replaced before the next turn.
     harness.toolCall(2)
     expect(await harness.offer([candidate(HELM)])).toEqual({ action: "followed_up", wake: 2 })
-    child.emit({ type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "" }], usage: { input: 5_400, cacheRead: 600, output: 5 } } })
+    child.emit({
+      type: "message_end",
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: "" }],
+        usage: { input: 5_400, cacheRead: 600, output: 5 },
+      },
+    })
     child.settle(completed)
     expect(await harness.nextWake()).toMatchObject({ wake: 2, contextTokens: 6_000 })
     expect(harness.sidecar.state()).toBe("reseeding")

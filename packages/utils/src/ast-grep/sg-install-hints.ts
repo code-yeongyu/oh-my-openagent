@@ -1,6 +1,7 @@
 import { SG_PATH_ENV_KEY } from "./types"
 
-const OMO_PROVISION_HINT = "Start an OMO session so the bundled ast-grep skill provisions the pinned runtime automatically"
+const OMO_PROVISION_HINT =
+  "Start an OMO session so the bundled ast-grep skill provisions the pinned runtime automatically"
 const ENV_OVERRIDE_HINT = `Or point ${SG_PATH_ENV_KEY} at an existing ast-grep binary`
 
 const DARWIN_HINTS = [

@@ -20,9 +20,11 @@ export async function settlePaused(
   const record = ports.store.load(taskId)
   if (record?.notification.run_epoch !== epoch) return true
   if (record.status !== "running" && record.status !== "paused") return true
-  if (record.status === "running") ports.store.transition(taskId, {
-    type: "pause", timestamp: new Date(ports.now()).toISOString(),
-  })
+  if (record.status === "running")
+    ports.store.transition(taskId, {
+      type: "pause",
+      timestamp: new Date(ports.now()).toISOString(),
+    })
   ports.parkSlot?.(taskId, epoch)
   return true
 }

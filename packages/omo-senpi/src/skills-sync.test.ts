@@ -207,7 +207,10 @@ describe("OMO Senpi scoped skill sync", () => {
     const keep = createSkillSourceCopyFilter(sharedSkillRoot)
     const toRelative = (root: string) => (file: string) => relative(root, file).replaceAll("\\", "/")
 
-    const sharedScripts = listFiles(join(sharedSkillRoot, "scripts")).filter(keep).map(toRelative(sharedSkillRoot)).sort()
+    const sharedScripts = listFiles(join(sharedSkillRoot, "scripts"))
+      .filter(keep)
+      .map(toRelative(sharedSkillRoot))
+      .sort()
     const shippedScripts = listFiles(join(shippedSkillRoot, "scripts")).map(toRelative(shippedSkillRoot)).sort()
 
     expect(shippedScripts).toEqual(sharedScripts)
@@ -215,7 +218,9 @@ describe("OMO Senpi scoped skill sync", () => {
     expect(shippedScripts.filter((path) => path.endsWith(".test.ts") || path.startsWith("scripts/tests/"))).toEqual([])
 
     const { sources } = createNativeSkillSources(join(repoRoot, "packages"))
-    const sharedAssetFiles = (sources.find((source) => source.name === "ulw-research")?.sharedAssets ?? []).filter((asset) => asset !== "scripts")
+    const sharedAssetFiles = (sources.find((source) => source.name === "ulw-research")?.sharedAssets ?? []).filter(
+      (asset) => asset !== "scripts",
+    )
     expect(sharedAssetFiles.length).toBeGreaterThan(0)
     for (const relativePath of [...shippedScripts, ...sharedAssetFiles]) {
       const shipped = readFileSync(join(shippedSkillRoot, relativePath))
@@ -228,7 +233,9 @@ describe("OMO Senpi scoped skill sync", () => {
     const skillFile = join(skillsRoot, "ulw-research", "SKILL.md")
     const content = readFileSync(skillFile, "utf8")
 
-    expect(content.includes("X / social (`x_search`"), "ulw-research must ship the X / social lane role protocol").toBe(true)
+    expect(content.includes("X / social (`x_search`"), "ulw-research must ship the X / social lane role protocol").toBe(
+      true,
+    )
   })
 
   test("#given ulw-execute skill #when inspected #then session ids reference senpi, not codex", () => {
@@ -336,11 +343,14 @@ describe("OMO Senpi scoped skill sync", () => {
   })
 })
 
-
 test("#given the Native execution skill #when shipped #then the absolute rule scopes the root and dispatch step assigns an executor", () => {
   const skill = readFileSync(join(skillsRoot, "ulw-execute", "SKILL.md"), "utf8")
   expect(skill).toContain("## ABSOLUTE RULE (root session): YOU ARE AN ORCHESTRATOR — NEVER THE IMPLEMENTER")
-  expect(skill).toContain("NO EXCEPTIONS for the root session that owns the Boulder work; a dispatched executor does its assigned unit itself and does not delegate it again.")
-  expect(skill).toContain("7. Give every dispatched sub-task its completion condition and its role: the brief names the unit, allowed files, acceptance evidence, and states that the worker is its executor, does it itself, and does not delegate it.")
+  expect(skill).toContain(
+    "NO EXCEPTIONS for the root session that owns the Boulder work; a dispatched executor does its assigned unit itself and does not delegate it again.",
+  )
+  expect(skill).toContain(
+    "7. Give every dispatched sub-task its completion condition and its role: the brief names the unit, allowed files, acceptance evidence, and states that the worker is its executor, does it itself, and does not delegate it.",
+  )
   expect(skill).not.toContain("## ABSOLUTE RULE:")
 })

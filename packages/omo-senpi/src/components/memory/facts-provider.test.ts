@@ -27,11 +27,14 @@ async function providerFixture(chosen: string | undefined, explicit?: string) {
       }
       requests.push(body.model)
       const base = { id: "completion-1", object: "chat.completion.chunk", created: 1, model: body.model }
-      return new Response([
-        `data: ${JSON.stringify({ ...base, choices: [{ index: 0, delta: { role: "assistant", content: "No new facts." }, finish_reason: null }] })}`,
-        `data: ${JSON.stringify({ ...base, choices: [{ index: 0, delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } })}`,
-        "data: [DONE]",
-      ].join("\n\n") + "\n\n", { headers: { "content-type": "text/event-stream" } })
+      return new Response(
+        [
+          `data: ${JSON.stringify({ ...base, choices: [{ index: 0, delta: { role: "assistant", content: "No new facts." }, finish_reason: null }] })}`,
+          `data: ${JSON.stringify({ ...base, choices: [{ index: 0, delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } })}`,
+          "data: [DONE]",
+        ].join("\n\n") + "\n\n",
+        { headers: { "content-type": "text/event-stream" } },
+      )
     },
   })
   onTestFinished(() => server.stop(true))
@@ -41,14 +44,19 @@ async function providerFixture(chosen: string | undefined, explicit?: string) {
     baseUrl: `${server.url}v1`,
     apiKey: "fixture-key",
     models: [CHOSEN, BUILTIN, "explicit-extractor"].map((id) => ({
-      id, name: id, reasoning: false, input: ["text"],
+      id,
+      name: id,
+      reasoning: false,
+      input: ["text"],
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-      contextWindow: 100_000, maxTokens: 4096,
+      contextWindow: 100_000,
+      maxTokens: 4096,
     })),
   })
   const sessionId = "session-1"
   const context = createMemoryIdentityContext({
-    identity: identity.id, identityPaths: identity.paths,
+    identity: identity.id,
+    identityPaths: identity.paths,
     binding: createMemoryBinding({ identity: identity.id, repoPath: identity.paths.repo, boundAt: 1 }),
   })
   const memory = memorySettings({
@@ -60,18 +68,24 @@ async function providerFixture(chosen: string | undefined, explicit?: string) {
   const component = componentContext()
   const operations: Promise<unknown>[] = []
   let extractor: FactsExtractorRunner | undefined
-  const branch = [{
-    id: "u1", type: "message",
-    message: { role: "user", content: "The project uses Bun." },
-  }]
+  const branch = [
+    {
+      id: "u1",
+      type: "message",
+      message: { role: "user", content: "The project uses Bun." },
+    },
+  ]
   const eventCtx = {
     sessionManager: {
-      getSessionId: () => sessionId, getEntries: () => branch, getBranch: () => branch,
+      getSessionId: () => sessionId,
+      getEntries: () => branch,
+      getBranch: () => branch,
       getSessionFile: () => join(root, "session.jsonl"),
     },
     modelRegistry: registry,
     ...(chosen === undefined ? {} : { model: registry.find("openai", chosen) }),
-    isIdle: () => true, hasPendingMessages: () => false,
+    isIdle: () => true,
+    hasPendingMessages: () => false,
   }
   const start = async () => {
     const pi = new MemoryFakeExtensionAPI()
@@ -113,7 +127,13 @@ async function providerFixture(chosen: string | undefined, explicit?: string) {
     return { pi, drain, close, rebind: () => wiring.afterBind(pi, sessionId, context, eventCtx) }
   }
   return {
-    start, requests, queue, eventCtx, registry, identity, logs: component.logs,
+    start,
+    requests,
+    queue,
+    eventCtx,
+    registry,
+    identity,
+    logs: component.logs,
     extractPending: () => {
       if (extractor === undefined) throw new Error("the fixture must bind before extraction")
       return extractor.launchPending()
@@ -145,8 +165,16 @@ test("#given a chosen model #when a real prompt settles #then extraction sends t
   const run = await f.start()
   await run.drain()
   f.requests.splice(0)
-  await run.pi.dispatch("input", { type: "input", source: "rpc", inputId: "input-1", text: "Remember this." }, f.eventCtx)
-  await run.pi.dispatch("input_disposition", { type: "input_disposition", inputId: "input-1", disposition: "started" }, f.eventCtx)
+  await run.pi.dispatch(
+    "input",
+    { type: "input", source: "rpc", inputId: "input-1", text: "Remember this." },
+    f.eventCtx,
+  )
+  await run.pi.dispatch(
+    "input_disposition",
+    { type: "input_disposition", inputId: "input-1", disposition: "started" },
+    f.eventCtx,
+  )
   await run.pi.dispatch("agent_settled", {}, f.eventCtx)
   await run.drain()
   expect(f.requests.length).toBeGreaterThan(0)
@@ -160,20 +188,41 @@ test("#given no chosen or configured model but a built-in model is available #wh
   await run.drain()
   f.requests.splice(0)
   f.logs.splice(0)
-  await run.pi.dispatch("input", { type: "input", source: "rpc", inputId: "input-1", text: "Remember this." }, f.eventCtx)
-  await run.pi.dispatch("input_disposition", { type: "input_disposition", inputId: "input-1", disposition: "started" }, f.eventCtx)
+  await run.pi.dispatch(
+    "input",
+    { type: "input", source: "rpc", inputId: "input-1", text: "Remember this." },
+    f.eventCtx,
+  )
+  await run.pi.dispatch(
+    "input_disposition",
+    { type: "input_disposition", inputId: "input-1", disposition: "started" },
+    f.eventCtx,
+  )
   await run.pi.dispatch("agent_settled", {}, f.eventCtx)
   await run.drain()
   expect(f.requests).toEqual([])
-  expect(f.logs.filter((log) => log.details !== undefined && typeof log.details === "object" && log.details !== null && "cause" in log.details)).toHaveLength(1)
+  expect(
+    f.logs.filter(
+      (log) =>
+        log.details !== undefined && typeof log.details === "object" && log.details !== null && "cause" in log.details,
+    ),
+  ).toHaveLength(1)
   expect((await f.queue.listPending()).map((entry) => entry.range.end_message_id)).toContain("m1")
 }, 30_000)
 
 test("#given an explicit extraction model #when a real prompt settles #then that model overrides the session selection", async () => {
   const f = await providerFixture(CHOSEN, "openai/explicit-extractor")
   const run = await f.start()
-  await run.pi.dispatch("input", { type: "input", source: "rpc", inputId: "input-1", text: "Remember this." }, f.eventCtx)
-  await run.pi.dispatch("input_disposition", { type: "input_disposition", inputId: "input-1", disposition: "started" }, f.eventCtx)
+  await run.pi.dispatch(
+    "input",
+    { type: "input", source: "rpc", inputId: "input-1", text: "Remember this." },
+    f.eventCtx,
+  )
+  await run.pi.dispatch(
+    "input_disposition",
+    { type: "input_disposition", inputId: "input-1", disposition: "started" },
+    f.eventCtx,
+  )
   await run.pi.dispatch("agent_settled", {}, f.eventCtx)
   await run.drain()
   expect(f.requests.length).toBeGreaterThan(0)
@@ -183,8 +232,16 @@ test("#given an explicit extraction model #when a real prompt settles #then that
 test("#given an unavailable explicit model #when a real prompt settles #then extraction does not fall back to the chosen or built-in model", async () => {
   const f = await providerFixture(CHOSEN, "missing/model")
   const run = await f.start()
-  await run.pi.dispatch("input", { type: "input", source: "rpc", inputId: "input-1", text: "Remember this." }, f.eventCtx)
-  await run.pi.dispatch("input_disposition", { type: "input_disposition", inputId: "input-1", disposition: "started" }, f.eventCtx)
+  await run.pi.dispatch(
+    "input",
+    { type: "input", source: "rpc", inputId: "input-1", text: "Remember this." },
+    f.eventCtx,
+  )
+  await run.pi.dispatch(
+    "input_disposition",
+    { type: "input_disposition", inputId: "input-1", disposition: "started" },
+    f.eventCtx,
+  )
   await run.pi.dispatch("agent_settled", {}, f.eventCtx)
   await run.drain()
   expect(f.requests).toEqual([])
@@ -193,10 +250,22 @@ test("#given an unavailable explicit model #when a real prompt settles #then ext
 test("#given extension input or rejected user input #when a synthetic settle arrives #then queued extraction stays dormant", async () => {
   const f = await providerFixture(CHOSEN)
   const run = await f.start()
-  await run.pi.dispatch("input", { type: "input", source: "extension", inputId: "extension-1", text: "Hidden wake" }, f.eventCtx)
-  await run.pi.dispatch("input_disposition", { type: "input_disposition", inputId: "extension-1", disposition: "started" }, f.eventCtx)
+  await run.pi.dispatch(
+    "input",
+    { type: "input", source: "extension", inputId: "extension-1", text: "Hidden wake" },
+    f.eventCtx,
+  )
+  await run.pi.dispatch(
+    "input_disposition",
+    { type: "input_disposition", inputId: "extension-1", disposition: "started" },
+    f.eventCtx,
+  )
   await run.pi.dispatch("input", { type: "input", source: "rpc", inputId: "rejected-1", text: "Rejected" }, f.eventCtx)
-  await run.pi.dispatch("input_disposition", { type: "input_disposition", inputId: "rejected-1", disposition: "handled" }, f.eventCtx)
+  await run.pi.dispatch(
+    "input_disposition",
+    { type: "input_disposition", inputId: "rejected-1", disposition: "handled" },
+    f.eventCtx,
+  )
   await run.pi.dispatch("agent_settled", {}, f.eventCtx)
   await run.drain()
   expect(f.requests).toEqual([])
@@ -205,8 +274,16 @@ test("#given extension input or rejected user input #when a synthetic settle arr
 test("#given a previously accepted prompt and new pending facts #when the same session is rebound without another prompt #then extraction permission resets", async () => {
   const f = await providerFixture(CHOSEN)
   const run = await f.start()
-  await run.pi.dispatch("input", { type: "input", source: "rpc", inputId: "input-1", text: "Remember this." }, f.eventCtx)
-  await run.pi.dispatch("input_disposition", { type: "input_disposition", inputId: "input-1", disposition: "queued" }, f.eventCtx)
+  await run.pi.dispatch(
+    "input",
+    { type: "input", source: "rpc", inputId: "input-1", text: "Remember this." },
+    f.eventCtx,
+  )
+  await run.pi.dispatch(
+    "input_disposition",
+    { type: "input_disposition", inputId: "input-1", disposition: "queued" },
+    f.eventCtx,
+  )
   await run.pi.dispatch("agent_settled", {}, f.eventCtx)
   await run.drain()
   await f.seedPending()
@@ -221,19 +298,34 @@ test("#given a previously accepted prompt and new pending facts #when the same s
 test("#given a selected model visible in the catalog but without provider credentials #when a real prompt settles #then extraction skips without reserving a run", async () => {
   const f = await providerFixture(CHOSEN)
   f.registry.registerProvider("uncredentialed-fixture", {
-    api: "openai-completions", baseUrl: "https://example.invalid",
-    models: [{
-      id: "selected", name: "Selected", reasoning: false, input: ["text"],
-      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-      contextWindow: 100_000, maxTokens: 4096,
-    }],
+    api: "openai-completions",
+    baseUrl: "https://example.invalid",
+    models: [
+      {
+        id: "selected",
+        name: "Selected",
+        reasoning: false,
+        input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 100_000,
+        maxTokens: 4096,
+      },
+    ],
   })
   f.eventCtx.model = f.registry.find("uncredentialed-fixture", "selected")
   expect(f.eventCtx.model).toBeDefined()
   expect(f.registry.getAvailable().some((model) => model.provider === "uncredentialed-fixture")).toBe(false)
   const run = await f.start()
-  await run.pi.dispatch("input", { type: "input", source: "rpc", inputId: "input-1", text: "Remember this." }, f.eventCtx)
-  await run.pi.dispatch("input_disposition", { type: "input_disposition", inputId: "input-1", disposition: "started" }, f.eventCtx)
+  await run.pi.dispatch(
+    "input",
+    { type: "input", source: "rpc", inputId: "input-1", text: "Remember this." },
+    f.eventCtx,
+  )
+  await run.pi.dispatch(
+    "input_disposition",
+    { type: "input_disposition", inputId: "input-1", disposition: "started" },
+    f.eventCtx,
+  )
   await run.pi.dispatch("agent_settled", {}, f.eventCtx)
   await run.drain()
   expect(f.requests).toEqual([])

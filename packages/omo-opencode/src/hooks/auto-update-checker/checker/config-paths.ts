@@ -1,11 +1,6 @@
 import * as os from "node:os"
 import * as path from "node:path"
-import {
-  getUserConfigDir,
-  getUserOpencodeConfig,
-  getUserOpencodeConfigJsonc,
-  getWindowsAppdataDir,
-} from "../constants"
+import { getUserConfigDir, getUserOpencodeConfig, getUserOpencodeConfigJsonc, getWindowsAppdataDir } from "../constants"
 
 export function getConfigPaths(directory: string): string[] {
   const userConfigDir = getUserConfigDir()

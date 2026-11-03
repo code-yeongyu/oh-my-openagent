@@ -4,7 +4,7 @@
  *
  * @see processFilePathForInjection in ./injector.ts where the marker is emitted.
  */
-const RULE_MARKER_PATTERN = /\[Rule: ([^\]\n]+)\]\n\[Match: [^\]\n]+\]/g;
+const RULE_MARKER_PATTERN = /\[Rule: ([^\]\n]+)\]\n\[Match: [^\]\n]+\]/g
 
 /**
  * Safety caps so transcript scanning cannot dominate a hook invocation when
@@ -12,31 +12,29 @@ const RULE_MARKER_PATTERN = /\[Rule: ([^\]\n]+)\]\n\[Match: [^\]\n]+\]/g;
  * messages are scanned first so that recent injections are detected even
  * when the cap fires.
  */
-const HYDRATION_MAX_MESSAGES = 200;
-const HYDRATION_MAX_CHARS = 1_000_000;
+const HYDRATION_MAX_MESSAGES = 200
+const HYDRATION_MAX_CHARS = 1_000_000
 
 export interface TranscriptHydrationDeps {
-	readonly client: TranscriptHydrationClient;
+  readonly client: TranscriptHydrationClient
 }
 
 export interface TranscriptHydrationStore {
-	hydrateSession(sessionID: string): Promise<ReadonlySet<string>>;
-	getHydratedRelativePaths(sessionID: string): ReadonlySet<string>;
-	clearSession(sessionID: string): void;
+  hydrateSession(sessionID: string): Promise<ReadonlySet<string>>
+  getHydratedRelativePaths(sessionID: string): ReadonlySet<string>
+  clearSession(sessionID: string): void
 }
 
 interface SessionHydrationState {
-	relativePaths: Set<string>;
-	hydrated: boolean;
-	inflight?: Promise<void>;
+  relativePaths: Set<string>
+  hydrated: boolean
+  inflight?: Promise<void>
 }
 
 interface TranscriptHydrationClient {
-	readonly session: {
-		readonly messages: (args: {
-			readonly path: { readonly id: string };
-		}) => Promise<{ readonly data?: unknown }>;
-	};
+  readonly session: {
+    readonly messages: (args: { readonly path: { readonly id: string } }) => Promise<{ readonly data?: unknown }>
+  }
 }
 
 /**
@@ -47,114 +45,104 @@ interface TranscriptHydrationClient {
  * file but whose model context still contains prior `[Rule: ...]` markers
  * does not re-inject duplicates.
  */
-export function createTranscriptHydrationStore(
-	deps: TranscriptHydrationDeps,
-): TranscriptHydrationStore {
-	const states = new Map<string, SessionHydrationState>();
+export function createTranscriptHydrationStore(deps: TranscriptHydrationDeps): TranscriptHydrationStore {
+  const states = new Map<string, SessionHydrationState>()
 
-	function ensureState(sessionID: string): SessionHydrationState {
-		const existing = states.get(sessionID);
-		if (existing !== undefined) {
-			return existing;
-		}
-		const state: SessionHydrationState = {
-			relativePaths: new Set(),
-			hydrated: false,
-		};
-		states.set(sessionID, state);
-		return state;
-	}
+  function ensureState(sessionID: string): SessionHydrationState {
+    const existing = states.get(sessionID)
+    if (existing !== undefined) {
+      return existing
+    }
+    const state: SessionHydrationState = {
+      relativePaths: new Set(),
+      hydrated: false,
+    }
+    states.set(sessionID, state)
+    return state
+  }
 
-	async function hydrateSession(
-		sessionID: string,
-	): Promise<ReadonlySet<string>> {
-		const state = ensureState(sessionID);
-		if (state.hydrated) {
-			return state.relativePaths;
-		}
-		if (state.inflight === undefined) {
-			state.inflight = (async () => {
-				try {
-					const fetched = await fetchTranscriptRelativePaths(
-						deps.client,
-						sessionID,
-					);
-					for (const relativePath of fetched) {
-						state.relativePaths.add(relativePath);
-					}
-				} catch (error) {
-					if (error instanceof Error) {
-						return;
-					}
-					throw error;
-				} finally {
-					state.hydrated = true;
-					state.inflight = undefined;
-				}
-			})();
-		}
-		await state.inflight;
-		return state.relativePaths;
-	}
+  async function hydrateSession(sessionID: string): Promise<ReadonlySet<string>> {
+    const state = ensureState(sessionID)
+    if (state.hydrated) {
+      return state.relativePaths
+    }
+    if (state.inflight === undefined) {
+      state.inflight = (async () => {
+        try {
+          const fetched = await fetchTranscriptRelativePaths(deps.client, sessionID)
+          for (const relativePath of fetched) {
+            state.relativePaths.add(relativePath)
+          }
+        } catch (error) {
+          if (error instanceof Error) {
+            return
+          }
+          throw error
+        } finally {
+          state.hydrated = true
+          state.inflight = undefined
+        }
+      })()
+    }
+    await state.inflight
+    return state.relativePaths
+  }
 
-	function getHydratedRelativePaths(sessionID: string): ReadonlySet<string> {
-		return states.get(sessionID)?.relativePaths ?? EMPTY_SET;
-	}
+  function getHydratedRelativePaths(sessionID: string): ReadonlySet<string> {
+    return states.get(sessionID)?.relativePaths ?? EMPTY_SET
+  }
 
-	function clearSession(sessionID: string): void {
-		states.delete(sessionID);
-	}
+  function clearSession(sessionID: string): void {
+    states.delete(sessionID)
+  }
 
-	return { hydrateSession, getHydratedRelativePaths, clearSession };
+  return { hydrateSession, getHydratedRelativePaths, clearSession }
 }
 
-const EMPTY_SET: ReadonlySet<string> = new Set();
+const EMPTY_SET: ReadonlySet<string> = new Set()
 
 function normalizeRuleRelativePath(relativePath: string): string {
-	return relativePath.split("\\").join("/");
+  return relativePath.split("\\").join("/")
 }
 
 async function fetchTranscriptRelativePaths(
-	client: TranscriptHydrationClient,
-	sessionID: string,
+  client: TranscriptHydrationClient,
+  sessionID: string,
 ): Promise<Set<string>> {
-	const relativePaths = new Set<string>();
-	const response = await client.session.messages({
-		path: { id: sessionID },
-	});
-	const data = Array.isArray(response.data) ? response.data : [];
-	const start = Math.max(0, data.length - HYDRATION_MAX_MESSAGES);
-	let scannedChars = 0;
-	for (let index = data.length - 1; index >= start; index -= 1) {
-		const text = collectMessageText(data[index]);
-		scannedChars += text.length;
-		for (const match of text.matchAll(RULE_MARKER_PATTERN)) {
-			const relativePath = match[1];
-			if (relativePath !== undefined) {
-				relativePaths.add(normalizeRuleRelativePath(relativePath));
-			}
-		}
-		if (scannedChars > HYDRATION_MAX_CHARS) {
-			break;
-		}
-	}
-	return relativePaths;
+  const relativePaths = new Set<string>()
+  const response = await client.session.messages({
+    path: { id: sessionID },
+  })
+  const data = Array.isArray(response.data) ? response.data : []
+  const start = Math.max(0, data.length - HYDRATION_MAX_MESSAGES)
+  let scannedChars = 0
+  for (let index = data.length - 1; index >= start; index -= 1) {
+    const text = collectMessageText(data[index])
+    scannedChars += text.length
+    for (const match of text.matchAll(RULE_MARKER_PATTERN)) {
+      const relativePath = match[1]
+      if (relativePath !== undefined) {
+        relativePaths.add(normalizeRuleRelativePath(relativePath))
+      }
+    }
+    if (scannedChars > HYDRATION_MAX_CHARS) {
+      break
+    }
+  }
+  return relativePaths
 }
 
-function collectMessageText(
-	value: unknown,
-	accumulator: string[] = [],
-): string {
-	if (typeof value === "string") {
-		accumulator.push(value);
-	} else if (Array.isArray(value)) {
-		for (const item of value) {
-			collectMessageText(item, accumulator);
-		}
-	} else if (value !== null && typeof value === "object") {
-		for (const item of Object.values(value)) {
-			collectMessageText(item, accumulator);
-		}
-	}
-	return accumulator.join("\n");
+function collectMessageText(value: unknown, accumulator: string[] = []): string {
+  if (typeof value === "string") {
+    accumulator.push(value)
+  } else if (Array.isArray(value)) {
+    for (const item of value) {
+      collectMessageText(item, accumulator)
+    }
+  } else if (value !== null && typeof value === "object") {
+    for (const item of Object.values(value)) {
+      collectMessageText(item, accumulator)
+    }
+  }
+  return accumulator.join("\n")
 }

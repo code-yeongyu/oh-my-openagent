@@ -24,11 +24,7 @@ describe("selectRegistryFallbackModels", () => {
       const result = selectRegistryFallbackModels(available)
 
       // then
-      expect(result.map((entry) => entry.model)).toEqual([
-        "openai/cheapest",
-        "openai/middle",
-        "openai/fourth",
-      ])
+      expect(result.map((entry) => entry.model)).toEqual(["openai/cheapest", "openai/middle", "openai/fourth"])
     })
 
     test("#when two models share a price #then the larger context window breaks the tie", () => {
@@ -82,11 +78,7 @@ describe("selectRegistryFallbackModels", () => {
       const result = selectRegistryFallbackModels(available)
 
       // then
-      expect(result.map((entry) => entry.model)).toEqual([
-        "cloud/billed",
-        "local/swift-flash",
-        "local/heavyweight",
-      ])
+      expect(result.map((entry) => entry.model)).toEqual(["cloud/billed", "local/swift-flash", "local/heavyweight"])
     })
   })
 })

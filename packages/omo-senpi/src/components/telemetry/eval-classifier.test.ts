@@ -1,11 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import {
-  classifyWaveBucket,
-  isEvalToolName,
-  summarizeWaveBuckets,
-  type ClassifiableWave,
-} from "./eval-classifier"
+import { classifyWaveBucket, isEvalToolName, summarizeWaveBuckets, type ClassifiableWave } from "./eval-classifier"
 
 function wave(toolNames: readonly string[], durationMs = 1_000): ClassifiableWave {
   return { toolNames, spanMs: durationMs }
@@ -26,7 +21,17 @@ describe("eval tool bucket classification", () => {
   })
 
   test("#given eval naming variants #when detected #then only true eval names match", () => {
-    for (const name of ["eval", "codemode", "mcp:eval", "code-mode", "EVAL", " eval ", "server/eval", "tool_eval", "code_mode"]) {
+    for (const name of [
+      "eval",
+      "codemode",
+      "mcp:eval",
+      "code-mode",
+      "EVAL",
+      " eval ",
+      "server/eval",
+      "tool_eval",
+      "code_mode",
+    ]) {
       expect(isEvalToolName(name)).toBe(true)
     }
     for (const name of ["evaluate_foo", "evaluate", "ln", "bash", "read", "codemodel", "eval_helper", "", "   "]) {
@@ -44,11 +49,7 @@ describe("eval tool bucket classification", () => {
   })
 
   test("#given eval_only and mixed waves #when tool-call counters are aggregated #then only the non_eval domain is counted", () => {
-    const nonEvalOnly = summarizeWaveBuckets([
-      wave(["bash", "read", "grep"]),
-      wave(["bash", "read"]),
-      wave(["read"]),
-    ])
+    const nonEvalOnly = summarizeWaveBuckets([wave(["bash", "read", "grep"]), wave(["bash", "read"]), wave(["read"])])
     const polluted = summarizeWaveBuckets([
       wave(["bash", "read", "grep"]),
       wave(["bash", "read"]),

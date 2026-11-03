@@ -9,9 +9,29 @@ const METADATA_OPTIONS = new Set(["--help", "-h", "--list-models", "--list-tips"
 const SESSION_HOST_OPTIONS = new Set(["--multi-session", "--listen"])
 
 const ALWAYS_TAKES_VALUE = new Set([
-  "--provider", "--model", "--api-key", "--system-prompt", "--append-system-prompt", "--name", "-n",
-  "--session", "--session-id", "--fork", "--rebind", "--session-dir", "--models", "--tools", "-t",
-  "--exclude-tools", "-xt", "--thinking", "--export", "--extension", "-e", "--skill", "--prompt-template",
+  "--provider",
+  "--model",
+  "--api-key",
+  "--system-prompt",
+  "--append-system-prompt",
+  "--name",
+  "-n",
+  "--session",
+  "--session-id",
+  "--fork",
+  "--rebind",
+  "--session-dir",
+  "--models",
+  "--tools",
+  "-t",
+  "--exclude-tools",
+  "-xt",
+  "--thinking",
+  "--export",
+  "--extension",
+  "-e",
+  "--skill",
+  "--prompt-template",
   "--theme",
 ])
 const TAKES_NON_OPTION_VALUE = new Set(["--mode", "--use-theme", "--tui-mode", "--list-models"])

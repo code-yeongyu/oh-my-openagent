@@ -9,7 +9,12 @@ const SIDE = "n.sync-conflict-20261015-mac.md"
 const NO_REGISTERS = new Map<string, string[]>()
 const HEADER =
   "<!-- memory-sync 2026-10-15: the other machine had different frontmatter for n.md; kept here so no fact is lost:"
-const live = (currentText: string | null) => ({ currentText, lastMaterialised: null, tombstoned: false, registers: soleRegisters(currentText) })
+const live = (currentText: string | null) => ({
+  currentText,
+  lastMaterialised: null,
+  tombstoned: false,
+  registers: soleRegisters(currentText),
+})
 const bodyOf = (plan: ReturnType<typeof planAdoption>, base: string): string =>
   splitItem(plan.action === "capture" ? plan.workingText : base).body
 
@@ -28,7 +33,10 @@ describe("review r4 HIGH-1: text inside a T2 block after its closing fence", () 
   })
 
   test("a main file never loses the text inside a malformed block", () => {
-    for (const [main, facts] of [[glued, ["SECRET FACT"]], [midLine, ["FACT -->", "more"]]] as const) {
+    for (const [main, facts] of [
+      [glued, ["SECRET FACT"]],
+      [midLine, ["FACT -->", "more"]],
+    ] as const) {
       const lines = bodyOf(planAdoption([{ path: "n.md", text: main }], live(null)), "").split("\n")
       for (const fact of facts) expect(lines, JSON.stringify(lines)).toContain(fact)
     }
@@ -57,12 +65,16 @@ describe("the enumerated metadata lines adoption may drop", () => {
     const fused = t2Block("2026-10-15", "n.md", '---\nk: "v"\n---')
     expect(fused).toContain("\n----->\n")
     expect(firstMissingFact(withKey, `x\n${fused}`, NO_REGISTERS)).toBeNull()
-    expect(firstMissingFact("x\n", "x\n----->\n", NO_REGISTERS)).toBe('missing line "----->" (1 dropped, 0 allowed as metadata)')
+    expect(firstMissingFact("x\n", "x\n----->\n", NO_REGISTERS)).toBe(
+      'missing line "----->" (1 dropped, 0 allowed as metadata)',
+    )
   })
 
   test('"-->" may drop once per T2 header, never more', () => {
     expect(firstMissingFact(withKey, `x\n${block}`, NO_REGISTERS)).toBeNull()
-    expect(firstMissingFact("x\n", "x\n-->\n", NO_REGISTERS)).toBe('missing line "-->" (1 dropped, 0 allowed as metadata)')
+    expect(firstMissingFact("x\n", "x\n-->\n", NO_REGISTERS)).toBe(
+      'missing line "-->" (1 dropped, 0 allowed as metadata)',
+    )
   })
 
   test("a blank line may drop once per T2 header (the hub's separator), never more", () => {
@@ -73,16 +85,22 @@ describe("the enumerated metadata lines adoption may drop", () => {
   test('"---" may drop as the file header\'s two fences plus two per T2 header, never more', () => {
     expect(firstMissingFact("x\n", "---\nk: v\n---\nx\n", NO_REGISTERS)).toBe('missing line "k: v"')
     expect(firstMissingFact(withKey, "---\nk: v\n---\nx\n", NO_REGISTERS)).toBeNull()
-    expect(firstMissingFact("x\n", "---\nk: v\n---\nx\n---\n", NO_REGISTERS)).toBe('missing line "---" (3 dropped, 2 allowed as metadata)')
+    expect(firstMissingFact("x\n", "---\nk: v\n---\nx\n---\n", NO_REGISTERS)).toBe(
+      'missing line "---" (3 dropped, 2 allowed as metadata)',
+    )
   })
 
   test("a key line may drop only when the result represents that key's value", () => {
-    expect(firstMissingFact("---\ntags:\n  - a\n  - b\n---\nx\n", "---\ntags: [a, b]\n---\nx\n", NO_REGISTERS)).toBeNull()
+    expect(
+      firstMissingFact("---\ntags:\n  - a\n  - b\n---\nx\n", "---\ntags: [a, b]\n---\nx\n", NO_REGISTERS),
+    ).toBeNull()
     expect(firstMissingFact("---\nk: other\n---\nx\n", `x\n${block}`, NO_REGISTERS)).toBe('missing line "k: \\"v\\""')
   })
 
   test("a multi-line value is never vouched for line by line", () => {
-    expect(firstMissingFact("---\ntags: [a]\n---\nx\n", "---\ntags:\n  - a\n---\nx\n", NO_REGISTERS)).toBe('missing line "tags:"')
+    expect(firstMissingFact("---\ntags: [a]\n---\nx\n", "---\ntags:\n  - a\n---\nx\n", NO_REGISTERS)).toBe(
+      'missing line "tags:"',
+    )
   })
 })
 
@@ -95,10 +113,14 @@ describe("#10321: a joined register counts for nothing only in the result's own 
 
   test("a body line equal to the joined header line is text; the header line itself still vouches for nothing", () => {
     expect(firstMissingFact('---\nk: "a / b"\n---\nk: "a / b"\n', 'k: "a / b"\n', registers)).toBeNull()
-    expect(firstMissingFact('---\nk: "a / b"\n---\nx\n', 'x\nk: "a / b"\n', registers)).toBe('missing line "k: \\"a / b\\""')
+    expect(firstMissingFact('---\nk: "a / b"\n---\nx\n', 'x\nk: "a / b"\n', registers)).toBe(
+      'missing line "k: \\"a / b\\""',
+    )
   })
 
   test("a leading BOM on the result does not move the header range", () => {
-    expect(firstMissingFact('\uFEFF---\nk: "a / b"\n---\nx\n', 'x\nk: "a / b"\n', registers)).toBe('missing line "k: \\"a / b\\""')
+    expect(firstMissingFact('\uFEFF---\nk: "a / b"\n---\nx\n', 'x\nk: "a / b"\n', registers)).toBe(
+      'missing line "k: \\"a / b\\""',
+    )
   })
 })

@@ -129,8 +129,18 @@ describe("task history cleanup", () => {
 
     getTaskMap(manager).set(staleTask.id, staleTask)
     getTaskMap(manager).set(liveTask.id, liveTask)
-    manager.taskHistory.record("parent-1", { id: staleTask.id, agent: staleTask.agent, description: staleTask.description, status: staleTask.status })
-    manager.taskHistory.record("parent-2", { id: liveTask.id, agent: liveTask.agent, description: liveTask.description, status: liveTask.status })
+    manager.taskHistory.record("parent-1", {
+      id: staleTask.id,
+      agent: staleTask.agent,
+      description: staleTask.description,
+      status: staleTask.status,
+    })
+    manager.taskHistory.record("parent-2", {
+      id: liveTask.id,
+      agent: liveTask.agent,
+      description: liveTask.description,
+      status: liveTask.status,
+    })
 
     // when
     pruneStaleTasksAndNotificationsForTest(manager)

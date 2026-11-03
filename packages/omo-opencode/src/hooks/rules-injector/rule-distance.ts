@@ -1,1 +1,1 @@
-export { calculateDistance } from "@oh-my-opencode/rules-engine";
+export { calculateDistance } from "@oh-my-opencode/rules-engine"

@@ -27,7 +27,10 @@ function silentExitDetail(code: number, termination: GitTermination | undefined)
 }
 
 export class GitTimeoutError extends GitError {
-  constructor(readonly argv: readonly string[], readonly timeoutMs: number) {
+  constructor(
+    readonly argv: readonly string[],
+    readonly timeoutMs: number,
+  ) {
     super(`git ${argv.join(" ")} timed out after ${timeoutMs}ms`)
   }
 }
@@ -45,10 +48,12 @@ export class GitNotFoundError extends GitError {
 }
 
 export class DirtyRepoError extends GitError {
-  constructor(readonly porcelain: string, readonly encodingDiagnostics: readonly string[]) {
-    const encoding = encodingDiagnostics.length > 0
-      ? ` Dirty markdown encoding issue(s): ${encodingDiagnostics.join("; ")}.`
-      : ""
+  constructor(
+    readonly porcelain: string,
+    readonly encodingDiagnostics: readonly string[],
+  ) {
+    const encoding =
+      encodingDiagnostics.length > 0 ? ` Dirty markdown encoding issue(s): ${encodingDiagnostics.join("; ")}.` : ""
     super(
       `Memory repo has uncommitted changes. Commit, discard, or sync them before using memory tools.\n${porcelain.trimEnd()}${encoding}`,
     )

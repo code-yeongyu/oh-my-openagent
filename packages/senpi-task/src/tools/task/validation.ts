@@ -52,9 +52,7 @@ export type BatchShapeError = {
 }
 
 export type BatchShapeResult =
-  | { readonly kind: "single" }
-  | { readonly kind: "batch" }
-  | { readonly kind: "error"; readonly error: BatchShapeError }
+  { readonly kind: "single" } | { readonly kind: "batch" } | { readonly kind: "error"; readonly error: BatchShapeError }
 
 export type SpawnItemTargetError = {
   readonly code: "item_target"
@@ -149,7 +147,10 @@ export function resolveRunInBackground(params: SpawnParamsInput): RunInBackgroun
   if (values.size > 1) {
     return {
       kind: "error",
-      error: { code: "run_in_background_conflict", message: `${RUN_IN_BACKGROUND_CONFLICT_MESSAGE} Seen: ${seen.join(", ")}.` },
+      error: {
+        code: "run_in_background_conflict",
+        message: `${RUN_IN_BACKGROUND_CONFLICT_MESSAGE} Seen: ${seen.join(", ")}.`,
+      },
     }
   }
   const [runInBackground] = values

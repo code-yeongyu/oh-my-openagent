@@ -10,7 +10,18 @@
  *   transcript) while this harness writes NOTHING to B's pty; B's screen shows the provenance header;
  * - B -> A: the same the other way, as a fresh user turn in B (a new causal root, so not a cycle).
  */
-import { awaitToolResult, awaitTuiEndpoint, assistantTexts, callDirective, deliveryEntries, deliveryIdOf, deliveryRow, omo, runScenario, waitFor } from "./lib/gateway.mjs"
+import {
+  awaitToolResult,
+  awaitTuiEndpoint,
+  assistantTexts,
+  callDirective,
+  deliveryEntries,
+  deliveryIdOf,
+  deliveryRow,
+  omo,
+  runScenario,
+  waitFor,
+} from "./lib/gateway.mjs"
 
 const EPOCH_YEAR = 1970
 
@@ -28,19 +39,36 @@ await runScenario("tui-to-tui", async ({ report, fake, scratch, install, startTu
 
   await alpha.submit("/name tui-alpha")
   await beta.submit("/name tui-beta")
-  const listed = await waitFor(async () => {
-    const result = await omo(scratch, install, ["thread", "list", "--json"])
-    const rows = Array.isArray(result.json) ? result.json : []
-    const a = rows.find((row) => row.thread_id === alphaEndpoint.durableId)
-    const b = rows.find((row) => row.thread_id === betaEndpoint.durableId)
-    return a?.name === "tui-alpha" && b?.name === "tui-beta" ? rows : undefined
-  }, { label: "omo thread list shows both names", timeoutMs: 30_000 })
-  const realTimes = (row) => [row.created_at, row.updated_at].every((stamp) => typeof stamp === "string" && new Date(stamp).getUTCFullYear() > EPOCH_YEAR)
-  const rows = listed.filter((row) => row.thread_id === alphaEndpoint.durableId || row.thread_id === betaEndpoint.durableId)
+  const listed = await waitFor(
+    async () => {
+      const result = await omo(scratch, install, ["thread", "list", "--json"])
+      const rows = Array.isArray(result.json) ? result.json : []
+      const a = rows.find((row) => row.thread_id === alphaEndpoint.durableId)
+      const b = rows.find((row) => row.thread_id === betaEndpoint.durableId)
+      return a?.name === "tui-alpha" && b?.name === "tui-beta" ? rows : undefined
+    },
+    { label: "omo thread list shows both names", timeoutMs: 30_000 },
+  )
+  const realTimes = (row) =>
+    [row.created_at, row.updated_at].every(
+      (stamp) => typeof stamp === "string" && new Date(stamp).getUTCFullYear() > EPOCH_YEAR,
+    )
+  const rows = listed.filter(
+    (row) => row.thread_id === alphaEndpoint.durableId || row.thread_id === betaEndpoint.durableId,
+  )
   report.assert(
     "list-both-terminals-named",
     rows.length === 2 && rows.every((row) => row.surface === "tui" && row.endpoint?.kind === "tui" && realTimes(row)),
-    JSON.stringify(rows.map((row) => ({ id: row.thread_id, name: row.name, surface: row.surface, endpoint: row.endpoint?.kind, created_at: row.created_at, updated_at: row.updated_at }))),
+    JSON.stringify(
+      rows.map((row) => ({
+        id: row.thread_id,
+        name: row.name,
+        surface: row.surface,
+        endpoint: row.endpoint?.kind,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      })),
+    ),
   )
 
   for (const [sender, senderEndpoint, target, targetEndpoint, targetName, token] of [
@@ -50,22 +78,46 @@ await runScenario("tui-to-tui", async ({ report, fake, scratch, install, startTu
     const direction = `${sender.label}->${target.label}`
     const keystrokesBefore = target.keystrokes
     const mark = fake.requests.length
-    await sender.submit(callDirective("thread_send", { thread: targetName, message: `${token} hello from ${sender.label}` }))
+    await sender.submit(
+      callDirective("thread_send", { thread: targetName, message: `${token} hello from ${sender.label}` }),
+    )
     const sent = await awaitToolResult(fake, "thread_send", mark, { label: `${direction} thread_send result` })
-    report.assert(`${direction}-send-ok`, sent?.kind === "ok" && typeof sent.delivery_id === "string", JSON.stringify(sent).slice(0, 400))
+    report.assert(
+      `${direction}-send-ok`,
+      sent?.kind === "ok" && typeof sent.delivery_id === "string",
+      JSON.stringify(sent).slice(0, 400),
+    )
     const deliveryId = sent?.delivery_id
     const entry = await waitFor(
       () => deliveryEntries(targetEndpoint.sessionPath).find((candidate) => deliveryIdOf(candidate) === deliveryId),
       { label: `${direction} delivery entry in the target transcript`, timeoutMs: 60_000 },
     )
-    await waitFor(() => assistantTexts(targetEndpoint.sessionPath).some((text) => text.includes(`QA-ACK ${token}`)), { label: `${target.label} answers ${token}` })
-    const row = await waitFor(async () => {
-      const current = await deliveryRow(scratch.agentDir, deliveryId)
-      return current?.state === "applied" ? current : undefined
-    }, { label: `${direction} row applied` })
-    report.assert(`${direction}-idle-target-started`, row.admission_kind === "started" && row.target_durable_id === targetEndpoint.durableId, `state=${row.state} admission_kind=${row.admission_kind} target=${row.target_durable_id}`)
-    report.assert(`${direction}-no-keystroke-on-target`, target.keystrokes === keystrokesBefore, `target pty bytes written by harness during delivery: ${target.keystrokes - keystrokesBefore}`)
-    report.assert(`${direction}-single-entry`, deliveryEntries(targetEndpoint.sessionPath).filter((candidate) => deliveryIdOf(candidate) === deliveryId).length === 1, `delivery_id=${deliveryId}`)
+    await waitFor(() => assistantTexts(targetEndpoint.sessionPath).some((text) => text.includes(`QA-ACK ${token}`)), {
+      label: `${target.label} answers ${token}`,
+    })
+    const row = await waitFor(
+      async () => {
+        const current = await deliveryRow(scratch.agentDir, deliveryId)
+        return current?.state === "applied" ? current : undefined
+      },
+      { label: `${direction} row applied` },
+    )
+    report.assert(
+      `${direction}-idle-target-started`,
+      row.admission_kind === "started" && row.target_durable_id === targetEndpoint.durableId,
+      `state=${row.state} admission_kind=${row.admission_kind} target=${row.target_durable_id}`,
+    )
+    report.assert(
+      `${direction}-no-keystroke-on-target`,
+      target.keystrokes === keystrokesBefore,
+      `target pty bytes written by harness during delivery: ${target.keystrokes - keystrokesBefore}`,
+    )
+    report.assert(
+      `${direction}-single-entry`,
+      deliveryEntries(targetEndpoint.sessionPath).filter((candidate) => deliveryIdOf(candidate) === deliveryId)
+        .length === 1,
+      `delivery_id=${deliveryId}`,
+    )
     const envelope = JSON.parse(row.envelope)
     report.assert(
       `${direction}-provenance-sender`,
@@ -74,21 +126,33 @@ await runScenario("tui-to-tui", async ({ report, fake, scratch, install, startTu
     )
     const expectedFirstLine = `From QA workspace / qa-project / lane qa-review / session "${sender.label}"`
     const message = entry.message ?? entry
-    const deliveredText = typeof message.content === "string" ? message.content : message.content.map((part) => part.text ?? "").join("")
+    const deliveredText =
+      typeof message.content === "string" ? message.content : message.content.map((part) => part.text ?? "").join("")
     report.assert(
       `${direction}-sender-workspace-project`,
-      envelope.provenance?.workspace === "QA workspace" && envelope.provenance?.project === "qa-project"
-        && envelope.provenance?.lane === "qa-review" && envelope.provenance?.session === sender.label
-        && deliveredText.split("\n")[0].startsWith(`${expectedFirstLine} [OMO_GATEWAY v=1 `)
-        && deliveredText.split("\n")[0].includes('workspace="QA workspace" project="qa-project"'),
+      envelope.provenance?.workspace === "QA workspace" &&
+        envelope.provenance?.project === "qa-project" &&
+        envelope.provenance?.lane === "qa-review" &&
+        envelope.provenance?.session === sender.label &&
+        deliveredText.split("\n")[0].startsWith(`${expectedFirstLine} [OMO_GATEWAY v=1 `) &&
+        deliveredText.split("\n")[0].includes('workspace="QA workspace" project="qa-project"'),
       deliveredText.split("\n").slice(0, 2).join("\n"),
     )
     // The human display omits the machine header; verify that above from the target transcript.
     const flat = (text) => text.replace(/\s+/g, "")
-    const screen = await target.waitScreen(
-      (text) => flat(text).includes(flat(expectedFirstLine)) && text.includes(token),
-      { label: `${direction} provenance header visible on the target`, scope: "history", timeoutMs: 30_000 },
-    ).catch((error) => error)
-    report.assert(`${direction}-provenance-visible`, typeof screen === "string", typeof screen === "string" ? `header rendered: source=peer_agent sender_session=${senderEndpoint.durableId} delivery=${deliveryId}` : String(screen.message))
+    const screen = await target
+      .waitScreen((text) => flat(text).includes(flat(expectedFirstLine)) && text.includes(token), {
+        label: `${direction} provenance header visible on the target`,
+        scope: "history",
+        timeoutMs: 30_000,
+      })
+      .catch((error) => error)
+    report.assert(
+      `${direction}-provenance-visible`,
+      typeof screen === "string",
+      typeof screen === "string"
+        ? `header rendered: source=peer_agent sender_session=${senderEndpoint.durableId} delivery=${deliveryId}`
+        : String(screen.message),
+    )
   }
 })

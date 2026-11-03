@@ -13,8 +13,8 @@ export function buildLookAtPrompt(goal: string, fileParts: LookAtFilePart[]): st
   const pronoun = isPlural ? "them" : "it"
   const labels = isPlural
     ? `\n\nAttached files/images:\n${fileParts
-      .map((filePart, index) => `File ${index + 1}: ${sanitizeFilename(filePart.filename)}`)
-      .join("\n")}`
+        .map((filePart, index) => `File ${index + 1}: ${sanitizeFilename(filePart.filename)}`)
+        .join("\n")}`
     : ""
   const sourceClause = READ_ENABLED
     ? "Use the Read tool on the provided file path to load its contents, then analyze it."

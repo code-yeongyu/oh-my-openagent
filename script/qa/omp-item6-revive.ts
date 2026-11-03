@@ -30,14 +30,18 @@ function childTurn(body: string) {
 async function spawn(env: ChildEnv, kernel: ProducerKernel, name: string): Promise<TaskToolDetails> {
   const result = (await env.taskTool.execute(
     `omp-item6-${name}`,
-    { prompt: "Call fixture_lookup with key=config.txt and report its value.", subagent_type: "qa-worker", run_in_background: false, tools: ["fixture_lookup"] } as never,
+    {
+      prompt: "Call fixture_lookup with key=config.txt and report its value.",
+      subagent_type: "qa-worker",
+      run_in_background: false,
+      tools: ["fixture_lookup"],
+    } as never,
     undefined,
     undefined,
     env.context(kernel.capability) as never,
   )) as AgentToolResult<TaskToolDetails>
   return result.details
 }
-
 
 export async function runParkedChildLiveKernel(): Promise<Record<string, unknown>> {
   const { kernel, release } = await definedKernel("omp-item6-parked")
@@ -53,9 +57,16 @@ export async function runParkedChildLiveKernel(): Promise<Record<string, unknown
     assert.equal(parked.state, "persisted_only")
     assert.ok(env.kernelToolBindings.get(taskId), "the binding must survive same-host parking")
 
-    const revived = await runTaskSend(env.manager, { to: taskId, message: `${REVIVE_MARKER} Call fixture_lookup again for config.txt.` }, "omp-item6-parent")
+    const revived = await runTaskSend(
+      env.manager,
+      { to: taskId, message: `${REVIVE_MARKER} Call fixture_lookup again for config.txt.` },
+      "omp-item6-parent",
+    )
     assert.equal(revived.details.kind, "revived")
-    const terminal = await bounded(env.manager.waitFor(taskId, { signal: AbortSignal.timeout(20_000) }), "revived-terminal")
+    const terminal = await bounded(
+      env.manager.waitFor(taskId, { signal: AbortSignal.timeout(20_000) }),
+      "revived-terminal",
+    )
     assert.equal(terminal.status, "completed")
     assert.equal(terminal.final_response, "CHILD_SAW parent-state:config.txt")
     assert.equal(terminal.notification.run_epoch, 1)
@@ -74,8 +85,16 @@ export async function runParkedChildLiveKernel(): Promise<Record<string, unknown
       passed: true,
       producer_sha: kernel.sha,
       parked: { task_id: taskId, residency_state: parked.state, reclaimed: parked.reclaimed, binding_retained: true },
-      revived: { kind: revived.details.kind, status: terminal.status, run_epoch: terminal.notification.run_epoch, final_response: terminal.final_response },
-      after_redefinition: { task_id: afterRedefinition.task_id, final_response: env.store.load(afterRedefinition.task_id)?.final_response },
+      revived: {
+        kind: revived.details.kind,
+        status: terminal.status,
+        run_epoch: terminal.notification.run_epoch,
+        final_response: terminal.final_response,
+      },
+      after_redefinition: {
+        task_id: afterRedefinition.task_id,
+        final_response: env.store.load(afterRedefinition.task_id)?.final_response,
+      },
       persisted_spawn_spec: env.store.load(taskId)?.spawn_spec,
     }
   } finally {
@@ -96,22 +115,49 @@ export async function runRevivedChildStaleKernel(): Promise<Record<string, unkno
     // A real kernel reset bumps the generation, so the fenced descriptor is stale on the next call.
     const beforeReset = kernel.invocations()
     await kernel.reset()
-    const revived = await runTaskSend(env.manager, { to: taskId, message: `${REVIVE_MARKER} Call fixture_lookup again.` }, "omp-item6-parent")
+    const revived = await runTaskSend(
+      env.manager,
+      { to: taskId, message: `${REVIVE_MARKER} Call fixture_lookup again.` },
+      "omp-item6-parent",
+    )
     assert.equal(revived.details.kind, "revived")
-    const terminal = await bounded(env.manager.waitFor(taskId, { signal: AbortSignal.timeout(20_000) }), "stale-terminal")
+    const terminal = await bounded(
+      env.manager.waitFor(taskId, { signal: AbortSignal.timeout(20_000) }),
+      "stale-terminal",
+    )
     assert.equal(terminal.final_response, "CHILD_SAW_ERROR kernel_tool_stale")
 
     // A new host process has no binding at all: only a typed stub is restored from the transcript.
     const sessionPath = `${env.store.stateDir}/children/${taskId}/sessions/${taskId}/${(await import("node:fs")).readdirSync(`${env.store.stateDir}/children/${taskId}/sessions/${taskId}`)[0]}`
     const restartedTools: ToolDefinition[] = []
-    const restarted = new InProcessRunner({ kernelToolBindings: createKernelToolBindings(), createSession: async (options) => {
-      restartedTools.push(...(options.customTools ?? []))
-      return { sessionId: "restarted", prompt: async () => undefined, steer: async () => "handled", followUp: async () => "handled", abort: async () => undefined, subscribe: () => () => undefined, getLastAssistantText: () => undefined, dispose: () => undefined }
-    } })
-    const handle = await restarted.resume({
-      taskId, cwd: env.root, sessionDir: `${env.store.stateDir}/children/${taskId}/sessions/${taskId}/`,
-      depth: 1, parentSessionId: "omp-item6-parent", rootSessionId: "omp-item6-parent", prompt: "",
-    }, sessionPath)
+    const restarted = new InProcessRunner({
+      kernelToolBindings: createKernelToolBindings(),
+      createSession: async (options) => {
+        restartedTools.push(...(options.customTools ?? []))
+        return {
+          sessionId: "restarted",
+          prompt: async () => undefined,
+          steer: async () => "handled",
+          followUp: async () => "handled",
+          abort: async () => undefined,
+          subscribe: () => () => undefined,
+          getLastAssistantText: () => undefined,
+          dispose: () => undefined,
+        }
+      },
+    })
+    const handle = await restarted.resume(
+      {
+        taskId,
+        cwd: env.root,
+        sessionDir: `${env.store.stateDir}/children/${taskId}/sessions/${taskId}/`,
+        depth: 1,
+        parentSessionId: "omp-item6-parent",
+        rootSessionId: "omp-item6-parent",
+        prompt: "",
+      },
+      sessionPath,
+    )
     assert.ok(handle)
     const stubTool = restartedTools.find((tool) => tool.name === "fixture_lookup")
     assert.ok(stubTool, "the restarted host restores a named stub")
@@ -128,7 +174,9 @@ export async function runRevivedChildStaleKernel(): Promise<Record<string, unkno
     assert.equal(stubResult.details?.error?.code, "tools_unavailable")
     assert.deepEqual(stubInvocations, { attempted: 0, succeeded: 0 }, "a restored stub must never invoke a closure")
 
-    const stub = (await import("../../packages/senpi-task/src/kernel-tools/transcript-names")).recordedKernelToolNames(sessionPath)
+    const stub = (await import("../../packages/senpi-task/src/kernel-tools/transcript-names")).recordedKernelToolNames(
+      sessionPath,
+    )
     assert.deepEqual(stub, ["fixture_lookup"])
 
     const afterReset = kernel.invocationsSince(beforeReset)
@@ -139,7 +187,11 @@ export async function runRevivedChildStaleKernel(): Promise<Record<string, unkno
     return {
       passed: true,
       producer_sha: kernel.sha,
-      stale_after_reset: { task_id: taskId, final_response: terminal.final_response, run_epoch: terminal.notification.run_epoch },
+      stale_after_reset: {
+        task_id: taskId,
+        final_response: terminal.final_response,
+        run_epoch: terminal.notification.run_epoch,
+      },
       restarted_host: {
         restored_stub_names: stub,
         no_binding: true,

@@ -22,14 +22,25 @@ export function recoveryPresentation(record: {
   readonly error_message?: string
 }): { readonly state: "resuming" | "ending"; readonly cause: string; readonly text: string } | undefined {
   if (TERMINAL_STATUSES.has(record.status)) return undefined
-  const expiring = record.failure_kind === "suspended_unresumable"
-    || record.error_message?.startsWith("suspended_unresumable:") === true
-  if (!expiring && record.suspension_reason === undefined
-    && (record.residency_state === undefined || record.residency_state === "resident")) return undefined
+  const expiring =
+    record.failure_kind === "suspended_unresumable" ||
+    record.error_message?.startsWith("suspended_unresumable:") === true
+  if (
+    !expiring &&
+    record.suspension_reason === undefined &&
+    (record.residency_state === undefined || record.residency_state === "resident")
+  )
+    return undefined
   const reason = record.revival_deferred_reason ?? record.suspension_reason ?? ""
   const state = expiring || PERMANENT_REVIVAL_REASONS.has(reason) ? "ending" : "resuming"
-  const cause = (record.revival_deferred_reason === undefined ? undefined
-    : record.suspension_reason === "revival_deferred" ? `revival deferred: ${record.revival_deferred_reason}` : record.revival_deferred_reason)
-    ?? (record.suspension_reason === undefined ? "parent session restarted" : CAUSES[record.suspension_reason] ?? record.suspension_reason)
+  const cause =
+    (record.revival_deferred_reason === undefined
+      ? undefined
+      : record.suspension_reason === "revival_deferred"
+        ? `revival deferred: ${record.revival_deferred_reason}`
+        : record.revival_deferred_reason) ??
+    (record.suspension_reason === undefined
+      ? "parent session restarted"
+      : (CAUSES[record.suspension_reason] ?? record.suspension_reason))
   return { state, cause, text: `${state} (${cause})` }
 }

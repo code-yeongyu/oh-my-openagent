@@ -61,7 +61,11 @@ describe("runTaskOutput non-blocking peek", () => {
     const manager = managerFrom([running])
 
     // when
-    const result = await runTaskOutput(depsFrom(manager), { task_id: running.task_id, mode: "status" }, "session-parent")
+    const result = await runTaskOutput(
+      depsFrom(manager),
+      { task_id: running.task_id, mode: "status" },
+      "session-parent",
+    )
 
     // then
     expect(manager.waitForCalls()).toEqual([])
@@ -73,17 +77,24 @@ describe("runTaskOutput non-blocking peek", () => {
     ["block true", { block: true }],
     ["block false", { block: false }],
     ["blocking timeout", { timeout_ms: 1 }],
-  ] as const)("#given a legacy %s param #when task_output runs #then it redirects to notification-driven peeks", async (_label, legacyParam) => {
-    // given
-    const running = makeRecord({ task_id: "st_running", status: "running" })
-    const manager = managerFrom([running])
+  ] as const)(
+    "#given a legacy %s param #when task_output runs #then it redirects to notification-driven peeks",
+    async (_label, legacyParam) => {
+      // given
+      const running = makeRecord({ task_id: "st_running", status: "running" })
+      const manager = managerFrom([running])
 
-    // when
-    const result = await runTaskOutput(depsFrom(manager), { task_id: running.task_id, ...legacyParam }, "session-parent")
+      // when
+      const result = await runTaskOutput(
+        depsFrom(manager),
+        { task_id: running.task_id, ...legacyParam },
+        "session-parent",
+      )
 
-    // then
-    expect(manager.waitForCalls()).toEqual([])
-    expect(result.details.kind).toBe("invalid_arguments")
-    expect(firstText(result)).toBe(BLOCKING_REMOVED_GUIDANCE)
-  })
+      // then
+      expect(manager.waitForCalls()).toEqual([])
+      expect(result.details.kind).toBe("invalid_arguments")
+      expect(firstText(result)).toBe(BLOCKING_REMOVED_GUIDANCE)
+    },
+  )
 })

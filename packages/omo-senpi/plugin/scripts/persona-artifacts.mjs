@@ -3,16 +3,25 @@ import { join } from "node:path"
 
 export function runtimePersonaSources(repoRoot) {
   return [
-    ["reflection-persona.md", join(repoRoot, "packages", "memory-core", "src", "reflection", "assets", "reflection-persona.md")],
+    [
+      "reflection-persona.md",
+      join(repoRoot, "packages", "memory-core", "src", "reflection", "assets", "reflection-persona.md"),
+    ],
     ["dream-persona.md", join(repoRoot, "packages", "memory-core", "src", "reflection", "assets", "dream-persona.md")],
     ["facts-persona.md", join(repoRoot, "packages", "memory-core", "src", "facts", "assets", "facts-persona.md")],
-    ["kibitzer-persona.md", join(repoRoot, "packages", "memory-core", "src", "recall", "assets", "kibitzer-persona.md")],
+    [
+      "kibitzer-persona.md",
+      join(repoRoot, "packages", "memory-core", "src", "recall", "assets", "kibitzer-persona.md"),
+    ],
   ]
 }
 
 export async function stageRuntimePersonas(repoRoot, outputDir) {
-  await Promise.all(runtimePersonaSources(repoRoot).map(async ([name, source]) =>
-    writeFile(join(outputDir, name), await readFile(source, "utf8"))))
+  await Promise.all(
+    runtimePersonaSources(repoRoot).map(async ([name, source]) =>
+      writeFile(join(outputDir, name), await readFile(source, "utf8")),
+    ),
+  )
 }
 
 export async function findStaleRuntimePersona(expectedDir, currentDir, repoRoot) {

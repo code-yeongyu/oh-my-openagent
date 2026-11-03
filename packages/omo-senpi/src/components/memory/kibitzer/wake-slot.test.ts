@@ -3,7 +3,12 @@ import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os"
 import path from "node:path"
 
-import { createLockRecord, recallWakeLockPath, recallWakeTicketDirectory, type LockRecord } from "@oh-my-opencode/memory-core"
+import {
+  createLockRecord,
+  recallWakeLockPath,
+  recallWakeTicketDirectory,
+  type LockRecord,
+} from "@oh-my-opencode/memory-core"
 
 import { withinMs } from "./sidecar.test-support"
 import {
@@ -87,7 +92,11 @@ describe("createKibitzerWakeSlot", () => {
     } finally {
       controller.abort()
       await Promise.allSettled(waits)
-      await Promise.all(leases.map(async (lease) => { await lease?.release() }))
+      await Promise.all(
+        leases.map(async (lease) => {
+          await lease?.release()
+        }),
+      )
     }
   })
 
@@ -132,7 +141,8 @@ describe("createKibitzerWakeSlot", () => {
     const dir = await locksDirectory()
     const slot = createKibitzerWakeSlot({ locksDirectory: dir, maxConcurrent: 1, waitTimeoutMs: 300, pollMs: 25 })
     const own = await createLockRecord("recall-wake")
-    if (own.process_start === "unavailable") throw new Error("this host cannot prove process identity; the wake-slot tests need it")
+    if (own.process_start === "unavailable")
+      throw new Error("this host cannot prove process identity; the wake-slot tests need it")
     await mkdir(dir, { recursive: true })
 
     // A live owner (this very process) keeps the slot: the wake waits and leaves busy, the record untouched.
@@ -154,7 +164,9 @@ describe("createKibitzerWakeSlot", () => {
     const unprovable: LockRecord = { ...own, process_start: "unavailable" }
     const unprovableRecord = `${JSON.stringify(unprovable)}\n`
     await writeFile(recallWakeLockPath(dir, 1), unprovableRecord)
-    expect((await withinMs(slot.acquire(), "the busy admission against an unprovable owner", 5_000)).status).toBe("busy")
+    expect((await withinMs(slot.acquire(), "the busy admission against an unprovable owner", 5_000)).status).toBe(
+      "busy",
+    )
     expect(await readFile(recallWakeLockPath(dir, 1), "utf8")).toBe(unprovableRecord)
     expect(await tickets(dir)).toEqual([])
   })

@@ -2,10 +2,7 @@ import { writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { observeState, stopParent } from "./task-host-e2e-events.mjs"
-import {
-  taskRecords,
-  teardownSandbox,
-} from "./task-host-e2e-shard-cost-support.mjs"
+import { taskRecords, teardownSandbox } from "./task-host-e2e-shard-cost-support.mjs"
 import {
   createHttpScenario,
   endpoint,
@@ -20,10 +17,7 @@ import {
   taskStep,
   textStep,
 } from "./task-host-e2e-shards-handoff-successors-support.mjs"
-import {
-  crashRows,
-  generationNames,
-} from "./task-host-e2e-shards-support.mjs"
+import { crashRows, generationNames } from "./task-host-e2e-shards-support.mjs"
 
 const ROOT_START = "T14_ROOT_START"
 const CHILD_HOLD = "T14_CHILD_HOLD"
@@ -38,12 +32,7 @@ function route(parentRelease, childRelease, grandchildRelease) {
     }
     if (request.user.includes(CHILD_HOLD)) {
       return request.count("task") === 0
-        ? heldTaskStep(
-            "child held",
-            childRelease,
-            "successor-grandchild",
-            GRANDCHILD_HOLD,
-          )
+        ? heldTaskStep("child held", childRelease, "successor-grandchild", GRANDCHILD_HOLD)
         : textStep("grandchild spawned")
     }
     if (request.user.includes(GRANDCHILD_HOLD)) {
@@ -75,19 +64,14 @@ export async function runParentSuccessorScenario(current, olderBin, artifacts) {
     parent = startHttpParent({ ...sandbox, bin: binary }, ROOT_START)
     const child = await observeState(sandbox.root, () => {
       const record = taskRecords(project).find((entry) => entry.name === "successor-child")
-      return record?.host_session?.socket && requestSeen(requestLog, CHILD_HOLD)
-        ? record
-        : undefined
+      return record?.host_session?.socket && requestSeen(requestLog, CHILD_HOLD) ? record : undefined
     })
     if (child === undefined) throw new Error("child did not reach streamed text hold")
     const socket = child.host_session.socket
     const before = endpoint(sandbox, "p")
     const generationsBefore = generationNames(sandbox, socket)
     swapBinary(current.bin, binary)
-    const handoffRun = startCommand(
-      { ...sandbox, bin: binary },
-      ["daemon", "handoff", "--json"],
-    )
+    const handoffRun = startCommand({ ...sandbox, bin: binary }, ["daemon", "handoff", "--json"])
     const successor = await observeState(sandbox.root, () => {
       const report = endpoint(sandbox, "p")
       return report?.instanceId !== before?.instanceId ? report : undefined
@@ -96,9 +80,7 @@ export async function runParentSuccessorScenario(current, olderBin, artifacts) {
     writeFileSync(childRelease, "go\n")
     const grandchild = await observeState(sandbox.root, () => {
       const record = taskRecords(project).find((entry) => entry.name === "successor-grandchild")
-      return record?.host_session?.session_path && requestSeen(requestLog, GRANDCHILD_HOLD)
-        ? record
-        : undefined
+      return record?.host_session?.session_path && requestSeen(requestLog, GRANDCHILD_HOLD) ? record : undefined
     })
     const after = endpoint(sandbox, "p")
     const generationsAfter = generationNames(sandbox, socket)
@@ -133,9 +115,6 @@ export async function runParentSuccessorScenario(current, olderBin, artifacts) {
     await stopParent(parent)
     scenario.close()
     const cleanup = await teardownSandbox(sandbox, [parent].filter(Boolean))
-    writeFileSync(
-      join(artifacts, "handoff-nested-successor-cleanup.json"),
-      `${JSON.stringify(cleanup, null, 2)}\n`,
-    )
+    writeFileSync(join(artifacts, "handoff-nested-successor-cleanup.json"), `${JSON.stringify(cleanup, null, 2)}\n`)
   }
 }

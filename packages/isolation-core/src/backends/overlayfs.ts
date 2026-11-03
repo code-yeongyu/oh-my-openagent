@@ -9,14 +9,27 @@ export class OverlayfsBackend implements IsolationBackend {
   readonly clonesTree = true
   constructor(private readonly io: BackendRuntime = runtime) {}
   async probe(_lower: string) {
-    return { available: this.io.platform === "linux" && this.io.which("fuse-overlayfs") && this.io.which("fusermount3") && await this.io.accessible("/dev/fuse"), reason: "fuse-overlayfs requires Linux, fusermount3 and accessible /dev/fuse" }
+    return {
+      available:
+        this.io.platform === "linux" &&
+        this.io.which("fuse-overlayfs") &&
+        this.io.which("fusermount3") &&
+        (await this.io.accessible("/dev/fuse")),
+      reason: "fuse-overlayfs requires Linux, fusermount3 and accessible /dev/fuse",
+    }
   }
   private async mount(lower: string, base: string) {
     // Commas/colons are option separators even without a shell; reject rather than mis-mount.
-    if (/[,:\n\\]/.test(lower + base)) throw new IsolationUnavailableError("overlay paths contain unsupported mount-option separators")
+    if (/[,:\n\\]/.test(lower + base))
+      throw new IsolationUnavailableError("overlay paths contain unsupported mount-option separators")
     for (const name of ["upper", "work", "m"]) await mkdir(join(base, name), { recursive: true })
     try {
-      await checked(this.io, ["fuse-overlayfs", "-o", `lowerdir=${lower},upperdir=${join(base, "upper")},workdir=${join(base, "work")}`, join(base, "m")])
+      await checked(this.io, [
+        "fuse-overlayfs",
+        "-o",
+        `lowerdir=${lower},upperdir=${join(base, "upper")},workdir=${join(base, "work")}`,
+        join(base, "m"),
+      ])
     } catch (error) {
       const message = String((error as Error).message)
       // A missing or unusable FUSE device is a capability gap other backends can fill.
@@ -34,7 +47,7 @@ export class OverlayfsBackend implements IsolationBackend {
     await markStarted(ctx.baseDir, this.kind, { lower })
   }
   private async unmount(merged: string) {
-    if (!await this.io.mounted(merged)) return
+    if (!(await this.io.mounted(merged))) return
     let message = ""
     for (let attempt = 0; attempt < 3; attempt++) {
       const result = await this.io.run(["fusermount3", "-u", merged])
@@ -49,7 +62,9 @@ export class OverlayfsBackend implements IsolationBackend {
     // No pathname changes before successful unmount; a busy mount fails closed.
     await this.unmount(join(from, "m"))
     await rename(from, to)
-    try { await this.mount(marker.lower, to) } catch (error) {
+    try {
+      await this.mount(marker.lower, to)
+    } catch (error) {
       // Restore the original parent and mount so ensure can tear down at its known path.
       await this.unmount(join(to, "m"))
       await rename(to, from)

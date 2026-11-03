@@ -21,13 +21,14 @@ type PruneRequest = {
 }
 
 const request = JSON.parse(readFileSync(0, "utf8")) as MigrationRequest | PruneRequest
-const result = request.operation === "prune-store-index"
-  ? { removed: await pruneMissingStoreIndexEntries(request.indexPath) }
-  : request.planOnly
-    ? planHostSessionSocketMigration(request.storeDir, request.to)
-    : migrateHostSessionSockets(request.storeDir, {
-        to: request.to,
-        deadEndpoints: new Set(request.deadEndpoints ?? []),
-        dryRun: request.dryRun,
-      })
+const result =
+  request.operation === "prune-store-index"
+    ? { removed: await pruneMissingStoreIndexEntries(request.indexPath) }
+    : request.planOnly
+      ? planHostSessionSocketMigration(request.storeDir, request.to)
+      : migrateHostSessionSockets(request.storeDir, {
+          to: request.to,
+          deadEndpoints: new Set(request.deadEndpoints ?? []),
+          dryRun: request.dryRun,
+        })
 process.stdout.write(`${JSON.stringify(result)}\n`)

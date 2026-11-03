@@ -57,12 +57,14 @@ describe("spawn_spec v1 persistence", () => {
     const { manager, store, project } = makeManager({ planner: fullPlanner() })
 
     // when an in-process task starts
-    const result = await manager.start(managerSpec({
-      execution_mode: "in-process",
-      prompt: "RAW PROMPT",
-      instructions: "be careful",
-      memberScopedTools: [makeTool("alpha_read"), makeTool("alpha_write")],
-    }))
+    const result = await manager.start(
+      managerSpec({
+        execution_mode: "in-process",
+        prompt: "RAW PROMPT",
+        instructions: "be careful",
+        memberScopedTools: [makeTool("alpha_read"), makeTool("alpha_write")],
+      }),
+    )
 
     // then the persisted spec is v1 and carries the post-planner prompt, never the raw one
     if (result.kind !== "started") throw new Error("expected started")
@@ -82,11 +84,13 @@ describe("spawn_spec v1 persistence", () => {
     const { manager, store } = makeManager({ planner: fullPlanner() })
 
     // when the task starts
-    const result = await manager.start(managerSpec({
-      execution_mode: "process",
-      extensions: ["/tmp/member-extension.ts"],
-      memberEnv: { SENPI_TASK_MEMBER: "run-1::alpha" },
-    }))
+    const result = await manager.start(
+      managerSpec({
+        execution_mode: "process",
+        extensions: ["/tmp/member-extension.ts"],
+        memberEnv: { SENPI_TASK_MEMBER: "run-1::alpha" },
+      }),
+    )
 
     // then process mode persists the same v1 shape and the untrusted inputs stay out of it
     if (result.kind !== "started") throw new Error("expected started")
@@ -128,8 +132,22 @@ describe("buildRespawnManagedSpec", () => {
   test("#given an older curated spec allowing write and a member-scoped write tool #when child options are restored #then the current curated floor excludes both", () => {
     // given / when
     const options = buildChildSessionOptions({
-      spec: { taskId: "st_00000902", cwd: process.cwd(), sessionDir: process.cwd(), depth: 1, parentSessionId: "parent", rootSessionId: "parent", prompt: "recorded", agentType: "explore", toolAllowlist: ["read", "write", "member_write"], toolDenylist: ["edit"], memberScopedTools: [makeTool("member_write")] },
-      sessionManager: SessionManager.inMemory(), sharedParentTools: [makeTool("write")], uiOnlyToolNames: [],
+      spec: {
+        taskId: "st_00000902",
+        cwd: process.cwd(),
+        sessionDir: process.cwd(),
+        depth: 1,
+        parentSessionId: "parent",
+        rootSessionId: "parent",
+        prompt: "recorded",
+        agentType: "explore",
+        toolAllowlist: ["read", "write", "member_write"],
+        toolDenylist: ["edit"],
+        memberScopedTools: [makeTool("member_write")],
+      },
+      sessionManager: SessionManager.inMemory(),
+      sharedParentTools: [makeTool("write")],
+      uiOnlyToolNames: [],
     })
     // then
     expect(options.tools).toEqual(["read"])
@@ -141,12 +159,14 @@ describe("buildRespawnManagedSpec", () => {
     // given a started in-process task with the full planner output and member-scoped tools
     const inProcess = new FakeRunner()
     const { manager, store } = makeManager({ inProcess, planner: fullPlanner() })
-    const result = await manager.start(managerSpec({
-      execution_mode: "in-process",
-      prompt: "RAW PROMPT",
-      subagent_type: "explore",
-      memberScopedTools: [makeTool("alpha_read")],
-    }))
+    const result = await manager.start(
+      managerSpec({
+        execution_mode: "in-process",
+        prompt: "RAW PROMPT",
+        subagent_type: "explore",
+        memberScopedTools: [makeTool("alpha_read")],
+      }),
+    )
     if (result.kind !== "started") throw new Error("expected started")
     const original = inProcess.startedSpecs[0]
     if (original === undefined) throw new Error("expected a start spec")

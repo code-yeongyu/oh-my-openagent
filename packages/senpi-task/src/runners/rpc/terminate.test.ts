@@ -16,18 +16,21 @@ function onExit(child: ChildProcess): Promise<{ code: number | null; signal: Nod
 }
 
 describe("terminateRpcChild", () => {
-  test.skipIf(isWin32)("#given a cooperating child #when terminating #then SIGTERM ends it without escalation", async () => {
-    // given
-    const child = spawnFakeChild()
-    const exited = onExit(child)
+  test.skipIf(isWin32)(
+    "#given a cooperating child #when terminating #then SIGTERM ends it without escalation",
+    async () => {
+      // given
+      const child = spawnFakeChild()
+      const exited = onExit(child)
 
-    // when
-    await terminateRpcChild(child, { sigkillDelayMs: 5_000 })
+      // when
+      await terminateRpcChild(child, { sigkillDelayMs: 5_000 })
 
-    // then
-    const { signal } = await exited
-    expect(signal).toBe("SIGTERM")
-  })
+      // then
+      const { signal } = await exited
+      expect(signal).toBe("SIGTERM")
+    },
+  )
 
   test.skipIf(isWin32)(
     "#given a TERM-ignoring child #when terminating #then it escalates to SIGKILL within the budget",
@@ -46,28 +49,31 @@ describe("terminateRpcChild", () => {
     },
   )
 
-  test.skipIf(isWin32)("#given a non-group-leader child #when terminating #then direct escalation remains available", async () => {
-    // given
-    const child = spawn(process.execPath, [PROCESS_TREE_PATH, "descendant"], {
-      detached: false,
-      stdio: ["ignore", "pipe", "ignore"],
-    })
-    await once(child.stdout!, "data")
-    const pid = child.pid
-    if (pid === undefined) throw new Error("non-group-leader child did not receive a pid")
+  test.skipIf(isWin32)(
+    "#given a non-group-leader child #when terminating #then direct escalation remains available",
+    async () => {
+      // given
+      const child = spawn(process.execPath, [PROCESS_TREE_PATH, "descendant"], {
+        detached: false,
+        stdio: ["ignore", "pipe", "ignore"],
+      })
+      await once(child.stdout!, "data")
+      const pid = child.pid
+      if (pid === undefined) throw new Error("non-group-leader child did not receive a pid")
 
-    try {
-      // when
-      await terminateRpcChild(child, { sigkillDelayMs: 150 })
+      try {
+        // when
+        await terminateRpcChild(child, { sigkillDelayMs: 150 })
 
-      // then
-      expect(isRunning(pid)).toBe(false)
-    } finally {
-      if (isRunning(pid)) {
-        child.kill("SIGKILL")
+        // then
+        expect(isRunning(pid)).toBe(false)
+      } finally {
+        if (isRunning(pid)) {
+          child.kill("SIGKILL")
+        }
       }
-    }
-  })
+    },
+  )
 
   test("#given an already-exited child #when terminating #then it resolves without throwing", async () => {
     // given

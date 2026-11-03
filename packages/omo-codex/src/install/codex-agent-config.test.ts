@@ -17,7 +17,9 @@ function readFor(home: string, extraEnv: Record<string, string> = {}) {
 
 describe("readCodexAgentConfig agent overrides", () => {
   test("#given [codex].agents model and reasoning #when read #then the Codex override maps reasoning to model_reasoning_effort", async () => {
-    const home = await homeWithConfig({ "[codex]": { agents: { explorer: { model: "gpt-6-luna", reasoning: "medium" } } } })
+    const home = await homeWithConfig({
+      "[codex]": { agents: { explorer: { model: "gpt-6-luna", reasoning: "medium" } } },
+    })
 
     const config = readFor(home)
 
@@ -34,7 +36,9 @@ describe("readCodexAgentConfig agent overrides", () => {
 
   test("#given a model reasoning suffix and off reasoning #when read #then the suffix splits and off becomes none", async () => {
     const home = await homeWithConfig({
-      "[codex]": { agents: { plan: { model: "gpt-6-astra:xhigh" }, momus: { model: "gpt-6-astra", reasoning: "off" } } },
+      "[codex]": {
+        agents: { plan: { model: "gpt-6-astra:xhigh" }, momus: { model: "gpt-6-astra", reasoning: "off" } },
+      },
     })
 
     const config = readFor(home)
@@ -64,7 +68,10 @@ describe("readCodexAgentConfig agent overrides", () => {
   })
 
   test("#given an override for an unmanaged role #when warnings are computed #then only that role is reported", () => {
-    const overrides = new Map([["explorer", { model: "gpt-6-luna" }], ["oracle", { model: "gpt-6-luna" }]])
+    const overrides = new Map([
+      ["explorer", { model: "gpt-6-luna" }],
+      ["oracle", { model: "gpt-6-luna" }],
+    ])
 
     const warnings = unmanagedAgentOverrideWarnings(overrides, new Set(["explorer"]))
 

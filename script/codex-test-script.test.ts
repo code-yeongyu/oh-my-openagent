@@ -28,9 +28,7 @@ describe("Codex compatibility test script", () => {
     const pluginBuildIndex = testCodexScript.indexOf("bun run --cwd packages/omo-codex/plugin build")
     const installerTestIndex = testCodexScript.indexOf("packages/omo-codex/src/install/install-codex-packaged.test.ts")
     const buildsLspDaemonBeforePluginAndInstallerTests =
-      lspDaemonBuildIndex >= 0 &&
-      pluginBuildIndex > lspDaemonBuildIndex &&
-      installerTestIndex > lspDaemonBuildIndex
+      lspDaemonBuildIndex >= 0 && pluginBuildIndex > lspDaemonBuildIndex && installerTestIndex > lspDaemonBuildIndex
 
     // #then
     expect(

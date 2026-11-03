@@ -8,7 +8,14 @@ test("#given complete Unicode and escaped oversized source #when admitted #then 
   const { identity, queue } = await fixture()
   await queue.markConsumed(await queue.listPending())
   await enqueue(queue, identity, "large", "last", 'é🌍\\"\n'.repeat(20_000))
-  const payload: FactsPayload = { version: 1, identity: identity.id, today: "2026-08-10", entries: await queue.listPending(), knownPeople: [], primaryHuman: { slug: "human", aliases: [] } }
+  const payload: FactsPayload = {
+    version: 1,
+    identity: identity.id,
+    today: "2026-08-10",
+    entries: await queue.listPending(),
+    knownPeople: [],
+    primaryHuman: { slug: "human", aliases: [] },
+  }
   const before = serializeFactsPayload(payload)
   const model = { contextWindow: 1_048_576, maxTokens: 8192 }
   expect(Buffer.byteLength(before)).toBeGreaterThan(131_072)
@@ -17,7 +24,12 @@ test("#given complete Unicode and escaped oversized source #when admitted #then 
   expect(admitOversizedFacts(payload, { ...model, maxTokens: 0 })).toBe(false)
   expect(admitOversizedFacts(payload, undefined)).toBe(false)
   expect(admitOversizedFacts({ ...payload, entries: [...payload.entries, ...payload.entries] }, model)).toBe(false)
-  expect(admitOversizedFacts({ ...payload, primaryHuman: { slug: "human", aliases: ["x".repeat(FACTS_OVERSIZED_BYTES)] } }, model)).toBe(false)
+  expect(
+    admitOversizedFacts(
+      { ...payload, primaryHuman: { slug: "human", aliases: ["x".repeat(FACTS_OVERSIZED_BYTES)] } },
+      model,
+    ),
+  ).toBe(false)
   expect(serializeFactsPayload(payload)).toBe(before)
 })
 

@@ -15,7 +15,14 @@ import {
 } from "./identity-runtime"
 import { createMemoryJournalWiring, type MemoryJournalWiring } from "./journal-wiring"
 import { resolveMemorySessionModel } from "./session-model-resolver"
-import { NO_LAUNCH_FACTS, currentLaunchScope, factsForScope, readLaunchFacts, withLaunchScope, type LaunchFacts } from "./launch-facts"
+import {
+  NO_LAUNCH_FACTS,
+  currentLaunchScope,
+  factsForScope,
+  readLaunchFacts,
+  withLaunchScope,
+  type LaunchFacts,
+} from "./launch-facts"
 import { isStaleExtensionContextError } from "./stale-extension-context"
 import { resolveReflectionTriggerConfig, type ReflectionTriggerSession } from "./trigger-wiring"
 import { isRecord, sessionIdFrom } from "./wiring-context"
@@ -105,7 +112,10 @@ export function createMemoryRuntimeWiring(
       return readLaunchFacts(eventCtx)
     } catch (error) {
       if (!isStaleExtensionContextError(error)) {
-        options.logger?.warn("memory reflection could not read its session details at trigger time; the launch reads them later", { error: error instanceof Error ? error.message : String(error) })
+        options.logger?.warn(
+          "memory reflection could not read its session details at trigger time; the launch reads them later",
+          { error: error instanceof Error ? error.message : String(error) },
+        )
       }
       return undefined
     }
@@ -146,8 +156,8 @@ export function createMemoryRuntimeWiring(
     const cached = factsWirings.get(identity.identity)
     if (cached !== undefined) return cached
     const settings = resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory)
-    const createExtractor = options.createFactsExtractor
-      ?? ((extractorOptions) => new FactsExtractorRunner(extractorOptions))
+    const createExtractor =
+      options.createFactsExtractor ?? ((extractorOptions) => new FactsExtractorRunner(extractorOptions))
     const extractor = createExtractor({
       identity: {
         id: identity.identity,
@@ -236,7 +246,10 @@ export function createMemoryRuntimeWiring(
           const result = await runtime.store.evaluate(conversationId, event)
           if (result?.status === "active") {
             const run = result.run
-            void withLaunchScope({ conversationIds: run.request.conversationIds, ...(facts === undefined ? {} : { snapshot: facts }) }, () => runtime.launch(run))
+            void withLaunchScope(
+              { conversationIds: run.request.conversationIds, ...(facts === undefined ? {} : { snapshot: facts }) },
+              () => runtime.launch(run),
+            )
             // Reservation admission transfers ownership to the identity. Its committed launch
             // must finish even if the observer retires, but a retired observer cannot publish UI.
             signal?.throwIfAborted()

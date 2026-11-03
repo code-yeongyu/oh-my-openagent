@@ -58,15 +58,18 @@ export async function runMemberTaskSend(
   const recipients = new Set([...deps.members, TEAM_LEAD_SENTINEL])
   if (!recipients.has(input.to)) throw new UnknownMemberRecipientError(input.to, deps.members)
 
-  const message = buildTeamMessage({
-    from: deps.memberName,
-    to: input.to,
-    body: input.message,
-    ...(input.summary !== undefined ? { summary: input.summary } : {}),
-  }, {
-    now: deps.now ?? Date.now,
-    newMessageId: deps.newMessageId ?? randomUUID,
-  })
+  const message = buildTeamMessage(
+    {
+      from: deps.memberName,
+      to: input.to,
+      body: input.message,
+      ...(input.summary !== undefined ? { summary: input.summary } : {}),
+    },
+    {
+      now: deps.now ?? Date.now,
+      newMessageId: deps.newMessageId ?? randomUUID,
+    },
+  )
 
   await sendMessage(message, deps.teamRunId, deps.config, {
     isLead: false,

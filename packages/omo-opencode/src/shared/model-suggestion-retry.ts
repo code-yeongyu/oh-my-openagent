@@ -1,14 +1,7 @@
 import { parseModelSuggestion as parseModelSuggestionFromCore } from "@oh-my-opencode/model-core"
-import type {
-  SessionPromptAsyncData,
-  SessionPromptData,
-} from "@opencode-ai/sdk"
+import type { SessionPromptAsyncData, SessionPromptData } from "@opencode-ai/sdk"
 import { log } from "./logger"
-import {
-  createPromptTimeoutContext,
-  PROMPT_TIMEOUT_MS,
-  type PromptRetryOptions,
-} from "./prompt-timeout-context"
+import { createPromptTimeoutContext, PROMPT_TIMEOUT_MS, type PromptRetryOptions } from "./prompt-timeout-context"
 import {
   dispatchInternalPrompt,
   isInternalPromptDispatchAccepted,
@@ -55,7 +48,10 @@ type PromptSyncArgs = Omit<SessionPromptData, "url" | "body"> & {
 type PromptAsyncRetryClient = {
   readonly session?: {
     readonly status?: () => Promise<unknown>
-    readonly messages?: (input: { readonly path: { readonly id: string }; readonly query: { readonly directory: string; readonly limit?: number } }) => Promise<unknown>
+    readonly messages?: (input: {
+      readonly path: { readonly id: string }
+      readonly query: { readonly directory: string; readonly limit?: number }
+    }) => Promise<unknown>
     promptAsync?(input: PromptAsyncArgs): Promise<unknown>
   }
 }
@@ -63,7 +59,10 @@ type PromptAsyncRetryClient = {
 type PromptSyncRetryClient = {
   readonly session?: {
     readonly status?: () => Promise<unknown>
-    readonly messages?: (input: { readonly path: { readonly id: string }; readonly query: { readonly directory: string; readonly limit?: number } }) => Promise<unknown>
+    readonly messages?: (input: {
+      readonly path: { readonly id: string }
+      readonly query: { readonly directory: string; readonly limit?: number }
+    }) => Promise<unknown>
     prompt?(input: PromptSyncArgs): Promise<unknown>
   }
 }

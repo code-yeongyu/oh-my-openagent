@@ -19,16 +19,30 @@ export const fixture = async () => {
   let ceremonies = 0
   const options = { baseUrl: server.url, token: () => token }
   const input = {
-    account: ACCOUNT, serviceDeviceId: "service-first", serviceOrigin: server.url,
-    keyring: v.keyring, pinDir, chain: createAccountHttp(options), pairing: createPairingHttp(options),
-    rpId: "recovery.omo.dev", userName: "synthetic-user", roaming: false,
+    account: ACCOUNT,
+    serviceDeviceId: "service-first",
+    serviceOrigin: server.url,
+    keyring: v.keyring,
+    pinDir,
+    chain: createAccountHttp(options),
+    pairing: createPairingHttp(options),
+    rpId: "recovery.omo.dev",
+    userName: "synthetic-user",
+    roaming: false,
     genesis: {
       prfSupported: true,
-      createGenesis: async () => { ceremonies += 1; return { ok: true as const, prepared: v.prepared } },
+      createGenesis: async () => {
+        ceremonies += 1
+        return { ok: true as const, prepared: v.prepared }
+      },
     },
   }
   return {
-    ...v, input, entries, server, options,
+    ...v,
+    input,
+    entries,
+    server,
+    options,
     ceremonies: () => ceremonies,
     async close() {
       disposeRecoveryKeys(v.recovery)

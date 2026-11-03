@@ -78,8 +78,16 @@ describe("omo-senpi lsp post-edit diagnostics", () => {
     }).register(test.pi, test.ctx)
 
     // when
-    const unconfigured = await test.pi.dispatch("tool_result", mutationEvent("scripts/probe.xyz"), sessionContext("session-1"))
-    const extensionless = await test.pi.dispatch("tool_result", mutationEvent("scripts/probe"), sessionContext("session-1"))
+    const unconfigured = await test.pi.dispatch(
+      "tool_result",
+      mutationEvent("scripts/probe.xyz"),
+      sessionContext("session-1"),
+    )
+    const extensionless = await test.pi.dispatch(
+      "tool_result",
+      mutationEvent("scripts/probe"),
+      sessionContext("session-1"),
+    )
 
     // then
     expect(extensionless).toEqual(unconfigured)

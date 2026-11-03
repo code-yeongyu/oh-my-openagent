@@ -36,13 +36,27 @@ describe("omo-native session_summary opt-out purge", () => {
         expect(contentFiles(stateDir).length).toBeGreaterThan(0)
 
         // when: registration only, no session event yet
-        const optedOut = await registerProcess({ agentDir, recorder, env, cwd: "/repo", options: { isConfigEnabled: () => false } })
+        const optedOut = await registerProcess({
+          agentDir,
+          recorder,
+          env,
+          cwd: "/repo",
+          options: { isConfigEnabled: () => false },
+        })
 
         // then: windows, pending events, claims and the dead owner's registry entry are gone at once
         expect(summaryFiles(stateDir)).toEqual([])
-        await optedOut.dispatch("session_start", { type: "session_start", reason: "startup" }, inProject("now", "/repo"))
+        await optedOut.dispatch(
+          "session_start",
+          { type: "session_start", reason: "startup" },
+          inProject("now", "/repo"),
+        )
         await optedOut.dispatch("turn_end", turnEnd(), inProject("now", "/repo"))
-        await optedOut.dispatch("session_shutdown", { type: "session_shutdown", reason: "quit" }, inProject("now", "/repo"))
+        await optedOut.dispatch(
+          "session_shutdown",
+          { type: "session_shutdown", reason: "quit" },
+          inProject("now", "/repo"),
+        )
         expect(recorder.messages.filter(({ event }) => event === "session_summary")).toEqual([])
       })
     })
@@ -67,9 +81,23 @@ describe("omo-native session_summary opt-out purge", () => {
         expect(before.length).toBeGreaterThan(0)
 
         // when
-        const optedOut = await registerProcess({ agentDir, recorder, env, cwd: "/repo", options: { isConfigEnabled: () => true } })
-        await optedOut.dispatch("session_start", { type: "session_start", reason: "startup" }, inProject("now", "/repo"))
-        await optedOut.dispatch("session_shutdown", { type: "session_shutdown", reason: "quit" }, inProject("now", "/repo"))
+        const optedOut = await registerProcess({
+          agentDir,
+          recorder,
+          env,
+          cwd: "/repo",
+          options: { isConfigEnabled: () => true },
+        })
+        await optedOut.dispatch(
+          "session_start",
+          { type: "session_start", reason: "startup" },
+          inProject("now", "/repo"),
+        )
+        await optedOut.dispatch(
+          "session_shutdown",
+          { type: "session_shutdown", reason: "quit" },
+          inProject("now", "/repo"),
+        )
 
         // then
         expect(contentFiles(stateDir)).toEqual(before)
@@ -85,7 +113,12 @@ describe("omo-native session_summary opt-out purge", () => {
       writeInventory(agentDir)
       const stateDir = join(agentDir, "omo-senpi", "omo-native")
       const recorder = createTransportRecorder()
-      seedDeadOwnerQueue(stateDir, { sessionHash: "hashed:reused", scope: { cwd: "/repo" }, claimed: true, ownerPid: 1 })
+      seedDeadOwnerQueue(stateDir, {
+        sessionHash: "hashed:reused",
+        scope: { cwd: "/repo" },
+        claimed: true,
+        ownerPid: 1,
+      })
       expect(contentFiles(stateDir).length).toBeGreaterThan(0)
 
       // when
@@ -113,8 +146,16 @@ describe("omo-native session_summary opt-out purge", () => {
       expect(left.filter((name) => name.includes("hashed_a"))).toEqual([])
       expect(left.filter((name) => !name.startsWith("pending/"))).toEqual(["hashed_b.json"])
       expect(left.filter((name) => name.startsWith("pending/"))).toHaveLength(1)
-      await optedOut.dispatch("session_start", { type: "session_start", reason: "startup" }, inProject("a2", "/project-a"))
-      await optedOut.dispatch("session_shutdown", { type: "session_shutdown", reason: "quit" }, inProject("a2", "/project-a"))
+      await optedOut.dispatch(
+        "session_start",
+        { type: "session_start", reason: "startup" },
+        inProject("a2", "/project-a"),
+      )
+      await optedOut.dispatch(
+        "session_shutdown",
+        { type: "session_shutdown", reason: "quit" },
+        inProject("a2", "/project-a"),
+      )
       expect(sentSeqs(recorder, "hashed:a")).toEqual([])
     })
   })
@@ -140,7 +181,8 @@ describe("omo-native session_summary opt-out purge", () => {
       // runs, and the process dies
       const first = await registerProcess({ agentDir, recorder, cwd: "/repo", options })
       await first.dispatch("session_start", { type: "session_start", reason: "startup" }, inProject("resumed", "/repo"))
-      for (let turn = 0; turn < CHECKPOINT_MAX_TURNS; turn += 1) await first.dispatch("turn_end", turnEnd(), inProject("resumed", "/repo"))
+      for (let turn = 0; turn < CHECKPOINT_MAX_TURNS; turn += 1)
+        await first.dispatch("turn_end", turnEnd(), inProject("resumed", "/repo"))
       await recorder.summariesSent("hashed:resumed", 1)
       await sidecar.sendsSettled()
       expect(sentSeqs(recorder, "hashed:resumed")).toHaveLength(1)
@@ -152,9 +194,17 @@ describe("omo-native session_summary opt-out purge", () => {
       // when: telemetry is back on and a new process resumes the same session
       consent = true
       const resumed = await registerProcess({ agentDir, recorder, cwd: "/repo", options })
-      await resumed.dispatch("session_start", { type: "session_start", reason: "resume" }, inProject("resumed", "/repo"))
+      await resumed.dispatch(
+        "session_start",
+        { type: "session_start", reason: "resume" },
+        inProject("resumed", "/repo"),
+      )
       await resumed.dispatch("turn_end", turnEnd(), inProject("resumed", "/repo"))
-      await resumed.dispatch("session_shutdown", { type: "session_shutdown", reason: "quit" }, inProject("resumed", "/repo"))
+      await resumed.dispatch(
+        "session_shutdown",
+        { type: "session_shutdown", reason: "quit" },
+        inProject("resumed", "/repo"),
+      )
 
       // then
       expectNoRepeatedSummaryKey(recorder, "hashed:resumed", 2)
@@ -170,7 +220,11 @@ describe("omo-native session_summary opt-out purge", () => {
       const first = await registerProcess({ agentDir, recorder, cwd: "/repo", options })
       await first.dispatch("session_start", { type: "session_start", reason: "startup" }, inProject("cycled", "/repo"))
       await first.dispatch("turn_end", turnEnd(), inProject("cycled", "/repo"))
-      await first.dispatch("session_shutdown", { type: "session_shutdown", reason: "reload" }, inProject("cycled", "/repo"))
+      await first.dispatch(
+        "session_shutdown",
+        { type: "session_shutdown", reason: "reload" },
+        inProject("cycled", "/repo"),
+      )
       expect(sentSeqs(recorder, "hashed:cycled")).toHaveLength(1)
       killWithoutShutdown(stateDir)
 
@@ -180,7 +234,11 @@ describe("omo-native session_summary opt-out purge", () => {
       const resumed = await registerProcess({ agentDir, recorder, cwd: "/repo", options })
       await resumed.dispatch("session_start", { type: "session_start", reason: "resume" }, inProject("cycled", "/repo"))
       await resumed.dispatch("turn_end", turnEnd(), inProject("cycled", "/repo"))
-      await resumed.dispatch("session_shutdown", { type: "session_shutdown", reason: "quit" }, inProject("cycled", "/repo"))
+      await resumed.dispatch(
+        "session_shutdown",
+        { type: "session_shutdown", reason: "quit" },
+        inProject("cycled", "/repo"),
+      )
 
       // then
       expectNoRepeatedSummaryKey(recorder, "hashed:cycled", 2)
@@ -199,12 +257,23 @@ describe("omo-native session_summary opt-out purge", () => {
         const stateDir = join(agentDir, "omo-senpi", "omo-native")
         const root = join(stateDir, "session-summary")
         mkdirSync(join(root, "pending"), { recursive: true })
-        writeFileSync(join(root, "hashed_torn.json"), '{"v":2,"consent":"enabled","scope":{"cwd":"/repo"},"window":{"sums":{"cost_1e4":12')
+        writeFileSync(
+          join(root, "hashed_torn.json"),
+          '{"v":2,"consent":"enabled","scope":{"cwd":"/repo"},"window":{"sums":{"cost_1e4":12',
+        )
         writeFileSync(join(root, "pending", "0395eae0-1111-4222-8333-944455556699.json"), "not json")
 
-        await registerProcess({ agentDir, recorder: createTransportRecorder(), env: setup.env, cwd: "/repo", options: { isConfigEnabled: setup.isConfigEnabled } })
+        await registerProcess({
+          agentDir,
+          recorder: createTransportRecorder(),
+          env: setup.env,
+          cwd: "/repo",
+          options: { isConfigEnabled: setup.isConfigEnabled },
+        })
 
-        expect(summaryFiles(stateDir)).toEqual(gone ? [] : ["hashed_torn.json", "pending/0395eae0-1111-4222-8333-944455556699.json"])
+        expect(summaryFiles(stateDir)).toEqual(
+          gone ? [] : ["hashed_torn.json", "pending/0395eae0-1111-4222-8333-944455556699.json"],
+        )
       })
     })
   }
@@ -215,14 +284,29 @@ describe("omo-native session_summary opt-out purge", () => {
     await withTempAgentDir(async (agentDir) => {
       writeInventory(agentDir)
       const stateDir = join(agentDir, "omo-senpi", "omo-native")
-      const workProfileOn = { isConfigEnabled: (_cwd: string | undefined, env: Record<string, string | undefined>) => env.OMO_PROFILE === "work" }
-      const writer = await registerProcess({ agentDir, recorder: createTransportRecorder(), env: { OMO_PROFILE: "work" }, cwd: "/repo", options: workProfileOn })
+      const workProfileOn = {
+        isConfigEnabled: (_cwd: string | undefined, env: Record<string, string | undefined>) =>
+          env.OMO_PROFILE === "work",
+      }
+      const writer = await registerProcess({
+        agentDir,
+        recorder: createTransportRecorder(),
+        env: { OMO_PROFILE: "work" },
+        cwd: "/repo",
+        options: workProfileOn,
+      })
       await writer.dispatch("session_start", { type: "session_start", reason: "startup" }, inProject("work", "/repo"))
       await writer.dispatch("turn_end", turnEnd(), inProject("work", "/repo"))
       const queued = contentFiles(stateDir)
       expect(queued.length).toBeGreaterThan(0)
 
-      await registerProcess({ agentDir, recorder: createTransportRecorder(), env: { DO_NOT_TRACK: "1" }, cwd: "/repo", options: workProfileOn })
+      await registerProcess({
+        agentDir,
+        recorder: createTransportRecorder(),
+        env: { DO_NOT_TRACK: "1" },
+        cwd: "/repo",
+        options: workProfileOn,
+      })
 
       expect(contentFiles(stateDir)).toEqual(queued)
     })
@@ -233,11 +317,21 @@ describe("omo-native session_summary opt-out purge", () => {
     await withTempAgentDir(async (agentDir) => {
       writeInventory(agentDir)
       const stateDir = join(agentDir, "omo-senpi", "omo-native")
-      seedDeadOwnerQueue(stateDir, { sessionHash: "hashed:off", scope: { cwd: "/repo", config: { OMO_PROFILE: "retired" } } })
-      seedDeadOwnerQueue(stateDir, { sessionHash: "hashed:mine", scope: { cwd: "/repo", config: { OMO_PROFILE: "work" } } })
+      seedDeadOwnerQueue(stateDir, {
+        sessionHash: "hashed:off",
+        scope: { cwd: "/repo", config: { OMO_PROFILE: "retired" } },
+      })
+      seedDeadOwnerQueue(stateDir, {
+        sessionHash: "hashed:mine",
+        scope: { cwd: "/repo", config: { OMO_PROFILE: "work" } },
+      })
       const recorder = createWatchedTransport()
       const sidecar = trackedSidecar()
-      const options = { isConfigEnabled: (_cwd: string | undefined, env: Record<string, string | undefined>) => env.OMO_PROFILE === "work", loadRecovery: sidecar.load }
+      const options = {
+        isConfigEnabled: (_cwd: string | undefined, env: Record<string, string | undefined>) =>
+          env.OMO_PROFILE === "work",
+        loadRecovery: sidecar.load,
+      }
 
       const sweeper = await registerProcess({ agentDir, recorder, env: { OMO_PROFILE: "work" }, cwd: "/repo", options })
       await sweeper.dispatch("session_start", { type: "session_start", reason: "startup" }, inProject("now", "/repo"))
@@ -254,11 +348,26 @@ describe("omo-native session_summary opt-out purge", () => {
     await withTempAgentDir(async (agentDir) => {
       writeInventory(agentDir)
       const stateDir = join(agentDir, "omo-senpi", "omo-native")
-      seedDeadOwnerQueue(stateDir, { sessionHash: "hashed:work", scope: { cwd: "/repo", config: { OMO_PROFILE: "work" } } })
-      seedDeadOwnerQueue(stateDir, { sessionHash: "hashed:private", scope: { cwd: "/repo", config: { OMO_PROFILE: "private" } } })
-      const options = { isConfigEnabled: (_cwd: string | undefined, env: Record<string, string | undefined>) => env.OMO_PROFILE === "work" }
+      seedDeadOwnerQueue(stateDir, {
+        sessionHash: "hashed:work",
+        scope: { cwd: "/repo", config: { OMO_PROFILE: "work" } },
+      })
+      seedDeadOwnerQueue(stateDir, {
+        sessionHash: "hashed:private",
+        scope: { cwd: "/repo", config: { OMO_PROFILE: "private" } },
+      })
+      const options = {
+        isConfigEnabled: (_cwd: string | undefined, env: Record<string, string | undefined>) =>
+          env.OMO_PROFILE === "work",
+      }
 
-      await registerProcess({ agentDir, recorder: createTransportRecorder(), env: { DO_NOT_TRACK: "1" }, cwd: "/repo", options })
+      await registerProcess({
+        agentDir,
+        recorder: createTransportRecorder(),
+        env: { DO_NOT_TRACK: "1" },
+        cwd: "/repo",
+        options,
+      })
 
       const windows = summaryFiles(stateDir).filter((name) => !name.includes("/"))
       expect(windows).toContain("hashed_work.json")
@@ -272,17 +381,28 @@ describe("omo-native session_summary opt-out purge", () => {
   test.each([
     { name: "a DO_NOT_TRACK-only start", persistedOn: true, kept: true },
     { name: "a start under a persisted opt-out", persistedOn: false, kept: false },
-  ])("#given a dead owner's queue whose scope.config cannot be parsed #when $name runs #then it is kept: $kept", async ({ persistedOn, kept }) => {
-    await withTempAgentDir(async (agentDir) => {
-      writeInventory(agentDir)
-      const stateDir = join(agentDir, "omo-senpi", "omo-native")
-      const malformed = { cwd: "/repo", config: { OMO_PROFILE: 7 } } as unknown as Parameters<typeof seedDeadOwnerQueue>[1]["scope"]
-      seedDeadOwnerQueue(stateDir, { sessionHash: "hashed:malformed", scope: malformed })
+  ])(
+    "#given a dead owner's queue whose scope.config cannot be parsed #when $name runs #then it is kept: $kept",
+    async ({ persistedOn, kept }) => {
+      await withTempAgentDir(async (agentDir) => {
+        writeInventory(agentDir)
+        const stateDir = join(agentDir, "omo-senpi", "omo-native")
+        const malformed = { cwd: "/repo", config: { OMO_PROFILE: 7 } } as unknown as Parameters<
+          typeof seedDeadOwnerQueue
+        >[1]["scope"]
+        seedDeadOwnerQueue(stateDir, { sessionHash: "hashed:malformed", scope: malformed })
 
-      await registerProcess({ agentDir, recorder: createTransportRecorder(), env: { DO_NOT_TRACK: "1" }, cwd: "/repo", options: { isConfigEnabled: () => persistedOn } })
+        await registerProcess({
+          agentDir,
+          recorder: createTransportRecorder(),
+          env: { DO_NOT_TRACK: "1" },
+          cwd: "/repo",
+          options: { isConfigEnabled: () => persistedOn },
+        })
 
-      const left = summaryFiles(stateDir).filter((name) => !name.startsWith("owners/"))
-      expect(left.length > 0).toBe(kept)
-    })
-  })
+        const left = summaryFiles(stateDir).filter((name) => !name.startsWith("owners/"))
+        expect(left.length > 0).toBe(kept)
+      })
+    },
+  )
 })

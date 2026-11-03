@@ -39,7 +39,10 @@ export function loadUserAgents(anthropicProvider?: string): Record<string, Claud
   return result
 }
 
-export function loadProjectAgents(directory?: string, anthropicProvider?: string): Record<string, ClaudeCodeAgentConfig> {
+export function loadProjectAgents(
+  directory?: string,
+  anthropicProvider?: string,
+): Record<string, ClaudeCodeAgentConfig> {
   const projectAgentsDir = join(directory ?? process.cwd(), ".claude", "agents")
   const agents = loadAgentsFromDir(projectAgentsDir, "project", anthropicProvider)
 

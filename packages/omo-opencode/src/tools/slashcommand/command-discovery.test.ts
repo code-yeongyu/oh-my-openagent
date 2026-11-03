@@ -11,7 +11,9 @@ function requireFresh<T>(modulePath: string): T {
   return require(modulePath) as T
 }
 
-function discoverCommandsSync(...args: Parameters<typeof import("./command-discovery").discoverCommandsSync>): ReturnType<typeof import("./command-discovery").discoverCommandsSync> {
+function discoverCommandsSync(
+  ...args: Parameters<typeof import("./command-discovery").discoverCommandsSync>
+): ReturnType<typeof import("./command-discovery").discoverCommandsSync> {
   return requireFresh<typeof import("./command-discovery")>("./command-discovery").discoverCommandsSync(...args)
 }
 
@@ -140,13 +142,13 @@ describe("slashcommand command discovery plugin integration", () => {
 
   it("discovers marketplace plugin commands and skills as command items", () => {
     const commands = discoverCommandsSync(projectDir, { pluginsEnabled: true })
-    const names = commands.map(command => command.name)
+    const names = commands.map((command) => command.name)
 
     expect(names).toContain("daplug:run-prompt")
     expect(names).toContain("daplug:plugin-plan")
 
-    const pluginCommand = commands.find(command => command.name === "daplug:run-prompt")
-    const pluginSkill = commands.find(command => command.name === "daplug:plugin-plan")
+    const pluginCommand = commands.find((command) => command.name === "daplug:run-prompt")
+    const pluginSkill = commands.find((command) => command.name === "daplug:plugin-plan")
 
     expect(pluginCommand?.scope).toBe("plugin")
     expect(pluginSkill?.scope).toBe("plugin")
@@ -154,7 +156,7 @@ describe("slashcommand command discovery plugin integration", () => {
 
   it("omits marketplace plugin commands when plugins are disabled", () => {
     const commands = discoverCommandsSync(projectDir, { pluginsEnabled: false })
-    const names = commands.map(command => command.name)
+    const names = commands.map((command) => command.name)
 
     expect(names).not.toContain("daplug:run-prompt")
     expect(names).not.toContain("daplug:plugin-plan")
@@ -165,7 +167,7 @@ describe("slashcommand command discovery plugin integration", () => {
       pluginsEnabled: true,
       enabledPluginsOverride: { "daplug@1.0.0": false },
     })
-    const names = commands.map(command => command.name)
+    const names = commands.map((command) => command.name)
 
     expect(names).not.toContain("daplug:run-prompt")
     expect(names).not.toContain("daplug:plugin-plan")
@@ -184,12 +186,12 @@ describe("slashcommand command discovery plugin integration", () => {
 description: Commit through parent opencode config
 ---
 Use parent opencode commit command.
-`
+`,
     )
     process.env.OPENCODE_CONFIG_DIR = profileConfigDir
 
     const commands = discoverCommandsSync(projectDir)
-    const commitCommand = commands.find(command => command.name === "commit")
+    const commitCommand = commands.find((command) => command.name === "commit")
 
     expect(commitCommand?.scope).toBe("opencode")
     expect(commitCommand?.content).toContain("Use parent opencode commit command.")
@@ -223,7 +225,7 @@ Use custom global command.
     process.env.OPENCODE_CONFIG_DIR = join(tempDir, "custom-opencode")
 
     const commands = discoverCommandsSync(projectDir)
-    const names = commands.map(command => command.name)
+    const names = commands.map((command) => command.name)
 
     expect(names).toContain("global-default")
     expect(names).toContain("global-custom")
@@ -342,7 +344,7 @@ describe("non-directory commands path", () => {
   it("#given .claude/commands is a file #when discoverCommandsSync runs #then returns without crashing", () => {
     const projectDir = join(testDir, "project")
     mkdirSync(join(projectDir, ".claude"), { recursive: true })
-    writeFileSync(join(projectDir, ".claude", "commands"), "")  // file, not directory
+    writeFileSync(join(projectDir, ".claude", "commands"), "") // file, not directory
 
     // Should not throw
     const commands = discoverCommandsSync(projectDir)
@@ -371,10 +373,7 @@ describe("non-directory commands path", () => {
     mkdirSync(join(commandsDir, "node_modules", "fake-pkg"), { recursive: true })
     mkdirSync(join(commandsDir, ".git", "branches"), { recursive: true })
     mkdirSync(join(commandsDir, "dist"), { recursive: true })
-    writeFileSync(
-      join(commandsDir, "real-cmd.md"),
-      "---\ndescription: Real command\n---\nRun real command.\n",
-    )
+    writeFileSync(join(commandsDir, "real-cmd.md"), "---\ndescription: Real command\n---\nRun real command.\n")
     writeFileSync(
       join(commandsDir, "node_modules", "fake-pkg", "cmd.md"),
       "---\ndescription: Nested command\n---\nRun nested command.\n",

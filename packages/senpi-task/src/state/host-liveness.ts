@@ -1,6 +1,5 @@
 export type HostLivenessStatus =
-  | { readonly state: "running" }
-  | { readonly state: "unresponsive" | "terminal-pending"; readonly since: number }
+  { readonly state: "running" } | { readonly state: "unresponsive" | "terminal-pending"; readonly since: number }
 
 export function hostLivenessText(status: HostLivenessStatus): string {
   if (status.state === "running") return "running: the original session is responding again"

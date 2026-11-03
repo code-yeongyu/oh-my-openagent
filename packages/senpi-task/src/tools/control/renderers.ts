@@ -36,7 +36,10 @@ export function renderTaskSendCall(args: TaskSendInput, theme: ControlRenderThem
   return widthComponent((width) => theme.fg("toolTitle", taskSendCallLine(args, theme, width)))
 }
 
-export function renderMemberScopedTaskSendCall(args: MemberScopedTaskSendInput, theme: ControlRenderTheme): RenderComponent {
+export function renderMemberScopedTaskSendCall(
+  args: MemberScopedTaskSendInput,
+  theme: ControlRenderTheme,
+): RenderComponent {
   return renderTaskSendCall(args, theme)
 }
 
@@ -59,7 +62,12 @@ export function renderTaskCancelResult(
   theme: ControlRenderTheme,
 ): RenderComponent {
   const row = taskCancelResultRow(result.details)
-  const dropped = result.details.kind === "cancelled" || result.details.kind === "cancel_pending" || result.details.kind === "released" ? result.details.undelivered_messages ?? 0 : 0
+  const dropped =
+    result.details.kind === "cancelled" ||
+    result.details.kind === "cancel_pending" ||
+    result.details.kind === "released"
+      ? (result.details.undelivered_messages ?? 0)
+      : 0
   return linesComponent([theme.fg(row.color, normalizeRendererText(withDroppedSteeringNotice(row.text, dropped)))])
 }
 
@@ -72,7 +80,8 @@ function widthComponent(renderLine: (width: number) => string): RenderComponent 
 }
 
 function taskSendCallLine(args: TaskSendInput, theme: ControlRenderTheme, width: number): string {
-  if (typeof args.message === "object" && args.message !== null) return shutdownCallLine(args, args.message, theme, width)
+  if (typeof args.message === "object" && args.message !== null)
+    return shutdownCallLine(args, args.message, theme, width)
   const base = joinRendererTokens([
     "task_send",
     `to:${normalizeRendererText(args.to)}`,
@@ -116,13 +125,7 @@ function taskCancelCallLine(args: TaskCancelInput, theme: ControlRenderTheme, wi
   return args.reason === undefined ? base : withExcerpt(base, "reason", args.reason, theme, width)
 }
 
-function withExcerpt(
-  base: string,
-  label: string,
-  value: string,
-  theme: ControlRenderTheme,
-  width: number,
-): string {
+function withExcerpt(base: string, label: string, value: string, theme: ControlRenderTheme, width: number): string {
   const prefix = joinRendererTokens([base, `${label}:`])
   const quoteOverhead = 2
   const maxExcerpt = label === "reason" ? REASON_EXCERPT_MAX : MESSAGE_EXCERPT_MAX
@@ -130,9 +133,8 @@ function withExcerpt(
   if (normalized.length === 0) return base
   const available = Math.min(maxExcerpt, Math.max(0, width - rendererVisibleWidth(prefix) - quoteOverhead))
   if (rendererVisibleWidth(normalized) > available && available < MIN_MEANINGFUL_TRUNCATED_EXCERPT_WIDTH) return base
-  const excerpt = label === "message"
-    ? excerptRendererPromptText(normalized, available)
-    : excerptRendererText(normalized, available)
+  const excerpt =
+    label === "message" ? excerptRendererPromptText(normalized, available) : excerptRendererText(normalized, available)
   return `${prefix}${theme.italic(`"${excerpt}"`)}`
 }
 
@@ -162,7 +164,10 @@ function taskSendResultRow(details: SendResultDetails): ResultRow {
     case "revived":
       return { color: "success", text: `task_send revived ${details.task_id} epoch ${details.run_epoch}` }
     case "delivery_uncertain":
-      return { color: "warning", text: `task_send delivery uncertain ${details.task_id} epoch ${details.run_epoch}: ${details.reason} ${details.suggestion}` }
+      return {
+        color: "warning",
+        text: `task_send delivery uncertain ${details.task_id} epoch ${details.run_epoch}: ${details.reason} ${details.suggestion}`,
+      }
     case "queued":
       return { color: "muted", text: `task_send queued ${details.task_id} position ${details.queue_position}` }
     case "held":
@@ -176,7 +181,10 @@ function taskSendResultRow(details: SendResultDetails): ResultRow {
     case "capacity_deferred":
       return { color: "warning", text: `task_send deferred ${details.task_id}: ${details.reason}` }
     case "not_continuable":
-      return { color: "warning", text: `task_send not continuable ${details.task_id}: ${details.reason} ${details.suggestion}` }
+      return {
+        color: "warning",
+        text: `task_send not continuable ${details.task_id}: ${details.reason} ${details.suggestion}`,
+      }
     case "one_shot_agent":
       return { color: "error", text: `task_send denied ${details.task_id} one-shot:${details.agent}` }
     case "scope_denied":
@@ -245,9 +253,15 @@ function taskCancelResultRow(details: CancelResultDetails): ResultRow {
     case "cancel_pending":
       return { color: "warning", text: `task_cancel pending ${details.task_id}: ${details.reason}` }
     case "noop":
-      return { color: statusThemeColor(details.status), text: `task_cancel no change ${details.task_id} (${details.status}): ${details.reason}` }
+      return {
+        color: statusThemeColor(details.status),
+        text: `task_cancel no change ${details.task_id} (${details.status}): ${details.reason}`,
+      }
     case "released":
-      return { color: statusThemeColor(details.status), text: `task_cancel released ${details.task_id} (${details.status}, child stopped)` }
+      return {
+        color: statusThemeColor(details.status),
+        text: `task_cancel released ${details.task_id} (${details.status}, child stopped)`,
+      }
     case "not_found":
       return { color: "error", text: `task_cancel not found: ${details.reason}` }
     case "invalid_arguments":

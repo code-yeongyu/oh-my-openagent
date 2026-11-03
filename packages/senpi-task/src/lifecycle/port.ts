@@ -7,7 +7,13 @@ import type { AwaitingInputReason, TaskRecord, TaskStatus } from "../state"
 import type { IsolationRuntime, OwnerProbe } from "../isolation"
 import type { TaskRecordStore } from "../store"
 import type { KernelToolBindingRegistry } from "../kernel-tools/bindings"
-import type { HostEndpointPort, HostGenerationView, HostSessionCloser, HostSessionProbe, HostSessionRetryPolicy } from "./host-session"
+import type {
+  HostEndpointPort,
+  HostGenerationView,
+  HostSessionCloser,
+  HostSessionProbe,
+  HostSessionRetryPolicy,
+} from "./host-session"
 import type { BatchAdmissionOptions } from "./residency"
 import type { RevivePolicyPort } from "./revive-policy"
 
@@ -119,8 +125,7 @@ export type RespawnResult =
     }
 
 export type ReattachResult =
-  | { readonly ok: true }
-  | { readonly ok: false; readonly kind: "already_attached" | "failed"; readonly reason: string }
+  { readonly ok: true } | { readonly ok: false; readonly kind: "already_attached" | "failed"; readonly reason: string }
 
 export type DetachedRevivalReservation = {
   commit(): void
@@ -129,14 +134,11 @@ export type DetachedRevivalReservation = {
 
 export type ColdRevivalFailureCode = "admission_refused" | "cwd_unavailable" | "config_generation_mismatch"
 export type DetachedRevivalResult =
-  | { readonly ok: true }
-  | { readonly ok: false; readonly reason: string; readonly code?: ColdRevivalFailureCode }
+  { readonly ok: true } | { readonly ok: false; readonly reason: string; readonly code?: ColdRevivalFailureCode }
 
 export type DetachedRevivalRollbackResult = "rolled_back" | "not_owner"
 
-export type CapacityReservation =
-  | { readonly ok: false }
-  | { readonly ok: true; release(): void }
+export type CapacityReservation = { readonly ok: false } | { readonly ok: true; release(): void }
 
 export type RespawnPort = (record: TaskRecord, resumeSessionPath?: string) => Promise<RespawnResult>
 export type ReattachPort = (
@@ -153,13 +155,16 @@ export type LifecycleReattachPorts = {
 }
 
 const registeredReattachPorts = new WeakMap<TaskRecordStore, LifecycleReattachPorts>()
-const registeredDetachedRevivals = new WeakMap<TaskRecordStore, (taskId: string, reservation: DetachedRevivalReservation) => Promise<DetachedRevivalResult>>()
-const registeredDetachedRevivalRollbacks = new WeakMap<TaskRecordStore, (prior: TaskRecord) => DetachedRevivalRollbackResult>()
+const registeredDetachedRevivals = new WeakMap<
+  TaskRecordStore,
+  (taskId: string, reservation: DetachedRevivalReservation) => Promise<DetachedRevivalResult>
+>()
+const registeredDetachedRevivalRollbacks = new WeakMap<
+  TaskRecordStore,
+  (prior: TaskRecord) => DetachedRevivalRollbackResult
+>()
 
-export function registerLifecycleReattachPorts(
-  store: TaskRecordStore,
-  ports: LifecycleReattachPorts,
-): void {
+export function registerLifecycleReattachPorts(store: TaskRecordStore, ports: LifecycleReattachPorts): void {
   registeredReattachPorts.set(store, ports)
 }
 

@@ -1,9 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import {
-  transformConfigJsoncSources,
-  type DiscoveredLegacyConfigSource,
-} from "./index"
+import { transformConfigJsoncSources, type DiscoveredLegacyConfigSource } from "./index"
 import { transformReasoningUnification } from "./reasoning-unification"
 
 const configSource: DiscoveredLegacyConfigSource = {
@@ -16,18 +13,20 @@ const configSource: DiscoveredLegacyConfigSource = {
 describe("config.jsonc migration transform", () => {
   test("#given both [omo] and [senpi] blocks #when transforming config.jsonc #then [native] wins and the overlap is diagnostic", () => {
     // given
-    const sources = [{
-      path: configSource.path,
-      value: {
-        $schema: "https://legacy.example/config.schema.json",
-        "[opencode]": { nested: { value: true } },
-        "[codex]": { disabled_hooks: ["startup-toast"] },
-        "[omo]": { agents: { oracle: { model: "legacy" } } },
-        "[senpi]": { agents: { oracle: { model: "current" } } },
-        _migrations: ["legacy-file-marker"],
-        appliedMigrations: ["legacy-top-level-marker"],
+    const sources = [
+      {
+        path: configSource.path,
+        value: {
+          $schema: "https://legacy.example/config.schema.json",
+          "[opencode]": { nested: { value: true } },
+          "[codex]": { disabled_hooks: ["startup-toast"] },
+          "[omo]": { agents: { oracle: { model: "legacy" } } },
+          "[senpi]": { agents: { oracle: { model: "current" } } },
+          _migrations: ["legacy-file-marker"],
+          appliedMigrations: ["legacy-top-level-marker"],
+        },
       },
-    }]
+    ]
 
     // when
     const result = transformConfigJsoncSources({ discovered: [configSource], sources })
@@ -42,9 +41,7 @@ describe("config.jsonc migration transform", () => {
         "/home/alice/.omo/config.jsonc": ["legacy-file-marker", "legacy-top-level-marker"],
       },
     })
-    expect(result.diagnostics).toEqual([
-      "conflict: [native] legacy [omo] kept [native]",
-    ])
+    expect(result.diagnostics).toEqual(["conflict: [native] legacy [omo] kept [native]"])
   })
 
   test("#given a legacy document carrying a [senpi] block #when transforming config.jsonc #then the harness key is [native] and every value is preserved", () => {
@@ -54,10 +51,12 @@ describe("config.jsonc migration transform", () => {
       categories: { deep: { model: "deep-model" } },
       telemetry: { enabled: true },
     }
-    const sources = [{
-      path: configSource.path,
-      value: { "[senpi]": senpiBlock },
-    }]
+    const sources = [
+      {
+        path: configSource.path,
+        value: { "[senpi]": senpiBlock },
+      },
+    ]
 
     // when
     const result = transformConfigJsoncSources({ discovered: [configSource], sources })

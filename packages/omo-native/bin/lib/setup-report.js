@@ -5,13 +5,15 @@ function values(items) {
 export function formatSetupReport(inventory) {
   const lines = ["HARNESS | INSTALLED | PROVIDERS | CREDENTIAL TYPES | MODELS"]
   for (const harness of inventory.harnesses) {
-    lines.push([
-      harness.id,
-      harness.installed ? "yes" : "no",
-      values(harness.providers),
-      values(harness.credentialTypes),
-      harness.modelHint,
-    ].join(" | "))
+    lines.push(
+      [
+        harness.id,
+        harness.installed ? "yes" : "no",
+        values(harness.providers),
+        values(harness.credentialTypes),
+        harness.modelHint,
+      ].join(" | "),
+    )
     for (const notice of harness.notices) {
       const level = notice.startsWith("could not") ? "WARN" : "NOTICE"
       lines.push(`${level} ${harness.id}: ${notice}`)

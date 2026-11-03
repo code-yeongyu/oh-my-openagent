@@ -77,9 +77,7 @@ describe("loadPluginHooksConfigs pluginRoot stamping (#4458)", () => {
         PostToolUse: [
           {
             matcher: "Bash",
-            hooks: [
-              { type: "http", url: "https://example.test/hook" },
-            ],
+            hooks: [{ type: "http", url: "https://example.test/hook" }],
           },
         ],
       },

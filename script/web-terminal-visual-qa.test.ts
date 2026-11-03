@@ -34,7 +34,14 @@ async function renderTranscript(fileName: string, title: string, contents: strin
   const transcript = join(dir, fileName)
   writeFileSync(transcript, contents, "utf8")
   const { exitCode, stdoutText, stderrText } = await spawnHelper([
-    "--title", title, "--from-file", transcript, "--evidence-dir", dir, "--no-browser", ...extraArgs,
+    "--title",
+    title,
+    "--from-file",
+    transcript,
+    "--evidence-dir",
+    dir,
+    "--no-browser",
+    ...extraArgs,
   ])
   expect(stderrText).toBe("")
   expect(exitCode).toBe(0)
@@ -70,7 +77,11 @@ describe("web terminal visual QA helper", () => {
 
   test("#given ANSI escapes #when rendering #then the raw stream is preserved and text is plain", async () => {
     // given
-    const rendered = await renderTranscript("ansi.txt", "ANSI QA", "\u001b[31mred\u001b[0m \u001b[1;32mbold green\u001b[0m\n")
+    const rendered = await renderTranscript(
+      "ansi.txt",
+      "ANSI QA",
+      "\u001b[31mred\u001b[0m \u001b[1;32mbold green\u001b[0m\n",
+    )
 
     // then
     expect(rendered.ansi()).toContain("\u001b[31mred")
@@ -122,12 +133,8 @@ describe("web terminal visual QA helper", () => {
 
   test("#given wheel input tokens #when driving the browser terminal #then mouse wheel events target the xterm viewport", async () => {
     // given
-    const module = await import("./qa/xterm-live-terminal.mjs") as {
-      driveInput?: (
-        page: unknown,
-        inputs: readonly string[],
-        keyDelayMs: number,
-      ) => Promise<void>
+    const module = (await import("./qa/xterm-live-terminal.mjs")) as {
+      driveInput?: (page: unknown, inputs: readonly string[], keyDelayMs: number) => Promise<void>
     }
     const wheel = mock(async () => undefined)
     const move = mock(async () => undefined)
@@ -171,17 +178,10 @@ describe("web terminal visual QA helper", () => {
 
   test("#given the Ctrl slash byte token #when driving the browser bridge #then the exact terminal control sequence reaches the PTY", async () => {
     // given
-    const module = await import("./qa/xterm-live-terminal.mjs") as {
-      driveInput?: (
-        page: unknown,
-        inputs: readonly string[],
-        keyDelayMs: number,
-      ) => Promise<void>
+    const module = (await import("./qa/xterm-live-terminal.mjs")) as {
+      driveInput?: (page: unknown, inputs: readonly string[], keyDelayMs: number) => Promise<void>
     }
-    const evaluate = mock(async (
-      _callback: unknown,
-      _data: string,
-    ) => undefined)
+    const evaluate = mock(async (_callback: unknown, _data: string) => undefined)
     const page = unsafeTestValue({
       evaluate,
     })
@@ -189,11 +189,7 @@ describe("web terminal visual QA helper", () => {
     // when
     expect(module.driveInput).toBeInstanceOf(Function)
     if (!module.driveInput) return
-    await module.driveInput(
-      page,
-      ["{CtrlSlashByte}", "{Ctrl7Byte}"],
-      0,
-    )
+    await module.driveInput(page, ["{CtrlSlashByte}", "{Ctrl7Byte}"], 0)
 
     // then
     expect(evaluate).toHaveBeenCalledTimes(2)
@@ -203,7 +199,7 @@ describe("web terminal visual QA helper", () => {
 
   test("#given a WaitFor token #when the marker renders after a delay #then later input is typed only after it appears", async () => {
     // given
-    const module = await import("./qa/xterm-live-terminal.mjs") as {
+    const module = (await import("./qa/xterm-live-terminal.mjs")) as {
       driveInput?: (
         page: unknown,
         inputs: readonly string[],
@@ -214,12 +210,18 @@ describe("web terminal visual QA helper", () => {
     const startedAt = Date.now()
     const events: string[] = []
     let screen = "booting...\n"
-    setTimeout(() => { screen = "booting...\n❯ \n" }, 250)
+    setTimeout(() => {
+      screen = "booting...\n❯ \n"
+    }, 250)
     const page = unsafeTestValue({
       evaluate: async () => screen,
       keyboard: {
-        press: async (key: string) => { events.push(`press:${key}`) },
-        type: async (text: string) => { events.push(`type:${text}@${screen.includes("❯") ? "ready" : "early"}`) },
+        press: async (key: string) => {
+          events.push(`press:${key}`)
+        },
+        type: async (text: string) => {
+          events.push(`type:${text}@${screen.includes("❯") ? "ready" : "early"}`)
+        },
       },
     })
 
@@ -235,7 +237,7 @@ describe("web terminal visual QA helper", () => {
 
   test("#given a WaitFor token #when the marker never renders #then the capture fails naming the text and timeout", async () => {
     // given
-    const module = await import("./qa/xterm-live-terminal.mjs") as {
+    const module = (await import("./qa/xterm-live-terminal.mjs")) as {
       driveInput?: (
         page: unknown,
         inputs: readonly string[],
@@ -261,7 +263,7 @@ describe("web terminal visual QA helper", () => {
 
   test("#given an empty WaitFor token #when driving input #then it is rejected instead of passing instantly", async () => {
     // given
-    const module = await import("./qa/xterm-live-terminal.mjs") as {
+    const module = (await import("./qa/xterm-live-terminal.mjs")) as {
       driveInput?: (page: unknown, inputs: readonly string[], keyDelayMs: number) => Promise<void>
     }
     const page = unsafeTestValue({ evaluate: async () => "anything\n" })
@@ -279,7 +281,14 @@ describe("web terminal visual QA helper", () => {
     // when
     const dir = makeTempDir()
     const { exitCode, stderrText } = await spawnHelper([
-      "--title", "x", "--from-file", "a", "--command", "b", "--evidence-dir", dir,
+      "--title",
+      "x",
+      "--from-file",
+      "a",
+      "--command",
+      "b",
+      "--evidence-dir",
+      dir,
     ])
 
     // then

@@ -91,8 +91,11 @@ export function commandCodeProviderItem(env) {
  * notice (listed in `skipped`) - so the preset never competes with an entry the user wrote.
  */
 export function withCommandCodeProvider(source, env) {
-  if (source.providers.some((provider) => provider.id === COMMANDCODE_PROVIDER_ID)
-    || source.skipped.includes(COMMANDCODE_PROVIDER_ID)) return source
+  if (
+    source.providers.some((provider) => provider.id === COMMANDCODE_PROVIDER_ID) ||
+    source.skipped.includes(COMMANDCODE_PROVIDER_ID)
+  )
+    return source
   const item = commandCodeProviderItem(env)
   return item === undefined ? source : { ...source, providers: [...source.providers, item] }
 }

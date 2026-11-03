@@ -16,7 +16,8 @@ async function run(cmd: string[], cwd: string): Promise<string> {
   const stdout = new Response(child.stdout).text()
   const stderr = new Response(child.stderr).text()
   const status = await child.exited
-  if (child.signalCode !== null) throw new Error(`${cmd.join(" ")} was killed (${child.signalCode}) after its 120 s timeout`)
+  if (child.signalCode !== null)
+    throw new Error(`${cmd.join(" ")} was killed (${child.signalCode}) after its 120 s timeout`)
   // The same surviving process can hold the pipes after a failing npm.cmd exits on its own, so the
   // failure report waits for stderr only briefly instead of hanging to the test limit (#10672).
   if (status !== 0) throw new Error(`${cmd.join(" ")} exited ${status}\n${await settledWithin(stderr, 5_000)}`)
@@ -25,8 +26,14 @@ async function run(cmd: string[], cwd: string): Promise<string> {
 
 async function settledWithin(text: Promise<string>, ms: number): Promise<string> {
   let timer: ReturnType<typeof setTimeout> | undefined
-  const late = new Promise<string>(resolve => { timer = setTimeout(resolve, ms, "(stderr still open after exit; output withheld)") })
-  try { return await Promise.race([text, late]) } finally { clearTimeout(timer) }
+  const late = new Promise<string>((resolve) => {
+    timer = setTimeout(resolve, ms, "(stderr still open after exit; output withheld)")
+  })
+  try {
+    return await Promise.race([text, late])
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 it("packs and installs omo-ai, then resolves its shipped PostHog sidecar and receives one real event", async () => {
@@ -37,12 +44,15 @@ it("packs and installs omo-ai, then resolves its shipped PostHog sidecar and rec
   const root = await mkdtemp(join(tmpdir(), "posthog-packed-"))
   const posted: unknown[] = []
   const server = Bun.serve({
-    hostname: "127.0.0.1", port: 0,
+    hostname: "127.0.0.1",
+    port: 0,
     async fetch(request) {
       const bytes = new Uint8Array(await request.arrayBuffer())
-      posted.push(JSON.parse(new TextDecoder().decode(
-        request.headers.get("content-encoding") === "gzip" ? gunzipSync(bytes) : bytes,
-      )))
+      posted.push(
+        JSON.parse(
+          new TextDecoder().decode(request.headers.get("content-encoding") === "gzip" ? gunzipSync(bytes) : bytes),
+        ),
+      )
       return Response.json({ status: 1 })
     },
   })
@@ -52,25 +62,44 @@ it("packs and installs omo-ai, then resolves its shipped PostHog sidecar and rec
     // The sidecar bundles the SDK and imports only Node builtins, so omo-ai's registry dependency (the senpi
     // engine: ~28,000 files, ~480 MB) plays no part in resolving or running it. Installing it took 237 s on
     // windows-latest against 16 s on ubuntu (#10660); dropping it also proves the sidecar needs nothing else.
-    const { dependencies: _engine, ...omoAiManifest } = JSON.parse(await readFile(join(repoRoot, "packages/omo-native/package.json"), "utf8"))
+    const { dependencies: _engine, ...omoAiManifest } = JSON.parse(
+      await readFile(join(repoRoot, "packages/omo-native/package.json"), "utf8"),
+    )
     await writeFile(join(staged, "package.json"), JSON.stringify(omoAiManifest, null, 2))
     await cp(join(repoRoot, "packages/omo-native/bin"), join(staged, "bin"), { recursive: true })
     await cp(plugin, join(staged, "plugin"), {
       recursive: true,
-      filter: source => !source.split(/[\\/]/).includes("node_modules"),
+      filter: (source) => !source.split(/[\\/]/).includes("node_modules"),
     })
-    const packed = JSON.parse(await run(["npm", "pack", "--json", "--ignore-scripts", "--pack-destination", root], staged))
+    const packed = JSON.parse(
+      await run(["npm", "pack", "--json", "--ignore-scripts", "--pack-destination", root], staged),
+    )
     const tarball = join(root, packed[0].filename)
     const installed = join(root, "installed")
     await mkdir(installed)
     // When the actual omo-ai tarball is installed into a fresh directory.
-    await run(["npm", "install", "--prefix", installed, "--ignore-scripts", "--no-audit", "--no-fund", "--package-lock=false", tarball], root)
+    await run(
+      [
+        "npm",
+        "install",
+        "--prefix",
+        installed,
+        "--ignore-scripts",
+        "--no-audit",
+        "--no-fund",
+        "--package-lock=false",
+        tarball,
+      ],
+      root,
+    )
     const extensionDir = join(installed, "node_modules/omo-ai/plugin/extensions")
     const manifest = JSON.parse(await readFile(join(extensionDir, "../package.json"), "utf8"))
     expect(manifest.imports["#omo-telemetry-posthog-runtime"]).toBe("./extensions/omo-telemetry-posthog.js")
     expect(manifest.imports["#omo-telemetry-otlp-runtime"]).toBe("./extensions/omo-telemetry-otlp.js")
     const probe = join(extensionDir, "posthog-packed-probe.mjs")
-    await writeFile(probe, `
+    await writeFile(
+      probe,
+      `
 const { createDefaultPostHogTransport } = await import("#omo-telemetry-posthog-runtime")
 const transport = createDefaultPostHogTransport("synthetic-local-only", {
   host: ${JSON.stringify(`http://127.0.0.1:${server.port}`)},
@@ -83,17 +112,23 @@ console.log("PACKED_POSTHOG_EVENT_SENT=1")
 const { createSenpiOtlpTransport } = await import("#omo-telemetry-otlp-runtime")
 if (typeof createSenpiOtlpTransport !== "function") throw new Error("OTLP sidecar export missing")
 console.log("PACKED_OTLP_MODULE_LOADED=1")
-`)
+`,
+    )
     const output = await run(["node", probe], root)
     // Then a real SDK loaded from the installed package sends exactly one original event.
     expect(output).toContain("PACKED_POSTHOG_EVENT_SENT=1")
     expect(output).toContain("PACKED_OTLP_MODULE_LOADED=1")
-    expect(posted).toEqual([expect.objectContaining({
-      batch: [expect.objectContaining({
-        distinct_id: "synthetic", event: "packed_sidecar_probe",
-        properties: expect.objectContaining({ ordinal: 1 }),
-      })],
-    })])
+    expect(posted).toEqual([
+      expect.objectContaining({
+        batch: [
+          expect.objectContaining({
+            distinct_id: "synthetic",
+            event: "packed_sidecar_probe",
+            properties: expect.objectContaining({ ordinal: 1 }),
+          }),
+        ],
+      }),
+    ])
     console.log("PACKED_POSTHOG_EVENT_RECEIVED=1")
   } finally {
     await server.stop(true)

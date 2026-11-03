@@ -106,11 +106,12 @@ describe("claimTaskRecord", () => {
     const store = createTaskRecordStore({ project_dir: project })
 
     // when
-    const claim = () => claimTaskRecord(store, baseRecord("st_00000010"), {
-      maxAttempts: 2,
-      nameFollowsId: true,
-      nameAvailable: () => false,
-    })
+    const claim = () =>
+      claimTaskRecord(store, baseRecord("st_00000010"), {
+        maxAttempts: 2,
+        nameFollowsId: true,
+        nameAvailable: () => false,
+      })
 
     // then
     expect(claim).toThrow(TaskIdSpaceExhaustedError)
@@ -135,7 +136,12 @@ describe("claimTaskRecord", () => {
     const project = tempProject()
     const store = createTaskRecordStore({ project_dir: project })
     const expected = new TypeError("store unavailable")
-    const failingStore = { ...store, save: () => { throw expected } }
+    const failingStore = {
+      ...store,
+      save: () => {
+        throw expected
+      },
+    }
 
     // when
     const claim = () => claimTaskRecord(failingStore, baseRecord("st_00000010"))
@@ -146,7 +152,11 @@ describe("claimTaskRecord", () => {
 
   test("#given a claimed record in an isolated process #when a new id is created #then the id floor follows the claim", async () => {
     // given
-    const child = Bun.spawn([process.execPath, claimFloorChildFixturePath], { stdout: "pipe", stderr: "pipe", env: { ...process.env } })
+    const child = Bun.spawn([process.execPath, claimFloorChildFixturePath], {
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { ...process.env },
+    })
 
     // when
     const [exitCode, stdout, stderr] = await Promise.all([

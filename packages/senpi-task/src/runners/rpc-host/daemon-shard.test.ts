@@ -53,7 +53,12 @@ function shardFixture() {
   return { agentDir, root, key, socket: shardSocketPathForKey(root, "p", key), meta: shardMetaPath(root, "p", key) }
 }
 
-function ensureOn(agentDir: string, socket: string, port: TaskDaemonHostPort, owner?: { readonly ownerSessionId: string; readonly key: string }) {
+function ensureOn(
+  agentDir: string,
+  socket: string,
+  port: TaskDaemonHostPort,
+  owner?: { readonly ownerSessionId: string; readonly key: string },
+) {
   return ensureTaskDaemon({
     agentDir,
     env: DAEMON_LAUNCH_FIXTURE.parentEnv,
@@ -76,7 +81,10 @@ describe("ensureTaskDaemon on an explicit shard endpoint", () => {
     const { port, ensured } = hostPort()
 
     // when
-    const result = await ensureOn(shard.agentDir, shard.socket, port, { key: shard.key, ownerSessionId: "root-session" })
+    const result = await ensureOn(shard.agentDir, shard.socket, port, {
+      key: shard.key,
+      ownerSessionId: "root-session",
+    })
 
     // then
     expect(result.action).toBe("start")
@@ -121,7 +129,10 @@ describe("ensureTaskDaemon on an explicit shard endpoint", () => {
     const { port } = hostPort({ host: running() })
 
     // when
-    const result = await ensureOn(shard.agentDir, shard.socket, port, { key: shard.key, ownerSessionId: "root-session" })
+    const result = await ensureOn(shard.agentDir, shard.socket, port, {
+      key: shard.key,
+      ownerSessionId: "root-session",
+    })
 
     // then
     expect(result.action).toBe("reuse")
@@ -131,7 +142,10 @@ describe("ensureTaskDaemon on an explicit shard endpoint", () => {
   test("#given an engine refusal naming a legacy host #when ensuring #then it is an incompatible host, never a plain ensure failure", async () => {
     // given
     const shard = shardFixture()
-    const refusal = Object.assign(new Error("RPC socket refused: legacy_host"), { name: "HostEnsureRefusedError", reason: "legacy_host" })
+    const refusal = Object.assign(new Error("RPC socket refused: legacy_host"), {
+      name: "HostEnsureRefusedError",
+      reason: "legacy_host",
+    })
     const { port } = hostPort({ ensureError: refusal })
 
     // when
@@ -166,19 +180,25 @@ describe("ensureTaskDaemon when senpi refuses the p-shard owner claim", () => {
     ["a host started by an engine before owner lifetimes", "RPC host does not support owner lifetime registration"],
     ["a host another live process owns", "RPC host lifetime owner is still alive or its identity is unknown"],
     ["a host with no matching registered generation", "RPC host has no matching registered owner-lifetime generation"],
-  ])("#given %s #when the shard is ensured #then it attaches without the claim instead of failing", async (_case, message) => {
-    // given
-    const shard = shardFixture()
-    const { port, ensured } = claimRefusingPort(new Error(message))
+  ])(
+    "#given %s #when the shard is ensured #then it attaches without the claim instead of failing",
+    async (_case, message) => {
+      // given
+      const shard = shardFixture()
+      const { port, ensured } = claimRefusingPort(new Error(message))
 
-    // when
-    const result = await ensureOn(shard.agentDir, shard.socket, port, { key: shard.key, ownerSessionId: "root-session" })
+      // when
+      const result = await ensureOn(shard.agentDir, shard.socket, port, {
+        key: shard.key,
+        ownerSessionId: "root-session",
+      })
 
-    // then
-    expect(result.action).toBe("reuse")
-    expect(result.socket).toBe(shard.socket)
-    expect(ensured.map((input) => input.owner)).toEqual(["caller", undefined])
-  })
+      // then
+      expect(result.action).toBe("reuse")
+      expect(result.socket).toBe(shard.socket)
+      expect(ensured.map((input) => input.owner)).toEqual(["caller", undefined])
+    },
+  )
 
   test("#given a claimed ensure that fails for another reason #when the shard is ensured #then it still fails and is not retried", async () => {
     // given
@@ -186,9 +206,10 @@ describe("ensureTaskDaemon when senpi refuses the p-shard owner claim", () => {
     const { port, ensured } = claimRefusingPort(new Error("spawn ENOENT"))
 
     // when
-    const failure = await ensureOn(shard.agentDir, shard.socket, port, { key: shard.key, ownerSessionId: "root-session" }).catch(
-      (error: unknown) => error,
-    )
+    const failure = await ensureOn(shard.agentDir, shard.socket, port, {
+      key: shard.key,
+      ownerSessionId: "root-session",
+    }).catch((error: unknown) => error)
 
     // then
     expect(failure).toBeInstanceOf(HostUnavailableError)

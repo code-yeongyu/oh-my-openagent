@@ -22,8 +22,12 @@ function createEmittingSession(sessionId = "child-session-1"): EmittingSessionCo
         settle = resolve
       })
     },
-    async steer() { return "handled" },
-    async followUp() { return "handled" },
+    async steer() {
+      return "handled"
+    },
+    async followUp() {
+      return "handled"
+    },
     async abort() {},
     subscribe(listener: ChildSessionListener) {
       listeners.add(listener)
@@ -85,7 +89,12 @@ function emptyTextEnd(): ChildSessionEvent {
 describe("createChildHandle turn outcomes", () => {
   test('#given completion "turn" and a toolUse message_end followed by a stop message_end with an empty text part #when the prompt resolves #then the outcome is completed with empty finalResponse', async () => {
     const fake = createEmittingSession()
-    const handle = createChildHandle({ taskId: "task-1", session: fake.session, promptText: "judge", completion: "turn" })
+    const handle = createChildHandle({
+      taskId: "task-1",
+      session: fake.session,
+      promptText: "judge",
+      completion: "turn",
+    })
 
     fake.emit(toolUseEnd())
     fake.emit(emptyTextEnd())
@@ -97,7 +106,12 @@ describe("createChildHandle turn outcomes", () => {
   test('#given completion "turn" and a stop message_end with no assistant text and no baseline change #when the prompt resolves #then the outcome is completed, not the no-output error', async () => {
     const fake = createEmittingSession()
     fake.lastText.value = "previous verdict"
-    const handle = createChildHandle({ taskId: "task-1", session: fake.session, promptText: "judge", completion: "turn" })
+    const handle = createChildHandle({
+      taskId: "task-1",
+      session: fake.session,
+      promptText: "judge",
+      completion: "turn",
+    })
 
     fake.emit(assistantEnd("", "stop"))
     fake.resolvePrompt()
@@ -107,7 +121,12 @@ describe("createChildHandle turn outcomes", () => {
 
   test('#given completion "turn" and a stopReason error message_end #when the prompt resolves #then the outcome is still an error carrying the provider message', async () => {
     const fake = createEmittingSession()
-    const handle = createChildHandle({ taskId: "task-1", session: fake.session, promptText: "judge", completion: "turn" })
+    const handle = createChildHandle({
+      taskId: "task-1",
+      session: fake.session,
+      promptText: "judge",
+      completion: "turn",
+    })
     fake.emit(assistantEnd("", "error", "upstream gateway timeout"))
     fake.resolvePrompt()
     expect(await handle.waitForIdle()).toEqual({
@@ -124,7 +143,12 @@ describe("createChildHandle turn outcomes", () => {
 
   test('#given completion "turn" and an abort after prompt resolution #when waitForIdle settles #then the outcome is cancelled', async () => {
     const fake = createEmittingSession()
-    const handle = createChildHandle({ taskId: "task-1", session: fake.session, promptText: "judge", completion: "turn" })
+    const handle = createChildHandle({
+      taskId: "task-1",
+      session: fake.session,
+      promptText: "judge",
+      completion: "turn",
+    })
     const outcome = handle.waitForIdle()
     fake.emit(emptyTextEnd())
     fake.resolvePrompt()
@@ -141,7 +165,12 @@ describe("createChildHandle turn outcomes", () => {
 
   test('#given completion "turn" and a length stopReason after tool-stage text #when the prompt resolves #then the outcome completes with that text', async () => {
     const fake = createEmittingSession()
-    const handle = createChildHandle({ taskId: "task-1", session: fake.session, promptText: "judge", completion: "turn" })
+    const handle = createChildHandle({
+      taskId: "task-1",
+      session: fake.session,
+      promptText: "judge",
+      completion: "turn",
+    })
     fake.emit(assistantEnd("tool-stage verdict", "toolUse"))
     fake.emit(assistantEnd("", "length"))
     fake.lastText.value = "tool-stage verdict"

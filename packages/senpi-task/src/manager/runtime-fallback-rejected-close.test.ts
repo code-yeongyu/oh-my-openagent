@@ -49,7 +49,16 @@ describe("runtime fallback whose failed-rung close is never acknowledged", () =>
     const host = await harness.fakeHost()
     const rpc = harness.runnerOver(host, { closeGraceMs: 50 })
     const runner: ManagedRunner = {
-      start: async (spec) => adaptRpcHandle(await rpc.start({ task_id: spec.taskId, cwd: project, state_dir: spec.stateDir, prompt: spec.prompt, model: spec.model })),
+      start: async (spec) =>
+        adaptRpcHandle(
+          await rpc.start({
+            task_id: spec.taskId,
+            cwd: project,
+            state_dir: spec.stateDir,
+            prompt: spec.prompt,
+            model: spec.model,
+          }),
+        ),
     }
     const config = settings()
     const manager = createTaskManager({
@@ -57,7 +66,15 @@ describe("runtime fallback whose failed-rung close is never acknowledged", () =>
       config,
       cwd: project,
       runners: { process: runner, "in-process": runner },
-      planner: () => ({ kind: "resolved", plan: { model: "test/old", requested_model: rung("old"), resolved_model: rung("old"), fallback_models: [rung("next")] } }),
+      planner: () => ({
+        kind: "resolved",
+        plan: {
+          model: "test/old",
+          requested_model: rung("old"),
+          resolved_model: rung("old"),
+          fallback_models: [rung("next")],
+        },
+      }),
       destruction: { destroyResidentTask: (taskId, cause) => lifecycle.destroyResidentTask(taskId, cause) },
     })
     const lifecycle = createTaskLifecycle({
@@ -78,7 +95,10 @@ describe("runtime fallback whose failed-rung close is never acknowledged", () =>
 
     try {
       // when
-      host.emitRecord(original.routingId, { type: "message_end", message: { role: "assistant", content: [], stopReason: "error", errorMessage: "provider failed" } })
+      host.emitRecord(original.routingId, {
+        type: "message_end",
+        message: { role: "assistant", content: [], stopReason: "error", errorMessage: "provider failed" },
+      })
       host.emitRecord(original.routingId, { type: "agent_end", willRetry: false, messages: [] })
       host.emitRecord(original.routingId, { type: "agent_idle" })
       const record = await settled

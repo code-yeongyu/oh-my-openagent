@@ -6,11 +6,7 @@ import { fileURLToPath } from "node:url"
 import type { MemoryIdentity } from "../identity"
 import { ReflectionReservationStore, type ReservationResult } from "../reflection/reservation"
 import type { ReservedRun } from "../reflection/machine"
-import {
-  assertLinearCommits,
-  createConcurrencyKit,
-  type ChildHarness,
-} from "./two-process-kit.test-support"
+import { assertLinearCommits, createConcurrencyKit, type ChildHarness } from "./two-process-kit.test-support"
 
 const writerChildPath = fileURLToPath(new URL("./writer-child.ts", import.meta.url))
 const reflectionChildPath = fileURLToPath(new URL("./reflection-child.ts", import.meta.url))
@@ -80,8 +76,12 @@ describe("one memory identity across real Bun processes", () => {
 
     // #then
     expect(results.map((result) => result.status).sort()).toEqual(["active", "pending"])
-    const activeRecord = JSON.parse(await readFile(join(shared.identity.paths.reflection, "active.lock"), "utf8")) as ReservedRun
-    const pendingRecord = JSON.parse(await readFile(join(shared.identity.paths.reflection, "pending.json"), "utf8")) as ReservedRun
+    const activeRecord = JSON.parse(
+      await readFile(join(shared.identity.paths.reflection, "active.lock"), "utf8"),
+    ) as ReservedRun
+    const pendingRecord = JSON.parse(
+      await readFile(join(shared.identity.paths.reflection, "pending.json"), "utf8"),
+    ) as ReservedRun
     expect(activeRecord.runId).not.toBe(pendingRecord.runId)
 
     const store = new ReflectionReservationStore({
@@ -96,6 +96,8 @@ describe("one memory identity across real Bun processes", () => {
     expect(completion.launch?.runId).toBe(pendingRecord.runId)
     expect(promoted.active?.runId).toBe(pendingRecord.runId)
     expect(promoted.pending).toBeUndefined()
-    expect((JSON.parse(await readFile(join(shared.identity.paths.reflection, "active.lock"), "utf8")) as ReservedRun).runId).toBe(pendingRecord.runId)
+    expect(
+      (JSON.parse(await readFile(join(shared.identity.paths.reflection, "active.lock"), "utf8")) as ReservedRun).runId,
+    ).toBe(pendingRecord.runId)
   }, 30_000)
 })

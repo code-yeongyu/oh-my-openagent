@@ -12,12 +12,19 @@ function own<TValue>(record: Readonly<Record<string, TValue>> | undefined, key: 
   return record !== undefined && Object.hasOwn(record, key) ? record[key] : undefined
 }
 
-export function categoryRuntimeChain<TModel extends SenpiModelPort>(result: CategoryResolutionResult<TModel>): readonly string[] {
+export function categoryRuntimeChain<TModel extends SenpiModelPort>(
+  result: CategoryResolutionResult<TModel>,
+): readonly string[] {
   if (result.kind !== "resolved") return []
-  return [`${result.spec.provider}/${result.spec.modelId}`, ...(result.spec.fallback_models ?? []).map((model) => model.display)]
+  return [
+    `${result.spec.provider}/${result.spec.modelId}`,
+    ...(result.spec.fallback_models ?? []).map((model) => model.display),
+  ]
 }
 
-function unavailableReason<TModel extends SenpiModelPort>(result: CategoryResolutionResult<TModel>): string | undefined {
+function unavailableReason<TModel extends SenpiModelPort>(
+  result: CategoryResolutionResult<TModel>,
+): string | undefined {
   switch (result.kind) {
     case "resolved":
       return undefined
@@ -46,15 +53,21 @@ export function describeCategoryChain<TModel extends SenpiModelPort>(
 ): ModelChainEntry {
   const result = resolveCategory(name, config, registry)
   const userConfig = own(config.categories, name)
-  const userModels = new Set(userConfig === undefined ? [] : categoryModelCandidates(userConfig).map((candidate) => candidate.model))
+  const userModels = new Set(
+    userConfig === undefined ? [] : categoryModelCandidates(userConfig).map((candidate) => candidate.model),
+  )
   const chain = own(CATEGORY_FALLBACK_CHAINS, name)
   // The builtin default model is the chain's own head rung; listing it twice would read as two rungs.
   const chainModelIds = new Set((chain ?? []).map((rung) => rung.model))
   const declared: readonly DeclaredRung[] = [
-    ...categoryModelCandidates({ ...own(DEFAULT_CATEGORIES, name), ...userConfig }).flatMap((candidate): readonly DeclaredRung[] => {
-      if (userModels.has(candidate.model)) return [{ model: candidate.model, source: "omo.json" }]
-      return chainModelIds.has(candidate.model.slice(candidate.model.indexOf("/") + 1)) ? [] : [{ model: candidate.model, source: "built-in" }]
-    }),
+    ...categoryModelCandidates({ ...own(DEFAULT_CATEGORIES, name), ...userConfig }).flatMap(
+      (candidate): readonly DeclaredRung[] => {
+        if (userModels.has(candidate.model)) return [{ model: candidate.model, source: "omo.json" }]
+        return chainModelIds.has(candidate.model.slice(candidate.model.indexOf("/") + 1))
+          ? []
+          : [{ model: candidate.model, source: "built-in" }]
+      },
+    ),
     ...builtinRungs(chain, available),
   ]
   const runtime = categoryRuntimeChain(result)

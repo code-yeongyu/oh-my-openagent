@@ -106,11 +106,13 @@ describe("memory tool onCommit seam", () => {
 
     // then
     expect(result.isError).toBeUndefined()
-    expect(commits).toEqual([{
-      sha: (await fixture.repo.head()) ?? "",
-      subject: "rewrite the persona",
-      affectedPaths: ["system/persona.md"],
-    }])
+    expect(commits).toEqual([
+      {
+        sha: (await fixture.repo.head()) ?? "",
+        subject: "rewrite the persona",
+        affectedPaths: ["system/persona.md"],
+      },
+    ])
   }, 30_000)
   test("#given an engine rejection #when the tool executes #then onCommit is not called", async () => {
     // given

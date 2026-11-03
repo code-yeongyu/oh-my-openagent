@@ -109,7 +109,9 @@ export class RetryClock {
     for (const waiter of this.#waiters) {
       if (this.delays.length >= waiter.count) waiter.resolve()
     }
-    return () => { timer.cancelled = true }
+    return () => {
+      timer.cancelled = true
+    }
   }
 
   whenScheduled(count: number): Promise<void> {

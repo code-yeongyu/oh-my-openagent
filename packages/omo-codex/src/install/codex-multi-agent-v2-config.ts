@@ -45,8 +45,7 @@ export function ensureCodexMultiAgentV2Config(
 ): string {
   const featureFlag = removeFeatureFlagSetting(config, "multi_agent_v2")
   // Keep this V2-active rule aligned with plugin/scripts/migrate-codex-config/subagent-limit-guard.mjs.
-  const v2Preferred = options.multiAgentVersion === "v2"
-    || isMultiAgentV2Enabled(featureFlag.config)
+  const v2Preferred = options.multiAgentVersion === "v2" || isMultiAgentV2Enabled(featureFlag.config)
   const agentsConfig = removeAgentsMaxThreads(featureFlag.config, v2Preferred)
   const preserveDisable = featureFlag.value === false && !v2Preferred
   const featureConfig = preserveDisable
@@ -164,8 +163,11 @@ function removeMatchingCap(config: string, section: TomlSection, keyName: string
     if (!scan.wasInside) {
       const assignment = line.indexOf("=")
       const key = assignment < 0 ? null : parseTomlDottedKey(line.slice(0, assignment).trim())
-      if (key?.length === 1 && key[0] === keyName
-        && (expectedValue === undefined || expectedValue.test(line.slice(assignment + 1).trim()))) {
+      if (
+        key?.length === 1 &&
+        key[0] === keyName &&
+        (expectedValue === undefined || expectedValue.test(line.slice(assignment + 1).trim()))
+      ) {
         return config.slice(0, offset) + config.slice(offset + line.length)
       }
     }

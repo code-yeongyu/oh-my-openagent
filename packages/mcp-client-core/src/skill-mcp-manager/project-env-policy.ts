@@ -7,20 +7,60 @@ import type { SkillMcpClientInfo } from "./types"
 import { declarationDigest as hashIdentity } from "./env-grants-store"
 
 export const SAFE_MCP_ENV_NAMES = [
-  "PATH", "HOME", "USER", "LOGNAME", "SHELL", "TERM", "TMPDIR", "TMP", "TEMP", "TZ",
-  "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME",
-  "LANG", "LANGUAGE", "LC_ALL", "LC_CTYPE", "LC_COLLATE", "LC_MESSAGES", "LC_MONETARY",
-  "LC_NUMERIC", "LC_TIME", "LC_ADDRESS", "LC_IDENTIFICATION", "LC_MEASUREMENT", "LC_NAME", "LC_PAPER", "LC_TELEPHONE",
-  "APPDATA", "LOCALAPPDATA", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "USERNAME", "SYSTEMROOT",
-  "SYSTEMDRIVE", "WINDIR", "COMSPEC", "PATHEXT", "PROGRAMFILES", "PROCESSOR_ARCHITECTURE",
-  "NODE_EXTRA_CA_CERTS", "SSL_CERT_FILE", "SSL_CERT_DIR", "REQUESTS_CA_BUNDLE",
+  "PATH",
+  "HOME",
+  "USER",
+  "LOGNAME",
+  "SHELL",
+  "TERM",
+  "TMPDIR",
+  "TMP",
+  "TEMP",
+  "TZ",
+  "XDG_CONFIG_HOME",
+  "XDG_DATA_HOME",
+  "XDG_CACHE_HOME",
+  "LANG",
+  "LANGUAGE",
+  "LC_ALL",
+  "LC_CTYPE",
+  "LC_COLLATE",
+  "LC_MESSAGES",
+  "LC_MONETARY",
+  "LC_NUMERIC",
+  "LC_TIME",
+  "LC_ADDRESS",
+  "LC_IDENTIFICATION",
+  "LC_MEASUREMENT",
+  "LC_NAME",
+  "LC_PAPER",
+  "LC_TELEPHONE",
+  "APPDATA",
+  "LOCALAPPDATA",
+  "USERPROFILE",
+  "HOMEDRIVE",
+  "HOMEPATH",
+  "USERNAME",
+  "SYSTEMROOT",
+  "SYSTEMDRIVE",
+  "WINDIR",
+  "COMSPEC",
+  "PATHEXT",
+  "PROGRAMFILES",
+  "PROCESSOR_ARCHITECTURE",
+  "NODE_EXTRA_CA_CERTS",
+  "SSL_CERT_FILE",
+  "SSL_CERT_DIR",
+  "REQUESTS_CA_BUNDLE",
 ] as const
 const safe = new Set<string>(SAFE_MCP_ENV_NAMES)
 const packageExclusion = /^(?:NPM_CONFIG_|YARN_|PNPM_|NO_UPDATE_NOTIFIER$)/i
 
 export const policyHash = hashIdentity
 function canonicalPath(path: string): string {
-  try { return realpathSync.native(path) } catch (error) {
+  try {
+    return realpathSync.native(path)
+  } catch (error) {
     if (!(error instanceof Error)) throw error
     return resolve(path)
   }
@@ -30,7 +70,9 @@ export function declarationDigest(info: SkillMcpClientInfo, config: ClaudeCodeMc
     sourcePath: canonicalPath(info.sourcePath ?? info.provenance?.selectedRoot ?? info.directory ?? "."),
     sourceKind: info.sourceKind ?? "frontmatter",
     projectRoot: canonicalPath(info.provenance?.projectRoot ?? info.directory ?? "."),
-    serverName: info.serverName, raw: config, cwdBase: canonicalPath(info.directory ?? info.provenance?.projectRoot ?? "."),
+    serverName: info.serverName,
+    raw: config,
+    cwdBase: canonicalPath(info.directory ?? info.provenance?.projectRoot ?? "."),
   })
 }
 export function usesProjectEnvironment(info: SkillMcpClientInfo): boolean {
@@ -41,13 +83,14 @@ export function usesProjectEnvironment(info: SkillMcpClientInfo): boolean {
 }
 
 export function resolveProjectEnvironment(
-  raw: ClaudeCodeMcpServer, grantedNames: readonly string[],
+  raw: ClaudeCodeMcpServer,
+  grantedNames: readonly string[],
   explicit: Readonly<Record<string, string>> = {},
   ambient: Readonly<Record<string, string | undefined>> = process.env,
   platform: NodeJS.Platform = process.platform,
 ): { config: ClaudeCodeMcpServer; env: Record<string, string>; withheld: string[] } {
   const windows = platform === "win32"
-  const key = (name: string) => windows ? name.toUpperCase() : name
+  const key = (name: string) => (windows ? name.toUpperCase() : name)
   const ambientValues = new Map<string, { name: string; value: string }>()
   for (const [name, value] of Object.entries(ambient)) {
     if (value === undefined) continue
@@ -56,20 +99,33 @@ export function resolveProjectEnvironment(
   }
   const grants = new Set(grantedNames.map(key))
   const withheld = new Set<string>()
-  const expand = (value: string) => value.replace(/\$\{([^}:]+)(?::-([^}]*))?\}/g, (literal, name: string, fallback?: string) => {
-    if (!isAllowedMcpEnvVar(name) && !grants.has(key(name))) { withheld.add(name); return literal }
-    return ambientValues.get(key(name))?.value ?? fallback ?? ""
-  })
-  const expandMap = (values: Record<string, string> | undefined) => values === undefined ? undefined :
-    Object.fromEntries(Object.entries(values).map(([name, value]) => [name, expand(value)]))
+  const expand = (value: string) =>
+    value.replace(/\$\{([^}:]+)(?::-([^}]*))?\}/g, (literal, name: string, fallback?: string) => {
+      if (!isAllowedMcpEnvVar(name) && !grants.has(key(name))) {
+        withheld.add(name)
+        return literal
+      }
+      return ambientValues.get(key(name))?.value ?? fallback ?? ""
+    })
+  const expandMap = (values: Record<string, string> | undefined) =>
+    values === undefined
+      ? undefined
+      : Object.fromEntries(Object.entries(values).map(([name, value]) => [name, expand(value)]))
   const config: ClaudeCodeMcpServer = {
-    ...raw, command: raw.command === undefined ? undefined : expand(raw.command),
-    args: raw.args?.map(expand), url: raw.url === undefined ? undefined : expand(raw.url),
-    env: expandMap(raw.env), headers: expandMap(raw.headers),
-    oauth: raw.oauth === undefined ? undefined : {
-      ...raw.oauth, clientId: raw.oauth.clientId === undefined ? undefined : expand(raw.oauth.clientId),
-      scopes: raw.oauth.scopes?.map(expand),
-    },
+    ...raw,
+    command: raw.command === undefined ? undefined : expand(raw.command),
+    args: raw.args?.map(expand),
+    url: raw.url === undefined ? undefined : expand(raw.url),
+    env: expandMap(raw.env),
+    headers: expandMap(raw.headers),
+    oauth:
+      raw.oauth === undefined
+        ? undefined
+        : {
+            ...raw.oauth,
+            clientId: raw.oauth.clientId === undefined ? undefined : expand(raw.oauth.clientId),
+            scopes: raw.oauth.scopes?.map(expand),
+          },
   }
   const env: Record<string, string> = {}
   for (const { name, value } of ambientValues.values()) {

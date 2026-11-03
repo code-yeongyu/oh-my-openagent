@@ -46,7 +46,9 @@ describe("host first-prompt refusal cleanup", () => {
       await bounded(promptObserved)
       let shutdownDone = false
       // Shutdown starts before refusal registers cleanup, so its later snapshot must join it too.
-      const shutdown = manager.settleLaunchesForShutdown?.(2_000).then(() => { shutdownDone = true })
+      const shutdown = manager.settleLaunchesForShutdown?.(2_000).then(() => {
+        shutdownDone = true
+      })
       releasePrompt()
       await bounded(detaching.promise)
       const result = await bounded(starting)

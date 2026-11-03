@@ -22,7 +22,11 @@ export type WatchDeps = { readonly tasks: TaskWaiter; readonly pools: PoolAccess
  * revision is newer than the ref's last one: a settle that lands during setup is seen exactly once,
  * in `initial` or as one update, never both and never lost. Nothing polls.
  */
-export async function watchRefs(deps: WatchDeps, refs: readonly HandleRef[], ctx: HandleCallContext): Promise<HandleWatch> {
+export async function watchRefs(
+  deps: WatchDeps,
+  refs: readonly HandleRef[],
+  ctx: HandleCallContext,
+): Promise<HandleWatch> {
   const queue = createUpdateQueue()
   const controller = new AbortController()
   const unsubscribes: (() => void)[] = []
@@ -42,7 +46,10 @@ export async function watchRefs(deps: WatchDeps, refs: readonly HandleRef[], ctx
   ctx.signal?.addEventListener("abort", close, { once: true })
   try {
     const initial = refs.map((ref) => {
-      const snapshot = ref.kind === "workpool" ? subscribePool(deps.pools, ref, ctx, unsubscribes, offer) : subscribeTask(deps.tasks, ref, ctx, controller.signal, offer)
+      const snapshot =
+        ref.kind === "workpool"
+          ? subscribePool(deps.pools, ref, ctx, unsubscribes, offer)
+          : subscribeTask(deps.tasks, ref, ctx, controller.signal, offer)
       latest.set(ref, snapshot.revision)
       return snapshot
     })
@@ -53,8 +60,18 @@ export async function watchRefs(deps: WatchDeps, refs: readonly HandleRef[], ctx
   }
 }
 
-function subscribeTask(tasks: TaskWaiter, ref: HandleRef, ctx: HandleCallContext, signal: AbortSignal, offer: (ref: HandleRef, snapshot: HandleSnapshot) => void): HandleSnapshot {
-  if (ref.kind !== "agent") throw new EvalHandleHostError("eval_handle_operation_unsupported", `${ref.kind} refs are not served by the task host`)
+function subscribeTask(
+  tasks: TaskWaiter,
+  ref: HandleRef,
+  ctx: HandleCallContext,
+  signal: AbortSignal,
+  offer: (ref: HandleRef, snapshot: HandleSnapshot) => void,
+): HandleSnapshot {
+  if (ref.kind !== "agent")
+    throw new EvalHandleHostError(
+      "eval_handle_operation_unsupported",
+      `${ref.kind} refs are not served by the task host`,
+    )
   // The waiter settles with the terminal record, or rejects once the watch closes (abort).
   tasks.waitFor(ref.id, { signal }).then(
     // A pre-upgrade record cannot prove an in-run epoch move, but its terminal still ends the watch: the caller's
@@ -73,14 +90,25 @@ function subscribeTask(tasks: TaskWaiter, ref: HandleRef, ctx: HandleCallContext
   return taskSnapshot(loadFencedTask(tasks, ref, ctx), ref)
 }
 
-function subscribePool(pools: PoolAccess, ref: HandleRef, ctx: HandleCallContext, unsubscribes: (() => void)[], offer: (ref: HandleRef, snapshot: HandleSnapshot) => void): HandleSnapshot {
-  unsubscribes.push(pools.workpools.subscribe((event) => {
-    if (event.pool_id !== ref.id) return
-    try {
-      offer(ref, poolSnapshot(loadOwnedPool(pools, ref, ctx), ref))
-    } catch (error) {
-      log("senpi-task eval-handle pool watch could not re-read its pool", { poolId: ref.id, error: error instanceof Error ? error.message : String(error) })
-    }
-  }))
+function subscribePool(
+  pools: PoolAccess,
+  ref: HandleRef,
+  ctx: HandleCallContext,
+  unsubscribes: (() => void)[],
+  offer: (ref: HandleRef, snapshot: HandleSnapshot) => void,
+): HandleSnapshot {
+  unsubscribes.push(
+    pools.workpools.subscribe((event) => {
+      if (event.pool_id !== ref.id) return
+      try {
+        offer(ref, poolSnapshot(loadOwnedPool(pools, ref, ctx), ref))
+      } catch (error) {
+        log("senpi-task eval-handle pool watch could not re-read its pool", {
+          poolId: ref.id,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
+    }),
+  )
   return poolSnapshot(loadOwnedPool(pools, ref, ctx), ref)
 }

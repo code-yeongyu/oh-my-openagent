@@ -82,7 +82,11 @@ export const FABLE_55_PREDECESSOR = LATEST_MODEL_BY_FAMILY.claudeFable
 // while FABLE_55_RELEASED is false no resolver (model-core, delegate-core, getFirstFallbackModel,
 // senpi-task, cold/warm/null caches) can ever see the provisional id.
 export function launchRungs<T extends { model: string; variant?: string }>(rungs: readonly T[]): T[] {
-  return selectLaunchRungs(rungs, { released: FABLE_55_RELEASED, accepted: FABLE_55_EFFORTS.accepted }, recordLaunchRungRejection)
+  return selectLaunchRungs(
+    rungs,
+    { released: FABLE_55_RELEASED, accepted: FABLE_55_EFFORTS.accepted },
+    recordLaunchRungRejection,
+  )
 }
 
 export function launchDefaultModelId(): string {

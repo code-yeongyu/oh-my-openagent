@@ -22,10 +22,7 @@ import { createProjectMemoryScope } from "./project-memory-nudge"
 import { readUi, branchEntryCount, sessionIdFrom } from "./wiring-context"
 import { createMemoryUserActivity } from "./user-activity"
 import { logBindReconcileFailure } from "./bind-reconcile-log"
-import {
-  createMemoryReflectionLiveWiring,
-  createReflectionCompletionApi,
-} from "./wiring-reflection-live"
+import { createMemoryReflectionLiveWiring, createReflectionCompletionApi } from "./wiring-reflection-live"
 import { createMemoryRuntimeWiring } from "./wiring-runtime"
 import { registerMemoryStatic } from "./wiring-static"
 import { recoverStaleReflectionHolder } from "./reflection-stale-active"
@@ -38,17 +35,26 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
   // Persisted compiled blocks: a relaunch reads the block of a commit an earlier process compiled (the store ships
   // in the lazily loaded recall-store sidecar). Keyed by the build, so an upgrade never reads an older build's bytes.
   const blockBuild = memoryBlockBuild()
-  const promptCache = new MemoryBlockCache(blockBuild === undefined ? {} : {
-    store: loadRecallStoreRuntime,
-    build: blockBuild,
-    onStoreError: (error) => options.logger?.warn("omo-senpi persisted memory block unavailable; compiling instead", {
-      error: error instanceof Error ? error.message : String(error),
-    }),
-    onDegraded: ({ revision, reasons }) => options.logger?.warn("omo-senpi memory block compiled from incomplete git reads; used for this turn only, not persisted", {
-      revision,
-      reasons,
-    }),
-  })
+  const promptCache = new MemoryBlockCache(
+    blockBuild === undefined
+      ? {}
+      : {
+          store: loadRecallStoreRuntime,
+          build: blockBuild,
+          onStoreError: (error) =>
+            options.logger?.warn("omo-senpi persisted memory block unavailable; compiling instead", {
+              error: error instanceof Error ? error.message : String(error),
+            }),
+          onDegraded: ({ revision, reasons }) =>
+            options.logger?.warn(
+              "omo-senpi memory block compiled from incomplete git reads; used for this turn only, not persisted",
+              {
+                revision,
+                reasons,
+              },
+            ),
+        },
+  )
   const promptPrebuild: { current?: (context: MemoryIdentityContext) => Promise<void> } = {}
   const lastEventCtx: { current?: unknown } = {}
   const activeSession: { current?: string } = {}
@@ -61,7 +67,12 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
   // Session-start reconciliation runs once per session, so a holder that died after it would keep
   // the reflection lock for good (#10377). Each later turn settles a provably dead holder, and shows
   // a holder whose liveness cannot be proven once per session and run.
-  const recoverStaleHolderAfterTurn = async (sessionId: string, identity: MemoryIdentityContext, eventCtx: unknown, signal?: AbortSignal): Promise<void> => {
+  const recoverStaleHolderAfterTurn = async (
+    sessionId: string,
+    identity: MemoryIdentityContext,
+    eventCtx: unknown,
+    signal?: AbortSignal,
+  ): Promise<void> => {
     if (!userActivity.has(sessionId) || !userActivity.hasReconciled(sessionId)) return
     let attemptedKey: string | undefined
     try {
@@ -88,18 +99,15 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
       readUi(eventCtx)?.notify(recovery.notice, "warning")
     } catch (error) {
       signal?.throwIfAborted()
-      options.logger?.warn("omo-senpi memory could not check the reflection lock holder", { error: error instanceof Error ? error.message : String(error) })
+      options.logger?.warn("omo-senpi memory could not check the reflection lock holder", {
+        error: error instanceof Error ? error.message : String(error),
+      })
     }
   }
-  const runtimeWiring = createMemoryRuntimeWiring(
-    options,
-    lastEventCtx,
-    reflectionLive.currentSession,
-    {
-      onLaunch: reflectionLive.onReflectionLaunched,
-      onLiveCompletion: reflectionLive.onLiveReflectionCompleted,
-    },
-  )
+  const runtimeWiring = createMemoryRuntimeWiring(options, lastEventCtx, reflectionLive.currentSession, {
+    onLaunch: reflectionLive.onReflectionLaunched,
+    onLiveCompletion: reflectionLive.onLiveReflectionCompleted,
+  })
   const { resolveContext, journalWiringFor, factsWiringFor, runtimeFor } = runtimeWiring
 
   const nudgeWiring = createMemoryNudgeWiring({
@@ -209,14 +217,16 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
     registerStatic(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
       userActivity.register(pi)
       projectScope.register(pi)
-      const applyFacts = createConfiguredFactsApplier(options, (sessionId) => resolveContext(sessionId ?? activeSession.current ?? ""))
+      const applyFacts = createConfiguredFactsApplier(options, (sessionId) =>
+        resolveContext(sessionId ?? activeSession.current ?? ""),
+      )
       reflectionLive.registerRpc(pi, resolveContext, applyFacts)
       publishSessionFactsApplier(applyFacts)
       const kibitzer = createKibitzerComposition({
         env: options.env,
         cwd: options.cwd,
         loadConfig: options.loadConfig,
-        resolveContext: (sessionId) => userActivity.hasInput(sessionId) ? resolveContext(sessionId) : undefined,
+        resolveContext: (sessionId) => (userActivity.hasInput(sessionId) ? resolveContext(sessionId) : undefined),
         recall: recallWiring,
         corpusCache,
         projectScope,
@@ -246,7 +256,9 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
         runtimeFor,
         triggerSessionFor: (eventCtx) => {
           const sessionId = sessionIdFrom(eventCtx)
-          return sessionId !== undefined && userActivity.has(sessionId) ? runtimeWiring.triggerSessionFor(eventCtx) : undefined
+          return sessionId !== undefined && userActivity.has(sessionId)
+            ? runtimeWiring.triggerSessionFor(eventCtx)
+            : undefined
         },
         resolvePalacePeople,
         loadCommandSettings,
@@ -286,11 +298,12 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
     async afterBind(pi, sessionId, identity, eventCtx): Promise<void> {
       // Off the prompt path: a NEW session's first prompt shares this compile of HEAD, or reads what it persisted.
       // A resumed session is pinned to its recorded revision, which may not be HEAD; it gets no prebuild.
-      if (branchEntryCount(eventCtx) === 0) void promptPrebuild.current?.(identity).catch((error: unknown) => {
-        options.logger?.warn("omo-senpi memory block prebuild failed; the first prompt compiles it", {
-          error: error instanceof Error ? error.message : String(error),
+      if (branchEntryCount(eventCtx) === 0)
+        void promptPrebuild.current?.(identity).catch((error: unknown) => {
+          options.logger?.warn("omo-senpi memory block prebuild failed; the first prompt compiles it", {
+            error: error instanceof Error ? error.message : String(error),
+          })
         })
-      })
       activeSession.current = sessionId
       userActivity.reset(sessionId)
       pressureDreamAdmission.reset(sessionId)
@@ -302,15 +315,9 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
         await journalWiringFor(identity).reconcileSession(eventCtx)
       }
       factsWiringFor(identity).reconcileExtractor(sessionId)
-      await reflectionLive.bind(
-        pi,
-        sessionId,
-        identity,
-        eventCtx,
-        () => {
-          pressureDreamAdmission.deferOrRequest(sessionId, userActivity.has(sessionId))
-        },
-      )
+      await reflectionLive.bind(pi, sessionId, identity, eventCtx, () => {
+        pressureDreamAdmission.deferOrRequest(sessionId, userActivity.has(sessionId))
+      })
     },
 
     async flushSkillsUsage(): Promise<void> {
@@ -344,7 +351,9 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
       if (identity !== undefined) {
         const facts = factsWiringFor(identity)
         if (facts.cancelActive !== undefined) {
-          await shutdownDrain.raceDetached(input, "facts-cancel", async () => { await facts.cancelActive?.() })
+          await shutdownDrain.raceDetached(input, "facts-cancel", async () => {
+            await facts.cancelActive?.()
+          })
         }
       }
       await shutdownDrain.run(input, { journalFlushed })

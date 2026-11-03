@@ -56,7 +56,11 @@ function writeProjectConfig(directory: string): string {
   return path
 }
 
-function targetFor(paths: readonly { readonly path: string; readonly filterGlobs: readonly string[] }[], path: string, filter: string): boolean {
+function targetFor(
+  paths: readonly { readonly path: string; readonly filterGlobs: readonly string[] }[],
+  path: string,
+  filter: string,
+): boolean {
   return paths.some((target) => target.path === path && target.filterGlobs.includes(filter))
 }
 
@@ -81,10 +85,12 @@ describe("resolveOmoConfigWatchTargets", () => {
     })
 
     expect(resolveUserOmoConfigDirectory(fixtureEnv(fixture))).toBe(userConfigDirectory)
-    expect(findProjectConfigPathsFarthestFirst(fixture.cwd, fixture.homeDir, {
-      existsSync: (path) => [workConfigPath, projectConfigPath, cwdConfigPath].includes(path),
-      readFileSync: () => "",
-    })).toEqual([workConfigPath, projectConfigPath, cwdConfigPath])
+    expect(
+      findProjectConfigPathsFarthestFirst(fixture.cwd, fixture.homeDir, {
+        existsSync: (path) => [workConfigPath, projectConfigPath, cwdConfigPath].includes(path),
+        readFileSync: () => "",
+      }),
+    ).toEqual([workConfigPath, projectConfigPath, cwdConfigPath])
     expect(loaderPaths.map((candidate) => candidate.path)).toEqual([
       join(userConfigDirectory, "omo.jsonc"),
       workConfigPath,
@@ -198,12 +204,13 @@ describe("resolveOmoConfigWatchTargets", () => {
       platform: "linux",
     })
 
-    expect(resolution.targets.some((target) => target.path === fixture.homeDir && target.filterGlobs.includes("/.omo"))).toBe(true)
-    expect(resolution.targets.find((target) => target.path === fixture.homeDir && target.filterGlobs.includes("/.omo"))?.filterGlobs).toEqual([
-      "/.omo",
-      "/.omo/omo.jsonc",
-      "/.omo/omo.json",
-    ])
+    expect(
+      resolution.targets.some((target) => target.path === fixture.homeDir && target.filterGlobs.includes("/.omo")),
+    ).toBe(true)
+    expect(
+      resolution.targets.find((target) => target.path === fixture.homeDir && target.filterGlobs.includes("/.omo"))
+        ?.filterGlobs,
+    ).toEqual(["/.omo", "/.omo/omo.jsonc", "/.omo/omo.json"])
     expect(resolution.userConfigCreationDiscovery).toBe("watched")
     expect(resolution.userConfigCreationWatched).toBe(true)
   })
@@ -244,12 +251,23 @@ describe("resolveOmoConfigWatchTargets", () => {
     const fixture = createFixture()
     const agentDir = join(fixture.homeDir, ".omo", "agent")
     const protectedPaths = [join(agentDir, "auth.json"), join(agentDir, "sessions"), join(agentDir, "logs")]
-    const target = (filterGlobs: string[]): OmoConfigWatchTarget => ({ path: fixture.homeDir, kind: "dir", filterGlobs })
+    const target = (filterGlobs: string[]): OmoConfigWatchTarget => ({
+      path: fixture.homeDir,
+      kind: "dir",
+      filterGlobs,
+    })
 
     expect(isSenpiRestrictedTarget(target([".omo"]), protectedPaths)).toBe(true)
     expect(isSenpiRestrictedTarget(target(["/.omo/agent/auth.json"]), protectedPaths)).toBe(true)
-    expect(isSenpiRestrictedTarget({ path: join(fixture.homeDir, ".omo"), kind: "dir", filterGlobs: ["/omo.jsonc", "/omo.json"] }, protectedPaths)).toBe(false)
-    expect(isSenpiRestrictedTarget({ path: agentDir, kind: "dir", filterGlobs: ["settings.json"] }, protectedPaths)).toBe(true)
+    expect(
+      isSenpiRestrictedTarget(
+        { path: join(fixture.homeDir, ".omo"), kind: "dir", filterGlobs: ["/omo.jsonc", "/omo.json"] },
+        protectedPaths,
+      ),
+    ).toBe(false)
+    expect(
+      isSenpiRestrictedTarget({ path: agentDir, kind: "dir", filterGlobs: ["settings.json"] }, protectedPaths),
+    ).toBe(true)
   })
 
   it("#given an explicit SENPI_CODING_AGENT_DIR under HOME #when resolving targets #then drops only targets intersecting its protected paths", () => {
@@ -280,9 +298,15 @@ describe("resolveOmoConfigWatchTargets", () => {
 
   it("#given the user config parent creation target #when resolving targets #then its glob is root-anchored", () => {
     const fixture = createFixture()
-    const env = { HOME: fixture.homeDir, XDG_CONFIG_HOME: fixture.xdgConfigHome, SENPI_CODING_AGENT_DIR: fixture.agentDir }
+    const env = {
+      HOME: fixture.homeDir,
+      XDG_CONFIG_HOME: fixture.xdgConfigHome,
+      SENPI_CODING_AGENT_DIR: fixture.agentDir,
+    }
     const targets = resolveOmoConfigWatchTargets({ cwd: fixture.cwd, env, platform: "linux" })
-    const userCreationTarget = targets.find((target) => target.path === fixture.homeDir && target.filterGlobs.includes("/.omo"))
+    const userCreationTarget = targets.find(
+      (target) => target.path === fixture.homeDir && target.filterGlobs.includes("/.omo"),
+    )
     expect(userCreationTarget?.filterGlobs).toEqual(["/.omo", "/.omo/omo.jsonc", "/.omo/omo.json"])
   })
 
@@ -312,11 +336,13 @@ describe("resolveOmoConfigWatchTargets", () => {
       cwd: fixture.cwd,
       env: fixtureEnv(fixture),
       platform: "linux",
-      resolveFileSystemType: (path) => path === userConfigDirectory ? 0x01021994 : 0x01021997,
+      resolveFileSystemType: (path) => (path === userConfigDirectory ? 0x01021994 : 0x01021997),
     })
 
     expect(targetFor(targets, userConfigDirectory, "/omo.jsonc")).toBe(true)
-    expect(targets.some((target) => target.path === fixture.projectDir && target.filterGlobs.includes("/.omo"))).toBe(false)
+    expect(targets.some((target) => target.path === fixture.projectDir && target.filterGlobs.includes("/.omo"))).toBe(
+      false,
+    )
     expect(targets.some((target) => target.filterGlobs.includes("/.omo"))).toBe(false)
   })
 

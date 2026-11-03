@@ -82,6 +82,10 @@ export class ReflectionParkFile {
       ...(failure ?? { fingerprint: `${outcome}:`, retryable: true }),
     })
     await this.write(after)
-    return { state: after, parked: isReflectionParked(after), justParked: isReflectionParked(after) && !isReflectionParked(before) }
+    return {
+      state: after,
+      parked: isReflectionParked(after),
+      justParked: isReflectionParked(after) && !isReflectionParked(before),
+    }
   }
 }

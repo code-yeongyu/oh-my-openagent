@@ -1,12 +1,7 @@
 import { mkdir } from "node:fs/promises"
 import { join } from "node:path"
 
-import {
-  getInboxDir,
-  getRuntimeStateDir,
-  getTasksDir,
-  getTeamSpecPath,
-} from "@oh-my-opencode/team-core/team-registry"
+import { getInboxDir, getRuntimeStateDir, getTasksDir, getTeamSpecPath } from "@oh-my-opencode/team-core/team-registry"
 
 import { resolveStateDir } from "../store"
 import type { StateDirConfig } from "../store"

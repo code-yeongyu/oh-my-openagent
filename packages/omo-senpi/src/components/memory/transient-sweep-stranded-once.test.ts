@@ -13,7 +13,8 @@ const NOW = Date.parse("2026-09-10T12:00:00Z")
 const STRANDED = "omo-senpi memory transient run holds memory a durable identity already owns"
 
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  for (const root of roots.splice(0))
+    rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
 function memoryRoot(): string {
@@ -60,12 +61,14 @@ async function sweepTimes(root: string, times: number, options: { readonly age?:
   const results = []
   if (options.age !== false) ageTree(root)
   for (let pass = 0; pass < times; pass += 1) {
-    results.push(await sweepTransientMemoryRuns({
-      memoryRoot: root,
-      now: () => NOW,
-      isProcessAlive: () => false,
-      warn: (message, fields) => warnings.push({ message, ...(fields === undefined ? {} : { fields }) }),
-    }))
+    results.push(
+      await sweepTransientMemoryRuns({
+        memoryRoot: root,
+        now: () => NOW,
+        isProcessAlive: () => false,
+        warn: (message, fields) => warnings.push({ message, ...(fields === undefined ? {} : { fields }) }),
+      }),
+    )
   }
   return { warnings, results }
 }

@@ -21,9 +21,15 @@ export function staleBackoffMs(attempt: number, random: () => number = Math.rand
 }
 
 const sha256Hex = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex")
-const carried = (out: OutgoingBatch, item: WireItem): boolean => out.items.some((o) => o.key === item.key && o.ops === item.ops)
+const carried = (out: OutgoingBatch, item: WireItem): boolean =>
+  out.items.some((o) => o.key === item.key && o.ops === item.ops)
 
-async function seal(deps: EngineDeps, journal: SyncJournal, items: readonly WireItem[], batchId: string): Promise<OutgoingBatch> {
+async function seal(
+  deps: EngineDeps,
+  journal: SyncJournal,
+  items: readonly WireItem[],
+  batchId: string,
+): Promise<OutgoingBatch> {
   const all = (await journal.pending()).items
   const baseSeq = (await journal.state()).applied
   const payload = { items: items.map((i) => ({ key: i.key, ops: fromBase64(i.ops) })) }
@@ -90,7 +96,9 @@ async function pushOne(deps: EngineDeps, journal: SyncJournal, batchBytes: numbe
   }
   deps.fault?.("append-landed")
   const sent = out
-  await journal.recordApplied([{ seq: result.seq, kind: "batch", batchId: sent.batchId, digest: sent.digest, objectId: "", author: "self" }])
+  await journal.recordApplied([
+    { seq: result.seq, kind: "batch", batchId: sent.batchId, digest: sent.digest, objectId: "", author: "self" },
+  ])
   const state = await journal.state()
   if (result.seq === state.applied + 1) await journal.updateState({ applied: result.seq })
   const remaining = (await journal.pending()).items.filter((i) => !carried(sent, i))

@@ -4,11 +4,7 @@ import { excludedModelPattern } from "@oh-my-opencode/omo-config-core"
 import { asSenpiThinkingLevel } from "../senpi/thinking-level"
 import { splitModelDecorators } from "../senpi/explicit-pin"
 import { RunnerError } from "../runners/in-process/runner-error"
-import type {
-  InProcessSessionContext,
-  InProcessSessionContextProvider,
-  ResumeSessionContextResult,
-} from "./runner"
+import type { InProcessSessionContext, InProcessSessionContextProvider, ResumeSessionContextResult } from "./runner"
 import type { ManagedStartSpec } from "./types"
 
 // The concrete senpi ModelRegistry the parent session owns. `createAgentSession` needs this exact
@@ -72,7 +68,8 @@ export function createParentRegistrySessionContext(
       }
       // A record written before #9722 may still carry a `:level` in its model id; resolve it by its
       // canonical base and let the suffix ride the thinking level instead of failing the respawn.
-      const model = findModelReference(registry, spec.model) ?? findModelReference(registry, splitModelDecorators(spec.model).base)
+      const model =
+        findModelReference(registry, spec.model) ?? findModelReference(registry, splitModelDecorators(spec.model).base)
       if (model === undefined) {
         throw new RunnerError({
           kind: "model_unavailable",
@@ -80,7 +77,8 @@ export function createParentRegistrySessionContext(
         })
       }
       const modelRuntime = registry.modelRuntime
-      const thinkingLevel = asSenpiThinkingLevel(spec.variant) ?? asSenpiThinkingLevel(splitModelDecorators(spec.model).thinkingLevel)
+      const thinkingLevel =
+        asSenpiThinkingLevel(spec.variant) ?? asSenpiThinkingLevel(splitModelDecorators(spec.model).thinkingLevel)
       return {
         ...trust(),
         modelRegistry: registry,

@@ -93,7 +93,6 @@ export function regText(value: string): string {
   return typeof parsed === "string" ? parsed : value
 }
 
-
 function stampCompare(a: Stamp, b: Stamp): number {
   if (a.lamport !== b.lamport) return a.lamport - b.lamport
   const pa = BigInt(a.peer)
@@ -101,7 +100,13 @@ function stampCompare(a: Stamp, b: Stamp): number {
   return pa < pb ? -1 : pa > pb ? 1 : 0
 }
 
-function addStamp(history: ItemHistory, key: string, part: "set" | "reg", tag: string, fallback: Stamp | undefined): Stamp {
+function addStamp(
+  history: ItemHistory,
+  key: string,
+  part: "set" | "reg",
+  tag: string,
+  fallback: Stamp | undefined,
+): Stamp {
   const book = part === "set" ? history.setAdds : history.regAdds
   return book.get(key)?.get(tag) ?? fallback ?? MISSING_STAMP
 }

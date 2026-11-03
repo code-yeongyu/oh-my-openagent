@@ -105,7 +105,12 @@ export function resolveOmoConfigPaths(options: ResolveOmoConfigPathsOptions): re
   const fileSystem = options.fileSystem ?? DEFAULT_READ_FILE_SYSTEM
   const env = options.env ?? process.env
   const userPath = detectUserOmoJsonPath(env, fileSystem)
-  const projectPaths = findProjectConfigPathsFarthestFirst(options.cwd, resolveHomeDir(env), fileSystem, ACCOUNT_HOME_DIR)
+  const projectPaths = findProjectConfigPathsFarthestFirst(
+    options.cwd,
+    resolveHomeDir(env),
+    fileSystem,
+    ACCOUNT_HOME_DIR,
+  )
   return [
     { path: userPath, scope: "user" },
     ...projectPaths.map((path): OmoConfigPathCandidate => ({ path, scope: "project" })),

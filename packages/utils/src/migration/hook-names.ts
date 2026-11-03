@@ -15,9 +15,7 @@ export const HOOK_NAME_MAP: Record<string, string | null> = {
   "session-recovery": null,
 }
 
-export function migrateHookNames(
-  hooks: string[]
-): { migrated: string[]; changed: boolean; removed: string[] } {
+export function migrateHookNames(hooks: string[]): { migrated: string[]; changed: boolean; removed: string[] } {
   const migrated: string[] = []
   const removed: string[] = []
   let changed = false

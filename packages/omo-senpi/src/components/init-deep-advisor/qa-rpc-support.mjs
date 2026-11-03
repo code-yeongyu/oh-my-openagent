@@ -1,7 +1,17 @@
 #!/usr/bin/env node
 import { spawn, spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, utimesSync, writeFileSync } from "node:fs"
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { createInterface } from "node:readline"
@@ -44,18 +54,33 @@ export function gitText(repo, args) {
 }
 
 export function commit(repo, message) {
-  const result = git(repo, ["-c", "user.name=QA", "-c", "user.email=qa@example.invalid", "-c", "commit.gpgsign=false", "commit", "-m", message])
+  const result = git(repo, [
+    "-c",
+    "user.name=QA",
+    "-c",
+    "user.email=qa@example.invalid",
+    "-c",
+    "commit.gpgsign=false",
+    "commit",
+    "-m",
+    message,
+  ])
   if (result.status !== 0) throw new Error(`git commit failed: ${result.stderr}`)
 }
 
 export function repoHash(repo) {
   const common = gitText(repo, ["rev-parse", "--git-common-dir"])
-  return createHash("sha256").update(realpathSync(resolve(repo, common))).digest("hex")
+  return createHash("sha256")
+    .update(realpathSync(resolve(repo, common)))
+    .digest("hex")
 }
 
 export function writeSnapshot(repo, sha) {
   mkdirSync(join(repo, ".omo"), { recursive: true })
-  writeFileSync(join(repo, ".omo", "init-deep.json"), `${JSON.stringify({ commitSha: sha, fileCount: 10, loc: 10, timestamp: Date.now(), mode: "local" })}\n`)
+  writeFileSync(
+    join(repo, ".omo", "init-deep.json"),
+    `${JSON.stringify({ commitSha: sha, fileCount: 10, loc: 10, timestamp: Date.now(), mode: "local" })}\n`,
+  )
 }
 
 export function writeFutureCooldown(fixture) {
@@ -68,12 +93,23 @@ export async function launchRpc(fixture, expectUi) {
   const before = new Set(sessionFiles(fixture.sandbox))
   const child = spawn("senpi", ["-e", MOCK_PROVIDER, "--mode", "rpc", "--provider", "omo-mock", "--model", "mock-1"], {
     cwd: fixture.repo,
-    env: { ...process.env, HOME: fixture.home, USERPROFILE: fixture.home, XDG_CONFIG_HOME: fixture.xdg, SENPI_CODING_AGENT_DIR: fixture.sandbox, PI_CODING_AGENT_DIR: fixture.sandbox },
+    env: {
+      ...process.env,
+      HOME: fixture.home,
+      USERPROFILE: fixture.home,
+      XDG_CONFIG_HOME: fixture.xdg,
+      SENPI_CODING_AGENT_DIR: fixture.sandbox,
+      PI_CODING_AGENT_DIR: fixture.sandbox,
+    },
     stdio: ["pipe", "pipe", "pipe"],
   })
   const events = createEventBus(child)
   const turnWait = events.waitFor((event) => event.type === "turn_start", 10_000, "turn_start")
-  const uiWait = events.waitFor((event) => event.type === "extension_ui_request" && event.method === "select" && event.title === "Init-deep", 10_000, "extension_ui_request")
+  const uiWait = events.waitFor(
+    (event) => event.type === "extension_ui_request" && event.method === "select" && event.title === "Init-deep",
+    10_000,
+    "extension_ui_request",
+  )
   const settledWait = events.waitFor((event) => event.type === "agent_settled", 30_000, "agent_settled")
   try {
     child.stdin.write(`${JSON.stringify({ id: "qa-prompt", type: "prompt", message: "test" })}\n`)
@@ -83,16 +119,27 @@ export async function launchRpc(fixture, expectUi) {
       request = await uiWait
       child.stdin.write(`${JSON.stringify({ type: "extension_ui_response", id: request.id, value: "Run now" })}\n`)
     } else {
-      request = await uiWait.then((event) => event, () => undefined)
+      request = await uiWait.then(
+        (event) => event,
+        () => undefined,
+      )
     }
     const settled = await settledWait
-    if (settled.turnIndex !== events.latestTurnIndex()) throw new Error("agent_settled was not correlated to the latest captured turnIndex")
+    if (settled.turnIndex !== events.latestTurnIndex())
+      throw new Error("agent_settled was not correlated to the latest captured turnIndex")
     if (turn.turnIndex > settled.turnIndex) throw new Error("agent_settled preceded the captured turn")
     if (!expectUi && request !== undefined) throw new Error(`unexpected Init-deep UI request ${request.id}`)
     await terminate(child)
     const created = sessionFiles(fixture.sandbox).filter((file) => !before.has(file))
     if (created.length !== 1) throw new Error(`expected one new session JSONL, found ${created.length}`)
-    return { turnIndex: turn.turnIndex, settledTurnIndex: settled.turnIndex, requestId: request?.id, session: created[0], transcript: readFileSync(created[0], "utf8"), stderr: events.stderr() }
+    return {
+      turnIndex: turn.turnIndex,
+      settledTurnIndex: settled.turnIndex,
+      requestId: request?.id,
+      session: created[0],
+      transcript: readFileSync(created[0], "utf8"),
+      stderr: events.stderr(),
+    }
   } finally {
     await terminate(child)
   }
@@ -105,11 +152,28 @@ export function assertPointer(run) {
 }
 
 export function proposalPath(fixture) {
-  return join(fixture.sandbox, "omo-senpi", "omo-native", "init-deep-advisor-state", "init-deep-advisor-proposals", repoHash(fixture.repo))
+  return join(
+    fixture.sandbox,
+    "omo-senpi",
+    "omo-native",
+    "init-deep-advisor-state",
+    "init-deep-advisor-proposals",
+    repoHash(fixture.repo),
+  )
 }
 
 export function removeCooldown(fixture) {
-  rmSync(join(fixture.sandbox, "omo-senpi", "omo-native", "init-deep-advisor-state", "init-deep-advisor-cooldowns", repoHash(fixture.repo)), { force: true })
+  rmSync(
+    join(
+      fixture.sandbox,
+      "omo-senpi",
+      "omo-native",
+      "init-deep-advisor-state",
+      "init-deep-advisor-cooldowns",
+      repoHash(fixture.repo),
+    ),
+    { force: true },
+  )
 }
 
 export function cleanupFixture(fixture) {
@@ -122,10 +186,16 @@ function createEventBus(child) {
   const waiters = []
   let latestTurn = -1
   let stderr = ""
-  child.stderr.on("data", (chunk) => { stderr += chunk.toString() })
+  child.stderr.on("data", (chunk) => {
+    stderr += chunk.toString()
+  })
   createInterface({ input: child.stdout }).on("line", (line) => {
     let event
-    try { event = JSON.parse(line) } catch { return }
+    try {
+      event = JSON.parse(line)
+    } catch {
+      return
+    }
     if (event.type === "turn_start") {
       latestTurn += 1
       event = { ...event, turnIndex: latestTurn }

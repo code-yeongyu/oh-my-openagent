@@ -33,12 +33,7 @@ import {
 } from "@oh-my-opencode/senpi-task"
 
 import type { TaskRuntimeContext } from "./runtime-context"
-import {
-  buildMemberPorts,
-  makeCancelMemberTask,
-  makeShutdownMessenger,
-  resolveTeamSpec,
-} from "./team-service-support"
+import { buildMemberPorts, makeCancelMemberTask, makeShutdownMessenger, resolveTeamSpec } from "./team-service-support"
 
 const CANONICAL_TEAM_RUN_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 
@@ -184,13 +179,16 @@ export function createTeamService(deps: TeamServiceDeps): TeamToolsService {
     listTeams: async () => toTeams(await listActiveTeams(config)),
     createTask: async (teamRunId, input) => {
       await assertOwnedTeam(deps, config, teamRunId)
-      return createTeamTask({ teamRunId, config }, {
-        subject: input.subject,
-        description: input.description,
-        status: input.status,
-        ...(input.owner !== undefined ? { owner: input.owner } : {}),
-        ...(input.blockedBy !== undefined ? { blockedBy: input.blockedBy } : {}),
-      })
+      return createTeamTask(
+        { teamRunId, config },
+        {
+          subject: input.subject,
+          description: input.description,
+          status: input.status,
+          ...(input.owner !== undefined ? { owner: input.owner } : {}),
+          ...(input.blockedBy !== undefined ? { blockedBy: input.blockedBy } : {}),
+        },
+      )
     },
     listTasks: async (teamRunId, filter) => {
       await assertOwnedTeam(deps, config, teamRunId)
@@ -245,9 +243,10 @@ export function createTeamService(deps: TeamServiceDeps): TeamToolsService {
 export function createTeamMailboxReconciler(deps: TeamServiceDeps): () => Promise<void> {
   const stateDir = stateDirConfig(deps)
   const config: TeamCoreConfig = toTeamCoreConfig(deps.settings, teamStorageBaseDir(stateDir))
-  return () => reconcileTeamMailboxOnSessionStart({
-    stateDir,
-    config,
-    currentLeadSessionId: deps.runtime.sessionId(),
-  })
+  return () =>
+    reconcileTeamMailboxOnSessionStart({
+      stateDir,
+      config,
+      currentLeadSessionId: deps.runtime.sessionId(),
+    })
 }

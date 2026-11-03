@@ -51,20 +51,37 @@ interface Case {
 
 function build(bom: boolean, style: Style, front: Front, op: Op, rand: () => number): Case {
   const e = breaks(style, rand, 9)
-  const keys = [["n", "2"], ["k", "x"], ["z", "1"]].sort(() => rand() - 0.5)
+  const keys = [
+    ["n", "2"],
+    ["k", "x"],
+    ["z", "1"],
+  ].sort(() => rand() - 0.5)
   const body = `body line${e[6]}second${e[7]}`
   const header = keys.map(([key, value], index) => `${key}: ${value}${e[index + 1]}`).join("")
   const content =
-    front === "valid" ? `---${e[0]}${header}---${e[4]}${body}`
-    : front === "none" ? body
-    : front === "malformed" ? `---${e[0]}n: [${e[1]}k: x${e[2]}---${e[4]}${body}`
-    : `---${e[0]}n: 2${e[1]}${body}`
+    front === "valid"
+      ? `---${e[0]}${header}---${e[4]}${body}`
+      : front === "none"
+        ? body
+        : front === "malformed"
+          ? `---${e[0]}n: [${e[1]}k: x${e[2]}---${e[4]}${body}`
+          : `---${e[0]}n: 2${e[1]}${body}`
   const touched = new Set<string>()
   let edited = content
   if (front === "valid" && op !== "untouched") {
-    if (op === "change") { edited = content.replace("n: 2", "n: 3"); touched.add("n") }
-    if (op === "add") { const last = `${keys[2]?.[0]}: ${keys[2]?.[1]}${e[3]}`; edited = content.replace(last, `${last}added: v${e[5]}`); touched.add("added") }
-    if (op === "delete") { edited = content.replace(/k: x\r?\n/, ""); touched.add("k") }
+    if (op === "change") {
+      edited = content.replace("n: 2", "n: 3")
+      touched.add("n")
+    }
+    if (op === "add") {
+      const last = `${keys[2]?.[0]}: ${keys[2]?.[1]}${e[3]}`
+      edited = content.replace(last, `${last}added: v${e[5]}`)
+      touched.add("added")
+    }
+    if (op === "delete") {
+      edited = content.replace(/k: x\r?\n/, "")
+      touched.add("k")
+    }
   } else if (front === "none" && op === "add") {
     edited = `---${e[0]}added: v${e[1]}---${e[2]}${content}`
   } else if (op === "change") edited = content.replace("second", "second2")
@@ -95,7 +112,8 @@ async function check(bom: boolean, style: Style, front: Front, op: Op, seed: num
     captureInto(a, renderItem(a) ?? "", itemFrontier(a), c.working)
     b.import(a.export({ mode: "update" }))
     const written = renderForDisk(b, c.disk) ?? ""
-    const fail = (why: string) => `${why}: disk=${JSON.stringify(c.disk)} working=${JSON.stringify(c.working)} written=${JSON.stringify(written)}`
+    const fail = (why: string) =>
+      `${why}: disk=${JSON.stringify(c.disk)} working=${JSON.stringify(c.working)} written=${JSON.stringify(written)}`
     const boms = written.split("\ufeff").length - 1
     if (boms !== (bom ? 1 : 0) || (bom && !written.startsWith("\ufeff"))) return fail(`(1) ${boms} BOMs`)
     if (splitItem(written).body !== splitItem(c.working).body) return fail("(3) body bytes differ")
@@ -104,8 +122,10 @@ async function check(bom: boolean, style: Style, front: Front, op: Op, seed: num
     const diskHeader = linesOf(headerRegion(c.disk))
     const writtenHeader = linesOf(headerRegion(written))
     for (const line of writtenHeader) {
-      if (!diskHeader.includes(line) && !line.endsWith(eol)) return fail(`(2) written line ${JSON.stringify(line)} not in the dominant style`)
-      if (line.endsWith("\r\n") === false && line.endsWith("\n") && eol === "\r\n" && !diskHeader.includes(line)) return fail("(2) mixed written line")
+      if (!diskHeader.includes(line) && !line.endsWith(eol))
+        return fail(`(2) written line ${JSON.stringify(line)} not in the dominant style`)
+      if (line.endsWith("\r\n") === false && line.endsWith("\n") && eol === "\r\n" && !diskHeader.includes(line))
+        return fail("(2) mixed written line")
     }
     if (splitItem(c.disk).fm !== null && splitItem(written).fm !== null) {
       for (const line of diskHeader) {

@@ -41,10 +41,7 @@ export type UltraworkSource = "planner" | "gpt" | "gemini" | "glm" | "default"
 /**
  * Determines which ultrawork message source to use.
  */
-export function getUltraworkSource(
-  agentName?: string,
-  modelID?: string
-): UltraworkSource {
+export function getUltraworkSource(agentName?: string, modelID?: string): UltraworkSource {
   // Priority 1: Planner agents
   if (isPlannerAgent(agentName)) {
     return "planner"
@@ -54,7 +51,6 @@ export function getUltraworkSource(
   if (modelID && isGptModel(modelID)) {
     return "gpt"
   }
-
 
   // Priority 3: Gemini models
   if (modelID && isGeminiModel(modelID)) {

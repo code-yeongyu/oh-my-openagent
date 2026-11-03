@@ -18,9 +18,7 @@ const PLAIN_PAINT: NativeEditionHintPaint = {
   link: (text) => text,
 }
 
-export function shouldShowNativeEditionHint(
-  config: Pick<InstallConfig, "hasNative" | "hasNativeDev">,
-): boolean {
+export function shouldShowNativeEditionHint(config: Pick<InstallConfig, "hasNative" | "hasNativeDev">): boolean {
   return !config.hasNative && !config.hasNativeDev
 }
 

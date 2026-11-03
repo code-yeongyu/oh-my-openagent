@@ -55,7 +55,18 @@ export interface GenesisCapabilities {
 
 export class GenesisBuildError extends Error {
   override readonly name = "GenesisBuildError"
-  constructor(readonly reason: "bad_bootstrap" | "bad_record" | "principal_mismatch" | "account_mismatch" | "bad_wrap_set" | "bad_custody_root" | "wraps_digest_mismatch" | "bad_countersign" | "bad_signature") {
+  constructor(
+    readonly reason:
+      | "bad_bootstrap"
+      | "bad_record"
+      | "principal_mismatch"
+      | "account_mismatch"
+      | "bad_wrap_set"
+      | "bad_custody_root"
+      | "wraps_digest_mismatch"
+      | "bad_countersign"
+      | "bad_signature",
+  ) {
     super(`genesis: ${reason}`)
   }
 }

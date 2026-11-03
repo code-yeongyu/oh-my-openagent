@@ -8,20 +8,27 @@ export async function captureOwnedFactsState(
   repo: GitMemoryRepo,
   recovery: FactsApplyRecovery,
 ): Promise<FactsOwnedState | undefined> {
-  if (await repo.head() !== recovery.headBeforeApply) return undefined
+  if ((await repo.head()) !== recovery.headBeforeApply) return undefined
   const allowed = new Set(recovery.paths.map((entry) => entry.path))
   const dirty = (await repo.status()).split(/\r?\n/).filter(Boolean)
-  if (dirty.some((line) => {
-    const path = parsePorcelainPath(line)
-    return path === null || !allowed.has(path)
-  })) return undefined
+  if (
+    dirty.some((line) => {
+      const path = parsePorcelainPath(line)
+      return path === null || !allowed.has(path)
+    })
+  )
+    return undefined
   const current = await repo.pathState.captureAll([...allowed])
   return recovery.paths.every((entry) => {
     const state = current.get(entry.path)
-    return state !== undefined
-      && ownedIdentity(state.index, entry.pre.index, entry.post.index)
-      && ownedIdentity(state.worktree, entry.pre.worktree, entry.post.worktree)
-  }) ? current : undefined
+    return (
+      state !== undefined &&
+      ownedIdentity(state.index, entry.pre.index, entry.post.index) &&
+      ownedIdentity(state.worktree, entry.pre.worktree, entry.post.worktree)
+    )
+  })
+    ? current
+    : undefined
 }
 
 export function sameFactsOwnedState(left: FactsOwnedState, right: FactsOwnedState): boolean {

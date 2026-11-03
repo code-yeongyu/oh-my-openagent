@@ -12,9 +12,15 @@ export const grant = {
   offlineGrant: "synthetic-offline-grant",
   device: { id: "device-1", name: "Test CLI" },
 }
-export const privateKeys = { signingPrivateKey: "synthetic-signing-private", sealingPrivateKey: "synthetic-sealing-private" }
+export const privateKeys = {
+  signingPrivateKey: "synthetic-signing-private",
+  sealingPrivateKey: "synthetic-sealing-private",
+}
 export const refusal = (code: string, detail?: unknown, status = 400) =>
-  Response.json({ error: { code, message: "synthetic refusal", retryable: false, requestId: "test", detail } }, { status })
+  Response.json(
+    { error: { code, message: "synthetic refusal", retryable: false, requestId: "test", detail } },
+    { status },
+  )
 export const limitDetail = { reason: "device_limit", managementToken: "synthetic-management", used: 2, limit: 2 }
 
 export async function temporaryHome() {
@@ -52,20 +58,39 @@ export function memorySecrets() {
   const writes: string[] = []
   const api: SecretApi = {
     get: async ({ service, name }) => values.get(`${service}:${name}`) ?? null,
-    set: async ({ service, name, value }) => { writes.push(value); values.set(`${service}:${name}`, value) },
+    set: async ({ service, name, value }) => {
+      writes.push(value)
+      values.set(`${service}:${name}`, value)
+    },
     delete: async ({ service, name }) => values.delete(`${service}:${name}`),
   }
-  return { api, values, writes, store: (origin: string) => createCredentialStore(origin, { secrets: api, platform: process.platform, lockProbe: async () => "unlocked" }) }
+  return {
+    api,
+    values,
+    writes,
+    store: (origin: string) =>
+      createCredentialStore(origin, { secrets: api, platform: process.platform, lockProbe: async () => "unlocked" }),
+  }
 }
 
 export function clock() {
   let current = Date.parse("2030-01-01T00:00:00Z")
   const delays: number[] = []
-  return { now: () => current, delays, sleep: async (ms: number) => { delays.push(ms); current += ms } }
+  return {
+    now: () => current,
+    delays,
+    sleep: async (ms: number) => {
+      delays.push(ms)
+      current += ms
+    },
+  }
 }
 
 export const minted = {
-  deviceCode: `dc.${"a".repeat(43)}`, userCode: "BCDF-GHJK", matchingCode: "482 913",
+  deviceCode: `dc.${"a".repeat(43)}`,
+  userCode: "BCDF-GHJK",
+  matchingCode: "482 913",
   verificationUri: "https://signin.omo.dev/device?code=BCDF-GHJK",
-  expiresAt: "2030-01-01T00:05:00.000Z", intervalSeconds: 5,
+  expiresAt: "2030-01-01T00:05:00.000Z",
+  intervalSeconds: 5,
 }

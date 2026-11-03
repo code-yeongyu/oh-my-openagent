@@ -3,10 +3,7 @@ import type { ApplyPatchAccumulator, ApplyPatchFileMetadata, CheckerEdit } from 
 
 export { isRecord } from "@oh-my-opencode/utils/record-type-guard"
 
-export function extractApplyPatchEdits(
-  details: unknown,
-  args?: Record<string, unknown>,
-): CheckerEdit[] {
+export function extractApplyPatchEdits(details: unknown, args?: Record<string, unknown>): CheckerEdit[] {
   const metadataEdits = getApplyPatchMetadataFiles(details)
     .filter((file) => file.type?.toLowerCase() !== "delete")
     .map((file) => ({

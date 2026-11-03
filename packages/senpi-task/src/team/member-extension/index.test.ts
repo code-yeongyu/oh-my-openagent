@@ -25,15 +25,20 @@ describe("member extension lifecycle", () => {
     const sessionDir = join(root, "sessions")
     const config = TeamModeConfigSchema.parse({ base_dir: join(stateDir, "teams") })
     mkdirSync(sessionDir, { recursive: true })
-    await sendMessage({
-      version: 1,
-      messageId: MESSAGE_ID,
-      from: "lead",
-      to: "alice",
-      kind: "message",
-      body: "start only after bind",
-      timestamp: 1,
-    }, TEAM_RUN_ID, config, { isLead: true, activeMembers: ["alice"] })
+    await sendMessage(
+      {
+        version: 1,
+        messageId: MESSAGE_ID,
+        from: "lead",
+        to: "alice",
+        kind: "message",
+        body: "start only after bind",
+        timestamp: 1,
+      },
+      TEAM_RUN_ID,
+      config,
+      { isLead: true, activeMembers: ["alice"] },
+    )
 
     const handlers = new Map<string, Array<() => unknown | Promise<unknown>>>()
     const toolNames: string[] = []
@@ -102,12 +107,12 @@ const MEMBER_ENV_NAMES = [
   "SENPI_CODING_AGENT_SESSION_DIR",
 ] as const
 
-type MemberEnvName = typeof MEMBER_ENV_NAMES[number]
+type MemberEnvName = (typeof MEMBER_ENV_NAMES)[number]
 type MemberEnvSnapshot = Readonly<Partial<Record<MemberEnvName, string>>>
 
 function captureMemberEnv(): MemberEnvSnapshot {
   return Object.fromEntries(
-    MEMBER_ENV_NAMES.flatMap((name) => process.env[name] === undefined ? [] : [[name, process.env[name]]]),
+    MEMBER_ENV_NAMES.flatMap((name) => (process.env[name] === undefined ? [] : [[name, process.env[name]]])),
   )
 }
 

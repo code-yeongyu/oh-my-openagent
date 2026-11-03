@@ -90,7 +90,11 @@ export function composeOmoSenpiExtension(
     // Shell children inherit process.env: a bundled skill's Python must not write __pycache__ into a signed app (#11373),
     // so bytecode goes to <user cache>/omo-senpi/pycache unless the user set either variable, even to an empty string.
     if (process.env.PYTHONDONTWRITEBYTECODE === undefined) {
-      process.env.PYTHONPYCACHEPREFIX ??= join(defaultCommentCheckerCacheDir(process.platform, process.env, "omo-senpi"), "..", "pycache")
+      process.env.PYTHONPYCACHEPREFIX ??= join(
+        defaultCommentCheckerCacheDir(process.platform, process.env, "omo-senpi"),
+        "..",
+        "pycache",
+      )
     }
     // Publish the dag eval sdk directory so JavaScript cells can import it from OMO_DAG_SDK_ROOT.
     provisionDagSdkRoot()
@@ -136,7 +140,8 @@ export function composeOmoSenpiExtension(
     // 200ms timer behind after a `quit` shutdown.
     const publishChildWork = publishWakeQueueChildWork(pi, logger)
     const idleCoordinator = new IdleInjectionCoordinator(
-      (message, options) => deliverItems((native, delivery) => pi.sendMessage(native, delivery), { ...options, message }),
+      (message, options) =>
+        deliverItems((native, delivery) => pi.sendMessage(native, delivery), { ...options, message }),
       {
         scheduleFlush: (flush) => {
           const timer = setTimeout(flush, IDLE_FLUSH_BATCH_WINDOW_MS)
@@ -162,7 +167,9 @@ export function composeOmoSenpiExtension(
       try {
         idleCoordinator.retire()
       } catch (error) {
-        logger.warn("omo-senpi idle injection receipt failed on shutdown", { error: error instanceof Error ? error.message : String(error) })
+        logger.warn("omo-senpi idle injection receipt failed on shutdown", {
+          error: error instanceof Error ? error.message : String(error),
+        })
       }
     })
 
@@ -175,7 +182,11 @@ export function composeOmoSenpiExtension(
     // as the idle coordinator: a session that ends before the gate opens must not start a
     // half-session's worth of work on a dead API.
     const startupDeferral = createStartupDeferral({
-      schedule: options.scheduleStartupWork ?? createFirstPaintScheduler({ on: (event, handler, registrationOptions) => pi.on(event, handler, registrationOptions) }),
+      schedule:
+        options.scheduleStartupWork ??
+        createFirstPaintScheduler({
+          on: (event, handler, registrationOptions) => pi.on(event, handler, registrationOptions),
+        }),
       onError: (label, error) => logger.warn("omo-senpi deferred startup work failed", { label, error }),
     })
     pi.on("session_shutdown", () => startupDeferral.retire())

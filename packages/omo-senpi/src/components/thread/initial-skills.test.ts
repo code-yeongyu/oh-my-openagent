@@ -40,7 +40,13 @@ type Opened = Parameters<ThreadHost["openSession"]>[0]
 function creator() {
   const opened: Opened[] = []
   const prompts: string[] = []
-  const session: ThreadHostSession = { sessionId: "rpc-new", durableSessionId: "dur-new", cwd: process.cwd(), name: "lead", status: "open" }
+  const session: ThreadHostSession = {
+    sessionId: "rpc-new",
+    durableSessionId: "dur-new",
+    cwd: process.cwd(),
+    name: "lead",
+    status: "open",
+  }
   const host: ThreadHost = {
     socket: "/tmp/initial-skills.sock",
     listSessions: async () => [],
@@ -63,7 +69,13 @@ function creator() {
   }
   const store = createGatewayStore({ agentDir: tempDir("initial-skills-gateway-") })
   stores.push(store)
-  const tools = createThreadTools({ host, store, stateDirectory: tempDir("initial-skills-state-"), callerSessionId: () => "caller", callerWorkspaceRoot: () => process.cwd() })
+  const tools = createThreadTools({
+    host,
+    store,
+    stateDirectory: tempDir("initial-skills-state-"),
+    callerSessionId: () => "caller",
+    callerWorkspaceRoot: () => process.cwd(),
+  })
   const tool = tools.find((candidate) => candidate.name === "thread_create")
   if (tool === undefined) throw new Error("thread_create must be registered")
   let call = 0
@@ -83,19 +95,35 @@ function sessionSide(context: Record<string, string>, entries: unknown[] = []) {
   const warnings: string[] = []
   const pi = {
     sessionContext: context,
-    on(event: string, handler: (payload: unknown, ctx?: unknown) => unknown) { handlers.set(event, [...(handlers.get(event) ?? []), handler]) },
-    appendEntry(customType: string, data?: unknown) { entries.push({ type: "custom", customType, data }) },
+    on(event: string, handler: (payload: unknown, ctx?: unknown) => unknown) {
+      handlers.set(event, [...(handlers.get(event) ?? []), handler])
+    },
+    appendEntry(customType: string, data?: unknown) {
+      entries.push({ type: "custom", customType, data })
+    },
   }
-  registerInitialSkills(pi as never, { logger: { warn: (line: string) => warnings.push(line), info() {}, error() {}, debug() {} } } as never)
+  registerInitialSkills(
+    pi as never,
+    { logger: { warn: (line: string) => warnings.push(line), info() {}, error() {}, debug() {} } } as never,
+  )
   const ctx = { sessionManager: { getEntries: () => entries } }
   return {
     entries,
     warnings,
-    start: async () => { for (const handler of handlers.get("session_start") ?? []) await handler({ type: "session_start" }, ctx) },
+    start: async () => {
+      for (const handler of handlers.get("session_start") ?? []) await handler({ type: "session_start" }, ctx)
+    },
     turn: async (skills: readonly { name: string; filePath: string }[], preview = false) => {
       let systemPrompt = "BASE"
       for (const handler of handlers.get("before_agent_start") ?? []) {
-        const result = (await handler({ type: "before_agent_start", prompt: "", trigger: "prompt", systemPrompt, systemPromptOptions: { cwd: process.cwd(), skills }, ...(preview ? { preview: true } : {}) })) as { systemPrompt?: string } | undefined
+        const result = (await handler({
+          type: "before_agent_start",
+          prompt: "",
+          trigger: "prompt",
+          systemPrompt,
+          systemPromptOptions: { cwd: process.cwd(), skills },
+          ...(preview ? { preview: true } : {}),
+        })) as { systemPrompt?: string } | undefined
         if (result?.systemPrompt !== undefined) systemPrompt = result.systemPrompt
       }
       return systemPrompt
@@ -105,7 +133,10 @@ function sessionSide(context: Record<string, string>, entries: unknown[] = []) {
 
 test("#given a skill the workspace loads #when a thread is created with it #then the session opens with the list, no prompt is sent, and the result echoes it", async () => {
   const c = creator()
-  expect(await c.create({ skills: ["gateway-lead"] })).toMatchObject({ kind: "ok", thread: { thread_id: "dur-new", requested_skills: ["gateway-lead"] } })
+  expect(await c.create({ skills: ["gateway-lead"] })).toMatchObject({
+    kind: "ok",
+    thread: { thread_id: "dur-new", requested_skills: ["gateway-lead"] },
+  })
   expect(c.opened).toHaveLength(1)
   expect(c.opened[0]?.initialSkills).toEqual(["gateway-lead"])
   expect(c.prompts).toEqual([])
@@ -160,7 +191,9 @@ test("#given a session created with a skill #when it restarts with no launch con
   const file = writeSkill(root, "gateway-lead", "You lead the gateway scope.")
   const first = sessionSide({ [INITIAL_SKILLS_CONTEXT_KEY]: JSON.stringify(["gateway-lead"]) })
   await first.start()
-  expect(first.entries).toEqual([{ type: "custom", customType: INITIAL_SKILLS_ENTRY, data: { names: ["gateway-lead"] } }])
+  expect(first.entries).toEqual([
+    { type: "custom", customType: INITIAL_SKILLS_ENTRY, data: { names: ["gateway-lead"] } },
+  ])
   const restarted = sessionSide({}, first.entries)
   await restarted.start()
   expect(await restarted.turn([{ name: "gateway-lead", filePath: file }])).toContain("You lead the gateway scope.")

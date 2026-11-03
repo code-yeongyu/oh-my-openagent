@@ -7,7 +7,7 @@ import type { StoredMessage } from "./types"
 export async function resolveMessageContext(
   sessionID: string,
   client: OpencodeClient,
-  messageDir: string | null
+  messageDir: string | null,
 ): Promise<{ prevMessage: StoredMessage | null; firstMessageAgent: string | null }> {
   if (isSqliteBackend()) {
     return findMessageContextFromSDK(client, sessionID)

@@ -1,9 +1,26 @@
 import { randomUUID } from "node:crypto"
 import type { RunRef } from "../../../senpi-task/src/pause/ports"
-import { admissionBatches, failItems, settleItemReceipts, withSuperseded, type AdmissionItem, type ItemReceipt, type QueuedInjection } from "./idle-injection-items"
+import {
+  admissionBatches,
+  failItems,
+  settleItemReceipts,
+  withSuperseded,
+  type AdmissionItem,
+  type ItemReceipt,
+  type QueuedInjection,
+} from "./idle-injection-items"
 import { NO_RECEIPT_ERRORS, type ReceiptErrors } from "./idle-injection-receipts"
 
-export type IdleInjectionSource = "task-status" | "task-completion" | "workpool-aggregate" | "team-message" | "team-liveness" | "boulder-continuation" | "ulw-continuation" | "dag-run" | "kibitzer"
+export type IdleInjectionSource =
+  | "task-status"
+  | "task-completion"
+  | "workpool-aggregate"
+  | "team-message"
+  | "team-liveness"
+  | "boulder-continuation"
+  | "ulw-continuation"
+  | "dag-run"
+  | "kibitzer"
 
 export interface IdleInjection {
   // Cancellation/order key; every enqueue retains its independent custody identity.
@@ -28,7 +45,11 @@ export interface IdleInjectionMessage extends Record<string, unknown> {
   readonly customType: "omo-senpi:wake"
   readonly content: string
   readonly display: false
-  readonly details: ReadonlyArray<{ readonly customType: string; readonly details: unknown; readonly contentRange?: readonly [number, number] }>
+  readonly details: ReadonlyArray<{
+    readonly customType: string
+    readonly details: unknown
+    readonly contentRange?: readonly [number, number]
+  }>
 }
 
 export type IdleInjectionDelivery = (
@@ -55,7 +76,12 @@ export interface IdleInjectionCoordinatorOptions {
 
 // Sources that carry a child's result to its parent: until they are delivered, the parent still owes
 // that work, so the engine must not read it as done. Continuations and nudges are the parent's own.
-const CHILD_WORK_SOURCES: ReadonlySet<IdleInjectionSource> = new Set(["task-completion", "workpool-aggregate", "team-message", "dag-run"])
+const CHILD_WORK_SOURCES: ReadonlySet<IdleInjectionSource> = new Set([
+  "task-completion",
+  "workpool-aggregate",
+  "team-message",
+  "dag-run",
+])
 
 /**
  * Handed to `onDeliveryFailed` for every injection still queued when the coordinator retires, and
@@ -139,7 +165,14 @@ export class IdleInjectionCoordinator {
     const itemId = injection.itemId ?? randomUUID()
     const prior = this.#pending.get(injection.key)
     const superseded = prior === undefined ? [] : withSuperseded(prior)
-    this.#pending.set(injection.key, { ...injection, itemId, superseded, get content() { return injection.content } })
+    this.#pending.set(injection.key, {
+      ...injection,
+      itemId,
+      superseded,
+      get content() {
+        return injection.content
+      },
+    })
     this.#reportChildWork()
     return true
   }
@@ -150,11 +183,12 @@ export class IdleInjectionCoordinator {
   scheduleFlush(): void {
     if (this.#retired || this.#flushScheduled) return
     this.#flushScheduled = true
-    this.#cancelScheduledFlush = this.#scheduleFlush(() => {
-      this.#flushScheduled = false
-      this.#cancelScheduledFlush = undefined
-      this.#flush("steer")
-    }) ?? undefined
+    this.#cancelScheduledFlush =
+      this.#scheduleFlush(() => {
+        this.#flushScheduled = false
+        this.#cancelScheduledFlush = undefined
+        this.#flush("steer")
+      }) ?? undefined
   }
 
   // Immediate coalesced flush for an IDLE parent. A microtask is soon enough to land the steer before
@@ -216,7 +250,10 @@ export class IdleInjectionCoordinator {
       try {
         this.#onReceiptError?.(error)
       } catch (reporterError) {
-        console.error("[omo-senpi] onReceiptError threw while reporting a receipt error", { receiptError: error, reporterError })
+        console.error("[omo-senpi] onReceiptError threw while reporting a receipt error", {
+          receiptError: error,
+          reporterError,
+        })
       }
     }
   }
@@ -278,7 +315,8 @@ export class IdleInjectionCoordinator {
     // unhandled rejection.
     try {
       void delivery.then(
-        (result) => this.#reportAllReceiptErrors(receiptsThenSettle(() => settleItemReceipts(batch.injections, result))),
+        (result) =>
+          this.#reportAllReceiptErrors(receiptsThenSettle(() => settleItemReceipts(batch.injections, result))),
         (error: unknown) => this.#reportAllReceiptErrors(receiptsThenSettle(() => failItems(batch.injections, error))),
       )
     } catch (error) {

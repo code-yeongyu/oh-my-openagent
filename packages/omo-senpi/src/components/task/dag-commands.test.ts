@@ -120,7 +120,8 @@ function fakeManager(
       const found = snapshots[runId]
       if (found === undefined) throw new Error(`unknown dag run "${runId}"`)
       const owner = summaries.find((summary) => summary.runId === runId)?.parentSessionId
-      if (owner !== undefined && owner !== parentSessionId) throw new Error(`dag run "${runId}" belongs to another session`)
+      if (owner !== undefined && owner !== parentSessionId)
+        throw new Error(`dag run "${runId}" belongs to another session`)
       return found
     },
     taskRecord: (taskId) => tasks[taskId],
@@ -161,7 +162,12 @@ describe("registerDagCommands", () => {
   it("#given runs in two sessions #when /dag runs with no argument #then this session's runs print with statuses", async () => {
     // given
     const mine = summary({ runId: "dag_mine", name: "release audit", status: "running" })
-    const done = summary({ runId: "dag_done", name: "nightly sweep", status: "completed", counts: { total: 3, completed: 3, running: 0, failed: 0 } })
+    const done = summary({
+      runId: "dag_done",
+      name: "nightly sweep",
+      status: "completed",
+      counts: { total: 3, completed: 3, running: 0, failed: 0 },
+    })
     const other = summary({ runId: "dag_other", name: "foreign", parentSessionId: "session-b" })
     const pi = new FakeExtensionAPI()
     registerDagCommands(pi, fakeManager([mine, done, other]))
@@ -184,14 +190,20 @@ describe("registerDagCommands", () => {
     // given
     const snapshot = diamondSnapshot()
     const pi = new FakeExtensionAPI()
-    registerDagCommands(pi, fakeManager([summary({ runId: "dag_diamond", name: "release audit" })], { dag_diamond: snapshot }))
+    registerDagCommands(
+      pi,
+      fakeManager([summary({ runId: "dag_diamond", name: "release audit" })], { dag_diamond: snapshot }),
+    )
     const { ctx, ui } = commandCtx("session-a")
 
     // when
     await invoke(pi, "dag_diamond", ctx)
 
     // then the tree is wave-grouped and every dependent node names what it waits on
-    const lines = ui.notifications.map((entry) => entry.message).join("\n").split("\n")
+    const lines = ui.notifications
+      .map((entry) => entry.message)
+      .join("\n")
+      .split("\n")
     const waveHeaders = lines.filter((line) => line.startsWith("wave "))
     expect(waveHeaders).toEqual(["wave 1/3", "wave 2/3", "wave 3/3"])
     const seedLine = lines.find((line) => line.includes("collect inputs"))
@@ -218,7 +230,10 @@ describe("registerDagCommands", () => {
     await invoke(pi, "dag_diamond", ctx)
 
     // then
-    const lines = ui.notifications.map((entry) => entry.message).join("\n").split("\n")
+    const lines = ui.notifications
+      .map((entry) => entry.message)
+      .join("\n")
+      .split("\n")
     const leftLine = lines.find((line) => line.includes("deep review")) ?? ""
     expect(leftLine).toContain("running")
     expect(leftLine).toContain("agent:reviewer")
@@ -260,7 +275,10 @@ describe("registerDagCommands", () => {
     await invoke(pi, "dag_diamond", ctx)
 
     // then
-    const lines = ui.notifications.map((entry) => entry.message).join("\n").split("\n")
+    const lines = ui.notifications
+      .map((entry) => entry.message)
+      .join("\n")
+      .split("\n")
     expect(lines.find((line) => line.includes("deep review"))).toContain("x2")
     expect(lines.find((line) => line.includes("collect inputs"))).not.toContain("x2")
     expect(lines.find((line) => line.includes("quick lint"))).toContain("error: task_error lint exited 1")
@@ -268,7 +286,10 @@ describe("registerDagCommands", () => {
 
   it("#given an amended run #when /dag <id> runs #then the header carries an amended xN marker", async () => {
     // given the definition was amended twice
-    const snapshot = { ...diamondSnapshot(), amendHistory: [{ at: "2026-08-14T00:01:00.000Z" }, { at: "2026-08-14T00:02:00.000Z" }] }
+    const snapshot = {
+      ...diamondSnapshot(),
+      amendHistory: [{ at: "2026-08-14T00:01:00.000Z" }, { at: "2026-08-14T00:02:00.000Z" }],
+    }
     const pi = new FakeExtensionAPI()
     registerDagCommands(pi, fakeManager([summary({ runId: "dag_diamond" })], { dag_diamond: snapshot }))
     const { ctx, ui } = commandCtx("session-a")
@@ -277,14 +298,21 @@ describe("registerDagCommands", () => {
     await invoke(pi, "dag_diamond", ctx)
 
     // then
-    const header = ui.notifications.map((entry) => entry.message).join("\n").split("\n")[0] ?? ""
+    const header =
+      ui.notifications
+        .map((entry) => entry.message)
+        .join("\n")
+        .split("\n")[0] ?? ""
     expect(header).toContain("amended x2")
   })
 
   it("#given a run that was never amended #when /dag <id> runs #then no amended marker renders", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    registerDagCommands(pi, fakeManager([summary({ runId: "dag_diamond" })], { dag_diamond: { ...diamondSnapshot(), amendHistory: [] } }))
+    registerDagCommands(
+      pi,
+      fakeManager([summary({ runId: "dag_diamond" })], { dag_diamond: { ...diamondSnapshot(), amendHistory: [] } }),
+    )
     const { ctx, ui } = commandCtx("session-a")
 
     // when
@@ -340,7 +368,14 @@ describe("registerDagCommands", () => {
       taskRecord: () => undefined,
     })
     const notifications: string[] = []
-    const ctx = { mode: "tui", ui: { notify: (message: string) => notifications.push(message), select: () => Promise.resolve(undefined), confirm: () => Promise.resolve(true) } }
+    const ctx = {
+      mode: "tui",
+      ui: {
+        notify: (message: string) => notifications.push(message),
+        select: () => Promise.resolve(undefined),
+        confirm: () => Promise.resolve(true),
+      },
+    }
 
     // when
     await invoke(pi, "", ctx)

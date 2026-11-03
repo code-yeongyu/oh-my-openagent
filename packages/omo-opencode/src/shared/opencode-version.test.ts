@@ -102,7 +102,6 @@ describe("opencode-version", () => {
     })
   })
 
-
   describe("getOpenCodeVersion", () => {
     beforeEach(() => {
       resetVersionCache()

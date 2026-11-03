@@ -1,9 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { applySessionPromptParams } from "./session-prompt-params-helpers"
-import {
-  clearAllSessionPromptParams,
-  getSessionPromptParams,
-} from "./session-prompt-params-state"
+import { clearAllSessionPromptParams, getSessionPromptParams } from "./session-prompt-params-state"
 
 describe("applySessionPromptParams", () => {
   afterEach(() => {

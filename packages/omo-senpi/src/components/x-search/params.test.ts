@@ -22,21 +22,28 @@ describe("validateXSearchParams", () => {
   })
 
   test("rejects both handle lists as INVALID_FILTERS", () => {
-    expect(validateXSearchParams({ query: "x", allowed_x_handles: ["alice"], excluded_x_handles: ["bob"] })).toMatchObject({
+    expect(
+      validateXSearchParams({ query: "x", allowed_x_handles: ["alice"], excluded_x_handles: ["bob"] }),
+    ).toMatchObject({
       ok: false,
       code: "INVALID_FILTERS",
     })
   })
 
   test("rejects more than 20 handles as TOO_MANY_HANDLES", () => {
-    expect(validateXSearchParams({ query: "x", allowed_x_handles: Array.from({ length: 21 }, (_, i) => `user${i}`) })).toMatchObject({
+    expect(
+      validateXSearchParams({ query: "x", allowed_x_handles: Array.from({ length: 21 }, (_, i) => `user${i}`) }),
+    ).toMatchObject({
       ok: false,
       code: "TOO_MANY_HANDLES",
     })
   })
 
   test("rejects impossible calendar dates as INVALID_DATE", () => {
-    expect(validateXSearchParams({ query: "x", from_date: "2026-02-30" })).toMatchObject({ ok: false, code: "INVALID_DATE" })
+    expect(validateXSearchParams({ query: "x", from_date: "2026-02-30" })).toMatchObject({
+      ok: false,
+      code: "INVALID_DATE",
+    })
   })
 
   test("rejects an inverted date range as INVALID_DATE_RANGE", () => {

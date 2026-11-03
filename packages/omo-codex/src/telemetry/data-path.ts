@@ -1,6 +1,4 @@
-import {
-  resolveTelemetryStateDir,
-} from "@oh-my-opencode/telemetry-core"
+import { resolveTelemetryStateDir } from "@oh-my-opencode/telemetry-core"
 import type { XdgOsProvider } from "@oh-my-opencode/utils"
 import { dirname } from "node:path"
 
@@ -23,10 +21,12 @@ export function __resetOsProviderForTesting(): void {
 }
 
 export function getDataDir(): string {
-  return dirname(resolveTelemetryStateDir(createCodexTelemetryProductConfig(), {
-    env: process.env,
-    osProvider: getOsProvider(),
-  }))
+  return dirname(
+    resolveTelemetryStateDir(createCodexTelemetryProductConfig(), {
+      env: process.env,
+      osProvider: getOsProvider(),
+    }),
+  )
 }
 
 export function getActivityStateDir(): string {

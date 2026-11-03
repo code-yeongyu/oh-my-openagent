@@ -61,7 +61,12 @@ function readChildStdout(stdout: ReadableStream<Uint8Array>): ChildResult {
     }
   })()
 
-  return { get output() { return output }, ready }
+  return {
+    get output() {
+      return output
+    },
+    ready,
+  }
 }
 
 function parseChildResult(output: string): { readonly ids: readonly string[]; readonly retries: number } {
@@ -74,14 +79,14 @@ describe("claimTaskRecord cross-process race", () => {
   test("#given two processes in one frozen id bucket #when they claim task records concurrently #then every record is unique and collisions retry", async () => {
     // given
     const project = tempProject()
-    const children = ["a", "b"].map((tag) => Bun.spawn([
-      process.execPath,
-      claimRaceChildFixturePath,
-      project,
-      String(frozenNowMs),
-      "50",
-      tag,
-    ], { stdin: "pipe", stdout: "pipe", stderr: "pipe", env: { ...process.env } }))
+    const children = ["a", "b"].map((tag) =>
+      Bun.spawn([process.execPath, claimRaceChildFixturePath, project, String(frozenNowMs), "50", tag], {
+        stdin: "pipe",
+        stdout: "pipe",
+        stderr: "pipe",
+        env: { ...process.env },
+      }),
+    )
     const stdout = children.map((child) => readChildStdout(child.stdout))
     const stderr = children.map((child) => new Response(child.stderr).text())
 

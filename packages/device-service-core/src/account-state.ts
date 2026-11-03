@@ -1,7 +1,11 @@
 export type AccountShowResult = { readonly exitCode: number; readonly stdout: string }
 
 export type AccountState =
-  | { readonly kind: "signed_in"; readonly device: { readonly id: string; readonly name: string }; readonly refreshState: string }
+  | {
+      readonly kind: "signed_in"
+      readonly device: { readonly id: string; readonly name: string }
+      readonly refreshState: string
+    }
   | { readonly kind: "signed_out" }
   | { readonly kind: "keychain_locked" }
   | { readonly kind: "store_unavailable" }
@@ -10,7 +14,8 @@ export type AccountState =
 const KEYCHAIN_LOCKED_EXIT = 7
 const STORE_UNAVAILABLE_EXITS: readonly number[] = [8, 9]
 
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value)
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
 const text = (value: unknown): value is string => typeof value === "string" && value.length > 0
 
 function lastJsonLine(stdout: string): unknown {
@@ -29,7 +34,8 @@ function lastJsonLine(stdout: string): unknown {
  */
 export function classifyAccountShow(result: AccountShowResult): AccountState {
   const value = lastJsonLine(result.stdout)
-  if (result.exitCode === KEYCHAIN_LOCKED_EXIT && isRecord(value) && value.keychain === "locked") return { kind: "keychain_locked" }
+  if (result.exitCode === KEYCHAIN_LOCKED_EXIT && isRecord(value) && value.keychain === "locked")
+    return { kind: "keychain_locked" }
   if (STORE_UNAVAILABLE_EXITS.includes(result.exitCode)) return { kind: "store_unavailable" }
   if (!isRecord(value)) return { kind: "account_unavailable", reason: "omo account show printed no JSON" }
   if (value.signedIn === false) return { kind: "signed_out" }
@@ -42,7 +48,10 @@ export function classifyAccountShow(result: AccountShowResult): AccountState {
         refreshState: text(value.refreshState) ? value.refreshState : "ok",
       }
   }
-  return { kind: "account_unavailable", reason: `omo account show answered an unexpected shape (exit ${result.exitCode})` }
+  return {
+    kind: "account_unavailable",
+    reason: `omo account show answered an unexpected shape (exit ${result.exitCode})`,
+  }
 }
 
 /** The one line a user can act on for each state that stops the bootstrap; undefined when signed in. */

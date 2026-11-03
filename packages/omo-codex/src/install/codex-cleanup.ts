@@ -165,10 +165,7 @@ export interface RemoveManagedPathSeams {
 // may recreate state between the first removal and the re-check. If the
 // artifact reappears after the retry as well, the cleanup still exits 0 and a
 // second `lazycodex-ai uninstall` run clears it.
-export async function removeManagedPathBestEffort(
-  path: string,
-  seams: RemoveManagedPathSeams,
-): Promise<boolean> {
+export async function removeManagedPathBestEffort(path: string, seams: RemoveManagedPathSeams): Promise<boolean> {
   const skip = validateManagedCleanupTarget({ codexHome: seams.codexHome, path })
   if (skip !== null) {
     seams.onSkip?.(skip)
@@ -234,9 +231,9 @@ async function collectInstalledAgentPaths(codexHome: string, configPath: string)
 async function readManagedAgentPathsFromConfig(codexHome: string, configPath: string): Promise<readonly string[]> {
   if (!(await exists(configPath))) return []
   const config = await readFile(configPath, "utf8")
-  return MANAGED_CODEX_AGENT_NAMES
-    .filter((agentName) => config.includes(`config_file = ${JSON.stringify(`./agents/${agentName}.toml`)}`))
-    .map((agentName) => join(codexHome, "agents", `${agentName}.toml`))
+  return MANAGED_CODEX_AGENT_NAMES.filter((agentName) =>
+    config.includes(`config_file = ${JSON.stringify(`./agents/${agentName}.toml`)}`),
+  ).map((agentName) => join(codexHome, "agents", `${agentName}.toml`))
 }
 
 async function readInstalledAgentManifest(manifestPath: string): Promise<readonly string[]> {

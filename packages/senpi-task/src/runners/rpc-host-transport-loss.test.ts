@@ -3,7 +3,12 @@ import { afterEach, describe, expect, test } from "bun:test"
 import type { TaskRecord } from "../state"
 import { runTaskSend } from "../tools/control/send"
 import type { FakeHost, FakeHostOptions } from "./rpc-host/__fixtures__/fake-host"
-import { HOST_CHILD_MODEL, startHostWorld, type HostWorld, type ParentSession } from "./rpc-host/__fixtures__/host-world"
+import {
+  HOST_CHILD_MODEL,
+  startHostWorld,
+  type HostWorld,
+  type ParentSession,
+} from "./rpc-host/__fixtures__/host-world"
 import { hostWorldRecovery } from "./rpc-host/__fixtures__/host-world-recovery"
 import { manualRecoveryClock, type ManualRecoveryClock } from "./rpc-host/__fixtures__/manual-recovery-clock"
 import { LIVE_PARENT_SUSPENSION_BUDGET_MS } from "../lifecycle/live-parent-recovery"
@@ -34,7 +39,11 @@ interface Lane {
   readonly outcomes: ReattachOutcome[]
 }
 
-async function laneOf(slots: number, host: FakeHostOptions = {}, reattachDelaysMs: readonly number[] = [0, 0]): Promise<Lane> {
+async function laneOf(
+  slots: number,
+  host: FakeHostOptions = {},
+  reattachDelaysMs: readonly number[] = [0, 0],
+): Promise<Lane> {
   const world = await startHostWorld(host)
   worlds.push(world)
   const clock = manualRecoveryClock()
@@ -89,8 +98,11 @@ function routingOf(world: HostWorld, record: TaskRecord): string {
 /** Parked for live-parent recovery: detached with its cause, still unfinished, and holding no lease. */
 function parkedFor(parent: ParentSession, taskId: string): boolean {
   const record = parent.store.load(taskId)
-  return record?.residency_state === "rpc_detached" && record.suspension_reason !== undefined
-    && (record.status === "running" || record.status === "pending")
+  return (
+    record?.residency_state === "rpc_detached" &&
+    record.suspension_reason !== undefined &&
+    (record.status === "running" || record.status === "pending")
+  )
 }
 
 /**
@@ -108,9 +120,13 @@ function expectRecoveryNotice(lane: Lane, record: TaskRecord, confirmedStop: boo
 }
 
 function hostTrace(host: FakeHost): string {
-  const commands = host.commands.map((command, index) =>
-    `${index} ${command.type} sid=${command.sessionId ?? ""} path=${String(command.payload.sessionPath ?? "")}`)
-  const sessions = host.sessions().map((row) => `${row.sessionPath} routing=${row.routingId} parked=${row.parked} attachments=${row.attachments}`)
+  const commands = host.commands.map(
+    (command, index) =>
+      `${index} ${command.type} sid=${command.sessionId ?? ""} path=${String(command.payload.sessionPath ?? "")}`,
+  )
+  const sessions = host
+    .sessions()
+    .map((row) => `${row.sessionPath} routing=${row.routingId} parked=${row.parked} attachments=${row.attachments}`)
   return ["host commands:", ...commands, "host sessions:", ...sessions].join("\n")
 }
 
@@ -172,8 +188,11 @@ describe("a child whose host transport drops", () => {
     expect((await settled(parent, second.task_id)).status).toBe("completed")
     const steered = world.host.waitForCommand("steer")
     live.advance(5_000)
-    await live.until(() => parent.store.load(first.task_id)?.residency_state === "resident"
-      && parent.store.load(first.task_id)?.suspension_reason === undefined)
+    await live.until(
+      () =>
+        parent.store.load(first.task_id)?.residency_state === "resident" &&
+        parent.store.load(first.task_id)?.suspension_reason === undefined,
+    )
     expect(parent.store.load(first.task_id)?.host_session?.session_path).toBe(first.host_session?.session_path)
 
     // then the message acknowledged as queued reaches the respawned child before its run ends
@@ -245,12 +264,15 @@ describe("a child whose host transport drops", () => {
     clock.expire()
     await live.until(() => outcomes.length === 3)
     expect(outcomes).toEqual(["lost", "lost", "lost"])
-    for (const child of children) expect(concurrencyOf(parent).leaseState(child.task_id, child.notification.run_epoch)).toBeUndefined()
+    for (const child of children)
+      expect(concurrencyOf(parent).leaseState(child.task_id, child.notification.run_epoch)).toBeUndefined()
 
     // when - the host never takes a continuation for the whole live-parent recovery budget, nor
     // answers the close that ends it: the close deadline releases each child, not the host
     live.advance(LIVE_PARENT_SUSPENSION_BUDGET_MS + 1)
-    await live.until(() => children.every((child) => parent.store.load(child.task_id)?.failure_kind === "suspended_unresumable"))
+    await live.until(() =>
+      children.every((child) => parent.store.load(child.task_id)?.failure_kind === "suspended_unresumable"),
+    )
     live.advance(CLOSE_DEADLINE_MS)
 
     // then
@@ -283,8 +305,11 @@ describe("a child whose host transport drops", () => {
     const { world, parent, clock, live } = lane
     await parent.startChildren(1)
     const child = recordAt(parent, 0)
-    const session = world.host.sessions().find((candidate) => candidate.sessionPath === child.host_session?.session_path)
-    if (session?.processPid === undefined || session.processExit === undefined) throw new Error("the child's session has no process")
+    const session = world.host
+      .sessions()
+      .find((candidate) => candidate.sessionPath === child.host_session?.session_path)
+    if (session?.processPid === undefined || session.processExit === undefined)
+      throw new Error("the child's session has no process")
     world.host.withholdReply("open_session")
     const reopenAsked = world.host.waitForCommand("open_session")
     world.host.cutConnections()
@@ -305,7 +330,9 @@ describe("a child whose host transport drops", () => {
     // then
     await Promise.race([session.processExit, rejectAfter(10_000, "the child's process never exited")])
     expect(processAlive(session.processPid)).toBe(false)
-    const relisted = world.host.sessions().filter((candidate) => candidate.sessionPath === child.host_session?.session_path)
+    const relisted = world.host
+      .sessions()
+      .filter((candidate) => candidate.sessionPath === child.host_session?.session_path)
     // #10925: on loaded Windows CI the closed session is sometimes listed again; carry the host's command
     // sequence in the failure so the next occurrence shows whether a reopen arrived after the close.
     expect(relisted, relisted.length === 0 ? "" : hostTrace(world.host)).toEqual([])

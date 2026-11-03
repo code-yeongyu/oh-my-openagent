@@ -6,7 +6,12 @@
  * instead of a copy of the file lookup, the parse or the precedence.
  */
 
-import { loadOmoConfig, mergeOmoConfigRecords, resolveOmoConfigView, type OmoConfigEnv } from "@oh-my-opencode/omo-config-core"
+import {
+  loadOmoConfig,
+  mergeOmoConfigRecords,
+  resolveOmoConfigView,
+  type OmoConfigEnv,
+} from "@oh-my-opencode/omo-config-core"
 
 /** The `task.*` keys `omo daemon` reads. Each is present only when a loaded layer sets it, so the caller can
  * tell "configured" from the schema default. */
@@ -19,7 +24,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
-export function resolveDaemonTaskSettings(input: { readonly cwd: string; readonly env: OmoConfigEnv }): DaemonTaskSettings {
+export function resolveDaemonTaskSettings(input: {
+  readonly cwd: string
+  readonly env: OmoConfigEnv
+}): DaemonTaskSettings {
   // The same config view the extension's task runner loads (omo-senpi config-resolution: harness "senpi").
   const loaded = loadOmoConfig({ cwd: input.cwd, env: input.env, harness: "senpi" })
   // `loaded.config` fills schema defaults, so whether a layer SET a key is read from the loaded layers

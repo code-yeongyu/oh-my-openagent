@@ -11,12 +11,15 @@ const ATTACHED = {
   name: "render_page",
   description: "Render a host page.",
   inputSchema: schema,
-  _meta: { "senpi/host-tool": { name: "host_page", label: "Host page", exposure: "search", allowLazyActivation: true } },
+  _meta: {
+    "senpi/host-tool": { name: "host_page", label: "Host page", exposure: "search", allowLazyActivation: true },
+  },
 }
 
 function routeOf(routes: readonly unknown[]): ((...args: unknown[]) => Promise<unknown>) | undefined {
   const last = routes.at(-1)
-  if (typeof last !== "object" || last === null || !("execute" in last) || typeof last.execute !== "function") return undefined
+  if (typeof last !== "object" || last === null || !("execute" in last) || typeof last.execute !== "function")
+    return undefined
   const execute = last.execute
   return (...args) => Promise.resolve(Reflect.apply(execute, undefined, args))
 }
@@ -30,7 +33,9 @@ describe("desktop thread toolkit", () => {
     it(`#11897: a ${ending} sets no host route and registers no second tool`, async () => {
       const stub = await mcp({ ...mcpOptions, tools: [ATTACHED] })
       const host = await setup({
-        timeoutMs: 50, offer: "host", hostToolNames: "host_page",
+        timeoutMs: 50,
+        offer: "host",
+        hostToolNames: "host_page",
         reply: reply === "grant" ? () => ({ grant: stub.grant }) : reply,
       })
       await host.start()
@@ -40,8 +45,17 @@ describe("desktop thread toolkit", () => {
   }
 
   it("#11897: a confirmed grant routes the declared callable to the host and keeps details out of model content", async () => {
-    const details = { html: "<p>host-only-page</p>", title: "Page", height: 300, prepared: true, path: "/work/.senpi/html-pages/page.html" }
-    const stub = await mcp({ tools: [ATTACHED], callResult: { content, _meta: { "senpi/tool-result-details": details } } })
+    const details = {
+      html: "<p>host-only-page</p>",
+      title: "Page",
+      height: 300,
+      prepared: true,
+      path: "/work/.senpi/html-pages/page.html",
+    }
+    const stub = await mcp({
+      tools: [ATTACHED],
+      callResult: { content, _meta: { "senpi/tool-result-details": details } },
+    })
     const host = await setup({ offer: "host", hostToolNames: "host_page", reply: () => ({ grant: stub.grant }) })
     await host.start()
     expect(host.pi.tools.map((tool) => tool.name)).not.toContain("host_page")
@@ -65,8 +79,12 @@ describe("desktop thread toolkit", () => {
     await host.start()
     const route = routeOf(host.routes)
     if (route === undefined) throw new Error("no host route")
-    await expect(route("call-1", { title: "Grouped" }, undefined, undefined, session("A"))).rejects.toMatchObject({ name: "HostToolRouteUnavailable" })
-    await expect(route("call-2", { title: "Grouped" }, undefined, undefined, session("B"))).rejects.toMatchObject({ name: "HostToolRouteUnavailable" })
+    await expect(route("call-1", { title: "Grouped" }, undefined, undefined, session("A"))).rejects.toMatchObject({
+      name: "HostToolRouteUnavailable",
+    })
+    await expect(route("call-2", { title: "Grouped" }, undefined, undefined, session("B"))).rejects.toMatchObject({
+      name: "HostToolRouteUnavailable",
+    })
     expect(JSON.stringify(host.logs)).not.toContain(stub.token())
   })
 
@@ -87,13 +105,21 @@ describe("desktop thread toolkit", () => {
       expect(host.pi.rpcEvents[0]).toMatchObject({ name: TOOLKIT_REQUEST_EVENT, data: { toolkit: "thread" } })
       expect(host.tools()).toHaveLength(1)
       const tool = host.tools()[0]
-      expect(tool).toMatchObject({ name: "desktop_thread_organize", parameters: schema, description: "Organize this desktop thread." })
+      expect(tool).toMatchObject({
+        name: "desktop_thread_organize",
+        parameters: schema,
+        description: "Organize this desktop thread.",
+      })
       expect(host.pi.tools.some((entry) => entry.name === "thread_organize")).toBe(false)
       await stub.rotate()
       const result = await execute(tool)
       expect(result.content).toEqual(content)
       expect(stub.requests.filter((request) => request.method === "tools/call")).toEqual([
-        { method: "tools/call", params: { name: "thread_organize", arguments: { title: "Grouped" } }, authorized: true },
+        {
+          method: "tools/call",
+          params: { name: "thread_organize", arguments: { title: "Grouped" } },
+          authorized: true,
+        },
       ])
       expect(JSON.stringify([host.logs, result])).not.toContain(stub.token())
     })
@@ -115,7 +141,12 @@ describe("desktop thread toolkit", () => {
     expect(host.pi.rpcEvents).toHaveLength(1)
     const data = host.pi.rpcEvents[0]?.data
     if (typeof data !== "object" || data === null || !("requestId" in data)) throw new Error("request missing")
-    expect(host.handlers.get(TOOLKIT_GRANT_RPC)?.({ requestId: data.requestId, grant: { endpoint: "http://127.0.0.1:1/mcp", tokenFile: "/unused" } })).toEqual({ accepted: false })
+    expect(
+      host.handlers.get(TOOLKIT_GRANT_RPC)?.({
+        requestId: data.requestId,
+        grant: { endpoint: "http://127.0.0.1:1/mcp", tokenFile: "/unused" },
+      }),
+    ).toEqual({ accepted: false })
     expect(host.tools()).toEqual([])
     expect(host.logs.length).toBeGreaterThan(0)
   })
@@ -184,7 +215,9 @@ describe("desktop thread toolkit", () => {
     const host = await setup({ reply: () => ({ grant: stub.grant }) })
     await host.start()
     expect(host.tools()).toHaveLength(1)
-    expect(stub.requests.filter((request) => request.method === "tools/list").at(-1)?.params).toEqual({ cursor: "second" })
+    expect(stub.requests.filter((request) => request.method === "tools/list").at(-1)?.params).toEqual({
+      cursor: "second",
+    })
     expect(stub.requests.filter((request) => request.method === "tools/list")).toHaveLength(2)
     expect(stub.closedSessions()).toBe(1)
   })

@@ -1,6 +1,14 @@
 import { describe, expect, test } from "bun:test"
 
-import { auditContinuationTrace, contextWindowFor, continuationCustomType, FAILURES, LANES, providerOutcome, selfTest } from "./policy-continuation-e2e.mjs"
+import {
+  auditContinuationTrace,
+  contextWindowFor,
+  continuationCustomType,
+  FAILURES,
+  LANES,
+  providerOutcome,
+  selfTest,
+} from "./policy-continuation-e2e.mjs"
 
 // The deterministic half of the live driver, so `bun test packages/omo-senpi` (the senpi QA lane and
 // its CI step) keeps the scenario definitions honest without spawning a Senpi child.

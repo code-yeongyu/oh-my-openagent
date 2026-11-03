@@ -5,18 +5,30 @@ import type { Signal } from "./otlp-spool-file"
 export const QUARANTINE_DIR = "quarantine"
 
 export type SpoolEntry =
-  | { readonly kind: "active"; readonly name: string; readonly signal: Signal; readonly pid: number; readonly bootId: string }
+  | {
+      readonly kind: "active"
+      readonly name: string
+      readonly signal: Signal
+      readonly pid: number
+      readonly bootId: string
+    }
   | { readonly kind: "batch"; readonly name: string; readonly signal: Signal; readonly batchId: string }
   | {
-    readonly kind: "sending"
-    readonly name: string
-    readonly signal: Signal
-    readonly batchId: string
-    readonly claimer: string
-    readonly leaseExpiresMs: number
-  }
+      readonly kind: "sending"
+      readonly name: string
+      readonly signal: Signal
+      readonly batchId: string
+      readonly claimer: string
+      readonly leaseExpiresMs: number
+    }
   | { readonly kind: "lock"; readonly name: string; readonly target: string }
-  | { readonly kind: "owner"; readonly name: string; readonly signal: Signal; readonly pid: number; readonly bootId: string }
+  | {
+      readonly kind: "owner"
+      readonly name: string
+      readonly signal: Signal
+      readonly pid: number
+      readonly bootId: string
+    }
   | { readonly kind: "other"; readonly name: string }
 
 const ACTIVE = /^active-(logs|traces)-([0-9]+)-([0-9a-f]{32})\.otlp$/

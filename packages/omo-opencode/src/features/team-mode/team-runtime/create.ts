@@ -8,7 +8,12 @@ import type { BackgroundTask } from "../../background-agent/types"
 import type { BackgroundManager } from "../../background-agent/manager"
 import type { TmuxSessionManager } from "../../tmux-subagent/manager"
 import { ensureBaseDirs, getInboxDir, getTeamSpecPath, resolveBaseDir } from "../team-registry/paths"
-import { createRuntimeState, listActiveTeams, loadRuntimeState, transitionRuntimeState } from "../team-state-store/store"
+import {
+  createRuntimeState,
+  listActiveTeams,
+  loadRuntimeState,
+  transitionRuntimeState,
+} from "../team-state-store/store"
 import { registerTeamSession } from "../team-session-registry"
 import type { RuntimeState, TeamSpec } from "../types"
 import { activateTeamLayout } from "./activate-team-layout"
@@ -58,28 +63,43 @@ async function pathExists(filePath: string): Promise<boolean> {
   }
 }
 
-async function resolveSpecSource(spec: TeamSpec, ctx: ExecutorContext, config: TeamModeConfig): Promise<"project" | "user"> {
+async function resolveSpecSource(
+  spec: TeamSpec,
+  ctx: ExecutorContext,
+  config: TeamModeConfig,
+): Promise<"project" | "user"> {
   const baseDir = resolveBaseDir(config)
   if (await pathExists(getTeamSpecPath(baseDir, spec.name, "project", ctx.directory))) return "project"
   if (await pathExists(getTeamSpecPath(baseDir, spec.name, "user"))) return "user"
   return "project"
 }
 
-async function findExistingRuntime(spec: TeamSpec, leadSessionId: string, config: TeamModeConfig): Promise<RuntimeState | undefined> {
+async function findExistingRuntime(
+  spec: TeamSpec,
+  leadSessionId: string,
+  config: TeamModeConfig,
+): Promise<RuntimeState | undefined> {
   for (const candidate of await listActiveTeams(config)) {
     if (candidate.teamName !== spec.name || (candidate.status !== "creating" && candidate.status !== "active")) continue
     const runtimeState = await loadRuntimeState(candidate.teamRunId, config).catch(() => undefined)
-    if (runtimeState?.leadSessionId === leadSessionId && !hasUnresolvedTeamMembers(runtimeState.members)) return runtimeState
+    if (runtimeState?.leadSessionId === leadSessionId && !hasUnresolvedTeamMembers(runtimeState.members))
+      return runtimeState
   }
 }
 
 async function createMemberWorktree(memberWorktreePath: string, projectRoot: string): Promise<string> {
-  const absolutePath = path.isAbsolute(memberWorktreePath) ? memberWorktreePath : path.resolve(projectRoot, memberWorktreePath)
+  const absolutePath = path.isAbsolute(memberWorktreePath)
+    ? memberWorktreePath
+    : path.resolve(projectRoot, memberWorktreePath)
   await mkdir(absolutePath, { recursive: true })
   return absolutePath
 }
 
-async function waitForTaskSessionId(bgMgr: BackgroundManager, task: BackgroundTask, deadlineAt: number): Promise<string> {
+async function waitForTaskSessionId(
+  bgMgr: BackgroundManager,
+  task: BackgroundTask,
+  deadlineAt: number,
+): Promise<string> {
   let sessionId = task.sessionId
   while (!sessionId) {
     if (Date.now() > deadlineAt) throw new Error(`timed out waiting for child session for task ${task.id}`)
@@ -113,12 +133,14 @@ async function updateMemberInRuntimeState(
   patch: (member: RuntimeState["members"][number]) => RuntimeState["members"][number],
   config: TeamModeConfig,
 ): Promise<RuntimeState> {
-  return transitionRuntimeState(teamRunId, (currentState) => ({
-    ...currentState,
-    members: currentState.members.map((member) =>
-      member.name === memberName ? patch(member) : member,
-    ),
-  }), config)
+  return transitionRuntimeState(
+    teamRunId,
+    (currentState) => ({
+      ...currentState,
+      members: currentState.members.map((member) => (member.name === memberName ? patch(member) : member)),
+    }),
+    config,
+  )
 }
 
 export async function createTeamRun(
@@ -149,16 +171,23 @@ export async function createTeamRun(
       memberName: spec.leadAgentId,
       role: "lead",
     })
-    runtimeState = await updateMemberInRuntimeState(runtimeState.teamRunId, spec.leadAgentId, (member) => ({
-      ...member,
-      sessionId: leadSessionId,
-      status: "running",
-      ...(callerLeadSubagentType ? { subagent_type: callerLeadSubagentType } : {}),
-    }), config)
+    runtimeState = await updateMemberInRuntimeState(
+      runtimeState.teamRunId,
+      spec.leadAgentId,
+      (member) => ({
+        ...member,
+        sessionId: leadSessionId,
+        status: "running",
+        ...(callerLeadSubagentType ? { subagent_type: callerLeadSubagentType } : {}),
+      }),
+      config,
+    )
   }
-  await Promise.all(spec.members.map((member) => mkdir(getInboxDir(baseDir, runtimeState.teamRunId, member.name), { recursive: true })))
+  await Promise.all(
+    spec.members.map((member) => mkdir(getInboxDir(baseDir, runtimeState.teamRunId, member.name), { recursive: true })),
+  )
 
-  const deadlineAt = Date.now() + (config.max_wall_clock_minutes * 60_000)
+  const deadlineAt = Date.now() + config.max_wall_clock_minutes * 60_000
   const resources: SpawnedMemberResource[] = spec.members.map(() => ({}))
   let createdLayout = false
 
@@ -168,91 +197,115 @@ export async function createTeamRun(
     const workerCount = Math.min(config.max_parallel_members, spec.members.length)
     const categoryExamples = Object.keys(ctx.userCategories ?? {}).join(", ")
 
-    await Promise.all(Array.from({ length: workerCount }, async () => {
-      while (!failure) {
-        if (Date.now() > deadlineAt) {
-          failure = new Error("team creation exceeded max_wall_clock_minutes")
-          return
-        }
-        const memberIndex = nextMemberIndex++
-        const member = spec.members[memberIndex]
-        if (!member) return
-        const resource = resources[memberIndex]
-        if (!resource) return
-
-        try {
-          if (member.worktreePath) resource.worktreePath = await createMemberWorktree(member.worktreePath, ctx.directory)
-          if (reusesCallerLeadSession && member.name === spec.leadAgentId) {
-            if (resource.worktreePath) {
-              await updateMemberInRuntimeState(runtimeState.teamRunId, member.name, (currentMember) => ({
-                ...currentMember,
-                worktreePath: resource.worktreePath,
-              }), config)
-            }
-            continue
+    await Promise.all(
+      Array.from({ length: workerCount }, async () => {
+        while (!failure) {
+          if (Date.now() > deadlineAt) {
+            failure = new Error("team creation exceeded max_wall_clock_minutes")
+            return
           }
-          const resolvedMember = await resolveMember(member, ctx, categoryExamples, spec.leadAgentId)
-          const task = await bgMgr.launch({
-            description: `Create team member ${spec.name}/${member.name}`,
-            prompt: buildMemberPrompt(spec, member, runtimeState.teamRunId, config, resource.worktreePath),
-            agent: resolvedMember.agentToUse,
-            parentSessionId: leadSessionId,
-            parentMessageId: options?.parentMessageID ?? `team-create:${runtimeState.teamRunId}:${member.name}`,
-            teamRunId: runtimeState.teamRunId,
-            suppressTmuxSpawn: true,
-            model: resolvedMember.model,
-            fallbackChain: resolvedMember.fallbackChain,
-            skillContent: resolvedMember.systemContent,
-            category: member.kind === "category" ? member.category : undefined,
-            sessionPermission: QUESTION_DENIED_SESSION_PERMISSION,
-            ...(resource.worktreePath ? { cwd: resource.worktreePath } : {}),
-            onSessionCreated: async (sessionId) => {
-              registerTeamSession(sessionId, {
-                teamRunId: runtimeState.teamRunId,
-                memberName: member.name,
-                role: member.name === spec.leadAgentId ? "lead" : "member",
-              })
-              runtimeState = await updateMemberInRuntimeState(runtimeState.teamRunId, member.name, (currentMember) => ({
+          const memberIndex = nextMemberIndex++
+          const member = spec.members[memberIndex]
+          if (!member) return
+          const resource = resources[memberIndex]
+          if (!resource) return
+
+          try {
+            if (member.worktreePath)
+              resource.worktreePath = await createMemberWorktree(member.worktreePath, ctx.directory)
+            if (reusesCallerLeadSession && member.name === spec.leadAgentId) {
+              if (resource.worktreePath) {
+                await updateMemberInRuntimeState(
+                  runtimeState.teamRunId,
+                  member.name,
+                  (currentMember) => ({
+                    ...currentMember,
+                    worktreePath: resource.worktreePath,
+                  }),
+                  config,
+                )
+              }
+              continue
+            }
+            const resolvedMember = await resolveMember(member, ctx, categoryExamples, spec.leadAgentId)
+            const task = await bgMgr.launch({
+              description: `Create team member ${spec.name}/${member.name}`,
+              prompt: buildMemberPrompt(spec, member, runtimeState.teamRunId, config, resource.worktreePath),
+              agent: resolvedMember.agentToUse,
+              parentSessionId: leadSessionId,
+              parentMessageId: options?.parentMessageID ?? `team-create:${runtimeState.teamRunId}:${member.name}`,
+              teamRunId: runtimeState.teamRunId,
+              suppressTmuxSpawn: true,
+              model: resolvedMember.model,
+              fallbackChain: resolvedMember.fallbackChain,
+              skillContent: resolvedMember.systemContent,
+              category: member.kind === "category" ? member.category : undefined,
+              sessionPermission: QUESTION_DENIED_SESSION_PERMISSION,
+              ...(resource.worktreePath ? { cwd: resource.worktreePath } : {}),
+              onSessionCreated: async (sessionId) => {
+                registerTeamSession(sessionId, {
+                  teamRunId: runtimeState.teamRunId,
+                  memberName: member.name,
+                  role: member.name === spec.leadAgentId ? "lead" : "member",
+                })
+                runtimeState = await updateMemberInRuntimeState(
+                  runtimeState.teamRunId,
+                  member.name,
+                  (currentMember) => ({
+                    ...currentMember,
+                    sessionId,
+                    status: "running",
+                  }),
+                  config,
+                )
+              },
+            })
+            resource.taskId = task.id
+            const sessionId = await waitForTaskSessionId(bgMgr, task, deadlineAt)
+            registerTeamSession(sessionId, {
+              teamRunId: runtimeState.teamRunId,
+              memberName: member.name,
+              role: member.name === spec.leadAgentId ? "lead" : "member",
+            })
+            const persistedModel = resolvedMember.model
+              ? {
+                  providerID: resolvedMember.model.providerID,
+                  modelID: resolvedMember.model.modelID,
+                  ...(resolvedMember.model.variant ? { variant: resolvedMember.model.variant } : {}),
+                  ...(resolvedMember.model.reasoningEffort
+                    ? { reasoningEffort: resolvedMember.model.reasoningEffort }
+                    : {}),
+                  ...(resolvedMember.model.temperature !== undefined
+                    ? { temperature: resolvedMember.model.temperature }
+                    : {}),
+                  ...(resolvedMember.model.top_p !== undefined ? { top_p: resolvedMember.model.top_p } : {}),
+                  ...(resolvedMember.model.maxTokens !== undefined
+                    ? { maxTokens: resolvedMember.model.maxTokens }
+                    : {}),
+                  ...(resolvedMember.model.thinking ? { thinking: resolvedMember.model.thinking } : {}),
+                }
+              : undefined
+            await updateMemberInRuntimeState(
+              runtimeState.teamRunId,
+              member.name,
+              (currentMember) => ({
                 ...currentMember,
                 sessionId,
                 status: "running",
-              }), config)
-            },
-          })
-          resource.taskId = task.id
-          const sessionId = await waitForTaskSessionId(bgMgr, task, deadlineAt)
-          registerTeamSession(sessionId, {
-            teamRunId: runtimeState.teamRunId,
-            memberName: member.name,
-            role: member.name === spec.leadAgentId ? "lead" : "member",
-          })
-          const persistedModel = resolvedMember.model
-            ? {
-                providerID: resolvedMember.model.providerID,
-                modelID: resolvedMember.model.modelID,
-                ...(resolvedMember.model.variant ? { variant: resolvedMember.model.variant } : {}),
-                ...(resolvedMember.model.reasoningEffort ? { reasoningEffort: resolvedMember.model.reasoningEffort } : {}),
-                ...(resolvedMember.model.temperature !== undefined ? { temperature: resolvedMember.model.temperature } : {}),
-                ...(resolvedMember.model.top_p !== undefined ? { top_p: resolvedMember.model.top_p } : {}),
-                ...(resolvedMember.model.maxTokens !== undefined ? { maxTokens: resolvedMember.model.maxTokens } : {}),
-                ...(resolvedMember.model.thinking ? { thinking: resolvedMember.model.thinking } : {}),
-              }
-            : undefined
-          await updateMemberInRuntimeState(runtimeState.teamRunId, member.name, (currentMember) => ({
-            ...currentMember,
-            sessionId,
-            status: "running",
-            worktreePath: resource.worktreePath,
-            subagent_type: resolvedMember.agentToUse,
-            ...(member.kind === "category" ? { category: member.category } : {}),
-            ...(persistedModel ? { model: persistedModel } : {}),
-          }), config)
-        } catch (error) {
-          failure = error instanceof Error ? error : new Error(String(error))
-          return
+                worktreePath: resource.worktreePath,
+                subagent_type: resolvedMember.agentToUse,
+                ...(member.kind === "category" ? { category: member.category } : {}),
+                ...(persistedModel ? { model: persistedModel } : {}),
+              }),
+              config,
+            )
+          } catch (error) {
+            failure = error instanceof Error ? error : new Error(String(error))
+            return
+          }
         }
-      }
-    }))
+      }),
+    )
 
     if (failure) throw failure
 
@@ -260,7 +313,11 @@ export async function createTeamRun(
     assertNoUnresolvedTeamMembers(launchedRuntimeState.members)
     createdLayout = await activateTeamLayout(launchedRuntimeState, config, ctx.directory, tmuxMgr)
 
-    return await transitionRuntimeState(runtimeState.teamRunId, (currentState) => ({ ...currentState, status: "active" }), config)
+    return await transitionRuntimeState(
+      runtimeState.teamRunId,
+      (currentState) => ({ ...currentState, status: "active" }),
+      config,
+    )
   } catch (error) {
     const cleanupReport = await cleanupTeamRunResources({
       teamRunId: runtimeState.teamRunId,

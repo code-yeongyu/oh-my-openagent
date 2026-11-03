@@ -66,7 +66,8 @@ describe("resolveAgentHome", () => {
           env: {},
           homeDir: HOME,
           exists: (path) =>
-            path === join(HOME, ".omo", "agent", AGENT_HOME_SENTINEL) || path === join(HOME, ".omo", AGENT_HOME_SENTINEL),
+            path === join(HOME, ".omo", "agent", AGENT_HOME_SENTINEL) ||
+            path === join(HOME, ".omo", AGENT_HOME_SENTINEL),
         })
 
         expect(home).toBe(join(HOME, ".omo", "agent"))

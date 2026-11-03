@@ -8,7 +8,11 @@ import type { RespawnResult } from "../lifecycle/port"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
 import type { AwaitingInputReason, TaskRecord } from "../state"
 import { adaptRpcHandle, discardManagedHandle, discardRpcHandle, type ManagedChildHandle } from "./child-handle"
-import { sessionTailContinuationBlocker, sessionTailFinishedText, sessionTailNeedsContinuation } from "./interrupted-turn"
+import {
+  sessionTailContinuationBlocker,
+  sessionTailFinishedText,
+  sessionTailNeedsContinuation,
+} from "./interrupted-turn"
 import { buildRespawnManagedSpec, isTerminalRecord } from "./manager-helpers"
 import type { ManagedRunner, TrustedRespawnLaunchResolver } from "./types"
 import { modelSelector } from "../runners/in-process/runtime-fallback-settings"
@@ -34,7 +38,8 @@ export async function respawnManagedTask(input: {
   readonly paused?: boolean
 }): Promise<RespawnResult> {
   if (input.sessionPath === undefined) return respawnFresh(input)
-  if (input.record.execution_mode === "in-process") return respawnInProcess({ ...input, sessionPath: input.sessionPath })
+  if (input.record.execution_mode === "in-process")
+    return respawnInProcess({ ...input, sessionPath: input.sessionPath })
   return respawnProcess({ ...input, sessionPath: input.sessionPath })
 }
 
@@ -71,7 +76,9 @@ async function respawnFresh(input: {
       prompt: rebuilt.spec.prompt,
       model: input.record.model,
       ...(input.record.resolved_model?.variant === undefined ? {} : { variant: input.record.resolved_model.variant }),
-      ...(input.record.fallback_models === undefined ? {} : { fallbackModels: input.record.fallback_models.map(modelSelector) }),
+      ...(input.record.fallback_models === undefined
+        ? {}
+        : { fallbackModels: input.record.fallback_models.map(modelSelector) }),
       ...(trusted?.extensions === undefined ? {} : { extensions: trusted.extensions }),
       ...(trusted?.memberEnv === undefined ? {} : { memberEnv: trusted.memberEnv }),
       depth: input.record.depth,
@@ -102,7 +109,8 @@ async function respawnInProcess(input: {
   const rebuilt = buildRespawnManagedSpec(input.record, input.stateDir)
   if (!rebuilt.ok) return failure("unrecoverable", rebuilt.code, rebuilt.reason)
   const runner = input.runners["in-process"]
-  if (runner.resume === undefined) return failure("unrecoverable", "respawn_failed", "in-process runner cannot resume sessions")
+  if (runner.resume === undefined)
+    return failure("unrecoverable", "respawn_failed", "in-process runner cannot resume sessions")
   let handle: ManagedChildHandle | undefined
   try {
     input.beforeLaunch()
@@ -135,7 +143,8 @@ async function respawnProcess(input: {
   readonly paused?: boolean
 }): Promise<RespawnResult> {
   const spawnSpec = input.record.spawn_spec
-  if (spawnSpec === undefined) return failure("unrecoverable", "spawn_spec_unavailable", "persisted spawn spec unavailable")
+  if (spawnSpec === undefined)
+    return failure("unrecoverable", "spawn_spec_unavailable", "persisted spawn spec unavailable")
   // A daemon-hosted child resumes the session path its RECORD carries: the daemon owns that
   // transcript, so the newest file in the child's session dir can be the wrong one (or missing).
   const sessionPath = hostSessionResumePath(input.record) ?? input.sessionPath
@@ -158,7 +167,9 @@ async function respawnProcess(input: {
       ...(input.record.host_session === undefined ? {} : { hostSocket: input.record.host_session.socket }),
       model: input.record.model,
       ...(input.record.resolved_model?.variant === undefined ? {} : { variant: input.record.resolved_model.variant }),
-      ...(input.record.fallback_models === undefined ? {} : { fallbackModels: input.record.fallback_models.map(modelSelector) }),
+      ...(input.record.fallback_models === undefined
+        ? {}
+        : { fallbackModels: input.record.fallback_models.map(modelSelector) }),
       ...(trusted?.extensions === undefined ? {} : { extensions: trusted.extensions }),
       ...(trusted?.memberEnv === undefined ? {} : { memberEnv: trusted.memberEnv }),
       depth: input.record.depth,
@@ -184,7 +195,11 @@ async function respawnProcess(input: {
     // report that child by itself instead of resuming an empty session under its task id.
     if (isHostSessionHandle(handle) && !sessionDirPresent) {
       const reason = `recorded session transcript is missing: ${dirname(sessionPath)} no longer exists`
-      return failure("unrecoverable", "session_unavailable", await disposeRpc(handle) ? reason : RESPAWN_CLEANUP_FAILURE_REASON)
+      return failure(
+        "unrecoverable",
+        "session_unavailable",
+        (await disposeRpc(handle)) ? reason : RESPAWN_CLEANUP_FAILURE_REASON,
+      )
     }
     if (handle.switchSession === undefined) return cleanupFailure(handle, "respawned RPC handle cannot switch sessions")
     const switched = await handle.switchSession(sessionPath)
@@ -199,7 +214,7 @@ async function respawnProcess(input: {
     }
     return { ok: true, handle: adaptRpcHandle(handle) }
   } catch (error) {
-    const cleaned = handle === undefined || await disposeRpc(handle)
+    const cleaned = handle === undefined || (await disposeRpc(handle))
     if (isTeamRuntimeUnavailable(error)) {
       return failure("retryable", "team_inactive", "team runtime is not active")
     }
@@ -253,8 +268,12 @@ function joinedLiveHostSession(handle: RpcChildHandle): boolean {
   )
 }
 
-async function continueInterruptedTurn(record: TaskRecord, sessionPath: string, handle: ManagedChildHandle): Promise<void> {
-  if (!isTerminalRecord(record) && await sessionTailNeedsContinuation(sessionPath, CONTINUATION_MESSAGE)) {
+async function continueInterruptedTurn(
+  record: TaskRecord,
+  sessionPath: string,
+  handle: ManagedChildHandle,
+): Promise<void> {
+  if (!isTerminalRecord(record) && (await sessionTailNeedsContinuation(sessionPath, CONTINUATION_MESSAGE))) {
     await handle.followUp(CONTINUATION_MESSAGE)
   }
 }
@@ -269,7 +288,7 @@ async function adoptFinishedTurn(record: TaskRecord, sessionPath: string, handle
 }
 
 async function cleanupFailure(handle: RpcChildHandle, reason: string): Promise<RespawnResult> {
-  return failure("retryable", "respawn_failed", await disposeRpc(handle) ? reason : RESPAWN_CLEANUP_FAILURE_REASON)
+  return failure("retryable", "respawn_failed", (await disposeRpc(handle)) ? reason : RESPAWN_CLEANUP_FAILURE_REASON)
 }
 
 async function discardManagedHandleBestEffort(handle: ManagedChildHandle): Promise<void> {

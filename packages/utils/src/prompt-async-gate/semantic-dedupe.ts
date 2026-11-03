@@ -53,10 +53,7 @@ function canonicalizePromptInputForDedupe(
   try {
     const canonicalEntries: Array<[string, unknown]> = []
     for (const entryKey of Object.keys(value).sort()) {
-      canonicalEntries.push([
-        entryKey,
-        canonicalizePromptInputForDedupe(entryKey, value[entryKey], seen, depth + 1),
-      ])
+      canonicalEntries.push([entryKey, canonicalizePromptInputForDedupe(entryKey, value[entryKey], seen, depth + 1)])
     }
     return Object.fromEntries(canonicalEntries)
   } finally {

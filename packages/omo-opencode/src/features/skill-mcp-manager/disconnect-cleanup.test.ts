@@ -37,10 +37,7 @@ function createState(): SkillMcpManagerState {
 
 function createManagedClient(skillName: string): ManagedClient {
   return {
-    client: new Client(
-      { name: `test-${skillName}`, version: "1.0.0" },
-      { capabilities: {} }
-    ),
+    client: new Client({ name: `test-${skillName}`, version: "1.0.0" }, { capabilities: {} }),
     transport: new StreamableHTTPClientTransport(new URL("https://example.com/mcp")),
     skillName,
     lastUsedAt: Date.now(),

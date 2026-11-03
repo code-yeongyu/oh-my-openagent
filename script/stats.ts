@@ -77,8 +77,7 @@ async function fetchNpmStat(packageName: string, fetchJson: StatsDeps["fetchJson
 function readGitHubReleaseDownloadStat(releasesJson: unknown): DownloadStat {
   const releases = GitHubReleasesPayloadSchema.parse(releasesJson)
   const count = releases.reduce(
-    (total, release) =>
-      total + release.assets.reduce((assetTotal, asset) => assetTotal + asset.download_count, 0),
+    (total, release) => total + release.assets.reduce((assetTotal, asset) => assetTotal + asset.download_count, 0),
     0,
   )
   return {
@@ -89,9 +88,7 @@ function readGitHubReleaseDownloadStat(releasesJson: unknown): DownloadStat {
 }
 
 export async function collectDownloadStats(deps: StatsDeps): Promise<readonly DownloadStat[]> {
-  const npmStats = await Promise.all(
-    NPM_PACKAGES.map((packageName) => fetchNpmStat(packageName, deps.fetchJson)),
-  )
+  const npmStats = await Promise.all(NPM_PACKAGES.map((packageName) => fetchNpmStat(packageName, deps.fetchJson)))
   return [...npmStats, readGitHubReleaseDownloadStat(await deps.runGhApi())]
 }
 

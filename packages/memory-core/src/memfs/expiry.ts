@@ -12,7 +12,8 @@
 import { decodeScalarSource } from "./frontmatter-scalar"
 import type { MemoryFrontmatter } from "./frontmatter"
 
-const EXPIRY_RE = /^(\d{4}-\d{2}-\d{2})(?:T([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,9})?)?(Z|[+-](?:[01]\d|2[0-3]):[0-5]\d))?$/
+const EXPIRY_RE =
+  /^(\d{4}-\d{2}-\d{2})(?:T([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,9})?)?(Z|[+-](?:[01]\d|2[0-3]):[0-5]\d))?$/
 
 /** The instant (epoch ms) the file stops being projected, or `undefined` when it declares no readable expiry. */
 export function memoryExpiresAtMs(frontmatter: MemoryFrontmatter): number | undefined {

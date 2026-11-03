@@ -22,19 +22,28 @@ function isSqliteBackend(): boolean {
   if (cachedResult === true) return true
   if (cachedResult === false) return false
   if (cachedResult === FALSE_PENDING_RETRY) {
-    const versionOk = (() => { versionCheckCalls.push(SQLITE_VERSION); return versionReturnValue })()
+    const versionOk = (() => {
+      versionCheckCalls.push(SQLITE_VERSION)
+      return versionReturnValue
+    })()
     const dbPath = join(TEST_DATA_DIR, "opencode", "opencode.db")
     const dbExists = existsSync(dbPath)
     const result = versionOk && dbExists
     cachedResult = result
     return result
   }
-  const versionOk = (() => { versionCheckCalls.push(SQLITE_VERSION); return versionReturnValue })()
+  const versionOk = (() => {
+    versionCheckCalls.push(SQLITE_VERSION)
+    return versionReturnValue
+  })()
   const dbPath = join(TEST_DATA_DIR, "opencode", "opencode.db")
   const dbExists = existsSync(dbPath)
   const result = versionOk && dbExists
-  if (result) { cachedResult = true }
-  else { cachedResult = FALSE_PENDING_RETRY }
+  if (result) {
+    cachedResult = true
+  } else {
+    cachedResult = FALSE_PENDING_RETRY
+  }
   return result
 }
 
@@ -47,7 +56,9 @@ describe("isSqliteBackend", () => {
     resetSqliteBackendCache()
     versionCheckCalls = []
     versionReturnValue = true
-    try { rmSync(TEST_DATA_DIR, { recursive: true, force: true }) } catch {} // no-excuse-ok: catch — best-effort temp-dir cleanup
+    try {
+      rmSync(TEST_DATA_DIR, { recursive: true, force: true })
+    } catch {} // no-excuse-ok: catch — best-effort temp-dir cleanup
   })
 
   it("returns false when version is below threshold", () => {

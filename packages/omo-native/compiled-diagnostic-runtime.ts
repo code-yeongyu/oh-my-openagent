@@ -16,9 +16,11 @@ export function compiledDiagnosticRuntimeLoader(execDir: string): () => Promise<
 // beside the installed engine; here it is the pi-ai graph compiled into this binary, read through the
 // table senpi publishes to extensions in both its source and compiled runtimes.
 export async function loadCompiledModelCatalog() {
-  const { VIRTUAL_MODULES } = await import("../../node_modules/@code-yeongyu/senpi/dist/core/extensions/virtual-modules.js")
+  const { VIRTUAL_MODULES } =
+    await import("../../node_modules/@code-yeongyu/senpi/dist/core/extensions/virtual-modules.js")
   const catalog: unknown = VIRTUAL_MODULES["@earendil-works/pi-ai/providers/all"]
-  const builtinProviders: unknown = typeof catalog === "object" && catalog !== null ? Reflect.get(catalog, "builtinProviders") : undefined
+  const builtinProviders: unknown =
+    typeof catalog === "object" && catalog !== null ? Reflect.get(catalog, "builtinProviders") : undefined
   if (typeof builtinProviders !== "function") throw new Error("the compiled engine carries no builtin provider catalog")
   return builtinProviders()
 }

@@ -20,7 +20,7 @@ describe("insertJsoncMember", () => {
       expect(next).toContain("// the user's own note")
       expect(next).toContain("/* trailing block comment */")
       expect(parseJsonc(next)).toEqual({
-        "$schema": "https://example.test/omo.schema.json",
+        $schema: "https://example.test/omo.schema.json",
         "[opencode]": { tmux: { enabled: true } },
         "[native]": { categories: { quick: { model: "opencode-go/glm-5.2" } } },
       })
@@ -37,14 +37,21 @@ describe("insertJsoncMember", () => {
 
       // then
       expect(next).toContain("// mine")
-      expect(parseJsonc(next)).toEqual({ "[native]": { categories: { quick: { model: "a/b" }, "deep-low": { model: "c/d" } } } })
+      expect(parseJsonc(next)).toEqual({
+        "[native]": { categories: { quick: { model: "a/b" }, "deep-low": { model: "c/d" } } },
+      })
     })
   })
 
   describe("#given an empty document", () => {
     test("#when members are added one after another #then the result is pretty JSON holding both", () => {
       // when
-      const next = insertJsoncMember(insertJsoncMember("{}\n", [], "defaultProvider", "kimi-coding"), [], "defaultModel", "k3")
+      const next = insertJsoncMember(
+        insertJsoncMember("{}\n", [], "defaultProvider", "kimi-coding"),
+        [],
+        "defaultModel",
+        "k3",
+      )
 
       // then
       expect(JSON.parse(next)).toEqual({ defaultProvider: "kimi-coding", defaultModel: "k3" })

@@ -9,10 +9,7 @@ const TOKEN_LIMIT_FALLBACK_PATTERNS = [
   "too many tokens",
 ]
 
-const TOKEN_LIMIT_ERROR_NAMES = new Set([
-  "contextlengtherror",
-  "context_length_exceeded",
-])
+const TOKEN_LIMIT_ERROR_NAMES = new Set(["contextlengtherror", "context_length_exceeded"])
 
 export function isTokenLimitError(error: { name?: string; message?: string } | undefined): boolean {
   if (!error) return false

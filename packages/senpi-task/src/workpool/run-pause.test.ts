@@ -8,7 +8,9 @@ import type { WorkpoolAdmission, WorkpoolRequest } from "./ports"
 import type { WorkpoolSpec } from "./types"
 
 const roots: string[] = []
-afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
+afterEach(() => {
+  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
+})
 
 test("a Stop persists a pool hold, revokes an in-flight assignment and prevents reload from dispatching", async () => {
   const root = mkdtempSync(join(tmpdir(), "pool-hold-"))
@@ -16,17 +18,38 @@ test("a Stop persists a pool hold, revokes an in-flight assignment and prevents 
   const caller = { sessionId: "parent", rootSessionId: "parent", depth: 0, cwd: root }
   const spec: WorkpoolSpec = {
     plan: { model: "test/model" },
-    start: { prompt: "work", parent_session_id: "parent", root_session_id: "parent", depth: 1, cwd: root, execution_mode: "in-process" },
+    start: {
+      prompt: "work",
+      parent_session_id: "parent",
+      root_session_id: "parent",
+      depth: 1,
+      cwd: root,
+      execution_mode: "in-process",
+    },
   }
   const requested = Promise.withResolvers<WorkpoolRequest>()
   let requests = 0
   let cancellations = 0
   const admission: WorkpoolAdmission = {
     tasks: createTaskRecordStore({ project_dir: root }),
-    resolve: () => spec, hasFreeSlot: () => true,
-    request: request => { requests++; requested.resolve(request); return { cancel: () => { cancellations++ } } },
-    drain() {}, get: () => undefined, pending: () => false, cancel: async () => undefined,
-    waitFor: () => { throw new Error("no worker was started") },
+    resolve: () => spec,
+    hasFreeSlot: () => true,
+    request: (request) => {
+      requests++
+      requested.resolve(request)
+      return {
+        cancel: () => {
+          cancellations++
+        },
+      }
+    },
+    drain() {},
+    get: () => undefined,
+    pending: () => false,
+    cancel: async () => undefined,
+    waitFor: () => {
+      throw new Error("no worker was started")
+    },
   }
   const engine = createWorkpoolEngine(root, admission)
   const pool = engine.create(caller, { name: "work", agent: { category: "quick", prompt: "work" } })
@@ -38,13 +61,14 @@ test("a Stop persists a pool hold, revokes an in-flight assignment and prevents 
   expect(request.bind("st_12345678", 0)).toBe(false)
   expect(cancellations).toBe(1)
   expect(engine.inspect(caller, pool.pool_id)).toMatchObject({
-    generation, hold: { reason: "user_stop", pauseSeq: 9 },
+    generation,
+    hold: { reason: "user_stop", pauseSeq: 9 },
     items: [{ status: "queued" }],
   })
   engine.dispose()
   const recovered = createWorkpoolEngine(root, admission)
   recovered.attach(caller)
-  await new Promise<void>(resolve => setImmediate(resolve))
+  await new Promise<void>((resolve) => setImmediate(resolve))
   expect(requests).toBe(1)
   expect(recovered.inspect(caller, pool.pool_id).hold?.pauseSeq).toBe(9)
   expect(recovered.resumeForRun(caller, pool.pool_id, 8)).toEqual({ released: false, reason: "stale" })

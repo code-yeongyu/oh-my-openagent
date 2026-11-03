@@ -41,7 +41,9 @@ function catalogReference(
     model: entry.model,
     ...(reasoning === undefined && entry.reasoning !== undefined
       ? { reasoning: entry.reasoning }
-      : reasoning !== undefined ? { reasoning } : {}),
+      : reasoning !== undefined
+        ? { reasoning }
+        : {}),
   }
 }
 
@@ -85,9 +87,10 @@ function resolveAgentDefinition(
   catalog: OmoModelCatalog | undefined,
   cycleNames: ReadonlySet<string>,
 ): OmoAgentDef {
-  const resolvedModel = definition.model === undefined
-    ? undefined
-    : catalogReference(definition.model, definition.reasoning, catalog, cycleNames)
+  const resolvedModel =
+    definition.model === undefined
+      ? undefined
+      : catalogReference(definition.model, definition.reasoning, catalog, cycleNames)
 
   return {
     ...definition,
@@ -106,9 +109,10 @@ function resolveCategoryDefinition(
   catalog: OmoModelCatalog | undefined,
   cycleNames: ReadonlySet<string>,
 ): OmoCategoryConfig {
-  const resolvedModel = definition.model === undefined
-    ? undefined
-    : catalogReference(definition.model, definition.reasoning, catalog, cycleNames)
+  const resolvedModel =
+    definition.model === undefined
+      ? undefined
+      : catalogReference(definition.model, definition.reasoning, catalog, cycleNames)
 
   return {
     ...definition,
@@ -147,11 +151,13 @@ function profileShadowDiagnostics(view: OmoConfig): readonly OmoModelReferenceDi
   return Object.keys(view.model_profiles).flatMap((name) =>
     view.models?.[name] === undefined
       ? []
-      : [{
-        kind: "validation" as const,
-        message: `Model profile "${name}" shadows a model catalog entry of the same name`,
-        path: `model_profiles.${name}`,
-      }],
+      : [
+          {
+            kind: "validation" as const,
+            message: `Model profile "${name}" shadows a model catalog entry of the same name`,
+            path: `model_profiles.${name}`,
+          },
+        ],
   )
 }
 
@@ -170,11 +176,13 @@ function profileSpliceDiagnostics(
     (definition.models ?? []).flatMap((entry, index) =>
       typeof entry !== "string" || !profileNames.has(entry)
         ? []
-        : [{
-          kind: "validation" as const,
-          message: `"${entry}" is a model profile; splicing a profile into a category chain is not supported yet`,
-          path: `${section}.${name}.models.${index}`,
-        }],
+        : [
+            {
+              kind: "validation" as const,
+              message: `"${entry}" is a model profile; splicing a profile into a category chain is not supported yet`,
+              path: `${section}.${name}.models.${index}`,
+            },
+          ],
     ),
   )
 }
@@ -192,9 +200,10 @@ function cycleDiagnostics(catalog: OmoModelCatalog | undefined): readonly OmoMod
   if (catalog === undefined) return []
   return findModelCatalogCycles(catalog).map((name) => ({
     kind: "model_catalog_cycle",
-    message: catalog[name]?.model === name
-      ? `Model catalog entry "${name}" references itself`
-      : `Model catalog entry "${name}" participates in a reference cycle`,
+    message:
+      catalog[name]?.model === name
+        ? `Model catalog entry "${name}" references itself`
+        : `Model catalog entry "${name}" participates in a reference cycle`,
     path: `models.${name}.model`,
   }))
 }
@@ -207,24 +216,33 @@ export function resolveModelReferences(view: OmoConfig): ResolveModelReferencesR
     const name = diagnostic.path.split(".")[1]
     if (name !== undefined) cycleNames.add(name)
   }
-  const agents = view.agents === undefined
-    ? undefined
-    : Object.fromEntries(Object.entries(view.agents).map(([name, definition]) => [
-      name,
-      resolveAgentDefinition(definition, view.models, cycleNames),
-    ]))
-  const categories = view.categories === undefined
-    ? undefined
-    : Object.fromEntries(Object.entries(view.categories).map(([name, definition]) => [
-      name,
-      resolveCategoryDefinition(definition, view.models, cycleNames),
-    ]))
-  const modelProfiles = view.model_profiles === undefined
-    ? undefined
-    : Object.fromEntries(Object.entries(view.model_profiles).map(([name, definition]) => [
-      name,
-      resolveModelProfile(definition, view.models, cycleNames),
-    ]))
+  const agents =
+    view.agents === undefined
+      ? undefined
+      : Object.fromEntries(
+          Object.entries(view.agents).map(([name, definition]) => [
+            name,
+            resolveAgentDefinition(definition, view.models, cycleNames),
+          ]),
+        )
+  const categories =
+    view.categories === undefined
+      ? undefined
+      : Object.fromEntries(
+          Object.entries(view.categories).map(([name, definition]) => [
+            name,
+            resolveCategoryDefinition(definition, view.models, cycleNames),
+          ]),
+        )
+  const modelProfiles =
+    view.model_profiles === undefined
+      ? undefined
+      : Object.fromEntries(
+          Object.entries(view.model_profiles).map(([name, definition]) => [
+            name,
+            resolveModelProfile(definition, view.models, cycleNames),
+          ]),
+        )
 
   return {
     diagnostics,

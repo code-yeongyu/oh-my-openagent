@@ -59,23 +59,27 @@ export async function computeUnreflectedVolumeFast(options: DreamSelectorOptions
     if (errorCode(error) === "ENOENT") return []
     throw error
   })
-  const sizes = await Promise.all(entries.filter((entry) => entry.isDirectory()).map(async (entry) => {
-    const journalDir = join(options.transcriptsDir, entry.name)
-    const transcriptSize = await stat(join(journalDir, "transcript.jsonl"))
-      .then((value) => value.size)
-      .catch((error: unknown) => errorCode(error) === "ENOENT" ? 0 : Promise.reject(error))
-    const state = await readReflectionState(join(journalDir, "state.json"), [])
-    if (state.reflected_through_byte_offset !== undefined) {
-      return Math.max(0, transcriptSize - state.reflected_through_byte_offset)
-    }
-    // Legacy journals are parsed once; preserve the old payload-byte semantics for this probe
-    // while publishing the offset for all subsequent fires.
-    const journal = new TranscriptJournal({ journalDir })
-    const journalEntries = await journal.readEntriesSnapshot()
-    const backfilled = await journal.backfillReflectionByteOffset(journalEntries)
-    const snapshot = captureCursorSnapshot(journalEntries, backfilled)
-    return snapshot === null ? 0 : conversationByteLength(snapshot.entries)
-  }))
+  const sizes = await Promise.all(
+    entries
+      .filter((entry) => entry.isDirectory())
+      .map(async (entry) => {
+        const journalDir = join(options.transcriptsDir, entry.name)
+        const transcriptSize = await stat(join(journalDir, "transcript.jsonl"))
+          .then((value) => value.size)
+          .catch((error: unknown) => (errorCode(error) === "ENOENT" ? 0 : Promise.reject(error)))
+        const state = await readReflectionState(join(journalDir, "state.json"), [])
+        if (state.reflected_through_byte_offset !== undefined) {
+          return Math.max(0, transcriptSize - state.reflected_through_byte_offset)
+        }
+        // Legacy journals are parsed once; preserve the old payload-byte semantics for this probe
+        // while publishing the offset for all subsequent fires.
+        const journal = new TranscriptJournal({ journalDir })
+        const journalEntries = await journal.readEntriesSnapshot()
+        const backfilled = await journal.backfillReflectionByteOffset(journalEntries)
+        const snapshot = captureCursorSnapshot(journalEntries, backfilled)
+        return snapshot === null ? 0 : conversationByteLength(snapshot.entries)
+      }),
+  )
   return sizes.reduce((total, size) => total + size, 0)
 }
 
@@ -141,43 +145,62 @@ export function selectLoadedConversations(
   })
 }
 
-export async function loadConversations(transcriptsDir: string, candidateLimit?: number): Promise<LoadedConversation[]> {
+export async function loadConversations(
+  transcriptsDir: string,
+  candidateLimit?: number,
+): Promise<LoadedConversation[]> {
   const entries = await readdir(transcriptsDir, { withFileTypes: true }).catch((error: unknown) => {
     if (errorCode(error) === "ENOENT") return []
     throw error
   })
-  const names = entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort(compareConversationIds)
-  const rankedNames = candidateLimit === undefined
-    ? names
-    : (await Promise.all(names.map(async (conversationId) => ({
+  const names = entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort(compareConversationIds)
+  const rankedNames =
+    candidateLimit === undefined
+      ? names
+      : (
+          await Promise.all(
+            names.map(async (conversationId) => ({
+              conversationId,
+              mtimeMs: await stat(join(transcriptsDir, conversationId, "transcript.jsonl"))
+                .then((value) => value.mtimeMs)
+                .catch(() => 0),
+            })),
+          )
+        )
+          .sort(
+            (left, right) =>
+              right.mtimeMs - left.mtimeMs || compareConversationIds(left.conversationId, right.conversationId),
+          )
+          .slice(0, candidateLimit)
+          .map((entry) => entry.conversationId)
+  const conversations = await Promise.all(
+    rankedNames.map(async (conversationId): Promise<LoadedConversation | null> => {
+      const journalDir = join(transcriptsDir, conversationId)
+      // Snapshot read (lock-free, torn-tail tolerant): this scan walks EVERY journal of the
+      // identity, so taking each state.lock here starved active sessions' reconciles and the
+      // shutdown drain that share those locks.
+      const journalEntries = await new TranscriptJournal({ journalDir }).readEntriesSnapshot()
+      let state = await readReflectionState(join(journalDir, "state.json"), journalEntries)
+      if (state.reflected_through_byte_offset === undefined) {
+        state = await new TranscriptJournal({ journalDir }).backfillReflectionByteOffset(journalEntries)
+      }
+      const snapshot = captureCursorSnapshot(journalEntries, state)
+      const newest = journalEntries.findLast(isCanonicalEntry)
+      if (snapshot === null || newest === undefined) return null
+      return {
         conversationId,
-        mtimeMs: await stat(join(transcriptsDir, conversationId, "transcript.jsonl")).then((value) => value.mtimeMs).catch(() => 0),
-      })))).sort((left, right) => right.mtimeMs - left.mtimeMs || compareConversationIds(left.conversationId, right.conversationId))
-      .slice(0, candidateLimit)
-      .map((entry) => entry.conversationId)
-  const conversations = await Promise.all(rankedNames.map(async (conversationId): Promise<LoadedConversation | null> => {
-    const journalDir = join(transcriptsDir, conversationId)
-    // Snapshot read (lock-free, torn-tail tolerant): this scan walks EVERY journal of the
-    // identity, so taking each state.lock here starved active sessions' reconciles and the
-    // shutdown drain that share those locks.
-    const journalEntries = await new TranscriptJournal({ journalDir }).readEntriesSnapshot()
-    let state = await readReflectionState(join(journalDir, "state.json"), journalEntries)
-    if (state.reflected_through_byte_offset === undefined) {
-      state = await new TranscriptJournal({ journalDir }).backfillReflectionByteOffset(journalEntries)
-    }
-    const snapshot = captureCursorSnapshot(journalEntries, state)
-    const newest = journalEntries.findLast(isCanonicalEntry)
-    if (snapshot === null || newest === undefined) return null
-    return {
-      conversationId,
-      entries: journalEntries,
-      stepsSinceLastSuccessfulReflection: state.steps_since_last_successful_reflection,
-      reflectedThroughMessageId: state.reflected_through_message_id,
-      newestMessageId: newest.source_message_id,
-      lastActivity: newest.captured_at,
-      totalBytes: conversationByteLength(snapshot.entries),
-    }
-  }))
+        entries: journalEntries,
+        stepsSinceLastSuccessfulReflection: state.steps_since_last_successful_reflection,
+        reflectedThroughMessageId: state.reflected_through_message_id,
+        newestMessageId: newest.source_message_id,
+        lastActivity: newest.captured_at,
+        totalBytes: conversationByteLength(snapshot.entries),
+      }
+    }),
+  )
   return conversations.filter((conversation): conversation is LoadedConversation => conversation !== null)
 }
 
@@ -191,27 +214,32 @@ async function readReflectionState(
   } catch (error) {
     if (errorCode(error) !== "ENOENT" && !(error instanceof SyntaxError)) throw error
   }
-  const value = parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : {}
-  const reflectedThrough = typeof value.reflected_through_message_id === "string"
-    && value.reflected_through_message_id.length > 0
-    ? value.reflected_through_message_id
-    : undefined
-  const reflectedSteps = typeof value.reflected_completed_steps === "number"
-    && Number.isInteger(value.reflected_completed_steps)
-    && value.reflected_completed_steps >= 0
-    ? value.reflected_completed_steps
-    : 0
-  const reflectedOffset = typeof value.reflected_through_byte_offset === "number"
-    && Number.isInteger(value.reflected_through_byte_offset)
-    && value.reflected_through_byte_offset >= 0
-    ? value.reflected_through_byte_offset
-    : undefined
-  return deriveState({
-    ...initialReflectionState(),
-    ...(reflectedThrough === undefined ? {} : { reflected_through_message_id: reflectedThrough }),
-    ...(reflectedOffset === undefined ? {} : { reflected_through_byte_offset: reflectedOffset }),
-    reflected_completed_steps: reflectedSteps,
-  }, entries)
+  const value = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {}
+  const reflectedThrough =
+    typeof value.reflected_through_message_id === "string" && value.reflected_through_message_id.length > 0
+      ? value.reflected_through_message_id
+      : undefined
+  const reflectedSteps =
+    typeof value.reflected_completed_steps === "number" &&
+    Number.isInteger(value.reflected_completed_steps) &&
+    value.reflected_completed_steps >= 0
+      ? value.reflected_completed_steps
+      : 0
+  const reflectedOffset =
+    typeof value.reflected_through_byte_offset === "number" &&
+    Number.isInteger(value.reflected_through_byte_offset) &&
+    value.reflected_through_byte_offset >= 0
+      ? value.reflected_through_byte_offset
+      : undefined
+  return deriveState(
+    {
+      ...initialReflectionState(),
+      ...(reflectedThrough === undefined ? {} : { reflected_through_message_id: reflectedThrough }),
+      ...(reflectedOffset === undefined ? {} : { reflected_through_byte_offset: reflectedOffset }),
+      reflected_completed_steps: reflectedSteps,
+    },
+    entries,
+  )
 }
 
 function conversationByteLength(entries: readonly TranscriptEntry[]): number {
@@ -263,7 +291,10 @@ function searchDocuments(conversation: LoadedConversation): SearchDocument[] {
       content,
       reasoning,
       toolCalls: tools.map((entry) => ({ name: entry.name, arguments: entry.argsText })),
-      toolReturn: tools.map((entry) => entry.resultText).filter((text) => text !== undefined).join("\n"),
+      toolReturn: tools
+        .map((entry) => entry.resultText)
+        .filter((text) => text !== undefined)
+        .join("\n"),
     }
   })
 }

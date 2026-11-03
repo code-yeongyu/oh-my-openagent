@@ -10,7 +10,11 @@ import type {
   SessionHistoryScanSource,
 } from "./session-history"
 import type { SessionHistoryRuntimeLoader } from "./session-history-runtime-loader"
-import type { OnboardingSessionHistoryDetails, OnboardingSessionHistoryParams, SourceSummary } from "./session-history-tool"
+import type {
+  OnboardingSessionHistoryDetails,
+  OnboardingSessionHistoryParams,
+  SourceSummary,
+} from "./session-history-tool"
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const SHOWN_PROJECTS = 40
@@ -24,7 +28,9 @@ export interface OnboardingSessionHistoryRun {
   readonly loadRuntime: SessionHistoryRuntimeLoader
 }
 
-export async function executeOnboardingSessionHistory(run: OnboardingSessionHistoryRun): Promise<AgentToolResult<OnboardingSessionHistoryDetails>> {
+export async function executeOnboardingSessionHistory(
+  run: OnboardingSessionHistoryRun,
+): Promise<AgentToolResult<OnboardingSessionHistoryDetails>> {
   const { createSessionDigestStore, scanSessionHistory } = await run.loadRuntime()
   const { params, scanId } = run
   const digestStore = createSessionDigestStore({ stateDir: run.stateDir })
@@ -63,7 +69,9 @@ async function collectScan(events: AsyncIterable<SessionHistoryScanEvent>) {
 function formatSource(name: SessionHistoryScanSource, summary: SourceSummary | undefined): string {
   if (summary?.error !== undefined) return `${name}: failed (${summary.error})`
   const counts = summary?.counts
-  return counts === undefined ? `${name}: no result` : `${name}: found ${counts.found}, read ${counts.read}, cap ${counts.cap}`
+  return counts === undefined
+    ? `${name}: no result`
+    : `${name}: found ${counts.found}, read ${counts.read}, cap ${counts.cap}`
 }
 
 function formatScan(
@@ -77,8 +85,12 @@ function formatScan(
     formatSource("sessions", details.sources.sessions),
     "",
     `projects (${projects.length}, newest first):`,
-    ...projects.slice(0, SHOWN_PROJECTS).map((project) =>
-      `- ${project.path} [${project.sources.join(",")}] threads=${project.threadCount} last=${project.lastActiveAt ?? "unknown"}`),
+    ...projects
+      .slice(0, SHOWN_PROJECTS)
+      .map(
+        (project) =>
+          `- ${project.path} [${project.sources.join(",")}] threads=${project.threadCount} last=${project.lastActiveAt ?? "unknown"}`,
+      ),
     ...(projects.length > SHOWN_PROJECTS ? [`- ... ${projects.length - SHOWN_PROJECTS} more`] : []),
     "",
     `session digests (${digests.length}; all in ${details.digestsFile}):`,

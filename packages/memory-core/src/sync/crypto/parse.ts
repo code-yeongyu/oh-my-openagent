@@ -163,7 +163,8 @@ const parseApproval = (body: JsonObject): ParsedBody | null => {
 const parseRotation = (body: JsonObject): ParsedBody | null => {
   if (!hasExactly(body, [...COMMON, "members", "wraps_digest", "fork_resolution"])) return null
   const fork = body["fork_resolution"]
-  const forkResolution = fork === null ? null : typeof fork === "number" && Number.isSafeInteger(fork) && fork >= 1 ? fork : undefined
+  const forkResolution =
+    fork === null ? null : typeof fork === "number" && Number.isSafeInteger(fork) && fork >= 1 ? fork : undefined
   if (forkResolution === undefined) return null
   const membersValue = body["members"]
   const wrapsDigest = text(body, "wraps_digest")

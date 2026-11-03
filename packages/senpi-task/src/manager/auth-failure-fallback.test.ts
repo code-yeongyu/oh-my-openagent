@@ -55,7 +55,9 @@ describe("runtime fallback after a credential failure", () => {
     if (task.kind !== "started") throw new Error("expected started")
 
     const terminal = manager.waitFor(task.task_id)
-    runner.handles.get(task.task_id)?.settle({ status: "error", failure: { kind: "child-turn-failed", message: "500: upstream overloaded" } })
+    runner.handles
+      .get(task.task_id)
+      ?.settle({ status: "error", failure: { kind: "child-turn-failed", message: "500: upstream overloaded" } })
 
     const record = await terminal
     expect(record.failure_kind).toBe("model_chain_exhausted")

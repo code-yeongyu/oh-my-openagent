@@ -39,11 +39,7 @@ function expectSyntheticContinuation(body: PromptBody["body"]): void {
 }
 
 describe("createEventHandler - model-fallback auto-continuation pins agent/model/variant", () => {
-  const createHandler = (args?: {
-    hooks?: unknown
-    pluginConfig?: unknown
-    withPromptAsync?: boolean
-  }) => {
+  const createHandler = (args?: { hooks?: unknown; pluginConfig?: unknown; withPromptAsync?: boolean }) => {
     setupConnectedProviderCacheMocks()
     const promptAsyncBodies: PromptBody[] = []
     const promptBodies: PromptBody[] = []
@@ -71,7 +67,7 @@ describe("createEventHandler - model-fallback auto-continuation pins agent/model
         directory: "/tmp",
         client: { session: sessionClient },
       }),
-      pluginConfig: unsafeTestValue((args?.pluginConfig ?? {})),
+      pluginConfig: unsafeTestValue(args?.pluginConfig ?? {}),
       firstMessageVariantGate: {
         markSessionCreated: () => {},
         clear: () => {},
@@ -120,8 +116,7 @@ describe("createEventHandler - model-fallback auto-continuation pins agent/model
             error: {
               name: "APIError",
               data: {
-                message:
-                  "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+                message: 'Bad Gateway: {"error":{"message":"unknown provider for model claude-opus-4-7-thinking"}}',
                 isRetryable: true,
               },
             },
@@ -166,8 +161,7 @@ describe("createEventHandler - model-fallback auto-continuation pins agent/model
             name: "UnknownError",
             data: {
               error: {
-                message:
-                  "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+                message: 'Bad Gateway: {"error":{"message":"unknown provider for model claude-opus-4-7-thinking"}}',
               },
             },
           },
@@ -223,8 +217,7 @@ describe("createEventHandler - model-fallback auto-continuation pins agent/model
           status: {
             type: "retry",
             attempt: 1,
-            message:
-              "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+            message: 'Bad Gateway: {"error":{"message":"unknown provider for model claude-opus-4-7-thinking"}}',
             next: 1234,
           },
         },
@@ -274,8 +267,7 @@ describe("createEventHandler - model-fallback auto-continuation pins agent/model
             name: "UnknownError",
             data: {
               error: {
-                message:
-                  "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+                message: 'Bad Gateway: {"error":{"message":"unknown provider for model claude-opus-4-7-thinking"}}',
               },
             },
           },

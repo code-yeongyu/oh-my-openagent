@@ -128,10 +128,15 @@ export function createOnboardingComponent(
       // Session history is never awaited: it starts with the claim, runs bounded in the background and
       // rides the next turn when it lands; a hang or failure just leaves it out until the next claim.
       const history = onceUntilSuccess(async () => {
-        const content = await (dependencies.sessionHistory
-          ?? (async () => (await loadOnboardingScanRuntime()).onboardingHistorySummary(scanEnvironment())))()
+        const content = await (
+          dependencies.sessionHistory ??
+          (async () => (await loadOnboardingScanRuntime()).onboardingHistorySummary(scanEnvironment()))
+        )()
         if (content !== undefined && pending !== undefined) {
-          await pi.sendMessage({ customType: "omo-onboarding:history", content, display: false }, { deliverAs: "nextTurn" })
+          await pi.sendMessage(
+            { customType: "omo-onboarding:history", content, display: false },
+            { deliverAs: "nextTurn" },
+          )
         }
       })
       const withInventory = async (base: string): Promise<string> => {
@@ -140,10 +145,9 @@ export function createOnboardingComponent(
       }
       // The same addition without starting the history read, so a preview consumes no one-shot work.
       const inventoryText = async (base: string): Promise<string> => {
-        const result = injectedFacts !== undefined && dependencies.scan === undefined ? undefined : await inventoryScan()
-        const facts = injected === undefined
-          ? result?.inventory
-          : await injected()
+        const result =
+          injectedFacts !== undefined && dependencies.scan === undefined ? undefined : await inventoryScan()
+        const facts = injected === undefined ? result?.inventory : await injected()
         const parts = [base]
         if (facts !== undefined) parts.push(` Migration inventory (from the same scan omo setup runs): ${facts}`)
         if (result !== undefined) parts.push(`\n\n${result.context}`)
@@ -151,27 +155,28 @@ export function createOnboardingComponent(
       }
       const force = () => pi.getFlag("onboard") === true && !processState[forcedKey]
       // Undefined is unclaimed; null is a successfully completed onboarding turn.
-      let pending: {
-        id: string
-        owned: boolean
-        active: boolean
-        end?: unknown
-      } | null | undefined
+      let pending:
+        | {
+            id: string
+            owned: boolean
+            active: boolean
+            end?: unknown
+          }
+        | null
+        | undefined
 
       const eligible = (ctx: unknown): ctx is ExtensionContext =>
-        isExtensionContext(ctx) && ctx.hasUI && pi.sessionKind === "interactive"
-        && pi.getFlag("omo-senpi-onboarding-disabled") !== true
+        isExtensionContext(ctx) &&
+        ctx.hasUI &&
+        pi.sessionKind === "interactive" &&
+        pi.getFlag("omo-senpi-onboarding-disabled") !== true
 
       const showWelcome = (ctx: ExtensionContext): void => {
         if (ctx.mode !== "tui") return
-        ctx.ui.setWidget("omo-onboarding", [
-          "Welcome to OmO. Ask anything.",
-          "Use ulw for full workflows.",
-        ])
+        ctx.ui.setWidget("omo-onboarding", ["Welcome to OmO. Ask anything.", "Use ulw for full workflows."])
       }
       const ownsRun = (ctx: unknown): ctx is ExtensionContext =>
-        isExtensionContext(ctx) && pending != null
-        && ctx.sessionManager.getSessionId() === pending.id
+        isExtensionContext(ctx) && pending != null && ctx.sessionManager.getSessionId() === pending.id
 
       const release = (ctx: ExtensionContext): void => {
         if (pending?.owned) dependencies.releaseOnboarding(stateDir)
@@ -207,7 +212,9 @@ export function createOnboardingComponent(
         stateDir,
         completeOnboarding: dependencies.completeOnboarding ?? completeOnboarding,
         resetOnboarding: dependencies.resetOnboarding ?? resetOnboarding,
-        onReset: () => { pending = undefined },
+        onReset: () => {
+          pending = undefined
+        },
         ...(dependencies.claimOwnerSeams === undefined ? {} : { claimOwnerSeams: dependencies.claimOwnerSeams }),
       })
       registerSessionHistoryRpc(pi)
@@ -219,19 +226,21 @@ export function createOnboardingComponent(
       })
 
       pi.on("session_start", async (event, ctx) => {
-        if (!isSessionStartEvent(event) || event.reason !== "startup"
-          || !eligible(ctx) || ctx.mode !== "tui") return
+        if (!isSessionStartEvent(event) || event.reason !== "startup" || !eligible(ctx) || ctx.mode !== "tui") return
         if (!force()) {
           if (!dependencies.isOnboardingComplete(stateDir)) showWelcome(ctx)
           return
         }
         if (!(await claim(ctx, true))) return
         try {
-          await pi.sendMessage({
-            customType: "omo-onboarding:bootstrap",
-            content: await withInventory(`${tour} Greet first.`),
-            display: false,
-          }, { triggerTurn: true, deliverAs: "followUp" })
+          await pi.sendMessage(
+            {
+              customType: "omo-onboarding:bootstrap",
+              content: await withInventory(`${tour} Greet first.`),
+              display: false,
+            },
+            { triggerTurn: true, deliverAs: "followUp" },
+          )
         } catch (error) {
           release(ctx)
           throw error
@@ -239,27 +248,41 @@ export function createOnboardingComponent(
       })
 
       // Preview-safe: a preview neither claims onboarding nor starts the background history read.
-      pi.on("before_agent_start", async (event, ctx) => {
-        if (!isRecord(event) || event.trigger !== "prompt" || !eligible(ctx)) return
-        const preview = event.preview === true
-        const forced = force()
-        if (preview) {
-          if (pending !== undefined || claiming) return
-          if (!forced && !(await (dependencies.isOnboardingClaimable?.(stateDir, dependencies.claimOwnerSeams)
-            ?? !dependencies.isOnboardingComplete(stateDir)))) return
-        } else if (!(await claim(ctx, forced))) return
-        if (ctx.sessionManager.getBranch().some((entry) =>
-          entry.type === "custom_message" && entry.customType === "omo-onboarding:context")) return
-        return {
-          message: {
-            customType: "omo-onboarding:context",
-            display: false,
-            content: await (preview ? inventoryText : withInventory)(forced
-              ? `${tour} Tour using their message.`
-              : `Answer fully; greet in their language; offer a one-line tour. On request/acceptance: ${tour}`),
-          },
-        }
-      }, { previewSafe: true })
+      pi.on(
+        "before_agent_start",
+        async (event, ctx) => {
+          if (!isRecord(event) || event.trigger !== "prompt" || !eligible(ctx)) return
+          const preview = event.preview === true
+          const forced = force()
+          if (preview) {
+            if (pending !== undefined || claiming) return
+            if (
+              !forced &&
+              !(await (dependencies.isOnboardingClaimable?.(stateDir, dependencies.claimOwnerSeams) ??
+                !dependencies.isOnboardingComplete(stateDir)))
+            )
+              return
+          } else if (!(await claim(ctx, forced))) return
+          if (
+            ctx.sessionManager
+              .getBranch()
+              .some((entry) => entry.type === "custom_message" && entry.customType === "omo-onboarding:context")
+          )
+            return
+          return {
+            message: {
+              customType: "omo-onboarding:context",
+              display: false,
+              content: await (preview ? inventoryText : withInventory)(
+                forced
+                  ? `${tour} Tour using their message.`
+                  : `Answer fully; greet in their language; offer a one-line tour. On request/acceptance: ${tour}`,
+              ),
+            },
+          }
+        },
+        { previewSafe: true },
+      )
 
       pi.on("agent_start", (_event, ctx) => {
         if (ownsRun(ctx) && pending) {
@@ -287,8 +310,8 @@ export function createOnboardingComponent(
         }
       })
       pi.on("input_disposition", (event, ctx) => {
-        if (ownsRun(ctx) && pending && !pending.active
-          && isRecord(event) && event.disposition === "rejected") release(ctx)
+        if (ownsRun(ctx) && pending && !pending.active && isRecord(event) && event.disposition === "rejected")
+          release(ctx)
       })
       for (const event of ["session_abort", "session_shutdown"]) {
         pi.on(event, (_event, ctx) => {
@@ -304,7 +327,7 @@ export function createOnboardingComponent(
 function onceUntilSuccess<T>(run: () => Promise<T>): () => Promise<T | undefined> {
   let kept: Promise<T> | undefined
   return () => {
-    const current = kept ??= Promise.resolve().then(run)
+    const current = (kept ??= Promise.resolve().then(run))
     return current.catch(() => {
       if (kept === current) kept = undefined
       return undefined

@@ -193,7 +193,12 @@ describe("shutdownChildren", () => {
     registry.add(child)
 
     // when
-    await shutdownChildren(registry, "SIGTERM", () => {}, async () => registry.remove(child))
+    await shutdownChildren(
+      registry,
+      "SIGTERM",
+      () => {},
+      async () => registry.remove(child),
+    )
 
     // then
     expect(selfKills).toEqual(["101:SIGTERM"])
@@ -260,11 +265,7 @@ describe("partition tiling", () => {
     const owned = groupScopes(testFastGroups())
 
     // then — the canonical tiling is whole packages on both sides, compared verbatim
-    expect(sorted(owned)).toEqual([
-      "packages/memory-core/**",
-      "packages/omo-opencode/**",
-      "packages/omo-senpi/**",
-    ])
+    expect(sorted(owned)).toEqual(["packages/memory-core/**", "packages/omo-opencode/**", "packages/omo-senpi/**"])
     expect(sorted(ignored)).toEqual(sorted(owned))
   })
 
@@ -289,9 +290,7 @@ describe("partition tiling", () => {
     const base = readFileSync(new URL("../bunfig.toml", import.meta.url), "utf8")
     const win2 = readFileSync(new URL("../bunfig.win2.toml", import.meta.url), "utf8")
     const narrowed = testFastGroups().map((group) =>
-      group.name === "senpi"
-        ? { ...group, args: ["test", "packages/omo-senpi/src"] }
-        : group,
+      group.name === "senpi" ? { ...group, args: ["test", "packages/omo-senpi/src"] } : group,
     )
 
     // when
@@ -372,7 +371,11 @@ describe("spawnInheritingStdio", () => {
     const { registry } = trackingRegistry()
 
     // when
-    void spawnInheritingStdio(registry, () => {}, spawner)({
+    void spawnInheritingStdio(
+      registry,
+      () => {},
+      spawner,
+    )({
       name: "senpi",
       args: ["test", "packages/omo-senpi"],
     })
@@ -396,7 +399,11 @@ describe("spawnInheritingStdio", () => {
     const { added, removed, registry } = trackingRegistry()
 
     // when
-    const exit = spawnInheritingStdio(registry, () => {}, spawner)({
+    const exit = spawnInheritingStdio(
+      registry,
+      () => {},
+      spawner,
+    )({
       name: "senpi",
       args: ["test"],
     })
@@ -451,16 +458,13 @@ describe("runTestFast", () => {
 
     // then
     expect(testFastGroups().length).toBe(3)
-    expect(order.indexOf("start:senpi")).toBeLessThan(
-      order.indexOf("exit:opencode-memory"),
-    )
+    expect(order.indexOf("start:senpi")).toBeLessThan(order.indexOf("exit:opencode-memory"))
     expect(exit).toBe(0)
   })
 
   it("#given one nonzero group exit #when the runner aggregates #then the combined exit is 1", async () => {
     // given
-    const spawnGroup = async (group: TestFastGroup) =>
-      group.name === "root-rest" ? 3 : 0
+    const spawnGroup = async (group: TestFastGroup) => (group.name === "root-rest" ? 3 : 0)
 
     // when
     const exit = await runTestFast(spawnGroup, capturingLogger([]))
@@ -500,8 +504,10 @@ describe("runTestFast", () => {
     const shutdowns: string[] = []
 
     // when
-    const exit = await runTestFast(async () => 0, capturingLogger([]), () =>
-      void shutdowns.push("shutdown"),
+    const exit = await runTestFast(
+      async () => 0,
+      capturingLogger([]),
+      () => void shutdowns.push("shutdown"),
     )
 
     // then
@@ -527,9 +533,7 @@ describe("runTestFast", () => {
     }
 
     // then
-    expect(lines).toEqual([
-      "[test-fast] running 3 groups in parallel: opencode-memory, root-rest, senpi",
-    ])
+    expect(lines).toEqual(["[test-fast] running 3 groups in parallel: opencode-memory, root-rest, senpi"])
     expect(stdoutWrites.join("")).not.toContain("[test-fast]")
   })
 })

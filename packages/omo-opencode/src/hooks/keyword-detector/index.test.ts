@@ -4,7 +4,12 @@ import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import * as sessionState from "../../features/claude-code-session-state"
-import { _resetForTesting, clearSessionAgent, setMainSession, updateSessionAgent } from "../../features/claude-code-session-state"
+import {
+  _resetForTesting,
+  clearSessionAgent,
+  setMainSession,
+  updateSessionAgent,
+} from "../../features/claude-code-session-state"
 import { ContextCollector } from "../../features/context-injector"
 import * as sharedModule from "../../shared"
 import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
@@ -196,11 +201,13 @@ describe("keyword-detector message transform", () => {
     const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
     const output = {
       message: {} as Record<string, unknown>,
-      parts: [{
-        type: "text",
-        synthetic: true,
-        text: '<peer_message from="researcher">search the issue thread and report findings</peer_message>',
-      }],
+      parts: [
+        {
+          type: "text",
+          synthetic: true,
+          text: '<peer_message from="researcher">search the issue thread and report findings</peer_message>',
+        },
+      ],
     }
 
     // when - keyword detection sees the synthetic peer message
@@ -234,12 +241,9 @@ describe("keyword-detector message transform", () => {
   test("should only fire ultrawork when enabled_expansions is set to [ultrawork]", async () => {
     // given - allowlist configured to only enable ultrawork, and the prompt asks for ultrawork and team mode
     const collector = new ContextCollector()
-    const hook = createKeywordDetectorHook(
-      createMockPluginInput(),
-      collector,
-      undefined,
-      { enabled_expansions: ["ultrawork"] }
-    )
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector, undefined, {
+      enabled_expansions: ["ultrawork"],
+    })
     const sessionID = "enabled-expansions-ultrawork-only"
     const output = {
       message: {} as Record<string, unknown>,
@@ -258,12 +262,7 @@ describe("keyword-detector message transform", () => {
   test("should block all expansions when enabled_expansions is empty array", async () => {
     // given - empty allowlist (effectively disable all)
     const collector = new ContextCollector()
-    const hook = createKeywordDetectorHook(
-      createMockPluginInput(),
-      collector,
-      undefined,
-      { enabled_expansions: [] }
-    )
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector, undefined, { enabled_expansions: [] })
     const sessionID = "enabled-expansions-empty"
     const output = {
       message: {} as Record<string, unknown>,
@@ -281,12 +280,10 @@ describe("keyword-detector message transform", () => {
   test("should allow both allowlist and denylist to coexist", async () => {
     // given - allowlist enables team, but denylist also blocks team
     const collector = new ContextCollector()
-    const hook = createKeywordDetectorHook(
-      createMockPluginInput(),
-      collector,
-      undefined,
-      { enabled_expansions: ["team"], disabled_keywords: ["team"] }
-    )
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector, undefined, {
+      enabled_expansions: ["team"],
+      disabled_keywords: ["team"],
+    })
     const sessionID = "enabled-and-disabled-coexist"
     const output = {
       message: {} as Record<string, unknown>,
@@ -340,10 +337,7 @@ describe("keyword-detector session filtering", () => {
     }
 
     // when - non-main session triggers ultrawork keyword
-    await hook["chat.message"](
-      { sessionID: subagentSessionID },
-      output
-    )
+    await hook["chat.message"]({ sessionID: subagentSessionID }, output)
 
     // then - ultrawork should still work without forcing a new variant
     expect(output.message.variant).toBeUndefined()
@@ -362,10 +356,7 @@ describe("keyword-detector session filtering", () => {
     }
 
     // when - main session triggers keyword detection
-    await hook["chat.message"](
-      { sessionID: mainSessionID },
-      output
-    )
+    await hook["chat.message"]({ sessionID: mainSessionID }, output)
 
     // then - active keyword should be detected without forcing a runtime variant
     expect(output.message.variant).toBeUndefined()
@@ -385,10 +376,7 @@ describe("keyword-detector session filtering", () => {
     }
 
     // when - any session triggers keyword detection
-    await hook["chat.message"](
-      { sessionID: "any-session" },
-      output
-    )
+    await hook["chat.message"]({ sessionID: "any-session" }, output)
 
     // then - all keywords should work without forcing a new variant
     expect(output.message.variant).toBeUndefined()
@@ -407,10 +395,7 @@ describe("keyword-detector session filtering", () => {
     }
 
     // when - ultrawork keyword triggers
-    await hook["chat.message"](
-      { sessionID: "main-123" },
-      output
-    )
+    await hook["chat.message"]({ sessionID: "main-123" }, output)
 
     // then - ultrawork should preserve the already resolved runtime variant
     expect(output.message.variant).toBe("low")
@@ -454,10 +439,7 @@ describe("keyword-detector word boundary", () => {
     }
 
     // when - message with partial 'ulw' match is processed
-    await hook["chat.message"](
-      { sessionID: "any-session" },
-      output
-    )
+    await hook["chat.message"]({ sessionID: "any-session" }, output)
 
     // then - ultrawork should NOT be triggered
     expect(output.message.variant).toBeUndefined()
@@ -476,10 +458,7 @@ describe("keyword-detector word boundary", () => {
     }
 
     // when - message with standalone 'ulw' is processed
-    await hook["chat.message"](
-      { sessionID: "any-session" },
-      output
-    )
+    await hook["chat.message"]({ sessionID: "any-session" }, output)
 
     // then - ultrawork should be triggered without forcing max
     expect(output.message.variant).toBeUndefined()
@@ -498,10 +477,7 @@ describe("keyword-detector word boundary", () => {
     }
 
     // when - message referencing file with 'ulw' substring is processed
-    await hook["chat.message"](
-      { sessionID: "any-session" },
-      output
-    )
+    await hook["chat.message"]({ sessionID: "any-session" }, output)
 
     // then - ultrawork should NOT be triggered
     expect(output.message.variant).toBeUndefined()
@@ -562,14 +538,16 @@ The system mentions ulw and team mode in passing.
     const sessionID = "test-session"
     const output = {
       message: {} as Record<string, unknown>,
-      parts: [{
-        type: "text",
-        text: `<system-reminder>
+      parts: [
+        {
+          type: "text",
+          text: `<system-reminder>
 System will find and locate files.
 </system-reminder>
 
-Please ultrawork the bug in the code.`
-      }],
+Please ultrawork the bug in the code.`,
+        },
+      ],
     }
 
     // when - keyword detection runs on mixed content
@@ -996,12 +974,9 @@ describe("keyword-detector disabled_keywords config", () => {
     // given - keyword detector with team disabled
     const sessionID = "team-disabled-session"
     getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
-    const hook = createKeywordDetectorHook(
-      createMockPluginInput(),
-      undefined,
-      undefined,
-      { disabled_keywords: ["team"] },
-    )
+    const hook = createKeywordDetectorHook(createMockPluginInput(), undefined, undefined, {
+      disabled_keywords: ["team"],
+    })
     const output = {
       message: {} as Record<string, unknown>,
       parts: [{ type: "text", text: "let's use team mode for this" }],
@@ -1019,12 +994,9 @@ describe("keyword-detector disabled_keywords config", () => {
     // given - keyword detector with ultrawork disabled
     const sessionID = "ultrawork-disabled-session"
     const toastCalls: string[] = []
-    const hook = createKeywordDetectorHook(
-      createMockPluginInput({ toastCalls }),
-      undefined,
-      undefined,
-      { disabled_keywords: ["ultrawork"] },
-    )
+    const hook = createKeywordDetectorHook(createMockPluginInput({ toastCalls }), undefined, undefined, {
+      disabled_keywords: ["ultrawork"],
+    })
     const output = {
       message: {} as Record<string, unknown>,
       parts: [{ type: "text", text: "ultrawork do this task" }],

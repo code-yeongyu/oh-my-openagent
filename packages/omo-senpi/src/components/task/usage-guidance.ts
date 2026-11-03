@@ -3,7 +3,7 @@
 export const TASK_USAGE_GUIDANCE = [
   "<omo-senpi-task>",
   "Background task results are automatically delivered: an idle session is always woken, and a running turn receives them at its next tool boundary.",
-  "- /tasks shows this session's children; task_output is for one midpoint status or transcript peek (mode:\"tail\" for recent output).",
+  '- /tasks shows this session\'s children; task_output is for one midpoint status or transcript peek (mode:"tail" for recent output).',
   "- task_send always steers a message into the addressed child, while task_cancel ends it.",
   "- Team mail is steered into the recipient's running turn. Use task_send for updates; team mail never queues as editable follow-up work.",
   "If no independent work remains, end your turn.",

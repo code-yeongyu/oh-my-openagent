@@ -14,7 +14,13 @@ import {
   type TranscriptEntry,
 } from "@oh-my-opencode/memory-core"
 import { OmoMemorySettingsSchema } from "@oh-my-opencode/omo-config-core"
-import type { ChildHandle, ChildModelRegistry, ChildSpec, InProcessRunnerLike, SenpiModelPort } from "@oh-my-opencode/senpi-task"
+import type {
+  ChildHandle,
+  ChildModelRegistry,
+  ChildSpec,
+  InProcessRunnerLike,
+  SenpiModelPort,
+} from "@oh-my-opencode/senpi-task"
 
 import { ModelRegistry, ModelRuntime } from "../../senpi-test-runtime"
 import { FactsExtractorRunner, type FactsExtractorRunnerOptions } from "./facts-runner"
@@ -23,10 +29,7 @@ import type { FactsRunLedger } from "./facts-runner-types"
 import { rmEfaultTolerant } from "./teardown.test-support"
 
 export const AVAILABLE_MODEL: SenpiModelPort = { provider: "omo-mock", id: "mock-1" }
-export async function fixture(
-  now?: () => Date,
-  options: { readonly registerCleanup?: boolean } = {},
-) {
+export async function fixture(now?: () => Date, options: { readonly registerCleanup?: boolean } = {}) {
   const root = await mkdtemp(join(tmpdir(), "omo-facts-runner-"))
   const cleanup = () => rmEfaultTolerant(root, { recursive: true, force: true })
   if (options.registerCleanup !== false) onTestFinished(cleanup)
@@ -46,7 +49,11 @@ export async function fixture(
  * exist - the shipped catalog would otherwise satisfy the quick chain on its own. An in-process
  * child shares this exact instance, so the facts child cannot drift onto another engine's model set.
  */
-export function registrySnapshot(models: readonly { readonly id: string; readonly contextWindow?: number; readonly maxTokens?: number }[] = [{ id: "mock-1" }]): ChildModelRegistry {
+export function registrySnapshot(
+  models: readonly { readonly id: string; readonly contextWindow?: number; readonly maxTokens?: number }[] = [
+    { id: "mock-1" },
+  ],
+): ChildModelRegistry {
   const registry = new ModelRegistry(ModelRuntime.createSync({ modelsPath: null }))
   registry.registerProvider("omo-mock", {
     api: "openai-completions",
@@ -72,13 +79,15 @@ export async function enqueue(
   messageId: string,
   text: string,
 ): Promise<void> {
-  const entries: TranscriptEntry[] = [{
-    kind: "user",
-    text,
-    captured_at: "2026-08-10T00:00:00.000Z",
-    source_line_id: `${messageId}:user`,
-    source_message_id: messageId,
-  }]
+  const entries: TranscriptEntry[] = [
+    {
+      kind: "user",
+      text,
+      captured_at: "2026-08-10T00:00:00.000Z",
+      source_line_id: `${messageId}:user`,
+      source_message_id: messageId,
+    },
+  ]
   await queue.enqueue({
     identity: identity.id,
     sessionId: conversationId,
@@ -103,14 +112,15 @@ export function runnerOptions(
     loadConfig: () => ({
       config: {
         categories: {
-          quick: mode === "model-fallback"
-            ? {
-                models: [
-                  { model: "extension-only/primary", reasoning: "off" },
-                  { model: "omo-mock/mock-1", reasoning: "minimal" },
-                ],
-              }
-            : { model: "omo-mock/mock-1" },
+          quick:
+            mode === "model-fallback"
+              ? {
+                  models: [
+                    { model: "extension-only/primary", reasoning: "off" },
+                    { model: "omo-mock/mock-1", reasoning: "minimal" },
+                  ],
+                }
+              : { model: "omo-mock/mock-1" },
         },
       },
       diagnostics: [],
@@ -119,9 +129,8 @@ export function runnerOptions(
     }),
     resolveModelRegistry: () => ({
       getAvailable: () => models,
-      find: (provider, modelId) => models.find((candidate) =>
-        provider === candidate.provider && modelId === candidate.id
-      ),
+      find: (provider, modelId) =>
+        models.find((candidate) => provider === candidate.provider && modelId === candidate.id),
       getProviderAuth: () => undefined,
     }),
     deadlineMs: 10_000,
@@ -137,11 +146,23 @@ export function runnerOptions(
         const payloadStart = spec.prompt.indexOf("\n\n")
         const payload = JSON.parse(spec.prompt.slice(payloadStart + 2)) as { readonly entries: readonly unknown[] }
         if (mode === "fact" || mode === "model-fallback") {
-          await tool.execute("fact-1", { scope: "project", text: `fixture consumed ${payload.entries.length} queue entries`, date: "2026-08-10" })
+          await tool.execute("fact-1", {
+            scope: "project",
+            text: `fixture consumed ${payload.entries.length} queue entries`,
+            date: "2026-08-10",
+          })
         } else if (mode === "person") {
-          await tool.execute("fact-1", { scope: "person", person: { name: "Mina", aliases: ["Min"] }, text: "Mina prefers concise reviews.", date: "2026-08-10" })
+          await tool.execute("fact-1", {
+            scope: "person",
+            person: { name: "Mina", aliases: ["Min"] },
+            text: "Mina prefers concise reviews.",
+            date: "2026-08-10",
+          })
         } else if (mode === "malformed") {
-          await appendFile(join(spec.cwd, "extraction.jsonl"), '{"scope":"project","person":{"name":"Mina","aliases":[]},"text":"bad","date":"2026-08-10"}\n')
+          await appendFile(
+            join(spec.cwd, "extraction.jsonl"),
+            '{"scope":"project","person":{"name":"Mina","aliases":[]},"text":"bad","date":"2026-08-10"}\n',
+          )
         }
         return {
           task_id: spec.taskId,
@@ -170,15 +191,21 @@ export function runnerOptions(
 export async function runLedgers(identity: MemoryIdentity): Promise<FactsRunLedger[]> {
   const runs = join(identity.paths.facts, "runs")
   const names = await readdir(runs)
-  const dated = await Promise.all(names.map(async (name) => ({
-    name,
-    createdAt: (await stat(join(runs, name), { bigint: true })).birthtimeNs,
-    ledger: JSON.parse(await readFile(join(runs, name, "ledger.json"), "utf8")) as FactsRunLedger,
-  })))
+  const dated = await Promise.all(
+    names.map(async (name) => ({
+      name,
+      createdAt: (await stat(join(runs, name), { bigint: true })).birthtimeNs,
+      ledger: JSON.parse(await readFile(join(runs, name, "ledger.json"), "utf8")) as FactsRunLedger,
+    })),
+  )
   return dated
-    .sort((left, right) => (left.createdAt === right.createdAt
-      ? left.name.localeCompare(right.name)
-      : left.createdAt < right.createdAt ? -1 : 1))
+    .sort((left, right) =>
+      left.createdAt === right.createdAt
+        ? left.name.localeCompare(right.name)
+        : left.createdAt < right.createdAt
+          ? -1
+          : 1,
+    )
     .map((entry) => entry.ledger)
 }
 

@@ -10,7 +10,11 @@ function discoveredSkills(): SkillInfo[] {
     opencodeNativeSkill("deploy-model/preset", "preset desc", "/home/pack/models/deploy-model/preset/SKILL.md"),
     opencodeNativeSkill("deploy-model/capacity", "capacity desc", "/home/pack/models/deploy-model/capacity/SKILL.md"),
     makeSkill("review-work", "local desc", { scope: "project", location: "/repo/custom-skills/review-work/SKILL.md" }),
-    opencodeNativeSkill("deploy-model/customize", "customize desc", "/home/pack/models/deploy-model/customize/SKILL.md"),
+    opencodeNativeSkill(
+      "deploy-model/customize",
+      "customize desc",
+      "/home/pack/models/deploy-model/customize/SKILL.md",
+    ),
     makeSkill("Zeta-upper"),
     makeSkill("alpha-lower"),
   ]
@@ -28,18 +32,19 @@ function discoveredCommands(): CommandInfo[] {
 describe("formatCombinedDescription ordering", () => {
   it("renders byte-identical descriptions for the same items discovered in different orders", () => {
     const forward = formatCombinedDescription(discoveredSkills(), discoveredCommands(), { includeSkills: true })
-    const reversed = formatCombinedDescription(
-      discoveredSkills().toReversed(),
-      discoveredCommands().toReversed(),
-      { includeSkills: true },
-    )
+    const reversed = formatCombinedDescription(discoveredSkills().toReversed(), discoveredCommands().toReversed(), {
+      includeSkills: true,
+    })
 
     expect(reversed).toBe(forward)
   })
 
   it("renders byte-identical command-only descriptions for different discovery orders", () => {
     const forward = formatCombinedDescription([], discoveredCommands())
-    const rotated = formatCombinedDescription([], [...discoveredCommands().slice(2), ...discoveredCommands().slice(0, 2)])
+    const rotated = formatCombinedDescription(
+      [],
+      [...discoveredCommands().slice(2), ...discoveredCommands().slice(0, 2)],
+    )
 
     expect(rotated).toBe(forward)
   })

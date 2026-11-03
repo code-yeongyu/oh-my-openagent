@@ -50,7 +50,11 @@ describe("findProjectConfigPathsFarthestFirst", () => {
   test("#given nested project configs inside HOME #when resolving project paths #then they are farthest-first", () => {
     // given
     const homeDir = resolve("/home/alice")
-    const configDirectories = [join(homeDir, "work"), join(homeDir, "work", "project"), join(homeDir, "work", "project", "src")]
+    const configDirectories = [
+      join(homeDir, "work"),
+      join(homeDir, "work", "project"),
+      join(homeDir, "work", "project", "src"),
+    ]
     const cwd = configDirectories[2]
     const fileSystem = makeProjectFileSystem(configDirectories)
 
@@ -107,7 +111,13 @@ describe("findProjectConfigPathsFarthestFirst", () => {
   })
 
   test("#given no project configs #when resolving project paths #then it returns an empty list", () => {
-    expect(findProjectConfigPathsFarthestFirst(resolve("/opt/work/project"), resolve("/home/alice"), makeProjectFileSystem([]))).toEqual([])
+    expect(
+      findProjectConfigPathsFarthestFirst(
+        resolve("/opt/work/project"),
+        resolve("/home/alice"),
+        makeProjectFileSystem([]),
+      ),
+    ).toEqual([])
   })
 
   test("#given cwd exceeds the maximum walk depth #when resolving project paths #then the walk is bounded", () => {
@@ -124,7 +134,11 @@ describe("findProjectConfigPathsFarthestFirst", () => {
     }
 
     // when
-    const paths = findProjectConfigPathsFarthestFirst(nestedPath(rootDir, MAX_PROJECT_CONFIG_DIRECTORY_DEPTH + 1), homeDir, fileSystem)
+    const paths = findProjectConfigPathsFarthestFirst(
+      nestedPath(rootDir, MAX_PROJECT_CONFIG_DIRECTORY_DEPTH + 1),
+      homeDir,
+      fileSystem,
+    )
 
     // then
     expect(paths).toEqual([])

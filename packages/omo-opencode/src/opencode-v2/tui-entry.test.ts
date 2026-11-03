@@ -6,7 +6,10 @@ import { showOpenCodeV2Notice } from "./tui-entry"
 
 type ShownToast = { readonly title: string; readonly message: string; readonly variant: string }
 
-function recordingContext(): { readonly shown: ShownToast[]; readonly context: Parameters<typeof showOpenCodeV2Notice>[0] } {
+function recordingContext(): {
+  readonly shown: ShownToast[]
+  readonly context: Parameters<typeof showOpenCodeV2Notice>[0]
+} {
   const shown: ShownToast[] = []
   return { shown, context: { ui: { toast: { show: (options) => shown.push(options) } } } }
 }

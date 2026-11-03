@@ -25,8 +25,14 @@ function createEnforcerContext() {
       session: {
         messages: async () => ({
           data: [
-            { info: { role: "user", id: "m1", time: { created: 1 } }, parts: [{ type: "text", text: "implement feature" }] },
-            { info: { role: "assistant", id: "m2", time: { created: 2, completed: 3 } }, parts: [{ type: "text", text: "did part of the work" }] },
+            {
+              info: { role: "user", id: "m1", time: { created: 1 } },
+              parts: [{ type: "text", text: "implement feature" }],
+            },
+            {
+              info: { role: "assistant", id: "m2", time: { created: 2, completed: 3 } },
+              parts: [{ type: "text", text: "did part of the work" }],
+            },
           ],
         }),
         todo: async () => ({
@@ -50,7 +56,10 @@ describe("issue #5112 - delegate-task sync child must not be re-awakened after h
       STABILITY_POLLS_REQUIRED: 1,
       MAX_POLL_TIME_MS: 100,
     })
-    const { initTaskToastManager, _resetTaskToastManagerForTesting } = require("../../features/task-toast-manager/manager")
+    const {
+      initTaskToastManager,
+      _resetTaskToastManagerForTesting,
+    } = require("../../features/task-toast-manager/manager")
     _resetTaskToastManagerForTesting()
     initTaskToastManager({
       tui: { showToast: mock(() => Promise.resolve()) },
@@ -87,9 +96,20 @@ describe("issue #5112 - delegate-task sync child must not be re-awakened after h
       run_in_background: false,
       command: null,
     }
-    await executeSyncTask(args as never, mockCtx as never, mockExecutorCtx as never, {
-      sessionID: "parent-session",
-    } as never, "test-agent", undefined, undefined, undefined, undefined, createDeps() as never)
+    await executeSyncTask(
+      args as never,
+      mockCtx as never,
+      mockExecutorCtx as never,
+      {
+        sessionID: "parent-session",
+      } as never,
+      "test-agent",
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      createDeps() as never,
+    )
 
     //#when
     const store = createSessionStateStore()

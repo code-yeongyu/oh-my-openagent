@@ -56,8 +56,10 @@ export function parseArgs(argv) {
   }
   if (options.laneReport || options.selfTest) return options
   if (options.mode !== "clean" && options.mode !== "contaminated") throw new Error("--mode must be clean|contaminated")
-  if (options.mode === "clean" && options.set.length > 0) throw new Error("--set is only valid with --mode contaminated")
-  if (options.mode === "contaminated" && options.set.length === 0) throw new Error("--mode contaminated needs at least one --set NAME=VALUE")
+  if (options.mode === "clean" && options.set.length > 0)
+    throw new Error("--set is only valid with --mode contaminated")
+  if (options.mode === "contaminated" && options.set.length === 0)
+    throw new Error("--mode contaminated needs at least one --set NAME=VALUE")
   return options
 }
 
@@ -73,7 +75,9 @@ export function parseAssignment(text) {
 }
 
 export function packageDirEntries(env) {
-  return Object.fromEntries(Object.entries(env).filter(([name, value]) => PACKAGE_DIR_PATTERN.test(name) && typeof value === "string"))
+  return Object.fromEntries(
+    Object.entries(env).filter(([name, value]) => PACKAGE_DIR_PATTERN.test(name) && typeof value === "string"),
+  )
 }
 
 /**
@@ -83,15 +87,38 @@ export function packageDirEntries(env) {
 export function inspectPackageDirs({ parentEnv, laneEnv, injected }) {
   const parentDirs = packageDirEntries(parentEnv)
   const injectedNames = new Set(injected.map((entry) => entry.name))
-  const names = new Set([...KNOWN_PACKAGE_DIR_NAMES, ...Object.keys(parentDirs), ...Object.keys(laneEnv), ...injectedNames])
+  const names = new Set([
+    ...KNOWN_PACKAGE_DIR_NAMES,
+    ...Object.keys(parentDirs),
+    ...Object.keys(laneEnv),
+    ...injectedNames,
+  ])
   const inspected = [...names].sort().map((name) => {
     const laneValue = laneEnv[name]
-    const source = injectedNames.has(name) ? "injected" : parentDirs[name] !== undefined ? "inherited" : laneValue !== undefined ? "lane-discovered" : "known"
-    return { name, source, set: laneValue !== undefined, ...(laneValue === undefined ? {} : { value: laneValue }), ...(parentDirs[name] === undefined ? {} : { parentValue: parentDirs[name] }) }
+    const source = injectedNames.has(name)
+      ? "injected"
+      : parentDirs[name] !== undefined
+        ? "inherited"
+        : laneValue !== undefined
+          ? "lane-discovered"
+          : "known"
+    return {
+      name,
+      source,
+      set: laneValue !== undefined,
+      ...(laneValue === undefined ? {} : { value: laneValue }),
+      ...(parentDirs[name] === undefined ? {} : { parentValue: parentDirs[name] }),
+    }
   })
   const contaminating = inspected.filter((entry) => entry.set).map((entry) => entry.name)
   const unobserved = injected.filter((entry) => laneEnv[entry.name] !== entry.value).map((entry) => entry.name)
-  return { inspected, contaminating, inherited: inspected.filter((entry) => entry.source === "inherited" && entry.set).map((entry) => entry.name), injected: [...injectedNames].sort(), unobserved }
+  return {
+    inspected,
+    contaminating,
+    inherited: inspected.filter((entry) => entry.source === "inherited" && entry.set).map((entry) => entry.name),
+    injected: [...injectedNames].sort(),
+    unobserved,
+  }
 }
 
 /** Runs ONE child lane under this bun with `env` and returns the package-dir variables it sees. */
@@ -100,21 +127,35 @@ export function reportLane(env) {
     const child = spawn(process.execPath, [scriptPath, "--lane-report"], { env, stdio: ["ignore", "pipe", "pipe"] })
     let stdout = ""
     let stderr = ""
-    child.stdout.on("data", (chunk) => { stdout += chunk })
-    child.stderr.on("data", (chunk) => { stderr += chunk })
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk
+    })
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk
+    })
     const timer = setTimeout(() => {
       child.kill("SIGKILL")
       reject(new Error(`lane pid ${child.pid} did not report within ${LANE_TIMEOUT_MS}ms`))
     }, LANE_TIMEOUT_MS)
-    child.once("error", (error) => { clearTimeout(timer); reject(error) })
+    child.once("error", (error) => {
+      clearTimeout(timer)
+      reject(error)
+    })
     child.once("exit", (code, signal) => {
       clearTimeout(timer)
-      if (code !== 0) { reject(new Error(`lane pid ${child.pid} exited code=${code} signal=${signal}: ${stderr.trim()}`)); return }
+      if (code !== 0) {
+        reject(new Error(`lane pid ${child.pid} exited code=${code} signal=${signal}: ${stderr.trim()}`))
+        return
+      }
       try {
         const report = JSON.parse(stdout.trim().split("\n").at(-1) ?? "")
         resolvePromise({ pid: child.pid, exitCode: code, packageDirs: report.packageDirs, execPath: report.execPath })
       } catch (error) {
-        reject(new Error(`lane pid ${child.pid} printed no report: ${error instanceof Error ? error.message : String(error)}; stdout=${stdout.slice(-300)}`))
+        reject(
+          new Error(
+            `lane pid ${child.pid} printed no report: ${error instanceof Error ? error.message : String(error)}; stdout=${stdout.slice(-300)}`,
+          ),
+        )
       }
     })
   })
@@ -131,10 +172,15 @@ function writeArtifact(dir, name, payload) {
 async function main() {
   const options = parseArgs(process.argv.slice(2))
   if (options.laneReport) {
-    process.stdout.write(`${JSON.stringify({ pid: process.pid, execPath: process.execPath, packageDirs: packageDirEntries(process.env) })}\n`)
+    process.stdout.write(
+      `${JSON.stringify({ pid: process.pid, execPath: process.execPath, packageDirs: packageDirEntries(process.env) })}\n`,
+    )
     return
   }
-  if (options.selfTest) { runSelfTest(); return }
+  if (options.selfTest) {
+    runSelfTest()
+    return
+  }
 
   const laneEnv = { ...process.env }
   for (const entry of options.set) laneEnv[entry.name] = entry.value
@@ -142,13 +188,22 @@ async function main() {
   try {
     lane = await reportLane(laneEnv)
   } catch (error) {
-    const summary = { ok: false, driver: DRIVER, mode: options.mode, verdict: "probe-broken", reason: error instanceof Error ? error.message : String(error) }
+    const summary = {
+      ok: false,
+      driver: DRIVER,
+      mode: options.mode,
+      verdict: "probe-broken",
+      reason: error instanceof Error ? error.message : String(error),
+    }
     summary.artifact = writeArtifact(options.evidenceDir, "package-dir-hygiene.json", summary)
     console.log(JSON.stringify(summary))
     process.exit(EXIT_PROBE_BROKEN)
   }
   const audit = inspectPackageDirs({ parentEnv: process.env, laneEnv: lane.packageDirs, injected: options.set })
-  for (const entry of audit.inspected) console.log(`${entry.set ? "SET  " : "unset"} ${entry.name} (${entry.source})${entry.set ? ` = ${entry.value}` : ""}`)
+  for (const entry of audit.inspected)
+    console.log(
+      `${entry.set ? "SET  " : "unset"} ${entry.name} (${entry.source})${entry.set ? ` = ${entry.value}` : ""}`,
+    )
 
   const base = {
     driver: DRIVER,
@@ -164,12 +219,23 @@ async function main() {
   let artifactName
   if (options.mode === "clean") {
     const exitCode = audit.contaminating.length === 0 ? EXIT_CLEAN : EXIT_CONTAMINATED
-    summary = { ok: exitCode === EXIT_CLEAN, ...base, verdict: exitCode === EXIT_CLEAN ? "clean" : "contaminated", exitCode }
+    summary = {
+      ok: exitCode === EXIT_CLEAN,
+      ...base,
+      verdict: exitCode === EXIT_CLEAN ? "clean" : "contaminated",
+      exitCode,
+    }
     artifactName = "package-dir-hygiene.json"
   } else if (audit.unobserved.length > 0) {
     // The injected variable never reached the lane: the probe cannot see contamination, so no
     // clean verdict from it means anything either.
-    summary = { ok: false, ...base, verdict: "probe-broken", reason: `injected variable not observed by the lane: ${audit.unobserved.join(",")}`, exitCode: EXIT_PROBE_BROKEN }
+    summary = {
+      ok: false,
+      ...base,
+      verdict: "probe-broken",
+      reason: `injected variable not observed by the lane: ${audit.unobserved.join(",")}`,
+      exitCode: EXIT_PROBE_BROKEN,
+    }
     artifactName = "package-dir-contamination-receipt.json"
   } else {
     // The RED the lanes are gated on: the lane saw exactly what was injected, the probe is sound.
@@ -182,24 +248,72 @@ async function main() {
 }
 
 function runSelfTest() {
-  const contaminated = parseArgs(["--mode", "contaminated", "--set", "SENPI_PACKAGE_DIR=/tmp/ulw-contaminated", "--evidence-dir", "/tmp/x"])
-  if (contaminated.set[0]?.name !== "SENPI_PACKAGE_DIR" || contaminated.set[0]?.value !== "/tmp/ulw-contaminated") throw new Error("self-test: --set parsing")
-  if (parseArgs(["--mode", "contaminated", "--set", "SENPI_PACKAGE_DIR=C:\\ulw-contaminated"]).set[0]?.value !== "C:\\ulw-contaminated") throw new Error("self-test: a Windows value survives parsing")
-  for (const bad of [["--mode", "clean", "--set", "OMO_PACKAGE_DIR=/x"], ["--mode", "contaminated"], ["--mode", "other"], ["--mode", "contaminated", "--set", "HOME=/x"], ["--mode", "contaminated", "--set", "OMO_PACKAGE_DIR="]]) {
+  const contaminated = parseArgs([
+    "--mode",
+    "contaminated",
+    "--set",
+    "SENPI_PACKAGE_DIR=/tmp/ulw-contaminated",
+    "--evidence-dir",
+    "/tmp/x",
+  ])
+  if (contaminated.set[0]?.name !== "SENPI_PACKAGE_DIR" || contaminated.set[0]?.value !== "/tmp/ulw-contaminated")
+    throw new Error("self-test: --set parsing")
+  if (
+    parseArgs(["--mode", "contaminated", "--set", "SENPI_PACKAGE_DIR=C:\\ulw-contaminated"]).set[0]?.value !==
+    "C:\\ulw-contaminated"
+  )
+    throw new Error("self-test: a Windows value survives parsing")
+  for (const bad of [
+    ["--mode", "clean", "--set", "OMO_PACKAGE_DIR=/x"],
+    ["--mode", "contaminated"],
+    ["--mode", "other"],
+    ["--mode", "contaminated", "--set", "HOME=/x"],
+    ["--mode", "contaminated", "--set", "OMO_PACKAGE_DIR="],
+  ]) {
     let rejected = false
-    try { parseArgs(bad) } catch { rejected = true }
+    try {
+      parseArgs(bad)
+    } catch {
+      rejected = true
+    }
     if (!rejected) throw new Error(`self-test: ${bad.join(" ")} must be rejected`)
   }
-  if (JSON.stringify(packageDirEntries({ OMO_PACKAGE_DIR: "/a", HOME: "/h", FOO_PACKAGE_DIR: "/f", PACKAGE_DIR: "/p" })) !== JSON.stringify({ OMO_PACKAGE_DIR: "/a", FOO_PACKAGE_DIR: "/f" })) throw new Error("self-test: package-dir pattern")
+  if (
+    JSON.stringify(
+      packageDirEntries({ OMO_PACKAGE_DIR: "/a", HOME: "/h", FOO_PACKAGE_DIR: "/f", PACKAGE_DIR: "/p" }),
+    ) !== JSON.stringify({ OMO_PACKAGE_DIR: "/a", FOO_PACKAGE_DIR: "/f" })
+  )
+    throw new Error("self-test: package-dir pattern")
   const clean = inspectPackageDirs({ parentEnv: { HOME: "/h" }, laneEnv: {}, injected: [] })
-  if (clean.contaminating.length !== 0 || clean.inspected.map((entry) => entry.name).join(",") !== KNOWN_PACKAGE_DIR_NAMES.slice().sort().join(",")) throw new Error("self-test: a clean lane still lists every known name")
-  const dirty = inspectPackageDirs({ parentEnv: { OMO_PACKAGE_DIR: "/real" }, laneEnv: { OMO_PACKAGE_DIR: "/real", SENPI_PACKAGE_DIR: "/tmp/ulw-contaminated", ACME_PACKAGE_DIR: "/acme" }, injected: [{ name: "SENPI_PACKAGE_DIR", value: "/tmp/ulw-contaminated" }] })
-  if (dirty.contaminating.join(",") !== "ACME_PACKAGE_DIR,OMO_PACKAGE_DIR,SENPI_PACKAGE_DIR") throw new Error(`self-test: contaminating names ${dirty.contaminating.join(",")}`)
+  if (
+    clean.contaminating.length !== 0 ||
+    clean.inspected.map((entry) => entry.name).join(",") !== KNOWN_PACKAGE_DIR_NAMES.slice().sort().join(",")
+  )
+    throw new Error("self-test: a clean lane still lists every known name")
+  const dirty = inspectPackageDirs({
+    parentEnv: { OMO_PACKAGE_DIR: "/real" },
+    laneEnv: { OMO_PACKAGE_DIR: "/real", SENPI_PACKAGE_DIR: "/tmp/ulw-contaminated", ACME_PACKAGE_DIR: "/acme" },
+    injected: [{ name: "SENPI_PACKAGE_DIR", value: "/tmp/ulw-contaminated" }],
+  })
+  if (dirty.contaminating.join(",") !== "ACME_PACKAGE_DIR,OMO_PACKAGE_DIR,SENPI_PACKAGE_DIR")
+    throw new Error(`self-test: contaminating names ${dirty.contaminating.join(",")}`)
   const sources = Object.fromEntries(dirty.inspected.map((entry) => [entry.name, entry.source]))
-  if (sources.OMO_PACKAGE_DIR !== "inherited" || sources.SENPI_PACKAGE_DIR !== "injected" || sources.ACME_PACKAGE_DIR !== "lane-discovered" || sources.PI_PACKAGE_DIR !== "known") throw new Error(`self-test: sources ${JSON.stringify(sources)}`)
-  if (dirty.unobserved.length !== 0 || dirty.inherited.join(",") !== "OMO_PACKAGE_DIR") throw new Error("self-test: inherited/unobserved accounting")
-  const lost = inspectPackageDirs({ parentEnv: {}, laneEnv: {}, injected: [{ name: "SENPI_PACKAGE_DIR", value: "/tmp/x" }] })
-  if (lost.unobserved.join(",") !== "SENPI_PACKAGE_DIR") throw new Error("self-test: an injected variable the lane never saw must be reported as unobserved")
+  if (
+    sources.OMO_PACKAGE_DIR !== "inherited" ||
+    sources.SENPI_PACKAGE_DIR !== "injected" ||
+    sources.ACME_PACKAGE_DIR !== "lane-discovered" ||
+    sources.PI_PACKAGE_DIR !== "known"
+  )
+    throw new Error(`self-test: sources ${JSON.stringify(sources)}`)
+  if (dirty.unobserved.length !== 0 || dirty.inherited.join(",") !== "OMO_PACKAGE_DIR")
+    throw new Error("self-test: inherited/unobserved accounting")
+  const lost = inspectPackageDirs({
+    parentEnv: {},
+    laneEnv: {},
+    injected: [{ name: "SENPI_PACKAGE_DIR", value: "/tmp/x" }],
+  })
+  if (lost.unobserved.join(",") !== "SENPI_PACKAGE_DIR")
+    throw new Error("self-test: an injected variable the lane never saw must be reported as unobserved")
   console.log(JSON.stringify({ ok: true, driver: DRIVER, selfTest: true }))
 }
 

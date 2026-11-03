@@ -48,9 +48,13 @@ async function loadEngine() {
 // read from the inspected agent dir (the extension's default reads the engine's own default dir).
 function extensionProviders(register, cwd) {
   const providers = []
-  const capture = (name, config) => { providers.push([name, config]) }
+  const capture = (name, config) => {
+    providers.push([name, config])
+  }
   // The extension reads the session's absolute cwd (senpi 2026.10.25-1 refuses to register without one).
-  register(new Proxy({}, { get: (_, key) => key === "cwd" ? cwd : key === "registerProvider" ? capture : () => undefined }))
+  register(
+    new Proxy({}, { get: (_, key) => (key === "cwd" ? cwd : key === "registerProvider" ? capture : () => undefined) }),
+  )
   return providers
 }
 
@@ -73,9 +77,10 @@ async function loadRuntime() {
  */
 export async function engineAvailableModels(input) {
   const engine = await (input.loadEngine ?? loadEngine)()
-  const credentials = input.authEntries === undefined
-    ? new engine.ReadOnlyAuthStorage(join(input.agentDir, "auth.json"))
-    : engine.AuthStorage.inMemory(input.authEntries)
+  const credentials =
+    input.authEntries === undefined
+      ? new engine.ReadOnlyAuthStorage(join(input.agentDir, "auth.json"))
+      : engine.AuthStorage.inMemory(input.authEntries)
   const scratch = input.modelsDocument === undefined ? undefined : mkdtempSync(join(tmpdir(), "omo-coverage-"))
   try {
     const modelsPath = scratch === undefined ? join(input.agentDir, "models.json") : join(scratch, "models.json")
@@ -87,8 +92,12 @@ export async function engineAvailableModels(input) {
       allowModelNetwork: false,
     })
     const cwd = input.cwd ?? process.cwd()
-    const readSettings = () => engine.loadAnthropicSubscriptionSettings(engine.SettingsManager.create(cwd, input.agentDir))
-    for (const [name, config] of extensionProviders((pi) => engine.registerAnthropicSubscription(pi, { readSettings }), resolve(cwd))) {
+    const readSettings = () =>
+      engine.loadAnthropicSubscriptionSettings(engine.SettingsManager.create(cwd, input.agentDir))
+    for (const [name, config] of extensionProviders(
+      (pi) => engine.registerAnthropicSubscription(pi, { readSettings }),
+      resolve(cwd),
+    )) {
       await runtime.registerProvider(name, config, { refresh: false })
     }
     return (await runtime.getAvailable()).map((model) => ({ provider: model.provider, id: model.id }))
@@ -112,7 +121,12 @@ export async function engineAvailableModels(input) {
  */
 export async function categoryCoverage(input) {
   const runtime = await (input.loadRuntime ?? loadRuntime)()
-  return runtime.categoryCoverage({ models: input.models, cwd: input.cwd, env: input.env, pinnedCategories: input.pinnedCategories ?? [] })
+  return runtime.categoryCoverage({
+    models: input.models,
+    cwd: input.cwd,
+    env: input.env,
+    pinnedCategories: input.pinnedCategories ?? [],
+  })
 }
 
 function total(coverage) {
@@ -133,7 +147,8 @@ function gapLine(gap) {
 
 /** @param {CategoryCoverage} coverage */
 export function formatDoctorCoverageLines(coverage) {
-  if (coverage.unusable.length === 0) return [`PASS task categories: all ${total(coverage)} usable with your connected providers`]
+  if (coverage.unusable.length === 0)
+    return [`PASS task categories: all ${total(coverage)} usable with your connected providers`]
   const usable = coverage.usable.length > 0 ? ` (${coverage.usable.join(", ")})` : ""
   return [
     `WARN task categories: ${coverage.usable.length} of ${total(coverage)} usable with your connected providers${usable}`,
@@ -145,7 +160,10 @@ export function formatDoctorCoverageLines(coverage) {
 export function coverageSummaryParts(coverage) {
   if (coverage.unusable.length === 0) return [`all ${total(coverage)} usable with these providers`]
   const usable = coverage.usable.length > 0 ? ` (${coverage.usable.join(", ")})` : ""
-  return [`${coverage.usable.length} of ${total(coverage)} usable with these providers${usable}`, ...coverage.unusable.map(gapLine)]
+  return [
+    `${coverage.usable.length} of ${total(coverage)} usable with these providers${usable}`,
+    ...coverage.unusable.map(gapLine),
+  ]
 }
 
 /**
@@ -165,7 +183,12 @@ export async function doctorCoverageLines(options) {
     const runtime = await (options.loadRuntime ?? loadRuntime)()
     const cwd = options.cwd ?? process.cwd()
     const models = await engineAvailableModels({ agentDir: options.agentDir, cwd, loadEngine: options.loadEngine })
-    const coverage = await categoryCoverage({ models, cwd, env: options.env ?? process.env, loadRuntime: async () => runtime })
+    const coverage = await categoryCoverage({
+      models,
+      cwd,
+      env: options.env ?? process.env,
+      loadRuntime: async () => runtime,
+    })
     return formatDoctorCoverageLines(coverage)
   } catch {
     return []
@@ -195,15 +218,30 @@ export async function setupCoverage(input) {
     if (credentials.malformed || providers.models.malformed) return undefined
     const runtime = await (input.loadRuntime ?? loadRuntime)()
     const authEntries = { ...credentials.current.entries }
-    for (const item of [...credentials.result.additions, ...providers.result.keys]) authEntries[item.provider] ??= { type: "api_key", key: item.key }
+    for (const item of [...credentials.result.additions, ...providers.result.keys])
+      authEntries[item.provider] ??= { type: "api_key", key: item.key }
     const added = providers.result.added
-    const modelsDocument = added.length === 0 ? undefined : {
-      ...providers.models.document,
-      providers: { ...providers.models.document.providers, ...Object.fromEntries(added.map((provider) => [provider.id, provider.config])) },
-    }
+    const modelsDocument =
+      added.length === 0
+        ? undefined
+        : {
+            ...providers.models.document,
+            providers: {
+              ...providers.models.document.providers,
+              ...Object.fromEntries(added.map((provider) => [provider.id, provider.config])),
+            },
+          }
     const cwd = input.cwd ?? process.cwd()
-    const models = await engineAvailableModels({ agentDir: input.agentDir, authEntries, modelsDocument, cwd, loadEngine: input.loadEngine })
-    const pinnedCategories = modelChoices.items.filter((item) => item.kind === "categories" && item.state === "pending").map((item) => item.name)
+    const models = await engineAvailableModels({
+      agentDir: input.agentDir,
+      authEntries,
+      modelsDocument,
+      cwd,
+      loadEngine: input.loadEngine,
+    })
+    const pinnedCategories = modelChoices.items
+      .filter((item) => item.kind === "categories" && item.state === "pending")
+      .map((item) => item.name)
     return await categoryCoverage({
       models,
       cwd,

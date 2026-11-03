@@ -10,7 +10,10 @@ type QueryWindowStateDeps = {
   log: typeof log
 }
 
-export async function queryWindowStateWithDeps(sourcePaneId: string, deps: QueryWindowStateDeps): Promise<WindowState | null> {
+export async function queryWindowStateWithDeps(
+  sourcePaneId: string,
+  deps: QueryWindowStateDeps,
+): Promise<WindowState | null> {
   const tmux = await deps.getTmuxPath()
   if (!tmux) return null
 
@@ -19,15 +22,15 @@ export async function queryWindowStateWithDeps(sourcePaneId: string, deps: Query
     "-t",
     sourcePaneId,
     "-F",
-		"#{pane_id}\t#{pane_width}\t#{pane_height}\t#{pane_left}\t#{pane_top}\t#{pane_active}\t#{window_width}\t#{window_height}\t#{window_active}\t#{session_attached}\t#{pane_title}",
+    "#{pane_id}\t#{pane_width}\t#{pane_height}\t#{pane_left}\t#{pane_top}\t#{pane_active}\t#{window_width}\t#{window_height}\t#{window_active}\t#{session_attached}\t#{pane_title}",
   ])
 
-	if (result.exitCode !== 0) {
-		deps.log("[pane-state-querier] list-panes failed", { exitCode: result.exitCode })
-		return null
-	}
+  if (result.exitCode !== 0) {
+    deps.log("[pane-state-querier] list-panes failed", { exitCode: result.exitCode })
+    return null
+  }
 
-	const parsedPaneState = parsePaneStateOutput(result.output)
+  const parsedPaneState = parsePaneStateOutput(result.output)
   if (!parsedPaneState) {
     deps.log("[pane-state-querier] failed to parse pane state output", {
       sourcePaneId,

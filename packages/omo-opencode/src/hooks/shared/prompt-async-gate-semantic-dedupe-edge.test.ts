@@ -133,10 +133,7 @@ describe("dispatchInternalPrompt semantic dedupe edge cases", () => {
         postDispatchHoldMs: 100,
         semanticDedupeHoldMs: 1_000,
       })
-      const released = releasePromptAsyncReservation(
-        "ses_reject_after_attempt_release",
-        "test:reject-release:first",
-      )
+      const released = releasePromptAsyncReservation("ses_reject_after_attempt_release", "test:reject-release:first")
       currentNow += 2
       const second = await dispatchInternalPrompt({
         mode: "async",

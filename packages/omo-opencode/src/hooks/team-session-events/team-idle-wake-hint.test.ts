@@ -14,22 +14,13 @@ import { TeamModeConfigSchema } from "../../config/schema/team-mode"
 import type { TeamModeConfig } from "../../config/schema/team-mode"
 import * as ackModule from "../../features/team-mode/team-mailbox/ack"
 import { sendMessage } from "../../features/team-mode/team-mailbox/send"
-import {
-  clearTeamSessionRegistry,
-  registerTeamSession,
-} from "../../features/team-mode/team-session-registry"
+import { clearTeamSessionRegistry, registerTeamSession } from "../../features/team-mode/team-session-registry"
 import { getInboxDir, resolveBaseDir } from "../../features/team-mode/team-registry/paths"
 import { loadRuntimeState, saveRuntimeState } from "../../features/team-mode/team-state-store/store"
 import type { RuntimeState } from "../../features/team-mode/types"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
-import {
-  clearAllSessionPromptParams,
-  getSessionPromptParams,
-} from "../../shared/session-prompt-params-state"
-import {
-  releaseAllPromptAsyncReservationsForTesting,
-  releasePromptAsyncReservation,
-} from "../shared/prompt-async-gate"
+import { clearAllSessionPromptParams, getSessionPromptParams } from "../../shared/session-prompt-params-state"
+import { releaseAllPromptAsyncReservationsForTesting, releasePromptAsyncReservation } from "../shared/prompt-async-gate"
 import { createTeamMemberErrorHandler } from "./team-member-error-handler"
 import { createTeamIdleWakeHint } from "./team-idle-wake-hint"
 
@@ -173,15 +164,20 @@ async function seedUnreadMessage(
   body: string,
   timestamp: number,
 ): Promise<void> {
-  await sendMessage({
-    version: 1,
-    messageId,
-    from: "lead",
-    to: "worker",
-    kind: "message",
-    body,
-    timestamp,
-  }, teamRunId, config, { isLead: true, activeMembers: ["worker"] })
+  await sendMessage(
+    {
+      version: 1,
+      messageId,
+      from: "lead",
+      to: "worker",
+      kind: "message",
+      body,
+      timestamp,
+    },
+    teamRunId,
+    config,
+    { isLead: true, activeMembers: ["worker"] },
+  )
 }
 
 async function seedReservedUnreadMessage(
@@ -191,19 +187,24 @@ async function seedReservedUnreadMessage(
   body: string,
   timestamp: number,
 ): Promise<void> {
-  await sendMessage({
-    version: 1,
-    messageId,
-    from: "lead",
-    to: "worker",
-    kind: "message",
-    body,
-    timestamp,
-  }, teamRunId, config, {
-    isLead: true,
-    activeMembers: ["worker"],
-    reservedRecipients: new Set(["worker"]),
-  })
+  await sendMessage(
+    {
+      version: 1,
+      messageId,
+      from: "lead",
+      to: "worker",
+      kind: "message",
+      body,
+      timestamp,
+    },
+    teamRunId,
+    config,
+    {
+      isLead: true,
+      activeMembers: ["worker"],
+      reservedRecipients: new Set(["worker"]),
+    },
+  )
 }
 
 async function seedLeadUnreadMessage(
@@ -213,15 +214,20 @@ async function seedLeadUnreadMessage(
   body: string,
   timestamp: number,
 ): Promise<void> {
-  await sendMessage({
-    version: 1,
-    messageId,
-    from: "worker",
-    to: "lead",
-    kind: "message",
-    body,
-    timestamp,
-  }, teamRunId, config, { isLead: false, activeMembers: ["lead"] })
+  await sendMessage(
+    {
+      version: 1,
+      messageId,
+      from: "worker",
+      to: "lead",
+      kind: "message",
+      body,
+      timestamp,
+    },
+    teamRunId,
+    config,
+    { isLead: false, activeMembers: ["lead"] },
+  )
 }
 
 afterEach(async () => {
@@ -229,9 +235,11 @@ afterEach(async () => {
   SessionCategoryRegistry.clear()
   clearAllSessionPromptParams()
   releaseAllPromptAsyncReservationsForTesting()
-  await Promise.all(temporaryDirectories.splice(0).map(async (directoryPath) => {
-    await rm(directoryPath, { recursive: true, force: true })
-  }))
+  await Promise.all(
+    temporaryDirectories.splice(0).map(async (directoryPath) => {
+      await rm(directoryPath, { recursive: true, force: true })
+    }),
+  )
 })
 
 describe("createTeamIdleWakeHint", () => {
@@ -244,10 +252,14 @@ describe("createTeamIdleWakeHint", () => {
     await seedUnreadMessage(teamRunId, config, randomUUID(), "first message body", 100)
 
     const promptAsyncSpy = mock(async (_input: WakeHintPromptInput) => ({}))
-    const handler = createTeamIdleWakeHint({
-      directory: "/tmp/project",
-      client: { session: { promptAsync: promptAsyncSpy } },
-    }, config, { idleSettleMs: 50 })
+    const handler = createTeamIdleWakeHint(
+      {
+        directory: "/tmp/project",
+        client: { session: { promptAsync: promptAsyncSpy } },
+      },
+      config,
+      { idleSettleMs: 50 },
+    )
 
     // when
     const startedAt = Date.now()
@@ -281,10 +293,13 @@ describe("createTeamIdleWakeHint", () => {
       promptInputs.push(input)
       return {}
     })
-    const handler = createTeamIdleWakeHint({
-      directory: "/tmp/project",
-      client: { session: { promptAsync: promptAsyncSpy } },
-    }, config)
+    const handler = createTeamIdleWakeHint(
+      {
+        directory: "/tmp/project",
+        client: { session: { promptAsync: promptAsyncSpy } },
+      },
+      config,
+    )
 
     // when
     await handler({
@@ -314,19 +329,23 @@ describe("createTeamIdleWakeHint", () => {
     await seedUnreadMessage(teamRunId, config, randomUUID(), "first message body", 100)
 
     const promptAsyncSpy = mock(async (_input: WakeHintPromptInput) => ({}))
-    const handler = createTeamIdleWakeHint({
-      directory: "/tmp/project",
-      client: {
-        session: {
-          promptAsync: promptAsyncSpy,
-          status: async () => ({
-            data: {
-              "member-session": { type: "busy" },
-            },
-          }),
+    const handler = createTeamIdleWakeHint(
+      {
+        directory: "/tmp/project",
+        client: {
+          session: {
+            promptAsync: promptAsyncSpy,
+            status: async () => ({
+              data: {
+                "member-session": { type: "busy" },
+              },
+            }),
+          },
         },
       },
-    }, config, { idleSettleMs: 0 })
+      config,
+      { idleSettleMs: 0 },
+    )
 
     // when
     await handler({
@@ -351,10 +370,14 @@ describe("createTeamIdleWakeHint", () => {
     const promptAsyncSpy = mock(async (_input: WakeHintPromptInput) => {
       throw new Error("JSON Parse error: Unexpected EOF")
     })
-    const handler = createTeamIdleWakeHint({
-      directory: "/tmp/project",
-      client: { session: { promptAsync: promptAsyncSpy } },
-    }, config, { idleSettleMs: 0 })
+    const handler = createTeamIdleWakeHint(
+      {
+        directory: "/tmp/project",
+        client: { session: { promptAsync: promptAsyncSpy } },
+      },
+      config,
+      { idleSettleMs: 0 },
+    )
 
     // when
     await handler({
@@ -396,10 +419,13 @@ describe("createTeamIdleWakeHint", () => {
       promptInputs.push(input)
       return {}
     })
-    const handler = createTeamIdleWakeHint({
-      directory: "/tmp/project",
-      client: { session: { promptAsync: promptAsyncSpy } },
-    }, config)
+    const handler = createTeamIdleWakeHint(
+      {
+        directory: "/tmp/project",
+        client: { session: { promptAsync: promptAsyncSpy } },
+      },
+      config,
+    )
 
     // when
     await handler({
@@ -448,10 +474,13 @@ describe("createTeamIdleWakeHint", () => {
       promptInputs.push(input)
       return {}
     })
-    const handler = createTeamIdleWakeHint({
-      directory: "/tmp/project",
-      client: { session: { promptAsync: promptAsyncSpy } },
-    }, config)
+    const handler = createTeamIdleWakeHint(
+      {
+        directory: "/tmp/project",
+        client: { session: { promptAsync: promptAsyncSpy } },
+      },
+      config,
+    )
 
     // when
     await handler({
@@ -502,10 +531,13 @@ describe("createTeamIdleWakeHint", () => {
       promptInputs.push(input)
       return {}
     })
-    const handler = createTeamIdleWakeHint({
-      directory: "/tmp/project",
-      client: { session: { promptAsync: promptAsyncSpy } },
-    }, config)
+    const handler = createTeamIdleWakeHint(
+      {
+        directory: "/tmp/project",
+        client: { session: { promptAsync: promptAsyncSpy } },
+      },
+      config,
+    )
 
     // when
     await handler({
@@ -538,22 +570,28 @@ describe("createTeamIdleWakeHint", () => {
     await seedUnreadMessage(teamRunId, config, messageIds[2], "three", 300)
 
     const ackSpy = spyOn(ackModule, "ackMessages")
-    const promptAsyncSpy = mock(async (_input: {
-      path: { id: string }
-      body: { parts: Array<{ type: "text"; text: string }> }
-      query: { directory: string }
-    }) => {
-      return {}
-    })
-    const handler = createTeamIdleWakeHint({
-      directory: "/tmp/project",
-      client: {
-        session: {
-          promptAsync: promptAsyncSpy,
-          status: async () => ({ data: { "member-session": { type: "idle" } } }),
+    const promptAsyncSpy = mock(
+      async (_input: {
+        path: { id: string }
+        body: { parts: Array<{ type: "text"; text: string }> }
+        query: { directory: string }
+      }) => {
+        return {}
+      },
+    )
+    const handler = createTeamIdleWakeHint(
+      {
+        directory: "/tmp/project",
+        client: {
+          session: {
+            promptAsync: promptAsyncSpy,
+            status: async () => ({ data: { "member-session": { type: "idle" } } }),
+          },
         },
       },
-    }, config, immediatePromptGateOptions)
+      config,
+      immediatePromptGateOptions,
+    )
 
     // when
     await handler({
@@ -574,7 +612,9 @@ describe("createTeamIdleWakeHint", () => {
     const inboxEntries = await readdir(getInboxDir(resolveBaseDir(config), teamRunId, "worker"))
     expect(inboxEntries).toContain("processed")
 
-    const processedEntries = await readdir(path.join(getInboxDir(resolveBaseDir(config), teamRunId, "worker"), "processed"))
+    const processedEntries = await readdir(
+      path.join(getInboxDir(resolveBaseDir(config), teamRunId, "worker"), "processed"),
+    )
     expect(processedEntries.sort()).toEqual(messageIds.map((messageId) => `${messageId}.json`).sort())
     // Loaded Windows runners push this past the 5s default; the waits stay event-driven
     // (~60ms locally), so only the ceiling moves.
@@ -589,10 +629,13 @@ describe("createTeamIdleWakeHint", () => {
     await seedRuntimeState(createRuntimeState(teamRunId, [messageId]), config)
     await seedReservedUnreadMessage(teamRunId, config, messageId, "live delivery body", 100)
 
-    const handler = createTeamIdleWakeHint({
-      directory: "/tmp/project",
-      client: { session: { promptAsync: mock(async (_input: WakeHintPromptInput) => ({})) } },
-    }, config)
+    const handler = createTeamIdleWakeHint(
+      {
+        directory: "/tmp/project",
+        client: { session: { promptAsync: mock(async (_input: WakeHintPromptInput) => ({})) } },
+      },
+      config,
+    )
 
     // when
     await handler({
@@ -625,15 +668,19 @@ describe("createTeamIdleWakeHint", () => {
 
     const ackSpy = spyOn(ackModule, "ackMessages")
     const promptAsyncSpy = mock(async (_input: WakeHintPromptInput) => ({}))
-    const handler = createTeamIdleWakeHint({
-      directory: "/tmp/project",
-      client: {
-        session: {
-          promptAsync: promptAsyncSpy,
-          status: async () => ({ data: { "member-session": { type: "busy" } } }),
+    const handler = createTeamIdleWakeHint(
+      {
+        directory: "/tmp/project",
+        client: {
+          session: {
+            promptAsync: promptAsyncSpy,
+            status: async () => ({ data: { "member-session": { type: "busy" } } }),
+          },
         },
       },
-    }, config, { idleSettleMs: 0 })
+      config,
+      { idleSettleMs: 0 },
+    )
 
     // when
     await handler({
@@ -673,19 +720,23 @@ describe("createTeamIdleWakeHint", () => {
     const idleHandlerReachedStatus = createDeferred<void>()
     const continueIdleHandler = createDeferred<void>()
 
-    const handler = createTeamIdleWakeHint({
-      directory: "/tmp/project",
-      client: {
-        session: {
-          promptAsync: mock(async (_input: WakeHintPromptInput) => ({})),
-          status: async () => {
-            idleHandlerReachedStatus.resolve()
-            await continueIdleHandler.promise
-            return { data: { "member-session": { type: "idle" } } }
+    const handler = createTeamIdleWakeHint(
+      {
+        directory: "/tmp/project",
+        client: {
+          session: {
+            promptAsync: mock(async (_input: WakeHintPromptInput) => ({})),
+            status: async () => {
+              idleHandlerReachedStatus.resolve()
+              await continueIdleHandler.promise
+              return { data: { "member-session": { type: "idle" } } }
+            },
           },
         },
       },
-    }, config, { idleSettleMs: 0 })
+      config,
+      { idleSettleMs: 0 },
+    )
 
     // when
     const idleHandler = handler({
@@ -735,10 +786,13 @@ describe("createTeamIdleWakeHint", () => {
       promptInputs.push(input)
       return {}
     })
-    const handler = createTeamIdleWakeHint({
-      directory: "/tmp/project",
-      client: { session: { promptAsync: promptAsyncSpy } },
-    }, config)
+    const handler = createTeamIdleWakeHint(
+      {
+        directory: "/tmp/project",
+        client: { session: { promptAsync: promptAsyncSpy } },
+      },
+      config,
+    )
 
     // when
     await handler({
@@ -773,10 +827,13 @@ describe("createTeamIdleWakeHint", () => {
 
     const ackSpy = spyOn(ackModule, "ackMessages")
     const promptAsyncSpy = mock(async (_input: WakeHintPromptInput) => ({}))
-    const handler = createTeamIdleWakeHint({
-      directory: "/tmp/project",
-      client: { session: { promptAsync: promptAsyncSpy } },
-    }, config)
+    const handler = createTeamIdleWakeHint(
+      {
+        directory: "/tmp/project",
+        client: { session: { promptAsync: promptAsyncSpy } },
+      },
+      config,
+    )
 
     // when
     await handler({
@@ -831,10 +888,13 @@ describe("createTeamIdleWakeHint", () => {
       promptInputs.push(input)
       return {}
     })
-    const handler = createTeamIdleWakeHint({
-      directory: "/tmp/project",
-      client: { session: { promptAsync: promptAsyncSpy } },
-    }, config)
+    const handler = createTeamIdleWakeHint(
+      {
+        directory: "/tmp/project",
+        client: { session: { promptAsync: promptAsyncSpy } },
+      },
+      config,
+    )
 
     // when
     await handler({
@@ -866,18 +926,21 @@ describe("createTeamIdleWakeHint", () => {
     }
     correctWorker.subagent_type = "atlas"
     await seedRuntimeState(correctRuntimeState, config)
-    await seedRuntimeState({
-      ...createRuntimeState(wrongTeamRunId),
-      members: [
-        {
-          name: "worker",
-          sessionId: "other-session",
-          agentType: "general-purpose",
-          status: "idle",
-          pendingInjectedMessageIds: [],
-        },
-      ],
-    }, config)
+    await seedRuntimeState(
+      {
+        ...createRuntimeState(wrongTeamRunId),
+        members: [
+          {
+            name: "worker",
+            sessionId: "other-session",
+            agentType: "general-purpose",
+            status: "idle",
+            pendingInjectedMessageIds: [],
+          },
+        ],
+      },
+      config,
+    )
     await seedUnreadMessage(correctTeamRunId, config, randomUUID(), "first correct message", 100)
     await seedUnreadMessage(correctTeamRunId, config, randomUUID(), "second correct message", 200)
     await seedUnreadMessage(wrongTeamRunId, config, randomUUID(), "wrong team message", 300)
@@ -892,10 +955,13 @@ describe("createTeamIdleWakeHint", () => {
       promptInputs.push(input)
       return {}
     })
-    const handler = createTeamIdleWakeHint({
-      directory: "/tmp/project",
-      client: { session: { promptAsync: promptAsyncSpy } },
-    }, config)
+    const handler = createTeamIdleWakeHint(
+      {
+        directory: "/tmp/project",
+        client: { session: { promptAsync: promptAsyncSpy } },
+      },
+      config,
+    )
 
     // when
     await handler({

@@ -87,7 +87,10 @@ describe("reflection worktree finalization", () => {
     const result = await finalizeReflectionWorktree(worktree, {
       mode: "auto",
       summary: "learned facts",
-      withWriterLock: async (operation) => { lockCalls += 1; return operation() },
+      withWriterLock: async (operation) => {
+        lockCalls += 1
+        return operation()
+      },
     })
 
     // #then
@@ -95,8 +98,9 @@ describe("reflection worktree finalization", () => {
     expect(result.cleanup).toEqual({ worktreeRemoved: true, branchRemoved: true })
     expect(lockCalls).toBe(1)
     expect(await repo.show("HEAD", "learned.md")).toBe("learned\n")
-    expect((await exec.run(["log", "-1", "--format=%s"], { cwd: parentDir, timeoutMs: 30_000 })).stdout.trim())
-      .toBe("merge(reflection): learned facts")
+    expect((await exec.run(["log", "-1", "--format=%s"], { cwd: parentDir, timeoutMs: 30_000 })).stdout.trim()).toBe(
+      "merge(reflection): learned facts",
+    )
     await assertCleaned(worktree, parentDir)
   })
 
@@ -113,7 +117,10 @@ describe("reflection worktree finalization", () => {
       mode: "auto",
       summary: "targeted dream",
       allowedPaths: ["reference-style.md"],
-      withWriterLock: async (operation) => { lockCalls += 1; return operation() },
+      withWriterLock: async (operation) => {
+        lockCalls += 1
+        return operation()
+      },
     })
 
     // #then
@@ -159,7 +166,9 @@ describe("reflection worktree finalization", () => {
     // #then
     expect(result.status).toBe("merge_conflict")
     expect(await repo.status()).toBe("")
-    expect((await exec.run(["rev-parse", "-q", "--verify", "MERGE_HEAD"], { cwd: parentDir, timeoutMs: 30_000 })).code).toBe(1)
+    expect(
+      (await exec.run(["rev-parse", "-q", "--verify", "MERGE_HEAD"], { cwd: parentDir, timeoutMs: 30_000 })).code,
+    ).toBe(1)
     await assertCleaned(worktree, parentDir)
   })
 
@@ -183,69 +192,82 @@ describe("reflection worktree finalization", () => {
     await assertCleaned(worktree, parentDir)
   })
 
-  it("#given a non-conflicting parent advance after launch #when auto-finalized #then recorded-base drift merges successfully", async () => {
-    // #given
-    const { repo, parentDir, worktreesDir } = await fixture()
-    const worktree = await createReflectionWorktree(repo, "drift", worktreesDir)
-    await commit(worktree, "child.md", "child\n")
-    await writeFile(join(parentDir, "parent.md"), "parent\n")
-    await repo.commitWrite(["parent.md"], "parent advance", { agentId: "agent-one", authorName: "Parent" })
+  it(
+    "#given a non-conflicting parent advance after launch #when auto-finalized #then recorded-base drift merges successfully",
+    async () => {
+      // #given
+      const { repo, parentDir, worktreesDir } = await fixture()
+      const worktree = await createReflectionWorktree(repo, "drift", worktreesDir)
+      await commit(worktree, "child.md", "child\n")
+      await writeFile(join(parentDir, "parent.md"), "parent\n")
+      await repo.commitWrite(["parent.md"], "parent advance", { agentId: "agent-one", authorName: "Parent" })
 
-    // #when
-    const result = await finalizeReflectionWorktree(worktree, {
-      mode: "auto",
-      summary: "drift-safe",
-      withWriterLock: async (operation) => operation(),
-    })
+      // #when
+      const result = await finalizeReflectionWorktree(worktree, {
+        mode: "auto",
+        summary: "drift-safe",
+        withWriterLock: async (operation) => operation(),
+      })
 
-    // #then
-    expect(result.status).toBe("merged")
-    expect(await repo.show("HEAD", "child.md")).toBe("child\n")
-    expect(await repo.show("HEAD", "parent.md")).toBe("parent\n")
-    await assertCleaned(worktree, parentDir)
-  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
+      // #then
+      expect(result.status).toBe("merged")
+      expect(await repo.show("HEAD", "child.md")).toBe("child\n")
+      expect(await repo.show("HEAD", "parent.md")).toBe("parent\n")
+      await assertCleaned(worktree, parentDir)
+    },
+    WINDOWS_INTEGRATION_TEST_TIMEOUT,
+  )
 
-  it("#given a branch deletion that keeps failing #when a merged reflection finalizes #then the landed outcome survives the incomplete cleanup", async () => {
-    // #given
-    const { repo, worktreesDir } = await fixture()
-    const blockBranchDelete: GitExec = {
-      run: async (argv, options) => argv[0] === "branch" && argv[1] === "-D"
-        ? { code: 1, stdout: "", stderr: "error: cannot delete branch used by worktree" }
-        : exec.run(argv, options),
-    }
-    const worktree = await createReflectionWorktree(repo, "cleanup-blocked", worktreesDir, blockBranchDelete)
-    await commit(worktree, "learned.md", "learned\n")
+  it(
+    "#given a branch deletion that keeps failing #when a merged reflection finalizes #then the landed outcome survives the incomplete cleanup",
+    async () => {
+      // #given
+      const { repo, worktreesDir } = await fixture()
+      const blockBranchDelete: GitExec = {
+        run: async (argv, options) =>
+          argv[0] === "branch" && argv[1] === "-D"
+            ? { code: 1, stdout: "", stderr: "error: cannot delete branch used by worktree" }
+            : exec.run(argv, options),
+      }
+      const worktree = await createReflectionWorktree(repo, "cleanup-blocked", worktreesDir, blockBranchDelete)
+      await commit(worktree, "learned.md", "learned\n")
 
-    // #when
-    const result = await finalizeReflectionWorktree(worktree, {
-      mode: "auto",
-      summary: "landed but uncleaned",
-      withWriterLock: async (operation) => operation(),
-    })
+      // #when
+      const result = await finalizeReflectionWorktree(worktree, {
+        mode: "auto",
+        summary: "landed but uncleaned",
+        withWriterLock: async (operation) => operation(),
+      })
 
-    // #then
-    expect(result.status).toBe("merged")
-    expect(result.cleanup).toEqual({ worktreeRemoved: true, branchRemoved: false })
-    expect(result.detail).toContain("Reflection cleanup did not fully complete")
-    expect(await repo.show("HEAD", "learned.md")).toBe("learned\n")
-  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
+      // #then
+      expect(result.status).toBe("merged")
+      expect(result.cleanup).toEqual({ worktreeRemoved: true, branchRemoved: false })
+      expect(result.detail).toContain("Reflection cleanup did not fully complete")
+      expect(await repo.show("HEAD", "learned.md")).toBe("learned\n")
+    },
+    WINDOWS_INTEGRATION_TEST_TIMEOUT,
+  )
 
-  it("#given an externally merged reflection branch #when explicit finalization verifies reachability #then it reports merged and cleans up", async () => {
-    // #given
-    const { repo, parentDir, worktreesDir } = await fixture()
-    const worktree = await createReflectionWorktree(repo, "explicit", worktreesDir)
-    await commit(worktree, "explicit.md", "integrated\n")
-    await repo.merge(worktree.branch, { noFF: true, message: "manual integration" })
+  it(
+    "#given an externally merged reflection branch #when explicit finalization verifies reachability #then it reports merged and cleans up",
+    async () => {
+      // #given
+      const { repo, parentDir, worktreesDir } = await fixture()
+      const worktree = await createReflectionWorktree(repo, "explicit", worktreesDir)
+      await commit(worktree, "explicit.md", "integrated\n")
+      await repo.merge(worktree.branch, { noFF: true, message: "manual integration" })
 
-    // #when
-    const result = await finalizeReflectionWorktree(worktree, {
-      mode: "explicit",
-      withWriterLock: async (operation) => operation(),
-    })
+      // #when
+      const result = await finalizeReflectionWorktree(worktree, {
+        mode: "explicit",
+        withWriterLock: async (operation) => operation(),
+      })
 
-    // #then
-    expect(result.status).toBe("merged")
-    expect(await repo.show("HEAD", "explicit.md")).toBe("integrated\n")
-    await assertCleaned(worktree, parentDir)
-  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
+      // #then
+      expect(result.status).toBe("merged")
+      expect(await repo.show("HEAD", "explicit.md")).toBe("integrated\n")
+      await assertCleaned(worktree, parentDir)
+    },
+    WINDOWS_INTEGRATION_TEST_TIMEOUT,
+  )
 })

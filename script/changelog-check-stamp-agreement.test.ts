@@ -26,7 +26,10 @@ const REVIEWED_SHAPES: readonly (readonly [string, string])[] = [
   ["a 10. item with a blank line before its fence", `10. Run:\n\n    ${F}sh\n    a\n    ${F}\n`],
   ["a nested * item with a blank line before its fence", `* x\n  * y\n\n    ${F}\n    a\n    ${F}\n`],
   ["a nested * item whose fence holds a blank line", `* x\n  * y\n    ${F}\n    a\n\n    ${F}\n`],
-  ["an intro paragraph with fenced numbered steps", `**Steps.** Do this:\n\n1. Install:\n\n   ${F}sh\n   bun add x\n   ${F}\n\n2. Run it.\n`],
+  [
+    "an intro paragraph with fenced numbered steps",
+    `**Steps.** Do this:\n\n1. Install:\n\n   ${F}sh\n   bun add x\n   ${F}\n\n2. Run it.\n`,
+  ],
   ["an ordered list with an indented fence", `Steps:\n\n1. Run:\n    ${F}sh\n    a\n\n    b\n    ${F}\n`],
   ["a paragraph back in an outer item", `- a\n  - b\n    - c\n  para in a\n     ${F}\n     z\n     ${F}\n`],
   ["a tab after the marker", `1.\tx\n    ${F}\n    a\n    ${F}\n`],

@@ -26,13 +26,38 @@ export interface ChainWireServer {
   stop(): Promise<void>
 }
 
-const refusal = (status: number, code: string): Response => Response.json({ error: { code, message: code } }, { status })
+const refusal = (status: number, code: string): Response =>
+  Response.json({ error: { code, message: code } }, { status })
 
-const chainRow = ({ seq, base_seq, kind, account, epoch, author, digest, link, keyring_link, record_sig }: SyncEntry) => ({
-  seq, base_seq, kind, account, epoch, author, digest, link, keyring_link, record_sig,
+const chainRow = ({
+  seq,
+  base_seq,
+  kind,
+  account,
+  epoch,
+  author,
+  digest,
+  link,
+  keyring_link,
+  record_sig,
+}: SyncEntry) => ({
+  seq,
+  base_seq,
+  kind,
+  account,
+  epoch,
+  author,
+  digest,
+  link,
+  keyring_link,
+  record_sig,
 })
 
-export function startChainWireServer(account: string, chain: SyncEntry[], options: { readonly requireConsent?: boolean } = {}): ChainWireServer {
+export function startChainWireServer(
+  account: string,
+  chain: SyncEntry[],
+  options: { readonly requireConsent?: boolean } = {},
+): ChainWireServer {
   const authors = new Map<string, SyncAuthor>()
   const devices = new Map<string, string>()
   const deviceConsent = new Map<string, boolean>()
@@ -42,7 +67,9 @@ export function startChainWireServer(account: string, chain: SyncEntry[], option
   const head = () => chain.at(-1)
   const pairings = new Map<string, Pending>()
   const switches: string[] = []
-  const hooks: { tamperReveal: ((reveal: Record<string, unknown>) => Record<string, unknown>) | null } = { tamperReveal: null }
+  const hooks: { tamperReveal: ((reveal: Record<string, unknown>) => Record<string, unknown>) | null } = {
+    tamperReveal: null,
+  }
   let onWrite: (() => void) | null = null
   const server = Bun.serve({
     // Bound to the exact address the client dials: on a wildcard bind another process may bind
@@ -57,8 +84,15 @@ export function startChainWireServer(account: string, chain: SyncEntry[], option
       const path = url.pathname
       const token = (req.headers.get("authorization") ?? "").replace(/^Bearer /, "")
       const device = devices.get(token) ?? ""
-      if (options.requireConsent && (path.includes("/batches") || path.includes("/uploads") || path.includes("/objects") || (path === "/v1/sync/keys" && req.method === "PUT")) &&
-          !(accountConsent && deviceConsent.get(device) === true)) return refusal(403, "sync_disabled")
+      if (
+        options.requireConsent &&
+        (path.includes("/batches") ||
+          path.includes("/uploads") ||
+          path.includes("/objects") ||
+          (path === "/v1/sync/keys" && req.method === "PUT")) &&
+        !(accountConsent && deviceConsent.get(device) === true)
+      )
+        return refusal(403, "sync_disabled")
       const after = Number(url.searchParams.get("after") ?? "0")
       if (req.method === "GET" && path === "/v1/sync/state") {
         const last = head()
@@ -72,14 +106,23 @@ export function startChainWireServer(account: string, chain: SyncEntry[], option
           min_client_format: 1,
         })
       }
-      if (req.method === "GET" && path === "/v1/sync/entries") return Response.json({ entries: chain.filter((e) => e.seq > after).map(chainRow) })
-      if (req.method === "GET" && path === "/v1/sync/keys") return Response.json({ entries: chain.filter((e) => e.kind === "keyring") })
+      if (req.method === "GET" && path === "/v1/sync/entries")
+        return Response.json({ entries: chain.filter((e) => e.seq > after).map(chainRow) })
+      if (req.method === "GET" && path === "/v1/sync/keys")
+        return Response.json({ entries: chain.filter((e) => e.kind === "keyring") })
       if (req.method === "GET" && path === "/v1/sync/batches") {
         return Response.json({
-          entries: chain.filter((e) => e.seq > after).map((e) => {
-            const stored = objects.get(e.seq)
-            return { ...chainRow(e), object_id: stored?.id ?? null, bytes: stored?.bytes.byteLength ?? null, batch_id: stored?.batchId ?? null }
-          }),
+          entries: chain
+            .filter((e) => e.seq > after)
+            .map((e) => {
+              const stored = objects.get(e.seq)
+              return {
+                ...chainRow(e),
+                object_id: stored?.id ?? null,
+                bytes: stored?.bytes.byteLength ?? null,
+                batch_id: stored?.batchId ?? null,
+              }
+            }),
         })
       }
       if (req.method === "GET" && path.startsWith("/v1/sync/objects/")) {
@@ -97,20 +140,41 @@ export function startChainWireServer(account: string, chain: SyncEntry[], option
       if (req.method === "PUT" && path.startsWith("/v1/sync/uploads/")) {
         const up = uploads.get(path.slice("/v1/sync/uploads/".length))
         const data = new Uint8Array(await req.arrayBuffer())
-        if (up === undefined || data.byteLength !== up.size || createHash("sha256").update(data).digest("hex") !== up.sha256) return refusal(400, "invalid_request")
+        if (
+          up === undefined ||
+          data.byteLength !== up.size ||
+          createHash("sha256").update(data).digest("hex") !== up.sha256
+        )
+          return refusal(400, "invalid_request")
         up.data = data
         return new Response(null, { status: 204 })
       }
       if (req.method === "POST" && path === "/v1/sync/batches") {
-        const body = (await req.json()) as { upload_id: string; digest: string; base_seq: number; idempotency_key: string; epoch: number; link: string; record_sig: string }
+        const body = (await req.json()) as {
+          upload_id: string
+          digest: string
+          base_seq: number
+          idempotency_key: string
+          epoch: number
+          link: string
+          record_sig: string
+        }
         const up = uploads.get(body.upload_id)
         if (up === undefined || up.data === null) return refusal(404, "not_found")
         const replay = [...objects.entries()].find(([, o]) => o.batchId === body.idempotency_key)
         if (replay !== undefined) return Response.json({ seq: replay[0] })
         if (body.base_seq !== chain.length) return refusal(409, "stale_base")
         const entry: BatchEntry = {
-          seq: chain.length + 1, base_seq: body.base_seq, kind: "batch", account, epoch: body.epoch, author,
-          digest: body.digest, link: body.link, keyring_link: null, record_sig: body.record_sig,
+          seq: chain.length + 1,
+          base_seq: body.base_seq,
+          kind: "batch",
+          account,
+          epoch: body.epoch,
+          author,
+          digest: body.digest,
+          link: body.link,
+          keyring_link: null,
+          record_sig: body.record_sig,
         }
         chain.push(entry)
         objects.set(entry.seq, { id: body.upload_id, batchId: body.idempotency_key, bytes: up.data })
@@ -118,7 +182,14 @@ export function startChainWireServer(account: string, chain: SyncEntry[], option
       }
       if (req.method === "PUT" && path === "/v1/sync/pending") {
         const body = (await req.json()) as { account: string; commitment: string }
-        const row: Pending = { id: randomBytes(9).toString("base64url"), account: body.account, commitment: body.commitment, answer: null, reveal: null, expires_at: Date.now() + 600_000 }
+        const row: Pending = {
+          id: randomBytes(9).toString("base64url"),
+          account: body.account,
+          commitment: body.commitment,
+          answer: null,
+          reveal: null,
+          expires_at: Date.now() + 600_000,
+        }
         pairings.set(row.id, row)
         onWrite?.()
         return Response.json(row)
@@ -148,9 +219,18 @@ export function startChainWireServer(account: string, chain: SyncEntry[], option
         const digest = await sha256B64(jcsBytes(request.record))
         if (request.base_seq !== chain.length) return refusal(409, "stale_base")
         const entry: KeyringEntry = {
-          seq: chain.length + 1, base_seq: request.base_seq, kind: "keyring", account, epoch: request.record.epoch, author,
-          body: request.record, digest, link: request.link,
-          keyring_link: request.keyring_link, record_sig: request.record_sig, wraps: request.wraps,
+          seq: chain.length + 1,
+          base_seq: request.base_seq,
+          kind: "keyring",
+          account,
+          epoch: request.record.epoch,
+          author,
+          body: request.record,
+          digest,
+          link: request.link,
+          keyring_link: request.keyring_link,
+          record_sig: request.record_sig,
+          wraps: request.wraps,
         }
         chain.push(entry)
         onWrite?.()
@@ -169,8 +249,12 @@ export function startChainWireServer(account: string, chain: SyncEntry[], option
       hooks.tamperReveal = fn
     },
     pending: () => [...pairings.values()],
-    get onWrite() { return onWrite },
-    set onWrite(fn) { onWrite = fn },
+    get onWrite() {
+      return onWrite
+    },
+    set onWrite(fn) {
+      onWrite = fn
+    },
     enabled: (deviceId) => accountConsent && deviceConsent.get(deviceId) === true,
     tokenFor(author, serviceDeviceId = author.kind === "device" ? author.id : author.credential_id) {
       const token = randomBytes(12).toString("base64url")

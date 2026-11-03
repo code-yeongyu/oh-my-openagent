@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test"
 
-import { REFLECTION_DIR, SCENARIOS, probeFor } from "../../memory-core/src/reflection/stale-holder.scenarios.test-support"
+import {
+  REFLECTION_DIR,
+  SCENARIOS,
+  probeFor,
+} from "../../memory-core/src/reflection/stale-holder.scenarios.test-support"
 import { classifyReflectionLock } from "../bin/lib/doctor-reflection-lock.js"
 import { classifyActiveReflectionHolder } from "../../omo-senpi/src/components/memory/reflection-stale-active"
 

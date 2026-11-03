@@ -8,7 +8,10 @@ export function parseToolsConfig(toolsValue: unknown): Record<string, boolean> |
 
   let items: string[]
   if (typeof toolsValue === "string") {
-    items = toolsValue.split(",").map((t) => t.trim()).filter(Boolean)
+    items = toolsValue
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean)
   } else if (Array.isArray(toolsValue)) {
     items = toolsValue.filter((t) => typeof t === "string" && t.trim().length > 0).map((t) => (t as string).trim())
   } else {

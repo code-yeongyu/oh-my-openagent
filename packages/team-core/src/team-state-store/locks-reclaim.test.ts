@@ -24,7 +24,9 @@ test("#given concurrent reclaimers of one crash-torn lock #when they all reclaim
   await writeCrashTornLock(lockPath)
 
   // when
-  const outcomes = await Promise.all(Array.from({ length: 8 }, () => removeLockRecordIfUnchanged(lockPath, "", 300_000)))
+  const outcomes = await Promise.all(
+    Array.from({ length: 8 }, () => removeLockRecordIfUnchanged(lockPath, "", 300_000)),
+  )
 
   // then
   expect(outcomes.filter((outcome) => outcome === "removed")).toHaveLength(1)
@@ -47,7 +49,10 @@ test("#given a second reclaimer and a new holder racing into the gap before the 
     unlink: async (path: PathLike) => {
       if (String(path) === lockPath && racerOutcome === undefined) {
         racerOutcome = await removeLockRecordIfUnchanged(lockPath, "", 300_000)
-        racerPublished = await writeFile(lockPath, liveRecord, { flag: "wx" }).then(() => true, () => false)
+        racerPublished = await writeFile(lockPath, liveRecord, { flag: "wx" }).then(
+          () => true,
+          () => false,
+        )
       }
       await unlink(path)
     },

@@ -10,9 +10,7 @@ interface TodoResultEvent {
   readonly content: ReadonlyArray<Record<string, unknown>>
 }
 
-export function createTodoFanoutReminderComponent(
-  arming: SessionArming = sharedSessionArming(),
-): OmoSenpiComponent {
+export function createTodoFanoutReminderComponent(arming: SessionArming = sharedSessionArming()): OmoSenpiComponent {
   return {
     name: "todo-fanout-reminder",
     register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
@@ -36,18 +34,21 @@ export function createTodoFanoutReminderComponent(
         remindedSessionIds.delete(sessionId)
       }
 
-      pi.on("tool_result", (payload: unknown, eventCtx: unknown): { content: ReadonlyArray<Record<string, unknown>> } | undefined => {
-        if (ctx.config.getFlag(DISABLED_FLAG) === true) return undefined
-        const event = asTodoResultEvent(payload)
-        if (event === undefined) return undefined
-        if (!TASK_ADDING_OPS.has(event.op)) return undefined
-        const sessionId = extractSessionId(eventCtx)
-        if (!arming.isArmed(sessionId)) return undefined
-        if (isReminded(sessionId)) return undefined
-        markReminded(sessionId)
-        ctx.logger.info("omo-senpi todo-fanout-reminder injected", { sessionId, op: event.op })
-        return { content: [...event.content, { type: "text", text: TODO_FANOUT_REMINDER }] }
-      })
+      pi.on(
+        "tool_result",
+        (payload: unknown, eventCtx: unknown): { content: ReadonlyArray<Record<string, unknown>> } | undefined => {
+          if (ctx.config.getFlag(DISABLED_FLAG) === true) return undefined
+          const event = asTodoResultEvent(payload)
+          if (event === undefined) return undefined
+          if (!TASK_ADDING_OPS.has(event.op)) return undefined
+          const sessionId = extractSessionId(eventCtx)
+          if (!arming.isArmed(sessionId)) return undefined
+          if (isReminded(sessionId)) return undefined
+          markReminded(sessionId)
+          ctx.logger.info("omo-senpi todo-fanout-reminder injected", { sessionId, op: event.op })
+          return { content: [...event.content, { type: "text", text: TODO_FANOUT_REMINDER }] }
+        },
+      )
 
       pi.on("session_compact", (payload: unknown, eventCtx: unknown): void => {
         if (isRejectedCompaction(payload)) return

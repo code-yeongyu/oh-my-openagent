@@ -5,10 +5,7 @@ import type { DelegatedModelConfig } from "./types"
 export function resolveEffectiveFallbackEntry(input: {
   categoryModel: DelegatedModelConfig | undefined
   configuredFallbackChain: FallbackEntry[] | undefined
-  resolution:
-    | { skipped: true }
-    | { fallbackEntry?: FallbackEntry; matchedFallback?: boolean }
-    | undefined
+  resolution: { skipped: true } | { fallbackEntry?: FallbackEntry; matchedFallback?: boolean } | undefined
 }): FallbackEntry | undefined {
   const { categoryModel, configuredFallbackChain, resolution } = input
 
@@ -20,8 +17,10 @@ export function resolveEffectiveFallbackEntry(input: {
     return undefined
   }
 
-  return resolvedFallbackEntry
-    ?? (configuredFallbackChain
+  return (
+    resolvedFallbackEntry ??
+    (configuredFallbackChain
       ? findMostSpecificFallbackEntry(categoryModel.providerID, categoryModel.modelID, configuredFallbackChain)
       : undefined)
+  )
 }

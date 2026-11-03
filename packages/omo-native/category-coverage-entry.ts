@@ -42,7 +42,10 @@ export function modelChains(input: CategoryCoverageInput): ModelChainsView {
   return {
     ...report,
     ...(profile === undefined ? {} : { configProfile: profile }),
-    modelProfile: describeModelProfile(config, models.map((model) => `${model.provider}/${model.id}`)),
+    modelProfile: describeModelProfile(
+      config,
+      models.map((model) => `${model.provider}/${model.id}`),
+    ),
   }
 }
 

@@ -15,7 +15,11 @@ afterEach(async () => {
   }
 })
 
-function countingExec(): { readonly exec: GitExec; readonly logCalls: () => number; readonly logRanges: () => string[] } {
+function countingExec(): {
+  readonly exec: GitExec
+  readonly logCalls: () => number
+  readonly logRanges: () => string[]
+} {
   const real = createNodeGitExec()
   const ranges: string[] = []
   return {
@@ -31,7 +35,11 @@ function countingExec(): { readonly exec: GitExec; readonly logCalls: () => numb
 }
 
 async function repoWithHistory(
-  steps: ReadonlyArray<{ readonly write?: Record<string, string>; readonly remove?: readonly string[]; readonly at: string }>,
+  steps: ReadonlyArray<{
+    readonly write?: Record<string, string>
+    readonly remove?: readonly string[]
+    readonly at: string
+  }>,
   exec?: GitExec,
 ): Promise<{ readonly repo: GitMemoryRepo; readonly dir: string; readonly heads: string[] }> {
   const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-commit-times-")))
@@ -93,10 +101,13 @@ describe("GitMemoryRepo.pathCommitTimes", () => {
   it("#given the same commit read twice #when timed #then git log runs once, and another commit recomputes", async () => {
     // given
     const counting = countingExec()
-    const { repo, heads } = await repoWithHistory([
-      { write: { "a.md": "1" }, at: "2026-01-01T00:00:01Z" },
-      { write: { "a.md": "2" }, at: "2026-01-01T00:00:02Z" },
-    ], counting.exec)
+    const { repo, heads } = await repoWithHistory(
+      [
+        { write: { "a.md": "1" }, at: "2026-01-01T00:00:01Z" },
+        { write: { "a.md": "2" }, at: "2026-01-01T00:00:02Z" },
+      ],
+      counting.exec,
+    )
     const before = counting.logCalls()
 
     // when
@@ -113,9 +124,10 @@ describe("GitMemoryRepo.pathCommitTimes", () => {
   it("#given times already computed for an ancestor #when a descendant is read #then only the new commits are logged", async () => {
     // given
     const counting = countingExec()
-    const { repo, dir, heads } = await repoWithHistory([
-      { write: { "a.md": "1", "b.md": "1" }, at: "2026-01-01T00:00:01Z" },
-    ], counting.exec)
+    const { repo, dir, heads } = await repoWithHistory(
+      [{ write: { "a.md": "1", "b.md": "1" }, at: "2026-01-01T00:00:01Z" }],
+      counting.exec,
+    )
     await repo.pathCommitTimes(heads[0] ?? "")
     const git = createNodeGitExec()
     const at = "2026-01-01T00:00:05Z"
@@ -159,7 +171,10 @@ describe("GitMemoryRepo.pathCommitTimes", () => {
 
   for (const [label, store] of [
     ["truncated JSON", (revision: string) => `{"version":2,"revision":"${revision}","times":{"a.md":`],
-    ["one non-integer entry in valid JSON", (revision: string) => JSON.stringify({ version: 2, revision, times: { "a.md": "soon", "b.md": 1 } })],
+    [
+      "one non-integer entry in valid JSON",
+      (revision: string) => JSON.stringify({ version: 2, revision, times: { "a.md": "soon", "b.md": 1 } }),
+    ],
   ] as const) {
     it(`#given a stored cache with ${label} #when read #then the whole store is ignored and the full history answers`, async () => {
       // given
@@ -232,7 +247,7 @@ describe("GitMemoryRepo.pathCommitTimes", () => {
     await run(["add", "-A"], at("2026-05-01T00:00:00Z"))
     await run(["commit", "-q", "-m", "trunk"], at("2026-05-01T00:00:00Z"))
     await run(["merge", "-q", "--no-ff", "-m", "merge", "side"], at("2026-02-01T00:00:00Z"))
-    const merged = ((await run(["rev-parse", "HEAD"])).stdout).trim()
+    const merged = (await run(["rev-parse", "HEAD"])).stdout.trim()
     await new GitMemoryRepo({ dir, agentId: "agent" }).pathCommitTimes(heads[0] ?? "")
 
     // when
@@ -260,7 +275,7 @@ describe("GitMemoryRepo.pathCommitTimes", () => {
     await writeFile(join(dir, "c.md"), "resolved in the merge")
     await run(["add", "-A"], at("2026-06-01T00:00:00Z"))
     await run(["commit", "-q", "-m", "merge"], at("2026-06-01T00:00:00Z"))
-    const merged = ((await run(["rev-parse", "HEAD"])).stdout).trim()
+    const merged = (await run(["rev-parse", "HEAD"])).stdout.trim()
 
     // when
     const times = await new GitMemoryRepo({ dir, agentId: "agent" }).pathCommitTimes(merged)
@@ -310,8 +325,11 @@ describe("GitMemoryRepo.pathCommitTimes", () => {
     ])
 
     // when
-    const reads = await Promise.allSettled(Array.from({ length: 5 }, () =>
-      heads.map((head) => new GitMemoryRepo({ dir, agentId: "agent" }).pathCommitTimes(head))).flat())
+    const reads = await Promise.allSettled(
+      Array.from({ length: 5 }, () =>
+        heads.map((head) => new GitMemoryRepo({ dir, agentId: "agent" }).pathCommitTimes(head)),
+      ).flat(),
+    )
 
     // then
     expect(reads.filter((read) => read.status === "rejected")).toEqual([])

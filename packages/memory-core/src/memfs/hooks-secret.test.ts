@@ -142,7 +142,9 @@ describe("pre-commit hook secret screening", () => {
     const dir = await createRepo()
 
     // when
-    const result = await commit(dir, { "reference/policy.md": "---\ndescription: Policy\n---\n\npassword policy doc\nthe token budget is 30000 tokens\n" })
+    const result = await commit(dir, {
+      "reference/policy.md": "---\ndescription: Policy\n---\n\npassword policy doc\nthe token budget is 30000 tokens\n",
+    })
 
     // then
     expect(result.code).toBe(0)

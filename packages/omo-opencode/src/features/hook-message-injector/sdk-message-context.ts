@@ -8,7 +8,7 @@ import type { StoredMessage } from "./types"
 
 export async function findMessageContextFromSDK(
   client: OpencodeClient,
-  sessionID: string
+  sessionID: string,
 ): Promise<{ prevMessage: StoredMessage | null; firstMessageAgent: string | null }> {
   const messages = await fetchSDKMessages(client, sessionID)
   if (!messages) {

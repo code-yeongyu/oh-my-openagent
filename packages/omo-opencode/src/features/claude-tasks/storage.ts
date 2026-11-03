@@ -127,8 +127,8 @@ export function listTaskFiles(config: Partial<OhMyOpenCodeConfig> = {}): string[
   const dir = getTaskDir(config)
   if (!existsSync(dir)) return []
   return readdirSync(dir)
-    .filter((f) => f.endsWith('.json') && f.startsWith('T-'))
-    .map((f) => f.replace('.json', ''))
+    .filter((f) => f.endsWith(".json") && f.startsWith("T-"))
+    .map((f) => f.replace(".json", ""))
 }
 
 export async function acquireLock(

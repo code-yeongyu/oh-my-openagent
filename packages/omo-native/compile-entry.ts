@@ -13,7 +13,13 @@ import {
 } from "./compile-runtime"
 import { handOffToProvisionedRuntime, planProvisionedLaunch } from "./provisioned-handoff"
 import { parseBuildInfo, parseEngineBuildStamp, versionLines } from "./build-info"
-import { compiledUpdate, fetchGitHubReleases, probePackageOwner, releaseAssetName, RELEASES_URL } from "./compiled-update"
+import {
+  compiledUpdate,
+  fetchGitHubReleases,
+  probePackageOwner,
+  releaseAssetName,
+  RELEASES_URL,
+} from "./compiled-update"
 import { migrateLegacyBunGlobalManifest } from "./bin/lib/legacy-bun-global-migration.js"
 import { removeLegacyServiceCredentials } from "./bin/lib/legacy-service-credentials.js"
 import { adoptLegacyFlatState, canonicalAgentDir } from "./bin/lib/agent-dir.js"
@@ -28,7 +34,11 @@ import { isSelfUpdate, updateUsageAnswer } from "./bin/lib/update-args.js"
 import { detectHarnesses } from "./bin/lib/setup-detect.js"
 import { runSetup } from "./bin/lib/setup-import.js"
 import { runCompiledDoctor, type CompiledDoctorOptions } from "./compiled-doctor"
-import { compiledDiagnosticRuntimeLoader, loadCompiledCoverageEngine, loadCompiledModelCatalog } from "./compiled-diagnostic-runtime"
+import {
+  compiledDiagnosticRuntimeLoader,
+  loadCompiledCoverageEngine,
+  loadCompiledModelCatalog,
+} from "./compiled-diagnostic-runtime"
 import { isInternalSupervisorLaunch, runInternalSupervisor } from "./supervisor-fast-path"
 import { registerEngineRuntimeModules } from "./engine-runtime-modules"
 import { applyCachedClaudeCode } from "../omo-senpi/src/components/claude-code/index"
@@ -76,7 +86,11 @@ export function versionLine(
  * A dev build is refreshed by rebuilding it. A release binary resolves its update in `main()` from the
  * embedded manifest (see compiled-update.ts); any other caller has no binary to replace.
  */
-export function updateHint(rawBuildInfo: unknown, platform: NodeJS.Platform = process.platform, arch: string = process.arch): string {
+export function updateHint(
+  rawBuildInfo: unknown,
+  platform: NodeJS.Platform = process.platform,
+  arch: string = process.arch,
+): string {
   const info = parseBuildInfo(rawBuildInfo)
   if (info !== undefined) return `rebuild with: bun run ${info.command}`
   return `omo update runs from the compiled omo binary; download ${releaseAssetName(undefined, platform, arch)} from ${RELEASES_URL}`
@@ -108,11 +122,16 @@ export function answerCompiledFastPath(
   manifest: Pick<EmbeddedManifest, "omoAiVersion" | "enginePin" | "buildInfo" | "engineBuild">,
 ): boolean {
   if ((args[0] === "--version" || args[0] === "-v") && args.length === 1) {
-    console.log(versionLine({
-      version: manifest.omoAiVersion,
-      omoBuild: manifest.buildInfo,
-      engineBuild: manifest.engineBuild,
-    }, manifest.enginePin))
+    console.log(
+      versionLine(
+        {
+          version: manifest.omoAiVersion,
+          omoBuild: manifest.buildInfo,
+          engineBuild: manifest.engineBuild,
+        },
+        manifest.enginePin,
+      ),
+    )
     return true
   }
   if (isSelfUpdate(args)) {
@@ -132,11 +151,19 @@ export function compiledBannerLines(manifest: Pick<EmbeddedManifest, "omoAiVersi
   return info === undefined ? [releaseBanner(manifest.omoAiVersion)] : versionLines(info)
 }
 
-
 /** Test seam: the thread SDK `omo daemon adopt` locates and releases through (the plugin's by default). */
-type CompiledLauncherSeams = { readonly threadSdk?: (options: Record<string, unknown>) => Promise<{ sdk?: unknown; error?: string }> }
+type CompiledLauncherSeams = {
+  readonly threadSdk?: (options: Record<string, unknown>) => Promise<{ sdk?: unknown; error?: string }>
+}
 
-export async function runCompiledLauncher(args: string[], execDir: string, enginePin = "unknown", compiledPackageRoot?: string, migration: CompiledLauncherOptions = {}, seams: CompiledLauncherSeams = {}): Promise<boolean> {
+export async function runCompiledLauncher(
+  args: string[],
+  execDir: string,
+  enginePin = "unknown",
+  compiledPackageRoot?: string,
+  migration: CompiledLauncherOptions = {},
+  seams: CompiledLauncherSeams = {},
+): Promise<boolean> {
   if (args[0] === "loro-smoke") {
     process.exitCode = await runLoroSmoke()
     return true
@@ -171,7 +198,9 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
   // The toolkit CLI is no longer shipped in the Native payload: the loop runs in-process behind the
   // eval SDK the extension publishes. Answer with a named result instead of an ENOENT spawn failure.
   if (command === "ulw-loop") {
-    process.stderr.write('omo ulw-loop is unavailable in this build: use the agent toolkit SDK from an eval js cell: const { agentToolkit } = await import(`${env("OMO_AGENT_TOOLKIT_SDK_ROOT")}/sdk.js`); print(await agentToolkit.status()) (Codex keeps the standalone CLI).\n')
+    process.stderr.write(
+      'omo ulw-loop is unavailable in this build: use the agent toolkit SDK from an eval js cell: const { agentToolkit } = await import(`${env("OMO_AGENT_TOOLKIT_SDK_ROOT")}/sdk.js`); print(await agentToolkit.status()) (Codex keeps the standalone CLI).\n',
+    )
     process.exitCode = 2
     return true
   }
@@ -182,8 +211,10 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
   const engine = {
     run(engineArgs: string[], options: { env: Record<string, string | undefined> }) {
       const marker = adoptedEngineTrust()
-      const env = marker === undefined ? options.env
-        : buildTrustLaunchEnvironment(options.env, { marker, hop: false, platform: process.platform })
+      const env =
+        marker === undefined
+          ? options.env
+          : buildTrustLaunchEnvironment(options.env, { marker, hop: false, platform: process.platform })
       const result = spawnSync(process.execPath, engineArgs, { encoding: "utf8", env, windowsHide: true })
       return { exitCode: result.status ?? 1, stdout: result.stdout ?? "", stderr: result.stderr ?? "" }
     },
@@ -237,7 +268,11 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
   if (command === "doctor") {
     const inventory = await detectHarnesses()
     if (compiledPackageRoot) {
-      const stamped = readJson(join(compiledPackageRoot, "package.json")) as { version: string; omoBuild?: unknown; engineBuild?: unknown }
+      const stamped = readJson(join(compiledPackageRoot, "package.json")) as {
+        version: string
+        omoBuild?: unknown
+        engineBuild?: unknown
+      }
       await runCompiledDoctor({
         inventory,
         execDir: compiledPackageRoot,
@@ -261,8 +296,14 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
     })
     return true
   }
-  if ((command === "--version" || command === "-v") && args.length === 1) { console.log(versionLine(packageJson, enginePin ?? "unknown")); return true }
-  if (isSelfUpdate(args)) { answerUpdateHint(args, packageJson.omoBuild); return true }
+  if ((command === "--version" || command === "-v") && args.length === 1) {
+    console.log(versionLine(packageJson, enginePin ?? "unknown"))
+    return true
+  }
+  if (isSelfUpdate(args)) {
+    answerUpdateHint(args, packageJson.omoBuild)
+    return true
+  }
   return false
 }
 
@@ -296,13 +337,22 @@ async function answerUnderRefusedTrust(args: string[]): Promise<boolean> {
     return true
   }
   if (args[0] !== "--version") return false
-  const embedded = (globalThis as typeof globalThis & { Bun?: { embeddedFiles?: EmbeddedFile[] } }).Bun?.embeddedFiles as EmbeddedFile[] | undefined
+  const embedded = (globalThis as typeof globalThis & { Bun?: { embeddedFiles?: EmbeddedFile[] } }).Bun
+    ?.embeddedFiles as EmbeddedFile[] | undefined
   const manifestFile = embedded?.length ? await selectRuntimeManifest(embedded) : undefined
   if (manifestFile) {
     const manifest = JSON.parse(await embeddedText(manifestFile)) as EmbeddedManifest
-    console.log(versionLine({ version: manifest.omoAiVersion, omoBuild: manifest.buildInfo, engineBuild: manifest.engineBuild }, manifest.enginePin))
+    console.log(
+      versionLine(
+        { version: manifest.omoAiVersion, omoBuild: manifest.buildInfo, engineBuild: manifest.engineBuild },
+        manifest.enginePin,
+      ),
+    )
   } else {
-    const packageJson = readJson(join(dirname(fileURLToPath(import.meta.url)), "package.json")) as { version: string; omoBuild?: unknown }
+    const packageJson = readJson(join(dirname(fileURLToPath(import.meta.url)), "package.json")) as {
+      version: string
+      omoBuild?: unknown
+    }
     console.log(versionLine(packageJson, "unknown"))
   }
   return true
@@ -328,7 +378,8 @@ async function main(): Promise<void> {
     process.stderr.write(`omo: ${error.message}; not starting with a trust set the caller did not intend\n`)
     process.exit(78)
   }
-  const embedded = (globalThis as typeof globalThis & { Bun?: { embeddedFiles?: EmbeddedFile[] } }).Bun?.embeddedFiles as EmbeddedFile[] | undefined
+  const embedded = (globalThis as typeof globalThis & { Bun?: { embeddedFiles?: EmbeddedFile[] } }).Bun
+    ?.embeddedFiles as EmbeddedFile[] | undefined
   if (!embedded?.length) {
     const execDir = dirname(fileURLToPath(import.meta.url))
     const args = process.argv.slice(2)
@@ -357,7 +408,13 @@ async function main(): Promise<void> {
   if (!manifestFile) throw new Error("embedded runtime-manifest.json is missing")
   const manifest = JSON.parse(await embeddedText(manifestFile)) as EmbeddedManifest
   const runningExecutable = runningExecutablePath()
-  const expected = join(homedir(), ".omo", "binary-runtime", manifest.omoAiVersion, process.platform === "win32" ? "omo.exe" : "omo")
+  const expected = join(
+    homedir(),
+    ".omo",
+    "binary-runtime",
+    manifest.omoAiVersion,
+    process.platform === "win32" ? "omo.exe" : "omo",
+  )
   const launch = planProvisionedLaunch(runningExecutable, expected)
   // Materialize the provisioned runtime BEFORE answering the informational fast-path.
   // First-run provisioning must happen even for `--version`/`-v`: the release smoke test
@@ -379,12 +436,21 @@ async function main(): Promise<void> {
     return
   }
   const helperPath = resolveEngineTrustHelperPath({ OMO_PACKAGE_DIR: dirname(expected) })
-  const helperEntry = helperPath === null ? undefined : manifest.entries.find((entry) => join(dirname(expected), entry.relPath) === helperPath)
+  const helperEntry =
+    helperPath === null
+      ? undefined
+      : manifest.entries.find((entry) => join(dirname(expected), entry.relPath) === helperPath)
   const trust = await runTrustStage({
     args,
     executable: launch.handOff ? expected : process.execPath,
-    helper: helperPath !== null && helperEntry !== undefined ? { path: helperPath, sha256: helperEntry.sha256 } : undefined,
-    ...(launch.handOff ? { exec: (file: string, argv: string[], env: NodeJS.ProcessEnv) => handOffToProvisionedRuntime(file, { argv, env }) } : {}),
+    helper:
+      helperPath !== null && helperEntry !== undefined ? { path: helperPath, sha256: helperEntry.sha256 } : undefined,
+    ...(launch.handOff
+      ? {
+          exec: (file: string, argv: string[], env: NodeJS.ProcessEnv) =>
+            handOffToProvisionedRuntime(file, { argv, env }),
+        }
+      : {}),
   })
   if (trust.action !== "adopt") {
     setTrustExitCode(trust.action)
@@ -425,7 +491,7 @@ async function main(): Promise<void> {
   process.argv.splice(2, process.argv.length - 2, ...buildSenpiArgs(process.argv.slice(2), execDir))
   Object.assign(process.env, remapSenpiEnvironment(process.env, execDir))
   applyCachedClaudeCode(process.env, execDir)
-  if (isInternalSupervisorLaunch(process.argv.slice(2)) && await runInternalSupervisor(process.argv.slice(2))) return
+  if (isInternalSupervisorLaunch(process.argv.slice(2)) && (await runInternalSupervisor(process.argv.slice(2)))) return
   await registerEngineRuntimeModules()
   await import("../../node_modules/@code-yeongyu/senpi/dist/cli.js") // literal: see import note above
 }

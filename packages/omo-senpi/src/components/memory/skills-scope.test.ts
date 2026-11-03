@@ -63,7 +63,11 @@ const IDENTITY = "skills-scope-agent"
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rmEfaultTolerant(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(
+    tempDirs
+      .splice(0)
+      .map((dir) => rmEfaultTolerant(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })),
+  )
 })
 
 async function fixture(createSkills = true): Promise<{ context: MemoryIdentityContext; skillsDir: string }> {

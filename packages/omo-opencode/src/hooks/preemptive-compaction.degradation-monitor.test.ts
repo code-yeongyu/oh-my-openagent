@@ -8,7 +8,9 @@ mock.module("../shared/logger", () => ({
   log: logMock,
 }))
 
-afterAll(() => { mock.restore() })
+afterAll(() => {
+  mock.restore()
+})
 
 const { createPreemptiveCompactionHook } = await import("./preemptive-compaction")
 
@@ -51,11 +53,7 @@ function appendAssistantHistory(
   })
 }
 
-function buildAssistantUpdate(input: {
-  sessionID: string
-  id: string
-  parts: unknown[]
-}): {
+function buildAssistantUpdate(input: { sessionID: string; id: string; parts: unknown[] }): {
   event: {
     type: string
     properties: {
@@ -125,13 +123,10 @@ describe("preemptive-compaction post-compaction degradation monitor", () => {
     // then
     expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
     expect(ctx.client.tui.showToast).toHaveBeenCalledTimes(1)
-    expect(logMock).toHaveBeenCalledWith(
-      "[preemptive-compaction] Detected post-compaction no-text tail pattern",
-      {
-        sessionID,
-        streak: 3,
-      },
-    )
+    expect(logMock).toHaveBeenCalledWith("[preemptive-compaction] Detected post-compaction no-text tail pattern", {
+      sessionID,
+      streak: 3,
+    })
   })
 
   it("resets no-text streak when assistant emits text content", async () => {
@@ -153,41 +148,49 @@ describe("preemptive-compaction post-compaction degradation monitor", () => {
       id: "msg_1",
       parts: [{ type: "step-start" }, { type: "step-finish" }],
     })
-    await hook.event(buildAssistantUpdate({
-      sessionID,
-      id: "msg_1",
-      parts: [{ type: "step-start" }, { type: "step-finish" }],
-    }))
+    await hook.event(
+      buildAssistantUpdate({
+        sessionID,
+        id: "msg_1",
+        parts: [{ type: "step-start" }, { type: "step-finish" }],
+      }),
+    )
 
     appendAssistantHistory(sessionHistory, {
       id: "msg_2",
       parts: [{ type: "text", text: "Recovered response" }],
     })
-    await hook.event(buildAssistantUpdate({
-      sessionID,
-      id: "msg_2",
-      parts: [{ type: "text", text: "Recovered response" }],
-    }))
+    await hook.event(
+      buildAssistantUpdate({
+        sessionID,
+        id: "msg_2",
+        parts: [{ type: "text", text: "Recovered response" }],
+      }),
+    )
 
     appendAssistantHistory(sessionHistory, {
       id: "msg_3",
       parts: [{ type: "step-start" }, { type: "step-finish" }],
     })
-    await hook.event(buildAssistantUpdate({
-      sessionID,
-      id: "msg_3",
-      parts: [{ type: "step-start" }, { type: "step-finish" }],
-    }))
+    await hook.event(
+      buildAssistantUpdate({
+        sessionID,
+        id: "msg_3",
+        parts: [{ type: "step-start" }, { type: "step-finish" }],
+      }),
+    )
 
     appendAssistantHistory(sessionHistory, {
       id: "msg_4",
       parts: [{ type: "step-start" }, { type: "step-finish" }],
     })
-    await hook.event(buildAssistantUpdate({
-      sessionID,
-      id: "msg_4",
-      parts: [{ type: "step-start" }, { type: "step-finish" }],
-    }))
+    await hook.event(
+      buildAssistantUpdate({
+        sessionID,
+        id: "msg_4",
+        parts: [{ type: "step-start" }, { type: "step-finish" }],
+      }),
+    )
 
     // then
     expect(ctx.client.session.summarize).not.toHaveBeenCalled()

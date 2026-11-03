@@ -13,7 +13,7 @@ export async function removeStaleSelfPackageTests(root = process.cwd()): Promise
 
     for (const packageName of SELF_PACKAGE_NAMES) {
       const candidate = join(packagesDir, packageEntry.name, "node_modules", packageName)
-      if (!await pathExists(candidate)) continue
+      if (!(await pathExists(candidate))) continue
       await rm(candidate, { recursive: true, force: true })
       removed.push(["packages", packageEntry.name, "node_modules", packageName].join("/"))
     }
@@ -33,10 +33,7 @@ async function pathExists(path: string): Promise<boolean> {
 }
 
 function hasCode(error: unknown, code: string): boolean {
-  return typeof error === "object"
-    && error !== null
-    && "code" in error
-    && error.code === code
+  return typeof error === "object" && error !== null && "code" in error && error.code === code
 }
 
 if (import.meta.main) {

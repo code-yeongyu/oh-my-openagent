@@ -2,12 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
-import {
-  ADOPTION_MARKER,
-  adoptLegacyFlatState,
-  canonicalAgentDir,
-  legacyFlatAgentDir,
-} from "../bin/lib/agent-dir.js"
+import { ADOPTION_MARKER, adoptLegacyFlatState, canonicalAgentDir, legacyFlatAgentDir } from "../bin/lib/agent-dir.js"
 
 const roots: string[] = []
 
@@ -26,10 +21,14 @@ function readJson(path: string): Record<string, unknown> {
   return JSON.parse(readFileSync(path, "utf8"))
 }
 
-const FLAT_SETTINGS = JSON.stringify({
-  favoriteModels: ["anthropic/claude-fable-5"],
-  retry: { fallbackChains: { "claude-fable-5": [] }, modelFallback: true },
-}, null, 2)
+const FLAT_SETTINGS = JSON.stringify(
+  {
+    favoriteModels: ["anthropic/claude-fable-5"],
+    retry: { fallbackChains: { "claude-fable-5": [] }, modelFallback: true },
+  },
+  null,
+  2,
+)
 
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })

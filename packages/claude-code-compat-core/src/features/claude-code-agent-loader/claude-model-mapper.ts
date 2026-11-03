@@ -29,9 +29,7 @@ function mapClaudeModelString(model: string | undefined, anthropicProvider?: str
 
     if (providerID.length === 0 || modelID.length === 0) return trimmed
 
-    return modelID.startsWith("claude-")
-      ? `${providerID}/${normalizeModelID(modelID)}`
-      : trimmed
+    return modelID.startsWith("claude-") ? `${providerID}/${normalizeModelID(modelID)}` : trimmed
   }
 
   const normalized = normalizeModelID(trimmed)

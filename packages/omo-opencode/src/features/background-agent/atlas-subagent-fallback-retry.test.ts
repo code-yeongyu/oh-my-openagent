@@ -112,9 +112,7 @@ async function launchAtlasOracleSubagent(manager: BackgroundManager): Promise<st
     parentMessageId: "atlas-message",
     parentAgent: "atlas",
     model: { providerID: "openai", modelID: "gpt-5.5", variant: "high" },
-    fallbackChain: [
-      { providers: ["github-copilot"], model: "claude-sonnet-4.6", variant: "high" },
-    ],
+    fallbackChain: [{ providers: ["github-copilot"], model: "claude-sonnet-4.6", variant: "high" }],
   })
   await flushAsyncWork()
   return task.id
@@ -155,7 +153,11 @@ describe("Atlas-spawned subagent runtime fallback", () => {
     expect(task?.model).toEqual({ providerID: "github-copilot", modelID: "claude-sonnet-4.6", variant: "high" })
     expect(task?.attemptCount).toBe(1)
     expect(createdSessions).toHaveLength(2)
-    expect(createdSessions[1]?.body?.model).toEqual({ providerID: "github-copilot", id: "claude-sonnet-4.6", variant: "high" })
+    expect(createdSessions[1]?.body?.model).toEqual({
+      providerID: "github-copilot",
+      id: "claude-sonnet-4.6",
+      variant: "high",
+    })
     expect(promptCalls).toHaveLength(2)
     expect(subagentSessions.has("ses_primary")).toBe(false)
     expect(subagentSessions.has("ses_fallback")).toBe(true)

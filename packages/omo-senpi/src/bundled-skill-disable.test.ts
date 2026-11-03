@@ -83,7 +83,11 @@ describe("bundled skill disable on the Native surface", () => {
 
   it("#given disabled_skills names frontend and visual-qa in the user config #when the Native skill set resolves #then both are absent and the rest stay", async () => {
     mkdirSync(join(home, ".omo"), { recursive: true })
-    writeFileSync(join(home, ".omo", "omo.jsonc"), JSON.stringify({ disabled_skills: ["frontend", "visual-qa"] }), "utf-8")
+    writeFileSync(
+      join(home, ".omo", "omo.jsonc"),
+      JSON.stringify({ disabled_skills: ["frontend", "visual-qa"] }),
+      "utf-8",
+    )
 
     const names = await resolveNativeSkillNames(cwd)
 
@@ -96,7 +100,11 @@ describe("bundled skill disable on the Native surface", () => {
     mkdirSync(join(home, ".omo"), { recursive: true })
     writeFileSync(join(home, ".omo", "omo.jsonc"), JSON.stringify({ disabled_skills: ["frontend"] }), "utf-8")
     mkdirSync(join(cwd, ".omo"), { recursive: true })
-    writeFileSync(join(cwd, ".omo", "omo.jsonc"), JSON.stringify({ "[senpi]": { disabled_skills: ["visual-qa"] } }), "utf-8")
+    writeFileSync(
+      join(cwd, ".omo", "omo.jsonc"),
+      JSON.stringify({ "[senpi]": { disabled_skills: ["visual-qa"] } }),
+      "utf-8",
+    )
 
     const names = await resolveNativeSkillNames(cwd)
 

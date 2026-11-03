@@ -157,7 +157,9 @@ describe("createCompletionNotifier - async delivery failure receipts", () => {
     const completion = createCompletionNotifier({ notifier: parent.notifier, store })
 
     // when / then
-    expect(() => completion.recordDeliveryFailure({ taskIds: ["st_gone"], error: new Error("coordinator retired") })).not.toThrow()
+    expect(() =>
+      completion.recordDeliveryFailure({ taskIds: ["st_gone"], error: new Error("coordinator retired") }),
+    ).not.toThrow()
     expect(events).toHaveLength(0)
     expect(parent.calls).toHaveLength(0)
   })

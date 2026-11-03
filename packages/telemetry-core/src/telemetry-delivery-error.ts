@@ -8,7 +8,12 @@ export class TelemetryDeliveryError extends Error {
   readonly status: number | undefined
 
   constructor(status: number | undefined, cause?: unknown) {
-    super(status === undefined ? "telemetry event was not delivered (no response)" : `telemetry event was rejected with HTTP ${status}`, { cause })
+    super(
+      status === undefined
+        ? "telemetry event was not delivered (no response)"
+        : `telemetry event was rejected with HTTP ${status}`,
+      { cause },
+    )
     this.name = "TelemetryDeliveryError"
     this.status = status
     this.permanent = status !== undefined && PERMANENT_STATUSES.has(status)

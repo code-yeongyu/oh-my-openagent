@@ -12,14 +12,17 @@ const POOL_KEY = "a"
 /** The worker's OWN tool-result channel, read back from its real JSONL transcript. */
 function workerToolResults(env: ChildEnv, taskId: string): readonly string[] {
   const dir = join(env.store.stateDir, "children", taskId, "sessions", taskId)
-  return readdirSync(dir).flatMap((file) => readFileSync(join(dir, file), "utf8").split("\n"))
-    .filter((line) => line.includes("\"kernel_tool\":\"fixture_lookup\""))
+  return readdirSync(dir)
+    .flatMap((file) => readFileSync(join(dir, file), "utf8").split("\n"))
+    .filter((line) => line.includes('"kernel_tool":"fixture_lookup"'))
 }
 
 function workpoolTool(env: ChildEnv, context: unknown) {
   return async (callId: string, params: Record<string, unknown>): Promise<Record<string, unknown>> =>
-    (await env.workpoolTool.execute(callId, params as never, undefined, undefined, context as never))
-      .details as Record<string, unknown>
+    (await env.workpoolTool.execute(callId, params as never, undefined, undefined, context as never)).details as Record<
+      string,
+      unknown
+    >
 }
 
 /**
@@ -38,7 +41,10 @@ export async function runPoolWorkerStaleYield(): Promise<Record<string, unknown>
     if (body.includes("kernel_tool_stale")) {
       return {
         toolName: "workpool",
-        args: { op: "yield", results: [{ key: POOL_KEY, error: { code: "kernel_tool_stale", message: "parent kernel tool is stale" } }] },
+        args: {
+          op: "yield",
+          results: [{ key: POOL_KEY, error: { code: "kernel_tool_stale", message: "parent kernel tool is stale" } }],
+        },
       }
     }
     // The worker exists and holds its grant: reset the parent kernel now, then call the tool.
@@ -51,19 +57,35 @@ export async function runPoolWorkerStaleYield(): Promise<Record<string, unknown>
     if (event.kind === "dispatched") dispatches.push(event)
   })
   const aggregates: WorkpoolAggregateMessage[] = []
-  env.manager.workpools.bindAggregate({ enqueue: (message, receipts) => { aggregates.push(message); receipts.ack() } })
+  env.manager.workpools.bindAggregate({
+    enqueue: (message, receipts) => {
+      aggregates.push(message)
+      receipts.ack()
+    },
+  })
   try {
     const context = env.context(kernel.capability, "omp-item6-parent")
     const pool = workpoolTool(env, context)
     const created = await pool("omp-item6-stale-create", {
-      op: "create", name: "omp-item6-stale-pool", agent: { category: "quick", prompt: "Use fixture_lookup" }, tools: ["fixture_lookup"],
+      op: "create",
+      name: "omp-item6-stale-pool",
+      agent: { category: "quick", prompt: "Use fixture_lookup" },
+      tools: ["fixture_lookup"],
     })
     const poolId = created["pool_id"]
     assert.equal(created["error"], undefined)
     assert.ok(typeof poolId === "string" && poolId.length > 0, "the pool must be created with its parent tool")
 
-    const dispatched = env.manager.workpools.waitForEvent(poolId as `wp_${string}`, "dispatched", AbortSignal.timeout(20_000))
-    const settled = env.manager.workpools.waitForEvent(poolId as `wp_${string}`, "item_result", AbortSignal.timeout(20_000))
+    const dispatched = env.manager.workpools.waitForEvent(
+      poolId as `wp_${string}`,
+      "dispatched",
+      AbortSignal.timeout(20_000),
+    )
+    const settled = env.manager.workpools.waitForEvent(
+      poolId as `wp_${string}`,
+      "item_result",
+      AbortSignal.timeout(20_000),
+    )
     await pool("omp-item6-stale-push", { op: "push", pool_id: poolId, items: [{ key: POOL_KEY, input: 1 }] })
     const dispatchEvent = await bounded(dispatched, "pool-dispatched")
     const workerTools = env.sessions.at(-1) ?? []

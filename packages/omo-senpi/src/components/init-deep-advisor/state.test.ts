@@ -291,10 +291,7 @@ describe("readSnapshot", () => {
   test("#given a snapshot missing a required field #when reading #then it reports invalid", () => {
     // given
     const root = makeTempDir("omo-advisor-snapshot-")
-    writeSnapshotRaw(
-      root,
-      JSON.stringify({ commitSha: "d".repeat(40), fileCount: 1, loc: 2, mode: "local" }),
-    )
+    writeSnapshotRaw(root, JSON.stringify({ commitSha: "d".repeat(40), fileCount: 1, loc: 2, mode: "local" }))
 
     // when / then
     expect(readSnapshot(root)).toEqual({ kind: "invalid" })
@@ -303,10 +300,7 @@ describe("readSnapshot", () => {
   test("#given a snapshot with wrong field types #when reading #then it reports invalid", () => {
     // given
     const root = makeTempDir("omo-advisor-snapshot-")
-    writeSnapshotRaw(
-      root,
-      JSON.stringify({ commitSha: 12345, fileCount: "1", loc: 2, timestamp: 3, mode: "local" }),
-    )
+    writeSnapshotRaw(root, JSON.stringify({ commitSha: 12345, fileCount: "1", loc: 2, timestamp: 3, mode: "local" }))
 
     // when / then
     expect(readSnapshot(root)).toEqual({ kind: "invalid" })
@@ -320,10 +314,7 @@ describe("readSnapshot", () => {
       JSON.stringify({ commitSha: "e".repeat(40), fileCount: -1, loc: 2, timestamp: 3, mode: "local" }),
     )
     const infiniteRoot = makeTempDir("omo-advisor-snapshot-")
-    writeSnapshotRaw(
-      infiniteRoot,
-      '{"commitSha":"eeee","fileCount":1,"loc":1e999,"timestamp":3,"mode":"local"}',
-    )
+    writeSnapshotRaw(infiniteRoot, '{"commitSha":"eeee","fileCount":1,"loc":1e999,"timestamp":3,"mode":"local"}')
 
     // when / then
     expect(readSnapshot(negativeRoot)).toEqual({ kind: "invalid" })

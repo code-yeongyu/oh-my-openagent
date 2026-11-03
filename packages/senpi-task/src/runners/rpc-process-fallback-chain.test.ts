@@ -53,7 +53,9 @@ function processRunner(
     // Model admission probes a real catalog (seconds on a cold Windows runner); it is not what these tests cover.
     modelAdmission: async () => {},
     onWarning: (message) => void warnings.push(message),
-    ...(options.fallbackChainDeadlineMs === undefined ? {} : { fallbackChainDeadlineMs: options.fallbackChainDeadlineMs }),
+    ...(options.fallbackChainDeadlineMs === undefined
+      ? {}
+      : { fallbackChainDeadlineMs: options.fallbackChainDeadlineMs }),
     spawnChild: (descriptor) => {
       const child = spawnFakeChild({
         ...descriptor.env,
@@ -126,7 +128,10 @@ describe("a process-runner child's own fallback chain (#9582)", () => {
     // then
     const commands = engine.commands()
     expect(commands.map((command) => command.type)).toEqual(["get_protocol_info", "set_retry_fallback", "prompt"])
-    expect(commands[1]?.retryFallback).toEqual({ modelFallback: false, fallbackChains: { "anthropic/claude-opus-5-5": [] } })
+    expect(commands[1]?.retryFallback).toEqual({
+      modelFallback: false,
+      fallbackChains: { "anthropic/claude-opus-5-5": [] },
+    })
     expect(engine.warnings).toEqual([])
   })
 
@@ -154,7 +159,11 @@ describe("a process-runner child's own fallback chain (#9582)", () => {
     // then
     await handle.waitForIdle()
     expect(handle.lastAssistantText()).toBe("hello")
-    expect(engine.commands().map((command) => command.type)).toEqual(["get_protocol_info", "set_retry_fallback", "prompt"])
+    expect(engine.commands().map((command) => command.type)).toEqual([
+      "get_protocol_info",
+      "set_retry_fallback",
+      "prompt",
+    ])
     expect(engine.warnings).toHaveLength(1)
     expect(engine.warnings[0]).toContain("st_p6")
     expect(engine.warnings[0]).toContain("refused")
@@ -182,7 +191,10 @@ describe("a process-runner child's own fallback chain (#9582)", () => {
 
   test("#given an engine that answers the capability probe only after the deadline #when a child with fallback models starts #then the chain is never sent after its first prompt", async () => {
     // given
-    const engine = processRunner(["retry_fallback_command"], { protocolInfo: "after-prompt", fallbackChainDeadlineMs: 50 })
+    const engine = processRunner(["retry_fallback_command"], {
+      protocolInfo: "after-prompt",
+      fallbackChainDeadlineMs: 50,
+    })
 
     // when
     const handle = await engine.runner.start(spec("st_p9", CHAINED))
@@ -213,28 +225,63 @@ describe("a process-runner child's own fallback chain (#9582)", () => {
   })
 })
 
-const PRIMARY: ResolvedModelRecord = { provider: "openai", model_id: "gpt-5.6-sol", display: "openai/gpt-5.6-sol", source: "category" }
-const SAME_PROVIDER: ResolvedModelRecord = { provider: "openai", model_id: "gpt-5.5", display: "openai/gpt-5.5", source: "category" }
-const OTHER_PROVIDER: ResolvedModelRecord = { provider: "kimi-coding", model_id: "kimi-k3", display: "kimi-coding/kimi-k3", source: "category" }
+const PRIMARY: ResolvedModelRecord = {
+  provider: "openai",
+  model_id: "gpt-5.6-sol",
+  display: "openai/gpt-5.6-sol",
+  source: "category",
+}
+const SAME_PROVIDER: ResolvedModelRecord = {
+  provider: "openai",
+  model_id: "gpt-5.5",
+  display: "openai/gpt-5.5",
+  source: "category",
+}
+const OTHER_PROVIDER: ResolvedModelRecord = {
+  provider: "kimi-coding",
+  model_id: "kimi-k3",
+  display: "kimi-coding/kimi-k3",
+  source: "category",
+}
 // The engine's typed prompt refusals (senpi `ModelNotReadyError` on the RPC wire): a provider with no
 // stored key, and a stored login that could not be refreshed.
-const MISSING = { error: "No API key found for openai.", errorCode: "provider_credentials_missing", errorData: { provider: "openai" } }
-const EXPIRED = { error: "Authentication failed for \"kimi-coding\".", errorCode: "provider_credentials_expired", errorData: { provider: "kimi-coding" } }
+const MISSING = {
+  error: "No API key found for openai.",
+  errorCode: "provider_credentials_missing",
+  errorData: { provider: "openai" },
+}
+const EXPIRED = {
+  error: 'Authentication failed for "kimi-coding".',
+  errorCode: "provider_credentials_expired",
+  errorData: { provider: "kimi-coding" },
+}
 
 const chainPlanner: ChildPlanner = () => ({
   kind: "resolved",
-  plan: { model: PRIMARY.display, resolved_model: PRIMARY, category: "unspecified-high", fallback_models: [SAME_PROVIDER, OTHER_PROVIDER] },
+  plan: {
+    model: PRIMARY.display,
+    resolved_model: PRIMARY,
+    category: "unspecified-high",
+    fallback_models: [SAME_PROVIDER, OTHER_PROVIDER],
+  },
 })
 
 describe("a process child whose prompt start is refused for missing provider credentials (#10806)", () => {
   test("#given the primary provider has no key and the next provider's login expired #when the task starts #then it skips the same-provider rung, hops to the next provider, and fails typed listing both refusals", async () => {
     // given
-    const { runner, launched } = refusingProcessRunner({ [PRIMARY.display]: MISSING, [OTHER_PROVIDER.display]: EXPIRED }, children)
+    const { runner, launched } = refusingProcessRunner(
+      { [PRIMARY.display]: MISSING, [OTHER_PROVIDER.display]: EXPIRED },
+      children,
+    )
     const { manager, store } = makeManager({ planner: chainPlanner, process: createRpcManagedRunner(runner) })
 
     // when
     const result = await manager.start({
-      prompt: "work", parent_session_id: "parent-1", depth: 1, category: "unspecified-high", execution_mode: "process",
+      prompt: "work",
+      parent_session_id: "parent-1",
+      depth: 1,
+      category: "unspecified-high",
+      execution_mode: "process",
     })
     await launchSettled(manager, result)
 
@@ -243,7 +290,15 @@ describe("a process child whose prompt start is refused for missing provider cre
     expect(launched).toEqual([PRIMARY.display, OTHER_PROVIDER.display])
     expect(result.failure_kind).toBe("model_chain_exhausted")
     const fallbacks = taskEvents(store.stateDir, result.task_id).filter((event) => event.type === "task_model_fallback")
-    expect(fallbacks.map((event) => [event.payload.from_model, event.payload.to_model, event.payload.cause_class, event.payload.cause_code, event.payload.provider])).toEqual([
+    expect(
+      fallbacks.map((event) => [
+        event.payload.from_model,
+        event.payload.to_model,
+        event.payload.cause_class,
+        event.payload.cause_code,
+        event.payload.provider,
+      ]),
+    ).toEqual([
       [PRIMARY.display, OTHER_PROVIDER.display, "credentials_missing", "provider_credentials_missing", "openai"],
     ])
     expect(result.error_message).toContain(`${PRIMARY.display}: not signed in`)
@@ -261,9 +316,19 @@ describe("a process child whose prompt start is refused for missing provider cre
     const started = runner.start(spec("st_c2", { model: PRIMARY.display }))
 
     // then
-    const failure = await started.then(() => undefined, (error: unknown) => error)
-    expect(failure).toMatchObject({ failure: { kind: "child-prompt-failed", cause: { name: "RpcCommandError", errorCode: "provider_credentials_missing" } } })
-    expect((failure as { failure: { cause: { errorData?: unknown } } }).failure.cause.errorData).toEqual({ provider: "openai" })
+    const failure = await started.then(
+      () => undefined,
+      (error: unknown) => error,
+    )
+    expect(failure).toMatchObject({
+      failure: {
+        kind: "child-prompt-failed",
+        cause: { name: "RpcCommandError", errorCode: "provider_credentials_missing" },
+      },
+    })
+    expect((failure as { failure: { cause: { errorData?: unknown } } }).failure.cause.errorData).toEqual({
+      provider: "openai",
+    })
     await runner.settleTeardowns()
   })
 })

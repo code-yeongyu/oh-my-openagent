@@ -6,10 +6,7 @@ import path from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { TeamModeConfig } from "../../config/schema/team-mode"
 import { TeamModeConfigSchema } from "../../config/schema/team-mode"
-import {
-  clearTeamSessionRegistry,
-  registerTeamSession,
-} from "../../features/team-mode/team-session-registry"
+import { clearTeamSessionRegistry, registerTeamSession } from "../../features/team-mode/team-session-registry"
 import type { RuntimeState } from "../../features/team-mode/types"
 import { saveRuntimeState } from "../../features/team-mode/team-state-store/store"
 import { createTeamToolGating } from "./hook"
@@ -41,23 +38,49 @@ function createRuntimeState(): RuntimeState {
     status: "active",
     leadSessionId: "lead-session",
     members: [
-      { name: "m1", sessionId: "member-session-1", agentType: "general-purpose", status: "running", pendingInjectedMessageIds: [] },
-      { name: "m2", sessionId: "member-session-2", agentType: "general-purpose", status: "running", pendingInjectedMessageIds: [] },
+      {
+        name: "m1",
+        sessionId: "member-session-1",
+        agentType: "general-purpose",
+        status: "running",
+        pendingInjectedMessageIds: [],
+      },
+      {
+        name: "m2",
+        sessionId: "member-session-2",
+        agentType: "general-purpose",
+        status: "running",
+        pendingInjectedMessageIds: [],
+      },
     ],
     shutdownRequests: [],
-    bounds: { maxMembers: 8, maxParallelMembers: 4, maxMessagesPerRun: 10_000, maxWallClockMinutes: 120, maxMemberTurns: 500 },
+    bounds: {
+      maxMembers: 8,
+      maxParallelMembers: 4,
+      maxMessagesPerRun: 10_000,
+      maxWallClockMinutes: 120,
+      maxMemberTurns: 500,
+    },
   }
 }
 
 async function seedTeams(baseDir: string, ...runtimeStates: RuntimeState[]): Promise<void> {
   const config = TeamModeConfigSchema.parse({ base_dir: baseDir, enabled: true })
-  await Promise.all(runtimeStates.map(async (runtimeState) => {
-    await mkdir(path.join(baseDir, "runtime", runtimeState.teamRunId), { recursive: true })
-    await saveRuntimeState(runtimeState, config)
-  }))
+  await Promise.all(
+    runtimeStates.map(async (runtimeState) => {
+      await mkdir(path.join(baseDir, "runtime", runtimeState.teamRunId), { recursive: true })
+      await saveRuntimeState(runtimeState, config)
+    }),
+  )
 }
 
-async function runHook(tool: string, sessionID: string, args: Record<string, unknown>, config?: Partial<TeamModeConfig>, baseDir = "/tmp/team-mode"): Promise<void> {
+async function runHook(
+  tool: string,
+  sessionID: string,
+  args: Record<string, unknown>,
+  config?: Partial<TeamModeConfig>,
+  baseDir = "/tmp/team-mode",
+): Promise<void> {
   const hook = createTeamToolGating({ directory: baseDir } as PluginInput, createConfig(config, baseDir))
   await hook["tool.execute.before"]?.({ tool, sessionID, callID: "call-1" }, { args })
 }
@@ -72,7 +95,9 @@ describe("createTeamToolGating", () => {
 
   afterEach(async () => {
     clearTeamSessionRegistry()
-    await Promise.all(temporaryDirectories.splice(0).map(async (directoryPath) => rm(directoryPath, { recursive: true, force: true })))
+    await Promise.all(
+      temporaryDirectories.splice(0).map(async (directoryPath) => rm(directoryPath, { recursive: true, force: true })),
+    )
   })
 
   test("allows a fresh session to call team_create", async () => {
@@ -111,7 +136,9 @@ describe("createTeamToolGating", () => {
     const result = runHook("team_create", "member-session-1", {}, undefined, baseDir)
 
     // then
-    await expect(result).rejects.toThrow("team_create denied: session is already a participant of team 11111111-1111-4111-8111-111111111111")
+    await expect(result).rejects.toThrow(
+      "team_create denied: session is already a participant of team 11111111-1111-4111-8111-111111111111",
+    )
   })
 
   test("allows the target member to self-approve shutdown", async () => {
@@ -121,7 +148,13 @@ describe("createTeamToolGating", () => {
     await seedTeams(baseDir, createRuntimeState())
 
     // when
-    const result = runHook("team_approve_shutdown", "member-session-1", { teamRunId: "11111111-1111-4111-8111-111111111111", memberName: "m1" }, undefined, baseDir)
+    const result = runHook(
+      "team_approve_shutdown",
+      "member-session-1",
+      { teamRunId: "11111111-1111-4111-8111-111111111111", memberName: "m1" },
+      undefined,
+      baseDir,
+    )
 
     // then
     await expect(result).resolves.toBeUndefined()
@@ -134,7 +167,13 @@ describe("createTeamToolGating", () => {
     await seedTeams(baseDir, createRuntimeState())
 
     // when
-    const result = runHook("team_approve_shutdown", "lead-session", { teamRunId: "11111111-1111-4111-8111-111111111111", memberName: "m1" }, undefined, baseDir)
+    const result = runHook(
+      "team_approve_shutdown",
+      "lead-session",
+      { teamRunId: "11111111-1111-4111-8111-111111111111", memberName: "m1" },
+      undefined,
+      baseDir,
+    )
 
     // then
     await expect(result).resolves.toBeUndefined()
@@ -147,7 +186,13 @@ describe("createTeamToolGating", () => {
     await seedTeams(baseDir, createRuntimeState())
 
     // when
-    const result = runHook("team_approve_shutdown", "member-session-2", { teamRunId: "11111111-1111-4111-8111-111111111111", memberName: "m1" }, undefined, baseDir)
+    const result = runHook(
+      "team_approve_shutdown",
+      "member-session-2",
+      { teamRunId: "11111111-1111-4111-8111-111111111111", memberName: "m1" },
+      undefined,
+      baseDir,
+    )
 
     // then
     await expect(result).rejects.toThrow("team_approve_shutdown: caller must be target member or team lead")
@@ -173,7 +218,13 @@ describe("createTeamToolGating", () => {
     await seedTeams(baseDir, createRuntimeState())
 
     // when
-    const result = runHook("team_delete", "lead-session", { teamRunId: "11111111-1111-4111-8111-111111111111" }, undefined, baseDir)
+    const result = runHook(
+      "team_delete",
+      "lead-session",
+      { teamRunId: "11111111-1111-4111-8111-111111111111" },
+      undefined,
+      baseDir,
+    )
 
     // then
     await expect(result).resolves.toBeUndefined()
@@ -211,7 +262,13 @@ describe("createTeamToolGating", () => {
     })
 
     // when
-    const result = runHook("team_send_message", "just-spawned-session", { teamRunId: "11111111-1111-4111-8111-111111111111" }, undefined, baseDir)
+    const result = runHook(
+      "team_send_message",
+      "just-spawned-session",
+      { teamRunId: "11111111-1111-4111-8111-111111111111" },
+      undefined,
+      baseDir,
+    )
 
     // then
     await expect(result).resolves.toBeUndefined()
@@ -224,9 +281,7 @@ describe("createTeamToolGating", () => {
     const staleRuntimeState: RuntimeState = {
       ...createRuntimeState(),
       leadSessionId: undefined,
-      members: [
-        { name: "lead", agentType: "leader", status: "pending", pendingInjectedMessageIds: [] },
-      ],
+      members: [{ name: "lead", agentType: "leader", status: "pending", pendingInjectedMessageIds: [] }],
     }
     await seedTeams(baseDir, staleRuntimeState)
     registerTeamSession("caller-lead-session", {
@@ -236,7 +291,13 @@ describe("createTeamToolGating", () => {
     })
 
     // when
-    const result = runHook("team_send_message", "caller-lead-session", { teamRunId: "11111111-1111-4111-8111-111111111111" }, undefined, baseDir)
+    const result = runHook(
+      "team_send_message",
+      "caller-lead-session",
+      { teamRunId: "11111111-1111-4111-8111-111111111111" },
+      undefined,
+      baseDir,
+    )
 
     // then
     await expect(result).resolves.toBeUndefined()
@@ -249,10 +310,18 @@ describe("createTeamToolGating", () => {
     await seedTeams(baseDir, createRuntimeState())
 
     // when
-    const result = runHook("team_send_message", "unknown-session", { teamRunId: "11111111-1111-4111-8111-111111111111" }, undefined, baseDir)
+    const result = runHook(
+      "team_send_message",
+      "unknown-session",
+      { teamRunId: "11111111-1111-4111-8111-111111111111" },
+      undefined,
+      baseDir,
+    )
 
     // then
-    await expect(result).rejects.toThrow("team-mode tool team_send_message denied: not a participant of team 11111111-1111-4111-8111-111111111111")
+    await expect(result).rejects.toThrow(
+      "team-mode tool team_send_message denied: not a participant of team 11111111-1111-4111-8111-111111111111",
+    )
   })
 
   test("rejects team_status when the session is not in the registry and not in runtime state", async () => {
@@ -262,10 +331,18 @@ describe("createTeamToolGating", () => {
     await seedTeams(baseDir, createRuntimeState())
 
     // when
-    const result = runHook("team_status", "unknown-session", { teamRunId: "11111111-1111-4111-8111-111111111111" }, undefined, baseDir)
+    const result = runHook(
+      "team_status",
+      "unknown-session",
+      { teamRunId: "11111111-1111-4111-8111-111111111111" },
+      undefined,
+      baseDir,
+    )
 
     // then
-    await expect(result).rejects.toThrow("team-mode tool team_status denied: not a participant of team 11111111-1111-4111-8111-111111111111")
+    await expect(result).rejects.toThrow(
+      "team-mode tool team_status denied: not a participant of team 11111111-1111-4111-8111-111111111111",
+    )
   })
 
   test("rejects team_send_message when the registry only has the caller for a different team than the requested teamRunId", async () => {
@@ -281,7 +358,13 @@ describe("createTeamToolGating", () => {
     })
 
     // when
-    const result = runHook("team_send_message", "cross-team-session", { teamRunId: "11111111-1111-4111-8111-111111111111" }, undefined, baseDir)
+    const result = runHook(
+      "team_send_message",
+      "cross-team-session",
+      { teamRunId: "11111111-1111-4111-8111-111111111111" },
+      undefined,
+      baseDir,
+    )
 
     // then
     await expect(result).rejects.toThrow("denied: not a participant of team 11111111-1111-4111-8111-111111111111")

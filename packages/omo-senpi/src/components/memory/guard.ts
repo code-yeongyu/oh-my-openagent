@@ -13,7 +13,8 @@ import { TRANSIENT_DIRNAME } from "./transient-identity"
 const FILE_TOOL_NAMES = ["read", "write", "edit", "ls", "find", "grep", "glob"] as const
 const ENUMERATION_TOOL_NAMES = new Set(["ls", "find", "grep", "glob"])
 const PATH_ARGUMENT_NAMES = ["path", "filePath", "file_path", "target"] as const
-const BASH_ADVISORY = "omo-senpi memory guard advisory: bash command references another memory identity; shell text is not blocked because this soft guard is not a security boundary"
+const BASH_ADVISORY =
+  "omo-senpi memory guard advisory: bash command references another memory identity; shell text is not blocked because this soft guard is not a security boundary"
 
 export interface MemoryGuardOptions {
   readonly getContext: (eventContext: unknown) => MemoryIdentityContext | undefined
@@ -68,9 +69,12 @@ export function registerMemoryGuard(
       const cwd = resolveCwd()
       // Built-ins open path.resolve()d targets; suffix-classified external tools may open raw strings.
       const name = normalizeToolName(event.toolName)
-      const target = name === operation || name === "apply_patch"
-        ? resolve(cwd, rawPath)
-        : isAbsolute(rawPath) ? rawPath : `${cwd}/${rawPath}`
+      const target =
+        name === operation || name === "apply_patch"
+          ? resolve(cwd, rawPath)
+          : isAbsolute(rawPath)
+            ? rawPath
+            : `${cwd}/${rawPath}`
       if (operation === "read" && isGrantedProjectMemoryRead(context, target)) continue
       if (!isForbiddenTarget(target, cwd, roots, recursive)) continue
       return {
@@ -113,7 +117,12 @@ function isRegisteredPatchTool(toolName: string, context: ComponentContext): boo
 function matchesToolName(toolName: string, expected: string): boolean {
   const normalized = normalizeToolName(toolName)
   const suffix = normalizeToolName(expected)
-  return normalized === suffix || normalized.endsWith(`_${suffix}`) || normalized.endsWith(`:${suffix}`) || normalized.endsWith(`/${suffix}`)
+  return (
+    normalized === suffix ||
+    normalized.endsWith(`_${suffix}`) ||
+    normalized.endsWith(`:${suffix}`) ||
+    normalized.endsWith(`/${suffix}`)
+  )
 }
 
 function normalizeToolName(toolName: string): string {

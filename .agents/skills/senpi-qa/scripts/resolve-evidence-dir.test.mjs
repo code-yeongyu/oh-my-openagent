@@ -116,11 +116,9 @@ describe("resolveEvidenceDir", () => {
     const valid = spawnSync("node", [cliPath, "--repo-root", repoRoot, "--slug", "20260820-node-cli"], {
       encoding: "utf8",
     })
-    const invalid = spawnSync(
-      "node",
-      [cliPath, "--repo-root", repoRoot, "--slug", "local-ignore/qa-evidence/x"],
-      { encoding: "utf8" },
-    )
+    const invalid = spawnSync("node", [cliPath, "--repo-root", repoRoot, "--slug", "local-ignore/qa-evidence/x"], {
+      encoding: "utf8",
+    })
 
     // then
     expect(valid.status).toBe(0)
@@ -136,11 +134,9 @@ describe("resolveEvidenceDir", () => {
     symlinkSync(cliPath, symlinkPath)
 
     // when
-    const result = spawnSync(
-      "node",
-      [symlinkPath, "--repo-root", repoRoot, "--slug", "20260820-symlink-cli"],
-      { encoding: "utf8" },
-    )
+    const result = spawnSync("node", [symlinkPath, "--repo-root", repoRoot, "--slug", "20260820-symlink-cli"], {
+      encoding: "utf8",
+    })
 
     // then
     expect(result.status).toBe(0)

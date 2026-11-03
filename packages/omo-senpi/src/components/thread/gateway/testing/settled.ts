@@ -2,5 +2,8 @@
 // expect(p).resolves/.rejects once the worker has answered before, so gateway tests await every
 // store-backed promise plainly through this helper and assert the settled value.
 export async function settled<T>(promise: Promise<T>): Promise<{ readonly value?: T; readonly error?: Error }> {
-  return await promise.then((value) => ({ value }), (error: unknown) => ({ error: error instanceof Error ? error : new Error(String(error)) }))
+  return await promise.then(
+    (value) => ({ value }),
+    (error: unknown) => ({ error: error instanceof Error ? error : new Error(String(error)) }),
+  )
 }

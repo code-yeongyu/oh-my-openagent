@@ -4,7 +4,13 @@ import { existsSync, realpathSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
-import { GitMemoryRepo, inspectStrandedGitLock, unlockStrandedGitLock, type GitCommitAuthor, type UnlockScans } from "../git"
+import {
+  GitMemoryRepo,
+  inspectStrandedGitLock,
+  unlockStrandedGitLock,
+  type GitCommitAuthor,
+  type UnlockScans,
+} from "../git"
 import { restoreWorktreeFromHead } from "../git/worktree-restore"
 import { renderMemoryFile } from "../memfs/frontmatter"
 import { runMemoryTool, type MemoryToolLock } from "./memory"
@@ -20,7 +26,9 @@ const AUTHOR: GitCommitAuthor = { agentId: "agent-stranded-lock-write", authorNa
 const NOBODY: UnlockScans = { findHolders: async () => [], findRepoUsers: async () => [] }
 
 class IndexLockAtCommitRepo extends GitMemoryRepo {
-  override async commitPrepared(...args: Parameters<GitMemoryRepo["commitPrepared"]>): ReturnType<GitMemoryRepo["commitPrepared"]> {
+  override async commitPrepared(
+    ...args: Parameters<GitMemoryRepo["commitPrepared"]>
+  ): ReturnType<GitMemoryRepo["commitPrepared"]> {
     await writeFile(join(this.dir, ".git", "index.lock"), "", "utf8")
     return super.commitPrepared(...args)
   }
@@ -68,7 +76,9 @@ describe("a memory write behind a kept stranded git lock (omo #10199)", () => {
     await writeFile(setup.lockPath, "", "utf8")
 
     // #when
-    const failure = await create(setup, "system/new.md", "new fact", "write behind the lock").catch((error: unknown) => error)
+    const failure = await create(setup, "system/new.md", "new fact", "write behind the lock").catch(
+      (error: unknown) => error,
+    )
 
     // #then
     expect(String(failure)).toContain("/memory unlock")
@@ -88,7 +98,14 @@ describe("a memory write behind a kept stranded git lock (omo #10199)", () => {
     await runMemoryTool({
       repo: setup.repo,
       lock: setup.lock,
-      params: { command: "str_replace", reason: "edit behind the lock", file_path: "system/facts.md", old_string: "old fact", new_string: "new fact", author: AUTHOR },
+      params: {
+        command: "str_replace",
+        reason: "edit behind the lock",
+        file_path: "system/facts.md",
+        old_string: "old fact",
+        new_string: "new fact",
+        author: AUTHOR,
+      },
     }).catch(() => undefined)
 
     // #then
@@ -121,7 +138,9 @@ describe("a memory write behind a kept stranded git lock (omo #10199)", () => {
     await writeFile(refLock, "", "utf8")
 
     // #when
-    const failure = await create(setup, "system/new.md", "new fact", "write behind the ref lock").catch((error: unknown) => error)
+    const failure = await create(setup, "system/new.md", "new fact", "write behind the ref lock").catch(
+      (error: unknown) => error,
+    )
     const statusAfterFailure = await setup.repo.status()
     const inspection = await inspectStrandedGitLock(setup.repo.dir, refLock, NOBODY)
     if (inspection.kind !== "found") throw new Error(`unexpected ${inspection.kind}`)
@@ -143,7 +162,14 @@ describe("a memory write behind a kept stranded git lock (omo #10199)", () => {
     const failure = await runMemoryTool({
       repo: lockedAtCommit,
       lock: setup.lock,
-      params: { command: "create", reason: "write behind a commit-time lock", file_path: "system/new.md", description: "Fact", file_text: "new fact", author: AUTHOR },
+      params: {
+        command: "create",
+        reason: "write behind a commit-time lock",
+        file_path: "system/new.md",
+        description: "Fact",
+        file_text: "new fact",
+        author: AUTHOR,
+      },
     }).catch((error: unknown) => error)
     const inspection = await inspectStrandedGitLock(setup.repo.dir, setup.lockPath, NOBODY)
     if (inspection.kind !== "found") throw new Error(`unexpected ${inspection.kind}`)
@@ -169,7 +195,14 @@ describe("a memory write behind a kept stranded git lock (omo #10199)", () => {
     const failure = await runMemoryTool({
       repo: broken,
       lock: setup.lock,
-      params: { command: "str_replace", reason: "edit behind the lock", file_path: "system/facts.md", old_string: "old fact", new_string: "new fact", author: AUTHOR },
+      params: {
+        command: "str_replace",
+        reason: "edit behind the lock",
+        file_path: "system/facts.md",
+        old_string: "old fact",
+        new_string: "new fact",
+        author: AUTHOR,
+      },
     }).catch((error: unknown) => error)
 
     // #then

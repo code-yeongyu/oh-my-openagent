@@ -107,7 +107,11 @@ function startParent(parentPath: string, env: NodeJS.ProcessEnv): ParentRun {
 async function waitForProcessGone(pid: number, timeoutMs = 15_000): Promise<void> {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
-    try { process.kill(pid, 0) } catch { return }
+    try {
+      process.kill(pid, 0)
+    } catch {
+      return
+    }
     await new Promise((resolveWait) => setTimeout(resolveWait, 10))
   }
   throw new Error(`process ${pid} is still alive`)
@@ -131,7 +135,9 @@ async function waitForContent(path: string, expected: string, timeoutMs = 15_000
     }
     await new Promise((resolveWait) => setTimeout(resolveWait, 10))
   }
-  throw new Error(`timed out waiting for ${expected} in ${path}: ${existsSync(path) ? readFileSync(path, "utf8") : "<absent>"}`)
+  throw new Error(
+    `timed out waiting for ${expected} in ${path}: ${existsSync(path) ? readFileSync(path, "utf8") : "<absent>"}`,
+  )
 }
 
 type Harness = {
@@ -262,7 +268,11 @@ describePosix("launcher child signal forwarding", () => {
       writeFile(parentPath, parentSource(childPath))
       const readyFile = join(root, "ready")
       const pidFile = join(root, "child.pid")
-      const parent = startParent(parentPath, { READY_FILE: readyFile, PARENT_LOG: join(root, "parent.log"), PID_FILE: pidFile })
+      const parent = startParent(parentPath, {
+        READY_FILE: readyFile,
+        PARENT_LOG: join(root, "parent.log"),
+        PID_FILE: pidFile,
+      })
       await waitForFile(readyFile)
       fixturePids.push(parent.pid, Number(readFileSync(pidFile, "utf8")))
       allFixturePids.push(...fixturePids.slice(-2))

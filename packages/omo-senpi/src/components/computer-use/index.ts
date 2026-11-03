@@ -147,7 +147,8 @@ export function createComputerUseComponent(options: ComputerUseComponentOptions 
               onPermissionRequired: reportPermission,
               fullAccess: watchFullAccess(pi),
               onEngineError: (code) => {
-                if (state.telemetryContext !== undefined) telemetry.engineError(state.telemetryContext, code, state.backend)
+                if (state.telemetryContext !== undefined)
+                  telemetry.engineError(state.telemetryContext, code, state.backend)
               },
             })
       wireComputerControlEvents(pi, runtime)
@@ -198,7 +199,9 @@ export function createComputerUseComponent(options: ComputerUseComponentOptions 
             }
             const prelude = available.host.getActiveTools().includes(COMPUTER_TOOL_NAME) ? "active" : "inactive"
             const source = describeEngineSource(available.settings.enginePath, options.env ?? process.env, { platform })
-            const permissions = handle.running ? "" : `\n${await describeEnginePermissions(available.settings.enginePath, options.env ?? process.env, { platform })}`
+            const permissions = handle.running
+              ? ""
+              : `\n${await describeEnginePermissions(available.settings.enginePath, options.env ?? process.env, { platform })}`
             const status = `${text}\nengine: ${service.engineState}${service.engineState === "not started" ? ` (${source})` : ""}\nprelude: ${prelude}${skillStatusLine(state.skill)}\nengine source: ${source}${permissions}`
             commandCtx.ui.notify(status, "info")
             if (commandCtx.hasUI === false) process.stderr.write(`${status}\n`)

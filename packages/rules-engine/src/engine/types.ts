@@ -12,11 +12,11 @@
  * `globs` by the parser before any matcher sees this struct.
  */
 export interface RuleFrontmatter {
-	description?: string;
-	globs?: string | string[];
-	paths?: string | string[];
-	applyTo?: string | string[];
-	alwaysApply?: boolean;
+  description?: string
+  globs?: string | string[]
+  paths?: string | string[]
+  applyTo?: string | string[]
+  alwaysApply?: boolean
 }
 
 /**
@@ -24,13 +24,13 @@ export interface RuleFrontmatter {
  * `body` excludes the frontmatter delimiters and the YAML payload.
  */
 export interface ParsedRule {
-	frontmatter: RuleFrontmatter;
-	body: string;
-	/**
-	 * Diagnostic message if frontmatter parsing failed but the body was salvaged.
-	 * Empty when parsing succeeded.
-	 */
-	diagnostic?: string;
+  frontmatter: RuleFrontmatter
+  body: string
+  /**
+   * Diagnostic message if frontmatter parsing failed but the body was salvaged.
+   * Empty when parsing succeeded.
+   */
+  diagnostic?: string
 }
 
 /**
@@ -41,82 +41,82 @@ export interface ParsedRule {
  * `source` identifies which discovery source produced this candidate.
  */
 export interface RuleCandidate {
-	path: string;
-	realPath: string;
-	source: RuleSource;
-	/**
-	 * Distance from the target file directory to the directory containing this rule.
-	 * 0 = same directory, 9999 = global/user-home rule.
-	 */
-	distance: number;
-	isGlobal: boolean;
-	/**
-	 * True when this candidate is a SINGLE-FILE rule like
-	 * `.github/copilot-instructions.md` (frontmatter optional, applies always).
-	 */
-	isSingleFile: boolean;
-	/**
-	 * Path relative to project root, POSIX-normalized. Used for matcher and display.
-	 * Empty string for user-home global rules.
-	 */
-	relativePath: string;
+  path: string
+  realPath: string
+  source: RuleSource
+  /**
+   * Distance from the target file directory to the directory containing this rule.
+   * 0 = same directory, 9999 = global/user-home rule.
+   */
+  distance: number
+  isGlobal: boolean
+  /**
+   * True when this candidate is a SINGLE-FILE rule like
+   * `.github/copilot-instructions.md` (frontmatter optional, applies always).
+   */
+  isSingleFile: boolean
+  /**
+   * Path relative to project root, POSIX-normalized. Used for matcher and display.
+   * Empty string for user-home global rules.
+   */
+  relativePath: string
 }
 
 /**
  * A fully-loaded rule ready for injection.
  */
 export interface LoadedRule extends RuleCandidate {
-	frontmatter: RuleFrontmatter;
-	body: string;
-	contentHash: string;
-	matchReason: MatchReason;
+  frontmatter: RuleFrontmatter
+  body: string
+  contentHash: string
+  matchReason: MatchReason
 }
 
 /**
  * Source identifier for rule files. Used for deterministic ordering and display.
  */
 export type RuleSource =
-	| ".omo/rules"
-	| ".claude/rules"
-	| ".cursor/rules"
-	| ".github/instructions"
-	| ".github/copilot-instructions.md"
-	| "CONTEXT.md"
-	| "plugin-bundled"
-	| "~/.omo/rules"
-	| "~/.opencode/rules"
-	| "~/.claude/rules";
+  | ".omo/rules"
+  | ".claude/rules"
+  | ".cursor/rules"
+  | ".github/instructions"
+  | ".github/copilot-instructions.md"
+  | "CONTEXT.md"
+  | "plugin-bundled"
+  | "~/.omo/rules"
+  | "~/.opencode/rules"
+  | "~/.claude/rules"
 
 /**
  * Why a candidate matched the target file. Surfaced in the injection block so
  * the model can attribute its behavior to a specific rule.
  */
-export type MatchReason = "alwaysApply" | "single-file" | { kind: "glob"; pattern: string } | { kind: "no-match" };
+export type MatchReason = "alwaysApply" | "single-file" | { kind: "glob"; pattern: string } | { kind: "no-match" }
 
 /**
  * Truncation result.
  */
 export interface TruncationResult {
-	body: string;
-	truncated: boolean;
-	originalLength: number;
+  body: string
+  truncated: boolean
+  originalLength: number
 }
 
 /**
  * Configuration knobs resolved from env vars and package.json.
  */
 export interface PiRulesConfig {
-	disabled: boolean;
-	mode: "static" | "dynamic" | "both" | "off";
-	maxRuleChars: number;
-	maxResultChars: number;
-	postCompactMaxRuleChars: number;
-	postCompactMaxResultChars: number;
-	dynamicMaxRuleChars: number;
-	dynamicMaxResultChars: number;
-	promptMaxRuleChars: number;
-	promptMaxResultChars: number;
-	enabledSources: RuleSource[] | "auto";
+  disabled: boolean
+  mode: "static" | "dynamic" | "both" | "off"
+  maxRuleChars: number
+  maxResultChars: number
+  postCompactMaxRuleChars: number
+  postCompactMaxResultChars: number
+  dynamicMaxRuleChars: number
+  dynamicMaxResultChars: number
+  promptMaxRuleChars: number
+  promptMaxResultChars: number
+  enabledSources: RuleSource[] | "auto"
 }
 
 /**
@@ -126,16 +126,16 @@ export interface PiRulesConfig {
  * `dynamicDedup` stores session-scoped `{rulePath}::{contentHash}` strings.
  */
 export interface SessionState {
-	cwd: string | undefined;
-	staticDedup: Set<string>;
-	dynamicDedup: Map<string, Set<string>>;
-	dynamicTargetFingerprints: Map<string, string>;
-	loadedRules: LoadedRule[];
-	diagnostics: RuleDiagnostic[];
+  cwd: string | undefined
+  staticDedup: Set<string>
+  dynamicDedup: Map<string, Set<string>>
+  dynamicTargetFingerprints: Map<string, string>
+  loadedRules: LoadedRule[]
+  diagnostics: RuleDiagnostic[]
 }
 
 export interface RuleDiagnostic {
-	severity: "warning" | "error";
-	source: string;
-	message: string;
+  severity: "warning" | "error"
+  source: string
+  message: string
 }

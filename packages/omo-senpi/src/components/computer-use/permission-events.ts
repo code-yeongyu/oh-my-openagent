@@ -34,11 +34,21 @@ const localLatches = (() => {
 function permissionClaim(): typeof localLatches.claim {
   try {
     const retained: unknown = Object.getOwnPropertyDescriptor(globalThis, PERMISSION_LATCHES)?.value
-    const facade = typeof retained === "object" && retained !== null && Object.isFrozen(retained)
-      && "version" in retained && retained.version === 1 && "claim" in retained && typeof retained.claim === "function"
-      ? retained : localLatches
+    const facade =
+      typeof retained === "object" &&
+      retained !== null &&
+      Object.isFrozen(retained) &&
+      "version" in retained &&
+      retained.version === 1 &&
+      "claim" in retained &&
+      typeof retained.claim === "function"
+        ? retained
+        : localLatches
     Object.defineProperty(globalThis, PERMISSION_LATCHES, {
-      value: facade, writable: false, configurable: false, enumerable: false,
+      value: facade,
+      writable: false,
+      configurable: false,
+      enumerable: false,
     })
     const claim = facade.claim
     if (typeof claim !== "function") return localLatches.claim
@@ -70,7 +80,11 @@ export function wireComputerPermissionEvents(pi: SenpiExtensionAPI, env: NodeJS.
       return
     }
     if (!claim(sessionId, event.permission)) return
-    const data = { session_id: sessionId, permission: event.permission, ...(event.app === undefined ? {} : { app: event.app }) }
+    const data = {
+      session_id: sessionId,
+      permission: event.permission,
+      ...(event.app === undefined ? {} : { app: event.app }),
+    }
     pi.rpc.emit(ROOT_PERMISSION_EVENT, data)
     try {
       pi.appendEntry?.(ROOT_PERMISSION_EVENT, { session_id: sessionId, permission: event.permission })

@@ -5,7 +5,11 @@ import { z } from "zod"
 import { getOpenCodeConfigDir } from "../shared/opencode-config-dir"
 import { hasCliSuffix } from "./cli-suffix"
 import { resolveRuntimeExecutable, type RuntimeExecutableResolver } from "./runtime-executable"
-import { createAncestorCliCandidates, resolveJavaScriptRuntime, type AncestorCliCandidate } from "./shared/ancestor-cli-resolver"
+import {
+  createAncestorCliCandidates,
+  resolveJavaScriptRuntime,
+  type AncestorCliCandidate,
+} from "./shared/ancestor-cli-resolver"
 
 const PACKAGE_REL = "packages/lsp-daemon"
 const LSP_TOOLS_PACKAGE_REL = "packages/lsp-tools-mcp"
@@ -137,7 +141,9 @@ export function createLspMcpConfig(options: LspMcpConfigOptions = {}): LocalMcpC
   const resolvedCommand = resolveLspCommand(options)
   const cwd = resolve(options.cwd ?? process.cwd())
   const configDir = getOpenCodeConfigDir({ binary: "opencode" })
-  const sourceVersion = hasCliSuffix(resolvedCommand.path, SOURCE_CLI_REL) ? readDaemonPackageVersion(resolvedCommand.root) : null
+  const sourceVersion = hasCliSuffix(resolvedCommand.path, SOURCE_CLI_REL)
+    ? readDaemonPackageVersion(resolvedCommand.root)
+    : null
 
   return {
     type: "local",

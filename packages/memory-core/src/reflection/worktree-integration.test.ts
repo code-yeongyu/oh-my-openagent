@@ -97,7 +97,9 @@ describe("reflection worktree integration", () => {
 
     expect(result.outcome).toBe("merged")
     expect(result.integrationSha).toBe((await git(parentDir, ["rev-parse", "HEAD"])).stdout.trim())
-    expect((await git(parentDir, ["rev-list", "--parents", "-n", "1", "HEAD"])).stdout.trim().split(" ")).toHaveLength(3)
+    expect((await git(parentDir, ["rev-list", "--parents", "-n", "1", "HEAD"])).stdout.trim().split(" ")).toHaveLength(
+      3,
+    )
     expect((await git(parentDir, ["show", "-s", "--format=%B", "HEAD"])).stdout).toContain("Omo-Run: run-123")
     expect(existsSync(worktree.dir)).toBe(true)
     expect((await git(parentDir, ["show-ref", "--verify", `refs/heads/${worktree.branch}`])).code).toBe(0)
@@ -105,14 +107,12 @@ describe("reflection worktree integration", () => {
 
   it("#given legacy auto receipts #when probed without a validated tip #then only the exact trailer is accepted", async () => {
     const { parentDir, worktree } = await fixture("legacy")
-    expect((await git(parentDir, [
-      "commit", "--allow-empty", "-m", "non-exact", "-m", "Omo-Run: legacy-extra",
-    ])).code).toBe(0)
+    expect(
+      (await git(parentDir, ["commit", "--allow-empty", "-m", "non-exact", "-m", "Omo-Run: legacy-extra"])).code,
+    ).toBe(0)
     await expect(probeLegacyAutoRunReceipt(worktree, "legacy")).resolves.toEqual({ status: "not_integrated" })
 
-    expect((await git(parentDir, [
-      "commit", "--allow-empty", "-m", "exact", "-m", "Omo-Run: legacy",
-    ])).code).toBe(0)
+    expect((await git(parentDir, ["commit", "--allow-empty", "-m", "exact", "-m", "Omo-Run: legacy"])).code).toBe(0)
     const integrationSha = (await git(parentDir, ["rev-parse", "HEAD"])).stdout.trim()
     await expect(probeLegacyAutoRunReceipt(worktree, "legacy")).resolves.toEqual({
       status: "integrated",
@@ -136,11 +136,13 @@ describe("reflection worktree integration", () => {
 
     expect(merged.outcome).toBe("merged")
     if (merged.outcome !== "merged" || merged.integrationSha === undefined) throw new Error("expected merge receipt")
-    await expect(probeReflectionIntegration(worktree, {
-      mode: "auto",
-      runId: "receipt",
-      validatedTipSha: validation.tipSha,
-    })).resolves.toEqual({ status: "integrated", evidence: "receipt", integrationSha: merged.integrationSha })
+    await expect(
+      probeReflectionIntegration(worktree, {
+        mode: "auto",
+        runId: "receipt",
+        validatedTipSha: validation.tipSha,
+      }),
+    ).resolves.toEqual({ status: "integrated", evidence: "receipt", integrationSha: merged.integrationSha })
   })
 
   it("#given a matching receipt that excludes the validated tip #when probed #then it is rejected", async () => {
@@ -148,13 +150,17 @@ describe("reflection worktree integration", () => {
     await commit(worktree, "unmerged.md", "unmerged\n")
     const validation = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
     if (validation.status !== "valid") throw new Error("expected valid reflection")
-    expect((await git(parentDir, ["commit", "--allow-empty", "-m", "unrelated", "-m", "Omo-Run: false-receipt"])).code).toBe(0)
+    expect(
+      (await git(parentDir, ["commit", "--allow-empty", "-m", "unrelated", "-m", "Omo-Run: false-receipt"])).code,
+    ).toBe(0)
 
-    await expect(probeReflectionIntegration(worktree, {
-      mode: "auto",
-      runId: "false-receipt",
-      validatedTipSha: validation.tipSha,
-    })).resolves.toEqual({ status: "not_integrated" })
+    await expect(
+      probeReflectionIntegration(worktree, {
+        mode: "auto",
+        runId: "false-receipt",
+        validatedTipSha: validation.tipSha,
+      }),
+    ).resolves.toEqual({ status: "not_integrated" })
   })
 
   it("#given a non-exact receipt on an integrated tip #when auto mode probes #then only ancestry is accepted", async () => {
@@ -162,16 +168,28 @@ describe("reflection worktree integration", () => {
     await commit(worktree, "exact.md", "exact\n")
     const validation = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
     if (validation.status !== "valid") throw new Error("expected valid reflection")
-    expect((await git(parentDir, [
-      "merge", "--no-ff", validation.tipSha, "-m", "manual integration", "-m", "Omo-Run: exact-extra",
-    ])).code).toBe(0)
+    expect(
+      (
+        await git(parentDir, [
+          "merge",
+          "--no-ff",
+          validation.tipSha,
+          "-m",
+          "manual integration",
+          "-m",
+          "Omo-Run: exact-extra",
+        ])
+      ).code,
+    ).toBe(0)
     const integrationSha = (await git(parentDir, ["rev-parse", "HEAD"])).stdout.trim()
 
-    await expect(probeReflectionIntegration(worktree, {
-      mode: "auto",
-      runId: "exact",
-      validatedTipSha: validation.tipSha,
-    })).resolves.toEqual({ status: "integrated", evidence: "ancestry", integrationSha })
+    await expect(
+      probeReflectionIntegration(worktree, {
+        mode: "auto",
+        runId: "exact",
+        validatedTipSha: validation.tipSha,
+      }),
+    ).resolves.toEqual({ status: "integrated", evidence: "ancestry", integrationSha })
   })
 
   it("#given external integration without a receipt #when either mode probes #then ancestry proves integration", async () => {
@@ -181,16 +199,20 @@ describe("reflection worktree integration", () => {
     if (validation.status !== "valid") throw new Error("expected valid reflection")
     const integrationSha = await repo.merge(validation.tipSha, { noFF: true, message: "manual integration" })
 
-    await expect(probeReflectionIntegration(worktree, {
-      mode: "auto",
-      runId: "external",
-      validatedTipSha: validation.tipSha,
-    })).resolves.toEqual({ status: "integrated", evidence: "ancestry", integrationSha })
-    await expect(probeReflectionIntegration(worktree, {
-      mode: "integration",
-      runId: "external",
-      validatedTipSha: validation.tipSha,
-    })).resolves.toEqual({ status: "integrated", evidence: "ancestry", integrationSha })
+    await expect(
+      probeReflectionIntegration(worktree, {
+        mode: "auto",
+        runId: "external",
+        validatedTipSha: validation.tipSha,
+      }),
+    ).resolves.toEqual({ status: "integrated", evidence: "ancestry", integrationSha })
+    await expect(
+      probeReflectionIntegration(worktree, {
+        mode: "integration",
+        runId: "external",
+        validatedTipSha: validation.tipSha,
+      }),
+    ).resolves.toEqual({ status: "integrated", evidence: "ancestry", integrationSha })
   })
 
   it("#given an owned interrupted merge #when auto integration retries #then it aborts that merge and lands one clean merge", async () => {
@@ -214,31 +236,35 @@ describe("reflection worktree integration", () => {
     expect((await git(parentDir, ["status", "--porcelain"])).stdout).toBe("")
   })
 
-  it("#given foreign merge residue #when auto integration runs #then parent index and merge state remain untouched", async () => {
-    const { root, parentDir, repo, worktree } = await fixture("target")
-    await commit(worktree, "target.md", "target\n")
-    const validation = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
-    if (validation.status !== "valid") throw new Error("expected valid reflection")
-    const foreign = await createReflectionWorktree(repo, "foreign", join(root, "worktrees"))
-    await commit(foreign, "foreign.md", "foreign\n")
-    const foreignTip = (await git(foreign.dir, ["rev-parse", "HEAD"])).stdout.trim()
-    expect((await git(parentDir, ["merge", "--no-ff", "--no-commit", foreignTip])).code).toBe(0)
-    const beforeStatus = (await git(parentDir, ["status", "--porcelain=v2"])).stdout
-    const beforeTree = (await git(parentDir, ["write-tree"])).stdout.trim()
+  it(
+    "#given foreign merge residue #when auto integration runs #then parent index and merge state remain untouched",
+    async () => {
+      const { root, parentDir, repo, worktree } = await fixture("target")
+      await commit(worktree, "target.md", "target\n")
+      const validation = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
+      if (validation.status !== "valid") throw new Error("expected valid reflection")
+      const foreign = await createReflectionWorktree(repo, "foreign", join(root, "worktrees"))
+      await commit(foreign, "foreign.md", "foreign\n")
+      const foreignTip = (await git(foreign.dir, ["rev-parse", "HEAD"])).stdout.trim()
+      expect((await git(parentDir, ["merge", "--no-ff", "--no-commit", foreignTip])).code).toBe(0)
+      const beforeStatus = (await git(parentDir, ["status", "--porcelain=v2"])).stdout
+      const beforeTree = (await git(parentDir, ["write-tree"])).stdout.trim()
 
-    const result = await integrateValidatedReflection(worktree, {
-      mode: "auto",
-      runId: "target",
-      summary: "must not interfere",
-      validated: validation,
-      withWriterLock: unlocked,
-    })
+      const result = await integrateValidatedReflection(worktree, {
+        mode: "auto",
+        runId: "target",
+        summary: "must not interfere",
+        validated: validation,
+        withWriterLock: unlocked,
+      })
 
-    expect(result.outcome).toBe("parent_dirty")
-    expect((await git(parentDir, ["rev-parse", "-q", "--verify", "MERGE_HEAD"])).stdout.trim()).toBe(foreignTip)
-    expect((await git(parentDir, ["status", "--porcelain=v2"])).stdout).toBe(beforeStatus)
-    expect((await git(parentDir, ["write-tree"])).stdout.trim()).toBe(beforeTree)
-  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
+      expect(result.outcome).toBe("parent_dirty")
+      expect((await git(parentDir, ["rev-parse", "-q", "--verify", "MERGE_HEAD"])).stdout.trim()).toBe(foreignTip)
+      expect((await git(parentDir, ["status", "--porcelain=v2"])).stdout).toBe(beforeStatus)
+      expect((await git(parentDir, ["write-tree"])).stdout.trim()).toBe(beforeTree)
+    },
+    WINDOWS_INTEGRATION_TEST_TIMEOUT,
+  )
 
   it("#given present then absent resources #when cleanup repeats #then both receipts confirm absence", async () => {
     const { parentDir, worktree } = await fixture("cleanup")

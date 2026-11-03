@@ -37,8 +37,10 @@ export function poolOutcome(pool: WorkpoolRecord, ref: HandleRef): HandleOutcome
   if (pool.status === "cancelled") {
     return { status: "rejected", ref, error: { code: "eval_handle_cancelled", message: `${ref.id} was cancelled` } }
   }
-  const results = pool.items.map((item) => item.status === "completed"
-    ? { key: item.key, data: item.data ?? null }
-    : { key: item.key, error: item.error ?? { code: item.status, message: "Pool item did not complete." } })
+  const results = pool.items.map((item) =>
+    item.status === "completed"
+      ? { key: item.key, data: item.data ?? null }
+      : { key: item.key, error: item.error ?? { code: item.status, message: "Pool item did not complete." } },
+  )
   return { status: "fulfilled", ref, value: results }
 }

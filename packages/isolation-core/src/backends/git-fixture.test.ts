@@ -17,10 +17,15 @@ test("fixture commits leave no detached maintenance process behind", async () =>
   const autoMaintenanceOn = join(repoRoot, ".git", "auto-maintenance-on.gitconfig")
   await writeFile(autoMaintenanceOn, "[maintenance]\n\tauto = true\n")
   const trace = await new Promise<string>((resolve, reject) => {
-    execFile("git", ["-C", repoRoot, "commit", "--allow-empty", "-q", "-m", "probe"], { env: { ...process.env, GIT_TRACE: "1", GIT_CONFIG_GLOBAL: autoMaintenanceOn } }, (error, _stdout, stderr) => {
-      if (error) return reject(error)
-      resolve(stderr.toString())
-    })
+    execFile(
+      "git",
+      ["-C", repoRoot, "commit", "--allow-empty", "-q", "-m", "probe"],
+      { env: { ...process.env, GIT_TRACE: "1", GIT_CONFIG_GLOBAL: autoMaintenanceOn } },
+      (error, _stdout, stderr) => {
+        if (error) return reject(error)
+        resolve(stderr.toString())
+      },
+    )
   })
   expect(trace).toContain("built-in: git commit")
   expect(trace).not.toMatch(/run_command: git (maintenance run --auto|gc --auto)/)

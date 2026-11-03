@@ -63,15 +63,18 @@ type AgentToolRestrictionsOptions = {
   includeTeamToolDenylist?: boolean
 }
 
-export function getAgentToolRestrictions(agentName: string, options: AgentToolRestrictionsOptions = {}): Record<string, boolean> {
+export function getAgentToolRestrictions(
+  agentName: string,
+  options: AgentToolRestrictionsOptions = {},
+): Record<string, boolean> {
   const stripped = stripInvisibleAgentCharacters(agentName)
-  const agentRestrictions = AGENT_RESTRICTIONS[stripped]
-    ?? Object.entries(AGENT_RESTRICTIONS).find(([key]) => key.toLowerCase() === stripped.toLowerCase())?.[1]
-    ?? {}
+  const agentRestrictions =
+    AGENT_RESTRICTIONS[stripped] ??
+    Object.entries(AGENT_RESTRICTIONS).find(([key]) => key.toLowerCase() === stripped.toLowerCase())?.[1] ??
+    {}
 
   return {
     ...(options.includeTeamToolDenylist === false ? {} : TEAM_TOOL_DENYLIST),
     ...agentRestrictions,
   }
 }
-

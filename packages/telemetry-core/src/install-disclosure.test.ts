@@ -27,7 +27,9 @@ describe("telemetry install disclosure shipped copies", () => {
   test("#given install.ps1 #when its printed lines are read #then the disclosure block equals the source", () => {
     const source = readFileSync(join(repoRoot, "packages", "get-worker", "scripts", "install.ps1"), "utf8")
 
-    expect(disclosureBlock(printedLines(source, /^\s*Write-OmoSay '(.*)'\r?$/gm))).toEqual(TELEMETRY_INSTALL_DISCLOSURE_LINES)
+    expect(disclosureBlock(printedLines(source, /^\s*Write-OmoSay '(.*)'\r?$/gm))).toEqual(
+      TELEMETRY_INSTALL_DISCLOSURE_LINES,
+    )
   })
 
   test("#given omo setup #when its telemetry notice is loaded #then it equals the source", async () => {

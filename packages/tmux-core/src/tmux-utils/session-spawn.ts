@@ -9,158 +9,155 @@ import { buildPaneAuthEnvironmentArgs, buildSubagentPaneTitle, buildTmuxPlacehol
 const ISOLATED_SESSION_NAME_PREFIX = "omo-agents"
 
 export type SpawnTmuxSessionDeps = {
-	readonly log: (message: string, data?: unknown) => void
-	readonly runTmuxCommand: typeof RunTmuxCommand
-	readonly isInsideTmux: typeof isInsideTmux
-	readonly isServerRunning: typeof isServerRunning
-	readonly getTmuxPath: () => Promise<string | null | undefined>
+  readonly log: (message: string, data?: unknown) => void
+  readonly runTmuxCommand: typeof RunTmuxCommand
+  readonly isInsideTmux: typeof isInsideTmux
+  readonly isServerRunning: typeof isServerRunning
+  readonly getTmuxPath: () => Promise<string | null | undefined>
 }
 
 async function resolveSpawnTmuxSessionDeps(deps?: Partial<SpawnTmuxSessionDeps>): Promise<SpawnTmuxSessionDeps> {
-	const { runTmuxCommand } = await import("../runner")
+  const { runTmuxCommand } = await import("../runner")
 
-	return {
-		log: () => undefined,
-		runTmuxCommand,
-		isInsideTmux,
-		isServerRunning,
-		getTmuxPath: async () => null,
-		...deps,
-	}
+  return {
+    log: () => undefined,
+    runTmuxCommand,
+    isInsideTmux,
+    isServerRunning,
+    getTmuxPath: async () => null,
+    ...deps,
+  }
 }
 
 export function getIsolatedSessionName(pid: number = process.pid, managerId?: string): string {
-	return managerId
-		? `${ISOLATED_SESSION_NAME_PREFIX}-${pid}-${managerId}`
-		: `${ISOLATED_SESSION_NAME_PREFIX}-${pid}`
+  return managerId ? `${ISOLATED_SESSION_NAME_PREFIX}-${pid}-${managerId}` : `${ISOLATED_SESSION_NAME_PREFIX}-${pid}`
 }
 
 async function getWindowDimensions(
-	tmux: string,
-	sourcePaneId: string,
-	runTmuxCommand: typeof RunTmuxCommand,
+  tmux: string,
+  sourcePaneId: string,
+  runTmuxCommand: typeof RunTmuxCommand,
 ): Promise<{ width: number; height: number } | null> {
-	const result = await runTmuxCommand(tmux, ["display", "-p", "-t", sourcePaneId, "#{window_width},#{window_height}"])
+  const result = await runTmuxCommand(tmux, ["display", "-p", "-t", sourcePaneId, "#{window_width},#{window_height}"])
 
-	if (result.exitCode !== 0) return null
+  if (result.exitCode !== 0) return null
 
-	const [width, height] = result.output.trim().split(",").map(Number)
-	if (Number.isNaN(width) || Number.isNaN(height)) return null
+  const [width, height] = result.output.trim().split(",").map(Number)
+  if (Number.isNaN(width) || Number.isNaN(height)) return null
 
-	return { width, height }
+  return { width, height }
 }
 
-async function sessionExists(tmux: string, sessionName: string, runTmuxCommand: typeof RunTmuxCommand): Promise<boolean> {
-	const result = await runTmuxCommand(tmux, ["has-session", "-t", sessionName])
-	return result.exitCode === 0
+async function sessionExists(
+  tmux: string,
+  sessionName: string,
+  runTmuxCommand: typeof RunTmuxCommand,
+): Promise<boolean> {
+  const result = await runTmuxCommand(tmux, ["has-session", "-t", sessionName])
+  return result.exitCode === 0
 }
 
 export async function spawnTmuxSession(
-	sessionId: string,
-	description: string,
-	config: TmuxConfig,
-	serverUrl: string,
-	_directory: string,
-	sourcePaneId?: string,
-	depsInput?: Partial<SpawnTmuxSessionDeps>,
-	managerId?: string,
+  sessionId: string,
+  description: string,
+  config: TmuxConfig,
+  serverUrl: string,
+  _directory: string,
+  sourcePaneId?: string,
+  depsInput?: Partial<SpawnTmuxSessionDeps>,
+  managerId?: string,
 ): Promise<SpawnPaneResult> {
-	const deps = await resolveSpawnTmuxSessionDeps(depsInput)
-	const { log, runTmuxCommand } = deps
+  const deps = await resolveSpawnTmuxSessionDeps(depsInput)
+  const { log, runTmuxCommand } = deps
 
-	log("[spawnTmuxSession] called", {
-		sessionId,
-		description,
-		serverUrl,
-		configEnabled: config.enabled,
-	})
+  log("[spawnTmuxSession] called", {
+    sessionId,
+    description,
+    serverUrl,
+    configEnabled: config.enabled,
+  })
 
-	if (!config.enabled) {
-		log("[spawnTmuxSession] SKIP: config.enabled is false")
-		return { success: false }
-	}
-	if (!deps.isInsideTmux()) {
-		log("[spawnTmuxSession] SKIP: not inside tmux", { TMUX: process.env.TMUX })
-		return { success: false }
-	}
+  if (!config.enabled) {
+    log("[spawnTmuxSession] SKIP: config.enabled is false")
+    return { success: false }
+  }
+  if (!deps.isInsideTmux()) {
+    log("[spawnTmuxSession] SKIP: not inside tmux", { TMUX: process.env.TMUX })
+    return { success: false }
+  }
 
-	const serverRunning = await deps.isServerRunning(serverUrl)
-	if (!serverRunning) {
-		log("[spawnTmuxSession] SKIP: server not running", { serverUrl })
-		return { success: false }
-	}
+  const serverRunning = await deps.isServerRunning(serverUrl)
+  if (!serverRunning) {
+    log("[spawnTmuxSession] SKIP: server not running", { serverUrl })
+    return { success: false }
+  }
 
-	const authEnvArgs = buildPaneAuthEnvironmentArgs()
-	if (isCmuxCompatEnvironment() && authEnvArgs.length > 0) {
-		log("[spawnTmuxSession] SKIP: authenticated cmux sessions are unsupported")
-		return { success: false }
-	}
+  const authEnvArgs = buildPaneAuthEnvironmentArgs()
+  if (isCmuxCompatEnvironment() && authEnvArgs.length > 0) {
+    log("[spawnTmuxSession] SKIP: authenticated cmux sessions are unsupported")
+    return { success: false }
+  }
 
-	const tmux = await deps.getTmuxPath()
-	if (!tmux) {
-		log("[spawnTmuxSession] SKIP: tmux not found")
-		return { success: false }
-	}
+  const tmux = await deps.getTmuxPath()
+  if (!tmux) {
+    log("[spawnTmuxSession] SKIP: tmux not found")
+    return { success: false }
+  }
 
-	log("[spawnTmuxSession] all checks passed, creating isolated session...")
+  log("[spawnTmuxSession] all checks passed, creating isolated session...")
 
-	const placeholderCmd = buildTmuxPlaceholderCommand(description)
+  const placeholderCmd = buildTmuxPlaceholderCommand(description)
 
-	const sizeArgs: string[] = []
-	if (sourcePaneId) {
-		const dims = await getWindowDimensions(tmux, sourcePaneId, runTmuxCommand)
-		if (dims) {
-			sizeArgs.push("-x", String(dims.width), "-y", String(dims.height))
-		}
-	}
+  const sizeArgs: string[] = []
+  if (sourcePaneId) {
+    const dims = await getWindowDimensions(tmux, sourcePaneId, runTmuxCommand)
+    if (dims) {
+      sizeArgs.push("-x", String(dims.width), "-y", String(dims.height))
+    }
+  }
 
-	const isolatedSessionName = getIsolatedSessionName(process.pid, managerId)
-	const sessionAlreadyExists = await sessionExists(tmux, isolatedSessionName, runTmuxCommand)
+  const isolatedSessionName = getIsolatedSessionName(process.pid, managerId)
+  const sessionAlreadyExists = await sessionExists(tmux, isolatedSessionName, runTmuxCommand)
 
-	const args = sessionAlreadyExists
-		? [
-			"new-window",
-			"-t", isolatedSessionName,
-			"-P",
-			"-F", "#{pane_id}",
-			...authEnvArgs,
-			placeholderCmd,
-		]
-		: [
-			"new-session",
-			"-d",
-			"-s", isolatedSessionName,
-			...sizeArgs,
-			"-P",
-			"-F", "#{pane_id}",
-			...authEnvArgs,
-			placeholderCmd,
-		]
+  const args = sessionAlreadyExists
+    ? ["new-window", "-t", isolatedSessionName, "-P", "-F", "#{pane_id}", ...authEnvArgs, placeholderCmd]
+    : [
+        "new-session",
+        "-d",
+        "-s",
+        isolatedSessionName,
+        ...sizeArgs,
+        "-P",
+        "-F",
+        "#{pane_id}",
+        ...authEnvArgs,
+        placeholderCmd,
+      ]
 
-	log("[spawnTmuxSession] spawning", {
-		mode: sessionAlreadyExists ? "new-window" : "new-session",
-		sessionName: isolatedSessionName,
-	})
+  log("[spawnTmuxSession] spawning", {
+    mode: sessionAlreadyExists ? "new-window" : "new-session",
+    sessionName: isolatedSessionName,
+  })
 
-	const result = await runTmuxCommand(tmux, args)
-	const paneId = result.output
+  const result = await runTmuxCommand(tmux, args)
+  const paneId = result.output
 
-	if (result.exitCode !== 0 || !paneId) {
-		log("[spawnTmuxSession] FAILED", { exitCode: result.exitCode, stderr: result.stderr.trim() })
-		return { success: false }
-	}
+  if (result.exitCode !== 0 || !paneId) {
+    log("[spawnTmuxSession] FAILED", { exitCode: result.exitCode, stderr: result.stderr.trim() })
+    return { success: false }
+  }
 
-	const title = buildSubagentPaneTitle(description)
-	const titleResult = await runTmuxCommand(tmux, ["select-pane", "-t", paneId, "-T", title])
-	if (titleResult.exitCode !== 0) {
-		log("[spawnTmuxSession] WARNING: failed to set pane title", {
-			paneId,
-			title,
-			exitCode: titleResult.exitCode,
-			stderr: titleResult.stderr.trim(),
-		})
-	}
+  const title = buildSubagentPaneTitle(description)
+  const titleResult = await runTmuxCommand(tmux, ["select-pane", "-t", paneId, "-T", title])
+  if (titleResult.exitCode !== 0) {
+    log("[spawnTmuxSession] WARNING: failed to set pane title", {
+      paneId,
+      title,
+      exitCode: titleResult.exitCode,
+      stderr: titleResult.stderr.trim(),
+    })
+  }
 
-	log("[spawnTmuxSession] SUCCESS", { paneId, sessionName: isolatedSessionName })
-	return { success: true, paneId }
+  log("[spawnTmuxSession] SUCCESS", { paneId, sessionName: isolatedSessionName })
+  return { success: true, paneId }
 }

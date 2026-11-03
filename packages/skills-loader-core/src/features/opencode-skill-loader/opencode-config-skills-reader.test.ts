@@ -17,9 +17,7 @@ describe("readOpencodeConfigSkills", () => {
     // empty tmp dir so the developer's real ~/.config/opencode does not
     // leak into these tests (or vice versa: CI passes while local fails).
     globalConfigDir = fs.mkdtempSync(path.join(os.tmpdir(), "ohmo-global-opencode-"))
-    getOpenCodeConfigDirsSpy = spyOn(opencodeConfigDir, "getOpenCodeConfigDirs").mockReturnValue([
-      globalConfigDir,
-    ])
+    getOpenCodeConfigDirsSpy = spyOn(opencodeConfigDir, "getOpenCodeConfigDirs").mockReturnValue([globalConfigDir])
   })
 
   afterEach(() => {
@@ -54,10 +52,7 @@ describe("readOpencodeConfigSkills", () => {
   it("returns undefined when skills key is missing", () => {
     const opencodeDir = path.join(tmpDir, ".opencode")
     fs.mkdirSync(opencodeDir, { recursive: true })
-    fs.writeFileSync(
-      path.join(opencodeDir, "opencode.json"),
-      JSON.stringify({ model: "anthropic/claude-opus-4-7" }),
-    )
+    fs.writeFileSync(path.join(opencodeDir, "opencode.json"), JSON.stringify({ model: "anthropic/claude-opus-4-7" }))
 
     expect(readOpencodeConfigSkills(tmpDir)).toBeUndefined()
   })

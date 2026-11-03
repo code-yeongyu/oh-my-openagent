@@ -57,10 +57,7 @@ function resolved<T>(value: T, overridden: boolean): ResolvedSleeptimeValue<T> {
   return { value, overridden }
 }
 
-export function resolveSleeptimeSettings(
-  settings: OmoMemorySettings,
-  agentId: string,
-): ResolvedSleeptimeSettings {
+export function resolveSleeptimeSettings(settings: OmoMemorySettings, agentId: string): ResolvedSleeptimeSettings {
   const agentOverride = settings.agents[agentId]
   const reflection = agentOverride?.reflection
   const nudge = agentOverride?.nudge
@@ -73,20 +70,14 @@ export function resolveSleeptimeSettings(
   return {
     reflection: {
       enabled: resolved(effectiveReflection.enabled, reflection?.enabled !== undefined),
-      stepCount: resolved(
-        effectiveReflection.trigger.step_count,
-        reflection?.trigger?.step_count !== undefined,
-      ),
+      stepCount: resolved(effectiveReflection.trigger.step_count, reflection?.trigger?.step_count !== undefined),
       onCompaction: resolved(
         effectiveReflection.trigger.on_compaction,
         reflection?.trigger?.on_compaction !== undefined,
       ),
       merge: resolved(effectiveReflection.merge, reflection?.merge !== undefined),
       category: resolved(effectiveReflection.category, reflection?.category !== undefined),
-      timeoutMinutes: resolved(
-        effectiveReflection.timeout_minutes,
-        reflection?.timeout_minutes !== undefined,
-      ),
+      timeoutMinutes: resolved(effectiveReflection.timeout_minutes, reflection?.timeout_minutes !== undefined),
       sandbox: resolved(effectiveReflection.sandbox, reflection?.sandbox !== undefined),
     },
     nudge: {

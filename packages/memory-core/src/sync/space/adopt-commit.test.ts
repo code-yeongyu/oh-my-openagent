@@ -28,36 +28,62 @@ async function space(text: string): Promise<{ readonly doc: LoroDoc; readonly ba
 }
 
 /** One update (capture + register values) on a plain doc; the device entry point is covered in the H1 row and adopt-replay.test.ts. */
-function commitAdoption(doc: LoroDoc, base: string, frontier: ReturnType<typeof itemFrontier>, working: string, values: Parameters<typeof withRegisterValues>[2]) {
+function commitAdoption(
+  doc: LoroDoc,
+  base: string,
+  frontier: ReturnType<typeof itemFrontier>,
+  working: string,
+  values: Parameters<typeof withRegisterValues>[2],
+) {
   return withRegisterValues(doc, captureItem(doc, base, frontier, working), values)
 }
 
-const stateOf = (doc: LoroDoc, base: string) => ({ currentText: base, lastMaterialised: null, tombstoned: false, registers: activeRegisters(doc) })
-const active = (doc: LoroDoc, key: string): string[] => activeReg(readKeyState(doc, key).reg).map((entry) => entry.value).sort()
+const stateOf = (doc: LoroDoc, base: string) => ({
+  currentText: base,
+  lastMaterialised: null,
+  tombstoned: false,
+  registers: activeRegisters(doc),
+})
+const active = (doc: LoroDoc, key: string): string[] =>
+  activeReg(readKeyState(doc, key).reg)
+    .map((entry) => entry.value)
+    .sort()
 
 describe("H1: one atomic commit, deletion decided on the committed item", () => {
   const files: readonly Snapshot[] = [{ path: SIDE, text: "---\nd: laptop\n---\nbody\nnew line\n" }]
 
-  test("through the device entry point, the capture and the extra register values are ONE update", async () => {
-    await withDevices(1, async ([device]) => {
-      if (device === undefined) throw new Error("no device")
-      const doc = await createDeviceItemDoc(device)
-      try {
-        const seed = await captureOnDevice(device, "n.md", doc, "", [], "---\nd: space\n---\nbody\n")
-        if (seed !== null) doc.import(seed)
-        const base = renderDocContent(doc)
-        const plan = planAdoption(files, stateOf(doc, base))
-        if (plan.action !== "capture") throw new Error("expected capture")
-        const update = await captureOnDevice(device, "n.md", doc, base, itemFrontier(doc), plan.workingText, plan.extraRegisterValues)
-        expect(update).not.toBeNull()
-        if (update !== null) doc.import(update)
-        expect(active(doc, "d")).toEqual(["laptop", "space"])
-        expect(renderDocContent(doc)).toContain("new line\n")
-      } finally {
-        doc.free()
-      }
-    })
-  }, DEVICE_TIMEOUT_MS)
+  test(
+    "through the device entry point, the capture and the extra register values are ONE update",
+    async () => {
+      await withDevices(1, async ([device]) => {
+        if (device === undefined) throw new Error("no device")
+        const doc = await createDeviceItemDoc(device)
+        try {
+          const seed = await captureOnDevice(device, "n.md", doc, "", [], "---\nd: space\n---\nbody\n")
+          if (seed !== null) doc.import(seed)
+          const base = renderDocContent(doc)
+          const plan = planAdoption(files, stateOf(doc, base))
+          if (plan.action !== "capture") throw new Error("expected capture")
+          const update = await captureOnDevice(
+            device,
+            "n.md",
+            doc,
+            base,
+            itemFrontier(doc),
+            plan.workingText,
+            plan.extraRegisterValues,
+          )
+          expect(update).not.toBeNull()
+          if (update !== null) doc.import(update)
+          expect(active(doc, "d")).toEqual(["laptop", "space"])
+          expect(renderDocContent(doc)).toContain("new line\n")
+        } finally {
+          doc.free()
+        }
+      })
+    },
+    DEVICE_TIMEOUT_MS,
+  )
 
   test("a crash after the capture but before the register values keeps the source", async () => {
     const { doc, base } = await space("---\nd: space\n---\nbody\n")
@@ -101,7 +127,7 @@ describe("H1: one atomic commit, deletion decided on the committed item", () => 
 })
 
 describe("the deletion gate reads back BOTH sides of the committed item: its render and its active registers", () => {
-  test("registers side: a joined render of the values a and b never vouches for a side's single value \"a / b\"", async () => {
+  test('registers side: a joined render of the values a and b never vouches for a side\'s single value "a / b"', async () => {
     const { doc, base } = await space("---\nk: x\n---\nx\n")
     try {
       const other = await newDoc("2")
@@ -119,7 +145,10 @@ describe("the deletion gate reads back BOTH sides of the committed item: its ren
       const plan = planAdoption(files, stateOf(doc, joined))
       // The planner keeps it too; the gate is pinned on its own by handing it the side as a candidate.
       const candidate = { ...plan, removalCandidates: [SIDE], retainedSources: [] }
-      expect(confirmRemovals(doc, candidate, files)).toEqual({ remove: [], retained: [{ path: SIDE, reason: 'missing line "k: \\"a / b\\""' }] })
+      expect(confirmRemovals(doc, candidate, files)).toEqual({
+        remove: [],
+        retained: [{ path: SIDE, reason: 'missing line "k: \\"a / b\\""' }],
+      })
     } finally {
       doc.free()
     }
@@ -154,7 +183,10 @@ describe("the deletion gate reads back BOTH sides of the committed item: its ren
       const files = [{ path: SIDE, text: "---\nd: space\n---\nx\nonly in the side\n" }]
       const plan = planAdoption(files, stateOf(doc, base))
       const candidate = { ...plan, removalCandidates: [SIDE], retainedSources: [] }
-      expect(confirmRemovals(doc, candidate, files)).toEqual({ remove: [], retained: [{ path: SIDE, reason: 'missing line "only in the side"' }] })
+      expect(confirmRemovals(doc, candidate, files)).toEqual({
+        remove: [],
+        retained: [{ path: SIDE, reason: 'missing line "only in the side"' }],
+      })
     } finally {
       doc.free()
     }
@@ -163,11 +195,18 @@ describe("the deletion gate reads back BOTH sides of the committed item: its ren
 
 describe("M1: the space's register components are required", () => {
   test("a register key missing from the components is refused, never read as one whole value", () => {
-    const state = { currentText: '---\nk: "a / b"\n---\n', lastMaterialised: null, tombstoned: false, registers: new Map() }
-    expect(() => planAdoption([], state)).toThrow('planAdoption: ItemState.registers has no components for register key "k"')
+    const state = {
+      currentText: '---\nk: "a / b"\n---\n',
+      lastMaterialised: null,
+      tombstoned: false,
+      registers: new Map(),
+    }
+    expect(() => planAdoption([], state)).toThrow(
+      'planAdoption: ItemState.registers has no components for register key "k"',
+    )
   })
 
-  test("a side's single value \"a / b\" over the two values a and b is adopted as its own entry", async () => {
+  test('a side\'s single value "a / b" over the two values a and b is adopted as its own entry', async () => {
     const { doc, base } = await space("---\nk: x\n---\nx\n")
     try {
       const other = await newDoc("2")
@@ -228,7 +267,10 @@ test("M2 end to end: a BOM main and a BOM side are adopted, and the main is writ
   const { doc, base } = await space("---\ntitle: A\n---\nbody\n")
   try {
     const main = "\uFEFF---\ntitle: A\n---\nbody\n"
-    const files = [{ path: "n.md", text: main }, { path: SIDE, text: "\uFEFF---\ntitle: B\n---\nbody\n" }]
+    const files = [
+      { path: "n.md", text: main },
+      { path: SIDE, text: "\uFEFF---\ntitle: B\n---\nbody\n" },
+    ]
     const plan = planAdoption(files, stateOf(doc, base))
     if (plan.action !== "capture") throw new Error("expected capture")
     const update = commitAdoption(doc, base, itemFrontier(doc), plan.workingText, plan.extraRegisterValues)
@@ -249,7 +291,8 @@ describe("L1: the two header fences are allowed only when the source has a heade
   test("a lossy merge that drops the rules keeps the source", async () => {
     const { doc, base } = await space("x\n")
     try {
-      const dropRules = (into: string, incoming: string): string => mergeInsertions(into, incoming.replace(/^---\n/gm, ""))
+      const dropRules = (into: string, incoming: string): string =>
+        mergeInsertions(into, incoming.replace(/^---\n/gm, ""))
       const files = [{ path: SIDE, text: "x\n---\nsection\n---\n" }]
       const plan = planAdoption(files, stateOf(doc, base), dropRules)
       expect(plan.removalCandidates).toEqual([])

@@ -44,27 +44,42 @@ function hasHardenedRuntime(codesignOutput: string): boolean {
   return /^CodeDirectory .*flags=0x[0-9a-f]*\([^)]*\bruntime\b[^)]*\)/m.test(codesignOutput)
 }
 
-export function keychainHelperFailures(file: string, run: ToolRunner = runTool, mode: number = statSync(file).mode): string[] {
+export function keychainHelperFailures(
+  file: string,
+  run: ToolRunner = runTool,
+  mode: number = statSync(file).mode,
+): string[] {
   const failures: string[] = []
   if ((mode & 0o100) === 0) failures.push(`${file} is not executable by its owner (mode ${(mode & 0o777).toString(8)})`)
 
   const archs = run("lipo", ["-archs", file])
   const present = archs.stdout.trim().split(/\s+/)
   for (const arch of UNIVERSAL) {
-    if (archs.status !== 0 || !present.includes(arch)) failures.push(`${file} lacks the ${arch} slice (lipo: ${archs.stdout.trim() || archs.stderr.trim()})`)
+    if (archs.status !== 0 || !present.includes(arch))
+      failures.push(`${file} lacks the ${arch} slice (lipo: ${archs.stdout.trim() || archs.stderr.trim()})`)
   }
 
-  const strict = run("codesign", ["--verify", "--strict", "--all-architectures", "-R", `=${KEYCHAIN_HELPER_REQUIREMENT}`, file])
-  if (strict.status !== 0) failures.push(`codesign --verify --strict against the helper requirement failed: ${strict.stderr.trim()}`)
+  const strict = run("codesign", [
+    "--verify",
+    "--strict",
+    "--all-architectures",
+    "-R",
+    `=${KEYCHAIN_HELPER_REQUIREMENT}`,
+    file,
+  ])
+  if (strict.status !== 0)
+    failures.push(`codesign --verify --strict against the helper requirement failed: ${strict.stderr.trim()}`)
 
   const requirement = run("codesign", ["-d", "-r-", file])
   const actual = designatedRequirement(`${requirement.stdout}\n${requirement.stderr}`)
-  if (actual !== KEYCHAIN_HELPER_REQUIREMENT) failures.push(`designated requirement differs: expected ${KEYCHAIN_HELPER_REQUIREMENT}, got ${actual ?? "none"}`)
+  if (actual !== KEYCHAIN_HELPER_REQUIREMENT)
+    failures.push(`designated requirement differs: expected ${KEYCHAIN_HELPER_REQUIREMENT}, got ${actual ?? "none"}`)
 
   const details = run("codesign", ["-dv", "--verbose=2", file])
   const text = `${details.stdout}\n${details.stderr}`
   const identifier = detail(text, "Identifier")
-  if (identifier !== KEYCHAIN_HELPER_IDENTIFIER) failures.push(`Identifier=${identifier ?? "none"}, expected ${KEYCHAIN_HELPER_IDENTIFIER}`)
+  if (identifier !== KEYCHAIN_HELPER_IDENTIFIER)
+    failures.push(`Identifier=${identifier ?? "none"}, expected ${KEYCHAIN_HELPER_IDENTIFIER}`)
   const team = detail(text, "TeamIdentifier")
   if (team !== KEYCHAIN_HELPER_TEAM) failures.push(`TeamIdentifier=${team ?? "none"}, expected ${KEYCHAIN_HELPER_TEAM}`)
   if (!hasHardenedRuntime(text)) failures.push(`${file} lacks the hardened runtime flag`)
@@ -84,5 +99,7 @@ if (import.meta.main) {
   const failures = keychainHelperFailures(file)
   for (const failure of failures) console.error(`::error::${failure}`)
   if (failures.length > 0) process.exit(1)
-  console.log(`${file}: ${KEYCHAIN_HELPER_IDENTIFIER}, team ${KEYCHAIN_HELPER_TEAM}, ${UNIVERSAL.join("+")}, designated requirement matches`)
+  console.log(
+    `${file}: ${KEYCHAIN_HELPER_IDENTIFIER}, team ${KEYCHAIN_HELPER_TEAM}, ${UNIVERSAL.join("+")}, designated requirement matches`,
+  )
 }

@@ -17,7 +17,12 @@ import {
   SIGNATURE,
   SIGNATURE_BYTES,
 } from "./release-assets.ts"
-import { codeSignaturePasses, DEVICE_SERVICE_RELEASE_KEY, releaseKeyBytes, verifyReleaseSignature } from "./release-signature.ts"
+import {
+  codeSignaturePasses,
+  DEVICE_SERVICE_RELEASE_KEY,
+  releaseKeyBytes,
+  verifyReleaseSignature,
+} from "./release-signature.ts"
 import { compareVersions } from "./version.ts"
 
 export { type DeviceServiceHost, deviceServiceAssetName } from "./release-assets.ts"
@@ -57,29 +62,34 @@ export type AcquireResult =
   | { readonly ok: true; readonly version: string; readonly releaseDir: string; readonly binary: string }
   | { readonly ok: false; readonly refusal: AcquireRefusal; readonly action: string }
 
-const VERIFY_FAILED = "The downloaded OmO device service failed verification and was not installed. Try again later; if it keeps failing, report it with /bug."
+const VERIFY_FAILED =
+  "The downloaded OmO device service failed verification and was not installed. Try again later; if it keeps failing, report it with /bug."
 
 const refuse = (refusal: AcquireRefusal, action = VERIFY_FAILED): AcquireResult => ({ ok: false, refusal, action })
 const sha256 = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex")
 
 const platformSecure: SecureFile =
-  process.platform === "win32" ? async (path, kind) => windowsSecureFile(await currentUserSid())(path, kind) : posixSecureFile
+  process.platform === "win32"
+    ? async (path, kind) => windowsSecureFile(await currentUserSid())(path, kind)
+    : posixSecureFile
 
 type Download = Uint8Array | "missing" | "too_large"
 
-const downloader = (fetchRelease: FetchRelease, base: string) => async (name: string, maxBytes: number): Promise<Download> => {
-  let response: Response
-  try {
-    response = await fetchRelease(`${base}${name}`, { signal: AbortSignal.timeout(120_000) })
-  } catch {
-    return "missing"
+const downloader =
+  (fetchRelease: FetchRelease, base: string) =>
+  async (name: string, maxBytes: number): Promise<Download> => {
+    let response: Response
+    try {
+      response = await fetchRelease(`${base}${name}`, { signal: AbortSignal.timeout(120_000) })
+    } catch {
+      return "missing"
+    }
+    if (!response.ok) return "missing"
+    const declared = Number(response.headers.get("content-length") ?? "0")
+    if (declared > maxBytes) return "too_large"
+    const bytes = new Uint8Array(await response.arrayBuffer())
+    return bytes.length > maxBytes ? "too_large" : bytes
   }
-  if (!response.ok) return "missing"
-  const declared = Number(response.headers.get("content-length") ?? "0")
-  if (declared > maxBytes) return "too_large"
-  const bytes = new Uint8Array(await response.arrayBuffer())
-  return bytes.length > maxBytes ? "too_large" : bytes
-}
 
 const downloadRefusal = (download: "missing" | "too_large"): AcquireResult =>
   download === "missing"
@@ -104,7 +114,10 @@ const install = async (
   try {
     for (const [name, bytes] of files) writeFileSync(join(staging, name), bytes, { mode: 0o600 })
     chmodSync(join(staging, binaryName), 0o755)
-    if (options.host.startsWith("darwin-") && !(options.verifyCodeSignature ?? codeSignaturePasses)(join(staging, binaryName)))
+    if (
+      options.host.startsWith("darwin-") &&
+      !(options.verifyCodeSignature ?? codeSignaturePasses)(join(staging, binaryName))
+    )
       return refuse("code_signature")
     const previous = existsSync(releaseDir) ? `${staging}.previous` : undefined
     if (previous !== undefined) renameSync(releaseDir, previous)
@@ -129,7 +142,10 @@ export const acquireDeviceService = async (options: AcquireOptions): Promise<Acq
     options.fetch ?? globalThis.fetch,
     `${options.origin ?? DEVICE_SERVICE_ORIGIN}/${options.channel ?? "stable"}/device-service/${options.version}/`,
   )
-  const [checksums, signature] = await Promise.all([get(CHECKSUMS, CHECKSUMS_MAX_BYTES), get(SIGNATURE, SIGNATURE_BYTES)])
+  const [checksums, signature] = await Promise.all([
+    get(CHECKSUMS, CHECKSUMS_MAX_BYTES),
+    get(SIGNATURE, SIGNATURE_BYTES),
+  ])
   if (typeof checksums === "string") return downloadRefusal(checksums)
   if (typeof signature === "string") return downloadRefusal(signature)
   const verdict = await verifyReleaseSignature(key, signature, checksums)
@@ -139,7 +155,10 @@ export const acquireDeviceService = async (options: AcquireOptions): Promise<Acq
   const manifestDigest = digests?.get(MANIFEST)
   const binaryDigest = digests?.get(binaryName)
   if (manifestDigest === undefined || binaryDigest === undefined) return refuse("malformed")
-  const [manifestBytes, binary] = await Promise.all([get(MANIFEST, MANIFEST_MAX_BYTES), get(binaryName, BINARY_MAX_BYTES)])
+  const [manifestBytes, binary] = await Promise.all([
+    get(MANIFEST, MANIFEST_MAX_BYTES),
+    get(binaryName, BINARY_MAX_BYTES),
+  ])
   if (typeof manifestBytes === "string") return downloadRefusal(manifestBytes)
   if (typeof binary === "string") return downloadRefusal(binary)
   if (sha256(manifestBytes) !== manifestDigest || sha256(binary) !== binaryDigest) return refuse("checksum")

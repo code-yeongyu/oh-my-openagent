@@ -5,11 +5,14 @@ import { diagnoseHeldTestRoot } from "./windows-held-root.mjs"
 // The preload and tests must resolve this same module instance; otherwise the leak check fails loudly.
 export const skippedTestRoots = new Map()
 
-export function removeTestRootBestEffort(root, {
-  remove = (path) => rmSync(path, { recursive: true, force: true }),
-  diagnose = diagnoseHeldTestRoot,
-  report = console.warn,
-} = {}) {
+export function removeTestRootBestEffort(
+  root,
+  {
+    remove = (path) => rmSync(path, { recursive: true, force: true }),
+    diagnose = diagnoseHeldTestRoot,
+    report = console.warn,
+  } = {},
+) {
   try {
     remove(root)
     skippedTestRoots.delete(root)

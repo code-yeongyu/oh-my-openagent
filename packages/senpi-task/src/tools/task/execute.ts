@@ -44,7 +44,10 @@ function deliveredKernelTools(detail: TaskKernelToolsDetail, details: TaskToolDe
     return {
       requested: detail.requested,
       status: "refused",
-      error: { code: "tools_unavailable", message: details.reason ?? "Parent kernel tools are unavailable for this child." },
+      error: {
+        code: "tools_unavailable",
+        message: details.reason ?? "Parent kernel tools are unavailable for this child.",
+      },
     }
   }
   if (details.task_id.length === 0 || details.failure_kind !== undefined) {
@@ -102,18 +105,23 @@ export function buildTaskExecute(deps: TaskToolDeps, options: ForegroundWaitOpti
     const withKernelTools = (spawned: AgentToolResult<TaskToolDetails>): AgentToolResult<TaskToolDetails> =>
       granted === undefined
         ? spawned
-        : { ...spawned, details: { ...spawned.details, kernel_tools: deliveredKernelTools(granted.detail, spawned.details) } }
+        : {
+            ...spawned,
+            details: { ...spawned.details, kernel_tools: deliveredKernelTools(granted.detail, spawned.details) },
+          }
 
     if (resolved.items.length === 1) {
-      return withKernelTools(await runSpawn(deps, {
-        params: singleSpawnParams(first, runInBackground),
-        signal,
-        onUpdate,
-        ctx,
-        ...(granted === undefined ? {} : { kernelTools: granted.grant }),
-        ...(options.env !== undefined && { env: options.env }),
-        ...(options.scheduleDeadline !== undefined && { scheduleDeadline: options.scheduleDeadline }),
-      }))
+      return withKernelTools(
+        await runSpawn(deps, {
+          params: singleSpawnParams(first, runInBackground),
+          signal,
+          onUpdate,
+          ctx,
+          ...(granted === undefined ? {} : { kernelTools: granted.grant }),
+          ...(options.env !== undefined && { env: options.env }),
+          ...(options.scheduleDeadline !== undefined && { scheduleDeadline: options.scheduleDeadline }),
+        }),
+      )
     }
 
     const parentSessionId = ctx.sessionManager.getSessionId()

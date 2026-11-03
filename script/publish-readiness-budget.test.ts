@@ -19,7 +19,9 @@ import { join } from "node:path"
 
 const workflowPath = new URL("../.github/workflows/publish.yml", import.meta.url)
 const workflowText = readFileSync(workflowPath, "utf8").replace(/\r\n/g, "\n")
-const workflow = Bun.YAML.parse(workflowText) as { jobs: Record<string, { steps: Array<{ name?: string; run?: string }> }> }
+const workflow = Bun.YAML.parse(workflowText) as {
+  jobs: Record<string, { steps: Array<{ name?: string; run?: string }> }>
+}
 // Git Bash process startup is slower on Windows, especially in parallel CI legs.
 const READINESS_TEST_TIMEOUT_MS = process.platform === "win32" ? 60_000 : 15_000
 
@@ -52,7 +54,10 @@ interface Outcome {
  * shims) - the first version of this harness did that and both cases hung to the 30 s budget on
  * Windows while passing on POSIX. The workflow text itself stays untouched.
  */
-function runReadiness(options: { readonly metadataReadyAfterViews: number; readonly tarballReadyAfterHeads: number }, channel: { version: string; distTag: string } = { version: "5.0.0-0.beta.42", distTag: "beta" }): Outcome {
+function runReadiness(
+  options: { readonly metadataReadyAfterViews: number; readonly tarballReadyAfterHeads: number },
+  channel: { version: string; distTag: string } = { version: "5.0.0-0.beta.42", distTag: "beta" },
+): Outcome {
   const root = mkdtempSync(join(tmpdir(), "publish-readiness-"))
   try {
     const counter = join(root, "npm-views")
@@ -107,44 +112,68 @@ function runReadiness(options: { readonly metadataReadyAfterViews: number; reado
       curlCalls: Number(readFileSync(curlCounter, "utf8").trim()),
       sleeps: readFileSync(sleeps, "utf8").split("\n").filter(Boolean).length,
     }
-  } finally { rmSync(root, { recursive: true, force: true }) }
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 }
 
 describe("publish.yml post-publish-verify registry readiness", () => {
-  test("#given the registry needs ~5 minutes to expose the version #when readiness polls #then it keeps waiting instead of failing a successful publish", () => {
-    // 5 minutes at the loop's own interval, expressed in npm view calls (3 views per attempt).
-    const outcome = runReadiness({ metadataReadyAfterViews: 3 * 20, tarballReadyAfterHeads: 0 })
-    expect(outcome.status).toBe(0)
-    expect(outcome.stdout).toContain("metadata and tarball are ready")
-  }, READINESS_TEST_TIMEOUT_MS)
+  test(
+    "#given the registry needs ~5 minutes to expose the version #when readiness polls #then it keeps waiting instead of failing a successful publish",
+    () => {
+      // 5 minutes at the loop's own interval, expressed in npm view calls (3 views per attempt).
+      const outcome = runReadiness({ metadataReadyAfterViews: 3 * 20, tarballReadyAfterHeads: 0 })
+      expect(outcome.status).toBe(0)
+      expect(outcome.stdout).toContain("metadata and tarball are ready")
+    },
+    READINESS_TEST_TIMEOUT_MS,
+  )
 
-  test("#given metadata is visible before the tarball #when artifact propagation takes several minutes #then readiness waits for the installable blob", () => {
-    const outcome = runReadiness({ metadataReadyAfterViews: 0, tarballReadyAfterHeads: 20 })
-    expect(outcome.status).toBe(0)
-    expect(outcome.curlCalls).toBe(21)
-    expect(outcome.sleeps).toBe(20)
-    expect(outcome.stdout).toContain("metadata and tarball are ready")
-  }, READINESS_TEST_TIMEOUT_MS)
+  test(
+    "#given metadata is visible before the tarball #when artifact propagation takes several minutes #then readiness waits for the installable blob",
+    () => {
+      const outcome = runReadiness({ metadataReadyAfterViews: 0, tarballReadyAfterHeads: 20 })
+      expect(outcome.status).toBe(0)
+      expect(outcome.curlCalls).toBe(21)
+      expect(outcome.sleeps).toBe(20)
+      expect(outcome.stdout).toContain("metadata and tarball are ready")
+    },
+    READINESS_TEST_TIMEOUT_MS,
+  )
 
-  test("#given a stable release on the latest dist-tag #when the registry catches up #then readiness passes on the same budget", () => {
-    const outcome = runReadiness({ metadataReadyAfterViews: 3 * 20, tarballReadyAfterHeads: 0 }, { version: "5.0.0", distTag: "latest" })
-    expect(outcome.status).toBe(0)
-    expect(outcome.stdout).toContain("omo-ai@5.0.0 metadata and tarball are ready")
-  }, READINESS_TEST_TIMEOUT_MS)
+  test(
+    "#given a stable release on the latest dist-tag #when the registry catches up #then readiness passes on the same budget",
+    () => {
+      const outcome = runReadiness(
+        { metadataReadyAfterViews: 3 * 20, tarballReadyAfterHeads: 0 },
+        { version: "5.0.0", distTag: "latest" },
+      )
+      expect(outcome.status).toBe(0)
+      expect(outcome.stdout).toContain("omo-ai@5.0.0 metadata and tarball are ready")
+    },
+    READINESS_TEST_TIMEOUT_MS,
+  )
 
-  test("#given metadata is ready but the tarball stays unavailable #when readiness exhausts its budget #then it probes HEAD every attempt and names tarball availability", () => {
-    const outcome = runReadiness({ metadataReadyAfterViews: 0, tarballReadyAfterHeads: Number.MAX_SAFE_INTEGER })
-    expect(outcome.status).not.toBe(0)
-    expect(outcome.curlCalls).toBe(240)
-    expect(outcome.sleeps).toBe(239)
-    expect(outcome.stdout + outcome.stderr).toContain("metadata and tarball did not become ready")
-    expect(outcome.stdout + outcome.stderr).toContain("tarball availability")
-  }, READINESS_TEST_TIMEOUT_MS)
+  test(
+    "#given metadata is ready but the tarball stays unavailable #when readiness exhausts its budget #then it probes HEAD every attempt and names tarball availability",
+    () => {
+      const outcome = runReadiness({ metadataReadyAfterViews: 0, tarballReadyAfterHeads: Number.MAX_SAFE_INTEGER })
+      expect(outcome.status).not.toBe(0)
+      expect(outcome.curlCalls).toBe(240)
+      expect(outcome.sleeps).toBe(239)
+      expect(outcome.stdout + outcome.stderr).toContain("metadata and tarball did not become ready")
+      expect(outcome.stdout + outcome.stderr).toContain("tarball availability")
+    },
+    READINESS_TEST_TIMEOUT_MS,
+  )
 
   test(
     "#given the registry never exposes the version #when the budget is exhausted #then it fails and names the publish-vs-propagation distinction",
     () => {
-      const outcome = runReadiness({ metadataReadyAfterViews: Number.MAX_SAFE_INTEGER, tarballReadyAfterHeads: Number.MAX_SAFE_INTEGER })
+      const outcome = runReadiness({
+        metadataReadyAfterViews: Number.MAX_SAFE_INTEGER,
+        tarballReadyAfterHeads: Number.MAX_SAFE_INTEGER,
+      })
       expect(outcome.status).not.toBe(0)
       expect(outcome.stdout + outcome.stderr).toContain("propagat")
       // Budget is wall-clock shaped, not "5 tries": sleeps x the 15 s interval must cover npm's

@@ -28,18 +28,31 @@ describe("isolated genesis rejection vectors", () => {
     const [device, recovery] = v.prepared.wraps
     const ciphertext = b64urlDecode(recovery.wrap)
     ciphertext[ciphertext.length - 1] = (ciphertext.at(-1) ?? 0) ^ 1
-    const wraps = mutation === "reversed wraps" ? [recovery, device]
-      : mutation === "missing recovery" ? [device]
-      : mutation === "tampered recovery ciphertext" ? [device, { ...recovery, wrap: b64urlEncode(ciphertext) }]
-      : [device, recovery]
+    const wraps =
+      mutation === "reversed wraps"
+        ? [recovery, device]
+        : mutation === "missing recovery"
+          ? [device]
+          : mutation === "tampered recovery ciphertext"
+            ? [device, { ...recovery, wrap: b64urlEncode(ciphertext) }]
+            : [device, recovery]
     const digest = await sha256B64(jcsBytes(mutation === "single-wrap digest" ? [device] : wraps))
     const payload = {
-      t: "omo-sync/v1/recovery-countersign", account: ACCOUNT,
-      custody_root: v.prepared.body.custody_root, predecessor: "", wraps_digest: digest,
+      t: "omo-sync/v1/recovery-countersign",
+      account: ACCOUNT,
+      custody_root: v.prepared.body.custody_root,
+      predecessor: "",
+      wraps_digest: digest,
     }
     // Tampering models an attacker with the device key, not the recovery signing key.
-    const countersign = mutation === "tampered recovery ciphertext" ? v.prepared.body.countersign
-      : await signFramed(mutation === "wrong countersign domain" ? "omo-sync/v1/record" : payload.t, payload, v.recovery.signSeed)
+    const countersign =
+      mutation === "tampered recovery ciphertext"
+        ? v.prepared.body.countersign
+        : await signFramed(
+            mutation === "wrong countersign domain" ? "omo-sync/v1/record" : payload.t,
+            payload,
+            v.recovery.signSeed,
+          )
     const body = { ...v.prepared.body, wraps_digest: digest, countersign }
     const request = await signedAppend(v.keyring, EMPTY_HEAD, body, wraps)
     const entry = await entryOf(request, v.keyring)
@@ -56,7 +69,13 @@ describe("isolated genesis rejection vectors", () => {
     const wraps = [device, changed] as const
     const prepared = { body: { ...v.prepared.body, wraps_digest: await sha256B64(jcsBytes(wraps)) }, wraps }
     let signed = false
-    const keyring = { ...v.keyring, sign: async () => { signed = true; throw new Error("must not sign") } }
+    const keyring = {
+      ...v.keyring,
+      sign: async () => {
+        signed = true
+        throw new Error("must not sign")
+      },
+    }
     await expect(buildGenesis(ACCOUNT, keyring, prepared)).rejects.toMatchObject({ reason: "bad_countersign" })
     expect(signed).toBe(false)
   })
@@ -66,12 +85,17 @@ describe("isolated genesis rejection vectors", () => {
     const [device] = v.prepared.wraps
     const wraps_digest = await sha256B64(jcsBytes([device]))
     const countersign = await v.capabilities.countersign({
-      t: "omo-sync/v1/recovery-countersign", account: ACCOUNT, custody_root: v.prepared.body.custody_root,
-      predecessor: "", wraps_digest,
+      t: "omo-sync/v1/recovery-countersign",
+      account: ACCOUNT,
+      custody_root: v.prepared.body.custody_root,
+      predecessor: "",
+      wraps_digest,
     })
     const prepared = { ...v.prepared, body: { ...v.prepared.body, wraps_digest, countersign } }
     const sign = mock(v.keyring.sign)
-    await expect(buildGenesis(ACCOUNT, { ...v.keyring, sign }, prepared)).rejects.toMatchObject({ reason: "wraps_digest_mismatch" })
+    await expect(buildGenesis(ACCOUNT, { ...v.keyring, sign }, prepared)).rejects.toMatchObject({
+      reason: "wraps_digest_mismatch",
+    })
     expect(sign).toHaveBeenCalledTimes(0)
   })
 
@@ -96,42 +120,42 @@ describe("isolated genesis rejection vectors", () => {
     ["extra bootstrap", "bad_record"],
     ["extra recovery", "bad_record"],
     ["non-NFC RP", "bad_bootstrap"],
-  ] as const)(
-    "refuses prepared %s mismatch before device signing",
-    async (mutation, reason) => {
-      const v = await vector()
-      const bootstrap = v.prepared.body.bootstrap
-      const first = bootstrap.first_device
-      const recovery = bootstrap.recovery_key
-      const changed = {
-        ...bootstrap,
-        ...(mutation === "account" ? { account: "another-account" } : {}),
-        ...(mutation === "nonce length" ? { custody_nonce: b64urlEncode(bytes(32, 5)) } : {}),
-        ...(mutation === "extra bootstrap" ? { extra: true } : {}),
-        first_device: {
-          ...first,
-          ...(mutation === "device id" ? { id: b64urlEncode(bytes(16, 99)) } : {}),
-          ...(mutation === "sealing key" ? { sealing_public_key: recovery.sealing_public_key } : {}),
-          ...(mutation === "signing key" ? { signing_public_key: recovery.signing_public_key } : {}),
-        },
-        recovery_key: {
-          ...recovery,
-          ...(mutation === "extra recovery" ? { extra: true } : {}),
-          ...(mutation === "non-NFC RP" ? { rp_id: "e\u0301.test" } : {}),
-        },
-      }
-      const custody_root = await taggedHash("omo-sync/v1/custody-root", changed)
-      const countersign = await v.capabilities.countersign({
-        t: "omo-sync/v1/recovery-countersign", account: ACCOUNT, custody_root,
-        predecessor: "", wraps_digest: v.prepared.body.wraps_digest,
-      })
-      const prepared = {
-        ...v.prepared,
-        body: { ...v.prepared.body, bootstrap: changed, custody_root, countersign },
-      }
-      const sign = mock(v.keyring.sign)
-      await expect(buildGenesis(ACCOUNT, { ...v.keyring, sign }, prepared)).rejects.toMatchObject({ reason })
-      expect(sign).toHaveBeenCalledTimes(0)
-    },
-  )
+  ] as const)("refuses prepared %s mismatch before device signing", async (mutation, reason) => {
+    const v = await vector()
+    const bootstrap = v.prepared.body.bootstrap
+    const first = bootstrap.first_device
+    const recovery = bootstrap.recovery_key
+    const changed = {
+      ...bootstrap,
+      ...(mutation === "account" ? { account: "another-account" } : {}),
+      ...(mutation === "nonce length" ? { custody_nonce: b64urlEncode(bytes(32, 5)) } : {}),
+      ...(mutation === "extra bootstrap" ? { extra: true } : {}),
+      first_device: {
+        ...first,
+        ...(mutation === "device id" ? { id: b64urlEncode(bytes(16, 99)) } : {}),
+        ...(mutation === "sealing key" ? { sealing_public_key: recovery.sealing_public_key } : {}),
+        ...(mutation === "signing key" ? { signing_public_key: recovery.signing_public_key } : {}),
+      },
+      recovery_key: {
+        ...recovery,
+        ...(mutation === "extra recovery" ? { extra: true } : {}),
+        ...(mutation === "non-NFC RP" ? { rp_id: "e\u0301.test" } : {}),
+      },
+    }
+    const custody_root = await taggedHash("omo-sync/v1/custody-root", changed)
+    const countersign = await v.capabilities.countersign({
+      t: "omo-sync/v1/recovery-countersign",
+      account: ACCOUNT,
+      custody_root,
+      predecessor: "",
+      wraps_digest: v.prepared.body.wraps_digest,
+    })
+    const prepared = {
+      ...v.prepared,
+      body: { ...v.prepared.body, bootstrap: changed, custody_root, countersign },
+    }
+    const sign = mock(v.keyring.sign)
+    await expect(buildGenesis(ACCOUNT, { ...v.keyring, sign }, prepared)).rejects.toMatchObject({ reason })
+    expect(sign).toHaveBeenCalledTimes(0)
+  })
 })

@@ -2,7 +2,12 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { basename, join } from "node:path"
 import { describe, expect, test } from "bun:test"
 
-import { createDefaultPostHogTransport, type TelemetryCaptureMessage, type TelemetryEnv, type TelemetryTransportFactory } from "@oh-my-opencode/telemetry-core"
+import {
+  createDefaultPostHogTransport,
+  type TelemetryCaptureMessage,
+  type TelemetryEnv,
+  type TelemetryTransportFactory,
+} from "@oh-my-opencode/telemetry-core"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createOmoNativeTelemetryComponent } from "./omo-native-component"
 import { summaryDir } from "./session-summary-storage"
@@ -25,7 +30,12 @@ function turnEnd(): Record<string, unknown> {
     type: "turn_end",
     turnIndex: 0,
     message: {
-      role: "assistant", content: [], provider: "openai", model: "gpt-5.6-sol", stopReason: "stop", timestamp: 1,
+      role: "assistant",
+      content: [],
+      provider: "openai",
+      model: "gpt-5.6-sol",
+      stopReason: "stop",
+      timestamp: 1,
       usage: { input: 1, output: 2, cacheRead: 0, cacheWrite: 0, totalTokens: 3, cost: { total: 0.0002 } },
     },
     toolResults: [],
@@ -38,7 +48,12 @@ type SessionVariant = {
   readonly configEnabled?: boolean
 }
 
-async function runSession(agentDir: string, factory: TelemetryTransportFactory, withTurn: boolean, variant: SessionVariant = {}): Promise<void> {
+async function runSession(
+  agentDir: string,
+  factory: TelemetryTransportFactory,
+  withTurn: boolean,
+  variant: SessionVariant = {},
+): Promise<void> {
   const pi = new FakeExtensionAPI()
   const sessionId = variant.sessionId ?? (withTurn ? "ack-session" : "later-session")
   const session = { cwd: "/repo", sessionManager: { getSessionId: () => sessionId } }
@@ -79,15 +94,25 @@ function writeLegacyQueue(agentDir: string): void {
   const dir = summaryDirOf(agentDir)
   mkdirSync(join(dir, "pending"), { recursive: true })
   const now = Date.now()
-  writeFileSync(join(dir, "pending", `${LEGACY_UUID}.json`), JSON.stringify({
-    v: 2, uuid: LEGACY_UUID, sessionHash: "hashed:off-session", owner: DEAD_OWNER, createdAt: now,
-    properties: { $session_id: "hashed:off-session", turns: 1, ended_by: "shutdown" },
-  }))
+  writeFileSync(
+    join(dir, "pending", `${LEGACY_UUID}.json`),
+    JSON.stringify({
+      v: 2,
+      uuid: LEGACY_UUID,
+      sessionHash: "hashed:off-session",
+      owner: DEAD_OWNER,
+      createdAt: now,
+      properties: { $session_id: "hashed:off-session", turns: 1, ended_by: "shutdown" },
+    }),
+  )
 }
 
 // Delivers only what was enqueued; `capture` enqueues asynchronously, after this test is over, the way
 // posthog-node prepares an event before queueing it. `captureImmediate` resolves once the event was sent.
-function createLateEnqueueTransport(): { readonly sent: TelemetryCaptureMessage[]; readonly factory: TelemetryTransportFactory } {
+function createLateEnqueueTransport(): {
+  readonly sent: TelemetryCaptureMessage[]
+  readonly factory: TelemetryTransportFactory
+} {
   const sent: TelemetryCaptureMessage[] = []
   const queue: TelemetryCaptureMessage[] = []
   const never = new Promise<void>(() => undefined)
@@ -108,7 +133,8 @@ function createLateEnqueueTransport(): { readonly sent: TelemetryCaptureMessage[
   }
 }
 
-const summariesOf = (messages: readonly TelemetryCaptureMessage[]) => messages.filter(({ event }) => event === "session_summary")
+const summariesOf = (messages: readonly TelemetryCaptureMessage[]) =>
+  messages.filter(({ event }) => event === "session_summary")
 
 describe("session_summary acknowledgment through the native transport", () => {
   test("#given an acknowledging transport #when the session quits #then the summary carries a uuid and no pending file is left", async () => {
@@ -132,7 +158,9 @@ describe("session_summary acknowledgment through the native transport", () => {
       expect(firstUuid).toBeString()
       expect(pendingOf(agentDir)).toEqual([`${firstUuid}.json`])
 
-      const pending: unknown = JSON.parse(readFileSync(join(summaryDirOf(agentDir), "pending", `${firstUuid}.json`), "utf8"))
+      const pending: unknown = JSON.parse(
+        readFileSync(join(summaryDirOf(agentDir), "pending", `${firstUuid}.json`), "utf8"),
+      )
       expect(pending).toMatchObject({ consent: "enabled" })
 
       const recorder = createTransportRecorder()
@@ -162,8 +190,10 @@ describe("session_summary acknowledgment through the native transport", () => {
 
 // The real PostHog transport against a fake HTTP server: only a 2xx answer retires the pending file.
 describe("session_summary delivery through the real PostHog transport", () => {
-  const realTransport = (host: string): TelemetryTransportFactory => (apiKey, options) =>
-    createDefaultPostHogTransport(apiKey, { ...options, host, fetchRetryCount: 0 })
+  const realTransport =
+    (host: string): TelemetryTransportFactory =>
+    (apiKey, options) =>
+      createDefaultPostHogTransport(apiKey, { ...options, host, fetchRetryCount: 0 })
 
   const withServer = async (status: number, run: (host: string) => Promise<void>): Promise<void> => {
     const server = Bun.serve({ port: 0, fetch: () => new Response("{}", { status }) })
@@ -205,19 +235,22 @@ describe("session_summary consent", () => {
     ["OMO_DISABLE_POSTHOG=1", { env: { OMO_DISABLE_POSTHOG: "1" } }],
     ["OMO_SENPI_SEND_ANONYMOUS_TELEMETRY=0", { env: { OMO_SENPI_SEND_ANONYMOUS_TELEMETRY: "0" } }],
     ["telemetry off in config", { configEnabled: false }],
-  ] as const)("#given an opted-out session (%s) and a later opted-in one #when both run #then nothing of the first is written or sent", async (_label, optOut) => {
-    await withTempAgentDir(async (agentDir) => {
-      const offMessages = createTransportRecorder()
-      await runSession(agentDir, offMessages.factory, true, { sessionId: "off-session", ...optOut })
-      expect(offMessages.messages).toEqual([])
-      expect(queuedFilesOf(agentDir)).toEqual([])
+  ] as const)(
+    "#given an opted-out session (%s) and a later opted-in one #when both run #then nothing of the first is written or sent",
+    async (_label, optOut) => {
+      await withTempAgentDir(async (agentDir) => {
+        const offMessages = createTransportRecorder()
+        await runSession(agentDir, offMessages.factory, true, { sessionId: "off-session", ...optOut })
+        expect(offMessages.messages).toEqual([])
+        expect(queuedFilesOf(agentDir)).toEqual([])
 
-      const recorder = createTransportRecorder()
-      await runSession(agentDir, recorder.factory, false)
-      expect(summariesOf(recorder.messages)).toEqual([])
-      expect(queuedFilesOf(agentDir)).toEqual([])
-    })
-  })
+        const recorder = createTransportRecorder()
+        await runSession(agentDir, recorder.factory, false)
+        expect(summariesOf(recorder.messages)).toEqual([])
+        expect(queuedFilesOf(agentDir)).toEqual([])
+      })
+    },
+  )
 
   test("#given a pending file written before consent marks existed #when an opted-in session starts #then it is purged unsent", async () => {
     await withTempAgentDir(async (agentDir) => {
@@ -250,14 +283,36 @@ function writeConsentedQueue(agentDir: string): string[] {
   const now = Date.now()
   const owner = { pid: process.pid, bootId: "consented-session-boot" }
   const uuid = "0395eae0-1111-4222-8333-944455556677"
-  writeFileSync(join(dir, "pending", `${uuid}.json`), JSON.stringify({
-    v: 2, consent: "enabled", scope: { cwd: "/repo" }, uuid, sessionHash: "hashed:consented", owner, createdAt: now,
-    properties: { $session_id: "hashed:consented", turns: 1, ended_by: "shutdown" },
-  }))
-  writeFileSync(join(dir, "hashed_consented.json"), JSON.stringify({
-    v: 2, consent: "enabled", scope: { cwd: "/repo" }, sessionHash: "hashed:consented", sessionRole: "root", owner,
-    heartbeatAt: now, epoch: "0123456789abcdef", seq: 1, sampleRate: 0.05, windowId: null, window: null,
-  }))
+  writeFileSync(
+    join(dir, "pending", `${uuid}.json`),
+    JSON.stringify({
+      v: 2,
+      consent: "enabled",
+      scope: { cwd: "/repo" },
+      uuid,
+      sessionHash: "hashed:consented",
+      owner,
+      createdAt: now,
+      properties: { $session_id: "hashed:consented", turns: 1, ended_by: "shutdown" },
+    }),
+  )
+  writeFileSync(
+    join(dir, "hashed_consented.json"),
+    JSON.stringify({
+      v: 2,
+      consent: "enabled",
+      scope: { cwd: "/repo" },
+      sessionHash: "hashed:consented",
+      sessionRole: "root",
+      owner,
+      heartbeatAt: now,
+      epoch: "0123456789abcdef",
+      seq: 1,
+      sampleRate: 0.05,
+      windowId: null,
+      window: null,
+    }),
+  )
   return queuedFilesOf(agentDir).sort()
 }
 
@@ -294,7 +349,12 @@ describe("a per-process opt-out leaves other sessions' queue alone", () => {
 // Review LOW (8c6b1a8959): the persisted setting is read the way every process reads it, from the real config
 // files, and never through this process's own profile selection.
 describe("the purge reads the persisted setting from the real config files", () => {
-  async function runRealConfigSession(agentDir: string, env: TelemetryEnv, cwd: string, accountHomeDir = agentDir): Promise<void> {
+  async function runRealConfigSession(
+    agentDir: string,
+    env: TelemetryEnv,
+    cwd: string,
+    accountHomeDir = agentDir,
+  ): Promise<void> {
     const pi = new FakeExtensionAPI()
     const session = { cwd, sessionManager: { getSessionId: () => "real-config-session" } }
     createOmoNativeTelemetryComponent({
@@ -314,10 +374,19 @@ describe("the purge reads the persisted setting from the real config files", () 
   function writeScopedPending(agentDir: string, uuid: string, cwd: string): void {
     const dir = join(summaryDirOf(agentDir), "pending")
     mkdirSync(dir, { recursive: true })
-    writeFileSync(join(dir, `${uuid}.json`), JSON.stringify({
-      v: 2, consent: "enabled", scope: { cwd }, uuid, sessionHash: `hashed:${uuid}`, owner: { pid: process.pid, bootId: "other-session" }, createdAt: Date.now(),
-      properties: { turns: 1 },
-    }))
+    writeFileSync(
+      join(dir, `${uuid}.json`),
+      JSON.stringify({
+        v: 2,
+        consent: "enabled",
+        scope: { cwd },
+        uuid,
+        sessionHash: `hashed:${uuid}`,
+        owner: { pid: process.pid, bootId: "other-session" },
+        createdAt: Date.now(),
+        properties: { turns: 1 },
+      }),
+    )
   }
 
   test("#given a project whose .omo/omo.json turns telemetry off #when any session quits #then that project's records go and another project's stay", async () => {
@@ -332,7 +401,9 @@ describe("the purge reads the persisted setting from the real config files", () 
 
       await runRealConfigSession(agentDir, { OMO_DISABLE_TELEMETRY: "1" }, onProject)
 
-      expect(queuedFilesOf(agentDir).map((name) => basename(name))).toEqual(["0395eae0-1111-4222-8333-944455556682.json"])
+      expect(queuedFilesOf(agentDir).map((name) => basename(name))).toEqual([
+        "0395eae0-1111-4222-8333-944455556682.json",
+      ])
     })
   })
 
@@ -341,12 +412,17 @@ describe("the purge reads the persisted setting from the real config files", () 
       const project = join(agentDir, "project")
       mkdirSync(join(agentDir, ".omo"), { recursive: true })
       mkdirSync(project, { recursive: true })
-      writeFileSync(join(agentDir, ".omo", "omo.jsonc"), JSON.stringify({ profiles: { quiet: { telemetry: { enabled: false } } } }))
+      writeFileSync(
+        join(agentDir, ".omo", "omo.jsonc"),
+        JSON.stringify({ profiles: { quiet: { telemetry: { enabled: false } } } }),
+      )
       writeScopedPending(agentDir, "0395eae0-1111-4222-8333-944455556683", project)
 
       await runRealConfigSession(agentDir, { OMO_PROFILE: "quiet" }, project)
 
-      expect(queuedFilesOf(agentDir).map((name) => basename(name))).toEqual(["0395eae0-1111-4222-8333-944455556683.json"])
+      expect(queuedFilesOf(agentDir).map((name) => basename(name))).toEqual([
+        "0395eae0-1111-4222-8333-944455556683.json",
+      ])
     })
   })
 
@@ -361,7 +437,9 @@ describe("the purge reads the persisted setting from the real config files", () 
 
       await runRealConfigSession(agentDir, { HOME: otherHome }, project, agentDir)
 
-      expect(queuedFilesOf(agentDir).map((name) => basename(name))).toEqual(["0395eae0-1111-4222-8333-944455556684.json"])
+      expect(queuedFilesOf(agentDir).map((name) => basename(name))).toEqual([
+        "0395eae0-1111-4222-8333-944455556684.json",
+      ])
     })
   })
 })

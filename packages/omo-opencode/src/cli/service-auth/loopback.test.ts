@@ -30,7 +30,9 @@ describe("loopback sign-in", () => {
     })
     const session = createSession({ api, store: secrets.store(api), home })
     await loginLoopback(session, {
-      accounts: "https://signin.omo.dev", name: "Test CLI", platform: "macos",
+      accounts: "https://signin.omo.dev",
+      name: "Test CLI",
+      platform: "macos",
       open: async (url) => {
         const authorize = new URL(url)
         expect(authorize.pathname).toBe("/")
@@ -61,10 +63,14 @@ describe("loopback sign-in", () => {
     expect(saved?.refreshToken).toBe(grant.refreshToken)
     expect(saved?.signingPrivateKey).toBeString()
     if (!saved) throw new Error("missing credentials")
-    const pub = createPublicKey(createPrivateKey({ key: Buffer.from(saved.signingPrivateKey, "base64"), format: "der", type: "pkcs8" }))
+    const pub = createPublicKey(
+      createPrivateKey({ key: Buffer.from(saved.signingPrivateKey, "base64"), format: "der", type: "pkcs8" }),
+    )
     expect(pub.asymmetricKeyType).toBe("ed25519")
     expect(pub.export({ format: "jwk" }).x).toBe(signingKey)
-    const sealing = createPublicKey(createPrivateKey({ key: Buffer.from(saved.sealingPrivateKey, "base64"), format: "der", type: "pkcs8" }))
+    const sealing = createPublicKey(
+      createPrivateKey({ key: Buffer.from(saved.sealingPrivateKey, "base64"), format: "der", type: "pkcs8" }),
+    )
     expect(sealing.asymmetricKeyType).toBe("x25519")
     expect(sealing.export({ format: "jwk" }).x).toBe(sealingKey)
     const files = await readdir(home, { recursive: true })
@@ -72,7 +78,7 @@ describe("loopback sign-in", () => {
       if (!file.endsWith(".lock")) continue
       expect(await readFile(join(home, file), "utf8")).not.toContain(grant.refreshToken)
     }
-    expect(files.filter(file => !file.startsWith(".omo"))).toEqual([])
+    expect(files.filter((file) => !file.startsWith(".omo"))).toEqual([])
   })
 
   test("device-limit recovery starts a new authorization instead of reusing a code", async () => {
@@ -80,18 +86,21 @@ describe("loopback sign-in", () => {
     const codes: string[] = []
     let opened = 0
     const { limitDetail, refusal } = await import("./test-support")
-    const api = fakeApi(async request => {
+    const api = fakeApi(async (request) => {
       const path = new URL(request.url).pathname
-      if (path === "/v1/devices") return Response.json({ devices: [{ id: "old", name: "Old CLI", revokedAt: null }], browsers: [] })
+      if (path === "/v1/devices")
+        return Response.json({ devices: [{ id: "old", name: "Old CLI", revokedAt: null }], browsers: [] })
       if (request.method === "DELETE") return new Response(null, { status: 204 })
       const body = await request.json()
       codes.push(body.code)
       return codes.length === 1 ? refusal("entitlement_required", limitDetail, 403) : Response.json(grant)
     })
     await loginLoopback(createSession({ api, store: secrets.store(api), home: await temporaryHome() }), {
-      accounts: "https://signin.omo.dev", name: "Test", platform: "linux",
+      accounts: "https://signin.omo.dev",
+      name: "Test",
+      platform: "linux",
       chooseDevice: async () => "old",
-      open: async url => {
+      open: async (url) => {
         const ask = new URL(url)
         const callback = new URL(ask.searchParams.get("redirect_uri") ?? "")
         callback.searchParams.set("state", ask.searchParams.get("state") ?? "")

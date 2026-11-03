@@ -23,27 +23,18 @@ describe("skill tool - short name resolution", () => {
   })
 
   it("does not resolve short name when ambiguous (multiple matches)", async () => {
-    const loadedSkills = [
-      createMockSkill("toolkit/debugging"),
-      createMockSkill("utils/debugging"),
-    ]
+    const loadedSkills = [createMockSkill("toolkit/debugging"), createMockSkill("utils/debugging")]
     const tool = createSkillTool({ skills: loadedSkills })
 
-    return expect(tool.execute({ name: "debugging" }, mockContext)).rejects.toThrow(
-      "not found"
-    )
+    return expect(tool.execute({ name: "debugging" }, mockContext)).rejects.toThrow("not found")
   })
 
   it("prefers exact match over short name match", async () => {
-    const loadedSkills = [
-      createMockSkill("debugging"),
-      createMockSkill("toolkit/debugging"),
-    ]
+    const loadedSkills = [createMockSkill("debugging"), createMockSkill("toolkit/debugging")]
     const tool = createSkillTool({ skills: loadedSkills })
 
     const result = await tool.execute({ name: "debugging" }, mockContext)
 
     expect(result).toContain(loadedSkills[0]!.definition.template)
-
   })
 })

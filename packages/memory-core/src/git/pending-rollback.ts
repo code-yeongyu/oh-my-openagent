@@ -25,8 +25,8 @@ export class PendingRollbackEditsKeptError extends Error {
   constructor(readonly paths: readonly string[]) {
     super(
       `An earlier memory write that failed behind a git lock was unstaged, but ${paths.join(", ")} ` +
-      "changed after that failure, so the current file contents were kept as they are. " +
-      "Commit or discard those edits, then retry the memory write.",
+        "changed after that failure, so the current file contents were kept as they are. " +
+        "Commit or discard those edits, then retry the memory write.",
     )
     this.name = "PendingRollbackEditsKeptError"
   }
@@ -45,7 +45,8 @@ function parsePending(raw: string): PendingRollback | null {
     const value: unknown = JSON.parse(raw)
     if (typeof value !== "object" || value === null) return null
     const { head, paths } = value as { head?: unknown; paths?: unknown }
-    if (typeof head !== "string" || !Array.isArray(paths) || !paths.every((path) => typeof path === "string")) return null
+    if (typeof head !== "string" || !Array.isArray(paths) || !paths.every((path) => typeof path === "string"))
+      return null
     return { head, paths }
   } catch {
     return null

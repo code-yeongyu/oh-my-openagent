@@ -9,12 +9,14 @@ for (const path of ["LRU eviction", "interrupted idle reclaim", "completion", "r
     let now = 1000
     const h = coldReviveHarness({ cap: 1, idleTimeoutMs: 37, now: () => now })
     const pending = ["Q1", "Q2"].map((message, index) => ({
-      id: `queued-${index}`, message, deliver_as: "steer" as const,
+      id: `queued-${index}`,
+      message,
+      deliver_as: "steer" as const,
     }))
     const events = spyOn(h.store, "appendEvent")
     try {
       expect((await h.send()).kind).toBe("revived")
-      h.store.mutate(h.record.task_id, record => ({ ...record, pending_steering: pending }))
+      h.store.mutate(h.record.task_id, (record) => ({ ...record, pending_steering: pending }))
       const terminal = h.manager.waitFor(h.record.task_id, { signal: AbortSignal.timeout(5000) })
       if (path === "interrupted idle reclaim") await h.manager.interruptTask(h.record.task_id)
       h.fake.settle({ status: "completed", finalResponse: "DONE" })
@@ -44,11 +46,16 @@ for (const path of ["LRU eviction", "interrupted idle reclaim", "completion", "r
 test("before TTL a parked queue's next revival delivers the entries in order", async () => {
   const h = coldReviveHarness({ ttlMs: 200, now: () => 1100 })
   const pending = ["Q1", "Q2"].map((message, index) => ({
-    id: `ttl-${index}`, message, deliver_as: "steer" as const,
+    id: `ttl-${index}`,
+    message,
+    deliver_as: "steer" as const,
   }))
   try {
-    h.store.mutate(h.record.task_id, record => ({
-      ...record, updated_at: new Date(1000).toISOString(), terminal_at: new Date(1000).toISOString(), pending_steering: pending,
+    h.store.mutate(h.record.task_id, (record) => ({
+      ...record,
+      updated_at: new Date(1000).toISOString(),
+      terminal_at: new Date(1000).toISOString(),
+      pending_steering: pending,
     }))
     const swept = await h.lifecycle.cleanupExpiredRecords()
     expect(swept.retained).toContain(h.record.task_id)

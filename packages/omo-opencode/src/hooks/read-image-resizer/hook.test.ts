@@ -12,10 +12,13 @@ import { createReadImageResizerHook } from "./hook"
 const mockParseImageDimensions = mock((): ImageDimensions | null => null)
 const mockCalculateTargetDimensions = mock((): ImageDimensions | null => null)
 const mockResizeImage = mock(async (): Promise<ResizeResult | null> => null)
-const mockGetSessionModel = mock((_sessionID: string) => ({
-  providerID: "anthropic",
-  modelID: "claude-sonnet-4-6",
-} as { providerID: string; modelID: string } | undefined))
+const mockGetSessionModel = mock(
+  (_sessionID: string) =>
+    ({
+      providerID: "anthropic",
+      modelID: "claude-sonnet-4-6",
+    }) as { providerID: string; modelID: string } | undefined,
+)
 
 let parseImageDimensionsSpy: { mockRestore: () => void } | undefined
 let calculateTargetDimensionsSpy: { mockRestore: () => void } | undefined
@@ -24,7 +27,9 @@ let getSessionModelSpy: { mockRestore: () => void } | undefined
 
 function setupHookSpies(): void {
   parseImageDimensionsSpy = spyOn(imageDimensions, "parseImageDimensions").mockImplementation(mockParseImageDimensions)
-  calculateTargetDimensionsSpy = spyOn(imageResizer, "calculateTargetDimensions").mockImplementation(mockCalculateTargetDimensions)
+  calculateTargetDimensionsSpy = spyOn(imageResizer, "calculateTargetDimensions").mockImplementation(
+    mockCalculateTargetDimensions,
+  )
   resizeImageSpy = spyOn(imageResizer, "resizeImage").mockImplementation(mockResizeImage)
   getSessionModelSpy = spyOn(sessionModelState, "getSessionModel").mockImplementation(mockGetSessionModel)
 }

@@ -21,10 +21,7 @@ class MockHttpClient {
   readonly getPrompt = mock(async () => ({ messages: [] }))
   readonly connect = mock(async (_transport: McpTransport) => {})
 
-  constructor(
-    _clientInfo: { name: string; version: string },
-    _options: { capabilities: Record<string, never> },
-  ) {
+  constructor(_clientInfo: { name: string; version: string }, _options: { capabilities: Record<string, never> }) {
     createdClients.push(this)
     configureNextClient?.(this)
   }

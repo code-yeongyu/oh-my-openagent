@@ -1,12 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
-import {
-  FakeRunner,
-  baseSpec,
-  cleanupProjects,
-  makeManager,
-  settings,
-} from "./__fixtures__/manager-fakes"
+import { FakeRunner, baseSpec, cleanupProjects, makeManager, settings } from "./__fixtures__/manager-fakes"
 
 afterEach(cleanupProjects)
 

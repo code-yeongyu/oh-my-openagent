@@ -9,9 +9,8 @@ import { log } from "../../shared/logger"
 export type { DelegateModelResolutionInput, DelegateModelResolutionResult }
 
 export function resolveModelForDelegateTask(input: DelegateModelResolutionInput): DelegateModelResolutionResult {
-  const connectedProviders = input.availableModels.size === 0
-    ? connectedProvidersCache.readConnectedProvidersCache()
-    : null
+  const connectedProviders =
+    input.availableModels.size === 0 ? connectedProvidersCache.readConnectedProvidersCache() : null
 
   return resolveModelForDelegateTaskCore(input, {
     connectedProviders,

@@ -7,7 +7,7 @@ afterEach(() => {
 })
 
 describe("manager background_mode persistence", () => {
-  test("#given a foreground task promoted to background #when promoteToBackground runs #then background_mode becomes \"promoted\" and notify_on_terminal stays true", async () => {
+  test('#given a foreground task promoted to background #when promoteToBackground runs #then background_mode becomes "promoted" and notify_on_terminal stays true', async () => {
     // given
     const { manager, store } = makeManager()
     const started = await manager.start(baseSpec({ run_in_background: false }))
@@ -23,7 +23,7 @@ describe("manager background_mode persistence", () => {
     expect(promoted?.notify_on_terminal).toBe(true)
   })
 
-  test("#given a background spawn #when promoteToBackground runs #then background_mode stays \"background\"", async () => {
+  test('#given a background spawn #when promoteToBackground runs #then background_mode stays "background"', async () => {
     // given
     const { manager, store } = makeManager()
     const started = await manager.start(baseSpec({ run_in_background: true }))

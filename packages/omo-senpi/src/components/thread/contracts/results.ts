@@ -18,7 +18,12 @@ export type ThreadSummary = {
   /** Present only on a thread listed from disk because its endpoint stopped answering. */
   readonly error_note?: string
   /** The endpoint serving the thread: a host (`rpc_host`, with the session's routing id) or a terminal (`tui`). */
-  readonly endpoint?: { readonly kind: "rpc_host" | "tui"; readonly socket: string; readonly routing_id: string | null; readonly durable_session_id: string } | null
+  readonly endpoint?: {
+    readonly kind: "rpc_host" | "tui"
+    readonly socket: string
+    readonly routing_id: string | null
+    readonly durable_session_id: string
+  } | null
   readonly surface?: "tui" | "desktop" | "child" | "daemon" | null
   /** `false` when the endpoint is not answering; the fields then come from the session file. */
   readonly alive?: boolean
@@ -63,8 +68,7 @@ export type ThreadTranscriptItem = {
 }
 
 export type ThreadCreateResult =
-  | { readonly kind: "ok"; readonly thread: ThreadResultSummary; readonly deduplicated: boolean }
-  | ThreadDataError
+  { readonly kind: "ok"; readonly thread: ThreadResultSummary; readonly deduplicated: boolean } | ThreadDataError
 
 export type ThreadListResult =
   | { readonly kind: "ok"; readonly threads: readonly ThreadResultSummary[]; readonly scope: "workspace" | "all" }
@@ -116,22 +120,31 @@ export type ThreadThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" 
 export type ThreadReasoningScope = "session" | "turn"
 
 export type ThreadRenameResult =
-  | { readonly kind: "ok"; readonly thread_id: string; readonly name: string }
-  | ThreadDataError
+  { readonly kind: "ok"; readonly thread_id: string; readonly name: string } | ThreadDataError
 
 export type ThreadSetModelResult =
-  | { readonly kind: "ok"; readonly thread_id: string; readonly model: { readonly provider: string; readonly id: string } }
+  | {
+      readonly kind: "ok"
+      readonly thread_id: string
+      readonly model: { readonly provider: string; readonly id: string }
+    }
   | ThreadDataError
 
 export type ThreadSetReasoningResult =
-  | { readonly kind: "ok"; readonly thread_id: string; readonly level: ThreadThinkingLevel; readonly scope: ThreadReasoningScope }
+  | {
+      readonly kind: "ok"
+      readonly thread_id: string
+      readonly level: ThreadThinkingLevel
+      readonly scope: ThreadReasoningScope
+    }
   | ThreadDataError
 
 export type ThreadBinding = BindingRecord
 
 export type ThreadOutboxRow = OutboxRow
 
-export type ThreadBindResult = { readonly kind: "ok"; readonly binding: ThreadBinding; readonly deduplicated: boolean } | ThreadDataError
+export type ThreadBindResult =
+  { readonly kind: "ok"; readonly binding: ThreadBinding; readonly deduplicated: boolean } | ThreadDataError
 
 export type ThreadUnbindResult =
   | {
@@ -155,7 +168,9 @@ export type ThreadRebindResult =
     }
   | ThreadDataError
 
-export type ThreadBindingsResult = { readonly kind: "ok"; readonly bindings: readonly ThreadBinding[]; readonly next_cursor: string | null } | ThreadDataError
+export type ThreadBindingsResult =
+  | { readonly kind: "ok"; readonly bindings: readonly ThreadBinding[]; readonly next_cursor: string | null }
+  | ThreadDataError
 
 export type ThreadReportResult =
   | {
@@ -183,9 +198,13 @@ export type ThreadOutboxResult =
     }
   | ThreadDataError
 
-export type ThreadOutboxAckResult = { readonly kind: "ok"; readonly binding_id: string; readonly acked_cursor: number; readonly changed: boolean } | ThreadDataError
+export type ThreadOutboxAckResult =
+  | { readonly kind: "ok"; readonly binding_id: string; readonly acked_cursor: number; readonly changed: boolean }
+  | ThreadDataError
 
-export type ThreadAnswerResult = { readonly kind: "ok"; readonly binding_id: string; readonly cursor: number; readonly session_durable_id: string } | ThreadDataError
+export type ThreadAnswerResult =
+  | { readonly kind: "ok"; readonly binding_id: string; readonly cursor: number; readonly session_durable_id: string }
+  | ThreadDataError
 
 export type ThreadToolResult =
   | ThreadBindResult

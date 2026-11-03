@@ -1,19 +1,13 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundManager } from "../../features/background-agent"
 
-import {
-  clearContinuationMarker,
-  setContinuationMarkerSource,
-} from "../../features/run-continuation-state"
+import { clearContinuationMarker, setContinuationMarkerSource } from "../../features/run-continuation-state"
 import { resolveSessionEventID } from "../../shared/event-session-id"
 import { log } from "../../shared/logger"
 
 const HOOK_NAME = "stop-continuation-guard"
 
-type StopContinuationBackgroundManager = Pick<
-  BackgroundManager,
-  "getAllDescendantTasks" | "cancelTask"
->
+type StopContinuationBackgroundManager = Pick<BackgroundManager, "getAllDescendantTasks" | "cancelTask">
 
 export interface StopContinuationGuard {
   event: (input: { event: { type: string; properties?: unknown } }) => Promise<void>
@@ -27,7 +21,7 @@ export function createStopContinuationGuardHook(
   ctx: PluginInput,
   options?: {
     backgroundManager?: StopContinuationBackgroundManager
-  }
+  },
 ): StopContinuationGuard {
   const stoppedSessions = new Set<string>()
 
@@ -57,7 +51,7 @@ export function createStopContinuationGuardHook(
           abortSession: task.status === "running",
           skipNotification: true,
         })
-      })
+      }),
     ).then((results) => {
       const cancelledCount = results.filter((result) => result.status === "fulfilled").length
       const failedCount = results.length - cancelledCount
@@ -79,11 +73,7 @@ export function createStopContinuationGuardHook(
     log(`[${HOOK_NAME}] Continuation guard cleared for session`, { sessionID })
   }
 
-  const event = async ({
-    event,
-  }: {
-    event: { type: string; properties?: unknown }
-  }): Promise<void> => {
+  const event = async ({ event }: { event: { type: string; properties?: unknown } }): Promise<void> => {
     const props = event.properties as Record<string, unknown> | undefined
 
     if (event.type === "session.deleted") {
@@ -96,11 +86,7 @@ export function createStopContinuationGuardHook(
     }
   }
 
-  const chatMessage = async ({
-    sessionID,
-  }: {
-    sessionID?: string
-  }): Promise<void> => {
+  const chatMessage = async ({ sessionID }: { sessionID?: string }): Promise<void> => {
     // Intentionally no-op: stop state should persist across user messages.
     // Previously this cleared the stop on any new user message, but that caused
     // /stop-continuation to be ineffective — the user's very next message

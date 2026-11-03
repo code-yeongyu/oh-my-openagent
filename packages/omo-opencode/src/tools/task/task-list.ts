@@ -47,9 +47,7 @@ Returns summary format: id, subject, status, owner, blockedBy (not full descript
 
       const taskMap = new Map(allTasks.map((t) => [t.id, t]))
 
-      const activeTasks = allTasks.filter(
-        (task) => task.status !== "completed" && task.status !== "deleted"
-      )
+      const activeTasks = allTasks.filter((task) => task.status !== "completed" && task.status !== "deleted")
 
       // Build summary with filtered blockedBy
       const summaries: TaskSummary[] = activeTasks.map((task) => {
@@ -67,10 +65,11 @@ Returns summary format: id, subject, status, owner, blockedBy (not full descript
         }
       })
 
-       return JSON.stringify({
-         tasks: summaries,
-         reminder: "1 task = 1 task. Maximize parallel execution by running independent tasks (tasks with empty blockedBy) concurrently."
-       })
+      return JSON.stringify({
+        tasks: summaries,
+        reminder:
+          "1 task = 1 task. Maximize parallel execution by running independent tasks (tasks with empty blockedBy) concurrently.",
+      })
     },
   })
 }

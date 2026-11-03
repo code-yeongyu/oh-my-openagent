@@ -2,19 +2,19 @@
 // bin/oh-my-opencode.js
 // Wrapper script that detects platform and spawns the correct binary
 
-import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
-import { createRequire } from "node:module";
-import { basename } from "node:path";
-import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process"
+import { existsSync, readFileSync } from "node:fs"
+import { createRequire } from "node:module"
+import { basename } from "node:path"
+import { fileURLToPath } from "node:url"
 import {
   getPlatformPackageCandidates,
   getBinaryPath,
   getPackageBareName,
   resolvePlatformPackageBaseName,
-} from "./platform.js";
+} from "./platform.js"
 
-const require = createRequire(import.meta.url);
+const require = createRequire(import.meta.url)
 
 /**
  * Detect libc family on Linux
@@ -22,49 +22,49 @@ const require = createRequire(import.meta.url);
  */
 function getLibcFamily() {
   if (process.platform !== "linux") {
-    return undefined; // Not needed on non-Linux
+    return undefined // Not needed on non-Linux
   }
-  
+
   try {
-    const detectLibc = require("detect-libc");
-    return detectLibc.familySync();
+    const detectLibc = require("detect-libc")
+    return detectLibc.familySync()
   } catch {
     // detect-libc not available
-    return null;
+    return null
   }
 }
 
 function supportsAvx2() {
   if (process.arch !== "x64") {
-    return null;
+    return null
   }
 
   if (process.env.OH_MY_OPENCODE_FORCE_BASELINE === "1") {
-    return false;
+    return false
   }
 
   if (process.platform === "linux") {
     try {
-      const cpuInfo = readFileSync("/proc/cpuinfo", "utf8").toLowerCase();
-      return cpuInfo.includes("avx2");
+      const cpuInfo = readFileSync("/proc/cpuinfo", "utf8").toLowerCase()
+      return cpuInfo.includes("avx2")
     } catch {
-      return null;
+      return null
     }
   }
 
   if (process.platform === "darwin") {
     const probe = spawnSync("sysctl", ["-n", "machdep.cpu.leaf7_features"], {
       encoding: "utf8",
-    });
+    })
 
     if (probe.error || probe.status !== 0) {
-      return null;
+      return null
     }
 
-    return probe.stdout.toUpperCase().includes("AVX2");
+    return probe.stdout.toUpperCase().includes("AVX2")
   }
 
-  return null;
+  return null
 }
 
 function getSignalExitCode(signal) {
@@ -73,48 +73,48 @@ function getSignalExitCode(signal) {
     SIGILL: 4,
     SIGKILL: 9,
     SIGTERM: 15,
-  };
+  }
 
-  return 128 + (signalCodeByName[signal] ?? 1);
+  return 128 + (signalCodeByName[signal] ?? 1)
 }
 
 function getPackageBaseName() {
-  return resolvePlatformPackageBaseName(getWrapperPackageName());
+  return resolvePlatformPackageBaseName(getWrapperPackageName())
 }
 
 function getWrapperPackageName() {
   try {
-    const packageJson = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
-    return packageJson.name || "oh-my-opencode";
+    const packageJson = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"))
+    return packageJson.name || "oh-my-opencode"
   } catch {
-    return "oh-my-opencode";
+    return "oh-my-opencode"
   }
 }
 
 function getWrapperPackageRoot() {
-  return fileURLToPath(new URL("..", import.meta.url));
+  return fileURLToPath(new URL("..", import.meta.url))
 }
 
 function readInstallerCommand(args) {
   for (let index = 0; index < args.length; index += 1) {
-    const arg = args[index];
+    const arg = args[index]
     if (arg === "--platform" || arg === "--repo-root") {
-      index += 1;
-      continue;
+      index += 1
+      continue
     }
-    if (arg.startsWith("-")) continue;
-    return arg;
+    if (arg.startsWith("-")) continue
+    return arg
   }
-  return undefined;
+  return undefined
 }
 
 function maybeRunLazyCodexNodeInstaller(invocationName) {
-  if (invocationName !== "lazycodex" && invocationName !== "lazycodex-ai") return false;
-  const command = readInstallerCommand(process.argv.slice(2));
-  if (command !== "update" && command !== "uninstall") return false;
+  if (invocationName !== "lazycodex" && invocationName !== "lazycodex-ai") return false
+  const command = readInstallerCommand(process.argv.slice(2))
+  if (command !== "update" && command !== "uninstall") return false
 
-  const installerPath = fileURLToPath(new URL("../packages/omo-codex/scripts/install-local.mjs", import.meta.url));
-  if (!existsSync(installerPath)) return false;
+  const installerPath = fileURLToPath(new URL("../packages/omo-codex/scripts/install-local.mjs", import.meta.url))
+  if (!existsSync(installerPath)) return false
 
   const result = spawnSync(process.execPath, [installerPath, ...process.argv.slice(2)], {
     stdio: "inherit",
@@ -123,11 +123,11 @@ function maybeRunLazyCodexNodeInstaller(invocationName) {
       OMO_INVOCATION_NAME: invocationName,
       OMO_WRAPPER_PACKAGE_ROOT: getWrapperPackageRoot(),
     },
-  });
+  })
   if (result.signal) {
-    process.exit(getSignalExitCode(result.signal));
+    process.exit(getSignalExitCode(result.signal))
   }
-  process.exit(result.status ?? 1);
+  process.exit(result.status ?? 1)
 }
 
 /**
@@ -138,30 +138,30 @@ function maybeRunLazyCodexNodeInstaller(invocationName) {
  */
 function getInvocationName(wrapperPackageName) {
   if (process.env.OMO_INVOCATION_NAME) {
-    return process.env.OMO_INVOCATION_NAME;
+    return process.env.OMO_INVOCATION_NAME
   }
-  const wrapperBareName = getPackageBareName(wrapperPackageName);
+  const wrapperBareName = getPackageBareName(wrapperPackageName)
   if (wrapperBareName === "lazycodex" || wrapperBareName === "lazycodex-ai") {
-    return wrapperBareName;
+    return wrapperBareName
   }
-  const argv1 = process.argv[1] ?? "";
+  const argv1 = process.argv[1] ?? ""
   if (!argv1) {
-    return "oh-my-opencode";
+    return "oh-my-opencode"
   }
-  return basename(argv1, ".js").replace(/\.exe$/, "");
+  return basename(argv1, ".js").replace(/\.exe$/, "")
 }
 
 function main() {
-  const { platform, arch } = process;
-  const libcFamily = getLibcFamily();
-  const wrapperPackageName = getWrapperPackageName();
-  const invocationName = getInvocationName(wrapperPackageName);
-  maybeRunLazyCodexNodeInstaller(invocationName);
+  const { platform, arch } = process
+  const libcFamily = getLibcFamily()
+  const wrapperPackageName = getWrapperPackageName()
+  const invocationName = getInvocationName(wrapperPackageName)
+  maybeRunLazyCodexNodeInstaller(invocationName)
 
-  const packageBaseName = resolvePlatformPackageBaseName(wrapperPackageName);
-  const avx2Supported = supportsAvx2();
-  
-  let packageCandidates;
+  const packageBaseName = resolvePlatformPackageBaseName(wrapperPackageName)
+  const avx2Supported = supportsAvx2()
+
+  let packageCandidates
   try {
     packageCandidates = getPlatformPackageCandidates({
       platform,
@@ -169,67 +169,67 @@ function main() {
       libcFamily,
       preferBaseline: avx2Supported === false,
       packageBaseName,
-    });
+    })
   } catch (error) {
-    console.error(`\noh-my-opencode: ${error.message}\n`);
-    process.exit(1);
+    console.error(`\noh-my-opencode: ${error.message}\n`)
+    process.exit(1)
   }
 
   const resolvedBinaries = packageCandidates
     .map((pkg) => {
       try {
-        return { pkg, binPath: require.resolve(getBinaryPath(pkg, platform)) };
+        return { pkg, binPath: require.resolve(getBinaryPath(pkg, platform)) }
       } catch {
-        return null;
+        return null
       }
     })
-    .filter((entry) => entry !== null);
+    .filter((entry) => entry !== null)
 
   if (resolvedBinaries.length === 0) {
-    console.error(`\noh-my-opencode: Platform binary not installed.`);
-    console.error(`\nYour platform: ${platform}-${arch}${libcFamily === "musl" ? "-musl" : ""}`);
-    console.error(`Expected packages (in order): ${packageCandidates.join(", ")}`);
-    console.error(`\nTo fix, run:`);
-    console.error(`  npm install ${packageCandidates[0]}\n`);
-    process.exit(1);
+    console.error(`\noh-my-opencode: Platform binary not installed.`)
+    console.error(`\nYour platform: ${platform}-${arch}${libcFamily === "musl" ? "-musl" : ""}`)
+    console.error(`Expected packages (in order): ${packageCandidates.join(", ")}`)
+    console.error(`\nTo fix, run:`)
+    console.error(`  npm install ${packageCandidates[0]}\n`)
+    process.exit(1)
   }
 
   const childEnv = {
     ...process.env,
     OMO_INVOCATION_NAME: invocationName,
     OMO_WRAPPER_PACKAGE_ROOT: getWrapperPackageRoot(),
-  };
+  }
 
   for (let index = 0; index < resolvedBinaries.length; index += 1) {
-    const currentBinary = resolvedBinaries[index];
-    const hasFallback = index < resolvedBinaries.length - 1;
+    const currentBinary = resolvedBinaries[index]
+    const hasFallback = index < resolvedBinaries.length - 1
     const result = spawnSync(process.execPath, [currentBinary.binPath, ...process.argv.slice(2)], {
       stdio: "inherit",
       env: childEnv,
-    });
+    })
 
     if (result.error) {
       if (hasFallback) {
-        continue;
+        continue
       }
 
-      console.error(`\noh-my-opencode: Failed to execute binary.`);
-      console.error(`Error: ${result.error.message}\n`);
-      process.exit(2);
+      console.error(`\noh-my-opencode: Failed to execute binary.`)
+      console.error(`Error: ${result.error.message}\n`)
+      process.exit(2)
     }
 
     if (result.signal === "SIGILL" && hasFallback) {
-      continue;
+      continue
     }
 
     if (result.signal) {
-      process.exit(getSignalExitCode(result.signal));
+      process.exit(getSignalExitCode(result.signal))
     }
 
-    process.exit(result.status ?? 1);
+    process.exit(result.status ?? 1)
   }
 
-  process.exit(1);
+  process.exit(1)
 }
 
-main();
+main()

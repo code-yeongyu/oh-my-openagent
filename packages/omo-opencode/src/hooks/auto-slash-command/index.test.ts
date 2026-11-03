@@ -210,9 +210,7 @@ describe("createAutoSlashCommandHook", () => {
       const hook = createAutoSlashCommandHook()
       const sessionID = `test-session-existing-${Date.now()}`
       const input = createMockInput(sessionID)
-      const output = createMockOutput(
-        "<auto-slash-command>/commit</auto-slash-command>"
-      )
+      const output = createMockOutput("<auto-slash-command>/commit</auto-slash-command>")
       const originalText = output.parts[0].text
 
       // when hook is called
@@ -416,7 +414,8 @@ describe("createAutoSlashCommandHook", () => {
       //#given - parts already have tags (as if chat.message hook already ran)
       const hook = createAutoSlashCommandHook()
       const input = createCommandInput("goal")
-      const alreadyTagged = "<auto-slash-command>\n/goal Command\n## Command Instructions\ntemplate content\n</auto-slash-command>"
+      const alreadyTagged =
+        "<auto-slash-command>\n/goal Command\n## Command Instructions\ntemplate content\n</auto-slash-command>"
       const output: CommandExecuteBeforeOutput = {
         parts: [{ type: "text", text: alreadyTagged }],
       }
@@ -430,7 +429,6 @@ describe("createAutoSlashCommandHook", () => {
       const tagCount = (output.parts[0].text?.split("<auto-slash-command>").length ?? 1) - 1
       expect(tagCount).toBe(1)
     })
-
   })
   describe("skills as slash commands", () => {
     function createTestSkill(name: string, template: string): LoadedSkill {

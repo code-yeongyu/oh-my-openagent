@@ -12,7 +12,9 @@ function fixture() {
   const account: DesktopSyncAccount = {
     kind: "desktop",
     descriptor: {
-      genesis: "supported", rpId: "recovery.example.test", userName: "desktop-account",
+      genesis: "supported",
+      rpId: "recovery.example.test",
+      userName: "desktop-account",
       serviceOrigin: "https://api.example.test",
       accountId: "desktop-account",
       serviceDeviceId: "service-device",
@@ -22,12 +24,16 @@ function fixture() {
       incarnation: "incarnation-1",
     },
     signal: lifetime.signal,
-    boundary: async dispatch => dispatch(),
+    boundary: async (dispatch) => dispatch(),
     keyring: {
       principal: () => principal,
       publicKeys: () => publicKeys,
-      sign: async () => { throw new Error("unexpected signature") },
-      unseal: async () => { throw new Error("unexpected unseal") },
+      sign: async () => {
+        throw new Error("unexpected signature")
+      },
+      unseal: async () => {
+        throw new Error("unexpected unseal")
+      },
     },
     chain: {
       listKeys: async () => [],
@@ -39,11 +45,17 @@ function fixture() {
       recoveryJoin: async () => ({ ok: false, reason: "refused" }),
     },
     pairing: {
-      openPending: async () => { throw new Error("unexpected pairing") },
+      openPending: async () => {
+        throw new Error("unexpected pairing")
+      },
       readPending: async () => null,
       listPending: async () => [],
-      answerPending: async () => { throw new Error("unexpected pairing") },
-      revealPending: async () => { throw new Error("unexpected pairing") },
+      answerPending: async () => {
+        throw new Error("unexpected pairing")
+      },
+      revealPending: async () => {
+        throw new Error("unexpected pairing")
+      },
       setAccountSync: async () => undefined,
       setDeviceSync: async () => undefined,
     },
@@ -57,7 +69,9 @@ function fixture() {
     },
     devices: async () => [],
     isCurrent: async () => !lifetime.signal.aborted,
-    forOperation: async () => { throw new Error("unexpected ceremony") },
+    forOperation: async () => {
+      throw new Error("unexpected ceremony")
+    },
   }
   const calls: AccountSessionOptions[] = []
   let factoryCalls = 0
@@ -82,15 +96,16 @@ function fixture() {
       return { ok: true, session }
     },
   }
-  const resolve = (loadRuntime = async () => runtime) => createDeviceSessionResolver({
-    source: async () => account,
-    pinDir: "/unused-pins",
-    loadRuntime,
-  })({
-    identity: "fixture",
-    paths: buildIdentityPaths("/unused-memory", "fixture"),
-    space: { profile: "personal", projectDir: "/unused-project" },
-  })
+  const resolve = (loadRuntime = async () => runtime) =>
+    createDeviceSessionResolver({
+      source: async () => account,
+      pinDir: "/unused-pins",
+      loadRuntime,
+    })({
+      identity: "fixture",
+      paths: buildIdentityPaths("/unused-memory", "fixture"),
+      space: { profile: "personal", projectDir: "/unused-project" },
+    })
   return { account, lifetime, runtime, calls, resolve, factoryCalls: () => factoryCalls }
 }
 
@@ -132,7 +147,9 @@ describe("desktop account session ports", () => {
     const opened = await world.resolve()
     if (opened === null || "idle" in opened) throw new Error("expected open session")
     let ended = 0
-    opened.onEnded?.(() => { ended++ })
+    opened.onEnded?.(() => {
+      ended++
+    })
     world.lifetime.abort()
     expect(ended).toBe(1)
   })

@@ -18,11 +18,12 @@ type ClaudeCodeAgentRecord = Record<
 const logMock = mock((..._args: unknown[]) => {})
 const readConnectedProvidersCacheMock = mock(() => null as string[] | null)
 const readProviderModelsCacheMock = mock(
-  () => null as {
-    models: Record<string, string[]>
-    connected: string[]
-    updatedAt: string
-  } | null,
+  () =>
+    null as {
+      models: Record<string, string[]>
+      connected: string[]
+      updatedAt: string
+    } | null,
 )
 const loadUserAgentsMock = mock((): ClaudeCodeAgentRecord => ({}))
 const loadProjectAgentsMock = mock((_directory?: string): ClaudeCodeAgentRecord => ({}))
@@ -45,7 +46,7 @@ function createBaseArgs(overrides?: Partial<DelegateTaskArgs>): DelegateTaskArgs
 function createExecutorContext(overrides?: Partial<ExecutorContext>): ExecutorContext {
   const client = {
     app: {
-      agents: async () => ([{ name: "oracle", mode: "subagent" }]),
+      agents: async () => [{ name: "oracle", mode: "subagent" }],
     },
   } as ExecutorContext["client"]
 

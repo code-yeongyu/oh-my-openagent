@@ -123,7 +123,8 @@ async function resolveMode(deps: HostExecutionModeDeps): Promise<ExecutionMode> 
     processRunner: deps.settings.process_runner,
     capabilities: await sessionHostCapabilities(deps, resolution),
   })
-  if (mode === "in-process") deps.notices.add(unavailableNotice("capability", "the daemon does not advertise generation_handoff"))
+  if (mode === "in-process")
+    deps.notices.add(unavailableNotice("capability", "the daemon does not advertise generation_handoff"))
   return mode
 }
 
@@ -237,5 +238,12 @@ export function createEngineHostRuntime(
     insideHost: routing.insideHost,
     onNotice: routing.onNotice,
   })
-  return { agentDir, notices, executionModeGate: gate, routing, hostEndpoint, shardSocket: () => routing.shardResolver().socket }
+  return {
+    agentDir,
+    notices,
+    executionModeGate: gate,
+    routing,
+    hostEndpoint,
+    shardSocket: () => routing.shardResolver().socket,
+  }
 }

@@ -4,7 +4,12 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { readRecords } from "./task-rpc-e2e-helpers.mjs"
-import { killSenpiHost, prepareScenarioSandbox, waitForProcessCompletion, waitForRunningRpcChild } from "./task-rpc-e2e-scenarios.mjs"
+import {
+  killSenpiHost,
+  prepareScenarioSandbox,
+  waitForProcessCompletion,
+  waitForRunningRpcChild,
+} from "./task-rpc-e2e-scenarios.mjs"
 
 test("the PID-based RPC scenario selects the child-process runner on every platform", () => {
   const { sandbox } = prepareScenarioSandbox()

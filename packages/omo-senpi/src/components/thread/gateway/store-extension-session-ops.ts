@@ -33,7 +33,9 @@ export type SessionCallReply = {
   readonly await?: { readonly timeout_ms: number; readonly wake_dir: string }
 }
 
-const refused = (code: StoreExtensionRefusal["code"], message: string): SessionCallReply => ({ result: { kind: "refused", code, message } })
+const refused = (code: StoreExtensionRefusal["code"], message: string): SessionCallReply => ({
+  result: { kind: "refused", code, message },
+})
 
 /** The wake hint after a committed call: a temp file in the same dir renamed over it. The connector creates the dir; this never does. */
 function touchWake(agentDir: string, wakeDir: string, wake: string): void {
@@ -48,30 +50,54 @@ function touchWake(agentDir: string, wakeDir: string, wake: string): void {
 }
 
 function createdBy(ctx: StoreContext, creator: string, created: string): boolean {
-  return ctx.sql.one(["n"], "SELECT 1 AS n FROM thread_creations WHERE creator_durable_id = ? AND created_durable_id = ?", [creator, created]) !== undefined
+  return (
+    ctx.sql.one(["n"], "SELECT 1 AS n FROM thread_creations WHERE creator_durable_id = ? AND created_durable_id = ?", [
+      creator,
+      created,
+    ]) !== undefined
+  )
 }
 
-export async function recordThreadCreation(ctx: StoreContext, request: { readonly now: number; readonly creator_durable_id: string; readonly created_durable_id: string }): Promise<void> {
+export async function recordThreadCreation(
+  ctx: StoreContext,
+  request: { readonly now: number; readonly creator_durable_id: string; readonly created_durable_id: string },
+): Promise<void> {
   await transaction(ctx, "record_thread_creation", () => {
-    ctx.sql.run("INSERT OR IGNORE INTO thread_creations (creator_durable_id, created_durable_id, created_at) VALUES (?, ?, ?)", [request.creator_durable_id, request.created_durable_id, request.now])
+    ctx.sql.run(
+      "INSERT OR IGNORE INTO thread_creations (creator_durable_id, created_durable_id, created_at) VALUES (?, ?, ?)",
+      [request.creator_durable_id, request.created_durable_id, request.now],
+    )
   })
 }
 
-export async function sessionCall(ctx: StoreContext, extensions: StoreExtensions, request: SessionCallRequest): Promise<SessionCallReply> {
+export async function sessionCall(
+  ctx: StoreContext,
+  extensions: StoreExtensions,
+  request: SessionCallRequest,
+): Promise<SessionCallReply> {
   const { name, caller, phase } = request
   if (typeof caller !== "string" || caller.length === 0 || caller === UNKNOWN_CALLER) {
-    return refused("caller_context_missing", "A session-callable op needs the calling session's engine-resolved durable id.")
+    return refused(
+      "caller_context_missing",
+      "A session-callable op needs the calling session's engine-resolved durable id.",
+    )
   }
   const loaded = await extensions.load(name)
   if ("kind" in loaded) return { result: loaded }
   const { descriptor } = loaded
   const entry = descriptor.sessionCallable?.find((candidate) => candidate.op === request.op)
-  if (entry === undefined) return refused("extension_unknown_op", `Extension ${name} declares no session-callable op ${request.op}.`)
+  if (entry === undefined)
+    return refused("extension_unknown_op", `Extension ${name} declares no session-callable op ${request.op}.`)
   const args = request.args
-  if (typeof args !== "object" || args === null || Array.isArray(args)) return refused("invalid_arguments", "Session op arguments must be an object.")
+  if (typeof args !== "object" || args === null || Array.isArray(args))
+    return refused("invalid_arguments", "Session op arguments must be an object.")
   // A caller field in args is a forgery attempt whatever its value: refused before validation.
   const forged = RESERVED_CALLER_KEYS.find((key) => Object.hasOwn(args, key))
-  if (forged !== undefined) return refused("invalid_arguments", `${forged} is stamped by the store from the engine's caller and cannot be passed.`)
+  if (forged !== undefined)
+    return refused(
+      "invalid_arguments",
+      `${forged} is stamped by the store from the engine's caller and cannot be passed.`,
+    )
   let op = entry.op
   const awaited = isToolSessionOp(entry) ? entry.await : undefined
   if (phase === "op") {
@@ -80,13 +106,18 @@ export async function sessionCall(ctx: StoreContext, extensions: StoreExtensions
       failure = argumentFailure(entry.parameters, args)
     } catch (error) {
       // A schema that only breaks once a value reaches the bad part (an invalid pattern).
-      return refused("invalid_arguments", `${name}.${entry.op} declares parameters that cannot be checked: ${error instanceof Error ? error.message : String(error)}`)
+      return refused(
+        "invalid_arguments",
+        `${name}.${entry.op} declares parameters that cannot be checked: ${error instanceof Error ? error.message : String(error)}`,
+      )
     }
-    if (failure !== undefined) return refused("invalid_arguments", `Parameter validation failed at ${failure.path || "/"}: ${failure.message}`)
+    if (failure !== undefined)
+      return refused("invalid_arguments", `Parameter validation failed at ${failure.path || "/"}: ${failure.message}`)
   } else if (phase === "status" || phase === "expire") {
     const id = (args as { readonly await_request_id?: unknown }).await_request_id
     if (awaited === undefined) return refused("extension_unknown_op", `${name}.${entry.op} declares no await.`)
-    if (typeof id !== "string" || !AWAIT_REQUEST_ID.test(id)) return refused("invalid_arguments", `await_request_id must match ${AWAIT_REQUEST_ID.source}.`)
+    if (typeof id !== "string" || !AWAIT_REQUEST_ID.test(id))
+      return refused("invalid_arguments", `await_request_id must match ${AWAIT_REQUEST_ID.source}.`)
     op = phase === "status" ? awaited.statusOp : awaited.expireOp
   } else {
     return refused("invalid_arguments", `Unknown session call phase ${String(phase)}.`)
@@ -95,11 +126,21 @@ export async function sessionCall(ctx: StoreContext, extensions: StoreExtensions
   const stamped = () => ({
     ...(phase === "op" ? args : { await_request_id: (args as { readonly await_request_id: string }).await_request_id }),
     caller_session_durable_id: caller,
-    ...(phase === "op" && typeof target === "string" && createdBy(ctx, caller, target) ? { caller_created_target: true } : {}),
+    ...(phase === "op" && typeof target === "string" && createdBy(ctx, caller, target)
+      ? { caller_created_target: true }
+      : {}),
   })
   const { wakeDir } = descriptor
   const wake = isToolSessionOp(entry) ? entry.wake : undefined
-  const effects = phase === "op" && wake !== undefined && wakeDir !== undefined ? [() => touchWake(ctx.config.agent_dir, wakeDir, wake)] : []
-  const result = await extensions.run({ name, descriptor, module: loaded.module, op, args: stamped, effects }, request.now)
-  return phase === "op" && awaited !== undefined && wakeDir !== undefined ? { result, await: { timeout_ms: awaited.timeoutMs, wake_dir: wakeDir } } : { result }
+  const effects =
+    phase === "op" && wake !== undefined && wakeDir !== undefined
+      ? [() => touchWake(ctx.config.agent_dir, wakeDir, wake)]
+      : []
+  const result = await extensions.run(
+    { name, descriptor, module: loaded.module, op, args: stamped, effects },
+    request.now,
+  )
+  return phase === "op" && awaited !== undefined && wakeDir !== undefined
+    ? { result, await: { timeout_ms: awaited.timeoutMs, wake_dir: wakeDir } }
+    : { result }
 }

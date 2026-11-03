@@ -14,13 +14,25 @@ describe("daemon child extension-event delivery", () => {
     const client = harness.hostClient(host)
     const opened = await client.open(childOpenInput("/tmp/permission-child.jsonl"))
     const handle = createHostSessionHandle({
-      client, session: { routingId: opened.sessionId, sessionPath: "/tmp/permission-child.jsonl", instanceId: opened.instanceId },
-      taskId: "st_permission", heartbeatIntervalMs: 60_000, now: Date.now, closeGraceMs: 100,
+      client,
+      session: {
+        routingId: opened.sessionId,
+        sessionPath: "/tmp/permission-child.jsonl",
+        instanceId: opened.instanceId,
+      },
+      taskId: "st_permission",
+      heartbeatIntervalMs: 60_000,
+      now: Date.now,
+      closeGraceMs: 100,
       openDisposition: "reopened",
     })
     const agentEvents: AgentSessionEvent[] = []
     handle.subscribe((event) => agentEvents.push(event))
-    const event: ChildExtensionEvent = { type: "computer.permission_required", permission: "accessibility", app: "Test App" }
+    const event: ChildExtensionEvent = {
+      type: "computer.permission_required",
+      permission: "accessibility",
+      app: "Test App",
+    }
     try {
       // when: delivery precedes manager ownership, as it can during the initial prompt.
       host.emitRecord(opened.sessionId, { type: "extension_event", name: event.type, data: event })
@@ -49,7 +61,10 @@ describe("daemon child extension-event delivery", () => {
       host.emitRecord(opened.sessionId, { type: "extension_event", name: "computer.permission_required", data })
     }
     host.emitRecord(opened.sessionId, {
-      type: "extension_event", sessionId: "another-child", name: "computer.permission_required", data: valid,
+      type: "extension_event",
+      sessionId: "another-child",
+      name: "computer.permission_required",
+      data: valid,
     })
     await client.getState()
     // then

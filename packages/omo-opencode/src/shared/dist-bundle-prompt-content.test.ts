@@ -53,9 +53,12 @@ describe("dist bundle prompt content", () => {
     await Promise.all([
       Bun.write(join(homeDirectory, ".keep"), ""),
       Bun.write(join(projectDirectory, ".keep"), ""),
-      Bun.write(join(projectDirectory, ".omo", "omo.jsonc"), JSON.stringify({
-        agents: { prometheus: { model: CONFIGURED_MODEL } },
-      })),
+      Bun.write(
+        join(projectDirectory, ".omo", "omo.jsonc"),
+        JSON.stringify({
+          agents: { prometheus: { model: CONFIGURED_MODEL } },
+        }),
+      ),
     ])
 
     try {
@@ -97,13 +100,16 @@ describe("dist bundle prompt content", () => {
       if (!runtimeAgent) throw new Error("Missing bundled Prometheus agent")
       expect(runtimeAgent.model).toBe(CONFIGURED_MODEL)
       expect(runtimeAgent.prompt.split("\n")[0]).toMatch(/^<omo-model-core ref="[0-9a-f]{16}">$/)
-      const snippets = Object.fromEntries(Object.entries(toolSnippets).map(([name, description]) => [name, toolPromptSnippet(description)]))
+      const snippets = Object.fromEntries(
+        Object.entries(toolSnippets).map(([name, description]) => [name, toolPromptSnippet(description)]),
+      )
       const rules: NonNullable<NativePromptContext["toolPermissions"]> = []
       for (const [pattern, permission] of Object.entries((runtimeAgent.permission ?? {}) as Record<string, unknown>)) {
         if (permission === "allow" || permission === "ask" || permission === "deny") rules.push({ pattern, permission })
         else if (typeof permission === "object" && permission !== null) {
           for (const [scope, action] of Object.entries(permission)) {
-            if (action === "allow" || action === "ask" || action === "deny") rules.push({ pattern, permission: action, scope })
+            if (action === "allow" || action === "ask" || action === "deny")
+              rules.push({ pattern, permission: action, scope })
           }
         }
       }

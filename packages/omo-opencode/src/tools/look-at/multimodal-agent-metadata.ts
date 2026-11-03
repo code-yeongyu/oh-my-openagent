@@ -36,8 +36,8 @@ function isVisionCapableAgentModel(
     return false
   }
 
-  return visionCapableModels.some((visionCapableModel) =>
-    getFullModelKey(visionCapableModel) === getFullModelKey(agentModel),
+  return visionCapableModels.some(
+    (visionCapableModel) => getFullModelKey(visionCapableModel) === getFullModelKey(agentModel),
   )
 }
 
@@ -57,24 +57,18 @@ function toAgentInfo(value: unknown): AgentInfo | null {
   const variant = typeof value["variant"] === "string" ? value["variant"] : undefined
   const modelValue = value["model"]
   const model =
-    isObject(modelValue) &&
-    typeof modelValue["providerID"] === "string" &&
-    typeof modelValue["modelID"] === "string"
+    isObject(modelValue) && typeof modelValue["providerID"] === "string" && typeof modelValue["modelID"] === "string"
       ? { providerID: modelValue["providerID"], modelID: modelValue["modelID"] }
       : undefined
   return { name, model, variant }
 }
 
-async function resolveRegisteredAgentMetadata(
-  ctx: PluginInput,
-): Promise<ResolvedAgentMetadata> {
+async function resolveRegisteredAgentMetadata(ctx: PluginInput): Promise<ResolvedAgentMetadata> {
   const agentsResult = await ctx.client.app?.agents?.()
   const agentsRaw = isObject(agentsResult) ? agentsResult["data"] : undefined
   const agents = Array.isArray(agentsRaw) ? agentsRaw.map(toAgentInfo).filter(Boolean) : []
 
-  const matched = agents.find(
-    (agent) => agent?.name?.toLowerCase() === MULTIMODAL_LOOKER_AGENT.toLowerCase()
-  )
+  const matched = agents.find((agent) => agent?.name?.toLowerCase() === MULTIMODAL_LOOKER_AGENT.toLowerCase())
 
   return {
     agentModel: matched?.model,
@@ -124,9 +118,7 @@ function isConfiguredVisionModel(
   return getFullModelKey(configuredModel) === getFullModelKey(dynamicModel)
 }
 
-export async function resolveMultimodalLookerAgentMetadata(
-  ctx: PluginInput
-): Promise<ResolvedAgentMetadata> {
+export async function resolveMultimodalLookerAgentMetadata(ctx: PluginInput): Promise<ResolvedAgentMetadata> {
   try {
     const registeredMetadata = await resolveRegisteredAgentMetadata(ctx)
     const visionCapableModels = readVisionCapableModelsCache()

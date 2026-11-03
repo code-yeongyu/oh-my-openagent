@@ -106,9 +106,20 @@ async function screenEntries(
       }
     }
     // Rename detection is off here on purpose: `git mv system/agreements.md elsewhere` must read as a deletion.
-    const ledger = await git(exec, dir, ["diff", "--no-renames", "--name-only", "-z", `${recordedBase}..${tipSha}`, "--", AGREEMENTS_PATH])
+    const ledger = await git(exec, dir, [
+      "diff",
+      "--no-renames",
+      "--name-only",
+      "-z",
+      `${recordedBase}..${tipSha}`,
+      "--",
+      AGREEMENTS_PATH,
+    ])
     if (ledger.stdout.split("\0").some(Boolean)) {
-      return { status: "failed", detail: `Reflection may not modify ${AGREEMENTS_PATH}; agreements change only through the facts lane and /agreements` }
+      return {
+        status: "failed",
+        detail: `Reflection may not modify ${AGREEMENTS_PATH}; agreements change only through the facts lane and /agreements`,
+      }
     }
     const secrets = await findSecretLikeFailures((argv, stdin) => run(exec, dir, argv, stdin), recordedBase, tipSha)
     const frontmatter = await findFrontmatterFailures(exec, dir, recordedBase, tipSha, changedPaths)
@@ -117,12 +128,16 @@ async function screenEntries(
     }
     if (secrets.length === 0 && frontmatter.size === 0) {
       if (dropped.size === 0) {
-        for (const entry of await readDroppedTrailers(exec, dir, recordedBase, tipSha)) dropped.set(entry.path, entry.reason)
+        for (const entry of await readDroppedTrailers(exec, dir, recordedBase, tipSha))
+          dropped.set(entry.path, entry.reason)
       }
       return { status: "valid", tipSha, changedPaths, ...droppedList() }
     }
     if (round >= MAX_REPAIR_ROUNDS) {
-      return { status: "failed", detail: secrets[0]?.detail ?? [...frontmatter.values()][0] ?? "completion validation failed" }
+      return {
+        status: "failed",
+        detail: secrets[0]?.detail ?? [...frontmatter.values()][0] ?? "completion validation failed",
+      }
     }
     // A secret in an earlier commit may be gone from the tip, so a multi-commit branch is first
     // squashed with only the tip-level frontmatter failures removed; the squashed commit is then

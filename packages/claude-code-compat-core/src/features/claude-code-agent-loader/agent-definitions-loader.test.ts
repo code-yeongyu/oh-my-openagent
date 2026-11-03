@@ -143,7 +143,7 @@ name: md-agent
 ---
 
 Markdown agent prompt.`,
-        "utf-8"
+        "utf-8",
       )
 
       writeFileSync(
@@ -152,7 +152,7 @@ Markdown agent prompt.`,
           name: "json-agent",
           prompt: "JSON agent prompt.",
         }),
-        "utf-8"
+        "utf-8",
       )
 
       const result = loadAgentDefinitions([mdPath, jsonPath], "definition-file")
@@ -175,7 +175,7 @@ name: valid-agent
 ---
 
 Valid prompt.`,
-        "utf-8"
+        "utf-8",
       )
 
       const result = loadAgentDefinitions([validPath, missingPath], "definition-file")
@@ -194,7 +194,7 @@ Valid prompt.`,
           name: "valid-agent",
           prompt: "Valid prompt.",
         }),
-        "utf-8"
+        "utf-8",
       )
 
       writeFileSync(malformedPath, "{ invalid json", "utf-8")
@@ -217,7 +217,7 @@ description: First version
 ---
 
 First prompt.`,
-        "utf-8"
+        "utf-8",
       )
 
       writeFileSync(
@@ -228,7 +228,7 @@ description: Second version
 ---
 
 Second prompt.`,
-        "utf-8"
+        "utf-8",
       )
 
       const result = loadAgentDefinitions([path1, path2], "definition-file")
@@ -254,7 +254,7 @@ name: absolute-agent
 ---
 
 Absolute path prompt.`,
-        "utf-8"
+        "utf-8",
       )
 
       const result = loadAgentDefinitions([absolutePath], "definition-file")
@@ -274,7 +274,7 @@ name: valid-agent
 ---
 
 Valid prompt.`,
-        "utf-8"
+        "utf-8",
       )
 
       writeFileSync(unsupportedPath, "Some text file content.", "utf-8")
@@ -296,7 +296,7 @@ Valid prompt.`,
   "description": "JSONC agent", // inline comment
   "prompt": "JSONC prompt."
 }`,
-        "utf-8"
+        "utf-8",
       )
 
       const result = loadAgentDefinitions([jsoncPath], "definition-file")
@@ -317,7 +317,7 @@ model: sonnet
 ---
 
 Provider prompt.`,
-        "utf-8"
+        "utf-8",
       )
 
       const result = loadAgentDefinitions([mdPath], "definition-file", "kiro")

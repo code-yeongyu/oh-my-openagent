@@ -23,9 +23,8 @@ async function main() {
   const sandbox = createSandbox(parseArgs(process.argv.slice(2)))
   const previousCwd = process.cwd()
   // Windows shells hold the checkout root open; hide every original entry there.
-  const trees = process.platform === "win32"
-    ? readdirSync(sourceTree).map((name) => join(sourceTree, name))
-    : [sourceTree]
+  const trees =
+    process.platform === "win32" ? readdirSync(sourceTree).map((name) => join(sourceTree, name)) : [sourceTree]
   const hiddenTrees = []
   const hostSockets = []
   const controller = new AbortController()
@@ -42,26 +41,34 @@ async function main() {
     if (trees.some(existsSync)) throw new Error("source checkout remains accessible")
     const result = await drive(sandbox, controller.signal)
     if (process.platform !== "win32") {
-      const supervisors = (await ownedProcesses(sandbox.root))
-        .filter(({ command }) => command.includes("--internal-rpc-host-supervisor"))
-      await stopSmokeHosts(sandbox.binary, {
-        cwd: sandbox.cwd, env: isolatedEnvironment(sandbox), signal: controller.signal,
-      }, {
-        supervisors,
-        onDrained(shutdown) {
-          process.stderr.write(`SHUTDOWN ${shutdown.stdout.trim()}\n`)
-          for (const line of shutdown.stdout.split("\n")) {
-            const socket = line.match(/^(.+\.sock): drained/)?.[1]
-            if (socket) hostSockets.push(socket)
-          }
+      const supervisors = (await ownedProcesses(sandbox.root)).filter(({ command }) =>
+        command.includes("--internal-rpc-host-supervisor"),
+      )
+      await stopSmokeHosts(
+        sandbox.binary,
+        {
+          cwd: sandbox.cwd,
+          env: isolatedEnvironment(sandbox),
+          signal: controller.signal,
         },
-      })
+        {
+          supervisors,
+          onDrained(shutdown) {
+            process.stderr.write(`SHUTDOWN ${shutdown.stdout.trim()}\n`)
+            for (const line of shutdown.stdout.split("\n")) {
+              const socket = line.match(/^(.+\.sock): drained/)?.[1]
+              if (socket) hostSockets.push(socket)
+            }
+          },
+        },
+      )
     }
     if (result.code !== 0) throw new Error(`binary exited code=${result.code}\n${result.stderr.slice(-4000)}`)
     const passes = assertEvalLegs(sandbox, result)
     const survivors = await ownedProcesses(sandbox.root)
-    const sockets = readdirSync(sandbox.root, { recursive: true, withFileTypes: true })
-      .filter((entry) => entry.isSocket())
+    const sockets = readdirSync(sandbox.root, { recursive: true, withFileTypes: true }).filter((entry) =>
+      entry.isSocket(),
+    )
     if (survivors.length || sockets.length || hostSockets.some(existsSync)) {
       throw new Error(`shutdown leaked owned processes/sockets: ${JSON.stringify(survivors)} sockets=${sockets.length}`)
     }

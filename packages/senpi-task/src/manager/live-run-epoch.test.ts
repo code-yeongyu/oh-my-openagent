@@ -97,7 +97,10 @@ describe("every run-stats tracker is tagged with the run it measures", () => {
     const dispatched = await bounded(first)
     const taskId = dispatched.task_id
     if (taskId === undefined) throw new Error("no worker")
-    f.manager.workpools.yieldResults(taskId, dispatched.run_epoch ?? 0, { op: "yield", results: [{ key: "a", data: 1 }] })
+    f.manager.workpools.yieldResults(taskId, dispatched.run_epoch ?? 0, {
+      op: "yield",
+      results: [{ key: "a", data: 1 }],
+    })
     f.handles.get(taskId)?.settle({ status: "completed", finalResponse: "a done" })
     await f.manager.waitFor(taskId)
 

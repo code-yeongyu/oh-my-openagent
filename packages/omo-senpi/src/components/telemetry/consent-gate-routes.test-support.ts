@@ -21,8 +21,16 @@ type SourceFile = { readonly name: string; readonly source: string }
 const EMITTERS = new Set(["captureEvent", "capture", "recordDailyActive", "recordSenpiDailyActive"])
 /** A guard reads the gate when it calls the gate itself or the component's consent read built on it. */
 const GATE_READ = /\bisOmoNativeTelemetryEnabled\(|\bisConsented\b/u
-const FAN_IN = { file: "omo-native-component.ts", fn: "createOmoNativeTelemetryComponent>captureEvent", call: "state.capture(name)" }
-const SESSION_CLIENT = { file: "omo-native-session.ts", fn: "createOmoNativeSessionComponent>register>captureSessionStart", call: "createEventTelemetryClient(" }
+const FAN_IN = {
+  file: "omo-native-component.ts",
+  fn: "createOmoNativeTelemetryComponent>captureEvent",
+  call: "state.capture(name)",
+}
+const SESSION_CLIENT = {
+  file: "omo-native-session.ts",
+  fn: "createOmoNativeSessionComponent>register>captureSessionStart",
+  call: "createEventTelemetryClient(",
+}
 
 const calleeOf = (call: string): string => call.slice(0, call.indexOf("(")).split(".").at(-1) ?? ""
 const routeKey = (site: Pick<WriterSite, "file" | "fn" | "call">): string => `${site.file}: ${site.fn} | ${site.call}`
@@ -40,7 +48,9 @@ export function findGateBypasses(
   registrations: readonly SourceFile[] = [],
 ): readonly string[] {
   const sites = files.flatMap((file) => scanWriterSites(file.name, file.source))
-  const routes = new Map(routed.flatMap((entry) => (entry.route === undefined ? [] : [[routeKey(entry), entry.route] as const])))
+  const routes = new Map(
+    routed.flatMap((entry) => (entry.route === undefined ? [] : [[routeKey(entry), entry.route] as const])),
+  )
   const find = (target: typeof FAN_IN): WriterSite | undefined =>
     sites.find((site) => site.file === target.file && site.fn === target.fn && site.call.startsWith(target.call))
 
@@ -53,12 +63,16 @@ export function findGateBypasses(
       case "fan-in":
         return gated(find(FAN_IN)) ? undefined : "the fan-in it relies on does not read the consent gate"
       case "session-client":
-        return gated(find(SESSION_CLIENT)) ? undefined : "the session client it relies on is not created behind the consent gate"
+        return gated(find(SESSION_CLIENT))
+          ? undefined
+          : "the session client it relies on is not created behind the consent gate"
       case "callers": {
         const callers = sites.filter((caller) => calleeOf(caller.call) === route.fn && !seen.has(siteKey(caller)))
         if (callers.length === 0) return `no emission site calls ${route.fn}`
         const failing = callers.find((caller) => passes(caller, new Set([...seen, siteKey(site)])) !== undefined)
-        return failing === undefined ? undefined : `its caller ${failing.file}: ${siteKey(failing)} bypasses the consent gate`
+        return failing === undefined
+          ? undefined
+          : `its caller ${failing.file}: ${siteKey(failing)} bypasses the consent gate`
       }
       case "unregistered": {
         const pattern = new RegExp(`\\b(?:${route.exports.join("|")})\\b`, "u")

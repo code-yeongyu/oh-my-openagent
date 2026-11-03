@@ -54,7 +54,10 @@ describe("RpcHostRunner transport recovery", () => {
     const runner = runnerOver(host, {
       ...NO_WAIT,
       createClient: (socketPath) => {
-        const client = new HostSessionClient({ socketPath, ports: { probeProtocolInfo: () => host.probeProtocolInfo() } })
+        const client = new HostSessionClient({
+          socketPath,
+          ports: { probeProtocolInfo: () => host.probeProtocolInfo() },
+        })
         const calls: string[] = []
         const getEntries = client.getEntries.bind(client)
         const switchSession = client.switchSession.bind(client)
@@ -99,14 +102,15 @@ describe("RpcHostRunner transport recovery", () => {
       shardEvents: { onReattachOutcome: (info) => recoveryOutcomes.push(info.outcome) },
       ...NO_WAIT,
       createClient: (socketPath) => {
-        const client = new HostSessionClient({ socketPath, ports: { probeProtocolInfo: () => host.probeProtocolInfo() } })
+        const client = new HostSessionClient({
+          socketPath,
+          ports: { probeProtocolInfo: () => host.probeProtocolInfo() },
+        })
         created += 1
         if (created === 2) {
           const send = client.send.bind(client)
           client.send = (command) =>
-            command.type === "prompt"
-              ? Promise.reject(new Error(failureMessage))
-              : send(command)
+            command.type === "prompt" ? Promise.reject(new Error(failureMessage)) : send(command)
         }
         return client
       },

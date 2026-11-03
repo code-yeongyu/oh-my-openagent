@@ -1,7 +1,16 @@
 import { afterEach, describe, expect, it, spyOn } from "bun:test"
 import * as os from "node:os"
 import { createHash } from "node:crypto"
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir, userInfo } from "node:os"
 import { basename, join } from "node:path"
 
@@ -51,7 +60,9 @@ describe("one anonymous install id per user, independent of the agent home (#109
     writeId(canonicalFile(h), ID_A)
     const isolated = join(h, "runs", "run-1", "agent")
     expect(attribution({ HOME: h, USERPROFILE: h, OMO_CODING_AGENT_DIR: isolated }).install_hash).toBe(sha(ID_A))
-    expect(attribution({ HOME: h, USERPROFILE: h, SENPI_CODING_AGENT_DIR: join(h, "runs", "run-2") }).install_hash).toBe(sha(ID_A))
+    expect(
+      attribution({ HOME: h, USERPROFILE: h, SENPI_CODING_AGENT_DIR: join(h, "runs", "run-2") }).install_hash,
+    ).toBe(sha(ID_A))
   })
 
   it("#given only a legacy per-agent-home id #then it is adopted once into the canonical file (0600) and kept", () => {
@@ -68,7 +79,9 @@ describe("one anonymous install id per user, independent of the agent home (#109
     const h = home()
     flatLayout(h)
     writeId(join(h, ".omo", "omo-senpi", "omo-native", "install-id"), ID_B)
-    expect(attribution({ HOME: h, USERPROFILE: h, OMO_CODING_AGENT_DIR: join(h, "runs", "fresh", "agent") }).install_hash).toBe(sha(ID_B))
+    expect(
+      attribution({ HOME: h, USERPROFILE: h, OMO_CODING_AGENT_DIR: join(h, "runs", "fresh", "agent") }).install_hash,
+    ).toBe(sha(ID_B))
     expect(attribution({ HOME: h, USERPROFILE: h }).install_hash).toBe(sha(ID_B))
   })
 
@@ -89,7 +102,12 @@ describe("one anonymous install id per user, independent of the agent home (#109
 describe("telemetry is off by default for automated runs that cannot hold a stable id (#10934)", () => {
   const realHome = { HOME: "/Users/someone", USERPROFILE: "/Users/someone" }
   // A real profile, simulated (identity realpath) so the fixture does not depend on the machine's own home.
-  const realDeps = { platform: "darwin" as const, realpath: (p: string) => p, tmpdir: () => "/var/folders/ab/T", posixTempRoots: [] }
+  const realDeps = {
+    platform: "darwin" as const,
+    realpath: (p: string) => p,
+    tmpdir: () => "/var/folders/ab/T",
+    posixTempRoots: [],
+  }
 
   it("#given CI, a test runner, or a HOME inside the OS temp dir #then the run is automated", () => {
     expect(automatedRunReason({ ...realHome, CI: "1" })).toBe("ci")
@@ -99,7 +117,20 @@ describe("telemetry is off by default for automated runs that cannot hold a stab
     expect(automatedRunReason({ ...realHome, JEST_WORKER_ID: "1" })).toBe("test_runner")
     const h = home()
     // Diagnostic for the Windows CI run (#10935): the temp-dir comparison's inputs, as the OS reports them.
-    if (process.platform === "win32") console.log("[#10935 diag]", JSON.stringify({ tmpdir: tmpdir(), tmpdirReal: realpathSync(tmpdir()), tmpdirNative: realpathSync.native(tmpdir()), home: h, homeReal: realpathSync(h), homeNative: realpathSync.native(h), systemDrive: process.env.SystemDrive, verdict: automatedRunReason({ HOME: h, USERPROFILE: h }) ?? "none" }))
+    if (process.platform === "win32")
+      console.log(
+        "[#10935 diag]",
+        JSON.stringify({
+          tmpdir: tmpdir(),
+          tmpdirReal: realpathSync(tmpdir()),
+          tmpdirNative: realpathSync.native(tmpdir()),
+          home: h,
+          homeReal: realpathSync(h),
+          homeNative: realpathSync.native(h),
+          systemDrive: process.env.SystemDrive,
+          verdict: automatedRunReason({ HOME: h, USERPROFILE: h }) ?? "none",
+        }),
+      )
     expect(automatedRunReason({ HOME: h, USERPROFILE: h })).toBe("ephemeral_home")
     expect(automatedRunReason(realHome, realDeps)).toBeUndefined()
   })
@@ -107,22 +138,35 @@ describe("telemetry is off by default for automated runs that cannot hold a stab
   it("#given a HOME that cannot be resolved #then it fails SAFE: the run counts as ephemeral and telemetry is OFF", () => {
     const gone = join(tmpdir(), "omo-identity-gone-" + process.pid, "home")
     expect(automatedRunReason({ HOME: gone, USERPROFILE: gone })).toBe("ephemeral_home")
-    expect(isOmoNativeTelemetryEnabled({ isConfigEnabled: () => true }, {}, { HOME: gone, USERPROFILE: gone })).toBe(false)
+    expect(isOmoNativeTelemetryEnabled({ isConfigEnabled: () => true }, {}, { HOME: gone, USERPROFILE: gone })).toBe(
+      false,
+    )
   })
 
   it("#given a misconfigured temp dir (TMPDIR=/ or one containing the real account home) #then a real user's home is NOT treated as temporary", () => {
     // Simulated POSIX paths (identity realpath): a real profile is a direct child of the users directory.
-    const posixDeps = (tmp: string) => ({ platform: "linux" as const, realpath: (p: string) => p, tmpdir: () => tmp, posixTempRoots: [] })
+    const posixDeps = (tmp: string) => ({
+      platform: "linux" as const,
+      realpath: (p: string) => p,
+      tmpdir: () => tmp,
+      posixTempRoots: [],
+    })
     expect(automatedRunReason({ HOME: "/home/someone" }, posixDeps("/"))).toBeUndefined()
     expect(automatedRunReason({ HOME: "/home/someone" }, posixDeps("/home"))).toBeUndefined()
     expect(automatedRunReason({ HOME: "/home/someone" }, posixDeps("/home/someone"))).toBeUndefined()
     expect(automatedRunReason({ HOME: "/root" }, posixDeps("/"))).toBeUndefined()
-    expect(automatedRunReason({ HOME: "/var/folders/ab/T/fake-home" }, posixDeps("/var/folders/ab/T"))).toBe("ephemeral_home")
+    expect(automatedRunReason({ HOME: "/var/folders/ab/T/fake-home" }, posixDeps("/var/folders/ab/T"))).toBe(
+      "ephemeral_home",
+    )
   })
 
   it("#given a darwin HOME outside /Users #when the automation check runs #then it never resolves an automount trigger (/home, /net), which blocks the host loop when wedged (#11545)", () => {
     const triggers = (p: string) => ["/home", "/net"].some((t) => p === t || p.startsWith(`${t}/`))
-    const cases: ReadonlyArray<{ readonly home: string; readonly tmp: string; readonly verdict: "ephemeral_home" | undefined }> = [
+    const cases: ReadonlyArray<{
+      readonly home: string
+      readonly tmp: string
+      readonly verdict: "ephemeral_home" | undefined
+    }> = [
       { home: "/Users/Shared/app-home", tmp: "/var/folders/ab/T", verdict: undefined },
       { home: "/opt/app/home", tmp: "/var/folders/ab/T", verdict: undefined },
       { home: "/Volumes/ext/home", tmp: "/var/folders/ab/T", verdict: undefined },
@@ -133,7 +177,12 @@ describe("telemetry is off by default for automated runs that cannot hold a stab
     ]
     for (const { home: h, tmp, verdict } of cases) {
       const resolved: string[] = []
-      const deps = { platform: "darwin" as const, realpath: (p: string) => (resolved.push(p), p), tmpdir: () => tmp, posixTempRoots: [] }
+      const deps = {
+        platform: "darwin" as const,
+        realpath: (p: string) => (resolved.push(p), p),
+        tmpdir: () => tmp,
+        posixTempRoots: [],
+      }
       expect({ home: h, tmp, verdict: automatedRunReason({ HOME: h }, deps) }).toEqual({ home: h, tmp, verdict })
       expect({ home: h, tmp, triggers: resolved.filter(triggers) }).toEqual({ home: h, tmp, triggers: [] })
     }
@@ -149,13 +198,25 @@ describe("telemetry is off by default for automated runs that cannot hold a stab
 
   it("#given a darwin HOME inside a temp dir under an automount trigger #then only that HOME itself is resolved and the run still counts as ephemeral", () => {
     const resolved: string[] = []
-    const deps = { platform: "darwin" as const, realpath: (p: string) => (resolved.push(p), p), tmpdir: () => "/home/tmp", posixTempRoots: [] }
+    const deps = {
+      platform: "darwin" as const,
+      realpath: (p: string) => (resolved.push(p), p),
+      tmpdir: () => "/home/tmp",
+      posixTempRoots: [],
+    }
     expect(automatedRunReason({ HOME: "/home/tmp/run-1" }, deps)).toBe("ephemeral_home")
-    expect(new Set(resolved.filter((p) => p === "/home" || p.startsWith("/home/")))).toEqual(new Set(["/home/tmp/run-1"]))
+    expect(new Set(resolved.filter((p) => p === "/home" || p.startsWith("/home/")))).toEqual(
+      new Set(["/home/tmp/run-1"]),
+    )
   })
 
   it("#given linux, where /home is a real directory #then the users-dir candidates are still resolved (a /home symlink keeps counting as the users dir)", () => {
-    const deps = { platform: "linux" as const, realpath: (p: string) => (p === "/home" ? "/var/home" : p), tmpdir: () => "/var/home", posixTempRoots: [] }
+    const deps = {
+      platform: "linux" as const,
+      realpath: (p: string) => (p === "/home" ? "/var/home" : p),
+      tmpdir: () => "/var/home",
+      posixTempRoots: [],
+    }
     expect(automatedRunReason({ HOME: "/var/home/someone" }, deps)).toBeUndefined()
   })
 
@@ -164,7 +225,12 @@ describe("telemetry is off by default for automated runs that cannot hold a stab
       throw new Error("ENOENT: no such file or directory, uv_os_tmpdir")
     })
     try {
-      const gate = () => isOmoNativeTelemetryEnabled({ isConfigEnabled: () => true }, {}, { HOME: "/Users/someone", USERPROFILE: "/Users/someone" })
+      const gate = () =>
+        isOmoNativeTelemetryEnabled(
+          { isConfigEnabled: () => true },
+          {},
+          { HOME: "/Users/someone", USERPROFILE: "/Users/someone" },
+        )
       expect(gate).not.toThrow()
       expect(gate()).toBe(false)
     } finally {
@@ -174,7 +240,11 @@ describe("telemetry is off by default for automated runs that cannot hold a stab
 
   it("#given an automated run #then the enablement gate is off, unless OMO_TELEMETRY_ALLOW_AUTOMATION opts back in", () => {
     const enabled = (env: Record<string, string>, automationDeps?: typeof realDeps) =>
-      isOmoNativeTelemetryEnabled({ isConfigEnabled: () => true, ...(automationDeps === undefined ? {} : { automationDeps }) }, {}, env)
+      isOmoNativeTelemetryEnabled(
+        { isConfigEnabled: () => true, ...(automationDeps === undefined ? {} : { automationDeps }) },
+        {},
+        env,
+      )
     expect(enabled({ ...realHome }, realDeps)).toBe(true)
     expect(enabled({ ...realHome, CI: "true" })).toBe(false)
     expect(enabled({ ...realHome, NODE_ENV: "test" })).toBe(false)
@@ -195,7 +265,13 @@ describe("temp-home detection is path-correct on every platform (#10935)", () =>
     const testHome = runRoot + "\\omo-test-home-1"
     // Bun's os.userInfo().homedir reads USERPROFILE/HOME, so the "account home" IS the home being classified: the
     // check must not depend on it (the guard that read it dropped the only Windows temp root, #10935 review H1).
-    const spy = spyOn(os, "userInfo").mockImplementation((() => ({ uid: -1, gid: -1, username: "runneradmin", homedir: testHome, shell: null })) as typeof os.userInfo)
+    const spy = spyOn(os, "userInfo").mockImplementation((() => ({
+      uid: -1,
+      gid: -1,
+      username: "runneradmin",
+      homedir: testHome,
+      shell: null,
+    })) as typeof os.userInfo)
     try {
       expect(automatedRunReason({ USERPROFILE: testHome }, win(runRoot))).toBe("ephemeral_home")
       expect(automatedRunReason({ USERPROFILE: runRoot }, win(runRoot))).toBe("ephemeral_home")
@@ -205,7 +281,9 @@ describe("temp-home detection is path-correct on every platform (#10935)", () =>
   })
 
   it("#given a mixed-case long-name home under the short-name TEMP #then it is ephemeral (win32 compares case-insensitively)", () => {
-    expect(automatedRunReason({ USERPROFILE: "c:\\users\\RunnerAdmin\\appdata\\local\\temp\\omo-x1" }, win())).toBe("ephemeral_home")
+    expect(automatedRunReason({ USERPROFILE: "c:\\users\\RunnerAdmin\\appdata\\local\\temp\\omo-x1" }, win())).toBe(
+      "ephemeral_home",
+    )
   })
 
   it("#given the real Windows profile (TEMP lives under it), in any case #then it is NOT ephemeral", () => {
@@ -218,53 +296,73 @@ describe("temp-home detection is path-correct on every platform (#10935)", () =>
   })
 
   it("#given a temp root that resolves to the filesystem root #then it is not a temp root", () => {
-    const toRoot = { platform: "linux" as const, realpath: (p: string) => (p === "/tmp-link" ? "/" : p), tmpdir: () => "/tmp-link", posixTempRoots: [] }
+    const toRoot = {
+      platform: "linux" as const,
+      realpath: (p: string) => (p === "/tmp-link" ? "/" : p),
+      tmpdir: () => "/tmp-link",
+      posixTempRoots: [],
+    }
     expect(automatedRunReason({ HOME: "/srv/someone" }, toRoot)).toBeUndefined()
   })
 
-  it.skipIf(process.platform === "win32")("#given a POSIX symlink inside the temp root whose target uses '..' to leave it #then the home is NOT inside", () => {
-    const base = realpathSync(mkdtempSync(join(tmpdir(), "omo-escape-")))
-    roots.push(base)
-    const root = join(base, "root")
-    const outside = join(base, "outside")
-    mkdirSync(join(root, "jump"), { recursive: true })
-    mkdirSync(join(outside, "home"), { recursive: true })
-    symlinkSync(join(outside, "home"), join(root, "jump", "out"))
-    symlinkSync("jump/out/../home", join(root, "entry"))
-    expect(automatedRunReason({ HOME: join(root, "entry") }, { tmpdir: () => root, posixTempRoots: [] })).toBeUndefined()
-    // Control: the same home reached without the escaping link IS inside.
-    mkdirSync(join(root, "inner"))
-    expect(automatedRunReason({ HOME: join(root, "inner") }, { tmpdir: () => root, posixTempRoots: [] })).toBe("ephemeral_home")
-  })
+  it.skipIf(process.platform === "win32")(
+    "#given a POSIX symlink inside the temp root whose target uses '..' to leave it #then the home is NOT inside",
+    () => {
+      const base = realpathSync(mkdtempSync(join(tmpdir(), "omo-escape-")))
+      roots.push(base)
+      const root = join(base, "root")
+      const outside = join(base, "outside")
+      mkdirSync(join(root, "jump"), { recursive: true })
+      mkdirSync(join(outside, "home"), { recursive: true })
+      symlinkSync(join(outside, "home"), join(root, "jump", "out"))
+      symlinkSync("jump/out/../home", join(root, "entry"))
+      expect(
+        automatedRunReason({ HOME: join(root, "entry") }, { tmpdir: () => root, posixTempRoots: [] }),
+      ).toBeUndefined()
+      // Control: the same home reached without the escaping link IS inside.
+      mkdirSync(join(root, "inner"))
+      expect(automatedRunReason({ HOME: join(root, "inner") }, { tmpdir: () => root, posixTempRoots: [] })).toBe(
+        "ephemeral_home",
+      )
+    },
+  )
 
-  it.skipIf(process.platform === "win32")("#given a missing lexical HOME whose raw path links outside temp #then it is ephemeral, never telemetry ON", () => {
-    const base = home()
-    const root = join(base, "temp")
-    const outside = join(base, "outside")
-    mkdirSync(root, { recursive: true })
-    mkdirSync(join(outside, "subdir"), { recursive: true })
-    mkdirSync(join(outside, "onlyout"))
-    symlinkSync(join(outside, "subdir"), join(root, "jump"))
-    const rawHome = `${root}/jump/../onlyout`
+  it.skipIf(process.platform === "win32")(
+    "#given a missing lexical HOME whose raw path links outside temp #then it is ephemeral, never telemetry ON",
+    () => {
+      const base = home()
+      const root = join(base, "temp")
+      const outside = join(base, "outside")
+      mkdirSync(root, { recursive: true })
+      mkdirSync(join(outside, "subdir"), { recursive: true })
+      mkdirSync(join(outside, "onlyout"))
+      symlinkSync(join(outside, "subdir"), join(root, "jump"))
+      const rawHome = `${root}/jump/../onlyout`
 
-    // path.join collapses `jump/..` lexically: the id would be written in <root>/onlyout, which does not exist and is inside temp.
-    expect(join(rawHome, ".omo")).toBe(join(root, "onlyout", ".omo"))
-    expect(automatedRunReason({ HOME: rawHome }, { tmpdir: () => root, posixTempRoots: [] })).toBe("ephemeral_home")
-  })
+      // path.join collapses `jump/..` lexically: the id would be written in <root>/onlyout, which does not exist and is inside temp.
+      expect(join(rawHome, ".omo")).toBe(join(root, "onlyout", ".omo"))
+      expect(automatedRunReason({ HOME: rawHome }, { tmpdir: () => root, posixTempRoots: [] })).toBe("ephemeral_home")
+    },
+  )
 
-  it.skipIf(process.platform === "win32")("#given literal dot-dot after a symlink in HOME #then temp detection agrees with where the id is written", () => {
-    const base = home()
-    const root = join(base, "temp")
-    const outside = join(base, "outside")
-    mkdirSync(join(root, "home"), { recursive: true })
-    mkdirSync(join(outside, "subdir"), { recursive: true })
-    mkdirSync(join(outside, "home"))
-    symlinkSync(join(outside, "subdir"), join(root, "jump"))
-    const rawHome = `${root}/jump/../home`
+  it.skipIf(process.platform === "win32")(
+    "#given literal dot-dot after a symlink in HOME #then temp detection agrees with where the id is written",
+    () => {
+      const base = home()
+      const root = join(base, "temp")
+      const outside = join(base, "outside")
+      mkdirSync(join(root, "home"), { recursive: true })
+      mkdirSync(join(outside, "subdir"), { recursive: true })
+      mkdirSync(join(outside, "home"))
+      symlinkSync(join(outside, "subdir"), join(root, "jump"))
+      const rawHome = `${root}/jump/../home`
 
-    // path.join(rawHome, ".omo") collapses `jump/..` lexically, so the id would land in <root>/home: inside temp.
-    expect(join(rawHome, ".omo")).toBe(join(root, "home", ".omo"))
-    expect(automatedRunReason({ HOME: rawHome }, { tmpdir: () => root, posixTempRoots: [] })).toBe("ephemeral_home")
-    expect(automatedRunReason({ HOME: join(root, "home") }, { tmpdir: () => root, posixTempRoots: [] })).toBe("ephemeral_home")
-  })
+      // path.join(rawHome, ".omo") collapses `jump/..` lexically, so the id would land in <root>/home: inside temp.
+      expect(join(rawHome, ".omo")).toBe(join(root, "home", ".omo"))
+      expect(automatedRunReason({ HOME: rawHome }, { tmpdir: () => root, posixTempRoots: [] })).toBe("ephemeral_home")
+      expect(automatedRunReason({ HOME: join(root, "home") }, { tmpdir: () => root, posixTempRoots: [] })).toBe(
+        "ephemeral_home",
+      )
+    },
+  )
 })

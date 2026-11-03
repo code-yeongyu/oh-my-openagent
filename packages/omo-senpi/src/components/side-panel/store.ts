@@ -93,7 +93,8 @@ export function createPanelStore(now: () => number = Date.now): PanelStore {
       const previous = children.get(update.id)
       const status = update.status ?? previous?.status ?? "queued"
       // A reason only describes a parked child: once it runs or ends, the old reason is history.
-      const parkedReason = (status === "resuming" || status === "ending") ? (update.parkedReason ?? previous?.parkedReason) : undefined
+      const parkedReason =
+        status === "resuming" || status === "ending" ? (update.parkedReason ?? previous?.parkedReason) : undefined
       const host = update.host ?? previous?.host
       const merged: PanelChild = {
         id: update.id,

@@ -29,11 +29,27 @@ async function identity() {
 // The keychain approval dialog nobody has answered (#11262): the OS read never settles.
 function unansweredKeychainStore() {
   let gets = 0
-  const store = createCredentialStore("http://127.0.0.1:9", { secrets: { get: () => { gets += 1; return new Promise<string | null>(() => undefined) }, set: async () => undefined, delete: async () => true }, platform: "darwin", lockProbe: async () => "unlocked", notice: quietNotice, wait: { kind: "bounded", deadlineMs: 50 } })
+  const store = createCredentialStore("http://127.0.0.1:9", {
+    secrets: {
+      get: () => {
+        gets += 1
+        return new Promise<string | null>(() => undefined)
+      },
+      set: async () => undefined,
+      delete: async () => true,
+    },
+    platform: "darwin",
+    lockProbe: async () => "unlocked",
+    notice: quietNotice,
+    wait: { kind: "bounded", deadlineMs: 50 },
+  })
   return { store, gets: () => gets }
 }
 
-type Outcome<T> = { readonly state: "resolved"; readonly value: T } | { readonly state: "rejected"; readonly error: unknown } | { readonly state: "hung" }
+type Outcome<T> =
+  | { readonly state: "resolved"; readonly value: T }
+  | { readonly state: "rejected"; readonly error: unknown }
+  | { readonly state: "hung" }
 
 // The test's own bound: a call that has not settled by then is the hang this file guards against.
 async function settled<T>(work: Promise<T>, ms = 2_000): Promise<Outcome<T>> {
@@ -42,7 +58,13 @@ async function settled<T>(work: Promise<T>, ms = 2_000): Promise<Outcome<T>> {
     timer = setTimeout(() => resolve({ state: "hung" }), ms)
   })
   try {
-    return await Promise.race([work.then((value): Outcome<T> => ({ state: "resolved", value }), (error: unknown): Outcome<T> => ({ state: "rejected", error })), hung])
+    return await Promise.race([
+      work.then(
+        (value): Outcome<T> => ({ state: "resolved", value }),
+        (error: unknown): Outcome<T> => ({ state: "rejected", error }),
+      ),
+      hung,
+    ])
   } finally {
     clearTimeout(timer)
   }
@@ -77,7 +99,9 @@ describe("memory sync while the keychain waits for approval", () => {
         expect(attempts).toBe(before + 1)
       }
       expect(warnings).toHaveLength(6)
-      expect(warnings).toMatchObject([15_000, 30_000, 60_000, 120_000, 240_000, 300_000].map(retryMs => ({ retryMs })))
+      expect(warnings).toMatchObject(
+        [15_000, 30_000, 60_000, 120_000, 240_000, 300_000].map((retryMs) => ({ retryMs })),
+      )
       await runner.release(paths.repo)
       jest.advanceTimersByTime(300_000)
       expect(attempts).toBe(8)
@@ -156,13 +180,25 @@ describe("memory sync while the keychain waits for approval", () => {
     const { store } = unansweredKeychainStore()
     const runner = createSyncRunner({
       logger: { info: () => undefined, warn: (message) => warnings.push(message), error: () => undefined },
-      resolveSession: createDeviceSessionResolver({ source: createCliAccountSource({ api: "http://127.0.0.1:9", store }), pinDir: join(paths.root, "pins"), loadRuntime: noRuntime }),
+      resolveSession: createDeviceSessionResolver({
+        source: createCliAccountSource({ api: "http://127.0.0.1:9", store }),
+        pinDir: join(paths.root, "pins"),
+        loadRuntime: noRuntime,
+      }),
       watchHead: () => () => undefined,
     })
     void runner.acquire("agent", paths, { enabled: true })
-    const repo = { head: async () => "", headCommitTimestamp: async () => 0, lsTree: async () => [], show: async () => "", status: async () => "" }
+    const repo = {
+      head: async () => "",
+      headCommitTimestamp: async () => 0,
+      lsTree: async () => [],
+      show: async () => "",
+      status: async () => "",
+    }
     const context = { identityPaths: paths } as Parameters<typeof readMemoryStatusSegments>[1]
-    const segments = await settled(readMemoryStatusSegments(repo, context, undefined, (target) => runner.status(target)))
+    const segments = await settled(
+      readMemoryStatusSegments(repo, context, undefined, (target) => runner.status(target)),
+    )
     expect(segments.state === "resolved" ? segments.value.syncBlocked : segments).toBe(false)
     expect(warnings.some((line) => line.includes("wants to access key omo-cli"))).toBe(true)
     await runner.release(paths.repo)
@@ -182,7 +218,9 @@ describe("memory sync while the keychain waits for approval", () => {
       resolveSession: async (request) => {
         resolves += 1
         if (resolves === 2) secondResolve()
-        return createDeviceSessionResolver({ source, pinDir: join(paths.root, "pins"), loadRuntime: noRuntime })(request)
+        return createDeviceSessionResolver({ source, pinDir: join(paths.root, "pins"), loadRuntime: noRuntime })(
+          request,
+        )
       },
       watchHead: () => () => undefined,
       deferredRetryMs: 20,

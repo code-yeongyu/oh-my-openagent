@@ -56,7 +56,9 @@ describe("createSkillInvocationTracker - cross-generation handoff", () => {
     const state = createSkillInvocationTracker(rebuilt).stateFor("sess-reload")
     expect(state.hasUserRequested("ulw-plan")).toBe(true)
     expect(state.hasPlanArtifact()).toBe(true)
-    expect(state.planArtifactReferences().map((reference) => [reference.path, reference.count])).toEqual([[PLAN_PATH, 1]])
+    expect(state.planArtifactReferences().map((reference) => [reference.path, reference.count])).toEqual([
+      [PLAN_PATH, 1],
+    ])
     expect(evaluateInvocationGuard("plan-reviewer", state)).toEqual({ kind: "allow" })
   })
 
@@ -127,7 +129,11 @@ describe("createSkillInvocationTracker - cross-generation handoff", () => {
     )
 
     // when
-    await retiring.dispatch("session_shutdown", { type: "session_shutdown", reason: "reload" }, ctxFor("sess-executing"))
+    await retiring.dispatch(
+      "session_shutdown",
+      { type: "session_shutdown", reason: "reload" },
+      ctxFor("sess-executing"),
+    )
 
     // then
     const verdict = evaluateInvocationGuard(
@@ -160,7 +166,9 @@ describe("createSkillInvocationTracker - cross-generation handoff", () => {
     await openGate(first, "sess-twice")
     await first.dispatch("session_shutdown", { type: "session_shutdown", reason: "reload" }, ctxFor("sess-twice"))
     const second = new FakeExtensionAPI()
-    expect(evaluateInvocationGuard("plan-reviewer", createSkillInvocationTracker(second).stateFor("sess-twice"))).toEqual({ kind: "allow" })
+    expect(
+      evaluateInvocationGuard("plan-reviewer", createSkillInvocationTracker(second).stateFor("sess-twice")),
+    ).toEqual({ kind: "allow" })
 
     // when
     await second.dispatch("session_shutdown", { type: "session_shutdown", reason: "reload" }, ctxFor("sess-twice"))

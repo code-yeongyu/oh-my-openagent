@@ -25,9 +25,7 @@ export function legacyAgreementEventKey(id: string, date: string): string {
 }
 
 export function legacyAgreementEvents(items: readonly AgreementItem[]): string[] {
-  return items.flatMap((item) => item.last === undefined ? [] : [
-    legacyAgreementEventKey(item.id, item.last),
-  ])
+  return items.flatMap((item) => (item.last === undefined ? [] : [legacyAgreementEventKey(item.id, item.last)]))
 }
 
 function digest(parts: readonly string[]): string {

@@ -31,7 +31,11 @@ describe("GPT-6 family routing", () => {
 
   test.each(["explore", "librarian"])("%s carries gpt-6-luna-fast low as its OpenAI rung", (agentName) => {
     const chain = AGENT_MODEL_REQUIREMENTS[agentName].fallbackChain
-    expect(chain[1]).toEqual({ providers: ["openai", "chatgpt-subscription"], model: "gpt-6-luna-fast", variant: "low" })
+    expect(chain[1]).toEqual({
+      providers: ["openai", "chatgpt-subscription"],
+      model: "gpt-6-luna-fast",
+      variant: "low",
+    })
     expect(chain.map(({ model }) => model)).not.toContain("gpt-5.6-luna-fast")
   })
 

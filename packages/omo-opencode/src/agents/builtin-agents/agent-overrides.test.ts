@@ -19,7 +19,7 @@ describe("applyCategoryOverride", () => {
       // given
       const base = makeBase()
       const categories: Record<string, CategoryConfig> = {
-        "ultrabrain": { reasoning: "xhigh" } as CategoryConfig,
+        ultrabrain: { reasoning: "xhigh" } as CategoryConfig,
       }
 
       // when
@@ -33,7 +33,7 @@ describe("applyCategoryOverride", () => {
       // given
       const base = makeBase()
       const categories: Record<string, CategoryConfig> = {
-        "ultrabrain": { reasoning: "high", variant: "medium" } as CategoryConfig,
+        ultrabrain: { reasoning: "high", variant: "medium" } as CategoryConfig,
       }
 
       // when
@@ -47,7 +47,7 @@ describe("applyCategoryOverride", () => {
       // given
       const base = makeBase()
       const categories: Record<string, CategoryConfig> = {
-        "ultrabrain": { variant: "medium" } as CategoryConfig,
+        ultrabrain: { variant: "medium" } as CategoryConfig,
       }
 
       // when
@@ -129,7 +129,7 @@ describe("applyOverrides", () => {
       // given
       const base = makeBase()
       const categories: Record<string, CategoryConfig> = {
-        "ultrabrain": { reasoning: "medium" } as CategoryConfig,
+        ultrabrain: { reasoning: "medium" } as CategoryConfig,
       }
       const override: AgentOverrideConfig = {
         category: "ultrabrain",
@@ -147,7 +147,7 @@ describe("applyOverrides", () => {
       // given
       const base = makeBase()
       const categories: Record<string, CategoryConfig> = {
-        "ultrabrain": { variant: "medium" } as CategoryConfig,
+        ultrabrain: { variant: "medium" } as CategoryConfig,
       }
       const override: AgentOverrideConfig = {
         category: "ultrabrain",
@@ -165,7 +165,7 @@ describe("applyOverrides", () => {
       // given
       const base = makeBase()
       const categories: Record<string, CategoryConfig> = {
-        "ultrabrain": { reasoning: "high" } as CategoryConfig,
+        ultrabrain: { reasoning: "high" } as CategoryConfig,
       }
       const override: AgentOverrideConfig = {
         category: "ultrabrain",

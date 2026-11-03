@@ -1,6 +1,6 @@
 export interface AgentUsageState {
-  sessionID: string;
-  agentUsed: boolean;
-  reminderCount: number;
-  updatedAt: number;
+  sessionID: string
+  agentUsed: boolean
+  reminderCount: number
+  updatedAt: number
 }

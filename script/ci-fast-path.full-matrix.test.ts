@@ -9,8 +9,7 @@ import { load } from "js-yaml"
 const classifierPath = new URL("./ci-fast-path.mjs", import.meta.url)
 const ciWorkflowPath = new URL("../.github/workflows/ci.yml", import.meta.url)
 
-const UBUNTU_OR_FULL_MATRIX =
-  "(matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')"
+const UBUNTU_OR_FULL_MATRIX = "(matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')"
 
 interface FullMatrixMode {
   readonly generatedReleasePush: boolean
@@ -217,35 +216,38 @@ describe("full-matrix classification", () => {
   })
 
   describe("#given a release-state head branch", () => {
-    test.each([
-      "release/v5.0.0-source-state",
-      "release/v5.0.0-beta.11-source-state",
-    ])("#then %s forces the full matrix", (headRef) => {
-      // given / when
-      const mode = classify({
-        eventName: "pull_request",
-        headRef,
-        changedPaths: ["package.json"],
-      })
+    test.each(["release/v5.0.0-source-state", "release/v5.0.0-beta.11-source-state"])(
+      "#then %s forces the full matrix",
+      (headRef) => {
+        // given / when
+        const mode = classify({
+          eventName: "pull_request",
+          headRef,
+          changedPaths: ["package.json"],
+        })
 
-      // then
-      expect(mode.fullMatrix).toBe(true)
-    })
+        // then
+        expect(mode.fullMatrix).toBe(true)
+      },
+    )
   })
 
   describe("#given a full-matrix label", () => {
-    test.each(["ci:full-matrix", "run-full-ci"])("#then %s forces the full matrix on a runtime pull request", (label) => {
-      // given / when
-      const mode = classify({
-        eventName: "pull_request",
-        headRef: "feature/runtime-change",
-        changedPaths: ["packages/utils/src/index.ts"],
-        labels: ["bug", label],
-      })
+    test.each(["ci:full-matrix", "run-full-ci"])(
+      "#then %s forces the full matrix on a runtime pull request",
+      (label) => {
+        // given / when
+        const mode = classify({
+          eventName: "pull_request",
+          headRef: "feature/runtime-change",
+          changedPaths: ["packages/utils/src/index.ts"],
+          labels: ["bug", label],
+        })
 
-      // then
-      expect(mode.fullMatrix).toBe(true)
-    })
+        // then
+        expect(mode.fullMatrix).toBe(true)
+      },
+    )
   })
 
   describe("#given a platform-sensitive changed path", () => {
@@ -361,9 +363,7 @@ describe("full-matrix workflow wiring", () => {
       "#then every heavy step in %s is ubuntu-first",
       (jobName) => {
         // given
-        const heavySteps = jobSteps(jobName).filter((step) =>
-          String(step["if"] ?? "").includes("run_heavy"),
-        )
+        const heavySteps = jobSteps(jobName).filter((step) => String(step["if"] ?? "").includes("run_heavy"))
 
         // then
         expect(heavySteps.length).toBeGreaterThan(0)

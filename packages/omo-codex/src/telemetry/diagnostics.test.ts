@@ -3,11 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import {
-  cleanupTelemetryDiagnostics,
-  getTelemetryDiagnosticsFilePath,
-  writeTelemetryDiagnostic,
-} from "./diagnostics"
+import { cleanupTelemetryDiagnostics, getTelemetryDiagnosticsFilePath, writeTelemetryDiagnostic } from "./diagnostics"
 import { CACHE_DIR_NAME } from "./product-identity"
 
 const originalXdgDataHome = process.env.XDG_DATA_HOME
@@ -117,9 +113,6 @@ describe("telemetry diagnostics", () => {
     // then
     expect(existsSync(diagnosticsFilePath)).toBe(true)
     const entries = readDiagnosticEntries(diagnosticsFilePath)
-    expect(entries.map((entry) => entry.timestamp)).toEqual([
-      "2026-06-03T00:00:00.000Z",
-      "2026-06-04T00:01:00.000Z",
-    ])
+    expect(entries.map((entry) => entry.timestamp)).toEqual(["2026-06-03T00:00:00.000Z", "2026-06-04T00:01:00.000Z"])
   })
 })

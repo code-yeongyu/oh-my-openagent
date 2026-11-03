@@ -50,18 +50,12 @@ export function stopFsyncSkipWarningCleanup(): void {
 }
 
 export function createFsyncSkipWarningHook() {
-  const toolExecuteBefore = async (
-    input: ToolExecuteInput,
-    _output: ToolBeforeOutput,
-  ): Promise<void> => {
+  const toolExecuteBefore = async (input: ToolExecuteInput, _output: ToolBeforeOutput): Promise<void> => {
     ensureCleanupInterval()
     startTimesByCallId.set(input.callID, Date.now())
   }
 
-  const toolExecuteAfter = async (
-    input: ToolExecuteInput,
-    output: ToolAfterOutput,
-  ): Promise<void> => {
+  const toolExecuteAfter = async (input: ToolExecuteInput, output: ToolAfterOutput): Promise<void> => {
     const startTimestamp = startTimesByCallId.get(input.callID) ?? 0
     startTimesByCallId.delete(input.callID)
     if (typeof output.output !== "string") return

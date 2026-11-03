@@ -22,9 +22,12 @@ export function createSdkRootProvisioning(options: SdkRootProvisioningOptions): 
       if (!existsSync(baseDir)) return
       process.env[options.envKey] = baseDir
     } catch (error) {
-      options.logger?.warn(options.envKey === DAG_SDK_ROOT_ENV
-        ? "omo-senpi dag sdk root provisioning failed"
-        : "omo-senpi agent toolkit sdk root provisioning failed", { error })
+      options.logger?.warn(
+        options.envKey === DAG_SDK_ROOT_ENV
+          ? "omo-senpi dag sdk root provisioning failed"
+          : "omo-senpi agent toolkit sdk root provisioning failed",
+        { error },
+      )
     }
   }
 }

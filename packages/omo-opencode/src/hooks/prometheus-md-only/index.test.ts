@@ -96,9 +96,9 @@ describe("prometheus-md-only", () => {
       }
 
       //#when //#then
-      await expect(
-        invokeBefore(hook, input, output)
-      ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
+      await expect(invokeBefore(hook, input, output)).rejects.toThrow(
+        "File operations restricted to .omo/*.md plan files only",
+      )
     })
 
     test("should enforce md-only restriction for Prometheus display name Plan Builder", async () => {
@@ -115,9 +115,9 @@ describe("prometheus-md-only", () => {
       }
 
       //#when //#then
-      await expect(
-        invokeBefore(hook, input, output)
-      ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
+      await expect(invokeBefore(hook, input, output)).rejects.toThrow(
+        "File operations restricted to .omo/*.md plan files only",
+      )
     })
 
     test("should enforce md-only restriction for Prometheus display name Planner", async () => {
@@ -134,9 +134,9 @@ describe("prometheus-md-only", () => {
       }
 
       //#when //#then
-      await expect(
-        invokeBefore(hook, input, output)
-      ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
+      await expect(invokeBefore(hook, input, output)).rejects.toThrow(
+        "File operations restricted to .omo/*.md plan files only",
+      )
     })
 
     test("should enforce md-only restriction for uppercase PROMETHEUS", async () => {
@@ -153,9 +153,9 @@ describe("prometheus-md-only", () => {
       }
 
       //#when //#then
-      await expect(
-        invokeBefore(hook, input, output)
-      ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
+      await expect(invokeBefore(hook, input, output)).rejects.toThrow(
+        "File operations restricted to .omo/*.md plan files only",
+      )
     })
 
     test("should not enforce restriction for non-Prometheus agent", async () => {
@@ -172,9 +172,7 @@ describe("prometheus-md-only", () => {
       }
 
       //#when //#then
-      await expect(
-        invokeBefore(hook, input, output)
-      ).resolves.toBeUndefined()
+      await expect(invokeBefore(hook, input, output)).resolves.toBeUndefined()
     })
 
     test("should not enforce restriction when agent name is undefined", async () => {
@@ -191,16 +189,14 @@ describe("prometheus-md-only", () => {
       }
 
       //#when //#then
-      await expect(
-        invokeBefore(hook, input, output)
-      ).resolves.toBeUndefined()
+      await expect(invokeBefore(hook, input, output)).resolves.toBeUndefined()
     })
   })
 
-   describe("with Prometheus agent in message storage", () => {
-     beforeEach(() => {
-       setupMessageStorage(TEST_SESSION_ID, "prometheus")
-     })
+  describe("with Prometheus agent in message storage", () => {
+    beforeEach(() => {
+      setupMessageStorage(TEST_SESSION_ID, "prometheus")
+    })
 
     test("should block Prometheus from writing non-.md files", async () => {
       // given
@@ -215,9 +211,9 @@ describe("prometheus-md-only", () => {
       }
 
       // when / #then
-      await expect(
-        invokeBefore(hook, input, output)
-      ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
+      await expect(invokeBefore(hook, input, output)).rejects.toThrow(
+        "File operations restricted to .omo/*.md plan files only",
+      )
     })
 
     describe("#given the patch-based edit tools (omo#11367)", () => {
@@ -317,7 +313,13 @@ describe("prometheus-md-only", () => {
         // given
         const hook = createPrometheusMdOnlyHook(createMockPluginInput())
         const input = { tool: "edit", sessionID: TEST_SESSION_ID, callID: "call-1" }
-        const output = { args: { filePath: join(workspaceRoot, ".omo/plans/a.md"), rename: join(workspaceRoot, "src/a.ts"), edits: [] } }
+        const output = {
+          args: {
+            filePath: join(workspaceRoot, ".omo/plans/a.md"),
+            rename: join(workspaceRoot, "src/a.ts"),
+            edits: [],
+          },
+        }
 
         // when / then
         await expect(invokeBefore(hook, input, output)).rejects.toThrow(
@@ -351,9 +353,7 @@ describe("prometheus-md-only", () => {
       }
 
       // when / #then
-      await expect(
-        invokeBefore(hook, input, output)
-      ).resolves.toBeUndefined()
+      await expect(invokeBefore(hook, input, output)).resolves.toBeUndefined()
     })
 
     test("should inject workflow reminder when Prometheus writes to .omo/plans/", async () => {
@@ -407,9 +407,9 @@ describe("prometheus-md-only", () => {
       }
 
       // when / #then
-      await expect(
-        invokeBefore(hook, input, output)
-      ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
+      await expect(invokeBefore(hook, input, output)).rejects.toThrow(
+        "File operations restricted to .omo/*.md plan files only",
+      )
     })
 
     test("should block Prometheus from writing .md files when .omo is only part of a path segment", async () => {
@@ -425,9 +425,9 @@ describe("prometheus-md-only", () => {
       }
 
       // when / #then
-      await expect(
-        invokeBefore(hook, input, output)
-      ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
+      await expect(invokeBefore(hook, input, output)).rejects.toThrow(
+        "File operations restricted to .omo/*.md plan files only",
+      )
     })
 
     test("should block Prometheus from writing .md files under .omo-backup", async () => {
@@ -443,9 +443,9 @@ describe("prometheus-md-only", () => {
       }
 
       // when / #then
-      await expect(
-        invokeBefore(hook, input, output)
-      ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
+      await expect(invokeBefore(hook, input, output)).rejects.toThrow(
+        "File operations restricted to .omo/*.md plan files only",
+      )
     })
 
     test("should block Edit tool for non-.md files", async () => {
@@ -461,9 +461,9 @@ describe("prometheus-md-only", () => {
       }
 
       // when / #then
-      await expect(
-        invokeBefore(hook, input, output)
-      ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
+      await expect(invokeBefore(hook, input, output)).rejects.toThrow(
+        "File operations restricted to .omo/*.md plan files only",
+      )
     })
 
     test("should allow bash commands from Prometheus", async () => {
@@ -479,9 +479,7 @@ describe("prometheus-md-only", () => {
       }
 
       // when / #then
-      await expect(
-        invokeBefore(hook, input, output)
-      ).resolves.toBeUndefined()
+      await expect(invokeBefore(hook, input, output)).resolves.toBeUndefined()
     })
 
     test("should not affect non-blocked tools", async () => {
@@ -497,9 +495,7 @@ describe("prometheus-md-only", () => {
       }
 
       // when / #then
-      await expect(
-        invokeBefore(hook, input, output)
-      ).resolves.toBeUndefined()
+      await expect(invokeBefore(hook, input, output)).resolves.toBeUndefined()
     })
 
     test("should fail closed on a write whose file argument it cannot read (omo#11367)", async () => {
@@ -515,9 +511,9 @@ describe("prometheus-md-only", () => {
       }
 
       // when / #then
-      await expect(
-        invokeBefore(hook, input, output)
-      ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
+      await expect(invokeBefore(hook, input, output)).rejects.toThrow(
+        "File operations restricted to .omo/*.md plan files only",
+      )
     })
 
     test("should inject planning warning when Prometheus calls task", async () => {
@@ -640,9 +636,7 @@ describe("prometheus-md-only", () => {
       }
 
       // when / #then
-      await expect(
-        invokeBefore(hook, input, output)
-      ).resolves.toBeUndefined()
+      await expect(invokeBefore(hook, input, output)).resolves.toBeUndefined()
     })
 
     test("should not inject warning for non-Prometheus agents calling task", async () => {
@@ -684,15 +678,18 @@ describe("prometheus-md-only", () => {
     //#then should use boulder state agent (atlas), not message file agent (prometheus)
     test("should prioritize boulder agent over message file agent", async () => {
       setupMessageStorage(TEST_SESSION_ID, undefined)
-      
+
       // given - atlas in boulder state (from /ulw-execute)
-      writeFileSync(BOULDER_FILE, JSON.stringify({
-        active_plan: "/test/plan.md",
-        started_at: new Date().toISOString(),
-        session_ids: [TEST_SESSION_ID],
-        plan_name: "test-plan",
-        agent: "atlas"
-      }))
+      writeFileSync(
+        BOULDER_FILE,
+        JSON.stringify({
+          active_plan: "/test/plan.md",
+          started_at: new Date().toISOString(),
+          session_ids: [TEST_SESSION_ID],
+          plan_name: "test-plan",
+          agent: "atlas",
+        }),
+      )
 
       const hook = createPrometheusMdOnlyHook({
         client: {},
@@ -709,23 +706,24 @@ describe("prometheus-md-only", () => {
       }
 
       // when / then - should NOT block because boulder says atlas, not prometheus
-      await expect(
-        invokeBefore(hook, input, output)
-      ).resolves.toBeUndefined()
+      await expect(invokeBefore(hook, input, output)).resolves.toBeUndefined()
     })
 
     test("should use prometheus from boulder state when set", async () => {
       // given - atlas in message files (from some other agent)
       setupMessageStorage(TEST_SESSION_ID, "atlas", { useSessionAgent: false })
-      
+
       // given - prometheus in boulder state (edge case, but should honor it)
-      writeFileSync(BOULDER_FILE, JSON.stringify({
-        active_plan: "/test/plan.md",
-        started_at: new Date().toISOString(),
-        session_ids: [TEST_SESSION_ID],
-        plan_name: "test-plan",
-        agent: "prometheus"
-      }))
+      writeFileSync(
+        BOULDER_FILE,
+        JSON.stringify({
+          active_plan: "/test/plan.md",
+          started_at: new Date().toISOString(),
+          session_ids: [TEST_SESSION_ID],
+          plan_name: "test-plan",
+          agent: "prometheus",
+        }),
+      )
 
       const hook = createPrometheusMdOnlyHook({
         client: {},
@@ -742,23 +740,26 @@ describe("prometheus-md-only", () => {
       }
 
       // when / then - should block because boulder says prometheus
-      await expect(
-        invokeBefore(hook, input, output)
-      ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
+      await expect(invokeBefore(hook, input, output)).rejects.toThrow(
+        "File operations restricted to .omo/*.md plan files only",
+      )
     })
 
     test("should fall back to message files when session not in boulder", async () => {
       // given - prometheus in message files
       setupMessageStorage(TEST_SESSION_ID, "prometheus")
-      
+
       // given - boulder state exists but for different session
-      writeFileSync(BOULDER_FILE, JSON.stringify({
-        active_plan: "/test/plan.md",
-        started_at: new Date().toISOString(),
-        session_ids: ["ses_other_session_id"],
-        plan_name: "test-plan",
-        agent: "atlas"
-      }))
+      writeFileSync(
+        BOULDER_FILE,
+        JSON.stringify({
+          active_plan: "/test/plan.md",
+          started_at: new Date().toISOString(),
+          session_ids: ["ses_other_session_id"],
+          plan_name: "test-plan",
+          agent: "atlas",
+        }),
+      )
 
       const hook = createPrometheusMdOnlyHook({
         client: {},
@@ -775,9 +776,9 @@ describe("prometheus-md-only", () => {
       }
 
       // when / then - should block because falls back to message files (prometheus)
-      await expect(
-        invokeBefore(hook, input, output)
-      ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
+      await expect(invokeBefore(hook, input, output)).rejects.toThrow(
+        "File operations restricted to .omo/*.md plan files only",
+      )
     })
   })
 
@@ -795,9 +796,7 @@ describe("prometheus-md-only", () => {
       }
 
       // when / #then
-      await expect(
-        invokeBefore(hook, input, output)
-      ).resolves.toBeUndefined()
+      await expect(invokeBefore(hook, input, output)).resolves.toBeUndefined()
     })
   })
 
@@ -806,192 +805,185 @@ describe("prometheus-md-only", () => {
       setupMessageStorage(TEST_SESSION_ID, "prometheus")
     })
 
-     test("should allow Windows-style backslash paths under .omo/", async () => {
-       // given
-       setupMessageStorage(TEST_SESSION_ID, "prometheus")
-       const hook = createPrometheusMdOnlyHook(createMockPluginInput())
-       const input = {
-         tool: "Write",
-         sessionID: TEST_SESSION_ID,
-         callID: "call-1",
-       }
-       const output = {
-         args: { filePath: ".omo\\plans\\work-plan.md" },
-       }
+    test("should allow Windows-style backslash paths under .omo/", async () => {
+      // given
+      setupMessageStorage(TEST_SESSION_ID, "prometheus")
+      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+      const input = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output = {
+        args: { filePath: ".omo\\plans\\work-plan.md" },
+      }
 
-       // when / #then
-       await expect(invokeBefore(hook, input, output)).resolves.toBeUndefined()
-     })
+      // when / #then
+      await expect(invokeBefore(hook, input, output)).resolves.toBeUndefined()
+    })
 
-     test("should allow mixed separator paths under .omo/", async () => {
-       // given
-       setupMessageStorage(TEST_SESSION_ID, "prometheus")
-       const hook = createPrometheusMdOnlyHook(createMockPluginInput())
-       const input = {
-         tool: "Write",
-         sessionID: TEST_SESSION_ID,
-         callID: "call-1",
-       }
-       const output = {
-         args: { filePath: ".omo\\plans/work-plan.MD" },
-       }
+    test("should allow mixed separator paths under .omo/", async () => {
+      // given
+      setupMessageStorage(TEST_SESSION_ID, "prometheus")
+      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+      const input = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output = {
+        args: { filePath: ".omo\\plans/work-plan.MD" },
+      }
 
-       // when / #then
-       await expect(invokeBefore(hook, input, output)).resolves.toBeUndefined()
-     })
+      // when / #then
+      await expect(invokeBefore(hook, input, output)).resolves.toBeUndefined()
+    })
 
-     test("should allow uppercase .MD extension", async () => {
-       // given
-       setupMessageStorage(TEST_SESSION_ID, "prometheus")
-       const hook = createPrometheusMdOnlyHook(createMockPluginInput())
-       const input = {
-         tool: "Write",
-         sessionID: TEST_SESSION_ID,
-         callID: "call-1",
-       }
-       const output = {
-         args: { filePath: ".omo/plans/work-plan.MD" },
-       }
+    test("should allow uppercase .MD extension", async () => {
+      // given
+      setupMessageStorage(TEST_SESSION_ID, "prometheus")
+      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+      const input = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output = {
+        args: { filePath: ".omo/plans/work-plan.MD" },
+      }
 
-       // when / #then
-       await expect(
-         invokeBefore(hook, input, output)
-       ).resolves.toBeUndefined()
-     })
+      // when / #then
+      await expect(invokeBefore(hook, input, output)).resolves.toBeUndefined()
+    })
 
-     test("should block paths outside workspace root even if containing .omo", async () => {
-       // given
-       setupMessageStorage(TEST_SESSION_ID, "prometheus")
-       const hook = createPrometheusMdOnlyHook(createMockPluginInput())
-       const input = {
-         tool: "Write",
-         sessionID: TEST_SESSION_ID,
-         callID: "call-1",
-       }
-       const output = {
-         args: { filePath: "/other/project/.omo/plans/x.md" },
-       }
+    test("should block paths outside workspace root even if containing .omo", async () => {
+      // given
+      setupMessageStorage(TEST_SESSION_ID, "prometheus")
+      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+      const input = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output = {
+        args: { filePath: "/other/project/.omo/plans/x.md" },
+      }
 
-       // when / #then
-       await expect(
-         invokeBefore(hook, input, output)
-       ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
-     })
+      // when / #then
+      await expect(invokeBefore(hook, input, output)).rejects.toThrow(
+        "File operations restricted to .omo/*.md plan files only",
+      )
+    })
 
-     test("should allow nested .omo directories (ctx.directory may be parent)", async () => {
-       // given - when ctx.directory is parent of actual project, path includes project name
-       setupMessageStorage(TEST_SESSION_ID, "prometheus")
-       const hook = createPrometheusMdOnlyHook(createMockPluginInput())
-       const input = {
-         tool: "Write",
-         sessionID: TEST_SESSION_ID,
-         callID: "call-1",
-       }
-       const output = {
-         args: { filePath: "src/.omo/plans/x.md" },
-       }
+    test("should allow nested .omo directories (ctx.directory may be parent)", async () => {
+      // given - when ctx.directory is parent of actual project, path includes project name
+      setupMessageStorage(TEST_SESSION_ID, "prometheus")
+      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+      const input = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output = {
+        args: { filePath: "src/.omo/plans/x.md" },
+      }
 
-       // when / #then - the nested .omo remains a planning directory
-       await expect(
-         invokeBefore(hook, input, output)
-       ).resolves.toBeUndefined()
-     })
+      // when / #then - the nested .omo remains a planning directory
+      await expect(invokeBefore(hook, input, output)).resolves.toBeUndefined()
+    })
 
-     test("should block path traversal attempts", async () => {
-       // given
-       setupMessageStorage(TEST_SESSION_ID, "prometheus")
-       const hook = createPrometheusMdOnlyHook(createMockPluginInput())
-       const input = {
-         tool: "Write",
-         sessionID: TEST_SESSION_ID,
-         callID: "call-1",
-       }
-       const output = {
-         args: { filePath: ".omo/../secrets.md" },
-       }
+    test("should block path traversal attempts", async () => {
+      // given
+      setupMessageStorage(TEST_SESSION_ID, "prometheus")
+      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+      const input = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output = {
+        args: { filePath: ".omo/../secrets.md" },
+      }
 
-       // when / #then
-       await expect(
-         invokeBefore(hook, input, output)
-       ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
-     })
+      // when / #then
+      await expect(invokeBefore(hook, input, output)).rejects.toThrow(
+        "File operations restricted to .omo/*.md plan files only",
+      )
+    })
 
-     test("should allow .OMO only when the filesystem identifies it as .omo", async () => {
-       // given
-       setupMessageStorage(TEST_SESSION_ID, "prometheus")
-       const hook = createPrometheusMdOnlyHook(createMockPluginInput())
-       const input = {
-         tool: "Write",
-         sessionID: TEST_SESSION_ID,
-         callID: "call-1",
-       }
-       const output = {
-         args: { filePath: ".OMO/plans/work-plan.md" },
-       }
+    test("should allow .OMO only when the filesystem identifies it as .omo", async () => {
+      // given
+      setupMessageStorage(TEST_SESSION_ID, "prometheus")
+      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+      const input = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output = {
+        args: { filePath: ".OMO/plans/work-plan.md" },
+      }
 
-       // when / #then - native aliases share an entry; separate case-sensitive dirs do not.
-       const alias = join(workspaceRoot, ".OMO")
-       const sameEntry = existsSync(alias) && lstatSync(alias).ino === lstatSync(join(workspaceRoot, ".omo")).ino
-       if (sameEntry) await expect(invokeBefore(hook, input, output)).resolves.toBeUndefined()
-       else await expect(invokeBefore(hook, input, output)).rejects.toThrow("Attempted to modify: .OMO/plans/work-plan.md.")
-     })
+      // when / #then - native aliases share an entry; separate case-sensitive dirs do not.
+      const alias = join(workspaceRoot, ".OMO")
+      const sameEntry = existsSync(alias) && lstatSync(alias).ino === lstatSync(join(workspaceRoot, ".omo")).ino
+      if (sameEntry) await expect(invokeBefore(hook, input, output)).resolves.toBeUndefined()
+      else
+        await expect(invokeBefore(hook, input, output)).rejects.toThrow("Attempted to modify: .OMO/plans/work-plan.md.")
+    })
 
-     test("should allow nested project path with .omo (Windows real-world case)", async () => {
-       // given - simulates when ctx.directory is parent of actual project
-       // User reported: xauusd-dxy-plan\.omo\drafts\supabase-email-templates.md
-       setupMessageStorage(TEST_SESSION_ID, "prometheus")
-       const hook = createPrometheusMdOnlyHook(createMockPluginInput())
-       const input = {
-         tool: "Write",
-         sessionID: TEST_SESSION_ID,
-         callID: "call-1",
-       }
-       const output = {
-         args: { filePath: "xauusd-dxy-plan\\.omo\\drafts\\supabase-email-templates.md" },
-       }
+    test("should allow nested project path with .omo (Windows real-world case)", async () => {
+      // given - simulates when ctx.directory is parent of actual project
+      // User reported: xauusd-dxy-plan\.omo\drafts\supabase-email-templates.md
+      setupMessageStorage(TEST_SESSION_ID, "prometheus")
+      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+      const input = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output = {
+        args: { filePath: "xauusd-dxy-plan\\.omo\\drafts\\supabase-email-templates.md" },
+      }
 
-       // when / #then
-       await expect(
-         invokeBefore(hook, input, output)
-       ).resolves.toBeUndefined()
-     })
+      // when / #then
+      await expect(invokeBefore(hook, input, output)).resolves.toBeUndefined()
+    })
 
-     test("should allow nested project path with mixed separators", async () => {
-       // given
-       setupMessageStorage(TEST_SESSION_ID, "prometheus")
-       const hook = createPrometheusMdOnlyHook(createMockPluginInput())
-       const input = {
-         tool: "Write",
-         sessionID: TEST_SESSION_ID,
-         callID: "call-1",
-       }
-       const output = {
-         args: { filePath: "my-project/.omo\\plans/task.md" },
-       }
+    test("should allow nested project path with mixed separators", async () => {
+      // given
+      setupMessageStorage(TEST_SESSION_ID, "prometheus")
+      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+      const input = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output = {
+        args: { filePath: "my-project/.omo\\plans/task.md" },
+      }
 
-       // when / #then
-       await expect(
-         invokeBefore(hook, input, output)
-       ).resolves.toBeUndefined()
-     })
+      // when / #then
+      await expect(invokeBefore(hook, input, output)).resolves.toBeUndefined()
+    })
 
-     test("should block nested project path without .omo", async () => {
-       // given
-       setupMessageStorage(TEST_SESSION_ID, "prometheus")
-       const hook = createPrometheusMdOnlyHook(createMockPluginInput())
-       const input = {
-         tool: "Write",
-         sessionID: TEST_SESSION_ID,
-         callID: "call-1",
-       }
-       const output = {
-         args: { filePath: "my-project\\src\\code.ts" },
-       }
+    test("should block nested project path without .omo", async () => {
+      // given
+      setupMessageStorage(TEST_SESSION_ID, "prometheus")
+      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+      const input = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output = {
+        args: { filePath: "my-project\\src\\code.ts" },
+      }
 
-       // when / #then
-       await expect(
-         invokeBefore(hook, input, output)
-       ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
-     })
+      // when / #then
+      await expect(invokeBefore(hook, input, output)).rejects.toThrow(
+        "File operations restricted to .omo/*.md plan files only",
+      )
+    })
   })
 })

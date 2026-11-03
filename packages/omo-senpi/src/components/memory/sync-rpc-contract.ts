@@ -10,8 +10,7 @@ export type PendingId = string
 export type PairingCode = string
 
 export type SyncRpcProblem =
-  | { readonly kind: "refused"; readonly reason: string }
-  | { readonly kind: "unavailable"; readonly reason: string }
+  { readonly kind: "refused"; readonly reason: string } | { readonly kind: "unavailable"; readonly reason: string }
 
 export interface JoinProgress {
   readonly pendingId: PendingId
@@ -34,9 +33,7 @@ export interface PendingDeviceApproval {
   readonly revealed: boolean
 }
 
-export type SyncPendingResponse =
-  | { readonly pending: readonly PendingDeviceApproval[] }
-  | SyncRpcProblem
+export type SyncPendingResponse = { readonly pending: readonly PendingDeviceApproval[] } | SyncRpcProblem
 
 export type SyncApproveRequest =
   | { readonly action: "begin"; readonly pendingId: PendingId }

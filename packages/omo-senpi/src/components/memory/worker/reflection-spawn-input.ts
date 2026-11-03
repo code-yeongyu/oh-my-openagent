@@ -54,15 +54,16 @@ export function prepareReflectionCandidateSpawn(input: ReflectionSpawnInput) {
     memoryUsageSource: join(input.identity.paths.runtime, "memory-usage.json"),
     dreamStateSource: join(input.identity.paths.runtime, "dream", "state.json"),
     peoplePolicy: {
-      enabled: input.config.memory?.agents[input.identity.id]?.people?.enabled
-        ?? input.config.memory?.people.enabled
-        ?? true,
-      max_entries: input.config.memory?.agents[input.identity.id]?.people?.max_entries
-        ?? input.config.memory?.people.max_entries
-        ?? 40,
-      max_entry_chars: input.config.memory?.agents[input.identity.id]?.people?.max_entry_chars
-        ?? input.config.memory?.people.max_entry_chars
-        ?? 200,
+      enabled:
+        input.config.memory?.agents[input.identity.id]?.people?.enabled ?? input.config.memory?.people.enabled ?? true,
+      max_entries:
+        input.config.memory?.agents[input.identity.id]?.people?.max_entries ??
+        input.config.memory?.people.max_entries ??
+        40,
+      max_entry_chars:
+        input.config.memory?.agents[input.identity.id]?.people?.max_entry_chars ??
+        input.config.memory?.people.max_entry_chars ??
+        200,
     },
     systemTokenBudget,
     systemTokenTarget: Math.floor(MEMORY_PRESSURE_SOFT_RATIO * systemTokenBudget),

@@ -4,15 +4,7 @@ import { countDagNodes as countNodes } from "./counts"
 import { subscribeDagJournal, type DagJournalListener } from "./journal"
 import type { DagRunRecordV1 } from "./manager"
 import type { DagFileStore } from "./store"
-import type {
-  DagNode,
-  DagNodeCounts,
-  DagNodeError,
-  DagNodeId,
-  DagRunId,
-  DagRunSnapshot,
-  DagRunStatus,
-} from "./types"
+import type { DagNode, DagNodeCounts, DagNodeError, DagNodeId, DagRunId, DagRunSnapshot, DagRunStatus } from "./types"
 import { TERMINAL_DAG_RUN_STATUSES } from "./types"
 
 const CANCEL_REASON_PAGE_LIMIT = 64
@@ -94,7 +86,11 @@ export function createDagWaitSurface(options: DagWaitSurfaceOptions): DagWaitSur
       throw new DagWaitError({ code: "invalid_arguments", message: "runId must be a non-empty string" })
     }
     if (typeof parentSessionId !== "string" || parentSessionId.length === 0) {
-      throw new DagWaitError({ code: "invalid_arguments", message: "parentSessionId must be a non-empty string", runId })
+      throw new DagWaitError({
+        code: "invalid_arguments",
+        message: "parentSessionId must be a non-empty string",
+        runId,
+      })
     }
     const record = store.readCheckpoint<DagRunRecordV1>(runId)
     if (record === null) {

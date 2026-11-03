@@ -53,10 +53,17 @@ export const SHELL_COMMAND_PATTERNS = {
   },
   // Banned commands - will always hang
   banned: [
-    "vim", "nano", "vi", "emacs",           // Editors
-    "less", "more", "man",                   // Pagers
-    "python (REPL)", "node (REPL)",          // REPLs without -c/-e
-    "git add -p", "git rebase -i",           // Interactive git modes
+    "vim",
+    "nano",
+    "vi",
+    "emacs", // Editors
+    "less",
+    "more",
+    "man", // Pagers
+    "python (REPL)",
+    "node (REPL)", // REPLs without -c/-e
+    "git add -p",
+    "git rebase -i", // Interactive git modes
   ],
   // Workarounds for scripts that require input
   workarounds: {

@@ -57,7 +57,7 @@ name: duplicate-skill
 description: From opencode-project (highest priority)
 ---
 opencode-project body.
-`
+`,
       )
 
       writeFileSync(
@@ -67,7 +67,7 @@ name: duplicate-skill
 description: From opencode-global (middle priority)
 ---
 opencode-global body.
-`
+`,
       )
 
       writeFileSync(
@@ -77,7 +77,7 @@ name: duplicate-skill
 description: From claude project (lowest priority among these)
 ---
 claude project body.
-`
+`,
       )
 
       // when
@@ -86,7 +86,7 @@ claude project body.
 
       try {
         const skills = await discoverSkills()
-        const duplicates = skills.filter(s => s.name === "duplicate-skill")
+        const duplicates = skills.filter((s) => s.name === "duplicate-skill")
 
         // then
         expect(duplicates).toHaveLength(1)
@@ -129,7 +129,7 @@ name: global-over-project
 description: From opencode-global (should win)
 ---
 opencode-global body.
-`
+`,
       )
 
       writeFileSync(
@@ -139,7 +139,7 @@ name: global-over-project
 description: From claude project (should lose)
 ---
 claude project body.
-`
+`,
       )
 
       const { discoverSkills } = await import("./loader")
@@ -147,7 +147,7 @@ claude project body.
 
       try {
         const skills = await discoverSkills()
-        const matches = skills.filter(s => s.name === "global-over-project")
+        const matches = skills.filter((s) => s.name === "global-over-project")
 
         expect(matches).toHaveLength(1)
         expect(matches[0]?.scope).toBe("opencode")
@@ -186,7 +186,7 @@ name: ulw-plan
 description: From project Claude ulw-plan (should win over shared)
 ---
 project Claude ulw-plan body.
-`
+`,
       )
 
       const { discoverSkills } = await import("./loader")
@@ -194,7 +194,7 @@ project Claude ulw-plan body.
 
       try {
         const skills = await discoverSkills()
-        const matches = skills.filter(s => s.name === "ulw-plan")
+        const matches = skills.filter((s) => s.name === "ulw-plan")
 
         expect(matches).toHaveLength(1)
         expect(matches[0]?.scope).toBe("project")
@@ -233,7 +233,7 @@ name: ulw-plan
 description: From project Agents ulw-plan (should win over shared)
 ---
 project Agents ulw-plan body.
-`
+`,
       )
 
       const { discoverSkills } = await import("./loader")
@@ -241,7 +241,7 @@ project Agents ulw-plan body.
 
       try {
         const skills = await discoverSkills()
-        const matches = skills.filter(s => s.name === "ulw-plan")
+        const matches = skills.filter((s) => s.name === "ulw-plan")
 
         expect(matches).toHaveLength(1)
         expect(matches[0]?.scope).toBe("project")
@@ -285,7 +285,7 @@ name: ulw-plan
 description: Local shadow ulw-plan
 ---
 local shadow ulw-plan body.
-`
+`,
         )
       }
 
@@ -337,7 +337,7 @@ name: shared/ulw-plan
 description: Literal project skill with slash in name
 ---
 literal project body.
-`
+`,
       )
 
       const { discoverSkills, getSkillByName } = await import("./loader")
@@ -393,12 +393,12 @@ Skill body.
         const skills = await discoverSkills({ includeClaudeCodePaths: false })
 
         // then
-        const names = skills.map(s => s.name)
+        const names = skills.map((s) => s.name)
         const uniqueNames = [...new Set(names)]
         expect(names.length).toBe(uniqueNames.length)
       } finally {
         process.chdir(originalCwd)
-         if (originalOpenCodeConfigDir === undefined) {
+        if (originalOpenCodeConfigDir === undefined) {
           delete process.env.OPENCODE_CONFIG_DIR
         } else {
           process.env.OPENCODE_CONFIG_DIR = originalOpenCodeConfigDir

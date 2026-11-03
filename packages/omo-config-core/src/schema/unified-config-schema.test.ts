@@ -127,7 +127,9 @@ describe("unified omo config schema", () => {
     // then
     expect(result.success).toBe(false)
     if (result.success) throw new Error("Expected the opaque opencode block to reject arrays")
-    expect(result.error.issues.map((issue) => issue.path.join(".")).some((path) => path.includes("[opencode]"))).toBe(true)
+    expect(result.error.issues.map((issue) => issue.path.join(".")).some((path) => path.includes("[opencode]"))).toBe(
+      true,
+    )
   })
 
   test("#given base telemetry and an empty codex block #when parsed #then the block stays default-free", () => {

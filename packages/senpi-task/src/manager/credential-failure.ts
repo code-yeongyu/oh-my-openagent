@@ -22,7 +22,8 @@ const CREDENTIAL_MISSING =
 // provider, unless the text scopes the requirement to a model ("Authentication required for this model", or the
 // failed model's id), which a sibling may not share. The absence phrasings above stay provider-wide even when they
 // name a model: a key or an account belongs to the provider.
-const CREDENTIAL_REQUIRED = /\b(?:access token|(?<!proxy[ _-])authentication) is required\b|(?<!proxy[ _-])authentication[_ ]required/i
+const CREDENTIAL_REQUIRED =
+  /\b(?:access token|(?<!proxy[ _-])authentication) is required\b|(?<!proxy[ _-])authentication[_ ]required/i
 // A 403 is ambiguous: a provider also answers it for ONE model the key may not use (tier, region,
 // preview access, an organization that must be verified for that model), which a sibling model on
 // the same provider does not share. A 403 counts as a credential rejection only when it names the
@@ -93,9 +94,10 @@ export function terminalFailureMessage(record: TaskRecord | null | undefined, fa
   }
   if (usageLimitScope(failureMessage) === undefined) return failureMessage
   const model = record.resolved_model === undefined ? record.model : `${provider}/${record.resolved_model.model_id}`
-  const exhausted = runtimeFallbackCandidates(record, failureMessage).remaining.length === 0
-    ? " No other model in its fallback chain could take over."
-    : ""
+  const exhausted =
+    runtimeFallbackCandidates(record, failureMessage).remaining.length === 0
+      ? " No other model in its fallback chain could take over."
+      : ""
   return `${failureMessage}\n${model} reached its usage limit, so this task stopped.${exhausted} Retry once the limit resets, or point this category at another provider or model in omo.json.`
 }
 

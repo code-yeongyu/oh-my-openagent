@@ -1,11 +1,14 @@
-export type EnsureFailureReason = "ensure_failed" | "ensure_timed_out" | "protocol" | "capability" | "legacy_host" | "host_busy"
+export type EnsureFailureReason =
+  "ensure_failed" | "ensure_timed_out" | "protocol" | "capability" | "legacy_host" | "host_busy"
 
 const INCOMPATIBLE_REFUSALS: ReadonlySet<string> = new Set(["protocol", "capability", "legacy_host"])
 
 export function classifyEnsureFailure(error: unknown): EnsureFailureReason {
   if (error instanceof Error) {
     if (error.name === "HostEnsureRefusedError") {
-      return "reason" in error && error.reason === "host_busy" ? "host_busy" : incompatibleRefusal(error) ?? "ensure_failed"
+      return "reason" in error && error.reason === "host_busy"
+        ? "host_busy"
+        : (incompatibleRefusal(error) ?? "ensure_failed")
     }
     const code = "code" in error && typeof error.code === "string" ? error.code : undefined
     if (code === "SQLITE_BUSY" || code === "ETIMEDOUT") return "ensure_timed_out"

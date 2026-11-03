@@ -69,28 +69,44 @@ export async function runTaskSend(
   options: TaskSendRunOptions = {},
 ): Promise<SendToolResult> {
   if (options.signal?.aborted === true) {
-    return toolResult(`Not sent to ${params.to}: the turn was aborted before the message went out.`, { kind: "aborted", to: params.to })
+    return toolResult(`Not sent to ${params.to}: the turn was aborted before the message went out.`, {
+      kind: "aborted",
+      to: params.to,
+    })
   }
   const deliver = options.deliverLateOutcome
   const sending = sendNow(manager, params, callerSessionId, teamRouting)
-  const reported = await settledWithin(sending, deliver === undefined ? Number.POSITIVE_INFINITY : SEND_REPORT_WINDOW_MS, options.signal)
+  const reported = await settledWithin(
+    sending,
+    deliver === undefined ? Number.POSITIVE_INFINITY : SEND_REPORT_WINDOW_MS,
+    options.signal,
+  )
   if (reported.settled) return reported.value
   const cause = reported.cause === "aborted" ? "aborted" : "host_slow"
   sending.then(
     (result) => {
       if (deliver !== undefined) deliver(result, { cause, callerSessionId })
-      else log("senpi-task task_send outcome after the caller stopped waiting", { to: params.to, details: result.details })
+      else
+        log("senpi-task task_send outcome after the caller stopped waiting", { to: params.to, details: result.details })
     },
     (error: unknown) => {
       const reason = error instanceof Error ? error.message : String(error)
       log("senpi-task task_send failed after the caller stopped waiting", { to: params.to, reason })
-      deliver?.(toolErrorResult(`task_send to ${params.to} failed: ${reason}`, { kind: "send_failed", to: params.to, reason }), { cause, callerSessionId })
+      deliver?.(
+        toolErrorResult(`task_send to ${params.to} failed: ${reason}`, { kind: "send_failed", to: params.to, reason }),
+        { cause, callerSessionId },
+      )
     },
   )
-  const lead = cause === "aborted" ? "The turn was aborted while the message was being delivered" : "The task host is slow to answer"
+  const lead =
+    cause === "aborted"
+      ? "The turn was aborted while the message was being delivered"
+      : "The task host is slow to answer"
   const follow = deliver === undefined ? "check task_output for the result" : "the outcome arrives as a notification"
   return toolResult(`${lead}; delivery to ${params.to} continues in the background and ${follow}. Do not resend it.`, {
-    kind: "delivering", to: params.to, reason: cause,
+    kind: "delivering",
+    to: params.to,
+    reason: cause,
   })
 }
 
@@ -131,7 +147,10 @@ async function sendNow(
       body: params.message,
       ...(params.summary !== undefined ? { summary: params.summary } : {}),
     })
-    const wrapped: SendToolResult = toolResult(firstText(teamResult), { kind: "team_message", team: teamResult.details })
+    const wrapped: SendToolResult = toolResult(firstText(teamResult), {
+      kind: "team_message",
+      team: teamResult.details,
+    })
     return teamResult.isError === true ? { ...wrapped, isError: true } : wrapped
   }
 
@@ -173,10 +192,11 @@ export function createTaskSendTool(deps: TaskSendDeps): ToolDefinition<typeof Ta
     label: "Task Send",
     description: DESCRIPTION,
     parameters: TaskSendParams,
-    execute: (_toolCallId, params, signal, _onUpdate, ctx) => runTaskSend(deps.manager, params, resolveCaller(ctx), deps.teamRouting, {
-      ...(signal === undefined ? {} : { signal }),
-      ...(deps.deliverLateOutcome === undefined ? {} : { deliverLateOutcome: deps.deliverLateOutcome }),
-    }),
+    execute: (_toolCallId, params, signal, _onUpdate, ctx) =>
+      runTaskSend(deps.manager, params, resolveCaller(ctx), deps.teamRouting, {
+        ...(signal === undefined ? {} : { signal }),
+        ...(deps.deliverLateOutcome === undefined ? {} : { deliverLateOutcome: deps.deliverLateOutcome }),
+      }),
     renderCall: (args, theme) => renderTaskSendCall(args, theme),
     renderResult: (result, options, theme) => renderTaskSendResult(result, options, theme),
   }
@@ -209,11 +229,17 @@ export function createMemberScopedTaskSendTool(
     description: MEMBER_SCOPED_DESCRIPTION,
     parameters: MemberScopedTaskSendParams,
     execute: (_toolCallId, params: MemberScopedTaskSendInput, signal, _onUpdate, ctx) =>
-      runTaskSend(deps.manager, params, resolveCaller(ctx), {
-        service: deps.service,
-        from: deps.from,
-        teamRunId: deps.teamRunId,
-      }, signal === undefined ? {} : { signal }),
+      runTaskSend(
+        deps.manager,
+        params,
+        resolveCaller(ctx),
+        {
+          service: deps.service,
+          from: deps.from,
+          teamRunId: deps.teamRunId,
+        },
+        signal === undefined ? {} : { signal },
+      ),
     renderCall: (args, theme) => renderMemberScopedTaskSendCall(args, theme),
     renderResult: (result, options, theme) => renderTaskSendResult(result, options, theme),
   }

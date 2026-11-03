@@ -34,10 +34,15 @@ describe("browser bridge", () => {
   it("#given the skill reports a state #when the tool runs #then the app gets it as the session's omo.browser.state event", async () => {
     const { pi, tool } = setup()
 
-    const result = await tool.execute("c1", { op: "state", data: { engine: "connected", status: "acting", action: "click" } })
+    const result = await tool.execute("c1", {
+      op: "state",
+      data: { engine: "connected", status: "acting", action: "click" },
+    })
 
     expect(result.details.ok).toBe(true)
-    expect(pi.rpcEvents).toEqual([{ name: BROWSER_STATE_EVENT, data: { engine: "connected", status: "acting", action: "click" } }])
+    expect(pi.rpcEvents).toEqual([
+      { name: BROWSER_STATE_EVENT, data: { engine: "connected", status: "acting", action: "click" } },
+    ])
   })
 
   it("#given a malformed state #when the tool runs #then nothing is published", async () => {

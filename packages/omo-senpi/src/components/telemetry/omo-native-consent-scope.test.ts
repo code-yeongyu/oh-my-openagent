@@ -27,7 +27,13 @@ describe("omo-native session_summary consent scope", () => {
       const home = join(agentDir, "home")
       const project = join(home, "project")
       writeProjectTelemetry(project, true)
-      const pi = await registerProcess({ agentDir, recorder, cwd: project, env: { HOME: home }, options: { scheduleConsentCheck: () => () => undefined } })
+      const pi = await registerProcess({
+        agentDir,
+        recorder,
+        cwd: project,
+        env: { HOME: home },
+        options: { scheduleConsentCheck: () => () => undefined },
+      })
       await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, inProject("flip", project))
       await pi.dispatch("turn_end", turnEnd(), inProject("flip", project))
       expect(contentFiles(stateDir)).toHaveLength(1)
@@ -59,10 +65,18 @@ describe("omo-native session_summary consent scope", () => {
 
       // when
       const recovering = await registerProcess({ agentDir, recorder, cwd: "/repo", options })
-      await recovering.dispatch("session_start", { type: "session_start", reason: "startup" }, inProject("recovering", "/repo"))
+      await recovering.dispatch(
+        "session_start",
+        { type: "session_start", reason: "startup" },
+        inProject("recovering", "/repo"),
+      )
       await recovering.dispatch("turn_end", turnEnd(), inProject("recovering", "/repo"))
       // The recovery sweep is loaded on demand; the process's own shutdown waits for it to finish.
-      await recovering.dispatch("session_shutdown", { type: "session_shutdown", reason: "quit" }, inProject("recovering", "/repo"))
+      await recovering.dispatch(
+        "session_shutdown",
+        { type: "session_shutdown", reason: "quit" },
+        inProject("recovering", "/repo"),
+      )
 
       // then
       expect(sentSeqs(recorder, "hashed:scopeless")).toEqual([])
@@ -82,7 +96,11 @@ describe("omo-native session_summary consent scope", () => {
           scheduleConsentCheck: () => () => undefined,
         }
         const pi = await registerProcess({ agentDir, recorder, cwd: "/project-a", options })
-        await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, inProject("cwdless", "/project-a"))
+        await pi.dispatch(
+          "session_start",
+          { type: "session_start", reason: "startup" },
+          inProject("cwdless", "/project-a"),
+        )
         await pi.dispatch("turn_end", turnEnd(), inProject("cwdless", "/project-a"))
 
         // when: the project opts out and the next event carries no cwd

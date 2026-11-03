@@ -1,5 +1,14 @@
 import { describe, expect, test } from "bun:test"
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 
@@ -177,11 +186,7 @@ describe("writeMomusReviewArtifact containment", () => {
 
     try {
       // when
-      const written = writeMomusReviewArtifact(
-        directory,
-        join(otherProject, ".omo", "plans", "demo.md"),
-        baseArtifact,
-      )
+      const written = writeMomusReviewArtifact(directory, join(otherProject, ".omo", "plans", "demo.md"), baseArtifact)
 
       // then
       expect(written).toBeNull()

@@ -10,11 +10,7 @@ describe("copyBundledMcpRuntimeDists", () => {
     const tempRoot = await mkdtemp(join(tmpdir(), "codex-bundled-mcps-"))
     const sourceRoot = join(tempRoot, "packages", "omo-codex", "plugin")
     const pluginRoot = join(tempRoot, "cache", "plugin")
-    const runtimeRoots = [
-      "../../git-bash-mcp/dist",
-      "../../lsp-daemon/dist",
-      "../../lsp-tools-mcp/dist",
-    ] as const
+    const runtimeRoots = ["../../git-bash-mcp/dist", "../../lsp-daemon/dist", "../../lsp-tools-mcp/dist"] as const
 
     try {
       await mkdir(sourceRoot, { recursive: true })

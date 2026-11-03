@@ -16,7 +16,7 @@ import { getAgentConfigKey } from "../../shared/agent-display-names"
 export function getFallbackModelsForSession(
   sessionID: string,
   agent: string | undefined,
-  pluginConfig: OhMyOpenCodeConfig | undefined
+  pluginConfig: OhMyOpenCodeConfig | undefined,
 ): string[] {
   if (!pluginConfig) return []
 
@@ -47,18 +47,24 @@ function getRawFallbackModelsForSession(
   const categoryConfig = sessionCategory ? pluginConfig.categories?.[sessionCategory] : undefined
   const agentKey = agent ? getAgentConfigKey(agent) : undefined
   const agentConfig = agentKey
-    ? pluginConfig.agents?.[agentKey]
-      ?? Object.entries(pluginConfig.agents ?? {}).find(([key]) => key.toLowerCase() === agentKey)?.[1]
+    ? (pluginConfig.agents?.[agentKey] ??
+      Object.entries(pluginConfig.agents ?? {}).find(([key]) => key.toLowerCase() === agentKey)?.[1])
     : undefined
   const agentCategoryConfig = agentConfig?.category ? pluginConfig.categories?.[agentConfig.category] : undefined
-  const distribution = categoryConfig?.models_distribution
-    ?? (agentConfig?.models?.length ? agentConfig.models_distribution
-      : !agentConfig?.model ? agentCategoryConfig?.models_distribution : undefined)
+  const distribution =
+    categoryConfig?.models_distribution ??
+    (agentConfig?.models?.length
+      ? agentConfig.models_distribution
+      : !agentConfig?.model
+        ? agentCategoryConfig?.models_distribution
+        : undefined)
   const bootstrap = distribution === "round_robin" ? getDelegatedChildSessionBootstrap(sessionID) : undefined
   if (bootstrap) {
-    return bootstrap.fallbackChain?.flatMap(({ providers, model, ...settings }) =>
-      providers.map((provider) => ({ ...settings, model: `${provider}/${model}` })),
-    ) ?? []
+    return (
+      bootstrap.fallbackChain?.flatMap(({ providers, model, ...settings }) =>
+        providers.map((provider) => ({ ...settings, model: `${provider}/${model}` })),
+      ) ?? []
+    )
   }
   if (sessionCategory && pluginConfig.categories?.[sessionCategory]) {
     const categoryConfig = pluginConfig.categories[sessionCategory]

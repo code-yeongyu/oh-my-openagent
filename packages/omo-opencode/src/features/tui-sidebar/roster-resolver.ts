@@ -69,9 +69,7 @@ function toModelResolutionConfig(config: OhMyOpenCodeConfig): OmoConfig {
 export function resolveRoster(directory: string): RosterRow[] {
   try {
     const config = validatePluginConfig(directory).config
-    const disabledAgents = new Set(
-      migrateDisabledAgents(config.disabled_agents).map((agent) => agent.toLowerCase()),
-    )
+    const disabledAgents = new Set(migrateDisabledAgents(config.disabled_agents).map((agent) => agent.toLowerCase()))
     const resolution = getModelResolutionInfoWithOverrides(toModelResolutionConfig(config))
     return [
       ...resolution.agents.filter((entry) => !disabledAgents.has(entry.name.toLowerCase())),

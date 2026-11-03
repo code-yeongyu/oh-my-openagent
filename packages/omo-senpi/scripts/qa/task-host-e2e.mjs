@@ -76,7 +76,9 @@ function transcript(result, header) {
 
 async function main(options) {
   if (process.platform === "win32") {
-    console.log(JSON.stringify({ result: "SKIP", reason: "a shared daemon needs a unix socket, which win32 does not provide" }))
+    console.log(
+      JSON.stringify({ result: "SKIP", reason: "a shared daemon needs a unix socket, which win32 does not provide" }),
+    )
     return 0
   }
   const bin = options.bin === undefined ? undefined : resolve(options.bin)
@@ -121,7 +123,11 @@ async function main(options) {
       title: "the binary under test was not replaced while the suite ran",
       status: "fail",
       reason: `${bin} changed during the run (${binaryBefore.slice(0, 12)} -> ${binaryAfter.slice(0, 12)}): every scenario after the swap measured a different build, and only the first provisioned runtime carries the seeded mock provider. Rerun against a binary nobody is rebuilding.`,
-      facts: { binaryDigestBefore: binaryBefore, binaryDigestAfter: binaryAfter, runtimeVersionsProvisioned: provisioned },
+      facts: {
+        binaryDigestBefore: binaryBefore,
+        binaryDigestAfter: binaryAfter,
+        runtimeVersionsProvisioned: provisioned,
+      },
     })
   }
   // Structural isolation only: QA must not even read the operator's credentials to hash them.
@@ -157,13 +163,15 @@ async function main(options) {
     writeFileSync(join(out, `task-host-e2e-${result.scenario}.log`), transcript(result, header))
   }
   for (const name of SUMMARY_NAMES) writeFileSync(join(out, name), `${JSON.stringify(summary, null, 2)}\n`)
-  console.log(JSON.stringify({
-    result: summary.result,
-    counts: summary.counts,
-    out,
-    realSenpiUntouched,
-    realAgentDirNeverAddressed: summary.realAgentDirNeverAddressed,
-  }))
+  console.log(
+    JSON.stringify({
+      result: summary.result,
+      counts: summary.counts,
+      out,
+      realSenpiUntouched,
+      realAgentDirNeverAddressed: summary.realAgentDirNeverAddressed,
+    }),
+  )
   return summary.result === "PASS" && leaked.after.length === 0 && addressed.length === 0 ? 0 : 1
 }
 
@@ -183,7 +191,10 @@ async function sweepRunRoot(runRoot) {
     }
     await new Promise((resolve) => setTimeout(resolve, 1_000))
   }
-  return { before: before.map((entry) => ({ pid: entry.pid, args: entry.args.slice(0, 200) })), after: sandboxProcesses({ root: runRoot }).map((entry) => entry.pid) }
+  return {
+    before: before.map((entry) => ({ pid: entry.pid, args: entry.args.slice(0, 200) })),
+    after: sandboxProcesses({ root: runRoot }).map((entry) => entry.pid),
+  }
 }
 
 /**
@@ -212,7 +223,11 @@ function optionalPath(value) {
 }
 
 function countBy(results) {
-  return results.reduce((counts, entry) => ({ ...counts, [entry.status]: (counts[entry.status] ?? 0) + 1 }), { pass: 0, fail: 0, skipped: 0 })
+  return results.reduce((counts, entry) => ({ ...counts, [entry.status]: (counts[entry.status] ?? 0) + 1 }), {
+    pass: 0,
+    fail: 0,
+    skipped: 0,
+  })
 }
 
 async function runScenarios(run, selected) {

@@ -17,8 +17,13 @@ for await (const line of createInterface({ input: process.stdin })) {
     break
   }
   if (command.type === "get_state") {
-    send({ type: "response", command: command.type, id: command.id, success: true,
-      data: { sessionId: fixture.session.sessionId, isStreaming: false, isCompacting: false } })
+    send({
+      type: "response",
+      command: command.type,
+      id: command.id,
+      success: true,
+      data: { sessionId: fixture.session.sessionId, isStreaming: false, isCompacting: false },
+    })
     continue
   }
   if (command.type !== "prompt") {
@@ -28,11 +33,17 @@ for await (const line of createInterface({ input: process.stdin })) {
   // The response deliberately follows the denial: the owner must retain startup events.
   if (command.message === "nested") await fixture.child("process")
   else if (command.message === "invalid") {
-    send({ type: "extension_event", name: "computer.permission_required",
-      data: { type: "computer.permission_required", permission: "camera", app: "Test App" } })
+    send({
+      type: "extension_event",
+      name: "computer.permission_required",
+      data: { type: "computer.permission_required", permission: "camera", app: "Test App" },
+    })
   } else await fixture.execute("computer", capture)
   send({ type: "response", command: command.type, id: command.id, success: true })
-  send({ type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "done" }], stopReason: "stop" } })
+  send({
+    type: "message_end",
+    message: { role: "assistant", content: [{ type: "text", text: "done" }], stopReason: "stop" },
+  })
   send({ type: "agent_end", messages: [], willRetry: false })
   send({ type: "agent_idle" })
 }

@@ -1,4 +1,5 @@
-const CODEX_ONLY_ERROR = "lazycodex-ai installs the Codex Light edition only. Use the omo installer for OpenCode or both-platform installs."
+const CODEX_ONLY_ERROR =
+  "lazycodex-ai installs the Codex Light edition only. Use the omo installer for OpenCode or both-platform installs."
 
 export const PASSTHROUGH_COMMANDS: ReadonlySet<string> = new Set([
   "doctor",
@@ -11,7 +12,11 @@ export const PASSTHROUGH_COMMANDS: ReadonlySet<string> = new Set([
 ] as const)
 
 export type LazyCodexInstallCliArgs =
-  | { readonly kind: "install"; readonly autonomousPermissions: boolean | undefined; readonly repoRoot: string | undefined }
+  | {
+      readonly kind: "install"
+      readonly autonomousPermissions: boolean | undefined
+      readonly repoRoot: string | undefined
+    }
   | { readonly kind: "help" }
   | { readonly kind: "version" }
   | {

@@ -7,7 +7,15 @@ import { appendEntries, emptyChain } from "../crypto/chain.ts"
 import { createRejectionCounter } from "../crypto/rejection.ts"
 import { pinTrustAnchor } from "../crypto/trust-pin.ts"
 import type { SyncSession } from "../engine/open.ts"
-import { approve, createWorld, type Device, freshStateDir, newDevice, removeWorldStateDirs, type World } from "../recovery/testing/world.test-support.ts"
+import {
+  approve,
+  createWorld,
+  type Device,
+  freshStateDir,
+  newDevice,
+  removeWorldStateDirs,
+  type World,
+} from "../recovery/testing/world.test-support.ts"
 import { SealRefusedError } from "./sealer.ts"
 import { type AccountSessionOutcome, openAccountSession } from "./session.ts"
 import { type ChainWireServer, startChainWireServer } from "./testing/chain-wire-server.test-support.ts"
@@ -23,7 +31,11 @@ afterEach(async () => {
 afterAll(removeWorldStateDirs)
 
 async function pinnedDir(world: World): Promise<string> {
-  const walked = await appendEntries(emptyChain(world.account, creatorAnchor(world.account, world.owner.keyring)), world.server.chain(world.account), createRejectionCounter())
+  const walked = await appendEntries(
+    emptyChain(world.account, creatorAnchor(world.account, world.owner.keyring)),
+    world.server.chain(world.account),
+    createRejectionCounter(),
+  )
   if (!walked.ok || walked.state.pin === null) throw new Error("the fixture genesis does not anchor")
   const dir = freshStateDir()
   await pinTrustAnchor(dir, world.account, walked.state.pin)
@@ -36,7 +48,14 @@ async function setup() {
   servers.push(server)
   const open = (device: Device, pinDir: string, spaceId = SPACE): Promise<AccountSessionOutcome> => {
     const token = server.tokenFor({ ...device.principal })
-    return openAccountSession({ baseUrl: server.url, token: () => token, account: world.account, keyring: device.keyring, pinDir, spaceId })
+    return openAccountSession({
+      baseUrl: server.url,
+      token: () => token,
+      account: world.account,
+      keyring: device.keyring,
+      pinDir,
+      spaceId,
+    })
   }
   return { world, server, open }
 }
@@ -52,7 +71,15 @@ async function push(session: SyncSession, baseSeq: number, key: string, text: st
   const digest = new Bun.CryptoHasher("sha256").update(sealed.bytes).digest("hex")
   const uploadId = await session.transport.reserve(sealed.bytes.length, digest)
   await session.transport.upload(uploadId, sealed.bytes)
-  const appended = await session.transport.append({ uploadId, digest, baseSeq, batchId, epoch: sealed.epoch, link: sealed.link, recordSig: sealed.recordSig })
+  const appended = await session.transport.append({
+    uploadId,
+    digest,
+    baseSeq,
+    batchId,
+    epoch: sealed.epoch,
+    link: sealed.link,
+    recordSig: sealed.recordSig,
+  })
   if (!appended.ok) throw new Error("the append was refused as stale")
   return appended.seq
 }
@@ -61,7 +88,10 @@ async function verifyAt(session: SyncSession, seq: number) {
   const page = await session.transport.pull(seq - 1, 1)
   const entry = page.entries[0]
   if (entry === undefined || entry.seq !== seq) throw new Error(`no pulled entry at ${seq}`)
-  return session.verifier.verifyEntry(entry, entry.kind === "batch" ? await session.transport.download(entry.objectId) : new Uint8Array())
+  return session.verifier.verifyEntry(
+    entry,
+    entry.kind === "batch" ? await session.transport.download(entry.objectId) : new Uint8Array(),
+  )
 }
 
 describe("account sync session", () => {
@@ -70,14 +100,16 @@ describe("account sync session", () => {
     const token = () => server.tokenFor({ ...world.owner.principal })
     const chain = createAccountHttp({ baseUrl: server.url, token })
     const transport = createHttpTransport({ baseUrl: server.url, token })
-    const session = ready(await openAccountSession({
-      account: world.account,
-      keyring: world.owner.keyring,
-      pinDir: await pinnedDir(world),
-      spaceId: SPACE,
-      chain,
-      transport,
-    }))
+    const session = ready(
+      await openAccountSession({
+        account: world.account,
+        keyring: world.owner.keyring,
+        pinDir: await pinnedDir(world),
+        spaceId: SPACE,
+        chain,
+        transport,
+      }),
+    )
     expect(session.transport).toBe(transport)
     const seq = await push(session, 1, "notes/proxy.md", "main-owned transport")
     expect(await verifyAt(session, seq)).toMatchObject({ ok: true })
@@ -93,7 +125,9 @@ describe("account sync session", () => {
     const verdict = await verifyAt(ready(await open(second, await pinnedDir(world))), seq)
     expect(verdict.ok).toBe(true)
     if (!verdict.ok) return
-    expect(verdict.payload.items.map((item) => [item.key, new TextDecoder().decode(item.ops)])).toEqual([["notes/a.md", "hello from the owner"]])
+    expect(verdict.payload.items.map((item) => [item.key, new TextDecoder().decode(item.ops)])).toEqual([
+      ["notes/a.md", "hello from the owner"],
+    ])
 
     const elsewhere = await verifyAt(ready(await open(second, await pinnedDir(world), OTHER_SPACE)), seq)
     expect(elsewhere.ok && elsewhere.payload.items).toEqual([])
@@ -142,6 +176,8 @@ describe("account sync session", () => {
   test("sealing on a base the verified chain has not reached is refused", async () => {
     const { world, open } = await setup()
     const session = ready(await open(world.owner, await pinnedDir(world)))
-    await expect(session.sealer.seal("AAAAAAAAAAAAAAAAAAAAAA", 5, { items: [] })).rejects.toBeInstanceOf(SealRefusedError)
+    await expect(session.sealer.seal("AAAAAAAAAAAAAAAAAAAAAA", 5, { items: [] })).rejects.toBeInstanceOf(
+      SealRefusedError,
+    )
   }, 30_000)
 })

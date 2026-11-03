@@ -31,12 +31,9 @@ export function runContractMatrix(repoRoot, artifacts) {
   const logPath = join(artifacts, "contract-tests.log")
   writeFileSync(
     logPath,
-    [
-      `command=bun test ${TESTS.join(" ")}`,
-      `exit=${result.status}`,
-      result.stdout ?? "",
-      result.stderr ?? "",
-    ].join("\n"),
+    [`command=bun test ${TESTS.join(" ")}`, `exit=${result.status}`, result.stdout ?? "", result.stderr ?? ""].join(
+      "\n",
+    ),
   )
   if (result.status !== 0) {
     return {

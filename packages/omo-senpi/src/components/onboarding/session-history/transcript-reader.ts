@@ -11,7 +11,14 @@ import type { AgentSessionSource, TranscriptSource } from "./types"
 export type TranscriptIdentity = Omit<TranscriptSource, "provider" | "homePath" | "providerSessionId">
 
 export function transcriptIdentity(filePath: string, stats: SessionHistoryFileStats): TranscriptIdentity {
-  return { filePath, size: stats.size, mtimeMs: stats.mtimeMs, device: stats.dev, inode: stats.ino, birthtimeMs: stats.birthtimeMs }
+  return {
+    filePath,
+    size: stats.size,
+    mtimeMs: stats.mtimeMs,
+    device: stats.dev,
+    inode: stats.ino,
+    birthtimeMs: stats.birthtimeMs,
+  }
 }
 
 export function sameTranscriptIdentity(left: TranscriptIdentity, right: TranscriptIdentity): boolean {

@@ -30,7 +30,7 @@ describe("discoverAllSkillsBlocking", () => {
 name: test-skill
 description: A test skill
 ---
-This is test skill content.`
+This is test skill content.`,
     )
 
     const dirs = [skillDir]
@@ -90,7 +90,7 @@ This is test skill content.`
 name: skill1
 description: First skill
 ---
-Skill 1 content.`
+Skill 1 content.`,
     )
 
     writeFileSync(
@@ -99,7 +99,7 @@ Skill 1 content.`
 name: skill2
 description: Second skill
 ---
-Skill 2 content.`
+Skill 2 content.`,
     )
 
     const dirs = [dir1, dir2]
@@ -112,7 +112,7 @@ Skill 2 content.`
     expect(skills).toBeArray()
     expect(skills.length).toBe(2)
 
-    const skillNames = skills.map(s => s.name).sort()
+    const skillNames = skills.map((s) => s.name).sort()
     expect(skillNames).toEqual(["skill1", "skill2"])
   })
 
@@ -128,7 +128,7 @@ Skill 2 content.`
 name: valid-skill
 description: Valid skill
 ---
-Valid skill content.`
+Valid skill content.`,
     )
 
     const invalidSkillPath = join(skillDir, "invalid.md")
@@ -138,7 +138,7 @@ Valid skill content.`
 name: invalid skill
 description: [ invalid yaml
 ---
-Invalid content.`
+Invalid content.`,
     )
 
     const dirs = [skillDir]
@@ -166,7 +166,7 @@ Invalid content.`
 name: my-skill
 description: Directory-based skill
 ---
-This is a directory-based skill.`
+This is a directory-based skill.`,
     )
 
     const dirs = [skillsDir]
@@ -195,7 +195,7 @@ This is a directory-based skill.`
 name: skill-${i}
 description: Skill number ${i}
 ---
-Content for skill ${i}.`
+Content for skill ${i}.`,
       )
     }
 

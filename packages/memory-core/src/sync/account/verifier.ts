@@ -33,7 +33,8 @@ const OPEN_REFUSALS: Partial<Record<OpenFailureReason, RefusalCode>> = {
   kind_mismatch: "object_binding",
 }
 
-const sameBytes = (left: Uint8Array, right: Uint8Array): boolean => left.length === right.length && left.every((byte, index) => byte === right[index])
+const sameBytes = (left: Uint8Array, right: Uint8Array): boolean =>
+  left.length === right.length && left.every((byte, index) => byte === right[index])
 
 export const hexOfB64url = (value: string): string => Buffer.from(b64urlDecode(value)).toString("hex")
 
@@ -62,9 +63,13 @@ export function createChainVerifier(input: {
         case "unknown":
           return refuse("sequence_gap")
         case "keyring":
-          return entry.kind === "keyring" ? { ok: true, payload: { items: [] }, batchId: `keyring:${entry.seq}` } : refuse("object_binding")
+          return entry.kind === "keyring"
+            ? { ok: true, payload: { items: [] }, batchId: `keyring:${entry.seq}` }
+            : refuse("object_binding")
         case "vetoed":
-          return entry.kind === "batch" ? { ok: true, payload: { items: [] }, batchId: entry.batchId ?? `vetoed:${entry.seq}` } : refuse("object_binding")
+          return entry.kind === "batch"
+            ? { ok: true, payload: { items: [] }, batchId: entry.batchId ?? `vetoed:${entry.seq}` }
+            : refuse("object_binding")
         case "batch": {
           const batch = position.batch
           if (entry.kind !== "batch" || hexOfB64url(batch.digest) !== entry.digest) return refuse("content_hash")
@@ -72,7 +77,14 @@ export function createChainVerifier(input: {
           if (key === null) return refuse("epoch")
           const opened = await openBatch(
             new Uint8Array(bytes),
-            { account: chain.account, epoch: batch.epoch, authorId: batch.authorId, signingPublicKey: batch.signingPublicKey, digest: batch.digest, kind: "ops" },
+            {
+              account: chain.account,
+              epoch: batch.epoch,
+              authorId: batch.authorId,
+              signingPublicKey: batch.signingPublicKey,
+              digest: batch.digest,
+              kind: "ops",
+            },
             key,
             rejections,
           )

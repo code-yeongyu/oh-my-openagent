@@ -26,12 +26,19 @@ test("#given an already granted revival #when O9 routes a detached terminal thro
   }
   const granted: ReviveReservation = {
     ok: true,
-    commit: () => { commits += 1 },
-    release: () => { releases += 1 },
+    commit: () => {
+      commits += 1
+    },
+    release: () => {
+      releases += 1
+    },
   }
   const engine = createSteeringEngine({ ...port, reserveForRevive: reserve, reserveForDetachedRevive: reserve })
 
-  const result = await engine.sendToTask({ idOrName: record.task_id, callerSessionId: "parent", message: "next turn" }, granted)
+  const result = await engine.sendToTask(
+    { idOrName: record.task_id, callerSessionId: "parent", message: "next turn" },
+    granted,
+  )
 
   expect(result.kind).toBe("revived")
   expect(acquisitions).toBe(0)

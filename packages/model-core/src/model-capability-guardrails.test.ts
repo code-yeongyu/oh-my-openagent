@@ -3,13 +3,17 @@ import { describe, expect, test } from "bun:test"
 import type { ModelCapabilitiesSnapshot } from "./model-capabilities"
 import { getBundledModelCapabilitiesSnapshot } from "./model-capabilities"
 import bundledModelCapabilitiesSnapshotJson from "../../../packages/omo-opencode/src/generated/model-capabilities.generated.json"
-import {
-  collectModelCapabilityGuardrailIssues,
-  getBuiltInRequirementModelIDs,
-} from "./model-capability-guardrails"
+import { collectModelCapabilityGuardrailIssues, getBuiltInRequirementModelIDs } from "./model-capability-guardrails"
 
 describe("model-capability-guardrails", () => {
-  test.each(["gpt-5.6-luna-fast", "gpt-6-luna-fast", "gpt-6-sol-fast", "gpt-6.1-sol", "gpt-6.1-sol-fast", "kimi-k3.1-pro"])("keeps %s aligned with its bundled canonical model", (modelID) => {
+  test.each([
+    "gpt-5.6-luna-fast",
+    "gpt-6-luna-fast",
+    "gpt-6-sol-fast",
+    "gpt-6.1-sol",
+    "gpt-6.1-sol-fast",
+    "kimi-k3.1-pro",
+  ])("keeps %s aligned with its bundled canonical model", (modelID) => {
     const issues = collectModelCapabilityGuardrailIssues({
       snapshot: getBundledModelCapabilitiesSnapshot(bundledModelCapabilitiesSnapshotJson),
     })

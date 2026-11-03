@@ -56,7 +56,9 @@ describe("omo-ai publish workflow shape", () => {
   test("requires tarball readiness before live install", () => {
     const readinessRun = namedStep("post-publish-verify", "Wait for omo-ai registry readiness").run ?? ""
     expect(readinessRun).toContain('npm view --prefer-online "omo-ai@$OMO_AI_VERSION" dist.tarball')
-    expect(readinessRun).toContain('curl --fail --silent --location --connect-timeout 10 --max-time 15 --head --output /dev/null "$TARBALL_URL"')
+    expect(readinessRun).toContain(
+      'curl --fail --silent --location --connect-timeout 10 --max-time 15 --head --output /dev/null "$TARBALL_URL"',
+    )
   })
 
   test("preserves an explicit prerelease version and derives its beta dist tag", () => {
@@ -64,8 +66,8 @@ describe("omo-ai publish workflow shape", () => {
     const versionRun = namedStep("release-metadata", "Calculate version").run ?? ""
 
     // when
-    const explicitVersionPrecedesBump = versionRun.indexOf('VERSION="$RAW_VERSION"') <
-      versionRun.indexOf('if [ -z "$VERSION" ]')
+    const explicitVersionPrecedesBump =
+      versionRun.indexOf('VERSION="$RAW_VERSION"') < versionRun.indexOf('if [ -z "$VERSION" ]')
 
     // then
     expect(explicitVersionPrecedesBump).toBe(true)

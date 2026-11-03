@@ -45,7 +45,14 @@ describe("compiled omo update argument handling", () => {
     expect(lookups).toBe(0)
   })
 
-  const printed = [undefined, ["update"], ["update", "self"], ["update", "--self"], ["update", "--dry-run"], ["update", "--print"]]
+  const printed = [
+    undefined,
+    ["update"],
+    ["update", "self"],
+    ["update", "--self"],
+    ["update", "--dry-run"],
+    ["update", "--print"],
+  ]
   for (const args of printed) {
     test(`#given ${args?.join(" ") ?? "no arguments"} #then it prints the newer release and its replace command, unchanged`, async () => {
       const { result, lookups } = await releaseUpdate(args)
@@ -64,8 +71,12 @@ describe("compiled fast path update argument handling", () => {
     const out: string[] = []
     const err: string[] = []
     const [log, error] = [console.log, console.error]
-    console.log = (value?: unknown) => { out.push(String(value)) }
-    console.error = (value?: unknown) => { err.push(String(value)) }
+    console.log = (value?: unknown) => {
+      out.push(String(value))
+    }
+    console.error = (value?: unknown) => {
+      err.push(String(value))
+    }
     try {
       return { handled: answerCompiledFastPath(args, manifest), out, err, exitCode: process.exitCode }
     } finally {
@@ -94,6 +105,8 @@ describe("compiled fast path update argument handling", () => {
   test("#given plain update #then the fast path keeps its download hint", () => {
     const result = capture(["update"])
     expect(result.handled).toBe(true)
-    expect(result.out).toEqual([`omo update runs from the compiled omo binary; download ${releaseAssetName(undefined, process.platform, process.arch)} from ${RELEASES_URL}`])
+    expect(result.out).toEqual([
+      `omo update runs from the compiled omo binary; download ${releaseAssetName(undefined, process.platform, process.arch)} from ${RELEASES_URL}`,
+    ])
   })
 })

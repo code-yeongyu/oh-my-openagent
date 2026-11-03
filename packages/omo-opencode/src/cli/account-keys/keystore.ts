@@ -55,7 +55,8 @@ export function createOsKeyStore(
   run: RunSecretCommand = defaultRun,
   secrets?: SecretApi | null,
 ): KeyStore {
-  const resolved = secrets === undefined ? (run === defaultRun && typeof Bun !== "undefined" ? Bun.secrets : null) : secrets
+  const resolved =
+    secrets === undefined ? (run === defaultRun && typeof Bun !== "undefined" ? Bun.secrets : null) : secrets
   switch (platform) {
     case "darwin":
       return resolved !== null ? createBunSecretsKeyStore(name, resolved) : createMacOsKeychainKeyStore(name, run)
@@ -128,7 +129,15 @@ function createMacOsKeychainKeyStore(name: string, run: RunSecretCommand): KeySt
     )
   return {
     async read() {
-      const result = await guarded(run, fail, ["security", "find-generic-password", "-s", DEFAULT_SERVICE, "-a", account, "-w"])
+      const result = await guarded(run, fail, [
+        "security",
+        "find-generic-password",
+        "-s",
+        DEFAULT_SERVICE,
+        "-a",
+        account,
+        "-w",
+      ])
       if (result.code !== 0) {
         // Exit 44 is errSecItemNotFound (no record yet); anything else is a locked or broken keychain.
         if (result.code === 44) return null
@@ -216,7 +225,12 @@ function createDpapiKeyStore(name: string, run: RunSecretCommand): KeyStore {
         "$b = [Text.Encoding]::UTF8.GetBytes($s); " +
         "$e = [Security.Cryptography.ProtectedData]::Protect($b, $null, 'CurrentUser'); " +
         `[IO.File]::WriteAllBytes(${ps(file)}, $e)`
-      const result = await guarded(run, fail, ["powershell", "-NoProfile", "-NonInteractive", "-Command", script], value)
+      const result = await guarded(
+        run,
+        fail,
+        ["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+        value,
+      )
       if (result.code !== 0) throw fail()
     },
   }

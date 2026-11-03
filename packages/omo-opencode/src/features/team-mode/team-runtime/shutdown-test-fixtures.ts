@@ -112,22 +112,28 @@ export async function updateMemberStatuses(
   config: TeamModeConfig,
   statuses: Record<string, RuntimeState["members"][number]["status"]>,
 ): Promise<void> {
-  await transitionRuntimeState(teamRunId, (runtimeState) => ({
-    ...runtimeState,
-    members: runtimeState.members.map((member) => ({
-      ...member,
-      status: statuses[member.name] ?? member.status,
-    })),
-  }), config)
+  await transitionRuntimeState(
+    teamRunId,
+    (runtimeState) => ({
+      ...runtimeState,
+      members: runtimeState.members.map((member) => ({
+        ...member,
+        status: statuses[member.name] ?? member.status,
+      })),
+    }),
+    config,
+  )
 }
 
 export async function readInboxMessages(teamRunId: string, memberName: string, config: TeamModeConfig) {
   const inboxDir = getInboxDir(resolveBaseDir(config), teamRunId, memberName)
   const fileNames = (await readdir(inboxDir)).filter((entry) => entry.endsWith(".json")).sort()
-  return Promise.all(fileNames.map(async (fileName) => {
-    const content = await readFile(path.join(inboxDir, fileName), "utf8")
-    return MessageSchema.parse(JSON.parse(content))
-  }))
+  return Promise.all(
+    fileNames.map(async (fileName) => {
+      const content = await readFile(path.join(inboxDir, fileName), "utf8")
+      return MessageSchema.parse(JSON.parse(content))
+    }),
+  )
 }
 
 export function createTestMessage(overrides?: Partial<Parameters<typeof sendMessage>[0]>) {

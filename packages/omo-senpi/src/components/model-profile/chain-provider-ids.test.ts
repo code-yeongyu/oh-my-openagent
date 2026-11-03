@@ -13,9 +13,7 @@ import { BUILTIN_MODEL_PROFILES } from "./builtin-profiles"
 // snapshot that can drift from the pin.
 const senpiEntryPath = fileURLToPath(import.meta.resolve("@code-yeongyu/senpi"))
 const senpiPackageRoot = realpathSync(dirname(dirname(senpiEntryPath)))
-const providerRegistryUrl = pathToFileURL(
-  Bun.resolveSync("@earendil-works/pi-ai/providers/all", senpiPackageRoot),
-).href
+const providerRegistryUrl = pathToFileURL(Bun.resolveSync("@earendil-works/pi-ai/providers/all", senpiPackageRoot)).href
 const { builtinProviders } = (await import(providerRegistryUrl)) as {
   builtinProviders(): Array<{ id: string }>
 }
@@ -61,7 +59,9 @@ function chainProviderIds(): readonly string[] {
 describe("native chain provider ids", () => {
   test("#given builtin profiles and senpi-task category chains #when each provider id is checked against the pinned engine registry #then every id is a builtinProviders() id or an allow-listed alias", () => {
     const engineIds = new Set(builtinProviders().map(({ id }) => id))
-    const unknown = chainProviderIds().filter((id) => !engineIds.has(id) && !Object.hasOwn(CHAIN_PROVIDER_ID_ALLOWLIST, id))
+    const unknown = chainProviderIds().filter(
+      (id) => !engineIds.has(id) && !Object.hasOwn(CHAIN_PROVIDER_ID_ALLOWLIST, id),
+    )
     expect(unknown).toEqual([])
   })
 

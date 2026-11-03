@@ -124,7 +124,11 @@ export const importSnapshot = async (
     if (!opened.ok) return { ok: false, reason: "chunk_refused" }
     records.push(...opened.records)
   }
-  const continued = atVerifiedHead(state, { seq: snapshot.covers_seq, link: snapshot.link, keyring_link: snapshot.keyring_head })
+  const continued = atVerifiedHead(state, {
+    seq: snapshot.covers_seq,
+    link: snapshot.link,
+    keyring_link: snapshot.keyring_head,
+  })
   if (continued === null) return refuse("keyring_prefix_refused")
   return { ok: true, state: continued, records }
 }

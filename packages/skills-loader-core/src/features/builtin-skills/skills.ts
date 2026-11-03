@@ -33,33 +33,26 @@ export interface CreateBuiltinSkillsOptions {
 }
 
 export function createBuiltinSkills(options: CreateBuiltinSkillsOptions = {}): BuiltinSkill[] {
-  const {
-    browserProvider = "playwright",
-    disabledSkills,
-    teamModeEnabled = false,
-    playwrightMcpArgs,
-  } = options
+  const { browserProvider = "playwright", disabledSkills, teamModeEnabled = false, playwrightMcpArgs } = options
 
   const browserSkills = {
     "dev-browser": devBrowserSkill,
     "playwright-cli": playwrightCliSkill,
-    playwright: playwrightMcpArgs?.length
-      ? createPlaywrightSkill({ mcp_args: playwrightMcpArgs })
-      : playwrightSkill,
+    playwright: playwrightMcpArgs?.length ? createPlaywrightSkill({ mcp_args: playwrightMcpArgs }) : playwrightSkill,
   } satisfies Record<BrowserAutomationProvider, BuiltinSkill>
 
-	const skills = [
-		browserSkills[browserProvider],
-		frontendSkill,
-		gitMasterSkill,
-		reviewWorkSkill,
-		removeAiSlopsSkill,
-		initDeepSkill,
-		debuggingSkill,
-		securityResearchSkill,
-		securityReviewSkill,
-		visualQaSkill,
-	]
+  const skills = [
+    browserSkills[browserProvider],
+    frontendSkill,
+    gitMasterSkill,
+    reviewWorkSkill,
+    removeAiSlopsSkill,
+    initDeepSkill,
+    debuggingSkill,
+    securityResearchSkill,
+    securityReviewSkill,
+    visualQaSkill,
+  ]
 
   if (teamModeEnabled && !disabledSkills?.has("team-mode")) {
     skills.push(teamModeSkill)

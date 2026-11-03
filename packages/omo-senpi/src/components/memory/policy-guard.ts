@@ -38,9 +38,7 @@ export function hasFilesystemPolicySupport(
 }
 
 export type MemoryPolicyRegistration =
-  | { readonly status: "registered" }
-  | { readonly status: "unbound" }
-  | { readonly status: "unsupported" }
+  { readonly status: "registered" } | { readonly status: "unbound" } | { readonly status: "unsupported" }
 
 /**
  * Registers the hard cross-identity filesystem policy when the host exposes the Senpi
@@ -82,7 +80,11 @@ function buildMemoryFilesystemPolicy(context: MemoryIdentityContext): Filesystem
   const ownRoot = resolve(context.identityPaths.root)
   const durableAgentsRoot = dirname(resolve(context.durableRoot))
   const ownRoots = stableRoots([ownRoot])
-  const deniedAreas = stableRoots([dirname(ownRoot), durableAgentsRoot, join(dirname(durableAgentsRoot), TRANSIENT_DIRNAME)])
+  const deniedAreas = stableRoots([
+    dirname(ownRoot),
+    durableAgentsRoot,
+    join(dirname(durableAgentsRoot), TRANSIENT_DIRNAME),
+  ])
   let resolvedDeniedRoots: readonly string[] | undefined
 
   return {

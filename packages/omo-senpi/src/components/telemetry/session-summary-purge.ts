@@ -5,7 +5,13 @@ import { join } from "node:path"
 // must delete what earlier runs queued without loading any telemetry code (the recorder lives in a sidecar).
 
 /** Env keys that pick which config a process reads (a profile, a config dir, a home): per-process choices. */
-export const CONFIG_SELECTION_ENV_KEYS = ["OMO_PROFILE", "OCX_PROFILE", "OPENCODE_CONFIG_DIR", "HOME", "USERPROFILE"] as const
+export const CONFIG_SELECTION_ENV_KEYS = [
+  "OMO_PROFILE",
+  "OCX_PROFILE",
+  "OPENCODE_CONFIG_DIR",
+  "HOME",
+  "USERPROFILE",
+] as const
 
 /**
  * The config selection a record's writer consented under. Stored with the record's scope so that a reader judges
@@ -74,7 +80,10 @@ export function purgeUnconsentedQueue(
   // One persisted-setting read per cwd per pass: a queue of many records from one project loads its config once.
   const verdicts = new Map<string, boolean>()
   const consented = (scope: QueuedScope): boolean => {
-    const config = scope.config === undefined ? "" : JSON.stringify(CONFIG_SELECTION_ENV_KEYS.map((name) => scope.config?.[name] ?? null))
+    const config =
+      scope.config === undefined
+        ? ""
+        : JSON.stringify(CONFIG_SELECTION_ENV_KEYS.map((name) => scope.config?.[name] ?? null))
     const key = `${scope.cwd ?? ""}\u0000${config}`
     const known = verdicts.get(key)
     if (known !== undefined) return known

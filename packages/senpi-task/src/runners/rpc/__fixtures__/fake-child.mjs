@@ -57,7 +57,13 @@ function handlePrompt(cmd) {
     return
   }
   if (process.env.FAKE_PROMPT_REFUSAL) {
-    emit({ type: "response", command: "prompt", id: cmd.id, success: false, ...JSON.parse(process.env.FAKE_PROMPT_REFUSAL) })
+    emit({
+      type: "response",
+      command: "prompt",
+      id: cmd.id,
+      success: false,
+      ...JSON.parse(process.env.FAKE_PROMPT_REFUSAL),
+    })
     return
   }
   if (message.startsWith("delay:")) {
@@ -147,7 +153,8 @@ function handleCommand(cmd) {
     case "set_retry_fallback":
       if (process.env.FAKE_RETRY_FALLBACK === "hang") return
       if (process.env.FAKE_RETRY_FALLBACK === "exit") return process.exit(3)
-      if (process.env.FAKE_RETRY_FALLBACK === "refuse") return reject("set_retry_fallback", cmd.id, "set_retry_fallback is refused once a turn has started")
+      if (process.env.FAKE_RETRY_FALLBACK === "refuse")
+        return reject("set_retry_fallback", cmd.id, "set_retry_fallback is refused once a turn has started")
       return respond("set_retry_fallback", cmd.id)
     case "get_state":
       return respond("get_state", cmd.id, {

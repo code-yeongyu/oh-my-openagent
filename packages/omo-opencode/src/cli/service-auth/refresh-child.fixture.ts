@@ -5,7 +5,8 @@ const api = process.argv[2]
 const home = process.argv[3]
 if (!api || !home) throw new Error("missing fake API or home")
 const session = createSession({
-  api, home,
+  api,
+  home,
   store: {
     async read() {
       const response = await fetch(`${api}/fake-store`, { proxy: "" })
@@ -18,7 +19,9 @@ const session = createSession({
     async write(value) {
       await fetch(`${api}/fake-store`, { method: "PUT", body: JSON.stringify(value), proxy: "" })
     },
-    async clear() { await fetch(`${api}/fake-store`, { method: "DELETE", proxy: "" }) },
+    async clear() {
+      await fetch(`${api}/fake-store`, { method: "DELETE", proxy: "" })
+    },
   },
 })
 await session.accessToken()

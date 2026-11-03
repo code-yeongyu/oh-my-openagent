@@ -59,7 +59,13 @@ export const USER_SHARDED_MODES = {
 const qaEnv = (idleMs) => ({ SENPI_RPC_HOST_IDLE_EXIT_MS: String(idleMs), BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0" })
 
 function userScript(latencyMs) {
-  return { parentSteps: [{ ...taskStep(childTask("first child")), delayMs: latencyMs }, { type: "text", text: "user parent done" }], childSteps: CHILD_TEXT }
+  return {
+    parentSteps: [
+      { ...taskStep(childTask("first child")), delayMs: latencyMs },
+      { type: "text", text: "user parent done" },
+    ],
+    childSteps: CHILD_TEXT,
+  }
 }
 
 // The earliest moment a new endpoint socket file exists, polled cheaply (a directory read, never a connection).
@@ -79,21 +85,35 @@ function configurations(run) {
     kind: "sharded",
     prewarm: prewarm ?? "default",
     config: run.sharded,
-    omoConfig: taskConfig({ default_execution_mode: "auto", host_idle_exit_ms: QA_IDLE_EXIT_MS, ...(prewarm === undefined ? {} : { host_shard_prewarm: prewarm }) }),
+    omoConfig: taskConfig({
+      default_execution_mode: "auto",
+      host_idle_exit_ms: QA_IDLE_EXIT_MS,
+      ...(prewarm === undefined ? {} : { host_shard_prewarm: prewarm }),
+    }),
   }))
   // The pre-change schema has no `host_shard_prewarm` (it is strict), so the control config never names it.
-  const control = { name: "user_first_child_control", kind: "control", prewarm: "n/a", config: run.control, omoConfig: taskConfig({ default_execution_mode: "auto" }) }
+  const control = {
+    name: "user_first_child_control",
+    kind: "control",
+    prewarm: "n/a",
+    config: run.control,
+    omoConfig: taskConfig({ default_execution_mode: "auto" }),
+  }
   return [...sharded, control]
 }
 
 async function openConfiguration(entry, index) {
-  const sandbox = newSandbox(entry.config, `u${index}${entry.kind[0]}`, { omoConfig: entry.omoConfig, script: userScript(MODEL_LATENCIES_MS[0]) })
+  const sandbox = newSandbox(entry.config, `u${index}${entry.kind[0]}`, {
+    omoConfig: entry.omoConfig,
+    script: userScript(MODEL_LATENCIES_MS[0]),
+  })
   const project = mainProject(sandbox, userScript(MODEL_LATENCIES_MS[0]))
   const state = { entry, sandbox, project, values: [], detail: [] }
   if (entry.kind === "control") {
     const ran = runBin(sandbox, ["daemon", "run", "--json"], { timeoutMs: 120_000, env: qaEnv(QA_IDLE_EXIT_MS) })
     const socket = join(sandbox.agentDir, "rpc", "rpc.sock")
-    if (!(await reachable(sandbox, socket))) throw new Error(`control daemon run did not serve rpc.sock (exit ${ran.status})`)
+    if (!(await reachable(sandbox, socket)))
+      throw new Error(`control daemon run did not serve rpc.sock (exit ${ran.status})`)
     state.sharedSocket = socket
   }
   return state
@@ -118,9 +138,10 @@ async function runSample(state, round, cleanup, latencyMs = MODEL_LATENCIES_MS[r
   const fresh = endpointSockets(sandbox).filter((socket) => !known.has(socket))
   const record = taskRecords(project).find((candidate) => !recordsBefore.has(candidate.task_id))
   const sharedAfter = state.sharedSocket === undefined ? undefined : supervisorPid(sandbox, state.sharedSocket)
-  const topology = entry.kind === "control"
-    ? sharedBefore !== undefined && sharedBefore === sharedAfter && fresh.length === 0
-    : fresh.length === 1 && /\/p-[0-9a-f]{16}\.sock$/.test(fresh[0])
+  const topology =
+    entry.kind === "control"
+      ? sharedBefore !== undefined && sharedBefore === sharedAfter && fresh.length === 0
+      : fresh.length === 1 && /\/p-[0-9a-f]{16}\.sock$/.test(fresh[0])
   const hostSession = record?.runner_kind === "host-session"
   const valid = taskAt !== undefined && first !== undefined && topology && hostSession
   const ms = valid ? first.atMs - taskAt : null
@@ -152,7 +173,11 @@ export async function userFirstChild(run, samples, cleanup, log) {
   try {
     for (const [index, entry] of configurations(run).entries()) states.push(await openConfiguration(entry, index))
     for (const state of states) state.warmup = await runSample(state, -1, cleanup, MODEL_LATENCIES_MS[2])
-    for (let round = 0; round < samples + MAX_EXTRA_ROUNDS && states.some((state) => state.values.length < samples); round += 1) {
+    for (
+      let round = 0;
+      round < samples + MAX_EXTRA_ROUNDS && states.some((state) => state.values.length < samples);
+      round += 1
+    ) {
       for (const state of states) {
         if (state.values.length >= samples) continue
         const ms = await runSample(state, round, cleanup)
@@ -166,7 +191,8 @@ export async function userFirstChild(run, samples, cleanup, log) {
   for (const state of states) {
     const { entry } = state
     scenarios[entry.name] = summarizeSamples(state.values, {
-      definition: "user-shaped: fresh session -> first turn -> mock model latency -> task call; parent task tool_execution_start (driver clock) -> first child provider request (mock clock)",
+      definition:
+        "user-shaped: fresh session -> first turn -> mock model latency -> task call; parent task tool_execution_start (driver clock) -> first child provider request (mock clock)",
       configuration: entry.kind,
       prewarm: entry.prewarm,
       model_latencies_ms: MODEL_LATENCIES_MS,
@@ -174,7 +200,9 @@ export async function userFirstChild(run, samples, cleanup, log) {
       invalid_samples: state.detail.filter((row) => row.round >= 0 && !row.valid).length,
       detail: state.detail,
     })
-    log(`(e) ${entry.name}: ${state.values.length}/${samples} valid, p50 ${scenarios[entry.name].p50_ms} p95 ${scenarios[entry.name].p95_ms}`)
+    log(
+      `(e) ${entry.name}: ${state.values.length}/${samples} valid, p50 ${scenarios[entry.name].p50_ms} p95 ${scenarios[entry.name].p95_ms}`,
+    )
   }
   return scenarios
 }
@@ -188,13 +216,21 @@ export const PREWARM_IDLE_MODES = { default: undefined, session_start: "session-
 
 export async function prewarmIdle(run, cleanup, log) {
   const results = {}
-  for (const [name, prewarm] of Object.entries(PREWARM_IDLE_MODES)) results[name] = await prewarmIdleProbe(run, name, prewarm, cleanup, log)
+  for (const [name, prewarm] of Object.entries(PREWARM_IDLE_MODES))
+    results[name] = await prewarmIdleProbe(run, name, prewarm, cleanup, log)
   return results
 }
 
 async function prewarmIdleProbe(run, name, prewarm, cleanup, log) {
-  const script = { parentSteps: [holdStep("idle-release", 900), { type: "text", text: "idle parent done" }], childSteps: CHILD_TEXT }
-  const omoConfig = taskConfig({ default_execution_mode: "auto", host_idle_exit_ms: IDLE_PROBE_EXIT_MS, ...(prewarm === undefined ? {} : { host_shard_prewarm: prewarm }) })
+  const script = {
+    parentSteps: [holdStep("idle-release", 900), { type: "text", text: "idle parent done" }],
+    childSteps: CHILD_TEXT,
+  }
+  const omoConfig = taskConfig({
+    default_execution_mode: "auto",
+    host_idle_exit_ms: IDLE_PROBE_EXIT_MS,
+    ...(prewarm === undefined ? {} : { host_shard_prewarm: prewarm }),
+  })
   const sandbox = newSandbox(run.sharded, `pi${name[0]}`, { omoConfig, script })
   const project = mainProject(sandbox, script)
   const watcher = watchNewSocket(sandbox, new Set())
@@ -212,10 +248,13 @@ async function prewarmIdleProbe(run, name, prewarm, cleanup, log) {
     const table = processTable()
     const pids = supervisor === undefined ? [] : treePids(supervisor, table)
     const idle = sampleEndpoint(socket, supervisor, table)
-    const gone = await waitFor(() => (pids.length > 0 && pids.every((pid) => !pidAlive(pid)) ? Date.now() : undefined), {
-      timeoutMs: IDLE_PROBE_EXIT_MS + 60_000,
-      intervalMs: 250,
-    })
+    const gone = await waitFor(
+      () => (pids.length > 0 && pids.every((pid) => !pidAlive(pid)) ? Date.now() : undefined),
+      {
+        timeoutMs: IDLE_PROBE_EXIT_MS + 60_000,
+        intervalMs: 250,
+      },
+    )
     const parentAliveAtExit = pidAlive(parent.child.pid)
     const result = {
       prewarm: prewarm ?? "default",
@@ -231,7 +270,9 @@ async function prewarmIdleProbe(run, name, prewarm, cleanup, log) {
       child_requests: childRequests(project).length,
       task_records: taskRecords(project).length,
     }
-    log(`(f) prewarm idle ${name}: footprint ${idle.endpoint_footprint_mb} MB, host exited ${result.host_exit_ms_after_last_probe} ms after the last probe, parent alive ${parentAliveAtExit}`)
+    log(
+      `(f) prewarm idle ${name}: footprint ${idle.endpoint_footprint_mb} MB, host exited ${result.host_exit_ms_after_last_probe} ms after the last probe, parent alive ${parentAliveAtExit}`,
+    )
     return result
   } finally {
     watcher.stop()

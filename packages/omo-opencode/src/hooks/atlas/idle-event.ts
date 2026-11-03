@@ -1,18 +1,11 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import {
-  normalizeSessionId,
-  resolveBoulderPlanPath,
-} from "../../features/boulder-state"
+import { normalizeSessionId, resolveBoulderPlanPath } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
 import { shouldPromptAfterSessionIdle } from "../shared/session-idle-settle"
 import { HOOK_NAME } from "./hook-name"
 import { handleCompletedBoulderIdle } from "./idle-completion-nudge"
 import { hasRunningBackgroundTasks, injectContinuation, scheduleRetry } from "./idle-continuation"
-import {
-  CONTINUATION_COOLDOWN_MS,
-  FAILURE_BACKOFF_MS,
-  MAX_CONSECUTIVE_PROMPT_FAILURES,
-} from "./idle-constants"
+import { CONTINUATION_COOLDOWN_MS, FAILURE_BACKOFF_MS, MAX_CONSECUTIVE_PROMPT_FAILURES } from "./idle-constants"
 import { canContinueTrackedBoulderSession } from "./idle-session-eligibility"
 import { resolveActiveBoulderSession } from "./resolve-active-boulder-session"
 import {
@@ -151,7 +144,10 @@ export async function handleAtlasSessionIdle(input: {
     return
   }
 
-  if (sessionState.lastContinuationInjectedAt && now - sessionState.lastContinuationInjectedAt < CONTINUATION_COOLDOWN_MS) {
+  if (
+    sessionState.lastContinuationInjectedAt &&
+    now - sessionState.lastContinuationInjectedAt < CONTINUATION_COOLDOWN_MS
+  ) {
     scheduleRetry({ ctx, sessionID, sessionState, options })
     log(`[${HOOK_NAME}] Skipped: continuation cooldown active`, {
       sessionID,

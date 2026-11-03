@@ -16,7 +16,9 @@ const outside = "src/outside.ts"
 const patch = (...lines: string[]) => ["*** Begin Patch", ...lines, "*** End Patch"].join("\n")
 const pluginInput = (root: string): PluginInput => ({
   client: createOpencodeClient({
-    fetch: async () => { throw new Error("Unexpected SDK request in patch-lines test") },
+    fetch: async () => {
+      throw new Error("Unexpected SDK request in patch-lines test")
+    },
   }),
   project: { id: "patch-lines", worktree: root, time: { created: 0 } },
   directory: root,
@@ -84,7 +86,11 @@ describe("apply_patch executor / guard differential (omo#11367 B1)", () => {
   for (const operation of operations) {
     test(`Update context does not hide a following outside ${operation.name} header`, async () => {
       const patchText = patch(
-        `*** Update File:${allowed}`, "@@", " ***", "-before", "+after",
+        `*** Update File:${allowed}`,
+        "@@",
+        " ***",
+        "-before",
+        "+after",
         ...operation.lines(outside),
       )
       const { hunks } = parsePatch(patchText)

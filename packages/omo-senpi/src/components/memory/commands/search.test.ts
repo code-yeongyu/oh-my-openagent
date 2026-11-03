@@ -43,8 +43,18 @@ async function setup(): Promise<{ sessionsDir: string; pi: MemoryFakeExtensionAP
   const sessionsDir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-search-sessions-")))
   tempDirs.push(sessionsDir)
   await writeSession(sessionsDir, "sess-a", "sess-a", [
-    { id: "msg-1", role: "user", text: "how do I run the linter before committing", timestamp: "2026-08-01T10:00:01.000Z" },
-    { id: "msg-2", role: "assistant", text: "run bun run lint first, then commit", timestamp: "2026-08-01T10:00:02.000Z" },
+    {
+      id: "msg-1",
+      role: "user",
+      text: "how do I run the linter before committing",
+      timestamp: "2026-08-01T10:00:01.000Z",
+    },
+    {
+      id: "msg-2",
+      role: "assistant",
+      text: "run bun run lint first, then commit",
+      timestamp: "2026-08-01T10:00:02.000Z",
+    },
   ])
   await writeSession(sessionsDir, "sess-b", "sess-b", [
     { id: "msg-9", role: "user", text: "tabs versus spaces preference", timestamp: "2026-08-02T09:00:00.000Z" },
@@ -71,7 +81,7 @@ describe("/search", () => {
     const text = await invoke(pi, "search", "linter", ctx)
 
     // then
-    expect(text).toContain('1. session sess-a · 2026-08-01T10:00:01.000Z · user')
+    expect(text).toContain("1. session sess-a · 2026-08-01T10:00:01.000Z · user")
     expect(text).toContain("**linter**")
     expect(text).toContain("entry msg-1")
     expect(text).not.toContain("sess-hidden")
@@ -133,7 +143,12 @@ describe("/search", () => {
     // given
     const { sessionsDir, pi } = await setup()
     await writeSession(sessionsDir, "sess-secret", "sess-secret", [
-      { id: "msg-s1", role: "user", text: "my key is AKIAABCDEFGHIJKLMNOP please store it", timestamp: "2026-08-04T10:00:00.000Z" },
+      {
+        id: "msg-s1",
+        role: "user",
+        text: "my key is AKIAABCDEFGHIJKLMNOP please store it",
+        timestamp: "2026-08-04T10:00:00.000Z",
+      },
     ])
     const ctx = fakeCommandContext()
 

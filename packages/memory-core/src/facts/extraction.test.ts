@@ -72,12 +72,7 @@ async function commitPersonCard(
   await repo.commitWrite([`people/${slug}/card.md`], `test: seed ${slug} card`, AUTHOR)
 }
 
-async function commitObservations(
-  repo: GitMemoryRepo,
-  slug: string,
-  name: string,
-  body: string,
-): Promise<void> {
+async function commitObservations(repo: GitMemoryRepo, slug: string, name: string, body: string): Promise<void> {
   await mkdir(join(repo.dir, "people", slug), { recursive: true })
   await writeFile(
     join(repo.dir, "people", slug, "observations.md"),
@@ -165,7 +160,9 @@ describe("facts extraction JSONL validation", () => {
     ]
 
     // when
-    const parsed = placeholders.map((placeholder, index) => parseFactsExtractionRecord({ ...project(), person: placeholder }, index))
+    const parsed = placeholders.map((placeholder, index) =>
+      parseFactsExtractionRecord({ ...project(), person: placeholder }, index),
+    )
 
     // then
     expect(parsed).toEqual(placeholders.map(() => project()))
@@ -207,10 +204,14 @@ describe("atomic facts batch application", () => {
     const { dir, repo } = await fixture()
 
     // when
-    const result = await applyFactsBatch(repo, {
-      batchId: "11111111-1111-4111-8111-111111111111",
-      records: [project(), person()],
-    }, AUTHOR)
+    const result = await applyFactsBatch(
+      repo,
+      {
+        batchId: "11111111-1111-4111-8111-111111111111",
+        records: [project(), person()],
+      },
+      AUTHOR,
+    )
 
     // then
     expect(result.outcome).toBe("committed")
@@ -232,10 +233,14 @@ describe("atomic facts batch application", () => {
     const before = await repo.head()
 
     // when
-    const result = await applyFactsBatch(repo, {
-      batchId: "22222222-2222-4222-8222-222222222222",
-      records: [],
-    }, AUTHOR)
+    const result = await applyFactsBatch(
+      repo,
+      {
+        batchId: "22222222-2222-4222-8222-222222222222",
+        records: [],
+      },
+      AUTHOR,
+    )
 
     // then
     expect(result).toEqual({ outcome: "no_facts", affectedPaths: [] })
@@ -258,10 +263,14 @@ describe("atomic facts batch application", () => {
     rejectCommit = true
 
     // when
-    const operation = applyFactsBatch(repo, {
-      batchId: "33333333-3333-4333-8333-333333333333",
-      records: [project()],
-    }, AUTHOR)
+    const operation = applyFactsBatch(
+      repo,
+      {
+        batchId: "33333333-3333-4333-8333-333333333333",
+        records: [project()],
+      },
+      AUTHOR,
+    )
 
     // then
     await expect(operation).rejects.toThrow("injected commit failure")

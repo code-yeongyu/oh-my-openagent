@@ -96,7 +96,15 @@ function evaluate(documents, strategy, queries) {
   }
   const count = queries.length
   const ratio = (value) => Number((value / count).toFixed(3))
-  return { queries: count, "R@1": ratio(hit1), "R@2": ratio(hit2), "R@5": ratio(hit5), MRR: ratio(reciprocal), empty, medianMs: Number(median(timings).toFixed(3)) }
+  return {
+    queries: count,
+    "R@1": ratio(hit1),
+    "R@2": ratio(hit2),
+    "R@5": ratio(hit5),
+    MRR: ratio(reciprocal),
+    empty,
+    medianMs: Number(median(timings).toFixed(3)),
+  }
 }
 
 function autoChoices(documents, queries) {
@@ -111,24 +119,30 @@ function autoChoices(documents, queries) {
 function identicalToSubstring(documents, queries) {
   return queries.filter((query) => {
     const planned = planRecallQueries([query.text])
-    return JSON.stringify(select(documents, planned, "auto")) === JSON.stringify(select(documents, planned, "substring"))
+    return (
+      JSON.stringify(select(documents, planned, "auto")) === JSON.stringify(select(documents, planned, "substring"))
+    )
   }).length
 }
 
 function run(corpus, documents, slices) {
-  return slices.flatMap(([slice, queries]) => STRATEGIES.map((strategy) => ({
-    corpus,
-    notes: documents.length,
-    slice,
-    strategy,
-    ...(strategy === "auto" ? { autoPicked: autoChoices(documents, queries) } : {}),
-    ...evaluate(documents, strategy, queries),
-  })))
+  return slices.flatMap(([slice, queries]) =>
+    STRATEGIES.map((strategy) => ({
+      corpus,
+      notes: documents.length,
+      slice,
+      strategy,
+      ...(strategy === "auto" ? { autoPicked: autoChoices(documents, queries) } : {}),
+      ...evaluate(documents, strategy, queries),
+    })),
+  )
 }
 
 const LANGS = ["en", "ko", "ja", "zh", "mixed"]
-const bySlice = (queries) => [["all", queries], ...LANGS.map((lang) => [lang, queries.filter((query) => query.lang === lang)])]
-  .filter(([, sliceQueries]) => sliceQueries.length > 0)
+const bySlice = (queries) =>
+  [["all", queries], ...LANGS.map((lang) => [lang, queries.filter((query) => query.lang === lang)])].filter(
+    ([, sliceQueries]) => sliceQueries.length > 0,
+  )
 
 const results = [
   ...run("en-only", englishDocuments, [["en", englishQueries]]),
@@ -144,12 +158,25 @@ const thresholds = { CJK_CORPUS_MIN_SHARE, LARGE_CORPUS_MIN_DOCUMENTS }
 if (process.argv.includes("--json")) {
   console.log(JSON.stringify({ thresholds, identity, results }, null, 2))
 } else {
-  console.log(`thresholds: CJK corpus share >= ${CJK_CORPUS_MIN_SHARE}, large corpus >= ${LARGE_CORPUS_MIN_DOCUMENTS} notes`)
-  console.log(`en-only: auto returns exactly the substring candidates for ${identity.identical}/${identity.queries} English queries`)
-  console.log("| corpus | notes | slice | strategy | auto picked | queries | R@1 | R@2 | R@5 | MRR | no candidate | median ms |")
+  console.log(
+    `thresholds: CJK corpus share >= ${CJK_CORPUS_MIN_SHARE}, large corpus >= ${LARGE_CORPUS_MIN_DOCUMENTS} notes`,
+  )
+  console.log(
+    `en-only: auto returns exactly the substring candidates for ${identity.identical}/${identity.queries} English queries`,
+  )
+  console.log(
+    "| corpus | notes | slice | strategy | auto picked | queries | R@1 | R@2 | R@5 | MRR | no candidate | median ms |",
+  )
   console.log("|---|---|---|---|---|---|---|---|---|---|---|---|")
   for (const row of results) {
-    const picked = row.autoPicked === undefined ? "" : Object.entries(row.autoPicked).map(([name, count]) => `${name} ${count}`).join(", ")
-    console.log(`| ${row.corpus} | ${row.notes} | ${row.slice} | ${row.strategy} | ${picked} | ${row.queries} | ${row["R@1"]} | ${row["R@2"]} | ${row["R@5"]} | ${row.MRR} | ${row.empty} | ${row.medianMs} |`)
+    const picked =
+      row.autoPicked === undefined
+        ? ""
+        : Object.entries(row.autoPicked)
+            .map(([name, count]) => `${name} ${count}`)
+            .join(", ")
+    console.log(
+      `| ${row.corpus} | ${row.notes} | ${row.slice} | ${row.strategy} | ${picked} | ${row.queries} | ${row["R@1"]} | ${row["R@2"]} | ${row["R@5"]} | ${row.MRR} | ${row.empty} | ${row.medianMs} |`,
+    )
   }
 }

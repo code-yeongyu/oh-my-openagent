@@ -12,16 +12,41 @@ import { DAEMON_EXIT, runDaemonCommand } from "../bin/lib/daemon.js"
 type Reply = Record<string, unknown>
 
 const HOST = { kind: "rpc_host", socket: "/agent/rpc/shards/i-0123456789abcdef.sock", routing_id: "rpc-1" }
-const HOST_THREAD = { thread_id: "dur-host", title: "host lane", cwd: "/work/repo", status: "live", session_path: "/sessions/dur-host.jsonl", endpoint: HOST, surface: "desktop", alive: true }
-const TUI_THREAD = { ...HOST_THREAD, thread_id: "dur-tui", surface: "tui", endpoint: { kind: "tui", socket: "/agent/rpc/tui/t-0123456789abcdef.sock", routing_id: "dur-tui" } }
-const RELEASED = { success: true, data: { released: true, session_path: "/sessions/dur-host.jsonl", attachments: 0, dropped: { deliveries: [], user_messages: [] } } }
+const HOST_THREAD = {
+  thread_id: "dur-host",
+  title: "host lane",
+  cwd: "/work/repo",
+  status: "live",
+  session_path: "/sessions/dur-host.jsonl",
+  endpoint: HOST,
+  surface: "desktop",
+  alive: true,
+}
+const TUI_THREAD = {
+  ...HOST_THREAD,
+  thread_id: "dur-tui",
+  surface: "tui",
+  endpoint: { kind: "tui", socket: "/agent/rpc/tui/t-0123456789abcdef.sock", routing_id: "dur-tui" },
+}
+const RELEASED = {
+  success: true,
+  data: {
+    released: true,
+    session_path: "/sessions/dur-host.jsonl",
+    attachments: 0,
+    dropped: { deliveries: [], user_messages: [] },
+  },
+}
 
 function capture() {
   const chunks: string[] = []
   return { write: (text: string) => void chunks.push(text), text: () => chunks.join("") }
 }
 
-async function adopt(args: readonly string[], options: { readonly located?: Reply; readonly replies?: readonly Reply[]; readonly platform?: string } = {}) {
+async function adopt(
+  args: readonly string[],
+  options: { readonly located?: Reply; readonly replies?: readonly Reply[]; readonly platform?: string } = {},
+) {
   const releases: Reply[] = []
   const replies = [...(options.replies ?? [RELEASED])]
   let disposed = 0
@@ -57,20 +82,45 @@ describe("omo daemon adopt", () => {
   })
 
   test("#given --interrupt took queued input out #when released #then the messages become the terminal's first prompts, and one starting with @ is printed instead", async () => {
-    const released = { success: true, data: { released: true, session_path: "/sessions/dur-host.jsonl", attachments: 0, dropped: { deliveries: ["d-1"], user_messages: ["first ask", "", "@notes.md please", "   ", "second ask"] } } }
+    const released = {
+      success: true,
+      data: {
+        released: true,
+        session_path: "/sessions/dur-host.jsonl",
+        attachments: 0,
+        dropped: { deliveries: ["d-1"], user_messages: ["first ask", "", "@notes.md please", "   ", "second ask"] },
+      },
+    }
     const result = await adopt(["dur-host", "--interrupt", "--json"], { replies: [released] })
     expect(result.releases).toEqual([{ interrupt: true }])
-    expect(result.outcome).toEqual({ launch: ["--session", "/sessions/dur-host.jsonl", "--", "first ask", "second ask"], cwd: "/work/repo" })
+    expect(result.outcome).toEqual({
+      launch: ["--session", "/sessions/dur-host.jsonl", "--", "first ask", "second ask"],
+      cwd: "/work/repo",
+    })
     expect(result.stderr).toContain("@notes.md please")
     expect(result.stderr).toContain("1 gateway delivery returns")
     expect(JSON.parse(result.stdout)).toMatchObject({ kind: "released", dropped: { deliveries: ["d-1"] } })
   })
 
   test("#given --interrupt took queued input out #when released without --json #then every replayed message is printed on stderr before the relaunch", async () => {
-    const released = { success: true, data: { released: true, session_path: "/sessions/dur-host.jsonl", attachments: 0, dropped: { deliveries: [], user_messages: ["first ask", "second ask"] } } }
+    const released = {
+      success: true,
+      data: {
+        released: true,
+        session_path: "/sessions/dur-host.jsonl",
+        attachments: 0,
+        dropped: { deliveries: [], user_messages: ["first ask", "second ask"] },
+      },
+    }
     const result = await adopt(["dur-host", "--interrupt"], { replies: [released] })
-    expect(result.outcome).toEqual({ launch: ["--session", "/sessions/dur-host.jsonl", "--", "first ask", "second ask"], cwd: "/work/repo" })
-    expect({ first: result.stderr.includes("first ask"), second: result.stderr.includes("second ask") }).toEqual({ first: true, second: true })
+    expect(result.outcome).toEqual({
+      launch: ["--session", "/sessions/dur-host.jsonl", "--", "first ask", "second ask"],
+      cwd: "/work/repo",
+    })
+    expect({ first: result.stderr.includes("first ask"), second: result.stderr.includes("second ask") }).toEqual({
+      first: true,
+      second: true,
+    })
   })
 
   test("#given a terminal session #when adopted #then it exits 4 already a terminal session and nothing is released", async () => {
@@ -81,7 +131,11 @@ describe("omo daemon adopt", () => {
   })
 
   test("#given a streaming session and no --interrupt #when adopted #then it exits 4 turn_active and names --interrupt", async () => {
-    const refused = { success: false, error: "turn_active", errorData: { attachments: 0, busy: ["turn", "queued"], retry_with: { interrupt: true }, hint: "h" } }
+    const refused = {
+      success: false,
+      error: "turn_active",
+      errorData: { attachments: 0, busy: ["turn", "queued"], retry_with: { interrupt: true }, hint: "h" },
+    }
     const result = await adopt(["dur-host"], { replies: [refused] })
     expect(result.outcome).toBe(DAEMON_EXIT.unsupported)
     expect(result.stderr).toContain("turn_active")
@@ -89,7 +143,11 @@ describe("omo daemon adopt", () => {
   })
 
   test("#given --interrupt was passed #when the host still answers turn_active with retry_with #then the message never asks for --interrupt again", async () => {
-    const refused = { success: false, error: "turn_active", errorData: { attachments: 0, busy: ["turn"], retry_with: { interrupt: true }, interrupted: true } }
+    const refused = {
+      success: false,
+      error: "turn_active",
+      errorData: { attachments: 0, busy: ["turn"], retry_with: { interrupt: true }, interrupted: true },
+    }
     const result = await adopt(["dur-host", "--interrupt"], { replies: [refused] })
     expect(result.outcome).toBe(DAEMON_EXIT.unsupported)
     expect(result.stderr).toContain("still busy after the interrupt")
@@ -100,18 +158,29 @@ describe("omo daemon adopt", () => {
     const attached = { success: false, error: "attached", errorData: { attachments: 2 } }
     const refused = await adopt(["dur-host"], { replies: [attached] })
     expect(refused.outcome).toBe(DAEMON_EXIT.unsupported)
-    expect(refused.stderr).toContain("attached: 2 client(s) - a Desktop thread or another client owns it; pass --force to take it anyway")
+    expect(refused.stderr).toContain(
+      "attached: 2 client(s) - a Desktop thread or another client owns it; pass --force to take it anyway",
+    )
     const forced = await adopt(["dur-host", "--force"])
     expect(forced.releases).toEqual([{ force: true }])
     expect(forced.outcome).toMatchObject({ launch: ["--session", "/sessions/dur-host.jsonl"] })
   })
 
   test("#given a refusal after the interrupt emptied the queues #when adopted #then the dropped user input is printed and reported, never lost", async () => {
-    const refused = { success: false, error: "attached", errorData: { attachments: 1, interrupted: true, dropped: { deliveries: ["d-2"], user_messages: ["keep me"] } } }
+    const refused = {
+      success: false,
+      error: "attached",
+      errorData: { attachments: 1, interrupted: true, dropped: { deliveries: ["d-2"], user_messages: ["keep me"] } },
+    }
     const result = await adopt(["dur-host", "--interrupt", "--json"], { replies: [refused] })
     expect(result.outcome).toBe(DAEMON_EXIT.unsupported)
     expect(result.stderr).toContain("not delivered: keep me")
-    expect(JSON.parse(result.stdout)).toEqual({ kind: "refused", error: "attached", thread_id: "dur-host", dropped: { deliveries: ["d-2"], user_messages: ["keep me"] } })
+    expect(JSON.parse(result.stdout)).toEqual({
+      kind: "refused",
+      error: "attached",
+      thread_id: "dur-host",
+      dropped: { deliveries: ["d-2"], user_messages: ["keep me"] },
+    })
   })
 
   test("#given release_failed #when the second ask answers unknown_session #then the session counts as released at its known path", async () => {
@@ -142,7 +211,9 @@ describe("omo daemon adopt", () => {
   })
 
   test("#given an unknown session or one no host serves #when adopted #then it exits 3 without a release", async () => {
-    const missing = await adopt(["nope"], { located: { kind: "error", error: { code: "not_found", message: "no thread", next_action: "n" } } })
+    const missing = await adopt(["nope"], {
+      located: { kind: "error", error: { code: "not_found", message: "no thread", next_action: "n" } },
+    })
     const dead = await adopt(["dur-host"], { located: { kind: "ok", thread: { ...HOST_THREAD, alive: false } } })
     expect([missing.outcome, dead.outcome]).toEqual([DAEMON_EXIT.notRunning, DAEMON_EXIT.notRunning])
     expect([...missing.releases, ...dead.releases]).toEqual([])
@@ -154,11 +225,18 @@ describe("omo daemon adopt", () => {
     ["a bad flag after --json", ["dur-host", "--json", "--bogus"], true],
     ["no session, without --json", [], false],
     ["a bad flag, without --json", ["dur-host", "--bogus"], false],
-  ] as const)("#given %s #when adopted #then it exits 2 with the usage line, stdout carries one refused/usage object only under --json, and nothing is released", async (_name, args, json) => {
-    const result = await adopt(args)
-    expect({ outcome: result.outcome, releases: result.releases, usage: result.stderr.includes("usage: omo daemon adopt") }).toEqual({ outcome: DAEMON_EXIT.usage, releases: [], usage: true })
-    expect(result.stdout).toBe(json ? `${JSON.stringify({ kind: "refused", error: "usage" })}\n` : "")
-  })
+  ] as const)(
+    "#given %s #when adopted #then it exits 2 with the usage line, stdout carries one refused/usage object only under --json, and nothing is released",
+    async (_name, args, json) => {
+      const result = await adopt(args)
+      expect({
+        outcome: result.outcome,
+        releases: result.releases,
+        usage: result.stderr.includes("usage: omo daemon adopt"),
+      }).toEqual({ outcome: DAEMON_EXIT.usage, releases: [], usage: true })
+      expect(result.stdout).toBe(json ? `${JSON.stringify({ kind: "refused", error: "usage" })}\n` : "")
+    },
+  )
 
   test("#given win32 or no session argument #when adopted #then it is refused before the SDK loads", async () => {
     const windows = await adopt(["dur-host"], { platform: "win32" })

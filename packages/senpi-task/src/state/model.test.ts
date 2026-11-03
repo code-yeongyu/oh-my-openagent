@@ -1,12 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import {
-  RESIDENCY_STATES,
-  TASK_STATUSES,
-  createTaskRecord,
-  messageability,
-  transitionTaskRecord,
-} from "../index"
+import { RESIDENCY_STATES, TASK_STATUSES, createTaskRecord, messageability, transitionTaskRecord } from "../index"
 import type { Messageability, ResidencyState, TaskStatus } from "../index"
 
 const expectedMessageability: Record<TaskStatus, Record<ResidencyState, Messageability>> = {
@@ -71,9 +65,7 @@ const expectedMessageability: Record<TaskStatus, Record<ResidencyState, Messagea
 describe("messageability", () => {
   test("#given every status and residency pair #when classified #then the table is exhaustive", () => {
     // given
-    const pairs = TASK_STATUSES.flatMap((status) =>
-      RESIDENCY_STATES.map((residency) => ({ status, residency })),
-    )
+    const pairs = TASK_STATUSES.flatMap((status) => RESIDENCY_STATES.map((residency) => ({ status, residency })))
 
     // when
     const actual = pairs.map(({ status, residency }) => ({

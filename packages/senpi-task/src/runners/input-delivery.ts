@@ -8,7 +8,11 @@ export function createInputDelivery(input: {
   readonly promptFailed: (error: unknown) => void
 }) {
   // A caller's own id travels with the input; a busy refusal admitted nothing, so its fallback keeps it.
-  const prompt = async (message: string, streamingBehavior: RpcStreamingBehavior, clientMessageId?: string): Promise<void> => {
+  const prompt = async (
+    message: string,
+    streamingBehavior: RpcStreamingBehavior,
+    clientMessageId?: string,
+  ): Promise<void> => {
     const identity = clientMessageId === undefined ? {} : { clientMessageId }
     try {
       await input.effects.send({ type: "prompt", message, streamingBehavior, ...identity })
@@ -19,7 +23,11 @@ export function createInputDelivery(input: {
   }
   return {
     prompt,
-    async runPrompt(message: string, streamingBehavior: RpcStreamingBehavior = "steer", clientMessageId?: string): Promise<void> {
+    async runPrompt(
+      message: string,
+      streamingBehavior: RpcStreamingBehavior = "steer",
+      clientMessageId?: string,
+    ): Promise<void> {
       input.beginTurn()
       try {
         await prompt(message, streamingBehavior, clientMessageId)
@@ -31,7 +39,11 @@ export function createInputDelivery(input: {
     async steer(message: string, clientMessageId?: string): Promise<void> {
       input.beginTurn()
       try {
-        await input.effects.send({ type: "steer", message, ...(clientMessageId === undefined ? {} : { clientMessageId }) })
+        await input.effects.send({
+          type: "steer",
+          message,
+          ...(clientMessageId === undefined ? {} : { clientMessageId }),
+        })
       } catch (error) {
         if (!isBusyChildRejection(error)) throw error
         await prompt(message, "followUp", clientMessageId)

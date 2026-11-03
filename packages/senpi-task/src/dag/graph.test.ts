@@ -105,7 +105,10 @@ describe("compileDag structure", () => {
 
   it("#given a downstream node #when compiled #then the prompt is never templated with upstream ids", () => {
     // given: scheduling-only dependsOn, no substitution
-    const templated = definition([node("plan"), { id: "build", prompt: "use {{plan}}", category: "quick", dependsOn: ["plan"] }])
+    const templated = definition([
+      node("plan"),
+      { id: "build", prompt: "use {{plan}}", category: "quick", dependsOn: ["plan"] },
+    ])
 
     // when
     const result = compileDag(templated, { at: AT })
@@ -133,7 +136,12 @@ describe("compileDag ordering determinism", () => {
   it("#given identical graphs declared in different node order #when compiled #then wave membership is identical", () => {
     const forward = compileDag(diamond, { at: AT })
     const backward = compileDag(
-      definition([node("synthesize", ["build", "test"]), node("test", ["plan"]), node("build", ["plan"]), node("plan")]),
+      definition([
+        node("synthesize", ["build", "test"]),
+        node("test", ["plan"]),
+        node("build", ["plan"]),
+        node("plan"),
+      ]),
       { at: AT },
     )
     expect(backward.waves.map((wave) => [...wave.nodeIds].sort())).toEqual(
@@ -248,13 +256,16 @@ describe("compileDag validation", () => {
     ["a lone dot", "."],
     ["a double dot", ".."],
     ["an empty id", ""],
-  ])("#given a node id with %s #when compiled #then rejected as invalid_node_id and no graph produced", (_label, unsafeId) => {
-    const result = compileDag(definition([node(unsafeId)]), { at: AT })
+  ])(
+    "#given a node id with %s #when compiled #then rejected as invalid_node_id and no graph produced",
+    (_label, unsafeId) => {
+      const result = compileDag(definition([node(unsafeId)]), { at: AT })
 
-    expect(result.ok).toBe(false)
-    expect(result.nodes).toEqual([])
-    expect(result.errors.map((error) => error.code)).toEqual(["invalid_node_id"])
-  })
+      expect(result.ok).toBe(false)
+      expect(result.nodes).toEqual([])
+      expect(result.errors.map((error) => error.code)).toEqual(["invalid_node_id"])
+    },
+  )
 
   it("#given a dot-only three-character id #when compiled #then it is accepted, because only the traversal segments are refused", () => {
     expect(compileDag(definition([node("...")]), { at: AT }).ok).toBe(true)
@@ -306,7 +317,9 @@ describe("compileDag size bounds", () => {
 
     expect(result.ok).toBe(false)
     expect(result.errors.map((error) => error.code)).toContain("dependency_fanout_exceeded")
-    expect(result.errors.find((error) => error.code === "dependency_fanout_exceeded")?.nodeIds).toEqual([nodeId("join")])
+    expect(result.errors.find((error) => error.code === "dependency_fanout_exceeded")?.nodeIds).toEqual([
+      nodeId("join"),
+    ])
   })
 })
 

@@ -49,15 +49,13 @@ export async function runSenpiInstaller(options: SenpiInstallOptions = {}): Prom
   await ensurePluginArtifacts(context)
   const settings = await readSettings(context.settingsPath)
   const before = JSON.stringify(settings)
-  const packages = dedupePackages(await removeSupersededOmoPackages(
-    removeLegacyBuiltinShadows(
-      dedupePackages(readPackages(settings)),
-      context.repoRoot,
+  const packages = dedupePackages(
+    await removeSupersededOmoPackages(
+      removeLegacyBuiltinShadows(dedupePackages(readPackages(settings)), context.repoRoot, context.agentDir),
+      context.pluginPath,
       context.agentDir,
     ),
-    context.pluginPath,
-    context.agentDir,
-  ))
+  )
   if (!packages.includes(context.pluginPath)) packages.push(context.pluginPath)
   settings.packages = packages
   const backupPath = await writeSettingsAtomically(context.settingsPath, settings)
@@ -118,7 +116,10 @@ function resolveInstallContext(options: SenpiInstallOptions): {
 } {
   const env = options.env ?? process.env
   const allowBuild = options.pluginPath === undefined
-  const repoRoot = resolve(options.repoRoot ?? (allowBuild ? findRepoRoot(dirname(fileURLToPath(import.meta.url))) : dirname(resolve(options.pluginPath))))
+  const repoRoot = resolve(
+    options.repoRoot ??
+      (allowBuild ? findRepoRoot(dirname(fileURLToPath(import.meta.url))) : dirname(resolve(options.pluginPath))),
+  )
   const homeDir = options.homeDir ?? env.HOME ?? homedir()
   const agentDir = resolve(options.agentDir ?? resolveAgentHome({ env, homeDir }))
   const pluginPath = resolve(options.pluginPath ?? join(repoRoot, "packages", "omo-senpi", "plugin"))

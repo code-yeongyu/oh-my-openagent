@@ -29,7 +29,10 @@ function transportGoneError(): Error {
   return Object.assign(new Error(`Shared RPC host is unavailable ${SECRET}`), { code: "rpc_transport_gone" })
 }
 
-async function startWithCause(cause: unknown, kind: "child-prompt-failed" | "session_unavailable" = "child-prompt-failed") {
+async function startWithCause(
+  cause: unknown,
+  kind: "child-prompt-failed" | "session_unavailable" = "child-prompt-failed",
+) {
   const runner = new FakeRunner()
   runner.startError = new RunnerError({ kind, message: SECRET, cause, rejected_while: "alive" })
   const { manager, store } = makeManager({ process: runner })
@@ -42,7 +45,10 @@ async function startWithCause(cause: unknown, kind: "child-prompt-failed" | "ses
   })
   if (result.kind !== "start_failed") throw new Error("expected start_failed")
   const eventLog = readFileSync(join(store.stateDir, "logs", `${result.task_id}.jsonl`), "utf8")
-  const event = JSON.parse(eventLog.trim().split("\n").at(-1) ?? "{}") as { type?: string; payload?: Record<string, unknown> }
+  const event = JSON.parse(eventLog.trim().split("\n").at(-1) ?? "{}") as {
+    type?: string
+    payload?: Record<string, unknown>
+  }
   const record = readFileSync(join(store.stateDir, "tasks", `${result.task_id}.json`), "utf8")
   return { result, event, eventLog, record, persisted: store.load(result.task_id) }
 }
@@ -87,50 +93,85 @@ describe("task start failure cause", () => {
     ["a secret", SECRET],
     ["not a string", 42],
     ["too long", "x".repeat(80)],
-  ])("#given a refusal whose error code is %s #when the start failure is recorded #then the refusal is named without the code", async (_label, errorCode) => {
-    // when
-    const { result, event, eventLog } = await startWithCause(senpiCommandError(errorCode))
+  ])(
+    "#given a refusal whose error code is %s #when the start failure is recorded #then the refusal is named without the code",
+    async (_label, errorCode) => {
+      // when
+      const { result, event, eventLog } = await startWithCause(senpiCommandError(errorCode))
 
-    // then
-    expect(result.error_message).toBe("Child prompt failed to start: the prompt was refused (host_refused).")
-    expect(event.payload).toMatchObject({ cause_class: "host_refused" })
-    expect(event.payload).not.toHaveProperty("cause_code")
-    expect(eventLog).not.toContain("sk-live-secret")
-  })
+      // then
+      expect(result.error_message).toBe("Child prompt failed to start: the prompt was refused (host_refused).")
+      expect(event.payload).toMatchObject({ cause_class: "host_refused" })
+      expect(event.payload).not.toHaveProperty("cause_code")
+      expect(eventLog).not.toContain("sk-live-secret")
+    },
+  )
 
   test.each([
-    ["no error code (an engine that predates typed refusals)", { error: "No API key found for openai." }, "the prompt was refused (host_refused)", {}],
-    ["a non-credential error code", { error: "busy", errorCode: "host_memory_pressure" }, "the prompt was refused (host_refused: host_memory_pressure)", { cause_code: "host_memory_pressure" }],
-  ])("#given a real process child refuses its first prompt with %s #when the task starts #then it fails on its own model with that refusal named and no chain walk", async (_label, refusal, cause, code) => {
-    // given: protocol contract - the wire's typed errorCode reaches the start-failure record unchanged
-    const primary = { provider: "openai", model_id: "gpt-5.6-sol", display: "openai/gpt-5.6-sol", source: "category" } as const
-    const next = { provider: "kimi-coding", model_id: "kimi-k3", display: "kimi-coding/kimi-k3", source: "category" } as const
-    const planner: ChildPlanner = () => ({ kind: "resolved", plan: { model: primary.display, resolved_model: primary, category: "quick", fallback_models: [next] } })
-    const { runner, launched } = refusingProcessRunner({ [primary.display]: refusal }, spawned)
-    const { manager, store } = makeManager({ planner, process: createRpcManagedRunner(runner) })
+    [
+      "no error code (an engine that predates typed refusals)",
+      { error: "No API key found for openai." },
+      "the prompt was refused (host_refused)",
+      {},
+    ],
+    [
+      "a non-credential error code",
+      { error: "busy", errorCode: "host_memory_pressure" },
+      "the prompt was refused (host_refused: host_memory_pressure)",
+      { cause_code: "host_memory_pressure" },
+    ],
+  ])(
+    "#given a real process child refuses its first prompt with %s #when the task starts #then it fails on its own model with that refusal named and no chain walk",
+    async (_label, refusal, cause, code) => {
+      // given: protocol contract - the wire's typed errorCode reaches the start-failure record unchanged
+      const primary = {
+        provider: "openai",
+        model_id: "gpt-5.6-sol",
+        display: "openai/gpt-5.6-sol",
+        source: "category",
+      } as const
+      const next = {
+        provider: "kimi-coding",
+        model_id: "kimi-k3",
+        display: "kimi-coding/kimi-k3",
+        source: "category",
+      } as const
+      const planner: ChildPlanner = () => ({
+        kind: "resolved",
+        plan: { model: primary.display, resolved_model: primary, category: "quick", fallback_models: [next] },
+      })
+      const { runner, launched } = refusingProcessRunner({ [primary.display]: refusal }, spawned)
+      const { manager, store } = makeManager({ planner, process: createRpcManagedRunner(runner) })
 
-    // when
-    const result = await manager.start({ prompt: "work", parent_session_id: "parent-1", depth: 1, category: "quick", execution_mode: "process" })
+      // when
+      const result = await manager.start({
+        prompt: "work",
+        parent_session_id: "parent-1",
+        depth: 1,
+        category: "quick",
+        execution_mode: "process",
+      })
 
-    // then
-    expect(result.kind).toBe("start_failed")
-    if (result.kind !== "start_failed") return
-    expect(await launchSettled(manager, result)).toBe("start_failed")
-    const message = `Child prompt failed to start: ${cause}.`
-    expect(result.error_message).toBe(message)
-    expect(launched).toEqual([primary.display])
-    const log = taskEvents(store.stateDir, result.task_id)
-    expect(log.filter((event) => event.type === "task_model_fallback")).toEqual([])
-    expect(log.find((event) => event.type === "task_start_failed")?.payload).toEqual({
-      error_message: message,
-      failure_kind: "child-prompt-failed",
-      rejected_while: "alive",
-      cause_class: "host_refused",
-      ...code,
-    })
-    expect(store.load(result.task_id)).toMatchObject({ model: primary.display, status: "error" })
-    await runner.settleTeardowns()
-  })
+      // then
+      expect(result.kind).toBe("start_failed")
+      if (result.kind !== "start_failed") return
+      expect(await launchSettled(manager, result)).toBe("start_failed")
+      const message = `Child prompt failed to start: ${cause}.`
+      expect(result.error_message).toBe(message)
+      expect(launched).toEqual([primary.display])
+      const log = taskEvents(store.stateDir, result.task_id)
+      expect(log.filter((event) => event.type === "task_model_fallback")).toEqual([])
+      expect(log.find((event) => event.type === "task_start_failed")?.payload).toEqual({
+        error_message: message,
+        failure_kind: "child-prompt-failed",
+        rejected_while: "alive",
+        cause_class: "host_refused",
+        ...code,
+      })
+      expect(store.load(result.task_id)).toMatchObject({ model: primary.display, status: "error" })
+      await runner.settleTeardowns()
+    },
+  )
 
   test("#given the host connection is lost while the first prompt waits #when the start failure is recorded #then a lost transport is named", async () => {
     // when

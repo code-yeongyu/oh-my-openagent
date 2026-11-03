@@ -43,9 +43,7 @@ export function createCategoryConfigCapture(options: CategoryConfigCaptureOption
       options.captureEvent("category_config", {
         $session_id: options.sessionHash,
         config_generation: generation,
-        ...Object.fromEntries(
-          Object.entries(categories).map(([name, value]) => [categoryPropertyName(name), value]),
-        ),
+        ...Object.fromEntries(Object.entries(categories).map(([name, value]) => [categoryPropertyName(name), value])),
         combo_fingerprint: createHash("sha256").update(form).digest("hex").slice(0, FINGERPRINT_LENGTH),
         user_category_count: counts.user,
         builtin_overridden_count: counts.overridden,
@@ -57,10 +55,7 @@ export function createCategoryConfigCapture(options: CategoryConfigCaptureOption
 
 // One closed value per builtin category. The map is keyed by category NAME (not property name) so the
 // canonical form stays comparable with the planner-side generation counter's canonicalization.
-function encodeCategories(
-  omoConfig: OmoConfig,
-  registry: TaskModelRegistry,
-): Readonly<Record<string, string>> {
+function encodeCategories(omoConfig: OmoConfig, registry: TaskModelRegistry): Readonly<Record<string, string>> {
   return Object.fromEntries(BUILTIN_CATEGORY_NAMES.map((name) => [name, encodeCategory(name, omoConfig, registry)]))
 }
 
@@ -74,10 +69,8 @@ function encodeCategory(name: string, omoConfig: OmoConfig, registry: TaskModelR
   switch (resolution.kind) {
     case "resolved": {
       const masked = maskProviderAndModel(resolution.spec.provider, resolution.spec.modelId)
-      const reasoning = resolution.spec.reasoning
-        ?? resolution.spec.reasoningEffort
-        ?? resolution.spec.variant
-        ?? "none"
+      const reasoning =
+        resolution.spec.reasoning ?? resolution.spec.reasoningEffort ?? resolution.spec.variant ?? "none"
       const depth = chainDepth(name, resolution.modelSelection.fallbackEntry?.model)
       return `${masked.provider}/${masked.model_id}/${reasoning}${depth === 0 ? "" : `+${depth}`}`
     }

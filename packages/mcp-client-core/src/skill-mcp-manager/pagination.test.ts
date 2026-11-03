@@ -12,7 +12,7 @@ for (const catalog of catalogs) {
         hostname: "127.0.0.1",
         async fetch(request) {
           if (request.method !== "POST") return new Response(null, { status: 405 })
-          const message = await request.json() as {
+          const message = (await request.json()) as {
             id?: number
             method: string
             params?: { cursor?: string }
@@ -20,7 +20,8 @@ for (const catalog of catalogs) {
           if (message.id === undefined) return new Response(null, { status: 202 })
           if (message.method !== "initialize" && message.method !== `${catalog}/list`) {
             return Response.json({
-              jsonrpc: "2.0", id: message.id,
+              jsonrpc: "2.0",
+              id: message.id,
               error: { code: -32601, message: "Method not found" },
             })
           }
@@ -35,13 +36,15 @@ for (const catalog of catalogs) {
             cursors.push(message.params?.cursor)
             const page = cursors.length
             const name = `item-${page}`
-            const item = catalog === "tools" ? { name, inputSchema: { type: "object" } }
-              : catalog === "resources" ? { name, uri: `fixture://${name}` }
-                : { name }
+            const item =
+              catalog === "tools"
+                ? { name, inputSchema: { type: "object" } }
+                : catalog === "resources"
+                  ? { name, uri: `fixture://${name}` }
+                  : { name }
             result = {
               [catalog]: mode === "single" ? [] : [item],
-              ...(mode === "endless" || (mode === "paged" && page === 1)
-                ? { nextCursor: "opaque /+= cursor" } : {}),
+              ...(mode === "endless" || (mode === "paged" && page === 1) ? { nextCursor: "opaque /+= cursor" } : {}),
             }
           }
           return Response.json({ jsonrpc: "2.0", id: message.id, result })
@@ -51,16 +54,17 @@ for (const catalog of catalogs) {
       const info = { sessionID: "pagination", skillName: "fixture", serverName: "fixture" }
       const context = { skillName: "fixture", config: { url: `http://127.0.0.1:${server.port}/mcp` } }
       try {
-        const result = catalog === "tools" ? manager.listTools(info, context)
-          : catalog === "resources" ? manager.listResources(info, context)
-            : manager.listPrompts(info, context)
+        const result =
+          catalog === "tools"
+            ? manager.listTools(info, context)
+            : catalog === "resources"
+              ? manager.listResources(info, context)
+              : manager.listPrompts(info, context)
         if (mode === "endless") {
           await expect(result).rejects.toThrow("100 pages")
           expect(cursors).toHaveLength(100)
         } else {
-          expect((await result).map((item) => item.name)).toEqual(
-            mode === "single" ? [] : ["item-1", "item-2"],
-          )
+          expect((await result).map((item) => item.name)).toEqual(mode === "single" ? [] : ["item-1", "item-2"])
           expect(cursors).toEqual(mode === "single" ? [undefined] : [undefined, "opaque /+= cursor"])
         }
       } finally {

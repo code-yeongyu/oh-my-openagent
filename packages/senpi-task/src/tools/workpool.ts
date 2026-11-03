@@ -27,14 +27,23 @@ export function buildWorkpoolExecute(deps: WorkpoolToolDeps) {
     if (agent.subagent_type === undefined) return
     const policy = evaluateSpawnPolicy(deps, agent.subagent_type, agent.prompt, parent)
     if (policy.kind === "deny") throw new WorkpoolError("policy_denied", policy.message)
-    if (policy.kind === "force" && policy.prompt !== agent.prompt) throw new WorkpoolError("policy_denied", "The worker's recorded prompt no longer matches the current spawn policy.")
+    if (policy.kind === "force" && policy.prompt !== agent.prompt)
+      throw new WorkpoolError(
+        "policy_denied",
+        "The worker's recorded prompt no longer matches the current spawn policy.",
+      )
   })
   return async (value: unknown, ctx: TaskToolContext): Promise<WorkpoolToolResult> => {
     try {
       const input = parseInput(WorkpoolCommandSchema, value)
       const sessionId = ctx.sessionManager.getSessionId()
       const ancestry = deps.resolveAncestry?.(sessionId)
-      const caller: WorkpoolCaller = { sessionId, rootSessionId: ancestry?.rootSessionId ?? sessionId, depth: ancestry?.depth ?? 0, cwd: ctx.cwd }
+      const caller: WorkpoolCaller = {
+        sessionId,
+        rootSessionId: ancestry?.rootSessionId ?? sessionId,
+        depth: ancestry?.depth ?? 0,
+        cwd: ctx.cwd,
+      }
       switch (input.op) {
         case "create": {
           let agent = input.agent
@@ -47,28 +56,50 @@ export function buildWorkpoolExecute(deps: WorkpoolToolDeps) {
           // Requested worker tools are resolved against the caller's LIVE capability first; only the
           // normalized names reach the persisted pool record.
           const request = { ...create, agent }
-          const grant = await deps.workpools.resolveKernelTools(caller, request, ctx.kernelTools, deps.resolveChildToolNames?.())
+          const grant = await deps.workpools.resolveKernelTools(
+            caller,
+            request,
+            ctx.kernelTools,
+            deps.resolveChildToolNames?.(),
+          )
           return result(deps.workpools.create(caller, request, grant))
         }
-        case "push": return result(deps.workpools.push(caller, input.pool_id, input.items))
-        case "inspect": return result(deps.workpools.inspect(caller, input.pool_id))
-        case "close": return result(deps.workpools.close(caller, input.pool_id))
-        case "cancel": return result(deps.workpools.cancel(caller, input.pool_id))
-        case "yield": throw new WorkpoolError("worker_unassigned", "Only an assigned worker's host wrapper may yield.")
-        default: return exhaustive(input)
+        case "push":
+          return result(deps.workpools.push(caller, input.pool_id, input.items))
+        case "inspect":
+          return result(deps.workpools.inspect(caller, input.pool_id))
+        case "close":
+          return result(deps.workpools.close(caller, input.pool_id))
+        case "cancel":
+          return result(deps.workpools.cancel(caller, input.pool_id))
+        case "yield":
+          throw new WorkpoolError("worker_unassigned", "Only an assigned worker's host wrapper may yield.")
+        default:
+          return exhaustive(input)
       }
-    } catch (error) { return failure(error) }
+    } catch (error) {
+      return failure(error)
+    }
   }
 }
-function exhaustive(value: never): never { throw new Error(`Unhandled workpool operation: ${String(value)}`) }
+function exhaustive(value: never): never {
+  throw new Error(`Unhandled workpool operation: ${String(value)}`)
+}
 
-export function createWorkpoolTool(deps: WorkpoolToolDeps): ToolDefinition<typeof WorkpoolParams, Record<string, unknown>> {
+export function createWorkpoolTool(
+  deps: WorkpoolToolDeps,
+): ToolDefinition<typeof WorkpoolParams, Record<string, unknown>> {
   const execute = buildWorkpoolExecute(deps)
   return {
-    name: "workpool", label: "Workpool", description: "Create and inspect engine-owned keyed work queues. Push returns durable IDs without waiting for capacity. Omitted mode uses the approved keep_alive default; fresh remains selectable. Inspect reads durable keyed data or errors; close delivers one aggregate; uncertain delivery is never retried automatically.",
+    name: "workpool",
+    label: "Workpool",
+    description:
+      "Create and inspect engine-owned keyed work queues. Push returns durable IDs without waiting for capacity. Omitted mode uses the approved keep_alive default; fresh remains selectable. Inspect reads durable keyed data or errors; close delivers one aggregate; uncertain delivery is never retried automatically.",
     parameters: WorkpoolParams,
     // Rarely used: searchable and activated by name on first call (#11454). The worker yield tool below stays direct.
-    exposure: "search", allowLazyActivation: true, searchKeywords: ["work queue", "keyed fan-out", "pool", "batch workers"],
+    exposure: "search",
+    allowLazyActivation: true,
+    searchKeywords: ["work queue", "keyed fan-out", "pool", "batch workers"],
     // Pool admission plans each worker synchronously, and an explicit pin reads senpi's resolver from the lazy barrel.
     execute: async (_id, params, _signal, _update, ctx) => {
       await loadSenpiBarrel()
@@ -83,14 +114,21 @@ export function createWorkpoolWorkerTool(deps: {
   readonly runEpoch: () => number
 }): ToolDefinition {
   return markWorkpoolYieldTool({
-    name: "workpool", label: "Workpool yield", description: "Yield JSON data or a typed error for each assigned key. Identical repeated yields are idempotent; conflicting or stale yields are refused. This tool cannot schedule or spawn workers.",
+    name: "workpool",
+    label: "Workpool yield",
+    description:
+      "Yield JSON data or a typed error for each assigned key. Identical repeated yields are idempotent; conflicting or stale yields are refused. This tool cannot schedule or spawn workers.",
     parameters: WorkpoolWorkerYieldParams,
     execute: async (_id, params) => {
       try {
         const yielded = deps.workpools.yieldResults(deps.taskId, deps.runEpoch(), params)
-        return { ...result(yielded), ...(yielded.results.some(receipt => receipt.status === "refused") ? { isError: true } : {}) }
+        return {
+          ...result(yielded),
+          ...(yielded.results.some((receipt) => receipt.status === "refused") ? { isError: true } : {}),
+        }
+      } catch (error) {
+        return failure(error)
       }
-      catch (error) { return failure(error) }
     },
   })
 }

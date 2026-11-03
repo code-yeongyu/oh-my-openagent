@@ -5,7 +5,6 @@ import type { ParentNotifier, ParentNotifierMessage, ParentState } from "./types
 import type { TaskRecord } from "../state"
 import type { PersistedTaskEvent } from "../store"
 
-
 function baseRecord(overrides: Partial<TaskRecord> = {}): TaskRecord {
   return {
     task_id: "st_deadbeef",
@@ -150,8 +149,16 @@ describe("createCompletionNotifier - gating", () => {
     const completion = createCompletionNotifier({ notifier, store })
 
     // when
-    const cancelResult = completion.notifyTerminal({ record: cancelled, parentState: { kind: "idle" }, runInBackground: true })
-    const interruptResult = completion.notifyTerminal({ record: interrupted, parentState: { kind: "idle" }, runInBackground: true })
+    const cancelResult = completion.notifyTerminal({
+      record: cancelled,
+      parentState: { kind: "idle" },
+      runInBackground: true,
+    })
+    const interruptResult = completion.notifyTerminal({
+      record: interrupted,
+      parentState: { kind: "idle" },
+      runInBackground: true,
+    })
 
     // then
     expect(cancelResult).toEqual({ kind: "skipped", reason: "non-notifying-terminal" })

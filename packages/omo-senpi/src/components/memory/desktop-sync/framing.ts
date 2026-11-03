@@ -6,7 +6,8 @@ const MAX_FRAME_BYTES = 92 * 1024 * 1024
 const BINARY_TAG = "$omoSyncBytes"
 
 export function writeFrame(stream: Duplex, packet: unknown): void {
-  if (stream.destroyed || !stream.writable || stream.writableLength > MAX_FRAME_BYTES) throw new DesktopSyncUnavailable()
+  if (stream.destroyed || !stream.writable || stream.writableLength > MAX_FRAME_BYTES)
+    throw new DesktopSyncUnavailable()
   const line = JSON.stringify(packet, function (this: Record<string, unknown>, key, item: unknown) {
     const original = this[key]
     return original instanceof Uint8Array ? { [BINARY_TAG]: Buffer.from(original).toString("base64url") } : item
@@ -36,7 +37,8 @@ export function readFrames(stream: Duplex, receive: (packet: unknown) => void, c
         pending = Buffer.concat([pending, chunk.subarray(offset, end)])
         if (newline < 0) return
         const value: unknown = JSON.parse(pending.toString("utf8"), (_key, item: unknown) => {
-          if (typeof item !== "object" || item === null || Object.keys(item).length !== 1 || !(BINARY_TAG in item)) return item
+          if (typeof item !== "object" || item === null || Object.keys(item).length !== 1 || !(BINARY_TAG in item))
+            return item
           const encoded = item[BINARY_TAG]
           if (typeof encoded !== "string" || !/^[A-Za-z0-9_-]*$/u.test(encoded)) throw new DesktopSyncUnavailable()
           const bytes = Buffer.from(encoded, "base64url")

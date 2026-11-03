@@ -12,11 +12,17 @@ function requireFresh<T>(modulePath: string): T {
   return require(modulePath) as T
 }
 
-function executeSlashCommand(...args: Parameters<typeof import("../../hooks/auto-slash-command/executor").executeSlashCommand>): ReturnType<typeof import("../../hooks/auto-slash-command/executor").executeSlashCommand> {
-  return requireFresh<typeof import("../../hooks/auto-slash-command/executor")>("../../hooks/auto-slash-command/executor").executeSlashCommand(...args)
+function executeSlashCommand(
+  ...args: Parameters<typeof import("../../hooks/auto-slash-command/executor").executeSlashCommand>
+): ReturnType<typeof import("../../hooks/auto-slash-command/executor").executeSlashCommand> {
+  return requireFresh<typeof import("../../hooks/auto-slash-command/executor")>(
+    "../../hooks/auto-slash-command/executor",
+  ).executeSlashCommand(...args)
 }
 
-function discoverCommandsSync(...args: Parameters<typeof import("./command-discovery").discoverCommandsSync>): ReturnType<typeof import("./command-discovery").discoverCommandsSync> {
+function discoverCommandsSync(
+  ...args: Parameters<typeof import("./command-discovery").discoverCommandsSync>
+): ReturnType<typeof import("./command-discovery").discoverCommandsSync> {
   return requireFresh<typeof import("./command-discovery")>("./command-discovery").discoverCommandsSync(...args)
 }
 
@@ -63,14 +69,17 @@ describe("slashcommand discovery and execution compatibility", () => {
     process.env.OPENCODE_CONFIG_DIR = profileConfigDir
     process.chdir(projectDir)
 
-    expect(discoverCommandsSync(projectDir).some(command => command.name === commandName)).toBe(true)
+    expect(discoverCommandsSync(projectDir).some((command) => command.name === commandName)).toBe(true)
 
     // when
-    const result = await executeSlashCommand({
-      command: commandName,
-      args: "",
-      raw: `/${commandName}`,
-    }, { skills: [] })
+    const result = await executeSlashCommand(
+      {
+        command: commandName,
+        args: "",
+        raw: `/${commandName}`,
+      },
+      { skills: [] },
+    )
 
     // then
     expect(result.success).toBe(true)
@@ -90,14 +99,17 @@ describe("slashcommand discovery and execution compatibility", () => {
     )
     process.chdir("/tmp")
 
-    expect(discoverCommandsSync(projectDir).some(command => command.name === commandName)).toBe(true)
+    expect(discoverCommandsSync(projectDir).some((command) => command.name === commandName)).toBe(true)
 
     // when
-    const result = await executeSlashCommand({
-      command: commandName,
-      args: "",
-      raw: `/${commandName}`,
-    }, { skills: [], directory: projectDir })
+    const result = await executeSlashCommand(
+      {
+        command: commandName,
+        args: "",
+        raw: `/${commandName}`,
+      },
+      { skills: [], directory: projectDir },
+    )
 
     // then
     expect(result.success).toBe(true)

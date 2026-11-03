@@ -78,16 +78,21 @@ export function registerSessionHistoryRpc(pi: SenpiExtensionAPI, options: Sessio
 }
 
 function wireOutcome(outcome: RecentSessionOutcome) {
-  return outcome._tag === "Importable" ? { _tag: outcome._tag, thread: outcome.thread, source: outcome.source } : outcome
+  return outcome._tag === "Importable"
+    ? { _tag: outcome._tag, thread: outcome.thread, source: outcome.source }
+    : outcome
 }
 
-function parseProjectsRequest(data: unknown): Parsed<OwnDirectories & { homes: Array<AgentHome>; importedProjects: Array<ImportedProject> }> {
+function parseProjectsRequest(
+  data: unknown,
+): Parsed<OwnDirectories & { homes: Array<AgentHome>; importedProjects: Array<ImportedProject> }> {
   if (!isRecord(data)) return unavailable("Request must be an object.")
   const homes = parseHomes(data.homes)
   const importedProjects = parseList(data.importedProjects, (entry) =>
     isRecord(entry) && typeof entry.id === "string" && typeof entry.workspaceRoot === "string"
       ? { id: entry.id, workspaceRoot: entry.workspaceRoot }
-      : undefined)
+      : undefined,
+  )
   const own = parseOwnDirectories(data)
   if (homes === undefined) return unavailable("homes must list {source, homePath} with a claudeAgent or codex source.")
   if (importedProjects === undefined) return unavailable("importedProjects must list {id, workspaceRoot}.")
@@ -95,12 +100,15 @@ function parseProjectsRequest(data: unknown): Parsed<OwnDirectories & { homes: A
   return { value: { homes, importedProjects, ...own } }
 }
 
-function parseSessionsRequest(data: unknown): Parsed<OwnDirectories & { workspaceRoot: string; homes: Array<AgentHome>; completed: Array<CompletedTranscript> }> {
+function parseSessionsRequest(
+  data: unknown,
+): Parsed<OwnDirectories & { workspaceRoot: string; homes: Array<AgentHome>; completed: Array<CompletedTranscript> }> {
   if (!isRecord(data)) return unavailable("Request must be an object.")
   const homes = parseHomes(data.homes)
   const completed = parseList(data.completed, parseCompleted)
   const own = parseOwnDirectories(data)
-  if (typeof data.workspaceRoot !== "string" || data.workspaceRoot.length === 0) return unavailable("workspaceRoot must be a non-empty string.")
+  if (typeof data.workspaceRoot !== "string" || data.workspaceRoot.length === 0)
+    return unavailable("workspaceRoot must be a non-empty string.")
   if (homes === undefined) return unavailable("homes must list {source, homePath} with a claudeAgent or codex source.")
   if (completed === undefined) return unavailable("completed must list transcript identities.")
   if (own === undefined) return unavailable("excludedDirectories and managedWorktreeDirectories must be string lists.")
@@ -111,7 +119,8 @@ function parseHomes(value: unknown): Array<AgentHome> | undefined {
   return parseList(value, (entry) =>
     isRecord(entry) && isSource(entry.source) && typeof entry.homePath === "string"
       ? { source: entry.source, homePath: entry.homePath }
-      : undefined)
+      : undefined,
+  )
 }
 
 function parseCompleted(entry: unknown): CompletedTranscript | undefined {
@@ -124,8 +133,12 @@ function parseCompleted(entry: unknown): CompletedTranscript | undefined {
 }
 
 function parseOwnDirectories(data: Record<string, unknown>): OwnDirectories | undefined {
-  const excludedDirectories = parseList(data.excludedDirectories, (entry) => typeof entry === "string" ? entry : undefined)
-  const managedWorktreeDirectories = parseList(data.managedWorktreeDirectories, (entry) => typeof entry === "string" ? entry : undefined)
+  const excludedDirectories = parseList(data.excludedDirectories, (entry) =>
+    typeof entry === "string" ? entry : undefined,
+  )
+  const managedWorktreeDirectories = parseList(data.managedWorktreeDirectories, (entry) =>
+    typeof entry === "string" ? entry : undefined,
+  )
   if (excludedDirectories === undefined || managedWorktreeDirectories === undefined) return undefined
   return { excludedDirectories, managedWorktreeDirectories }
 }
@@ -145,4 +158,4 @@ const isSource = (value: unknown): value is AgentSessionSource => value === "cla
 const isNumberOrNull = (value: unknown): value is number | null => value === null || typeof value === "number"
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null
 const unavailable = (reason: string): Unavailable => ({ kind: "unavailable", reason })
-const reasonOf = (cause: unknown): string => cause instanceof Error ? cause.message : String(cause)
+const reasonOf = (cause: unknown): string => (cause instanceof Error ? cause.message : String(cause))

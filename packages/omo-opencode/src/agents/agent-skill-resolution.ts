@@ -11,7 +11,7 @@ export function resolveAgentSkills(
     browserProvider?: BrowserAutomationProvider
     disabledSkills?: Set<string>
     teamModeEnabled?: boolean
-  } = {}
+  } = {},
 ): AgentConfig {
   const { skills, ...configWithoutSkills } = config as AgentConfigWithSkills
   if (!skills?.length) return configWithoutSkills

@@ -1,5 +1,13 @@
 import type { DoctorOptions, DoctorResult, CheckDefinition, CheckResult, DoctorSummary } from "./framework/types"
-import { getAllCheckDefinitions, getCodexCheckDefinitions, gatherSystemInfo, gatherToolsSummary, gatherCodexSummary, gatherEditionDistTags, resolveLatestVersion } from "./checks"
+import {
+  getAllCheckDefinitions,
+  getCodexCheckDefinitions,
+  gatherSystemInfo,
+  gatherToolsSummary,
+  gatherCodexSummary,
+  gatherEditionDistTags,
+  resolveLatestVersion,
+} from "./checks"
 import { EXIT_CODES } from "./framework/constants"
 import { formatDoctorOutput, formatJsonOutput } from "./framework/formatter"
 
@@ -46,10 +54,46 @@ export function determineExitCode(results: CheckResult[]): number {
 
 function buildTimeoutResult(start: number, options: DoctorOptions): DoctorResult {
   const timeoutResult: DoctorResult = {
-    results: [{ name: "Timeout", status: "fail", message: "Doctor timed out after 30s", issues: [{ title: "Doctor timeout", description: "Checks did not complete within 30s. A subprocess may be hanging.", severity: "error" }] }],
-    systemInfo: { opencodeVersion: null, opencodePath: null, pluginVersion: null, loadedVersion: null, bunVersion: null, configPath: null, configValid: false, isLocalDev: false },
-    tools: { lspServers: [], astGrepCli: false, commentChecker: false, ghCli: { installed: false, authenticated: false, username: null }, mcpBuiltin: [], mcpUser: [] },
-    summary: { total: 1, passed: 0, failed: 1, warnings: 0, skipped: 0, duration: Math.round(performance.now() - start) },
+    results: [
+      {
+        name: "Timeout",
+        status: "fail",
+        message: "Doctor timed out after 30s",
+        issues: [
+          {
+            title: "Doctor timeout",
+            description: "Checks did not complete within 30s. A subprocess may be hanging.",
+            severity: "error",
+          },
+        ],
+      },
+    ],
+    systemInfo: {
+      opencodeVersion: null,
+      opencodePath: null,
+      pluginVersion: null,
+      loadedVersion: null,
+      bunVersion: null,
+      configPath: null,
+      configValid: false,
+      isLocalDev: false,
+    },
+    tools: {
+      lspServers: [],
+      astGrepCli: false,
+      commentChecker: false,
+      ghCli: { installed: false, authenticated: false, username: null },
+      mcpBuiltin: [],
+      mcpUser: [],
+    },
+    summary: {
+      total: 1,
+      passed: 0,
+      failed: 1,
+      warnings: 0,
+      skipped: 0,
+      duration: Math.round(performance.now() - start),
+    },
     exitCode: EXIT_CODES.FAILURE,
     latestVersion: null,
   }

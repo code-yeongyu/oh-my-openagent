@@ -16,7 +16,10 @@ export function detectUltrawork(text: string): boolean {
 }
 
 function extractPromptText(parts: Array<{ type: string; text?: string }>): string {
-  return parts.filter((part) => part.type === "text").map((part) => part.text || "").join("")
+  return parts
+    .filter((part) => part.type === "text")
+    .map((part) => part.text || "")
+    .join("")
 }
 
 type ToastFn = {
@@ -26,9 +29,11 @@ type ToastFn = {
 function showToast(tui: unknown, title: string, message: string): void {
   const toastFn = tui as Partial<ToastFn>
   if (typeof toastFn.showToast !== "function") return
-  toastFn.showToast({
-    body: { title, message, variant: "warning" as const, duration: 3000 },
-  }).catch(() => {})
+  toastFn
+    .showToast({
+      body: { title, message, variant: "warning" as const, duration: 3000 },
+    })
+    .catch(() => {})
 }
 
 export type UltraworkOverrideResult = {
@@ -69,8 +74,7 @@ export function resolveUltraworkOverride(
   const promptText = extractPromptText(output.parts)
   if (!detectUltrawork(promptText)) return null
 
-  const messageAgentName =
-    typeof output.message["agent"] === "string" ? (output.message["agent"] as string) : undefined
+  const messageAgentName = typeof output.message["agent"] === "string" ? (output.message["agent"] as string) : undefined
   const sessionAgentName = sessionID ? getSessionAgent(sessionID) : undefined
   const rawAgentName = inputAgentName ?? messageAgentName ?? sessionAgentName
   if (!rawAgentName || !pluginConfig.agents) return null
@@ -128,8 +132,7 @@ function applyResolvedUltraworkOverride(args: {
 
   const fromModel = (output.message.model as { modelID?: string } | undefined)?.modelID ?? "unknown"
   const agentConfigKey = getAgentConfigKey(
-    inputAgentName ??
-    (typeof output.message["agent"] === "string" ? (output.message["agent"] as string) : "unknown"),
+    inputAgentName ?? (typeof output.message["agent"] === "string" ? (output.message["agent"] as string) : "unknown"),
   )
 
   scheduleDeferredModelOverride(messageId, targetModel, validatedVariant)
@@ -138,11 +141,7 @@ function applyResolvedUltraworkOverride(args: {
     agent: agentConfigKey,
   })
 
-  showToast(
-    tui,
-    "Ultrawork Model Override",
-    `${fromModel} → ${override.modelID}. Maximum precision engaged.`,
-  )
+  showToast(tui, "Ultrawork Model Override", `${fromModel} → ${override.modelID}. Maximum precision engaged.`)
 }
 
 export function applyUltraworkModelOverrideOnMessage(
@@ -160,9 +159,10 @@ export function applyUltraworkModelOverrideOnMessage(
   if (!override) return
 
   const currentModel = getMessageModel(output.message.model)
-  const variantTargetModel = override.providerID && override.modelID
-    ? { providerID: override.providerID, modelID: override.modelID }
-    : currentModel
+  const variantTargetModel =
+    override.providerID && override.modelID
+      ? { providerID: override.providerID, modelID: override.modelID }
+      : currentModel
 
   if (!client || typeof (client as { provider?: { list?: unknown } }).provider?.list !== "function") {
     log("[ultrawork-model-override] SDK validation unavailable, skipping variant override", {

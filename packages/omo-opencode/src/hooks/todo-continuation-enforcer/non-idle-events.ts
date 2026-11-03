@@ -26,7 +26,7 @@ function isEventPart(value: unknown): value is InternalInitiatorTextPartLike {
 }
 
 function resolveEventParts(
-  properties: Record<string, unknown> | undefined
+  properties: Record<string, unknown> | undefined,
 ): InternalInitiatorTextPartLike[] | undefined {
   const parts = properties?.parts
   if (!Array.isArray(parts) || !parts.every(isEventPart)) {
@@ -38,16 +38,16 @@ function resolveEventParts(
 
 function hasInternalSystemDirective(parts: InternalInitiatorTextPartLike[] | undefined): boolean {
   return (parts ?? []).some(
-    (part) => part.type === "text"
-      && typeof part.text === "string"
-      && isSystemDirective(part.text),
+    (part) => part.type === "text" && typeof part.text === "string" && isSystemDirective(part.text),
   )
 }
 
 function hasAcceptedContinuationLifecycle(state: SessionState): boolean {
-  return state.awaitingPostInjectionProgressCheck === true
-    || state.continuationResponseObserved === true
-    || state.continuationBlockReason === "directive-response"
+  return (
+    state.awaitingPostInjectionProgressCheck === true ||
+    state.continuationResponseObserved === true ||
+    state.continuationBlockReason === "directive-response"
+  )
 }
 
 function markContinuationResponseObserved(state: SessionState | undefined): void {
@@ -118,8 +118,8 @@ export function handleNonIdleEvent(args: {
       }
       const state = sessionStateStore.getExistingState(sessionID)
       const messageID = typeof info?.id === "string" ? info.id : undefined
-      const shouldDeferClassification = state !== undefined &&
-        (hasAcceptedContinuationLifecycle(state) || state.unrecoverableErrorDetected === true)
+      const shouldDeferClassification =
+        state !== undefined && (hasAcceptedContinuationLifecycle(state) || state.unrecoverableErrorDetected === true)
       if (parts === undefined && state && shouldDeferClassification && messageID) {
         state.pendingUserMessageID = messageID
         log(`[${HOOK_NAME}] Deferred user interruption classification until message part`, {

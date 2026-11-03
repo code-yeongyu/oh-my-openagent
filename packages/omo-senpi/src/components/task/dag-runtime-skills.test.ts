@@ -4,12 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { loadOmoConfig } from "@oh-my-opencode/omo-config-core"
-import type {
-  ManagedChildHandle,
-  ManagedRunner,
-  ManagedStartSpec,
-  RunnerOutcome,
-} from "@oh-my-opencode/senpi-task"
+import type { ManagedChildHandle, ManagedRunner, ManagedStartSpec, RunnerOutcome } from "@oh-my-opencode/senpi-task"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createDagRuntime } from "./dag-runtime"
@@ -24,7 +19,9 @@ afterEach(() => {
 
 function deferred<T>() {
   let resolve = (_value: T): void => undefined
-  const promise = new Promise<T>((done) => { resolve = done })
+  const promise = new Promise<T>((done) => {
+    resolve = done
+  })
   return { promise, resolve }
 }
 
@@ -75,12 +72,15 @@ describe("createDagRuntime skill wiring", () => {
       sharedParentTools: () => [],
       runnerFactories: { inProcess: () => runner, process: () => runner },
       loadSkills: (names) => ({
-        prepend: names.length === 0 ? "" : "<skill name=\"shared\">\nSHARED BODY\n</skill>\n\n",
+        prepend: names.length === 0 ? "" : '<skill name="shared">\nSHARED BODY\n</skill>\n\n',
         resolved: names,
         missing: [],
       }),
     })
-    engine.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(), sessionManager: { getSessionId: () => "session-shared-skill" } })
+    engine.runtime.captureFrom({
+      modelRegistry: createTeamServiceTestModelRegistry(),
+      sessionManager: { getSessionId: () => "session-shared-skill" },
+    })
     const runtime = createDagRuntime({ pi, engine, logger: logger() })
     await runtime.attach()
 
@@ -90,13 +90,15 @@ describe("createDagRuntime skill wiring", () => {
       definition: {
         key: "assembled-shared-skill",
         name: "assembled shared skill",
-        nodes: [{
-          id: "shared",
-          prompt: "original prompt",
-          load_skills: ["shared"],
-          subagent_type: "explore",
-          model: "omo-mock/mock-1",
-        }],
+        nodes: [
+          {
+            id: "shared",
+            prompt: "original prompt",
+            load_skills: ["shared"],
+            subagent_type: "explore",
+            model: "omo-mock/mock-1",
+          },
+        ],
       },
     })
     await runner.whenStarted()

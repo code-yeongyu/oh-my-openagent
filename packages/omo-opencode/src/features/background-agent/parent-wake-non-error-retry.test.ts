@@ -54,10 +54,12 @@ function installThrowingUnrefTimers(): { readonly thrownUnrefs: () => number; re
   }
 }
 
-function createNotifier(args: {
-  readonly sessionMessagesImpl?: (attempt: number) => Promise<unknown>
-  readonly promptAsyncImpl?: (call: PromptAsyncCall, attempt: number) => Promise<unknown>
-} = {}): NotifierFixture {
+function createNotifier(
+  args: {
+    readonly sessionMessagesImpl?: (attempt: number) => Promise<unknown>
+    readonly promptAsyncImpl?: (call: PromptAsyncCall, attempt: number) => Promise<unknown>
+  } = {},
+): NotifierFixture {
   const promptAsyncCalls: PromptAsyncCall[] = []
   let messagesAttempt = 0
   const sessionMessages: readonly SessionMessageStub[] = [

@@ -33,7 +33,13 @@ function parkingHandle(taskId: string) {
     lastAssistantText: () => undefined,
     dispose: () => Promise.resolve(),
   }
-  return { handle, listeners, park: (reason: SuspensionReason) => { for (const listener of listeners) listener({ reason }) } }
+  return {
+    handle,
+    listeners,
+    park: (reason: SuspensionReason) => {
+      for (const listener of listeners) listener({ reason })
+    },
+  }
 }
 
 function trackerOver(store: ReturnType<typeof tempStore>, handle: ManagedChildHandle, forgotten: string[]) {
@@ -54,10 +60,19 @@ describe("a daemon child whose session parks parks its record", () => {
   test("#given a running child whose recorded host refused the reattach #when it parks host_incompatible #then the record is rpc_detached with that reason and the run is released", () => {
     // given
     const store = tempStore()
-    const record = seedRecord(store, { ...hostSessionRecordInput("st_0e000001", hostSession("st_0e000001", { socket: SHARD })), status: "running", host_pid: 4_242 })
+    const record = seedRecord(store, {
+      ...hostSessionRecordInput("st_0e000001", hostSession("st_0e000001", { socket: SHARD })),
+      status: "running",
+      host_pid: 4_242,
+    })
     const { handle, park } = parkingHandle(record.task_id)
     const forgotten: string[] = []
-    trackerOver(store, handle, forgotten).trackOutcome(record.task_id, handle, record.model, record.notification.run_epoch)
+    trackerOver(store, handle, forgotten).trackOutcome(
+      record.task_id,
+      handle,
+      record.model,
+      record.notification.run_epoch,
+    )
 
     // when
     park("host_incompatible")
@@ -76,16 +91,29 @@ describe("a daemon child whose session parks parks its record", () => {
     test(`#given a session the HOST parked as ${cause} #when the park arrives #then the record is rpc_detached with that cause, still running, and the run is released`, () => {
       // given
       const store = tempStore()
-      const record = seedRecord(store, { ...hostSessionRecordInput("st_0e000002", hostSession("st_0e000002")), status: "running", host_pid: 4_242 })
+      const record = seedRecord(store, {
+        ...hostSessionRecordInput("st_0e000002", hostSession("st_0e000002")),
+        status: "running",
+        host_pid: 4_242,
+      })
       const { handle, park } = parkingHandle(record.task_id)
       const forgotten: string[] = []
-      trackerOver(store, handle, forgotten).trackOutcome(record.task_id, handle, record.model, record.notification.run_epoch)
+      trackerOver(store, handle, forgotten).trackOutcome(
+        record.task_id,
+        handle,
+        record.model,
+        record.notification.run_epoch,
+      )
 
       // when
       park(cause)
 
       // then
-      expect(store.load(record.task_id)).toMatchObject({ residency_state: "rpc_detached", suspension_reason: cause, status: "running" })
+      expect(store.load(record.task_id)).toMatchObject({
+        residency_state: "rpc_detached",
+        suspension_reason: cause,
+        status: "running",
+      })
       expect(forgotten).toEqual([record.task_id])
     })
   }
@@ -93,7 +121,11 @@ describe("a daemon child whose session parks parks its record", () => {
   test("#given a tracked child #when the manager releases it #then a later park touches neither the record nor the manager", () => {
     // given
     const store = tempStore()
-    const record = seedRecord(store, { ...hostSessionRecordInput("st_0e000004", hostSession("st_0e000004")), status: "running", host_pid: 4_242 })
+    const record = seedRecord(store, {
+      ...hostSessionRecordInput("st_0e000004", hostSession("st_0e000004")),
+      status: "running",
+      host_pid: 4_242,
+    })
     const { handle, listeners, park } = parkingHandle(record.task_id)
     const forgotten: string[] = []
     const tracker = trackerOver(store, handle, forgotten)
@@ -112,7 +144,11 @@ describe("a daemon child whose session parks parks its record", () => {
   test("#given a child tracked twice on one handle #when it parks #then the record is parked once", () => {
     // given
     const store = tempStore()
-    const record = seedRecord(store, { ...hostSessionRecordInput("st_0e000005", hostSession("st_0e000005")), status: "running", host_pid: 4_242 })
+    const record = seedRecord(store, {
+      ...hostSessionRecordInput("st_0e000005", hostSession("st_0e000005")),
+      status: "running",
+      host_pid: 4_242,
+    })
     const { handle, listeners, park } = parkingHandle(record.task_id)
     const forgotten: string[] = []
     const tracker = trackerOver(store, handle, forgotten)
@@ -142,7 +178,10 @@ describe("respawn opens a daemon child on its RECORDED socket", () => {
       record,
       sessionPath: record.host_session?.session_path,
       stateDir: store.stateDir,
-      runners: { "in-process": { start: () => Promise.reject(new Error("unused")) }, process: { start: () => Promise.reject(new Error("unused")) } },
+      runners: {
+        "in-process": { start: () => Promise.reject(new Error("unused")) },
+        process: { start: () => Promise.reject(new Error("unused")) },
+      },
       rpcRunner: {
         start: (spec) => {
           specs.push(spec)
@@ -197,7 +236,10 @@ describe("respawn hands a daemon child its remaining fallback chain (#9512)", ()
       record,
       sessionPath: record.host_session?.session_path,
       stateDir: store.stateDir,
-      runners: { "in-process": { start: () => Promise.reject(new Error("unused")) }, process: { start: () => Promise.reject(new Error("unused")) } },
+      runners: {
+        "in-process": { start: () => Promise.reject(new Error("unused")) },
+        process: { start: () => Promise.reject(new Error("unused")) },
+      },
       rpcRunner: {
         start: (spec) => {
           specs.push(spec)

@@ -1,7 +1,12 @@
 import type { AddressBookHost, DiskSession } from "../address-book"
 import type { ThreadControl } from "../endpoint-controls"
 import type { EndpointKind } from "../endpoint-registry"
-import type { GatewayEndpointPort, GatewayWakeReply, ReleaseSessionReply, ReleaseSessionRequest } from "../gateway/adapter"
+import type {
+  GatewayEndpointPort,
+  GatewayWakeReply,
+  ReleaseSessionReply,
+  ReleaseSessionRequest,
+} from "../gateway/adapter"
 import type { ProvenanceRuntime } from "../gateway/provenance-resolver"
 import type { GatewayStore } from "../gateway/store"
 import type { ThreadTranscriptEntry } from "../reader"
@@ -35,7 +40,17 @@ export type ThreadHostSession = {
 /** The per-session half of the host surface, bound to the ONE endpoint that holds the session. */
 export type ThreadSessionPort = Pick<
   ThreadHost,
-  "getMessages" | "getState" | "prompt" | "interrupt" | "setSessionName" | "setModel" | "getAvailableModels" | "setThinkingLevel" | "getAvailableThinkingLevels" | "wake" | "releaseSession"
+  | "getMessages"
+  | "getState"
+  | "prompt"
+  | "interrupt"
+  | "setSessionName"
+  | "setModel"
+  | "getAvailableModels"
+  | "setThinkingLevel"
+  | "getAvailableThinkingLevels"
+  | "wake"
+  | "releaseSession"
 >
 
 /**
@@ -61,24 +76,62 @@ export type ThreadHostViewRequest = {
 export type ThreadHost = {
   readonly socket: string
   readonly listSessions: () => Promise<readonly ThreadHostSession[]>
-  readonly openSession: (params: { readonly cwd?: string; readonly sessionPath?: string; readonly name?: string; readonly forkFrom?: string; readonly initialSkills?: readonly string[] }) => Promise<ThreadHostSession>
+  readonly openSession: (params: {
+    readonly cwd?: string
+    readonly sessionPath?: string
+    readonly name?: string
+    readonly forkFrom?: string
+    readonly initialSkills?: readonly string[]
+  }) => Promise<ThreadHostSession>
   readonly getMessages: (sessionId: string) => Promise<readonly ThreadTranscriptEntry[]>
   readonly getState: (sessionId: string) => Promise<{ readonly isStreaming?: boolean; readonly activeTurnId?: string }>
-  readonly prompt: (sessionId: string, message: string, options?: { readonly streamingBehavior?: "steer" | "followUp" }, durable_session_id?: string) => Promise<{ readonly turnId?: string }>
-  readonly interrupt: (sessionId: string, turnId?: string, durable_session_id?: string) => Promise<{ readonly interrupted?: boolean; readonly turnId?: string }>
+  readonly prompt: (
+    sessionId: string,
+    message: string,
+    options?: { readonly streamingBehavior?: "steer" | "followUp" },
+    durable_session_id?: string,
+  ) => Promise<{ readonly turnId?: string }>
+  readonly interrupt: (
+    sessionId: string,
+    turnId?: string,
+    durable_session_id?: string,
+  ) => Promise<{ readonly interrupted?: boolean; readonly turnId?: string }>
   readonly setSessionName: (sessionId: string, name: string, durable_session_id?: string) => Promise<void>
-  readonly setModel: (sessionId: string, provider: string, modelId: string, durable_session_id?: string) => Promise<{ provider: string; id: string; name?: string }>
-  readonly getAvailableModels: (sessionId: string) => Promise<readonly { provider: string; id: string; name?: string }[]>
-  readonly setThinkingLevel: (sessionId: string, level: string, scope?: "session" | "turn", durable_session_id?: string) => Promise<void>
+  readonly setModel: (
+    sessionId: string,
+    provider: string,
+    modelId: string,
+    durable_session_id?: string,
+  ) => Promise<{ provider: string; id: string; name?: string }>
+  readonly getAvailableModels: (
+    sessionId: string,
+  ) => Promise<readonly { provider: string; id: string; name?: string }[]>
+  readonly setThinkingLevel: (
+    sessionId: string,
+    level: string,
+    scope?: "session" | "turn",
+    durable_session_id?: string,
+  ) => Promise<void>
   readonly getAvailableThinkingLevels: (sessionId: string) => Promise<readonly string[]>
   /** Runs the session's registered inbox drain once (`wake`); every endpoint kind answers it. */
-  readonly wake?: (sessionId: string, deliveryIds: readonly string[], durable_session_id?: string) => Promise<GatewayWakeReply>
+  readonly wake?: (
+    sessionId: string,
+    deliveryIds: readonly string[],
+    durable_session_id?: string,
+  ) => Promise<GatewayWakeReply>
   /** Hands a quiet host session to another runtime (`release_session`); hosts only. */
-  readonly releaseSession?: (sessionId: string, request: ReleaseSessionRequest, durable_session_id?: string) => Promise<ReleaseSessionReply>
+  readonly releaseSession?: (
+    sessionId: string,
+    request: ReleaseSessionRequest,
+    durable_session_id?: string,
+  ) => Promise<ReleaseSessionReply>
   /** Every endpoint at once; absent on a single-endpoint host, whose `listSessions` is the view. */
   readonly listView?: (request?: ThreadHostViewRequest) => Promise<ThreadHostView>
   /** Fresh identity validation on exactly one published endpoint, without enumeration. */
-  readonly listTarget?: (durableId: string, endpoint: { readonly socket: string; readonly kind: EndpointKind }) => Promise<ThreadHostView>
+  readonly listTarget?: (
+    durableId: string,
+    endpoint: { readonly socket: string; readonly kind: EndpointKind },
+  ) => Promise<ThreadHostView>
   /** The per-session methods on the endpoint a listed session's `socket` names. */
   readonly endpoint?: (socket: string) => ThreadSessionPort
   /** The session gateway's sender port over the same endpoints (`wake`, `release_session`, `extension_ui_response`). */
@@ -128,7 +181,6 @@ export type ThreadToolSurfaceOptions = {
   readonly onCompletionArmed?: (durableId: string, armSeq: number) => void
   readonly now?: () => number
 }
-
 
 /** Placeholder the component supplies when the host passes no per-call caller identity. */
 export const UNKNOWN_CALLER = "unknown-caller"

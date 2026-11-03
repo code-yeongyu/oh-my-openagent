@@ -18,7 +18,10 @@ import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { fullAccessControlNote } from "./control-confirm"
 import { createComputerUseComponent } from "./index"
 
-const FAKE_ENGINE = join(dirname(fileURLToPath(import.meta.url)), "../../../../senpi-desktop-service/test/fake-engine.mjs")
+const FAKE_ENGINE = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "../../../../senpi-desktop-service/test/fake-engine.mjs",
+)
 const RECEIVED = "recv "
 const FULL_ACCESS_GRANT_REASON = "full access: the session's permission preset consents to desktop input"
 /** The engine-side methods this baseline pins; heartbeats and capability reads are timing-dependent noise. */
@@ -58,12 +61,14 @@ afterEach(() => {
 
 function received(line: string): Received | undefined {
   const message: unknown = JSON.parse(line)
-  if (typeof message !== "object" || message === null || !("method" in message) || message.method !== "engine.log") return undefined
+  if (typeof message !== "object" || message === null || !("method" in message) || message.method !== "engine.log")
+    return undefined
   if (!("params" in message) || typeof message.params !== "object" || message.params === null) return undefined
   const text = "message" in message.params ? message.params.message : undefined
   if (typeof text !== "string" || !text.startsWith(RECEIVED)) return undefined
   const request: unknown = JSON.parse(text.slice(RECEIVED.length))
-  if (typeof request !== "object" || request === null || !("method" in request) || typeof request.method !== "string") return undefined
+  if (typeof request !== "object" || request === null || !("method" in request) || typeof request.method !== "string")
+    return undefined
   return { method: request.method, params: "params" in request ? request.params : undefined }
 }
 
@@ -122,7 +127,13 @@ async function callComputer(pi: HostApi, chain: readonly unknown[], context: unk
   const execute = pi.tools.find((candidate) => candidate.name === "computer")?.execute
   if (typeof execute !== "function") throw new Error("the computer tool is not registered")
   try {
-    const result: { readonly details?: { readonly value?: unknown } } = await execute("call-e2", { action: "call", chain }, undefined, undefined, context)
+    const result: { readonly details?: { readonly value?: unknown } } = await execute(
+      "call-e2",
+      { action: "call", chain },
+      undefined,
+      undefined,
+      context,
+    )
     return { ok: true, value: result.details?.value }
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) }
@@ -166,7 +177,11 @@ describe("E2 characterization: computer-use runtime on its real path (today's be
     await pi.dispatch("session_shutdown", { type: "session_shutdown" }, hostContext())
 
     // then
-    expect({ spawns: engine.spawns(), wire: engine.wire, active: pi.active }).toEqual({ spawns: 0, wire: [], active: ["read", "bash"] })
+    expect({ spawns: engine.spawns(), wire: engine.wire, active: pi.active }).toEqual({
+      spawns: 0,
+      wire: [],
+      active: ["read", "bash"],
+    })
   })
 
   test("#given a registered component #when computer is activated twice #then the runtime loads once, one engine session opens and computer joins the active tools once", async () => {
@@ -227,9 +242,15 @@ describe("E2 characterization: computer-use runtime on its real path (today's be
     await pi.dispatch("session_shutdown", { type: "session_shutdown" }, hostContext())
 
     // then
-    expect({ acquire, pressed: press.ok }).toMatchObject({ acquire: { ok: true, value: { active: false } }, pressed: true })
+    expect({ acquire, pressed: press.ok }).toMatchObject({
+      acquire: { ok: true, value: { active: false } },
+      pressed: true,
+    })
     const granted = ["session.open", `control.grant(${FULL_ACCESS_GRANT_REASON})`, 'keyChord(["A"])', "control.revoke"]
-    expect({ atRunEnd, atShutdown: pinnedWire(engine.wire) }).toEqual({ atRunEnd: granted, atShutdown: [...granted, "session.close"] })
+    expect({ atRunEnd, atShutdown: pinnedWire(engine.wire) }).toEqual({
+      atRunEnd: granted,
+      atShutdown: [...granted, "session.close"],
+    })
   })
 
   test("#given no full access and no UI #when the model acquires and presses A #then nothing is granted and the press comes back as a COMPUTER_CONTROL_REQUIRED result", async () => {

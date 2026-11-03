@@ -31,8 +31,7 @@ const FORWARDED_EVENT_TYPES = new Set([
 const FORWARDED_EVENT_PREFIXES = ["session.next."]
 
 function shouldForwardEvent(type: string): boolean {
-  return FORWARDED_EVENT_TYPES.has(type)
-    || FORWARDED_EVENT_PREFIXES.some((prefix) => type.startsWith(prefix))
+  return FORWARDED_EVENT_TYPES.has(type) || FORWARDED_EVENT_PREFIXES.some((prefix) => type.startsWith(prefix))
 }
 
 export function createBackgroundNotificationHook(manager: BackgroundManager) {
@@ -41,10 +40,7 @@ export function createBackgroundNotificationHook(manager: BackgroundManager) {
     manager.handleEvent(event)
   }
 
-  const chatMessageHandler = async (
-    input: ChatMessageInput,
-    output: ChatMessageOutput,
-  ): Promise<void> => {
+  const chatMessageHandler = async (input: ChatMessageInput, output: ChatMessageOutput): Promise<void> => {
     manager.injectPendingNotificationsIntoChatMessage(output, input.sessionID)
   }
 

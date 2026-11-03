@@ -30,7 +30,10 @@ function resolveFilePath(from: string, configDir?: string): string {
   return resolve(baseDir, filePath)
 }
 
-function loadSkillFromFile(filePath: string, provenance: SkillProvenance): { template: string; metadata: SkillMetadata } | null {
+function loadSkillFromFile(
+  filePath: string,
+  provenance: SkillProvenance,
+): { template: string; metadata: SkillMetadata } | null {
   try {
     const content = readSkillFileChecked(filePath, provenance)
     const { data, body } = parseFrontmatter<SkillMetadata>(content)

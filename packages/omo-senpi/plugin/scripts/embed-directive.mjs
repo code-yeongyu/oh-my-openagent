@@ -58,12 +58,15 @@ export function parseVariantBlocks(body) {
     const [line, name, kind] = match
     if (kind === "start") {
       if (open !== null) throw new Error(`senpi ultrawork directive: marker "${name}" opens inside "${open.name}"`)
-      if (blocks.some((block) => block.name === name)) throw new Error(`senpi ultrawork directive: marker "${name}" appears twice`)
+      if (blocks.some((block) => block.name === name))
+        throw new Error(`senpi ultrawork directive: marker "${name}" appears twice`)
       open = { name, markerStart: match.index, contentStart: match.index + line.length }
       continue
     }
     if (open === null || open.name !== name) {
-      throw new Error(`senpi ultrawork directive: marker "${name}" closes ${open === null ? "nothing" : `"${open.name}"`}`)
+      throw new Error(
+        `senpi ultrawork directive: marker "${name}" closes ${open === null ? "nothing" : `"${open.name}"`}`,
+      )
     }
     blocks.push({ ...open, contentEnd: match.index, markerEnd: match.index + line.length })
     open = null
@@ -78,7 +81,8 @@ export function parseVariantSections(rawVariant) {
   const normalized = normalizeNewlines(rawVariant)
   const headings = [...normalized.matchAll(/^## ([a-z0-9-]+)\n/gm)]
   if (headings.length === 0) throw new Error("senpi ultrawork astra variant has no `## <name>` section")
-  if (headings[0].index !== 0) throw new Error("senpi ultrawork astra variant has text before its first `## <name>` section")
+  if (headings[0].index !== 0)
+    throw new Error("senpi ultrawork astra variant has text before its first `## <name>` section")
   headings.forEach((heading, index) => {
     const name = heading[1]
     if (sections.has(name)) throw new Error(`senpi ultrawork astra variant defines "${name}" twice`)
@@ -100,7 +104,9 @@ function assertNoForbiddenTokens(body) {
     }
   }
   if (violations.length > 0) {
-    throw new Error(`senpi ultrawork directive source contains forbidden non-senpi tokens:\n  - ${violations.join("\n  - ")}`)
+    throw new Error(
+      `senpi ultrawork directive source contains forbidden non-senpi tokens:\n  - ${violations.join("\n  - ")}`,
+    )
   }
 }
 

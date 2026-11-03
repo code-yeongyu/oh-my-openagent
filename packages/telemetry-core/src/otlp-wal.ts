@@ -138,7 +138,11 @@ export class SpoolWriter {
     if (this.#owned) return
     try {
       mkdirSync(ownersDir(this.#input.dir), { recursive: true, mode: 0o700 })
-      writeFileSync(join(ownersDir(this.#input.dir), ownerName(this.#input.signal, this.#input.pid, this.#input.bootId)), "", { mode: 0o600, flag: "a" })
+      writeFileSync(
+        join(ownersDir(this.#input.dir), ownerName(this.#input.signal, this.#input.pid, this.#input.bootId)),
+        "",
+        { mode: 0o600, flag: "a" },
+      )
       this.#owned = true
     } catch (error) {
       this.#input.onError(error, 0)
@@ -191,7 +195,15 @@ export class WalLogRecordProcessor implements LogRecordProcessor {
 
   onEmit(record: ReadableLogRecord): void {
     const encode = (): Uint8Array =>
-      toBinary(LogRecordSchema, encodeLogRecord({ ...record, body: undefined, severityText: "", attributes: wireAttributes(record.attributes) }))
+      toBinary(
+        LogRecordSchema,
+        encodeLogRecord({
+          ...record,
+          body: undefined,
+          severityText: "",
+          attributes: wireAttributes(record.attributes),
+        }),
+      )
     // No free-text slot: a record's name must be an `omo.<bare name>` event, or it is not written.
     if (record.eventName === undefined || !EVENT_NAME.test(record.eventName)) return
     if (this.writer.append(encode)) this.#onAppended(this.writer)
@@ -220,7 +232,9 @@ export class WalSpanProcessor implements SpanProcessor {
     // A span name outside the allowlist is not written; a listed span keeps only its listed attributes.
     const allowed = Object.hasOwn(this.#spans, span.name) ? new Set(this.#spans[span.name]) : undefined
     if (allowed === undefined) return
-    const attributes = Object.fromEntries(Object.entries(wireAttributes(span.attributes)).filter(([key]) => allowed.has(key)))
+    const attributes = Object.fromEntries(
+      Object.entries(wireAttributes(span.attributes)).filter(([key]) => allowed.has(key)),
+    )
     const encode = (): Uint8Array => toBinary(SpanSchema, encodeSpan({ ...span, attributes }))
     if (this.writer.append(encode)) this.#onAppended(this.writer)
   }

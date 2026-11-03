@@ -9,12 +9,17 @@ class SessionApi extends FakeExtensionAPI {
   constructor(entries: unknown[] = [], wire?: typeof wireComputerPermissionEvents) {
     super()
     this.entries = entries
-    this.rpc = { emit: (name, data) => { this.rpcEvents.push({ name, data }) } }
+    this.rpc = {
+      emit: (name, data) => {
+        this.rpcEvents.push({ name, data })
+      },
+    }
     enableFakeExtensionEvents(this)
     const logger = { info() {}, warn() {}, error() {} }
     if (wire === undefined) {
       createComputerUseComponent({ platform: "freebsd", env: {} }).register(this, {
-        logger, config: { getFlag: () => undefined },
+        logger,
+        config: { getFlag: () => undefined },
       })
     } else {
       wire(this, {}, logger)
@@ -24,9 +29,13 @@ class SessionApi extends FakeExtensionAPI {
     this.entries.push({ type: "custom", customType, data })
   }
   start(id: string) {
-    return this.dispatch("session_start", {}, {
-      sessionManager: { getSessionId: () => id, getEntries: () => this.entries },
-    })
+    return this.dispatch(
+      "session_start",
+      {},
+      {
+        sessionManager: { getSessionId: () => id, getEntries: () => this.entries },
+      },
+    )
   }
   denial(id: string, event: unknown = { type: "computer.permission_required", permission: "screen_recording" }) {
     this.events?.emit("omo.task.child_extension_event", { parent_session_id: id, root_session_id: id, event })
@@ -51,12 +60,18 @@ describe("root permission latch lifetime", () => {
     await reloaded.start(nextRoot)
     reloaded.denial(nextRoot)
     // then
-    expect(first.rpcEvents).toEqual([{
-      name: "omo.computer.permission_required", data: { session_id: root, permission: "screen_recording" },
-    }])
-    expect(reloaded.rpcEvents).toEqual([{
-      name: "omo.computer.permission_required", data: { session_id: nextRoot, permission: "screen_recording" },
-    }])
+    expect(first.rpcEvents).toEqual([
+      {
+        name: "omo.computer.permission_required",
+        data: { session_id: root, permission: "screen_recording" },
+      },
+    ])
+    expect(reloaded.rpcEvents).toEqual([
+      {
+        name: "omo.computer.permission_required",
+        data: { session_id: nextRoot, permission: "screen_recording" },
+      },
+    ])
   })
 
   test("ignores another owner's denial and malformed data without consuming the root latch", async () => {
@@ -70,9 +85,12 @@ describe("root permission latch lifetime", () => {
     pi.denial(root, { type: "computer.permission_required", permission: "screen_recording", app: 1 })
     pi.denial(root)
     // then
-    expect(pi.rpcEvents).toEqual([{
-      name: "omo.computer.permission_required", data: { session_id: root, permission: "screen_recording" },
-    }])
+    expect(pi.rpcEvents).toEqual([
+      {
+        name: "omo.computer.permission_required",
+        data: { session_id: root, permission: "screen_recording" },
+      },
+    ])
   })
 
   test("retains a failed-write latch when the reporter module is evaluated again", async () => {
@@ -92,9 +110,12 @@ describe("root permission latch lifetime", () => {
       await reloaded.start(root)
       reloaded.denial(root)
       // then
-      expect([...first.rpcEvents, ...reloaded.rpcEvents]).toEqual([{
-        name: "omo.computer.permission_required", data: { session_id: root, permission: "screen_recording" },
-      }])
+      expect([...first.rpcEvents, ...reloaded.rpcEvents]).toEqual([
+        {
+          name: "omo.computer.permission_required",
+          data: { session_id: root, permission: "screen_recording" },
+        },
+      ])
     } finally {
       marker.mockRestore()
     }

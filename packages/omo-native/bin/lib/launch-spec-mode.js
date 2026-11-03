@@ -68,11 +68,15 @@ export function launchSpecDoctorLines(pluginRoot, io = {}) {
   const uid = io.getuid === undefined ? currentUid() : io.getuid()
   const impact = "the task host refuses it, so process-mode task children and every team_create fail"
   if (uid !== undefined && stat.uid !== uid) {
-    return [`FAIL launch spec: launch_spec_insecure: ${path} is not owned by you (uid ${stat.uid}); ${impact}. Fix: reinstall omo as this user, or run: sudo chown ${ownerName()} ${path}`]
+    return [
+      `FAIL launch spec: launch_spec_insecure: ${path} is not owned by you (uid ${stat.uid}); ${impact}. Fix: reinstall omo as this user, or run: sudo chown ${ownerName()} ${path}`,
+    ]
   }
   if ((stat.mode & WRITABLE_BY_OTHERS) !== 0) {
     const mode = (stat.mode & 0o777).toString(8)
-    return [`FAIL launch spec: launch_spec_insecure: ${path} is group/world-writable (${mode}); ${impact}. Fix: chmod 644 ${path}`]
+    return [
+      `FAIL launch spec: launch_spec_insecure: ${path} is group/world-writable (${mode}); ${impact}. Fix: chmod 644 ${path}`,
+    ]
   }
   return []
 }

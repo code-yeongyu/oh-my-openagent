@@ -12,11 +12,7 @@ import {
   type AnyValue,
   type KeyValue,
 } from "./otlp-proto/opentelemetry/proto/common/v1/common_pb.js"
-import {
-  LogRecordSchema,
-  SeverityNumber,
-  type LogRecord,
-} from "./otlp-proto/opentelemetry/proto/logs/v1/logs_pb.js"
+import { LogRecordSchema, SeverityNumber, type LogRecord } from "./otlp-proto/opentelemetry/proto/logs/v1/logs_pb.js"
 import { ResourceSchema, type Resource } from "./otlp-proto/opentelemetry/proto/resource/v1/resource_pb.js"
 import {
   Span_SpanKind,

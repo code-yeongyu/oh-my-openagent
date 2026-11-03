@@ -1,12 +1,6 @@
 import { isQaInstall, recordDownload, requestCountry } from "./datapoint"
 import type { RequestContext } from "./env"
-import {
-  assetKind,
-  completionMarkerKey,
-  githubAssetUrl,
-  isReleaseVersion,
-  releaseObjectKey,
-} from "./release-names"
+import { assetKind, completionMarkerKey, githubAssetUrl, isReleaseVersion, releaseObjectKey } from "./release-names"
 
 export const IMMUTABLE = "public, max-age=31536000, immutable"
 
@@ -38,7 +32,8 @@ function objectResponse(object: R2ObjectBody, asset: string, source: "r2" | "cac
   return new Response(object.body, { headers })
 }
 
-type R2Outcome = { readonly kind: "served"; readonly response: Response } | { readonly kind: "fallback"; readonly reason: string }
+type R2Outcome =
+  { readonly kind: "served"; readonly response: Response } | { readonly kind: "fallback"; readonly reason: string }
 
 async function readFromR2(ctx: RequestContext, version: string, asset: string): Promise<R2Outcome> {
   try {
@@ -64,7 +59,14 @@ export async function serveReleaseAsset(
   const isGet = request.method === "GET"
   const record = (source: "r2" | "cache" | "github") => {
     if (!isGet) return
-    recordDownload(ctx.env, { kind, source, version, asset, country: requestCountry(request), qa: isQaInstall(request) })
+    recordDownload(ctx.env, {
+      kind,
+      source,
+      version,
+      asset,
+      country: requestCountry(request),
+      qa: isQaInstall(request),
+    })
   }
 
   const cacheKey = new Request(`https://get.omo.dev/v/${version}/${asset}`, { method: "GET" })

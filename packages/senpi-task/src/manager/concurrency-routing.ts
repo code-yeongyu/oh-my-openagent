@@ -10,7 +10,8 @@ const DEFAULT_LIMIT = 5
 export function getTaskLimit(config: TaskConcurrencyConfig, model: string): number {
   const modelLimit = ownNumber(config.model_concurrency, model)
   if (modelLimit !== undefined) return modelLimit === 0 ? Number.POSITIVE_INFINITY : modelLimit
-  const providerLimit = ownNumber(config.provider_concurrency, providerOf(model)) ?? (providerOf(model) === "opengateway" ? 0 : undefined)
+  const providerLimit =
+    ownNumber(config.provider_concurrency, providerOf(model)) ?? (providerOf(model) === "opengateway" ? 0 : undefined)
   if (providerLimit !== undefined) return providerLimit === 0 ? Number.POSITIVE_INFINITY : providerLimit
   const defaultLimit = config.default_concurrency
   if (defaultLimit !== undefined) return defaultLimit === 0 ? Number.POSITIVE_INFINITY : defaultLimit

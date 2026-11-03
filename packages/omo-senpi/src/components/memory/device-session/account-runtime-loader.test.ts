@@ -6,10 +6,23 @@ import { type DeviceAccountRuntimeModule, lazyCliAccountSource } from "./account
 
 const account = (accountId: string): CliDeviceAccount => ({
   kind: "cli",
-  descriptor: { genesis: "unsupported", rpId: null, userName: null, serviceOrigin: "http://127.0.0.1:9", accountId, serviceDeviceId: "service-device", syncPrincipalId: "principal", publicKeys: { signing: "signing", sealing: "sealing" }, generation: "fixture", incarnation: "cli" },
+  descriptor: {
+    genesis: "unsupported",
+    rpId: null,
+    userName: null,
+    serviceOrigin: "http://127.0.0.1:9",
+    accountId,
+    serviceDeviceId: "service-device",
+    syncPrincipalId: "principal",
+    publicKeys: { signing: "signing", sealing: "sealing" },
+    generation: "fixture",
+    incarnation: "cli",
+  },
   signal: new AbortController().signal,
-  boundary: async dispatch => dispatch(),
-  forOperation: async () => { throw new Error("unused") },
+  boundary: async (dispatch) => dispatch(),
+  forOperation: async () => {
+    throw new Error("unused")
+  },
   serviceDeviceId: "service-device",
   isCurrent: async () => true,
   api: "http://127.0.0.1:9",
@@ -57,7 +70,10 @@ describe("lazyCliAccountSource", () => {
       return { createCliAccountSource: () => async () => account("acct_2") }
     })
 
-    const failure = await source().then(() => undefined, (error: unknown) => error)
+    const failure = await source().then(
+      () => undefined,
+      (error: unknown) => error,
+    )
     expect(failure).toBeInstanceOf(SyncSidecarUnavailableError)
     expect(String(failure)).toContain("Cannot find module '#omo-device-account-runtime'")
     const [first, second] = await Promise.all([source(), source()])

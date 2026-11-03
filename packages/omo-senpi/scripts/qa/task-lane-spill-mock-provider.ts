@@ -31,8 +31,7 @@ interface UrlModule {
   pathToFileURL(path: string): { href: string }
 }
 
-const { existsSync, readFileSync, appendFileSync, mkdirSync, writeFileSync } =
-  process.getBuiltinModule<FsModule>("fs")
+const { existsSync, readFileSync, appendFileSync, mkdirSync, writeFileSync } = process.getBuiltinModule<FsModule>("fs")
 const { join } = process.getBuiltinModule<PathModule>("path")
 const { pathToFileURL } = process.getBuiltinModule<UrlModule>("url")
 
@@ -48,8 +47,7 @@ type Api = "openai-completions"
 type StopReason = "stop" | "toolUse" | "aborted" | "error"
 
 type MockStep =
-  | { type: "text"; text: string }
-  | { type: "tool_call"; name: string; arguments: Record<string, unknown>; id?: string }
+  { type: "text"; text: string } | { type: "tool_call"; name: string; arguments: Record<string, unknown>; id?: string }
 
 interface LaneScript {
   readonly parentSteps: readonly MockStep[]
@@ -75,7 +73,12 @@ interface Context {
 
 type AssistantContent =
   | { readonly type: "text"; readonly text: string }
-  | { readonly type: "toolCall"; readonly id: string; readonly name: string; readonly arguments: Record<string, unknown> }
+  | {
+      readonly type: "toolCall"
+      readonly id: string
+      readonly name: string
+      readonly arguments: Record<string, unknown>
+    }
 
 interface AssistantMessage {
   readonly role: "assistant"
@@ -100,7 +103,12 @@ interface MockModel {
   readonly name: string
   readonly reasoning: boolean
   readonly input: readonly ["text"]
-  readonly cost: { readonly input: number; readonly output: number; readonly cacheRead: number; readonly cacheWrite: number }
+  readonly cost: {
+    readonly input: number
+    readonly output: number
+    readonly cacheRead: number
+    readonly cacheWrite: number
+  }
   readonly contextWindow: number
   readonly maxTokens: number
 }
@@ -112,14 +120,17 @@ interface EventStream extends AsyncIterable<unknown> {
 }
 
 interface ExtensionAPI {
-  registerProvider(id: string, provider: {
-    readonly name: string
-    readonly baseUrl: string
-    readonly apiKey: string
-    readonly api: Api
-    readonly models: readonly MockModel[]
-    streamSimple(model: Model, context: Context): EventStream
-  }): void
+  registerProvider(
+    id: string,
+    provider: {
+      readonly name: string
+      readonly baseUrl: string
+      readonly apiKey: string
+      readonly api: Api
+      readonly models: readonly MockModel[]
+      streamSimple(model: Model, context: Context): EventStream
+    },
+  ): void
 }
 
 const FALLBACK_SCRIPT: LaneScript = { parentSteps: [{ type: "text", text: "no script" }], models: ["primary"] }
@@ -217,12 +228,14 @@ function parentStep(script: LaneScript, display: string, provider: string): Assi
   parentCallCount += 1
   return step.type === "text"
     ? assistant(display, provider, "stop", [{ type: "text", text: step.text }])
-    : assistant(display, provider, "toolUse", [{
-        type: "toolCall",
-        id: step.id ?? `omo-lane-tool-${parentCallCount}`,
-        name: step.name,
-        arguments: step.arguments,
-      }])
+    : assistant(display, provider, "toolUse", [
+        {
+          type: "toolCall",
+          id: step.id ?? `omo-lane-tool-${parentCallCount}`,
+          name: step.name,
+          arguments: step.arguments,
+        },
+      ])
 }
 
 function recordArrival(observeDir: string | undefined, display: string): void {

@@ -43,12 +43,14 @@ describe("collectDisabledSkills across the harness rename", () => {
 
   test("#given both spellings and a profile copy #when collecting #then every name is unioned", () => {
     // given
-    const layers = [layer({
-      disabled_skills: ["base"],
-      "[native]": { disabled_skills: ["native-scoped"] },
-      "[senpi]": { disabled_skills: ["legacy-scoped"] },
-      profiles: { kimi: { "[senpi]": { disabled_skills: ["profile-legacy"] } } },
-    })]
+    const layers = [
+      layer({
+        disabled_skills: ["base"],
+        "[native]": { disabled_skills: ["native-scoped"] },
+        "[senpi]": { disabled_skills: ["legacy-scoped"] },
+        profiles: { kimi: { "[senpi]": { disabled_skills: ["profile-legacy"] } } },
+      }),
+    ]
 
     // when
     const names = collectDisabledSkills({ harness: "native", layers, profile: "kimi" })

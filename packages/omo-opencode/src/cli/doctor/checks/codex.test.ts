@@ -14,7 +14,11 @@ async function createPlatformBin(binDir: string, name: string, target: string): 
   await symlink(target, join(binDir, name))
 }
 
-async function createInstalledCodexHome(): Promise<{ readonly codexHome: string; readonly binDir: string; readonly pluginRoot: string }> {
+async function createInstalledCodexHome(): Promise<{
+  readonly codexHome: string
+  readonly binDir: string
+  readonly pluginRoot: string
+}> {
   const root = await mkdtemp(join(tmpdir(), "omo-codex-doctor-"))
   const codexHome = join(root, ".codex")
   const binDir = join(root, "bin")
@@ -24,7 +28,10 @@ async function createInstalledCodexHome(): Promise<{ readonly codexHome: string;
   await mkdir(join(codexHome, "agents"), { recursive: true })
   await mkdir(binDir, { recursive: true })
   await writeFile(join(pluginRoot, ".codex-plugin", "plugin.json"), JSON.stringify({ name: "omo", version: "4.7.5" }))
-  await writeFile(join(pluginRoot, "lazycodex-install.json"), JSON.stringify({ packageName: "lazycodex-ai", version: "4.7.5" }))
+  await writeFile(
+    join(pluginRoot, "lazycodex-install.json"),
+    JSON.stringify({ packageName: "lazycodex-ai", version: "4.7.5" }),
+  )
   await writeFile(
     join(codexHome, "config.toml"),
     [
@@ -184,8 +191,12 @@ describe("codex doctor checks", () => {
     await writeFile(
       wrapperPath,
       process.platform === "win32"
-        ? ["@echo off", "rem OMO_GENERATED_RUNTIME_WRAPPER", `"%%BUN_BINARY%%" "${missingCliPath}" %%*`, ""].join("\r\n")
-        : ["#!/bin/sh", "# OMO_GENERATED_RUNTIME_WRAPPER", `exec "$BUN_BINARY" "${missingCliPath}" "$@"`, ""].join("\n"),
+        ? ["@echo off", "rem OMO_GENERATED_RUNTIME_WRAPPER", `"%%BUN_BINARY%%" "${missingCliPath}" %%*`, ""].join(
+            "\r\n",
+          )
+        : ["#!/bin/sh", "# OMO_GENERATED_RUNTIME_WRAPPER", `exec "$BUN_BINARY" "${missingCliPath}" "$@"`, ""].join(
+            "\n",
+          ),
     )
 
     // when
@@ -220,7 +231,10 @@ describe("codex doctor checks", () => {
     // given
     const { codexHome, binDir } = await createInstalledCodexHome()
     const legacyPath = join(binDir, process.platform === "win32" ? "omo.cmd" : "omo")
-    await writeFile(legacyPath, process.platform === "win32" ? "@echo off\r\necho user owned\r\n" : "#!/bin/sh\necho user-owned\n")
+    await writeFile(
+      legacyPath,
+      process.platform === "win32" ? "@echo off\r\necho user owned\r\n" : "#!/bin/sh\necho user-owned\n",
+    )
 
     // when
     const result = await checkCodexRuntimeWrapper({ codexHome, binDir })
@@ -297,7 +311,9 @@ describe("codex doctor checks", () => {
     expect(summary.config.companionPluginEnabled).toBe(true)
     expect(summary.config.companionLifecycleHookStateEvents).toEqual(["session_start", "stop"])
     expect(result.details).toContain("Companion plugin: codex@openai-codex enabled (SessionStart, Stop hook trust)")
-    const issue = result.issues.find((entry) => entry.title === "Codex Companion lifecycle hooks may conflict with LazyCodex")
+    const issue = result.issues.find(
+      (entry) => entry.title === "Codex Companion lifecycle hooks may conflict with LazyCodex",
+    )
     expect(issue).toBeDefined()
     expect(issue?.severity).toBe("warning")
     expect(issue?.description).toContain("codex@openai-codex is enabled")

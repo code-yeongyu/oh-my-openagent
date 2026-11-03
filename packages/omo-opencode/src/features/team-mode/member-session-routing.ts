@@ -23,7 +23,9 @@ export type TeamMemberPromptBody = {
   options?: Record<string, unknown>
 }
 
-function buildPromptGenerationParams(model: PromptGenerationModel | undefined): Omit<TeamMemberPromptBody, "parts" | "agent" | "model" | "variant"> {
+function buildPromptGenerationParams(
+  model: PromptGenerationModel | undefined,
+): Omit<TeamMemberPromptBody, "parts" | "agent" | "model" | "variant"> {
   if (!model) {
     return {}
   }

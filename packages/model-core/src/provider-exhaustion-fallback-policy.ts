@@ -2,9 +2,7 @@ import { classifyRuntimeFallbackError, type RuntimeFallbackErrorType } from "./r
 
 export type ProviderExhaustionFallbackSignal = Extract<RuntimeFallbackErrorType, "quota_exceeded">
 
-export function classifyProviderExhaustionFallbackSignal(
-  error: unknown,
-): ProviderExhaustionFallbackSignal | undefined {
+export function classifyProviderExhaustionFallbackSignal(error: unknown): ProviderExhaustionFallbackSignal | undefined {
   const runtimeFallbackErrorType = classifyRuntimeFallbackError(error)
   return runtimeFallbackErrorType === "quota_exceeded" ? runtimeFallbackErrorType : undefined
 }

@@ -35,16 +35,20 @@ describe("bounded resumed-child revival (omo#9498)", () => {
       expect(record.status).toBe("lost")
       expect(record.error_message).toContain("model_unavailable")
       expect(record.error_message).toContain("3 retry attempts")
-      const output = await runTaskOutput({
-        manager: {
-          get: (id) => h.store.load(id) ?? undefined,
-          list: () => h.store.list().records.map((entry) => ({ record: entry })),
+      const output = await runTaskOutput(
+        {
+          manager: {
+            get: (id) => h.store.load(id) ?? undefined,
+            list: () => h.store.list().records.map((entry) => ({ record: entry })),
+          },
+          stateDir: h.store.stateDir,
         },
-        stateDir: h.store.stateDir,
-      }, { task_id: h.taskId }, "parent-1")
-      expect(output.content).toEqual(expect.arrayContaining([
-        expect.objectContaining({ type: "text", text: expect.stringContaining("[lost]") }),
-      ]))
+        { task_id: h.taskId },
+        "parent-1",
+      )
+      expect(output.content).toEqual(
+        expect.arrayContaining([expect.objectContaining({ type: "text", text: expect.stringContaining("[lost]") })]),
+      )
       expect(output.details.kind).toBe("status")
       if (output.details.kind === "status") expect(output.details.snapshot.lost?.session_dir).toBeDefined()
     } finally {

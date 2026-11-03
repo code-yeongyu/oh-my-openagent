@@ -12,9 +12,7 @@ function toComparisonSeparators(path: string): string {
 export function normalizeSessionDirectory(directory: string): string {
   const normalized = normalize(directory)
   const root = parse(normalized).root
-  const withoutTrailing = normalized !== root && normalized.endsWith(sep)
-    ? normalized.slice(0, -1)
-    : normalized
+  const withoutTrailing = normalized !== root && normalized.endsWith(sep) ? normalized.slice(0, -1) : normalized
   return toComparisonSeparators(withoutTrailing)
 }
 

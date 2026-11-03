@@ -1,11 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import type { ThreadErrorCode } from "./errors"
-import {
-  THREAD_ERROR_CODES,
-  isThreadErrorCode,
-  threadToolFailure,
-} from "./index"
+import { THREAD_ERROR_CODES, isThreadErrorCode, threadToolFailure } from "./index"
 import {
   ThreadCreateParams,
   ThreadDeliveryMode,
@@ -20,11 +16,23 @@ const VALID_SAMPLES: Record<keyof typeof threadToolParamSchemas, unknown> = {
   thread_read: { thread: "019233a1-7c2e-7bbb", cursor: "rev12:seq40", max_bytes: 65536 },
   thread_send: { thread: "019233a1-7c2e-7bbb", message: "Continue the payments migration.", delivery: "auto" },
   thread_interrupt: { thread: "019233a1-7c2e-7bbb", turn_id: "turn-7" },
-  thread_handoff: { thread: "payments", match: "fuzzy", message: "Pick this up where it stopped.", delivery: "follow_up" },
+  thread_handoff: {
+    thread: "payments",
+    match: "fuzzy",
+    message: "Pick this up where it stopped.",
+    delivery: "follow_up",
+  },
   thread_rename: { thread: "019233a1-7c2e-7bbb", name: "payments-lane-2" },
   thread_set_model: { thread: "019233a1-7c2e-7bbb", model: "claude-opus-4" },
   thread_set_reasoning: { thread: "019233a1-7c2e-7bbb", level: "high" },
-  thread_bind: { platform: "custom", account_id: "qa", chat_id: "c1", thread_id: "t1", session: "019233a1-7c2e-7bbb", ttl_seconds: null },
+  thread_bind: {
+    platform: "custom",
+    account_id: "qa",
+    chat_id: "c1",
+    thread_id: "t1",
+    session: "019233a1-7c2e-7bbb",
+    ttl_seconds: null,
+  },
   thread_unbind: { binding_id: "bnd-1", expected_revision: 1 },
   thread_rebind: { binding_id: "bnd-1", expected_revision: 1, session: "019233a1-7c2e-7bbc" },
   thread_bindings: { platform: "discord", status: "active", limit: 10 },
@@ -183,7 +191,11 @@ describe("thread_set_reasoning params", () => {
 
 describe("relay tool params", () => {
   test("#given a bind with an off-catalog platform #when parsed #then it returns invalid_arguments as data", () => {
-    const outcome = parseThreadParams(threadToolParamSchemas.thread_bind, { platform: "irc", account_id: "a", chat_id: "c" })
+    const outcome = parseThreadParams(threadToolParamSchemas.thread_bind, {
+      platform: "irc",
+      account_id: "a",
+      chat_id: "c",
+    })
     expect(outcome).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
   })
 

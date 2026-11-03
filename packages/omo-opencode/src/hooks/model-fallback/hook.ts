@@ -1,10 +1,7 @@
 import type { FallbackEntry } from "../../shared/model-requirements"
 import type { ChatMessageInput, ChatMessageHandlerOutput } from "../../plugin/chat-message"
 import { applyFallbackToChatMessage } from "./chat-message-fallback-handler"
-import {
-  createModelFallbackStateController,
-  type ModelFallbackStateController,
-} from "./fallback-state-controller"
+import { createModelFallbackStateController, type ModelFallbackStateController } from "./fallback-state-controller"
 import type { ModelFallbackControllerAccessor } from "./controller-accessor"
 
 type FallbackToast = (input: {
@@ -44,10 +41,7 @@ type ModelFallbackControllerWithState = Pick<
 >
 
 export type ModelFallbackHook = ModelFallbackControllerWithState & {
-  "chat.message": (
-    input: ChatMessageInput,
-    output: ChatMessageHandlerOutput,
-  ) => Promise<void>
+  "chat.message": (input: ChatMessageInput, output: ChatMessageHandlerOutput) => Promise<void>
 }
 
 type ModelFallbackHookArgs = {
@@ -78,7 +72,6 @@ export function clearSessionFallbackChain(
   controller.clearSessionFallbackChain(sessionID)
 }
 
-
 /**
  * Sets a pending model fallback for a session.
  * Called when a model error is detected in session.error handler.
@@ -90,12 +83,7 @@ export function setPendingModelFallback(
   currentProviderID: string,
   currentModelID: string,
 ): boolean {
-  return controller.setPendingModelFallback(
-    sessionID,
-    agentName,
-    currentProviderID,
-    currentModelID,
-  )
+  return controller.setPendingModelFallback(sessionID, agentName, currentProviderID, currentModelID)
 }
 
 /**
@@ -169,10 +157,7 @@ export function createModelFallbackHook(args?: ModelFallbackHookArgs): ModelFall
     hasPendingModelFallback: controller.hasPendingModelFallback,
     getFallbackState: controller.getFallbackState,
     reset: controller.reset,
-    "chat.message": async (
-      input: ChatMessageInput,
-      output: ChatMessageHandlerOutput,
-    ): Promise<void> => {
+    "chat.message": async (input: ChatMessageInput, output: ChatMessageHandlerOutput): Promise<void> => {
       const { sessionID } = input
       if (!sessionID) return
 

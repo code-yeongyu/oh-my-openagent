@@ -12,7 +12,11 @@ function toRunning(harness: SteeringHarness, record: TaskRecord): void {
 
 function toCompleted(harness: SteeringHarness, record: TaskRecord): void {
   toRunning(harness, record)
-  harness.store.transition(record.task_id, { type: "complete", timestamp: new Date().toISOString(), final_response: "first pass" })
+  harness.store.transition(record.task_id, {
+    type: "complete",
+    timestamp: new Date().toISOString(),
+    final_response: "first pass",
+  })
 }
 
 describe("steering engine one-shot agent refusal", () => {
@@ -25,7 +29,11 @@ describe("steering engine one-shot agent refusal", () => {
     harness.setLive(record.task_id, fake.handle)
 
     // when
-    const outcome = await harness.engine.sendToTask({ idOrName: record.task_id, message: "steer attempt", deliverAs: "steer" })
+    const outcome = await harness.engine.sendToTask({
+      idOrName: record.task_id,
+      message: "steer attempt",
+      deliverAs: "steer",
+    })
 
     // then
     if (outcome.kind !== "one_shot_agent") throw new Error("expected one_shot_agent")
@@ -47,7 +55,11 @@ describe("steering engine one-shot agent refusal", () => {
     harness.setLive(record.task_id, fake.handle)
 
     // when
-    const outcome = await harness.engine.sendToTask({ idOrName: record.task_id, message: "steer attempt", deliverAs: "steer" })
+    const outcome = await harness.engine.sendToTask({
+      idOrName: record.task_id,
+      message: "steer attempt",
+      deliverAs: "steer",
+    })
 
     // then
     expect(outcome.kind).not.toBe("one_shot_agent")
@@ -92,12 +104,20 @@ describe("steering engine one-shot refusal vs scope ordering", () => {
   test("#given a foreign-owned plan-reviewer child #when sent without all_scope #then the scope denial wins and the one-shot classification is not leaked", async () => {
     // given
     const harness = makeHarness()
-    const record = harness.seedRecord({ agent_type: "plan-reviewer", parent_session_id: "parent-1", root_session_id: "parent-1" })
+    const record = harness.seedRecord({
+      agent_type: "plan-reviewer",
+      parent_session_id: "parent-1",
+      root_session_id: "parent-1",
+    })
     toRunning(harness, record)
     harness.setLive(record.task_id, makeFakeHandle(record.task_id, "in-process").handle)
 
     // when
-    const outcome = await harness.engine.sendToTask({ idOrName: record.task_id, message: "hi", callerSessionId: "parent-2" })
+    const outcome = await harness.engine.sendToTask({
+      idOrName: record.task_id,
+      message: "hi",
+      callerSessionId: "parent-2",
+    })
 
     // then
     if (outcome.kind !== "scope_denied") throw new Error("expected scope_denied")
@@ -107,13 +127,22 @@ describe("steering engine one-shot refusal vs scope ordering", () => {
   test("#given a foreign-owned plan-reviewer child #when sent with all_scope #then the one-shot refusal applies", async () => {
     // given
     const harness = makeHarness()
-    const record = harness.seedRecord({ agent_type: "plan-reviewer", parent_session_id: "parent-1", root_session_id: "parent-1" })
+    const record = harness.seedRecord({
+      agent_type: "plan-reviewer",
+      parent_session_id: "parent-1",
+      root_session_id: "parent-1",
+    })
     toRunning(harness, record)
     const fake = makeFakeHandle(record.task_id, "in-process")
     harness.setLive(record.task_id, fake.handle)
 
     // when
-    const outcome = await harness.engine.sendToTask({ idOrName: record.task_id, message: "hi", callerSessionId: "parent-2", allScope: true })
+    const outcome = await harness.engine.sendToTask({
+      idOrName: record.task_id,
+      message: "hi",
+      callerSessionId: "parent-2",
+      allScope: true,
+    })
 
     // then
     if (outcome.kind !== "one_shot_agent") throw new Error("expected one_shot_agent")

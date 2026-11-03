@@ -1,15 +1,34 @@
 import { createScenarioSandbox } from "./task-host-e2e-sandbox.mjs"
 import { generationHostPid, zombieChildCount } from "./task-host-e2e-daemon-state.mjs"
-import { cleanupScenario, daemonStatus, pidAlive, readTaskRecords, spawnParent, waitFor } from "./task-host-e2e-process.mjs"
+import {
+  cleanupScenario,
+  daemonStatus,
+  pidAlive,
+  readTaskRecords,
+  spawnParent,
+  waitFor,
+} from "./task-host-e2e-process.mjs"
 import { observeState, stopParent } from "./task-host-e2e-events.mjs"
 import { stormPass } from "./task-host-e2e-gates.mjs"
-import { CHILD_DONE, childSessionFiles, childStartDiagnosis, childrenSettled, hostConfig, holdParent, jsonlLines, spawnScript } from "./task-host-e2e-support.mjs"
+import {
+  CHILD_DONE,
+  childSessionFiles,
+  childStartDiagnosis,
+  childrenSettled,
+  hostConfig,
+  holdParent,
+  jsonlLines,
+  spawnScript,
+} from "./task-host-e2e-support.mjs"
 
 // A finite, distinct workload: the success marker is emitted only after the real bash tool returns.
 const BASH_STORM = [
   ...Array.from({ length: 25 }, (_, index) => ({
-    type: "tool_call", name: "eval", arguments: {
-      language: "js", summary: `spawn one short-lived child process (${index})`,
+    type: "tool_call",
+    name: "eval",
+    arguments: {
+      language: "js",
+      summary: `spawn one short-lived child process (${index})`,
       code: `var result = await tool.bash({ command: "true # storm-${index}" });
         if (result.hasError || result.isError) throw new Error("storm bash failed");
         console.log("STORM_OK:${index}");`,
@@ -42,19 +61,32 @@ export async function scenarioF(run) {
   })
   let parent
   let calls = {}
-  await observeState(sandbox.root, () => {
-    const records = readTaskRecords(sandbox)
-    calls = Object.fromEntries(records.map((record) => [
-      record.task_id, completedStormCalls(childSessionFiles(sandbox, record.task_id).flatMap(jsonlLines)),
-    ]))
-    return childrenSettled(records, 8) ? records : undefined
-  }, { trigger: () => { parent = spawnParent(sandbox, run.mockEntry, "run the bash storm across eight children") } })
+  await observeState(
+    sandbox.root,
+    () => {
+      const records = readTaskRecords(sandbox)
+      calls = Object.fromEntries(
+        records.map((record) => [
+          record.task_id,
+          completedStormCalls(childSessionFiles(sandbox, record.task_id).flatMap(jsonlLines)),
+        ]),
+      )
+      return childrenSettled(records, 8) ? records : undefined
+    },
+    {
+      trigger: () => {
+        parent = spawnParent(sandbox, run.mockEntry, "run the bash storm across eight children")
+      },
+    },
+  )
   const records = readTaskRecords(sandbox)
   const hostPid = generationHostPid(sandbox.agentDir)
   await stopParent(parent)
   // Time is the subject of this bound: after the finite workload settles, zombies must be reaped.
-  const settled = await waitFor(() => hostPid !== undefined && pidAlive(hostPid) &&
-    zombieChildCount(hostPid) === 0 ? true : undefined, { timeoutMs: 30_000, intervalMs: 1_000 })
+  const settled = await waitFor(
+    () => (hostPid !== undefined && pidAlive(hostPid) && zombieChildCount(hostPid) === 0 ? true : undefined),
+    { timeoutMs: 30_000, intervalMs: 1_000 },
+  )
   const status = daemonStatus(sandbox, { includeWorkers: true })
   const facts = {
     hostPid: hostPid ?? null,
@@ -71,9 +103,11 @@ export async function scenarioF(run) {
   const pass = stormPass(facts)
   const receipt = await cleanupScenario(sandbox, { hostPids: [hostPid, status.json?.pid].filter(Boolean) })
   return {
-    scenario: "F", title: "zombies (E1): 200 successful bash calls across 8 children",
+    scenario: "F",
+    title: "zombies (E1): 200 successful bash calls across 8 children",
     status: pass ? "pass" : "fail",
     reason: `participants=${facts.stormParticipants} bashCalls=${facts.bashCallRecords} alive=${facts.daemonAlive} zombies=${facts.zombieChildCount} daemonZombies=${facts.daemonReportedZombies}`,
-    facts, receipt,
+    facts,
+    receipt,
   }
 }

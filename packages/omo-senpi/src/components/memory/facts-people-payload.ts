@@ -27,10 +27,13 @@ export async function readFactsPeoplePayload(repoDir: string): Promise<{
   }
 }
 
-async function readCard(path: string): Promise<{
-  readonly description: string
-  readonly aliases: readonly string[]
-} | undefined> {
+async function readCard(path: string): Promise<
+  | {
+      readonly description: string
+      readonly aliases: readonly string[]
+    }
+  | undefined
+> {
   const raw = await readFile(path, "utf8").catch(() => undefined)
   if (raw === undefined) return undefined
   try {

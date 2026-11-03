@@ -3,10 +3,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
 
-import {
-  _resetForTesting,
-  registerAgentName,
-} from "../../features/claude-code-session-state"
+import { _resetForTesting, registerAgentName } from "../../features/claude-code-session-state"
 import { releaseAllPromptAsyncReservationsForTesting } from "../shared/prompt-async-gate"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import { injectContinuationPrompt } from "./continuation-prompt-injector"

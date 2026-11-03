@@ -5,11 +5,15 @@ export const NativePromptContext = z.object({
   model: z.string(),
   tools: z.array(z.string()),
   toolSnippets: z.record(z.string(), z.string()).optional(),
-  toolPermissions: z.array(z.object({
-    pattern: z.string(),
-    permission: z.enum(["allow", "ask", "deny"]),
-    scope: z.string().optional(),
-  })).optional(),
+  toolPermissions: z
+    .array(
+      z.object({
+        pattern: z.string(),
+        permission: z.enum(["allow", "ask", "deny"]),
+        scope: z.string().optional(),
+      }),
+    )
+    .optional(),
   restriction: z.literal("hephaestus").optional(),
   useTaskSystem: z.boolean().optional(),
 })

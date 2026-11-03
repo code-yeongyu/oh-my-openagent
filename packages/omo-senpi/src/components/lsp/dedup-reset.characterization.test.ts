@@ -177,7 +177,9 @@ describe("omo-senpi lsp post-edit dedup and reset (characterization X8b)", () =>
 
   it("#given clean and error results #when the same file is edited again #then it is checked every time, and duplicate paths in one result are checked once", async () => {
     const { pi, checked } = harness((filePath) =>
-      filePath === "broken.ts" ? { content: [{ type: "text", text: "error[typescript] (2322) at 1:1: broken" }] } : CLEAN,
+      filePath === "broken.ts"
+        ? { content: [{ type: "text", text: "error[typescript] (2322) at 1:1: broken" }] }
+        : CLEAN,
     )
     const ctx = session("s1")
 

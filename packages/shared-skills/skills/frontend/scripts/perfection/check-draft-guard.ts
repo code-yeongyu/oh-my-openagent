@@ -11,30 +11,30 @@ import { lintDraft } from "./draft-guard/lint"
 const MESSAGES: Readonly<Record<string, string>> = { ...RULE_MESSAGES, ...DRAFT_RULE_MESSAGES }
 
 function main(argv: readonly string[]): number {
-	const json = argv.includes("--json")
-	const targets = argv.filter((a) => a !== "--json")
-	if (targets.length === 0) {
-		process.stderr.write("usage: check-draft-guard.ts [--json] <file-or-dir>...\n")
-		return 2
-	}
-	const { paths, missing } = collectFiles(targets)
-	if (missing.length > 0) {
-		process.stderr.write(`check-draft-guard: cannot read ${missing.join(", ")}\n`)
-		return 2
-	}
-	const files: SourceFile[] = paths.map((path) => ({ path, text: readFileSync(path, "utf8") }))
-	const findings = [...lintFiles(files), ...lintDraft(files)].sort(
-		(a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.column - b.column,
-	)
-	if (json) process.stdout.write(`${JSON.stringify(findings, null, 2)}\n`)
-	else {
-		for (const f of findings) {
-			process.stdout.write(`${f.file}:${f.line}:${f.column}  ${f.rule}  ${MESSAGES[f.rule]}\n    > ${f.excerpt}\n`)
-		}
-		const summary = findings.length === 0 ? "clean" : `${findings.length} finding(s); fix each before visual QA`
-		process.stdout.write(`check-draft-guard: ${paths.length} file(s), ${summary}\n`)
-	}
-	return findings.length === 0 ? 0 : 1
+  const json = argv.includes("--json")
+  const targets = argv.filter((a) => a !== "--json")
+  if (targets.length === 0) {
+    process.stderr.write("usage: check-draft-guard.ts [--json] <file-or-dir>...\n")
+    return 2
+  }
+  const { paths, missing } = collectFiles(targets)
+  if (missing.length > 0) {
+    process.stderr.write(`check-draft-guard: cannot read ${missing.join(", ")}\n`)
+    return 2
+  }
+  const files: SourceFile[] = paths.map((path) => ({ path, text: readFileSync(path, "utf8") }))
+  const findings = [...lintFiles(files), ...lintDraft(files)].sort(
+    (a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.column - b.column,
+  )
+  if (json) process.stdout.write(`${JSON.stringify(findings, null, 2)}\n`)
+  else {
+    for (const f of findings) {
+      process.stdout.write(`${f.file}:${f.line}:${f.column}  ${f.rule}  ${MESSAGES[f.rule]}\n    > ${f.excerpt}\n`)
+    }
+    const summary = findings.length === 0 ? "clean" : `${findings.length} finding(s); fix each before visual QA`
+    process.stdout.write(`check-draft-guard: ${paths.length} file(s), ${summary}\n`)
+  }
+  return findings.length === 0 ? 0 : 1
 }
 
 process.exitCode = main(process.argv.slice(2))

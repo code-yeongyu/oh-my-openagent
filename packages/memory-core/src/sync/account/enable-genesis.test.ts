@@ -6,8 +6,14 @@ import { enableSync } from "./enable.ts"
 import { ACCOUNT, fixture, operationScope } from "./testing/genesis-enable.test-support.ts"
 
 const cleanups: (() => Promise<void>)[] = []
-afterEach(async () => { for (const close of cleanups.splice(0).reverse()) await close() })
-const setup = async () => { const f = await fixture(); cleanups.push(f.close); return f }
+afterEach(async () => {
+  for (const close of cleanups.splice(0).reverse()) await close()
+})
+const setup = async () => {
+  const f = await fixture()
+  cleanups.push(f.close)
+  return f
+}
 
 test("empty account creates genesis, persists exact intent before PUT, and pins the served chain", async () => {
   const f = await setup()
@@ -17,7 +23,9 @@ test("empty account creates genesis, persists exact intent before PUT, and pins 
     async appendKeys(request: Parameters<typeof f.input.chain.appendKeys>[0]) {
       const dirs = await readdir(join(f.input.pinDir, "genesis-intent"))
       for (const dir of dirs.filter((name) => !name.endsWith(".lock") && !name.endsWith(".tmp"))) {
-        const intent: unknown = JSON.parse(await readFile(join(f.input.pinDir, "genesis-intent", dir, "intent.json"), "utf8"))
+        const intent: unknown = JSON.parse(
+          await readFile(join(f.input.pinDir, "genesis-intent", dir, "intent.json"), "utf8"),
+        )
         if (typeof intent === "object" && intent !== null && "request" in intent) {
           expect(intent.request).toEqual(request)
           durable = true
@@ -35,26 +43,37 @@ test("empty account creates genesis, persists exact intent before PUT, and pins 
   expect(f.ceremonies()).toBe(1)
 })
 
-test.each(["before-commit", "after-commit"] as const)("uncertain %s resumes the identical signed request without a second ceremony", async (when) => {
-  const f = await setup()
-  const requests: unknown[] = []
-  const chain = {
-    ...f.input.chain,
-    async appendKeys(request: Parameters<typeof f.input.chain.appendKeys>[0]) {
-      requests.push(request)
-      if (when === "after-commit") await f.input.chain.appendKeys(request)
-      throw new TypeError("synthetic lost response")
-    },
-  }
-  await expect(enableSync({ ...f.input, chain })).rejects.toThrow()
-  expect(await enableSync({
-    ...f.input,
-    chain: { ...f.input.chain, appendKeys: async (request) => { requests.push(request); return f.input.chain.appendKeys(request) } },
-  })).toEqual({ kind: "joined", created: true })
-  expect(f.ceremonies()).toBe(1)
-  expect(f.entries).toHaveLength(1)
-  if (when === "before-commit") expect(requests[1]).toEqual(requests[0])
-})
+test.each(["before-commit", "after-commit"] as const)(
+  "uncertain %s resumes the identical signed request without a second ceremony",
+  async (when) => {
+    const f = await setup()
+    const requests: unknown[] = []
+    const chain = {
+      ...f.input.chain,
+      async appendKeys(request: Parameters<typeof f.input.chain.appendKeys>[0]) {
+        requests.push(request)
+        if (when === "after-commit") await f.input.chain.appendKeys(request)
+        throw new TypeError("synthetic lost response")
+      },
+    }
+    await expect(enableSync({ ...f.input, chain })).rejects.toThrow()
+    expect(
+      await enableSync({
+        ...f.input,
+        chain: {
+          ...f.input.chain,
+          appendKeys: async (request) => {
+            requests.push(request)
+            return f.input.chain.appendKeys(request)
+          },
+        },
+      }),
+    ).toEqual({ kind: "joined", created: true })
+    expect(f.ceremonies()).toBe(1)
+    expect(f.entries).toHaveLength(1)
+    if (when === "before-commit") expect(requests[1]).toEqual(requests[0])
+  },
+)
 
 test("malformed key list and a withheld pinned chain fail before switches or ceremony", async () => {
   const f = await setup()

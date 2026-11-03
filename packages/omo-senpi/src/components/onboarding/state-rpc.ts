@@ -35,7 +35,9 @@ export function registerOnboardingStateRpc(pi: SenpiExtensionAPI, store: Onboard
   // The marker reader ships in the onboarding-scan sidecar; the writes stay here, synchronous, so a
   // complete or reset lands before the sidecar is even asked for.
   const read = async (): Promise<OnboardingStateResponse> => {
-    const { completedAt, inProgress } = await (await loadOnboardingScanRuntime()).readOnboardingState(store.stateDir, store.claimOwnerSeams)
+    const { completedAt, inProgress } = await (
+      await loadOnboardingScanRuntime()
+    ).readOnboardingState(store.stateDir, store.claimOwnerSeams)
     return { completed: completedAt !== null, completedAt, inProgress }
   }
   handle(ONBOARDING_STATE_GET_RPC_METHOD, read)

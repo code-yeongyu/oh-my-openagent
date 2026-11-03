@@ -22,7 +22,9 @@ const observers = new Set<SkillDiagnosticSink>()
 
 export function subscribeSkillDiagnostics(sink: SkillDiagnosticSink): () => void {
   observers.add(sink)
-  return () => { observers.delete(sink) }
+  return () => {
+    observers.delete(sink)
+  }
 }
 
 export function pathIsInside(path: string, root: string): boolean {
@@ -55,12 +57,12 @@ function spelledInsideProject(path: string, root: string): boolean {
 export function knownUserSkillRoots(): string[] {
   const home = homedir()
   return [
-    join(getClaudeConfigDir(), "skills"), join(home, ".agents", "skills"),
-    join(home, ".omo", "agent", "skills"), join(home, ".senpi", "agent", "skills"),
+    join(getClaudeConfigDir(), "skills"),
+    join(home, ".agents", "skills"),
+    join(home, ".omo", "agent", "skills"),
+    join(home, ".senpi", "agent", "skills"),
     sharedSkillsRootPath(),
-    ...getOpenCodeConfigDirs({ binary: "opencode" }).flatMap((dir) => [
-      join(dir, "skills"), join(dir, "skill"),
-    ]),
+    ...getOpenCodeConfigDirs({ binary: "opencode" }).flatMap((dir) => [join(dir, "skills"), join(dir, "skill")]),
   ]
 }
 export function knownHostUserRoots(): string[] {
@@ -84,20 +86,20 @@ export function skillProjectRoot(path: string): string {
   return detectWorktreePath(existsSync(path) && statSync(path).isDirectory() ? path : dirname(path)) ?? dirname(path)
 }
 
-export function skillProvenance(
-  path: string,
-  scope: string,
-  supplied?: SkillProvenance,
-): SkillProvenance {
+export function skillProvenance(path: string, scope: string, supplied?: SkillProvenance): SkillProvenance {
   const projectRoot = supplied?.projectRoot ?? skillProjectRoot(path)
-  const kind = supplied?.kind ?? (
-    scope === "project" || scope === "opencode-project" ? "project-auto" : scope === "builtin" ? "builtin" : "user"
-  )
+  const kind =
+    supplied?.kind ??
+    (scope === "project" || scope === "opencode-project" ? "project-auto" : scope === "builtin" ? "builtin" : "user")
   // Host classification is lexical: resolving this path first would hide a project link.
-  const classified = kind === "host" && spelledInsideProject(resolve(path), resolve(projectRoot)) ? "project-auto" : kind
+  const classified =
+    kind === "host" && spelledInsideProject(resolve(path), resolve(projectRoot)) ? "project-auto" : kind
   return {
-    ...supplied, kind: classified, selectedRoot: supplied?.selectedRoot ?? path,
-    projectRoot, userRoots: supplied?.userRoots ?? knownUserSkillRoots(),
+    ...supplied,
+    kind: classified,
+    selectedRoot: supplied?.selectedRoot ?? path,
+    projectRoot,
+    userRoots: supplied?.userRoots ?? knownUserSkillRoots(),
   }
 }
 
@@ -107,7 +109,10 @@ export function userAllowedPaths(provenance: SkillProvenance): { roots: string[]
   function walk(path: string, ancestry: ReadonlySet<string>, sourceRoot = false): void {
     try {
       const canonical = realpathSync.native(path)
-      if (!statSync(canonical).isDirectory()) { files.push(canonical); return }
+      if (!statSync(canonical).isDirectory()) {
+        files.push(canonical)
+        return
+      }
       roots.push(canonical)
       if (ancestry.has(canonical)) return
       if (!sourceRoot && (existsSync(join(path, "SKILL.md")) || existsSync(join(path, `${basename(path)}.md`)))) return
@@ -122,7 +127,11 @@ export function userAllowedPaths(provenance: SkillProvenance): { roots: string[]
   }
   for (const root of provenance.userRoots ?? knownUserSkillRoots()) walk(root, new Set(), true)
   for (const file of provenance.userFiles ?? []) {
-    try { files.push(realpathSync.native(file)) } catch (error) { if (!(error instanceof Error)) throw error }
+    try {
+      files.push(realpathSync.native(file))
+    } catch (error) {
+      if (!(error instanceof Error)) throw error
+    }
   }
   return { roots: [...new Set(roots)], files: [...new Set(files)] }
 }
@@ -134,7 +143,9 @@ function shortPath(path: string): string {
 export class SkillLinkBlockedError extends Error {
   readonly diagnostic: SkillDiagnostic
   constructor(path: string, target: string) {
-    super(`Blocked skill link outside the project: ${shortPath(path)} -> ${shortPath(target)}. Add the target folder to your user skills settings to allow it.`)
+    super(
+      `Blocked skill link outside the project: ${shortPath(path)} -> ${shortPath(target)}. Add the target folder to your user skills settings to allow it.`,
+    )
     this.name = "SkillLinkBlockedError"
     this.diagnostic = { type: "warning", category: "skill-link-blocked", path, message: this.message }
   }
@@ -152,7 +163,9 @@ export function reportSkillLoadError(error: unknown, path: string, sink?: SkillD
   }
   if (!(error instanceof Error)) throw error
   const diagnostic: SkillDiagnostic = {
-    type: "warning", category: "skill-load-error", path,
+    type: "warning",
+    category: "skill-load-error",
+    path,
     message: `Failed to load skill ${shortPath(path)}: ${error.message}`,
   }
   sink?.(diagnostic)
@@ -165,7 +178,11 @@ export function checkSkillPath(path: string, provenance: SkillProvenance, direct
   const project = realpathSync.native(provenance.projectRoot ?? skillProjectRoot(path))
   if (pathIsInside(canonical, project)) return canonical
   const allowed = userAllowedPaths(provenance)
-  if (allowed.roots.some((root) => pathIsInside(canonical, root)) ||
-    allowed.files.includes(canonical) || (directory && allowed.files.some((file) => pathIsInside(file, canonical)))) return canonical
+  if (
+    allowed.roots.some((root) => pathIsInside(canonical, root)) ||
+    allowed.files.includes(canonical) ||
+    (directory && allowed.files.some((file) => pathIsInside(file, canonical)))
+  )
+    return canonical
   throw new SkillLinkBlockedError(path, canonical)
 }

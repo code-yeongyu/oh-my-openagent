@@ -2,10 +2,7 @@ import { describe, expect, it, mock } from "bun:test"
 
 import { BTW_SIDE_METADATA_KEY } from "./metadata"
 import { createBtwSideController } from "./tui-controller"
-import type {
-  BtwPromptRef,
-  BtwSideControllerDependencies,
-} from "./tui-controller-types"
+import type { BtwPromptRef, BtwSideControllerDependencies } from "./tui-controller-types"
 
 function createDeferred<T>() {
   let resolve!: (value: T) => void
@@ -17,7 +14,10 @@ function createDeferred<T>() {
   return { promise, resolve, reject }
 }
 
-function createPromptRef(input: string, hasAttachments = false): BtwPromptRef & {
+function createPromptRef(
+  input: string,
+  hasAttachments = false,
+): BtwPromptRef & {
   readonly hasAttachments: boolean
   readonly submitted: () => number
 } {
@@ -83,10 +83,8 @@ function createHarness(overrides?: Partial<BtwSideControllerDependencies>) {
   }))
   const dependencies: BtwSideControllerDependencies = {
     getCurrentSessionID: () => currentSessionID,
-    getSession: (sessionID) =>
-      sessionID === parentSession.id ? parentSession : undefined,
-    getMessages: (sessionID) =>
-      sessionID === parentSession.id ? parentMessages : [],
+    getSession: (sessionID) => (sessionID === parentSession.id ? parentSession : undefined),
+    getMessages: (sessionID) => (sessionID === parentSession.id ? parentMessages : []),
     createSession,
     navigateSession: (sessionID) => {
       currentSessionID = sessionID
@@ -163,9 +161,7 @@ describe("createBtwSideController", () => {
     expect(harness.createSession).not.toHaveBeenCalled()
     expect(parentPrompt.input).toBe("/btw describe this image")
     expect(harness.navigations).toEqual([])
-    expect(harness.toasts).toContain(
-      "BTW supports text-only drafts. Remove attachments before starting BTW.",
-    )
+    expect(harness.toasts).toContain("BTW supports text-only drafts. Remove attachments before starting BTW.")
   })
 
   it("#given side creation is pending #when BTW starts twice #then only one temporary session is created", async () => {
@@ -202,9 +198,7 @@ describe("createBtwSideController", () => {
     }>()
     const createSession = mock(() => created.promise)
     const harness = createHarness({ createSession })
-    const start = harness.controller.startFromPrompt(
-      createPromptRef("/btw cancelled"),
-    )
+    const start = harness.controller.startFromPrompt(createPromptRef("/btw cancelled"))
 
     // when
     let disposed = false
@@ -238,18 +232,12 @@ describe("createBtwSideController", () => {
     const harness = createHarness({
       createSession: () => {
         creationIndex += 1
-        return creationIndex === 1
-          ? firstCreated.promise
-          : secondCreated.promise
+        return creationIndex === 1 ? firstCreated.promise : secondCreated.promise
       },
     })
-    const firstStart = harness.controller.startFromPrompt(
-      createPromptRef("/btw first"),
-    )
+    const firstStart = harness.controller.startFromPrompt(createPromptRef("/btw first"))
     await harness.controller.handleNavigation("ses_other")
-    const secondStart = harness.controller.startFromPrompt(
-      createPromptRef("/btw second"),
-    )
+    const secondStart = harness.controller.startFromPrompt(createPromptRef("/btw second"))
     let disposed = false
     const disposal = harness.controller.dispose().then(() => {
       disposed = true
@@ -270,10 +258,7 @@ describe("createBtwSideController", () => {
 
     // then
     expect(disposed).toBe(true)
-    expect(harness.deleted).toEqual([
-      "ses_side_second",
-      "ses_side_first",
-    ])
+    expect(harness.deleted).toEqual(["ses_side_second", "ses_side_first"])
   })
 
   it("#given side creation is pending #when navigation leaves the parent #then the late session is deleted without stealing focus", async () => {
@@ -354,9 +339,7 @@ describe("createBtwSideController", () => {
     expect(harness.navigations).toEqual([])
     expect(harness.controller.state()).toEqual({ phase: "closed" })
     expect(prompt.input).toBe("/btw cancelled by deletion")
-    expect(harness.toasts).toContain(
-      "BTW cancelled because its main session was deleted.",
-    )
+    expect(harness.toasts).toContain("BTW cancelled because its main session was deleted.")
   })
 
   it("#given a pending side is deleted before create resolves #when the response arrives #then the deleted route never opens", async () => {
@@ -394,11 +377,7 @@ describe("createBtwSideController", () => {
     harness.controller.toggle()
 
     // then
-    expect(harness.navigations).toEqual([
-      "ses_side",
-      "ses_parent",
-      "ses_side",
-    ])
+    expect(harness.navigations).toEqual(["ses_side", "ses_parent", "ses_side"])
     expect(harness.createSession).toHaveBeenCalledTimes(1)
   })
 
@@ -431,11 +410,7 @@ describe("createBtwSideController", () => {
     expect(firstSidePrompt.submitted()).toBe(1)
     expect(secondSidePrompt.input).toBe("second retained question")
     expect(secondSidePrompt.submitted()).toBe(1)
-    expect(harness.navigations).toEqual([
-      "ses_side_1",
-      "ses_parent",
-      "ses_side_2",
-    ])
+    expect(harness.navigations).toEqual(["ses_side_1", "ses_parent", "ses_side_2"])
   })
 
   it("#given a visible retained side #when inline BTW starts again #then the new side is a sibling of the same parent", async () => {
@@ -449,14 +424,10 @@ describe("createBtwSideController", () => {
       }
     })
     const harness = createHarness({ createSession })
-    await harness.controller.startFromPrompt(
-      createPromptRef("/btw first retained question"),
-    )
+    await harness.controller.startFromPrompt(createPromptRef("/btw first retained question"))
 
     // when
-    await harness.controller.startFromPrompt(
-      createPromptRef("/btw sibling retained question"),
-    )
+    await harness.controller.startFromPrompt(createPromptRef("/btw sibling retained question"))
 
     // then
     expect(createSession).toHaveBeenCalledTimes(2)
@@ -468,10 +439,7 @@ describe("createBtwSideController", () => {
         },
       },
     })
-    expect(harness.navigations).toEqual([
-      "ses_side_1",
-      "ses_side_2",
-    ])
+    expect(harness.navigations).toEqual(["ses_side_1", "ses_side_2"])
   })
 
   it("#given an active side #when close runs #then it returns to the parent and deletes the side", async () => {
@@ -501,13 +469,9 @@ describe("createBtwSideController", () => {
         }
       },
     })
-    await harness.controller.startFromPrompt(
-      createPromptRef("/btw first retained question"),
-    )
+    await harness.controller.startFromPrompt(createPromptRef("/btw first retained question"))
     harness.controller.toggle()
-    await harness.controller.startFromPrompt(
-      createPromptRef("/btw second retained question"),
-    )
+    await harness.controller.startFromPrompt(createPromptRef("/btw second retained question"))
 
     // when
     await harness.controller.close()
@@ -515,22 +479,14 @@ describe("createBtwSideController", () => {
     // then
     expect(harness.aborted).toEqual(["ses_side_2"])
     expect(harness.deleted).toEqual(["ses_side_2"])
-    expect(harness.navigations).toEqual([
-      "ses_side_1",
-      "ses_parent",
-      "ses_side_2",
-      "ses_parent",
-    ])
+    expect(harness.navigations).toEqual(["ses_side_1", "ses_parent", "ses_side_2", "ses_parent"])
   })
 
   it("#given an attachment-only side composer #when close availability is checked #then Ctrl+C does not intercept the draft", async () => {
     // given
     const harness = createHarness()
     await harness.controller.startFromPrompt(createPromptRef("/btw"))
-    harness.controller.attachPromptRef(
-      "ses_side",
-      createPromptRef("", true),
-    )
+    harness.controller.attachPromptRef("ses_side", createPromptRef("", true))
 
     // when
     const canClose = harness.controller.canCloseCurrentSide()
@@ -710,9 +666,7 @@ describe("createBtwSideController", () => {
     expect(harness.navigations).toEqual(["ses_side"])
     expect(harness.deleted).toEqual(["ses_side"])
     expect(harness.controller.state()).toEqual({ phase: "closed" })
-    expect(harness.toasts).toContain(
-      "BTW detached because its main session was deleted.",
-    )
+    expect(harness.toasts).toContain("BTW detached because its main session was deleted.")
   })
 
   it("#given close races an external delete #when local deletion reports failure #then closed state is not resurrected", async () => {
@@ -766,9 +720,7 @@ describe("createBtwSideController", () => {
         owned: true,
       },
     ])
-    expect(harness.toasts).toContain(
-      "Unable to delete BTW. Delete the abandoned side session manually.",
-    )
+    expect(harness.toasts).toContain("Unable to delete BTW. Delete the abandoned side session manually.")
   })
 
   it("#given an adopted side #when the second TUI disposes #then it leaves the owned session intact", async () => {
@@ -813,13 +765,9 @@ describe("createBtwSideController", () => {
       },
       deleteSession: async () => deletion.promise,
     })
-    await harness.controller.startFromPrompt(
-      createPromptRef("/btw first"),
-    )
+    await harness.controller.startFromPrompt(createPromptRef("/btw first"))
     harness.controller.toggle()
-    await harness.controller.startFromPrompt(
-      createPromptRef("/btw second"),
-    )
+    await harness.controller.startFromPrompt(createPromptRef("/btw second"))
     harness.controller.toggle()
     harness.controller.toggle()
     const close = harness.controller.close()

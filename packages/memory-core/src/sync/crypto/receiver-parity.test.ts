@@ -6,7 +6,22 @@ import { importSnapshot, type SnapshotRecord } from "./snapshot.ts"
 import { buildFork, rotation } from "./testing/fork.ts"
 import { envelopeRefusal } from "./envelope.ts"
 import { receiverRefusal, takeReceiver, wire } from "./receiver.ts"
-import { ACCOUNT, appendBatch, appendKeyring, chain, deviceId, epochKey, keyringFor, keys, mainChain, objects, principalKeys, readBytes, record, fixtureAnchor } from "./testing/sync-v1.test-support.ts"
+import {
+  ACCOUNT,
+  appendBatch,
+  appendKeyring,
+  chain,
+  deviceId,
+  epochKey,
+  keyringFor,
+  keys,
+  mainChain,
+  objects,
+  principalKeys,
+  readBytes,
+  record,
+  fixtureAnchor,
+} from "./testing/sync-v1.test-support.ts"
 import { buildBatch } from "./build.ts"
 import { b64urlDecode, sha256B64 } from "./vendor/sync-format/jcs.ts"
 import * as vendorFold from "./vendor/sync-format/fold.ts"
@@ -37,7 +52,11 @@ const mainUntil = (name: string): KeyringEntry[] => chain.main.slice(0, chain.ma
 describe("keyring records the merged receiver refuses", () => {
   test("a join is vetoed at most once: a second veto naming it is refused and changes nothing", async () => {
     const state = await verified(mainChain())
-    const again = await appendKeyring(headOf(state), { ...record("recovery_join_vetoed").body, epoch: 3 }, { keyring: keyringFor("owner") })
+    const again = await appendKeyring(
+      headOf(state),
+      { ...record("recovery_join_vetoed").body, epoch: 3 },
+      { keyring: keyringFor("owner") },
+    )
     const { outcome, rejections } = await run([again], state)
     expect(refusal(outcome)).toEqual({ seq: again.seq, reason: "join_already_vetoed" })
     expect(outcome.state).toBe(state)
@@ -50,7 +69,12 @@ describe("keyring records the merged receiver refuses", () => {
     const members = Array.isArray(rotation.body["members"]) ? rotation.body["members"] : []
     expect(members.length).toBeGreaterThan(1)
     for (const bad of [[...members].reverse(), [...members, ...members.slice(-1)]]) {
-      const entry = await appendKeyring(headOf(state), { ...rotation.body, members: bad }, { keyring: keyringFor("owner") }, rotation.wraps)
+      const entry = await appendKeyring(
+        headOf(state),
+        { ...rotation.body, members: bad },
+        { keyring: keyringFor("owner") },
+        rotation.wraps,
+      )
       expect(refusal((await run([entry], state)).outcome)).toEqual({ seq: entry.seq, reason: "noncanonical_order" })
     }
   })
@@ -122,7 +146,15 @@ describe("snapshot import matches the merged receiver", () => {
 
   test("the golden snapshot.json (author in the signed preimage) imports, chunks in any order", async () => {
     for (const order of [chunks(), chunks().reverse()]) {
-      const imported = await importSnapshot(ACCOUNT, fixtureAnchor(), mainChain(), golden, order, epochKey, createRejectionCounter())
+      const imported = await importSnapshot(
+        ACCOUNT,
+        fixtureAnchor(),
+        mainChain(),
+        golden,
+        order,
+        epochKey,
+        createRejectionCounter(),
+      )
       expect(imported.ok && imported.records.map((r) => r.itemKey)).toEqual(["snapshot part 0", "snapshot part 1"])
     }
   })
@@ -135,14 +167,42 @@ describe("snapshot import matches the merged receiver", () => {
     const author = { kind: "device" as const, id: deviceId("owner"), ...principalKeys(keyringFor("owner")) }
     const sealedAt = async (epoch: number) => {
       const chunk = await buildBatch({
-        account: ACCOUNT, kind: "snapshot", epoch, epochKey: epochKey(epoch) ?? new Uint8Array(32), keyring: keyringFor("owner"),
-        peers: [], batchId: new Uint8Array(16).fill(5), salt: new Uint8Array(32).fill(6), createdAt: 1760000000000,
-        chunk: { index: 0, count: 1 }, records: [{ type: 1, spaceId: new Uint8Array(16), itemKey: "after-veto", body: new Uint8Array([1]) }],
+        account: ACCOUNT,
+        kind: "snapshot",
+        epoch,
+        epochKey: epochKey(epoch) ?? new Uint8Array(32),
+        keyring: keyringFor("owner"),
+        peers: [],
+        batchId: new Uint8Array(16).fill(5),
+        salt: new Uint8Array(32).fill(6),
+        createdAt: 1760000000000,
+        chunk: { index: 0, count: 1 },
+        records: [{ type: 1, spaceId: new Uint8Array(16), itemKey: "after-veto", body: new Uint8Array([1]) }],
       })
       const digest = await sha256B64(b64urlDecode(await sha256B64(chunk)))
-      const unsigned = { account: ACCOUNT, author, covers_seq: veto.seq, digest, link: veto.link, keyring_head: veto.keyring_link, record_sig: "" }
-      const record_sig = await signFramed("omo-sync/v1/snapshot", snapshotPreimage(unsigned), b64urlDecode(owner.signing_seed))
-      return importSnapshot(ACCOUNT, fixtureAnchor(), entries, { ...unsigned, record_sig }, [chunk], epochKey, createRejectionCounter())
+      const unsigned = {
+        account: ACCOUNT,
+        author,
+        covers_seq: veto.seq,
+        digest,
+        link: veto.link,
+        keyring_head: veto.keyring_link,
+        record_sig: "",
+      }
+      const record_sig = await signFramed(
+        "omo-sync/v1/snapshot",
+        snapshotPreimage(unsigned),
+        b64urlDecode(owner.signing_seed),
+      )
+      return importSnapshot(
+        ACCOUNT,
+        fixtureAnchor(),
+        entries,
+        { ...unsigned, record_sig },
+        [chunk],
+        epochKey,
+        createRejectionCounter(),
+      )
     }
     expect((await sealedAt(1)).ok).toBe(true)
     expect((await sealedAt(2)).ok).toBe(false)
@@ -164,7 +224,10 @@ describe("the receiver check does not re-read the verified chain for every new e
     const stringify = spyOn(JSON, "stringify")
     try {
       expect((await run(walked)).outcome.ok).toBe(true)
-      const serialized = stringify.mock.results.reduce((sum, result) => sum + (typeof result.value === "string" ? result.value.length : 0), 0)
+      const serialized = stringify.mock.results.reduce(
+        (sum, result) => sum + (typeof result.value === "string" ? result.value.length : 0),
+        0,
+      )
       const chainBytes = JSON.stringify(walked).length
       expect(serialized).toBeLessThan(3 * chainBytes)
     } finally {
@@ -177,7 +240,9 @@ describe("the receiver walks the chain once per pull, not once per entry", () =>
   const ROTATIONS = 1000
   const BATCHES = 500
   const recoveredPrefix = (): KeyringEntry[] => [...mainUntil("post_join_rotation"), record("post_join_rotation")]
-  const rotations = async (count: number): Promise<{ readonly entries: KeyringEntry[]; readonly state: ChainState }> => {
+  const rotations = async (
+    count: number,
+  ): Promise<{ readonly entries: KeyringEntry[]; readonly state: ChainState }> => {
     let state = await verified(recoveredPrefix())
     const entries: KeyringEntry[] = []
     for (let i = 0; i < count; i++) {
@@ -240,7 +305,15 @@ describe("the receiver walks the chain once per pull, not once per entry", () =>
     const golden: SnapshotRecord = JSON.parse(new TextDecoder().decode(readBytes("snapshot.json")))
     const record = { ...golden, covers_seq: last.seq, link: last.link, keyring_head: last.keyring_link }
     const walked = await walkedDuring(async () => {
-      const imported = await importSnapshot(ACCOUNT, fixtureAnchor(), covered, record, [], epochKey, createRejectionCounter())
+      const imported = await importSnapshot(
+        ACCOUNT,
+        fixtureAnchor(),
+        covered,
+        record,
+        [],
+        epochKey,
+        createRejectionCounter(),
+      )
       expect(imported.ok ? "imported" : imported.reason).not.toBe("keyring_prefix_refused")
     })
     expect(walked).toBeLessThanOrEqual(2 * covered.length)
@@ -277,7 +350,8 @@ describe("the receiver checks one new entry in constant work (#10655)", () => {
       const receiver = create()
       return { ...receiver, receive: (entry) => ((received += 1), receiver.receive(entry)) }
     })
-    const listed = (calls: ReadonlyArray<ReadonlyArray<unknown>>) => calls.reduce((sum, [entries]) => sum + (Array.isArray(entries) ? entries.length : 0), 0)
+    const listed = (calls: ReadonlyArray<ReadonlyArray<unknown>>) =>
+      calls.reduce((sum, [entries]) => sum + (Array.isArray(entries) ? entries.length : 0), 0)
     try {
       await work(() => listed(fold.mock.calls) + listed(chain.mock.calls) + received)
     } finally {

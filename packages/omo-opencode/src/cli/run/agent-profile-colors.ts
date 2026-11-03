@@ -6,9 +6,7 @@ interface AgentProfile {
   color?: string
 }
 
-export async function loadAgentProfileColors(
-  client: OpencodeClient,
-): Promise<Record<string, string>> {
+export async function loadAgentProfileColors(client: OpencodeClient): Promise<Record<string, string>> {
   try {
     const agentsRes = await client.app.agents()
     const agents = normalizeSDKResponse(agentsRes, [] as AgentProfile[], {

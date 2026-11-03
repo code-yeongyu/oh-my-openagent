@@ -25,12 +25,7 @@ const defaultDeleteTeamDeps: DeleteTeamDeps = {
   log,
 }
 
-const DELETABLE_TEAM_STATUSES = new Set<RuntimeState["status"]>([
-  "active",
-  "shutdown_requested",
-  "deleting",
-  "deleted",
-])
+const DELETABLE_TEAM_STATUSES = new Set<RuntimeState["status"]>(["active", "shutdown_requested", "deleting", "deleted"])
 
 const FORCE_DELETABLE_TEAM_STATUSES = new Set<RuntimeState["status"]>([
   ...DELETABLE_TEAM_STATUSES,
@@ -58,8 +53,11 @@ function getTeamBackgroundTasks(
   if (!runtimeState.leadSessionId) return []
 
   const teamMessageMarkerPrefix = `team-create:${runtimeState.teamRunId}:`
-  return bgMgr.getTasksByParentSession(runtimeState.leadSessionId)
-    .filter((task) => task.teamRunId === runtimeState.teamRunId || task.parentMessageId?.startsWith(teamMessageMarkerPrefix))
+  return bgMgr
+    .getTasksByParentSession(runtimeState.leadSessionId)
+    .filter(
+      (task) => task.teamRunId === runtimeState.teamRunId || task.parentMessageId?.startsWith(teamMessageMarkerPrefix),
+    )
 }
 
 export async function deleteTeam(
@@ -77,16 +75,17 @@ export async function deleteTeam(
     throw new Error("members still active")
   }
 
-  const deletableTeamStatuses = options?.force === true
-    ? FORCE_DELETABLE_TEAM_STATUSES
-    : DELETABLE_TEAM_STATUSES
+  const deletableTeamStatuses = options?.force === true ? FORCE_DELETABLE_TEAM_STATUSES : DELETABLE_TEAM_STATUSES
   if (!deletableTeamStatuses.has(runtimeState.status)) {
     throw new Error(`team cannot be deleted from '${runtimeState.status}'`)
   }
 
   if (bgMgr) {
     const teamTasks = getTeamBackgroundTasks(bgMgr, runtimeState)
-    if (options?.force !== true && teamTasks.some((task) => task.status !== undefined && ACTIVE_BACKGROUND_TASK_STATUSES.has(task.status))) {
+    if (
+      options?.force !== true &&
+      teamTasks.some((task) => task.status !== undefined && ACTIVE_BACKGROUND_TASK_STATUSES.has(task.status))
+    ) {
       throw new Error("members still active")
     }
 
@@ -94,10 +93,14 @@ export async function deleteTeam(
       return await deleteTeamResources(teamRunId, config, runtimeState, tmuxMgr, options, deps)
     }
 
-    await Promise.all(teamTasks.map((task) => bgMgr.cancelTask(task.id, {
-      source: "team-mode-delete",
-      reason: `delete team ${teamRunId}`,
-    })))
+    await Promise.all(
+      teamTasks.map((task) =>
+        bgMgr.cancelTask(task.id, {
+          source: "team-mode-delete",
+          reason: `delete team ${teamRunId}`,
+        }),
+      ),
+    )
   }
 
   return await deleteTeamResources(teamRunId, config, runtimeState, tmuxMgr, options, deps)
@@ -111,21 +114,22 @@ async function deleteTeamResources(
   options?: { force?: boolean },
   deps: DeleteTeamDeps = defaultDeleteTeamDeps,
 ): Promise<{ removedWorktrees: string[]; removedLayout: boolean }> {
-
   if (options?.force === true) {
-    await transitionRuntimeState(teamRunId, (currentRuntimeState) => ({
-      ...currentRuntimeState,
-      members: currentRuntimeState.members.map((member) => (
-        member.agentType === "leader" || !FORCE_COMPLETABLE_MEMBER_STATUSES.has(member.status)
-          ? member
-          : { ...member, status: "completed" }
-      )),
-    }), config)
+    await transitionRuntimeState(
+      teamRunId,
+      (currentRuntimeState) => ({
+        ...currentRuntimeState,
+        members: currentRuntimeState.members.map((member) =>
+          member.agentType === "leader" || !FORCE_COMPLETABLE_MEMBER_STATUSES.has(member.status)
+            ? member
+            : { ...member, status: "completed" },
+        ),
+      }),
+      config,
+    )
   }
 
-  const deletableTeamStatuses = options?.force === true
-    ? FORCE_DELETABLE_TEAM_STATUSES
-    : DELETABLE_TEAM_STATUSES
+  const deletableTeamStatuses = options?.force === true ? FORCE_DELETABLE_TEAM_STATUSES : DELETABLE_TEAM_STATUSES
   if (!deletableTeamStatuses.has(runtimeState.status)) {
     throw new Error(`team cannot be deleted from '${runtimeState.status}'`)
   }
@@ -137,22 +141,22 @@ async function deleteTeamResources(
         await saveRuntimeState({ ...currentRuntimeState, status: "deleting" }, config)
       }
     } else {
-      await transitionRuntimeState(teamRunId, (currentRuntimeState) => (
-        currentRuntimeState.status === "deleting"
-          ? currentRuntimeState
-          : { ...currentRuntimeState, status: "deleting" }
-      ), config)
+      await transitionRuntimeState(
+        teamRunId,
+        (currentRuntimeState) =>
+          currentRuntimeState.status === "deleting"
+            ? currentRuntimeState
+            : { ...currentRuntimeState, status: "deleting" },
+        config,
+      )
     }
   }
 
   const removedLayout = config.tmux_visualization && tmuxMgr !== undefined && deps.canVisualize()
   if (removedLayout) {
-    const memberPaneIds = runtimeState.members
-      .flatMap((member) => (
-        member.agentType !== "leader" && member.tmuxPaneId
-          ? [member.tmuxPaneId]
-          : []
-      ))
+    const memberPaneIds = runtimeState.members.flatMap((member) =>
+      member.agentType !== "leader" && member.tmuxPaneId ? [member.tmuxPaneId] : [],
+    )
 
     const cleanupTarget = runtimeState.tmuxLayout
       ? {
@@ -178,11 +182,12 @@ async function deleteTeamResources(
   const removedWorktrees = await removeWorktrees(runtimeState.members.map((member) => member.worktreePath))
 
   if (runtimeState.status !== "deleted") {
-    await transitionRuntimeState(teamRunId, (currentRuntimeState) => (
-      currentRuntimeState.status === "deleted"
-        ? currentRuntimeState
-        : { ...currentRuntimeState, status: "deleted" }
-    ), config)
+    await transitionRuntimeState(
+      teamRunId,
+      (currentRuntimeState) =>
+        currentRuntimeState.status === "deleted" ? currentRuntimeState : { ...currentRuntimeState, status: "deleted" },
+      config,
+    )
   }
 
   await removeWorktrees([getRuntimeStateDir(resolveBaseDir(config), teamRunId)])

@@ -31,7 +31,9 @@ export async function createTasklistFixture(): Promise<{
   }
 }
 
-export function createTaskInput(overrides?: Partial<Omit<Task, "id" | "createdAt" | "updatedAt" | "version">>): Omit<Task, "id" | "createdAt" | "updatedAt" | "version"> {
+export function createTaskInput(
+  overrides?: Partial<Omit<Task, "id" | "createdAt" | "updatedAt" | "version">>,
+): Omit<Task, "id" | "createdAt" | "updatedAt" | "version"> {
   return {
     subject: overrides?.subject ?? "task subject",
     description: overrides?.description ?? "task description",

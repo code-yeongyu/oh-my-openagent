@@ -28,7 +28,11 @@ import type { MemoryWiringOptions, StatusUi } from "./wiring-types"
 
 export interface MemoryReflectionLiveWiring {
   currentSession(): ReflectionLiveSession | undefined
-  registerRpc(pi: SenpiExtensionAPI, resolveContext: (sessionId: string) => MemoryIdentityContext | undefined, applyFacts?: MemoryFactsApplier): void
+  registerRpc(
+    pi: SenpiExtensionAPI,
+    resolveContext: (sessionId: string) => MemoryIdentityContext | undefined,
+    applyFacts?: MemoryFactsApplier,
+  ): void
   attach(sessionId: string): void
   bind(
     pi: SenpiExtensionAPI,
@@ -128,15 +132,16 @@ export function createMemoryReflectionLiveWiring(
       // The engine emits transitions only; a failure may have started before this session became active.
       await syncNotifier?.changed(identity.identityPaths.repo, ui)
       const api = createReflectionCompletionApi(pi)
-      liveSession.current = api === undefined
-        ? undefined
-        : {
-            sessionId,
-            api,
-            identityContext: identity,
-            ...(ui === undefined ? {} : { ui }),
-            ...(options.logger === undefined ? {} : { logger: options.logger }),
-          }
+      liveSession.current =
+        api === undefined
+          ? undefined
+          : {
+              sessionId,
+              api,
+              identityContext: identity,
+              ...(ui === undefined ? {} : { ui }),
+              ...(options.logger === undefined ? {} : { logger: options.logger }),
+            }
       const initialStatus = refreshInitialStatus(options, sessionId, identity, ui, requestPressureDream)
       if (initialStatus !== undefined) track(initialStatus)
       if (liveSession.current !== undefined) {
@@ -167,11 +172,18 @@ export function createMemoryReflectionLiveWiring(
       signal?.throwIfAborted()
       const ui = readUi(eventCtx)
       const identity = options.sessions.get(sessionId)?.context
-      track(footerLive.refresh(sessionId, ui === undefined ? undefined : {
-        setStatus(key, text) {
-          if (!signal?.aborted && options.sessions.get(sessionId)?.context === identity) ui.setStatus(key, text)
-        },
-      }))
+      track(
+        footerLive.refresh(
+          sessionId,
+          ui === undefined
+            ? undefined
+            : {
+                setStatus(key, text) {
+                  if (!signal?.aborted && options.sessions.get(sessionId)?.context === identity) ui.setStatus(key, text)
+                },
+              },
+        ),
+      )
       await rpcBridge.current?.sync(signal)
     },
     async syncRpc(): Promise<void> {

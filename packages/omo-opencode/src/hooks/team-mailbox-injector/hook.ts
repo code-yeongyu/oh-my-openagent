@@ -42,10 +42,7 @@ export type TeamMailboxInjectorHook = {
   ) => Promise<void>
 }
 
-function resolveSessionID(
-  input: TeamMailboxInjectorInput,
-  messages: MessageWithParts[],
-): string | undefined {
+function resolveSessionID(input: TeamMailboxInjectorInput, messages: MessageWithParts[]): string | undefined {
   if (typeof input.sessionID === "string" && input.sessionID.length > 0) {
     return input.sessionID
   }
@@ -74,10 +71,7 @@ function findLastUserMessageIndex(messages: MessageWithParts[]): number {
   return -1
 }
 
-function createInjectedMessage(
-  sessionID: string,
-  content: string,
-): MessageWithParts {
+function createInjectedMessage(sessionID: string, content: string): MessageWithParts {
   return {
     info: {
       role: "user",
@@ -87,15 +81,9 @@ function createInjectedMessage(
   }
 }
 
-export function createTeamMailboxInjector(
-  _ctx: HookContext,
-  config: TeamModeConfig,
-): TeamMailboxInjectorHook {
+export function createTeamMailboxInjector(_ctx: HookContext, config: TeamModeConfig): TeamMailboxInjectorHook {
   return {
-    "experimental.chat.messages.transform": async (
-      input,
-      output,
-    ): Promise<void> => {
+    "experimental.chat.messages.transform": async (input, output): Promise<void> => {
       if (!config.enabled || output.messages.length === 0) {
         return
       }

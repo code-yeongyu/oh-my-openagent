@@ -12,10 +12,7 @@ export interface PermissionFormat {
 /**
  * Creates tool restrictions that deny specified tools.
  */
-export function createAgentToolRestrictions(
-  denyTools: string[],
-  allowTools: string[] = [],
-): PermissionFormat {
+export function createAgentToolRestrictions(denyTools: string[], allowTools: string[] = []): PermissionFormat {
   return {
     permission: Object.fromEntries([
       ...denyTools.map((tool) => [tool, "deny" as const]),
@@ -28,15 +25,11 @@ export function createAgentToolRestrictions(
  * Creates tool restrictions that ONLY allow specified tools.
  * All other tools are denied by default using `*: deny` pattern.
  */
-export function createAgentToolAllowlist(
-  allowTools: string[]
-): PermissionFormat {
+export function createAgentToolAllowlist(allowTools: string[]): PermissionFormat {
   return {
     permission: {
       "*": "deny" as const,
-      ...Object.fromEntries(
-        allowTools.map((tool) => [tool, "allow" as const])
-      ),
+      ...Object.fromEntries(allowTools.map((tool) => [tool, "allow" as const])),
     },
   }
 }
@@ -45,14 +38,9 @@ export function createAgentToolAllowlist(
  * Converts legacy tools format to permission format.
  * For migrating user configs from older versions.
  */
-export function migrateToolsToPermission(
-  tools: Record<string, boolean>
-): Record<string, PermissionValue> {
+export function migrateToolsToPermission(tools: Record<string, boolean>): Record<string, PermissionValue> {
   return Object.fromEntries(
-    Object.entries(tools).map(([key, value]) => [
-      key,
-      value ? ("allow" as const) : ("deny" as const),
-    ])
+    Object.entries(tools).map(([key, value]) => [key, value ? ("allow" as const) : ("deny" as const)]),
   )
 }
 
@@ -60,17 +48,12 @@ export function migrateToolsToPermission(
  * Migrates agent config from legacy tools format to permission format.
  * If config has `tools`, converts to `permission`.
  */
-export function migrateAgentConfig(
-  config: Record<string, unknown>
-): Record<string, unknown> {
+export function migrateAgentConfig(config: Record<string, unknown>): Record<string, unknown> {
   const result = { ...config }
 
   if (result.tools && typeof result.tools === "object") {
-    const existingPermission =
-      (result.permission as Record<string, PermissionValue>) || {}
-    const migratedPermission = migrateToolsToPermission(
-      result.tools as Record<string, boolean>
-    )
+    const existingPermission = (result.permission as Record<string, PermissionValue>) || {}
+    const migratedPermission = migrateToolsToPermission(result.tools as Record<string, boolean>)
     result.permission = { ...migratedPermission, ...existingPermission }
     delete result.tools
   }

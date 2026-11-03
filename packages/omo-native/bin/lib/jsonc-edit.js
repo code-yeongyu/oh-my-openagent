@@ -72,7 +72,8 @@ function lineIndent(text, index) {
 }
 
 function indentOf(text, node) {
-  const closing = lineIndent(text, node.close) ?? /^[ \t]*/.exec(text.slice(text.lastIndexOf("\n", node.open - 1) + 1))[0]
+  const closing =
+    lineIndent(text, node.close) ?? /^[ \t]*/.exec(text.slice(text.lastIndexOf("\n", node.open - 1) + 1))[0]
   const first = node.members[0]
   return { closing, member: (first && lineIndent(text, first.keyStart)) ?? `${closing}  ` }
 }
@@ -87,7 +88,8 @@ function insertInto(text, node, key, value) {
   if (node.members.length === 0) {
     const inner = text.slice(node.open + 1, node.close)
     // An empty `{}` (or one holding only whitespace) is rewritten whole; one holding a comment keeps it.
-    if (inner.trim() === "") return `${text.slice(0, node.open + 1)}\n${member}\n${indent.closing}${text.slice(node.close)}`
+    if (inner.trim() === "")
+      return `${text.slice(0, node.open + 1)}\n${member}\n${indent.closing}${text.slice(node.close)}`
     return `${text.slice(0, node.open + 1)}\n${member}${text.slice(node.open + 1)}`
   }
   let at = node.close
@@ -131,10 +133,12 @@ export function insertJsoncMember(text, path, key, value) {
     if (member.object === undefined) throw new TypeError(`${path.slice(0, depth + 1).join(".")} is not an object`)
     node = member.object
   }
-  if (depth === path.length && node.members.some((member) => member.key === key)) throw new TypeError(`${[...path, key].join(".")} already exists`)
-  const next = depth === path.length
-    ? insertInto(text, node, key, value)
-    : insertInto(text, node, path[depth], nest(path.slice(depth + 1), key, value))
+  if (depth === path.length && node.members.some((member) => member.key === key))
+    throw new TypeError(`${[...path, key].join(".")} already exists`)
+  const next =
+    depth === path.length
+      ? insertInto(text, node, key, value)
+      : insertInto(text, node, path[depth], nest(path.slice(depth + 1), key, value))
   if (!isDeepStrictEqual(parseJsonc(next), setIn(parseJsonc(text), path, key, value))) {
     throw new SyntaxError("the edited document does not parse back to the intended value")
   }

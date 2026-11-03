@@ -52,21 +52,26 @@ export function startHeartbeat<T>(input: {
     deadline = setTimeout(miss, HEARTBEAT_DEADLINE_MS)
     // A detached port can throw synchronously; Promise adoption keeps the same failure path.
     const work = Promise.resolve().then(input.probe)
-    void work.then((state) => {
-      if (stopped || input.paused()) return
-      failures = 0
-      input.onState(state)
-    }, (error: unknown) => {
-      if (stopped || input.paused()) return
-      // A request rejection after a missed probe must not count the same silence twice.
-      if (!missed) fail(error)
-    }).finally(() => {
-      clearTimeout(deadline)
-      deadline = undefined
-      pending = false
-      // Do not lose the tick coinciding with a timeout. Fast refusals still wait for the next interval.
-      if (!stopped && failures > 0 && Date.now() - startedAt >= input.intervalMs) tick()
-    })
+    void work
+      .then(
+        (state) => {
+          if (stopped || input.paused()) return
+          failures = 0
+          input.onState(state)
+        },
+        (error: unknown) => {
+          if (stopped || input.paused()) return
+          // A request rejection after a missed probe must not count the same silence twice.
+          if (!missed) fail(error)
+        },
+      )
+      .finally(() => {
+        clearTimeout(deadline)
+        deadline = undefined
+        pending = false
+        // Do not lose the tick coinciding with a timeout. Fast refusals still wait for the next interval.
+        if (!stopped && failures > 0 && Date.now() - startedAt >= input.intervalMs) tick()
+      })
   }
   const interval = setInterval(tick, input.intervalMs)
   interval.unref?.()

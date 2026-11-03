@@ -4,11 +4,7 @@ import { describe, expect, it } from "bun:test"
 
 import probeFixture from "./__fixtures__/x-search-response.probe.json"
 import { CARRIER_MODELS, DEFAULT_CARRIER } from "./client"
-import {
-  createXSearchTool,
-  type XSearchToolExecutionContext,
-  type XSearchToolExecutionResult,
-} from "./tool"
+import { createXSearchTool, type XSearchToolExecutionContext, type XSearchToolExecutionResult } from "./tool"
 
 function jsonResponse(body: unknown, init: { status?: number; headers?: Record<string, string> } = {}): Response {
   return new Response(JSON.stringify(body), {
@@ -41,7 +37,13 @@ async function runTool(
   params: Record<string, unknown>,
   ctx: XSearchToolExecutionContext,
 ): Promise<XSearchToolExecutionResult> {
-  return (await tool.execute("call-1", params as never, undefined, undefined, ctx as never)) as XSearchToolExecutionResult
+  return (await tool.execute(
+    "call-1",
+    params as never,
+    undefined,
+    undefined,
+    ctx as never,
+  )) as XSearchToolExecutionResult
 }
 
 function textOf(result: XSearchToolExecutionResult): string {
@@ -149,7 +151,9 @@ describe("createXSearchTool execute", () => {
   })
 
   it("#given an upstream rate limit #when executing #then the error code is surfaced in text and details", async () => {
-    const tool = toolWith(async () => jsonResponse({ error: "slow down" }, { status: 429, headers: { "retry-after": "7" } }))
+    const tool = toolWith(async () =>
+      jsonResponse({ error: "slow down" }, { status: 429, headers: { "retry-after": "7" } }),
+    )
 
     const result = await runTool(tool, { query: "Grok CLI" }, storedContext)
 

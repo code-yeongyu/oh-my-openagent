@@ -127,11 +127,7 @@ describe("#given process cleanup registration", () => {
       const shutdownOne = mock(() => {})
       const shutdownTwo = mock(() => {})
       const shutdownThree = mock(() => {})
-      const managers = [
-        { shutdown: shutdownOne },
-        { shutdown: shutdownTwo },
-        { shutdown: shutdownThree },
-      ]
+      const managers = [{ shutdown: shutdownOne }, { shutdown: shutdownTwo }, { shutdown: shutdownThree }]
       registeredManagers.push(...managers)
 
       for (const manager of managers) {
@@ -229,16 +225,12 @@ describe("#given process cleanup registration", () => {
       registeredManagers.push(manager)
 
       registerManagerForCleanup(manager)
-      expect(process.listeners("uncaughtException")).toHaveLength(
-        uncaughtExceptionListenersBefore.length + 1,
-      )
+      expect(process.listeners("uncaughtException")).toHaveLength(uncaughtExceptionListenersBefore.length + 1)
 
       unregisterManagerForCleanup(manager)
       registeredManagers.length = 0
 
-      expect(process.listeners("uncaughtException")).toHaveLength(
-        uncaughtExceptionListenersBefore.length,
-      )
+      expect(process.listeners("uncaughtException")).toHaveLength(uncaughtExceptionListenersBefore.length)
 
       process.emit("uncaughtException", new Error("boom"))
       expect(shutdown).not.toHaveBeenCalled()
@@ -451,9 +443,7 @@ describe("#given process cleanup registration", () => {
         process.emit("uncaughtException", new Error("second transient MCP failure"))
         await flushMicrotasks()
 
-        expect(process.listeners("uncaughtException")).toHaveLength(
-          uncaughtExceptionListenersBefore.length + 1,
-        )
+        expect(process.listeners("uncaughtException")).toHaveLength(uncaughtExceptionListenersBefore.length + 1)
         expect(shutdown).not.toHaveBeenCalled()
         expect(exitSpy).not.toHaveBeenCalled()
         expect(process.exitCode).toBe(0)
@@ -482,17 +472,13 @@ describe("#given process cleanup registration", () => {
       const manager = { shutdown }
 
       registerManagerForCleanup(manager)
-      expect(process.listeners("uncaughtException")).toHaveLength(
-        uncaughtExceptionListenersBefore.length + 1,
-      )
+      expect(process.listeners("uncaughtException")).toHaveLength(uncaughtExceptionListenersBefore.length + 1)
 
       _resetForTesting()
       process.emit("uncaughtException", new Error("boom"))
 
       expect(shutdown).not.toHaveBeenCalled()
-      expect(process.listeners("uncaughtException")).toHaveLength(
-        uncaughtExceptionListenersBefore.length,
-      )
+      expect(process.listeners("uncaughtException")).toHaveLength(uncaughtExceptionListenersBefore.length)
     })
 
     test("#given cleanup itself throws re-entrant uncaughtException #when event fires repeatedly #then listener body runs only once AND no further log calls occur", async () => {

@@ -1,9 +1,4 @@
-import type {
-  ContextEntry,
-  ContextPriority,
-  PendingContext,
-  RegisterContextOptions,
-} from "./types"
+import type { ContextEntry, ContextPriority, PendingContext, RegisterContextOptions } from "./types"
 
 const PRIORITY_ORDER: Record<ContextPriority, number> = {
   critical: 0,

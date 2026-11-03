@@ -56,7 +56,10 @@ function writeJsonl(dir: string, name: string, lines: readonly (Entry | string)[
   return path
 }
 
-function jsonlSource(path: string, extra: Partial<Extract<ThreadReadSourceRef, { kind: "jsonl" }>> = {}): ThreadReadSourceRef {
+function jsonlSource(
+  path: string,
+  extra: Partial<Extract<ThreadReadSourceRef, { kind: "jsonl" }>> = {},
+): ThreadReadSourceRef {
   return { kind: "jsonl", path, ...extra }
 }
 
@@ -86,7 +89,10 @@ function expectNextAction(result: ThreadTranscriptReadResult): string {
 describe("readTranscript tail mode", () => {
   test("returns the last N entries in file order and marks the jsonl source", () => {
     const dir = makeTempDir()
-    const path = writeJsonl(dir, "tail.jsonl", [sessionHeader(), ...Array.from({ length: 10 }, (_, i) => messageEntry(i))])
+    const path = writeJsonl(dir, "tail.jsonl", [
+      sessionHeader(),
+      ...Array.from({ length: 10 }, (_, i) => messageEntry(i)),
+    ])
 
     const result = expectOk(readTranscript(jsonlSource(path), { mode: "tail", tail_items: 4 }))
 
@@ -298,7 +304,11 @@ describe("readTranscript cursor handling", () => {
 
     writeJsonl(dir, "stale-append.jsonl", [...entries, messageEntry(99, "w".repeat(300))])
 
-    const result = readTranscript(jsonlSource(path), { mode: "page", max_bytes: 2048, cursor: first.next_cursor as string })
+    const result = readTranscript(jsonlSource(path), {
+      mode: "page",
+      max_bytes: 2048,
+      cursor: first.next_cursor as string,
+    })
     const failure = expectError(result)
     expect(failure.error.code).toBe("cursor_stale")
     expectNextAction(result)
@@ -312,7 +322,11 @@ describe("readTranscript cursor handling", () => {
     const first = expectOk(readTranscript(jsonlSource(path), { mode: "page", max_bytes: 2048 }))
     writeJsonl(dir, "stale-truncate.jsonl", entries.slice(0, 3))
 
-    const result = readTranscript(jsonlSource(path), { mode: "page", max_bytes: 2048, cursor: first.next_cursor as string })
+    const result = readTranscript(jsonlSource(path), {
+      mode: "page",
+      max_bytes: 2048,
+      cursor: first.next_cursor as string,
+    })
     const failure = expectError(result)
     expect(failure.error.code).toBe("cursor_stale")
   })
@@ -328,7 +342,11 @@ describe("readTranscript cursor handling", () => {
     )
     writeJsonl(dir, "stale-middle-rewrite.jsonl", rewritten)
 
-    const result = readTranscript(jsonlSource(path), { mode: "page", max_bytes: 2048, cursor: first.next_cursor as string })
+    const result = readTranscript(jsonlSource(path), {
+      mode: "page",
+      max_bytes: 2048,
+      cursor: first.next_cursor as string,
+    })
     const failure = expectError(result)
     expect(failure.error.code).toBe("cursor_stale")
   })

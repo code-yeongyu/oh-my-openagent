@@ -1,11 +1,8 @@
 import { z } from "zod"
 
-export const BrowserAutomationProviderSchema = z.enum([
-  "playwright",
-  "dev-browser",
-  "playwright-cli",
-], {
-  error: (issue) => `Browser provider ${JSON.stringify(issue.input)} is no longer supported; use the built-in browser path: Bun.WebView / playwright-core scripts`,
+export const BrowserAutomationProviderSchema = z.enum(["playwright", "dev-browser", "playwright-cli"], {
+  error: (issue) =>
+    `Browser provider ${JSON.stringify(issue.input)} is no longer supported; use the built-in browser path: Bun.WebView / playwright-core scripts`,
 })
 
 export const BrowserAutomationConfigSchema = z.object({
@@ -38,7 +35,5 @@ export const BrowserAutomationConfigSchema = z.object({
   playwright_mcp_args: z.array(z.string()).optional(),
 })
 
-export type BrowserAutomationProvider = z.infer<
-  typeof BrowserAutomationProviderSchema
->
+export type BrowserAutomationProvider = z.infer<typeof BrowserAutomationProviderSchema>
 export type BrowserAutomationConfig = z.infer<typeof BrowserAutomationConfigSchema>

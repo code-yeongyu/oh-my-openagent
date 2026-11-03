@@ -66,7 +66,9 @@ describe("the local verified chain over the sync-v1 fixtures", () => {
   test("the second-recovery branch verifies: a join with the second enrolled key resets membership", async () => {
     const state = await verified([record("genesis"), record("recovery_key"), ...chain.branches.recovery2.map(record)])
     expect([...(state.authority?.members.keys() ?? [])]).toEqual([deviceId("recovered2")])
-    expect([...(state.authority?.registry.keys() ?? [])]).toEqual([String(record("recovery_key").body["credential_id"])])
+    expect([...(state.authority?.registry.keys() ?? [])]).toEqual([
+      String(record("recovery_key").body["credential_id"]),
+    ])
   })
 
   test("a member's batch after the veto rotation is accepted with the folded signing key", async () => {
@@ -74,7 +76,16 @@ describe("the local verified chain over the sync-v1 fixtures", () => {
     const batch = await appendBatch(headOf(state), objectDigest("batch-c-epoch3.omob"), 3, keyringFor("owner"))
     const { outcome, rejections } = await run([batch], state)
     expect(outcome.ok && outcome.steps).toEqual([
-      { kind: "batch", batch: { seq: 9, digest: batch.digest, epoch: 3, authorId: deviceId("owner"), signingPublicKey: keyringFor("owner").publicKeys().signing } },
+      {
+        kind: "batch",
+        batch: {
+          seq: 9,
+          digest: batch.digest,
+          epoch: 3,
+          authorId: deviceId("owner"),
+          signingPublicKey: keyringFor("owner").publicKeys().signing,
+        },
+      },
     ])
     expect(rejections.count()).toBe(0)
   })
@@ -83,7 +94,9 @@ describe("the local verified chain over the sync-v1 fixtures", () => {
 describe("receiver refusals: nothing that fails a check is applied", () => {
   test("the rotated-out signer's batch is refused", async () => {
     const state = await verified(mainChain())
-    const rotatedOut: BatchEntry = JSON.parse(new TextDecoder().decode(readBytes("corrupted/rotated-out-signer.record.json")))
+    const rotatedOut: BatchEntry = JSON.parse(
+      new TextDecoder().decode(readBytes("corrupted/rotated-out-signer.record.json")),
+    )
     const { outcome, rejections } = await run([rotatedOut], state)
     expect(refusal(outcome)).toEqual({ seq: 9, reason: "not_member" })
     expect(outcome.state).toBe(state)
@@ -100,7 +113,8 @@ describe("receiver refusals: nothing that fails a check is applied", () => {
 
   test("a reordered entry is refused, counted once", async () => {
     const [genesis, enrol, removal, approval, ...rest] = mainChain()
-    if (genesis === undefined || enrol === undefined || removal === undefined || approval === undefined) throw new Error("short fixture")
+    if (genesis === undefined || enrol === undefined || removal === undefined || approval === undefined)
+      throw new Error("short fixture")
     const { outcome, rejections } = await run([genesis, enrol, approval, removal, ...rest])
     expect(refusal(outcome)).toEqual({ seq: 4, reason: "link_mismatch" })
     expect(rejections.count()).toBe(1)
@@ -141,7 +155,10 @@ describe("receiver refusals: nothing that fails a check is applied", () => {
   })
 
   test("a keyring chain served for another account is refused at the account binding", async () => {
-    const { outcome, rejections } = await run(mainChain(), emptyChain("another-account", fixtureAnchor("another-account")))
+    const { outcome, rejections } = await run(
+      mainChain(),
+      emptyChain("another-account", fixtureAnchor("another-account")),
+    )
     expect(refusal(outcome)).toEqual({ seq: 1, reason: "account_mismatch" })
     expect(rejections.count()).toBe(1)
   })
@@ -150,7 +167,12 @@ describe("receiver refusals: nothing that fails a check is applied", () => {
 describe("vetoed-epoch batches", () => {
   test("a batch under the cancelled post-join epoch is skipped without blocking the cursor", async () => {
     const state = await verified(mainChain())
-    const vetoed = await appendBatch(headOf(state), objectDigest("batch-d-epoch3-recovered.omob"), 2, keyringFor("recovered"))
+    const vetoed = await appendBatch(
+      headOf(state),
+      objectDigest("batch-d-epoch3-recovered.omob"),
+      2,
+      keyringFor("recovered"),
+    )
     const vetoedHead = { seq: vetoed.seq, link: vetoed.link, keyring_link: headOf(state).keyring_link }
     const next = await appendBatch(vetoedHead, objectDigest("batch-c-epoch3.omob"), 3, keyringFor("owner"))
     const { outcome, rejections } = await run([vetoed, next], state)

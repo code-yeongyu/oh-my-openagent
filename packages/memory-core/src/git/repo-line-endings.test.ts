@@ -148,7 +148,9 @@ describe("memory repository line endings (#11109)", () => {
   test("#given a converted copy whose committed blob is missing #when it is opened #then init succeeds and the copy is left as it is", async () => {
     const { repo } = await convertedRepository(await tempRoot())
     const blob = (await git(repo.dir, ["rev-parse", ":converted.md"])).trim()
-    const objectPath = (await git(repo.dir, ["rev-parse", "--git-path", `objects/${blob.slice(0, 2)}/${blob.slice(2)}`])).trim()
+    const objectPath = (
+      await git(repo.dir, ["rev-parse", "--git-path", `objects/${blob.slice(0, 2)}/${blob.slice(2)}`])
+    ).trim()
     await rm(join(repo.dir, objectPath))
     // A fresh mtime makes git list the path as changed, so the repair has to read the missing blob.
     await utimes(join(repo.dir, "converted.md"), new Date(), new Date())
@@ -161,16 +163,23 @@ describe("memory repository line endings (#11109)", () => {
 
   test("#given a git call in the repair rejects (a Windows command-line limit, a timeout) #when the defaults are ensured #then they resolve and the pin is not recorded", async () => {
     const { repo } = await convertedRepository(await tempRoot())
-    const config = async (argv: readonly string[]) => exec.run(["config", "--local", ...argv], { cwd: repo.dir, timeoutMs: 30_000 })
+    const config = async (argv: readonly string[]) =>
+      exec.run(["config", "--local", ...argv], { cwd: repo.dir, timeoutMs: 30_000 })
     const target = {
       dir: repo.dir,
       agentId: AUTHOR.agentId,
-      configGet: async (key: string) => { const r = await config(["--get", key]); return r.code === 0 ? r.stdout.trim() : null },
-      configSet: async (key: string, value: string) => { await config([key, value]) },
+      configGet: async (key: string) => {
+        const r = await config(["--get", key])
+        return r.code === 0 ? r.stdout.trim() : null
+      },
+      configSet: async (key: string, value: string) => {
+        await config([key, value])
+      },
     }
     const rejecting = {
       result: async (argv: readonly string[], stdin?: string) => {
-        if (argv.includes("update-index")) throw Object.assign(new Error("spawn ENAMETOOLONG"), { code: "ENAMETOOLONG" })
+        if (argv.includes("update-index"))
+          throw Object.assign(new Error("spawn ENAMETOOLONG"), { code: "ENAMETOOLONG" })
         return exec.run(argv, { cwd: repo.dir, timeoutMs: 30_000, ...(stdin === undefined ? {} : { stdin }) })
       },
     }

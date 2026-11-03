@@ -23,12 +23,26 @@ function open(): GatewayHarness {
   return harness
 }
 
-type SendOptions = Omit<GatewayDeliverRequest, "sender" | "target" | "text"> & { readonly turn_id?: string; readonly cause_delivery_id?: string }
+type SendOptions = Omit<GatewayDeliverRequest, "sender" | "target" | "text"> & {
+  readonly turn_id?: string
+  readonly cause_delivery_id?: string
+}
 
-function send(h: GatewayHarness, from: string, to: string, text: string, options: SendOptions = {}): Promise<GatewayDeliveryResult> {
+function send(
+  h: GatewayHarness,
+  from: string,
+  to: string,
+  text: string,
+  options: SendOptions = {},
+): Promise<GatewayDeliveryResult> {
   const { turn_id, cause_delivery_id, ...rest } = options
   return h.get(from).engine.deliver({
-    sender: { kind: "session", durable_id: from, ...(turn_id === undefined ? {} : { turn_id }), ...(cause_delivery_id === undefined ? {} : { cause_delivery_id }) },
+    sender: {
+      kind: "session",
+      durable_id: from,
+      ...(turn_id === undefined ? {} : { turn_id }),
+      ...(cause_delivery_id === undefined ? {} : { cause_delivery_id }),
+    },
     target: to,
     text,
     ...rest,
@@ -53,11 +67,21 @@ describe("all_fifteen_delivery_state_cases", () => {
     const h = open()
     h.session("A")
     const expected: Record<string, readonly [string, string | null]> = {
-      "idle/auto": ["started", "applied"], "idle/steer": ["error:not_steerable", "refused"], "idle/follow_up": ["started", "applied"],
-      "mid_turn/auto": ["queued", "admitted"], "mid_turn/steer": ["steered", "admitted"], "mid_turn/follow_up": ["queued", "admitted"],
-      "waiting_question/auto": ["queued", "admitted"], "waiting_question/steer": ["error:not_steerable", "refused"], "waiting_question/follow_up": ["queued", "admitted"],
-      "compacting/auto": ["queued", "admitted"], "compacting/steer": ["error:not_steerable", "refused"], "compacting/follow_up": ["queued", "admitted"],
-      "offline/auto": ["queued_offline", "queued"], "offline/steer": ["error:turn_conflict", null], "offline/follow_up": ["queued_offline", "queued"],
+      "idle/auto": ["started", "applied"],
+      "idle/steer": ["error:not_steerable", "refused"],
+      "idle/follow_up": ["started", "applied"],
+      "mid_turn/auto": ["queued", "admitted"],
+      "mid_turn/steer": ["steered", "admitted"],
+      "mid_turn/follow_up": ["queued", "admitted"],
+      "waiting_question/auto": ["queued", "admitted"],
+      "waiting_question/steer": ["error:not_steerable", "refused"],
+      "waiting_question/follow_up": ["queued", "admitted"],
+      "compacting/auto": ["queued", "admitted"],
+      "compacting/steer": ["error:not_steerable", "refused"],
+      "compacting/follow_up": ["queued", "admitted"],
+      "offline/auto": ["queued_offline", "queued"],
+      "offline/steer": ["error:turn_conflict", null],
+      "offline/follow_up": ["queued_offline", "queued"],
     }
     const observed: Record<string, readonly [string, string | null]> = {}
     for (const state of ["idle", "mid_turn", "waiting_question", "compacting", "offline"] as const) {
@@ -66,7 +90,10 @@ describe("all_fifteen_delivery_state_cases", () => {
         const target = h.session(id, { online: state !== "offline" })
         if (state !== "idle" && state !== "offline") target.runtime.beginUserTurn()
         if (state === "waiting_question" || state === "compacting") target.runtime.phaseValue = state
-        const result = await send(h, "A", id, `cell ${state}/${mode}`, { mode, ...(mode === "steer" ? { expected_turn_id: target.runtime.epoch } : {}) })
+        const result = await send(h, "A", id, `cell ${state}/${mode}`, {
+          mode,
+          ...(mode === "steer" ? { expected_turn_id: target.runtime.epoch } : {}),
+        })
         await h.quiesce()
         const rows = await target.store.list({ target_durable_id: id })
         observed[`${state}/${mode}`] = [summary(result), rows[0]?.state ?? null]
@@ -121,7 +148,11 @@ describe("turn_epoch_cas_and_fifo", () => {
     b.runtime.clearDraft()
     await b.drain.drain({ reason: "draft_cleared" })
     const row = (await b.store.deliveryView(steer))?.row
-    expect({ state: row?.state, reason: row?.reason, enqueued: b.runtime.enqueueCount(steer) }).toEqual({ state: "refused", reason: "turn_conflict", enqueued: 0 })
+    expect({ state: row?.state, reason: row?.reason, enqueued: b.runtime.enqueueCount(steer) }).toEqual({
+      state: "refused",
+      reason: "turn_conflict",
+      enqueued: 0,
+    })
   })
 })
 
@@ -139,7 +170,11 @@ describe("repeated_wake_during_streaming", () => {
     expect(b.runtime.enqueueCount(m1)).toBe(1)
     b.runtime.endTurn()
     await h.quiesce()
-    expect({ state: await stateOf(h, m1), enqueued: b.runtime.enqueueCount(m1), entries: b.runtime.transcriptEntries(m1) }).toEqual({ state: "applied", enqueued: 1, entries: 1 })
+    expect({
+      state: await stateOf(h, m1),
+      enqueued: b.runtime.enqueueCount(m1),
+      entries: b.runtime.transcriptEntries(m1),
+    }).toEqual({ state: "applied", enqueued: 1, entries: 1 })
   })
 })
 
@@ -154,10 +189,16 @@ describe("repeated_wake_during_pending_steer", () => {
     const m2 = okId(result)
     expect(b.runtime.listAdmittedDeliveries()).toEqual({ pending: [m2], emitted: [] })
     for (let wake = 0; wake < 3; wake++) await b.drain.drain({ reason: "command" })
-    expect({ state: await stateOf(h, m2), enqueued: b.runtime.enqueueCount(m2) }).toEqual({ state: "admitted", enqueued: 1 })
+    expect({ state: await stateOf(h, m2), enqueued: b.runtime.enqueueCount(m2) }).toEqual({
+      state: "admitted",
+      enqueued: 1,
+    })
     b.runtime.toolBoundary()
     await h.quiesce()
-    expect({ state: await stateOf(h, m2), entries: b.runtime.transcriptEntries(m2) }).toEqual({ state: "applied", entries: 1 })
+    expect({ state: await stateOf(h, m2), entries: b.runtime.transcriptEntries(m2) }).toEqual({
+      state: "applied",
+      entries: 1,
+    })
   })
 })
 
@@ -180,18 +221,29 @@ describe("lost_ack_and_durable_recovery", () => {
     const b = h.session("B", { online: false })
     const crashing = h.engineFor(h.store({ _test: { afterDbCommit: "throw" } }))
     const retrying = h.engineFor(h.store())
-    const request = (key: string): GatewayDeliverRequest => ({ sender: { kind: "session", durable_id: "A" }, target: "B", text: `lost ${key}`, idempotency_key: key })
+    const request = (key: string): GatewayDeliverRequest => ({
+      sender: { kind: "session", durable_id: "A" },
+      target: "B",
+      text: `lost ${key}`,
+      idempotency_key: key,
+    })
 
-    expect((await settled(crashing.deliver(request("unadmitted")))).error?.message).toContain("gateway test hook afterDbCommit")
+    expect((await settled(crashing.deliver(request("unadmitted")))).error?.message).toContain(
+      "gateway test hook afterDbCommit",
+    )
     const uncertain = await retrying.deliver(request("unadmitted"))
     expect(summary(uncertain)).toBe("error:idempotency_uncertain")
 
-    expect((await settled(crashing.deliver(request("admitted")))).error?.message).toContain("gateway test hook afterDbCommit")
+    expect((await settled(crashing.deliver(request("admitted")))).error?.message).toContain(
+      "gateway test hook afterDbCommit",
+    )
     b.online = true
     await b.drain.drain({ reason: "start" })
     await h.quiesce()
     const replayed = await retrying.deliver(request("admitted"))
-    expect(replayed.kind === "ok" && { delivery: replayed.delivery.kind, deduplicated: replayed.deduplicated }).toEqual({ delivery: "queued", deduplicated: true })
+    expect(replayed.kind === "ok" && { delivery: replayed.delivery.kind, deduplicated: replayed.deduplicated }).toEqual(
+      { delivery: "queued", deduplicated: true },
+    )
 
     const stillUncertain = await retrying.deliver(request("unadmitted"))
     expect(summary(stillUncertain)).toBe("error:idempotency_uncertain")
@@ -204,12 +256,21 @@ describe("lost_ack_and_durable_recovery", () => {
     const h = open()
     h.session("A")
     h.session("B", { online: false })
-    const ids = [okId(await send(h, "A", "B", "one")), okId(await send(h, "A", "B", "two")), okId(await send(h, "A", "B", "three"))]
+    const ids = [
+      okId(await send(h, "A", "B", "one")),
+      okId(await send(h, "A", "B", "two")),
+      okId(await send(h, "A", "B", "three")),
+    ]
     await h.get("A").store.dispose()
     await h.get("B").store.dispose()
     const reopened = h.session("B2")
     const { createInboxDrain } = await import("./drain")
-    const drain = createInboxDrain({ store: h.store(), runtime: reopened.runtime, durableId: "B", sessionPath: () => reopened.runtime.sessionPath })
+    const drain = createInboxDrain({
+      store: h.store(),
+      runtime: reopened.runtime,
+      durableId: "B",
+      sessionPath: () => reopened.runtime.sessionPath,
+    })
     reopened.runtime.beginUserTurn()
     await drain.drain({ reason: "start" })
     expect(reopened.runtime.enqueueCalls.map((call) => call.delivery_id)).toEqual(ids)
@@ -225,7 +286,10 @@ describe("causal_cycle_hop_rate_and_fanout_budgets", () => {
     const bc = okId(await send(h, "B", "C", "to C", { cause_delivery_id: ab }))
     await h.quiesce()
     const ca = await send(h, "C", "A", "back to A", { cause_delivery_id: bc })
-    expect(ca.kind === "error" && { code: ca.error.code, guard: ca.error.details?.guard }).toEqual({ code: "loop_detected", guard: "cycle" })
+    expect(ca.kind === "error" && { code: ca.error.code, guard: ca.error.details?.guard }).toEqual({
+      code: "loop_detected",
+      guard: "cycle",
+    })
     expect(await h.get("A").store.list({ target_durable_id: "A" })).toEqual([])
     const self = await send(h, "A", "A", "me")
     expect(self.kind === "error" && self.error.details?.guard).toBe("self_send")
@@ -239,7 +303,10 @@ describe("causal_cycle_hop_rate_and_fanout_budgets", () => {
     const xp = okId(await send(h, "X", "P", "p", { cause_delivery_id: wx, turn_id: "x1" }))
     const xq = okId(await send(h, "X", "Q", "q", { cause_delivery_id: wx, turn_id: "x1" }))
     await h.quiesce()
-    const results = await Promise.all([send(h, "P", "Q", "p->q", { cause_delivery_id: xp }), send(h, "Q", "P", "q->p", { cause_delivery_id: xq })])
+    const results = await Promise.all([
+      send(h, "P", "Q", "p->q", { cause_delivery_id: xp }),
+      send(h, "Q", "P", "q->p", { cause_delivery_id: xq }),
+    ])
     expect(results.map(summary).toSorted()).toEqual(["error:loop_detected", "queued"])
   })
 
@@ -248,11 +315,16 @@ describe("causal_cycle_hop_rate_and_fanout_budgets", () => {
     for (let index = 0; index <= 5; index++) h.session(`H${index}`)
     let cause: string | undefined
     for (let hop = 1; hop <= 4; hop++) {
-      cause = okId(await send(h, `H${hop - 1}`, `H${hop}`, `hop ${hop}`, cause === undefined ? {} : { cause_delivery_id: cause }))
+      cause = okId(
+        await send(h, `H${hop - 1}`, `H${hop}`, `hop ${hop}`, cause === undefined ? {} : { cause_delivery_id: cause }),
+      )
       await h.quiesce()
     }
     const fifth = await send(h, "H4", "H5", "hop 5", { cause_delivery_id: cause })
-    expect(fifth.kind === "error" && { code: fifth.error.code, guard: fifth.error.details?.guard }).toEqual({ code: "loop_detected", guard: "hop_limit" })
+    expect(fifth.kind === "error" && { code: fifth.error.code, guard: fifth.error.details?.guard }).toEqual({
+      code: "loop_detected",
+      guard: "hop_limit",
+    })
   })
 
   test("#given one sender turn #when it reaches a 17th distinct session #then that send is refused while a second send to a known target passes", async () => {
@@ -260,7 +332,8 @@ describe("causal_cycle_hop_rate_and_fanout_budgets", () => {
     h.session("F")
     for (let index = 1; index <= 17; index++) h.phantom(`G${index}`)
     const results: string[] = []
-    for (let index = 1; index <= 17; index++) results.push(summary(await send(h, "F", `G${index}`, "fan", { turn_id: "turn-1" })))
+    for (let index = 1; index <= 17; index++)
+      results.push(summary(await send(h, "F", `G${index}`, "fan", { turn_id: "turn-1" })))
     expect(results.slice(0, 16).every((result) => result === "queued_offline")).toBe(true)
     expect(results[16]).toBe("error:overloaded")
     expect(summary(await send(h, "F", "G1", "again", { turn_id: "turn-1" }))).toBe("queued_offline")
@@ -270,9 +343,13 @@ describe("causal_cycle_hop_rate_and_fanout_budgets", () => {
     const h = open()
     h.session("R")
     h.phantom("S")
-    for (let index = 1; index <= 8; index++) expect(summary(await send(h, "R", "S", `m${index}`, { idempotency_key: `r${index}` }))).toBe("queued_offline")
+    for (let index = 1; index <= 8; index++)
+      expect(summary(await send(h, "R", "S", `m${index}`, { idempotency_key: `r${index}` }))).toBe("queued_offline")
     const ninth = await send(h, "R", "S", "m9", { idempotency_key: "r9" })
-    expect(ninth.kind === "error" && { code: ninth.error.code, budget: ninth.error.details?.budget }).toEqual({ code: "overloaded", budget: "pair_rate" })
+    expect(ninth.kind === "error" && { code: ninth.error.code, budget: ninth.error.details?.budget }).toEqual({
+      code: "overloaded",
+      budget: "pair_rate",
+    })
     const retry = await send(h, "R", "S", "m3", { idempotency_key: "r3" })
     expect(retry.kind === "ok" && retry.deduplicated).toBe(true)
     h.clock.now += 5_000
@@ -303,7 +380,11 @@ describe("causal_cycle_hop_rate_and_fanout_budgets", () => {
     const outcomes: string[] = []
     for (let index = 0; index < 64; index++) {
       h.phantom(`N${index}`)
-      outcomes.push(summary(await send(h, "F", `N${index}`, "fan", { cause_delivery_id: seed, turn_id: `t${Math.floor(index / 16)}` })))
+      outcomes.push(
+        summary(
+          await send(h, "F", `N${index}`, "fan", { cause_delivery_id: seed, turn_id: `t${Math.floor(index / 16)}` }),
+        ),
+      )
     }
     expect(outcomes.filter((outcome) => outcome === "queued_offline")).toHaveLength(63)
     expect(outcomes[63]).toBe("error:loop_detected")
@@ -339,19 +420,28 @@ describe("cli_sender_principal", () => {
     const h = open()
     const b = h.session("B")
     const cli = h.engineFor(h.store())
-    const result = await cli.deliver({ sender: { kind: "cli", uid: 501, user: "tester" }, target: "B", text: "from the shell" })
+    const result = await cli.deliver({
+      sender: { kind: "cli", uid: 501, user: "tester" },
+      target: "B",
+      text: "from the shell",
+    })
     const id = okId(result)
     await h.quiesce()
     const row = (await b.store.deliveryView(id))?.row
     expect({ sender: row?.sender, origin: row?.envelope.origin }).toEqual({
       sender: "cli:501",
-      origin: { external: { platform: "cli", account_id: "tester", chat_id: "@cli", thread_id: "@chat", message_id: id } },
+      origin: {
+        external: { platform: "cli", account_id: "tester", chat_id: "@cli", thread_id: "@chat", message_id: id },
+      },
     })
     const text = b.runtime.textOf(id) ?? ""
     expect(text.split("\n")[0]).toStartWith("From unclassified / ")
     expect(text.split("\n")[0]).toContain("source=external")
     expect(text.split("\n")[2]).toBe(JSON.stringify("from the shell"))
-    expect(b.runtime.senderOf(id)).toEqual({ sender: { kind: "command_line", user: "tester" }, display_text: "From unclassified / fixture\nfrom the shell" })
+    expect(b.runtime.senderOf(id)).toEqual({
+      sender: { kind: "command_line", user: "tester" },
+      display_text: "From unclassified / fixture\nfrom the shell",
+    })
   })
 
   test("#given a named session sends to another #when it lands #then the receiver is told the sending session's id and name and the message as written, apart from the provenance header the model reads", async () => {
@@ -359,16 +449,30 @@ describe("cli_sender_principal", () => {
     h.session("A")
     const b = h.session("B")
     const named = h.engineFor(h.store())
-    const result = await named.deliver({ sender: { kind: "session", durable_id: "A", name: "planner" }, target: "B", text: "review the diff" })
+    const result = await named.deliver({
+      sender: { kind: "session", durable_id: "A", name: "planner" },
+      target: "B",
+      text: "review the diff",
+    })
     const id = okId(result)
     await h.quiesce()
-    expect(b.runtime.senderOf(id)).toEqual({ sender: { kind: "agent", session_id: "A", name: "planner" }, display_text: 'From unclassified / fixture / session "planner"\nreview the diff' })
+    expect(b.runtime.senderOf(id)).toEqual({
+      sender: { kind: "agent", session_id: "A", name: "planner" },
+      display_text: 'From unclassified / fixture / session "planner"\nreview the diff',
+    })
     expect((b.runtime.textOf(id) ?? "").split("\n")[0]).toContain('/ session "planner" [OMO_GATEWAY v=1 ')
     expect((b.runtime.textOf(id) ?? "").split("\n")[0]).toContain("source=peer_agent")
 
-    const unnamed = await named.deliver({ sender: { kind: "session", durable_id: "A" }, target: "B", text: "and the tests" })
+    const unnamed = await named.deliver({
+      sender: { kind: "session", durable_id: "A" },
+      target: "B",
+      text: "and the tests",
+    })
     await h.quiesce()
-    expect(b.runtime.senderOf(okId(unnamed))).toEqual({ sender: { kind: "agent", session_id: "A" }, display_text: "From unclassified / fixture\nand the tests" })
+    expect(b.runtime.senderOf(okId(unnamed))).toEqual({
+      sender: { kind: "agent", session_id: "A" },
+      display_text: "From unclassified / fixture\nand the tests",
+    })
   })
 })
 
@@ -385,11 +489,20 @@ describe("held_draft_quiescence", () => {
     await b.drain.drain({ reason: "inbox" })
     const after = await b.store.stats()
     const row = (await b.store.deliveryView(id))?.row
-    expect({ writes: after.writes - before.writes, marker: existsSync(marker), state: row?.state, attempt: row?.attempt }).toEqual({ writes: 0, marker: true, state: "queued", attempt: 0 })
+    expect({
+      writes: after.writes - before.writes,
+      marker: existsSync(marker),
+      state: row?.state,
+      attempt: row?.attempt,
+    }).toEqual({ writes: 0, marker: true, state: "queued", attempt: 0 })
     b.runtime.submitDraft()
     await b.drain.drain({ reason: "submission" })
     b.runtime.endTurn()
     await h.quiesce()
-    expect({ state: (await b.store.deliveryView(id))?.row.state, marker: existsSync(marker), entries: b.runtime.transcriptEntries(id) }).toEqual({ state: "applied", marker: false, entries: 1 })
+    expect({
+      state: (await b.store.deliveryView(id))?.row.state,
+      marker: existsSync(marker),
+      entries: b.runtime.transcriptEntries(id),
+    }).toEqual({ state: "applied", marker: false, entries: 1 })
   })
 })

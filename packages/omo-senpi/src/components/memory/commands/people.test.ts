@@ -83,13 +83,17 @@ describe("/people command", () => {
     const text = await invoke(pi, "people", "", ctx)
 
     // then
-    expect(new Set(graph.nodes.map((node) => node.slug))).toEqual(new Set(["human", "jane-doe", "nia-blank", "sam-rivers"]))
-    expect(new Set(graph.edges.map((edge) => `${edge.source}:${edge.predicate}:${edge.target}`))).toEqual(new Set([
-      "human:works-with:jane-doe",
-      "human:mentors:sam-rivers",
-      "jane-doe:reports-to:human",
-      "sam-rivers:collaborates:unknown-person",
-    ]))
+    expect(new Set(graph.nodes.map((node) => node.slug))).toEqual(
+      new Set(["human", "jane-doe", "nia-blank", "sam-rivers"]),
+    )
+    expect(new Set(graph.edges.map((edge) => `${edge.source}:${edge.predicate}:${edge.target}`))).toEqual(
+      new Set([
+        "human:works-with:jane-doe",
+        "human:mentors:sam-rivers",
+        "jane-doe:reports-to:human",
+        "sam-rivers:collaborates:unknown-person",
+      ]),
+    )
     expect(ctx.ui.notifications).toEqual([{ message: text, level: "info" }])
   }, 30_000)
 
@@ -116,11 +120,24 @@ describe("/people command", () => {
     // given: a card committed before secret screening existed, so the repo has no screening hook
     const { root, identity } = await tempIdentity()
     tempDirs.push(root)
-    await new GitMemoryRepo({ dir: identity.identityPaths.repo, agentId: identity.identity, installHooks: () => undefined }).init({
+    await new GitMemoryRepo({
+      dir: identity.identityPaths.repo,
+      agentId: identity.identity,
+      installHooks: () => undefined,
+    }).init({
       seedFiles: [
         {
           relativePath: "people/alice-wong/card.md",
-          content: ["---", "description: Person - Alice Wong", "kind: person", "---", "", "IDENTITY: engineer", "ATTRIBUTE: AKIAABCDEFGHIJKLMNOP", ""].join("\n"),
+          content: [
+            "---",
+            "description: Person - Alice Wong",
+            "kind: person",
+            "---",
+            "",
+            "IDENTITY: engineer",
+            "ATTRIBUTE: AKIAABCDEFGHIJKLMNOP",
+            "",
+          ].join("\n"),
         },
       ],
     })

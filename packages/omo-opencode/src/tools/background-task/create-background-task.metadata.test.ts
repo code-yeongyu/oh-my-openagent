@@ -20,13 +20,15 @@ describe("createBackgroundTask metadata", () => {
     clearPendingStore()
 
     const manager = unsafeTestValue<BackgroundManager>({
-      launch: mock(() => Promise.resolve({
-        id: "task-1",
-        sessionID: null,
-        description: "Test task",
-        agent: "test-agent",
-        status: "pending",
-      })),
+      launch: mock(() =>
+        Promise.resolve({
+          id: "task-1",
+          sessionID: null,
+          description: "Test task",
+          agent: "test-agent",
+          status: "pending",
+        }),
+      ),
       getTask: mock(() => undefined),
     })
     const client = unsafeTestValue<PluginInput["client"]>({
@@ -55,7 +57,7 @@ describe("createBackgroundTask metadata", () => {
         abort: new AbortController().signal,
         ask: async () => {},
         callID: "call-1",
-        metadata: input => {
+        metadata: (input) => {
           capturedMetadata = input
         },
       }
@@ -66,12 +68,12 @@ describe("createBackgroundTask metadata", () => {
           prompt: "Test prompt",
           agent: "test-agent",
         },
-        context
+        context,
       )
 
       // #then
       expect(output).toContain("Session ID: (not yet assigned)")
-      expect(output).not.toContain('Session ID: pending')
+      expect(output).not.toContain("Session ID: pending")
       expect(capturedMetadata?.metadata).toEqual({})
       expect(consumeToolMetadata("test-session", "call-1")).toEqual({
         title: "Test background task",

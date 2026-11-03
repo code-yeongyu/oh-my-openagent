@@ -1,8 +1,4 @@
-import {
-  DEFAULT_POSTHOG_API_KEY,
-  DEFAULT_POSTHOG_HOST,
-  UNCONFIGURED_POSTHOG_API_KEY,
-} from "./constants"
+import { DEFAULT_POSTHOG_API_KEY, DEFAULT_POSTHOG_HOST, UNCONFIGURED_POSTHOG_API_KEY } from "./constants"
 import type { TelemetryEnv } from "./types"
 
 const TRUTHY_DISABLE_VALUES = ["1", "true", "yes"] as const
@@ -69,9 +65,6 @@ export function hasTelemetryApiKey(env?: TelemetryEnv, defaultApiKey?: string): 
   return isConfiguredTelemetryApiKey(getTelemetryApiKey(env, defaultApiKey))
 }
 
-export function getTelemetryHost(
-  env: TelemetryEnv = process.env,
-  defaultHost: string = DEFAULT_POSTHOG_HOST,
-): string {
+export function getTelemetryHost(env: TelemetryEnv = process.env, defaultHost: string = DEFAULT_POSTHOG_HOST): string {
   return env["POSTHOG_HOST"]?.trim() || defaultHost
 }

@@ -6,13 +6,7 @@ import type { ManagedChildHandle } from "../manager/child-handle"
 import { resolveChildSessionDir } from "../runners/rpc/spawn"
 import type { TaskRecord } from "../state"
 import { createTaskLifecycle } from "./create"
-import {
-  cleanupProjects,
-  FakeRegistry,
-  seedRecord,
-  settings,
-  tempStore,
-} from "./__fixtures__/lifecycle-fakes"
+import { cleanupProjects, FakeRegistry, seedRecord, settings, tempStore } from "./__fixtures__/lifecycle-fakes"
 import { NO_HOST_ENDPOINT } from "./host-session"
 
 const parentSessionId = "session-capacity"
@@ -34,23 +28,26 @@ function handle(taskId: string): ManagedChildHandle {
 
 function harness(options: { readonly reservationOk: boolean; readonly legacy: boolean }) {
   const store = tempStore()
-  const record = seedRecord(store, options.legacy
-    ? {
-        task_id: "st_20000001",
-        parent_session_id: "legacy-session",
-        status: "completed",
-        residency_state: "resident",
-        execution_mode: "process",
-        pid: 900,
-        host_pid: 999,
-      }
-    : {
-        task_id: "st_20000002",
-        parent_session_id: parentSessionId,
-        status: "running",
-        residency_state: "persisted_only",
-        execution_mode: "in-process",
-      })
+  const record = seedRecord(
+    store,
+    options.legacy
+      ? {
+          task_id: "st_20000001",
+          parent_session_id: "legacy-session",
+          status: "completed",
+          residency_state: "resident",
+          execution_mode: "process",
+          pid: 900,
+          host_pid: 999,
+        }
+      : {
+          task_id: "st_20000002",
+          parent_session_id: parentSessionId,
+          status: "running",
+          residency_state: "persisted_only",
+          execution_mode: "in-process",
+        },
+  )
   if (options.legacy) {
     const directory = resolveChildSessionDir(join(store.stateDir, "children", record.task_id), record.task_id)
     mkdirSync(directory, { recursive: true })
@@ -96,7 +93,11 @@ describe("reconcile capacity reservations", () => {
 
     const result = await lifecycle.reconcileOnSessionStart()
 
-    expect(result.outcomes).toContainEqual({ task_id: record.task_id, kind: "resumed", reason: "terminal resident detached" })
+    expect(result.outcomes).toContainEqual({
+      task_id: record.task_id,
+      kind: "resumed",
+      reason: "terminal resident detached",
+    })
     expect(calls).toEqual([])
   })
 

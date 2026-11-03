@@ -62,11 +62,7 @@ describe("redactUrl", () => {
   describe("#given urls without credentials", () => {
     it("#then https, file and bare paths pass through unchanged", () => {
       // given
-      const urls = [
-        "https://github.com/acme/memory.git",
-        "file:///tmp/mirror.git",
-        "/srv/mirrors/memory.git",
-      ]
+      const urls = ["https://github.com/acme/memory.git", "file:///tmp/mirror.git", "/srv/mirrors/memory.git"]
 
       // when
       const redacted = urls.map(redactUrl)
@@ -111,7 +107,8 @@ describe("redactUrl", () => {
         "password=hunter2",
         "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.abc",
         "sk-proj-AAAABBBBCCCCDDDD",
-      ]) expect(containsSecretLikeMaterial(value)).toBe(true)
+      ])
+        expect(containsSecretLikeMaterial(value)).toBe(true)
     })
   })
 
@@ -278,7 +275,8 @@ describe("scanSecretLikeMaterial / redactSecretLikeMaterial", () => {
   describe("#given a PEM block", () => {
     it("#then scan reports a pem_block match spanning the whole block and redact masks it whole", () => {
       // given
-      const pem = "-----BEGIN RSA PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSk\n-----END RSA PRIVATE KEY-----"
+      const pem =
+        "-----BEGIN RSA PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSk\n-----END RSA PRIVATE KEY-----"
 
       // when
       const matches = scanSecretLikeMaterial(pem)
@@ -293,7 +291,8 @@ describe("scanSecretLikeMaterial / redactSecretLikeMaterial", () => {
 
     it("#then a zero-width character inside a marker label does not hide the block", () => {
       // given
-      const pem = "note -----BEGIN RSA PRIV\u200bATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSk\n-----END RSA PRIVATE KEY----- tail"
+      const pem =
+        "note -----BEGIN RSA PRIV\u200bATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSk\n-----END RSA PRIVATE KEY----- tail"
 
       // when
       const matches = scanSecretLikeMaterial(pem)

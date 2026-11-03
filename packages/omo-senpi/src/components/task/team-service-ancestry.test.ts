@@ -63,7 +63,11 @@ test.each(["root", "in-process", "hosted"] as const)(
       categories: { quick: { model: "omo-mock/mock-1" } },
     }
     const engine = composeTaskEngine({
-      pi, omoConfig, cwd, env: {}, sharedParentTools: () => [],
+      pi,
+      omoConfig,
+      cwd,
+      env: {},
+      sharedParentTools: () => [],
       runnerFactories: { inProcess: () => runner, process: () => runner },
     })
     const modelRegistry = createTeamServiceTestModelRegistry()
@@ -71,8 +75,13 @@ test.each(["root", "in-process", "hosted"] as const)(
     engine.runtime.captureFrom({ modelRegistry, sessionManager: { getSessionId: () => leadSessionId } })
     if (kind === "in-process") {
       const child = await engine.manager.start({
-        prompt: "Lead a team", category: "quick", execution_mode: "in-process",
-        parent_session_id: "tree-root", root_session_id: "tree-root", depth: 1, run_in_background: true,
+        prompt: "Lead a team",
+        category: "quick",
+        execution_mode: "in-process",
+        parent_session_id: "tree-root",
+        root_session_id: "tree-root",
+        depth: 1,
+        run_in_background: true,
       })
       if (child.kind !== "started") throw new Error(`lead did not start: ${child.kind}`)
       leadSessionId = `session-${child.task_id}`
@@ -83,7 +92,8 @@ test.each(["root", "in-process", "hosted"] as const)(
       destruction: engine.lifecycle,
       runtime: engine.runtime,
       settings: engine.settings,
-      omoConfig, cwd,
+      omoConfig,
+      cwd,
       agentNames: new Set(Object.keys(engine.agents)),
       resolveAncestry: engine.resolveAncestry,
     })
@@ -102,10 +112,14 @@ test.each(["root", "in-process", "hosted"] as const)(
         // then both disk and launch records retain the immediate parent and the original root
         const record = store.load(taskId)
         expect(record).toMatchObject({
-          parent_session_id: leadSessionId, root_session_id: "tree-root", depth,
+          parent_session_id: leadSessionId,
+          root_session_id: "tree-root",
+          depth,
         })
         expect(launches.find((spec) => spec.taskId === taskId)).toMatchObject({
-          parentSessionId: leadSessionId, rootSessionId: "tree-root", depth,
+          parentSessionId: leadSessionId,
+          rootSessionId: "tree-root",
+          depth,
         })
         if (record === null) throw new Error("member record missing")
         expect(buildRespawnManagedSpec(record, stateDir)).toMatchObject({

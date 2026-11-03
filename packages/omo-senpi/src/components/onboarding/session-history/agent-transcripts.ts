@@ -28,7 +28,10 @@ export interface SourceCandidates {
 }
 
 /** `CLAUDE_CONFIG_DIR` or `~/.claude`, and `CODEX_HOME` or `~/.codex`, as each CLI resolves its own home. */
-export function defaultAgentHomes(env: Readonly<Record<string, string | undefined>>, homeDir = homedir()): Array<AgentHome> {
+export function defaultAgentHomes(
+  env: Readonly<Record<string, string | undefined>>,
+  homeDir = homedir(),
+): Array<AgentHome> {
   const configured = (value: string | undefined, fallback: string) => {
     const trimmed = value?.trim() ?? ""
     return trimmed.length > 0 ? resolve(expandHomePath(trimmed, homeDir)) : join(homeDir, fallback)
@@ -39,7 +42,11 @@ export function defaultAgentHomes(env: Readonly<Record<string, string | undefine
   ]
 }
 
-export async function uniqueHomes(rules: ProjectPathRules, homes: ReadonlyArray<AgentHome>, source: AgentSessionSource) {
+export async function uniqueHomes(
+  rules: ProjectPathRules,
+  homes: ReadonlyArray<AgentHome>,
+  source: AgentSessionSource,
+) {
   const seen = new Set<string>()
   const unique: Array<string> = []
   for (const home of homes) {

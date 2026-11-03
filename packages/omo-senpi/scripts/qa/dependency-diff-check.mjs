@@ -51,12 +51,17 @@ export function parseArgs(argv) {
     else throw new Error(`unknown argument ${arg}`)
   }
   if (options.selfTest) return options
-  if (options.base === undefined || options.head === undefined) throw new Error("--base <rev> and --head <rev> are required")
+  if (options.base === undefined || options.head === undefined)
+    throw new Error("--base <rev> and --head <rev> are required")
   return options
 }
 
 export function git(repo, args) {
-  return execFileSync("git", ["-C", repo, ...args], { encoding: "utf8", maxBuffer: GIT_MAX_BUFFER, stdio: ["ignore", "pipe", "pipe"] })
+  return execFileSync("git", ["-C", repo, ...args], {
+    encoding: "utf8",
+    maxBuffer: GIT_MAX_BUFFER,
+    stdio: ["ignore", "pipe", "pipe"],
+  })
 }
 
 export function resolveCommit(repo, rev) {
@@ -102,7 +107,14 @@ export function diffEntries(base, head) {
 /** One file's verdict between two blobs (either may be absent). */
 export function compareFile(path, baseBlob, headBlob, read) {
   const kind = manifestKind(path)
-  const status = baseBlob === undefined ? "added" : headBlob === undefined ? "deleted" : baseBlob === headBlob ? "unchanged" : "modified"
+  const status =
+    baseBlob === undefined
+      ? "added"
+      : headBlob === undefined
+        ? "deleted"
+        : baseBlob === headBlob
+          ? "unchanged"
+          : "modified"
   const file = { path, kind, status, baseBlob, headBlob, added: [], removed: [], changed: [], unverifiable: undefined }
   if (status === "unchanged") return file
   const base = baseBlob === undefined ? { entries: new Map(), reason: undefined } : read(path, baseBlob, kind)
@@ -120,7 +132,9 @@ export function compareRange(repo, baseSha, headSha, read = (path, blob, kind) =
   const paths = [...new Set([...baseFiles.keys(), ...headFiles.keys()])].sort()
   const files = paths.map((path) => compareFile(path, baseFiles.get(path), headFiles.get(path), read))
   const added = files.flatMap((file) => file.added.map((entry) => ({ path: file.path, ...entry })))
-  const unverifiable = files.filter((file) => file.unverifiable !== undefined).map((file) => ({ path: file.path, reason: file.unverifiable }))
+  const unverifiable = files
+    .filter((file) => file.unverifiable !== undefined)
+    .map((file) => ({ path: file.path, reason: file.unverifiable }))
   return {
     ok: added.length === 0 && unverifiable.length === 0,
     driver: DRIVER,
@@ -146,7 +160,10 @@ export function compareRange(repo, baseSha, headSha, read = (path, blob, kind) =
 function printReport(report) {
   for (const file of report.files) {
     if (file.status === "unchanged") continue
-    if (file.unverifiable !== undefined) { console.log(`FAIL ${file.path} :: ${file.status}, unverifiable (${file.unverifiable})`); continue }
+    if (file.unverifiable !== undefined) {
+      console.log(`FAIL ${file.path} :: ${file.status}, unverifiable (${file.unverifiable})`)
+      continue
+    }
     const line = `${file.status}, +${file.added.length} added, ~${file.changed.length} changed, -${file.removed.length} removed`
     console.log(`${file.added.length === 0 ? "PASS" : "FAIL"} ${file.path} :: ${line}`)
     for (const entry of file.added) console.log(`  ADDED ${file.path} :: ${entry.key} = ${entry.value}`)
@@ -162,7 +179,10 @@ async function main() {
     console.error(`${DRIVER}: ${error instanceof Error ? error.message : String(error)}`)
     process.exit(EXIT_USAGE)
   }
-  if (options.selfTest) { runSelfTest(); return }
+  if (options.selfTest) {
+    runSelfTest()
+    return
+  }
   let report
   try {
     const base = resolveCommit(options.repo, options.base)
@@ -181,53 +201,97 @@ async function main() {
     console.log(`evidence: ${evidence}`)
   }
   const exitCode = report.ok ? EXIT_CLEAN : EXIT_ADDED
-  console.log(JSON.stringify({
-    ok: report.ok,
-    driver: DRIVER,
-    base: report.base,
-    head: report.head,
-    totals: report.totals,
-    added: report.added.map((entry) => `${entry.path}:${entry.key}`),
-    unverifiable: report.unverifiable,
-    exitCode,
-    ...(evidence === undefined ? {} : { evidence }),
-  }))
+  console.log(
+    JSON.stringify({
+      ok: report.ok,
+      driver: DRIVER,
+      base: report.base,
+      head: report.head,
+      totals: report.totals,
+      added: report.added.map((entry) => `${entry.path}:${entry.key}`),
+      unverifiable: report.unverifiable,
+      exitCode,
+      ...(evidence === undefined ? {} : { evidence }),
+    }),
+  )
   process.exit(exitCode)
 }
 
 function runSelfTest() {
-  const read = (fixtures) => (path, blob) => ({ entries: entriesOf(manifestKind(path), fixtures[blob]), reason: undefined })
-  const bump = compareFile("package.json", "a", "b", read({
-    a: '{"dependencies":{"zod":"^4.0.0"},"devDependencies":{"typescript":"^5"}}',
-    b: '{"dependencies":{"zod":"^4.4.3"}}',
-  }))
-  if (bump.added.length !== 0 || bump.changed.length !== 1 || bump.removed.length !== 1) throw new Error(`self-test: bump ${JSON.stringify(bump)}`)
-  const added = compareFile("packages/x/package.json", "a", "b", read({
-    a: '{"dependencies":{"zod":"^4.0.0"}}',
-    b: '{"dependencies":{"zod":"^4.0.0","left-pad":"1.3.0"}}',
-  }))
-  if (added.added.map((entry) => entry.key).join() !== "dependencies:left-pad") throw new Error("self-test: an added dependency is named")
-  const lock = compareFile("bun.lock", "a", "b", read({
-    a: '{ "workspaces": { "": { "dependencies": { "zod": "^4.0.0", }, }, }, "packages": { "zod": ["zod@4.0.0", "", {}, "sha512-a"], }, }',
-    b: '{ "workspaces": { "": { "dependencies": { "zod": "^4.4.3", }, }, }, "packages": { "zod": ["zod@4.4.3", "", {}, "sha512-b"], "left-pad": ["left-pad@1.3.0", "", {}, "sha512-c"], }, }',
-  }))
-  if (lock.added.map((entry) => entry.key).join() !== "packages:left-pad" || lock.changed.length !== 2) throw new Error(`self-test: bun.lock ${JSON.stringify(lock)}`)
-  const yarn = compareFile("yarn.lock", "a", "b", read({
-    a: '# yarn lockfile v1\n\n"@scope/a@^1.0.0", "@scope/a@^1.1.0":\n  version "1.1.0"\n',
-    b: '# yarn lockfile v1\n\n"@scope/a@^1.2.0":\n  version "1.2.0"\n\nb@^2.0.0:\n  version "2.0.0"\n',
-  }))
-  if (yarn.added.map((entry) => entry.key).join() !== "packages:b" || yarn.changed[0]?.key !== "packages:@scope/a") throw new Error(`self-test: yarn ${JSON.stringify(yarn)}`)
-  const pnpm = compareFile("pnpm-lock.yaml", "a", "b", read({
-    a: "lockfileVersion: '9.0'\n\npackages:\n\n  '@scope/a@1.1.0':\n    resolution: {integrity: x}\n",
-    b: "lockfileVersion: '9.0'\n\npackages:\n\n  '@scope/a@1.2.0':\n    resolution: {integrity: x}\n\n  b@2.0.0(peer@1):\n    resolution: {integrity: y}\n",
-  }))
-  if (pnpm.added.map((entry) => entry.key).join() !== "packages/b" || pnpm.changed[0]?.key !== "packages/@scope/a") throw new Error(`self-test: pnpm ${JSON.stringify(pnpm)}`)
+  const read = (fixtures) => (path, blob) => ({
+    entries: entriesOf(manifestKind(path), fixtures[blob]),
+    reason: undefined,
+  })
+  const bump = compareFile(
+    "package.json",
+    "a",
+    "b",
+    read({
+      a: '{"dependencies":{"zod":"^4.0.0"},"devDependencies":{"typescript":"^5"}}',
+      b: '{"dependencies":{"zod":"^4.4.3"}}',
+    }),
+  )
+  if (bump.added.length !== 0 || bump.changed.length !== 1 || bump.removed.length !== 1)
+    throw new Error(`self-test: bump ${JSON.stringify(bump)}`)
+  const added = compareFile(
+    "packages/x/package.json",
+    "a",
+    "b",
+    read({
+      a: '{"dependencies":{"zod":"^4.0.0"}}',
+      b: '{"dependencies":{"zod":"^4.0.0","left-pad":"1.3.0"}}',
+    }),
+  )
+  if (added.added.map((entry) => entry.key).join() !== "dependencies:left-pad")
+    throw new Error("self-test: an added dependency is named")
+  const lock = compareFile(
+    "bun.lock",
+    "a",
+    "b",
+    read({
+      a: '{ "workspaces": { "": { "dependencies": { "zod": "^4.0.0", }, }, }, "packages": { "zod": ["zod@4.0.0", "", {}, "sha512-a"], }, }',
+      b: '{ "workspaces": { "": { "dependencies": { "zod": "^4.4.3", }, }, }, "packages": { "zod": ["zod@4.4.3", "", {}, "sha512-b"], "left-pad": ["left-pad@1.3.0", "", {}, "sha512-c"], }, }',
+    }),
+  )
+  if (lock.added.map((entry) => entry.key).join() !== "packages:left-pad" || lock.changed.length !== 2)
+    throw new Error(`self-test: bun.lock ${JSON.stringify(lock)}`)
+  const yarn = compareFile(
+    "yarn.lock",
+    "a",
+    "b",
+    read({
+      a: '# yarn lockfile v1\n\n"@scope/a@^1.0.0", "@scope/a@^1.1.0":\n  version "1.1.0"\n',
+      b: '# yarn lockfile v1\n\n"@scope/a@^1.2.0":\n  version "1.2.0"\n\nb@^2.0.0:\n  version "2.0.0"\n',
+    }),
+  )
+  if (yarn.added.map((entry) => entry.key).join() !== "packages:b" || yarn.changed[0]?.key !== "packages:@scope/a")
+    throw new Error(`self-test: yarn ${JSON.stringify(yarn)}`)
+  const pnpm = compareFile(
+    "pnpm-lock.yaml",
+    "a",
+    "b",
+    read({
+      a: "lockfileVersion: '9.0'\n\npackages:\n\n  '@scope/a@1.1.0':\n    resolution: {integrity: x}\n",
+      b: "lockfileVersion: '9.0'\n\npackages:\n\n  '@scope/a@1.2.0':\n    resolution: {integrity: x}\n\n  b@2.0.0(peer@1):\n    resolution: {integrity: y}\n",
+    }),
+  )
+  if (pnpm.added.map((entry) => entry.key).join() !== "packages/b" || pnpm.changed[0]?.key !== "packages/@scope/a")
+    throw new Error(`self-test: pnpm ${JSON.stringify(pnpm)}`)
   const opaque = compareFile("bun.lockb", "a", "b", () => ({ entries: undefined, reason: "binary lockfile" }))
   if (opaque.unverifiable !== "base: binary lockfile") throw new Error("self-test: an opaque change is unverifiable")
-  if (compareFile("package.json", "same", "same", () => { throw new Error("must not read an unchanged file") }).status !== "unchanged") throw new Error("self-test: unchanged")
+  if (
+    compareFile("package.json", "same", "same", () => {
+      throw new Error("must not read an unchanged file")
+    }).status !== "unchanged"
+  )
+    throw new Error("self-test: unchanged")
   for (const bad of [["--base", "a"], ["--head", "b"], ["--base"], ["--nope"]]) {
     let rejected = false
-    try { parseArgs(bad) } catch { rejected = true }
+    try {
+      parseArgs(bad)
+    } catch {
+      rejected = true
+    }
     if (!rejected) throw new Error(`self-test: ${bad.join(" ")} must be rejected`)
   }
   console.log(JSON.stringify({ ok: true, driver: DRIVER, selfTest: true }))

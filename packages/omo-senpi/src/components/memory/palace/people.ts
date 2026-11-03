@@ -5,12 +5,7 @@
 import { readFile, readdir, stat } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
-import {
-  parseMemoryFile,
-  parsePeopleCard,
-  type GitMemoryRepo,
-  type PeopleLimits,
-} from "@oh-my-opencode/memory-core"
+import { parseMemoryFile, parsePeopleCard, type GitMemoryRepo, type PeopleLimits } from "@oh-my-opencode/memory-core"
 
 import { UNCOMMITTED_LABEL, type PalaceEntryState } from "./collectors"
 
@@ -155,7 +150,10 @@ async function dirtyPaths(repo: GitMemoryRepo): Promise<ReadonlySet<string>> {
   const paths = new Set<string>()
   for (const line of porcelain.split(/\r?\n/)) {
     if (line.trim().length === 0) continue
-    const path = line.slice(3).trim().replace(/^"(.*)"$/, "$1")
+    const path = line
+      .slice(3)
+      .trim()
+      .replace(/^"(.*)"$/, "$1")
     if (path.length > 0) paths.add(path)
   }
   return paths

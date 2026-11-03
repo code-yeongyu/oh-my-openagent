@@ -4,7 +4,10 @@ import { fakeKernelTools } from "../runners/in-process/__fixtures__/kernel-tools
 import { resolvePoolKernelTools } from "./worker-kernel-tools"
 import { WorkpoolError, type WorkpoolSpec } from "./types"
 
-function spec(policy: { readonly toolAllowlist?: readonly string[]; readonly toolDenylist?: readonly string[] }): WorkpoolSpec {
+function spec(policy: {
+  readonly toolAllowlist?: readonly string[]
+  readonly toolDenylist?: readonly string[]
+}): WorkpoolSpec {
   return {
     start: { prompt: "worker", parent_session_id: "parent", depth: 1, execution_mode: "in-process" },
     plan: { model: "fixture/fixture", ...policy },

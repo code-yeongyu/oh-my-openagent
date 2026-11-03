@@ -42,16 +42,20 @@ export class EnvironmentGrantPolicy {
   async refresh(conservative = false): Promise<void> {
     const run = this.reconciliation.then(async () => {
       let next: EnvGrantSnapshot
-      try { next = await this.store.read() } catch (error) {
+      try {
+        next = await this.store.read()
+      } catch (error) {
         if (!(error instanceof Error)) throw error
         next = { version: 1, generation: -1, grants: {} }
       }
       const previous = this.snapshot
       this.snapshot = next
-      const gap = conservative || previous !== undefined && (
-        next.generation < previous.generation || next.generation > previous.generation + 1 ||
-        (next.revision !== previous.revision && next.generation <= previous.generation)
-      )
+      const gap =
+        conservative ||
+        (previous !== undefined &&
+          (next.generation < previous.generation ||
+            next.generation > previous.generation + 1 ||
+            (next.revision !== previous.revision && next.generation <= previous.generation)))
       for (const [identity, live] of this.live) {
         const names = [...(next.grants[identity]?.names ?? [])].sort()
         if (gap || policyHash(names) !== policyHash(live.names)) {
@@ -67,7 +71,11 @@ export class EnvironmentGrantPolicy {
     await run
   }
 
-  prepare(info: SkillMcpClientInfo, raw: ClaudeCodeMcpServer, explicit: Readonly<Record<string, string>> = {}): Promise<PreparedPolicy | undefined> {
+  prepare(
+    info: SkillMcpClientInfo,
+    raw: ClaudeCodeMcpServer,
+    explicit: Readonly<Record<string, string>> = {},
+  ): Promise<PreparedPolicy | undefined> {
     if (!usesProjectEnvironment(info)) return Promise.resolve(undefined)
     this.unwatch ??= this.store.watch((event) => this.refresh(event?.conservative))
     const identity = declarationDigest(info, raw)
@@ -93,10 +101,13 @@ export class EnvironmentGrantPolicy {
       }
       if (policy.withheld.length > 0 && this.notices.get(identity) !== digest) {
         for (const [id, pending] of this.pending) {
-          if (pending.digest === identity || (
-            pending.info.sessionID === info.sessionID && pending.info.skillName === info.skillName &&
-            pending.info.serverName === info.serverName
-          )) this.dropPending(id)
+          if (
+            pending.digest === identity ||
+            (pending.info.sessionID === info.sessionID &&
+              pending.info.skillName === info.skillName &&
+              pending.info.serverName === info.serverName)
+          )
+            this.dropPending(id)
         }
         while (this.pending.size >= MAX_PENDING_GRANTS) {
           const oldest = this.pending.keys().next().value
@@ -110,14 +121,27 @@ export class EnvironmentGrantPolicy {
         log("[skill-mcp-env] " + message)
         this.notify?.(message, info)
       }
-      return { identity, digest, version: live.version, config: policy.config, environment: policy.env, signal: live.controller.signal }
+      return {
+        identity,
+        digest,
+        version: live.version,
+        config: policy.config,
+        environment: policy.env,
+        signal: live.controller.signal,
+      }
     })()
     this.decisions.set(decisionKey, decision)
-    void decision.finally(() => { if (this.decisions.get(decisionKey) === decision) this.decisions.delete(decisionKey) }).catch(() => {})
+    void decision
+      .finally(() => {
+        if (this.decisions.get(decisionKey) === decision) this.decisions.delete(decisionKey)
+      })
+      .catch(() => {})
     return decision
   }
 
-  version(identity: string): number { return this.live.get(identity)?.version ?? 0 }
+  version(identity: string): number {
+    return this.live.get(identity)?.version ?? 0
+  }
 
   private dropPending(id: string): void {
     const pending = this.pending.get(id)
@@ -144,19 +168,34 @@ export class EnvironmentGrantPolicy {
     const pending = this.pending.get(id)
     if (!pending) throw new Error("Unknown or expired MCP environment grant handle.")
     const names = [...new Set(subset?.length ? subset : pending.names)].sort()
-    if (names.some((name) => !pending.names.includes(name))) throw new Error("Grant contains a name outside the displayed set.")
-    const current = pending.info.revalidateDeclaration ? await pending.info.revalidateDeclaration() : {
-      config: pending.raw, sourcePath: pending.info.sourcePath, sourceKind: pending.info.sourceKind,
-    }
+    if (names.some((name) => !pending.names.includes(name)))
+      throw new Error("Grant contains a name outside the displayed set.")
+    const current = pending.info.revalidateDeclaration
+      ? await pending.info.revalidateDeclaration()
+      : {
+          config: pending.raw,
+          sourcePath: pending.info.sourcePath,
+          sourceKind: pending.info.sourceKind,
+        }
     if (this.pending.get(id) !== pending) throw new Error("Unknown or expired MCP environment grant handle.")
     const declarationKey = `${pending.info.sessionID}:${pending.info.skillName}:${pending.info.serverName}`
-    if (!current || declarationDigest({ ...pending.info, sourcePath: current.sourcePath, sourceKind: current.sourceKind }, current.config) !== pending.digest ||
-      this.declarations.get(declarationKey) !== pending.digest) {
+    if (
+      !current ||
+      declarationDigest(
+        { ...pending.info, sourcePath: current.sourcePath, sourceKind: current.sourceKind },
+        current.config,
+      ) !== pending.digest ||
+      this.declarations.get(declarationKey) !== pending.digest
+    ) {
       this.dropPending(id)
       throw new Error("The MCP declaration changed. Start the server again to obtain a new grant command.")
     }
     await this.store.add(pending.digest, {
-      label: { project: pending.info.provenance?.projectRoot ?? pending.info.directory ?? "", skill: pending.info.skillName, server: pending.info.serverName },
+      label: {
+        project: pending.info.provenance?.projectRoot ?? pending.info.directory ?? "",
+        skill: pending.info.skillName,
+        server: pending.info.serverName,
+      },
       names,
     })
     this.dropPending(id)

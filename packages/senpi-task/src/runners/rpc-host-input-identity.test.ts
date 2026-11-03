@@ -23,8 +23,11 @@ for (const launch of ["admitted", "held"] as const) {
     let launched: string | undefined
     try {
       const started = await parent.manager.start({
-        prompt: "host child parent #0", parent_session_id: "parent", depth: 1,
-        execution_mode: "process", model: HOST_CHILD_MODEL,
+        prompt: "host child parent #0",
+        parent_session_id: "parent",
+        depth: 1,
+        execution_mode: "process",
+        model: HOST_CHILD_MODEL,
       })
       if (started.kind !== "started") throw new Error(`launch failed: ${started.kind}`)
       await bounded(prompted)
@@ -37,15 +40,19 @@ for (const launch of ["admitted", "held"] as const) {
       // A message queued behind the launch reaches the child under its own queue entry id (#2838 step 4); one
       // sent straight to the running child gets the next minted id. Which path a send takes is the send's own
       // reported outcome: a slow launch can queue a send even when the test does not hold it.
-      const queuedIds = parent.store.load(taskId)?.pending_steering?.map(entry => entry.id) ?? []
+      const queuedIds = parent.store.load(taskId)?.pending_steering?.map((entry) => entry.id) ?? []
       release()
       await bounded(steered)
-      const inputs = world.host.commands.filter(command => INPUT_TYPES.includes(command.type))
-      const ids = inputs.map(command => String(command.payload.clientMessageId))
+      const inputs = world.host.commands.filter((command) => INPUT_TYPES.includes(command.type))
+      const ids = inputs.map((command) => String(command.payload.clientMessageId))
       let minted = 1
-      const expected = [`${taskId}:0:1`, ...[first, second].map(sent =>
-        sent.details.kind === "queued" ? "queued" : `${taskId}:0:${++minted}`)]
-      expect(ids.map((id, index) => expected[index] === "queued" && id.startsWith("ps-") ? "queued" : id)).toEqual(expected)
+      const expected = [
+        `${taskId}:0:1`,
+        ...[first, second].map((sent) => (sent.details.kind === "queued" ? "queued" : `${taskId}:0:${++minted}`)),
+      ]
+      expect(ids.map((id, index) => (expected[index] === "queued" && id.startsWith("ps-") ? "queued" : id))).toEqual(
+        expected,
+      )
       expect(new Set(ids).size).toBe(3)
       if (launch === "held") expect(ids.slice(1)).toEqual(queuedIds)
       expect(parent.store.load(taskId)?.host_session?.effect_seq).toBe(minted)
@@ -78,15 +85,21 @@ for (const conflict of [false, true]) {
     }
     const runner = hostHarness.runnerOver(host, {
       storeDir: h.store.stateDir,
-      createClient: socketPath => new DeadlineClient({ socketPath, ports: { probeProtocolInfo: () => host.probeProtocolInfo() } }),
+      createClient: (socketPath) =>
+        new DeadlineClient({ socketPath, ports: { probeProtocolInfo: () => host.probeProtocolInfo() } }),
     })
-    const handle = await runner.start(childSpec({ task_id: record.task_id, taskStoreDir: h.store.stateDir,
-      state_dir: join(h.store.stateDir, "children", record.task_id) }))
+    const handle = await runner.start(
+      childSpec({
+        task_id: record.task_id,
+        taskStoreDir: h.store.stateDir,
+        state_dir: join(h.store.stateDir, "children", record.task_id),
+      }),
+    )
     h.setLive(record.task_id, adaptRpcHandle(handle))
     try {
       const outcome = await h.engine.sendToTask({ idOrName: record.task_id, message: "once", deliverAs: "steer" })
       expect(outcome.kind).toBe("uncertain")
-      const first = host.commands.find(command => command.type === "steer")
+      const first = host.commands.find((command) => command.type === "steer")
       if (first === undefined) throw new Error("steer never arrived")
       const session = host.sessions()[0]
       if (session === undefined) throw new Error("host session is missing")
@@ -95,18 +108,24 @@ for (const conflict of [false, true]) {
       host.allowReply("steer")
       await bounded(second)
       await handle.reconcileInputs?.()
-      const sends = host.commands.filter(command => command.type === "steer")
+      const sends = host.commands.filter((command) => command.type === "steer")
       expect(sends).toHaveLength(2)
-      expect(sends.map(command => ({ id: command.payload.clientMessageId, text: command.payload.message })))
-        .toEqual([{ id: first.payload.clientMessageId, text: "once" }, { id: first.payload.clientMessageId, text: "once" }])
+      expect(sends.map((command) => ({ id: command.payload.clientMessageId, text: command.payload.message }))).toEqual([
+        { id: first.payload.clientMessageId, text: "once" },
+        { id: first.payload.clientMessageId, text: "once" },
+      ])
       expect(host.admissions.count()).toBe(2) // initial prompt plus one steer
       const events = readFileSync(join(h.store.stateDir, "logs", `${record.task_id}.jsonl`), "utf8")
-        .trim().split("\n").map(line => JSON.parse(line) as { type: string; payload: Record<string, unknown> })
-      expect(events.filter(event => event.type === "effect_uncertain")).toHaveLength(1)
-      expect(events.filter(event => event.type === "steered")).toHaveLength(conflict ? 0 : 1)
-      if (conflict) expect(events.find(event => event.type === "effect_failed")?.payload).toMatchObject({
-        reason: "effect_id_conflict", action: "send the message again",
-      })
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line) as { type: string; payload: Record<string, unknown> })
+      expect(events.filter((event) => event.type === "effect_uncertain")).toHaveLength(1)
+      expect(events.filter((event) => event.type === "steered")).toHaveLength(conflict ? 0 : 1)
+      if (conflict)
+        expect(events.find((event) => event.type === "effect_failed")?.payload).toMatchObject({
+          reason: "effect_id_conflict",
+          action: "send the message again",
+        })
       expect(h.store.load(record.task_id)?.uncertain_inputs).toBeUndefined()
     } finally {
       await handle.dispose()
@@ -117,8 +136,14 @@ for (const conflict of [false, true]) {
 
 async function bounded<T>(promise: Promise<T>): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
-  try { return await Promise.race([promise, new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error("host input did not arrive")), 5_000)
-  })]) } finally { clearTimeout(timer) }
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("host input did not arrive")), 5_000)
+      }),
+    ])
+  } finally {
+    clearTimeout(timer)
+  }
 }
-

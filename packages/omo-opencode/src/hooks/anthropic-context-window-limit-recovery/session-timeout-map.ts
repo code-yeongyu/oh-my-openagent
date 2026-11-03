@@ -9,9 +9,7 @@ export function clearSessionTimeout(
   }
 }
 
-export function clearAllSessionTimeouts(
-  timeoutBySession: Map<string, ReturnType<typeof setTimeout>>,
-): void {
+export function clearAllSessionTimeouts(timeoutBySession: Map<string, ReturnType<typeof setTimeout>>): void {
   for (const timeoutID of timeoutBySession.values()) {
     clearTimeout(timeoutID)
   }

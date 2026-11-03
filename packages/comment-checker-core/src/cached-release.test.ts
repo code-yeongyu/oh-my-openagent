@@ -3,7 +3,11 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { COMMENT_CHECKER_VERSION_MARKER, isCachedCommentCheckerCurrent, recordCachedCommentCheckerRelease } from "./cached-release"
+import {
+  COMMENT_CHECKER_VERSION_MARKER,
+  isCachedCommentCheckerCurrent,
+  recordCachedCommentCheckerRelease,
+} from "./cached-release"
 import { COMMENT_CHECKER_RELEASE_VERSION } from "./release"
 
 const roots: string[] = []
@@ -36,7 +40,9 @@ describe("cached comment-checker release marker (#8850)", () => {
 
     // then
     expect(current).toBe(true)
-    expect(readFileSync(join(cacheDir, COMMENT_CHECKER_VERSION_MARKER), "utf-8")).toBe(`${COMMENT_CHECKER_RELEASE_VERSION}\n`)
+    expect(readFileSync(join(cacheDir, COMMENT_CHECKER_VERSION_MARKER), "utf-8")).toBe(
+      `${COMMENT_CHECKER_RELEASE_VERSION}\n`,
+    )
   })
 
   test("#given a marker from another release #when checked #then it is not current", () => {

@@ -16,7 +16,10 @@ type GhCliDependencies = {
   readonly spawn?: typeof spawnWithTimeout
 }
 
-async function checkBinaryExists(binary: string, which: typeof bunWhich): Promise<{ exists: boolean; path: string | null }> {
+async function checkBinaryExists(
+  binary: string,
+  which: typeof bunWhich,
+): Promise<{ exists: boolean; path: string | null }> {
   try {
     const binaryPath = which(binary)
     return { exists: Boolean(binaryPath), path: binaryPath ?? null }
@@ -50,10 +53,11 @@ async function getGhAuthStatus(spawn: typeof spawnWithTimeout): Promise<{
   error: string | null
 }> {
   try {
-    const result = await spawn(
-      ["gh", "auth", "status"],
-      { stdout: "pipe", stderr: "pipe", env: { ...process.env, GH_NO_UPDATE_NOTIFIER: "1" } }
-    )
+    const result = await spawn(["gh", "auth", "status"], {
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { ...process.env, GH_NO_UPDATE_NOTIFIER: "1" },
+    })
 
     if (result.timedOut) {
       return { authenticated: false, username: null, scopes: [], error: "gh auth status timed out" }
@@ -67,7 +71,11 @@ async function getGhAuthStatus(spawn: typeof spawnWithTimeout): Promise<{
       return {
         authenticated: true,
         username: usernameMatch?.[1]?.replace(/[()]/g, "") ?? null,
-        scopes: scopesMatch?.[1]?.split(/,\s*/).map((scope) => scope.trim()).filter(Boolean) ?? [],
+        scopes:
+          scopesMatch?.[1]
+            ?.split(/,\s*/)
+            .map((scope) => scope.trim())
+            .filter(Boolean) ?? [],
         error: null,
       }
     }

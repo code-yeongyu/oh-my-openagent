@@ -15,9 +15,8 @@ function describeSessionError(error: unknown): string {
     return String(error)
   }
   const data = isRecord(error.data) ? error.data : undefined
-  const message = typeof data?.message === "string" ? data.message
-    : typeof error.message === "string" ? error.message
-      : undefined
+  const message =
+    typeof data?.message === "string" ? data.message : typeof error.message === "string" ? error.message : undefined
   const name = typeof error.name === "string" ? error.name : undefined
   return [name, message].filter((value): value is string => Boolean(value)).join(": ") || "unknown error"
 }

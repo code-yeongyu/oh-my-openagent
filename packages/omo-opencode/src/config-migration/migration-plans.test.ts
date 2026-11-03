@@ -92,12 +92,20 @@ describe("legacy config migration plans", () => {
         pathOperations: posix,
         platform: "linux",
       })
-      const opencodeUserPlan = plans.find((plan) =>
-        plan.id === OPENCODE_CONFIG_MIGRATION_ID && plan.sources.some((source) => source.path === canonicalRootPath))
-      const configJsoncPlan = plans.find((plan) =>
-        plan.id === CONFIG_JSONC_MIGRATION_ID && plan.sources.some((source) => source.path === canonicalConfigJsoncPath))
-      const projectPlan = plans.find((plan) =>
-        plan.id === OPENCODE_CONFIG_MIGRATION_ID && plan.sources.some((source) => source.path.endsWith("oh-my-opencode.json")))
+      const opencodeUserPlan = plans.find(
+        (plan) =>
+          plan.id === OPENCODE_CONFIG_MIGRATION_ID && plan.sources.some((source) => source.path === canonicalRootPath),
+      )
+      const configJsoncPlan = plans.find(
+        (plan) =>
+          plan.id === CONFIG_JSONC_MIGRATION_ID &&
+          plan.sources.some((source) => source.path === canonicalConfigJsoncPath),
+      )
+      const projectPlan = plans.find(
+        (plan) =>
+          plan.id === OPENCODE_CONFIG_MIGRATION_ID &&
+          plan.sources.some((source) => source.path.endsWith("oh-my-opencode.json")),
+      )
       if (opencodeUserPlan === undefined || configJsoncPlan === undefined || projectPlan === undefined) {
         throw new Error("Expected user, config.jsonc, and project migration plans")
       }
@@ -110,29 +118,68 @@ describe("legacy config migration plans", () => {
       expect(opencodeResult.status).toBe("migrated")
       expect(projectResult.status).toBe("migrated")
       const userDocument = parse(readFileSync(join(homeDir, ".omo", "omo.jsonc"), "utf-8")) as Record<string, unknown>
-      expect(userDocument._migrations).toEqual([
-        CONFIG_JSONC_MIGRATION_ID,
-        OPENCODE_CONFIG_MIGRATION_ID,
-      ])
+      expect(userDocument._migrations).toEqual([CONFIG_JSONC_MIGRATION_ID, OPENCODE_CONFIG_MIGRATION_ID])
       expect(userDocument["[opencode]"]).toBeUndefined()
       expect(userDocument.legacy_migrations).toMatchObject({
         [canonicalRootPath]: ["model-version:reverted-old-model->new-model"],
         [canonicalConfigJsoncPath]: ["legacy-config-jsonc"],
       })
       expect(opencodeUserPlan.sources.map((source) => source.backupPath)).toEqual([
-        join(canonicalHomeDir, ".omo", `migration-backup-${timestamp}-opencode-config`, ".config", "opencode", "oh-my-openagent.jsonc"),
-        join(canonicalHomeDir, ".omo", `migration-backup-${timestamp}-opencode-config`, ".config", "opencode", "oh-my-openagent.jsonc.migrations.json"),
-        join(canonicalHomeDir, ".omo", `migration-backup-${timestamp}-opencode-config`, ".config", "opencode", "profiles", "kimi", "oh-my-openagent.jsonc"),
+        join(
+          canonicalHomeDir,
+          ".omo",
+          `migration-backup-${timestamp}-opencode-config`,
+          ".config",
+          "opencode",
+          "oh-my-openagent.jsonc",
+        ),
+        join(
+          canonicalHomeDir,
+          ".omo",
+          `migration-backup-${timestamp}-opencode-config`,
+          ".config",
+          "opencode",
+          "oh-my-openagent.jsonc.migrations.json",
+        ),
+        join(
+          canonicalHomeDir,
+          ".omo",
+          `migration-backup-${timestamp}-opencode-config`,
+          ".config",
+          "opencode",
+          "profiles",
+          "kimi",
+          "oh-my-openagent.jsonc",
+        ),
       ])
       expect(configJsoncPlan.sources.map((source) => source.backupPath)).toEqual([
         join(canonicalHomeDir, ".omo", `migration-backup-${timestamp}-opencode-config`, ".omo", "config.jsonc"),
-        join(canonicalHomeDir, ".omo", `migration-backup-${timestamp}-opencode-config`, ".omo", "config.jsonc.migrations.json"),
+        join(
+          canonicalHomeDir,
+          ".omo",
+          `migration-backup-${timestamp}-opencode-config`,
+          ".omo",
+          "config.jsonc.migrations.json",
+        ),
       ])
       expect(projectPlan.sources.map((source) => source.backupPath)).toEqual([
         join(canonicalProjectDir, ".omo", `migration-backup-${timestamp}`, "oh-my-opencode.json"),
       ])
-      expect(existsSync(join(canonicalHomeDir, ".omo", `migration-backup-${timestamp}-opencode-config`, ".config", "opencode", "oh-my-openagent.jsonc"))).toBe(true)
-      expect(existsSync(join(canonicalProjectDir, ".omo", `migration-backup-${timestamp}`, "oh-my-opencode.json"))).toBe(true)
+      expect(
+        existsSync(
+          join(
+            canonicalHomeDir,
+            ".omo",
+            `migration-backup-${timestamp}-opencode-config`,
+            ".config",
+            "opencode",
+            "oh-my-openagent.jsonc",
+          ),
+        ),
+      ).toBe(true)
+      expect(
+        existsSync(join(canonicalProjectDir, ".omo", `migration-backup-${timestamp}`, "oh-my-opencode.json")),
+      ).toBe(true)
       expect(existsSync(`${rootPath}.bak.unrelated`)).toBe(true)
     } finally {
       rmSync(fixtureRoot, { force: true, recursive: true })
@@ -145,10 +192,13 @@ describe("legacy config migration plans", () => {
     const homeDir = join(fixtureRoot, "home")
     const configJsoncPath = join(homeDir, ".omo", "config.jsonc")
     mkdirSync(join(configJsoncPath, ".."), { recursive: true })
-    writeFileSync(configJsoncPath, JSON.stringify({
-      "[omo]": { agents: { oracle: { model: "legacy" } } },
-      "[senpi]": { agents: { oracle: { model: "current" } } },
-    }))
+    writeFileSync(
+      configJsoncPath,
+      JSON.stringify({
+        "[omo]": { agents: { oracle: { model: "legacy" } } },
+        "[senpi]": { agents: { oracle: { model: "current" } } },
+      }),
+    )
 
     try {
       const plans = createLegacyConfigMigrationPlans({

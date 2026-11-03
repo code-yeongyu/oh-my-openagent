@@ -1,10 +1,6 @@
 import type { KeywordType } from "../../config/schema/keyword-detector"
 import { isRealUserTextPart } from "../../shared/internal-initiator-marker"
-import {
-  CODE_BLOCK_PATTERN,
-  INLINE_CODE_PATTERN,
-  KEYWORD_DETECTORS,
-} from "./constants"
+import { CODE_BLOCK_PATTERN, INLINE_CODE_PATTERN, KEYWORD_DETECTORS } from "./constants"
 
 export interface DetectedKeyword {
   type: KeywordType
@@ -24,7 +20,7 @@ export function looksLikeSlashCommand(text: string): boolean {
 function resolveMessage(
   message: string | ((agentName?: string, modelID?: string) => string),
   agentName?: string,
-  modelID?: string
+  modelID?: string,
 ): string {
   return typeof message === "function" ? message(agentName, modelID) : message
 }
@@ -70,9 +66,7 @@ export function detectKeywordsWithType(
     .map(({ type, message }) => ({ type, message }))
 }
 
-export function extractPromptText(
-  parts: Array<{ type: string; text?: string; synthetic?: boolean }>
-): string {
+export function extractPromptText(parts: Array<{ type: string; text?: string; synthetic?: boolean }>): string {
   return parts
     .filter(isRealUserTextPart)
     .map((p) => p.text || "")

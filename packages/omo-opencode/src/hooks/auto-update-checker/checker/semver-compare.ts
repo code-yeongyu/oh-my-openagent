@@ -13,7 +13,8 @@ interface ParsedSemver {
   readonly prerelease: readonly string[]
 }
 
-const SEMVER_REGEX = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/
+const SEMVER_REGEX =
+  /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/
 
 function parseSemver(version: string): ParsedSemver | null {
   const match = SEMVER_REGEX.exec(version.trim())

@@ -40,7 +40,11 @@ describe("sweepStaleLockCandidates", () => {
     await writeAged(directory, "notice.lock.recovery", staleAge)
     await writeAged(directory, "notice.lock.candidate-11111111-aaaa-bbbb-cccc-000000000001", 0)
     await writeAged(directory, "notice.lock.candidate-11111111-aaaa-bbbb-cccc-000000000002", staleAge)
-    await writeAged(directory, "reflection-scheduler.lock.recovery.candidate-11111111-aaaa-bbbb-cccc-000000000003", staleAge)
+    await writeAged(
+      directory,
+      "reflection-scheduler.lock.recovery.candidate-11111111-aaaa-bbbb-cccc-000000000003",
+      staleAge,
+    )
 
     const swept = await sweepStaleLockCandidates(directory)
 
@@ -84,7 +88,9 @@ describe("sweepStaleLockCandidates", () => {
     let blockedAttempts = 0
     const swept = await sweepStaleLockCandidates(directory, () => Date.now(), {
       isSharingError: () => true,
-      onFailure: () => { throw new Error("advisory callback failure") },
+      onFailure: () => {
+        throw new Error("advisory callback failure")
+      },
       unlink: async (candidatePath) => {
         if (candidatePath.endsWith(blocked)) {
           blockedAttempts += 1

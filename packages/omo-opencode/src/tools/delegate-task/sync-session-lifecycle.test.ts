@@ -77,9 +77,20 @@ describe("executeSyncTask - sync session lifecycle ordering", () => {
     }
 
     //#when
-    const resultPromise = executeSyncTask(args, mockCtx, mockExecutorCtx, {
-      sessionID: "parent-session",
-    }, "test-agent", undefined, undefined, undefined, undefined, deps)
+    const resultPromise = executeSyncTask(
+      args,
+      mockCtx,
+      mockExecutorCtx,
+      {
+        sessionID: "parent-session",
+      },
+      "test-agent",
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      deps,
+    )
     await syncCallbackStarted
 
     try {

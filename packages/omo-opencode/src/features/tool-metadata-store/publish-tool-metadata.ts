@@ -9,7 +9,7 @@ export interface ToolMetadataPublisherContext extends ToolCallIDCarrier {
 
 export async function publishToolMetadata(
   ctx: ToolMetadataPublisherContext,
-  payload: PendingToolMetadata
+  payload: PendingToolMetadata,
 ): Promise<{ stored: boolean }> {
   await ctx.metadata?.(payload)
 

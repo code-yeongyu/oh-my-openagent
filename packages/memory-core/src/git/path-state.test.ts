@@ -36,12 +36,16 @@ async function rejectedError(operation: Promise<unknown>): Promise<Error> {
 }
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, {
-    recursive: true,
-    force: true,
-    maxRetries: 10,
-    retryDelay: 200,
-  })))
+  await Promise.all(
+    tempDirs.splice(0).map((dir) =>
+      rm(dir, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 200,
+      }),
+    ),
+  )
 })
 
 describe("GitPathStateStore", () => {
@@ -107,10 +111,14 @@ describe("GitPathStateStore", () => {
     const content = "unique-filtered-content\r\n"
 
     const rawUnwritten = await repo.pathState.hashWorktreeBlob(content)
-    expect((await createNodeGitExec().run(["cat-file", "-e", rawUnwritten], {
-      cwd: dir,
-      timeoutMs: 30_000,
-    })).code).not.toBe(0)
+    expect(
+      (
+        await createNodeGitExec().run(["cat-file", "-e", rawUnwritten], {
+          cwd: dir,
+          timeoutMs: 30_000,
+        })
+      ).code,
+    ).not.toBe(0)
 
     const raw = await repo.pathState.hashWorktreeBlob(content, true)
     const filtered = await repo.pathState.hashIndexBlob("filtered.txt", content, true)
@@ -182,12 +190,16 @@ describe("GitPathStateStore", () => {
 
     const other = await repo.pathState.hashWorktreeBlob("other\n", true)
     const main = await repo.pathState.hashWorktreeBlob("main\n", true)
-    await git(dir, ["update-index", "--index-info"], [
-      `100644 ${base.index.oid} 1\tconflict.md`,
-      `100644 ${main} 2\tconflict.md`,
-      `100644 ${other} 3\tconflict.md`,
-      "",
-    ].join("\n"))
+    await git(
+      dir,
+      ["update-index", "--index-info"],
+      [
+        `100644 ${base.index.oid} 1\tconflict.md`,
+        `100644 ${main} 2\tconflict.md`,
+        `100644 ${other} 3\tconflict.md`,
+        "",
+      ].join("\n"),
+    )
 
     const error = await rejectedError(repo.pathState.capture("conflict.md"))
     expect(error).toBeInstanceOf(GitPathStateError)

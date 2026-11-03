@@ -23,11 +23,7 @@ describe("promptAsyncInDirectory", () => {
 
     // when, then
     await expect(
-      promptAsyncInDirectory(
-        unsafeTestValue(client),
-        unsafeTestValue(args),
-        "/workspace/project",
-      ),
+      promptAsyncInDirectory(unsafeTestValue(client), unsafeTestValue(args), "/workspace/project"),
     ).rejects.toThrow("session id is required for routed promptAsync")
     expect(promptAsync).toHaveBeenCalledTimes(0)
   })
@@ -46,16 +42,8 @@ describe("promptAsyncInDirectory", () => {
     }
 
     // when
-    const first = await promptAsyncInDirectory(
-      unsafeTestValue(client),
-      unsafeTestValue(args),
-      "/workspace/project",
-    )
-    const second = promptAsyncInDirectory(
-      unsafeTestValue(client),
-      unsafeTestValue(args),
-      "/workspace/project",
-    )
+    const first = await promptAsyncInDirectory(unsafeTestValue(client), unsafeTestValue(args), "/workspace/project")
+    const second = promptAsyncInDirectory(unsafeTestValue(client), unsafeTestValue(args), "/workspace/project")
 
     // then
     expect(first).toEqual({ data: "sent" })
@@ -80,11 +68,7 @@ describe("promptAsyncInDirectory", () => {
     }
 
     // when
-    const result = await promptAsyncInDirectory(
-      unsafeTestValue(client),
-      unsafeTestValue(args),
-      "/workspace/project",
-    )
+    const result = await promptAsyncInDirectory(unsafeTestValue(client), unsafeTestValue(args), "/workspace/project")
 
     // then
     expect(result).toBeUndefined()
@@ -111,16 +95,8 @@ describe("promptWithRetryInDirectory", () => {
     }
 
     // when
-    await promptWithRetryInDirectory(
-      unsafeTestValue(client),
-      unsafeTestValue(args),
-      "/workspace/project",
-    )
-    const second = promptWithRetryInDirectory(
-      unsafeTestValue(client),
-      unsafeTestValue(args),
-      "/workspace/project",
-    )
+    await promptWithRetryInDirectory(unsafeTestValue(client), unsafeTestValue(args), "/workspace/project")
+    const second = promptWithRetryInDirectory(unsafeTestValue(client), unsafeTestValue(args), "/workspace/project")
 
     // then
     await expect(second).rejects.toThrow("promptAsync skipped by gate: reserved")

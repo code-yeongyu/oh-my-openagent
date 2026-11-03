@@ -318,21 +318,24 @@ describe("side panel wiring", () => {
       cwd: "/workspaces/long-nested-directory/another-directory/oh-my-openagent-test-worktree",
       location: "…ory/another-directory/oh-my-openagent-test-worktree",
     },
-  ])("#given a mounted panel at $cwd #when the column renders #then it carries the session facts and the location", async ({ cwd, location }) => {
-    // given
-    const harness = mounted({}, {}, cwd)
-    await harness.pi.dispatch("session_start", {}, harness.host)
+  ])(
+    "#given a mounted panel at $cwd #when the column renders #then it carries the session facts and the location",
+    async ({ cwd, location }) => {
+      // given
+      const harness = mounted({}, {}, cwd)
+      await harness.pi.dispatch("session_start", {}, harness.host)
 
-    // when
-    harness.attach()
-    const rows = columnRows(harness.tui)
+      // when
+      harness.attach()
+      const rows = columnRows(harness.tui)
 
-    // then
-    expect(rows[0]).toBe("SESSION  $1.20 · 16.8K")
-    expect(rows).toContain("model   claude-opus-5")
-    expect(rows).toContain("CONTEXT  29K/1M")
-    expect(rows[rows.length - 1]).toBe(location)
-  })
+      // then
+      expect(rows[0]).toBe("SESSION  $1.20 · 16.8K")
+      expect(rows).toContain("model   claude-opus-5")
+      expect(rows).toContain("CONTEXT  29K/1M")
+      expect(rows[rows.length - 1]).toBe(location)
+    },
+  )
 
   test("#given a tool starts #when the column renders #then the tool row appears with its target", async () => {
     // given
@@ -341,7 +344,11 @@ describe("side panel wiring", () => {
     harness.attach()
 
     // when
-    await harness.pi.dispatch("tool_execution_start", { toolName: "read", args: { file_path: "src/index.ts" } }, harness.host)
+    await harness.pi.dispatch(
+      "tool_execution_start",
+      { toolName: "read", args: { file_path: "src/index.ts" } },
+      harness.host,
+    )
     const rows = columnRows(harness.tui)
 
     // then
@@ -915,13 +922,13 @@ describe("side panel session boundaries and section gates", () => {
   test("#given a child from the previous session #when the session switches #then the next session shows none of it", async () => {
     // given
     let records: PanelTaskRecord[] = [
-        {
-          task_id: "t1",
-          status: "running",
-          created_at: new Date(40_000).toISOString(),
-          parent_session_id: "session-1",
-          task_summary: "map the seams",
-        },
+      {
+        task_id: "t1",
+        status: "running",
+        created_at: new Date(40_000).toISOString(),
+        parent_session_id: "session-1",
+        task_summary: "map the seams",
+      },
     ]
     const harness = mounted({ readTaskRecords: () => records })
     await harness.pi.dispatch("session_start", {}, harness.host)
@@ -974,7 +981,9 @@ describe("side panel session boundaries and section gates", () => {
     await harness.pi.dispatch("session_start", {}, harness.host)
     harness.attach()
     expect(columnRows(harness.tui).length).toBeGreaterThan(0)
-    const anchorsBefore = harness.widgets.filter((call) => call.key === SIDE_PANEL_ANCHOR_WIDGET_KEY && call.content !== undefined).length
+    const anchorsBefore = harness.widgets.filter(
+      (call) => call.key === SIDE_PANEL_ANCHOR_WIDGET_KEY && call.content !== undefined,
+    ).length
 
     // when: the host clears the old root and mounts a fresh one, as switchTuiMode does
     harness.tui.setLayoutRoot({ render: () => ["transcript"], invalidate: () => {} })
@@ -982,7 +991,9 @@ describe("side panel session boundaries and section gates", () => {
     harness.attach()
 
     // then: the host never calls a mounted factory again, so the panel must register a fresh anchor
-    expect(harness.widgets.filter((call) => call.key === SIDE_PANEL_ANCHOR_WIDGET_KEY && call.content !== undefined).length).toBe(anchorsBefore + 1)
+    expect(
+      harness.widgets.filter((call) => call.key === SIDE_PANEL_ANCHOR_WIDGET_KEY && call.content !== undefined).length,
+    ).toBe(anchorsBefore + 1)
     expect(columnRows(harness.tui).some((row) => row.startsWith("SESSION"))).toBe(true)
   })
 
@@ -993,7 +1004,9 @@ describe("side panel session boundaries and section gates", () => {
     await harness.pi.dispatch("session_start", {}, harness.host)
     harness.attach()
     expect(() => columnRows(harness.tui)).toThrow()
-    const anchorsBefore = harness.widgets.filter((call) => call.key === SIDE_PANEL_ANCHOR_WIDGET_KEY && call.content !== undefined).length
+    const anchorsBefore = harness.widgets.filter(
+      (call) => call.key === SIDE_PANEL_ANCHOR_WIDGET_KEY && call.content !== undefined,
+    ).length
 
     // when
     harness.tui.setLayoutRoot({ render: () => ["transcript"], invalidate: () => {} })
@@ -1001,7 +1014,9 @@ describe("side panel session boundaries and section gates", () => {
     harness.attach()
 
     // then: the host never calls a mounted factory again, so the panel must register a fresh anchor
-    expect(harness.widgets.filter((call) => call.key === SIDE_PANEL_ANCHOR_WIDGET_KEY && call.content !== undefined).length).toBe(anchorsBefore + 1)
+    expect(
+      harness.widgets.filter((call) => call.key === SIDE_PANEL_ANCHOR_WIDGET_KEY && call.content !== undefined).length,
+    ).toBe(anchorsBefore + 1)
     expect(columnRows(harness.tui).some((row) => row.startsWith("SESSION"))).toBe(true)
   })
 
@@ -1124,7 +1139,12 @@ describe("side panel lifecycle and guards", () => {
 
     // when: each dispatch races the next turn of the event loop, which runs only once microtasks drain
     const settled: boolean[] = []
-    const events = [["tool_execution_start", { toolName: "read" }], ["tool_execution_end", {}], ["message_end", {}], ["turn_end", {}]] as const
+    const events = [
+      ["tool_execution_start", { toolName: "read" }],
+      ["tool_execution_end", {}],
+      ["message_end", {}],
+      ["turn_end", {}],
+    ] as const
     for (const [event, payload] of events) {
       harness.advance(GIT_REFRESH_FLOOR_MS + 1)
       const idle = new Promise<boolean>((resolve) => setImmediate(() => resolve(false)))
@@ -1158,7 +1178,8 @@ describe("side panel lifecycle and guards", () => {
     // given
     let reads = 0
     const harness = mounted({
-      loadSettings: () => settings({ enabled: true, sections: { ...allSections(), usage: false, agents: false, session: false } }),
+      loadSettings: () =>
+        settings({ enabled: true, sections: { ...allSections(), usage: false, agents: false, session: false } }),
       readTaskRecords: () => {
         reads += 1
         return []
@@ -1215,7 +1236,13 @@ describe("side panel lifecycle and guards", () => {
     }
     const stale: PanelMemory = {
       identity: identity.id,
-      reflection: { streak: 3, parkedAt: "2026-09-21T09:00:00.000Z", nextProbeAt: "2026-09-21T15:00:00.000Z", reason: "stale park", detail: "stale" },
+      reflection: {
+        streak: 3,
+        parkedAt: "2026-09-21T09:00:00.000Z",
+        nextProbeAt: "2026-09-21T15:00:00.000Z",
+        reason: "stale park",
+        detail: "stale",
+      },
       factsQueued: 7,
       recallSurfaced: 0,
       recallPending: 0,
@@ -1258,7 +1285,13 @@ describe("side panel lifecycle and guards", () => {
         called.resolve()
         await gate.promise
         return [
-          { task_id: "t1", status: "running", created_at: new Date(40_000).toISOString(), parent_session_id: "session-1", task_summary: "late child" },
+          {
+            task_id: "t1",
+            status: "running",
+            created_at: new Date(40_000).toISOString(),
+            parent_session_id: "session-1",
+            task_summary: "late child",
+          },
         ]
       },
     })
@@ -1295,7 +1328,9 @@ describe("side panel lifecycle and guards", () => {
     await first
 
     // then
-    expect(harness.widgets.some((call) => call.key === SIDE_PANEL_ANCHOR_WIDGET_KEY && call.content !== undefined)).toBe(false)
+    expect(
+      harness.widgets.some((call) => call.key === SIDE_PANEL_ANCHOR_WIDGET_KEY && call.content !== undefined),
+    ).toBe(false)
   })
 
   test("#given an ended session #when a tool finishes before the next one starts #then git is not run", async () => {

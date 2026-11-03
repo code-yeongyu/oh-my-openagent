@@ -75,25 +75,35 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
       const deviceAccount = options.deviceAccount ?? lazyCliAccountSource({ env })
       const memoryRoot = resolveMemoryRoot(env, cwd)
       const pinDir = syncPinDir(memoryRoot)
-      const syncRunner = options.syncRunner ?? createSyncRunner({
-        logger: ctx.logger,
-        onStatusChange: (repo) => syncStatusChanged.current?.(repo),
-        resolveSession: createDeviceSessionResolver({
-          source: deviceAccount,
-          pinDir,
-          loadRuntime: () => import("#omo-memory-sync-runtime"),
-        }),
-      })
+      const syncRunner =
+        options.syncRunner ??
+        createSyncRunner({
+          logger: ctx.logger,
+          onStatusChange: (repo) => syncStatusChanged.current?.(repo),
+          resolveSession: createDeviceSessionResolver({
+            source: deviceAccount,
+            pinDir,
+            loadRuntime: () => import("#omo-memory-sync-runtime"),
+          }),
+        })
       const syncLifetime = new AbortController()
       let syncSessionId: string | undefined
       const rpcHandle = pi.rpc?.handle?.bind(pi.rpc)
-      const syncRpc = rpcHandle === undefined ? undefined : wireSyncRpc({
-        rpc: { handle: rpcHandle }, source: deviceAccount, memoryRoot, pinDir, signal: syncLifetime.signal,
-        syncStatus: async () => {
-          const repo = syncSessionId === undefined ? undefined : sessions.get(syncSessionId)?.context?.identityPaths.repo
-          return repo === undefined ? undefined : readMemoryRpcSync((path) => syncRunner.status(path), repo)
-        },
-      })
+      const syncRpc =
+        rpcHandle === undefined
+          ? undefined
+          : wireSyncRpc({
+              rpc: { handle: rpcHandle },
+              source: deviceAccount,
+              memoryRoot,
+              pinDir,
+              signal: syncLifetime.signal,
+              syncStatus: async () => {
+                const repo =
+                  syncSessionId === undefined ? undefined : sessions.get(syncSessionId)?.context?.identityPaths.repo
+                return repo === undefined ? undefined : readMemoryRpcSync((path) => syncRunner.status(path), repo)
+              },
+            })
       primeMemoryPersonaAssets({ logger: ctx.logger })
       // Reclaim runs an abnormal exit left behind (#7765). Detached from registration on purpose:
       // it is pure maintenance, and a slow or failing sweep must never delay or break binding.
@@ -142,18 +152,22 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
       // binding. Registered after the static handlers so their projection-first result order holds:
       // the memory tool is live on this turn (afterBind marks the session active) and the prompt
       // block follows on the next one.
-      pi.on("before_agent_start", (payload, eventCtx) => {
-        if (isRecord(payload) && payload.preview === true) return undefined
-        const surface = readSessionSurface(eventCtx)
-        if (surface.id === "unknown-session") return undefined
-        const state = sessions.get(surface.id)
-        if (state?.context !== undefined) return undefined
-        if (state !== undefined && !state.enabled) return undefined
-        syncRpc?.retireBinding()
-        syncSessionId = surface.id
-        bindSession(surface, eventCtx, { existing: state, verifyRepository: true })
-        return undefined
-      }, { previewSafe: true })
+      pi.on(
+        "before_agent_start",
+        (payload, eventCtx) => {
+          if (isRecord(payload) && payload.preview === true) return undefined
+          const surface = readSessionSurface(eventCtx)
+          if (surface.id === "unknown-session") return undefined
+          const state = sessions.get(surface.id)
+          if (state?.context !== undefined) return undefined
+          if (state !== undefined && !state.enabled) return undefined
+          syncRpc?.retireBinding()
+          syncSessionId = surface.id
+          bindSession(surface, eventCtx, { existing: state, verifyRepository: true })
+          return undefined
+        },
+        { previewSafe: true },
+      )
       const unregisterReadClassifier = registerMemoryReadClassifier(pi, {
         resolveRepos: function* () {
           for (const state of sessions.values()) {
@@ -228,10 +242,12 @@ function isEnabled(
   ctx: ComponentContext,
   env: Record<string, string | undefined>,
 ): boolean {
-  return config.enabled
-    && !isMemoryChildProcess(env)
-    && ctx.config.getFlag(GLOBAL_DISABLED_FLAG) !== true
-    && ctx.config.getFlag(MEMORY_DISABLED_FLAG) !== true
+  return (
+    config.enabled &&
+    !isMemoryChildProcess(env) &&
+    ctx.config.getFlag(GLOBAL_DISABLED_FLAG) !== true &&
+    ctx.config.getFlag(MEMORY_DISABLED_FLAG) !== true
+  )
 }
 
 function extensionCwd(pi: SenpiExtensionAPI): string {

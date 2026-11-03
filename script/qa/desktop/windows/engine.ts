@@ -146,7 +146,9 @@ export class Engine {
    * none arrives before the hang guard. History is checked before listening, so a notification that
    * rode out behind an earlier reply is not missed.
    */
-  async waitForNotification(matches: (notification: EngineNotification) => boolean): Promise<EngineNotification | undefined> {
+  async waitForNotification(
+    matches: (notification: EngineNotification) => boolean,
+  ): Promise<EngineNotification | undefined> {
     const seen = this.notifications.find(matches)
     if (seen !== undefined) return seen
     let listener: NotificationListener | undefined

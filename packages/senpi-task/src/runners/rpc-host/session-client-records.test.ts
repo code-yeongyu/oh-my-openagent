@@ -58,7 +58,9 @@ describe("HostSessionClient records", () => {
     // then
     // The record after the request has been delivered, so the request was already ingested; a deny
     // that waited on anything (a UI timeout, a timer) would reach the host after get_state.
-    const order = host.commands.map((command) => command.type).filter((type) => type === "extension_ui_response" || type === "get_state")
+    const order = host.commands
+      .map((command) => command.type)
+      .filter((type) => type === "extension_ui_response" || type === "get_state")
     expect(order).toEqual(["extension_ui_response", "get_state"])
     expect((await answered).payload).toMatchObject({ type: "extension_ui_response", id: "ui-1", confirmed: false })
   })
@@ -96,7 +98,9 @@ describe("HostSessionClient records", () => {
     await seen
 
     // then
-    expect(parked).toEqual([{ sessionId: opened.sessionId, sessionPath: "/tmp/sessions/n.jsonl", reason: "idle_evicted" }])
+    expect(parked).toEqual([
+      { sessionId: opened.sessionId, sessionPath: "/tmp/sessions/n.jsonl", reason: "idle_evicted" },
+    ])
     expect(client.sessionId).toBeUndefined()
   })
 

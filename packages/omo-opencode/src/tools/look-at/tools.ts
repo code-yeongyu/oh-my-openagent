@@ -17,7 +17,10 @@ export function createLookAt(ctx: PluginInput): ToolDefinition {
       file_path: tool.schema.string().optional().describe("Absolute path to the file to analyze"),
       file_paths: tool.schema.array(tool.schema.string()).optional().describe("Absolute paths to the files to analyze"),
       image_data: tool.schema.string().optional().describe("Base64 encoded image data (for clipboard/pasted images)"),
-      image_data_list: tool.schema.array(tool.schema.string()).optional().describe("Base64 encoded image data entries (for multiple clipboard/pasted images)"),
+      image_data_list: tool.schema
+        .array(tool.schema.string())
+        .optional()
+        .describe("Base64 encoded image data entries (for multiple clipboard/pasted images)"),
       goal: tool.schema.string().describe("What specific information to extract from the file"),
     },
     async execute(rawArgs: LookAtArgs, toolContext) {

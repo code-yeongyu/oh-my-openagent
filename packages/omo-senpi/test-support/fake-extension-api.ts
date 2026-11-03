@@ -155,14 +155,16 @@ export class FakeExtensionAPI implements SenpiExtensionAPI {
     this.messages.push({ message, options })
   }
 
-  sendUserMessage(content: string | readonly Record<string, unknown>[], options?: { deliverAs?: "steer" | "followUp" }): void {
+  sendUserMessage(
+    content: string | readonly Record<string, unknown>[],
+    options?: { deliverAs?: "steer" | "followUp" },
+  ): void {
     this.userMessages.push({ content, options })
   }
 
   registerMcpServer(name: string, config: Record<string, unknown>): void {
     this.mcpServers.push({ name, config })
   }
-
 
   async dispatch(event: string, payload: unknown, ctx?: unknown): Promise<unknown[]> {
     const results: unknown[] = []

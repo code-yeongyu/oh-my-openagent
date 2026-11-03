@@ -86,7 +86,11 @@ describe("createConsentGatedFetch", () => {
     const gated = createConsentGatedFetch({ isSendAllowed: () => false, onDropped: (count) => dropped.push(count) })
 
     // when
-    const response = await gated("http://127.0.0.1:9/batch", { method: "POST", headers: {}, body: new UnreadableBody(["x"]) })
+    const response = await gated("http://127.0.0.1:9/batch", {
+      method: "POST",
+      headers: {},
+      body: new UnreadableBody(["x"]),
+    })
 
     // then
     expect(response.status).toBe(200)

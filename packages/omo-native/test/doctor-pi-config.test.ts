@@ -26,7 +26,10 @@ function copiedHome(options: { recordCopyTime: boolean }): Home {
   mkdirSync(agentDir, { recursive: true })
   mkdirSync(piAgentDir, { recursive: true })
   const copiedAt = Date.parse("2026-09-01T00:00:00Z")
-  for (const [file, content] of [["models.json", '{"providers":{}}\n'], ["settings.json", '{"theme":"dark"}\n']]) {
+  for (const [file, content] of [
+    ["models.json", '{"providers":{}}\n'],
+    ["settings.json", '{"theme":"dark"}\n'],
+  ]) {
     writeAt(join(piAgentDir, file), content, copiedAt - 60_000)
     writeAt(join(agentDir, file), content, copiedAt - 60_000)
   }
@@ -41,7 +44,9 @@ describe("omo doctor config dir and ~/.pi/agent edits (#9173)", () => {
   test("#given an untouched copy #when reported #then only the active config dir is printed", () => {
     const home = copiedHome({ recordCopyTime: true })
 
-    expect(piConfigReport({ agentDir: home.agentDir, homeDir: home.homeDir })).toEqual([`INFO config dir: ${home.agentDir}`])
+    expect(piConfigReport({ agentDir: home.agentDir, homeDir: home.homeDir })).toEqual([
+      `INFO config dir: ${home.agentDir}`,
+    ])
   })
 
   test("#given models.json edited in ~/.pi/agent after the copy #when reported #then it is flagged with both exact paths", () => {
@@ -68,7 +73,9 @@ describe("omo doctor config dir and ~/.pi/agent edits (#9173)", () => {
     const agentMtime = statSync(join(home.agentDir, "settings.json")).mtimeMs
     writeAt(join(home.piAgentDir, "settings.json"), '{"theme":"light"}\n', agentMtime + 60_000)
 
-    expect(findPiConfigEdits({ agentDir: home.agentDir, homeDir: home.homeDir }).map((edit) => edit.file)).toEqual(["settings.json"])
+    expect(findPiConfigEdits({ agentDir: home.agentDir, homeDir: home.homeDir }).map((edit) => edit.file)).toEqual([
+      "settings.json",
+    ])
   })
 
   test("#given no ~/.pi/agent #when reported #then only the config dir line is printed", () => {

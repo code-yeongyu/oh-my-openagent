@@ -139,10 +139,10 @@ describe("McpOAuthProvider", () => {
         const url = input.toString()
         if (url.includes("oauth-protected-resource")) {
           // PRM: return authorization_servers pointing to auth server
-          return new Response(
-            JSON.stringify({ authorization_servers: ["https://auth.example.com"] }),
-            { status: 200, headers: { "content-type": "application/json" } },
-          )
+          return new Response(JSON.stringify({ authorization_servers: ["https://auth.example.com"] }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          })
         }
         if (url.includes(".well-known")) {
           // AS metadata
@@ -160,10 +160,10 @@ describe("McpOAuthProvider", () => {
         expect(body).toContain("grant_type=refresh_token")
         expect(body).toContain("refresh_token=refresh-token-456")
         expect(body).toContain("client_id=my-client")
-        return new Response(
-          JSON.stringify({ access_token: "refreshed-access-token", expires_in: 3600 }),
-          { status: 200, headers: { "content-type": "application/json" } },
-        )
+        return new Response(JSON.stringify({ access_token: "refreshed-access-token", expires_in: 3600 }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        })
       })
       const fetchMock = (async (...args: Parameters<typeof fetch>): ReturnType<typeof fetch> =>
         fetchStub(...args)) satisfies typeof fetch
@@ -196,10 +196,10 @@ describe("McpOAuthProvider", () => {
       const fetchStub = mock(async (input: RequestInfo | URL) => {
         const url = input.toString()
         if (url.includes("oauth-protected-resource")) {
-          return new Response(
-            JSON.stringify({ authorization_servers: ["https://auth.example.com"] }),
-            { status: 200, headers: { "content-type": "application/json" } },
-          )
+          return new Response(JSON.stringify({ authorization_servers: ["https://auth.example.com"] }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          })
         }
         if (url.includes(".well-known")) {
           return new Response(

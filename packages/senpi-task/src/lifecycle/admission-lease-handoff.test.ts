@@ -10,12 +10,13 @@ test("#given local admission waiters #when the holder releases #then ownership h
   if (held.kind !== "acquired") throw new Error("expected initial admission lease")
   const order: number[] = []
   const leases: SessionAdmissionLease[] = [held.lease]
-  const wait = (id: number) => acquireSessionAdmissionLease(stateDir, "parent").then(result => {
-    if (result.kind !== "acquired") throw new Error("expected queued admission lease")
-    leases.push(result.lease)
-    order.push(id)
-    return result.lease
-  })
+  const wait = (id: number) =>
+    acquireSessionAdmissionLease(stateDir, "parent").then((result) => {
+      if (result.kind !== "acquired") throw new Error("expected queued admission lease")
+      leases.push(result.lease)
+      order.push(id)
+      return result.lease
+    })
   // Subscribe both callers before release, just as parallel DAG starts contend on one parent.
   const second = wait(2)
   const third = wait(3)

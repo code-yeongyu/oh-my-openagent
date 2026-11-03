@@ -2,7 +2,16 @@ import { describe, expect, test } from "bun:test"
 import { createShutdownDrain } from "./shutdown-drain"
 import { DREAM_VOLUME_GATE_BYTES, evaluateDreamGates, resolveDreamTriggerSettings } from "./dream-trigger"
 import { memorySettings } from "./memory.test-support"
-import { CONVERSATION, NOW_MS, fireTimer, fixture, gateProbe, noopSteps, settle, triggerSettings } from "./dream-trigger.test-support"
+import {
+  CONVERSATION,
+  NOW_MS,
+  fireTimer,
+  fixture,
+  gateProbe,
+  noopSteps,
+  settle,
+  triggerSettings,
+} from "./dream-trigger.test-support"
 
 describe("resolveDreamTriggerSettings", () => {
   test("#given base dream settings #when no agent override exists #then the base values resolve", () => {
@@ -33,7 +42,11 @@ describe("resolveDreamTriggerSettings", () => {
 describe("evaluateDreamGates", () => {
   test("#given every gate failing #when the origin is manual #then the gates are bypassed without probing", async () => {
     const { probe, calls } = gateProbe({ lastDreamAtMs: NOW_MS, unreflectedBytes: 0 })
-    const decision = await evaluateDreamGates("manual", triggerSettings({ enabled: false, shutdownLaunch: false }), probe)
+    const decision = await evaluateDreamGates(
+      "manual",
+      triggerSettings({ enabled: false, shutdownLaunch: false }),
+      probe,
+    )
     expect(decision).toEqual({ allowed: true })
     expect(calls).toEqual({ lastDreamAt: 0, unreflectedBytes: 0 })
   })

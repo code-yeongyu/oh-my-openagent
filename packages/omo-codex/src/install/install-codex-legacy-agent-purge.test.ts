@@ -35,58 +35,80 @@ Be concise, specific, and strict."""
 `
 
 describe("install-codex legacy agent purge", () => {
-  test("#given retired managed reviewer artifacts and user agents #when installing omo #then purges only managed legacy reviewer artifacts", async () => {
-    // given
-    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-retired-reviewer-"))
-    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-retired-reviewer-"))
-    const agentsDir = join(codexHome, "agents")
-    await mkdir(agentsDir, { recursive: true })
-    await writeFile(
-      join(codexHome, "config.toml"),
-      [
-        "[agents.codex-ultrawork-reviewer]",
-        'config_file = "./agents/codex-ultrawork-reviewer.toml"',
-        "",
-        "[agents.user_custom]",
-        'config_file = "./agents/user-custom.toml"',
-        "",
-      ].join("\n"),
-    )
-    await writeFile(join(agentsDir, "codex-ultrawork-reviewer.toml"), LEGACY_MANAGED_ULTRAWORK_REVIEWER_TOML)
-    await writeFile(join(agentsDir, "user-custom.toml"), 'name = "user-custom"\nmodel = "gpt-5.5"\n')
+  test(
+    "#given retired managed reviewer artifacts and user agents #when installing omo #then purges only managed legacy reviewer artifacts",
+    async () => {
+      // given
+      const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-retired-reviewer-"))
+      const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-retired-reviewer-"))
+      const agentsDir = join(codexHome, "agents")
+      await mkdir(agentsDir, { recursive: true })
+      await writeFile(
+        join(codexHome, "config.toml"),
+        [
+          "[agents.codex-ultrawork-reviewer]",
+          'config_file = "./agents/codex-ultrawork-reviewer.toml"',
+          "",
+          "[agents.user_custom]",
+          'config_file = "./agents/user-custom.toml"',
+          "",
+        ].join("\n"),
+      )
+      await writeFile(join(agentsDir, "codex-ultrawork-reviewer.toml"), LEGACY_MANAGED_ULTRAWORK_REVIEWER_TOML)
+      await writeFile(join(agentsDir, "user-custom.toml"), 'name = "user-custom"\nmodel = "gpt-5.5"\n')
 
-    // when
-    await runCodexInstaller({ codexHome, binDir, repoRoot: process.cwd(), astGrepInstaller: skipAstGrepInstall, runCommand: async () => undefined })
+      // when
+      await runCodexInstaller({
+        codexHome,
+        binDir,
+        repoRoot: process.cwd(),
+        astGrepInstaller: skipAstGrepInstall,
+        runCommand: async () => undefined,
+      })
 
-    // then
-    const configContent = await readFile(join(codexHome, "config.toml"), "utf8")
-    expect(configContent).not.toContain("[agents.codex-ultrawork-reviewer]")
-    expect(configContent).not.toContain('config_file = "./agents/codex-ultrawork-reviewer.toml"')
-    expect(await pathExists(join(agentsDir, "codex-ultrawork-reviewer.toml"))).toBe(false)
-    expect(await readFile(join(agentsDir, "user-custom.toml"), "utf8")).toBe('name = "user-custom"\nmodel = "gpt-5.5"\n')
-  }, { timeout: INSTALL_CODEX_LEGACY_AGENT_PURGE_TIMEOUT_MS })
+      // then
+      const configContent = await readFile(join(codexHome, "config.toml"), "utf8")
+      expect(configContent).not.toContain("[agents.codex-ultrawork-reviewer]")
+      expect(configContent).not.toContain('config_file = "./agents/codex-ultrawork-reviewer.toml"')
+      expect(await pathExists(join(agentsDir, "codex-ultrawork-reviewer.toml"))).toBe(false)
+      expect(await readFile(join(agentsDir, "user-custom.toml"), "utf8")).toBe(
+        'name = "user-custom"\nmodel = "gpt-5.5"\n',
+      )
+    },
+    { timeout: INSTALL_CODEX_LEGACY_AGENT_PURGE_TIMEOUT_MS },
+  )
 
-  test("#given custom file using retired reviewer filename #when installing omo #then preserves the unproven user TOML", async () => {
-    // given
-    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-custom-reviewer-"))
-    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-custom-reviewer-"))
-    const agentsDir = join(codexHome, "agents")
-    const customReviewer = 'name = "codex-ultrawork-reviewer"\ndescription = "My local reviewer override"\n'
-    await mkdir(agentsDir, { recursive: true })
-    await writeFile(
-      join(codexHome, "config.toml"),
-      ["[agents.codex-ultrawork-reviewer]", 'config_file = "./agents/codex-ultrawork-reviewer.toml"', ""].join("\n"),
-    )
-    await writeFile(join(agentsDir, "codex-ultrawork-reviewer.toml"), customReviewer)
+  test(
+    "#given custom file using retired reviewer filename #when installing omo #then preserves the unproven user TOML",
+    async () => {
+      // given
+      const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-custom-reviewer-"))
+      const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-custom-reviewer-"))
+      const agentsDir = join(codexHome, "agents")
+      const customReviewer = 'name = "codex-ultrawork-reviewer"\ndescription = "My local reviewer override"\n'
+      await mkdir(agentsDir, { recursive: true })
+      await writeFile(
+        join(codexHome, "config.toml"),
+        ["[agents.codex-ultrawork-reviewer]", 'config_file = "./agents/codex-ultrawork-reviewer.toml"', ""].join("\n"),
+      )
+      await writeFile(join(agentsDir, "codex-ultrawork-reviewer.toml"), customReviewer)
 
-    // when
-    await runCodexInstaller({ codexHome, binDir, repoRoot: process.cwd(), astGrepInstaller: skipAstGrepInstall, runCommand: async () => undefined })
+      // when
+      await runCodexInstaller({
+        codexHome,
+        binDir,
+        repoRoot: process.cwd(),
+        astGrepInstaller: skipAstGrepInstall,
+        runCommand: async () => undefined,
+      })
 
-    // then
-    const configContent = await readFile(join(codexHome, "config.toml"), "utf8")
-    expect(configContent).not.toContain("[agents.codex-ultrawork-reviewer]")
-    expect(await readFile(join(agentsDir, "codex-ultrawork-reviewer.toml"), "utf8")).toBe(customReviewer)
-  }, { timeout: INSTALL_CODEX_LEGACY_AGENT_PURGE_TIMEOUT_MS })
+      // then
+      const configContent = await readFile(join(codexHome, "config.toml"), "utf8")
+      expect(configContent).not.toContain("[agents.codex-ultrawork-reviewer]")
+      expect(await readFile(join(agentsDir, "codex-ultrawork-reviewer.toml"), "utf8")).toBe(customReviewer)
+    },
+    { timeout: INSTALL_CODEX_LEGACY_AGENT_PURGE_TIMEOUT_MS },
+  )
 })
 
 async function pathExists(path: string): Promise<boolean> {

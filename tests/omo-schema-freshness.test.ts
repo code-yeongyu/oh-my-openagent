@@ -12,7 +12,7 @@ function extractSchemaExample(markdown: string): unknown {
   const fences = markdown.match(/```json\n([\s\S]*?)```/g) ?? []
   for (const fence of fences) {
     const body = fence.replace(/```json\n/, "").replace(/```$/, "")
-    if (body.includes("\"$schema\"")) return JSON.parse(body)
+    if (body.includes('"$schema"')) return JSON.parse(body)
   }
   throw new Error("no $schema-bearing json example found in omo-json.md")
 }
@@ -49,8 +49,6 @@ describe("omo schema freshness", () => {
     const schemaUrl = example.$schema
 
     // then
-    expect(schemaUrl).toBe(
-      "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json",
-    )
+    expect(schemaUrl).toBe("https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json")
   })
 })

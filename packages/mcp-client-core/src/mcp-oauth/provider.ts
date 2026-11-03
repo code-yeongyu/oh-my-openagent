@@ -84,11 +84,19 @@ export class McpOAuthProvider {
 
   saveTokens(tokenData: OAuthTokenData): boolean {
     const issuer = tokenData.issuer ?? this.issuer
-    return saveToken(this.serverUrl, this.serverUrl, issuer ? {
-      ...tokenData,
-      issuer,
-      ...(tokenData.clientInfo ? { clientInfo: { ...tokenData.clientInfo, issuer: tokenData.clientInfo.issuer ?? issuer } } : {}),
-    } : tokenData)
+    return saveToken(
+      this.serverUrl,
+      this.serverUrl,
+      issuer
+        ? {
+            ...tokenData,
+            issuer,
+            ...(tokenData.clientInfo
+              ? { clientInfo: { ...tokenData.clientInfo, issuer: tokenData.clientInfo.issuer ?? issuer } }
+              : {}),
+          }
+        : tokenData,
+    )
   }
 
   private bindIssuer(issuer: string): boolean {
@@ -234,11 +242,15 @@ export class McpOAuthProvider {
     })
 
     const tokenData = await parseTokenResponse(tokenResponse)
-    const oauthTokenData = buildOAuthTokenData(tokenData, {
-      clientId,
-      issuer: metadata.issuer,
-      ...(clientInfo?.clientSecret ? { clientSecret: clientInfo.clientSecret } : {}),
-    }, refreshToken)
+    const oauthTokenData = buildOAuthTokenData(
+      tokenData,
+      {
+        clientId,
+        issuer: metadata.issuer,
+        ...(clientInfo?.clientSecret ? { clientSecret: clientInfo.clientSecret } : {}),
+      },
+      refreshToken,
+    )
 
     this.saveTokens(oauthTokenData)
     return oauthTokenData

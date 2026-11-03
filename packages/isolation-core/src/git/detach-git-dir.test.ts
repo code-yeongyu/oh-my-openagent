@@ -7,8 +7,7 @@ import { realpathSync } from "node:fs"
  * the expectations compare in that form instead of the caller's spelling. POSIX
  * keeps the registered spelling verbatim — resolving there would chase /tmp
  * symlinks git never followed. */
-const gitPath = (path: string) =>
-  process.platform === "win32" ? realpathSync.native(path).replace(/\\/g, "/") : path
+const gitPath = (path: string) => (process.platform === "win32" ? realpathSync.native(path).replace(/\\/g, "/") : path)
 import { git, repo } from "../backends/git-fixture"
 import { detachGitDir, scanNestedGitDirs } from "./detach-git-dir"
 import { IsolationUnavailableError } from "../backend"
@@ -45,15 +44,18 @@ test("directory metadata removes nested lock files and worktree/bare configurati
   await git(repoRoot, "config", "core.worktree", root)
   await git(repoRoot, "config", "core.bare", "false")
   expect(await detachGitDir(repoRoot, join(repoRoot, ".git"))).toBe("independent")
-  for (const path of ["index.lock", "refs/heads/nested/ref.lock"]) await expect(lstat(join(repoRoot, ".git", path))).rejects.toMatchObject({ code: "ENOENT" })
+  for (const path of ["index.lock", "refs/heads/nested/ref.lock"])
+    await expect(lstat(join(repoRoot, ".git", path))).rejects.toMatchObject({ code: "ENOENT" })
   expect(await readFile(join(repoRoot, ".git/config"), "utf8")).not.toMatch(/worktree|bare/)
-  const empty = join(root, "empty"); await mkdir(empty)
+  const empty = join(root, "empty")
+  await mkdir(empty)
   expect(await detachGitDir(empty, join(repoRoot, ".git"))).toBe("no-git")
 })
 
 test("copied linked metadata never deletes the source worktree admin", async () => {
   const { repoRoot, root } = await repo()
-  const linked = join(root, "linked"), merged = join(root, "merged")
+  const linked = join(root, "linked"),
+    merged = join(root, "merged")
   await git(repoRoot, "worktree", "add", "--detach", linked, "HEAD")
   await cp(linked, merged, { recursive: true })
   await detachGitDir(merged, join(repoRoot, ".git"))
@@ -88,7 +90,10 @@ test("ensure retries one inconsistent clone, detaches before publication, then r
   let starts = 0
   const base = new RcopyBackend()
   const backend = {
-    kind: base.kind, clonesTree: false, probe: base.probe.bind(base), stop: base.stop.bind(base),
+    kind: base.kind,
+    clonesTree: false,
+    probe: base.probe.bind(base),
+    stop: base.stop.bind(base),
     start: async (...args: Parameters<typeof base.start>) => {
       await base.start(...args)
       starts++
@@ -104,14 +109,19 @@ test("ensure retries one inconsistent clone, detaches before publication, then r
   await cleanupIsolation(h)
   starts = 0
   backend.start = async (...args) => {
-    await base.start(...args); starts++
+    await base.start(...args)
+    starts++
     const admin = (await readFile(join(args[1], ".git"), "utf8")).trim().slice(8)
     await writeFile(join(admin, "index"), "broken")
   }
   // Persistent corruption after the retry is an operational failure, not a
   // capability gap: no other backend would produce a consistent snapshot of it.
   let failure: unknown
-  try { await ensureIsolation({ repoRoot, homeDir, id: "bad", backends: [backend] }) } catch (error) { failure = error }
+  try {
+    await ensureIsolation({ repoRoot, homeDir, id: "bad", backends: [backend] })
+  } catch (error) {
+    failure = error
+  }
   expect(failure).toBeInstanceOf(Error)
   expect(failure instanceof IsolationUnavailableError).toBe(false)
   expect((failure as Error).message).toContain("snapshot")
@@ -166,5 +176,10 @@ test("admin directories outside the common worktrees area are never deleted", as
   expect(await detachGitDir(merged, join(source, ".git"))).toBe("detached")
   // The back-pointer matches, but the admin directory is not a registration under
   // the source's worktrees area: it must survive untouched.
-  expect(await access(admin).then(() => true, () => false)).toBe(true)
+  expect(
+    await access(admin).then(
+      () => true,
+      () => false,
+    ),
+  ).toBe(true)
 })

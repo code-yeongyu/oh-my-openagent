@@ -13,7 +13,12 @@ function claudeAuth(pinned: string, names: readonly string[]): UsageCredentialSo
       "anthropic-subscription": {
         type: "oauth",
         pinned,
-        accounts: names.map((name) => ({ name, access: token(name), refresh: token(`r-${name}`), expires: NOW + 3_600_000 })),
+        accounts: names.map((name) => ({
+          name,
+          access: token(name),
+          refresh: token(`r-${name}`),
+          expires: NOW + 3_600_000,
+        })),
       },
     },
     pool: undefined,
@@ -33,7 +38,9 @@ function record(account: string, usedPercent: number, extra: Partial<SenpiAccoun
   }
 }
 
-function engine(initial: readonly SenpiAccountLimits[]): EngineLimits & { set(next: readonly SenpiAccountLimits[]): void; listeners: number } {
+function engine(
+  initial: readonly SenpiAccountLimits[],
+): EngineLimits & { set(next: readonly SenpiAccountLimits[]): void; listeners: number } {
   let records = initial
   const listeners = new Set<() => void>()
   return {
@@ -55,7 +62,12 @@ function engine(initial: readonly SenpiAccountLimits[]): EngineLimits & { set(ne
 describe("createEngineUsageSource", () => {
   test("#given engine records for two accounts #when the panel reads #then it draws the serving account's record", () => {
     const limits = engine([record("work", 41), record("home", 90)])
-    const source = createEngineUsageSource({ limits, readCredentials: () => claudeAuth("work", ["work", "home"]), now: () => NOW, onChange: () => {} })
+    const source = createEngineUsageSource({
+      limits,
+      readCredentials: () => claudeAuth("work", ["work", "home"]),
+      now: () => NOW,
+      onChange: () => {},
+    })
 
     expect(source.snapshot()).toEqual({
       claude: {
@@ -73,18 +85,31 @@ describe("createEngineUsageSource", () => {
   test("#given a new report from the engine #when it lands #then the snapshot follows and the panel repaints", () => {
     const limits = engine([])
     let repaints = 0
-    const source = createEngineUsageSource({ limits, readCredentials: () => claudeAuth("work", ["work"]), now: () => NOW, onChange: () => (repaints += 1) })
+    const source = createEngineUsageSource({
+      limits,
+      readCredentials: () => claudeAuth("work", ["work"]),
+      now: () => NOW,
+      onChange: () => (repaints += 1),
+    })
     expect(source.snapshot()).toEqual({})
 
     limits.set([record("work", 12, { error: "rate limited" })])
 
-    expect(source.snapshot().claude).toMatchObject({ error: "rate limited", windows: [{ percent: 12 }, { percent: 3 }] })
+    expect(source.snapshot().claude).toMatchObject({
+      error: "rate limited",
+      windows: [{ percent: 12 }, { percent: 3 }],
+    })
     expect(repaints).toBe(2)
   })
 
   test("#given no stored login (an env or ambient account) #when the engine reported one #then that record is drawn", () => {
     const limits = engine([record("env", 55, { reportedAt: "2026-10-19T03:00:00.000Z" }), record("ambient", 20)])
-    const source = createEngineUsageSource({ limits, readCredentials: () => ({ auth: {}, pool: undefined }), now: () => NOW, onChange: () => {} })
+    const source = createEngineUsageSource({
+      limits,
+      readCredentials: () => ({ auth: {}, pool: undefined }),
+      now: () => NOW,
+      onChange: () => {},
+    })
 
     expect(source.snapshot().claude).toMatchObject({ account: "ambient", windows: [{ percent: 20 }, { percent: 3 }] })
     expect(source.snapshot().claude?.accountState).toBeUndefined()
@@ -92,14 +117,24 @@ describe("createEngineUsageSource", () => {
 
   test("#given a stored login but the engine serves through an env token #when only the env record exists #then the env record is drawn", () => {
     const limits = engine([record("env", 55)])
-    const source = createEngineUsageSource({ limits, readCredentials: () => claudeAuth("work", ["work"]), now: () => NOW, onChange: () => {} })
+    const source = createEngineUsageSource({
+      limits,
+      readCredentials: () => claudeAuth("work", ["work"]),
+      now: () => NOW,
+      onChange: () => {},
+    })
 
     expect(source.snapshot().claude?.windows?.[0]?.percent).toBe(55)
   })
 
   test("#given a stored login with its own record and an env record #when the panel reads #then the stored login's record wins", () => {
     const limits = engine([record("env", 55), record("work", 41)])
-    const source = createEngineUsageSource({ limits, readCredentials: () => claudeAuth("work", ["work"]), now: () => NOW, onChange: () => {} })
+    const source = createEngineUsageSource({
+      limits,
+      readCredentials: () => claudeAuth("work", ["work"]),
+      now: () => NOW,
+      onChange: () => {},
+    })
 
     expect(source.snapshot().claude?.windows?.[0]?.percent).toBe(41)
   })
@@ -107,7 +142,12 @@ describe("createEngineUsageSource", () => {
   test("#given the pool rotated #when the turn refreshes #then the new serving account's record is drawn, and stop unsubscribes", () => {
     const limits = engine([record("work", 41), record("home", 7)])
     let pinned = "work"
-    const source = createEngineUsageSource({ limits, readCredentials: () => claudeAuth(pinned, ["work", "home"]), now: () => NOW, onChange: () => {} })
+    const source = createEngineUsageSource({
+      limits,
+      readCredentials: () => claudeAuth(pinned, ["work", "home"]),
+      now: () => NOW,
+      onChange: () => {},
+    })
     pinned = "home"
     source.refresh()
 
@@ -119,7 +159,12 @@ describe("createEngineUsageSource", () => {
   test("#given the pool rotated to an account the engine has not read yet #when the turn refreshes #then the old account's numbers are not shown", () => {
     const limits = engine([record("work", 41)])
     let pinned = "work"
-    const source = createEngineUsageSource({ limits, readCredentials: () => claudeAuth(pinned, ["work", "home"]), now: () => NOW, onChange: () => {} })
+    const source = createEngineUsageSource({
+      limits,
+      readCredentials: () => claudeAuth(pinned, ["work", "home"]),
+      now: () => NOW,
+      onChange: () => {},
+    })
     pinned = "home"
     source.refresh()
 

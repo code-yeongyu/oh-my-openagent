@@ -26,7 +26,9 @@ function readStringField(source: Record<string, unknown>, field: string): string
   return value
 }
 
-async function fetchMetadata(url: string): Promise<{ ok: true; json: Record<string, unknown> } | { ok: false; status: number }> {
+async function fetchMetadata(
+  url: string,
+): Promise<{ ok: true; json: Record<string, unknown> } | { ok: false; status: number }> {
   const response = await fetch(url, { headers: { accept: "application/json" } })
   if (!response.ok) {
     return { ok: false, status: response.status }
@@ -38,7 +40,11 @@ async function fetchMetadata(url: string): Promise<{ ok: true; json: Record<stri
   return { ok: true, json }
 }
 
-function parseMetadataFields(json: Record<string, unknown>, resource: string, expectedIssuer: string): OAuthServerMetadata {
+function parseMetadataFields(
+  json: Record<string, unknown>,
+  resource: string,
+  expectedIssuer: string,
+): OAuthServerMetadata {
   const issuer = readStringField(json, "issuer")
   parseHttpsUrl(issuer, "issuer")
   if (issuer !== expectedIssuer) {
@@ -46,12 +52,9 @@ function parseMetadataFields(json: Record<string, unknown>, resource: string, ex
   }
   const authorizationEndpoint = parseHttpsUrl(
     readStringField(json, "authorization_endpoint"),
-    "authorization_endpoint"
+    "authorization_endpoint",
   ).toString()
-  const tokenEndpoint = parseHttpsUrl(
-    readStringField(json, "token_endpoint"),
-    "token_endpoint"
-  ).toString()
+  const tokenEndpoint = parseHttpsUrl(readStringField(json, "token_endpoint"), "token_endpoint").toString()
   const registrationEndpointValue = json.registration_endpoint
   const registrationEndpoint =
     typeof registrationEndpointValue === "string" && registrationEndpointValue.length > 0
@@ -103,7 +106,10 @@ function parseAuthorizationServers(metadata: Record<string, unknown>): string[] 
   return servers.filter((server): server is string => typeof server === "string" && server.length > 0)
 }
 
-export async function discoverOAuthServerMetadata(resource: string, forceRefresh = false): Promise<OAuthServerMetadata> {
+export async function discoverOAuthServerMetadata(
+  resource: string,
+  forceRefresh = false,
+): Promise<OAuthServerMetadata> {
   const resourceUrl = parseHttpsUrl(resource, "Resource server URL")
   const resourceKey = resourceUrl.toString()
 

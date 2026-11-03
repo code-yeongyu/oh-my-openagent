@@ -27,19 +27,19 @@ type ComputerUseRuntime = {
 
 export type ComputerUseTelemetryObservation =
   | (ComputerUseRuntime & {
-    readonly kind: "activation"
-    readonly active: boolean
-    readonly source: ComputerUseActivationSource
-  })
+      readonly kind: "activation"
+      readonly active: boolean
+      readonly source: ComputerUseActivationSource
+    })
   | (ComputerUseRuntime & {
-    readonly kind: "permission_denied"
-    readonly permission: ComputerUsePermission
-    readonly scope: ComputerUsePermissionScope
-  })
+      readonly kind: "permission_denied"
+      readonly permission: ComputerUsePermission
+      readonly scope: ComputerUsePermissionScope
+    })
   | (ComputerUseRuntime & {
-    readonly kind: "engine_error"
-    readonly code: ComputerUseEngineErrorCode
-  })
+      readonly kind: "engine_error"
+      readonly code: ComputerUseEngineErrorCode
+    })
 
 type ComputerUseTelemetryObserver = (observation: ComputerUseTelemetryObservation) => void
 

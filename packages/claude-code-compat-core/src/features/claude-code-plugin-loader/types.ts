@@ -74,9 +74,7 @@ export interface InstalledPluginEntryV3 {
  * - v3: InstalledPluginEntryV3[] (flat array, current Claude Code format)
  */
 export type InstalledPluginsDatabase =
-  | InstalledPluginsDatabaseV1
-  | InstalledPluginsDatabaseV2
-  | InstalledPluginEntryV3[]
+  InstalledPluginsDatabaseV1 | InstalledPluginsDatabaseV2 | InstalledPluginEntryV3[]
 
 /**
  * Plugin author information
@@ -118,7 +116,14 @@ export type HookEntry =
   | { type: "command"; command?: string; allowedEnvVars?: string[]; pluginRoot?: string }
   | { type: "prompt"; prompt?: string }
   | { type: "agent"; agent?: string }
-  | { type: "http"; url: string; headers?: Record<string, string>; allowedEnvVars?: string[]; timeout?: number; pluginRoot?: string }
+  | {
+      type: "http"
+      url: string
+      headers?: Record<string, string>
+      allowedEnvVars?: string[]
+      timeout?: number
+      pluginRoot?: string
+    }
 
 export interface HookMatcher {
   matcher?: string

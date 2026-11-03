@@ -69,7 +69,9 @@ export function startSenpiRun(input) {
       XDG_CONFIG_HOME: input.sandbox.xdgConfigHome,
       // The omo user-scope config resolves from HOME (~/.omo/omo.jsonc), not XDG - without this the
       // developer's real user categories leak into the lane and shadow the mock-pinned ones.
-      ...(input.sandbox.homeDir === undefined ? {} : { HOME: input.sandbox.homeDir, USERPROFILE: input.sandbox.homeDir }),
+      ...(input.sandbox.homeDir === undefined
+        ? {}
+        : { HOME: input.sandbox.homeDir, USERPROFILE: input.sandbox.homeDir }),
       SENPI_CODING_AGENT_SESSION_DIR: sessionDir,
       OMO_SENPI_QA: "1",
       ...(input.obsDir === undefined ? {} : { OMO_TEAM_E2E_OBS: input.obsDir }),
@@ -85,7 +87,9 @@ export function startSenpiRun(input) {
   let settled = false
   let childClosed = false
   let finishRun = () => undefined
-  const completion = new Promise((resolveRun) => { finishRun = resolveRun })
+  const completion = new Promise((resolveRun) => {
+    finishRun = resolveRun
+  })
   const finish = (status, extraStderr) => {
     if (settled) return
     settled = true
@@ -103,8 +107,12 @@ export function startSenpiRun(input) {
       finish(null, "team e2e run exceeded 120000ms")
     })()
   }, 120_000)
-  child.stdout.on("data", (chunk) => { stdout += chunk })
-  child.stderr.on("data", (chunk) => { stderr += chunk })
+  child.stdout.on("data", (chunk) => {
+    stdout += chunk
+  })
+  child.stderr.on("data", (chunk) => {
+    stderr += chunk
+  })
   child.on("close", (status) => {
     childClosed = true
     if (typeof child.pid === "number") input.onClose?.(child.pid)
@@ -120,10 +128,7 @@ export function startSenpiRun(input) {
 }
 
 function ownsLiveChild(child, childClosed) {
-  return !childClosed
-    && typeof child.pid === "number"
-    && child.exitCode === null
-    && child.signalCode === null
+  return !childClosed && typeof child.pid === "number" && child.exitCode === null && child.signalCode === null
 }
 
 export async function pollUntil(readValue, accepted, timeoutMs) {

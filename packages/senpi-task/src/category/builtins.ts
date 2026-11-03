@@ -56,9 +56,7 @@ export function categoryGateModels(categoryName: string): readonly string[] | un
 }
 
 function categoryChainProviders(categoryName: string): readonly string[] {
-  const chain = Object.hasOwn(CATEGORY_FALLBACK_CHAINS, categoryName)
-    ? CATEGORY_FALLBACK_CHAINS[categoryName]
-    : []
+  const chain = Object.hasOwn(CATEGORY_FALLBACK_CHAINS, categoryName) ? CATEGORY_FALLBACK_CHAINS[categoryName] : []
   return chain.flatMap((rung) => rung.providers)
 }
 
@@ -68,8 +66,10 @@ function categoryChainProviders(categoryName: string): readonly string[] {
 // part of the check: a gateway re-publishing the model (openrouter/anthropic/claude-opus-5.5) serves
 // no builtin rung, because a builtin chain resolves only on the providers it lists (#9146).
 function providerServesModel(provider: string, model: string, availableModels: ReadonlySet<string>): boolean {
-  return availableModels.has(`${provider}/${model}`)
-    || availableModels.has(`${provider}/${transformModelForProvider(provider, model)}`)
+  return (
+    availableModels.has(`${provider}/${model}`) ||
+    availableModels.has(`${provider}/${transformModelForProvider(provider, model)}`)
+  )
 }
 
 // `availableModels` holds live registry models as `provider/id`. A gate opens only when a provider
@@ -83,7 +83,7 @@ export function isCategoryGateSatisfied(
   if (gateModels === undefined || hasExplicitUserConfig) return true
   const chainProviders = categoryChainProviders(categoryName)
   return gateModels.some((gateModel) =>
-    chainProviders.some((provider) => providerServesModel(provider, gateModel, availableModels))
+    chainProviders.some((provider) => providerServesModel(provider, gateModel, availableModels)),
   )
 }
 
@@ -113,9 +113,10 @@ export function isCategoryChainViable(
 
 export const CATEGORY_PROMPT_APPEND_RESOLVERS: Readonly<Record<string, (model: string | undefined) => string>> =
   Object.fromEntries(
-    BUILTIN_CATEGORY_DEFAULTS
-      .filter(hasPromptAppendResolver)
-      .map((definition) => [definition.name, definition.resolvePromptAppend]),
+    BUILTIN_CATEGORY_DEFAULTS.filter(hasPromptAppendResolver).map((definition) => [
+      definition.name,
+      definition.resolvePromptAppend,
+    ]),
   )
 
 function hasPromptAppendResolver(

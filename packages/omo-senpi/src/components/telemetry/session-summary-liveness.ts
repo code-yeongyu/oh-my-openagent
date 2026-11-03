@@ -10,7 +10,10 @@ import { readProcessStartTime } from "./session-summary-process-start"
  * counts as alive: wrongly keeping a dead owner's files costs a delay, wrongly adopting a live owner's window
  * costs a duplicate.
  */
-export function processIsAlive(pid: number, kill: (pid: number) => unknown = (target) => process.kill(target, 0)): boolean {
+export function processIsAlive(
+  pid: number,
+  kill: (pid: number) => unknown = (target) => process.kill(target, 0),
+): boolean {
   try {
     kill(pid)
     return true
@@ -34,9 +37,11 @@ export function processIsAlive(pid: number, kill: (pid: number) => unknown = (ta
  * frees it at once), and a window older than the 14-day limit is dropped and counted in `dropped_events`.
  * Only recovery asks, so this ships in the recovery sidecar.
  */
-export function createOwnerLiveness(input: OwnerRegistryInput & {
-  readonly isPidAlive?: (pid: number) => boolean
-}): (owner: ProcessOwner) => boolean {
+export function createOwnerLiveness(
+  input: OwnerRegistryInput & {
+    readonly isPidAlive?: (pid: number) => boolean
+  },
+): (owner: ProcessOwner) => boolean {
   const isPidAlive = input.isPidAlive ?? processIsAlive
   const startTimeOf = input.processStartTime ?? readProcessStartTime
   // Removes the entry only while it is still the one judged: a process that took the pid meanwhile keeps its own.
@@ -81,7 +86,11 @@ function parseEntry(text: string | undefined): object | undefined {
  * Moves the entry aside (an atomic hand-over: a rename takes whichever file is there now), deletes it when it is
  * the one judged, and otherwise links it back unless an even newer entry has been written in the meantime.
  */
-function removeIfUnchanged(path: string, judged: string, reader: { readonly pid: number; readonly bootId: string }): void {
+function removeIfUnchanged(
+  path: string,
+  judged: string,
+  reader: { readonly pid: number; readonly bootId: string },
+): void {
   const aside = `${path}.forget-${reader.pid}-${reader.bootId}`
   if (!renameIfPresent(path, aside)) return
   if (readText(aside) !== judged) {

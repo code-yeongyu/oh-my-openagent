@@ -16,7 +16,6 @@ export const POLLING_INTERVAL_MS = 3000
 export const TASK_CLEANUP_DELAY_MS = 10 * 60 * 1000
 export const TMUX_CALLBACK_DELAY_MS = 200
 
-
 export type OpencodeClient = PluginInput["client"]
 
 export interface MessagePartInfo {
@@ -35,7 +34,6 @@ export interface BackgroundEvent {
   type: string
   properties?: EventProperties
 }
-
 
 export interface QueueItem {
   attemptID: string

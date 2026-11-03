@@ -114,7 +114,9 @@ describe("OmoMemorySettingsSchema defaults", () => {
     // then
     expect(result.success).toBe(false)
     if (result.success) throw new Error("Expected memory settings parsing to fail")
-    expect(result.error.issues.map((issue) => issue.path.join(".")).join(",")).toContain("reflection.trigger.step_count")
+    expect(result.error.issues.map((issue) => issue.path.join(".")).join(",")).toContain(
+      "reflection.trigger.step_count",
+    )
   })
 
   test("#given a non-boolean compaction trigger #when parsed #then validation fails at the trigger path", () => {
@@ -127,7 +129,9 @@ describe("OmoMemorySettingsSchema defaults", () => {
     // then
     expect(result.success).toBe(false)
     if (result.success) throw new Error("Expected memory settings parsing to fail")
-    expect(result.error.issues.map((issue) => issue.path.join(".")).join(",")).toContain("reflection.trigger.on_compaction")
+    expect(result.error.issues.map((issue) => issue.path.join(".")).join(",")).toContain(
+      "reflection.trigger.on_compaction",
+    )
   })
 
   test("#given write_notice defaults #when parsing empty #then the tool-result notice is enabled", () => {
@@ -304,9 +308,7 @@ describe("OmoMemorySettingsSchema defaults", () => {
     for (const recall of removed) {
       expect(OmoMemorySettingsSchema.safeParse({ recall }).success).toBe(false)
       expect(OmoMemorySettingsLayerSchema.safeParse({ recall }).success).toBe(false)
-      expect(
-        OmoMemorySettingsLayerSchema.safeParse({ agents: { "backend-lead": { recall } } }).success,
-      ).toBe(false)
+      expect(OmoMemorySettingsLayerSchema.safeParse({ agents: { "backend-lead": { recall } } }).success).toBe(false)
     }
   })
 

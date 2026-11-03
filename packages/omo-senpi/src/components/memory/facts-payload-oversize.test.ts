@@ -60,11 +60,10 @@ function warnCollector() {
 async function queueFileNames(identity: MemoryIdentity): Promise<string[]> {
   const layout = factsQueuePaths(identity.paths)
   return (await readdir(layout.queueDir).catch(() => []))
-    .filter((name) =>
-      name.endsWith(".json") &&
-      name !== "consumed.json" &&
-      name !== "failures.json" &&
-      name !== "claims.json")
+    .filter(
+      (name) =>
+        name.endsWith(".json") && name !== "consumed.json" && name !== "failures.json" && name !== "claims.json",
+    )
     .sort()
 }
 
@@ -75,8 +74,9 @@ function launch(
   queue: FactsQueue,
   overrides: Partial<FactsExtractorRunnerOptions> = {},
 ) {
-  return new FactsExtractorRunner(runnerOptions(root, identity, queue, "fact", { now: () => NOW, ...overrides }))
-    .launchPending()
+  return new FactsExtractorRunner(
+    runnerOptions(root, identity, queue, "fact", { now: () => NOW, ...overrides }),
+  ).launchPending()
 }
 
 describe("facts oversize payload classification", () => {
@@ -91,9 +91,7 @@ describe("facts oversize payload classification", () => {
 
     // then: the healthy conversation launched, the oversize one is parked in the REAL store.
     expect(result.status).toBe("committed")
-    const ledger = JSON.parse(
-      await readFile(join(await onlyRunDir(identity), "ledger.json"), "utf8"),
-    ) as FactsRunLedger
+    const ledger = JSON.parse(await readFile(join(await onlyRunDir(identity), "ledger.json"), "utf8")) as FactsRunLedger
     expect(ledger.queued.map((key) => key.conversationId)).toEqual(["session-1"])
     const state = await new FactsFailureStore({ identityPaths: identity.paths }).readFailures()
     expect(state.entries).toHaveLength(1)
@@ -136,7 +134,10 @@ describe("facts oversize payload classification", () => {
     const latest = JSON.parse(
       await readFile(join(identity.paths.facts, "runs", newRuns[0] ?? "missing", "ledger.json"), "utf8"),
     ) as FactsRunLedger
-    expect(latest.queued.map((key) => `${key.conversationId}/${key.end_message_id}`).sort()).toEqual(["session-2/m3", "session-3/m4"])
+    expect(latest.queued.map((key) => `${key.conversationId}/${key.end_message_id}`).sort()).toEqual([
+      "session-2/m3",
+      "session-3/m4",
+    ])
     expect(await queue.listPending()).toEqual([])
     expect(await readdir(factsQueuePaths(identity.paths).parkedDir)).toHaveLength(1)
   }, 30_000)

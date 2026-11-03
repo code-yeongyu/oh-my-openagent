@@ -17,7 +17,10 @@ import { SENPI_ASTRA_ULTRAWORK_DIRECTIVE, SENPI_ULTRAWORK_DIRECTIVE } from "./ge
 // "ulwfoo", "ulw_helper", "mass-ulw-refactor", "ulw-plan.md" and ".omo/ulw/" do not (#9738). Quoted,
 // injected, relayed and negated regions are blanked before this pattern runs.
 const ULTRAWORK_KEYWORD = /\b(?:ultrawork|ulw)\b/i
-const ULTRAWORK_CURRENT_PROMPT_PATTERN = new RegExp(String.raw`${NOT_AFTER_IDENTIFIER}\b(?:ultrawork|ulw)\b${NOT_INTO_IDENTIFIER}${NOT_BEFORE_PATH}`, "i")
+const ULTRAWORK_CURRENT_PROMPT_PATTERN = new RegExp(
+  String.raw`${NOT_AFTER_IDENTIFIER}\b(?:ultrawork|ulw)\b${NOT_INTO_IDENTIFIER}${NOT_BEFORE_PATH}`,
+  "i",
+)
 const ULTRAWORK_DISABLED_FLAG = "omo-senpi-ultrawork-disabled"
 const ULTRAWORK_MODE_OPEN_TAG = "<ultrawork-mode>"
 const ULTRAWORK_MODE_CLOSE_TAG = "</ultrawork-mode>"
@@ -120,7 +123,12 @@ function isCurrentArmingSlot(value: unknown): value is SharedArmingSlot {
   // a 32-bit FNV-1a revision demonstrably allowed) can never reuse stale arming.
   // A bare ledger from a pre-slot bundle has no directive to match, so it is
   // discarded here exactly like a mismatched one.
-  return slot.directive === SENPI_ULTRAWORK_DIRECTIVE && slot.astraDirective === SENPI_ASTRA_ULTRAWORK_DIRECTIVE && typeof slot.arming === "object" && slot.arming !== null
+  return (
+    slot.directive === SENPI_ULTRAWORK_DIRECTIVE &&
+    slot.astraDirective === SENPI_ASTRA_ULTRAWORK_DIRECTIVE &&
+    typeof slot.arming === "object" &&
+    slot.arming !== null
+  )
 }
 
 export function sharedSessionArming(): SessionArming {
@@ -130,7 +138,11 @@ export function sharedSessionArming(): SessionArming {
     return existing.arming
   }
   const created = createSessionArming()
-  const slot: SharedArmingSlot = { directive: SENPI_ULTRAWORK_DIRECTIVE, astraDirective: SENPI_ASTRA_ULTRAWORK_DIRECTIVE, arming: created }
+  const slot: SharedArmingSlot = {
+    directive: SENPI_ULTRAWORK_DIRECTIVE,
+    astraDirective: SENPI_ASTRA_ULTRAWORK_DIRECTIVE,
+    arming: created,
+  }
   registry[ARMING_LEDGER_KEY] = slot
   return created
 }
@@ -146,7 +158,13 @@ export function createUltraworkComponent(arming: SessionArming = sharedSessionAr
       // receiving boundary so a model switch or fallback cannot deliver its old policy.
       pi.on("context", (payload: unknown, eventCtx: unknown) => {
         if (ctx.config.getFlag(ULTRAWORK_DISABLED_FLAG) === true) return
-        if (typeof payload !== "object" || payload === null || !("messages" in payload) || !Array.isArray(payload.messages)) return
+        if (
+          typeof payload !== "object" ||
+          payload === null ||
+          !("messages" in payload) ||
+          !Array.isArray(payload.messages)
+        )
+          return
         const directive = directiveForModel(modelIdFromContext(eventCtx))
         let selected = false
         const messages = payload.messages.map((message: unknown) => {
@@ -157,10 +175,20 @@ export function createUltraworkComponent(arming: SessionArming = sharedSessionAr
             return content ?? text
           }
           if (typeof message.content === "string") return transformContextText({ ...message }, selectText)
-          const content = Array.isArray(message.content) ? message.content.map((block: unknown) => {
-              if (typeof block !== "object" || block === null || !("type" in block) || block.type !== "text" || !("text" in block) || typeof block.text !== "string") return block
-              return { ...block, text: selectText(block.text) }
-            }) : message.content
+          const content = Array.isArray(message.content)
+            ? message.content.map((block: unknown) => {
+                if (
+                  typeof block !== "object" ||
+                  block === null ||
+                  !("type" in block) ||
+                  block.type !== "text" ||
+                  !("text" in block) ||
+                  typeof block.text !== "string"
+                )
+                  return block
+                return { ...block, text: selectText(block.text) }
+              })
+            : message.content
           return { ...message, content }
         })
         if (!selected) return
@@ -250,9 +278,17 @@ export function classifyUltraworkInput(
   if (input.text.startsWith(SKILL_COMMAND_PREFIX)) {
     const spaceIndex = input.text.indexOf(" ")
     const skillName =
-      spaceIndex === -1 ? input.text.slice(SKILL_COMMAND_PREFIX.length) : input.text.slice(SKILL_COMMAND_PREFIX.length, spaceIndex)
+      spaceIndex === -1
+        ? input.text.slice(SKILL_COMMAND_PREFIX.length)
+        : input.text.slice(SKILL_COMMAND_PREFIX.length, spaceIndex)
     if (skillName === ULTRAWORK_SKILL_NAME) {
-      return { ...base, effective: false, stage: "none", route: "skill_expansion", suppressionReason: "skill_expansion" }
+      return {
+        ...base,
+        effective: false,
+        stage: "none",
+        route: "skill_expansion",
+        suppressionReason: "skill_expansion",
+      }
     }
 
     const argsStart = spaceIndex === -1 ? input.text.length : spaceIndex + 1

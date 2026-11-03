@@ -15,7 +15,8 @@ const LIST_MARKER = /^([-*+]|\d{1,9}[.)])([ \t]+|$)/
 export type ScannedLine = { readonly text: string; readonly fenced: boolean; readonly indentedCode: boolean }
 
 /** The column after `whitespace` written from column `from`: a space moves one column, a tab to the next multiple of 4. */
-const columnsAfter = (from: number, whitespace: string): number => [...whitespace].reduce((column, char) => (char === "\t" ? column + 4 - (column % 4) : column + 1), from)
+const columnsAfter = (from: number, whitespace: string): number =>
+  [...whitespace].reduce((column, char) => (char === "\t" ? column + 4 - (column % 4) : column + 1), from)
 
 /** Leading whitespace width, a tab moving to the next multiple of four columns. */
 const indentOf = (line: string): number => columnsAfter(0, /^[ \t]*/.exec(line)?.[0] ?? "")
@@ -41,9 +42,13 @@ export function scanFences(text: string): ScannedLine[] {
         items.push(start + (gap >= 1 && gap <= 4 ? gap : 1))
       }
       const candidate = listMarker === null && indent - item <= 3 ? OPEN.exec(stripped)?.[1] : undefined
-      const marker = candidate !== undefined && !(candidate[0] === "`" && stripped.slice(candidate.length).includes("`")) ? candidate : undefined
+      const marker =
+        candidate !== undefined && !(candidate[0] === "`" && stripped.slice(candidate.length).includes("`"))
+          ? candidate
+          : undefined
       if (marker !== undefined) open = { marker, base: item }
-      const indentedCode: boolean = marker === undefined && listMarker === null && stripped !== "" && codeMayStart && indent - item >= 4
+      const indentedCode: boolean =
+        marker === undefined && listMarker === null && stripped !== "" && codeMayStart && indent - item >= 4
       lines.push({ text: line, fenced: marker !== undefined, indentedCode })
       codeMayStart = stripped === "" || indentedCode
     } else {
@@ -60,7 +65,8 @@ export function scanFences(text: string): ScannedLine[] {
 }
 
 const isBlank = (line: ScannedLine): boolean => !line.fenced && line.text.trim() === ""
-const isColumn0ListItem = (line: ScannedLine): boolean => !line.fenced && indentOf(line.text) === 0 && LIST_MARKER.test(line.text)
+const isColumn0ListItem = (line: ScannedLine): boolean =>
+  !line.fenced && indentOf(line.text) === 0 && LIST_MARKER.test(line.text)
 
 /**
  * The paragraph entries of `text`, read from ONE scan of the whole text so a fence keeps its list context (#11253 review
@@ -93,9 +99,12 @@ export function entriesOf(text: string): ScannedLine[][] {
 /** Already-scanned entry lines with the link added, by the rule linkEntry documents. */
 export function linkScanned(lines: readonly ScannedLine[], pr: number, pullUrl: string): string {
   const prose = (line: ScannedLine): boolean => !line.fenced && !line.indentedCode
-  if (lines.some((line) => prose(line) && line.text.includes(`${pullUrl}/${pr})`))) return lines.map((line) => line.text).join("\n")
+  if (lines.some((line) => prose(line) && line.text.includes(`${pullUrl}/${pr})`)))
+    return lines.map((line) => line.text).join("\n")
   const last = lines.findLastIndex((line) => prose(line) && line.text.trim() !== "")
-  return lines.map((line, index) => (index === last ? `${line.text.trimEnd()} ([#${pr}](${pullUrl}/${pr}))` : line.text)).join("\n")
+  return lines
+    .map((line, index) => (index === last ? `${line.text.trimEnd()} ([#${pr}](${pullUrl}/${pr}))` : line.text))
+    .join("\n")
 }
 
 /**

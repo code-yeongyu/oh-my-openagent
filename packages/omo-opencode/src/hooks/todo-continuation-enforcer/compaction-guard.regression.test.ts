@@ -1,11 +1,7 @@
 import { describe, expect, it as test } from "bun:test"
 
 import { COMPACTION_GUARD_MS } from "./constants"
-import {
-  acknowledgeCompactionGuard,
-  armCompactionGuard,
-  isCompactionGuardActive,
-} from "./compaction-guard"
+import { acknowledgeCompactionGuard, armCompactionGuard, isCompactionGuardActive } from "./compaction-guard"
 import type { SessionState } from "./types"
 
 function createSessionState(): SessionState {

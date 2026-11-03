@@ -46,7 +46,9 @@ describe("subscription provider rename migration", () => {
 
   it("#given a rewrite #when diagnostics are read #then each names the path, the old id and the new id", () => {
     const { diagnostics } = transformSubscriptionProviderRename({ default_model: "openai-codex/gpt-6-astra" })
-    expect(diagnostics).toEqual(["$.default_model: openai-codex/gpt-6-astra renamed to chatgpt-subscription/gpt-6-astra"])
+    expect(diagnostics).toEqual([
+      "$.default_model: openai-codex/gpt-6-astra renamed to chatgpt-subscription/gpt-6-astra",
+    ])
   })
 
   it("#given the shipped id #when read #then it is the stable recorded migration id", () => {

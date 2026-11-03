@@ -31,11 +31,7 @@ export type ModelCatalogSpawnOptions = {
 
 export type ModelCatalogProbeOptions = {
   readonly timeoutMs?: number
-  readonly spawnProcess?: (
-    command: string,
-    args: readonly string[],
-    options: ModelCatalogSpawnOptions,
-  ) => ChildProcess
+  readonly spawnProcess?: (command: string, args: readonly string[], options: ModelCatalogSpawnOptions) => ChildProcess
   readonly terminateChild?: (child: ChildProcess) => Promise<void>
 }
 
@@ -64,7 +60,10 @@ function describeError(error: unknown): string {
 export function parseModelCatalog(output: string): ReadonlySet<string> {
   const models = new Set<string>()
   for (const rawLine of output.replace(ANSI_ESCAPE, "").split(/\r?\n/)) {
-    const columns = rawLine.trim().split(/\s+/).filter((column) => column.length > 0)
+    const columns = rawLine
+      .trim()
+      .split(/\s+/)
+      .filter((column) => column.length > 0)
     const provider = columns[0]
     const model = columns[1]
     if (provider === undefined || provider === "provider") continue
@@ -89,9 +88,8 @@ export function probeModelCatalog(
   options: ModelCatalogProbeOptions = {},
 ): Promise<ModelCatalogProbeResult> {
   return new Promise((resolve) => {
-    const spawnProcess = options.spawnProcess ?? ((command, args, spawnOptions) => (
-      spawn(command, [...args], spawnOptions)
-    ))
+    const spawnProcess =
+      options.spawnProcess ?? ((command, args, spawnOptions) => spawn(command, [...args], spawnOptions))
     const terminateChild = options.terminateChild ?? terminateRpcChild
     const captureDir = mkdtempSync(join(tmpdir(), "omo-model-catalog-"))
     const capturePath = join(captureDir, "stdout")
@@ -165,11 +163,12 @@ export function probeModelCatalog(
       timingOut = true
       void terminateChild(child).then(
         () => finish({ code: null, stderr, timedOut: true }),
-        (error: unknown) => finish({
-          code: null,
-          stderr: `${stderr}\nfailed to terminate model catalog probe: ${describeError(error)}`,
-          timedOut: true,
-        }),
+        (error: unknown) =>
+          finish({
+            code: null,
+            stderr: `${stderr}\nfailed to terminate model catalog probe: ${describeError(error)}`,
+            timedOut: true,
+          }),
       )
     }, options.timeoutMs ?? PROBE_TIMEOUT_MS)
     timeout.unref()

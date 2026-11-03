@@ -112,9 +112,7 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
       printError(`Failed: ${pluginResult.error}`)
       return 1
     }
-    printSuccess(
-      `Plugin ${isUpdate ? "verified" : "added"} ${SYMBOLS.arrow} ${color.dim(pluginResult.configPath)}`,
-    )
+    printSuccess(`Plugin ${isUpdate ? "verified" : "added"} ${SYMBOLS.arrow} ${color.dim(pluginResult.configPath)}`)
     try {
       ensureTuiPluginEntry()
     } catch (error) {
@@ -131,10 +129,14 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
         printInfo("Refreshed the OpenCode plugin cache; the next OpenCode start loads the installed version.")
       }
       if (deferred.length > 0) {
-        printInfo("OpenCode is running from its plugin cache; it refreshes when the last OpenCode window closes. Restart OpenCode to load the installed version.")
+        printInfo(
+          "OpenCode is running from its plugin cache; it refreshes when the last OpenCode window closes. Restart OpenCode to load the installed version.",
+        )
       }
       for (const { dir, message } of failed) {
-        printWarning(`Could not refresh the OpenCode plugin cache at ${dir} (${message}). Close OpenCode and delete that directory, or OpenCode keeps loading the previous version.`)
+        printWarning(
+          `Could not refresh the OpenCode plugin cache at ${dir} (${message}). Close OpenCode and delete that directory, or OpenCode keeps loading the previous version.`,
+        )
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -164,7 +166,9 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     printWarning(getNoModelProvidersWarning())
   }
 
-  console.log(`${SYMBOLS.star} ${color.bold(color.green(isUpdate ? "Configuration updated!" : "Installation complete!"))}`)
+  console.log(
+    `${SYMBOLS.star} ${color.bold(color.green(isUpdate ? "Configuration updated!" : "Installation complete!"))}`,
+  )
   if (hasOpenCode) {
     console.log(`  Run ${color.cyan("opencode")} to start!`)
   }
@@ -206,7 +210,9 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     printInfo("Installing the OmO Native development adapter...")
     try {
       const nativeDevResult = await runNativeDevInstaller()
-      printSuccess(`OmO Native development adapter installed ${SYMBOLS.arrow} ${color.dim(nativeDevResult.settingsPath)}`)
+      printSuccess(
+        `OmO Native development adapter installed ${SYMBOLS.arrow} ${color.dim(nativeDevResult.settingsPath)}`,
+      )
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       printError(`OmO Native development adapter install failed: ${message}`)
@@ -257,7 +263,9 @@ async function maybePromptForGitHubStars(platform: InstallPlatform): Promise<voi
 
   const readline = createInterface({ input: process.stdin, output: process.stdout })
   try {
-    const answer = await readline.question(`${SYMBOLS.star} ${color.yellow("Star the repos on GitHub?")} ${color.dim("[y/N]")} `)
+    const answer = await readline.question(
+      `${SYMBOLS.star} ${color.yellow("Star the repos on GitHub?")} ${color.dim("[y/N]")} `,
+    )
     if (!isYes(answer)) return
   } finally {
     readline.close()

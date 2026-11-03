@@ -98,9 +98,7 @@ export function reconcileStaleWorks(
       return NO_CHANGES
     }
 
-    const nextWorks = Object.fromEntries(
-      works.map((work) => [work.work_id, demotedWorks.get(work.work_id) ?? work]),
-    )
+    const nextWorks = Object.fromEntries(works.map((work) => [work.work_id, demotedWorks.get(work.work_id) ?? work]))
     // A legacy mirror-only state carries its single work implicitly; persisting a demotion
     // materializes it exactly like selectActiveWork/addBoulderWork already do.
     const activeWorkId = state.active_work_id ?? (works.length === 1 ? works[0]?.work_id : undefined)
@@ -173,8 +171,11 @@ export function findNewestSessionTranscriptMs(input: {
 
   let entries: { name: string; isDirectory: boolean; isFile: boolean }[]
   try {
-    entries = readdirSync(input.sessionsDirectory, { withFileTypes: true })
-      .map((entry) => ({ name: entry.name, isDirectory: entry.isDirectory(), isFile: entry.isFile() }))
+    entries = readdirSync(input.sessionsDirectory, { withFileTypes: true }).map((entry) => ({
+      name: entry.name,
+      isDirectory: entry.isDirectory(),
+      isFile: entry.isFile(),
+    }))
   } catch {
     return null
   }
@@ -217,8 +218,8 @@ function isTranscriptOf(fileName: string, sessionIds: readonly string[]): boolea
 
   return sessionIds.some(
     (sessionId) =>
-      fileName === `${sessionId}${SESSION_TRANSCRIPT_SUFFIX}`
-      || fileName.endsWith(`_${sessionId}${SESSION_TRANSCRIPT_SUFFIX}`),
+      fileName === `${sessionId}${SESSION_TRANSCRIPT_SUFFIX}` ||
+      fileName.endsWith(`_${sessionId}${SESSION_TRANSCRIPT_SUFFIX}`),
   )
 }
 

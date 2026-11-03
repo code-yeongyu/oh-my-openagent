@@ -53,9 +53,7 @@ export interface ReflectionSpawnArgs {
   readonly paths: ReflectionSpawnPaths
 }
 
-export type ReflectionSandbox = (
-  spawnArgs: ReflectionSpawnArgs,
-) => ReflectionSpawnArgs | Promise<ReflectionSpawnArgs>
+export type ReflectionSandbox = (spawnArgs: ReflectionSpawnArgs) => ReflectionSpawnArgs | Promise<ReflectionSpawnArgs>
 
 export interface ReflectionChildResult {
   readonly code: number | null

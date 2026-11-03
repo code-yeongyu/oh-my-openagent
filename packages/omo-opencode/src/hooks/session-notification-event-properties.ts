@@ -1,8 +1,6 @@
 import { isRecord } from "@oh-my-opencode/utils"
 type EventProperties = Record<string, unknown> | undefined
 
-
-
 function getEventInfo(properties: EventProperties): Record<string, unknown> | undefined {
   const info = properties?.info
   return isRecord(info) ? info : undefined

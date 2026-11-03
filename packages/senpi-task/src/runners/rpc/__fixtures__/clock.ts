@@ -9,14 +9,16 @@ export function fakeClock() {
     timers.set(id, { at: now + ms, interval, callback })
     return id
   }
-  const timeout = spyOn(globalThis, "setTimeout").mockImplementation(
-    ((callback: () => void, ms = 0) => install(callback, ms)) as typeof setTimeout,
-  )
-  const interval = spyOn(globalThis, "setInterval").mockImplementation(
-    ((callback: () => void, ms = 0) => install(callback, ms, ms)) as typeof setInterval,
-  )
-  const clearTimeoutSpy = spyOn(globalThis, "clearTimeout").mockImplementation((id) => { timers.delete(id as object) })
-  const clearIntervalSpy = spyOn(globalThis, "clearInterval").mockImplementation((id) => { timers.delete(id as object) })
+  const timeout = spyOn(globalThis, "setTimeout").mockImplementation(((callback: () => void, ms = 0) =>
+    install(callback, ms)) as typeof setTimeout)
+  const interval = spyOn(globalThis, "setInterval").mockImplementation(((callback: () => void, ms = 0) =>
+    install(callback, ms, ms)) as typeof setInterval)
+  const clearTimeoutSpy = spyOn(globalThis, "clearTimeout").mockImplementation((id) => {
+    timers.delete(id as object)
+  })
+  const clearIntervalSpy = spyOn(globalThis, "clearInterval").mockImplementation((id) => {
+    timers.delete(id as object)
+  })
   const date = spyOn(Date, "now").mockImplementation(() => now)
   return {
     now: () => now,

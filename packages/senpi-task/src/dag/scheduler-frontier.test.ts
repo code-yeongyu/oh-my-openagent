@@ -98,11 +98,14 @@ class FrontierFakeManager implements TaskManager {
   readonly attempts: string[] = []
   readonly denials: string[] = []
   readonly #options: FakeOptions
-  readonly #tasks = new Map<string, {
-    record: TaskRecord
-    readonly completion: Promise<TaskRecord>
-    readonly resolveCompletion: (record: TaskRecord) => void
-  }>()
+  readonly #tasks = new Map<
+    string,
+    {
+      record: TaskRecord
+      readonly completion: Promise<TaskRecord>
+      readonly resolveCompletion: (record: TaskRecord) => void
+    }
+  >()
   readonly #startedSignals = new Map<string, ReturnType<typeof deferred<void>>>()
   readonly #deniedSignals = new Map<string, ReturnType<typeof deferred<void>>>()
   // Session-scoped residency wake, mirroring the real manager: armed per parent session, fired
@@ -172,7 +175,13 @@ class FrontierFakeManager implements TaskManager {
     this.attempts.push(nodeId)
     const existing = this.recordOf(nodeId)
     if (existing !== undefined) {
-      return { kind: "started", reused: true, task_id: existing.task_id, status: existing.status, name: existing.name ?? existing.task_id }
+      return {
+        kind: "started",
+        reused: true,
+        task_id: existing.task_id,
+        status: existing.status,
+        name: existing.name ?? existing.task_id,
+      }
     }
     const limit = this.#options.residencyLimit ?? Number.POSITIVE_INFINITY
     const residents = [...this.#tasks.values()]
@@ -186,7 +195,11 @@ class FrontierFakeManager implements TaskManager {
         reason: "resident child cap reached",
         cause: "residents",
         max_children: limit,
-        residents: residents.map((record) => ({ task_id: record.task_id, name: record.name ?? record.task_id, status: record.status })),
+        residents: residents.map((record) => ({
+          task_id: record.task_id,
+          name: record.name ?? record.task_id,
+          status: record.status,
+        })),
       }
     }
     this.#taskCounter += 1
@@ -228,21 +241,43 @@ class FrontierFakeManager implements TaskManager {
     return entry.completion
   }
 
-  start(): Promise<never> { throw new Error("not implemented") }
-  continueTask(): Promise<never> { throw new Error("not implemented") }
-  sendToTask(): Promise<never> { throw new Error("not implemented") }
-  interruptTask(): Promise<never> { throw new Error("not implemented") }
-  cancelTask(): Promise<never> { throw new Error("not implemented") }
-  list(): readonly [] { return [] }
+  start(): Promise<never> {
+    throw new Error("not implemented")
+  }
+  continueTask(): Promise<never> {
+    throw new Error("not implemented")
+  }
+  sendToTask(): Promise<never> {
+    throw new Error("not implemented")
+  }
+  interruptTask(): Promise<never> {
+    throw new Error("not implemented")
+  }
+  cancelTask(): Promise<never> {
+    throw new Error("not implemented")
+  }
+  list(): readonly [] {
+    return []
+  }
   get(taskId: string): TaskRecord | undefined {
     return this.#tasks.get(taskId)?.record
   }
   forget(_taskId: string, _options: Parameters<TaskManager["forget"]>[1]): void {}
-  getResidentHandle(): undefined { return undefined }
-  subscribeChild(): () => void { return () => undefined }
-  residentTaskIds(): readonly string[] { return [] }
-  promoteToBackground(): boolean { return false }
-  wasBackground(): boolean { return true }
+  getResidentHandle(): undefined {
+    return undefined
+  }
+  subscribeChild(): () => void {
+    return () => undefined
+  }
+  residentTaskIds(): readonly string[] {
+    return []
+  }
+  promoteToBackground(): boolean {
+    return false
+  }
+  wasBackground(): boolean {
+    return true
+  }
 }
 
 function frontierFixture(
@@ -283,11 +318,7 @@ function whenNodeTransition(
 }
 
 // Event-driven settle observation: resolves once the node reaches the state, never by sleeping.
-function whenNodeState(
-  scheduler: ReturnType<typeof createDagScheduler>,
-  nodeId: string,
-  state: string,
-): Promise<void> {
+function whenNodeState(scheduler: ReturnType<typeof createDagScheduler>, nodeId: string, state: string): Promise<void> {
   const current = scheduler.snapshot().nodes.find((entry) => String(entry.id) === nodeId)
   if (current?.state === state) return Promise.resolve()
   return new Promise<void>((resolve) => {
@@ -319,8 +350,7 @@ describe("DAG scheduler dependency-frontier admission", () => {
     expect(manager.recordOf("lane-c")?.status).toBe("running")
 
     // and - wave events stay informational: wave 1 admitted lane-b even though wave 0 is open.
-    const startedWaveOne = events().find((event) =>
-      event.type === "dag.wave.started" && event.waveIndex === 1)
+    const startedWaveOne = events().find((event) => event.type === "dag.wave.started" && event.waveIndex === 1)
     expect(startedWaveOne).toMatchObject({ nodeIds: ["lane-b"] })
 
     // cleanup - the run settles only once every node is terminal.
@@ -336,8 +366,7 @@ describe("DAG scheduler dependency-frontier admission", () => {
 
     // and - the wave 1 grouping was reported BEFORE wave 0 finished grouping: interleaving is
     // expected under frontier admission, and both indexes still complete exactly once.
-    const completedWaveZero = events().find((event) =>
-      event.type === "dag.wave.completed" && event.waveIndex === 0)
+    const completedWaveZero = events().find((event) => event.type === "dag.wave.completed" && event.waveIndex === 0)
     expect(startedWaveOne?.seq).toBeLessThan(completedWaveZero?.seq ?? Number.POSITIVE_INFINITY)
   })
 
@@ -399,20 +428,30 @@ describe("DAG scheduler dependency-frontier admission", () => {
     // given - ONE task manager (one parent session) with cap 2; run A saturates it with two leaves.
     const manager = new FrontierFakeManager({ residencyLimit: 2 })
     const store = createDagFileStore({ project_dir: tempProject() })
-    const runA = frontierFixture(definition([node("a1"), node("a2")]), manager, { runId: "run-frontier-a" as DagRunId, store })
+    const runA = frontierFixture(definition([node("a1"), node("a2")]), manager, {
+      runId: "run-frontier-a" as DagRunId,
+      store,
+    })
     const runB = frontierFixture(definition([node("b1")]), manager, { runId: "run-frontier-b" as DagRunId, store })
     const runningA = runA.scheduler.run()
     await Promise.all([manager.whenStarted("a1"), manager.whenStarted("a2")])
 
     // when - run B starts with nothing of its own attached; the only slot holders belong to run A.
-    const b1Outcome = whenNodeTransition(runB.scheduler, "b1", (event) =>
-      event.to === "failed" || event.reason.kind === "residency_queued")
+    const b1Outcome = whenNodeTransition(
+      runB.scheduler,
+      "b1",
+      (event) => event.to === "failed" || event.reason.kind === "residency_queued",
+    )
     const runningB = runB.scheduler.run()
     await manager.whenDenied("b1")
     const outcome = await b1Outcome
 
     // then - b1 is parked as scheduled, not failed: run-local emptiness is not session emptiness.
-    expect(outcome).toMatchObject({ from: "scheduled", to: "scheduled", reason: { kind: "residency_queued", residents: 2, heldByOtherOwners: 2 } })
+    expect(outcome).toMatchObject({
+      from: "scheduled",
+      to: "scheduled",
+      reason: { kind: "residency_queued", residents: 2, heldByOtherOwners: 2 },
+    })
     const parked = runB.scheduler.snapshot().nodes.find((entry) => String(entry.id) === "b1")
     expect(parked?.state).toBe("scheduled")
     expect(parked?.error).toBeUndefined()
@@ -453,15 +492,18 @@ describe("DAG scheduler dependency-frontier admission", () => {
     // then - waves 1 and 2 complete while wave 0 stays open; wave 0 completes only when slow
     // settles, and each index reports exactly one completion.
     const completions = events()
-      .filter((event): event is Extract<DagRunEvent, { type: "dag.wave.completed" }> => event.type === "dag.wave.completed")
+      .filter(
+        (event): event is Extract<DagRunEvent, { type: "dag.wave.completed" }> => event.type === "dag.wave.completed",
+      )
       .map((event) => event.waveIndex)
     expect(completions).toEqual([1, 2])
     manager.complete("slow")
     const result = await running
 
     expect(result.status).toBe("completed")
-    const waveCompletions = events().filter((event): event is Extract<DagRunEvent, { type: "dag.wave.completed" }> =>
-      event.type === "dag.wave.completed")
+    const waveCompletions = events().filter(
+      (event): event is Extract<DagRunEvent, { type: "dag.wave.completed" }> => event.type === "dag.wave.completed",
+    )
     expect(waveCompletions.map((event) => event.waveIndex)).toEqual([1, 2, 0])
     expect(waveCompletions.find((event) => event.waveIndex === 0)).toMatchObject({ nodeIds: ["slow", "fast"] })
   })
@@ -496,8 +538,18 @@ describe("DAG scheduler foreign-commit wake (#7412)", () => {
       now: () => Date.parse("2026-08-25T00:00:03.000Z"),
     })
     expect(persisted.kind).not.toBe("failed")
-    const foreign = controlJournal({ store, taskManager: manager, initialRecord: durable() } as DagSchedulerOptions, durable())
-    foreign.append(dagNodeTransitionedEvent({ nodeId: "a" as DagNodeId, from: "running", to: "completed", reason: { kind: "succeeded" } }))
+    const foreign = controlJournal(
+      { store, taskManager: manager, initialRecord: durable() } as DagSchedulerOptions,
+      durable(),
+    )
+    foreign.append(
+      dagNodeTransitionedEvent({
+        nodeId: "a" as DagNodeId,
+        from: "running",
+        to: "completed",
+        reason: { kind: "succeeded" },
+      }),
+    )
 
     // then - the live scheduler refreshes off the foreign commit and admits b at once.
     await manager.whenStarted("b")
@@ -507,8 +559,9 @@ describe("DAG scheduler foreign-commit wake (#7412)", () => {
     expect(manager.starts).toEqual(["a", "b"])
 
     // and - exactly one completed transition for a: the foreign commit, never a stale re-append.
-    const aCompletions = events().filter((event) =>
-      event.type === "dag.node.transitioned" && String(event.nodeId) === "a" && event.to === "completed")
+    const aCompletions = events().filter(
+      (event) => event.type === "dag.node.transitioned" && String(event.nodeId) === "a" && event.to === "completed",
+    )
     expect(aCompletions).toHaveLength(1)
   })
 })

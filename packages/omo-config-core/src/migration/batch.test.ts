@@ -14,12 +14,14 @@ describe("runMigrations", () => {
     // when
     const result = runMigrations({
       clock: { now: () => 100_000 },
-      discover: () => [{
-        id: "stale-live-owner",
-        sources: [{ path: migrationFixture.sourcePath }],
-        targetPath: migrationFixture.targetPath,
-        transform: () => ({ task: { default_concurrency: 3 } }),
-      }],
+      discover: () => [
+        {
+          id: "stale-live-owner",
+          sources: [{ path: migrationFixture.sourcePath }],
+          targetPath: migrationFixture.targetPath,
+          transform: () => ({ task: { default_concurrency: 3 } }),
+        },
+      ],
       env: migrationFixture.env,
       fileSystem,
       isProcessAlive: (pid) => pid === 99,
@@ -38,27 +40,33 @@ describe("runMigrations", () => {
     const fileSystem = new MemoryMigrationFileSystem()
     const backupPath = `${migrationFixture.sourcePath}.backup`
     fileSystem.files.set(migrationFixture.sourcePath, "{}")
-    fileSystem.files.set(migrationJournalPath(migrationFixture.env), `${JSON.stringify({
-      backupMoves: [{ from: migrationFixture.sourcePath, to: backupPath }],
-      completedMoves: [],
-      migrationId: "recovery",
-      targetPath: migrationFixture.targetPath,
-      targetWrite: { additions: { task: { default_concurrency: 3 } } },
-      targetWritten: false,
-      version: 1,
-    })}\n`)
+    fileSystem.files.set(
+      migrationJournalPath(migrationFixture.env),
+      `${JSON.stringify({
+        backupMoves: [{ from: migrationFixture.sourcePath, to: backupPath }],
+        completedMoves: [],
+        migrationId: "recovery",
+        targetPath: migrationFixture.targetPath,
+        targetWrite: { additions: { task: { default_concurrency: 3 } } },
+        targetWritten: false,
+        version: 1,
+      })}\n`,
+    )
     let discoveryAfterRecovery = false
 
     // when
     const result = runMigrations({
       discover: () => {
-        discoveryAfterRecovery = fileSystem.existsSync(backupPath) && !fileSystem.existsSync(migrationJournalPath(migrationFixture.env))
-        return [{
-          id: "preview",
-          sources: [{ path: "/legacy/preview.jsonc" }],
-          targetPath: migrationFixture.targetPath,
-          transform: () => ({ task: { default_concurrency: 4 } }),
-        }]
+        discoveryAfterRecovery =
+          fileSystem.existsSync(backupPath) && !fileSystem.existsSync(migrationJournalPath(migrationFixture.env))
+        return [
+          {
+            id: "preview",
+            sources: [{ path: "/legacy/preview.jsonc" }],
+            targetPath: migrationFixture.targetPath,
+            transform: () => ({ task: { default_concurrency: 4 } }),
+          },
+        ]
       },
       dryRun: true,
       env: migrationFixture.env,

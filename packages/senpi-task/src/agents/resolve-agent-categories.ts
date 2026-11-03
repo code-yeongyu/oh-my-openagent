@@ -61,9 +61,8 @@ export function firstCategoryDefaultModel(
 ): string | undefined {
   const userCategories = omoConfig?.categories
   for (const name of categories ?? []) {
-    const userModel = userCategories !== undefined && Object.hasOwn(userCategories, name)
-      ? userCategories[name]?.model
-      : undefined
+    const userModel =
+      userCategories !== undefined && Object.hasOwn(userCategories, name) ? userCategories[name]?.model : undefined
     if (userModel !== undefined) return userModel
     const builtin = Object.hasOwn(DEFAULT_CATEGORIES, name) ? DEFAULT_CATEGORIES[name] : undefined
     if (builtin?.model !== undefined) return builtin.model
@@ -93,7 +92,9 @@ export function resolveAgentCategoryModel<TModel extends SenpiModelPort>(
     modelId: spec.modelId,
     ...(input.configuredTuning.variant !== undefined
       ? { variant: input.configuredTuning.variant }
-      : categoryReasoning !== undefined ? { variant: categoryReasoning } : {}),
+      : categoryReasoning !== undefined
+        ? { variant: categoryReasoning }
+        : {}),
     ...(input.configuredTuning.reasoningEffort !== undefined
       ? { reasoningEffort: input.configuredTuning.reasoningEffort }
       : {}),
@@ -129,8 +130,9 @@ function selectedFirstRecords(spec: CategorySpecChain): readonly ResolvedModelRe
     display,
     ...(reasoning !== undefined ? { variant: reasoning, reasoning } : {}),
   }
-  const rest = [spec.requested_model, ...(spec.fallback_models ?? [])]
-    .filter((record): record is ResolvedModelRecord => record !== undefined && record.display !== display)
+  const rest = [spec.requested_model, ...(spec.fallback_models ?? [])].filter(
+    (record): record is ResolvedModelRecord => record !== undefined && record.display !== display,
+  )
   return [selected, ...rest]
 }
 

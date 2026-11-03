@@ -4,14 +4,35 @@ import { directoryItems, generatedIds, type NamedFile } from "./external-project
 const AWS_KEY_SHAPED = ["AKIA", "ABCDEFGHIJKLMNOP"].join("")
 const files = (...names: readonly string[]): NamedFile[] => names.map((name) => ({ name, time: 0, files: 1 }))
 const texts = (names: readonly string[]): string[] => directoryItems(files(...names)).map((item) => item.text)
-const range = (count: number, name: (index: number) => string): string[] => Array.from({ length: count }, (_, index) => name(index))
+const range = (count: number, name: (index: number) => string): string[] =>
+  Array.from({ length: count }, (_, index) => name(index))
 
 describe("directoryItems name classes", () => {
-  const cases: ReadonlyArray<{ readonly name: string; readonly names: readonly string[]; readonly expected: readonly string[] }> = [
-    { name: "a hinted markdown name drops only .md", names: ["release-checklist-notes.md"], expected: ["release-checklist-notes"] },
-    { name: "a dotted markdown name drops only the last .md", names: ["1password.com.md"], expected: ["1password.com"] },
-    { name: "a non-markdown name stays exact and quoted", names: [".dream-state.json"], expected: ["\".dream-state.json\""] },
-    { name: "a lone dated name keeps its date", names: ["quarterly-review-20261012.md"], expected: ["quarterly-review-20261012"] },
+  const cases: ReadonlyArray<{
+    readonly name: string
+    readonly names: readonly string[]
+    readonly expected: readonly string[]
+  }> = [
+    {
+      name: "a hinted markdown name drops only .md",
+      names: ["release-checklist-notes.md"],
+      expected: ["release-checklist-notes"],
+    },
+    {
+      name: "a dotted markdown name drops only the last .md",
+      names: ["1password.com.md"],
+      expected: ["1password.com"],
+    },
+    {
+      name: "a non-markdown name stays exact and quoted",
+      names: [".dream-state.json"],
+      expected: ['".dream-state.json"'],
+    },
+    {
+      name: "a lone dated name keeps its date",
+      names: ["quarterly-review-20261012.md"],
+      expected: ["quarterly-review-20261012"],
+    },
     {
       name: "hinted names sharing a date are grouped under it",
       names: ["alpha-20261012.md", "beta-20261012.md", "gamma-20261013.md"],
@@ -29,7 +50,11 @@ describe("directoryItems name classes", () => {
     },
     {
       name: "generated-id names fold into one id entry",
-      names: ["0b6e3c1a-2d4f-4e8a-9b1c-3d5e7f9a1b2c.md", "1c7f4d2b-3e5a-4f9b-8c2d-4e6f8a0b2c3d.md", "2d8a5e3c-4f6b-4a0c-9d3e-5f7a9b1c3d4e.md"],
+      names: [
+        "0b6e3c1a-2d4f-4e8a-9b1c-3d5e7f9a1b2c.md",
+        "1c7f4d2b-3e5a-4f9b-8c2d-4e6f8a0b2c3d.md",
+        "2d8a5e3c-4f6b-4a0c-9d3e-5f7a9b1c3d4e.md",
+      ],
       expected: ["<id> (3 files)"],
     },
     {
@@ -44,7 +69,11 @@ describe("directoryItems name classes", () => {
     },
     {
       name: "a word after the date is a hint and never folds",
-      names: ["standup-notes-20261020-afternoon.md", "standup-notes-20261021-evening.md", "standup-notes-20261022-late.md"],
+      names: [
+        "standup-notes-20261020-afternoon.md",
+        "standup-notes-20261021-evening.md",
+        "standup-notes-20261022-late.md",
+      ],
       expected: ["standup-notes-20261020-afternoon", "standup-notes-20261021-evening", "standup-notes-20261022-late"],
     },
     {
@@ -106,9 +135,17 @@ describe("directoryItems name classes", () => {
 })
 
 describe("generatedIds", () => {
-  const cases: ReadonlyArray<{ readonly name: string; readonly names: readonly string[]; readonly ids: readonly string[] }> = [
+  const cases: ReadonlyArray<{
+    readonly name: string
+    readonly names: readonly string[]
+    readonly ids: readonly string[]
+  }> = [
     { name: "a UUID", names: ["0b6e3c1a-2d4f-4e8a-9b1c-3d5e7f9a1b2c"], ids: ["0b6e3c1a-2d4f-4e8a-9b1c-3d5e7f9a1b2c"] },
-    { name: "a hex digest of 16 or more characters", names: ["4bea7ccd8f2e19a0", "4bea7ccd", "deadbeefcafe2026"], ids: ["4bea7ccd8f2e19a0"] },
+    {
+      name: "a hex digest of 16 or more characters",
+      names: ["4bea7ccd8f2e19a0", "4bea7ccd", "deadbeefcafe2026"],
+      ids: ["4bea7ccd8f2e19a0"],
+    },
     {
       name: "same-length random tokens, each judged on its own so a word-like one is never pulled in",
       names: ["Y2Gw9vTZ9pnH2K5a", "87U3F2ZseCw7bLMz", "wcjyAab9yeccko3U", "design-notes"],

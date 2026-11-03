@@ -25,7 +25,8 @@ function hostLines(text) {
   const seen = new Set()
   for (const line of text.split("\n")) {
     const trimmed = line.trim()
-    if (trimmed.length > 0 && /host|ensure|handoff|daemon|generation|socket/i.test(trimmed)) seen.add(trimmed.slice(0, 220))
+    if (trimmed.length > 0 && /host|ensure|handoff|daemon|generation|socket/i.test(trimmed))
+      seen.add(trimmed.slice(0, 220))
   }
   return [...seen].slice(0, 12)
 }
@@ -46,19 +47,30 @@ import {
 } from "./task-host-e2e-support.mjs"
 
 export async function scenarioA(run) {
-  const sandbox = createScenarioSandbox(run, "sA", { omoConfig: hostConfig(), script: holdParent(spawnScript(16, CHILD_BUSY)) })
+  const sandbox = createScenarioSandbox(run, "sA", {
+    omoConfig: hostConfig(),
+    script: holdParent(spawnScript(16, CHILD_BUSY)),
+  })
   const startedAt = Date.now()
-  const parents = [0, 1].map(() => spawnParent(sandbox, run.mockEntry, "fan out sixteen daemon children", { capture: true }))
+  const parents = [0, 1].map(() =>
+    spawnParent(sandbox, run.mockEntry, "fan out sixteen daemon children", { capture: true }),
+  )
   const parentExits = []
   parents.forEach((parent, index) => {
-    void parent.closed.then((closed) => parentExits.push({ parent: index, status: closed.status, signal: closed.signal, ms: Date.now() - startedAt }))
+    void parent.closed.then((closed) =>
+      parentExits.push({ parent: index, status: closed.status, signal: closed.signal, ms: Date.now() - startedAt }),
+    )
   })
-  const watched = await observeDaemon(sandbox, (probe) => {
-    if (probe.json?.sessions?.worker >= 32) return true
-    return childrenSettled(readTaskRecords(sandbox), 32)
-  // Allow a loaded host to open the full cohort; return as soon as the 32nd session lands.
-  // The parents remain attached until observation, so graceful shutdown cannot cancel admission.
-  }, { timeoutMs: 420_000, intervalMs: 1_000 })
+  const watched = await observeDaemon(
+    sandbox,
+    (probe) => {
+      if (probe.json?.sessions?.worker >= 32) return true
+      return childrenSettled(readTaskRecords(sandbox), 32)
+      // Allow a loaded host to open the full cohort; return as soon as the 32nd session lands.
+      // The parents remain attached until observation, so graceful shutdown cannot cancel admission.
+    },
+    { timeoutMs: 420_000, intervalMs: 1_000 },
+  )
   const observed = watched.matched ?? watched.lastProbe ?? daemonStatus(sandbox, { includeWorkers: true })
   const records = readTaskRecords(sandbox)
   const perChild = perChildRpcProcesses(sandbox)
@@ -94,9 +106,16 @@ export async function scenarioA(run) {
       : {}),
   }
   const pass =
-    facts.sessionsTotal >= 32 && facts.sessionsWorker >= 32 && tokens.length === 0 && perChild.length === 0 &&
-    facts.daemonIdentitiesSeen === 1 && facts.terminalChildFailures === 0
-  facts.driverTeardown = recordMockEvent(sandbox.cwd, { type: "driver_teardown", parentPids: parents.map((parent) => parent.child.pid) })
+    facts.sessionsTotal >= 32 &&
+    facts.sessionsWorker >= 32 &&
+    tokens.length === 0 &&
+    perChild.length === 0 &&
+    facts.daemonIdentitiesSeen === 1 &&
+    facts.terminalChildFailures === 0
+  facts.driverTeardown = recordMockEvent(sandbox.cwd, {
+    type: "driver_teardown",
+    parentPids: parents.map((parent) => parent.child.pid),
+  })
   for (const parent of parents) {
     try {
       process.kill(-parent.child.pid, "SIGKILL")
@@ -122,15 +141,26 @@ export async function scenarioA(run) {
  * stable identity here blames the race, an unstable one exonerates it.
  */
 export async function scenarioA1(run) {
-  const sandbox = createScenarioSandbox(run, "sA1", { omoConfig: hostConfig(), script: holdParent(spawnScript(16, CHILD_BUSY, "s")) })
+  const sandbox = createScenarioSandbox(run, "sA1", {
+    omoConfig: hostConfig(),
+    script: holdParent(spawnScript(16, CHILD_BUSY, "s")),
+  })
   const startedAt = Date.now()
-  const parent = spawnParent(sandbox, run.mockEntry, "fan out sixteen daemon children from one parent", { capture: true })
+  const parent = spawnParent(sandbox, run.mockEntry, "fan out sixteen daemon children from one parent", {
+    capture: true,
+  })
   const parentExits = []
-  void parent.closed.then((closed) => parentExits.push({ parent: 0, status: closed.status, signal: closed.signal, ms: Date.now() - startedAt }))
-  const watched = await observeDaemon(sandbox, (probe) => {
-    if (probe.json?.sessions?.worker >= 16) return true
-    return childrenSettled(readTaskRecords(sandbox), 16)
-  }, { timeoutMs: STATE_DEADLINE_MS, intervalMs: 1_000 })
+  void parent.closed.then((closed) =>
+    parentExits.push({ parent: 0, status: closed.status, signal: closed.signal, ms: Date.now() - startedAt }),
+  )
+  const watched = await observeDaemon(
+    sandbox,
+    (probe) => {
+      if (probe.json?.sessions?.worker >= 16) return true
+      return childrenSettled(readTaskRecords(sandbox), 16)
+    },
+    { timeoutMs: STATE_DEADLINE_MS, intervalMs: 1_000 },
+  )
   const observed = watched.matched ?? watched.lastProbe ?? daemonStatus(sandbox, { includeWorkers: true })
   const records = readTaskRecords(sandbox)
   const identities = [...new Set(watched.timeline.map((entry) => entry.instanceId).filter(Boolean))]
@@ -165,7 +195,10 @@ export async function scenarioA1(run) {
 }
 
 export async function scenarioI(run) {
-  const sandbox = createScenarioSandbox(run, "sI", { omoConfig: hostConfig(), script: spawnScript(1, CHILD_DONE, "auto") })
+  const sandbox = createScenarioSandbox(run, "sI", {
+    omoConfig: hostConfig(),
+    script: spawnScript(1, CHILD_DONE, "auto"),
+  })
   const auto = runBin(sandbox, run.parentArgs(sandbox, "default mode child"), { timeoutMs: 180_000 })
   const autoRecords = readTaskRecords(sandbox)
   const autoRpc = perChildRpcProcesses(sandbox).length
@@ -176,23 +209,36 @@ export async function scenarioI(run) {
   const inProcessRecords = readTaskRecords(sandbox).filter((record) => record.name?.startsWith("inproc"))
   const facts = {
     autoExit: auto.status,
-    autoExecutionModes: [...new Set(autoRecords.filter((r) => r.name?.startsWith("auto")).map((r) => r.execution_mode))],
+    autoExecutionModes: [
+      ...new Set(autoRecords.filter((r) => r.name?.startsWith("auto")).map((r) => r.execution_mode)),
+    ],
     autoChildStatuses: autoRecords.filter((r) => r.name?.startsWith("auto")).map((r) => r.status),
     autoPerChildRpcProcesses: autoRpc,
     autoDaemonReachable: autoStatus.exitCode === 0,
     inProcessExit: inProcess.status,
     inProcessExecutionModes: [...new Set(inProcessRecords.map((record) => record.execution_mode))],
     inProcessStatuses: inProcessRecords.map((record) => record.status),
-    childStart: childStartDiagnosis(sandbox, autoRecords.filter((record) => record.name?.startsWith("auto"))),
+    childStart: childStartDiagnosis(
+      sandbox,
+      autoRecords.filter((record) => record.name?.startsWith("auto")),
+    ),
   }
-  const autoOk = facts.autoExecutionModes.join() === "process" && autoRpc === 0 && facts.autoChildStatuses.every((s) => s === "completed")
-  const inProcessOk = facts.inProcessExecutionModes.join() === "in-process" && facts.inProcessStatuses.every((s) => s === "completed")
+  const autoOk =
+    facts.autoExecutionModes.join() === "process" &&
+    autoRpc === 0 &&
+    facts.autoChildStatuses.every((s) => s === "completed")
+  const inProcessOk =
+    facts.inProcessExecutionModes.join() === "in-process" && facts.inProcessStatuses.every((s) => s === "completed")
   const receipt = await cleanupScenario(sandbox, { hostPids: [autoStatus.json?.pid].filter(Boolean) })
   return {
     scenario: "I",
     title: "default-mode rule: unset omo.json -> daemon sessions, in-process -> in-process",
     status: autoOk && inProcessOk ? "pass" : "fail",
-    ...(autoOk && inProcessOk ? {} : { reason: `auto=${facts.autoExecutionModes.join()}/${facts.autoChildStatuses.join()} perChildRpc=${autoRpc} inProcess=${facts.inProcessExecutionModes.join()}/${facts.inProcessStatuses.join()}` }),
+    ...(autoOk && inProcessOk
+      ? {}
+      : {
+          reason: `auto=${facts.autoExecutionModes.join()}/${facts.autoChildStatuses.join()} perChildRpc=${autoRpc} inProcess=${facts.inProcessExecutionModes.join()}/${facts.inProcessStatuses.join()}`,
+        }),
     facts,
     receipt,
   }

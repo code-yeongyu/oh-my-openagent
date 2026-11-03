@@ -35,13 +35,13 @@ function createSpawnedProcess(exited: Promise<number>, stdout = "", stderr = "")
 describe("runRg", () => {
   it("#given mocked spawn rejection #when grep runs #then returns a structured error result", async () => {
     const spawnMock = mock((_command: string[], _options?: SpawnOptions): SpawnedProcess =>
-      createSpawnedProcess(Promise.reject(new Error("spawn rejected")))
+      createSpawnedProcess(Promise.reject(new Error("spawn rejected"))),
     )
 
     const result = await runRg(
       { pattern: "needle", paths: ["."], timeout: 1000 },
       { path: "rg", backend: "rg" },
-      spawnMock
+      spawnMock,
     )
 
     expect(result.matches).toEqual([])

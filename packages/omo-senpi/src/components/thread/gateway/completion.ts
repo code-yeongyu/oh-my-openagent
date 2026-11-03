@@ -9,9 +9,12 @@ export type AgentEndFacts = {
 /** The run's outcome as the final `agent_end` reports it: an abort is `cancelled`, an assistant turn that stopped on an error is `failed`. */
 export function completionOutcome(event: AgentEndFacts): CompletionOutcome {
   if (event.aborted === true) return "cancelled"
-  const last = [...(event.messages ?? [])].reverse().find((message) => typeof message === "object" && message !== null && (message as { role?: unknown }).role === "assistant") as
-    | { readonly stopReason?: unknown }
-    | undefined
+  const last = [...(event.messages ?? [])]
+    .reverse()
+    .find(
+      (message) =>
+        typeof message === "object" && message !== null && (message as { role?: unknown }).role === "assistant",
+    ) as { readonly stopReason?: unknown } | undefined
   if (last?.stopReason === "aborted") return "cancelled"
   return last?.stopReason === "error" ? "failed" : "completed"
 }
@@ -54,7 +57,10 @@ export type CompletionTrackerOptions = {
  * A later run's arm always has a higher sequence number, so a delayed or retried write never takes it
  * with the earlier outcome, even when both runs settle at the same clock reading.
  */
-export function createCompletionTracker(settle: (durableId: string, outcome: CompletionOutcome, throughArmSeq: number) => Promise<Emitted>, options: CompletionTrackerOptions): CompletionTracker {
+export function createCompletionTracker(
+  settle: (durableId: string, outcome: CompletionOutcome, throughArmSeq: number) => Promise<Emitted>,
+  options: CompletionTrackerOptions,
+): CompletionTracker {
   type Arm = { readonly generation: number; readonly throughArmSeq: number }
   type SettledRun = Arm & { readonly outcome: CompletionOutcome }
   const lastOutcome = new Map<string, CompletionOutcome>()
@@ -107,7 +113,10 @@ export function createCompletionTracker(settle: (durableId: string, outcome: Com
 
   return {
     arm: (durableId, armSeq) => {
-      armed.set(durableId, { generation: ++generation, throughArmSeq: Math.max(armed.get(durableId)?.throughArmSeq ?? armSeq, armSeq) })
+      armed.set(durableId, {
+        generation: ++generation,
+        throughArmSeq: Math.max(armed.get(durableId)?.throughArmSeq ?? armSeq, armSeq),
+      })
     },
     agentEnd: (durableId, event) => {
       lastOutcome.set(durableId, completionOutcome(event))

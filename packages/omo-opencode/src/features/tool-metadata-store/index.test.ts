@@ -1,10 +1,5 @@
 import { describe, test, expect, beforeEach } from "bun:test"
-import {
-  storeToolMetadata,
-  consumeToolMetadata,
-  getPendingStoreSize,
-  clearPendingStore,
-} from "./index"
+import { storeToolMetadata, consumeToolMetadata, getPendingStoreSize, clearPendingStore } from "./index"
 
 describe("tool-metadata-store", () => {
   beforeEach(() => {

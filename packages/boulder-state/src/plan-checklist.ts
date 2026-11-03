@@ -5,8 +5,7 @@ import type { PlanChecklist, TopLevelTaskRef } from "./types"
 
 const SIMPLE_CHECKBOX_PATTERN = /^[-*][ \t]*\[[ \t]*([xX~]?)[ \t]*\][ \t]+(.+)$/
 const TODO_HEADING_PATTERN = /^##[ \t]+TODOs(?:[ \t]+#+)?[ \t]*$/i
-const FINAL_VERIFICATION_HEADING_PATTERN =
-  /^##[ \t]+Final Verification Wave(?:[ \t]+#+)?[ \t]*$/i
+const FINAL_VERIFICATION_HEADING_PATTERN = /^##[ \t]+Final Verification Wave(?:[ \t]+#+)?[ \t]*$/i
 const SECTION_BOUNDARY_HEADING_PATTERN = /^#{1,2}(?:[ \t]+|$)/
 const STRUCTURED_CHECKBOX_PATTERN = /^- \[([ xX~])\] (.+)$/
 const TODO_TASK_LABEL_PATTERN =

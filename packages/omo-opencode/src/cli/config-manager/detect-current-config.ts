@@ -101,8 +101,12 @@ function detectProvidersFromOmoConfig(): {
 
 function isOurPlugin(plugin: PluginEntry): boolean {
   const name = getPluginEntryName(plugin)
-  return name === PLUGIN_NAME || name.startsWith(`${PLUGIN_NAME}@`) ||
-         name === LEGACY_PLUGIN_NAME || name.startsWith(`${LEGACY_PLUGIN_NAME}@`)
+  return (
+    name === PLUGIN_NAME ||
+    name.startsWith(`${PLUGIN_NAME}@`) ||
+    name === LEGACY_PLUGIN_NAME ||
+    name.startsWith(`${LEGACY_PLUGIN_NAME}@`)
+  )
 }
 
 function findOurPluginEntry(plugins: PluginEntry[]): string | null {

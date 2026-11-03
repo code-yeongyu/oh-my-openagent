@@ -51,10 +51,15 @@ describe("Loro encoding pin", () => {
 
       expect(doc.getText("body").toString()).toBe("hallo")
       expect(Buffer.from(doc.export({ mode: "update" })).toString("hex"), "update fixture drift").toBe(updateHex)
-      expect(Buffer.from(doc.export({
-        mode: "shallow-snapshot",
-        frontiers: doc.oplogFrontiers(),
-      })).toString("hex"), "shallow-snapshot fixture drift").toBe(shallowSnapshotHex)
+      expect(
+        Buffer.from(
+          doc.export({
+            mode: "shallow-snapshot",
+            frontiers: doc.oplogFrontiers(),
+          }),
+        ).toString("hex"),
+        "shallow-snapshot fixture drift",
+      ).toBe(shallowSnapshotHex)
 
       for (const hex of [updateHex, shallowSnapshotHex]) {
         const restored = new LoroDoc()

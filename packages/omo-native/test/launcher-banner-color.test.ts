@@ -26,25 +26,42 @@ function createFixture() {
   roots.push(root)
   const packageRoot = join(root, "app")
   cpSync(join(SOURCE_ROOT, "bin"), join(packageRoot, "bin"), { recursive: true })
-  write(join(packageRoot, "package.json"), JSON.stringify({
-    name: "omo-ai", version: "1.2.3-test.0", type: "module",
-    dependencies: { "@code-yeongyu/senpi": "2026.8.9" },
-  }))
+  write(
+    join(packageRoot, "package.json"),
+    JSON.stringify({
+      name: "omo-ai",
+      version: "1.2.3-test.0",
+      type: "module",
+      dependencies: { "@code-yeongyu/senpi": "2026.8.9" },
+    }),
+  )
   const senpiRoot = join(packageRoot, "node_modules", "@code-yeongyu", "senpi")
-  write(join(senpiRoot, "package.json"), JSON.stringify({
-    name: "@code-yeongyu/senpi", version: "2026.8.9", type: "module", exports: { ".": "./dist/index.js" },
-  }))
+  write(
+    join(senpiRoot, "package.json"),
+    JSON.stringify({
+      name: "@code-yeongyu/senpi",
+      version: "2026.8.9",
+      type: "module",
+      exports: { ".": "./dist/index.js" },
+    }),
+  )
   write(join(senpiRoot, "dist", "index.js"), "export const fixture = true\n")
-  write(join(senpiRoot, "dist", "cli.js"), `
+  write(
+    join(senpiRoot, "dist", "cli.js"),
+    `
 import { writeFileSync } from "node:fs"
 writeFileSync(process.env.CAPTURE_FILE, "spawned")
 process.exit(0)
-`)
+`,
+  )
   write(join(senpiRoot, "dist", "core", "brand.js"), "export {}\n")
   for (const artifact of [
-    "plugin/package.json", "plugin/extensions/omo.js", "plugin/runtime/lsp-daemon/dist/cli.js",
+    "plugin/package.json",
+    "plugin/extensions/omo.js",
+    "plugin/runtime/lsp-daemon/dist/cli.js",
     "plugin/runtime/agent-toolkit/cli.js",
-  ]) write(join(packageRoot, artifact), "fixture\n")
+  ])
+    write(join(packageRoot, artifact), "fixture\n")
   const home = join(root, "home")
   mkdirSync(home, { recursive: true })
   const agentDir = join(root, "senpi-agent")
@@ -74,29 +91,32 @@ function seedFreshSetupCache(cachePath: string, env: NodeJS.ProcessEnv, home: st
 }
 
 describe("interactive launch banner styling (#8442)", () => {
-  test.skipIf(process.platform === "win32")("#given a color-enabled terminal #when an interactive launch prints the version banner #then the banner carries no error coloring", () => {
-    // given
-    const fixture = createFixture()
-    const inherited: NodeJS.ProcessEnv = { ...process.env, CAPTURE_FILE: fixture.captureFile, FORCE_COLOR: "1" }
-    delete inherited.OMO_CODING_AGENT_DIR
-    delete inherited.PI_CODING_AGENT_DIR
-    delete inherited.NO_COLOR
-    const env = { ...inherited, ...fixture.env }
-    const cache = seedFreshSetupCache(fixture.cachePath, env, fixture.home)
+  test.skipIf(process.platform === "win32")(
+    "#given a color-enabled terminal #when an interactive launch prints the version banner #then the banner carries no error coloring",
+    () => {
+      // given
+      const fixture = createFixture()
+      const inherited: NodeJS.ProcessEnv = { ...process.env, CAPTURE_FILE: fixture.captureFile, FORCE_COLOR: "1" }
+      delete inherited.OMO_CODING_AGENT_DIR
+      delete inherited.PI_CODING_AGENT_DIR
+      delete inherited.NO_COLOR
+      const env = { ...inherited, ...fixture.env }
+      const cache = seedFreshSetupCache(fixture.cachePath, env, fixture.home)
 
-    // when
-    const result = spawnSync("python3", [TTY_DRIVER, "", "", process.execPath, fixture.launcher], {
-      encoding: "utf8",
-      env,
-    })
+      // when
+      const result = spawnSync("python3", [TTY_DRIVER, "", "", process.execPath, fixture.launcher], {
+        encoding: "utf8",
+        env,
+      })
 
-    // then
-    expect(result.status).toBe(0)
-    const output = `${result.stdout}${result.stderr}`
-    expect(output).toContain("omo (omo-ai beta 1.2.3-test.0)")
-    expect(output).not.toContain(ANSI_RED)
-    expect(readFileSync(fixture.captureFile, "utf8")).toBe("spawned")
-    // The launch read the cache as fresh: no detached refresh child was spawned to rewrite it.
-    expect(readFileSync(fixture.cachePath, "utf8")).toBe(cache)
-  })
+      // then
+      expect(result.status).toBe(0)
+      const output = `${result.stdout}${result.stderr}`
+      expect(output).toContain("omo (omo-ai beta 1.2.3-test.0)")
+      expect(output).not.toContain(ANSI_RED)
+      expect(readFileSync(fixture.captureFile, "utf8")).toBe("spawned")
+      // The launch read the cache as fresh: no detached refresh child was spawned to rewrite it.
+      expect(readFileSync(fixture.cachePath, "utf8")).toBe(cache)
+    },
+  )
 })

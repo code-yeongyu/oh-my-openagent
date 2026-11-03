@@ -25,7 +25,10 @@ function write(path: string, contents: string): void {
 function createEngine(): string {
   const root = mkdtempSync(join(tmpdir(), "omo-compile-safe-"))
   roots.push(root)
-  write(join(root, "package.json"), JSON.stringify({ name: "@code-yeongyu/senpi", version: "2026.9.10", type: "module" }))
+  write(
+    join(root, "package.json"),
+    JSON.stringify({ name: "@code-yeongyu/senpi", version: "2026.9.10", type: "module" }),
+  )
   const cssTree = join(root, "node_modules", "css-tree")
   write(join(cssTree, "package.json"), JSON.stringify({ name: "css-tree", version: CSS_TREE_VERSION, type: "module" }))
   write(join(cssTree, "data", "patch.json"), JSON.stringify(PATCH_DATA))
@@ -49,7 +52,10 @@ function createEngine(): string {
     join(cssTree, "lib", "version.js"),
     "import { createRequire } from 'module';\n\nconst require = createRequire(import.meta.url);\n\nexport const { version } = require('../package.json');\n",
   )
-  write(join(cssTree, "cjs", "version.cjs"), "'use strict';\n\nconst { version } = require('../package.json');\n\nexports.version = version;\n")
+  write(
+    join(cssTree, "cjs", "version.cjs"),
+    "'use strict';\n\nconst { version } = require('../package.json');\n\nexports.version = version;\n",
+  )
   const mdnCss = join(root, "node_modules", "mdn-data", "css")
   write(join(root, "node_modules", "mdn-data", "package.json"), JSON.stringify({ name: "mdn-data", version: "2.27.1" }))
   write(join(mdnCss, "at-rules.json"), JSON.stringify(AT_RULES))

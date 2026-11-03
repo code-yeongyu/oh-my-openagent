@@ -13,12 +13,17 @@ describe("isolation task parameters", () => {
   test("rejects string booleans through normalization and schema validation", () => {
     expect(Value.Check(TaskToolParams, { prompt: "Inspect", category: "quick", isolated: "yes" })).toBe(false)
     expect(() => normalizeTaskToolArguments({ prompt: "Inspect", category: "quick", isolated: "yes" })).toThrow()
-    expect(() => normalizeTaskToolArguments({ category: "quick", tasks: [{ prompt: "Inspect", apply: "no" }] })).toThrow()
+    expect(() =>
+      normalizeTaskToolArguments({ category: "quick", tasks: [{ prompt: "Inspect", apply: "no" }] }),
+    ).toThrow()
   })
 
   test("batch inherits isolation options and preserves explicit false", () => {
     const prepared = normalizeTaskToolArguments({
-      isolated: true, apply: false, merge: "branch", category: "quick",
+      isolated: true,
+      apply: false,
+      merge: "branch",
+      category: "quick",
       tasks: [{ prompt: "First" }, { prompt: "Second", isolated: false, apply: true, merge: "patch" }],
     })
     const resolved = resolveSpawnItems(prepared)
@@ -30,22 +35,41 @@ describe("isolation task parameters", () => {
     expect(singleSpawnParams(second, true)).toMatchObject({ isolated: false, apply: true, merge: "patch" })
   })
 
-  test.each([{ merge: "branch" as const }, { apply: false }])("refuses merge options without isolation before starting", async (options) => {
-    const manager = createFakeManager({})
-    const result = await buildTaskExecute(makeDeps(manager))("call", {
-      prompt: "Inspect", category: "quick", ...options,
-    }, undefined, undefined, CTX)
-    expect(result.details.status).toBe("invalid_arguments")
-  })
+  test.each([{ merge: "branch" as const }, { apply: false }])(
+    "refuses merge options without isolation before starting",
+    async (options) => {
+      const manager = createFakeManager({})
+      const result = await buildTaskExecute(makeDeps(manager))(
+        "call",
+        {
+          prompt: "Inspect",
+          category: "quick",
+          ...options,
+        },
+        undefined,
+        undefined,
+        CTX,
+      )
+      expect(result.details.status).toBe("invalid_arguments")
+    },
+  )
 
   test("explicit false overrides an enabled setting for batch validation", async () => {
     const deps = makeDeps(createFakeManager({}), {
       omoConfig: { task: OmoTaskSettingsSchema.parse({ isolation: { enabled: true } }) },
     })
-    const result = await buildTaskExecute(deps)("call", {
-      category: "quick", isolated: true, merge: "patch",
-      tasks: [{ prompt: "First" }, { prompt: "Second", isolated: false }],
-    }, undefined, undefined, CTX)
+    const result = await buildTaskExecute(deps)(
+      "call",
+      {
+        category: "quick",
+        isolated: true,
+        merge: "patch",
+        tasks: [{ prompt: "First" }, { prompt: "Second", isolated: false }],
+      },
+      undefined,
+      undefined,
+      CTX,
+    )
     expect(result.details.status).toBe("invalid_arguments")
   })
 
@@ -53,10 +77,20 @@ describe("isolation task parameters", () => {
     const deps = makeDeps(createFakeManager({}), {
       omoConfig: { task: OmoTaskSettingsSchema.parse({ isolation: { enabled: true, apply: false, merge: "branch" } }) },
     })
-    expect(buildStartSpec({ prompt: "Inspect" }, { category: "quick" }, "parent", deps, "/project"))
-      .toMatchObject({ isolated: true, apply: false, merge: "branch" })
-    expect(buildStartSpec({ prompt: "Inspect", isolated: true, apply: true, merge: "patch" }, { category: "quick" }, "parent", deps, "/project"))
-      .toMatchObject({ isolated: true, apply: true, merge: "patch" })
+    expect(buildStartSpec({ prompt: "Inspect" }, { category: "quick" }, "parent", deps, "/project")).toMatchObject({
+      isolated: true,
+      apply: false,
+      merge: "branch",
+    })
+    expect(
+      buildStartSpec(
+        { prompt: "Inspect", isolated: true, apply: true, merge: "patch" },
+        { category: "quick" },
+        "parent",
+        deps,
+        "/project",
+      ),
+    ).toMatchObject({ isolated: true, apply: true, merge: "patch" })
   })
 
   test("call row displays isolation beside foreground or background", () => {

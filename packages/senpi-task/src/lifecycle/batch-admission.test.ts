@@ -5,13 +5,7 @@ import type { TaskRecordStore } from "../store"
 import { acquireSessionAdmissionLease, type SessionAdmissionLease } from "./admission-lease"
 import { resolveContext, type LifecycleContext } from "./context"
 import { admitSuspendedBatch, reclaimOrphanedResident } from "./residency"
-import {
-  cleanupProjects,
-  FakeRegistry,
-  seedRecord,
-  settings,
-  tempStore,
-} from "./__fixtures__/lifecycle-fakes"
+import { cleanupProjects, FakeRegistry, seedRecord, settings, tempStore } from "./__fixtures__/lifecycle-fakes"
 import { NO_HOST_ENDPOINT } from "./host-session"
 
 afterEach(cleanupProjects)
@@ -21,7 +15,12 @@ function iso(offsetMs: number): string {
 }
 
 function contextFor(store: TaskRecordStore, cap: number | "unlimited"): LifecycleContext {
-  return resolveContext({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings({ residency_max_children: cap }) })
+  return resolveContext({
+    hostEndpoint: NO_HOST_ENDPOINT,
+    store,
+    registry: new FakeRegistry(),
+    config: settings({ residency_max_children: cap }),
+  })
 }
 
 describe("admitSuspendedBatch (capacity-aware batch admission)", () => {
@@ -52,17 +51,67 @@ describe("admitSuspendedBatch (capacity-aware batch admission)", () => {
     seedRecord(store, { task_id: "st_000000e8", status: "running", residency_state: "resident", host_pid: process.pid })
     seedRecord(store, { task_id: "st_000000e9", status: "completed", residency_state: "resident", host_pid: 424_242 })
     // and 3 non-terminal suspended records, deliberately OLDER than the completed MRU set
-    seedRecord(store, { task_id: "st_00000010", status: "running", residency_state: "persisted_only", updated_at: iso(5) })
-    seedRecord(store, { task_id: "st_00000011", status: "running", residency_state: "rpc_detached", updated_at: iso(15) })
-    seedRecord(store, { task_id: "st_00000012", status: "pending", residency_state: "persisted_only", updated_at: iso(25) })
+    seedRecord(store, {
+      task_id: "st_00000010",
+      status: "running",
+      residency_state: "persisted_only",
+      updated_at: iso(5),
+    })
+    seedRecord(store, {
+      task_id: "st_00000011",
+      status: "running",
+      residency_state: "rpc_detached",
+      updated_at: iso(15),
+    })
+    seedRecord(store, {
+      task_id: "st_00000012",
+      status: "pending",
+      residency_state: "persisted_only",
+      updated_at: iso(25),
+    })
     // and 7 terminal suspended records, the two most recent sharing a timestamp (tie-break task_id ASC)
-    seedRecord(store, { task_id: "st_00000020", status: "completed", residency_state: "persisted_only", updated_at: iso(0) })
-    seedRecord(store, { task_id: "st_00000021", status: "completed", residency_state: "rpc_detached", updated_at: iso(10) })
-    seedRecord(store, { task_id: "st_00000022", status: "error", residency_state: "persisted_only", updated_at: iso(20) })
-    seedRecord(store, { task_id: "st_00000023", status: "interrupted", residency_state: "persisted_only", updated_at: iso(30) })
-    seedRecord(store, { task_id: "st_00000024", status: "completed", residency_state: "rpc_detached", updated_at: iso(40) })
-    seedRecord(store, { task_id: "st_00000025", status: "completed", residency_state: "persisted_only", updated_at: iso(50) })
-    seedRecord(store, { task_id: "st_00000026", status: "completed", residency_state: "persisted_only", updated_at: iso(50) })
+    seedRecord(store, {
+      task_id: "st_00000020",
+      status: "completed",
+      residency_state: "persisted_only",
+      updated_at: iso(0),
+    })
+    seedRecord(store, {
+      task_id: "st_00000021",
+      status: "completed",
+      residency_state: "rpc_detached",
+      updated_at: iso(10),
+    })
+    seedRecord(store, {
+      task_id: "st_00000022",
+      status: "error",
+      residency_state: "persisted_only",
+      updated_at: iso(20),
+    })
+    seedRecord(store, {
+      task_id: "st_00000023",
+      status: "interrupted",
+      residency_state: "persisted_only",
+      updated_at: iso(30),
+    })
+    seedRecord(store, {
+      task_id: "st_00000024",
+      status: "completed",
+      residency_state: "rpc_detached",
+      updated_at: iso(40),
+    })
+    seedRecord(store, {
+      task_id: "st_00000025",
+      status: "completed",
+      residency_state: "persisted_only",
+      updated_at: iso(50),
+    })
+    seedRecord(store, {
+      task_id: "st_00000026",
+      status: "completed",
+      residency_state: "persisted_only",
+      updated_at: iso(50),
+    })
     const context = contextFor(store, 8)
 
     // when
@@ -117,7 +166,12 @@ describe("admitSuspendedBatch (capacity-aware batch admission)", () => {
   test("#given another session's, cancelled, and killed suspended records #when the batch admits #then only this session's revivable records are claimed", async () => {
     // given
     const store = tempStore()
-    seedRecord(store, { task_id: "st_00000040", parent_session_id: "other", status: "running", residency_state: "persisted_only" })
+    seedRecord(store, {
+      task_id: "st_00000040",
+      parent_session_id: "other",
+      status: "running",
+      residency_state: "persisted_only",
+    })
     seedRecord(store, { task_id: "st_00000041", status: "cancelled", residency_state: "persisted_only" })
     seedRecord(store, { task_id: "st_00000042", status: "running", residency_state: "persisted_only", killed: true })
     seedRecord(store, { task_id: "st_00000043", status: "running", residency_state: "persisted_only" })
@@ -159,9 +213,24 @@ describe("admitSuspendedBatch (capacity-aware batch admission)", () => {
   test("#given the lease is displaced mid-batch #when the holder re-reads it before each mutation #then it aborts the remaining claims", async () => {
     // given: three non-terminal candidates and a lease whose ownership flips after the first fencing check
     const store = tempStore()
-    seedRecord(store, { task_id: "st_00000060", status: "running", residency_state: "persisted_only", updated_at: iso(0) })
-    seedRecord(store, { task_id: "st_00000061", status: "running", residency_state: "persisted_only", updated_at: iso(10) })
-    seedRecord(store, { task_id: "st_00000062", status: "running", residency_state: "persisted_only", updated_at: iso(20) })
+    seedRecord(store, {
+      task_id: "st_00000060",
+      status: "running",
+      residency_state: "persisted_only",
+      updated_at: iso(0),
+    })
+    seedRecord(store, {
+      task_id: "st_00000061",
+      status: "running",
+      residency_state: "persisted_only",
+      updated_at: iso(10),
+    })
+    seedRecord(store, {
+      task_id: "st_00000062",
+      status: "running",
+      residency_state: "persisted_only",
+      updated_at: iso(20),
+    })
     const context = contextFor(store, 8)
     let ownershipChecks = 0
     let released = false
@@ -201,7 +270,12 @@ describe("reclaimOrphanedResident (reclamation bypasses admission)", () => {
     const store = tempStore()
     seedRecord(store, { task_id: "st_00000070", status: "running", residency_state: "resident", host_pid: process.pid })
     seedRecord(store, { task_id: "st_00000071", status: "running", residency_state: "resident", host_pid: process.pid })
-    const orphan = seedRecord(store, { task_id: "st_00000072", status: "completed", residency_state: "resident", host_pid: 999_999 })
+    const orphan = seedRecord(store, {
+      task_id: "st_00000072",
+      status: "completed",
+      residency_state: "resident",
+      host_pid: 999_999,
+    })
     const context = contextFor(store, 2)
 
     // when
@@ -218,7 +292,12 @@ describe("reclaimOrphanedResident (reclamation bypasses admission)", () => {
   test("#given a reclaim raced and lost the expected-owner CAS #when retrying with the stale observation #then it reports not_claimable and touches nothing", () => {
     // given
     const store = tempStore()
-    const orphan = seedRecord(store, { task_id: "st_00000080", status: "completed", residency_state: "resident", host_pid: 999_999 })
+    const orphan = seedRecord(store, {
+      task_id: "st_00000080",
+      status: "completed",
+      residency_state: "resident",
+      host_pid: 999_999,
+    })
     const context = contextFor(store, 2)
 
     // when: a winner claims first, then the loser retries with its stale observation

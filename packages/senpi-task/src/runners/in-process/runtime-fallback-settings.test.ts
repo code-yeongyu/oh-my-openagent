@@ -25,7 +25,11 @@ afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 
-function caller(global: Record<string, unknown>, project?: Record<string, unknown>, projectTrusted = true): CallerSettingsSource & { readonly globalPath: string } {
+function caller(
+  global: Record<string, unknown>,
+  project?: Record<string, unknown>,
+  projectTrusted = true,
+): CallerSettingsSource & { readonly globalPath: string } {
   const root = mkdtempSync(join(tmpdir(), "senpi-task-child-settings-"))
   roots.push(root)
   const agentDir = join(root, "agent")
@@ -83,7 +87,13 @@ describe("createRuntimeFallbackSettings", () => {
     // given
     const source = caller(
       { retry: { maxRetries: 5 } },
-      { retry: { maxRetries: 7, modelFallback: true, fallbackChains: { "vendor/primary": ["vendor/project-fallback"] } } },
+      {
+        retry: {
+          maxRetries: 7,
+          modelFallback: true,
+          fallbackChains: { "vendor/primary": ["vendor/project-fallback"] },
+        },
+      },
     )
 
     // when

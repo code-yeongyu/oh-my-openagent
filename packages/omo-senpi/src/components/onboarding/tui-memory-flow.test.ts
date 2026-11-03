@@ -3,7 +3,12 @@ import { existsSync } from "node:fs"
 import { mkdir, readFile } from "node:fs/promises"
 import { join } from "node:path"
 
-import { GitMemoryRepo, buildDefaultSeedFiles, buildIdentityPaths, type FactsPeopleRouting } from "@oh-my-opencode/memory-core"
+import {
+  GitMemoryRepo,
+  buildDefaultSeedFiles,
+  buildIdentityPaths,
+  type FactsPeopleRouting,
+} from "@oh-my-opencode/memory-core"
 
 import type { MemoryIdentityContext } from "../memory/context"
 import { createSessionFactsApplier, publishSessionFactsApplier } from "../memory/facts-apply-rpc"
@@ -26,7 +31,13 @@ afterEach(async () => {
 
 interface ToolLike {
   readonly name: string
-  execute(id: string, params: unknown, signal?: AbortSignal, onUpdate?: unknown, ctx?: unknown): Promise<{ content: Array<{ text?: string }>; details?: unknown; isError?: boolean }>
+  execute(
+    id: string,
+    params: unknown,
+    signal?: AbortSignal,
+    onUpdate?: unknown,
+    ctx?: unknown,
+  ): Promise<{ content: Array<{ text?: string }>; details?: unknown; isError?: boolean }>
 }
 
 async function machine() {
@@ -94,7 +105,8 @@ function contextOf(results: readonly unknown[]): string {
   const contents = results.flatMap((result) =>
     typeof result === "object" && result !== null && "message" in result
       ? [String((result as { message: { content: unknown } }).message.content)]
-      : [])
+      : [],
+  )
   expect(contents).toHaveLength(1)
   return contents[0] ?? ""
 }
@@ -136,15 +148,30 @@ describe("TUI onboarding: shared scan, understanding, select-before-write", () =
     expect(refused.isError).toBe(true)
     expect(model.starts).toHaveLength(0)
 
-    const understood = await tool("onboarding_understand").execute("u1", { consent: true }, undefined, undefined, toolCtx)
+    const understood = await tool("onboarding_understand").execute(
+      "u1",
+      { consent: true },
+      undefined,
+      undefined,
+      toolCtx,
+    )
     expect(understood.isError).not.toBe(true)
-    const details = understood.details as { understandId: string; candidates: Array<{ id: string; fact: { text: string } }> }
+    const details = understood.details as {
+      understandId: string
+      candidates: Array<{ id: string; fact: { text: string } }>
+    }
     expect(details.candidates.map((candidate) => candidate.fact.text).sort()).toEqual([DROPPED, KEPT].sort())
     expect(model.starts[0]?.model?.id).toBe("mock-1")
     expect(await snapshotTree(profile.memoryRoot)).toEqual(beforeUnderstanding)
 
     const kept = details.candidates.find((candidate) => candidate.fact.text === KEPT)
-    const applied = await tool("onboarding_memory_apply").execute("a1", { understand_id: details.understandId, selected: [kept?.id] }, undefined, undefined, toolCtx)
+    const applied = await tool("onboarding_memory_apply").execute(
+      "a1",
+      { understand_id: details.understandId, selected: [kept?.id] },
+      undefined,
+      undefined,
+      toolCtx,
+    )
     expect(applied.isError).not.toBe(true)
     expect(applied.details).toMatchObject({ outcome: "committed" })
 
@@ -162,20 +189,50 @@ describe("TUI onboarding: shared scan, understanding, select-before-write", () =
     const { h, tool, toolCtx } = tuiOnboarding(profile, recordsBoth)
     await h.start()
     await h.prompt()
-    const understood = await tool("onboarding_understand").execute("u1", { consent: true }, undefined, undefined, toolCtx)
+    const understood = await tool("onboarding_understand").execute(
+      "u1",
+      { consent: true },
+      undefined,
+      undefined,
+      toolCtx,
+    )
     const details = understood.details as { understandId: string; candidates: Array<{ id: string }> }
     const head = await profile.repo.head()
 
-    const none = await tool("onboarding_memory_apply").execute("a0", { understand_id: details.understandId, selected: [] }, undefined, undefined, toolCtx)
+    const none = await tool("onboarding_memory_apply").execute(
+      "a0",
+      { understand_id: details.understandId, selected: [] },
+      undefined,
+      undefined,
+      toolCtx,
+    )
     expect(none.details).toMatchObject({ outcome: "no_facts" })
-    const unknown = await tool("onboarding_memory_apply").execute("a1", { understand_id: details.understandId, selected: ["not-a-candidate"] }, undefined, undefined, toolCtx)
+    const unknown = await tool("onboarding_memory_apply").execute(
+      "a1",
+      { understand_id: details.understandId, selected: ["not-a-candidate"] },
+      undefined,
+      undefined,
+      toolCtx,
+    )
     expect(unknown.isError).toBe(true)
     expect(await profile.repo.head()).toBe(head)
 
-    const first = await tool("onboarding_memory_apply").execute("a2", { understand_id: details.understandId, selected: [details.candidates[0]?.id] }, undefined, undefined, toolCtx)
+    const first = await tool("onboarding_memory_apply").execute(
+      "a2",
+      { understand_id: details.understandId, selected: [details.candidates[0]?.id] },
+      undefined,
+      undefined,
+      toolCtx,
+    )
     expect(first.details).toMatchObject({ outcome: "committed" })
     const committed = await profile.repo.head()
-    const replay = await tool("onboarding_memory_apply").execute("a3", { understand_id: details.understandId, selected: [details.candidates[1]?.id] }, undefined, undefined, toolCtx)
+    const replay = await tool("onboarding_memory_apply").execute(
+      "a3",
+      { understand_id: details.understandId, selected: [details.candidates[1]?.id] },
+      undefined,
+      undefined,
+      toolCtx,
+    )
     expect(replay.isError).toBe(true)
     expect(await profile.repo.head()).toBe(committed)
   }, 90_000)

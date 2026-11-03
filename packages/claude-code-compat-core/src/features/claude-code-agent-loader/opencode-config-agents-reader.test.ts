@@ -51,7 +51,7 @@ describe("readOpencodeConfigAgents", () => {
             prompt: "You are a helpful assistant",
           },
         },
-      })
+      }),
     )
 
     const result = readOpencodeConfigAgents(tempDir)
@@ -82,7 +82,7 @@ describe("readOpencodeConfigAgents", () => {
     }
   }
 }
-`
+`,
     )
 
     const result = readOpencodeConfigAgents(tempDir)
@@ -152,7 +152,7 @@ describe("readOpencodeConfigAgents", () => {
             prompt: "test",
           },
         },
-      })
+      }),
     )
 
     const result = readOpencodeConfigAgents(tempDir)
@@ -175,7 +175,7 @@ describe("readOpencodeConfigAgents", () => {
         name: "definition-agent",
         description: "From definition file",
         prompt: "File-based agent prompt",
-      })
+      }),
     )
 
     const configPath = path.join(opencodeDir, "opencode.json")
@@ -183,7 +183,7 @@ describe("readOpencodeConfigAgents", () => {
       configPath,
       JSON.stringify({
         agent_definitions: ["./agents.json"],
-      })
+      }),
     )
 
     const result = readOpencodeConfigAgents(tempDir)
@@ -208,7 +208,7 @@ describe("readOpencodeConfigAgents", () => {
         name: "shared-agent",
         description: "From definition file",
         prompt: "Definition prompt",
-      })
+      }),
     )
 
     const configPath = path.join(opencodeDir, "opencode.json")
@@ -222,7 +222,7 @@ describe("readOpencodeConfigAgents", () => {
           },
         },
         agent_definitions: ["./agents.json"],
-      })
+      }),
     )
 
     const result = readOpencodeConfigAgents(tempDir)
@@ -254,7 +254,7 @@ describe("readOpencodeConfigAgents", () => {
             prompt: "test",
           },
         },
-      })
+      }),
     )
 
     const result = readOpencodeConfigAgents(tempDir)
@@ -289,7 +289,7 @@ describe("readOpencodeConfigAgents", () => {
             prompt: "Fallback prompt",
           },
         },
-      })
+      }),
     )
 
     const result = readOpencodeConfigAgents(tempDir)
@@ -316,7 +316,7 @@ describe("readOpencodeConfigAgents", () => {
             prompt: "Project prompt",
           },
         },
-      })
+      }),
     )
 
     const result = readOpencodeConfigAgents(projectDir)
@@ -339,7 +339,7 @@ describe("readOpencodeConfigAgents", () => {
         name: "agent-one",
         description: "First agent",
         prompt: "Prompt 1",
-      })
+      }),
     )
 
     const agentDef2 = path.join(opencodeDir, "agents2.json")
@@ -349,7 +349,7 @@ describe("readOpencodeConfigAgents", () => {
         name: "agent-two",
         description: "Second agent",
         prompt: "Prompt 2",
-      })
+      }),
     )
 
     const configPath = path.join(opencodeDir, "opencode.json")
@@ -357,7 +357,7 @@ describe("readOpencodeConfigAgents", () => {
       configPath,
       JSON.stringify({
         agent_definitions: ["./agents1.json", "./agents2.json"],
-      })
+      }),
     )
 
     const result = readOpencodeConfigAgents(tempDir)
@@ -387,7 +387,7 @@ describe("readOpencodeConfigAgents", () => {
             prompt: "Custom prompt",
           },
         },
-      })
+      }),
     )
 
     fs.writeFileSync(
@@ -399,7 +399,7 @@ describe("readOpencodeConfigAgents", () => {
             prompt: "Default prompt",
           },
         },
-      })
+      }),
     )
 
     const origOpencodeConfigDir = process.env.OPENCODE_CONFIG_DIR

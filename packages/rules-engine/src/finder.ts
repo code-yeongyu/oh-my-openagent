@@ -1,25 +1,29 @@
-import { existsSync, statSync } from "node:fs";
-import { homedir } from "node:os";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
-import { GLOBAL_DISTANCE, OPENCODE_USER_RULE_DIRS, PROJECT_RULE_FILES, PROJECT_RULE_SUBDIRS, USER_RULE_DIR } from "./constants";
-import { sortCandidates } from "./ordering";
-import { findRuleFilesRecursive, safeRealpathSync } from "./scanner";
-import type { DirectoryScanEntry, FindRuleFilesOptions, RuleFileCandidate, RuleScanCache, RuleSource } from "./types";
+import { existsSync, statSync } from "node:fs"
+import { homedir } from "node:os"
+import { dirname, isAbsolute, join, relative, resolve } from "node:path"
+import {
+  GLOBAL_DISTANCE,
+  OPENCODE_USER_RULE_DIRS,
+  PROJECT_RULE_FILES,
+  PROJECT_RULE_SUBDIRS,
+  USER_RULE_DIR,
+} from "./constants"
+import { sortCandidates } from "./ordering"
+import { findRuleFilesRecursive, safeRealpathSync } from "./scanner"
+import type { DirectoryScanEntry, FindRuleFilesOptions, RuleFileCandidate, RuleScanCache, RuleSource } from "./types"
 
-export type SisyphusRuleDeprecationLogger = (
-  message: string,
-  meta: { event: string; path: string },
-) => void;
+export type SisyphusRuleDeprecationLogger = (message: string, meta: { event: string; path: string }) => void
 
-const noopSisyphusRuleDeprecationLogger: SisyphusRuleDeprecationLogger = () => {};
+const noopSisyphusRuleDeprecationLogger: SisyphusRuleDeprecationLogger = () => {}
 
-const SISYPHUS_DEPRECATION_MESSAGE = "[rules] .sisyphus/rules is deprecated and will be removed in v4.3.0; migrate to .omo/rules";
-const SISYPHUS_LEGACY_RULE_SOURCES: ReadonlySet<RuleSource> = new Set([".sisyphus/rules", "~/.sisyphus/rules"]);
-const warnedSisyphusRuleDirectories = new Set<string>();
-let logSisyphusRuleDeprecation: SisyphusRuleDeprecationLogger = noopSisyphusRuleDeprecationLogger;
+const SISYPHUS_DEPRECATION_MESSAGE =
+  "[rules] .sisyphus/rules is deprecated and will be removed in v4.3.0; migrate to .omo/rules"
+const SISYPHUS_LEGACY_RULE_SOURCES: ReadonlySet<RuleSource> = new Set([".sisyphus/rules", "~/.sisyphus/rules"])
+const warnedSisyphusRuleDirectories = new Set<string>()
+let logSisyphusRuleDeprecation: SisyphusRuleDeprecationLogger = noopSisyphusRuleDeprecationLogger
 
 export function setSisyphusRuleDeprecationLogger(logger: SisyphusRuleDeprecationLogger): void {
-  logSisyphusRuleDeprecation = logger;
+  logSisyphusRuleDeprecation = logger
 }
 
 export function findRuleFiles(
@@ -29,26 +33,20 @@ export function findRuleFiles(
   options?: FindRuleFilesOptions,
   cache?: RuleScanCache,
 ): RuleFileCandidate[] {
-  const startDir = dirname(resolve(currentFile));
-  const skipClaudeUserRules = options?.skipClaudeUserRules ?? false;
-  const effectiveProjectRoot = resolveEffectiveProjectRoot(
-    projectRoot,
-    options?.workspaceDirectory,
-    startDir,
-  );
-  const cacheKey = [projectRoot ?? "", effectiveProjectRoot, startDir, skipClaudeUserRules ? "1" : "0"].join(
-    "\0",
-  );
-  const cached = cache?.get(cacheKey);
-  if (cached) return [...cached];
-  const candidates: RuleFileCandidate[] = [];
-  const seenRealPaths = new Set<string>();
-  addProjectRuleCandidates(effectiveProjectRoot, startDir, candidates, seenRealPaths, cache);
-  addProjectSingleFileCandidates(effectiveProjectRoot, candidates, seenRealPaths);
-  addUserRuleCandidates(homeDir || homedir(), skipClaudeUserRules, candidates, seenRealPaths, cache);
-  const sorted = sortCandidates(candidates);
-  cache?.set(cacheKey, sorted);
-  return sorted;
+  const startDir = dirname(resolve(currentFile))
+  const skipClaudeUserRules = options?.skipClaudeUserRules ?? false
+  const effectiveProjectRoot = resolveEffectiveProjectRoot(projectRoot, options?.workspaceDirectory, startDir)
+  const cacheKey = [projectRoot ?? "", effectiveProjectRoot, startDir, skipClaudeUserRules ? "1" : "0"].join("\0")
+  const cached = cache?.get(cacheKey)
+  if (cached) return [...cached]
+  const candidates: RuleFileCandidate[] = []
+  const seenRealPaths = new Set<string>()
+  addProjectRuleCandidates(effectiveProjectRoot, startDir, candidates, seenRealPaths, cache)
+  addProjectSingleFileCandidates(effectiveProjectRoot, candidates, seenRealPaths)
+  addUserRuleCandidates(homeDir || homedir(), skipClaudeUserRules, candidates, seenRealPaths, cache)
+  const sorted = sortCandidates(candidates)
+  cache?.set(cacheKey, sorted)
+  return sorted
 }
 
 function resolveEffectiveProjectRoot(
@@ -56,10 +54,10 @@ function resolveEffectiveProjectRoot(
   workspaceDirectory: string | undefined,
   startDir: string,
 ): string {
-  if (projectRoot) return projectRoot;
-  if (!workspaceDirectory) return startDir;
-  const workspaceRoot = resolve(workspaceDirectory);
-  return isSameOrChildPath(startDir, workspaceRoot) ? workspaceRoot : startDir;
+  if (projectRoot) return projectRoot
+  if (!workspaceDirectory) return startDir
+  const workspaceRoot = resolve(workspaceDirectory)
+  return isSameOrChildPath(startDir, workspaceRoot) ? workspaceRoot : startDir
 }
 
 function addProjectRuleCandidates(
@@ -69,17 +67,17 @@ function addProjectRuleCandidates(
   seenRealPaths: Set<string>,
   cache: RuleScanCache | undefined,
 ): void {
-  const projectRootRealPath = safeRealpathSync(projectRoot);
-  let currentDir = startDir;
-  let distance = 0;
+  const projectRootRealPath = safeRealpathSync(projectRoot)
+  let currentDir = startDir
+  let distance = 0
   while (true) {
     for (const [parent, subdir] of PROJECT_RULE_SUBDIRS) {
-      const source = `${parent}/${subdir}` as RuleSource;
-      const ruleDir = join(currentDir, parent, subdir);
+      const source = `${parent}/${subdir}` as RuleSource
+      const ruleDir = join(currentDir, parent, subdir)
       for (const entry of scanDirectoryWithCache(ruleDir, cache, projectRootRealPath)) {
-        if (seenRealPaths.has(entry.realPath)) continue;
-        seenRealPaths.add(entry.realPath);
-        warnSisyphusRuleDeprecation(source, entry.path);
+        if (seenRealPaths.has(entry.realPath)) continue
+        seenRealPaths.add(entry.realPath)
+        warnSisyphusRuleDeprecation(source, entry.path)
         candidates.push({
           path: entry.path,
           realPath: entry.realPath,
@@ -87,14 +85,14 @@ function addProjectRuleCandidates(
           isGlobal: false,
           distance,
           relativePath: normalizePath(relative(projectRoot, entry.path)),
-        });
+        })
       }
     }
-    if (currentDir === projectRoot) break;
-    const parentDir = dirname(currentDir);
-    if (parentDir === currentDir || !isSameOrChildPath(parentDir, projectRoot)) break;
-    currentDir = parentDir;
-    distance += 1;
+    if (currentDir === projectRoot) break
+    const parentDir = dirname(currentDir)
+    if (parentDir === currentDir || !isSameOrChildPath(parentDir, projectRoot)) break
+    currentDir = parentDir
+    distance += 1
   }
 }
 
@@ -103,12 +101,12 @@ function addProjectSingleFileCandidates(
   candidates: RuleFileCandidate[],
   seenRealPaths: Set<string>,
 ): void {
-  const projectRootRealPath = safeRealpathSync(projectRoot);
+  const projectRootRealPath = safeRealpathSync(projectRoot)
   for (const ruleFile of PROJECT_RULE_FILES) {
-    const filePath = join(projectRoot, ruleFile);
-    const realPath = validFileRealPath(filePath, projectRootRealPath);
-    if (realPath === null || seenRealPaths.has(realPath)) continue;
-    seenRealPaths.add(realPath);
+    const filePath = join(projectRoot, ruleFile)
+    const realPath = validFileRealPath(filePath, projectRootRealPath)
+    if (realPath === null || seenRealPaths.has(realPath)) continue
+    seenRealPaths.add(realPath)
     candidates.push({
       path: filePath,
       realPath,
@@ -117,7 +115,7 @@ function addProjectSingleFileCandidates(
       distance: 0,
       isSingleFile: true,
       relativePath: normalizePath(ruleFile),
-    });
+    })
   }
 }
 
@@ -128,13 +126,16 @@ function addUserRuleCandidates(
   seenRealPaths: Set<string>,
   cache: RuleScanCache | undefined,
 ): void {
-  const userRuleDirs: Array<readonly [string, RuleSource]> = OPENCODE_USER_RULE_DIRS.map((dir) => [join(homeDir, dir), `~/${dir}` as RuleSource]);
-  if (!skipClaudeUserRules) userRuleDirs.push([join(homeDir, USER_RULE_DIR), "~/.claude/rules"]);
+  const userRuleDirs: Array<readonly [string, RuleSource]> = OPENCODE_USER_RULE_DIRS.map((dir) => [
+    join(homeDir, dir),
+    `~/${dir}` as RuleSource,
+  ])
+  if (!skipClaudeUserRules) userRuleDirs.push([join(homeDir, USER_RULE_DIR), "~/.claude/rules"])
   for (const [userRuleDir, source] of userRuleDirs) {
     for (const entry of scanDirectoryWithCache(userRuleDir, cache)) {
-      if (seenRealPaths.has(entry.realPath)) continue;
-      seenRealPaths.add(entry.realPath);
-      warnSisyphusRuleDeprecation(source, entry.path);
+      if (seenRealPaths.has(entry.realPath)) continue
+      seenRealPaths.add(entry.realPath)
+      warnSisyphusRuleDeprecation(source, entry.path)
       candidates.push({
         path: entry.path,
         realPath: entry.realPath,
@@ -142,57 +143,61 @@ function addUserRuleCandidates(
         isGlobal: true,
         distance: GLOBAL_DISTANCE,
         relativePath: normalizePath(relative(homeDir, entry.path)),
-      });
+      })
     }
   }
 }
 
-function scanDirectoryWithCache(dir: string, cache: RuleScanCache | undefined, boundaryRealPath?: string): readonly DirectoryScanEntry[] {
-  const cached = cache?.getDirScan(dir);
-  if (cached) return cached;
-  const entries: DirectoryScanEntry[] = [];
-  findRuleFilesRecursive(dir, entries, new Set<string>(), boundaryRealPath);
-  cache?.setDirScan(dir, entries);
-  return entries;
+function scanDirectoryWithCache(
+  dir: string,
+  cache: RuleScanCache | undefined,
+  boundaryRealPath?: string,
+): readonly DirectoryScanEntry[] {
+  const cached = cache?.getDirScan(dir)
+  if (cached) return cached
+  const entries: DirectoryScanEntry[] = []
+  findRuleFilesRecursive(dir, entries, new Set<string>(), boundaryRealPath)
+  cache?.setDirScan(dir, entries)
+  return entries
 }
 
 function warnSisyphusRuleDeprecation(source: RuleSource, path: string): void {
-  if (!SISYPHUS_LEGACY_RULE_SOURCES.has(source)) return;
-  const warningKey = dirname(path);
-  if (warnedSisyphusRuleDirectories.has(warningKey)) return;
-  warnedSisyphusRuleDirectories.add(warningKey);
+  if (!SISYPHUS_LEGACY_RULE_SOURCES.has(source)) return
+  const warningKey = dirname(path)
+  if (warnedSisyphusRuleDirectories.has(warningKey)) return
+  warnedSisyphusRuleDirectories.add(warningKey)
   logSisyphusRuleDeprecation(SISYPHUS_DEPRECATION_MESSAGE, {
     event: "rules-sisyphus-deprecated",
     path,
-  });
+  })
 }
 
 export function _setSisyphusRuleDeprecationLoggerForTesting(logger: SisyphusRuleDeprecationLogger): void {
-  logSisyphusRuleDeprecation = logger;
+  logSisyphusRuleDeprecation = logger
 }
 
 export function _resetSisyphusRuleDeprecationWarningStateForTesting(): void {
-  warnedSisyphusRuleDirectories.clear();
-  logSisyphusRuleDeprecation = noopSisyphusRuleDeprecationLogger;
+  warnedSisyphusRuleDirectories.clear()
+  logSisyphusRuleDeprecation = noopSisyphusRuleDeprecationLogger
 }
 
 function validFileRealPath(filePath: string, boundaryRealPath?: string): string | null {
-  if (!existsSync(filePath)) return null;
+  if (!existsSync(filePath)) return null
   try {
-    if (!statSync(filePath).isFile()) return null;
-    const realPath = safeRealpathSync(filePath);
-    if (boundaryRealPath !== undefined && !isSameOrChildPath(realPath, boundaryRealPath)) return null;
-    return realPath;
+    if (!statSync(filePath).isFile()) return null
+    const realPath = safeRealpathSync(filePath)
+    if (boundaryRealPath !== undefined && !isSameOrChildPath(realPath, boundaryRealPath)) return null
+    return realPath
   } catch {
-    return null;
+    return null
   }
 }
 
 function isSameOrChildPath(childPath: string, parentPath: string): boolean {
-  const relativePath = relative(parentPath, childPath);
-  return relativePath === "" || (!relativePath.startsWith("..") && !isAbsolute(relativePath));
+  const relativePath = relative(parentPath, childPath)
+  return relativePath === "" || (!relativePath.startsWith("..") && !isAbsolute(relativePath))
 }
 
 function normalizePath(path: string): string {
-  return path.replaceAll("\\", "/");
+  return path.replaceAll("\\", "/")
 }

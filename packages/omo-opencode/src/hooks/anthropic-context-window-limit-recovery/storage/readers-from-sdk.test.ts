@@ -50,9 +50,7 @@ describe("auto-compact storage SDK readers", () => {
     const { readPartsFromSDK } = await importFreshReaders()
     const sessionID = "ses_test"
     const messageID = "msg_test"
-    const storedParts = [
-      { id: "prt_1", sessionID, messageID, type: "text", text: "hello" },
-    ]
+    const storedParts = [{ id: "prt_1", sessionID, messageID, type: "text", text: "hello" }]
 
     const client = createMockClient({
       message: (_sid, _mid) => ({ parts: storedParts }),

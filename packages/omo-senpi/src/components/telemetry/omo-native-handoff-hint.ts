@@ -30,8 +30,10 @@ function parsePayload(value: unknown): HandoffHintPayload | undefined {
   const record = value as Record<string, unknown>
   const action = HANDOFF_HINT_ACTIONS.find((candidate) => candidate === record.action)
   if (action === undefined) return undefined
-  if (typeof record.sessionId !== "string" || typeof record.provider !== "string" || typeof record.model !== "string") return undefined
-  if (![record.contextTokens, record.nextReplyUsd, record.freshUsd, record.savingUsd].every(isFiniteNumber)) return undefined
+  if (typeof record.sessionId !== "string" || typeof record.provider !== "string" || typeof record.model !== "string")
+    return undefined
+  if (![record.contextTokens, record.nextReplyUsd, record.freshUsd, record.savingUsd].every(isFiniteNumber))
+    return undefined
   if (typeof record.subscription !== "boolean") return undefined
   return record as unknown as HandoffHintPayload
 }

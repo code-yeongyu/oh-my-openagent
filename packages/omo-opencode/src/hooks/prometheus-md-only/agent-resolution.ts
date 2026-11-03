@@ -16,10 +16,7 @@ function isCompactionAgent(agent: string): boolean {
   return agent.toLowerCase() === "compaction"
 }
 
-async function getAgentFromMessageFiles(
-  sessionID: string,
-  client?: OpencodeClient
-): Promise<string | undefined> {
+async function getAgentFromMessageFiles(sessionID: string, client?: OpencodeClient): Promise<string | undefined> {
   if (isSqliteBackend() && client) {
     const firstAgent = await findFirstMessageWithAgentFromSDK(client, sessionID)
     if (firstAgent && !isCompactionAgent(firstAgent)) return firstAgent
@@ -53,7 +50,7 @@ async function getAgentFromMessageFiles(
 export async function getAgentFromSession(
   sessionID: string,
   directory: string,
-  client?: OpencodeClient
+  client?: OpencodeClient,
 ): Promise<string | undefined> {
   // Check in-memory first (current session)
   const memoryAgent = getSessionAgent(sessionID)

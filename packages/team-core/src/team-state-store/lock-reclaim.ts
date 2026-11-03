@@ -74,7 +74,7 @@ export async function removeLockRecordIfUnchanged(
   const guardRecord = await buildLockRecord("lock-reclaim")
   if (!(await publishLockRecord(guardPath, guardRecord))) {
     const guard = await readLockRecord(guardPath)
-    if (guard !== null && await isLockRecordStale(guard, staleAfterMs)) {
+    if (guard !== null && (await isLockRecordStale(guard, staleAfterMs))) {
       await removeLockRecordIfUnchanged(guardPath, guard.content, staleAfterMs, deps)
     }
     return "busy"
@@ -83,12 +83,12 @@ export async function removeLockRecordIfUnchanged(
   try {
     const current = await readLockRecord(lockPath)
     if (current === null) return "absent"
-    if (current.content !== expectedRecord || !await isLockRecordStale(current, staleAfterMs)) return "changed"
+    if (current.content !== expectedRecord || !(await isLockRecordStale(current, staleAfterMs))) return "changed"
     const unlinked = await unlinkWithRetry(lockPath, deps)
     if (unlinked !== "stuck") forgetLockRecord(expectedRecord)
     return unlinked === "absent" ? "absent" : unlinked
   } finally {
     markLockRecordReleased(guardRecord)
-    if (await unlinkWithRetry(guardPath, deps) !== "stuck") forgetLockRecord(guardRecord)
+    if ((await unlinkWithRetry(guardPath, deps)) !== "stuck") forgetLockRecord(guardRecord)
   }
 }

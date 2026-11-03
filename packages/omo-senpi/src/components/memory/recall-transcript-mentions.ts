@@ -115,7 +115,9 @@ export function excludedPathsByWindowScan(
   const json = JSON.stringify(window)
   const found = new Set<string>()
   for (const document of documents) {
-    const escaped = JSON.stringify(document.path).slice(1, -1).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    const escaped = JSON.stringify(document.path)
+      .slice(1, -1)
+      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
     if (new RegExp(`${escaped}(?=$|[\\s"'\x60\\])}>:;,!?]|\\\\["nrtbf])`).test(json)) found.add(document.path)
   }
   return found

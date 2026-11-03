@@ -62,7 +62,9 @@ function harness() {
       kind: "resolved",
       plan: {
         model: "fixture/fixture",
-        ...(spec.subagent_type === NO_WRITE_RULE.name ? { agentType: spec.subagent_type, toolAllowlist: [], toolDenylist: ["write"] } : {}),
+        ...(spec.subagent_type === NO_WRITE_RULE.name
+          ? { agentType: spec.subagent_type, toolAllowlist: [], toolDenylist: ["write"] }
+          : {}),
         ...(spec.subagent_type === DENY_ONLY.name ? { agentType: spec.subagent_type, toolDenylist: ["write"] } : {}),
       },
     }),
@@ -73,14 +75,26 @@ function harness() {
     agents: { [NO_WRITE_RULE.name]: NO_WRITE_RULE, [DENY_ONLY.name]: DENY_ONLY },
     resolveChildToolNames: () => CHILD_TOOLS,
   })
-  const context: TaskToolContext = { cwd: root, sessionManager: { getSessionId: () => "parent" }, kernelTools: capability }
+  const context: TaskToolContext = {
+    cwd: root,
+    sessionManager: { getSessionId: () => "parent" },
+    kernelTools: capability,
+  }
   const spawn = async (subagentType: string): Promise<TaskToolDetails> =>
-    (await buildTaskExecute(deps)("call-1", {
-      prompt: "use the parent tool",
-      subagent_type: subagentType,
-      run_in_background: true,
-      tools: ["fixture_write"],
-    } as never, undefined, undefined, context)).details
+    (
+      await buildTaskExecute(deps)(
+        "call-1",
+        {
+          prompt: "use the parent tool",
+          subagent_type: subagentType,
+          run_in_background: true,
+          tools: ["fixture_write"],
+        } as never,
+        undefined,
+        undefined,
+        context,
+      )
+    ).details
   return { spawn, store, sessions, capability }
 }
 

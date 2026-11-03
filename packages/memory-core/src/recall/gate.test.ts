@@ -15,9 +15,7 @@ async function createPendingDir(): Promise<string> {
 }
 
 afterEach(async () => {
-  await Promise.all(
-    tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })),
-  )
+  await Promise.all(tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })))
 })
 
 describe("validateNudges", () => {
@@ -39,10 +37,11 @@ describe("validateNudges", () => {
 
   it("#given an already surfaced path #when validated #then it is rejected", () => {
     // given / when
-    const accepted = validateNudges(
-      [{ path: "notes/b.md", hint: "beta" }],
-      { candidates, surfaced: new Set(["notes/b.md"]), maxItems: 5 },
-    )
+    const accepted = validateNudges([{ path: "notes/b.md", hint: "beta" }], {
+      candidates,
+      surfaced: new Set(["notes/b.md"]),
+      maxItems: 5,
+    })
 
     // then
     expect(accepted).toEqual([])
@@ -219,9 +218,17 @@ describe("PendingNudges", () => {
     const stalePath = join(dir, "old-session.json")
     const orphanPath = join(dir, "session-9.json.tmp-4242")
     const freshPath = join(dir, "fresh-session.json")
-    await writeFile(stalePath, JSON.stringify({ version: 1, sessionId: "old-session", writtenAt: "x", nudges: [] }), "utf8")
+    await writeFile(
+      stalePath,
+      JSON.stringify({ version: 1, sessionId: "old-session", writtenAt: "x", nudges: [] }),
+      "utf8",
+    )
     await writeFile(orphanPath, "{}", "utf8")
-    await writeFile(freshPath, JSON.stringify({ version: 1, sessionId: "fresh-session", writtenAt: "y", nudges: [] }), "utf8")
+    await writeFile(
+      freshPath,
+      JSON.stringify({ version: 1, sessionId: "fresh-session", writtenAt: "y", nudges: [] }),
+      "utf8",
+    )
     const old = new Date(Date.now() - 25 * 60 * 60_000)
     await utimes(stalePath, old, old)
     await utimes(orphanPath, old, old)

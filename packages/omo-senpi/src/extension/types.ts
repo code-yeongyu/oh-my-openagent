@@ -60,7 +60,10 @@ export interface SenpiExtensionAPI {
   ): void
   rpc?: {
     emit(name: string, data: unknown): void
-    handle?(name: string, handler: (data: unknown, context?: ExtensionRpcRequestContext) => unknown | Promise<unknown>): void
+    handle?(
+      name: string,
+      handler: (data: unknown, context?: ExtensionRpcRequestContext) => unknown | Promise<unknown>,
+    ): void
   }
   events?: {
     emit(name: string, data: unknown): void
@@ -87,7 +90,10 @@ export interface SenpiExtensionAPI {
   /** The permission preset senpi enforces for this session (senpi #3301); undefined without the permission system. */
   getPermissionPreset?(): string | undefined
   sendMessage(message: Record<string, unknown>, options?: Record<string, unknown>): void | Promise<void>
-  sendUserMessage(content: string | readonly Record<string, unknown>[], options?: { deliverAs?: "steer" | "followUp" }): void
+  sendUserMessage(
+    content: string | readonly Record<string, unknown>[],
+    options?: { deliverAs?: "steer" | "followUp" },
+  ): void
   /** senpi's slash-command registry: extension commands, prompt templates, and `skill:<name>` entries. */
   getCommands?(): readonly {
     readonly name: string

@@ -26,10 +26,7 @@ function stateDir(): string {
 
 function writeEventLog(dir: string, taskId: string, lines: readonly Record<string, unknown>[]): void {
   mkdirSync(join(dir, "logs"), { recursive: true })
-  writeFileSync(
-    join(dir, "logs", `${taskId}.jsonl`),
-    `${lines.map((line) => JSON.stringify(line)).join("\n")}\n`,
-  )
+  writeFileSync(join(dir, "logs", `${taskId}.jsonl`), `${lines.map((line) => JSON.stringify(line)).join("\n")}\n`)
 }
 
 function record(overrides: Partial<TaskRecord> = {}): TaskRecord {
@@ -50,12 +47,22 @@ function record(overrides: Partial<TaskRecord> = {}): TaskRecord {
     category: "deep-low",
     background_mode: "foreground",
     spawn_spec: { version: 1, cwd: "/repo", prompt: "work" },
-    run_stats: { runtime_ms: 5, turns: 1, tool_calls: 1, duration_status: "monotonic", token_status: "complete", cost_status: "unavailable" },
+    run_stats: {
+      runtime_ms: 5,
+      turns: 1,
+      tool_calls: 1,
+      duration_status: "monotonic",
+      token_status: "complete",
+      cost_status: "unavailable",
+    },
     ...overrides,
   }
 }
 
-function harness(dir: string, options: { readonly capture?: (name: OmoNativeEventName, properties: EventTelemetryProperties) => void } = {}) {
+function harness(
+  dir: string,
+  options: { readonly capture?: (name: OmoNativeEventName, properties: EventTelemetryProperties) => void } = {},
+) {
   const captured: Captured[] = []
   const diagnostics: unknown[] = []
   const observers = createTaskTerminalObservers()
@@ -111,7 +118,7 @@ describe("omo-native delegation capture", () => {
     expect(captured[0]?.properties).toMatchObject({ task_send_running_count: 0, task_send_queued_count: 0 })
   })
 
-  test("#given a task that completes then is revived and errors #when both terminals are captured #then two events share task_seq with run_epoch 0 and 1 and the second carries start_reason \"revive_after_completed\"", () => {
+  test('#given a task that completes then is revived and errors #when both terminals are captured #then two events share task_seq with run_epoch 0 and 1 and the second carries start_reason "revive_after_completed"', () => {
     // given
     const dir = stateDir()
     const { captured, notify, dispose } = harness(dir)
@@ -126,7 +133,9 @@ describe("omo-native delegation capture", () => {
     dispose()
 
     // then
-    expect(captured.map(({ properties }) => [properties.task_seq, properties.run_epoch, properties.start_reason])).toEqual([
+    expect(
+      captured.map(({ properties }) => [properties.task_seq, properties.run_epoch, properties.start_reason]),
+    ).toEqual([
       [7, 0, "initial_spawn"],
       [7, 1, "revive_after_completed"],
     ])

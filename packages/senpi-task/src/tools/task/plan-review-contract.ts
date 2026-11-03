@@ -27,7 +27,8 @@ export function extractPlanPaths(text: string): readonly string[] {
   return paths
 }
 
-export type PlanReviewTarget = { readonly kind: "path"; readonly path: string } | { readonly kind: "deny"; readonly message: string }
+export type PlanReviewTarget =
+  { readonly kind: "path"; readonly path: string } | { readonly kind: "deny"; readonly message: string }
 
 export function resolvePlanReviewTarget(callerPrompt: string, state: SkillInvocationState): PlanReviewTarget {
   const references = state.planArtifactReferences()
@@ -46,7 +47,10 @@ export function resolvePlanReviewTarget(callerPrompt: string, state: SkillInvoca
 // reaches the child: the prompt is built from the RECORDED path, so caller-controlled prefixes,
 // absolute paths, and `..` segments cannot be interpolated into the plan-reviewer prompt. Identity is the
 // normalized `.omo/plans/<name>.md` suffix, which keeps worktree-rooted recordings matchable.
-function matchRecordedReference(candidate: string, references: readonly PlanArtifactReference[]): PlanArtifactReference | undefined {
+function matchRecordedReference(
+  candidate: string,
+  references: readonly PlanArtifactReference[],
+): PlanArtifactReference | undefined {
   const wanted = planSuffix(candidate)
   if (wanted === undefined) return undefined
   return references.find((reference) => planSuffix(reference.path) === wanted)
@@ -64,8 +68,7 @@ export function buildPlanReviewPrompt(path: string): string {
 }
 
 export type PlanReviewContractOutcome =
-  | { readonly kind: "prompt"; readonly prompt: string }
-  | { readonly kind: "deny"; readonly message: string }
+  { readonly kind: "prompt"; readonly prompt: string } | { readonly kind: "deny"; readonly message: string }
 
 // Tool-layer bridge mirroring invocation-gate.ts: returns undefined when the target agent carries
 // no plan-review contract (passthrough), otherwise the forced prompt or the denial. A missing
@@ -87,7 +90,11 @@ export function planReviewContractOutcome(
 function topReference(references: readonly PlanArtifactReference[]): PlanArtifactReference | undefined {
   let top: PlanArtifactReference | undefined
   for (const reference of references) {
-    if (top === undefined || reference.count > top.count || (reference.count === top.count && reference.lastTouchedAt > top.lastTouchedAt)) {
+    if (
+      top === undefined ||
+      reference.count > top.count ||
+      (reference.count === top.count && reference.lastTouchedAt > top.lastTouchedAt)
+    ) {
       top = reference
     }
   }

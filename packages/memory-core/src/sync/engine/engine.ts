@@ -141,17 +141,19 @@ export class SyncEngine {
         const shownBefore = this.shownKey()
         const failure = describeSyncFailure(error)
         const previous = this.failing
-        const failing = previous?.failure.kind === failure.kind
-          ? { failure, since: previous.since, attempts: previous.attempts + 1 }
-          : { failure, since: this.deps.clock.now(), attempts: 1 }
+        const failing =
+          previous?.failure.kind === failure.kind
+            ? { failure, since: previous.since, attempts: previous.attempts + 1 }
+            : { failure, since: this.deps.clock.now(), attempts: 1 }
         this.failing = failing
         // A failure below its threshold (an offline blip) never replaces or clears what is shown: only a
         // successful cycle clears a shown failure.
         if (isFailureShown(failing.failure.kind, failing.attempts)) {
           const shown = this.shown
-          this.shown = shown !== null && shownBefore === `${failure.kind}\n${failure.action}`
-            ? { failure, since: shown.since, attempts: shown.attempts + 1 }
-            : failing
+          this.shown =
+            shown !== null && shownBefore === `${failure.kind}\n${failure.action}`
+              ? { failure, since: shown.since, attempts: shown.attempts + 1 }
+              : failing
         }
         this.announceIfChanged(shownBefore)
         for (const w of waiters) w.reject(error)
@@ -177,7 +179,9 @@ export class SyncEngine {
     try {
       this.deps.onStatusChange?.()
     } catch (error) {
-      this.deps.log?.(`sync status listener failed: ${error instanceof Error ? error.message : "a non-Error value was thrown"}`)
+      this.deps.log?.(
+        `sync status listener failed: ${error instanceof Error ? error.message : "a non-Error value was thrown"}`,
+      )
     }
   }
 

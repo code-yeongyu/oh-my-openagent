@@ -24,12 +24,19 @@ afterEach(async () => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
 })
 
-const SIGNED_IN: AccountShowResult = { exitCode: 0, stdout: JSON.stringify({ signedIn: true, device: { id: "dev-self", name: "This Mac" }, refreshState: "ok" }) }
+const SIGNED_IN: AccountShowResult = {
+  exitCode: 0,
+  stdout: JSON.stringify({ signedIn: true, device: { id: "dev-self", name: "This Mac" }, refreshState: "ok" }),
+}
 
 const credential = (): DeviceCredential => ({
   device: { id: "dev-self", name: "This Mac" },
-  signingPrivateKey: generateKeyPairSync("ed25519").privateKey.export({ format: "der", type: "pkcs8" }).toString("base64"),
-  sealingPrivateKey: generateKeyPairSync("x25519").privateKey.export({ format: "der", type: "pkcs8" }).toString("base64"),
+  signingPrivateKey: generateKeyPairSync("ed25519")
+    .privateKey.export({ format: "der", type: "pkcs8" })
+    .toString("base64"),
+  sealingPrivateKey: generateKeyPairSync("x25519")
+    .privateKey.export({ format: "der", type: "pkcs8" })
+    .toString("base64"),
 })
 
 const home = (): string => {
@@ -114,10 +121,30 @@ describe("device service bootstrap", () => {
   })
 
   test.each([
-    ["signedIn false stops with omo login hint", { exitCode: 0, stdout: JSON.stringify({ signedIn: false }) }, "signed_out", "omo login"],
-    ["locked store reports keychain_locked and installs nothing", { exitCode: 7, stdout: JSON.stringify({ keychain: "locked" }) }, "keychain_locked", "Unlock"],
-    ["store unavailable reports service_degraded", { exitCode: 9, stdout: JSON.stringify({ error: "store-unavailable" }) }, "service_degraded", "credential store"],
-    ["invalid json is account_unavailable", { exitCode: 0, stdout: "{signedIn: true" }, "account_unavailable", "omo login"],
+    [
+      "signedIn false stops with omo login hint",
+      { exitCode: 0, stdout: JSON.stringify({ signedIn: false }) },
+      "signed_out",
+      "omo login",
+    ],
+    [
+      "locked store reports keychain_locked and installs nothing",
+      { exitCode: 7, stdout: JSON.stringify({ keychain: "locked" }) },
+      "keychain_locked",
+      "Unlock",
+    ],
+    [
+      "store unavailable reports service_degraded",
+      { exitCode: 9, stdout: JSON.stringify({ error: "store-unavailable" }) },
+      "service_degraded",
+      "credential store",
+    ],
+    [
+      "invalid json is account_unavailable",
+      { exitCode: 0, stdout: "{signedIn: true" },
+      "account_unavailable",
+      "omo login",
+    ],
   ])("%s", async (_name, account, state, hint) => {
     const { deps, calls } = harness(home(), { accountShow: async () => account })
     const outcome = await bootstrapDeviceService(deps)
@@ -144,7 +171,11 @@ describe("device service bootstrap", () => {
     const owner = await ownerAt(stateDir, PIN)
     await writeToken(stateDir, testSecure)
     const { deps, calls } = harness(stateDir)
-    expect(await bootstrapDeviceService(deps)).toMatchObject({ kind: "stopped", state: "service_degraded", exitCode: 3 })
+    expect(await bootstrapDeviceService(deps)).toMatchObject({
+      kind: "stopped",
+      state: "service_degraded",
+      exitCode: 3,
+    })
     expect(owner.state.adoptions).toBe(0)
     expect(owner.state.log).toEqual([])
     expect(calls.install).toBe(0)

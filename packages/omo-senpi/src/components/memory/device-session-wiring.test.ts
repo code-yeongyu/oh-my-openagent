@@ -23,7 +23,11 @@ const cleanups: Array<() => Promise<void>> = []
 
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup()
-  await Promise.all(roots.splice(0).map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(
+    roots
+      .splice(0)
+      .map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })),
+  )
 })
 
 const sessionEventContext = (): unknown => ({
@@ -34,10 +38,23 @@ const sessionEventContext = (): unknown => ({
 
 const signedIn: DeviceAccountSource = async () => ({
   kind: "cli",
-  descriptor: { genesis: "unsupported", rpId: null, userName: null, serviceOrigin: "http://127.0.0.1:9", accountId: "acct-wiring", serviceDeviceId: "service-device", syncPrincipalId: "principal", publicKeys: { signing: "signing", sealing: "sealing" }, generation: "fixture", incarnation: "cli" },
+  descriptor: {
+    genesis: "unsupported",
+    rpId: null,
+    userName: null,
+    serviceOrigin: "http://127.0.0.1:9",
+    accountId: "acct-wiring",
+    serviceDeviceId: "service-device",
+    syncPrincipalId: "principal",
+    publicKeys: { signing: "signing", sealing: "sealing" },
+    generation: "fixture",
+    incarnation: "cli",
+  },
   signal: new AbortController().signal,
-  boundary: async dispatch => dispatch(),
-  forOperation: async () => { throw new Error("unused") },
+  boundary: async (dispatch) => dispatch(),
+  forOperation: async () => {
+    throw new Error("unused")
+  },
   serviceDeviceId: "service-device",
   isCurrent: async () => true,
   api: "http://127.0.0.1:9",
@@ -51,14 +68,18 @@ const signedIn: DeviceAccountSource = async () => ({
   signedOut: async () => false,
 })
 
-async function syncLinesAfterBind(source: DeviceAccountSource): Promise<{ readonly message: string; readonly fields: unknown }[]> {
+async function syncLinesAfterBind(
+  source: DeviceAccountSource,
+): Promise<{ readonly message: string; readonly fields: unknown }[]> {
   const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-device-session-")))
   roots.push(root)
   const cwd = join(root, "project")
   const env = { OMO_MEMORY_HOME: join(root, "memory") }
   const settings = memorySettings()
   const identity = resolveMemoryIdentity(settings.agent, cwd, env)
-  await new GitMemoryRepo({ dir: identity.paths.repo, agentId: identity.id }).init({ seedFiles: [{ relativePath: "system/persona.md", content: "---\ndescription: Persona\n---\nhi\n" }] })
+  await new GitMemoryRepo({ dir: identity.paths.repo, agentId: identity.id }).init({
+    seedFiles: [{ relativePath: "system/persona.md", content: "---\ndescription: Persona\n---\nhi\n" }],
+  })
   await ensureIdentityRuntimeDirs(identity.paths)
   const lines: { message: string; fields: unknown }[] = []
   const settled = new Promise<void>((resolve) => {
@@ -68,14 +89,23 @@ async function syncLinesAfterBind(source: DeviceAccountSource): Promise<{ readon
     }
     const ctx = componentContext()
     const pi = new MemoryFakeExtensionAPI()
-    createMemoryComponent({ env, loadConfig: () => loadedMemoryConfig(settings), resolveCwd: () => cwd, deviceAccount: source })
-      .register(pi, { ...ctx, logger: { ...ctx.logger, info: record } })
+    createMemoryComponent({
+      env,
+      loadConfig: () => loadedMemoryConfig(settings),
+      resolveCwd: () => cwd,
+      deviceAccount: source,
+    }).register(pi, { ...ctx, logger: { ...ctx.logger, info: record } })
     cleanups.push(async () => {
       await pi.dispatch("session_shutdown", { type: "session_shutdown" }, sessionEventContext())
     })
     void pi.dispatch("session_start", { type: "session_start" }, sessionEventContext())
   })
-  await Promise.race([settled, new Promise((_, reject) => setTimeout(() => reject(new Error("waited 20s for a 'sync idle' line, none was logged")), 20_000))])
+  await Promise.race([
+    settled,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("waited 20s for a 'sync idle' line, none was logged")), 20_000),
+    ),
+  ])
   return lines.filter((line) => line.message.startsWith("sync idle"))
 }
 

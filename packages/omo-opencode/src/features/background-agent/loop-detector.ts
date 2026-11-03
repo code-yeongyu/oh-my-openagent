@@ -18,15 +18,11 @@ export interface ToolLoopDetectionResult {
   repeatedCount?: number
 }
 
-export function resolveCircuitBreakerSettings(
-  config?: BackgroundTaskConfig
-): CircuitBreakerSettings {
+export function resolveCircuitBreakerSettings(config?: BackgroundTaskConfig): CircuitBreakerSettings {
   return {
     enabled: config?.circuitBreaker?.enabled ?? DEFAULT_CIRCUIT_BREAKER_ENABLED,
-    maxToolCalls:
-      config?.circuitBreaker?.maxToolCalls ?? config?.maxToolCalls ?? DEFAULT_MAX_TOOL_CALLS,
-    consecutiveThreshold:
-      config?.circuitBreaker?.consecutiveThreshold ?? DEFAULT_CIRCUIT_BREAKER_CONSECUTIVE_THRESHOLD,
+    maxToolCalls: config?.circuitBreaker?.maxToolCalls ?? config?.maxToolCalls ?? DEFAULT_MAX_TOOL_CALLS,
+    consecutiveThreshold: config?.circuitBreaker?.consecutiveThreshold ?? DEFAULT_CIRCUIT_BREAKER_CONSECUTIVE_THRESHOLD,
   }
 }
 
@@ -34,7 +30,7 @@ export function recordToolCall(
   window: ToolCallWindow | undefined,
   toolName: string,
   settings: CircuitBreakerSettings,
-  toolInput?: Record<string, unknown> | null
+  toolInput?: Record<string, unknown> | null,
 ): ToolCallWindow {
   if (toolInput == null) {
     return {
@@ -74,10 +70,7 @@ function sortObject(obj: unknown): unknown {
   return sorted
 }
 
-export function createToolCallSignature(
-  toolName: string,
-  toolInput?: Record<string, unknown> | null
-): string {
+export function createToolCallSignature(toolName: string, toolInput?: Record<string, unknown> | null): string {
   if (toolInput == null) {
     return toolName
   }
@@ -87,9 +80,7 @@ export function createToolCallSignature(
   return `${toolName}::${JSON.stringify(sortObject(toolInput))}`
 }
 
-export function detectRepetitiveToolUse(
-  window: ToolCallWindow | undefined
-): ToolLoopDetectionResult {
+export function detectRepetitiveToolUse(window: ToolCallWindow | undefined): ToolLoopDetectionResult {
   if (!window || window.consecutiveCount < window.threshold) {
     return { triggered: false }
   }

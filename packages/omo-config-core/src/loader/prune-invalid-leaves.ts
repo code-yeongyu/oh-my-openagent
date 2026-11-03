@@ -51,7 +51,7 @@ function hasChild(container: Container, segment: ConfigPathSegment): boolean {
 }
 
 function segmentsOf(path: readonly PropertyKey[]): ConfigPathSegment[] {
-  return path.map((segment) => typeof segment === "number" ? segment : String(segment))
+  return path.map((segment) => (typeof segment === "number" ? segment : String(segment)))
 }
 
 /**

@@ -20,8 +20,7 @@ export function notifyWhenModelCacheIsMissing(tui: TuiClient): void {
     .showToast({
       body: {
         title: "⚠️ Provider Cache Missing",
-        message:
-          "Model filtering disabled. RESTART OpenCode to enable full functionality.",
+        message: "Model filtering disabled. RESTART OpenCode to enable full functionality.",
         variant: "warning",
         duration: 6000,
       },

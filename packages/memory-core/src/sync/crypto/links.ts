@@ -13,8 +13,7 @@ export const nextLink = async (prior: string, digest: string): Promise<string | 
 }
 
 export type WrapSetCheck =
-  | { readonly ok: true; readonly digest: string }
-  | { readonly ok: false; readonly reason: "duplicate_wrap" }
+  { readonly ok: true; readonly digest: string } | { readonly ok: false; readonly reason: "duplicate_wrap" }
 
 /**
  * The wraps digest of sync-design section 7: SHA-256 of one RFC 8785 array of

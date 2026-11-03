@@ -29,7 +29,8 @@ afterEach(async () => {
 function tracingExec(traceDir: string): GitExec {
   const real = createNodeGitExec()
   return {
-    run: (argv, options) => real.run(argv, { ...options, env: { ...(options.env ?? process.env), GIT_TRACE2_EVENT: traceDir } }),
+    run: (argv, options) =>
+      real.run(argv, { ...options, env: { ...(options.env ?? process.env), GIT_TRACE2_EVENT: traceDir } }),
   }
 }
 
@@ -37,7 +38,7 @@ async function tracedArgvs(traceDir: string): Promise<string[]> {
   const argvs: string[] = []
   for (const name of await readdir(traceDir)) {
     for (const line of (await readFile(join(traceDir, name), "utf8")).split("\n")) {
-      if (!line.includes("\"argv\"")) continue
+      if (!line.includes('"argv"')) continue
       const event = JSON.parse(line) as { readonly argv?: readonly string[] }
       if (event.argv !== undefined) argvs.push(event.argv.join(" "))
     }
@@ -86,34 +87,41 @@ describe("memory commit path and git auto-maintenance (omo #10177)", () => {
     expect(argvs.filter((argv) => /\bmaintenance run\b.*--auto|\bgc\b.*--auto/.test(argv))).toEqual([])
   }, 30_000)
 
-  test.skipIf(process.platform === "win32")("#given a LIVE git holding .git/index.lock with an unchanging mtime #when the stranded-lock sweep runs #then the live lock survives, and after the holder dies the debris is KEPT (unknown ownership)", async () => {
-    // #given: `git update-index --stdin` creates index.lock at startup and holds the fd while it
-    // waits for input, writing nothing - exactly a slow live writer whose lock mtime never moves.
-    // The sweep must leave it live (omo #10199 review HIGH 1), and must STILL leave it after the
-    // holder dies: a killed git holder's debris has unknown ownership here (no memory-write lock
-    // takeover proved a dead previous owner), so reclamation is reported, not performed.
-    const root = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-live-lock-")))
-    roots.push(root)
-    const dir = join(root, "repo")
-    await mkdir(dir, { recursive: true })
-    await git(dir, ["init", "-b", "main"])
-    const lockPath = join(dir, ".git", "index.lock")
-    const holder = spawn("git", ["-C", dir, "update-index", "--stdin"], { stdio: ["pipe", "ignore", "ignore"], windowsHide: true })
-    try {
-      expect(await probeUntil(() => existsSync(lockPath), 10_000)).toBe(true)
+  test.skipIf(process.platform === "win32")(
+    "#given a LIVE git holding .git/index.lock with an unchanging mtime #when the stranded-lock sweep runs #then the live lock survives, and after the holder dies the debris is KEPT (unknown ownership)",
+    async () => {
+      // #given: `git update-index --stdin` creates index.lock at startup and holds the fd while it
+      // waits for input, writing nothing - exactly a slow live writer whose lock mtime never moves.
+      // The sweep must leave it live (omo #10199 review HIGH 1), and must STILL leave it after the
+      // holder dies: a killed git holder's debris has unknown ownership here (no memory-write lock
+      // takeover proved a dead previous owner), so reclamation is reported, not performed.
+      const root = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-live-lock-")))
+      roots.push(root)
+      const dir = join(root, "repo")
+      await mkdir(dir, { recursive: true })
+      await git(dir, ["init", "-b", "main"])
+      const lockPath = join(dir, ".git", "index.lock")
+      const holder = spawn("git", ["-C", dir, "update-index", "--stdin"], {
+        stdio: ["pipe", "ignore", "ignore"],
+        windowsHide: true,
+      })
+      try {
+        expect(await probeUntil(() => existsSync(lockPath), 10_000)).toBe(true)
 
-      // #when
-      const whileLive = await sweepStrandedGitLockFiles(dir, 50)
+        // #when
+        const whileLive = await sweepStrandedGitLockFiles(dir, 50)
 
-      // #then
-      expect(whileLive).toEqual({ removed: [], kept: [{ path: lockPath, reason: "owner-not-proven-dead" }] })
+        // #then
+        expect(whileLive).toEqual({ removed: [], kept: [{ path: lockPath, reason: "owner-not-proven-dead" }] })
+        expect(existsSync(lockPath)).toBe(true)
+      } finally {
+        holder.kill("SIGKILL")
+        expect(await exitedWithin(holder, 5_000)).toBe(true)
+      }
+      const afterDeath = await sweepStrandedGitLockFiles(dir, 50)
+      expect(afterDeath).toEqual({ removed: [], kept: [{ path: lockPath, reason: "owner-not-proven-dead" }] })
       expect(existsSync(lockPath)).toBe(true)
-    } finally {
-      holder.kill("SIGKILL")
-      expect(await exitedWithin(holder, 5_000)).toBe(true)
-    }
-    const afterDeath = await sweepStrandedGitLockFiles(dir, 50)
-    expect(afterDeath).toEqual({ removed: [], kept: [{ path: lockPath, reason: "owner-not-proven-dead" }] })
-    expect(existsSync(lockPath)).toBe(true)
-  }, 30_000)
+    },
+    30_000,
+  )
 })

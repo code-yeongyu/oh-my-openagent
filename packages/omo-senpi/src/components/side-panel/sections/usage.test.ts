@@ -92,7 +92,13 @@ describe("buildUsageRows", () => {
   test("#given the pool failed over #when built #then the row says whose quota is on screen", () => {
     // given
     const usage: PanelUsageSnapshot = {
-      claude: { updatedAt: NOW, account: "personal", pinnedAccount: "work", accountState: "ok", windows: [{ label: "5h", percent: 5 }] },
+      claude: {
+        updatedAt: NOW,
+        account: "personal",
+        pinnedAccount: "work",
+        accountState: "ok",
+        windows: [{ label: "5h", percent: 5 }],
+      },
     }
 
     // when
@@ -146,7 +152,10 @@ describe("buildUsageRows", () => {
     ] as const
     const withoutHiddenReset: PanelUsageSnapshot = { claude: { updatedAt: NOW, windows: visible } }
     const withHiddenReset: PanelUsageSnapshot = {
-      claude: { updatedAt: NOW, windows: [...visible, { label: "hidden", percent: 50, resetsAt: NOW + 3 * 24 * 60 * 60 * 1_000 }] },
+      claude: {
+        updatedAt: NOW,
+        windows: [...visible, { label: "hidden", percent: 50, resetsAt: NOW + 3 * 24 * 60 * 60 * 1_000 }],
+      },
     }
 
     // when

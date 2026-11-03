@@ -11,7 +11,11 @@ function shellQuoteForNestedCommand(value: string): string {
     .replace(/"/g, '\\"')
 }
 
-export function buildTmuxAttachCommand(serverUrl: string, sessionId: string, directory: string = process.cwd()): string {
+export function buildTmuxAttachCommand(
+  serverUrl: string,
+  sessionId: string,
+  directory: string = process.cwd(),
+): string {
   const escapedUrl = shellQuoteForNestedCommand(serverUrl)
   const escapedSessionId = shellQuoteForNestedCommand(sessionId)
   const escapedDirectory = shellQuoteForNestedCommand(directory || process.cwd())
@@ -37,7 +41,8 @@ export function buildSubagentPaneTitle(description: string): string {
 
 export function buildTmuxPlaceholderCommand(description: string): string {
   const clean = withoutNul(description)
-  const shown = clean.length > PLACEHOLDER_DESCRIPTION_LIMIT ? `${clean.slice(0, PLACEHOLDER_DESCRIPTION_LIMIT)}…` : clean
+  const shown =
+    clean.length > PLACEHOLDER_DESCRIPTION_LIMIT ? `${clean.slice(0, PLACEHOLDER_DESCRIPTION_LIMIT)}…` : clean
   const banner = shellQuoteForNestedCommand(`OMO subagent pane ready: ${shown}`)
   const hint = shellQuoteForNestedCommand("Focus this pane to attach.")
   const authPrefix = withPaneAuth("").replaceAll("\\", "\\\\").replaceAll("$", "\\$").replaceAll('"', '\\"')

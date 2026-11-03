@@ -1,8 +1,4 @@
-import type {
-  PreCompactInput,
-  PreCompactOutput,
-  ClaudeHooksConfig,
-} from "./types"
+import type { PreCompactInput, PreCompactOutput, ClaudeHooksConfig } from "./types"
 import { findMatchingHooks, log } from "../../shared"
 import { dispatchHook, getHookIdentifier } from "./dispatch-hook"
 import { isHookCommandDisabled, type PluginExtendedConfig } from "./config-loader"
@@ -33,7 +29,7 @@ function appendContext(context: string[], value: string): void {
 export async function executePreCompactHooks(
   ctx: PreCompactContext,
   config: ClaudeHooksConfig | null,
-  extendedConfig?: PluginExtendedConfig | null
+  extendedConfig?: PluginExtendedConfig | null,
 ): Promise<PreCompactResult> {
   if (!config) {
     return { context: [] }
@@ -55,10 +51,10 @@ export async function executePreCompactHooks(
   let firstHookName: string | undefined
   const collectedContext: string[] = []
 
-   for (const matcher of matchers) {
-     if (!matcher.hooks || matcher.hooks.length === 0) continue
-     for (const hook of matcher.hooks) {
-       if (hook.type !== "command" && hook.type !== "http") continue
+  for (const matcher of matchers) {
+    if (!matcher.hooks || matcher.hooks.length === 0) continue
+    for (const hook of matcher.hooks) {
+      if (hook.type !== "command" && hook.type !== "http") continue
 
       const hookName = getHookIdentifier(hook)
       if (isHookCommandDisabled("PreCompact", hookName, extendedConfig ?? null)) {

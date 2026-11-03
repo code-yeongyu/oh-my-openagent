@@ -67,8 +67,10 @@ const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000
  *   once rather than behind the delay: control sessions exit within seconds and dispose() would cancel it.
  */
 export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}): MemoryMaintenance {
-  const createRepo = options.createRepo
-    ?? ((context: MemoryIdentityContext) => new GitMemoryRepo({ dir: context.identityPaths.repo, agentId: context.identity }))
+  const createRepo =
+    options.createRepo ??
+    ((context: MemoryIdentityContext) =>
+      new GitMemoryRepo({ dir: context.identityPaths.repo, agentId: context.identity }))
   const delayMs = options.delayMs ?? DEFAULT_DELAY_MS
   const intervalMs = options.intervalMs ?? DEFAULT_INTERVAL_MS
   const minLooseObjects = options.minLooseObjects ?? DEFAULT_MIN_LOOSE_OBJECTS
@@ -101,21 +103,26 @@ export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}):
     if (!existsSync(context.identityPaths.repo)) return
     const record = await createLockRecord("memory-maintenance", { runId: `maintenance-${process.pid}` })
     try {
-      await withLock(memoryMaintenanceLockPath(context.identityPaths.locks), record, async () => {
-        signal.throwIfAborted()
-        const repo = createRepo(context)
-        const last = Number(await repo.configGet(STAMP_KEY) ?? Number.NaN)
-        if (Number.isFinite(last) && now() - last < intervalMs) return
-        await repo.configSet(STAMP_KEY, String(now()))
-        const result = await repo.maintain({ minLooseObjects, timeoutMs, signal })
-        if (result.status === "packed") {
-          options.logger?.info("omo-senpi memory repo packed", {
-            identity: context.identity,
-            looseObjectsBefore: result.looseObjectsBefore,
-            looseObjectsAfter: result.looseObjectsAfter,
-          })
-        }
-      }, { waitTimeoutMs: 0 })
+      await withLock(
+        memoryMaintenanceLockPath(context.identityPaths.locks),
+        record,
+        async () => {
+          signal.throwIfAborted()
+          const repo = createRepo(context)
+          const last = Number((await repo.configGet(STAMP_KEY)) ?? Number.NaN)
+          if (Number.isFinite(last) && now() - last < intervalMs) return
+          await repo.configSet(STAMP_KEY, String(now()))
+          const result = await repo.maintain({ minLooseObjects, timeoutMs, signal })
+          if (result.status === "packed") {
+            options.logger?.info("omo-senpi memory repo packed", {
+              identity: context.identity,
+              looseObjectsBefore: result.looseObjectsBefore,
+              looseObjectsAfter: result.looseObjectsAfter,
+            })
+          }
+        },
+        { waitTimeoutMs: 0 },
+      )
     } catch (error) {
       // Another session or process holds the pass: it is that runner's job, not a failure.
       if (error instanceof LockContentionError) return
@@ -147,13 +154,15 @@ export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}):
       const timer = setTimeout(() => {
         timers.delete(timer)
         const signal = abort.signal
-        void run(context, signal).catch((error: unknown) => {
-          if (signal.aborted) return
-          options.logger?.warn("omo-senpi memory repo maintenance failed", {
-            identity: context.identity,
-            error: error instanceof Error ? error.message : String(error),
+        void run(context, signal)
+          .catch((error: unknown) => {
+            if (signal.aborted) return
+            options.logger?.warn("omo-senpi memory repo maintenance failed", {
+              identity: context.identity,
+              error: error instanceof Error ? error.message : String(error),
+            })
           })
-        }).finally(finish)
+          .finally(finish)
       }, delayMs)
       // A short-lived process (a print run, a test) exits without waiting for it.
       timer.unref?.()

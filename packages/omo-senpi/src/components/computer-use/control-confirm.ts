@@ -55,7 +55,10 @@ export async function confirmComputerControl(
   const confirm = request.context.ui?.confirm
   if (confirm === undefined) return false
   // The facade refuses `acquire` before asking when too little run time is left to answer (#9967 M2).
-  const timeoutMs = Math.min(options.timeoutMs ?? CONTROL_CONFIRM_TIMEOUT_MS, request.budgetMs ?? Number.POSITIVE_INFINITY)
+  const timeoutMs = Math.min(
+    options.timeoutMs ?? CONTROL_CONFIRM_TIMEOUT_MS,
+    request.budgetMs ?? Number.POSITIVE_INFINITY,
+  )
   const scheduleTimeout = options.scheduleTimeout ?? realScheduler
   return await new Promise<boolean>((resolve) => {
     let settled = false
@@ -72,7 +75,10 @@ export async function confirmComputerControl(
     // The host's own timeout is passed through too, so an RPC client's pending dialog is cleared and
     // a desktop client can show the deadline; the local timer still bounds a host that ignores it.
     Promise.resolve(
-      confirm(CONTROL_CONFIRM_TITLE, controlConfirmBody(request.reason), { signal: request.signal, timeout: timeoutMs }),
+      confirm(CONTROL_CONFIRM_TITLE, controlConfirmBody(request.reason), {
+        signal: request.signal,
+        timeout: timeoutMs,
+      }),
     ).then(
       (approved) => settle(approved === true),
       () => settle(false),

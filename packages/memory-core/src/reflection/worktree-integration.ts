@@ -110,9 +110,14 @@ export async function integrateValidatedReflection(
     }
 
     const merge = await run(worktree.exec, worktree.parent.dir, [
-      ...NO_AUTO_MAINTENANCE, "merge", "--no-ff", input.validated.tipSha,
-      "-m", `merge(reflection): ${input.summary}`,
-      "-m", `Omo-Run: ${input.runId}`,
+      ...NO_AUTO_MAINTENANCE,
+      "merge",
+      "--no-ff",
+      input.validated.tipSha,
+      "-m",
+      `merge(reflection): ${input.summary}`,
+      "-m",
+      `Omo-Run: ${input.runId}`,
     ])
     if (merge.code === 0) {
       const head = await git(worktree.exec, worktree.parent.dir, ["rev-parse", "--verify", "HEAD"])
@@ -134,18 +139,20 @@ export async function integrateValidatedReflection(
   })
 }
 
-export async function cleanupReflectionWorktree(
-  worktree: ReflectionWorktree,
-): Promise<ReflectionCleanupReceipt> {
+export async function cleanupReflectionWorktree(worktree: ReflectionWorktree): Promise<ReflectionCleanupReceipt> {
   await worktree.parent.worktreeRemove(worktree.dir, true).catch(() => undefined)
   await rm(worktree.dir, { recursive: true, force: true }).catch(() => undefined)
   await run(worktree.exec, worktree.parent.dir, ["worktree", "prune"])
   await run(worktree.exec, worktree.parent.dir, ["branch", "-D", worktree.branch])
   const listed = await run(worktree.exec, worktree.parent.dir, ["worktree", "list", "--porcelain"])
-  const branchRef = await run(worktree.exec, worktree.parent.dir, ["show-ref", "--verify", `refs/heads/${worktree.branch}`])
+  const branchRef = await run(worktree.exec, worktree.parent.dir, [
+    "show-ref",
+    "--verify",
+    `refs/heads/${worktree.branch}`,
+  ])
   return {
-    worktreeRemoved: !existsSync(worktree.dir)
-      && !listed.stdout.split(/\r?\n/).includes(`worktree ${resolve(worktree.dir)}`),
+    worktreeRemoved:
+      !existsSync(worktree.dir) && !listed.stdout.split(/\r?\n/).includes(`worktree ${resolve(worktree.dir)}`),
     branchRemoved: branchRef.code !== 0,
   }
 }
@@ -158,15 +165,24 @@ async function findExactRunReceipt(
   const commits = await run(worktree.exec, worktree.parent.dir, ["rev-list", `${worktree.baseSha}..HEAD`])
   if (commits.code !== 0) return null
   for (const commit of commits.stdout.split(/\r?\n/).filter(Boolean)) {
-    if (!await hasExactRunReceipt(worktree.exec, worktree.parent.dir, commit, runId)) continue
-    if (validatedTipSha === undefined
-      || await isAncestor(worktree.exec, worktree.parent.dir, validatedTipSha, commit)) return commit
+    if (!(await hasExactRunReceipt(worktree.exec, worktree.parent.dir, commit, runId))) continue
+    if (
+      validatedTipSha === undefined ||
+      (await isAncestor(worktree.exec, worktree.parent.dir, validatedTipSha, commit))
+    )
+      return commit
   }
   return null
 }
 
 async function hasExactRunReceipt(exec: GitExec, cwd: string, commit: string, runId: string): Promise<boolean> {
-  const trailers = await run(exec, cwd, [...STABLE_LOG_OUTPUT, "show", "-s", "--format=%(trailers:key=Omo-Run,valueonly)", commit])
+  const trailers = await run(exec, cwd, [
+    ...STABLE_LOG_OUTPUT,
+    "show",
+    "-s",
+    "--format=%(trailers:key=Omo-Run,valueonly)",
+    commit,
+  ])
   return trailers.code === 0 && trailers.stdout.split(/\r?\n/).some((value) => value === runId)
 }
 

@@ -6,11 +6,7 @@ import { realpathSync } from "node:fs"
 
 import { buildIdentityPaths, type MemoryIdentityPaths } from "../identity"
 import type { TranscriptEntry } from "../journal"
-import {
-  FactsQueue,
-  factsQueuePaths,
-  type FactsEnqueueRequest,
-} from "./queue"
+import { FactsQueue, factsQueuePaths, type FactsEnqueueRequest } from "./queue"
 import { removeTree } from "../../../../test-support/remove-tree"
 
 const IDENTITY = "facts-queue-agent"
@@ -67,9 +63,7 @@ function clockFrom(start: number): () => Date {
 
 async function queueFileNames(paths: MemoryIdentityPaths): Promise<string[]> {
   const names = await readdir(paths.factsQueue).catch(() => [])
-  return names.filter((name) =>
-    name.endsWith(".json") && name !== "consumed.json" && name !== "claims.json"
-  ).sort()
+  return names.filter((name) => name.endsWith(".json") && name !== "consumed.json" && name !== "claims.json").sort()
 }
 
 describe("facts queue reconcile", () => {
@@ -115,9 +109,7 @@ describe("facts queue reconcile", () => {
 
     // then
     expect(await queueFileNames(paths)).toHaveLength(0)
-    const consumed: unknown = JSON.parse(
-      await readFile(factsQueuePaths(paths).consumedPath, "utf8"),
-    )
+    const consumed: unknown = JSON.parse(await readFile(factsQueuePaths(paths).consumedPath, "utf8"))
     expect(consumed).toMatchObject({
       version: 1,
       consumed: { [CONVERSATION]: { end_message_id: "m2" } },

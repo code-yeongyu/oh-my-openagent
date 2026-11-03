@@ -44,9 +44,14 @@ export async function createRepoWithBuiltComponentBins(
 
   await mkdir(join(pluginRoot, ".codex-plugin"), { recursive: true })
   const pluginManifest =
-    input.includeBundledGitBashMcp === true ? { name: "omo", version: "0.1.0", hooks: "hooks/hooks.json" } : { name: "omo", version: "0.1.0" }
+    input.includeBundledGitBashMcp === true
+      ? { name: "omo", version: "0.1.0", hooks: "hooks/hooks.json" }
+      : { name: "omo", version: "0.1.0" }
   await writeFile(join(pluginRoot, ".codex-plugin", "plugin.json"), JSON.stringify(pluginManifest))
-  await writeFile(join(pluginRoot, "package.json"), JSON.stringify({ name: "@sisyphuslabs/omo-codex-plugin", version: "0.1.0" }))
+  await writeFile(
+    join(pluginRoot, "package.json"),
+    JSON.stringify({ name: "@sisyphuslabs/omo-codex-plugin", version: "0.1.0" }),
+  )
 
   if (input.includeBundledGitBashMcp === true) {
     await createBundledGitBashMcpFixture({ pluginRoot, repoRoot })
@@ -68,7 +73,10 @@ export async function createRepoWithBuiltComponentBins(
   return repoRoot
 }
 
-async function createBundledGitBashMcpFixture(input: { readonly pluginRoot: string; readonly repoRoot: string }): Promise<void> {
+async function createBundledGitBashMcpFixture(input: {
+  readonly pluginRoot: string
+  readonly repoRoot: string
+}): Promise<void> {
   await mkdir(join(input.pluginRoot, "hooks"), { recursive: true })
   await writeFile(
     join(input.pluginRoot, "hooks", "hooks.json"),

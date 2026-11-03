@@ -15,9 +15,16 @@ afterEach(async () => {
   for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true })
 })
 const identity: SyncRpcIdentity = {
-  genesis: "unsupported", rpId: null, userName: null,
-  serviceOrigin: "https://service.invalid", accountId: "account", serviceDeviceId: "device",
-  syncPrincipalId: "principal", publicKeys: { signing: "public-signing", sealing: "public-sealing" }, generation: "g", incarnation: "main-1",
+  genesis: "unsupported",
+  rpId: null,
+  userName: null,
+  serviceOrigin: "https://service.invalid",
+  accountId: "account",
+  serviceDeviceId: "device",
+  syncPrincipalId: "principal",
+  publicKeys: { signing: "public-signing", sealing: "public-sealing" },
+  generation: "g",
+  incarnation: "main-1",
 }
 function authority(): SyncRpcAuthority {
   return { signal: new AbortController().signal, admit: (effect) => effect(), boundary: async (effect) => effect() }
@@ -31,7 +38,8 @@ function message(worker: Worker, kind: string): Promise<Record<string, unknown>>
   return new Promise((resolve, reject) => {
     const deadline = setTimeout(() => finish(new Error(`worker did not send ${kind}`)), 10_000)
     const receive = (value: unknown) => {
-      if (typeof value === "object" && value !== null && "kind" in value && value.kind === kind) finish(undefined, value)
+      if (typeof value === "object" && value !== null && "kind" in value && value.kind === kind)
+        finish(undefined, value)
     }
     const fail = (error: Error) => finish(error)
     const finish = (error?: Error, value?: Record<string, unknown>) => {
@@ -49,7 +57,9 @@ function message(worker: Worker, kind: string): Promise<Record<string, unknown>>
 test("#given two session workers #when they claim one host account device #then only one service start is admitted", async () => {
   const path = await root()
   const spawn = () => {
-    const worker = new Worker(new URL("./sync-rpc-claims-worker.fixture.ts", import.meta.url), { workerData: { root: path, identity } })
+    const worker = new Worker(new URL("./sync-rpc-claims-worker.fixture.ts", import.meta.url), {
+      workerData: { root: path, identity },
+    })
     workers.push(worker)
     observeLockWorker(worker)
     return worker

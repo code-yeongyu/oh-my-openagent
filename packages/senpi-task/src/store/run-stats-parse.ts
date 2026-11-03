@@ -90,4 +90,3 @@ function readDurationStatus(record: Record<string, unknown>): DurationSourceStat
       throw new Error(`run_stats.duration_status must be one of ${DURATION_SOURCE_STATUSES.join(", ")}`)
   }
 }
-

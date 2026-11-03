@@ -1,8 +1,4 @@
-import type {
-  ExtensionRuntime,
-  LoadExtensionsResult,
-  ResourceLoader,
-} from "@code-yeongyu/senpi"
+import type { ExtensionRuntime, LoadExtensionsResult, ResourceLoader } from "@code-yeongyu/senpi"
 
 export type MinimalSenpiResourceLoaderOptions = {
   readonly runtime: ExtensionRuntime

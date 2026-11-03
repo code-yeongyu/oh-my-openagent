@@ -156,7 +156,9 @@ export function evaluateBuiltRuntimeProbe(input: {
   if (input.ci !== undefined) {
     for (const found of input.discovered) {
       if (!input.known.includes(found)) {
-        failures.push("CI: built omowright runtime missing from KNOWN_BUILT_RUNTIMES: " + found + ". Add it so the guard scans it.")
+        failures.push(
+          "CI: built omowright runtime missing from KNOWN_BUILT_RUNTIMES: " + found + ". Add it so the guard scans it.",
+        )
       }
     }
   }
@@ -199,7 +201,11 @@ export function discoverPluginBuiltRuntimes(): string[] {
   for (const pkg of readdirSync(path.join(WORKSPACE_ROOT, "packages"), { withFileTypes: true })) {
     if (pkg.name === "node_modules") continue
     if (!isDirectory(path.join(WORKSPACE_ROOT, "packages"), pkg)) continue
-    walk(path.join(WORKSPACE_ROOT, "packages", pkg.name, "plugin", "skills"), "packages/" + pkg.name + "/plugin/skills", false)
+    walk(
+      path.join(WORKSPACE_ROOT, "packages", pkg.name, "plugin", "skills"),
+      "packages/" + pkg.name + "/plugin/skills",
+      false,
+    )
   }
   return [...new Set(found)].sort()
 }

@@ -19,7 +19,11 @@ const SESSION = "session-alpha"
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rmEfaultTolerant(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(
+    tempDirs
+      .splice(0)
+      .map((dir) => rmEfaultTolerant(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })),
+  )
 })
 
 async function fixture(): Promise<MemoryIdentityPaths> {
@@ -71,7 +75,9 @@ describe("facts wiring settle enqueue", () => {
     await seedJournal(paths, 2)
     let launches = 0
     let signalLaunch: (() => void) | undefined
-    const launched = new Promise<void>((resolve) => { signalLaunch = resolve })
+    const launched = new Promise<void>((resolve) => {
+      signalLaunch = resolve
+    })
     const wiring = createMemoryFactsWiring({
       identity: IDENTITY,
       identityPaths: paths,
@@ -167,12 +173,13 @@ describe("facts wiring settle enqueue", () => {
       identity: IDENTITY,
       identityPaths: paths,
       factsEnabled: () => true,
-      createJournal: () => ({
-        readEntries: async () => {
-          journalReads += 1
-          return [entry("user", "m1")]
-        },
-      }) as unknown as TranscriptJournal,
+      createJournal: () =>
+        ({
+          readEntries: async () => {
+            journalReads += 1
+            return [entry("user", "m1")]
+          },
+        }) as unknown as TranscriptJournal,
     })
 
     const result = await wiring.enqueueSettled(SESSION, controller.signal)
@@ -189,12 +196,13 @@ describe("facts wiring settle enqueue", () => {
       identity: IDENTITY,
       identityPaths: paths,
       factsEnabled: () => true,
-      createJournal: () => ({
-        readEntries: async () => {
-          controller.abort()
-          return [entry("user", "m1")]
-        },
-      }) as unknown as TranscriptJournal,
+      createJournal: () =>
+        ({
+          readEntries: async () => {
+            controller.abort()
+            return [entry("user", "m1")]
+          },
+        }) as unknown as TranscriptJournal,
     })
 
     const result = await wiring.enqueueSettled(SESSION, controller.signal)
@@ -215,7 +223,9 @@ describe("facts wiring session_start reconcile", () => {
       identityPaths: paths,
       factsEnabled: () => true,
       extractor: {
-        launchPending: async () => { launches += 1 },
+        launchPending: async () => {
+          launches += 1
+        },
         reconcilePending: async () => undefined,
       },
     })
@@ -239,7 +249,9 @@ describe("facts wiring session_start reconcile", () => {
       identityPaths: paths,
       factsEnabled: () => true,
       extractor: {
-        launchPending: async () => { launches += 1 },
+        launchPending: async () => {
+          launches += 1
+        },
         reconcilePending: async () => undefined,
       },
     })

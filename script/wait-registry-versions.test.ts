@@ -1,12 +1,20 @@
 import { describe, expect, test } from "bun:test"
-import { parseSpec, pendingSpecs, platformPackageNames, waitForRegistryVersions, type RegistryFetch } from "./wait-registry-versions.mjs"
+import {
+  parseSpec,
+  pendingSpecs,
+  platformPackageNames,
+  waitForRegistryVersions,
+  type RegistryFetch,
+} from "./wait-registry-versions.mjs"
 
-const registry = (served: Record<string, string>): RegistryFetch => async (url) => {
-  const parts = new URL(url).pathname.split("/").filter(Boolean)
-  const name = decodeURIComponent(parts.slice(0, -1).join("/"))
-  const version = served[name]
-  return version === undefined ? new Response("not found", { status: 404 }) : Response.json({ name, version })
-}
+const registry =
+  (served: Record<string, string>): RegistryFetch =>
+  async (url) => {
+    const parts = new URL(url).pathname.split("/").filter(Boolean)
+    const name = decodeURIComponent(parts.slice(0, -1).join("/"))
+    const version = served[name]
+    return version === undefined ? new Response("not found", { status: 404 }) : Response.json({ name, version })
+  }
 
 describe("wait-registry-versions", () => {
   test("#given one package npm never served #when the window closes #then it fails naming only that package and why", async () => {
@@ -37,14 +45,26 @@ describe("wait-registry-versions", () => {
       calls++
       return calls === 1 ? new Response("", { status: 404 }) : Response.json({ version: "5.1.38" })
     }
-    const result = await waitForRegistryVersions({ specs: ["oh-my-openagent@5.1.38"], deadlineMs: 60_000, delayMs: 0, fetchImpl: late, log: () => {} })
+    const result = await waitForRegistryVersions({
+      specs: ["oh-my-openagent@5.1.38"],
+      deadlineMs: 60_000,
+      delayMs: 0,
+      fetchImpl: late,
+      log: () => {},
+    })
     expect(result.ok).toBe(true)
   })
 
   test("#given the registry serves a different version or the probe throws #when checked #then each stays pending with its reason", async () => {
-    expect(await pendingSpecs(["omo-ai@5.1.38"], registry({ "omo-ai": "5.1.37" }))).toEqual([{ spec: "omo-ai@5.1.38", reason: "serves 5.1.37" }])
-    const failing: RegistryFetch = async () => { throw new Error("socket hang up") }
-    expect(await pendingSpecs(["omo-ai@5.1.38"], failing)).toEqual([{ spec: "omo-ai@5.1.38", reason: "probe failed: socket hang up" }])
+    expect(await pendingSpecs(["omo-ai@5.1.38"], registry({ "omo-ai": "5.1.37" }))).toEqual([
+      { spec: "omo-ai@5.1.38", reason: "serves 5.1.37" },
+    ])
+    const failing: RegistryFetch = async () => {
+      throw new Error("socket hang up")
+    }
+    expect(await pendingSpecs(["omo-ai@5.1.38"], failing)).toEqual([
+      { spec: "omo-ai@5.1.38", reason: "probe failed: socket hang up" },
+    ])
   })
 
   test("#given a probe #when sent #then it bypasses caches and carries a bounded timeout", async () => {
@@ -78,7 +98,9 @@ describe("wait-registry-versions overall deadline", () => {
       delayMs: 15_000,
       fetchImpl: slow,
       now: () => now,
-      sleep: async (ms) => { now += ms },
+      sleep: async (ms) => {
+        now += ms
+      },
       log: () => {},
     })
     expect(result).toEqual({ ok: false, pending: [{ spec: "oh-my-openagent@5.1.38", reason: "HTTP 404" }] })
@@ -89,7 +111,15 @@ describe("wait-registry-versions overall deadline", () => {
 
 describe("platformPackageNames", () => {
   test("#given the root manifest #when platform packages are derived #then both families come from optionalDependencies", () => {
-    expect(platformPackageNames({ optionalDependencies: { "oh-my-opencode-linux-x64": "5.1.38", "oh-my-opencode-windows-arm64": "5.1.38", "left-pad": "1.0.0" } })).toEqual([
+    expect(
+      platformPackageNames({
+        optionalDependencies: {
+          "oh-my-opencode-linux-x64": "5.1.38",
+          "oh-my-opencode-windows-arm64": "5.1.38",
+          "left-pad": "1.0.0",
+        },
+      }),
+    ).toEqual([
       "oh-my-opencode-linux-x64",
       "oh-my-openagent-linux-x64",
       "oh-my-opencode-windows-arm64",

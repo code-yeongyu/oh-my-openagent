@@ -45,7 +45,7 @@ export async function injectTextPartAsync(
   client: OpencodeClient,
   sessionID: string,
   messageID: string,
-  text: string
+  text: string,
 ): Promise<boolean> {
   const partId = generatePartId()
   const part: Record<string, unknown> = {

@@ -78,8 +78,6 @@ export function compareVersions(a: string, b: string): -1 | 0 | 1 {
   return 0
 }
 
-
-
 function parsePackageVersion(content: string): string | null {
   try {
     const parsed: unknown = JSON.parse(content)
@@ -129,11 +127,13 @@ export function getOpenCodeVersion(deps: Partial<OpenCodeVersionDeps> = {}): str
   }
 
   try {
-    const result = resolvedDeps.execCommand("opencode --version", {
-      encoding: "utf-8",
-      timeout: 5000,
-      stdio: ["pipe", "pipe", "pipe"],
-    }).trim()
+    const result = resolvedDeps
+      .execCommand("opencode --version", {
+        encoding: "utf-8",
+        timeout: 5000,
+        stdio: ["pipe", "pipe", "pipe"],
+      })
+      .trim()
 
     const versionMatch = result.match(/(\d+\.\d+\.\d+(?:-[\w.]+)?)/)
     cachedVersion = versionMatch?.[1] ?? null

@@ -3,8 +3,7 @@ import { describe, expect, test } from "bun:test"
 import { createFallbackSessionHarness, FALLBACK_PROVIDER } from "./__fixtures__/in-process-fallback-session"
 
 const quotaError =
-  `403: {"message":"You've reached your usage limit for this billing cycle.",` +
-  `"type":"access_terminated_error"}`
+  `403: {"message":"You've reached your usage limit for this billing cycle.",` + `"type":"access_terminated_error"}`
 
 describe("in-process access_terminated_error fallback", () => {
   test("#given access_terminated_error makes the first category candidate unusable #when the child runs #then the next configured candidate produces the result", async () => {
@@ -35,9 +34,7 @@ describe("in-process access_terminated_error fallback", () => {
 
   test("#given context overflow is deliberately non-fallback #when the child runs #then it stays terminal on the first candidate", async () => {
     // given
-    const harness = await createFallbackSessionHarness(
-      "Your input exceeds the context window of this model",
-    )
+    const harness = await createFallbackSessionHarness("Your input exceeds the context window of this model")
 
     // when
     try {

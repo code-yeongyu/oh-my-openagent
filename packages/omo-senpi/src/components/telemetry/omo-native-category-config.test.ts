@@ -77,7 +77,7 @@ describe("omo-native category config capture", () => {
     expect(Object.keys(props ?? {}).sort()).toEqual([...OMO_NATIVE_PROPERTY_ALLOWLISTS.category_config].sort())
   })
 
-  test("#given a disabled category and an unresolvable one #when encoded #then the values are exactly \"disabled\" and \"unavailable\" and every value is at most 64 characters", () => {
+  test('#given a disabled category and an unresolvable one #when encoded #then the values are exactly "disabled" and "unavailable" and every value is at most 64 characters', () => {
     // given: writing disabled outright, and an empty registry so nothing resolves
     const config: OmoConfig = { categories: { writing: { disable: true } } }
 
@@ -109,8 +109,11 @@ describe("omo-native category config capture", () => {
   test("#given an unchanged effective map #when observed twice #then only one row ships with a reused generation, and a changed map ships a new generation", () => {
     // given
     const config: OmoConfig = { categories: {} }
-    const models: SenpiModelPort[] = [...FULL_REGISTRY.getAvailable() as readonly SenpiModelPort[]]
-    const { captured, observe } = harness(config, registry2(() => models))
+    const models: SenpiModelPort[] = [...(FULL_REGISTRY.getAvailable() as readonly SenpiModelPort[])]
+    const { captured, observe } = harness(
+      config,
+      registry2(() => models),
+    )
 
     // when
     observe("startup")

@@ -32,20 +32,27 @@ describe("hephaestus agents md injector hook", () => {
     // given
     temporaryDirectory = mkdtempSync(join(tmpdir(), "hephaestus-agents-md-"))
     writeFileSync(join(temporaryDirectory, "AGENTS.md"), "Always force-load this rule.")
-    const hook = createHephaestusAgentsMdInjectorHook(unsafeTestValue({
-      directory: temporaryDirectory,
-      client: { session: { messages: async () => [] } },
-    }))
+    const hook = createHephaestusAgentsMdInjectorHook(
+      unsafeTestValue({
+        directory: temporaryDirectory,
+        client: { session: { messages: async () => [] } },
+      }),
+    )
     const output = createOutput()
 
     // when
-    await hook["chat.message"]?.({
-      sessionID: "ses_hep",
-      agent: HEPHAESTUS_DISPLAY,
-    }, output)
+    await hook["chat.message"]?.(
+      {
+        sessionID: "ses_hep",
+        agent: HEPHAESTUS_DISPLAY,
+      },
+      output,
+    )
 
     // then
-    expect(output.parts[0]?.text).toContain(`[Directory Context: ${realpathSync(join(temporaryDirectory, "AGENTS.md"))}]`)
+    expect(output.parts[0]?.text).toContain(
+      `[Directory Context: ${realpathSync(join(temporaryDirectory, "AGENTS.md"))}]`,
+    )
     expect(output.parts[0]?.text).toContain("Always force-load this rule.")
     expect(output.parts[0]?.text).toEndWith("Implement the thing")
   })
@@ -54,17 +61,22 @@ describe("hephaestus agents md injector hook", () => {
     // given
     temporaryDirectory = mkdtempSync(join(tmpdir(), "hephaestus-agents-md-"))
     writeFileSync(join(temporaryDirectory, "AGENTS.md"), "Hephaestus-only rule.")
-    const hook = createHephaestusAgentsMdInjectorHook(unsafeTestValue({
-      directory: temporaryDirectory,
-      client: { session: { messages: async () => [] } },
-    }))
+    const hook = createHephaestusAgentsMdInjectorHook(
+      unsafeTestValue({
+        directory: temporaryDirectory,
+        client: { session: { messages: async () => [] } },
+      }),
+    )
     const output = createOutput()
 
     // when
-    await hook["chat.message"]?.({
-      sessionID: "ses_sis",
-      agent: SISYPHUS_DISPLAY,
-    }, output)
+    await hook["chat.message"]?.(
+      {
+        sessionID: "ses_sis",
+        agent: SISYPHUS_DISPLAY,
+      },
+      output,
+    )
 
     // then
     expect(output.parts[0]?.text).toBe("Implement the thing")
@@ -74,18 +86,23 @@ describe("hephaestus agents md injector hook", () => {
     // given
     temporaryDirectory = mkdtempSync(join(tmpdir(), "hephaestus-agents-md-"))
     writeFileSync(join(temporaryDirectory, "AGENTS.md"), "Should not be injected.")
-    const hook = createHephaestusAgentsMdInjectorHook(unsafeTestValue({
-      directory: temporaryDirectory,
-      client: { session: { messages: async () => [] } },
-    }))
+    const hook = createHephaestusAgentsMdInjectorHook(
+      unsafeTestValue({
+        directory: temporaryDirectory,
+        client: { session: { messages: async () => [] } },
+      }),
+    )
     const output = createOutput()
     output.message.agent = "sisyphus"
 
     // when
-    await hook["chat.message"]?.({
-      sessionID: "ses_switched",
-      agent: HEPHAESTUS_DISPLAY,
-    }, output)
+    await hook["chat.message"]?.(
+      {
+        sessionID: "ses_switched",
+        agent: HEPHAESTUS_DISPLAY,
+      },
+      output,
+    )
 
     // then
     expect(output.parts[0]?.text).toBe("Implement the thing")
@@ -95,22 +112,30 @@ describe("hephaestus agents md injector hook", () => {
     // given
     temporaryDirectory = mkdtempSync(join(tmpdir(), "hephaestus-agents-md-"))
     writeFileSync(join(temporaryDirectory, "AGENTS.md"), "Inject me once.")
-    const hook = createHephaestusAgentsMdInjectorHook(unsafeTestValue({
-      directory: temporaryDirectory,
-      client: { session: { messages: async () => [] } },
-    }))
+    const hook = createHephaestusAgentsMdInjectorHook(
+      unsafeTestValue({
+        directory: temporaryDirectory,
+        client: { session: { messages: async () => [] } },
+      }),
+    )
     const firstOutput = createOutput("First")
     const secondOutput = createOutput("Second")
 
     // when
-    await hook["chat.message"]?.({
-      sessionID: "ses_once",
-      agent: HEPHAESTUS_DISPLAY,
-    }, firstOutput)
-    await hook["chat.message"]?.({
-      sessionID: "ses_once",
-      agent: HEPHAESTUS_DISPLAY,
-    }, secondOutput)
+    await hook["chat.message"]?.(
+      {
+        sessionID: "ses_once",
+        agent: HEPHAESTUS_DISPLAY,
+      },
+      firstOutput,
+    )
+    await hook["chat.message"]?.(
+      {
+        sessionID: "ses_once",
+        agent: HEPHAESTUS_DISPLAY,
+      },
+      secondOutput,
+    )
 
     // then
     expect(firstOutput.parts[0]?.text).toContain("Inject me once.")

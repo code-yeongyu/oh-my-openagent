@@ -9,7 +9,11 @@ import { createSubagentCostLedger } from "./subagent-cost-ledger"
 // each store mutation and each live child message_end updates its run's entry in the ledger, and the
 // figure is re-sent only when it changes. A process child's run settling re-reads the tree once, so
 // records that child process wrote for its own children are picked up without watching another writer.
-export function createTreeCostFeed(deps: Pick<TaskStatusUiDeps, "manager" | "runtime">): { ensureSeeded(): void; observe(change: StoreMutation): void; dispose(): void } {
+export function createTreeCostFeed(deps: Pick<TaskStatusUiDeps, "manager" | "runtime">): {
+  ensureSeeded(): void
+  observe(change: StoreMutation): void
+  dispose(): void
+} {
   const ledger = createSubagentCostLedger()
   const liveSubscriptions = new Map<string, () => void>()
   let seededFor: string | undefined
@@ -17,7 +21,8 @@ export function createTreeCostFeed(deps: Pick<TaskStatusUiDeps, "manager" | "run
   // in-process child records the tasks it spawns with ITSELF as parent and root, so a grandchild is
   // reached through its parent's child_session_id, not through root_session_id.
   const treeSessions = new Set<string>()
-  const belongs = (record: TaskRecord): boolean => treeSessions.has(record.parent_session_id) || treeSessions.has(record.root_session_id)
+  const belongs = (record: TaskRecord): boolean =>
+    treeSessions.has(record.parent_session_id) || treeSessions.has(record.root_session_id)
   let published: string | undefined
 
   const ui = (): CapturedUi | undefined => {
@@ -46,11 +51,14 @@ export function createTreeCostFeed(deps: Pick<TaskStatusUiDeps, "manager" | "run
     if (!ledger.isUnsettled(record.task_id)) return unsubscribe(record.task_id)
     ledger.upsertLive(record.task_id, deps.manager.liveRunStats?.(record.task_id))
     if (liveSubscriptions.has(record.task_id) || deps.manager.subscribeChild === undefined) return
-    liveSubscriptions.set(record.task_id, deps.manager.subscribeChild(record.task_id, (event) => {
-      if (event.type !== "message_end") return
-      ledger.upsertLive(record.task_id, deps.manager.liveRunStats?.(record.task_id))
-      publish()
-    }))
+    liveSubscriptions.set(
+      record.task_id,
+      deps.manager.subscribeChild(record.task_id, (event) => {
+        if (event.type !== "message_end") return
+        ledger.upsertLive(record.task_id, deps.manager.liveRunStats?.(record.task_id))
+        publish()
+      }),
+    )
   }
   const seed = (sessionId: string): void => {
     for (const taskId of [...liveSubscriptions.keys()]) unsubscribe(taskId)
@@ -90,7 +98,10 @@ export function createTreeCostFeed(deps: Pick<TaskStatusUiDeps, "manager" | "run
       } else if (belongs(change.record)) {
         // Only a process child's own tasks are written by another process (unseen by this wrapper);
         // an in-process child's tasks arrive here as mutations, so its settle needs no re-read.
-        const rereadTree = ledger.isUnsettled(change.taskId) && change.record.run_stats !== undefined && change.record.execution_mode !== "in-process"
+        const rereadTree =
+          ledger.isUnsettled(change.taskId) &&
+          change.record.run_stats !== undefined &&
+          change.record.execution_mode !== "in-process"
         track(change.record)
         if (rereadTree) seed(sessionId)
       }

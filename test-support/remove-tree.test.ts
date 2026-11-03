@@ -31,7 +31,9 @@ describe("removeTree", () => {
     }
 
     // when
-    const failure = await removeTree("/unused", { maxRetries: 2, retryDelay: 1 }, remove).catch((caught: unknown) => caught)
+    const failure = await removeTree("/unused", { maxRetries: 2, retryDelay: 1 }, remove).catch(
+      (caught: unknown) => caught,
+    )
 
     // then
     expect(failure).toBe(error)
@@ -48,7 +50,9 @@ describe("removeTree", () => {
     }
 
     // when
-    const failure = await removeTree("/unused", { maxRetries: 5, retryDelay: 1 }, remove).catch((caught: unknown) => caught)
+    const failure = await removeTree("/unused", { maxRetries: 5, retryDelay: 1 }, remove).catch(
+      (caught: unknown) => caught,
+    )
 
     // then
     expect(failure).toBe(error)

@@ -13,7 +13,13 @@ import {
   type SetupStageResult,
 } from "../../../../omo-native/bin/lib/setup-stream.js"
 import type { OnboardingEngineAuthStore } from "./scan-component"
-import type { OnboardingApplyResponse, OnboardingApplyStage, OnboardingScanEvent, OnboardingScanItem, OnboardingScanSource } from "./scan-contract"
+import type {
+  OnboardingApplyResponse,
+  OnboardingApplyStage,
+  OnboardingScanEvent,
+  OnboardingScanItem,
+  OnboardingScanSource,
+} from "./scan-contract"
 import {
   createMemorySessionDigestStore,
   defaultAgentHomes,
@@ -76,7 +82,8 @@ export async function runOnboardingScan(
   emit: (event: OnboardingScanEvent) => void,
 ): Promise<OnboardingScanOutcome> {
   const startedAt = performance.now()
-  const send = (body: EventBody): void => emit({ scanId: options.scanId, ...body, elapsedMs: Math.round(performance.now() - startedAt) })
+  const send = (body: EventBody): void =>
+    emit({ scanId: options.scanId, ...body, elapsedMs: Math.round(performance.now() - startedAt) })
   const home = environment.home ?? homedir()
   const env = environment.env ?? process.env
   const agentDir = environment.agentDir ?? canonicalAgentDir(env, home)
@@ -102,25 +109,32 @@ export async function runOnboardingScan(
   // Nothing is persisted before consent: the digests stay in memory, with the retained scan.
   const digestStore = createMemorySessionDigestStore()
   const projectRoots = new Set<string>()
-  const history = options.sessions === false ? [] : scanSessionHistory({
-    homeDir: home,
-    env,
-    ...environment.sessionHistory,
-    scanId: options.scanId,
-    digestStore,
-  })
+  const history =
+    options.sessions === false
+      ? []
+      : scanSessionHistory({
+          homeDir: home,
+          env,
+          ...environment.sessionHistory,
+          scanId: options.scanId,
+          digestStore,
+        })
   for await (const event of history) {
     const source = event.source
     if (event.kind === "source_started") send({ kind: "source_started", source })
-    else if (event.kind === "source_failed") send({ kind: "source_failed", source, reason: event.error ?? "unknown error" })
+    else if (event.kind === "source_failed")
+      send({ kind: "source_failed", source, reason: event.error ?? "unknown error" })
     else if (event.kind === "item" && event.item !== undefined) {
       if ("path" in event.item) projectRoots.add(event.item.path)
       send({ kind: "item", source, item: historyItem(event.item) })
-    }
-    else if (event.kind === "source_done" && event.counts !== undefined) {
+    } else if (event.kind === "source_done" && event.counts !== undefined) {
       found += event.counts.found
       read += event.counts.read
-      send({ kind: "source_done", source, counts: { found: event.counts.found, read: event.counts.read, cap: MAX_TRANSCRIPTS_PER_SOURCE } })
+      send({
+        kind: "source_done",
+        source,
+        counts: { found: event.counts.found, read: event.counts.read, cap: MAX_TRANSCRIPTS_PER_SOURCE },
+      })
     }
   }
   send({ kind: "done", source: "all", counts: { found, read, cap: null } })
@@ -162,8 +176,10 @@ export async function onboardingHistorySummary(
     signal: AbortSignal.timeout(budgetMs),
   })
   if (digests.length === 0) return undefined
-  const lines = digests.map((digest) =>
-    `${digest.lastActiveAt.slice(0, 10)} ${digest.source} ${digest.cwd}: ${clip(digest.firstRequest || digest.title)}${digest.outcome === "" ? "" : ` -> ${clip(digest.outcome)}`}`)
+  const lines = digests.map(
+    (digest) =>
+      `${digest.lastActiveAt.slice(0, 10)} ${digest.source} ${digest.cwd}: ${clip(digest.firstRequest || digest.title)}${digest.outcome === "" ? "" : ` -> ${clip(digest.outcome)}`}`,
+  )
   return `Recent agent sessions on this machine (newest ${digests.length}, from a background scan; onboarding_session_history has more): ${lines.join("; ")}`
 }
 
@@ -173,7 +189,8 @@ function clip(text: string): string {
 }
 
 function historyItem(item: ProjectCandidate | SessionScanItem): OnboardingScanItem {
-  if ("path" in item) return { id: item.path, kind: "project", state: item.alreadyImported ? "imported" : "found", detail: item.title }
+  if ("path" in item)
+    return { id: item.path, kind: "project", state: item.alreadyImported ? "imported" : "found", detail: item.title }
   return { id: item.sessionKey, kind: "session", state: "found", detail: item.title, project: item.cwd }
 }
 
@@ -181,13 +198,21 @@ export { authWritesPending, staleSetupTargets } from "../../../../omo-native/bin
 
 /** How an apply's credential additions and notice lines travel: through the engine's locked store, and to the caller's report sink. */
 export interface ApplyOnboardingScanOptions {
-  readonly writeAuth?: (target: string, additions: readonly { readonly provider: string; readonly key: string }[]) => Promise<void> | void
+  readonly writeAuth?: (
+    target: string,
+    additions: readonly { readonly provider: string; readonly key: string }[],
+  ) => Promise<void> | void
   readonly report?: (line: string) => void
 }
 
 export type OnboardingApplyOutcome =
   | { readonly applied: readonly OnboardingApplyStage[]; readonly notices: readonly string[] }
-  | { readonly kind: "stale"; readonly reason: string; readonly paths: readonly string[]; readonly applied?: readonly OnboardingApplyStage[] }
+  | {
+      readonly kind: "stale"
+      readonly reason: string
+      readonly paths: readonly string[]
+      readonly applied?: readonly OnboardingApplyStage[]
+    }
 
 /**
  * Applies the requested stages of a finished scan with the same writers `omo setup` uses. Every
@@ -211,11 +236,14 @@ export async function applyOnboardingScan(
     options.report?.(line)
   }
   try {
-    const applied = [...await applySetupStages(plans, (stage) => stages.has(stage.id), report, {
-      ...(options.writeAuth === undefined ? {} : { writeAuth: options.writeAuth }),
-      // Files an earlier stage of this apply wrote are not a change since the scan (#10496 review).
-      staleGuard: (stageId: string, written: ReadonlySet<string>) => staleSetupTargets(plans, [stageId as OnboardingApplyStage], written),
-    })]
+    const applied = [
+      ...(await applySetupStages(plans, (stage) => stages.has(stage.id), report, {
+        ...(options.writeAuth === undefined ? {} : { writeAuth: options.writeAuth }),
+        // Files an earlier stage of this apply wrote are not a change since the scan (#10496 review).
+        staleGuard: (stageId: string, written: ReadonlySet<string>) =>
+          staleSetupTargets(plans, [stageId as OnboardingApplyStage], written),
+      })),
+    ]
     return { applied, notices }
   } catch (error) {
     if (error instanceof SetupStaleError) {
@@ -249,18 +277,28 @@ export async function applyRetainedScan(
   if (authWritesPending(plans, requested)) {
     const store = authStore()
     if (store === undefined) {
-      return { kind: "unavailable", reason: "The engine's credential store is not available, so credentials cannot be imported here; run omo setup --yes instead." }
+      return {
+        kind: "unavailable",
+        reason:
+          "The engine's credential store is not available, so credentials cannot be imported here; run omo setup --yes instead.",
+      }
     }
     const target = authTargetOf(plans)
     if (target === undefined || resolve(store.getStoragePath()) !== resolve(target)) {
-      return { kind: "unavailable", reason: `The engine's credential store (${store.getStoragePath()}) is not the planned target; run omo setup --yes instead.` }
+      return {
+        kind: "unavailable",
+        reason: `The engine's credential store (${store.getStoragePath()}) is not the planned target; run omo setup --yes instead.`,
+      }
     }
   }
   const notices: string[] = []
   const outcome = await applyOnboardingScan(plans, new Set(requested), {
-    ...(authStore() === undefined ? {} : {
-      writeAuth: (target, additions) => writeAuthThrough(authStore() as OnboardingEngineAuthStore, target, additions),
-    }),
+    ...(authStore() === undefined
+      ? {}
+      : {
+          writeAuth: (target, additions) =>
+            writeAuthThrough(authStore() as OnboardingEngineAuthStore, target, additions),
+        }),
     report: (line) => notices.push(line),
   })
   if ("kind" in outcome) {
@@ -292,7 +330,8 @@ async function writeAuthThrough(
     // Under the store's lock: an entry the store already holds (a login or refresh that landed
     // after the scan) is kept exactly as it is.
     await store.modify(item.provider, (current: unknown) =>
-      current === undefined ? { type: "api_key", key: item.key } : undefined)
+      current === undefined ? { type: "api_key", key: item.key } : undefined,
+    )
   }
 }
 
@@ -332,7 +371,12 @@ export function onboardingScanContext(scanId: string, events: readonly Onboardin
   }
   // A setup-only scan (sessions: false) never read session history, so it states no session count.
   const readSessions = events.some((event) => event.source === "sessions" || event.source === "projects")
-  lines.push(`Value summary: ${valueSummary(items.flatMap((event) => (event.item === undefined ? [] : [event.item])), readSessions)}`)
+  lines.push(
+    `Value summary: ${valueSummary(
+      items.flatMap((event) => (event.item === undefined ? [] : [event.item])),
+      readSessions,
+    )}`,
+  )
   return lines.join("\n")
 }
 
@@ -341,7 +385,9 @@ function valueSummary(rows: readonly OnboardingScanItem[], readSessions: boolean
   const sessions = count("session")
   const projects = count("project")
   const parts = readSessions
-    ? [`${sessions} recent ${sessions === 1 ? "session" : "sessions"} across ${projects} ${projects === 1 ? "project" : "projects"}`]
+    ? [
+        `${sessions} recent ${sessions === 1 ? "session" : "sessions"} across ${projects} ${projects === 1 ? "project" : "projects"}`,
+      ]
     : []
   for (const [label, kinds] of SUMMARY_KINDS) {
     const found = rows.filter((row) => kinds.has(row.kind))
@@ -367,9 +413,11 @@ const FACT_GROUPS: ReadonlyArray<readonly [string, ReadonlySet<string>]> = [
 export function migrationFactsFromScan(results: readonly SetupStageResult[]): string | undefined {
   const rows = results.flatMap((result) => (result.disabled === true ? [] : [...result.items]))
   if (rows.length === 0) return undefined
-  return FACT_GROUPS
-    .map(([label, kinds]) => [label, rows.filter((row) => kinds.has(row.kind))] as const)
+  return FACT_GROUPS.map(([label, kinds]) => [label, rows.filter((row) => kinds.has(row.kind))] as const)
     .filter(([, own]) => own.length > 0)
-    .map(([label, own]) => `${label}: ${own.map((row) => `${row.id} (${row.state}${row.detail === undefined ? "" : ` - ${row.detail}`})`).join(", ")}`)
+    .map(
+      ([label, own]) =>
+        `${label}: ${own.map((row) => `${row.id} (${row.state}${row.detail === undefined ? "" : ` - ${row.detail}`})`).join(", ")}`,
+    )
     .join("; ")
 }

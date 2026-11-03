@@ -16,11 +16,19 @@ type AvailableModelsParseResult = {
 }
 
 const SECRET_LIKE_MODEL_FIELD_NAMES: ReadonlySet<string> = new Set([
-  "accesstoken", "apikey", "auth", "authorization",
-  "bearertoken", "clientsecret", "password", "privatekey",
-  "privatetoken", "secret", "secretkey", "token",
+  "accesstoken",
+  "apikey",
+  "auth",
+  "authorization",
+  "bearertoken",
+  "clientsecret",
+  "password",
+  "privatekey",
+  "privatetoken",
+  "secret",
+  "secretkey",
+  "token",
 ] as const)
-
 
 export function formatModel(model: ParsedModel): string {
   return `${model.provider}/${model.modelId}`
@@ -32,7 +40,7 @@ function normalizeModelFieldName(key: string): string {
 
 function hasSecretLikeModelField(model: object): boolean {
   return Object.getOwnPropertyNames(model).some((key) =>
-    SECRET_LIKE_MODEL_FIELD_NAMES.has(normalizeModelFieldName(key))
+    SECRET_LIKE_MODEL_FIELD_NAMES.has(normalizeModelFieldName(key)),
   )
 }
 
@@ -56,10 +64,24 @@ export function parseRegistryModel<TModel extends SenpiModelPort>(
   const provider = ownStringDataProperty(model, "provider")
   const modelId = ownStringDataProperty(model, "id")
   const displayName = ownStringDataProperty(model, "name")
-  if (!provider || !modelId || (expected !== undefined && (provider !== expected.provider || modelId !== expected.modelId))) {
+  if (
+    !provider ||
+    !modelId ||
+    (expected !== undefined && (provider !== expected.provider || modelId !== expected.modelId))
+  ) {
     return undefined
   }
-  return { model, provider, modelId, ...(displayName !== undefined && displayName.trim().length > 0 && displayName.length <= 120 && !/[\u0000-\u001f\u007f-\u009f]/u.test(displayName) ? { displayName } : {}) }
+  return {
+    model,
+    provider,
+    modelId,
+    ...(displayName !== undefined &&
+    displayName.trim().length > 0 &&
+    displayName.length <= 120 &&
+    !/[\u0000-\u001f\u007f-\u009f]/u.test(displayName)
+      ? { displayName }
+      : {}),
+  }
 }
 
 export function parseModel(model: string): ParsedModel | undefined {
@@ -77,5 +99,12 @@ export function parseAvailableModels(models: unknown): AvailableModelsParseResul
   if (!Array.isArray(models)) {
     return { models: [], validContainer: false }
   }
-  return { models: models.map((model) => parseRegistryModel(model)).filter((model) => model !== undefined).map(formatModel).sort(), validContainer: true }
+  return {
+    models: models
+      .map((model) => parseRegistryModel(model))
+      .filter((model) => model !== undefined)
+      .map(formatModel)
+      .sort(),
+    validContainer: true,
+  }
 }

@@ -1,5 +1,15 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { spawn, spawnSync } from "node:child_process"
@@ -39,38 +49,42 @@ function expandShortPath(path: string): string {
   }
 }
 
-function createFixture(options: { hoisted?: boolean; scopedEngine?: boolean; shim?: boolean; installLayout?: InstallLayout } = {}): Fixture {
+function createFixture(
+  options: { hoisted?: boolean; scopedEngine?: boolean; shim?: boolean; installLayout?: InstallLayout } = {},
+): Fixture {
   // Windows hands back the 8.3 short form (RUNNER~1) here while the launcher reports the long path, so
   // the fixture root is canonicalized once and every derived path inherits the same spelling.
   const root = expandShortPath(realpathSync(mkdtempSync(join(tmpdir(), "omo-launcher-"))))
   roots.push(root)
-  const packagePath = options.installLayout === "bun-legacy"
-    ? join(root, "home", "node_modules", "omo-ai")
-    : options.installLayout?.startsWith("bun")
-    ? join(
-      root,
-      options.installLayout === "bun-posix-special"
-        ? "custom $HOME's bun"
-        : "custom-bun",
-      "install",
-      "global",
-      "node_modules",
-      "omo-ai",
-    )
-    : options.installLayout === "npm"
-      ? join(root, "prefix", "lib", "node_modules", "omo-ai")
-      : options.hoisted
-        ? join(root, "node_modules", "omo-ai")
-        : join(root, "app")
+  const packagePath =
+    options.installLayout === "bun-legacy"
+      ? join(root, "home", "node_modules", "omo-ai")
+      : options.installLayout?.startsWith("bun")
+        ? join(
+            root,
+            options.installLayout === "bun-posix-special" ? "custom $HOME's bun" : "custom-bun",
+            "install",
+            "global",
+            "node_modules",
+            "omo-ai",
+          )
+        : options.installLayout === "npm"
+          ? join(root, "prefix", "lib", "node_modules", "omo-ai")
+          : options.hoisted
+            ? join(root, "node_modules", "omo-ai")
+            : join(root, "app")
   mkdirSync(packagePath, { recursive: true })
   const packageRoot = expandShortPath(realpathSync(packagePath))
   cpSync(join(SOURCE_ROOT, "bin"), join(packageRoot, "bin"), { recursive: true })
-  writeFile(join(packageRoot, "package.json"), JSON.stringify({
-    name: "omo-ai",
-    version: "1.2.3-test.0",
-    type: "module",
-    dependencies: { "@code-yeongyu/senpi": "2026.8.9" },
-  }))
+  writeFile(
+    join(packageRoot, "package.json"),
+    JSON.stringify({
+      name: "omo-ai",
+      version: "1.2.3-test.0",
+      type: "module",
+      dependencies: { "@code-yeongyu/senpi": "2026.8.9" },
+    }),
+  )
   if (options.installLayout === "npm") {
     writeFile(join(root, "prefix", "lib", "node_modules", ".package-lock.json"), "{}\n")
   }
@@ -80,20 +94,26 @@ function createFixture(options: { hoisted?: boolean; scopedEngine?: boolean; shi
     ? join(packageRoot, "node_modules", "@code-yeongyu", "senpi")
     : join(modulesRoot, "@code-yeongyu", "senpi")
   if (options.scopedEngine) writeFile(join(senpiRoot, "node_modules", ".bin", "dummy"), "decoy\n", 0o755)
-  writeFile(join(senpiRoot, "package.json"), JSON.stringify({
-    name: "@code-yeongyu/senpi",
-    version: "2026.8.9",
-    type: "module",
-    exports: { ".": "./dist/index.js" },
-  }))
+  writeFile(
+    join(senpiRoot, "package.json"),
+    JSON.stringify({
+      name: "@code-yeongyu/senpi",
+      version: "2026.8.9",
+      type: "module",
+      exports: { ".": "./dist/index.js" },
+    }),
+  )
   writeFile(join(senpiRoot, "dist", "index.js"), "export const fixture = true\n")
-  writeFile(join(senpiRoot, "dist", "cli.js"), `
+  writeFile(
+    join(senpiRoot, "dist", "cli.js"),
+    `
 import { writeFileSync } from "node:fs"
 writeFileSync(process.env.CAPTURE_FILE, JSON.stringify({ argv: process.argv.slice(2), env: process.env }))
 if (process.env.FAKE_STDOUT) console.log(process.env.FAKE_STDOUT)
 if (process.env.FAKE_SIGNAL) process.kill(process.pid, process.env.FAKE_SIGNAL)
 process.exit(Number(process.env.FAKE_EXIT ?? 0))
-`)
+`,
+  )
   writeFile(join(senpiRoot, "dist", "core", "brand.js"), "export {}\n")
 
   let shimPath: string | undefined
@@ -104,16 +124,22 @@ process.exit(Number(process.env.FAKE_EXIT ?? 0))
     shimPath = expandShortPath(realpathSync(shimPath))
   }
   const toolkitRuntime = join(packageRoot, "plugin", "runtime", "agent-toolkit")
-  writeFile(join(toolkitRuntime, "cli.js"), `
+  writeFile(
+    join(toolkitRuntime, "cli.js"),
+    `
 import { writeFileSync } from "node:fs"
 writeFileSync(process.env.CAPTURE_FILE, JSON.stringify({ argv: process.argv.slice(2), target: "agent-toolkit" }))
 process.exit(Number(process.env.FAKE_EXIT ?? 0))
-`)
-  writeFile(join(toolkitRuntime, "ulw-loop", "cli.js"), `
+`,
+  )
+  writeFile(
+    join(toolkitRuntime, "ulw-loop", "cli.js"),
+    `
 import { writeFileSync } from "node:fs"
 writeFileSync(process.env.CAPTURE_FILE, JSON.stringify({ argv: process.argv.slice(2), target: "ulw-loop" }))
 process.exit(Number(process.env.FAKE_EXIT ?? 0))
-`)
+`,
+  )
   const captureFile = join(root, "capture.json")
   return { root, packageRoot, launcher: join(packageRoot, "bin", "omo.js"), captureFile, shimPath }
 }
@@ -158,18 +184,23 @@ const NPM_UPDATE_HINT = `omo is updated via npm: npm i -g omo-ai@${PUBLISHED_BET
 
 /** Answers the dist-tags lookup from FAKE_DIST_TAGS (JSON), or as an unreachable registry when it is unset. */
 function stubRegistry(fixture: Fixture): void {
-  writeFile(join(fixture.packageRoot, "bin", "lib", "npm-dist-tags.js"), `
+  writeFile(
+    join(fixture.packageRoot, "bin", "lib", "npm-dist-tags.js"),
+    `
 export function fetchNpmDistTagsSync() {
   return process.env.FAKE_DIST_TAGS ? JSON.parse(process.env.FAKE_DIST_TAGS) : null
 }
-`)
+`,
+  )
 }
 
 const REGISTRY_ENV = { FAKE_DIST_TAGS: JSON.stringify({ latest: "1.2.2", beta: PUBLISHED_BETA }) }
 
 /** The fake manager moves the fixture's installed version to FAKE_INSTALLS when it is set. */
 function stubPackageManagerSpawn(fixture: Fixture): void {
-  writeFile(join(fixture.packageRoot, "bin", "lib", "child-process.js"), `
+  writeFile(
+    join(fixture.packageRoot, "bin", "lib", "child-process.js"),
+    `
 import { readFileSync, writeFileSync } from "node:fs"
 export function propagateResult() {}
 export async function spawnNode() {}
@@ -183,7 +214,8 @@ export async function runChild(command, args, options = {}) {
   }
   return { status: Number(process.env.FAKE_EXIT ?? 0), signal: null }
 }
-`)
+`,
+  )
 }
 
 afterEach(() => {
@@ -197,7 +229,9 @@ describe("omo launcher", () => {
       const fixture = createFixture()
       const probe = join(fixture.packageRoot, "probe.mjs")
       const execCapture = join(fixture.root, "exec.json")
-      writeFile(probe, `
+      writeFile(
+        probe,
+        `
 import { writeFileSync } from "node:fs"
 import { runLauncher } from "./bin/lib/launcher.js"
 Object.defineProperty(process, "platform", { value: "linux" })
@@ -205,11 +239,17 @@ process.execve = (file, argv, env) => {
   writeFileSync(process.env.EXEC_CAPTURE, JSON.stringify({ file, argv, env }))
 }
 await runLauncher(["say", "hi", "-e", "/user/plugin"])
-`)
+`,
+      )
       // when
       const result = spawnSync(process.execPath, [probe], {
         encoding: "utf8",
-        env: { ...process.env, EXEC_CAPTURE: execCapture, CAPTURE_FILE: fixture.captureFile, OMO_CODING_AGENT_DIR: join(fixture.root, "agent") },
+        env: {
+          ...process.env,
+          EXEC_CAPTURE: execCapture,
+          CAPTURE_FILE: fixture.captureFile,
+          OMO_CODING_AGENT_DIR: join(fixture.root, "agent"),
+        },
       })
       // then: the fake engine writes captureFile only if the spawn path ran.
       expect(result.status).toBe(0)
@@ -218,8 +258,14 @@ await runLauncher(["say", "hi", "-e", "/user/plugin"])
       const handed = JSON.parse(readFileSync(execCapture, "utf8"))
       expect(handed.file).toBe(process.execPath)
       expect(handed.argv).toEqual([
-        process.execPath, join(fixture.packageRoot, "node_modules", "@code-yeongyu", "senpi", "dist", "cli.js"),
-        "--extension", join(fixture.packageRoot, "plugin"), "say", "hi", "-e", "/user/plugin",
+        process.execPath,
+        join(fixture.packageRoot, "node_modules", "@code-yeongyu", "senpi", "dist", "cli.js"),
+        "--extension",
+        join(fixture.packageRoot, "plugin"),
+        "say",
+        "hi",
+        "-e",
+        "/user/plugin",
       ])
       expect(handed.env.OMO_CODING_AGENT_DIR).toBe(join(fixture.root, "agent"))
       expect(handed.env.SENPI_CODING_AGENT_DIR).toBe(join(fixture.root, "agent"))
@@ -233,12 +279,15 @@ await runLauncher(["say", "hi", "-e", "/user/plugin"])
       async () => {
         // given: a launcher-created duplex on fd 5, named by the private descriptor table
         const fixture = createFixture()
-        writeFile(join(fixture.packageRoot, "node_modules", "@code-yeongyu", "senpi", "dist", "cli.js"), `
+        writeFile(
+          join(fixture.packageRoot, "node_modules", "@code-yeongyu", "senpi", "dist", "cli.js"),
+          `
 import { writeFileSync } from "node:fs"
 let wrote = false
 try { writeFileSync(5, "engine:ok"); wrote = true } catch {}
 writeFileSync(process.env.CAPTURE_FILE, JSON.stringify({ pid: process.pid, table: process.env.SENPI_PRIVATE_FDS ?? null, wrote }))
-`)
+`,
+        )
         const node = runtimeInterpreter("node") ?? "node"
         // `host ensure` is the launch a desktop launcher makes. `spare` names a descriptor it never passed.
         const child = spawn(node, [fixture.launcher, "host", "ensure"], {
@@ -256,7 +305,9 @@ writeFileSync(process.env.CAPTURE_FILE, JSON.stringify({ pid: process.pid, table
         const channel = stdio[5]
         if (!(channel instanceof Socket)) throw new Error("no private channel")
         let stderr = ""
-        child.stderr?.on("data", (chunk: Buffer) => { stderr += chunk.toString() })
+        child.stderr?.on("data", (chunk: Buffer) => {
+          stderr += chunk.toString()
+        })
         const reply = once(channel, "data", { signal: AbortSignal.timeout(30_000) })
         // when: the launcher hands off to the engine
         const [code] = await once(child, "exit", { signal: AbortSignal.timeout(30_000) })
@@ -278,16 +329,24 @@ writeFileSync(process.env.CAPTURE_FILE, JSON.stringify({ pid: process.pid, table
         // given
         const fixture = createFixture()
         const probe = join(fixture.packageRoot, "probe.mjs")
-        writeFile(probe, `
+        writeFile(
+          probe,
+          `
 import { runLauncher } from "./bin/lib/launcher.js"
 ${mode === "win32" ? 'Object.defineProperty(process, "platform", { value: "win32" })' : ""}
 process.execve = ${mode === "absent" ? "undefined" : '() => { throw new Error("injected execve unavailable") }'}
 await runLauncher(["say", "hi"])
-`)
+`,
+        )
         // when
         const result = spawnSync(process.execPath, [probe], {
           encoding: "utf8",
-          env: { ...process.env, CAPTURE_FILE: fixture.captureFile, FAKE_EXIT: "37", OMO_CODING_AGENT_DIR: join(fixture.root, "agent") },
+          env: {
+            ...process.env,
+            CAPTURE_FILE: fixture.captureFile,
+            FAKE_EXIT: "37",
+            OMO_CODING_AGENT_DIR: join(fixture.root, "agent"),
+          },
         })
         // then
         expect(result.status).toBe(37)
@@ -305,7 +364,12 @@ await runLauncher(["say", "hi"])
         const result = run(fixture, ["say", "hi", "-e", "/user/plugin"])
         expect(result.status).toBe(0)
         expect(capture(fixture).argv).toEqual([
-          "--extension", join(fixture.packageRoot, "plugin"), "say", "hi", "-e", "/user/plugin",
+          "--extension",
+          join(fixture.packageRoot, "plugin"),
+          "say",
+          "hi",
+          "-e",
+          "/user/plugin",
         ])
       })
 
@@ -383,7 +447,6 @@ await runLauncher(["say", "hi"])
       })
     })
 
-
     describe("#when the product identity is handed to the engine", () => {
       test("#then the brand profile names the product, its home and its update channel", () => {
         const fixture = createFixture()
@@ -408,7 +471,10 @@ await runLauncher(["say", "hi"])
         expect(capture(fixture).env.OMO_REINSTALL_COMMAND).toBe(brand.update.command)
         // The provider sign-in result page shows this mark (senpi#4432).
         // Compared over LF: a Windows checkout may hand the asset back with CRLF.
-        const icon = readFileSync(join(SOURCE_ROOT, "..", "..", ".github", "assets", "omo-icon-light.svg"), "utf8").replaceAll("\r\n", "\n")
+        const icon = readFileSync(
+          join(SOURCE_ROOT, "..", "..", ".github", "assets", "omo-icon-light.svg"),
+          "utf8",
+        ).replaceAll("\r\n", "\n")
         expect(typeof brand.logo).toBe("string")
         expect(brand.logo.startsWith("data:image/svg+xml;base64,")).toBe(true)
         expect(Buffer.from(brand.logo.slice("data:image/svg+xml;base64,".length), "base64").toString("utf8")).toBe(icon)
@@ -422,22 +488,25 @@ await runLauncher(["say", "hi"])
         const interpreter = runtimeInterpreter(runtime)
         // Skipping is visible in the report; silently passing on a host without the interpreter
         // would let the contract rot unnoticed.
-        test.skipIf(!interpreter)(`#then a launcher running on ${runtime} tells the engine SENPI_RUNTIME=${runtime}`, () => {
-          const fixture = createFixture()
-          // OMO_RUNTIME pins the decision, so this asserts the reported value and never depends on
-          // whether the host happens to have omo installed in a bun global tree.
-          const result = spawnSync(interpreter ?? process.execPath, [fixture.launcher, "say", "hi"], {
-            encoding: "utf8",
-            env: {
-              ...process.env,
-              CAPTURE_FILE: fixture.captureFile,
-              OMO_RUNTIME: runtime,
-            },
-          })
-          expect(result.status).toBe(0)
-          expect(capture(fixture).env.SENPI_RUNTIME).toBe(runtime)
-          expect(result.stderr).not.toContain("ExperimentalWarning")
-        })
+        test.skipIf(!interpreter)(
+          `#then a launcher running on ${runtime} tells the engine SENPI_RUNTIME=${runtime}`,
+          () => {
+            const fixture = createFixture()
+            // OMO_RUNTIME pins the decision, so this asserts the reported value and never depends on
+            // whether the host happens to have omo installed in a bun global tree.
+            const result = spawnSync(interpreter ?? process.execPath, [fixture.launcher, "say", "hi"], {
+              encoding: "utf8",
+              env: {
+                ...process.env,
+                CAPTURE_FILE: fixture.captureFile,
+                OMO_RUNTIME: runtime,
+              },
+            })
+            expect(result.status).toBe(0)
+            expect(capture(fixture).env.SENPI_RUNTIME).toBe(runtime)
+            expect(result.stderr).not.toContain("ExperimentalWarning")
+          },
+        )
       }
 
       test("#then OMO_BIN names this launcher, so the product never resolves to the bare engine", () => {
@@ -469,7 +538,11 @@ await runLauncher(["say", "hi"])
     })
 
     describe("#when a self-update is requested", () => {
-      for (const args of [["update", "--self", "--dry-run"], ["update", "self", "--dry-run"], ["update", "senpi", "--print"]]) {
+      for (const args of [
+        ["update", "--self", "--dry-run"],
+        ["update", "self", "--dry-run"],
+        ["update", "senpi", "--print"],
+      ]) {
         test(`#then ${args.join(" ")} prints the product's own update command without spawning senpi`, () => {
           const fixture = createFixture()
           stubRegistry(fixture)
@@ -490,8 +563,11 @@ await runLauncher(["say", "hi"])
 
     describe("#when an early senpi command is launched", () => {
       for (const [label, args] of [
-        ["install", ["install", "source"]], ["remove", ["remove", "source"]],
-        ["list", ["list"]], ["config", ["config"]], ["auth", ["auth", "login"]],
+        ["install", ["install", "source"]],
+        ["remove", ["remove", "source"]],
+        ["list", ["list"]],
+        ["config", ["config"]],
+        ["auth", ["auth", "login"]],
         ["update with flags", ["update", "--extensions"]],
         ["update with a source", ["update", "source"]],
       ] as const) {
@@ -618,14 +694,20 @@ await runLauncher(["say", "hi"])
         const fixture = createFixture({ installLayout: "bun" })
         stubRegistry(fixture)
         stubPackageManagerSpawn(fixture)
-        const result = run(fixture, ["update"], { ...REGISTRY_ENV, FAKE_INSTALLS: PUBLISHED_BETA, BUN_INSTALL: "/wrong" })
+        const result = run(fixture, ["update"], {
+          ...REGISTRY_ENV,
+          FAKE_INSTALLS: PUBLISHED_BETA,
+          BUN_INSTALL: "/wrong",
+        })
         expect(result.status).toBe(0)
         expect(result.stdout).toContain(BUN_UPDATE_HINT)
         expect(result.stdout).toContain(`omo 1.2.3-test.0 -> ${PUBLISHED_BETA} (engine: senpi 2026.8.9)`)
         const spawned = JSON.parse(readFileSync(fixture.captureFile, "utf8"))
         expect(spawned.command).toBe("bun")
         expect(spawned.args).toEqual(["add", "-g", `omo-ai@${PUBLISHED_BETA}`])
-        expect(spawned.env.BUN_INSTALL).toBe(fixture.packageRoot.replaceAll("\\", "/").replace(/\/install\/global\/node_modules\/omo-ai$/, ""))
+        expect(spawned.env.BUN_INSTALL).toBe(
+          fixture.packageRoot.replaceAll("\\", "/").replace(/\/install\/global\/node_modules\/omo-ai$/, ""),
+        )
       })
 
       test("#then a failing package-manager run exits non-zero with the manual command", () => {
@@ -645,12 +727,15 @@ await runLauncher(["say", "hi"])
         const fixture = createFixture({ installLayout: "bun-legacy" })
         const home = join(fixture.root, "home")
         const manifestPath = join(home, "package.json")
-        writeFile(manifestPath, JSON.stringify({
-          dependencies: {
-            "": ".",
-            "left-pad": "1.3.0",
-          },
-        }))
+        writeFile(
+          manifestPath,
+          JSON.stringify({
+            dependencies: {
+              "": ".",
+              "left-pad": "1.3.0",
+            },
+          }),
+        )
 
         const result = run(fixture, ["--version"], { HOME: home })
 

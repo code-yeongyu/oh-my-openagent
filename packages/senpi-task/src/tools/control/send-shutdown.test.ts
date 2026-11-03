@@ -12,10 +12,7 @@ function missingStateError() {
   return Object.assign(new Error(RAW_MISSING_STATE_MESSAGE), { code: "ENOENT" })
 }
 
-function expectMissingStateFailure(
-  result: SendToolResult,
-  operation: "request" | "approve" | "reject",
-): void {
+function expectMissingStateFailure(result: SendToolResult, operation: "request" | "approve" | "reject"): void {
   expect(result.details).toEqual({
     kind: "shutdown_failed",
     operation,
@@ -62,12 +59,21 @@ describe("runTaskSend shutdown routing", () => {
 
     const result = await runTaskSend(
       manager,
-      { to: "alpha", team_run_id: "run-1", message: { type: "shutdown_response", request_id: "ignored", approve: true } },
+      {
+        to: "alpha",
+        team_run_id: "run-1",
+        message: { type: "shutdown_response", request_id: "ignored", approve: true },
+      },
       "lead-session",
       { service, from: TEAM_LEAD_SENTINEL },
     )
 
-    expect(result.details).toEqual({ kind: "shutdown_responded", team_run_id: "run-1", member: "alpha", approved: true })
+    expect(result.details).toEqual({
+      kind: "shutdown_responded",
+      team_run_id: "run-1",
+      member: "alpha",
+      approved: true,
+    })
     expect(service.calls[0]).toMatchObject({ method: "approveShutdown", args: ["run-1", "alpha"] })
     const text = result.content[0]?.type === "text" ? result.content[0].text : ""
     expect(text).toContain("alpha")
@@ -108,12 +114,21 @@ describe("runTaskSend shutdown routing", () => {
 
     const result = await runTaskSend(
       manager,
-      { to: "alpha", team_run_id: "run-1", message: { type: "shutdown_response", approve: false, reason: "still needed" } },
+      {
+        to: "alpha",
+        team_run_id: "run-1",
+        message: { type: "shutdown_response", approve: false, reason: "still needed" },
+      },
       "lead-session",
       { service, from: TEAM_LEAD_SENTINEL },
     )
 
-    expect(result.details).toEqual({ kind: "shutdown_responded", team_run_id: "run-1", member: "alpha", approved: false })
+    expect(result.details).toEqual({
+      kind: "shutdown_responded",
+      team_run_id: "run-1",
+      member: "alpha",
+      approved: false,
+    })
     expect(service.calls[0]).toMatchObject({ method: "rejectShutdown", args: ["run-1", "alpha", "still needed"] })
     const text = result.content[0]?.type === "text" ? result.content[0].text : ""
     expect(text).toContain("alpha")

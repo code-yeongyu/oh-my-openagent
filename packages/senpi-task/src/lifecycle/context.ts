@@ -14,7 +14,13 @@ import {
 } from "./host-session"
 import { defaultHostSessionCloser, defaultHostSessionProbe } from "./host-session-default"
 import { injectedLifecycleReattachPorts } from "./port"
-import type { IdleReclaimerScheduler, LifecycleDeps, LifecycleReattachPorts, ProcessSignaller, ResidencyRegistry } from "./port"
+import type {
+  IdleReclaimerScheduler,
+  LifecycleDeps,
+  LifecycleReattachPorts,
+  ProcessSignaller,
+  ResidencyRegistry,
+} from "./port"
 import type { BatchAdmissionOptions } from "./residency"
 
 import { defaultIdleReclaimerScheduler } from "./idle-reclaimer-scheduler"

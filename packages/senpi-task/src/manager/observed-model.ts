@@ -9,7 +9,9 @@ import type { EffectiveModel } from "../runners/pinned-model-equivalence"
  * stream those. Anything else is not a model observation, and an event naming only one half is
  * ignored: a partial observation must never rewrite the record.
  */
-export function readObservedModel(event: ManagedChildEvent): { readonly provider: string; readonly modelId: string } | undefined {
+export function readObservedModel(
+  event: ManagedChildEvent,
+): { readonly provider: string; readonly modelId: string } | undefined {
   if (typeof event.message !== "object" || event.message === null) return undefined
   const provider = readStringField(event.message, "provider")
   const modelId = readStringField(event.message, "model")
@@ -48,7 +50,12 @@ export function stampSpawnEffectiveModel(record: TaskRecord, observedModel: Effe
  * the fallback path's job. A same-value observation is a no-op, so the store is not churned per
  * assistant message.
  */
-export function observeChildEffectiveModel(port: EffectiveModelPort, provider: string, modelId: string, serviceTier?: string): void {
+export function observeChildEffectiveModel(
+  port: EffectiveModelPort,
+  provider: string,
+  modelId: string,
+  serviceTier?: string,
+): void {
   if (port.store.load === undefined || port.store.replace === undefined) return
   const current = port.store.load(port.taskId)
   if (current === null || current === undefined || isTerminalRecord(current)) return
@@ -73,7 +80,10 @@ export function subscribeEffectiveModel(handle: ManagedChildHandle, port: Effect
     const observed = readObservedModel(event)
     if (observed !== undefined) {
       const effective = handle.effectiveModel?.()
-      const tier = effective?.provider === observed.provider && effective.id === observed.modelId ? effective.serviceTier : undefined
+      const tier =
+        effective?.provider === observed.provider && effective.id === observed.modelId
+          ? effective.serviceTier
+          : undefined
       observeChildEffectiveModel(port, observed.provider, observed.modelId, tier)
     }
   })

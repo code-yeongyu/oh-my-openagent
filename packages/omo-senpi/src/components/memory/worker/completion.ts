@@ -1,15 +1,9 @@
-import type {
-  ReflectionCompletionRecord,
-  ReflectionLiveSession,
-} from "./completion-contracts"
+import type { ReflectionCompletionRecord, ReflectionLiveSession } from "./completion-contracts"
 import { deliverReflectionCompletion } from "./completion-delivery"
 import { ensureReflectionCompletion } from "./completion-records"
 
 export * from "./completion-contracts"
-export {
-  consumePendingReflectionCompletions,
-  safeNotify,
-} from "./completion-delivery"
+export { consumePendingReflectionCompletions, safeNotify } from "./completion-delivery"
 export * from "./completion-records"
 export * from "./completion-renderers"
 

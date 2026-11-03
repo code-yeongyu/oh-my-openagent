@@ -8,26 +8,23 @@ import {
   resolveCircuitBreakerSettings,
 } from "./loop-detector"
 
-function buildWindow(
-  toolNames: string[],
-  override?: Parameters<typeof resolveCircuitBreakerSettings>[0]
-) {
+function buildWindow(toolNames: string[], override?: Parameters<typeof resolveCircuitBreakerSettings>[0]) {
   const settings = resolveCircuitBreakerSettings(override)
 
   return toolNames.reduce(
     (window, toolName) => recordToolCall(window, toolName, settings),
-    undefined as ReturnType<typeof recordToolCall> | undefined
+    undefined as ReturnType<typeof recordToolCall> | undefined,
   )
 }
 
 function buildWindowWithInputs(
   calls: Array<{ tool: string; input?: Record<string, unknown> | null }>,
-  override?: Parameters<typeof resolveCircuitBreakerSettings>[0]
+  override?: Parameters<typeof resolveCircuitBreakerSettings>[0],
 ) {
   const settings = resolveCircuitBreakerSettings(override)
   return calls.reduce(
     (window, { tool, input }) => recordToolCall(window, tool, settings, input),
-    undefined as ReturnType<typeof recordToolCall> | undefined
+    undefined as ReturnType<typeof recordToolCall> | undefined,
   )
 }
 
@@ -168,7 +165,7 @@ describe("loop-detector", () => {
           Array.from({ length: 20 }, () => ({
             tool: "read",
             input: { filePath: "/src/same.ts" },
-          }))
+          })),
         )
 
         const result = detectRepetitiveToolUse(window)
@@ -183,11 +180,7 @@ describe("loop-detector", () => {
 
     describe("#given consecutive calls are interrupted by different tool", () => {
       test("#when evaluated #then it does not trigger", () => {
-        const window = buildWindow([
-          ...Array.from({ length: 19 }, () => "read"),
-          "edit",
-          "read",
-        ])
+        const window = buildWindow([...Array.from({ length: 19 }, () => "read"), "edit", "read"])
 
         const result = detectRepetitiveToolUse(window)
 
@@ -201,7 +194,7 @@ describe("loop-detector", () => {
           Array.from({ length: 19 }, () => ({
             tool: "read",
             input: { filePath: "/src/same.ts" },
-          }))
+          })),
         )
 
         const result = detectRepetitiveToolUse(belowThresholdWindow)
@@ -214,7 +207,7 @@ describe("loop-detector", () => {
           Array.from({ length: 20 }, () => ({
             tool: "read",
             input: { filePath: "/src/same.ts" },
-          }))
+          })),
         )
 
         const result = detectRepetitiveToolUse(atThresholdWindow)

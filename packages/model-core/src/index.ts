@@ -12,11 +12,7 @@ export type {
   ModelResolutionProvenance,
   ModelResolutionResult,
 } from "./model-resolution-types"
-export type {
-  ModelResolutionInput,
-  ModelSource,
-  ExtendedModelResolutionInput,
-} from "./model-resolver"
+export type { ModelResolutionInput, ModelSource, ExtendedModelResolutionInput } from "./model-resolver"
 export {
   resolveModel,
   resolveModelWithFallback,
@@ -28,19 +24,10 @@ export * from "./model-normalization"
 export * from "./reasoning-level"
 export * from "./model-string-parser"
 export * from "./model-sanitizer"
-export {
-	fuzzyMatchModel,
-	isModelAvailable,
-} from "./model-availability"
-export {
-	transformModelForProvider,
-	transformModelForProviderDisplay,
-} from "./provider-model-id-transform"
+export { fuzzyMatchModel, isModelAvailable } from "./model-availability"
+export { transformModelForProvider, transformModelForProviderDisplay } from "./provider-model-id-transform"
 export * from "./fallback-chain-from-models"
-export {
-  _setModelResolutionLogImplementationForTesting,
-  resolveModelPipeline,
-} from "./model-resolution-pipeline"
+export { _setModelResolutionLogImplementationForTesting, resolveModelPipeline } from "./model-resolution-pipeline"
 export type {
   ModelResolutionRequest as PipelineModelResolutionRequest,
   ModelResolutionProvenance as PipelineModelResolutionProvenance,

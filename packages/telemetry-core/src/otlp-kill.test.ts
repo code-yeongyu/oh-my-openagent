@@ -2,7 +2,15 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { join } from "node:path"
 
 import { readSpoolRequest } from "./otlp-spool-file"
-import { attributeMap, createSpoolRoot, decodeLogs, logRecordsOf, makeTransport, recordingFetch, spoolNames } from "./otlp-test-support"
+import {
+  attributeMap,
+  createSpoolRoot,
+  decodeLogs,
+  logRecordsOf,
+  makeTransport,
+  recordingFetch,
+  spoolNames,
+} from "./otlp-test-support"
 
 const roots: (() => void)[] = []
 afterEach(() => {
@@ -53,7 +61,9 @@ describe("crash before the first flush", () => {
     expect(onDisk.kind).toBe("ok")
     expect(onDisk.records).toBe(7)
     expect(calls.length).toBe(1)
-    const uids = logRecordsOf(decodeLogs(calls[0]?.body ?? new Uint8Array())).map((r) => attributeMap(r.attributes)["log.record.uid"])
+    const uids = logRecordsOf(decodeLogs(calls[0]?.body ?? new Uint8Array())).map(
+      (r) => attributeMap(r.attributes)["log.record.uid"],
+    )
     expect(new Set(uids).size).toBe(7)
     expect(spoolNames(created.dir)).toEqual([])
   }, 60_000)

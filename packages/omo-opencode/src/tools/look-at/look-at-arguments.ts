@@ -87,7 +87,7 @@ export function validateArgs(args: LookAtArgs): string | null {
 - look_at(image_data="base64_encoded_data", goal="what to extract")`
   }
   if (!args.goal) {
-    return "Error: Missing required parameter 'goal'. Usage: look_at(file_path=\"/path/to/file\", goal=\"what to extract\")"
+    return 'Error: Missing required parameter \'goal\'. Usage: look_at(file_path="/path/to/file", goal="what to extract")'
   }
   return null
 }

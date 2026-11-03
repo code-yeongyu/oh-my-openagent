@@ -138,8 +138,13 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
         ...(ctx.idleCoordinator === undefined ? {} : { coordinator: ctx.idleCoordinator }),
       })
       const { forgetTaskOutputReads } = registerTaskTools(
-        pi, engine, teamTools.service, teamTools.leadPollers.resolveDefaultTeamRunId,
-        skillInvocations, dagRuntime, ctx.idleCoordinator,
+        pi,
+        engine,
+        teamTools.service,
+        teamTools.leadPollers.resolveDefaultTeamRunId,
+        skillInvocations,
+        dagRuntime,
+        ctx.idleCoordinator,
       )
       registerTeamTools(pi, teamTools)
       registerRemovedTeamWaitHint(pi)
@@ -182,17 +187,20 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
       // Ahead of the recovery chain's session_start, so a revived child's host boots during the reconcile.
       wireHostPrewarm(pi, engine)
 
-      wireDagLifecycle(pi, dagRuntime, () =>
-        wireEventBridge(pi, ctx, engine, statusUi, transitions, {
-          reconcileTeamMailbox: teamTools.reconcileTeamMailbox,
-          leadPollers: teamTools.leadPollers,
-          resumptionChannels,
-          forgetTaskOutputReads,
-          dagReloadSource: createDagReloadSource({
-            manager: dagRuntime.manager,
-            sessionId: () => engine.runtime.sessionId(),
+      wireDagLifecycle(
+        pi,
+        dagRuntime,
+        () =>
+          wireEventBridge(pi, ctx, engine, statusUi, transitions, {
+            reconcileTeamMailbox: teamTools.reconcileTeamMailbox,
+            leadPollers: teamTools.leadPollers,
+            resumptionChannels,
+            forgetTaskOutputReads,
+            dagReloadSource: createDagReloadSource({
+              manager: dagRuntime.manager,
+              sessionId: () => engine.runtime.sessionId(),
+            }),
           }),
-        }),
         (error) => ctx.logger.warn("omo-senpi DAG attach after reconcile failed", { error: String(error) }),
       )
 
@@ -210,7 +218,10 @@ function sessionCwd(pi: SenpiExtensionAPI): string {
   return typeof pi.cwd === "string" && pi.cwd.length > 0 ? pi.cwd : process.cwd()
 }
 
-async function readJobWidgetHost(load: () => Promise<JobWidgetHostApi>, ctx: ComponentContext): Promise<JobWidgetHostApi> {
+async function readJobWidgetHost(
+  load: () => Promise<JobWidgetHostApi>,
+  ctx: ComponentContext,
+): Promise<JobWidgetHostApi> {
   try {
     return await load()
   } catch (error) {
@@ -226,9 +237,14 @@ async function readJobWidgetHost(load: () => Promise<JobWidgetHostApi>, ctx: Com
 function wireJobWidgets(pi: SenpiExtensionAPI, engine: TaskEngine, cwd: string, host: JobWidgetHostApi): void {
   if (host.setAuthorResolver === undefined && host.sources === undefined) return
   const releaseAuthor = installJobWidgetAuthor(host, cwd, engine.omoConfig)
-  const feed = host.sources === undefined
-    ? undefined
-    : createTaskJobWidgetFeed({ sources: host.sources, manager: engine.manager, sessionId: () => engine.runtime.sessionId() })
+  const feed =
+    host.sources === undefined
+      ? undefined
+      : createTaskJobWidgetFeed({
+          sources: host.sources,
+          manager: engine.manager,
+          sessionId: () => engine.runtime.sessionId(),
+        })
   const stopObserving = feed === undefined ? undefined : engine.onStoreMutation((change) => feed.observe(change))
   pi.on("session_start", () => feed?.sync())
   pi.on("session_shutdown", () => {
@@ -280,12 +296,19 @@ function registerTaskTools(
       manager,
       resolveCallerSessionId,
       deliverLateOutcome: createLateSendOutcomeDeliverer(pi, () => engine.runtime.sessionId()),
-      teamRouting: { service: teamService, from: TEAM_LEAD_SENTINEL, ...(resolveDefaultTeamRunId !== undefined ? { resolveDefaultTeamRunId } : {}) },
+      teamRouting: {
+        service: teamService,
+        from: TEAM_LEAD_SENTINEL,
+        ...(resolveDefaultTeamRunId !== undefined ? { resolveDefaultTeamRunId } : {}),
+      },
     }),
   })
   pi.registerTool({ ...createTaskCancelTool({ manager }) })
   const output = createTaskOutputTool({
-    manager, stateDir: engine.stateDir, resolveCallerSessionId, notices: engine.host.notices.list,
+    manager,
+    stateDir: engine.stateDir,
+    resolveCallerSessionId,
+    notices: engine.host.notices.list,
   })
   const { forgetSession, ...outputTool } = output
   pi.registerTool({ ...outputTool })
@@ -294,7 +317,6 @@ function registerTaskTools(
   registerEvalHandleHost(pi, engine)
   return { forgetTaskOutputReads: forgetSession }
 }
-
 
 export function wireDagLifecycle(
   pi: SenpiExtensionAPI,
@@ -320,11 +342,7 @@ export function wireDagLifecycle(
   return { lastAttach: () => latest }
 }
 
-function createTeamToolContext(
-  pi: SenpiExtensionAPI,
-  ctx: ComponentContext,
-  engine: TaskEngine,
-): TeamToolContext {
+function createTeamToolContext(pi: SenpiExtensionAPI, ctx: ComponentContext, engine: TaskEngine): TeamToolContext {
   const serviceDeps = {
     manager: engine.manager,
     resolveInheritedExtensions: engine.resolveInheritedExtensions,

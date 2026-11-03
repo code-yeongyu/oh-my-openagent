@@ -10,7 +10,12 @@ function textOf(result: Awaited<ReturnType<ReturnType<typeof buildTaskExecute>>>
   const content = result.content[0]
   return content?.type === "text" ? content.text : ""
 }
-function started(taskId: string, name: string, status: "running" | "pending" = "running", queuePosition?: number): StartResult {
+function started(
+  taskId: string,
+  name: string,
+  status: "running" | "pending" = "running",
+  queuePosition?: number,
+): StartResult {
   return {
     kind: "started",
     task_id: taskId,
@@ -100,7 +105,11 @@ describe("buildTaskExecute batch fanout", () => {
 
     // when
     const output = await buildTaskExecute(makeDeps(manager))(
-      "large-batch", { category: "quick", tasks }, undefined, undefined, CTX,
+      "large-batch",
+      { category: "quick", tasks },
+      undefined,
+      undefined,
+      CTX,
     )
 
     // then
@@ -129,7 +138,11 @@ describe("buildTaskExecute batch fanout", () => {
 
     // when
     const output = await buildTaskExecute(makeDeps(manager))(
-      "throwing-batch", { category: "quick", tasks: [{ prompt: "one" }, { prompt: "two" }, { prompt: "three" }] }, undefined, undefined, CTX,
+      "throwing-batch",
+      { category: "quick", tasks: [{ prompt: "one" }, { prompt: "two" }, { prompt: "three" }] },
+      undefined,
+      undefined,
+      CTX,
     )
 
     // then
@@ -181,7 +194,9 @@ describe("buildTaskExecute batch fanout", () => {
       "batch-abort",
       { category: "quick", tasks: [{ prompt: "one" }, { prompt: "two" }, { prompt: "three" }] },
       controller.signal,
-      (update) => { updates.push(update) },
+      (update) => {
+        updates.push(update)
+      },
       CTX,
     )
     // then
@@ -194,17 +209,32 @@ describe("buildTaskExecute batch fanout", () => {
 
   test(" w2batch #given one tasks item #when compared with a legacy prompt #then the single-spawn result is identical", async () => {
     // given
-    const makeManager = () => createFakeManager({
-      start: async (): Promise<StartResult> => started(IDS[0], "only"),
-      waitFor: async (): Promise<TaskRecord> =>
-        makeRecord({ task_id: IDS[0], status: "completed", final_response: "same answer", category: "quick", name: "only" }),
-    })
+    const makeManager = () =>
+      createFakeManager({
+        start: async (): Promise<StartResult> => started(IDS[0], "only"),
+        waitFor: async (): Promise<TaskRecord> =>
+          makeRecord({
+            task_id: IDS[0],
+            status: "completed",
+            final_response: "same answer",
+            category: "quick",
+            name: "only",
+          }),
+      })
     // when
     const legacy = await buildTaskExecute(makeDeps(makeManager()))(
-      "single-legacy", { prompt: "only", category: "quick" }, undefined, undefined, CTX,
+      "single-legacy",
+      { prompt: "only", category: "quick" },
+      undefined,
+      undefined,
+      CTX,
     )
     const batched = await buildTaskExecute(makeDeps(makeManager()))(
-      "single-array", { tasks: [{ prompt: "only", category: "quick" }] }, undefined, undefined, CTX,
+      "single-array",
+      { tasks: [{ prompt: "only", category: "quick" }] },
+      undefined,
+      undefined,
+      CTX,
     )
     // then
     expect(batched).toEqual(legacy)
@@ -266,7 +296,7 @@ describe("buildTaskExecute batch fanout", () => {
     const text = textOf(output)
     expect(text).toContain("Valid category names: deep, quick")
     expect(text).toContain("omo.json")
-    expect(text).not.toContain('Pass model:')
+    expect(text).not.toContain("Pass model:")
     expect(text).not.toContain("Available categories:")
   })
 })

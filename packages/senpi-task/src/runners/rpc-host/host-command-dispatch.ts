@@ -5,18 +5,27 @@ import type { HostPromptDisposition, HostQueuedInputDisposition, HostRpcClient }
 const ignoreHostDisposition = (_disposition: HostPromptDisposition | HostQueuedInputDisposition): void => undefined
 
 /** Issue one child command on the engine client that holds the child's session. */
-export function dispatchHostCommand(client: HostRpcClient, routingId: string | undefined, command: HostSessionCommand): Promise<void> {
+export function dispatchHostCommand(
+  client: HostRpcClient,
+  routingId: string | undefined,
+  command: HostSessionCommand,
+): Promise<void> {
   switch (command.type) {
     case "prompt":
-      return client.prompt(
-        command.message,
-        { ...(command.streamingBehavior === undefined ? {} : { streamingBehavior: command.streamingBehavior }),
-          ...(command.clientMessageId === undefined ? {} : { clientMessageId: command.clientMessageId }) },
-      ).then(ignoreHostDisposition)
+      return client
+        .prompt(command.message, {
+          ...(command.streamingBehavior === undefined ? {} : { streamingBehavior: command.streamingBehavior }),
+          ...(command.clientMessageId === undefined ? {} : { clientMessageId: command.clientMessageId }),
+        })
+        .then(ignoreHostDisposition)
     case "steer":
-      return client.steer(command.message, undefined, { clientMessageId: command.clientMessageId }).then(ignoreHostDisposition)
+      return client
+        .steer(command.message, undefined, { clientMessageId: command.clientMessageId })
+        .then(ignoreHostDisposition)
     case "followUp":
-      return client.followUp(command.message, undefined, { clientMessageId: command.clientMessageId }).then(ignoreHostDisposition)
+      return client
+        .followUp(command.message, undefined, { clientMessageId: command.clientMessageId })
+        .then(ignoreHostDisposition)
     case "abort":
       return client.abort()
     case "set_session_context":

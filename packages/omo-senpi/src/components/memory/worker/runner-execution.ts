@@ -17,10 +17,7 @@ import type { SenpiOmoConfigResult } from "../../config-resolution"
 import { resolveAgentReflectionSettings } from "../reflection-settings"
 import { createRunWorktree } from "./create-run-worktree"
 import { resolveAndPreflightMemoryLaunch } from "./memory-launch-preflight"
-import {
-  MemoryModelExhaustedError,
-  type MemoryModelChain,
-} from "./memory-model-attempts"
+import { MemoryModelExhaustedError, type MemoryModelChain } from "./memory-model-attempts"
 import type { MemoryLaunchRoute } from "./fork-cost"
 import { prepareReflectionCandidateSpawn } from "./reflection-spawn-input"
 import type { ReflectionModelResolution } from "./resolve-model"
@@ -47,7 +44,12 @@ export async function executeReflectionRun(input: {
   const { run, resolution, loaded, options } = input
   const repo = new GitMemoryRepo({ dir: options.identity.paths.repo, agentId: options.identity.id })
   if (!existsSync(join(options.identity.paths.repo, ".git"))) {
-    await repo.init({ seedFiles: buildDefaultSeedFiles(), installHooks: (dir) => { installHooks(dir, { checker: memoryHookChecker() }) } })
+    await repo.init({
+      seedFiles: buildDefaultSeedFiles(),
+      installHooks: (dir) => {
+        installHooks(dir, { checker: memoryHookChecker() })
+      },
+    })
   }
   let worktree: ReflectionWorktree | undefined
   try {
@@ -78,9 +80,9 @@ export async function executeReflectionRun(input: {
       attempt: async (candidate, attemptNumber, nextAttempt) => {
         // Queue time is excluded, but previous model attempts still consume the SAME run budget.
         if (attemptNumber > 1) {
-          const previous = parseReservationRunLedger(await readRunJson<unknown>(
-            join(options.identity.paths.reflection, "runs", run.runId, "ledger.json"),
-          ))
+          const previous = parseReservationRunLedger(
+            await readRunJson<unknown>(join(options.identity.paths.reflection, "runs", run.runId, "ledger.json")),
+          )
           hardDeadlineAt = previous.hardDeadlineAt
         }
         const parentSessionFile = input.route?.route === "fork" ? options.resolveParentSessionFile?.() : undefined
@@ -135,11 +137,12 @@ async function finalizeExecutionFailure(
   const runDir = join(input.options.identity.paths.reflection, "runs", input.run.runId)
   if (existsSync(join(runDir, "ledger.json"))) {
     const ledger = parseReservationRunLedger(await readRunJson<unknown>(join(runDir, "ledger.json")))
-    const finalized = error instanceof MemoryModelExhaustedError
-      ? await overrideFailedReservationRun(input.finalizationContext(), runDir, ledger, error.message)
-      : await failReservationRun(input.finalizationContext(), runDir, ledger, "failed", errorMessage(error), {
-        recoverWorktreeTip: isSupervisorDeathWithoutOutcome(error),
-      })
+    const finalized =
+      error instanceof MemoryModelExhaustedError
+        ? await overrideFailedReservationRun(input.finalizationContext(), runDir, ledger, error.message)
+        : await failReservationRun(input.finalizationContext(), runDir, ledger, "failed", errorMessage(error), {
+            recoverWorktreeTip: isSupervisorDeathWithoutOutcome(error),
+          })
     return requireFinalizedResult(finalized)
   }
   const discarded = worktree === undefined ? undefined : await discardWorktree(worktree)

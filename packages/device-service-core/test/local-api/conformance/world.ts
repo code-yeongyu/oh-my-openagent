@@ -7,45 +7,45 @@ import type {
   RoundDeviceState,
   SnapshotBody,
   Status,
-} from "../../../src/local-api/protocol.ts";
+} from "../../../src/local-api/protocol.ts"
 
 // What an owner knows, described as plain JSON so the same fixtures can drive the fake owner here and any other
 // server implementation that can put itself into this state.
 export type WorldEntry =
   | { readonly entry_id: string; readonly entry: JsonValue }
-  | { readonly entry_id: string; readonly too_large: true; readonly bytes: number };
+  | { readonly entry_id: string; readonly too_large: true; readonly bytes: number }
 export type WorldPage = {
-  readonly before_entry_id: string | null;
-  readonly entries: readonly WorldEntry[];
-  readonly next_before: string | null;
-};
+  readonly before_entry_id: string | null
+  readonly entries: readonly WorldEntry[]
+  readonly next_before: string | null
+}
 export type WorldSession = {
-  readonly device: string;
-  readonly session_id: string;
-  readonly attach_pending?: boolean;
-  readonly snapshot: SnapshotBody;
-  readonly records: readonly JsonObject[];
-  readonly pages: readonly WorldPage[];
-  readonly outcome: readonly CommandOutcome[];
-};
+  readonly device: string
+  readonly session_id: string
+  readonly attach_pending?: boolean
+  readonly snapshot: SnapshotBody
+  readonly records: readonly JsonObject[]
+  readonly pages: readonly WorldPage[]
+  readonly outcome: readonly CommandOutcome[]
+}
 export type WorldRevision = {
-  readonly rows: readonly ListingRow[];
-  readonly incomplete: readonly string[];
-};
+  readonly rows: readonly ListingRow[]
+  readonly incomplete: readonly string[]
+}
 export type World = {
-  readonly service_version: string;
-  readonly status: Status;
-  readonly devices: readonly DeviceRow[];
+  readonly service_version: string
+  readonly status: Status
+  readonly devices: readonly DeviceRow[]
   readonly listing: {
-    readonly revisions: readonly WorldRevision[];
-    readonly devices: { readonly [device: string]: RoundDeviceState };
-  };
-  readonly sessions: readonly WorldSession[];
-};
+    readonly revisions: readonly WorldRevision[]
+    readonly devices: { readonly [device: string]: RoundDeviceState }
+  }
+  readonly sessions: readonly WorldSession[]
+}
 
-export const PEER = "dev-peer-1";
-export const OFFLINE_PEER = "dev-peer-2";
-export const SESSION_ID = "c2Vzc2lvbi1rZXktMDAwMQ";
+export const PEER = "dev-peer-1"
+export const OFFLINE_PEER = "dev-peer-2"
+export const SESSION_ID = "c2Vzc2lvbi1rZXktMDAwMQ"
 
 const row = (device: string, title: string, source: "live" | "cache"): ListingRow => ({
   device,
@@ -57,7 +57,7 @@ const row = (device: string, title: string, source: "live" | "cache"): ListingRo
   updated_ms: 1_790_000_000_000,
   source,
   as_of: 1_790_000_100_000,
-});
+})
 
 export const defaultWorld = (): World => ({
   service_version: "1.4.0",
@@ -126,4 +126,4 @@ export const defaultWorld = (): World => ({
       ],
     },
   ],
-});
+})

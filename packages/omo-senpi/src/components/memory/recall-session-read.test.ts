@@ -1,9 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import type { BeforeAgentStartEventResult } from "@code-yeongyu/senpi"
-import {
-  GitMemoryRepo,
-  RecallLedger,
-} from "@oh-my-opencode/memory-core"
+import { GitMemoryRepo, RecallLedger } from "@oh-my-opencode/memory-core"
 
 import { MemoryFakeExtensionAPI, memorySettings } from "./memory.test-support"
 import { RECALL_CUSTOM_TYPE, createMemoryRecallWiring } from "./recall-wiring"

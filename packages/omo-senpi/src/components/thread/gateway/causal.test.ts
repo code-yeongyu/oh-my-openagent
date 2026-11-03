@@ -58,7 +58,10 @@ describe("causal cycle detector", () => {
   })
 
   test("#given A->B->C #when C->A, A->A and B->A are offered #then each closes a cycle while A->C does not", () => {
-    const edges = [{ from: "A", to: "B" }, { from: "B", to: "C" }]
+    const edges = [
+      { from: "A", to: "B" },
+      { from: "B", to: "C" },
+    ]
     expect(closesCycle(edges, "C", "A")).toBe(true)
     expect(closesCycle(edges, "A", "A")).toBe(true)
     expect(closesCycle(edges, "B", "A")).toBe(true)

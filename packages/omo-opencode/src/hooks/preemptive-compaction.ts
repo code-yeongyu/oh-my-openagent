@@ -5,11 +5,7 @@ import type { ContextLimitModelCacheState } from "../shared/context-limit-resolv
 
 import { createPostCompactionDegradationMonitor } from "./preemptive-compaction-degradation-monitor"
 import { runPreemptiveCompactionIfNeeded } from "./preemptive-compaction-trigger"
-import type {
-  CachedCompactionState,
-  PreemptiveCompactionContext,
-  TokenInfo,
-} from "./preemptive-compaction-types"
+import type { CachedCompactionState, PreemptiveCompactionContext, TokenInfo } from "./preemptive-compaction-types"
 
 export function createPreemptiveCompactionHook(
   ctx: PreemptiveCompactionContext,
@@ -31,7 +27,7 @@ export function createPreemptiveCompactionHook(
 
   const toolExecuteAfter = async (
     input: { tool: string; sessionID: string; callID: string },
-    _output: { title: string; output: string; metadata: unknown }
+    _output: { title: string; output: string; metadata: unknown },
   ) => {
     await runPreemptiveCompactionIfNeeded({
       ctx,
@@ -69,17 +65,19 @@ export function createPreemptiveCompactionHook(
     }
 
     if (event.type === "message.updated") {
-      const info = props?.info as {
-        id?: string
-        agent?: unknown
-        role?: string
-        sessionID?: string
-        providerID?: string
-        modelID?: string
-        finish?: unknown
-        tokens?: TokenInfo
-        parts?: unknown
-      } | undefined
+      const info = props?.info as
+        | {
+            id?: string
+            agent?: unknown
+            role?: string
+            sessionID?: string
+            providerID?: string
+            modelID?: string
+            finish?: unknown
+            tokens?: TokenInfo
+            parts?: unknown
+          }
+        | undefined
 
       const sessionID = resolveMessageEventSessionID(props)
       const finish = info?.finish

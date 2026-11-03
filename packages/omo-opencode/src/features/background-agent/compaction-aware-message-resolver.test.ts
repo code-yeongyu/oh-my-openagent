@@ -123,16 +123,22 @@ describe("findNearestMessageExcludingCompaction", () => {
       // given
       const compactionMessageID = "msg_test_background_compaction_marker"
       const partDir = getCompactionPartStorageDir(compactionMessageID)
-      writeFileSync(join(tempDir, "002.json"), JSON.stringify({
-        id: compactionMessageID,
-        agent: "atlas",
-        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
-      }))
-      writeFileSync(join(tempDir, "001.json"), JSON.stringify({
-        id: "msg_001",
-        agent: "sisyphus",
-        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
-      }))
+      writeFileSync(
+        join(tempDir, "002.json"),
+        JSON.stringify({
+          id: compactionMessageID,
+          agent: "atlas",
+          model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+        }),
+      )
+      writeFileSync(
+        join(tempDir, "001.json"),
+        JSON.stringify({
+          id: "msg_001",
+          agent: "sisyphus",
+          model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+        }),
+      )
       mkdirSync(partDir, { recursive: true })
       writeFileSync(join(partDir, "prt_0001.json"), JSON.stringify({ type: "compaction" }))
 

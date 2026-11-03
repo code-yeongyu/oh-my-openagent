@@ -46,12 +46,11 @@ export async function buildSubagentCompletionReminder(input: {
     : false
 
   const finalWavePlanState = readFinalWavePlanState(input.planPath)
-  const isFinalWaveTask = input.currentTask?.key.startsWith("final-wave:") === true
-    || ((finalWavePlanState?.pendingImplementationTaskCount ?? 1) === 0
-      && (finalWavePlanState?.pendingFinalWaveTaskCount ?? 0) > 0)
-  const finalWaveVerdict = isFinalWaveTask
-    ? classifyFinalWaveVerdict(input.originalResponse)
-    : "missing"
+  const isFinalWaveTask =
+    input.currentTask?.key.startsWith("final-wave:") === true ||
+    ((finalWavePlanState?.pendingImplementationTaskCount ?? 1) === 0 &&
+      (finalWavePlanState?.pendingFinalWaveTaskCount ?? 0) > 0)
+  const finalWaveVerdict = isFinalWaveTask ? classifyFinalWaveVerdict(input.originalResponse) : "missing"
   const isMissingFinalWaveVerdict = isFinalWaveTask && finalWaveVerdict === "missing"
   const isRejectedFinalWaveVerdict = isFinalWaveTask && finalWaveVerdict === "reject"
   const shouldPause = shouldPauseForApproval || isMissingFinalWaveVerdict || isRejectedFinalWaveVerdict
@@ -65,7 +64,11 @@ export async function buildSubagentCompletionReminder(input: {
   }
 
   if (isMissingFinalWaveVerdict) {
-    await showFinalWaveToast(input.ctx, "Final review incomplete", "A reviewer returned no clear verdict. Boulder paused - confirm or re-run the review.")
+    await showFinalWaveToast(
+      input.ctx,
+      "Final review incomplete",
+      "A reviewer returned no clear verdict. Boulder paused - confirm or re-run the review.",
+    )
     return {
       leadReminder: buildMissingVerdictEscalation(
         input.planName,
@@ -81,7 +84,11 @@ export async function buildSubagentCompletionReminder(input: {
   }
 
   if (isRejectedFinalWaveVerdict) {
-    await showFinalWaveToast(input.ctx, "Final review rejected", "A reviewer returned VERDICT: REJECT. Boulder paused - fix or ask the user how to proceed.")
+    await showFinalWaveToast(
+      input.ctx,
+      "Final review rejected",
+      "A reviewer returned VERDICT: REJECT. Boulder paused - fix or ask the user how to proceed.",
+    )
     return {
       leadReminder: buildRejectedVerdictEscalation(
         input.planName,
@@ -125,7 +132,13 @@ export async function buildSubagentCompletionReminder(input: {
 
   return {
     leadReminder: buildCompletionGate(input.planName, input.preferredSessionId),
-    followupReminder: buildOrchestratorReminder(input.planName, input.progress, input.preferredSessionId, input.autoCommit, false),
+    followupReminder: buildOrchestratorReminder(
+      input.planName,
+      input.progress,
+      input.preferredSessionId,
+      input.autoCommit,
+      false,
+    ),
     isFinalWaveTask,
     isMissingFinalWaveVerdict,
     isRejectedFinalWaveVerdict,

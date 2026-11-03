@@ -18,29 +18,56 @@ export const KIBITZER_MEMORY_TOOL_NAME = "memory"
 /** The ONLY operations the sidecar's memory tool has. There is no write operation, by design. */
 export const MemoryToolOperations = ["search", "read"] as const
 
-export const KibitzerMemoryParams = Type.Object({
-  operation: Type.Union([Type.Literal("search"), Type.Literal("read")], { description: "search: find committed memories by query. read: return one committed memory body." }),
-  query: Type.Optional(Type.String({ description: "Search terms (double quotes group a phrase). Required by search." })),
-  path: Type.Optional(Type.String({ description: "Memory path relative to the memory repo. Required by read." })),
-}, { additionalProperties: false })
+export const KibitzerMemoryParams = Type.Object(
+  {
+    operation: Type.Union([Type.Literal("search"), Type.Literal("read")], {
+      description: "search: find committed memories by query. read: return one committed memory body.",
+    }),
+    query: Type.Optional(
+      Type.String({ description: "Search terms (double quotes group a phrase). Required by search." }),
+    ),
+    path: Type.Optional(Type.String({ description: "Memory path relative to the memory repo. Required by read." })),
+  },
+  { additionalProperties: false },
+)
 
 /** Bounds of the terms a search may add; the same as birkin-mnemosyne's `memory_search`. */
 export const MEMORY_EXPANSION_BOUNDS = { terms: 16, termChars: 80, noteLineChars: 300 } as const
 
 function expansionTerms(description: string) {
-  return Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: MEMORY_EXPANSION_BOUNDS.termChars }), { maxItems: MEMORY_EXPANSION_BOUNDS.terms, description }))
+  return Type.Optional(
+    Type.Array(Type.String({ minLength: 1, maxLength: MEMORY_EXPANSION_BOUNDS.termChars }), {
+      maxItems: MEMORY_EXPANSION_BOUNDS.terms,
+      description,
+    }),
+  )
 }
 
 /** The parameters when `memory.recall.query_expansion` is on: the same two operations, and a search may add terms. */
-export const KibitzerMemoryExpansionParams = Type.Object({
-  ...KibitzerMemoryParams.properties,
-  synonyms: expansionTerms("search only: 4-8 close synonyms or other wordings of the query's key words, in the query's language; not words already in it."),
-  keywords: expansionTerms("search only: 4-8 keywords for the topic in the user's other working language(s), e.g. English for a Korean query."),
-  related: expansionTerms("search only: 4-8 looser terms a memory answering the question might contain (broader, narrower or associated)."),
-  note_line: Type.Optional(Type.String({ maxLength: MEMORY_EXPANSION_BOUNDS.noteLineChars, description: "search only: one short sentence written like a line of a memory that would answer the question." })),
-}, { additionalProperties: false })
+export const KibitzerMemoryExpansionParams = Type.Object(
+  {
+    ...KibitzerMemoryParams.properties,
+    synonyms: expansionTerms(
+      "search only: 4-8 close synonyms or other wordings of the query's key words, in the query's language; not words already in it.",
+    ),
+    keywords: expansionTerms(
+      "search only: 4-8 keywords for the topic in the user's other working language(s), e.g. English for a Korean query.",
+    ),
+    related: expansionTerms(
+      "search only: 4-8 looser terms a memory answering the question might contain (broader, narrower or associated).",
+    ),
+    note_line: Type.Optional(
+      Type.String({
+        maxLength: MEMORY_EXPANSION_BOUNDS.noteLineChars,
+        description: "search only: one short sentence written like a line of a memory that would answer the question.",
+      }),
+    ),
+  },
+  { additionalProperties: false },
+)
 
-const SEARCH_ONLY_DESCRIPTION = "Read-only access to committed memories: search by query or read one path. This tool cannot write."
+const SEARCH_ONLY_DESCRIPTION =
+  "Read-only access to committed memories: search by query or read one path. This tool cannot write."
 const EXPANSION_DESCRIPTION = `${SEARCH_ONLY_DESCRIPTION} Search matches words, not meaning: when a memory may be worded differently from the query, also pass synonyms / keywords / related / note_line. Each of their terms counts for less than a word of the query, and a memory that holds every word of the query still ranks first.`
 
 export interface KibitzerMemoryToolInput {
@@ -70,7 +97,7 @@ export function createKibitzerMemoryTool(
   const cache = input.cache ?? new RecallCorpusCache()
   const corpus = async (): Promise<SearchCorpus> => {
     const own = await cache.load(input.repo)
-    return { own, projects: await input.projectCorpora?.() ?? [] }
+    return { own, projects: (await input.projectCorpora?.()) ?? [] }
   }
   return {
     name: KIBITZER_MEMORY_TOOL_NAME,
@@ -84,13 +111,19 @@ export function createKibitzerMemoryTool(
         case "read":
           return read(params.path, await corpus(), input.caps)
         default:
-          return rejection("unsupported_operation", `Unsupported operation; use one of: ${MemoryToolOperations.join(", ")}.`)
+          return rejection(
+            "unsupported_operation",
+            `Unsupported operation; use one of: ${MemoryToolOperations.join(", ")}.`,
+          )
       }
     }),
   }
 }
 
-type ExpansionArguments = Pick<Static<typeof KibitzerMemoryExpansionParams>, "synonyms" | "keywords" | "related" | "note_line">
+type ExpansionArguments = Pick<
+  Static<typeof KibitzerMemoryExpansionParams>,
+  "synonyms" | "keywords" | "related" | "note_line"
+>
 
 /** The added terms of one search, or the reason they are refused. The model wrote them, so the bounds are checked here. */
 function readExpansions(params: ExpansionArguments): RecallQueryExpansions | string {
@@ -98,13 +131,22 @@ function readExpansions(params: ExpansionArguments): RecallQueryExpansions | str
     const terms: unknown = params[tier]
     if (terms === undefined) continue
     if (!Array.isArray(terms)) return `${tier} is a list of terms.`
-    if (terms.length > MEMORY_EXPANSION_BOUNDS.terms) return `${tier} takes at most ${MEMORY_EXPANSION_BOUNDS.terms} terms.`
-    if (terms.some((term) => typeof term !== "string" || term.length === 0 || Array.from(term).length > MEMORY_EXPANSION_BOUNDS.termChars)) {
+    if (terms.length > MEMORY_EXPANSION_BOUNDS.terms)
+      return `${tier} takes at most ${MEMORY_EXPANSION_BOUNDS.terms} terms.`
+    if (
+      terms.some(
+        (term) =>
+          typeof term !== "string" || term.length === 0 || Array.from(term).length > MEMORY_EXPANSION_BOUNDS.termChars,
+      )
+    ) {
       return `every ${tier} term is text of 1-${MEMORY_EXPANSION_BOUNDS.termChars} characters.`
     }
   }
   const noteLine: unknown = params.note_line
-  if (noteLine !== undefined && (typeof noteLine !== "string" || Array.from(noteLine).length > MEMORY_EXPANSION_BOUNDS.noteLineChars)) {
+  if (
+    noteLine !== undefined &&
+    (typeof noteLine !== "string" || Array.from(noteLine).length > MEMORY_EXPANSION_BOUNDS.noteLineChars)
+  ) {
     return `note_line is text of at most ${MEMORY_EXPANSION_BOUNDS.noteLineChars} characters.`
   }
   return {
@@ -120,8 +162,14 @@ interface SearchCorpus {
   readonly projects: readonly ProjectRecallCorpus[]
 }
 
-function search(query: string | undefined, added: ExpansionArguments | undefined, corpus: SearchCorpus, input: KibitzerMemoryToolInput) {
-  if (query === undefined || query.trim().length === 0) return rejection("missing_argument", "search requires a non-empty query.")
+function search(
+  query: string | undefined,
+  added: ExpansionArguments | undefined,
+  corpus: SearchCorpus,
+  input: KibitzerMemoryToolInput,
+) {
+  if (query === undefined || query.trim().length === 0)
+    return rejection("missing_argument", "search requires a non-empty query.")
   const parsedExpansions = added === undefined ? undefined : readExpansions(added)
   const expansionFallback = typeof parsedExpansions === "string" ? parsedExpansions : undefined
   const expansions = typeof parsedExpansions === "string" ? undefined : parsedExpansions
@@ -134,7 +182,8 @@ function search(query: string | undefined, added: ExpansionArguments | undefined
       maxItems: pageProbe,
       surfaced: new Set(),
       ...(expansions === undefined ? {} : { expansions }),
-    }))
+    }),
+  )
   const truncated = selected.length > input.caps.memorySearchResults
   const results: KibitzerMemorySearchHit[] = selected.slice(0, input.caps.memorySearchResults).map((candidate) => ({
     path: candidate.path,
@@ -142,7 +191,12 @@ function search(query: string | undefined, added: ExpansionArguments | undefined
     excerpt: boundedText(candidate.excerpt, input.caps.memoryReadChars),
   }))
   for (const hit of results) input.searchedPaths.add(hit.path)
-  return okJson({ revision: corpus.own.revision, results, truncated, ...(expansionFallback === undefined ? {} : { expansion_fallback: expansionFallback }) })
+  return okJson({
+    revision: corpus.own.revision,
+    results,
+    truncated,
+    ...(expansionFallback === undefined ? {} : { expansion_fallback: expansionFallback }),
+  })
 }
 
 function read(path: string | undefined, corpus: SearchCorpus, caps: KibitzerToolCaps) {

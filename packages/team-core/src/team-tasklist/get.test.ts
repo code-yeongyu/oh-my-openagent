@@ -11,7 +11,11 @@ test("getTask returns a persisted task", async () => {
   const fixture = await createTasklistFixture()
 
   try {
-    const createdTask = await createTask(fixture.teamRunId, createTaskInput({ subject: "persisted task" }), fixture.config)
+    const createdTask = await createTask(
+      fixture.teamRunId,
+      createTaskInput({ subject: "persisted task" }),
+      fixture.config,
+    )
 
     // when
     const loadedTask = await getTask(fixture.teamRunId, createdTask.id, fixture.config)

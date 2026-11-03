@@ -37,7 +37,7 @@ function buildSuccessMeta(
   beforeContent: string,
   afterContent: string,
   noopEdits: number,
-  deduplicatedEdits: number
+  deduplicatedEdits: number,
 ) {
   const unifiedDiff = generateUnifiedDiff(beforeContent, afterContent, effectivePath)
   const { additions, deletions } = countLineDiffs(beforeContent, afterContent)
@@ -76,7 +76,11 @@ function buildSuccessMeta(
   }
 }
 
-export async function executeHashlineEditTool(args: HashlineEditArgs, context: ToolContext, pluginCtx?: PluginContext): Promise<string> {
+export async function executeHashlineEditTool(
+  args: HashlineEditArgs,
+  context: ToolContext,
+  pluginCtx?: PluginContext,
+): Promise<string> {
   try {
     const metadataContext = context as ToolContextWithMetadata
     const filePath = args.filePath
@@ -135,7 +139,7 @@ export async function executeHashlineEditTool(args: HashlineEditArgs, context: T
           oldEnvelope.content,
           formattedEnvelope.content,
           applyResult.noopEdits,
-          applyResult.deduplicatedEdits
+          applyResult.deduplicatedEdits,
         )
         await publishToolMetadata(metadataContext, formattedMeta)
         if (rename && rename !== filePath) {
@@ -158,7 +162,7 @@ export async function executeHashlineEditTool(args: HashlineEditArgs, context: T
       oldEnvelope.content,
       canonicalNewContent,
       applyResult.noopEdits,
-      applyResult.deduplicatedEdits
+      applyResult.deduplicatedEdits,
     )
 
     await publishToolMetadata(metadataContext, meta)

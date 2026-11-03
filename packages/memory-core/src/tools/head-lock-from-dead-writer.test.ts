@@ -42,15 +42,27 @@ async function repoWithZeroByteHeadLock(writerRecord: "dead writer" | "none") {
   if (writerRecord === "dead writer") {
     const dead = spawn(process.execPath, ["-e", ""], { stdio: "ignore" })
     expect(await exitedWithin(dead, 5_000)).toBe(true)
-    await writeFile(memoryWriterLockPath(paths.locks), JSON.stringify({
-      pid: dead.pid, process_start: "unavailable", hostname: hostname(), nonce: randomUUID(),
-      created_at: new Date().toISOString(), purpose: "memory-write", git_activity_lock: true,
-    }), "utf8")
+    await writeFile(
+      memoryWriterLockPath(paths.locks),
+      JSON.stringify({
+        pid: dead.pid,
+        process_start: "unavailable",
+        hostname: hostname(),
+        nonce: randomUUID(),
+        created_at: new Date().toISOString(),
+        purpose: "memory-write",
+        git_activity_lock: true,
+      }),
+      "utf8",
+    )
   }
   const headLock = join(paths.repo, ".git", "HEAD.lock")
   await writeFile(headLock, "", "utf8")
   const lock: MemoryToolLock = async (_domain, operation) =>
-    withLock(memoryWriterLockPath(paths.locks), await createLockRecord("memory-write"), operation, { waitTimeoutMs: 5_000, retryDelayMs: 5 })
+    withLock(memoryWriterLockPath(paths.locks), await createLockRecord("memory-write"), operation, {
+      waitTimeoutMs: 5_000,
+      retryDelayMs: 5,
+    })
   return { repo, lock, headLock }
 }
 
@@ -58,7 +70,14 @@ function create(setup: Awaited<ReturnType<typeof repoWithZeroByteHeadLock>>) {
   return runMemoryTool({
     repo: setup.repo,
     lock: setup.lock,
-    params: { command: "create", reason: "write after the killed writer", file_path: "system/new.md", description: "Fact", file_text: "new fact", author: AUTHOR },
+    params: {
+      command: "create",
+      reason: "write after the killed writer",
+      file_path: "system/new.md",
+      description: "Fact",
+      file_text: "new fact",
+      author: AUTHOR,
+    },
   })
 }
 
@@ -70,18 +89,21 @@ function strandedLockIn(error: unknown): StrandedGitLockError | undefined {
 }
 
 describe("a 0-byte HEAD.lock left by a memory writer killed mid-commit (omo #10199 field incident)", () => {
-  test.skipIf(process.platform === "win32")("#given the writer that left it is proven dead #when the next memory write runs #then the lock is reclaimed and the write commits", async () => {
-    // #given
-    const setup = await repoWithZeroByteHeadLock("dead writer")
+  test.skipIf(process.platform === "win32")(
+    "#given the writer that left it is proven dead #when the next memory write runs #then the lock is reclaimed and the write commits",
+    async () => {
+      // #given
+      const setup = await repoWithZeroByteHeadLock("dead writer")
 
-    // #when
-    const result = await create(setup)
+      // #when
+      const result = await create(setup)
 
-    // #then
-    expect(result.commit?.affectedPaths).toEqual(["system/new.md"])
-    expect(existsSync(setup.headLock)).toBe(false)
-    expect(await setup.repo.status()).toBe("")
-  })
+      // #then
+      expect(result.commit?.affectedPaths).toEqual(["system/new.md"])
+      expect(existsSync(setup.headLock)).toBe(false)
+      expect(await setup.repo.status()).toBe("")
+    },
+  )
 
   test("#given nothing proves the writer that left it dead #when the next memory write runs #then it is refused naming HEAD.lock with the way out, and nothing stays staged", async () => {
     // #given

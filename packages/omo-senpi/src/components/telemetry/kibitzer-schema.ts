@@ -6,7 +6,7 @@ const STRING_PROPERTY = Object.freeze({ type: "string" } as const)
  * and hints never appear - they are user-authored text from a private memory corpus.
  */
 export const KIBITZER_SUMMARY_SCHEMA = Object.freeze({
-  "$session_id": STRING_PROPERTY,
+  $session_id: STRING_PROPERTY,
   buffered_cooldown: NUMBER_PROPERTY,
   buffered_no_new_candidate: NUMBER_PROPERTY,
   cache_read_tokens: NUMBER_PROPERTY,

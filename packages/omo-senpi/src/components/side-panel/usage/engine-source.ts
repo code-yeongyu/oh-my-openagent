@@ -75,11 +75,9 @@ function servingRecord(
       own.find((record) => record.account === "env")
     )
   }
-  return (
-    own.reduce<SenpiAccountLimits | undefined>(
-      (latest, record) => (latest === undefined || record.reportedAt > latest.reportedAt ? record : latest),
-      undefined,
-    )
+  return own.reduce<SenpiAccountLimits | undefined>(
+    (latest, record) => (latest === undefined || record.reportedAt > latest.reportedAt ? record : latest),
+    undefined,
   )
 }
 

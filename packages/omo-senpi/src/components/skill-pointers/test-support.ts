@@ -53,7 +53,11 @@ export async function dispatchInput(
   return result as InputDispatchResult
 }
 
-export function expectPointerInjections(pi: FakeExtensionAPI, result: unknown, expected: readonly ExpectedPointer[]): void {
+export function expectPointerInjections(
+  pi: FakeExtensionAPI,
+  result: unknown,
+  expected: readonly ExpectedPointer[],
+): void {
   expect(result).toEqual({ action: "continue" })
   expect(pi.messages).toHaveLength(expected.length)
   expect(pi.messages.map((call) => call.message["customType"])).toEqual(expected.map((entry) => entry.customType))

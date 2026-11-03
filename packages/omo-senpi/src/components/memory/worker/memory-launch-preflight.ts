@@ -1,9 +1,5 @@
 import type { ReflectionChildResult } from "./spawn"
-import {
-  runMemoryModelAttempts,
-  type MemoryModelAttempt,
-  type MemoryModelChain,
-} from "./memory-model-attempts"
+import { runMemoryModelAttempts, type MemoryModelAttempt, type MemoryModelChain } from "./memory-model-attempts"
 import { preflightMemoryModels } from "./model-preflight"
 import { resolveSenpiLaunch, withoutForeignPackageDirEnv } from "./senpi-command"
 import type { ReflectionModelCandidate } from "./resolve-model"
@@ -32,9 +28,10 @@ export type ResolveAndPreflightMemoryLaunch = (
 ) => Promise<MemoryModelAttempt>
 
 export const resolveAndPreflightMemoryLaunch: ResolveAndPreflightMemoryLaunch = async (input) => {
-  const launch = input.senpiCommand === undefined
-    ? resolveSenpiLaunch(input.env)
-    : { command: input.senpiCommand, prefixArgs: input.senpiPrefixArgs ?? [] }
+  const launch =
+    input.senpiCommand === undefined
+      ? resolveSenpiLaunch(input.env)
+      : { command: input.senpiCommand, prefixArgs: input.senpiPrefixArgs ?? [] }
   const preflight = await preflightMemoryModels({
     candidates: input.candidates,
     launch,

@@ -126,7 +126,10 @@ type Fixture = {
   readonly settle: (nodes: readonly DagNode[], status: DagRunStatus, reason?: string) => void
 }
 
-function fixture(nodes: readonly DagNode[], overrides: { readonly cancel?: (id: DagRunId, reason?: string) => void } = {}): Fixture {
+function fixture(
+  nodes: readonly DagNode[],
+  overrides: { readonly cancel?: (id: DagRunId, reason?: string) => void } = {},
+): Fixture {
   const store = createDagFileStore({ project_dir: tempProject() })
   const initial = record(nodes)
   store.writeCheckpoint(runId, initial)
@@ -148,11 +151,16 @@ function fixture(nodes: readonly DagNode[], overrides: { readonly cancel?: (id: 
       store.writeCheckpoint(runId, { ...current, nodes: settledNodes })
       if (status === "completed") journal.append(dagRunCompletedEvent({ counts: counts(settledNodes) }))
       else if (status === "failed") {
-        journal.append(dagRunFailedEvent({
-          error: { code: "task_error", message: "build failed", nodeId: "build" as DagNodeId, at },
-          counts: counts(settledNodes),
-        }))
-      } else journal.append(dagRunCancelledEvent({ counts: counts(settledNodes), ...(reason === undefined ? {} : { reason }) }))
+        journal.append(
+          dagRunFailedEvent({
+            error: { code: "task_error", message: "build failed", nodeId: "build" as DagNodeId, at },
+            counts: counts(settledNodes),
+          }),
+        )
+      } else
+        journal.append(
+          dagRunCancelledEvent({ counts: counts(settledNodes), ...(reason === undefined ? {} : { reason }) }),
+        )
     },
   }
 }
@@ -160,7 +168,10 @@ function fixture(nodes: readonly DagNode[], overrides: { readonly cancel?: (id: 
 describe("createDagWaitSurface wait terminal projection", () => {
   test("#given a two node run #when both nodes complete #then wait resolves with each node output and run stats", async () => {
     // given
-    const running = [node("plan", { state: "running", taskId: "task-plan" }), node("build", { state: "running", taskId: "task-build" })]
+    const running = [
+      node("plan", { state: "running", taskId: "task-plan" }),
+      node("build", { state: "running", taskId: "task-build" }),
+    ]
     const harness = fixture(running)
     harness.store.writeResult(runId, "plan", "plan output")
     harness.store.writeResult(runId, "build", "build output")
@@ -169,7 +180,12 @@ describe("createDagWaitSurface wait terminal projection", () => {
     const waiting = harness.surface.wait(runId, parentSessionId)
     harness.settle(
       [
-        node("plan", { state: "completed", taskId: "task-plan", completedAt: at, runStats: { runtime_ms: 10, turns: 2, tool_calls: 1 } }),
+        node("plan", {
+          state: "completed",
+          taskId: "task-plan",
+          completedAt: at,
+          runStats: { runtime_ms: 10, turns: 2, tool_calls: 1 },
+        }),
         node("build", { state: "completed", taskId: "task-build", completedAt: at }),
       ],
       "completed",
@@ -181,14 +197,22 @@ describe("createDagWaitSurface wait terminal projection", () => {
     expect(result.runId).toBe(runId)
     expect(result.snapshot.status).toBe("completed")
     expect(result.nodes).toEqual({
-      plan: { state: "completed", taskId: "task-plan", output: "plan output", runStats: { runtime_ms: 10, turns: 2, tool_calls: 1 } },
+      plan: {
+        state: "completed",
+        taskId: "task-plan",
+        output: "plan output",
+        runStats: { runtime_ms: 10, turns: 2, tool_calls: 1 },
+      },
       build: { state: "completed", taskId: "task-build", output: "build output" },
     })
   })
 
   test("#given a failed node with a dependent #when the run ends failed #then wait resolves with the node error and the dependency skip", async () => {
     // given
-    const harness = fixture([node("plan", { state: "running", taskId: "task-plan" }), node("ship", { state: "blocked", dependsOn: ["plan" as DagNodeId] })])
+    const harness = fixture([
+      node("plan", { state: "running", taskId: "task-plan" }),
+      node("ship", { state: "blocked", dependsOn: ["plan" as DagNodeId] }),
+    ])
 
     // when
     const waiting = harness.surface.wait(runId, parentSessionId)
@@ -219,15 +243,15 @@ describe("createDagWaitSurface wait terminal projection", () => {
 
   test("#given a cancelled run #when wait is pending #then it resolves rather than rejects and carries the cancellation reason", async () => {
     // given
-    const harness = fixture([node("plan", { state: "running", taskId: "task-plan" }), node("build", { state: "pending" })])
+    const harness = fixture([
+      node("plan", { state: "running", taskId: "task-plan" }),
+      node("build", { state: "pending" }),
+    ])
 
     // when
     const waiting = harness.surface.wait(runId, parentSessionId)
     harness.settle(
-      [
-        node("plan", { state: "cancelled", taskId: "task-plan" }),
-        node("build", { state: "cancelled" }),
-      ],
+      [node("plan", { state: "cancelled", taskId: "task-plan" }), node("build", { state: "cancelled" })],
       "cancelled",
       "user_requested",
     )

@@ -16,7 +16,12 @@ export async function withResidentStart(
     return { kind: "residency_denied", reason: "Residency admission is contended.", cause: "lease" }
   }
   let released = false
-  const release = (): void => { if (!released) { released = true; acquired.lease.release() } }
+  const release = (): void => {
+    if (!released) {
+      released = true
+      acquired.lease.release()
+    }
+  }
   try {
     ticket?.assertOpen()
     const admission = await options.admit(parentSessionId)
@@ -34,5 +39,7 @@ export async function withResidentStart(
       return { kind: "residency_denied", reason: "Residency admission lease was displaced.", cause: "lease" }
     }
     return await start(release)
-  } finally { release() }
+  } finally {
+    release()
+  }
 }

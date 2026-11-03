@@ -145,7 +145,9 @@ describe("agent clicks and card", () => {
 
   test("#given a child that knows little #when the card is built #then absent fields are omitted", () => {
     // when
-    const texts = buildAgentCardRows({ id: "st_2", name: "x", status: "queued", startedAt: 0 }, 1_000).map((r) => r.text)
+    const texts = buildAgentCardRows({ id: "st_2", name: "x", status: "queued", startedAt: 0 }, 1_000).map(
+      (r) => r.text,
+    )
 
     // then
     expect(texts.some((text) => text.startsWith("cost"))).toBe(false)
@@ -223,7 +225,9 @@ describe("where a child runs", () => {
 
   test("#given a child whose lane was never recorded #when the card is built #then no lane row appears", () => {
     // given records written before runner_kind shipped carry none
-    const texts = buildAgentCardRows({ id: "st_10", name: "x", status: "running", startedAt: 0 }, 60_000).map((r) => r.text)
+    const texts = buildAgentCardRows({ id: "st_10", name: "x", status: "running", startedAt: 0 }, 60_000).map(
+      (r) => r.text,
+    )
 
     // then
     expect(texts.some((text) => text.startsWith("runs"))).toBe(false)

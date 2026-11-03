@@ -215,9 +215,7 @@ describe("deleteTeam", () => {
   test("#given a completed resident member revives between residency checks #when deleted #then destruction is skipped", async () => {
     // given
     const { created, deps, manager, destruction, taskId } = await completedResidentTeam()
-    manager.setGetHook(taskId, (record, readCount) => (
-      readCount === 3 ? { ...record, status: "running" } : record
-    ))
+    manager.setGetHook(taskId, (record, readCount) => (readCount === 3 ? { ...record, status: "running" } : record))
 
     // when
     const result = await deleteTeam(created.runtimeState.teamRunId, deps)

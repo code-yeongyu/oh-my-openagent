@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
-import { cleanupProjects, FakeRegistry, seedRecord, settings, tempStore } from "../lifecycle/__fixtures__/lifecycle-fakes"
+import {
+  cleanupProjects,
+  FakeRegistry,
+  seedRecord,
+  settings,
+  tempStore,
+} from "../lifecycle/__fixtures__/lifecycle-fakes"
 import { createTaskLifecycle } from "../lifecycle/create"
 import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
 import type { TaskRecord, TaskRunStats } from "../state"
@@ -13,14 +19,24 @@ afterEach(cleanupProjects)
 const HOST_PID = 6100
 const NOW = "2026-10-20T00:00:00.000Z"
 
-function withRunStats(store: ReturnType<typeof tempStore>, input: Parameters<typeof seedRecord>[1], runStats: TaskRunStats): TaskRecord {
+function withRunStats(
+  store: ReturnType<typeof tempStore>,
+  input: Parameters<typeof seedRecord>[1],
+  runStats: TaskRunStats,
+): TaskRecord {
   const record: TaskRecord = { ...seedRecord(store, input), run_stats: runStats }
   store.replace(record)
   return record
 }
 
 function stats(cost: number | undefined, status: TaskRunStats["cost_status"]): TaskRunStats {
-  return { runtime_ms: 1, turns: 1, tool_calls: 0, cost_status: status, ...(cost === undefined ? {} : { cost_usd: cost }) }
+  return {
+    runtime_ms: 1,
+    turns: 1,
+    tool_calls: 0,
+    cost_status: status,
+    ...(cost === undefined ? {} : { cost_usd: cost }),
+  }
 }
 
 describe("a task's earlier runs keep their spend across revives (senpi#2471)", () => {
@@ -43,7 +59,11 @@ describe("a task's earlier runs keep their spend across revives (senpi#2471)", (
   test("#given a finished run whose cost was never reported #when it is revived #then nothing is folded in", () => {
     // given
     const store = tempStore()
-    const unreported = withRunStats(store, { task_id: "st_00024711", status: "completed" }, stats(undefined, "unavailable"))
+    const unreported = withRunStats(
+      store,
+      { task_id: "st_00024711", status: "completed" },
+      stats(undefined, "unavailable"),
+    )
 
     // when
     const revived = buildRevived(unreported, NOW)
@@ -79,14 +99,24 @@ describe("a task's earlier runs keep their spend across revives (senpi#2471)", (
   test("#given a revive that is rolled back #when the prior run is restored #then its cost is not counted twice", () => {
     // given
     const store = tempStore()
-    const prior = withRunStats(store, {
-      task_id: "st_00024712",
-      status: "completed",
-      residency_state: "rpc_detached",
-      execution_mode: "process",
-    }, stats(0.25, "reported"))
+    const prior = withRunStats(
+      store,
+      {
+        task_id: "st_00024712",
+        status: "completed",
+        residency_state: "rpc_detached",
+        execution_mode: "process",
+      },
+      stats(0.25, "reported"),
+    )
     store.replace({ ...buildRevived(prior, new Date().toISOString()), host_pid: HOST_PID })
-    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings(), hostPid: HOST_PID })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry: new FakeRegistry(),
+      config: settings(),
+      hostPid: HOST_PID,
+    })
 
     // when
     expect(lifecycle.rollbackDetachedRevival(prior)).toBe("rolled_back")
@@ -105,7 +135,9 @@ describe("a task's earlier runs keep their spend across revives (senpi#2471)", (
     store.replace(buildRevived(prior, NOW))
 
     // when
-    const reloaded = createTaskRecordStore({ project_dir: "/unused", task: { state_dir: store.stateDir } }).load(prior.task_id)
+    const reloaded = createTaskRecordStore({ project_dir: "/unused", task: { state_dir: store.stateDir } }).load(
+      prior.task_id,
+    )
 
     // then
     expect(reloaded?.prior_runs_cost_usd).toBeCloseTo(0.25, 10)

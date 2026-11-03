@@ -19,14 +19,7 @@ export function createFallbackTimeoutHelpers(
     source: string,
   ) => Promise<AutoRetryDispatchOutcome>,
 ) {
-  const {
-    config,
-    options,
-    sessionStates,
-    sessionRetryInFlight,
-    sessionFallbackTimeouts,
-    pluginConfig,
-  } = deps
+  const { config, options, sessionStates, sessionRetryInFlight, sessionFallbackTimeouts, pluginConfig } = deps
 
   const clearSessionFallbackTimeout = (sessionID: string) => {
     const timer = sessionFallbackTimeouts.get(sessionID)
@@ -94,7 +87,12 @@ export function createFallbackTimeoutHelpers(
 
       const result = prepareFallback(sessionID, state, fallbackModels, config)
       if (result.success && result.newModel) {
-        const dispatchOutcome = await autoRetryWithFallback(sessionID, result.newModel, resolvedAgent, "session.timeout")
+        const dispatchOutcome = await autoRetryWithFallback(
+          sessionID,
+          result.newModel,
+          resolvedAgent,
+          "session.timeout",
+        )
         if (!dispatchOutcome.accepted) {
           restoreFallbackState(state, stateSnapshot)
           if (deps.sessionAwaitingFallbackResult.has(sessionID)) {

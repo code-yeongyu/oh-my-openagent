@@ -11,7 +11,8 @@ import { validateCompletion } from "./completion-validation"
 import { createReflectionWorktree, type ReflectionWorktree } from "./worktree"
 
 const AUTHOR = { agentId: "agent-one", authorName: "Reflection Agent" }
-const LEDGER = "---\ndescription: Agreements\n---\n\n- [global] Never filter the monitor <!-- id: 3f9a1c0b2e; by: human; n: 1; status: active -->\n"
+const LEDGER =
+  "---\ndescription: Agreements\n---\n\n- [global] Never filter the monitor <!-- id: 3f9a1c0b2e; by: human; n: 1; status: active -->\n"
 const roots: string[] = []
 
 setDefaultTimeout(process.platform === "win32" ? 20_000 : 5_000)
@@ -53,10 +54,16 @@ describe("reflection completion: the agreement ledger is off limits (security co
     // given
     const worktree = await fixture()
     await mkdir(join(worktree.dir, "reference"), { recursive: true })
-    const moved = await worktree.exec.run(["mv", AGREEMENTS_PATH, "reference/old-agreements.md"], { cwd: worktree.dir, timeoutMs: 30_000 })
+    const moved = await worktree.exec.run(["mv", AGREEMENTS_PATH, "reference/old-agreements.md"], {
+      cwd: worktree.dir,
+      timeoutMs: 30_000,
+    })
     expect(moved.code).toBe(0)
-    await new GitMemoryRepo({ dir: worktree.dir, agentId: AUTHOR.agentId })
-      .commitPrepared([AGREEMENTS_PATH, "reference/old-agreements.md"], "move the ledger", AUTHOR)
+    await new GitMemoryRepo({ dir: worktree.dir, agentId: AUTHOR.agentId }).commitPrepared(
+      [AGREEMENTS_PATH, "reference/old-agreements.md"],
+      "move the ledger",
+      AUTHOR,
+    )
 
     // when
     const result = await validateCompletion(worktree, worktree.baseSha, worktree.exec)

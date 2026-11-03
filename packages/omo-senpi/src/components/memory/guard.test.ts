@@ -16,7 +16,8 @@ import { AUTOMOUNT_TRIGGER_CASES, withAutomountTrap } from "../../automount-trap
 const roots: string[] = []
 
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  for (const root of roots.splice(0))
+    rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
 type GuardFixture = {
@@ -52,7 +53,7 @@ function fixture(options: { readonly bound?: boolean } = {}): GuardFixture {
   const pi = new FakeExtensionAPI()
   const context = componentContext()
   registerMemoryGuard(pi, context, {
-    getContext: () => options.bound === false ? undefined : own,
+    getContext: () => (options.bound === false ? undefined : own),
     resolveCwd: () => workspace,
   })
 
@@ -153,16 +154,21 @@ describe("memory cross-identity guard", () => {
     const setup = fixture()
     const foreignRepo = dirname(dirname(setup.foreignFile))
     mkdirSync(join(foreignRepo, "subdir"))
-    symlinkSync(join(foreignRepo, "subdir"), join(setup.own.identityPaths.repo, "jump"), process.platform === "win32" ? "junction" : "dir")
+    symlinkSync(
+      join(foreignRepo, "subdir"),
+      join(setup.own.identityPaths.repo, "jump"),
+      process.platform === "win32" ? "junction" : "dir",
+    )
     const raw = relative(setup.workspace, setup.own.identityPaths.repo) + "/jump/../system/persona.md"
 
     const result = await dispatch(setup, "vendor_read", { path: raw })
 
     if (process.platform === "win32") expect(result).toBeUndefined()
-    else expect(result).toEqual({
-      block: true,
-      reason: `cross-identity memory access denied: vendor_read to ${raw} belongs to another memory identity`,
-    })
+    else
+      expect(result).toEqual({
+        block: true,
+        reason: `cross-identity memory access denied: vendor_read to ${raw} belongs to another memory identity`,
+      })
   })
 
   test("#given the identities root and one of its ancestors #when enumeration tools target them #then cross-identity enumeration is blocked", async () => {
@@ -199,11 +205,14 @@ describe("memory cross-identity guard", () => {
 
     expect(await dispatch(setup, "bash", { command })).toBeUndefined()
     expect(await dispatch(setup, "bash", { command })).toBeUndefined()
-    expect(setup.context.logs).toEqual([{
-      level: "warn",
-      message: "omo-senpi memory guard advisory: bash command references another memory identity; shell text is not blocked because this soft guard is not a security boundary",
-      details: { sessionId: "session-1" },
-    }])
+    expect(setup.context.logs).toEqual([
+      {
+        level: "warn",
+        message:
+          "omo-senpi memory guard advisory: bash command references another memory identity; shell text is not blocked because this soft guard is not a security boundary",
+        details: { sessionId: "session-1" },
+      },
+    ])
   })
 
   test("#given separate sessions invoke bash with a forbidden root #when advisory state is tracked #then each session receives one warning", async () => {
@@ -234,7 +243,9 @@ describe("memory cross-identity guard for transient runs", () => {
   test("#given a transient run root #when file tools target durable memory or another run #then only its own transient root is reachable", async () => {
     const setup = transientFixture()
 
-    expect(await dispatch(setup, "write", { path: join(setup.own.identityPaths.transcripts, "stream", "transcript.jsonl") })).toBeUndefined()
+    expect(
+      await dispatch(setup, "write", { path: join(setup.own.identityPaths.transcripts, "stream", "transcript.jsonl") }),
+    ).toBeUndefined()
     expect(await dispatch(setup, "read", { path: setup.durableForeignFile })).toEqual({
       block: true,
       reason: `cross-identity memory access denied: read to ${setup.durableForeignFile} belongs to another memory identity`,
@@ -287,11 +298,14 @@ function transientFixture(): GuardFixture & { readonly durableForeignFile: strin
 }
 
 describe("memory guard never resolves a macOS automount trigger (#11545)", () => {
-  test.each([...AUTOMOUNT_TRIGGER_CASES])("#given a tool path %s on darwin #when the guard classifies it #then it is allowed without resolving the trigger", async (path) => {
-    const setup = fixture()
-    const touched = await withAutomountTrap(async () => {
-      expect(await dispatch(setup, "read", { path })).toBeUndefined()
-    })
-    expect(touched).toEqual([])
-  })
+  test.each([...AUTOMOUNT_TRIGGER_CASES])(
+    "#given a tool path %s on darwin #when the guard classifies it #then it is allowed without resolving the trigger",
+    async (path) => {
+      const setup = fixture()
+      const touched = await withAutomountTrap(async () => {
+        expect(await dispatch(setup, "read", { path })).toBeUndefined()
+      })
+      expect(touched).toEqual([])
+    },
+  )
 })

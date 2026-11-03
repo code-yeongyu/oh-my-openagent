@@ -1,11 +1,6 @@
 import * as p from "@clack/prompts"
 import type { Option } from "@clack/prompts"
-import type {
-  ClaudeSubscription,
-  DetectedConfig,
-  InstallConfig,
-  InstallPlatform,
-} from "./types"
+import type { ClaudeSubscription, DetectedConfig, InstallConfig, InstallPlatform } from "./types"
 import { detectedToInitialValues } from "./install-validators"
 import { ULTIMATE_FALLBACK } from "./model-fallback"
 import { isNativeDevPlatformEnabled } from "./native-dev-platform-flag"
@@ -235,10 +230,7 @@ export async function promptInstallConfig(
   }
 }
 
-async function resolveCodexAutonomous(
-  hasCodex: boolean,
-  override: boolean | undefined,
-): Promise<boolean | null> {
+async function resolveCodexAutonomous(hasCodex: boolean, override: boolean | undefined): Promise<boolean | null> {
   if (!hasCodex) return false
   if (override !== undefined) return override
   return true

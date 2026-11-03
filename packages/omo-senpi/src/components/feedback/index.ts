@@ -5,7 +5,12 @@ import type { OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { createOmoNativeProductConfig } from "../telemetry/product-identity"
 import type { FeedbackDraft, FeedbackKind, UploadRedactor } from "./draft"
-import { feedbackRuntimeLoadFailure, loadFeedbackRuntime, type FeedbackRuntimeLoader, type FeedbackRuntimeModule } from "./runtime-loader"
+import {
+  feedbackRuntimeLoadFailure,
+  loadFeedbackRuntime,
+  type FeedbackRuntimeLoader,
+  type FeedbackRuntimeModule,
+} from "./runtime-loader"
 import type { FeedbackCommandUi, FeedbackCore, FeedbackSessionLike } from "./runtime"
 import type { ReportTransport, SubmitResult } from "./submit"
 
@@ -44,7 +49,8 @@ const sessionIdOf = (ctx: SessionLike | undefined): string | undefined => {
   }
 }
 
-export const FEEDBACK_UNAVAILABLE = "Feedback needs an OmO runtime that can remove secrets before upload. Update OmO and try again."
+export const FEEDBACK_UNAVAILABLE =
+  "Feedback needs an OmO runtime that can remove secrets before upload. Update OmO and try again."
 
 export function createFeedbackComponent(options: FeedbackComponentOptions = {}): OmoSenpiComponent {
   return {
@@ -103,7 +109,10 @@ export function createFeedbackComponent(options: FeedbackComponentOptions = {}):
         return core
       }
 
-      const prepare = async (session: SessionLike | undefined, input: unknown): Promise<FeedbackDraft | { kind: "unavailable"; reason: string }> => {
+      const prepare = async (
+        session: SessionLike | undefined,
+        input: unknown,
+      ): Promise<FeedbackDraft | { kind: "unavailable"; reason: string }> => {
         const redact = hostRedactor(pi)
         if (redact === undefined) return { kind: "unavailable", reason: FEEDBACK_UNAVAILABLE }
         return (await coreOf()).prepare(session, input, redact)

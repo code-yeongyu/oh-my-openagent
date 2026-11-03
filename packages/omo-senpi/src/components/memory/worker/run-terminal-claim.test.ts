@@ -17,7 +17,9 @@ async function runDir(): Promise<string> {
 
 function deferred(): { readonly promise: Promise<void>; readonly resolve: () => void } {
   let resolve!: () => void
-  const promise = new Promise<void>((done) => { resolve = done })
+  const promise = new Promise<void>((done) => {
+    resolve = done
+  })
   return { promise, resolve }
 }
 
@@ -33,17 +35,29 @@ async function expectSingleRecoveryWinner(dir: string, initial: string): Promise
   }
   const identity = { runId: "run-1", attempt: 1 }
   const liveness = { getPidLiveness: () => "dead" as const }
-  const abandon = claimRunTerminal(dir, identity, "abandon", {
-    ...liveness,
-    beforeRecovery: inspectedStaleClaim,
-  }, 1111).finally(abandonFinished.resolve)
-  const publish = claimRunTerminal(dir, identity, "publish", {
-    ...liveness,
-    beforeRecovery: async () => {
-      await inspectedStaleClaim()
-      await abandonFinished.promise
+  const abandon = claimRunTerminal(
+    dir,
+    identity,
+    "abandon",
+    {
+      ...liveness,
+      beforeRecovery: inspectedStaleClaim,
     },
-  }, 2222)
+    1111,
+  ).finally(abandonFinished.resolve)
+  const publish = claimRunTerminal(
+    dir,
+    identity,
+    "publish",
+    {
+      ...liveness,
+      beforeRecovery: async () => {
+        await inspectedStaleClaim()
+        await abandonFinished.promise
+      },
+    },
+    2222,
+  )
 
   const claims = await Promise.all([abandon, publish])
   const ownWinners = claims.filter((claim, index) => claim.claimantPid === [1111, 2222][index])
@@ -59,7 +73,9 @@ describe("run terminal claim", () => {
     writeFileSync(runTerminalClaimPath(dir), "")
 
     // when
-    const claim = await claimRunTerminal(dir, { runId: "run-1", attempt: 1 }, "abandon", { getPidLiveness: () => "dead" })
+    const claim = await claimRunTerminal(dir, { runId: "run-1", attempt: 1 }, "abandon", {
+      getPidLiveness: () => "dead",
+    })
 
     // then
     expect(claim.kind).toBe("abandon")
@@ -72,7 +88,9 @@ describe("run terminal claim", () => {
     await claimRunTerminal(dir, { runId: "run-1", attempt: 1 }, "publish", {}, 4242)
 
     // when
-    const claim = await claimRunTerminal(dir, { runId: "run-1", attempt: 1 }, "abandon", { getPidLiveness: () => "alive" })
+    const claim = await claimRunTerminal(dir, { runId: "run-1", attempt: 1 }, "abandon", {
+      getPidLiveness: () => "alive",
+    })
 
     // then
     expect(claim.kind).toBe("publish")
@@ -84,12 +102,15 @@ describe("run terminal claim", () => {
   }, 30_000)
 
   test("#given two claimants inspected the same confirmed-dead publish claim #when recovery races #then only one replacement wins", async () => {
-    await expectSingleRecoveryWinner(await runDir(), `${JSON.stringify({
-      version: 1,
-      kind: "publish",
-      runId: "stale-run",
-      attempt: 1,
-      claimantPid: 434343,
-    })}\n`)
+    await expectSingleRecoveryWinner(
+      await runDir(),
+      `${JSON.stringify({
+        version: 1,
+        kind: "publish",
+        runId: "stale-run",
+        attempt: 1,
+        claimantPid: 434343,
+      })}\n`,
+    )
   }, 30_000)
 })

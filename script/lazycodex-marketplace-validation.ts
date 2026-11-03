@@ -30,9 +30,16 @@ async function validateRootCliRuntime(pluginRoot: string, issues: string[]): Pro
   await collectBundleFileIssue(pluginRoot, pluginRoot, "dist/cli/index.js", "missing root CLI runtime path", issues, {
     allowEscape: false,
   })
-  await collectBundleFileIssue(pluginRoot, pluginRoot, "dist/cli-node/index.js", "missing root CLI runtime path", issues, {
-    allowEscape: false,
-  })
+  await collectBundleFileIssue(
+    pluginRoot,
+    pluginRoot,
+    "dist/cli-node/index.js",
+    "missing root CLI runtime path",
+    issues,
+    {
+      allowEscape: false,
+    },
+  )
 }
 
 async function validatePluginMcpManifests(pluginRoot: string, issues: string[]): Promise<void> {
@@ -57,10 +64,17 @@ async function validatePluginMcpManifest(pluginRoot: string, manifestPath: strin
     if (!isPlainRecord(server) || !Array.isArray(server.args)) continue
     for (const arg of server.args) {
       if (typeof arg !== "string" || !isPluginRuntimePathArg(arg)) continue
-      await collectBundleFileIssue(pluginRoot, manifestRoot, arg, `missing MCP runtime path for ${serverName}`, issues, {
-        // codex only reads the root .mcp.json; nested dev manifests may point outside the bundle
-        allowEscape: !isRootManifest,
-      })
+      await collectBundleFileIssue(
+        pluginRoot,
+        manifestRoot,
+        arg,
+        `missing MCP runtime path for ${serverName}`,
+        issues,
+        {
+          // codex only reads the root .mcp.json; nested dev manifests may point outside the bundle
+          allowEscape: !isRootManifest,
+        },
+      )
     }
   }
 }
@@ -201,7 +215,8 @@ function isPluginRuntimePathArg(arg: string): boolean {
     (normalized.startsWith("./") ||
       normalized.startsWith("../") ||
       normalized.startsWith("components/") ||
-      normalized.startsWith("/") || isAbsolute(arg))
+      normalized.startsWith("/") ||
+      isAbsolute(arg))
   )
 }
 

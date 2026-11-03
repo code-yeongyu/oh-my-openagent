@@ -4,7 +4,16 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { createScrubbedEnvironment, observeChildXSearchCall, resolveSenpiBin, scenarioTarget, seedXaiCredential, senpiVersion, shredSeededCredential, skillHasX } from "./x-search-live-e2e.mjs"
+import {
+  createScrubbedEnvironment,
+  observeChildXSearchCall,
+  resolveSenpiBin,
+  scenarioTarget,
+  seedXaiCredential,
+  senpiVersion,
+  shredSeededCredential,
+  skillHasX,
+} from "./x-search-live-e2e.mjs"
 
 describe("x-search live QA isolation helpers", () => {
   test("resolves SENPI_BIN, then the peer dependency, then PATH", () => {
@@ -19,20 +28,34 @@ describe("x-search live QA isolation helpers", () => {
     const body = win32 ? "@echo 2026.9.2-4\n" : "#!/bin/sh\nprintf '2026.9.2-4\\n'\n"
     for (const path of [requested, peer, join(pathDir, shim)]) writeFileSync(path, body, { mode: 0o755 })
     try {
-      expect(resolveSenpiBin({ root, cwd: root, env: { SENPI_BIN: requested, PATH: pathDir } })).toEqual({ path: requested, source: "SENPI_BIN" })
+      expect(resolveSenpiBin({ root, cwd: root, env: { SENPI_BIN: requested, PATH: pathDir } })).toEqual({
+        path: requested,
+        source: "SENPI_BIN",
+      })
       rmSync(requested)
-      expect(resolveSenpiBin({ root, cwd: root, env: { SENPI_BIN: requested, PATH: pathDir } })).toEqual({ path: peer, source: "peer-dependency" })
+      expect(resolveSenpiBin({ root, cwd: root, env: { SENPI_BIN: requested, PATH: pathDir } })).toEqual({
+        path: peer,
+        source: "peer-dependency",
+      })
       rmSync(peer)
-      expect(resolveSenpiBin({ root, cwd: root, env: { SENPI_BIN: requested, PATH: pathDir } })).toEqual({ path: join(pathDir, shim), source: "PATH", warning: expect.any(String) })
+      expect(resolveSenpiBin({ root, cwd: root, env: { SENPI_BIN: requested, PATH: pathDir } })).toEqual({
+        path: join(pathDir, shim),
+        source: "PATH",
+        warning: expect.any(String),
+      })
       expect(senpiVersion(join(pathDir, shim))).toBe("2026.9.2-4")
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
   })
   test("uses the observed child x_search execution outcome", () => {
-    const denied = observeChildXSearchCall(JSON.stringify({ type: "tool_execution", payload: { tool: "x_search", is_error: true } }))
+    const denied = observeChildXSearchCall(
+      JSON.stringify({ type: "tool_execution", payload: { tool: "x_search", is_error: true } }),
+    )
     expect(denied).toEqual({ observed: true, source: "child-tool-execution", isError: true, outcome: "denied" })
-    const fabricatedSuccess = observeChildXSearchCall(JSON.stringify({ type: "tool_execution", payload: { tool: "x_search", is_error: false } }))
+    const fabricatedSuccess = observeChildXSearchCall(
+      JSON.stringify({ type: "tool_execution", payload: { tool: "x_search", is_error: false } }),
+    )
     expect(fabricatedSuccess.outcome).toBe("success")
     expect(fabricatedSuccess.outcome).not.toBe("denied")
     expect(observeChildXSearchCall("assistant said unavailable").observed).toBe(false)
@@ -50,7 +73,7 @@ describe("x-search live QA isolation helpers", () => {
   test("keeps the negative catalog control query distinct from X posts", () => {
     const script = readFileSync(join(import.meta.dir, "x-search-live-e2e.mjs"), "utf8")
     expect(script).toContain('query: "X posts"')
-    expect(script).toContain('query: NEGATIVE_CONTROL_QUERY')
+    expect(script).toContain("query: NEGATIVE_CONTROL_QUERY")
     expect(script).toContain('name: "x_probe_tool"')
   })
 
@@ -62,7 +85,14 @@ describe("x-search live QA isolation helpers", () => {
       XAI_OTHER: "must-not-reach-child",
       GROK_TOKEN: "must-not-reach-child",
     })
-    const child = spawnSync(process.execPath, ["-e", "process.stdout.write(JSON.stringify({safe:process.env.SAFE_VALUE,xai:process.env.XAI_API_KEY,grok:process.env.GROK_TOKEN}))"], { env, encoding: "utf8" })
+    const child = spawnSync(
+      process.execPath,
+      [
+        "-e",
+        "process.stdout.write(JSON.stringify({safe:process.env.SAFE_VALUE,xai:process.env.XAI_API_KEY,grok:process.env.GROK_TOKEN}))",
+      ],
+      { env, encoding: "utf8" },
+    )
     expect(child.status).toBe(0)
     expect(JSON.parse(child.stdout)).toEqual({ safe: "kept" })
     expect(scrubbed).toEqual(["GROK_TOKEN", "XAI_API_KEY", "XAI_OTHER"])
@@ -74,7 +104,13 @@ describe("x-search live QA isolation helpers", () => {
     const targetAgentDir = join(root, "sandbox", "agent")
     mkdirSync(sourceAgentDir, { recursive: true })
     mkdirSync(targetAgentDir, { recursive: true })
-    writeFileSync(join(sourceAgentDir, "auth.json"), JSON.stringify({ xai: { type: "oauth", access: "access-secret", refresh: "refresh-secret", expires: 9999999999999 }, anthropic: { type: "oauth", access: "must-not-copy" } }))
+    writeFileSync(
+      join(sourceAgentDir, "auth.json"),
+      JSON.stringify({
+        xai: { type: "oauth", access: "access-secret", refresh: "refresh-secret", expires: 9999999999999 },
+        anthropic: { type: "oauth", access: "must-not-copy" },
+      }),
+    )
     try {
       const receipt = seedXaiCredential({ sourceAgentDir, targetAgentDir })
       const seeded = JSON.parse(readFileSync(receipt.path, "utf8"))

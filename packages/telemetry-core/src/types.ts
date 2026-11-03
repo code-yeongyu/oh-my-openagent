@@ -129,10 +129,7 @@ export type TelemetryTransport = {
   readonly traces?: TurnTracing
 }
 
-export type TelemetryTransportFactory = (
-  apiKey: string,
-  options: TelemetryTransportOptions,
-) => TelemetryTransport
+export type TelemetryTransportFactory = (apiKey: string, options: TelemetryTransportOptions) => TelemetryTransport
 
 export type TelemetryClient = {
   readonly enabled: boolean

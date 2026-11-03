@@ -27,7 +27,9 @@ export class SecretServiceUnavailableError extends CredentialStoreError {}
 export class InvalidCredentialState extends SignInError {}
 /** The stored credential is no longer the identity and generation a caller captured. */
 export class CredentialIdentityChanged extends Error {
-  constructor() { super("The stored sign-in changed; the captured account is no longer current.") }
+  constructor() {
+    super("The stored sign-in changed; the captured account is no longer current.")
+  }
 }
 /** The OS store has not answered a read in time: it is waiting on a person (a keychain approval dialog, #11262). */
 export class KeychainApprovalPendingError extends CredentialStoreError {}
@@ -47,7 +49,7 @@ export const SESSION_READ_WAIT: CredentialReadWait = { kind: "bounded", deadline
 export const INTERACTIVE_READ_WAIT: CredentialReadWait = {
   kind: "interactive",
   noticeAfterMs: 2_000,
-  notice: message => process.stderr.write(`${message}\n`),
+  notice: (message) => process.stderr.write(`${message}\n`),
 }
 
 // One OS read per credential per process: a read the OS has not answered is shared by every later caller, so an open
@@ -69,7 +71,8 @@ const stderrNoticeOncePerProcess = (message: string): void => {
 }
 export const quietNotice = (_message: string): void => {}
 const isLocked = (error: unknown): boolean =>
-  error instanceof Error && (LOCKED.test(error.message) || LOCKED.test(String((error as { code?: unknown }).code ?? "")))
+  error instanceof Error &&
+  (LOCKED.test(error.message) || LOCKED.test(String((error as { code?: unknown }).code ?? "")))
 
 export function credentialId(api: string): string {
   return createHash("sha256").update(serviceOrigin(api)).digest("hex")
@@ -86,24 +89,35 @@ export function createCredentialStore(
     readonly home?: string
   } = {},
 ): CredentialStore {
-  const store = createSealedStore(api, "omo-cli", credentialSchema, options.secrets, options.platform, options.lockProbe, options.notice, options.wait,
+  const store = createSealedStore(
+    api,
+    "omo-cli",
+    credentialSchema,
+    options.secrets,
+    options.platform,
+    options.lockProbe,
+    options.notice,
+    options.wait,
     (current, value) => {
-      const sameIdentity = current !== null && current.device.id === value.device.id
-        && current.signingPrivateKey === value.signingPrivateKey
-        && current.sealingPrivateKey === value.sealingPrivateKey
-        && (value.accountId === undefined || current.accountId === undefined || current.accountId === value.accountId)
+      const sameIdentity =
+        current !== null &&
+        current.device.id === value.device.id &&
+        current.signingPrivateKey === value.signingPrivateKey &&
+        current.sealingPrivateKey === value.sealingPrivateKey &&
+        (value.accountId === undefined || current.accountId === undefined || current.accountId === value.accountId)
       const accountId = value.accountId ?? (sameIdentity ? current?.accountId : undefined)
       // An incoming snapshot cannot restore its old generation after A -> B -> A or clear.
       return {
         ...value,
         ...(accountId === undefined ? {} : { accountId }),
-        credentialGeneration: sameIdentity ? current?.credentialGeneration ?? randomUUID() : randomUUID(),
+        credentialGeneration: sameIdentity ? (current?.credentialGeneration ?? randomUUID()) : randomUUID(),
       }
-    })
+    },
+  )
   return {
     read: store.read,
     readAuthoritative: store.readAuthoritative,
-    write: value => withCredentialLock(api, () => store.write(value), options.home),
+    write: (value) => withCredentialLock(api, () => store.write(value), options.home),
     clear: () => withCredentialLock(api, store.clear, options.home),
   }
 }
@@ -119,7 +133,10 @@ export function createSealedStore<T>(
   wait: CredentialReadWait = SESSION_READ_WAIT,
   amendWrite?: (previous: T | null, next: T) => T,
 ): SealedStore<T> {
-  if (!secrets) throw new SignInError("OmO sign-in needs Bun 1.4 or newer with OS credential storage. No file fallback is available.")
+  if (!secrets)
+    throw new SignInError(
+      "OmO sign-in needs Bun 1.4 or newer with OS credential storage. No file fallback is available.",
+    )
   const platformName =
     platform === "darwin"
       ? "macOS Keychain"
@@ -167,7 +184,10 @@ export function createSealedStore<T>(
       }
       const expired = new Promise<never>((_, reject) => {
         timer = setTimeout(
-          () => reject(new KeychainApprovalPendingError(`${waiting}, then try again. Credentials are never saved to a file.`)),
+          () =>
+            reject(
+              new KeychainApprovalPendingError(`${waiting}, then try again. Credentials are never saved to a file.`),
+            ),
           wait.deadlineMs,
         )
       })
@@ -178,7 +198,9 @@ export function createSealedStore<T>(
   }
   const unavailable = (error: unknown) =>
     isLocked(error)
-      ? new KeychainLockedError(`${platformName} is locked. Unlock it, then try again. Credentials are never saved to a file.`)
+      ? new KeychainLockedError(
+          `${platformName} is locked. Unlock it, then try again. Credentials are never saved to a file.`,
+        )
       : new CredentialStoreError(
           `Cannot access ${platformName}. Unlock or enable the OS credential store and try again. Credentials are never saved to a file.`,
         )
@@ -194,14 +216,19 @@ export function createSealedStore<T>(
   const assertUsable = async () => {
     if (platform !== "linux" || Date.now() < unlockedUntil) return
     const lock = await lockProbe()
-    if (lock === "locked") throw new KeychainLockedError(`${platformName} is locked. Unlock it, then try again. Credentials are never saved to a file.`)
+    if (lock === "locked")
+      throw new KeychainLockedError(
+        `${platformName} is locked. Unlock it, then try again. Credentials are never saved to a file.`,
+      )
     if (lock === "unlocked") {
       unlockedUntil = Date.now() + UNLOCKED_REUSE_MS
       return
     }
     if (!noticed) {
       noticed = true
-      notice("omo: could not check whether the keyring is locked (gdbus or the Secret Service did not answer); using libsecret directly.")
+      notice(
+        "omo: could not check whether the keyring is locked (gdbus or the Secret Service did not answer); using libsecret directly.",
+      )
     }
   }
   const parsedRead = async (fresh: boolean): Promise<T | null> => {
@@ -217,9 +244,11 @@ export function createSealedStore<T>(
     try {
       return schema.parse(JSON.parse(value))
     } catch {
-      throw new InvalidCredentialState(signInRoute() === "cli"
-        ? "Stored sign-in data is invalid. Run omo account forget, then omo login."
-        : "The OmO sign-in saved on this computer can't be read. Run omo account forget to remove it, then sign in again in the desktop app.")
+      throw new InvalidCredentialState(
+        signInRoute() === "cli"
+          ? "Stored sign-in data is invalid. Run omo account forget, then omo login."
+          : "The OmO sign-in saved on this computer can't be read. Run omo account forget to remove it, then sign in again in the desktop app.",
+      )
     }
   }
   return {
@@ -236,7 +265,11 @@ export function createSealedStore<T>(
           const raw = await answered(secrets, true)
           let previous: T | null = null
           if (raw !== null) {
-            try { previous = schema.parse(JSON.parse(raw)) } catch { /* replacement repairs an invalid item */ }
+            try {
+              previous = schema.parse(JSON.parse(raw))
+            } catch {
+              /* replacement repairs an invalid item */
+            }
           }
           next = amendWrite(previous, value)
         }

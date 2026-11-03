@@ -75,8 +75,14 @@ export function createTelemetryProviders(input: CreateTelemetryProvidersInput): 
   const logWriter = writer("logs")
   const spanWriter = writer("traces")
   const clock = input.clock ?? systemClock
-  const loggerProvider = new MinimalLoggerProvider({ processor: new WalLogRecordProcessor(logWriter, onAppended), clock })
-  const tracerProvider = new MinimalTracerProvider({ processor: new WalSpanProcessor(spanWriter, onAppended, input.spans), clock })
+  const loggerProvider = new MinimalLoggerProvider({
+    processor: new WalLogRecordProcessor(logWriter, onAppended),
+    clock,
+  })
+  const tracerProvider = new MinimalTracerProvider({
+    processor: new WalSpanProcessor(spanWriter, onAppended, input.spans),
+    clock,
+  })
   return {
     loggerProvider,
     tracerProvider,
@@ -96,5 +102,7 @@ export function createTelemetryProviders(input: CreateTelemetryProvidersInput): 
 
 export function getActiveTraceContext(): ActiveTraceContext | undefined {
   const span = trace.getSpanContext(context.active())
-  return span === undefined || !trace.isSpanContextValid(span) ? undefined : { traceId: span.traceId, spanId: span.spanId }
+  return span === undefined || !trace.isSpanContextValid(span)
+    ? undefined
+    : { traceId: span.traceId, spanId: span.spanId }
 }

@@ -2,11 +2,7 @@
 
 import { describe, expect, it } from "bun:test"
 
-import {
-  createDynamicTruncator,
-  dynamicTruncate,
-  truncateToTokenLimit,
-} from "./dynamic-truncator"
+import { createDynamicTruncator, dynamicTruncate, truncateToTokenLimit } from "./dynamic-truncator"
 
 function createContextUsageMockContext(inputTokens: number) {
   return {
@@ -91,12 +87,7 @@ describe("dynamicTruncate", () => {
   it("#then falls back to the target token limit when context usage is unavailable", async () => {
     // given
     const ctx = createNoUsageMockContext()
-    const output = [
-      "header",
-      "line one",
-      "line two ".repeat(80),
-      "line three ".repeat(80),
-    ].join("\n")
+    const output = ["header", "line one", "line two ".repeat(80), "line three ".repeat(80)].join("\n")
 
     // when
     const result = await dynamicTruncate(
@@ -109,12 +100,7 @@ describe("dynamicTruncate", () => {
 
     // then
     expect(result).toEqual({
-      result: [
-        "header",
-        "line one",
-        "",
-        "[2 more lines truncated due to context window limit]",
-      ].join("\n"),
+      result: ["header", "line one", "", "[2 more lines truncated due to context window limit]"].join("\n"),
       truncated: true,
       removedCount: 2,
     })

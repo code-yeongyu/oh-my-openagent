@@ -10,14 +10,26 @@ export function captureChild(child, onOutput = () => {}) {
   const stopped = new AbortController()
   child.stdout?.setEncoding("utf8")
   child.stderr?.setEncoding("utf8")
-  child.stdout?.on("data", (chunk) => { stdout = (stdout + chunk).slice(-OUTPUT_TAIL_LIMIT); onOutput() })
-  child.stderr?.on("data", (chunk) => { stderr = (stderr + chunk).slice(-OUTPUT_TAIL_LIMIT); onOutput() })
+  child.stdout?.on("data", (chunk) => {
+    stdout = (stdout + chunk).slice(-OUTPUT_TAIL_LIMIT)
+    onOutput()
+  })
+  child.stderr?.on("data", (chunk) => {
+    stderr = (stderr + chunk).slice(-OUTPUT_TAIL_LIMIT)
+    onOutput()
+  })
   const snapshot = () => ({
-    pid: child.pid, status: child.exitCode, signal: child.signalCode,
-    stdoutTail: stdout, stderrTail: stderr,
+    pid: child.pid,
+    status: child.exitCode,
+    signal: child.signalCode,
+    stdoutTail: stdout,
+    stderrTail: stderr,
   })
   const closed = new Promise((resolve) => {
-    child.once("close", () => { stopped.abort(); resolve(snapshot()) })
+    child.once("close", () => {
+      stopped.abort()
+      resolve(snapshot())
+    })
     child.once("error", (error) => {
       stderr = (stderr + String(error)).slice(-OUTPUT_TAIL_LIMIT)
       stopped.abort()
@@ -27,11 +39,13 @@ export function captureChild(child, onOutput = () => {}) {
   return { closed, snapshot, signal: stopped.signal }
 }
 
-export function stageRecorder(onStage = (entry) => {
-  if (process.env.OMO_RECONCILE_STAGES === "1") {
-    process.stderr.write(`OMO_RECONCILE_STAGE ${JSON.stringify(entry)}\n`)
-  }
-}) {
+export function stageRecorder(
+  onStage = (entry) => {
+    if (process.env.OMO_RECONCILE_STAGES === "1") {
+      process.stderr.write(`OMO_RECONCILE_STAGE ${JSON.stringify(entry)}\n`)
+    }
+  },
+) {
   const started = performance.now()
   const stages = []
   return {
@@ -52,14 +66,17 @@ export async function withinDeadline(promise, ms, beforeTimeout) {
       let expired = false
       timer = setTimeout(() => {
         expired = true
-        Promise.resolve().then(beforeTimeout).then(
-          () => reject(new Error(`deadline exceeded after ${ms}ms`)),
-          reject,
-        )
+        Promise.resolve()
+          .then(beforeTimeout)
+          .then(() => reject(new Error(`deadline exceeded after ${ms}ms`)), reject)
       }, ms)
       promise.then(
-        (value) => { if (!expired) resolve(value) },
-        (error) => { if (!expired) reject(error) },
+        (value) => {
+          if (!expired) resolve(value)
+        },
+        (error) => {
+          if (!expired) reject(error)
+        },
       )
     })
   } finally {
@@ -96,7 +113,10 @@ export async function runProcesses(rootPids, namespace) {
   do {
     added = false
     for (const row of rows) {
-      if (!ancestors.has(row.pid) && !owned.has(row.pid) && owned.has(row.ppid)) { owned.add(row.pid); added = true }
+      if (!ancestors.has(row.pid) && !owned.has(row.pid) && owned.has(row.ppid)) {
+        owned.add(row.pid)
+        added = true
+      }
     }
   } while (added)
   return rows.filter((row) => owned.has(row.pid) && row.pid !== process.pid)
@@ -107,9 +127,12 @@ export async function dumpRunProcesses(rootPids, namespace) {
     return { tasklist: await captureCommand("tasklist.exe", ["/FO", "CSV"]), roots: rootPids }
   }
   const processes = await runProcesses(rootPids, namespace)
-  const sockets = await Promise.all(processes.map(async ({ pid }) => ({
-    pid, ...await captureCommand("lsof", ["-nP", "-p", String(pid)]),
-  })))
+  const sockets = await Promise.all(
+    processes.map(async ({ pid }) => ({
+      pid,
+      ...(await captureCommand("lsof", ["-nP", "-p", String(pid)])),
+    })),
+  )
   return { processes, sockets }
 }
 

@@ -3,7 +3,14 @@
 // uses the covered layout; `foreground-scroll-same-rect` is #9062's shape, both hosts on one rect.
 // The first visible line comes from the independent probe (EM_GETFIRSTVISIBLELINE), never from the
 // engine.
-import { eventAt, HOST_FIRST_VISIBLE_LINE, type PointerHost, type PointerProbe, pointerEvents, probeHostsUntil } from "./pointer-kit"
+import {
+  eventAt,
+  HOST_FIRST_VISIBLE_LINE,
+  type PointerHost,
+  type PointerProbe,
+  pointerEvents,
+  probeHostsUntil,
+} from "./pointer-kit"
 import {
   at,
   COVERED,
@@ -53,7 +60,10 @@ function foregroundScroll(name: string, layout: Layout): Scenario {
             ["positive-dy-moves-target-toward-end", afterPositive > start],
             ["negative-dy-succeeded", up.error === undefined],
             ["negative-dy-returns-target-to-start", afterNegative === start],
-            ["target-wheels-at-point", wheels.length === 2 && wheels.every((line) => eventAt(line, point.screen, POINT_TOLERANCE))],
+            [
+              "target-wheels-at-point",
+              wheels.length === 2 && wheels.every((line) => eventAt(line, point.screen, POINT_TOLERANCE)),
+            ],
             ["front-got-no-wheel", pointerEvents(state.front, "wheel").length === 0],
             ["front-document-unmoved", firstLine(after, state.front) === HOST_FIRST_VISIBLE_LINE],
             ...restoreChecks(state, after),

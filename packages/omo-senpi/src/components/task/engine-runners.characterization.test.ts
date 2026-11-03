@@ -37,7 +37,9 @@ afterEach(() => {
   for (const restore of restores.splice(0)) restore()
 })
 
-function buildContext(overrides: Partial<Omit<RunnerBuildContext, "settings">> & { readonly settings?: Record<string, unknown> } = {}): RunnerBuildContext {
+function buildContext(
+  overrides: Partial<Omit<RunnerBuildContext, "settings">> & { readonly settings?: Record<string, unknown> } = {},
+): RunnerBuildContext {
   const { settings, ...rest } = overrides
   return {
     runtime: new TaskRuntimeContext("/project"),
@@ -86,30 +88,77 @@ describe("E1 characterization: which runner a process child gets", () => {
   })
 
   test.each([
-    { name: "host on linux with routing", settings: { process_runner: "host" }, platform: "linux", routing: true, expected: RpcHostRunner },
-    { name: "host on darwin with routing", settings: { process_runner: "host" }, platform: "darwin", routing: true, expected: RpcHostRunner },
-    { name: "default settings on linux with routing", settings: {}, platform: "linux", routing: true, expected: RpcHostRunner },
-    { name: "host on win32 without routing", settings: { process_runner: "host" }, platform: "win32", routing: false, expected: RpcProcessRunner },
-    { name: "host on win32 with routing", settings: { process_runner: "host" }, platform: "win32", routing: true, expected: RpcProcessRunner },
-    { name: "child-process on linux without routing", settings: { process_runner: "child-process" }, platform: "linux", routing: false, expected: RpcProcessRunner },
-    { name: "child-process on darwin with routing", settings: { process_runner: "child-process" }, platform: "darwin", routing: true, expected: RpcProcessRunner },
-  ] as const)("#given $name #when the process child runner is built #then it is the expected runner class", ({ settings, platform, routing, expected }) => {
-    // given
-    const context = buildContext({ settings, platform, ...(routing ? { hostRouting: STUBBED_HOST_ROUTING } : {}) })
+    {
+      name: "host on linux with routing",
+      settings: { process_runner: "host" },
+      platform: "linux",
+      routing: true,
+      expected: RpcHostRunner,
+    },
+    {
+      name: "host on darwin with routing",
+      settings: { process_runner: "host" },
+      platform: "darwin",
+      routing: true,
+      expected: RpcHostRunner,
+    },
+    {
+      name: "default settings on linux with routing",
+      settings: {},
+      platform: "linux",
+      routing: true,
+      expected: RpcHostRunner,
+    },
+    {
+      name: "host on win32 without routing",
+      settings: { process_runner: "host" },
+      platform: "win32",
+      routing: false,
+      expected: RpcProcessRunner,
+    },
+    {
+      name: "host on win32 with routing",
+      settings: { process_runner: "host" },
+      platform: "win32",
+      routing: true,
+      expected: RpcProcessRunner,
+    },
+    {
+      name: "child-process on linux without routing",
+      settings: { process_runner: "child-process" },
+      platform: "linux",
+      routing: false,
+      expected: RpcProcessRunner,
+    },
+    {
+      name: "child-process on darwin with routing",
+      settings: { process_runner: "child-process" },
+      platform: "darwin",
+      routing: true,
+      expected: RpcProcessRunner,
+    },
+  ] as const)(
+    "#given $name #when the process child runner is built #then it is the expected runner class",
+    ({ settings, platform, routing, expected }) => {
+      // given
+      const context = buildContext({ settings, platform, ...(routing ? { hostRouting: STUBBED_HOST_ROUTING } : {}) })
 
-    // when
-    const runner = buildProcessChildRunner(context)
+      // when
+      const runner = buildProcessChildRunner(context)
 
-    // then
-    expect(runner).toBeInstanceOf(expected)
-  })
+      // then
+      expect(runner).toBeInstanceOf(expected)
+    },
+  )
 
   test("#given the host runner on a non-win32 platform without shard routing #when the process child runner is built #then it throws the routing error", () => {
     // given
     const context = buildContext({ settings: { process_runner: "host" }, platform: "linux" })
 
     // when / then
-    expect(() => buildProcessChildRunner(context)).toThrow("omo-senpi task host runner built without the session's shard routing")
+    expect(() => buildProcessChildRunner(context)).toThrow(
+      "omo-senpi task host runner built without the session's shard routing",
+    )
   })
 })
 
@@ -118,13 +167,15 @@ describe("E1 characterization: respawn runner launch spec", () => {
     // given
     const seen = captureProcessStarts()
     let resolverCalls = 0
-    const runner = buildRespawnRunner(buildContext({
-      settings: { process_runner: "child-process" },
-      resolveInheritedExtensions: () => {
-        resolverCalls += 1
-        return Promise.resolve(["/inherited/a.ts", "/inherited/b.ts"])
-      },
-    }))
+    const runner = buildRespawnRunner(
+      buildContext({
+        settings: { process_runner: "child-process" },
+        resolveInheritedExtensions: () => {
+          resolverCalls += 1
+          return Promise.resolve(["/inherited/a.ts", "/inherited/b.ts"])
+        },
+      }),
+    )
 
     // when
     await expect(runner.start(rpcSpec())).rejects.toThrow("stop before spawning")
@@ -138,13 +189,15 @@ describe("E1 characterization: respawn runner launch spec", () => {
     // given
     const seen = captureProcessStarts()
     let resolverCalls = 0
-    const runner = buildRespawnRunner(buildContext({
-      settings: { process_runner: "child-process" },
-      resolveInheritedExtensions: () => {
-        resolverCalls += 1
-        return Promise.resolve(["/inherited/a.ts"])
-      },
-    }))
+    const runner = buildRespawnRunner(
+      buildContext({
+        settings: { process_runner: "child-process" },
+        resolveInheritedExtensions: () => {
+          resolverCalls += 1
+          return Promise.resolve(["/inherited/a.ts"])
+        },
+      }),
+    )
 
     // when
     await expect(runner.start(rpcSpec({ extensions: ["/explicit.ts"] }))).rejects.toThrow("stop before spawning")
@@ -157,14 +210,18 @@ describe("E1 characterization: respawn runner launch spec", () => {
   test("#given exclude_models #when the respawn runner starts a spec with a fallback chain #then excluded selectors are dropped in order", async () => {
     // given
     const seen = captureProcessStarts()
-    const runner = buildRespawnRunner(buildContext({
-      settings: { process_runner: "child-process" },
-      excludeModels: ["zai/glm-5.3"],
-      resolveInheritedExtensions: () => Promise.resolve([]),
-    }))
+    const runner = buildRespawnRunner(
+      buildContext({
+        settings: { process_runner: "child-process" },
+        excludeModels: ["zai/glm-5.3"],
+        resolveInheritedExtensions: () => Promise.resolve([]),
+      }),
+    )
 
     // when
-    await expect(runner.start(rpcSpec({ fallbackModels: ["openai/gpt-5.6-sol:high", "zai/glm-5.3", "kimi-coding/kimi-k3"] }))).rejects.toThrow("stop before spawning")
+    await expect(
+      runner.start(rpcSpec({ fallbackModels: ["openai/gpt-5.6-sol:high", "zai/glm-5.3", "kimi-coding/kimi-k3"] })),
+    ).rejects.toThrow("stop before spawning")
 
     // then
     expect(seen.map((spec) => spec.fallbackModels)).toEqual([["openai/gpt-5.6-sol:high", "kimi-coding/kimi-k3"]])
@@ -184,12 +241,14 @@ describe("E1 characterization: inherited extensions resolver", () => {
     // given
     withArgv(["bun", "omo", "-e", "/argv/plugin", "--extension", "/argv/other.ts"])
     let listed = 0
-    const resolve = createInheritedExtensionsResolver(buildContext({
-      listInstalledPackageRoots: () => {
-        listed += 1
-        return ["/packages/one"]
-      },
-    }))
+    const resolve = createInheritedExtensionsResolver(
+      buildContext({
+        listInstalledPackageRoots: () => {
+          listed += 1
+          return ["/packages/one"]
+        },
+      }),
+    )
 
     // when
     const inherited = await resolve()
@@ -213,13 +272,15 @@ describe("E1 characterization: inherited extensions resolver", () => {
       ],
     })
     let listed = 0
-    const resolve = createInheritedExtensionsResolver(buildContext({
-      runtime,
-      listInstalledPackageRoots: () => {
-        listed += 1
-        return ["/packages/one"]
-      },
-    }))
+    const resolve = createInheritedExtensionsResolver(
+      buildContext({
+        runtime,
+        listInstalledPackageRoots: () => {
+          listed += 1
+          return ["/packages/one"]
+        },
+      }),
+    )
 
     // when
     const first = await resolve()
@@ -236,12 +297,14 @@ describe("E1 characterization: inherited extensions resolver", () => {
     withArgv(["bun", "omo", "-e", "/argv/plugin"])
     const runtime = new TaskRuntimeContext("/project")
     runtime.captureFrom({ loadedExtensionPaths: ["/packages/one/extensions/provider.ts"] })
-    const resolve = createInheritedExtensionsResolver(buildContext({
-      runtime,
-      listInstalledPackageRoots: () => {
-        throw new Error("package discovery unavailable")
-      },
-    }))
+    const resolve = createInheritedExtensionsResolver(
+      buildContext({
+        runtime,
+        listInstalledPackageRoots: () => {
+          throw new Error("package discovery unavailable")
+        },
+      }),
+    )
 
     // when
     const inherited = await resolve()

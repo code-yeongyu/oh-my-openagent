@@ -1,21 +1,11 @@
-import type {
-  BtwPromptRef,
-  BtwSideControllerDependencies,
-  BtwSideRecord,
-  BtwSideState,
-} from "./tui-controller-types"
-import {
-  abortBtwSide,
-  deleteBtwSide,
-} from "./tui-side-removal"
+import type { BtwPromptRef, BtwSideControllerDependencies, BtwSideRecord, BtwSideState } from "./tui-controller-types"
+import { abortBtwSide, deleteBtwSide } from "./tui-side-removal"
 import { createBtwPromptQueue } from "./tui-prompt-queue"
 import { prepareBtwSideStart } from "./tui-side-start"
 
 const MAX_DELETED_SESSION_TOMBSTONES = 512
 
-export function createBtwSideController(
-  dependencies: BtwSideControllerDependencies,
-) {
+export function createBtwSideController(dependencies: BtwSideControllerDependencies) {
   let currentState: BtwSideState = { phase: "closed" }
   let stateGeneration = 0
   let disposed = false
@@ -32,10 +22,7 @@ export function createBtwSideController(
   const promptQueue = createBtwPromptQueue()
 
   function rememberDeletedSession(sessionID: string): void {
-    if (
-      !deletedSessionIDs.has(sessionID) &&
-      deletedSessionIDs.size >= MAX_DELETED_SESSION_TOMBSTONES
-    ) {
+    if (!deletedSessionIDs.has(sessionID) && deletedSessionIDs.size >= MAX_DELETED_SESSION_TOMBSTONES) {
       const oldestSessionID = deletedSessionIDs.values().next().value
       if (oldestSessionID !== undefined) {
         deletedSessionIDs.delete(oldestSessionID)
@@ -62,17 +49,11 @@ export function createBtwSideController(
   }
 
   function isClosingGeneration(generation: number): boolean {
-    return (
-      stateGeneration === generation &&
-      currentState.phase === "closing"
-    )
+    return stateGeneration === generation && currentState.phase === "closing"
   }
 
   function isCreatingGeneration(generation: number): boolean {
-    return (
-      stateGeneration === generation &&
-      currentState.phase === "creating"
-    )
+    return stateGeneration === generation && currentState.phase === "creating"
   }
 
   function attachPromptRef(sessionID: string, promptRef: BtwPromptRef | undefined): void {
@@ -80,9 +61,7 @@ export function createBtwSideController(
   }
 
   function latestSideForParent(parentSessionID: string): BtwSideRecord | undefined {
-    return [...retainedSides.values()]
-      .reverse()
-      .find((side) => side.parentSessionID === parentSessionID)
+    return [...retainedSides.values()].reverse().find((side) => side.parentSessionID === parentSessionID)
   }
 
   function stateForSession(sessionID: string | undefined): BtwSideState {
@@ -106,8 +85,7 @@ export function createBtwSideController(
   function rootParentForCurrentSession(): string | undefined {
     const currentSessionID = dependencies.getCurrentSessionID()
     if (!currentSessionID) return undefined
-    return retainedSides.get(currentSessionID)?.parentSessionID
-      ?? currentSessionID
+    return retainedSides.get(currentSessionID)?.parentSessionID ?? currentSessionID
   }
 
   async function startFromPrompt(
@@ -115,24 +93,13 @@ export function createBtwSideController(
     parentSessionID = rootParentForCurrentSession(),
   ): Promise<boolean> {
     if (disposed) return false
-    if (
-      currentState.phase === "creating" ||
-      currentState.phase === "closing"
-    ) {
-      dependencies.showToast(
-        currentState.phase === "creating"
-          ? "BTW is already starting."
-          : "BTW is still closing.",
-      )
+    if (currentState.phase === "creating" || currentState.phase === "closing") {
+      dependencies.showToast(currentState.phase === "creating" ? "BTW is already starting." : "BTW is still closing.")
       return false
     }
 
     const previousState = currentState
-    const prepared = prepareBtwSideStart(
-      dependencies,
-      promptRef,
-      parentSessionID,
-    )
+    const prepared = prepareBtwSideStart(dependencies, promptRef, parentSessionID)
     if (!prepared) return false
     const restoreDraftIfUnchanged = (): void => {
       if (prepared.consumeDraft && promptRef.input.length === 0) {
@@ -227,9 +194,7 @@ export function createBtwSideController(
 
   async function close(): Promise<void> {
     const currentSessionID = dependencies.getCurrentSessionID()
-    const openState = currentSessionID
-      ? retainedSides.get(currentSessionID)
-      : undefined
+    const openState = currentSessionID ? retainedSides.get(currentSessionID) : undefined
     if (!openState) return
     skipClosingParentNavigation = false
     const closingState = {
@@ -260,9 +225,7 @@ export function createBtwSideController(
       promptQueue.clear(openState.sideSessionID)
       setState({ phase: "closed" })
       setState(stateForSession(openState.parentSessionID))
-      dependencies.showToast(
-        "Unable to delete BTW. Delete the abandoned side session manually.",
-      )
+      dependencies.showToast("Unable to delete BTW. Delete the abandoned side session manually.")
       return
     }
     retainedSides.delete(openState.sideSessionID)
@@ -286,10 +249,7 @@ export function createBtwSideController(
       return
     }
     if (currentState.phase === "closing") {
-      if (
-        sessionID !== currentState.parentSessionID &&
-        sessionID !== currentState.sideSessionID
-      ) {
+      if (sessionID !== currentState.parentSessionID && sessionID !== currentState.sideSessionID) {
         skipClosingParentNavigation = true
       }
       return
@@ -302,9 +262,7 @@ export function createBtwSideController(
     if (currentState.phase === "creating") {
       if (sessionID === currentState.parentSessionID) {
         setState({ phase: "closed" })
-        dependencies.showToast(
-          "BTW cancelled because its main session was deleted.",
-        )
+        dependencies.showToast("BTW cancelled because its main session was deleted.")
       }
       return
     }
@@ -319,13 +277,10 @@ export function createBtwSideController(
       setState(stateForSession(deletedSide.parentSessionID))
       return
     }
-    const detachedSides = [...retainedSides.values()].filter(
-      (side) => side.parentSessionID === sessionID,
-    )
+    const detachedSides = [...retainedSides.values()].filter((side) => side.parentSessionID === sessionID)
     if (detachedSides.length > 0) {
       const closingSideID =
-        currentState.phase === "closing" &&
-        sessionID === currentState.parentSessionID
+        currentState.phase === "closing" && sessionID === currentState.parentSessionID
           ? currentState.sideSessionID
           : undefined
       for (const side of detachedSides) {
@@ -338,18 +293,14 @@ export function createBtwSideController(
           sessionID: side.sideSessionID,
           deleteSession: dependencies.deleteSession,
           showToast: dependencies.showToast,
-          failureMessage:
-            "Unable to delete BTW after Main was removed. Delete the abandoned side session manually.",
+          failureMessage: "Unable to delete BTW after Main was removed. Delete the abandoned side session manually.",
         }).then((deleted) => {
           if (deleted || disposed) return
           retainedSides.set(side.sideSessionID, side)
           if (sideNumber !== undefined) {
             sideNumbers.set(side.sideSessionID, sideNumber)
           }
-          if (
-            dependencies.getCurrentSessionID() ===
-            side.sideSessionID
-          ) {
+          if (dependencies.getCurrentSessionID() === side.sideSessionID) {
             setState(stateForSession(side.sideSessionID))
           }
         })
@@ -359,17 +310,13 @@ export function createBtwSideController(
       } else {
         setState({ phase: "closed" })
       }
-      dependencies.showToast(
-        "BTW detached because its main session was deleted.",
-      )
+      dependencies.showToast("BTW detached because its main session was deleted.")
     }
   }
 
   function canCloseCurrentSide(): boolean {
     const currentSessionID = dependencies.getCurrentSessionID()
-    const currentSide = currentSessionID
-      ? retainedSides.get(currentSessionID)
-      : undefined
+    const currentSide = currentSessionID ? retainedSides.get(currentSessionID) : undefined
     if (!currentSide) return false
     return (
       promptQueue.input(currentSide.sideSessionID).length === 0 &&
@@ -377,11 +324,7 @@ export function createBtwSideController(
     )
   }
 
-  function adopt(
-    parentSessionID: string,
-    sideSessionID: string,
-    sideNumber?: number,
-  ): void {
+  function adopt(parentSessionID: string, sideSessionID: string, sideNumber?: number): void {
     const retainedSide: BtwSideRecord = {
       parentSessionID,
       sideSessionID,
@@ -401,9 +344,7 @@ export function createBtwSideController(
 
   function returnToParent(): void {
     const currentSessionID = dependencies.getCurrentSessionID()
-    const currentSide = currentSessionID
-      ? retainedSides.get(currentSessionID)
-      : undefined
+    const currentSide = currentSessionID ? retainedSides.get(currentSessionID) : undefined
     if (!currentSide) return
     dependencies.navigateSession(currentSide.parentSessionID)
     setState({
@@ -415,12 +356,9 @@ export function createBtwSideController(
   return {
     state: (): BtwSideState => currentState,
     sides: (): BtwSideRecord[] => [...retainedSides.values()],
-    side: (sessionID: string): BtwSideRecord | undefined =>
-      retainedSides.get(sessionID),
-    sideNumber: (sessionID: string): number | undefined =>
-      sideNumbers.get(sessionID),
-    rootParent: (sessionID: string): string =>
-      retainedSides.get(sessionID)?.parentSessionID ?? sessionID,
+    side: (sessionID: string): BtwSideRecord | undefined => retainedSides.get(sessionID),
+    sideNumber: (sessionID: string): number | undefined => sideNumbers.get(sessionID),
+    rootParent: (sessionID: string): string => retainedSides.get(sessionID)?.parentSessionID ?? sessionID,
     startFromPrompt,
     attachPromptRef,
     toggle,
@@ -433,9 +371,7 @@ export function createBtwSideController(
     waitUntilClosed,
     dispose: async (): Promise<void> => {
       disposed = true
-      const pendingCreations = [...activeCreationOperations].map(
-        (operation) => operation.finished,
-      )
+      const pendingCreations = [...activeCreationOperations].map((operation) => operation.finished)
       if (currentState.phase === "creating") {
         setState({ phase: "closed" })
       } else if (currentState.phase === "closing") {

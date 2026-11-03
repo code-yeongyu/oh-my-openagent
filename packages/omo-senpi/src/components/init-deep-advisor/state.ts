@@ -1,12 +1,5 @@
 import { createHash, randomUUID } from "node:crypto"
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  unlinkSync,
-  writeFileSync,
-} from "node:fs"
+import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { getOmoNativeStateDir } from "../telemetry/product-identity"
@@ -22,9 +15,7 @@ export interface InitDeepSnapshotV1 {
 }
 
 export type SnapshotReadResult =
-  | { kind: "missing" }
-  | { kind: "invalid" }
-  | { kind: "valid"; snapshot: InitDeepSnapshotV1 }
+  { kind: "missing" } | { kind: "invalid" } | { kind: "valid"; snapshot: InitDeepSnapshotV1 }
 
 const ADVISOR_STATE_DIR = "init-deep-advisor-state"
 const GLOBAL_DECLINE_FILE = "init-deep-advisor-declined-global"
@@ -89,10 +80,7 @@ export function isCoolingDown(stateDir: string, repoHash: string, now: number): 
 export function writeLastProposedHead(stateDir: string, repoHash: string, head: string): void {
   const dir = join(stateDir, PROPOSAL_DIR)
   mkdirSync(dir, { recursive: true })
-  writeAtomic(
-    join(dir, repoHash),
-    JSON.stringify({ lastProposedHead: head, lastProposedAt: Date.now() }),
-  )
+  writeAtomic(join(dir, repoHash), JSON.stringify({ lastProposedHead: head, lastProposedAt: Date.now() }))
 }
 
 export function readLastProposedHead(stateDir: string, repoHash: string): string | null {

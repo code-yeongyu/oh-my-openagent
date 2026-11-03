@@ -50,7 +50,10 @@ export function omoReleaseVersion(env: Env): string | undefined {
  * `computer.engine_path` wins; an omo launch acquires the engine for its own release (local install
  * first, then the verified GitHub release download); anything else uses the synchronous locator.
  */
-export function defaultEngineChild(env: Env = process.env, locatorOptions?: DesktopEngineLocatorOptions): (enginePath: string | undefined) => ChildFactory {
+export function defaultEngineChild(
+  env: Env = process.env,
+  locatorOptions?: DesktopEngineLocatorOptions,
+): (enginePath: string | undefined) => ChildFactory {
   return (enginePath) => {
     if (enginePath !== undefined) return explicitEngineChild(enginePath)
     const version = omoReleaseVersion(env)

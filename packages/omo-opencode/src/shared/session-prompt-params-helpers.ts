@@ -14,25 +14,21 @@ type PromptParamModel = {
   thinking?: { type: "enabled" | "disabled"; budgetTokens?: number }
 }
 
-export function applySessionPromptParams(
-  sessionID: string,
-  model: PromptParamModel | undefined,
-): LoweredReasoning {
+export function applySessionPromptParams(sessionID: string, model: PromptParamModel | undefined): LoweredReasoning {
   if (!model) {
     clearSessionPromptParams(sessionID)
     return {}
   }
 
-  const loweredReasoning = model.reasoning !== undefined
-    ? lowerReasoningForModel(model.reasoning, {
-        providerID: model.providerID ?? "",
-        modelID: model.modelID ?? "",
-        runtimeModel: model.runtimeModel,
-      })
-    : undefined
-  const reasoningEffort = model.reasoning !== undefined
-    ? loweredReasoning?.reasoningEffort
-    : model.reasoningEffort
+  const loweredReasoning =
+    model.reasoning !== undefined
+      ? lowerReasoningForModel(model.reasoning, {
+          providerID: model.providerID ?? "",
+          modelID: model.modelID ?? "",
+          runtimeModel: model.runtimeModel,
+        })
+      : undefined
+  const reasoningEffort = model.reasoning !== undefined ? loweredReasoning?.reasoningEffort : model.reasoningEffort
   const promptOptions: Record<string, unknown> = {
     ...(reasoningEffort ? { reasoningEffort } : {}),
     ...(model.thinking ? { thinking: model.thinking } : {}),

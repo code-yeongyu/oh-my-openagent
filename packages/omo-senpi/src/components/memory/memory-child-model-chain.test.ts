@@ -16,14 +16,21 @@ describe("childModelChainSpec", () => {
       selectedModel: "omo-mock/mock-1",
       fallbackModels: [
         { provider: "omo-mock", model_id: "mock-2", display: "omo-mock/mock-2", source: "category" },
-        { provider: "apitopia", model_id: "z-ai/glm-5.3", display: "apitopia/z-ai/glm-5.3", reasoning: "high", source: "category" },
+        {
+          provider: "apitopia",
+          model_id: "z-ai/glm-5.3",
+          display: "apitopia/z-ai/glm-5.3",
+          reasoning: "high",
+          source: "category",
+        },
       ],
       retry: { maxRetries: 1 },
     })
   })
 
   test("#given a single-model quick category #when converted #then fallback and retry overrides are absent", () => {
-    expect(childModelChainSpec({ model: "omo-mock/mock-1", fallbacks: [] }))
-      .toEqual({ selectedModel: "omo-mock/mock-1" })
+    expect(childModelChainSpec({ model: "omo-mock/mock-1", fallbacks: [] })).toEqual({
+      selectedModel: "omo-mock/mock-1",
+    })
   })
 })

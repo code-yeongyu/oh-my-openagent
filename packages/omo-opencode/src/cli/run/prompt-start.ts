@@ -23,10 +23,12 @@ function sleep(delayMs: number): Promise<void> {
 }
 
 function hasPromptStartEvidence(eventState: EventState): boolean {
-  return eventState.mainSessionStarted ||
+  return (
+    eventState.mainSessionStarted ||
     eventState.hasReceivedMeaningfulWork ||
     eventState.messageCount > 0 ||
     eventState.currentTool !== null
+  )
 }
 
 async function readMainSessionStatus(ctx: RunContext): Promise<SessionStatus["type"] | null> {
@@ -104,7 +106,7 @@ export async function waitForPromptStart(
 
     if (Date.now() - startedAt >= timeoutMs) {
       throw new Error(
-        `Prompt did not start within ${timeoutMs}ms; no busy status, message event, or persisted message was observed.`
+        `Prompt did not start within ${timeoutMs}ms; no busy status, message event, or persisted message was observed.`,
       )
     }
 

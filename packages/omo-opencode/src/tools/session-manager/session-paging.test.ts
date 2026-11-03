@@ -59,14 +59,29 @@ function createFakeServer(sessions: Record<string, number>, headerShape: HeaderS
   let gate: { onRequest: (request: Request) => Promise<void> } | undefined
 
   const message = (sessionID: string, index: number) => ({
-    info: { id: `msg_${String(index).padStart(6, "0")}`, role: index % 2 === 0 ? "user" : "assistant", time: { created: 1_000 + index } },
-    parts: [{ id: `prt_${index}`, type: "text", text: `${sessionID} message ${index}${index === 0 ? " needle-oldest" : ""}` }],
+    info: {
+      id: `msg_${String(index).padStart(6, "0")}`,
+      role: index % 2 === 0 ? "user" : "assistant",
+      time: { created: 1_000 + index },
+    },
+    parts: [
+      { id: `prt_${index}`, type: "text", text: `${sessionID} message ${index}${index === 0 ? " needle-oldest" : ""}` },
+    ],
   })
 
   const client = {
     session: {
-      messages: async (input: { path: { id: string }; query?: { limit?: number; before?: string }; signal?: AbortSignal }) => {
-        const request: Request = { sessionID: input.path.id, limit: input.query?.limit, before: input.query?.before, signal: input.signal }
+      messages: async (input: {
+        path: { id: string }
+        query?: { limit?: number; before?: string }
+        signal?: AbortSignal
+      }) => {
+        const request: Request = {
+          sessionID: input.path.id,
+          limit: input.query?.limit,
+          before: input.query?.before,
+          signal: input.signal,
+        }
         requests.push(request)
         if (gate) await gate.onRequest(request)
         input.signal?.throwIfAborted()
@@ -132,7 +147,11 @@ function writeFileSession(sessionID: string, count: number): void {
     mkdirSync(join(TEST_DIR, "part", messageID), { recursive: true })
     writeFileSync(
       join(TEST_DIR, "part", messageID, "prt_0.json"),
-      JSON.stringify({ id: "prt_0", type: "text", text: `file message ${index}${index === 0 ? " needle-oldest" : ""}` }),
+      JSON.stringify({
+        id: "prt_0",
+        type: "text",
+        text: `file message ${index}${index === 0 ? " needle-oldest" : ""}`,
+      }),
     )
   }
 }
@@ -221,7 +240,10 @@ describe("session-manager paging (#10738)", () => {
     const { session_search } = createTools(server)
 
     //#when
-    const output = await session_search.execute({ query: "ses_big message 99", session_id: "ses_big", limit: 1 }, createContext())
+    const output = await session_search.execute(
+      { query: "ses_big message 99", session_id: "ses_big", limit: 1 },
+      createContext(),
+    )
 
     //#then
     expect(output).toContain("Found 1 matches")
@@ -260,60 +282,71 @@ describe("session-manager paging (#10738)", () => {
   test.each([
     ["session_info", { session_id: "ses_big" }],
     ["session_read", { session_id: "ses_big", limit: 2 }],
-  ] as const)("#given %s walking a long session #when the caller aborts mid-walk #then it returns without the blocked page and reads nothing more", async (toolName: "session_info" | "session_read", args: { session_id: string; limit?: number }) => {
-    //#given
-    const server = createFakeServer({ ses_big: SESSION_SIZE })
-    const gate = blockRequest(server, 3)
-    const caller = new AbortController()
-    const tools = createTools(server)
-    const output = tools[toolName].execute(args, createContext(caller.signal))
-    const blocked = await Promise.race([
-      gate.blocked,
-      output.then(() => {
-        throw new Error(`${toolName} settled before the walk reached its third request`)
-      }),
-    ])
+  ] as const)(
+    "#given %s walking a long session #when the caller aborts mid-walk #then it returns without the blocked page and reads nothing more",
+    async (toolName: "session_info" | "session_read", args: { session_id: string; limit?: number }) => {
+      //#given
+      const server = createFakeServer({ ses_big: SESSION_SIZE })
+      const gate = blockRequest(server, 3)
+      const caller = new AbortController()
+      const tools = createTools(server)
+      const output = tools[toolName].execute(args, createContext(caller.signal))
+      const blocked = await Promise.race([
+        gate.blocked,
+        output.then(() => {
+          throw new Error(`${toolName} settled before the walk reached its third request`)
+        }),
+      ])
 
-    //#when
-    caller.abort(new Error("cancelled by caller"))
-    const result = await output
+      //#when
+      caller.abort(new Error("cancelled by caller"))
+      const result = await output
 
-    //#then
-    expect(result).toContain("cancelled by caller")
-    expect(blocked.signal?.aborted).toBe(true)
-    expect(server.requests.length).toBe(3)
-    expect(server.fetchedMessages).toBeLessThanOrEqual(201)
-  })
+      //#then
+      expect(result).toContain("cancelled by caller")
+      expect(blocked.signal?.aborted).toBe(true)
+      expect(server.requests.length).toBe(3)
+      expect(server.fetchedMessages).toBeLessThanOrEqual(201)
+    },
+  )
 
   test.each([
     ["listing", {}],
     ["filtering by date", { from_date: "1970-01-01T00:00:00Z" }],
-  ] as const)("#given session_list %s a long session #when the caller aborts mid-count #then it reports the cancellation and reads nothing more", async (_mode: string, args: { from_date?: string }) => {
-    //#given
-    const server = createFakeServer({ ses_big: SESSION_SIZE })
-    const gate = blockRequest(server, 3)
-    const caller = new AbortController()
-    const { session_list } = createSessionManagerTools({ directory: TEST_DIR, client: server.client } as unknown as PluginInput, {
-      getMainSessions: async () => [{ id: "ses_big", projectID: "p", directory: TEST_DIR, time: { created: 1, updated: 1 } }],
-    })
-    const output = session_list.execute(args, createContext(caller.signal))
-    const blocked = await Promise.race([
-      gate.blocked,
-      output.then(() => {
-        throw new Error("session_list settled before its count reached the third request")
-      }),
-    ])
+  ] as const)(
+    "#given session_list %s a long session #when the caller aborts mid-count #then it reports the cancellation and reads nothing more",
+    async (_mode: string, args: { from_date?: string }) => {
+      //#given
+      const server = createFakeServer({ ses_big: SESSION_SIZE })
+      const gate = blockRequest(server, 3)
+      const caller = new AbortController()
+      const { session_list } = createSessionManagerTools(
+        { directory: TEST_DIR, client: server.client } as unknown as PluginInput,
+        {
+          getMainSessions: async () => [
+            { id: "ses_big", projectID: "p", directory: TEST_DIR, time: { created: 1, updated: 1 } },
+          ],
+        },
+      )
+      const output = session_list.execute(args, createContext(caller.signal))
+      const blocked = await Promise.race([
+        gate.blocked,
+        output.then(() => {
+          throw new Error("session_list settled before its count reached the third request")
+        }),
+      ])
 
-    //#when
-    caller.abort(new Error("cancelled by caller"))
-    const result = String(await output)
+      //#when
+      caller.abort(new Error("cancelled by caller"))
+      const result = String(await output)
 
-    //#then
-    expect(result).toContain("cancelled by caller")
-    expect(result).not.toContain("Skipped")
-    expect(blocked.signal?.aborted).toBe(true)
-    expect(server.requests.length).toBe(3)
-  })
+      //#then
+      expect(result).toContain("cancelled by caller")
+      expect(result).not.toContain("Skipped")
+      expect(blocked.signal?.aborted).toBe(true)
+      expect(server.requests.length).toBe(3)
+    },
+  )
 
   test("#given a long session #when session_read asks for the first 150 messages #then the window spans the page boundary exactly", async () => {
     //#given
@@ -324,22 +357,32 @@ describe("session-manager paging (#10738)", () => {
     const output = await session_read.execute({ session_id: "ses_big", limit: 150 }, createContext())
 
     //#then
-    const indexes = (String(output).match(/ses_big message (\d+)/g) ?? []).map((match: string) => Number(match.split(" ").pop()))
+    const indexes = (String(output).match(/ses_big message (\d+)/g) ?? []).map((match: string) =>
+      Number(match.split(" ").pop()),
+    )
     expect(indexes).toEqual(Array.from({ length: 150 }, (_, index) => index))
   })
 
-  test.each([true, false])("#given a 30-message session #when session_read asks for 50 with from_end=%p #then all 30 come back in order", async (fromEnd: boolean) => {
-    //#given
-    const server = createFakeServer({ ses_small: 30 })
-    const { session_read } = createTools(server)
+  test.each([true, false])(
+    "#given a 30-message session #when session_read asks for 50 with from_end=%p #then all 30 come back in order",
+    async (fromEnd: boolean) => {
+      //#given
+      const server = createFakeServer({ ses_small: 30 })
+      const { session_read } = createTools(server)
 
-    //#when
-    const output = await session_read.execute({ session_id: "ses_small", limit: 50, from_end: fromEnd }, createContext())
+      //#when
+      const output = await session_read.execute(
+        { session_id: "ses_small", limit: 50, from_end: fromEnd },
+        createContext(),
+      )
 
-    //#then
-    const indexes = (String(output).match(/ses_small message (\d+)/g) ?? []).map((match: string) => Number(match.split(" ").pop()))
-    expect(indexes).toEqual(Array.from({ length: 30 }, (_, index) => index))
-  })
+      //#then
+      const indexes = (String(output).match(/ses_small message (\d+)/g) ?? []).map((match: string) =>
+        Number(match.split(" ").pop()),
+      )
+      expect(indexes).toEqual(Array.from({ length: 30 }, (_, index) => index))
+    },
+  )
 
   test("#given responses whose headers come from another Response implementation #when session_info counts a long session #then it still follows the cursor to the end", async () => {
     //#given
@@ -377,7 +420,10 @@ describe("session-manager paging (#10738)", () => {
     //#when
     const last = await session_read.execute({ session_id: "ses_file", limit: 2, from_end: true }, createContext())
     const info = await session_info.execute({ session_id: "ses_file" }, createContext())
-    const newest = await session_search.execute({ query: "file message", session_id: "ses_file", limit: 2 }, createContext())
+    const newest = await session_search.execute(
+      { query: "file message", session_id: "ses_file", limit: 2 },
+      createContext(),
+    )
     const oldest = await session_search.execute({ query: "needle-oldest", session_id: "ses_file" }, createContext())
 
     //#then

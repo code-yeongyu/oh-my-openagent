@@ -12,30 +12,21 @@ export type LastUserRetryPayload = {
   tools?: Record<string, boolean>
 }
 
-export function getLastUserRetryParts(
-  messagesResponse: unknown,
-  sessionID?: string,
-): RetryPart[] {
+export function getLastUserRetryParts(messagesResponse: unknown, sessionID?: string): RetryPart[] {
   return getLastUserRetryPayload(messagesResponse, sessionID).retryParts
 }
 
-export function getLastUserRetryPayload(
-  messagesResponse: unknown,
-  sessionID?: string,
-): LastUserRetryPayload {
+export function getLastUserRetryPayload(messagesResponse: unknown, sessionID?: string): LastUserRetryPayload {
   const bootstrap = sessionID ? getDelegatedChildSessionBootstrap(sessionID) : undefined
   const messages = extractSessionMessages(messagesResponse)
   const lastUserMessage = messages?.filter((message) => message.info?.role === "user").pop()
   const lastUserParts =
-    lastUserMessage?.parts
-    ?? (lastUserMessage?.info?.parts as Array<{ type?: string; text?: string }> | undefined)
+    lastUserMessage?.parts ?? (lastUserMessage?.info?.parts as Array<{ type?: string; text?: string }> | undefined)
 
   const retryParts = (lastUserParts ?? [])
     .filter(
       (part): part is { type: "text"; text: string } =>
-        part.type === "text"
-        && typeof part.text === "string"
-        && part.text.length > 0,
+        part.type === "text" && typeof part.text === "string" && part.text.length > 0,
     )
     .map((part) => ({ type: "text" as const, text: part.text }))
 

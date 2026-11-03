@@ -84,30 +84,36 @@ describe("posthog telemetry client", () => {
   })
 
   test("#given the placeholder default and a real env override #when enabled state is checked #then telemetry is enabled", () => {
-    expect(isTelemetryClientEnabled({
-      env: { POSTHOG_API_KEY: "phc_test" },
-      product: {
-        defaultApiKey: UNCONFIGURED_POSTHOG_API_KEY,
-        productEnvPrefix: "OMO_SENPI",
-      },
-    })).toBe(true)
+    expect(
+      isTelemetryClientEnabled({
+        env: { POSTHOG_API_KEY: "phc_test" },
+        product: {
+          defaultApiKey: UNCONFIGURED_POSTHOG_API_KEY,
+          productEnvPrefix: "OMO_SENPI",
+        },
+      }),
+    ).toBe(true)
   })
 
   test("#given the legacy shared key as the default #when enabled state is checked #then telemetry remains enabled", () => {
-    expect(isTelemetryClientEnabled({
-      env: {},
-      product: PRODUCT,
-    })).toBe(true)
+    expect(
+      isTelemetryClientEnabled({
+        env: {},
+        product: PRODUCT,
+      }),
+    ).toBe(true)
   })
 
   test("#given a real OmO Native default replaces the placeholder #when enabled state is checked #then telemetry activates without another flag", () => {
-    expect(isTelemetryClientEnabled({
-      env: {},
-      product: {
-        defaultApiKey: "phc_omo_native_project_key",
-        productEnvPrefix: "OMO_SENPI",
-      },
-    })).toBe(true)
+    expect(
+      isTelemetryClientEnabled({
+        env: {},
+        product: {
+          defaultApiKey: "phc_omo_native_project_key",
+          productEnvPrefix: "OMO_SENPI",
+        },
+      }),
+    ).toBe(true)
   })
 
   test("#given codex product parameters #when daily active is captured #then payload shape matches current contract", async () => {
@@ -281,33 +287,36 @@ describe("posthog telemetry client", () => {
     ["OMO_DISABLE_POSTHOG", { OMO_DISABLE_POSTHOG: "1" }],
     ["OMO_SEND_ANONYMOUS_TELEMETRY=0", { OMO_SEND_ANONYMOUS_TELEMETRY: "0" }],
     ["OMO_CODEX_DISABLE_POSTHOG", { OMO_CODEX_DISABLE_POSTHOG: "1" }],
-  ] as const)("#given telemetry is disabled by %s #when daily active records #then no dedup state or install id file is written", async (_name, optOut) => {
-    // given
-    const capturedMessages: TelemetryCaptureMessage[] = []
-    const stateDir = mkdtempSync(join(tmpdir(), "telemetry-core-disabled-"))
-    const stateFilePath = getTelemetryActivityStateFilePath(stateDir)
+  ] as const)(
+    "#given telemetry is disabled by %s #when daily active records #then no dedup state or install id file is written",
+    async (_name, optOut) => {
+      // given
+      const capturedMessages: TelemetryCaptureMessage[] = []
+      const stateDir = mkdtempSync(join(tmpdir(), "telemetry-core-disabled-"))
+      const stateFilePath = getTelemetryActivityStateFilePath(stateDir)
 
-    try {
-      // when
-      await recordDailyActive({
-        env: { ...optOut, POSTHOG_API_KEY: "test-key" },
-        now: new Date("2026-05-25T01:02:03.000Z"),
-        osProvider: OS_PROVIDER,
-        product: PRODUCT,
-        reason: "session_start",
-        source: "plugin",
-        stateDir,
-        transportFactory: createCapturingFactory(capturedMessages),
-      })
+      try {
+        // when
+        await recordDailyActive({
+          env: { ...optOut, POSTHOG_API_KEY: "test-key" },
+          now: new Date("2026-05-25T01:02:03.000Z"),
+          osProvider: OS_PROVIDER,
+          product: PRODUCT,
+          reason: "session_start",
+          source: "plugin",
+          stateDir,
+          transportFactory: createCapturingFactory(capturedMessages),
+        })
 
-      // then
-      expect(capturedMessages).toHaveLength(0)
-      expect(existsSync(stateFilePath)).toBe(false)
-      expect(existsSync(join(stateDir, TELEMETRY_INSTALL_ID_FILE_NAME))).toBe(false)
-    } finally {
-      rmSync(stateDir, { recursive: true, force: true })
-    }
-  })
+        // then
+        expect(capturedMessages).toHaveLength(0)
+        expect(existsSync(stateFilePath)).toBe(false)
+        expect(existsSync(join(stateDir, TELEMETRY_INSTALL_ID_FILE_NAME))).toBe(false)
+      } finally {
+        rmSync(stateDir, { recursive: true, force: true })
+      }
+    },
+  )
 
   test("#given blank API key #when daily active records #then dedup state is not written", async () => {
     // given
@@ -365,7 +374,13 @@ describe("posthog telemetry client", () => {
     try {
       // when
       expect(transport.captureImmediate).toBeFunction()
-      await transport.captureImmediate?.({ distinctId: "machine-hash", event: "session_summary", properties: { turns: 1 }, uuid, timestamp: createdAt })
+      await transport.captureImmediate?.({
+        distinctId: "machine-hash",
+        event: "session_summary",
+        properties: { turns: 1 },
+        uuid,
+        timestamp: createdAt,
+      })
 
       // then
       const wire = bodies.join("\n")

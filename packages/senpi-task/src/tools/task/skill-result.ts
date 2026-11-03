@@ -27,6 +27,7 @@ export function appendMissingSkills(
     summaries === undefined ? [] : isSummaryList(summaries) ? summaries : [summaries]
   const missing = [...new Set(list.flatMap((summary) => summary?.missing ?? []))]
   const rejected = [...new Set(list.flatMap((summary) => summary?.rejected?.map((entry) => entry.reason) ?? []))]
-  const withMissing = missing.length === 0 ? text : `${text}\n\nMissing skills: ${missing.join(", ")}. Child started without them.`
+  const withMissing =
+    missing.length === 0 ? text : `${text}\n\nMissing skills: ${missing.join(", ")}. Child started without them.`
   return rejected.length === 0 ? withMissing : `${withMissing}\n\n${rejected.join("\n")}`
 }

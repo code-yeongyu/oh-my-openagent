@@ -25,11 +25,14 @@ const realStorage = createSummaryStorage({
   stateDir,
   owner: currentProcessOwner(),
   now: () => clock,
-  ...(platform === undefined ? {} : { processStartTime: (pid: number) => readProcessStartTime(pid, platform as typeof process.platform) }),
+  ...(platform === undefined
+    ? {}
+    : { processStartTime: (pid: number) => readProcessStartTime(pid, platform as typeof process.platform) }),
 })
-const storage: SummaryStorage = mode === "die-before-pending"
-  ? { ...realStorage, writePending: () => process.kill(process.pid, "SIGKILL") }
-  : realStorage
+const storage: SummaryStorage =
+  mode === "die-before-pending"
+    ? { ...realStorage, writePending: () => process.kill(process.pid, "SIGKILL") }
+    : realStorage
 
 const summary = createSessionSummaryRecorder({
   consentScope: () => ({ cwd: "/repo" }),
@@ -55,7 +58,10 @@ let count = 0
 for await (const line of createInterface({ input: process.stdin })) {
   const [command, first, second, third] = line.trim().split(/\s+/)
   if (command === "turn") {
-    await summary.recordTurn(first ?? "s1", summaryTurn({ turnIndex: Number(second), totalTokens: Number(third ?? 40) }))
+    await summary.recordTurn(
+      first ?? "s1",
+      summaryTurn({ turnIndex: Number(second), totalTokens: Number(third ?? 40) }),
+    )
   } else if (command === "finish") {
     await summary.finish(first ?? "s1", second)
   } else if (command === "advance") {

@@ -69,7 +69,12 @@ describe("validateTaskTarget", () => {
 
   test("#given a batch item with a retired curated subagent_type #when items are resolved #then the item carries the submitted id verbatim", () => {
     // when
-    const result = resolveSpawnItems({ tasks: [{ prompt: "a", subagent_type: "metis" }, { prompt: "b", subagent_type: "explore" }] })
+    const result = resolveSpawnItems({
+      tasks: [
+        { prompt: "a", subagent_type: "metis" },
+        { prompt: "b", subagent_type: "explore" },
+      ],
+    })
 
     // then
     expect(result.kind).toBe("ok")
@@ -360,10 +365,7 @@ describe("resolveSpawnItems task_summary", () => {
     const resolved = resolveSpawnItems({
       task_summary: "Top-level summary",
       category: "quick",
-      tasks: [
-        { prompt: "TASK: first.", task_summary: "First summary" },
-        { prompt: "TASK: second." },
-      ],
+      tasks: [{ prompt: "TASK: first.", task_summary: "First summary" }, { prompt: "TASK: second." }],
     })
 
     // then
@@ -447,7 +449,10 @@ describe("resolveSpawnItems category+model exclusivity", () => {
 
   test("#given a top-level model inherited by a category item #then returns an item_target error", () => {
     // given / when
-    const result = resolveSpawnItems({ model: "openai/gpt-5.6-luna-fast", tasks: [{ prompt: "one", category: "quick" }] })
+    const result = resolveSpawnItems({
+      model: "openai/gpt-5.6-luna-fast",
+      tasks: [{ prompt: "one", category: "quick" }],
+    })
 
     // then
     expect(result.kind).toBe("error")
@@ -458,7 +463,10 @@ describe("resolveSpawnItems category+model exclusivity", () => {
 
   test("#given a top-level category and an item model #then returns an item_target error", () => {
     // given / when
-    const result = resolveSpawnItems({ category: "quick", tasks: [{ prompt: "one" }, { prompt: "two", model: "openai/gpt-5.6-luna-fast" }] })
+    const result = resolveSpawnItems({
+      category: "quick",
+      tasks: [{ prompt: "one" }, { prompt: "two", model: "openai/gpt-5.6-luna-fast" }],
+    })
 
     // then
     expect(result.kind).toBe("error")
@@ -469,7 +477,11 @@ describe("resolveSpawnItems category+model exclusivity", () => {
 
   test("#given subagent items inheriting a top-level model #then resolves ok with the model attached", () => {
     // given / when
-    const result = resolveSpawnItems({ subagent_type: "plan-reviewer", model: "openai/gpt-5.6-sol", tasks: [{ prompt: "one" }] })
+    const result = resolveSpawnItems({
+      subagent_type: "plan-reviewer",
+      model: "openai/gpt-5.6-sol",
+      tasks: [{ prompt: "one" }],
+    })
 
     // then
     expect(result.kind).toBe("ok")

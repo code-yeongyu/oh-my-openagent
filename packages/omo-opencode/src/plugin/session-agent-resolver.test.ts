@@ -49,10 +49,7 @@ describe("resolveSessionAgent", () => {
     const client = {
       session: {
         messages: async () => ({
-          data: [
-            { info: { role: "user" } },
-            { info: { role: "assistant" } },
-          ],
+          data: [{ info: { role: "user" } }, { info: { role: "assistant" } }],
         }),
       },
     }
@@ -83,7 +80,9 @@ describe("resolveSessionAgent", () => {
     //#given
     const client = {
       session: {
-        messages: async () => { throw new Error("API error") },
+        messages: async () => {
+          throw new Error("API error")
+        },
       },
     }
 

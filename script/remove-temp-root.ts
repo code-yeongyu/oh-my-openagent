@@ -14,15 +14,15 @@ import { TEARDOWN_FAILURE_PREFIX } from "../packages/omo-native/test/teardown.te
  * every error on POSIX, still throws on the first attempt.
  */
 export function removeTempRoot(
-	root: string,
-	remove: (path: string) => void = (path) => rmSync(path, { recursive: true, force: true }),
-	platform: NodeJS.Platform = process.platform,
+  root: string,
+  remove: (path: string) => void = (path) => rmSync(path, { recursive: true, force: true }),
+  platform: NodeJS.Platform = process.platform,
 ): void {
-	try {
-		remove(root)
-	} catch (error) {
-		const code = error !== null && typeof error === "object" && "code" in error ? error.code : undefined
-		if (platform !== "win32" || code !== "EBUSY") throw error
-		console.warn(`${TEARDOWN_FAILURE_PREFIX} leaving ${root} for the OS to reclaim (win32 EBUSY)`)
-	}
+  try {
+    remove(root)
+  } catch (error) {
+    const code = error !== null && typeof error === "object" && "code" in error ? error.code : undefined
+    if (platform !== "win32" || code !== "EBUSY") throw error
+    console.warn(`${TEARDOWN_FAILURE_PREFIX} leaving ${root} for the OS to reclaim (win32 EBUSY)`)
+  }
 }

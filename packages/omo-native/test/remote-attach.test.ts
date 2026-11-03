@@ -8,7 +8,13 @@ import { join } from "node:path"
 import { connectDeviceService, type DeviceService } from "../../device-service-core/src/index.ts"
 import { startFakeOwner, type FakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
 import { defaultWorld, PEER, SESSION_ID } from "../../device-service-core/test/local-api/conformance/world.ts"
-import { LOCAL_SESSION_ID, pipeAddress, REMOTE_INPUT_OFF, type RemoteAttachEndpoint, serveRemoteAttach } from "../remote-attach"
+import {
+  LOCAL_SESSION_ID,
+  pipeAddress,
+  REMOTE_INPUT_OFF,
+  type RemoteAttachEndpoint,
+  serveRemoteAttach,
+} from "../remote-attach"
 
 const owners: FakeOwner[] = []
 const services: DeviceService[] = []
@@ -43,7 +49,10 @@ type Line = Record<string, unknown>
 class TuiPeer {
   readonly records: Line[] = []
   private readonly waiting = new Map<string, (line: Line) => void>()
-  private readonly recordWaiters: { readonly match: (line: Line) => boolean; readonly resolve: (line: Line) => void }[] = []
+  private readonly recordWaiters: {
+    readonly match: (line: Line) => boolean
+    readonly resolve: (line: Line) => void
+  }[] = []
   readonly closed: Promise<void>
 
   constructor(readonly socket: Socket) {
@@ -63,7 +72,7 @@ class TuiPeer {
         newline = buffer.indexOf("\n")
       }
     })
-    this.closed = new Promise(resolve => socket.once("close", () => resolve()))
+    this.closed = new Promise((resolve) => socket.once("close", () => resolve()))
   }
 
   static async connect(socketPath: string, secret = readFileSync(`${socketPath}.secret`)): Promise<TuiPeer> {
@@ -78,7 +87,7 @@ class TuiPeer {
 
   request(command: Line): Promise<Line> {
     const id = randomUUID()
-    const answered = new Promise<Line>(resolve => this.waiting.set(id, resolve))
+    const answered = new Promise<Line>((resolve) => this.waiting.set(id, resolve))
     this.socket.write(`${JSON.stringify({ ...command, id })}\n`)
     return within(answered, `the ${String(command.type)} response`)
   }
@@ -86,7 +95,7 @@ class TuiPeer {
   record(match: (line: Line) => boolean, what: string): Promise<Line> {
     const seen = this.records.find(match)
     if (seen) return Promise.resolve(seen)
-    return within(new Promise<Line>(resolve => this.recordWaiters.push({ match, resolve })), what)
+    return within(new Promise<Line>((resolve) => this.recordWaiters.push({ match, resolve })), what)
   }
 }
 
@@ -106,27 +115,61 @@ describe.skipIf(process.platform === "win32")("omo remote attach endpoint", () =
   test("answers the attach TUI's sequence from the device service's attach and refuses every input", async () => {
     const endpoint = await endpointFor()
     const tui = await TuiPeer.connect(endpoint.socketPath)
-    expect((await tui.request({ type: "set_client_info", width: 80, capabilities: ["interactive_user"] })).success).toBe(true)
+    expect(
+      (await tui.request({ type: "set_client_info", width: 80, capabilities: ["interactive_user"] })).success,
+    ).toBe(true)
 
     const listing = await tui.request({ type: "list_sessions", observe: true })
     const rows = (listing.data as { sessions: Line[] }).sessions
-    expect(rows).toEqual([expect.objectContaining({ sessionId: LOCAL_SESSION_ID, durableSessionId: endpoint.sessionRef, retain_on_disconnect: true })])
+    expect(rows).toEqual([
+      expect.objectContaining({
+        sessionId: LOCAL_SESSION_ID,
+        durableSessionId: endpoint.sessionRef,
+        retain_on_disconnect: true,
+      }),
+    ])
     expect(endpoint.sessionRef).toBe(SESSION_ID)
-    expect((await tui.request({ type: "attach_session", sessionId: LOCAL_SESSION_ID, durableSessionId: SESSION_ID })).success).toBe(true)
+    expect(
+      (await tui.request({ type: "attach_session", sessionId: LOCAL_SESSION_ID, durableSessionId: SESSION_ID }))
+        .success,
+    ).toBe(true)
     expect(tui.records).toEqual([])
-    expect((await tui.request({ type: "subscribe_sessions", sessions: { ids: [LOCAL_SESSION_ID] }, mirror: "all" })).data).toMatchObject({ snapshot: [] })
+    expect(
+      (await tui.request({ type: "subscribe_sessions", sessions: { ids: [LOCAL_SESSION_ID] }, mirror: "all" })).data,
+    ).toMatchObject({ snapshot: [] })
 
     const state = await tui.request({ type: "get_state", sessionId: LOCAL_SESSION_ID, observe: true })
     expect(state.data).toMatchObject({ sessionId: LOCAL_SESSION_ID, isStreaming: false })
 
     const tail = await tui.request({ type: "get_entries", sessionId: LOCAL_SESSION_ID, tail: 100, observe: true })
-    expect(tail.data).toEqual({ entries: [{ id: "e-3", type: "message", text: "hello" }], leafId: null, next_before: "e-3" })
-    const older = await tui.request({ type: "get_entries", sessionId: LOCAL_SESSION_ID, tail: 100, before: "e-3", observe: true })
+    expect(tail.data).toEqual({
+      entries: [{ id: "e-3", type: "message", text: "hello" }],
+      leafId: null,
+      next_before: "e-3",
+    })
+    const older = await tui.request({
+      type: "get_entries",
+      sessionId: LOCAL_SESSION_ID,
+      tail: 100,
+      before: "e-3",
+      observe: true,
+    })
     expect(older.data).toEqual({ entries: [{ id: "e-1", type: "message", text: "first" }], leafId: null })
-    await tui.record(line => line.method === "notify" && String(line.message).includes("too large"), "the too-large notice")
+    await tui.record(
+      (line) => line.method === "notify" && String(line.message).includes("too large"),
+      "the too-large notice",
+    )
 
-    expect(await tui.record(line => line.type === "message_update", "the forwarded record")).toEqual({ type: "message_update", text: "hi", sessionId: LOCAL_SESSION_ID })
-    expect(tui.records.find(line => line.method === "notify")).toMatchObject({ type: "extension_ui_request", method: "notify", message: `Observing Studio/${SESSION_ID}: ${REMOTE_INPUT_OFF}` })
+    expect(await tui.record((line) => line.type === "message_update", "the forwarded record")).toEqual({
+      type: "message_update",
+      text: "hi",
+      sessionId: LOCAL_SESSION_ID,
+    })
+    expect(tui.records.find((line) => line.method === "notify")).toMatchObject({
+      type: "extension_ui_request",
+      method: "notify",
+      message: `Observing Studio/${SESSION_ID}: ${REMOTE_INPUT_OFF}`,
+    })
 
     for (const type of ["prompt", "steer", "abort"]) {
       const refused = await tui.request({ type, sessionId: LOCAL_SESSION_ID, message: "hi" })
@@ -164,6 +207,8 @@ describe("pipeAddress", () => {
     const address = pipeAddress("C:\\Users\\A\\AppData\\Local\\Temp\\omo-ra-x\\t-0011223344556677.sock", secret)
     expect(address).toMatch(/^\\\\\.\\pipe\\senpi-rpc-[0-9a-f]{32}$/)
     expect(pipeAddress("c:/users/a/appdata/local/temp/omo-ra-x/t-0011223344556677.sock", secret)).toBe(address)
-    expect(pipeAddress("C:\\Users\\A\\AppData\\Local\\Temp\\omo-ra-x\\t-0011223344556677.sock", Buffer.alloc(32, 2))).not.toBe(address)
+    expect(
+      pipeAddress("C:\\Users\\A\\AppData\\Local\\Temp\\omo-ra-x\\t-0011223344556677.sock", Buffer.alloc(32, 2)),
+    ).not.toBe(address)
   })
 })

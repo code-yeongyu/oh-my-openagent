@@ -77,7 +77,7 @@ export function openAttach(client: LocalApiClient, device: string, sessionId: st
   })
   snapshot.catch(() => {})
   let resolveDetached!: (reason: AttachEnd) => void
-  const detached = new Promise<AttachEnd>(resolve => {
+  const detached = new Promise<AttachEnd>((resolve) => {
     resolveDetached = resolve
   })
   let ended = false
@@ -109,7 +109,7 @@ export function openAttach(client: LocalApiClient, device: string, sessionId: st
     }
     if (remote.kind === "detached") finish(remote.reason)
   }
-  const stop = client.onEvent(event => {
+  const stop = client.onEvent((event) => {
     const mine = attachEvent(event)
     if (mine === undefined) return
     if (handle === undefined) early.push(mine)
@@ -126,7 +126,7 @@ export function openAttach(client: LocalApiClient, device: string, sessionId: st
         handle: attach,
         snapshot,
         detached,
-        onEvent: listener => {
+        onEvent: (listener) => {
           for (const event of history) listener(event)
           if (!ended) listeners.add(listener)
           return () => listeners.delete(listener)

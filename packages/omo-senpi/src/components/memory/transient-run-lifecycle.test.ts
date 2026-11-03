@@ -14,7 +14,8 @@ import { TRANSIENT_DIRNAME } from "./transient-identity"
 const roots: string[] = []
 
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  for (const root of roots.splice(0))
+    rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
 function fixture(): { readonly cwd: string; readonly memoryHome: string } {
@@ -42,9 +43,7 @@ function fakeRuntime(): MemoryIdentityRuntime {
   } as unknown as MemoryIdentityRuntime
 }
 
-async function bind(options: {
-  readonly hasUI: boolean
-}): Promise<{
+async function bind(options: { readonly hasUI: boolean }): Promise<{
   readonly pi: MemoryFakeExtensionAPI
   readonly context: MemoryIdentityContext
   readonly memoryHome: string

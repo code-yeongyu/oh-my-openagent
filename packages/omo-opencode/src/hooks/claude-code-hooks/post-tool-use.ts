@@ -1,8 +1,4 @@
-import type {
-  PostToolUseInput,
-  PostToolUseOutput,
-  ClaudeHooksConfig,
-} from "./types"
+import type { PostToolUseInput, PostToolUseOutput, ClaudeHooksConfig } from "./types"
 import { findMatchingHooks, objectToSnakeCase, transformToolName, log } from "../../shared"
 import { dispatchHook, getHookIdentifier } from "./dispatch-hook"
 import { buildTranscriptFromSession, deleteTempTranscript } from "./transcript"
@@ -21,7 +17,7 @@ export interface PostToolUseContext {
   toolInput: Record<string, unknown>
   toolOutput: Record<string, unknown>
   cwd: string
-  transcriptPath?: string  // Fallback for append-based transcript
+  transcriptPath?: string // Fallback for append-based transcript
   toolUseId?: string
   client?: PostToolUseClient
   permissionMode?: "default" | "plan" | "acceptEdits" | "bypassPermissions"
@@ -49,7 +45,7 @@ function joinedMessages(messages: readonly string[]): string | undefined {
 export async function executePostToolUseHooks(
   ctx: PostToolUseContext,
   config: ClaudeHooksConfig | null,
-  extendedConfig?: PluginExtendedConfig | null
+  extendedConfig?: PluginExtendedConfig | null,
 ): Promise<PostToolUseResult> {
   if (!config) {
     return { block: false }
@@ -72,7 +68,7 @@ export async function executePostToolUseHooks(
         ctx.sessionId,
         ctx.cwd,
         ctx.toolName,
-        ctx.toolInput
+        ctx.toolInput,
       )
     }
 
@@ -96,10 +92,10 @@ export async function executePostToolUseHooks(
 
     const startTime = Date.now()
 
-     for (const matcher of matchers) {
-       if (!matcher.hooks || matcher.hooks.length === 0) continue
-       for (const hook of matcher.hooks) {
-         if (hook.type !== "command" && hook.type !== "http") continue
+    for (const matcher of matchers) {
+      if (!matcher.hooks || matcher.hooks.length === 0) continue
+      for (const hook of matcher.hooks) {
+        if (hook.type !== "command" && hook.type !== "http") continue
 
         const hookName = getHookIdentifier(hook)
         if (isHookCommandDisabled("PostToolUse", hookName, extendedConfig ?? null)) {
@@ -139,7 +135,13 @@ export async function executePostToolUseHooks(
                 systemMessage: normalizeHookText(output.systemMessage),
               }
             }
-            if (additionalContext || output.continue !== undefined || output.systemMessage || output.suppressOutput === true || output.stopReason !== undefined) {
+            if (
+              additionalContext ||
+              output.continue !== undefined ||
+              output.systemMessage ||
+              output.suppressOutput === true ||
+              output.stopReason !== undefined
+            ) {
               return {
                 block: false,
                 message: joinedMessages(messages),

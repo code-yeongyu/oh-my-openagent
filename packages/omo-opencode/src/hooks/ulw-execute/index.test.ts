@@ -7,11 +7,7 @@ import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
 import { createUlwExecuteHook } from "./index"
 import { createAtlasHook } from "../atlas"
-import {
-  writeBoulderState,
-  clearBoulderState,
-  readBoulderState,
-} from "../../features/boulder-state"
+import { writeBoulderState, clearBoulderState, readBoulderState } from "../../features/boulder-state"
 import type { BoulderState } from "../../features/boulder-state"
 import * as sessionState from "../../features/claude-code-session-state"
 import * as worktreeDetector from "./worktree-detector"
@@ -32,10 +28,7 @@ describe("ulw-execute hook", () => {
     })
   }
 
-  function createUlwExecutePrompt(options?: {
-    sessionContext?: string
-    userRequest?: string
-  }): string {
+  function createUlwExecutePrompt(options?: { sessionContext?: string; userRequest?: string }): string {
     const sessionContext = options?.sessionContext ?? ""
     const userRequest = options?.userRequest ?? ""
 
@@ -43,9 +36,13 @@ describe("ulw-execute hook", () => {
 You are starting an Atlas work session.
 </command-instruction>
 
-<session-context>${sessionContext}</session-context>${userRequest ? `
+<session-context>${sessionContext}</session-context>${
+      userRequest
+        ? `
 
-<user-request>${userRequest}</user-request>` : ""}`
+<user-request>${userRequest}</user-request>`
+        : ""
+    }`
   }
 
   beforeEach(() => {
@@ -80,10 +77,7 @@ You are starting an Atlas work session.
       }
 
       // when
-      await hook["chat.message"](
-        { sessionID: "session-123" },
-        output
-      )
+      await hook["chat.message"]({ sessionID: "session-123" }, output)
 
       // then - output should be unchanged
       expect(output.parts[0].text).toBe("Just a regular message")
@@ -97,10 +91,7 @@ You are starting an Atlas work session.
       }
 
       // when
-      await hook["chat.message"](
-        { sessionID: "session-123" },
-        output
-      )
+      await hook["chat.message"]({ sessionID: "session-123" }, output)
 
       // then
       expect(output.parts[0].text).toBe("<session-context>Some context here</session-context>")
@@ -120,10 +111,7 @@ You are starting an Atlas work session.
       }
 
       // when
-      await hook["chat.message"](
-        { sessionID: "session-123" },
-        output
-      )
+      await hook["chat.message"]({ sessionID: "session-123" }, output)
 
       // then - output should be modified with context info (idempotence-marker guarded)
       expect(output.parts[0].text).toContain("<!-- omo-ulw-execute-context -->")
@@ -148,10 +136,7 @@ You are starting an Atlas work session.
       }
 
       // when
-      await hook["chat.message"](
-        { sessionID: "session-123" },
-        output
-      )
+      await hook["chat.message"]({ sessionID: "session-123" }, output)
 
       // then - should show resuming status
       expect(output.parts[0].text).toContain("test-plan")
@@ -168,33 +153,32 @@ You are starting an Atlas work session.
       writeFileSync(planAPath, "# Plan A\n- [ ] Task 1")
       writeFileSync(planBPath, "# Plan B\n- [ ] Task 2")
 
-      const hook = createUlwExecuteHook(unsafeTestValue<Parameters<typeof createUlwExecuteHook>[0]>({
-        directory: testDir,
-        client: {
-          session: {
-            messages: async () => ({
-              data: [
-                {
-                  parts: [
-                    {
-                      text: `Plan saved to: ${planBPath}`,
-                    },
-                  ],
-                },
-              ],
-            }),
+      const hook = createUlwExecuteHook(
+        unsafeTestValue<Parameters<typeof createUlwExecuteHook>[0]>({
+          directory: testDir,
+          client: {
+            session: {
+              messages: async () => ({
+                data: [
+                  {
+                    parts: [
+                      {
+                        text: `Plan saved to: ${planBPath}`,
+                      },
+                    ],
+                  },
+                ],
+              }),
+            },
           },
-        },
-      }))
+        }),
+      )
       const output = {
         parts: [{ type: "text", text: createUlwExecutePrompt() }],
       }
 
       // when
-      await hook["chat.message"](
-        { sessionID: "session-123" },
-        output,
-      )
+      await hook["chat.message"]({ sessionID: "session-123" }, output)
 
       // then - should auto-select plan-b instead of prompting for multiple plans
       expect(output.parts[0].text).toContain("plan-b")
@@ -220,33 +204,32 @@ You are starting an Atlas work session.
         plan_name: "old-plan",
       })
 
-      const hook = createUlwExecuteHook(unsafeTestValue<Parameters<typeof createUlwExecuteHook>[0]>({
-        directory: testDir,
-        client: {
-          session: {
-            messages: async () => ({
-              data: [
-                {
-                  parts: [
-                    {
-                      output: `Plan saved to: ${newPlanPath}`,
-                    },
-                  ],
-                },
-              ],
-            }),
+      const hook = createUlwExecuteHook(
+        unsafeTestValue<Parameters<typeof createUlwExecuteHook>[0]>({
+          directory: testDir,
+          client: {
+            session: {
+              messages: async () => ({
+                data: [
+                  {
+                    parts: [
+                      {
+                        output: `Plan saved to: ${newPlanPath}`,
+                      },
+                    ],
+                  },
+                ],
+              }),
+            },
           },
-        },
-      }))
+        }),
+      )
       const output = {
         parts: [{ type: "text", text: createUlwExecutePrompt() }],
       }
 
       // when
-      await hook["chat.message"](
-        { sessionID: "session-123" },
-        output,
-      )
+      await hook["chat.message"]({ sessionID: "session-123" }, output)
 
       // then - should select the session-preferred new plan, not resume the unrelated one
       expect(output.parts[0].text).toContain("new-plan")
@@ -265,38 +248,37 @@ You are starting an Atlas work session.
       writeFileSync(planAPath, "# Plan A\n- [ ] Task A")
       writeFileSync(planBPath, "# Plan B\n- [ ] Task B")
 
-      const hook = createUlwExecuteHook(unsafeTestValue<Parameters<typeof createUlwExecuteHook>[0]>({
-        directory: testDir,
-        client: {
-          session: {
-            messages: async () => ({
-              data: [
-                {
-                  parts: [
-                    {
-                      input: {
-                        path: `Legacy reference ${planAPath}`,
-                        metadata: {
-                          selectedPlan: `Current reference ${planBPath}`,
+      const hook = createUlwExecuteHook(
+        unsafeTestValue<Parameters<typeof createUlwExecuteHook>[0]>({
+          directory: testDir,
+          client: {
+            session: {
+              messages: async () => ({
+                data: [
+                  {
+                    parts: [
+                      {
+                        input: {
+                          path: `Legacy reference ${planAPath}`,
+                          metadata: {
+                            selectedPlan: `Current reference ${planBPath}`,
+                          },
                         },
                       },
-                    },
-                  ],
-                },
-              ],
-            }),
+                    ],
+                  },
+                ],
+              }),
+            },
           },
-        },
-      }))
+        }),
+      )
       const output = {
         parts: [{ type: "text", text: createUlwExecutePrompt() }],
       }
 
       // when
-      await hook["chat.message"](
-        { sessionID: "session-123" },
-        output,
-      )
+      await hook["chat.message"]({ sessionID: "session-123" }, output)
 
       // then - latest nested reference should still be discoverable and selected
       const state = readBoulderState(testDir)
@@ -317,10 +299,7 @@ You are starting an Atlas work session.
       }
 
       // when
-      await hook["chat.message"](
-        { sessionID: "ses-abc123" },
-        output
-      )
+      await hook["chat.message"]({ sessionID: "ses-abc123" }, output)
 
       // then - placeholder should be replaced
       expect(output.parts[0].text).toContain("ses-abc123")
@@ -340,10 +319,7 @@ You are starting an Atlas work session.
       }
 
       // when
-      await hook["chat.message"](
-        { sessionID: "session-123" },
-        output
-      )
+      await hook["chat.message"]({ sessionID: "session-123" }, output)
 
       // then - placeholder should be replaced with ISO timestamp
       expect(output.parts[0].text).not.toContain("$TIMESTAMP")
@@ -369,10 +345,7 @@ You are starting an Atlas work session.
       }
 
       // when
-      await hook["chat.message"](
-        { sessionID: "session-123" },
-        output
-      )
+      await hook["chat.message"]({ sessionID: "session-123" }, output)
 
       // then - should auto-select the incomplete plan, not ask user
       expect(output.parts[0].text).toContain("plan-incomplete")
@@ -396,10 +369,7 @@ You are starting an Atlas work session.
       }
 
       // when
-      await hook["chat.message"](
-        { sessionID: "session-123" },
-        output
-      )
+      await hook["chat.message"]({ sessionID: "session-123" }, output)
 
       // then - should use system-reminder tag format and ask for a decision without writing state
       expect(output.parts[0].text).toContain("<system-reminder>")
@@ -440,10 +410,7 @@ You are starting an Atlas work session.
       }
 
       // when - user explicitly specifies new-plan
-      await hook["chat.message"](
-        { sessionID: "session-123" },
-        output
-      )
+      await hook["chat.message"]({ sessionID: "session-123" }, output)
 
       // then - should select new-plan, NOT resume old-plan
       expect(output.parts[0].text).toContain("new-plan")
@@ -469,10 +436,7 @@ You are starting an Atlas work session.
       }
 
       // when - user specifies plan with ultrawork keyword
-      await hook["chat.message"](
-        { sessionID: "session-123" },
-        output
-      )
+      await hook["chat.message"]({ sessionID: "session-123" }, output)
 
       // then - should find plan without ultrawork suffix
       expect(output.parts[0].text).toContain("my-feature-plan")
@@ -498,10 +462,7 @@ You are starting an Atlas work session.
       }
 
       // when
-      await hook["chat.message"](
-        { sessionID: "session-123" },
-        output
-      )
+      await hook["chat.message"]({ sessionID: "session-123" }, output)
 
       // then - should find plan without ulw suffix
       expect(output.parts[0].text).toContain("api-refactor")
@@ -527,10 +488,7 @@ You are starting an Atlas work session.
       }
 
       // when
-      await hook["chat.message"](
-        { sessionID: "session-123" },
-        output
-      )
+      await hook["chat.message"]({ sessionID: "session-123" }, output)
 
       // then - should find plan by partial match
       expect(output.parts[0].text).toContain("2026-01-15-feature-implementation")
@@ -550,16 +508,13 @@ You are starting an Atlas work session.
         parts: [
           {
             type: "text",
-            text: createUlwExecutePrompt({ userRequest: "\"my feature plan\"" }),
+            text: createUlwExecutePrompt({ userRequest: '"my feature plan"' }),
           },
         ],
       }
 
       // when
-      await hook["chat.message"](
-        { sessionID: "session-123" },
-        output,
-      )
+      await hook["chat.message"]({ sessionID: "session-123" }, output)
 
       // then
       expect(output.parts[0].text).toContain("my-feature-plan")
@@ -585,10 +540,7 @@ You are starting an Atlas work session.
       }
 
       // when
-      await hook["chat.message"](
-        { sessionID: "session-korean-plan" },
-        output,
-      )
+      await hook["chat.message"]({ sessionID: "session-korean-plan" }, output)
 
       // then
       expect(output.parts[0].text).toContain("결제-플로우")
@@ -614,10 +566,7 @@ You are starting an Atlas work session.
       }
 
       // when
-      await hook["chat.message"](
-        { sessionID: "session-japanese-plan" },
-        output,
-      )
+      await hook["chat.message"]({ sessionID: "session-japanese-plan" }, output)
 
       // then
       expect(output.parts[0].text).toContain("支払い-フロー")
@@ -643,10 +592,7 @@ You are starting an Atlas work session.
       }
 
       // when
-      await hook["chat.message"](
-        { sessionID: "session-ascii-plan" },
-        output,
-      )
+      await hook["chat.message"]({ sessionID: "session-ascii-plan" }, output)
 
       // then
       expect(output.parts[0].text).toContain("checkout-flow")
@@ -672,10 +618,7 @@ You are starting an Atlas work session.
       }
 
       // when
-      await hook["chat.message"](
-        { sessionID: "session-mixed-plan" },
-        output,
-      )
+      await hook["chat.message"]({ sessionID: "session-mixed-plan" }, output)
 
       // then
       expect(output.parts[0].text).toContain("v2-결제-flow")
@@ -687,17 +630,14 @@ You are starting an Atlas work session.
     test("should update session agent to Atlas when ulw-execute command is triggered", async () => {
       // given
       const updateSpy = spyOn(sessionState, "updateSessionAgent")
-      
+
       const hook = createUlwExecuteHook(createMockPluginInput())
       const output = {
         parts: [{ type: "text", text: createUlwExecutePrompt() }],
       }
 
       // when
-      await hook["chat.message"](
-        { sessionID: "ses-prometheus-to-sisyphus" },
-        output
-      )
+      await hook["chat.message"]({ sessionID: "ses-prometheus-to-sisyphus" }, output)
 
       // then
       expect(updateSpy).toHaveBeenCalledWith("ses-prometheus-to-sisyphus", "atlas")
@@ -713,10 +653,7 @@ You are starting an Atlas work session.
       }
 
       // when
-      await hook["chat.message"](
-        { sessionID: "ses-prometheus-to-atlas" },
-        output
-      )
+      await hook["chat.message"]({ sessionID: "ses-prometheus-to-atlas" }, output)
 
       // then - config key, not display name (matches no-sisyphus-gpt / boulder-continuation-injector convention)
       expect(output.message.agent).toBe("atlas")
@@ -733,10 +670,7 @@ You are starting an Atlas work session.
         parts: [{ type: "text", text: createUlwExecutePrompt() }],
       }
 
-      await hook["chat.message"](
-        { sessionID: "ses-sisyphus-to-atlas" },
-        output
-      )
+      await hook["chat.message"]({ sessionID: "ses-sisyphus-to-atlas" }, output)
 
       // atlas is registered in beforeEach, so it must be selected
       expect(output.message.agent).toBe("atlas")
@@ -756,10 +690,7 @@ You are starting an Atlas work session.
       }
 
       // when
-      await hook["chat.message"](
-        { sessionID: "ses-prometheus-to-sisyphus" },
-        output
-      )
+      await hook["chat.message"]({ sessionID: "ses-prometheus-to-sisyphus" }, output)
 
       // then
       expect(output.message.agent).toBe("sisyphus")
@@ -784,10 +715,7 @@ You are starting an Atlas work session.
       }
 
       // when
-      await hook["chat.message"](
-        { sessionID: "ses-prometheus-to-worker" },
-        output
-      )
+      await hook["chat.message"]({ sessionID: "ses-prometheus-to-worker" }, output)
 
       // then
       expect(output.message.agent).toBe("sisyphus")
@@ -819,10 +747,7 @@ You are starting an Atlas work session.
       }
 
       // when
-      await hook["chat.message"](
-        { sessionID: "ses-prometheus-resume" },
-        output
-      )
+      await hook["chat.message"]({ sessionID: "ses-prometheus-resume" }, output)
 
       // then
       expect(output.message.agent).toBe("sisyphus")
@@ -835,9 +760,12 @@ You are starting an Atlas work session.
       mkdirSync(plansDir, { recursive: true })
       writeFileSync(join(plansDir, "atlas-plan.md"), "# Plan\n- [ ] Task 1\n- [ ] Task 2")
 
-      const promptAsyncMock = spyOn({
-        promptAsync: async (_request: unknown) => undefined,
-      }, "promptAsync")
+      const promptAsyncMock = spyOn(
+        {
+          promptAsync: async (_request: unknown) => undefined,
+        },
+        "promptAsync",
+      )
       const ctx = unsafeTestValue<Parameters<typeof createAtlasHook>[0]>({
         directory: testDir,
         client: {
@@ -881,22 +809,27 @@ You are starting an Atlas work session.
       const originalClearTimeout = globalThis.clearTimeout
       const originalDateNow = Date.now
       let fakeNow = 10000
-      const promptAsyncMock = spyOn({
-        promptAsync: async (_request: unknown) => undefined,
-      }, "promptAsync")
+      const promptAsyncMock = spyOn(
+        {
+          promptAsync: async (_request: unknown) => undefined,
+        },
+        "promptAsync",
+      )
 
-      globalThis.setTimeout = unsafeTestValue<typeof setTimeout>(((callback: Function, delay?: number, ...args: unknown[]) => {
-        const normalized = typeof delay === "number" ? delay : 0
-        if (normalized >= 5000) {
-          const id = nextTimerId++
-          capturedTimers.set(id, { callback: () => callback(...args), cleared: false })
-          return unsafeTestValue<ReturnType<typeof setTimeout>>(id)
-        }
+      globalThis.setTimeout = unsafeTestValue<typeof setTimeout>(
+        (callback: Function, delay?: number, ...args: unknown[]) => {
+          const normalized = typeof delay === "number" ? delay : 0
+          if (normalized >= 5000) {
+            const id = nextTimerId++
+            capturedTimers.set(id, { callback: () => callback(...args), cleared: false })
+            return unsafeTestValue<ReturnType<typeof setTimeout>>(id)
+          }
 
-        return originalSetTimeout(callback as Parameters<typeof originalSetTimeout>[0], delay)
-      }))
+          return originalSetTimeout(callback as Parameters<typeof originalSetTimeout>[0], delay)
+        },
+      )
 
-      globalThis.clearTimeout = unsafeTestValue<typeof clearTimeout>(((id?: number | ReturnType<typeof setTimeout>) => {
+      globalThis.clearTimeout = unsafeTestValue<typeof clearTimeout>((id?: number | ReturnType<typeof setTimeout>) => {
         if (typeof id === "number" && capturedTimers.has(id)) {
           capturedTimers.get(id)!.cleared = true
           capturedTimers.delete(id)
@@ -904,7 +837,7 @@ You are starting an Atlas work session.
         }
 
         originalClearTimeout(id as Parameters<typeof originalClearTimeout>[0])
-      }))
+      })
 
       Date.now = () => fakeNow
 
@@ -923,7 +856,7 @@ You are starting an Atlas work session.
       const atlasHook = createAtlasHook(ctx, {
         directory: testDir,
         backgroundManager: unsafeTestValue<NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"]>({
-          getTasksByParentSession: () => backgroundRunning ? [{ status: "running" }] : [],
+          getTasksByParentSession: () => (backgroundRunning ? [{ status: "running" }] : []),
         }),
       })
       const output = {
@@ -1169,10 +1102,7 @@ You are starting an Atlas work session.
       }
 
       // when
-      await hook["chat.message"](
-        { sessionID: "ses-retry-789" },
-        output
-      )
+      await hook["chat.message"]({ sessionID: "ses-retry-789" }, output)
 
       // then - both parts should have placeholders replaced
       expect(output.parts[0].text).not.toContain("$SESSION_ID")

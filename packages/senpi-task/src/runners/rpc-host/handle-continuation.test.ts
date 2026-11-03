@@ -10,7 +10,11 @@ const ABORTED_BY_STREAM_RULE = {
   errorMessage: "This operation was aborted",
 }
 
-const CONTINUED = { role: "assistant", content: [{ type: "text", text: "finished after the nudge" }], stopReason: "stop" }
+const CONTINUED = {
+  role: "assistant",
+  content: [{ type: "text", text: "finished after the nudge" }],
+  stopReason: "stop",
+}
 
 function settledYet(outcome: Promise<RunnerOutcome>): Promise<boolean> {
   return Promise.race([outcome.then(() => true), Promise.resolve().then(() => false)])
@@ -26,7 +30,15 @@ describe("host session turn settlement follows the session, not the first agent_
 
     // when
     port.emitEvent(event({ type: "message_end", message: ABORTED_BY_STREAM_RULE }))
-    port.emitEvent(event({ type: "agent_end", willRetry: false, aborted: true, abortSource: "system", messages: [ABORTED_BY_STREAM_RULE] }))
+    port.emitEvent(
+      event({
+        type: "agent_end",
+        willRetry: false,
+        aborted: true,
+        abortSource: "system",
+        messages: [ABORTED_BY_STREAM_RULE],
+      }),
+    )
     port.emitEvent(event({ type: "agent_settled" }))
     const settledAfterAbort = await settledYet(outcome)
     port.emitEvent(event({ type: "agent_start" }))
@@ -56,7 +68,11 @@ describe("host session turn settlement follows the session, not the first agent_
     })
 
     // when
-    const woken = { role: "assistant", content: [{ type: "text", text: "the monitor fired, all green" }], stopReason: "stop" }
+    const woken = {
+      role: "assistant",
+      content: [{ type: "text", text: "the monitor fired, all green" }],
+      stopReason: "stop",
+    }
     port.emitEvent(event({ type: "agent_start" }))
     const next = handle.waitForOutcome()
     port.emitEvent(event({ type: "message_end", message: woken }))
@@ -78,7 +94,15 @@ describe("host session turn settlement follows the session, not the first agent_
 
     // when
     port.emitEvent(event({ type: "message_end", message: ABORTED_BY_STREAM_RULE }))
-    port.emitEvent(event({ type: "agent_end", willRetry: false, aborted: true, abortSource: "system", messages: [ABORTED_BY_STREAM_RULE] }))
+    port.emitEvent(
+      event({
+        type: "agent_end",
+        willRetry: false,
+        aborted: true,
+        abortSource: "system",
+        messages: [ABORTED_BY_STREAM_RULE],
+      }),
+    )
     port.emitEvent(event({ type: "agent_idle" }))
 
     // then
@@ -95,7 +119,12 @@ describe("a reopened session's finished transcript settles only an idle session 
     const handle = handleOverPort(port)
     const outcome = handle.waitForOutcome()
     void port.stateAsked().then(() =>
-      port.answerState({ sessionId: "s", isStreaming: false, followUp: ["the monitor fired"], pendingMessageCount: 1 }),
+      port.answerState({
+        sessionId: "s",
+        isStreaming: false,
+        followUp: ["the monitor fired"],
+        pendingMessageCount: 1,
+      }),
     )
 
     // when
@@ -111,9 +140,11 @@ describe("a reopened session's finished transcript settles only an idle session 
     const port = fakeSessionPort()
     const handle = handleOverPort(port)
     const outcome = handle.waitForOutcome()
-    void port.stateAsked().then(() =>
-      port.answerState({ sessionId: "s", isStreaming: false, steering: [], followUp: [], pendingMessageCount: 0 }),
-    )
+    void port
+      .stateAsked()
+      .then(() =>
+        port.answerState({ sessionId: "s", isStreaming: false, steering: [], followUp: [], pendingMessageCount: 0 }),
+      )
 
     // when
     await handle.adoptFinishedTurn("all green")

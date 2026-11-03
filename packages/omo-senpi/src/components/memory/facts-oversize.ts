@@ -38,9 +38,7 @@ export interface OversizeClassificationInput {
 }
 
 /** Newest endpoint per conversation: the frontier a global condition is charged against. */
-export function conversationFrontiers(
-  entries: readonly FactsQueueEntry[],
-): readonly FactsQueueEntry[] {
+export function conversationFrontiers(entries: readonly FactsQueueEntry[]): readonly FactsQueueEntry[] {
   const frontiers = new Map<string, FactsQueueEntry>()
   for (const entry of entries) {
     const current = frontiers.get(entry.conversationId)

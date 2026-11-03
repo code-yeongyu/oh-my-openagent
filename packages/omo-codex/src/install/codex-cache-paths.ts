@@ -14,7 +14,13 @@ export function resolveDefaultCodexHome(homeDir: string): string {
 }
 
 export function resolveCodexPluginCacheRoot(codexHome: string, input: CodexCacheIdentity = {}): string {
-  return join(codexHome, "plugins", "cache", input.marketplaceName ?? DEFAULT_CODEX_MARKETPLACE_NAME, input.pluginName ?? DEFAULT_CODEX_PLUGIN_NAME)
+  return join(
+    codexHome,
+    "plugins",
+    "cache",
+    input.marketplaceName ?? DEFAULT_CODEX_MARKETPLACE_NAME,
+    input.pluginName ?? DEFAULT_CODEX_PLUGIN_NAME,
+  )
 }
 
 export function resolveCachedCodexComponentCliPath(pluginRoot: string, componentName: string): string {
@@ -71,8 +77,8 @@ function compareVersionNames(left: string, right: string): number {
   const rightParts = right.split(".").map((part) => Number.parseInt(part, 10))
   const length = Math.max(leftParts.length, rightParts.length)
   for (let index = 0; index < length; index += 1) {
-    const leftValue = Number.isFinite(leftParts[index] ?? Number.NaN) ? leftParts[index] ?? 0 : 0
-    const rightValue = Number.isFinite(rightParts[index] ?? Number.NaN) ? rightParts[index] ?? 0 : 0
+    const leftValue = Number.isFinite(leftParts[index] ?? Number.NaN) ? (leftParts[index] ?? 0) : 0
+    const rightValue = Number.isFinite(rightParts[index] ?? Number.NaN) ? (rightParts[index] ?? 0) : 0
     if (leftValue !== rightValue) return leftValue - rightValue
   }
   return left.localeCompare(right)

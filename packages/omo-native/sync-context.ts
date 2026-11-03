@@ -1,10 +1,20 @@
 import { resolveMemoryRoot } from "../memory-core/src/identity/layout"
-import { type AccountHttp, createAccountHttp, createPairingHttp, deviceKeyringFromMaterial, type PairingHttp } from "../memory-core/src/sync/account/index.ts"
+import {
+  type AccountHttp,
+  createAccountHttp,
+  createPairingHttp,
+  deviceKeyringFromMaterial,
+  type PairingHttp,
+} from "../memory-core/src/sync/account/index.ts"
 import type { DeviceKeyring } from "../memory-core/src/sync/keyring-port"
 import { syncPinDir } from "../memory-core/src/sync/pin-dir"
 
 import { signInHint } from "../omo-opencode/src/cli/service-auth/accounts-gate"
-import { type CredentialStore, createCredentialStore, INTERACTIVE_READ_WAIT } from "../omo-opencode/src/cli/service-auth/keystore"
+import {
+  type CredentialStore,
+  createCredentialStore,
+  INTERACTIVE_READ_WAIT,
+} from "../omo-opencode/src/cli/service-auth/keystore"
 import { ApiRefusal, serviceOrigin, SignInError } from "../omo-opencode/src/cli/service-auth/protocol"
 import { createSession } from "../omo-opencode/src/cli/service-auth/session"
 
@@ -27,7 +37,8 @@ export interface SyncContextOptions {
 
 const base64url = (base64: string): string => Buffer.from(base64, "base64").toString("base64url")
 
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value)
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
 
 export async function signedInSyncContext(options: SyncContextOptions): Promise<SyncContext> {
   const api = serviceOrigin(options.env.OMO_SERVICE_API_URL ?? "https://api.omo.dev")
@@ -45,13 +56,17 @@ export async function signedInSyncContext(options: SyncContextOptions): Promise<
   }
   const body: unknown = await me.json()
   const account = isRecord(body) && isRecord(body["account"]) ? body["account"]["id"] : undefined
-  if (typeof account !== "string" || account === "") throw new SignInError("The service named no account for this sign-in.")
+  if (typeof account !== "string" || account === "")
+    throw new SignInError("The service named no account for this sign-in.")
   const http = { baseUrl: api, token, ...(options.fetch === undefined ? {} : { fetch: options.fetch }) }
   return {
     account,
     serviceOrigin: api,
     serviceDeviceId: credentials.device.id,
-    keyring: await deviceKeyringFromMaterial({ signingPrivatePkcs8: base64url(credentials.signingPrivateKey), sealingPrivatePkcs8: base64url(credentials.sealingPrivateKey) }),
+    keyring: await deviceKeyringFromMaterial({
+      signingPrivatePkcs8: base64url(credentials.signingPrivateKey),
+      sealingPrivatePkcs8: base64url(credentials.sealingPrivateKey),
+    }),
     pinDir: syncPinDir(resolveMemoryRoot(options.env, options.cwd)),
     chain: createAccountHttp(http),
     pairing: createPairingHttp(http),

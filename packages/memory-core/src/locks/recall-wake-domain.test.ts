@@ -46,7 +46,8 @@ async function writeRecord(filePath: string, record: LockRecord): Promise<void> 
 /** Our own live identity: the strongest possible "live owner" a test can put in front of a contender. */
 async function liveRecord(purpose: string): Promise<LockRecord> {
   const record = await createLockRecord(purpose)
-  if (record.process_start === "unavailable") throw new Error("this host cannot prove process identity; the lock tests need it")
+  if (record.process_start === "unavailable")
+    throw new Error("this host cannot prove process identity; the lock tests need it")
   return record
 }
 
@@ -88,13 +89,15 @@ describe("recall-wake lock domain: counting FIFO lease", () => {
     let peak = 0
     const leases: Array<RecallWakeLease | undefined> = []
     const waits = Array.from({ length: 10 }, (_, index) =>
-      acquireRecallWakeLease(dir, { waitTimeoutMs: 10_000, retryDelayMs: 10, signal: controller.signal }).then((lease) => {
-        order.push(index)
-        leases[index] = lease
-        live += 1
-        peak = Math.max(peak, live)
-        return lease
-      }),
+      acquireRecallWakeLease(dir, { waitTimeoutMs: 10_000, retryDelayMs: 10, signal: controller.signal }).then(
+        (lease) => {
+          order.push(index)
+          leases[index] = lease
+          live += 1
+          peak = Math.max(peak, live)
+          return lease
+        },
+      ),
     )
 
     try {
@@ -118,7 +121,11 @@ describe("recall-wake lock domain: counting FIFO lease", () => {
     } finally {
       controller.abort(new Error("FIFO test teardown"))
       await Promise.allSettled(waits)
-      await Promise.all(leases.map(async (lease) => { await lease?.release() }))
+      await Promise.all(
+        leases.map(async (lease) => {
+          await lease?.release()
+        }),
+      )
     }
   })
 
@@ -167,7 +174,9 @@ describe("recall-wake lock domain: counting FIFO lease", () => {
 
     const lease = await acquireRecallWakeLease(dir, fast)
     expect(lease.slot).toBe(1)
-    expect((JSON.parse(await readFile(recallWakeLockPath(dir, 1), "utf8")) as LockRecord).nonce).not.toBe(recycled.nonce)
+    expect((JSON.parse(await readFile(recallWakeLockPath(dir, 1), "utf8")) as LockRecord).nonce).not.toBe(
+      recycled.nonce,
+    )
     expect(await readFile(recallWakeLockPath(dir, 2), "utf8")).toBe(`${JSON.stringify(unprovable)}\n`)
 
     await expect(acquireRecallWakeLease(dir, fast)).rejects.toBeInstanceOf(RecallWakeBusyError)
@@ -179,7 +188,11 @@ describe("recall-wake lock domain: counting FIFO lease", () => {
     const ticketDir = recallWakeTicketDirectory(dir)
     await mkdir(ticketDir, { recursive: true })
     const stale = await createLockRecord("recall-wake:ticket")
-    await writeRecord(path.join(ticketDir, "0000000000000000-000000-0000000000-dead.ticket"), { ...stale, pid: 99_999_999, process_start: "proc-start-epoch:0" })
+    await writeRecord(path.join(ticketDir, "0000000000000000-000000-0000000000-dead.ticket"), {
+      ...stale,
+      pid: 99_999_999,
+      process_start: "proc-start-epoch:0",
+    })
 
     const lease = await acquireRecallWakeLease(dir, fast)
     expect(lease.slot).toBe(1)
@@ -217,8 +230,8 @@ describe("recall-wake lock domain: counting FIFO lease", () => {
     const headWait = acquireRecallWakeLease(dir, waiting)
     const followerWait = acquireRecallWakeLease(dir, waiting)
     const followerResult = followerWait.then(
-      (lease) => ({ status: "acquired", lease } as const),
-      (error: unknown) => ({ status: "rejected", error } as const),
+      (lease) => ({ status: "acquired", lease }) as const,
+      (error: unknown) => ({ status: "rejected", error }) as const,
     )
     let headLease: RecallWakeLease | undefined
     let followerLease: RecallWakeLease | undefined
@@ -261,9 +274,15 @@ describe("recall-wake lock domain: counting FIFO lease", () => {
     const dir = await fixture()
     const slot = await withRecallWakeLease(dir, async (lease) => lease.slot, fast)
     expect(slot).toBe(1)
-    await expect(withRecallWakeLease(dir, async () => {
-      throw new Error("wake failed")
-    }, fast)).rejects.toThrow("wake failed")
+    await expect(
+      withRecallWakeLease(
+        dir,
+        async () => {
+          throw new Error("wake failed")
+        },
+        fast,
+      ),
+    ).rejects.toThrow("wake failed")
     const again = await acquireRecallWakeLease(dir, { ...fast, maxConcurrent: 1 })
     expect(again.slot).toBe(1)
     expect(await again.release()).toBe(true)

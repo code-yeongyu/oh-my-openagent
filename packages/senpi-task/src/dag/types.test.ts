@@ -138,21 +138,11 @@ describe("dag domain types", () => {
     // when / then
     expect(byCategory.category).toBe("quick")
     expect(bySubagent.subagent_type).toBe("plan-reviewer")
-    expectTypeOf<Extract<DagNodeTargetInput, { category: string }>["subagent_type"]>().toEqualTypeOf<
-      undefined
-    >()
-    expectTypeOf<Extract<DagNodeTargetInput, { category: string }>["model"]>().toEqualTypeOf<
-      undefined
-    >()
-    expectTypeOf<
-      Extract<DagNodeTargetInput, { subagent_type: string }>["category"]
-    >().toEqualTypeOf<undefined>()
-    expectTypeOf<
-      Extract<DagNodeTargetInput, { subagent_type: string }>["model"]
-    >().toEqualTypeOf<string | undefined>()
-    expectTypeOf<
-      import("./types").DagNodeTargetErrorCode
-    >().toEqualTypeOf<TaskTargetErrorCode>()
+    expectTypeOf<Extract<DagNodeTargetInput, { category: string }>["subagent_type"]>().toEqualTypeOf<undefined>()
+    expectTypeOf<Extract<DagNodeTargetInput, { category: string }>["model"]>().toEqualTypeOf<undefined>()
+    expectTypeOf<Extract<DagNodeTargetInput, { subagent_type: string }>["category"]>().toEqualTypeOf<undefined>()
+    expectTypeOf<Extract<DagNodeTargetInput, { subagent_type: string }>["model"]>().toEqualTypeOf<string | undefined>()
+    expectTypeOf<import("./types").DagNodeTargetErrorCode>().toEqualTypeOf<TaskTargetErrorCode>()
   })
 
   test("#given the settings block #when defaults resolve #then every documented default holds", () => {
@@ -171,14 +161,7 @@ describe("dag domain types", () => {
 
   test("#given the state vocabularies #when enumerated #then run statuses node states error codes and transition reasons match the contract", () => {
     // given / when / then
-    expect([...DAG_RUN_STATUSES]).toEqual([
-      "pending",
-      "running",
-      "paused",
-      "completed",
-      "failed",
-      "cancelled",
-    ])
+    expect([...DAG_RUN_STATUSES]).toEqual(["pending", "running", "paused", "completed", "failed", "cancelled"])
     expect([...DAG_NODE_STATES]).toEqual([
       "pending",
       "blocked",

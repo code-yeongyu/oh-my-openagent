@@ -12,11 +12,7 @@ import { join, resolve } from "node:path"
  * environment always wins over detection.
  */
 
-export const AGENT_DIR_ENV_NAMES = [
-  "OMO_CODING_AGENT_DIR",
-  "SENPI_CODING_AGENT_DIR",
-  "PI_CODING_AGENT_DIR",
-] as const
+export const AGENT_DIR_ENV_NAMES = ["OMO_CODING_AGENT_DIR", "SENPI_CODING_AGENT_DIR", "PI_CODING_AGENT_DIR"] as const
 
 /** Marker proving a directory really holds engine state rather than sharing its name. */
 export const AGENT_HOME_SENTINEL = "settings.json"

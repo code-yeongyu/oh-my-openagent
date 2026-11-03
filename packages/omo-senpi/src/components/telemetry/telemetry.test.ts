@@ -75,30 +75,33 @@ describe("omo-senpi telemetry daily activity", () => {
     ["product disable opt-out", { OMO_SENPI_DISABLE_POSTHOG: "1" }],
     ["product anonymous telemetry opt-out", { OMO_SENPI_SEND_ANONYMOUS_TELEMETRY: "0" }],
     ["global opt-out", { OMO_DISABLE_POSTHOG: "1" }],
-  ])("#given %s #when session_start fires #then opt-out suppresses emission and stamp writes", async (_name, optOutEnv) => {
-    await withTempAgentDir(async (agentDir) => {
-      // given
-      const transport = createTransportRecorder()
-      const env = {
-        ...createEnabledEnv(agentDir),
-        ...optOutEnv,
-      }
-      const stateDir = getSenpiTelemetryStateDir(env)
+  ])(
+    "#given %s #when session_start fires #then opt-out suppresses emission and stamp writes",
+    async (_name, optOutEnv) => {
+      await withTempAgentDir(async (agentDir) => {
+        // given
+        const transport = createTransportRecorder()
+        const env = {
+          ...createEnabledEnv(agentDir),
+          ...optOutEnv,
+        }
+        const stateDir = getSenpiTelemetryStateDir(env)
 
-      // when
-      await recordSenpiDailyActive({
-        env,
-        now: FIXED_NOW,
-        osProvider: createOsProvider("senpi-opt-out-host"),
-        timeoutMs: 50,
-        transportFactory: transport.factory,
+        // when
+        await recordSenpiDailyActive({
+          env,
+          now: FIXED_NOW,
+          osProvider: createOsProvider("senpi-opt-out-host"),
+          timeoutMs: 50,
+          transportFactory: transport.factory,
+        })
+
+        // then
+        expect(transport.messages).toEqual([])
+        expect(existsSync(getTelemetryActivityStateFilePath(stateDir))).toBe(false)
       })
-
-      // then
-      expect(transport.messages).toEqual([])
-      expect(existsSync(getTelemetryActivityStateFilePath(stateDir))).toBe(false)
-    })
-  })
+    },
+  )
 
   it("#given SENPI_CODING_AGENT_DIR #when telemetry records #then stamp file location respects the isolated senpi agent dir", async () => {
     await withTempAgentDir(async (agentDir) => {

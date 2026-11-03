@@ -1,7 +1,13 @@
 import { homedir } from "node:os"
 import { join } from "node:path"
 
-import { astGrepRuntimeDir, findSgBinarySync, provisionSgBinary, type SgProvisionOptions, type SgResolverOptions } from "@oh-my-opencode/utils"
+import {
+  astGrepRuntimeDir,
+  findSgBinarySync,
+  provisionSgBinary,
+  type SgProvisionOptions,
+  type SgResolverOptions,
+} from "@oh-my-opencode/utils"
 
 import { log } from "../../shared"
 

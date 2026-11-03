@@ -35,20 +35,31 @@ export function createHeldSend(barrier: AdmissionBarrier, ports: HeldSendPorts) 
     const state = barrier.state(root)
     // A live send never carries a Resume credential, so `resuming` holds it exactly like `closed`.
     if (state.kind === "open" || !holdsInChild(record, ports)) return undefined
-    const runRef = record.owner === undefined ? { kind: "task" as const, id: record.task_id } : { kind: "dag" as const, id: record.owner.runId }
+    const runRef =
+      record.owner === undefined
+        ? { kind: "task" as const, id: record.task_id }
+        : { kind: "dag" as const, id: record.owner.runId }
     return sendWhileHeld(ports, record, message, { parentSessionId: root, parentPauseSeq: state.pauseSeq, runRef })
   }
 }
 
-async function sendWhileHeld(ports: HeldSendPorts, record: TaskRecord, message: string, owner: RunPauseOwner): Promise<SendOutcome> {
+async function sendWhileHeld(
+  ports: HeldSendPorts,
+  record: TaskRecord,
+  message: string,
+  owner: RunPauseOwner,
+): Promise<SendOutcome> {
   const taskId = record.task_id
   if (record.status !== "paused") {
-    const ack = record.status === "running" ? await ports.pauseTask(taskId, owner) : await ports.joinIdlePause(taskId, owner)
-    if ("refused" in ack) return {
-      kind: "not_continuable", task_id: taskId,
-      reason: `Task ${taskId} is paused for another parent's run; nothing was delivered.`,
-      suggestion: "Resume the run that paused it, then send again.",
-    }
+    const ack =
+      record.status === "running" ? await ports.pauseTask(taskId, owner) : await ports.joinIdlePause(taskId, owner)
+    if ("refused" in ack)
+      return {
+        kind: "not_continuable",
+        task_id: taskId,
+        reason: `Task ${taskId} is paused for another parent's run; nothing was delivered.`,
+        suggestion: "Resume the run that paused it, then send again.",
+      }
     ports.noteParticipant(ports.load(taskId) ?? record, owner, ack.childSeq)
   }
   const held = await ports.holdTaskInput(taskId, { inputId: `send-${randomUUID()}`, revision: 0, text: message })

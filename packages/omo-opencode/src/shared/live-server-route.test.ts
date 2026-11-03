@@ -18,7 +18,10 @@ type FakeFetchResponse = {
   status: number
 }
 
-function makeFakeFetch(responses: FakeFetchResponse[], { delay = 0 }: { delay?: number } = {}): {
+function makeFakeFetch(
+  responses: FakeFetchResponse[],
+  { delay = 0 }: { delay?: number } = {},
+): {
   fetch: typeof fetch
   callCount: () => number
 } {
@@ -331,7 +334,10 @@ describe("live-server-route", () => {
   describe("resolveDispatchClient — multiple server() registrations (multi-instance serve)", () => {
     test("#given two registrations with different in-process clients #when resolveDispatchClient called with the first client #then it still routes live instead of identity passthrough", async () => {
       //#given
-      const { fetch: fakeFetch } = makeFakeFetch([{ ok: true, status: 200 }, { ok: true, status: 200 }])
+      const { fetch: fakeFetch } = makeFakeFetch([
+        { ok: true, status: 200 },
+        { ok: true, status: 200 },
+      ])
       _setFetchImplementationForTesting(fakeFetch)
       const firstClient = { _marker: "first" } as unknown
       const secondClient = { _marker: "second" } as unknown

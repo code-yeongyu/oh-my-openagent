@@ -1,12 +1,7 @@
 import type { CapturedUi } from "./runtime-context"
 import { runRows, type DagStatusRunSnapshot } from "./dag-status-row-format"
 
-export type {
-  DagStatusNode,
-  DagStatusRoute,
-  DagStatusRunSnapshot,
-  DagStatusWave,
-} from "./dag-status-row-format"
+export type { DagStatusNode, DagStatusRoute, DagStatusRunSnapshot, DagStatusWave } from "./dag-status-row-format"
 
 // Own widget key: the DAG rows render BESIDE the existing "omo-task" widget, never over it.
 export const DAG_STATUS_UI_KEY = "omo-dag"

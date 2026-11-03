@@ -55,6 +55,8 @@ test("browser skill is materialized into both shipped editions", async () => {
   for (const { root, names } of manifests) {
     expect(names, `${relative(repoRoot, root)} manifest omits ${SKILL_NAME}`).toContain(SKILL_NAME)
     const skillFile = join(root, SKILL_NAME, "SKILL.md")
-    expect(existsSync(skillFile), `${relative(repoRoot, skillFile)} is absent; run the edition's sync-skills.mjs`).toBe(true)
+    expect(existsSync(skillFile), `${relative(repoRoot, skillFile)} is absent; run the edition's sync-skills.mjs`).toBe(
+      true,
+    )
   }
 })

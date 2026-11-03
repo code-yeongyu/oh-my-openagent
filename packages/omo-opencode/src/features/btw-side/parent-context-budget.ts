@@ -22,9 +22,7 @@ function cloneMessage(message: MessageWithParts): MessageWithParts {
 }
 
 function boundedString(value: unknown, maxCharacters = 512): string {
-  return typeof value === "string"
-    ? value.slice(0, maxCharacters)
-    : ""
+  return typeof value === "string" ? value.slice(0, maxCharacters) : ""
 }
 
 function minimalMessageInfo(info: Message): Message {
@@ -38,22 +36,11 @@ function minimalMessageInfo(info: Message): Message {
   if (time && typeof time === "object" && !Array.isArray(time)) {
     const sourceTime = time as Record<string, unknown>
     minimal["time"] = {
-      ...(typeof sourceTime["created"] === "number"
-        ? { created: sourceTime["created"] }
-        : {}),
-      ...(typeof sourceTime["completed"] === "number"
-        ? { completed: sourceTime["completed"] }
-        : {}),
+      ...(typeof sourceTime["created"] === "number" ? { created: sourceTime["created"] } : {}),
+      ...(typeof sourceTime["completed"] === "number" ? { completed: sourceTime["completed"] } : {}),
     }
   }
-  for (const key of [
-    "agent",
-    "modelID",
-    "providerID",
-    "parentID",
-    "mode",
-    "path",
-  ]) {
+  for (const key of ["agent", "modelID", "providerID", "parentID", "mode", "path"]) {
     if (typeof source[key] === "string") {
       minimal[key] = boundedString(source[key])
     }
@@ -69,10 +56,7 @@ function minimalMessageInfo(info: Message): Message {
   return minimal as unknown as Message
 }
 
-function truncatedMessage(
-  message: MessageWithParts,
-  maxBytes: number,
-): MessageWithParts {
+function truncatedMessage(message: MessageWithParts, maxBytes: number): MessageWithParts {
   const sourceText = message.parts
     .filter((part) => part.type === "text")
     .map((part) => part.text)
@@ -112,25 +96,18 @@ function truncatedMessage(
   return best
 }
 
-export function boundBtwParentContext(
-  messages: MessageWithParts[],
-): MessageWithParts[] {
+export function boundBtwParentContext(messages: MessageWithParts[]): MessageWithParts[] {
   const candidates = messages.slice(-BTW_PARENT_CONTEXT_MAX_MESSAGES)
   const bounded: MessageWithParts[] = []
 
   for (let index = candidates.length - 1; index >= 0; index -= 1) {
     const message = cloneMessage(candidates[index])
-    if (
-      serializedBytes([message, ...bounded]) <=
-      BTW_PARENT_CONTEXT_MAX_BYTES
-    ) {
+    if (serializedBytes([message, ...bounded]) <= BTW_PARENT_CONTEXT_MAX_BYTES) {
       bounded.unshift(message)
       continue
     }
     if (bounded.length === 0) {
-      bounded.unshift(
-        truncatedMessage(message, BTW_PARENT_CONTEXT_MAX_BYTES),
-      )
+      bounded.unshift(truncatedMessage(message, BTW_PARENT_CONTEXT_MAX_BYTES))
     }
     break
   }

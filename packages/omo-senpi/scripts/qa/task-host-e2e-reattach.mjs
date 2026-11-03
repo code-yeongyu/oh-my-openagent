@@ -12,7 +12,14 @@ import { join } from "node:path"
 
 import { generationHostPid, generationHostRecord } from "./task-host-e2e-daemon-state.mjs"
 import { observeState, stopParent } from "./task-host-e2e-events.mjs"
-import { cleanupScenario, daemonStatus, pidAlive, readTaskRecords, spawnParent, waitFor } from "./task-host-e2e-process.mjs"
+import {
+  cleanupScenario,
+  daemonStatus,
+  pidAlive,
+  readTaskRecords,
+  spawnParent,
+  waitFor,
+} from "./task-host-e2e-process.mjs"
 import { createScenarioSandbox } from "./task-host-e2e-sandbox.mjs"
 import {
   CHILD_DONE,
@@ -75,10 +82,15 @@ export async function scenarioJ(run) {
       const records = readTaskRecords(sandbox)
       const sizes = transcriptSizes(sandbox, records)
       const allRunning =
-        records.length === CHILDREN && records.every((record) => record.status === "running" && sizes[record.task_id] > 0)
+        records.length === CHILDREN &&
+        records.every((record) => record.status === "running" && sizes[record.task_id] > 0)
       return allRunning || childrenSettled(records, CHILDREN) ? records : undefined
     },
-    { trigger: () => { parent = spawnParent(sandbox, run.mockEntry, "run four children through a host death", { capture: true }) } },
+    {
+      trigger: () => {
+        parent = spawnParent(sandbox, run.mockEntry, "run four children through a host death", { capture: true })
+      },
+    },
   )
   const records = started ?? readTaskRecords(sandbox)
   const hostBefore = generationHostRecord(sandbox.agentDir)
@@ -95,21 +107,27 @@ export async function scenarioJ(run) {
       killed = false
     }
   }
-  const hostGone = killed ? await waitFor(() => (pidAlive(hostPidBefore) ? undefined : true), { timeoutMs: 30_000 }) : undefined
+  const hostGone = killed
+    ? await waitFor(() => (pidAlive(hostPidBefore) ? undefined : true), { timeoutMs: 30_000 })
+    : undefined
 
   // A new generation must be serving the socket before the children can be released, otherwise the
   // release lands on nothing; the handles reattach on their own (backoff up to ~15 s).
   const replaced = await waitFor(
     () => {
       const record = generationHostRecord(sandbox.agentDir)
-      return record !== undefined && record.pid !== null && record.pid !== hostPidBefore && pidAlive(record.pid) ? record : undefined
+      return record !== undefined && record.pid !== null && record.pid !== hostPidBefore && pidAlive(record.pid)
+        ? record
+        : undefined
     },
     { timeoutMs: 120_000, intervalMs: 500 },
   )
   // Every child must be re-prompted (its turn was in flight on the dead host) before it is released.
   const reprompted = await waitFor(
     () => {
-      const counts = records.map((record) => countLines(sandbox, record.task_id, (row, line) => row.message?.role === "user" && line.includes(REATTACH_TAG)))
+      const counts = records.map((record) =>
+        countLines(sandbox, record.task_id, (row, line) => row.message?.role === "user" && line.includes(REATTACH_TAG)),
+      )
       return counts.every((count) => count >= 1) ? counts : undefined
     },
     { timeoutMs: 120_000, intervalMs: 500 },
@@ -141,11 +159,14 @@ export async function scenarioJ(run) {
     sessionsBeforeKill: statusBefore?.sessions ?? null,
     repromptedBeforeRelease: reprompted !== undefined,
     continuationPromptsPerChild: continuationPrompts,
-    exactlyOneContinuationEach: records.length === CHILDREN && Object.values(continuationPrompts).every((count) => count === 1),
+    exactlyOneContinuationEach:
+      records.length === CHILDREN && Object.values(continuationPrompts).every((count) => count === 1),
     finalStatuses: Object.fromEntries(finalRecords.map((record) => [record.task_id, record.status])),
     childrenCompleted: finalRecords.filter((record) => record.status === "completed").length,
     childrenFailed: finalRecords.filter((record) => record.status === "error" || record.status === "lost").length,
-    parentSawTransportGoneFailure: /task_error[^\n]*transport_gone|"status":"failed"[^\n]*transport_gone/.test(parentOutput),
+    parentSawTransportGoneFailure: /task_error[^\n]*transport_gone|"status":"failed"[^\n]*transport_gone/.test(
+      parentOutput,
+    ),
     parentReattachLines: (parentOutput.match(/host session reattach/g) ?? []).length,
   }
   const pass =
@@ -158,7 +179,9 @@ export async function scenarioJ(run) {
     facts.childrenFailed === 0 &&
     !facts.parentSawTransportGoneFailure
   const receipt = await cleanupScenario(sandbox, {
-    hostPids: [hostPidBefore, facts.hostAfter?.pid, daemonStatus(sandbox).json?.pid].filter((pid) => typeof pid === "number"),
+    hostPids: [hostPidBefore, facts.hostAfter?.pid, daemonStatus(sandbox).json?.pid].filter(
+      (pid) => typeof pid === "number",
+    ),
   })
   return {
     scenario: "J",

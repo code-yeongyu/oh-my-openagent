@@ -17,12 +17,16 @@ describe("resident continuation safety", () => {
     })
   }
   test("#given a legacy resumed child #when interrupted with partial output #then continuation bookkeeping preserves unknown provenance", async () => {
-    const h = coldReviveHarness({ resume: async (_spec, _path, handle) => ({ ...handle, lastAssistantText: () => "PARTIAL" }) })
+    const h = coldReviveHarness({
+      resume: async (_spec, _path, handle) => ({ ...handle, lastAssistantText: () => "PARTIAL" }),
+    })
     try {
       expect((await h.send()).kind).toBe("revived")
       expect((await h.manager.interruptTask(h.record.task_id)).kind).toBe("interrupted")
       expect(h.store.load(h.record.task_id)?.final_response).toBe("PARTIAL")
       expect(h.store.load(h.record.task_id)?.config_generation).toBeUndefined()
-    } finally { await h.dispose() }
+    } finally {
+      await h.dispose()
+    }
   })
 })

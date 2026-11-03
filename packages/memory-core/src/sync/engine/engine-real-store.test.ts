@@ -10,22 +10,26 @@ afterEach(async () => {
 
 const note = (body: string) => `---\ndescription: shared note\n---\n${body}`
 
-test("two engines on the production Loro item store converge, keeping both sides' edits to one note", async () => {
-  const server = new FakeSyncServer()
-  const a = await makeDevice(server, "a", undefined, { realStore: true })
-  const b = await makeDevice(server, "b", undefined, { realStore: true })
-  devices.push(a, b)
-  await a.write("note.md", note("first line\n"))
-  await a.engine.runCycle()
-  await b.engine.runCycle()
-  expect(await b.read("note.md")).toBe(note("first line\n"))
-  await a.write("note.md", note("first line\nfrom a\n"))
-  await b.write("note.md", note("from b\nfirst line\n"))
-  await a.engine.runCycle()
-  await b.engine.runCycle()
-  await a.engine.runCycle()
-  const [onA, onB] = [await a.read("note.md"), await b.read("note.md")]
-  expect(onA).toBe(onB)
-  for (const piece of ["first line", "from a", "from b"]) expect(onA).toContain(piece)
-  expect(await b.syncCommits()).toHaveLength(2)
-}, GIT_TEST_TIMEOUT)
+test(
+  "two engines on the production Loro item store converge, keeping both sides' edits to one note",
+  async () => {
+    const server = new FakeSyncServer()
+    const a = await makeDevice(server, "a", undefined, { realStore: true })
+    const b = await makeDevice(server, "b", undefined, { realStore: true })
+    devices.push(a, b)
+    await a.write("note.md", note("first line\n"))
+    await a.engine.runCycle()
+    await b.engine.runCycle()
+    expect(await b.read("note.md")).toBe(note("first line\n"))
+    await a.write("note.md", note("first line\nfrom a\n"))
+    await b.write("note.md", note("from b\nfirst line\n"))
+    await a.engine.runCycle()
+    await b.engine.runCycle()
+    await a.engine.runCycle()
+    const [onA, onB] = [await a.read("note.md"), await b.read("note.md")]
+    expect(onA).toBe(onB)
+    for (const piece of ["first line", "from a", "from b"]) expect(onA).toContain(piece)
+    expect(await b.syncCommits()).toHaveLength(2)
+  },
+  GIT_TEST_TIMEOUT,
+)

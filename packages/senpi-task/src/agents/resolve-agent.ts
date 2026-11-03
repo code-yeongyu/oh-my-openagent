@@ -7,11 +7,7 @@ import { buildRuntimeModelChain, chainRungCandidates } from "../model-chain"
 import { withoutExcludedModels } from "../model-exclusion"
 import type { ResolvedModelRecord } from "../state"
 import { agentModelCandidates, type AgentModelCandidate } from "./agent-model-entry"
-import {
-  findExactAgentModel,
-  parseAvailableAgentModels,
-  type ParsedAgentModel,
-} from "./agent-model-registry"
+import { findExactAgentModel, parseAvailableAgentModels, type ParsedAgentModel } from "./agent-model-registry"
 import { agentToolPolicy } from "./agent-tool-policy"
 import { AGENT_FALLBACK_CHAINS } from "./builtin/fallback-chains"
 import { canonicalAgentName } from "./builtin/legacy-agent-names"
@@ -72,7 +68,8 @@ export function resolveAgent<TModel extends SenpiModelPort>(
   liveRegistry: SenpiModelRegistryPort<TModel> | undefined,
   options: ResolveAgentOptions = {},
 ): AgentResolutionResult {
-  const registry = liveRegistry === undefined ? undefined : withoutExcludedModels(liveRegistry, options.omoConfig?.exclude_models)
+  const registry =
+    liveRegistry === undefined ? undefined : withoutExcludedModels(liveRegistry, options.omoConfig?.exclude_models)
   const name = canonicalAgentName(requestedName.trim())
   const availableAgents = Object.entries(agents)
     .filter(([, definition]) => definition.disable !== true)
@@ -99,10 +96,11 @@ export function resolveAgent<TModel extends SenpiModelPort>(
   if (registry === undefined) {
     const fallbackHead = fallbackChain?.[0]
     const fallbackProvider = fallbackHead?.providers[0]
-    const attemptedModel = definition.model
-      ?? firstConfiguredModel(definition)
-      ?? firstCategoryDefaultModel(definition.categories, options.omoConfig)
-      ?? (fallbackHead !== undefined && fallbackProvider !== undefined
+    const attemptedModel =
+      definition.model ??
+      firstConfiguredModel(definition) ??
+      firstCategoryDefaultModel(definition.categories, options.omoConfig) ??
+      (fallbackHead !== undefined && fallbackProvider !== undefined
         ? `${fallbackProvider}/${fallbackHead.model}`
         : undefined)
     return { kind: "model_unavailable", agent: name, attemptedModel, availableAgents }
@@ -123,9 +121,10 @@ export function resolveAgent<TModel extends SenpiModelPort>(
     definition.models,
     configuredTuning,
   )
-  const directModels = definition.models?.length && options.distributeModels
-    ? options.distributeModels(`agent:${name}`, configuredModels, definition.models_distribution)
-    : configuredModels
+  const directModels =
+    definition.models?.length && options.distributeModels
+      ? options.distributeModels(`agent:${name}`, configuredModels, definition.models_distribution)
+      : configuredModels
   for (const candidate of directModels) {
     attemptedModel = candidate.model
     const found = findExactAgentModel(candidate.model, registry)
@@ -193,9 +192,7 @@ export function resolveAgent<TModel extends SenpiModelPort>(
             candidates: chainRungCandidates({
               chain: fallbackChain,
               selectedModel: resolution.model,
-              ...(resolution.fallbackEntry !== undefined
-                ? { selectedRungEntry: resolution.fallbackEntry }
-                : {}),
+              ...(resolution.fallbackEntry !== undefined ? { selectedRungEntry: resolution.fallbackEntry } : {}),
               availableModels: availableModelSet,
             }),
             selectedModel: resolution.model,

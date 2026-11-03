@@ -30,7 +30,10 @@ async function abortChildSession(client: Client, sessionID: string): Promise<voi
   }
 }
 
-async function getSessionStatus(client: Client, sessionID: string): Promise<{
+async function getSessionStatus(
+  client: Client,
+  sessionID: string,
+): Promise<{
   supported: boolean
   type: string | null
 }> {
@@ -52,7 +55,10 @@ async function getSessionStatus(client: Client, sessionID: string): Promise<{
   }
 }
 
-async function getSessionMessages(client: Client, sessionID: string): Promise<{
+async function getSessionMessages(
+  client: Client,
+  sessionID: string,
+): Promise<{
   messages: unknown[]
   error: boolean
 }> {
@@ -103,8 +109,8 @@ export async function waitForLookAtSessionResult(
     // If the SDK supports status but our session has never appeared in the map,
     // treat it as still-starting rather than idle, unless the caller explicitly
     // allows stable idle without activity (in which case empty status means done).
-    const supportedButNeverSeen = status.supported && statusType === null && !hasEverSeenSessionInStatus
-      && !options?.allowStableIdleWithoutActivity
+    const supportedButNeverSeen =
+      status.supported && statusType === null && !hasEverSeenSessionInStatus && !options?.allowStableIdleWithoutActivity
     const isActive = supportedButNeverSeen || (statusType !== null && !isTerminal)
     const { messages, error: messagesError } = await getSessionMessages(client, sessionID)
     const outcome = extractLatestAssistantOutcome(messages)
@@ -137,10 +143,8 @@ export async function waitForLookAtSessionResult(
       const canConcludeIdle =
         sawNonIdleStatus ||
         !status.supported ||
-        (
-          Boolean(options?.allowStableIdleWithoutActivity)
-          && (outcome.hasAssistant || Boolean(options?.allowEmptyStableIdleWithoutActivity))
-        )
+        (Boolean(options?.allowStableIdleWithoutActivity) &&
+          (outcome.hasAssistant || Boolean(options?.allowEmptyStableIdleWithoutActivity)))
 
       if (canConcludeIdle && stableIdlePolls >= IDLE_STABILITY_POLLS_REQUIRED) {
         return { messages, outcome, statusType }

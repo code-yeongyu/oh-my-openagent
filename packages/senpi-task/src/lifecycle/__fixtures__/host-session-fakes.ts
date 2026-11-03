@@ -117,8 +117,7 @@ export function hostLifecycleDeps(input: HostLifecycleInput): HostLifecycleFixtu
   }
   const hostSessionProbe: HostLifecycleFixture["hostSessionProbe"] = {
     daemonAlive: (identity) => daemon.daemonReachable(identity.socket),
-    sessionLive: async (identity) =>
-      (await daemon.liveSessionPaths(identity.socket)).includes(identity.session_path),
+    sessionLive: async (identity) => (await daemon.liveSessionPaths(identity.socket)).includes(identity.session_path),
     sessionLiveness: async (identity) =>
       (await daemon.liveSessionPaths(identity.socket)).includes(identity.session_path) ? "live" : "gone",
     refresh: () => undefined,

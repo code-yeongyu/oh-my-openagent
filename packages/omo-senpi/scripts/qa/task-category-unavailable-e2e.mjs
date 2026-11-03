@@ -7,15 +7,7 @@
 //   negative: task.warnings.unavailable_categories=false -> neither frame nor message.
 // Isolation: real ~/.senpi/agent credential files must stay byte-identical; the sandbox is removed.
 import { spawn } from "node:child_process"
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from "node:fs"
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { delimiter, dirname, isAbsolute, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -218,7 +210,9 @@ function driveRpc(senpiBin, scenario) {
       stderr += String(error)
       finish("spawn-error")
     })
-    child.stdin.write(`${JSON.stringify({ id: "probe-1", type: "prompt", message: "spawn the quick task twice and stop" })}\n`)
+    child.stdin.write(
+      `${JSON.stringify({ id: "probe-1", type: "prompt", message: "spawn the quick task twice and stop" })}\n`,
+    )
   })
 }
 
@@ -344,10 +338,11 @@ async function main() {
     realOmoConfigUnchanged: beforeOmoConfig === afterOmoConfig,
     realSettingsMtimeUnchanged: beforeSettingsMtime === afterSettingsMtime,
   }
-  const allPass = reports.every((report) => report.result.result === "PASS")
-    && isolation.credentialDigestUnchanged
-    && isolation.realOmoConfigUnchanged
-    && isolation.realSettingsMtimeUnchanged
+  const allPass =
+    reports.every((report) => report.result.result === "PASS") &&
+    isolation.credentialDigestUnchanged &&
+    isolation.realOmoConfigUnchanged &&
+    isolation.realSettingsMtimeUnchanged
   console.log(
     JSON.stringify(
       {

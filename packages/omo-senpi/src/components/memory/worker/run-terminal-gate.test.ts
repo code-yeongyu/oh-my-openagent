@@ -1,8 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import type {
-  AcquireLockOptions,
-  LockRecord,
-} from "@oh-my-opencode/memory-core"
+import type { AcquireLockOptions, LockRecord } from "@oh-my-opencode/memory-core"
 
 import { withRunTerminalGate } from "./run-terminal-gate"
 

@@ -148,10 +148,7 @@ describe("autoMigrateLegacyPluginEntry", () => {
   describe("#given opencode.jsonc has comments and a legacy entry", () => {
     it("#then preserves comments and replaces entry", async () => {
       // given
-      writeFileSync(
-        join(testConfigDir, "opencode.jsonc"),
-        '{\n  // my config\n  "plugin": ["oh-my-opencode"]\n}\n',
-      )
+      writeFileSync(join(testConfigDir, "opencode.jsonc"), '{\n  // my config\n  "plugin": ["oh-my-opencode"]\n}\n')
 
       const { autoMigrateLegacyPluginEntry } = await autoMigrateModulePromise
 

@@ -94,7 +94,9 @@ function fakeManager(initial: readonly DagStatusRunSnapshot[], sessionId = "sess
   const snapshotCalls: string[] = []
   return {
     snapshotCalls,
-    set: (next) => { runs = next },
+    set: (next) => {
+      runs = next
+    },
     list: (parentSessionId) =>
       parentSessionId !== sessionId ? [] : runs.map((run) => ({ runId: run.runId, status: run.status })),
     snapshot: (runId, parentSessionId) => {
@@ -106,7 +108,9 @@ function fakeManager(initial: readonly DagStatusRunSnapshot[], sessionId = "sess
   }
 }
 
-function activity(overrides: Partial<DagStatusActivityEvent> & { runId: string; nodeId: string }): DagStatusActivityEvent {
+function activity(
+  overrides: Partial<DagStatusActivityEvent> & { runId: string; nodeId: string },
+): DagStatusActivityEvent {
   return {
     taskId: "st_1",
     activity: "running",
@@ -130,7 +134,10 @@ describe("createDagStatusUi.syncNow", () => {
           node({ id: "plan", state: "pending" }),
           node({ id: "build", state: "pending", dependsOn: ["plan"], route: { kind: "agent", agent: "coder" } }),
         ],
-        waves: [{ index: 0, nodeIds: ["plan"] }, { index: 1, nodeIds: ["build"] }],
+        waves: [
+          { index: 0, nodeIds: ["plan"] },
+          { index: 1, nodeIds: ["build"] },
+        ],
       }),
     ])
     const ui = fakeUi()
@@ -152,7 +159,10 @@ describe("createDagStatusUi.syncNow", () => {
           node({ id: "plan", state: "running" }),
           node({ id: "build", state: "blocked", dependsOn: ["plan"], route: { kind: "agent", agent: "coder" } }),
         ],
-        waves: [{ index: 0, nodeIds: ["plan"] }, { index: 1, nodeIds: ["build"] }],
+        waves: [
+          { index: 0, nodeIds: ["plan"] },
+          { index: 1, nodeIds: ["build"] },
+        ],
       }),
     ])
     dagUi.syncNow()
@@ -166,7 +176,10 @@ describe("createDagStatusUi.syncNow", () => {
           node({ id: "plan", state: "completed" }),
           node({ id: "build", state: "failed", dependsOn: ["plan"], route: { kind: "agent", agent: "coder" } }),
         ],
-        waves: [{ index: 0, nodeIds: ["plan"] }, { index: 1, nodeIds: ["build"] }],
+        waves: [
+          { index: 0, nodeIds: ["plan"] },
+          { index: 1, nodeIds: ["build"] },
+        ],
       }),
     ])
     dagUi.syncNow()
@@ -296,9 +309,7 @@ describe("createDagStatusUi.syncNow", () => {
     expect(rowsOf(ui)).not.toHaveLength(0)
 
     // when
-    manager.set([
-      snapshot({ runId: "dag_1", status: "completed", nodes: [node({ id: "a", state: "completed" })] }),
-    ])
+    manager.set([snapshot({ runId: "dag_1", status: "completed", nodes: [node({ id: "a", state: "completed" })] })])
     dagUi.syncNow()
 
     // then
@@ -311,7 +322,12 @@ describe("createDagStatusUi.syncNow", () => {
     // given
     const ui = fakeUi()
     const dagUi = createDagStatusUi({
-      manager: fakeManager([snapshot({ runId: "dag_1", nodes: [node({ id: "a", state: "running", startedAt: new Date(0).toISOString() })] })]),
+      manager: fakeManager([
+        snapshot({
+          runId: "dag_1",
+          nodes: [node({ id: "a", state: "running", startedAt: new Date(0).toISOString() })],
+        }),
+      ]),
       runtime: { ui: () => ui, sessionId: () => "session-a", mode: () => "tui" },
       timers: fakeTimers(),
     })
@@ -341,7 +357,13 @@ describe("createDagStatusUi.syncNow", () => {
       terminalWidth: () => 120,
       now: () => 95_000,
     })
-    dagUi.onActivity(activity({ runId: "dag_1", nodeId: "wide-node", activity: "running bash grep -rn scheduler-claim packages and reporting the wave manifest drift" }))
+    dagUi.onActivity(
+      activity({
+        runId: "dag_1",
+        nodeId: "wide-node",
+        activity: "running bash grep -rn scheduler-claim packages and reporting the wave manifest drift",
+      }),
+    )
     dagUi.syncNow()
     const wide = rowsOf(ui)[1] ?? ""
 
@@ -355,7 +377,13 @@ describe("createDagStatusUi.syncNow", () => {
         terminalWidth: () => 50,
         now: () => 95_000,
       })
-      narrowDagUi.onActivity(activity({ runId: "dag_1", nodeId: "wide-node", activity: "running bash grep -rn scheduler-claim packages and reporting the wave manifest drift" }))
+      narrowDagUi.onActivity(
+        activity({
+          runId: "dag_1",
+          nodeId: "wide-node",
+          activity: "running bash grep -rn scheduler-claim packages and reporting the wave manifest drift",
+        }),
+      )
       narrowDagUi.syncNow()
       return rowsOf(narrowUi)[1] ?? ""
     })()
@@ -497,7 +525,9 @@ describe("createDagStatusUi.onActivity", () => {
     })
 
     // when
-    expect(() => dagUi.onActivity(activity({ runId: "dag_missing", nodeId: "ghost", activity: "wandering" }))).not.toThrow()
+    expect(() =>
+      dagUi.onActivity(activity({ runId: "dag_missing", nodeId: "ghost", activity: "wandering" })),
+    ).not.toThrow()
     timers.advance(250)
 
     // then
@@ -519,10 +549,7 @@ describe("createDagStatusUi.onActivity", () => {
     }
     const dagUi = createDagStatusUi({
       manager: {
-        list: (parentSessionId) => [
-          ...listOnlyManager.list(parentSessionId),
-          { runId: "dag_gone", status: "running" },
-        ],
+        list: (parentSessionId) => [...listOnlyManager.list(parentSessionId), { runId: "dag_gone", status: "running" }],
         snapshot: listOnlyManager.snapshot,
       },
       runtime: { ui: () => ui, sessionId: () => "session-a", mode: () => "tui" },
@@ -555,7 +582,6 @@ describe("createDagStatusUi.onActivity", () => {
     expect(ui.widgetCalls.at(-1)?.content).toBeUndefined()
   })
 })
-
 
 // #7316: a live run whose snapshot projection fails (or whose session filter yields nothing) used
 // to clear the widget outright, which reads to the user as "the DAG died".

@@ -27,9 +27,11 @@ describe("deleteTeam cancels only this team's background tasks", () => {
   const temporaryDirectories: string[] = []
 
   afterEach(async () => {
-    await Promise.all(temporaryDirectories.splice(0).map(async (directoryPath) => {
-      await rm(directoryPath, { recursive: true, force: true })
-    }))
+    await Promise.all(
+      temporaryDirectories.splice(0).map(async (directoryPath) => {
+        await rm(directoryPath, { recursive: true, force: true })
+      }),
+    )
   })
 
   test("uses leadSessionId as the getTasksByParentSession key when force deleting", async () => {
@@ -44,11 +46,21 @@ describe("deleteTeam cancels only this team's background tasks", () => {
     const getTasksByParentSessionMock = mock((sessionId: string) => {
       if (sessionId !== "lead-session") return []
       return [
-        createBackgroundTask({ id: "team-task-a", sessionId: "session-a", parentMessageId: `team-create:${fixture.teamRunId}:member-a` }),
-        createBackgroundTask({ id: "team-task-b", sessionId: "session-b", parentMessageId: `team-create:${fixture.teamRunId}:member-b` }),
+        createBackgroundTask({
+          id: "team-task-a",
+          sessionId: "session-a",
+          parentMessageId: `team-create:${fixture.teamRunId}:member-a`,
+        }),
+        createBackgroundTask({
+          id: "team-task-b",
+          sessionId: "session-b",
+          parentMessageId: `team-create:${fixture.teamRunId}:member-b`,
+        }),
       ]
     })
-    const cancelTaskMock = mock(async (_taskId: string, _options?: Parameters<DeleteTeamBackgroundManager["cancelTask"]>[1]) => true)
+    const cancelTaskMock = mock(
+      async (_taskId: string, _options?: Parameters<DeleteTeamBackgroundManager["cancelTask"]>[1]) => true,
+    )
     const bgMgr = {
       getTasksByParentSession: getTasksByParentSessionMock,
       cancelTask: cancelTaskMock,
@@ -73,9 +85,15 @@ describe("deleteTeam cancels only this team's background tasks", () => {
     temporaryDirectories.push(fixture.baseDir)
 
     const getTasksByParentSessionMock = mock(() => [
-      createBackgroundTask({ id: "team-task-a", sessionId: "session-a", parentMessageId: `team-create:${fixture.teamRunId}:member-a` }),
+      createBackgroundTask({
+        id: "team-task-a",
+        sessionId: "session-a",
+        parentMessageId: `team-create:${fixture.teamRunId}:member-a`,
+      }),
     ])
-    const cancelTaskMock = mock(async (_taskId: string, _options?: Parameters<DeleteTeamBackgroundManager["cancelTask"]>[1]) => true)
+    const cancelTaskMock = mock(
+      async (_taskId: string, _options?: Parameters<DeleteTeamBackgroundManager["cancelTask"]>[1]) => true,
+    )
     const bgMgr = {
       getTasksByParentSession: getTasksByParentSessionMock,
       cancelTask: cancelTaskMock,
@@ -107,9 +125,15 @@ describe("deleteTeam cancels only this team's background tasks", () => {
       "member-b": "shutdown_approved",
     })
     const getTasksByParentSessionMock = mock(() => [
-      createBackgroundTask({ id: "team-task-a", sessionId: "session-a", parentMessageId: `team-create:${fixture.teamRunId}:member-a` }),
+      createBackgroundTask({
+        id: "team-task-a",
+        sessionId: "session-a",
+        parentMessageId: `team-create:${fixture.teamRunId}:member-a`,
+      }),
     ])
-    const cancelTaskMock = mock(async (_taskId: string, _options?: Parameters<DeleteTeamBackgroundManager["cancelTask"]>[1]) => true)
+    const cancelTaskMock = mock(
+      async (_taskId: string, _options?: Parameters<DeleteTeamBackgroundManager["cancelTask"]>[1]) => true,
+    )
     const bgMgr = {
       getTasksByParentSession: getTasksByParentSessionMock,
       cancelTask: cancelTaskMock,
@@ -139,12 +163,30 @@ describe("deleteTeam cancels only this team's background tasks", () => {
     })
 
     const getTasksByParentSessionMock = mock(() => [
-      createBackgroundTask({ id: "team-task-a", sessionId: "session-a", parentMessageId: `team-create:${fixture.teamRunId}:member-a` }),
-      createBackgroundTask({ id: "delegate-task-x", sessionId: "session-x", parentMessageId: "delegate-task:plan-refactor" }),
-      createBackgroundTask({ id: "background-task-y", sessionId: "session-y", parentMessageId: "delegate-task:background-task-y" }),
-      createBackgroundTask({ id: "team-task-other", sessionId: "session-other", parentMessageId: "team-create:other-team-id:member-a" }),
+      createBackgroundTask({
+        id: "team-task-a",
+        sessionId: "session-a",
+        parentMessageId: `team-create:${fixture.teamRunId}:member-a`,
+      }),
+      createBackgroundTask({
+        id: "delegate-task-x",
+        sessionId: "session-x",
+        parentMessageId: "delegate-task:plan-refactor",
+      }),
+      createBackgroundTask({
+        id: "background-task-y",
+        sessionId: "session-y",
+        parentMessageId: "delegate-task:background-task-y",
+      }),
+      createBackgroundTask({
+        id: "team-task-other",
+        sessionId: "session-other",
+        parentMessageId: "team-create:other-team-id:member-a",
+      }),
     ])
-    const cancelTaskMock = mock(async (_taskId: string, _options?: Parameters<DeleteTeamBackgroundManager["cancelTask"]>[1]) => true)
+    const cancelTaskMock = mock(
+      async (_taskId: string, _options?: Parameters<DeleteTeamBackgroundManager["cancelTask"]>[1]) => true,
+    )
     const bgMgr = {
       getTasksByParentSession: getTasksByParentSessionMock,
       cancelTask: cancelTaskMock,

@@ -17,11 +17,18 @@ async function fixture() {
   const codex = await temp.make("tui-codex-")
   const workspace = await temp.make("tui-workspace-")
   const stateDir = await temp.make("tui-state-")
-  await writeTranscript({ filePath: join(codex, "sessions", "2026", "08", "24", "rollout-one.jsonl"), mtimeMs: nowMs - 1_000, contents: [
-    encodeRecord({ type: "session_meta", payload: { id: "codex-one", cwd: workspace } }),
-    encodeRecord({ type: "event_msg", payload: { type: "user_message", message: "Ship the onboarding feature" } }),
-  ].join("\n") })
-  const homes = [{ source: "claudeAgent" as const, homePath: claude }, { source: "codex" as const, homePath: codex }]
+  await writeTranscript({
+    filePath: join(codex, "sessions", "2026", "08", "24", "rollout-one.jsonl"),
+    mtimeMs: nowMs - 1_000,
+    contents: [
+      encodeRecord({ type: "session_meta", payload: { id: "codex-one", cwd: workspace } }),
+      encodeRecord({ type: "event_msg", payload: { type: "user_message", message: "Ship the onboarding feature" } }),
+    ].join("\n"),
+  })
+  const homes = [
+    { source: "claudeAgent" as const, homePath: claude },
+    { source: "codex" as const, homePath: codex },
+  ]
   return { homes, workspace, stateDir }
 }
 
@@ -46,7 +53,11 @@ describe("onboarding session archaeology runs through the engine session-history
   it("#given local agent history #when the tool runs #then returns the scan's projects and stored digests", async () => {
     // given
     const { homes, workspace, stateDir } = await fixture()
-    const tool = createOnboardingSessionHistoryTool({ stateDir, newScanId: () => "tui-scan-1", scanOptions: { homes, omoSessionsRoots: [], now: () => nowMs } })
+    const tool = createOnboardingSessionHistoryTool({
+      stateDir,
+      newScanId: () => "tui-scan-1",
+      scanOptions: { homes, omoSessionsRoots: [], now: () => nowMs },
+    })
 
     // when
     const result = await tool.execute("call-1", {}, undefined, undefined, {} as never)
@@ -55,12 +66,24 @@ describe("onboarding session archaeology runs through the engine session-history
     expect(result.details).toEqual({
       scanId: "tui-scan-1",
       digestsFile: join(stateDir, "onboarding", "scans", "tui-scan-1", "digests.jsonl"),
-      sources: { projects: { counts: { found: 1, read: 1, cap: 15_000 } }, sessions: { counts: { found: 1, read: 1, cap: 100 } } },
+      sources: {
+        projects: { counts: { found: 1, read: 1, cap: 15_000 } },
+        sessions: { counts: { found: 1, read: 1, cap: 100 } },
+      },
       projectCount: 1,
       digestCount: 1,
     })
-    const stored = (await readFile(result.details.digestsFile, "utf8")).trim().split("\n").map((line) => JSON.parse(line))
-    expect(stored).toEqual([expect.objectContaining({ sessionKey: "codex:codex-one", cwd: workspace, firstRequest: "Ship the onboarding feature" })])
+    const stored = (await readFile(result.details.digestsFile, "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line))
+    expect(stored).toEqual([
+      expect.objectContaining({
+        sessionKey: "codex:codex-one",
+        cwd: workspace,
+        firstRequest: "Ship the onboarding feature",
+      }),
+    ])
     const text = result.content.map((part) => (part.type === "text" ? part.text : "")).join("")
     expect(text).toContain(`- ${workspace} [codex] threads=1`)
     expect(text).toContain(JSON.stringify(stored[0]))

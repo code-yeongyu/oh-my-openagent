@@ -19,13 +19,21 @@ import type { DagToolInput } from "./dag-tool-params"
 // with the same code instead of paying for a round trip.
 function retryTargets(
   params: DagToolInput,
-): { readonly kind: "ok"; readonly nodeIds?: readonly string[] } | { readonly kind: "error"; readonly result: DagToolResult } {
+):
+  | { readonly kind: "ok"; readonly nodeIds?: readonly string[] }
+  | { readonly kind: "error"; readonly result: DagToolResult } {
   if (params.node_id !== undefined && params.node_ids !== undefined) {
-    return { kind: "error", result: failure("invalid_arguments", "action=retry accepts node_id OR node_ids, never both.") }
+    return {
+      kind: "error",
+      result: failure("invalid_arguments", "action=retry accepts node_id OR node_ids, never both."),
+    }
   }
   const selected = params.node_id !== undefined ? [params.node_id] : params.node_ids
   if (params.prompt !== undefined && (selected === undefined || selected.length !== 1)) {
-    return { kind: "error", result: failure("invalid_arguments", "action=retry accepts prompt only alongside exactly one node id.") }
+    return {
+      kind: "error",
+      result: failure("invalid_arguments", "action=retry accepts prompt only alongside exactly one node id."),
+    }
   }
   return { kind: "ok", ...(selected === undefined ? {} : { nodeIds: selected }) }
 }
@@ -39,9 +47,10 @@ export async function retryAction(deps: DagToolDeps, params: DagToolInput, runId
   if (deps.retry === undefined) {
     return failure("run_still_active", `Dag run ${runId} has no retry surface wired in this session.`)
   }
-  const snapshot = params.prompt === undefined
-    ? await deps.retry(runId as DagRunId, nodeIds)
-    : await deps.retry(runId as DagRunId, nodeIds, { prompt: params.prompt })
+  const snapshot =
+    params.prompt === undefined
+      ? await deps.retry(runId as DagRunId, nodeIds)
+      : await deps.retry(runId as DagRunId, nodeIds, { prompt: params.prompt })
   const scope = nodeIds === undefined ? "every failed or cancelled node" : nodeIds.join(", ")
   return toolResult(`Retried ${scope} on dag run ${runId}; it is now ${snapshot.status}.`, {
     kind: "retried",
@@ -65,13 +74,16 @@ export async function sendAction(deps: DagToolDeps, params: DagToolInput, runId:
     return failure("node_not_continuable", `Dag run ${runId} has no send surface wired in this session.`)
   }
   const sent = await deps.send(runId as DagRunId, nodeId.trim(), message)
-  const text = sent.delivery === "guidance" ? `Stored guidance for dag node ${sent.nodeId}; the run remains paused.`
-    : sent.delivery === "held" ? `Held the message in dag node ${sent.nodeId}; it is delivered when the run resumes.`
-    : sent.delivery === "uncertain"
-    ? `uncertain: the host did not acknowledge the message to dag node ${sent.nodeId}; it may still be delivered. omo will confirm by itself; do not resend the same text. Effect id: ${sent.effectId}`
-    : sent.delivery === "queued"
-      ? `Queued the message for dag node ${sent.nodeId}; pending host delivery.`
-      : `Delivered the message to dag node ${sent.nodeId} (${sent.delivery}).`
+  const text =
+    sent.delivery === "guidance"
+      ? `Stored guidance for dag node ${sent.nodeId}; the run remains paused.`
+      : sent.delivery === "held"
+        ? `Held the message in dag node ${sent.nodeId}; it is delivered when the run resumes.`
+        : sent.delivery === "uncertain"
+          ? `uncertain: the host did not acknowledge the message to dag node ${sent.nodeId}; it may still be delivered. omo will confirm by itself; do not resend the same text. Effect id: ${sent.effectId}`
+          : sent.delivery === "queued"
+            ? `Queued the message for dag node ${sent.nodeId}; pending host delivery.`
+            : `Delivered the message to dag node ${sent.nodeId} (${sent.delivery}).`
   return toolResult(text, {
     kind: "sent",
     run_id: runId,

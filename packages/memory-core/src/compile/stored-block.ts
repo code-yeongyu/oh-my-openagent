@@ -19,7 +19,9 @@ export function decodeStoredBlock(text: string): StoredBlock | undefined {
     const pairs: unknown[] = expiries
     const parsed = pairs.flatMap((pair) => {
       const [path, expiresAtMs]: unknown[] = Array.isArray(pair) ? pair : []
-      return typeof path === "string" && typeof expiresAtMs === "number" && Number.isFinite(expiresAtMs) ? [{ path, expiresAtMs }] : []
+      return typeof path === "string" && typeof expiresAtMs === "number" && Number.isFinite(expiresAtMs)
+        ? [{ path, expiresAtMs }]
+        : []
     })
     return parsed.length === pairs.length ? { block, slot, expiries: parsed } : undefined
   } catch {

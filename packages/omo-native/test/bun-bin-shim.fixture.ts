@@ -1,4 +1,14 @@
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { spawnSync } from "node:child_process"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
@@ -14,7 +24,7 @@ function nodeInterpreter(): string | undefined {
   const sibling = join(dirname(process.execPath), "node")
   if (existsSync(sibling)) return sibling
   const located = spawnSync("which", ["node"], { encoding: "utf8" })
-  return located.status === 0 ? (located.stdout.split(/\r?\n/)[0]?.trim() || undefined) : undefined
+  return located.status === 0 ? located.stdout.split(/\r?\n/)[0]?.trim() || undefined : undefined
 }
 
 export const NODE = nodeInterpreter()
@@ -23,9 +33,10 @@ export const POSIX_ONLY = process.platform === "win32" || !NODE
 // The system dirs a node-less PATH keeps (`sh` lives there). A host that ships node in them cannot
 // stage a machine without node, so that case skips instead of passing on the wrong runtime.
 const NODELESS_SYSTEM_DIRS = "/bin"
-export const NODELESS_UNAVAILABLE = process.platform === "win32"
-  || !process.versions.bun
-  || spawnSync("/usr/bin/env", ["node", "--version"], { env: { PATH: NODELESS_SYSTEM_DIRS } }).status === 0
+export const NODELESS_UNAVAILABLE =
+  process.platform === "win32" ||
+  !process.versions.bun ||
+  spawnSync("/usr/bin/env", ["node", "--version"], { env: { PATH: NODELESS_SYSTEM_DIRS } }).status === 0
 
 export type Fixture = {
   root: string
@@ -63,27 +74,36 @@ export function createFixture(label = ""): Fixture {
   const packageRoot = join(bunInstall, "install", "global", "node_modules", "omo-ai")
   mkdirSync(join(packageRoot, "bin"), { recursive: true })
   cpSync(join(SOURCE_ROOT, "bin"), join(packageRoot, "bin"), { recursive: true })
-  writeFileSync(join(packageRoot, "package.json"), JSON.stringify({
-    name: "omo-ai",
-    version: "9.9.9-test.0",
-    type: "module",
-    dependencies: { "@code-yeongyu/senpi": "2026.8.9" },
-  }))
+  writeFileSync(
+    join(packageRoot, "package.json"),
+    JSON.stringify({
+      name: "omo-ai",
+      version: "9.9.9-test.0",
+      type: "module",
+      dependencies: { "@code-yeongyu/senpi": "2026.8.9" },
+    }),
+  )
   const senpiRoot = join(packageRoot, "node_modules", "@code-yeongyu", "senpi")
   mkdirSync(join(senpiRoot, "dist"), { recursive: true })
-  writeFileSync(join(senpiRoot, "package.json"), JSON.stringify({
-    name: "@code-yeongyu/senpi",
-    version: "2026.8.9",
-    type: "module",
-    exports: { ".": "./dist/index.js" },
-  }))
+  writeFileSync(
+    join(senpiRoot, "package.json"),
+    JSON.stringify({
+      name: "@code-yeongyu/senpi",
+      version: "2026.8.9",
+      type: "module",
+      exports: { ".": "./dist/index.js" },
+    }),
+  )
   writeFileSync(join(senpiRoot, "dist", "index.js"), "export const fixture = true\n")
   const captureFile = join(root, "capture.json")
-  writeFileSync(join(senpiRoot, "dist", "cli.js"), `
+  writeFileSync(
+    join(senpiRoot, "dist", "cli.js"),
+    `
 import { writeFileSync } from "node:fs"
 writeFileSync(process.env.CAPTURE_FILE, JSON.stringify({ argv: process.argv.slice(2), env: process.env, versions: process.versions }))
 process.exit(Number(process.env.FAKE_EXIT ?? 0))
-`)
+`,
+  )
   mkdirSync(join(senpiRoot, "dist", "core"), { recursive: true })
   writeFileSync(join(senpiRoot, "dist", "core", "brand.js"), "export {}\n")
   // A stand-in bun that proves it ran; the real bun end to end is QA's job against the real install.
@@ -92,7 +112,11 @@ process.exit(Number(process.env.FAKE_EXIT ?? 0))
   const markerFile = join(root, "fake-bun.marker")
   const bunBinary = join(bunInstall, "bin", "bun")
   mkdirSync(join(bunInstall, "bin"), { recursive: true })
-  writeFileSync(bunBinary, `#!/bin/sh\nif [ "$1" = "--version" ]; then echo 1.4.2; exit 0; fi\nprintf fake-bun-ran > '${markerFile.replaceAll("'", "'\\''")}'\nexit 42\n`, { mode: 0o755 })
+  writeFileSync(
+    bunBinary,
+    `#!/bin/sh\nif [ "$1" = "--version" ]; then echo 1.4.2; exit 0; fi\nprintf fake-bun-ran > '${markerFile.replaceAll("'", "'\\''")}'\nexit 42\n`,
+    { mode: 0o755 },
+  )
   symlinkSync(stockLinkTarget(), join(bunInstall, "bin", "omo"))
   mkdirSync(join(root, "home"), { recursive: true })
   return {
@@ -141,7 +165,10 @@ export function stageInstalledPackage(fixture: Fixture): void {
   const senpiRoot = join(fixture.packageRoot, "node_modules", "@code-yeongyu", "senpi")
   const rpcMode = join(senpiRoot, "dist", "modes", "rpc", "rpc-mode.js")
   mkdirSync(dirname(rpcMode), { recursive: true })
-  writeFileSync(rpcMode, readFileSync(new URL("./modes/rpc/rpc-mode.js", import.meta.resolve("@code-yeongyu/senpi")), "utf8"))
+  writeFileSync(
+    rpcMode,
+    readFileSync(new URL("./modes/rpc/rpc-mode.js", import.meta.resolve("@code-yeongyu/senpi")), "utf8"),
+  )
 }
 
 /** A PATH that reaches bun and the system shell but no node, like a launchd job or a bun-only box. */
@@ -157,7 +184,11 @@ export function nodelessEnv(fixture: Fixture): NodeJS.ProcessEnv {
   return env
 }
 
-export function capture(fixture: Fixture): { argv: string[]; env: NodeJS.ProcessEnv; versions: Record<string, string | undefined> } {
+export function capture(fixture: Fixture): {
+  argv: string[]
+  env: NodeJS.ProcessEnv
+  versions: Record<string, string | undefined>
+} {
   return JSON.parse(readFileSync(fixture.captureFile, "utf8"))
 }
 

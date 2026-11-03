@@ -26,10 +26,7 @@ describe("parseSessionTranscript", () => {
     const texts = assistantTexts(text)
 
     // then
-    expect(texts).toEqual([
-      "The build fails because of a missing import.",
-      "Fixed it. The import path was wrong.",
-    ])
+    expect(texts).toEqual(["The build fails because of a missing import.", "Fixed it. The import path was wrong."])
   })
 
   test("#given a v2 tree session with a model_change and toolResult #when parsed #then user/tool/non-message entries are skipped", () => {

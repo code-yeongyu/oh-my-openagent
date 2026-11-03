@@ -13,12 +13,22 @@ import { createKibitzerMemoryTool, KIBITZER_MEMORY_TOOL_NAME } from "./memory"
 import { createKibitzerSidecarNudgeTool, KIBITZER_NUDGE_TOOL_NAME } from "./nudge"
 import { createKibitzerReadTool, KIBITZER_READ_TOOL_NAME } from "./read"
 import type { AnyKibitzerSidecarTool } from "./result"
-import { createKibitzerSessionEntriesTool, KIBITZER_SESSION_ENTRIES_TOOL_NAME, type SessionBranchSnapshot } from "./session-read"
+import {
+  createKibitzerSessionEntriesTool,
+  KIBITZER_SESSION_ENTRIES_TOOL_NAME,
+  type SessionBranchSnapshot,
+} from "./session-read"
 
 export { createWakeToolBudget, type WakeToolBudget } from "./budget"
 export { DEFAULT_KIBITZER_TOOL_CAPS, type KibitzerToolCaps } from "./caps"
 export { MemoryToolOperations } from "./memory"
-export type { AnyKibitzerSidecarTool, KibitzerRejection, KibitzerRejectionCode, KibitzerSidecarTool, KibitzerToolResult } from "./result"
+export type {
+  AnyKibitzerSidecarTool,
+  KibitzerRejection,
+  KibitzerRejectionCode,
+  KibitzerSidecarTool,
+  KibitzerToolResult,
+} from "./result"
 export { createSessionBranchSnapshot, HIDDEN_SESSION_CUSTOM_TYPES, type SessionBranchSnapshot } from "./session-read"
 
 export const KIBITZER_SIDECAR_TOOL_NAMES = [

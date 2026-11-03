@@ -16,7 +16,10 @@ import {
   recordingFetch,
   spoolNames,
   TEST_SCOPE,
-  testResource, testWireProjection, TEST_SPANS } from "./otlp-test-support"
+  testResource,
+  testWireProjection,
+  TEST_SPANS,
+} from "./otlp-test-support"
 import type { TelemetryDiagnosticInput } from "./types"
 
 const roots: (() => void)[] = []
@@ -44,7 +47,9 @@ describe("OTLP sender", () => {
     await transport.flush()
 
     // then
-    const batches = calls.map((call) => logRecordsOf(decodeLogs(call.body)).map((r) => attributeMap(r.attributes)["omo.seq"]))
+    const batches = calls.map((call) =>
+      logRecordsOf(decodeLogs(call.body)).map((r) => attributeMap(r.attributes)["omo.seq"]),
+    )
     expect(batches.map((batch) => batch.length)).toEqual([20, 20, 5])
     expect(batches.flat()).toEqual(Array.from({ length: 45 }, (_, index) => index))
     expect(calls.every((call) => call.url === "https://collector.test/v1/logs")).toBe(true)
@@ -62,7 +67,14 @@ describe("OTLP sender", () => {
     // when
     capture(transport, "feature_used", { feature: "small" })
     await transport.flush()
-    for (let index = 0; index < 19; index += 1) capture(transport, "feature_used", { blob: "x".repeat(64), more: "y".repeat(64), seq: index, a: "z".repeat(64), b: "w".repeat(64) })
+    for (let index = 0; index < 19; index += 1)
+      capture(transport, "feature_used", {
+        blob: "x".repeat(64),
+        more: "y".repeat(64),
+        seq: index,
+        a: "z".repeat(64),
+        b: "w".repeat(64),
+      })
     await transport.flush()
 
     // then
@@ -77,9 +89,22 @@ describe("OTLP sender", () => {
     const dir = root()
 
     // when
-    const ignored = makeTransport(dir, { env: { OTEL_EXPORTER_OTLP_ENDPOINT: "http://evil.test", OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: "http://evil.test" } })
+    const ignored = makeTransport(dir, {
+      env: { OTEL_EXPORTER_OTLP_ENDPOINT: "http://evil.test", OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: "http://evil.test" },
+    })
     const overridden = makeTransport(dir, { env: { OMO_TELEMETRY_ENDPOINT: "https://staging.test/" } })
-    const defaulted = await createOtlpTelemetryTransport({ productEnvPrefix: "OMO_TEST", ingestKey: "k", spoolDir: dir, spoolRoot: dirname(dir), resource: testResource(), scope: TEST_SCOPE, project: testWireProjection, spans: TEST_SPANS, env: {}, autoStart: false })
+    const defaulted = await createOtlpTelemetryTransport({
+      productEnvPrefix: "OMO_TEST",
+      ingestKey: "k",
+      spoolDir: dir,
+      spoolRoot: dirname(dir),
+      resource: testResource(),
+      scope: TEST_SCOPE,
+      project: testWireProjection,
+      spans: TEST_SPANS,
+      env: {},
+      autoStart: false,
+    })
 
     // then
     expect(ignored.endpoint).toBe("https://collector.test")
@@ -90,12 +115,25 @@ describe("OTLP sender", () => {
   test("#given OTEL_SDK_DISABLED=true or DO_NOT_TRACK=1 #then no transport is built and no spool directory exists", async () => {
     // given
     const dir = root()
-    const base = { productEnvPrefix: "OMO_TEST", ingestKey: "k", spoolDir: dir, spoolRoot: dirname(dir), resource: testResource(), scope: TEST_SCOPE, project: testWireProjection, spans: TEST_SPANS, autoStart: false }
+    const base = {
+      productEnvPrefix: "OMO_TEST",
+      ingestKey: "k",
+      spoolDir: dir,
+      spoolRoot: dirname(dir),
+      resource: testResource(),
+      scope: TEST_SCOPE,
+      project: testWireProjection,
+      spans: TEST_SPANS,
+      autoStart: false,
+    }
 
     // when
     const otelDisabled = await createOtlpTelemetryTransport({ ...base, env: { OTEL_SDK_DISABLED: "TRUE" } })
     const doNotTrack = await createOtlpTelemetryTransport({ ...base, env: { DO_NOT_TRACK: "1" } })
-    const productOptOut = await createOtlpTelemetryTransport({ ...base, env: { OMO_TEST_SEND_ANONYMOUS_TELEMETRY: "0" } })
+    const productOptOut = await createOtlpTelemetryTransport({
+      ...base,
+      env: { OMO_TEST_SEND_ANONYMOUS_TELEMETRY: "0" },
+    })
 
     // then
     expect([otelDisabled, doNotTrack, productOptOut]).toEqual([null, null, null])
@@ -113,9 +151,12 @@ describe("OTLP sender", () => {
   test("#given a 200 carrying partial_success #then the batch is settled, never retried, and the rejected count is diagnosed", async () => {
     // given
     const dir = root()
-    const partial = toBinary(ExportLogsServiceResponseSchema, create(ExportLogsServiceResponseSchema, {
-      partialSuccess: { rejectedLogRecords: 1n, errorMessage: "rejected 1 of 2: #1 unknown_event" },
-    }))
+    const partial = toBinary(
+      ExportLogsServiceResponseSchema,
+      create(ExportLogsServiceResponseSchema, {
+        partialSuccess: { rejectedLogRecords: 1n, errorMessage: "rejected 1 of 2: #1 unknown_event" },
+      }),
+    )
     const { calls, fetch } = recordingFetch(() => new Response(partial, { status: 200 }))
     const diagnostics: TelemetryDiagnosticInput[] = []
     const transport = makeTransport(dir, { fetch, diagnostics: (input) => diagnostics.push(input) })
@@ -145,7 +186,9 @@ describe("the first flush after start", () => {
       spoolDir: dir,
       spoolRoot: dirname(dir),
       resource: testResource(),
-      scope: TEST_SCOPE, project: testWireProjection, spans: TEST_SPANS,
+      scope: TEST_SCOPE,
+      project: testWireProjection,
+      spans: TEST_SPANS,
       env: {},
       endpoint: "https://collector.test",
       sleep: async () => undefined,

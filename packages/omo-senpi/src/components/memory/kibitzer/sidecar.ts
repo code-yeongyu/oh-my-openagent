@@ -33,7 +33,12 @@
 // steer / settle).
 
 import { createAdmission } from "./sidecar-admission"
-import type { KibitzerOfferInput, KibitzerOfferResult, KibitzerSidecar, KibitzerSidecarOptions } from "./sidecar-contract"
+import type {
+  KibitzerOfferInput,
+  KibitzerOfferResult,
+  KibitzerSidecar,
+  KibitzerSidecarOptions,
+} from "./sidecar-contract"
 import { createSidecarCore, isRecord } from "./sidecar-core"
 import { createRecovery } from "./sidecar-recovery"
 import { createTurnLifecycle } from "./sidecar-turn"
@@ -73,18 +78,27 @@ export function createKibitzerSidecar(options: KibitzerSidecarOptions): Kibitzer
       if (core.closing || core.state === "disposed") return { action: "buffered", reason: "disposed" }
       for (const path of input.surfaced) core.surfaced.add(path)
       if (core.state === "backoff") return { action: "buffered", reason: "backoff" }
-      const decision = decideWake({ candidates: input.candidates, offered: core.offered, surfaced: core.surfaced, maxItems: input.maxItems, cooldown: core.cooldown })
+      const decision = decideWake({
+        candidates: input.candidates,
+        offered: core.offered,
+        surfaced: core.surfaced,
+        maxItems: input.maxItems,
+        cooldown: core.cooldown,
+      })
       if (!decision.wake) return { action: "buffered", reason: decision.reason }
       if (input.taskSummary !== undefined) core.taskSummary = input.taskSummary
       const current = core.child
       switch (core.state) {
         case "turn_running": {
           const turn = core.activeTurn
-          if (turn === undefined || current === undefined) throw new Error("kibitzer sidecar invariant broken: turn_running without a live turn")
+          if (turn === undefined || current === undefined)
+            throw new Error("kibitzer sidecar invariant broken: turn_running without a live turn")
           return wake.steer(current, turn, decision.candidates, input.maxItems)
         }
         case "idle":
-          return current === undefined ? wake.seed(decision.candidates, input.maxItems) : wake.followUp(current, decision.candidates, input.maxItems)
+          return current === undefined
+            ? wake.seed(decision.candidates, input.maxItems)
+            : wake.followUp(current, decision.candidates, input.maxItems)
         case "reseeding":
           return wake.seed(decision.candidates, input.maxItems)
         default:
@@ -119,7 +133,12 @@ export function createKibitzerSidecar(options: KibitzerSidecarOptions): Kibitzer
 
   function rememberTask(payload: unknown): void {
     if (core.taskSummary !== undefined) return
-    const text = typeof payload === "string" ? payload : isRecord(payload) && typeof payload.prompt === "string" ? payload.prompt : undefined
+    const text =
+      typeof payload === "string"
+        ? payload
+        : isRecord(payload) && typeof payload.prompt === "string"
+          ? payload.prompt
+          : undefined
     const line = text?.replace(/\s+/g, " ").trim()
     if (line === undefined || line.length === 0) return
     core.taskSummary = line.length > TASK_SUMMARY_HEAD_CHARS ? line.slice(0, TASK_SUMMARY_HEAD_CHARS) : line

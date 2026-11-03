@@ -165,9 +165,7 @@ describe("handleSessionIdleBackgroundEvent", () => {
       const baseNow = realDateNow()
       const task = createRunningTask({ startedAt: new Date(baseNow) })
       const existingTimer = setTimeout(() => {}, 99999)
-      const idleDeferralTimers = new Map<string, ReturnType<typeof setTimeout>>([
-        [task.id, existingTimer],
-      ])
+      const idleDeferralTimers = new Map<string, ReturnType<typeof setTimeout>>([[task.id, existingTimer]])
       const emitIdleEvent = mock(() => {})
 
       try {

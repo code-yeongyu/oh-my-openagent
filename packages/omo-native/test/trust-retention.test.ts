@@ -4,7 +4,12 @@ import * as nodeFs from "node:fs/promises"
 import { chmod, lstat, mkdir, mkdtemp, readdir, rm, symlink, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { pidAnswersSignalZero, RETAINED_GENERATIONS, sweepTrustRetention, type TrustRetentionFs } from "../trust-retention"
+import {
+  pidAnswersSignalZero,
+  RETAINED_GENERATIONS,
+  sweepTrustRetention,
+  type TrustRetentionFs,
+} from "../trust-retention"
 
 const BOOT = 1_700_000_000_000
 const BASE_SECONDS = 1_750_000_000
@@ -32,7 +37,9 @@ describe.skipIf(process.platform === "win32")("trust generation retention sweep"
   const generation = async (index: number, user: string | null = null): Promise<string> => {
     const name = digest(`generation ${index}`)
     const path = join(directory, `${name}.pem`)
-    await writeFile(path, `# omo-engine-trust-generation v1 user=${user ?? "none"}\nsynthetic body ${index}\n`, { mode: 0o600 })
+    await writeFile(path, `# omo-engine-trust-generation v1 user=${user ?? "none"}\nsynthetic body ${index}\n`, {
+      mode: 0o600,
+    })
     await utimes(path, BASE_SECONDS + index, BASE_SECONDS + index)
     return name
   }
@@ -43,12 +50,18 @@ describe.skipIf(process.platform === "win32")("trust generation retention sweep"
   }
   const lease = async (name: string, pid: number, body: unknown = { v: 1, pid, bootAtMs: BOOT }): Promise<string> => {
     const entry = `${name}.${pid}`
-    await writeFile(join(directory, "leases", entry), typeof body === "string" ? body : JSON.stringify(body), { mode: 0o600 })
+    await writeFile(join(directory, "leases", entry), typeof body === "string" ? body : JSON.stringify(body), {
+      mode: 0o600,
+    })
     return entry
   }
   const generations = async (count: number, user: string | null = null) =>
     Promise.all(Array.from({ length: count }, (_, index) => generation(index, user)))
-  const exists = async (path: string) => lstat(path).then(() => true, () => false)
+  const exists = async (path: string) =>
+    lstat(path).then(
+      () => true,
+      () => false,
+    )
   const listing = async () => (await readdir(directory)).sort()
   const sweep = (options: { current?: string; fs?: TrustRetentionFs; bootAtMs?: number } = {}) =>
     sweepTrustRetention({ directory, bootAtMs: options.bootAtMs ?? BOOT, isPidAlive, ...options })
@@ -57,8 +70,8 @@ describe.skipIf(process.platform === "win32")("trust generation retention sweep"
     const refuse = () => Promise.reject(Object.assign(new Error("denied"), { code: "EACCES" }))
     return {
       ...nodeFs,
-      open: (path, flags) => call === "open" && path === denied ? refuse() : nodeFs.open(path, flags),
-      lstat: (path) => call === "lstat" && path === denied ? refuse() : nodeFs.lstat(path),
+      open: (path, flags) => (call === "open" && path === denied ? refuse() : nodeFs.open(path, flags)),
+      lstat: (path) => (call === "lstat" && path === denied ? refuse() : nodeFs.lstat(path)),
     }
   }
 
@@ -69,7 +82,11 @@ describe.skipIf(process.platform === "win32")("trust generation retention sweep"
     const outcome = await sweep()
     // Then exactly the 4 oldest by mtime are removed.
     expect(RETAINED_GENERATIONS).toBe(16)
-    expect(outcome).toEqual({ kind: "swept", removed: { generations: names.slice(0, 4).sort(), leases: [], userExtras: [] }, failures: [] })
+    expect(outcome).toEqual({
+      kind: "swept",
+      removed: { generations: names.slice(0, 4).sort(), leases: [], userExtras: [] },
+      failures: [],
+    })
     expect(await listing()).toEqual([...names.slice(4).map((name) => `${name}.pem`), "leases"].sort())
   })
 
@@ -94,7 +111,11 @@ describe.skipIf(process.platform === "win32")("trust generation retention sweep"
     // When the sweep runs.
     const outcome = await sweep()
     // Then the leased one and its lease survive, and only the unleased one is evicted.
-    expect(outcome).toEqual({ kind: "swept", removed: { generations: [second], leases: [], userExtras: [] }, failures: [] })
+    expect(outcome).toEqual({
+      kind: "swept",
+      removed: { generations: [second], leases: [], userExtras: [] },
+      failures: [],
+    })
     expect(await exists(join(directory, `${oldest}.pem`))).toBe(true)
     expect(await exists(join(directory, "leases", entry))).toBe(true)
   })
@@ -111,7 +132,11 @@ describe.skipIf(process.platform === "win32")("trust generation retention sweep"
     const entry = await lease(oldest, pid, { v: 1, pid, bootAtMs })
     // When the sweep runs; then the dead lease goes in the same sweep and no longer pins.
     const outcome = await sweep()
-    expect(outcome).toEqual({ kind: "swept", removed: { generations: [oldest], leases: [entry], userExtras: [] }, failures: [] })
+    expect(outcome).toEqual({
+      kind: "swept",
+      removed: { generations: [oldest], leases: [entry], userExtras: [] },
+      failures: [],
+    })
   })
 
   test.each([
@@ -129,7 +154,9 @@ describe.skipIf(process.platform === "win32")("trust generation retention sweep"
     const entry = await lease(oldest, 4242, { v: 1, pid: 4242, bootAtMs: BOOT + offset })
     // When the sweep runs; then within the tolerance the lease is this boot's and pins, and past it the lease is dead.
     const outcome = await sweep()
-    const removed = pins ? { generations: [], leases: [], userExtras: [] } : { generations: [oldest], leases: [entry], userExtras: [] }
+    const removed = pins
+      ? { generations: [], leases: [], userExtras: [] }
+      : { generations: [oldest], leases: [entry], userExtras: [] }
     expect(outcome).toEqual({ kind: "swept", removed, failures: [] })
   })
 
@@ -140,7 +167,11 @@ describe.skipIf(process.platform === "win32")("trust generation retention sweep"
     const entry = await lease(only, 6161)
     // When the sweep runs; then the lease goes and the generation stays.
     const outcome = await sweep()
-    expect(outcome).toEqual({ kind: "swept", removed: { generations: [], leases: [entry], userExtras: [] }, failures: [] })
+    expect(outcome).toEqual({
+      kind: "swept",
+      removed: { generations: [], leases: [entry], userExtras: [] },
+      failures: [],
+    })
     expect(await exists(join(directory, `${only}.pem`))).toBe(true)
   })
 
@@ -159,7 +190,11 @@ describe.skipIf(process.platform === "win32")("trust generation retention sweep"
     const entry = await lease(oldest, 4242, body)
     // When the sweep runs; then the lease is removed and does not pin.
     const outcome = await sweep()
-    expect(outcome).toEqual({ kind: "swept", removed: { generations: [oldest], leases: [entry], userExtras: [] }, failures: [] })
+    expect(outcome).toEqual({
+      kind: "swept",
+      removed: { generations: [oldest], leases: [entry], userExtras: [] },
+      failures: [],
+    })
   })
 
   test("keeps a lease written by a newer schema version and its generation", async () => {
@@ -188,11 +223,16 @@ describe.skipIf(process.platform === "win32")("trust generation retention sweep"
     const entry = await lease(oldest, 7171)
     // When the sweep runs.
     const outcome = await sweepTrustRetention({
-      directory, bootAtMs: BOOT, isPidAlive: () => { throw Object.assign(new Error("probe"), { code: "EINVAL" }) },
+      directory,
+      bootAtMs: BOOT,
+      isPidAlive: () => {
+        throw Object.assign(new Error("probe"), { code: "EINVAL" })
+      },
     })
     // Then the uncertain lease pins, and the failure is reported, not thrown.
     expect(outcome).toEqual({
-      kind: "swept", removed: { generations: [], leases: [], userExtras: [] },
+      kind: "swept",
+      removed: { generations: [], leases: [], userExtras: [] },
       failures: [{ entry: `leases/${entry}`, step: "probe-lease", code: "EINVAL" }],
     })
   })
@@ -207,7 +247,8 @@ describe.skipIf(process.platform === "win32")("trust generation retention sweep"
     const outcome = await sweep({ fs: denying(call, join(directory, "leases", entry)) })
     // Then an unreadable lease counts as live: it pins, stays, and the failure is reported.
     expect(outcome).toEqual({
-      kind: "swept", removed: { generations: [], leases: [], userExtras: [] },
+      kind: "swept",
+      removed: { generations: [], leases: [], userExtras: [] },
       failures: [{ entry: `leases/${entry}`, step: "read-lease", code: "EACCES" }],
     })
     expect(await exists(join(directory, `${oldest}.pem`))).toBe(true)
@@ -237,7 +278,11 @@ describe.skipIf(process.platform === "win32")("trust generation retention sweep"
     // When the sweep runs.
     const outcome = await sweep()
     // Then only extras no remaining header names are removed; a lease pins its generation's extras too.
-    expect(outcome).toEqual({ kind: "swept", removed: { generations: [evicted], leases: [], userExtras: [a, d].sort() }, failures: [] })
+    expect(outcome).toEqual({
+      kind: "swept",
+      removed: { generations: [evicted], leases: [], userExtras: [a, d].sort() },
+      failures: [],
+    })
     for (const kept of [b, c]) expect(await exists(join(directory, `u-${kept}.pem`))).toBe(true)
   })
 
@@ -246,14 +291,22 @@ describe.skipIf(process.platform === "win32")("trust generation retention sweep"
     const names = await generations(17)
     await mkdir(join(directory, "defaults", "empty.d"), { recursive: true, mode: 0o700 })
     await writeFile(join(directory, "defaults", "empty.pem"), "", { mode: 0o600 })
-    const others = ["diagnostics.jsonl", "diagnostics.1.jsonl", `.${digest("tmp")}.pem.tmp`, "notes.pem", `${digest("upper").toUpperCase()}.pem`]
+    const others = [
+      "diagnostics.jsonl",
+      "diagnostics.1.jsonl",
+      `.${digest("tmp")}.pem.tmp`,
+      "notes.pem",
+      `${digest("upper").toUpperCase()}.pem`,
+    ]
     for (const other of others) await writeFile(join(directory, other), "x")
     await writeFile(join(directory, "leases", `.${digest("lease tmp")}.4242.tmp`), "{")
     // When the sweep runs.
     const outcome = await sweep()
     // Then only the evicted generation leaves.
     expect(outcome.kind === "swept" && outcome.removed).toEqual({ generations: [names[0]], leases: [], userExtras: [] })
-    expect(await listing()).toEqual([...names.slice(1).map((name) => `${name}.pem`), ...others, "defaults", "leases"].sort())
+    expect(await listing()).toEqual(
+      [...names.slice(1).map((name) => `${name}.pem`), ...others, "defaults", "leases"].sort(),
+    )
     expect((await readdir(join(directory, "defaults"))).sort()).toEqual(["empty.d", "empty.pem"])
     expect(await readdir(join(directory, "leases"))).toEqual([`.${digest("lease tmp")}.4242.tmp`])
   })
@@ -302,7 +355,11 @@ describe.skipIf(process.platform === "win32")("trust generation retention sweep"
     // When the sweep runs.
     const outcome = await sweepTrustRetention({ directory: swept, bootAtMs: BOOT, isPidAlive })
     // Then nothing is removed, and the outcome says why.
-    expect(outcome).toEqual({ kind: "skipped", reason: which === "directory" ? "directory-unsafe" : "leases-unsafe", failures: [] })
+    expect(outcome).toEqual({
+      kind: "skipped",
+      reason: which === "directory" ? "directory-unsafe" : "leases-unsafe",
+      failures: [],
+    })
     expect(await exists(join(directory, `${names[0]}.pem`))).toBe(true)
   })
 
@@ -321,7 +378,11 @@ describe.skipIf(process.platform === "win32")("trust generation retention sweep"
     await rm(join(directory, "leases"), { recursive: true })
     // When the sweep runs; then the unleased oldest is evicted.
     const outcome = await sweep()
-    expect(outcome).toEqual({ kind: "swept", removed: { generations: [names[0]], leases: [], userExtras: [] }, failures: [] })
+    expect(outcome).toEqual({
+      kind: "swept",
+      removed: { generations: [names[0]], leases: [], userExtras: [] },
+      failures: [],
+    })
   })
 
   test("reports a removal failure without throwing, and keeps the extras that generation names", async () => {
@@ -340,7 +401,8 @@ describe.skipIf(process.platform === "win32")("trust generation retention sweep"
     const outcome = await sweep({ fs })
     // Then the failure is reported, and the still-present generation keeps E.
     expect(outcome).toEqual({
-      kind: "swept", removed: { generations: [], leases: [], userExtras: [] },
+      kind: "swept",
+      removed: { generations: [], leases: [], userExtras: [] },
       failures: [{ entry: `${held}.pem`, step: "remove-generation", code: "EBUSY" }],
     })
     expect(await exists(join(directory, `u-${extras}.pem`))).toBe(true)
@@ -358,7 +420,8 @@ describe.skipIf(process.platform === "win32")("trust generation retention sweep"
     const outcome = await sweep({ fs: denying(call, join(directory, `${unknown}.pem`)) })
     // Then every extras file survives, because a header this sweep cannot see might name it.
     expect(outcome).toEqual({
-      kind: "swept", removed: { generations: [], leases: [], userExtras: [] },
+      kind: "swept",
+      removed: { generations: [], leases: [], userExtras: [] },
       failures: [{ entry: `${unknown}.pem`, step, code: "EACCES" }],
     })
     for (const kept of [named, orphan]) expect(await exists(join(directory, `u-${kept}.pem`))).toBe(true)
@@ -367,9 +430,18 @@ describe.skipIf(process.platform === "win32")("trust generation retention sweep"
   test("reports an unexpected failure as a skipped outcome instead of throwing", async () => {
     // Given a trust directory whose listing fails.
     await generations(17)
-    const fs: TrustRetentionFs = { ...nodeFs, readdir: async () => { throw Object.assign(new Error("io"), { code: "EIO" }) } }
+    const fs: TrustRetentionFs = {
+      ...nodeFs,
+      readdir: async () => {
+        throw Object.assign(new Error("io"), { code: "EIO" })
+      },
+    }
     // When the sweep runs; then the caller's launch gets an outcome, not an exception.
-    expect(await sweep({ fs })).toEqual({ kind: "skipped", reason: "sweep-error", failures: [{ entry: ".", step: "list", code: "EIO" }] })
+    expect(await sweep({ fs })).toEqual({
+      kind: "skipped",
+      reason: "sweep-error",
+      failures: [{ entry: ".", step: "list", code: "EIO" }],
+    })
   })
 })
 

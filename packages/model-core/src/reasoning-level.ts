@@ -13,7 +13,10 @@ export function isReasoningLevelOrAuto(value: string): value is ReasoningLevel |
   return REASONING_LEVEL_OR_AUTO_SET.has(value)
 }
 
-export function normalizeReasoning(input: string): { level?: ReasoningLevel | typeof REASONING_AUTO; passthrough?: string } {
+export function normalizeReasoning(input: string): {
+  level?: ReasoningLevel | typeof REASONING_AUTO
+  passthrough?: string
+} {
   const normalized = input.trim().toLowerCase()
   if (!normalized) return {}
   if (normalized === "none") return { level: "off" }
@@ -43,7 +46,10 @@ export function splitReasoningSuffix(
   const separatorIndex = trimmed.lastIndexOf(":")
   if (separatorIndex === -1) return { base: trimmed }
   const base = trimmed.slice(0, separatorIndex).trim()
-  const token = trimmed.slice(separatorIndex + 1).trim().toLowerCase()
+  const token = trimmed
+    .slice(separatorIndex + 1)
+    .trim()
+    .toLowerCase()
   if (!base || !isReasoningLevelOrAuto(token)) return { base: trimmed }
   // ":max" doubles as a real model-id ending, so bare ids keep it attached unless the
   // caller knows the string is provider-prefixed (pi's allowMaxSuffix gating).

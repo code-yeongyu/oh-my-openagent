@@ -23,22 +23,30 @@ export function createMemoryUserActivity(env: NodeJS.ProcessEnv = process.env) {
       if (!accepted.has(sessionId) || reconciled.has(sessionId)) return
       const existing = inFlight.get(sessionId)
       if (existing !== undefined) return existing
-      const task = Promise.resolve().then(() => {
-        if (inFlight.get(sessionId) === task) return reconcile()
-      }).then(() => {
-        if (inFlight.get(sessionId) === task) reconciled.add(sessionId)
-      }).finally(() => {
-        if (inFlight.get(sessionId) === task) inFlight.delete(sessionId)
-      })
+      const task = Promise.resolve()
+        .then(() => {
+          if (inFlight.get(sessionId) === task) return reconcile()
+        })
+        .then(() => {
+          if (inFlight.get(sessionId) === task) reconciled.add(sessionId)
+        })
+        .finally(() => {
+          if (inFlight.get(sessionId) === task) inFlight.delete(sessionId)
+        })
       inFlight.set(sessionId, task)
       await task
     },
     register(pi: SenpiExtensionAPI): void {
       pi.on("input", (payload, eventCtx) => {
-        if (readSessionRole(pi, env) !== undefined || !isRecord(payload) || payload.source === "extension"
-          || typeof payload.inputId !== "string"
-          || typeof payload.text !== "string"
-          || (payload.text.trim().length === 0 && (!Array.isArray(payload.images) || payload.images.length === 0))) return
+        if (
+          readSessionRole(pi, env) !== undefined ||
+          !isRecord(payload) ||
+          payload.source === "extension" ||
+          typeof payload.inputId !== "string" ||
+          typeof payload.text !== "string" ||
+          (payload.text.trim().length === 0 && (!Array.isArray(payload.images) || payload.images.length === 0))
+        )
+          return
         const sessionId = sessionIdFrom(eventCtx)
         if (sessionId !== undefined) inputs.set(payload.inputId, sessionId)
       })

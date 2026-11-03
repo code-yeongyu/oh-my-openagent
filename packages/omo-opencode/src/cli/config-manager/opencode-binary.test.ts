@@ -93,12 +93,12 @@ describe("getOpenCodeVersion (installer)", () => {
         }),
       )
 
-      const immediateSetTimeout = unsafeTestValue<typeof globalThis.setTimeout>(((handler: TimerHandler) => {
+      const immediateSetTimeout = unsafeTestValue<typeof globalThis.setTimeout>((handler: TimerHandler) => {
         if (typeof handler === "function") {
           handler()
         }
         return unsafeTestValue<ReturnType<typeof setTimeout>>(1)
-      }))
+      })
       const setTimeoutSpy = spyOn(globalThis, "setTimeout").mockImplementation(immediateSetTimeout)
 
       const result = await getOpenCodeVersion()
@@ -125,12 +125,12 @@ describe("getOpenCodeVersion (installer)", () => {
         }),
       )
 
-      const immediateSetTimeout = unsafeTestValue<typeof globalThis.setTimeout>(((handler: TimerHandler) => {
+      const immediateSetTimeout = unsafeTestValue<typeof globalThis.setTimeout>((handler: TimerHandler) => {
         if (typeof handler === "function") {
           handler()
         }
         return unsafeTestValue<ReturnType<typeof setTimeout>>(1)
-      }))
+      })
       const setTimeoutSpy = spyOn(globalThis, "setTimeout").mockImplementation(immediateSetTimeout)
 
       const result = await getOpenCodeVersion()

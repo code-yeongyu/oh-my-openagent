@@ -6,9 +6,7 @@ import { ConcurrencyManager } from "./concurrency"
 import type { BackgroundTask } from "./types"
 import { tryFallbackRetry, type FallbackRetryHandlerDeps } from "./fallback-retry-handler"
 
-const fallbackChain: FallbackEntry[] = [
-  { model: "fallback-model-1", providers: ["provider-a"], variant: undefined },
-]
+const fallbackChain: FallbackEntry[] = [{ model: "fallback-model-1", providers: ["provider-a"], variant: undefined }]
 
 function createTask(overrides: Partial<BackgroundTask> = {}): BackgroundTask {
   return {

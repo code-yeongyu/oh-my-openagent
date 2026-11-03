@@ -63,11 +63,7 @@ export function extractErrorMessage(error: unknown): string | undefined {
 
     for (const candidate of candidates) {
       if (typeof candidate === "string" && candidate.length > 0) return candidate
-      if (
-        isRecord(candidate) &&
-        typeof candidate["message"] === "string" &&
-        candidate["message"].length > 0
-      ) {
+      if (isRecord(candidate) && typeof candidate["message"] === "string" && candidate["message"].length > 0) {
         return candidate["message"]
       }
     }
@@ -164,13 +160,8 @@ const TERMINAL_SESSION_ERROR_PATTERNS: readonly RegExp[] = [
   /all providers (?:are )?(?:unavailable|disconnected|exhausted)/i,
 ]
 
-export function isTerminalSessionError(
-  errorInfo: { name?: string; message?: string; statusCode?: number },
-): boolean {
-  const text = [
-    errorInfo?.name,
-    errorInfo?.message,
-  ]
+export function isTerminalSessionError(errorInfo: { name?: string; message?: string; statusCode?: number }): boolean {
+  const text = [errorInfo?.name, errorInfo?.message]
     .filter((value): value is string => typeof value === "string" && value.length > 0)
     .join(" ")
   if (text.length === 0) return false

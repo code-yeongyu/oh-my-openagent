@@ -38,8 +38,7 @@ export function estimateForkCost(input: ForkCostInput): number {
   const { pricing, parentContextTokens, turns, outputTokens, cacheHit } = input
   const cacheRead = pricing.cacheRead ?? pricing.input
   const firstTurn =
-    parentContextTokens * (cacheHit ? cacheRead : pricing.input)
-    + INJECTED_PROMPT_TOKENS * pricing.input
+    parentContextTokens * (cacheHit ? cacheRead : pricing.input) + INJECTED_PROMPT_TOKENS * pricing.input
   let total = firstTurn
   for (let turn = 1; turn < turns; turn += 1) {
     total += (parentContextTokens + INJECTED_PROMPT_TOKENS + PER_TURN_NEW_TOKENS * turn) * cacheRead
@@ -56,9 +55,9 @@ export function estimateQuickCost(input: QuickCostInput): number {
   const { pricing, profile } = input
   const cacheRead = pricing.cacheRead ?? pricing.input
   const tokens =
-    profile.inputTokens * pricing.input
-    + profile.cacheReadTokens * cacheRead
-    + profile.outputTokens * (pricing.output ?? 0)
+    profile.inputTokens * pricing.input +
+    profile.cacheReadTokens * cacheRead +
+    profile.outputTokens * (pricing.output ?? 0)
   return tokens / 1_000_000
 }
 
@@ -102,9 +101,14 @@ export function chooseMemoryLaunchRoute(input: MemoryLaunchRouteInput): MemoryLa
   // The only-candidate fork branch above intentionally remains unconditional: without a quick
   // candidate there is no safer route to choose. When both routes exist, reject a fork that cannot
   // fit the inherited parent, injected prompt, payload, and expected working turns.
-  if (session.contextWindow !== undefined
-    && input.parentContextTokens + INJECTED_PROMPT_TOKENS + (input.payloadTokens ?? 0) + PER_TURN_NEW_TOKENS * input.turns
-      > FORK_WINDOW_FIT_RATIO * session.contextWindow) {
+  if (
+    session.contextWindow !== undefined &&
+    input.parentContextTokens +
+      INJECTED_PROMPT_TOKENS +
+      (input.payloadTokens ?? 0) +
+      PER_TURN_NEW_TOKENS * input.turns >
+      FORK_WINDOW_FIT_RATIO * session.contextWindow
+  ) {
     return pick("quick", quick, "window_unfit")
   }
 
@@ -116,9 +120,7 @@ export function chooseMemoryLaunchRoute(input: MemoryLaunchRouteInput): MemoryLa
     outputTokens: profile.outputTokens,
     cacheHit: input.cacheHit,
   })
-  const quickCost = quick.cost === undefined
-    ? undefined
-    : estimateQuickCost({ pricing: quick.cost, profile })
+  const quickCost = quick.cost === undefined ? undefined : estimateQuickCost({ pricing: quick.cost, profile })
   if (quickCost === undefined) return pick("quick", quick, "no_pricing")
   if (forkCost < quickCost) {
     return { ...pick("fork", session, "cheaper"), forkCost, quickCost }

@@ -47,7 +47,9 @@ function createMockContext(sessionID: string): ToolContext {
   }
 }
 
-async function createSkillTool(...args: Parameters<typeof import("./tools").createSkillTool>): ReturnType<typeof import("./tools").createSkillTool> {
+async function createSkillTool(
+  ...args: Parameters<typeof import("./tools").createSkillTool>
+): ReturnType<typeof import("./tools").createSkillTool> {
   const module = await import(`./tools?test=${Date.now()}-${Math.random()}`)
   return module.createSkillTool(...args)
 }
@@ -90,7 +92,7 @@ describe("createSkillTool", () => {
     // then
     expect(getAllSkills.mock.calls.length).toBe(baselineGetAllSkillsCalls)
 
-		await skillTool.execute({ name: "lazy-skill" }, mockContext)
+    await skillTool.execute({ name: "lazy-skill" }, mockContext)
 
     expect(getAllSkills.mock.calls.length).toBe(baselineGetAllSkillsCalls + 1)
   })

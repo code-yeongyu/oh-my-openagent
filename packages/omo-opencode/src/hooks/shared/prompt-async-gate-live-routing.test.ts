@@ -9,10 +9,7 @@ import {
   resetLiveServerRouteForTesting,
   setLiveParentWakeRoutingDisabled,
 } from "../../shared/live-server-route"
-import {
-  dispatchInternalPrompt,
-  releaseAllPromptAsyncReservationsForTesting,
-} from "../../shared/prompt-async-gate"
+import { dispatchInternalPrompt, releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt-async-gate"
 
 function makeRecordingSession() {
   const calls: string[] = []
@@ -135,7 +132,11 @@ describe("dispatchInternalPrompt live-server-route routing", () => {
       fetchCallCount += 1
       return new Response(JSON.stringify([]), { status: 200 })
     }) as typeof fetch)
-    initLiveServerRoute({ serverUrl: new URL("http://127.0.0.1:9999"), directory: "/test", inProcessClient: makeClient(origSession.session) })
+    initLiveServerRoute({
+      serverUrl: new URL("http://127.0.0.1:9999"),
+      directory: "/test",
+      inProcessClient: makeClient(origSession.session),
+    })
 
     //#when
     const result = await dispatchInternalPrompt(makeBaseDispatchArgs("ses_unregistered", unregistered))
@@ -283,10 +284,12 @@ describe("dispatchInternalPrompt live-server-route routing", () => {
     status = "idle"
     await new Promise<void>((resolve, reject) => {
       const timeoutId = setTimeout(() => reject(new Error("timed out waiting for queued prompt")), 2_000)
-      promptSeen.then(() => {
-        clearTimeout(timeoutId)
-        resolve()
-      }).catch(reject)
+      promptSeen
+        .then(() => {
+          clearTimeout(timeoutId)
+          resolve()
+        })
+        .catch(reject)
     })
 
     //#then

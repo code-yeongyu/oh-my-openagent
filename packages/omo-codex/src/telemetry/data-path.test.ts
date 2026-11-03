@@ -3,12 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 
-import {
-  __resetOsProviderForTesting,
-  __setOsProviderForTesting,
-  getActivityStateDir,
-  getDataDir,
-} from "./data-path"
+import { __resetOsProviderForTesting, __setOsProviderForTesting, getActivityStateDir, getDataDir } from "./data-path"
 
 const originalXdgDataHome = process.env.XDG_DATA_HOME
 

@@ -90,7 +90,8 @@ export function parseArgs(argv, { scenarios = [], extra = {} } = {}) {
   }
   if (scenarios.length > 0) {
     const allowed = ["all", ...scenarios]
-    if (!allowed.includes(options.scenario)) throw new Error(`--scenario must be ${allowed.join("|")}, got ${options.scenario}`)
+    if (!allowed.includes(options.scenario))
+      throw new Error(`--scenario must be ${allowed.join("|")}, got ${options.scenario}`)
   }
   return options
 }
@@ -103,12 +104,20 @@ export function parseArgs(argv, { scenarios = [], extra = {} } = {}) {
 export function resolveCommand({ commandFile, senpiCli }) {
   if (commandFile !== undefined) {
     if (!existsSync(commandFile)) throw new Error(`command file not found: ${commandFile}`)
-    const lines = readFileSync(commandFile, "utf8").split(/\r?\n/).filter((line) => line.trim().length > 0)
-    if (lines.length !== 1) throw new Error(`command file must hold exactly one executable path, found ${lines.length} lines: ${commandFile}`)
+    const lines = readFileSync(commandFile, "utf8")
+      .split(/\r?\n/)
+      .filter((line) => line.trim().length > 0)
+    if (lines.length !== 1)
+      throw new Error(`command file must hold exactly one executable path, found ${lines.length} lines: ${commandFile}`)
     const executable = lines[0].trim()
     if (!existsSync(executable)) throw new Error(`packaged executable not found: ${executable}`)
     return /\.(?:m?js|cjs)$/u.test(executable)
-      ? { file: process.execPath, prefix: [executable], display: `${process.execPath} ${executable}`, source: "command-file" }
+      ? {
+          file: process.execPath,
+          prefix: [executable],
+          display: `${process.execPath} ${executable}`,
+          source: "command-file",
+        }
       : { file: executable, prefix: [], display: executable, source: "command-file" }
   }
   if (!existsSync(senpiCli)) throw new Error(`senpi cli not found at ${senpiCli}`)
@@ -120,15 +129,35 @@ export function resolveCommand({ commandFile, senpiCli }) {
 export function prepareSandbox(pluginRoot, baseUrl) {
   const sandbox = createSandbox()
   seedSandbox(sandbox)
-  writeFileSync(join(sandbox.agentDir, "settings.json"), `${JSON.stringify({ defaultProjectTrust: "ask", packages: [pluginRoot] }, null, 2)}\n`)
+  writeFileSync(
+    join(sandbox.agentDir, "settings.json"),
+    `${JSON.stringify({ defaultProjectTrust: "ask", packages: [pluginRoot] }, null, 2)}\n`,
+  )
   mkdirSync(join(sandbox.agentDir, "sessions"), { recursive: true })
   mkdirSync(join(sandbox.cwd, ".omo"), { recursive: true })
   const nativeState = join(sandbox.agentDir, "omo-senpi", "omo-native")
   mkdirSync(nativeState, { recursive: true })
-  writeFileSync(join(nativeState, "onboarding-completed"), `${JSON.stringify({ completedAt: new Date().toISOString(), version: 1 })}\n`)
-  writeFileSync(join(sandbox.agentDir, "auth.json"), `${JSON.stringify({ "omo-mock": { type: "api_key", key: "mock" } }, null, 2)}\n`)
-  const model = { id: "mock-1", name: "Mock 1", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 200000, maxTokens: 8192 }
-  writeFileSync(join(sandbox.agentDir, "models.json"), `${JSON.stringify({ providers: { "omo-mock": { name: "omo mock http provider", api: "openai-completions", baseUrl, apiKey: "mock", models: [model] } } }, null, 2)}\n`)
+  writeFileSync(
+    join(nativeState, "onboarding-completed"),
+    `${JSON.stringify({ completedAt: new Date().toISOString(), version: 1 })}\n`,
+  )
+  writeFileSync(
+    join(sandbox.agentDir, "auth.json"),
+    `${JSON.stringify({ "omo-mock": { type: "api_key", key: "mock" } }, null, 2)}\n`,
+  )
+  const model = {
+    id: "mock-1",
+    name: "Mock 1",
+    reasoning: false,
+    input: ["text"],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    contextWindow: 200000,
+    maxTokens: 8192,
+  }
+  writeFileSync(
+    join(sandbox.agentDir, "models.json"),
+    `${JSON.stringify({ providers: { "omo-mock": { name: "omo mock http provider", api: "openai-completions", baseUrl, apiKey: "mock", models: [model] } } }, null, 2)}\n`,
+  )
   return { ...sandbox, memoryHome: join(sandbox.root, "memory"), sessionsDir: join(sandbox.agentDir, "sessions") }
 }
 
@@ -137,23 +166,45 @@ export function prepareSandbox(pluginRoot, baseUrl) {
  * first accept. `categories` replaces the lane's mock quick pin - `{}` leaves the recall category on
  * its builtin chain, whose providers this sandbox never connects (only `omo-mock` is authenticated).
  */
-export function writeOmoConfig(sandbox, { recallEnabled, recall = {}, categories = { quick: { description: "QA mock quick category", model: "omo-mock/mock-1" } } }) {
-  writeFileSync(join(sandbox.cwd, ".omo", "omo.json"), `${JSON.stringify({
-    categories,
-    memory: {
-      enabled: true,
-      recall: { enabled: recallEnabled, max_items: 1, ...recall },
-      reflection: { trigger: { step_count: 0, on_compaction: false } },
-      facts: { enabled: false },
-    },
-  }, null, 2)}\n`)
+export function writeOmoConfig(
+  sandbox,
+  {
+    recallEnabled,
+    recall = {},
+    categories = { quick: { description: "QA mock quick category", model: "omo-mock/mock-1" } },
+  },
+) {
+  writeFileSync(
+    join(sandbox.cwd, ".omo", "omo.json"),
+    `${JSON.stringify(
+      {
+        categories,
+        memory: {
+          enabled: true,
+          recall: { enabled: recallEnabled, max_items: 1, ...recall },
+          reflection: { trigger: { step_count: 0, on_compaction: false } },
+          facts: { enabled: false },
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  )
 }
 
 const SCRUBBED_ENV = [
-  "OMO_CODING_AGENT_DIR", "PI_CODING_AGENT_DIR", "SENPI_CODING_AGENT_DIR",
-  "SENPI_PACKAGE_DIR", "OMO_PACKAGE_DIR", "PI_PACKAGE_DIR", "SENPI_BIN",
-  "RPC_CLIENT_CAPABILITIES", "SENPI_RPC_CLIENT_CAPABILITIES", "OMO_RPC_CLIENT_CAPABILITIES",
-  "PI_SESSION_FILE", "SENPI_SESSION_FILE",
+  "OMO_CODING_AGENT_DIR",
+  "PI_CODING_AGENT_DIR",
+  "SENPI_CODING_AGENT_DIR",
+  "SENPI_PACKAGE_DIR",
+  "OMO_PACKAGE_DIR",
+  "PI_PACKAGE_DIR",
+  "SENPI_BIN",
+  "RPC_CLIENT_CAPABILITIES",
+  "SENPI_RPC_CLIENT_CAPABILITIES",
+  "OMO_RPC_CLIENT_CAPABILITIES",
+  "PI_SESSION_FILE",
+  "SENPI_SESSION_FILE",
 ]
 
 export function sandboxEnv(sandbox) {
@@ -176,14 +227,19 @@ export function sandboxEnv(sandbox) {
 // Every agent-dir lane points at the sandbox: `isolatedChildEnv` sets all three (#8967), and the omo
 // lane outranks the senpi one, so a lane that is merely absent-or-real would be a leak, not a scrub.
 export function assertSandboxEnv(sandbox, env) {
-  for (const [name, expected] of [...AGENT_DIR_ENV_NAMES.map((lane) => [lane, sandbox.agentDir]), ["OMO_MEMORY_HOME", sandbox.memoryHome], ["HOME", sandbox.homeDir]]) {
+  for (const [name, expected] of [
+    ...AGENT_DIR_ENV_NAMES.map((lane) => [lane, sandbox.agentDir]),
+    ["OMO_MEMORY_HOME", sandbox.memoryHome],
+    ["HOME", sandbox.homeDir],
+  ]) {
     if (env[name] !== expected) throw new Error(`env ${name} is ${env[name]}, expected the sandbox path ${expected}`)
     if (!env[name].startsWith(sandbox.root)) throw new Error(`env ${name} escapes the sandbox root ${sandbox.root}`)
   }
   for (const name of ["SENPI_BIN", "SENPI_PACKAGE_DIR", "OMO_PACKAGE_DIR", "PI_PACKAGE_DIR"]) {
     if (env[name] !== undefined) throw new Error(`env ${name} must be scrubbed before spawning`)
   }
-  if (env.PI_OFFLINE !== "1") throw new Error("env PI_OFFLINE must be 1: the lane allows no network beyond the mock provider")
+  if (env.PI_OFFLINE !== "1")
+    throw new Error("env PI_OFFLINE must be 1: the lane allows no network beyond the mock provider")
 }
 
 // ---- the mock router ---------------------------------------------------------------------------------
@@ -214,7 +270,9 @@ export function isSidecarRequest(body) {
 }
 
 export function sameNames(actual, expected) {
-  return actual.length === expected.length && [...actual].sort().every((name, index) => name === [...expected].sort()[index])
+  return (
+    actual.length === expected.length && [...actual].sort().every((name, index) => name === [...expected].sort()[index])
+  )
 }
 
 /**
@@ -243,7 +301,12 @@ export function createRouter({ lanes = [] } = {}) {
       state[lane.name] = (state[lane.name] ?? 0) + 1
       step = lane.step(body)
     } else if (isSidecarRequest(body)) {
-      state.sidecarRequests.push({ index, toolNames: requestToolNames(body), memoryParameters: requestToolParameters(body, "memory"), messageCount: Array.isArray(body?.messages) ? body.messages.length : 0 })
+      state.sidecarRequests.push({
+        index,
+        toolNames: requestToolNames(body),
+        memoryParameters: requestToolParameters(body, "memory"),
+        messageCount: Array.isArray(body?.messages) ? body.messages.length : 0,
+      })
       step = sidecarSteps[sidecarCursor] ?? { type: "text", text: "sidecar script exhausted" }
       sidecarCursor += 1
       state.sidecar += 1
@@ -260,8 +323,14 @@ export function createRouter({ lanes = [] } = {}) {
     steps,
     state,
     classify: (body) => laneFor(body)?.name ?? (isSidecarRequest(body) ? "sidecar" : "parent"),
-    setParentSteps(next) { parentSteps = next; parentCursor = 0 },
-    setSidecarSteps(next) { sidecarSteps = next; sidecarCursor = 0 },
+    setParentSteps(next) {
+      parentSteps = next
+      parentCursor = 0
+    },
+    setSidecarSteps(next) {
+      sidecarSteps = next
+      sidecarCursor = 0
+    },
   }
 }
 
@@ -279,14 +348,34 @@ export const RATE_LIMIT_STEP = {
 // ---- the RPC driver ----------------------------------------------------------------------------------
 
 export function launchRpc(command, sandbox, env) {
-  const child = spawn(command.file, [...command.prefix, "--mode", "rpc", "--provider", "omo-mock", "--model", "mock-1", "--session-dir", sandbox.sessionsDir], { cwd: sandbox.cwd, env, stdio: ["pipe", "pipe", "pipe"] })
+  const child = spawn(
+    command.file,
+    [
+      ...command.prefix,
+      "--mode",
+      "rpc",
+      "--provider",
+      "omo-mock",
+      "--model",
+      "mock-1",
+      "--session-dir",
+      sandbox.sessionsDir,
+    ],
+    { cwd: sandbox.cwd, env, stdio: ["pipe", "pipe", "pipe"] },
+  )
   const events = []
   const waiters = []
   let stderr = ""
-  child.stderr.on("data", (chunk) => { stderr += chunk.toString() })
+  child.stderr.on("data", (chunk) => {
+    stderr += chunk.toString()
+  })
   createInterface({ input: child.stdout }).on("line", (line) => {
     let event
-    try { event = JSON.parse(line) } catch { return }
+    try {
+      event = JSON.parse(line)
+    } catch {
+      return
+    }
     events.push(event)
     for (const waiter of [...waiters]) {
       if (!waiter.predicate(event)) continue
@@ -303,7 +392,11 @@ export function launchRpc(command, sandbox, env) {
       const waiter = { predicate, resolve: resolvePromise, timer: undefined }
       waiter.timer = setTimeout(() => {
         waiters.splice(waiters.indexOf(waiter), 1)
-        reject(new Error(`${label} timed out after ${timeoutMs}ms; events=${events.map((event) => event.type).join(",")}; stderr=${stderr.slice(-800)}`))
+        reject(
+          new Error(
+            `${label} timed out after ${timeoutMs}ms; events=${events.map((event) => event.type).join(",")}; stderr=${stderr.slice(-800)}`,
+          ),
+        )
       }, timeoutMs)
       waiters.push(waiter)
     })
@@ -315,14 +408,21 @@ export function launchRpc(command, sandbox, env) {
     mark: () => events.length,
     waitFrom,
     stderr: () => stderr,
-    send: (message) => { child.stdin.write(`${JSON.stringify(message)}\n`) },
+    send: (message) => {
+      child.stdin.write(`${JSON.stringify(message)}\n`)
+    },
   }
 }
 
 export async function getState(session) {
   const from = session.mark()
   session.send({ id: `state-${from}`, type: "get_state" })
-  const response = await session.waitFrom(from, (event) => event.type === "response" && event.command === "get_state", TURN_TIMEOUT_MS, "get_state response")
+  const response = await session.waitFrom(
+    from,
+    (event) => event.type === "response" && event.command === "get_state",
+    TURN_TIMEOUT_MS,
+    "get_state response",
+  )
   if (response.success !== true) throw new Error(`get_state failed: ${response.error}`)
   return response.data
 }
@@ -338,8 +438,16 @@ export async function prompt(session, message, timeoutMs = TURN_TIMEOUT_MS) {
 export async function teardown(session) {
   const { child } = session
   if (child.exitCode !== null || child.signalCode !== null) return `pid ${child.pid} already exited`
-  try { session.send({ type: "abort" }) } catch { /* stdin already closed */ }
-  try { child.stdin.end() } catch { /* stdin already closed */ }
+  try {
+    session.send({ type: "abort" })
+  } catch {
+    /* stdin already closed */
+  }
+  try {
+    child.stdin.end()
+  } catch {
+    /* stdin already closed */
+  }
   if (await waitForExit(child, EXIT_TIMEOUT_MS)) return `pid ${child.pid} exited`
   child.kill("SIGTERM")
   if (await waitForExit(child, EXIT_TIMEOUT_MS)) return `pid ${child.pid} exited after SIGTERM`
@@ -351,15 +459,26 @@ export async function teardown(session) {
 export function waitForExit(child, timeoutMs) {
   if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve(true)
   return new Promise((resolvePromise) => {
-    const timer = setTimeout(() => { child.removeListener("exit", onExit); resolvePromise(false) }, timeoutMs)
-    const onExit = () => { clearTimeout(timer); resolvePromise(true) }
+    const timer = setTimeout(() => {
+      child.removeListener("exit", onExit)
+      resolvePromise(false)
+    }, timeoutMs)
+    const onExit = () => {
+      clearTimeout(timer)
+      resolvePromise(true)
+    }
     child.once("exit", onExit)
   })
 }
 
 export function isAlive(pid) {
   if (typeof pid !== "number") return false
-  try { process.kill(pid, 0); return true } catch (error) { return error?.code === "EPERM" }
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    return error?.code === "EPERM"
+  }
 }
 
 // ---- file signals ------------------------------------------------------------------------------------
@@ -386,7 +505,12 @@ export function watchUntil(directories, predicate, { timeoutMs, description }) {
     }
     const inspect = () => {
       let value
-      try { value = predicate() } catch (error) { finish(reject, error); return }
+      try {
+        value = predicate()
+      } catch (error) {
+        finish(reject, error)
+        return
+      }
       if (value !== undefined && value !== false) finish(resolvePromise, value)
     }
     inspect()
@@ -411,19 +535,34 @@ export function watchUntil(directories, predicate, { timeoutMs, description }) {
  * an `omo-kibitzer:nudged` entry (steered into a running parent turn). Either signal ends the wait.
  */
 export function waitForAccepted(identity, state, memory, { timeoutMs = WAKE_TIMEOUT_MS, description }) {
-  return watchUntil([join(identity, "runtime", "recall"), dirname(state.sessionFile)], () => {
-    const held = readPending(identity, state.sessionId)
-    if (held?.nudges?.some((nudge) => nudge.path === memory.path)) return { via: "pending", nudges: held.nudges }
-    const nudged = readEntries(state.sessionFile).filter(isNudged).find((entry) => entry.data?.nudges?.some((nudge) => nudge.path === memory.path))
-    return nudged === undefined ? undefined : { via: nudged.data.via, nudges: nudged.data.nudges }
-  }, { timeoutMs, description })
+  return watchUntil(
+    [join(identity, "runtime", "recall"), dirname(state.sessionFile)],
+    () => {
+      const held = readPending(identity, state.sessionId)
+      if (held?.nudges?.some((nudge) => nudge.path === memory.path)) return { via: "pending", nudges: held.nudges }
+      const nudged = readEntries(state.sessionFile)
+        .filter(isNudged)
+        .find((entry) => entry.data?.nudges?.some((nudge) => nudge.path === memory.path))
+      return nudged === undefined ? undefined : { via: nudged.data.via, nudges: nudged.data.nudges }
+    },
+    { timeoutMs, description },
+  )
 }
 
 // ---- readers -------------------------------------------------------------------------------------------
 
 export function readEntries(file) {
   if (!existsSync(file)) return []
-  return readFileSync(file, "utf8").split("\n").filter((line) => line.trim().length > 0).flatMap((line) => { try { return [JSON.parse(line)] } catch { return [] } })
+  return readFileSync(file, "utf8")
+    .split("\n")
+    .filter((line) => line.trim().length > 0)
+    .flatMap((line) => {
+      try {
+        return [JSON.parse(line)]
+      } catch {
+        return []
+      }
+    })
 }
 
 export const isNudged = (entry) => entry.type === "custom" && entry.customType === NUDGED_ENTRY_TYPE
@@ -445,13 +584,19 @@ export function toolCallsOf(message) {
 }
 
 export function nudgedPaths(entries) {
-  return entries.filter(isNudged).flatMap((entry) => (Array.isArray(entry.data?.nudges) ? entry.data.nudges.map((nudge) => nudge.path) : []))
+  return entries
+    .filter(isNudged)
+    .flatMap((entry) => (Array.isArray(entry.data?.nudges) ? entry.data.nudges.map((nudge) => nudge.path) : []))
 }
 
 /** Durable identities of the sandbox: `<memory>/agents/<id>` (a transient one-shot run never lands here). */
 export function identityDirs(memoryHome) {
   const agents = join(memoryHome, "agents")
-  return existsSync(agents) ? readdirSync(agents).sort().map((name) => join(agents, name)) : []
+  return existsSync(agents)
+    ? readdirSync(agents)
+        .sort()
+        .map((name) => join(agents, name))
+    : []
 }
 
 export function decodeSidecarDirName(name) {
@@ -466,7 +611,9 @@ export function encodeSidecarDirName(sessionId) {
 export function sidecarDirs(identityDir) {
   const root = join(identityDir, "runtime", "recall", "sidecars")
   if (!existsSync(root)) return []
-  return readdirSync(root).sort().map((name) => ({ name, dir: join(root, name), sessionId: decodeSidecarDirName(name) }))
+  return readdirSync(root)
+    .sort()
+    .map((name) => ({ name, dir: join(root, name), sessionId: decodeSidecarDirName(name) }))
 }
 
 /** `wakes.ndjson`: one bounded record per settled wake of that lineage. */
@@ -476,22 +623,27 @@ export function wakeRecords(sidecarDir) {
 
 export function childTranscripts(sidecarDir) {
   if (!existsSync(sidecarDir)) return []
-  return readdirSync(sidecarDir).filter((name) => name.endsWith(".jsonl")).sort().map((name) => {
-    const file = join(sidecarDir, name)
-    const entries = readEntries(file)
-    return {
-      file,
-      entries,
-      users: entries.filter(isUserMessage).map((entry) => entry.message),
-      assistants: entries.filter(isAssistantMessage).map((entry) => entry.message),
-    }
-  })
+  return readdirSync(sidecarDir)
+    .filter((name) => name.endsWith(".jsonl"))
+    .sort()
+    .map((name) => {
+      const file = join(sidecarDir, name)
+      const entries = readEntries(file)
+      return {
+        file,
+        entries,
+        users: entries.filter(isUserMessage).map((entry) => entry.message),
+        assistants: entries.filter(isAssistantMessage).map((entry) => entry.message),
+      }
+    })
 }
 
 export function leaseFiles(identityDir) {
   const locks = join(identityDir, "runtime", "locks")
   if (!existsSync(locks)) return []
-  return readdirSync(locks).filter((name) => /^recall-wake\.slot-\d+\.lock$/u.test(name)).sort()
+  return readdirSync(locks)
+    .filter((name) => /^recall-wake\.slot-\d+\.lock$/u.test(name))
+    .sort()
 }
 
 export function pendingFile(identityDir, sessionId) {
@@ -501,7 +653,11 @@ export function pendingFile(identityDir, sessionId) {
 export function readPending(identityDir, sessionId) {
   const file = pendingFile(identityDir, sessionId)
   if (!existsSync(file)) return undefined
-  try { return JSON.parse(readFileSync(file, "utf8")) } catch { return undefined }
+  try {
+    return JSON.parse(readFileSync(file, "utf8"))
+  } catch {
+    return undefined
+  }
 }
 
 // ---- seeding -------------------------------------------------------------------------------------------
@@ -517,7 +673,13 @@ export async function seedMemories(command, sandbox, env, router, memories) {
     ...memories.map((memory) => ({
       type: "tool_call",
       name: "memory",
-      arguments: { command: "create", file_path: memory.path, description: memory.description, file_text: memory.body, reason: "seed the recall corpus for the resident Kibitzer QA lane" },
+      arguments: {
+        command: "create",
+        file_path: memory.path,
+        description: memory.description,
+        file_text: memory.body,
+        reason: "seed the recall corpus for the resident Kibitzer QA lane",
+      },
     })),
     { type: "text", text: "memory seeded" },
   ])
@@ -529,7 +691,10 @@ export async function seedMemories(command, sandbox, env, router, memories) {
     await prompt(session, "Write down these operational rules for later.")
     const entries = readEntries(state.sessionFile)
     const results = entries
-      .filter((entry) => entry.type === "message" && entry.message?.role === "toolResult" && entry.message?.toolName === "memory")
+      .filter(
+        (entry) =>
+          entry.type === "message" && entry.message?.role === "toolResult" && entry.message?.toolName === "memory",
+      )
       .map((entry) => ({ isError: entry.message.isError === true, text: messageText(entry.message).slice(0, 160) }))
     const identities = identityDirs(sandbox.memoryHome)
     const seeded = memories.map((memory) => identities.map((dir) => join(dir, "repo", memory.path)).filter(existsSync))
@@ -538,7 +703,11 @@ export async function seedMemories(command, sandbox, env, router, memories) {
       results,
       identities,
       seeded,
-      ok: identities.length === 1 && seeded.every((hits) => hits.length === 1) && results.length === memories.length && results.every((result) => !result.isError),
+      ok:
+        identities.length === 1 &&
+        seeded.every((hits) => hits.length === 1) &&
+        results.length === memories.length &&
+        results.every((result) => !result.isError),
     }
   } finally {
     // The seed process is torn down whether or not the turn succeeded; the caller reads `stderr` on failure.
@@ -561,7 +730,9 @@ export function createCleanup() {
   const receipts = []
   let running
   return {
-    add(label, action) { steps.push({ label, action }) },
+    add(label, action) {
+      steps.push({ label, action })
+    },
     receipts,
     run() {
       if (running !== undefined) return running

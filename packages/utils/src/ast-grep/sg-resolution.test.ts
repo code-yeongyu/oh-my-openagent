@@ -347,36 +347,40 @@ describe("resolveSgBinarySync probe-all behaviour", () => {
     rmSync(root, { force: true, recursive: true })
   })
 
-  it("#given a stub that hangs #when probing #then the 5s timeout bounds it and resolution reports not found", () => {
-    // given
-    const root = tempDir("probe-hang")
-    const hanging = writeStubBinary(join(root, "bin", "sg"), "#!/bin/sh\nsleep 60\n")
-    const startedAt = Date.now()
+  it(
+    "#given a stub that hangs #when probing #then the 5s timeout bounds it and resolution reports not found",
+    () => {
+      // given
+      const root = tempDir("probe-hang")
+      const hanging = writeStubBinary(join(root, "bin", "sg"), "#!/bin/sh\nsleep 60\n")
+      const startedAt = Date.now()
 
-    // when
-    const result = resolveSgBinarySync(
-      isolatedOptions({
-        platform: "linux",
-        runVersionProbeSync:
-          process.platform === "win32"
-            ? () => {
-                const error = new Error("probe timed out") as Error & { code: string }
-                error.code = "ETIMEDOUT"
-                throw error
-              }
-            : undefined,
-        which: (commandName) => (commandName === "sg" ? hanging : null),
-      }),
-    )
-    const elapsedMs = Date.now() - startedAt
+      // when
+      const result = resolveSgBinarySync(
+        isolatedOptions({
+          platform: "linux",
+          runVersionProbeSync:
+            process.platform === "win32"
+              ? () => {
+                  const error = new Error("probe timed out") as Error & { code: string }
+                  error.code = "ETIMEDOUT"
+                  throw error
+                }
+              : undefined,
+          which: (commandName) => (commandName === "sg" ? hanging : null),
+        }),
+      )
+      const elapsedMs = Date.now() - startedAt
 
-    // then
-    expect(result.found).toBe(false)
-    expect(elapsedMs).toBeLessThan(20_000)
-    if (process.platform !== "win32") expect(elapsedMs).toBeGreaterThanOrEqual(4_000)
+      // then
+      expect(result.found).toBe(false)
+      expect(elapsedMs).toBeLessThan(20_000)
+      if (process.platform !== "win32") expect(elapsedMs).toBeGreaterThanOrEqual(4_000)
 
-    rmSync(root, { force: true, recursive: true })
-  }, { timeout: 30_000 })
+      rmSync(root, { force: true, recursive: true })
+    },
+    { timeout: 30_000 },
+  )
 })
 
 describe("resolveSgBinarySync cache", () => {
@@ -424,7 +428,11 @@ describe("resolveSgBinarySync cache", () => {
     // when
     const first = resolveSgBinarySync(baseOptions)
     rmSync(join(root, "bin"), { force: true, recursive: true })
-    const second = resolveSgBinarySync({ ...baseOptions, env: {}, which: (name) => (name === "ast-grep" ? replacement : null) })
+    const second = resolveSgBinarySync({
+      ...baseOptions,
+      env: {},
+      which: (name) => (name === "ast-grep" ? replacement : null),
+    })
 
     // then
     expect(first.found ? first.path : null).toBe(cached)

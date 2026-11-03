@@ -63,8 +63,7 @@ function extractLockedVersion(packageReference: string): string {
 async function findFirstPartyEffectImports(): Promise<string[]> {
   // POSIX ERE, not PCRE: `git grep -P` needs a git built with USE_LIBPCRE and
   // exits 128 without it (#10735). Every git supports -E.
-  const importPattern =
-    String.raw`(from[[:space:]]+|import\([[:space:]]*|require\([[:space:]]*)["']effect(/[^"']*)?["']`
+  const importPattern = String.raw`(from[[:space:]]+|import\([[:space:]]*|require\([[:space:]]*)["']effect(/[^"']*)?["']`
   const result = Bun.spawnSync(
     [
       "git",

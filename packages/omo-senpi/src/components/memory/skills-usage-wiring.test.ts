@@ -12,7 +12,7 @@ describe("registerSkillsUsage", () => {
     const pi = new FakeExtensionAPI()
     const sessionContext = eventContext("session-1")
     const trackers = registerSkillsUsage(pi, {
-      resolveContext: (candidate) => candidate === sessionContext ? context : undefined,
+      resolveContext: (candidate) => (candidate === sessionContext ? context : undefined),
       resolveCwd: () => repoDir,
       now: () => new Date("2026-01-15T10:00:00Z"),
     })
@@ -112,11 +112,7 @@ describe("registerSkillsUsage", () => {
     })
 
     // #when
-    await pi.dispatch(
-      "tool_call",
-      toolCall("read", { path: "/tmp/skills/foo/SKILL.md" }),
-      eventContext("session-1"),
-    )
+    await pi.dispatch("tool_call", toolCall("read", { path: "/tmp/skills/foo/SKILL.md" }), eventContext("session-1"))
 
     // #then
     expect(trackers.size).toBe(0)

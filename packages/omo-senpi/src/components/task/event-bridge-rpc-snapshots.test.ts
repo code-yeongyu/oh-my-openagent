@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 
-import { taskRecord, taskSnapshot , fakeTaskRpcTimers } from "./event-bridge.test-fixtures"
+import { taskRecord, taskSnapshot, fakeTaskRpcTimers } from "./event-bridge.test-fixtures"
 import { wireHarness } from "./event-bridge.test-harness"
 
 describe("event-bridge native task RPC snapshots", () => {

@@ -1,9 +1,6 @@
 import { getOpenCodeConfigPaths } from "../../shared"
 import { resolveUserOmoConfigPath } from "@oh-my-opencode/omo-config-core"
-import type {
-  OpenCodeBinaryType,
-  OpenCodeConfigPaths,
-} from "../../shared/opencode-config-dir-types"
+import type { OpenCodeBinaryType, OpenCodeConfigPaths } from "../../shared/opencode-config-dir-types"
 
 export interface ConfigContext {
   binary: OpenCodeBinaryType

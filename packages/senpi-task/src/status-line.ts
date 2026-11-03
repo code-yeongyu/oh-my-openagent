@@ -44,8 +44,12 @@ export type StatusLineInput = {
 // handle when none was supplied.
 export function taskIdentityLabel(input: TaskIdentityInput): string {
   const label =
-    optionalRendererText(input.taskSummary) ?? optionalRendererText(input.description) ?? optionalRendererText(input.name)
-  return label === undefined ? excerptRendererText(input.taskId, IDENTITY_MAX_WIDTH) : excerptRendererText(label, IDENTITY_MAX_WIDTH)
+    optionalRendererText(input.taskSummary) ??
+    optionalRendererText(input.description) ??
+    optionalRendererText(input.name)
+  return label === undefined
+    ? excerptRendererText(input.taskId, IDENTITY_MAX_WIDTH)
+    : excerptRendererText(label, IDENTITY_MAX_WIDTH)
 }
 
 // WHO it runs as: one routing identity, shared by category- and agent-routed tasks. A record
@@ -67,12 +71,18 @@ export function formatTargetIdentity(input: Pick<StatusTargetInput, "category" |
 // is the only useful signal left.
 export function formatTargetWithModel(input: StatusTargetInput): string | undefined {
   const identity = formatTargetIdentity(input)
-  const model = formatStatusModel(input.effectiveModel)
-    ?? formatStatusModel(input.resolvedModel)
-    ?? optionalRendererText(input.model)
-  const target = identity !== undefined
-    ? (model === undefined ? identity : `${identity}(${model})`)
-    : (model !== undefined ? `model:${model}` : undefined)
+  const model =
+    formatStatusModel(input.effectiveModel) ??
+    formatStatusModel(input.resolvedModel) ??
+    optionalRendererText(input.model)
+  const target =
+    identity !== undefined
+      ? model === undefined
+        ? identity
+        : `${identity}(${model})`
+      : model !== undefined
+        ? `model:${model}`
+        : undefined
   if (target === undefined) return undefined
   return input.effectiveModel?.switched_by_operator === true ? `${target} (switched by operator)` : target
 }
@@ -81,7 +91,8 @@ export function formatTargetWithModel(input: StatusTargetInput): string | undefi
 export function formatStatusTarget(input: StatusTargetInput): string | undefined {
   const target = formatTargetWithModel(input)
   if (target === undefined) return undefined
-  const fallback = input.fallbackCount === undefined || input.fallbackCount <= 0 ? undefined : `fallback:${input.fallbackCount}`
+  const fallback =
+    input.fallbackCount === undefined || input.fallbackCount <= 0 ? undefined : `fallback:${input.fallbackCount}`
   return [target, fallback].filter((token) => token !== undefined).join(" · ")
 }
 
@@ -101,7 +112,7 @@ export type LiveStatsTokens = {
 export function buildLiveStatsTokens(stats: StatusLineStats): LiveStatsTokens {
   const spend = formatLiveSpend(stats)
   return {
-    ...((stats.turns > 0 || stats.tool_calls > 0)
+    ...(stats.turns > 0 || stats.tool_calls > 0
       ? { turn: `turn ${stats.turns}${toolCountSuffix(stats.tool_calls)}` }
       : {}),
     ...((stats.failed_turns ?? 0) > 0 ? { failed: `failed ${stats.failed_turns}` } : {}),
@@ -132,9 +143,7 @@ export function formatLiveSpend(stats: Pick<TaskRunStats, "cost_usd">): string |
 }
 
 // Completed-run summaries pair spend with the cumulative whole-run cache-hit rate.
-export function formatRunSpend(
-  stats: Pick<TaskRunStats, "cost_usd" | "cache_hit_rate_run">,
-): string | undefined {
+export function formatRunSpend(stats: Pick<TaskRunStats, "cost_usd" | "cache_hit_rate_run">): string | undefined {
   return formatSpendFacts(stats.cost_usd, stats.cache_hit_rate_run)
 }
 
@@ -163,12 +172,16 @@ export function toolCountSuffix(toolCalls: number): string {
 }
 
 function formatStatusModel(
-  resolved: Pick<ResolvedModelRecord, "provider" | "model_id" | "variant" | "reasoning_effort" | "reasoning"> | undefined,
+  resolved:
+    Pick<ResolvedModelRecord, "provider" | "model_id" | "variant" | "reasoning_effort" | "reasoning"> | undefined,
 ): string | undefined {
   if (resolved === undefined) return undefined
   const provider = optionalRendererText(resolved.provider)
   const modelId = optionalRendererText(resolved.model_id)
   if (provider === undefined || modelId === undefined) return undefined
-  const effort = optionalRendererText(resolved.reasoning) ?? optionalRendererText(resolved.reasoning_effort) ?? optionalRendererText(resolved.variant)
+  const effort =
+    optionalRendererText(resolved.reasoning) ??
+    optionalRendererText(resolved.reasoning_effort) ??
+    optionalRendererText(resolved.variant)
   return `${provider}/${modelId}${effort === undefined ? "" : `:${effort}`}`
 }

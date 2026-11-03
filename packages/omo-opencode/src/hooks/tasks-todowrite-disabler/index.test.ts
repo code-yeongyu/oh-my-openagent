@@ -17,9 +17,7 @@ describe("tasks-todowrite-disabler", () => {
       }
 
       // when / then
-      await expect(
-        hook["tool.execute.before"](input, output)
-      ).resolves.toBeUndefined()
+      await expect(hook["tool.execute.before"](input, output)).resolves.toBeUndefined()
     })
 
     test("should block TodoRead tool", async () => {
@@ -35,9 +33,7 @@ describe("tasks-todowrite-disabler", () => {
       }
 
       // when / then
-      await expect(
-        hook["tool.execute.before"](input, output)
-      ).rejects.toThrow("TodoRead is DISABLED")
+      await expect(hook["tool.execute.before"](input, output)).rejects.toThrow("TodoRead is DISABLED")
     })
 
     test("should not block other tools", async () => {
@@ -53,9 +49,7 @@ describe("tasks-todowrite-disabler", () => {
       }
 
       // when / then
-      await expect(
-        hook["tool.execute.before"](input, output)
-      ).resolves.toBeUndefined()
+      await expect(hook["tool.execute.before"](input, output)).resolves.toBeUndefined()
     })
   })
 
@@ -73,9 +67,7 @@ describe("tasks-todowrite-disabler", () => {
       }
 
       // when / then
-      await expect(
-        hook["tool.execute.before"](input, output)
-      ).resolves.toBeUndefined()
+      await expect(hook["tool.execute.before"](input, output)).resolves.toBeUndefined()
     })
 
     test("should not block TodoWrite when experimental is undefined because task_system defaults to disabled", async () => {
@@ -91,9 +83,7 @@ describe("tasks-todowrite-disabler", () => {
       }
 
       // when / then
-      await expect(
-        hook["tool.execute.before"](input, output)
-      ).resolves.toBeUndefined()
+      await expect(hook["tool.execute.before"](input, output)).resolves.toBeUndefined()
     })
 
     test("should not block TodoRead when flag is false", async () => {
@@ -109,9 +99,7 @@ describe("tasks-todowrite-disabler", () => {
       }
 
       // when / then
-      await expect(
-        hook["tool.execute.before"](input, output)
-      ).resolves.toBeUndefined()
+      await expect(hook["tool.execute.before"](input, output)).resolves.toBeUndefined()
     })
   })
 
@@ -129,9 +117,7 @@ describe("tasks-todowrite-disabler", () => {
       }
 
       // when / then
-      await expect(
-        hook["tool.execute.before"](input, output)
-      ).rejects.toThrow(/TaskCreate|TaskUpdate|TaskList|TaskGet/)
+      await expect(hook["tool.execute.before"](input, output)).rejects.toThrow(/TaskCreate|TaskUpdate|TaskList|TaskGet/)
     })
   })
 })

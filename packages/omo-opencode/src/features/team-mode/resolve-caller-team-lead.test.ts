@@ -13,7 +13,14 @@ function makeSpec(overrides: Partial<TeamSpec> = {}): TeamSpec {
     leadAgentId: "lead",
     members: [
       { kind: "subagent_type", name: "lead", subagent_type: "sisyphus", backendType: "in-process", isActive: true },
-      { kind: "category", name: "worker", category: "quick", prompt: "do work", backendType: "in-process", isActive: true },
+      {
+        kind: "category",
+        name: "worker",
+        category: "quick",
+        prompt: "do work",
+        backendType: "in-process",
+        isActive: true,
+      },
     ],
     ...overrides,
   }
@@ -108,8 +115,22 @@ describe("shouldReuseCallerLeadSession", () => {
     const spec = makeSpec({
       leadAgentId: "lead",
       members: [
-        { kind: "category", name: "lead", category: "deep", prompt: "lead the team", backendType: "in-process", isActive: true },
-        { kind: "category", name: "worker", category: "quick", prompt: "do work", backendType: "in-process", isActive: true },
+        {
+          kind: "category",
+          name: "lead",
+          category: "deep",
+          prompt: "lead the team",
+          backendType: "in-process",
+          isActive: true,
+        },
+        {
+          kind: "category",
+          name: "worker",
+          category: "quick",
+          prompt: "do work",
+          backendType: "in-process",
+          isActive: true,
+        },
       ],
     })
 

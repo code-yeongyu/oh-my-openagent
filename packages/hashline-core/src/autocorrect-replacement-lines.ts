@@ -64,10 +64,7 @@ export function restoreOldWrappedLines(originalLines: string[], replacementLines
   return correctedLines
 }
 
-export function maybeExpandSingleLineMerge(
-  originalLines: string[],
-  replacementLines: string[]
-): string[] {
+export function maybeExpandSingleLineMerge(originalLines: string[], replacementLines: string[]): string[] {
   if (replacementLines.length !== 1 || originalLines.length <= 1) {
     return replacementLines
   }
@@ -149,10 +146,7 @@ export function maybeExpandSingleLineMerge(
   return replacementLines
 }
 
-export function restoreIndentForPairedReplacement(
-  originalLines: string[],
-  replacementLines: string[]
-): string[] {
+export function restoreIndentForPairedReplacement(originalLines: string[], replacementLines: string[]): string[] {
   if (originalLines.length !== replacementLines.length) {
     return replacementLines
   }
@@ -167,10 +161,7 @@ export function restoreIndentForPairedReplacement(
   })
 }
 
-export function autocorrectReplacementLines(
-  originalLines: string[],
-  replacementLines: string[]
-): string[] {
+export function autocorrectReplacementLines(originalLines: string[], replacementLines: string[]): string[] {
   let next = replacementLines
   next = maybeExpandSingleLineMerge(originalLines, next)
   next = restoreOldWrappedLines(originalLines, next)

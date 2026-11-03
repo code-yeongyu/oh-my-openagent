@@ -103,8 +103,7 @@ describe("sidecar parity set", () => {
     const codemode = installedSenpiRequire.resolve("@code-yeongyu/senpi-codemode/package.json")
 
     // when
-    const destinations = codemodeRuntimeDependencySources(dirname(codemode))
-      .map((source) => source.to)
+    const destinations = codemodeRuntimeDependencySources(dirname(codemode)).map((source) => source.to)
 
     // then
     const parser = "node_modules/@code-yeongyu/senpi-codemode/node_modules/@babel/parser"
@@ -132,9 +131,7 @@ describe("sidecar parity set", () => {
       const destinations = codemodeRuntimeDependencySources(codemode, host).map((source) => source.to)
 
       // then
-      expect(destinations).toEqual([
-        "node_modules/@code-yeongyu/senpi-codemode/node_modules/shared",
-      ])
+      expect(destinations).toEqual(["node_modules/@code-yeongyu/senpi-codemode/node_modules/shared"])
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
@@ -154,9 +151,7 @@ describe("sidecar parity set", () => {
       const destinations = codemodeRuntimeDependencySources(codemode, host).map((source) => source.to)
 
       // then
-      expect(destinations).toEqual([
-        "node_modules/@code-yeongyu/senpi-codemode/node_modules/shared",
-      ])
+      expect(destinations).toEqual(["node_modules/@code-yeongyu/senpi-codemode/node_modules/shared"])
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
@@ -208,7 +203,6 @@ describe("sidecar parity set", () => {
       rmSync(root, { recursive: true, force: true })
     }
   })
-
 
   test("#given the installed engine #when the sidecars are resolved #then the sandbox runtime quickjs-wasi and its wasm are staged as required entries", () => {
     // Given / When

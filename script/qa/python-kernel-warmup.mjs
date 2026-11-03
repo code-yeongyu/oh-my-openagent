@@ -23,7 +23,12 @@ export function preludeImports(source) {
   for (const line of source.split(/\r?\n/u)) {
     const plain = line.replace(/#.*$/u, "").trimEnd()
     const from = plain.match(/^from\s+([A-Za-z_][\w.]*)\s+import\b/u)
-    const names = from ? [from[1]] : plain.match(/^import\s+(.+)$/u)?.[1].split(",").map((part) => part.trim().split(/\s+/u)[0]) ?? []
+    const names = from
+      ? [from[1]]
+      : (plain
+          .match(/^import\s+(.+)$/u)?.[1]
+          .split(",")
+          .map((part) => part.trim().split(/\s+/u)[0]) ?? [])
     for (const name of names) {
       if (name && name !== "__future__" && !modules.includes(name)) modules.push(name)
     }

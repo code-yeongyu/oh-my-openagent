@@ -17,10 +17,7 @@ export const R0_FAILURE_KINDS = [
   "host_unavailable",
 ] as const
 
-export const R0_SUSPENSION_REASONS = [
-  "daemon_unavailable",
-  "host_draining",
-] as const
+export const R0_SUSPENSION_REASONS = ["daemon_unavailable", "host_draining"] as const
 
 export const R0_MODEL_START_FAILURE_REASONS = [
   "model_not_in_child_profile",

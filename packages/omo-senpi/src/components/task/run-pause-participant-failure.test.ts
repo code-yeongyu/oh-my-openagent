@@ -18,11 +18,19 @@ afterEach(() => {
 })
 
 const PARENT = "parent"
-const stopped = (pauseSeq: number): EnginePauseState => ({ pauseSeq, holds: [{ kind: "session_hold", key: `session_hold:${pauseSeq}` }] })
+const stopped = (pauseSeq: number): EnginePauseState => ({
+  pauseSeq,
+  holds: [{ kind: "session_hold", key: `session_hold:${pauseSeq}` }],
+})
 const released = (pauseSeq: number): EnginePauseState => ({ pauseSeq, holds: [] })
 const child: PauseParticipant = {
-  key: "st_b", kind: "task", taskId: "st_b", runEpoch: 0, runRef: { kind: "task", id: "st_b" },
-  state: "pending", at: "2026-01-01T00:00:00.000Z",
+  key: "st_b",
+  kind: "task",
+  taskId: "st_b",
+  runEpoch: 0,
+  runRef: { kind: "task", id: "st_b" },
+  state: "pending",
+  at: "2026-01-01T00:00:00.000Z",
 }
 
 function bridgeOver(root: string, pause: RunPauseEffects["pause"], state: EnginePauseState) {
@@ -35,14 +43,25 @@ function bridgeOver(root: string, pause: RunPauseEffects["pause"], state: Engine
     addFences: async () => undefined,
     pause,
     dispatchGuidance: async () => undefined,
-    resume: async participant => { resumed.push(participant.key); return { kind: "resumed" } },
+    resume: async (participant) => {
+      resumed.push(participant.key)
+      return { kind: "resumed" }
+    },
     install: async () => undefined,
     acknowledgeInstalled: async () => undefined,
     cancel: async () => undefined,
   }
   let live = state
   const bridge = new EngineRunPauseBridge(new RunPauseController(registry, effects), { getPauseState: () => live })
-  return { barrier, registry, bridge, resumed, setState: (next: EnginePauseState) => { live = next } }
+  return {
+    barrier,
+    registry,
+    bridge,
+    resumed,
+    setState: (next: EnginePauseState) => {
+      live = next
+    },
+  }
 }
 
 function stateRoot(): string {
@@ -69,7 +88,13 @@ test("H2: a participant that never acknowledges the pause is recorded lost and R
 })
 
 test("H2: a participant whose pause throws is recorded lost and Resume still reopens admission", async () => {
-  const h = bridgeOver(stateRoot(), async () => { throw new Error("child transport lost") }, stopped(7))
+  const h = bridgeOver(
+    stateRoot(),
+    async () => {
+      throw new Error("child transport lost")
+    },
+    stopped(7),
+  )
   await stopThenResume(h)
   expect(h.resumed).toEqual([])
   expect(h.barrier.state(PARENT)).toEqual({ kind: "open" })
@@ -78,7 +103,13 @@ test("H2: a participant whose pause throws is recorded lost and Resume still reo
 test("H2: after a restart from a registry left propagating, a released engine reopens admission", async () => {
   const root = stateRoot()
   new PauseRegistry(root, new AdmissionBarrier()).begin(PARENT, 7, [child])
-  const h = bridgeOver(root, async () => { throw new Error("child gone after restart") }, stopped(7))
+  const h = bridgeOver(
+    root,
+    async () => {
+      throw new Error("child gone after restart")
+    },
+    stopped(7),
+  )
   await h.bridge.restore(PARENT)
   await h.bridge.reconciled(PARENT)
   expect(h.registry.require(PARENT).phase).toBe("applied")
@@ -90,26 +121,46 @@ test("H2: after a restart from a registry left propagating, a released engine re
 
 function engineGraph(pauseTask: () => Promise<EngineInheritReceipt>) {
   const record = {
-    task_id: "st_b", status: "running", parent_session_id: PARENT, created_at: "2026-01-01T00:00:00.000Z",
-    updated_at: "2026-01-01T00:00:00.000Z", notification: { run_epoch: 0 },
+    task_id: "st_b",
+    status: "running",
+    parent_session_id: PARENT,
+    created_at: "2026-01-01T00:00:00.000Z",
+    updated_at: "2026-01-01T00:00:00.000Z",
+    notification: { run_epoch: 0 },
   }
   const manager = {
     list: () => [{ record }],
-    get: (taskId: string) => taskId === "st_b" ? record : undefined,
+    get: (taskId: string) => (taskId === "st_b" ? record : undefined),
     pauseTask,
-    resumePausedTask: async () => { throw new Error("a child the run never held is not resumed") },
+    resumePausedTask: async () => {
+      throw new Error("a child the run never held is not resumed")
+    },
   } as unknown as Parameters<typeof createEngineRunPause>[0]["manager"]
   let live: EnginePauseState = stopped(7)
   const barrier = new AdmissionBarrier()
   const graph = createEngineRunPause({
-    stateDir: tempProject(), barrier, manager, runtime: { getPauseState: () => live, fenceRun: () => undefined },
+    stateDir: tempProject(),
+    barrier,
+    manager,
+    runtime: { getPauseState: () => live, fenceRun: () => undefined },
   })
-  return { graph, barrier, setState: (next: EnginePauseState) => { live = next } }
+  return {
+    graph,
+    barrier,
+    setState: (next: EnginePauseState) => {
+      live = next
+    },
+  }
 }
 
 for (const [name, pauseTask] of [
   ["refuses the parent with a receipt", async (): Promise<EngineInheritReceipt> => ({ refused: "wrong_parent" })],
-  ["runs on an engine without a run hold", async (): Promise<EngineInheritReceipt> => { throw new NativePauseUnavailableError("st_b") }],
+  [
+    "runs on an engine without a run hold",
+    async (): Promise<EngineInheritReceipt> => {
+      throw new NativePauseUnavailableError("st_b")
+    },
+  ],
 ] as const) {
   test(`H2: when a child ${name}, Stop still applies and Resume or a person's message reopens admission`, async () => {
     const h = engineGraph(pauseTask)

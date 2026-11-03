@@ -7,7 +7,13 @@ import type { SenpiHostProtocolInfo } from "../../../lazy/senpi-barrel"
 import { FakeSessionTable, type FakeDrainedSession, type FakeHostSession } from "./fake-host-sessions"
 import { fakeProtocolInfo, probeFakeHost, type FakeHostIdentityOptions } from "./fake-host-probe"
 import { fakeHostTransport, type FakeHostTransport } from "./fake-host-transport"
-import { handleWireLine, writeFrame, type FakeHostCommand, type FakeHostOpenFailure, type FakeHostWarmAnswer } from "./fake-host-wire"
+import {
+  handleWireLine,
+  writeFrame,
+  type FakeHostCommand,
+  type FakeHostOpenFailure,
+  type FakeHostWarmAnswer,
+} from "./fake-host-wire"
 import { FakeInputAdmissions } from "./fake-input-admissions"
 
 /**
@@ -100,10 +106,17 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
   // `<path>.secret`, which is how the real host behaves and how clients already resolve the address.
   let transport: FakeHostTransport
   const drainRetryAfterMs = options.drainRetryAfterMs ?? 2_000
-  const table = new FakeSessionTable({ transcripts: options.transcripts === true, sessionProcesses: options.sessionProcesses === true })
+  const table = new FakeSessionTable({
+    transcripts: options.transcripts === true,
+    sessionProcesses: options.sessionProcesses === true,
+  })
   const admissions = new FakeInputAdmissions()
   const commands: FakeHostCommand[] = []
-  const waiters: Array<{ readonly type: string; remaining: number; readonly resolve: (command: FakeHostCommand) => void }> = []
+  const waiters: Array<{
+    readonly type: string
+    remaining: number
+    readonly resolve: (command: FakeHostCommand) => void
+  }> = []
   const sockets = new Set<Socket>()
   const connectionWaiters: Array<{ readonly count: number; readonly resolve: () => void }> = []
   const withheld = new Set<string>()
@@ -125,7 +138,18 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
     }
   }
 
-  const ports = { table, admissions, warm: options.warm ?? { state: "warmed" as const }, identity: () => identity, openFailure: () => openFailure, enforceSessionDir: options.enforceSessionDir === true, withheld, held, failed, record }
+  const ports = {
+    table,
+    admissions,
+    warm: options.warm ?? { state: "warmed" as const },
+    identity: () => identity,
+    openFailure: () => openFailure,
+    enforceSessionDir: options.enforceSessionDir === true,
+    withheld,
+    held,
+    failed,
+    record,
+  }
 
   const settleConnectionWaiters = (): void => {
     for (let index = connectionWaiters.length - 1; index >= 0; index--) {
@@ -138,28 +162,30 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
 
   const listen = async (): Promise<void> => {
     transport = fakeHostTransport(socketPath)
-    server = createServer((socket) => transport.authenticate(socket, () => {
-      sockets.add(socket)
-      settleConnectionWaiters()
-      let buffer = ""
-      socket.setEncoding("utf8")
-      socket.on("data", (chunk: string) => {
-        buffer += chunk
-        for (;;) {
-          const newline = buffer.indexOf("\n")
-          if (newline === -1) break
-          const line = buffer.slice(0, newline).trim()
-          buffer = buffer.slice(newline + 1)
-          if (line) handleWireLine(ports, socket, line)
-        }
-      })
-      socket.on("error", () => undefined)
-      socket.on("close", () => {
-        sockets.delete(socket)
-        table.detach(socket)
+    server = createServer((socket) =>
+      transport.authenticate(socket, () => {
+        sockets.add(socket)
         settleConnectionWaiters()
-      })
-    }))
+        let buffer = ""
+        socket.setEncoding("utf8")
+        socket.on("data", (chunk: string) => {
+          buffer += chunk
+          for (;;) {
+            const newline = buffer.indexOf("\n")
+            if (newline === -1) break
+            const line = buffer.slice(0, newline).trim()
+            buffer = buffer.slice(newline + 1)
+            if (line) handleWireLine(ports, socket, line)
+          }
+        })
+        socket.on("error", () => undefined)
+        socket.on("close", () => {
+          sockets.delete(socket)
+          table.detach(socket)
+          settleConnectionWaiters()
+        })
+      }),
+    )
     await new Promise<void>((resolve) => server.listen(transport.listenAddress, resolve))
   }
   await listen()
@@ -225,7 +251,11 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
     },
     requestUi: (routingId, request) => sendTo(routingId, { type: "extension_ui_request", ...request }),
     emitRecord: (routingId, payload) => {
-      if (payload["type"] === "agent_start" && (payload["sessionId"] === undefined || payload["sessionId"] === routingId)) table.setStreaming(routingId, true)
+      if (
+        payload["type"] === "agent_start" &&
+        (payload["sessionId"] === undefined || payload["sessionId"] === routingId)
+      )
+        table.setStreaming(routingId, true)
       sendTo(routingId, payload)
     },
     stall: (driftMs) => {
@@ -244,7 +274,14 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
       table.appendTranscript(routingId, message)
       table.setStreaming(routingId, false)
       sendTo(routingId, { type: "message_end", message })
-      sendTo(routingId, { type: "agent_end", willRetry: false, messages: [message], aborted: true, abortSource: "user", ...(abortCause === undefined ? {} : { abortCause }) })
+      sendTo(routingId, {
+        type: "agent_end",
+        willRetry: false,
+        messages: [message],
+        aborted: true,
+        abortSource: "user",
+        ...(abortCause === undefined ? {} : { abortCause }),
+      })
       sendTo(routingId, { type: "agent_idle" })
     },
     evict: (sessionPath) => {

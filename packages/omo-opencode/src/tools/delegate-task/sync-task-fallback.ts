@@ -3,7 +3,9 @@ import type { DelegatedModelConfig } from "./types"
 import type { ModelFallbackState } from "../../hooks/model-fallback/hook"
 import { getNextReachableFallback } from "../../hooks/model-fallback/next-fallback"
 
-function toDelegatedModelConfig(fallback: NonNullable<ReturnType<typeof getNextReachableFallback>>): DelegatedModelConfig {
+function toDelegatedModelConfig(
+  fallback: NonNullable<ReturnType<typeof getNextReachableFallback>>,
+): DelegatedModelConfig {
   return {
     providerID: fallback.providerID,
     modelID: fallback.modelID,
@@ -27,7 +29,11 @@ export async function retrySyncPromptWithFallbacks(input: {
   categoryModel: DelegatedModelConfig | undefined
   fallbackChain: FallbackEntry[] | undefined
   sendPrompt: (categoryModel: DelegatedModelConfig) => Promise<string | null>
-}): Promise<{ promptError: string | null; categoryModel: DelegatedModelConfig | undefined; fallbackState?: ModelFallbackState }> {
+}): Promise<{
+  promptError: string | null
+  categoryModel: DelegatedModelConfig | undefined
+  fallbackState?: ModelFallbackState
+}> {
   const { sessionID, initialError, categoryModel, fallbackChain, sendPrompt } = input
 
   if (!categoryModel || !fallbackChain || fallbackChain.length === 0) {

@@ -83,7 +83,9 @@ describe("SenpiSubprocessRunner integration", () => {
     // then
     expect(result.outcome).toBe("merged")
     expect(await parent.head()).not.toBe(headBefore)
-    expect(await readFile(join(item.identity.paths.repo, "system", "reflected.md"), "utf8")).toContain("reflection stub")
+    expect(await readFile(join(item.identity.paths.repo, "system", "reflected.md"), "utf8")).toContain(
+      "reflection stub",
+    )
     expect((await item.journal.getState()).reflected_completed_steps).toBe(1)
     expect(item.api.entries.map((entry) => entry.customType)).toEqual([
       REFLECTION_LAUNCHED_ENTRY_TYPE,
@@ -117,15 +119,20 @@ describe("SenpiSubprocessRunner integration", () => {
     expect(spawn?.env.SENPI_PTY_FORCE_PIPE).toBe("1")
     const childArgs = [
       "-p",
-      "--system-prompt", spawn?.paths.persona,
-      "--tools", "bash,edit",
+      "--system-prompt",
+      spawn?.paths.persona,
+      "--tools",
+      "bash,edit",
       "--no-extensions",
       "--no-skills",
       "--no-prompt-templates",
       "--no-context-files",
-      "--session-dir", spawn?.paths.sessionDir,
-      "--model", "omo-mock/mock-1",
-      "--thinking", "high",
+      "--session-dir",
+      spawn?.paths.sessionDir,
+      "--model",
+      "omo-mock/mock-1",
+      "--thinking",
+      "high",
       `@${spawn?.paths.prompt}`,
     ]
     expect(spawn?.args.slice(-childArgs.length)).toEqual(childArgs)
@@ -147,7 +154,9 @@ describe("SenpiSubprocessRunner integration", () => {
       mergePolicy: "auto",
       worktreeDir: spawn?.paths.worktree,
     })
-    expect(JSON.parse(await readFile(join(item.identity.paths.reflection, "completions", `${item.run.runId}.json`), "utf8"))).toMatchObject({
+    expect(
+      JSON.parse(await readFile(join(item.identity.paths.reflection, "completions", `${item.run.runId}.json`), "utf8")),
+    ).toMatchObject({
       runId: item.run.runId,
       outcome: "merged",
       durationMs: expect.any(Number),
@@ -173,7 +182,6 @@ describe("SenpiSubprocessRunner integration", () => {
     expect((await item.store.readState()).active).toBeUndefined()
     await assertWorktreesClean(item)
   }, 60_000)
-
 
   test("#given empty categories and no quick model #when launched twice in one session #then both fail without spawning and only one unsuppressed warning appears", async () => {
     // given

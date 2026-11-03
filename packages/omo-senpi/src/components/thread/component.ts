@@ -9,7 +9,14 @@ import { gatewayDatabasePath } from "./gateway/paths"
 import { loadProvenanceWorkspaces } from "./gateway/provenance-config"
 import { resolveProvenance } from "./gateway/provenance-resolver"
 import { registerInitialSkills } from "./initial-skills"
-import { controlSessionOf, createControlEndpointRegistrant, hostInstanceOf, sessionControlOf, type ControlEndpointRegistrantOptions, type SessionControlActionsPort } from "./gateway/registration"
+import {
+  controlSessionOf,
+  createControlEndpointRegistrant,
+  hostInstanceOf,
+  sessionControlOf,
+  type ControlEndpointRegistrantOptions,
+  type SessionControlActionsPort,
+} from "./gateway/registration"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { registerThreadTools, UNKNOWN_CALLER, type ThreadToolSurfaceOptions } from "./tools"
 import { createLazyLiveThreadSurface } from "./lazy-live-surface"
@@ -29,13 +36,20 @@ const LEGACY_MAILBOX_FILES = ["mailbox.jsonl", "mailbox.json"] as const
 async function waitAtMost(work: Promise<void>, ms: number): Promise<void> {
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
-    await Promise.race([work, new Promise<void>((resolve) => { timer = setTimeout(resolve, ms) })])
+    await Promise.race([
+      work,
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, ms)
+      }),
+    ])
   } finally {
     clearTimeout(timer)
   }
 }
 
-export type ThreadComponentOptions = Partial<Omit<ThreadToolSurfaceOptions, "callerSessionId" | "callerWorkspaceRoot" | "store" | "onCompletionArmed">> & {
+export type ThreadComponentOptions = Partial<
+  Omit<ThreadToolSurfaceOptions, "callerSessionId" | "callerWorkspaceRoot" | "store" | "onCompletionArmed">
+> & {
   readonly callerSessionId?: () => string
   readonly callerWorkspaceRoot?: () => string
   /** Absent: `pi.session` when the engine has it. `null`: no control endpoint. */
@@ -67,7 +81,12 @@ export type ThreadComponentOptions = Partial<Omit<ThreadToolSurfaceOptions, "cal
  */
 type RunContext = { turn: number; cause: string | undefined; consumed: string[]; local: boolean; answered: boolean }
 
-type EngineMessage = { readonly role?: unknown; readonly customType?: unknown; readonly details?: unknown; readonly content?: unknown }
+type EngineMessage = {
+  readonly role?: unknown
+  readonly customType?: unknown
+  readonly details?: unknown
+  readonly content?: unknown
+}
 
 function messageOf(event: unknown): EngineMessage | undefined {
   const message = (event as { readonly message?: unknown } | undefined)?.message
@@ -82,7 +101,10 @@ function deliveryIdOf(message: EngineMessage): string | undefined {
 }
 
 function callsTools(message: EngineMessage): boolean {
-  return Array.isArray(message.content) && message.content.some((part) => (part as { readonly type?: unknown } | null)?.type === "toolCall")
+  return (
+    Array.isArray(message.content) &&
+    message.content.some((part) => (part as { readonly type?: unknown } | null)?.type === "toolCall")
+  )
 }
 
 function noteInput(run: RunContext, message: EngineMessage): void {
@@ -100,7 +122,10 @@ function noteInput(run: RunContext, message: EngineMessage): void {
 }
 
 /** senpi's ask_user tool per model family (`ask-user/family.js` `TOOL_NAMES`) and the flag that makes it wait for the answer. */
-const ASK_USER_WAIT_FLAGS: Readonly<Record<string, string>> = { ask_user_question: "waitForAnswer", request_user_input: "wait_for_answer" }
+const ASK_USER_WAIT_FLAGS: Readonly<Record<string, string>> = {
+  ask_user_question: "waitForAnswer",
+  request_user_input: "wait_for_answer",
+}
 
 /**
  * The tool call of a question the session waits on: an ask_user call whose wait flag is set holds
@@ -108,10 +133,16 @@ const ASK_USER_WAIT_FLAGS: Readonly<Record<string, string>> = { ask_user_questio
  * that does not wait returns at once and blocks nothing.
  */
 function waitingQuestionCallOf(event: unknown): string | undefined {
-  const { toolCallId, toolName, args } = (event ?? {}) as { readonly toolCallId?: unknown; readonly toolName?: unknown; readonly args?: unknown }
+  const { toolCallId, toolName, args } = (event ?? {}) as {
+    readonly toolCallId?: unknown
+    readonly toolName?: unknown
+    readonly args?: unknown
+  }
   if (typeof toolCallId !== "string" || typeof toolName !== "string") return undefined
   const flag = ASK_USER_WAIT_FLAGS[toolName]
-  return flag !== undefined && (args as Record<string, unknown> | null | undefined)?.[flag] === true ? toolCallId : undefined
+  return flag !== undefined && (args as Record<string, unknown> | null | undefined)?.[flag] === true
+    ? toolCallId
+    : undefined
 }
 
 /** senpi `ask-user/notify.js` ASK_USER_CLOSED_EVENT: every terminal outcome of an ask_user question, `{ requestId, status, resolvedBy? }`. */
@@ -123,14 +154,21 @@ const CLOSED_REQUESTS_KEPT = 64
 
 /** The ask_user request a `thread_report` call relays as a question (`kind: "question"` with `request_id`). */
 function relayedQuestionOf(event: unknown): { readonly call: string; readonly request: string } | undefined {
-  const { toolCallId, toolName, args } = (event ?? {}) as { readonly toolCallId?: unknown; readonly toolName?: unknown; readonly args?: unknown }
+  const { toolCallId, toolName, args } = (event ?? {}) as {
+    readonly toolCallId?: unknown
+    readonly toolName?: unknown
+    readonly args?: unknown
+  }
   if (toolName !== "thread_report" || typeof toolCallId !== "string") return undefined
   const { kind, request_id } = (args ?? {}) as { readonly kind?: unknown; readonly request_id?: unknown }
-  return kind === "question" && typeof request_id === "string" && request_id.length > 0 ? { call: toolCallId, request: request_id } : undefined
+  return kind === "question" && typeof request_id === "string" && request_id.length > 0
+    ? { call: toolCallId, request: request_id }
+    : undefined
 }
 
 function durableIdOf(eventCtx: unknown): string | undefined {
-  const manager = (eventCtx as { readonly sessionManager?: { readonly getSessionId?: () => unknown } } | undefined)?.sessionManager
+  const manager = (eventCtx as { readonly sessionManager?: { readonly getSessionId?: () => unknown } } | undefined)
+    ?.sessionManager
   const id = typeof manager?.getSessionId === "function" ? manager.getSessionId() : undefined
   return typeof id === "string" && id.length > 0 ? id : undefined
 }
@@ -143,7 +181,14 @@ function durableIdOf(eventCtx: unknown): string | undefined {
  * `session_start` path (the inbox watch arms asynchronously); shutdown waits for it and disposes
  * the endpoint before the store, because senpi's clean exit asks `isSessionReferenced` then.
  */
-function registerControlEndpoint(pi: SenpiExtensionAPI, ctx: ComponentContext, options: ThreadComponentOptions, store: GatewayStore, agentDir: () => string, onCommandWake: (durableId: string) => Promise<void>) {
+function registerControlEndpoint(
+  pi: SenpiExtensionAPI,
+  ctx: ComponentContext,
+  options: ThreadComponentOptions,
+  store: GatewayStore,
+  agentDir: () => string,
+  onCommandWake: (durableId: string) => Promise<void>,
+) {
   const control = options.sessionControl === undefined ? sessionControlOf(pi) : (options.sessionControl ?? undefined)
   if (control === undefined) return undefined
   const runtimeInstance = hostInstanceOf(pi)
@@ -159,7 +204,13 @@ function registerControlEndpoint(pi: SenpiExtensionAPI, ctx: ComponentContext, o
   pi.on("session_start", (_event, eventCtx) => {
     const session = controlSessionOf(eventCtx)
     if (session === undefined) return
-    void registrant.start(session).catch((error: unknown) => ctx.logger.warn(`thread gateway: control endpoint registration failed: ${error instanceof Error ? error.message : String(error)}`))
+    void registrant
+      .start(session)
+      .catch((error: unknown) =>
+        ctx.logger.warn(
+          `thread gateway: control endpoint registration failed: ${error instanceof Error ? error.message : String(error)}`,
+        ),
+      )
   })
   // A session thread_create opened runs on a host, so its initial skills ride with the control endpoint.
   registerInitialSkills(pi, ctx)
@@ -198,44 +249,77 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
       const legacyMailbox = join(stateDirectory, "mailbox")
       const callerWorkspaceRoot = options.callerWorkspaceRoot ?? (() => pi.cwd ?? process.cwd())
       const onProvenanceWarning = (message: string) => ctx.logger.warn(`thread gateway: ${message}`)
-      const store = options.store ?? createGatewayStore({ agentDir: agentDir(), senderProvenance: () => resolveProvenance({ cwd: callerWorkspaceRoot(), env: options.env, loadWorkspaces: loadProvenanceWorkspaces, onWarning: onProvenanceWarning }), legacyMailboxDirectories: [legacyMailbox], ...(runtimeInstance === undefined ? {} : { runtimeInstance }) })
+      const store =
+        options.store ??
+        createGatewayStore({
+          agentDir: agentDir(),
+          senderProvenance: () =>
+            resolveProvenance({
+              cwd: callerWorkspaceRoot(),
+              env: options.env,
+              loadWorkspaces: loadProvenanceWorkspaces,
+              onWarning: onProvenanceWarning,
+            }),
+          legacyMailboxDirectories: [legacyMailbox],
+          ...(runtimeInstance === undefined ? {} : { runtimeInstance }),
+        })
       // Every store open retries an unreadable legacy mailbox, and an idle store reopens its worker on
       // the next call, so the same failure would repeat each time: it is reported once per session.
       const reportedInvalidMailboxes = new Set<string>()
       store.onEvent((event) => {
         if (event.kind === "legacy_mailbox_invalid" && !reportedInvalidMailboxes.has(event.directory)) {
           reportedInvalidMailboxes.add(event.directory)
-          ctx.logger.warn(`thread gateway: the legacy thread mailbox ${event.directory} could not be read and was not imported (it is retried each time the store opens): ${event.error}`)
+          ctx.logger.warn(
+            `thread gateway: the legacy thread mailbox ${event.directory} could not be read and was not imported (it is retried each time the store opens): ${event.error}`,
+          )
         }
-        if (event.kind === "legacy_mailbox_skipped") ctx.logger.warn(`thread gateway: ${event.items.length} legacy thread mailbox item(s) in ${event.directory} name no session id and were not imported: ${event.items.map((item) => `#${item.message_seq} -> ${JSON.stringify(item.target)}`).join(", ")}`)
+        if (event.kind === "legacy_mailbox_skipped")
+          ctx.logger.warn(
+            `thread gateway: ${event.items.length} legacy thread mailbox item(s) in ${event.directory} name no session id and were not imported: ${event.items.map((item) => `#${item.message_seq} -> ${JSON.stringify(item.target)}`).join(", ")}`,
+          )
       })
       const run: RunContext = { turn: 0, cause: undefined, consumed: [], local: false, answered: true }
-      const completions = createCompletionTracker((durableId, outcome, throughArmSeq) => store.emitCompletions({ now: store.now(), session_durable_id: durableId, outcome, through_arm_seq: throughArmSeq }), {
-        retryAfterMs: () => store.busyTimeoutMs,
-        onWriteFailed: (error, retrying) =>
-          ctx.logger.warn(retrying
-            ? `thread gateway: completion report not written yet, retrying in ${store.busyTimeoutMs} ms: ${error instanceof Error ? error.message : String(error)}`
-            : `thread gateway: completion reports were not written: ${error instanceof Error ? error.message : String(error)}`),
-      })
-      const tools = registerThreadTools(pi, {
-        host,
-        stateDirectory,
-        store,
-        env: options.env,
-        loadProvenanceWorkspaces,
-        onProvenanceWarning,
-        diskSessions: options.diskSessions,
-        sessionsDirectory: options.sessionsDirectory ?? (() => join(agentDir(), "sessions")),
-        ensureHost: options.ensureHost,
-        callerSessionId: options.callerSessionId ?? (() => UNKNOWN_CALLER),
-        callerWorkspaceRoot,
-        callerTurnId: () => (run.turn === 0 ? undefined : `turn-${run.turn}`),
-        callerName: () => pi.getSessionName?.(),
-        callerCause: () => run.cause,
-        callerRunDeliveries: () => [...run.consumed],
-        callerRunHasLocalInput: () => run.local,
-        onCompletionArmed: (durableId, armSeq) => completions.arm(durableId, armSeq),
-      }, (line) => ctx.logger.warn(line))
+      const completions = createCompletionTracker(
+        (durableId, outcome, throughArmSeq) =>
+          store.emitCompletions({
+            now: store.now(),
+            session_durable_id: durableId,
+            outcome,
+            through_arm_seq: throughArmSeq,
+          }),
+        {
+          retryAfterMs: () => store.busyTimeoutMs,
+          onWriteFailed: (error, retrying) =>
+            ctx.logger.warn(
+              retrying
+                ? `thread gateway: completion report not written yet, retrying in ${store.busyTimeoutMs} ms: ${error instanceof Error ? error.message : String(error)}`
+                : `thread gateway: completion reports were not written: ${error instanceof Error ? error.message : String(error)}`,
+            ),
+        },
+      )
+      const tools = registerThreadTools(
+        pi,
+        {
+          host,
+          stateDirectory,
+          store,
+          env: options.env,
+          loadProvenanceWorkspaces,
+          onProvenanceWarning,
+          diskSessions: options.diskSessions,
+          sessionsDirectory: options.sessionsDirectory ?? (() => join(agentDir(), "sessions")),
+          ensureHost: options.ensureHost,
+          callerSessionId: options.callerSessionId ?? (() => UNKNOWN_CALLER),
+          callerWorkspaceRoot,
+          callerTurnId: () => (run.turn === 0 ? undefined : `turn-${run.turn}`),
+          callerName: () => pi.getSessionName?.(),
+          callerCause: () => run.cause,
+          callerRunDeliveries: () => [...run.consumed],
+          callerRunHasLocalInput: () => run.local,
+          onCompletionArmed: (durableId, armSeq) => completions.arm(durableId, armSeq),
+        },
+        (line) => ctx.logger.warn(line),
+      )
       // A durable arm this runtime did not make itself - left by an earlier runtime (a restart, or a
       // crash before its write), or made by another process (`omo thread report ... completion`) - is
       // picked up at session_start and on a `wake` command, and written at this session's next settle.
@@ -246,7 +330,9 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
           const latest = await store.latestCompletionArm(durableId)
           if (latest !== null) completions.arm(durableId, latest)
         } catch (error) {
-          ctx.logger.warn(`thread gateway: pending completion arms were not read: ${error instanceof Error ? error.message : String(error)}`)
+          ctx.logger.warn(
+            `thread gateway: pending completion arms were not read: ${error instanceof Error ? error.message : String(error)}`,
+          )
         }
       }
       const registrant = registerControlEndpoint(pi, ctx, options, store, agentDir, pickUpArms)
@@ -261,13 +347,19 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         const relayed = new Map<string, string>()
         const closedEarly = new Set<string>()
         const closeRelayed = (request: string, durableId: string): void => {
-          void store.closeQuestion({ now: store.now(), session_durable_id: durableId, ui_request_id: request }).catch((error: unknown) =>
-            ctx.logger.warn(`thread gateway: the relayed question ${request} was not closed: ${error instanceof Error ? error.message : String(error)}`))
+          void store
+            .closeQuestion({ now: store.now(), session_durable_id: durableId, ui_request_id: request })
+            .catch((error: unknown) =>
+              ctx.logger.warn(
+                `thread gateway: the relayed question ${request} was not closed: ${error instanceof Error ? error.message : String(error)}`,
+              ),
+            )
         }
         pi.on("tool_execution_start", (event, eventCtx) => {
           const question = relayedQuestionOf(event)
           const durableId = durableIdOf(eventCtx)
-          if (question !== undefined && durableId !== undefined) reporting.set(question.call, { request: question.request, durableId })
+          if (question !== undefined && durableId !== undefined)
+            reporting.set(question.call, { request: question.request, durableId })
         })
         pi.on("tool_execution_end", (event) => {
           const call = (event as { readonly toolCallId?: unknown } | undefined)?.toolCallId
@@ -280,7 +372,8 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         })
         events.on(ASK_USER_ASKED_EVENT, (payload) => {
           // A new question under a request id that closed before it was relayed: that close is not this question's.
-          const request = (payload as { readonly request?: { readonly requestId?: unknown } } | undefined)?.request?.requestId
+          const request = (payload as { readonly request?: { readonly requestId?: unknown } } | undefined)?.request
+            ?.requestId
           if (typeof request === "string") closedEarly.delete(request)
         })
         events.on(ASK_USER_CLOSED_EVENT, (payload) => {
@@ -305,9 +398,14 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         legacyImportStarted = true
         try {
           const imported = await store.legacyMigrated()
-          if (imported > 0) ctx.logger.info(`thread gateway: imported ${imported} undelivered message(s) from the legacy thread mailbox ${legacyMailbox}`)
+          if (imported > 0)
+            ctx.logger.info(
+              `thread gateway: imported ${imported} undelivered message(s) from the legacy thread mailbox ${legacyMailbox}`,
+            )
         } catch (error) {
-          ctx.logger.warn(`thread gateway: the legacy thread mailbox was not imported: ${error instanceof Error ? error.message : String(error)}`)
+          ctx.logger.warn(
+            `thread gateway: the legacy thread mailbox was not imported: ${error instanceof Error ? error.message : String(error)}`,
+          )
         }
       }
       pi.on("session_start", (_event, eventCtx) => {
@@ -338,12 +436,24 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         run.answered = true
         if (durableId === undefined) return
         // A failed write is reported (and retried) by the tracker's onWriteFailed.
-        await waitAtMost(completions.settled(durableId).then(() => undefined, () => undefined), COMPLETION_SETTLE_WAIT_MS)
+        await waitAtMost(
+          completions.settled(durableId).then(
+            () => undefined,
+            () => undefined,
+          ),
+          COMPLETION_SETTLE_WAIT_MS,
+        )
       })
       pi.on("session_shutdown", async () => {
         completions.dispose()
         tools.dispose()
-        await registrant?.stop().catch((error: unknown) => ctx.logger.warn(`thread gateway: control endpoint teardown failed: ${error instanceof Error ? error.message : String(error)}`))
+        await registrant
+          ?.stop()
+          .catch((error: unknown) =>
+            ctx.logger.warn(
+              `thread gateway: control endpoint teardown failed: ${error instanceof Error ? error.message : String(error)}`,
+            ),
+          )
         if (options.store === undefined) await store.dispose().catch(() => undefined)
       })
     },

@@ -31,11 +31,10 @@ const SESSION = "session-1"
 async function commitAs(repo: GitMemoryRepo, sessionId: string, path: string, body: string): Promise<void> {
   await mkdir(dirname(join(repo.dir, path)), { recursive: true })
   await writeFile(join(repo.dir, path), `---\ndescription: ${path}\n---\n${body}\n`)
-  await repo.commitWrite(
-    [path],
-    `record ${path}\n\nOmo-Writer: memory-tool\nOmo-Session: ${sessionId}\nOmo-Turn: 1`,
-    { agentId: IDENTITY, authorName: "Prompt Agent" },
-  )
+  await repo.commitWrite([path], `record ${path}\n\nOmo-Writer: memory-tool\nOmo-Session: ${sessionId}\nOmo-Turn: 1`, {
+    agentId: IDENTITY,
+    authorName: "Prompt Agent",
+  })
 }
 
 function pinnedHandler(
@@ -46,15 +45,20 @@ function pinnedHandler(
   const records: ProjectionPinRecord[] = []
   const repins: string[] = []
   const pi = new FakeExtensionAPI()
-  pi.on("before_agent_start", createMemoryPromptHandler({
-    resolveContext: () => context,
-    createRepo: () => repo,
-    cache: new MemoryBlockCache(),
-    pins: overrides.pins ?? createProjectionPins(),
-    recordPin: (record) => records.push(record),
-    onRepin: (_sessionId, reason) => repins.push(reason),
-    ...(overrides.resolveCompileWarnTokens === undefined ? {} : { resolveCompileWarnTokens: overrides.resolveCompileWarnTokens }),
-  }))
+  pi.on(
+    "before_agent_start",
+    createMemoryPromptHandler({
+      resolveContext: () => context,
+      createRepo: () => repo,
+      cache: new MemoryBlockCache(),
+      pins: overrides.pins ?? createProjectionPins(),
+      recordPin: (record) => records.push(record),
+      onRepin: (_sessionId, reason) => repins.push(reason),
+      ...(overrides.resolveCompileWarnTokens === undefined
+        ? {}
+        : { resolveCompileWarnTokens: overrides.resolveCompileWarnTokens }),
+    }),
+  )
   const dispatch = (branch: readonly unknown[], sessionId = SESSION, preview = false) =>
     dispatchEvent(
       pi,
@@ -225,7 +229,8 @@ describe("session-pinned memory projection", () => {
     const revisionLookups: string[] = []
     const log = repo.log.bind(repo)
     repo.log = async (options) => {
-      if (options?.limit === 1 && options.paths === undefined && typeof options.range === "string") revisionLookups.push(options.range)
+      if (options?.limit === 1 && options.paths === undefined && typeof options.range === "string")
+        revisionLookups.push(options.range)
       return log(options)
     }
     const { dispatch, repins } = pinnedHandler(repo, context)

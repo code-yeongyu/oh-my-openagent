@@ -12,18 +12,15 @@ type ResolveFallbackBootstrapModelOptions = {
   pluginConfig?: OhMyOpenCodeConfig
 }
 
-export function resolveFallbackBootstrapModel(
-  options: ResolveFallbackBootstrapModelOptions,
-): string | undefined {
+export function resolveFallbackBootstrapModel(options: ResolveFallbackBootstrapModelOptions): string | undefined {
   const eventModel = stringifyRuntimeModel(options.eventModel)
   if (eventModel) {
     return eventModel
   }
 
   const agentConfigs = options.pluginConfig?.agents
-  const agentConfig = options.resolvedAgent && agentConfigs
-    ? agentConfigs[options.resolvedAgent as keyof typeof agentConfigs]
-    : undefined
+  const agentConfig =
+    options.resolvedAgent && agentConfigs ? agentConfigs[options.resolvedAgent as keyof typeof agentConfigs] : undefined
   const agentConfigRecord = agentConfig as Record<string, unknown> | undefined
   const agentModelCandidate = agentConfigRecord?.model
   const agentModel = typeof agentModelCandidate === "string" ? agentModelCandidate : undefined
@@ -51,9 +48,7 @@ export function resolveFallbackBootstrapModel(
   }
 
   const sessionCategory = SessionCategoryRegistry.get(options.sessionID)
-  const categoryModel = sessionCategory
-    ? options.pluginConfig?.categories?.[sessionCategory]?.model
-    : undefined
+  const categoryModel = sessionCategory ? options.pluginConfig?.categories?.[sessionCategory]?.model : undefined
   if (typeof categoryModel === "string" && categoryModel.length > 0) {
     log(`[${HOOK_NAME}] Derived model from session category config for ${options.source}`, {
       sessionID: options.sessionID,

@@ -3,7 +3,7 @@ import type { ClaudeCodeMcpServer } from "./types"
 
 export function shouldLoadMcpServer(
   server: Pick<ClaudeCodeMcpServer, "scope" | "projectPath">,
-  cwd = process.cwd()
+  cwd = process.cwd(),
 ): boolean {
   if (server.scope !== "local") {
     return true

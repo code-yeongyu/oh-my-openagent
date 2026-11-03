@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import {
-  createSisyphusJuniorAgentWithOverrides,
-  SISYPHUS_JUNIOR_DEFAULTS,
-  buildSisyphusJuniorPrompt,
-} from "./index"
+import { createSisyphusJuniorAgentWithOverrides, SISYPHUS_JUNIOR_DEFAULTS, buildSisyphusJuniorPrompt } from "./index"
 
 describe("createSisyphusJuniorAgentWithOverrides", () => {
   describe("honored fields", () => {
@@ -282,7 +278,9 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       } as { permission: Record<string, string> }
 
       // when
-      const result = createSisyphusJuniorAgentWithOverrides(override as Parameters<typeof createSisyphusJuniorAgentWithOverrides>[0])
+      const result = createSisyphusJuniorAgentWithOverrides(
+        override as Parameters<typeof createSisyphusJuniorAgentWithOverrides>[0],
+      )
 
       // then - task blocked, but call_omo_agent allowed for explore/librarian spawning
       const tools = result.tools as Record<string, boolean> | undefined
@@ -303,7 +301,9 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
         tools: { grep: false, write: false, read: true } as Record<string, boolean>,
       }
       // when
-      const result = createSisyphusJuniorAgentWithOverrides(override as Parameters<typeof createSisyphusJuniorAgentWithOverrides>[0])
+      const result = createSisyphusJuniorAgentWithOverrides(
+        override as Parameters<typeof createSisyphusJuniorAgentWithOverrides>[0],
+      )
       // then
       const permission = result.permission as Record<string, string>
       expect(permission.grep).toBe("deny")
@@ -320,7 +320,9 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
         } as Record<string, string>,
       }
       // when
-      const result = createSisyphusJuniorAgentWithOverrides(override as Parameters<typeof createSisyphusJuniorAgentWithOverrides>[0])
+      const result = createSisyphusJuniorAgentWithOverrides(
+        override as Parameters<typeof createSisyphusJuniorAgentWithOverrides>[0],
+      )
       // then
       const permission = result.permission as Record<string, string>
       expect(permission["mcp__context7__resolve-library-id"]).toBe("allow")
@@ -453,5 +455,4 @@ describe("buildSisyphusJuniorPrompt", () => {
     expect(prompt).toContain("todowrite")
     expect(prompt).not.toContain("task_create")
   })
-
 })

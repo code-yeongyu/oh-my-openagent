@@ -35,7 +35,12 @@ describe("task_create tool", () => {
 
   test("#given a blocked task #when create runs #then the text names the blockers", async () => {
     const service = createFakeTeamService({ createTask: async () => fakeTask({ blockedBy: ["task-0"] }) })
-    const result = await runTeamTaskCreate(service, { team_run_id: "run-1", subject: "s", description: "d", blocked_by: ["task-0"] })
+    const result = await runTeamTaskCreate(service, {
+      team_run_id: "run-1",
+      subject: "s",
+      description: "d",
+      blocked_by: ["task-0"],
+    })
     const text = result.content[0]?.type === "text" ? result.content[0].text : ""
     expect(text).toContain("blocked by: task-0")
   })
@@ -45,7 +50,11 @@ describe("task_create tool", () => {
     const service = createFakeTeamService({ createTask: async () => fakeTask({ subject: "line one\nline two" }) })
 
     // when
-    const result = await runTeamTaskCreate(service, { team_run_id: "run-1", subject: "line one\nline two", description: "d" })
+    const result = await runTeamTaskCreate(service, {
+      team_run_id: "run-1",
+      subject: "line one\nline two",
+      description: "d",
+    })
 
     // then
     const text = result.content[0]?.type === "text" ? result.content[0].text : ""
@@ -58,7 +67,11 @@ describe("task_create tool", () => {
     const service = createFakeTeamService({ createTask: async () => fakeTask({ subject: "line one\nline two" }) })
 
     // when
-    const result = await runTeamTaskCreate(service, { team_run_id: "run-1", subject: "line one\nline two", description: "d" })
+    const result = await runTeamTaskCreate(service, {
+      team_run_id: "run-1",
+      subject: "line one\nline two",
+      description: "d",
+    })
 
     // then
     const text = result.content[0]?.type === "text" ? result.content[0].text : ""
@@ -93,7 +106,9 @@ describe("task_create tool", () => {
 
 describe("task_list tool", () => {
   test("#given tasks #when list runs #then it reports them, forwarding the filter", async () => {
-    const service = createFakeTeamService({ listTasks: async () => [fakeTask(), fakeTask({ id: "task-2", status: "claimed", owner: "alpha" })] })
+    const service = createFakeTeamService({
+      listTasks: async () => [fakeTask(), fakeTask({ id: "task-2", status: "claimed", owner: "alpha" })],
+    })
     const result = await runTeamTaskList(service, { team_run_id: "run-1", status: "pending" })
     expect(result.details.kind).toBe("list")
     if (result.details.kind !== "list") throw new Error("expected list")
@@ -160,7 +175,12 @@ describe("task_update tool", () => {
         throw new TeamTaskAlreadyClaimedError()
       },
     })
-    const result = await runTeamTaskUpdate(service, { team_run_id: "run-1", task_id: "task-1", status: "claimed", owner: "alpha" })
+    const result = await runTeamTaskUpdate(service, {
+      team_run_id: "run-1",
+      task_id: "task-1",
+      status: "claimed",
+      owner: "alpha",
+    })
     expect(result.details).toMatchObject({ kind: "already_claimed", task_id: "task-1" })
   })
 
@@ -190,7 +210,12 @@ describe("task_update tool", () => {
         throw new TeamTaskCrossOwnerUpdateError()
       },
     })
-    const result = await runTeamTaskUpdate(service, { team_run_id: "run-1", task_id: "task-1", status: "completed", owner: "alpha" })
+    const result = await runTeamTaskUpdate(service, {
+      team_run_id: "run-1",
+      task_id: "task-1",
+      status: "completed",
+      owner: "alpha",
+    })
     expect(result.details.kind).toBe("cross_owner")
   })
 

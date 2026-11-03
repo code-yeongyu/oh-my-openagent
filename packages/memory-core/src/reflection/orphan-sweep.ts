@@ -65,7 +65,10 @@ export async function listReflectionLeftovers(
     `refs/heads/${REFLECTION_BRANCH_PREFIX}*`,
     `refs/heads/${LEGACY_BRANCH_PREFIX}*`,
   ])
-  const branches = refs.stdout.split(/\r?\n/).map((line) => line.trim()).filter(isReflectionBranch)
+  const branches = refs.stdout
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(isReflectionBranch)
   return { registeredWorktrees, strayDirs, branches }
 }
 
@@ -83,8 +86,9 @@ export function selectReflectionOrphans(
     return owner.epoch === undefined || owner.epoch <= selection.now - graceMs
   }
   return {
-    registeredWorktrees: leftovers.registeredWorktrees
-      .filter((worktree) => isOrphan(basename(worktree.dir), worktree.present)),
+    registeredWorktrees: leftovers.registeredWorktrees.filter((worktree) =>
+      isOrphan(basename(worktree.dir), worktree.present),
+    ),
     strayDirs: leftovers.strayDirs.filter((dir) => isOrphan(basename(dir), true)),
     branches: leftovers.branches.filter((branch) => isOrphan(branch, true)),
   }
@@ -105,25 +109,31 @@ export async function sweepReflectionOrphans(
   for (const worktree of orphans.registeredWorktrees) {
     const branch = worktree.branch ?? `${REFLECTION_BRANCH_PREFIX}${basename(worktree.dir)}`
     discarded.add(branch)
-    receipts.push(await attempt("worktree", worktree.dir, async () => {
-      const cleanup = await discardReflectionWorktree(repo, worktree.dir, branch, exec)
-      return cleanup.worktreeRemoved && cleanup.branchRemoved
-    }))
+    receipts.push(
+      await attempt("worktree", worktree.dir, async () => {
+        const cleanup = await discardReflectionWorktree(repo, worktree.dir, branch, exec)
+        return cleanup.worktreeRemoved && cleanup.branchRemoved
+      }),
+    )
   }
   for (const dir of orphans.strayDirs) {
-    receipts.push(await attempt("directory", dir, async () => {
-      if (!isInside(root, resolve(dir))) throw new Error(`Refusing to remove ${dir} outside ${root}`)
-      await rm(dir, { recursive: true, force: true })
-      return !existsSync(dir)
-    }))
+    receipts.push(
+      await attempt("directory", dir, async () => {
+        if (!isInside(root, resolve(dir))) throw new Error(`Refusing to remove ${dir} outside ${root}`)
+        await rm(dir, { recursive: true, force: true })
+        return !existsSync(dir)
+      }),
+    )
   }
   if (orphans.strayDirs.length > 0) await run(exec, repo.dir, ["worktree", "prune"])
   for (const branch of orphans.branches) {
     if (discarded.has(branch)) continue
-    receipts.push(await attempt("branch", branch, async () => {
-      await run(exec, repo.dir, ["branch", "-D", branch])
-      return (await run(exec, repo.dir, ["show-ref", "--verify", `refs/heads/${branch}`])).code !== 0
-    }))
+    receipts.push(
+      await attempt("branch", branch, async () => {
+        await run(exec, repo.dir, ["branch", "-D", branch])
+        return (await run(exec, repo.dir, ["show-ref", "--verify", `refs/heads/${branch}`])).code !== 0
+      }),
+    )
   }
   return receipts
 }
@@ -158,7 +168,8 @@ function parseRegisteredWorktrees(porcelain: string): RegisteredReflectionWorktr
   let dir: string | undefined
   let branch: string | undefined
   const flush = () => {
-    if (dir !== undefined) worktrees.push({ dir, ...(branch === undefined ? {} : { branch }), present: existsSync(dir) })
+    if (dir !== undefined)
+      worktrees.push({ dir, ...(branch === undefined ? {} : { branch }), present: existsSync(dir) })
     dir = undefined
     branch = undefined
   }

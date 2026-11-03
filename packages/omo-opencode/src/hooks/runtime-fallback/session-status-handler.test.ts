@@ -58,14 +58,22 @@ function createDeps(): HookDeps {
   }
 }
 
-function createHelpers(abortCalls: string[], retryCalls: Array<{ sessionID: string; model: string; source: string }>): AutoRetryHelpers {
+function createHelpers(
+  abortCalls: string[],
+  retryCalls: Array<{ sessionID: string; model: string; source: string }>,
+): AutoRetryHelpers {
   return {
     abortSessionRequest: async (sessionID: string) => {
       abortCalls.push(sessionID)
     },
     clearSessionFallbackTimeout: () => {},
     scheduleSessionFallbackTimeout: () => {},
-    autoRetryWithFallback: async (sessionID: string, model: string, _resolvedAgent: string | undefined, source: string) => {
+    autoRetryWithFallback: async (
+      sessionID: string,
+      model: string,
+      _resolvedAgent: string | undefined,
+      source: string,
+    ) => {
       retryCalls.push({ sessionID, model, source })
       return { accepted: true, status: "dispatched" }
     },

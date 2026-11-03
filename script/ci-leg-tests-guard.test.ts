@@ -186,28 +186,33 @@ describe("macOS status jobs forwarding combined-job outcomes", () => {
     ["heavy work disabled", "skipped", "", "false", "true", "true", 0],
     ["unexpected skip", "skipped", "", "true", "true", "true", 1],
     ["classification missing", "skipped", "", "", "", "", 1],
-  ])("#given %s #when the real status script runs #then it propagates the verdict", (
-    _name, jobStatus, outcomes, runHeavy, fullMatrix, runtimeTouching, exitCode,
-  ) => {
-    const root = mkdtempSync(join(tmpdir(), "ci-macos-status-"))
-    scratchRoots.push(root)
-    const result = spawnSync("bash", [fileURLToPath(new URL("../.github/scripts/ci-macos-status.sh", import.meta.url))], {
-      cwd: fileURLToPath(new URL("..", import.meta.url)),
-      encoding: "utf8",
-      env: {
-        ...process.env,
-        GITHUB_STEP_SUMMARY: join(root, "summary.md"),
-        LEG_OS: "macos-latest",
-        LEG_JOB_STATUS: jobStatus,
-        TEST_OUTCOMES: outcomes,
-        RUN_HEAVY: runHeavy,
-        FULL_MATRIX: fullMatrix,
-        RUNTIME_TOUCHING: runtimeTouching,
-      },
-    })
-    expect({ status: result.status, stderr: result.stderr }).toEqual({ status: exitCode, stderr: "" })
-    if (jobStatus === "skipped" && exitCode === 0) {
-      expect(result.stdout).toContain("::notice title=tests intentionally not run::")
-    }
-  })
+  ])(
+    "#given %s #when the real status script runs #then it propagates the verdict",
+    (_name, jobStatus, outcomes, runHeavy, fullMatrix, runtimeTouching, exitCode) => {
+      const root = mkdtempSync(join(tmpdir(), "ci-macos-status-"))
+      scratchRoots.push(root)
+      const result = spawnSync(
+        "bash",
+        [fileURLToPath(new URL("../.github/scripts/ci-macos-status.sh", import.meta.url))],
+        {
+          cwd: fileURLToPath(new URL("..", import.meta.url)),
+          encoding: "utf8",
+          env: {
+            ...process.env,
+            GITHUB_STEP_SUMMARY: join(root, "summary.md"),
+            LEG_OS: "macos-latest",
+            LEG_JOB_STATUS: jobStatus,
+            TEST_OUTCOMES: outcomes,
+            RUN_HEAVY: runHeavy,
+            FULL_MATRIX: fullMatrix,
+            RUNTIME_TOUCHING: runtimeTouching,
+          },
+        },
+      )
+      expect({ status: result.status, stderr: result.stderr }).toEqual({ status: exitCode, stderr: "" })
+      if (jobStatus === "skipped" && exitCode === 0) {
+        expect(result.stdout).toContain("::notice title=tests intentionally not run::")
+      }
+    },
+  )
 })

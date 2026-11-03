@@ -171,10 +171,7 @@ export function recordReplyListenerPoll(state: ReplyListenerDaemonState, pid: nu
   state.lastPollAt = new Date().toISOString()
 }
 
-export function recordSeenDiscordMessage(
-  state: ReplyListenerDaemonState,
-  messageId: string,
-): void {
+export function recordSeenDiscordMessage(state: ReplyListenerDaemonState, messageId: string): void {
   state.discordLastMessageId = messageId
   state.lastDiscordMessageId = messageId
   state.messagesSeen += 1

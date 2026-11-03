@@ -32,16 +32,23 @@ type Version = {
 
 type LazyCodexUpdatePlan =
   | { readonly shouldUpdate: false; readonly reason: "unknown-current" | "unknown-latest" | "up-to-date" }
-  | { readonly shouldUpdate: true; readonly command: string; readonly args: readonly string[]; readonly postUpdate: "bun-global-trust" | "none" }
+  | {
+      readonly shouldUpdate: true
+      readonly command: string
+      readonly args: readonly string[]
+      readonly postUpdate: "bun-global-trust" | "none"
+    }
 
-export async function runLazyCodexManualUpdate(input: {
-  readonly env?: NodeJS.ProcessEnv
-  readonly dryRun?: boolean
-  readonly log?: (line: string) => void
-  readonly runCommand?: RunCommand
-  readonly invokedPath?: string
-  readonly isInteractive?: boolean
-} = {}): Promise<number> {
+export async function runLazyCodexManualUpdate(
+  input: {
+    readonly env?: NodeJS.ProcessEnv
+    readonly dryRun?: boolean
+    readonly log?: (line: string) => void
+    readonly runCommand?: RunCommand
+    readonly invokedPath?: string
+    readonly isInteractive?: boolean
+  } = {},
+): Promise<number> {
   const env = input.env ?? process.env
   const log = input.log ?? console.log
   const commandRunner = input.runCommand ?? defaultRunCommandForManualUpdate
@@ -57,9 +64,11 @@ export async function runLazyCodexManualUpdate(input: {
   })
   if (!plan.shouldUpdate) {
     const printableVersion = currentVersion ?? "unknown"
-    log(plan.reason === "up-to-date"
-      ? `lazycodex-ai ${printableVersion} is already up to date.`
-      : `Unable to check lazycodex-ai updates (${plan.reason}).`)
+    log(
+      plan.reason === "up-to-date"
+        ? `lazycodex-ai ${printableVersion} is already up to date.`
+        : `Unable to check lazycodex-ai updates (${plan.reason}).`,
+    )
     return plan.reason === "up-to-date" ? 0 : 1
   }
   if (input.dryRun) {
@@ -80,23 +89,35 @@ export async function runLazyCodexManualUpdate(input: {
   return 0
 }
 
-function resolveLazyCodexUpdatePlan(input: {
-  readonly currentVersion?: string
-  readonly latestVersion?: string
-  readonly command?: string
-  readonly args?: readonly string[]
-  readonly env?: NodeJS.ProcessEnv
-  readonly invokedPath?: string
-} = {}): LazyCodexUpdatePlan {
+function resolveLazyCodexUpdatePlan(
+  input: {
+    readonly currentVersion?: string
+    readonly latestVersion?: string
+    readonly command?: string
+    readonly args?: readonly string[]
+    readonly env?: NodeJS.ProcessEnv
+    readonly invokedPath?: string
+  } = {},
+): LazyCodexUpdatePlan {
   const current = parseVersion(input.currentVersion)
   if (current === null) return { shouldUpdate: false, reason: "unknown-current" }
   const latest = parseVersion(input.latestVersion)
   if (latest === null) return { shouldUpdate: false, reason: "unknown-latest" }
   if (compareVersions(latest, current) <= 0) return { shouldUpdate: false, reason: "up-to-date" }
   if (isBunGlobalEntrypoint(input.invokedPath, input.env ?? process.env)) {
-    return { shouldUpdate: true, command: BUN_UPDATE_COMMAND, args: BUN_GLOBAL_UPDATE_ARGS, postUpdate: "bun-global-trust" }
+    return {
+      shouldUpdate: true,
+      command: BUN_UPDATE_COMMAND,
+      args: BUN_GLOBAL_UPDATE_ARGS,
+      postUpdate: "bun-global-trust",
+    }
   }
-  return { shouldUpdate: true, command: input.command ?? DEFAULT_UPDATE_COMMAND, args: input.args ?? DEFAULT_UPDATE_ARGS, postUpdate: "none" }
+  return {
+    shouldUpdate: true,
+    command: input.command ?? DEFAULT_UPDATE_COMMAND,
+    args: input.args ?? DEFAULT_UPDATE_ARGS,
+    postUpdate: "none",
+  }
 }
 
 function resolveCommand(env: NodeJS.ProcessEnv): string {
@@ -187,15 +208,21 @@ async function confirmBunGlobalTrust(packageNames: readonly string[]): Promise<b
 }
 
 function isKnownLazyCodexBunTrustPackage(packageName: string): boolean {
-  return KNOWN_LAZYCODEX_BUN_TRUST_PACKAGES.has(packageName) ||
+  return (
+    KNOWN_LAZYCODEX_BUN_TRUST_PACKAGES.has(packageName) ||
     KNOWN_LAZYCODEX_BUN_TRUST_PREFIXES.some((prefix) => packageName.startsWith(prefix))
+  )
 }
 
 function isBunGlobalEntrypoint(invokedPath: string | undefined, env: NodeJS.ProcessEnv): boolean {
   return isBunGlobalEntrypointPath(invokedPath, env)
 }
 
-function defaultRunCommandForManualUpdate(command: string, args: readonly string[], options: { readonly cwd: string; readonly env?: NodeJS.ProcessEnv }): Promise<void> {
+function defaultRunCommandForManualUpdate(
+  command: string,
+  args: readonly string[],
+  options: { readonly cwd: string; readonly env?: NodeJS.ProcessEnv },
+): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd: options.cwd,

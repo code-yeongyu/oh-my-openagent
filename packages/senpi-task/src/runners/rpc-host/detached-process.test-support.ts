@@ -81,9 +81,10 @@ async function drive(): Promise<void> {
       await detachedClient.detach()
       const port = {
         ...fakeSessionPort(),
-        getState: () => scenario === "site-1-rejection"
-          ? Promise.reject(new HostSessionDetachedError("get_state"))
-          : detachedClient.getState(),
+        getState: () =>
+          scenario === "site-1-rejection"
+            ? Promise.reject(new HostSessionDetachedError("get_state"))
+            : detachedClient.getState(),
         send: detachedClient.send.bind(detachedClient),
         close: () => {
           if (scenario === "site-3-close") throw new HostSessionDetachedError("close_session")
@@ -117,7 +118,11 @@ async function drive(): Promise<void> {
       const client = new DetachedProtocolClient({ child })
       client.detach()
       const handle = createRpcChildHandle({
-        client, child, taskId: "detached-probe", heartbeatIntervalMs: 1, now: () => 7,
+        client,
+        child,
+        taskId: "detached-probe",
+        heartbeatIntervalMs: 1,
+        now: () => 7,
       })
       cleanup = async () => {
         try {
@@ -134,7 +139,11 @@ async function drive(): Promise<void> {
       const { child } = startChild()
       const client = new RejectingDetachClient({ child })
       const handle = createRpcChildHandle({
-        client, child, taskId: "detached-probe", heartbeatIntervalMs: 60_000, now: () => 7,
+        client,
+        child,
+        taskId: "detached-probe",
+        heartbeatIntervalMs: 60_000,
+        now: () => 7,
       })
       const disposed = handle.dispose()
       client.release.reject(new HostSessionDetachedError("detach"))

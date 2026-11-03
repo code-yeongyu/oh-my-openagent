@@ -63,9 +63,7 @@ export async function resolveTeamRuntimeDetails(
   try {
     const runtimeState = await deps.loadRuntimeState(teamRunId, config)
     const isLead = runtimeState.leadSessionId === sessionID
-    const leadMember = isLead
-      ? runtimeState.members.find((member) => member.agentType === "leader")
-      : undefined
+    const leadMember = isLead ? runtimeState.members.find((member) => member.agentType === "leader") : undefined
     const member = runtimeState.members.find((entry) => entry.sessionId === sessionID)
     const senderName = leadMember?.name ?? member?.name ?? "unknown"
 
@@ -73,9 +71,7 @@ export async function resolveTeamRuntimeDetails(
       teamRunId: runtimeState.teamRunId,
       isLead,
       senderName,
-      activeMembers: runtimeState.members
-        .map((entry) => entry.name)
-        .filter((name) => name !== senderName),
+      activeMembers: runtimeState.members.map((entry) => entry.name).filter((name) => name !== senderName),
     }
   } catch (error) {
     error instanceof Error

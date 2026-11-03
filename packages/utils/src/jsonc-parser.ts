@@ -39,9 +39,7 @@ export function parseJsonc<T = unknown>(content: string): T {
   }) as T
 
   if (errors.length > 0) {
-    const errorMessages = errors
-      .map((e) => `${printParseErrorCode(e.error)} at offset ${e.offset}`)
-      .join(", ")
+    const errorMessages = errors.map((e) => `${printParseErrorCode(e.error)} at offset ${e.offset}`).join(", ")
     throw new SyntaxError(`JSONC parse error: ${errorMessages}`)
   }
 
@@ -94,10 +92,7 @@ export function clearPluginConfigFileDetectionCache(): void {
   pluginConfigFileDetectionCache.clear()
 }
 
-export function detectPluginConfigFile(
-  dir: string,
-  options: DetectPluginConfigFileOptions,
-): DetectPluginConfigResult {
+export function detectPluginConfigFile(dir: string, options: DetectPluginConfigFileOptions): DetectPluginConfigResult {
   const cacheKey = getPluginConfigCacheKey(dir, options)
   const cachedResult = pluginConfigFileDetectionCache.get(cacheKey)
 

@@ -10,8 +10,7 @@ const BUSY_CHILD_REJECTION =
   "Agent is already processing. Specify streamingBehavior ('steer' or 'followUp') to queue the message."
 
 function busyOn(type: HostSessionCommand["type"]): (command: HostSessionCommand) => Promise<void> {
-  return (command) =>
-    command.type === type ? Promise.reject(new Error(BUSY_CHILD_REJECTION)) : Promise.resolve()
+  return (command) => (command.type === type ? Promise.reject(new Error(BUSY_CHILD_REJECTION)) : Promise.resolve())
 }
 
 function prompts(sent: readonly HostSessionCommand[]): readonly HostSessionCommand[] {
@@ -33,7 +32,12 @@ describe("host session delivery semantics", () => {
 
     // then
     expect(prompts(port.sent)).toEqual([
-      { type: "prompt", message: "do the daemon child work", streamingBehavior: "steer", clientMessageId: "st_29_delivery:0:1" },
+      {
+        type: "prompt",
+        message: "do the daemon child work",
+        streamingBehavior: "steer",
+        clientMessageId: "st_29_delivery:0:1",
+      },
     ])
     await handle.dispose()
   })
@@ -47,7 +51,9 @@ describe("host session delivery semantics", () => {
     await handle.steer("keep going")
 
     // then
-    expect(prompts(port.sent)).toEqual([{ type: "prompt", message: "keep going", streamingBehavior: "followUp", clientMessageId: "st_29_delivery:0:2" }])
+    expect(prompts(port.sent)).toEqual([
+      { type: "prompt", message: "keep going", streamingBehavior: "followUp", clientMessageId: "st_29_delivery:0:2" },
+    ])
     await handle.dispose()
   })
 
@@ -176,7 +182,10 @@ describe("host session heartbeat", () => {
     // given
     const port = fakeSessionPort()
     const observed = Promise.withResolvers<void>()
-    const handle = handleOverPort(port, 1, () => { observed.resolve(); return 7 })
+    const handle = handleOverPort(port, 1, () => {
+      observed.resolve()
+      return 7
+    })
     expect(handle.lastSeen()).toBeUndefined()
 
     // when

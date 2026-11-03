@@ -1,7 +1,13 @@
 import type { SessionDigestStore } from "./digest-store"
 import { digestByteLength } from "./session-digest"
 import { createSessionHistoryScanner } from "./session-history-scanner"
-import type { AgentSessionSource, ProjectCandidate, RecentSessionsQuery, ScanCounts, SessionHistoryOptions } from "./types"
+import type {
+  AgentSessionSource,
+  ProjectCandidate,
+  RecentSessionsQuery,
+  ScanCounts,
+  SessionHistoryOptions,
+} from "./types"
 
 export type SessionHistoryScanSource = "projects" | "sessions"
 
@@ -46,7 +52,8 @@ export async function* scanSessionHistory(options: ScanSessionHistoryOptions): A
   yield { scanId, kind: "source_started", source: "projects", elapsedMs: elapsedMs() }
   try {
     const result = await scanner.scanProjects()
-    for (const item of result.candidates) yield { scanId, kind: "item", source: "projects", item, elapsedMs: elapsedMs() }
+    for (const item of result.candidates)
+      yield { scanId, kind: "item", source: "projects", item, elapsedMs: elapsedMs() }
     yield { scanId, kind: "source_done", source: "projects", counts: result.counts, elapsedMs: elapsedMs() }
   } catch (cause) {
     yield { scanId, kind: "source_failed", source: "projects", error: errorMessage(cause), elapsedMs: elapsedMs() }

@@ -14,15 +14,24 @@ afterEach(cleanupProjects)
 
 const OWNER = { ownerSessionId: "parent-1" }
 const NO_POOLS = {
-  inspect: () => { throw new Error("no pools in this test") },
-  cancel: () => { throw new Error("no pools in this test") },
+  inspect: () => {
+    throw new Error("no pools in this test")
+  },
+  cancel: () => {
+    throw new Error("no pools in this test")
+  },
   subscribe: () => () => undefined,
 }
 
 async function harness() {
   const inProcess = new FakeRunner()
   const { manager, store } = makeManager({ inProcess })
-  const host = createEvalHandleHost({ tasks: manager, workpools: NO_POOLS, poolCaller: (sessionId) => ({ sessionId, rootSessionId: sessionId, depth: 0, cwd: "/" }), stateDir: store.stateDir })
+  const host = createEvalHandleHost({
+    tasks: manager,
+    workpools: NO_POOLS,
+    poolCaller: (sessionId) => ({ sessionId, rootSessionId: sessionId, depth: 0, cwd: "/" }),
+    stateDir: store.stateDir,
+  })
   const started = await manager.start(baseSpec())
   if (started.kind !== "started") throw new Error("expected a started child")
   const ref: HandleRef = { kind: "agent", id: started.task_id, run_epoch: 0 }
@@ -43,19 +52,36 @@ class StartObservingRunner extends FakeRunner {
   }
 
   nextStart(): Promise<void> {
-    return new Promise((resolve) => { this.#waiters.push(resolve) })
+    return new Promise((resolve) => {
+      this.#waiters.push(resolve)
+    })
   }
 }
 
 function fallbackPlanner() {
-  const model = (provider: string, id: string) => ({ source: "category" as const, provider, model_id: id, display: `${provider}/${id}` })
+  const model = (provider: string, id: string) => ({
+    source: "category" as const,
+    provider,
+    model_id: id,
+    display: `${provider}/${id}`,
+  })
   return () => ({
     kind: "resolved" as const,
-    plan: { model: "vendor-a/primary", requested_model: model("vendor-a", "primary"), resolved_model: model("vendor-a", "primary"), fallback_models: [model("vendor-b", "next")], category: "quick" },
+    plan: {
+      model: "vendor-a/primary",
+      requested_model: model("vendor-a", "primary"),
+      resolved_model: model("vendor-a", "primary"),
+      fallback_models: [model("vendor-b", "next")],
+      category: "quick",
+    },
   })
 }
 
-async function phaseOf(host: EvalHandleHost, ref: HandleRef, owner: { readonly ownerSessionId: string }): Promise<string | undefined> {
+async function phaseOf(
+  host: EvalHandleHost,
+  ref: HandleRef,
+  owner: { readonly ownerSessionId: string },
+): Promise<string | undefined> {
   const watch = await host.watch([ref], owner)
   watch.close()
   return watch.initial[0]?.phase
@@ -84,11 +110,19 @@ describe("EvalHandleHost over real task children", () => {
   test("two agent runs finishing out of order are each reported once and their results come back in the caller's order", async () => {
     const inProcess = new FakeRunner()
     const { manager, store } = makeManager({ inProcess })
-    const host = createEvalHandleHost({ tasks: manager, workpools: NO_POOLS, poolCaller: (sessionId) => ({ sessionId, rootSessionId: sessionId, depth: 0, cwd: "/" }), stateDir: store.stateDir })
+    const host = createEvalHandleHost({
+      tasks: manager,
+      workpools: NO_POOLS,
+      poolCaller: (sessionId) => ({ sessionId, rootSessionId: sessionId, depth: 0, cwd: "/" }),
+      stateDir: store.stateDir,
+    })
     const a = await manager.start(baseSpec())
     const b = await manager.start(baseSpec())
     if (a.kind !== "started" || b.kind !== "started") throw new Error("expected two started children")
-    const refs: HandleRef[] = [{ kind: "agent", id: a.task_id, run_epoch: 0 }, { kind: "agent", id: b.task_id, run_epoch: 0 }]
+    const refs: HandleRef[] = [
+      { kind: "agent", id: a.task_id, run_epoch: 0 },
+      { kind: "agent", id: b.task_id, run_epoch: 0 },
+    ]
     const watch = await host.watch(refs, OWNER)
     const updates = drain(watch)
 
@@ -99,11 +133,14 @@ describe("EvalHandleHost over real task children", () => {
     watch.close()
 
     expect((await updates).map((s) => s.ref.id)).toEqual([b.task_id, a.task_id])
-    const values = await Promise.all(refs.map(async (ref) => {
-      const outcome = await host.result(ref, OWNER)
-      if (outcome.status !== "fulfilled") throw new Error(`expected a fulfilled outcome, got ${JSON.stringify(outcome)}`)
-      return outcome.value
-    }))
+    const values = await Promise.all(
+      refs.map(async (ref) => {
+        const outcome = await host.result(ref, OWNER)
+        if (outcome.status !== "fulfilled")
+          throw new Error(`expected a fulfilled outcome, got ${JSON.stringify(outcome)}`)
+        return outcome.value
+      }),
+    )
     expect(values).toEqual(["value a", "value b"])
   })
 
@@ -122,7 +159,12 @@ describe("EvalHandleHost over real task children", () => {
   test("a runtime model fallback moves the epoch inside the same run: the handle stays live and the fallback's result arrives", async () => {
     const runner = new StartObservingRunner()
     const { manager, store } = makeManager({ inProcess: runner, planner: fallbackPlanner() })
-    const host = createEvalHandleHost({ tasks: manager, workpools: NO_POOLS, poolCaller: (sessionId) => ({ sessionId, rootSessionId: sessionId, depth: 0, cwd: "/" }), stateDir: store.stateDir })
+    const host = createEvalHandleHost({
+      tasks: manager,
+      workpools: NO_POOLS,
+      poolCaller: (sessionId) => ({ sessionId, rootSessionId: sessionId, depth: 0, cwd: "/" }),
+      stateDir: store.stateDir,
+    })
     const firstStart = runner.nextStart()
     const started = await manager.start(baseSpec({ execution_mode: "in-process" }))
     if (started.kind !== "started") throw new Error("expected a started child")
@@ -132,7 +174,9 @@ describe("EvalHandleHost over real task children", () => {
     const updates = drain(watch)
 
     const fallbackStart = runner.nextStart()
-    runner.handles.get(started.task_id)?.settle({ status: "error", failure: { kind: "child-turn-failed", message: "provider capacity exhausted" } })
+    runner.handles
+      .get(started.task_id)
+      ?.settle({ status: "error", failure: { kind: "child-turn-failed", message: "provider capacity exhausted" } })
     await fallbackStart
     expect(store.load(started.task_id)?.notification.run_epoch).toBeGreaterThan(0)
     expect(await host.cancel(ref, OWNER)).toMatchObject({ cancelled: true, phase: "cancelled" })
@@ -178,7 +222,11 @@ describe("EvalHandleHost over real task children", () => {
         waitFor: (id, options) => manager.waitFor(id, options),
         sendToTask: (input) => manager.sendToTask(input),
         cancelTask: async (id, reason, options) => {
-          await manager.sendToTask({ idOrName: id, message: "revived in the gap", callerSessionId: OWNER.ownerSessionId })
+          await manager.sendToTask({
+            idOrName: id,
+            message: "revived in the gap",
+            callerSessionId: OWNER.ownerSessionId,
+          })
           return manager.cancelTask(id, reason, options)
         },
       },
@@ -198,7 +246,11 @@ describe("EvalHandleHost over real task children", () => {
     await settle("first pass")
     await host.send(ref, "second pass", OWNER)
 
-    const result = store.transition(ref.id, { type: "cancel", timestamp: new Date().toISOString(), expected_run_epoch: ref.run_epoch })
+    const result = store.transition(ref.id, {
+      type: "cancel",
+      timestamp: new Date().toISOString(),
+      expected_run_epoch: ref.run_epoch,
+    })
 
     expect(result.applied).toBe(false)
     expect(result.audit).toEqual({ type: "epoch_mismatch_ignored", expected_run_epoch: 0, run_epoch: 1 })
@@ -226,8 +278,12 @@ describe("EvalHandleHost over real task children", () => {
   test("another session's task is forbidden and an unknown task is not found", async () => {
     const { host, ref } = await harness()
 
-    await expect(host.watch([ref], { ownerSessionId: "someone-else" })).rejects.toMatchObject({ code: "eval_handle_forbidden" })
-    await expect(host.result({ ...ref, id: "st_0000000000000000000000000" }, OWNER)).rejects.toMatchObject({ code: "eval_handle_not_found" })
+    await expect(host.watch([ref], { ownerSessionId: "someone-else" })).rejects.toMatchObject({
+      code: "eval_handle_forbidden",
+    })
+    await expect(host.result({ ...ref, id: "st_0000000000000000000000000" }, OWNER)).rejects.toMatchObject({
+      code: "eval_handle_not_found",
+    })
   })
 
   test("a resume during an output read yields eval_handle_stale, never the successor's transcript", async () => {
@@ -239,7 +295,12 @@ describe("EvalHandleHost over real task children", () => {
       poolCaller: (sessionId) => ({ sessionId, rootSessionId: sessionId, depth: 0, cwd: "/" }),
       stateDir: store.stateDir,
       transcriptReader: () => {
-        store.mutate(ref.id, (record) => ({ ...record, status: "running", run_start_epoch: 1, notification: { ...record.notification, run_epoch: 1 } }))
+        store.mutate(ref.id, (record) => ({
+          ...record,
+          status: "running",
+          run_start_epoch: 1,
+          notification: { ...record.notification, run_epoch: 1 },
+        }))
         return { entries: [{ kind: "assistant", text: "successor text" }], source: "event-log" }
       },
     })
@@ -253,7 +314,12 @@ describe("EvalHandleHost over real task children", () => {
     await manager.sendToTask({ idOrName: ref.id, message: "second pass", callerSessionId: OWNER.ownerSessionId })
 
     const cancel = await manager.cancelTask(ref.id, "from an old handle", { expectedRunEpoch: 0 })
-    const send = await manager.sendToTask({ idOrName: ref.id, message: "from an old handle", callerSessionId: OWNER.ownerSessionId, expectedRunEpoch: 0 })
+    const send = await manager.sendToTask({
+      idOrName: ref.id,
+      message: "from an old handle",
+      callerSessionId: OWNER.ownerSessionId,
+      expectedRunEpoch: 0,
+    })
 
     expect(cancel).toMatchObject({ kind: "stale", task_id: ref.id, run_epoch: 1 })
     expect(send).toMatchObject({ kind: "stale", task_id: ref.id, run_epoch: 1 })
@@ -300,7 +366,11 @@ describe("EvalHandleHost over real task children", () => {
         sendToTask: (input) => manager.sendToTask(input),
         cancelTask: async (id, reason, options) => {
           const outcome = await manager.cancelTask(id, reason, options)
-          await manager.sendToTask({ idOrName: id, message: "revived after the cancel", callerSessionId: OWNER.ownerSessionId })
+          await manager.sendToTask({
+            idOrName: id,
+            message: "revived after the cancel",
+            callerSessionId: OWNER.ownerSessionId,
+          })
           return outcome
         },
       },
@@ -357,7 +427,11 @@ describe("EvalHandleHost over real task children", () => {
         // The barrier: the run settles after the waiter is registered and before the initial snapshot is read,
         // and the waiter then delivers that same terminal record.
         waitFor: (id) => {
-          store.transition(id, { type: "complete", timestamp: new Date().toISOString(), final_response: "settled mid-setup" })
+          store.transition(id, {
+            type: "complete",
+            timestamp: new Date().toISOString(),
+            final_response: "settled mid-setup",
+          })
           const terminal = store.load(id)
           return terminal === null ? Promise.reject(new Error("missing record")) : Promise.resolve(terminal)
         },
@@ -379,7 +453,11 @@ describe("EvalHandleHost over real task children", () => {
   test("a watch whose run is rolled back ends as lost when the waiter settles with the earlier run, instead of waiting out its timeout", async () => {
     const { manager, store, ref, settle } = await harness()
     await settle("first pass")
-    const revived = await manager.sendToTask({ idOrName: ref.id, message: "second pass", callerSessionId: OWNER.ownerSessionId })
+    const revived = await manager.sendToTask({
+      idOrName: ref.id,
+      message: "second pass",
+      callerSessionId: OWNER.ownerSessionId,
+    })
     if (revived.kind !== "revived") throw new Error("expected a revive")
     const successor: HandleRef = { ...ref, run_epoch: revived.run_epoch }
     let rollBack: () => void = () => undefined
@@ -388,13 +466,19 @@ describe("EvalHandleHost over real task children", () => {
         get: (id) => manager.get(id),
         cancelTask: (id, reason, options) => manager.cancelTask(id, reason, options),
         sendToTask: (input) => manager.sendToTask(input),
-        waitFor: (id) => new Promise((resolve) => {
-          rollBack = () => {
-            store.mutate(id, (record) => ({ ...record, status: "completed", run_start_epoch: 0, notification: { ...record.notification, run_epoch: 0 } }))
-            const restored = store.load(id)
-            if (restored !== null) resolve(restored)
-          }
-        }),
+        waitFor: (id) =>
+          new Promise((resolve) => {
+            rollBack = () => {
+              store.mutate(id, (record) => ({
+                ...record,
+                status: "completed",
+                run_start_epoch: 0,
+                notification: { ...record.notification, run_epoch: 0 },
+              }))
+              const restored = store.load(id)
+              if (restored !== null) resolve(restored)
+            }
+          }),
       },
       workpools: NO_POOLS,
       poolCaller: (sessionId) => ({ sessionId, rootSessionId: sessionId, depth: 0, cwd: "/" }),
@@ -414,7 +498,12 @@ describe("EvalHandleHost over real task children", () => {
   test("a watch on a pre-upgrade record still delivers its terminal after an in-run epoch move, and the result names the re-fetch", async () => {
     const runner = new StartObservingRunner()
     const { manager, store } = makeManager({ inProcess: runner, planner: fallbackPlanner() })
-    const host = createEvalHandleHost({ tasks: manager, workpools: NO_POOLS, poolCaller: (sessionId) => ({ sessionId, rootSessionId: sessionId, depth: 0, cwd: "/" }), stateDir: store.stateDir })
+    const host = createEvalHandleHost({
+      tasks: manager,
+      workpools: NO_POOLS,
+      poolCaller: (sessionId) => ({ sessionId, rootSessionId: sessionId, depth: 0, cwd: "/" }),
+      stateDir: store.stateDir,
+    })
     const firstStart = runner.nextStart()
     const started = await manager.start(baseSpec({ execution_mode: "in-process" }))
     if (started.kind !== "started") throw new Error("expected a started child")
@@ -428,7 +517,9 @@ describe("EvalHandleHost over real task children", () => {
     const updates = drain(watch)
 
     const fallbackStart = runner.nextStart()
-    runner.handles.get(started.task_id)?.settle({ status: "error", failure: { kind: "child-turn-failed", message: "provider capacity exhausted" } })
+    runner.handles
+      .get(started.task_id)
+      ?.settle({ status: "error", failure: { kind: "child-turn-failed", message: "provider capacity exhausted" } })
     await fallbackStart
     const terminal = manager.waitFor(started.task_id, { signal: AbortSignal.timeout(5000) })
     await manager.cancelTask(started.task_id, "end the fallback run")
@@ -483,23 +574,41 @@ describe("EvalHandleHost over a real workpool", () => {
 
     expect(await host.cancel(ref, owner)).toMatchObject({ cancelled: true, phase: "cancelled" })
 
-    expect(await host.result(ref, owner)).toMatchObject({ status: "rejected", error: { code: "eval_handle_cancelled" } })
+    expect(await host.result(ref, owner)).toMatchObject({
+      status: "rejected",
+      error: { code: "eval_handle_cancelled" },
+    })
   })
 
   test("another session's pool is forbidden", async () => {
     const { host, ref } = pools()
 
-    await expect(host.watch([ref], { ownerSessionId: "someone-else" })).rejects.toMatchObject({ code: "eval_handle_forbidden" })
+    await expect(host.watch([ref], { ownerSessionId: "someone-else" })).rejects.toMatchObject({
+      code: "eval_handle_forbidden",
+    })
   })
 })
 
 describe("every send and cancel reply is checked against the run after the engine returns", () => {
-  type Interleave = (input: { readonly store: ReturnType<typeof makeManager>["store"]; readonly taskId: string; readonly epoch: number }) => void
+  type Interleave = (input: {
+    readonly store: ReturnType<typeof makeManager>["store"]
+    readonly taskId: string
+    readonly epoch: number
+  }) => void
   const startFollowUpRun: Interleave = ({ store, taskId, epoch }) => {
-    store.mutate(taskId, (record) => ({ ...record, status: "running", run_start_epoch: epoch, notification: { ...record.notification, run_epoch: epoch } }))
+    store.mutate(taskId, (record) => ({
+      ...record,
+      status: "running",
+      run_start_epoch: epoch,
+      notification: { ...record.notification, run_epoch: epoch },
+    }))
   }
 
-  async function racingHost(sendOutcome: (input: { readonly taskId: string }) => Promise<SendOutcome>, moveTo: number, interleave: Interleave = startFollowUpRun) {
+  async function racingHost(
+    sendOutcome: (input: { readonly taskId: string }) => Promise<SendOutcome>,
+    moveTo: number,
+    interleave: Interleave = startFollowUpRun,
+  ) {
     const { manager, store, ref, settle } = await harness()
     const host = createEvalHandleHost({
       tasks: {
@@ -520,25 +629,54 @@ describe("every send and cancel reply is checked against the run after the engin
   }
 
   test.each([
-    { branch: "revived", outcome: (taskId: string): SendOutcome => ({ kind: "revived", task_id: taskId, run_epoch: 1 }), moveTo: 2 },
-    { branch: "steered", outcome: (taskId: string): SendOutcome => ({ kind: "steered", task_id: taskId, status: "running", delivered: "steer" }), moveTo: 1 },
-    { branch: "queued", outcome: (taskId: string): SendOutcome => ({ kind: "queued", task_id: taskId, queue_position: 1 }), moveTo: 1 },
-  ])("a $branch send whose follow-up run started before the re-read returns that run's ref and says it continued", async ({ outcome, moveTo }) => {
-    const { host, ref } = await racingHost(async ({ taskId }) => outcome(taskId), moveTo)
+    {
+      branch: "revived",
+      outcome: (taskId: string): SendOutcome => ({ kind: "revived", task_id: taskId, run_epoch: 1 }),
+      moveTo: 2,
+    },
+    {
+      branch: "steered",
+      outcome: (taskId: string): SendOutcome => ({
+        kind: "steered",
+        task_id: taskId,
+        status: "running",
+        delivered: "steer",
+      }),
+      moveTo: 1,
+    },
+    {
+      branch: "queued",
+      outcome: (taskId: string): SendOutcome => ({ kind: "queued", task_id: taskId, queue_position: 1 }),
+      moveTo: 1,
+    },
+  ])(
+    "a $branch send whose follow-up run started before the re-read returns that run's ref and says it continued",
+    async ({ outcome, moveTo }) => {
+      const { host, ref } = await racingHost(async ({ taskId }) => outcome(taskId), moveTo)
 
-    const reply = await host.send(ref, "next", OWNER)
+      const reply = await host.send(ref, "next", OWNER)
 
-    expect(reply.ref.run_epoch).toBe(moveTo)
-    expect(reply.phase).toBe("pending")
-    expect(reply.host_status).toBe(`continued as epoch ${moveTo}`)
-    expect((await host.watch([reply.ref], OWNER)).initial.map((s) => s.ref.run_epoch)).toEqual([moveTo])
-  })
+      expect(reply.ref.run_epoch).toBe(moveTo)
+      expect(reply.phase).toBe("pending")
+      expect(reply.host_status).toBe(`continued as epoch ${moveTo}`)
+      expect((await host.watch([reply.ref], OWNER)).initial.map((s) => s.ref.run_epoch)).toEqual([moveTo])
+    },
+  )
 
   test("a revive whose run is rolled back before the re-read is refused, not reported as a newer or older run", async () => {
     const rollBack: Interleave = ({ store, taskId }) => {
-      store.mutate(taskId, (record) => ({ ...record, status: "completed", run_start_epoch: 0, notification: { ...record.notification, run_epoch: 0 } }))
+      store.mutate(taskId, (record) => ({
+        ...record,
+        status: "completed",
+        run_start_epoch: 0,
+        notification: { ...record.notification, run_epoch: 0 },
+      }))
     }
-    const { host, ref } = await racingHost(async ({ taskId }) => ({ kind: "revived", task_id: taskId, run_epoch: 1 }), 0, rollBack)
+    const { host, ref } = await racingHost(
+      async ({ taskId }) => ({ kind: "revived", task_id: taskId, run_epoch: 1 }),
+      0,
+      rollBack,
+    )
 
     await expect(host.send(ref, "next", OWNER)).rejects.toMatchObject({ code: "eval_handle_send_refused" })
   })
@@ -546,27 +684,31 @@ describe("every send and cancel reply is checked against the run after the engin
   test.each([
     { outcome: "cancelled" as const, expect: { cancelled: true, phase: "cancelled" } },
     { outcome: "noop" as const, expect: "eval_handle_stale" },
-  // No cancel_pending row: a pending cancel blocks revive and steer, so a newer run cannot start under one.
-  ])("a cancel the engine answers $outcome, with a newer run started before the re-read, never reports that run", async (row) => {
-    const { manager, store, ref } = await harness()
-    const host = createEvalHandleHost({
-      tasks: {
-        get: (id) => manager.get(id),
-        waitFor: (id, options) => manager.waitFor(id, options),
-        sendToTask: (input) => manager.sendToTask(input),
-        cancelTask: async (id) => {
-          startFollowUpRun({ store, taskId: id, epoch: 1 })
-          const status = store.load(id)?.status ?? "running"
-          if (row.outcome === "cancelled") return { kind: "cancelled", task_id: id, previous_status: "running" }
-          return { kind: "noop", task_id: id, status, reason: "already ended" }
+    // No cancel_pending row: a pending cancel blocks revive and steer, so a newer run cannot start under one.
+  ])(
+    "a cancel the engine answers $outcome, with a newer run started before the re-read, never reports that run",
+    async (row) => {
+      const { manager, store, ref } = await harness()
+      const host = createEvalHandleHost({
+        tasks: {
+          get: (id) => manager.get(id),
+          waitFor: (id, options) => manager.waitFor(id, options),
+          sendToTask: (input) => manager.sendToTask(input),
+          cancelTask: async (id) => {
+            startFollowUpRun({ store, taskId: id, epoch: 1 })
+            const status = store.load(id)?.status ?? "running"
+            if (row.outcome === "cancelled") return { kind: "cancelled", task_id: id, previous_status: "running" }
+            return { kind: "noop", task_id: id, status, reason: "already ended" }
+          },
         },
-      },
-      workpools: NO_POOLS,
-      poolCaller: (sessionId) => ({ sessionId, rootSessionId: sessionId, depth: 0, cwd: "/" }),
-      stateDir: store.stateDir,
-    })
+        workpools: NO_POOLS,
+        poolCaller: (sessionId) => ({ sessionId, rootSessionId: sessionId, depth: 0, cwd: "/" }),
+        stateDir: store.stateDir,
+      })
 
-    if (typeof row.expect === "string") await expect(host.cancel(ref, OWNER)).rejects.toMatchObject({ code: row.expect })
-    else expect(await host.cancel(ref, OWNER)).toEqual({ ref, ...row.expect })
-  })
+      if (typeof row.expect === "string")
+        await expect(host.cancel(ref, OWNER)).rejects.toMatchObject({ code: row.expect })
+      else expect(await host.cancel(ref, OWNER)).toEqual({ ref, ...row.expect })
+    },
+  )
 })

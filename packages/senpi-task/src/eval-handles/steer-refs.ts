@@ -44,16 +44,30 @@ export async function cancelRef(deps: SteerDeps, ref: HandleRef, ctx: HandleCall
   }
 }
 
-export async function sendRef(deps: SteerDeps, ref: HandleRef, message: string, ctx: HandleCallContext): Promise<HandleSnapshot> {
-  if (ref.kind !== "agent") throw new EvalHandleHostError("eval_handle_operation_unsupported", `send is for agent handles, not ${ref.kind}`)
+export async function sendRef(
+  deps: SteerDeps,
+  ref: HandleRef,
+  message: string,
+  ctx: HandleCallContext,
+): Promise<HandleSnapshot> {
+  if (ref.kind !== "agent")
+    throw new EvalHandleHostError("eval_handle_operation_unsupported", `send is for agent handles, not ${ref.kind}`)
   const prior = fenceBeforeEngine(deps.tasks, ref, ctx)
-  const outcome = await deps.tasks.sendToTask({ idOrName: ref.id, message, callerSessionId: ctx.ownerSessionId, expectedRunEpoch: ref.run_epoch })
+  const outcome = await deps.tasks.sendToTask({
+    idOrName: ref.id,
+    message,
+    callerSessionId: ctx.ownerSessionId,
+    expectedRunEpoch: ref.run_epoch,
+  })
   const runAt = prior.reread(deps.tasks, "not_found")
   switch (outcome.kind) {
     case "uncertain":
       return runAt(ref.run_epoch).uncertain(ref, `${outcome.reason} Effect id: ${outcome.effect_id}`)
     case "failed":
-      throw new EvalHandleHostError("eval_handle_send_refused", `${outcome.reason}: ${outcome.detail}. Action: ${outcome.action}.`)
+      throw new EvalHandleHostError(
+        "eval_handle_send_refused",
+        `${outcome.reason}: ${outcome.detail}. Action: ${outcome.action}.`,
+      )
     case "revived":
       return runAt(outcome.run_epoch).delivered(ref, `revived as epoch ${outcome.run_epoch}`)
     case "steered":
@@ -83,6 +97,10 @@ export async function sendRef(deps: SteerDeps, ref: HandleRef, message: string, 
 }
 
 function agentRef(ref: HandleRef): HandleRef {
-  if (ref.kind !== "agent") throw new EvalHandleHostError("eval_handle_operation_unsupported", `${ref.kind} refs are not served by the task host`)
+  if (ref.kind !== "agent")
+    throw new EvalHandleHostError(
+      "eval_handle_operation_unsupported",
+      `${ref.kind} refs are not served by the task host`,
+    )
   return ref
 }

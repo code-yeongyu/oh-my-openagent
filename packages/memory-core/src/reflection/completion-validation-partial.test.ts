@@ -23,7 +23,9 @@ async function fixture(seedFiles: Record<string, string> = {}) {
   const root = realpathSync.native(await mkdtemp(join(tmpdir(), "reflection-partial-")))
   roots.push(root)
   const repo = new GitMemoryRepo({ dir: join(root, "memory"), agentId: "agent-one" })
-  await repo.init({ seedFiles: Object.entries(seedFiles).map(([relativePath, content]) => ({ relativePath, content })) })
+  await repo.init({
+    seedFiles: Object.entries(seedFiles).map(([relativePath, content]) => ({ relativePath, content })),
+  })
   const worktree = await createReflectionWorktree(repo, "run-1", join(root, "worktrees"))
   return { worktree }
 }
@@ -54,7 +56,11 @@ const treePaths = async (dir: string): Promise<string[]> =>
 describe("reflection completion keeps valid notes when one entry fails validation", () => {
   it("#given a good note and a note with a PEM block #when validated #then the good note is kept and the secret file dropped", async () => {
     const { worktree } = await fixture()
-    await commit(worktree.dir, { "reference/good.md": GOOD, "reference/leak.md": `---\ndescription: Leak\n---\n\n${PEM}` }, "two notes")
+    await commit(
+      worktree.dir,
+      { "reference/good.md": GOOD, "reference/leak.md": `---\ndescription: Leak\n---\n\n${PEM}` },
+      "two notes",
+    )
 
     const result = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
 
@@ -69,9 +75,22 @@ describe("reflection completion keeps valid notes when one entry fails validatio
 
   it("#given a secret only in an earlier commit #when validated #then the branch history carries no secret blob", async () => {
     const { worktree } = await fixture()
-    await commit(worktree.dir, { "reference/good.md": GOOD, "reference/tmp.md": `---\ndescription: T\n---\n\n${PEM}` }, "add")
+    await commit(
+      worktree.dir,
+      { "reference/good.md": GOOD, "reference/tmp.md": `---\ndescription: T\n---\n\n${PEM}` },
+      "add",
+    )
     await git(worktree.dir, "rm", "-q", "reference/tmp.md")
-    await git(worktree.dir, "-c", "user.email=fixture@example.com", "-c", "user.name=fixture", "commit", "-qm", "remove")
+    await git(
+      worktree.dir,
+      "-c",
+      "user.email=fixture@example.com",
+      "-c",
+      "user.name=fixture",
+      "commit",
+      "-qm",
+      "remove",
+    )
 
     const result = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
 
@@ -83,10 +102,14 @@ describe("reflection completion keeps valid notes when one entry fails validatio
 
   it("#given a note whose description is over 1024 characters #when validated #then it is dropped and the others are kept", async () => {
     const { worktree } = await fixture()
-    await commit(worktree.dir, {
-      "reference/good.md": GOOD,
-      "reference/long.md": `---\ndescription: ${"x".repeat(1100)}\n---\n\nbody\n`,
-    }, "notes")
+    await commit(
+      worktree.dir,
+      {
+        "reference/good.md": GOOD,
+        "reference/long.md": `---\ndescription: ${"x".repeat(1100)}\n---\n\nbody\n`,
+      },
+      "notes",
+    )
 
     const result = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
 
@@ -115,11 +138,15 @@ describe("reflection completion keeps valid notes when one entry fails validatio
 
   it("#given a repaired tip #when validated again #then the dropped entries are still reported and the commit message carries no secret", async () => {
     const { worktree } = await fixture()
-    await commit(worktree.dir, {
-      "reference/good.md": GOOD,
-      "reference/leak.md": `---\ndescription: Leak\n---\n\n${PEM}`,
-      "reference/token=abc123456.md": "---\ndescription: Named\n---\n\nclean\n",
-    }, "notes with password=hunter2Abrx9 in the subject")
+    await commit(
+      worktree.dir,
+      {
+        "reference/good.md": GOOD,
+        "reference/leak.md": `---\ndescription: Leak\n---\n\n${PEM}`,
+        "reference/token=abc123456.md": "---\ndescription: Named\n---\n\nclean\n",
+      },
+      "notes with password=hunter2Abrx9 in the subject",
+    )
 
     const first = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
     const second = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
@@ -146,7 +173,11 @@ describe("reflection completion keeps valid notes when one entry fails validatio
   for (const name of globNames) {
     it(`#given a dropped note named ${JSON.stringify(name)} #when validated #then only that note is dropped and no other note is touched`, async () => {
       const { worktree } = await fixture({ "reference/keep1.md": GOOD, "reference/keep2.md": GOOD })
-      await commit(worktree.dir, { [name]: `---\ndescription: Leak\n---\n\n${PEM}`, "reference/good.md": GOOD }, "glob name")
+      await commit(
+        worktree.dir,
+        { [name]: `---\ndescription: Leak\n---\n\n${PEM}`, "reference/good.md": GOOD },
+        "glob name",
+      )
 
       const result = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
 
@@ -163,7 +194,11 @@ describe("reflection completion keeps valid notes when one entry fails validatio
     const globbed = isWindows ? "reference/k[e]e[p]x.md" : "reference/k?ep*.md"
     const { worktree } = await fixture({ [globbed]: GOOD, "reference/keep1.md": GOOD })
     const edited = GOOD.replace("body", "edited body")
-    await commit(worktree.dir, { [globbed]: `---\ndescription: Leak\n---\n\n${PEM}`, "reference/keep1.md": edited }, "edit both")
+    await commit(
+      worktree.dir,
+      { [globbed]: `---\ndescription: Leak\n---\n\n${PEM}`, "reference/keep1.md": edited },
+      "edit both",
+    )
 
     const result = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
 
@@ -188,7 +223,11 @@ describe("reflection completion keeps valid notes when one entry fails validatio
 
   it("#given a new glob-named note with no frontmatter #when validated #then it is dropped like any other", async () => {
     const { worktree } = await fixture()
-    await commit(worktree.dir, { "reference/k[x].md": "no frontmatter here\n", "reference/good.md": GOOD }, "bare glob note")
+    await commit(
+      worktree.dir,
+      { "reference/k[x].md": "no frontmatter here\n", "reference/good.md": GOOD },
+      "bare glob note",
+    )
 
     const result = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
 
@@ -203,7 +242,11 @@ describe("reflection completion keeps valid notes when one entry fails validatio
     process.env.GIT_ICASE_PATHSPECS = "1"
     try {
       const { worktree } = await fixture()
-      await commit(worktree.dir, { "reference/leak.md": `---\ndescription: Leak\n---\n\n${PEM}`, "reference/good.md": GOOD }, "icase env")
+      await commit(
+        worktree.dir,
+        { "reference/leak.md": `---\ndescription: Leak\n---\n\n${PEM}`, "reference/good.md": GOOD },
+        "icase env",
+      )
 
       const result = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
 
@@ -219,7 +262,11 @@ describe("reflection completion keeps valid notes when one entry fails validatio
   it("#given a secret-shaped file name #when the drop is described #then the note never prints the raw name", async () => {
     const { worktree } = await fixture()
     const name = "reference/ghp_Ab3dEf5hJ7kL9mN1pQ3rS5tU7vW9xY1zB3C5.md"
-    await commit(worktree.dir, { [name]: "---\ndescription: Named\n---\n\nclean\n", "reference/good.md": GOOD }, "secret name")
+    await commit(
+      worktree.dir,
+      { [name]: "---\ndescription: Named\n---\n\nclean\n", "reference/good.md": GOOD },
+      "secret name",
+    )
 
     const result = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
 
@@ -230,17 +277,24 @@ describe("reflection completion keeps valid notes when one entry fails validatio
     expect(note).not.toContain("Ab3dEf5hJ7kL9mN1pQ3rS5tU7vW9xY1zB3C5")
   })
 
-  it.skipIf(isWindows)("#given a dropped path containing ' | ' #when validated again #then the trailer reads back the same path", async () => {
-    const { worktree } = await fixture()
-    await commit(worktree.dir, { "reference/a | b.md": `---\ndescription: Leak\n---\n\n${PEM}`, "reference/good.md": GOOD }, "pipe name")
+  it.skipIf(isWindows)(
+    "#given a dropped path containing ' | ' #when validated again #then the trailer reads back the same path",
+    async () => {
+      const { worktree } = await fixture()
+      await commit(
+        worktree.dir,
+        { "reference/a | b.md": `---\ndescription: Leak\n---\n\n${PEM}`, "reference/good.md": GOOD },
+        "pipe name",
+      )
 
-    await validateCompletion(worktree, worktree.baseSha, worktree.exec)
-    const again = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
+      await validateCompletion(worktree, worktree.baseSha, worktree.exec)
+      const again = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
 
-    expect(again.status).toBe("valid")
-    if (again.status !== "valid") return
-    expect(again.dropped?.map((entry) => entry.path)).toEqual(["reference/a | b.md"])
-  })
+      expect(again.status).toBe("valid")
+      if (again.status !== "valid") return
+      expect(again.dropped?.map((entry) => entry.path)).toEqual(["reference/a | b.md"])
+    },
+  )
 
   it("#given every changed note is invalid #when validated #then nothing is committed and the run reports no changes", async () => {
     const { worktree } = await fixture()

@@ -180,15 +180,14 @@ describe("opencode-server-auth", () => {
     delete process.env.OPENCODE_SERVER_USERNAME
 
     let registeredInterceptor:
-      | ((request: Request, options: { headers?: Headers }) => Promise<Request> | Request)
-      | undefined
+      ((request: Request, options: { headers?: Headers }) => Promise<Request> | Request) | undefined
 
     const client = {
       _client: {
         interceptors: {
           request: {
             use: (
-              interceptor: (request: Request, options: { headers?: Headers }) => Promise<Request> | Request
+              interceptor: (request: Request, options: { headers?: Headers }) => Promise<Request> | Request,
             ): number => {
               registeredInterceptor = interceptor
               return 0

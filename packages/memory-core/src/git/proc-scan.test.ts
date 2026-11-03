@@ -34,7 +34,12 @@ async function sandbox(): Promise<{ readonly proc: string; readonly repo: string
   return { proc, repo, lock }
 }
 
-async function processEntry(proc: string, pid: number, fds: Readonly<Record<string, string>> = {}, cwd?: string): Promise<void> {
+async function processEntry(
+  proc: string,
+  pid: number,
+  fds: Readonly<Record<string, string>> = {},
+  cwd?: string,
+): Promise<void> {
   await mkdir(join(proc, String(pid), "fd"), { recursive: true })
   for (const [fd, target] of Object.entries(fds)) await symlink(target, join(proc, String(pid), "fd", fd))
   if (cwd !== undefined) await symlink(cwd, join(proc, String(pid), "cwd"))

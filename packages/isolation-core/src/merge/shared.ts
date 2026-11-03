@@ -6,7 +6,8 @@ import { GitCommandError, runGit } from "../git/command"
 import type { DeltaPatchResult } from "../git/delta"
 import { parseDiffGitLinePaths } from "../git/synthetic-tree"
 
-export type MergeKind = "applied" | "already-applied" | "not-applied" | "branch-merged" | "branch-merge-failed" | "no-changes" | "retained"
+export type MergeKind =
+  "applied" | "already-applied" | "not-applied" | "branch-merged" | "branch-merge-failed" | "no-changes" | "retained"
 export interface MergeState {
   changes_applied: boolean
   kind: MergeKind
@@ -24,18 +25,24 @@ export interface IsolationMergeResult extends MergeState {
   files_changed: number
 }
 export type LockHook = (event: "waiting" | "acquired" | "released", path: string) => void | Promise<void>
-export interface ArtifactOptions { id: string; artifactsDir: string; lockHook?: LockHook }
+export interface ArtifactOptions {
+  id: string
+  artifactsDir: string
+  lockHook?: LockHook
+}
 export function errorText(error: unknown): string {
   return error instanceof GitCommandError ? error.stderr : error instanceof Error ? error.message : String(error)
 }
 export function taskBranch(id: string): string {
-  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(id) || id.includes("..") || id.endsWith(".") || id.endsWith(".lock")) throw new Error("Invalid isolation task id")
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(id) || id.includes("..") || id.endsWith(".") || id.endsWith(".lock"))
+    throw new Error("Invalid isolation task id")
   return `omo/task/${id}`
 }
 export function nestedPath(root: string, relativePath: string): Promise<string> {
   return (async () => {
     const path = resolve(root, relativePath)
-    if (isAbsolute(relativePath) || !path.startsWith(resolve(root) + sep)) throw new Error(`Invalid nested repository path: ${relativePath}`)
+    if (isAbsolute(relativePath) || !path.startsWith(resolve(root) + sep))
+      throw new Error(`Invalid nested repository path: ${relativePath}`)
     // Lexical containment is not filesystem containment: an existing component can
     // be a symlink out of the root, redirecting every later mutation. Validate the
     // canonical location of the deepest existing ancestor of the target.
@@ -50,8 +57,13 @@ export function nestedPath(root: string, relativePath: string): Promise<string> 
 async function deepestExistingCanonical(path: string): Promise<string> {
   let current = path
   for (;;) {
-    try { return await realpath(current) } catch (error) {
-      if (error instanceof Error && "code" in error && error.code === "ENOENT") { current = dirname(current); continue }
+    try {
+      return await realpath(current)
+    } catch (error) {
+      if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+        current = dirname(current)
+        continue
+      }
       throw error
     }
   }
@@ -61,7 +73,11 @@ async function deepestExistingCanonical(path: string): Promise<string> {
 // other processes and all linked worktrees sharing the same Git object/ref database.
 const queues = new Map<string, Promise<void>>()
 export async function withRepoLock<T>(repoRoot: string, fn: () => Promise<T>, hook?: LockHook): Promise<T> {
-  const commonDir = (await runGit(["rev-parse", "--path-format=absolute", "--git-common-dir"], { cwd: repoRoot })).stdout.toString().trim()
+  const commonDir = (
+    await runGit(["rev-parse", "--path-format=absolute", "--git-common-dir"], { cwd: repoRoot })
+  ).stdout
+    .toString()
+    .trim()
   const path = join(commonDir, "omo-isolation-merge.lock")
   const previous = queues.get(path) ?? Promise.resolve()
   const turn = Promise.withResolvers<void>()
@@ -102,7 +118,8 @@ export async function writeArtifacts(delta: DeltaPatchResult, options: ArtifactO
   }
   const files = new Set(delta.rootPatch.split("\n").flatMap(parseDiffGitLinePaths))
   for (const nested of delta.nestedPatches) {
-    for (const path of nested.patch.split("\n").flatMap(parseDiffGitLinePaths)) files.add(`${nested.relativePath}/${path}`)
+    for (const path of nested.patch.split("\n").flatMap(parseDiffGitLinePaths))
+      files.add(`${nested.relativePath}/${path}`)
   }
   return { patch_path, nested_patch_paths, summary_path: join(dir, "isolation-summary.md"), files_changed: files.size }
 }
@@ -115,7 +132,9 @@ async function assertNoSymlinkComponents(path: string, base: string): Promise<vo
   for (const part of parts) {
     prefix = join(prefix, part)
     let info
-    try { info = await lstat(prefix) } catch (error) {
+    try {
+      info = await lstat(prefix)
+    } catch (error) {
       if (error instanceof Error && "code" in error && error.code === "ENOENT") continue
       throw error
     }
@@ -124,7 +143,9 @@ async function assertNoSymlinkComponents(path: string, base: string): Promise<vo
 }
 /** Owned outputs are created without following a pre-existing final symlink. */
 async function writeFileOwned(path: string, data: string): Promise<void> {
-  try { await writeFile(path, data, { flag: "wx" }) } catch (error) {
+  try {
+    await writeFile(path, data, { flag: "wx" })
+  } catch (error) {
     if (!(error instanceof Error && "code" in error && error.code === "EEXIST")) throw error
     const info = await lstat(path)
     if (!info.isFile()) throw new Error(`Artifact path is not a regular file: ${path}`)
@@ -133,12 +154,20 @@ async function writeFileOwned(path: string, data: string): Promise<void> {
 }
 
 export async function summarize(result: IsolationMergeResult): Promise<IsolationMergeResult> {
-  await writeFile(result.summary_path, `# Isolation merge: ${result.kind}\n\n\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\`\n`)
+  await writeFile(
+    result.summary_path,
+    `# Isolation merge: ${result.kind}\n\n\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\`\n`,
+  )
   return result
 }
 export async function stashPush(repoRoot: string): Promise<string | null> {
   if (!(await runGit(["status", "--porcelain", "--untracked-files=all"], { cwd: repoRoot })).stdout.length) return null
-  const readTip = async () => (await runGit(["rev-parse", "--verify", "--quiet", "refs/stash"], { cwd: repoRoot, allowedExitCodes: [0, 1] })).stdout.toString().trim()
+  const readTip = async () =>
+    (
+      await runGit(["rev-parse", "--verify", "--quiet", "refs/stash"], { cwd: repoRoot, allowedExitCodes: [0, 1] })
+    ).stdout
+      .toString()
+      .trim()
   const before = await readTip()
   await runGit(["stash", "push", "--include-untracked", "-m", "omo-task-merge"], { cwd: repoRoot })
   const created = await readTip()

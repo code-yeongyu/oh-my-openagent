@@ -19,7 +19,8 @@ import {
 
 const roots: string[] = []
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  for (const root of roots.splice(0))
+    rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
 interface RecordingUi {
@@ -61,10 +62,7 @@ async function createFixtureRepo(
 }
 
 function contextFor(repoPath: string, identity = "agent-test-id") {
-  const paths = buildIdentityPaths(
-    join(repoPath, "..", "..", ".."),
-    identity,
-  )
+  const paths = buildIdentityPaths(join(repoPath, "..", "..", ".."), identity)
   return createMemoryIdentityContext({
     identity,
     identityPaths: { ...paths, repo: repoPath },
@@ -96,12 +94,21 @@ function segmentContext(input: {
   const paths = buildIdentityPaths(root, identity)
   if (input.parked === true) {
     mkdirSync(paths.reflection, { recursive: true })
-    writeFileSync(join(paths.reflection, "park.json"), JSON.stringify({
-      version: 1,
-      streak: 3,
-      parkedAt: new Date(SEGMENT_NOW - 60_000).toISOString(),
-      lastFailure: { runId: "run-2", at: new Date(SEGMENT_NOW - 60_000).toISOString(), fingerprint: "spawn_failed:Model not found", retryable: false, reason: "spawn_failed" },
-    }))
+    writeFileSync(
+      join(paths.reflection, "park.json"),
+      JSON.stringify({
+        version: 1,
+        streak: 3,
+        parkedAt: new Date(SEGMENT_NOW - 60_000).toISOString(),
+        lastFailure: {
+          runId: "run-2",
+          at: new Date(SEGMENT_NOW - 60_000).toISOString(),
+          fingerprint: "spawn_failed:Model not found",
+          retryable: false,
+          reason: "spawn_failed",
+        },
+      }),
+    )
   }
   if (input.sessionId !== undefined && input.backlogSteps !== undefined) {
     const stateDir = join(paths.transcripts, input.sessionId)
@@ -156,9 +163,7 @@ describe("refreshMemoryStatus segments", () => {
       checkAdvisory: false,
     })
 
-    expect(recorder.statusCalls).toEqual([
-      { key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago*" },
-    ])
+    expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago*" }])
   }, 30_000)
 
   test("#given a clean worktree with a backlog of fourteen steps #when refresh runs #then the backlog segment renders", async () => {
@@ -176,9 +181,7 @@ describe("refreshMemoryStatus segments", () => {
       sessionId: "session-a",
     })
 
-    expect(recorder.statusCalls).toEqual([
-      { key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago (+14)" },
-    ])
+    expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago (+14)" }])
   }, 30_000)
 
   test("#given a zero backlog #when refresh runs #then no backlog segment renders", async () => {
@@ -196,9 +199,7 @@ describe("refreshMemoryStatus segments", () => {
       sessionId: "session-a",
     })
 
-    expect(recorder.statusCalls).toEqual([
-      { key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago" },
-    ])
+    expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago" }])
   }, 30_000)
 
   test("#given three consecutive reflection failures #when refresh runs #then the streak badge renders", async () => {
@@ -215,9 +216,7 @@ describe("refreshMemoryStatus segments", () => {
       checkAdvisory: false,
     })
 
-    expect(recorder.statusCalls).toEqual([
-      { key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago !3" },
-    ])
+    expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago !3" }])
   }, 30_000)
 
   test("#given automatic reflection is parked #when refresh runs #then the footer says paused after the streak badge", async () => {
@@ -234,9 +233,7 @@ describe("refreshMemoryStatus segments", () => {
       checkAdvisory: false,
     })
 
-    expect(recorder.statusCalls).toEqual([
-      { key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago !3 paused" },
-    ])
+    expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago !3 paused" }])
   }, 30_000)
 
   test("#given only two consecutive failures #when refresh runs #then no streak badge renders", async () => {
@@ -253,9 +250,7 @@ describe("refreshMemoryStatus segments", () => {
       checkAdvisory: false,
     })
 
-    expect(recorder.statusCalls).toEqual([
-      { key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago" },
-    ])
+    expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago" }])
   }, 30_000)
 
   test("#given dirty, backlog, and streak all present #when refresh runs #then segments render in fixed order", async () => {
@@ -278,9 +273,7 @@ describe("refreshMemoryStatus segments", () => {
       sessionId: "session-a",
     })
 
-    expect(recorder.statusCalls).toEqual([
-      { key: MEMORY_STATUS_KEY, text: "mem:agent 1m ago* (+7) !3" },
-    ])
+    expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: "mem:agent 1m ago* (+7) !3" }])
   }, 30_000)
 
   test("#given an assembled line over sixty characters #when refresh runs #then segments drop right to left until it fits", async () => {
@@ -300,9 +293,7 @@ describe("refreshMemoryStatus segments", () => {
     })
 
     // base `mem:<45 chars> 1m ago` is 56; `*` fits at 57, `* (+7)` would be 62.
-    expect(recorder.statusCalls).toEqual([
-      { key: MEMORY_STATUS_KEY, text: `mem:${identity} 1m ago*` },
-    ])
+    expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: `mem:${identity} 1m ago*` }])
     expect(recorder.statusCalls[0]?.text?.length).toBeLessThanOrEqual(60)
   }, 30_000)
 
@@ -322,9 +313,7 @@ describe("refreshMemoryStatus segments", () => {
       sessionId: "session-a",
     })
 
-    expect(recorder.statusCalls).toEqual([
-      { key: MEMORY_STATUS_KEY, text: `mem:${identity} 1m ago` },
-    ])
+    expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: `mem:${identity} 1m ago` }])
   }, 30_000)
 
   test("#given memory sync failing #when refresh runs #then the footer says sync blocked, kept even when other segments drop (omo #10637)", async () => {
@@ -332,7 +321,12 @@ describe("refreshMemoryStatus segments", () => {
     const context = segmentContext({ identity, sessionId: "session-a", backlogSteps: 7, failures: 3 })
     const recorder = recordingUi()
     const repos: string[] = []
-    const failing = { kind: "failing", since: 0, attempts: 1, failure: { kind: "offline", reason: "r", action: "a" } } as const
+    const failing = {
+      kind: "failing",
+      since: 0,
+      attempts: 1,
+      failure: { kind: "offline", reason: "r", action: "a" },
+    } as const
 
     await refreshMemoryStatus({
       context,
@@ -469,9 +463,7 @@ describe("refreshMemoryStatus segments", () => {
       checkAdvisory: false,
     })
 
-    expect(recorder.statusCalls).toEqual([
-      { key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago" },
-    ])
+    expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago" }])
   }, 30_000)
 })
 
@@ -500,9 +492,7 @@ describe("refreshMemoryStatus", () => {
       now: () => Date.parse("2026-08-10T00:01:30.000Z"),
     })
 
-    expect(recorder.statusCalls).toEqual([
-      { key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago" },
-    ])
+    expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago" }])
   }, 30_000)
 
   test("#given committed HEAD ages across display buckets #when refresh runs #then compact labels follow the system clock", async () => {
@@ -535,9 +525,7 @@ describe("refreshMemoryStatus", () => {
         now: () => now,
       })
 
-      expect(recorder.statusCalls).toEqual([
-        { key: MEMORY_STATUS_KEY, text: `mem:fake-agent ${expected}` },
-      ])
+      expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: `mem:fake-agent ${expected}` }])
     }
   }, 30_000)
 
@@ -563,7 +551,9 @@ describe("refreshMemoryStatus", () => {
       compileWarnTokens: 100,
       alreadyNotified: false,
       gitRepo: fakeRepo,
-      requestPressureDream: async () => { pressureRequests.push(1) },
+      requestPressureDream: async () => {
+        pressureRequests.push(1)
+      },
     })
 
     expect(pressureRequests).toHaveLength(1)
@@ -591,7 +581,9 @@ describe("refreshMemoryStatus", () => {
       compileWarnTokens: 100,
       alreadyNotified: false,
       gitRepo: fakeRepo,
-      requestPressureDream: async () => { pressureRequests.push(1) },
+      requestPressureDream: async () => {
+        pressureRequests.push(1)
+      },
     })
 
     expect(pressureRequests).toEqual([])
@@ -602,7 +594,10 @@ describe("refreshMemoryStatus", () => {
     const fakeRepo: GitRepoForStatus = {
       head: async () => "abcdef1234567890",
       headCommitTimestamp: async () => null,
-      lsTree: async () => { calls.tree += 1; return ["system/persona.md"] },
+      lsTree: async () => {
+        calls.tree += 1
+        return ["system/persona.md"]
+      },
       show: async () => "P".repeat(400),
       status: async () => "",
     }
@@ -618,7 +613,9 @@ describe("refreshMemoryStatus", () => {
       compileWarnTokens: 100,
       alreadyNotified: true,
       gitRepo: fakeRepo,
-      requestPressureDream: async () => { calls.pressure += 1 },
+      requestPressureDream: async () => {
+        calls.pressure += 1
+      },
     })
 
     expect(calls).toEqual({ tree: 0, pressure: 0 })
@@ -722,17 +719,13 @@ describe("refreshMemoryStatus", () => {
       checkAdvisory: false,
     })
 
-    expect(recorder.statusCalls).toEqual([
-      { key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago" },
-    ])
+    expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago" }])
     expect(recorder.notifications).toEqual([])
   }, 30_000)
 
   test("#given an already-notified session #when refresh runs again over threshold #then no second notify fires", async () => {
     const bigContent = "B".repeat(120_000)
-    const { repoPath } = await createFixtureRepo([
-      { relativePath: "system/persona.md", content: bigContent },
-    ])
+    const { repoPath } = await createFixtureRepo([{ relativePath: "system/persona.md", content: bigContent }])
     const context = contextFor(repoPath)
     const recorder = recordingUi()
 

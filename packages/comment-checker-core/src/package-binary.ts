@@ -7,8 +7,9 @@ export const COMMENT_CHECKER_PACKAGE_NAME = "@code-yeongyu/comment-checker"
 
 // Older embedded Bun runtimes throw ResolveMessage objects, not Error instances.
 export function isModuleResolutionMiss(error: unknown): boolean {
-  return error instanceof Error || (
-    typeof error === "object" && error !== null && "name" in error && error.name === "ResolveMessage"
+  return (
+    error instanceof Error ||
+    (typeof error === "object" && error !== null && "name" in error && error.name === "ResolveMessage")
   )
 }
 
@@ -24,7 +25,11 @@ export function findCommentCheckerPackageBinary(input: FindCommentCheckerPackage
   return candidates.find((candidate): candidate is string => candidate !== null && input.existsSync(candidate)) ?? null
 }
 
-function resolvePlatformPackageBinary(packageJsonPath: string, platformPackageName: string, binaryName: string): string | null {
+function resolvePlatformPackageBinary(
+  packageJsonPath: string,
+  platformPackageName: string,
+  binaryName: string,
+): string | null {
   try {
     const manifestPath = createRequire(packageJsonPath).resolve(`${platformPackageName}/package.json`)
     return join(dirname(manifestPath), "bin", binaryName)

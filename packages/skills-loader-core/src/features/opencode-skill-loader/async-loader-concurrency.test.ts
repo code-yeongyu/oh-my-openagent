@@ -50,7 +50,7 @@ describe("async-loader", () => {
       const mapper = async (item: number) => {
         currentConcurrent++
         maxConcurrent = Math.max(maxConcurrent, currentConcurrent)
-        await new Promise(resolve => setTimeout(resolve, 10))
+        await new Promise((resolve) => setTimeout(resolve, 10))
         currentConcurrent--
         return item * 2
       }
@@ -59,7 +59,7 @@ describe("async-loader", () => {
       const results = await mapWithConcurrency(items, mapper, 16)
 
       // then
-      expect(results).toEqual(items.map(i => i * 2))
+      expect(results).toEqual(items.map((i) => i * 2))
       expect(maxConcurrent).toBeLessThanOrEqual(16)
       expect(maxConcurrent).toBeGreaterThan(1) // Should actually run concurrently
     })

@@ -71,13 +71,28 @@ describe("generations of one task during a runtime-fallback close", () => {
           cwd: project,
           hostPid: 11_001,
           runners: { process: runner, "in-process": runner },
-          planner: (spec) => ({ kind: "resolved", plan: spec.name === undefined || spec.name === "fallback" ? { model: "test/first", resolved_model: rung("first"), fallback_models: [rung("next")] } : { model: "test/first" } }),
+          planner: (spec) => ({
+            kind: "resolved",
+            plan:
+              spec.name === undefined || spec.name === "fallback"
+                ? { model: "test/first", resolved_model: rung("first"), fallback_models: [rung("next")] }
+                : { model: "test/first" },
+          }),
           destruction: { destroyResidentTask: (taskId, cause) => lifecycle.destroyResidentTask(taskId, cause) },
         })
-        const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, config, hostPid: 11_001, registry: createManagerResidencyRegistry(() => manager), signaller: { isAlive: (pid) => pid === 11_001, signal: () => undefined } })
+        const lifecycle = createTaskLifecycle({
+          hostEndpoint: NO_HOST_ENDPOINT,
+          store,
+          config,
+          hostPid: 11_001,
+          registry: createManagerResidencyRegistry(() => manager),
+          signaller: { isAlive: (pid) => pid === 11_001, signal: () => undefined },
+        })
         const task = await manager.start(baseSpec({ name: "fallback" }))
         if (task.kind !== "started") throw new Error("expected the task to start")
-        runner.handles.get(task.task_id)?.settle({ status: "error", failure: { kind: "child-turn-failed", message: "500: upstream overloaded" } })
+        runner.handles
+          .get(task.task_id)
+          ?.settle({ status: "error", failure: { kind: "child-turn-failed", message: "500: upstream overloaded" } })
         await runner.closing.promise
         await lifecycle.suspendOnSessionShutdown({ parentSessionId: "parent-1", reason: "reload" })
         await lifecycle.reconcileOnSessionStart("parent-1")
@@ -85,7 +100,12 @@ describe("generations of one task during a runtime-fallback close", () => {
         if (newer === undefined) throw new Error("expected the revived run")
         let newerAborts = 0
         const abortNewer = newer.handle.abort.bind(newer.handle)
-        Object.assign(newer.handle, { abort: async () => { newerAborts += 1; await abortNewer() } })
+        Object.assign(newer.handle, {
+          abort: async () => {
+            newerAborts += 1
+            await abortNewer()
+          },
+        })
 
         try {
           // when
@@ -105,7 +125,11 @@ describe("generations of one task during a runtime-fallback close", () => {
           const followingTwo = await manager.start(baseSpec({ name: "following-two" }))
 
           // then
-          expect([0, 1, 2].map((epoch) => concurrency.leaseState(task.task_id, epoch))).toEqual([undefined, undefined, undefined])
+          expect([0, 1, 2].map((epoch) => concurrency.leaseState(task.task_id, epoch))).toEqual([
+            undefined,
+            undefined,
+            undefined,
+          ])
           expect(followingOne.kind).toBe("started")
           expect(followingTwo.kind).toBe("started")
           if (ending !== "completes") expect(newerAborts).toBeGreaterThan(0)
@@ -126,14 +150,38 @@ describe("generations of one task during a runtime-fallback close", () => {
     const host = await harness.fakeHost({ transcripts: true })
     const rpc = harness.runnerOver(host)
     const taskId = "st_0000e001"
-    const old = await rpc.start({ task_id: taskId, cwd: project, state_dir: store.stateDir, prompt: "original work", model: "test/first" })
+    const old = await rpc.start({
+      task_id: taskId,
+      cwd: project,
+      state_dir: store.stateDir,
+      prompt: "original work",
+      model: "test/first",
+    })
     const [original] = host.sessions()
     if (original === undefined) throw new Error("expected the failed rung's session")
     const disconnected = host.waitForConnections(0)
     await old.dispose()
     await disconnected
-    seedRecord(store, { task_id: taskId, status: "running", execution_mode: "process", residency_state: "rpc_detached", run_epoch: 1, spawn_spec: { version: 1, cwd: project, prompt: "original work" } })
-    store.mutate(taskId, (record) => ({ ...record, fallback_handoff_epoch: 1, fallback_closing_child: { host_session: { socket: host.socketPath, routing_id: original.routingId, session_path: original.sessionPath, instance_id: host.instanceId } } }))
+    seedRecord(store, {
+      task_id: taskId,
+      status: "running",
+      execution_mode: "process",
+      residency_state: "rpc_detached",
+      run_epoch: 1,
+      spawn_spec: { version: 1, cwd: project, prompt: "original work" },
+    })
+    store.mutate(taskId, (record) => ({
+      ...record,
+      fallback_handoff_epoch: 1,
+      fallback_closing_child: {
+        host_session: {
+          socket: host.socketPath,
+          routing_id: original.routingId,
+          session_path: original.sessionPath,
+          instance_id: host.instanceId,
+        },
+      },
+    }))
     const closeEntered = Promise.withResolvers<void>()
     const finishClose = Promise.withResolvers<void>()
     let closes = 0
@@ -146,7 +194,11 @@ describe("generations of one task during a runtime-fallback close", () => {
       rpcRespawnRunner: rpc,
       planner: () => ({ kind: "resolved", plan: { model: "test/next" } }),
     })
-    const { hostSessionProbe: _fakeProbe, hostSessionClose: _fakeClose, ...deps } = hostLifecycleDeps({ store, hostPid: 22_002, isAlive: (pid) => pid === 22_002 }).deps
+    const {
+      hostSessionProbe: _fakeProbe,
+      hostSessionClose: _fakeClose,
+      ...deps
+    } = hostLifecycleDeps({ store, hostPid: 22_002, isAlive: (pid) => pid === 22_002 }).deps
     const lifecycle = createTaskLifecycle({
       ...deps,
       registry: createManagerResidencyRegistry(() => manager),
@@ -171,7 +223,11 @@ describe("generations of one task during a runtime-fallback close", () => {
       await losing
 
       // then
-      expect(store.load(taskId)).toMatchObject({ host_pid: 22_002, residency_state: "resident", notification: { run_epoch: 2 } })
+      expect(store.load(taskId)).toMatchObject({
+        host_pid: 22_002,
+        residency_state: "resident",
+        notification: { run_epoch: 2 },
+      })
       expect(manager.getResidentHandle(taskId)).toBeDefined()
     } finally {
       finishClose.resolve()

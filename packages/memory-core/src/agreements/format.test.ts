@@ -44,19 +44,29 @@ describe("agreement ids and the ledger line format (storage contract)", () => {
     const parsed = parseAgreementsLedger(body)
 
     // then
-    expect(parsed.items).toEqual([{
-      id: agreementId("Ask before force-pushing"), scope: "global", by: "agent",
-      text: "Ask before force-pushing", n: 0, status: "active",
-    }])
+    expect(parsed.items).toEqual([
+      {
+        id: agreementId("Ask before force-pushing"),
+        scope: "global",
+        by: "agent",
+        text: "Ask before force-pushing",
+        n: 0,
+        status: "active",
+      },
+    ])
     expect(parsed.diagnostics).toHaveLength(1)
   })
 
   test("#given a ledger with a line the parser cannot read #when the file is rendered after a mutation #then that line is kept verbatim", () => {
     // given
-    const existing = "---\ndescription: Agreements\n---\n\n- [global] Ask before force-pushing\nhand-written note the person typed\n"
+    const existing =
+      "---\ndescription: Agreements\n---\n\n- [global] Ask before force-pushing\nhand-written note the person typed\n"
 
     // when
-    const rendered = renderAgreementsFile(existing, agreementItemsOf(existing).map((item) => ({ ...item, n: 1 })))
+    const rendered = renderAgreementsFile(
+      existing,
+      agreementItemsOf(existing).map((item) => ({ ...item, n: 1 })),
+    )
 
     // then
     expect(rendered).toContain("\nhand-written note the person typed\n")

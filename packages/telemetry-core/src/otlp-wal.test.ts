@@ -3,7 +3,15 @@ import { appendFileSync, existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { readFrames, readSpoolRequest } from "./otlp-spool-file"
-import { capture, createSpoolRoot, decodeLogs, logRecordsOf, makeTransport, recordingFetch, spoolNames } from "./otlp-test-support"
+import {
+  capture,
+  createSpoolRoot,
+  decodeLogs,
+  logRecordsOf,
+  makeTransport,
+  recordingFetch,
+  spoolNames,
+} from "./otlp-test-support"
 
 const roots: (() => void)[] = []
 afterEach(() => {

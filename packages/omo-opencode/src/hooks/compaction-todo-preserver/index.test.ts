@@ -83,9 +83,7 @@ describe("compaction-todo-preserver", () => {
     //#given
     updateMock.mockClear()
     const sessionID = "session-compaction-present"
-    const todos: Todo[] = [
-      { content: "Task 1", status: "pending", priority: "high" },
-    ]
+    const todos: Todo[] = [{ content: "Task 1", status: "pending", priority: "high" }]
     const ctx = createMockContext([todos, todos])
     const hook = createCompactionTodoPreserverHook(ctx)
 
@@ -149,9 +147,7 @@ describe("compaction-todo-preserver", () => {
     //#given
     updateMock.mockClear()
     const sessionID = "session-compaction-empty-later"
-    const oldTodos: Todo[] = [
-      { content: "Old task that no longer exists", status: "pending", priority: "high" },
-    ]
+    const oldTodos: Todo[] = [{ content: "Old task that no longer exists", status: "pending", priority: "high" }]
     const ctx = createMockContext([oldTodos, []])
     const hook = createCompactionTodoPreserverHook(ctx)
 
@@ -168,9 +164,7 @@ describe("compaction-todo-preserver", () => {
     //#given
     updateMock.mockClear()
     const sessionID = "session-compaction-failed-later"
-    const oldTodos: Todo[] = [
-      { content: "Old task that should not come back", status: "pending", priority: "high" },
-    ]
+    const oldTodos: Todo[] = [{ content: "Old task that should not come back", status: "pending", priority: "high" }]
     const ctx = createMockContext([oldTodos, new Error("todo api unavailable")])
     const hook = createCompactionTodoPreserverHook(ctx)
 
@@ -280,9 +274,7 @@ describe("compaction-todo-preserver", () => {
     //#given
     updateMock.mockClear()
     const sessionID = "session-compaction-protection-idle"
-    const detailedTodos: Todo[] = [
-      { content: "Detailed task before idle", status: "in_progress", priority: "high" },
-    ]
+    const detailedTodos: Todo[] = [{ content: "Detailed task before idle", status: "in_progress", priority: "high" }]
     const atlasBootstrapTodos: Todo[] = [
       { content: "Complete ALL implementation tasks", status: "in_progress", priority: "high" },
       { content: "Pass Final Verification Wave - ALL reviewers APPROVE", status: "pending", priority: "high" },

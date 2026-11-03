@@ -23,11 +23,7 @@ describe("resolveLatestMessageInfo", () => {
     ]
 
     // when
-    const result = await resolveLatestMessageInfo(
-      unsafeTestValue({}),
-      "ses_synthetic_latest_info",
-      messages,
-    )
+    const result = await resolveLatestMessageInfo(unsafeTestValue({}), "ses_synthetic_latest_info", messages)
 
     // then
     expect(result.resolvedInfo).toEqual({
@@ -53,11 +49,7 @@ describe("resolveLatestMessageInfo", () => {
     ]
 
     // when
-    const result = await resolveLatestMessageInfo(
-      unsafeTestValue({}),
-      "ses_internal_latest_info",
-      messages,
-    )
+    const result = await resolveLatestMessageInfo(unsafeTestValue({}), "ses_internal_latest_info", messages)
 
     // then
     expect(result.resolvedInfo).toEqual({

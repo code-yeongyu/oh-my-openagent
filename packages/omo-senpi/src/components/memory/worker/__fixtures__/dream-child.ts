@@ -33,8 +33,8 @@ const transcriptPath = required("TRANSCRIPT_PATH")
 const skillsUsagePath = required("SKILLS_USAGE_PATH")
 const dreamStatePath = required("DREAM_STATE_PATH")
 const dreamPolicyPath = required("DREAM_POLICY_PATH")
-const policy = await json(dreamPolicyPath) as DreamPolicy
-const transcript = await json(transcriptPath) as { request?: { trigger?: string; origin?: string } }
+const policy = (await json(dreamPolicyPath)) as DreamPolicy
+const transcript = (await json(transcriptPath)) as { request?: { trigger?: string; origin?: string } }
 
 if (process.env.SENPI_MEMORY_REFLECTION !== "1") throw new Error("reflection sentinel is required")
 if (transcript.request?.trigger !== "dream" || transcript.request.origin !== "manual") {
@@ -59,7 +59,10 @@ if (targetPath !== undefined) {
   await writeFile(join(memoryDir, "system", "dream-dispatch.json"), `${JSON.stringify(policy, null, 2)}\n`)
   if (policy.people.enabled) {
     const entries = Array.from({ length: policy.people.max_entries }, (_, index) =>
-      `ATTRIBUTE: ${String(index + 1).padStart(2, "0")} ${"x".repeat(policy.people.max_entry_chars)}`.slice(0, policy.people.max_entry_chars),
+      `ATTRIBUTE: ${String(index + 1).padStart(2, "0")} ${"x".repeat(policy.people.max_entry_chars)}`.slice(
+        0,
+        policy.people.max_entry_chars,
+      ),
     )
     await mkdir(join(memoryDir, "people", "fixture"), { recursive: true })
     const cardFrontmatter = "---\ndescription: Person - Fixture\nkind: person\naliases: []\n---\n"

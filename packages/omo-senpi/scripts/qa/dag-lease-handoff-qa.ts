@@ -68,7 +68,8 @@ function assembleRuntime(cwd: string, runner: CompletingRunner, warnings: unknow
     logger: {
       info: () => undefined,
       warn: (message: string, fields?: Record<string, unknown>) => warnings.push({ message, ...fields }),
-      error: (message: string, fields?: Record<string, unknown>) => warnings.push({ level: "error", message, ...fields }),
+      error: (message: string, fields?: Record<string, unknown>) =>
+        warnings.push({ level: "error", message, ...fields }),
     },
     leaseWatch: { intervalMs: POLL_MS },
   })
@@ -115,8 +116,14 @@ try {
   report.warnings_after_attach = warnings
   check("run stays paused while the predecessor lives", afterAttach?.status === "paused", afterAttach?.status)
   check("no child started while the predecessor lives", runner.started === 0, runner.started)
-  check("deferral is logged with the holder pid", warnings.some((entry) =>
-    typeof entry === "object" && entry !== null && "holderPid" in entry && entry.holderPid === predecessorPid), warnings)
+  check(
+    "deferral is logged with the holder pid",
+    warnings.some(
+      (entry) =>
+        typeof entry === "object" && entry !== null && "holderPid" in entry && entry.holderPid === predecessorPid,
+    ),
+    warnings,
+  )
 
   // Hold the predecessor across several polls: the watch must never claim early.
   await new Promise((resolve) => setTimeout(resolve, POLL_MS * 4))
@@ -130,13 +137,19 @@ try {
   await exited
   const result = await Promise.race([
     successor.wait(RUN_ID, SESSION_ID),
-    new Promise<never>((_resolve, reject) => setTimeout(() => reject(new Error("run did not resume within 10s")), 10_000)),
+    new Promise<never>((_resolve, reject) =>
+      setTimeout(() => reject(new Error("run did not resume within 10s")), 10_000),
+    ),
   ])
   const events = store.readEvents(RUN_ID, 0, { limit: 100 }).events
   report.resumed_seq = events.find((event) => event.type === "dag.run.resumed")?.seq
   report.final_status = result.status
   report.children_started = runner.started
-  check("run resumed after the predecessor exited", report.resumed_seq !== undefined, events.map((event) => event.type))
+  check(
+    "run resumed after the predecessor exited",
+    report.resumed_seq !== undefined,
+    events.map((event) => event.type),
+  )
   check("run completed through the successor", result.status === "completed", result.status)
   check("exactly one child ran the pending node", runner.started === 1, runner.started)
   successor.dispose()

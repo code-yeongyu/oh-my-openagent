@@ -13,11 +13,17 @@ const failing = (kind: "offline" | "auth_expired", reason: string, action: strin
 
 test("#given a failure starts in the background #when its repo becomes active #then its unseen failure is announced once (#11059)", async () => {
   const notices: Array<{ message: string; level: string }> = []
-  const notifier = createSyncStatusNotifier(async () => failing("offline", "Cannot reach the service.", "Check your connection."))
+  const notifier = createSyncStatusNotifier(async () =>
+    failing("offline", "Cannot reach the service.", "Check your connection."),
+  )
   const ui = { notify: (message: string, level: "info" | "warning" | "error") => notices.push({ message, level }) }
   await deliverSyncStatusChange({
-    repo: "/repo", isActiveRepo: false, notifier, ui,
-    refreshFooter: () => {}, pushRpc: async () => {},
+    repo: "/repo",
+    isActiveRepo: false,
+    notifier,
+    ui,
+    refreshFooter: () => {},
+    pushRpc: async () => {},
   })
   expect(notices).toEqual([])
 
@@ -59,7 +65,12 @@ test("#given a stranded lock that moves to another path #when the notifier hears
     kind: "failing",
     since: 0,
     attempts: 1,
-    failure: { kind: "stranded_lock", paths: [path], reason: "A git lock blocks sync.", action: `Run /memory unlock ${path}.` },
+    failure: {
+      kind: "stranded_lock",
+      paths: [path],
+      reason: "A git lock blocks sync.",
+      action: `Run /memory unlock ${path}.`,
+    },
   })
   let status: EngineStatus = lockAt("/m/.git/index.lock")
   const notices: string[] = []
@@ -98,7 +109,14 @@ test("#given sync recovers while another session is active #when the repo goes o
   const notifier = createSyncStatusNotifier(async () => status)
   const ui = { notify: (message: string) => notices.push(message) }
   const deliver = (active: boolean) =>
-    deliverSyncStatusChange({ repo: "/repo", isActiveRepo: active, notifier, ui, refreshFooter: () => {}, pushRpc: async () => {} })
+    deliverSyncStatusChange({
+      repo: "/repo",
+      isActiveRepo: active,
+      notifier,
+      ui,
+      refreshFooter: () => {},
+      pushRpc: async () => {},
+    })
 
   await deliver(true)
   status = { kind: "synced", at: 1, updatedWhileOffline: 0 }

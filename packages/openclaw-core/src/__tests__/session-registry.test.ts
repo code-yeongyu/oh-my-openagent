@@ -78,17 +78,9 @@ describe("session-registry", () => {
       // then
       expect(firstResolvedPath).toBe(registryPath)
       expect(readFileSync(registryPath, "utf-8")).toContain(JSON.stringify(mapping))
-      expect(
-        existsSync(
-          join(
-            otherDataHome,
-            "opencode",
-            "storage",
-            "openclaw",
-            "reply-session-registry.jsonl",
-          ),
-        ),
-      ).toBe(false)
+      expect(existsSync(join(otherDataHome, "opencode", "storage", "openclaw", "reply-session-registry.jsonl"))).toBe(
+        false,
+      )
     } finally {
       rmSync(otherDataHome, { recursive: true, force: true })
       process.env.XDG_DATA_HOME = tempDataHome
@@ -103,7 +95,9 @@ describe("session-registry", () => {
     expect(sessionRegistryModule.registerMessage(mapping)).toBe(true)
 
     // then
-    expect(getRegistryPath()).toBe(join(tempDataHome, "opencode", "storage", "openclaw", "reply-session-registry.jsonl"))
+    expect(getRegistryPath()).toBe(
+      join(tempDataHome, "opencode", "storage", "openclaw", "reply-session-registry.jsonl"),
+    )
     expect(existsSync(registryPath)).toBe(true)
   })
 
@@ -139,7 +133,11 @@ describe("session-registry", () => {
   test("removes mappings by session and pane while preserving other records", () => {
     // given
     const keepMapping = createMapping({ sessionId: "session-keep", tmuxPaneId: "%keep", messageId: "keep" })
-    const removeBySessionMapping = createMapping({ sessionId: "session-remove", tmuxPaneId: "%session", messageId: "session" })
+    const removeBySessionMapping = createMapping({
+      sessionId: "session-remove",
+      tmuxPaneId: "%session",
+      messageId: "session",
+    })
     const removeByPaneMapping = createMapping({ sessionId: "session-pane", tmuxPaneId: "%remove", messageId: "pane" })
 
     sessionRegistryModule.registerMessage(keepMapping)
@@ -157,7 +155,11 @@ describe("session-registry", () => {
   test("prunes mappings older than the registry retention window", () => {
     // given
     const freshMapping = createMapping({ sessionId: "fresh", messageId: "fresh", createdAt: new Date().toISOString() })
-    const staleMapping = createMapping({ sessionId: "stale", messageId: "stale", createdAt: "2026-01-01T00:00:00.000Z" })
+    const staleMapping = createMapping({
+      sessionId: "stale",
+      messageId: "stale",
+      createdAt: "2026-01-01T00:00:00.000Z",
+    })
     const invalidDateMapping = createMapping({ sessionId: "invalid", messageId: "invalid", createdAt: "not-a-date" })
 
     sessionRegistryModule.registerMessage(freshMapping)

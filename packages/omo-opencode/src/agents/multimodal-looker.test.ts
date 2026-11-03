@@ -4,9 +4,7 @@ import { READ_ENABLED } from "../tools/look-at/look-at-prompt"
 import { createMultimodalLookerAgent } from "./multimodal-looker"
 
 function extractAvailableToolClaims(prompt: string): readonly string[] {
-  const availableToolsLine = prompt
-    .split("\n")
-    .find((line) => line.toLowerCase().includes("available tools"))
+  const availableToolsLine = prompt.split("\n").find((line) => line.toLowerCase().includes("available tools"))
   if (availableToolsLine === undefined) {
     return []
   }
@@ -22,9 +20,7 @@ function extractAvailableToolClaims(prompt: string): readonly string[] {
   return [...new Set(tools)].sort()
 }
 
-function allowedToolNames(
-  toolAllowlist: ReturnType<typeof createAgentToolAllowlist>
-): readonly string[] {
+function allowedToolNames(toolAllowlist: ReturnType<typeof createAgentToolAllowlist>): readonly string[] {
   return Object.entries(toolAllowlist.permission)
     .filter(([toolName, permission]) => toolName !== "*" && permission === "allow")
     .map(([toolName]) => toolName)
@@ -61,5 +57,4 @@ describe("createMultimodalLookerAgent", () => {
     // then
     expect(extractAvailableToolClaims(prompt)).toEqual([])
   })
-
 })

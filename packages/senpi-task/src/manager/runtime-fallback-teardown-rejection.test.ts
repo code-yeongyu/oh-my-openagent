@@ -8,40 +8,45 @@ import { managerOver, managerWithLifecycle, NEXT, PRIMARY, stubbornChild } from 
 afterEach(cleanupProjects)
 
 describe("runtime fallback: the failed rung's teardown rejects", () => {
-  for (const [label, rejection] of [["an Error", new Error("dispose rejected")], ["undefined", undefined], ["a string", "dispose rejected"]] as const) test(`#given the failed rung's teardown rejects with ${label} #when the handoff was committed #then the task ends in error, is released, and no next rung starts`, async () => {
-    const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
-    const starts: string[] = []
-    let first: ReturnType<typeof makeHandle> | undefined
-    const runner: ManagedRunner = {
-      start: async (spec) => {
-        starts.push(spec.model ?? "")
-        first = makeHandle(spec.taskId)
-        return first.handle
-      },
-    }
-    const manager = managerOver(store, runner, project, async (_taskId, cause) => {
-      if (cause === "fallback_handoff") return Promise.reject(rejection)
+  for (const [label, rejection] of [
+    ["an Error", new Error("dispose rejected")],
+    ["undefined", undefined],
+    ["a string", "dispose rejected"],
+  ] as const)
+    test(`#given the failed rung's teardown rejects with ${label} #when the handoff was committed #then the task ends in error, is released, and no next rung starts`, async () => {
+      const project = tempProject()
+      const store = createTaskRecordStore({ project_dir: project })
+      const starts: string[] = []
+      let first: ReturnType<typeof makeHandle> | undefined
+      const runner: ManagedRunner = {
+        start: async (spec) => {
+          starts.push(spec.model ?? "")
+          first = makeHandle(spec.taskId)
+          return first.handle
+        },
+      }
+      const manager = managerOver(store, runner, project, async (_taskId, cause) => {
+        if (cause === "fallback_handoff") return Promise.reject(rejection)
+      })
+      const started = await manager.start(baseSpec())
+      if (started.kind !== "started" || first === undefined) throw new Error("setup failed")
+
+      const terminal = manager.waitFor(started.task_id)
+      first.settle({ status: "error", failure: { kind: "child-turn-failed", message: "500: upstream overloaded" } })
+      const ended = await terminal
+
+      expect(ended.status).toBe("error")
+      expect(ended.error_message).toContain(rejection === undefined ? "was not started" : "dispose rejected")
+      expect(ended.fallback_handoff_epoch).toBeUndefined()
+      expect(starts).toEqual([PRIMARY])
+      // #10797: the next rung never started, so the record must not name it as the model the task ran on.
+      expect(ended.effective_model?.display).not.toBe(NEXT)
+      // An in-process child has no pid or session to hand the orphan path: it stays resident as its own cleanup owner.
+      expect(manager.getResidentHandle(started.task_id)?.task_id).toBe(started.task_id)
+      const other = await manager.start(baseSpec({ name: "after" }))
+      expect(other).toMatchObject({ kind: "started", status: "running" })
+      manager.workpools.dispose()
     })
-    const started = await manager.start(baseSpec())
-    if (started.kind !== "started" || first === undefined) throw new Error("setup failed")
-
-    const terminal = manager.waitFor(started.task_id)
-    first.settle({ status: "error", failure: { kind: "child-turn-failed", message: "500: upstream overloaded" } })
-    const ended = await terminal
-
-    expect(ended.status).toBe("error")
-    expect(ended.error_message).toContain(rejection === undefined ? "was not started" : "dispose rejected")
-    expect(ended.fallback_handoff_epoch).toBeUndefined()
-    expect(starts).toEqual([PRIMARY])
-    // #10797: the next rung never started, so the record must not name it as the model the task ran on.
-    expect(ended.effective_model?.display).not.toBe(NEXT)
-    // An in-process child has no pid or session to hand the orphan path: it stays resident as its own cleanup owner.
-    expect(manager.getResidentHandle(started.task_id)?.task_id).toBe(started.task_id)
-    const other = await manager.start(baseSpec({ name: "after" }))
-    expect(other).toMatchObject({ kind: "started", status: "running" })
-    manager.workpools.dispose()
-  })
 
   test("#given a cancel lands while the stranded handoff is being failed #when the failure is written #then the cancel is kept", async () => {
     const project = tempProject()
@@ -141,7 +146,10 @@ describe("runtime fallback: a child whose cleanup rejects is handed to orphan te
       start: async (spec) => {
         starts.push(spec.model ?? "")
         first = makeHandle(spec.taskId, 3_333)
-        return Object.assign(first.handle, stubbornChild(spec.taskId, 3_333), { waitForOutcome: first.handle.waitForOutcome, subscribe: first.handle.subscribe })
+        return Object.assign(first.handle, stubbornChild(spec.taskId, 3_333), {
+          waitForOutcome: first.handle.waitForOutcome,
+          subscribe: first.handle.subscribe,
+        })
       },
     }
     const { manager, signals, terminated, orphaned } = managerWithLifecycle(store, runner, project, alive)

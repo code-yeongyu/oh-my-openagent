@@ -29,12 +29,7 @@ export type DagDefinitionFingerprintInputV1 = {
 }
 
 type JsonValue =
-  | string
-  | number
-  | boolean
-  | null
-  | readonly JsonValue[]
-  | { readonly [key: string]: JsonValue | undefined }
+  string | number | boolean | null | readonly JsonValue[] | { readonly [key: string]: JsonValue | undefined }
 
 function canonicalize(value: JsonValue | undefined): string {
   if (value === undefined) {
@@ -63,7 +58,9 @@ export function nodeFingerprintInput(input: DagNodeFingerprintInputV1): DagNodeF
 }
 
 export function dagDefinitionFingerprint(input: DagDefinitionFingerprintInputV1): string {
-  const nodes = input.nodes.map(nodeFingerprintInput).sort((a, b) => (a.nodeId < b.nodeId ? -1 : a.nodeId > b.nodeId ? 1 : 0))
+  const nodes = input.nodes
+    .map(nodeFingerprintInput)
+    .sort((a, b) => (a.nodeId < b.nodeId ? -1 : a.nodeId > b.nodeId ? 1 : 0))
   return dagFingerprint({ name: input.name, scheduler: input.scheduler, nodes })
 }
 

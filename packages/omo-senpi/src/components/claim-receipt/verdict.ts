@@ -19,12 +19,19 @@ const REASON_TEXT: Readonly<Record<UnsupportedReason, string>> = {
   "stale-after-edit": "code was edited after the last passing check",
 }
 
-const quote = (sentence: string): string => JSON.stringify(sentence.length > 200 ? `${sentence.slice(0, 197)}...` : sentence)
+const quote = (sentence: string): string =>
+  JSON.stringify(sentence.length > 200 ? `${sentence.slice(0, 197)}...` : sentence)
 
 function describe(verdict: ClaimVerdict): string {
   const reason = verdict.reason === undefined ? "unsupported" : REASON_TEXT[verdict.reason]
-  const check = verdict.receipt === undefined ? "" : ` (check entry ${verdict.receipt.entryId}, ${verdict.receipt.kind} ${verdict.receipt.outcome})`
-  const edit = verdict.invalidatedBy === undefined ? "" : ` (edit entry ${verdict.invalidatedBy.entryId}${verdict.invalidatedBy.paths.length > 0 ? `: ${verdict.invalidatedBy.paths.join(", ")}` : ""})`
+  const check =
+    verdict.receipt === undefined
+      ? ""
+      : ` (check entry ${verdict.receipt.entryId}, ${verdict.receipt.kind} ${verdict.receipt.outcome})`
+  const edit =
+    verdict.invalidatedBy === undefined
+      ? ""
+      : ` (edit entry ${verdict.invalidatedBy.entryId}${verdict.invalidatedBy.paths.length > 0 ? `: ${verdict.invalidatedBy.paths.join(", ")}` : ""})`
   return `- ${quote(verdict.claim.sentence)}: ${reason}${check}${edit}`
 }
 

@@ -10,9 +10,10 @@ const pluginRoot = dirname(scriptDir)
 const packageRoot = dirname(pluginRoot)
 const repoRoot = join(packageRoot, "..", "..")
 const entryPath = join(packageRoot, "src", "install", "cli-local.ts")
-const outputPath = process.env.OMO_SENPI_PLUGIN_OUTPUT === undefined
-  ? join(pluginRoot, "scripts", "install.mjs")
-  : join(process.env.OMO_SENPI_PLUGIN_OUTPUT, "scripts", "install.mjs")
+const outputPath =
+  process.env.OMO_SENPI_PLUGIN_OUTPUT === undefined
+    ? join(pluginRoot, "scripts", "install.mjs")
+    : join(process.env.OMO_SENPI_PLUGIN_OUTPUT, "scripts", "install.mjs")
 
 export async function buildInstallCli(options = {}) {
   const output = options.outputPath ?? outputPath
@@ -63,7 +64,11 @@ export async function checkInstallCliCurrent(options = {}) {
       readFile(output, "utf8"),
     ])
     if (current === undefined) return { current: false, reason: `missing installer: ${committed}` }
-    if (current !== fresh) return { current: false, reason: `stale installer: ${committed} differs from a fresh build of src/install/cli-local.ts` }
+    if (current !== fresh)
+      return {
+        current: false,
+        reason: `stale installer: ${committed} differs from a fresh build of src/install/cli-local.ts`,
+      }
     return { current: true }
   } finally {
     await rm(tempRoot, { recursive: true, force: true })

@@ -76,9 +76,12 @@ function extensionOrderHarness() {
   const cwd = mkdtempSync(join(tmpdir(), "omo-senpi-team-service-extensions-"))
   tempRoots.push(cwd)
   mkdirSync(join(cwd, ".omo"), { recursive: true })
-  writeFileSync(join(cwd, ".omo", "omo.json"), `${JSON.stringify({
-    categories: { quick: { model: "omo-mock/mock-1" } },
-  })}\n`)
+  writeFileSync(
+    join(cwd, ".omo", "omo.json"),
+    `${JSON.stringify({
+      categories: { quick: { model: "omo-mock/mock-1" } },
+    })}\n`,
+  )
   const started: ManagedStartSpec[] = []
   const runner: ManagedRunner = {
     start: (spec) => {
@@ -151,10 +154,14 @@ describe("createTeamService curated agent gating", () => {
       service.createTeam({
         inlineSpec: {
           name: "curated-team",
-          members: [{ name: "plan-reviewer", kind: "subagent_type", subagent_type: "plan-reviewer", prompt: "review the plan" }],
+          members: [
+            { name: "plan-reviewer", kind: "subagent_type", subagent_type: "plan-reviewer", prompt: "review the plan" },
+          ],
         },
       }),
-    ).rejects.toThrow('curated read-only agent "plan-reviewer" cannot be a team member; delegate via the task tool instead')
+    ).rejects.toThrow(
+      'curated read-only agent "plan-reviewer" cannot be a team member; delegate via the task tool instead',
+    )
   })
 })
 
@@ -175,10 +182,12 @@ describe("createTeamService lead messaging", () => {
     // then
     const store = createTaskRecordStore(stateDir)
     const eventLog = readFileSync(join(store.stateDir, "logs", `${MEMBER_TASK_ID}.jsonl`), "utf8")
-    expect(eventLog).toBe(`${JSON.stringify({
-      type: "team_message_sent",
-      payload: { message_id: MESSAGE_ID, from: "lead", to: "beta", kind: "message" },
-    })}\n`)
+    expect(eventLog).toBe(
+      `${JSON.stringify({
+        type: "team_message_sent",
+        payload: { message_id: MESSAGE_ID, from: "lead", to: "beta", kind: "message" },
+      })}\n`,
+    )
   })
 
   test("#given an active runtime member without a sidecar entry #when the lead sends #then delivery succeeds without a correlation event", async () => {
@@ -186,14 +195,13 @@ describe("createTeamService lead messaging", () => {
     const { runtimeState, service, stateDir } = await activeTeamHarness()
 
     // when
-    const result = await service.sendMessage(
-      runtimeState.teamRunId,
-      { from: "lead", to: "beta", body: "continue" },
-    )
+    const result = await service.sendMessage(runtimeState.teamRunId, { from: "lead", to: "beta", body: "continue" })
 
     // then
     expect(result).toEqual({ kind: "to_members", messageId: MESSAGE_ID, recipients: ["beta"] })
-    expect(existsSync(join(resolveTeamMemberInboxDir(stateDir, runtimeState.teamRunId, "beta"), `${MESSAGE_ID}.json`))).toBe(true)
+    expect(
+      existsSync(join(resolveTeamMemberInboxDir(stateDir, runtimeState.teamRunId, "beta"), `${MESSAGE_ID}.json`)),
+    ).toBe(true)
     expect(existsSync(join(createTaskRecordStore(stateDir).stateDir, "logs", `${MEMBER_TASK_ID}.jsonl`))).toBe(false)
   })
 
@@ -230,12 +238,15 @@ describe("createTeamService named-team lookup", () => {
     const cwd = mkdtempSync(join(tmpdir(), "omo-senpi-team-named-"))
     tempRoots.push(cwd)
     mkdirSync(join(cwd, ".omo"), { recursive: true })
-    writeFileSync(join(cwd, ".omo", "omo.json"), `${JSON.stringify({
-      teams: {
-        "declared-a": { members: [{ name: "alpha", kind: "category", category: "quick", prompt: "work" }] },
-        "declared-b": { members: [{ name: "beta", kind: "category", category: "quick", prompt: "work" }] },
-      },
-    })}\n`)
+    writeFileSync(
+      join(cwd, ".omo", "omo.json"),
+      `${JSON.stringify({
+        teams: {
+          "declared-a": { members: [{ name: "alpha", kind: "category", category: "quick", prompt: "work" }] },
+          "declared-b": { members: [{ name: "beta", kind: "category", category: "quick", prompt: "work" }] },
+        },
+      })}\n`,
+    )
     const pi = new FakeExtensionAPI()
     const omoConfig = loadOmoConfig({ cwd }).config
     const engine = composeTaskEngine({ pi, omoConfig, cwd, sharedParentTools: () => [] })
@@ -251,7 +262,9 @@ describe("createTeamService named-team lookup", () => {
     })
 
     // when / then
-    await expect(service.createTeam({ teamName: "missing-team" })).rejects.toThrow(/missing-team[\s\S]*declared-a[\s\S]*declared-b/)
+    await expect(service.createTeam({ teamName: "missing-team" })).rejects.toThrow(
+      /missing-team[\s\S]*declared-a[\s\S]*declared-b/,
+    )
   })
 })
 
@@ -269,14 +282,22 @@ describe("createTeamService ownership guard", () => {
     await expect(
       service.updateTask({ teamRunId: runtimeState.teamRunId, taskId: "1", status: "completed" }),
     ).rejects.toThrow("is not owned by the current session")
-    await expect(
-      service.sendMessage(runtimeState.teamRunId, { from: "lead", to: "beta", body: "x" }),
-    ).rejects.toThrow("is not owned by the current session")
+    await expect(service.sendMessage(runtimeState.teamRunId, { from: "lead", to: "beta", body: "x" })).rejects.toThrow(
+      "is not owned by the current session",
+    )
     await expect(service.status(runtimeState.teamRunId)).rejects.toThrow("is not owned by the current session")
-    await expect(service.deleteTeam({ teamRunId: runtimeState.teamRunId })).rejects.toThrow("is not owned by the current session")
-    await expect(service.requestShutdown(runtimeState.teamRunId, "beta")).rejects.toThrow("is not owned by the current session")
-    await expect(service.approveShutdown(runtimeState.teamRunId, "beta")).rejects.toThrow("is not owned by the current session")
-    await expect(service.rejectShutdown(runtimeState.teamRunId, "beta", "keep going")).rejects.toThrow("is not owned by the current session")
+    await expect(service.deleteTeam({ teamRunId: runtimeState.teamRunId })).rejects.toThrow(
+      "is not owned by the current session",
+    )
+    await expect(service.requestShutdown(runtimeState.teamRunId, "beta")).rejects.toThrow(
+      "is not owned by the current session",
+    )
+    await expect(service.approveShutdown(runtimeState.teamRunId, "beta")).rejects.toThrow(
+      "is not owned by the current session",
+    )
+    await expect(service.rejectShutdown(runtimeState.teamRunId, "beta", "keep going")).rejects.toThrow(
+      "is not owned by the current session",
+    )
   })
 
   test("#given the owning session #when scoped service methods are called #then they proceed", async () => {

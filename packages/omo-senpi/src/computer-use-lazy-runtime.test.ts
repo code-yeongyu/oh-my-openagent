@@ -87,7 +87,9 @@ describe("computer-use lazy runtime (#9113)", () => {
 
     for (const [field, marker, sha256] of PRELUDE_ASSET_FIELDS) {
       expect(main.includes(marker), `omo.js still bundles prelude text ${JSON.stringify(marker)}`).toBe(false)
-      expect(runtime.includes(marker), `${RUNTIME_FILE} still bundles prelude text ${JSON.stringify(marker)}`).toBe(false)
+      expect(runtime.includes(marker), `${RUNTIME_FILE} still bundles prelude text ${JSON.stringify(marker)}`).toBe(
+        false,
+      )
       expect(typeof asset[field], `staged prelude JSON lacks ${field}`).toBe("string")
       expect(
         createHash("sha256").update(asset[field]).digest("hex"),
@@ -97,61 +99,65 @@ describe("computer-use lazy runtime (#9113)", () => {
     }
   })
 
-  it("#given the built main bundle #when a session never uses the desktop #then the runtime entry is evaluated only on first use", async () => {
-    // given: a copy of the plugin whose runtime entry counts its own evaluations. It sits inside the
-    // package so the bundle's senpi peers resolve exactly as they do from plugin/extensions.
-    const root = mkdtempSync(join(packageRoot, ".computer-use-lazy-"))
-    roots.push(root)
-    const copyExtensions = join(root, "plugin", "extensions")
-    mkdirSync(copyExtensions, { recursive: true })
-    copyFileSync(join(pluginRoot, "package.json"), join(root, "plugin", "package.json"))
-    copyFileSync(join(extensionsDir, "omo.js"), join(copyExtensions, "omo.js"))
-    copyFileSync(join(extensionsDir, "assets.generated.json"), join(copyExtensions, "assets.generated.json"))
-    const realRuntime = join(extensionsDir, RUNTIME_FILE)
-    const reexport = existsSync(realRuntime)
-      ? `export * from ${JSON.stringify(pathToFileURL(copyRuntime(realRuntime, copyExtensions)).href)}\n`
-      : ""
-    writeFileSync(
-      join(copyExtensions, RUNTIME_FILE),
-      `globalThis.${EVALUATIONS} = (globalThis.${EVALUATIONS} ?? 0) + 1\n${reexport}`,
-    )
-    const home = join(root, "home")
-    mkdirSync(home)
-    const driver = join(root, "drive.mjs")
-    writeFileSync(driver, DRIVER_SOURCE)
+  it(
+    "#given the built main bundle #when a session never uses the desktop #then the runtime entry is evaluated only on first use",
+    async () => {
+      // given: a copy of the plugin whose runtime entry counts its own evaluations. It sits inside the
+      // package so the bundle's senpi peers resolve exactly as they do from plugin/extensions.
+      const root = mkdtempSync(join(packageRoot, ".computer-use-lazy-"))
+      roots.push(root)
+      const copyExtensions = join(root, "plugin", "extensions")
+      mkdirSync(copyExtensions, { recursive: true })
+      copyFileSync(join(pluginRoot, "package.json"), join(root, "plugin", "package.json"))
+      copyFileSync(join(extensionsDir, "omo.js"), join(copyExtensions, "omo.js"))
+      copyFileSync(join(extensionsDir, "assets.generated.json"), join(copyExtensions, "assets.generated.json"))
+      const realRuntime = join(extensionsDir, RUNTIME_FILE)
+      const reexport = existsSync(realRuntime)
+        ? `export * from ${JSON.stringify(pathToFileURL(copyRuntime(realRuntime, copyExtensions)).href)}\n`
+        : ""
+      writeFileSync(
+        join(copyExtensions, RUNTIME_FILE),
+        `globalThis.${EVALUATIONS} = (globalThis.${EVALUATIONS} ?? 0) + 1\n${reexport}`,
+      )
+      const home = join(root, "home")
+      mkdirSync(home)
+      const driver = join(root, "drive.mjs")
+      writeFileSync(driver, DRIVER_SOURCE)
 
-    // when
-    const child = Bun.spawn([process.execPath, driver, join(copyExtensions, "omo.js")], {
-      cwd: home,
-      env: {
-        ...process.env,
-        HOME: home,
-        USERPROFILE: home,
-        XDG_CONFIG_HOME: join(home, ".config"),
-        APPDATA: join(home, "AppData", "Roaming"),
-        LOCALAPPDATA: join(home, "AppData", "Local"),
-      },
-      stdout: "pipe",
-      stderr: "pipe",
-    })
-    const timer = setTimeout(() => child.kill(), DRIVER_TIMEOUT_MS)
-    const [stdout, stderr, exitCode] = await Promise.all([
-      new Response(child.stdout).text(),
-      new Response(child.stderr).text(),
-      child.exited,
-    ])
-    clearTimeout(timer)
+      // when
+      const child = Bun.spawn([process.execPath, driver, join(copyExtensions, "omo.js")], {
+        cwd: home,
+        env: {
+          ...process.env,
+          HOME: home,
+          USERPROFILE: home,
+          XDG_CONFIG_HOME: join(home, ".config"),
+          APPDATA: join(home, "AppData", "Roaming"),
+          LOCALAPPDATA: join(home, "AppData", "Local"),
+        },
+        stdout: "pipe",
+        stderr: "pipe",
+      })
+      const timer = setTimeout(() => child.kill(), DRIVER_TIMEOUT_MS)
+      const [stdout, stderr, exitCode] = await Promise.all([
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+        child.exited,
+      ])
+      clearTimeout(timer)
 
-    // then
-    expect(exitCode, `driver failed:\n${stderr}`).toBe(0)
-    const steps = JSON.parse(stdout.trim().split("\n").at(-1) ?? "{}") as DriverSteps
-    expect(steps.registered.tools).toEqual(["computer"])
-    expect(steps.registered.evaluations).toBe(0)
-    expect(steps.startup).toBe(0)
-    expect(steps.executed).toEqual({ evaluations: 1, text: "Closed the desktop session." })
-    expect(steps.status.evaluations).toBe(1)
-    expect(steps.status.notice).toContain("Computer use: enabled=true active=false engine=not started")
-  }, DRIVER_TIMEOUT_MS + 10_000)
+      // then
+      expect(exitCode, `driver failed:\n${stderr}`).toBe(0)
+      const steps = JSON.parse(stdout.trim().split("\n").at(-1) ?? "{}") as DriverSteps
+      expect(steps.registered.tools).toEqual(["computer"])
+      expect(steps.registered.evaluations).toBe(0)
+      expect(steps.startup).toBe(0)
+      expect(steps.executed).toEqual({ evaluations: 1, text: "Closed the desktop session." })
+      expect(steps.status.evaluations).toBe(1)
+      expect(steps.status.notice).toContain("Computer use: enabled=true active=false engine=not started")
+    },
+    DRIVER_TIMEOUT_MS + 10_000,
+  )
 })
 
 function copyRuntime(realRuntime: string, dir: string): string {

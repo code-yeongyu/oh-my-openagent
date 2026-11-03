@@ -29,9 +29,14 @@ const shellQuote = (value: string): string => `'${value.replaceAll("'", `'\\''`)
 
 // pre-commit runs the checker right after the shebang and keeps its own value and secret checks
 // afterwards. commit-msg runs it after the trailer test, so a memory-tool write never depends on it.
-export function withMemoryHookChecker(script: string, stage: "pre-commit" | "commit-msg", checker: MemoryHookChecker | undefined): string {
+export function withMemoryHookChecker(
+  script: string,
+  stage: "pre-commit" | "commit-msg",
+  checker: MemoryHookChecker | undefined,
+): string {
   if (checker === undefined) return script
-  const anchor = stage === "commit-msg" ? script.indexOf("\n", script.indexOf("Omo-Writer: memory-tool")) : script.indexOf("\n")
+  const anchor =
+    stage === "commit-msg" ? script.indexOf("\n", script.indexOf("Omo-Writer: memory-tool")) : script.indexOf("\n")
   const block = [
     `omo_hook_runtime=${shellQuote(checker.execPath)}`,
     `omo_hook_script=${shellQuote(checker.script)}`,

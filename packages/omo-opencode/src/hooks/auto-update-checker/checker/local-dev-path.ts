@@ -19,7 +19,7 @@ export function getLocalDevPath(directory: string): string | null {
 
       for (const entry of plugins) {
         if (!entry.startsWith("file://")) continue
-        if (!ACCEPTED_PACKAGE_NAMES.some(name => entry.includes(name))) continue
+        if (!ACCEPTED_PACKAGE_NAMES.some((name) => entry.includes(name))) continue
         try {
           return fileURLToPath(entry)
         } catch (error) {

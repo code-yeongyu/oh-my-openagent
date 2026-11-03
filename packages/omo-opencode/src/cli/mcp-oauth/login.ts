@@ -9,7 +9,9 @@ export interface LoginOptions {
 export type McpOAuthProviderLike = Pick<McpOAuthProvider, "login">
 
 export interface LoginDependencies {
-  createProvider: (options: Required<Pick<LoginOptions, "serverUrl">> & Omit<LoginOptions, "serverUrl">) => McpOAuthProviderLike
+  createProvider: (
+    options: Required<Pick<LoginOptions, "serverUrl">> & Omit<LoginOptions, "serverUrl">,
+  ) => McpOAuthProviderLike
 }
 
 const defaultLoginDependencies: LoginDependencies = {

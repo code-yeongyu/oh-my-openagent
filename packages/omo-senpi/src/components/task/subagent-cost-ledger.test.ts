@@ -1,6 +1,12 @@
 import { describe, expect, it } from "bun:test"
 
-import { LEGACY_RUN_START_EPOCH, type LiveRunStats, type TaskRecord, type TaskRunStats, type TaskStatus } from "@oh-my-opencode/senpi-task"
+import {
+  LEGACY_RUN_START_EPOCH,
+  type LiveRunStats,
+  type TaskRecord,
+  type TaskRunStats,
+  type TaskStatus,
+} from "@oh-my-opencode/senpi-task"
 
 import { createSubagentCostLedger } from "./subagent-cost-ledger"
 
@@ -50,7 +56,15 @@ describe("subagent cost ledger: one source per run (senpi#2471)", () => {
     // given: run 0 settled at 0.3, then a revive starts run 1 with run 0 folded into prior_runs_cost_usd
     const ledger = createSubagentCostLedger()
     ledger.upsertRecord(record({ task_id: "st_a", status: "completed", run_stats: cost(0.3) }))
-    ledger.upsertRecord(record({ task_id: "st_a", status: "running", prior_runs_cost_usd: 0.3, run_start_epoch: 1, notification: { run_epoch: 1, notified_epoch: 0 } }))
+    ledger.upsertRecord(
+      record({
+        task_id: "st_a",
+        status: "running",
+        prior_runs_cost_usd: 0.3,
+        run_start_epoch: 1,
+        notification: { run_epoch: 1, notified_epoch: 0 },
+      }),
+    )
 
     // when: the stale tracker of run 0 reports, then run 1's tracker reports
     ledger.upsertLive("st_a", live(0, 0.3))
@@ -70,7 +84,15 @@ describe("subagent cost ledger: one source per run (senpi#2471)", () => {
     const beforeRecord = ledger.total()
 
     // when
-    ledger.upsertRecord(record({ task_id: "st_a", status: "running", prior_runs_cost_usd: 0.3, run_start_epoch: 1, notification: { run_epoch: 1, notified_epoch: 0 } }))
+    ledger.upsertRecord(
+      record({
+        task_id: "st_a",
+        status: "running",
+        prior_runs_cost_usd: 0.3,
+        run_start_epoch: 1,
+        notification: { run_epoch: 1, notified_epoch: 0 },
+      }),
+    )
     ledger.upsertLive("st_a", live(1, 0.05))
 
     // then
@@ -81,7 +103,13 @@ describe("subagent cost ledger: one source per run (senpi#2471)", () => {
   it("#given tasks whose cost was unreported, and a removed task #when totalled #then they add nothing", () => {
     // given
     const ledger = createSubagentCostLedger()
-    ledger.upsertRecord(record({ task_id: "st_sub", status: "completed", run_stats: { runtime_ms: 1, turns: 3, tool_calls: 2, cost_status: "unavailable" } }))
+    ledger.upsertRecord(
+      record({
+        task_id: "st_sub",
+        status: "completed",
+        run_stats: { runtime_ms: 1, turns: 3, tool_calls: 2, cost_status: "unavailable" },
+      }),
+    )
     ledger.upsertRecord(record({ task_id: "st_gone", status: "completed", run_stats: cost(2) }))
 
     // when

@@ -4,7 +4,12 @@ import type { SuspensionReason, TaskRecord, TaskStatus } from "../state"
 import { runTaskSend } from "../tools/control/send"
 import { runTaskOutput } from "../tools/output/output"
 import type { FakeHostOptions } from "./rpc-host/__fixtures__/fake-host"
-import { HOST_CHILD_MODEL, startHostWorld, type HostWorld, type ParentSession } from "./rpc-host/__fixtures__/host-world"
+import {
+  HOST_CHILD_MODEL,
+  startHostWorld,
+  type HostWorld,
+  type ParentSession,
+} from "./rpc-host/__fixtures__/host-world"
 
 /**
  * The HOST parks a child's session (idle sweep, generation handoff): the record must follow - parked
@@ -18,7 +23,12 @@ afterEach(async () => {
   for (const world of worlds.splice(0)) await world.cleanup()
 })
 
-type Child = { readonly world: HostWorld; readonly parent: ParentSession; readonly record: TaskRecord; readonly routingId: string }
+type Child = {
+  readonly world: HostWorld
+  readonly parent: ParentSession
+  readonly record: TaskRecord
+  readonly routingId: string
+}
 
 function concurrencyOf(parent: ParentSession) {
   const concurrency = parent.manager.concurrency
@@ -60,9 +70,15 @@ async function expectParked(child: Child, reason: SuspensionReason, status: Task
   expect(parent.manager.getResidentHandle(record.task_id)).toBeUndefined()
   expect(concurrencyOf(parent).leaseState(record.task_id, record.notification.run_epoch)).toBeUndefined()
   expect(concurrencyOf(parent).getCount(HOST_CHILD_MODEL)).toBe(0)
-  const output = await runTaskOutput({ manager: parent.manager, stateDir: parent.store.stateDir }, { task_id: record.task_id }, parent.sessionId)
+  const output = await runTaskOutput(
+    { manager: parent.manager, stateDir: parent.store.stateDir },
+    { task_id: record.task_id },
+    parent.sessionId,
+  )
   expect(output.details).toMatchObject({ kind: "status", snapshot: { residency_state: "rpc_detached", status } })
-  expect(output.details.kind === "status" && output.details.snapshot.suspended !== undefined).toBe(status === "running" || status === "pending")
+  expect(output.details.kind === "status" && output.details.snapshot.suspended !== undefined).toBe(
+    status === "running" || status === "pending",
+  )
 }
 
 describe("a session the host parks parks its task record", () => {
@@ -83,7 +99,10 @@ describe("a session the host parks parks its task record", () => {
 
     // then - reopened on the same host from its transcript, no prompt replayed
     expect(revived.outcomes.map((outcome) => outcome.kind)).toEqual(["resumed"])
-    expect(child.parent.store.load(child.record.task_id)).toMatchObject({ residency_state: "resident", status: "running" })
+    expect(child.parent.store.load(child.record.task_id)).toMatchObject({
+      residency_state: "resident",
+      status: "running",
+    })
     expect(child.parent.store.load(child.record.task_id)?.suspension_reason).toBeUndefined()
     expect(child.world.prompts()).toHaveLength(1)
   })
@@ -120,10 +139,17 @@ describe("a session the host parks parks its task record", () => {
 
     // then
     expect(revived.outcomes.map((outcome) => outcome.kind)).toEqual(["resumed"])
-    expect(child.parent.store.load(child.record.task_id)).toMatchObject({ residency_state: "resident", status: "running" })
+    expect(child.parent.store.load(child.record.task_id)).toMatchObject({
+      residency_state: "resident",
+      status: "running",
+    })
     expect(child.parent.store.load(child.record.task_id)?.host_session?.instance_id).toBe(child.world.host.instanceId)
     expect(child.world.prompts()).toHaveLength(2)
-    expect(child.world.host.commands.filter(command => command.type === "prompt" && command.payload.streamingBehavior === "followUp")).toHaveLength(1)
+    expect(
+      child.world.host.commands.filter(
+        (command) => command.type === "prompt" && command.payload.streamingBehavior === "followUp",
+      ),
+    ).toHaveLength(1)
   })
 
   test("#given a child whose turn completed while it stayed resident #when the idle sweep parks its session #then the completed record parks idle_evicted instead of keeping a dead handle", async () => {
@@ -154,14 +180,20 @@ describe("a session the host parks parks its task record", () => {
     const delivered = child.world.host.waitForCommand("prompt")
 
     // when
-    const sent = await runTaskSend(child.parent.manager, { to: child.record.task_id, message: "KEEP_GOING_SENTINEL" }, child.parent.sessionId)
+    const sent = await runTaskSend(
+      child.parent.manager,
+      { to: child.record.task_id, message: "KEEP_GOING_SENTINEL" },
+      child.parent.sessionId,
+    )
 
     // then
     expect(JSON.stringify(sent.details)).not.toContain("lane_capacity")
     expect(String((await delivered).payload.message)).toContain("KEEP_GOING_SENTINEL")
     const revived = child.parent.store.load(child.record.task_id)
     expect(revived).toMatchObject({ status: "running", residency_state: "resident" })
-    const live = child.world.host.sessions().find((session) => session.sessionPath === child.record.host_session?.session_path)
+    const live = child.world.host
+      .sessions()
+      .find((session) => session.sessionPath === child.record.host_session?.session_path)
     if (live === undefined) throw new Error("the revived session is not open on the host")
     child.world.host.completeTurn(live.routingId, "DONE_AFTER_REVIVAL")
     const done = await child.parent.manager.waitFor(child.record.task_id, { signal: AbortSignal.timeout(10_000) })
@@ -183,11 +215,17 @@ describe("a session the host parks parks its task record", () => {
     const previousInstance = child.record.host_session?.instance_id
 
     // when
-    const sent = await runTaskSend(child.parent.manager, { to: child.record.task_id, message: "AGAIN_SENTINEL" }, child.parent.sessionId)
+    const sent = await runTaskSend(
+      child.parent.manager,
+      { to: child.record.task_id, message: "AGAIN_SENTINEL" },
+      child.parent.sessionId,
+    )
 
     // then
     expect(sent.details).toMatchObject({ kind: "revived" })
-    const live = child.world.host.sessions().find((session) => session.sessionPath === child.record.host_session?.session_path)
+    const live = child.world.host
+      .sessions()
+      .find((session) => session.sessionPath === child.record.host_session?.session_path)
     const revived = child.parent.store.load(child.record.task_id)
     expect(child.world.host.instanceId).not.toBe(previousInstance)
     expect(revived?.host_session?.instance_id).toBe(child.world.host.instanceId)

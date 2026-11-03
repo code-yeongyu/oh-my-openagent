@@ -84,7 +84,7 @@ describe("executeUnstableAgentTask cleanup", () => {
       "test-agent",
       undefined,
       undefined,
-      "gpt-test"
+      "gpt-test",
     )
 
     // then
@@ -125,7 +125,7 @@ describe("executeUnstableAgentTask cleanup", () => {
       "test-agent",
       undefined,
       undefined,
-      "gpt-test"
+      "gpt-test",
     )
 
     // then
@@ -165,7 +165,7 @@ describe("executeUnstableAgentTask cleanup", () => {
       "test-agent",
       undefined,
       undefined,
-      "gpt-test"
+      "gpt-test",
     )
 
     // then

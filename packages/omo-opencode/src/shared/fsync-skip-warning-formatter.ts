@@ -3,9 +3,7 @@ import type { FsyncSkipEntry } from "./fsync-skip-tracker"
 
 const MAX_PATH_LINES = 5
 
-function selectMostCommonClassification(
-  entries: FsyncSkipEntry[],
-): FsyncSkipEntry["pathClassification"] {
+function selectMostCommonClassification(entries: FsyncSkipEntry[]): FsyncSkipEntry["pathClassification"] {
   const counts = new Map<FsyncSkipEntry["pathClassification"], number>()
 
   for (const entry of entries) {
@@ -37,13 +35,12 @@ export function formatFsyncSkipWarning(entries: FsyncSkipEntry[]): string {
     pathLines.push(`  ... and ${hiddenCount} more`)
   }
 
-  const environmentLines = selectedClassification === "unknown"
-    ? []
-    : [`Detected environment: ${selectedDescription}`]
+  const environmentLines = selectedClassification === "unknown" ? [] : [`Detected environment: ${selectedDescription}`]
 
-  const durabilityLine = selectedClassification === "unknown"
-    ? "  - Crash durability is best-effort because this filesystem does not support fsync."
-    : "  - Crash durability is best-effort on this filesystem (this is normal for iCloud, OneDrive, network drives, antivirus-locked paths)."
+  const durabilityLine =
+    selectedClassification === "unknown"
+      ? "  - Crash durability is best-effort because this filesystem does not support fsync."
+      : "  - Crash durability is best-effort on this filesystem (this is normal for iCloud, OneDrive, network drives, antivirus-locked paths)."
 
   return [
     "---",

@@ -62,7 +62,9 @@ mock.module("../../shared/opencode-message-dir", () => ({
   },
 }))
 
-afterAll(() => { mock.restore() })
+afterAll(() => {
+  mock.restore()
+})
 
 const { getAllSessions, getMessageDir, sessionExists, readSessionMessages, readSessionTodos, getSessionInfo } =
   await import("./storage")
@@ -152,11 +154,11 @@ describe("session-manager storage", () => {
 
     writeFileSync(
       join(sessionPath, "msg_002.json"),
-      JSON.stringify({ id: "msg_002", role: "assistant", time: { created: 2000 } })
+      JSON.stringify({ id: "msg_002", role: "assistant", time: { created: 2000 } }),
     )
     writeFileSync(
       join(sessionPath, "msg_001.json"),
-      JSON.stringify({ id: "msg_001", role: "user", time: { created: 1000 } })
+      JSON.stringify({ id: "msg_001", role: "user", time: { created: 1000 } }),
     )
 
     // when
@@ -254,7 +256,7 @@ describe("session-manager storage", () => {
         role: "user",
         agent: "build",
         time: { created: now - 10000 },
-      })
+      }),
     )
     writeFileSync(
       join(sessionPath, "msg_002.json"),
@@ -263,7 +265,7 @@ describe("session-manager storage", () => {
         role: "assistant",
         agent: "oracle",
         time: { created: now },
-      })
+      }),
     )
 
     // when
@@ -341,7 +343,7 @@ describe("session-manager storage - getMainSessions", () => {
   function createSessionMetadata(
     projectID: string,
     sessionID: string,
-    opts: { parentID?: string; directory: string; updated: number }
+    opts: { parentID?: string; directory: string; updated: number },
   ) {
     const projectDir = join(TEST_SESSION_STORAGE, projectID)
     mkdirSync(projectDir, { recursive: true })
@@ -353,17 +355,14 @@ describe("session-manager storage - getMainSessions", () => {
         directory: opts.directory,
         parentID: opts.parentID,
         time: { created: opts.updated - 1000, updated: opts.updated },
-      })
+      }),
     )
   }
 
   function createMessageForSession(sessionID: string, msgID: string, created: number) {
     const sessionPath = join(TEST_MESSAGE_STORAGE, sessionID)
     mkdirSync(sessionPath, { recursive: true })
-    writeFileSync(
-      join(sessionPath, `${msgID}.json`),
-      JSON.stringify({ id: msgID, role: "user", time: { created } })
-    )
+    writeFileSync(join(sessionPath, `${msgID}.json`), JSON.stringify({ id: msgID, role: "user", time: { created } }))
   }
 
   test("getMainSessions returns only sessions without parentID", async () => {

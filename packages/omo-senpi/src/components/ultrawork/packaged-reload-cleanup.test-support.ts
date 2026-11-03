@@ -102,7 +102,9 @@ export async function cleanUpReloadRun(run: ReloadCleanup): Promise<void> {
     for (const shutdown of run.shutdowns) {
       const settled = shutdown().then(
         () => undefined,
-        (error: unknown) => { errors.push(error) },
+        (error: unknown) => {
+          errors.push(error)
+        },
       )
       if (!(await settlesBy(settled, shutdownsBy, clock))) {
         errors.push(new Error("packaged reload plugin shutdown did not settle in time"))

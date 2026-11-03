@@ -1,7 +1,10 @@
 import assert from "node:assert/strict"
 
 import type { AgentToolResult } from "@code-yeongyu/senpi"
-import { fakeKernelTools, type FakeKernelToolsCapability } from "../../packages/senpi-task/src/runners/in-process/__fixtures__/kernel-tools-fakes"
+import {
+  fakeKernelTools,
+  type FakeKernelToolsCapability,
+} from "../../packages/senpi-task/src/runners/in-process/__fixtures__/kernel-tools-fakes"
 import type { TaskToolDetails } from "../../packages/senpi-task/src/tools/task/types"
 import { openChildEnv, type ChildEnv } from "./omp-item6-harness"
 
@@ -91,7 +94,10 @@ export async function runScopedNarrowedChild(): Promise<Record<string, unknown>>
     assert.ok(capability.invokeCalls.length >= 2, "the child must have called both parent tools")
     for (const call of capability.invokeCalls) {
       const options = call.options
-      assert.ok(options !== undefined && !(options instanceof AbortSignal), `invoke ${call.request.name} must carry options`)
+      assert.ok(
+        options !== undefined && !(options instanceof AbortSignal),
+        `invoke ${call.request.name} must carry options`,
+      )
       assert.deepEqual(options.scope, EXPECTED_SCOPE, `invoke ${call.request.name} must carry the scope`)
       assert.ok(options.signal instanceof AbortSignal, "the turn's abort signal must still ride along")
       assert.equal(call.argCount, 2)

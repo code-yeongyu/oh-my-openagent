@@ -17,7 +17,9 @@ export function createBackgroundCancel(manager: BackgroundManager, _client: Back
 
         if (cancelAll) {
           const tasks = manager.getAllDescendantTasks(toolContext.sessionID)
-          const cancellableTasks = tasks.filter((t: { status: string }) => t.status === "running" || t.status === "pending")
+          const cancellableTasks = tasks.filter(
+            (t: { status: string }) => t.status === "running" || t.status === "pending",
+          )
 
           if (cancellableTasks.length === 0) {
             return `No running or pending background tasks to cancel.`
@@ -44,7 +46,7 @@ export function createBackgroundCancel(manager: BackgroundManager, _client: Back
           const tableRows = cancelledInfo
             .map(
               (t) =>
-                `| \`${t.id}\` | ${t.description} | ${t.status} | ${t.sessionID ? `\`${t.sessionID}\`` : "(not started)"} |`
+                `| \`${t.id}\` | ${t.description} | ${t.status} | ${t.sessionID ? `\`${t.sessionID}\`` : "(not started)"} |`,
             )
             .join("\n")
 

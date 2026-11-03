@@ -24,11 +24,13 @@ function tool(name: string): ToolDefinition {
   }
 }
 
-function spec(policy: {
-  readonly toolAllowlist?: readonly string[]
-  readonly toolDenylist?: readonly string[]
-  readonly memberScopedTools?: readonly ToolDefinition[]
-} = {}): ChildSpec {
+function spec(
+  policy: {
+    readonly toolAllowlist?: readonly string[]
+    readonly toolDenylist?: readonly string[]
+    readonly memberScopedTools?: readonly ToolDefinition[]
+  } = {},
+): ChildSpec {
   return {
     taskId: "st_surface",
     cwd: process.cwd(),
@@ -57,7 +59,10 @@ function grantSide(
 ): string[] {
   return [
     ...childEffectiveToolNames({
-      childToolNames: mergeChildCustomTools(parent, memberScoped, { uiOnlyToolNames: ["memory"], includeTaskTools: true }).map((entry) => entry.name),
+      childToolNames: mergeChildCustomTools(parent, memberScoped, {
+        uiOnlyToolNames: ["memory"],
+        includeTaskTools: true,
+      }).map((entry) => entry.name),
       includeTaskTools: true,
       ...policy,
     }),

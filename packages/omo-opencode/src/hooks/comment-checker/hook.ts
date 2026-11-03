@@ -9,12 +9,7 @@ import {
   processApplyPatchEditsWithCli,
 } from "./cli-runner"
 import { extractApplyPatchEdits } from "@oh-my-opencode/comment-checker-core"
-import {
-  registerPendingCall,
-  startPendingCallCleanup,
-  stopPendingCallCleanup,
-  takePendingCall,
-} from "./pending-calls"
+import { registerPendingCall, startPendingCallCleanup, stopPendingCallCleanup, takePendingCall } from "./pending-calls"
 import { ensureCommentCheckerInitialization } from "./initialization-gate"
 
 import * as fs from "fs"
@@ -74,9 +69,7 @@ export function createCommentCheckerHooks(
         return
       }
 
-      const filePath = (output.args.filePath ??
-        output.args.file_path ??
-        output.args.path) as string | undefined
+      const filePath = (output.args.filePath ?? output.args.file_path ?? output.args.path) as string | undefined
       const content = output.args.content as string | undefined
       const oldString = (output.args.oldString ?? output.args.old_string) as string | undefined
       const newString = (output.args.newString ?? output.args.new_string) as string | undefined
@@ -126,7 +119,6 @@ export function createCommentCheckerHooks(
         debugLog("skipping due to tool failure in output")
         return
       }
-
 
       if (toolLower === "apply_patch") {
         const edits = extractApplyPatchEdits(output.metadata, input.args)

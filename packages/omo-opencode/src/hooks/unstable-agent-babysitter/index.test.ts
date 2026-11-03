@@ -2,10 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { _resetForTesting, setMainSession } from "../../features/claude-code-session-state"
 import type { BackgroundTask } from "../../features/background-agent"
 import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
-import {
-  releaseAllPromptAsyncReservationsForTesting,
-  releasePromptAsyncReservation,
-} from "../shared/prompt-async-gate"
+import { releaseAllPromptAsyncReservationsForTesting, releasePromptAsyncReservation } from "../shared/prompt-async-gate"
 import { createUnstableAgentBabysitterHook } from "./index"
 
 const projectDir = process.cwd()
@@ -78,12 +75,8 @@ describe("unstable-agent-babysitter hook", () => {
     const promptCalls: Array<{ input: unknown }> = []
     const ctx = createMockPluginInput({
       messagesBySession: {
-        "main-1": [
-          { info: { agent: "sisyphus", model: { providerID: "openai", modelID: "gpt-4" } } },
-        ],
-        "bg-1": [
-          { info: { role: "assistant" }, parts: [{ type: "thinking", thinking: "deep thought" }] },
-        ],
+        "main-1": [{ info: { agent: "sisyphus", model: { providerID: "openai", modelID: "gpt-4" } } }],
+        "bg-1": [{ info: { role: "assistant" }, parts: [{ type: "thinking", thinking: "deep thought" }] }],
       },
       promptCalls,
     })
@@ -113,12 +106,8 @@ describe("unstable-agent-babysitter hook", () => {
     const promptCalls: Array<{ input: unknown }> = []
     const ctx = createMockPluginInput({
       messagesBySession: {
-        "main-1": [
-          { info: { agent: "sisyphus", model: { providerID: "openai", modelID: "gpt-4" } } },
-        ],
-        "bg-1": [
-          { info: { role: "assistant" }, parts: [{ type: "thinking", thinking: "deep thought" }] },
-        ],
+        "main-1": [{ info: { agent: "sisyphus", model: { providerID: "openai", modelID: "gpt-4" } } }],
+        "bg-1": [{ info: { role: "assistant" }, parts: [{ type: "thinking", thinking: "deep thought" }] }],
       },
       promptCalls,
     })
@@ -147,12 +136,8 @@ describe("unstable-agent-babysitter hook", () => {
     const promptCalls: Array<{ input: unknown }> = []
     const ctx = createMockPluginInput({
       messagesBySession: {
-        "main-1": [
-          { info: { agent: "sisyphus", model: { providerID: "openai", modelID: "gpt-4" } } },
-        ],
-        "bg-1": [
-          { info: { role: "assistant" }, parts: [{ type: "thinking", thinking: "minimax thought" }] },
-        ],
+        "main-1": [{ info: { agent: "sisyphus", model: { providerID: "openai", modelID: "gpt-4" } } }],
+        "bg-1": [{ info: { role: "assistant" }, parts: [{ type: "thinking", thinking: "minimax thought" }] }],
       },
       promptCalls,
     })
@@ -235,12 +220,8 @@ describe("unstable-agent-babysitter hook", () => {
     Date.now = () => now
     const ctx = createMockPluginInput({
       messagesBySession: {
-        "main-1": [
-          { info: { agent: "sisyphus", model: { providerID: "openai", modelID: "gpt-4" } } },
-        ],
-        "bg-1": [
-          { info: { role: "assistant" }, parts: [{ type: "thinking", thinking: "deep thought" }] },
-        ],
+        "main-1": [{ info: { agent: "sisyphus", model: { providerID: "openai", modelID: "gpt-4" } } }],
+        "bg-1": [{ info: { role: "assistant" }, parts: [{ type: "thinking", thinking: "deep thought" }] }],
       },
       promptCalls,
       promptAsyncImpl: async () => {
@@ -273,12 +254,8 @@ describe("unstable-agent-babysitter hook", () => {
     const promptCalls: Array<{ input: unknown }> = []
     const ctx = createMockPluginInput({
       messagesBySession: {
-        "main-1": [
-          { info: { agent: "sisyphus", model: { providerID: "openai", modelID: "gpt-4" } } },
-        ],
-        "bg-1": [
-          { info: { role: "assistant" }, parts: [{ type: "thinking", thinking: "deep thought" }] },
-        ],
+        "main-1": [{ info: { agent: "sisyphus", model: { providerID: "openai", modelID: "gpt-4" } } }],
+        "bg-1": [{ info: { role: "assistant" }, parts: [{ type: "thinking", thinking: "deep thought" }] }],
       },
       promptCalls,
     })
@@ -293,7 +270,9 @@ describe("unstable-agent-babysitter hook", () => {
     Date.now = () => currentNow
 
     await hook.event({ event: { type: "session.idle", properties: { sessionID: "main-1" } } })
-    await hook.event({ event: { type: "session.error", properties: { sessionID: "main-1", error: { name: "AbortError" } } } })
+    await hook.event({
+      event: { type: "session.error", properties: { sessionID: "main-1", error: { name: "AbortError" } } },
+    })
     currentNow += 5 * 60 * 1000 + 1
     await hook.event({ event: { type: "session.idle", properties: { sessionID: "main-1" } } })
 
@@ -312,12 +291,8 @@ describe("unstable-agent-babysitter hook", () => {
     }
     const ctx = createMockPluginInput({
       messagesBySession: {
-        "main-1": [
-          { info: { agent: "sisyphus", model: mainModel } },
-        ],
-        "bg-1": [
-          { info: { role: "assistant" }, parts: [{ type: "thinking", thinking: "deep thought" }] },
-        ],
+        "main-1": [{ info: { agent: "sisyphus", model: mainModel } }],
+        "bg-1": [{ info: { role: "assistant" }, parts: [{ type: "thinking", thinking: "deep thought" }] }],
       },
       promptCalls,
     })
@@ -367,9 +342,7 @@ describe("unstable-agent-babysitter hook", () => {
             },
           },
         ],
-        "bg-1": [
-          { info: { role: "assistant" }, parts: [{ type: "thinking", thinking: "deep thought" }] },
-        ],
+        "bg-1": [{ info: { role: "assistant" }, parts: [{ type: "thinking", thinking: "deep thought" }] }],
       },
       promptCalls,
     })
@@ -402,23 +375,21 @@ describe("unstable-agent-babysitter hook", () => {
     const promptCalls: Array<{ input: unknown }> = []
     const ctx = createMockPluginInput({
       messagesBySession: {
-        "main-1": [
-          { info: { role: "user", time: { created: Date.now() - 1_500 } } },
-        ],
-        "bg-1": [
-          { info: { role: "assistant" }, parts: [{ type: "thinking", thinking: "deep thought" }] },
-        ],
+        "main-1": [{ info: { role: "user", time: { created: Date.now() - 1_500 } } }],
+        "bg-1": [{ info: { role: "assistant" }, parts: [{ type: "thinking", thinking: "deep thought" }] }],
       },
       promptCalls,
     })
-    const backgroundManager = createBackgroundManager([createTask({
-      progress: {
-        toolCalls: 1,
-        lastUpdate: new Date(0),
-        lastMessage: "still working",
-        lastMessageAt: new Date(0),
-      },
-    })])
+    const backgroundManager = createBackgroundManager([
+      createTask({
+        progress: {
+          toolCalls: 1,
+          lastUpdate: new Date(0),
+          lastMessage: "still working",
+          lastMessageAt: new Date(0),
+        },
+      }),
+    ])
     const hook = createUnstableAgentBabysitterHook(ctx, {
       backgroundManager,
       config: { timeout_ms: 120000 },
@@ -447,20 +418,20 @@ describe("unstable-agent-babysitter hook", () => {
           { info: { role: "user", time: { created: Date.now() - 1_500 } } },
           { info: { role: "assistant", time: { created: Date.now() - 500 }, agent: "sisyphus", finish: "stop" } },
         ],
-        "bg-1": [
-          { info: { role: "assistant" }, parts: [{ type: "thinking", thinking: "deep thought" }] },
-        ],
+        "bg-1": [{ info: { role: "assistant" }, parts: [{ type: "thinking", thinking: "deep thought" }] }],
       },
       promptCalls,
     })
-    const backgroundManager = createBackgroundManager([createTask({
-      progress: {
-        toolCalls: 1,
-        lastUpdate: new Date(0),
-        lastMessage: "still working",
-        lastMessageAt: new Date(0),
-      },
-    })])
+    const backgroundManager = createBackgroundManager([
+      createTask({
+        progress: {
+          toolCalls: 1,
+          lastUpdate: new Date(0),
+          lastMessage: "still working",
+          lastMessageAt: new Date(0),
+        },
+      }),
+    ])
     const hook = createUnstableAgentBabysitterHook(ctx, {
       backgroundManager,
       config: { timeout_ms: 120000 },
@@ -489,20 +460,20 @@ describe("unstable-agent-babysitter hook", () => {
           { info: { role: "user", time: { created: Date.now() - 1_500 } } },
           { info: { role: "assistant", time: { created: Date.now() - 500 }, agent: "sisyphus" } },
         ],
-        "bg-1": [
-          { info: { role: "assistant" }, parts: [{ type: "thinking", thinking: "deep thought" }] },
-        ],
+        "bg-1": [{ info: { role: "assistant" }, parts: [{ type: "thinking", thinking: "deep thought" }] }],
       },
       promptCalls,
     })
-    const backgroundManager = createBackgroundManager([createTask({
-      progress: {
-        toolCalls: 1,
-        lastUpdate: new Date(0),
-        lastMessage: "still working",
-        lastMessageAt: new Date(0),
-      },
-    })])
+    const backgroundManager = createBackgroundManager([
+      createTask({
+        progress: {
+          toolCalls: 1,
+          lastUpdate: new Date(0),
+          lastMessage: "still working",
+          lastMessageAt: new Date(0),
+        },
+      }),
+    ])
     const hook = createUnstableAgentBabysitterHook(ctx, {
       backgroundManager,
       config: { timeout_ms: 120000 },
@@ -529,14 +500,16 @@ describe("unstable-agent-babysitter hook", () => {
       messagesBySession: { "main-1": [], "bg-1": [] },
       promptCalls,
     })
-    const backgroundManager = createBackgroundManager([createTask({
-      progress: {
-        toolCalls: 2,
-        lastUpdate: new Date(Date.now() - 1_000),
-        lastMessage: "still working",
-        lastMessageAt: new Date(Date.now() - 5 * 60 * 1000),
-      },
-    })])
+    const backgroundManager = createBackgroundManager([
+      createTask({
+        progress: {
+          toolCalls: 2,
+          lastUpdate: new Date(Date.now() - 1_000),
+          lastMessage: "still working",
+          lastMessageAt: new Date(Date.now() - 5 * 60 * 1000),
+        },
+      }),
+    ])
     const hook = createUnstableAgentBabysitterHook(ctx, {
       backgroundManager,
       config: { timeout_ms: 120000 },
@@ -563,14 +536,16 @@ describe("unstable-agent-babysitter hook", () => {
       messagesBySession: { "main-1": [], "bg-1": [] },
       promptCalls,
     })
-    const backgroundManager = createBackgroundManager([createTask({
-      progress: {
-        toolCalls: 2,
-        lastUpdate: new Date(Date.now() - 5 * 60 * 1000),
-        lastMessage: "still working",
-        lastMessageAt: new Date(Date.now() - 5 * 60 * 1000),
-      },
-    })])
+    const backgroundManager = createBackgroundManager([
+      createTask({
+        progress: {
+          toolCalls: 2,
+          lastUpdate: new Date(Date.now() - 5 * 60 * 1000),
+          lastMessage: "still working",
+          lastMessageAt: new Date(Date.now() - 5 * 60 * 1000),
+        },
+      }),
+    ])
     const hook = createUnstableAgentBabysitterHook(ctx, {
       backgroundManager,
       config: { timeout_ms: 120000 },
@@ -598,14 +573,16 @@ describe("unstable-agent-babysitter hook", () => {
       messagesBySession: { "main-1": [], "bg-1": [] },
       promptCalls,
     })
-    const backgroundManager = createBackgroundManager([createTask({
-      progress: {
-        toolCalls: 1,
-        lastUpdate: new Date(0),
-        lastMessage: "still working",
-        lastMessageAt: new Date(0),
-      },
-    })])
+    const backgroundManager = createBackgroundManager([
+      createTask({
+        progress: {
+          toolCalls: 1,
+          lastUpdate: new Date(0),
+          lastMessage: "still working",
+          lastMessageAt: new Date(0),
+        },
+      }),
+    ])
     const hook = createUnstableAgentBabysitterHook(ctx, {
       backgroundManager,
       config: { timeout_ms: 120000 },
@@ -614,9 +591,13 @@ describe("unstable-agent-babysitter hook", () => {
     try {
       // when
       await hook.event({ event: { type: "session.idle", properties: { sessionID: "main-1" } } })
-      await hook.event({ event: { type: "session.error", properties: { sessionID: "main-1", error: { name: "AbortError" } } } })
+      await hook.event({
+        event: { type: "session.error", properties: { sessionID: "main-1", error: { name: "AbortError" } } },
+      })
       currentNow += 1_000
-      await hook.event({ event: { type: "message.updated", properties: { sessionID: "main-1", info: { role: "user" } } } })
+      await hook.event({
+        event: { type: "message.updated", properties: { sessionID: "main-1", info: { role: "user" } } },
+      })
       await hook.event({ event: { type: "session.idle", properties: { sessionID: "main-1" } } })
 
       // then
@@ -637,14 +618,16 @@ describe("unstable-agent-babysitter hook", () => {
       messagesBySession: { "main-1": [], "bg-1": [] },
       promptCalls,
     })
-    const backgroundManager = createBackgroundManager([createTask({
-      progress: {
-        toolCalls: 1,
-        lastUpdate: new Date(0),
-        lastMessage: "still working",
-        lastMessageAt: new Date(0),
-      },
-    })])
+    const backgroundManager = createBackgroundManager([
+      createTask({
+        progress: {
+          toolCalls: 1,
+          lastUpdate: new Date(0),
+          lastMessage: "still working",
+          lastMessageAt: new Date(0),
+        },
+      }),
+    ])
     const hook = createUnstableAgentBabysitterHook(ctx, {
       backgroundManager,
       config: { timeout_ms: 120000 },
@@ -655,7 +638,9 @@ describe("unstable-agent-babysitter hook", () => {
       await hook.event({ event: { type: "session.idle", properties: { sessionID: "main-1" } } })
       await hook.event({ event: { type: "session.stop", properties: { sessionID: "main-1" } } })
       currentNow += 1_000
-      await hook.event({ event: { type: "message.updated", properties: { sessionID: "main-1", info: { role: "assistant" } } } })
+      await hook.event({
+        event: { type: "message.updated", properties: { sessionID: "main-1", info: { role: "assistant" } } },
+      })
       await hook.event({ event: { type: "session.idle", properties: { sessionID: "main-1" } } })
 
       // then
@@ -664,6 +649,4 @@ describe("unstable-agent-babysitter hook", () => {
       Date.now = originalNow
     }
   })
-
-
 })

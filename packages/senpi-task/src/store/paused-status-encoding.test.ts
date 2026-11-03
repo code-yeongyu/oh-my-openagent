@@ -35,7 +35,8 @@ describe("paused status stored encoding (R0 rollback compatibility)", () => {
 
   test("#given those bytes #when this build reads them #then the task is paused with its run owner", () => {
     expect(parseTaskRecord(writeAndReadRaw(paused), "record.json")).toMatchObject({
-      status: "paused", run_pause: paused.run_pause,
+      status: "paused",
+      run_pause: paused.run_pause,
     })
   })
 

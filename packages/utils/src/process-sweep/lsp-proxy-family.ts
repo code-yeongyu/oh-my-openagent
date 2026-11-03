@@ -1,4 +1,9 @@
-import { hasExecutableTokenUnderRootWithSuffix, normalizeForComparison, normalizeRoots, splitCommandTokens } from "./command-match"
+import {
+  hasExecutableTokenUnderRootWithSuffix,
+  normalizeForComparison,
+  normalizeRoots,
+  splitCommandTokens,
+} from "./command-match"
 import { isOrphaned, type ProcessInfo } from "./process-table"
 
 /**

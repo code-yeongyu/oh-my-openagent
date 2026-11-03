@@ -6,7 +6,9 @@ import { join } from "node:path"
 import { parseDagSessionStartEvent, readDagSessionHeader, resolveDagForkSource } from "./dag-fork-source"
 
 const roots: string[] = []
-afterEach(() => { for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true }) })
+afterEach(() => {
+  for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true })
+})
 
 function sessionFile(name: string, header: Record<string, unknown>, trailing = "\n"): string {
   const root = fs.mkdtempSync(join(tmpdir(), "dag-fork-source-"))
@@ -31,7 +33,10 @@ describe("parseDagSessionStartEvent", () => {
   })
 
   test("#given a fork payload with a blank previousSessionFile #when parsed #then the file is treated as absent", () => {
-    expect(parseDagSessionStartEvent({ reason: "fork", previousSessionFile: "  " })).toEqual({ reason: "fork", previousSessionFile: undefined })
+    expect(parseDagSessionStartEvent({ reason: "fork", previousSessionFile: "  " })).toEqual({
+      reason: "fork",
+      previousSessionFile: undefined,
+    })
   })
 })
 
@@ -55,14 +60,22 @@ describe("readDagSessionHeader", () => {
 describe("resolveDagForkSource", () => {
   test("#given a non-fork reason #when resolved #then own-only without a diagnostic", async () => {
     const current = sessionFile("c.jsonl", { type: "session", id: "C", parentSession: "/nowhere.jsonl" })
-    const resolution = await resolveDagForkSource({ event: { reason: "resume", previousSessionFile: current }, currentSessionId: "C", currentSessionFile: current })
+    const resolution = await resolveDagForkSource({
+      event: { reason: "resume", previousSessionFile: current },
+      currentSessionId: "C",
+      currentSessionFile: current,
+    })
     expect(resolution).toEqual({ kind: "own-only", diagnostic: undefined })
   })
 
   test("#given the declared parent is the forked session itself #when resolved #then own-only with a diagnostic", async () => {
     const parent = sessionFile("a.jsonl", { type: "session", id: "C" })
     const current = sessionFile("c.jsonl", { type: "session", id: "C", parentSession: parent })
-    const resolution = await resolveDagForkSource({ event: { reason: "fork", previousSessionFile: parent }, currentSessionId: "C", currentSessionFile: current })
+    const resolution = await resolveDagForkSource({
+      event: { reason: "fork", previousSessionFile: parent },
+      currentSessionId: "C",
+      currentSessionFile: current,
+    })
     expect(resolution.kind).toBe("own-only")
     expect(resolution.kind === "own-only" ? resolution.diagnostic : undefined).toContain("own identity")
   })
@@ -71,7 +84,11 @@ describe("resolveDagForkSource", () => {
     const parent = sessionFile("a.jsonl", { type: "session", id: "A" })
     const current = sessionFile("c.jsonl", { type: "session", id: "C", parentSession: parent })
     const offered = join(parent, "..", "a.jsonl")
-    const resolution = await resolveDagForkSource({ event: { reason: "fork", previousSessionFile: offered }, currentSessionId: "C", currentSessionFile: current })
+    const resolution = await resolveDagForkSource({
+      event: { reason: "fork", previousSessionFile: offered },
+      currentSessionId: "C",
+      currentSessionFile: current,
+    })
     expect(resolution).toEqual({ kind: "source", sessionId: "A" })
   })
 })

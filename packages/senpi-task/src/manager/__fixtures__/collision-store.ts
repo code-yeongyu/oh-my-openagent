@@ -1,6 +1,9 @@
 import type { TaskRecordStore } from "../../store"
 
-export function collisionStore(inner: TaskRecordStore): { readonly store: TaskRecordStore; readonly firstCandidate: () => string | undefined } {
+export function collisionStore(inner: TaskRecordStore): {
+  readonly store: TaskRecordStore
+  readonly firstCandidate: () => string | undefined
+} {
   let firstSave = true
   let firstCandidate: string | undefined
   return {

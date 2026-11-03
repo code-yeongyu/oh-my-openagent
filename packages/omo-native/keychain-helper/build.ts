@@ -34,7 +34,7 @@ function keychainHelperCompileArgs(build: KeychainHelperBuild): string[] {
     "-Wextra",
     "-Werror",
     "-mmacosx-version-min=12.0",
-    ...architectures.flatMap(arch => ["-arch", arch]),
+    ...architectures.flatMap((arch) => ["-arch", arch]),
     ...(build.flavor === "test" ? ["-DOMO_KEYCHAIN_TEST_BUILD=1"] : []),
     `-DOMO_KEYCHAIN_REFUSE_ROOT=${(build.refuseRoot ?? KEYCHAIN_HELPER_REFUSE_ROOT_DEFAULT) ? 1 : 0}`,
     "-framework",
@@ -43,7 +43,7 @@ function keychainHelperCompileArgs(build: KeychainHelperBuild): string[] {
     "CoreFoundation",
     "-o",
     build.output,
-    ...SOURCES.map(source => join(sourceDir, source)),
+    ...SOURCES.map((source) => join(sourceDir, source)),
   ]
 }
 

@@ -14,10 +14,22 @@ const failures = [
 test.each(failures.flatMap((failure) => [true, false].map((automatic) => ({ ...failure, automatic }))))(
   "#given $failure and automatic=$automatic #when the real CLI fails #then automatic errors are tolerated and warn while manual errors stay strict",
   ({ automatic, failure, reason }) => {
-    const workflow = z.object({ jobs: z.object({ announce: z.object({
-      "continue-on-error": z.string(),
-      steps: z.array(z.object({ name: z.string().optional(), if: z.string().optional(), run: z.string().optional() }).passthrough()),
-    }).passthrough() }) }).parse(Bun.YAML.parse(readFileSync(".github/workflows/release-announce.yml", "utf8")))
+    const workflow = z
+      .object({
+        jobs: z.object({
+          announce: z
+            .object({
+              "continue-on-error": z.string(),
+              steps: z.array(
+                z
+                  .object({ name: z.string().optional(), if: z.string().optional(), run: z.string().optional() })
+                  .passthrough(),
+              ),
+            })
+            .passthrough(),
+        }),
+      })
+      .parse(Bun.YAML.parse(readFileSync(".github/workflows/release-announce.yml", "utf8")))
     const job = workflow.jobs.announce
     const step = job.steps.find((item) => item.name === "Announce release")
     const warning = job.steps.find((item) => item.name === "Warn about undelivered announcement")
@@ -27,7 +39,9 @@ test.each(failures.flatMap((failure) => [true, false].map((automatic) => ({ ...f
     const preload = join(directory, "transport.mjs")
     writeFileSync(summary, "")
     // Replace only fetch, the script's existing transport seam, never the CLI or announce().
-    writeFileSync(preload, `
+    writeFileSync(
+      preload,
+      `
 globalThis.fetch = async (url, init) => {
   if (init?.method === "GET" && String(url).startsWith("https://api.github.com/")) {
     return Response.json({ tag_name: "v5.1.29", body: "**Fixed.** Details.", draft: false, prerelease: false });
@@ -38,17 +52,26 @@ globalThis.fetch = async (url, init) => {
   }
   throw new Error("Unexpected test request");
 };
-`)
+`,
+    )
     try {
       // The job runs on ubuntu-latest, which has GNU timeout; macOS test runners don't, so drop only that wrapper there.
       const hasTimeout = spawnSync("bash", ["-c", "command -v timeout"]).status === 0
       const command = hasTimeout ? step.run : step.run.replace(/^timeout -k \d+ \d+ /, "")
       const run = command.replace("bun script/", `bun --preload "${preload}" script/`)
       const delivery = spawnSync("bash", ["-c", run], {
-        encoding: "utf8", timeout: 5000,
-        env: { ...process.env, ANNOUNCEMENT_EVENT: automatic ? "workflow_call" : "workflow_dispatch",
-          RELEASE_TAG: "v5.1.29", DISCORD_OMO_RELEASES_WEBHOOK_URL: failure === "missing secret" ? "" : "https://discord.com/api/webhooks/123/dummy",
-          TEST_POST_FAILURE: failure, DRY_RUN: "false", PROBE: "false" },
+        encoding: "utf8",
+        timeout: 5000,
+        env: {
+          ...process.env,
+          ANNOUNCEMENT_EVENT: automatic ? "workflow_call" : "workflow_dispatch",
+          RELEASE_TAG: "v5.1.29",
+          DISCORD_OMO_RELEASES_WEBHOOK_URL:
+            failure === "missing secret" ? "" : "https://discord.com/api/webhooks/123/dummy",
+          TEST_POST_FAILURE: failure,
+          DRY_RUN: "false",
+          PROBE: "false",
+        },
       })
       expect(delivery.error).toBeUndefined()
       expect(delivery.status).toBe(1)
@@ -61,7 +84,8 @@ globalThis.fetch = async (url, init) => {
       expect(evaluateExpression(warning.if, context, ["cancelled"])).toBe(automatic)
       if (shouldWarn) {
         const recovery = spawnSync("bash", ["-c", warning.run], {
-          encoding: "utf8", timeout: 5000,
+          encoding: "utf8",
+          timeout: 5000,
           env: { ...process.env, RELEASE_TAG: "v5.1.29", GITHUB_STEP_SUMMARY: summary },
         })
         expect(recovery.status).toBe(0)
@@ -76,21 +100,37 @@ globalThis.fetch = async (url, init) => {
   },
 )
 
-test.each([{ dry_run: true, probe: false }, { dry_run: false, probe: true }])(
-  "#given manual mode %p #when it fails #then no production recovery hint is eligible",
-  (inputs) => {
-    const workflow = z.object({ jobs: z.object({ announce: z.object({
-      steps: z.array(z.object({ name: z.string().optional(), if: z.string().optional() }).passthrough()),
-    }).passthrough() }) }).parse(Bun.YAML.parse(readFileSync(".github/workflows/release-announce.yml", "utf8")))
-    const warning = workflow.jobs.announce.steps.find((step) => step.name === "Warn about undelivered announcement")
-    expect(evaluateExpression(z.string().parse(warning?.if), { inputs }, ["failure"])).toBe(false)
-  },
-)
+test.each([
+  { dry_run: true, probe: false },
+  { dry_run: false, probe: true },
+])("#given manual mode %p #when it fails #then no production recovery hint is eligible", (inputs) => {
+  const workflow = z
+    .object({
+      jobs: z.object({
+        announce: z
+          .object({
+            steps: z.array(z.object({ name: z.string().optional(), if: z.string().optional() }).passthrough()),
+          })
+          .passthrough(),
+      }),
+    })
+    .parse(Bun.YAML.parse(readFileSync(".github/workflows/release-announce.yml", "utf8")))
+  const warning = workflow.jobs.announce.steps.find((step) => step.name === "Warn about undelivered announcement")
+  expect(evaluateExpression(z.string().parse(warning?.if), { inputs }, ["failure"])).toBe(false)
+})
 
 test("#given skipped or cancelled automatic announcement #when recovery runs #then the summary writer warns and names the command", () => {
-  const workflow = z.object({ jobs: z.object({ "release-announce-recovery": z.object({
-    steps: z.array(z.object({ name: z.string(), run: z.string() }).passthrough()),
-  }).passthrough() }) }).parse(Bun.YAML.parse(readFileSync(".github/workflows/publish.yml", "utf8")))
+  const workflow = z
+    .object({
+      jobs: z.object({
+        "release-announce-recovery": z
+          .object({
+            steps: z.array(z.object({ name: z.string(), run: z.string() }).passthrough()),
+          })
+          .passthrough(),
+      }),
+    })
+    .parse(Bun.YAML.parse(readFileSync(".github/workflows/publish.yml", "utf8")))
   const step = workflow.jobs["release-announce-recovery"].steps.find((item) => item.name === "Write job summary")
   if (!step) throw new Error("Missing recovery summary writer")
   const directory = mkdtempSync(join(tmpdir(), "omo-announcement-recovery-"))
@@ -98,7 +138,8 @@ test("#given skipped or cancelled automatic announcement #when recovery runs #th
   writeFileSync(summary, "")
   try {
     const result = spawnSync("bash", ["-c", step.run], {
-      encoding: "utf8", timeout: 5000,
+      encoding: "utf8",
+      timeout: 5000,
       env: { ...process.env, RELEASE_TAG: "v5.1.29", GITHUB_STEP_SUMMARY: summary },
     })
     expect(result.status).toBe(0)

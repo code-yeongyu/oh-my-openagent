@@ -76,7 +76,9 @@ describe("package extension inheritance", () => {
     const list = spyOn(DefaultPackageManager.prototype, "listConfiguredPackages")
     try {
       const runtime = new TaskRuntimeContext(cwd)
-      runtime.captureFrom({ loadedExtensionPaths: ["/installed/omo/plugin/extensions/omo.js", "/agent/extensions/local.ts"] })
+      runtime.captureFrom({
+        loadedExtensionPaths: ["/installed/omo/plugin/extensions/omo.js", "/agent/extensions/local.ts"],
+      })
       const runner = DEFAULT_RUNNER_FACTORIES.process({
         runtime,
         sharedParentTools: () => [],
@@ -95,7 +97,9 @@ describe("package extension inheritance", () => {
       await expect(runner.start(spec)).rejects.toBe(stopped)
       expect(list).toHaveBeenCalledTimes(1)
       expect(list.mock.results[0]?.value).toEqual([])
-      list.mockImplementation(() => { throw new Error("package discovery unavailable") })
+      list.mockImplementation(() => {
+        throw new Error("package discovery unavailable")
+      })
       await expect(runner.start(spec)).rejects.toBe(stopped)
       expect(list).toHaveBeenCalledTimes(2)
       expect(inherited).toEqual([["/installed/omo/plugin"], ["/installed/omo/plugin"]])
@@ -112,17 +116,23 @@ describe("package extension inheritance", () => {
     process.argv = ["bun", "omo", "-e", "/installed/omo/plugin", "-e", "/explicit.ts"]
     const stopped = new Error("stop before spawning")
     let inherited: readonly string[] = []
-    const start = spyOn(RpcProcessRunner.prototype, "start").mockImplementation(function (this: RpcProcessRunner, spec) {
+    const start = spyOn(RpcProcessRunner.prototype, "start").mockImplementation(function (
+      this: RpcProcessRunner,
+      spec,
+    ) {
       inherited = spec.extensions ?? this["inheritedExtensions"]
       return Promise.reject(stopped)
     })
     try {
       const runtime = new TaskRuntimeContext("/project")
-      const live = { loadedExtensionPaths: [
-        "/installed/omo/plugin/extensions/omo.js",
-        "/installed/provider/extensions/index.ts",
-        "/agent/extensions/local.ts",
-      ], cwd: "/project" }
+      const live = {
+        loadedExtensionPaths: [
+          "/installed/omo/plugin/extensions/omo.js",
+          "/installed/provider/extensions/index.ts",
+          "/agent/extensions/local.ts",
+        ],
+        cwd: "/project",
+      }
       runtime.captureFrom(live)
       const build = {
         runtime,
@@ -131,20 +141,18 @@ describe("package extension inheritance", () => {
         listInstalledPackageRoots: () => ["/installed/omo", "/installed/provider"],
       }
       const runner = DEFAULT_RUNNER_FACTORIES.process(build)
-      await expect(runner.start({
-        taskId: "st_package",
-        cwd: "/project",
-        stateDir: "/state",
-        prompt: "test",
-        depth: 1,
-        parentSessionId: "parent",
-        rootSessionId: "parent",
-      })).rejects.toBe(stopped)
-      expect(inherited).toEqual([
-        "/installed/omo/plugin",
-        "/explicit.ts",
-        "/installed/provider/extensions/index.ts",
-      ])
+      await expect(
+        runner.start({
+          taskId: "st_package",
+          cwd: "/project",
+          stateDir: "/state",
+          prompt: "test",
+          depth: 1,
+          parentSessionId: "parent",
+          rootSessionId: "parent",
+        }),
+      ).rejects.toBe(stopped)
+      expect(inherited).toEqual(["/installed/omo/plugin", "/explicit.ts", "/installed/provider/extensions/index.ts"])
     } finally {
       start.mockRestore()
       process.argv = originalArgv
@@ -156,7 +164,10 @@ describe("package extension inheritance", () => {
     process.argv = ["bun", "omo", "-e", "/installed/omo/plugin"]
     const stopped = new Error("stop before spawning")
     let inherited: readonly string[] = []
-    const start = spyOn(RpcProcessRunner.prototype, "start").mockImplementation(function (this: RpcProcessRunner, spec) {
+    const start = spyOn(RpcProcessRunner.prototype, "start").mockImplementation(function (
+      this: RpcProcessRunner,
+      spec,
+    ) {
       inherited = spec.extensions ?? this["inheritedExtensions"]
       return Promise.reject(stopped)
     })
@@ -171,15 +182,17 @@ describe("package extension inheritance", () => {
       const runner = DEFAULT_RUNNER_FACTORIES.process(build)
       const live = { cwd: "/project", loadedExtensionPaths: ["/installed/provider/extensions/index.ts"] }
       runtime.captureFrom(live)
-      await expect(runner.start({
-        taskId: "st_package",
-        cwd: "/project",
-        stateDir: "/state",
-        prompt: "test",
-        depth: 1,
-        parentSessionId: "parent",
-        rootSessionId: "parent",
-      })).rejects.toBe(stopped)
+      await expect(
+        runner.start({
+          taskId: "st_package",
+          cwd: "/project",
+          stateDir: "/state",
+          prompt: "test",
+          depth: 1,
+          parentSessionId: "parent",
+          rootSessionId: "parent",
+        }),
+      ).rejects.toBe(stopped)
       expect(inherited).toEqual(["/installed/omo/plugin", "/installed/provider/extensions/index.ts"])
     } finally {
       start.mockRestore()
@@ -195,11 +208,15 @@ describe("package extension inheritance", () => {
       const instances = new Set<RpcHostRunner | RpcProcessRunner>()
       const inherited: (readonly string[])[] = []
       const prototype = processRunner === "host" ? RpcHostRunner.prototype : RpcProcessRunner.prototype
-      const start = spyOn(prototype, "start").mockImplementation(function (this: RpcHostRunner | RpcProcessRunner, spec) {
+      const start = spyOn(prototype, "start").mockImplementation(function (
+        this: RpcHostRunner | RpcProcessRunner,
+        spec,
+      ) {
         instances.add(this)
-        inherited.push(spec.extensions ?? (this instanceof RpcHostRunner
-          ? this["inheritedExtensions"]
-          : this["inheritedExtensions"]))
+        inherited.push(
+          spec.extensions ??
+            (this instanceof RpcHostRunner ? this["inheritedExtensions"] : this["inheritedExtensions"]),
+        )
         return Promise.reject(stopped)
       })
       try {

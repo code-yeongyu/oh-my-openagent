@@ -20,9 +20,7 @@ async function fixture() {
   return { dir, repo }
 }
 
-function batch(records = [
-  { scope: "project" as const, text: "Uses Bun.", date: "2026-08-10" },
-]): FactsBatch {
+function batch(records = [{ scope: "project" as const, text: "Uses Bun.", date: "2026-08-10" }]): FactsBatch {
   return { batchId: "11111111-1111-4111-8111-111111111111", records }
 }
 
@@ -107,14 +105,20 @@ describe("facts path-state recovery ownership", () => {
 
   test("rejects a foreign creation injected after bulk validation and before mutation", async () => {
     const { dir, repo } = await fixture()
-    const recovery = await planFactsMutation(repo, batch([
-      { scope: "project", text: "August.", date: "2026-08-10" },
-      { scope: "project", text: "September.", date: "2026-09-01" },
-    ]), undefined)
+    const recovery = await planFactsMutation(
+      repo,
+      batch([
+        { scope: "project", text: "August.", date: "2026-08-10" },
+        { scope: "project", text: "September.", date: "2026-09-01" },
+      ]),
+      undefined,
+    )
     const paths = recovery.paths.map((entry) => entry.path)
     const foreignPath = paths[0]!
     const originalCaptureAll = repo.pathState.captureAll.bind(repo.pathState)
-    const indexBefore = new Map(paths.map((path) => [path, recovery.paths.find((entry) => entry.path === path)!.pre.index]))
+    const indexBefore = new Map(
+      paths.map((path) => [path, recovery.paths.find((entry) => entry.path === path)!.pre.index]),
+    )
     repo.pathState.captureAll = async (requested) => {
       repo.pathState.captureAll = originalCaptureAll
       const captured = await originalCaptureAll(requested)
@@ -128,18 +132,23 @@ describe("facts path-state recovery ownership", () => {
     expect(result.outcome).toBe("parent_dirty")
     expect(await readFile(join(dir, foreignPath), "utf8")).toBe("foreign after validation\n")
     for (const path of paths) expect((await repo.pathState.capture(path)).index).toEqual(indexBefore.get(path) ?? null)
-    for (const path of paths.slice(1)) expect(await repo.pathState.capture(path)).toEqual(
-      recovery.paths.find((entry) => entry.path === path)!.pre,
+    for (const path of paths.slice(1))
+      expect(await repo.pathState.capture(path)).toEqual(recovery.paths.find((entry) => entry.path === path)!.pre)
+    expect((await repo.log()).filter((commit) => commit.trailers["Omo-Facts-Batch"] === recovery.batchId)).toHaveLength(
+      0,
     )
-    expect((await repo.log()).filter((commit) => commit.trailers["Omo-Facts-Batch"] === recovery.batchId)).toHaveLength(0)
   }, 30_000)
 
   test("preserves every path when one member of a multi-path batch is foreign", async () => {
     const { dir, repo } = await fixture()
-    const recovery = await planFactsMutation(repo, batch([
-      { scope: "project", text: "August.", date: "2026-08-10" },
-      { scope: "project", text: "September.", date: "2026-09-01" },
-    ]), undefined)
+    const recovery = await planFactsMutation(
+      repo,
+      batch([
+        { scope: "project", text: "August.", date: "2026-08-10" },
+        { scope: "project", text: "September.", date: "2026-09-01" },
+      ]),
+      undefined,
+    )
     const foreign = recovery.paths[1]!.path
     await mkdir(dirname(join(dir, foreign)), { recursive: true })
     await writeFile(join(dir, foreign), "foreign\n")
@@ -151,10 +160,14 @@ describe("facts path-state recovery ownership", () => {
 
   test("restores owned partial pre/post residue and commits the exact recorded post state", async () => {
     const { repo } = await fixture()
-    const recovery = await planFactsMutation(repo, batch([
-      { scope: "project", text: "August.", date: "2026-08-10" },
-      { scope: "project", text: "September.", date: "2026-09-01" },
-    ]), undefined)
+    const recovery = await planFactsMutation(
+      repo,
+      batch([
+        { scope: "project", text: "August.", date: "2026-08-10" },
+        { scope: "project", text: "September.", date: "2026-09-01" },
+      ]),
+      undefined,
+    )
     const first = recovery.paths[0]!
     await repo.pathState.setIndex(first.path, first.post.index)
     await repo.pathState.writeWorktree(first.path, first.post.worktree)

@@ -55,9 +55,7 @@ export async function readProcessStream(stream: ProcessReadableStream): Promise<
   }
 
   // #3919: Buffer-concat avoids Response(stream).text() crashes in Windows utility processes.
-  const chunks = isWebReadableStream(stream)
-    ? await readWebStream(stream)
-    : await readNodeStream(stream)
+  const chunks = isWebReadableStream(stream) ? await readWebStream(stream) : await readNodeStream(stream)
 
   return Buffer.concat(chunks).toString("utf8")
 }

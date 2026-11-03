@@ -72,8 +72,9 @@ export function updateTarget(
   const bunInstall = normalizedRoot.endsWith(BUN_GLOBAL_PACKAGE_SUFFIX)
     ? normalizedRoot.slice(0, -BUN_GLOBAL_PACKAGE_SUFFIX.length)
     : undefined
-  const isLegacyBunGlobal = normalizedRoot === `${normalizedHome}/node_modules/omo-ai`
-    && (exists(join(homeDir, "bun.lock")) || exists(join(homeDir, "bun.lockb")))
+  const isLegacyBunGlobal =
+    normalizedRoot === `${normalizedHome}/node_modules/omo-ai` &&
+    (exists(join(homeDir, "bun.lock")) || exists(join(homeDir, "bun.lockb")))
   if (bunInstall !== undefined || isLegacyBunGlobal) {
     // `--cwd` into this package dir does not retarget `bun add -g`; bun still installs into
     // `$BUN_INSTALL/install/global` (or `~/.bun` when that env is unset). The prefix is the
@@ -102,7 +103,9 @@ export function resolveSenpi(options = {}) {
   try {
     indexPath = resolveIndex()
   } catch (error) {
-    throw new Error(`could not resolve @code-yeongyu/senpi; reinstall with: ${updateTarget().command} (${error.message})`)
+    throw new Error(
+      `could not resolve @code-yeongyu/senpi; reinstall with: ${updateTarget().command} (${error.message})`,
+    )
   }
 
   const distDir = dirname(indexPath)
@@ -122,9 +125,10 @@ export function resolveSenpi(options = {}) {
   // checking it here turns the engine's raw ERR_MODULE_NOT_FOUND stack into one actionable line.
   const brandPath = join(distDir, "core", "brand.js")
   if (!existsSync(brandPath)) {
-    const windowsHint = platform === "win32"
-      ? " (close every running omo/senpi process first: Windows locks loaded native modules, so npm fails with EBUSY mid-upgrade and leaves exactly this partial state)"
-      : ""
+    const windowsHint =
+      platform === "win32"
+        ? " (close every running omo/senpi process first: Windows locks loaded native modules, so npm fails with EBUSY mid-upgrade and leaves exactly this partial state)"
+        : ""
     throw new Error(
       `senpi engine files are incomplete: ${brandPath} is missing, which usually means an interrupted or failed omo-ai upgrade; reinstall with: ${updateTarget().command}${windowsHint}`,
     )
@@ -137,10 +141,14 @@ export function nearestNodeBin(startPath) {
   // whose .bin is a sibling, not a child - starting the climb inside node_modules would walk to the
   // filesystem root and never find it. For unscoped packages begin at the package's parent; for
   // scoped packages (…/node_modules/@scope/package), begin at the parent of node_modules instead.
-  let current = basename(startPath) === "node_modules" ? dirname(startPath)
-    : basename(dirname(startPath)) === "node_modules" ? dirname(dirname(startPath))
-    : basename(dirname(dirname(startPath))) === "node_modules" ? dirname(dirname(dirname(startPath)))
-    : startPath
+  let current =
+    basename(startPath) === "node_modules"
+      ? dirname(startPath)
+      : basename(dirname(startPath)) === "node_modules"
+        ? dirname(dirname(startPath))
+        : basename(dirname(dirname(startPath))) === "node_modules"
+          ? dirname(dirname(dirname(startPath)))
+          : startPath
   const root = parse(current).root
   while (true) {
     const candidate = join(current, "node_modules", ".bin")

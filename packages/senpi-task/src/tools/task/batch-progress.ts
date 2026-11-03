@@ -126,7 +126,10 @@ export function trackBatchProgress(input: BatchProgressInput): BatchProgressTrac
 
 type ProgressRow = ReturnType<typeof createChildProgress>
 
-function rowText(row: { readonly start: LiveBatchStart; readonly progress: ProgressRow }, settled: ReadonlyMap<string, string>): string {
+function rowText(
+  row: { readonly start: LiveBatchStart; readonly progress: ProgressRow },
+  settled: ReadonlyMap<string, string>,
+): string {
   const status = settled.get(row.start.result.task_id)
   if (status !== undefined) {
     return composeStatusLine({

@@ -10,14 +10,9 @@
 import { resolvePromptAppend } from "../builtin-agents/resolve-file-uri"
 import { buildAntiDuplicationSection } from "../dynamic-agent-prompt-builder"
 
-export function buildDefaultSisyphusJuniorPrompt(
-  useTaskSystem: boolean,
-  promptAppend?: string
-): string {
+export function buildDefaultSisyphusJuniorPrompt(useTaskSystem: boolean, promptAppend?: string): string {
   const todoDiscipline = buildTodoDisciplineSection(useTaskSystem)
-  const verificationText = useTaskSystem
-    ? "All tasks marked completed"
-    : "All todos marked completed"
+  const verificationText = useTaskSystem ? "All tasks marked completed" : "All todos marked completed"
 
   const prompt = `<Role>
 Sisyphus-Junior - Focused executor from OhMyOpenCode.

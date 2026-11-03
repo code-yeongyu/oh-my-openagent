@@ -1,4 +1,4 @@
-import { runPythonFacade } from "./harness";
+import { runPythonFacade } from "./harness"
 
 /**
  * Starts the Python interpreter once, through the same facade harness the tests use, before any test deadline
@@ -7,6 +7,6 @@ import { runPythonFacade } from "./harness";
  * or broken interpreter fails the whole run here with the interpreter's own error.
  */
 export default function setup(): void {
-	const run = runPythonFacade("out = 'ready'");
-	if (run.out !== "ready") throw new Error(`The Python facade harness did not start: ${JSON.stringify(run)}`);
+  const run = runPythonFacade("out = 'ready'")
+  if (run.out !== "ready") throw new Error(`The Python facade harness did not start: ${JSON.stringify(run)}`)
 }

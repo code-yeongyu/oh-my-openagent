@@ -1,11 +1,5 @@
 import { log } from "../../shared/logger"
-import {
-  findUnpairedToolParts,
-  getToolCallID,
-  getToolStatus,
-  isTerminalToolStatus,
-  toRecord,
-} from "./tool-part-ids"
+import { findUnpairedToolParts, getToolCallID, getToolStatus, isTerminalToolStatus, toRecord } from "./tool-part-ids"
 import type { MessageWithParts, TransformMessageInfo, TransformPart, UnpairedToolPart } from "./types"
 
 export const INTERRUPTED_TOOL_ERROR = "[Tool execution was interrupted before it produced output]"

@@ -1,10 +1,7 @@
 /// <reference path="../../../bun-test.d.ts" />
 import { afterEach, describe, expect, test } from "bun:test"
 
-import {
-  createInternalAgentContinuationTextPart,
-  createInternalAgentTextPart,
-} from "./internal-initiator-marker"
+import { createInternalAgentContinuationTextPart, createInternalAgentTextPart } from "./internal-initiator-marker"
 import {
   _setPromptGateMessagesFetchTimeoutMsForTesting,
   dispatchInternalPrompt,

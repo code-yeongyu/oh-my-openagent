@@ -208,14 +208,12 @@ describe("buildPowerShellCommand", () => {
 
 describe("runRgFiles", () => {
   it("#given empty stdout #when rg exits successfully #then returns an empty result", async () => {
-    const spawnMock = mock((_command: string[], _options?: SpawnOptions): SpawnedProcess =>
-      createSpawnedProcess(0)
-    )
+    const spawnMock = mock((_command: string[], _options?: SpawnOptions): SpawnedProcess => createSpawnedProcess(0))
 
     const result = await runRgFiles(
       { pattern: "*.ts", paths: ["."], timeout: 1000 },
       { path: "rg", backend: "rg" },
-      spawnMock
+      spawnMock,
     )
 
     expect(result).toEqual({

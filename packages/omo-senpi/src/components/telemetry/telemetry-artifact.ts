@@ -44,17 +44,40 @@ export const SEMCONV_MAP_SHA256 = createHash("sha256").update(canonicalJson(SEMC
  * already define, so the generator refuses.
  */
 const CONVENTION_NAMES: ReadonlySet<string> = new Set([
-  "$os", "$os_version", "os", "os_type", "os_version", "arch", "host_arch", "$session_id", "session_id",
-  "event_id", "service_name", "service_version", "package_version", "install_hash", "provider_name",
-  "operation_name", "request_model", "response_model", "error_type", "http_method", "status_code", "url",
-  "user_id", "thread_id", "exit_code",
+  "$os",
+  "$os_version",
+  "os",
+  "os_type",
+  "os_version",
+  "arch",
+  "host_arch",
+  "$session_id",
+  "session_id",
+  "event_id",
+  "service_name",
+  "service_version",
+  "package_version",
+  "install_hash",
+  "provider_name",
+  "operation_name",
+  "request_model",
+  "response_model",
+  "error_type",
+  "http_method",
+  "status_code",
+  "url",
+  "user_id",
+  "thread_id",
+  "exit_code",
 ])
 
 /**
  * Where each common (shared-block) property travels on the wire. `resource`: the Resource carries it;
  * `record`: every record carries it; `relay`: the PostHog relay adds it, the wire never does.
  */
-const COMMON_PROPERTY_PLACEMENT: Readonly<Record<keyof typeof OMO_NATIVE_COMMON_PROPERTY_SCHEMAS, "resource" | "record" | "relay">> = {
+const COMMON_PROPERTY_PLACEMENT: Readonly<
+  Record<keyof typeof OMO_NATIVE_COMMON_PROPERTY_SCHEMAS, "resource" | "record" | "relay">
+> = {
   $process_person_profile: "relay",
   ci: "resource",
   event_id: "record",
@@ -80,7 +103,9 @@ const EVENT_SCOPED_KEYS: Readonly<Record<string, ReadonlySet<string>>> = {
 }
 
 /** PostHog properties that are derived from a wire attribute rather than sent (D-P: cost_usd). */
-const DERIVED_PROPERTIES: Readonly<Record<string, { readonly from: string; readonly divide_by: number; readonly events: ReadonlySet<string> }>> = {
+const DERIVED_PROPERTIES: Readonly<
+  Record<string, { readonly from: string; readonly divide_by: number; readonly events: ReadonlySet<string> }>
+> = {
   cost_usd: { from: "omo.cost.usd_1e4", divide_by: 10_000, events: new Set(["turn_completed", "session_summary"]) },
 }
 
@@ -133,7 +158,10 @@ function wireValues(table: string): string[] {
  * names one for this property and event, else `omo.` + the bare name. Throws when the name has a
  * convention the map does not cover.
  */
-export function wireKeyOf(event: string, property: string): { readonly key: string; readonly location: SemconvKey["location"] } {
+export function wireKeyOf(
+  event: string,
+  property: string,
+): { readonly key: string; readonly location: SemconvKey["location"] } {
   const mapped = SEMCONV_MAP.keys.find((entry) => entry.posthog_name === property)
   if (mapped !== undefined) {
     const scope = EVENT_SCOPED_KEYS[mapped.wire_key]
@@ -144,10 +172,17 @@ export function wireKeyOf(event: string, property: string): { readonly key: stri
   return { key: `omo.${OTEL_NAME_OVERRIDES[property] ?? property}`, location: "record" }
 }
 
-function attribute(owner: string, property: string, schema: OmoNativePropertySchema, required: boolean): ArtifactAttribute {
+function attribute(
+  owner: string,
+  property: string,
+  schema: OmoNativePropertySchema,
+  required: boolean,
+): ArtifactAttribute {
   const constraint: PropertyConstraint | undefined = propertyConstraint(property, schema)
   if (constraint === undefined) {
-    throw new Error(`${owner}.${property}: string property without values or pattern; declare it in event-schema-constraints.ts`)
+    throw new Error(
+      `${owner}.${property}: string property without values or pattern; declare it in event-schema-constraints.ts`,
+    )
   }
   return { type: schema.type, ...constraint, required, posthog_name: OTEL_NAME_OVERRIDES[property] ?? property }
 }
@@ -156,7 +191,10 @@ function sortedObject<T>(entries: Iterable<readonly [string, T]>): Record<string
   return Object.fromEntries([...entries].sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0)))
 }
 
-function eventAttributes(event: string, properties: Readonly<Record<string, OmoNativePropertySchema>>): {
+function eventAttributes(
+  event: string,
+  properties: Readonly<Record<string, OmoNativePropertySchema>>,
+): {
   readonly attributes: AttributeMap
   readonly projection: Record<string, string>
 } {
@@ -169,7 +207,10 @@ function eventAttributes(event: string, properties: Readonly<Record<string, OmoN
     const derived = DERIVED_PROPERTIES[property]
     if (derived !== undefined && derived.events.has(event)) {
       // The OTel wire carries the cost as an integer (rule.from); the relay derives the PostHog value (derived_properties).
-      attributes.push([derived.from, { type: "number", integer: true, min: 0, max: 1e10, required: isPropertyRequired(event, property) }])
+      attributes.push([
+        derived.from,
+        { type: "number", integer: true, min: 0, max: 1e10, required: isPropertyRequired(event, property) },
+      ])
       continue
     }
     const wire = wireKeyOf(event, property)
@@ -183,7 +224,10 @@ function eventAttributes(event: string, properties: Readonly<Record<string, OmoN
   if (event === "turn_completed") {
     attributes.push(...turnGenAiAttributes())
     // OTel-only (the session-role slice): which session a turn ran in; optional, closed vocabulary.
-    attributes.push(["omo.session.role", { type: "string", values: [...TELEMETRY_SESSION_ROLES], required: false, posthog_name: "session_role" }])
+    attributes.push([
+      "omo.session.role",
+      { type: "string", values: [...TELEMETRY_SESSION_ROLES], required: false, posthog_name: "session_role" },
+    ])
   }
   return { attributes: sortedObject(attributes), projection: sortedObject(Object.entries(projection)) }
 }
@@ -192,8 +236,14 @@ function eventAttributes(event: string, properties: Readonly<Record<string, OmoN
 function turnGenAiAttributes(): [string, ArtifactAttribute][] {
   return [
     ["gen_ai.provider.name", { type: "string", values: wireValues("gen_ai.provider.name"), required: true }],
-    ["gen_ai.request.model", { type: "string", values: MODEL_VALUES, required: false, posthog_name: "request_model_id" }],
-    ["gen_ai.response.model", { type: "string", values: MODEL_VALUES, required: false, posthog_name: "response_model_id" }],
+    [
+      "gen_ai.request.model",
+      { type: "string", values: MODEL_VALUES, required: false, posthog_name: "request_model_id" },
+    ],
+    [
+      "gen_ai.response.model",
+      { type: "string", values: MODEL_VALUES, required: false, posthog_name: "response_model_id" },
+    ],
   ]
 }
 

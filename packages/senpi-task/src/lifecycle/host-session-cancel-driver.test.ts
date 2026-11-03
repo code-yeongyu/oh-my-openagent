@@ -14,9 +14,13 @@ describe("the host-session cancel driver", () => {
   test("#given the named generation exits during the first backoff #when the driver retries #then the child is cancelled and the stop settles once", async () => {
     // given
     let harnessView: { present: boolean } | undefined
-    const harness = cancelHarness({ taskId: "st_0d000001", deferredRetryBackoffMs: [10, 20], onWait: () => {
-      if (harnessView !== undefined) harnessView.present = false
-    } })
+    const harness = cancelHarness({
+      taskId: "st_0d000001",
+      deferredRetryBackoffMs: [10, 20],
+      onWait: () => {
+        if (harnessView !== undefined) harnessView.present = false
+      },
+    })
     harnessView = harness.view
     const destroyed = harness.nextEvent("destroyed")
 
@@ -51,8 +55,18 @@ describe("the host-session cancel driver", () => {
   })
 
   for (const [exit, act] of [
-    ["the parent session shuts down", (harness: ReturnType<typeof cancelHarness>) => { void harness.lifecycle.suspendOnSessionShutdown({ parentSessionId: "parent-1", reason: "quit" }) }],
-    ["another entrant finished the cancel", (harness: ReturnType<typeof cancelHarness>) => { harness.store.transition("st_0d000003", { type: "cancel", timestamp: "2026-10-29T00:00:00.000Z" }) }],
+    [
+      "the parent session shuts down",
+      (harness: ReturnType<typeof cancelHarness>) => {
+        void harness.lifecycle.suspendOnSessionShutdown({ parentSessionId: "parent-1", reason: "quit" })
+      },
+    ],
+    [
+      "another entrant finished the cancel",
+      (harness: ReturnType<typeof cancelHarness>) => {
+        harness.store.transition("st_0d000003", { type: "cancel", timestamp: "2026-10-29T00:00:00.000Z" })
+      },
+    ],
     ["the record is gone", (harness: ReturnType<typeof cancelHarness>) => harness.store.remove("st_0d000003")],
   ] as const) {
     test(`#given ${exit} during a backoff #when the wait ends #then the driver stops and settles the stop once`, async () => {
@@ -78,10 +92,17 @@ describe("the host-session cancel driver", () => {
     // given
     const never = new Promise<void>(() => undefined)
     let closes = 0
-    const harness = cancelHarness({ taskId: "st_0d000004", deferredRetryBackoffMs: [10, 20], deps: { hostCloseTimeoutMs: 0, hostSessionClose: () => {
-      closes += 1
-      return never
-    } } })
+    const harness = cancelHarness({
+      taskId: "st_0d000004",
+      deferredRetryBackoffMs: [10, 20],
+      deps: {
+        hostCloseTimeoutMs: 0,
+        hostSessionClose: () => {
+          closes += 1
+          return never
+        },
+      },
+    })
     harness.fixture.daemon.hold(harness.record.host_session?.session_path ?? "")
     const settled = harness.nextSettlement()
 
@@ -99,7 +120,11 @@ describe("the host-session cancel driver", () => {
   test("#given a close that answers only after the backoff ran out #when it answers #then the cancel finishes in-process with one close event and no second settlement", async () => {
     // given
     const answer = Promise.withResolvers<void>()
-    const harness = cancelHarness({ taskId: "st_0d000005", deferredRetryBackoffMs: [10], deps: { hostCloseTimeoutMs: 0, hostSessionClose: () => answer.promise } })
+    const harness = cancelHarness({
+      taskId: "st_0d000005",
+      deferredRetryBackoffMs: [10],
+      deps: { hostCloseTimeoutMs: 0, hostSessionClose: () => answer.promise },
+    })
     harness.fixture.daemon.hold(harness.record.host_session?.session_path ?? "")
     const settled = harness.nextSettlement()
     await harness.engine.cancelTask("st_0d000005")

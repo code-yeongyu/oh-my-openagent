@@ -29,17 +29,27 @@ describe("classifyJudgeTurn", () => {
   })
 
   test("#given a different settled error after an accepted nudge #when classified #then the judge turn still fails", () => {
-    expect(classifyJudgeTurn({
-      status: "error",
-      failure: { kind: "child-turn-failed", message: "provider exploded" },
-    }, ONE_NUDGE)).toEqual({ status: "failed", cause: "child_failed", reason: "provider exploded" })
+    expect(
+      classifyJudgeTurn(
+        {
+          status: "error",
+          failure: { kind: "child-turn-failed", message: "provider exploded" },
+        },
+        ONE_NUDGE,
+      ),
+    ).toEqual({ status: "failed", cause: "child_failed", reason: "provider exploded" })
   })
 
   test("#given an error outcome with a multi-line provider message #when classified #then failed/child_failed carries the single-line normalized reason", () => {
-    expect(classifyJudgeTurn({
-      status: "error",
-      failure: { kind: "child-turn-failed", message: "provider\nfailed\twhile judging" },
-    }, NO_NUDGES)).toEqual({ status: "failed", cause: "child_failed", reason: "providerfailedwhile judging" })
+    expect(
+      classifyJudgeTurn(
+        {
+          status: "error",
+          failure: { kind: "child-turn-failed", message: "provider\nfailed\twhile judging" },
+        },
+        NO_NUDGES,
+      ),
+    ).toEqual({ status: "failed", cause: "child_failed", reason: "providerfailedwhile judging" })
   })
 
   test("#given an error outcome whose message is upstream-shaped #when classified #then failed/child_failed_upstream carries the sanitized reason", () => {
@@ -47,8 +57,11 @@ describe("classifyJudgeTurn", () => {
     const message = "OpenAI API error (503): auth_unavailable (model gpt-5.6-luna, server_is_overloaded)"
 
     // when / then
-    expect(classifyJudgeTurn({ status: "error", failure: { kind: "child-turn-failed", message } }, NO_NUDGES))
-      .toEqual({ status: "failed", cause: "child_failed_upstream", reason: message })
+    expect(classifyJudgeTurn({ status: "error", failure: { kind: "child-turn-failed", message } }, NO_NUDGES)).toEqual({
+      status: "failed",
+      cause: "child_failed_upstream",
+      reason: message,
+    })
   })
 
   test("#given a cancelled outcome #when classified #then the judge turn is dropped as cancelled", () => {

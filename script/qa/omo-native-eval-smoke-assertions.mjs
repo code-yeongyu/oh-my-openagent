@@ -16,7 +16,9 @@ export function assertEvalLegs(sandbox, result) {
     throw new Error(`missing packaged asset: ${result.stderr.slice(-4000)}`)
   }
   if (results.length !== 9) {
-    throw new Error(`expected js, py, list, sandbox probe, sandbox store, large cell, peek, release, after; got ${results.length}`)
+    throw new Error(
+      `expected js, py, list, sandbox probe, sandbox store, large cell, peek, release, after; got ${results.length}`,
+    )
   }
   const [js, py, list, isolated, stored, large, peek, release, after] = results
   if (!textOf(js).includes("JS_OK 42") || !textOf(js).includes(sandbox.marker)) {
@@ -31,8 +33,12 @@ export function assertEvalLegs(sandbox, result) {
   } catch (error) {
     if (!(error instanceof Error) || error.code !== "ESRCH") throw error
   }
-  if (list.details?.action !== "list" || !["js", "py"].every((language) =>
-    list.details.cells.some((cell) => cell.language === language && cell.state === "completed"))) {
+  if (
+    list.details?.action !== "list" ||
+    !["js", "py"].every((language) =>
+      list.details.cells.some((cell) => cell.language === language && cell.state === "completed"),
+    )
+  ) {
     throw new Error(`cell list receipt missing: ${textOf(list)}`)
   }
   if (processIsolation && js.details?.runtime?.isolation !== "process") {
@@ -44,7 +50,11 @@ export function assertEvalLegs(sandbox, result) {
   }
   // The sandbox cell reports its own runtime, not the persistent kernel's (senpi #2811).
   const sandboxRuntime = isolated.details?.runtime
-  if (sandboxRuntime?.name !== "quickjs" || sandboxRuntime?.isolation !== "sandbox" || typeof sandboxRuntime?.version !== "string") {
+  if (
+    sandboxRuntime?.name !== "quickjs" ||
+    sandboxRuntime?.isolation !== "sandbox" ||
+    typeof sandboxRuntime?.version !== "string"
+  ) {
     throw new Error(`sandbox cell runtime: expected quickjs/sandbox, got ${JSON.stringify(sandboxRuntime)}`)
   }
   // An isolated cell's own error is a settled cell result (status "error"), not a failed tool call.
@@ -60,14 +70,26 @@ export function assertEvalLegs(sandbox, result) {
   }
   const spill = largeCellSpill(sandbox.sessionDir)
   const expected = createHash("sha256").update(LARGE_ITEM).digest("hex")
-  const actual = createHash("sha256").update(spill.match(/x{1024,}/u)?.[0] ?? "").digest("hex")
+  const actual = createHash("sha256")
+    .update(spill.match(/x{1024,}/u)?.[0] ?? "")
+    .digest("hex")
   if (actual !== expected) throw new Error(`large item spill sha256 ${actual} != source ${expected}`)
-  const receipts = readFileSync(sandbox.receiptPath, "utf8").trim().split("\n").map((line) => JSON.parse(line))
+  const receipts = readFileSync(sandbox.receiptPath, "utf8")
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line))
   const reads = receipts.length / 2
-  if (receipts.length !== 4 || [0, 2].some((index) =>
-      receipts[index].kind !== "tool_call" || receipts[index + 1].kind !== "tool_result" ||
-      receipts[index].id !== receipts[index + 1].id || receipts[index + 1].isError ||
-      !JSON.stringify(receipts[index + 1].content).includes(sandbox.marker))) {
+  if (
+    receipts.length !== 4 ||
+    [0, 2].some(
+      (index) =>
+        receipts[index].kind !== "tool_call" ||
+        receipts[index + 1].kind !== "tool_result" ||
+        receipts[index].id !== receipts[index + 1].id ||
+        receipts[index + 1].isError ||
+        !JSON.stringify(receipts[index + 1].content).includes(sandbox.marker),
+    )
+  ) {
     throw new Error(`expected two real host reads (kernel cell, sandbox cell) through before/after hooks, got ${reads}`)
   }
   return [

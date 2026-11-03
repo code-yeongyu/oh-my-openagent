@@ -1,11 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import {
-  applyFailure,
-  clearForRetry,
-  clearOnSuccess,
-  type FactsFailureRecord,
-} from "./failures-backoff"
+import { applyFailure, clearForRetry, clearOnSuccess, type FactsFailureRecord } from "./failures-backoff"
 
 const CONVERSATION = "conversation-alpha"
 const T0 = new Date("2026-08-16T00:00:00.000Z")

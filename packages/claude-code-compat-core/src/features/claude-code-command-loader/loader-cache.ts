@@ -16,16 +16,11 @@ export async function getCommandLoaderCacheKey(directory?: string): Promise<stri
   }
 }
 
-export function getCachedCommands(
-  cacheKey: string,
-): Promise<Record<string, CommandDefinition>> | undefined {
+export function getCachedCommands(cacheKey: string): Promise<Record<string, CommandDefinition>> | undefined {
   return commandLoaderCache.get(cacheKey)
 }
 
-export function setCachedCommands(
-  cacheKey: string,
-  commands: Promise<Record<string, CommandDefinition>>,
-): void {
+export function setCachedCommands(cacheKey: string, commands: Promise<Record<string, CommandDefinition>>): void {
   commandLoaderCache.set(cacheKey, commands)
 }
 

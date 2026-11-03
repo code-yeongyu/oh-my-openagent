@@ -10,7 +10,7 @@ export const TASK_PROMPT_SNIPPET = "Spawn one child or fan out a batch; use task
 export const TASK_PROMPT_GUIDELINES: readonly string[] = [
   "Spawn children with run_in_background=true.",
   "NEVER pass model together with category: category-routed tasks take their model from omo.json (categories.<name>.models).",
-  "Continue an existing child with task_send(to=\"st_...\", message=\"...\"); task always spawns.",
+  'Continue an existing child with task_send(to="st_...", message="..."); task always spawns.',
   "Use task_output for one midpoint status or transcript peek; use task_cancel to end a child.",
   "Pass task_summary (one line, <=80 chars) on every spawn: the user's footer/widget UI shows it instead of the raw prompt, so it should say WHAT was delegated.",
 ]
@@ -22,11 +22,13 @@ type DescriptionInput = {
 
 function renderCategoryList(entries: readonly TaskCategoryInfo[]): string {
   if (entries.length === 0) return "  (none configured)"
-  return entries.map((entry) => {
-    const categoryLine = entry.description ? `  - ${entry.name}: ${entry.description}` : `  - ${entry.name}`
-    const callerGuidance = CATEGORY_CALLER_GUIDANCE[entry.name]?.replaceAll("\n", "\n    ")
-    return callerGuidance ? `${categoryLine}\n    ${callerGuidance}` : categoryLine
-  }).join("\n")
+  return entries
+    .map((entry) => {
+      const categoryLine = entry.description ? `  - ${entry.name}: ${entry.description}` : `  - ${entry.name}`
+      const callerGuidance = CATEGORY_CALLER_GUIDANCE[entry.name]?.replaceAll("\n", "\n    ")
+      return callerGuidance ? `${categoryLine}\n    ${callerGuidance}` : categoryLine
+    })
+    .join("\n")
 }
 
 export function buildTaskToolDescription(input: DescriptionInput): string {

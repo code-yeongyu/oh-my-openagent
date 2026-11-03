@@ -22,11 +22,7 @@ export function createMemoryRunSupervisorIc8ExitResources(waitMs: number) {
     childExitTimeouts.delete(timeout)
   }
 
-  const waitBounded = <T>(
-    signal: Promise<T>,
-    timeoutMs: number,
-    description: string,
-  ): Promise<T> =>
+  const waitBounded = <T>(signal: Promise<T>, timeoutMs: number, description: string): Promise<T> =>
     new Promise<T>((resolve, reject) => {
       const timeout = setTimeout(() => {
         childExitTimeouts.delete(timeout)
@@ -196,8 +192,7 @@ export function createMemoryRunSupervisorIc8ExitResources(waitMs: number) {
     }),
     hasConnectedSockets: () => acceptedSockets.size > 0,
     openServer,
-    trackTimeout: (timeout: ReturnType<typeof setTimeout>) =>
-      childExitTimeouts.add(timeout),
+    trackTimeout: (timeout: ReturnType<typeof setTimeout>) => childExitTimeouts.add(timeout),
     waitBounded,
   }
 }

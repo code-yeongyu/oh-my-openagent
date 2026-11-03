@@ -68,8 +68,9 @@ function release(unsubscribes: readonly (() => void)[]): void {
 /** Registers omo config surfaces with senpi's optional in-process config-watch protocol. */
 export function createConfigWatchComponent(options: ConfigWatchComponentOptions = {}): OmoSenpiComponent {
   const resolveCwd = options.resolveCwd ?? (() => process.cwd())
-  const resolveTargetResolution = options.resolveTargetResolution
-    ?? ((request: { readonly cwd: string }): OmoConfigWatchTargetResolution => {
+  const resolveTargetResolution =
+    options.resolveTargetResolution ??
+    ((request: { readonly cwd: string }): OmoConfigWatchTargetResolution => {
       if (options.resolveTargets === undefined) return resolveOmoConfigWatchTargetResolution(request)
       return {
         targets: options.resolveTargets(request),

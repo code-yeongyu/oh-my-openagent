@@ -5,11 +5,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { unsafeTestValue } from "../../../../test-support/unsafe-test-value"
 import type { OhMyOpenCodeConfig } from "../config"
-import {
-  createBoulderState,
-  readBoulderState,
-  writeBoulderState,
-} from "../features/boulder-state"
+import { createBoulderState, readBoulderState, writeBoulderState } from "../features/boulder-state"
 import type { PluginContext } from "./types"
 import { createChatMessageHandler } from "./chat-message"
 import { createCommandExecuteBeforeHandler } from "./command-execute-before"
@@ -72,26 +68,22 @@ describe("stop continuation entrypoints", () => {
   })
 
   function seedBoulderState(): void {
-    writeBoulderState(
-      testDirectory,
-      createBoulderState(join(testDirectory, "plan.md"), "ses-stop", "atlas"),
-    )
+    writeBoulderState(testDirectory, createBoulderState(join(testDirectory, "plan.md"), "ses-stop", "atlas"))
   }
 
   test("#given active continuations #when native /stop-continuation executes #then every mechanism stops", async () => {
     // given
     const { calls, hooks } = createStopHooks()
     seedBoulderState()
-    const handler = createCommandExecuteBeforeHandler(unsafeTestValue({
-      hooks,
-      directory: testDirectory,
-    }))
+    const handler = createCommandExecuteBeforeHandler(
+      unsafeTestValue({
+        hooks,
+        directory: testDirectory,
+      }),
+    )
 
     // when
-    await handler(
-      { command: "stop-continuation", sessionID: "ses-stop", arguments: "" },
-      { parts: [] },
-    )
+    await handler({ command: "stop-continuation", sessionID: "ses-stop", arguments: "" }, { parts: [] })
 
     // then
     expect(calls.stoppedSessions).toEqual(["ses-stop"])

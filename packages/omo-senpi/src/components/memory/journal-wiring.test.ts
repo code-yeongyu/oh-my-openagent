@@ -4,18 +4,15 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { rmSyncEfaultTolerant } from "./teardown.test-support"
 
-import {
-  buildIdentityPaths,
-  REDACTED_REASONING_TEXT,
-  type MemoryIdentityPaths,
-} from "@oh-my-opencode/memory-core"
+import { buildIdentityPaths, REDACTED_REASONING_TEXT, type MemoryIdentityPaths } from "@oh-my-opencode/memory-core"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createMemoryJournalWiring } from "./journal-wiring"
 
 const roots: string[] = []
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  for (const root of roots.splice(0))
+    rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
 function fixture(): { readonly paths: MemoryIdentityPaths } {
@@ -75,12 +72,7 @@ function assistantEntry(id: string, spec: AssistantSpec): Record<string, unknown
   }
 }
 
-function toolResultEntry(
-  id: string,
-  toolCallId: string,
-  text: string,
-  isError = false,
-): Record<string, unknown> {
+function toolResultEntry(id: string, toolCallId: string, text: string, isError = false): Record<string, unknown> {
   return {
     type: "message",
     id,
@@ -109,10 +101,7 @@ function compactionEntry(id: string): Record<string, unknown> {
   }
 }
 
-function sessionCtx(
-  entries: readonly Record<string, unknown>[],
-  sessionId = "session-alpha",
-): Record<string, unknown> {
+function sessionCtx(entries: readonly Record<string, unknown>[], sessionId = "session-alpha"): Record<string, unknown> {
   return {
     sessionManager: {
       getBranch: () => entries,
@@ -147,15 +136,27 @@ describe("memory journal wiring", () => {
     const journal = wiring.journalFor("session-alpha")
     const rows = await journal.readEntries()
     expect(rows.map((row) => row.kind)).toEqual([
-      "user", "assistant", "user", "assistant", "tool_call", "user", "assistant",
+      "user",
+      "assistant",
+      "user",
+      "assistant",
+      "tool_call",
+      "user",
+      "assistant",
     ])
     expect(rows.map((row) => row.source_line_id)).toEqual([
-      "u1:user", "a1:assistant", "u2:user", "a2:assistant", "a2:tool:c1", "u3:user", "a3:assistant",
+      "u1:user",
+      "a1:assistant",
+      "u2:user",
+      "a2:assistant",
+      "a2:tool:c1",
+      "u3:user",
+      "a3:assistant",
     ])
     expect(rows[4]).toMatchObject({
       kind: "tool_call",
       name: "read",
-      argsText: "{\"path\":\"/tmp/x\"}",
+      argsText: '{"path":"/tmp/x"}',
       resultText: "file body",
       resultOk: true,
     })

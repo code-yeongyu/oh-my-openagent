@@ -80,7 +80,11 @@ const sealStream = async (key: CryptoKey, aad: Uint8Array<ArrayBuffer>, compress
   for (let index = 0; index < count; index += 1) {
     const iv = segmentNonce(index, index === count - 1)
     const slice = compressed.slice(index * SEGMENT, (index + 1) * SEGMENT)
-    segments.push(new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: aad, tagLength: 128 }, key, slice)))
+    segments.push(
+      new Uint8Array(
+        await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: aad, tagLength: 128 }, key, slice),
+      ),
+    )
   }
   return concatBytes(segments)
 }
@@ -105,7 +109,11 @@ export const buildBatch = async (input: BuildBatchInput): Promise<Uint8Array<Arr
     ...(input.chunk === undefined ? {} : { chunk: { index: input.chunk.index, count: input.chunk.count } }),
   }
   const headerBytes = jcsBytes(header)
-  const batchKey = await hkdfSha256(new Uint8Array(input.epochKey), new Uint8Array(input.salt), asciiBytes("omo-sync/v1/batch"))
+  const batchKey = await hkdfSha256(
+    new Uint8Array(input.epochKey),
+    new Uint8Array(input.salt),
+    asciiBytes("omo-sync/v1/batch"),
+  )
   const key = await crypto.subtle.importKey("raw", batchKey, "AES-GCM", false, ["encrypt"])
   const ciphertext = await sealStream(key, await sha256(headerBytes), await deflateRaw(encodePayload(input.records)))
   const preamble = new Uint8Array(10)

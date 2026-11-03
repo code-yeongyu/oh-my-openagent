@@ -26,11 +26,7 @@ export async function linkCachedPluginBins(input: {
   const platform = input.platform ?? process.platform
   await mkdir(input.binDir, { recursive: true })
   await removeLegacyCodexComponentBins(input.binDir, platform)
-  await removeDanglingManagedComponentBins(
-    input.binDir,
-    platform,
-    new Set(binLinks.map((link) => link.name)),
-  )
+  await removeDanglingManagedComponentBins(input.binDir, platform, new Set(binLinks.map((link) => link.name)))
   const linked: Array<{ name: string; path: string; target: string }> = []
   for (const link of binLinks) {
     const linkPath = await linkCachedPluginBin(input.binDir, link, platform)
@@ -72,13 +68,19 @@ export async function linkRootRuntimeBin(input: {
   await mkdir(input.binDir, { recursive: true })
   if (platform === "win32") {
     const linkPath = join(input.binDir, `${binName}.cmd`)
-    await replaceRuntimeWrapper(linkPath, windowsRuntimeWrapper(binName, cliPath, input.codexHome, input.binDir, nodeCliPath))
+    await replaceRuntimeWrapper(
+      linkPath,
+      windowsRuntimeWrapper(binName, cliPath, input.codexHome, input.binDir, nodeCliPath),
+    )
     await removeGeneratedRuntimeWrapper(legacyPath)
     return { name: binName, path: linkPath, target: cliPath }
   }
 
   const linkPath = join(input.binDir, binName)
-  await replaceRuntimeWrapper(linkPath, posixRuntimeWrapper(binName, cliPath, input.codexHome, input.binDir, nodeCliPath))
+  await replaceRuntimeWrapper(
+    linkPath,
+    posixRuntimeWrapper(binName, cliPath, input.codexHome, input.binDir, nodeCliPath),
+  )
   await chmod(linkPath, 0o755)
   await removeGeneratedRuntimeWrapper(legacyPath)
   return { name: binName, path: linkPath, target: cliPath }
@@ -125,7 +127,11 @@ async function discoverPackageBins(root: string): Promise<readonly { name: strin
   return links
 }
 
-async function collectPackageBins(directory: string, root: string, links: Array<{ name: string; target: string }>): Promise<void> {
+async function collectPackageBins(
+  directory: string,
+  root: string,
+  links: Array<{ name: string; target: string }>,
+): Promise<void> {
   const entries = await readdir(directory, { withFileTypes: true })
   if (entries.some((entry) => entry.isFile() && entry.name === "package.json")) {
     await appendPackageBinLinks(join(directory, "package.json"), directory, root, links)
@@ -166,7 +172,14 @@ async function appendPackageBinLinks(
 }
 
 function assertSafeCommandName(name: string): string {
-  if (name.length === 0 || name === "." || name === ".." || name.includes("/") || name.includes("\\") || name.includes("\0")) {
+  if (
+    name.length === 0 ||
+    name === "." ||
+    name === ".." ||
+    name.includes("/") ||
+    name.includes("\\") ||
+    name.includes("\0")
+  ) {
     throw new Error(`Invalid package bin command name: ${name}`)
   }
   return name
@@ -181,7 +194,10 @@ function resolvePackageBinTarget(packageRoot: string, target: string): string {
   const root = resolve(packageRoot)
   const resolvedTarget = resolve(root, target)
   const relativeTarget = relative(root, resolvedTarget)
-  if (relativeTarget === "" || (relativeTarget !== ".." && !relativeTarget.startsWith(`..${sep}`) && !isAbsolute(relativeTarget))) {
+  if (
+    relativeTarget === "" ||
+    (relativeTarget !== ".." && !relativeTarget.startsWith(`..${sep}`) && !isAbsolute(relativeTarget))
+  ) {
     return resolvedTarget
   }
   throw new Error("Package bin target must stay inside package root")
@@ -199,7 +215,8 @@ async function replaceCommandShim(linkPath: string, targetPath: string): Promise
 }
 
 async function replaceRuntimeWrapper(linkPath: string, content: string): Promise<void> {
-  if (await existingNonRuntimeWrapper(linkPath)) throw new Error(`${linkPath} already exists and is not a generated OMO runtime wrapper`)
+  if (await existingNonRuntimeWrapper(linkPath))
+    throw new Error(`${linkPath} already exists and is not a generated OMO runtime wrapper`)
   await rm(linkPath, { force: true })
   await writeFile(linkPath, content)
 }

@@ -8,7 +8,7 @@ import { playWindowsSessionNotificationSound } from "./session-notification-wind
 export async function playSessionNotificationSound(
   ctx: PluginInput,
   platform: Platform,
-  soundPath: string
+  soundPath: string,
 ): Promise<void> {
   try {
     switch (platform) {

@@ -64,12 +64,8 @@ describe("resolveModelReferences", () => {
     // then
     expect(result.view.agents?.oracle?.model).toBe("openai/gpt-5.6-sol")
     expect(result.view.agents?.oracle?.reasoning).toBe("minimal")
-    expect(result.view.agents?.oracle?.models).toEqual([
-      { model: "openai/gpt-5.6-sol", reasoning: "high" },
-    ])
-    expect(result.view.categories?.deep?.fallback_models).toEqual([
-      { model: "openai/gpt-5.6-sol", reasoning: "high" },
-    ])
+    expect(result.view.agents?.oracle?.models).toEqual([{ model: "openai/gpt-5.6-sol", reasoning: "high" }])
+    expect(result.view.categories?.deep?.fallback_models).toEqual([{ model: "openai/gpt-5.6-sol", reasoning: "high" }])
   })
 
   test("#given model names outside the catalog #when resolved #then every name passes through verbatim", () => {

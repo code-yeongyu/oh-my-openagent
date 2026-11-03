@@ -19,10 +19,7 @@ export interface NativeInstallSpawnResult {
   readonly stderr?: string
 }
 
-export type NativeInstallSpawn = (
-  command: string,
-  args: readonly string[],
-) => Promise<NativeInstallSpawnResult>
+export type NativeInstallSpawn = (command: string, args: readonly string[]) => Promise<NativeInstallSpawnResult>
 
 export interface NativeInstallDependencies {
   readonly isBunAvailable: () => boolean | Promise<boolean>
@@ -70,8 +67,7 @@ export async function runNativeInstall(
   notes.push(...repair.notes)
   warnings.push(...repair.warnings)
   const hints = repair.failures.map(
-    (failure) =>
-      `Remove the stale omo command first: ${removeFileCommand(failure.binPath, environment.isWindows)}`,
+    (failure) => `Remove the stale omo command first: ${removeFileCommand(failure.binPath, environment.isWindows)}`,
   )
 
   const failed = (reason: string): NativeInstallOutcome => ({

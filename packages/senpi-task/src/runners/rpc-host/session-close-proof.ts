@@ -16,5 +16,6 @@ export async function confirmHostSessionAbsent(
   // Even a refused or lost acknowledgement may follow an actual close. Query AFTER that attempt.
   const sessions = await client.listSessions({ include_workers: true })
   if (!connected()) throw new HostSessionDetachedError("confirm close_session")
-  if (sessions.some(session => session.sessionId === routingId)) throw closeError ?? new HostSessionUnresponsiveError()
+  if (sessions.some((session) => session.sessionId === routingId))
+    throw closeError ?? new HostSessionUnresponsiveError()
 }

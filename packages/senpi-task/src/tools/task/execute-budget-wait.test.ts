@@ -221,7 +221,7 @@ describe("prompt-cache-safe foreground wait budget", () => {
         return { kind: "started", task_id: taskId, status: "running", name: `item-${startIndex}` }
       },
       waitFor: (taskId) => {
-        const index = BATCH_IDS.indexOf(taskId as typeof BATCH_IDS[number])
+        const index = BATCH_IDS.indexOf(taskId as (typeof BATCH_IDS)[number])
         const wait = waits[index]
         if (wait === undefined) throw new Error(`unexpected task id ${taskId}`)
         waitCalls += 1
@@ -253,7 +253,9 @@ describe("prompt-cache-safe foreground wait budget", () => {
     // when
     expect(budgetReads).toBe(3)
     expect(timer.deadlines.map((deadline) => deadline.delayMs)).toEqual([1_000, 2_000, 3_000])
-    waits[0]?.resolve(makeRecord({ task_id: BATCH_IDS[0], name: "item-1", status: "completed", final_response: "first done" }))
+    waits[0]?.resolve(
+      makeRecord({ task_id: BATCH_IDS[0], name: "item-1", status: "completed", final_response: "first done" }),
+    )
     await Promise.resolve()
     timer.deadlines[1]?.fire()
     timer.deadlines[2]?.fire()

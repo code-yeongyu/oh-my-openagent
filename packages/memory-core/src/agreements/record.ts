@@ -6,7 +6,8 @@ export class AgreementRecordValidationError extends Error {
 }
 
 export function parseAgreementRecord(value: unknown, index: number): AgreementExtractionRecord {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) throw invalid(index, "record must be an object")
+  if (value === null || typeof value !== "object" || Array.isArray(value))
+    throw invalid(index, "record must be an object")
   const record: Record<string, unknown> = { ...value }
   const date = validDate(record.date)
   if (date === undefined) throw invalid(index, "date must be YYYY-MM-DD")
@@ -16,12 +17,14 @@ export function parseAgreementRecord(value: unknown, index: number): AgreementEx
     assertKeys(record, ["action", "applies", "text", "date", "source"], index)
     const text = boundedText(record.text, index)
     if (text === undefined) throw invalid(index, "text must be non-empty")
-    if (record.applies !== "global" && record.applies !== "project") throw invalid(index, "applies must be global or project")
+    if (record.applies !== "global" && record.applies !== "project")
+      throw invalid(index, "applies must be global or project")
     return { action: "new", applies: record.applies, text, date, ...withSource }
   }
   if (record.action !== "reaffirm") throw invalid(index, "action must be new or reaffirm")
   assertKeys(record, ["action", "id", "date", "text", "source"], index)
-  if (typeof record.id !== "string" || !/^[0-9a-f]{10}$/.test(record.id)) throw invalid(index, "id must name an existing agreement")
+  if (typeof record.id !== "string" || !/^[0-9a-f]{10}$/.test(record.id))
+    throw invalid(index, "id must name an existing agreement")
   const text = record.text === undefined ? undefined : boundedText(record.text, index)
   return { action: "reaffirm", id: record.id, date, ...(text === undefined ? {} : { text }), ...withSource }
 }
@@ -32,18 +35,28 @@ export function validateAgreementSource(record: AgreementExtractionRecord, paylo
     return
   }
   const source = record.source
-  if (!payload.entries.some((entry) => entry.sessionId === source.sessionId
-    && entry.entries.some((message) => message.kind === "user" && message.source_message_id === source.messageId))) {
+  if (
+    !payload.entries.some(
+      (entry) =>
+        entry.sessionId === source.sessionId &&
+        entry.entries.some((message) => message.kind === "user" && message.source_message_id === source.messageId),
+    )
+  ) {
     throw invalid(index, "source must identify a user message in the extraction payload, not lead context")
   }
 }
 
 function parseSource(value: unknown, index: number): AgreementSourceEvent {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) throw invalid(index, "source must be an object")
+  if (value === null || typeof value !== "object" || Array.isArray(value))
+    throw invalid(index, "source must be an object")
   const source: Record<string, unknown> = { ...value }
   assertKeys(source, ["sessionId", "messageId"], index)
-  if (typeof source.sessionId !== "string" || source.sessionId.trim().length === 0
-    || typeof source.messageId !== "string" || source.messageId.trim().length === 0) {
+  if (
+    typeof source.sessionId !== "string" ||
+    source.sessionId.trim().length === 0 ||
+    typeof source.messageId !== "string" ||
+    source.messageId.trim().length === 0
+  ) {
     throw invalid(index, "source requires non-empty sessionId and messageId")
   }
   return { sessionId: source.sessionId, messageId: source.messageId }

@@ -20,15 +20,13 @@ export function getServerBasicAuthHeader(): string | undefined {
 
 type UnknownRecord = Record<string, unknown>
 
-
-
 function isRequestFetch(value: unknown): value is (request: Request) => Promise<Response> {
   return typeof value === "function"
 }
 
 function wrapRequestFetch(
   baseFetch: (request: Request) => Promise<Response>,
-  auth: string
+  auth: string,
 ): (request: Request) => Promise<Response> {
   return async (request: Request): Promise<Response> => {
     const headers = new Headers(request.headers)

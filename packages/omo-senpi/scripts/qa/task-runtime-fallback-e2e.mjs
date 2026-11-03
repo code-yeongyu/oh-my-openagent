@@ -43,18 +43,18 @@ const runners = [
   {
     name: "in-process",
     task: { default_execution_mode: "in-process" },
-    runner: (task) => task?.execution_mode === "in-process" ? "PASS" : "FAIL",
+    runner: (task) => (task?.execution_mode === "in-process" ? "PASS" : "FAIL"),
   },
   {
     name: "child-process",
     task: { default_execution_mode: "process", process_runner: "child-process" },
-    runner: (task) => task?.execution_mode === "process" && task?.runner_kind !== "host-session" ? "PASS" : "FAIL",
+    runner: (task) => (task?.execution_mode === "process" && task?.runner_kind !== "host-session" ? "PASS" : "FAIL"),
   },
   {
     name: "host-session",
     task: { default_execution_mode: "process", process_runner: "host" },
     daemon: true,
-    runner: (task) => task?.execution_mode === "process" && task?.runner_kind === "host-session" ? "PASS" : "FAIL",
+    runner: (task) => (task?.execution_mode === "process" && task?.runner_kind === "host-session" ? "PASS" : "FAIL"),
   },
 ]
 
@@ -81,12 +81,11 @@ const scenarios = [
       final_text: stdoutText.includes(finalText) ? "PASS" : "FAIL",
       fallback_event: fallbackRecorded(artifacts.log),
       final_model: artifacts.task?.model === "omo-fallback-healthy/healthy-fallback" ? "PASS" : "FAIL",
-      fallback_attempts: JSON.stringify(
-        artifacts.task?.fallback_attempts?.map((model) => `${model.provider}/${model.model_id}`),
-      ) === JSON.stringify([
-        "omo-fallback-mock/dead-primary",
-        "omo-fallback-healthy/healthy-fallback",
-      ]) ? "PASS" : "FAIL",
+      fallback_attempts:
+        JSON.stringify(artifacts.task?.fallback_attempts?.map((model) => `${model.provider}/${model.model_id}`)) ===
+        JSON.stringify(["omo-fallback-mock/dead-primary", "omo-fallback-healthy/healthy-fallback"])
+          ? "PASS"
+          : "FAIL",
     }),
   },
   {
@@ -96,15 +95,13 @@ const scenarios = [
       final_text: stdoutText.includes(finalText) ? "PASS" : "FAIL",
       fallback_event: fallbackRecorded(artifacts.log),
       final_model: artifacts.task?.model === "deepseek/deepseek-flash" ? "PASS" : "FAIL",
-      requested_model: artifacts.task?.requested_model?.display === "chatgpt-subscription/gpt-6-luna-fast"
-        ? "PASS"
-        : "FAIL",
-      fallback_attempts: JSON.stringify(
-        artifacts.task?.fallback_attempts?.map((model) => `${model.provider}/${model.model_id}`),
-      ) === JSON.stringify([
-        "chatgpt-subscription/gpt-6-luna-fast",
-        "deepseek/deepseek-flash",
-      ]) ? "PASS" : "FAIL",
+      requested_model:
+        artifacts.task?.requested_model?.display === "chatgpt-subscription/gpt-6-luna-fast" ? "PASS" : "FAIL",
+      fallback_attempts:
+        JSON.stringify(artifacts.task?.fallback_attempts?.map((model) => `${model.provider}/${model.model_id}`)) ===
+        JSON.stringify(["chatgpt-subscription/gpt-6-luna-fast", "deepseek/deepseek-flash"])
+          ? "PASS"
+          : "FAIL",
     }),
   },
   // Usage-limit scenarios (#8296): a visual-engineering-shaped chain, two rungs on one account and a
@@ -122,7 +119,11 @@ const scenarios = [
         ["omo-fallback-mock/limit-fable", "omo-fallback-mock/limit-opus", "omo-fallback-other/limit-kimi"],
       ],
     },
-    { name: "limit-model", finalModel: "omo-fallback-mock/limit-opus", attempts: ["omo-fallback-mock/limit-fable", "omo-fallback-mock/limit-opus"] },
+    {
+      name: "limit-model",
+      finalModel: "omo-fallback-mock/limit-opus",
+      attempts: ["omo-fallback-mock/limit-fable", "omo-fallback-mock/limit-opus"],
+    },
   ].map((limit) => ({
     name: limit.name,
     omoConfig: {
@@ -134,10 +135,13 @@ const scenarios = [
       },
     },
     checks: (artifacts, stdoutText) => {
-      const attempts = JSON.stringify(artifacts.task?.fallback_attempts?.map((model) => `${model.provider}/${model.model_id}`))
-      const accepted = artifacts.task?.execution_mode === "in-process" && limit.senpiOwnedAttempts !== undefined
-        ? limit.senpiOwnedAttempts
-        : [limit.attempts]
+      const attempts = JSON.stringify(
+        artifacts.task?.fallback_attempts?.map((model) => `${model.provider}/${model.model_id}`),
+      )
+      const accepted =
+        artifacts.task?.execution_mode === "in-process" && limit.senpiOwnedAttempts !== undefined
+          ? limit.senpiOwnedAttempts
+          : [limit.attempts]
       return {
         final_text: stdoutText.includes(finalText) ? "PASS" : "FAIL",
         fallback_event: fallbackRecorded(artifacts.log),
@@ -153,7 +157,11 @@ const scenarios = [
   // engine's pre-retry compaction runs on the spent model first; the child must still reach its fallback.
   ...[
     { name: "limit-after-tool", model: "omo-fallback-mock/limit-after-tool", tool: "limit-after-tool-ran" },
-    { name: "limit-near-compaction", model: "omo-fallback-mock/limit-near-compaction", tool: "limit-near-compaction-ran" },
+    {
+      name: "limit-near-compaction",
+      model: "omo-fallback-mock/limit-near-compaction",
+      tool: "limit-near-compaction-ran",
+    },
   ].map((turn) => ({
     name: turn.name,
     omoConfig: {
@@ -170,9 +178,10 @@ const scenarios = [
       // The task event log records each finished tool call as `tool_execution`; the hop must come after it.
       tool_ran_before_limit: /"type":"tool_execution","payload":\{"tool":"bash"/.test(artifacts.log) ? "PASS" : "FAIL",
       final_model: artifacts.task?.model === "omo-fallback-healthy/healthy-fallback" ? "PASS" : "FAIL",
-      settings_byte_identical: artifacts.settingsBefore !== undefined && artifacts.settingsBefore === artifacts.settingsAfter
-        ? "PASS"
-        : "FAIL",
+      settings_byte_identical:
+        artifacts.settingsBefore !== undefined && artifacts.settingsBefore === artifacts.settingsAfter
+          ? "PASS"
+          : "FAIL",
     }),
   })),
   // #12006 / #11781: every model the child's category names is spent while the parent session runs on another,
@@ -182,28 +191,40 @@ const scenarios = [
   // child's engine apply the user's settings is caught moving it.
   ...[
     { name: "designated-only-limit", category: "limitsolo", model: "omo-fallback-mock/limit-fable", toolRuns: 0 },
-    { name: "designated-only-after-tool", category: "toolsolo", model: "omo-fallback-mock/limit-after-tool", toolRuns: 1 },
+    {
+      name: "designated-only-after-tool",
+      category: "toolsolo",
+      model: "omo-fallback-mock/limit-after-tool",
+      toolRuns: 1,
+    },
   ].map((solo) => ({
     name: solo.name,
     parent: { provider: "omo-fallback-parent", model: "parent-gpt" },
     userSettings: {
-      retry: { fallbackChains: { [solo.model]: ["omo-fallback-parent/parent-gpt", "omo-fallback-healthy/healthy-fallback"] } },
+      retry: {
+        fallbackChains: { [solo.model]: ["omo-fallback-parent/parent-gpt", "omo-fallback-healthy/healthy-fallback"] },
+      },
     },
     omoConfig: { categories: { [solo.category]: { model: solo.model } } },
     checks: (artifacts) => ({
       task_failed: artifacts.task?.status === "error" ? "PASS" : "FAIL",
       failure_kind: artifacts.task?.failure_kind === "model_chain_exhausted" ? "PASS" : "FAIL",
-      never_on_parent: artifacts.task?.model === solo.model
-        && artifacts.task?.effective_model?.provider !== "omo-fallback-parent"
-        && !artifacts.log.includes("omo-fallback-parent/parent-gpt")
-        ? "PASS"
-        : "FAIL",
+      never_on_parent:
+        artifacts.task?.model === solo.model &&
+        artifacts.task?.effective_model?.provider !== "omo-fallback-parent" &&
+        !artifacts.log.includes("omo-fallback-parent/parent-gpt")
+          ? "PASS"
+          : "FAIL",
       user_chain_unused: !artifacts.log.includes("omo-fallback-healthy/healthy-fallback") ? "PASS" : "FAIL",
       refusal_listed: (artifacts.task?.error_message ?? "").includes(`${solo.model}: usage limit`) ? "PASS" : "FAIL",
-      tool_runs: (artifacts.log.match(/"type":"tool_execution","payload":\{"tool":"bash"/g) ?? []).length === solo.toolRuns ? "PASS" : "FAIL",
-      settings_byte_identical: artifacts.settingsBefore !== undefined && artifacts.settingsBefore === artifacts.settingsAfter
-        ? "PASS"
-        : "FAIL",
+      tool_runs:
+        (artifacts.log.match(/"type":"tool_execution","payload":\{"tool":"bash"/g) ?? []).length === solo.toolRuns
+          ? "PASS"
+          : "FAIL",
+      settings_byte_identical:
+        artifacts.settingsBefore !== undefined && artifacts.settingsBefore === artifacts.settingsAfter
+          ? "PASS"
+          : "FAIL",
     }),
   })),
   {
@@ -218,9 +239,7 @@ const scenarios = [
 
 function readTaskArtifacts(stateDir) {
   const tasksDir = join(stateDir, "tasks")
-  const names = existsSync(tasksDir)
-    ? readdirSync(tasksDir).filter((name) => name.endsWith(".json"))
-    : []
+  const names = existsSync(tasksDir) ? readdirSync(tasksDir).filter((name) => name.endsWith(".json")) : []
   const taskFile = names[0] === undefined ? undefined : join(tasksDir, names[0])
   const task = taskFile === undefined ? undefined : JSON.parse(readFileSync(taskFile, "utf8"))
   const logFile = task === undefined ? undefined : join(stateDir, "logs", `${task.task_id}.jsonl`)
@@ -263,12 +282,20 @@ function settingsDigest(sandbox) {
 // so PATHEXT names are tried; the spawn below never uses a shell.
 function resolveSenpi() {
   const bin = process.env.SENPI_BIN?.trim() || "senpi"
-  const names = process.platform !== "win32" || extname(bin) !== ""
-    ? [bin]
-    : [...(process.env.PATHEXT?.trim() || ".COM;.EXE;.BAT;.CMD").split(";").filter(Boolean).map((ext) => `${bin}${ext}`), bin]
-  const dirs = isAbsolute(bin) || bin.includes("/") || bin.includes("\\")
-    ? [""]
-    : [join(process.cwd(), "node_modules", ".bin"), ...(process.env.PATH ?? "").split(delimiter)]
+  const names =
+    process.platform !== "win32" || extname(bin) !== ""
+      ? [bin]
+      : [
+          ...(process.env.PATHEXT?.trim() || ".COM;.EXE;.BAT;.CMD")
+            .split(";")
+            .filter(Boolean)
+            .map((ext) => `${bin}${ext}`),
+          bin,
+        ]
+  const dirs =
+    isAbsolute(bin) || bin.includes("/") || bin.includes("\\")
+      ? [""]
+      : [join(process.cwd(), "node_modules", ".bin"), ...(process.env.PATH ?? "").split(delimiter)]
   for (const dir of new Set(dirs)) {
     for (const name of names) {
       const candidate = dir === "" ? resolve(name) : resolve(dir, name)
@@ -283,8 +310,12 @@ function processTable() {
   if (process.platform === "win32") {
     const json = execFileSync(
       "powershell.exe",
-      ["-NoProfile", "-NonInteractive", "-Command",
-        "Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,CommandLine | ConvertTo-Json -Compress"],
+      [
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        "Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,CommandLine | ConvertTo-Json -Compress",
+      ],
       { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, windowsHide: true },
     )
     const rows = JSON.parse(json || "[]")
@@ -308,7 +339,10 @@ function sandboxProcesses(sandbox, table = processTable()) {
 function descendants(pid, table) {
   if (process.platform === "win32") {
     const args = windowsTreeKillArgs(pid)
-    return args.filter((_arg, index) => args[index - 1] === "/PID").map(Number).filter((child) => child !== pid)
+    return args
+      .filter((_arg, index) => args[index - 1] === "/PID")
+      .map(Number)
+      .filter((child) => child !== pid)
   }
   const direct = table.filter((row) => row.ppid === pid).map((row) => row.pid)
   return direct.flatMap((child) => [child, ...descendants(child, table)])
@@ -458,10 +492,15 @@ async function runScenario(scenario, runner, outDir) {
 }
 
 async function run() {
-  const outDir = resolve(process.env.TASK_RUNTIME_FALLBACK_OUT_DIR ?? join(process.cwd(), ".omo", "evidence", "task-runtime-fallback"))
+  const outDir = resolve(
+    process.env.TASK_RUNTIME_FALLBACK_OUT_DIR ?? join(process.cwd(), ".omo", "evidence", "task-runtime-fallback"),
+  )
   mkdirSync(outDir, { recursive: true })
   const pick = (variable, entries, label) => {
-    const names = process.env[variable]?.split(",").map((name) => name.trim()).filter(Boolean)
+    const names = process.env[variable]
+      ?.split(",")
+      .map((name) => name.trim())
+      .filter(Boolean)
     const unknown = names?.filter((name) => !entries.some((entry) => entry.name === name)) ?? []
     if (unknown.length > 0) throw new Error(`unknown ${label}(s): ${unknown.join(", ")}`)
     return entries.filter((entry) => names === undefined || names.includes(entry.name))

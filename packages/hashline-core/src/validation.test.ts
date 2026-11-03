@@ -164,8 +164,7 @@ describe("validateLineRef", () => {
     const lines = ["one", "two", "three", "four"]
 
     //#when / #then
-    expect(() => validateLineRefs(lines, ["2#ZZ"]))
-      .toThrow(/>>>\s+2#[ZPMQVRWSNKTXJBYH]{2}\|two/)
+    expect(() => validateLineRefs(lines, ["2#ZZ"])).toThrow(/>>>\s+2#[ZPMQVRWSNKTXJBYH]{2}\|two/)
   })
 
   it("suggests correct line number when hash matches a file line", () => {

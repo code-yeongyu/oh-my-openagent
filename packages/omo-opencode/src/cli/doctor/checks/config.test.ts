@@ -34,7 +34,10 @@ describe("config check", () => {
     it("#given a user config with one invalid value #when running the config check #then it warns once, naming the file and the dotted key", async () => {
       const originalHome = process.env.HOME
       const originalCwd = process.cwd()
-      const testRootDir = join(tmpdir(), `omo-doctor-config-invalid-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+      const testRootDir = join(
+        tmpdir(),
+        `omo-doctor-config-invalid-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      )
       const projectDir = join(testRootDir, "project")
 
       try {
@@ -70,10 +73,7 @@ describe("config check", () => {
       const originalConfigDir = process.env.OPENCODE_CONFIG_DIR
       const originalHome = process.env.HOME
       const originalCwd = process.cwd()
-      const testRootDir = join(
-        tmpdir(),
-        `omo-doctor-config-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      )
+      const testRootDir = join(tmpdir(), `omo-doctor-config-${Date.now()}-${Math.random().toString(36).slice(2)}`)
       const projectDir = join(testRootDir, "project")
       const userConfigPath = join(testRootDir, ".omo", "omo.jsonc")
 
@@ -85,15 +85,19 @@ describe("config check", () => {
         process.env.OPENCODE_CONFIG_DIR = join(testRootDir, "opencode", "profiles", "focused")
         writeFileSync(
           userConfigPath,
-          JSON.stringify({
-            profiles: {
-              focused: {
-                "[opencode]": {
-                  categories: { deep: { model: "profile-only-model" } },
+          JSON.stringify(
+            {
+              profiles: {
+                focused: {
+                  "[opencode]": {
+                    categories: { deep: { model: "profile-only-model" } },
+                  },
                 },
               },
             },
-          }, null, 2) + "\n",
+            null,
+            2,
+          ) + "\n",
           "utf-8",
         )
         process.chdir(projectDir)
@@ -192,30 +196,34 @@ describe("config check", () => {
 
         writeFileSync(
           join(testRootDir, ".omo", "omo.jsonc"),
+          JSON.stringify({ "[opencode]": { agents: { sisyphus: { model: "kiro/claude-opus-4-6" } } } }, null, 2) + "\n",
+          "utf-8",
+        )
+        writeFileSync(
+          join(xdgConfigDir, "opencode", "opencode.json"),
           JSON.stringify(
-            { "[opencode]": { agents: { sisyphus: { model: "kiro/claude-opus-4-6" } } } },
+            {
+              provider: {
+                kiro: {
+                  npm: "@ai-sdk/openai-compatible",
+                  models: { "claude-opus-4-6": {} },
+                },
+              },
+            },
             null,
             2,
           ) + "\n",
           "utf-8",
         )
         writeFileSync(
-          join(xdgConfigDir, "opencode", "opencode.json"),
-          JSON.stringify({
-            provider: {
-              kiro: {
-                npm: "@ai-sdk/openai-compatible",
-                models: { "claude-opus-4-6": {} },
-              },
-            },
-          }, null, 2) + "\n",
-          "utf-8",
-        )
-        writeFileSync(
           join(xdgCacheDir, "opencode", "models.json"),
-          JSON.stringify({
-            openai: { models: { "gpt-5.4": {} } },
-          }, null, 2) + "\n",
+          JSON.stringify(
+            {
+              openai: { models: { "gpt-5.4": {} } },
+            },
+            null,
+            2,
+          ) + "\n",
           "utf-8",
         )
 
@@ -268,13 +276,17 @@ describe("config check", () => {
         delete process.env.OPENCODE_CONFIG_DIR
         writeFileSync(
           join(testRootDir, ".omo", "omo.jsonc"),
-          JSON.stringify({
-            "[opencode]": {
-              agents: {
-                sisyphus: { reasoningEffort: "max" },
+          JSON.stringify(
+            {
+              "[opencode]": {
+                agents: {
+                  sisyphus: { reasoningEffort: "max" },
+                },
               },
             },
-          }, null, 2) + "\n",
+            null,
+            2,
+          ) + "\n",
           "utf-8",
         )
         process.chdir(projectDir)

@@ -38,7 +38,10 @@ function getMonitorConfig(pluginConfig: MonitorStartConfig) {
   }
 }
 
-function getEffectiveMode(requestedMode: MonitorMode | undefined, liveModeEnabled: boolean): {
+function getEffectiveMode(
+  requestedMode: MonitorMode | undefined,
+  liveModeEnabled: boolean,
+): {
   mode: MonitorMode
   note?: string
 } {

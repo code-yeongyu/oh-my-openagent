@@ -63,7 +63,9 @@ function main() {
     console.log(`${REPORT_ONLY_LIST_PATH}: no entries added since ${baseSha.slice(0, 10)}.`)
     return
   }
-  console.error(`${REPORT_ONLY_LIST_PATH} may only shrink (#9766). Remove the temp dirs these tests leave instead of listing them:`)
+  console.error(
+    `${REPORT_ONLY_LIST_PATH} may only shrink (#9766). Remove the temp dirs these tests leave instead of listing them:`,
+  )
   for (const entry of added) console.error(`  ${entry}`)
   process.exitCode = 1
 }

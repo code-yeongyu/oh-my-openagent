@@ -24,10 +24,17 @@ export function startResumeRun(input) {
   const sessionDir = join(input.sandbox.root, "sessions")
   mkdirSync(sessionDir, { recursive: true })
   const args = [
-    "-e", input.mockProviderEntry,
-    "-p", "--mode", "json",
-    "--provider", "omo-mock", "--model", "mock-1",
-    "--session-dir", sessionDir,
+    "-e",
+    input.mockProviderEntry,
+    "-p",
+    "--mode",
+    "json",
+    "--provider",
+    "omo-mock",
+    "--model",
+    "mock-1",
+    "--session-dir",
+    sessionDir,
     ...(input.sessionId === undefined ? [] : ["--session-id", input.sessionId]),
     input.prompt ?? "drive the quit-resume scenario",
   ]
@@ -38,7 +45,9 @@ export function startResumeRun(input) {
       SENPI_CODING_AGENT_DIR: input.sandbox.agentDir,
       XDG_CONFIG_HOME: input.sandbox.xdgConfigHome,
       // Same HOME isolation as the team runtime: the omo user-scope config resolves from HOME.
-      ...(input.sandbox.homeDir === undefined ? {} : { HOME: input.sandbox.homeDir, USERPROFILE: input.sandbox.homeDir }),
+      ...(input.sandbox.homeDir === undefined
+        ? {}
+        : { HOME: input.sandbox.homeDir, USERPROFILE: input.sandbox.homeDir }),
       SENPI_CODING_AGENT_SESSION_DIR: sessionDir,
       OMO_SENPI_QA: "1",
       ...(input.extraEnv ?? {}),
@@ -51,7 +60,9 @@ export function startResumeRun(input) {
   let stderr = ""
   let settled = false
   let finish = () => undefined
-  const completion = new Promise((resolve) => { finish = resolve })
+  const completion = new Promise((resolve) => {
+    finish = resolve
+  })
   const settle = (status) => {
     if (settled) return
     settled = true
@@ -62,8 +73,12 @@ export function startResumeRun(input) {
     killGroup(child.pid)
     settle(null)
   }, 90_000)
-  child.stdout.on("data", (chunk) => { stdout += chunk })
-  child.stderr.on("data", (chunk) => { stderr += chunk })
+  child.stdout.on("data", (chunk) => {
+    stdout += chunk
+  })
+  child.stderr.on("data", (chunk) => {
+    stderr += chunk
+  })
   child.on("close", (status) => {
     if (typeof child.pid === "number") input.onClose?.(child.pid)
     settle(status)

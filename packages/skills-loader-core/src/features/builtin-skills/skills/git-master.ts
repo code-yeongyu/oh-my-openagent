@@ -1,9 +1,6 @@
 import type { BuiltinSkill } from "../types"
 
-import {
-  GIT_MASTER_SKILL_DESCRIPTION,
-  GIT_MASTER_SKILL_NAME,
-} from "./git-master-skill-metadata"
+import { GIT_MASTER_SKILL_DESCRIPTION, GIT_MASTER_SKILL_NAME } from "./git-master-skill-metadata"
 import { GIT_MASTER_COMMIT_WORKFLOW_SECTION } from "./git-master-sections/commit-workflow"
 import { GIT_MASTER_HISTORY_SEARCH_WORKFLOW_SECTION } from "./git-master-sections/history-search-workflow"
 import { GIT_MASTER_OVERVIEW_SECTION } from "./git-master-sections/overview"

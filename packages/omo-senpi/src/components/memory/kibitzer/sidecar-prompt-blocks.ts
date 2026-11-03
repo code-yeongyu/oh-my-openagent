@@ -52,13 +52,28 @@ const TOOL_CONTRACTS: readonly ToolContract[] = [
   { name: "read", args: "path, offset?, limit?", summary: "Read one workspace file; the result is capped." },
   { name: "grep", args: "pattern, path?, glob?", summary: "Search the workspace; the match list is capped." },
   { name: "session_entries", args: "since", summary: "Read the parent session entries after a cursor." },
-  { name: "memory", args: "operation, query|path", operations: "search,read", summary: "Read memory: search and read only, there is no write operation." },
-  { name: "nudge", args: "path, hint", summary: "Your only output: one candidate path and one factual hint of at most 200 characters." },
+  {
+    name: "memory",
+    args: "operation, query|path",
+    operations: "search,read",
+    summary: "Read memory: search and read only, there is no write operation.",
+  },
+  {
+    name: "nudge",
+    args: "path, hint",
+    summary: "Your only output: one candidate path and one factual hint of at most 200 characters.",
+  },
 ]
 
 const RULES: readonly { readonly id: string; readonly text: string }[] = [
-  { id: "no-memory-write", text: "You never write, edit, move or delete memory, files or state; the parent process owns every write." },
-  { id: "nudge-only", text: "Only the nudge tool reaches the primary agent; anything you write outside a tool call is discarded." },
+  {
+    id: "no-memory-write",
+    text: "You never write, edit, move or delete memory, files or state; the parent process owns every write.",
+  },
+  {
+    id: "nudge-only",
+    text: "Only the nudge tool reaches the primary agent; anything you write outside a tool call is discarded.",
+  },
   { id: "silence-default", text: "Stay silent unless a stored memory would change what the primary agent does next." },
 ]
 
@@ -66,15 +81,17 @@ export function renderContract(): string {
   return [
     "<contract>",
     ...RULES.map((rule) => `<rule id="${rule.id}">${escapeText(rule.text)}</rule>`),
-    ...TOOL_CONTRACTS.map((tool) => [
-      openTag("tool", [
-        ["name", tool.name],
-        ["args", tool.args],
-        ...(tool.operations === undefined ? [] : [["operations", tool.operations] as const]),
-      ]),
-      escapeText(tool.summary),
-      "</tool>",
-    ].join("")),
+    ...TOOL_CONTRACTS.map((tool) =>
+      [
+        openTag("tool", [
+          ["name", tool.name],
+          ["args", tool.args],
+          ...(tool.operations === undefined ? [] : [["operations", tool.operations] as const]),
+        ]),
+        escapeText(tool.summary),
+        "</tool>",
+      ].join(""),
+    ),
     "</contract>",
   ].join("\n")
 }
@@ -111,11 +128,19 @@ function stripControl(value: string): string {
 }
 
 export function escapeText(value: string): string {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/'/g, "&apos;").replace(/"/g, "&quot;")
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/'/g, "&apos;")
+    .replace(/"/g, "&quot;")
 }
 
 // Attribute values are redacted too: a path or a parent tool name is transcript-derived, so the
 // same secret rule applies, and a raw newline or quote inside an attribute would end the envelope.
 function escapeAttribute(value: string): string {
-  return escapeText(stripControl(redactUrl(value))).replace(/\n/g, "&#10;").replace(/\r/g, "&#13;").replace(/\t/g, "&#9;")
+  return escapeText(stripControl(redactUrl(value)))
+    .replace(/\n/g, "&#10;")
+    .replace(/\r/g, "&#13;")
+    .replace(/\t/g, "&#9;")
 }

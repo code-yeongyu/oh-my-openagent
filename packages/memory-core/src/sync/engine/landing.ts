@@ -27,7 +27,8 @@ export const readWorking = (root: string, path: string): Promise<string | null> 
 
 type Landing = { readonly path: string; readonly working: string | null } | { readonly refused: string }
 
-const missing = (error: unknown): boolean => error instanceof Error && "code" in error && (error.code === "ENOENT" || error.code === "ENOTDIR")
+const missing = (error: unknown): boolean =>
+  error instanceof Error && "code" in error && (error.code === "ENOENT" || error.code === "ENOTDIR")
 
 /** Whether a component of `path` that exists under `root`, the last one included, is a symlink. */
 export async function throughSymlink(root: string, path: string): Promise<boolean> {

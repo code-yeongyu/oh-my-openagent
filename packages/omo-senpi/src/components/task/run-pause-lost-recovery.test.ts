@@ -9,14 +9,24 @@ import { RunPauseController, type RunPauseEffects } from "../../../../senpi-task
 import { EngineRunPauseBridge } from "./run-pause-bridge"
 
 const roots: string[] = []
-afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
+afterEach(() => {
+  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
+})
 
 const PARENT = "parent"
-const stopped = (pauseSeq: number): EnginePauseState => ({ pauseSeq, holds: [{ kind: "session_hold", key: `session_hold:${pauseSeq}` }] })
+const stopped = (pauseSeq: number): EnginePauseState => ({
+  pauseSeq,
+  holds: [{ kind: "session_hold", key: `session_hold:${pauseSeq}` }],
+})
 const released = (pauseSeq: number): EnginePauseState => ({ pauseSeq, holds: [] })
 const child: PauseParticipant = {
-  key: "st_b", kind: "task", taskId: "st_b", runEpoch: 0, runRef: { kind: "task", id: "st_b" },
-  state: "pending", at: "2026-01-01T00:00:00.000Z",
+  key: "st_b",
+  kind: "task",
+  taskId: "st_b",
+  runEpoch: 0,
+  runRef: { kind: "task", id: "st_b" },
+  state: "pending",
+  at: "2026-01-01T00:00:00.000Z",
 }
 
 function hostOver(overrides: Partial<RunPauseEffects>) {
@@ -29,10 +39,16 @@ function hostOver(overrides: Partial<RunPauseEffects>) {
     snapshot: () => [child],
     quiesce: () => undefined,
     addFences: async () => undefined,
-    pause: async () => { throw new Error("pause_for_run timed out") },
+    pause: async () => {
+      throw new Error("pause_for_run timed out")
+    },
     dispatchGuidance: async () => undefined,
     resume: async (participant, request) => {
-      resumed.push({ key: participant.key, state: participant.state, ...(request.childSeqCutoff === undefined ? {} : { cutoff: request.childSeqCutoff }) })
+      resumed.push({
+        key: participant.key,
+        state: participant.state,
+        ...(request.childSeqCutoff === undefined ? {} : { cutoff: request.childSeqCutoff }),
+      })
       return { kind: "resumed", turnId: "turn-b" }
     },
     install: async () => undefined,
@@ -42,7 +58,15 @@ function hostOver(overrides: Partial<RunPauseEffects>) {
   }
   let live: EnginePauseState = stopped(7)
   const bridge = new EngineRunPauseBridge(new RunPauseController(registry, effects), { getPauseState: () => live })
-  return { barrier, registry, bridge, resumed, setState: (next: EnginePauseState) => { live = next } }
+  return {
+    barrier,
+    registry,
+    bridge,
+    resumed,
+    setState: (next: EnginePauseState) => {
+      live = next
+    },
+  }
 }
 
 async function stopThenResume(h: ReturnType<typeof hostOver>): Promise<void> {
@@ -85,7 +109,9 @@ test("delta M1: a lost child with no live hold at Resume is left alone and admis
 test("delta LOW: a propagation failure Resume runs past is recorded as the lost child's reason, never discarded", async () => {
   const h = hostOver({
     pause: async () => ({ kind: "held", childSeq: 8 }),
-    addFences: async () => { throw new Error("fence write failed") },
+    addFences: async () => {
+      throw new Error("fence write failed")
+    },
     observeHold: async () => ({ held: false, childSeq: 0 }),
   })
   await expect(h.bridge.changed(PARENT, { ...stopped(7), change: "paused" })).rejects.toThrow("fence write failed")

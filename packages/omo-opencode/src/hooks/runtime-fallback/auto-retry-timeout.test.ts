@@ -197,10 +197,11 @@ describe("createFallbackTimeoutHelpers", () => {
     let retryCalls = 0
     const helpers = createFallbackTimeoutHelpers(
       deps,
-      async () => new Promise<void>((resolve) => {
-        resolveAbort = resolve
-        markAbortStarted?.()
-      }),
+      async () =>
+        new Promise<void>((resolve) => {
+          resolveAbort = resolve
+          markAbortStarted?.()
+        }),
       async () => {
         retryCalls += 1
         return { accepted: true, status: "dispatched" }

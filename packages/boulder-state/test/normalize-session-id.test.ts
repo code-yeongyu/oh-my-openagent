@@ -42,7 +42,6 @@ describe("normalizeSessionId", () => {
     // given
     expect(typeof boulderState.normalizeSessionId).toBe("function")
 
-
     // when
     const normalized = boulderState.normalizeSessionId("codex:sess_abc", "opencode")
 

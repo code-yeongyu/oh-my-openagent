@@ -1,4 +1,9 @@
-import { isCanonicalEntry, projectTranscriptEntries, type GitTreeSizedEntry, type TranscriptProjection } from "@oh-my-opencode/memory-core"
+import {
+  isCanonicalEntry,
+  projectTranscriptEntries,
+  type GitTreeSizedEntry,
+  type TranscriptProjection,
+} from "@oh-my-opencode/memory-core"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
 import type { MemoryIdentityContext } from "./context"
@@ -8,11 +13,7 @@ import { MEMORY_REFLECTIONS_RPC_METHOD, readMemoryReflections } from "./memory-r
 import type { MemoryRpcSync } from "./memory-rpc-sync"
 import type { SyncStatusReader } from "./sync-status-surface"
 export { MEMORY_REFLECTIONS_RPC_METHOD } from "./memory-rpc-reflections"
-import {
-  buildMemorySnapshot,
-  createMemoryRpcGitRepo,
-  type MemoryTreeStats,
-} from "./memory-rpc-snapshot-state"
+import { buildMemorySnapshot, createMemoryRpcGitRepo, type MemoryTreeStats } from "./memory-rpc-snapshot-state"
 
 /** Push channel: RPC clients receive `{type:"extension_event", name, data}` frames under this name. */
 export const MEMORY_UPDATED_RPC_EVENT = "omo.memory.updated"
@@ -126,10 +127,7 @@ interface MemoryPublication {
  * `omo.memory.status` pull. Snapshots are RPC-only - they are never appended to the transcript -
  * and every rpc touch is guarded, so a host without `pi.rpc` degrades to a silent no-op.
  */
-export function createMemoryRpcBridge(
-  pi: SenpiExtensionAPI,
-  deps: MemoryRpcBridgeDeps,
-): MemoryRpcBridge {
+export function createMemoryRpcBridge(pi: SenpiExtensionAPI, deps: MemoryRpcBridgeDeps): MemoryRpcBridge {
   const createRepo = deps.createGitRepo ?? createMemoryRpcGitRepo
   const repos = new Map<string, MemoryRpcGitRepo>()
   /** Size reads walk the whole tree, so they are cached per commit, not per sync. */
@@ -187,7 +185,11 @@ export function createMemoryRpcBridge(
     return {
       snapshot: {
         ...previous,
-        reflection: { ...previous.reflection, backlogSteps: journal.backlogSteps, pendingCompaction: journal.pendingCompaction },
+        reflection: {
+          ...previous.reflection,
+          backlogSteps: journal.backlogSteps,
+          pendingCompaction: journal.pendingCompaction,
+        },
         journal: { ...previous.journal, totalSteps: journal.totalSteps, reflectedSteps: journal.reflectedSteps },
       },
       force: journal.transcriptReadFailed === true,
@@ -251,20 +253,24 @@ export function createMemoryRpcBridge(
       if (snapshot === undefined) return
       // Full work never occupies publication. A result joins only when ready; any journal
       // delivery that overtook its build remains authoritative for the journal fields.
-      await publishSnapshot(async () => {
-        if (revision === journalRevision || lastPublished === undefined) return { snapshot }
-        return {
-          snapshot: {
-            ...snapshot,
-            reflection: {
-              ...snapshot.reflection,
-              backlogSteps: lastPublished.reflection.backlogSteps,
-              pendingCompaction: lastPublished.reflection.pendingCompaction,
+      await publishSnapshot(
+        async () => {
+          if (revision === journalRevision || lastPublished === undefined) return { snapshot }
+          return {
+            snapshot: {
+              ...snapshot,
+              reflection: {
+                ...snapshot.reflection,
+                backlogSteps: lastPublished.reflection.backlogSteps,
+                pendingCompaction: lastPublished.reflection.pendingCompaction,
+              },
+              journal: lastPublished.journal,
             },
-            journal: lastPublished.journal,
-          },
-        }
-      }, generation, signal)
+          }
+        },
+        generation,
+        signal,
+      )
     })
     fullBuilds = current.catch(() => {})
     return current
@@ -314,10 +320,7 @@ export function createMemoryRpcBridge(
   }
 }
 
-function registerStatusHandler(
-  pi: SenpiExtensionAPI,
-  snapshot: () => Promise<MemoryRpcSnapshot | undefined>,
-): void {
+function registerStatusHandler(pi: SenpiExtensionAPI, snapshot: () => Promise<MemoryRpcSnapshot | undefined>): void {
   const handle = pi.rpc?.handle
   if (handle === undefined) return
   handle(MEMORY_STATUS_RPC_METHOD, async (): Promise<MemoryRpcSnapshot | MemoryRpcUnavailable> => {

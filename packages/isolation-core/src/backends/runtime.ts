@@ -5,7 +5,11 @@ import { delimiter, dirname, join } from "node:path"
 import { IsolationUnavailableError } from "../backend"
 import { exists } from "../git/command"
 
-export interface CommandResult { code: number; stdout: string; stderr: string }
+export interface CommandResult {
+  code: number
+  stdout: string
+  stderr: string
+}
 export interface BackendRuntime {
   platform: NodeJS.Platform
   which(binary: string): boolean
@@ -20,8 +24,16 @@ export const runtime: BackendRuntime = {
   which(binary) {
     for (const dir of (process.env.PATH ?? "").split(delimiter)) {
       for (const suffix of process.platform === "win32" ? ["", ".exe", ".cmd"] : [""]) {
-        try { accessSync(join(dir, binary + suffix), constants.X_OK); return true } catch (error) {
-          if (!(error instanceof Error && "code" in error && ["ENOENT", "EACCES", "ENOTDIR"].includes(String(error.code)))) throw error
+        try {
+          accessSync(join(dir, binary + suffix), constants.X_OK)
+          return true
+        } catch (error) {
+          if (!(
+            error instanceof Error &&
+            "code" in error &&
+            ["ENOENT", "EACCES", "ENOTDIR"].includes(String(error.code))
+          ))
+            throw error
         }
       }
     }
@@ -36,16 +48,29 @@ export const runtime: BackendRuntime = {
       })
     })
   },
-  async device(path) { return (await stat(path)).dev },
+  async device(path) {
+    return (await stat(path)).dev
+  },
   async accessible(path) {
-    try { await access(path, constants.R_OK | constants.W_OK); return true } catch (error) {
-      if (error instanceof Error && "code" in error && ["ENOENT", "EACCES", "EPERM"].includes(String(error.code))) return false
+    try {
+      await access(path, constants.R_OK | constants.W_OK)
+      return true
+    } catch (error) {
+      if (error instanceof Error && "code" in error && ["ENOENT", "EACCES", "EPERM"].includes(String(error.code)))
+        return false
       throw error
     }
   },
   async mounted(path) {
     const mounts = await readFile("/proc/mounts", "utf8")
-    return mounts.split("\n").some((line) => line.split(" ")[1]?.replace(/\\([0-7]{3})/g, (_, octal: string) => String.fromCharCode(parseInt(octal, 8))) === path)
+    return mounts
+      .split("\n")
+      .some(
+        (line) =>
+          line
+            .split(" ")[1]
+            ?.replace(/\\([0-7]{3})/g, (_, octal: string) => String.fromCharCode(parseInt(octal, 8))) === path,
+      )
   },
   async waitMounted(path) {
     const deadline = Date.now() + 5000
@@ -58,7 +83,7 @@ export const runtime: BackendRuntime = {
   },
 }
 export async function existingParent(path: string): Promise<string> {
-  while (!await exists(path)) {
+  while (!(await exists(path))) {
     const parent = dirname(path)
     if (parent === path) throw new Error(`No existing parent for ${path}`)
     path = parent

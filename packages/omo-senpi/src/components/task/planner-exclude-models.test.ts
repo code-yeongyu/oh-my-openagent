@@ -20,7 +20,12 @@ describe("task model pins with exclude_models", () => {
     const planner = createTaskChildPlanner({ exclude_models: ["claude-fable-*"] }, BUILTIN_AGENTS, () => REGISTRY)
 
     // when
-    const result = planner({ prompt: "draw", parent_session_id: "parent-1", depth: 0, model: "anthropic/claude-fable-5-1" })
+    const result = planner({
+      prompt: "draw",
+      parent_session_id: "parent-1",
+      depth: 0,
+      model: "anthropic/claude-fable-5-1",
+    })
 
     // then
     expect(result.kind).toBe("error")
@@ -32,16 +37,31 @@ describe("task model pins with exclude_models", () => {
     // given
     const models = [
       { provider: "chatgpt-subscription", id: "gpt-5.6-luna" },
-      { provider: "chatgpt-subscription", id: "gpt-5.6-luna-fast", upstreamModelId: "gpt-5.6-luna", serviceTier: "priority" as const },
+      {
+        provider: "chatgpt-subscription",
+        id: "gpt-5.6-luna-fast",
+        upstreamModelId: "gpt-5.6-luna",
+        serviceTier: "priority" as const,
+      },
     ]
     const fastRegistry: TaskModelRegistry = {
       getAvailable: () => models,
       find: (provider, modelId) => models.find((model) => model.provider === provider && model.id === modelId),
     }
-    const planner = createTaskChildPlanner({ exclude_models: ["*-fast"] }, BUILTIN_AGENTS, () => fastRegistry, () => "priority")
+    const planner = createTaskChildPlanner(
+      { exclude_models: ["*-fast"] },
+      BUILTIN_AGENTS,
+      () => fastRegistry,
+      () => "priority",
+    )
 
     // when
-    const result = planner({ prompt: "go", parent_session_id: "parent-1", depth: 0, model: "chatgpt-subscription/gpt-5.6-luna" })
+    const result = planner({
+      prompt: "go",
+      parent_session_id: "parent-1",
+      depth: 0,
+      model: "chatgpt-subscription/gpt-5.6-luna",
+    })
 
     // then
     expect(result.kind === "resolved" ? result.plan.model : result.kind).toBe("chatgpt-subscription/gpt-5.6-luna")
@@ -52,7 +72,12 @@ describe("task model pins with exclude_models", () => {
     const planner = createTaskChildPlanner({ exclude_models: ["claude-fable-*"] }, BUILTIN_AGENTS, () => REGISTRY)
 
     // when
-    const result = planner({ prompt: "draw", parent_session_id: "parent-1", depth: 0, model: "anthropic/claude-opus-5-5" })
+    const result = planner({
+      prompt: "draw",
+      parent_session_id: "parent-1",
+      depth: 0,
+      model: "anthropic/claude-opus-5-5",
+    })
 
     // then
     expect(result.kind === "resolved" ? result.plan.model : result.kind).toBe("anthropic/claude-opus-5-5")

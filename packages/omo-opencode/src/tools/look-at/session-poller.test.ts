@@ -46,11 +46,7 @@ describe("waitForLookAtSessionResult", () => {
       { info: { role: "assistant" }, parts: [{ type: "text", text: "result text" }] },
     ]
     const client = createMockClient(
-      [
-        { data: { ses_test: { type: "busy" } } },
-        { data: { ses_test: { type: "busy" } } },
-        { data: {} },
-      ],
+      [{ data: { ses_test: { type: "busy" } } }, { data: { ses_test: { type: "busy" } } }, { data: {} }],
       assistantMessages,
     )
 
@@ -64,9 +60,7 @@ describe("waitForLookAtSessionResult", () => {
   })
 
   test("#given session is already idle with content #when polling #then resolves with stable idle", async () => {
-    const messages: RawMessage[] = [
-      { info: { role: "assistant" }, parts: [{ type: "text", text: "done" }] },
-    ]
+    const messages: RawMessage[] = [{ info: { role: "assistant" }, parts: [{ type: "text", text: "done" }] }]
     const client = createMockClient([{ data: {} }], messages)
 
     const result = await waitForLookAtSessionResult(unsafeTestValue(client), "ses_test", {
@@ -137,10 +131,7 @@ describe("waitForLookAtSessionResult", () => {
   })
 
   test("#given session never becomes idle #when polling exceeds timeout #then rejects", async () => {
-    const client = createMockClient(
-      [{ data: { ses_test: { type: "busy" } } }],
-      [],
-    )
+    const client = createMockClient([{ data: { ses_test: { type: "busy" } } }], [])
 
     await expect(
       waitForLookAtSessionResult(unsafeTestValue(client), "ses_test", {
@@ -151,9 +142,7 @@ describe("waitForLookAtSessionResult", () => {
   })
 
   test("#given session status API returns error #when polling #then treats as idle (graceful degradation)", async () => {
-    const messages: RawMessage[] = [
-      { info: { role: "assistant" }, parts: [{ type: "text", text: "ok" }] },
-    ]
+    const messages: RawMessage[] = [{ info: { role: "assistant" }, parts: [{ type: "text", text: "ok" }] }]
     const client = createMockClient([{ error: new Error("API error") }], messages)
 
     const result = await waitForLookAtSessionResult(unsafeTestValue(client), "ses_test", {
@@ -166,9 +155,7 @@ describe("waitForLookAtSessionResult", () => {
   })
 
   test("#given default options #when polling #then uses sensible defaults", async () => {
-    const messages: RawMessage[] = [
-      { info: { role: "assistant" }, parts: [{ type: "text", text: "hi" }] },
-    ]
+    const messages: RawMessage[] = [{ info: { role: "assistant" }, parts: [{ type: "text", text: "hi" }] }]
     const client = createMockClient([{ data: {} }], messages)
 
     const result = await waitForLookAtSessionResult(unsafeTestValue(client), "ses_test", {

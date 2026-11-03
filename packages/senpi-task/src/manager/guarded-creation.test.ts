@@ -3,7 +3,15 @@ import { AdmissionBarrier } from "../pause/admission-barrier"
 import type { ChildCreationPort } from "../pause/ports"
 import { createTaskRecordStore } from "../store"
 import { createTaskManager } from "./manager"
-import { baseSpec, categoryPlanner, cleanupProjects, FakeRunner, makeHandle, settings, tempProject } from "./__fixtures__/manager-fakes"
+import {
+  baseSpec,
+  categoryPlanner,
+  cleanupProjects,
+  FakeRunner,
+  makeHandle,
+  settings,
+  tempProject,
+} from "./__fixtures__/manager-fakes"
 
 afterEach(cleanupProjects)
 
@@ -33,15 +41,21 @@ describe("creation-time admission staging", () => {
     const runner = new FakeRunner()
     const store = createTaskRecordStore({ project_dir: cwd })
     const manager = createTaskManager({
-      cwd, store, config: settings(), planner: categoryPlanner(),
+      cwd,
+      store,
+      config: settings(),
+      planner: categoryPlanner(),
       runners: { "in-process": runner, process: runner },
-      admissionBarrier: barrier, childCreationPort: creation,
+      admissionBarrier: barrier,
+      childCreationPort: creation,
     })
     const spec = { ...baseSpec(), root_session_id: "root" }
     const starting = manager.start(spec)
     await Promise.race([
       created.promise,
-      starting.then(() => { throw new Error("runner bypassed the creation-time admission port") }),
+      starting.then(() => {
+        throw new Error("runner bypassed the creation-time admission port")
+      }),
     ])
     barrier.close("root", 1)
     continueCreation.resolve()

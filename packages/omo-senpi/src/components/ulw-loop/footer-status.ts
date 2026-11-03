@@ -40,7 +40,8 @@ export interface UlwLoopFooterStatus {
 
 export function createUlwLoopFooterStatus(options: UlwLoopFooterStatusOptions = {}): UlwLoopFooterStatus {
   const goalCache = createGoalJsonCache()
-  const isGoalActive = options.isGoalActive ?? ((runtime: UlwLoopFooterRuntime) => goalActiveFromContext(runtime, goalCache))
+  const isGoalActive =
+    options.isGoalActive ?? ((runtime: UlwLoopFooterRuntime) => goalActiveFromContext(runtime, goalCache))
   const timers = options.timers ?? defaultTimers
   let timer: TimerHandle | undefined
   let frameIndex = 0

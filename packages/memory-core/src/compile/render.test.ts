@@ -9,15 +9,17 @@ describe("renderExternalProjection", () => {
     const paths = ["reference/project/b.md", "people/ann/card.md", "reference/project/a.md", "reference/top.md"]
 
     // when / then
-    expect(renderExternalProjection(paths)).toBe([
-      "<external_projection>",
-      NAME_NOTE,
-      "$MEMORY_DIR/",
-      "people/ann/: card",
-      "reference/: top",
-      "reference/project/: a, b",
-      "</external_projection>",
-    ].join("\n"))
+    expect(renderExternalProjection(paths)).toBe(
+      [
+        "<external_projection>",
+        NAME_NOTE,
+        "$MEMORY_DIR/",
+        "people/ann/: card",
+        "reference/: top",
+        "reference/project/: a, b",
+        "</external_projection>",
+      ].join("\n"),
+    )
   })
 })
 

@@ -8,7 +8,14 @@ import type { Server, Socket } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { captureIdentity, killIfAlive, pidAlive, pidTerminalWithin, readPidFileWhenWritten, waitForFileToExist } from "./process-liveness.test-support"
+import {
+  captureIdentity,
+  killIfAlive,
+  pidAlive,
+  pidTerminalWithin,
+  readPidFileWhenWritten,
+  waitForFileToExist,
+} from "./process-liveness.test-support"
 
 const holdLockFixture = join(import.meta.dir, "__fixtures__", "hold-lock.ts")
 const READY_TIMEOUT_MS = 10_000
@@ -17,10 +24,17 @@ const EXIT_TIMEOUT_MS = 5_000
 type ExitInfo = { readonly code: number | null; readonly signal: NodeJS.Signals | null }
 
 function exitWithin(child: ChildProcess, boundMs: number): Promise<ExitInfo> {
-  if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve({ code: child.exitCode, signal: child.signalCode })
+  if (child.exitCode !== null || child.signalCode !== null)
+    return Promise.resolve({ code: child.exitCode, signal: child.signalCode })
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`child ${String(child.pid)} did not exit within ${boundMs}ms`)), boundMs)
-    child.once("exit", (code, signal) => { clearTimeout(timer); resolve({ code, signal }) })
+    const timer = setTimeout(
+      () => reject(new Error(`child ${String(child.pid)} did not exit within ${boundMs}ms`)),
+      boundMs,
+    )
+    child.once("exit", (code, signal) => {
+      clearTimeout(timer)
+      resolve({ code, signal })
+    })
   })
 }
 
@@ -54,7 +68,9 @@ function listenOnLoopback(control: Server): Promise<number> {
 describe("hold-lock fixture lifecycle", () => {
   test("exits on the parent-owned stdin EOF event", async () => {
     const root = await mkdtemp(join(tmpdir(), "omo-hold-lock-lifecycle-"))
-    const child = spawn(process.execPath, [holdLockFixture, join(root, "finalize.lock")], { stdio: ["pipe", "pipe", "pipe"] })
+    const child = spawn(process.execPath, [holdLockFixture, join(root, "finalize.lock")], {
+      stdio: ["pipe", "pipe", "pipe"],
+    })
     try {
       await waitForReady(child)
       const exit = exitWithin(child, EXIT_TIMEOUT_MS)
@@ -106,7 +122,9 @@ describe("hold-lock fixture lifecycle", () => {
     const holderPidPath = join(root, "holder.pid")
     const marker = join(root, "holder-exited.marker")
     const wrapperPath = join(root, "abrupt-wrapper.mjs")
-    await writeFile(wrapperPath, `
+    await writeFile(
+      wrapperPath,
+      `
 import { spawn } from "node:child_process"
 import { writeFileSync } from "node:fs"
 const child = spawn(process.execPath, [process.env.HOLDER_FIXTURE, process.env.LOCK_PATH], { stdio: ["pipe", "pipe", "ignore"] })
@@ -115,15 +133,26 @@ child.stdout.on("data", (chunk) => {
   writeFileSync(process.env.HOLDER_PID_PATH, String(child.pid))
   process.kill(process.pid, "SIGKILL")
 })
-`, "utf8")
+`,
+      "utf8",
+    )
     const wrapper = spawn(process.execPath, [wrapperPath], {
       stdio: ["ignore", "ignore", "ignore"],
-      env: { ...process.env, HOLDER_FIXTURE: holdLockFixture, LOCK_PATH: join(root, "facts-runs.lock"), HOLDER_PID_PATH: holderPidPath, EXIT_MARKER: marker },
+      env: {
+        ...process.env,
+        HOLDER_FIXTURE: holdLockFixture,
+        LOCK_PATH: join(root, "facts-runs.lock"),
+        HOLDER_PID_PATH: holderPidPath,
+        EXIT_MARKER: marker,
+      },
     })
     // Subscribe to the wrapper's death BEFORE it can fire: the wrapper SIGKILLs itself in the
     // same tick it writes the pid file, so listening only after the read would miss the event.
     const wrapperExit = new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error("wrapper did not terminate after holder readiness")), READY_TIMEOUT_MS)
+      const timer = setTimeout(
+        () => reject(new Error("wrapper did not terminate after holder readiness")),
+        READY_TIMEOUT_MS,
+      )
       const onExit = (code: number | null, signal: NodeJS.Signals | null): void => {
         clearTimeout(timer)
         try {
@@ -136,7 +165,10 @@ child.stdout.on("data", (chunk) => {
           reject(error as Error)
         }
       }
-      if (wrapper.exitCode !== null || wrapper.signalCode !== null) { onExit(wrapper.exitCode, wrapper.signalCode); return }
+      if (wrapper.exitCode !== null || wrapper.signalCode !== null) {
+        onExit(wrapper.exitCode, wrapper.signalCode)
+        return
+      }
       wrapper.once("exit", onExit)
     })
     let holderIdentityForCleanup: import("./process-liveness.test-support").ProcessIdentity | null = null

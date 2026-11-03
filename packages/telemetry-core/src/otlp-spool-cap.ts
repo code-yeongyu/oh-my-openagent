@@ -1,4 +1,13 @@
-import { compareBatchIds, deleteFile, dropFile, fileStat, listQuarantine, listSpool, QUARANTINE_DIR, type SpoolContext } from "./otlp-spool-dir"
+import {
+  compareBatchIds,
+  deleteFile,
+  dropFile,
+  fileStat,
+  listQuarantine,
+  listSpool,
+  QUARANTINE_DIR,
+  type SpoolContext,
+} from "./otlp-spool-dir"
 import type { Signal } from "./otlp-spool-file"
 
 /**

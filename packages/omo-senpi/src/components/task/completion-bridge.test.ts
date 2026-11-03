@@ -28,26 +28,29 @@ function tempProject(): string {
 
 function pendingRunner(): ManagedRunner {
   return {
-    start: (spec): Promise<ManagedChildHandle> => Promise.resolve({
-      task_id: spec.taskId,
-      sessionId: `session-${spec.taskId}`,
-      pid: undefined,
-      steer: () => Promise.resolve(),
-      followUp: () => Promise.resolve(),
-      abort: () => Promise.resolve(),
-      subscribe: () => () => {},
-      waitForOutcome: () => new Promise(() => {}),
-      lastAssistantText: () => undefined,
-      dispose: () => Promise.resolve(),
-    }),
+    start: (spec): Promise<ManagedChildHandle> =>
+      Promise.resolve({
+        task_id: spec.taskId,
+        sessionId: `session-${spec.taskId}`,
+        pid: undefined,
+        steer: () => Promise.resolve(),
+        followUp: () => Promise.resolve(),
+        abort: () => Promise.resolve(),
+        subscribe: () => () => {},
+        waitForOutcome: () => new Promise(() => {}),
+        lastAssistantText: () => undefined,
+        dispose: () => Promise.resolve(),
+      }),
   }
 }
 
-function createHarness(options: {
-  currentSessionId?: string | null
-  runner?: ManagedRunner
-  onMessage?: (message: ParentNotifierMessage) => void
-} = {}): {
+function createHarness(
+  options: {
+    currentSessionId?: string | null
+    runner?: ManagedRunner
+    onMessage?: (message: ParentNotifierMessage) => void
+  } = {},
+): {
   readonly manager: TaskManager
   readonly messages: ParentNotifierMessage[]
   readonly complete: (taskId: string) => void
@@ -58,17 +61,29 @@ function createHarness(options: {
   const backing = createTaskRecordStore({ project_dir: tempProject() })
   const messages: ParentNotifierMessage[] = []
   const completion = createCompletionNotifier({
-    notifier: { enqueue: (message) => { messages.push(message); options.onMessage?.(message) } },
+    notifier: {
+      enqueue: (message) => {
+        messages.push(message)
+        options.onMessage?.(message)
+      },
+    },
     store: backing,
   })
   let managerRef: TaskManager | undefined
   let notifyCalls = 0
   const store = createCompletionObservingStore(backing, {
     // Counts the bridge's own calls, so "once" is the bridge's guarantee, not the notifier's dedupe.
-    notifier: { ...completion, notifyTerminal: (input) => { notifyCalls += 1; return completion.notifyTerminal(input) } },
+    notifier: {
+      ...completion,
+      notifyTerminal: (input) => {
+        notifyCalls += 1
+        return completion.notifyTerminal(input)
+      },
+    },
     parentState: () => ({ kind: "idle" }),
     wasBackground: (taskId) => managerRef?.wasBackground(taskId) ?? false,
-    currentSessionId: () => (options.currentSessionId === null ? undefined : (options.currentSessionId ?? "parent-session")),
+    currentSessionId: () =>
+      options.currentSessionId === null ? undefined : (options.currentSessionId ?? "parent-session"),
   })
   const runner = options.runner ?? pendingRunner()
   const manager = createTaskManager({
@@ -92,10 +107,14 @@ function createHarness(options: {
       })
     },
     lose: (taskId) => {
-      store.mutate(taskId, (record) => markRecordLostForReconciliation(record, {
-        timestamp: "2026-07-28T00:00:01.000Z",
-        error_message: "revival deferred: model_unavailable; exhausted 3 retry attempts",
-      }).record)
+      store.mutate(
+        taskId,
+        (record) =>
+          markRecordLostForReconciliation(record, {
+            timestamp: "2026-07-28T00:00:01.000Z",
+            error_message: "revival deferred: model_unavailable; exhausted 3 retry attempts",
+          }).record,
+      )
     },
   }
 }
@@ -203,9 +222,14 @@ describe("completion bridge live background promotion", () => {
     // given
     const release = Promise.withResolvers<void>()
     const refusing: ManagedRunner = {
-      start: () => release.promise.then(() => {
-        throw new RunnerError({ kind: "host_unavailable", reason: "host_busy", message: "the task host is not answering" })
-      }),
+      start: () =>
+        release.promise.then(() => {
+          throw new RunnerError({
+            kind: "host_unavailable",
+            reason: "host_busy",
+            message: "the task host is not answering",
+          })
+        }),
     }
     const arrived = Promise.withResolvers<ParentNotifierMessage>()
     const harness = createHarness({ runner: refusing, onMessage: arrived.resolve })
@@ -223,7 +247,9 @@ describe("completion bridge live background promotion", () => {
     release.resolve()
     const message = await Promise.race([
       arrived.promise,
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("waited 2s for the start-failure notification, it never came")), 2_000)),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("waited 2s for the start-failure notification, it never came")), 2_000),
+      ),
     ])
 
     // then

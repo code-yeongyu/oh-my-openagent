@@ -1,9 +1,6 @@
 import { describe, expect, it, mock } from "bun:test"
 
-import {
-  createCompactionAutocontinueHandler,
-  createSessionCompactingHandler,
-} from "./plugin/session-compacting"
+import { createCompactionAutocontinueHandler, createSessionCompactingHandler } from "./plugin/session-compacting"
 
 describe("experimental.session.compacting handler", () => {
   //#given all three hooks are present
@@ -37,12 +34,7 @@ describe("experimental.session.compacting handler", () => {
     const output = { context: [] as string[], prompt: undefined as string | undefined }
     await handler({ sessionID: "ses_test" }, output)
 
-    expect(callOrder).toEqual([
-      "checkpointCapture",
-      "capture",
-      "preCompact",
-      "contextInjector",
-    ])
+    expect(callOrder).toEqual(["checkpointCapture", "capture", "preCompact", "contextInjector"])
     expect(output.context).toEqual(["context-for-ses_test"])
   })
 

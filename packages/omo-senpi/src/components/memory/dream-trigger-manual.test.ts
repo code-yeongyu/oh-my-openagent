@@ -2,7 +2,17 @@ import { describe, expect, test } from "bun:test"
 import { createShutdownDrain } from "./shutdown-drain"
 import { DREAM_VOLUME_GATE_BYTES, evaluateDreamGates, resolveDreamTriggerSettings } from "./dream-trigger"
 import { memorySettings } from "./memory.test-support"
-import { CONVERSATION, NOW_MS, fireTimer, fixture, gateProbe, noopSteps, settle, triggerSettings, writeConversation } from "./dream-trigger.test-support"
+import {
+  CONVERSATION,
+  NOW_MS,
+  fireTimer,
+  fixture,
+  gateProbe,
+  noopSteps,
+  settle,
+  triggerSettings,
+  writeConversation,
+} from "./dream-trigger.test-support"
 
 describe("manual dream origin", () => {
   test("#given a fresh sub-floor transcript and a recent dream #when a manual dream is requested #then it launches past every gate", async () => {

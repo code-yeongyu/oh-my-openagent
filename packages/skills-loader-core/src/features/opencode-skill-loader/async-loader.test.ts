@@ -147,7 +147,7 @@ name: brainstorming
 description: Nested brainstorming skill
 ---
 Nested skill.
-`
+`,
       )
 
       // when
@@ -171,7 +171,7 @@ name: brainstorming
 description: Nested brainstorming skill
 ---
 Nested skill.
-`
+`,
       )
 
       // when
@@ -195,7 +195,7 @@ name: brainstorming
 description: Nested brainstorming skill
 ---
 Nested skill.
-`
+`,
       )
 
       // when

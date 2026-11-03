@@ -37,15 +37,14 @@ function getIntentVersion(pluginInfo: PluginEntryInfo): string {
 }
 
 function getPackageNameFromIntent(pluginInfo: PluginEntryInfo): string {
-  return ACCEPTED_PACKAGE_NAMES.find((packageName) =>
-    pluginInfo.entry === packageName || pluginInfo.entry.startsWith(`${packageName}@`)
-  ) ?? PACKAGE_NAME
+  return (
+    ACCEPTED_PACKAGE_NAMES.find(
+      (packageName) => pluginInfo.entry === packageName || pluginInfo.entry.startsWith(`${packageName}@`),
+    ) ?? PACKAGE_NAME
+  )
 }
 
-function writeCachePackageJson(
-  cachePackageJsonPath: string,
-  pkgJson: CachePackageJson,
-): SyncResult {
+function writeCachePackageJson(cachePackageJsonPath: string, pkgJson: CachePackageJson): SyncResult {
   const tmpPath = `${cachePackageJsonPath}.${crypto.randomUUID()}`
   try {
     fs.mkdirSync(path.dirname(cachePackageJsonPath), { recursive: true })
@@ -102,7 +101,9 @@ export function syncCachePackageJsonToIntent(pluginInfo: PluginEntryInfo): SyncR
   }
 
   if (!pkgJson || !pkgJson.dependencies?.[packageName]) {
-    log("[auto-update-checker] Plugin missing from cache package.json dependencies, adding dependency", { intentVersion })
+    log("[auto-update-checker] Plugin missing from cache package.json dependencies, adding dependency", {
+      intentVersion,
+    })
     const nextPkgJson = {
       ...(pkgJson ?? {}),
       dependencies: {
@@ -128,12 +129,10 @@ export function syncCachePackageJsonToIntent(pluginInfo: PluginEntryInfo): SyncR
 
   if (intentIsTag && currentIsSemver) {
     log(
-      `[auto-update-checker] Syncing cache package.json: "${currentVersion}" → "${intentVersion}" (opencode.json intent)`
+      `[auto-update-checker] Syncing cache package.json: "${currentVersion}" → "${intentVersion}" (opencode.json intent)`,
     )
   } else {
-    log(
-      `[auto-update-checker] Updating cache package.json: "${currentVersion}" → "${intentVersion}"`
-    )
+    log(`[auto-update-checker] Updating cache package.json: "${currentVersion}" → "${intentVersion}"`)
   }
 
   pkgJson.dependencies[packageName] = intentVersion

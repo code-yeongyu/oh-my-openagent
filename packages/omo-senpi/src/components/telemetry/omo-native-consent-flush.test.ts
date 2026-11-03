@@ -7,7 +7,13 @@ import { createDefaultPostHogTransport } from "@oh-my-opencode/telemetry-core"
 import type { TelemetryTransport, TelemetryTransportFactory } from "@oh-my-opencode/telemetry-core"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { CONSENT_CACHE_MS, createOmoNativeTelemetryComponent } from "./omo-native-component"
-import { FIXED_NOW, createEnabledEnv, createOsProvider, createSilentLogger, withTempAgentDir } from "./telemetry.test-support"
+import {
+  FIXED_NOW,
+  createEnabledEnv,
+  createOsProvider,
+  createSilentLogger,
+  withTempAgentDir,
+} from "./telemetry.test-support"
 
 // #10226 delta-3 M1: consent was checked before an event entered the PostHog SDK queue, but nothing
 // re-checked it when that queue was sent (the 10 s interval flush, the 20-event batch flush, the
@@ -33,7 +39,8 @@ async function withPostHogSink(run: (sink: Sink) => Promise<void>): Promise<void
       const text = new TextDecoder().decode(request.headers.get("content-encoding") === "gzip" ? gunzipSync(raw) : raw)
       const body: unknown = JSON.parse(text)
       const batch = isRecord(body) && Array.isArray(body.batch) ? body.batch : [body]
-      for (const event of batch) posted.push(isRecord(event) && typeof event.event === "string" ? event.event : "<unnamed>")
+      for (const event of batch)
+        posted.push(isRecord(event) && typeof event.event === "string" ? event.event : "<unnamed>")
       return Response.json({ status: 1 })
     },
   })
@@ -98,7 +105,10 @@ type Harness = {
 
 function startSession(agentDir: string, sink: Sink): Harness {
   mkdirSync(agentDir, { recursive: true })
-  writeFileSync(join(agentDir, "models.json"), JSON.stringify({ providers: { openai: { models: [{ id: "gpt-5.6-sol" }] } } }))
+  writeFileSync(
+    join(agentDir, "models.json"),
+    JSON.stringify({ providers: { openai: { models: [{ id: "gpt-5.6-sol" }] } } }),
+  )
   let consent = true
   let clock = 1_000_000
   let nativeTransport: TelemetryTransport | undefined
@@ -107,7 +117,8 @@ function startSession(agentDir: string, sink: Sink): Harness {
   const factory: TelemetryTransportFactory = (apiKey, options) => {
     // Only the native queue is under test. The legacy daily-active ping runs fire-and-forget and can
     // build its client after the test ended, so it gets an inert transport instead of a real one.
-    if (options.flushAt !== 20) return { capture: () => undefined, flush: async () => undefined, shutdown: async () => undefined }
+    if (options.flushAt !== 20)
+      return { capture: () => undefined, flush: async () => undefined, shutdown: async () => undefined }
     const transport = createDefaultPostHogTransport(apiKey, options)
     sink.transports.push(transport)
     nativeTransport = transport
@@ -259,7 +270,11 @@ describe("omo-native queued events after a consent withdrawal (#10226 M1)", () =
         // when
         session.setConsent(true)
         await flush(session.nativeTransport())
-        await session.pi.dispatch("session_shutdown", { type: "session_shutdown", reason: "quit" }, context("failed-drop"))
+        await session.pi.dispatch(
+          "session_shutdown",
+          { type: "session_shutdown", reason: "quit" },
+          context("failed-drop"),
+        )
 
         // then
         expect(native(sink.posted)).not.toContain("session_started")

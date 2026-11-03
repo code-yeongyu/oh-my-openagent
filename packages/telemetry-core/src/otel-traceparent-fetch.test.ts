@@ -39,7 +39,9 @@ describe("traceparent injection allowlist", () => {
     ]
 
     // when
-    await turn.run(() => Promise.all(urls.map((url) => wrapped(url, { method: "POST", headers: { "content-type": "application/json" } }))))
+    await turn.run(() =>
+      Promise.all(urls.map((url) => wrapped(url, { method: "POST", headers: { "content-type": "application/json" } }))),
+    )
     turn.end("ok")
     await wrapped("https://t.omo.dev/v1/logs", { method: "POST", headers: {} })
 
@@ -73,8 +75,8 @@ describe("traceparent injection allowlist", () => {
     turn.end("ok")
 
     // then
-    expect(recorder.calls.map(({ url, headers }) => [url, headers["traceparent"], headers["x-omo-ingest-key"]])).toEqual([
-      ["https://collector.test/v1/logs", turn.traceparent, "test-ingest-key"],
-    ])
+    expect(
+      recorder.calls.map(({ url, headers }) => [url, headers["traceparent"], headers["x-omo-ingest-key"]]),
+    ).toEqual([["https://collector.test/v1/logs", turn.traceparent, "test-ingest-key"]])
   })
 })

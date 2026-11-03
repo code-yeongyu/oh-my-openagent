@@ -11,7 +11,8 @@ export async function writeCachedMarketplaceManifest(input: {
   await mkdir(marketplaceDir, { recursive: true })
   for (const plugin of input.plugins) {
     const pluginPath = join(input.marketplaceRoot, plugin.name, plugin.version)
-    if (!(await isDirectory(pluginPath))) throw new Error(`Cannot write cached marketplace manifest: ${pluginPath} does not exist`)
+    if (!(await isDirectory(pluginPath)))
+      throw new Error(`Cannot write cached marketplace manifest: ${pluginPath} does not exist`)
   }
   const manifestPath = join(marketplaceDir, "marketplace.json")
   const tempPath = join(marketplaceDir, `.marketplace.json.tmp-${process.pid}-${Date.now()}`)

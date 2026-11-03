@@ -11,7 +11,7 @@ function getMessageKey(sessionID: string, messageID: string): MessageConsumption
 export function recordBackgroundOutputConsumption(
   parentSessionID: string | undefined,
   parentMessageID: string | undefined,
-  taskSessionID: string | undefined
+  taskSessionID: string | undefined,
 ): void {
   if (!parentSessionID || !parentMessageID || !taskSessionID) return
 
@@ -28,7 +28,7 @@ export function recordBackgroundOutputConsumption(
 
 export function restoreBackgroundOutputConsumption(
   parentSessionID: string | undefined,
-  parentMessageID: string | undefined
+  parentMessageID: string | undefined,
 ): void {
   if (!parentSessionID || !parentMessageID) return
 

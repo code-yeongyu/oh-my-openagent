@@ -3,12 +3,14 @@ import * as z from "zod"
 const mode = z.enum(["off", "best-effort", "required"])
 const languages = z.record(z.string(), z.boolean()).optional()
 
-export const OmoFormatOnMutationLayerSchema = z.object({
-  mode: mode.optional(),
-  languages,
-  maxFileBytes: z.number().int().positive().optional(),
-  timeoutMs: z.number().int().positive().optional(),
-}).strict()
+export const OmoFormatOnMutationLayerSchema = z
+  .object({
+    mode: mode.optional(),
+    languages,
+    maxFileBytes: z.number().int().positive().optional(),
+    timeoutMs: z.number().int().positive().optional(),
+  })
+  .strict()
 
 export const OmoFormatOnMutationSchema = OmoFormatOnMutationLayerSchema.extend({
   mode: mode.default("best-effort"),

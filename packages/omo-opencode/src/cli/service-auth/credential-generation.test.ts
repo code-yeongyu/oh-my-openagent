@@ -13,9 +13,15 @@ describe("persistent credential identity generations", () => {
       expect(captured).toHaveProperty("credentialGeneration")
       const generation = Reflect.get(captured ?? {}, "credentialGeneration")
       switch (transition) {
-        case "device": await second.write({ ...original, device: { ...original.device, id: "second" } }); break
-        case "signing": await second.write({ ...original, signingPrivateKey: "second-signing" }); break
-        case "sealing": await second.write({ ...original, sealingPrivateKey: "second-sealing" }); break
+        case "device":
+          await second.write({ ...original, device: { ...original.device, id: "second" } })
+          break
+        case "signing":
+          await second.write({ ...original, signingPrivateKey: "second-signing" })
+          break
+        case "sealing":
+          await second.write({ ...original, sealingPrivateKey: "second-sealing" })
+          break
         case "aba":
           await second.write({ ...original, device: { ...original.device, id: "second" } })
           await second.write(captured ?? original)
@@ -24,9 +30,11 @@ describe("persistent credential identity generations", () => {
           await second.clear()
           await second.write(captured ?? original)
           break
-        case "refresh": await second.write({ ...original, accessToken: "rotated", refreshToken: "rotated-refresh" }); break
+        case "refresh":
+          await second.write({ ...original, accessToken: "rotated", refreshToken: "rotated-refresh" })
+          break
       }
-      const after = Reflect.get(await first.read() ?? {}, "credentialGeneration")
+      const after = Reflect.get((await first.read()) ?? {}, "credentialGeneration")
       if (transition === "refresh") expect(after).toBe(generation)
       else expect(after).not.toBe(generation)
       expect(typeof after).toBe("string")

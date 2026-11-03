@@ -61,7 +61,10 @@ function isInsideOrEqual(dir: string, root: string): boolean {
 
 export function createProjectIdentityResolver(options: ProjectIdentityResolverOptions): ProjectIdentityResolver {
   const sessionCwd = resolve(options.sessionCwd)
-  const env = options.memoryRoot === undefined ? (options.env ?? process.env) : { ...(options.env ?? process.env), [MEMORY_ROOT_ENV_VAR]: options.memoryRoot }
+  const env =
+    options.memoryRoot === undefined
+      ? (options.env ?? process.env)
+      : { ...(options.env ?? process.env), [MEMORY_ROOT_ENV_VAR]: options.memoryRoot }
   const mode = options.autoIdentity ?? "path"
   const probe = createProjectScopeProbe(options.fs)
   const linkedRoots = new Set<string>()
@@ -100,7 +103,8 @@ export function createProjectIdentityResolver(options: ProjectIdentityResolverOp
   // Probes first, records after: `settle` reruns this until every answer is loaded.
   function considerLink(link: string, scope: ScopeRoots): void {
     if (checkedLinks.has(link)) return
-    const target = isDirectorySymlink(link) && !isInsideGitWorkTree(dirname(link)) ? realPathOrResolved(link) : undefined
+    const target =
+      isDirectorySymlink(link) && !isInsideGitWorkTree(dirname(link)) ? realPathOrResolved(link) : undefined
     checkedLinks.add(link)
     if (target !== undefined && !isTooBroadRoot(target, scope)) linkedRoots.add(target)
   }
@@ -109,7 +113,11 @@ export function createProjectIdentityResolver(options: ProjectIdentityResolverOp
   // memory root would pull every project on the machine into scope (`ln -s ~ x`): only a link that
   // names a project's own tree counts.
   function isTooBroadRoot(target: string, scope: ScopeRoots): boolean {
-    return isInsideOrEqual(scope.session, target) || isInsideOrEqual(scope.home, target) || isInsideOrEqual(scope.memory, target)
+    return (
+      isInsideOrEqual(scope.session, target) ||
+      isInsideOrEqual(scope.home, target) ||
+      isInsideOrEqual(scope.memory, target)
+    )
   }
 
   async function scanSessionTree(scope: ScopeRoots): Promise<void> {
@@ -143,7 +151,9 @@ export function createProjectIdentityResolver(options: ProjectIdentityResolverOp
   // A touched path spelled through a symlink names its own link even past the scan's depth.
   function linksAlong(lexicalDir: string, scope: ScopeRoots): void {
     if (!isInsideOrEqual(lexicalDir, sessionCwd)) return
-    const parts = relative(sessionCwd, lexicalDir).split(sep).filter((part) => part !== "")
+    const parts = relative(sessionCwd, lexicalDir)
+      .split(sep)
+      .filter((part) => part !== "")
     let current = sessionCwd
     for (const part of parts) {
       current = join(current, part)
@@ -158,10 +168,14 @@ export function createProjectIdentityResolver(options: ProjectIdentityResolverOp
     return linked === undefined ? real : realPathOrResolved(linked.hashSource)
   }
 
-  function deepestRoot(dir: string, sessionRoot: string): { readonly root: string; readonly candidate: boolean } | undefined {
+  function deepestRoot(
+    dir: string,
+    sessionRoot: string,
+  ): { readonly root: string; readonly candidate: boolean } | undefined {
     let best: { root: string; candidate: boolean } | undefined
     for (const root of linkedRoots) {
-      if (isInsideOrEqual(dir, root) && (best === undefined || root.length > best.root.length)) best = { root, candidate: true }
+      if (isInsideOrEqual(dir, root) && (best === undefined || root.length > best.root.length))
+        best = { root, candidate: true }
     }
     if (isInsideOrEqual(dir, sessionRoot) && (best === undefined || sessionRoot.length > best.root.length)) {
       best = { root: sessionRoot, candidate: false }
@@ -173,7 +187,8 @@ export function createProjectIdentityResolver(options: ProjectIdentityResolverOp
     const cached = byDir.get(dir)
     if (cached !== undefined) return cached
     const identity = resolveAutoIdentity(dir, env, mode, probe)
-    const found = identity.id !== options.boundId && probe.exists(identity.paths.repo) ? { projectDir: dir, identity } : null
+    const found =
+      identity.id !== options.boundId && probe.exists(identity.paths.repo) ? { projectDir: dir, identity } : null
     byDir.set(dir, found)
     return found
   }

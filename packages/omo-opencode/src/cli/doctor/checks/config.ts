@@ -62,10 +62,10 @@ function collectModelResolutionIssues(config: OmoConfig): DoctorIssue[] {
   const resolution = getModelResolutionInfoWithOverrides(config)
 
   const invalidAgentOverrides = resolution.agents.filter(
-    (agent) => agent.userOverride && !agent.userOverride.includes("/")
+    (agent) => agent.userOverride && !agent.userOverride.includes("/"),
   )
   const invalidCategoryOverrides = resolution.categories.filter(
-    (category) => category.userOverride && !category.userOverride.includes("/")
+    (category) => category.userOverride && !category.userOverride.includes("/"),
   )
 
   for (const invalidAgent of invalidAgentOverrides) {
@@ -114,23 +114,28 @@ export async function checkConfig(): Promise<CheckResult> {
   const validation = validateConfig()
   const issues: DoctorIssue[] = []
   const homeDir = process.env.HOME ?? process.env.USERPROFILE ?? process.cwd()
-  const legacyWarning = legacyConfigLeftoverWarning(findLegacyConfigLeftovers({
-    cwd: process.cwd(),
-    homeDir,
-  }))
+  const legacyWarning = legacyConfigLeftoverWarning(
+    findLegacyConfigLeftovers({
+      cwd: process.cwd(),
+      homeDir,
+    }),
+  )
   if (legacyWarning !== undefined) issues.push(legacyWarning)
-  issues.push(...validation.warnings.map((warning) => ({
-    title: warning,
-    description: "The rest of that file still applies; fix or remove this value to use it.",
-    severity: "warning" as const,
-    affects: ["configuration"],
-  })))
+  issues.push(
+    ...validation.warnings.map((warning) => ({
+      title: warning,
+      description: "The rest of that file still applies; fix or remove this value to use it.",
+      severity: "warning" as const,
+      affects: ["configuration"],
+    })),
+  )
 
   if (!validation.exists) {
     return {
       name: CHECK_NAMES[CHECK_IDS.CONFIG],
       status: issues.length > 0 ? "warn" : "pass",
-      message: issues.length > 0 ? "Legacy configuration migration required" : "No custom config found; defaults are used",
+      message:
+        issues.length > 0 ? "Legacy configuration migration required" : "No custom config found; defaults are used",
       details: undefined,
       issues,
     }
@@ -143,7 +148,7 @@ export async function checkConfig(): Promise<CheckResult> {
         description: error,
         severity: "error" as const,
         affects: ["plugin startup"],
-      }))
+      })),
     )
 
     return {

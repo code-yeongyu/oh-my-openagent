@@ -12,7 +12,13 @@ import { withDevices } from "./test-support"
 // crash, and an older baseline replayed after a newer one. A hand-resolved register conflict
 // survives the next capture and a sync on both devices.
 
-async function fire(device: ItemDevice, doc: LoroDoc, base: string, frontier: ItemFrontier, working: string): Promise<void> {
+async function fire(
+  device: ItemDevice,
+  doc: LoroDoc,
+  base: string,
+  frontier: ItemFrontier,
+  working: string,
+): Promise<void> {
   const update = await captureOnDevice(device, "item.md", doc, base, frontier, working)
   if (update !== null) doc.import(update)
 }

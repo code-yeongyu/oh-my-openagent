@@ -27,13 +27,21 @@ const refreshTokenHash = (token: string): string => createHash("sha256").update(
 export const sameOwner = sameStableOwner
 
 export function newRefreshAttempt(
-  origin: string, owner: CredentialOwner, token: string, reading: RecoveryClockReading,
+  origin: string,
+  owner: CredentialOwner,
+  token: string,
+  reading: RecoveryClockReading,
   idempotencyKey = randomBytes(32).toString("base64url"),
 ): RefreshAttempt {
   return {
-    writerProtocol: 2, origin, owner: { ...owner }, refreshTokenHash: refreshTokenHash(token),
+    writerProtocol: 2,
+    origin,
+    owner: { ...owner },
+    refreshTokenHash: refreshTokenHash(token),
     idempotencyKey,
-    firstSend: { ...reading }, deadline: reading.wallTimeMs + REFRESH_SEND_BUDGET_MS, state: "ready",
+    firstSend: { ...reading },
+    deadline: reading.wallTimeMs + REFRESH_SEND_BUDGET_MS,
+    state: "ready",
   }
 }
 
@@ -50,9 +58,15 @@ export function eligibleAttempt(
   const attempt = parsed.data
   if (attempt.state === "exhausted") return null
   const current = clock.data
-  if (attempt.origin !== origin || !sameOwner(attempt.owner, owner) || attempt.owner.generation !== owner.generation ||
-      attempt.refreshTokenHash !== refreshTokenHash(token) || attempt.firstSend.bootId !== current.bootId ||
-      attempt.deadline !== attempt.firstSend.wallTimeMs + REFRESH_SEND_BUDGET_MS) return null
+  if (
+    attempt.origin !== origin ||
+    !sameOwner(attempt.owner, owner) ||
+    attempt.owner.generation !== owner.generation ||
+    attempt.refreshTokenHash !== refreshTokenHash(token) ||
+    attempt.firstSend.bootId !== current.bootId ||
+    attempt.deadline !== attempt.firstSend.wallTimeMs + REFRESH_SEND_BUDGET_MS
+  )
+    return null
   const wallElapsed = current.wallTimeMs - attempt.firstSend.wallTimeMs
   const continuousElapsed = current.continuousTimeMs - attempt.firstSend.continuousTimeMs
   if (wallElapsed < 0 || continuousElapsed < 0 || Math.abs(wallElapsed - continuousElapsed) > 1000) return null

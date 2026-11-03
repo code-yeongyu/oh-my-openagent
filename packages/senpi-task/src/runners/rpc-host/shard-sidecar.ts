@@ -48,23 +48,27 @@ export async function writeStartedShardSidecar(input: WriteStartedSidecarInput):
   if (parsed === null) return
   const metaPath = shardMetaPath(dirname(input.socket), parsed.kind, parsed.key)
   const fs = input.fs ?? DURABLE_JSON_FS
-  await withTaskRecordLockAsync(metaPath, async () => {
-    const previous = readSidecarObject(fs, metaPath)
-    const ownerSessionId = input.owner?.ownerSessionId ?? stringField(previous, "owner_session_id")
-    const ownerSessionFile = input.owner?.ownerSessionFile ?? stringField(previous, "owner_session_file")
-    const sidecar: ShardSidecar = {
-      socket: input.socket,
-      kind: parsed.kind,
-      root: dirname(input.socket),
-      ...(ownerSessionId === undefined ? {} : { owner_session_id: ownerSessionId }),
-      ...(ownerSessionFile === undefined ? {} : { owner_session_file: ownerSessionFile }),
-      created_at: new Date(input.now()).toISOString(),
-      created_by_pid: input.pid,
-      ...(input.notice === undefined ? {} : { notice: input.notice }),
-      stores: storesOf(previous),
-    }
-    fs.write(metaPath, `${JSON.stringify(sidecar, null, 2)}\n`)
-  }, DURABLE_JSON_LOCK_OPTIONS)
+  await withTaskRecordLockAsync(
+    metaPath,
+    async () => {
+      const previous = readSidecarObject(fs, metaPath)
+      const ownerSessionId = input.owner?.ownerSessionId ?? stringField(previous, "owner_session_id")
+      const ownerSessionFile = input.owner?.ownerSessionFile ?? stringField(previous, "owner_session_file")
+      const sidecar: ShardSidecar = {
+        socket: input.socket,
+        kind: parsed.kind,
+        root: dirname(input.socket),
+        ...(ownerSessionId === undefined ? {} : { owner_session_id: ownerSessionId }),
+        ...(ownerSessionFile === undefined ? {} : { owner_session_file: ownerSessionFile }),
+        created_at: new Date(input.now()).toISOString(),
+        created_by_pid: input.pid,
+        ...(input.notice === undefined ? {} : { notice: input.notice }),
+        stores: storesOf(previous),
+      }
+      fs.write(metaPath, `${JSON.stringify(sidecar, null, 2)}\n`)
+    },
+    DURABLE_JSON_LOCK_OPTIONS,
+  )
 }
 
 export interface RegisterSidecarStoreInput {
@@ -80,18 +84,25 @@ export async function registerSidecarStore(input: RegisterSidecarStoreInput): Pr
   if (metaPath === undefined) return "no_sidecar"
   const fs = input.fs ?? DURABLE_JSON_FS
   const storeDir = resolve(input.storeDir)
-  return await withTaskRecordLockAsync(metaPath, async () => {
-    const previous = readSidecarObject(fs, metaPath)
-    if (previous === undefined) return "no_sidecar"
-    const stores = storesOf(previous)
-    if (stores.includes(storeDir) && Array.isArray(previous.stores)) return "already_registered"
-    const next = { ...previous, stores: stores.includes(storeDir) ? stores : [...stores, storeDir] }
-    fs.write(metaPath, `${JSON.stringify(next, null, 2)}\n`)
-    return "registered"
-  }, DURABLE_JSON_LOCK_OPTIONS)
+  return await withTaskRecordLockAsync(
+    metaPath,
+    async () => {
+      const previous = readSidecarObject(fs, metaPath)
+      if (previous === undefined) return "no_sidecar"
+      const stores = storesOf(previous)
+      if (stores.includes(storeDir) && Array.isArray(previous.stores)) return "already_registered"
+      const next = { ...previous, stores: stores.includes(storeDir) ? stores : [...stores, storeDir] }
+      fs.write(metaPath, `${JSON.stringify(next, null, 2)}\n`)
+      return "registered"
+    },
+    DURABLE_JSON_LOCK_OPTIONS,
+  )
 }
 
-export function readShardSidecar(metaPath: string, fs: DurableJsonFs = DURABLE_JSON_FS): Record<string, unknown> | undefined {
+export function readShardSidecar(
+  metaPath: string,
+  fs: DurableJsonFs = DURABLE_JSON_FS,
+): Record<string, unknown> | undefined {
   return readSidecarObject(fs, metaPath)
 }
 

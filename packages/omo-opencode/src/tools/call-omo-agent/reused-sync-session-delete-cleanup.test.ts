@@ -1,10 +1,6 @@
 import { afterEach, describe, expect, it } from "bun:test"
 
-import {
-  _resetForTesting,
-  subagentSessions,
-  syncSubagentSessions,
-} from "../../features/claude-code-session-state"
+import { _resetForTesting, subagentSessions, syncSubagentSessions } from "../../features/claude-code-session-state"
 import { createEventHandler } from "../../plugin/event"
 
 function createMinimalEventHandler() {

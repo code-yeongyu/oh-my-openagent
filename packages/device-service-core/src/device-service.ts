@@ -60,7 +60,10 @@ export type DeviceService = {
   readonly thisDevice: () => Promise<DeviceRef | null>
   readonly devices: () => Promise<readonly DeviceRow[]>
   /** One listing round across the account's devices; `onRevision` sees each complete revision as it lands. */
-  readonly sessions: (filter?: SessionFilter, onRevision?: (revision: ListingRevision) => void) => Promise<ListingResult>
+  readonly sessions: (
+    filter?: SessionFilter,
+    onRevision?: (revision: ListingRevision) => void,
+  ) => Promise<ListingResult>
   readonly attach: (device: string, sessionId: string) => Promise<RemoteAttach>
   readonly close: () => void
   readonly closed: Promise<void>
@@ -83,13 +86,16 @@ export type ConnectDeviceServiceOptions = {
 /** Opens a proven connection to this device's service (mutual proof before any request) and returns the typed SDK. */
 export async function connectDeviceService(options: ConnectDeviceServiceOptions): Promise<DeviceService> {
   const stateDir = options.stateDir ?? deviceServiceStateDir()
-  const client = await (options.connect ?? connectLocalApi)({ stateDir, client: { name: "omo", version: options.version } })
+  const client = await (options.connect ?? connectLocalApi)({
+    stateDir,
+    client: { name: "omo", version: options.version },
+  })
   return {
     serviceVersion: client.welcome.service_version,
     initialStatus: client.welcome.state,
     status: () => client.request("status.get", {}),
-    watchStatus: async listener => {
-      const stop = client.onEvent(event => {
+    watchStatus: async (listener) => {
+      const stop = client.onEvent((event) => {
         if (event.kind === "status.changed") listener(event.status)
       })
       try {
@@ -100,14 +106,19 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
       }
       return stop
     },
-    setEnabled: async enabled => (await client.request("service.set_enabled", { enabled })).enabled,
+    setEnabled: async (enabled) => (await client.request("service.set_enabled", { enabled })).enabled,
     registerRefresher: async (binaryPath, version) => {
       await client.request("refresher.register", { binary_path: binaryPath, version })
     },
     adopt: async ({ device, signingPrivateKey, sealingPrivateKey }) =>
-      (await client.request("device.adopt", { device, signing_private_key: signingPrivateKey, sealing_private_key: sealingPrivateKey }))
-        .device,
-    registerEndpoints: async agentDir => {
+      (
+        await client.request("device.adopt", {
+          device,
+          signing_private_key: signingPrivateKey,
+          sealing_private_key: sealingPrivateKey,
+        })
+      ).device,
+    registerEndpoints: async (agentDir) => {
       await client.request("endpoints.register", { agent_dir: agentDir })
     },
     forget: async () => {

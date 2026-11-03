@@ -86,7 +86,9 @@ function createFakeInjector(): FakeInjector {
   }
 }
 
-function createManagerHarness(opts: { maxMonitorsPerSession?: number; isBackgroundSession?: (sessionId: string) => boolean } = {}) {
+function createManagerHarness(
+  opts: { maxMonitorsPerSession?: number; isBackgroundSession?: (sessionId: string) => boolean } = {},
+) {
   const killCallsByCommand = new Map<string, string[]>()
   const injectorsByMonitorId = new Map<string, FakeInjector>()
   const scheduler = createFakeScheduler()
@@ -307,7 +309,9 @@ describe("MonitorManager", () => {
   describe("#given a background session id", () => {
     test("#when start is requested #then it rejects before spawning", async () => {
       // given
-      const { manager, spawnCalls } = createManagerHarness({ isBackgroundSession: (sessionId) => sessionId === "bg-session" })
+      const { manager, spawnCalls } = createManagerHarness({
+        isBackgroundSession: (sessionId) => sessionId === "bg-session",
+      })
 
       // when
       const rejectedStart = manager.start({ command: "should-not-run", parentSessionId: "bg-session" })

@@ -17,7 +17,6 @@ import { log } from "../../shared/logger"
 
 const SUMMARIZE_RETRY_TOTAL_TIMEOUT_MS = 120_000
 
-
 async function showToastSafely(
   client: Client,
   body: {
@@ -101,8 +100,7 @@ export async function runSummarizeRetryStrategy(params: {
         params.client,
         {
           title: "Recovery Failed",
-          message:
-            "Max recovery attempts (3) reached for empty content error. Please start a new session.",
+          message: "Max recovery attempts (3) reached for empty content error. Please start a new session.",
           variant: "error",
           duration: 10000,
         },
@@ -144,7 +142,7 @@ export async function runSummarizeRetryStrategy(params: {
           params.pluginConfig,
           params.sessionID,
           providerID,
-          modelID
+          modelID,
         )
 
         const summarizeBody = { providerID: targetProviderID, modelID: targetModelID, auto: true }
@@ -178,9 +176,7 @@ export async function runSummarizeRetryStrategy(params: {
           return
         }
 
-        const delay =
-          RETRY_CONFIG.initialDelayMs *
-          Math.pow(RETRY_CONFIG.backoffFactor, retryState.attempt - 1)
+        const delay = RETRY_CONFIG.initialDelayMs * Math.pow(RETRY_CONFIG.backoffFactor, retryState.attempt - 1)
         const cappedDelay = Math.min(delay, RETRY_CONFIG.maxDelayMs, remainingTimeMs)
 
         const timeout = setTimeout(() => {

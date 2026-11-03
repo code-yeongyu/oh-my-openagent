@@ -9,7 +9,11 @@ import {
 
 describe("fragment parsing", () => {
   test.each([
-    ["accepts a numeric fragment", "42.md", "**Fixed.** A fix. ([#42](https://github.com/code-yeongyu/oh-my-openagent/pull/42))"],
+    [
+      "accepts a numeric fragment",
+      "42.md",
+      "**Fixed.** A fix. ([#42](https://github.com/code-yeongyu/oh-my-openagent/pull/42))",
+    ],
     ["accepts a fragment with leading zeros in its id", "042.md", "note"],
   ])("%s", (_name, file, content) => {
     expect(parseFragment(file, content)).toEqual({ pr: 42, content })
@@ -77,7 +81,9 @@ describe("Unreleased section merge", () => {
     )
   })
   test("an empty body reopens the empty shape the release stamp produces", () => {
-    expect(mergeUnreleased(changelog, "")).toBe(`# Changelog\n\nIntro.\n\n## [Unreleased]\n\n## [1.0.0] - 2026-10-16\n\nOld.\n`)
+    expect(mergeUnreleased(changelog, "")).toBe(
+      `# Changelog\n\nIntro.\n\n## [Unreleased]\n\n## [1.0.0] - 2026-10-16\n\nOld.\n`,
+    )
   })
   test("refuses a changelog without the Unreleased heading", () => {
     expect(() => mergeUnreleased("# Changelog\n", "body")).toThrow(/## \[Unreleased\]/)
@@ -86,4 +92,3 @@ describe("Unreleased section merge", () => {
     expect(unreleasedBody(mergeUnreleased(changelog, "**New.** Entry."))).toBe("**New.** Entry.")
   })
 })
-

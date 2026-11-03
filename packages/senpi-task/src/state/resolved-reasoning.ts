@@ -6,9 +6,10 @@ export function readResolvedReasoning(model: ResolvedModelRecord): string | unde
   return model.reasoning ?? model.reasoning_effort ?? model.variant
 }
 
-export function resolvedReasoningFields(
-  model: ResolvedModelRecord,
-): { readonly reasoning?: string; readonly variant?: string } {
+export function resolvedReasoningFields(model: ResolvedModelRecord): {
+  readonly reasoning?: string
+  readonly variant?: string
+} {
   const reasoning = readResolvedReasoning(model)
   return reasoning === undefined ? {} : { reasoning, variant: reasoning }
 }

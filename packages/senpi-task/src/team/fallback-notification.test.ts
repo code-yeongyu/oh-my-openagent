@@ -1,11 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { createCompletionNotifier } from "../completion"
-import type {
-  ParentNotifierMessage,
-  PersistedTaskEvent,
-  TaskRecord,
-} from "../index"
+import type { ParentNotifierMessage, PersistedTaskEvent, TaskRecord } from "../index"
 
 function completedTeamRecord(): TaskRecord {
   return {
@@ -84,8 +80,6 @@ describe("team fallback notification", () => {
     // then
     expect(messages).toHaveLength(1)
     expect(messages[0]?.content.match(/fallback:/gu)).toHaveLength(1)
-    expect(messages[0]?.content).toContain(
-      "fallback:vendor-a/primary-model->vendor-b/fallback-model",
-    )
+    expect(messages[0]?.content).toContain("fallback:vendor-a/primary-model->vendor-b/fallback-model")
   })
 })

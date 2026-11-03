@@ -68,14 +68,21 @@ describe("syncPollTimeoutMs threading", () => {
         })
 
         await withMockedDateNow(60_000, async () => {
-          const result = await pollSyncSession(createMockCtx(), mockClient, {
-            sessionID: "ses_custom",
-            agentToUse: "test-agent",
-            toastManager: null,
-            taskId: undefined,
-          }, 120_000)
+          const result = await pollSyncSession(
+            createMockCtx(),
+            mockClient,
+            {
+              sessionID: "ses_custom",
+              agentToUse: "test-agent",
+              toastManager: null,
+              taskId: undefined,
+            },
+            120_000,
+          )
 
-          expect(result).toBe("Poll inactivity timeout reached after 120000ms without active OpenCode status for session ses_custom")
+          expect(result).toBe(
+            "Poll inactivity timeout reached after 120000ms without active OpenCode status for session ses_custom",
+          )
           expect(abortCount).toBe(1)
         })
       })
@@ -115,12 +122,17 @@ describe("syncPollTimeoutMs threading", () => {
         }
 
         await withMockedDateNow(60_000, async () => {
-          const result = await pollSyncSession(createMockCtx(), mockClient, {
-            sessionID: "ses_active",
-            agentToUse: "oracle",
-            toastManager: null,
-            taskId: undefined,
-          }, 120_000)
+          const result = await pollSyncSession(
+            createMockCtx(),
+            mockClient,
+            {
+              sessionID: "ses_active",
+              agentToUse: "oracle",
+              toastManager: null,
+              taskId: undefined,
+            },
+            120_000,
+          )
 
           expect(result).toBeNull()
           expect(abortCount).toBe(0)
@@ -151,12 +163,17 @@ describe("syncPollTimeoutMs threading", () => {
         }
 
         await withMockedDateNow(1_000, async () => {
-          const result = await pollSyncSession(createMockCtx(), mockClient, {
-            sessionID: "ses_busy_complete",
-            agentToUse: "oracle",
-            toastManager: null,
-            taskId: undefined,
-          }, 120_000)
+          const result = await pollSyncSession(
+            createMockCtx(),
+            mockClient,
+            {
+              sessionID: "ses_busy_complete",
+              agentToUse: "oracle",
+              toastManager: null,
+              taskId: undefined,
+            },
+            120_000,
+          )
 
           expect(result).toBeNull()
           expect(statusCallCount).toBe(5)
@@ -176,12 +193,23 @@ describe("syncPollTimeoutMs threading", () => {
             messages: async () => {
               messageCallCount++
               const turns = Array.from({ length: messageCallCount }, (_, index) => ({
-                info: { id: `msg_a${String(index + 2).padStart(3, "0")}`, role: "assistant", time: { created: 2000 + index }, finish: "tool-calls" },
+                info: {
+                  id: `msg_a${String(index + 2).padStart(3, "0")}`,
+                  role: "assistant",
+                  time: { created: 2000 + index },
+                  finish: "tool-calls",
+                },
                 parts: [{ type: "text", text: `step ${index}` }],
               }))
-              const done = statusCallCount >= 300
-                ? [{ info: { id: "msg_a999", role: "assistant", time: { created: 9000 }, finish: "stop" }, parts: [{ type: "text", text: "done" }] }]
-                : []
+              const done =
+                statusCallCount >= 300
+                  ? [
+                      {
+                        info: { id: "msg_a999", role: "assistant", time: { created: 9000 }, finish: "stop" },
+                        parts: [{ type: "text", text: "done" }],
+                      },
+                    ]
+                  : []
               return { data: [{ info: { id: "msg_001", role: "user", time: { created: 1000 } } }, ...turns, ...done] }
             },
             status: async () => {
@@ -192,13 +220,18 @@ describe("syncPollTimeoutMs threading", () => {
         }
 
         await withMockedDateNow(1_000, async () => {
-          const result = await pollSyncSession(createMockCtx(), mockClient, {
-            sessionID: "ses_progress",
-            agentToUse: "oracle",
-            toastManager: null,
-            taskId: undefined,
-            maxAssistantTurns: 1_000,
-          }, 120_000)
+          const result = await pollSyncSession(
+            createMockCtx(),
+            mockClient,
+            {
+              sessionID: "ses_progress",
+              agentToUse: "oracle",
+              toastManager: null,
+              taskId: undefined,
+              maxAssistantTurns: 1_000,
+            },
+            120_000,
+          )
 
           expect(result).toBeNull()
           expect(abortCount).toBe(0)
@@ -219,7 +252,12 @@ describe("syncPollTimeoutMs threading", () => {
             messages: async () => {
               messageCallCount++
               const turns = Array.from({ length: messageCallCount }, (_, index) => ({
-                info: { id: `msg_a${String(index + 2).padStart(3, "0")}`, role: "assistant", time: { created: 2000 + index }, finish: "tool-calls" },
+                info: {
+                  id: `msg_a${String(index + 2).padStart(3, "0")}`,
+                  role: "assistant",
+                  time: { created: 2000 + index },
+                  finish: "tool-calls",
+                },
                 parts: [{ type: "text", text: `loop ${index}` }],
               }))
               return { data: [{ info: { id: "msg_001", role: "user", time: { created: 1000 } } }, ...turns] }
@@ -229,13 +267,18 @@ describe("syncPollTimeoutMs threading", () => {
         }
 
         await withMockedDateNow(1_000, async () => {
-          const result = await pollSyncSession(createMockCtx(), mockClient, {
-            sessionID: "ses_loop",
-            agentToUse: "oracle",
-            toastManager: null,
-            taskId: undefined,
-            maxAssistantTurns: 3,
-          }, 120_000)
+          const result = await pollSyncSession(
+            createMockCtx(),
+            mockClient,
+            {
+              sessionID: "ses_loop",
+              agentToUse: "oracle",
+              toastManager: null,
+              taskId: undefined,
+              maxAssistantTurns: 3,
+            },
+            120_000,
+          )
 
           expect(result).toContain("exceeded 3 assistant turns")
           expect(abortCount).toBe(1)
@@ -257,7 +300,9 @@ describe("syncPollTimeoutMs threading", () => {
             taskId: undefined,
           })
 
-          expect(result).toBe(`Poll inactivity timeout reached after ${MAX_POLL_TIME_MS}ms without active OpenCode status for session ses_default`)
+          expect(result).toBe(
+            `Poll inactivity timeout reached after ${MAX_POLL_TIME_MS}ms without active OpenCode status for session ses_default`,
+          )
         })
       })
 
@@ -275,7 +320,9 @@ describe("syncPollTimeoutMs threading", () => {
             taskId: undefined,
           })
 
-          expect(result).toBe("Poll inactivity timeout reached after 120000ms without active OpenCode status for session ses_legacy")
+          expect(result).toBe(
+            "Poll inactivity timeout reached after 120000ms without active OpenCode status for session ses_legacy",
+          )
         })
       })
     })
@@ -286,14 +333,21 @@ describe("syncPollTimeoutMs threading", () => {
         const mockClient = createNeverCompleteClient("ses_guard")
 
         await withMockedDateNow(25, async () => {
-          const result = await pollSyncSession(createMockCtx(), mockClient, {
-            sessionID: "ses_guard",
-            agentToUse: "test-agent",
-            toastManager: null,
-            taskId: undefined,
-          }, 10)
+          const result = await pollSyncSession(
+            createMockCtx(),
+            mockClient,
+            {
+              sessionID: "ses_guard",
+              agentToUse: "test-agent",
+              toastManager: null,
+              taskId: undefined,
+            },
+            10,
+          )
 
-          expect(result).toBe("Poll inactivity timeout reached after 50ms without active OpenCode status for session ses_guard")
+          expect(result).toBe(
+            "Poll inactivity timeout reached after 50ms without active OpenCode status for session ses_guard",
+          )
         })
       })
     })
@@ -351,7 +405,7 @@ describe("syncPollTimeoutMs threading", () => {
           "test-agent",
           undefined,
           undefined,
-          "gpt-test"
+          "gpt-test",
         )
 
         expect(statusCallCount).toBe(0)

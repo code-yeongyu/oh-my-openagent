@@ -6,14 +6,30 @@ import { join } from "node:path"
 import { isolatedEnvironment } from "./omo-native-eval-smoke-sandbox.mjs"
 
 export async function drive(sandbox, signal) {
-  const child = spawn(sandbox.binary, [
-    "--mode", "rpc", "--offline", "--approve", "--no-context-files",
-    "--session-dir", sandbox.sessionDir, "-e", sandbox.providerPath,
-    "--provider", "openai", "--model", "gpt-5.6-sol",
-  ], {
-    cwd: sandbox.cwd, env: isolatedEnvironment(sandbox), signal,
-    stdio: ["pipe", "pipe", "pipe"],
-  })
+  const child = spawn(
+    sandbox.binary,
+    [
+      "--mode",
+      "rpc",
+      "--offline",
+      "--approve",
+      "--no-context-files",
+      "--session-dir",
+      sandbox.sessionDir,
+      "-e",
+      sandbox.providerPath,
+      "--provider",
+      "openai",
+      "--model",
+      "gpt-5.6-sol",
+    ],
+    {
+      cwd: sandbox.cwd,
+      env: isolatedEnvironment(sandbox),
+      signal,
+      stdio: ["pipe", "pipe", "pipe"],
+    },
+  )
   let stdout = ""
   let stderr = ""
   let pending = ""
@@ -33,11 +49,16 @@ export async function drive(sandbox, signal) {
         if (JSON.parse(line).type === "agent_settled") child.stdin.end()
       }
     })
-    child.stderr.on("data", (chunk) => { stderr += chunk.toString("utf8") })
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk.toString("utf8")
+    })
     child.stdin.on("error", (error) => {
       if (error.code !== "EPIPE") rejectRun(error)
     })
-    child.once("error", (error) => { clearTimeout(watchdog); rejectRun(error) })
+    child.once("error", (error) => {
+      clearTimeout(watchdog)
+      rejectRun(error)
+    })
     child.once("close", (code, signal) => {
       clearTimeout(watchdog)
       resolveRun({ code, signal })
@@ -48,22 +69,28 @@ export async function drive(sandbox, signal) {
 }
 
 export function readEvalResults(sessionDir) {
-  return readdirSync(sessionDir).filter((name) => name.endsWith(".jsonl"))
+  return readdirSync(sessionDir)
+    .filter((name) => name.endsWith(".jsonl"))
     .flatMap((name) => readFileSync(join(sessionDir, name), "utf8").split("\n"))
-    .filter(Boolean).map((line) => JSON.parse(line))
-    .filter((record) => record.type === "message").map((record) => record.message)
+    .filter(Boolean)
+    .map((line) => JSON.parse(line))
+    .filter((record) => record.type === "message")
+    .map((record) => record.message)
     .filter((message) => message.role === "toolResult" && message.toolName === "eval")
 }
 
 // The large cell's completion notification names the file holding its full output. Records are decoded as JSON
 // first, so a Windows path keeps its backslashes, and the path runs to the end of its line (it may contain spaces).
 export function largeCellSpill(sessionDir) {
-  const texts = readdirSync(sessionDir).filter((name) => name.endsWith(".jsonl"))
+  const texts = readdirSync(sessionDir)
+    .filter((name) => name.endsWith(".jsonl"))
     .flatMap((name) => readFileSync(join(sessionDir, name), "utf8").split("\n"))
-    .filter(Boolean).flatMap((line) => stringsOf(JSON.parse(line)))
+    .filter(Boolean)
+    .flatMap((line) => stringsOf(JSON.parse(line)))
   const notice = texts.find((text) => text.includes("eval-smoke-5") && /[Ff]ull output: /u.test(text))
   const path = notice?.match(/[Ff]ull output: (.+?)\]?[ \t]*$/mu)?.[1]
-  if (path === undefined) throw new Error("no completion notification with a full-output path for the large sandbox cell")
+  if (path === undefined)
+    throw new Error("no completion notification with a full-output path for the large sandbox cell")
   return readFileSync(path, "utf8")
 }
 
@@ -74,5 +101,8 @@ function stringsOf(value) {
 }
 
 export function textOf(message) {
-  return message.content.filter((part) => part.type === "text").map((part) => part.text).join("\n")
+  return message.content
+    .filter((part) => part.type === "text")
+    .map((part) => part.text)
+    .join("\n")
 }

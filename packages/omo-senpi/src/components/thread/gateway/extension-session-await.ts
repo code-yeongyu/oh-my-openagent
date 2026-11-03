@@ -20,7 +20,11 @@ async function settle(read: () => Promise<StoreExtensionResult<unknown>>): Promi
   try {
     return await read()
   } catch (error) {
-    return { kind: "refused", code: "extension_operation_failed", message: error instanceof Error ? error.message : String(error) }
+    return {
+      kind: "refused",
+      code: "extension_operation_failed",
+      message: error instanceof Error ? error.message : String(error),
+    }
   }
 }
 
@@ -46,7 +50,12 @@ async function expireAndRead(request: SessionAwait): Promise<StoreExtensionResul
   if (expired.kind !== "ok") return unresolved(id, `expiring it was refused (${expired.code}: ${expired.message})`)
   const last = await settle(request.status)
   if (final(last)) return last
-  return unresolved(id, last.kind === "ok" ? "its status still reads pending after it was expired" : `its status after expiry was refused (${last.code}: ${last.message})`)
+  return unresolved(
+    id,
+    last.kind === "ok"
+      ? "its status still reads pending after it was expired"
+      : `its status after expiry was refused (${last.code}: ${last.message})`,
+  )
 }
 
 /**
@@ -83,7 +92,10 @@ export async function awaitSessionRequest(request: SessionAwait): Promise<StoreE
   }
   const name = basename(request.file)
   const watchers: FSWatcher[] = []
-  for (const [path, only] of [[dirname(request.file), name], [request.file, undefined]] as const) {
+  for (const [path, only] of [
+    [dirname(request.file), name],
+    [request.file, undefined],
+  ] as const) {
     try {
       const watcher = (request.watch ?? watch)(path, (_event, filename) => {
         if (only === undefined || filename === null || String(filename) === only) signal()
@@ -119,7 +131,12 @@ export async function awaitSessionRequest(request: SessionAwait): Promise<StoreE
           resolve(value)
         }
         const timer = setTimeout(() => done(false), remaining)
-        const recheck = setInterval(() => { if (wakeFileArrived()) done(true) }, Math.min(WAKE_FILE_RECHECK_MS, remaining))
+        const recheck = setInterval(
+          () => {
+            if (wakeFileArrived()) done(true)
+          },
+          Math.min(WAKE_FILE_RECHECK_MS, remaining),
+        )
         wake = () => done(true)
       })
       wake = undefined

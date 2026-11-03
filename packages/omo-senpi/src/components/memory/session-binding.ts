@@ -3,11 +3,21 @@
 // memory module supervisor and the end-to-end encrypted sync runner for durable sessions.
 
 import type { OmoMemorySettings } from "@oh-my-opencode/omo-config-core"
-import { isAutoAgentValue, resolveAutoIdentity, resolveMemoryIdentity, resolveMemoryRoot } from "@oh-my-opencode/memory-core"
+import {
+  isAutoAgentValue,
+  resolveAutoIdentity,
+  resolveMemoryIdentity,
+  resolveMemoryRoot,
+} from "@oh-my-opencode/memory-core"
 
 import type { ComponentContext } from "../../extension/types"
 import type { SenpiOmoConfigResult } from "../config-resolution"
-import { MEMORY_BINDING_CUSTOM_TYPE, createMemoryBinding, findLatestMemoryBinding, type SessionEntryLike } from "./binding"
+import {
+  MEMORY_BINDING_CUSTOM_TYPE,
+  createMemoryBinding,
+  findLatestMemoryBinding,
+  type SessionEntryLike,
+} from "./binding"
 import { logBindReconcileFailure } from "./bind-reconcile-log"
 import type { MemoryExtensionAPI } from "./capabilities"
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
@@ -142,7 +152,10 @@ export function createSessionBinder(deps: SessionBinderDeps): SessionBinder {
     memoryModuleSupervisor.acquire()
     if (!oneShot) {
       state.syncRepo = identity.paths.repo
-      void syncRunner.acquire(identity.id, identity.paths, sessionConfig.sync, { profile: sessionConfig.agent, projectDir: sessionCwd })
+      void syncRunner.acquire(identity.id, identity.paths, sessionConfig.sync, {
+        profile: sessionConfig.agent,
+        projectDir: sessionCwd,
+      })
     }
     // Disposable bookkeeping: a session closed without a conversation leaves no file (senpi#3263).
     pi.appendEntry(MEMORY_BINDING_CUSTOM_TYPE, binding, { startupBookkeeping: true })

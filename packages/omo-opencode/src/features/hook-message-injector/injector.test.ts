@@ -46,19 +46,21 @@ function createMessageDir(): string {
 
 //#region Test Helpers
 
-function createMockClient(messages: Array<{
-  id?: string
-  info?: {
-    agent?: string
-    model?: { providerID?: string; modelID?: string; variant?: string }
-    providerID?: string
-    modelID?: string
-    variant?: string
-    tools?: Record<string, boolean>
-    time?: { created?: number }
-  }
-  parts?: Array<{ type?: string }>
-}>): {
+function createMockClient(
+  messages: Array<{
+    id?: string
+    info?: {
+      agent?: string
+      model?: { providerID?: string; modelID?: string; variant?: string }
+      providerID?: string
+      modelID?: string
+      variant?: string
+      tools?: Record<string, boolean>
+      time?: { created?: number }
+    }
+    parts?: Array<{ type?: string }>
+  }>,
+): {
   session: {
     messages: (opts: { path: { id: string } }) => Promise<{ data: typeof messages }>
   }
@@ -88,9 +90,7 @@ describe("findNearestMessageWithFieldsFromSDK", () => {
   })
 
   it("returns message with assistant shape (providerID/modelID directly on info)", async () => {
-    const mockClient = createMockClient([
-      { info: { agent: "sisyphus", providerID: "openai", modelID: "gpt-5" } },
-    ])
+    const mockClient = createMockClient([{ info: { agent: "sisyphus", providerID: "openai", modelID: "gpt-5" } }])
 
     const result = await findNearestMessageWithFieldsFromSDK(unsafeTestValue(mockClient), "ses_123")
 
@@ -135,8 +135,14 @@ describe("findNearestMessageWithFieldsFromSDK", () => {
 
   it("returns nearest (most recent) message with all fields", async () => {
     const mockClient = createMockClient([
-      { id: "msg_old", info: { agent: "old-agent", model: { providerID: "old", modelID: "model" }, time: { created: 10 } } },
-      { id: "msg_new", info: { agent: "new-agent", model: { providerID: "new", modelID: "model" }, time: { created: 20 } } },
+      {
+        id: "msg_old",
+        info: { agent: "old-agent", model: { providerID: "old", modelID: "model" }, time: { created: 10 } },
+      },
+      {
+        id: "msg_new",
+        info: { agent: "new-agent", model: { providerID: "new", modelID: "model" }, time: { created: 20 } },
+      },
     ])
 
     const result = await findNearestMessageWithFieldsFromSDK(unsafeTestValue(mockClient), "ses_123")
@@ -145,9 +151,7 @@ describe("findNearestMessageWithFieldsFromSDK", () => {
   })
 
   it("falls back to message with partial fields", async () => {
-    const mockClient = createMockClient([
-      { info: { agent: "partial-agent" } },
-    ])
+    const mockClient = createMockClient([{ info: { agent: "partial-agent" } }])
 
     const result = await findNearestMessageWithFieldsFromSDK(unsafeTestValue(mockClient), "ses_123")
 
@@ -155,10 +159,7 @@ describe("findNearestMessageWithFieldsFromSDK", () => {
   })
 
   it("returns null when no messages have useful fields", async () => {
-    const mockClient = createMockClient([
-      { info: {} },
-      { info: {} },
-    ])
+    const mockClient = createMockClient([{ info: {} }, { info: {} }])
 
     const result = await findNearestMessageWithFieldsFromSDK(unsafeTestValue(mockClient), "ses_123")
 
@@ -220,8 +221,14 @@ describe("findNearestMessageWithFieldsFromSDK", () => {
 
   it("uses message time.created rather than SDK array order when resolving nearest message", async () => {
     const mockClient = createMockClient([
-      { id: "msg_newer", info: { agent: "older-array-entry", model: { providerID: "openai", modelID: "gpt-5" }, time: { created: 10 } } },
-      { id: "msg_older", info: { agent: "newest-by-time", model: { providerID: "openai", modelID: "gpt-5" }, time: { created: 100 } } },
+      {
+        id: "msg_newer",
+        info: { agent: "older-array-entry", model: { providerID: "openai", modelID: "gpt-5" }, time: { created: 10 } },
+      },
+      {
+        id: "msg_older",
+        info: { agent: "newest-by-time", model: { providerID: "openai", modelID: "gpt-5" }, time: { created: 100 } },
+      },
     ])
 
     const result = await findNearestMessageWithFieldsFromSDK(unsafeTestValue(mockClient), "ses_123")
@@ -238,7 +245,11 @@ describe("findNearestMessageWithFieldsFromSDK", () => {
       },
       {
         id: "msg_real",
-        info: { agent: "sisyphus", model: { providerID: "anthropic", modelID: "claude-opus-4" }, time: { created: 100 } },
+        info: {
+          agent: "sisyphus",
+          model: { providerID: "anthropic", modelID: "claude-opus-4" },
+          time: { created: 100 },
+        },
       },
     ])
 
@@ -252,16 +263,22 @@ describe("findNearestMessageWithFields JSON backend ordering", () => {
   it("uses message time.created rather than filename order", () => {
     mockIsSqliteBackend.mockReturnValue(false)
     const messageDir = createMessageDir()
-    writeFileSync(join(messageDir, "msg_ffff0000_000001.json"), JSON.stringify({
-      agent: "older-by-time",
-      model: { providerID: "openai", modelID: "gpt-5" },
-      time: { created: 10 },
-    }))
-    writeFileSync(join(messageDir, "msg_00000000_000999.json"), JSON.stringify({
-      agent: "newest-by-time",
-      model: { providerID: "openai", modelID: "gpt-5" },
-      time: { created: 100 },
-    }))
+    writeFileSync(
+      join(messageDir, "msg_ffff0000_000001.json"),
+      JSON.stringify({
+        agent: "older-by-time",
+        model: { providerID: "openai", modelID: "gpt-5" },
+        time: { created: 10 },
+      }),
+    )
+    writeFileSync(
+      join(messageDir, "msg_00000000_000999.json"),
+      JSON.stringify({
+        agent: "newest-by-time",
+        model: { providerID: "openai", modelID: "gpt-5" },
+        time: { created: 100 },
+      }),
+    )
 
     const result = findNearestMessageWithFields(messageDir)
 
@@ -275,21 +292,27 @@ describe("findNearestMessageWithFields JSON backend ordering", () => {
     const partDir = getCompactionPartStorageDir(compactionMessageID)
     tempDirs.push(partDir)
 
-    writeFileSync(join(messageDir, "msg_0001.json"), JSON.stringify({
-      id: compactionMessageID,
-      agent: "atlas",
-      model: { providerID: "openai", modelID: "gpt-5" },
-      time: { created: 200 },
-    }))
+    writeFileSync(
+      join(messageDir, "msg_0001.json"),
+      JSON.stringify({
+        id: compactionMessageID,
+        agent: "atlas",
+        model: { providerID: "openai", modelID: "gpt-5" },
+        time: { created: 200 },
+      }),
+    )
     mkdirSync(partDir, { recursive: true })
     writeFileSync(join(partDir, "prt_0001.json"), JSON.stringify({ type: "compaction" }))
 
-    writeFileSync(join(messageDir, "msg_0002.json"), JSON.stringify({
-      id: "msg_0002",
-      agent: "sisyphus",
-      model: { providerID: "anthropic", modelID: "claude-opus-4" },
-      time: { created: 100 },
-    }))
+    writeFileSync(
+      join(messageDir, "msg_0002.json"),
+      JSON.stringify({
+        id: "msg_0002",
+        agent: "sisyphus",
+        model: { providerID: "anthropic", modelID: "claude-opus-4" },
+        time: { created: 100 },
+      }),
+    )
 
     const result = findNearestMessageWithFields(messageDir)
 
@@ -299,10 +322,7 @@ describe("findNearestMessageWithFields JSON backend ordering", () => {
 
 describe("findFirstMessageWithAgentFromSDK", () => {
   it("returns agent from first message", async () => {
-    const mockClient = createMockClient([
-      { info: { agent: "first-agent" } },
-      { info: { agent: "second-agent" } },
-    ])
+    const mockClient = createMockClient([{ info: { agent: "first-agent" } }, { info: { agent: "second-agent" } }])
 
     const result = await findFirstMessageWithAgentFromSDK(unsafeTestValue(mockClient), "ses_123")
 
@@ -332,10 +352,7 @@ describe("findFirstMessageWithAgentFromSDK", () => {
   })
 
   it("skips messages without agent field", async () => {
-    const mockClient = createMockClient([
-      { info: {} },
-      { info: { agent: "first-real-agent" } },
-    ])
+    const mockClient = createMockClient([{ info: {} }, { info: { agent: "first-real-agent" } }])
 
     const result = await findFirstMessageWithAgentFromSDK(unsafeTestValue(mockClient), "ses_123")
 
@@ -343,10 +360,7 @@ describe("findFirstMessageWithAgentFromSDK", () => {
   })
 
   it("returns null when no messages have agent", async () => {
-    const mockClient = createMockClient([
-      { info: {} },
-      { info: {} },
-    ])
+    const mockClient = createMockClient([{ info: {} }, { info: {} }])
 
     const result = await findFirstMessageWithAgentFromSDK(unsafeTestValue(mockClient), "ses_123")
 

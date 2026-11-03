@@ -145,9 +145,11 @@ export function createShutdownDrain(options: ShutdownDrainOptions): ShutdownDrai
         if (!journalCompleted) return false
       }
       if (settings.journalOnly) return journalCompleted
-      if (!(await runStep("facts-enqueue", () => options.steps.enqueueFinalDelta(input.sessionId, signal)))) return journalCompleted
+      if (!(await runStep("facts-enqueue", () => options.steps.enqueueFinalDelta(input.sessionId, signal))))
+        return journalCompleted
       if (input.reason !== "quit") return journalCompleted
-      if (!(await runStep("skills-usage-flush", () => options.steps.flushSkillsUsage(input.sessionId, signal)))) return journalCompleted
+      if (!(await runStep("skills-usage-flush", () => options.steps.flushSkillsUsage(input.sessionId, signal))))
+        return journalCompleted
       for (const evaluator of evaluators) {
         const proceed = await runStep("shutdown-evaluator", async () => {
           await evaluator(evaluatorInput)

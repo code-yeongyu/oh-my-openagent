@@ -21,7 +21,7 @@ export function brandLogoModule(svg: string): string {
 export async function buildBrandLogo(check = false): Promise<void> {
   const text = brandLogoModule(await Bun.file(source).text())
   if (check) {
-    if (!(await Bun.file(target).exists()) || await Bun.file(target).text() !== text) {
+    if (!(await Bun.file(target).exists()) || (await Bun.file(target).text()) !== text) {
       throw new Error("Brand logo module is stale; run bun script/build-brand-logo.ts")
     }
   } else {

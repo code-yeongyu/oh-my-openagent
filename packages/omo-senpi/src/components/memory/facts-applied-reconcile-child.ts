@@ -12,7 +12,13 @@ const runner = new FactsExtractorRunner({
   cwd: root,
   loadConfig: () => ({ config: {}, diagnostics: [], layers: [], sources: [] }),
   resolveModelRegistry: () => undefined,
-  logger: { info() {}, warn: (message, fields) => { console.error(message, JSON.stringify(fields)) }, error() {} },
+  logger: {
+    info() {},
+    warn: (message, fields) => {
+      console.error(message, JSON.stringify(fields))
+    },
+    error() {},
+  },
 })
 const result = await runner.reconcilePending()
 process.exit(result.status === "empty" ? 0 : 1)

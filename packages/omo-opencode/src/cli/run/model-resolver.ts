@@ -1,6 +1,4 @@
-export function resolveRunModel(
-  modelString?: string
-): { providerID: string; modelID: string } | undefined {
+export function resolveRunModel(modelString?: string): { providerID: string; modelID: string } | undefined {
   if (modelString === undefined) {
     return undefined
   }

@@ -10,26 +10,36 @@ export async function guideAction(deps: DagToolDeps, params: DagToolInput, runId
   let command: PausedDagGuideCommand
   if (params.guidance_id !== undefined) {
     if (params.remove === true) command = { kind: "remove", id: params.guidance_id }
-    else if (params.text !== undefined && params.text.trim().length > 0) command = { kind: "edit", id: params.guidance_id, text: params.text }
+    else if (params.text !== undefined && params.text.trim().length > 0)
+      command = { kind: "edit", id: params.guidance_id, text: params.text }
     else return failure("invalid_arguments", "Editing guidance requires text or remove=true.")
   } else {
     if (params.text === undefined || params.text.trim().length === 0 || params.remove === true) {
       return failure("invalid_arguments", "New guidance requires text.")
     }
-    const node = params.node_id === undefined ? undefined : snapshot.nodes.find(node => node.id === params.node_id)
-    if (params.node_id !== undefined && node === undefined) return failure("node_not_found", "Guidance target does not exist.")
+    const node = params.node_id === undefined ? undefined : snapshot.nodes.find((node) => node.id === params.node_id)
+    if (params.node_id !== undefined && node === undefined)
+      return failure("node_not_found", "Guidance target does not exist.")
     command = { kind: "add", text: params.text, ...(node === undefined ? {} : { nodeId: node.id }) }
   }
   try {
     const guidance = await deps.guide(runId, command)
-    return toolResult(`Stored guidance ${guidance.id} (${guidance.state}).`, { kind: "guided", run_id: runId, guidance })
+    return toolResult(`Stored guidance ${guidance.id} (${guidance.state}).`, {
+      kind: "guided",
+      run_id: runId,
+      guidance,
+    })
   } catch (error) {
     if (error instanceof GuidanceError) {
       switch (error.code) {
-        case "frozen": return failure("guidance_frozen", "Dispatched guidance cannot be changed.")
-        case "not_found": return failure("guidance_not_found", "Guidance does not exist.")
-        case "duplicate_id": throw error
-        default: throw new Error(`Unexpected guidance error: ${error.code satisfies never}`)
+        case "frozen":
+          return failure("guidance_frozen", "Dispatched guidance cannot be changed.")
+        case "not_found":
+          return failure("guidance_not_found", "Guidance does not exist.")
+        case "duplicate_id":
+          throw error
+        default:
+          throw new Error(`Unexpected guidance error: ${error.code satisfies never}`)
       }
     }
     throw error

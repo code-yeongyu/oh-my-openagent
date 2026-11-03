@@ -11,9 +11,7 @@ export interface MemoryExtensionAPI extends SenpiExtensionAPI {
 }
 
 export function missingMemoryCapabilities(pi: SenpiExtensionAPI): MissingMemoryCapability[] {
-  return REQUIRED_MEMORY_CAPABILITIES.filter(
-    (capability) => typeof Reflect.get(pi, capability) !== "function",
-  )
+  return REQUIRED_MEMORY_CAPABILITIES.filter((capability) => typeof Reflect.get(pi, capability) !== "function")
 }
 
 export function hasMemoryCapabilities(pi: SenpiExtensionAPI): pi is MemoryExtensionAPI {

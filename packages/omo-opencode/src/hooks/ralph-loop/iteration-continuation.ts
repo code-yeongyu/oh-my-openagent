@@ -31,11 +31,7 @@ export async function continueIteration(
   const continuationPrompt = buildContinuationPrompt(state)
 
   if (strategy === "reset") {
-    const newSessionID = await createIterationSession(
-      ctx,
-      options.previousSessionID,
-      options.directory,
-    )
+    const newSessionID = await createIterationSession(ctx, options.previousSessionID, options.directory)
     if (!newSessionID) {
       return { status: "session_creation_rejected" }
     }

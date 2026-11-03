@@ -59,8 +59,7 @@ export type SessionAdmissionLease = {
 }
 
 export type AcquireAdmissionLeaseResult =
-  | { readonly kind: "acquired"; readonly lease: SessionAdmissionLease }
-  | { readonly kind: "contended" }
+  { readonly kind: "acquired"; readonly lease: SessionAdmissionLease } | { readonly kind: "contended" }
 
 type LeaseBody = {
   readonly pid: number
@@ -87,7 +86,9 @@ let leaseFs: AdmissionLeaseFs = {}
 export function setAdmissionLeaseFsForTests(next: AdmissionLeaseFs | undefined): () => void {
   const previous = leaseFs
   leaseFs = next ?? {}
-  return () => { leaseFs = previous }
+  return () => {
+    leaseFs = previous
+  }
 }
 
 const DEFAULT_ACQUIRE_TIMEOUT_MS = 5_000
@@ -173,7 +174,7 @@ function tryCreateLease(path: string, body: LeaseBody): boolean {
   try {
     writeFileSync(tmp, JSON.stringify(body), "utf8")
     try {
-      (leaseFs.linkSync ?? linkSync)(tmp, path)
+      ;(leaseFs.linkSync ?? linkSync)(tmp, path)
       return true
     } catch (error) {
       if (hasCode(error, "EEXIST")) return false
@@ -189,7 +190,12 @@ function tryCreateLease(path: string, body: LeaseBody): boolean {
 // are one serialized section: the takeover lands ONLY if the on-disk token still equals the token
 // observed at the start of the attempt AND the lease is still stale (a holder that renewed between
 // our observation and the mutex is left alone). Never delete-then-create; the loser changes nothing.
-function tryTakeover(path: string, observed: LeaseBody | IncompleteLease, token: string, timing: AdmissionLeaseTiming): boolean {
+function tryTakeover(
+  path: string,
+  observed: LeaseBody | IncompleteLease,
+  token: string,
+  timing: AdmissionLeaseTiming,
+): boolean {
   try {
     return withTaskRecordLock(path, () => {
       const fresh = readLeaseBody(path)
@@ -197,7 +203,8 @@ function tryTakeover(path: string, observed: LeaseBody | IncompleteLease, token:
       if (isIncompleteLease(observed) || isIncompleteLease(fresh)) {
         // An incomplete body has no token to fence on. Take it over only while it is still the same
         // old inode observed before the mutex; a live fallback writer remains held during grace.
-        if (!isIncompleteLease(observed) || !isIncompleteLease(fresh) || !sameIncompleteLease(fresh, observed)) return false
+        if (!isIncompleteLease(observed) || !isIncompleteLease(fresh) || !sameIncompleteLease(fresh, observed))
+          return false
         if (timing.now() - fresh.mtimeMs <= timing.incompleteGraceMs) return false
         writeLeaseAtomic(path, { pid: process.pid, token, renewed_at: timing.now() })
         return true
@@ -268,7 +275,11 @@ function readLeaseBody(path: string): LeaseSnapshot {
   }
   if (typeof parsed !== "object" || parsed === null) return incompleteLease(path)
   const candidate = parsed as Record<string, unknown>
-  if (typeof candidate.pid !== "number" || typeof candidate.token !== "string" || typeof candidate.renewed_at !== "number") {
+  if (
+    typeof candidate.pid !== "number" ||
+    typeof candidate.token !== "string" ||
+    typeof candidate.renewed_at !== "number"
+  ) {
     return incompleteLease(path)
   }
   return { pid: candidate.pid, token: candidate.token, renewed_at: candidate.renewed_at }

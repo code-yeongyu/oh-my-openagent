@@ -74,16 +74,18 @@ const MOCK_MODULE_LIFECYCLE_ALLOWLIST = new Map<string, string>([
 
 async function listTestFiles(directory: string): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true })
-  const nestedFiles = await Promise.all(entries.map(async (entry) => {
-    const entryPath = path.join(directory, entry.name)
-    if (entry.isDirectory()) {
-      return listTestFiles(entryPath)
-    }
-    if (entry.isFile() && entry.name.endsWith(".test.ts") && !entry.name.endsWith(".d.ts")) {
-      return [entryPath]
-    }
-    return []
-  }))
+  const nestedFiles = await Promise.all(
+    entries.map(async (entry) => {
+      const entryPath = path.join(directory, entry.name)
+      if (entry.isDirectory()) {
+        return listTestFiles(entryPath)
+      }
+      if (entry.isFile() && entry.name.endsWith(".test.ts") && !entry.name.endsWith(".d.ts")) {
+        return [entryPath]
+      }
+      return []
+    }),
+  )
 
   return nestedFiles.flat()
 }
@@ -97,21 +99,23 @@ async function listPackageTestFiles(): Promise<string[]> {
     return []
   }
 
-  const nestedFiles = await Promise.all(packageNames.map(async (name) => {
-    if (name === "omo-opencode") {
-      return []
-    }
-    const packageSrc = path.join(packagesDir, name, "src")
-    try {
-      const s = await stat(packageSrc)
-      if (!s.isDirectory()) {
+  const nestedFiles = await Promise.all(
+    packageNames.map(async (name) => {
+      if (name === "omo-opencode") {
         return []
       }
-    } catch {
-      return []
-    }
-    return listTestFiles(packageSrc)
-  }))
+      const packageSrc = path.join(packagesDir, name, "src")
+      try {
+        const s = await stat(packageSrc)
+        if (!s.isDirectory()) {
+          return []
+        }
+      } catch {
+        return []
+      }
+      return listTestFiles(packageSrc)
+    }),
+  )
 
   return nestedFiles.flat()
 }
@@ -122,10 +126,12 @@ function relativeSourcePath(filePath: string): string {
 
 function isMockModuleCall(node: ts.CallExpression): boolean {
   const expression = node.expression
-  return ts.isPropertyAccessExpression(expression)
-    && ts.isIdentifier(expression.expression)
-    && expression.expression.text === "mock"
-    && expression.name.text === "module"
+  return (
+    ts.isPropertyAccessExpression(expression) &&
+    ts.isIdentifier(expression.expression) &&
+    expression.expression.text === "mock" &&
+    expression.name.text === "module"
+  )
 }
 
 function isStringLiteralLike(node: ts.Node): node is ts.StringLiteral | ts.NoSubstitutionTemplateLiteral {
@@ -185,10 +191,12 @@ function isCleanupCall(node: ts.CallExpression): boolean {
   }
 
   const expression = node.expression
-  return ts.isPropertyAccessExpression(expression)
-    && ts.isIdentifier(expression.expression)
-    && expression.expression.text === "mock"
-    && expression.name.text === "restore"
+  return (
+    ts.isPropertyAccessExpression(expression) &&
+    ts.isIdentifier(expression.expression) &&
+    expression.expression.text === "mock" &&
+    expression.name.text === "restore"
+  )
 }
 
 function hasCleanupPattern(sourceFile: ts.SourceFile): boolean {
@@ -221,13 +229,17 @@ type ParseSourceFiles = (filePaths: readonly string[]) => Promise<ReadonlyMap<st
 // test tree (thousands of files) blew the 20 s budget on loaded CI runners (#10681). Only files that contain the
 // token can contain a mock.module call, so the text filter runs first and only those candidates are parsed.
 async function auditMockModuleLifecycle(files: readonly string[], parse: ParseSourceFiles): Promise<string[]> {
-  const candidates = (await Promise.all(files.map(async (filePath) => {
-    if (MOCK_MODULE_LIFECYCLE_ALLOWLIST.has(filePath)) {
-      return null
-    }
-    const contents = await readFile(filePath, "utf8")
-    return contents.includes(MOCK_MODULE_TOKEN) ? filePath : null
-  }))).filter((filePath): filePath is string => filePath !== null)
+  const candidates = (
+    await Promise.all(
+      files.map(async (filePath) => {
+        if (MOCK_MODULE_LIFECYCLE_ALLOWLIST.has(filePath)) {
+          return null
+        }
+        const contents = await readFile(filePath, "utf8")
+        return contents.includes(MOCK_MODULE_TOKEN) ? filePath : null
+      }),
+    )
+  ).filter((filePath): filePath is string => filePath !== null)
   const parsedSourceFiles = await parse(candidates)
   const offenders: string[] = []
 
@@ -253,7 +265,10 @@ describe("mock.module lifecycle hygiene", () => {
       const cleaned = path.join(fixtureDir, "cleaned.test.ts")
       const plain = path.join(fixtureDir, "plain.test.ts")
       await writeFile(leak, `import { mock } from "bun:test"\nmock.module("./dep", () => ({}))\n`)
-      await writeFile(cleaned, `import { afterEach, mock } from "bun:test"\nmock.module("./dep", () => ({}))\nafterEach(() => mock.restore())\n`)
+      await writeFile(
+        cleaned,
+        `import { afterEach, mock } from "bun:test"\nmock.module("./dep", () => ({}))\nafterEach(() => mock.restore())\n`,
+      )
       await writeFile(plain, `import { expect, test } from "bun:test"\ntest("plain", () => expect(1).toBe(1))\n`)
       const parsedPaths: string[] = []
       const recordingParse: ParseSourceFiles = (filePaths) => {
@@ -274,7 +289,7 @@ describe("mock.module lifecycle hygiene", () => {
 
   test("#given test files using mock.module #when audited #then each must pair with cleanup", async () => {
     // given
-    const files = [...await listTestFiles(SOURCE_ROOT), ...await listPackageTestFiles()]
+    const files = [...(await listTestFiles(SOURCE_ROOT)), ...(await listPackageTestFiles())]
 
     // when
     const offenders = await auditMockModuleLifecycle(files, (filePaths) => parser.parse(filePaths))

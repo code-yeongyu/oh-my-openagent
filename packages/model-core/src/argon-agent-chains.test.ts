@@ -8,17 +8,24 @@ import { AGENT_MODEL_REQUIREMENTS } from "./model-requirements"
 // row must still land on the previous rung.
 
 const ARGON_RUNG = { providers: ["google", "google-vertex", "opencode"], model: "gemini-4-argon", variant: "high" }
-const PREVIOUS_PRO_RUNG = { providers: ["google", "github-copilot", "opencode"], model: "gemini-3.1-pro", variant: "high" }
+const PREVIOUS_PRO_RUNG = {
+  providers: ["google", "github-copilot", "opencode"],
+  model: "gemini-3.1-pro",
+  variant: "high",
+}
 
 describe("Argon in the oracle and momus chains (#10180)", () => {
-  test.each(["oracle", "momus"])("#given the %s chain #then Argon high sits directly before the previous pro rung", (agent) => {
-    const chain = AGENT_MODEL_REQUIREMENTS[agent]?.fallbackChain ?? []
-    const argonIndex = chain.findIndex((entry) => entry.model === "gemini-4-argon")
+  test.each(["oracle", "momus"])(
+    "#given the %s chain #then Argon high sits directly before the previous pro rung",
+    (agent) => {
+      const chain = AGENT_MODEL_REQUIREMENTS[agent]?.fallbackChain ?? []
+      const argonIndex = chain.findIndex((entry) => entry.model === "gemini-4-argon")
 
-    expect(argonIndex).toBeGreaterThanOrEqual(0)
-    expect(chain[argonIndex]).toEqual(ARGON_RUNG)
-    expect(chain[argonIndex + 1]).toEqual(PREVIOUS_PRO_RUNG)
-  })
+      expect(argonIndex).toBeGreaterThanOrEqual(0)
+      expect(chain[argonIndex]).toEqual(ARGON_RUNG)
+      expect(chain[argonIndex + 1]).toEqual(PREVIOUS_PRO_RUNG)
+    },
+  )
 
   test("#given every agent chain #when a rung names Argon #then it uses a supported thinking level and never routes through Copilot", () => {
     const argonRungs = Object.values(AGENT_MODEL_REQUIREMENTS).flatMap((requirement) =>

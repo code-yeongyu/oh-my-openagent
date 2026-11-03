@@ -3,11 +3,17 @@ import { addGuidance, dispatchGuidance, type Guidance } from "./guidance"
 
 test("design 24: a crash after the child held the guidance and before delivered was saved redelivers the same input, so the child keeps one entry", async () => {
   let saved: readonly Guidance[] = addGuidance([], {
-    id: "guide-1", scope: { kind: "node", nodeId: "b" }, text: "use staging", createdAt: "2026-01-01T00:00:00Z",
+    id: "guide-1",
+    scope: { kind: "node", nodeId: "b" },
+    text: "use staging",
+    createdAt: "2026-01-01T00:00:00Z",
   })
   const childEntries = new Map<string, { readonly entryId: string; readonly revision: number; readonly text: string }>()
   const sentInputs: { readonly inputId: string; readonly revision: number; readonly text: string }[] = []
-  const deliver = async (_taskId: string, input: { readonly inputId: string; readonly revision: number; readonly text: string }) => {
+  const deliver = async (
+    _taskId: string,
+    input: { readonly inputId: string; readonly revision: number; readonly text: string },
+  ) => {
     sentInputs.push(input)
     const existing = childEntries.get(input.inputId)
     if (existing !== undefined) {

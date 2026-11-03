@@ -46,26 +46,32 @@ describe("sendMessage", () => {
     const baseDir = await createBaseDirectory()
     const config = createConfig(baseDir)
     const teamRunId = randomUUID()
-    const messages = Array.from({ length: 4 }, (_, index) => createMessage({
-      from: `m${index + 1}`,
-      body: `message-${index + 1}`,
-      timestamp: 100 + index,
-    }))
+    const messages = Array.from({ length: 4 }, (_, index) =>
+      createMessage({
+        from: `m${index + 1}`,
+        body: `message-${index + 1}`,
+        timestamp: 100 + index,
+      }),
+    )
 
     // when
-    await Promise.all(messages.map(async (message) => {
-      await sendMessage(message, teamRunId, config, { isLead: false, activeMembers: ["m1"] })
-    }))
+    await Promise.all(
+      messages.map(async (message) => {
+        await sendMessage(message, teamRunId, config, { isLead: false, activeMembers: ["m1"] })
+      }),
+    )
 
     // then
     const inboxDir = getInboxDir(resolveBaseDir(config), teamRunId, "m1")
     const fileNames = (await readdir(inboxDir)).filter((entry) => entry.endsWith(".json"))
     expect(fileNames).toHaveLength(4)
 
-    const parsedMessages = await Promise.all(fileNames.map(async (fileName) => {
-      const fileContent = await readFile(path.join(inboxDir, fileName), "utf8")
-      return MessageSchema.parse(JSON.parse(fileContent))
-    }))
+    const parsedMessages = await Promise.all(
+      fileNames.map(async (fileName) => {
+        const fileContent = await readFile(path.join(inboxDir, fileName), "utf8")
+        return MessageSchema.parse(JSON.parse(fileContent))
+      }),
+    )
     expect(new Set(parsedMessages.map((message) => message.messageId)).size).toBe(4)
   })
 

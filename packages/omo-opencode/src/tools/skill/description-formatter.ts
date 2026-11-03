@@ -26,9 +26,8 @@ function formatSkillCommand(skill: SkillInfo): string {
 }
 
 function formatSlashCommand(command: CommandInfo): string {
-  const argumentHint = typeof command.metadata.argumentHint === "string"
-    ? command.metadata.argumentHint.trim()
-    : undefined
+  const argumentHint =
+    typeof command.metadata.argumentHint === "string" ? command.metadata.argumentHint.trim() : undefined
   const lines = [
     "  <command>",
     `    <name>/${command.name}</name>`,
@@ -95,17 +94,14 @@ function shouldSuppressBuiltinCommandAlias(command: CommandInfo, skills: SkillIn
   return skills.some((skill) => normalizeSkillName(skill.name) === normalizedCommandName)
 }
 
-function deduplicateCommandsForPathAliasedSkills(
-  commands: CommandInfo[],
-  skills: SkillInfo[],
-): CommandInfo[] {
+function deduplicateCommandsForPathAliasedSkills(commands: CommandInfo[], skills: SkillInfo[]): CommandInfo[] {
   return commands.filter((command) => !shouldSuppressBuiltinCommandAlias(command, skills))
 }
 
 export function formatCombinedDescription(
   skills?: SkillInfo[],
   commands?: CommandInfo[],
-  options: CombinedDescriptionOptions = {}
+  options: CombinedDescriptionOptions = {},
 ): string {
   const allSkills = options.includeSkills ? deduplicatePathAliasedSkills(skills ?? []) : []
   const isRenderedByCore = createCoreRenderedSkillFilter(options.coreListedSkills)

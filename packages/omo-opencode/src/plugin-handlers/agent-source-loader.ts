@@ -5,27 +5,22 @@ import {
   loadProjectAgents,
   loadUserAgents,
   readOpencodeConfigAgents,
-} from "../features/claude-code-agent-loader";
-import { log, migrateAgentConfig } from "../shared";
-import type {
-  AgentConfigRecord,
-  AgentSourceMap,
-  AgentSources,
-  ApplyAgentConfigParams,
-} from "./agent-config-types";
+} from "../features/claude-code-agent-loader"
+import { log, migrateAgentConfig } from "../shared"
+import type { AgentConfigRecord, AgentSourceMap, AgentSources, ApplyAgentConfigParams } from "./agent-config-types"
 
 function migratePluginAgents(rawPluginAgents: Record<string, unknown>): AgentSourceMap {
-  const migratedAgents: AgentSourceMap = {};
+  const migratedAgents: AgentSourceMap = {}
   for (const [key, value] of Object.entries(rawPluginAgents)) {
     if (!value) {
-      migratedAgents[key] = undefined;
-      continue;
+      migratedAgents[key] = undefined
+      continue
     }
-    const migrated = migrateAgentConfig(value as Record<string, unknown>);
-    if (!migrated.mode) migrated.mode = "subagent";
-    migratedAgents[key] = migrated;
+    const migrated = migrateAgentConfig(value as Record<string, unknown>)
+    if (!migrated.mode) migrated.mode = "subagent"
+    migratedAgents[key] = migrated
   }
-  return migratedAgents;
+  return migratedAgents
 }
 
 function summarizeCustomAgents(
@@ -48,28 +43,22 @@ function summarizeCustomAgents(
         typeof (config as Record<string, unknown>).description === "string"
           ? ((config as Record<string, unknown>).description as string)
           : "",
-    }));
+    }))
 }
 
 export function loadAgentSources(params: ApplyAgentConfigParams): AgentSources {
-  const includeClaudeAgents = params.pluginConfig.claude_code?.agents ?? true;
-  const anthropicProvider = params.pluginConfig.claude_code?.anthropic_provider;
-  const userAgents = includeClaudeAgents ? loadUserAgents(anthropicProvider) : {};
-  const projectAgents = includeClaudeAgents
-    ? loadProjectAgents(params.ctx.directory, anthropicProvider)
-    : {};
-  const opencodeGlobalAgents = loadOpencodeGlobalAgents();
-  const opencodeProjectAgents = loadOpencodeProjectAgents(params.ctx.directory);
-  const pluginAgents = migratePluginAgents(params.pluginComponents.agents);
+  const includeClaudeAgents = params.pluginConfig.claude_code?.agents ?? true
+  const anthropicProvider = params.pluginConfig.claude_code?.anthropic_provider
+  const userAgents = includeClaudeAgents ? loadUserAgents(anthropicProvider) : {}
+  const projectAgents = includeClaudeAgents ? loadProjectAgents(params.ctx.directory, anthropicProvider) : {}
+  const opencodeGlobalAgents = loadOpencodeGlobalAgents()
+  const opencodeProjectAgents = loadOpencodeProjectAgents(params.ctx.directory)
+  const pluginAgents = migratePluginAgents(params.pluginComponents.agents)
   const agentDefinitionAgents = params.pluginConfig.agent_definitions
-    ? loadAgentDefinitions(
-        params.pluginConfig.agent_definitions,
-        "definition-file",
-        anthropicProvider,
-      )
-    : {};
-  const opencodeConfigAgents = readOpencodeConfigAgents(params.ctx.directory);
-  const configAgent = params.config.agent as AgentConfigRecord | undefined;
+    ? loadAgentDefinitions(params.pluginConfig.agent_definitions, "definition-file", anthropicProvider)
+    : {}
+  const opencodeConfigAgents = readOpencodeConfigAgents(params.ctx.directory)
+  const configAgent = params.config.agent as AgentConfigRecord | undefined
   const sourceCounts = {
     user: Object.keys(userAgents).length,
     project: Object.keys(projectAgents).length,
@@ -79,7 +68,7 @@ export function loadAgentSources(params: ApplyAgentConfigParams): AgentSources {
     agentDefinitions: Object.keys(agentDefinitionAgents).length,
     opencodeConfig: Object.keys(opencodeConfigAgents).length,
     config: Object.keys(configAgent ?? {}).length,
-  };
+  }
   const sources = {
     userAgents,
     projectAgents,
@@ -89,12 +78,12 @@ export function loadAgentSources(params: ApplyAgentConfigParams): AgentSources {
     agentDefinitionAgents,
     opencodeConfigAgents,
     configAgent,
-  };
+  }
 
-  log("[agent-source-loader] Agent sources loaded", sourceCounts);
+  log("[agent-source-loader] Agent sources loaded", sourceCounts)
 
   return {
     ...sources,
     customAgentSummaries: summarizeCustomAgents(sources),
-  };
+  }
 }

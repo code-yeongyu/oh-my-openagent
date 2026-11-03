@@ -6,7 +6,10 @@ import type { NativeSetupOfferResult } from "./index"
 
 const VERIFIED_BIN = "/sandbox/.bun/bin/omo"
 
-function recorder(answer: boolean, runSetup: (binPath: string, args: readonly string[]) => Promise<number> = async () => 0) {
+function recorder(
+  answer: boolean,
+  runSetup: (binPath: string, args: readonly string[]) => Promise<number> = async () => 0,
+) {
   const questions: string[] = []
   const runs: { binPath: string; args: readonly string[] }[] = []
   const starts: string[] = []

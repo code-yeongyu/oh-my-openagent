@@ -89,11 +89,7 @@ function jobsKeyParts(jobs: JobBoardState): readonly unknown[] {
     case "none":
       return ["jobs", "none"]
     case "list":
-      return [
-        "jobs",
-        "list",
-        jobs.jobs.map((job) => [job.title, job.status, job.toolCalls, job.lastTool]),
-      ]
+      return ["jobs", "list", jobs.jobs.map((job) => [job.title, job.status, job.toolCalls, job.lastTool])]
     default:
       return assertNever(jobs)
   }
@@ -111,13 +107,5 @@ function loopKeyParts(loop: LoopState): readonly unknown[] {
 }
 
 function liveLoopKeyParts(loop: LoopLive): readonly unknown[] {
-  return [
-    loop.goalsDone,
-    loop.goalsTotal,
-    loop.pass,
-    loop.fail,
-    loop.pending,
-    loop.blocked,
-    loop.activeGoal,
-  ]
+  return [loop.goalsDone, loop.goalsTotal, loop.pass, loop.fail, loop.pending, loop.blocked, loop.activeGoal]
 }

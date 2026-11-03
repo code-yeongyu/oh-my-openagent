@@ -1,6 +1,4 @@
-export {
-  OhMyOpenCodeConfigSchema,
-} from "./schema"
+export { OhMyOpenCodeConfigSchema } from "./schema"
 
 export type {
   OhMyOpenCodeConfig,

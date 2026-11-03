@@ -29,17 +29,21 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: LATEST_MODEL_BY_FAMILY.kimi,
         variant: "max",
       },
-      { providers: ["opencode"], model: LATEST_MODEL_BY_FAMILY.kimiK3, variant: "max" }
+      { providers: ["opencode"], model: LATEST_MODEL_BY_FAMILY.kimiK3, variant: "max" },
     ]),
   },
   ultrabrain: {
     fallbackChain: [
       { providers: ["openai", "chatgpt-subscription"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "max" },
       { providers: ["github-copilot"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "max" },
-      { providers: ["openai", "chatgpt-subscription", "opencode"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "max" },
+      {
+        providers: ["openai", "chatgpt-subscription", "opencode"],
+        model: LATEST_MODEL_BY_FAMILY.gptAstra,
+        variant: "max",
+      },
       { providers: ["openai", "chatgpt-subscription"], model: "gpt-5.6-sol", variant: "max" },
       { providers: ["github-copilot"], model: "gpt-5.6-sol", variant: "max" },
-      { providers: ["openai", "chatgpt-subscription", "opencode"], model: "gpt-5.6-sol", variant: "max" }
+      { providers: ["openai", "chatgpt-subscription", "opencode"], model: "gpt-5.6-sol", variant: "max" },
     ],
   },
   "deep-low": {
@@ -54,7 +58,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: "gpt-5.6-sol",
         variant: "high",
       },
-      { providers: ["openai", "chatgpt-subscription"], model: "gpt-5.6-sol-fast", variant: "high" }
+      { providers: ["openai", "chatgpt-subscription"], model: "gpt-5.6-sol-fast", variant: "high" },
     ],
   },
   "deep-high": {
@@ -63,7 +67,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
         model: LATEST_MODEL_BY_FAMILY.gptAstra,
         variant: "high",
-      }
+      },
     ],
   },
   artistry: {
@@ -88,7 +92,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: LATEST_MODEL_BY_FAMILY.kimi,
         variant: "max",
       },
-      { providers: ["opencode"], model: LATEST_MODEL_BY_FAMILY.kimiK3, variant: "max" }
+      { providers: ["opencode"], model: LATEST_MODEL_BY_FAMILY.kimiK3, variant: "max" },
     ]),
   },
   quick: {
@@ -110,7 +114,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["xai"], model: "grok-4.20-0309-non-reasoning" },
       // Trailing: only a Z.ai-only or Xiaomi-only machine reaches these (#9202).
       { providers: ["zai-coding-plan"], model: LATEST_MODEL_BY_FAMILY.glmFlash, variant: "low" },
-      { providers: ["xiaomi"], model: "mimo-v2.6-flash", variant: "low" }
+      { providers: ["xiaomi"], model: "mimo-v2.6-flash", variant: "low" },
     ],
   },
   "unspecified-low": {
@@ -143,7 +147,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "max",
       },
       { providers: ["deepseek", "opencode-go"], model: "deepseek-v4-pro", variant: "max" },
-      { providers: ["xiaomi", "opencode-go"], model: "mimo-v2.5-pro", variant: "max" }
+      { providers: ["xiaomi", "opencode-go"], model: "mimo-v2.5-pro", variant: "max" },
     ],
   },
   "unspecified-high": {
@@ -159,7 +163,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: LATEST_MODEL_BY_FAMILY.kimi,
         variant: "max",
       },
-      { providers: ["opencode"], model: LATEST_MODEL_BY_FAMILY.kimiK3, variant: "max" }
+      { providers: ["opencode"], model: LATEST_MODEL_BY_FAMILY.kimiK3, variant: "max" },
     ],
   },
   writing: {
@@ -180,7 +184,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-opus-4-6",
         variant: "max",
-      }
+      },
     ],
   },
 }

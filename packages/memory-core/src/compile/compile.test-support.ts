@@ -26,12 +26,12 @@ export function parseCompiledBlock(block: string): CompiledBlockStructure {
     }
   }
 
-  const projectionPaths = [...block.matchAll(/<projection>\$MEMORY_DIR\/([^<]+)<\/projection>/g)]
-    .map((match) => match[1] ?? "")
+  const projectionPaths = [...block.matchAll(/<projection>\$MEMORY_DIR\/([^<]+)<\/projection>/g)].map(
+    (match) => match[1] ?? "",
+  )
   const memory = region(block, "memory")
-  const memoryOpenTags = memory === undefined
-    ? []
-    : [...memory.matchAll(/^\s*<([a-z][a-z0-9_-]*)>$/gm)].map((match) => match[1] ?? "")
+  const memoryOpenTags =
+    memory === undefined ? [] : [...memory.matchAll(/^\s*<([a-z][a-z0-9_-]*)>$/gm)].map((match) => match[1] ?? "")
   const metadata = requiredRegion(block, "memory_metadata")
   const agentId = requiredMatch(metadata, /^- AGENT_ID: (.+)$/m)
 

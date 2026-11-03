@@ -24,7 +24,7 @@ describe("owner-bound lsp-daemon attestation", () => {
     })
     const ownerAttested = await attestLspDaemonOwner(target, {
       pingOwner: async () => null,
-      readText: async (path) => path === target.ownerPath ? JSON.stringify(owner) : "auth-token",
+      readText: async (path) => (path === target.ownerPath ? JSON.stringify(owner) : "auth-token"),
     })
 
     expect(genericArgvAttested).toBe(true)
@@ -40,10 +40,12 @@ describe("owner-bound lsp-daemon attestation", () => {
     }
     const target = { authPath: "/tmp/auth.token", owner, ownerPath: "/tmp/daemon.owner", pid: owner.pid }
 
-    expect(await attestLspDaemonOwner(target, {
-      pingOwner: async () => owner,
-      readText: async (path) => path === target.ownerPath ? JSON.stringify(owner) : "auth-token",
-    })).toBe(true)
+    expect(
+      await attestLspDaemonOwner(target, {
+        pingOwner: async () => owner,
+        readText: async (path) => (path === target.ownerPath ? JSON.stringify(owner) : "auth-token"),
+      }),
+    ).toBe(true)
   })
   test("#given an owner auth token #when a ping request is created #then it matches the daemon wire protocol", () => {
     expect(createLspDaemonOwnerPingRequest("auth-token")).toEqual({
@@ -96,5 +98,4 @@ describe("owner-bound lsp-daemon attestation", () => {
       result: { protocolVersion: 1, ...owner },
     })
   })
-
 })

@@ -9,15 +9,28 @@ for (const property of ["bind-address", "ephemeral-port", "single-use", "state-m
     const api = fakeApi(() => Response.json(grant))
     const listen = spyOn(Server.prototype, "listen")
     const address = spyOn(Server.prototype, "address")
-    onTestFinished(() => { listen.mockRestore(); address.mockRestore() })
+    onTestFinished(() => {
+      listen.mockRestore()
+      address.mockRestore()
+    })
     await loginLoopback(createSession({ api, store: memorySecrets().store(api), home: await temporaryHome() }), {
-      accounts: "https://signin.omo.dev", name: "Test", platform: "linux", chooseDevice: async () => null,
-      open: async url => {
+      accounts: "https://signin.omo.dev",
+      name: "Test",
+      platform: "linux",
+      chooseDevice: async () => null,
+      open: async (url) => {
         const ask = new URL(url)
         const callback = new URL(ask.searchParams.get("redirect_uri") ?? "")
         if (property === "bind-address") {
-          expect(address.mock.results.some(result => result.type === "return" && typeof result.value === "object" &&
-            result.value !== null && result.value.address === "127.0.0.1")).toBe(true)
+          expect(
+            address.mock.results.some(
+              (result) =>
+                result.type === "return" &&
+                typeof result.value === "object" &&
+                result.value !== null &&
+                result.value.address === "127.0.0.1",
+            ),
+          ).toBe(true)
         }
         if (property === "ephemeral-port") {
           expect(listen).toHaveBeenCalledWith(0, "127.0.0.1", expect.any(Function))
@@ -48,10 +61,18 @@ for (const accounts of ["http://example.com", "javascript:alert(1)", "file:///tm
   test(`loopback rejects unsafe accounts override ${accounts}`, async () => {
     const api = fakeApi(() => Response.json(grant))
     let opened = false
-    await expect(loginLoopback(createSession({ api, store: memorySecrets().store(api), home: await temporaryHome() }), {
-      accounts, name: "Test", platform: "linux", chooseDevice: async () => null,
-      open: async () => { opened = true; return false },
-    })).rejects.toThrow()
+    await expect(
+      loginLoopback(createSession({ api, store: memorySecrets().store(api), home: await temporaryHome() }), {
+        accounts,
+        name: "Test",
+        platform: "linux",
+        chooseDevice: async () => null,
+        open: async () => {
+          opened = true
+          return false
+        },
+      }),
+    ).rejects.toThrow()
     expect(opened).toBe(false)
   })
 }

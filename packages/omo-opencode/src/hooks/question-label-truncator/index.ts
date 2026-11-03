@@ -1,1 +1,1 @@
-export { createQuestionLabelTruncatorHook } from "./hook";
+export { createQuestionLabelTruncatorHook } from "./hook"

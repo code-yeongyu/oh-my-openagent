@@ -8,9 +8,8 @@ import { SENPI_TELEMETRY_EVENT_NAME } from "./index"
 // exist to make that break loud.
 
 describe("telemetry identity is stable across the OmO Native wording rename", () => {
-	test("#given the legacy daily-active event #when its name is read #then it is unchanged", () => {
-		// given / when / then
-		expect(SENPI_TELEMETRY_EVENT_NAME).toBe("omo_senpi_daily_active")
-	})
-
+  test("#given the legacy daily-active event #when its name is read #then it is unchanged", () => {
+    // given / when / then
+    expect(SENPI_TELEMETRY_EVENT_NAME).toBe("omo_senpi_daily_active")
+  })
 })

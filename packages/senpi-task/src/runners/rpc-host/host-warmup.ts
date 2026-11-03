@@ -56,7 +56,13 @@ const WARM_REQUEST_ID = "omo-task-host-warm"
 const WARM_TIMEOUT_MS = 60_000
 // What an engine that KNOWS `warm` refuses it with. Any other refusal (`missing_session_id` from a
 // router that reads an unknown session-less command as a session command) is an engine from before it.
-const WARM_REFUSALS = ["host_draining", "warm_failed", "invalid_session_kind", "invalid_session_context", "invalid_path"] as const
+const WARM_REFUSALS = [
+  "host_draining",
+  "warm_failed",
+  "invalid_session_kind",
+  "invalid_session_context",
+  "invalid_path",
+] as const
 
 type WarmAnswer =
   | { readonly kind: "warm"; readonly state: "warmed" | "already_warm" }
@@ -68,7 +74,14 @@ export async function warmTaskHost(input: WarmHostSessionInput): Promise<TaskHos
   const context = { role: "child", task_id: HOST_WARMUP_TASK_ID, state_dir: stateDir, [HOST_WARMUP_CONTEXT]: "1" }
   try {
     const request = { id: WARM_REQUEST_ID, type: "warm", cwd: input.cwd, kind: "worker", context }
-    const answer = classifyWarmReply(await askHost(input.socket, request, WARM_TIMEOUT_MS, input.agentDir === undefined ? {} : { agentDir: input.agentDir }))
+    const answer = classifyWarmReply(
+      await askHost(
+        input.socket,
+        request,
+        WARM_TIMEOUT_MS,
+        input.agentDir === undefined ? {} : { agentDir: input.agentDir },
+      ),
+    )
     switch (answer.kind) {
       case "warm":
         return answer.state
@@ -101,7 +114,10 @@ async function openAndCloseWarmUpSession(
   stateDir: string,
   context: Readonly<Record<string, string>>,
 ): Promise<void> {
-  const client = new HostSessionClient({ socketPath: input.socket, ...(input.ports === undefined ? {} : { ports: input.ports }) })
+  const client = new HostSessionClient({
+    socketPath: input.socket,
+    ...(input.ports === undefined ? {} : { ports: input.ports }),
+  })
   try {
     await client.open({
       sessionPath: join(stateDir, "warmup.jsonl"),

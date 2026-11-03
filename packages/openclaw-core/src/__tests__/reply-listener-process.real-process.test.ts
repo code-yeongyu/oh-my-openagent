@@ -43,23 +43,19 @@ afterAll(() => {
 })
 
 describe("isReplyListenerDaemonProcess against real processes", () => {
-  test(
-    "#given live children with and without the daemon marker #when probing their self-reported pids #then only the marked child is the daemon and a dead pid is not",
-    async () => {
-      const marked = spawnIdleChild("marked", [REPLY_LISTENER_DAEMON_IDENTITY_MARKER])
-      const unmarked = spawnIdleChild("unmarked", [])
-      const markedPid = await awaitReady(marked.readyPath)
-      const unmarkedPid = await awaitReady(unmarked.readyPath)
-      try {
-        expect(await isReplyListenerDaemonProcess(markedPid)).toBe(true)
-        expect(await isReplyListenerDaemonProcess(unmarkedPid)).toBe(false)
-      } finally {
-        marked.child.kill()
-        unmarked.child.kill()
-        await Promise.all([marked.child.exited, unmarked.child.exited])
-      }
-      expect(await isReplyListenerDaemonProcess(markedPid)).toBe(false)
-    },
-    30_000,
-  )
+  test("#given live children with and without the daemon marker #when probing their self-reported pids #then only the marked child is the daemon and a dead pid is not", async () => {
+    const marked = spawnIdleChild("marked", [REPLY_LISTENER_DAEMON_IDENTITY_MARKER])
+    const unmarked = spawnIdleChild("unmarked", [])
+    const markedPid = await awaitReady(marked.readyPath)
+    const unmarkedPid = await awaitReady(unmarked.readyPath)
+    try {
+      expect(await isReplyListenerDaemonProcess(markedPid)).toBe(true)
+      expect(await isReplyListenerDaemonProcess(unmarkedPid)).toBe(false)
+    } finally {
+      marked.child.kill()
+      unmarked.child.kill()
+      await Promise.all([marked.child.exited, unmarked.child.exited])
+    }
+    expect(await isReplyListenerDaemonProcess(markedPid)).toBe(false)
+  }, 30_000)
 })

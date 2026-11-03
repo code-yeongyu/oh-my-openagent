@@ -11,9 +11,14 @@ describe("anthropic builtin categories", () => {
   describe("#given the architect category", () => {
     describe("#when the resolver routes it", () => {
       it("#then it prefers Fable 5.5 at max and accepts either generation", () => {
-        expect(architect?.config.model).toBe(FABLE_55_RELEASED ? "anthropic/claude-fable-5-5" : "anthropic/claude-fable-5-1")
+        expect(architect?.config.model).toBe(
+          FABLE_55_RELEASED ? "anthropic/claude-fable-5-5" : "anthropic/claude-fable-5-1",
+        )
         expect(architect?.config.variant).toBe("max")
-        expect(architect?.requiresModel).toEqual([...(FABLE_55_RELEASED ? ["claude-fable-5-5"] : []), "claude-fable-5-1"])
+        expect(architect?.requiresModel).toEqual([
+          ...(FABLE_55_RELEASED ? ["claude-fable-5-5"] : []),
+          "claude-fable-5-1",
+        ])
       })
     })
   })

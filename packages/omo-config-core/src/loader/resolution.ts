@@ -29,8 +29,9 @@ export type ResolveOmoConfigViewResult = {
   readonly profile?: string
 }
 
-const HARNESS_KEYS = [...new Set([...HARNESS_IDS, ...OMO_CONFIG_HARNESS_IDS, ...OMO_CONFIG_LEGACY_HARNESS_IDS])]
-  .map((harness) => harnessBlockKey(harness))
+const HARNESS_KEYS = [...new Set([...HARNESS_IDS, ...OMO_CONFIG_HARNESS_IDS, ...OMO_CONFIG_LEGACY_HARNESS_IDS])].map(
+  (harness) => harnessBlockKey(harness),
+)
 
 function profileName(value: string | undefined): string | undefined {
   return value === "" ? undefined : value
@@ -43,10 +44,12 @@ function profileNameFromOpenCodeConfigDir(path: string | undefined): string | un
 
 export function resolveOmoProfileName(options: ResolveOmoProfileNameOptions = {}): string | undefined {
   const env = options.env ?? process.env
-  return profileName(options.profile)
-    ?? profileName(env["OMO_PROFILE"])
-    ?? profileName(env["OCX_PROFILE"])
-    ?? profileNameFromOpenCodeConfigDir(env["OPENCODE_CONFIG_DIR"])
+  return (
+    profileName(options.profile) ??
+    profileName(env["OMO_PROFILE"]) ??
+    profileName(env["OCX_PROFILE"]) ??
+    profileNameFromOpenCodeConfigDir(env["OPENCODE_CONFIG_DIR"])
+  )
 }
 
 function toRecord(value: unknown): Record<string, unknown> | undefined {
@@ -84,13 +87,16 @@ function harnessLayer(
 export function resolveOmoConfigView(options: ResolveOmoConfigViewOptions): ResolveOmoConfigViewResult {
   const profiles = toRecord(options.config["profiles"])
   const profile = options.profile === undefined ? undefined : toRecord(profiles?.[options.profile])
-  const diagnostics: OmoConfigDiagnostic[] = profile === undefined && options.profile !== undefined
-    ? [{
-      kind: "profile",
-      message: `Activated omo profile \"${options.profile}\" does not exist; using the base configuration`,
-      path: `profiles.${options.profile}`,
-    }]
-    : []
+  const diagnostics: OmoConfigDiagnostic[] =
+    profile === undefined && options.profile !== undefined
+      ? [
+          {
+            kind: "profile",
+            message: `Activated omo profile \"${options.profile}\" does not exist; using the base configuration`,
+            path: `profiles.${options.profile}`,
+          },
+        ]
+      : []
   const layers = [
     withoutControlKeys(options.config),
     harnessLayer(options.config, options.harness),

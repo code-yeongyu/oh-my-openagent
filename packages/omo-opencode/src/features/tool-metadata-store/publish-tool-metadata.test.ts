@@ -19,13 +19,13 @@ describe("publishToolMetadata", () => {
       {
         sessionID: "ses_parent",
         callID: "call_123",
-        metadata: async input => {
+        metadata: async (input) => {
           calls.push(input.title ?? "")
-          await new Promise(resolve => setTimeout(resolve, 1))
+          await new Promise((resolve) => setTimeout(resolve, 1))
           metadataFinished = true
         },
       },
-      payload
+      payload,
     )
 
     // then
@@ -45,7 +45,7 @@ describe("publishToolMetadata", () => {
         sessionID: "ses_parent",
         callId: " call_legacy ",
       },
-      payload
+      payload,
     )
 
     // then
@@ -65,7 +65,7 @@ describe("publishToolMetadata", () => {
           metadataCalls += 1
         },
       },
-      { title: "Task" }
+      { title: "Task" },
     )
 
     // then

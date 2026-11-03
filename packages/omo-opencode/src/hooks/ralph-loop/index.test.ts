@@ -16,7 +16,10 @@ describe("ralph-loop", () => {
   let toastCalls: Array<{ title: string; message: string; variant: string }>
   let messagesCalls: Array<{ sessionID: string }>
   let createSessionCalls: Array<{ parentID?: string; title?: string; directory?: string }>
-  let mockSessionMessages: Array<{ info?: { role?: string; finish?: string }; parts?: Array<{ type: string; text?: string }> }>
+  let mockSessionMessages: Array<{
+    info?: { role?: string; finish?: string }
+    parts?: Array<{ type: string; text?: string }>
+  }>
   let mockMessagesApiResponseShape: "data" | "array"
 
   function createMockPluginInput(): Parameters<typeof createRalphLoopHook>[0] {
@@ -30,7 +33,10 @@ describe("ralph-loop", () => {
             })
             return {}
           },
-          promptAsync: async (opts: { path: { id: string }; body: { parts: Array<{ type: string; text: string }> } }) => {
+          promptAsync: async (opts: {
+            path: { id: string }
+            body: { parts: Array<{ type: string; text: string }> }
+          }) => {
             promptCalls.push({
               sessionID: opts.path.id,
               text: opts.body.parts[0].text,
@@ -41,10 +47,7 @@ describe("ralph-loop", () => {
             messagesCalls.push({ sessionID: opts.path.id })
             return mockMessagesApiResponseShape === "array" ? mockSessionMessages : { data: mockSessionMessages }
           },
-          create: async (opts: {
-            body: { parentID?: string; title?: string }
-            query?: { directory?: string }
-          }) => {
+          create: async (opts: { body: { parentID?: string; title?: string }; query?: { directory?: string } }) => {
             createSessionCalls.push({
               parentID: opts.body.parentID,
               title: opts.body.title,
@@ -480,12 +483,14 @@ describe("ralph-loop", () => {
 
       // when - session goes idle
       const result = await Promise.race([
-        hook.event({
-          event: {
-            type: "session.idle",
-            properties: { sessionID: "session-123" },
-          },
-        }).then(() => "resolved" as const),
+        hook
+          .event({
+            event: {
+              type: "session.idle",
+              properties: { sessionID: "session-123" },
+            },
+          })
+          .then(() => "resolved" as const),
         new Promise<"timed-out">((resolvePromise) => setTimeout(() => resolvePromise("timed-out"), 50)),
       ])
 
@@ -499,9 +504,7 @@ describe("ralph-loop", () => {
       // given - active loop state with a running background task
       const hook = makeHook(createMockPluginInput(), {
         backgroundManager: {
-          getTasksByParentSession: (sessionID: string) => sessionID === "session-123"
-            ? [{ status: "running" }]
-            : [],
+          getTasksByParentSession: (sessionID: string) => (sessionID === "session-123" ? [{ status: "running" }] : []),
         },
       })
       hook.startLoop("session-123", "Build a feature", { maxIterations: 10 })
@@ -784,7 +787,10 @@ describe("ralph-loop", () => {
       })
       hook.startLoop("session-123", "Build something", { completionPromise: "COMPLETE" })
 
-      writeFileSync(transcriptPath, JSON.stringify({ type: "assistant", content: "Task done <promise>COMPLETE</promise>" }) + "\n")
+      writeFileSync(
+        transcriptPath,
+        JSON.stringify({ type: "assistant", content: "Task done <promise>COMPLETE</promise>" }) + "\n",
+      )
 
       // when - session goes idle (transcriptPath now derived from sessionID via getTranscriptPath)
       await hook.event({
@@ -804,7 +810,10 @@ describe("ralph-loop", () => {
       // given - active loop with assistant message containing completion promise
       mockSessionMessages = [
         { info: { role: "user" }, parts: [{ type: "text", text: "Build something" }] },
-        { info: { role: "assistant" }, parts: [{ type: "text", text: "I have completed the task. <promise>API_DONE</promise>" }] },
+        {
+          info: { role: "assistant" },
+          parts: [{ type: "text", text: "I have completed the task. <promise>API_DONE</promise>" }],
+        },
       ]
       const hook = makeHook(createMockPluginInput(), {
         getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
@@ -834,7 +843,10 @@ describe("ralph-loop", () => {
       mockMessagesApiResponseShape = "array"
       mockSessionMessages = [
         { info: { role: "user" }, parts: [{ type: "text", text: "Build something" }] },
-        { info: { role: "assistant" }, parts: [{ type: "text", text: "I have completed the task. <promise>API_DONE</promise>" }] },
+        {
+          info: { role: "assistant" },
+          parts: [{ type: "text", text: "I have completed the task. <promise>API_DONE</promise>" }],
+        },
       ]
       const hook = makeHook(createMockPluginInput(), {
         getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
@@ -901,9 +913,7 @@ describe("ralph-loop", () => {
       expect(promptCalls.length).toBe(1)
       expect(hook.getState()).toBeNull()
       expect(toastCalls.some((t) => t.title === "Ralph Loop Complete!")).toBe(true)
-      expect(
-        toastCalls.some((t) => t.title === "Ralph Loop" && t.message.includes("Iteration")),
-      ).toBe(false)
+      expect(toastCalls.some((t) => t.title === "Ralph Loop" && t.message.includes("Iteration"))).toBe(false)
     })
 
     test("should ignore completion promise in reasoning part via session messages API", async () => {
@@ -912,9 +922,7 @@ describe("ralph-loop", () => {
         { info: { role: "user" }, parts: [{ type: "text", text: "Build something" }] },
         {
           info: { role: "assistant", finish: "end_turn" },
-          parts: [
-            { type: "reasoning", text: "I am done now. <promise>REASONING_DONE</promise>" },
-          ],
+          parts: [{ type: "reasoning", text: "I am done now. <promise>REASONING_DONE</promise>" }],
         },
       ]
       const hook = makeHook(createMockPluginInput(), {
@@ -1050,7 +1058,10 @@ describe("ralph-loop", () => {
       const mockInput = createMockPluginInput() as {
         client: {
           session: {
-            promptAsync: (opts: { path: { id: string }; body: { parts: Array<{ type: string; text: string }> } }) => Promise<unknown>
+            promptAsync: (opts: {
+              path: { id: string }
+              body: { parts: Array<{ type: string; text: string }> }
+            }) => Promise<unknown>
           }
         }
       }
@@ -1255,7 +1266,7 @@ describe("ralph-loop", () => {
       const hook = makeHook(createMockPluginInput())
       try {
         hook.startLoop("session-A", "First task", { maxIterations: 10 })
-      
+
         // Simulate some iterations
         await hook.event({
           event: { type: "session.idle", properties: { sessionID: "session-A" } },
@@ -1391,9 +1402,7 @@ Original task: Build something`
       // given - transcript has completion promise
       const transcriptPath = join(TEST_DIR, "transcript.jsonl")
       writeFileSync(transcriptPath, JSON.stringify({ type: "assistant", content: "<promise>DONE</promise>" }) + "\n")
-      mockSessionMessages = [
-        { info: { role: "assistant" }, parts: [{ type: "text", text: "No promise here" }] },
-      ]
+      mockSessionMessages = [{ info: { role: "assistant" }, parts: [{ type: "text", text: "No promise here" }] }]
       const hook = makeHook(createMockPluginInput(), {
         getTranscriptPath: () => transcriptPath,
       })
@@ -1426,7 +1435,7 @@ Original task: Build something`
       // when - idle event triggered
       await hook.event({ event: { type: "session.idle", properties: { sessionID: "test-id" } } })
 
-      const verificationToast = toastCalls.find(t => t.title === "ULTRAWORK LOOP")
+      const verificationToast = toastCalls.find((t) => t.title === "ULTRAWORK LOOP")
       expect(verificationToast).toBeDefined()
       if (!verificationToast) {
         throw new Error("expected ultrawork verification toast")
@@ -1493,7 +1502,7 @@ Original task: Build something`
       await hook.event({ event: { type: "session.idle", properties: { sessionID: "test-id" } } })
 
       // then - regular toast shown
-      expect(toastCalls.some(t => t.title === "Ralph Loop Complete!")).toBe(true)
+      expect(toastCalls.some((t) => t.title === "Ralph Loop Complete!")).toBe(true)
     })
 
     test("should prepend ultrawork to continuation prompt when ultrawork=true", async () => {

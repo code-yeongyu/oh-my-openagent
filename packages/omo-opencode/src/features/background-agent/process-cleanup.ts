@@ -41,11 +41,7 @@ export function __enableScheduledForcedExitForTesting(): void {
   _scheduleForcedExitEnabled = true
 }
 
-function scheduleForcedExit(
-  cleanupResult: void | Promise<void>,
-  exitCode: number,
-  exitAfterCleanup = false,
-): void {
+function scheduleForcedExit(cleanupResult: void | Promise<void>, exitCode: number, exitAfterCleanup = false): void {
   if (!_scheduleForcedExitEnabled) return
   process.exitCode = exitCode
   const exitTimeout = setTimeout(() => process.exit(), 6000)
@@ -84,7 +80,7 @@ export function __setShutdownInProgressForTesting(value: boolean): void {
 function registerProcessSignal(
   signal: ProcessCleanupSignal,
   handler: () => void | Promise<void>,
-  exitAfter: boolean
+  exitAfter: boolean,
 ): () => void {
   const listener = () => {
     markShutdownStarted()
@@ -161,9 +157,7 @@ export function isHarmlessShutdownError(error: unknown): boolean {
   return _shutdownInProgress
 }
 
-function registerErrorEvent(
-  signal: ProcessCleanupErrorEvent,
-): (error: unknown) => void {
+function registerErrorEvent(signal: ProcessCleanupErrorEvent): (error: unknown) => void {
   // Log-only listener. We deliberately DO NOT run cleanup or force-exit on
   // transient errors.
   //
@@ -220,9 +214,7 @@ let cleanupRegistered = false
 const cleanupSignalHandlers = new Map<ProcessCleanupSignal, () => void>()
 const cleanupErrorHandlers = new Map<ProcessCleanupErrorEvent, (error: unknown) => void>()
 
-export function __getProcessCleanupSignalListenerForTesting(
-  signal: ProcessCleanupSignal,
-): (() => void) | undefined {
+export function __getProcessCleanupSignalListenerForTesting(signal: ProcessCleanupSignal): (() => void) | undefined {
   return cleanupSignalHandlers.get(signal)
 }
 
@@ -244,7 +236,7 @@ export function registerManagerForCleanup(manager: CleanupTarget): void {
             // Skip harmless stdio EPIPE during shutdown — see issue #3772.
             if (isHarmlessShutdownError(error)) return
             log("[background-agent] Error during async shutdown cleanup:", error)
-          })
+          }),
         )
       } catch (error) {
         const harmless = isHarmlessShutdownError(error)
@@ -279,8 +271,8 @@ export function registerManagerForCleanup(manager: CleanupTarget): void {
 
   if (isProcessCleanupErrorHandlersDisabled()) {
     log(
-      `[background-agent] ${PROCESS_CLEANUP_DISABLE_ENV} is set; skipping global uncaughtException/unhandledRejection handler registration. `
-        + "Signal handlers (SIGINT/SIGTERM/beforeExit/exit) remain active.",
+      `[background-agent] ${PROCESS_CLEANUP_DISABLE_ENV} is set; skipping global uncaughtException/unhandledRejection handler registration. ` +
+        "Signal handlers (SIGINT/SIGTERM/beforeExit/exit) remain active.",
     )
     return
   }

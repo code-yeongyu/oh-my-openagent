@@ -46,7 +46,11 @@ export async function scenarioG(run) {
     script: {
       parentSteps: [{ type: "text", text: "unused in the pty lane" }],
       childSteps: [
-        { type: "tool_call", name: "task", arguments: { category: "proc", run_in_background: true, name: "tui", prompt: "work from the attached tui" } },
+        {
+          type: "tool_call",
+          name: "task",
+          arguments: { category: "proc", run_in_background: true, name: "tui", prompt: "work from the attached tui" },
+        },
         { type: "text", text: "tui turn complete" },
       ],
     },
@@ -66,17 +70,23 @@ export async function scenarioG(run) {
   const baseSessions = daemonStatus(sandbox).json?.sessions?.total ?? 0
   const session = `dh41-${process.pid}`
   const tmux = tmuxAttach(sandbox, run, session)
-  const attached = await waitFor(() => {
-    const total = daemonStatus(sandbox).json?.sessions?.total ?? 0
-    return total > baseSessions ? total : undefined
-  }, { timeoutMs: 120_000, intervalMs: 1_000 })
+  const attached = await waitFor(
+    () => {
+      const total = daemonStatus(sandbox).json?.sessions?.total ?? 0
+      return total > baseSessions ? total : undefined
+    },
+    { timeoutMs: 120_000, intervalMs: 1_000 },
+  )
   if (attached !== undefined) {
     spawnSync("tmux", ["send-keys", "-t", session, "drive the task tool from the tui", "Enter"], { encoding: "utf8" })
   }
-  const taskRan = await waitFor(() => (readTaskRecords(sandbox).some((record) => record.name === "tui") ? true : undefined), {
-    timeoutMs: 120_000,
-    intervalMs: 1_000,
-  })
+  const taskRan = await waitFor(
+    () => (readTaskRecords(sandbox).some((record) => record.name === "tui") ? true : undefined),
+    {
+      timeoutMs: 120_000,
+      intervalMs: 1_000,
+    },
+  )
   const pane = spawnSync("tmux", ["capture-pane", "-p", "-t", session], { encoding: "utf8" })
   spawnSync("tmux", ["kill-session", "-t", session], { encoding: "utf8" })
   const drained = runBin(sandbox, ["daemon", "stop", "--drain"], { timeoutMs: 120_000 })
@@ -91,19 +101,36 @@ export async function scenarioG(run) {
     sessionsBeforeAttach: baseSessions,
     sessionsWithTui: attached ?? null,
     taskToolRanInsideTui: taskRan === true,
-    tuiTaskRecords: readTaskRecords(sandbox).filter((record) => record.name === "tui").map((record) => record.status),
-    paneExcerpt: (pane.stdout ?? "").split("\n").filter((line) => line.trim().length > 0).slice(-6),
+    tuiTaskRecords: readTaskRecords(sandbox)
+      .filter((record) => record.name === "tui")
+      .map((record) => record.status),
+    paneExcerpt: (pane.stdout ?? "")
+      .split("\n")
+      .filter((line) => line.trim().length > 0)
+      .slice(-6),
   }
   const pass =
-    exits.statusBeforeRun === 3 && exits.noSubcommand === 2 && exits.unknownSubcommand === 2 && exits.run === 0 &&
-    exits.runAgain === 0 && exits.stopDrain === 0 && exits.statusAfterStop === 3 &&
-    startedJson?.action === "start" && facts.reuseAction === "reuse" && attached === baseSessions + 1 && taskRan === true
+    exits.statusBeforeRun === 3 &&
+    exits.noSubcommand === 2 &&
+    exits.unknownSubcommand === 2 &&
+    exits.run === 0 &&
+    exits.runAgain === 0 &&
+    exits.stopDrain === 0 &&
+    exits.statusAfterStop === 3 &&
+    startedJson?.action === "start" &&
+    facts.reuseAction === "reuse" &&
+    attached === baseSessions + 1 &&
+    taskRan === true
   const receipt = await cleanupScenario(sandbox, { hostPids: [startedJson?.pid].filter(Boolean) })
   return {
     scenario: "G",
     title: "CLI: daemon run/status/stop/handoff exit codes + pty attach",
     status: pass ? "pass" : "fail",
-    ...(pass ? {} : { reason: `exits=${JSON.stringify(exits)} runAction=${facts.runAction} reuse=${facts.reuseAction} sessions=${baseSessions}->${attached} taskRan=${taskRan === true}` }),
+    ...(pass
+      ? {}
+      : {
+          reason: `exits=${JSON.stringify(exits)} runAction=${facts.runAction} reuse=${facts.reuseAction} sessions=${baseSessions}->${attached} taskRan=${taskRan === true}`,
+        }),
     facts,
     receipt,
   }
@@ -124,7 +151,8 @@ export async function scenarioH(run) {
       title: "legacy/fallback: a pre-wave-2 host on the sandbox socket",
       status: "skipped",
       reason: "needs a pre-wave-2 omo/senpi binary to serve the sandbox socket",
-      command: "node packages/omo-senpi/scripts/qa/task-host-e2e.mjs --bin <omob-daemon> --legacy-bin <mainline omob> --out <dir>",
+      command:
+        "node packages/omo-senpi/scripts/qa/task-host-e2e.mjs --bin <omob-daemon> --legacy-bin <mainline omob> --out <dir>",
     }
   }
   // `process` is pinned rather than left to `auto`: the plan's fallback is the RpcHostRunner's own loud
@@ -134,7 +162,11 @@ export async function scenarioH(run) {
     omoConfig: hostConfig({ task: { default_execution_mode: "process" } }),
     script: {
       parentSteps: [
-        { type: "tool_call", name: "task", arguments: { category: "proc", run_in_background: true, name: "lg0", prompt: "work against the legacy host" } },
+        {
+          type: "tool_call",
+          name: "task",
+          arguments: { category: "proc", run_in_background: true, name: "lg0", prompt: "work against the legacy host" },
+        },
         { type: "tool_call", name: "task_output", arguments: { name: "lg0", mode: "status" } },
         { type: "tool_call", name: "task_output", arguments: { name: "lg0", mode: "full" } },
         { type: "text", text: "legacy fallback scenario complete" },
@@ -149,10 +181,15 @@ export async function scenarioH(run) {
     detached: true,
     stdio: ["ignore", "ignore", "ignore"],
   })
-  const up = await waitFor(() => (socketInode(socket) === undefined ? undefined : socketInode(socket)), { timeoutMs: 60_000, intervalMs: 500 })
+  const up = await waitFor(() => (socketInode(socket) === undefined ? undefined : socketInode(socket)), {
+    timeoutMs: 60_000,
+    intervalMs: 500,
+  })
   const statusJson = daemonStatus(sandbox, { includeWorkers: true })
   const statusPlain = runBin(sandbox, ["daemon", "status"], { timeoutMs: 60_000 })
-  const parent = runBin(sandbox, run.parentArgs(sandbox, "run one child against the legacy host"), { timeoutMs: 240_000 })
+  const parent = runBin(sandbox, run.parentArgs(sandbox, "run one child against the legacy host"), {
+    timeoutMs: 240_000,
+  })
   const warnings = distinctHostWarnings(parent.stdout)
   const records = readTaskRecords(sandbox)
   const perChild = perChildRpcProcesses(sandbox)
@@ -173,9 +210,13 @@ export async function scenarioH(run) {
     perChildRpcProcessesSeen: perChild.length,
   }
   const pass =
-    facts.legacyAlive && facts.socketInodeBefore === facts.socketInodeAfter && facts.legacyHostReported &&
-    warnings.length === 1 && warnings[0] === "host_unavailable:capability" &&
-    records.length > 0 && records.every((record) => record.status === "completed") &&
+    facts.legacyAlive &&
+    facts.socketInodeBefore === facts.socketInodeAfter &&
+    facts.legacyHostReported &&
+    warnings.length === 1 &&
+    warnings[0] === "host_unavailable:capability" &&
+    records.length > 0 &&
+    records.every((record) => record.status === "completed") &&
     facts.childExecutionModes.join() === "process"
   // Subscribed BEFORE the signal and awaited with a bound: a killed-but-unreaped child still answers
   // `kill(pid, 0)`, so a receipt taken before the reap would report a zombie as a survivor.
@@ -191,7 +232,11 @@ export async function scenarioH(run) {
     scenario: "H",
     title: "legacy/fallback: a pre-wave-2 host on the sandbox socket",
     status: pass ? "pass" : "fail",
-    ...(pass ? {} : { reason: `legacyAlive=${facts.legacyAlive} inode ${facts.socketInodeBefore}->${facts.socketInodeAfter} warnings=${warnings.join(",")} children=${facts.childStatuses.join(",")}` }),
+    ...(pass
+      ? {}
+      : {
+          reason: `legacyAlive=${facts.legacyAlive} inode ${facts.socketInodeBefore}->${facts.socketInodeAfter} warnings=${warnings.join(",")} children=${facts.childStatuses.join(",")}`,
+        }),
     facts,
     receipt,
   }

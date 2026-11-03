@@ -11,7 +11,12 @@ import { BUILTIN_MODEL_PROFILES } from "./builtin-profiles"
 describe("Fable 5.5 launch rungs across every builtin chain table", () => {
   test("building the model-core, senpi-task and omo-senpi tables records no launch rung rejection", () => {
     // given: importing the tables builds every chain through launchRungs
-    const tables = [AGENT_MODEL_REQUIREMENTS, CATEGORY_MODEL_REQUIREMENTS, AGENT_FALLBACK_CHAINS, BUILTIN_MODEL_PROFILES]
+    const tables = [
+      AGENT_MODEL_REQUIREMENTS,
+      CATEGORY_MODEL_REQUIREMENTS,
+      AGENT_FALLBACK_CHAINS,
+      BUILTIN_MODEL_PROFILES,
+    ]
     expect(tables.every((table) => Object.keys(table).length > 0)).toBe(true)
     // then
     expect(launchRungRejections()).toEqual([])

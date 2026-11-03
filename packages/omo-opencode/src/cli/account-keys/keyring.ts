@@ -32,7 +32,10 @@ export async function initializeDeviceKeyring(store: KeyStore): Promise<DeviceKe
     sealing: material.sealingPrivatePkcs8,
   }
   await store.write(JSON.stringify(record))
-  return createDeviceKeyring(record.deviceId, { signingPrivatePkcs8: record.signing, sealingPrivatePkcs8: record.sealing })
+  return createDeviceKeyring(record.deviceId, {
+    signingPrivatePkcs8: record.signing,
+    sealingPrivatePkcs8: record.sealing,
+  })
 }
 
 /**
@@ -46,7 +49,8 @@ export async function loadDeviceKeyring(store: KeyStore): Promise<DeviceKeyring 
   try {
     const parsed: unknown = JSON.parse(raw)
     if (
-      typeof parsed !== "object" || parsed === null ||
+      typeof parsed !== "object" ||
+      parsed === null ||
       typeof (parsed as { deviceId?: unknown }).deviceId !== "string" ||
       (parsed as { deviceId: string }).deviceId.length === 0 ||
       typeof (parsed as { signing?: unknown }).signing !== "string" ||
@@ -55,11 +59,19 @@ export async function loadDeviceKeyring(store: KeyStore): Promise<DeviceKeyring 
       throw new Error("shape")
     }
     record = parsed as StoredDeviceKeys
-    if (Buffer.from(record.signing, "base64url").length === 0 || Buffer.from(record.sealing, "base64url").length === 0) {
+    if (
+      Buffer.from(record.signing, "base64url").length === 0 ||
+      Buffer.from(record.sealing, "base64url").length === 0
+    ) {
       throw new Error("length")
     }
   } catch {
-    throw new Error("omo account keys: the stored device key record is unreadable. Run `omo account keys init` on a fresh keystore entry.")
+    throw new Error(
+      "omo account keys: the stored device key record is unreadable. Run `omo account keys init` on a fresh keystore entry.",
+    )
   }
-  return createDeviceKeyring(record.deviceId, { signingPrivatePkcs8: record.signing, sealingPrivatePkcs8: record.sealing })
+  return createDeviceKeyring(record.deviceId, {
+    signingPrivatePkcs8: record.signing,
+    sealingPrivatePkcs8: record.sealing,
+  })
 }

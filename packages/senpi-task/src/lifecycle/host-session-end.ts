@@ -40,7 +40,8 @@ export function endHostSessionChild(context: LifecycleContext, record: TaskRecor
   const owner = ownerOf(record)
   const existing = table.get(record.task_id)
   if (existing !== undefined && existing.owner === owner) return existing.promise
-  if (existing !== undefined && !existing.done) return Promise.resolve({ kind: "not_ended", reason: "earlier_run_in_flight" })
+  if (existing !== undefined && !existing.done)
+    return Promise.resolve({ kind: "not_ended", reason: "earlier_run_in_flight" })
   const entry: FlightEntry = { promise: runPass(context, record), owner, done: false }
   table.set(record.task_id, entry)
   const drop = (): void => {
@@ -55,13 +56,20 @@ export function endHostSessionChild(context: LifecycleContext, record: TaskRecor
     void end.settled.then((closed) => {
       if (!closed) return drop()
       if (table.get(record.task_id) !== entry) return
-      table.set(record.task_id, { promise: Promise.resolve({ kind: "ended", via: "close_session" }), owner, done: true })
+      table.set(record.task_id, {
+        promise: Promise.resolve({ kind: "ended", via: "close_session" }),
+        owner,
+        done: true,
+      })
     }, drop)
   }, drop)
   return entry.promise
 }
 
-export function inFlightHostSessionEnd(context: LifecycleContext, record: TaskRecord): Promise<HostSessionEnd> | undefined {
+export function inFlightHostSessionEnd(
+  context: LifecycleContext,
+  record: TaskRecord,
+): Promise<HostSessionEnd> | undefined {
   if (!isHostSessionRecord(record)) return undefined
   const entry = flights.get(context.store)?.get(record.task_id)
   return entry?.owner === ownerOf(record) ? entry.promise : undefined
@@ -87,7 +95,8 @@ async function runPass(context: LifecycleContext, record: HostSessionRecord): Pr
   const view = context.hostGenerationView
   if (view === undefined) return { kind: "ended", via: "not_listed" }
   if (await view.parkedEntryPresent(record.host_session)) return close()
-  if (await view.generationPresent(record.host_session)) return { kind: "not_ended", reason: "generation_cannot_cancel" }
+  if (await view.generationPresent(record.host_session))
+    return { kind: "not_ended", reason: "generation_cannot_cancel" }
   const second = await listing(context, record)
   if (second === "live") return close()
   if (second === "unknown") return { kind: "not_ended", reason: "host_unknown" }

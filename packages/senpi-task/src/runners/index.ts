@@ -57,7 +57,12 @@ export type {
   RpcHostRunnerOptions,
 } from "./rpc-host"
 export type { HostSessionChildHandle, HostSessionFacts } from "./rpc-host/handle-port"
-export type { HostShardEvents, ReattachOutcome, ReattachOutcomeInfo, TransportLostInfo } from "./rpc-host/handle-reattach"
+export type {
+  HostShardEvents,
+  ReattachOutcome,
+  ReattachOutcomeInfo,
+  TransportLostInfo,
+} from "./rpc-host/handle-reattach"
 export { createLiveHostChildren } from "./rpc-host/live-children"
 export type { LiveHostChildren } from "./rpc-host/live-children"
 export { createHostEndpointPort } from "./rpc-host/host-endpoint-port"
@@ -65,7 +70,12 @@ export type { HostEndpointPortInput } from "./rpc-host/host-endpoint-port"
 export { HOST_NOTICE_TOKENS } from "./rpc-host/host-notice"
 export type { HostNoticeSink, HostNoticeToken } from "./rpc-host/host-notice"
 export { isOwnEndpoint, readOwnHostSocket } from "./rpc-host/own-endpoint"
-export { readTaskStoreIndex, registerStoreIndex, StoreIndexUnavailableError, taskStoreIndexPath } from "./rpc-host/store-index"
+export {
+  readTaskStoreIndex,
+  registerStoreIndex,
+  StoreIndexUnavailableError,
+  taskStoreIndexPath,
+} from "./rpc-host/store-index"
 export type { ShardResolver } from "./rpc-host/child-endpoint"
 export { attachOwnEndpoint } from "./rpc-host/child-endpoint"
 export {

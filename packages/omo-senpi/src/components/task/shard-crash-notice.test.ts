@@ -32,7 +32,16 @@ describe("silent crash episode accounting (#10023)", () => {
     f.settle("st_b", "resumed")
     expect(f.crashReads).toEqual([`${SOCKET_A}#gen-1`])
     expect(f.logs).toEqual([
-      { event: SHARD_CRASH_TOKEN, facts: expect.objectContaining({ supervisorPid: 4242, cause: "SIGSEGV", members: 2, socket: SOCKET_A, instanceId: "gen-1" }) },
+      {
+        event: SHARD_CRASH_TOKEN,
+        facts: expect.objectContaining({
+          supervisorPid: 4242,
+          cause: "SIGSEGV",
+          members: 2,
+          socket: SOCKET_A,
+          instanceId: "gen-1",
+        }),
+      },
       { event: SHARD_CRASH_DONE_TOKEN, facts: expect.objectContaining({ reattached: 2, lost: 0, cancelled: 0 }) },
     ])
   })

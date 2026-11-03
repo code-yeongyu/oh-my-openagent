@@ -45,13 +45,8 @@ export type FallbackSessionHarness = {
 export const FALLBACK_PROVIDER = "runtime-fallback-test-alt"
 
 export async function createFallbackSessionHarness(errorMessage: string): Promise<FallbackSessionHarness> {
-  const {
-    createAgentSession,
-    ModelRegistry,
-    ModelRuntime,
-    SessionManager,
-    createExtensionRuntime,
-  } = await loadSenpiBarrel()
+  const { createAgentSession, ModelRegistry, ModelRuntime, SessionManager, createExtensionRuntime } =
+    await loadSenpiBarrel()
   const root = mkdtempSync(join(tmpdir(), "senpi-task-access-terminated-"))
   const modelRuntime = ModelRuntime.createSync()
   const modelRegistry = new ModelRegistry(modelRuntime)
@@ -72,19 +67,27 @@ export async function createFallbackSessionHarness(errorMessage: string): Promis
       )
     },
   })
-  Reflect.apply(modelRegistry.registerProvider, modelRegistry, ["runtime-fallback-test", providerFor("runtime-fallback-test", "dead-primary")])
-  Reflect.apply(modelRegistry.registerProvider, modelRegistry, [FALLBACK_PROVIDER, providerFor(FALLBACK_PROVIDER, "healthy-fallback")])
+  Reflect.apply(modelRegistry.registerProvider, modelRegistry, [
+    "runtime-fallback-test",
+    providerFor("runtime-fallback-test", "dead-primary"),
+  ])
+  Reflect.apply(modelRegistry.registerProvider, modelRegistry, [
+    FALLBACK_PROVIDER,
+    providerFor(FALLBACK_PROVIDER, "healthy-fallback"),
+  ])
   const primary = modelRegistry.find("runtime-fallback-test", "dead-primary")
   if (primary === undefined) throw new Error("primary model missing")
   const settingsManager = createRuntimeFallbackSettings(
     { cwd: root, agentDir: join(root, "agent"), projectTrusted: false },
     "runtime-fallback-test/dead-primary",
-    [{
-      source: "category",
-      provider: FALLBACK_PROVIDER,
-      model_id: "healthy-fallback",
-      display: `${FALLBACK_PROVIDER}/healthy-fallback`,
-    }],
+    [
+      {
+        source: "category",
+        provider: FALLBACK_PROVIDER,
+        model_id: "healthy-fallback",
+        display: `${FALLBACK_PROVIDER}/healthy-fallback`,
+      },
+    ],
   )
   if (settingsManager === undefined) throw new Error("fallback settings missing")
   const { session } = await createAgentSession({
@@ -189,9 +192,10 @@ export function streamMessage(message: AssistantMessage): EventStream {
     },
   }
   queueMicrotask(() => {
-    const event = message.stopReason === "error"
-      ? { type: "error", reason: "error", error: message }
-      : { type: "done", reason: "stop", message }
+    const event =
+      message.stopReason === "error"
+        ? { type: "error", reason: "error", error: message }
+        : { type: "done", reason: "stop", message }
     stream.push(event)
     stream.end(message)
   })

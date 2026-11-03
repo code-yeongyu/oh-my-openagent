@@ -31,7 +31,9 @@ const theme = {
 
 function renderNotice(): unknown {
   return renderFallbackArchitectNotice(
-    { details: { from: "anthropic/claude-fable-5", to: "zai/glm-5" } } as Parameters<typeof renderFallbackArchitectNotice>[0],
+    { details: { from: "anthropic/claude-fable-5", to: "zai/glm-5" } } as Parameters<
+      typeof renderFallbackArchitectNotice
+    >[0],
     { expanded: false } as Parameters<typeof renderFallbackArchitectNotice>[1],
     theme,
   )

@@ -52,8 +52,12 @@ export async function createModelChainWorld(
   const agentDir = join(root, "agent")
   mkdirSync(agentDir, { recursive: true })
   const settingsPath = join(agentDir, "settings.json")
-  const retry = options.userFallbackChains === undefined ? {} : { retry: { fallbackChains: options.userFallbackChains } }
-  writeFileSync(settingsPath, `${JSON.stringify({ defaultProvider: CLAUDE, defaultModel: "primary", ...retry }, null, 2)}\n`)
+  const retry =
+    options.userFallbackChains === undefined ? {} : { retry: { fallbackChains: options.userFallbackChains } }
+  writeFileSync(
+    settingsPath,
+    `${JSON.stringify({ defaultProvider: CLAUDE, defaultModel: "primary", ...retry }, null, 2)}\n`,
+  )
   const engines: EngineRunner[] = []
   const modelRuntime = ModelRuntime.createSync({ agentDir })
   const modelRegistry = new ModelRegistry(modelRuntime)
@@ -62,18 +66,27 @@ export async function createModelChainWorld(
   let toolRuns = 0
 
   for (const [provider, ids] of Object.entries(MODELS)) {
-    Reflect.apply(modelRegistry.registerProvider, modelRegistry, [provider, {
-      api: "openai-completions",
-      baseUrl: `file://${provider}`,
-      apiKey: "test-key",
-      models: ids.map(testModel),
-      streamSimple(model: { readonly id: string }, context: { readonly messages: readonly { readonly role: string }[] }) {
-        const key = `${provider}/${model.id}`
-        calls.push({ model: key, toolResults: context.messages.filter((message) => message.role === "toolResult").length })
-        const step = remaining.get(key)?.shift() ?? "complete"
-        return answer(provider, model.id, step)
+    Reflect.apply(modelRegistry.registerProvider, modelRegistry, [
+      provider,
+      {
+        api: "openai-completions",
+        baseUrl: `file://${provider}`,
+        apiKey: "test-key",
+        models: ids.map(testModel),
+        streamSimple(
+          model: { readonly id: string },
+          context: { readonly messages: readonly { readonly role: string }[] },
+        ) {
+          const key = `${provider}/${model.id}`
+          calls.push({
+            model: key,
+            toolResults: context.messages.filter((message) => message.role === "toolResult").length,
+          })
+          const step = remaining.get(key)?.shift() ?? "complete"
+          return answer(provider, model.id, step)
+        },
       },
-    }])
+    ])
   }
 
   const countTool: ToolDefinition = {
@@ -93,11 +106,18 @@ export async function createModelChainWorld(
       return [...calls, ...engines.flatMap((engine) => engine.calls.map((model) => ({ model, toolResults: 0 })))]
     },
     toolRuns: () => toolRuns,
-    runner: () => createInProcessManagedRunner(new InProcessRunner({ sharedParentTools: [countTool] }), (spec) => {
-      const [provider, id] = (spec.model ?? "").split("/")
-      const model = provider === undefined || id === undefined ? undefined : modelRegistry.find(provider, id)
-      return { agentDir, projectTrusted: false, modelRegistry, modelRuntime, ...(model === undefined ? {} : { model }) }
-    }),
+    runner: () =>
+      createInProcessManagedRunner(new InProcessRunner({ sharedParentTools: [countTool] }), (spec) => {
+        const [provider, id] = (spec.model ?? "").split("/")
+        const model = provider === undefined || id === undefined ? undefined : modelRegistry.find(provider, id)
+        return {
+          agentDir,
+          projectTrusted: false,
+          modelRegistry,
+          modelRuntime,
+          ...(model === undefined ? {} : { model }),
+        }
+      }),
     engineRunner: async (kind) => {
       const engine = await startEngineRunner(kind, { root, settingsPath, scripts })
       engines.push(engine)

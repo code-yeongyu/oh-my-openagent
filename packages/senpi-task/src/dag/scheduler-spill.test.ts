@@ -78,7 +78,12 @@ function whenEvent(scheduler: DagScheduler, match: (event: DagRunEvent) => boole
 
 describe("DAG scheduler wave spill-through", () => {
   test("#given a node whose primary lane is full #when a fallback lane has capacity #then the wave runs on the spilled model without stalling", async () => {
-    const { manager: taskManager, store, inProcess, project } = makeManager({
+    const {
+      manager: taskManager,
+      store,
+      inProcess,
+      project,
+    } = makeManager({
       planner: () => ({ kind: "resolved", plan: spillPlan() }),
       config: settings({ default_concurrency: 1, max_depth: 1 }),
     })
@@ -135,9 +140,7 @@ describe("DAG scheduler wave spill-through", () => {
     await within(waveCompleted)
 
     expect(snapshot.status).toBe("completed")
-    expect(snapshot.nodes).toEqual([
-      expect.objectContaining({ id: "worker", state: "completed", taskId }),
-    ])
+    expect(snapshot.nodes).toEqual([expect.objectContaining({ id: "worker", state: "completed", taskId })])
     expect(store.load(taskId)).toMatchObject({
       model: fallback.display,
       requested_model: primary,

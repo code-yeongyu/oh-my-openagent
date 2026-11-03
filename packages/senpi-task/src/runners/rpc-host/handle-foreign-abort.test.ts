@@ -29,14 +29,16 @@ describe("host session foreign user abort classification (F10a)", () => {
 
     // when
     port.emitEvent(event({ type: "message_end", message: PARTIAL_ANSWER }))
-    port.emitEvent(event({
-      type: "agent_end",
-      willRetry: false,
-      aborted: true,
-      abortSource: "user",
-      abortedBy: "guest-client",
-      messages: [PARTIAL_ANSWER],
-    }))
+    port.emitEvent(
+      event({
+        type: "agent_end",
+        willRetry: false,
+        aborted: true,
+        abortSource: "user",
+        abortedBy: "guest-client",
+        messages: [PARTIAL_ANSWER],
+      }),
+    )
     port.emitEvent(event({ type: "agent_idle" }))
 
     // then
@@ -56,13 +58,15 @@ describe("host session foreign user abort classification (F10a)", () => {
 
     // when
     await handle.abort()
-    port.emitEvent(event({
-      type: "agent_end",
-      willRetry: false,
-      aborted: true,
-      abortSource: "user",
-      messages: [PARTIAL_ANSWER],
-    }))
+    port.emitEvent(
+      event({
+        type: "agent_end",
+        willRetry: false,
+        aborted: true,
+        abortSource: "user",
+        messages: [PARTIAL_ANSWER],
+      }),
+    )
     port.emitEvent(event({ type: "agent_idle" }))
 
     // then
@@ -78,13 +82,15 @@ describe("host session foreign user abort classification (F10a)", () => {
 
     // when
     port.emitEvent(event({ type: "message_end", message: PARTIAL_ANSWER }))
-    port.emitEvent(event({
-      type: "agent_end",
-      willRetry: false,
-      aborted: true,
-      abortSource: "provider",
-      messages: [PARTIAL_ANSWER],
-    }))
+    port.emitEvent(
+      event({
+        type: "agent_end",
+        willRetry: false,
+        aborted: true,
+        abortSource: "provider",
+        messages: [PARTIAL_ANSWER],
+      }),
+    )
     port.emitEvent(event({ type: "agent_idle" }))
 
     // then

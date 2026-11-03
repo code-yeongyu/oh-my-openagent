@@ -65,9 +65,7 @@ describe("tui-sidebar mirror IPC", () => {
     const storageDir = mirrorStorageDir()
 
     // then
-    expect(storageDir).toBe(
-      join(xdgDataHome, "opencode", "storage", "oh-my-openagent", MIRROR_DIR_NAME),
-    )
+    expect(storageDir).toBe(join(xdgDataHome, "opencode", "storage", "oh-my-openagent", MIRROR_DIR_NAME))
   })
 
   it("#given two project directories #when resolving mirror files #then they map to different files", () => {

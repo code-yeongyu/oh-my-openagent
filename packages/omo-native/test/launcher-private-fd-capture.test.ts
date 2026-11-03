@@ -14,14 +14,22 @@ for (const prepared of [false, true]) {
       mkdirSync(join(engine, "dist", "core"), { recursive: true })
       cpSync(resolve(import.meta.dir, "../bin"), join(pkg, "bin"), { recursive: true })
       writeFileSync(join(pkg, "package.json"), '{"name":"omo-ai","version":"0.0.0-test","type":"module"}')
-      writeFileSync(join(engine, "package.json"), '{"name":"@code-yeongyu/senpi","type":"module","exports":"./dist/index.js"}')
+      writeFileSync(
+        join(engine, "package.json"),
+        '{"name":"@code-yeongyu/senpi","type":"module","exports":"./dist/index.js"}',
+      )
       writeFileSync(join(engine, "dist", "index.js"), "export {}\n")
       writeFileSync(join(engine, "dist", "core", "brand.js"), "export {}\n")
       writeFileSync(join(engine, "dist", "cli.js"), "export {}\n")
       if (prepared) writeFileSync(join(engine, ".omo-engine-prepared"), "0.0.0-test\n")
       const node = Bun.which("node")
       if (node === null) throw new Error("launcher regression requires Node")
-      const result = spawnSync(node, ["--input-type=module", "-e", `
+      const result = spawnSync(
+        node,
+        [
+          "--input-type=module",
+          "-e",
+          `
 import fs from "node:fs"
 import cp from "node:child_process"
 import { EventEmitter } from "node:events"
@@ -40,13 +48,24 @@ syncBuiltinESMExports()
 Object.defineProperty(process, "platform", { value: "win32" })
 process.argv = [process.execPath, ${JSON.stringify(join(pkg, "bin", "omo.js"))}, "host", "ensure"]
 await import(${JSON.stringify(pathToFileURL(join(pkg, "bin", "omo.js")).href)})
-`], {
-        encoding: "utf8",
-        env: { ...process.env, HOME: root, USERPROFILE: root, OMO_CODING_AGENT_DIR: join(root, "agent"), OMO_RUNTIME: "node", SENPI_PRIVATE_FDS: '{"a":[5,6]}' },
-      })
+`,
+        ],
+        {
+          encoding: "utf8",
+          env: {
+            ...process.env,
+            HOME: root,
+            USERPROFILE: root,
+            OMO_CODING_AGENT_DIR: join(root, "agent"),
+            OMO_RUNTIME: "node",
+            SENPI_PRIVATE_FDS: '{"a":[5,6]}',
+          },
+        },
+      )
       expect(result.status, result.stderr).toBe(0)
       expect(JSON.parse(result.stdout)).toEqual({
-        table: '{"a":[5,6]}', stdio: ["inherit", "inherit", "inherit", "ignore", "ignore", 5, 6],
+        table: '{"a":[5,6]}',
+        stdio: ["inherit", "inherit", "inherit", "ignore", "ignore", 5, 6],
       })
       expect(result.stderr.includes("could not prepare")).toBe(!prepared)
     } finally {

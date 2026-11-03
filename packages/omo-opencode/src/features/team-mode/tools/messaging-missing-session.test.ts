@@ -53,27 +53,41 @@ describe("createTeamSendMessageTool missing recipient session fallback", () => {
         maxMemberTurns: 500,
       },
       members: [
-        { name: "team-lead", agentType: "leader", status: "idle", sessionId: leadSessionId, pendingInjectedMessageIds: [] },
-        { name: "m1", agentType: "general-purpose", status: "idle", sessionId: memberOneSessionId, pendingInjectedMessageIds: [] },
-        { name: "m2", agentType: "general-purpose", status: "idle", sessionId: memberTwoSessionId, pendingInjectedMessageIds: [] },
+        {
+          name: "team-lead",
+          agentType: "leader",
+          status: "idle",
+          sessionId: leadSessionId,
+          pendingInjectedMessageIds: [],
+        },
+        {
+          name: "m1",
+          agentType: "general-purpose",
+          status: "idle",
+          sessionId: memberOneSessionId,
+          pendingInjectedMessageIds: [],
+        },
+        {
+          name: "m2",
+          agentType: "general-purpose",
+          status: "idle",
+          sessionId: memberTwoSessionId,
+          pendingInjectedMessageIds: [],
+        },
       ],
     }
     const runtimeStateWithoutRecipientSession: RuntimeState = {
       ...runtimeStateWithRecipientSession,
-      members: runtimeStateWithRecipientSession.members.map((member) => (
-        member.name === "m2"
-          ? { ...member, sessionId: undefined }
-          : member
-      )),
+      members: runtimeStateWithRecipientSession.members.map((member) =>
+        member.name === "m2" ? { ...member, sessionId: undefined } : member,
+      ),
     }
 
     let loadRuntimeStateCalls = 0
     const deps = {
       loadRuntimeState: async () => {
         loadRuntimeStateCalls += 1
-        return loadRuntimeStateCalls >= 3
-          ? runtimeStateWithoutRecipientSession
-          : runtimeStateWithRecipientSession
+        return loadRuntimeStateCalls >= 3 ? runtimeStateWithoutRecipientSession : runtimeStateWithRecipientSession
       },
     } satisfies NonNullable<Parameters<typeof createTeamSendMessageTool>[2]>
 
@@ -87,11 +101,14 @@ describe("createTeamSendMessageTool missing recipient session fallback", () => {
     const tool = createTeamSendMessageTool(config, client, deps)
 
     // when
-    const result = await tool.execute({
-      teamRunId,
-      to: "m2",
-      body: "ping",
-    }, createToolContext(memberOneSessionId, baseDir))
+    const result = await tool.execute(
+      {
+        teamRunId,
+        to: "m2",
+        body: "ping",
+      },
+      createToolContext(memberOneSessionId, baseDir),
+    )
     const parsedResult = JSON.parse(result) as { deliveredTo: string[]; messageId: string }
     const inboxDir = getInboxDir(resolveBaseDir(config), teamRunId, "m2")
     const inboxEntries = (await readdir(inboxDir)).filter((entry) => entry.endsWith(".json"))

@@ -3,7 +3,11 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import type { MonitorConfig } from "../../config/schema/monitor"
 import { registerManagerForCleanup, unregisterManagerForCleanup } from "../background-agent/process-cleanup"
 import { log } from "../../shared"
-import type { InternalPromptDispatchArgs, PromptAsyncInput, PromptDispatchClient } from "@oh-my-opencode/utils/prompt-async-gate/types"
+import type {
+  InternalPromptDispatchArgs,
+  PromptAsyncInput,
+  PromptDispatchClient,
+} from "@oh-my-opencode/utils/prompt-async-gate/types"
 import { MonitorBatcher, type SchedulerDeps, type TimerHandle } from "./batcher"
 import { createMonitorPipeline } from "./pipeline"
 import { spawnMonitoredProcess, type MonitoredProcess } from "./process"
@@ -32,7 +36,10 @@ export interface MonitorManagerDeps {
   randomId?: () => MonitorId
   isBackgroundSession?: (sessionId: string) => boolean
   spawnMonitoredProcess?: typeof spawnMonitoredProcess
-  createInjector?: (record: MonitorRecord, scheduleFlush: (monitorId: string, delayMs: number, operation: () => Promise<void>) => void) => MonitorInjector
+  createInjector?: (
+    record: MonitorRecord,
+    scheduleFlush: (monitorId: string, delayMs: number, operation: () => Promise<void>) => void,
+  ) => MonitorInjector
   scheduler?: SchedulerDeps
   registerManagerForCleanup?: typeof registerManagerForCleanup
   unregisterManagerForCleanup?: typeof unregisterManagerForCleanup

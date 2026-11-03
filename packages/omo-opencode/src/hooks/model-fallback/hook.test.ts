@@ -57,10 +57,7 @@ describe("model fallback hook", () => {
       parts: [{ type: "text", text: "continue" }],
     }
 
-    await hook["chat.message"]?.(
-      { sessionID: "ses_model_fallback_main" },
-      output,
-    )
+    await hook["chat.message"]?.({ sessionID: "ses_model_fallback_main" }, output)
 
     expect(output.message["model"]).toEqual({
       providerID: "anthropic",
@@ -78,7 +75,13 @@ describe("model fallback hook", () => {
     const sessionID = "ses_model_fallback_main"
 
     expect(
-      setPendingModelFallback(modelFallback, sessionID, "Sisyphus - Ultraworker", "anthropic", "claude-opus-4-8-thinking"),
+      setPendingModelFallback(
+        modelFallback,
+        sessionID,
+        "Sisyphus - Ultraworker",
+        "anthropic",
+        "claude-opus-4-8-thinking",
+      ),
     ).toBe(true)
 
     const firstOutput = {
@@ -141,9 +144,7 @@ describe("model fallback hook", () => {
 
   test("isolates stored fallback chains from caller mutations on set and get", () => {
     const sessionID = "ses_model_fallback_defensive_copy"
-    const originalChain = [
-      { providers: ["anthropic"], model: "claude-opus-4-7" },
-    ]
+    const originalChain = [{ providers: ["anthropic"], model: "claude-opus-4-7" }]
 
     setSessionFallbackChain(modelFallback, sessionID, originalChain)
     originalChain.push({ providers: ["google"], model: "gemini-2.5-pro" })
@@ -172,13 +173,7 @@ describe("model fallback hook", () => {
     ])
 
     expect(
-      setPendingModelFallback(
-        modelFallback,
-        sessionID,
-        "Sisyphus - Ultraworker",
-        "anthropic",
-        "claude-opus-4-7",
-      ),
+      setPendingModelFallback(modelFallback, sessionID, "Sisyphus - Ultraworker", "anthropic", "claude-opus-4-7"),
     ).toBe(true)
 
     const output = {
@@ -214,13 +209,7 @@ describe("model fallback hook", () => {
     ])
 
     expect(
-      setPendingModelFallback(
-        modelFallback,
-        sessionID,
-        "Sisyphus - Ultraworker",
-        "quotio",
-        "claude-opus-4-7",
-      ),
+      setPendingModelFallback(modelFallback, sessionID, "Sisyphus - Ultraworker", "quotio", "claude-opus-4-7"),
     ).toBe(true)
 
     const output = {
@@ -262,18 +251,10 @@ describe("model fallback hook", () => {
       ) => Promise<void>
     }>(modelFallback)
 
-    setSessionFallbackChain(modelFallback, sessionID, [
-      { providers: ["provider-y"], model: "fallback-model" },
-    ])
+    setSessionFallbackChain(modelFallback, sessionID, [{ providers: ["provider-y"], model: "fallback-model" }])
 
     expect(
-      setPendingModelFallback(
-        modelFallback,
-        sessionID,
-        "Sisyphus - Ultraworker",
-        "provider-x",
-        "current-model",
-      ),
+      setPendingModelFallback(modelFallback, sessionID, "Sisyphus - Ultraworker", "provider-x", "current-model"),
     ).toBe(true)
 
     const output = {
@@ -297,13 +278,7 @@ describe("model fallback hook", () => {
     clearPendingModelFallback(modelFallback, sessionID)
     setSessionFallbackChain(modelFallback, sessionID, undefined)
 
-    const set = setPendingModelFallback(
-      modelFallback,
-      sessionID,
-      "Sisyphus - Junior",
-      "anthropic",
-      "claude-sonnet-4-6",
-    )
+    const set = setPendingModelFallback(modelFallback, sessionID, "Sisyphus - Junior", "anthropic", "claude-sonnet-4-6")
 
     expect(set).toBe(false)
     clearPendingModelFallback(modelFallback, sessionID)
@@ -316,11 +291,13 @@ describe("model fallback hook", () => {
         input: { sessionID: string },
         output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
       ) => Promise<void>
-    }>(createModelFallbackHook({
-      toast: async ({ title, message }: { title: string; message: string }) => {
-        toastCalls.push({ title, message })
-      },
-    }))
+    }>(
+      createModelFallbackHook({
+        toast: async ({ title, message }: { title: string; message: string }) => {
+          toastCalls.push({ title, message })
+        },
+      }),
+    )
 
     const set = setPendingModelFallback(
       hook,
@@ -356,9 +333,7 @@ describe("model fallback hook", () => {
       ) => Promise<void>
     }>(modelFallback)
 
-    setSessionFallbackChain(modelFallback, sessionID, [
-      { providers: ["github-copilot"], model: "claude-sonnet-4-6" },
-    ])
+    setSessionFallbackChain(modelFallback, sessionID, [{ providers: ["github-copilot"], model: "claude-sonnet-4-6" }])
 
     const set = setPendingModelFallback(
       modelFallback,
@@ -397,17 +372,9 @@ describe("model fallback hook", () => {
       ) => Promise<void>
     }>(modelFallback)
 
-    setSessionFallbackChain(modelFallback, sessionID, [
-      { providers: ["google"], model: "gemini-3.1-pro-preview" },
-    ])
+    setSessionFallbackChain(modelFallback, sessionID, [{ providers: ["google"], model: "gemini-3.1-pro-preview" }])
 
-    const set = setPendingModelFallback(
-      modelFallback,
-      sessionID,
-      "Oracle",
-      "google",
-      "gemini-3.1-pro-preview",
-    )
+    const set = setPendingModelFallback(modelFallback, sessionID, "Oracle", "google", "gemini-3.1-pro-preview")
     expect(set).toBe(true)
 
     const output = {

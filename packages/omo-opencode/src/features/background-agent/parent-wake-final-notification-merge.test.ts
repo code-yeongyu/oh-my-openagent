@@ -1,14 +1,14 @@
 import { describe, expect, test } from "bun:test"
-import {
-  releaseAllPromptAsyncReservationsForTesting,
-} from "../../hooks/shared/prompt-async-gate"
+import { releaseAllPromptAsyncReservationsForTesting } from "../../hooks/shared/prompt-async-gate"
 import { ParentWakeNotifier } from "./parent-wake-notifier"
 
 type ParentWakeNotifierClientForTest = ConstructorParameters<typeof ParentWakeNotifier>[0]["client"]
 type PromptAsyncCall = Parameters<ParentWakeNotifierClientForTest["session"]["promptAsync"]>[0]
 
-const FINAL_WAKE = "<system-reminder>\n[BACKGROUND TASK COMPLETED]\n[ALL BACKGROUND TASKS COMPLETE]\n**Completed:**\n- `task-a`: task A\n- `task-b`: task B\n</system-reminder>"
-const PROGRESS_WAKE = "<system-reminder>\n[BACKGROUND TASK RESULT READY]\n**ID:** `task-a`\n**1 task still in progress.** You WILL be notified when ALL complete.\n</system-reminder>"
+const FINAL_WAKE =
+  "<system-reminder>\n[BACKGROUND TASK COMPLETED]\n[ALL BACKGROUND TASKS COMPLETE]\n**Completed:**\n- `task-a`: task A\n- `task-b`: task B\n</system-reminder>"
+const PROGRESS_WAKE =
+  "<system-reminder>\n[BACKGROUND TASK RESULT READY]\n**ID:** `task-a`\n**1 task still in progress.** You WILL be notified when ALL complete.\n</system-reminder>"
 
 function createNotifier(): {
   readonly notifier: ParentWakeNotifier
@@ -80,7 +80,9 @@ describe("ParentWakeNotifier final notification merge", () => {
       // then
       expect(promptAsyncCalls).toHaveLength(1)
       const notificationText = getPromptText(promptAsyncCalls[0])
-      expect(notificationText.startsWith("<system-reminder>\n[BACKGROUND TASK COMPLETED]\n[ALL BACKGROUND TASKS COMPLETE]")).toBe(true)
+      expect(
+        notificationText.startsWith("<system-reminder>\n[BACKGROUND TASK COMPLETED]\n[ALL BACKGROUND TASKS COMPLETE]"),
+      ).toBe(true)
       expect(notificationText).not.toContain("[BACKGROUND TASK RESULT READY]")
       expect(notificationText).not.toContain("still in progress")
       expect(promptAsyncCalls[0]?.body.noReply).toBe(false)

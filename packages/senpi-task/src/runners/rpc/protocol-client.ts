@@ -84,7 +84,10 @@ export class RpcProtocolClient {
     return this.request(command, {})
   }
 
-  private request(command: { readonly type: string; readonly id?: string }, options: { readonly deadlineMs?: number }): Promise<RpcResponse> {
+  private request(
+    command: { readonly type: string; readonly id?: string },
+    options: { readonly deadlineMs?: number },
+  ): Promise<RpcResponse> {
     const stdin = this.child.stdin
     if (this.isExited || stdin === null || stdin === undefined) {
       return Promise.reject(new Error(`RPC process is not running. Stderr: ${this.stderrTail}`))
@@ -100,10 +103,19 @@ export class RpcProtocolClient {
           reject(new RpcRequestTimeout(command.type, ms))
         }, ms)
       }
-      arm(options.deadlineMs ?? (command.type === "get_state" ? 10_000 : command.type === "abort" ? TEARDOWN_STEP_BUDGET_MS : 30_000))
+      arm(
+        options.deadlineMs ??
+          (command.type === "get_state" ? 10_000 : command.type === "abort" ? TEARDOWN_STEP_BUDGET_MS : 30_000),
+      )
       const pending: PendingRequest = {
-        resolve: (response) => { clearTimeout(timer); resolve(response) },
-        reject: (error) => { clearTimeout(timer); reject(error) },
+        resolve: (response) => {
+          clearTimeout(timer)
+          resolve(response)
+        },
+        reject: (error) => {
+          clearTimeout(timer)
+          reject(error)
+        },
         received: () => {
           if (!isInput || received) return
           received = true
@@ -165,7 +177,9 @@ export class RpcProtocolClient {
       this.writeFailed(error)
     })
     this.child.once("error", (error) => this.finalize(error))
-    this.child.once("exit", () => { this.processExited = true })
+    this.child.once("exit", () => {
+      this.processExited = true
+    })
     this.child.once("close", () => this.finalize())
   }
 
@@ -278,10 +292,12 @@ export class RpcProtocolClient {
 
 export function isHarmlessRpcShutdownError(error: unknown): boolean {
   if (!(error instanceof Error) || !("code" in error)) return false
-  return error.code === "EPIPE"
-    || error.code === "ERR_STREAM_DESTROYED"
-    || error.code === "ERR_STREAM_WRITE_AFTER_END"
-    || error.code === "EOF"
+  return (
+    error.code === "EPIPE" ||
+    error.code === "ERR_STREAM_DESTROYED" ||
+    error.code === "ERR_STREAM_WRITE_AFTER_END" ||
+    error.code === "EOF"
+  )
 }
 
 function commandError(response: RpcResponse, expectedCommand: string): RpcCommandError {

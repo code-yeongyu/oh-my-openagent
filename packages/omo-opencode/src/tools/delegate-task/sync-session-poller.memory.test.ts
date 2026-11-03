@@ -32,12 +32,17 @@ describe("pollSyncSession transcript retention", () => {
       },
     })
 
-    const result = await pollSyncSession(ctx, client, {
-      sessionID: "child",
-      agentToUse: "explore",
-      toastManager: null,
-      taskId: undefined,
-    }, 15)
+    const result = await pollSyncSession(
+      ctx,
+      client,
+      {
+        sessionID: "child",
+        agentToUse: "explore",
+        toastManager: null,
+        taskId: undefined,
+      },
+      15,
+    )
 
     expect(result).toContain("Poll inactivity timeout reached")
     expect(messagesCalls).toBeGreaterThanOrEqual(1)

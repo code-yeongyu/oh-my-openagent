@@ -29,9 +29,7 @@ import { DEFAULT_AGENT_ORDER, resolveAgentOrderDisplayNames } from "./agent-orde
 import { getAgentListDisplayName } from "./agent-display-names"
 
 let agentRank: ReadonlyMap<string, number> = createAgentRank(undefined)
-const AGENT_ARRAY_SENTINELS = new Set(
-  DEFAULT_AGENT_ORDER.map((configKey) => getAgentListDisplayName(configKey)),
-)
+const AGENT_ARRAY_SENTINELS = new Set(DEFAULT_AGENT_ORDER.map((configKey) => getAgentListDisplayName(configKey)))
 
 const UNRANKED = Number.MAX_SAFE_INTEGER
 
@@ -55,11 +53,7 @@ function isAgentArray(arr: ReadonlyArray<unknown>): boolean {
   return rankedCount >= 2
 }
 
-function agentComparator(
-  a: unknown,
-  b: unknown,
-  fallback: ((a: unknown, b: unknown) => number) | undefined,
-): number {
+function agentComparator(a: unknown, b: unknown, fallback: ((a: unknown, b: unknown) => number) | undefined): number {
   const aRank = agentRank.get(extractAgentName(a)) ?? UNRANKED
   const bRank = agentRank.get(extractAgentName(b)) ?? UNRANKED
 
@@ -72,9 +66,7 @@ let installed = false
 
 function createAgentRank(agentOrder: readonly string[] | undefined): ReadonlyMap<string, number> {
   return new Map(
-    resolveAgentOrderDisplayNames(agentOrder).map(
-      (displayName, index): [string, number] => [displayName, index + 1],
-    ),
+    resolveAgentOrderDisplayNames(agentOrder).map((displayName, index): [string, number] => [displayName, index + 1]),
   )
 }
 
@@ -99,20 +91,14 @@ export function installAgentSortShim(): void {
   const originalToSorted = Array.prototype.toSorted
   const originalSort = Array.prototype.sort
 
-  function patchedToSorted(
-    this: unknown[],
-    compareFn?: (a: unknown, b: unknown) => number,
-  ): unknown[] {
+  function patchedToSorted(this: unknown[], compareFn?: (a: unknown, b: unknown) => number): unknown[] {
     if (isAgentArray(this)) {
       return originalToSorted.call(this, (a, b) => agentComparator(a, b, compareFn))
     }
     return originalToSorted.call(this, compareFn)
   }
 
-  function patchedSort(
-    this: unknown[],
-    compareFn?: (a: unknown, b: unknown) => number,
-  ): unknown[] {
+  function patchedSort(this: unknown[], compareFn?: (a: unknown, b: unknown) => number): unknown[] {
     if (isAgentArray(this)) {
       return originalSort.call(this, (a, b) => agentComparator(a, b, compareFn))
     }

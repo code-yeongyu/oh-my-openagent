@@ -58,8 +58,6 @@ describe("project-discovery-dirs", () => {
     mkdirSync(join(TEST_DIR, ".claude", "skills"), { recursive: true })
     const { findProjectClaudeSkillDirs } = await import("./project-discovery-dirs")
 
-    expect(findProjectClaudeSkillDirs(child, project)).toEqual([
-      canonicalPath(join(project, ".claude", "skills")),
-    ])
+    expect(findProjectClaudeSkillDirs(child, project)).toEqual([canonicalPath(join(project, ".claude", "skills"))])
   })
 })

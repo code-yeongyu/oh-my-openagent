@@ -1,4 +1,13 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs"
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs"
 import { basename, dirname, join, resolve } from "node:path"
 
 import { log } from "./logger"
@@ -111,12 +120,7 @@ export function removePluginSandbox(dir: string, cacheDir: string): boolean {
  * exit handler could not act on it, why - so the next start can say so
  * instead of promising "restart to apply" forever.
  */
-export function markPluginSandboxStale(
-  dir: string,
-  cacheDir: string,
-  reason = "",
-  pid: number = process.pid,
-): boolean {
+export function markPluginSandboxStale(dir: string, cacheDir: string, reason = "", pid: number = process.pid): boolean {
   if (!isPluginSandboxDir(dir, cacheDir)) return false
   if (!existsSync(dir)) return false
   writeFileSync(join(dir, REFRESH_MARKER_FILE), `${pid}\n${reason}`)

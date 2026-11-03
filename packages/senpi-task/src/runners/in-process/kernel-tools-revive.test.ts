@@ -28,21 +28,25 @@ function transcript(root: string, usedToolNames: readonly string[]): string {
   const path = join(dir, "child.jsonl")
   const lines = [JSON.stringify({ type: "session", id: "child-session" })]
   for (const [index, name] of usedToolNames.entries()) {
-    lines.push(JSON.stringify({
-      type: "message",
-      id: `call-${index}`,
-      message: { role: "assistant", content: [{ type: "toolCall", id: `c${index}`, name, arguments: {} }] },
-    }))
-    lines.push(JSON.stringify({
-      type: "message",
-      id: `result-${index}`,
-      message: {
-        role: "toolResult",
-        toolCallId: `c${index}`,
-        toolName: name,
-        content: [{ type: "text", text: JSON.stringify({ kernel_tool: name, value: "recorded" }) }],
-      },
-    }))
+    lines.push(
+      JSON.stringify({
+        type: "message",
+        id: `call-${index}`,
+        message: { role: "assistant", content: [{ type: "toolCall", id: `c${index}`, name, arguments: {} }] },
+      }),
+    )
+    lines.push(
+      JSON.stringify({
+        type: "message",
+        id: `result-${index}`,
+        message: {
+          role: "toolResult",
+          toolCallId: `c${index}`,
+          toolName: name,
+          content: [{ type: "text", text: JSON.stringify({ kernel_tool: name, value: "recorded" }) }],
+        },
+      }),
+    )
   }
   writeFileSync(path, `${lines.join("\n")}\n`)
   return path
@@ -186,7 +190,11 @@ describe("revived child kernel tools", () => {
     expect(replacements.value).toBe(0)
 
     // A NEW explicit spawn resolves the current descriptor and succeeds.
-    const fresh = await resolveKernelToolGrant({ requestedNames: ["fixture_lookup"], capability, executionMode: "in-process" })
+    const fresh = await resolveKernelToolGrant({
+      requestedNames: ["fixture_lookup"],
+      capability,
+      executionMode: "in-process",
+    })
     if (fresh.kind !== "granted") throw new Error("the redefined tool must resolve for a new spawn")
     await runner.start(spec(root, { taskId: "st_00000902", kernelTools: fresh.grant }))
     const renewed = await callTool(toolNamed("fixture_lookup"))
@@ -255,5 +263,4 @@ describe("revived child kernel tools", () => {
     expect(tools()).toEqual([])
     expect(recordedKernelToolNames(path)).toEqual([])
   })
-
 })

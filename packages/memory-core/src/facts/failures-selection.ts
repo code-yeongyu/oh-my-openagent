@@ -72,9 +72,7 @@ export function selectLaunchable(
 
   const skipped: Record<string, FactsSkipReason> = {}
   for (const bucket of byConversation.values()) {
-    const ordered = [...bucket].sort(
-      (left, right) => left.range.end_snapshot_line - right.range.end_snapshot_line,
-    )
+    const ordered = [...bucket].sort((left, right) => left.range.end_snapshot_line - right.range.end_snapshot_line)
     let blocked = false
     for (const entry of ordered) {
       const reason = blocked ? "blocked-by-predecessor" : dropReason(records.get(entryKey(entry)), now)

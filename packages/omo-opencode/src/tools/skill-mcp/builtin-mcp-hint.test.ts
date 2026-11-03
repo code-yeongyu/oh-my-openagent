@@ -22,17 +22,17 @@ describe("skill_mcp builtin MCP hint", () => {
       getSessionID: () => "session",
     })
 
-    await expect(
-      tool.execute({ mcp_name: "context7", tool_name: "resolve-library-id" }, mockContext),
-    ).rejects.toThrow(/builtin MCP/)
+    await expect(tool.execute({ mcp_name: "context7", tool_name: "resolve-library-id" }, mockContext)).rejects.toThrow(
+      /builtin MCP/,
+    )
 
-    await expect(
-      tool.execute({ mcp_name: "context7", tool_name: "resolve-library-id" }, mockContext),
-    ).rejects.toThrow(/context7_resolve-library-id/)
+    await expect(tool.execute({ mcp_name: "context7", tool_name: "resolve-library-id" }, mockContext)).rejects.toThrow(
+      /context7_resolve-library-id/,
+    )
 
-    await expect(
-      tool.execute({ mcp_name: "context7", tool_name: "resolve-library-id" }, mockContext),
-    ).rejects.toThrow(/do not retry this builtin through skill_mcp/)
+    await expect(tool.execute({ mcp_name: "context7", tool_name: "resolve-library-id" }, mockContext)).rejects.toThrow(
+      /do not retry this builtin through skill_mcp/,
+    )
   })
 
   it("keeps skill-loading hint for unknown MCP names", async () => {
@@ -42,8 +42,8 @@ describe("skill_mcp builtin MCP hint", () => {
       getSessionID: () => "session",
     })
 
-    await expect(
-      tool.execute({ mcp_name: "unknown-mcp", tool_name: "x" }, mockContext),
-    ).rejects.toThrow(/Load the skill first/)
+    await expect(tool.execute({ mcp_name: "unknown-mcp", tool_name: "x" }, mockContext)).rejects.toThrow(
+      /Load the skill first/,
+    )
   })
 })

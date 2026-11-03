@@ -112,7 +112,11 @@ export function fakeSessionPort(
   }
 }
 
-export function handleOverPort(client: FakeSessionPort, heartbeatIntervalMs = 60_000, now = () => 7): HostSessionChildHandle {
+export function handleOverPort(
+  client: FakeSessionPort,
+  heartbeatIntervalMs = 60_000,
+  now = () => 7,
+): HostSessionChildHandle {
   return createHostSessionHandle({
     client,
     session: FAKE_SESSION,

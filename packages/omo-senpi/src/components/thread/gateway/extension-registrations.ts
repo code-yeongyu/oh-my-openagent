@@ -10,7 +10,12 @@ import { fileURLToPath } from "node:url"
 
 import { schemaProblem } from "./session-args-schema"
 import type { StoreContext } from "./store-ops"
-import type { DeclaredSessionOp, SessionCallableOp, StoreExtensionRegistration, ToolSessionOp } from "./store-extensions"
+import type {
+  DeclaredSessionOp,
+  SessionCallableOp,
+  StoreExtensionRegistration,
+  ToolSessionOp,
+} from "./store-extensions"
 
 export const RESERVED_CALLER_KEYS = ["caller_session_durable_id", "caller_created_target"] as const
 export const AWAIT_REQUEST_ID = /^tor_[a-f0-9]{32}$/
@@ -23,9 +28,13 @@ const WAKE_DIR = /^[a-z0-9][a-z0-9_-]*$/
 const WAKE_FILE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
 
 /** What a registration persists: everything a process that never registered it needs to call it. */
-export type PersistedDescriptor = Pick<StoreExtensionRegistration, "moduleUrl" | "migrations" | "sessionCallable" | "wakeDir">
+export type PersistedDescriptor = Pick<
+  StoreExtensionRegistration,
+  "moduleUrl" | "migrations" | "sessionCallable" | "wakeDir"
+>
 
-const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> => typeof value === "object" && value !== null && !Array.isArray(value)
+const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
 const nonEmpty = (value: unknown): value is string => typeof value === "string" && value.length > 0
 
 /**
@@ -48,7 +57,8 @@ function internalEntryProblem(entry: Readonly<Record<string, unknown>>, op: stri
   for (const field of ["toolName", "await", "wake"] as const) {
     if (entry[field] !== undefined) return `${op}: an internal op registers no tool, so it cannot declare ${field}`
   }
-  if (entry.description !== undefined && !nonEmpty(entry.description)) return `${op}: description must be a non-empty string when present`
+  if (entry.description !== undefined && !nonEmpty(entry.description))
+    return `${op}: description must be a non-empty string when present`
   return undefined
 }
 
@@ -62,33 +72,45 @@ function entryProblem(entry: unknown, extension: string, wakeDir: string | undef
     const problem = internalEntryProblem(entry, op)
     if (problem !== undefined) return problem
   } else {
-    if (typeof toolName !== "string" || !TOOL_NAME.test(toolName)) return `toolName ${String(toolName)} must match ${TOOL_NAME.source}`
-    if (registeredToolName(extension, toolName).length > REGISTERED_TOOL_NAME_MAX) return `${registeredToolName(extension, toolName)} is longer than ${REGISTERED_TOOL_NAME_MAX} characters`
+    if (typeof toolName !== "string" || !TOOL_NAME.test(toolName))
+      return `toolName ${String(toolName)} must match ${TOOL_NAME.source}`
+    if (registeredToolName(extension, toolName).length > REGISTERED_TOOL_NAME_MAX)
+      return `${registeredToolName(extension, toolName)} is longer than ${REGISTERED_TOOL_NAME_MAX} characters`
     if (!nonEmpty(description)) return `${toolName}: description must be a non-empty string`
   }
   const label = internal ? op : String(toolName)
-  if (!isRecord(parameters) || parameters.type !== "object" || parameters.additionalProperties !== false) return `${label}: parameters must be an object schema with additionalProperties: false`
+  if (!isRecord(parameters) || parameters.type !== "object" || parameters.additionalProperties !== false)
+    return `${label}: parameters must be an object schema with additionalProperties: false`
   const properties = parameters.properties ?? {}
   if (!isRecord(properties)) return `${label}: parameters.properties must be an object`
-  if (RESERVED_CALLER_KEYS.some((key) => Object.hasOwn(properties, key))) return `${label}: parameters must not declare ${RESERVED_CALLER_KEYS.join(" or ")}; the store stamps them`
+  if (RESERVED_CALLER_KEYS.some((key) => Object.hasOwn(properties, key)))
+    return `${label}: parameters must not declare ${RESERVED_CALLER_KEYS.join(" or ")}; the store stamps them`
   const schema = schemaProblem(parameters)
   if (schema !== undefined) return `${label}: ${schema}`
-  if (targetArg !== undefined && (typeof targetArg !== "string" || !Object.hasOwn(properties, targetArg))) return `${label}: targetArg ${String(targetArg)} must name a field of parameters.properties`
+  if (targetArg !== undefined && (typeof targetArg !== "string" || !Object.hasOwn(properties, targetArg)))
+    return `${label}: targetArg ${String(targetArg)} must name a field of parameters.properties`
   if (awaited !== undefined) {
-    if (!isRecord(awaited) || !nonEmpty(awaited.statusOp) || !nonEmpty(awaited.expireOp)) return `${label}: await needs statusOp and expireOp`
+    if (!isRecord(awaited) || !nonEmpty(awaited.statusOp) || !nonEmpty(awaited.expireOp))
+      return `${label}: await needs statusOp and expireOp`
     const timeout = awaited.timeoutMs
-    if (typeof timeout !== "number" || !Number.isInteger(timeout) || timeout < 1 || timeout > AWAIT_TIMEOUT_MAX_MS) return `${label}: await.timeoutMs must be an integer from 1 to ${AWAIT_TIMEOUT_MAX_MS}`
+    if (typeof timeout !== "number" || !Number.isInteger(timeout) || timeout < 1 || timeout > AWAIT_TIMEOUT_MAX_MS)
+      return `${label}: await.timeoutMs must be an integer from 1 to ${AWAIT_TIMEOUT_MAX_MS}`
     if (wakeDir === undefined) return `${label}: await needs the registration's wakeDir`
   }
-  if (wake !== undefined && (typeof wake !== "string" || !WAKE_FILE.test(wake))) return `${label}: wake must be a plain file name matching ${WAKE_FILE.source}`
+  if (wake !== undefined && (typeof wake !== "string" || !WAKE_FILE.test(wake)))
+    return `${label}: wake must be a plain file name matching ${WAKE_FILE.source}`
   if (wake !== undefined && wakeDir === undefined) return `${label}: wake needs the registration's wakeDir`
   return undefined
 }
 
 /** Why a declaration is invalid, or undefined; `exports` (the imported module) also checks every named op exists. */
-export function declarationProblem(descriptor: Pick<StoreExtensionRegistration, "name" | "sessionCallable" | "wakeDir">, exports?: Readonly<Record<string, unknown>>): string | undefined {
+export function declarationProblem(
+  descriptor: Pick<StoreExtensionRegistration, "name" | "sessionCallable" | "wakeDir">,
+  exports?: Readonly<Record<string, unknown>>,
+): string | undefined {
   const { name, sessionCallable, wakeDir } = descriptor
-  if (wakeDir !== undefined && (typeof wakeDir !== "string" || !WAKE_DIR.test(wakeDir))) return `wakeDir must be one path segment matching ${WAKE_DIR.source}`
+  if (wakeDir !== undefined && (typeof wakeDir !== "string" || !WAKE_DIR.test(wakeDir)))
+    return `wakeDir must be one path segment matching ${WAKE_DIR.source}`
   if (sessionCallable === undefined) return undefined
   if (!Array.isArray(sessionCallable)) return "sessionCallable must be an array"
   const names = new Set<string>()
@@ -107,18 +129,22 @@ export function declarationProblem(descriptor: Pick<StoreExtensionRegistration, 
     if (exports === undefined) continue
     const awaited = isToolSessionOp(op) ? op.await : undefined
     for (const exported of [op.op, ...(awaited === undefined ? [] : [awaited.statusOp, awaited.expireOp])]) {
-      if (!Object.hasOwn(exports, exported) || typeof exports[exported] !== "function") return `${isToolSessionOp(op) ? op.toolName : op.op}: the module exports no operation ${exported}`
+      if (!Object.hasOwn(exports, exported) || typeof exports[exported] !== "function")
+        return `${isToolSessionOp(op) ? op.toolName : op.op}: the module exports no operation ${exported}`
     }
   }
   return undefined
 }
 
 /** Every op name a declaration reaches (op, statusOp, expireOp): the public channel refuses each. */
-export function declaredOpNames(descriptor: Pick<StoreExtensionRegistration, "sessionCallable"> | undefined): ReadonlySet<string> {
+export function declaredOpNames(
+  descriptor: Pick<StoreExtensionRegistration, "sessionCallable"> | undefined,
+): ReadonlySet<string> {
   const names = new Set<string>()
   for (const entry of descriptor?.sessionCallable ?? []) {
     names.add(entry.op)
-    if (isToolSessionOp(entry) && entry.await !== undefined) for (const name of [entry.await.statusOp, entry.await.expireOp]) names.add(name)
+    if (isToolSessionOp(entry) && entry.await !== undefined)
+      for (const name of [entry.await.statusOp, entry.await.expireOp]) names.add(name)
   }
   return names
 }
@@ -136,24 +162,44 @@ function parse(name: string, json: unknown): PersistedDescriptor | undefined {
 
 /** The persisted descriptor of one extension; a row that no longer passes the declaration rules reads as none. */
 export function readDescriptor(ctx: StoreContext, name: string): PersistedDescriptor | undefined {
-  const row = ctx.sql.one(["descriptor_json"], "SELECT descriptor_json FROM extension_registrations WHERE name = ?", [name])
+  const row = ctx.sql.one(["descriptor_json"], "SELECT descriptor_json FROM extension_registrations WHERE name = ?", [
+    name,
+  ])
   return row === undefined ? undefined : parse(name, row.descriptor_json)
 }
 
 /** Every declared tool op with its registered tool name, in extension-name order; one read, no import. Internal ops get no tool and are not listed. */
 export function listSessionOps(ctx: StoreContext): DeclaredSessionOp[] {
-  const rows = ctx.sql.all(["name", "descriptor_json"], "SELECT name, descriptor_json FROM extension_registrations", [], "name")
+  const rows = ctx.sql.all(
+    ["name", "descriptor_json"],
+    "SELECT name, descriptor_json FROM extension_registrations",
+    [],
+    "name",
+  )
   return rows.flatMap((row) => {
     const extension = String(row.name)
-    return (parse(extension, row.descriptor_json)?.sessionCallable ?? []).filter(isToolSessionOp).map((entry) => ({ ...entry, extension, registeredName: registeredToolName(extension, entry.toolName) }))
+    return (parse(extension, row.descriptor_json)?.sessionCallable ?? [])
+      .filter(isToolSessionOp)
+      .map((entry) => ({ ...entry, extension, registeredName: registeredToolName(extension, entry.toolName) }))
   })
 }
 
 /** Why the registration's tools cannot take their names: another extension already composes one of them. */
-export function toolNameTaken(ctx: StoreContext, descriptor: Pick<StoreExtensionRegistration, "name" | "sessionCallable">): string | undefined {
-  const mine = new Set((descriptor.sessionCallable ?? []).filter(isToolSessionOp).map((entry) => registeredToolName(descriptor.name, entry.toolName)))
-  const taken = listSessionOps(ctx).find((entry) => entry.extension !== descriptor.name && mine.has(entry.registeredName))
-  return taken === undefined ? undefined : `tool ${taken.registeredName} is already declared by extension ${taken.extension}`
+export function toolNameTaken(
+  ctx: StoreContext,
+  descriptor: Pick<StoreExtensionRegistration, "name" | "sessionCallable">,
+): string | undefined {
+  const mine = new Set(
+    (descriptor.sessionCallable ?? [])
+      .filter(isToolSessionOp)
+      .map((entry) => registeredToolName(descriptor.name, entry.toolName)),
+  )
+  const taken = listSessionOps(ctx).find(
+    (entry) => entry.extension !== descriptor.name && mine.has(entry.registeredName),
+  )
+  return taken === undefined
+    ? undefined
+    : `tool ${taken.registeredName} is already declared by extension ${taken.extension}`
 }
 
 /**
@@ -161,7 +207,12 @@ export function toolNameTaken(ctx: StoreContext, descriptor: Pick<StoreExtension
  * composes. `restoredAt` marks a worker restart replaying a registration made at that time: it never
  * overwrites a row another process registered since. Runs inside the caller's transaction.
  */
-export function persistDescriptor(ctx: StoreContext, descriptor: StoreExtensionRegistration, now: number, restoredAt?: number): string | undefined {
+export function persistDescriptor(
+  ctx: StoreContext,
+  descriptor: StoreExtensionRegistration,
+  now: number,
+  restoredAt?: number,
+): string | undefined {
   const taken = toolNameTaken(ctx, descriptor)
   if (taken !== undefined) return taken
   const persisted: PersistedDescriptor = {

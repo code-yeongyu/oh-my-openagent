@@ -106,10 +106,7 @@ describe("incrementSkillUsage", () => {
     const now = () => new Date("2026-01-15T10:00:00Z")
 
     // #when - both sessions read the same skill; the lock serializes read-modify-write
-    const [a, b] = await Promise.all([
-      incrementSkillUsage(paths, "foo", now),
-      incrementSkillUsage(paths, "foo", now),
-    ])
+    const [a, b] = await Promise.all([incrementSkillUsage(paths, "foo", now), incrementSkillUsage(paths, "foo", now)])
 
     // #then
     void a

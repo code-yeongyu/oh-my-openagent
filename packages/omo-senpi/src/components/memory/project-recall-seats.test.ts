@@ -44,7 +44,15 @@ describe("selectWithProjectSeats (#10044)", () => {
   test("#given 800 own notes that all match better #when a touched project holds one matching note #then it still gets its reserved seat", () => {
     // given
     const own = filler("own", 800, "kubernetes rollout canary kubernetes rollout canary")
-    const projects = [project("child-1234abcd", [note("deploy.md", "deployment journal", `${"unrelated words about the weekly sync ".repeat(60)} kubernetes rollout canary`)])]
+    const projects = [
+      project("child-1234abcd", [
+        note(
+          "deploy.md",
+          "deployment journal",
+          `${"unrelated words about the weekly sync ".repeat(60)} kubernetes rollout canary`,
+        ),
+      ]),
+    ]
 
     // when
     const selected = selectWithProjectSeats(own, projects, 2, rank([QUERY], 2))
@@ -56,10 +64,20 @@ describe("selectWithProjectSeats (#10044)", () => {
 
   test("#given two equally matching project notes #when one names the touched file #then that note ranks first in its project", () => {
     // given
-    const projects = [project("child-1234abcd", [
-      note("a-general.md", "canary rollout notes"),
-      note("b-scheduler.md", "canary rollout notes", "canary rollout notes for packages/senpi-task/src/dag/scheduler.ts"),
-    ], "packages/senpi-task/src/dag/scheduler.ts")]
+    const projects = [
+      project(
+        "child-1234abcd",
+        [
+          note("a-general.md", "canary rollout notes"),
+          note(
+            "b-scheduler.md",
+            "canary rollout notes",
+            "canary rollout notes for packages/senpi-task/src/dag/scheduler.ts",
+          ),
+        ],
+        "packages/senpi-task/src/dag/scheduler.ts",
+      ),
+    ]
 
     // when
     const selected = selectWithProjectSeats([], projects, 2, rank(["canary rollout"], 2))
@@ -87,7 +105,9 @@ describe("selectWithProjectSeats (#10044)", () => {
   test("#given three touched projects and an own corpus #when ranked #then each corpus is ranked exactly once, on its own documents", () => {
     // given
     const own = filler("own", 800, "kubernetes cluster notes")
-    const projects = ["a", "b", "c"].map((name) => project(`${name}-1234abcd`, filler(name, 200, "kubernetes rollout canary")))
+    const projects = ["a", "b", "c"].map((name) =>
+      project(`${name}-1234abcd`, filler(name, 200, "kubernetes rollout canary")),
+    )
     const calls: number[] = []
 
     // when

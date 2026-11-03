@@ -21,7 +21,16 @@ const PIPE_PREFIX = "\\\\.\\pipe\\senpi-rpc-"
 export const LOCAL_SESSION_ID = "remote"
 
 type Json = Record<string, unknown>
-const INPUT_COMMANDS = new Set(["prompt", "steer", "follow_up", "abort", "bash", "compact", "new_session", "switch_session"])
+const INPUT_COMMANDS = new Set([
+  "prompt",
+  "steer",
+  "follow_up",
+  "abort",
+  "bash",
+  "compact",
+  "new_session",
+  "switch_session",
+])
 
 export type RemoteAttachEndpoint = {
   /** Pass as `--attach`. */
@@ -63,7 +72,7 @@ class Presentation {
     if (this.streaming) return
     this.streaming = true
     this.notify(`Observing ${this.label}: ${REMOTE_INPUT_OFF}`, "info")
-    this.stopStream = this.attach.onEvent(event => this.event(event))
+    this.stopStream = this.attach.onEvent((event) => this.event(event))
   }
 
   stop(): void {
@@ -93,13 +102,22 @@ class Presentation {
   }
 
   notify(message: string, notifyType: "info" | "warning"): void {
-    this.send({ type: "extension_ui_request", id: randomUUID(), method: "notify", message, notifyType, sessionId: LOCAL_SESSION_ID })
+    this.send({
+      type: "extension_ui_request",
+      id: randomUUID(),
+      method: "notify",
+      message,
+      notifyType,
+      sessionId: LOCAL_SESSION_ID,
+    })
   }
 
   async answer(request: Json): Promise<void> {
     const type = String(request.type)
-    const reply = (data: Json = {}) => this.send({ type: "response", id: request.id, command: type, success: true, data })
-    const refuse = (error: string) => this.send({ type: "response", id: request.id, command: type, success: false, error })
+    const reply = (data: Json = {}) =>
+      this.send({ type: "response", id: request.id, command: type, success: true, data })
+    const refuse = (error: string) =>
+      this.send({ type: "response", id: request.id, command: type, success: false, error })
     try {
       switch (type) {
         case "set_client_info":
@@ -108,7 +126,14 @@ class Presentation {
           return reply()
         case "list_sessions":
           return reply({
-            sessions: [{ sessionId: LOCAL_SESSION_ID, durableSessionId: this.attach.sessionId, retain_on_disconnect: true, sessionName: this.label }],
+            sessions: [
+              {
+                sessionId: LOCAL_SESSION_ID,
+                durableSessionId: this.attach.sessionId,
+                retain_on_disconnect: true,
+                sessionName: this.label,
+              },
+            ],
           })
         case "subscribe_sessions":
           reply({ subscriptionId: randomUUID(), snapshot: [] })
@@ -136,13 +161,15 @@ class Presentation {
     if (before === undefined) {
       const snapshot = this.snapshot ?? (await this.attach.snapshot)
       this.snapshot = snapshot
-      const next = snapshot.history_truncated && snapshot.oldest_entry_id !== null ? { next_before: snapshot.oldest_entry_id } : {}
+      const next =
+        snapshot.history_truncated && snapshot.oldest_entry_id !== null ? { next_before: snapshot.oldest_entry_id } : {}
       return { entries: snapshot.entries, leafId: null, ...next }
     }
     const page = await this.attach.read({ before, ...(tail === undefined ? {} : { tail }) })
-    const shown = page.entries.flatMap(entry => ("entry" in entry ? [entry.entry] : []))
+    const shown = page.entries.flatMap((entry) => ("entry" in entry ? [entry.entry] : []))
     const skipped = page.entries.length - shown.length
-    if (skipped > 0) this.notify(`${skipped} older ${skipped === 1 ? "entry is" : "entries are"} too large to show`, "info")
+    if (skipped > 0)
+      this.notify(`${skipped} older ${skipped === 1 ? "entry is" : "entries are"} too large to show`, "info")
     return { entries: shown, leafId: null, ...(page.next_before === null ? {} : { next_before: page.next_before }) }
   }
 }
@@ -201,14 +228,14 @@ export async function serveRemoteAttach(
   const secret = randomBytes(SECRET_BYTES)
   writeFileSync(`${socketPath}.secret`, secret, { mode: 0o600 })
   const sockets = new Set<Socket>()
-  const server: Server = createServer(socket => {
+  const server: Server = createServer((socket) => {
     sockets.add(socket)
     socket.once("close", () => sockets.delete(socket))
     socket.once("error", () => socket.destroy())
     authenticate(socket, secret, () => {
       const presentation = new Presentation(attach, options.label, socket)
       socket.once("close", () => presentation.stop())
-      serveLines(socket, line => {
+      serveLines(socket, (line) => {
         let request: unknown
         try {
           request = JSON.parse(line)
@@ -232,7 +259,7 @@ export async function serveRemoteAttach(
   process.once("exit", removeDir)
   let closing: Promise<void> | undefined
   const close = () =>
-    (closing ??= new Promise<void>(resolve => {
+    (closing ??= new Promise<void>((resolve) => {
       for (const socket of sockets) socket.destroy()
       server.close(() => {
         process.off("exit", removeDir)

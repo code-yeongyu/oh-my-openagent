@@ -22,9 +22,11 @@ async function performCancellation(context: SchedulerContext, reason?: string): 
     await whenAdmissionIdle(context)
     // Watches go first so a promotion racing the cancel cannot flip nodes mid-cancellation.
     for (const nodeId of [...context.promotionWatches.keys()]) disposePromotionWatch(context, nodeId)
-    const cancellationResults = await Promise.allSettled([...context.attachedTaskIds.values()].map((taskId) =>
-      context.taskManager.cancelTask(taskId, reason, { abort: "skip" }),
-    ))
+    const cancellationResults = await Promise.allSettled(
+      [...context.attachedTaskIds.values()].map((taskId) =>
+        context.taskManager.cancelTask(taskId, reason, { abort: "skip" }),
+      ),
+    )
     const cancellationFailure = cancellationResults.find((result) => result.status === "rejected")
     const cancelledNodeIds: DagNodeId[] = []
     for (const node of context.journal.snapshot().nodes) {
@@ -33,10 +35,9 @@ async function performCancellation(context: SchedulerContext, reason?: string): 
       cancelledNodeIds.push(node.id)
     }
     const cancelled = context.journal.snapshot()
-    context.journal.append(Object.assign(
-      dagRunCancelledEvent({ reason, counts: countNodes(cancelled.nodes) }),
-      { cancelledNodeIds },
-    ))
+    context.journal.append(
+      Object.assign(dagRunCancelledEvent({ reason, counts: countNodes(cancelled.nodes) }), { cancelledNodeIds }),
+    )
     context.attachedTaskIds.clear()
     if (cancellationFailure?.status === "rejected") throw cancellationFailure.reason
   } finally {

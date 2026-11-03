@@ -1,14 +1,9 @@
 import { describe, expect, it } from "bun:test"
-import {
-  getOrRegisterClient,
-  type ClientCredentials,
-  type ClientRegistrationStorage,
-  type DcrFetch,
-} from "./dcr"
+import { getOrRegisterClient, type ClientCredentials, type ClientRegistrationStorage, type DcrFetch } from "./dcr"
 
-function createStorage(initial: ClientCredentials | null):
-  & ClientRegistrationStorage
-  & { getLastKey: () => string | null; getLastSet: () => ClientCredentials | null } {
+function createStorage(
+  initial: ClientCredentials | null,
+): ClientRegistrationStorage & { getLastKey: () => string | null; getLastSet: () => ClientCredentials | null } {
   let stored = initial
   let lastKey: string | null = null
   let lastSet: ClientCredentials | null = null
@@ -60,7 +55,7 @@ describe("getOrRegisterClient", () => {
     let fetchCalled = false
     const fetchMock: DcrFetch = async (
       input: string,
-      init?: { method?: string; headers?: Record<string, string>; body?: string }
+      init?: { method?: string; headers?: Record<string, string>; body?: string },
     ) => {
       fetchCalled = true
       expect(input).toBe("https://server.example.com/register")

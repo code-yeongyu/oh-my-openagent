@@ -17,21 +17,40 @@ export function factsPrompt(payloadText: string): string {
 }
 
 export function factsContextFits(context: unknown, model: FactsModelCapacity): boolean {
-  return Number.isSafeInteger(model.contextWindow) && model.contextWindow > 0
-    && Number.isSafeInteger(model.maxTokens) && model.maxTokens > 0
+  return (
+    Number.isSafeInteger(model.contextWindow) &&
+    model.contextWindow > 0 &&
+    Number.isSafeInteger(model.maxTokens) &&
+    model.maxTokens > 0 &&
     // UTF-8 bytes conservatively overestimate text tokens, including escaped JSON and tool schemas.
-    && Buffer.byteLength(JSON.stringify(context), "utf8") + Math.min(FACTS_OUTPUT_TOKENS, model.maxTokens)
-      + CONTEXT_FRAMING_RESERVE <= model.contextWindow
+    Buffer.byteLength(JSON.stringify(context), "utf8") +
+      Math.min(FACTS_OUTPUT_TOKENS, model.maxTokens) +
+      CONTEXT_FRAMING_RESERVE <=
+      model.contextWindow
+  )
 }
 
 export function admitOversizedFacts(payload: FactsPayload, model: unknown): boolean {
-  if (payload.entries.length !== 1 || model === null || typeof model !== "object"
-    || !("contextWindow" in model) || typeof model.contextWindow !== "number"
-    || !("maxTokens" in model) || typeof model.maxTokens !== "number") return false
+  if (
+    payload.entries.length !== 1 ||
+    model === null ||
+    typeof model !== "object" ||
+    !("contextWindow" in model) ||
+    typeof model.contextWindow !== "number" ||
+    !("maxTokens" in model) ||
+    typeof model.maxTokens !== "number"
+  )
+    return false
   const text = serializeFactsPayload(payload)
-  return Buffer.byteLength(text, "utf8") <= FACTS_OVERSIZED_BYTES && factsContextFits({
-    systemPrompt: loadFactsPersona(),
-    messages: [{ role: "user", content: [{ type: "text", text: factsPrompt(text) }] }],
-    tools: [factsRecordContract],
-  }, { contextWindow: model.contextWindow, maxTokens: model.maxTokens })
+  return (
+    Buffer.byteLength(text, "utf8") <= FACTS_OVERSIZED_BYTES &&
+    factsContextFits(
+      {
+        systemPrompt: loadFactsPersona(),
+        messages: [{ role: "user", content: [{ type: "text", text: factsPrompt(text) }] }],
+        tools: [factsRecordContract],
+      },
+      { contextWindow: model.contextWindow, maxTokens: model.maxTokens },
+    )
+  )
 }

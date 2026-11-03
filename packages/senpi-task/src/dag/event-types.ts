@@ -1,5 +1,13 @@
 import type { TaskStartFailureKind } from "../state/start-failure"
-import type { DagNodeId, DagRunId, DagNodeState, DagNodeCounts, DagNodeError, DagDiagnostic, DagEventLane } from "./types"
+import type {
+  DagNodeId,
+  DagRunId,
+  DagNodeState,
+  DagNodeCounts,
+  DagNodeError,
+  DagDiagnostic,
+  DagEventLane,
+} from "./types"
 import type { PausedDagEvent } from "./paused-events"
 
 export const DAG_NODE_TRANSITION_REASONS = [
@@ -112,7 +120,11 @@ export type DagRunEventPayload =
       readonly priorTaskId?: string
       readonly execAttempt: number
       readonly promptChanged: boolean
-      readonly automatic?: { readonly attempt: number; readonly failureKind: TaskStartFailureKind; readonly delayMs: number }
+      readonly automatic?: {
+        readonly attempt: number
+        readonly failureKind: TaskStartFailureKind
+        readonly delayMs: number
+      }
     }
   | {
       readonly type: "dag.node.steered"

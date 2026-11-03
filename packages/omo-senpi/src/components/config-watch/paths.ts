@@ -150,11 +150,7 @@ function userConfigCreationTarget(path: string, userConfigDirectory: string): Om
   return {
     path,
     kind: "dir",
-    filterGlobs: [
-      `/${directoryName}`,
-      `/${directoryName}/omo.jsonc`,
-      `/${directoryName}/omo.json`,
-    ],
+    filterGlobs: [`/${directoryName}`, `/${directoryName}/omo.jsonc`, `/${directoryName}/omo.json`],
   }
 }
 
@@ -178,11 +174,9 @@ export function resolveOmoConfigWatchTargetResolution(
     ...resolvedConfigPaths
       .filter((candidate) => candidate.scope === "project")
       .map((candidate) => dirname(candidate.path)),
-    ...findProjectConfigPathsFarthestFirst(
-      options.cwd,
-      resolveHomeDir(env),
-      DEFAULT_READ_FILE_SYSTEM,
-    ).map((path) => dirname(path)),
+    ...findProjectConfigPathsFarthestFirst(options.cwd, resolveHomeDir(env), DEFAULT_READ_FILE_SYSTEM).map((path) =>
+      dirname(path),
+    ),
   ])
   const targets: OmoConfigWatchTarget[] = []
 

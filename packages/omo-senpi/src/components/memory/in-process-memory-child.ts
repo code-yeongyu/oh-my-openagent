@@ -32,17 +32,22 @@ export async function runInProcessMemoryChild(input: RunInProcessMemoryChildInpu
   let deadlineReached = false
   let resolveCancelled: (() => void) | undefined
   let disposal: Promise<void> | undefined
-  const cancelled = new Promise<"cancelled">((resolve) => { resolveCancelled = () => resolve("cancelled") })
+  const cancelled = new Promise<"cancelled">((resolve) => {
+    resolveCancelled = () => resolve("cancelled")
+  })
   input.state.cancel = () => {
     input.state.cancelled = true
     resolveCancelled?.()
   }
   input.onState?.(input.state)
   const deadline = new Promise<"deadline">((resolve) => {
-    deadlineTimer = setTimeout(() => {
-      deadlineReached = true
-      resolve("deadline")
-    }, Math.max(0, input.deadlineMs ?? DEFAULT_DEADLINE_MS))
+    deadlineTimer = setTimeout(
+      () => {
+        deadlineReached = true
+        resolve("deadline")
+      },
+      Math.max(0, input.deadlineMs ?? DEFAULT_DEADLINE_MS),
+    )
     deadlineTimer.unref?.()
   })
   const expired = (): boolean => deadlineReached || input.state.cancelled
@@ -65,11 +70,11 @@ export async function runInProcessMemoryChild(input: RunInProcessMemoryChildInpu
     input.onSetupSettled?.()
     const taskRuntime = await import("#omo-task-runtime")
     if (expired()) return undefined
-    const runner = input.createRunner?.(
-      input.createSession === undefined ? {} : { createSession: input.createSession },
-    ) ?? taskRuntime.createInProcessJudgeRunner(
-      input.createSession === undefined ? {} : { createSession: input.createSession },
-    )
+    const runner =
+      input.createRunner?.(input.createSession === undefined ? {} : { createSession: input.createSession }) ??
+      taskRuntime.createInProcessJudgeRunner(
+        input.createSession === undefined ? {} : { createSession: input.createSession },
+      )
     return runner.start(input.buildStart(taskRuntime))
   })()
   const setupResult = setup.then(
@@ -92,7 +97,9 @@ export async function runInProcessMemoryChild(input: RunInProcessMemoryChildInpu
     if (settled === "deadline") {
       input.state.cancel?.()
       void setup.then(
-        (handle) => { if (handle !== undefined) void disposeOnce(handle, true) },
+        (handle) => {
+          if (handle !== undefined) void disposeOnce(handle, true)
+        },
         () => undefined,
       )
       return { status: "failed", cause: "deadline" }
@@ -123,7 +130,7 @@ export async function runInProcessMemoryChild(input: RunInProcessMemoryChildInpu
     clearTimeout(deadlineTimer)
     input.state.cancel = undefined
     input.state.released = setup.then(
-      (handle) => handle === undefined ? undefined : disposeOnce(handle, expired()),
+      (handle) => (handle === undefined ? undefined : disposeOnce(handle, expired())),
       () => undefined,
     )
   }

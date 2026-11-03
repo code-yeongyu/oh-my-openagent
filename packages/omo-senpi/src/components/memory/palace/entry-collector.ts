@@ -1,12 +1,7 @@
 import { readFile, stat } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
-import {
-  createNodeGitExec,
-  parseMemoryFile,
-  type GitExec,
-  type GitMemoryRepo,
-} from "@oh-my-opencode/memory-core"
+import { createNodeGitExec, parseMemoryFile, type GitExec, type GitMemoryRepo } from "@oh-my-opencode/memory-core"
 
 export const UNCOMMITTED_LABEL = "uncommitted - not active in system prompt"
 
@@ -33,10 +28,7 @@ export interface PalaceExternalEntry {
   readonly body?: string
 }
 
-export async function collectCore(
-  repo: GitMemoryRepo,
-  head: string | null,
-): Promise<readonly PalaceCoreEntry[]> {
+export async function collectCore(repo: GitMemoryRepo, head: string | null): Promise<readonly PalaceCoreEntry[]> {
   const committed = head === null ? [] : (await repo.lsTree(head)).filter(isSystemMarkdown)
   const dirty = await dirtyPaths(repo)
   const paths = unique([...committed, ...[...dirty].filter(isSystemMarkdown)])
@@ -140,7 +132,10 @@ async function dirtyPaths(repo: GitMemoryRepo): Promise<ReadonlySet<string>> {
   const paths = new Set<string>()
   for (const line of porcelain.split(/\r?\n/)) {
     if (line.trim().length === 0) continue
-    const path = line.slice(3).trim().replace(/^"(.*)"$/, "$1")
+    const path = line
+      .slice(3)
+      .trim()
+      .replace(/^"(.*)"$/, "$1")
     if (path.length > 0) paths.add(path)
   }
   return paths

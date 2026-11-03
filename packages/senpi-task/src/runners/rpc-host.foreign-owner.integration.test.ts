@@ -27,7 +27,11 @@ function within<T>(promise: Promise<T>, ms: number, what: string): Promise<T> {
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
 }
 
-async function oneLiveChild(): Promise<{ readonly world: HostWorld; readonly owner: ParentSession; readonly record: TaskRecord }> {
+async function oneLiveChild(): Promise<{
+  readonly world: HostWorld
+  readonly owner: ParentSession
+  readonly record: TaskRecord
+}> {
   const world = await startHostWorld()
   worlds.push(world)
   const owner = world.connect("parent-owner")
@@ -71,7 +75,9 @@ describe("a daemon-hosted child stays with the process that launched it (#8932)"
     expect(untouched?.notification.run_epoch).toBe(record.notification.run_epoch)
 
     // when - the child finishes its turn
-    const session = world.host.sessions().find((candidate) => candidate.sessionPath === record.host_session?.session_path)
+    const session = world.host
+      .sessions()
+      .find((candidate) => candidate.sessionPath === record.host_session?.session_path)
     world.host.completeTurn(session?.routingId ?? "", "done")
 
     // then - the owner, and so any DAG node waiting on it, observes the terminal record

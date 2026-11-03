@@ -58,24 +58,31 @@ function main() {
       return print({ result, reason, continuationQaPath, beforeDigest })
     }
 
-    writeFileSync(join(sandbox.cwd, "mock-script.json"), JSON.stringify({ steps: [{ type: "text", text: "first turn" }] }))
-    const printRun = spawnSync(resolvedSenpi, [
-      "-e",
-      mockProviderEntry,
-      "-p",
-      "--session-dir",
-      sessionDir,
-      "--provider",
-      "omo-mock",
-      "--model",
-      "mock-1",
-      "continue ulw-loop",
-    ], {
-      cwd: sandbox.cwd,
-      env: senpiEnv(sandbox, binDir, sessionDir),
-      encoding: "utf8",
-      timeout: 60_000,
-    })
+    writeFileSync(
+      join(sandbox.cwd, "mock-script.json"),
+      JSON.stringify({ steps: [{ type: "text", text: "first turn" }] }),
+    )
+    const printRun = spawnSync(
+      resolvedSenpi,
+      [
+        "-e",
+        mockProviderEntry,
+        "-p",
+        "--session-dir",
+        sessionDir,
+        "--provider",
+        "omo-mock",
+        "--model",
+        "mock-1",
+        "continue ulw-loop",
+      ],
+      {
+        cwd: sandbox.cwd,
+        env: senpiEnv(sandbox, binDir, sessionDir),
+        encoding: "utf8",
+        timeout: 60_000,
+      },
+    )
     const transcript = `${printRun.stdout}\n${printRun.stderr}`
     if (transcript.includes("Continue the active ulw-loop run.")) {
       result = "PASS"
@@ -93,38 +100,42 @@ function main() {
 
     tmuxSession = `omo-senpi-qa-${process.pid}`
     const tmuxPath = `${binDir}:${process.env.PATH ?? ""}`
-    const tmuxRun = spawnSync(tmuxBin, [
-      "new-session",
-      "-e",
-      `PATH=${tmuxPath}`,
-      // A running tmux server hands the session ITS global env, so every agent-dir lane is pinned
-      // here: an inherited OMO_CODING_AGENT_DIR would outrank SENPI_CODING_AGENT_DIR.
-      "-e",
-      `OMO_CODING_AGENT_DIR=${sandbox.agentDir}`,
-      "-e",
-      `SENPI_CODING_AGENT_DIR=${sandbox.agentDir}`,
-      "-e",
-      `PI_CODING_AGENT_DIR=${sandbox.agentDir}`,
-      "-e",
-      `SENPI_CODING_AGENT_SESSION_DIR=${sessionDir}`,
-      "-d",
-      "-s",
-      tmuxSession,
-      resolvedSenpi,
-      "-e",
-      mockProviderEntry,
-      "--session-dir",
-      sessionDir,
-      "--provider",
-      "omo-mock",
-      "--model",
-      "mock-1",
-      "continue ulw-loop",
-    ], {
-      cwd: sandbox.cwd,
-      env: senpiEnv(sandbox, binDir, sessionDir),
-      timeout: 10_000,
-    })
+    const tmuxRun = spawnSync(
+      tmuxBin,
+      [
+        "new-session",
+        "-e",
+        `PATH=${tmuxPath}`,
+        // A running tmux server hands the session ITS global env, so every agent-dir lane is pinned
+        // here: an inherited OMO_CODING_AGENT_DIR would outrank SENPI_CODING_AGENT_DIR.
+        "-e",
+        `OMO_CODING_AGENT_DIR=${sandbox.agentDir}`,
+        "-e",
+        `SENPI_CODING_AGENT_DIR=${sandbox.agentDir}`,
+        "-e",
+        `PI_CODING_AGENT_DIR=${sandbox.agentDir}`,
+        "-e",
+        `SENPI_CODING_AGENT_SESSION_DIR=${sessionDir}`,
+        "-d",
+        "-s",
+        tmuxSession,
+        resolvedSenpi,
+        "-e",
+        mockProviderEntry,
+        "--session-dir",
+        sessionDir,
+        "--provider",
+        "omo-mock",
+        "--model",
+        "mock-1",
+        "continue ulw-loop",
+      ],
+      {
+        cwd: sandbox.cwd,
+        env: senpiEnv(sandbox, binDir, sessionDir),
+        timeout: 10_000,
+      },
+    )
     if (tmuxRun.status !== 0) {
       reason = "tmux-start-failed"
       continuationQaPath = "tmux"
@@ -133,7 +144,10 @@ function main() {
 
     let captureText = ""
     for (let attempt = 0; attempt < 20; attempt += 1) {
-      const capture = spawnSync(tmuxBin, ["capture-pane", "-pt", tmuxSession, "-S", "-200"], { encoding: "utf8", timeout: 10_000 })
+      const capture = spawnSync(tmuxBin, ["capture-pane", "-pt", tmuxSession, "-S", "-200"], {
+        encoding: "utf8",
+        timeout: 10_000,
+      })
       captureText = capture.stdout
       if (captureText.includes("Continue the active ulw-loop run.")) break
       wait(250)
@@ -151,7 +165,14 @@ function main() {
 
 function print({ result, reason, continuationQaPath, beforeDigest }) {
   const afterDigest = digestDirectory(realSenpiAgentDir)
-  console.log(JSON.stringify({ result, ...(reason ? { reason } : {}), continuationQaPath, realSenpiUntouched: beforeDigest === afterDigest }))
+  console.log(
+    JSON.stringify({
+      result,
+      ...(reason ? { reason } : {}),
+      continuationQaPath,
+      realSenpiUntouched: beforeDigest === afterDigest,
+    }),
+  )
 }
 
 function senpiEnv(sandbox, binDir, sessionDir) {

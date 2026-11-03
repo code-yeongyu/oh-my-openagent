@@ -9,11 +9,7 @@ import type { TeamModeConfig } from "../../../config/schema/team-mode"
 import { TeamModeConfigSchema } from "../../../config/schema/team-mode"
 import type { BackgroundManager } from "../../background-agent/manager"
 import * as layoutModule from "../team-layout-tmux/layout"
-import {
-  clearTeamSessionRegistry,
-  lookupTeamSession,
-  registerTeamSession,
-} from "../team-session-registry"
+import { clearTeamSessionRegistry, lookupTeamSession, registerTeamSession } from "../team-session-registry"
 import { saveRuntimeState } from "../team-state-store/store"
 import type { RuntimeState } from "../types"
 import { cleanupTeamRunResources } from "./cleanup-team-run-resources"
@@ -34,11 +30,15 @@ function createRuntimeState(teamRunId: string): RuntimeState {
     createdAt: 1,
     status: "creating",
     leadSessionId: "lead-session",
-    members: [
-      { name: "worker-1", agentType: "general-purpose", status: "pending", pendingInjectedMessageIds: [] },
-    ],
+    members: [{ name: "worker-1", agentType: "general-purpose", status: "pending", pendingInjectedMessageIds: [] }],
     shutdownRequests: [],
-    bounds: { maxMembers: 8, maxParallelMembers: 4, maxMessagesPerRun: 10_000, maxWallClockMinutes: 120, maxMemberTurns: 500 },
+    bounds: {
+      maxMembers: 8,
+      maxParallelMembers: 4,
+      maxMessagesPerRun: 10_000,
+      maxWallClockMinutes: 120,
+      maxMemberTurns: 500,
+    },
   }
 }
 
@@ -52,7 +52,9 @@ describe("cleanupTeamRunResources", () => {
   afterEach(async () => {
     mock.restore()
     clearTeamSessionRegistry()
-    await Promise.all(temporaryDirectories.splice(0).map(async (directoryPath) => rm(directoryPath, { recursive: true, force: true })))
+    await Promise.all(
+      temporaryDirectories.splice(0).map(async (directoryPath) => rm(directoryPath, { recursive: true, force: true })),
+    )
   })
 
   test("unregisters every team-session-registry entry for the failed team so the gating hook cannot authorize stale participants", async () => {
@@ -78,7 +80,11 @@ describe("cleanupTeamRunResources", () => {
     // then
     expect(lookupTeamSession("lead-session")).toBeUndefined()
     expect(lookupTeamSession("worker-session")).toBeUndefined()
-    expect(lookupTeamSession("other-team-session")).toEqual({ teamRunId: "other-team", memberName: "solo", role: "member" })
+    expect(lookupTeamSession("other-team-session")).toEqual({
+      teamRunId: "other-team",
+      memberName: "solo",
+      role: "member",
+    })
   })
 
   test("uses persisted pane IDs for rollback layout cleanup so caller tmux windows are not killed", async () => {
@@ -87,15 +93,18 @@ describe("cleanupTeamRunResources", () => {
     temporaryDirectories.push(baseDir)
     const teamRunId = "44444444-4444-4444-8444-444444444444"
     await mkdir(path.join(baseDir, "runtime", teamRunId), { recursive: true })
-    await saveRuntimeState({
-      ...createRuntimeState(teamRunId),
-      tmuxLayout: {
-        ownedSession: false,
-        targetSessionId: "$caller",
-        focusWindowId: "test-session:0",
-        paneIds: ["%10", "%11"],
+    await saveRuntimeState(
+      {
+        ...createRuntimeState(teamRunId),
+        tmuxLayout: {
+          ownedSession: false,
+          targetSessionId: "$caller",
+          focusWindowId: "test-session:0",
+          paneIds: ["%10", "%11"],
+        },
       },
-    }, createConfig(baseDir))
+      createConfig(baseDir),
+    )
     const removeTeamLayoutSpy = spyOn(layoutModule, "removeTeamLayout").mockResolvedValue(undefined)
 
     // when
@@ -109,12 +118,16 @@ describe("cleanupTeamRunResources", () => {
     })
 
     // then
-    expect(removeTeamLayoutSpy).toHaveBeenCalledWith(teamRunId, {
-      ownedSession: false,
-      targetSessionId: "$caller",
-      focusWindowId: "test-session:0",
-      paneIds: ["%10", "%11"],
-    }, expect.anything())
+    expect(removeTeamLayoutSpy).toHaveBeenCalledWith(
+      teamRunId,
+      {
+        ownedSession: false,
+        targetSessionId: "$caller",
+        focusWindowId: "test-session:0",
+        paneIds: ["%10", "%11"],
+      },
+      expect.anything(),
+    )
   })
 
   test("falls back to member pane IDs for rollback cleanup when older runtime state lacks layout paneIds", async () => {
@@ -123,18 +136,28 @@ describe("cleanupTeamRunResources", () => {
     temporaryDirectories.push(baseDir)
     const teamRunId = "55555555-5555-4555-8555-555555555555"
     await mkdir(path.join(baseDir, "runtime", teamRunId), { recursive: true })
-    await saveRuntimeState({
-      ...createRuntimeState(teamRunId),
-      tmuxLayout: {
-        ownedSession: false,
-        targetSessionId: "$caller",
-        focusWindowId: "test-session:0",
+    await saveRuntimeState(
+      {
+        ...createRuntimeState(teamRunId),
+        tmuxLayout: {
+          ownedSession: false,
+          targetSessionId: "$caller",
+          focusWindowId: "test-session:0",
+        },
+        members: [
+          { name: "lead", agentType: "leader", tmuxPaneId: "%0", status: "running", pendingInjectedMessageIds: [] },
+          {
+            name: "worker-1",
+            agentType: "general-purpose",
+            tmuxPaneId: "%10",
+            tmuxGridPaneId: "%11",
+            status: "running",
+            pendingInjectedMessageIds: [],
+          },
+        ],
       },
-      members: [
-        { name: "lead", agentType: "leader", tmuxPaneId: "%0", status: "running", pendingInjectedMessageIds: [] },
-        { name: "worker-1", agentType: "general-purpose", tmuxPaneId: "%10", tmuxGridPaneId: "%11", status: "running", pendingInjectedMessageIds: [] },
-      ],
-    }, createConfig(baseDir))
+      createConfig(baseDir),
+    )
     const removeTeamLayoutSpy = spyOn(layoutModule, "removeTeamLayout").mockResolvedValue(undefined)
 
     // when
@@ -148,11 +171,15 @@ describe("cleanupTeamRunResources", () => {
     })
 
     // then
-    expect(removeTeamLayoutSpy).toHaveBeenCalledWith(teamRunId, {
-      ownedSession: false,
-      targetSessionId: "$caller",
-      focusWindowId: "test-session:0",
-      paneIds: ["%10", "%11"],
-    }, expect.anything())
+    expect(removeTeamLayoutSpy).toHaveBeenCalledWith(
+      teamRunId,
+      {
+        ownedSession: false,
+        targetSessionId: "$caller",
+        focusWindowId: "test-session:0",
+        paneIds: ["%10", "%11"],
+      },
+      expect.anything(),
+    )
   })
 })

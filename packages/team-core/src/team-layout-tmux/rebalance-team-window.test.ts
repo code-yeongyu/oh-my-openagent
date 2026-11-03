@@ -2,10 +2,7 @@
 
 import { beforeEach, describe, expect, it, mock } from "bun:test"
 
-import {
-  rebalanceTeamWindowWith,
-  type RebalanceTeamWindowDeps,
-} from "./rebalance-team-window"
+import { rebalanceTeamWindowWith, type RebalanceTeamWindowDeps } from "./rebalance-team-window"
 
 describe("rebalanceTeamWindowWith", () => {
   let runTmux: RebalanceTeamWindowDeps["runTmux"]

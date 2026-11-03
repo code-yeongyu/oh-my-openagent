@@ -90,15 +90,16 @@ export async function runSyncTaskLoop(input: SyncTaskRunnerInput): Promise<strin
   const hasPendingParentWake = executorCtx.manager?.hasPendingParentWake?.bind(executorCtx.manager)
   const deliverableTag = getDeliverableTag(agentToUse)
   let effectiveCategoryModel = input.categoryModel
-  let fallbackState: ModelFallbackState | undefined = effectiveCategoryModel && fallbackChain?.length
-    ? {
-        providerID: effectiveCategoryModel.providerID,
-        modelID: effectiveCategoryModel.modelID,
-        fallbackChain,
-        attemptCount: 0,
-        pending: true,
-      }
-    : undefined
+  let fallbackState: ModelFallbackState | undefined =
+    effectiveCategoryModel && fallbackChain?.length
+      ? {
+          providerID: effectiveCategoryModel.providerID,
+          modelID: effectiveCategoryModel.modelID,
+          fallbackChain,
+          attemptCount: 0,
+          pending: true,
+        }
+      : undefined
   let activeSessionID = input.sessionID
 
   while (true) {
@@ -143,14 +144,19 @@ export async function runSyncTaskLoop(input: SyncTaskRunnerInput): Promise<strin
       }
     }
 
-    const pollError = await deps.pollSyncSession(ctx, client, {
-      sessionID: activeSessionID,
-      agentToUse,
-      toastManager,
-      taskId,
-      hasActiveChildBackgroundTasks,
-      hasPendingParentWake,
-    }, syncPollTimeoutMs)
+    const pollError = await deps.pollSyncSession(
+      ctx,
+      client,
+      {
+        sessionID: activeSessionID,
+        agentToUse,
+        toastManager,
+        taskId,
+        hasActiveChildBackgroundTasks,
+        hasPendingParentWake,
+      },
+      syncPollTimeoutMs,
+    )
     if (pollError) {
       if (shouldAttemptPollErrorRecovery(pollError)) {
         const recoveredResult = await deps.fetchSyncResult(client, activeSessionID, undefined, {

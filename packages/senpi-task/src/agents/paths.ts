@@ -63,15 +63,13 @@ function listMarkdownFiles(dir: string, ignoreMissing: boolean): ListMarkdownAge
       const result = listMarkdownFiles(path, false)
       files.push(...result.files)
       diagnostics.push(...result.diagnostics)
-    }
-    else if (entry.isFile() && extname(entry.name) === ".md") files.push(path)
+    } else if (entry.isFile() && extname(entry.name) === ".md") files.push(path)
   }
   return { files, diagnostics }
 }
 
 type DirectoryInspection =
-  | { readonly ok: true }
-  | { readonly ok: false; readonly diagnostics: readonly AgentLoaderDiagnostic[] }
+  { readonly ok: true } | { readonly ok: false; readonly diagnostics: readonly AgentLoaderDiagnostic[] }
 
 function inspectDirectory(dir: string, ignoreMissing: boolean): DirectoryInspection {
   try {

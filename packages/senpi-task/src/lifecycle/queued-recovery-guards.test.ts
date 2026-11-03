@@ -24,7 +24,7 @@ test("queued permanent refusal ends before another respawn attempt", async () =>
   f.park(id)
   await attempted
   await f.manager.sendToTask({ idOrName: id, message: "Q1" })
-  f.store.mutate(id, record => ({ ...record, revival_deferred_reason: "host_incompatible" }))
+  f.store.mutate(id, (record) => ({ ...record, revival_deferred_reason: "host_incompatible" }))
   const respawns = f.state.respawns
   const ended = f.wait("suspended_unresumable")
 
@@ -42,7 +42,10 @@ test("queued attempt crossing the deadline re-scans on settlement without a time
   f.lifecycle.dispose?.()
   const recovery = startLiveParentRecovery(resolveContext(f.deps), undefined)
   const gate = f.holdRevival()
-  f.store.mutate(id, record => ({ ...record, pending_steering: [{ id: "deadline", message: "Q1", deliver_as: "steer" }] }))
+  f.store.mutate(id, (record) => ({
+    ...record,
+    pending_steering: [{ id: "deadline", message: "Q1", deliver_as: "steer" }],
+  }))
   f.park(id)
   recovery.scan()
   await gate.started

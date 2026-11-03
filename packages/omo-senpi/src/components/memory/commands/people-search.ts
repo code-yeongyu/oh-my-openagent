@@ -21,7 +21,9 @@ export function collectPersonSearchHits(
   const sessionsDir = resolveSessionsDir(deps, ctx)
   if (sessionsDir === undefined || !existsSync(sessionsDir)) return []
 
-  const needles = [node.displayName, ...node.aliases].map((needle) => needle.trim()).filter((needle) => needle.length > 0)
+  const needles = [node.displayName, ...node.aliases]
+    .map((needle) => needle.trim())
+    .filter((needle) => needle.length > 0)
   if (needles.length === 0) return []
 
   const provider = new SenpiSessionProvider({ sessionsDir })

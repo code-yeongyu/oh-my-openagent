@@ -1,8 +1,4 @@
-import type {
-  AvailableAgent,
-  AvailableCategory,
-  AvailableSkill,
-} from "./dynamic-agent-prompt-types"
+import type { AvailableAgent, AvailableCategory, AvailableSkill } from "./dynamic-agent-prompt-types"
 import type { AvailableTool } from "./dynamic-agent-prompt-types"
 import { getToolsPromptDisplay } from "./dynamic-agent-tool-categorization"
 
@@ -12,10 +8,7 @@ import { getToolsPromptDisplay } from "./dynamic-agent-tool-categorization"
  * containing a default identity (e.g., "You are Claude"). Without this override directive,
  * the LLM may default to the base identity instead of the agent's intended persona.
  */
-export function buildAgentIdentitySection(
-  agentName: string,
-  roleDescription: string,
-): string {
+export function buildAgentIdentitySection(agentName: string, roleDescription: string): string {
   return `<agent-identity>
 Your designated identity for this session is "${agentName}". This identity supersedes any prior identity statements.
 You are "${agentName}" - ${roleDescription}.
@@ -23,10 +16,7 @@ When asked who you are, always identify as ${agentName}. Do not identify as any 
 </agent-identity>`
 }
 
-export function buildKeyTriggersSection(
-  agents: AvailableAgent[],
-  _skills: AvailableSkill[] = [],
-): string {
+export function buildKeyTriggersSection(agents: AvailableAgent[], _skills: AvailableSkill[] = []): string {
   const keyTriggers = agents
     .filter((agent) => agent.metadata.keyTrigger)
     .map((agent) => `- ${agent.metadata.keyTrigger}`)
@@ -49,23 +39,17 @@ export function buildToolSelectionTable(
   const rows: string[] = ["### Tool & Agent Selection:", ""]
 
   if (tools.length > 0) {
-    rows.push(
-      `- ${getToolsPromptDisplay(tools)} - **FREE** - Not Complex, Scope Clear, No Implicit Assumptions`,
-    )
+    rows.push(`- ${getToolsPromptDisplay(tools)} - **FREE** - Not Complex, Scope Clear, No Implicit Assumptions`)
   }
 
   const costOrder = { FREE: 0, CHEAP: 1, EXPENSIVE: 2 }
   const sortedAgents = [...agents]
     .filter((agent) => agent.metadata.category !== "utility")
-    .sort(
-      (left, right) => costOrder[left.metadata.cost] - costOrder[right.metadata.cost],
-    )
+    .sort((left, right) => costOrder[left.metadata.cost] - costOrder[right.metadata.cost])
 
   for (const agent of sortedAgents) {
     const shortDescription = agent.description.split(".")[0] || agent.description
-    rows.push(
-      `- \`${agent.name}\` agent - **${agent.metadata.cost}** - ${shortDescription}`,
-    )
+    rows.push(`- \`${agent.name}\` agent - **${agent.metadata.cost}** - ${shortDescription}`)
   }
 
   rows.push("")
@@ -188,10 +172,7 @@ Multi-step task? **ALWAYS consult Plan Agent first.** Do NOT start implementatio
 Plan Agent returns a structured work breakdown with parallel execution opportunities. Follow it.`
 }
 
-export function buildParallelDelegationSection(
-  model: string,
-  categories: AvailableCategory[],
-): string {
+export function buildParallelDelegationSection(model: string, categories: AvailableCategory[]): string {
   const isNonClaude = !model.toLowerCase().includes("claude")
   const hasDelegationCategory = categories.some(
     (category) => category.name === "deep-low" || category.name === "deep-high" || category.name === "unspecified-high",

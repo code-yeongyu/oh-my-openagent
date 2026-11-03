@@ -5,9 +5,7 @@ import type { IterationCommitExpectation, RalphLoopState } from "./types"
 import { DEFAULT_STATE_FILE, DEFAULT_COMPLETION_PROMISE, DEFAULT_MAX_ITERATIONS } from "./constants"
 
 export function getStateFilePath(directory: string, customPath?: string): string {
-  return customPath
-    ? join(directory, customPath)
-    : join(directory, DEFAULT_STATE_FILE)
+  return customPath ? join(directory, customPath) : join(directory, DEFAULT_STATE_FILE)
 }
 
 export function readState(directory: string, customPath?: string): RalphLoopState | null {
@@ -23,14 +21,14 @@ export function readState(directory: string, customPath?: string): RalphLoopStat
 
     const active = data.active
     const iteration = data.iteration
-    
+
     if (active === undefined || iteration === undefined) {
       return null
     }
 
     const isActive = active === true || active === "true"
     const iterationNum = typeof iteration === "number" ? iteration : Number(iteration)
-    
+
     if (isNaN(iterationNum)) {
       return null
     }
@@ -63,26 +61,20 @@ export function readState(directory: string, customPath?: string): RalphLoopStat
       initial_completion_promise: data.initial_completion_promise
         ? stripQuotes(data.initial_completion_promise)
         : undefined,
-      verification_attempt_id: data.verification_attempt_id
-        ? stripQuotes(data.verification_attempt_id)
-        : undefined,
+      verification_attempt_id: data.verification_attempt_id ? stripQuotes(data.verification_attempt_id) : undefined,
       verification_attempt_started_at:
         data.verification_attempt_started_at === undefined || data.verification_attempt_started_at === ""
           ? undefined
           : Number.isFinite(verificationAttemptStartedAt)
             ? verificationAttemptStartedAt
             : undefined,
-      verification_session_id: data.verification_session_id
-        ? stripQuotes(data.verification_session_id)
-        : undefined,
+      verification_session_id: data.verification_session_id ? stripQuotes(data.verification_session_id) : undefined,
       started_at: stripQuotes(data.started_at) || new Date().toISOString(),
       prompt: body.trim(),
       session_id: data.session_id ? stripQuotes(data.session_id) : undefined,
       ultrawork,
       verification_pending:
-        data.verification_pending === true || data.verification_pending === "true"
-          ? true
-          : undefined,
+        data.verification_pending === true || data.verification_pending === "true" ? true : undefined,
       strategy: data.strategy === "reset" || data.strategy === "continue" ? data.strategy : undefined,
     }
   } catch (error) {
@@ -93,11 +85,7 @@ export function readState(directory: string, customPath?: string): RalphLoopStat
   }
 }
 
-export function writeState(
-  directory: string,
-  state: RalphLoopState,
-  customPath?: string
-): boolean {
+export function writeState(directory: string, state: RalphLoopState, customPath?: string): boolean {
   const filePath = getStateFilePath(directory, customPath)
 
   try {
@@ -109,26 +97,26 @@ export function writeState(
     const sessionIdLine = state.session_id ? `session_id: "${state.session_id}"\n` : ""
     const ultraworkLine = state.ultrawork !== undefined ? `ultrawork: ${state.ultrawork}\n` : ""
     const verificationPendingLine =
-      state.verification_pending !== undefined
-        ? `verification_pending: ${state.verification_pending}\n`
-        : ""
+      state.verification_pending !== undefined ? `verification_pending: ${state.verification_pending}\n` : ""
     const strategyLine = state.strategy ? `strategy: "${state.strategy}"\n` : ""
     const initialCompletionPromiseLine = state.initial_completion_promise
       ? `initial_completion_promise: "${state.initial_completion_promise}"\n`
       : ""
     const existingState = readState(directory, customPath)
-    const verificationAttemptStartedAt = state.verification_session_id || !state.verification_attempt_id
-      ? undefined
-      : state.verification_attempt_started_at
-        ?? (existingState?.verification_attempt_id !== state.verification_attempt_id
-          ? Date.now()
-          : existingState.verification_attempt_started_at)
+    const verificationAttemptStartedAt =
+      state.verification_session_id || !state.verification_attempt_id
+        ? undefined
+        : (state.verification_attempt_started_at ??
+          (existingState?.verification_attempt_id !== state.verification_attempt_id
+            ? Date.now()
+            : existingState.verification_attempt_started_at))
     const verificationAttemptLine = state.verification_attempt_id
       ? `verification_attempt_id: "${state.verification_attempt_id}"\n`
       : ""
-    const verificationAttemptStartedAtLine = typeof verificationAttemptStartedAt === "number"
-      ? `verification_attempt_started_at: ${verificationAttemptStartedAt}\n`
-      : ""
+    const verificationAttemptStartedAtLine =
+      typeof verificationAttemptStartedAt === "number"
+        ? `verification_attempt_started_at: ${verificationAttemptStartedAt}\n`
+        : ""
     const verificationSessionLine = state.verification_session_id
       ? `verification_session_id: "${state.verification_session_id}"\n`
       : ""
@@ -137,9 +125,7 @@ export function writeState(
         ? `message_count_at_start: ${state.message_count_at_start}\n`
         : ""
     const maxIterationsLine =
-      typeof state.max_iterations === "number"
-        ? `max_iterations: ${state.max_iterations}\n`
-        : ""
+      typeof state.max_iterations === "number" ? `max_iterations: ${state.max_iterations}\n` : ""
     const content = `---
 active: ${state.active}
 iteration: ${state.iteration}
@@ -182,10 +168,7 @@ export function incrementIteration(
 ): RalphLoopState | null {
   const state = readState(directory, customPath)
   if (!state) return null
-  if (
-    expected
-    && (state.iteration !== expected.iteration || state.session_id !== expected.sessionID)
-  ) {
+  if (expected && (state.iteration !== expected.iteration || state.session_id !== expected.sessionID)) {
     return null
   }
 

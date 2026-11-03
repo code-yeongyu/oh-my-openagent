@@ -8,7 +8,10 @@ describe("reflection trigger wiring compaction observers", () => {
     // given: the kibitzer gate drops that session's pending nudges here - they judged a
     // transcript the compaction has just replaced
     const observed: string[] = []
-    const { pi } = await fixture({ stepCount: 0, onCompactionAccepted: (conversationId) => observed.push(conversationId) })
+    const { pi } = await fixture({
+      stepCount: 0,
+      onCompactionAccepted: (conversationId) => observed.push(conversationId),
+    })
 
     // when
     await compact(pi, true)
@@ -20,7 +23,10 @@ describe("reflection trigger wiring compaction observers", () => {
   test("#given a rejected compaction #when the event fires #then the observer never runs", async () => {
     // given
     const observed: string[] = []
-    const { pi } = await fixture({ stepCount: 0, onCompactionAccepted: (conversationId) => observed.push(conversationId) })
+    const { pi } = await fixture({
+      stepCount: 0,
+      onCompactionAccepted: (conversationId) => observed.push(conversationId),
+    })
 
     // when
     await compact(pi, false)
@@ -234,7 +240,10 @@ describe("reflection trigger wiring", () => {
   test("#given a launch handler that never settles #when a run settles #then the event handler still completes", async () => {
     const { pi } = await fixture({ stepCount: 1, onLaunch: () => new Promise<never>(() => {}) })
 
-    const dispatched = await pi.dispatch("agent_end", { type: "agent_end", messages: [] }).then(() => settle(pi)).then(() => "completed")
+    const dispatched = await pi
+      .dispatch("agent_end", { type: "agent_end", messages: [] })
+      .then(() => settle(pi))
+      .then(() => "completed")
 
     expect(dispatched).toBe("completed")
   })

@@ -22,24 +22,44 @@ export function createSteeringControls(
   // budget the caller moves on, and for a cancel the destruction that follows terminates the child (SIGKILL
   // escalation for a process child) and waits for its exit.
   function boundedAbort(handle: ManagedChildHandle, taskId: string): Promise<void> {
-    return withinTeardownBudget(port.abortDeadline ?? defaultTeardownStepDeadline, { taskId, pid: handle.pid }, "abort", () => handle.abort())
+    return withinTeardownBudget(
+      port.abortDeadline ?? defaultTeardownStepDeadline,
+      { taskId, pid: handle.pid },
+      "abort",
+      () => handle.abort(),
+    )
   }
 
   async function interruptTask(idOrName: string): Promise<InterruptOutcome> {
     const record = resolve(idOrName)
     if (record === undefined) return { kind: "not_found", reason: `No task found for "${idOrName}".` }
     if (record.status !== "running") {
-      return { kind: "noop", task_id: record.task_id, status: record.status, reason: `Task ${record.task_id} is ${record.status}, not running.` }
+      return {
+        kind: "noop",
+        task_id: record.task_id,
+        status: record.status,
+        reason: `Task ${record.task_id} is ${record.status}, not running.`,
+      }
     }
     // An accepted cancel owns this run's ending: an interrupt cannot turn it into a resumable stop.
     if (record.cancel_requested !== undefined) {
-      return { kind: "noop", task_id: record.task_id, status: record.status, reason: `Task ${record.task_id} has a pending cancel; it ends cancelled.` }
+      return {
+        kind: "noop",
+        task_id: record.task_id,
+        status: record.status,
+        reason: `Task ${record.task_id} has a pending cancel; it ends cancelled.`,
+      }
     }
     // Transition BEFORE abort so steering is the single terminal writer: abort settles the launch
     // outcome tracker, whose late complete/cancel transition is then rejected by terminal idempotence.
     const result = port.store.transition(record.task_id, { type: "interrupt", timestamp: nowIso() })
     if (!result.applied) {
-      return { kind: "noop", task_id: record.task_id, status: result.record.status, reason: `Task ${record.task_id} could not be interrupted from running.` }
+      return {
+        kind: "noop",
+        task_id: record.task_id,
+        status: result.record.status,
+        reason: `Task ${record.task_id} could not be interrupted from running.`,
+      }
     }
     const handle = port.liveHandle(record.task_id)
     if (handle !== undefined) await boundedAbort(handle, record.task_id)
@@ -69,30 +89,54 @@ export function createSteeringControls(
       })
       if (!result.applied) {
         if (runMoved(result.record, expected)) return staleCancel(result.record)
-        return { kind: "noop", task_id: record.task_id, status: result.record.status, reason: `Task ${record.task_id} could not be cancelled from pending.` }
+        return {
+          kind: "noop",
+          task_id: record.task_id,
+          status: result.record.status,
+          reason: `Task ${record.task_id} could not be cancelled from pending.`,
+        }
       }
       port.dequeuePending(record.task_id)
       clearPersistedQueue(record.task_id)
-      port.store.appendEvent(record.task_id, { type: "cancelled", payload: { previous_status: "pending", ...(reason !== undefined ? { reason } : {}) } })
+      port.store.appendEvent(record.task_id, {
+        type: "cancelled",
+        payload: { previous_status: "pending", ...(reason !== undefined ? { reason } : {}) },
+      })
       await port.destruction.destroyResidentTask(record.task_id, destructionCause)
-      return { kind: "cancelled", task_id: record.task_id, previous_status: "pending",
-        ...((record.pending_steering?.length ?? 0) > 0 ? { undelivered_messages: record.pending_steering?.length } : {}) }
+      return {
+        kind: "cancelled",
+        task_id: record.task_id,
+        previous_status: "pending",
+        ...((record.pending_steering?.length ?? 0) > 0
+          ? { undelivered_messages: record.pending_steering?.length }
+          : {}),
+      }
     }
     if (record.status !== "running" && record.status !== "paused") {
       // A finished child can still hold its process or session (omo#9785); cancel is the way to release it.
-      const undelivered = options?.abort === "skip" ? 0 : record.pending_steering?.length ?? 0
+      const undelivered = options?.abort === "skip" ? 0 : (record.pending_steering?.length ?? 0)
       if (undelivered > 0) clearPersistedQueue(record.task_id)
-      const released = options?.abort !== "skip" && record.residency_state === "resident"
-        && (await port.destruction.parkTerminalResident?.(record.task_id)) === true
+      const released =
+        options?.abort !== "skip" &&
+        record.residency_state === "resident" &&
+        (await port.destruction.parkTerminalResident?.(record.task_id)) === true
       if (released || undelivered > 0) {
-        return { kind: "released", task_id: record.task_id, status: record.status,
-          ...(undelivered > 0 ? { undelivered_messages: undelivered } : {}) }
+        return {
+          kind: "released",
+          task_id: record.task_id,
+          status: record.status,
+          ...(undelivered > 0 ? { undelivered_messages: undelivered } : {}),
+        }
       }
-      const reasonText = record.status === "cancelled" ? `Task ${record.task_id} is already cancelled.` : `Task ${record.task_id} is ${record.status}, not running.`
+      const reasonText =
+        record.status === "cancelled"
+          ? `Task ${record.task_id} is already cancelled.`
+          : `Task ${record.task_id} is ${record.status}, not running.`
       return { kind: "noop", task_id: record.task_id, status: record.status, reason: reasonText }
     }
     const reachable = port.liveHandle(record.task_id)
-    if (reachable === undefined && isHostSessionRecord(record)) return cancelUnhandledHostSession(record, reason, expected)
+    if (reachable === undefined && isHostSessionRecord(record))
+      return cancelUnhandledHostSession(record, reason, expected)
     const recovering = reachable?.transportRecovering?.() === true
     // The stop already waiting on this child's connection is the cancel; a repeat joins it.
     if (record.cancel_requested !== undefined && recovering) return cancelPending(record)
@@ -111,7 +155,12 @@ export function createSteeringControls(
     })
     if (!result.applied) {
       if (runMoved(result.record, expected)) return staleCancel(result.record)
-      return { kind: "noop", task_id: record.task_id, status: result.record.status, reason: `Task ${record.task_id} could not be cancelled from running.` }
+      return {
+        kind: "noop",
+        task_id: record.task_id,
+        status: result.record.status,
+        reason: `Task ${record.task_id} could not be cancelled from running.`,
+      }
     }
     clearPersistedQueue(record.task_id)
     const handle = port.liveHandle(record.task_id)
@@ -129,7 +178,10 @@ export function createSteeringControls(
         })
       }
     }
-    port.store.appendEvent(record.task_id, { type: "cancelled", payload: { previous_status: record.status, ...(reason !== undefined ? { reason } : {}) } })
+    port.store.appendEvent(record.task_id, {
+      type: "cancelled",
+      payload: { previous_status: record.status, ...(reason !== undefined ? { reason } : {}) },
+    })
     // Active in-process sessions reach their exact outcome boundary before deferred DAG disposal;
     // RPC children still terminate immediately. Lifecycle remains the sole destruction writer.
     if (options?.abort === "skip" && handle !== undefined && handle.terminate === undefined) {
@@ -137,15 +189,24 @@ export function createSteeringControls(
     } else {
       await port.destruction.destroyResidentTask(record.task_id, destructionCause)
     }
-    return { kind: "cancelled", task_id: record.task_id, previous_status: record.status,
-      ...((record.pending_steering?.length ?? 0) > 0 ? { undelivered_messages: record.pending_steering?.length } : {}) }
+    return {
+      kind: "cancelled",
+      task_id: record.task_id,
+      previous_status: record.status,
+      ...((record.pending_steering?.length ?? 0) > 0 ? { undelivered_messages: record.pending_steering?.length } : {}),
+    }
   }
 
   // omo#9403: a child whose connection is down cannot be told to stop, and calling it cancelled would
   // be false - it may still be running on its host. The stop waits on the handle (applied on the host
   // before anything else once reachable, or the child ends when its connection never comes back), and
   // only then is the record cancelled and the child torn down, which releases its lane.
-  function stopWhenReachable(record: TaskRecord, handle: ManagedChildHandle, reason: string | undefined, expected?: number): CancelOutcome {
+  function stopWhenReachable(
+    record: TaskRecord,
+    handle: ManagedChildHandle,
+    reason: string | undefined,
+    expected?: number,
+  ): CancelOutcome {
     const stop = handle.stopWhenReachable
     if (stop === undefined) throw new Error("stopWhenReachable requires a stoppable handle")
     // Durable first: a parent that shuts down or crashes before the stop lands leaves the cancel on the
@@ -155,14 +216,22 @@ export function createSteeringControls(
     let moved: CancelOutcome | undefined
     port.store.mutate(record.task_id, (fresh) => {
       moved = runMoved(fresh, expected) ? staleCancel(fresh) : undefined
-      return moved !== undefined ? fresh : {
-        ...fresh,
-        cancel_requested: { requested_at: requestedAt, ...(errorMessage !== undefined ? { reason: errorMessage } : {}) },
-      }
+      return moved !== undefined
+        ? fresh
+        : {
+            ...fresh,
+            cancel_requested: {
+              requested_at: requestedAt,
+              ...(errorMessage !== undefined ? { reason: errorMessage } : {}),
+            },
+          }
     })
     if (moved !== undefined) return moved
     port.stopRequested?.(record.task_id)
-    port.store.appendEvent(record.task_id, { type: "cancel_requested", payload: { unreachable: true, ...(reason !== undefined ? { reason } : {}) } })
+    port.store.appendEvent(record.task_id, {
+      type: "cancel_requested",
+      payload: { unreachable: true, ...(reason !== undefined ? { reason } : {}) },
+    })
     // The pending stop is settled on every path, a failed record write included: the outcome tracker
     // waits on that settlement and ends the run as cancelled itself when this write did not land.
     const finish = async (): Promise<void> => {
@@ -176,29 +245,46 @@ export function createSteeringControls(
         })
         if (result.applied) {
           clearPersistedQueue(record.task_id)
-          port.store.appendEvent(record.task_id, { type: "cancelled", payload: { previous_status: "running", ...(reason !== undefined ? { reason } : {}) } })
+          port.store.appendEvent(record.task_id, {
+            type: "cancelled",
+            payload: { previous_status: "running", ...(reason !== undefined ? { reason } : {}) },
+          })
         }
         await port.destruction.destroyResidentTask(record.task_id, "cancel")
       } finally {
         port.stopSettled?.(record.task_id)
       }
     }
-    void stop.call(handle).then(finish, finish).catch((error: unknown) => {
-      log("senpi-task deferred cancel of an unreachable child failed", { taskId: record.task_id, error: String(error) })
-    })
+    void stop
+      .call(handle)
+      .then(finish, finish)
+      .catch((error: unknown) => {
+        log("senpi-task deferred cancel of an unreachable child failed", {
+          taskId: record.task_id,
+          error: String(error),
+        })
+      })
     return cancelPending(record)
   }
 
   function cancelPending(record: TaskRecord, reason: string = CANCEL_PENDING_REASON): CancelOutcome {
-    return { kind: "cancel_pending", task_id: record.task_id, previous_status: "running", reason,
-      ...((record.pending_steering?.length ?? 0) > 0 ? { undelivered_messages: record.pending_steering?.length } : {}) }
+    return {
+      kind: "cancel_pending",
+      task_id: record.task_id,
+      previous_status: "running",
+      reason,
+      ...((record.pending_steering?.length ?? 0) > 0 ? { undelivered_messages: record.pending_steering?.length } : {}),
+    }
   }
 
   function destroyAfterSettlement(handle: ManagedChildHandle, taskId: string): void {
     const destroy = (): Promise<void> => port.destruction.destroyResidentTask(taskId, "cancel_without_abort")
-    void handle.waitForOutcome().then(destroy, destroy).catch((error: unknown) => {
-      log("senpi-task deferred cancel destruction rejected", { taskId, error: String(error) })
-    })
+    void handle
+      .waitForOutcome()
+      .then(destroy, destroy)
+      .catch((error: unknown) => {
+        log("senpi-task deferred cancel destruction rejected", { taskId, error: String(error) })
+      })
   }
 
   return { interruptTask, cancelTask }

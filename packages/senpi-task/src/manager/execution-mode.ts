@@ -108,7 +108,8 @@ export function createExecutionModeGate(
     current: () => resolved,
     ensure,
     warm: () => {
-      if (settled !== undefined || warming !== undefined) return (settled ?? warming ?? Promise.resolve()).then(() => undefined)
+      if (settled !== undefined || warming !== undefined)
+        return (settled ?? warming ?? Promise.resolve()).then(() => undefined)
       const attempt: Promise<ExecutionMode | undefined> = resolve().then(
         (mode) => {
           settled = Promise.resolve(keep(mode))

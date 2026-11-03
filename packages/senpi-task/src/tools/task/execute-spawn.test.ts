@@ -224,12 +224,17 @@ describe("buildTaskExecute spawn", () => {
     const execute = buildTaskExecute(makeDeps(manager))
 
     // when
-    const result = await execute("call-resolved-fg", { prompt: "finish", category: "ultrabrain" }, undefined, undefined, CTX)
+    const result = await execute(
+      "call-resolved-fg",
+      { prompt: "finish", category: "ultrabrain" },
+      undefined,
+      undefined,
+      CTX,
+    )
 
     // then
     expect(result.details.resolved_model).toEqual(resolvedModel)
     expect(result.details.model).toBe("openai/gpt-5.6-sol")
     expect(result.details.run_in_background).toBe(false)
   })
-
 })

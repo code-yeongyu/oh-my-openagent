@@ -5,7 +5,10 @@ import { handleGoalMessage } from "./loop-commands"
 
 function setup(text: string, defaultGoal = false) {
   const goal = {
-    setGoal: mock((_sessionID: string, objective: string) => ({ objective: validateObjective(objective), status: "active" })),
+    setGoal: mock((_sessionID: string, objective: string) => ({
+      objective: validateObjective(objective),
+      status: "active",
+    })),
     getGoal: mock(() => null),
     pauseGoal: mock(() => null),
     resumeGoal: mock(() => null),
@@ -42,7 +45,11 @@ describe("chat goal command boundary", () => {
     expect(goal.setGoal).toHaveBeenCalledWith("session-goal-regression", "first line\nsecond line")
   })
 
-  for (const [command, method] of [["pause", "pauseGoal"], ["resume", "resumeGoal"], ["clear", "clearGoal"]] as const) {
+  for (const [command, method] of [
+    ["pause", "pauseGoal"],
+    ["resume", "resumeGoal"],
+    ["clear", "clearGoal"],
+  ] as const) {
     test(`explicit /goal ${command} remains a command`, () => {
       const { goal, run } = setup(`/goal ${command}`)
       run()

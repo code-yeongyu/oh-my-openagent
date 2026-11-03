@@ -17,8 +17,8 @@ export function createModelDistributor(): ModelDistributor {
     const seen = new Set<string>()
     const unique = models.filter((entry) => {
       const model = typeof entry === "string" ? entry : entry.model
-      const key = splitReasoningSuffix(model, { allowMaxSuffix: true }).base
-        .replace(/\([^()]+\)\s*$/, "")
+      const key = splitReasoningSuffix(model, { allowMaxSuffix: true })
+        .base.replace(/\([^()]+\)\s*$/, "")
         .replace(/\s+[a-z][a-z0-9_-]*$/i, "")
         .trim()
       if (seen.has(key)) return false

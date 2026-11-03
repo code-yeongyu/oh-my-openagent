@@ -7,35 +7,35 @@
 // xterm.js interprets the raw pty byte stream itself - no tmux capture-pane,
 // no hand-rolled ANSI-to-HTML, no color degradation.
 
-import { createRequire } from "node:module";
-import { chmodSync, existsSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { createRequire } from "node:module"
+import { chmodSync, existsSync, readFileSync } from "node:fs"
+import { dirname, join } from "node:path"
 
-const require = createRequire(import.meta.url);
+const require = createRequire(import.meta.url)
 
 function resolveAsset(spec) {
-  const path = require.resolve(spec);
-  return readFileSync(path, "utf8");
+  const path = require.resolve(spec)
+  return readFileSync(path, "utf8")
 }
 
 // node-pty ships a `spawn-helper` on macOS/Linux that MUST be executable.
 // `bun install` (unlike npm) does not run node-pty's chmod postinstall, so the
 // committed harness heals the exec bit itself before the first spawn.
 function healSpawnHelper() {
-  let ptyRoot;
+  let ptyRoot
   try {
-    ptyRoot = dirname(require.resolve("node-pty"));
+    ptyRoot = dirname(require.resolve("node-pty"))
   } catch {
-    return;
+    return
   }
   const candidates = [
     join(ptyRoot, `../prebuilds/${process.platform}-${process.arch}/spawn-helper`),
     join(ptyRoot, "../build/Release/spawn-helper"),
-  ];
+  ]
   for (const helper of candidates) {
     if (existsSync(helper)) {
       try {
-        chmodSync(helper, 0o755);
+        chmodSync(helper, 0o755)
       } catch {
         // best effort - a read-only store still works when the bit is already set
       }
@@ -69,30 +69,44 @@ html,body{margin:0;padding:0;background:#0b0e14}
   window.__resetAndWrite = (d) => { term.reset(); term.write(d); };
   term.focus();
   term.onData((d) => { if (window.__ptyInput) window.__ptyInput(d); });
-</script></body></html>`;
+</script></body></html>`
 }
 
 const NAMED_KEYS = new Set([
-  "Enter", "Tab", "Escape", "Backspace", "Delete", "Space",
-  "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End", "PageUp", "PageDown",
-]);
+  "Enter",
+  "Tab",
+  "Escape",
+  "Backspace",
+  "Delete",
+  "Space",
+  "ArrowUp",
+  "ArrowDown",
+  "ArrowLeft",
+  "ArrowRight",
+  "Home",
+  "End",
+  "PageUp",
+  "PageDown",
+])
 
-export const DEFAULT_WAIT_FOR_TIMEOUT_MS = 10000;
-const WAIT_FOR_POLL_MS = 100;
+export const DEFAULT_WAIT_FOR_TIMEOUT_MS = 10000
+const WAIT_FOR_POLL_MS = 100
 
 // `{WaitFor:<text>}` polls the rendered xterm buffer until it contains <text>,
 // so later tokens are not typed into a TUI that is still starting. A missing
 // marker fails loudly instead of falling through to the next token.
 async function waitForScreenText(page, text, timeoutMs) {
-  if (text === "") throw new Error("{WaitFor:} needs the text to wait for, e.g. {WaitFor:❯}");
-  const deadline = Date.now() + timeoutMs;
+  if (text === "") throw new Error("{WaitFor:} needs the text to wait for, e.g. {WaitFor:❯}")
+  const deadline = Date.now() + timeoutMs
   for (;;) {
-    const screen = await page.evaluate(() => window.__screenText());
-    if (typeof screen === "string" && screen.includes(text)) return;
+    const screen = await page.evaluate(() => window.__screenText())
+    if (typeof screen === "string" && screen.includes(text)) return
     if (Date.now() >= deadline) {
-      throw new Error(`{WaitFor:${text}} timed out after ${timeoutMs} ms: the text never appeared in the terminal buffer`);
+      throw new Error(
+        `{WaitFor:${text}} timed out after ${timeoutMs} ms: the text never appeared in the terminal buffer`,
+      )
     }
-    await new Promise((r) => setTimeout(r, Math.min(WAIT_FOR_POLL_MS, Math.max(0, deadline - Date.now()))));
+    await new Promise((r) => setTimeout(r, Math.min(WAIT_FOR_POLL_MS, Math.max(0, deadline - Date.now()))))
   }
 }
 
@@ -101,119 +115,148 @@ async function waitForScreenText(page, text, timeoutMs) {
 // pty), so the interaction is genuinely driven in the web terminal.
 export async function driveInput(page, inputs, keyDelayMs, { waitForTimeoutMs = DEFAULT_WAIT_FOR_TIMEOUT_MS } = {}) {
   for (const raw of inputs) {
-    const match = /^\{(.+)\}$/.exec(raw);
+    const match = /^\{(.+)\}$/.exec(raw)
     if (match?.[1].startsWith("WaitFor:")) {
-      await waitForScreenText(page, match[1].slice("WaitFor:".length), waitForTimeoutMs);
-      continue;
+      await waitForScreenText(page, match[1].slice("WaitFor:".length), waitForTimeoutMs)
+      continue
     }
-    if (
-      match?.[1] === "CtrlSlashByte" ||
-      match?.[1] === "Ctrl7Byte"
-    ) {
-      await page.evaluate((data) => window.__ptyInput(data), "\u001f");
+    if (match?.[1] === "CtrlSlashByte" || match?.[1] === "Ctrl7Byte") {
+      await page.evaluate((data) => window.__ptyInput(data), "\u001f")
     } else if (match && /^(WheelUp|WheelDown)$/.test(match[1])) {
-      const terminal = await page.$(".xterm-screen");
-      const bounds = await terminal?.boundingBox();
-      if (!bounds) throw new Error("xterm viewport unavailable for wheel input");
-      await page.mouse.move(
-        bounds.x + bounds.width / 2,
-        bounds.y + bounds.height / 2,
-      );
+      const terminal = await page.$(".xterm-screen")
+      const bounds = await terminal?.boundingBox()
+      if (!bounds) throw new Error("xterm viewport unavailable for wheel input")
+      await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)
       await page.mouse.wheel({
         deltaY: match[1] === "WheelDown" ? 720 : -720,
-      });
+      })
     } else if (match && NAMED_KEYS.has(match[1])) {
-      await page.keyboard.press(match[1] === "Space" ? " " : match[1], { delay: 15 });
+      await page.keyboard.press(match[1] === "Space" ? " " : match[1], { delay: 15 })
     } else if (match && /^Ctrl\+(.)$/i.test(match[1])) {
-      const key = /^Ctrl\+(.)$/i.exec(match[1])[1];
-      await page.keyboard.down("Control");
-      await page.keyboard.press(key);
-      await page.keyboard.up("Control");
+      const key = /^Ctrl\+(.)$/i.exec(match[1])[1]
+      await page.keyboard.down("Control")
+      await page.keyboard.press(key)
+      await page.keyboard.up("Control")
     } else {
-      await page.keyboard.type(raw, { delay: 10 });
+      await page.keyboard.type(raw, { delay: 10 })
     }
-    if (keyDelayMs > 0) await new Promise((r) => setTimeout(r, keyDelayMs));
+    if (keyDelayMs > 0) await new Promise((r) => setTimeout(r, keyDelayMs))
   }
 }
 
 function chromeCandidates(explicit) {
-  const c = [explicit, process.env.CHROME_BIN, process.env.GOOGLE_CHROME_BIN];
+  const c = [explicit, process.env.CHROME_BIN, process.env.GOOGLE_CHROME_BIN]
   if (process.platform === "darwin")
-    c.push("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/Applications/Chromium.app/Contents/MacOS/Chromium");
-  if (process.platform === "linux") c.push("/usr/bin/google-chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser");
+    c.push(
+      "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "/Applications/Chromium.app/Contents/MacOS/Chromium",
+    )
+  if (process.platform === "linux") c.push("/usr/bin/google-chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser")
   if (process.platform === "win32") {
-    c.push(join(process.env.PROGRAMFILES || "C:\\Program Files", "Google\\Chrome\\Application\\chrome.exe"));
-    c.push(join(process.env["PROGRAMFILES(X86)"] || "C:\\Program Files (x86)", "Google\\Chrome\\Application\\chrome.exe"));
+    c.push(join(process.env.PROGRAMFILES || "C:\\Program Files", "Google\\Chrome\\Application\\chrome.exe"))
+    c.push(
+      join(process.env["PROGRAMFILES(X86)"] || "C:\\Program Files (x86)", "Google\\Chrome\\Application\\chrome.exe"),
+    )
   }
-  return c.filter((x) => x && (x.includes("/") || x.includes("\\") ? existsSync(x) : true));
+  return c.filter((x) => x && (x.includes("/") || x.includes("\\") ? existsSync(x) : true))
 }
 
-async function captureLive({ command, cwd, cols, rows, inputs, dwellMs, keyDelayMs, waitForTimeoutMs, chromeBin, fromFile, redactStream }) {
-  healSpawnHelper();
-  const puppeteer = (await import("puppeteer-core")).default;
-  const executablePath = chromeCandidates(chromeBin)[0];
-  if (!executablePath) throw new Error("no Chrome/Chromium found; set --chrome-bin or CHROME_BIN");
+async function captureLive({
+  command,
+  cwd,
+  cols,
+  rows,
+  inputs,
+  dwellMs,
+  keyDelayMs,
+  waitForTimeoutMs,
+  chromeBin,
+  fromFile,
+  redactStream,
+}) {
+  healSpawnHelper()
+  const puppeteer = (await import("puppeteer-core")).default
+  const executablePath = chromeCandidates(chromeBin)[0]
+  if (!executablePath) throw new Error("no Chrome/Chromium found; set --chrome-bin or CHROME_BIN")
 
   const html = buildPageHtml({
     xtermJs: resolveAsset("@xterm/xterm/lib/xterm.js"),
     xtermCss: resolveAsset("@xterm/xterm/css/xterm.css"),
     unicodeJs: resolveAsset("@xterm/addon-unicode11/lib/addon-unicode11.js"),
-    cols, rows, fontSize: 15,
-  });
+    cols,
+    rows,
+    fontSize: 15,
+  })
 
   const browser = await puppeteer.launch({
-    executablePath, headless: "new",
+    executablePath,
+    headless: "new",
     args: ["--no-sandbox", "--disable-gpu", "--hide-scrollbars", "--force-color-profile=srgb"],
     defaultViewport: { width: cols * 10 + 40, height: rows * 20 + 40, deviceScaleFactor: 2 },
-  });
+  })
 
-  let rawStream = "";
-  let ptyProc;
-  const cleanupParts = [];
+  let rawStream = ""
+  let ptyProc
+  const cleanupParts = []
   try {
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "load" });
-    await page.evaluate(() => document.fonts && document.fonts.ready);
+    const page = await browser.newPage()
+    await page.setContent(html, { waitUntil: "load" })
+    await page.evaluate(() => document.fonts && document.fonts.ready)
 
     if (fromFile) {
-      rawStream = fromFile;
-      const shown = redactStream ? redactStream(rawStream) : rawStream;
-      await page.evaluate((d) => window.__writeToTerm(d), shown);
-      cleanupParts.push("no pty (replay)");
+      rawStream = fromFile
+      const shown = redactStream ? redactStream(rawStream) : rawStream
+      await page.evaluate((d) => window.__writeToTerm(d), shown)
+      cleanupParts.push("no pty (replay)")
     } else {
-      const pty = require("node-pty");
+      const pty = require("node-pty")
       ptyProc = pty.spawn(process.env.SHELL || "bash", ["-lc", command], {
-        name: "xterm-256color", cols, rows, cwd: cwd || process.cwd(),
+        name: "xterm-256color",
+        cols,
+        rows,
+        cwd: cwd || process.cwd(),
         env: { ...process.env, TERM: "xterm-256color", COLORTERM: "truecolor" },
-      });
-      await page.exposeFunction("__ptyInput", (d) => { try { ptyProc.write(d); } catch {} });
+      })
+      await page.exposeFunction("__ptyInput", (d) => {
+        try {
+          ptyProc.write(d)
+        } catch {}
+      })
       ptyProc.onData((d) => {
-        rawStream += d;
-        page.evaluate((chunk) => window.__writeToTerm(chunk), d).catch(() => {});
-      });
-      await new Promise((r) => setTimeout(r, 400));
-      await page.focus("#t");
-      if (inputs.length) await driveInput(page, inputs, keyDelayMs, { waitForTimeoutMs });
-      await new Promise((r) => setTimeout(r, dwellMs));
-      cleanupParts.push(`pty pid ${ptyProc.pid} killed`);
+        rawStream += d
+        page.evaluate((chunk) => window.__writeToTerm(chunk), d).catch(() => {})
+      })
+      await new Promise((r) => setTimeout(r, 400))
+      await page.focus("#t")
+      if (inputs.length) await driveInput(page, inputs, keyDelayMs, { waitForTimeoutMs })
+      await new Promise((r) => setTimeout(r, dwellMs))
+      cleanupParts.push(`pty pid ${ptyProc.pid} killed`)
     }
 
     // When redactions are configured, re-render the masked stream so the PNG
     // never shows a secret that the interaction surfaced on screen.
     if (redactStream && !fromFile) {
-      const masked = redactStream(rawStream);
-      if (masked !== rawStream) await page.evaluate((d) => window.__resetAndWrite(d), masked);
+      const masked = redactStream(rawStream)
+      if (masked !== rawStream) await page.evaluate((d) => window.__resetAndWrite(d), masked)
     }
-    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
 
-    const screenText = await page.evaluate(() => window.__screenText());
-    const el = (await page.$(".xterm")) || page;
-    const pngBuffer = await el.screenshot({ type: "png" });
-    return { pngBuffer, screenText, rawStream, connector: fromFile ? "xterm-replay" : "xterm-node-pty", cleanup: cleanupParts.join("; ") };
+    const screenText = await page.evaluate(() => window.__screenText())
+    const el = (await page.$(".xterm")) || page
+    const pngBuffer = await el.screenshot({ type: "png" })
+    return {
+      pngBuffer,
+      screenText,
+      rawStream,
+      connector: fromFile ? "xterm-replay" : "xterm-node-pty",
+      cleanup: cleanupParts.join("; "),
+    }
   } finally {
-    try { ptyProc && ptyProc.kill(); } catch {}
-    await browser.close();
+    try {
+      ptyProc && ptyProc.kill()
+    } catch {}
+    await browser.close()
   }
 }
 
-export { captureLive };
+export { captureLive }

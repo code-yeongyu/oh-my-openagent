@@ -31,7 +31,9 @@ function fakeManager(records: readonly TaskRecord[]): CommandManager & { cancell
     cancelled,
     list: (scope) => {
       if (scope.scope === "all") return listed(records)
-      return listed(records.filter((rec) => rec.parent_session_id === scope.session_id || rec.root_session_id === scope.session_id))
+      return listed(
+        records.filter((rec) => rec.parent_session_id === scope.session_id || rec.root_session_id === scope.session_id),
+      )
     },
     cancelTask: (idOrName) => {
       cancelled.push(idOrName)
@@ -101,7 +103,12 @@ describe("registerTaskCommands", () => {
   it("#given tasks in two sessions #when /tasks runs #then only the current session's rows print", async () => {
     // given
     const mine = record({ task_id: "st_mine", status: "running" })
-    const other = record({ task_id: "st_other", status: "running", parent_session_id: "session-b", root_session_id: "session-b" })
+    const other = record({
+      task_id: "st_other",
+      status: "running",
+      parent_session_id: "session-b",
+      root_session_id: "session-b",
+    })
     const pi = new FakeExtensionAPI()
     registerTaskCommands(pi, fakeManager([mine, other]))
     const { ctx, ui } = commandCtx("session-a", "tui")
@@ -118,7 +125,12 @@ describe("registerTaskCommands", () => {
   it("#given tasks in two sessions #when /tasks --all runs #then every session's rows print", async () => {
     // given
     const mine = record({ task_id: "st_mine", status: "running" })
-    const other = record({ task_id: "st_other", status: "running", parent_session_id: "session-b", root_session_id: "session-b" })
+    const other = record({
+      task_id: "st_other",
+      status: "running",
+      parent_session_id: "session-b",
+      root_session_id: "session-b",
+    })
     const pi = new FakeExtensionAPI()
     registerTaskCommands(pi, fakeManager([mine, other]))
     const { ctx, ui } = commandCtx("session-a", "tui")
@@ -134,8 +146,18 @@ describe("registerTaskCommands", () => {
 
   it("#given tasks only in other sessions #when /tasks runs #then the empty answer names /tasks --all and the count elsewhere", async () => {
     // given
-    const otherB = record({ task_id: "st_b", status: "running", parent_session_id: "session-b", root_session_id: "session-b" })
-    const otherC = record({ task_id: "st_c", status: "completed", parent_session_id: "session-c", root_session_id: "session-c" })
+    const otherB = record({
+      task_id: "st_b",
+      status: "running",
+      parent_session_id: "session-b",
+      root_session_id: "session-b",
+    })
+    const otherC = record({
+      task_id: "st_c",
+      status: "completed",
+      parent_session_id: "session-c",
+      root_session_id: "session-c",
+    })
     const pi = new FakeExtensionAPI()
     registerTaskCommands(pi, fakeManager([otherB, otherC]))
     const { ctx, ui } = commandCtx("session-a", "tui")
@@ -144,7 +166,9 @@ describe("registerTaskCommands", () => {
     await invoke(pi, "tasks", "", ctx)
 
     // then
-    expect(ui.notifications).toEqual(["No tasks in this session. /tasks --all lists every session's tasks (2 in other sessions)."])
+    expect(ui.notifications).toEqual([
+      "No tasks in this session. /tasks --all lists every session's tasks (2 in other sessions).",
+    ])
   })
 
   it("#given no tasks anywhere #when /tasks runs #then the empty answer still names /tasks --all without a count", async () => {
@@ -194,7 +218,12 @@ describe("registerTaskCommands", () => {
 
   it("#given a task with a description #when /task-kill lists options #then the human label leads and the id trails", async () => {
     // given
-    const running = record({ task_id: "st_kill", name: "task-1", description: "Audit the waiting line", status: "running" })
+    const running = record({
+      task_id: "st_kill",
+      name: "task-1",
+      description: "Audit the waiting line",
+      status: "running",
+    })
     const manager = fakeManager([running])
     const pi = new FakeExtensionAPI()
     registerTaskCommands(pi, manager)
@@ -209,7 +238,12 @@ describe("registerTaskCommands", () => {
 
   it("#given a multi-word description #when /task-kill selects and confirms #then cancelTask runs for the task id, not a word of the label", async () => {
     // given
-    const running = record({ task_id: "st_kill", name: "task-1", description: "Audit the waiting line", status: "running" })
+    const running = record({
+      task_id: "st_kill",
+      name: "task-1",
+      description: "Audit the waiting line",
+      status: "running",
+    })
     const manager = fakeManager([running])
     const pi = new FakeExtensionAPI()
     registerTaskCommands(pi, manager)

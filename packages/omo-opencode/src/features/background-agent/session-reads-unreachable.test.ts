@@ -50,4 +50,3 @@ describe("session reads against an unreachable server", () => {
     expect(lookup.type).toBe("unavailable")
   })
 })
-

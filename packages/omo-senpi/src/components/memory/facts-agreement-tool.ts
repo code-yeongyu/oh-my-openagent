@@ -8,23 +8,32 @@ export const FACTS_AGREEMENT_TOOL_NAME = "record_agreement"
 const AGREEMENT_RECORD_LIMIT = 32
 const AGREEMENT_RECORD_BYTES = 16 * 1024
 
-const FactsAgreementParams = Type.Object({
-  action: Type.Union([Type.Literal("new"), Type.Literal("reaffirm")]),
-  id: Type.Optional(Type.String()),
-  applies: Type.Optional(Type.Union([Type.Literal("global"), Type.Literal("project")])),
-  text: Type.Optional(Type.String()),
-  date: Type.String(),
-  source: Type.Object({
-    sessionId: Type.String({ description: "sessionId of the payload entry containing the user's correction." }),
-    messageId: Type.String({ description: "source_message_id of that user message, from entries, never lead context." }),
-  }, { additionalProperties: false }),
-}, { additionalProperties: false })
+const FactsAgreementParams = Type.Object(
+  {
+    action: Type.Union([Type.Literal("new"), Type.Literal("reaffirm")]),
+    id: Type.Optional(Type.String()),
+    applies: Type.Optional(Type.Union([Type.Literal("global"), Type.Literal("project")])),
+    text: Type.Optional(Type.String()),
+    date: Type.String(),
+    source: Type.Object(
+      {
+        sessionId: Type.String({ description: "sessionId of the payload entry containing the user's correction." }),
+        messageId: Type.String({
+          description: "source_message_id of that user message, from entries, never lead context.",
+        }),
+      },
+      { additionalProperties: false },
+    ),
+  },
+  { additionalProperties: false },
+)
 
 type FactsAgreementParams = Static<typeof FactsAgreementParams>
 
 export const factsAgreementContract = {
   name: FACTS_AGREEMENT_TOOL_NAME,
-  description: "Record that the person stated a new standing agreement, or repeated a correction an existing agreement already covers.",
+  description:
+    "Record that the person stated a new standing agreement, or repeated a correction an existing agreement already covers.",
   parameters: FactsAgreementParams,
 }
 
@@ -52,19 +61,26 @@ export function createFactsAgreementTool(input: FactsAgreementToolInput): FactsA
   return {
     ...factsAgreementContract,
     label: "Record agreement",
-    deactivate: () => { active = false },
+    deactivate: () => {
+      active = false
+    },
     execute: async (_toolCallId, params) => {
-      if (!active || input.state?.cancelled === true) return result("Agreement rejected: the facts run is no longer active", true)
-      if (count >= AGREEMENT_RECORD_LIMIT) return reject(`the agreement limit (${AGREEMENT_RECORD_LIMIT}) has been reached`)
+      if (!active || input.state?.cancelled === true)
+        return result("Agreement rejected: the facts run is no longer active", true)
+      if (count >= AGREEMENT_RECORD_LIMIT)
+        return reject(`the agreement limit (${AGREEMENT_RECORD_LIMIT}) has been reached`)
       try {
         const record = parseAgreementRecord(params, count)
         validateAgreementSource(record, { ...input.payload, agreementEventVersion: 1 })
         if (record.action === "reaffirm" && !input.knownIds.has(record.id)) {
-          return reject(`no agreement has id ${record.id}; use one of the ids in the payload's agreements, or action "new"`)
+          return reject(
+            `no agreement has id ${record.id}; use one of the ids in the payload's agreements, or action "new"`,
+          )
         }
         const line = `${JSON.stringify(record)}\n`
         const lineBytes = Buffer.byteLength(line, "utf8")
-        if (bytes + lineBytes > AGREEMENT_RECORD_BYTES) return reject(`the agreement byte limit (${AGREEMENT_RECORD_BYTES}) has been reached`)
+        if (bytes + lineBytes > AGREEMENT_RECORD_BYTES)
+          return reject(`the agreement byte limit (${AGREEMENT_RECORD_BYTES}) has been reached`)
         count += 1
         bytes += lineBytes
         const recordNumber = count

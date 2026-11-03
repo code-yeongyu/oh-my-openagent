@@ -3,7 +3,11 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { EventTelemetryProperties, TelemetryDiagnosticInput } from "@oh-my-opencode/telemetry-core"
 
-import { createSessionSummaryRecorder, type SessionSummaryOptions, type SessionSummaryRecorder } from "./omo-native-session-summary"
+import {
+  createSessionSummaryRecorder,
+  type SessionSummaryOptions,
+  type SessionSummaryRecorder,
+} from "./omo-native-session-summary"
 import { createSummaryStorage, type ConsentScope, type SummaryStorage } from "./session-summary-storage"
 import type { SummaryTurn } from "./session-summary-window"
 
@@ -25,9 +29,21 @@ export function createTempStateDirs(): { readonly make: () => string; readonly c
 
 export function summaryTurn(overrides: Partial<SummaryTurn> = {}): SummaryTurn {
   return {
-    turnIndex: 0, provider: "openai", modelId: "gpt-5.5", inputTokens: 10, outputTokens: 20, cacheReadTokens: 3,
-    cacheWriteTokens: 4, reasoningTokens: 5, totalTokens: 40, cost1e4: 100, usageValid: true, stopReason: "stop",
-    toolResultCount: 2, toolErrorCount: 0, ...overrides,
+    turnIndex: 0,
+    provider: "openai",
+    modelId: "gpt-5.5",
+    inputTokens: 10,
+    outputTokens: 20,
+    cacheReadTokens: 3,
+    cacheWriteTokens: 4,
+    reasoningTokens: 5,
+    totalTokens: 40,
+    cost1e4: 100,
+    usageValid: true,
+    stopReason: "stop",
+    toolResultCount: 2,
+    toolErrorCount: 0,
+    ...overrides,
   }
 }
 
@@ -75,7 +91,10 @@ export function createTestRecorder(input: TestRecorderInput): TestRecorder {
   const storage = createSummaryStorage({
     stateDir: input.dir,
     owner: { pid, bootId: input.bootId ?? `boot-${pid}` },
-    isPidAlive: input.isPidAlive ?? ((candidate) => candidate === pid || (input.otherPidsAlive ?? false) || (input.alivePids ?? []).includes(candidate)),
+    isPidAlive:
+      input.isPidAlive ??
+      ((candidate) =>
+        candidate === pid || (input.otherPidsAlive ?? false) || (input.alivePids ?? []).includes(candidate)),
     processStartTime: input.startTimes ?? (() => "test-process-start"),
     now,
   })

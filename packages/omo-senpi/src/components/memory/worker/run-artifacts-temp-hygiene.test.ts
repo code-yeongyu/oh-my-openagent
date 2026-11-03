@@ -48,56 +48,92 @@ describe("run artifact temporary hygiene", () => {
     const root = await workspace()
     await mkdir(join(root, "run-1.json"))
 
-    await expect(writeCompletionRecord(root, {
-      schemaVersion: 1, runId: "run-1", identity: "agent-test", category: "quick",
-      conversationIds: [], trigger: "manual", outcome: "failed",
-      startedAt: OLD.toISOString(), finishedAt: new Date(NOW).toISOString(),
-      delivery: { status: "pending" },
-    })).rejects.toThrow()
+    await expect(
+      writeCompletionRecord(root, {
+        schemaVersion: 1,
+        runId: "run-1",
+        identity: "agent-test",
+        category: "quick",
+        conversationIds: [],
+        trigger: "manual",
+        outcome: "failed",
+        startedAt: OLD.toISOString(),
+        finishedAt: new Date(NOW).toISOString(),
+        delivery: { status: "pending" },
+      }),
+    ).rejects.toThrow()
 
     expect(await readdir(root)).toEqual(["run-1.json"])
   })
 
-  test.each(["alive", "unknown"] as const)("#given stranded temporaries and an %s owner in terminal run and completion directories #when startup reconciles #then only abandoned old siblings are removed", async (liveness) => {
-    const root = await workspace()
-    const identity: MemoryIdentity = { id: "agent-test", safeSlug: "agent-test", paths: buildIdentityPaths(root, "agent-test") }
-    const runDir = join(identity.paths.reflection, "runs", "run-1")
-    const completionsDir = join(identity.paths.reflection, "completions")
-    for (const dir of [runDir, completionsDir]) {
-      await mkdir(dir, { recursive: true })
-      await writeFile(join(dir, "final.json"), "{}")
-      await writeFile(join(dir, `final.json.tmp-${UUID}`), "partial")
-      await utimes(join(dir, `final.json.tmp-${UUID}`), OLD, OLD)
-      await writeFile(join(dir, `fresh.json.tmp-${UUID}`), "writing")
-      await utimes(join(dir, `fresh.json.tmp-${UUID}`), new Date(NOW), new Date(NOW))
-      await writeFile(join(dir, `ledger.json.tmp-${process.pid}-${UUID}`), "writing")
-      await utimes(join(dir, `ledger.json.tmp-${process.pid}-${UUID}`), OLD, OLD)
-      await mkdir(join(dir, "directory.tmp-keep"))
-    }
+  test.each(["alive", "unknown"] as const)(
+    "#given stranded temporaries and an %s owner in terminal run and completion directories #when startup reconciles #then only abandoned old siblings are removed",
+    async (liveness) => {
+      const root = await workspace()
+      const identity: MemoryIdentity = {
+        id: "agent-test",
+        safeSlug: "agent-test",
+        paths: buildIdentityPaths(root, "agent-test"),
+      }
+      const runDir = join(identity.paths.reflection, "runs", "run-1")
+      const completionsDir = join(identity.paths.reflection, "completions")
+      for (const dir of [runDir, completionsDir]) {
+        await mkdir(dir, { recursive: true })
+        await writeFile(join(dir, "final.json"), "{}")
+        await writeFile(join(dir, `final.json.tmp-${UUID}`), "partial")
+        await utimes(join(dir, `final.json.tmp-${UUID}`), OLD, OLD)
+        await writeFile(join(dir, `fresh.json.tmp-${UUID}`), "writing")
+        await utimes(join(dir, `fresh.json.tmp-${UUID}`), new Date(NOW), new Date(NOW))
+        await writeFile(join(dir, `ledger.json.tmp-${process.pid}-${UUID}`), "writing")
+        await utimes(join(dir, `ledger.json.tmp-${process.pid}-${UUID}`), OLD, OLD)
+        await mkdir(join(dir, "directory.tmp-keep"))
+      }
 
-    await reconcileReflectionRuns({
-      identity,
-      reservation: { readState: async () => ({}), complete: async () => { throw new Error("unexpected completion") } },
-      now: () => NOW,
-      getPidLiveness: () => liveness,
-    })
+      await reconcileReflectionRuns({
+        identity,
+        reservation: {
+          readState: async () => ({}),
+          complete: async () => {
+            throw new Error("unexpected completion")
+          },
+        },
+        now: () => NOW,
+        getPidLiveness: () => liveness,
+      })
 
-    for (const dir of [runDir, completionsDir]) {
-      expect((await readdir(dir)).sort()).toEqual([
-        "directory.tmp-keep", "final.json", `fresh.json.tmp-${UUID}`, `ledger.json.tmp-${process.pid}-${UUID}`,
-      ].sort())
-    }
-  })
+      for (const dir of [runDir, completionsDir]) {
+        expect((await readdir(dir)).sort()).toEqual(
+          [
+            "directory.tmp-keep",
+            "final.json",
+            `fresh.json.tmp-${UUID}`,
+            `ledger.json.tmp-${process.pid}-${UUID}`,
+          ].sort(),
+        )
+      }
+    },
+  )
 
   test("#given an old durable completion with a temporary-like run id #when startup sweeps both temporary grammars #then the durable record survives", async () => {
     const root = await workspace()
-    const identity: MemoryIdentity = { id: "agent-test", safeSlug: "agent-test", paths: buildIdentityPaths(root, "agent-test") }
+    const identity: MemoryIdentity = {
+      id: "agent-test",
+      safeSlug: "agent-test",
+      paths: buildIdentityPaths(root, "agent-test"),
+    }
     const directory = join(identity.paths.reflection, "completions")
     const durablePath = join(directory, "run.json.tmp-archive.json")
     await writeCompletionRecord(directory, {
-      schemaVersion: 1, runId: "run.json.tmp-archive", identity: identity.id, category: "quick",
-      conversationIds: [], trigger: "manual", outcome: "failed",
-      startedAt: OLD.toISOString(), finishedAt: OLD.toISOString(), delivery: { status: "pending" },
+      schemaVersion: 1,
+      runId: "run.json.tmp-archive",
+      identity: identity.id,
+      category: "quick",
+      conversationIds: [],
+      trigger: "manual",
+      outcome: "failed",
+      startedAt: OLD.toISOString(),
+      finishedAt: OLD.toISOString(),
+      delivery: { status: "pending" },
     })
     await utimes(durablePath, OLD, OLD)
     const before = await readFile(durablePath, "utf8")
@@ -115,9 +151,17 @@ describe("run artifact temporary hygiene", () => {
 
     await reconcileReflectionRuns({
       identity,
-      reservation: { readState: async () => ({}), complete: async () => { throw new Error("unexpected completion") } },
+      reservation: {
+        readState: async () => ({}),
+        complete: async () => {
+          throw new Error("unexpected completion")
+        },
+      },
       now: () => NOW,
-      getPidLiveness: (pid) => { checkedPids.push(pid); return "dead" },
+      getPidLiveness: (pid) => {
+        checkedPids.push(pid)
+        return "dead"
+      },
     })
 
     expect(await readdir(directory)).toEqual(["run.json.tmp-archive.json"])
@@ -127,12 +171,23 @@ describe("run artifact temporary hygiene", () => {
 
   test("#given no reflection directories #when startup reconciles #then maintenance remains a no-op", async () => {
     const root = await workspace()
-    const identity: MemoryIdentity = { id: "agent-test", safeSlug: "agent-test", paths: buildIdentityPaths(root, "agent-test") }
+    const identity: MemoryIdentity = {
+      id: "agent-test",
+      safeSlug: "agent-test",
+      paths: buildIdentityPaths(root, "agent-test"),
+    }
 
-    expect(await reconcileReflectionRuns({
-      identity,
-      reservation: { readState: async () => ({}), complete: async () => { throw new Error("unexpected completion") } },
-      now: () => NOW,
-    })).toEqual([])
+    expect(
+      await reconcileReflectionRuns({
+        identity,
+        reservation: {
+          readState: async () => ({}),
+          complete: async () => {
+            throw new Error("unexpected completion")
+          },
+        },
+        now: () => NOW,
+      }),
+    ).toEqual([])
   })
 })

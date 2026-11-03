@@ -35,14 +35,8 @@ export async function runRecordedSocketMigration(current, artifacts) {
   const nextPrompt = "post-migration new child"
   const release = join(current.root, `migration-${process.pid}.release`)
   const scenario = await createRetainScenario(current, "migration-recorded-socket", {
-    parentSteps: [
-      taskStep("migrated", oldPrompt),
-      textStep("migration initial parent done"),
-    ],
-    childSteps: [
-      heldText("pre-migration child complete", release),
-      textStep("post-migration child complete"),
-    ],
+    parentSteps: [taskStep("migrated", oldPrompt), textStep("migration initial parent done")],
+    childSteps: [heldText("pre-migration child complete", release), textStep("post-migration child complete")],
   })
   const { sandbox, project } = scenario
   let parent
@@ -62,7 +56,8 @@ export async function runRecordedSocketMigration(current, artifacts) {
     parent = undefined
     writeFileSync(release, "go\n")
     const settledInHost = await observeState(sandbox.root, () =>
-      transcriptSettled(sandbox, running.task_id, /pre-migration child complete/) ? true : undefined)
+      transcriptSettled(sandbox, running.task_id, /pre-migration child complete/) ? true : undefined,
+    )
     if (settledInHost !== true) throw new Error("migration child did not finish its turn inside the host")
     const retainedRecord = taskRecords(project).find((entry) => entry.task_id === running.task_id)
     if (terminal(retainedRecord)) throw new Error("migration fixture is vacuous: the record settled without a parent")
@@ -70,10 +65,14 @@ export async function runRecordedSocketMigration(current, artifacts) {
 
     const legacy = join(sandbox.agentDir, "rpc", "rpc.sock")
     const ensured = runBin(sandbox, [
-      "host", "ensure",
-      "--socket", legacy,
-      "--launch-spec", current.specPath,
-      "--policy", "never",
+      "host",
+      "ensure",
+      "--socket",
+      legacy,
+      "--launch-spec",
+      current.specPath,
+      "--policy",
+      "never",
       "--json",
     ])
     if (ensured.status !== 0) {
@@ -115,8 +114,7 @@ export async function runRecordedSocketMigration(current, artifacts) {
     if (records === undefined) {
       throw new Error("recorded socket did not win or next child did not shard")
     }
-    const legacyRows = statusAll(sandbox).endpoints
-      .find((entry) => entry.socket === legacy)?.session_rows ?? []
+    const legacyRows = statusAll(sandbox).endpoints.find((entry) => entry.socket === legacy)?.session_rows ?? []
     const turns = childTurnFacts(sandbox, running.task_id, oldPrompt)
     const facts = {
       legacy,
@@ -125,14 +123,16 @@ export async function runRecordedSocketMigration(current, artifacts) {
       old_status_before_resume: retainedRecord?.status ?? null,
       old_status_after_resume: records.old.status,
       next_task_socket: records.next.host_session.socket,
-      legacy_lists_old_session: legacyRows.some((row) =>
-        row.sessionPath === childSession || row.session_path === childSession),
+      legacy_lists_old_session: legacyRows.some(
+        (row) => row.sessionPath === childSession || row.session_path === childSession,
+      ),
       old_child_http_requests: requestCount(scenario.childLog) - 1,
       old_continuation_count: lifecycleContinuations(sandbox, running.task_id),
       endpoints: endpointSockets(sandbox),
       ...turns,
     }
-    const ok = facts.old_task_socket === legacy &&
+    const ok =
+      facts.old_task_socket === legacy &&
       /\/p-[0-9a-f]{16}\.sock$/.test(facts.next_task_socket) &&
       facts.legacy_lists_old_session &&
       facts.prompt_count === 1 &&
@@ -147,10 +147,6 @@ export async function runRecordedSocketMigration(current, artifacts) {
   } finally {
     legacyClient?.close()
     writeFileSync(release, "go\n")
-    await cleanupScenario(
-      scenario,
-      [parent, resumed],
-      join(artifacts, "migration-recorded-socket-wins-cleanup.json"),
-    )
+    await cleanupScenario(scenario, [parent, resumed], join(artifacts, "migration-recorded-socket-wins-cleanup.json"))
   }
 }

@@ -44,7 +44,12 @@ export function createSessionHistoryScanner(options: SessionHistoryOptions): Ses
       })),
       ...omo.projects,
     ]
-    const candidates = await buildProjectCandidates({ fs, rules, raw, importedProjects: options.importedProjects ?? [] })
+    const candidates = await buildProjectCandidates({
+      fs,
+      rules,
+      raw,
+      importedProjects: options.importedProjects ?? [],
+    })
     const truncated = omo.truncated || perSource.some((result) => result.truncated)
     return {
       candidates,

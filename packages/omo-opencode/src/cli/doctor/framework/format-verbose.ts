@@ -13,14 +13,28 @@ export function formatVerbose(result: DoctorResult): string {
   if (result.target === "codex" && result.codex) {
     lines.push(`${color.bold("Codex Information")}`)
     lines.push(`${color.dim("\u2500".repeat(40))}`)
-    lines.push(`  ${formatStatusSymbol(result.codex.codexPath || result.codex.codexAppId ? "pass" : "fail")} codex      ${result.codex.codexPath ?? result.codex.codexAppId ?? "not detected"}`)
+    lines.push(
+      `  ${formatStatusSymbol(result.codex.codexPath || result.codex.codexAppId ? "pass" : "fail")} codex      ${result.codex.codexPath ?? result.codex.codexAppId ?? "not detected"}`,
+    )
     lines.push(`  ${formatStatusSymbol("pass")} cli        oh-my-openagent@${result.codex.installerVersion}`)
-    lines.push(`  ${formatStatusSymbol(result.codex.config.marketplaceConfigured ? "pass" : "fail")} marketplace ${result.codex.marketplaceName}`)
-    lines.push(`  ${formatStatusSymbol(result.codex.pluginRoot ? (result.codex.pluginVersionStamped ? "pass" : "warn") : "fail")} plugin     ${result.codex.pluginName}@${result.codex.pluginVersion ?? "unknown"}${result.codex.pluginVersionStamped ? "" : " (placeholder)"}`)
-    lines.push(`  ${formatStatusSymbol(result.codex.packageVersion ? "pass" : "warn")} package    ${result.codex.packageName ?? "unknown"}@${result.codex.packageVersion ?? "unknown"}`)
-    lines.push(`  ${formatStatusSymbol(result.codex.config.pluginEnabled ? "pass" : "fail")} config     ${result.codex.configPath}`)
-    lines.push(`  ${formatStatusSymbol(result.codex.linkedBins.length > 0 ? "pass" : "warn")} bins       ${result.codex.linkedBins.length > 0 ? result.codex.linkedBins.join(", ") : "none"}`)
-    lines.push(`  ${formatStatusSymbol(result.codex.agents.length > 0 ? "pass" : "warn")} agents     ${result.codex.agents.length > 0 ? result.codex.agents.join(", ") : "none"}`)
+    lines.push(
+      `  ${formatStatusSymbol(result.codex.config.marketplaceConfigured ? "pass" : "fail")} marketplace ${result.codex.marketplaceName}`,
+    )
+    lines.push(
+      `  ${formatStatusSymbol(result.codex.pluginRoot ? (result.codex.pluginVersionStamped ? "pass" : "warn") : "fail")} plugin     ${result.codex.pluginName}@${result.codex.pluginVersion ?? "unknown"}${result.codex.pluginVersionStamped ? "" : " (placeholder)"}`,
+    )
+    lines.push(
+      `  ${formatStatusSymbol(result.codex.packageVersion ? "pass" : "warn")} package    ${result.codex.packageName ?? "unknown"}@${result.codex.packageVersion ?? "unknown"}`,
+    )
+    lines.push(
+      `  ${formatStatusSymbol(result.codex.config.pluginEnabled ? "pass" : "fail")} config     ${result.codex.configPath}`,
+    )
+    lines.push(
+      `  ${formatStatusSymbol(result.codex.linkedBins.length > 0 ? "pass" : "warn")} bins       ${result.codex.linkedBins.length > 0 ? result.codex.linkedBins.join(", ") : "none"}`,
+    )
+    lines.push(
+      `  ${formatStatusSymbol(result.codex.agents.length > 0 ? "pass" : "warn")} agents     ${result.codex.agents.length > 0 ? result.codex.agents.join(", ") : "none"}`,
+    )
     lines.push("")
 
     for (const check of results) {
@@ -69,7 +83,9 @@ export function formatVerbose(result: DoctorResult): string {
   lines.push(`${color.bold("Configuration")}`)
   lines.push(`${color.dim("\u2500".repeat(40))}`)
   const configStatus = systemInfo.configValid ? color.green("valid") : color.red("invalid")
-  lines.push(`  ${formatStatusSymbol(systemInfo.configValid ? "pass" : "fail")} ${systemInfo.configPath ?? "unknown"} (${configStatus})`)
+  lines.push(
+    `  ${formatStatusSymbol(systemInfo.configValid ? "pass" : "fail")} ${systemInfo.configPath ?? "unknown"} (${configStatus})`,
+  )
   lines.push("")
 
   lines.push(`${color.bold("Tools")}`)
@@ -83,9 +99,15 @@ export function formatVerbose(result: DoctorResult): string {
       lines.push(`${" ".repeat(20)}${server.id} (${server.extensions.join(", ")})`)
     }
   }
-  lines.push(`  ${formatStatusSymbol(tools.astGrepCli ? "pass" : "fail")} ast-grep CLI ${tools.astGrepCli ? "installed" : "not found"}`)
-  lines.push(`  ${formatStatusSymbol(tools.commentChecker ? "pass" : "fail")} comment-checker ${tools.commentChecker ? "installed" : "not found"}`)
-  lines.push(`  ${formatStatusSymbol(tools.ghCli.installed && tools.ghCli.authenticated ? "pass" : "fail")} gh CLI ${tools.ghCli.installed ? "installed" : "not found"}${tools.ghCli.authenticated && tools.ghCli.username ? ` (${tools.ghCli.username})` : ""}`)
+  lines.push(
+    `  ${formatStatusSymbol(tools.astGrepCli ? "pass" : "fail")} ast-grep CLI ${tools.astGrepCli ? "installed" : "not found"}`,
+  )
+  lines.push(
+    `  ${formatStatusSymbol(tools.commentChecker ? "pass" : "fail")} comment-checker ${tools.commentChecker ? "installed" : "not found"}`,
+  )
+  lines.push(
+    `  ${formatStatusSymbol(tools.ghCli.installed && tools.ghCli.authenticated ? "pass" : "fail")} gh CLI ${tools.ghCli.installed ? "installed" : "not found"}${tools.ghCli.authenticated && tools.ghCli.username ? ` (${tools.ghCli.username})` : ""}`,
+  )
   lines.push("")
 
   lines.push(`${color.bold("MCPs")}`)

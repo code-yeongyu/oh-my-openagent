@@ -106,7 +106,7 @@ describe("applyMcpConfig collision handling", () => {
     const mergedMcp = config.mcp as Record<string, Record<string, unknown>>
     expect(mergedMcp.sharedServer.url).toBe("https://user.example.com")
     expect(logSpy).toHaveBeenCalledWith(
-      'warning: MCP server "sharedServer" from user config overrides Claude Code .mcp.json'
+      'warning: MCP server "sharedServer" from user config overrides Claude Code .mcp.json',
     )
   })
 
@@ -135,7 +135,7 @@ describe("applyMcpConfig collision handling", () => {
     expect(mergedMcp.sharedServer.enabled).toBe(false)
     expect(mergedMcp.sharedServer.url).toBe("https://user.example.com")
     expect(logSpy).toHaveBeenCalledWith(
-      'warning: MCP server "sharedServer" from user config overrides Claude Code .mcp.json'
+      'warning: MCP server "sharedServer" from user config overrides Claude Code .mcp.json',
     )
   })
 })

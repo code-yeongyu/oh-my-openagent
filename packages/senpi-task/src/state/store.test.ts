@@ -36,7 +36,9 @@ describe("resolveStateDir", () => {
     const stateDir = resolveStateDir({ project_dir: project })
 
     // then
-    expect(stateDir).toBe(join(process.env.HOME ?? "", ".omo", "agent", "projects", projectStateKey(project), "senpi-task"))
+    expect(stateDir).toBe(
+      join(process.env.HOME ?? "", ".omo", "agent", "projects", projectStateKey(project), "senpi-task"),
+    )
   })
 
   test("#given task state override #when resolved #then override directory wins", () => {

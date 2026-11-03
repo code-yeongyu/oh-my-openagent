@@ -41,7 +41,7 @@ export async function formatFullSession(
     includeToolResults: boolean
     thinkingMaxChars?: number
     fromEnd?: boolean
-  }
+  },
 ): Promise<string> {
   if (!task.sessionId) {
     return formatTaskStatus(task)

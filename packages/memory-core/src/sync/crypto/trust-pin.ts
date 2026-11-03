@@ -71,7 +71,8 @@ const cleanStaleCandidates = async (stateDir: string, account: string): Promise<
 const hasExactly = (value: Record<string, unknown>, keys: ReadonlyArray<string>): boolean =>
   Object.keys(value).sort().join(",") === [...keys].sort().join(",")
 
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value)
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
 
 const parsePin = (raw: string, account: string): TrustAnchor | null => {
   let value: unknown
@@ -80,12 +81,25 @@ const parsePin = (raw: string, account: string): TrustAnchor | null => {
   } catch {
     return null
   }
-  if (!isRecord(value) || !hasExactly(value, ["version", "account", "genesis_digest", "pinned_by", "pinned_at"])) return null
+  if (!isRecord(value) || !hasExactly(value, ["version", "account", "genesis_digest", "pinned_by", "pinned_at"]))
+    return null
   const at = value["pinned_at"]
   const digest = value["genesis_digest"]
-  if (value["version"] !== 1 || value["account"] !== account || typeof digest !== "string" || decodeB64(digest, 32) === null) return null
+  if (
+    value["version"] !== 1 ||
+    value["account"] !== account ||
+    typeof digest !== "string" ||
+    decodeB64(digest, 32) === null
+  )
+    return null
   if (typeof value["pinned_by"] !== "string" || !SOURCES.has(value["pinned_by"])) return null
-  if (!isRecord(at) || !hasExactly(at, ["seq", "keyring_link"]) || !Number.isSafeInteger(at["seq"]) || Number(at["seq"]) < 1) return null
+  if (
+    !isRecord(at) ||
+    !hasExactly(at, ["seq", "keyring_link"]) ||
+    !Number.isSafeInteger(at["seq"]) ||
+    Number(at["seq"]) < 1
+  )
+    return null
   if (typeof at["keyring_link"] !== "string" || decodeB64(at["keyring_link"], 32) === null) return null
   return mintTrustAnchor(account, digest)
 }
@@ -115,7 +129,12 @@ export const loadTrustAnchor = async (stateDir: string, account: string): Promis
  * pin; a different root, or a pin file that does not parse, throws and changes nothing. Losing the
  * publishing rename to a concurrent writer is decided the same way, by the pin that writer published.
  */
-export const pinTrustAnchor = async (stateDir: string, account: string, candidate: PinCandidate, operation: SyncOperationOptions = {}): Promise<TrustAnchor> => {
+export const pinTrustAnchor = async (
+  stateDir: string,
+  account: string,
+  candidate: PinCandidate,
+  operation: SyncOperationOptions = {},
+): Promise<TrustAnchor> => {
   if (!isPinCandidate(candidate) || candidate.account !== account) throw new TrustPinError("not_verified")
   const existing = await loadTrustAnchor(stateDir, account)
   if (existing.ok) {
@@ -130,7 +149,13 @@ export const pinTrustAnchor = async (stateDir: string, account: string, candidat
   await mkdir(rootDir(stateDir), { recursive: true, mode: 0o700 })
   const staging = `${target}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`
   await mkdir(staging, { mode: 0o700 })
-  const pin = { version: 1, account, genesis_digest: candidate.genesisDigest, pinned_by: candidate.pinnedBy, pinned_at: { ...candidate.at } }
+  const pin = {
+    version: 1,
+    account,
+    genesis_digest: candidate.genesisDigest,
+    pinned_by: candidate.pinnedBy,
+    pinned_at: { ...candidate.at },
+  }
   try {
     await writeFile(join(staging, PIN_FILE), `${JSON.stringify(pin)}\n`, { flag: "wx", mode: 0o600 })
     await syncJournalFile(join(staging, PIN_FILE))
@@ -158,7 +183,10 @@ export const pinTrustAnchor = async (stateDir: string, account: string, candidat
  */
 export const forgetTrustAnchor = async (stateDir: string, account: string): Promise<void> => {
   try {
-    await rename(pinDir(stateDir, account), `${pinDir(stateDir, account)}.retired-${Date.now()}-${randomBytes(4).toString("hex")}`)
+    await rename(
+      pinDir(stateDir, account),
+      `${pinDir(stateDir, account)}.retired-${Date.now()}-${randomBytes(4).toString("hex")}`,
+    )
   } catch (error) {
     if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error
   }

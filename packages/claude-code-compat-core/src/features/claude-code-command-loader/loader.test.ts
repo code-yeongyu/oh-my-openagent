@@ -15,10 +15,7 @@ let TEST_DIR = ""
 
 function writeCommand(directory: string, name: string, description: string): void {
   mkdirSync(directory, { recursive: true })
-  writeFileSync(
-    join(directory, `${name}.md`),
-    `---\ndescription: ${description}\n---\nRun ${name}.\n`,
-  )
+  writeFileSync(join(directory, `${name}.md`), `---\ndescription: ${description}\n---\nRun ${name}.\n`)
 }
 
 describe("claude-code command loader", () => {
@@ -154,11 +151,7 @@ describe("claude-code command loader", () => {
   it("#given commands nested under an excluded basename #when loadProjectCommands is called #then it skips the excluded directory contents", async () => {
     // given
     writeCommand(join(TEST_DIR, ".claude", "commands"), "real", "Real command")
-    writeCommand(
-      join(TEST_DIR, ".claude", "commands", "node_modules"),
-      "fake",
-      "Fake command",
-    )
+    writeCommand(join(TEST_DIR, ".claude", "commands", "node_modules"), "fake", "Fake command")
 
     // when
     const commands = await loader.loadProjectCommands(TEST_DIR)

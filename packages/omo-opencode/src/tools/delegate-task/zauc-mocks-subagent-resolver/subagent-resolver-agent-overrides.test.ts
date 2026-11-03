@@ -7,11 +7,12 @@ type SubagentResolverModule = typeof import("../subagent-resolver")
 const logMock = mock((..._args: unknown[]) => {})
 const readConnectedProvidersCacheMock = mock(() => null as string[] | null)
 const readProviderModelsCacheMock = mock(
-  () => null as {
-    models: Record<string, string[]>
-    connected: string[]
-    updatedAt: string
-  } | null,
+  () =>
+    null as {
+      models: Record<string, string[]>
+      connected: string[]
+      updatedAt: string
+    } | null,
 )
 
 async function importFreshSubagentResolverModule(): Promise<SubagentResolverModule> {
@@ -84,9 +85,7 @@ describe("resolveSubagentExecution agent overrides", () => {
     readConnectedProvidersCacheMock.mockReturnValue(["openai"])
     const args = createBaseArgs({ subagent_type: "oracle" })
     const executorCtx = createExecutorContext(
-      async () => ([
-        { name: "oracle", mode: "subagent", model: "anthropic/claude-opus-4-7" },
-      ]),
+      async () => [{ name: "oracle", mode: "subagent", model: "anthropic/claude-opus-4-7" }],
       {
         agentOverrides: {
           oracle: {

@@ -1,7 +1,5 @@
 export { ContextCollector, contextCollector } from "./collector"
-export {
-  createContextInjectorMessagesTransformHook,
-} from "./injector"
+export { createContextInjectorMessagesTransformHook } from "./injector"
 export type {
   ContextSourceType,
   ContextPriority,

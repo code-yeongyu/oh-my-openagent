@@ -17,10 +17,14 @@ describe("runtime fallback: the next rung's start races a user stop", () => {
       const manager = managerOver(store, runner, project)
       const started = await manager.start(baseSpec())
       if (started.kind !== "started" || runner.first === undefined) throw new Error("setup failed")
-      runner.first.settle({ status: "error", failure: { kind: "child-turn-failed", message: "500: upstream overloaded" } })
+      runner.first.settle({
+        status: "error",
+        failure: { kind: "child-turn-failed", message: "500: upstream overloaded" },
+      })
       await runner.entered.promise
 
-      const stopped = stop === "cancel" ? await manager.cancelTask(started.task_id) : await manager.interruptTask(started.task_id)
+      const stopped =
+        stop === "cancel" ? await manager.cancelTask(started.task_id) : await manager.interruptTask(started.task_id)
       expect(stopped.kind).toBe(stop === "cancel" ? "cancelled" : "interrupted")
 
       runner.release.resolve()

@@ -81,10 +81,7 @@ describe("background_output session.messages timeout protection", () => {
 
       // when
       const start = Date.now()
-      const [first, second] = await Promise.all([
-        formatTaskResult(task, client),
-        formatTaskResult(task, client),
-      ])
+      const [first, second] = await Promise.all([formatTaskResult(task, client), formatTaskResult(task, client)])
       const elapsed = Date.now() - start
 
       // then

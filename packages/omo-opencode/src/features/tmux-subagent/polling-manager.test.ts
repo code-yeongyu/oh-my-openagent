@@ -47,9 +47,9 @@ describe("TmuxPollingManager overlap", () => {
     )
 
     //#when
-    const firstPoll = (unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager)).pollSessions()
+    const firstPoll = unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager).pollSessions()
     await Promise.resolve()
-    const secondPoll = (unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager)).pollSessions()
+    const secondPoll = unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager).pollSessions()
     releaseStatus?.()
     await Promise.all([firstPoll, secondPoll])
 
@@ -101,7 +101,7 @@ describe("TmuxPollingManager overlap", () => {
     })
 
     //#when
-    const pollSessions = (unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager)).pollSessions
+    const pollSessions = unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager).pollSessions
     await pollSessions.call(manager)
     await pollSessions.call(manager)
     await pollSessions.call(manager)
@@ -144,7 +144,7 @@ describe("TmuxPollingManager overlap", () => {
     )
 
     // when
-    const pollSessions = (unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager)).pollSessions
+    const pollSessions = unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager).pollSessions
     await pollSessions.call(manager)
 
     // then
@@ -184,7 +184,7 @@ describe("TmuxPollingManager overlap", () => {
     )
 
     // when
-    const pollSessions = (unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager)).pollSessions
+    const pollSessions = unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager).pollSessions
     await pollSessions.call(manager)
 
     // then
@@ -224,7 +224,7 @@ describe("TmuxPollingManager overlap", () => {
     )
 
     // when
-    const pollSessions = (unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager)).pollSessions
+    const pollSessions = unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager).pollSessions
     await pollSessions.call(manager)
 
     // then
@@ -275,7 +275,7 @@ describe("TmuxPollingManager overlap", () => {
         closedSessionIds.push(sessionId)
       },
     )
-    const pollSessions = (unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager)).pollSessions
+    const pollSessions = unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager).pollSessions
 
     // when
     await pollSessions.call(manager)
@@ -313,9 +313,7 @@ describe("TmuxPollingManager overlap", () => {
       windowActive: true,
       sessionAttached: true,
       mainPane: null,
-      agentPanes: [
-        { paneId: "%1", width: 80, height: 24, left: 0, top: 0, title: "agent", isActive: true },
-      ],
+      agentPanes: [{ paneId: "%1", width: 80, height: 24, left: 0, top: 0, title: "agent", isActive: true }],
     }
     const manager = new TmuxPollingManager(
       unsafeTestValue<import("../../tools/delegate-task/types").OpencodeClient>(client),
@@ -530,9 +528,7 @@ describe("TmuxPollingManager overlap", () => {
       windowActive: true,
       sessionAttached: true,
       mainPane: { paneId: "%0", width: 80, height: 48, left: 0, top: 0, title: "main", isActive: true },
-      agentPanes: [
-        { paneId: "%1", width: 80, height: 48, left: 80, top: 0, title: "agent", isActive: false },
-      ],
+      agentPanes: [{ paneId: "%1", width: 80, height: 48, left: 80, top: 0, title: "agent", isActive: false }],
     }
     const manager = new TmuxPollingManager(
       unsafeTestValue<import("../../tools/delegate-task/types").OpencodeClient>(client),
@@ -583,9 +579,7 @@ describe("TmuxPollingManager overlap", () => {
       windowActive: true,
       sessionAttached: true,
       mainPane: { paneId: "%0", width: 80, height: 48, left: 0, top: 0, title: "main", isActive: true },
-      agentPanes: [
-        { paneId: "%1", width: 80, height: 48, left: 80, top: 0, title: "agent", isActive: false },
-      ],
+      agentPanes: [{ paneId: "%1", width: 80, height: 48, left: 80, top: 0, title: "agent", isActive: false }],
     }
     const manager = new TmuxPollingManager(
       unsafeTestValue<import("../../tools/delegate-task/types").OpencodeClient>(client),
@@ -618,7 +612,7 @@ describe("TmuxPollingManager cmux eager-activated sessions", () => {
       sessionId: "ses-cmux-eager",
       paneId: "%9",
       description: "cmux eager session",
-      attachActivated: true,       // ← set at creation for cmux
+      attachActivated: true, // ← set at creation for cmux
       attachActivatedAt: now,
       createdAt: now,
       lastSeenAt: now,
@@ -661,7 +655,7 @@ describe("TmuxPollingManager cmux eager-activated sessions", () => {
     )
 
     //#when — trigger a poll cycle
-    await (unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager)).pollSessions()
+    await unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager).pollSessions()
 
     //#then — activateSessionPane must NOT be called because the pane is already attachActivated
     expect(activateSessionPaneCalls).toBe(0)
@@ -675,7 +669,7 @@ describe("TmuxPollingManager cmux eager-activated sessions", () => {
       sessionId: "ses-normal",
       paneId: "%8",
       description: "normal session",
-      attachActivated: false,      // ← not yet activated
+      attachActivated: false, // ← not yet activated
       createdAt: now,
       lastSeenAt: now,
       closePending: false,
@@ -715,7 +709,7 @@ describe("TmuxPollingManager cmux eager-activated sessions", () => {
     )
 
     //#when
-    await (unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager)).pollSessions()
+    await unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager).pollSessions()
 
     //#then — focus-defer path: activateSessionPane MUST be called because pane is focused but not activated yet
     expect(activateSessionPaneCalls).toBe(1)

@@ -70,7 +70,9 @@ export function createProjectMemoryScope(options: ProjectMemoryNudgeOptions): Pr
   }
 
   function sessionCwd(eventCtx: unknown): string {
-    return isRecord(eventCtx) && typeof eventCtx.cwd === "string" && eventCtx.cwd.length > 0 ? eventCtx.cwd : options.fallbackCwd()
+    return isRecord(eventCtx) && typeof eventCtx.cwd === "string" && eventCtx.cwd.length > 0
+      ? eventCtx.cwd
+      : options.fallbackCwd()
   }
 
   function scopeFor(sessionId: string, cwd: string, context: MemoryIdentityContext): SessionScope {
@@ -109,13 +111,23 @@ export function createProjectMemoryScope(options: ProjectMemoryNudgeOptions): Pr
     const scope = sessions.get(sessionId)
     if (scope === undefined || !switchesFor(sessionId).recall) return []
     const projects = scope.touched.slice(0, PROJECT_MEMORY_RECALL_MAX_PROJECTS)
-    const list = await Promise.all(projects.map(async (project) => {
-      const corpus = await corpusOf(project)
-      const touchedPath = scope.touchedPaths.get(project.identity.id)
-      return { identityId: project.identity.id, revision: corpus.revision, documents: corpus.documents, ...(touchedPath === undefined ? {} : { touchedPath }) }
-    }))
-    const key = projects.map((project, index) => `${project.identity.id}@${list[index]?.revision}:${list[index]?.touchedPath ?? ""}`).join("\0")
-    if (scope.corpora?.key !== key) scope.corpora = { key, list: list.map(({ revision: _revision, ...corpus }) => corpus) }
+    const list = await Promise.all(
+      projects.map(async (project) => {
+        const corpus = await corpusOf(project)
+        const touchedPath = scope.touchedPaths.get(project.identity.id)
+        return {
+          identityId: project.identity.id,
+          revision: corpus.revision,
+          documents: corpus.documents,
+          ...(touchedPath === undefined ? {} : { touchedPath }),
+        }
+      }),
+    )
+    const key = projects
+      .map((project, index) => `${project.identity.id}@${list[index]?.revision}:${list[index]?.touchedPath ?? ""}`)
+      .join("\0")
+    if (scope.corpora?.key !== key)
+      scope.corpora = { key, list: list.map(({ revision: _revision, ...corpus }) => corpus) }
     return scope.corpora.list
   }
 
@@ -175,7 +187,9 @@ export function createProjectMemoryScope(options: ProjectMemoryNudgeOptions): Pr
     }
     if (!live() || nudged.get(projectId) !== reservation || notes.length === 0) return undefined
     const content = isRecord(payload) && Array.isArray(payload.content) ? payload.content : []
-    return { content: [...content, { type: "text", text: formatProjectMemoryNudge(project, notes), audience: "model" }] }
+    return {
+      content: [...content, { type: "text", text: formatProjectMemoryNudge(project, notes), audience: "model" }],
+    }
   }
 
   function register(pi: SenpiExtensionAPI): void {
@@ -220,7 +234,11 @@ export function formatProjectMemoryNudge(project: ProjectIdentity, notes: readon
 
 // The touched file named from its project's root, so a note about that file can match it. A path
 // mapped onto a main checkout (git mode) does not sit under it lexically and keeps no relative form.
-async function projectRelativePath(resolver: ProjectIdentityResolver, projectDir: string, filePath: string): Promise<string | undefined> {
+async function projectRelativePath(
+  resolver: ProjectIdentityResolver,
+  projectDir: string,
+  filePath: string,
+): Promise<string | undefined> {
   const realDir = await resolver.realPath(dirname(filePath))
   // A file whose directory vanished after the tool ran has no position to rank by.
   if (realDir === undefined) return undefined
@@ -241,10 +259,16 @@ function touchedPathOf(payload: unknown): string | undefined {
   return undefined
 }
 
-const mergedCorpora = new WeakMap<readonly RecallDocument[], WeakMap<readonly RecallDocument[], readonly RecallDocument[]>>()
+const mergedCorpora = new WeakMap<
+  readonly RecallDocument[],
+  WeakMap<readonly RecallDocument[], readonly RecallDocument[]>
+>()
 
 /** The session's own notes plus its touched projects', as one stable array per pair of inputs (the recall memos are keyed on it). */
-export function withProjectDocuments(own: readonly RecallDocument[], projects: readonly RecallDocument[]): readonly RecallDocument[] {
+export function withProjectDocuments(
+  own: readonly RecallDocument[],
+  projects: readonly RecallDocument[],
+): readonly RecallDocument[] {
   if (projects.length === 0) return own
   let byProjects = mergedCorpora.get(own)
   if (byProjects === undefined) {

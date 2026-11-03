@@ -108,12 +108,16 @@ describe("buildXSearchRequest", () => {
         enable_video_understanding: false,
       },
     ])
-    expect(body.input[0]?.content).toBe(PROMPT_VARIANTS.v2(baseParams({
-      query: "xAI livestream",
-      excluded_x_handles: ["spam_account"],
-      enable_image_understanding: true,
-      enable_video_understanding: false,
-    })))
+    expect(body.input[0]?.content).toBe(
+      PROMPT_VARIANTS.v2(
+        baseParams({
+          query: "xAI livestream",
+          excluded_x_handles: ["spam_account"],
+          enable_image_understanding: true,
+          enable_video_understanding: false,
+        }),
+      ),
+    )
   })
 
   it("#given the shipped defaults #when reading the frozen knobs #then v1 is the default variant on the fast carrier and v2 extends v1", () => {
@@ -153,23 +157,27 @@ describe("performXSearch", () => {
     { status: 403, code: "AUTH" },
     { status: 500, code: "UPSTREAM" },
     { status: 503, code: "UPSTREAM" },
-  ])("#given HTTP $status #when performing the search #then it fails closed as $code with no retry", async ({ status, code }) => {
-    let calls = 0
-    const fetchImpl: XSearchFetch = async () => {
-      calls += 1
-      return new Response("nope", { status })
-    }
+  ])(
+    "#given HTTP $status #when performing the search #then it fails closed as $code with no retry",
+    async ({ status, code }) => {
+      let calls = 0
+      const fetchImpl: XSearchFetch = async () => {
+        calls += 1
+        return new Response("nope", { status })
+      }
 
-    const outcome = await performXSearch({ fetch: fetchImpl, bearer: "b", body: {} })
+      const outcome = await performXSearch({ fetch: fetchImpl, bearer: "b", body: {} })
 
-    expect(outcome.ok).toBe(false)
-    if (outcome.ok) throw new Error("expected failure")
-    expect(outcome.code).toBe(code as never)
-    expect(calls).toBe(1)
-  })
+      expect(outcome.ok).toBe(false)
+      if (outcome.ok) throw new Error("expected failure")
+      expect(outcome.code).toBe(code as never)
+      expect(calls).toBe(1)
+    },
+  )
 
   it("#given HTTP 429 with Retry-After #when performing the search #then RATE_LIMITED carries the retryAfter seconds", async () => {
-    const fetchImpl: XSearchFetch = async () => new Response("slow down", { status: 429, headers: { "retry-after": "42" } })
+    const fetchImpl: XSearchFetch = async () =>
+      new Response("slow down", { status: 429, headers: { "retry-after": "42" } })
 
     const outcome = await performXSearch({ fetch: fetchImpl, bearer: "b", body: {} })
 
@@ -212,7 +220,13 @@ describe("performXSearch", () => {
         controller.abort()
       })
 
-    const outcome = await performXSearch({ fetch: fetchImpl, bearer: "b", body: {}, signal: controller.signal, deadlineMs: 5 })
+    const outcome = await performXSearch({
+      fetch: fetchImpl,
+      bearer: "b",
+      body: {},
+      signal: controller.signal,
+      deadlineMs: 5,
+    })
 
     expect(outcome.ok).toBe(false)
     if (outcome.ok) throw new Error("expected failure")

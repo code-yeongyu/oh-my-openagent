@@ -34,9 +34,11 @@ describe("onboarding claim lifecycle", () => {
       await h.settle()
       await h.prompt()
       await h.agentStart()
-      expect(h.requests.map((messages) => messages.filter(
-        (message) => message.customType === "omo-onboarding:context",
-      ).length)).toEqual([1, 1, 1])
+      expect(
+        h.requests.map(
+          (messages) => messages.filter((message) => message.customType === "omo-onboarding:context").length,
+        ),
+      ).toEqual([1, 1, 1])
     })
   }
 
@@ -71,9 +73,14 @@ describe("onboarding claim lifecycle", () => {
     await h.end("error")
     expect(isOnboardingComplete(h.dir)).toBe(true)
     await h.agentStart()
-    await h.pi.dispatch("agent_end", { type: "agent_end", aborted: true, messages: [] }, {
-      ...h.ctx, sessionManager: { getSessionId: () => "other" },
-    })
+    await h.pi.dispatch(
+      "agent_end",
+      { type: "agent_end", aborted: true, messages: [] },
+      {
+        ...h.ctx,
+        sessionManager: { getSessionId: () => "other" },
+      },
+    )
     expect(isOnboardingComplete(h.dir)).toBe(true)
   })
 

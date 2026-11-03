@@ -28,47 +28,35 @@ export const SCENARIO_IDS = [
 
 // Keep each driver's expected rows explicit: a failed group may produce no records.
 export const SCENARIO_GROUPS = {
-  "crash": [
-    "topology_two_parent_shards",
-    "host_crash_isolated",
-    "crashed_shard_reattaches",
-    "all_six_children_complete",
-  ],
-  "nested": [
-    "grandchild_reuses_tree_shard",
-    "nested_spawn_attach_only",
-    "own_endpoint_unreachable_fails_closed",
-  ],
-  "handoff": [
-    "mixed_engine_host_spawns_shard",
-  ],
+  crash: ["topology_two_parent_shards", "host_crash_isolated", "crashed_shard_reattaches", "all_six_children_complete"],
+  nested: ["grandchild_reuses_tree_shard", "nested_spawn_attach_only", "own_endpoint_unreachable_fails_closed"],
+  handoff: ["mixed_engine_host_spawns_shard"],
   "handoff-successors": [
     "handoff_nested_spawn_uses_successor",
     "interactive_handoff_nested_spawn",
     "alt_root_handoff_parent_and_thread",
     "nested_resume_attach_only",
   ],
-  "rollback": [
+  rollback: [
     "rollback_live_endpoint_refused",
     "rollback_drain_wait_gate",
     "rollback_three_store_migration",
     "rollback_r0_resume",
     "rollback_without_prepare_parks",
   ],
-  "index": [
+  index: [
     "cross_endpoint_open_hazard",
     "idle_gc_index_resume",
     "store_index_registration_precondition",
     "store_index_registration_precondition_auto",
   ],
-  "retain": [
+  retain: [
     "retain_idle_resume",
     "retain_midturn_continuation",
     "migration_recorded_socket_wins",
     "incompatibility_and_entry_fault_isolation",
   ],
-  "contracts": [
-  ],
+  contracts: [],
 }
 
 export function selectedScenarioIds(only = []) {
@@ -83,7 +71,9 @@ export function selectedScenarioIds(only = []) {
 export const CONTROL_ID = "shared_host_cascade_reproduced"
 
 function verdictFor(id, row) {
-  const evidence = Array.isArray(row?.evidence) ? row.evidence.filter((value) => typeof value === "string" && value.length > 0) : []
+  const evidence = Array.isArray(row?.evidence)
+    ? row.evidence.filter((value) => typeof value === "string" && value.length > 0)
+    : []
   const pass = row?.status === "pass" && evidence.length > 0
   return {
     id,

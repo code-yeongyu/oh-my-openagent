@@ -62,7 +62,9 @@ function setup(options: {
   } as unknown as SenpiExtensionAPI
   const runtime = new TaskRuntimeContext("/tmp/category-unavailable-warning-test")
   const ui = {
-    notify: (message: string, type?: string) => { notifies.push({ message, type }) },
+    notify: (message: string, type?: string) => {
+      notifies.push({ message, type })
+    },
   }
   runtime.captureFrom({
     sessionManager: { getSessionId: () => options.sessionId ?? "session-1" },

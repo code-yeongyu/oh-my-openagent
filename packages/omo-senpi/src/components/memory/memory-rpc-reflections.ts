@@ -15,7 +15,9 @@ export interface MemoryReflectionsPage {
   readonly nextCursor?: string
 }
 
-const requestSchema = z.object({ limit: z.number().int().min(1).max(100).default(20), cursor: z.string().max(4096).optional() }).strict()
+const requestSchema = z
+  .object({ limit: z.number().int().min(1).max(100).default(20), cursor: z.string().max(4096).optional() })
+  .strict()
 const tupleSchema = z.tuple([z.iso.datetime(), z.string().min(1), z.string().min(1)])
 type OrderingTuple = z.infer<typeof tupleSchema>
 
@@ -28,8 +30,9 @@ export async function readMemoryReflections(
   const after = cursor === undefined ? undefined : decodeCursor(cursor)
   const completionsDir = join(context.identityPaths.reflection, "completions")
   let names: string[]
-  try { names = await readdir(completionsDir) }
-  catch (error) {
+  try {
+    names = await readdir(completionsDir)
+  } catch (error) {
     if (error instanceof Error && "code" in error && error.code === "ENOENT") names = []
     else throw error
   }
@@ -53,8 +56,13 @@ export async function readMemoryReflections(
   const page = entries.slice(0, limit)
   const last = page.at(-1)
   return {
-    schemaVersion: 1, identity: context.identity, sessionId, entries: page,
-    ...(hasMore && last !== undefined ? { nextCursor: Buffer.from(JSON.stringify([last.finishedAt, last.runId, last.key])).toString("base64url") } : {}),
+    schemaVersion: 1,
+    identity: context.identity,
+    sessionId,
+    entries: page,
+    ...(hasMore && last !== undefined
+      ? { nextCursor: Buffer.from(JSON.stringify([last.finishedAt, last.runId, last.key])).toString("base64url") }
+      : {}),
   }
 }
 

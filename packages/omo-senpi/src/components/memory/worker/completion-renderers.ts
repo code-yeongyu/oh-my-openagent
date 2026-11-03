@@ -56,18 +56,21 @@ function reflectionNoticeSpec(record: ReflectionCompletionEntry): NoticeSpec {
  * emphasis markers are dropped; a report without a summary item contributes its first prose line.
  */
 export function reflectionHeadline(text: string): string | undefined {
-  const lines = sanitizeReflectionReport(text).split("\n").map(stripMarkdown).filter((line) => line.length > 0)
+  const lines = sanitizeReflectionReport(text)
+    .split("\n")
+    .map(stripMarkdown)
+    .filter((line) => line.length > 0)
   const summaryAt = lines.findIndex((line) => /^summary\b/iu.test(line))
-  const body = summaryAt < 0
-    ? lines[0]
-    : lines[summaryAt]?.replace(/^summary\b\s*[:-]?\s*/iu, "") || lines[summaryAt + 1]
+  const body =
+    summaryAt < 0 ? lines[0] : lines[summaryAt]?.replace(/^summary\b\s*[:-]?\s*/iu, "") || lines[summaryAt + 1]
   if (body === undefined || body.length === 0) return undefined
   const sentence = /^(.+?[.!?])(?:\s|$)/u.exec(body)?.[1] ?? body
   return normalizeRendererText(sentence)
 }
 
 function stripMarkdown(line: string): string {
-  return line.trim()
+  return line
+    .trim()
     .replace(/^#+\s*/u, "")
     .replace(/^(?:\d+[.)]|[-*+])\s+/u, "")
     .replace(/\*\*|__|`/gu, "")

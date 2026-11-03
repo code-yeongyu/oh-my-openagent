@@ -34,14 +34,16 @@ async function transitionMemberStatus(
   if (currentEntry === undefined) return
   if (!allowedSources.has(currentEntry.status)) return
 
-  await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
-    ...currentRuntimeState,
-    members: currentRuntimeState.members.map((member) => (
-      member.name === runtimeMember.memberName
-        ? { ...member, status: nextStatus }
-        : member
-    )),
-  }), config)
+  await transitionRuntimeState(
+    runtimeState.teamRunId,
+    (currentRuntimeState) => ({
+      ...currentRuntimeState,
+      members: currentRuntimeState.members.map((member) =>
+        member.name === runtimeMember.memberName ? { ...member, status: nextStatus } : member,
+      ),
+    }),
+    config,
+  )
 
   log(`team member ${eventLabel}`, {
     event: `team-mode-member-${eventLabel}`,
@@ -79,7 +81,14 @@ export function createTeamMemberStatusHandler(config: TeamModeConfig): HookImpl 
       try {
         const runtimeMember = await findResolvedMemberSession(sessionID, config, "team member status handler")
         if (runtimeMember === null) return
-        await transitionMemberStatus(runtimeMember, COMPLETED_TRANSITION_SOURCE_STATUSES, "completed", config, sessionID, "completed")
+        await transitionMemberStatus(
+          runtimeMember,
+          COMPLETED_TRANSITION_SOURCE_STATUSES,
+          "completed",
+          config,
+          sessionID,
+          "completed",
+        )
       } catch (error) {
         log("team member status handler failed on session.deleted", {
           event: "team-mode-member-status-handler-error",

@@ -3,7 +3,17 @@
  * through here, so they all escape, back up and write it the same way.
  */
 
-import { chmodSync, constants, copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs"
+import {
+  chmodSync,
+  constants,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { dirname } from "node:path"
 
 // opencode keeps a pasted key verbatim and never interprets it, but the engine resolves every stored

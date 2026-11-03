@@ -6,10 +6,7 @@ import { readReflectionParkFile } from "@oh-my-opencode/memory-core"
 
 import { reconcileReflectionRuns } from "./run-reconciliation"
 import { writeRunJsonAtomic } from "./run-artifacts"
-import {
-  cleanupReconciliationFixtures,
-  reconciliationFixture as fixture,
-} from "./run-reconciliation.test-support"
+import { cleanupReconciliationFixtures, reconciliationFixture as fixture } from "./run-reconciliation.test-support"
 
 afterEach(cleanupReconciliationFixtures)
 
@@ -18,9 +15,16 @@ describe("reflection settlement feeds the park policy", () => {
     // given
     const item = await fixture()
     await writeRunJsonAtomic(join(item.runDir, "ledger.json"), {
-      ...item.ledger, pid: 222, processStart: "supervisor-start", childPid: 333, childProcessStart: "child-start",
+      ...item.ledger,
+      pid: 222,
+      processStart: "supervisor-start",
+      childPid: 333,
+      childProcessStart: "child-start",
     })
-    await writeFile(join(item.runDir, "child-stderr.log"), 'Error: Model "quick/x" not found. Use --list-models to see available models.\n')
+    await writeFile(
+      join(item.runDir, "child-stderr.log"),
+      'Error: Model "quick/x" not found. Use --list-models to see available models.\n',
+    )
 
     // when
     const results = await reconcileReflectionRuns({
@@ -46,7 +50,11 @@ describe("reflection settlement feeds the park policy", () => {
     // given
     const item = await fixture()
     await writeRunJsonAtomic(join(item.runDir, "ledger.json"), {
-      ...item.ledger, pid: 222, processStart: "supervisor-start", childPid: 333, childProcessStart: "child-start",
+      ...item.ledger,
+      pid: 222,
+      processStart: "supervisor-start",
+      childPid: 333,
+      childProcessStart: "child-start",
     })
     await writeFile(join(item.runDir, "child-stderr.log"), 'OpenAI API error (429): {"type":"usage_limit_reached"}\n')
 

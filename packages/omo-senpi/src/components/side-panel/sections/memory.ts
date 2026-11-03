@@ -100,7 +100,8 @@ export function buildMemoryDetailRows(memory: PanelMemory, now: number): readonl
       compactTokens(kibitzer.tokens),
     ]
     rows.push(detail("kibitz", parts.join(" · ")))
-    if (kibitzer.lastStatus !== undefined) rows.push(detail("last", `${kibitzer.lastStatus} ${age(kibitzer.lastWakeAt, now)}`))
+    if (kibitzer.lastStatus !== undefined)
+      rows.push(detail("last", `${kibitzer.lastStatus} ${age(kibitzer.lastWakeAt, now)}`))
   }
   rows.push(detail("facts", `${memory.factsQueued} queued`))
   rows.push(detail("recall", recallValue(memory) ?? "nothing held"))

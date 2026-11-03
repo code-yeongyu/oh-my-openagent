@@ -38,9 +38,8 @@ function fmEntry(rand: () => number, key: string): string {
 }
 
 function genItem(rand: () => number): string {
-  const bodyLines = Array.from(
-    { length: Math.floor(rand() * 5) },
-    () => Array.from({ length: 1 + Math.floor(rand() * 4) }, () => pick(rand, WORD_POOL)).join(" "),
+  const bodyLines = Array.from({ length: Math.floor(rand() * 5) }, () =>
+    Array.from({ length: 1 + Math.floor(rand() * 4) }, () => pick(rand, WORD_POOL)).join(" "),
   )
   const body = bodyLines.length === 0 ? "" : `${bodyLines.join("\n")}\n`
 

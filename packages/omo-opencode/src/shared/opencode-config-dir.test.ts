@@ -145,10 +145,7 @@ describe("opencode-config-dir", () => {
       const result = getOpenCodeConfigDirs({ binary: "opencode", version: "1.0.200" })
 
       // then the custom path stays first, but the default global path remains visible
-      expect(result).toEqual([
-        resolve("/custom/opencode/path"),
-        resolve("/xdg/config/opencode"),
-      ])
+      expect(result).toEqual([resolve("/custom/opencode/path"), resolve("/xdg/config/opencode")])
     })
 
     test("deduplicates when OPENCODE_CONFIG_DIR equals the default XDG path", () => {
@@ -177,7 +174,6 @@ describe("opencode-config-dir", () => {
       expect(result).toEqual([getOpenCodeConfigDir({ binary: "opencode-desktop", version: "1.0.200" })])
       expect(result).toHaveLength(1)
     })
-
   })
 
   describe("isDevBuild", () => {
@@ -311,7 +307,6 @@ describe("opencode-config-dir", () => {
         // then returns %APPDATA%/ai.opencode.desktop using Windows path semantics
         expect(result).toBe(win32.join("C:\\Users\\TestUser\\AppData\\Roaming", TAURI_APP_IDENTIFIER))
       })
-
     })
 
     describe("dev build detection", () => {
@@ -321,7 +316,11 @@ describe("opencode-config-dir", () => {
         delete process.env.XDG_CONFIG_HOME
 
         // when getOpenCodeConfigDir is called with dev version
-        const result = getOpenCodeConfigDir({ binary: "opencode-desktop", version: "1.0.0-dev.123", checkExisting: false })
+        const result = getOpenCodeConfigDir({
+          binary: "opencode-desktop",
+          version: "1.0.0-dev.123",
+          checkExisting: false,
+        })
 
         // then returns path with ai.opencode.desktop.dev
         expect(result).toBe(join(homedir(), ".config", TAURI_APP_IDENTIFIER_DEV))

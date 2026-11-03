@@ -43,14 +43,9 @@ export function registerMemoryWriteListener(
 }
 
 function isMemoryToolResult(value: unknown): boolean {
-  if (
-    !isRecord(value)
-    || value.type !== "tool_result"
-    || value.isError === true
-    || typeof value.toolName !== "string"
-  ) return false
-  return matchesToolName(value.toolName, MEMORY_TOOL_NAME)
-    || matchesToolName(value.toolName, MEMORY_TOOL_NAME)
+  if (!isRecord(value) || value.type !== "tool_result" || value.isError === true || typeof value.toolName !== "string")
+    return false
+  return matchesToolName(value.toolName, MEMORY_TOOL_NAME) || matchesToolName(value.toolName, MEMORY_TOOL_NAME)
 }
 
 function matchesToolName(toolName: string, expected: string): boolean {

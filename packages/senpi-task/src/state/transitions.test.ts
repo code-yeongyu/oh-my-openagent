@@ -52,11 +52,16 @@ describe("transitionTaskRecord lifecycle graph", () => {
     const lost = markRecordLostForReconciliation(started.record, { timestamp, error_message: "owner died" })
     expect(lost.applied).toBe(true)
     expect(lost.record).toMatchObject({ status: "lost", started_at: startedAt })
-    const refreshed = markRecordLostForReconciliation(lost.record, { timestamp, error_message: "still lost", updateReason: true })
+    const refreshed = markRecordLostForReconciliation(lost.record, {
+      timestamp,
+      error_message: "still lost",
+      updateReason: true,
+    })
     expect(refreshed.applied).toBe(true)
     expect(refreshed.record).toHaveProperty("started_at", startedAt)
-    expect(markRecordLostForReconciliation(pending, { timestamp, error_message: "queued owner died" }).record)
-      .not.toHaveProperty("started_at")
+    expect(
+      markRecordLostForReconciliation(pending, { timestamp, error_message: "queued owner died" }).record,
+    ).not.toHaveProperty("started_at")
   })
 
   test("#given a running task interrupted by another client #when the interrupt transition carries the partial answer #then it is kept as final_response with no error", () => {
@@ -120,17 +125,16 @@ describe("transitionTaskRecord lifecycle graph", () => {
 
     // then
     expect(results.map((result) => result.applied)).toEqual([true, true, true, true])
-    expect(results.map((result) => result.record.status)).toEqual([
-      "completed",
-      "error",
-      "cancelled",
-      "interrupted",
-    ])
+    expect(results.map((result) => result.record.status)).toEqual(["completed", "error", "cancelled", "interrupted"])
   })
 
   test("#given a running rpc child killed by signal #when the fail transition carries killed #then the record persists killed:true", () => {
     // given
-    const running = transitionTaskRecord(pendingRecord(), { type: "start", timestamp: "2026-07-06T00:00:00.000Z", pid: 1234 }).record
+    const running = transitionTaskRecord(pendingRecord(), {
+      type: "start",
+      timestamp: "2026-07-06T00:00:00.000Z",
+      pid: 1234,
+    }).record
 
     // when
     const killed = transitionTaskRecord(running, {
@@ -148,10 +152,18 @@ describe("transitionTaskRecord lifecycle graph", () => {
 
   test("#given a plain (non-signal) failure #when the fail transition omits killed #then killed stays absent (a record fact)", () => {
     // given
-    const running = transitionTaskRecord(pendingRecord(), { type: "start", timestamp: "2026-07-06T00:00:00.000Z", pid: 1234 }).record
+    const running = transitionTaskRecord(pendingRecord(), {
+      type: "start",
+      timestamp: "2026-07-06T00:00:00.000Z",
+      pid: 1234,
+    }).record
 
     // when
-    const failed = transitionTaskRecord(running, { type: "fail", timestamp: "2026-07-06T00:00:01.000Z", error_message: "boom" })
+    const failed = transitionTaskRecord(running, {
+      type: "fail",
+      timestamp: "2026-07-06T00:00:01.000Z",
+      error_message: "boom",
+    })
 
     // then
     expect(failed.record.status).toBe("error")

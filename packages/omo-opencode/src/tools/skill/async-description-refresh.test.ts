@@ -15,7 +15,9 @@ function requireFresh<T>(modulePath: string): T {
   return require(modulePath) as T
 }
 
-function createFreshSkillTool(...args: Parameters<typeof import("./tools").createSkillTool>): ReturnType<typeof import("./tools").createSkillTool> {
+function createFreshSkillTool(
+  ...args: Parameters<typeof import("./tools").createSkillTool>
+): ReturnType<typeof import("./tools").createSkillTool> {
   return requireFresh<typeof import("./tools")>("./tools").createSkillTool(...args)
 }
 

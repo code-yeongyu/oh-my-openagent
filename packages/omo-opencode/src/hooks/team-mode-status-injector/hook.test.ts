@@ -6,7 +6,7 @@ import { createTeamModeStatusInjector } from "./hook"
 function createOutput(
   sessionID: string,
   text = "original message",
-  options?: { synthetic?: boolean }
+  options?: { synthetic?: boolean },
 ): {
   messages: Array<{
     info: { role: string; sessionID: string }
@@ -39,10 +39,7 @@ describe("createTeamModeStatusInjector", () => {
     const output = createOutput("session-team-mode", "team mode please")
 
     // when
-    await hook["experimental.chat.messages.transform"]?.(
-      { sessionID: "session-team-mode" },
-      output,
-    )
+    await hook["experimental.chat.messages.transform"]?.({ sessionID: "session-team-mode" }, output)
 
     // then
     expect(output.messages).toHaveLength(2)
@@ -69,22 +66,16 @@ describe("createTeamModeStatusInjector", () => {
     const secondOutput = createOutput("session-team-mode", "team mode please")
 
     // when
-    await hook["experimental.chat.messages.transform"]?.(
-      { sessionID: "session-team-mode" },
-      firstOutput,
-    )
+    await hook["experimental.chat.messages.transform"]?.({ sessionID: "session-team-mode" }, firstOutput)
     secondOutput.messages = structuredClone(firstOutput.messages)
-    await hook["experimental.chat.messages.transform"]?.(
-      { sessionID: "session-team-mode" },
-      secondOutput,
-    )
+    await hook["experimental.chat.messages.transform"]?.({ sessionID: "session-team-mode" }, secondOutput)
 
     // then
     expect(firstOutput.messages).toHaveLength(2)
     expect(secondOutput.messages).toHaveLength(2)
     expect(
       secondOutput.messages.filter((message) =>
-        message.parts.some((part) => part.text?.includes("<team_mode_status enabled=\"true\">")),
+        message.parts.some((part) => part.text?.includes('<team_mode_status enabled="true">')),
       ),
     ).toHaveLength(1)
   })
@@ -95,10 +86,7 @@ describe("createTeamModeStatusInjector", () => {
     const output = createOutput("session-team-mode")
 
     // when
-    await hook["experimental.chat.messages.transform"]?.(
-      { sessionID: "session-team-mode" },
-      output,
-    )
+    await hook["experimental.chat.messages.transform"]?.({ sessionID: "session-team-mode" }, output)
 
     // then
     expect(output.messages).toHaveLength(1)
@@ -111,10 +99,7 @@ describe("createTeamModeStatusInjector", () => {
     const output = createOutput("session-team-mode", ".")
 
     // when
-    await hook["experimental.chat.messages.transform"]?.(
-      { sessionID: "session-team-mode" },
-      output,
-    )
+    await hook["experimental.chat.messages.transform"]?.({ sessionID: "session-team-mode" }, output)
 
     // then
     expect(output.messages).toHaveLength(1)
@@ -127,10 +112,7 @@ describe("createTeamModeStatusInjector", () => {
     const output = createOutput("session-team-mode", "team mode please", { synthetic: true })
 
     // when
-    await hook["experimental.chat.messages.transform"]?.(
-      { sessionID: "session-team-mode" },
-      output,
-    )
+    await hook["experimental.chat.messages.transform"]?.({ sessionID: "session-team-mode" }, output)
 
     // then
     expect(output.messages).toHaveLength(1)
@@ -139,17 +121,13 @@ describe("createTeamModeStatusInjector", () => {
 
   it("does not inject team mode status when the team keyword is disabled", async () => {
     // given
-    const hook = createTeamModeStatusInjector(
-      TeamModeConfigSchema.parse({ enabled: true }),
-      { disabled_keywords: ["team"] },
-    )
+    const hook = createTeamModeStatusInjector(TeamModeConfigSchema.parse({ enabled: true }), {
+      disabled_keywords: ["team"],
+    })
     const output = createOutput("session-team-mode", "team mode please")
 
     // when
-    await hook["experimental.chat.messages.transform"]?.(
-      { sessionID: "session-team-mode" },
-      output,
-    )
+    await hook["experimental.chat.messages.transform"]?.({ sessionID: "session-team-mode" }, output)
 
     // then
     expect(output.messages).toHaveLength(1)

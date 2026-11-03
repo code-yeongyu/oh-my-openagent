@@ -62,9 +62,13 @@ function homeDirectory(options: SenpiStartupMigrationOptions): string {
 }
 
 function migratedSources(results: readonly MigrationRunResult[]): readonly string[] {
-  return [...new Set(results.flatMap((result) => result.status === "migrated"
-    ? result.preview?.backupMoves.map((move) => move.from) ?? []
-    : []))].sort()
+  return [
+    ...new Set(
+      results.flatMap((result) =>
+        result.status === "migrated" ? (result.preview?.backupMoves.map((move) => move.from) ?? []) : [],
+      ),
+    ),
+  ].sort()
 }
 
 function legacyPlanOptions(
@@ -176,31 +180,38 @@ export function notificationMessages(
   config: SenpiOmoConfigResult,
 ): readonly StartupNotice[] {
   const messages: StartupNotice[] = []
-  if (migration.error !== undefined) messages.push({ message: `OmO Native: configuration migration: ${migration.error}`, type: "warning" })
-  else if (migration.migratedFrom.length > 0) messages.push({
-    message: `OmO Native: migrated legacy configuration from ${migration.migratedFrom.join(", ")}`,
-    type: "info",
-  })
-  else if (migration.journalResumed) messages.push({ message: "OmO Native: recovered an interrupted configuration migration", type: "info" })
+  if (migration.error !== undefined)
+    messages.push({ message: `OmO Native: configuration migration: ${migration.error}`, type: "warning" })
+  else if (migration.migratedFrom.length > 0)
+    messages.push({
+      message: `OmO Native: migrated legacy configuration from ${migration.migratedFrom.join(", ")}`,
+      type: "info",
+    })
+  else if (migration.journalResumed)
+    messages.push({ message: "OmO Native: recovered an interrupted configuration migration", type: "info" })
   const migrationDiagnostics = migration.results.flatMap((result) => result.diagnostics)
-  if (migrationDiagnostics.length > 0) messages.push({
-    message: `OmO Native: configuration migration: ${migrationDiagnostics.join("; ")}`,
-    type: "warning",
-  })
-  if (config.diagnostics.length > 0) messages.push({
-    message: `OmO Native: configuration diagnostics: ${config.diagnostics.map((diagnostic) => diagnostic.message).join("; ")}`,
-    type: "warning",
-  })
+  if (migrationDiagnostics.length > 0)
+    messages.push({
+      message: `OmO Native: configuration migration: ${migrationDiagnostics.join("; ")}`,
+      type: "warning",
+    })
+  if (config.diagnostics.length > 0)
+    messages.push({
+      message: `OmO Native: configuration diagnostics: ${config.diagnostics.map((diagnostic) => diagnostic.message).join("; ")}`,
+      type: "warning",
+    })
   const shadowed = categoryShadowedAgentNames(config.config)
-  if (shadowed.length > 0) messages.push({
-    message: `OmO Native: ${shadowed.map((name) => categoryShadowMessage(config.config, name)).join("; ")}`,
-    type: "warning",
-  })
+  if (shadowed.length > 0)
+    messages.push({
+      message: `OmO Native: ${shadowed.map((name) => categoryShadowMessage(config.config, name)).join("; ")}`,
+      type: "warning",
+    })
   const unserved = unservedDevinSelectors(config.config)
-  if (unserved.length > 0) messages.push({
-    message: `OmO Native: Devin does not serve ${unserved.map((entry) => `${entry.selector} (${entry.path})`).join(", ")}; SWE-2 runs as ${servedDevinLanes()}`,
-    type: "warning",
-  })
+  if (unserved.length > 0)
+    messages.push({
+      message: `OmO Native: Devin does not serve ${unserved.map((entry) => `${entry.selector} (${entry.path})`).join(", ")}; SWE-2 runs as ${servedDevinLanes()}`,
+      type: "warning",
+    })
   return messages
 }
 
@@ -210,7 +221,10 @@ type ConfiguredSelector = { readonly selector: string; readonly path: string }
 // model and then fails every request with permission_denied; say so once at startup instead.
 function unservedDevinSelectors(config: SenpiOmoConfigResult["config"]): readonly ConfiguredSelector[] {
   const selectors: ConfiguredSelector[] = []
-  for (const [section, entries] of [["categories", config.categories], ["agents", config.agents]] as const) {
+  for (const [section, entries] of [
+    ["categories", config.categories],
+    ["agents", config.agents],
+  ] as const) {
     for (const [name, entry] of Object.entries(entries ?? {})) {
       if (entry === undefined) continue
       const base = `${section}.${name}`
@@ -226,7 +240,12 @@ function listSelectors(value: unknown, path: string): readonly ConfiguredSelecto
   if (typeof value === "string") return [{ selector: value, path }]
   if (!Array.isArray(value)) return []
   return value.flatMap((item: unknown, index): readonly ConfiguredSelector[] => {
-    const selector = typeof item === "string" ? item : typeof item === "object" && item !== null ? Reflect.get(item, "model") : undefined
+    const selector =
+      typeof item === "string"
+        ? item
+        : typeof item === "object" && item !== null
+          ? Reflect.get(item, "model")
+          : undefined
     return typeof selector === "string" ? [{ selector, path: `${path}[${index}]` }] : []
   })
 }

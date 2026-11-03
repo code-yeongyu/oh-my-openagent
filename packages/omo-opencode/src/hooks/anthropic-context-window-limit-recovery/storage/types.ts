@@ -50,13 +50,18 @@ export interface StoredStepPart {
   type: "step-start" | "step-finish"
 }
 
-export type StoredPart = StoredTextPart | StoredToolPart | StoredReasoningPart | StoredStepPart | {
-  id: string
-  sessionID: string
-  messageID: string
-  type: string
-  [key: string]: unknown
-}
+export type StoredPart =
+  | StoredTextPart
+  | StoredToolPart
+  | StoredReasoningPart
+  | StoredStepPart
+  | {
+      id: string
+      sessionID: string
+      messageID: string
+      type: string
+      [key: string]: unknown
+    }
 
 export interface MessageData {
   info?: {

@@ -12,7 +12,10 @@ function grantRequest(overrides: Partial<Parameters<typeof resolveKernelToolGran
   return { requestedNames: ["lookup"], capability, executionMode: "in-process" as const, ...overrides }
 }
 
-async function detailsOf(wrapper: KernelToolWrapper, args: Record<string, unknown> = {}): Promise<AgentToolResult<unknown>> {
+async function detailsOf(
+  wrapper: KernelToolWrapper,
+  args: Record<string, unknown> = {},
+): Promise<AgentToolResult<unknown>> {
   return wrapper.execute("call-1", args)
 }
 
@@ -23,7 +26,10 @@ function errorCode(result: AgentToolResult<unknown>): string | undefined {
   return error?.code
 }
 
-async function grantOf(capability = fakeKernelTools(), names: readonly string[] = ["lookup"]): Promise<KernelToolGrant> {
+async function grantOf(
+  capability = fakeKernelTools(),
+  names: readonly string[] = ["lookup"],
+): Promise<KernelToolGrant> {
   capability.define({ name: "lookup", run: (args) => ({ seen: args }) })
   const resolved = await resolveKernelToolGrant(grantRequest({ capability, requestedNames: names }))
   if (resolved.kind !== "granted") throw new Error(`expected a grant, got ${resolved.kind}`)
@@ -97,7 +103,9 @@ describe("kernel tool grant resolution", () => {
     capability.define({ name: "lookup" })
 
     const duplicate = await resolveKernelToolGrant(grantRequest({ capability, requestedNames: ["lookup", "lookup"] }))
-    const normalized = await resolveKernelToolGrant(grantRequest({ capability, requestedNames: ["look_up", "look-up"] }))
+    const normalized = await resolveKernelToolGrant(
+      grantRequest({ capability, requestedNames: ["look_up", "look-up"] }),
+    )
 
     expect(duplicate).toMatchObject({ kind: "denied", code: "tool_name_collision" })
     expect(normalized).toMatchObject({ kind: "denied", code: "tool_name_collision" })
@@ -136,9 +144,15 @@ describe("kernel tool grant resolution", () => {
     capability.define({ name: "lookup" })
     const child = ["read", "grep", "write", "edit", "bash", "web_search"]
 
-    const denied = await resolveKernelToolGrant(grantRequest({ capability, existingToolNames: child, toolDenylist: ["write"] }))
-    const allowlisted = await resolveKernelToolGrant(grantRequest({ capability, existingToolNames: child, toolAllowlist: ["read", "grep"] }))
-    const readOnlyDeny = await resolveKernelToolGrant(grantRequest({ capability, existingToolNames: child, toolDenylist: ["web_search"] }))
+    const denied = await resolveKernelToolGrant(
+      grantRequest({ capability, existingToolNames: child, toolDenylist: ["write"] }),
+    )
+    const allowlisted = await resolveKernelToolGrant(
+      grantRequest({ capability, existingToolNames: child, toolAllowlist: ["read", "grep"] }),
+    )
+    const readOnlyDeny = await resolveKernelToolGrant(
+      grantRequest({ capability, existingToolNames: child, toolDenylist: ["web_search"] }),
+    )
 
     expect(denied).toMatchObject({ kind: "denied", code: "tools_unavailable" })
     expect(allowlisted).toMatchObject({ kind: "denied", code: "tools_unavailable" })

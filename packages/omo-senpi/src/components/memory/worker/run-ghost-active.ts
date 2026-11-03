@@ -23,8 +23,7 @@ export const RESERVATION_GENERATION_SLACK_MS = 5_000
 export type GhostActiveReason = "missing-identity" | "older-ledger"
 
 export type GhostActiveClassification =
-  | { readonly ghost: false }
-  | { readonly ghost: true; readonly reason: GhostActiveReason }
+  { readonly ghost: false } | { readonly ghost: true; readonly reason: GhostActiveReason }
 
 /**
  * A terminal run dir (final/abandoned present) is left to the retired-generation rule, which

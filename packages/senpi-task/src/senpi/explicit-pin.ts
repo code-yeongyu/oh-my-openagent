@@ -30,7 +30,11 @@ export type ExplicitPinResolution = ResolvedExplicitPin | ExplicitPinFailure
  * after its full-id match. A suffix that matches neither vocabulary stays glued to the id, so a
  * genuine colon id (`provider/model:exacto`) is never mangled.
  */
-export function splitModelDecorators(reference: string): { readonly base: string; readonly thinkingLevel?: string; readonly serviceTier?: string } {
+export function splitModelDecorators(reference: string): {
+  readonly base: string
+  readonly thinkingLevel?: string
+  readonly serviceTier?: string
+} {
   let base = reference
   let thinkingLevel: string | undefined
   let serviceTier: string | undefined
@@ -134,15 +138,20 @@ export type SettingsDefaultRoute = {
  * the caller sees the route the failure just protected it from. Best-effort: an unreadable or
  * unset default omits the suffix rather than breaking the failure it decorates.
  */
-export function readSettingsDefaultRoute(input: { readonly cwd: string; readonly agentDir: string }): SettingsDefaultRoute | undefined {
+export function readSettingsDefaultRoute(input: {
+  readonly cwd: string
+  readonly agentDir: string
+}): SettingsDefaultRoute | undefined {
   try {
     const { SettingsManager } = senpiBarrel()
     const settings = SettingsManager.create(input.cwd, input.agentDir)
     const provider = settings.getDefaultProvider()
     const modelId = settings.getDefaultModel()
-    if (typeof provider !== "string" || typeof modelId !== "string" || provider.length === 0 || modelId.length === 0) return undefined
+    if (typeof provider !== "string" || typeof modelId !== "string" || provider.length === 0 || modelId.length === 0)
+      return undefined
     return { provider, modelId }
-  } catch { // no-excuse-ok: catch - a best-effort message detail never breaks the failure it describes.
+  } catch {
+    // no-excuse-ok: catch - a best-effort message detail never breaks the failure it describes.
     return undefined
   }
 }

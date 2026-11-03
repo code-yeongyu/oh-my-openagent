@@ -10,7 +10,9 @@ mock.module("./cli-runner", () => ({
   processApplyPatchEditsWithCli,
 }))
 
-afterAll(() => { mock.restore() })
+afterAll(() => {
+  mock.restore()
+})
 
 const { createCommentCheckerHooks } = await import("./hook")
 

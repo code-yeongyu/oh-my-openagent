@@ -16,7 +16,7 @@ export function createStagedChildCreation(pause: ChildPausePort): ChildCreationP
   return {
     async startPaused(spec, runner, ticket) {
       const staged = runner.startStaged === undefined ? undefined : await runner.startStaged(spec)
-      const child = staged?.child ?? await runner.start(spec)
+      const child = staged?.child ?? (await runner.start(spec))
       return {
         child,
         async activate() {
@@ -27,9 +27,13 @@ export function createStagedChildCreation(pause: ChildPausePort): ChildCreationP
           const ack = await pause.pauseForRun(child, decision.owner)
           if ("refused" in ack) throw new Error(`child ${spec.taskId} is held by another parent`)
           if (staged !== undefined) {
-            const held = await pause.holdInput(child, { inputId: `${spec.taskId}:first-prompt`, revision: 0, text: staged.firstPrompt }, {
-              parentSessionId: decision.owner.parentSessionId,
-            })
+            const held = await pause.holdInput(
+              child,
+              { inputId: `${spec.taskId}:first-prompt`, revision: 0, text: staged.firstPrompt },
+              {
+                parentSessionId: decision.owner.parentSessionId,
+              },
+            )
             if (held.kind !== "held") throw new Error(`child ${spec.taskId} refused to hold its first prompt`)
           }
           return { kind: "paused", childSeq: ack.childSeq, owner: decision.owner }

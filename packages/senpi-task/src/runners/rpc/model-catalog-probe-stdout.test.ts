@@ -60,13 +60,21 @@ describe("model catalog probe output capture (#9068)", () => {
     it("#when the child exits #then the probe still resolves and names the read failure in stderr", async () => {
       // given
       // Removes only this probe's own capture: the stdout fd is still open here, so its inode names exactly one file.
-      const spawnRemovingCapture = (command: string, args: readonly string[], options: ModelCatalogSpawnOptions): ChildProcess => {
+      const spawnRemovingCapture = (
+        command: string,
+        args: readonly string[],
+        options: ModelCatalogSpawnOptions,
+      ): ChildProcess => {
         const captureInode = fstatSync(options.stdio[1]).ino
         const child = spawn(command, [...args], options)
         child.once("exit", () => {
           for (const entry of readdirSync(tmpdir())) {
             const candidate = join(tmpdir(), entry, "stdout")
-            if (entry.startsWith("omo-model-catalog-") && statSync(candidate, { throwIfNoEntry: false })?.ino === captureInode) rmSync(candidate)
+            if (
+              entry.startsWith("omo-model-catalog-") &&
+              statSync(candidate, { throwIfNoEntry: false })?.ino === captureInode
+            )
+              rmSync(candidate)
           }
         })
         return child
@@ -74,7 +82,12 @@ describe("model catalog probe output capture (#9068)", () => {
 
       // when
       const result = await probeModelCatalog(
-        { command: process.execPath, args: ["-e", "process.stdout.write('provider  model\\n')"], cwd: process.cwd(), env: { ...process.env } },
+        {
+          command: process.execPath,
+          args: ["-e", "process.stdout.write('provider  model\\n')"],
+          cwd: process.cwd(),
+          env: { ...process.env },
+        },
         { spawnProcess: spawnRemovingCapture, timeoutMs: 60_000 },
       )
 

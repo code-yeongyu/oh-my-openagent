@@ -23,7 +23,10 @@ describe("browser provider doctor check", () => {
     root = mkdtempSync(join(tmpdir(), "browser-provider-doctor-"))
     originalDirectory = process.cwd()
     originalEnvironment = Object.fromEntries(
-      ["HOME", "USERPROFILE", "OMO_PROFILE", "OCX_PROFILE", "OPENCODE_CONFIG_DIR"].map((key) => [key, process.env[key]]),
+      ["HOME", "USERPROFILE", "OMO_PROFILE", "OCX_PROFILE", "OPENCODE_CONFIG_DIR"].map((key) => [
+        key,
+        process.env[key],
+      ]),
     )
     for (const key of Object.keys(originalEnvironment)) delete process.env[key]
     process.env.HOME = root
@@ -48,19 +51,20 @@ describe("browser provider doctor check", () => {
     const configDirectory = layer === "project" ? join(root, "project", ".omo") : join(root, ".omo")
     mkdirSync(configDirectory, { recursive: true })
     process.env.OMO_PROFILE = "qa"
-    const config = layer === "profile"
-      ? { profiles: { qa: { "[opencode]": browserConfig } } }
-      : { "[opencode]": browserConfig }
+    const config =
+      layer === "profile" ? { profiles: { qa: { "[opencode]": browserConfig } } } : { "[opencode]": browserConfig }
     writeFileSync(join(configDirectory, "omo.jsonc"), JSON.stringify(config))
     // When: doctor executes the check.
     const result = await checkBrowserProvider()
     // Then: machine-readable failure includes the migration diagnostic and key.
     expect(result.status).toBe("fail")
-    expect(result.issues).toEqual([expect.objectContaining({
-      severity: "error",
-      description: expect.stringContaining(removalMessage),
-      affects: ["browser_automation_engine.provider"],
-    })])
+    expect(result.issues).toEqual([
+      expect.objectContaining({
+        severity: "error",
+        description: expect.stringContaining(removalMessage),
+        affects: ["browser_automation_engine.provider"],
+      }),
+    ])
   })
 
   test("passes when the obsolete configuration key is removed", async () => {

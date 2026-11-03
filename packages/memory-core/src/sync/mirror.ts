@@ -124,10 +124,7 @@ export class MirrorSync {
   }
 
   private async push(url: string, timeoutMs: number): Promise<MirrorPushResult> {
-    const result = await this.run(
-      ["push", "--quiet", url, `${BRANCH}:${BRANCH}`],
-      timeoutMs,
-    )
+    const result = await this.run(["push", "--quiet", url, `${BRANCH}:${BRANCH}`], timeoutMs)
     if (result.code === 0) return { pushed: true, detail: "" }
     return { pushed: false, detail: redactUrl(describe(result)) }
   }

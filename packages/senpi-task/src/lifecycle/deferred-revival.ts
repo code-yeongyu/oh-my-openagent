@@ -9,7 +9,6 @@ import { newestSessionPath } from "./session-path"
 import { suspendHandle } from "./shutdown"
 import { withDroppedSteeringNotice } from "../state/queued-steering"
 
-
 /**
  * Sessions whose scoped retries must stop: the engine shut that session down or was disposed. A retry
  * re-checks this after every wait, so it never revives a child under a session the user has left, and
@@ -58,9 +57,13 @@ export async function retryDeferredScopedChild(
     if (!canRetry(context, fresh, parentSessionId)) return
     // Another revival can claim a child before it installs its handle. The claim/epoch fence,
     // not just registry presence, stops this retry from reclaiming that in-flight owner.
-    if (expected === null || fresh.notification.run_epoch !== expected.notification.run_epoch
-      || (fresh.residency_claim !== expected.residency_claim
-        && (reason !== "foreign_live_owner" || fresh.host_pid === context.hostPid || foreignOwnerAlive(context, fresh)))) return
+    if (
+      expected === null ||
+      fresh.notification.run_epoch !== expected.notification.run_epoch ||
+      (fresh.residency_claim !== expected.residency_claim &&
+        (reason !== "foreign_live_owner" || fresh.host_pid === context.hostPid || foreignOwnerAlive(context, fresh)))
+    )
+      return
     attempts += 1
     if (foreignOwnerAlive(context, fresh)) {
       // An existing owner may finish or release the child. Never steal its record or lose it.
@@ -68,10 +71,14 @@ export async function retryDeferredScopedChild(
       continue
     }
     if (isHostSessionRecord(fresh)) context.hostSessionProbe.refresh(fresh.host_session.socket)
-    if (reason === "foreign_live_owner" && isHostSessionRecord(fresh) && fresh.residency_state === "resident"
-      && await context.hostSessionProbe.daemonAlive(fresh.host_session)
-      && await context.hostSessionProbe.sessionLive(fresh.host_session)
-      && (fresh.host_pid === undefined || fresh.host_pid === context.hostPid)) {
+    if (
+      reason === "foreign_live_owner" &&
+      isHostSessionRecord(fresh) &&
+      fresh.residency_state === "resident" &&
+      (await context.hostSessionProbe.daemonAlive(fresh.host_session)) &&
+      (await context.hostSessionProbe.sessionLive(fresh.host_session)) &&
+      (fresh.host_pid === undefined || fresh.host_pid === context.hostPid)
+    ) {
       // The same-process host can hold another engine's live child. Its session liveness,
       // rather than absence from our registry, is the ownership evidence startup used.
       continue
@@ -104,11 +111,17 @@ export async function retryDeferredScopedChild(
     if (outcome?.kind !== "deferred" || outcome.reason === undefined) return
     reason = outcome.reason
     expected = context.store.load(taskId)
-    if (expected !== null && context.registry.ownsRecord?.(expected) === true
-      && (outcome.permanent === true || PERMANENT_REVIVAL_REASONS.has(reason))) {
+    if (
+      expected !== null &&
+      context.registry.ownsRecord?.(expected) === true &&
+      (outcome.permanent === true || PERMANENT_REVIVAL_REASONS.has(reason))
+    ) {
       const permanent = expected
-      await expireSuspendedChild(context, permanent,
-        () => !retriesStopped(context, parentSessionId) && context.registry.ownsRecord?.(permanent) === true)
+      await expireSuspendedChild(
+        context,
+        permanent,
+        () => !retriesStopped(context, parentSessionId) && context.registry.ownsRecord?.(permanent) === true,
+      )
       return
     }
     if (!SCOPED_RETRY_REASONS.has(reason)) return
@@ -117,8 +130,12 @@ export async function retryDeferredScopedChild(
   // foreign owner, which never ends lost below.
   const observed = context.store.load(taskId)
   if (!canRetry(context, observed, parentSessionId)) return
-  if (expected === null || observed.residency_claim !== expected.residency_claim
-    || observed.notification.run_epoch !== expected.notification.run_epoch) return
+  if (
+    expected === null ||
+    observed.residency_claim !== expected.residency_claim ||
+    observed.notification.run_epoch !== expected.notification.run_epoch
+  )
+    return
   context.store.appendEvent(taskId, { type: "revival_retry_exhausted", payload: { reason, attempts } })
   // A live parent owns the deadline and confirmed cleanup, including daemon-hosted children.
   if (context.registry.ownsRecord?.(observed) === true) return
@@ -128,11 +145,19 @@ export async function retryDeferredScopedChild(
   let applied = false
   const message = `revival deferred: ${reason}; exhausted ${attempts} retry attempts`
   context.store.mutate(taskId, (fresh) => {
-    if (!canRetry(context, fresh, parentSessionId) || isHostSessionRecord(fresh) || foreignOwnerAlive(context, fresh)
-      || fresh.host_pid !== observed.host_pid || fresh.residency_claim !== observed.residency_claim
-      || fresh.notification.run_epoch !== observed.notification.run_epoch || fresh.updated_at !== observed.updated_at) return fresh
+    if (
+      !canRetry(context, fresh, parentSessionId) ||
+      isHostSessionRecord(fresh) ||
+      foreignOwnerAlive(context, fresh) ||
+      fresh.host_pid !== observed.host_pid ||
+      fresh.residency_claim !== observed.residency_claim ||
+      fresh.notification.run_epoch !== observed.notification.run_epoch ||
+      fresh.updated_at !== observed.updated_at
+    )
+      return fresh
     const result = markRecordLostForReconciliation(fresh, {
-      timestamp: nowIso(context), error_message: withDroppedSteeringNotice(message, fresh.pending_steering?.length ?? 0),
+      timestamp: nowIso(context),
+      error_message: withDroppedSteeringNotice(message, fresh.pending_steering?.length ?? 0),
     })
     applied = result.applied
     return result.record
@@ -143,13 +168,20 @@ export async function retryDeferredScopedChild(
 }
 
 function canRetry(context: LifecycleContext, record: TaskRecord | null, parentSessionId: string): record is TaskRecord {
-  return record !== null && record.parent_session_id === parentSessionId
-    && !TERMINAL_STATUSES.has(record.status) && record.killed !== true
-    && context.registry.get(record.task_id) === undefined
-    && (record.residency_state === "persisted_only" || record.residency_state === "rpc_detached"
-      || record.residency_state === "resident")
+  return (
+    record !== null &&
+    record.parent_session_id === parentSessionId &&
+    !TERMINAL_STATUSES.has(record.status) &&
+    record.killed !== true &&
+    context.registry.get(record.task_id) === undefined &&
+    (record.residency_state === "persisted_only" ||
+      record.residency_state === "rpc_detached" ||
+      record.residency_state === "resident")
+  )
 }
 
 function foreignOwnerAlive(context: LifecycleContext, record: TaskRecord): boolean {
-  return record.host_pid !== undefined && record.host_pid !== context.hostPid && context.signaller.isAlive(record.host_pid)
+  return (
+    record.host_pid !== undefined && record.host_pid !== context.hostPid && context.signaller.isAlive(record.host_pid)
+  )
 }

@@ -11,13 +11,24 @@ import type { SyncJournal } from "./journal"
 
 type ItemSide = "receive" | "apply" | "render" | "capture"
 
-export async function rejectItem(deps: EngineDeps, journal: SyncJournal, side: ItemSide, key: string, rule: string): Promise<void> {
+export async function rejectItem(
+  deps: EngineDeps,
+  journal: SyncJournal,
+  side: ItemSide,
+  key: string,
+  rule: string,
+): Promise<void> {
   deps.log?.(`sync.item.rejected side=${side} len=${Buffer.byteLength(key, "utf8")} rule=${rule}`)
   if (side === "capture") return
   await journal.updateState({ rejectedItems: (await journal.state()).rejectedItems + 1 })
 }
 
-export async function acceptedItems<T extends { readonly key: string }>(deps: EngineDeps, journal: SyncJournal, side: ItemSide, items: readonly T[]): Promise<T[]> {
+export async function acceptedItems<T extends { readonly key: string }>(
+  deps: EngineDeps,
+  journal: SyncJournal,
+  side: ItemSide,
+  items: readonly T[],
+): Promise<T[]> {
   const kept: T[] = []
   for (const item of items) {
     const problem = isSyncItemKey(item.key)
@@ -27,6 +38,18 @@ export async function acceptedItems<T extends { readonly key: string }>(deps: En
   return kept
 }
 
-export async function acceptedKeys(deps: EngineDeps, journal: SyncJournal, side: ItemSide, keys: readonly string[]): Promise<string[]> {
-  return (await acceptedItems(deps, journal, side, keys.map((key) => ({ key })))).map((item) => item.key)
+export async function acceptedKeys(
+  deps: EngineDeps,
+  journal: SyncJournal,
+  side: ItemSide,
+  keys: readonly string[],
+): Promise<string[]> {
+  return (
+    await acceptedItems(
+      deps,
+      journal,
+      side,
+      keys.map((key) => ({ key })),
+    )
+  ).map((item) => item.key)
 }

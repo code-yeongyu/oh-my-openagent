@@ -6,11 +6,17 @@ import { fakeApi, grant, memorySecrets, temporaryHome } from "./test-support"
 for (const result of ["false", "reject"]) {
   test(`a valid loopback callback survives opener ${result}`, async () => {
     let exchanges = 0
-    const api = fakeApi(() => { exchanges++; return Response.json(grant) })
+    const api = fakeApi(() => {
+      exchanges++
+      return Response.json(grant)
+    })
     const store = memorySecrets().store(api)
     await loginLoopback(createSession({ api, store, home: await temporaryHome() }), {
-      accounts: "https://signin.omo.dev", name: "Test", platform: "linux", chooseDevice: async () => null,
-      open: async url => {
+      accounts: "https://signin.omo.dev",
+      name: "Test",
+      platform: "linux",
+      chooseDevice: async () => null,
+      open: async (url) => {
         const ask = new URL(url)
         const callback = new URL(ask.searchParams.get("redirect_uri") ?? "")
         callback.searchParams.set("state", ask.searchParams.get("state") ?? "")
@@ -25,12 +31,17 @@ for (const result of ["false", "reject"]) {
   })
   test(`opener ${result} without a callback still allows device fallback`, async () => {
     const api = fakeApi(() => Response.json(grant))
-    await expect(loginLoopback(createSession({ api, store: memorySecrets().store(api), home: await temporaryHome() }), {
-      accounts: "https://signin.omo.dev", name: "Test", platform: "linux", chooseDevice: async () => null,
-      open: async () => {
-        if (result === "reject") throw new Error("opener unavailable")
-        return false
-      },
-    })).rejects.toBeInstanceOf(BrowserUnavailable)
+    await expect(
+      loginLoopback(createSession({ api, store: memorySecrets().store(api), home: await temporaryHome() }), {
+        accounts: "https://signin.omo.dev",
+        name: "Test",
+        platform: "linux",
+        chooseDevice: async () => null,
+        open: async () => {
+          if (result === "reject") throw new Error("opener unavailable")
+          return false
+        },
+      }),
+    ).rejects.toBeInstanceOf(BrowserUnavailable)
   })
 }

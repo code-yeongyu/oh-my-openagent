@@ -51,12 +51,10 @@ describe("resolveVariant", () => {
 
     expect(resolveVariant({ modelID: "kimi-k2.8", variants: orderedVariants })).toBe("kimi-k2-7")
     expect(resolveVariant({ modelID: "kimi-for-coding/k2p8", variants: orderedVariants })).toBe("kimi-k2-7")
-    expect(resolveVariant({ modelID: "kimi-for-coding/kimi-for-coding", variants: orderedVariants })).toBe(
+    expect(resolveVariant({ modelID: "kimi-for-coding/kimi-for-coding", variants: orderedVariants })).toBe("kimi-k2-7")
+    expect(resolveVariant({ modelID: "kimi-for-coding/kimi-for-coding-highspeed", variants: orderedVariants })).toBe(
       "kimi-k2-7",
     )
-    expect(
-      resolveVariant({ modelID: "kimi-for-coding/kimi-for-coding-highspeed", variants: orderedVariants }),
-    ).toBe("kimi-k2-7")
   })
 
   test("#given a kimi-k3 variant ordered before kimi #then K3 wins and K2.x stays on its own variants", () => {
@@ -109,9 +107,7 @@ describe("resolveVariant", () => {
   })
 
   test("#given Prometheus agent #then planner overrides model variant", () => {
-    expect(resolveVariant({ agentName: "prometheus", modelID: "gpt-5-5", variants })).toBe(
-      "planner"
-    )
+    expect(resolveVariant({ agentName: "prometheus", modelID: "gpt-5-5", variants })).toBe("planner")
   })
 
   test("#given unknown model #then falls back to default variant", () => {

@@ -47,9 +47,16 @@ function scripts(routes, gates) {
   return {
     parent: {
       parentSteps: [
-        { type: "tool_call", name: "task", arguments: {
-          category: "proc", run_in_background: true, name: "cc-child",
-          prompt: `cc child [[mock-cwd:${routes.child}]]` } },
+        {
+          type: "tool_call",
+          name: "task",
+          arguments: {
+            category: "proc",
+            run_in_background: true,
+            name: "cc-child",
+            prompt: `cc child [[mock-cwd:${routes.child}]]`,
+          },
+        },
         hold(gates.cancel, "hold the parent until the grandchild is mid-tool"),
         { type: "tool_call", name: "task_cancel", arguments: { name: "cc-child", reason: "cancel-cascade QA" } },
         hold(gates.parentRelease, "keep the parent alive while the driver observes"),
@@ -60,9 +67,16 @@ function scripts(routes, gates) {
     child: {
       parentSteps: [],
       childSteps: [
-        { type: "tool_call", name: "task", arguments: {
-          category: "proc", run_in_background: true, name: "cc-grandchild",
-          prompt: `cc grandchild [[mock-cwd:${routes.grandchild}]]` } },
+        {
+          type: "tool_call",
+          name: "task",
+          arguments: {
+            category: "proc",
+            run_in_background: true,
+            name: "cc-grandchild",
+            prompt: `cc grandchild [[mock-cwd:${routes.grandchild}]]`,
+          },
+        },
         hold(gates.childHold, "child holds until it is cancelled"),
         { type: "text", text: "cc child done" },
       ],
@@ -78,9 +92,14 @@ function scripts(routes, gates) {
 }
 
 const byName = (project, name) => taskRecords(project).find((record) => record.name === name)
-const view = (record) => record === undefined ? null : {
-  status: record.status, residency_state: record.residency_state ?? null, error_message: record.error_message ?? null,
-}
+const view = (record) =>
+  record === undefined
+    ? null
+    : {
+        status: record.status,
+        residency_state: record.residency_state ?? null,
+        error_message: record.error_message ?? null,
+      }
 
 async function cancelCascade(config, artifacts, label) {
   const sandbox = newSandbox(config, `cancel-${label}`, {
@@ -90,8 +109,10 @@ async function cancelCascade(config, artifacts, label) {
   const project = mainProject(sandbox)
   const routes = { child: writeRoute(sandbox, "cc-child", {}), grandchild: writeRoute(sandbox, "cc-grandchild", {}) }
   const gates = {
-    cancel: join(sandbox.cwd, "gates", "cancel"), parentRelease: join(sandbox.cwd, "gates", "parent-release"),
-    childHold: join(routes.child, "child-hold"), grandchildHold: join(routes.grandchild, "grandchild-hold"),
+    cancel: join(sandbox.cwd, "gates", "cancel"),
+    parentRelease: join(sandbox.cwd, "gates", "parent-release"),
+    childHold: join(routes.child, "child-hold"),
+    grandchildHold: join(routes.grandchild, "grandchild-hold"),
   }
   mkdirSync(join(sandbox.cwd, "gates"), { recursive: true })
   const plan = scripts(routes, gates)
@@ -100,34 +121,53 @@ async function cancelCascade(config, artifacts, label) {
   writeFileSync(join(routes.grandchild, "mock-script.json"), `${JSON.stringify(plan.grandchild, null, 2)}\n`)
   const parent = startParent(sandbox, project, "spawn a child that spawns a grandchild")
   try {
-    const both = await observeState(sandbox.root, () => {
-      const child = byName(project, "cc-child")
-      const grandchild = byName(project, "cc-grandchild")
-      return child?.status === "running" && grandchild?.status === "running"
-        && typeof grandchild.host_session?.socket === "string" ? { child, grandchild } : undefined
-    }, { timeoutMs: 240_000 })
+    const both = await observeState(
+      sandbox.root,
+      () => {
+        const child = byName(project, "cc-child")
+        const grandchild = byName(project, "cc-grandchild")
+        return child?.status === "running" &&
+          grandchild?.status === "running" &&
+          typeof grandchild.host_session?.socket === "string"
+          ? { child, grandchild }
+          : undefined
+      },
+      { timeoutMs: 240_000 },
+    )
     if (both === undefined) throw new Error("child and hosted grandchild never both ran")
     writeFileSync(gates.cancel, "go\n")
-    const childCancelled = await observeState(sandbox.root, () =>
-      byName(project, "cc-child")?.status === "cancelled" ? true : undefined, { timeoutMs: 120_000 })
-    const afterCancel = await observeState(sandbox.root, () => {
-      const grandchild = byName(project, "cc-grandchild")
-      return grandchild !== undefined && TERMINAL.includes(grandchild.status) ? grandchild : undefined
-    }, { timeoutMs: 60_000 })
+    const childCancelled = await observeState(
+      sandbox.root,
+      () => (byName(project, "cc-child")?.status === "cancelled" ? true : undefined),
+      { timeoutMs: 120_000 },
+    )
+    const afterCancel = await observeState(
+      sandbox.root,
+      () => {
+        const grandchild = byName(project, "cc-grandchild")
+        return grandchild !== undefined && TERMINAL.includes(grandchild.status) ? grandchild : undefined
+      },
+      { timeoutMs: 60_000 },
+    )
     const atCancel = view(afterCancel ?? byName(project, "cc-grandchild"))
     writeFileSync(gates.grandchildHold, "go\n")
-    const settled = await observeState(sandbox.root, () => {
-      const grandchild = byName(project, "cc-grandchild")
-      return grandchild !== undefined && TERMINAL.includes(grandchild.status) ? grandchild : undefined
-    }, { timeoutMs: 120_000 })
+    const settled = await observeState(
+      sandbox.root,
+      () => {
+        const grandchild = byName(project, "cc-grandchild")
+        return grandchild !== undefined && TERMINAL.includes(grandchild.status) ? grandchild : undefined
+      },
+      { timeoutMs: 120_000 },
+    )
     const facts = {
       label,
       child_cancelled: childCancelled === true,
       grandchild_after_parent_cancel: atCancel,
       grandchild_after_release: view(settled ?? byName(project, "cc-grandchild")),
     }
-    facts.grandchild_stopped = facts.grandchild_after_parent_cancel?.status === "cancelled"
-      && facts.grandchild_after_release?.status === "cancelled"
+    facts.grandchild_stopped =
+      facts.grandchild_after_parent_cancel?.status === "cancelled" &&
+      facts.grandchild_after_release?.status === "cancelled"
     writeFileSync(join(artifacts, `cancel-cascade-${label}.json`), `${JSON.stringify(facts, null, 2)}\n`)
     return facts
   } finally {
@@ -144,7 +184,8 @@ function argValue(argv, flag) {
 }
 
 async function main(argv) {
-  if (process.platform === "win32") return console.log(JSON.stringify({ result: "SKIP", reason: "POSIX host shards only" })), 0
+  if (process.platform === "win32")
+    return (console.log(JSON.stringify({ result: "SKIP", reason: "POSIX host shards only" })), 0)
   const bin = argValue(argv, "--bin") ?? process.env.SENPI_BIN
   if (bin === undefined) throw new Error("--bin <compiled omo> is required")
   const beforeBin = argValue(argv, "--before-bin")
@@ -160,14 +201,19 @@ async function main(argv) {
     }
   } finally {
     for (const entry of sandboxProcesses({ root: runRoot })) {
-      try { process.kill(entry.pid, "SIGKILL") } catch { /* gone */ }
+      try {
+        process.kill(entry.pid, "SIGKILL")
+      } catch {
+        /* gone */
+      }
     }
     rmSync(runRoot, { recursive: true, force: true })
   }
   const report = {
     results,
-    pass: results.fixed?.grandchild_stopped === true
-      && (results.base === undefined || results.base.grandchild_stopped === false),
+    pass:
+      results.fixed?.grandchild_stopped === true &&
+      (results.base === undefined || results.base.grandchild_stopped === false),
     run_root_removed: !existsSync(runRoot),
     realSenpiUntouched: changedRealAgentFiles(realBefore, realAgentDigests()).length === 0,
   }

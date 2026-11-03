@@ -3,7 +3,12 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { HOST_STATUS_RAW_ENV, isHostStatusAll, runHostStatusAll, sessionActivityReader } from "../bin/lib/host-status.js"
+import {
+  HOST_STATUS_RAW_ENV,
+  isHostStatusAll,
+  runHostStatusAll,
+  sessionActivityReader,
+} from "../bin/lib/host-status.js"
 import { readDiskSession } from "../../omo-senpi/src/components/thread/address-book"
 import { readSessionFacts } from "../../omo-senpi/src/components/thread/session-facts"
 
@@ -31,17 +36,40 @@ function sessionFile(dir: string, lines: readonly Record<string, unknown>[]): st
 }
 
 function tuiRow(path: string | null) {
-  return { socket: "/agent/rpc-host-daemon/x/t-1.sock", endpoint_kind: "tui", reachable: true, alive: true, reason: null, owner: { pid: 42, cwd: "/work", session: path === null ? null : { id: "dur-tui", path, name: "my-tui" } } }
+  return {
+    socket: "/agent/rpc-host-daemon/x/t-1.sock",
+    endpoint_kind: "tui",
+    reachable: true,
+    alive: true,
+    reason: null,
+    owner: { pid: 42, cwd: "/work", session: path === null ? null : { id: "dur-tui", path, name: "my-tui" } },
+  }
 }
 
-const HOST_ROW = { socket: "/agent/rpc.sock", endpoint_kind: "rpc_host", reachable: true, alive: true, reason: null, owner: null }
+const HOST_ROW = {
+  socket: "/agent/rpc.sock",
+  endpoint_kind: "rpc_host",
+  reachable: true,
+  alive: true,
+  reason: null,
+  owner: null,
+}
 
-async function runWith(stdoutLine: string, exitCode = 0, readActivity = (path: string) => readSessionFacts(path)?.updated_at ?? null) {
+async function runWith(
+  stdoutLine: string,
+  exitCode = 0,
+  readActivity = (path: string) => readSessionFacts(path)?.updated_at ?? null,
+) {
   const stdout = capture()
   const stderr = capture()
   const calls: { args: readonly string[]; env: Record<string, string | undefined> }[] = []
   const code = await runHostStatusAll(["host", "status", "--all", "--json", "--include-workers"], {
-    engine: { run: (args: string[], options: { env: Record<string, string | undefined> }) => { calls.push({ args, env: options.env }); return { exitCode, stdout: stdoutLine, stderr: "engine note\n" } } },
+    engine: {
+      run: (args: string[], options: { env: Record<string, string | undefined> }) => {
+        calls.push({ args, env: options.env })
+        return { exitCode, stdout: stdoutLine, stderr: "engine note\n" }
+      },
+    },
     env: { KEEP: "1" },
     stdout,
     stderr,
@@ -64,14 +92,23 @@ describe("omo host status --all: last_activity_at on tui rows", () => {
     expect(printed.endpoints[0]).toEqual(HOST_ROW)
     expect(result.stdout.endsWith("}\n")).toBe(true)
     expect({ code: result.code, stderr: result.stderr }).toEqual({ code: 0, stderr: "engine note\n" })
-    expect(result.calls).toEqual([{ args: ["host", "status", "--all", "--json", "--include-workers"], env: { KEEP: "1", [HOST_STATUS_RAW_ENV]: "1" } }])
+    expect(result.calls).toEqual([
+      {
+        args: ["host", "status", "--all", "--json", "--include-workers"],
+        env: { KEEP: "1", [HOST_STATUS_RAW_ENV]: "1" },
+      },
+    ])
   })
 
   test("#given a tui row whose final session entry is larger than the facts window #when status runs #then last_activity_at is the final entry timestamp", async () => {
     const path = sessionFile(scratch(), [
       { type: "session", id: "dur-tui", cwd: "/work", timestamp: "2026-09-30T01:00:00.000Z" },
       { type: "message", timestamp: "2026-09-30T01:05:00.000Z", message: { role: "user", content: "hi" } },
-      { type: "message", timestamp: "2026-09-30T02:00:00.000Z", message: { role: "assistant", content: "x".repeat(160 * 1024) } },
+      {
+        type: "message",
+        timestamp: "2026-09-30T02:00:00.000Z",
+        message: { role: "assistant", content: "x".repeat(160 * 1024) },
+      },
     ])
 
     const result = await runWith(JSON.stringify({ endpoints: [tuiRow(path)] }))
@@ -82,10 +119,15 @@ describe("omo host status --all: last_activity_at on tui rows", () => {
   test("#given a session whose final line is partial #when status and degraded listing read it #then both report unknown activity", async () => {
     const dir = scratch()
     const path = join(dir, "partial.jsonl")
-    writeFileSync(path, `${[
-      { type: "session", id: "dur-tui", cwd: "/work", timestamp: "2026-09-30T01:00:00.000Z" },
-      { type: "message", timestamp: "2026-09-30T01:05:00.000Z", message: { role: "user", content: "hi" } },
-    ].map((entry) => JSON.stringify(entry)).join("\n")}\n{"type":"message","timestamp":"2026-09-30T02:00:00.000Z"`)
+    writeFileSync(
+      path,
+      `${[
+        { type: "session", id: "dur-tui", cwd: "/work", timestamp: "2026-09-30T01:00:00.000Z" },
+        { type: "message", timestamp: "2026-09-30T01:05:00.000Z", message: { role: "user", content: "hi" } },
+      ]
+        .map((entry) => JSON.stringify(entry))
+        .join("\n")}\n{"type":"message","timestamp":"2026-09-30T02:00:00.000Z"`,
+    )
 
     const status = await runWith(JSON.stringify({ endpoints: [tuiRow(path)] }))
     const disk = readDiskSession(path, "/agent/rpc-host-daemon/x/t-1.sock")
@@ -105,8 +147,14 @@ describe("omo host status --all: last_activity_at on tui rows", () => {
   })
 
   test("#given the engine exits 3 with its inventory line #when status runs #then the exit code is kept and the line is still enriched", async () => {
-    const result = await runWith(JSON.stringify({ endpoints: [{ ...tuiRow(null), reachable: false, alive: false, reason: "dead" }] }), 3)
-    expect({ code: result.code, activity: JSON.parse(result.stdout).endpoints[0].last_activity_at }).toEqual({ code: 3, activity: null })
+    const result = await runWith(
+      JSON.stringify({ endpoints: [{ ...tuiRow(null), reachable: false, alive: false, reason: "dead" }] }),
+      3,
+    )
+    expect({ code: result.code, activity: JSON.parse(result.stdout).endpoints[0].last_activity_at }).toEqual({
+      code: 3,
+      activity: null,
+    })
   })
 
   test("#given the engine prints no inventory JSON #when status runs #then its stdout passes through unchanged", async () => {
@@ -133,7 +181,10 @@ describe("omo host status --all: the session reader", () => {
   test("#given the plugin's thread SDK #when the reader runs #then it is the SDK's readSessionFacts updated_at, and a plugin without the SDK reads null", async () => {
     const plugin = scratch()
     mkdirSync(join(plugin, "runtime", "thread-sdk"), { recursive: true })
-    writeFileSync(join(plugin, "runtime", "thread-sdk", "sdk.js"), "export function readSessionFacts(path) { return path === '/known' ? { updated_at: '2026-09-30T02:00:00.000Z' } : null }\n")
+    writeFileSync(
+      join(plugin, "runtime", "thread-sdk", "sdk.js"),
+      "export function readSessionFacts(path) { return path === '/known' ? { updated_at: '2026-09-30T02:00:00.000Z' } : null }\n",
+    )
     const read = await sessionActivityReader(plugin)
     expect([read("/known"), read("/other")]).toEqual(["2026-09-30T02:00:00.000Z", null])
     const missing = await sessionActivityReader(join(plugin, "absent"))

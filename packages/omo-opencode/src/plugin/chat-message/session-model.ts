@@ -4,10 +4,7 @@ import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { getSessionModel, setSessionModel } from "../../shared/session-model-state"
 import type { ChatMessageHandlerOutput, ChatMessageInput, SessionModelOverride } from "./types"
 
-function hasExplicitAgentModelOverride(
-  agent: string | undefined,
-  pluginConfig: OhMyOpenCodeConfig,
-): boolean {
+function hasExplicitAgentModelOverride(agent: string | undefined, pluginConfig: OhMyOpenCodeConfig): boolean {
   const configuredAgents = pluginConfig.agents
   const normalizedAgent = typeof agent === "string" ? getAgentConfigKey(agent) : undefined
   if (!normalizedAgent || !configuredAgents || !(normalizedAgent in configuredAgents)) {

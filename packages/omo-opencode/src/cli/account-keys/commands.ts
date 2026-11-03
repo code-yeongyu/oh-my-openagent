@@ -12,7 +12,7 @@ export interface AccountKeysDependencies {
 
 const defaultDependencies: AccountKeysDependencies = {
   store: () => createOsKeyStore(ACCOUNT_KEYS_RECORD_NAME),
-  output: line => console.log(line),
+  output: (line) => console.log(line),
 }
 
 function describe(keyring: DeviceKeyring): string {
@@ -20,7 +20,10 @@ function describe(keyring: DeviceKeyring): string {
   return JSON.stringify({ device: keyring.principal().id, signing, sealing })
 }
 
-async function report(dependencies: AccountKeysDependencies, action: (store: KeyStore) => Promise<string>): Promise<void> {
+async function report(
+  dependencies: AccountKeysDependencies,
+  action: (store: KeyStore) => Promise<string>,
+): Promise<void> {
   try {
     dependencies.output(await action(dependencies.store()))
   } catch (error) {
@@ -30,16 +33,24 @@ async function report(dependencies: AccountKeysDependencies, action: (store: Key
   }
 }
 
-export function configureAccountKeysCommands(program: Command, dependencies: AccountKeysDependencies = defaultDependencies): void {
-  const keys = program.command("account").description("OmO account and device identity")
-    .command("keys").description("Device sync keys kept in the OS keystore")
-  keys.command("init")
+export function configureAccountKeysCommands(
+  program: Command,
+  dependencies: AccountKeysDependencies = defaultDependencies,
+): void {
+  const keys = program
+    .command("account")
+    .description("OmO account and device identity")
+    .command("keys")
+    .description("Device sync keys kept in the OS keystore")
+  keys
+    .command("init")
     .description("Create this device's sync keys (keeps existing keys)")
-    .action(() => report(dependencies, async store => describe(await initializeDeviceKeyring(store))))
-  keys.command("status")
+    .action(() => report(dependencies, async (store) => describe(await initializeDeviceKeyring(store))))
+  keys
+    .command("status")
     .description("Show this device's public sync keys")
     .action(() =>
-      report(dependencies, async store => {
+      report(dependencies, async (store) => {
         const keyring = await loadDeviceKeyring(store)
         if (!keyring) throw new Error("omo account keys: no device keys yet. Run `omo account keys init` first.")
         return describe(keyring)

@@ -26,10 +26,7 @@ type Episode = {
   deadlineAttempted: boolean
 }
 
-export function startLiveParentRecovery(
-  context: LifecycleContext,
-  subscribe: LifecycleDeps["onStoreMutation"],
-) {
+export function startLiveParentRecovery(context: LifecycleContext, subscribe: LifecycleDeps["onStoreMutation"]) {
   const episodes = new Map<string, Episode>()
   let timer: IdleReclaimerTimer | undefined
   let disposed = false
@@ -39,9 +36,7 @@ export function startLiveParentRecovery(
 
   function owned(record: TaskRecord): boolean {
     return (
-      !disposed &&
-      !retriesStopped(context, record.parent_session_id) &&
-      context.registry.ownsRecord?.(record) === true
+      !disposed && !retriesStopped(context, record.parent_session_id) && context.registry.ownsRecord?.(record) === true
     )
   }
 
@@ -52,9 +47,10 @@ export function startLiveParentRecovery(
     return (
       owned(record) &&
       (record.status === "pending" || record.status === "running") &&
-      (record.residency_state !== "resident" || record.suspension_reason !== undefined
-        || (record.recovery_deadline_at !== undefined && context.registry.get(record.task_id) === undefined)
-        || isSuspensionExpiry(record)) &&
+      (record.residency_state !== "resident" ||
+        record.suspension_reason !== undefined ||
+        (record.recovery_deadline_at !== undefined && context.registry.get(record.task_id) === undefined) ||
+        isSuspensionExpiry(record)) &&
       record.cancel_requested === undefined &&
       (record.killed !== true || isSuspensionExpiry(record))
     )
@@ -65,8 +61,10 @@ export function startLiveParentRecovery(
       if (!eligible(record)) return
       if (context.registry.get(record.task_id) !== undefined) return
       const expired = context.now() >= episode.deadline
-      if (isSuspensionExpiry(record)
-        || PERMANENT_REVIVAL_REASONS.has(record.revival_deferred_reason ?? record.suspension_reason ?? "")) {
+      if (
+        isSuspensionExpiry(record) ||
+        PERMANENT_REVIVAL_REASONS.has(record.revival_deferred_reason ?? record.suspension_reason ?? "")
+      ) {
         await expireSuspendedChild(context, record, () => owned(record))
         return
       }
@@ -75,8 +73,11 @@ export function startLiveParentRecovery(
       if (expired) episode.deadlineAttempted = true
       // A live foreign owner may release its claim within the budget. Do not start a second run
       // beside it; at expiry the normal stop/close path must end it (or disclose unconfirmed close).
-      if (record.host_pid !== undefined && record.host_pid !== context.hostPid
-        && context.signaller.isAlive(record.host_pid)) {
+      if (
+        record.host_pid !== undefined &&
+        record.host_pid !== context.hostPid &&
+        context.signaller.isAlive(record.host_pid)
+      ) {
         if (expired) await expireSuspendedChild(context, record, () => owned(record))
         return
       }
@@ -121,10 +122,18 @@ export function startLiveParentRecovery(
         }
         const deferred = context.store.mutate(record.task_id, (fresh) =>
           eligible(fresh) && fresh.notification.run_epoch === episode.epoch
-            ? { ...fresh, revival_deferred_reason: reason, ...(runPaused ? { recovery_deadline_at: episode.deadline } : {}) }
+            ? {
+                ...fresh,
+                revival_deferred_reason: reason,
+                ...(runPaused ? { recovery_deadline_at: episode.deadline } : {}),
+              }
             : fresh,
         )
-        if (!runPaused && deferred !== null && (expired || outcome.permanent === true || PERMANENT_REVIVAL_REASONS.has(reason))) {
+        if (
+          !runPaused &&
+          deferred !== null &&
+          (expired || outcome.permanent === true || PERMANENT_REVIVAL_REASONS.has(reason))
+        ) {
           await expireSuspendedChild(context, deferred, () => owned(deferred))
         }
       }
@@ -150,8 +159,12 @@ export function startLiveParentRecovery(
       if (fresh === null || !eligible(fresh) || fresh.notification.run_epoch !== episode.epoch)
         episodes.delete(record.task_id)
       // A failed attempt may have held the claim across the deadline. Settle its expiry now.
-      else if (context.now() >= episode.deadline && !isSuspensionExpiry(fresh)
-        && context.registry.get(record.task_id) === undefined) scan()
+      else if (
+        context.now() >= episode.deadline &&
+        !isSuspensionExpiry(fresh) &&
+        context.registry.get(record.task_id) === undefined
+      )
+        scan()
     }
   }
 
@@ -186,15 +199,23 @@ export function startLiveParentRecovery(
         )
       }
       if (episode.expiring) continue
-      if (record.revival_deferred_reason !== "run_paused" && context.now() >= episode.deadline
-        && context.registry.get(record.task_id) === undefined
-        && (episode.deadlineAttempted ? !episode.busy || retry
-          : episode.busy || (reconcilingRuns > 0 && record.residency_state === "resident"))) {
+      if (
+        record.revival_deferred_reason !== "run_paused" &&
+        context.now() >= episode.deadline &&
+        context.registry.get(record.task_id) === undefined &&
+        (episode.deadlineAttempted
+          ? !episode.busy || retry
+          : episode.busy || (reconcilingRuns > 0 && record.residency_state === "resident"))
+      ) {
         episode.expiring = true
         const currentEpisode = episode
         void expireSuspendedChild(context, record, () => owned(record))
-          .catch((error: unknown) => log("senpi-task recovery deadline cleanup failed", { taskId: record.task_id, error: String(error) }))
-          .finally(() => { currentEpisode.expiring = false })
+          .catch((error: unknown) =>
+            log("senpi-task recovery deadline cleanup failed", { taskId: record.task_id, error: String(error) }),
+          )
+          .finally(() => {
+            currentEpisode.expiring = false
+          })
         continue
       }
       if (episode.busy || reconciling > 0) continue
@@ -230,9 +251,12 @@ export function startLiveParentRecovery(
         inspect(false)
         // Try an expired parked run once on restart; permanent outcomes still end immediately.
         for (const record of context.store.list().records) {
-          if (eligible(record) && (isSuspensionExpiry(record)
-            || (record.recovery_deadline_at !== undefined && context.now() >= record.recovery_deadline_at)
-            || PERMANENT_REVIVAL_REASONS.has(record.revival_deferred_reason ?? record.suspension_reason ?? ""))) {
+          if (
+            eligible(record) &&
+            (isSuspensionExpiry(record) ||
+              (record.recovery_deadline_at !== undefined && context.now() >= record.recovery_deadline_at) ||
+              PERMANENT_REVIVAL_REASONS.has(record.revival_deferred_reason ?? record.suspension_reason ?? ""))
+          ) {
             const episode = episodes.get(record.task_id)
             if (episode !== undefined && !episode.busy) {
               episode.busy = true
@@ -241,9 +265,15 @@ export function startLiveParentRecovery(
           }
         }
         reconcilingRuns += 1
-        const result = await run().finally(() => { reconcilingRuns -= 1 })
+        const result = await run().finally(() => {
+          reconcilingRuns -= 1
+        })
         for (const outcome of result.outcomes) {
-          if (outcome.kind !== "deferred" || !(outcome.permanent === true || PERMANENT_REVIVAL_REASONS.has(outcome.reason ?? ""))) continue
+          if (
+            outcome.kind !== "deferred" ||
+            !(outcome.permanent === true || PERMANENT_REVIVAL_REASONS.has(outcome.reason ?? ""))
+          )
+            continue
           const record = context.store.load(outcome.task_id)
           if (record !== null && eligible(record)) {
             await expireSuspendedChild(context, record, () => owned(record))

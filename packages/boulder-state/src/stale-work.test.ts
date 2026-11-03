@@ -85,7 +85,7 @@ function writeTranscript(input: { projectDirectory: string; fileName: string; mt
 // backslashes, neither legal inside a segment, so the fixture mirrors the production normalizer
 // (storage/stale-work.ts: toLowerCase().replace(/[^a-z0-9]+/g, "-")) instead of splitting on "/".
 function encodeSessionCwd(directory: string): string {
-	return directory.replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "")
+  return directory.replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "")
 }
 
 function writeTranscriptInto(input: {
@@ -94,24 +94,24 @@ function writeTranscriptInto(input: {
   fileName: string
   mtimeMs: number
 }): void {
-  const projectSessionsDirectory = join(
-    input.sessionsDirectory,
-    `--${encodeSessionCwd(input.projectDirectory)}--`,
-  )
+  const projectSessionsDirectory = join(input.sessionsDirectory, `--${encodeSessionCwd(input.projectDirectory)}--`)
   mkdirSync(projectSessionsDirectory, { recursive: true })
   const transcriptPath = join(projectSessionsDirectory, input.fileName)
-  writeFileSync(transcriptPath, `${JSON.stringify({ type: "session", id: "01a09988-f0b5-7e7c-97b2-ea591aa4bdaf" })}\n`, "utf-8")
+  writeFileSync(
+    transcriptPath,
+    `${JSON.stringify({ type: "session", id: "01a09988-f0b5-7e7c-97b2-ea591aa4bdaf" })}\n`,
+    "utf-8",
+  )
   const mtime = new Date(input.mtimeMs)
   utimesSync(transcriptPath, mtime, mtime)
 }
 
-
 test("#given a Windows-shaped session cwd #when it is encoded for a session directory #then the segment carries no drive colon or separator", () => {
-	// A drive colon and a backslash are both illegal inside a Windows path segment, so a fixture that
-	// splits on "/" alone produced mkdir ENOENT on Windows runners while passing on POSIX.
-	const encoded = encodeSessionCwd("C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\boulder-stale-work-z5FTDO")
-	expect(encoded).toBe("C-Users-RUNNER-1-AppData-Local-Temp-boulder-stale-work-z5FTDO")
-	expect(/[:\\/]/.test(encoded)).toBe(false)
+  // A drive colon and a backslash are both illegal inside a Windows path segment, so a fixture that
+  // splits on "/" alone produced mkdir ENOENT on Windows runners while passing on POSIX.
+  const encoded = encodeSessionCwd("C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\boulder-stale-work-z5FTDO")
+  expect(encoded).toBe("C-Users-RUNNER-1-AppData-Local-Temp-boulder-stale-work-z5FTDO")
+  expect(/[:\\/]/.test(encoded)).toBe(false)
 })
 
 describe("reconcileStaleWorks", () => {
@@ -406,6 +406,8 @@ describe("resolveStaleWorkThresholdMs", () => {
 
   test("#given a non-positive or unparsable env knob #when resolving #then the default is used", () => {
     expect(resolveStaleWorkThresholdMs({ [STALE_WORK_THRESHOLD_ENV_KEY]: "0" })).toBe(DEFAULT_STALE_WORK_THRESHOLD_MS)
-    expect(resolveStaleWorkThresholdMs({ [STALE_WORK_THRESHOLD_ENV_KEY]: "soon" })).toBe(DEFAULT_STALE_WORK_THRESHOLD_MS)
+    expect(resolveStaleWorkThresholdMs({ [STALE_WORK_THRESHOLD_ENV_KEY]: "soon" })).toBe(
+      DEFAULT_STALE_WORK_THRESHOLD_MS,
+    )
   })
 })

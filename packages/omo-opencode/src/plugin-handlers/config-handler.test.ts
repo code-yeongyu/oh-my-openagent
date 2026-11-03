@@ -100,43 +100,48 @@ beforeEach(async () => {
     omoConfig: "/tmp/.config/opencode/omo.jsonc",
   })
 
-  spyOn(permissionCompat, unsafeTestValue("migrateAgentConfig")).mockImplementation((config: Record<string, unknown>) => config)
+  spyOn(permissionCompat, unsafeTestValue("migrateAgentConfig")).mockImplementation(
+    (config: Record<string, unknown>) => config,
+  )
 
-  spyOn(modelResolver, unsafeTestValue("resolveModelWithFallback")).mockReturnValue({ model: "anthropic/claude-opus-4-7", source: "provider-fallback" })
+  spyOn(modelResolver, unsafeTestValue("resolveModelWithFallback")).mockReturnValue({
+    model: "anthropic/claude-opus-4-7",
+    source: "provider-fallback",
+  })
   ;({ createConfigHandler } = await importFreshConfigHandlerModule())
 })
 
 afterEach(() => {
-  (unsafeTestValue(agents.createBuiltinAgents))?.mockRestore?.()
-  ;(unsafeTestValue(sisyphusJunior.createSisyphusJuniorAgentWithOverrides))?.mockRestore?.()
-  ;(unsafeTestValue(commandLoader.loadUserCommands))?.mockRestore?.()
-  ;(unsafeTestValue(commandLoader.loadProjectCommands))?.mockRestore?.()
-  ;(unsafeTestValue(commandLoader.loadOpencodeGlobalCommands))?.mockRestore?.()
-  ;(unsafeTestValue(commandLoader.loadOpencodeProjectCommands))?.mockRestore?.()
-  ;(unsafeTestValue(builtinCommands.loadBuiltinCommands))?.mockRestore?.()
-  ;(unsafeTestValue(skillLoader.loadUserSkills))?.mockRestore?.()
-  ;(unsafeTestValue(skillLoader.loadProjectSkills))?.mockRestore?.()
-  ;(unsafeTestValue(skillLoader.loadOpencodeGlobalSkills))?.mockRestore?.()
-  ;(unsafeTestValue(skillLoader.loadOpencodeProjectSkills))?.mockRestore?.()
-  ;(unsafeTestValue(skillLoader.discoverUserClaudeSkills))?.mockRestore?.()
-  ;(unsafeTestValue(skillLoader.discoverProjectClaudeSkills))?.mockRestore?.()
-  ;(unsafeTestValue(skillLoader.discoverOpencodeGlobalSkills))?.mockRestore?.()
-  ;(unsafeTestValue(skillLoader.discoverOpencodeProjectSkills))?.mockRestore?.()
-  ;(unsafeTestValue(agentLoader.loadUserAgents))?.mockRestore?.()
-  ;(unsafeTestValue(agentLoader.loadProjectAgents))?.mockRestore?.()
-  ;(unsafeTestValue(agentLoader.loadOpencodeGlobalAgents))?.mockRestore?.()
-  ;(unsafeTestValue(agentLoader.loadOpencodeProjectAgents))?.mockRestore?.()
-  ;(unsafeTestValue(mcpLoader.loadMcpConfigs))?.mockRestore?.()
+  unsafeTestValue(agents.createBuiltinAgents)?.mockRestore?.()
+  unsafeTestValue(sisyphusJunior.createSisyphusJuniorAgentWithOverrides)?.mockRestore?.()
+  unsafeTestValue(commandLoader.loadUserCommands)?.mockRestore?.()
+  unsafeTestValue(commandLoader.loadProjectCommands)?.mockRestore?.()
+  unsafeTestValue(commandLoader.loadOpencodeGlobalCommands)?.mockRestore?.()
+  unsafeTestValue(commandLoader.loadOpencodeProjectCommands)?.mockRestore?.()
+  unsafeTestValue(builtinCommands.loadBuiltinCommands)?.mockRestore?.()
+  unsafeTestValue(skillLoader.loadUserSkills)?.mockRestore?.()
+  unsafeTestValue(skillLoader.loadProjectSkills)?.mockRestore?.()
+  unsafeTestValue(skillLoader.loadOpencodeGlobalSkills)?.mockRestore?.()
+  unsafeTestValue(skillLoader.loadOpencodeProjectSkills)?.mockRestore?.()
+  unsafeTestValue(skillLoader.discoverUserClaudeSkills)?.mockRestore?.()
+  unsafeTestValue(skillLoader.discoverProjectClaudeSkills)?.mockRestore?.()
+  unsafeTestValue(skillLoader.discoverOpencodeGlobalSkills)?.mockRestore?.()
+  unsafeTestValue(skillLoader.discoverOpencodeProjectSkills)?.mockRestore?.()
+  unsafeTestValue(agentLoader.loadUserAgents)?.mockRestore?.()
+  unsafeTestValue(agentLoader.loadProjectAgents)?.mockRestore?.()
+  unsafeTestValue(agentLoader.loadOpencodeGlobalAgents)?.mockRestore?.()
+  unsafeTestValue(agentLoader.loadOpencodeProjectAgents)?.mockRestore?.()
+  unsafeTestValue(mcpLoader.loadMcpConfigs)?.mockRestore?.()
   setAdditionalAllowedMcpEnvVarsSpy?.mockRestore()
-  ;(unsafeTestValue(pluginLoader.loadAllPluginComponents))?.mockRestore?.()
-  ;(unsafeTestValue(mcpModule.createBuiltinMcps))?.mockRestore?.()
-  ;(unsafeTestValue(shared.log))?.mockRestore?.()
-  ;(unsafeTestValue(shared.fetchAvailableModels))?.mockRestore?.()
-  ;(unsafeTestValue(shared.readConnectedProvidersCache))?.mockRestore?.()
-  ;(unsafeTestValue(configDir.getOpenCodeConfigPaths))?.mockRestore?.()
-  ;(unsafeTestValue(permissionCompat.migrateAgentConfig))?.mockRestore?.()
-  ;(unsafeTestValue(modelResolver.resolveModelWithFallback))?.mockRestore?.()
-  ;(unsafeTestValue(agentPriorityOrder.reorderAgentsByPriority))?.mockRestore?.()
+  unsafeTestValue(pluginLoader.loadAllPluginComponents)?.mockRestore?.()
+  unsafeTestValue(mcpModule.createBuiltinMcps)?.mockRestore?.()
+  unsafeTestValue(shared.log)?.mockRestore?.()
+  unsafeTestValue(shared.fetchAvailableModels)?.mockRestore?.()
+  unsafeTestValue(shared.readConnectedProvidersCache)?.mockRestore?.()
+  unsafeTestValue(configDir.getOpenCodeConfigPaths)?.mockRestore?.()
+  unsafeTestValue(permissionCompat.migrateAgentConfig)?.mockRestore?.()
+  unsafeTestValue(modelResolver.resolveModelWithFallback)?.mockRestore?.()
+  unsafeTestValue(agentPriorityOrder.reorderAgentsByPriority)?.mockRestore?.()
   configErrors.clearConfigLoadErrors()
   mock.restore()
 })
@@ -164,7 +169,7 @@ describe("Sisyphus-Junior model inheritance", () => {
     // #then
     const agentConfig = config.agent as Record<string, { model?: string }>
     expect(agentConfig[getAgentDisplayName("sisyphus-junior")]?.model).toBe(
-      sisyphusJunior.SISYPHUS_JUNIOR_DEFAULTS.model
+      sisyphusJunior.SISYPHUS_JUNIOR_DEFAULTS.model,
     )
   })
 
@@ -195,9 +200,7 @@ describe("Sisyphus-Junior model inheritance", () => {
 
     // #then
     const agentConfig = config.agent as Record<string, { model?: string }>
-    expect(agentConfig[getAgentDisplayName("sisyphus-junior")]?.model).toBe(
-      "openai/gpt-5.5"
-    )
+    expect(agentConfig[getAgentDisplayName("sisyphus-junior")]?.model).toBe("openai/gpt-5.5")
   })
 })
 
@@ -224,10 +227,7 @@ describe("MCP env allowlist initialization", () => {
     await handler(config)
 
     // then
-    expect(mcpLoader.setAdditionalAllowedMcpEnvVars).toHaveBeenCalledWith([
-      "CUSTOM_API_KEY",
-      "CUSTOM_AUTH_TOKEN",
-    ])
+    expect(mcpLoader.setAdditionalAllowedMcpEnvVars).toHaveBeenCalledWith(["CUSTOM_API_KEY", "CUSTOM_AUTH_TOKEN"])
   })
 })
 
@@ -399,9 +399,7 @@ describe("Plan agent demote behavior", () => {
     await handler(config)
 
     // #then
-    const assembledAgentKeys = Object.keys(
-      reorderSpy.mock.calls.at(0)?.[0] as Record<string, unknown>
-    )
+    const assembledAgentKeys = Object.keys(reorderSpy.mock.calls.at(0)?.[0] as Record<string, unknown>)
     expect(assembledAgentKeys.slice(0, 4)).toEqual([
       getAgentListDisplayName("sisyphus"),
       getAgentListDisplayName("hephaestus"),
@@ -443,27 +441,13 @@ describe("Plan agent demote behavior", () => {
     await handler(config)
 
     // #then
-    const emittedCoreEntries = Object.entries(
-      config.agent as Record<string, { name?: string }>,
-    ).slice(0, 4)
+    const emittedCoreEntries = Object.entries(config.agent as Record<string, { name?: string }>).slice(0, 4)
 
     expect(emittedCoreEntries).toEqual([
-      [
-        getAgentListDisplayName("sisyphus"),
-        expect.objectContaining({ name: getAgentListDisplayName("sisyphus") }),
-      ],
-      [
-        getAgentListDisplayName("hephaestus"),
-        expect.objectContaining({ name: getAgentListDisplayName("hephaestus") }),
-      ],
-      [
-        getAgentListDisplayName("prometheus"),
-        expect.objectContaining({ name: getAgentListDisplayName("prometheus") }),
-      ],
-      [
-        getAgentListDisplayName("atlas"),
-        expect.objectContaining({ name: getAgentListDisplayName("atlas") }),
-      ],
+      [getAgentListDisplayName("sisyphus"), expect.objectContaining({ name: getAgentListDisplayName("sisyphus") })],
+      [getAgentListDisplayName("hephaestus"), expect.objectContaining({ name: getAgentListDisplayName("hephaestus") })],
+      [getAgentListDisplayName("prometheus"), expect.objectContaining({ name: getAgentListDisplayName("prometheus") })],
+      [getAgentListDisplayName("atlas"), expect.objectContaining({ name: getAgentListDisplayName("atlas") })],
     ])
   })
 
@@ -606,10 +590,13 @@ describe("hidden config-key aliases after applyToolConfig", () => {
     await handler(config)
 
     // then hidden config-key aliases spread the post-tool-config display-name objects
-    const agentConfig = config.agent as Record<string, {
-      hidden?: boolean
-      permission?: Record<string, unknown>
-    }>
+    const agentConfig = config.agent as Record<
+      string,
+      {
+        hidden?: boolean
+        permission?: Record<string, unknown>
+      }
+    >
     const sisyphusDisplayName = getAgentListDisplayName("sisyphus")
     const prometheusDisplayName = getAgentListDisplayName("prometheus")
     expect(agentConfig[sisyphusDisplayName]).toBeDefined()
@@ -650,10 +637,13 @@ describe("hidden config-key aliases after applyToolConfig", () => {
     await handler(secondConfig)
 
     // then the second pass still aliases the mutated display-name object
-    const agentConfig = secondConfig.agent as Record<string, {
-      hidden?: boolean
-      permission?: Record<string, unknown>
-    }>
+    const agentConfig = secondConfig.agent as Record<
+      string,
+      {
+        hidden?: boolean
+        permission?: Record<string, unknown>
+      }
+    >
     const sisyphusDisplayName = getAgentListDisplayName("sisyphus")
     expect(agentConfig["sisyphus"].hidden).toBe(true)
     expect(agentConfig["sisyphus"].permission).toEqual(agentConfig[sisyphusDisplayName].permission)
@@ -1409,7 +1399,7 @@ describe("Deadlock prevention - fetchAvailableModels must not receive client", (
 describe("config-handler plugin loading error boundary (#1559)", () => {
   test("returns empty defaults when loadAllPluginComponents throws", async () => {
     //#given
-    ;(unsafeTestValue(pluginLoader.loadAllPluginComponents)).mockRestore?.()
+    unsafeTestValue(pluginLoader.loadAllPluginComponents).mockRestore?.()
     spyOn(pluginLoader, unsafeTestValue("loadAllPluginComponents")).mockImplementation(async () => {
       throw new Error("crash")
     })
@@ -1437,10 +1427,8 @@ describe("config-handler plugin loading error boundary (#1559)", () => {
 
   test("returns empty defaults when loadAllPluginComponents times out", async () => {
     //#given
-    ;(unsafeTestValue(pluginLoader.loadAllPluginComponents)).mockRestore?.()
-    spyOn(pluginLoader, unsafeTestValue("loadAllPluginComponents")).mockImplementation(
-      () => new Promise(() => {})
-    )
+    unsafeTestValue(pluginLoader.loadAllPluginComponents).mockRestore?.()
+    spyOn(pluginLoader, unsafeTestValue("loadAllPluginComponents")).mockImplementation(() => new Promise(() => {}))
     const pluginConfig = createPluginConfig({
       experimental: { plugin_load_timeout_ms: 10 },
     })
@@ -1467,7 +1455,7 @@ describe("config-handler plugin loading error boundary (#1559)", () => {
 
   test("records a config load error when loadAllPluginComponents fails", async () => {
     //#given
-    ;(unsafeTestValue(pluginLoader.loadAllPluginComponents)).mockRestore?.()
+    unsafeTestValue(pluginLoader.loadAllPluginComponents).mockRestore?.()
     spyOn(pluginLoader, unsafeTestValue("loadAllPluginComponents")).mockImplementation(async () => {
       throw new Error("crash")
     })
@@ -1498,7 +1486,7 @@ describe("config-handler plugin loading error boundary (#1559)", () => {
 
   test("retries plugin component loading after an empty fallback failure", async () => {
     //#given
-    ;(unsafeTestValue(pluginLoader.loadAllPluginComponents)).mockRestore?.()
+    unsafeTestValue(pluginLoader.loadAllPluginComponents).mockRestore?.()
     let attempts = 0
     spyOn(pluginLoader, unsafeTestValue("loadAllPluginComponents")).mockImplementation(async () => {
       attempts += 1
@@ -1518,7 +1506,15 @@ describe("config-handler plugin loading error boundary (#1559)", () => {
         },
         mcpServers: {},
         hooksConfigs: [],
-        plugins: [{ name: "retry-plugin", version: "1.0.0", scope: "project", installPath: "/tmp/retry-plugin", pluginKey: "retry-plugin" }],
+        plugins: [
+          {
+            name: "retry-plugin",
+            version: "1.0.0",
+            scope: "project",
+            installPath: "/tmp/retry-plugin",
+            pluginKey: "retry-plugin",
+          },
+        ],
         errors: [],
       }
     })
@@ -1555,14 +1551,22 @@ describe("config-handler plugin loading error boundary (#1559)", () => {
 
   test("passes through plugin data on successful load (identity test)", async () => {
     //#given
-    ;(unsafeTestValue(pluginLoader.loadAllPluginComponents)).mockRestore?.()
+    unsafeTestValue(pluginLoader.loadAllPluginComponents).mockRestore?.()
     spyOn(pluginLoader, unsafeTestValue("loadAllPluginComponents")).mockResolvedValue({
       commands: { "test-cmd": { name: "test-cmd", description: "test", template: "test" } },
       skills: {},
       agents: {},
       mcpServers: {},
       hooksConfigs: [],
-      plugins: [{ name: "test-plugin", version: "1.0.0", scope: "project", installPath: "/tmp/test-plugin", pluginKey: "test-plugin" }],
+      plugins: [
+        {
+          name: "test-plugin",
+          version: "1.0.0",
+          scope: "project",
+          installPath: "/tmp/test-plugin",
+          pluginKey: "test-plugin",
+        },
+      ],
       errors: [],
     })
     const pluginConfig = createPluginConfig({})
@@ -1599,9 +1603,9 @@ describe("command agent routing coherence", () => {
       sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
       atlas: { name: "atlas", prompt: "test", mode: "primary" },
     })
-    ;(unsafeTestValue<{
+    unsafeTestValue<{
       mockReturnValue: (value: Record<string, unknown>) => void
-    }>(builtinCommands.loadBuiltinCommands)).mockReturnValue({
+    }>(builtinCommands.loadBuiltinCommands).mockReturnValue({
       "ulw-execute": {
         name: "ulw-execute",
         description: "(builtin) Start work",
@@ -1715,8 +1719,7 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
     await handler(config)
 
     //#then
-    const lastCall =
-      createBuiltinAgentsMock.mock.calls[createBuiltinAgentsMock.mock.calls.length - 1]
+    const lastCall = createBuiltinAgentsMock.mock.calls[createBuiltinAgentsMock.mock.calls.length - 1]
     expect(lastCall?.[11]).toBe(false)
 
     const agentResult = config.agent as Record<string, { permission?: Record<string, unknown> }>
@@ -1754,8 +1757,7 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
     await handler(config)
 
     //#then
-    const lastCall =
-      createBuiltinAgentsMock.mock.calls[createBuiltinAgentsMock.mock.calls.length - 1]
+    const lastCall = createBuiltinAgentsMock.mock.calls[createBuiltinAgentsMock.mock.calls.length - 1]
     expect(lastCall?.[11]).toBe(false)
 
     const agentResult = config.agent as Record<string, { permission?: Record<string, unknown> }>
@@ -1795,8 +1797,7 @@ describe("disable_omo_env pass-through", () => {
     await handler(config)
 
     //#then
-    const lastCall =
-      createBuiltinAgentsMock.mock.calls[createBuiltinAgentsMock.mock.calls.length - 1]
+    const lastCall = createBuiltinAgentsMock.mock.calls[createBuiltinAgentsMock.mock.calls.length - 1]
     expect(lastCall).toBeDefined()
     const disableOmoEnv = Array.isArray(lastCall) ? lastCall[12] : undefined
     expect(disableOmoEnv).toBe(true)
@@ -1830,8 +1831,7 @@ describe("disable_omo_env pass-through", () => {
     await handler(config)
 
     //#then
-    const lastCall =
-      createBuiltinAgentsMock.mock.calls[createBuiltinAgentsMock.mock.calls.length - 1]
+    const lastCall = createBuiltinAgentsMock.mock.calls[createBuiltinAgentsMock.mock.calls.length - 1]
     expect(lastCall).toBeDefined()
     const disableOmoEnv = Array.isArray(lastCall) ? lastCall[12] : undefined
     expect(disableOmoEnv).toBe(false)
@@ -1841,14 +1841,14 @@ describe("disable_omo_env pass-through", () => {
 describe("Agent merge priority — project-local overrides global", () => {
   test("project-local Claude agent overrides global Claude agent with same name", async () => {
     // #given — same agent name in both global (user) and project scopes
-    ;(unsafeTestValue(agentLoader.loadUserAgents)).mockReturnValue({
+    unsafeTestValue(agentLoader.loadUserAgents).mockReturnValue({
       "my-custom-agent": {
         description: "(user) global version",
         mode: "subagent",
         prompt: "global-agent-prompt-sentinel",
       },
     })
-    ;(unsafeTestValue(agentLoader.loadProjectAgents)).mockReturnValue({
+    unsafeTestValue(agentLoader.loadProjectAgents).mockReturnValue({
       "my-custom-agent": {
         description: "(project) project version",
         mode: "subagent",
@@ -1881,14 +1881,14 @@ describe("Agent merge priority — project-local overrides global", () => {
 
   test("opencode project agent overrides opencode global agent with same name", async () => {
     // #given — same agent name in opencode global vs opencode project
-    ;(unsafeTestValue(agentLoader.loadOpencodeGlobalAgents)).mockReturnValue({
+    unsafeTestValue(agentLoader.loadOpencodeGlobalAgents).mockReturnValue({
       "my-custom-agent": {
         description: "(opencode) global version",
         mode: "subagent",
         prompt: "opencode-global-agent-prompt-sentinel",
       },
     })
-    ;(unsafeTestValue(agentLoader.loadOpencodeProjectAgents)).mockReturnValue({
+    unsafeTestValue(agentLoader.loadOpencodeProjectAgents).mockReturnValue({
       "my-custom-agent": {
         description: "(opencode-project) project version",
         mode: "subagent",
@@ -1921,14 +1921,14 @@ describe("Agent merge priority — project-local overrides global", () => {
 
   test("project Claude agent overrides opencode global agent with same name", async () => {
     // #given — project-scope Claude agent vs global-scope opencode agent
-    ;(unsafeTestValue(agentLoader.loadOpencodeGlobalAgents)).mockReturnValue({
+    unsafeTestValue(agentLoader.loadOpencodeGlobalAgents).mockReturnValue({
       "my-custom-agent": {
         description: "(opencode) global version",
         mode: "subagent",
         prompt: "opencode-global-agent-prompt-sentinel",
       },
     })
-    ;(unsafeTestValue(agentLoader.loadProjectAgents)).mockReturnValue({
+    unsafeTestValue(agentLoader.loadProjectAgents).mockReturnValue({
       "my-custom-agent": {
         description: "(project) project version",
         mode: "subagent",
@@ -1961,7 +1961,7 @@ describe("Agent merge priority — project-local overrides global", () => {
 
   test("plugin agents have lowest priority — overridden by all other sources", async () => {
     // #given — same agent in plugin, global, and project scopes
-    ;(unsafeTestValue(pluginLoader.loadAllPluginComponents)).mockResolvedValue({
+    unsafeTestValue(pluginLoader.loadAllPluginComponents).mockResolvedValue({
       commands: {},
       skills: {},
       agents: {
@@ -1976,7 +1976,7 @@ describe("Agent merge priority — project-local overrides global", () => {
       plugins: [],
       errors: [],
     })
-    ;(unsafeTestValue(agentLoader.loadUserAgents)).mockReturnValue({
+    unsafeTestValue(agentLoader.loadUserAgents).mockReturnValue({
       "my-custom-agent": {
         description: "(user) global version",
         mode: "subagent",

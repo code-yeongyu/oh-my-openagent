@@ -5,7 +5,8 @@ export const ONBOARDING_SCAN_RPC_EVENT = "omo.onboarding.scan.event"
 /** Pull: `extension_request` with `OnboardingApplyRequest`; answers `OnboardingApplyResponse`. */
 export const ONBOARDING_APPLY_RPC_METHOD = "omo.onboarding.apply"
 
-export type OnboardingScanSource = "detect" | "providers" | "credentials" | "assets" | "model-choices" | "projects" | "sessions"
+export type OnboardingScanSource =
+  "detect" | "providers" | "credentials" | "assets" | "model-choices" | "projects" | "sessions"
 /** The stages `omo.onboarding.apply` accepts; `detect` only reads, so it has none. */
 export type OnboardingApplyStage = "credentials" | "assets" | "providers" | "model-choices"
 
@@ -52,7 +53,12 @@ export interface OnboardingApplyRequest {
 export type OnboardingApplyResponse =
   | { readonly scanId: string; readonly applied: readonly OnboardingApplyStage[]; readonly notices?: readonly string[] }
   | OnboardingUnavailable
-  | { readonly kind: "stale"; readonly reason: string; readonly paths: readonly string[]; readonly applied?: readonly OnboardingApplyStage[] }
+  | {
+      readonly kind: "stale"
+      readonly reason: string
+      readonly paths: readonly string[]
+      readonly applied?: readonly OnboardingApplyStage[]
+    }
   | { readonly kind: "invalid"; readonly reason: string }
 
 export interface OnboardingUnavailable {
@@ -60,4 +66,9 @@ export interface OnboardingUnavailable {
   readonly reason: string
 }
 
-export const ONBOARDING_APPLY_STAGES: readonly OnboardingApplyStage[] = ["credentials", "assets", "providers", "model-choices"]
+export const ONBOARDING_APPLY_STAGES: readonly OnboardingApplyStage[] = [
+  "credentials",
+  "assets",
+  "providers",
+  "model-choices",
+]

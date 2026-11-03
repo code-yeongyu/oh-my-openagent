@@ -20,19 +20,26 @@ async function ensureServiceAvailable(session: Pick<Session, "request">, api: st
     // No usable HTTP answer (DNS, refused, TLS, timeout, non-JSON body): the client can't tell a
     // service that hasn't launched from an offline network, so it names both.
     if (error instanceof RequestFailure) {
-      throw new SignInError(`Can't reach OmO accounts at ${api}. The service may not be available yet, or your network, proxy or certificate settings are blocking it.`)
+      throw new SignInError(
+        `Can't reach OmO accounts at ${api}. The service may not be available yet, or your network, proxy or certificate settings are blocking it.`,
+      )
     }
     throw new SignInError(`OmO accounts at ${api} aren't available right now. Try again later.`)
   }
 }
 
-type Options = { readonly api?: string; readonly accounts?: string; readonly device?: boolean; readonly browser?: boolean }
-
-export function deviceChoices(devices: readonly ListedDevice[]) {
-  return devices.map(device => ({ value: device.id, label: terminalText(device.name) }))
+type Options = {
+  readonly api?: string
+  readonly accounts?: string
+  readonly device?: boolean
+  readonly browser?: boolean
 }
 
-const chooseDevice: ChooseDevice = async devices => {
+export function deviceChoices(devices: readonly ListedDevice[]) {
+  return devices.map((device) => ({ value: device.id, label: terminalText(device.name) }))
+}
+
+const chooseDevice: ChooseDevice = async (devices) => {
   if (!process.stdin.isTTY || devices.length === 0) {
     console.error("Device limit reached. Run omo login in an interactive terminal to choose a device to remove.")
     return null
@@ -66,7 +73,10 @@ async function run(action: "login" | "logout" | "whoami", options: Options): Pro
     if (action === "logout") {
       const revoked = await session.logout()
       console.log("Signed out of OmO. Stored credentials and device keys were removed.")
-      if (!revoked) console.error("Server device revocation could not be confirmed. Remove this device from the Devices page of your OmO account when connected.")
+      if (!revoked)
+        console.error(
+          "Server device revocation could not be confirmed. Remove this device from the Devices page of your OmO account when connected.",
+        )
       return
     }
     if (action === "whoami") {
@@ -82,7 +92,10 @@ async function run(action: "login" | "logout" | "whoami", options: Options): Pro
       try {
         await loginLoopback(session, {
           accounts: accountsOrigin(options, process.env),
-          name, platform, open: openSignInBrowser, chooseDevice,
+          name,
+          platform,
+          open: openSignInBrowser,
+          chooseDevice,
         })
         console.log("Signed in to OmO.")
         return
@@ -91,8 +104,10 @@ async function run(action: "login" | "logout" | "whoami", options: Options): Pro
       }
     }
     await loginDevice(session, {
-      name, platform, chooseDevice,
-      show: code => {
+      name,
+      platform,
+      chooseDevice,
+      show: (code) => {
         console.log(`Open ${code.verificationUri}`)
         console.log(`User code: ${code.userCode}`)
         console.log(`Matching code: ${code.matchingCode}`)
@@ -100,8 +115,13 @@ async function run(action: "login" | "logout" | "whoami", options: Options): Pro
     })
     console.log("Signed in to OmO.")
   } catch (error) {
-    console.error(controller.signal.aborted ? "Sign-in cancelled."
-      : error instanceof SignInError ? error.message : "OmO sign-in stopped on an unexpected error. Run the command again, and report it with /bug if it keeps failing.")
+    console.error(
+      controller.signal.aborted
+        ? "Sign-in cancelled."
+        : error instanceof SignInError
+          ? error.message
+          : "OmO sign-in stopped on an unexpected error. Run the command again, and report it with /bug if it keeps failing.",
+    )
     process.exitCode = 1
   } finally {
     process.removeListener("SIGINT", cancel)
@@ -123,7 +143,11 @@ function refuseClosedServiceAuth(): never {
 
 function configureClosedServiceAuthCommands(program: Command): void {
   for (const name of SERVICE_AUTH_COMMANDS) {
-    const command = program.command(name, { hidden: true }).helpOption(false).allowUnknownOption().allowExcessArguments()
+    const command = program
+      .command(name, { hidden: true })
+      .helpOption(false)
+      .allowUnknownOption()
+      .allowExcessArguments()
       .action(() => {
         console.error(SERVICE_ACCOUNTS_CLOSED_MESSAGE)
         process.exitCode = 1
@@ -138,15 +162,20 @@ export function configureServiceAuthCommands(program: Command, open = serviceAcc
     configureClosedServiceAuthCommands(program)
     return
   }
-  program.command("login").description("Sign in to OmO using the OS credential store")
+  program
+    .command("login")
+    .description("Sign in to OmO using the OS credential store")
     .option("--device", "Use a device code instead of a browser callback")
     .option("--no-browser", "Sign in by device code without opening a browser")
     .option("--api <url>", "OmO API origin (or OMO_SERVICE_API_URL)")
     .option("--accounts <url>", "OmO sign-in page origin (or OMO_SERVICE_ACCOUNTS_URL)")
     .action((options: Options) => run("login", options))
   for (const action of ["logout", "whoami"] as const) {
-    program.command(action)
-      .description(action === "logout" ? "Remove stored OmO credentials and device keys" : "Show the current OmO device sign-in")
+    program
+      .command(action)
+      .description(
+        action === "logout" ? "Remove stored OmO credentials and device keys" : "Show the current OmO device sign-in",
+      )
       .option("--api <url>", "OmO API origin (or OMO_SERVICE_API_URL)")
       .action((options: Options) => run(action, options))
   }

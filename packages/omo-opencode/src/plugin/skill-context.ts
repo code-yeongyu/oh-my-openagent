@@ -1,10 +1,7 @@
 import type { AvailableSkill } from "../agents/dynamic-agent-prompt-builder"
 import type { OhMyOpenCodeConfig } from "../config"
 import type { BrowserAutomationProvider } from "../config/schema/browser-automation"
-import type {
-  LoadedSkill,
-  SkillScope,
-} from "../features/opencode-skill-loader/types"
+import type { LoadedSkill, SkillScope } from "../features/opencode-skill-loader/types"
 
 import {
   discoverConfigSourceSkills,
@@ -26,7 +23,10 @@ import { resolveActiveBuiltinSkills } from "@oh-my-opencode/skills-loader-core/b
 import { getSystemMcpServerNames } from "../features/claude-code-mcp-loader"
 import { adaptHostSkillConfig } from "../shared/host-skill-config"
 import { detectWorktreePath } from "@oh-my-opencode/skills-loader-core/shared/project-discovery-dirs"
-import { subscribeSkillDiagnostics, type SkillDiagnosticSink } from "@oh-my-opencode/skills-loader-core/opencode-skill-loader/skill-provenance"
+import {
+  subscribeSkillDiagnostics,
+  type SkillDiagnosticSink,
+} from "@oh-my-opencode/skills-loader-core/opencode-skill-loader/skill-provenance"
 
 export type SkillContext = {
   mergedSkills: LoadedSkill[]
@@ -45,10 +45,7 @@ function mapScopeToLocation(scope: SkillScope): AvailableSkill["location"] {
   return "plugin"
 }
 
-function filterProviderGatedSkills(
-  skills: LoadedSkill[],
-  browserProvider: BrowserAutomationProvider,
-): LoadedSkill[] {
+function filterProviderGatedSkills(skills: LoadedSkill[], browserProvider: BrowserAutomationProvider): LoadedSkill[] {
   return skills.filter((skill) => {
     if (!PROVIDER_GATED_SKILL_NAMES.has(skill.name)) {
       return true
@@ -58,19 +55,13 @@ function filterProviderGatedSkills(
   })
 }
 
-function filterDisabledSkills(
-  skills: LoadedSkill[],
-  disabledSkills: ReadonlySet<string>,
-): LoadedSkill[] {
+function filterDisabledSkills(skills: LoadedSkill[], disabledSkills: ReadonlySet<string>): LoadedSkill[] {
   if (disabledSkills.size === 0) return skills
 
   return skills.filter((skill) => !isDisabledSkillAlias(skill, disabledSkills))
 }
 
-function isDisabledConfigSkillEntryName(
-  name: string,
-  disabledSkills: ReadonlySet<string>,
-): boolean {
+function isDisabledConfigSkillEntryName(name: string, disabledSkills: ReadonlySet<string>): boolean {
   return disabledSkills.has(normalizeSkillAliasName(name))
 }
 
@@ -88,9 +79,7 @@ export async function createSkillContext(args: {
   const { directory, pluginConfig, hostSkills } = args
   const unsubscribe = args.onDiagnostic ? subscribeSkillDiagnostics(args.onDiagnostic) : undefined
   try {
-
-    const browserProvider: BrowserAutomationProvider =
-      pluginConfig.browser_automation_engine?.provider ?? "playwright"
+    const browserProvider: BrowserAutomationProvider = pluginConfig.browser_automation_engine?.provider ?? "playwright"
     const playwrightMcpArgs = pluginConfig.browser_automation_engine?.playwright_mcp_args
 
     const disabledSkills = collectDisabledSkillAliases(pluginConfig)
@@ -127,7 +116,12 @@ export async function createSkillContext(args: {
         configDir: directory,
         userSources: diskHostSkills?.userPaths,
         projectSources: diskHostSkills?.projectPaths,
-        provenance: { ...sourceProvenance, kind: "host", selectedRoot: directory, projectRoot: detectWorktreePath(directory) ?? directory },
+        provenance: {
+          ...sourceProvenance,
+          kind: "host",
+          selectedRoot: directory,
+          projectRoot: detectWorktreePath(directory) ?? directory,
+        },
       }),
       includeClaudeSkills ? discoverUserClaudeSkills() : Promise.resolve([]),
       discoverOpencodeGlobalSkills(),
@@ -155,34 +149,16 @@ export async function createSkillContext(args: {
     const filteredUserSkills = filterProviderGatedSkills(userSkills, browserProvider)
     const filteredGlobalSkills = filterProviderGatedSkills(globalSkills, browserProvider)
     const filteredProjectSkills = filterProviderGatedSkills(projectSkills, browserProvider)
-    const filteredOpencodeProjectSkills = filterProviderGatedSkills(
-      opencodeProjectSkills,
-      browserProvider,
-    )
-    const filteredAgentsProjectSkills = filterProviderGatedSkills(
-      agentsProjectSkills,
-      browserProvider,
-    )
-    const filteredAgentsGlobalSkills = filterProviderGatedSkills(
-      agentsGlobalSkills,
-      browserProvider,
-    )
+    const filteredOpencodeProjectSkills = filterProviderGatedSkills(opencodeProjectSkills, browserProvider)
+    const filteredAgentsProjectSkills = filterProviderGatedSkills(agentsProjectSkills, browserProvider)
+    const filteredAgentsGlobalSkills = filterProviderGatedSkills(agentsGlobalSkills, browserProvider)
     const activeConfigSourceSkills = filterDisabledSkills(filteredConfigSourceSkills, disabledSkills)
     const activeUserSkills = filterDisabledSkills(filteredUserSkills, disabledSkills)
     const activeGlobalSkills = filterDisabledSkills(filteredGlobalSkills, disabledSkills)
     const activeProjectSkills = filterDisabledSkills(filteredProjectSkills, disabledSkills)
-    const activeOpencodeProjectSkills = filterDisabledSkills(
-      filteredOpencodeProjectSkills,
-      disabledSkills,
-    )
-    const activeAgentsProjectSkills = filterDisabledSkills(
-      filteredAgentsProjectSkills,
-      disabledSkills,
-    )
-    const activeAgentsGlobalSkills = filterDisabledSkills(
-      filteredAgentsGlobalSkills,
-      disabledSkills,
-    )
+    const activeOpencodeProjectSkills = filterDisabledSkills(filteredOpencodeProjectSkills, disabledSkills)
+    const activeAgentsProjectSkills = filterDisabledSkills(filteredAgentsProjectSkills, disabledSkills)
+    const activeAgentsGlobalSkills = filterDisabledSkills(filteredAgentsGlobalSkills, disabledSkills)
     const filteredSharedSkills = filterDisabledSkills(
       filterProviderGatedSkills(sharedSkills, browserProvider),
       disabledSkills,

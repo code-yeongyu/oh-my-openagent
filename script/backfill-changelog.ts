@@ -1,15 +1,20 @@
 #!/usr/bin/env bun
 /**
  * Applies live manifest backfill to root CHANGELOG.md.
- * 
+ *
  * Usage: bun script/backfill-changelog.ts <manifest-path> [changelog-path]
- * 
+ *
  * Returns exit code 0 on success, non-zero on error.
  * On success, outputs the new CHANGELOG content to stdout (or writes in-place with --write).
  */
 
 import { readFileSync, writeFileSync } from "fs"
-import { validateManifest, generateBackfillSection, backfillChangelog, type LiveManifest } from "./changelog-backfill-live"
+import {
+  validateManifest,
+  generateBackfillSection,
+  backfillChangelog,
+  type LiveManifest,
+} from "./changelog-backfill-live"
 
 function main() {
   const args = Bun.argv.slice(2)

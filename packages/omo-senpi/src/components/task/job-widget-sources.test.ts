@@ -14,10 +14,19 @@ import {
 class FakeTap {
   text = ""
   closed = false
-  constructor(readonly id: string, readonly label: string) {}
-  append(text: string): void { this.text += text }
-  close(): void { this.closed = true }
-  read(from: number): JobWidgetTextChunk { return { start: from, end: this.text.length, text: this.text.slice(from), open: !this.closed } }
+  constructor(
+    readonly id: string,
+    readonly label: string,
+  ) {}
+  append(text: string): void {
+    this.text += text
+  }
+  close(): void {
+    this.closed = true
+  }
+  read(from: number): JobWidgetTextChunk {
+    return { start: from, end: this.text.length, text: this.text.slice(from), open: !this.closed }
+  }
 }
 
 type HandleLog = { notify: number; settle: number; dispose: number; updates: JobWidgetBriefText[] }
@@ -37,10 +46,18 @@ function fakeRegistry(options: { readonly accepts?: boolean } = {}) {
         const log: HandleLog = { notify: 0, settle: 0, dispose: 0, updates: [] }
         handles.push(log)
         return {
-          notify: () => { log.notify += 1 },
-          update: (brief: JobWidgetBriefText) => { log.updates.push(brief) },
-          settle: () => { log.settle += 1 },
-          dispose: () => { log.dispose += 1 },
+          notify: () => {
+            log.notify += 1
+          },
+          update: (brief: JobWidgetBriefText) => {
+            log.updates.push(brief)
+          },
+          settle: () => {
+            log.settle += 1
+          },
+          dispose: () => {
+            log.dispose += 1
+          },
         }
       },
       createTap: (id: string, label: string) => {
@@ -59,13 +76,20 @@ function fakeManager(records: () => readonly TaskRecord[] = () => []) {
       const set = listeners.get(taskId) ?? new Set()
       set.add(listener)
       listeners.set(taskId, set)
-      return () => { set.delete(listener) }
+      return () => {
+        set.delete(listener)
+      }
     },
-    list: (scope) => records().filter((record) => record.parent_session_id === scope.session_id).map((record) => ({ record })),
+    list: (scope) =>
+      records()
+        .filter((record) => record.parent_session_id === scope.session_id)
+        .map((record) => ({ record })),
   }
   return {
     manager,
-    emit: (taskId: string, event: ManagedChildEvent) => { for (const listener of listeners.get(taskId) ?? []) listener(event) },
+    emit: (taskId: string, event: ManagedChildEvent) => {
+      for (const listener of listeners.get(taskId) ?? []) listener(event)
+    },
     subscribers: (taskId: string) => listeners.get(taskId)?.size ?? 0,
   }
 }
@@ -95,8 +119,19 @@ function feedWith(options: { readonly accepts?: boolean; readonly records?: () =
   const registry = fakeRegistry(options)
   const child = fakeManager(options.records)
   let sessionId: string | undefined = "session-a"
-  const feed = createTaskJobWidgetFeed({ sources: registry.sources, manager: child.manager, sessionId: () => sessionId })
-  return { registry, child, feed, switchSession: (next: string | undefined) => { sessionId = next } }
+  const feed = createTaskJobWidgetFeed({
+    sources: registry.sources,
+    manager: child.manager,
+    sessionId: () => sessionId,
+  })
+  return {
+    registry,
+    child,
+    feed,
+    switchSession: (next: string | undefined) => {
+      sessionId = next
+    },
+  }
 }
 
 describe("task job widget sources", () => {
@@ -114,7 +149,10 @@ describe("task job widget sources", () => {
     expect(registration?.sessionId).toBe("session-a")
     expect(registration?.id).toBe("st_bg")
     expect(registration?.kind).toBe("task")
-    expect(registration?.brief).toEqual({ task: "Run bench.sh and report the p95 latency.", intent: "Run the benchmark" })
+    expect(registration?.brief).toEqual({
+      task: "Run bench.sh and report the p95 latency.",
+      intent: "Run the benchmark",
+    })
     expect(registration?.brief.watch).toBeUndefined()
     expect(registration?.startedAtMs).toBe(Date.parse("2026-10-28T00:00:05.000Z"))
     expect(registration?.sources.map((source) => source.id)).toEqual([TASK_TOOLS_SOURCE_ID])
@@ -127,16 +165,35 @@ describe("task job widget sources", () => {
     feed.observe({ taskId: "st_bg", record: record("running") })
 
     // when
-    child.emit("st_bg", { type: "tool_execution_start", toolCallId: "c1", toolName: "bash", args: { command: "./bench.sh --runs 3" } })
+    child.emit("st_bg", {
+      type: "tool_execution_start",
+      toolCallId: "c1",
+      toolName: "bash",
+      args: { command: "./bench.sh --runs 3" },
+    })
     child.emit("st_bg", { type: "tool_execution_update", toolCallId: "c1", toolName: "bash" })
-    child.emit("st_bg", { type: "tool_execution_end", toolCallId: "c1", toolName: "bash", result: { content: [{ type: "text", text: "run 1 p95=12ms" }, { type: "image", data: "x" }, { type: "text", text: "run 2 p95=11ms" }] } })
+    child.emit("st_bg", {
+      type: "tool_execution_end",
+      toolCallId: "c1",
+      toolName: "bash",
+      result: {
+        content: [
+          { type: "text", text: "run 1 p95=12ms" },
+          { type: "image", data: "x" },
+          { type: "text", text: "run 2 p95=11ms" },
+        ],
+      },
+    })
     child.emit("st_bg", { type: "tool_execution_end", toolCallId: "c2", toolName: "read", result: "plain text result" })
-    child.emit("st_bg", { type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "not a tool call" }] } })
+    child.emit("st_bg", {
+      type: "message_end",
+      message: { role: "assistant", content: [{ type: "text", text: "not a tool call" }] },
+    })
 
     // then
     expect(registry.taps[0]?.text).toBe(
       `\n${TASK_TOOL_CALL_MARK}bash ./bench.sh --runs 3\nrun 1 p95=12ms\nrun 2 p95=11ms\n` +
-      `\n${TASK_TOOL_CALL_MARK}read\nplain text result\n`,
+        `\n${TASK_TOOL_CALL_MARK}read\nplain text result\n`,
     )
     expect(registry.handles[0]?.notify).toBe(2)
   })
@@ -198,7 +255,10 @@ describe("task job widget sources", () => {
     // when
     feed.observe({ taskId: "st_bg", record: null })
     switchSession("session-b")
-    feed.observe({ taskId: "st_other", record: record("running", { task_id: "st_other", parent_session_id: "session-b" }) })
+    feed.observe({
+      taskId: "st_other",
+      record: record("running", { task_id: "st_other", parent_session_id: "session-b" }),
+    })
     feed.dispose()
 
     // then
@@ -212,7 +272,10 @@ describe("task job widget sources", () => {
 
     // when
     feed.observe({ taskId: "st_fg", record: record("running", { task_id: "st_fg", notify_on_terminal: false }) })
-    feed.observe({ taskId: "st_grandchild", record: record("running", { task_id: "st_grandchild", parent_session_id: "child-session" }) })
+    feed.observe({
+      taskId: "st_grandchild",
+      record: record("running", { task_id: "st_grandchild", parent_session_id: "child-session" }),
+    })
 
     // then
     expect(registry.registrations).toEqual([])
@@ -233,7 +296,10 @@ describe("task job widget sources", () => {
 
   it("#given background tasks already running when the feed attaches #when the session starts #then sync registers them from the manager's session list", () => {
     // given
-    const running = [record("running"), record("running", { task_id: "st_other_session", parent_session_id: "session-z" })]
+    const running = [
+      record("running"),
+      record("running", { task_id: "st_other_session", parent_session_id: "session-z" }),
+    ]
     const { registry, feed } = feedWith({ records: () => running })
 
     // when
@@ -254,21 +320,55 @@ describe("task job widget watch hints from background commands", () => {
     feed.observe({ taskId: "st_bg", record: record("running") })
 
     // when
-    child.emit("st_bg", { type: "tool_execution_start", toolCallId: "c1", toolName: "bash", args: { command: "blender -b scene.blend -a", run_in_background: true } })
-    child.emit("st_bg", { type: "tool_execution_end", toolCallId: "c1", toolName: "bash", result: text("bash_id: bash_1 (background)") })
-    child.emit("st_bg", { type: "tool_execution_start", toolCallId: "c2", toolName: "bash_output", args: { bash_id: "bash_1" } })
-    child.emit("st_bg", { type: "tool_execution_end", toolCallId: "c2", toolName: "bash_output", result: text("Fra:1 Mem:120M | Rendering 1 / 250 samples\nFra:2 Mem:121M | Rendering 2 / 250 samples") })
-    child.emit("st_bg", { type: "tool_execution_start", toolCallId: "c3", toolName: "bash_output", args: { bash_id: "bash_1" } })
-    child.emit("st_bg", { type: "tool_execution_end", toolCallId: "c3", toolName: "bash_output", result: text("Fra:3 Mem:121M | Rendering 3 / 250 samples") })
+    child.emit("st_bg", {
+      type: "tool_execution_start",
+      toolCallId: "c1",
+      toolName: "bash",
+      args: { command: "blender -b scene.blend -a", run_in_background: true },
+    })
+    child.emit("st_bg", {
+      type: "tool_execution_end",
+      toolCallId: "c1",
+      toolName: "bash",
+      result: text("bash_id: bash_1 (background)"),
+    })
+    child.emit("st_bg", {
+      type: "tool_execution_start",
+      toolCallId: "c2",
+      toolName: "bash_output",
+      args: { bash_id: "bash_1" },
+    })
+    child.emit("st_bg", {
+      type: "tool_execution_end",
+      toolCallId: "c2",
+      toolName: "bash_output",
+      result: text("Fra:1 Mem:120M | Rendering 1 / 250 samples\nFra:2 Mem:121M | Rendering 2 / 250 samples"),
+    })
+    child.emit("st_bg", {
+      type: "tool_execution_start",
+      toolCallId: "c3",
+      toolName: "bash_output",
+      args: { bash_id: "bash_1" },
+    })
+    child.emit("st_bg", {
+      type: "tool_execution_end",
+      toolCallId: "c3",
+      toolName: "bash_output",
+      result: text("Fra:3 Mem:121M | Rendering 3 / 250 samples"),
+    })
 
     // then
-    expect(registry.handles[0]?.updates).toEqual([{
-      task: "Run bench.sh and report the p95 latency.",
-      intent: "Run the benchmark",
-      watch: "background command: blender -b scene.blend -a",
-    }])
+    expect(registry.handles[0]?.updates).toEqual([
+      {
+        task: "Run bench.sh and report the p95 latency.",
+        intent: "Run the benchmark",
+        watch: "background command: blender -b scene.blend -a",
+      },
+    ])
     const tap = registry.taps[0]?.text ?? ""
-    expect(tap).toContain(`${TASK_TOOL_CALL_MARK}bash_output bash_1\nFra:1 Mem:120M | Rendering 1 / 250 samples\nFra:2 Mem:121M | Rendering 2 / 250 samples\n`)
+    expect(tap).toContain(
+      `${TASK_TOOL_CALL_MARK}bash_output bash_1\nFra:1 Mem:120M | Rendering 1 / 250 samples\nFra:2 Mem:121M | Rendering 2 / 250 samples\n`,
+    )
     expect(tap).toContain("Fra:3 Mem:121M | Rendering 3 / 250 samples")
     expect(tap).toContain(`${TASK_TOOL_CALL_MARK}bash blender -b scene.blend -a\n`)
   })
@@ -279,11 +379,31 @@ describe("task job widget watch hints from background commands", () => {
     feed.observe({ taskId: "st_bg", record: record("running") })
 
     // when
-    child.emit("st_bg", { type: "tool_execution_start", toolCallId: "r1", toolName: "read", args: { path: "src/a.ts" } })
-    child.emit("st_bg", { type: "tool_execution_end", toolCallId: "r1", toolName: "read", result: text("export const a = 1") })
-    child.emit("st_bg", { type: "tool_execution_start", toolCallId: "e1", toolName: "edit", args: { path: "src/a.ts", run_in_background: true } })
+    child.emit("st_bg", {
+      type: "tool_execution_start",
+      toolCallId: "r1",
+      toolName: "read",
+      args: { path: "src/a.ts" },
+    })
+    child.emit("st_bg", {
+      type: "tool_execution_end",
+      toolCallId: "r1",
+      toolName: "read",
+      result: text("export const a = 1"),
+    })
+    child.emit("st_bg", {
+      type: "tool_execution_start",
+      toolCallId: "e1",
+      toolName: "edit",
+      args: { path: "src/a.ts", run_in_background: true },
+    })
     child.emit("st_bg", { type: "tool_execution_end", toolCallId: "e1", toolName: "edit", result: text("edited") })
-    child.emit("st_bg", { type: "tool_execution_start", toolCallId: "b1", toolName: "bash", args: { command: "bun test", run_in_background: false } })
+    child.emit("st_bg", {
+      type: "tool_execution_start",
+      toolCallId: "b1",
+      toolName: "bash",
+      args: { command: "bun test", run_in_background: false },
+    })
     child.emit("st_bg", { type: "tool_execution_end", toolCallId: "b1", toolName: "bash", result: text("3 pass") })
 
     // then
@@ -297,9 +417,24 @@ describe("task job widget watch hints from background commands", () => {
     feed.observe({ taskId: "st_bg", record: record("running") })
 
     // when
-    child.emit("st_bg", { type: "tool_execution_start", toolCallId: "b1", toolName: "bash", args: { command: "./train.sh", run_in_background: true } })
-    child.emit("st_bg", { type: "tool_execution_start", toolCallId: "b2", toolName: "bash", args: { command: "./eval.sh", run_in_background: true } })
-    child.emit("st_bg", { type: "tool_execution_start", toolCallId: "b3", toolName: "bash", args: { command: "./eval.sh", run_in_background: true } })
+    child.emit("st_bg", {
+      type: "tool_execution_start",
+      toolCallId: "b1",
+      toolName: "bash",
+      args: { command: "./train.sh", run_in_background: true },
+    })
+    child.emit("st_bg", {
+      type: "tool_execution_start",
+      toolCallId: "b2",
+      toolName: "bash",
+      args: { command: "./eval.sh", run_in_background: true },
+    })
+    child.emit("st_bg", {
+      type: "tool_execution_start",
+      toolCallId: "b3",
+      toolName: "bash",
+      args: { command: "./eval.sh", run_in_background: true },
+    })
     child.emit("st_bg", { type: "tool_execution_end", toolCallId: "b1", toolName: "bash", result: text("exit 0") })
 
     // then
@@ -311,10 +446,14 @@ describe("task job widget watch hints from background commands", () => {
 
   it("#given a background command carrying secrets and a long tail #when it becomes the watch #then secrets are redacted before the 300-character cut", () => {
     // when
-    const watch = backgroundCommandWatch(`OPENAI_API_KEY=sk-live-abcdefghijklmnopqrstuv ./run --token hunter2 --password 'p w' ${"x".repeat(400)}`)
+    const watch = backgroundCommandWatch(
+      `OPENAI_API_KEY=sk-live-abcdefghijklmnopqrstuv ./run --token hunter2 --password 'p w' ${"x".repeat(400)}`,
+    )
 
     // then
-    expect(watch.startsWith("background command: OPENAI_API_KEY=[REDACTED] ./run --token [REDACTED] --password [REDACTED] ")).toBe(true)
+    expect(
+      watch.startsWith("background command: OPENAI_API_KEY=[REDACTED] ./run --token [REDACTED] --password [REDACTED] "),
+    ).toBe(true)
     expect(watch).not.toContain("hunter2")
     expect(watch).not.toContain("sk-live")
     expect(watch.length).toBe("background command: ".length + 300)

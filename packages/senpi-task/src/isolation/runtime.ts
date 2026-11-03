@@ -87,14 +87,15 @@ export function createIsolationRuntime(options: { readonly homeDir?: string } = 
       }
     },
     captureBaseline: (repoRoot) => captureBaseline(repoRoot),
-    ensure: (input) => ensureIsolation({
-      repoRoot: input.repoRoot,
-      id: input.id,
-      preferred: input.preferred,
-      backends,
-      homeDir,
-      ...(input.owner === undefined ? {} : { owner: input.owner }),
-    }),
+    ensure: (input) =>
+      ensureIsolation({
+        repoRoot: input.repoRoot,
+        id: input.id,
+        preferred: input.preferred,
+        backends,
+        homeDir,
+        ...(input.owner === undefined ? {} : { owner: input.owner }),
+      }),
     captureDelta: (mergedDir, baseline) => captureDeltaPatch(mergedDir, baseline),
     merge: (mergeOptions) => mergeIsolatedChanges(mergeOptions),
     cleanup: (handle) => cleanupIsolation(handle),

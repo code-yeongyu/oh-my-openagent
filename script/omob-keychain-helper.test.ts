@@ -18,9 +18,18 @@ function checkout(withBuildScript: boolean): string {
   return root
 }
 
-function recorder(status: number): { readonly calls: Call[]; readonly run: (command: string, args: readonly string[], cwd: string) => number } {
+function recorder(status: number): {
+  readonly calls: Call[]
+  readonly run: (command: string, args: readonly string[], cwd: string) => number
+} {
   const calls: Call[] = []
-  return { calls, run: (command, args, cwd) => { calls.push({ command, args, cwd }); return status } }
+  return {
+    calls,
+    run: (command, args, cwd) => {
+      calls.push({ command, args, cwd })
+      return status
+    },
+  }
 }
 
 describe("omob keychain helper", () => {

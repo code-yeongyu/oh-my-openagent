@@ -31,10 +31,7 @@ export function withSdkCallTimeout<T>(operation: Promise<T>, timeoutMs: number):
   }
   let timeoutID: ReturnType<typeof globalThis.setTimeout> | undefined
   const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutID = globalThis.setTimeout(
-      () => reject(new BackgroundOutputFetchTimeoutError(timeoutMs)),
-      timeoutMs,
-    )
+    timeoutID = globalThis.setTimeout(() => reject(new BackgroundOutputFetchTimeoutError(timeoutMs)), timeoutMs)
   })
   return Promise.race([operation, timeoutPromise]).finally(() => {
     if (timeoutID !== undefined) clearTimeout(timeoutID)

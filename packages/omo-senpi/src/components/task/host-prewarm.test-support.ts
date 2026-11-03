@@ -14,7 +14,11 @@ import {
   type TaskRecord,
 } from "@oh-my-opencode/senpi-task"
 
-import { startFakeHost, type FakeHost, type FakeHostWarmAnswer } from "../../../../senpi-task/src/runners/rpc-host/__fixtures__/fake-host"
+import {
+  startFakeHost,
+  type FakeHost,
+  type FakeHostWarmAnswer,
+} from "../../../../senpi-task/src/runners/rpc-host/__fixtures__/fake-host"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createEngineHostRuntime } from "./host-execution-mode"
 import { wireHostPrewarm } from "./host-prewarm"
@@ -92,10 +96,12 @@ export function world(input: {
     const existing = started.get(socket)
     if (existing !== undefined) return existing
     mkdirSync(dirname(socket), { recursive: true })
-    const host = startFakeHost({ socketPath: socket, ...(input.warm === undefined ? {} : { warm: input.warm }) }).then((fake) => {
-      hosts.push(fake)
-      return fake
-    })
+    const host = startFakeHost({ socketPath: socket, ...(input.warm === undefined ? {} : { warm: input.warm }) }).then(
+      (fake) => {
+        hosts.push(fake)
+        return fake
+      },
+    )
     started.set(socket, host)
     return host
   }
@@ -104,7 +110,9 @@ export function world(input: {
     platform: input.platform ?? "darwin",
     agentDir,
     ensureDaemon: (request) => {
-      storeRegisteredAtEnsure.push(input.storeIndex !== "unavailable" && resolve(stateDir) in readTaskStoreIndex(indexPath).stores)
+      storeRegisteredAtEnsure.push(
+        input.storeIndex !== "unavailable" && resolve(stateDir) in readTaskStoreIndex(indexPath).stores,
+      )
       ensures.push(request)
       const reject = input.ensure === "reject" || (input.ensure === "reject-once" && ensures.length === 1)
       if (reject) return Promise.reject(new HostUnavailableError("ensure_failed", { fallbackAllowed: false }))
@@ -119,9 +127,15 @@ export function world(input: {
   const records: TaskRecord[] = []
   const manager = {
     list: (scope: ListScope) =>
-      records.filter((record) => scope.scope === "all" || record.parent_session_id === scope.session_id).map((record) => ({ record })),
+      records
+        .filter((record) => scope.scope === "all" || record.parent_session_id === scope.session_id)
+        .map((record) => ({ record })),
   }
-  const prewarm = wireHostPrewarm(piWithContext, { settings, runtime, stateDir, host, manager }, input.platform ?? "darwin")
+  const prewarm = wireHostPrewarm(
+    piWithContext,
+    { settings, runtime, stateDir, host, manager },
+    input.platform ?? "darwin",
+  )
   return {
     pi,
     host,
@@ -140,17 +154,31 @@ export function world(input: {
     records,
     shard,
     legacy: join(agentDir, "rpc", "rpc.sock"),
-    sessionStart: (sessionId: string) => pi.dispatch("session_start", { type: "session_start", reason: "startup" }, sessionCtx(sessionId)),
-    prompt: (sessionId: string) => pi.dispatch("input", { type: "input", text: "hi", source: "interactive" }, sessionCtx(sessionId)),
-    agentStart: (sessionId: string) => pi.dispatch("before_agent_start", { type: "before_agent_start" }, sessionCtx(sessionId)),
-    toolCallStart: (sessionId: string, toolName: string) => pi.dispatch("message_update", toolCallStart(toolName), sessionCtx(sessionId)),
+    sessionStart: (sessionId: string) =>
+      pi.dispatch("session_start", { type: "session_start", reason: "startup" }, sessionCtx(sessionId)),
+    prompt: (sessionId: string) =>
+      pi.dispatch("input", { type: "input", text: "hi", source: "interactive" }, sessionCtx(sessionId)),
+    agentStart: (sessionId: string) =>
+      pi.dispatch("before_agent_start", { type: "before_agent_start" }, sessionCtx(sessionId)),
+    toolCallStart: (sessionId: string, toolName: string) =>
+      pi.dispatch("message_update", toolCallStart(toolName), sessionCtx(sessionId)),
   }
 }
 
 /** The streamed `message_update` whose event opens a tool call, before any argument arrives. */
 export function toolCallStart(toolName: string) {
-  const partial = { role: "assistant", content: [{ type: "text", text: "delegating" }, { type: "toolCall", id: "call-1", name: toolName, arguments: {} }] }
-  return { type: "message_update", message: partial, assistantMessageEvent: { type: "toolcall_start", contentIndex: 1, partial } }
+  const partial = {
+    role: "assistant",
+    content: [
+      { type: "text", text: "delegating" },
+      { type: "toolCall", id: "call-1", name: toolName, arguments: {} },
+    ],
+  }
+  return {
+    type: "message_update",
+    message: partial,
+    assistantMessageEvent: { type: "toolcall_start", contentIndex: 1, partial },
+  }
 }
 
 export function sessionCtx(sessionId: string) {
@@ -158,7 +186,15 @@ export function sessionCtx(sessionId: string) {
 }
 
 function ensured(socket: string): EnsuredTaskDaemon {
-  return { action: "reuse", reason: "compatible", socket, pid: 1, reused: true, upgradeable: false, capabilities: CAPABLE }
+  return {
+    action: "reuse",
+    reason: "compatible",
+    socket,
+    pid: 1,
+    reused: true,
+    upgradeable: false,
+    capabilities: CAPABLE,
+  }
 }
 
 let seq = 0
@@ -183,7 +219,10 @@ export function suspendedChild(parent: string, socket: string, overrides: Partia
 }
 
 // The gate itself, counted: the real gate memoizes, so only a counting double shows a second call.
-export function countingGateWorld(input: { readonly prewarm: Prewarm; readonly gate: () => Promise<"process" | "in-process"> }) {
+export function countingGateWorld(input: {
+  readonly prewarm: Prewarm
+  readonly gate: () => Promise<"process" | "in-process">
+}) {
   const pi = new FakeExtensionAPI()
   const calls: string[] = []
   const captures: (string | undefined)[] = []
@@ -191,35 +230,48 @@ export function countingGateWorld(input: { readonly prewarm: Prewarm; readonly g
   const warmUps: string[] = []
   const root = mkdtempSync(join(tmpdir(), "omo-t9-gate-"))
   dirs.push(root)
-  const settings = OmoTaskSettingsSchema.parse({ process_runner: "host", ...(input.prewarm === "default" ? {} : { host_shard_prewarm: input.prewarm }) })
-  const prewarm = wireHostPrewarm(pi, {
-    settings,
-    stateDir: join(root, "store"),
-    runtime: {
-      captureFrom: (ctx) => {
-        captures.push(ctx.sessionManager?.getSessionId())
-        runtime.captureFrom(ctx)
+  const settings = OmoTaskSettingsSchema.parse({
+    process_runner: "host",
+    ...(input.prewarm === "default" ? {} : { host_shard_prewarm: input.prewarm }),
+  })
+  const prewarm = wireHostPrewarm(
+    pi,
+    {
+      settings,
+      stateDir: join(root, "store"),
+      runtime: {
+        captureFrom: (ctx) => {
+          captures.push(ctx.sessionManager?.getSessionId())
+          runtime.captureFrom(ctx)
+        },
+        sessionId: () => runtime.sessionId(),
+        cwd: () => runtime.cwd(),
       },
-      sessionId: () => runtime.sessionId(),
-      cwd: () => runtime.cwd(),
+      host: {
+        agentDir: join(root, "agent"),
+        executionModeGate: {
+          warm: () => (calls.push("gate"), input.gate().then(() => undefined)),
+          current: () => undefined,
+        },
+        hostEndpoint: { isOwn: () => false, ensure: () => Promise.resolve("ensured") },
+        shardSocket: () => "/tmp/p-counting.sock",
+        warmHost: (socket) => (warmUps.push(socket), Promise.resolve()),
+      },
+      manager: { list: () => [] },
     },
-    host: {
-      agentDir: join(root, "agent"),
-      executionModeGate: { warm: () => (calls.push("gate"), input.gate().then(() => undefined)), current: () => undefined },
-      hostEndpoint: { isOwn: () => false, ensure: () => Promise.resolve("ensured") },
-      shardSocket: () => "/tmp/p-counting.sock",
-      warmHost: (socket) => (warmUps.push(socket), Promise.resolve()),
-    },
-    manager: { list: () => [] },
-  }, "darwin")
+    "darwin",
+  )
   return {
     settled: (sessionId: string) => prewarm.settled(sessionId) ?? Promise.resolve(),
     calls,
     captures,
     warmUps,
-    prompt: (sessionId: string) => pi.dispatch("input", { type: "input", text: "hi", source: "interactive" }, sessionCtx(sessionId)),
-    agentStart: (sessionId: string) => pi.dispatch("before_agent_start", { type: "before_agent_start" }, sessionCtx(sessionId)),
-    sessionStart: (sessionId: string) => pi.dispatch("session_start", { type: "session_start", reason: "startup" }, sessionCtx(sessionId)),
+    prompt: (sessionId: string) =>
+      pi.dispatch("input", { type: "input", text: "hi", source: "interactive" }, sessionCtx(sessionId)),
+    agentStart: (sessionId: string) =>
+      pi.dispatch("before_agent_start", { type: "before_agent_start" }, sessionCtx(sessionId)),
+    sessionStart: (sessionId: string) =>
+      pi.dispatch("session_start", { type: "session_start", reason: "startup" }, sessionCtx(sessionId)),
     // A host context without a session manager: the session id is the one session_start captured.
     bareTurn: () => pi.dispatch("before_agent_start", { type: "before_agent_start" }, {}),
   }

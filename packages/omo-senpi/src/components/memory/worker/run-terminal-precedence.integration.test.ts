@@ -106,9 +106,13 @@ describe("run terminal precedence", () => {
   test("#given abandonment owns the gate when the shipped supervisor child finishes successfully #when publication follows #then the matching outcome wins", async () => {
     const item = await fixture()
     let releaseStateRead!: () => void
-    const stateReadRelease = new Promise<void>((resolve) => { releaseStateRead = resolve })
+    const stateReadRelease = new Promise<void>((resolve) => {
+      releaseStateRead = resolve
+    })
     let stateReadReached!: () => void
-    const reachedStateRead = new Promise<void>((resolve) => { stateReadReached = resolve })
+    const reachedStateRead = new Promise<void>((resolve) => {
+      stateReadReached = resolve
+    })
     let completedAsFailed = false
     const reservation = {
       readState: async () => {
@@ -121,11 +125,15 @@ describe("run terminal precedence", () => {
         return { outcome }
       },
     }
-    const abandonment = abandonReservationRun({
-      identity: item.identity,
-      reservation,
-      now: Date.now,
-    }, item.runDir, item.ledger)
+    const abandonment = abandonReservationRun(
+      {
+        identity: item.identity,
+        reservation,
+        now: Date.now,
+      },
+      item.runDir,
+      item.ledger,
+    )
     await reachedStateRead
 
     const supervisor = spawn(process.execPath, [supervisorPath, item.runDir], {
@@ -136,7 +144,7 @@ describe("run terminal precedence", () => {
     const supervisorExit = waitForExit(supervisor)
     await waitForFilesystemState(
       item.runDir,
-      () => existsSync(join(item.runDir, "publishing.json")) ? true : undefined,
+      () => (existsSync(join(item.runDir, "publishing.json")) ? true : undefined),
       30_000,
       "outcome publication claim",
     )

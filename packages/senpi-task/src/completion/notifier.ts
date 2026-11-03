@@ -249,7 +249,12 @@ function retryKey(entry: BufferedEntry): string {
   return `${entry.task_id}:${entry.epoch}`
 }
 
-function hasBuffered(buffered: Map<string, BufferedEntry[]>, sessionId: string, taskId: string, epoch: number): boolean {
+function hasBuffered(
+  buffered: Map<string, BufferedEntry[]>,
+  sessionId: string,
+  taskId: string,
+  epoch: number,
+): boolean {
   return (buffered.get(sessionId) ?? []).some((entry) => entry.task_id === taskId && entry.epoch === epoch)
 }
 

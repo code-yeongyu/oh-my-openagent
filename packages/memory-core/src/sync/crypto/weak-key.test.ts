@@ -11,8 +11,25 @@ import { checkRecordRules } from "./rules.ts"
 import { deviceIdOf, verifyRecordSig } from "./signatures.ts"
 import { importSnapshot, type SnapshotRecord } from "./snapshot.ts"
 import { buildFork } from "./testing/fork.ts"
-import { approvalEntry, fixtureRecoveryCredential, genesisEntry, headAfter, pairingTranscript, principalOf, verifiedGenesisFor } from "./testing/genesis.ts"
-import { ACCOUNT, appendBatch, appendKeyring, chain, fixtureAnchor, keyringFor, record, recoverySigningSeed } from "./testing/sync-v1.test-support.ts"
+import {
+  approvalEntry,
+  fixtureRecoveryCredential,
+  genesisEntry,
+  headAfter,
+  pairingTranscript,
+  principalOf,
+  verifiedGenesisFor,
+} from "./testing/genesis.ts"
+import {
+  ACCOUNT,
+  appendBatch,
+  appendKeyring,
+  chain,
+  fixtureAnchor,
+  keyringFor,
+  record,
+  recoverySigningSeed,
+} from "./testing/sync-v1.test-support.ts"
 import { b64urlDecode, b64urlEncode, sha256B64 } from "./vendor/sync-format/jcs.ts"
 
 // #10742: Bun's WebCrypto verifies the identity key 01 00..00 with R = identity and S = 0 as valid for
@@ -35,12 +52,21 @@ const weakKeyring = async (): Promise<DeviceKeyring> => {
   }
 }
 
-const run = (entries: ReadonlyArray<SyncEntry>, state: ChainState) => appendEntries(state, entries, createRejectionCounter())
+const run = (entries: ReadonlyArray<SyncEntry>, state: ChainState) =>
+  appendEntries(state, entries, createRejectionCounter())
 const refusal = (outcome: Awaited<ReturnType<typeof run>>) => (outcome.ok ? "accepted" : outcome.reason)
 
 describe("every verify site refuses a signature under the identity key", () => {
   test("record signatures (keyring and batch entries) do not verify under it", async () => {
-    const fields = { account: ACCOUNT, base_seq: 0, digest: "D".repeat(43), epoch: 1, link: "L".repeat(43), keyring_link: null, record_sig: b64urlEncode(IDENTITY_SIG) }
+    const fields = {
+      account: ACCOUNT,
+      base_seq: 0,
+      digest: "D".repeat(43),
+      epoch: 1,
+      link: "L".repeat(43),
+      keyring_link: null,
+      record_sig: b64urlEncode(IDENTITY_SIG),
+    }
     expect(await verifyRecordSig(WEAK, fields)).toBe(false)
   })
 
@@ -55,7 +81,10 @@ describe("every verify site refuses a signature under the identity key", () => {
     const honest = await genesisEntry(ACCOUNT, owner, "W".repeat(43), await fixtureRecoveryCredential())
     const bootstrap = Object(honest.body["bootstrap"])
     const forged = { ...bootstrap, recovery_key: { ...Object(bootstrap["recovery_key"]), signing_public_key: WEAK } }
-    const custody = await genesisEntry(ACCOUNT, owner, "W".repeat(43), { seed: new Uint8Array(32), key: forged["recovery_key"] })
+    const custody = await genesisEntry(ACCOUNT, owner, "W".repeat(43), {
+      seed: new Uint8Array(32),
+      key: forged["recovery_key"],
+    })
     const body = { ...custody.body, countersign: b64urlEncode(IDENTITY_SIG) }
     const genesis = await appendKeyring({ seq: 0, link: "", keyring_link: "" }, body, { keyring: owner }, custody.wraps)
     expect(refusal(await run([genesis], emptyChain(ACCOUNT, creatorAnchor(ACCOUNT, owner))))).toBe("weak_key")
@@ -66,7 +95,12 @@ describe("every verify site refuses a signature under the identity key", () => {
     if (!genesis.ok) throw new Error(`fixture genesis refused: ${genesis.reason}`)
     const enrolled = record("recovery_key")
     const body = { ...enrolled.body, signing_public_key: WEAK, countersign: b64urlEncode(IDENTITY_SIG) }
-    const entry = await appendKeyring(headAfter(record("genesis")), body, { keyring: keyringFor("owner") }, enrolled.wraps)
+    const entry = await appendKeyring(
+      headAfter(record("genesis")),
+      body,
+      { keyring: keyringFor("owner") },
+      enrolled.wraps,
+    )
     expect(refusal(await run([entry], genesis.state))).toBe("weak_key")
   })
 
@@ -74,10 +108,25 @@ describe("every verify site refuses a signature under the identity key", () => {
     const weak = await weakKeyring()
     const epochKey = new Uint8Array(32).fill(7)
     const bytes = await buildBatch({
-      account: ACCOUNT, kind: "ops", epoch: 1, epochKey, keyring: weak, peers: [], batchId: new Uint8Array(16).fill(1),
-      salt: new Uint8Array(32).fill(2), createdAt: 1760000000000, records: [{ type: 1, spaceId: new Uint8Array(16), itemKey: "forged", body: new Uint8Array([1]) }],
+      account: ACCOUNT,
+      kind: "ops",
+      epoch: 1,
+      epochKey,
+      keyring: weak,
+      peers: [],
+      batchId: new Uint8Array(16).fill(1),
+      salt: new Uint8Array(32).fill(2),
+      createdAt: 1760000000000,
+      records: [{ type: 1, spaceId: new Uint8Array(16), itemKey: "forged", body: new Uint8Array([1]) }],
     })
-    const binding = { account: ACCOUNT, epoch: 1, authorId: weak.principal().id, signingPublicKey: WEAK, digest: await sha256B64(bytes), kind: "ops" as const }
+    const binding = {
+      account: ACCOUNT,
+      epoch: 1,
+      authorId: weak.principal().id,
+      signingPublicKey: WEAK,
+      digest: await sha256B64(bytes),
+      kind: "ops" as const,
+    }
     const opened = await openBatch(bytes, binding, epochKey, createRejectionCounter())
     expect(opened.ok ? "opened" : opened.reason).toBe("bad_key")
   })
@@ -87,14 +136,36 @@ describe("every verify site refuses a signature under the identity key", () => {
     const genesis = await genesisEntry(ACCOUNT, weak, "W".repeat(43), await fixtureRecoveryCredential())
     const epochKey = new Uint8Array(32).fill(9)
     const chunk = await buildBatch({
-      account: ACCOUNT, kind: "snapshot", epoch: 1, epochKey, keyring: weak, peers: [], batchId: new Uint8Array(16).fill(3),
-      salt: new Uint8Array(32).fill(4), createdAt: 1760000000000, chunk: { index: 0, count: 1 }, records: [{ type: 1, spaceId: new Uint8Array(16), itemKey: "forged", body: new Uint8Array([1]) }],
+      account: ACCOUNT,
+      kind: "snapshot",
+      epoch: 1,
+      epochKey,
+      keyring: weak,
+      peers: [],
+      batchId: new Uint8Array(16).fill(3),
+      salt: new Uint8Array(32).fill(4),
+      createdAt: 1760000000000,
+      chunk: { index: 0, count: 1 },
+      records: [{ type: 1, spaceId: new Uint8Array(16), itemKey: "forged", body: new Uint8Array([1]) }],
     })
     const snapshot: SnapshotRecord = {
-      account: ACCOUNT, author: principalOf(weak), covers_seq: genesis.seq, digest: await sha256B64(b64urlDecode(await sha256B64(chunk))),
-      link: genesis.link, keyring_head: genesis.keyring_link, record_sig: b64urlEncode(IDENTITY_SIG),
+      account: ACCOUNT,
+      author: principalOf(weak),
+      covers_seq: genesis.seq,
+      digest: await sha256B64(b64urlDecode(await sha256B64(chunk))),
+      link: genesis.link,
+      keyring_head: genesis.keyring_link,
+      record_sig: b64urlEncode(IDENTITY_SIG),
     }
-    const imported = await importSnapshot(ACCOUNT, creatorAnchor(ACCOUNT, weak), [genesis], snapshot, [chunk], () => epochKey, createRejectionCounter())
+    const imported = await importSnapshot(
+      ACCOUNT,
+      creatorAnchor(ACCOUNT, weak),
+      [genesis],
+      snapshot,
+      [chunk],
+      () => epochKey,
+      createRejectionCounter(),
+    )
     expect(imported.ok ? "imported" : imported.reason).toBe("keyring_prefix_refused")
   })
 })
@@ -106,7 +177,14 @@ describe("no record brings a weak key into the keyring authority", () => {
     const weak = await weakKeyring()
     const genesisHead = state.head
     if (genesisHead === null) throw new Error("empty chain")
-    const approval = await approvalEntry(genesisHead, ACCOUNT, owner, weak, await pairingTranscript(ACCOUNT, weak), "J".repeat(43))
+    const approval = await approvalEntry(
+      genesisHead,
+      ACCOUNT,
+      owner,
+      weak,
+      await pairingTranscript(ACCOUNT, weak),
+      "J".repeat(43),
+    )
     const batch = await appendBatch(headAfter(approval), await sha256B64(new Uint8Array([1])), 1, weak)
     const outcome = await run([approval, batch], state)
     expect(refusal(outcome)).toBe("weak_key")
@@ -123,7 +201,10 @@ describe("no record brings a weak key into the keyring authority", () => {
     const credentialId = String(join.body["credential_id"])
     const last = prefix.at(-1)
     if (last === undefined) throw new Error("fixture prefix is empty")
-    const entry = await appendKeyring(headAfter(last), body, { recoverySeed: await recoverySigningSeed("key1"), credentialId })
+    const entry = await appendKeyring(headAfter(last), body, {
+      recoverySeed: await recoverySigningSeed("key1"),
+      credentialId,
+    })
     expect(refusal(await run([entry], walked.state))).toBe("weak_key")
   })
 
@@ -131,8 +212,16 @@ describe("no record brings a weak key into the keyring authority", () => {
     const walked = await run(chain.main.map(record), emptyChain(ACCOUNT, fixtureAnchor()))
     if (!walked.ok || walked.state.authority === null) throw new Error("fixture chain refused")
     const weak = principalOf(await weakKeyring())
-    const approval: ParsedBody = { kind: "approval", principal: { ...weak, id: "X".repeat(22) }, wrapsDigest: "D".repeat(43), commitment: "C".repeat(43), joiningNonce: "N".repeat(22) }
-    expect(await checkRecordRules(record("approval"), approval, walked.state.authority, walked.state.history, "")).toBe("weak_key")
+    const approval: ParsedBody = {
+      kind: "approval",
+      principal: { ...weak, id: "X".repeat(22) },
+      wrapsDigest: "D".repeat(43),
+      commitment: "C".repeat(43),
+      joiningNonce: "N".repeat(22),
+    }
+    expect(await checkRecordRules(record("approval"), approval, walked.state.authority, walked.state.history, "")).toBe(
+      "weak_key",
+    )
   })
 
   test("a fork-resolution whose evidence branch, or stated state, carries a weak or malformed key is refused", async () => {
@@ -144,11 +233,15 @@ describe("no record brings a weak key into the keyring authority", () => {
     const inEvidence = await fork.resolution((evidence) => {
       const branch = evidence.branches[1]
       const first = branch?.records[0]
-      if (branch !== undefined && first !== undefined) branch.records.push({ ...first, body: { kind: "approval", principal: weak } })
+      if (branch !== undefined && first !== undefined)
+        branch.records.push({ ...first, body: { kind: "approval", principal: weak } })
       return evidence
     })
     const malformed = await fork.resolution()
-    const malformedBody = { ...malformed.body, state: { ...Object(malformed.body["state"]), members: [{ ...weak, signing_public_key: "AQ" }] } }
+    const malformedBody = {
+      ...malformed.body,
+      state: { ...Object(malformed.body["state"]), members: [{ ...weak, signing_public_key: "AQ" }] },
+    }
     for (const entry of [inEvidence, { ...malformed, body: malformedBody }]) {
       const body = parseBody(entry.body)
       if (body === null) throw new Error("fork-resolution body does not parse")

@@ -19,7 +19,11 @@ import {
 } from "../device-service-core/src/index.ts"
 import { resolveMemoryRoot } from "../memory-core/src/identity/layout"
 import { syncPinDir } from "../memory-core/src/sync/pin-dir"
-import { createCredentialStore, type CredentialStore, SESSION_READ_WAIT } from "../omo-opencode/src/cli/service-auth/keystore"
+import {
+  createCredentialStore,
+  type CredentialStore,
+  SESSION_READ_WAIT,
+} from "../omo-opencode/src/cli/service-auth/keystore"
 import { serviceOrigin } from "../omo-opencode/src/cli/service-auth/protocol"
 import { runAccountVerb } from "./account-cli"
 import packageJson from "./package.json" with { type: "json" }
@@ -67,7 +71,8 @@ class UsageError extends Error {}
 
 type Parsed = { readonly command: string; readonly json: boolean; readonly filter: SessionFilter }
 
-const isRowState = (value: string): value is SessionRowState => (SESSION_ROW_STATES as readonly string[]).includes(value)
+const isRowState = (value: string): value is SessionRowState =>
+  (SESSION_ROW_STATES as readonly string[]).includes(value)
 
 function parse(args: readonly string[]): Parsed {
   const [command = "", ...rest] = args
@@ -92,8 +97,12 @@ function parse(args: readonly string[]): Parsed {
 }
 
 function renderTable(header: readonly string[], rows: readonly (readonly string[])[]): string[] {
-  const widths = header.map((title, column) => Math.max(title.length, ...rows.map(row => (row[column] ?? "").length)))
-  const line = (cells: readonly string[]) => cells.map((cell, column) => cell.padEnd(widths[column] ?? 0)).join("  ").trimEnd()
+  const widths = header.map((title, column) => Math.max(title.length, ...rows.map((row) => (row[column] ?? "").length)))
+  const line = (cells: readonly string[]) =>
+    cells
+      .map((cell, column) => cell.padEnd(widths[column] ?? 0))
+      .join("  ")
+      .trimEnd()
   return [line(header), ...rows.map(line)]
 }
 
@@ -124,7 +133,13 @@ function deviceLines(devices: readonly DeviceRow[], now: number): string[] {
   if (devices.length === 0) return ["No devices on this account yet."]
   return renderTable(
     ["DEVICE", "NAME", "KIND", "PLATFORM", "SEEN"],
-    devices.map(device => [device.device, device.label, device.kind, device.platform, device.online ? "online" : ago(device.last_seen_ms, now)]),
+    devices.map((device) => [
+      device.device,
+      device.label,
+      device.kind,
+      device.platform,
+      device.online ? "online" : ago(device.last_seen_ms, now),
+    ]),
   )
 }
 
@@ -134,7 +149,7 @@ function sessionLines(result: ListingResult, labels: ReadonlyMap<string, string>
       ? ["No sessions found."]
       : renderTable(
           ["SESSION", "TITLE", "STATE", "PROJECT", "DEVICE", "UPDATED"],
-          result.rows.map(row => [
+          result.rows.map((row) => [
             `${row.device}/${row.session_id}`,
             row.title,
             row.source === "cache" ? `${row.state} (cached)` : row.state,
@@ -144,10 +159,18 @@ function sessionLines(result: ListingResult, labels: ReadonlyMap<string, string>
           ]),
         )
   const missing = [
-    ...new Set([...result.incomplete, ...Object.entries(result.devices).filter(([, state]) => state !== "answered").map(([device]) => device)]),
+    ...new Set([
+      ...result.incomplete,
+      ...Object.entries(result.devices)
+        .filter(([, state]) => state !== "answered")
+        .map(([device]) => device),
+    ]),
   ]
   if (missing.length > 0)
-    lines.push("", `Not answered, rows may be missing or cached: ${missing.map(device => labels.get(device) ?? device).join(", ")}`)
+    lines.push(
+      "",
+      `Not answered, rows may be missing or cached: ${missing.map((device) => labels.get(device) ?? device).join(", ")}`,
+    )
   return lines
 }
 
@@ -168,7 +191,7 @@ async function runOn(service: DeviceService, parsed: Parsed, dependencies: Remot
     }
     case "sessions": {
       const [result, devices] = await Promise.all([service.sessions(parsed.filter), service.devices()])
-      const labels = new Map(devices.map(device => [device.device, device.label]))
+      const labels = new Map(devices.map((device) => [device.device, device.label]))
       return print(result, () => sessionLines(result, labels, dependencies.now()))
     }
     case "enable":
@@ -177,22 +200,29 @@ async function runOn(service: DeviceService, parsed: Parsed, dependencies: Remot
       return print({ enabled }, () => [`Remote sessions are ${enabled ? "on" : "off"} for this device.`])
     }
     default:
-      throw new UsageError(parsed.command === "" ? "omo remote: a command is required" : `omo remote: unknown command ${parsed.command}`)
+      throw new UsageError(
+        parsed.command === "" ? "omo remote: a command is required" : `omo remote: unknown command ${parsed.command}`,
+      )
   }
 }
 
 // A stopped service: its socket is gone (POSIX) or its TCP endpoint refuses (Windows keeps endpoint.json).
 const isServiceStopped = (error: unknown): boolean =>
-  (error instanceof Error && "code" in error && ["ENOENT", "ECONNREFUSED", "ECONNRESET"].includes(String(error.code))) ||
+  (error instanceof Error &&
+    "code" in error &&
+    ["ENOENT", "ECONNREFUSED", "ECONNRESET"].includes(String(error.code))) ||
   (error instanceof LocalApiError && error.code === "handshake_timeout")
 
 export async function runRemoteVerb(dependencies: RemoteCommandDependencies, args: readonly string[]): Promise<number> {
   let parsed: Parsed
   try {
     parsed = parse(args)
-    if (!["status", "devices", "sessions", "enable", "disable"].includes(parsed.command)) throw new UsageError(
-      parsed.command === "" || parsed.command === "help" || parsed.command === "--help" ? "" : `omo remote: unknown command ${parsed.command}`,
-    )
+    if (!["status", "devices", "sessions", "enable", "disable"].includes(parsed.command))
+      throw new UsageError(
+        parsed.command === "" || parsed.command === "help" || parsed.command === "--help"
+          ? ""
+          : `omo remote: unknown command ${parsed.command}`,
+      )
   } catch (error) {
     if (!(error instanceof UsageError)) throw error
     if (error.message) dependencies.error(error.message)
@@ -248,7 +278,7 @@ async function inProcessAccountShow(): Promise<AccountShowResult> {
       },
       pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())),
       readStdin: async () => "",
-      output: line => lines.push(line),
+      output: (line) => lines.push(line),
       error: () => {},
     },
     ["show"],
@@ -272,7 +302,10 @@ export type RemoteAttachLaunch = { readonly engineArgs: readonly string[] }
  * `omo remote attach <device>/<session>`: attaches through the device service and serves the session on a private
  * endpoint for the engine's attach TUI. Returns the engine arguments to launch, or the exit code when it cannot.
  */
-export async function prepareRemoteAttach(dependencies: RemoteCommandDependencies, args: readonly string[]): Promise<RemoteAttachLaunch | number> {
+export async function prepareRemoteAttach(
+  dependencies: RemoteCommandDependencies,
+  args: readonly string[],
+): Promise<RemoteAttachLaunch | number> {
   const [target, ...extra] = args
   const slash = target?.indexOf("/") ?? -1
   if (target === undefined || extra.length > 0 || slash <= 0 || slash === target.length - 1) {
@@ -316,8 +349,8 @@ function remoteDependencies(): RemoteCommandDependencies {
     stateDir,
     connect: () => connectDeviceService({ version: packageJson.version, stateDir }),
     now: () => Date.now(),
-    output: line => process.stdout.write(`${line}\n`),
-    error: line => process.stderr.write(`${line}\n`),
+    output: (line) => process.stdout.write(`${line}\n`),
+    error: (line) => process.stderr.write(`${line}\n`),
   }
 }
 

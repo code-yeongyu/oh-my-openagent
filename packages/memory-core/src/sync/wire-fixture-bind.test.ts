@@ -24,7 +24,9 @@ for (const { name, start } of fixtures) {
     const port = Number(new URL(server.url).port)
     const contender = Bun.spawn([process.execPath, "-e", CONTENDER], {
       env: { ...process.env, CONTENDER_PORT: String(port) },
-      stdin: "pipe", stdout: "pipe", stderr: "pipe",
+      stdin: "pipe",
+      stdout: "pipe",
+      stderr: "pipe",
     })
     try {
       // given: the contender either bound the port (it prints BOUND) or failed to and exited
@@ -39,7 +41,9 @@ for (const { name, start } of fixtures) {
       let deadline: ReturnType<typeof setTimeout> | undefined
       const settled = await Promise.race([
         outcome(),
-        new Promise<string>((resolve) => { deadline = setTimeout(() => resolve("the contender neither bound nor exited within 10 s"), 10_000) }),
+        new Promise<string>((resolve) => {
+          deadline = setTimeout(() => resolve("the contender neither bound nor exited within 10 s"), 10_000)
+        }),
       ])
       clearTimeout(deadline)
 
@@ -47,7 +51,10 @@ for (const { name, start } of fixtures) {
       const response = await fetch(`${server.url}/v1/sync/state`, { headers: { connection: "close" } })
 
       // then: the fixture itself refuses it; the contender never got the port
-      expect({ status: response.status, body: await response.json().catch(() => "not the fixture's JSON") }).toMatchObject({ status: 401, body: { error: { code: "unauthorized" } } })
+      expect({
+        status: response.status,
+        body: await response.json().catch(() => "not the fixture's JSON"),
+      }).toMatchObject({ status: 401, body: { error: { code: "unauthorized" } } })
       expect(settled).toStartWith("exited ")
     } finally {
       contender.kill()

@@ -1,7 +1,9 @@
 const NUMBER_PROPERTY = Object.freeze({ type: "number" } as const)
 const STRING_PROPERTY = Object.freeze({ type: "string" } as const)
 
-function enumProperty<const Values extends readonly string[]>(values: Values): Readonly<{
+function enumProperty<const Values extends readonly string[]>(
+  values: Values,
+): Readonly<{
   type: "string"
   values: Values
 }> {
@@ -11,8 +13,21 @@ function enumProperty<const Values extends readonly string[]>(values: Values): R
 export const PROCESS_KINDS = ["interactive", "print", "json", "rpc-host", "task-child", "unknown"] as const
 export const CRASH_DETECTIONS = ["supervisor", "parent", "unclean_exit", "unknown"] as const
 export const CRASH_SIGNALS = [
-  "SIGSEGV", "SIGBUS", "SIGILL", "SIGTRAP", "SIGABRT", "SIGFPE", "SIGKILL", "SIGTERM", "SIGHUP", "SIGINT",
-  "SIGQUIT", "SIGSYS", "other", "none", "unknown",
+  "SIGSEGV",
+  "SIGBUS",
+  "SIGILL",
+  "SIGTRAP",
+  "SIGABRT",
+  "SIGFPE",
+  "SIGKILL",
+  "SIGTERM",
+  "SIGHUP",
+  "SIGINT",
+  "SIGQUIT",
+  "SIGSYS",
+  "other",
+  "none",
+  "unknown",
 ] as const
 export const UPTIME_BUCKETS = ["lt_1m", "1_10m", "10_60m", "1_6h", "6_24h", "24h_plus"] as const
 /**
@@ -29,7 +44,7 @@ export type CrashShardKind = (typeof SHARD_KINDS)[number]
  * strings or `unknown`.
  */
 export const PROCESS_CRASHED_SCHEMA = Object.freeze({
-  "$os": STRING_PROPERTY,
+  $os: STRING_PROPERTY,
   arch: STRING_PROPERTY,
   crashed_bun_version: STRING_PROPERTY,
   crashed_engine_version: STRING_PROPERTY,

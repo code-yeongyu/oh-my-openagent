@@ -110,7 +110,7 @@ export function createInfrastructureRetries(
       })
       arm(nodeId, delayMs)
     },
-    pending: (nodeId) => nodeId === undefined ? timers.size > 0 : timers.has(nodeId),
+    pending: (nodeId) => (nodeId === undefined ? timers.size > 0 : timers.has(nodeId)),
     takeReady() {
       const value = ready
       ready = false

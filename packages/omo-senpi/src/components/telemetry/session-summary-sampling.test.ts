@@ -26,13 +26,21 @@ describe("raw-turn sample rate resolution", () => {
     ["posthog", 7, { [RAW_TURN_SAMPLE_RATE_ENV]: "not-a-number" }, RAW_TURN_SAMPLE_RATE],
     ["collector", 0.05, {}, 1],
     ["collector", 0.05, { [RAW_TURN_SAMPLE_RATE_ENV]: "0" }, 1],
-  ] as const)("#given sink %s, config %p and env %p #when resolved #then the rate is %p", (sink, configured, env, expected) => {
-    expect(resolveRawTurnSampleRate({ sink, ...(configured === undefined ? {} : { configured }), env })).toBe(expected)
-  })
+  ] as const)(
+    "#given sink %s, config %p and env %p #when resolved #then the rate is %p",
+    (sink, configured, env, expected) => {
+      expect(resolveRawTurnSampleRate({ sink, ...(configured === undefined ? {} : { configured }), env })).toBe(
+        expected,
+      )
+    },
+  )
 })
 
 describe("raw-turn sample rate wiring through the component", () => {
-  async function sampleRateSeen(input: { readonly omoJson?: unknown; readonly env?: Record<string, string> }): Promise<unknown> {
+  async function sampleRateSeen(input: {
+    readonly omoJson?: unknown
+    readonly env?: Record<string, string>
+  }): Promise<unknown> {
     return withTempAgentDir(async (agentDir) => {
       const home = join(agentDir, "home")
       mkdirSync(join(home, ".omo"), { recursive: true })
@@ -50,12 +58,24 @@ describe("raw-turn sample rate wiring through the component", () => {
         transportFactory: recorder.factory,
       }).register(pi, { config: pi, logger: createSilentLogger() })
       await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, session)
-      await pi.dispatch("turn_end", {
-        type: "turn_end",
-        turnIndex: 0,
-        message: { role: "assistant", content: [], provider: "openai", model: "gpt-5.6-sol", usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: 2, cost: { total: 0 } }, stopReason: "stop", timestamp: 1 },
-        toolResults: [],
-      }, session)
+      await pi.dispatch(
+        "turn_end",
+        {
+          type: "turn_end",
+          turnIndex: 0,
+          message: {
+            role: "assistant",
+            content: [],
+            provider: "openai",
+            model: "gpt-5.6-sol",
+            usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: 2, cost: { total: 0 } },
+            stopReason: "stop",
+            timestamp: 1,
+          },
+          toolResults: [],
+        },
+        session,
+      )
       await pi.dispatch("session_shutdown", { type: "session_shutdown", reason: "quit" }, session)
       return recorder.messages.find(({ event }) => event === "session_summary")?.properties?.["sample_rate"]
     })
@@ -70,6 +90,11 @@ describe("raw-turn sample rate wiring through the component", () => {
   })
 
   test("#given the env override and a config value #when a session reports #then the env override wins", async () => {
-    expect(await sampleRateSeen({ omoJson: { telemetry: { rawTurnSampleRate: 0.5 } }, env: { [RAW_TURN_SAMPLE_RATE_ENV]: "1" } })).toBe(1)
+    expect(
+      await sampleRateSeen({
+        omoJson: { telemetry: { rawTurnSampleRate: 0.5 } },
+        env: { [RAW_TURN_SAMPLE_RATE_ENV]: "1" },
+      }),
+    ).toBe(1)
   })
 })

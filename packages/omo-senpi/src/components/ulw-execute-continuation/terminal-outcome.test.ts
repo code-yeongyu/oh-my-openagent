@@ -11,7 +11,8 @@ import { activeStatus, createLogger } from "../ulw-loop/ulw-loop.test-support"
 import { createUlwExecuteContinuationComponent } from "./index"
 
 // https://github.com/code-yeongyu/senpi/issues/1520
-const CODEX_ERROR = "Codex error: This request was blocked by our safety systems. Reason: Potentially unintended activity."
+const CODEX_ERROR =
+  "Codex error: This request was blocked by our safety systems. Reason: Potentially unintended activity."
 const clean = { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }], willRetry: false }
 const errorMessage = { role: "assistant", stopReason: "error", errorMessage: CODEX_ERROR, content: [] }
 const demotionDiagnostic = { type: EMPTY_TOOL_USE_DEMOTION_DIAGNOSTIC, timestamp: 0, details: {} }
@@ -30,16 +31,26 @@ const blockedOutcomes = [
     blockedBy: "unfinished-turn",
   },
   { name: "aborted run", event: { ...clean, aborted: true }, blockedBy: "aborted" },
-  { name: "aborted assistant", event: { ...clean, messages: [{ role: "assistant", stopReason: "aborted" }] }, blockedBy: "unfinished-turn" },
+  {
+    name: "aborted assistant",
+    event: { ...clean, messages: [{ role: "assistant", stopReason: "aborted" }] },
+    blockedBy: "unfinished-turn",
+  },
   { name: "host-owned retry", event: { ...clean, willRetry: true }, blockedBy: "host-retry" },
   {
     name: "empty tool-use refusal",
-    event: { ...clean, messages: [{ role: "assistant", stopReason: "toolUse", content: [], stopDetails: { type: "refusal" } }] },
+    event: {
+      ...clean,
+      messages: [{ role: "assistant", stopReason: "toolUse", content: [], stopDetails: { type: "refusal" } }],
+    },
     blockedBy: "refusal",
   },
   {
     name: "sensitive stop",
-    event: { ...clean, messages: [{ role: "assistant", stopReason: "toolUse", content: [], stopDetails: { type: "sensitive" } }] },
+    event: {
+      ...clean,
+      messages: [{ role: "assistant", stopReason: "toolUse", content: [], stopDetails: { type: "sensitive" } }],
+    },
     blockedBy: "refusal",
   },
   {
@@ -49,7 +60,13 @@ const blockedOutcomes = [
     event: {
       ...clean,
       messages: [
-        { role: "assistant", stopReason: "stop", content: [], diagnostics: [demotionDiagnostic], stopDetails: { type: "refusal" } },
+        {
+          role: "assistant",
+          stopReason: "stop",
+          content: [],
+          diagnostics: [demotionDiagnostic],
+          stopDetails: { type: "refusal" },
+        },
       ],
     },
     blockedBy: "refusal",
@@ -59,7 +76,13 @@ const blockedOutcomes = [
     event: {
       ...clean,
       messages: [
-        { role: "assistant", stopReason: "stop", content: [], diagnostics: [demotionDiagnostic], stopDetails: { type: "sensitive" } },
+        {
+          role: "assistant",
+          stopReason: "stop",
+          content: [],
+          diagnostics: [demotionDiagnostic],
+          stopDetails: { type: "sensitive" },
+        },
       ],
     },
     blockedBy: "refusal",
@@ -67,13 +90,23 @@ const blockedOutcomes = [
   { name: "missing outcome", event: { type: "agent_end" }, blockedBy: "missing-outcome" },
   { name: "empty outcome", event: { ...clean, messages: [] }, blockedBy: "missing-outcome" },
   { name: "missing stop reason", event: { ...clean, messages: [{ role: "assistant" }] }, blockedBy: "missing-outcome" },
-  { name: "error behind custom tail", event: { ...clean, messages: [errorMessage, { role: "custom", content: "notice" }] }, blockedBy: "unfinished-turn" },
+  {
+    name: "error behind custom tail",
+    event: { ...clean, messages: [errorMessage, { role: "custom", content: "notice" }] },
+    blockedBy: "unfinished-turn",
+  },
   {
     // A tool-call-bearing toolUse turn is a run stopped mid-tool-execution, which both host gates reject.
     name: "unfinished tool-use turn",
     event: {
       ...clean,
-      messages: [{ role: "assistant", stopReason: "toolUse", content: [{ type: "toolCall", id: "call-1", name: "bash", arguments: {} }] }],
+      messages: [
+        {
+          role: "assistant",
+          stopReason: "toolUse",
+          content: [{ type: "toolCall", id: "call-1", name: "bash", arguments: {} }],
+        },
+      ],
     },
     blockedBy: "unfinished-turn",
   },
@@ -83,7 +116,11 @@ const blockedOutcomes = [
     event: {
       ...clean,
       messages: [
-        { role: "assistant", stopReason: "toolUse", content: [{ type: "toolCall", id: "call-1", name: "bash", arguments: {} }] },
+        {
+          role: "assistant",
+          stopReason: "toolUse",
+          content: [{ type: "toolCall", id: "call-1", name: "bash", arguments: {} }],
+        },
         abortedToolResult,
       ],
     },
@@ -98,19 +135,31 @@ const blockedOutcomes = [
 const continuableOutcomes = [
   {
     name: "explanatory assistant text",
-    event: { ...clean, messages: [{ role: "assistant", stopReason: "stop", content: [{ type: "text", text: CODEX_ERROR }] }] },
+    event: {
+      ...clean,
+      messages: [{ role: "assistant", stopReason: "stop", content: [{ type: "text", text: CODEX_ERROR }] }],
+    },
   },
-  { name: "an earlier failed attempt behind a clean tail", event: { ...clean, messages: [errorMessage, ...clean.messages, { role: "custom", content: "notice" }] } },
+  {
+    name: "an earlier failed attempt behind a clean tail",
+    event: { ...clean, messages: [errorMessage, ...clean.messages, { role: "custom", content: "notice" }] },
+  },
   {
     // The host treats a demoted empty tool-use turn as continuable; only its refusal details block it.
     name: "a demoted empty tool-use turn without refusal details",
-    event: { ...clean, messages: [{ role: "assistant", stopReason: "stop", content: [], diagnostics: [demotionDiagnostic] }] },
+    event: {
+      ...clean,
+      messages: [{ role: "assistant", stopReason: "stop", content: [], diagnostics: [demotionDiagnostic] }],
+    },
   },
   {
     // One refusal definition: the stop reason is read first, so stale stopDetails on a plain stop is
     // not a refusal for this gate any more than it is for the fallback-architect nudge.
     name: "a plain stop carrying stale refusal details",
-    event: { ...clean, messages: [{ role: "assistant", stopReason: "stop", content: [], stopDetails: { type: "refusal" } }] },
+    event: {
+      ...clean,
+      messages: [{ role: "assistant", stopReason: "stop", content: [], stopDetails: { type: "refusal" } }],
+    },
   },
   {
     name: "a trailing tool error that is not an abort",
@@ -137,20 +186,35 @@ async function setup(component: "loop" | "boulder", coordinated: boolean) {
   const scheduled: Array<() => void> = []
   const coordinator = new IdleInjectionCoordinator(
     (message, options) => pi.sendMessage(message, { triggerTurn: true, deliverAs: options.deliverAs }),
-    { scheduleFlush: (flush) => { scheduled.push(flush) } },
+    {
+      scheduleFlush: (flush) => {
+        scheduled.push(flush)
+      },
+    },
   )
   let status = activeStatus()
   let onProbe: (() => void) | undefined
   const advance = (revision: number) => {
     status = activeStatus(`G${revision}`)
     if (component === "boulder") {
-      writeFileSync(join(root, ".omo", "boulder.json"), JSON.stringify({
-        schema_version: 2, active_work_id: "w1", works: { w1: {
-          work_id: "w1", active_plan: ".omo/plans/task.md", plan_name: "task",
-          session_ids: ["senpi:qa-s1"], status: "active", started_at: "2026-09-09T00:00:00Z",
-          updated_at: `2026-09-09T00:00:${String(revision).padStart(2, "0")}Z`,
-        } },
-      }))
+      writeFileSync(
+        join(root, ".omo", "boulder.json"),
+        JSON.stringify({
+          schema_version: 2,
+          active_work_id: "w1",
+          works: {
+            w1: {
+              work_id: "w1",
+              active_plan: ".omo/plans/task.md",
+              plan_name: "task",
+              session_ids: ["senpi:qa-s1"],
+              status: "active",
+              started_at: "2026-09-09T00:00:00Z",
+              updated_at: `2026-09-09T00:00:${String(revision).padStart(2, "0")}Z`,
+            },
+          },
+        }),
+      )
     }
   }
   if (component === "boulder") {
@@ -158,15 +222,19 @@ async function setup(component: "loop" | "boulder", coordinated: boolean) {
     writeFileSync(join(root, ".omo", "plans", "task.md"), "## TODOs\n- [ ] 1. Task one\n")
   }
   advance(0)
-  const hook = component === "loop" ? createUlwLoopComponent({
-    planExists: () => true,
-    readStatus: async () => {
-      onProbe?.()
-      return { code: 0, stdout: status }
-    },
-  }) : createUlwExecuteContinuationComponent()
+  const hook =
+    component === "loop"
+      ? createUlwLoopComponent({
+          planExists: () => true,
+          readStatus: async () => {
+            onProbe?.()
+            return { code: 0, stdout: status }
+          },
+        })
+      : createUlwExecuteContinuationComponent()
   await hook.register(pi, {
-    logger, config: { getFlag: () => false },
+    logger,
+    config: { getFlag: () => false },
     ...(coordinated ? { idleCoordinator: coordinator } : {}),
   })
   const eventCtx = { cwd: root, sessionManager: { getSessionId: () => "qa-s1" } }
@@ -174,7 +242,11 @@ async function setup(component: "loop" | "boulder", coordinated: boolean) {
     for (const pass of scheduled.splice(0)) pass()
   }
   return {
-    pi, coordinator, scheduled, advance, logger,
+    pi,
+    coordinator,
+    scheduled,
+    advance,
+    logger,
     // Marks a run that the host is NOT settling yet (an automatic retry or a required auto-compaction
     // still owns the turn), so nothing may be delivered for it.
     async endTurn(event: unknown) {
@@ -210,7 +282,9 @@ for (const component of ["loop", "boulder"] as const) {
           expect(scenario.coordinator.pendingCount()).toBe(0)
           expect(scenario.scheduled).toEqual([])
           // then every skip is observable with the outcome that caused it
-          expect(scenario.logger.entries.filter((entry) => isTerminalOutcomeSkip(entry.details, blockedBy))).toHaveLength(9)
+          expect(
+            scenario.logger.entries.filter((entry) => isTerminalOutcomeSkip(entry.details, blockedBy)),
+          ).toHaveLength(9)
           // when the same active status ends cleanly, its signature and all eight slots remain available
           for (let i = 0; i < 9; i++) {
             scenario.advance(i)
@@ -259,7 +333,9 @@ for (const component of ["loop", "boulder"] as const) {
         event["abortSource"] = "user"
         await scenario.settle()
         expect(scenario.pi.messages).toEqual([])
-        expect(scenario.logger.entries.filter((entry) => isTerminalOutcomeSkip(entry.details, "aborted"))).toHaveLength(1)
+        expect(scenario.logger.entries.filter((entry) => isTerminalOutcomeSkip(entry.details, "aborted"))).toHaveLength(
+          1,
+        )
       })
 
       it("#given a settle with no recorded run #when it fires #then nothing is delivered", async () => {

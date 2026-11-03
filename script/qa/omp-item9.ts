@@ -6,7 +6,10 @@ import { realColdRevive } from "../../packages/senpi-task/src/lifecycle/__fixtur
 import { coldReviveHarness } from "../../packages/senpi-task/src/lifecycle/__fixtures__/cold-revive-harness"
 import { cleanupProjects } from "../../packages/senpi-task/src/manager/__fixtures__/manager-fakes"
 import { idleReplacementCycles } from "../../packages/senpi-task/src/lifecycle/__fixtures__/idle-replacement-cycles"
-import { acknowledgedResidentContinuation, generationAcrossContinuations } from "../../packages/senpi-task/src/lifecycle/__fixtures__/resident-continuation"
+import {
+  acknowledgedResidentContinuation,
+  generationAcrossContinuations,
+} from "../../packages/senpi-task/src/lifecycle/__fixtures__/resident-continuation"
 import { OmoTaskSettingsSchema, OmoTaskSettingsLayerSchema } from "@oh-my-opencode/omo-config-core"
 
 const args = process.argv.slice(2)
@@ -18,19 +21,59 @@ const sha = process.env.OMP_SOURCE_SHA ?? execFileSync("git", ["rev-parse", "HEA
 mkdirSync(dirname(out), { recursive: true })
 try {
   const results = await runScenario()
-  writeFileSync(out, JSON.stringify({ case: scenario, sha, startedAt, endedAt: new Date().toISOString(), passed: true, results, cleanup: "execution-owned fixtures removed" }, null, 2))
+  writeFileSync(
+    out,
+    JSON.stringify(
+      {
+        case: scenario,
+        sha,
+        startedAt,
+        endedAt: new Date().toISOString(),
+        passed: true,
+        results,
+        cleanup: "execution-owned fixtures removed",
+      },
+      null,
+      2,
+    ),
+  )
 } catch (error) {
-  writeFileSync(out, JSON.stringify({ case: scenario, sha, startedAt, endedAt: new Date().toISOString(), passed: false, error: error instanceof Error ? error.stack : String(error) }, null, 2))
+  writeFileSync(
+    out,
+    JSON.stringify(
+      {
+        case: scenario,
+        sha,
+        startedAt,
+        endedAt: new Date().toISOString(),
+        passed: false,
+        error: error instanceof Error ? error.stack : String(error),
+      },
+      null,
+      2,
+    ),
+  )
   throw error
-} finally { cleanupProjects() }
+} finally {
+  cleanupProjects()
+}
 
 async function runScenario() {
   switch (scenario) {
-    case "park-send-resume": return [await realColdRevive("in-process"), await realColdRevive("process")]
-    case "revive-refusals": return refusals()
-    case "configured-ttl-team": return [await realColdRevive("in-process", false, { idleTimeoutMs: 37 }), await realColdRevive("process", false, { idleTimeoutMs: 37, team: true }), await idleReplacementCycles()]
-    case "pending-steering-pressure": return [await pendingPressure(), ...await refusals()]
-    default: return assert.fail("unknown --case")
+    case "park-send-resume":
+      return [await realColdRevive("in-process"), await realColdRevive("process")]
+    case "revive-refusals":
+      return refusals()
+    case "configured-ttl-team":
+      return [
+        await realColdRevive("in-process", false, { idleTimeoutMs: 37 }),
+        await realColdRevive("process", false, { idleTimeoutMs: 37, team: true }),
+        await idleReplacementCycles(),
+      ]
+    case "pending-steering-pressure":
+      return [await pendingPressure(), ...(await refusals())]
+    default:
+      return assert.fail("unknown --case")
   }
 }
 
@@ -55,7 +98,9 @@ async function pendingPressure() {
     assert.deepEqual(h.store.load(h.record.task_id)?.pending_steering, pending)
     assert(h.manager.getResidentHandle(h.record.task_id))
     return { invalidDurationsRejected: invalids.length, pendingSteeringPreserved: true, residentRetained: true }
-  } finally { await h.dispose() }
+  } finally {
+    await h.dispose()
+  }
 }
 
 async function refusals() {
@@ -68,26 +113,41 @@ async function refusals() {
         assert.equal(result.kind, policy === "refuse" && generation === 1 ? "config_generation_mismatch" : "revived")
         assert.equal(h.warnings.length, policy === "recorded_warn" && generation === 1 ? 1 : 0)
         results.push({ policy, generation: generation ?? "unknown", result, warnings: h.warnings })
-      } finally { await h.dispose() }
+      } finally {
+        await h.dispose()
+      }
     }
   }
   for (const reason of ["cwd", "transcript", "killed", "foreign", "residency"] as const) {
     const h = coldReviveHarness({ cap: 1 })
     try {
-      if (reason === "cwd") h.store.mutate(h.record.task_id, (record) => ({ ...record, spawn_spec: { version: 1, cwd: join(h.project, "missing"), prompt: "fixture" } }))
+      if (reason === "cwd")
+        h.store.mutate(h.record.task_id, (record) => ({
+          ...record,
+          spawn_spec: { version: 1, cwd: join(h.project, "missing"), prompt: "fixture" },
+        }))
       if (reason === "transcript") rmSync(h.sessionPath)
       if (reason === "killed") h.store.mutate(h.record.task_id, (record) => ({ ...record, killed: true }))
       if (reason === "foreign") h.store.mutate(h.record.task_id, (record) => ({ ...record, host_pid: process.pid + 1 }))
-      if (reason === "residency") h.store.save({ ...h.record, task_id: "st_00000903", status: "running", residency_state: "resident" })
+      if (reason === "residency")
+        h.store.save({ ...h.record, task_id: "st_00000903", status: "running", residency_state: "resident" })
       const result = await h.send()
       assert.notEqual(result.kind, "revived")
       assert.equal(h.resumed.length, 0)
       results.push({ reason, result })
-    } finally { await h.dispose() }
+    } finally {
+      await h.dispose()
+    }
   }
   const entered = Promise.withResolvers<void>()
   const release = Promise.withResolvers<void>()
-  const race = coldReviveHarness({ resume: async (_spec, _path, handle) => { entered.resolve(); await release.promise; return handle } })
+  const race = coldReviveHarness({
+    resume: async (_spec, _path, handle) => {
+      entered.resolve()
+      await release.promise
+      return handle
+    },
+  })
   const first = race.send()
   try {
     await Promise.race([entered.promise, first.then((result) => assert.fail(`early result: ${result.kind}`))])
@@ -96,8 +156,14 @@ async function refusals() {
     assert.deepEqual(await race.lifecycle.reclaimIdleResidents?.(), [])
     assert.equal(race.resumed.length, 1)
     results.push({ race: "two sends vs reaper", second, spawns: race.resumed.length })
-  } finally { release.resolve() }
-  try { assert.equal((await first).kind, "revived") } finally { await race.dispose() }
+  } finally {
+    release.resolve()
+  }
+  try {
+    assert.equal((await first).kind, "revived")
+  } finally {
+    await race.dispose()
+  }
   const lane = coldReviveHarness()
   try {
     const holder = await lane.manager.start({ prompt: "hold", parent_session_id: "parent", depth: 1 })
@@ -106,9 +172,20 @@ async function refusals() {
     assert.deepEqual(result, { kind: "admission_refused", task_id: lane.record.task_id, reason: "lane_capacity" })
     results.push({ lane: result })
     if (holder.kind === "started") await lane.manager.cancelTask(holder.task_id)
-  } finally { await lane.dispose() }
+  } finally {
+    await lane.dispose()
+  }
   let attempts = 0
-  const uncertain = coldReviveHarness({ resume: async (_spec, _path, handle) => ({ ...handle, hasExited: () => true, followUp: async () => { attempts += 1; throw new Error("fixture ack loss") } }) })
+  const uncertain = coldReviveHarness({
+    resume: async (_spec, _path, handle) => ({
+      ...handle,
+      hasExited: () => true,
+      followUp: async () => {
+        attempts += 1
+        throw new Error("fixture ack loss")
+      },
+    }),
+  })
   try {
     const initial = await uncertain.send()
     const repeated = await uncertain.send()
@@ -116,26 +193,50 @@ async function refusals() {
     assert.equal(repeated.kind, "delivery_uncertain")
     assert.equal(attempts, 1)
     results.push({ initial, repeated, attempts })
-  } finally { await uncertain.dispose() }
+  } finally {
+    await uncertain.dispose()
+  }
   let acknowledged = false
   const ackFailure = coldReviveHarness({
-    resume: async (_spec, _path, handle) => ({ ...handle, followUp: async (message) => { await handle.followUp(message); acknowledged = true } }),
-    storeWrapper: (store) => ({ ...store, mutate: (id, update) => store.mutate(id, (record) => {
-      const next = update(record)
-      if (acknowledged && next.pending_steering?.length === 0) throw new Error("fixture ack persistence failure")
-      return next
-    }) }),
+    resume: async (_spec, _path, handle) => ({
+      ...handle,
+      followUp: async (message) => {
+        await handle.followUp(message)
+        acknowledged = true
+      },
+    }),
+    storeWrapper: (store) => ({
+      ...store,
+      mutate: (id, update) =>
+        store.mutate(id, (record) => {
+          const next = update(record)
+          if (acknowledged && next.pending_steering?.length === 0) throw new Error("fixture ack persistence failure")
+          return next
+        }),
+    }),
   })
   try {
-    ackFailure.store.mutate(ackFailure.record.task_id, (record) => ({ ...record, pending_steering: [{ id: "p1", message: "PENDING", deliver_as: "steer" }] }))
+    ackFailure.store.mutate(ackFailure.record.task_id, (record) => ({
+      ...record,
+      pending_steering: [{ id: "p1", message: "PENDING", deliver_as: "steer" }],
+    }))
     const initial = await ackFailure.send()
     const repeated = await ackFailure.send()
     assert.equal(initial.kind, "delivery_uncertain")
     assert.equal(repeated.kind, "delivery_uncertain")
     assert.equal(ackFailure.fake.followUpCalls.length, 1)
-    results.push({ case: "acknowledged batch with failed bookkeeping", initial, repeated, attempts: ackFailure.fake.followUpCalls.length })
-  } finally { acknowledged = false; await ackFailure.dispose() }
-  for (const status of ["completed", "interrupted", "error"] as const) results.push(await acknowledgedResidentContinuation(status))
+    results.push({
+      case: "acknowledged batch with failed bookkeeping",
+      initial,
+      repeated,
+      attempts: ackFailure.fake.followUpCalls.length,
+    })
+  } finally {
+    acknowledged = false
+    await ackFailure.dispose()
+  }
+  for (const status of ["completed", "interrupted", "error"] as const)
+    results.push(await acknowledgedResidentContinuation(status))
   for (const generation of [undefined, 1]) results.push(await generationAcrossContinuations(generation))
   results.push(await realColdRevive("in-process", true))
   return results

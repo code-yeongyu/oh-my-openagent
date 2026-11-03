@@ -25,7 +25,7 @@ const DEBUG_FILE = join(tmpdir(), "comment-checker-debug.log")
 
 function debugLog(...args: unknown[]) {
   if (DEBUG) {
-    const msg = `[${new Date().toISOString()}] [comment-checker:downloader] ${args.map(a => typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)).join(' ')}\n`
+    const msg = `[${new Date().toISOString()}] [comment-checker:downloader] ${args.map((a) => (typeof a === "object" ? JSON.stringify(a, null, 2) : String(a))).join(" ")}\n`
     appendFileSync(DEBUG_FILE, msg)
   }
 }
@@ -68,36 +68,36 @@ export function getCachedBinaryPath(): string | null {
  */
 export async function downloadCommentChecker(): Promise<string | null> {
   const asset = resolveCommentCheckerReleaseAsset(process.platform, process.arch)
-  
+
   if (!asset) {
     debugLog(`Unsupported platform: ${process.platform}-${process.arch}`)
     return null
   }
-  
+
   const cacheDir = getCacheDir()
   const binaryName = getBinaryName()
   const binaryPath = join(cacheDir, binaryName)
-  
+
   // Already cached at the pinned release
   if (existsSync(binaryPath) && isCachedCommentCheckerCurrent(cacheDir)) {
     debugLog("Binary already cached at:", binaryPath)
     return binaryPath
   }
-  
+
   const { assetName, url: downloadUrl, ext } = asset
-  
+
   debugLog(`Downloading from: ${downloadUrl}`)
   log(`[${PUBLISHED_PACKAGE_NAME}] Downloading comment-checker binary...`)
-  
+
   try {
     // Ensure cache directory exists
     ensureCacheDir(cacheDir)
-    
+
     const archivePath = join(cacheDir, assetName)
     await downloadArchive(downloadUrl, archivePath)
-    
+
     debugLog(`Downloaded archive to: ${archivePath}`)
-    
+
     // Extract based on file type
     if (ext === "tar.gz") {
       debugLog("Extracting tar.gz:", archivePath, "to", cacheDir)
@@ -105,19 +105,18 @@ export async function downloadCommentChecker(): Promise<string | null> {
     } else {
       await extractZipArchive(archivePath, cacheDir)
     }
-    
+
     // Clean up archive
     cleanupArchive(archivePath)
-    
+
     // Set execute permission on Unix
     ensureExecutable(binaryPath)
     recordCachedCommentCheckerRelease(cacheDir)
-    
+
     debugLog(`Successfully downloaded binary to: ${binaryPath}`)
     log(`[${PUBLISHED_PACKAGE_NAME}] comment-checker binary ready.`)
-    
+
     return binaryPath
-    
   } catch (err) {
     debugLog(`Failed to download: ${err}`)
     log(`[${PUBLISHED_PACKAGE_NAME}] Failed to download comment-checker: ${err instanceof Error ? err.message : err}`)
@@ -138,7 +137,7 @@ export async function ensureCommentCheckerBinary(): Promise<string | null> {
     debugLog("Using cached binary:", cachedPath)
     return cachedPath
   }
-  
+
   // Download if not cached
   return downloadCommentChecker()
 }

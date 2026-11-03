@@ -15,9 +15,7 @@ const registry = {
 }
 
 describe("GPT-5.6 Sol category routing", () => {
-  const cases = [
-    { category: "ultrabrain", variant: "max" },
-  ] as const
+  const cases = [{ category: "ultrabrain", variant: "max" }] as const
 
   for (const { category, variant } of cases) {
     test(`#given only OpenCode Sol #when ${category} resolves #then it uses the migrated GPT-5.6 rung`, () => {

@@ -3,8 +3,20 @@
 import { describe, expect, it } from "bun:test"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import { BROWSER_CUSTOM_TYPE, MASS_ULW_CUSTOM_TYPE, ULTIMATE_BROWSING_CUSTOM_TYPE, ULW_LOOP_CUSTOM_TYPE, ULW_RESEARCH_CUSTOM_TYPE } from "./index"
-import { dispatchInput, expectNoInjection, expectPointerInjections, injectedContent, registerSkillPointers } from "./test-support"
+import {
+  BROWSER_CUSTOM_TYPE,
+  MASS_ULW_CUSTOM_TYPE,
+  ULTIMATE_BROWSING_CUSTOM_TYPE,
+  ULW_LOOP_CUSTOM_TYPE,
+  ULW_RESEARCH_CUSTOM_TYPE,
+} from "./index"
+import {
+  dispatchInput,
+  expectNoInjection,
+  expectPointerInjections,
+  injectedContent,
+  registerSkillPointers,
+} from "./test-support"
 
 const RESEARCH = { customType: ULW_RESEARCH_CUSTOM_TYPE, skillName: "ulw-research" } as const
 const BROWSER = { customType: BROWSER_CUSTOM_TYPE, skillName: "browser" } as const
@@ -78,7 +90,12 @@ describe("omo-senpi skill-pointers companion", () => {
       await registerSkillPointers(pi)
 
       // when
-      const result = await dispatchInput(pi, "use ulw research to compare the gateway options", "interactive", "followUp")
+      const result = await dispatchInput(
+        pi,
+        "use ulw research to compare the gateway options",
+        "interactive",
+        "followUp",
+      )
 
       // then
       expect(pi.messages).toHaveLength(0)
@@ -87,7 +104,9 @@ describe("omo-senpi skill-pointers companion", () => {
       }
       expect(result.text.startsWith("use ulw research to compare the gateway options\n")).toBe(true)
       expect(result.text.indexOf("<omo-ulw-research-mode>")).toBeLessThan(result.text.indexOf("<omo-browser-pointer>"))
-      expect(result.text.indexOf("<omo-browser-pointer>")).toBeLessThan(result.text.indexOf("<omo-ultimate-browsing-pointer>"))
+      expect(result.text.indexOf("<omo-browser-pointer>")).toBeLessThan(
+        result.text.indexOf("<omo-ultimate-browsing-pointer>"),
+      )
       expect(result.text).toContain("browser/SKILL.md")
       expect(result.text).toContain("ultimate-browsing/SKILL.md")
     })
@@ -100,7 +119,10 @@ describe("omo-senpi skill-pointers companion", () => {
       await registerSkillPointers(pi)
 
       // when
-      const result = await dispatchInput(pi, '<skill name="browser" path="skills/browser/SKILL.md">engines</skill> ulw research the gateway options')
+      const result = await dispatchInput(
+        pi,
+        '<skill name="browser" path="skills/browser/SKILL.md">engines</skill> ulw research the gateway options',
+      )
 
       // then
       expectPointerInjections(pi, result, [RESEARCH, COMPANION])

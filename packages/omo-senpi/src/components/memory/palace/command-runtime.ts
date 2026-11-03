@@ -2,7 +2,12 @@
 // `open` either fails or hijacks the wrong display), or returns the path as command output text when
 // no UI is attached. Output NEVER enters model context.
 
-import { reportPalace, type PalaceCommandContext, type PalaceContextResolver, type PalacePeopleResolver } from "./report"
+import {
+  reportPalace,
+  type PalaceCommandContext,
+  type PalaceContextResolver,
+  type PalacePeopleResolver,
+} from "./report"
 import { generatePalaceHtml } from "./generator"
 
 const UNBOUND_NOTICE = "memory is not bound in this session, so /palace has nothing to render"

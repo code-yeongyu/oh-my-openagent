@@ -17,10 +17,17 @@ afterEach(async () => {
 
 function summary(result: GatewayDeliveryResult | undefined): string {
   if (result === undefined) return "none"
-  return result.kind === "ok" ? `${result.delivery.kind}${result.deduplicated === true ? "+dedup" : ""}` : `error:${result.error.code}`
+  return result.kind === "ok"
+    ? `${result.delivery.kind}${result.deduplicated === true ? "+dedup" : ""}`
+    : `error:${result.error.code}`
 }
 
-const request = (key: string): GatewayDeliverRequest => ({ sender: { kind: "session", durable_id: "A" }, target: "B", text: `stuck ${key}`, idempotency_key: key })
+const request = (key: string): GatewayDeliverRequest => ({
+  sender: { kind: "session", durable_id: "A" },
+  target: "B",
+  text: `stuck ${key}`,
+  idempotency_key: key,
+})
 
 describe("receipt_write_failures_leave_the_store_serving", () => {
   test("#given one process whose two deliveries both lost their receipt writes #when it retries both keys and sends a third #then every call answers and nothing is sent twice", async () => {
@@ -29,8 +36,17 @@ describe("receipt_write_failures_leave_the_store_serving", () => {
     h.session("A")
     const b = h.session("B")
     const sender = h.store()
-    const lockWait = () => Object.assign(new Error("gateway store lock wait exceeded"), { code: "gateway_lock_wait_exceeded" })
-    const stuck = h.engineFor({ ...sender, completeReceipt: async () => { throw lockWait() }, abandonReceipt: async () => { throw lockWait() } } satisfies GatewayStore)
+    const lockWait = () =>
+      Object.assign(new Error("gateway store lock wait exceeded"), { code: "gateway_lock_wait_exceeded" })
+    const stuck = h.engineFor({
+      ...sender,
+      completeReceipt: async () => {
+        throw lockWait()
+      },
+      abandonReceipt: async () => {
+        throw lockWait()
+      },
+    } satisfies GatewayStore)
     const retrying = h.engineFor(sender)
 
     const first = await settled(stuck.deliver(request("admitted")))
@@ -47,7 +63,13 @@ describe("receipt_write_failures_leave_the_store_serving", () => {
       second: second.error?.message,
       inProgress: summary(inProgress.value),
       third: summary(third.value),
-    }).toEqual({ first: "gateway store lock wait exceeded", replay: "started+dedup", second: "gateway store lock wait exceeded", inProgress: "error:idempotency_in_progress", third: "queued_offline" })
+    }).toEqual({
+      first: "gateway store lock wait exceeded",
+      replay: "started+dedup",
+      second: "gateway store lock wait exceeded",
+      inProgress: "error:idempotency_in_progress",
+      third: "queued_offline",
+    })
     const rows = await b.store.list({ target_durable_id: "B" })
     expect(rows.map((row) => [row.body, row.state, b.runtime.enqueueCount(row.delivery_id)])).toEqual([
       ["stuck admitted", "applied", 1],
@@ -90,7 +112,8 @@ describe("receipt_write_failures_leave_the_store_serving", () => {
       for (const key of ["one", "two"]) {
         const lost = await settled(engine.deliver(request(key)))
         release()
-        outcomes[`${key}:send`] = lost.error === undefined ? `resolved:${summary(lost.value)}` : String((lost.error as { code?: string }).code)
+        outcomes[`${key}:send`] =
+          lost.error === undefined ? `resolved:${summary(lost.value)}` : String((lost.error as { code?: string }).code)
         outcomes[`${key}:retry`] = summary((await settled(h.engineFor(sender).deliver(request(key)))).value)
       }
       await settled(b.drain.drain({ reason: "start" }))

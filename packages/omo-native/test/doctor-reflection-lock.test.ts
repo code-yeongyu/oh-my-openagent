@@ -34,15 +34,25 @@ function identity(root: string, id: string, durable = true): string {
 
 function deadHolder(reflectionDir: string): void {
   write(join(reflectionDir, "active.lock"), { runId: "reflection-run-64", launcherPid: 11096, launcherHostname: HOST })
-  write(join(reflectionDir, "runs", "reflection-run-64", "outcome.json"), { version: 1, runId: "reflection-run-64", attempt: 1, finishedAt: "2026-10-17T00:00:00.000Z", childExit: { code: 0, signal: null }, timedOut: false })
+  write(join(reflectionDir, "runs", "reflection-run-64", "outcome.json"), {
+    version: 1,
+    runId: "reflection-run-64",
+    attempt: 1,
+    finishedAt: "2026-10-17T00:00:00.000Z",
+    childExit: { code: 0, signal: null },
+    timedOut: false,
+  })
 }
 
 test("#given an outcome.json that is not valid JSON on disk #when the report runs #then the holder is reported stuck with that reason", async () => {
   const root = memoryHome()
   const reflectionDir = identity(root, "agent-a")
   deadHolder(reflectionDir)
-  write(join(reflectionDir, "runs", "reflection-run-64", "outcome.json"), "{\"version\": 1, \"runId\": ")
-  const [line] = await reflectionLockReport({ env: { OMO_MEMORY_HOME: root }, reflectionLockProbe: { getPidLiveness: () => "dead", hostname: () => HOST } })
+  write(join(reflectionDir, "runs", "reflection-run-64", "outcome.json"), '{"version": 1, "runId": ')
+  const [line] = await reflectionLockReport({
+    env: { OMO_MEMORY_HOME: root },
+    reflectionLockProbe: { getPidLiveness: () => "dead", hostname: () => HOST },
+  })
   expect(line).toContain("its outcome is not valid JSON")
   expect(line).toContain("Next step: run /doctor in a session")
 })
@@ -72,7 +82,9 @@ describe("omo doctor reflection lock report (#10377)", () => {
   test("#given a live holder #when the report runs #then it prints nothing", async () => {
     const root = memoryHome()
     deadHolder(identity(root, "agent-a"))
-    expect(await reflectionLockReport({ env: { OMO_MEMORY_HOME: root }, reflectionLockProbe: probe("alive") })).toEqual([])
+    expect(await reflectionLockReport({ env: { OMO_MEMORY_HOME: root }, reflectionLockProbe: probe("alive") })).toEqual(
+      [],
+    )
   })
 
   test("#given a stuck durable identity and a stuck transient one #when the report runs #then only the durable one is reported", async () => {
@@ -96,9 +108,16 @@ describe("omo doctor reflection lock report (#10377)", () => {
     const logged: string[] = []
     const original = console.log
     const originalExitCode = process.exitCode
-    console.log = (...args: unknown[]) => { logged.push(args.join(" ")) }
+    console.log = (...args: unknown[]) => {
+      logged.push(args.join(" "))
+    }
     try {
-      runDoctor({ harnesses: [] }, [], { list: () => [], fetchDistTags: () => null, daemonReport: () => [], reflectionLock: ["WARN memory reflection is stuck on a stale lock (agent-a)"] })
+      runDoctor({ harnesses: [] }, [], {
+        list: () => [],
+        fetchDistTags: () => null,
+        daemonReport: () => [],
+        reflectionLock: ["WARN memory reflection is stuck on a stale lock (agent-a)"],
+      })
     } finally {
       console.log = original
       process.exitCode = originalExitCode ?? 0

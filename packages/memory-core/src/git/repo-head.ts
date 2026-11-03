@@ -10,7 +10,15 @@ interface CachedFile {
 const files = new Map<string, CachedFile>()
 const FILE_CACHE_SIZE = 256
 const OBJECT_ID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/
-const REPO_ENV = ["GIT_DIR", "GIT_COMMON_DIR", "GIT_WORK_TREE", "GIT_NAMESPACE", "GIT_CONFIG", "GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS"]
+const REPO_ENV = [
+  "GIT_DIR",
+  "GIT_COMMON_DIR",
+  "GIT_WORK_TREE",
+  "GIT_NAMESPACE",
+  "GIT_CONFIG",
+  "GIT_CONFIG_COUNT",
+  "GIT_CONFIG_PARAMETERS",
+]
 
 /** Undefined asks the caller to use git's authoritative resolver for an unfamiliar layout. */
 export function readHeadFromFiles(repoDir: string): string | undefined {
@@ -31,8 +39,17 @@ export function readHeadFromFiles(repoDir: string): string | undefined {
     const commonDir = common === undefined ? gitDir : resolve(gitDir, common.trim())
     const config = readText(join(commonDir, "config"))
     // Includes, worktree config, and alternative ref backends are git's job.
-    if (typeof config !== "string" || /^\s*(?:\[include(?:if)?\b|(?:refstorage|worktreeconfig)\s*(?:=|$))/im.test(config)) return undefined
-    if ([gitDir, commonDir].some((dir) => lstatSync(join(dir, "config.worktree"), { throwIfNoEntry: false }) !== undefined)) return undefined
+    if (
+      typeof config !== "string" ||
+      /^\s*(?:\[include(?:if)?\b|(?:refstorage|worktreeconfig)\s*(?:=|$))/im.test(config)
+    )
+      return undefined
+    if (
+      [gitDir, commonDir].some(
+        (dir) => lstatSync(join(dir, "config.worktree"), { throwIfNoEntry: false }) !== undefined,
+      )
+    )
+      return undefined
     // Detect reftable storage even when selected through system/global rather than local config.
     if (lstatSync(join(commonDir, "reftable"), { throwIfNoEntry: false }) !== undefined) return undefined
     if (!lstatSync(join(commonDir, "objects"), { throwIfNoEntry: false })?.isDirectory()) return undefined
@@ -42,7 +59,12 @@ export function readHeadFromFiles(repoDir: string): string | undefined {
     const detached = objectId(head)
     if (detached !== undefined) return detached
     const ref = /^ref: (refs\/heads\/[A-Za-z0-9_./-]+)\r?\n?$/.exec(head)?.[1]
-    if (ref === undefined || ref.includes("..") || ref.split("/").some((part) => !part || part.startsWith(".") || part.endsWith(".") || part.endsWith(".lock"))) return undefined
+    if (
+      ref === undefined ||
+      ref.includes("..") ||
+      ref.split("/").some((part) => !part || part.startsWith(".") || part.endsWith(".") || part.endsWith(".lock"))
+    )
+      return undefined
     const loose = readText(join(commonDir, ref))
     if (loose !== undefined) return typeof loose === "string" ? objectId(loose) : undefined
     const packed = readText(join(commonDir, "packed-refs"))

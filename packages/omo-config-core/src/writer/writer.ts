@@ -32,9 +32,14 @@ function backupCandidate(basePath: string, attempt: number): string {
  * could write the target, so it is reused. Any other file at that name is left alone and the copy
  * takes the next free name, so a resumed migration can never get stuck on its own leftover (#8187).
  */
-function writePlannedBackup(plannedPath: string, content: string, fileSystem: typeof DEFAULT_WRITE_FILE_SYSTEM): string {
+function writePlannedBackup(
+  plannedPath: string,
+  content: string,
+  fileSystem: typeof DEFAULT_WRITE_FILE_SYSTEM,
+): string {
   try {
-    if (fileSystem.existsSync(plannedPath) && fileSystem.readFileSync(plannedPath, "utf-8") === content) return plannedPath
+    if (fileSystem.existsSync(plannedPath) && fileSystem.readFileSync(plannedPath, "utf-8") === content)
+      return plannedPath
   } catch {}
   return writeBackupFrom(plannedPath, content, fileSystem)
 }
@@ -153,9 +158,10 @@ export function updateOmoConfig(options: UpdateOmoConfigOptions): UpdateOmoConfi
   if (existed) {
     try {
       assertConfigPathIsSafe(path, fileSystem)
-      backupPath = options.backupPath === undefined
-        ? writeBackup(path, content, fileSystem)
-        : writePlannedBackup(options.backupPath, content, fileSystem)
+      backupPath =
+        options.backupPath === undefined
+          ? writeBackup(path, content, fileSystem)
+          : writePlannedBackup(options.backupPath, content, fileSystem)
     } catch (error) {
       if (error instanceof OmoConfigWriteError) throw error
       throw new OmoConfigWriteError(path, "backup", error)

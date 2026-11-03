@@ -28,7 +28,9 @@ export function createUnresponsiveClose(input: {
   }
   const connect = async (): Promise<void> => {
     if (!disconnected) return
-    reconnecting ??= reconnect().finally(() => { reconnecting = undefined })
+    reconnecting ??= reconnect().finally(() => {
+      reconnecting = undefined
+    })
     await reconnecting
   }
   const closePort = (port: HostSessionPort): Promise<void> => {
@@ -36,8 +38,12 @@ export function createUnresponsiveClose(input: {
     return port.closeConfirmed()
   }
   return {
-    stop: () => { stopped.resolve(undefined) },
-    transportLost: () => { disconnected = true },
+    stop: () => {
+      stopped.resolve(undefined)
+    },
+    transportLost: () => {
+      disconnected = true
+    },
     probe: async () => {
       await connect()
       const port = input.port()
@@ -53,9 +59,13 @@ export function createUnresponsiveClose(input: {
       if (input.stopped()) return
       const port = input.port()
       const bound = armRecoveryBound({ boundMs: Math.min(input.closeGraceMs, 2_000) })
-      try { await Promise.race([withinBound(bound, port.send({ type: "abort" })), stopped.promise]) }
-      catch (error) { log("senpi-task unresponsive session abort pending", { taskId: input.taskId, error: String(error) }) }
-      finally { bound.settle() }
+      try {
+        await Promise.race([withinBound(bound, port.send({ type: "abort" })), stopped.promise])
+      } catch (error) {
+        log("senpi-task unresponsive session abort pending", { taskId: input.taskId, error: String(error) })
+      } finally {
+        bound.settle()
+      }
       if (input.stopped()) return
       // Parent shutdown's best-effort helper swallows this failure. Liveness cannot.
       await Promise.race([closePort(port), stopped.promise])

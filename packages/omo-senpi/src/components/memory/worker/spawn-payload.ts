@@ -10,11 +10,7 @@ import {
 } from "@oh-my-opencode/memory-core"
 
 import { estimateSystemTokens } from "../commands/tokens"
-import type {
-  PrepareReflectionSpawnInput,
-  ReflectionSpawnArgs,
-  ReflectionSpawnPaths,
-} from "./spawn-types"
+import type { PrepareReflectionSpawnInput, ReflectionSpawnArgs, ReflectionSpawnPaths } from "./spawn-types"
 import { resolveMemoryChildLaunch, withoutForeignPackageDirEnv } from "./senpi-command"
 import { OMO_SENPI_DISABLED_ENV } from "../../../extension/disable-env"
 
@@ -28,53 +24,73 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
   if (isDream && (input.systemTokenBudget === undefined || input.systemTokenTarget === undefined)) {
     throw new TypeError("dream spawn requires a system token budget and target")
   }
-  const dreamPaths = isDream ? {
-    skillsUsage: join(sessionDir, "skills-usage.json"),
-    memoryUsage: join(sessionDir, "memory-usage.json"),
-    dreamState: join(sessionDir, "dream-state.json"),
-    dreamPolicy: join(sessionDir, "dream-policy.json"),
-    systemTokens: join(sessionDir, "system-tokens.json"),
-    audit: join(sessionDir, "audit.json"),
-  } : undefined
-  const payloadPaths = [
-    transcript,
-    persona,
-    prompt,
-    ...(dreamPaths === undefined ? [] : Object.values(dreamPaths)),
-  ]
+  const dreamPaths = isDream
+    ? {
+        skillsUsage: join(sessionDir, "skills-usage.json"),
+        memoryUsage: join(sessionDir, "memory-usage.json"),
+        dreamState: join(sessionDir, "dream-state.json"),
+        dreamPolicy: join(sessionDir, "dream-policy.json"),
+        systemTokens: join(sessionDir, "system-tokens.json"),
+        audit: join(sessionDir, "audit.json"),
+      }
+    : undefined
+  const payloadPaths = [transcript, persona, prompt, ...(dreamPaths === undefined ? [] : Object.values(dreamPaths))]
   // Payload files are chmod 0400 after writing, so a reused run directory (retry with the same
   // runId) must relax the mode before rewriting or the open() fails with EACCES.
   const chmodFile = input.chmodFile ?? chmod
-  await Promise.all(payloadPaths.map(async (path) => {
-    try {
-      await chmodFile(path, 0o600)
-    } catch (error) {
-      if (errorCode(error) !== "ENOENT") throw error
-    }
-  }))
+  await Promise.all(
+    payloadPaths.map(async (path) => {
+      try {
+        await chmodFile(path, 0o600)
+      } catch (error) {
+        if (errorCode(error) !== "ENOENT") throw error
+      }
+    }),
+  )
   await Promise.all([
-    writeFile(transcript, `${JSON.stringify({ schemaVersion: 1, runId: input.run.runId, request: input.run.request }, null, 2)}\n`, "utf8"),
+    writeFile(
+      transcript,
+      `${JSON.stringify({ schemaVersion: 1, runId: input.run.runId, request: input.run.request }, null, 2)}\n`,
+      "utf8",
+    ),
     writeFile(persona, isDream ? loadDreamPersona().markdown : loadReflectionPersona().markdown, "utf8"),
     writeFile(prompt, buildTaskPrompt(input.run, input.worktree.dir, transcript), "utf8"),
-    ...(dreamPaths === undefined ? [] : [
-      copyJsonOrEmpty(input.skillsUsageSource, dreamPaths.skillsUsage),
-      copyJsonOrEmpty(input.memoryUsageSource, dreamPaths.memoryUsage),
-      copyJsonOrEmpty(input.dreamStateSource, dreamPaths.dreamState),
-      writeFile(dreamPaths.dreamPolicy, `${JSON.stringify({ version: 1, people: input.peoplePolicy }, null, 2)}\n`, "utf8"),
-      writeSystemTokenEstimate(input.worktree.dir, dreamPaths.systemTokens),
-      (async () => {
-        const systemTokens = await estimateSystemTokens(input.worktree.dir)
-        const audit = await auditMemoryRepo(input.worktree.dir, { systemTokens, budgetTokens: input.systemTokenBudget })
-        await writeFile(dreamPaths.audit, `${JSON.stringify(audit, (_key, value) =>
-          typeof value === "string" ? redactSecretLikeMaterial(value) : value, 2)}\n`, "utf8")
-      })(),
-    ]),
+    ...(dreamPaths === undefined
+      ? []
+      : [
+          copyJsonOrEmpty(input.skillsUsageSource, dreamPaths.skillsUsage),
+          copyJsonOrEmpty(input.memoryUsageSource, dreamPaths.memoryUsage),
+          copyJsonOrEmpty(input.dreamStateSource, dreamPaths.dreamState),
+          writeFile(
+            dreamPaths.dreamPolicy,
+            `${JSON.stringify({ version: 1, people: input.peoplePolicy }, null, 2)}\n`,
+            "utf8",
+          ),
+          writeSystemTokenEstimate(input.worktree.dir, dreamPaths.systemTokens),
+          (async () => {
+            const systemTokens = await estimateSystemTokens(input.worktree.dir)
+            const audit = await auditMemoryRepo(input.worktree.dir, {
+              systemTokens,
+              budgetTokens: input.systemTokenBudget,
+            })
+            await writeFile(
+              dreamPaths.audit,
+              `${JSON.stringify(
+                audit,
+                (_key, value) => (typeof value === "string" ? redactSecretLikeMaterial(value) : value),
+                2,
+              )}\n`,
+              "utf8",
+            )
+          })(),
+        ]),
   ])
   await Promise.all(payloadPaths.map((path) => chmod(path, 0o400)))
 
-  const dreamTarget = isDream && input.run.request.targetDoc !== undefined
-    ? resolveDreamTarget(input.worktree.dir, input.run.request.targetDoc)
-    : undefined
+  const dreamTarget =
+    isDream && input.run.request.targetDoc !== undefined
+      ? resolveDreamTarget(input.worktree.dir, input.run.request.targetDoc)
+      : undefined
   const paths: ReflectionSpawnPaths = {
     sessionDir,
     worktree: input.worktree.dir,
@@ -90,17 +106,19 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
     ...withoutForeignPackageDirEnv(input.env, launch),
     MEMORY_DIR: input.worktree.dir,
     TRANSCRIPT_PATH: transcript,
-    ...(dreamPaths === undefined ? {} : {
-      SKILLS_USAGE_PATH: dreamPaths.skillsUsage,
-      MEMORY_USAGE_PATH: dreamPaths.memoryUsage,
-      DREAM_STATE_PATH: dreamPaths.dreamState,
-      DREAM_POLICY_PATH: dreamPaths.dreamPolicy,
-      SYSTEM_TOKENS_PATH: dreamPaths.systemTokens,
-      AUDIT_PATH: dreamPaths.audit,
-      SYSTEM_TOKEN_BUDGET: String(input.systemTokenBudget),
-      SYSTEM_TOKEN_TARGET: String(input.systemTokenTarget),
-      ...(dreamTarget === undefined ? {} : { DREAM_TARGET_PATH: dreamTarget }),
-    }),
+    ...(dreamPaths === undefined
+      ? {}
+      : {
+          SKILLS_USAGE_PATH: dreamPaths.skillsUsage,
+          MEMORY_USAGE_PATH: dreamPaths.memoryUsage,
+          DREAM_STATE_PATH: dreamPaths.dreamState,
+          DREAM_POLICY_PATH: dreamPaths.dreamPolicy,
+          SYSTEM_TOKENS_PATH: dreamPaths.systemTokens,
+          AUDIT_PATH: dreamPaths.audit,
+          SYSTEM_TOKEN_BUDGET: String(input.systemTokenBudget),
+          SYSTEM_TOKEN_TARGET: String(input.systemTokenTarget),
+          ...(dreamTarget === undefined ? {} : { DREAM_TARGET_PATH: dreamTarget }),
+        }),
     SENPI_MEMORY_REFLECTION: "1",
     // Extensions load only for the provider one of them registers; omo's own components would
     // write runtime state into the memory worktree and dirty it (#9175).
@@ -119,14 +137,18 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
   // loads the mechanics prompt as the initial non-interactive message.
   const args = [
     "-p",
-    "--system-prompt", persona,
-    "--tools", "bash,edit",
+    "--system-prompt",
+    persona,
+    "--tools",
+    "bash,edit",
     ...(input.loadExtensions === true ? [] : ["--no-extensions"]),
     "--no-skills",
     "--no-prompt-templates",
     "--no-context-files",
-    "--session-dir", sessionDir,
-    "--model", input.model,
+    "--session-dir",
+    sessionDir,
+    "--model",
+    input.model,
     ...(input.thinking === undefined ? [] : ["--thinking", input.thinking]),
     `@${prompt}`,
   ]
@@ -146,10 +168,12 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
     ...(input.run.request.trigger === "dream" ? { origin: input.run.request.origin } : {}),
     mergePolicy: input.mergePolicy,
     ...(input.run.request.targetDoc === undefined ? {} : { targetDoc: input.run.request.targetDoc }),
-    ...(isDream ? {
-      systemTokenBudget: input.systemTokenBudget,
-      systemTokenTarget: input.systemTokenTarget,
-    } : {}),
+    ...(isDream
+      ? {
+          systemTokenBudget: input.systemTokenBudget,
+          systemTokenTarget: input.systemTokenTarget,
+        }
+      : {}),
     worktree: input.worktree,
     command: launch.command,
     args: [...launch.prefixArgs, ...args],
@@ -175,9 +199,12 @@ export async function prepareReflectionForkSpawn(input: PrepareReflectionSpawnIn
   const args = [
     ...resolveMemoryChildLaunch(input).prefixArgs,
     "-p",
-    "--fork", parentSessionFile,
-    "--session-dir", base.paths.sessionDir,
-    "--model", input.model,
+    "--fork",
+    parentSessionFile,
+    "--session-dir",
+    base.paths.sessionDir,
+    "--model",
+    input.model,
     ...(input.thinking === undefined ? [] : ["--thinking", input.thinking]),
     `@${base.paths.prompt}`,
   ]
@@ -197,8 +224,13 @@ function resolveDreamTarget(worktree: string, targetDoc: string): string {
   }
   const target = resolve(worktree, targetDoc)
   const confined = relative(resolve(worktree), target)
-  if (!confined || confined === ".." || confined.startsWith(`..${sep}`) || isAbsolute(confined)
-    || confined.split(sep).includes(".git")) {
+  if (
+    !confined ||
+    confined === ".." ||
+    confined.startsWith(`..${sep}`) ||
+    isAbsolute(confined) ||
+    confined.split(sep).includes(".git")
+  ) {
     throw new TypeError("dream target escapes the memory worktree")
   }
   return target
@@ -206,9 +238,10 @@ function resolveDreamTarget(worktree: string, targetDoc: string): string {
 
 function buildTaskPrompt(run: ReservedRun, worktree: string, transcript: string): string {
   const focus = run.request.focus ? `\nFocus: ${run.request.focus}` : ""
-  const target = run.request.targetDoc === undefined
-    ? []
-    : [`Document maintenance target: ${run.request.targetDoc}`, "Modify no memory document except this target."]
+  const target =
+    run.request.targetDoc === undefined
+      ? []
+      : [`Document maintenance target: ${run.request.targetDoc}`, "Modify no memory document except this target."]
   return [
     "# Reflection mechanics",
     `MEMORY_DIR=${worktree}`,
@@ -222,7 +255,11 @@ function buildTaskPrompt(run: ReservedRun, worktree: string, transcript: string)
 
 async function writeSystemTokenEstimate(repoDir: string, destination: string): Promise<void> {
   const estimate = await estimateSystemTokens(repoDir)
-  await writeFile(destination, `${JSON.stringify({ totalTokens: estimate.totalTokens, files: estimate.files }, null, 2)}\n`, "utf8")
+  await writeFile(
+    destination,
+    `${JSON.stringify({ totalTokens: estimate.totalTokens, files: estimate.files }, null, 2)}\n`,
+    "utf8",
+  )
 }
 
 async function copyJsonOrEmpty(source: string, destination: string): Promise<void> {
@@ -241,7 +278,9 @@ function errorCode(error: unknown): string | undefined {
 }
 
 function safeRunId(runId: string): string {
-  const safe = basename(runId.trim()).replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "")
+  const safe = basename(runId.trim())
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
   if (!safe || safe === "." || safe === "..") throw new TypeError("runId must contain a safe identifier")
   return safe.slice(0, 80)
 }

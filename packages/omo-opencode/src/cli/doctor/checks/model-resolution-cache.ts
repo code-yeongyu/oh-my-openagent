@@ -19,10 +19,7 @@ function getUserConfigDir(): string {
  */
 function loadCustomProviderNames(): string[] {
   const configDir = getUserConfigDir()
-  const candidatePaths = [
-    join(configDir, "opencode.json"),
-    join(configDir, "opencode.jsonc"),
-  ]
+  const candidatePaths = [join(configDir, "opencode.json"), join(configDir, "opencode.jsonc")]
 
   for (const configPath of candidatePaths) {
     if (!existsSync(configPath)) continue

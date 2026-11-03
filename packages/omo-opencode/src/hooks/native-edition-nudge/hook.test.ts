@@ -37,11 +37,7 @@ function fakeStore(state: NudgeStateRead): NudgeStateStore & { readonly writes: 
   }
 }
 
-function createCtx(options: {
-  behavior?: TuiBehavior
-  state?: NudgeStateRead
-  nativeInstalled?: boolean
-}) {
+function createCtx(options: { behavior?: TuiBehavior; state?: NudgeStateRead; nativeInstalled?: boolean }) {
   const toasts: ToastCall[] = []
   const behavior = options.behavior ?? "resolve"
   const store = fakeStore(options.state ?? "missing")
@@ -240,7 +236,9 @@ describe("createNativeEditionNudgeHook", () => {
 
     const nextLaunch = createCtx({ state: recorded })
     const before = recorded ? recorded.nextEligibleAt - 1 : start
-    await createNativeEditionNudgeHook(nextLaunch.ctx, { ...nextLaunch.deps, now: () => before }).event(sessionCreated())
+    await createNativeEditionNudgeHook(nextLaunch.ctx, { ...nextLaunch.deps, now: () => before }).event(
+      sessionCreated(),
+    )
     expect(nextLaunch.toasts).toHaveLength(0)
   })
 })

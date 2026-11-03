@@ -19,7 +19,8 @@ import { resolveSenpi } from "./package-paths.js"
 async function builtinCatalog() {
   const { packageRoot } = resolveSenpi()
   const piAiRoot = engineDependencyDir(packageRoot, "@earendil-works/pi-ai")
-  if (piAiRoot === undefined) throw new Error(`the engine model catalog is missing: @earendil-works/pi-ai is not resolvable from ${packageRoot}`)
+  if (piAiRoot === undefined)
+    throw new Error(`the engine model catalog is missing: @earendil-works/pi-ai is not resolvable from ${packageRoot}`)
   const path = join(piAiRoot, "dist", "providers", "all.js")
   if (!existsSync(path)) throw new Error(`the engine model catalog is missing at ${path}`)
   return (await import(pathToFileURL(path).href)).builtinProviders()

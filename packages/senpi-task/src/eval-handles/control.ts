@@ -25,8 +25,14 @@ export function resultOf(deps: ControlDeps, ref: HandleRef, ctx: HandleCallConte
   return taskOutcome(record, ref)
 }
 
-export function outputOf(deps: ControlDeps, ref: HandleRef, request: OutputRequest, ctx: HandleCallContext): OutputSnapshot {
-  if (ref.kind !== "agent") throw new EvalHandleHostError("eval_handle_operation_unsupported", `output is for agent handles, not ${ref.kind}`)
+export function outputOf(
+  deps: ControlDeps,
+  ref: HandleRef,
+  request: OutputRequest,
+  ctx: HandleCallContext,
+): OutputSnapshot {
+  if (ref.kind !== "agent")
+    throw new EvalHandleHostError("eval_handle_operation_unsupported", `output is for agent handles, not ${ref.kind}`)
   loadFencedTask(deps.tasks, ref, ctx)
   const read = deps.transcriptReader({ taskId: ref.id, stateDir: deps.stateDir })
   // A resume during the read would hand back the successor's transcript; re-fence after reading.
@@ -35,7 +41,13 @@ export function outputOf(deps: ControlDeps, ref: HandleRef, request: OutputReque
   const lines = rendered.text.length === 0 ? [] : rendered.text.split("\n")
   const total = lines.length
   const [start, end] = window(request, total)
-  return { ref, text: lines.slice(start, end).join("\n"), offset: start, total, truncated: rendered.truncated || read.truncated === true || start > 0 || end < total }
+  return {
+    ref,
+    text: lines.slice(start, end).join("\n"),
+    offset: start,
+    total,
+    truncated: rendered.truncated || read.truncated === true || start > 0 || end < total,
+  }
 }
 
 function window(request: OutputRequest, total: number): readonly [number, number] {
@@ -48,6 +60,10 @@ function window(request: OutputRequest, total: number): readonly [number, number
 }
 
 function agentRef(ref: HandleRef): HandleRef {
-  if (ref.kind !== "agent") throw new EvalHandleHostError("eval_handle_operation_unsupported", `${ref.kind} refs are not served by the task host`)
+  if (ref.kind !== "agent")
+    throw new EvalHandleHostError(
+      "eval_handle_operation_unsupported",
+      `${ref.kind} refs are not served by the task host`,
+    )
   return ref
 }

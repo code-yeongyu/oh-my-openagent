@@ -176,7 +176,9 @@ describe("parseTaskRecord persisted boundary", () => {
 
     // then
     expect(result.records).toEqual([])
-    expect(result.diagnostics).toEqual([{ type: "parse_error", path, message: "resolved_model.source must be category or explicit or agent" }])
+    expect(result.diagnostics).toEqual([
+      { type: "parse_error", path, message: "resolved_model.source must be category or explicit or agent" },
+    ])
   })
 
   test("#given malformed known resolved model fields #when listed #then diagnostic is typed and record is skipped", () => {
@@ -227,7 +229,11 @@ describe("parseTaskRecord persisted boundary", () => {
     // given: a subsequent residency transition (dispose) reloads through the parser, so killed must be preserved
     const project = tempProject()
     const store = createTaskRecordStore({ project_dir: project })
-    writePersistedRecord(project, "st_deadbee1", { status: "error", killed: true, error_message: "RPC child killed by signal SIGKILL" })
+    writePersistedRecord(project, "st_deadbee1", {
+      status: "error",
+      killed: true,
+      error_message: "RPC child killed by signal SIGKILL",
+    })
 
     // when
     const result = store.list()
@@ -302,12 +308,19 @@ describe("createTaskRecord privacy boundary", () => {
     // given
     const project = tempProject()
     const store = createTaskRecordStore({ project_dir: project })
-    const runtimeInput = { ...taskWithId("st_01d00005"), prompt: "do not persist this prompt", messages: ["do not persist this message"] }
+    const runtimeInput = {
+      ...taskWithId("st_01d00005"),
+      prompt: "do not persist this prompt",
+      messages: ["do not persist this message"],
+    }
 
     // when
     const record = createTaskRecord(runtimeInput)
     store.save(record)
-    const persisted = readFileSync(join(resolveStateDir({ project_dir: project }), "tasks", `${record.task_id}.json`), "utf8")
+    const persisted = readFileSync(
+      join(resolveStateDir({ project_dir: project }), "tasks", `${record.task_id}.json`),
+      "utf8",
+    )
 
     // then
     expect("prompt" in record).toBe(false)

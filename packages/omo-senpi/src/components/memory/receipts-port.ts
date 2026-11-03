@@ -49,7 +49,11 @@ export async function emitMemoryReceipt(
 }
 
 /** Generation is `ledger.startedAt`, the one value both a live emitter and a later backfill can read. */
-export function runReceipt(ledger: RunReceiptLedger, event: MemoryReceiptEvent, extra: ReceiptExtra = {}): MemoryReceiptInput {
+export function runReceipt(
+  ledger: RunReceiptLedger,
+  event: MemoryReceiptEvent,
+  extra: ReceiptExtra = {},
+): MemoryReceiptInput {
   return {
     kind: ledger.kind,
     runId: ledger.runId,

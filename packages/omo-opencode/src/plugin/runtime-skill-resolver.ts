@@ -15,9 +15,7 @@ export type RuntimeHostSkills = { paths?: string[]; urls?: string[] }
  *
  * Returns undefined on any failure so callers can fall back to base skills.
  */
-export async function readRuntimeHostSkills(
-  client: PluginContext["client"],
-): Promise<RuntimeHostSkills | undefined> {
+export async function readRuntimeHostSkills(client: PluginContext["client"]): Promise<RuntimeHostSkills | undefined> {
   try {
     const result = await client.config.get()
     const skills = (result as { data?: { skills?: unknown } }).data?.skills

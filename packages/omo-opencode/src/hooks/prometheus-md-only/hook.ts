@@ -1,5 +1,12 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { HOOK_NAME, BLOCKED_TOOLS, PATCH_TOOLS, PLANNING_CONSULT_WARNING, PLANNING_CONTEXT_OPEN, PROMETHEUS_WORKFLOW_REMINDER } from "./constants"
+import {
+  HOOK_NAME,
+  BLOCKED_TOOLS,
+  PATCH_TOOLS,
+  PLANNING_CONSULT_WARNING,
+  PLANNING_CONTEXT_OPEN,
+  PROMETHEUS_WORKFLOW_REMINDER,
+} from "./constants"
 import { log } from "../../shared/logger"
 import { replaceToolArgs } from "../../shared/replace-tool-args"
 import { getAgentFromSession } from "./agent-resolution"
@@ -29,7 +36,7 @@ const PATCH_PATH_HEADERS = ["*** Add File:", "*** Update File:", "*** Delete Fil
  * when a body or mutation header cannot be classified, which the caller treats as blocked.
  */
 function patchedPaths(args: Record<string, unknown>) {
-  const field = PATCH_TEXT_FIELDS.find(key => typeof args[key] === "string")
+  const field = PATCH_TEXT_FIELDS.find((key) => typeof args[key] === "string")
   if (field === undefined) return undefined
   const paths: { path: string; line: number; prefix: string }[] = []
   const lines = (args[field] as string).trim().split("\n")
@@ -65,9 +72,7 @@ function patchedPaths(args: Record<string, unknown>) {
 
 /** The file a write/edit-class call targets plus a hashline `rename` destination, or undefined. */
 function writeTargets(args: Record<string, unknown>) {
-  const field = WRITE_PATH_FIELDS.find(
-    key => typeof args[key] === "string" && (args[key] as string).length > 0,
-  )
+  const field = WRITE_PATH_FIELDS.find((key) => typeof args[key] === "string" && (args[key] as string).length > 0)
   if (field === undefined) return undefined
   const paths = [{ field, path: args[field] as string }]
   if (typeof args.rename === "string" && args.rename.length > 0) paths.push({ field: "rename", path: args.rename })
@@ -77,9 +82,9 @@ function writeTargets(args: Record<string, unknown>) {
 function blockedWriteError(path: string): Error {
   return new Error(
     `[${HOOK_NAME}] Prometheus is a planning agent. File operations restricted to .omo/*.md plan files only. ` +
-    `Do NOT route this change through a subagent either - delegated implementation is still implementation. ` +
-    `Record the intended change as a todo in the plan; implementation starts only when the user runs /ulw-execute. ` +
-    `Attempted to modify: ${path}.`
+      `Do NOT route this change through a subagent either - delegated implementation is still implementation. ` +
+      `Record the intended change as a todo in the plan; implementation starts only when the user runs /ulw-execute. ` +
+      `Attempted to modify: ${path}.`,
   )
 }
 
@@ -99,10 +104,10 @@ export function createPrometheusMdOnlyHook(ctx: PluginInput) {
       const toolName = input.tool
 
       // Inject planning-only warning for task tools called by Prometheus
-       if (TASK_TOOLS.includes(toolName)) {
-         const prompt = output.args.prompt as string | undefined
-         if (prompt && !prompt.includes(PLANNING_CONTEXT_OPEN)) {
-           replaceToolArgs(output, { prompt: PLANNING_CONSULT_WARNING + prompt })
+      if (TASK_TOOLS.includes(toolName)) {
+        const prompt = output.args.prompt as string | undefined
+        if (prompt && !prompt.includes(PLANNING_CONTEXT_OPEN)) {
+          replaceToolArgs(output, { prompt: PLANNING_CONSULT_WARNING + prompt })
           log(`[${HOOK_NAME}] Injected planning warning to ${toolName}`, {
             sessionID: input.sessionID,
             tool: toolName,
@@ -130,20 +135,26 @@ export function createPrometheusMdOnlyHook(ctx: PluginInput) {
       // Fail closed: a file-writing call whose target this guard cannot read is blocked, never let through.
       const patch = isPatchTool ? patchedPaths(output.args) : undefined
       const targets = isPatchTool ? patch?.paths : writeTargets(output.args)
-      const resolved = targets?.map(target => {
-        const mode: "entry" | "content" = "prefix" in target
-          ? target.prefix === "*** Delete File:" ||
-            (target.prefix === "*** Update File:" && patch?.lines[target.line + 1]?.startsWith("*** Move to:"))
-            ? "entry" : "content"
-          : output.args.delete === true || typeof output.args.rename === "string" ? "entry" : "content"
+      const resolved = targets?.map((target) => {
+        const mode: "entry" | "content" =
+          "prefix" in target
+            ? target.prefix === "*** Delete File:" ||
+              (target.prefix === "*** Update File:" && patch?.lines[target.line + 1]?.startsWith("*** Move to:"))
+              ? "entry"
+              : "content"
+            : output.args.delete === true || typeof output.args.rename === "string"
+              ? "entry"
+              : "content"
         return { target, mode, path: resolveAllowedFile(target.path, ctx.directory, mode) }
       })
       if (resolved === undefined) throw deny("(unrecognized file argument)")
       // Preserve the existing target boundary for every operation, including deletion.
       // Entry operations must still unlink the named link, not its authorized content.
       for (const entry of resolved) {
-        if (entry.path === undefined ||
-            (entry.mode === "entry" && resolveAllowedFile(entry.target.path, ctx.directory) === undefined)) {
+        if (
+          entry.path === undefined ||
+          (entry.mode === "entry" && resolveAllowedFile(entry.target.path, ctx.directory) === undefined)
+        ) {
           throw deny(entry.target.path)
         }
       }
@@ -161,11 +172,16 @@ export function createPrometheusMdOnlyHook(ctx: PluginInput) {
       if (patch) {
         const rewritten = patch.lines.join("\n")
         const original = output.args[patch.field] as string
-        const executableTargets = (text: string) => parsePatch(text).hunks.flatMap(hunk => [
-          { prefix: `*** ${hunk.type === "add" ? "Add" : hunk.type === "delete" ? "Delete" : "Update"} File:`, path: hunk.path },
-          ...(hunk.type === "update" && hunk.move_path !== undefined
-            ? [{ prefix: "*** Move to:", path: hunk.move_path }] : []),
-        ])
+        const executableTargets = (text: string) =>
+          parsePatch(text).hunks.flatMap((hunk) => [
+            {
+              prefix: `*** ${hunk.type === "add" ? "Add" : hunk.type === "delete" ? "Delete" : "Update"} File:`,
+              path: hunk.path,
+            },
+            ...(hunk.type === "update" && hunk.move_path !== undefined
+              ? [{ prefix: "*** Move to:", path: hunk.move_path }]
+              : []),
+          ])
         let executedRewritten: ReturnType<typeof executableTargets>
         let executedOriginal: ReturnType<typeof executableTargets>
         try {
@@ -175,10 +191,15 @@ export function createPrometheusMdOnlyHook(ctx: PluginInput) {
           throw deny("(unrepresentable patch)")
         }
         const matchesAuthorized = (executed: ReturnType<typeof executableTargets>) =>
-          executed.length === resolved.length && executed.every((entry, index) => {
+          executed.length === resolved.length &&
+          executed.every((entry, index) => {
             const allowed = resolved[index]
-            return allowed && "prefix" in allowed.target &&
-              entry.prefix === allowed.target.prefix && entry.path === allowed.path
+            return (
+              allowed &&
+              "prefix" in allowed.target &&
+              entry.prefix === allowed.target.prefix &&
+              entry.path === allowed.path
+            )
           })
         if (!matchesAuthorized(executedRewritten)) throw deny("(patch target round trip)")
         // Already canonical frozen calls need no change, including harmless header spacing.
@@ -200,7 +221,9 @@ export function createPrometheusMdOnlyHook(ctx: PluginInput) {
         throw deny("(tool arguments did not reach execution)")
       }
       // Snapshot by value so a later in-place change to a nested target value is still detected.
-      execution.approved = Object.fromEntries(TARGET_FIELDS.map(field => [field, structuredClone(retainedArgs[field])]))
+      execution.approved = Object.fromEntries(
+        TARGET_FIELDS.map((field) => [field, structuredClone(retainedArgs[field])]),
+      )
       if (isPatchTool) return
       const filePath = targets?.[0]?.path ?? ""
 

@@ -10,8 +10,16 @@ import { redactSecretLikeMaterial } from "../sync/redact"
 
 export type MemoryReceiptKind = "reflection" | "dream" | "facts"
 export type MemoryReceiptEvent =
-  | "launched" | "merged" | "no_changes" | "failed" | "abandoned"
-  | "quarantined" | "recovered" | "committed" | "no_facts" | "parked"
+  | "launched"
+  | "merged"
+  | "no_changes"
+  | "failed"
+  | "abandoned"
+  | "quarantined"
+  | "recovered"
+  | "committed"
+  | "no_facts"
+  | "parked"
 
 interface ReceiptBase {
   readonly trigger: string
@@ -38,7 +46,12 @@ export type MemoryReceipt = MemoryReceiptInput & {
 }
 
 export type MemoryReceiptIdentityInput =
-  | { readonly kind: "reflection" | "dream"; readonly runId: string; readonly event: MemoryReceiptEvent; readonly generation: string }
+  | {
+      readonly kind: "reflection" | "dream"
+      readonly runId: string
+      readonly event: MemoryReceiptEvent
+      readonly generation: string
+    }
   | { readonly kind: "facts"; readonly batchId: string; readonly event: MemoryReceiptEvent }
 
 const RECEIPTS_FILE = "receipts.jsonl"
@@ -86,7 +99,10 @@ export interface MemoryReceiptsRead {
   readonly skippedPartialLines: number
 }
 
-export async function readMemoryReceipts(runtimeDir: string, options: ReadMemoryReceiptsOptions): Promise<MemoryReceiptsRead> {
+export async function readMemoryReceipts(
+  runtimeDir: string,
+  options: ReadMemoryReceiptsOptions,
+): Promise<MemoryReceiptsRead> {
   const { receipts, skippedPartialLines } = parseReceipts(await readText(runtimeDir))
   const matching = receipts.filter((receipt) => options.kind === undefined || receipt.kind === options.kind).reverse()
   return { receipts: options.limit === undefined ? matching : matching.slice(0, options.limit), skippedPartialLines }
@@ -95,16 +111,22 @@ export async function readMemoryReceipts(runtimeDir: string, options: ReadMemory
 async function underReceiptsLock<T>(runtimeDir: string, operation: () => Promise<T>): Promise<T> {
   const locks = join(runtimeDir, "locks")
   await mkdir(locks, { recursive: true })
-  return withLock(receiptsLockPath(locks), await createLockRecord("receipts"), operation, { waitTimeoutMs: LOCK_WAIT_MS })
+  return withLock(receiptsLockPath(locks), await createLockRecord("receipts"), operation, {
+    waitTimeoutMs: LOCK_WAIT_MS,
+  })
 }
 
 function toReceipt(input: MemoryReceiptInput): MemoryReceipt {
   const detail = input.detail === undefined ? undefined : boundDetail(input.detail)
   const reason = input.reason === undefined ? undefined : boundDetail(input.reason)
   return {
-    v: 1, at: new Date().toISOString(), ...input,
-    ...(reason === undefined ? {} : { reason }), ...(detail === undefined ? {} : { detail }),
-    host: hostname(), pid: process.pid,
+    v: 1,
+    at: new Date().toISOString(),
+    ...input,
+    ...(reason === undefined ? {} : { reason }),
+    ...(detail === undefined ? {} : { detail }),
+    host: hostname(),
+    pid: process.pid,
   }
 }
 
@@ -150,7 +172,10 @@ function parseReceipt(line: string): MemoryReceipt | null {
   if (typeof value !== "object" || value === null) return null
   const candidate = value as Record<string, unknown>
   if (candidate.v !== 1 || typeof candidate.event !== "string" || typeof candidate.at !== "string") return null
-  if (candidate.kind === "facts") return typeof candidate.batchId === "string" ? candidate as unknown as MemoryReceipt : null
+  if (candidate.kind === "facts")
+    return typeof candidate.batchId === "string" ? (candidate as unknown as MemoryReceipt) : null
   if (candidate.kind !== "reflection" && candidate.kind !== "dream") return null
-  return typeof candidate.runId === "string" && typeof candidate.generation === "string" ? candidate as unknown as MemoryReceipt : null
+  return typeof candidate.runId === "string" && typeof candidate.generation === "string"
+    ? (candidate as unknown as MemoryReceipt)
+    : null
 }

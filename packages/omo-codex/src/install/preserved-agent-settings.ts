@@ -59,7 +59,9 @@ export async function restorePreservedReasoning(input: {
     preserved: input.value,
   })
   if (bundledEffort === effort) return
-  const replacement = replaceTopLevelStringSetting(content, "model_reasoning_effort", effort, { insertIfMissing: false })
+  const replacement = replaceTopLevelStringSetting(content, "model_reasoning_effort", effort, {
+    insertIfMissing: false,
+  })
   if (!replacement.replaced) return
   await writeFile(input.linkPath, replacement.content)
 }

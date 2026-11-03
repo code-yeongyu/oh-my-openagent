@@ -60,7 +60,9 @@ describe("kibitzer observability contract", () => {
     const wake = await fixture()
     const wakeEntries: unknown[] = []
     let wakeEntryReady: (() => void) | undefined
-    const wakeReady = new Promise<void>((resolve) => { wakeEntryReady = resolve })
+    const wakeReady = new Promise<void>((resolve) => {
+      wakeEntryReady = resolve
+    })
     const coordinator = new IdleInjectionCoordinator(() => undefined)
     const wakeDelivery = createKibitzerDelivery({
       ledgerFor: () => wake.ledger,
@@ -75,7 +77,10 @@ describe("kibitzer observability contract", () => {
     await wakeDelivery.accept("wake-session", wake.context, [nudge])
     coordinator.enqueue({ key: "task-completion:1", source: "task-completion", content: "done" })
     coordinator.flushOnIdle()
-    await Promise.race([wakeReady, new Promise<void>((_, r) => setTimeout(() => r(new Error("wake ready timeout")), 5000))])
+    await Promise.race([
+      wakeReady,
+      new Promise<void>((_, r) => setTimeout(() => r(new Error("wake ready timeout")), 5000)),
+    ])
 
     const prompt = await fixture()
     const promptEntries: unknown[] = []
@@ -96,9 +101,13 @@ describe("kibitzer observability contract", () => {
     })
     const pi = new MemoryFakeExtensionAPI()
     drain.register(pi)
-    await pi.dispatch("before_agent_start", { type: "before_agent_start" }, {
-      sessionManager: { getSessionId: () => "prompt-session", getBranch: () => [] },
-    })
+    await pi.dispatch(
+      "before_agent_start",
+      { type: "before_agent_start" },
+      {
+        sessionManager: { getSessionId: () => "prompt-session", getBranch: () => [] },
+      },
+    )
 
     expect(steerEntries).toEqual([{ version: 1, nudges: [nudge], via: "steer" }])
     expect(wakeEntries).toEqual([{ version: 1, nudges: [nudge], via: "wake" }])

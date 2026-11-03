@@ -36,7 +36,9 @@ const mockSyncCachePackageJsonToIntent = mock((_pluginInfo: PluginEntryInfo): Sy
 }))
 
 async function createRunner() {
-  const { createBackgroundUpdateCheckRunner } = await import(`../auto-update-checker/hook/background-update-check?test=${importCounter++}`)
+  const { createBackgroundUpdateCheckRunner } = await import(
+    `../auto-update-checker/hook/background-update-check?test=${importCounter++}`
+  )
 
   return createBackgroundUpdateCheckRunner({
     existsSync: () => false,
@@ -64,8 +66,7 @@ async function createRunner() {
 
 describe("runBackgroundUpdateCheck", () => {
   const mockCtx = { directory: "/test" } as PluginInput
-  const getToastMessage: ToastMessageGetter = (isUpdate, version) =>
-    isUpdate ? `Update to ${version}` : "Up to date"
+  const getToastMessage: ToastMessageGetter = (isUpdate, version) => (isUpdate ? `Update to ${version}` : "Up to date")
 
   beforeEach(() => {
     importCounter += 1

@@ -23,7 +23,11 @@ async function selfUpdate(args: string[]): Promise<Harness> {
   const errors: string[] = []
   let lookups = 0
   const code = await runSelfUpdate(args, {
-    resolveUpdate: () => ({ manager: "npm", command: "npm i -g omo-ai@1.0.1", argv: ["npm", "i", "-g", "omo-ai@1.0.1"] }),
+    resolveUpdate: () => ({
+      manager: "npm",
+      command: "npm i -g omo-ai@1.0.1",
+      argv: ["npm", "i", "-g", "omo-ai@1.0.1"],
+    }),
     fetchDistTags: () => {
       lookups += 1
       return { latest: "1.0.1" }
@@ -81,12 +85,21 @@ describe("omo update argument handling", () => {
       test(`#given ${args.join(" ")} #then it installs the resolved target once`, async () => {
         const result = await selfUpdate(args)
         expect(result.code).toBe(0)
-        expect(result.spawned).toEqual([["npm", ["i", "-g", "omo-ai@1.0.1"], expect.objectContaining({ stdio: "inherit" })]])
-        expect(result.lines).toEqual(["omo is updated via npm: npm i -g omo-ai@1.0.1", "omo 1.0.0 -> 1.0.1 (engine: senpi 2026.9.29)"])
+        expect(result.spawned).toEqual([
+          ["npm", ["i", "-g", "omo-ai@1.0.1"], expect.objectContaining({ stdio: "inherit" })],
+        ])
+        expect(result.lines).toEqual([
+          "omo is updated via npm: npm i -g omo-ai@1.0.1",
+          "omo 1.0.0 -> 1.0.1 (engine: senpi 2026.9.29)",
+        ])
       })
     }
 
-    for (const args of [["update", "--dry-run"], ["update", "--print"], ["update", "--self", "--print"]]) {
+    for (const args of [
+      ["update", "--dry-run"],
+      ["update", "--print"],
+      ["update", "--self", "--print"],
+    ]) {
       test(`#given ${args.join(" ")} #then it prints the command and installs nothing`, async () => {
         const result = await selfUpdate(args)
         expect(result.code).toBe(0)
@@ -118,31 +131,45 @@ function launcherFixture(): { root: string; launcher: string; captureFile: strin
   roots.push(root)
   const packageRoot = join(root, "prefix", "lib", "node_modules", "omo-ai")
   cpSync(join(SOURCE_ROOT, "bin"), join(packageRoot, "bin"), { recursive: true })
-  writeFile(join(packageRoot, "package.json"), JSON.stringify({
-    name: "omo-ai",
-    version: "1.2.3-test.0",
-    type: "module",
-    dependencies: { "@code-yeongyu/senpi": "2026.8.9" },
-  }))
+  writeFile(
+    join(packageRoot, "package.json"),
+    JSON.stringify({
+      name: "omo-ai",
+      version: "1.2.3-test.0",
+      type: "module",
+      dependencies: { "@code-yeongyu/senpi": "2026.8.9" },
+    }),
+  )
   const senpiRoot = join(packageRoot, "node_modules", "@code-yeongyu", "senpi")
-  writeFile(join(senpiRoot, "package.json"), JSON.stringify({
-    name: "@code-yeongyu/senpi",
-    version: "2026.8.9",
-    type: "module",
-    exports: { ".": "./dist/index.js" },
-  }))
+  writeFile(
+    join(senpiRoot, "package.json"),
+    JSON.stringify({
+      name: "@code-yeongyu/senpi",
+      version: "2026.8.9",
+      type: "module",
+      exports: { ".": "./dist/index.js" },
+    }),
+  )
   writeFile(join(senpiRoot, "dist", "index.js"), "export const fixture = true\n")
-  writeFile(join(senpiRoot, "dist", "cli.js"), `
+  writeFile(
+    join(senpiRoot, "dist", "cli.js"),
+    `
 import { writeFileSync } from "node:fs"
 writeFileSync(process.env.CAPTURE_FILE, JSON.stringify({ target: "engine", argv: process.argv.slice(2) }))
-`)
+`,
+  )
   writeFile(join(senpiRoot, "dist", "core", "brand.js"), "export {}\n")
-  writeFile(join(packageRoot, "bin", "lib", "npm-dist-tags.js"), `
+  writeFile(
+    join(packageRoot, "bin", "lib", "npm-dist-tags.js"),
+    `
 export function fetchNpmDistTagsSync() {
   return { beta: "1.2.3-test.1" }
 }
-`)
-  writeFile(join(packageRoot, "bin", "lib", "child-process.js"), `
+`,
+  )
+  writeFile(
+    join(packageRoot, "bin", "lib", "child-process.js"),
+    `
 import { writeFileSync } from "node:fs"
 export function propagateResult() {}
 export async function spawnNode(cliPath, args) {
@@ -152,12 +179,18 @@ export async function runChild(command, args) {
   writeFileSync(process.env.CAPTURE_FILE, JSON.stringify({ target: "install", command, args }))
   return { status: 0, signal: null }
 }
-`)
+`,
+  )
   return { root, launcher: join(packageRoot, "bin", "omo.js"), captureFile: join(root, "capture.json") }
 }
 
 function launch(fixture: ReturnType<typeof launcherFixture>, args: string[]) {
-  const env: NodeJS.ProcessEnv = { ...process.env, PATH: "/usr/bin:/bin", HOME: join(fixture.root, "home"), CAPTURE_FILE: fixture.captureFile }
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    PATH: "/usr/bin:/bin",
+    HOME: join(fixture.root, "home"),
+    CAPTURE_FILE: fixture.captureFile,
+  }
   delete env.OMO_CODING_AGENT_DIR
   delete env.SENPI_CODING_AGENT_DIR
   delete env.PI_CODING_AGENT_DIR
@@ -200,6 +233,9 @@ describe("omo launcher update routing", () => {
     const fixture = launcherFixture()
     const result = launch(fixture, ["update", "--extensions"])
     expect(result.status).toBe(0)
-    expect(JSON.parse(readFileSync(fixture.captureFile, "utf8"))).toEqual({ target: "engine", argv: ["update", "--extensions"] })
+    expect(JSON.parse(readFileSync(fixture.captureFile, "utf8"))).toEqual({
+      target: "engine",
+      argv: ["update", "--extensions"],
+    })
   })
 })

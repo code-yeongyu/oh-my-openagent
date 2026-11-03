@@ -11,12 +11,7 @@ import {
 import { randomUUID } from "node:crypto"
 import { dirname } from "node:path"
 
-const TOLERATED_FSYNC_CODES: ReadonlySet<string> = new Set([
-  "EPERM",
-  "EACCES",
-  "ENOTSUP",
-  "EINVAL",
-])
+const TOLERATED_FSYNC_CODES: ReadonlySet<string> = new Set(["EPERM", "EACCES", "ENOTSUP", "EINVAL"])
 
 export interface AtomicWriteOptions {
   readonly platform?: NodeJS.Platform
@@ -29,10 +24,7 @@ function isToleratedFsyncError(error: unknown): boolean {
   return code !== undefined && TOLERATED_FSYNC_CODES.has(code)
 }
 
-function tolerantFsyncSync(
-  fileDescriptor: number,
-  fsyncImpl: typeof FsyncSync,
-): void {
+function tolerantFsyncSync(fileDescriptor: number, fsyncImpl: typeof FsyncSync): void {
   try {
     fsyncImpl(fileDescriptor)
   } catch (error) {
@@ -57,8 +49,7 @@ export function writeFileAtomically(filePath: string, content: string, options: 
       renameSync(tempPath, filePath)
     } catch (error) {
       const isPermissionError =
-        error instanceof Error &&
-        (error.message.includes("EPERM") || error.message.includes("EACCES"))
+        error instanceof Error && (error.message.includes("EPERM") || error.message.includes("EACCES"))
 
       if (platform !== "win32" || !isPermissionError) throw error
       unlinkSync(filePath)

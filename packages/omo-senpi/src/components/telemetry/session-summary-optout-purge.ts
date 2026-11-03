@@ -31,9 +31,12 @@ export function purgeOptedOutQueue(input: {
   for (const leftover of storage.leftovers()) {
     if (storage.isOwnerAlive(leftover.owner)) continue
     const value = readJsonOrCorrupt(leftover.path)
-    const record = value === undefined || value === CORRUPT
-      ? undefined
-      : leftover.kind === "pending-claim" ? parsePendingRecord(value) : parseWindowRecord(value)
+    const record =
+      value === undefined || value === CORRUPT
+        ? undefined
+        : leftover.kind === "pending-claim"
+          ? parsePendingRecord(value)
+          : parseWindowRecord(value)
     if (leftover.kind !== "temp" && record !== undefined && sendable(record)) continue
     removeFile(leftover.path)
   }

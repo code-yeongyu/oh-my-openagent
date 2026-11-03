@@ -8,7 +8,12 @@ import { parseAllowedTools } from "./allowed-tools-parser"
 import { loadMcpJsonFromDir, parseSkillMcpConfigFromFrontmatter } from "./skill-mcp-config"
 import type { SkillScope, SkillMetadata, LoadedSkill, LazyContentLoader } from "./types"
 import { readSkillFileChecked } from "./checked-skill-read"
-import { reportSkillLoadError, skillProvenance, type SkillProvenance, type SkillDiagnosticSink } from "./skill-provenance"
+import {
+  reportSkillLoadError,
+  skillProvenance,
+  type SkillProvenance,
+  type SkillDiagnosticSink,
+} from "./skill-provenance"
 
 export async function loadSkillFromPath(options: {
   skillPath: string
@@ -61,7 +66,8 @@ export async function loadSkillFromPath(options: {
     return {
       name: skillName,
       provenance,
-      mcpSourcePath: mcpJsonMcp && existsSync(join(mcpDirectory, "mcp.json")) ? join(mcpDirectory, "mcp.json") : options.skillPath,
+      mcpSourcePath:
+        mcpJsonMcp && existsSync(join(mcpDirectory, "mcp.json")) ? join(mcpDirectory, "mcp.json") : options.skillPath,
       path: options.skillPath,
       resolvedPath: options.resolvedPath,
       definition,

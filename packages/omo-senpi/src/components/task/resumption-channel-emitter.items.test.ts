@@ -59,7 +59,8 @@ function createHarness(
     pi,
     manager: {
       list: (_scope: ListScope): readonly ListedTask[] => records.map((record) => ({ record })),
-      wasBackground: (taskId: string) => records.find((record) => record.task_id === taskId)?.notify_on_terminal === true,
+      wasBackground: (taskId: string) =>
+        records.find((record) => record.task_id === taskId)?.notify_on_terminal === true,
       workpools,
     },
     logger: { warn: (message: string) => warnings.push(message) },
@@ -125,12 +126,20 @@ describe("resumption-channel emitter wake-source items (#10026)", () => {
 
   it("#given an unreadable workpool store #when the session snapshot is emitted #then the emission still goes out and the failure is logged once (#10782)", async () => {
     // given a foreground record (so pool ownership is probed), a live background child, and a pool store that throws
-    const foreground = { ...child("st_00000041", "Foreground work", "2026-10-24T02:00:00.000Z"), notify_on_terminal: false }
+    const foreground = {
+      ...child("st_00000041", "Foreground work", "2026-10-24T02:00:00.000Z"),
+      notify_on_terminal: false,
+    }
     const background = child("st_00000042", "Draft the notes", "2026-10-24T02:01:00.000Z")
     const warnings: string[] = []
-    const harness = createHarness([foreground, background], [], () => {
-      throw new Error("store_corrupt")
-    }, warnings)
+    const harness = createHarness(
+      [foreground, background],
+      [],
+      () => {
+        throw new Error("store_corrupt")
+      },
+      warnings,
+    )
 
     // when
     await harness.emitter.emitSessionStart()
@@ -145,10 +154,15 @@ describe("resumption-channel emitter wake-source items (#10026)", () => {
     // given a live pool worker the session already published
     const worker = { ...child("st_00000051", "Pool worker", "2026-10-24T03:00:00.000Z"), notify_on_terminal: false }
     let storeReadable = true
-    const harness = createHarness([worker], [], (taskId) => {
-      if (!storeReadable) throw new Error("store_corrupt")
-      return taskId === worker.task_id
-    }, [])
+    const harness = createHarness(
+      [worker],
+      [],
+      (taskId) => {
+        if (!storeReadable) throw new Error("store_corrupt")
+        return taskId === worker.task_id
+      },
+      [],
+    )
     await harness.emitter.emitSessionStart()
     expect(harness.emitted.at(-1)?.activeCount).toBe(1)
 
@@ -164,7 +178,10 @@ describe("resumption-channel emitter wake-source items (#10026)", () => {
 
   it("#given many foreground records #when the session snapshot is emitted #then the pool store is read once, not once per record (#10782)", async () => {
     // given five foreground records, each of which needs a pool ownership check
-    const records = [1, 2, 3, 4, 5].map((n) => ({ ...child(`st_0000006${n}`, `Foreground ${n}`, "2026-10-24T04:00:00.000Z"), notify_on_terminal: false }))
+    const records = [1, 2, 3, 4, 5].map((n) => ({
+      ...child(`st_0000006${n}`, `Foreground ${n}`, "2026-10-24T04:00:00.000Z"),
+      notify_on_terminal: false,
+    }))
     const harness = createHarness(records, ["st_00000063"])
 
     // when

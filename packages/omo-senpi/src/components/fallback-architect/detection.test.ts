@@ -56,22 +56,33 @@ describe("fallback-architect detection", () => {
 
     describe("#when the demoted turn kept its refusal details", () => {
       it("#then the diagnostic admits it as refusal-like", () => {
-        const message = assistant({ stopReason: "stop", content: [], diagnostics: [demotion], stopDetails: { type: "refusal" } })
+        const message = assistant({
+          stopReason: "stop",
+          content: [],
+          diagnostics: [demotion],
+          stopDetails: { type: "refusal" },
+        })
         expect(isRefusalLikeMessage(message)).toBe(true)
       })
     })
 
     describe("#when the demoted turn carries no refusal signal", () => {
       it("#then it stays a continuable stop", () => {
-        expect(isRefusalLikeMessage(assistant({ stopReason: "stop", content: [], diagnostics: [demotion] }))).toBe(false)
+        expect(isRefusalLikeMessage(assistant({ stopReason: "stop", content: [], diagnostics: [demotion] }))).toBe(
+          false,
+        )
       })
     })
 
     describe("#when a plain stop carries refusal details without the demotion diagnostic", () => {
       it("#then the stop reason still wins", () => {
-        expect(isRefusalLikeMessage(assistant({ stopReason: "stop", stopDetails: { type: "refusal" }, diagnostics: [] }))).toBe(false)
         expect(
-          isRefusalLikeMessage(assistant({ stopReason: "stop", stopDetails: { type: "refusal" }, diagnostics: [{ type: "other" }] })),
+          isRefusalLikeMessage(assistant({ stopReason: "stop", stopDetails: { type: "refusal" }, diagnostics: [] })),
+        ).toBe(false)
+        expect(
+          isRefusalLikeMessage(
+            assistant({ stopReason: "stop", stopDetails: { type: "refusal" }, diagnostics: [{ type: "other" }] }),
+          ),
         ).toBe(false)
       })
     })
@@ -155,7 +166,9 @@ describe("fallback-architect detection", () => {
 
     describe("#when the payload is a well formed message_end event", () => {
       it("#then the guard accepts it and rejects junk", () => {
-        expect(isMessageEndEvent({ type: "message_end", message: { role: "assistant", stopReason: "stop" } })).toBe(true)
+        expect(isMessageEndEvent({ type: "message_end", message: { role: "assistant", stopReason: "stop" } })).toBe(
+          true,
+        )
         expect(isMessageEndEvent({ type: "message_end" })).toBe(false)
         expect(isMessageEndEvent(42)).toBe(false)
       })

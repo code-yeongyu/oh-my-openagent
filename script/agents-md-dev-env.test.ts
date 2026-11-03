@@ -29,7 +29,6 @@ describe("AGENTS.md dev-environment documentation", () => {
       expect(content, `AGENTS.md must document ${why} (${token})`).toContain(token)
     }
   })
-
 })
 
 describe("CLAUDE.md (shared with the Claude side)", () => {

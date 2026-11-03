@@ -1,4 +1,11 @@
-import type { OpenedHostSession, HostSessionCommand, HostSessionParked, HostSessionClosed, HostSessionReplaced, HostSessionClientOptions } from "./session-client-contract"
+import type {
+  OpenedHostSession,
+  HostSessionCommand,
+  HostSessionParked,
+  HostSessionClosed,
+  HostSessionReplaced,
+  HostSessionClientOptions,
+} from "./session-client-contract"
 import type { RpcSessionState, RpcTransportGoneError } from "@code-yeongyu/senpi"
 import { log } from "@oh-my-opencode/utils"
 
@@ -29,7 +36,6 @@ import { createHostTaskParentWire } from "./task-parent-wire"
 import type { TaskParentWire } from "../task-parent-control"
 import { confirmHostSessionAbsent } from "./session-close-proof"
 import { openHostSessionConnection } from "./session-client-opening"
-
 
 /**
  * ONE senpi `RpcClient` per child, over the machine-wide daemon's public socket. The client probes
@@ -97,7 +103,9 @@ export class HostSessionClient {
       socketAccepts: this.socketAccepts,
       onDisconnect: (error) => this.handleTransportLoss(error),
       onEvent: (record) => this.ingest(record),
-      bindClient: (client) => { this.client = client },
+      bindClient: (client) => {
+        this.client = client
+      },
     })
     this.identity = identity
     this.routingId = opened.sessionId
@@ -185,7 +193,10 @@ export class HostSessionClient {
       // A stop failure after the host answered must not erase that answer (omo#11765).
       await client.stop().catch((error: unknown) => {
         if (!answered) throw error
-        log("senpi-task host session client stop failed after an answered close", { socket: this.socketPath, error: String(error) })
+        log("senpi-task host session client stop failed after an answered close", {
+          socket: this.socketPath,
+          error: String(error),
+        })
       })
     }
     return answered
@@ -241,7 +252,8 @@ export class HostSessionClient {
         const sessionId = this.routingId ?? control.sessionId
         this.routingId = undefined
         try {
-          for (const listener of this.parkedListeners) listener({ sessionId, sessionPath: control.sessionPath, reason: SESSION_PARKED_CAUSE })
+          for (const listener of this.parkedListeners)
+            listener({ sessionId, sessionPath: control.sessionPath, reason: SESSION_PARKED_CAUSE })
         } finally {
           this.releaseEndedSession()
         }

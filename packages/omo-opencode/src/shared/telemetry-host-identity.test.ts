@@ -81,88 +81,104 @@ function hostLeaks(messages: readonly TelemetryCaptureMessage[]): string[] {
 }
 
 const SENDERS: readonly (readonly [string, (dir: string, recorder: Recorder) => Promise<void>])[] = [
-  ["OmO Native events (session_start, with the chained legacy ping)", async (_dir, recorder) => {
-    await withTempAgentDir(async (agentDir) => {
-      mkdirSync(agentDir, { recursive: true })
-      writeFileSync(join(agentDir, "models.json"), JSON.stringify({ providers: {} }))
-      writeFileSync(join(agentDir, "settings.json"), "{}")
-      const pi = new FakeExtensionAPI()
-      createOmoNativeSessionComponent({
-        env: createEnabledEnv(agentDir),
-        hashSessionId: (raw) => `hashed:${raw}`,
-        isConfigEnabled: () => true,
-        now: NOW,
-        osProvider: SENTINEL_OS,
-        transportFactory: recorder.factory,
-      }).register(pi, { config: pi, logger: createSilentLogger() })
-      await pi.dispatch(
-        "session_start",
-        { type: "session_start", reason: "startup" },
-        { cwd: "/repo", sessionManager: { getSessionId: () => "host-identity" } },
-      )
-    })
-  }],
-  ["omo_senpi_daily_active", async (dir, recorder) => {
-    await withTempAgentDir(async (agentDir) => {
-      await recordSenpiDailyActive({
-        env: createEnabledEnv(agentDir),
-        now: NOW,
-        osProvider: SENTINEL_OS,
-        stateDir: dir,
-        timeoutMs: 1_000,
-        transportFactory: recorder.factory,
+  [
+    "OmO Native events (session_start, with the chained legacy ping)",
+    async (_dir, recorder) => {
+      await withTempAgentDir(async (agentDir) => {
+        mkdirSync(agentDir, { recursive: true })
+        writeFileSync(join(agentDir, "models.json"), JSON.stringify({ providers: {} }))
+        writeFileSync(join(agentDir, "settings.json"), "{}")
+        const pi = new FakeExtensionAPI()
+        createOmoNativeSessionComponent({
+          env: createEnabledEnv(agentDir),
+          hashSessionId: (raw) => `hashed:${raw}`,
+          isConfigEnabled: () => true,
+          now: NOW,
+          osProvider: SENTINEL_OS,
+          transportFactory: recorder.factory,
+        }).register(pi, { config: pi, logger: createSilentLogger() })
+        await pi.dispatch(
+          "session_start",
+          { type: "session_start", reason: "startup" },
+          { cwd: "/repo", sessionManager: { getSessionId: () => "host-identity" } },
+        )
       })
-    })
-  }],
-  ["omo_codex_daily_active (installer)", async (_dir, recorder) => {
-    process.env.POSTHOG_API_KEY = "test-api-key"
-    codexPostHog.__setOsProviderForTesting(SENTINEL_OS)
-    codexPostHog.__setTransportFactoryForTesting(recorder.factory)
-    codexPostHog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-07-03", captureDaily: true }))
-    try {
-      await trackCodexInstallTelemetry()
-    } finally {
-      codexPostHog.__resetOsProviderForTesting()
-      codexPostHog.__resetTransportFactoryForTesting()
-      codexPostHog.__resetActivityStateProviderForTesting()
-    }
-  }],
-  ["omo_codex_daily_active (plugin SessionStart hook)", async (dir, recorder) => {
-    await runSessionStartHook(
-      {
-        session_id: "session-123",
-        transcript_path: null,
-        cwd: "/repo",
-        hook_event_name: "SessionStart",
-        model: "gpt-5.5",
-        permission_mode: "default",
-        source: "startup",
-      },
-      {
-        createClient: () => codexPluginPostHog.__createPluginPostHogForTesting({
-          env: { POSTHOG_API_KEY: "test-api-key" },
+    },
+  ],
+  [
+    "omo_senpi_daily_active",
+    async (dir, recorder) => {
+      await withTempAgentDir(async (agentDir) => {
+        await recordSenpiDailyActive({
+          env: createEnabledEnv(agentDir),
           now: NOW,
           osProvider: SENTINEL_OS,
           stateDir: dir,
+          timeoutMs: 1_000,
           transportFactory: recorder.factory,
-        }),
-      },
-    )
-  }],
-  ["OpenCode plugin ping (omo_daily_active)", async (_dir, recorder) => {
-    process.env.POSTHOG_API_KEY = "test-api-key"
-    const posthog: typeof import("./posthog") = await import(`./posthog?host-identity=${Date.now()}-${Math.random()}`)
-    posthog.__setOsProviderForTesting(SENTINEL_OS)
-    posthog.__setTransportFactoryForTesting(recorder.factory)
-    posthog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-07-03", captureDaily: true }))
-    try {
-      posthog.recordPluginTelemetry({ configEnabled: true })
-    } finally {
-      posthog.__resetOsProviderForTesting()
-      posthog.__resetTransportFactoryForTesting()
-      posthog.__resetActivityStateProviderForTesting()
-    }
-  }],
+        })
+      })
+    },
+  ],
+  [
+    "omo_codex_daily_active (installer)",
+    async (_dir, recorder) => {
+      process.env.POSTHOG_API_KEY = "test-api-key"
+      codexPostHog.__setOsProviderForTesting(SENTINEL_OS)
+      codexPostHog.__setTransportFactoryForTesting(recorder.factory)
+      codexPostHog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-07-03", captureDaily: true }))
+      try {
+        await trackCodexInstallTelemetry()
+      } finally {
+        codexPostHog.__resetOsProviderForTesting()
+        codexPostHog.__resetTransportFactoryForTesting()
+        codexPostHog.__resetActivityStateProviderForTesting()
+      }
+    },
+  ],
+  [
+    "omo_codex_daily_active (plugin SessionStart hook)",
+    async (dir, recorder) => {
+      await runSessionStartHook(
+        {
+          session_id: "session-123",
+          transcript_path: null,
+          cwd: "/repo",
+          hook_event_name: "SessionStart",
+          model: "gpt-5.5",
+          permission_mode: "default",
+          source: "startup",
+        },
+        {
+          createClient: () =>
+            codexPluginPostHog.__createPluginPostHogForTesting({
+              env: { POSTHOG_API_KEY: "test-api-key" },
+              now: NOW,
+              osProvider: SENTINEL_OS,
+              stateDir: dir,
+              transportFactory: recorder.factory,
+            }),
+        },
+      )
+    },
+  ],
+  [
+    "OpenCode plugin ping (omo_daily_active)",
+    async (_dir, recorder) => {
+      process.env.POSTHOG_API_KEY = "test-api-key"
+      const posthog: typeof import("./posthog") = await import(`./posthog?host-identity=${Date.now()}-${Math.random()}`)
+      posthog.__setOsProviderForTesting(SENTINEL_OS)
+      posthog.__setTransportFactoryForTesting(recorder.factory)
+      posthog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-07-03", captureDaily: true }))
+      try {
+        posthog.recordPluginTelemetry({ configEnabled: true })
+      } finally {
+        posthog.__resetOsProviderForTesting()
+        posthog.__resetTransportFactoryForTesting()
+        posthog.__resetActivityStateProviderForTesting()
+      }
+    },
+  ],
 ]
 
 describe("telemetry identities never derive from the host", () => {
@@ -182,15 +198,18 @@ describe("telemetry identities never derive from the host", () => {
     restoreTelemetryEnv()
   })
 
-  it.each(SENDERS)("#given hostname() is a sentinel #when %s sends #then no payload carries the hostname or a hash of it", async (_name, send) => {
-    // given
-    const recorder = createRecorder()
+  it.each(SENDERS)(
+    "#given hostname() is a sentinel #when %s sends #then no payload carries the hostname or a hash of it",
+    async (_name, send) => {
+      // given
+      const recorder = createRecorder()
 
-    // when
-    await send(dir, recorder)
+      // when
+      await send(dir, recorder)
 
-    // then
-    expect(recorder.messages.length).toBeGreaterThan(0)
-    expect(hostLeaks(recorder.messages)).toEqual([])
-  })
+      // then
+      expect(recorder.messages.length).toBeGreaterThan(0)
+      expect(hostLeaks(recorder.messages)).toEqual([])
+    },
+  )
 })

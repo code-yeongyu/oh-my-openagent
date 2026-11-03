@@ -9,7 +9,14 @@ describe("effective model surfaces (F12)", () => {
     const record = taskRecord({
       task_id: "st_operator_switch",
       status: "running",
-      effective_model: { provider: "anthropic", model_id: "claude-opus-5-5", display: "anthropic/claude-opus-5-5", reasoning: "high", source: "set", switched_by_operator: true },
+      effective_model: {
+        provider: "anthropic",
+        model_id: "claude-opus-5-5",
+        display: "anthropic/claude-opus-5-5",
+        reasoning: "high",
+        source: "set",
+        switched_by_operator: true,
+      },
     })
     const row = formatTaskRow(record)
     expect(row).toContain("anthropic/claude-opus-5-5:high")
@@ -21,7 +28,12 @@ describe("effective model surfaces (F12)", () => {
     const record = taskRecord({
       task_id: "st_fallback_reverted",
       status: "running",
-      effective_model: { provider: "kimi-coding", model_id: "kimi-for-coding-highspeed-unlocked", display: "kimi-coding/kimi-for-coding-highspeed-unlocked", source: "fallback-revert" },
+      effective_model: {
+        provider: "kimi-coding",
+        model_id: "kimi-for-coding-highspeed-unlocked",
+        display: "kimi-coding/kimi-for-coding-highspeed-unlocked",
+        source: "fallback-revert",
+      },
     })
     const row = formatTaskRow(record)
     expect(row).toContain("kimi-coding/kimi-for-coding-highspeed-unlocked")
@@ -32,7 +44,14 @@ describe("effective model surfaces (F12)", () => {
     const record = taskRecord({
       task_id: "st_effective_payload",
       status: "running",
-      effective_model: { provider: "anthropic", model_id: "claude-opus-5-5", display: "anthropic/claude-opus-5-5", reasoning: "high", source: "set", switched_by_operator: true },
+      effective_model: {
+        provider: "anthropic",
+        model_id: "claude-opus-5-5",
+        display: "anthropic/claude-opus-5-5",
+        reasoning: "high",
+        source: "set",
+        switched_by_operator: true,
+      },
     })
     const { pi } = wireHarness("parent-session", { records: { [record.task_id]: record }, withRpc: true })
 

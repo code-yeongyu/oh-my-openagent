@@ -10,15 +10,15 @@ export function createGrepTools(ctx: PluginInput): Record<string, ToolDefinition
     description:
       "Fast content search tool with safety limits (60s timeout, 256KB output). " +
       "Searches file contents using regular expressions. " +
-      "Supports full regex syntax (eg. \"log.*Error\", \"function\\s+\\w+\", etc.). " +
-      "Filter files by pattern with the include parameter (eg. \"*.js\", \"*.{ts,tsx}\"). " +
-      "Output modes: \"content\" shows matching lines, \"files_with_matches\" shows only file paths (default), \"count\" shows match counts per file.",
+      'Supports full regex syntax (eg. "log.*Error", "function\\s+\\w+", etc.). ' +
+      'Filter files by pattern with the include parameter (eg. "*.js", "*.{ts,tsx}"). ' +
+      'Output modes: "content" shows matching lines, "files_with_matches" shows only file paths (default), "count" shows match counts per file.',
     args: {
       pattern: tool.schema.string().describe("The regex pattern to search for in file contents"),
       include: tool.schema
         .string()
         .optional()
-        .describe("File pattern to include in the search (e.g. \"*.js\", \"*.{ts,tsx}\")"),
+        .describe('File pattern to include in the search (e.g. "*.js", "*.{ts,tsx}")'),
       path: tool.schema
         .string()
         .optional()
@@ -27,7 +27,7 @@ export function createGrepTools(ctx: PluginInput): Record<string, ToolDefinition
         .enum(["content", "files_with_matches", "count"])
         .optional()
         .describe(
-          "Output mode: \"content\" shows matching lines, \"files_with_matches\" shows only file paths (default), \"count\" shows match counts per file."
+          'Output mode: "content" shows matching lines, "files_with_matches" shows only file paths (default), "count" shows match counts per file.',
         ),
       head_limit: tool.schema
         .number()
@@ -46,23 +46,29 @@ export function createGrepTools(ctx: PluginInput): Record<string, ToolDefinition
         const cli = await resolveGrepCliWithAutoInstall()
 
         if (outputMode === "count") {
-          const results = await runRgCount({
-            pattern: args.pattern,
-            paths,
-            globs,
-          }, cli)
+          const results = await runRgCount(
+            {
+              pattern: args.pattern,
+              paths,
+              globs,
+            },
+            cli,
+          )
           const limited = headLimit > 0 ? results.slice(0, headLimit) : results
           return formatCountResult(limited)
         }
 
-        const result = await runRg({
-          pattern: args.pattern,
-          paths,
-          globs,
-          context: 0,
-          outputMode,
-          headLimit,
-        }, cli)
+        const result = await runRg(
+          {
+            pattern: args.pattern,
+            paths,
+            globs,
+            context: 0,
+            outputMode,
+            headLimit,
+          },
+          cli,
+        )
 
         return formatGrepResult(result)
       } catch (e) {

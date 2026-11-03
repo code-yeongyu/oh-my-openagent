@@ -1,13 +1,13 @@
 import type { TeamModeConfig } from "../../config/schema/team-mode"
 import { findResolvedMemberSession } from "../../features/team-mode/member-session-resolution"
-import {
-  applyMemberSessionRouting,
-  buildMemberPromptBody,
-} from "../../features/team-mode/member-session-routing"
+import { applyMemberSessionRouting, buildMemberPromptBody } from "../../features/team-mode/member-session-routing"
 import { ackMessages } from "../../features/team-mode/team-mailbox/ack"
 import { listUnreadMessages } from "../../features/team-mode/team-mailbox/inbox"
 import { loadRuntimeState, transitionRuntimeState } from "../../features/team-mode/team-state-store/store"
-import { findDeliveredMessageIds, requeuePendingLiveDeliveries } from "../../features/team-mode/team-mailbox/pending-delivery-recovery"
+import {
+  findDeliveredMessageIds,
+  requeuePendingLiveDeliveries,
+} from "../../features/team-mode/team-mailbox/pending-delivery-recovery"
 import { resolveSessionEventID } from "../../shared/event-session-id"
 import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failure-classifier"
 import { log } from "../../shared/logger"
@@ -66,36 +66,48 @@ async function claimPendingMessageAcks(
 
   let claimedMessageIds: string[] = []
   const candidateMessageIds = new Set(messageIds)
-  await transitionRuntimeState(teamRunId, (currentRuntimeState) => {
-    const currentMember = currentRuntimeState.members.find((member) => member.name === memberName)
-    if (currentMember === undefined) {
-      claimedMessageIds = []
-      return currentRuntimeState
-    }
+  await transitionRuntimeState(
+    teamRunId,
+    (currentRuntimeState) => {
+      const currentMember = currentRuntimeState.members.find((member) => member.name === memberName)
+      if (currentMember === undefined) {
+        claimedMessageIds = []
+        return currentRuntimeState
+      }
 
-    claimedMessageIds = currentMember.pendingInjectedMessageIds.filter((messageId) => candidateMessageIds.has(messageId))
-    if (claimedMessageIds.length === 0) {
-      return currentRuntimeState
-    }
+      claimedMessageIds = currentMember.pendingInjectedMessageIds.filter((messageId) =>
+        candidateMessageIds.has(messageId),
+      )
+      if (claimedMessageIds.length === 0) {
+        return currentRuntimeState
+      }
 
-    const claimedMessageIdSet = new Set(claimedMessageIds)
-    return {
-      ...currentRuntimeState,
-      members: currentRuntimeState.members.map((member) => (
-        member.name === memberName
-          ? {
-            ...member,
-            pendingInjectedMessageIds: member.pendingInjectedMessageIds.filter((messageId) => !claimedMessageIdSet.has(messageId)),
-          }
-          : member
-      )),
-    }
-  }, config)
+      const claimedMessageIdSet = new Set(claimedMessageIds)
+      return {
+        ...currentRuntimeState,
+        members: currentRuntimeState.members.map((member) =>
+          member.name === memberName
+            ? {
+                ...member,
+                pendingInjectedMessageIds: member.pendingInjectedMessageIds.filter(
+                  (messageId) => !claimedMessageIdSet.has(messageId),
+                ),
+              }
+            : member,
+        ),
+      }
+    },
+    config,
+  )
 
   return claimedMessageIds
 }
 
-export function createTeamIdleWakeHint(ctx: TeamIdleWakeHintContext, config: TeamModeConfig, options?: TeamIdleWakeHintOptions): HookImpl {
+export function createTeamIdleWakeHint(
+  ctx: TeamIdleWakeHintContext,
+  config: TeamModeConfig,
+  options?: TeamIdleWakeHintOptions,
+): HookImpl {
   const recentWakeHintBatches = new Map<string, number>()
 
   return async ({ event }: HookInput): Promise<void> => {
@@ -139,9 +151,10 @@ export function createTeamIdleWakeHint(ctx: TeamIdleWakeHintContext, config: Tea
           config,
         )
         if (claimedMessageIds.length > 0) {
-          const deliveredMessageIds = typeof ctx.client.session.messages === "function"
-            ? await findDeliveredMessageIds(ctx.client, sessionID, claimedMessageIds)
-            : new Set(claimedMessageIds)
+          const deliveredMessageIds =
+            typeof ctx.client.session.messages === "function"
+              ? await findDeliveredMessageIds(ctx.client, sessionID, claimedMessageIds)
+              : new Set(claimedMessageIds)
           const ackedMessageIds = claimedMessageIds.filter((messageId) => deliveredMessageIds.has(messageId))
           const requeuedMessageIds = claimedMessageIds.filter((messageId) => !deliveredMessageIds.has(messageId))
           if (ackedMessageIds.length > 0) {
@@ -167,9 +180,9 @@ export function createTeamIdleWakeHint(ctx: TeamIdleWakeHintContext, config: Tea
         return
       }
       if (
-        latestMemberEntry.status === "errored"
-        || latestMemberEntry.status === "completed"
-        || latestMemberEntry.status === "shutdown_approved"
+        latestMemberEntry.status === "errored" ||
+        latestMemberEntry.status === "completed" ||
+        latestMemberEntry.status === "shutdown_approved"
       ) {
         log("team idle wake hint skipped because member is no longer idle", {
           event: "team-mode-idle-member-not-idle",

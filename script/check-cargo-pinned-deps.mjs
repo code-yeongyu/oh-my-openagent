@@ -45,9 +45,7 @@ function manifestPaths(root) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const root = resolve(dirname(fileURLToPath(import.meta.url)), "..")
   const files = process.argv[2] === undefined ? manifestPaths(root) : [resolve(process.argv[2])]
-  const problems = files.flatMap((path) =>
-    unpinnedCargoDependencies(readFileSync(path, "utf8"), relative(root, path)),
-  )
+  const problems = files.flatMap((path) => unpinnedCargoDependencies(readFileSync(path, "utf8"), relative(root, path)))
   if (problems.length > 0) {
     console.error("Cargo dependencies must be exact `=` pins:")
     for (const problem of problems) console.error(`  ${problem}`)

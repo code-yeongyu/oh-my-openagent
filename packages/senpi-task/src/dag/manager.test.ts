@@ -128,10 +128,13 @@ type RaceOutcome = {
 async function raceStarts(projectDir: string, prompts: readonly string[]): Promise<readonly RaceOutcome[]> {
   const barrierDir = join(projectDir, "race-barrier")
   fs.mkdirSync(barrierDir)
-  const children = prompts.map((prompt) => Bun.spawn(
-    [process.execPath, "-e", raceWorkerSource(projectDir, prompt, barrierDir)],
-    { stdout: "pipe", stderr: "pipe", env: { ...process.env } },
-  ))
+  const children = prompts.map((prompt) =>
+    Bun.spawn([process.execPath, "-e", raceWorkerSource(projectDir, prompt, barrierDir)], {
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { ...process.env },
+    }),
+  )
   const readers = children.map((child) => lineReader(child.stdout))
   const errors = children.map((child) => new Response(child.stderr).text())
   // Each child installs its filesystem watcher before publishing ready. The single release file is
@@ -166,10 +169,7 @@ describe("createDagManager start", () => {
       status: "pending",
       generation: 1,
     })
-    expect(started.snapshot.nodes.map((node) => `${node.id}:${node.state}`)).toEqual([
-      "plan:pending",
-      "build:pending",
-    ])
+    expect(started.snapshot.nodes.map((node) => `${node.id}:${node.state}`)).toEqual(["plan:pending", "build:pending"])
     expect(started.snapshot.waves.map((wave) => wave.nodeIds.join(","))).toEqual(["plan", "build"])
     expect(started.snapshot.criticalPath).toEqual(["plan" as DagNodeId, "build" as DagNodeId])
     expect(store.readKey(parentSessionId, "release-plan")).toMatchObject({
@@ -223,8 +223,9 @@ describe("createDagManager start", () => {
     expect(store.readCheckpoint<object>(first.snapshot.runId)).toEqual(before)
     expect(runFiles(store)).toHaveLength(1)
     expect(store.readEvents(first.snapshot.runId, 0, { limit: 10 }).events).toHaveLength(1)
-    expect(store.readKey(parentSessionId, "release-plan")?.definitionFingerprint)
-      .toBe(first.snapshot.definitionFingerprint)
+    expect(store.readKey(parentSessionId, "release-plan")?.definitionFingerprint).toBe(
+      first.snapshot.definitionFingerprint,
+    )
   })
 
   test("#given a key file whose run record was pruned #when a changed definition reuses the key #then a fresh run is created instead of a conflict", async () => {
@@ -325,10 +326,14 @@ describe("createDagManager skill materialization seam", () => {
     const bare = await plain.start({ definition: definition(), parentSessionId: otherSessionId, rootSessionId })
 
     // then
-    expect(withSkills.record(materialized.snapshot.runId, parentSessionId).definition.nodes.map((node) => node.effectivePrompt))
-      .toEqual(['<skill name="x">body</skill>\n\ndraft the plan', '<skill name="x">body</skill>\n\nbuild it'])
-    expect(plain.record(bare.snapshot.runId, otherSessionId).definition.nodes.map((node) => node.effectivePrompt))
-      .toEqual(["draft the plan", "build it"])
+    expect(
+      withSkills
+        .record(materialized.snapshot.runId, parentSessionId)
+        .definition.nodes.map((node) => node.effectivePrompt),
+    ).toEqual(['<skill name="x">body</skill>\n\ndraft the plan', '<skill name="x">body</skill>\n\nbuild it'])
+    expect(
+      plain.record(bare.snapshot.runId, otherSessionId).definition.nodes.map((node) => node.effectivePrompt),
+    ).toEqual(["draft the plan", "build it"])
     expect(materialized.snapshot.definitionFingerprint).toBe(bare.snapshot.definitionFingerprint)
   })
 })
@@ -390,12 +395,22 @@ describe("createDagManager attach, snapshot, and history", () => {
     const started = await dag.start({ definition: definition(), parentSessionId, rootSessionId })
     const runId = started.snapshot.runId
     store.appendEvent({
-      schemaVersion: 1, runId, seq: 2, at: "2026-01-01T00:00:02.000Z", lane: "boundary",
-      type: "dag.run.started", generation: 1,
+      schemaVersion: 1,
+      runId,
+      seq: 2,
+      at: "2026-01-01T00:00:02.000Z",
+      lane: "boundary",
+      type: "dag.run.started",
+      generation: 1,
     })
     store.appendEvent({
-      schemaVersion: 1, runId, seq: 3, at: "2026-01-01T00:00:03.000Z", lane: "boundary",
-      type: "dag.run.paused", reason: "session_shutdown",
+      schemaVersion: 1,
+      runId,
+      seq: 3,
+      at: "2026-01-01T00:00:03.000Z",
+      lane: "boundary",
+      type: "dag.run.paused",
+      reason: "session_shutdown",
     })
 
     // when
@@ -499,19 +514,37 @@ describe("createDagManager amend", () => {
     const started = await dag.start({ definition: diamond(), parentSessionId, rootSessionId })
     completeDiamond(store, started.snapshot.runId)
 
-    const amended = await dag.amend({ runId: started.snapshot.runId, definition: diamond("build b differently"), parentSessionId })
+    const amended = await dag.amend({
+      runId: started.snapshot.runId,
+      definition: diamond("build b differently"),
+      parentSessionId,
+    })
 
-    expect(amended.nodes.map((node) => ({ id: node.id as string, state: node.state, taskId: node.taskId, attempt: node.attempt, execAttempt: node.execAttempt }))).toEqual([
+    expect(
+      amended.nodes.map((node) => ({
+        id: node.id as string,
+        state: node.state,
+        taskId: node.taskId,
+        attempt: node.attempt,
+        execAttempt: node.execAttempt,
+      })),
+    ).toEqual([
       { id: "A", state: "completed", taskId: "task-A", attempt: 1, execAttempt: undefined },
       { id: "B", state: "pending", taskId: "task-B", attempt: 1, execAttempt: 1 },
       { id: "C", state: "completed", taskId: "task-C", attempt: 1, execAttempt: undefined },
       { id: "D", state: "pending", taskId: "task-D", attempt: 1, execAttempt: 1 },
     ])
-    expect((amended.nodes[0] as typeof amended.nodes[number] & { resultArtifact?: unknown })?.resultArtifact).toBeDefined()
-    expect((amended.nodes[2] as typeof amended.nodes[number] & { resultArtifact?: unknown })?.resultArtifact).toBeDefined()
+    expect(
+      (amended.nodes[0] as (typeof amended.nodes)[number] & { resultArtifact?: unknown })?.resultArtifact,
+    ).toBeDefined()
+    expect(
+      (amended.nodes[2] as (typeof amended.nodes)[number] & { resultArtifact?: unknown })?.resultArtifact,
+    ).toBeDefined()
     expect(amended.nodes[1]?.error).toBeUndefined()
     expect(amended.amendHistory).toHaveLength(1)
-    expect(store.readEvents(started.snapshot.runId, 0, { limit: 10 }).events.at(-1)?.type).toBe("dag.definition.amended")
+    expect(store.readEvents(started.snapshot.runId, 0, { limit: 10 }).events.at(-1)?.type).toBe(
+      "dag.definition.amended",
+    )
     // Observe surfaces (/dag, widget, omo.dag.updated) read the projected snapshot, so the amend
     // history has to survive the projection or the "amended xN" marker can never render.
     expect(dag.snapshot(started.snapshot.runId, parentSessionId).amendHistory).toHaveLength(1)
@@ -531,17 +564,24 @@ describe("createDagManager amend", () => {
       ...completed,
       status: "running",
       completedAt: undefined,
-      nodes: completed.nodes.map((node) => node.id === "B" ? { ...node, state: "running" as const } : node),
+      nodes: completed.nodes.map((node) => (node.id === "B" ? { ...node, state: "running" as const } : node)),
     })
 
-    await expect(dag.amend({ runId: started.snapshot.runId, definition: diamond("changed"), parentSessionId }))
-      .rejects.toMatchObject({ code: "amend_running_node", nodeIds: ["B"] })
+    await expect(
+      dag.amend({ runId: started.snapshot.runId, definition: diamond("changed"), parentSessionId }),
+    ).rejects.toMatchObject({ code: "amend_running_node", nodeIds: ["B"] })
 
     store.writeCheckpoint(started.snapshot.runId, completed)
-    await expect(dag.amend({ runId: started.snapshot.runId, definition: {
-      ...diamond(),
-      nodes: diamond().nodes.filter((node) => node.id !== "A"),
-    }, parentSessionId })).rejects.toMatchObject({ code: "invalid_amendment" })
+    await expect(
+      dag.amend({
+        runId: started.snapshot.runId,
+        definition: {
+          ...diamond(),
+          nodes: diamond().nodes.filter((node) => node.id !== "A"),
+        },
+        parentSessionId,
+      }),
+    ).rejects.toMatchObject({ code: "invalid_amendment" })
 
     const withoutD = { ...diamond(), nodes: diamond().nodes.filter((node) => node.id !== "D") }
     const amended = await dag.amend({ key: "diamond", definition: withoutD, parentSessionId })
@@ -560,8 +600,16 @@ describe("createDagManager amend", () => {
     })
 
     expect(amended.nodes.find((node) => node.id === "E")).toMatchObject({ state: "pending", attempt: 0 })
-    expect(amended.waves.map((wave) => wave.nodeIds.map((id) => id as string))).toEqual([["A"], ["B", "C"], ["D"], ["E"]])
-    expect(amended.edges.map((edge) => ({ from: edge.from as string, to: edge.to as string }))).toContainEqual({ from: "D", to: "E" })
+    expect(amended.waves.map((wave) => wave.nodeIds.map((id) => id as string))).toEqual([
+      ["A"],
+      ["B", "C"],
+      ["D"],
+      ["E"],
+    ])
+    expect(amended.edges.map((edge) => ({ from: edge.from as string, to: edge.to as string }))).toContainEqual({
+      from: "D",
+      to: "E",
+    })
   })
 
   test("#given a materialized run #when changed and added nodes are amended #then skills rematerialize once for only those nodes", async () => {
@@ -584,7 +632,10 @@ describe("createDagManager amend", () => {
       parentSessionId,
     })
 
-    expect(calls).toEqual([["A", "B", "C", "D"], ["B", "E"]])
+    expect(calls).toEqual([
+      ["A", "B", "C", "D"],
+      ["B", "E"],
+    ])
     expect(amended.definition.nodes.find((node) => node.id === "A")?.effectivePrompt).toBe("skill:build a")
     expect(amended.definition.nodes.find((node) => node.id === "B")?.effectivePrompt).toBe("skill:changed")
     expect(amended.definition.nodes.find((node) => node.id === "E")?.effectivePrompt).toBe("skill:build e")
@@ -592,10 +643,12 @@ describe("createDagManager amend", () => {
 
   test("#given invalid selectors or a missing run #when amended #then invalid_arguments and run_not_found are returned", async () => {
     const { dag } = manager(tempProject())
-    await expect(dag.amend({ runId: "run-missing" as DagRunId, key: "missing", definition: diamond(), parentSessionId }))
-      .rejects.toMatchObject({ code: "invalid_arguments" })
-    await expect(dag.amend({ runId: "run-missing" as DagRunId, definition: diamond(), parentSessionId }))
-      .rejects.toMatchObject({ code: "run_not_found" })
+    await expect(
+      dag.amend({ runId: "run-missing" as DagRunId, key: "missing", definition: diamond(), parentSessionId }),
+    ).rejects.toMatchObject({ code: "invalid_arguments" })
+    await expect(
+      dag.amend({ runId: "run-missing" as DagRunId, definition: diamond(), parentSessionId }),
+    ).rejects.toMatchObject({ code: "run_not_found" })
   })
 
   test("#given amended and retried WAL events #when replayed from the old checkpoint #then the shared reducer rebuilds the identical checkpoint", async () => {
@@ -604,13 +657,28 @@ describe("createDagManager amend", () => {
     const old = completeDiamond(store, started.snapshot.runId)
     const amended = await dag.amend({ runId: started.snapshot.runId, definition: diamond("changed"), parentSessionId })
     const amendmentEvent = store.readEvents(started.snapshot.runId, 1, { limit: 10 }).events[0] as DagRunEvent
-    const retriedPayload = dagNodeRetriedEvent({ nodeId: "B" as DagNodeId, priorTaskId: "task-B", execAttempt: 2, promptChanged: false })
-    const journal = createDagJournal<DagRunRecordV1>({ store, runId: started.snapshot.runId, initialCheckpoint: amended, applyEvent: applyDagRunMutation })
+    const retriedPayload = dagNodeRetriedEvent({
+      nodeId: "B" as DagNodeId,
+      priorTaskId: "task-B",
+      execAttempt: 2,
+      promptChanged: false,
+    })
+    const journal = createDagJournal<DagRunRecordV1>({
+      store,
+      runId: started.snapshot.runId,
+      initialCheckpoint: amended,
+      applyEvent: applyDagRunMutation,
+    })
     journal.append(retriedPayload)
     const expected = journal.snapshot()
 
     store.writeCheckpoint(started.snapshot.runId, { ...old, checkpointSeq: 1 })
-    const replay = createDagJournal<DagRunRecordV1>({ store, runId: started.snapshot.runId, initialCheckpoint: old, applyEvent: applyDagRunMutation })
+    const replay = createDagJournal<DagRunRecordV1>({
+      store,
+      runId: started.snapshot.runId,
+      initialCheckpoint: old,
+      applyEvent: applyDagRunMutation,
+    })
 
     expect(amendmentEvent.type).toBe("dag.definition.amended")
     expect(replay.snapshot()).toEqual(expected)
@@ -631,15 +699,16 @@ describe("createDagManager amend", () => {
       ...old,
       status: "running",
       definitionFingerprint: "stale-fingerprint-that-never-matches",
-      nodes: old.nodes.map((node) => node.id === "B" ? { ...node, state: "running" as const } : node),
+      nodes: old.nodes.map((node) => (node.id === "B" ? { ...node, state: "running" as const } : node)),
     }
     store.writeCheckpoint(started.snapshot.runId, { ...hostile, checkpointSeq: 1 })
-    const replay = (): DagRunRecordV1 => createDagJournal<DagRunRecordV1>({
-      store,
-      runId: started.snapshot.runId,
-      initialCheckpoint: hostile,
-      applyEvent: applyDagRunMutation,
-    }).snapshot()
+    const replay = (): DagRunRecordV1 =>
+      createDagJournal<DagRunRecordV1>({
+        store,
+        runId: started.snapshot.runId,
+        initialCheckpoint: hostile,
+        applyEvent: applyDagRunMutation,
+      }).snapshot()
 
     // then replay is survivable and idempotent: the stale amendment is skipped, not fatal.
     expect(replay).not.toThrow()
@@ -647,7 +716,6 @@ describe("createDagManager amend", () => {
     expect(replayed.definitionFingerprint).toBe("stale-fingerprint-that-never-matches")
     expect(replayed.nodes.find((node) => node.id === "B")?.state).toBe("running")
   })
-
 })
 
 describe("createDagManager concurrent starts", () => {
@@ -661,10 +729,9 @@ describe("createDagManager concurrent starts", () => {
     // then
     const store = createDagFileStore({ project_dir: projectDir })
     expect(runFiles(store)).toHaveLength(1)
-    expect(outcomes).toEqual(expect.arrayContaining([
-      expect.objectContaining({ ok: true }),
-      expect.objectContaining({ ok: true }),
-    ]))
+    expect(outcomes).toEqual(
+      expect.arrayContaining([expect.objectContaining({ ok: true }), expect.objectContaining({ ok: true })]),
+    )
     expect(new Set(outcomes.map((outcome) => outcome.runId)).size).toBe(1)
     expect(outcomes.filter((outcome) => outcome.reused === false)).toHaveLength(1)
     expect(outcomes.filter((outcome) => outcome.reused === true)).toHaveLength(1)

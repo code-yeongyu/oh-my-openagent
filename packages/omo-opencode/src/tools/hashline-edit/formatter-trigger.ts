@@ -10,9 +10,7 @@ interface FormatterConfig {
 }
 
 interface OpencodeConfig {
-  formatter?:
-    | false
-    | Record<string, FormatterConfig>
+  formatter?: false | Record<string, FormatterConfig>
   experimental?: {
     hook?: {
       file_edited?: Record<string, Array<{ command: string[]; environment?: Record<string, string> }>>
@@ -22,7 +20,9 @@ interface OpencodeConfig {
 
 export interface FormatterClient {
   config: {
-    get: (options?: { query?: { directory?: string } }) => Promise<OpencodeConfig | { data: OpencodeConfig | undefined }>
+    get: (options?: {
+      query?: { directory?: string }
+    }) => Promise<OpencodeConfig | { data: OpencodeConfig | undefined }>
   }
 }
 
@@ -35,15 +35,14 @@ function getFormatterCacheKey(directory: string): string {
   return path.resolve(directory)
 }
 
-function unwrapConfigResponse(response: OpencodeConfig | { data: OpencodeConfig | undefined }): OpencodeConfig | undefined {
+function unwrapConfigResponse(
+  response: OpencodeConfig | { data: OpencodeConfig | undefined },
+): OpencodeConfig | undefined {
   if ("data" in response) return response.data
   return response
 }
 
-export async function resolveFormatters(
-  client: FormatterClient,
-  directory: string,
-): Promise<FormatterMap> {
+export async function resolveFormatters(client: FormatterClient, directory: string): Promise<FormatterMap> {
   const cacheKey = getFormatterCacheKey(directory)
   const cachedFormatters = cachedFormattersByDirectory.get(cacheKey)
   if (cachedFormatters) return cachedFormatters

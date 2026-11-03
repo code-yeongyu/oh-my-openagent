@@ -98,7 +98,14 @@ describe("omo daemon rollback preparation", () => {
     const stdout = capture()
 
     const exitCode = runDaemonCommand(["rollback-prepare", "--json"], {
-      engine, migration, pluginRoot, agentDir, env: {}, stdout, stderr: capture(), platform: "darwin",
+      engine,
+      migration,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout,
+      stderr: capture(),
+      platform: "darwin",
     })
 
     expect(exitCode).toBe(0)
@@ -125,7 +132,14 @@ describe("omo daemon rollback preparation", () => {
     const stderr = capture()
 
     const exitCode = runDaemonCommand(["rollback-prepare"], {
-      engine, migration, pluginRoot, agentDir, env: {}, stdout: capture(), stderr, platform: "darwin",
+      engine,
+      migration,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout: capture(),
+      stderr,
+      platform: "darwin",
     })
 
     expect(exitCode).toBe(3)
@@ -138,12 +152,24 @@ describe("omo daemon rollback preparation", () => {
     const { pluginRoot, agentDir } = fixture()
     rmSync(join(agentDir, "rpc", "task-stores.json"))
     const requests: Record<string, unknown>[] = []
-    const migration = { run(request: Record<string, unknown>) { requests.push(request); return {} } }
+    const migration = {
+      run(request: Record<string, unknown>) {
+        requests.push(request)
+        return {}
+      },
+    }
     const engine = scriptedEngine(() => ({ exitCode: 3, stdout: "" }))
     const stderr = capture()
 
     const exitCode = runDaemonCommand(["rollback-prepare"], {
-      engine, migration, pluginRoot, agentDir, env: {}, stdout: capture(), stderr, platform: "darwin",
+      engine,
+      migration,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout: capture(),
+      stderr,
+      platform: "darwin",
     })
 
     expect(exitCode).toBe(3)

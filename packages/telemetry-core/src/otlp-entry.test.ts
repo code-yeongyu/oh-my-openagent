@@ -11,7 +11,8 @@ import { join } from "node:path"
 
 const ENTRY = join(import.meta.dir, "otlp-entry.ts")
 const RUNTIME = join(import.meta.dir, "otlp-sender.ts")
-const HEAVY = /[\\/](otlp-sender-core|otel-providers|otel-minimal-(logs|trace)|otlp-wal|otlp-spool-(dir|file|cap)|otlp-encode|otlp-http|otlp-batch-sender)\.ts$|[\\/]otlp-proto[\\/]/
+const HEAVY =
+  /[\\/](otlp-sender-core|otel-providers|otel-minimal-(logs|trace)|otlp-wal|otlp-spool-(dir|file|cap)|otlp-encode|otlp-http|otlp-batch-sender)\.ts$|[\\/]otlp-proto[\\/]/
 
 const roots: string[] = []
 afterEach(() => {
@@ -22,23 +23,36 @@ type Starter = { readonly path: string; readonly fn: "createOtlpTelemetryTranspo
 const VIA_ENTRY: Starter = { path: ENTRY, fn: "createOtlpTelemetryTransport" }
 const VIA_RUNTIME: Starter = { path: RUNTIME, fn: "startOtlpTransport" }
 
-async function loadedModules(env: Record<string, string>, consent: boolean | "throws", via: Starter = VIA_ENTRY): Promise<{ readonly loaded: readonly string[]; readonly result: string; readonly spool: boolean }> {
+async function loadedModules(
+  env: Record<string, string>,
+  consent: boolean | "throws",
+  via: Starter = VIA_ENTRY,
+): Promise<{ readonly loaded: readonly string[]; readonly result: string; readonly spool: boolean }> {
   const root = mkdtempSync(join(tmpdir(), "telemetry-core-entry-spy-"))
   roots.push(root)
   const out = join(root, "loaded.json")
-  writeFileSync(join(root, "spy.ts"), [
-    'import { readFileSync, writeFileSync } from "node:fs"',
-    "const seen: string[] = []",
-    'Bun.plugin({ name: "load-spy", setup(build) { build.onLoad({ filter: /\\.ts$/ }, (args) => { seen.push(args.path); return { contents: readFileSync(args.path, "utf8"), loader: "ts" } }) } })',
-    `process.on("exit", () => writeFileSync(${JSON.stringify(out)}, JSON.stringify(seen)))`,
-  ].join("\n"))
-  writeFileSync(join(root, "probe.ts"), [
-    `const { ${via.fn}: start } = await import(${JSON.stringify(via.path)})`,
-    `const transport = await start({ productEnvPrefix: "OMO_TEST", ingestKey: "k", spoolDir: ${JSON.stringify(join(root, "spool"))}, spoolRoot: ${JSON.stringify(root)}, resource: {}, scope: { name: "omo-senpi", version: "1" }, project: () => ({}), spans: {}, env: ${JSON.stringify(env)}, consent: () => ${consent === "throws" ? '{ throw new Error("consent store unreadable") }' : consent}, autoStart: false })`,
-    'console.log(transport === null ? "RESULT null" : "RESULT transport")',
-    "await transport?.shutdown()",
-  ].join("\n"))
-  const child = Bun.spawn([process.execPath, "--preload", join(root, "spy.ts"), join(root, "probe.ts")], { stdout: "pipe", stderr: "pipe" })
+  writeFileSync(
+    join(root, "spy.ts"),
+    [
+      'import { readFileSync, writeFileSync } from "node:fs"',
+      "const seen: string[] = []",
+      'Bun.plugin({ name: "load-spy", setup(build) { build.onLoad({ filter: /\\.ts$/ }, (args) => { seen.push(args.path); return { contents: readFileSync(args.path, "utf8"), loader: "ts" } }) } })',
+      `process.on("exit", () => writeFileSync(${JSON.stringify(out)}, JSON.stringify(seen)))`,
+    ].join("\n"),
+  )
+  writeFileSync(
+    join(root, "probe.ts"),
+    [
+      `const { ${via.fn}: start } = await import(${JSON.stringify(via.path)})`,
+      `const transport = await start({ productEnvPrefix: "OMO_TEST", ingestKey: "k", spoolDir: ${JSON.stringify(join(root, "spool"))}, spoolRoot: ${JSON.stringify(root)}, resource: {}, scope: { name: "omo-senpi", version: "1" }, project: () => ({}), spans: {}, env: ${JSON.stringify(env)}, consent: () => ${consent === "throws" ? '{ throw new Error("consent store unreadable") }' : consent}, autoStart: false })`,
+      'console.log(transport === null ? "RESULT null" : "RESULT transport")',
+      "await transport?.shutdown()",
+    ].join("\n"),
+  )
+  const child = Bun.spawn([process.execPath, "--preload", join(root, "spy.ts"), join(root, "probe.ts")], {
+    stdout: "pipe",
+    stderr: "pipe",
+  })
   const timeout = setTimeout(() => child.kill(), 20_000)
   const [stdout, exitCode] = await Promise.all([new Response(child.stdout).text(), child.exited])
   clearTimeout(timeout)
@@ -104,7 +118,11 @@ describe("the OTLP runtime refuses to start while telemetry is off, whoever call
     const manifest = JSON.parse(await Bun.file(join(import.meta.dir, "..", "package.json")).text())
     // ./otlp-opt-out is the one deliberate exception (#11431): it carries only the opt-out purges, so a lazy adapter can
     // delete a spool without loading the sender; nothing in it starts a transport.
-    expect(Object.keys(manifest.exports).filter((key) => key.includes("otlp")).sort()).toEqual(["./otlp", "./otlp-opt-out"])
+    expect(
+      Object.keys(manifest.exports)
+        .filter((key) => key.includes("otlp"))
+        .sort(),
+    ).toEqual(["./otlp", "./otlp-opt-out"])
     // The export names are read from the source, not with Object.keys on the imported namespace: knip counts every export of
     // a module whose namespace is enumerated as used, so an unused export added to this entry would pass knip:check.
     const optOutSource = await Bun.file(join(import.meta.dir, "..", manifest.exports["./otlp-opt-out"].import)).text()

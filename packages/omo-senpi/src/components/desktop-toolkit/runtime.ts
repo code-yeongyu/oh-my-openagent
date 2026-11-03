@@ -2,7 +2,13 @@ import { isAbsolute } from "node:path"
 
 import { deferUntilAfterFirstPaint } from "../../extension/startup-deferral"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
-import { DESKTOP_TOOLKIT_TOOL_NAME, TOOLKIT_REQUEST_EVENT, TOOLKIT_GRANT_RPC, TOOLKITS_CONTEXT_KEY, type ToolkitGrant } from "./index"
+import {
+  DESKTOP_TOOLKIT_TOOL_NAME,
+  TOOLKIT_REQUEST_EVENT,
+  TOOLKIT_GRANT_RPC,
+  TOOLKITS_CONTEXT_KEY,
+  type ToolkitGrant,
+} from "./index"
 import { callThreadTool, listThreadTools } from "./thread-tools"
 import { callingSessionId, createHostToolRoutes } from "./host-tool-routes"
 import { type LoadSdk, registerHostToolExecution } from "./host-tool-execution"
@@ -43,7 +49,12 @@ function offeredToolkits(sessionContext: unknown): ReadonlySet<string> {
   if (typeof sessionContext !== "object" || sessionContext === null) return new Set()
   const raw = (sessionContext as Record<string, unknown>)[TOOLKITS_CONTEXT_KEY]
   if (typeof raw !== "string") return new Set()
-  return new Set(raw.split(",").map((name) => name.trim()).filter((name) => name.length > 0))
+  return new Set(
+    raw
+      .split(",")
+      .map((name) => name.trim())
+      .filter((name) => name.length > 0),
+  )
 }
 
 function parseGrant(value: unknown): ToolkitGrant | undefined {
@@ -52,7 +63,14 @@ function parseGrant(value: unknown): ToolkitGrant | undefined {
   if (typeof endpoint !== "string" || typeof tokenFile !== "string" || !isAbsolute(tokenFile)) return undefined
   try {
     const url = new URL(endpoint)
-    if (url.protocol !== "http:" || url.hostname !== "127.0.0.1" || url.username !== "" || url.password !== "" || url.search !== "") return undefined
+    if (
+      url.protocol !== "http:" ||
+      url.hostname !== "127.0.0.1" ||
+      url.username !== "" ||
+      url.password !== "" ||
+      url.search !== ""
+    )
+      return undefined
   } catch {
     return undefined
   }
@@ -79,7 +97,9 @@ function isPreviewEvent(event: unknown): boolean {
 }
 
 /** Asks the app for a toolkit it hosts for this session's thread; only toolkits listed in `omo_toolkits` are requested. */
-export function createDesktopToolkitRuntime(options: { readonly timeoutMs?: number; readonly loadSdk?: LoadSdk } = {}): OmoSenpiComponent {
+export function createDesktopToolkitRuntime(
+  options: { readonly timeoutMs?: number; readonly loadSdk?: LoadSdk } = {},
+): OmoSenpiComponent {
   const timeoutMs = options.timeoutMs ?? DEFAULT_ACQUIRE_TIMEOUT_MS
   return {
     name: "desktop-toolkit",
@@ -89,14 +109,23 @@ export function createDesktopToolkitRuntime(options: { readonly timeoutMs?: numb
       const sessions = new Map<string, SessionDiscovery>()
       const grants = new Map<string, ToolkitGrant>()
       const registered = new Set<string>()
-      const hostNames = typeof pi.sessionContext === "object" && pi.sessionContext !== null &&
-        "host_tool_names" in pi.sessionContext && typeof pi.sessionContext.host_tool_names === "string"
-        ? new Set(pi.sessionContext.host_tool_names.split(",").map((name) => name.trim()).filter(Boolean))
-        : new Set<string>()
+      const hostNames =
+        typeof pi.sessionContext === "object" &&
+        pi.sessionContext !== null &&
+        "host_tool_names" in pi.sessionContext &&
+        typeof pi.sessionContext.host_tool_names === "string"
+          ? new Set(
+              pi.sessionContext.host_tool_names
+                .split(",")
+                .map((name) => name.trim())
+                .filter(Boolean),
+            )
+          : new Set<string>()
 
       registerHostToolExecution(pi, hostNames, options.loadSdk)
       const routes = createHostToolRoutes(pi, {
-        grants, timeoutMs,
+        grants,
+        timeoutMs,
         onLost(sessionId) {
           const state = sessions.get(`host:${sessionId}`)
           if (state !== undefined) failAttempt(state)
@@ -151,7 +180,9 @@ export function createDesktopToolkitRuntime(options: { readonly timeoutMs?: numb
         }
         const refusal = message.refusal
         const reason =
-          typeof refusal === "object" && refusal !== null && typeof (refusal as Record<string, unknown>).reason === "string"
+          typeof refusal === "object" &&
+          refusal !== null &&
+          typeof (refusal as Record<string, unknown>).reason === "string"
             ? String((refusal as Record<string, unknown>).reason)
             : "invalid_grant"
         settle({ ok: false, reason })
@@ -176,11 +207,14 @@ export function createDesktopToolkitRuntime(options: { readonly timeoutMs?: numb
           if (signal.aborted) return
           if (!settled.ok) {
             failAttempt(state)
-            ctx.logger.info("desktop thread toolkit unavailable", { reason: settled.reason === "timeout" ? "timeout" : "grant_refused" })
+            ctx.logger.info("desktop thread toolkit unavailable", {
+              reason: settled.reason === "timeout" ? "timeout" : "grant_refused",
+            })
             return
           }
           const tools = await listThreadTools(settled.grant, timeoutMs, signal, (reason) =>
-            ctx.logger.info("desktop thread toolkit skipped tool", { reason }))
+            ctx.logger.info("desktop thread toolkit skipped tool", { reason }),
+          )
           if (signal.aborted) return
           state.failed = false
           state.failures = 0
@@ -195,15 +229,28 @@ export function createDesktopToolkitRuntime(options: { readonly timeoutMs?: numb
             if (attachment !== undefined) continue
             const name = `desktop_${tool.name}`
             if (registered.has(name)) continue
-            const inventory: unknown = "getAllTools" in pi && typeof pi.getAllTools === "function" ? pi.getAllTools() : []
-            if (Array.isArray(inventory) && inventory.some((entry: unknown) =>
-              typeof entry === "object" && entry !== null && "name" in entry && entry.name === name)) continue
+            const inventory: unknown =
+              "getAllTools" in pi && typeof pi.getAllTools === "function" ? pi.getAllTools() : []
+            if (
+              Array.isArray(inventory) &&
+              inventory.some(
+                (entry: unknown) =>
+                  typeof entry === "object" && entry !== null && "name" in entry && entry.name === name,
+              )
+            )
+              continue
             pi.registerTool({
               name,
               label: name,
               description: tool.description ?? "",
               parameters: tool.inputSchema,
-              async execute(_id: string, args: Record<string, unknown>, signal?: AbortSignal, _onUpdate?: unknown, callCtx?: unknown) {
+              async execute(
+                _id: string,
+                args: Record<string, unknown>,
+                signal?: AbortSignal,
+                _onUpdate?: unknown,
+                callCtx?: unknown,
+              ) {
                 const caller = callingSessionId(callCtx)
                 // Never substitute the registering session when the caller has no grant.
                 const grant = caller === undefined ? undefined : grants.get(`thread:${caller}`)
@@ -235,29 +282,41 @@ export function createDesktopToolkitRuntime(options: { readonly timeoutMs?: numb
         for (const toolkit of toolkits) {
           const key = `${toolkit}:${sessionId}`
           if (sessions.has(key)) continue
-          const state: SessionDiscovery = { toolkit, controller: new AbortController(), startupPending: true, failed: false, failures: 0, turnsSinceFailure: 0 }
+          const state: SessionDiscovery = {
+            toolkit,
+            controller: new AbortController(),
+            startupPending: true,
+            failed: false,
+            failures: 0,
+            turnsSinceFailure: 0,
+          }
           sessions.set(key, state)
           deferUntilAfterFirstPaint(ctx, "desktop thread toolkit", () =>
-            state.startupPending ? discover(sessionId, state) : undefined)
+            state.startupPending ? discover(sessionId, state) : undefined,
+          )
         }
       })
       // The first real turn joins the bounded startup attempt. After a failure, retries run in the background without
       // waiting, on the turns RETRY_GAPS_IN_TURNS allows, so an app that never answers cannot hold any prompt for the
       // timeout and is not asked on every turn forever.
       // A prompt-cache preview pass must not start a grant request: only the real turn does (senpi#3994).
-      pi.on("before_agent_start", (event, eventCtx) => {
-        if (isPreviewEvent(event)) return
-        const sessionId = callingSessionId(eventCtx)
-        if (sessionId === undefined) return
-        const pending: Promise<void>[] = []
-        for (const toolkit of DISCOVERY_TOOLKITS) {
-          const state = sessions.get(`${toolkit}:${sessionId}`)
-          if (state === undefined) continue
-          if (!state.failed) pending.push(discover(sessionId, state))
-          else if (state.running === undefined && retryDue(state)) void discover(sessionId, state)
-        }
-        return Promise.all(pending)
-      }, { previewSafe: true })
+      pi.on(
+        "before_agent_start",
+        (event, eventCtx) => {
+          if (isPreviewEvent(event)) return
+          const sessionId = callingSessionId(eventCtx)
+          if (sessionId === undefined) return
+          const pending: Promise<void>[] = []
+          for (const toolkit of DISCOVERY_TOOLKITS) {
+            const state = sessions.get(`${toolkit}:${sessionId}`)
+            if (state === undefined) continue
+            if (!state.failed) pending.push(discover(sessionId, state))
+            else if (state.running === undefined && retryDue(state)) void discover(sessionId, state)
+          }
+          return Promise.all(pending)
+        },
+        { previewSafe: true },
+      )
       pi.on("session_shutdown", (_event, eventCtx) => {
         const sessionId = callingSessionId(eventCtx)
         if (sessionId === undefined) return

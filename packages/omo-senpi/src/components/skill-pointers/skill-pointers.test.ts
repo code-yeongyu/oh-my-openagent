@@ -248,7 +248,10 @@ describe("omo-senpi skill-pointers component", () => {
     it("#when the prompt is anything else #then no mode binds and the conditional pointers stay", async () => {
       for (const [text, pointers] of [
         // The #10810 prompt types the keyword last; it keeps the pointer and the user retypes with a verb.
-        ["https://www.youtube.com/live/qt5p-_tE8d0 How is this possible? Recreate it in 3D. mass ulw research", ["mass-ulw", "ulw-research"]],
+        [
+          "https://www.youtube.com/live/qt5p-_tE8d0 How is this possible? Recreate it in 3D. mass ulw research",
+          ["mass-ulw", "ulw-research"],
+        ],
         // Keyword-first statements and questions (#10822 review H1).
         ["mass ulw is broken in this repo, can you look into it?", ["mass-ulw"]],
         ["Mass ulw keeps failing on my machine", ["mass-ulw"]],
@@ -304,8 +307,14 @@ describe("omo-senpi skill-pointers component", () => {
         ["the failing test is 'run mass ulw research > binds both'", []],
         ["[LEAD via coordinator -> lane-a, omo#1 FIX_FIRST] run mass ulw research on the fix", []],
         ["[lane-a w46:p6P] ran mass ulw on the docs refresh", ["mass-ulw"]],
-        ["[mass-ulw-hard-trigger lane-a] omo#1 SIMPLIFY ack, implementing now. One consequence for the lead: the motivating prompt itself ('<url> How is this possible? Recreate it in 3D. mass ulw research', keyword LAST) will NOT bind under (a)/(b); it gets the pointer only ...", []],
-        ["[lane-r3 -> coordinator + ledger-lane] (1) the one-time copy STARTED. (2) no parser bug: the recorded names are exact, and the other is 'omo-senpi ultrawork packaged reload > ...'; mass ulw research is next.\n[lane-r3 -> coordinator + ledger-lane] the rerun is filed.", []],
+        [
+          "[mass-ulw-hard-trigger lane-a] omo#1 SIMPLIFY ack, implementing now. One consequence for the lead: the motivating prompt itself ('<url> How is this possible? Recreate it in 3D. mass ulw research', keyword LAST) will NOT bind under (a)/(b); it gets the pointer only ...",
+          [],
+        ],
+        [
+          "[lane-r3 -> coordinator + ledger-lane] (1) the one-time copy STARTED. (2) no parser bug: the recorded names are exact, and the other is 'omo-senpi ultrawork packaged reload > ...'; mass ulw research is next.\n[lane-r3 -> coordinator + ledger-lane] the rerun is filed.",
+          [],
+        ],
       ] as const) {
         // given
         const pi = new FakeExtensionAPI()
@@ -316,8 +325,16 @@ describe("omo-senpi skill-pointers component", () => {
 
         // then
         const contents = pi.messages.map((call) => String(call.message["content"]))
-        expect({ text, modes: contents.filter((content) => /^<omo-[a-z-]+-mode>/.test(content)) }).toEqual({ text, modes: [] })
-        for (const skill of pointers) expect({ text, skill, found: contents.some((content) => content.startsWith(`<omo-${skill}-pointer>`)) }).toEqual({ text, skill, found: true })
+        expect({ text, modes: contents.filter((content) => /^<omo-[a-z-]+-mode>/.test(content)) }).toEqual({
+          text,
+          modes: [],
+        })
+        for (const skill of pointers)
+          expect({
+            text,
+            skill,
+            found: contents.some((content) => content.startsWith(`<omo-${skill}-pointer>`)),
+          }).toEqual({ text, skill, found: true })
       }
     })
 
@@ -327,7 +344,10 @@ describe("omo-senpi skill-pointers component", () => {
       await registerSkillPointers(pi)
 
       // when
-      const result = await dispatchInput(pi, "run mass ulw research on https://www.youtube.com/live/qt5p-_tE8d0 and recreate it in 3D")
+      const result = await dispatchInput(
+        pi,
+        "run mass ulw research on https://www.youtube.com/live/qt5p-_tE8d0 and recreate it in 3D",
+      )
 
       // then
       expectPointerInjections(pi, result, [

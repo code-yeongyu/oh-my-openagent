@@ -286,7 +286,6 @@ function panelThemeFrom(value: unknown): PanelTheme | undefined {
   }
 }
 
-
 /** A pi-tui viewport renderer that exposes the public layout seam. */
 function isHostTui(value: unknown): value is PanelHostTui {
   if (!isRecord(value)) return false

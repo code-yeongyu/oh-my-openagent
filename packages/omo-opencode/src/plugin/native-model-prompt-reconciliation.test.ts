@@ -21,37 +21,47 @@ describe("per-request Native model prompt selection", () => {
     const before = render("anthropic/claude-opus-5-5")
     const output = { system: ["HOST_SENTINEL", before + "\nUSER_APPEND_SENTINEL"] }
 
-    await createSystemTransformHandler()(
-      { model: { providerID: "openai", id: "gpt-5.4" } }, output,
-    )
+    await createSystemTransformHandler()({ model: { providerID: "openai", id: "gpt-5.4" } }, output)
 
     const marker = "\n</omo-model-core>"
     const afterCore = render("openai/gpt-5.4")
-    expect(output.system).toEqual(["HOST_SENTINEL",
+    expect(output.system).toEqual([
+      "HOST_SENTINEL",
       afterCore.slice(0, afterCore.indexOf(marker) + marker.length) +
-      before.slice(before.indexOf(marker) + marker.length) + "\nUSER_APPEND_SENTINEL",
+        before.slice(before.indexOf(marker) + marker.length) +
+        "\nUSER_APPEND_SENTINEL",
     ])
   })
 
   test("keeps a provider namespace inside the model ID", async () => {
     const before = createOracleAgent("anthropic/claude-opus-5-5").prompt ?? ""
     const output = { system: [before] }
-    await createSystemTransformHandler()(
-      { model: { providerID: "synthetic", id: "vendor/gpt-5.4" } }, output,
-    )
+    await createSystemTransformHandler()({ model: { providerID: "synthetic", id: "vendor/gpt-5.4" } }, output)
     const marker = "\n</omo-model-core>"
     const expected = createOracleAgent("synthetic/vendor/gpt-5.4").prompt ?? ""
-    expect(output.system).toEqual([expected.slice(0, expected.indexOf(marker) + marker.length)
-      + before.slice(before.indexOf(marker) + marker.length)])
+    expect(output.system).toEqual([
+      expected.slice(0, expected.indexOf(marker) + marker.length) +
+        before.slice(before.indexOf(marker) + marker.length),
+    ])
   })
 
   test("the user's allow_non_gpt_model decision survives the per-request transform", async () => {
     const warnings: unknown[] = []
-    const hook = createNoHephaestusNonGptHook({
-      client: { tui: { showToast: async (toast: unknown) => { warnings.push(toast) } } },
-    } as unknown as PluginInput, { allowNonGptModel: true })
+    const hook = createNoHephaestusNonGptHook(
+      {
+        client: {
+          tui: {
+            showToast: async (toast: unknown) => {
+              warnings.push(toast)
+            },
+          },
+        },
+      } as unknown as PluginInput,
+      { allowNonGptModel: true },
+    )
     await hook["chat.message"]({
-      sessionID: "override-session", agent: "hephaestus",
+      sessionID: "override-session",
+      agent: "hephaestus",
       model: { providerID: "anthropic", modelID: "claude-opus-5-5" },
     })
     const previous = createHephaestusAgent("openai/gpt-5.4").prompt
@@ -64,9 +74,7 @@ describe("per-request Native model prompt selection", () => {
 
   test("does not interpret unframed custom system prompts", async () => {
     const output = { system: ["CUSTOM_PROMPT_SENTINEL"] }
-    await createSystemTransformHandler()(
-      { model: { providerID: "openai", id: "gpt-5.4" } }, output,
-    )
+    await createSystemTransformHandler()({ model: { providerID: "openai", id: "gpt-5.4" } }, output)
     expect(output.system).toEqual(["CUSTOM_PROMPT_SENTINEL"])
   })
 
@@ -87,9 +95,7 @@ describe("per-request Native model prompt selection", () => {
     ["hephaestus", (model: string) => createHephaestusAgent(model, [], [], [], [], true).prompt ?? ""],
   ] as const)("preserves %s task tracking when the model changes", async (_name, render) => {
     const output = { system: [render("openai/gpt-5.5") + "\nUSER_APPEND_SENTINEL"] }
-    await createSystemTransformHandler()(
-      { model: { providerID: "openai", id: "gpt-5.6-sol" } }, output,
-    )
+    await createSystemTransformHandler()({ model: { providerID: "openai", id: "gpt-5.6-sol" } }, output)
     expect(output.system).toEqual([render("openai/gpt-5.6-sol") + "\nUSER_APPEND_SENTINEL"])
     expect(output.system[0]).toContain("task_create")
     expect(output.system[0]).not.toContain("todowrite")

@@ -46,8 +46,10 @@ export function notContinuableReason(record: TaskRecord): string {
     }
     return `Task ${record.task_id} is recovering automatically.`
   }
-  if (record.residency_state === "disposed") return `Task ${record.task_id} was disposed and can no longer be continued.`
-  if (record.residency_state === "evicted") return `Task ${record.task_id} was evicted from residency and can no longer be continued.`
+  if (record.residency_state === "disposed")
+    return `Task ${record.task_id} was disposed and can no longer be continued.`
+  if (record.residency_state === "evicted")
+    return `Task ${record.task_id} was evicted from residency and can no longer be continued.`
   return `Task ${record.task_id} is ${record.status} and can no longer be continued.`
 }
 
@@ -70,8 +72,11 @@ export function uncertainDeliveryDenial(record: TaskRecord, message: string): Se
   if (uncertain === undefined) return undefined
   // Retained batches cannot be retried implicitly, even by a distinct message. An ordinary
   // running turn without a retained batch still accepts distinct steering as before.
-  if (record.status !== "running" || (record.pending_steering?.length ?? 0) > 0 ||
-    (uncertain.run_epoch === record.notification.run_epoch && uncertain.message_sha256 === messageSha256(message))) {
+  if (
+    record.status !== "running" ||
+    (record.pending_steering?.length ?? 0) > 0 ||
+    (uncertain.run_epoch === record.notification.run_epoch && uncertain.message_sha256 === messageSha256(message))
+  ) {
     return deliveryUncertain(record, uncertain.run_epoch)
   }
   return undefined
@@ -131,7 +136,7 @@ export function evictionRefusal(taskId: string): SendOutcome {
 // a revive would drop it from the footer total.
 function foldPriorRunsCost(record: TaskRecord): number | undefined {
   const status = record.run_stats?.cost_status
-  const finished = status === "reported" || status === "partial" ? record.run_stats?.cost_usd ?? 0 : 0
+  const finished = status === "reported" || status === "partial" ? (record.run_stats?.cost_usd ?? 0) : 0
   const total = (record.prior_runs_cost_usd ?? 0) + (Number.isFinite(finished) && finished > 0 ? finished : 0)
   return total > 0 ? total : undefined
 }

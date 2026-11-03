@@ -28,10 +28,7 @@ import type { TaskHostRouting } from "./shard-routing"
 // Question tools need a parent user UI. Memory stays available to match process children; its
 // invocation context supplies the child session identity while the shared definition preserves the
 // parent's live service/client instances.
-export const TASK_CHILD_UI_ONLY_TOOL_NAMES: readonly string[] = [
-  "request_user_input",
-  "ask_user_question",
-]
+export const TASK_CHILD_UI_ONLY_TOOL_NAMES: readonly string[] = ["request_user_input", "ask_user_question"]
 
 export interface RunnerBuildContext {
   readonly runtime: TaskRuntimeContext
@@ -131,7 +128,9 @@ export function createInheritedExtensionsResolver(build: RunnerBuildContext): ()
       cwd,
       agentDir,
       settingsManager: SettingsManager.create(cwd, agentDir),
-    }).listConfiguredPackages().flatMap(({ installedPath }) => installedPath === undefined ? [] : [installedPath])
+    })
+      .listConfiguredPackages()
+      .flatMap(({ installedPath }) => (installedPath === undefined ? [] : [installedPath]))
   }
 
   return async () => {
@@ -140,16 +139,14 @@ export function createInheritedExtensionsResolver(build: RunnerBuildContext): ()
     let installedPackageRoots: readonly string[] = []
     try {
       installedPackageRoots = await withTimeout(discoverRoots(), PACKAGE_DISCOVERY_TIMEOUT_MS, "package discovery")
-    } catch (error) { // no-excuse-ok: catch - discovery is best-effort and must never block a spawn.
+    } catch (error) {
+      // no-excuse-ok: catch - discovery is best-effort and must never block a spawn.
       log("omo-senpi package extension discovery failed; task children inherit argv extensions only", {
         error: String(error),
       })
       installedPackageRoots = []
     }
-    return [
-      ...argvEntries,
-      ...selectPackageExtensionPaths(argvEntries, loadedExtensionPaths, installedPackageRoots),
-    ]
+    return [...argvEntries, ...selectPackageExtensionPaths(argvEntries, loadedExtensionPaths, installedPackageRoots)]
   }
 }
 
@@ -167,7 +164,9 @@ function buildProcessRunner(build: RunnerBuildContext): ManagedRunner {
 }
 
 function withoutExcludedRpcFallbacks(spec: RpcRunnerSpec, excludeModels: readonly string[] | undefined): RpcRunnerSpec {
-  return spec.fallbackModels === undefined ? spec : { ...spec, fallbackModels: withoutExcludedSelectors(spec.fallbackModels, excludeModels) }
+  return spec.fallbackModels === undefined
+    ? spec
+    : { ...spec, fallbackModels: withoutExcludedSelectors(spec.fallbackModels, excludeModels) }
 }
 
 /**
@@ -175,16 +174,19 @@ function withoutExcludedRpcFallbacks(spec: RpcRunnerSpec, excludeModels: readonl
  * carries no inherited extensions at all, so a revived child lost every package provider its first
  * launch had and failed admission against the model recorded in its own record.
  */
-export function buildRespawnRunner(
-  build: RunnerBuildContext,
-): { start(spec: RpcRunnerSpec): Promise<RpcChildHandle>; settleTeardowns(): Promise<void> } {
+export function buildRespawnRunner(build: RunnerBuildContext): {
+  start(spec: RpcRunnerSpec): Promise<RpcChildHandle>
+  settleTeardowns(): Promise<void>
+} {
   const runner = buildProcessChildRunner(build)
   const resolveInheritedExtensions = build.resolveInheritedExtensions ?? createInheritedExtensionsResolver(build)
   return {
     settleTeardowns: () => runner.settleTeardowns(),
     start: async (spec) => {
       const filtered = withoutExcludedRpcFallbacks(spec, build.excludeModels)
-      return runner.start(filtered.extensions === undefined ? { ...filtered, extensions: await resolveInheritedExtensions() } : filtered)
+      return runner.start(
+        filtered.extensions === undefined ? { ...filtered, extensions: await resolveInheritedExtensions() } : filtered,
+      )
     },
   }
 }
@@ -197,7 +199,10 @@ export function buildRespawnRunner(
  */
 export function buildProcessChildRunner(build: RunnerBuildContext): RpcHostRunner | RpcProcessRunner {
   const inheritedExtensions = parseExtensionEntries(process.argv)
-  const modelAdmission = build.excludeModels === undefined ? {} : { modelAdmission: createRpcModelAdmission({ excludeModels: build.excludeModels }) }
+  const modelAdmission =
+    build.excludeModels === undefined
+      ? {}
+      : { modelAdmission: createRpcModelAdmission({ excludeModels: build.excludeModels }) }
   const perChild = new RpcProcessRunner({
     inheritedExtensions,
     ...modelAdmission,

@@ -52,8 +52,9 @@ describe("locateReflectionChildLog", () => {
 
 describe("homeRelativePath", () => {
   test("#given a path under home #when it is shortened #then home becomes ~", () => {
-    expect(homeRelativePath("/Users/me/.omo/memory/agents/a/runtime/reflection/runs/r1/child-stderr.log", "/Users/me"))
-      .toBe("~/.omo/memory/agents/a/runtime/reflection/runs/r1/child-stderr.log")
+    expect(
+      homeRelativePath("/Users/me/.omo/memory/agents/a/runtime/reflection/runs/r1/child-stderr.log", "/Users/me"),
+    ).toBe("~/.omo/memory/agents/a/runtime/reflection/runs/r1/child-stderr.log")
   })
 
   test("#given a path outside home or a sibling prefix #when it is shortened #then it is unchanged", () => {

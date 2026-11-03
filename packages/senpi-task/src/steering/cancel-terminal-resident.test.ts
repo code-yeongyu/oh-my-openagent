@@ -1,7 +1,14 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
 import { createTaskLifecycle } from "../lifecycle/create"
-import { cleanupProjects, fakeHandle, FakeRegistry, seedRecord, settings, tempStore } from "../lifecycle/__fixtures__/lifecycle-fakes"
+import {
+  cleanupProjects,
+  fakeHandle,
+  FakeRegistry,
+  seedRecord,
+  settings,
+  tempStore,
+} from "../lifecycle/__fixtures__/lifecycle-fakes"
 import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
 import type { TaskRecordStore } from "../store"
 import { runTaskCancel } from "../tools/control/cancel"
@@ -33,7 +40,12 @@ function cancelSurface(store: TaskRecordStore, registry: FakeRegistry, options?:
   }
   const engine = createSteeringEngine(port)
   const manager = { cancelTask: engine.cancelTask, get: (taskId: string) => store.load(taskId) ?? undefined }
-  return { lifecycle, engine, cancel: () => runTaskCancel(manager, { task_id: TASK }), cancelWith: () => engine.cancelTask(TASK, undefined, options) }
+  return {
+    lifecycle,
+    engine,
+    cancel: () => runTaskCancel(manager, { task_id: TASK }),
+    cancelWith: () => engine.cancelTask(TASK, undefined, options),
+  }
 }
 
 describe("task_cancel on a finished child that is still resident (omo#9785)", () => {
@@ -130,7 +142,13 @@ describe("task_cancel on a finished child that is still resident (omo#9785)", ()
   test("#given an errored resident whose session never opened (no live handle) #when cancelled #then only its record is parked", async () => {
     // given
     const store = tempStore()
-    seedRecord(store, { task_id: TASK, status: "error", residency_state: "resident", host_pid: process.pid, execution_mode: "process" })
+    seedRecord(store, {
+      task_id: TASK,
+      status: "error",
+      residency_state: "resident",
+      host_pid: process.pid,
+      execution_mode: "process",
+    })
     const { lifecycle, cancel } = cancelSurface(store, new SessionRegistry())
 
     // when
@@ -145,7 +163,14 @@ describe("task_cancel on a finished child that is still resident (omo#9785)", ()
   test("#given a handle-less finished resident whose child pid is still alive #when cancelled #then it is left for reconciliation", async () => {
     // given
     const store = tempStore()
-    seedRecord(store, { task_id: TASK, status: "error", residency_state: "resident", host_pid: process.pid, execution_mode: "process", pid: process.pid })
+    seedRecord(store, {
+      task_id: TASK,
+      status: "error",
+      residency_state: "resident",
+      host_pid: process.pid,
+      execution_mode: "process",
+      pid: process.pid,
+    })
     const { lifecycle, cancel } = cancelSurface(store, new SessionRegistry())
 
     // when
@@ -159,7 +184,13 @@ describe("task_cancel on a finished child that is still resident (omo#9785)", ()
   test("#given a handle-less finished child of a sibling session in this process #when cancelled here #then it is left to its own session", async () => {
     // given
     const store = tempStore()
-    seedRecord(store, { task_id: TASK, status: "completed", residency_state: "resident", host_pid: process.pid, parent_session_id: "parent-2" })
+    seedRecord(store, {
+      task_id: TASK,
+      status: "completed",
+      residency_state: "resident",
+      host_pid: process.pid,
+      parent_session_id: "parent-2",
+    })
     const { lifecycle, cancel } = cancelSurface(store, new SessionRegistry())
 
     // when

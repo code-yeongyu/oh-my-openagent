@@ -59,8 +59,7 @@ export class RpcProcessRunner {
   constructor(options: RpcProcessRunnerOptions = {}) {
     this.terminateChild = options.terminateChild
     this.spawnChild =
-      options.spawnChild ??
-      ((descriptor) => defaultSpawnChild(descriptor, options.spawnProcess ?? spawn))
+      options.spawnChild ?? ((descriptor) => defaultSpawnChild(descriptor, options.spawnProcess ?? spawn))
     this.buildSpawn = options.buildSpawn ?? ((spec) => buildRpcSpawn(spec))
     this.heartbeatIntervalMs = options.heartbeatIntervalMs ?? DEFAULT_HEARTBEAT_INTERVAL_MS
     this.onMalformedLine = options.onMalformedLine
@@ -84,9 +83,11 @@ export class RpcProcessRunner {
       client,
       child,
       taskId: spec.task_id,
-      ...(spec.taskStoreDir === undefined ? {} : {
-        inputStore: createTaskRecordStore({ project_dir: spec.cwd, task: { state_dir: spec.taskStoreDir } }),
-      }),
+      ...(spec.taskStoreDir === undefined
+        ? {}
+        : {
+            inputStore: createTaskRecordStore({ project_dir: spec.cwd, task: { state_dir: spec.taskStoreDir } }),
+          }),
       heartbeatIntervalMs: this.heartbeatIntervalMs,
       now: this.now,
       childEnv: descriptor.env,
@@ -124,13 +125,17 @@ export class RpcProcessRunner {
       const message = error instanceof Error ? error.message : String(error)
       // The child's own model resolution is the authority admission defers to (#10863): a child that
       // exited because it could not resolve its `--model` fails typed, carrying its own error.
-      const unresolvedModel = exitOutcome?.kind === "crashed" ? childUnresolvedModelError(exitOutcome.facts.stderrTail) : undefined
+      const unresolvedModel =
+        exitOutcome?.kind === "crashed" ? childUnresolvedModelError(exitOutcome.facts.stderrTail) : undefined
       // A child that died before its first prompt leaves its cause ONLY here: the classified exit is
       // otherwise folded into `message`, which is stderr-derived and gets sanitized away downstream.
       throw new RunnerError({
-        kind: unresolvedModel !== undefined
-          ? "model_unavailable"
-          : spec.resumeSessionPath === undefined ? "child-prompt-failed" : "session_unavailable",
+        kind:
+          unresolvedModel !== undefined
+            ? "model_unavailable"
+            : spec.resumeSessionPath === undefined
+              ? "child-prompt-failed"
+              : "session_unavailable",
         message: unresolvedModel === undefined ? message : `the child could not resolve its model: ${unresolvedModel}`,
         cause: error,
         rejected_while: exitOutcome === undefined ? "alive" : "exited",
@@ -146,9 +151,7 @@ export class RpcProcessRunner {
         ...(spec.memberEnv === undefined ? {} : { memberEnv: spec.memberEnv }),
       },
       switchSession: (sessionPath: string) =>
-        sessionPath === spec.resumeSessionPath && resume !== undefined
-          ? resume
-          : client.switchSession(sessionPath),
+        sessionPath === spec.resumeSessionPath && resume !== undefined ? resume : client.switchSession(sessionPath),
       getEntries: (since?: string) => client.getEntries(since),
     })
   }
@@ -180,7 +183,9 @@ export class RpcProcessRunner {
     }
     // A child that died meanwhile fails on its first prompt next; the warning must not blame the engine.
     if (client.exited) {
-      this.onWarning(`task ${spec.task_id}: its fallback chain was not applied because the child exited while it was being sent`)
+      this.onWarning(
+        `task ${spec.task_id}: its fallback chain was not applied because the child exited while it was being sent`,
+      )
       return
     }
     const reason = outcome === "timeout" ? `no answer within ${this.fallbackChainDeadlineMs} ms` : outcome.refused

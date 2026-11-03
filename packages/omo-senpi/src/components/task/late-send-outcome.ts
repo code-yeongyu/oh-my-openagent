@@ -13,12 +13,20 @@ export function createLateSendOutcomeDeliverer(
 ): LateSendOutcome {
   return (result, delivery) => {
     if (delivery.callerSessionId !== undefined && delivery.callerSessionId !== currentSessionId()) {
-      log("senpi-task task_send outcome dropped: its session is no longer active", { session: delivery.callerSessionId, details: result.details })
+      log("senpi-task task_send outcome dropped: its session is no longer active", {
+        session: delivery.callerSessionId,
+        details: result.details,
+      })
       return
     }
     const text = result.content.map((part) => (part.type === "text" ? part.text : "")).join("\n")
     void pi.sendMessage(
-      { customType: SEND_OUTCOME_MESSAGE_TYPE, content: `task_send outcome: ${text}`, display: false, details: result.details },
+      {
+        customType: SEND_OUTCOME_MESSAGE_TYPE,
+        content: `task_send outcome: ${text}`,
+        display: false,
+        details: result.details,
+      },
       delivery.cause === "aborted" ? { deliverAs: "followUp" } : { triggerTurn: true, deliverAs: "steer" },
     )
   }

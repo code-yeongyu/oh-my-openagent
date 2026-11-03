@@ -11,7 +11,13 @@ import {
 import { formatTargetWithModel } from "../../status-line"
 import { statusThemeColor } from "../task/renderers"
 import type { ToolExecutionResult } from "../control"
-import type { TeamCreateDetails, TeamCreateInput, TeamCreateMemberView, TeamDeleteDetails, TeamDeleteInput } from "./lifecycle"
+import type {
+  TeamCreateDetails,
+  TeamCreateInput,
+  TeamCreateMemberView,
+  TeamDeleteDetails,
+  TeamDeleteInput,
+} from "./lifecycle"
 import type {
   TeamTaskCreateDetails,
   TeamTaskCreateInput,
@@ -67,7 +73,10 @@ function excerptToken(label: string, value: string | undefined, width: number): 
 
 // The model may pass inline_spec as an object or as a JSON string of that object; the row reports
 // what the call asked for, so an unparseable string degrades to the spec token instead of throwing.
-function inlineSpecSummary(spec: TeamCreateInput["inline_spec"]): { readonly name?: string; readonly members?: number } {
+function inlineSpecSummary(spec: TeamCreateInput["inline_spec"]): {
+  readonly name?: string
+  readonly members?: number
+} {
   const parsed = typeof spec === "string" ? parseJsonObject(spec) : spec
   if (parsed === undefined) return {}
   const name = typeof parsed.name === "string" ? parsed.name : undefined
@@ -96,10 +105,17 @@ export function renderTeamCreateCall(args: TeamCreateInput, theme: TeamRenderThe
 }
 
 export function renderTeamDeleteCall(args: TeamDeleteInput, theme: TeamRenderTheme): RenderComponent {
-  return callComponent(joinRendererTokens(["team delete", token("run", args.team_run_id), args.force === true && "force"]), theme)
+  return callComponent(
+    joinRendererTokens(["team delete", token("run", args.team_run_id), args.force === true && "force"]),
+    theme,
+  )
 }
 
-export function renderTeamTaskCall(operation: TeamTaskOperation, args: TeamTaskCallInput, theme: TeamRenderTheme): RenderComponent {
+export function renderTeamTaskCall(
+  operation: TeamTaskOperation,
+  args: TeamTaskCallInput,
+  theme: TeamRenderTheme,
+): RenderComponent {
   const record: Record<string, unknown> = { ...args }
   const line = joinRendererTokens([
     `team task ${operation}`,
@@ -169,7 +185,12 @@ export function renderTeamDeleteResult(
   const details = result.details
   if (details.kind === "deleted") {
     return component(
-      [{ color: "success", text: `team deleted run:${normalizeRendererText(details.team_run_id)} cancelled:${details.cancelled_task_ids.length}` }],
+      [
+        {
+          color: "success",
+          text: `team deleted run:${normalizeRendererText(details.team_run_id)} cancelled:${details.cancelled_task_ids.length}`,
+        },
+      ],
       theme,
     )
   }
@@ -190,7 +211,11 @@ export function renderTeamTaskResult(
           { color: "success", text: `team task list count:${details.tasks.length}` },
           ...details.tasks.map((task) => ({
             color: statusThemeColor(task.status),
-            text: joinRendererTokens([`- ${normalizeRendererText(task.id)}`, `[${normalizeRendererText(task.status)}]`, token("owner", task.owner)]),
+            text: joinRendererTokens([
+              `- ${normalizeRendererText(task.id)}`,
+              `[${normalizeRendererText(task.status)}]`,
+              token("owner", task.owner),
+            ]),
           })),
         ],
         theme,
@@ -200,7 +225,15 @@ export function renderTeamTaskResult(
     case "task":
       return component([{ color: "success", text: taskIdentityLine(details.task) }], theme)
     case "not_found":
-      return component([{ color: "error", text: joinRendererTokens([`team task ${operation} not_found`, token("id", details.task_id)]) }], theme)
+      return component(
+        [
+          {
+            color: "error",
+            text: joinRendererTokens([`team task ${operation} not_found`, token("id", details.task_id)]),
+          },
+        ],
+        theme,
+      )
     default:
       return component(
         [
@@ -218,7 +251,12 @@ export function renderTeamTaskResult(
   }
 }
 
-function taskIdentityLine(task: { readonly id: string; readonly status: string; readonly owner?: string; readonly subject: string }): string {
+function taskIdentityLine(task: {
+  readonly id: string
+  readonly status: string
+  readonly owner?: string
+  readonly subject: string
+}): string {
   return joinRendererTokens([
     `team task ${normalizeRendererText(task.id)}`,
     `[${normalizeRendererText(task.status)}]`,

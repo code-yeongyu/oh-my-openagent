@@ -11,11 +11,7 @@ import {
   terminateProcessGroup,
   validateProcessGroupPid,
 } from "./memory-run-supervisor-ic8-process-groups"
-import {
-  advanceTestClock,
-  createTestClock,
-  waitForFilesystemState,
-} from "./supervisor-test-signals"
+import { advanceTestClock, createTestClock, waitForFilesystemState } from "./supervisor-test-signals"
 
 export const IC8_WAIT_MS = 60_000
 export const IC8_PLATFORMS = ["posix", "win32"] as const
@@ -31,23 +27,15 @@ export function createMemoryRunSupervisorIc8Harness() {
   const exitResources = createMemoryRunSupervisorIc8ExitResources(IC8_WAIT_MS)
 
   const waitForPath = async (path: string, timeoutMs = IC8_WAIT_MS) => {
-    await waitForFilesystemState(
-      dirname(path),
-      () => (existsSync(path) ? true : undefined),
-      timeoutMs,
-      path,
-    )
+    await waitForFilesystemState(dirname(path), () => (existsSync(path) ? true : undefined), timeoutMs, path)
   }
 
   const makeRun = async (mode: "graceful" | "stubborn" | "with-grandchild") => {
-    const runDir = realpathSync.native(
-      await mkdtemp(join(tmpdir(), "memory-run-supervisor-ic8-")),
-    )
+    const runDir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-run-supervisor-ic8-")))
     roots.push(runDir)
     await mkdir(runDir, { recursive: true, mode: 0o700 })
     const clockPath = await createTestClock(runDir, 1_000)
-    const { port, childExited, exitSocketAccepted } =
-      await exitResources.openServer()
+    const { port, childExited, exitSocketAccepted } = await exitResources.openServer()
     await writeFile(
       join(runDir, "ledger.json"),
       `${JSON.stringify({ version: 1, runId: "run-ic8", kind: "reflection" })}\n`,
@@ -91,17 +79,11 @@ export function createMemoryRunSupervisorIc8Harness() {
         OMO_MEMORY_SUPERVISOR_ALLOW_TEST_SEAMS: "1",
         OMO_MEMORY_SUPERVISOR_PLATFORM: platform,
         OMO_MEMORY_SUPERVISOR_CLOCK_PATH: clockPath,
-        OMO_MEMORY_SUPERVISOR_TASKKILL_COMMAND: JSON.stringify([
-          process.execPath,
-          taskkillFixture,
-        ]),
+        OMO_MEMORY_SUPERVISOR_TASKKILL_COMMAND: JSON.stringify([process.execPath, taskkillFixture]),
         OMO_MEMORY_SUPERVISOR_TASKKILL_RUN_DIR: runDir,
         ...(process.platform === "win32" && platform === "posix"
           ? {
-              OMO_MEMORY_SUPERVISOR_POSIX_SIGNAL_COMMAND: JSON.stringify([
-                process.execPath,
-                taskkillFixture,
-              ]),
+              OMO_MEMORY_SUPERVISOR_POSIX_SIGNAL_COMMAND: JSON.stringify([process.execPath, taskkillFixture]),
             }
           : {}),
       },
@@ -110,9 +92,7 @@ export function createMemoryRunSupervisorIc8Harness() {
     return child
   }
 
-  const waitForExit = (
-    child: ChildProcess,
-  ): Promise<{ code: number | null; signal: NodeJS.Signals | null }> =>
+  const waitForExit = (child: ChildProcess): Promise<{ code: number | null; signal: NodeJS.Signals | null }> =>
     new Promise((resolve, reject) => {
       const cleanup = () => {
         exitResources.clearTrackedTimeout(timeout)
@@ -141,9 +121,7 @@ export function createMemoryRunSupervisorIc8Harness() {
     const groups = new Set<number>()
     for (const runDir of roots) {
       if (cleanedRunRoots.has(runDir)) continue
-      const ledger = JSON.parse(
-        await readFile(join(runDir, "ledger.json"), "utf8"),
-      ) as { readonly childPid?: number }
+      const ledger = JSON.parse(await readFile(join(runDir, "ledger.json"), "utf8")) as { readonly childPid?: number }
       if (ledger.childPid !== undefined) {
         groups.add(validateProcessGroupPid(ledger.childPid))
       }
@@ -176,9 +154,7 @@ export function createMemoryRunSupervisorIc8Harness() {
     try {
       const { forcedSocketDestructions } = await exitResources.cleanup()
       if (forcedSocketDestructions > 0) {
-        cleanupError ??= new Error(
-          `forced ${forcedSocketDestructions} model socket cleanup(s)`,
-        )
+        cleanupError ??= new Error(`forced ${forcedSocketDestructions} model socket cleanup(s)`)
       }
     } catch (error) {
       cleanupError ??= asError(error)
@@ -224,9 +200,7 @@ export function createMemoryRunSupervisorIc8Harness() {
     const removals = await Promise.allSettled(
       roots
         .splice(0)
-        .map((root) =>
-          rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 30, retryDelay: 200 }),
-        ),
+        .map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 30, retryDelay: 200 })),
     )
     for (const result of removals) {
       if (result.status === "rejected") cleanupError ??= asError(result.reason)

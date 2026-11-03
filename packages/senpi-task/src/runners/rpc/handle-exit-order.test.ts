@@ -10,7 +10,11 @@ test("process exit during a pending prompt retains exit facts for provisional se
   Object.defineProperty(child, "pid", { value: 42 })
   const client = new RpcProtocolClient({ child })
   const handle = createRpcChildHandle({
-    client, child, taskId: "st_97150011", now: () => 0, heartbeatIntervalMs: 60_000,
+    client,
+    child,
+    taskId: "st_97150011",
+    now: () => 0,
+    heartbeatIntervalMs: 60_000,
   })
   try {
     const initial = handle.startInitialPrompt("hold")
@@ -19,7 +23,10 @@ test("process exit during a pending prompt retains exit facts for provisional se
     if (handle.waitForOutcome === undefined) throw new Error("missing tracked outcome")
     const outcome = handle.waitForOutcome()
     const pending = handle.followUp("continue")
-    const rejected = pending.then(() => false, () => true)
+    const rejected = pending.then(
+      () => false,
+      () => true,
+    )
     // When the dying child's broken pipe rejects RPC before close supplies the exit code.
     child.stdin?.emit("error", Object.assign(new Error("closed pipe"), { code: "EPIPE" }))
     queueMicrotask(() => child.emit("close", 1, null))

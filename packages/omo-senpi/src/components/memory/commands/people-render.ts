@@ -37,7 +37,10 @@ export function renderRoster(graph: PalacePeople): string {
       lines.push(`  ${marker} ${edge.predicate} -> ${edge.target}${unknown}`)
     })
   }
-  lines.push("", `${graph.edges.length} relationship${graph.edges.length === 1 ? "" : "s"} across ${graph.nodes.length} card${graph.nodes.length === 1 ? "" : "s"}.`)
+  lines.push(
+    "",
+    `${graph.edges.length} relationship${graph.edges.length === 1 ? "" : "s"} across ${graph.nodes.length} card${graph.nodes.length === 1 ? "" : "s"}.`,
+  )
   for (const diagnostic of graph.diagnostics) lines.push(`! ${diagnostic.path}: ${diagnostic.message}`)
   return lines.join("\n")
 }

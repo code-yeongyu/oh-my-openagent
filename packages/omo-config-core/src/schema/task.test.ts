@@ -1,11 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import {
-  OmoTaskSettingsLayerSchema,
-  OmoTaskSettingsSchema,
-  resolveOmoTaskSettings,
-  type OmoTaskSettings,
-} from "./task"
+import { OmoTaskSettingsLayerSchema, OmoTaskSettingsSchema, resolveOmoTaskSettings, type OmoTaskSettings } from "./task"
 import { OmoConfigSchema } from "./config"
 
 // 0 is the unbounded sentinel for the concurrency/residency caps: the engine already maps it to
@@ -90,7 +85,7 @@ describe("OmoTaskSettingsSchema zero-as-unlimited concurrency", () => {
     expect(parsed.residency_max_children).toBe(0)
   })
 
-  test("#given \"unlimited\" on a concurrency field #when task settings parse #then only numbers are accepted", () => {
+  test('#given "unlimited" on a concurrency field #when task settings parse #then only numbers are accepted', () => {
     // given
     const input = { default_concurrency: "unlimited" }
 
@@ -130,13 +125,21 @@ describe("OmoTaskSettingsSchema zero-as-unlimited concurrency", () => {
 describe("OmoTaskSettingsSchema resident idle timeout", () => {
   test("#given absent retention #when resolved #then the approved default and expunge TTL stay independent", () => {
     expect(OmoTaskSettingsSchema.parse({})).toMatchObject({ resident_idle_timeout_ms: 900000, ttl_ms: 86400000 })
-    expect(resolveOmoTaskSettings({ resident_idle_timeout_ms: 37 })).toMatchObject({ resident_idle_timeout_ms: 37, ttl_ms: 86400000 })
+    expect(resolveOmoTaskSettings({ resident_idle_timeout_ms: 37 })).toMatchObject({
+      resident_idle_timeout_ms: 37,
+      ttl_ms: 86400000,
+    })
     expect(OmoTaskSettingsLayerSchema.parse({})).not.toHaveProperty("resident_idle_timeout_ms")
   })
   test("#given positive safe integer milliseconds #when each boundary parses #then values are preserved", () => {
     for (const value of [1, 37, 900000, Number.MAX_SAFE_INTEGER]) {
-      expect(OmoTaskSettingsSchema.parse({ resident_idle_timeout_ms: value })).toHaveProperty("resident_idle_timeout_ms", value)
-      expect(OmoTaskSettingsLayerSchema.parse({ resident_idle_timeout_ms: value })).toEqual({ resident_idle_timeout_ms: value })
+      expect(OmoTaskSettingsSchema.parse({ resident_idle_timeout_ms: value })).toHaveProperty(
+        "resident_idle_timeout_ms",
+        value,
+      )
+      expect(OmoTaskSettingsLayerSchema.parse({ resident_idle_timeout_ms: value })).toEqual({
+        resident_idle_timeout_ms: value,
+      })
     }
   })
   test("#given invalid durations #when each schema boundary parses #then no disable sentinel or coercion is accepted", () => {
@@ -169,9 +172,9 @@ describe("OmoTaskSettingsSchema host shard prewarm", () => {
     expect(invalidSharding.success).toBe(false)
     if (!invalidPrewarm.success && !invalidSharding.success) {
       expect(invalidPrewarm.error.issues.map((issue) => issue.path.join(".")).join(",")).toContain("host_shard_prewarm")
-      expect(invalidSharding.error.issues.map((issue) => `${issue.path.join(".")}:${issue.message}`).join(",")).toContain(
-        "host_sharding",
-      )
+      expect(
+        invalidSharding.error.issues.map((issue) => `${issue.path.join(".")}:${issue.message}`).join(","),
+      ).toContain("host_sharding")
     }
   })
 })
@@ -209,7 +212,9 @@ describe("OmoTaskSettingsSchema warnings", () => {
     // then
     expect(result.success).toBe(false)
     if (result.success) throw new Error("Expected task settings parsing to fail")
-    expect(result.error.issues.map((issue) => issue.path.join(".")).join(",")).toContain("warnings.unavailable_categories")
+    expect(result.error.issues.map((issue) => issue.path.join(".")).join(",")).toContain(
+      "warnings.unavailable_categories",
+    )
   })
 })
 
@@ -477,7 +482,7 @@ describe("OmoTaskSettingsSchema shared-daemon keys", () => {
 })
 
 function taskProperties(schema: unknown): Record<string, unknown> {
-  const definitions = (schema as { $defs?: Record<string, unknown>; properties?: Record<string, unknown> })
+  const definitions = schema as { $defs?: Record<string, unknown>; properties?: Record<string, unknown> }
   const task = definitions.properties?.["task"]
   const properties = (task as { properties?: Record<string, unknown> } | undefined)?.properties
   if (properties === undefined) throw new Error("assets/omo.schema.json has no task properties block")

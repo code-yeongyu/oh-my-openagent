@@ -25,7 +25,10 @@ function recordPath(): string {
 }
 
 function liveProcess(): number {
-  const child = Bun.spawn([process.execPath, "-e", "setInterval(() => {}, 1000)"], { stdout: "ignore", stderr: "ignore" })
+  const child = Bun.spawn([process.execPath, "-e", "setInterval(() => {}, 1000)"], {
+    stdout: "ignore",
+    stderr: "ignore",
+  })
   children.push(child)
   return child.pid
 }
@@ -170,7 +173,8 @@ describe("task record lock", () => {
   test("#given live holders that hand the lock on every 100ms for 1.5s #when a waiter queues behind them #then it waits past the per-holder budget and acquires", async () => {
     // given - each holder is this live process under a fresh token, so none of them is ever reaped
     const path = recordPath()
-    const holderBody = (token: string): string => `${process.pid}\n${Date.now()}\n${token}\n${readProcessStartIdentity(process.pid)}\n${hostname()}\n`
+    const holderBody = (token: string): string =>
+      `${process.pid}\n${Date.now()}\n${token}\n${readProcessStartIdentity(process.pid)}\n${hostname()}\n`
     writeFileSync(`${path}.lock`, holderBody("holder-0"))
     let handovers = 0
     const chainEnded = new Promise<void>((resolve) => {
@@ -212,13 +216,17 @@ describe("task record lock", () => {
 })
 
 describe("task record lock reap on a sharing violation", () => {
-  function failPrimaryUnlinks(lockPath: string, failures: number): { readonly attempts: () => number; readonly restore: () => void } {
+  function failPrimaryUnlinks(
+    lockPath: string,
+    failures: number,
+  ): { readonly attempts: () => number; readonly restore: () => void } {
     const realRm = fs.rmSync
     let attempts = 0
     const spy = spyOn(fs, "rmSync").mockImplementation((target: fs.PathLike, options?: fs.RmOptions) => {
       if (String(target) === lockPath) {
         attempts += 1
-        if (attempts <= failures) throw Object.assign(new Error("EPERM: operation not permitted, unlink"), { code: "EPERM" })
+        if (attempts <= failures)
+          throw Object.assign(new Error("EPERM: operation not permitted, unlink"), { code: "EPERM" })
       }
       realRm(target, options)
     })

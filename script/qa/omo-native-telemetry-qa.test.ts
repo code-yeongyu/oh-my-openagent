@@ -32,6 +32,8 @@ describe("OmO Native telemetry QA allowlist source", () => {
   test("#given a missing or extra event #when QA validates coverage #then divergence fails loudly", () => {
     const { daily_active: _removed, ...missing } = OMO_NATIVE_PROPERTY_ALLOWLISTS
     expect(() => assertAllowlistCoverage(missing)).toThrow("missing=daily_active")
-    expect(() => assertAllowlistCoverage({ ...OMO_NATIVE_PROPERTY_ALLOWLISTS, bogus_event: [] })).toThrow("extra=bogus_event")
+    expect(() => assertAllowlistCoverage({ ...OMO_NATIVE_PROPERTY_ALLOWLISTS, bogus_event: [] })).toThrow(
+      "extra=bogus_event",
+    )
   })
 })

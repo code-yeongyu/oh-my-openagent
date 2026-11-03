@@ -26,7 +26,10 @@ const NO_WAIT = { reattachDelaysMs: [0, 0, 0], sleep: () => Promise.resolve() } 
  * on its socket, as the engine's spawn would), `reuse` otherwise. The clock never moves, so every
  * ensure after the first is a cache hit unless something dropped the entry.
  */
-function engineOver(host: FakeHost): { readonly ensure: (input: EnsureTaskDaemonInput) => ReturnType<typeof ensureTaskDaemon>; readonly starts: EnsureHostInput[] } {
+function engineOver(host: FakeHost): {
+  readonly ensure: (input: EnsureTaskDaemonInput) => ReturnType<typeof ensureTaskDaemon>
+  readonly starts: EnsureHostInput[]
+} {
   const starts: EnsureHostInput[] = []
   const port: TaskDaemonHostPort = {
     engineBuildIdentity: () => ({ text: "2026.9.18", ordinal: [2026, 9, 18, 0, 0], scheme: "epoch" }),

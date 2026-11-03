@@ -6,7 +6,12 @@ import type { PersistedTaskEvent } from "../../store"
 import { taskSettings } from "../__fixtures__/runtime-fakes"
 import { writeMemberTaskMap } from "../member-map"
 import { toTeamCoreConfig } from "../runtime-config"
-import { ensureTeamRuntimeDirs, resolveTeamMemberInboxDir, resolveTeamRuntimeDirs, teamStorageBaseDir } from "../storage"
+import {
+  ensureTeamRuntimeDirs,
+  resolveTeamMemberInboxDir,
+  resolveTeamRuntimeDirs,
+  teamStorageBaseDir,
+} from "../storage"
 import { cleanupMessagingTmp, stateDirConfig, tempProjectDir } from "./__fixtures__/messaging-fakes"
 import { sendTeamMessage } from "./send"
 import type { MemberTaskMap, MessagingEngineDeps } from "./types"
@@ -47,7 +52,8 @@ function deps(
 }
 
 function unreadPath(stateDir: ReturnType<typeof stateDirConfig>, recipient: string, messageId: string): string {
-  return join(resolveTeamMemberInboxDir(stateDir, TEAM_RUN_ID, recipient), `${messageId}.json`)}
+  return join(resolveTeamMemberInboxDir(stateDir, TEAM_RUN_ID, recipient), `${messageId}.json`)
+}
 
 describe("sendTeamMessage recipient guidance", () => {
   test("#given an unknown recipient #when the lead sends #then the error names the team members and valid forms", async () => {
@@ -85,8 +91,9 @@ function processedPath(stateDir: ReturnType<typeof stateDirConfig>, recipient: s
 }
 
 function unreadFiles(stateDir: ReturnType<typeof stateDirConfig>, recipient: string): string[] {
-  return readdirSync(resolveTeamMemberInboxDir(stateDir, TEAM_RUN_ID, recipient))
-    .filter((name) => name.endsWith(".json") && !name.startsWith("."))
+  return readdirSync(resolveTeamMemberInboxDir(stateDir, TEAM_RUN_ID, recipient)).filter(
+    (name) => name.endsWith(".json") && !name.startsWith("."),
+  )
 }
 
 describe("sendTeamMessage pull-only delivery", () => {

@@ -16,7 +16,12 @@ export {
   type SessionHistoryScanSource,
   type SessionScanItem,
 } from "./scan-session-history"
-export { nodeSessionHistoryFs, type SessionHistoryFile, type SessionHistoryFileStats, type SessionHistoryFs } from "./session-history-fs"
+export {
+  nodeSessionHistoryFs,
+  type SessionHistoryFile,
+  type SessionHistoryFileStats,
+  type SessionHistoryFs,
+} from "./session-history-fs"
 export { createSessionHistoryScanner, type SessionHistoryScanner } from "./session-history-scanner"
 export { parseAgentSessionTranscript } from "./transcript-parser"
 export type * from "./types"

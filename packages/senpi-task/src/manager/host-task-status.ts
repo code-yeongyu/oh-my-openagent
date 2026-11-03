@@ -9,7 +9,11 @@ import type { ManagedChildHandle } from "./child-handle"
  * a finished child must still leave the session marked, so a successor host drops it instead of
  * reopening it unattended (omo#10778). The detach-time publish in `suspendHandle` is the backstop.
  */
-export function publishHostTaskStatus(handle: ManagedChildHandle | undefined, taskId: string, status: TaskStatus | undefined): void {
+export function publishHostTaskStatus(
+  handle: ManagedChildHandle | undefined,
+  taskId: string,
+  status: TaskStatus | undefined,
+): void {
   if (handle?.publishTaskStatus === undefined || status === undefined) return
   void handle.publishTaskStatus(status).catch((error: unknown) => {
     log("senpi-task host task_status publish failed", { taskId, status, error: String(error) })

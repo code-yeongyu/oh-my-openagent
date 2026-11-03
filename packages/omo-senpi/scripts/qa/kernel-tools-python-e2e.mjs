@@ -25,14 +25,27 @@ const DEFINE_TOOL = [
   "'defined'",
 ].join("\n")
 // Grants come from the calling kernel: the Python cell that defined the tool spawns the child.
-const CALL_CHILD = "reply = tool.task(prompt='MOCK' + 'ROLE=quick add 1 and 2 with the add tool', subagent_type='fixture', tools=['add'])\nreply"
+const CALL_CHILD =
+  "reply = tool.task(prompt='MOCK' + 'ROLE=quick add 1 and 2 with the add tool', subagent_type='fixture', tools=['add'])\nreply"
 const READ_CALLS = "calls"
 
 const SCRIPT = {
   lead: [
-    { type: "tool_call", name: "eval", arguments: { language: "py", summary: "define a Python tool", code: DEFINE_TOOL } },
-    { type: "tool_call", name: "eval", arguments: { language: "py", summary: "a child calls the Python tool", code: CALL_CHILD } },
-    { type: "tool_call", name: "eval", arguments: { language: "py", summary: "read the calls the parent kernel served", code: READ_CALLS } },
+    {
+      type: "tool_call",
+      name: "eval",
+      arguments: { language: "py", summary: "define a Python tool", code: DEFINE_TOOL },
+    },
+    {
+      type: "tool_call",
+      name: "eval",
+      arguments: { language: "py", summary: "a child calls the Python tool", code: CALL_CHILD },
+    },
+    {
+      type: "tool_call",
+      name: "eval",
+      arguments: { language: "py", summary: "read the calls the parent kernel served", code: READ_CALLS },
+    },
     { type: "text", text: "KERNEL-TOOLS-PY-DONE" },
   ],
   quick: [
@@ -44,7 +57,13 @@ const SCRIPT = {
 const OMO_CONFIG = {
   task: { reattach_on_reconcile: false },
   categories: { quick: { model: "omo-mock/mock-1" } },
-  agents: { fixture: { model: "omo-mock/mock-1", description: "kernel-tools fixture agent", prompt: "You are the fixture agent." } },
+  agents: {
+    fixture: {
+      model: "omo-mock/mock-1",
+      description: "kernel-tools fixture agent",
+      prompt: "You are the fixture agent.",
+    },
+  },
 }
 
 function evalResults(stdout) {
@@ -69,7 +88,10 @@ function childToolResults(agentDir) {
           try {
             const message = JSON.parse(line).message
             if (message?.role === "toolResult" && message.toolName === "add") {
-              found.push({ isError: message.isError === true, text: (message.content ?? []).map((part) => part.text ?? "").join("") })
+              found.push({
+                isError: message.isError === true,
+                text: (message.content ?? []).map((part) => part.text ?? "").join(""),
+              })
             }
           } catch {
             // a partial trailing line while the child was writing is not a tool result
@@ -141,7 +163,9 @@ async function main() {
   const checks = {
     tool_defined: cells[0]?.isError === false && cells[0].text.includes("defined") ? "PASS" : "FAIL",
     child_ran: cells[1]?.isError === false && cells[1].text.includes("CHILD-DONE") ? "PASS" : "FAIL",
-    child_got_sum: childResults.some((result) => !result.isError && kernelToolValue(result.text) === 3) ? "PASS" : "FAIL",
+    child_got_sum: childResults.some((result) => !result.isError && kernelToolValue(result.text) === 3)
+      ? "PASS"
+      : "FAIL",
     parent_kernel_served: cells[2]?.isError === false && /\(1,\s*2\)/.test(cells[2].text) ? "PASS" : "FAIL",
     no_leaked_processes: leaked === 0 ? "PASS" : "FAIL",
   }

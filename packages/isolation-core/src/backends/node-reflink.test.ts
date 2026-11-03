@@ -7,9 +7,15 @@ import { promisify } from "node:util"
 import { fixture } from "../test-fixture"
 
 test("Node-hosted caller without bun:ffi reaches the cp reflink tier", async () => {
-  const f = await fixture(), module = join(f.root, "reflink.mjs"), merged = join(f.root, "merged")
+  const f = await fixture(),
+    module = join(f.root, "reflink.mjs"),
+    merged = join(f.root, "merged")
   await writeFile(join(f.repoRoot, "content"), "source")
-  const built = await Bun.build({ entrypoints: [join(import.meta.dir, "reflink.ts")], target: "node", external: ["bun:ffi"] })
+  const built = await Bun.build({
+    entrypoints: [join(import.meta.dir, "reflink.ts")],
+    target: "node",
+    external: ["bun:ffi"],
+  })
   expect(built.success).toBe(true)
   await writeFile(module, await built.outputs[0]!.text())
   const script = `

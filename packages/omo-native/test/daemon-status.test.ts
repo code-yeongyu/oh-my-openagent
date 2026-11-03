@@ -84,7 +84,13 @@ describe("omo daemon multi-endpoint status", () => {
     const stdout = capture()
 
     const exitCode = runDaemonCommand(["status"], {
-      engine, pluginRoot, agentDir, env: {}, stdout, stderr: capture(), platform: "darwin",
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout,
+      stderr: capture(),
+      platform: "darwin",
     })
 
     expect(exitCode).toBe(0)
@@ -97,7 +103,9 @@ describe("omo daemon multi-endpoint status", () => {
     expect(stdout.text()).toContain("gen 1 (draining) pid 20 · engine old · 1 session(s) · rss 12 MB (host 8 MB)")
     expect(stdout.text()).toContain("gen 2 (current) pid 21 · engine new · 2 session(s) · rss 30 MB (host 22 MB)")
     expect(stdout.text()).toContain("not running (retained state kept; run omo daemon gc)")
-    expect(stdout.text()).toContain("hosts: 4 live (1 shards, 1 threads) · 5 session(s) · rss 100 MB (host 70 MB) · crashes 2")
+    expect(stdout.text()).toContain(
+      "hosts: 4 live (1 shards, 1 threads) · 5 session(s) · rss 100 MB (host 70 MB) · crashes 2",
+    )
   })
 
   test("#given engine rows with memory fields #when json status runs #then fields remain unchanged and owners are joined", () => {
@@ -106,7 +114,13 @@ describe("omo daemon multi-endpoint status", () => {
     const stdout = capture()
 
     runDaemonCommand(["status", "--json"], {
-      engine, pluginRoot, agentDir, env: {}, stdout, stderr: capture(), platform: "darwin",
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout,
+      stderr: capture(),
+      platform: "darwin",
     })
 
     const payload = JSON.parse(stdout.text())
@@ -136,9 +150,9 @@ describe("omo daemon multi-endpoint status", () => {
 
   test("#given a pre-all engine #when doctor runs #then it preserves the single-daemon row and reports degradation", () => {
     const status = { pid: 42, instanceId: "legacy", engineVersion: "old", sessions: { total: 3 }, zombies: 0 }
-    const engine = scriptedEngine((args) => args.includes("--all")
-      ? { exitCode: 2, stderr: "usage" }
-      : { exitCode: 0, stdout: JSON.stringify(status) })
+    const engine = scriptedEngine((args) =>
+      args.includes("--all") ? { exitCode: 2, stderr: "usage" } : { exitCode: 0, stdout: JSON.stringify(status) },
+    )
 
     const lines = daemonReportLines({ engine, pluginRoot: "/p", agentDir: "/a", env: {}, platform: "darwin" })
 
@@ -152,7 +166,13 @@ describe("omo daemon multi-endpoint status", () => {
     const stdout = capture()
 
     const exitCode = runDaemonCommand(["status"], {
-      engine, pluginRoot, agentDir, env: {}, stdout, stderr: capture(), platform: "darwin",
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout,
+      stderr: capture(),
+      platform: "darwin",
     })
 
     expect(exitCode).toBe(3)

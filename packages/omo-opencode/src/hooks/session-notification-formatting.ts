@@ -21,5 +21,7 @@ $SerializedXml.LoadXml($RawXml.OuterXml)
 $Toast = [Windows.UI.Notifications.ToastNotification]::new($SerializedXml)
 $Notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('OpenCode')
 $Notifier.Show($Toast)
-`.trim().replace(/\n/g, "; ")
+`
+    .trim()
+    .replace(/\n/g, "; ")
 }

@@ -113,7 +113,10 @@ export async function runCheckThenTeardown(
     if (checkFailure) {
       // bun test prints only an AggregateError's own message, so both inner messages go into it.
       const errors = [checkFailure.error, teardownError]
-      throw new AggregateError(errors, `The shard check and the temp-root teardown both failed (#9766):\n${errors.map(describeError).join("\n")}`)
+      throw new AggregateError(
+        errors,
+        `The shard check and the temp-root teardown both failed (#9766):\n${errors.map(describeError).join("\n")}`,
+      )
     }
     throw teardownError
   }
@@ -126,10 +129,15 @@ function describeError(error: unknown): string {
 
 /** The part of the engine's host API the teardown uses; tests pass their own. */
 export interface TaskHostEngine {
-  listHostEndpoints(agentDir: string): Promise<readonly { readonly socket: string | null; readonly endpoint_kind: string }[]>
-  stopHost(options: { readonly socket: string; readonly agentDir: string; readonly force: boolean; readonly timeoutMs: number }): Promise<
-    { readonly action: string; readonly pid?: number; readonly reason?: string }
-  >
+  listHostEndpoints(
+    agentDir: string,
+  ): Promise<readonly { readonly socket: string | null; readonly endpoint_kind: string }[]>
+  stopHost(options: {
+    readonly socket: string
+    readonly agentDir: string
+    readonly force: boolean
+    readonly timeoutMs: number
+  }): Promise<{ readonly action: string; readonly pid?: number; readonly reason?: string }>
 }
 
 /** What a connect to a host's socket says: someone accepts, nothing can be there, or no answer either way. */
@@ -175,7 +183,9 @@ export async function stopRunTaskHosts(
     throw new Error(`The engine needed to stop this run's task hosts did not load (#11630): ${describeError(error)}`)
   })
   if (engine === undefined) {
-    throw new Error(`The engine needed to stop this run's task hosts did not load within ${engineWaitMs}ms (#11630); hosts registered in ${agentDir} were not stopped`)
+    throw new Error(
+      `The engine needed to stop this run's task hosts did not load within ${engineWaitMs}ms (#11630); hosts registered in ${agentDir} were not stopped`,
+    )
   }
   const deadline = Date.now() + deadlineMs
   const unsettled = new Map<string, string>()
@@ -185,11 +195,15 @@ export async function stopRunTaskHosts(
       .filter((endpoint) => endpoint.endpoint_kind === "rpc_host")
       .flatMap((endpoint) => (endpoint.socket === null ? [] : [endpoint.socket]))
     for (const socket of sockets) unsettled.set(socket, "still stopping")
-    await Promise.all(sockets.map(async (socket) => {
-      const leftover = await stopOne(engine, probe, agentDir, socket, deadline, (state) => unsettled.set(socket, state))
-      unsettled.delete(socket)
-      if (leftover !== undefined) leftovers.push(leftover)
-    }))
+    await Promise.all(
+      sockets.map(async (socket) => {
+        const leftover = await stopOne(engine, probe, agentDir, socket, deadline, (state) =>
+          unsettled.set(socket, state),
+        )
+        unsettled.delete(socket)
+        if (leftover !== undefined) leftovers.push(leftover)
+      }),
+    )
   }
   const finished = await within(
     stopAll().then(
@@ -206,8 +220,8 @@ export async function stopRunTaskHosts(
   }
   if (leftovers.length === 0) return
   throw new Error(
-    `Task hosts this run started were still running ${deadlineMs}ms into the end-of-run teardown (#11630):\n`
-      + leftovers.map((leftover) => `  ${leftover}`).join("\n"),
+    `Task hosts this run started were still running ${deadlineMs}ms into the end-of-run teardown (#11630):\n` +
+      leftovers.map((leftover) => `  ${leftover}`).join("\n"),
   )
 }
 

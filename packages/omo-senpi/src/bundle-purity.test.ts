@@ -54,19 +54,27 @@ describe("omo-senpi bundle purity", () => {
     expect(existsSync(path)).toBe(true)
     const imports = collectStaticImportSpecifiers(readFileSync(path, "utf8"))
     expect(imports.length).toBeGreaterThan(0)
-    expect(imports.filter(specifier => !specifier.startsWith("node:"))).toEqual([])
+    expect(imports.filter((specifier) => !specifier.startsWith("node:"))).toEqual([])
     const root = await mkdtemp(join(tmpdir(), "sdk-inputs-"))
     try {
       const built = await buildExtension({ outputPath: join(root, "omo.js") })
       const { toolkitSdkInputs } = built
       expect(toolkitSdkInputs.length).toBeGreaterThan(0)
-      expect(toolkitSdkInputs.filter(input => input.replaceAll("\\\\", "/").includes("node_modules/"))).toEqual([])
+      expect(toolkitSdkInputs.filter((input) => input.replaceAll("\\\\", "/").includes("node_modules/"))).toEqual([])
       // The sidecar gets the PostHog class from the main bundle; its gzip/Sentry top-level code must not come along.
       const { telemetryRecoveryInputs } = built
       expect(telemetryRecoveryInputs.length).toBeGreaterThan(0)
-      expect(telemetryRecoveryInputs.filter(input => /posthog-node|telemetry-core\/src\/(index|posthog-client)\.ts$/.test(input.replaceAll("\\", "/")))).toEqual([])
-      expect(collectStaticImportSpecifiers(readFileSync(join(root, "omo-telemetry-recovery.js"), "utf8"))).not.toContain("node:zlib")
-    } finally { await rm(root, { recursive: true, force: true }) }
+      expect(
+        telemetryRecoveryInputs.filter((input) =>
+          /posthog-node|telemetry-core\/src\/(index|posthog-client)\.ts$/.test(input.replaceAll("\\", "/")),
+        ),
+      ).toEqual([])
+      expect(
+        collectStaticImportSpecifiers(readFileSync(join(root, "omo-telemetry-recovery.js"), "utf8")),
+      ).not.toContain("node:zlib")
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
   }, 120_000)
 
   it("#given the senpi loader aliases #when tested #then the shared build constant pins all 19 peers", () => {
@@ -75,7 +83,25 @@ describe("omo-senpi bundle purity", () => {
 
   it("#given built extension artifacts #when static imports are inspected #then only senpi peers and node builtins remain external", () => {
     const allowed = new Set<string>(SENPI_LOADER_ALIASES)
-    for (const path of [builtExtensionPath, builtTaskExtensionPath, builtComputerUseExtensionPath, builtMemoryDoctorExtensionPath, builtMemoryMemfsExtensionPath, builtMemoryPalaceExtensionPath, builtMemoryCommandsExtensionPath, builtDeviceAccountExtensionPath, builtSessionHistoryExtensionPath, builtRecallStoreExtensionPath, builtTelemetryPosthogExtensionPath, builtTelemetryOtlpExtensionPath, builtThreadClientExtensionPath, builtTelemetryRecoveryExtensionPath, builtFeedbackExtensionPath, builtDesktopToolkitExtensionPath, builtClaimReceiptExtensionPath]) {
+    for (const path of [
+      builtExtensionPath,
+      builtTaskExtensionPath,
+      builtComputerUseExtensionPath,
+      builtMemoryDoctorExtensionPath,
+      builtMemoryMemfsExtensionPath,
+      builtMemoryPalaceExtensionPath,
+      builtMemoryCommandsExtensionPath,
+      builtDeviceAccountExtensionPath,
+      builtSessionHistoryExtensionPath,
+      builtRecallStoreExtensionPath,
+      builtTelemetryPosthogExtensionPath,
+      builtTelemetryOtlpExtensionPath,
+      builtThreadClientExtensionPath,
+      builtTelemetryRecoveryExtensionPath,
+      builtFeedbackExtensionPath,
+      builtDesktopToolkitExtensionPath,
+      builtClaimReceiptExtensionPath,
+    ]) {
       expect(existsSync(path), `missing built extension at ${path}`).toBe(true)
       const imports = collectStaticImportSpecifiers(readFileSync(path, "utf8"))
       const forbidden = imports.filter((specifier) => !specifier.startsWith("node:") && !allowed.has(specifier))

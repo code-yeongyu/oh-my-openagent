@@ -17,8 +17,11 @@ export async function moveParkedEntries(
   records: readonly FactsFailureRecord[],
   restore = false,
 ): Promise<number> {
-  const suffixes = new Set(records.filter((record) => record.state === "parked")
-    .map((record) => queueEntrySuffix(record.conversationId, record.end_message_id)))
+  const suffixes = new Set(
+    records
+      .filter((record) => record.state === "parked")
+      .map((record) => queueEntrySuffix(record.conversationId, record.end_message_id)),
+  )
   if (suffixes.size === 0) return 0
   const wasMigrated = !restore && migrated.delete(layout.queueDir)
   const source = restore ? layout.parkedDir : layout.queueDir

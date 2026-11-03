@@ -1,18 +1,18 @@
-import { describe, expect, it } from "bun:test";
-import { handleGitBashMcpRequest } from "./mcp";
-import type { RunGitBashCommand } from "./runner";
+import { describe, expect, it } from "bun:test"
+import { handleGitBashMcpRequest } from "./mcp"
+import type { RunGitBashCommand } from "./runner"
 
 describe("git_bash MCP timeout resolution", () => {
   it("#given inherited default timeout and workdir #when run omits timeout #then runner receives the inherited timeout", async () => {
     // given
-    const captured: { bashPath?: string; command?: string; cwd?: string; timeoutMs?: number } = {};
+    const captured: { bashPath?: string; command?: string; cwd?: string; timeoutMs?: number } = {}
     const runGitBash: RunGitBashCommand = async (input) => {
-      captured.bashPath = input.bashPath;
-      captured.command = input.command;
-      captured.cwd = input.cwd;
-      captured.timeoutMs = input.timeoutMs;
-      return { exitCode: 0, stdout: "ok\n", stderr: "", timedOut: false };
-    };
+      captured.bashPath = input.bashPath
+      captured.command = input.command
+      captured.cwd = input.cwd
+      captured.timeoutMs = input.timeoutMs
+      return { exitCode: 0, stdout: "ok\n", stderr: "", timedOut: false }
+    }
 
     // when
     const response = await handleGitBashMcpRequest(
@@ -30,21 +30,21 @@ describe("git_bash MCP timeout resolution", () => {
         runGitBash,
         defaultTimeoutMs: 45_000,
       },
-    );
+    )
 
     // then
-    expect(isErrorFromResponse(response)).toBe(false);
+    expect(isErrorFromResponse(response)).toBe(false)
     expect(captured).toEqual({
       bashPath: "C:\\Program Files\\Git\\bin\\bash.exe",
       command: "printf ok",
       cwd: "C:\\repo",
       timeoutMs: 45_000,
-    });
-  });
+    })
+  })
 
   it("#given per-call timeout #when inherited timeout exists #then per-call timeout wins", async () => {
     // given
-    let timeoutMs = 0;
+    let timeoutMs = 0
 
     // when
     const response = await handleGitBashMcpRequest(
@@ -60,21 +60,21 @@ describe("git_bash MCP timeout resolution", () => {
         exists: (path) => path === "C:\\Program Files\\Git\\bin\\bash.exe",
         where: () => [],
         runGitBash: async (input) => {
-          timeoutMs = input.timeoutMs;
-          return { exitCode: 0, stdout: "ok\n", stderr: "", timedOut: false };
+          timeoutMs = input.timeoutMs
+          return { exitCode: 0, stdout: "ok\n", stderr: "", timedOut: false }
         },
         defaultTimeoutMs: 45_000,
       },
-    );
+    )
 
     // then
-    expect(isErrorFromResponse(response)).toBe(false);
-    expect(timeoutMs).toBe(7000);
-  });
+    expect(isErrorFromResponse(response)).toBe(false)
+    expect(timeoutMs).toBe(7000)
+  })
 
   it("#given exec command timeout env default #when run omits timeout #then env default is used", async () => {
     // given
-    let timeoutMs = 0;
+    let timeoutMs = 0
 
     // when
     const response = await handleGitBashMcpRequest(
@@ -93,25 +93,27 @@ describe("git_bash MCP timeout resolution", () => {
         exists: (path) => path === "C:\\Program Files\\Git\\bin\\bash.exe",
         where: () => [],
         runGitBash: async (input) => {
-          timeoutMs = input.timeoutMs;
-          return { exitCode: 0, stdout: "ok\n", stderr: "", timedOut: false };
+          timeoutMs = input.timeoutMs
+          return { exitCode: 0, stdout: "ok\n", stderr: "", timedOut: false }
         },
       },
-    );
+    )
 
     // then
-    expect(isErrorFromResponse(response)).toBe(false);
-    expect(timeoutMs).toBe(65_000);
-  });
-});
+    expect(isErrorFromResponse(response)).toBe(false)
+    expect(timeoutMs).toBe(65_000)
+  })
+})
 
 function isErrorFromResponse(response: Awaited<ReturnType<typeof handleGitBashMcpRequest>>): boolean | undefined {
-  const result = resultFromResponse(response);
-  const value = result?.isError;
-  return typeof value === "boolean" ? value : undefined;
+  const result = resultFromResponse(response)
+  const value = result?.isError
+  return typeof value === "boolean" ? value : undefined
 }
 
-function resultFromResponse(response: Awaited<ReturnType<typeof handleGitBashMcpRequest>>): Record<string, unknown> | undefined {
-  if (response === undefined || "error" in response) return undefined;
-  return response.result;
+function resultFromResponse(
+  response: Awaited<ReturnType<typeof handleGitBashMcpRequest>>,
+): Record<string, unknown> | undefined {
+  if (response === undefined || "error" in response) return undefined
+  return response.result
 }

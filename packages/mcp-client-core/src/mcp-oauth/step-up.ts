@@ -22,9 +22,7 @@ export function parseWwwAuthenticate(header: string): StepUpInfo | null {
     return null
   }
 
-  const requiredScopes = scope
-    .split(/\s+/)
-    .filter((s) => s.length > 0)
+  const requiredScopes = scope.split(/\s+/).filter((s) => s.length > 0)
 
   if (requiredScopes.length === 0) {
     return null

@@ -120,7 +120,10 @@ describe("win32 process creation time", () => {
     async () => {
       // #given
       const before = Date.now() - 1_000
-      const child = Bun.spawn([process.execPath, "-e", "setTimeout(() => {}, 30000)"], { stdout: "ignore", stderr: "ignore" })
+      const child = Bun.spawn([process.execPath, "-e", "setTimeout(() => {}, 30000)"], {
+        stdout: "ignore",
+        stderr: "ignore",
+      })
 
       try {
         // #when
@@ -187,7 +190,9 @@ describe("start identity comparison", () => {
   test("#given two identities in one scheme #when they disagree #then the conflict is reported so pid reuse is caught", () => {
     // #when + #then
     expect(startIdentitiesConflict("proc-start-epoch:1789041850", "proc-start-epoch:1789041999")).toBe(true)
-    expect(startIdentitiesConflict("ps-lstart:Thu Sep 10 21:04:10 2026", "ps-lstart:Thu Sep 10 22:04:10 2026")).toBe(true)
+    expect(startIdentitiesConflict("ps-lstart:Thu Sep 10 21:04:10 2026", "ps-lstart:Thu Sep 10 22:04:10 2026")).toBe(
+      true,
+    )
   })
 
   test("#given identities in different schemes #when they are compared #then no conflict is reported so a live owner keeps its lock", () => {

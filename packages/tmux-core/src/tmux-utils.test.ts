@@ -1,16 +1,11 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test"
-import {
-  isServerRunning,
-  resetServerCheck,
-  markServerRunningInProcess,
-} from "./tmux-utils"
-import {
-  isInsideTmuxEnvironment,
-  isTmuxPaneCompatibleEnvironment,
-} from "./tmux-utils/environment"
+import { isServerRunning, resetServerCheck, markServerRunningInProcess } from "./tmux-utils"
+import { isInsideTmuxEnvironment, isTmuxPaneCompatibleEnvironment } from "./tmux-utils/environment"
 import { createServerHealthStateForTesting } from "./tmux-utils/server-health"
 
-function createFetchRecorder(responseFactory: () => Promise<Response>): typeof fetch & { calls: Array<[RequestInfo | URL, RequestInit | undefined]> } {
+function createFetchRecorder(
+  responseFactory: () => Promise<Response>,
+): typeof fetch & { calls: Array<[RequestInfo | URL, RequestInit | undefined]> } {
   const calls: Array<[RequestInfo | URL, RequestInit | undefined]> = []
   const fetchRecorder = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     calls.push([input, init])
@@ -22,7 +17,6 @@ function createFetchRecorder(responseFactory: () => Promise<Response>): typeof f
     preconnect,
   }) as typeof fetch & { calls: Array<[RequestInfo | URL, RequestInit | undefined]> }
 }
-
 
 describe("isInsideTmux", () => {
   test("returns true when TMUX env is set", () => {
@@ -202,7 +196,6 @@ describe("resetServerCheck", () => {
 
     // then - should call fetch twice after reset
     expect(fetchMock.calls.length).toBe(2)
-
   })
 })
 

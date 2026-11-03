@@ -13,12 +13,13 @@ const roots: string[] = []
 setDefaultTimeout(60_000)
 
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  for (const root of roots.splice(0))
+    rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
-const LUNA = { input: 0.25, cacheRead: 0.025, output: 2.00 }
-const KIMI = { input: 0.60, cacheRead: 0.15, output: 2.50 }
-const OPUS = { input: 5.00, cacheRead: 0.50, output: 25.0 }
+const LUNA = { input: 0.25, cacheRead: 0.025, output: 2.0 }
+const KIMI = { input: 0.6, cacheRead: 0.15, output: 2.5 }
+const OPUS = { input: 5.0, cacheRead: 0.5, output: 25.0 }
 
 const PREFIX_BREAKING_FLAGS = [
   "--system-prompt",
@@ -33,7 +34,11 @@ function parentSessionFile(): string {
   const dir = mkdtempSync(join(tmpdir(), "parent-session-"))
   roots.push(dir)
   const file = join(dir, "parent.jsonl")
-  writeFileSync(file, `${JSON.stringify({ type: "session", id: "parent-1", timestamp: new Date().toISOString(), cwd: "/parent/project" })}\n`, "utf8")
+  writeFileSync(
+    file,
+    `${JSON.stringify({ type: "session", id: "parent-1", timestamp: new Date().toISOString(), cwd: "/parent/project" })}\n`,
+    "utf8",
+  )
   return file
 }
 

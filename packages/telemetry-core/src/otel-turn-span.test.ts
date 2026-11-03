@@ -33,7 +33,9 @@ function setup(consent: () => boolean = () => true) {
 
 async function sent(transport: OtlpTelemetryTransport, recorder: ReturnType<typeof recordingFetch>) {
   await transport.flush()
-  const logs = recorder.calls.filter(({ url }) => url.endsWith("/v1/logs")).flatMap(({ body }) => logRecordsOf(decodeLogs(body)))
+  const logs = recorder.calls
+    .filter(({ url }) => url.endsWith("/v1/logs"))
+    .flatMap(({ body }) => logRecordsOf(decodeLogs(body)))
   const spans = recorder.calls
     .filter(({ url }) => url.endsWith("/v1/traces"))
     .flatMap(({ body }) => decodeTraces(body).resourceSpans.flatMap((rs) => rs.scopeSpans.flatMap((ss) => ss.spans)))
@@ -120,10 +122,16 @@ describe("turn tracing on the OTLP transport", () => {
   test("#given a LOCAL parent whose sampled flag is clear #when a turn starts under it #then the span is still exported with that parent and the event keeps the exact pair", async () => {
     // given
     const { transport, recorder } = setup()
-    const parent = { traceId: "4bf92f3577b34da6a3ce929d0e0e4736", spanId: "00f067aa0ba902b7", traceFlags: TraceFlags.NONE }
+    const parent = {
+      traceId: "4bf92f3577b34da6a3ce929d0e0e4736",
+      spanId: "00f067aa0ba902b7",
+      traceFlags: TraceFlags.NONE,
+    }
 
     // when
-    const turn = context.with(trace.setSpanContext(ROOT_CONTEXT, parent), () => transport.traces.startTurn({ attributes: TURN_ATTRIBUTES }))
+    const turn = context.with(trace.setSpanContext(ROOT_CONTEXT, parent), () =>
+      transport.traces.startTurn({ attributes: TURN_ATTRIBUTES }),
+    )
     if (turn === undefined) throw new Error("turn span not started")
     turn.run(() => capture(transport, "turn_completed", { turn_index: 0 }))
     turn.end("ok")
@@ -131,7 +139,12 @@ describe("turn tracing on the OTLP transport", () => {
     // then
     const { logs, spans } = await sent(transport, recorder)
     expect(spans).toHaveLength(1)
-    expect(spans[0]).toMatchObject({ traceId: parent.traceId, parentSpanId: parent.spanId, flags: 1, spanId: turn.spanId })
+    expect(spans[0]).toMatchObject({
+      traceId: parent.traceId,
+      parentSpanId: parent.spanId,
+      flags: 1,
+      spanId: turn.spanId,
+    })
     expect(turn.spanId).not.toBe(parent.spanId)
     expect(logs[0]).toMatchObject({ traceId: parent.traceId, spanId: turn.spanId })
   })

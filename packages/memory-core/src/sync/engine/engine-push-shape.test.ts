@@ -24,17 +24,25 @@ test("one item alone over the bound is refused, never sent oversized", () => {
   expect(() => splitBatches([item("huge", 2_000)], 1_000)).toThrow(/exceeds/)
 })
 
-test("a backlog larger than one batch is pushed as consecutive batches the other device applies in order", async () => {
-  const server = new FakeSyncServer()
-  const a = await makeDevice(server, "a", undefined, { batchBytes: 64 })
-  const b = await makeDevice(server, "b")
-  devices.push(a, b)
-  for (const n of [1, 2, 3]) await a.write(`n${n}.md`, `line ${n}\n`)
-  await a.engine.runCycle()
-  expect(server.entries.length).toBeGreaterThan(1)
-  await b.engine.runCycle()
-  expect([await b.read("n1.md"), await b.read("n2.md"), await b.read("n3.md")]).toEqual(["line 1\n", "line 2\n", "line 3\n"])
-}, GIT_TEST_TIMEOUT)
+test(
+  "a backlog larger than one batch is pushed as consecutive batches the other device applies in order",
+  async () => {
+    const server = new FakeSyncServer()
+    const a = await makeDevice(server, "a", undefined, { batchBytes: 64 })
+    const b = await makeDevice(server, "b")
+    devices.push(a, b)
+    for (const n of [1, 2, 3]) await a.write(`n${n}.md`, `line ${n}\n`)
+    await a.engine.runCycle()
+    expect(server.entries.length).toBeGreaterThan(1)
+    await b.engine.runCycle()
+    expect([await b.read("n1.md"), await b.read("n2.md"), await b.read("n3.md")]).toEqual([
+      "line 1\n",
+      "line 2\n",
+      "line 3\n",
+    ])
+  },
+  GIT_TEST_TIMEOUT,
+)
 
 test("stale-base retries back off with jitter inside a doubling window", () => {
   const draws = [0, 0.5, 0.999]
@@ -49,25 +57,29 @@ test("stale-base retries back off with jitter inside a doubling window", () => {
   expect(staleBackoffMs(20, () => 0.999)).toBeLessThan(8_000)
 })
 
-test("a stale base receives the racing batch first, then retries after a jittered wait on the engine clock", async () => {
-  const server = new FakeSyncServer()
-  const a = await makeDevice(server, "a")
-  const b = await makeDevice(server, "b")
-  devices.push(a, b)
-  await b.write("b.md", "b\n")
-  server.beforeNextAppend = async () => {
-    await a.write("a.md", "a\n")
+test(
+  "a stale base receives the racing batch first, then retries after a jittered wait on the engine clock",
+  async () => {
+    const server = new FakeSyncServer()
+    const a = await makeDevice(server, "a")
+    const b = await makeDevice(server, "b")
+    devices.push(a, b)
+    await b.write("b.md", "b\n")
+    server.beforeNextAppend = async () => {
+      await a.write("a.md", "a\n")
+      await a.engine.runCycle()
+    }
+    const before = b.clock.now()
+    const cycle = b.engine.runCycle()
+    await b.clock.untilPending()
+    b.clock.advance(8_000)
+    expect(await cycle).toMatchObject({ pushed: true, applied: 1 })
+    expect(b.clock.now() - before).toBeGreaterThanOrEqual(125)
+    expect(server.appends.map((x) => x.ok)).toEqual([true, false, true])
+    expect(server.entries.map((e) => e.seq)).toEqual([1, 2])
+    expect(await b.read("a.md")).toBe("a\n")
     await a.engine.runCycle()
-  }
-  const before = b.clock.now()
-  const cycle = b.engine.runCycle()
-  await b.clock.untilPending()
-  b.clock.advance(8_000)
-  expect(await cycle).toMatchObject({ pushed: true, applied: 1 })
-  expect(b.clock.now() - before).toBeGreaterThanOrEqual(125)
-  expect(server.appends.map((x) => x.ok)).toEqual([true, false, true])
-  expect(server.entries.map((e) => e.seq)).toEqual([1, 2])
-  expect(await b.read("a.md")).toBe("a\n")
-  await a.engine.runCycle()
-  expect(await a.read("b.md")).toBe("b\n")
-}, GIT_TEST_TIMEOUT)
+    expect(await a.read("b.md")).toBe("b\n")
+  },
+  GIT_TEST_TIMEOUT,
+)

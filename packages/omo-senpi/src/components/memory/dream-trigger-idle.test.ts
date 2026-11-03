@@ -2,7 +2,17 @@ import { describe, expect, test } from "bun:test"
 import { createShutdownDrain } from "./shutdown-drain"
 import { DREAM_VOLUME_GATE_BYTES, evaluateDreamGates, resolveDreamTriggerSettings } from "./dream-trigger"
 import { memorySettings } from "./memory.test-support"
-import { CONVERSATION, IDLE_MS, NOW_MS, fireTimer, fixture, gateProbe, noopSteps, settle, triggerSettings } from "./dream-trigger.test-support"
+import {
+  CONVERSATION,
+  IDLE_MS,
+  NOW_MS,
+  fireTimer,
+  fixture,
+  gateProbe,
+  noopSteps,
+  settle,
+  triggerSettings,
+} from "./dream-trigger.test-support"
 
 describe("dream idle timer matrix", () => {
   test("#given a settled agent #when the settle event arrives #then an idle timer is armed for idle_minutes", async () => {
@@ -180,10 +190,12 @@ describe("dream idle timer matrix", () => {
 /** Live while the timer is armed; after retire() every probe throws the runner's stale message, as the host's retired ctx does. */
 function retirableContext(message: string): { readonly ctx: unknown; readonly retire: () => void } {
   let retired = false
-  const probe = <T>(read: () => T) => (): T => {
-    if (retired) throw new Error(message)
-    return read()
-  }
+  const probe =
+    <T>(read: () => T) =>
+    (): T => {
+      if (retired) throw new Error(message)
+      return read()
+    }
   return {
     ctx: {
       sessionManager: { getSessionId: probe(() => CONVERSATION) },

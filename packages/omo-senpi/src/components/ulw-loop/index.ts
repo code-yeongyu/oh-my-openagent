@@ -84,7 +84,10 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
         pendingRun: undefined as { payload: unknown; status: ActiveStatus } | undefined,
       }
 
-      pi.registerRemovedToolHint?.("omo_agent_toolkit", 'omo_agent_toolkit was removed. Inside an eval js cell: const { agentToolkit } = await import(`${env("OMO_AGENT_TOOLKIT_SDK_ROOT")}/sdk.js`); print(await agentToolkit.status()). Never spawn the toolkit CLI.')
+      pi.registerRemovedToolHint?.(
+        "omo_agent_toolkit",
+        'omo_agent_toolkit was removed. Inside an eval js cell: const { agentToolkit } = await import(`${env("OMO_AGENT_TOOLKIT_SDK_ROOT")}/sdk.js`); print(await agentToolkit.status()). Never spawn the toolkit CLI.',
+      )
 
       pi.on("session_start", async (_payload, eventCtx) => {
         const status = await readSessionStatus(eventCtx)
@@ -282,7 +285,8 @@ function planSnapshot(value: unknown): PlanSnapshot | undefined {
   if (!isRecord(value) || value["ok"] !== true || !isRecord(value["plan"])) return undefined
   const plan = value["plan"]
   const createdAt = typeof plan["createdAt"] === "string" ? plan["createdAt"] : undefined
-  const aggregateComplete = isRecord(plan["aggregateCompletion"]) && plan["aggregateCompletion"]["status"] === "complete"
+  const aggregateComplete =
+    isRecord(plan["aggregateCompletion"]) && plan["aggregateCompletion"]["status"] === "complete"
   return { createdAt, aggregateComplete }
 }
 
@@ -296,7 +300,6 @@ function toolkitErrorCode(stdout: string): string | undefined {
     return undefined
   }
 }
-
 
 function statusHasActiveIncompleteRun(value: unknown): boolean {
   if (!isRecord(value) || value["ok"] !== true || !isRecord(value["plan"])) return false
@@ -327,11 +330,13 @@ function isUserSourcedInput(value: InputEventLike): boolean {
 function shouldRefreshFooterAfterToolResult(value: unknown): boolean {
   if (!isRecord(value)) return false
   const toolName = value["toolName"]
-  return toolName === "create_goal"
-    || toolName === "update_goal"
-    || toolName === "bash"
-    || toolName === "interactive_bash"
-    || toolName === "eval"
+  return (
+    toolName === "create_goal" ||
+    toolName === "update_goal" ||
+    toolName === "bash" ||
+    toolName === "interactive_bash" ||
+    toolName === "eval"
+  )
 }
 
 function cwdFromContext(value: unknown): string {

@@ -65,8 +65,14 @@ export function inspectPrivateFdTable(table, platform = process.platform) {
   for (const [name, fd] of Object.entries(value)) {
     forwarded[name] = null
     if (platform === "win32") {
-      const usable = Array.isArray(fd) && fd.length === 2 && fd.every(inRange) && fd[0] !== fd[1] &&
-        ipc !== undefined && !fd.some(descriptor => descriptor === ipc || counts.get(descriptor) > 1) && fd.every(isPipe)
+      const usable =
+        Array.isArray(fd) &&
+        fd.length === 2 &&
+        fd.every(inRange) &&
+        fd[0] !== fd[1] &&
+        ipc !== undefined &&
+        !fd.some((descriptor) => descriptor === ipc || counts.get(descriptor) > 1) &&
+        fd.every(isPipe)
       if (usable) {
         forwarded[name] = fd
         fds.push(...fd)
@@ -97,18 +103,21 @@ export function privateFdHandoffFor(env, table, platform = process.platform, { s
     while (stdio.length <= fd) stdio.push("ignore")
     stdio[fd] = fd
   }
-  const forwarded = shell && inspected.fds.length > 0
-    ? JSON.stringify(Object.fromEntries(Object.keys(JSON.parse(inspected.table)).map(name => [name, null])))
-    : inspected.table
+  const forwarded =
+    shell && inspected.fds.length > 0
+      ? JSON.stringify(Object.fromEntries(Object.keys(JSON.parse(inspected.table)).map((name) => [name, null])))
+      : inspected.table
   return {
     env: { ...env, [PRIVATE_FDS_ENV]: forwarded },
     stdio,
     // Unlike POSIX's protected sockets, Windows pipes must not remain in the waiting parent.
     // runChild invokes this immediately after spawn, including a synchronous spawn failure.
-    ...(platform === "win32" && inspected.fds.length > 0 ? {
-      onSpawn() {
-        for (const fd of inspected.fds) closeSync(fd)
-      },
-    } : {}),
+    ...(platform === "win32" && inspected.fds.length > 0
+      ? {
+          onSpawn() {
+            for (const fd of inspected.fds) closeSync(fd)
+          },
+        }
+      : {}),
   }
 }

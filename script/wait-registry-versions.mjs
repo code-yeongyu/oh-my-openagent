@@ -40,20 +40,35 @@ export async function pendingSpecs(specs, fetchImpl = fetch) {
   return pending
 }
 
-export async function waitForRegistryVersions({ specs, deadlineMs, delayMs, fetchImpl = fetch, now = Date.now, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), log = console.log }) {
+export async function waitForRegistryVersions({
+  specs,
+  deadlineMs,
+  delayMs,
+  fetchImpl = fetch,
+  now = Date.now,
+  sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
+  log = console.log,
+}) {
   // ONE deadline shared by every package, probe time included: the step can never outrun it by more
   // than one probe round, so a missing package fails with its name instead of a job timeout.
   const start = now()
   let pending = specs.map((spec) => ({ spec, reason: "not probed" }))
   for (let round = 1; ; round++) {
-    pending = await pendingSpecs(pending.map((p) => p.spec), fetchImpl)
+    pending = await pendingSpecs(
+      pending.map((p) => p.spec),
+      fetchImpl,
+    )
     const elapsed = now() - start
     if (pending.length === 0) {
-      log(`all ${specs.length} packages are served at their exact versions (round ${round}, ${Math.round(elapsed / 1000)} s)`)
+      log(
+        `all ${specs.length} packages are served at their exact versions (round ${round}, ${Math.round(elapsed / 1000)} s)`,
+      )
       return { ok: true, pending: [] }
     }
     const remaining = deadlineMs - elapsed
-    log(`waiting for ${pending.length} package(s) (round ${round}, ${Math.max(0, Math.round(remaining / 1000))} s left): ${pending.map((p) => `${p.spec} (${p.reason})`).join(", ")}`)
+    log(
+      `waiting for ${pending.length} package(s) (round ${round}, ${Math.max(0, Math.round(remaining / 1000))} s left): ${pending.map((p) => `${p.spec} (${p.reason})`).join(", ")}`,
+    )
     if (remaining <= 0) return { ok: false, pending }
     await sleep(Math.min(delayMs, remaining))
   }
@@ -67,7 +82,8 @@ export function platformPackageNames(rootManifest) {
   const platforms = Object.keys(rootManifest.optionalDependencies ?? {})
     .filter((name) => name.startsWith(prefix))
     .map((name) => name.slice(prefix.length))
-  if (platforms.length === 0) throw new Error("root package.json optionalDependencies lists no oh-my-opencode-<platform> package")
+  if (platforms.length === 0)
+    throw new Error("root package.json optionalDependencies lists no oh-my-opencode-<platform> package")
   return platforms.flatMap((platform) => [`oh-my-opencode-${platform}`, `oh-my-openagent-${platform}`])
 }
 
@@ -95,7 +111,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const delayMs = Number(process.env.REGISTRY_WAIT_DELAY_SECONDS ?? 15) * 1000
   const result = await waitForRegistryVersions({ specs, deadlineMs, delayMs })
   if (!result.ok) {
-    console.log(`::error::npm never served: ${result.pending.map((p) => `${p.spec} (${p.reason})`).join(", ")}. publish printed success for each, so npm accepted and then dropped or held them; check https://www.npmjs.com/package/<name> before re-running.`)
+    console.log(
+      `::error::npm never served: ${result.pending.map((p) => `${p.spec} (${p.reason})`).join(", ")}. publish printed success for each, so npm accepted and then dropped or held them; check https://www.npmjs.com/package/<name> before re-running.`,
+    )
     process.exit(1)
   }
 }

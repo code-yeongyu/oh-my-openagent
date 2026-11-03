@@ -4,7 +4,14 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { deviceServiceAssetName } from "../src/release/acquire.ts"
 import { installDeviceService, type RunCommand } from "../src/install.ts"
-import { buildRelease, ENGINE_VERSION, PIN_VERSION, RELEASE_ORIGIN, releaseKey, serveRelease } from "./release-fixture.ts"
+import {
+  buildRelease,
+  ENGINE_VERSION,
+  PIN_VERSION,
+  RELEASE_ORIGIN,
+  releaseKey,
+  serveRelease,
+} from "./release-fixture.ts"
 
 const dirs: string[] = []
 afterEach(() => {
@@ -19,7 +26,7 @@ const setup = (minEngine?: string, exitCode = 0) => {
   dirs.push(dir)
   const key = releaseKey()
   const runs: (readonly string[])[] = []
-  const run: RunCommand = async argv => {
+  const run: RunCommand = async (argv) => {
     runs.push(argv)
     return { exitCode, output: exitCode === 0 ? "" : "install_failed {registration}" }
   }

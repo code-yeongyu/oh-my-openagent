@@ -36,12 +36,19 @@ const mockShowUpdateAvailableToast = mock(
 const mockShowAutoUpdatedToast = mock(
   async (_ctx: PluginInput, _fromVersion: string, _toVersion: string): Promise<void> => {},
 )
-const mockSyncCachePackageJsonToIntent = mock((_pluginInfo: PluginEntryInfo): SyncResult => ({ synced: true, error: null }))
-const mockRunBunInstallWithDetails = mock(async (_opts?: { outputMode?: string; workspaceDir?: string }) => ({ success: true }))
+const mockSyncCachePackageJsonToIntent = mock((_pluginInfo: PluginEntryInfo): SyncResult => ({
+  synced: true,
+  error: null,
+}))
+const mockRunBunInstallWithDetails = mock(async (_opts?: { outputMode?: string; workspaceDir?: string }) => ({
+  success: true,
+}))
 const mockLog = mock(() => {})
 
 async function createRunner() {
-  const { createBackgroundUpdateCheckRunner } = await import(`../auto-update-checker/hook/background-update-check?test=${importCounter++}`)
+  const { createBackgroundUpdateCheckRunner } = await import(
+    `../auto-update-checker/hook/background-update-check?test=${importCounter++}`
+  )
 
   return createBackgroundUpdateCheckRunner({
     existsSync,
@@ -69,8 +76,7 @@ async function createRunner() {
 
 describe("workspace resolution", () => {
   const mockCtx = { directory: "/test" } as PluginInput
-  const getToastMessage: ToastMessageGetter = (isUpdate, version) =>
-    isUpdate ? `Update to ${version}` : "Up to date"
+  const getToastMessage: ToastMessageGetter = (isUpdate, version) => (isUpdate ? `Update to ${version}` : "Up to date")
 
   beforeEach(() => {
     importCounter += 1
@@ -108,7 +114,10 @@ describe("workspace resolution", () => {
     // #given
     const runBackgroundUpdateCheck = await createRunner()
     mkdirSync(join(TEST_CONFIG_DIR, "node_modules", PACKAGE_NAME), { recursive: true })
-    writeFileSync(join(TEST_CONFIG_DIR, "package.json"), JSON.stringify({ dependencies: { [PACKAGE_NAME]: "3.4.0" } }, null, 2))
+    writeFileSync(
+      join(TEST_CONFIG_DIR, "package.json"),
+      JSON.stringify({ dependencies: { [PACKAGE_NAME]: "3.4.0" } }, null, 2),
+    )
     writeFileSync(
       join(TEST_CONFIG_DIR, "node_modules", PACKAGE_NAME, "package.json"),
       JSON.stringify({ name: PACKAGE_NAME, version: "3.4.0" }, null, 2),
@@ -125,13 +134,19 @@ describe("workspace resolution", () => {
     // #given
     const runBackgroundUpdateCheck = await createRunner()
     mkdirSync(join(TEST_CONFIG_DIR, "node_modules", PACKAGE_NAME), { recursive: true })
-    writeFileSync(join(TEST_CONFIG_DIR, "package.json"), JSON.stringify({ dependencies: { [PACKAGE_NAME]: "3.4.0" } }, null, 2))
+    writeFileSync(
+      join(TEST_CONFIG_DIR, "package.json"),
+      JSON.stringify({ dependencies: { [PACKAGE_NAME]: "3.4.0" } }, null, 2),
+    )
     writeFileSync(
       join(TEST_CONFIG_DIR, "node_modules", PACKAGE_NAME, "package.json"),
       JSON.stringify({ name: PACKAGE_NAME, version: "3.4.0" }, null, 2),
     )
     mkdirSync(join(TEST_CACHE_DIR, "node_modules", PACKAGE_NAME), { recursive: true })
-    writeFileSync(join(TEST_CACHE_DIR, "package.json"), JSON.stringify({ dependencies: { [PACKAGE_NAME]: "3.4.0" } }, null, 2))
+    writeFileSync(
+      join(TEST_CACHE_DIR, "package.json"),
+      JSON.stringify({ dependencies: { [PACKAGE_NAME]: "3.4.0" } }, null, 2),
+    )
     writeFileSync(
       join(TEST_CACHE_DIR, "node_modules", PACKAGE_NAME, "package.json"),
       JSON.stringify({ name: PACKAGE_NAME, version: "3.4.0" }, null, 2),
@@ -148,7 +163,10 @@ describe("workspace resolution", () => {
     // #given
     const runBackgroundUpdateCheck = await createRunner()
     mkdirSync(join(TEST_CACHE_WORKSPACE_DIR, "node_modules", PACKAGE_NAME), { recursive: true })
-    writeFileSync(join(TEST_CACHE_WORKSPACE_DIR, "package.json"), JSON.stringify({ dependencies: { [PACKAGE_NAME]: "3.4.0" } }, null, 2))
+    writeFileSync(
+      join(TEST_CACHE_WORKSPACE_DIR, "package.json"),
+      JSON.stringify({ dependencies: { [PACKAGE_NAME]: "3.4.0" } }, null, 2),
+    )
     writeFileSync(
       join(TEST_CACHE_WORKSPACE_DIR, "node_modules", PACKAGE_NAME, "package.json"),
       JSON.stringify({ name: PACKAGE_NAME, version: "3.4.0" }, null, 2),
@@ -165,7 +183,10 @@ describe("workspace resolution", () => {
     // #given
     const runner = await createRunner()
     mkdirSync(TEST_CACHE_WORKSPACE_DIR, { recursive: true })
-    writeFileSync(join(TEST_CACHE_WORKSPACE_DIR, "package.json"), JSON.stringify({ dependencies: { [PACKAGE_NAME]: "3.4.0" } }, null, 2))
+    writeFileSync(
+      join(TEST_CACHE_WORKSPACE_DIR, "package.json"),
+      JSON.stringify({ dependencies: { [PACKAGE_NAME]: "3.4.0" } }, null, 2),
+    )
 
     // #when
     await runner(mockCtx, true, getToastMessage)
@@ -178,7 +199,10 @@ describe("workspace resolution", () => {
     // #given
     const runBackgroundUpdateCheck = await createRunner()
     mkdirSync(join(TEST_CONFIG_DIR, "node_modules", PACKAGE_NAME), { recursive: true })
-    writeFileSync(join(TEST_CONFIG_DIR, "package.json"), JSON.stringify({ dependencies: { [PACKAGE_NAME]: "3.4.0" } }, null, 2))
+    writeFileSync(
+      join(TEST_CONFIG_DIR, "package.json"),
+      JSON.stringify({ dependencies: { [PACKAGE_NAME]: "3.4.0" } }, null, 2),
+    )
     writeFileSync(
       join(TEST_CONFIG_DIR, "node_modules", PACKAGE_NAME, "package.json"),
       JSON.stringify({ name: PACKAGE_NAME, version: "3.4.0" }, null, 2),

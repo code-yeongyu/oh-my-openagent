@@ -88,10 +88,7 @@ function readPackageIdentity(manifestPath: string): PackageIdentity {
   return { name, version }
 }
 
-function resolveDependencyIdentity(
-  packageDir: string,
-  dependencyName: string,
-): PackageIdentity | undefined {
+function resolveDependencyIdentity(packageDir: string, dependencyName: string): PackageIdentity | undefined {
   try {
     return readPackageIdentity(dependencyManifestPath(packageDir, dependencyName))
   } catch (error) {
@@ -120,12 +117,14 @@ function packageDependencySources(
       const assetPath = relative(dependencyDir, from).split(sep).join("/")
       sources.push({ from, to: `${dependencyTarget}/${assetPath}`, required: true })
     }
-    sources.push(...packageDependencySources(
-      dependencyDir,
-      dependencyTarget,
-      readPackageDependencies(dependencyDir),
-      new Set([...ancestors, realDependencyDir]),
-    ))
+    sources.push(
+      ...packageDependencySources(
+        dependencyDir,
+        dependencyTarget,
+        readPackageDependencies(dependencyDir),
+        new Set([...ancestors, realDependencyDir]),
+      ),
+    )
   }
   return sources
 }
@@ -135,24 +134,18 @@ export function codemodeRuntimeDependencySources(
   hostPackageDir = senpiPackageDir,
 ): SidecarSource[] {
   const hostDependencies = new Set(readPackageDependencies(hostPackageDir))
-  const externalDependencies = readPackageDependencies(codemodeDir)
-    .filter((dependencyName) => {
-      if (!hostDependencies.has(dependencyName)) return true
-      const codemodeIdentity = resolveDependencyIdentity(codemodeDir, dependencyName)
-      if (codemodeIdentity === undefined) {
-        throw new Error(`codemode dependency is not installed: ${dependencyName}`)
-      }
-      const hostIdentity = resolveDependencyIdentity(hostPackageDir, dependencyName)
-      if (hostIdentity === undefined) return true
-      return codemodeIdentity.name !== hostIdentity.name || codemodeIdentity.version !== hostIdentity.version
-    })
+  const externalDependencies = readPackageDependencies(codemodeDir).filter((dependencyName) => {
+    if (!hostDependencies.has(dependencyName)) return true
+    const codemodeIdentity = resolveDependencyIdentity(codemodeDir, dependencyName)
+    if (codemodeIdentity === undefined) {
+      throw new Error(`codemode dependency is not installed: ${dependencyName}`)
+    }
+    const hostIdentity = resolveDependencyIdentity(hostPackageDir, dependencyName)
+    if (hostIdentity === undefined) return true
+    return codemodeIdentity.name !== hostIdentity.name || codemodeIdentity.version !== hostIdentity.version
+  })
   const targetRoot = "node_modules/@code-yeongyu/senpi-codemode"
-  return packageDependencySources(
-    codemodeDir,
-    targetRoot,
-    externalDependencies,
-    new Set([realpathSync(codemodeDir)]),
-  )
+  return packageDependencySources(codemodeDir, targetRoot, externalDependencies, new Set([realpathSync(codemodeDir)]))
 }
 
 /**

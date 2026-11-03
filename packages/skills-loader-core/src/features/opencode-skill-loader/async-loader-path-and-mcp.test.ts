@@ -97,9 +97,9 @@ Path skill.
         mcpServers: {
           test: {
             command: "test-cmd",
-            args: ["arg1"]
-          }
-        }
+            args: ["arg1"],
+          },
+        },
       }
       writeFileSync(join(SKILLS_DIR, "mcp.json"), JSON.stringify(mcpJson))
 
@@ -144,8 +144,8 @@ Path skill.
       const mcpJson = {
         direct: {
           command: "direct-cmd",
-          args: ["arg"]
-        }
+          args: ["arg"],
+        },
       }
       writeFileSync(join(SKILLS_DIR, "mcp.json"), JSON.stringify(mcpJson))
 

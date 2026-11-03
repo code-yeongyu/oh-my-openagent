@@ -29,7 +29,6 @@ function countOf(lines: readonly string[], line: string): number {
   return lines.filter((candidate) => candidate === line).length
 }
 
-
 describe("H1: a mid-body T2 block never glues its neighbours", () => {
   const block = t2Block("2026-10-15", "n.md", '---\nk: "v"\n---\n')
 
@@ -44,7 +43,12 @@ describe("H1: a mid-body T2 block never glues its neighbours", () => {
 
   test("a side file with a glued block is adopted with both lines intact", () => {
     const side = `line1\n${block.slice(1)}line2\n`
-    const plan = planAdoption([{ path: SIDE, text: side }], { currentText: "base\n", lastMaterialised: null, tombstoned: false, registers: soleRegisters("base\n") })
+    const plan = planAdoption([{ path: SIDE, text: side }], {
+      currentText: "base\n",
+      lastMaterialised: null,
+      tombstoned: false,
+      registers: soleRegisters("base\n"),
+    })
     const body = linesOf(splitItem(plan.rendered).body)
     expect(body).toContain("line1")
     expect(body).toContain("line2")
@@ -53,15 +57,25 @@ describe("H1: a mid-body T2 block never glues its neighbours", () => {
 
   test("a main file with a glued block keeps both lines", () => {
     const main = `line1\n${block.slice(1)}line2\n`
-    const plan = planAdoption([{ path: "n.md", text: main }], { currentText: null, lastMaterialised: null, tombstoned: false, registers: soleRegisters(null) })
+    const plan = planAdoption([{ path: "n.md", text: main }], {
+      currentText: null,
+      lastMaterialised: null,
+      tombstoned: false,
+      registers: soleRegisters(null),
+    })
     expect(linesOf(splitItem(plan.rendered).body)).toEqual(["line1", "line2"])
   })
 })
 
 describe("M1: the read-back counts lines", () => {
   test("a merge that collapses a duplicated line keeps the source", () => {
-    const dedupe = (base: string, incoming: string): string => [...new Set(linesOf(base + incoming))].map((l) => `${l}\n`).join("")
-    const plan = planAdoption([{ path: SIDE, text: "x\nd\nd\n" }], { currentText: "x\n", lastMaterialised: null, tombstoned: false, registers: soleRegisters("x\n") }, dedupe)
+    const dedupe = (base: string, incoming: string): string =>
+      [...new Set(linesOf(base + incoming))].map((l) => `${l}\n`).join("")
+    const plan = planAdoption(
+      [{ path: SIDE, text: "x\nd\nd\n" }],
+      { currentText: "x\n", lastMaterialised: null, tombstoned: false, registers: soleRegisters("x\n") },
+      dedupe,
+    )
     expect(plan.removalCandidates).toEqual([])
     expect(plan.retainedSources.map((entry) => entry.path)).toEqual([SIDE])
   })
@@ -70,7 +84,10 @@ describe("M1: the read-back counts lines", () => {
 describe("L1: CRLF sources", () => {
   test("an LF main and a CRLF side do not duplicate shared lines", () => {
     const plan = planAdoption(
-      [{ path: "n.md", text: "x\ny\n" }, { path: SIDE, text: "x\r\ny\r\nz\r\n" }],
+      [
+        { path: "n.md", text: "x\ny\n" },
+        { path: SIDE, text: "x\r\ny\r\nz\r\n" },
+      ],
       { currentText: "x\ny\n", lastMaterialised: null, tombstoned: false, registers: soleRegisters("x\ny\n") },
     )
     const out = plan.rendered
@@ -81,7 +98,12 @@ describe("L1: CRLF sources", () => {
 
   test("a CRLF T2 block is folded into the frontmatter", () => {
     const block = t2Block("2026-10-15", "n.md", '---\nk: "v"\n---\n').replace(/\n/g, "\r\n")
-    const plan = planAdoption([{ path: SIDE, text: `x\r\n${block}` }], { currentText: "x\n", lastMaterialised: null, tombstoned: false, registers: soleRegisters("x\n") })
+    const plan = planAdoption([{ path: SIDE, text: `x\r\n${block}` }], {
+      currentText: "x\n",
+      lastMaterialised: null,
+      tombstoned: false,
+      registers: soleRegisters("x\n"),
+    })
     const out = plan.rendered
     expect(out.includes("kept here so no fact is lost")).toBe(false)
     expect(renderedFacts(out).has("k")).toBe(true)
@@ -90,23 +112,37 @@ describe("L1: CRLF sources", () => {
 
 describe("L2: the local-deletion shortcut", () => {
   test("a CRLF main whose text was deleted locally is still a local deletion", () => {
-    const plan = planAdoption(
-      [{ path: "n.md", text: "a\r\nc\r\n" }],
-      { currentText: "a\nb\nc\n", lastMaterialised: "a\nb\nc\n", tombstoned: false, registers: soleRegisters("a\nb\nc\n") },
-    )
+    const plan = planAdoption([{ path: "n.md", text: "a\r\nc\r\n" }], {
+      currentText: "a\nb\nc\n",
+      lastMaterialised: "a\nb\nc\n",
+      tombstoned: false,
+      registers: soleRegisters("a\nb\nc\n"),
+    })
     expect(plan.action).toBe("none")
   })
 
   test("a main that deleted whole lines is still a local deletion", () => {
-    const plan = planAdoption(
-      [{ path: "n.md", text: "a\nc\n" }],
-      { currentText: "a\nb\nc\n", lastMaterialised: "a\nb\nc\n", tombstoned: false, registers: soleRegisters("a\nb\nc\n") },
-    )
+    const plan = planAdoption([{ path: "n.md", text: "a\nc\n" }], {
+      currentText: "a\nb\nc\n",
+      lastMaterialised: "a\nb\nc\n",
+      tombstoned: false,
+      registers: soleRegisters("a\nb\nc\n"),
+    })
     expect(plan.action).toBe("none")
   })
 })
 
-const POOL = ["- likes tea", "- likes coffee", "abc", "ax", "note: alpha", "prefers 한글", "emoji 🙂", "-->", "--- not fm"] as const
+const POOL = [
+  "- likes tea",
+  "- likes coffee",
+  "abc",
+  "ax",
+  "note: alpha",
+  "prefers 한글",
+  "emoji 🙂",
+  "-->",
+  "--- not fm",
+] as const
 
 type Built = {
   readonly text: string
@@ -160,60 +196,87 @@ function build(rand: () => number, tag: string): Built {
 
 const LOSSY: readonly ((base: string, incoming: string) => string)[] = [
   (base, incoming) => [...new Set(linesOf(base + incoming))].map((line) => `${line}\n`).join(""),
-  (base, incoming) => base + linesOf(incoming).slice(1).map((line) => `${line}\n`).join(""),
+  (base, incoming) =>
+    base +
+    linesOf(incoming)
+      .slice(1)
+      .map((line) => `${line}\n`)
+      .join(""),
 ]
 
 for (const seed of [20261016, 0x5eed4a11]) {
-  test(`R1 every known fact of a deleted source survives: glued, malformed and hand-edited blocks, shared register and list keys, CRLF, duplicates, lossy merges; committed read-back; seed=${seed}`, async () => {
-    const rand = mulberry32(seed)
-    for (let iteration = 0; iteration < 1500; iteration++) {
-      const base = "base line\n"
-      const main = build(rand, `m${iteration}`)
-      const sides = Array.from({ length: 1 + Math.floor(rand() * 2) }, (_, n) => ({
-        path: `n.sync-conflict-20261015-${n === 0 ? "mac" : "mini"}.md`,
-        built: build(rand, `s${iteration}-${n}`),
-      }))
-      const merge = rand() < 0.3 ? pick(rand, LOSSY) : undefined
-      const files = [{ path: "n.md", text: main.text }, ...sides.map(({ path, built }) => ({ path, text: built.text }))]
-      const doc = await newDoc("1")
-      let out = ""
-      let decision: RemovalDecision = { remove: [], retained: [] }
-      try {
-        captureInto(doc, "", [], base)
-        const plan = planAdoption(files, { currentText: base, lastMaterialised: null, tombstoned: false, registers: activeRegisters(doc) }, merge)
-        applyPlan(doc, base, plan)
-        out = renderDocContent(doc)
-        decision = confirmRemovals(doc, plan, files)
-      } finally {
-        doc.free()
-      }
-      const context = `R1 seed=${seed} case=${iteration} main=${JSON.stringify(main.text)} out=${JSON.stringify(out)}`
-      const outLines = linesOf(splitItem(out).body)
-      const facts = renderedFacts(out)
-      for (const line of outLines) expect(line.startsWith("<!-- memory-sync frontmatter conflict"), `${context} marker in body`).toBe(false)
-      for (const [key, value] of main.keys) expect(holdsValue(facts, key, value), `${context} main lost ${key}`).toBe(true)
-      if (merge === undefined) {
-        for (const line of main.lines) expect(outLines.includes(line), `${context} main lost ${line}`).toBe(true)
-        if (!main.malformed && !sides.some(({ built }) => built.malformed)) {
-          for (const line of outLines) expect(line.includes("kept here so no fact is lost"), `${context} block left in body`).toBe(false)
+  test(
+    `R1 every known fact of a deleted source survives: glued, malformed and hand-edited blocks, shared register and list keys, CRLF, duplicates, lossy merges; committed read-back; seed=${seed}`,
+    async () => {
+      const rand = mulberry32(seed)
+      for (let iteration = 0; iteration < 1500; iteration++) {
+        const base = "base line\n"
+        const main = build(rand, `m${iteration}`)
+        const sides = Array.from({ length: 1 + Math.floor(rand() * 2) }, (_, n) => ({
+          path: `n.sync-conflict-20261015-${n === 0 ? "mac" : "mini"}.md`,
+          built: build(rand, `s${iteration}-${n}`),
+        }))
+        const merge = rand() < 0.3 ? pick(rand, LOSSY) : undefined
+        const files = [
+          { path: "n.md", text: main.text },
+          ...sides.map(({ path, built }) => ({ path, text: built.text })),
+        ]
+        const doc = await newDoc("1")
+        let out = ""
+        let decision: RemovalDecision = { remove: [], retained: [] }
+        try {
+          captureInto(doc, "", [], base)
+          const plan = planAdoption(
+            files,
+            { currentText: base, lastMaterialised: null, tombstoned: false, registers: activeRegisters(doc) },
+            merge,
+          )
+          applyPlan(doc, base, plan)
+          out = renderDocContent(doc)
+          decision = confirmRemovals(doc, plan, files)
+        } finally {
+          doc.free()
+        }
+        const context = `R1 seed=${seed} case=${iteration} main=${JSON.stringify(main.text)} out=${JSON.stringify(out)}`
+        const outLines = linesOf(splitItem(out).body)
+        const facts = renderedFacts(out)
+        for (const line of outLines)
+          expect(line.startsWith("<!-- memory-sync frontmatter conflict"), `${context} marker in body`).toBe(false)
+        for (const [key, value] of main.keys)
+          expect(holdsValue(facts, key, value), `${context} main lost ${key}`).toBe(true)
+        if (merge === undefined) {
+          for (const line of main.lines) expect(outLines.includes(line), `${context} main lost ${line}`).toBe(true)
+          if (!main.malformed && !sides.some(({ built }) => built.malformed)) {
+            for (const line of outLines)
+              expect(line.includes("kept here so no fact is lost"), `${context} block left in body`).toBe(false)
+          }
+        }
+        const represented = (key: string, value: unknown): boolean => holdsValue(facts, key, value)
+        for (const { path, built } of sides) {
+          const where = `${context} side=${JSON.stringify(built.text)}`
+          if (!decision.remove.includes(path)) {
+            expect(
+              decision.retained.map((entry) => entry.path),
+              where,
+            ).toContain(path)
+            continue
+          }
+          for (const line of new Set(built.lines)) {
+            expect(countOf(outLines, line) >= countOf(built.lines, line), `${where} deleted source lost ${line}`).toBe(
+              true,
+            )
+          }
+          for (const [key, value] of built.keys)
+            expect(represented(key, value), `${where} deleted source lost key ${key}`).toBe(true)
+          for (const [key, line] of built.keyLines) {
+            const value = line.slice(key.length + 3, -1)
+            expect(outLines.includes(line) || represented(key, value), `${where} deleted source lost ${line}`).toBe(
+              true,
+            )
+          }
         }
       }
-      const represented = (key: string, value: unknown): boolean => holdsValue(facts, key, value)
-      for (const { path, built } of sides) {
-        const where = `${context} side=${JSON.stringify(built.text)}`
-        if (!decision.remove.includes(path)) {
-          expect(decision.retained.map((entry) => entry.path), where).toContain(path)
-          continue
-        }
-        for (const line of new Set(built.lines)) {
-          expect(countOf(outLines, line) >= countOf(built.lines, line), `${where} deleted source lost ${line}`).toBe(true)
-        }
-        for (const [key, value] of built.keys) expect(represented(key, value), `${where} deleted source lost key ${key}`).toBe(true)
-        for (const [key, line] of built.keyLines) {
-          const value = line.slice(key.length + 3, -1)
-          expect(outLines.includes(line) || represented(key, value), `${where} deleted source lost ${line}`).toBe(true)
-        }
-      }
-    }
-  }, PROPERTY_TIMEOUT_MS)
+    },
+    PROPERTY_TIMEOUT_MS,
+  )
 }

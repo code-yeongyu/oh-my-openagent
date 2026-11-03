@@ -74,7 +74,9 @@ let ticketFs: CountingLeaseTicketFs = {}
 export function setCountingLeaseTicketFsForTests(next: CountingLeaseTicketFs | undefined): () => void {
   const previous = ticketFs
   ticketFs = next ?? {}
-  return () => { ticketFs = previous }
+  return () => {
+    ticketFs = previous
+  }
 }
 
 function ticketName(): string {
@@ -137,32 +139,49 @@ async function reapDeadHead(ticketDirectory: string, head: string): Promise<bool
   return true
 }
 
-async function takeAnySlot(locksDirectory: string, record: LockRecord, maxConcurrent: number, signal: AbortSignal | undefined): Promise<CountingLease | undefined> {
+async function takeAnySlot(
+  locksDirectory: string,
+  record: LockRecord,
+  maxConcurrent: number,
+  signal: AbortSignal | undefined,
+): Promise<CountingLease | undefined> {
   for (let slot = 1; slot <= maxConcurrent; slot += 1) {
     const lockPath = countingLeaseLockPath(locksDirectory, record.purpose, slot)
     try {
       // One pass per slot: publish, or recover a proven-dead owner and publish, or report contention.
       await acquireLock(lockPath, record, { waitTimeoutMs: 0, ...(signal === undefined ? {} : { signal }) })
-      return { slot, release: () => releaseLock(lockPath, record), retainFor: async (pid, processStart) => {
-        const staging = `${lockPath}.handoff-${record.nonce}`
-        try {
-          await writeFile(staging, `${JSON.stringify({
-            ...record, pid, process_start: processStart ?? "unavailable", git_activity_lock: undefined,
-          })}\n`, { mode: 0o600 })
-          await rename(staging, lockPath)
-        } finally {
-          await unlinkIfPresent(staging)
-        }
-      }, releaseSync: () => {
-        try {
-          if (parseLockRecord(readFileSync(lockPath, "utf8"))?.nonce !== record.nonce) return false
-          unlinkSync(lockPath)
-          return true
-        } catch (error) {
-          if (errorCode(error) === "ENOENT") return false
-          throw error
-        }
-      } }
+      return {
+        slot,
+        release: () => releaseLock(lockPath, record),
+        retainFor: async (pid, processStart) => {
+          const staging = `${lockPath}.handoff-${record.nonce}`
+          try {
+            await writeFile(
+              staging,
+              `${JSON.stringify({
+                ...record,
+                pid,
+                process_start: processStart ?? "unavailable",
+                git_activity_lock: undefined,
+              })}\n`,
+              { mode: 0o600 },
+            )
+            await rename(staging, lockPath)
+          } finally {
+            await unlinkIfPresent(staging)
+          }
+        },
+        releaseSync: () => {
+          try {
+            if (parseLockRecord(readFileSync(lockPath, "utf8"))?.nonce !== record.nonce) return false
+            unlinkSync(lockPath)
+            return true
+          } catch (error) {
+            if (errorCode(error) === "ENOENT") return false
+            throw error
+          }
+        },
+      }
     } catch (error) {
       if (error instanceof LockContentionError) continue
       throw error
@@ -180,7 +199,8 @@ export async function acquireCountingLease(
   const maxConcurrent = options.maxConcurrent ?? domain.defaultSlots
   const waitTimeoutMs = options.waitTimeoutMs ?? domain.waitTimeoutMs
   const retryDelayMs = options.retryDelayMs ?? 25
-  if (!Number.isInteger(maxConcurrent) || maxConcurrent < 1) throw new Error(`${domain.purpose} maxConcurrent must be a positive integer, got ${maxConcurrent}`)
+  if (!Number.isInteger(maxConcurrent) || maxConcurrent < 1)
+    throw new Error(`${domain.purpose} maxConcurrent must be a positive integer, got ${maxConcurrent}`)
   if (waitTimeoutMs < 0 || retryDelayMs <= 0) throw new Error("lock wait options must be positive")
   const { signal } = options
   const ticketDirectory = countingLeaseTicketDirectory(locksDirectory, domain.purpose)

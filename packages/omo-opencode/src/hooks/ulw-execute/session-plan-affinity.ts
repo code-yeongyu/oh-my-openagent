@@ -31,9 +31,7 @@ function normalizePlanPath(directory: string, candidate: string): string {
 }
 
 function normalizePlanPathKey(planPath: string): string {
-  const resolvedPath = looksLikeWindowsAbsolutePath(planPath)
-    ? win32.resolve(planPath)
-    : posix.resolve(planPath)
+  const resolvedPath = looksLikeWindowsAbsolutePath(planPath) ? win32.resolve(planPath) : posix.resolve(planPath)
   return resolvedPath.replaceAll("\\", "/")
 }
 

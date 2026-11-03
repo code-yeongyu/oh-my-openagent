@@ -44,7 +44,14 @@ interface MockStepUsage {
 
 type MockStep =
   | { type: "text"; text: string; usage?: MockStepUsage; delayMs?: number }
-  | { type: "tool_call"; name: string; arguments: Record<string, unknown>; id?: string; usage?: MockStepUsage; delayMs?: number }
+  | {
+      type: "tool_call"
+      name: string
+      arguments: Record<string, unknown>
+      id?: string
+      usage?: MockStepUsage
+      delayMs?: number
+    }
 
 interface MockScript {
   parentSteps: MockStep[]
@@ -82,8 +89,7 @@ interface SimpleStreamOptions {
 }
 
 type AssistantContent =
-  | { type: "text"; text: string }
-  | { type: "toolCall"; id: string; name: string; arguments: Record<string, unknown> }
+  { type: "text"; text: string } | { type: "toolCall"; id: string; name: string; arguments: Record<string, unknown> }
 
 interface AssistantMessage {
   role: "assistant"
@@ -201,11 +207,7 @@ export function messagesContainChild(context: Context): boolean {
   return false
 }
 
-export function stepToAssistantMessage(
-  step: MockStep,
-  callCount: number,
-  modelId = "mock-1",
-): AssistantMessage {
+export function stepToAssistantMessage(step: MockStep, callCount: number, modelId = "mock-1"): AssistantMessage {
   const content: AssistantContent[] =
     step.type === "text"
       ? [{ type: "text", text: step.text }]
@@ -238,11 +240,7 @@ function streamMockResponse(streamModel: Model<Api>, context: Context, options?:
       return stream
     }
     const failure: AssistantMessage = {
-      ...stepToAssistantMessage(
-        { type: "text", text: "" },
-        1,
-        streamModel.id,
-      ),
+      ...stepToAssistantMessage({ type: "text", text: "" }, 1, streamModel.id),
       stopReason: "error",
       errorMessage: "mock provider capacity exhausted",
     }
@@ -303,7 +301,14 @@ function streamMockResponse(streamModel: Model<Api>, context: Context, options?:
   if (delayMs === 0) queueMicrotask(emit)
   else {
     const timer = setTimeout(emit, delayMs)
-    options?.signal?.addEventListener("abort", () => { clearTimeout(timer); emit() }, { once: true })
+    options?.signal?.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer)
+        emit()
+      },
+      { once: true },
+    )
   }
 
   return stream

@@ -2,7 +2,11 @@ import { afterEach, describe, expect, it } from "bun:test"
 import { accessSync, constants, existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
-import { COMMENT_CHECKER_RELEASE_VERSION, COMMENT_CHECKER_VERSION_MARKER, type CommentCheckerReleaseAsset } from "@oh-my-opencode/comment-checker-core"
+import {
+  COMMENT_CHECKER_RELEASE_VERSION,
+  COMMENT_CHECKER_VERSION_MARKER,
+  type CommentCheckerReleaseAsset,
+} from "@oh-my-opencode/comment-checker-core"
 
 import { CACHE_DIR_NAME } from "../../../../omo-opencode/src/shared/plugin-identity"
 import { createRecordingLogger, createTempCwd } from "./comment-checker.test-support"
@@ -19,7 +23,10 @@ async function serveArchive(status = 200): Promise<{ url: string; requests: () =
   const stage = createTempCwd()
   writeFileSync(join(stage, "comment-checker"), "#!/bin/sh\necho fixture-checker\n", { mode: 0o755 })
   const archive = join(createTempCwd(), "fixture.tar.gz")
-  const result = Bun.spawnSync(["tar", "-czf", archive, "-C", stage, "comment-checker"], { stdout: "pipe", stderr: "pipe" })
+  const result = Bun.spawnSync(["tar", "-czf", archive, "-C", stage, "comment-checker"], {
+    stdout: "pipe",
+    stderr: "pipe",
+  })
   if (result.exitCode !== 0) throw new Error(`tar failed: ${new TextDecoder().decode(result.stderr)}`)
   const bytes = await Bun.file(archive).bytes()
   let requests = 0
@@ -27,7 +34,9 @@ async function serveArchive(status = 200): Promise<{ url: string; requests: () =
     port: 0,
     fetch() {
       requests += 1
-      return status === 200 ? new Response(bytes, { headers: { "content-type": "application/gzip" } }) : new Response(null, { status })
+      return status === 200
+        ? new Response(bytes, { headers: { "content-type": "application/gzip" } })
+        : new Response(null, { status })
     },
   })
   servers.push(server)
@@ -48,7 +57,13 @@ describe("omo-senpi comment-checker downloader", () => {
     const { url, requests } = await serveArchive()
 
     // when
-    const binaryPath = await downloadSenpiCommentCheckerBinary({ logger, platform: "linux", arch: "x64", cacheDir, resolveAssetUrl: toLocal(url) })
+    const binaryPath = await downloadSenpiCommentCheckerBinary({
+      logger,
+      platform: "linux",
+      arch: "x64",
+      cacheDir,
+      resolveAssetUrl: toLocal(url),
+    })
 
     // then
     expect(binaryPath).toBe(join(cacheDir, "comment-checker"))
@@ -69,7 +84,13 @@ describe("omo-senpi comment-checker downloader", () => {
     const { url, requests } = await serveArchive()
 
     // when
-    const binaryPath = await downloadSenpiCommentCheckerBinary({ logger, platform: "linux", arch: "x64", cacheDir, resolveAssetUrl: toLocal(url) })
+    const binaryPath = await downloadSenpiCommentCheckerBinary({
+      logger,
+      platform: "linux",
+      arch: "x64",
+      cacheDir,
+      resolveAssetUrl: toLocal(url),
+    })
 
     // then
     expect(binaryPath).toBe(join(cacheDir, "comment-checker"))
@@ -84,7 +105,13 @@ describe("omo-senpi comment-checker downloader", () => {
     const { url } = await serveArchive(503)
 
     // when
-    const binaryPath = await downloadSenpiCommentCheckerBinary({ logger, platform: "linux", arch: "x64", cacheDir, resolveAssetUrl: toLocal(url) })
+    const binaryPath = await downloadSenpiCommentCheckerBinary({
+      logger,
+      platform: "linux",
+      arch: "x64",
+      cacheDir,
+      resolveAssetUrl: toLocal(url),
+    })
 
     // then
     expect(binaryPath).toBeNull()
@@ -99,7 +126,13 @@ describe("omo-senpi comment-checker downloader", () => {
     const { url, requests } = await serveArchive()
 
     // when
-    const binaryPath = await downloadSenpiCommentCheckerBinary({ logger, platform: "freebsd", arch: "x64", cacheDir: createTempCwd(), resolveAssetUrl: toLocal(url) })
+    const binaryPath = await downloadSenpiCommentCheckerBinary({
+      logger,
+      platform: "freebsd",
+      arch: "x64",
+      cacheDir: createTempCwd(),
+      resolveAssetUrl: toLocal(url),
+    })
 
     // then
     expect(binaryPath).toBeNull()

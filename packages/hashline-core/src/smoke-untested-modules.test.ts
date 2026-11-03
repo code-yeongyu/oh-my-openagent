@@ -1,10 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import {
-  HASHLINE_DICT,
-  HASHLINE_OUTPUT_PATTERN,
-  HASHLINE_REF_PATTERN,
-  NIBBLE_STR,
-} from "./constants"
+import { HASHLINE_DICT, HASHLINE_OUTPUT_PATTERN, HASHLINE_REF_PATTERN, NIBBLE_STR } from "./constants"
 import { autocorrectReplacementLines } from "./autocorrect-replacement-lines"
 import { collectLineRefs, detectOverlappingRanges } from "./edit-ordering"
 import { toNewLines } from "./edit-text-normalization"
@@ -33,7 +28,7 @@ describe("smoke coverage for moved modules without direct legacy tests", () => {
       detectOverlappingRanges([
         { op: "replace", pos: "1#ZZ", end: "2#PM", lines: "x" },
         { op: "replace", pos: "2#PM", end: "3#QV", lines: "y" },
-      ])
+      ]),
     ).toContain("Overlapping range edits")
 
     const envelope = canonicalizeFileText("\uFEFFa\r\nb\r\n")

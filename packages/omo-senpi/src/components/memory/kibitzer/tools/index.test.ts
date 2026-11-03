@@ -84,7 +84,11 @@ describe("createKibitzerSidecarTools registry", () => {
 
   test("#given a read cap #when a file exceeds it #then the output is truncated with a marker and secrets are redacted", async () => {
     const root = await workspace()
-    await writeFile(join(root, "src", "big.ts"), `const key = "api_key=sk-abcdef1234567890"\n${"x".repeat(500)}\n`, "utf8")
+    await writeFile(
+      join(root, "src", "big.ts"),
+      `const key = "api_key=sk-abcdef1234567890"\n${"x".repeat(500)}\n`,
+      "utf8",
+    )
     const repo = await memoryRepo()
     const h = harness({ workspaceRoot: root, repo, caps: { readChars: 120 } })
 
@@ -97,7 +101,11 @@ describe("createKibitzerSidecarTools registry", () => {
 
   test("#given a grep cap #when matches exceed it #then at most the cap is returned and the result says so", async () => {
     const root = await workspace()
-    await writeFile(join(root, "src", "many.ts"), Array.from({ length: 20 }, (_, i) => `needle ${i}`).join("\n"), "utf8")
+    await writeFile(
+      join(root, "src", "many.ts"),
+      Array.from({ length: 20 }, (_, i) => `needle ${i}`).join("\n"),
+      "utf8",
+    )
     const repo = await memoryRepo()
     const h = harness({ workspaceRoot: root, repo, caps: { grepMatches: 5 } })
 

@@ -28,10 +28,17 @@ describe("the store's clock is the one clock", () => {
     const h = (harness = createGatewayHarness({ startAt: STORE_EPOCH }))
     h.session("A")
     const b = h.session("B", { online: false })
-    const sent = await h.get("A").engine.deliver({ sender: { kind: "session", durable_id: "A" }, target: "B", text: "fresh by the store's clock" })
+    const sent = await h
+      .get("A")
+      .engine.deliver({ sender: { kind: "session", durable_id: "A" }, target: "B", text: "fresh by the store's clock" })
     if (sent.kind !== "ok") throw new Error(JSON.stringify(sent))
     const runtime = new FakeSessionRuntime(b.runtime.sessionPath, "B", h.agentDir, { reopen: true })
-    const drain = createInboxDrain({ store: h.store(), runtime, durableId: "B", sessionPath: () => runtime.sessionPath })
+    const drain = createInboxDrain({
+      store: h.store(),
+      runtime,
+      durableId: "B",
+      sessionPath: () => runtime.sessionPath,
+    })
 
     const result = await drain.drain({ reason: "start" })
 
@@ -44,12 +51,23 @@ describe("the store's clock is the one clock", () => {
     h.session("A")
     h.session("B", { online: false })
     const store = h.store()
-    const engine = createGatewayEngine({ store, endpoints: UNREACHABLE, resolve: resolveFromEntries(h.entries, () => h.agentDir) })
+    const engine = createGatewayEngine({
+      store,
+      endpoints: UNREACHABLE,
+      resolve: resolveFromEntries(h.entries, () => h.agentDir),
+    })
 
-    const sent = await engine.deliver({ sender: { kind: "session", durable_id: "A" }, target: "B", text: "stamped by the store's clock" })
+    const sent = await engine.deliver({
+      sender: { kind: "session", durable_id: "A" },
+      target: "B",
+      text: "stamped by the store's clock",
+    })
 
     if (sent.kind !== "ok") throw new Error(JSON.stringify(sent))
     const row = (await store.deliveryView(sent.delivery_id))?.row
-    expect({ created_at: row?.created_at, expires_after_ms: (row?.expires_at ?? 0) - STORE_EPOCH }).toEqual({ created_at: STORE_EPOCH, expires_after_ms: 24 * 60 * 60 * 1000 })
+    expect({ created_at: row?.created_at, expires_after_ms: (row?.expires_at ?? 0) - STORE_EPOCH }).toEqual({
+      created_at: STORE_EPOCH,
+      expires_after_ms: 24 * 60 * 60 * 1000,
+    })
   })
 })

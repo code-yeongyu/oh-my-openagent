@@ -11,12 +11,7 @@ import { resolveMemoryIdentity } from "@oh-my-opencode/memory-core"
 
 import { ensureIdentityRuntimeDirs } from "./context"
 import { createMemoryComponent } from "./index"
-import {
-  MemoryFakeExtensionAPI,
-  componentContext,
-  loadedMemoryConfig,
-  memorySettings,
-} from "./memory.test-support"
+import { MemoryFakeExtensionAPI, componentContext, loadedMemoryConfig, memorySettings } from "./memory.test-support"
 import { MEMORY_TOOL_NAME } from "./tools"
 
 const roots: string[] = []

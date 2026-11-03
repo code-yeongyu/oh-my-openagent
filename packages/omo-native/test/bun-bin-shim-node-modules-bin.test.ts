@@ -1,7 +1,15 @@
 import { describe, expect, test } from "bun:test"
 import { dirname, join, relative } from "node:path"
 import { ensureBunBinShim } from "../bin/lib/bun-bin-shim.js"
-import { baseInput, bunTreePackage, legacyShim, NON_POSIX_HOST, nodeModulesBinPath, POSIX_HOME, recorder } from "./bun-bin-shim.test-support"
+import {
+  baseInput,
+  bunTreePackage,
+  legacyShim,
+  NON_POSIX_HOST,
+  nodeModulesBinPath,
+  POSIX_HOME,
+  recorder,
+} from "./bun-bin-shim.test-support"
 
 describe.skipIf(NON_POSIX_HOST)("both Bun global bin entries", () => {
   const scriptPath = bunTreePackage(join(POSIX_HOME, ".bun"))
@@ -12,23 +20,28 @@ describe.skipIf(NON_POSIX_HOST)("both Bun global bin entries", () => {
     const fs = recorder()
     for (const bin of bins) fs.markLink(bin)
     const result = ensureBunBinShim({
-      ...options, ...fs, realpath: (path: string) => bins.includes(path) ? scriptPath : path,
+      ...options,
+      ...fs,
+      realpath: (path: string) => (bins.includes(path) ? scriptPath : path),
     })
-    expect(result.entries.map(entry => entry.action)).toEqual(["current", "current"])
+    expect(result.entries.map((entry) => entry.action)).toEqual(["current", "current"])
     expect(fs.linked).toHaveLength(0)
-    expect(fs.renamed.map(entry => entry.to)).toEqual([scriptPath])
+    expect(fs.renamed.map((entry) => entry.to)).toEqual([scriptPath])
   })
 
   test("#given two legacy wrappers #then both become links to the same entrypoint", () => {
     const { options, bunRootDir, bunPath } = baseInput(scriptPath)
     const bins = [join(bunRootDir, "bin", "omo"), nodeModulesBinPath(bunRootDir)]
-    const fs = recorder(Object.fromEntries(bins.map(bin => [bin, legacyShim(scriptPath, bunPath)])))
+    const fs = recorder(Object.fromEntries(bins.map((bin) => [bin, legacyShim(scriptPath, bunPath)])))
     const result = ensureBunBinShim({ ...options, ...fs })
-    expect(result.entries.map(entry => entry.action)).toEqual(["repaired", "repaired"])
-    expect(fs.linked).toEqual(bins.map(bin => ({
-      target: relative(dirname(bin), scriptPath), path: `${bin}.4242.tmp`,
-    })))
-    expect(bins.every(bin => fs.lstat(bin).isSymbolicLink())).toBe(true)
+    expect(result.entries.map((entry) => entry.action)).toEqual(["repaired", "repaired"])
+    expect(fs.linked).toEqual(
+      bins.map((bin) => ({
+        target: relative(dirname(bin), scriptPath),
+        path: `${bin}.4242.tmp`,
+      })),
+    )
+    expect(bins.every((bin) => fs.lstat(bin).isSymbolicLink())).toBe(true)
   })
 
   for (const foreign of ["link", "file", "absent"]) {
@@ -42,11 +55,13 @@ describe.skipIf(NON_POSIX_HOST)("both Bun global bin entries", () => {
       })
       if (foreign === "link") fs.markLink(secondary)
       const result = ensureBunBinShim({
-        ...options, ...fs, realpath: (path: string) => path === secondary ? "/other/omo.js" : path,
+        ...options,
+        ...fs,
+        realpath: (path: string) => (path === secondary ? "/other/omo.js" : path),
       })
       expect(result.action).toBe("repaired")
       expect(result.entries[1]?.action).toBe(foreign === "absent" ? "absent-bin" : `foreign-${foreign}`)
-      expect(fs.linked.map(entry => entry.path)).toEqual([`${binPath}.4242.tmp`])
+      expect(fs.linked.map((entry) => entry.path)).toEqual([`${binPath}.4242.tmp`])
     })
   }
 
@@ -54,10 +69,11 @@ describe.skipIf(NON_POSIX_HOST)("both Bun global bin entries", () => {
     test(`#given migration ${failingIndex} fails #then the other entry migrates independently`, () => {
       const { options, bunRootDir, bunPath } = baseInput(scriptPath, { env: { OMO_DEBUG: "1" } })
       const bins = [join(bunRootDir, "bin", "omo"), nodeModulesBinPath(bunRootDir)]
-      const fs = recorder(Object.fromEntries(bins.map(bin => [bin, legacyShim(scriptPath, bunPath)])))
+      const fs = recorder(Object.fromEntries(bins.map((bin) => [bin, legacyShim(scriptPath, bunPath)])))
       const warnings: string[] = []
       const result = ensureBunBinShim({
-        ...options, ...fs,
+        ...options,
+        ...fs,
         symlink: (target: string, path: string) => {
           if (path === `${bins[failingIndex]}.4242.tmp`) throw new Error("EACCES: permission denied")
           fs.symlink(target, path)
@@ -78,9 +94,11 @@ describe.skipIf(NON_POSIX_HOST)("both Bun global bin entries", () => {
     const fs = recorder({ [primary]: legacyShim(scriptPath, bunPath) })
     fs.markLink(secondary)
     const result = ensureBunBinShim({
-      ...options, ...fs, realpath: (path: string) => path === secondary ? scriptPath : path,
+      ...options,
+      ...fs,
+      realpath: (path: string) => (path === secondary ? scriptPath : path),
     })
-    expect(result.entries.map(entry => entry.action)).toEqual(["repaired", "current"])
-    expect(fs.linked.map(entry => entry.path)).toEqual([`${primary}.4242.tmp`])
+    expect(result.entries.map((entry) => entry.action)).toEqual(["repaired", "current"])
+    expect(fs.linked.map((entry) => entry.path)).toEqual([`${primary}.4242.tmp`])
   })
 })

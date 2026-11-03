@@ -52,7 +52,8 @@ describe("warmTaskHost", () => {
     expect(payload["kind"]).toBe("worker")
     expect(payload["sessionId"]).toBeUndefined()
     const context = payload["context"]
-    const stateDir = typeof context === "object" && context !== null && "state_dir" in context ? String(context.state_dir) : ""
+    const stateDir =
+      typeof context === "object" && context !== null && "state_dir" in context ? String(context.state_dir) : ""
     expect(context).toEqual(childWarmContext(stateDir))
     expect(w.of("open_session")).toEqual([])
     expect(readdirSync(w.tempRoot)).toEqual([])
@@ -123,7 +124,10 @@ describe("warmTaskHost", () => {
 
   test("#given an older host that refuses the fallback open #when it is warmed #then the refusal reaches the caller and nothing is left behind", async () => {
     // given
-    const w = await world({ warm: { refuse: "missing_session_id" }, openFailure: { code: "invalid_launch_profile", detail: "refused" } })
+    const w = await world({
+      warm: { refuse: "missing_session_id" },
+      openFailure: { code: "invalid_launch_profile", detail: "refused" },
+    })
 
     // when
     const outcome = await w.warm().then(

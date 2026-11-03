@@ -19,12 +19,18 @@ test("#given an unfinished detach #when dispose runs #then it waits for the deta
   const closed = once(child, "close")
   const client = new DeferredDetachClient({ child })
   const handle = createRpcChildHandle({
-    client, child, taskId: "pending-detach", heartbeatIntervalMs: 60_000, now: () => 7,
+    client,
+    child,
+    taskId: "pending-detach",
+    heartbeatIntervalMs: 60_000,
+    now: () => 7,
   })
   let settled = false
 
   // when: cross the event-loop check phase so every already-resolved promise reaction has run.
-  const disposal = handle.dispose().then(() => { settled = true })
+  const disposal = handle.dispose().then(() => {
+    settled = true
+  })
   try {
     await new Promise<void>((resolve) => setImmediate(resolve))
 

@@ -10,9 +10,7 @@ import { captureInto, newDoc } from "./test-support"
 describe("splitItem on CRLF files", () => {
   test("a CRLF file's `title: A` parses as a key", () => {
     const parsed = splitItem("---\r\ntitle: A\r\n---\r\nbody\r\n")
-    expect(parsed.fm?.map((entry) => [entry.key, entry.value])).toEqual([
-      ["title", { kind: "reg", value: "A" }],
-    ])
+    expect(parsed.fm?.map((entry) => [entry.key, entry.value])).toEqual([["title", { kind: "reg", value: "A" }]])
     expect(parsed.body).toBe("body\r\n")
   })
 
@@ -29,7 +27,11 @@ describe("splitItem on CRLF files", () => {
   test("a CRLF frontmatter value round-trips through the canonical render", () => {
     const parsed = splitItem("---\r\ntitle: 茶 log\r\ntags: [a, b]\r\n---\r\nbody\r\n")
     const lines = (parsed.fm ?? []).map(({ key, value }) =>
-      renderEntry(key, value.kind === "set" ? value.elements : value.kind === "reg" ? value.value : "", value.kind === "reg"),
+      renderEntry(
+        key,
+        value.kind === "set" ? value.elements : value.kind === "reg" ? value.value : "",
+        value.kind === "reg",
+      ),
     )
     const again = splitItem(`---\n${lines.join("\n")}\n---\nbody\n`)
     expect(again.fm?.map((entry) => entry.key)).toEqual(["title", "tags"])

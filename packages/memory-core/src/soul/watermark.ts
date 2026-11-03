@@ -92,7 +92,11 @@ async function consumeUnderLock(
     // page that already contains one is the same answer an unbounded scan gives. Only a page that is
     // entirely memory-tool commits has to look underneath it. Over a long-lived identity the range is
     // thousands of commits and the unbounded form costs hundreds of milliseconds on every prompt.
-    commits = await repo.log({ range: `${watermark.lastNotifiedHead}..${head}`, paths: SOUL_PATHS, limit: SOUL_SCAN_PAGE })
+    commits = await repo.log({
+      range: `${watermark.lastNotifiedHead}..${head}`,
+      paths: SOUL_PATHS,
+      limit: SOUL_SCAN_PAGE,
+    })
     if (commits.length === SOUL_SCAN_PAGE && commits.every(isInBand)) {
       commits = await repo.log({ range: `${watermark.lastNotifiedHead}..${head}`, paths: SOUL_PATHS })
     }
@@ -124,18 +128,29 @@ function readWatermark(noticesDir: string): SoulHeadWatermark | undefined {
 function isWatermark(value: unknown): value is SoulHeadWatermark {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return false
   const record = value as Record<string, unknown>
-  return record.version === 1
-    && typeof record.lastNotifiedHead === "string"
-    && /^[0-9a-f]{40}$/.test(record.lastNotifiedHead)
+  return (
+    record.version === 1 &&
+    typeof record.lastNotifiedHead === "string" &&
+    /^[0-9a-f]{40}$/.test(record.lastNotifiedHead)
+  )
 }
 
-async function writeWatermark(noticesDir: string, head: string, onWarn?: ConsumeSoulNoticeOptions["onWarn"]): Promise<void> {
+async function writeWatermark(
+  noticesDir: string,
+  head: string,
+  onWarn?: ConsumeSoulNoticeOptions["onWarn"],
+): Promise<void> {
   await mkdir(noticesDir, { recursive: true, mode: 0o700 })
   const target = join(noticesDir, SOUL_NOTICE_WATERMARK_FILENAME)
   const temporary = `${target}.tmp-${process.pid}-${randomUUID()}`
   const watermark: SoulHeadWatermark = { version: 1, lastNotifiedHead: head }
   try {
-    await writeFile(temporary, `${JSON.stringify(watermark)}\n`, { encoding: "utf8", mode: 0o600, flag: "wx", flush: true })
+    await writeFile(temporary, `${JSON.stringify(watermark)}\n`, {
+      encoding: "utf8",
+      mode: 0o600,
+      flag: "wx",
+      flush: true,
+    })
     await rename(temporary, target)
   } catch (error) {
     // Cleanup is best-effort: a failing rm must not replace the original write/rename error.

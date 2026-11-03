@@ -4,16 +4,19 @@ import { mkdtemp, readFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import {
-  REFLECTION_COMPLETION_ENTRY_TYPE,
-  type ReflectionCompletionRecord,
-} from "./completion-contracts"
+import { REFLECTION_COMPLETION_ENTRY_TYPE, type ReflectionCompletionRecord } from "./completion-contracts"
 import { deliverReflectionCompletion } from "./completion-delivery"
 import { recapFixture } from "./reflection-recap.test-support"
 import { rmEfaultTolerant } from "../teardown.test-support"
 
 const roots: string[] = []
-afterEach(async () => Promise.all(roots.splice(0).map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }))))
+afterEach(async () =>
+  Promise.all(
+    roots
+      .splice(0)
+      .map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })),
+  ),
+)
 
 function failedRecord(overrides: Partial<ReflectionCompletionRecord> = {}): ReflectionCompletionRecord {
   return {
@@ -57,24 +60,55 @@ describe("deliverReflectionCompletion", () => {
     const fixture = await recapFixture(root)
     const entries: unknown[] = []
     const live = {
-      sessionId: "recipient", identityContext: fixture.context,
-      api: { appendEntry: (_type: string, data?: unknown) => { entries.push(data) }, registerEntryRenderer() {} },
+      sessionId: "recipient",
+      identityContext: fixture.context,
+      api: {
+        appendEntry: (_type: string, data?: unknown) => {
+          entries.push(data)
+        },
+        registerEntryRenderer() {},
+      },
     }
     const delivered = await deliverReflectionCompletion(fixture.completionsDir, fixture.record, live)
-    expect(entries).toEqual([{ ...delivered, recap: expect.objectContaining({
-      schemaVersion: 1, runId: fixture.record.runId, deliverySessionId: "recipient",
-      conversationIds: ["conversation-a", "conversation-b"],
-      report: { status: "available", text: fixture.report, preview: "# RECAP_SENTINEL\n한국어 기록\n- Saved synthetic preference", sourceTruncated: false },
-    }) }])
-    expect(JSON.parse(await readFile(join(fixture.completionsDir, `${fixture.record.runId}.json`), "utf8"))).toEqual(delivered)
+    expect(entries).toEqual([
+      {
+        ...delivered,
+        recap: expect.objectContaining({
+          schemaVersion: 1,
+          runId: fixture.record.runId,
+          deliverySessionId: "recipient",
+          conversationIds: ["conversation-a", "conversation-b"],
+          report: {
+            status: "available",
+            text: fixture.report,
+            preview: "# RECAP_SENTINEL\n한국어 기록\n- Saved synthetic preference",
+            sourceTruncated: false,
+          },
+        }),
+      },
+    ])
+    expect(JSON.parse(await readFile(join(fixture.completionsDir, `${fixture.record.runId}.json`), "utf8"))).toEqual(
+      delivered,
+    )
     expect(delivered).not.toHaveProperty("recap")
   })
 
-  test.each(["no_changes", "failed", "timed_out", "merge_conflict"] as const)("#given %s #when delivered #then no recap is appended", async (outcome) => {
-    const { entries } = await deliverLive(failedRecord({ outcome }))
-    expect(entries[0]?.data).not.toHaveProperty("recap")
-  })
-  test.each(["merged", "no_changes", "failed", "timed_out", "merge_conflict", "parent_dirty", "dirty_uncommitted"] as const)(
+  test.each(["no_changes", "failed", "timed_out", "merge_conflict"] as const)(
+    "#given %s #when delivered #then no recap is appended",
+    async (outcome) => {
+      const { entries } = await deliverLive(failedRecord({ outcome }))
+      expect(entries[0]?.data).not.toHaveProperty("recap")
+    },
+  )
+  test.each([
+    "merged",
+    "no_changes",
+    "failed",
+    "timed_out",
+    "merge_conflict",
+    "parent_dirty",
+    "dirty_uncommitted",
+  ] as const)(
     "#given a %s record #when delivered live #then it is journaled with its facts and no toast fires",
     async (outcome) => {
       // given

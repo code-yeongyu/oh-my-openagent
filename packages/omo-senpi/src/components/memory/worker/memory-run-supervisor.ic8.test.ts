@@ -2,11 +2,7 @@ import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { existsSync } from "node:fs"
 import { readFile, rm, stat } from "node:fs/promises"
 import { join } from "node:path"
-import {
-  createMemoryRunSupervisorIc8Harness,
-  IC8_PLATFORMS,
-  IC8_WAIT_MS,
-} from "./memory-run-supervisor-ic8-harness"
+import { createMemoryRunSupervisorIc8Harness, IC8_PLATFORMS, IC8_WAIT_MS } from "./memory-run-supervisor-ic8-harness"
 import { terminateProcessGroup } from "./memory-run-supervisor-ic8-process-groups"
 
 setDefaultTimeout(IC8_WAIT_MS)
@@ -171,7 +167,9 @@ describe("memory run supervisor IC-8 containment", () => {
       // when
       await advanceClock(clockPath, 2_000)
       if (supervisor.pid === undefined) throw new Error("supervisor pid is required")
-      await waitForPath(join(runDir, `${platform === "win32" ? "win32-graceful" : "posix-SIGTERM"}-${supervisor.pid}.json`))
+      await waitForPath(
+        join(runDir, `${platform === "win32" ? "win32-graceful" : "posix-SIGTERM"}-${supervisor.pid}.json`),
+      )
       if (nativeWindowsGraceWins) {
         await childExited
         await waitForPath(join(runDir, "outcome.json"))
@@ -208,7 +206,9 @@ describe("memory run supervisor IC-8 containment", () => {
       await exit
       expect(existsSync(join(runDir, "outcome.json"))).toBe(false)
       await advanceClock(clockPath, 2_000)
-      await waitForPath(join(runDir, `${platform === "win32" ? "win32-graceful" : "posix-SIGTERM"}-${ledger.childPid}.json`))
+      await waitForPath(
+        join(runDir, `${platform === "win32" ? "win32-graceful" : "posix-SIGTERM"}-${ledger.childPid}.json`),
+      )
       await childExited
       untrackProcessGroup(ledger.childPid)
 
@@ -218,9 +218,7 @@ describe("memory run supervisor IC-8 containment", () => {
   }
 })
 
-async function settlementState(
-  signal: Promise<unknown>,
-): Promise<"resolved" | "rejected" | "pending"> {
+async function settlementState(signal: Promise<unknown>): Promise<"resolved" | "rejected" | "pending"> {
   let state: "resolved" | "rejected" | "pending" = "pending"
   void signal.then(
     () => {

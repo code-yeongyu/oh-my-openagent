@@ -19,7 +19,12 @@ function isolatedModuleUrl(): string {
 }
 
 // The value Bun 1.3.x throws for a missing module: MODULE_NOT_FOUND, but not an Error instance (omo#8247).
-const bunResolveMessage = { name: "ResolveMessage", code: "MODULE_NOT_FOUND", isError: false, message: "Cannot find module" }
+const bunResolveMessage = {
+  name: "ResolveMessage",
+  code: "MODULE_NOT_FOUND",
+  isError: false,
+  message: "Cannot find module",
+}
 
 describe("omo-senpi comment-checker missing package", () => {
   it("#given a missing package #when PATH has a checker #then real module resolution falls back to PATH", () => {

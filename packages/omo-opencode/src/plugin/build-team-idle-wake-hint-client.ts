@@ -15,15 +15,10 @@ export type TeamIdleWakeHintNarrowClient = {
 
 export function buildTeamIdleWakeHintClient(client: PluginInput["client"]): TeamIdleWakeHintNarrowClient {
   const session = client.session
-  const promptAsync = typeof session.promptAsync === "function"
-    ? session.promptAsync.bind(session) as SdkPromptAsync
-    : undefined
-  const status = typeof session.status === "function"
-    ? session.status.bind(session) as SdkStatus
-    : undefined
-  const messages = typeof session.messages === "function"
-    ? session.messages.bind(session) as SdkMessages
-    : undefined
+  const promptAsync =
+    typeof session.promptAsync === "function" ? (session.promptAsync.bind(session) as SdkPromptAsync) : undefined
+  const status = typeof session.status === "function" ? (session.status.bind(session) as SdkStatus) : undefined
+  const messages = typeof session.messages === "function" ? (session.messages.bind(session) as SdkMessages) : undefined
   return {
     session: { promptAsync, status, messages },
   }

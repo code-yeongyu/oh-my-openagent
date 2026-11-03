@@ -1,8 +1,23 @@
 import { spawn } from "node:child_process"
 import { writeSync } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
-import { CHILD_EXIT_FILENAME, readRunJson, writeRunJsonAtomic, type RunChildExit, type RunLaunchManifest } from "./run-artifacts"
-import { getSupervisorRuntimePlatform, readSupervisorClockNow, recordSupervisorGracefulDeadline, scheduleSupervisorDeadline, signalSupervisorProcessGroup, terminateSupervisorChildHard, terminateSupervisorWin32Tree, type SupervisorChildExit } from "./supervisor-process-identity"
+import {
+  CHILD_EXIT_FILENAME,
+  readRunJson,
+  writeRunJsonAtomic,
+  type RunChildExit,
+  type RunLaunchManifest,
+} from "./run-artifacts"
+import {
+  getSupervisorRuntimePlatform,
+  readSupervisorClockNow,
+  recordSupervisorGracefulDeadline,
+  scheduleSupervisorDeadline,
+  signalSupervisorProcessGroup,
+  terminateSupervisorChildHard,
+  terminateSupervisorWin32Tree,
+  type SupervisorChildExit,
+} from "./supervisor-process-identity"
 
 async function readRelease(): Promise<boolean> {
   for await (const chunk of process.stdin) {

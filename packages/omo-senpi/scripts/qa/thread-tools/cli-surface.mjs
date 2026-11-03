@@ -101,7 +101,11 @@ try {
   // ---- thread_send delivery=steer: land a message inside the peer's ACTIVE turn ----
   const turnMark = tools.mark()
   await tools.request({ type: "prompt", sessionId: peer.routingId, message: "t13a-held-turn" })
-  await tools.waitFor((record) => record.type === "agent_start" && record.sessionId === peer.routingId, turnMark, 60_000)
+  await tools.waitFor(
+    (record) => record.type === "agent_start" && record.sessionId === peer.routingId,
+    turnMark,
+    60_000,
+  )
   await tools.request({ type: "steer", sessionId: peer.routingId, message: STEER_NEEDLE })
   fake.releaseHolds()
   await tools.waitFor(
@@ -152,7 +156,9 @@ try {
   await tools.request({ type: "close_session", sessionId: peer.routingId })
   await fake.stop()
 } catch (error) {
-  report.log(`FAIL cli-surface harness error: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`)
+  report.log(
+    `FAIL cli-surface harness error: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`,
+  )
   process.exitCode = 1
 } finally {
   await cleanupAllAndWait()

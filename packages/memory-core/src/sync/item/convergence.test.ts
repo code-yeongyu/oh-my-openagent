@@ -61,13 +61,14 @@ async function scriptedUpdates(peer: `${number}`, seed: number): Promise<Uint8Ar
   for (let i = 0; i < 10; i++) {
     const current = renderItem(doc) ?? ""
     const roll = rand()
-    const next = roll < 0.45
-      ? bodySplice(rand, current)
-      : roll < 0.7
-        ? fmWrite(rand, current, pick(rand, KEYS))
-        : roll < 0.85
-          ? fmRemove(current, pick(rand, KEYS))
-          : current
+    const next =
+      roll < 0.45
+        ? bodySplice(rand, current)
+        : roll < 0.7
+          ? fmWrite(rand, current, pick(rand, KEYS))
+          : roll < 0.85
+            ? fmRemove(current, pick(rand, KEYS))
+            : current
     if (next === current) continue
     const update = captureCurrent(doc, next)
     if (update !== null) updates.push(update)

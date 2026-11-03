@@ -5,7 +5,12 @@ import { mkdir, readFile, rm, utimes, writeFile } from "node:fs/promises"
 import { hostname } from "node:os"
 import { join } from "node:path"
 
-import { appendMemoryReceiptOnce, readMemoryReceipts, receiptIdentity, type MemoryReceiptInput } from "@oh-my-opencode/memory-core"
+import {
+  appendMemoryReceiptOnce,
+  readMemoryReceipts,
+  receiptIdentity,
+  type MemoryReceiptInput,
+} from "@oh-my-opencode/memory-core"
 
 import type { MemoryReceiptsPort } from "../receipts-port"
 import { writeRunJsonAtomic } from "./run-artifacts"
@@ -33,7 +38,9 @@ function deadLauncher() {
 }
 
 async function snapshot(runDir: string, names: readonly string[]): Promise<Record<string, string>> {
-  return Object.fromEntries(await Promise.all(names.map(async (name) => [name, await readFile(join(runDir, name), "utf8")] as const)))
+  return Object.fromEntries(
+    await Promise.all(names.map(async (name) => [name, await readFile(join(runDir, name), "utf8")] as const)),
+  )
 }
 
 async function quarantine(item: Item): Promise<Record<string, unknown>> {
@@ -48,19 +55,38 @@ describe("quarantine of runs reconciliation cannot recover", () => {
   test("#given a finished run with corrupt terminal timestamps under a dead launcher #when reconciled twice #then it is released, never quarantined, and has one terminal receipt", async () => {
     // given
     const item = await fixture()
-    await writeRunJsonAtomic(join(item.runDir, "final.json"), { version: 1, runId: item.ledger.runId, outcome: "merged", finishedAt: "not-a-date" })
+    await writeRunJsonAtomic(join(item.runDir, "final.json"), {
+      version: 1,
+      runId: item.ledger.runId,
+      outcome: "merged",
+      finishedAt: "not-a-date",
+    })
     await queuePendingReservation(item)
     const before = await snapshot(item.runDir, ["ledger.json", "final.json", "prelaunch.json"])
     const launched: string[] = []
 
     // when
-    await reconcileReflectionRuns({ identity: item.identity, reservation: item.store, launch: (run) => launched.push(run.runId), ...deadLauncher() })
-    await reconcileReflectionRuns({ identity: item.identity, reservation: item.store, launch: (run) => launched.push(run.runId), ...deadLauncher() })
+    await reconcileReflectionRuns({
+      identity: item.identity,
+      reservation: item.store,
+      launch: (run) => launched.push(run.runId),
+      ...deadLauncher(),
+    })
+    await reconcileReflectionRuns({
+      identity: item.identity,
+      reservation: item.store,
+      launch: (run) => launched.push(run.runId),
+      ...deadLauncher(),
+    })
 
     // then
     expect(existsSync(join(item.runDir, "quarantined.json"))).toBe(false)
     expect(await snapshot(item.runDir, ["ledger.json", "final.json", "prelaunch.json"])).toEqual(before)
-    expect((await receipts(item)).filter((receipt) => receipt.kind !== "facts" && receipt.runId === "run-orphan").map((receipt) => receipt.event)).toEqual(["merged"])
+    expect(
+      (await receipts(item))
+        .filter((receipt) => receipt.kind !== "facts" && receipt.runId === "run-orphan")
+        .map((receipt) => receipt.event),
+    ).toEqual(["merged"])
     expect(launched).toEqual(["run-pending"])
   }, 30_000)
 
@@ -69,10 +95,24 @@ describe("quarantine of runs reconciliation cannot recover", () => {
     const item = await fixture()
     const sleeper = spawn(process.execPath, ["-e", "setTimeout(() => {}, 60_000)"], { stdio: "ignore" })
     sleepers.push(sleeper)
-    await writeFile(join(item.runDir, "ledger.json"), JSON.stringify({ ...item.ledger, mergePolicy: "future-policy", launching: false, pid: sleeper.pid, processStart: null }))
+    await writeFile(
+      join(item.runDir, "ledger.json"),
+      JSON.stringify({
+        ...item.ledger,
+        mergePolicy: "future-policy",
+        launching: false,
+        pid: sleeper.pid,
+        processStart: null,
+      }),
+    )
 
     // when
-    const results = await reconcileReflectionRuns({ identity: item.identity, reservation: item.store, ...deadLauncher(), getPidLiveness: (pid) => pid === sleeper.pid ? "alive" : "dead" })
+    const results = await reconcileReflectionRuns({
+      identity: item.identity,
+      reservation: item.store,
+      ...deadLauncher(),
+      getPidLiveness: (pid) => (pid === sleeper.pid ? "alive" : "dead"),
+    })
 
     // then
     expect(results).toEqual([])
@@ -89,7 +129,11 @@ describe("quarantine of runs reconciliation cannot recover", () => {
     await utimes(item.runDir, recent, recent)
 
     // when
-    const results = await reconcileReflectionRuns({ identity: item.identity, reservation: item.store, ...deadLauncher() })
+    const results = await reconcileReflectionRuns({
+      identity: item.identity,
+      reservation: item.store,
+      ...deadLauncher(),
+    })
 
     // then
     expect(results).toEqual([])
@@ -100,10 +144,20 @@ describe("quarantine of runs reconciliation cannot recover", () => {
   test("#given corrupt terminal timestamps under a launcher on another host #when reconciled #then nothing is quarantined and the reservation stays", async () => {
     // given
     const item = await fixture()
-    await writeRunJsonAtomic(join(item.runDir, "final.json"), { version: 1, runId: item.ledger.runId, outcome: "merged", finishedAt: "not-a-date" })
+    await writeRunJsonAtomic(join(item.runDir, "final.json"), {
+      version: 1,
+      runId: item.ledger.runId,
+      outcome: "merged",
+      finishedAt: "not-a-date",
+    })
 
     // when
-    const results = await reconcileReflectionRuns({ identity: item.identity, reservation: item.store, ...deadLauncher(), hostname: () => "another-host" })
+    const results = await reconcileReflectionRuns({
+      identity: item.identity,
+      reservation: item.store,
+      ...deadLauncher(),
+      hostname: () => "another-host",
+    })
 
     // then
     expect(results).toEqual([])
@@ -122,8 +176,11 @@ describe("quarantine of runs reconciliation cannot recover", () => {
 
     // then
     expect(await quarantine(item)).toMatchObject({
-      runId: "run-orphan", kind: "reflection", trigger: "step-count",
-      generation: activeBefore.reservedAt, reason: "ledger_unreadable",
+      runId: "run-orphan",
+      kind: "reflection",
+      trigger: "step-count",
+      generation: activeBefore.reservedAt,
+      reason: "ledger_unreadable",
     })
     expect(JSON.parse(await readFile(join(item.runDir, "reservation.quarantined.json"), "utf8"))).toEqual(activeBefore)
     expect(await readFile(join(item.runDir, "ledger.json"), "utf8")).toBe("{ not json")
@@ -137,12 +194,15 @@ describe("quarantine of runs reconciliation cannot recover", () => {
     const sleeper = spawn(process.execPath, ["-e", "setTimeout(() => {}, 60_000)"], { stdio: "ignore" })
     sleepers.push(sleeper)
     const activePath = join(item.identity.paths.reflection, "active.lock")
-    await writeFile(activePath, JSON.stringify({
-      ...JSON.parse(await readFile(activePath, "utf8")),
-      launcherPid: sleeper.pid,
-      launcherHostname: hostname(),
-      launcherProcessStart: null,
-    }))
+    await writeFile(
+      activePath,
+      JSON.stringify({
+        ...JSON.parse(await readFile(activePath, "utf8")),
+        launcherPid: sleeper.pid,
+        launcherHostname: hostname(),
+        launcherProcessStart: null,
+      }),
+    )
 
     // when
     const results = await reconcileReflectionRuns({ identity: item.identity, reservation: item.store })
@@ -169,7 +229,13 @@ describe("quarantine of runs reconciliation cannot recover", () => {
         return appendMemoryReceiptOnce(runtimeDir, input)
       },
     }
-    await reconcileReflectionRuns({ identity: item.identity, reservation: item.store, receipts: flaky, warn: (message) => warnings.push(message), ...deadLauncher() })
+    await reconcileReflectionRuns({
+      identity: item.identity,
+      reservation: item.store,
+      receipts: flaky,
+      warn: (message) => warnings.push(message),
+      ...deadLauncher(),
+    })
     const sentinel = await quarantine(item)
     const after = { thrown, warnings: warnings.length, lines: (await receipts(item)).length }
 
@@ -183,8 +249,21 @@ describe("quarantine of runs reconciliation cannot recover", () => {
     expect(written).toHaveLength(1)
     const [receipt] = written
     if (receipt === undefined || receipt.kind === "facts") throw new Error("expected a run receipt")
-    expect(receiptIdentity({ kind: receipt.kind, runId: receipt.runId, event: "quarantined", generation: receipt.generation }))
-      .toBe(receiptIdentity({ kind: "reflection", runId: "run-orphan", event: "quarantined", generation: String(sentinel.generation) }))
+    expect(
+      receiptIdentity({
+        kind: receipt.kind,
+        runId: receipt.runId,
+        event: "quarantined",
+        generation: receipt.generation,
+      }),
+    ).toBe(
+      receiptIdentity({
+        kind: "reflection",
+        runId: "run-orphan",
+        event: "quarantined",
+        generation: String(sentinel.generation),
+      }),
+    )
     expect(await quarantine(item)).toEqual(sentinel)
   }, 30_000)
 
@@ -210,11 +289,21 @@ describe("quarantine of runs reconciliation cannot recover", () => {
     // given
     const item = await fixture()
     await writeRunJsonAtomic(join(item.runDir, "outcome.json"), {
-      version: 1, runId: item.ledger.runId, finishedAt: "2026-08-10T00:00:30.000Z", childExit: { code: 0, signal: null }, timedOut: false,
+      version: 1,
+      runId: item.ledger.runId,
+      finishedAt: "2026-08-10T00:00:30.000Z",
+      childExit: { code: 0, signal: null },
+      timedOut: false,
     })
     await writeRunJsonAtomic(join(item.runDir, "quarantined.json"), {
-      version: 1, runId: item.ledger.runId, kind: "reflection", trigger: "step-count",
-      generation: item.ledger.startedAt, reason: "ledger_unreadable", quarantinedAt: "2026-08-10T00:05:00.000Z", evidence: ["ledger.json"],
+      version: 1,
+      runId: item.ledger.runId,
+      kind: "reflection",
+      trigger: "step-count",
+      generation: item.ledger.startedAt,
+      reason: "ledger_unreadable",
+      quarantinedAt: "2026-08-10T00:05:00.000Z",
+      evidence: ["ledger.json"],
     })
 
     // when
@@ -242,14 +331,22 @@ describe("quarantine of runs reconciliation cannot recover", () => {
     })
 
     // then
-    expect(await quarantine(item)).toMatchObject({ reason: "terminal_claim_unrecoverable", generation: item.ledger.startedAt })
+    expect(await quarantine(item)).toMatchObject({
+      reason: "terminal_claim_unrecoverable",
+      generation: item.ledger.startedAt,
+    })
     expect((await item.store.readState()).active).toBeUndefined()
   }, 30_000)
 
   test("#given a finished run whose ledger was later corrupted #when reconciled #then it is a historical record and is not quarantined", async () => {
     // given
     const item = await fixture()
-    await writeRunJsonAtomic(join(item.runDir, "final.json"), { version: 1, runId: item.ledger.runId, outcome: "merged", finishedAt: "2026-08-10T00:00:30.000Z" })
+    await writeRunJsonAtomic(join(item.runDir, "final.json"), {
+      version: 1,
+      runId: item.ledger.runId,
+      outcome: "merged",
+      finishedAt: "2026-08-10T00:00:30.000Z",
+    })
     await writeFile(join(item.runDir, "ledger.json"), "{ not json")
 
     // when

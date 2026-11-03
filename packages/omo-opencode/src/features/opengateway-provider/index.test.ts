@@ -169,7 +169,9 @@ describe("applyOpenGatewayProviderConfig", () => {
     if (overriddenId === undefined) throw new Error("catalog is empty")
     const config: Record<string, unknown> = {
       provider: {
-        [OPENGATEWAY_PROVIDER_ID]: { models: { [overriddenId]: { name: "Pinned", limit: { context: 1234, output: 56 } } } },
+        [OPENGATEWAY_PROVIDER_ID]: {
+          models: { [overriddenId]: { name: "Pinned", limit: { context: 1234, output: 56 } } },
+        },
       },
     }
 

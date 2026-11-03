@@ -41,8 +41,9 @@ describe("suspend/revive lifecycle chaos model", () => {
       // then
       expect(report.violations.some((violation) => violation.invariant === invariant)).toBe(true)
       if (mutation === "capacity_gate_reclamation") {
-        expect(report.violations.find((violation) => violation.invariant === 12)?.detail)
-          .toContain("remained ownerless after capacity-gated reconcile")
+        expect(report.violations.find((violation) => violation.invariant === 12)?.detail).toContain(
+          "remained ownerless after capacity-gated reconcile",
+        )
       }
     })
   }

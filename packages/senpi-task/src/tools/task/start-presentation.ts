@@ -8,9 +8,12 @@ export type StartLabels = {
 }
 
 export function backgroundStartText(started: StartedResult, labels: StartLabels): string {
-  const queue = started.queue_position !== undefined
-    ? ` queued at position ${started.queue_position}`
-    : started.starting === true ? ", the task host is still admitting it; a failed start arrives as its notification" : ""
+  const queue =
+    started.queue_position !== undefined
+      ? ` queued at position ${started.queue_position}`
+      : started.starting === true
+        ? ", the task host is still admitting it; a failed start arrives as its notification"
+        : ""
   const label = labels.taskSummary ?? labels.description ?? started.name
   const base =
     label === started.task_id
@@ -19,11 +22,7 @@ export function backgroundStartText(started: StartedResult, labels: StartLabels)
   return base
 }
 
-export function backgroundConversionText(
-  started: StartedResult,
-  labels: StartLabels,
-  budgetSeconds: number,
-): string {
+export function backgroundConversionText(started: StartedResult, labels: StartLabels, budgetSeconds: number): string {
   const prefix = `Foreground wait reached the prompt-cache-safe budget (${budgetSeconds}s) for task ${started.task_id}; the task continues in background. Completion will arrive as a notification; steer with task_send, read with task_output.`
   return `${prefix}\n\n${backgroundStartText(started, labels)}`
 }

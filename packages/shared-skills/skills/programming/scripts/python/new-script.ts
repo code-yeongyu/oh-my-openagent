@@ -17,11 +17,11 @@
  * Exit codes: 0 written, 2 usage error.
  */
 
-import { chmodSync, mkdirSync, statSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import { parseArgs } from "node:util";
-import { assertNever } from "../shared/run-tool.ts";
+import { chmodSync, mkdirSync, statSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { dirname, join } from "node:path"
+import { parseArgs } from "node:util"
+import { assertNever } from "../shared/run-tool.ts"
 
 const USAGE = `Usage: bun run new-script.ts <name> [--output <path>] [--deps <dep>]... [--py <version>]
 
@@ -32,19 +32,19 @@ Options:
   -o, --output  Output path (default: OS temp directory)
   -d, --deps    Dependency to include (repeat --deps for each)
   --py          Minimum Python version (default: 3.13)
-  -h, --help    Show this help`;
+  -h, --help    Show this help`
 
 type ScriptOptions = {
-  readonly name: string;
-  readonly output: string | undefined;
-  readonly deps: readonly string[];
-  readonly py: string;
-};
+  readonly name: string
+  readonly output: string | undefined
+  readonly deps: readonly string[]
+  readonly py: string
+}
 
 type Cli =
   | { readonly kind: "run"; readonly options: ScriptOptions }
   | { readonly kind: "help" }
-  | { readonly kind: "usage"; readonly problem: string };
+  | { readonly kind: "usage"; readonly problem: string }
 
 function parseCli(): Cli {
   try {
@@ -58,14 +58,14 @@ function parseCli(): Cli {
       },
       allowPositionals: true,
       strict: true,
-    });
-    if (values.help) return { kind: "help" };
-    const [name, ...extra] = positionals;
-    if (name === undefined || extra.length > 0) return { kind: "usage", problem: "expected exactly one script name" };
-    return { kind: "run", options: { name, output: values.output, deps: values.deps, py: values.py } };
+    })
+    if (values.help) return { kind: "help" }
+    const [name, ...extra] = positionals
+    if (name === undefined || extra.length > 0) return { kind: "usage", problem: "expected exactly one script name" }
+    return { kind: "run", options: { name, output: values.output, deps: values.deps, py: values.py } }
   } catch (error) {
-    if (error instanceof TypeError) return { kind: "usage", problem: error.message };
-    throw error;
+    if (error instanceof TypeError) return { kind: "usage", problem: error.message }
+    throw error
   }
 }
 
@@ -73,8 +73,8 @@ function renderScript(pythonVersion: string, deps: readonly string[], filename: 
   const depsBlock =
     deps.length > 0
       ? deps.map((dep) => `#     "${dep}",\n`).join("")
-      : '#     # add deps here, e.g.: "httpx2[http2,brotli,zstd]"\n';
-  const argsHint = "";
+      : '#     # add deps here, e.g.: "httpx2[http2,brotli,zstd]"\n'
+  const argsHint = ""
   return `#!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=${pythonVersion}"
@@ -100,35 +100,35 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-`;
+`
 }
 
 function writeScript({ name, output, deps, py }: ScriptOptions): void {
-  const filename = name.endsWith(".py") ? name : `${name}.py`;
-  const dest = output ?? join(tmpdir(), "uv-scripts", filename);
-  mkdirSync(dirname(dest), { recursive: true });
-  writeFileSync(dest, renderScript(py, deps, filename));
-  if (process.platform !== "win32") chmodSync(dest, statSync(dest).mode | 0o111);
+  const filename = name.endsWith(".py") ? name : `${name}.py`
+  const dest = output ?? join(tmpdir(), "uv-scripts", filename)
+  mkdirSync(dirname(dest), { recursive: true })
+  writeFileSync(dest, renderScript(py, deps, filename))
+  if (process.platform !== "win32") chmodSync(dest, statSync(dest).mode | 0o111)
 
-  console.log(`✓ Created: ${dest}`);
-  console.log(`  Run: uv run ${dest}`);
+  console.log(`✓ Created: ${dest}`)
+  console.log(`  Run: uv run ${dest}`)
 }
 
 function main(): number {
-  const cli = parseCli();
+  const cli = parseCli()
   switch (cli.kind) {
     case "help":
-      console.log(USAGE);
-      return 0;
+      console.log(USAGE)
+      return 0
     case "usage":
-      console.error(`Error: ${cli.problem}\n\n${USAGE}`);
-      return 2;
+      console.error(`Error: ${cli.problem}\n\n${USAGE}`)
+      return 2
     case "run":
-      writeScript(cli.options);
-      return 0;
+      writeScript(cli.options)
+      return 0
     default:
-      return assertNever(cli);
+      return assertNever(cli)
   }
 }
 
-process.exit(main());
+process.exit(main())

@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import {
-  createCompletionNotifier,
-  type PersistedTaskEvent,
-  type TaskRecord,
-} from "@oh-my-opencode/senpi-task"
+import { createCompletionNotifier, type PersistedTaskEvent, type TaskRecord } from "@oh-my-opencode/senpi-task"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { createParentNotifier } from "./parent-notifier"

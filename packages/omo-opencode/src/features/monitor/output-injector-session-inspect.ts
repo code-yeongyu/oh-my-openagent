@@ -1,8 +1,4 @@
-import {
-  isSyntheticOrInternalUserMessage,
-  log,
-  normalizeSDKResponse,
-} from "../../shared"
+import { isSyntheticOrInternalUserMessage, log, normalizeSDKResponse } from "../../shared"
 import { latestAssistantTurnBlocksInternalPrompt } from "@oh-my-opencode/utils/prompt-async-gate/pending-tool-turn"
 import type { DispatchedMonitorOutput, MonitorPromptClient, MonitorSessionMessage } from "./output-injector-types"
 
@@ -89,12 +85,12 @@ export function monitorMessageHasOutput(message: MonitorSessionMessage): boolean
       return typeof part.text === "string" && part.text.trim().length > 0
     }
     if (
-      part.type === "tool"
-      || part.type === "tool_use"
-      || part.type === "tool-call"
-      || part.type === "tool-invocation"
-      || part.type === "tool_result"
-      || part.type === "tool-result"
+      part.type === "tool" ||
+      part.type === "tool_use" ||
+      part.type === "tool-call" ||
+      part.type === "tool-invocation" ||
+      part.type === "tool_result" ||
+      part.type === "tool-result"
     ) {
       return true
     }
@@ -117,12 +113,15 @@ export function monitorMessageContainsBatch(message: MonitorSessionMessage, outp
   }
   const monitorMarker = `monitor_id: ${output.record.id}`
   const batchMarker = `batch: ${output.batch.batchSeq}`
-  return message.parts?.some((part) =>
-    typeof part.text === "string"
-    && part.text.includes("[OMO MONITOR OUTPUT]")
-    && part.text.includes(monitorMarker)
-    && part.text.includes(batchMarker)
-  ) ?? false
+  return (
+    message.parts?.some(
+      (part) =>
+        typeof part.text === "string" &&
+        part.text.includes("[OMO MONITOR OUTPUT]") &&
+        part.text.includes(monitorMarker) &&
+        part.text.includes(batchMarker),
+    ) ?? false
+  )
 }
 
 export async function hasAcceptedMessageAfterDispatchedMonitorOutput(
@@ -138,10 +137,7 @@ export async function hasAcceptedMessageAfterDispatchedMonitorOutput(
     if (createdAt === undefined) {
       return false
     }
-    if (
-      createdAt >= output.dispatchedAt - acceptedMessageSkewMs
-      && monitorMessageContainsBatch(message, output)
-    ) {
+    if (createdAt >= output.dispatchedAt - acceptedMessageSkewMs && monitorMessageContainsBatch(message, output)) {
       return true
     }
     return createdAt >= output.dispatchedAt && monitorMessageHasOutput(message)

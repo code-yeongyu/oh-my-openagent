@@ -1,11 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { posix } from "node:path"
 
-import {
-  runMigrations,
-  type MigrationBatchRunResult,
-  type MigrationFileSystem,
-} from "@oh-my-opencode/omo-config-core"
+import { runMigrations, type MigrationBatchRunResult, type MigrationFileSystem } from "@oh-my-opencode/omo-config-core"
 import { createLegacyConfigMigrationPlans } from "@oh-my-opencode/omo-opencode/config-migration"
 import { parse } from "jsonc-parser"
 
@@ -18,7 +14,6 @@ import {
   runSenpiStartupMigration,
   type SenpiStartupMigrationResult,
 } from "./index"
-
 
 function fileError(code: string, message: string): Error {
   return Object.assign(new Error(message), { code })
@@ -33,10 +28,19 @@ function memoryFileSystem() {
     readonly realpathSync: (path: string) => string
   } = {
     files,
-    copyFileSync(source, destination) { files.set(key(destination), this.readFileSync(source, "utf-8")) },
-    existsSync(path) { return files.has(key(path)) || directories.has(key(path)) },
-    lstatSync() { return { isSymbolicLink: () => false } },
-    mkdirSync(path) { directories.add(key(path)); return undefined },
+    copyFileSync(source, destination) {
+      files.set(key(destination), this.readFileSync(source, "utf-8"))
+    },
+    existsSync(path) {
+      return files.has(key(path)) || directories.has(key(path))
+    },
+    lstatSync() {
+      return { isSymbolicLink: () => false }
+    },
+    mkdirSync(path) {
+      directories.add(key(path))
+      return undefined
+    },
     readFileSync(path) {
       const content = files.get(key(path))
       if (content === undefined) throw fileError("ENOENT", `Missing ${path}`)
@@ -74,7 +78,9 @@ function memoryFileSystem() {
       if (files.has(key(path))) throw fileError("EEXIST", `Exists ${path}`)
       files.set(key(path), content)
     },
-    writeFileSync(path, content) { files.set(key(path), content) },
+    writeFileSync(path, content) {
+      files.set(key(path), content)
+    },
     realpathSync(path) {
       if (!this.existsSync(path)) throw fileError("ENOENT", `Missing ${path}`)
       return key(path)
@@ -114,7 +120,10 @@ describe("runSenpiStartupMigration", () => {
   test("#given both legacy source groups without an OpenCode boot #when Senpi starts #then the core migration engine migrates both into the unified config", () => {
     // given
     const fileSystem = memoryFileSystem()
-    fileSystem.files.set("/home/alice/.config/opencode/oh-my-openagent.jsonc", '{"agents":{"finder":{"model":"provider/finder"}}}')
+    fileSystem.files.set(
+      "/home/alice/.config/opencode/oh-my-openagent.jsonc",
+      '{"agents":{"finder":{"model":"provider/finder"}}}',
+    )
     fileSystem.files.set("/home/alice/.omo/config.jsonc", '{"[opencode]":{"disabled_hooks":["startup-toast"]}}')
 
     // when
@@ -144,34 +153,40 @@ describe("runSenpiStartupMigration", () => {
   test("#given OpenCode and Senpi race on the first legacy migration #when Senpi holds the injected core lock #then exactly one caller migrates", () => {
     // given
     const fileSystem = memoryFileSystem()
-    fileSystem.files.set("/home/alice/.config/opencode/oh-my-openagent.jsonc", '{"agents":{"finder":{"model":"provider/finder"}}}')
+    fileSystem.files.set(
+      "/home/alice/.config/opencode/oh-my-openagent.jsonc",
+      '{"agents":{"finder":{"model":"provider/finder"}}}',
+    )
     const options = migrationOptions(fileSystem)
     let opencodeResult: MigrationBatchRunResult | undefined
     let raced = false
 
     // when
-    const senpiResult = withProcessPlatform("win32", () => runSenpiStartupMigration({
-      ...options,
-      onBoundary: (boundary) => {
-        if (boundary !== "journal-written" || raced) return
-        raced = true
-        opencodeResult = runMigrations({
-          clock: options.clock,
-          discover: () => createLegacyConfigMigrationPlans({
-            cwd: options.cwd,
-            environment: options.environment,
+    const senpiResult = withProcessPlatform("win32", () =>
+      runSenpiStartupMigration({
+        ...options,
+        onBoundary: (boundary) => {
+          if (boundary !== "journal-written" || raced) return
+          raced = true
+          opencodeResult = runMigrations({
+            clock: options.clock,
+            discover: () =>
+              createLegacyConfigMigrationPlans({
+                cwd: options.cwd,
+                environment: options.environment,
+                fileSystem,
+                homeDir: options.homeDir,
+                pathOperations: posix,
+                platform: options.platform,
+              }),
+            env: options.env,
             fileSystem,
-            homeDir: options.homeDir,
-            pathOperations: posix,
-            platform: options.platform,
-          }),
-          env: options.env,
-          fileSystem,
-          isProcessAlive: options.isProcessAlive,
-          pid: 42,
-        })
-      },
-    }))
+            isProcessAlive: options.isProcessAlive,
+            pid: 42,
+          })
+        },
+      }),
+    )
 
     // then
     if (opencodeResult === undefined) throw new Error("Expected OpenCode race result")
@@ -188,7 +203,11 @@ describe("runSenpiStartupMigration", () => {
 function context(logs: string[]): ComponentContext {
   return {
     config: { getFlag: () => undefined },
-    logger: { error() {}, info: (message) => logs.push(`info:${message}`), warn: (message) => logs.push(`warn:${message}`) },
+    logger: {
+      error() {},
+      info: (message) => logs.push(`info:${message}`),
+      warn: (message) => logs.push(`warn:${message}`),
+    },
   }
 }
 
@@ -355,17 +374,24 @@ describe("notificationMessages", () => {
     const notices = notificationMessages(quietMigration, config)
 
     // then
-    expect(notices).toEqual([{
-      message: "OmO Native: Devin does not serve devin/swe-2-low (categories.quick.model), devin/swe-2-high-lite (categories.deep-low.models[1]), devin/swe-2 (categories.writing.fallback_models[0]); SWE-2 runs as devin/swe-2-medium, devin/swe-2-high or devin/swe-2-max",
-      type: "warning",
-    }])
+    expect(notices).toEqual([
+      {
+        message:
+          "OmO Native: Devin does not serve devin/swe-2-low (categories.quick.model), devin/swe-2-high-lite (categories.deep-low.models[1]), devin/swe-2 (categories.writing.fallback_models[0]); SWE-2 runs as devin/swe-2-medium, devin/swe-2-high or devin/swe-2-max",
+        type: "warning",
+      },
+    ])
   })
 
   test("#given categories named after a builtin and a configured agent #when notices are built #then one warning names each ignored category key and its agents key", () => {
     // given
     const config: SenpiOmoConfigResult = {
       config: {
-        categories: { "plan-consultant": { model: "omo-mock/mock-1" }, scout: { model: "omo-mock/mock-2" }, quick: { model: "omo-mock/mock-3" } },
+        categories: {
+          "plan-consultant": { model: "omo-mock/mock-1" },
+          scout: { model: "omo-mock/mock-2" },
+          quick: { model: "omo-mock/mock-3" },
+        },
         agents: { scout: { description: "Project scout" } },
       },
       diagnostics: [],
@@ -377,10 +403,13 @@ describe("notificationMessages", () => {
     const notices = notificationMessages(quietMigration, config)
 
     // then
-    expect(notices).toEqual([{
-      message: 'OmO Native: categories."plan-consultant" is not read for subagent_type "plan-consultant" spawns (categories only route task(category: ...)), so that agent runs its default model chain. Move the chain to the agent: "agents": { "plan-consultant": { "models": ["omo-mock/mock-1"] } }. If you also use task(category: "plan-consultant") on purpose, the key keeps working there; giving the agent its own models silences this warning; categories."scout" is not read for subagent_type "scout" spawns (categories only route task(category: ...)), so that agent runs its default model chain. Move the chain to the agent: "agents": { "scout": { "models": ["omo-mock/mock-2"] } }. If you also use task(category: "scout") on purpose, the key keeps working there; giving the agent its own models silences this warning',
-      type: "warning",
-    }])
+    expect(notices).toEqual([
+      {
+        message:
+          'OmO Native: categories."plan-consultant" is not read for subagent_type "plan-consultant" spawns (categories only route task(category: ...)), so that agent runs its default model chain. Move the chain to the agent: "agents": { "plan-consultant": { "models": ["omo-mock/mock-1"] } }. If you also use task(category: "plan-consultant") on purpose, the key keeps working there; giving the agent its own models silences this warning; categories."scout" is not read for subagent_type "scout" spawns (categories only route task(category: ...)), so that agent runs its default model chain. Move the chain to the agent: "agents": { "scout": { "models": ["omo-mock/mock-2"] } }. If you also use task(category: "scout") on purpose, the key keeps working there; giving the agent its own models silences this warning',
+        type: "warning",
+      },
+    ])
   })
 
   test("#given a category named after an agent that already sets its own models #when notices are built #then no category-shadow warning is produced", () => {

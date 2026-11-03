@@ -19,7 +19,8 @@ export type WrapFailure =
   | "envelope_mismatch"
   | "bad_history"
 
-export type WrapOutcome = { readonly ok: true; readonly keys: EpochKeys } | { readonly ok: false; readonly reason: WrapFailure }
+export type WrapOutcome =
+  { readonly ok: true; readonly keys: EpochKeys } | { readonly ok: false; readonly reason: WrapFailure }
 
 const parseObject = (bytes: Uint8Array, keys: ReadonlyArray<string>): JsonObject | null => {
   const textValue = new TextDecoder().decode(bytes)
@@ -46,7 +47,10 @@ export const openHistory = async (
   material: JsonValue | undefined,
   binding: { readonly account: string; readonly epoch: number; readonly id: string },
   expected: ReadonlyMap<number, string>,
-): Promise<{ readonly current: Uint8Array<ArrayBuffer>; readonly history: ReadonlyMap<number, Uint8Array<ArrayBuffer>> } | null> => {
+): Promise<{
+  readonly current: Uint8Array<ArrayBuffer>
+  readonly history: ReadonlyMap<number, Uint8Array<ArrayBuffer>>
+} | null> => {
   if (!isObject(material)) return null
   const history = material["history"]
   if (material["version"] !== 1 || !isObject(history)) return null
@@ -58,7 +62,9 @@ export const openHistory = async (
   const additionalData = jcsBytes({ account: binding.account, epoch: binding.epoch, id: binding.id, version: 1 })
   let plain: Uint8Array<ArrayBuffer>
   try {
-    plain = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: nonce, additionalData, tagLength: 128 }, key, ciphertext))
+    plain = new Uint8Array(
+      await crypto.subtle.decrypt({ name: "AES-GCM", iv: nonce, additionalData, tagLength: 128 }, key, ciphertext),
+    )
   } catch {
     return null
   }
@@ -116,7 +122,11 @@ export const openWrap = async (
   if (envelope["account"] !== account || envelope["epoch"] !== wrap.epoch || envelope["id"] !== wrap.id) {
     return { ok: false, reason: "envelope_mismatch" }
   }
-  const opened = await openHistory(envelope["key_material"], { account, epoch: wrap.epoch, id: wrap.id }, expectedHistory)
+  const opened = await openHistory(
+    envelope["key_material"],
+    { account, epoch: wrap.epoch, id: wrap.id },
+    expectedHistory,
+  )
   if (opened === null) return { ok: false, reason: "bad_history" }
   return { ok: true, keys: { epoch: wrap.epoch, current: opened.current, history: opened.history } }
 }

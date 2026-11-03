@@ -7,10 +7,7 @@ import { createNodeGitExec } from "@oh-my-opencode/memory-core"
 
 import { finalizeRecordedOutcome } from "./run-finalization"
 import { failReservationRun } from "./run-finalization"
-import {
-  cleanupFinalizationFixtures,
-  finalizationFixture as fixture,
-} from "./run-finalization.test-support"
+import { cleanupFinalizationFixtures, finalizationFixture as fixture } from "./run-finalization.test-support"
 import { parseReservationRunLedger } from "./reservation-run-ledger"
 
 const exec = createNodeGitExec()
@@ -38,18 +35,22 @@ describe("reflection finalization cleanup incompleteness", () => {
     const completed: string[] = []
 
     // when
-    const result = await finalizeRecordedOutcome({
-      identity: item.identity,
-      reservation: {
-        readState: async () => await item.store.readState(),
-        complete: async (runId, outcome) => {
-          completed.push(`${runId}:${outcome}`)
-          return await item.store.complete(runId, outcome)
+    const result = await finalizeRecordedOutcome(
+      {
+        identity: item.identity,
+        reservation: {
+          readState: async () => await item.store.readState(),
+          complete: async (runId, outcome) => {
+            completed.push(`${runId}:${outcome}`)
+            return await item.store.complete(runId, outcome)
+          },
         },
+        now: () => Date.parse("2026-08-11T10:01:00.000Z"),
+        withWriterLock: async (operation) => operation(),
       },
-      now: () => Date.parse("2026-08-11T10:01:00.000Z"),
-      withWriterLock: async (operation) => operation(),
-    }, item.runDir, item.ledger)
+      item.runDir,
+      item.ledger,
+    )
 
     // then
     expect(result?.outcome).toBe("merged")
@@ -66,11 +67,17 @@ describe("reflection finalization cleanup incompleteness", () => {
     await rm(join(item.runDir, "outcome.json"))
 
     // when
-    const result = await failReservationRun({
-      identity: item.identity,
-      reservation: item.store,
-      now: () => Date.parse("2026-08-11T10:01:00.000Z"),
-    }, item.runDir, item.ledger, "failed", "supervisor died")
+    const result = await failReservationRun(
+      {
+        identity: item.identity,
+        reservation: item.store,
+        now: () => Date.parse("2026-08-11T10:01:00.000Z"),
+      },
+      item.runDir,
+      item.ledger,
+      "failed",
+      "supervisor died",
+    )
 
     // then
     expect(result?.outcome).toBe("failed")

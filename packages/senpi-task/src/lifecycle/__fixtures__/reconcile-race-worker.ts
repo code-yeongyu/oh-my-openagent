@@ -9,8 +9,12 @@ import { createTaskLifecycle } from "../create"
 import { NO_HOST_ENDPOINT } from "../host-session"
 
 const [projectDir, parentSessionId, launchLog, gate] = process.argv.slice(2)
-if (projectDir === undefined || parentSessionId === undefined || launchLog === undefined
-  || (gate !== undefined && gate !== "hold-probe" && gate !== "hold-claim")) {
+if (
+  projectDir === undefined ||
+  parentSessionId === undefined ||
+  launchLog === undefined ||
+  (gate !== undefined && gate !== "hold-probe" && gate !== "hold-claim")
+) {
   throw new Error("usage: reconcile-race-worker <projectDir> <parentSessionId> <launchLog> [hold-probe|hold-claim]")
 }
 

@@ -1,9 +1,4 @@
-import {
-  addBoulderWork,
-  createBoulderState,
-  getPlanName,
-  writeBoulderState,
-} from "../../features/boulder-state"
+import { addBoulderWork, createBoulderState, getPlanName, writeBoulderState } from "../../features/boulder-state"
 import { buildAutoSelectedPlanContextInfoOnly } from "./context-info-formatters"
 import { ensureNotepadScaffold } from "./notepad-scaffold"
 
@@ -40,8 +35,7 @@ export function buildAutoSelectedPlanContextWithStateInit(params: {
   readonly directory: string
   readonly reason?: string
 }): string {
-  const { planPath, sessionId, timestamp, activeAgent, worktreePath, worktreeBlock, directory, reason } =
-    params
+  const { planPath, sessionId, timestamp, activeAgent, worktreePath, worktreeBlock, directory, reason } = params
 
   const newState = createBoulderState(planPath, sessionId, activeAgent, worktreePath)
   writeBoulderState(directory, newState)

@@ -12,14 +12,22 @@ const KEY_ROOT_REMEDY = "set SENPI_RPC_KEY_ROOT to the host's agent dir"
 const graceLogged = new Set<string>()
 
 export class RpcIdentityError extends Error {
-  constructor(readonly code: "unsafe_key_record" | "host_identity_unproven" | "auth_failed" | "auth_required", location: string, detail?: string) {
+  constructor(
+    readonly code: "unsafe_key_record" | "host_identity_unproven" | "auth_failed" | "auth_required",
+    location: string,
+    detail?: string,
+  ) {
     super(detail === undefined ? `${code}:${location}` : `${code}:${location}: ${detail}`)
   }
 }
 
 /** An enforcing host's `auth_required` refusal, naming the endpoint and the remedy the missing-record line names. */
 export function authRequiredError(endpoint: string): RpcIdentityError {
-  return new RpcIdentityError("auth_required", endpoint, `the host requires authentication and no usable key record was found; ${KEY_ROOT_REMEDY}`)
+  return new RpcIdentityError(
+    "auth_required",
+    endpoint,
+    `the host requires authentication and no usable key record was found; ${KEY_ROOT_REMEDY}`,
+  )
 }
 
 function object(value: unknown): value is RpcObject {
@@ -40,11 +48,14 @@ const unsafe = (path: string, detail: string) => new RpcIdentityError("unsafe_ke
  */
 function checkDirectory(path: string, exactMode?: number): void {
   const stat = lstatSync(path)
-  if (stat.isSymbolicLink() || !stat.isDirectory()) throw unsafe(path, "not a directory (a symlink is refused); point SENPI_RPC_KEY_ROOT at the real agent dir")
+  if (stat.isSymbolicLink() || !stat.isDirectory())
+    throw unsafe(path, "not a directory (a symlink is refused); point SENPI_RPC_KEY_ROOT at the real agent dir")
   if (stat.uid !== process.getuid?.()) throw unsafe(path, `owned by uid ${stat.uid}, not the current user`)
   const mode = stat.mode & 0o7777
-  if (exactMode !== undefined && mode !== exactMode) throw unsafe(path, `mode ${octal(mode)}, must be ${octal(exactMode)}; run chmod ${exactMode.toString(8)} ${path}`)
-  if (exactMode === undefined && (mode & 0o022) !== 0) throw unsafe(path, `mode ${octal(mode)} is group- or world-writable; run chmod go-w ${path}`)
+  if (exactMode !== undefined && mode !== exactMode)
+    throw unsafe(path, `mode ${octal(mode)}, must be ${octal(exactMode)}; run chmod ${exactMode.toString(8)} ${path}`)
+  if (exactMode === undefined && (mode & 0o022) !== 0)
+    throw unsafe(path, `mode ${octal(mode)} is group- or world-writable; run chmod go-w ${path}`)
 }
 
 function readKey(root: string, launchId: string): Buffer | undefined {
@@ -58,9 +69,17 @@ function readKey(root: string, launchId: string): Buffer | undefined {
     const stat = fstatSync(descriptor)
     if (!stat.isFile()) throw unsafe(path, "not a regular file")
     if (stat.uid !== process.getuid?.()) throw unsafe(path, `owned by uid ${stat.uid}, not the current user`)
-    if ((stat.mode & 0o7777) !== 0o600) throw unsafe(path, `mode ${octal(stat.mode)}, must be 0600; run chmod 600 ${path}`)
+    if ((stat.mode & 0o7777) !== 0o600)
+      throw unsafe(path, `mode ${octal(stat.mode)}, must be 0600; run chmod 600 ${path}`)
     const row: unknown = JSON.parse(readFileSync(descriptor, "utf8"))
-    if (!object(row) || row.version !== 1 || row.launch_id !== launchId || typeof row.key !== "string" || !HEX_32.test(row.key)) throw unsafe(path, "not a valid version 1 key record for this launch")
+    if (
+      !object(row) ||
+      row.version !== 1 ||
+      row.launch_id !== launchId ||
+      typeof row.key !== "string" ||
+      !HEX_32.test(row.key)
+    )
+      throw unsafe(path, "not a valid version 1 key record for this launch")
     return Buffer.from(row.key, "hex")
   } catch (error) {
     if (error instanceof RpcIdentityError) throw error
@@ -84,9 +103,15 @@ export async function authenticateRpcHost(
   const data = object(reply.data) ? reply.data : undefined
   if (data?.auth === undefined) return reply
   const auth = data.auth
-  if (!object(auth) || typeof auth.launch_id !== "string" || !UUID.test(auth.launch_id)
-    || typeof auth.server_nonce !== "string" || !HEX_32.test(auth.server_nonce)
-    || typeof auth.server_proof !== "string" || !HEX_32.test(auth.server_proof)) {
+  if (
+    !object(auth) ||
+    typeof auth.launch_id !== "string" ||
+    !UUID.test(auth.launch_id) ||
+    typeof auth.server_nonce !== "string" ||
+    !HEX_32.test(auth.server_nonce) ||
+    typeof auth.server_proof !== "string" ||
+    !HEX_32.test(auth.server_proof)
+  ) {
     throw new RpcIdentityError("host_identity_unproven", endpoint)
   }
   const root = typeof keyRoot === "function" ? keyRoot() : keyRoot
@@ -94,16 +119,23 @@ export async function authenticateRpcHost(
   if (key === undefined) {
     if (!graceLogged.has(root)) {
       graceLogged.add(root)
-      log(`senpi rpc client: no key record for launch ${auth.launch_id} under ${root}; continuing unauthenticated (refused from the next release; ${KEY_ROOT_REMEDY})`)
+      log(
+        `senpi rpc client: no key record for launch ${auth.launch_id} under ${root}; continuing unauthenticated (refused from the next release; ${KEY_ROOT_REMEDY})`,
+      )
     }
     return reply
   }
   const proof = (label: string, first: string, second: string) =>
     createHmac("sha256", key).update([label, auth.launch_id, first, second].join("\n"), "utf8").digest()
-  if (!timingSafeEqual(proof("senpi-rpc-server", clientNonce, auth.server_nonce), Buffer.from(auth.server_proof, "hex"))) {
+  if (
+    !timingSafeEqual(proof("senpi-rpc-server", clientNonce, auth.server_nonce), Buffer.from(auth.server_proof, "hex"))
+  ) {
     throw new RpcIdentityError("host_identity_unproven", endpoint)
   }
-  const answer = await request({ type: "authenticate", client_proof: proof("senpi-rpc-client", auth.server_nonce, clientNonce).toString("hex") })
+  const answer = await request({
+    type: "authenticate",
+    client_proof: proof("senpi-rpc-client", auth.server_nonce, clientNonce).toString("hex"),
+  })
   if (answer.success !== true) throw new RpcIdentityError("auth_failed", endpoint)
   return reply
 }

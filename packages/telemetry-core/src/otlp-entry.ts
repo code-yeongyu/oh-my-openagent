@@ -21,7 +21,9 @@ export type { SpanAllowlist } from "./otlp-wal"
 export type { InspectedAttributes, InspectedLogRecord, InspectedSpan } from "./otlp-inspect"
 
 /** The collector transport, or null whenever an opt-out applies or consent is not given. */
-export async function createOtlpTelemetryTransport(input: CreateOtlpTelemetryTransportInput): Promise<OtlpTelemetryTransport | null> {
+export async function createOtlpTelemetryTransport(
+  input: CreateOtlpTelemetryTransportInput,
+): Promise<OtlpTelemetryTransport | null> {
   if (!isOtlpTransportAllowed(input)) {
     purgeOnOptOut(input)
     return null

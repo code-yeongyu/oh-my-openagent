@@ -49,9 +49,12 @@ export function createPausedNodeCancel(
 ): (runId: DagRunId, nodeId: string) => Promise<void> {
   return async (runId, nodeId) => {
     const context = options(runId)
-    if (holds === undefined) throw new DagNodeControlError({
-      code: "node_not_continuable", message: "The engine's inherited-hold close port is not configured.", runId,
-    })
+    if (holds === undefined)
+      throw new DagNodeControlError({
+        code: "node_not_continuable",
+        message: "The engine's inherited-hold close port is not configured.",
+        runId,
+      })
     await cancelPausedDagNode(context, runId, nodeId as DagNodeId, holds)
   }
 }

@@ -35,7 +35,10 @@ export function createIdleNotificationScheduler(options: {
       })
     }
     if (sessionActivitySinceIdle.size > maxSessions) {
-      const sessionsToRemove = Array.from(sessionActivitySinceIdle).slice(0, sessionActivitySinceIdle.size - maxSessions)
+      const sessionsToRemove = Array.from(sessionActivitySinceIdle).slice(
+        0,
+        sessionActivitySinceIdle.size - maxSessions,
+      )
       sessionsToRemove.forEach((id) => {
         sessionActivitySinceIdle.delete(id)
       })

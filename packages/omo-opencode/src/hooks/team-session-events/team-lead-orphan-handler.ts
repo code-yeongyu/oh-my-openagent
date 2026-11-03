@@ -1,7 +1,11 @@
 import type { TeamModeConfig } from "../../config/schema/team-mode"
 import type { BackgroundManager } from "../../features/background-agent/manager"
 import { lookupTeamSession } from "../../features/team-mode/team-session-registry"
-import { loadRuntimeState, listActiveTeams, transitionRuntimeState } from "../../features/team-mode/team-state-store/store"
+import {
+  loadRuntimeState,
+  listActiveTeams,
+  transitionRuntimeState,
+} from "../../features/team-mode/team-state-store/store"
 import type { TmuxSessionManager } from "../../features/tmux-subagent/manager"
 import { resolveSessionEventID } from "../../shared/event-session-id"
 import { log } from "../../shared/logger"
@@ -13,10 +17,7 @@ function getDeletedSessionID(properties: unknown): string | undefined {
   return resolveSessionEventID(properties)
 }
 
-async function findLeadTeamRunId(
-  deletedSessionID: string,
-  config: TeamModeConfig,
-): Promise<string | null> {
+async function findLeadTeamRunId(deletedSessionID: string, config: TeamModeConfig): Promise<string | null> {
   const registryEntry = lookupTeamSession(deletedSessionID)
   if (registryEntry?.role === "lead") {
     try {
@@ -73,10 +74,14 @@ export function createTeamLeadOrphanHandler(
       }
 
       const runtimeState = await loadRuntimeState(teamRunId, config)
-      const nextRuntimeState = await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
-        ...currentRuntimeState,
-        status: "orphaned",
-      }), config)
+      const nextRuntimeState = await transitionRuntimeState(
+        runtimeState.teamRunId,
+        (currentRuntimeState) => ({
+          ...currentRuntimeState,
+          status: "orphaned",
+        }),
+        config,
+      )
 
       log("team lead session deleted", {
         event: "team-mode-lead-orphaned",

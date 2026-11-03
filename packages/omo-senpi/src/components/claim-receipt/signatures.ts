@@ -37,7 +37,8 @@ const PASS_SIGNATURES: readonly RegExp[] = [
   /\tpass\t/,
 ]
 
-const HARNESS_REFUSAL = /\bTool \S+ not found\b|\bpermission denied by\b|\b(?:was|were) denied\b|\bblocked by (?:policy|the user|a hook)\b|\brequires approval\b|\b(?:aborted|cancelled) by the user\b/i
+const HARNESS_REFUSAL =
+  /\bTool \S+ not found\b|\bpermission denied by\b|\b(?:was|were) denied\b|\bblocked by (?:policy|the user|a hook)\b|\brequires approval\b|\b(?:aborted|cancelled) by the user\b/i
 
 /** A structured run that errored is a failed check only if it actually ran: a harness refusal is no evidence. */
 export function judgeStructured(errored: boolean, text: string): CheckOutcome {
@@ -52,7 +53,8 @@ export function judgeOutput(text: string): CheckOutcome {
   return "unknown"
 }
 
-const NON_CODE_PATH = /(?:^|\/)(?:\.omo|omo-runs|tmp|evidence|notepads?)\/|^\/(?:private\/)?tmp\/|\.(?:md|txt|log|jsonl|csv)$/i
+const NON_CODE_PATH =
+  /(?:^|\/)(?:\.omo|omo-runs|tmp|evidence|notepads?)\/|^\/(?:private\/)?tmp\/|\.(?:md|txt|log|jsonl|csv)$/i
 
 export function isRelevantPath(path: string): boolean {
   return !NON_CODE_PATH.test(path)

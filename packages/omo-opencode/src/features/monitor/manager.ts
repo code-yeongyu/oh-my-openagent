@@ -13,7 +13,12 @@ import {
   type MonitorManagerDeps,
   type MonitorManagerOptions,
 } from "./manager-internals"
-import { createMonitorInjector, createMonitorState, observeProcessExit, spawnMonitorProcess } from "./monitor-state-factory"
+import {
+  createMonitorInjector,
+  createMonitorState,
+  observeProcessExit,
+  spawnMonitorProcess,
+} from "./monitor-state-factory"
 import { MonitorRingBuffer } from "./ring-buffer"
 import type {
   MonitorId,
@@ -152,7 +157,7 @@ export class MonitorManager implements MonitorManagerContract {
   }
 
   async stopSessionMonitors(sessionId: string): Promise<void> {
-    const ids = [...this.monitorsByParentSession.get(sessionId) ?? []]
+    const ids = [...(this.monitorsByParentSession.get(sessionId) ?? [])]
     await Promise.all(ids.map((id) => this.stop(id)))
     for (const id of ids) {
       this.removeMonitor(id)
@@ -222,7 +227,7 @@ export class MonitorManager implements MonitorManagerContract {
   }
 
   private assertSessionCapacity(sessionId: string): void {
-    const activeCount = [...this.monitorsByParentSession.get(sessionId) ?? []]
+    const activeCount = [...(this.monitorsByParentSession.get(sessionId) ?? [])]
       .map((id) => this.monitors.get(id)?.record.status)
       .filter((status) => status === "starting" || status === "running").length
 
@@ -280,7 +285,7 @@ export class MonitorManager implements MonitorManagerContract {
   }
 
   private flushSessionMonitors(sessionId: string): void {
-    const ids = [...this.monitorsByParentSession.get(sessionId) ?? []]
+    const ids = [...(this.monitorsByParentSession.get(sessionId) ?? [])]
     for (const id of ids) {
       const state = this.monitors.get(id)
       if (!state || state.record.status === "stopped") {

@@ -85,8 +85,14 @@ describe("shared skills package manifest", () => {
         "scripts/tests/",
       ]),
     )
-    expect((await stat("packages/shared-skills/skills/coding-agent-sessions/scripts/find-agent-sessions.py")).isFile()).toBe(true)
-    expect((await stat("packages/shared-skills/skills/coding-agent-sessions/scripts/agent_sessions/cli.py")).isFile()).toBe(true)
-    expect((await stat("packages/shared-skills/skills/coding-agent-sessions/references/all-platforms.md")).isFile()).toBe(true)
+    expect(
+      (await stat("packages/shared-skills/skills/coding-agent-sessions/scripts/find-agent-sessions.py")).isFile(),
+    ).toBe(true)
+    expect(
+      (await stat("packages/shared-skills/skills/coding-agent-sessions/scripts/agent_sessions/cli.py")).isFile(),
+    ).toBe(true)
+    expect(
+      (await stat("packages/shared-skills/skills/coding-agent-sessions/references/all-platforms.md")).isFile(),
+    ).toBe(true)
   })
 })

@@ -31,7 +31,10 @@ describe("memory children honor exclude_models", () => {
 
   test("#given an excluded configured facts model #when the facts model resolves #then it is unavailable", () => {
     // given
-    const config: OmoConfig = { ...NO_FABLE, memory: memorySettings({ facts: { enabled: true, debounce_settles: 1, model: "anthropic/claude-fable-5-1" } }) }
+    const config: OmoConfig = {
+      ...NO_FABLE,
+      memory: memorySettings({ facts: { enabled: true, debounce_settles: 1, model: "anthropic/claude-fable-5-1" } }),
+    }
 
     // when
     const result = resolveFactsModel(config, registry([FABLE, OPUS]), undefined, "agent")

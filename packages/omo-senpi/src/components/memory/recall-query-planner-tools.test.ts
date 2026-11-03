@@ -5,7 +5,9 @@ import { toolArgTexts, ToolArgWindow } from "./recall-query-planner-tools"
 describe("toolArgTexts", () => {
   test("extracts read paths and path words", () => {
     expect(toolArgTexts("read", { path: "/a/b/compaction-timeout.ts" })).toEqual([
-      "compaction-timeout.ts", "compaction", "timeout",
+      "compaction-timeout.ts",
+      "compaction",
+      "timeout",
     ])
   })
 
@@ -30,7 +32,9 @@ describe("toolArgTexts", () => {
   })
 
   test("removes secret-bearing strings", () => {
-    expect(toolArgTexts("bash", { command: "curl -H 'Authorization: Bearer sk-abcdef0123456789abcdef'" })).not.toContain("sk-abcdef0123456789abcdef")
+    expect(
+      toolArgTexts("bash", { command: "curl -H 'Authorization: Bearer sk-abcdef0123456789abcdef'" }),
+    ).not.toContain("sk-abcdef0123456789abcdef")
   })
 
   test("ignores unknown keys and nested objects", () => {
@@ -75,7 +79,16 @@ describe("ToolArgWindow", () => {
   test("keeps newest eight pushes and clears", () => {
     const window = new ToolArgWindow()
     for (let index = 0; index < 10; index += 1) window.push("session", [`text-${index}`])
-    expect(window.texts("session")).toEqual(["text-2", "text-3", "text-4", "text-5", "text-6", "text-7", "text-8", "text-9"])
+    expect(window.texts("session")).toEqual([
+      "text-2",
+      "text-3",
+      "text-4",
+      "text-5",
+      "text-6",
+      "text-7",
+      "text-8",
+      "text-9",
+    ])
     window.clear("session")
     expect(window.texts("session")).toEqual([])
   })

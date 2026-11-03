@@ -1,9 +1,15 @@
 import type { AgentSession } from "@code-yeongyu/senpi"
 import type { CreateChildSession } from "@oh-my-opencode/senpi-task"
 
-import { FACTS_OUTPUT_TOKENS, FACTS_REQUEST_LIMIT, factsContextFits, type FactsModelCapacity } from "./facts-oversized-budget"
+import {
+  FACTS_OUTPUT_TOKENS,
+  FACTS_REQUEST_LIMIT,
+  factsContextFits,
+  type FactsModelCapacity,
+} from "./facts-oversized-budget"
 
-type GuardedSession = Awaited<ReturnType<CreateChildSession>> & Pick<AgentSession, "agent" | "abortCompaction" | "setAutoCompactionEnabled">
+type GuardedSession = Awaited<ReturnType<CreateChildSession>> &
+  Pick<AgentSession, "agent" | "abortCompaction" | "setAutoCompactionEnabled">
 
 export function createOversizedFactsGuard(input: {
   readonly model: FactsModelCapacity & { readonly provider: string; readonly id: string }
@@ -23,12 +29,16 @@ export function createOversizedFactsGuard(input: {
     })
   }
   const createSession: CreateChildSession = async (options) => {
-    const child = input.createSession === undefined
-      ? (await (await import("@code-yeongyu/senpi")).createAgentSession(options)).session
-      : await input.createSession(options)
+    const child =
+      input.createSession === undefined
+        ? (await (await import("@code-yeongyu/senpi")).createAgentSession(options)).session
+        : await input.createSession(options)
     const candidate = child as Partial<GuardedSession>
-    if (typeof candidate.agent?.streamFunction !== "function" || typeof candidate.abortCompaction !== "function"
-      || typeof candidate.setAutoCompactionEnabled !== "function") {
+    if (
+      typeof candidate.agent?.streamFunction !== "function" ||
+      typeof candidate.abortCompaction !== "function" ||
+      typeof candidate.setAutoCompactionEnabled !== "function"
+    ) {
       child.dispose()
       fail("facts child cannot enforce the oversized-input guards")
       throw new Error("facts child cannot enforce the oversized-input guards")
@@ -38,9 +48,15 @@ export function createOversizedFactsGuard(input: {
     const originalStream = session.agent.streamFunction
     let requests = 0
     session.agent.streamFunction = (model, context, options) => {
-      if (failed || model.provider !== input.model.provider || model.id !== input.model.id
-        || model.contextWindow < input.model.contextWindow || model.maxTokens < input.model.maxTokens
-        || requests >= FACTS_REQUEST_LIMIT || !factsContextFits(context, model)) {
+      if (
+        failed ||
+        model.provider !== input.model.provider ||
+        model.id !== input.model.id ||
+        model.contextWindow < input.model.contextWindow ||
+        model.maxTokens < input.model.maxTokens ||
+        requests >= FACTS_REQUEST_LIMIT ||
+        !factsContextFits(context, model)
+      ) {
         fail("facts child exceeded its model, request, or complete-context budget")
         throw new Error("facts child exceeded its model, request, or complete-context budget")
       }
@@ -56,8 +72,13 @@ export function createOversizedFactsGuard(input: {
       if (event.type === "compaction_start" || event.type === "resume_context_reduced") {
         fail("facts child attempted to discard complete source context")
       }
-      if (event.type === "message_end" && event.message !== null && typeof event.message === "object"
-        && "stopReason" in event.message && event.message.stopReason === "length") {
+      if (
+        event.type === "message_end" &&
+        event.message !== null &&
+        typeof event.message === "object" &&
+        "stopReason" in event.message &&
+        event.message.stopReason === "length"
+      ) {
         fail("facts child output was truncated")
       }
     })

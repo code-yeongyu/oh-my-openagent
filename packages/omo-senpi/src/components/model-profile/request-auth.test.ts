@@ -53,7 +53,10 @@ function oauthAccount(name: string, expires: number) {
   return { name, source: "login" as const, access: `${name}-access`, refresh: `${name}-refresh`, expires }
 }
 
-async function realRegistry(seed: Record<string, unknown>, register: (registry: InstanceType<typeof ModelRegistry>) => void) {
+async function realRegistry(
+  seed: Record<string, unknown>,
+  register: (registry: InstanceType<typeof ModelRegistry>) => void,
+) {
   const registry = ModelRegistry.inMemory(AuthStorage.inMemory(seed))
   register(registry)
   await registry.refresh({ allowNetwork: false })
@@ -78,14 +81,25 @@ async function realRegistryWithModelsJson(
   return { registry, agentDir }
 }
 
-function drive(config: OmoConfig, registry: InstanceType<typeof ModelRegistry>, agentDir = testTempDir("omo-model-profile-real-")) {
+function drive(
+  config: OmoConfig,
+  registry: InstanceType<typeof ModelRegistry>,
+  agentDir = testTempDir("omo-model-profile-real-"),
+) {
   const pi = new ProfileExtensionAPI()
   const logs: string[] = []
   const ctx: ComponentContext = {
     config: { getFlag: () => undefined },
-    logger: { error() {}, info: (message) => logs.push(`info:${message}`), warn: (message) => logs.push(`warn:${message}`) },
+    logger: {
+      error() {},
+      info: (message) => logs.push(`info:${message}`),
+      warn: (message) => logs.push(`warn:${message}`),
+    },
   }
-  createModelProfileComponent({ loadConfig: () => ({ config, diagnostics: [], layers: [], sources: [] }) }).register(pi, ctx)
+  createModelProfileComponent({ loadConfig: () => ({ config, diagnostics: [], layers: [], sources: [] }) }).register(
+    pi,
+    ctx,
+  )
   const start = () =>
     pi.dispatch(
       "session_start",
@@ -132,7 +146,10 @@ describe("probeRequestAuth against senpi's real ModelRegistry", () => {
     const attemptsBeforeStart = refreshAttempts.length
 
     // when
-    const { pi, start } = drive({ model_profile: "pooled", model_profiles: { pooled: { models: ["pool-fixture/pooled-1"] } } }, registry)
+    const { pi, start } = drive(
+      { model_profile: "pooled", model_profiles: { pooled: { models: ["pool-fixture/pooled-1"] } } },
+      registry,
+    )
     await start()
 
     // then
@@ -166,7 +183,10 @@ describe("probeRequestAuth against senpi's real ModelRegistry", () => {
         }),
     )
 
-    const { pi, logs, start } = drive({ model_profile: "pooled", model_profiles: { pooled: { models: ["pool-fixture/pooled-1"] } } }, registry)
+    const { pi, logs, start } = drive(
+      { model_profile: "pooled", model_profiles: { pooled: { models: ["pool-fixture/pooled-1"] } } },
+      registry,
+    )
     await start()
 
     expect(pi.sessionModels).toEqual([])
@@ -208,7 +228,11 @@ describe("probeRequestAuth against senpi's real ModelRegistry", () => {
     )
 
     // when
-    const { pi, start } = drive({ model_profile: "pooled", model_profiles: { pooled: { models: ["pool-fixture/pooled-1"] } } }, registry, agentDir)
+    const { pi, start } = drive(
+      { model_profile: "pooled", model_profiles: { pooled: { models: ["pool-fixture/pooled-1"] } } },
+      registry,
+      agentDir,
+    )
     await start()
 
     // then
@@ -239,7 +263,10 @@ describe("probeRequestAuth against senpi's real ModelRegistry", () => {
     expect(await registry.getApiKeyAndHeaders(healthy!)).toMatchObject({ ok: true })
 
     const { pi, logs, start } = drive(
-      { model_profile: "hdr", model_profiles: { hdr: { models: ["headers-fixture/broken", "headers-fixture/healthy"] } } },
+      {
+        model_profile: "hdr",
+        model_profiles: { hdr: { models: ["headers-fixture/broken", "headers-fixture/healthy"] } },
+      },
       registry,
     )
     await start()
@@ -257,10 +284,15 @@ describe("probeRequestAuth against senpi's real ModelRegistry", () => {
 describe("sanitizedAuthErrorDetail", () => {
   test("#given senpi's refresh error chain with a response body #when sanitized #then the class chain survives and the body does not", () => {
     const exchange = new Error("OAuth token exchange failed", {
-      cause: new Error(`Anthropic token refresh request failed. url=https://example.invalid/token; details=Error: body={"marker":"${PRIVATE_MARKER}"}`),
+      cause: new Error(
+        `Anthropic token refresh request failed. url=https://example.invalid/token; details=Error: body={"marker":"${PRIVATE_MARKER}"}`,
+      ),
     })
     exchange.name = "OAuthRefreshExchangeError"
-    const error = Object.assign(new Error(`OAuth refresh failed for anthropic: ${exchange.message}`, { cause: exchange }), { code: "oauth" })
+    const error = Object.assign(
+      new Error(`OAuth refresh failed for anthropic: ${exchange.message}`, { cause: exchange }),
+      { code: "oauth" },
+    )
     error.name = "ModelsError"
 
     const detail = sanitizedAuthErrorDetail(error)
@@ -271,7 +303,9 @@ describe("sanitizedAuthErrorDetail", () => {
   })
 
   test("#given a failing config command quoted in the message #when sanitized #then the command is redacted", () => {
-    const detail = sanitizedAuthErrorDetail(new Error(`Failed to resolve API key from shell command: cat ~/secrets/${PRIVATE_MARKER}`))
+    const detail = sanitizedAuthErrorDetail(
+      new Error(`Failed to resolve API key from shell command: cat ~/secrets/${PRIVATE_MARKER}`),
+    )
 
     expect(detail).toBe("Error: Failed to resolve API key from shell command: <redacted>")
   })
@@ -290,7 +324,9 @@ describe("sanitizedAuthErrorDetail", () => {
   })
 
   test("#given key-shaped assignments, long opaque strings and a stack #when sanitized #then each is masked and the line is bounded", () => {
-    const error = new Error(`token=abc123 key: ${"x".repeat(40)} stack=at somewhere\nsecond line with ${PRIVATE_MARKER}`)
+    const error = new Error(
+      `token=abc123 key: ${"x".repeat(40)} stack=at somewhere\nsecond line with ${PRIVATE_MARKER}`,
+    )
 
     const detail = sanitizedAuthErrorDetail(error)
 

@@ -15,8 +15,13 @@ import { createSessionTransitionBridge } from "./session-transition-bridge"
 import { baseSpec } from "../../../../senpi-task/src/manager/__fixtures__/manager-fakes"
 
 const roots: string[] = []
-afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
-const held = (pauseSeq: number): EnginePauseState => ({ pauseSeq, holds: [{ kind: "session_hold", key: `session_hold:${pauseSeq}` }] })
+afterEach(() => {
+  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
+})
+const held = (pauseSeq: number): EnginePauseState => ({
+  pauseSeq,
+  holds: [{ kind: "session_hold", key: `session_hold:${pauseSeq}` }],
+})
 
 function fixture(overrides: Partial<RunPauseEffects> = {}) {
   const root = mkdtempSync(join(tmpdir(), "run-pause-bridge-"))
@@ -26,30 +31,64 @@ function fixture(overrides: Partial<RunPauseEffects> = {}) {
   const calls: string[] = []
   const cutoffs: number[] = []
   const effects: RunPauseEffects = {
-    snapshot: () => [{ key: "child", kind: "task", taskId: "child", runRef: { kind: "task", id: "child" }, state: "pending", at: "2026-01-01" }],
-    quiesce: () => { calls.push("quiesce") },
-    addFences: async () => { calls.push("fence") },
+    snapshot: () => [
+      {
+        key: "child",
+        kind: "task",
+        taskId: "child",
+        runRef: { kind: "task", id: "child" },
+        state: "pending",
+        at: "2026-01-01",
+      },
+    ],
+    quiesce: () => {
+      calls.push("quiesce")
+    },
+    addFences: async () => {
+      calls.push("fence")
+    },
     pause: async () => ({ kind: "held", childSeq: 8 }),
-    dispatchGuidance: async () => { calls.push("guidance") },
+    dispatchGuidance: async () => {
+      calls.push("guidance")
+    },
     resume: async (_participant, request) => {
       cutoffs.push(request.childSeqCutoff ?? -1)
       calls.push("resume")
       return { kind: "resumed", turnId: "turn-1" }
     },
-    install: async () => { calls.push("install") },
-    acknowledgeInstalled: async () => { calls.push("installed") },
+    install: async () => {
+      calls.push("install")
+    },
+    acknowledgeInstalled: async () => {
+      calls.push("installed")
+    },
     cancel: async () => undefined,
     ...overrides,
   }
   const controller = new RunPauseController(registry, effects)
   let state: EnginePauseState | undefined = held(7)
   const bridge = new EngineRunPauseBridge(controller, { getPauseState: () => state })
-  return { root, bridge, registry, barrier, calls, cutoffs, setState: (next: EnginePauseState | undefined) => { state = next } }
+  return {
+    root,
+    bridge,
+    registry,
+    barrier,
+    calls,
+    cutoffs,
+    setState: (next: EnginePauseState | undefined) => {
+      state = next
+    },
+  }
 }
 
 test("Stop closes synchronously and Resume waits for propagation before freezing cutoffs", async () => {
   const ack = Promise.withResolvers<void>()
-  const h = fixture({ pause: async () => { await ack.promise; return { kind: "held", childSeq: 8 } } })
+  const h = fixture({
+    pause: async () => {
+      await ack.promise
+      return { kind: "held", childSeq: 8 }
+    },
+  })
   const pausing = h.bridge.changed("parent", { ...held(7), change: "paused" })
   expect(h.barrier.state("parent")).toEqual({ kind: "closed", pauseSeq: 7 })
   expect(h.registry.require("parent").phase).toBe("propagating")
@@ -98,7 +137,12 @@ test("an old Resume event cannot reopen a newer Stop", async () => {
 test("Option A keeps ordinary admission closed until installation acknowledges", async () => {
   const installing = Promise.withResolvers<void>()
   const installed = Promise.withResolvers<void>()
-  const h = fixture({ install: async () => { installing.resolve(); await installed.promise } })
+  const h = fixture({
+    install: async () => {
+      installing.resolve()
+      await installed.promise
+    },
+  })
   await h.bridge.changed("parent", { ...held(7), change: "paused" })
   h.setState({ pauseSeq: 7, holds: [] })
   const resuming = h.bridge.changed("parent", { pauseSeq: 7, holds: [], change: "resumed" })
@@ -112,9 +156,11 @@ test("Option A keeps ordinary admission closed until installation acknowledges",
 
 test("a failed guidance dispatch can be retried under the same persisted Resume identity", async () => {
   let dispatches = 0
-  const h = fixture({ dispatchGuidance: async () => {
-    if (++dispatches === 1) throw new Error("delivery interrupted")
-  } })
+  const h = fixture({
+    dispatchGuidance: async () => {
+      if (++dispatches === 1) throw new Error("delivery interrupted")
+    },
+  })
   await h.bridge.changed("parent", { ...held(7), change: "paused" })
   h.setState({ pauseSeq: 7, holds: [] })
   await expect(h.bridge.changed("parent", { pauseSeq: 7, holds: [], change: "resumed" })).rejects.toThrow()
@@ -131,27 +177,51 @@ test("the real session_start bridge awaits registry restoration before lifecycle
   const cwd = mkdtempSync(join(tmpdir(), "run-pause-startup-"))
   roots.push(cwd)
   const pi = new FakeExtensionAPI()
-  const base = composeTaskEngine({ pi, cwd, omoConfig: loadOmoConfig({ cwd }).config, sharedParentTools: () => [], admissionBarrier: h.barrier })
-  let reconciled = false
-  const engine: TaskEngine = { ...base, lifecycle: { ...base.lifecycle,
-    reconcileOnSessionStart: async () => {
-      expect(h.registry.require("parent").phase).toBe("propagating")
-      expect(h.barrier.state("parent").kind).toBe("closed")
-      expect(await base.manager.start(baseSpec({ parent_session_id: "parent", root_session_id: "parent" }))).toMatchObject({ kind: "held" })
-      reconciled = true
-      return { outcomes: [] }
-    },
-  } }
-  const eventBridge = wireEventBridge(pi, {
-    logger: { info: () => undefined, warn: () => undefined, error: () => undefined },
-    config: { getFlag: () => false }, getCapturedTools: () => [],
-  }, engine, { scheduleSync: () => undefined, syncNow: () => undefined, observeRecord: () => undefined, dispose: () => undefined },
-  createSessionTransitionBridge({ runtime: engine.runtime, notifier: engine.notifier }), {
-    runPause: h.bridge,
-    reconcileTeamMailbox: async () => undefined,
-    leadPollers: { tick: async () => undefined, shutdown: () => undefined },
-    resumptionChannels: { emitSessionStart: async () => undefined, emitShutdown: async () => undefined },
+  const base = composeTaskEngine({
+    pi,
+    cwd,
+    omoConfig: loadOmoConfig({ cwd }).config,
+    sharedParentTools: () => [],
+    admissionBarrier: h.barrier,
   })
+  let reconciled = false
+  const engine: TaskEngine = {
+    ...base,
+    lifecycle: {
+      ...base.lifecycle,
+      reconcileOnSessionStart: async () => {
+        expect(h.registry.require("parent").phase).toBe("propagating")
+        expect(h.barrier.state("parent").kind).toBe("closed")
+        expect(
+          await base.manager.start(baseSpec({ parent_session_id: "parent", root_session_id: "parent" })),
+        ).toMatchObject({ kind: "held" })
+        reconciled = true
+        return { outcomes: [] }
+      },
+    },
+  }
+  const eventBridge = wireEventBridge(
+    pi,
+    {
+      logger: { info: () => undefined, warn: () => undefined, error: () => undefined },
+      config: { getFlag: () => false },
+      getCapturedTools: () => [],
+    },
+    engine,
+    {
+      scheduleSync: () => undefined,
+      syncNow: () => undefined,
+      observeRecord: () => undefined,
+      dispose: () => undefined,
+    },
+    createSessionTransitionBridge({ runtime: engine.runtime, notifier: engine.notifier }),
+    {
+      runPause: h.bridge,
+      reconcileTeamMailbox: async () => undefined,
+      leadPollers: { tick: async () => undefined, shutdown: () => undefined },
+      resumptionChannels: { emitSessionStart: async () => undefined, emitShutdown: async () => undefined },
+    },
+  )
   const context = { sessionManager: { getSessionId: () => "parent" }, getPauseState: () => held(7) }
   await pi.dispatch("session_start", {}, context)
   // Reconciliation runs after admission, in the background (#11335).

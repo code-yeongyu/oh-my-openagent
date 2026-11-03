@@ -65,7 +65,11 @@ export function createKibitzerWakeSlot(options: KibitzerWakeSlotOptions): Kibitz
           retryDelayMs,
           ...(signal === undefined ? {} : { signal }),
         })
-        return { status: "acquired", lease: { slot: lease.slot, release: lease.release }, waitedMs: Math.max(0, now() - started) }
+        return {
+          status: "acquired",
+          lease: { slot: lease.slot, release: lease.release },
+          waitedMs: Math.max(0, now() - started),
+        }
       } catch (error) {
         if (error instanceof RecallWakeBusyError) return { status: "busy", waitedMs: Math.max(0, now() - started) }
         if (signal?.aborted === true) return { status: "aborted" }

@@ -17,7 +17,11 @@ export interface BranchOptions {
   lockHook?: LockHook
 }
 export class IsolationCommitReplayError extends Error {
-  constructor(readonly commit: string, readonly branchName: string, readonly cause: unknown) {
+  constructor(
+    readonly commit: string,
+    readonly branchName: string,
+    readonly cause: unknown,
+  ) {
     super(`Cannot replay isolation commit ${commit} onto ${branchName}: ${errorText(cause)}`)
     this.name = "IsolationCommitReplayError"
   }
@@ -26,7 +30,12 @@ async function output(cwd: string, args: string[]) {
   return (await runGit(args, { cwd })).stdout.toString().trim()
 }
 async function diff(cwd: string, base: string, head: string) {
-  return (await runGit(["diff-tree", "--no-commit-id", "-r", "-p", "--binary", "--no-ext-diff", "--no-textconv", base, head], { cwd })).stdout.toString()
+  return (
+    await runGit(
+      ["diff-tree", "--no-commit-id", "-r", "-p", "--binary", "--no-ext-diff", "--no-textconv", base, head],
+      { cwd },
+    )
+  ).stdout.toString()
 }
 /** Replay only in a disposable index: even a failed three-way merge cannot touch user files. */
 async function filteredTree(repoRoot: string, base: string, patch: string): Promise<string> {
@@ -40,7 +49,10 @@ async function filteredTree(repoRoot: string, base: string, patch: string): Prom
       } catch (error) {
         if (!(error instanceof GitCommandError)) throw error
         await runGit(["read-tree", base], options)
-        await runGit(["apply", "--cached", "--3way", "--binary", "--whitespace=nowarn", "-"], { ...options, input: patch })
+        await runGit(["apply", "--cached", "--3way", "--binary", "--whitespace=nowarn", "-"], {
+          ...options,
+          input: patch,
+        })
       }
     }
     return (await runGit(["write-tree"], options)).stdout.toString().trim()
@@ -48,27 +60,52 @@ async function filteredTree(repoRoot: string, base: string, patch: string): Prom
     await rm(dir, { recursive: true, force: true })
   }
 }
-async function commitTree(repoRoot: string, branch: string, tree: string, message: string, author?: Record<string, string>): Promise<void> {
+async function commitTree(
+  repoRoot: string,
+  branch: string,
+  tree: string,
+  message: string,
+  author?: Record<string, string>,
+): Promise<void> {
   const parent = await output(repoRoot, ["rev-parse", branch])
-  const sha = (await runGit(["commit-tree", tree, "-p", parent], { cwd: repoRoot, input: message, env: author })).stdout.toString().trim()
+  const sha = (await runGit(["commit-tree", tree, "-p", parent], { cwd: repoRoot, input: message, env: author })).stdout
+    .toString()
+    .trim()
   await runGit(["update-ref", `refs/heads/${branch}`, sha, parent], { cwd: repoRoot })
 }
 
-export async function commitToBranchLocked(isolationDir: string, repoRoot: string, id: string, baseline: WorktreeBaseline, options: BranchOptions = {}, suppliedDelta?: DeltaPatchResult): Promise<TaskBranch> {
+export async function commitToBranchLocked(
+  isolationDir: string,
+  repoRoot: string,
+  id: string,
+  baseline: WorktreeBaseline,
+  options: BranchOptions = {},
+  suppliedDelta?: DeltaPatchResult,
+): Promise<TaskBranch> {
   const branchName = taskBranch(id)
   const baseSha = baseline.root.headCommit
-  const delta = suppliedDelta ?? await captureDeltaPatch(isolationDir, baseline)
+  const delta = suppliedDelta ?? (await captureDeltaPatch(isolationDir, baseline))
   if (!delta.rootPatch.trim()) return { baseSha, nestedPatches: delta.nestedPatches }
   const head = await output(isolationDir, ["rev-parse", "HEAD"])
   // Reject rewritten/non-descendant child histories instead of importing unrelated commits.
   await runGit(["merge-base", "--is-ancestor", baseSha, head], { cwd: isolationDir })
-  const dirty = [baseline.root.staged, baseline.root.unstaged, baseline.root.untrackedPatch].some(p => p.trim())
+  const dirty = [baseline.root.staged, baseline.root.unstaged, baseline.root.untrackedPatch].some((p) => p.trim())
   const message = async (patch: string) => (await options.commitMessage?.(patch)) || `chore(task): ${id} leftovers`
   // Ref creation is non-forcing, including retries with a retained branch of this id.
   await runGit(["branch", branchName, baseSha], { cwd: repoRoot })
   if (!dirty && head !== baseSha) {
     await runGit(["fetch", "--no-tags", isolationDir, `HEAD:refs/heads/${branchName}`], { cwd: repoRoot })
-    const leftovers = await captureDeltaPatch(isolationDir, { root: { repoRoot: isolationDir, headCommit: head, staged: "", unstaged: "", untrackedFiles: [], untrackedPatch: "" }, nested: [] })
+    const leftovers = await captureDeltaPatch(isolationDir, {
+      root: {
+        repoRoot: isolationDir,
+        headCommit: head,
+        staged: "",
+        unstaged: "",
+        untrackedFiles: [],
+        untrackedPatch: "",
+      },
+      nested: [],
+    })
     if (leftovers.rootPatch.trim()) {
       const tree = await writeSyntheticTree(repoRoot, head, [leftovers.rootPatch])
       await commitTree(repoRoot, branchName, tree, await message(leftovers.rootPatch))
@@ -79,15 +116,25 @@ export async function commitToBranchLocked(isolationDir: string, repoRoot: strin
     const wip = [baseline.root.staged, baseline.root.unstaged, baseline.root.untrackedPatch]
     const dirtyTree = await writeSyntheticTree(isolationDir, baseSha, wip)
     await writeSyntheticTree(repoRoot, baseSha, wip)
-    const commits = (await output(isolationDir, ["rev-list", "--reverse", `${baseSha}..${head}`])).split("\n").filter(Boolean)
+    const commits = (await output(isolationDir, ["rev-list", "--reverse", `${baseSha}..${head}`]))
+      .split("\n")
+      .filter(Boolean)
     let previousTree = await output(repoRoot, ["rev-parse", `${baseSha}^{tree}`])
     for (const commit of commits) {
       try {
         const patch = await diff(isolationDir, dirtyTree, `${commit}^{tree}`)
         const tree = await filteredTree(repoRoot, baseSha, patch)
         if (tree !== previousTree) {
-          const details = (await runGit(["show", "-s", "--format=%an%x00%ae%x00%aI%x00%B", commit], { cwd: isolationDir })).stdout.toString().split("\0")
-          await commitTree(repoRoot, branchName, tree, details[3]!, { GIT_AUTHOR_NAME: details[0]!, GIT_AUTHOR_EMAIL: details[1]!, GIT_AUTHOR_DATE: details[2]! })
+          const details = (
+            await runGit(["show", "-s", "--format=%an%x00%ae%x00%aI%x00%B", commit], { cwd: isolationDir })
+          ).stdout
+            .toString()
+            .split("\0")
+          await commitTree(repoRoot, branchName, tree, details[3]!, {
+            GIT_AUTHOR_NAME: details[0]!,
+            GIT_AUTHOR_EMAIL: details[1]!,
+            GIT_AUTHOR_DATE: details[2]!,
+          })
         }
         previousTree = tree
       } catch (error) {
@@ -107,8 +154,18 @@ export async function commitToBranchLocked(isolationDir: string, repoRoot: strin
   }
   return { branchName, baseSha, nestedPatches: delta.nestedPatches }
 }
-export async function commitToBranch(isolationDir: string, repoRoot: string, id: string, baseline: WorktreeBaseline, options: BranchOptions = {}): Promise<TaskBranch> {
-  return withRepoLock(repoRoot, () => commitToBranchLocked(isolationDir, repoRoot, id, baseline, options), options.lockHook)
+export async function commitToBranch(
+  isolationDir: string,
+  repoRoot: string,
+  id: string,
+  baseline: WorktreeBaseline,
+  options: BranchOptions = {},
+): Promise<TaskBranch> {
+  return withRepoLock(
+    repoRoot,
+    () => commitToBranchLocked(isolationDir, repoRoot, id, baseline, options),
+    options.lockHook,
+  )
 }
 export async function mergeTaskBranchLocked(repoRoot: string, branch: TaskBranch): Promise<MergeState> {
   if (!branch.branchName) return { changes_applied: false, kind: "no-changes" }
@@ -137,6 +194,10 @@ export async function mergeTaskBranchLocked(repoRoot: string, branch: TaskBranch
   if (state.changes_applied) await runGit(["branch", "-D", branchName], { cwd: repoRoot })
   return { ...state, ...(warning ? { warning } : {}) }
 }
-export async function mergeTaskBranch(repoRoot: string, branch: TaskBranch, options: Pick<BranchOptions, "lockHook"> = {}): Promise<MergeState> {
+export async function mergeTaskBranch(
+  repoRoot: string,
+  branch: TaskBranch,
+  options: Pick<BranchOptions, "lockHook"> = {},
+): Promise<MergeState> {
   return withRepoLock(repoRoot, () => mergeTaskBranchLocked(repoRoot, branch), options.lockHook)
 }

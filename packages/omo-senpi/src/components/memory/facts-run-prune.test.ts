@@ -37,9 +37,7 @@ describe("terminal facts run pruning", () => {
     // #then
     const remaining = await runNames(factsDir)
     expect(remaining).toHaveLength(20)
-    expect([...result.pruned].sort()).toEqual(
-      Array.from({ length: 5 }, (_, index) => `facts-aaaa-${index}`).sort(),
-    )
+    expect([...result.pruned].sort()).toEqual(Array.from({ length: 5 }, (_, index) => `facts-aaaa-${index}`).sort())
     expect(remaining).toContain("facts-aaaa-24")
     expect(remaining).not.toContain("facts-aaaa-4")
   }, 30_000)
@@ -163,7 +161,10 @@ describe("terminal facts run pruning", () => {
     await finalizeReserved(first, instant(1))
     const second = await reserveRun(factsDir, locksDir, instant(2))
     await finalizeReserved(second, instant(2))
-    expect([runName(first), runName(second)]).toEqual(["facts-" + digestOf(first) + "-1", "facts-" + digestOf(first) + "-2"])
+    expect([runName(first), runName(second)]).toEqual([
+      "facts-" + digestOf(first) + "-1",
+      "facts-" + digestOf(first) + "-2",
+    ])
 
     // #when: pruning removes attempt 1, then the same digest reserves again.
     const result = await pruneTerminalFactsRuns({ factsDir, locksDir, keepLast: 1 })

@@ -11,10 +11,12 @@ describe("task-owned computer permission relay", () => {
         // when
         await fixture.child(path === "nested" ? "process" : path, path === "nested" ? "nested" : "capture")
         // then
-        expect(fixture.events).toEqual([{
-          name: "omo.computer.permission_required",
-          data: { session_id: fixture.session.sessionId, permission: "screen_recording", app: "Test App" },
-        }])
+        expect(fixture.events).toEqual([
+          {
+            name: "omo.computer.permission_required",
+            data: { session_id: fixture.session.sessionId, permission: "screen_recording", app: "Test App" },
+          },
+        ])
       } finally {
         await fixture.close()
       }
@@ -28,10 +30,12 @@ describe("task-owned computer permission relay", () => {
       // when
       await fixture.child("in-process", "NESTED_PERMISSION_PROBE")
       // then
-      expect(fixture.events).toEqual([{
-        name: "omo.computer.permission_required",
-        data: { session_id: fixture.session.sessionId, permission: "screen_recording", app: "Test App" },
-      }])
+      expect(fixture.events).toEqual([
+        {
+          name: "omo.computer.permission_required",
+          data: { session_id: fixture.session.sessionId, permission: "screen_recording", app: "Test App" },
+        },
+      ])
     } finally {
       await fixture.close()
     }

@@ -66,9 +66,11 @@ describe("team-registry loader", () => {
   const temporaryDirectories: string[] = []
 
   afterEach(async () => {
-    await Promise.all(temporaryDirectories.splice(0).map(async (directoryPath) => {
-      await rm(directoryPath, { recursive: true, force: true })
-    }))
+    await Promise.all(
+      temporaryDirectories.splice(0).map(async (directoryPath) => {
+        await rm(directoryPath, { recursive: true, force: true })
+      }),
+    )
   })
 
   test("loads and validates a valid 3-member team spec", async () => {
@@ -96,7 +98,11 @@ describe("team-registry loader", () => {
     await writeJsonFile(fixturePaths.userConfigPath, teamSpecWithoutVersion)
 
     // when
-    const teamSpec = await loadTeamSpec("default-version", createConfig(fixturePaths.userBaseDir), fixturePaths.projectRoot)
+    const teamSpec = await loadTeamSpec(
+      "default-version",
+      createConfig(fixturePaths.userBaseDir),
+      fixturePaths.projectRoot,
+    )
 
     // then
     expect(teamSpec.version).toBe(1)
@@ -114,7 +120,11 @@ describe("team-registry loader", () => {
 
     try {
       // when
-      const teamSpec = await loadTeamSpec("default-created-at", createConfig(fixturePaths.userBaseDir), fixturePaths.projectRoot)
+      const teamSpec = await loadTeamSpec(
+        "default-created-at",
+        createConfig(fixturePaths.userBaseDir),
+        fixturePaths.projectRoot,
+      )
 
       // then
       expect(teamSpec.createdAt).toBe(222_333_444)
@@ -139,7 +149,11 @@ describe("team-registry loader", () => {
     })
 
     // when
-    const teamSpec = await loadTeamSpec("lead-shorthand", createConfig(fixturePaths.userBaseDir), fixturePaths.projectRoot)
+    const teamSpec = await loadTeamSpec(
+      "lead-shorthand",
+      createConfig(fixturePaths.userBaseDir),
+      fixturePaths.projectRoot,
+    )
 
     // then
     expect(teamSpec.leadAgentId).toBe("lead")
@@ -154,7 +168,14 @@ describe("team-registry loader", () => {
     const fixturePaths = getFixturePaths(rootDirectory, "solo")
     await writeJsonFile(fixturePaths.userConfigPath, {
       name: "solo",
-      members: [{ kind: "category", name: "solo-lead", category: "deep", prompt: "Implement the assigned work for the solo team." }],
+      members: [
+        {
+          kind: "category",
+          name: "solo-lead",
+          category: "deep",
+          prompt: "Implement the assigned work for the solo team.",
+        },
+      ],
     })
 
     // when
@@ -189,7 +210,8 @@ describe("team-registry loader", () => {
     // then
     expect(thrownError).toMatchObject({
       name: TeamSpecValidationError.name,
-      message: "Invalid team spec field 'leadAgentId': leadAgentId required (or write a `lead: {...}` field, or mark one member with `isLead: true`)",
+      message:
+        "Invalid team spec field 'leadAgentId': leadAgentId required (or write a `lead: {...}` field, or mark one member with `isLead: true`)",
       code: "INVALID_TEAM_SPEC",
       field: "leadAgentId",
     })
@@ -256,14 +278,16 @@ describe("team-registry loader", () => {
 
     // then
     expect(results).toHaveLength(2)
-    expect(results).toEqual(expect.arrayContaining([
-      expect.objectContaining({ name: "good", scope: "user", spec: expect.objectContaining({ name: "good" }) }),
-      expect.objectContaining({
-        name: "broken",
-        scope: "user",
-        error: expect.objectContaining({ name: TeamSpecValidationError.name, code: "INVALID_JSON" }),
-      }),
-    ]))
+    expect(results).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "good", scope: "user", spec: expect.objectContaining({ name: "good" }) }),
+        expect.objectContaining({
+          name: "broken",
+          scope: "user",
+          error: expect.objectContaining({ name: TeamSpecValidationError.name, code: "INVALID_JSON" }),
+        }),
+      ]),
+    )
   })
 
   test("rejects specs with more than 8 members", async () => {

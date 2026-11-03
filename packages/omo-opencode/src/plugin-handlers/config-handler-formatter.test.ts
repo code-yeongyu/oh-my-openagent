@@ -56,10 +56,7 @@ beforeEach(async () => {
   mock.restore()
 
   logSpy = spyOn(shared, "log").mockImplementation(() => {})
-  loadPluginComponentsSpy = spyOn(
-    pluginComponentsLoader,
-    "loadPluginComponents",
-  ).mockResolvedValue({
+  loadPluginComponentsSpy = spyOn(pluginComponentsLoader, "loadPluginComponents").mockResolvedValue({
     commands: {},
     skills: {},
     agents: {},
@@ -68,21 +65,11 @@ beforeEach(async () => {
     plugins: [],
     errors: [],
   })
-  applyAgentConfigSpy = spyOn(agentConfigHandler, "applyAgentConfig").mockResolvedValue(
-    {},
-  )
-  applyToolConfigSpy = spyOn(toolConfigHandler, "applyToolConfig").mockImplementation(
-    () => {},
-  )
+  applyAgentConfigSpy = spyOn(agentConfigHandler, "applyAgentConfig").mockResolvedValue({})
+  applyToolConfigSpy = spyOn(toolConfigHandler, "applyToolConfig").mockImplementation(() => {})
   applyMcpConfigSpy = spyOn(mcpConfigHandler, "applyMcpConfig").mockResolvedValue()
-  applyCommandConfigSpy = spyOn(
-    commandConfigHandler,
-    "applyCommandConfig",
-  ).mockResolvedValue()
-  applyProviderConfigSpy = spyOn(
-    providerConfigHandler,
-    "applyProviderConfig",
-  ).mockImplementation(() => {})
+  applyCommandConfigSpy = spyOn(commandConfigHandler, "applyCommandConfig").mockResolvedValue()
+  applyProviderConfigSpy = spyOn(providerConfigHandler, "applyProviderConfig").mockImplementation(() => {})
   ;({ createConfigHandler } = await importFreshConfigHandlerModule())
 })
 

@@ -4,7 +4,7 @@ import { createMonitorFilter } from "./filter"
 
 describe("createMonitorFilter", () => {
   describe("#given no pattern", () => {
-    test('#when matching arbitrary text #then it uses feed-all mode', () => {
+    test("#when matching arbitrary text #then it uses feed-all mode", () => {
       // given
       const result = createMonitorFilter(undefined, { patternMaxLength: 512 })
 
