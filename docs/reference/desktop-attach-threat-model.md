@@ -6,8 +6,9 @@ This is the security design that has to be in place before the engine's
 does (cited as `path:line` at `origin/dev` 37c0448f4d) and what the follow-up
 changes must do and prove:
 
-- **P3b**: concurrent same-uid `--serve` clients, the peer credential check,
-  and the SDK `attach` (UDS) client. This is computer-use v2 plan row 25.
+- **P3b**: concurrent same-uid `--serve` clients, the peer credential checks,
+  the endpoint checks, and the SDK `attach` (UDS) client. This is computer-use
+  v2 plan row 25.
 - **Stop-marker policy**: stop persistence stays XPC-only, and the daemon
   restart path is pinned for v1 consumers. This is plan row 31.
 
@@ -17,11 +18,12 @@ Paths are relative to `crates/` unless they start with `packages/` or `docs/`.
 
 | Id | Asset | Where it lives |
 | --- | --- | --- |
-| A1 | Desktop input authority: synthesized keyboard and mouse in the user's session | the session's backend; the foreground grant is held in the one `ControlSlot` per process (`senpi-desktop-session/src/grant.rs:61-82`) |
-| A2 | Screen content: captures, frames, element refs, the artifact dir, the audit log | the daemon session opened from its CLI flags (`senpi-desktop-engine/src/daemon.rs:1-4,26-42`) |
-| A3 | Stop authority: stop paths, latched stop, the resume token | `StopPaths` shared by every session in the process (`senpi-desktop-engine/src/sessions.rs:1,34-47`); the token file is 0600 on unix (`daemon.rs:84-94`; the non-unix writer at `daemon.rs:97-100` sets no mode); the persistent latch exists only on the XPC agent path (`stop_latch.rs:1`, `sessions.rs:26-32`) |
+| A1 | Desktop input authority: synthesized keyboard and mouse in the user's session | the session's backend; the foreground grant is held in the one `ControlSlot` per process (`senpi-desktop-session/src/grant.rs:1-7,61-82`) |
+| A2 | Screen content: captures, frames, element refs, the artifact dir, the audit log | the daemon session opened from its CLI flags (`senpi-desktop-engine/src/daemon.rs:1-4,26-42,50-72`) |
+| A3 | Stop authority: stop paths, latched stop, the resume token | **UDS daemon:** the token is random per process (`engine.rs:60-62`) and written by `daemon.rs:71-72` through `write_token`, 0600 at creation on unix (`daemon.rs:84-94`; the non-unix writer at `daemon.rs:97-100` sets no mode). **XPC agent:** `StopPaths` are shared by its sessions (`sessions.rs:1,34-47`; `sessions` compiles only on macOS, `main.rs:21-22`) and the persistent latch exists only there (`stop_latch.rs:1`, `sessions.rs:26-32`) |
 | A4 | TCC grants (Accessibility, Screen Recording) of the responsible process | macOS charges requests to the responsible process (`senpi-desktop-backend-macos/src/launch_gate.rs:3-12`) |
 | A5 | The omo host's per-call permission preflight (`computer:read` / `computer:exec`) | the tool pipeline; kernels reach the engine only through it (`toolBridge`) |
+| A6 | Request content in transit: `typeText` text, `clipboard.write` content, the `--resume` token | the request lines a client sends to whatever answers at the endpoint |
 
 ## Trust boundaries
 
@@ -29,28 +31,44 @@ Paths are relative to `crates/` unless they start with `packages/` or `docs/`.
 
 - **Today.** The listener binds the endpoint and serves one client at a time
   (`senpi-desktop-engine/src/serve.rs:1-4,30-46`). It does no peer credential
-  check. The only access control is the directory. The default endpoint is
-  `$XDG_RUNTIME_DIR/senpi-desktop/<uid>.sock`, or the same path under the temp
-  dir, and that directory is created 0700 (`client.rs:15-29,40-49`). An explicit
-  `--serve <path>` outside that directory has no protection beyond the socket
-  file mode, which the umask sets.
-- **P3b target.** After `accept`, the daemon reads the peer's effective uid
-  (`getpeereid` on macOS/BSD, `SO_PEERCRED` on Linux) in a new `peer.rs`. If it
-  is not the daemon's euid, or the lookup fails, the daemon closes the
-  connection without writing a byte and writes one audit line.
+  check. The only access control is the directory.
+  - The default endpoint is `$XDG_RUNTIME_DIR/senpi-desktop/<uid>.sock`, or the
+    same path under the temp dir (`client.rs:15-29`).
+  - The directory is created 0700 only when it does not exist yet. On an
+    existing directory, `create` with `recursive(true)` succeeds and changes
+    neither mode nor owner. The socket is then named after the directory's
+    *owner*, not the caller (`client.rs:41-49`).
+  - An explicit `--serve <path>` outside that directory has no protection
+    beyond the socket file mode, which the umask sets.
+- **P3b target, daemon side.** Before writing anything or binding, the daemon
+  checks the endpoint's parent directory and refuses to start unless that
+  directory:
+  - is not a symlink (checked with `lstat` on every created component);
+  - is owned by the daemon's euid;
+  - has no group or other permission bits.
+
+  It writes the resume token only after that check: it unlinks any existing
+  file, then creates the token with `O_CREAT|O_EXCL|O_NOFOLLOW` and mode 0600.
+  After `accept`, it reads the peer's effective uid (`getpeereid` on
+  macOS/BSD, `SO_PEERCRED` on Linux) in a new `peer.rs`. If that uid is not the
+  daemon's euid, or the lookup fails, it closes the connection without writing
+  a byte and writes one audit line.
+- **P3b target, client side.** The Rust client (`--oneshot`, `--mcp`,
+  `--resume`: `client.rs`) and the SDK `attach` client apply the same directory
+  rule before they connect or auto-start a daemon. The check must not be a
+  stat-then-connect sequence. Open the directory with `O_DIRECTORY|O_NOFOLLOW`,
+  `fstat` that fd, and connect relative to it (`connectat`, or
+  `/proc/self/fd/<n>/<name>` on Linux). On a platform where neither works,
+  refuse any parent that is a shared, non-sticky directory.
 - **Strength.** This stops other uids. It does not stop a different process
   running as the same uid: every same-uid peer is equally trusted.
 - **Method exposure is client-side.** The host-only filter (`session.open`,
   `control.grant`, `stopPath.resume`, ...: `senpi-desktop-core/src/methods.rs:89-130`)
   runs in the `--oneshot` / `--mcp` client process (`oneshot.rs:1-5,18-31`). The
   daemon's line handler routes every method it parses
-  (`connection.rs:174-218`). `--resume` relies on that: it sends
-  `stopPath.resume` over the socket with the token from the 0600 file
+  (`connection.rs:174-218`, `route.rs:27-30`). `--resume` relies on that: it
+  sends `stopPath.resume` over the socket with the token from the token file
   (`client.rs:162-177`).
-- **Windows named pipe.** It is created with `first_pipe_instance(true)` and
-  the default security descriptor (`serve.rs:48-63`). There is no client-SID
-  check. The access the default descriptor grants to other accounts is
-  UNVERIFIED in this document.
 
 ### B2: XPC agent (`--xpc-agent`, macOS only)
 
@@ -58,15 +76,20 @@ Each check below must pass before the next one runs:
 
 1. **Same euid at accept.** The connection is cancelled if the peer's euid
    differs (`senpi-desktop-xpc/src/peers.rs:21-25`, `native.rs:97-101`).
-2. **Code-signature peer auth on every message.** The peer must match the role
-   requirement (team `523JNR86LZ`, a fixed identifier per role:
-   `roles.rs:1-30`). It must be validly signed, hardened (runtime, hard, kill),
-   not debugged, free of the forbidden entitlements, and on the current
-   security epoch (`policy.rs:98-164`). A verification result covers one
-   message and is never cached or cloned (`policy.rs:43-52`).
+2. **Code-signature peer auth.** The listener carries a code-signing
+   requirement. Every received message is also verified on its own
+   (`agent.rs:140-146` -> `dictionary.rs:78-85` -> `policy.rs:98-164`):
+   - team `523JNR86LZ` and a fixed identifier per role (`roles.rs:1-30`);
+   - a valid signature;
+   - hardened (runtime, hard, kill) and not debugged;
+   - none of the forbidden entitlements;
+   - the current security epoch.
+
+   A verification result covers one message and is never cached or cloned
+   (`policy.rs:43-52`).
 3. **Finite approval and replay boundary per live connection.** A capability is
-   bound per connection, and the message sequence must match
-   (`senpi-desktop-xpc/src/connection.rs:1,63-77,172`).
+   bound per connection, and the approval and message sequence are checked
+   (`senpi-desktop-xpc/src/connection.rs:1,63-77,166-182`).
 4. **Engine admission.** Only after the checks above does the engine accept a
    valid `session.open`, and it uses no environment-selected backend
    (`senpi-desktop-engine/src/xpc.rs:68-116`).
@@ -76,7 +99,27 @@ process. Such a process cannot speak to the engine unless it is one of our
 signed, hardened, non-debugged binaries in the expected role. Code execution
 inside such a binary is out of scope.
 
-### B3: omo-hosted kernels never attach
+### B3: Windows named pipe (`--serve`)
+
+- **Today.** The default endpoint is the predictable global name
+  `\\.\pipe\senpi-desktop-<USERNAME>` (`client.rs:21-23`). The pipe is created
+  with `first_pipe_instance(true)` and the default security descriptor
+  (`serve.rs:48-63`).
+  - The server checks nothing about the client.
+  - The client opens whatever answers with plain read/write `OpenOptions`
+    (`client.rs:104-107`). It sets no `SECURITY_SQOS_PRESENT |
+    SECURITY_IDENTIFICATION` and does not check the server.
+  - The access the default descriptor grants to other accounts is UNVERIFIED in
+    this document.
+- **P3b target.** P3b keeps single-client behavior and refuses a second
+  concurrent client. It ships no Windows peer check.
+- **Follow-up.** The Windows follow-up (one issue) needs both sides:
+  - **Client:** open with `SECURITY_SQOS_PRESENT|SECURITY_IDENTIFICATION`, and
+    verify the server before sending anything: the user SID of the token of
+    `GetNamedPipeServerProcessId` must equal the caller's.
+  - **Server:** check the client SID, then admit concurrent clients.
+
+### B4: omo-hosted kernels never attach
 
 The js and py kernels' `computer` global goes through `toolBridge`, which is one
 `tool.computer` call per helper. That keeps the host's per-call preflight (A5)
@@ -84,7 +127,7 @@ on every call. Kernels use neither `attach` nor `spawn` (DESIGN §3 attach,
 §6). The omo host never starts its own engine as `--serve`: that would let any
 same-uid process skip A5 (Q decision 2, MCP exposure).
 
-### B4: Launch and responsibility (macOS)
+### B5: Launch and responsibility (macOS)
 
 Every mode except `--xpc-agent` runs the #10207 gate first (`main.rs:45-56`).
 That gate refuses an engine that is its own responsible process, or one whose
@@ -97,10 +140,10 @@ is not a protection (`cli.rs:34-37`).
 
 | | UDS `--serve` daemon (P3b) | XPC agent |
 | --- | --- | --- |
-| Session | ONE session, opened by the daemon itself from its CLI flags (`daemon.rs:44-60`, `main.rs:126-135`); clients cannot open their own (`session.open` is host-only: `tests/serve_oneshot.rs:146-157`) | one Engine per approved anonymous connection (`sessions.rs:1`, `xpc.rs:28-64`) |
+| Session | ONE session, opened by the daemon itself from its CLI flags (`daemon.rs:50-72`, `main.rs:126-135`). A bridge client cannot open its own (`session.open` is host-only at the bridge: `tests/serve_oneshot.rs:143-154`), but a raw socket client can call `session.open`, which re-creates the backend for everyone (see M2) | one Engine per approved anonymous connection (`sessions.rs:1,50-62`, `xpc.rs:39-43`) |
 | Frames and refs | shared: client 2 may act on a frame that client 1 captured (`tests/serve_oneshot.rs:88-100`) | per connection |
-| Stop paths | shared; a stop from any client suspends all of them | shared across sessions in the process (`sessions.rs:1,59`) |
-| ControlSlot | one per process; a second grant is refused, never stolen (`grant.rs:61-82`) | the same |
+| Stop paths | shared; a stop from any client suspends all of them | shared across sessions in the process |
+| Foreground grant | one session, so the grant is that session's. Any client's `control.grant` re-grants with a fresh generation (`grant.rs:150-172`), and the grant then covers every client | one `ControlSlot` per process; a second session's grant is refused `InputBusy`, never stolen (`grant.rs:1-7,150-172`) |
 | Ordering | session requests are serialized FIFO in arrival order across connections; replies are matched to their own connection and id | per connection |
 | Disconnect | cancels that connection's input holds only (`connection.rs:132-134`); other clients keep running | cancels everything on that connection (`connection.rs:134`) |
 
@@ -112,62 +155,105 @@ consumers rely on frames carrying across `--oneshot` calls.
 
 ### M1: another uid on the same host
 
-- **UDS, default endpoint.** The 0700 directory denies `connect`. With P3b, the
-  peer uid check closes the connection without a reply, which also covers an
-  explicit `--serve` path or a loose directory.
-- **UDS, endpoint squatting (open finding F1).** When `XDG_RUNTIME_DIR` is
-  unset, the path lives in the shared temp dir. `private_dir` does not check an
-  existing directory: `create` with `recursive(true)` succeeds on it without
-  changing its mode, and the socket is then named after the directory's
-  *owner*, not the caller (`client.rs:25-28,41-49`).
-  - The attack: another uid pre-creates `<tmp>/senpi-desktop` with an open
-    mode and binds `<its-uid>.sock`.
-  - The result: the victim's `--oneshot` / `--mcp` / `--resume` connect to the
-    attacker's daemon, which receives the requests and forges the replies.
-  - Why P3b's check does not help: the daemon-side peer check protects the
-    daemon, not the client.
-  - Mitigation, tested under P3b: the SDK `attach` client refuses an endpoint
-    whose parent directory is not owned by the caller's uid or is accessible
-    to group or other. The same check in the Rust client (`client.rs`) is
-    outside P3b's write scope and needs its own issue.
-  - Status: found by reading the code, not reproduced here (reproducing it
-    needs two uids).
-- **Windows pipe.** P3b keeps single-client behavior and refuses a second
-  concurrent client until a client-SID check exists. That check is recorded as
-  a follow-up, not designed here.
-- **XPC.** Refused at accept by the euid check (B2.1).
+**UDS, default endpoint, private parent.** The 0700 directory denies `connect`.
+With P3b, the peer uid check closes the connection without a reply, which also
+covers an explicit `--serve` path or a loose directory.
+
+**UDS, shared temp parent: squatting (F1).**
+
+- **Precondition.** The parent is shared and non-sticky at the
+  `senpi-desktop` level. That happens on Linux without `XDG_RUNTIME_DIR` and
+  with `TMPDIR` unset or shared, or on macOS with `TMPDIR` unset (the normal
+  macOS `$TMPDIR` is per-user).
+- **Setup.** Another uid pre-creates `<tmp>/senpi-desktop` with an open mode.
+  Every consequence below follows from `client.rs:41-49` and is verified by
+  reading the code, not reproduced here (reproducing needs two uids):
+  - **Client spoofing and confidentiality loss.** The victim's `--oneshot`,
+    `--mcp` and `--resume` connect to `<tmp>/senpi-desktop/<attacker-uid>.sock`.
+    If the attacker answers there, it receives every request (A6) and forges
+    every reply.
+  - **Hijack after a real daemon is up.** If nothing answers,
+    `exchange_or_start` starts a real victim daemon on that path
+    (`client.rs:114-143`). Its socket inode then lives in a directory the
+    attacker controls, so the attacker can unlink or replace it at any time.
+  - **Token write through attacker-planted files.** Before binding,
+    `main.rs:131` runs `open_daemon_session`, which writes
+    `<attacker-dir>/<attacker-uid>.resume` with
+    `write|create|truncate` and neither `O_NOFOLLOW` nor `O_EXCL`
+    (`daemon.rs:84-94`).
+    - A pre-planted symlink makes the victim's daemon truncate and overwrite
+      any file the victim can write. `fs.protected_symlinks` does not apply,
+      because the directory is not sticky.
+    - A pre-created attacker-owned 0666 file receives the token, which the
+      attacker can then read, since mode 0600 applies only at creation. That
+      defeats A3.
+- **Mitigation (P3b scope, not a separate issue).** P3b ships the daemon-side
+  directory check and the `O_EXCL|O_NOFOLLOW` token write (B1). It also ships
+  the same fd-based directory check in both the Rust client and the SDK
+  `attach` client.
+- **Tests:** T25-13, T25-15, T25-16, T25-17.
+
+**Windows pipe-name squatting.**
+
+- **Attack.** Any account can create `\\.\pipe\senpi-desktop-<USERNAME>` first.
+  `first_pipe_instance(true)` (`serve.rs:52`) then makes the victim's own
+  daemon fail to create the pipe. The victim's client opens the attacker's
+  pipe without checking it (`client.rs:104-107`). The attacker receives every
+  request (A6) and forges every reply.
+- **Impersonation.** Because the client sets no SQOS flags, a server holding
+  `SeImpersonatePrivilege` can impersonate the victim's client token.
+- **Mitigation.** The Windows follow-up described in B3. Until it lands, the
+  Windows daemon endpoint is not a boundary against other accounts. This is
+  recorded under residual risk.
+
+**XPC.** Refused at accept by the euid check (B2.1).
 
 ### M2: a different process, same uid
 
 - **UDS: not stopped.** That process can connect and call every daemon method,
-  host-only ones included (B1, method exposure). It can read the 0600 resume
-  token and resume a stop. It can kill and restart the daemon, which clears a
-  UDS stop (plan row 31 pins this as the v1 behavior). It can read every
-  client's frames and refs. It can start the engine binary directly.
+  host-only ones included (B1, method exposure). In particular:
+  - **`control.grant`.** It grants itself the foreground control grant that is
+    meant to be human-confirmed (`grant.rs:1-7`), with no human in the loop,
+    and the grant then covers every client (session table).
+  - **`session.open`.** It re-creates the backend with the caller's options,
+    including `audit_path` and `artifact_dir`, so it can re-point the daemon's
+    audit log. It also invalidates every client's refs and frames
+    (`senpi-desktop-session/src/worker.rs:85-120`).
+  - **The resume token.** It can read the token file and resume a stop.
+  - **Daemon restart.** It can kill and restart the daemon, which clears a UDS
+    stop (plan row 31 pins this as the v1 behavior).
+  - **Shared content.** It can read every client's frames and refs.
+  - **The engine binary.** It can start the engine directly.
 - **What still limits it on UDS.** Nothing at the protocol level. On macOS, TCC
-  still charges every request to the responsible process (B4); the launch gate
-  refuses a self-responsible engine.
+  still charges every request to the responsible process (B5), and the launch
+  gate refuses a self-responsible engine.
 - **XPC: stopped**, unless the process is one of our signed binaries (B2.2).
 
 ### M3: model code inside an omo kernel (js or py eval)
 
-- **Intended path.** `toolBridge` only; every call passes A5 (B3).
+- **Intended path.** `toolBridge` only; every call passes A5 (B4).
 - **Raw socket.** Model code that opens the daemon socket itself is M2. The
   boundary is the eval tool's own permission gate, which decides whether that
   code runs at all (DESIGN §3 spawn, first boundary).
 - **Spawning its own engine** (`spawn` inside a session), handled in three
   layers:
-  1. The SDK refuses with `ControlRequired{reason: "spawn_inside_session"}`
-     when it sees the host-created kernel marker `SENPI_DESKTOP_HOST=1`. The
-     marker carries no secret and grants nothing. This refusal is an accident
-     guard, not a security boundary: same-uid code can unset the variable.
-  2. B4 refuses a self-responsible engine.
-  3. An engine started by a kernel that was launched with the
-     responsibility-disclaim attribute inherits the kernel as its responsible
-     process. TCC then charges the interpreter, which on an ordinary machine
-     holds no grant, so every capture and input ends `PermissionDenied`. On a
-     machine where the user granted the interpreter, only the eval permission
-     gate remains.
+  1. **The SDK accident guard.** The SDK refuses with
+     `ControlRequired{reason: "spawn_inside_session"}` when it sees the
+     host-created kernel marker `SENPI_DESKTOP_HOST=1`. The marker carries no
+     secret and grants nothing. This refusal is not a security boundary:
+     same-uid code can unset the variable.
+  2. **The launch gate.** B5 refuses a self-responsible engine.
+  3. **TCC (P4b-conditional; no code for it exists today).** An out-of-process
+     kernel (py) launched with `POSIX_SPAWN_SETDISCLAIM` becomes its own
+     responsible process, and an engine it starts inherits it. TCC then
+     charges the interpreter, which on an ordinary machine holds no grant, so
+     every capture and input ends `PermissionDenied`.
+     - **Grants on the interpreter:** if the user granted the interpreter, this
+       layer does not stand.
+     - **In-process kernels (js in the host process):** this layer does not
+       exist. An engine spawned from such a kernel inherits the host's
+       responsible process and its grants.
+     - **What remains in both cases:** only layer 1's eval permission gate.
 
 ### M4: replayed or late connection
 
@@ -177,14 +263,16 @@ consumers rely on frames carrying across `--oneshot` calls.
     peer that passed the check can do it.
   - A late connection joins the shared session. It sees the stop state and the
     frames and refs earlier clients created. It can act on them only through
-    the ControlSlot and the stop paths, like any client.
-  - The resume token is regenerated on every daemon start (`sessions.rs:43`).
+    the grant and the stop paths, like any client.
+  - The daemon's resume token is regenerated on every daemon start
+    (`engine.rs:60-62`, written at `daemon.rs:71-72`).
   - A socket fd handed to another process (`SCM_RIGHTS`) keeps the original
     peer's credentials, so handing one over is already same-uid cooperation
     (M2).
-- **XPC.** Verification is per message and never cached (`policy.rs:43-52`).
-  The approval is finite and the sequence check refuses a replayed or
-  reordered message (`senpi-desktop-xpc/src/connection.rs:25-29,172`).
+- **XPC.** Every message is verified, and the result is never cached
+  (`agent.rs:140-146`, `policy.rs:43-52`). The approval is finite, and the
+  sequence check refuses a replayed or reordered message
+  (`senpi-desktop-xpc/src/connection.rs:166-182`).
 
 ## Refusal table
 
@@ -192,30 +280,38 @@ consumers rely on frames carrying across `--oneshot` calls.
 | --- | --- | --- | --- |
 | UDS peer euid != daemon euid | `serve.rs` accept -> `peer.rs` (P3b) | close without a reply; one audit line; daemon keeps serving | T25-6 |
 | UDS peer credential lookup fails | the same | close without a reply (fail closed) | T25-7 |
-| Other uid connects to the default endpoint | kernel (0700 directory) | `connect` fails | OS behavior |
-| Endpoint directory not owned by the caller or group/other accessible | SDK `attach` client (P3b) | refuse before connecting | T25-13 |
+| Other uid connects to a private default endpoint | kernel (0700 directory) | `connect` fails | OS behavior |
+| Endpoint parent is a symlink, not owned by the daemon's euid, or group/other accessible | daemon start (P3b) | refuse to start; no token written, no bind | T25-15 |
+| Token path exists (file or symlink) when the daemon writes it | daemon start (P3b) | unlink, then `O_EXCL\|O_NOFOLLOW` create; a symlink target is never written | T25-16 |
+| Endpoint parent fails the same rule | Rust client and SDK `attach` client (P3b), fd-based | refuse before connecting or auto-starting | T25-13, T25-17 |
 | Second concurrent Windows pipe client | `serve.rs` (P3b) | refused; the first client continues | T25-8 |
-| Host-only method through `--oneshot` / `--mcp` / SDK `attach` | client-side bridge (`oneshot.rs:18-31`) | `hostOnly` rejection | `tests/serve_oneshot.rs:146-157`, T25-12 |
+| Windows client facing an unverified pipe server | Windows follow-up (client) | refuse before sending | follow-up issue |
+| Host-only method through `--oneshot` / `--mcp` / SDK `attach` | client-side bridge (`oneshot.rs:18-31`) | `hostOnly` rejection | `tests/serve_oneshot.rs:143-154`, T25-12 |
 | XPC peer euid differs | `peers.rs:21-25` | connection cancelled | existing XPC tests |
 | XPC signature, role, team, hardening, entitlement or epoch failure | `policy.rs:98-164` | message rejected | `policy/tests` |
-| XPC approval missing, or sequence mismatch | `senpi-desktop-xpc/src/connection.rs:25-29,172` | message rejected | existing transport tests |
+| XPC approval missing, or sequence mismatch | `senpi-desktop-xpc/src/connection.rs:166-182` | message rejected | existing transport tests |
 | Engine is its own responsible process, or unresolved | `launch_gate.rs:23-41`, `main.rs:53-56` | refuse before any mode (except `--xpc-agent`) | `tests/launch_gate.rs` |
 | `--serve` / `--oneshot` / `--mcp` without `--enable-daemon` | `cli.rs:151` | usage error (accident guard only) | existing CLI tests |
-| `spawn` inside an omo session | SDK | `ControlRequired{reason: "spawn_inside_session"}`; the boundary is the eval permission gate plus TCC (M3) | SDK spawn tests |
+| `spawn` inside an omo session | SDK | `ControlRequired{reason: "spawn_inside_session"}` (accident guard). The boundary is the eval permission gate, plus TCC only for a P4b out-of-process kernel without interpreter grants (M3) | SDK spawn tests |
 
 ## Residual risk
 
-1. **Same-uid code is not stopped on UDS.** On UDS, any same-uid process can use
-   every daemon method, resume a stop, restart the daemon to clear a stop, and
-   read all shared frames. XPC code-signature auth is the only same-uid
-   boundary, and kernels use neither transport. Accepted for daemon mode: its
-   consumers (bunshin `--oneshot`, `--mcp`, Linux) run as the user.
-2. **Endpoint squatting in a shared temp dir** (F1). Open finding: the SDK
-   `attach` check ships with P3b, and the Rust client check needs its own
-   issue.
-3. **Windows pipe.** The ACL is UNVERIFIED and there is no client-SID check;
-   single-client behavior is kept until one exists.
-4. **Granted interpreter.** TCC grants given to an interpreter remove the TCC
+1. **Same-uid code is not stopped on UDS.** On UDS, any same-uid process can:
+   - use every daemon method;
+   - self-grant the foreground grant with no human;
+   - re-point the audit log through `session.open`;
+   - resume a stop, or restart the daemon to clear one;
+   - read all shared frames.
+
+   XPC code-signature auth is the only same-uid boundary, and kernels use
+   neither transport. Accepted for daemon mode, whose consumers (bunshin
+   `--oneshot`, `--mcp`, Linux) run as the user. The self-grant and the
+   audit re-point are named here so that this acceptance is an explicit
+   decision.
+2. **Windows pipe.** Another account can squat the pipe name, read every
+   request and forge replies, and SQOS impersonation is possible, until the
+   Windows follow-up (B3) lands. The ACL is UNVERIFIED.
+3. **Granted interpreter or in-process kernel.** In either case, TCC is no
    layer of M3; only the eval permission gate remains.
 
 ## Rejected options
@@ -229,12 +325,25 @@ consumers rely on frames carrying across `--oneshot` calls.
 - **Engine flag exemptions** (a flag that skips the peer check, admits a
   self-responsible engine, or lifts a refusal). Rejected: any same-uid process
   can pass the same flag, so every protection would become opt-out.
-  `--enable-daemon` stays an accident guard and gains no exemption meaning.
+  - `--enable-daemon` stays an accident guard and gains no exemption meaning.
+  - The P3b peer-check failure tests (T25-6, T25-7) inject through a
+    compile-time `#[cfg(test)]` seam only.
+  - No environment variable or flag that a non-test build honors may change
+    the peer check, unlike the existing fake-backend environment hooks
+    (`config.rs:31-37,55-60`, `stop_path.rs:33-36`).
 - **Host-spawned `--serve` for omo's own engine.** Rejected: same-uid processes
   would skip A5 (Q decision 2).
-- **Daemon-side host-only filtering on UDS.** Not in this plan. It would not
-  stop M2, who can read the token file anyway, and `--resume` needs
-  `stopPath.resume` over the socket. Recorded as a possible later hardening.
+- **Daemon-side host-only filtering on UDS.** Not in this plan.
+  - **What it would stop:** an accidental or naive raw client calling
+    `control.grant`, `stopPath.start` or `session.open`. None of those need the
+    token, so the filter would remove the silent self-grant and the audit
+    re-point from casual misuse.
+  - **What it would not stop:** M2, which can start its own engine or replace
+    the daemon.
+  - **What it would break:** `--resume`, which needs `stopPath.resume` over the
+    socket.
+  - **Status:** recorded as a candidate later hardening for Q to weigh against
+    residual risk 1.
 
 ## Required tests
 
@@ -247,21 +356,24 @@ consumers rely on frames carrying across `--oneshot` calls.
 | T25-3 | Interleaved requests from two clients each get their own reply; the same request id used on both connections does not collide |
 | T25-4 | Exec requests from two clients run in arrival order (FIFO across connections) |
 | T25-5 | `stopPath.stop` from one client suspends both; the other's next exec is refused as stopped |
-| T25-6 | An injected peer-uid mismatch closes the connection before any byte is written (no `engine.hello` reply), writes one audit line, and a same-uid client is still served |
-| T25-7 | An injected peer-credential lookup failure is treated as a mismatch |
+| T25-6 | A peer-uid mismatch injected through a `#[cfg(test)]` seam closes the connection before any byte is written (no `engine.hello` reply), writes one audit line, and a same-uid client is still served; no environment variable or flag in a non-test build reaches the seam |
+| T25-7 | A peer-credential lookup failure (same seam) is treated as a mismatch |
 | T25-8 | Windows: a second concurrent pipe client is refused while the first is connected; single-client behavior is unchanged |
 | T25-9 | Client A disconnecting cancels only A's input holds; B's in-flight requests are still answered |
 | T25-10 | `--idle-ms` counts from the last client disconnect; the daemon never exits while any client is connected |
-| T25-11 | Existing `--oneshot` / `--mcp` tests pass unchanged, including the `hostOnly` refusals (`tests/serve_oneshot.rs:146-157`) |
+| T25-11 | Existing `--oneshot` / `--mcp` tests pass unchanged, including the `hostOnly` refusals (`tests/serve_oneshot.rs:143-154`) |
 | T25-12 | The SDK `attach` client refuses host-only methods without sending them |
-| T25-13 | The SDK `attach` client refuses an endpoint whose parent directory is not owned by the caller's uid or is accessible to group or other (F1) |
+| T25-13 | The SDK `attach` client refuses an endpoint whose parent directory is a symlink, not owned by the caller's uid, or accessible to group or other, and checks through a directory fd, not stat-then-connect |
 | T25-14 | Residual pin: a raw same-uid socket client is answered for a host-only method, so a future daemon-side filter is a deliberate change rather than drift |
+| T25-15 | The daemon refuses to start (no bind, no token file) when the endpoint's parent is a symlink, owned by another uid, or group/other accessible |
+| T25-16 | With a symlink or a pre-existing file at the token path, the daemon never writes through the symlink and never writes into the pre-existing inode; the new token file is 0600 and owned by the daemon's euid |
+| T25-17 | The Rust client (`--oneshot`, `--mcp`, `--resume`) refuses, and does not auto-start a daemon, when the endpoint's parent fails the same rule |
 
 ### Stop-marker policy (plan row 31)
 
 | Id | Test |
 | --- | --- |
-| T31-1 | v1 restart case: stop, `--resume`, kill, restart `--serve`, then `session.open` succeeds and the session is not Suspended |
+| T31-1 | v1 restart case: stop, `--resume`, kill, restart `--serve`; then `desktop.stopPath.status` reports not suspended and an admitted `desktop.click` succeeds (the daemon opens its own session; `desktop.session.open` stays `hostOnly` at the bridge) |
 | T31-2 | Stop-latch tests write no file under the real per-user directory (asserted) |
 | T31-3 | The doctor prints the INFO line saying stop persistence exists only on the XPC agent path |
 | T31-4 | `docs/reference/computer.md` says, in its stop paragraph, that persistence across restarts is XPC-agent-only |
