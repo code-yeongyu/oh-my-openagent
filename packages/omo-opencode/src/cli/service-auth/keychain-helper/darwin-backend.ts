@@ -23,7 +23,7 @@ type Secrets = {
  * "reinstall-notice" (default) fails with a one-line notice and no dialog; "dialog" takes today's read, which prompts.
  */
 export type Row9bChoice = "reinstall-notice" | "dialog"
-export const ROW_9B_DEFAULT: Row9bChoice = "reinstall-notice"
+const ROW_9B_DEFAULT: Row9bChoice = "reinstall-notice"
 
 /** Entry points with their own layout (the compiled binary's `execDir`, the desktop runtime) register their copy first. */
 export function registerHelperCandidates(paths: readonly string[]): void {

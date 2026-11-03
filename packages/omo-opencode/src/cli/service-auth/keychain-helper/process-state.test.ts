@@ -3,7 +3,10 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-type Copy = typeof import("./process-copy.test-support")
+import type { gatedSecrets, processApprovalCache, promptLockAt } from "./process-copy.test-support"
+
+// What each bundled copy exports; named here so the copy's entry stays statically referenced.
+type Copy = { readonly processApprovalCache: typeof processApprovalCache; readonly promptLockAt: typeof promptLockAt; readonly gatedSecrets: typeof gatedSecrets }
 
 const root = mkdtempSync(join(tmpdir(), "keychain-process-copies-"))
 let first: Copy
