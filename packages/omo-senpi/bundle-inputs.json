@@ -343,6 +343,7 @@
     "packages/memory-core/src/sync/engine/journal.ts",
     "packages/memory-core/src/sync/engine/landing.ts",
     "packages/memory-core/src/sync/engine/legacy-cycle.ts",
+    "packages/memory-core/src/sync/engine/local-capture.ts",
     "packages/memory-core/src/sync/engine/open.ts",
     "packages/memory-core/src/sync/engine/push.ts",
     "packages/memory-core/src/sync/engine/receive.ts",
