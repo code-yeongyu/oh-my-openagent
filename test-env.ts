@@ -3,6 +3,7 @@ import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { markTestInfrastructureDir } from "./test-temp-root"
+import { installGitDiscoveryCeiling } from "./test-support/git-discovery-ceiling"
 
 // Preloaded ahead of test-setup.ts on purpose.
 //
@@ -15,6 +16,9 @@ import { markTestInfrastructureDir } from "./test-temp-root"
 // This also makes `bun test --parallel` safe: each worker is a separate process, so a
 // per-process directory means workers no longer share one cache/storage tree and stop
 // deleting each other's fixtures in beforeEach/afterEach.
+// test-temp-root has already pointed TMPDIR at this process's run root, so the ceiling bounds git there (#12265).
+installGitDiscoveryCeiling()
+
 const xdgRoot = mkdtempSync(join(tmpdir(), "omo-test-xdg-"))
 markTestInfrastructureDir(xdgRoot)
 process.env.XDG_DATA_HOME = join(xdgRoot, "data")

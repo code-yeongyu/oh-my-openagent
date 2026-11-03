@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs"
 import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { createNodeGitExec } from "../../../git/exec"
@@ -10,7 +11,8 @@ export async function ensureQaRepo(repoDir: string): Promise<void> {
     if (r.code !== 0) throw new Error(`git ${argv.join(" ")}: ${r.stderr}`)
   }
   await mkdir(repoDir, { recursive: true })
-  if ((await exec.run(["rev-parse", "--git-dir"], { cwd: repoDir, timeoutMs: 30_000 })).code === 0) {
+  // Only repoDir's own .git counts: `git rev-parse` from repoDir also answers for an enclosing repository (#12265).
+  if (existsSync(join(repoDir, ".git"))) {
     disableFixtureAutoMaintenance(repoDir)
     return
   }
