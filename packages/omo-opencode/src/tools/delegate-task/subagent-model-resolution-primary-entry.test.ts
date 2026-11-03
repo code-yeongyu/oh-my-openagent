@@ -154,4 +154,29 @@ describe("resolveSubagentModel primary models[] entry", () => {
       thinking: { type: "disabled" },
     })
   })
+
+  test("#given the agent variant and an object primary variant are both set #when the primary is resolved #then the agent-level variant override wins", async () => {
+    //#given the agent override asks for low and the models[0] entry asks for xhigh
+    stubProviderCache({
+      openai: ["gpt-5.4"],
+    })
+    const executorCtx = executorContext({
+      agentOverrides: {
+        explore: {
+          variant: "low",
+          models: [{ model: "openai/gpt-5.4", variant: "xhigh" }],
+        },
+      },
+    })
+
+    //#when
+    const result = await resolveSubagentModel("explore", matchedExploreAgent, executorCtx)
+
+    //#then the fallback-entry pass applies the agent-level variant last, as its name says
+    expect(result.categoryModel).toMatchObject({
+      providerID: "openai",
+      modelID: "gpt-5.4",
+      variant: "low",
+    })
+  })
 })
