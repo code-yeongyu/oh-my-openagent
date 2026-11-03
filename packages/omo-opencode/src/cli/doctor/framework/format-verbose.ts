@@ -1,7 +1,38 @@
 import color from "picocolors"
 import { PLUGIN_NAME } from "../../../shared"
-import type { DoctorResult } from "./types"
+import type { DoctorIssue, DoctorResult } from "./types"
 import { formatHeader, formatStatusSymbol, formatIssue } from "./format-shared"
+
+function plural(count: number, singular: string): string {
+  return `${count} ${singular}${count === 1 ? "" : "s"}`
+}
+
+function passedChecks(count: number): string {
+  return count === 1 ? "1 check passed" : `${count} checks passed`
+}
+
+function formatIssueCountSummary(issues: readonly DoctorIssue[]): string | undefined {
+  if (issues.length === 0) return undefined
+  const warnings = issues.filter((issue) => issue.severity === "warning").length
+  const errors = issues.filter((issue) => issue.severity === "error").length
+  const parts = [
+    warnings > 0 ? plural(warnings, "warning") : undefined,
+    errors > 0 ? plural(errors, "error") : undefined,
+  ].filter((part): part is string => part !== undefined)
+  return `${plural(issues.length, "issue")} found (${parts.join(", ")})`
+}
+
+function formatCheckSummary(result: DoctorResult, issues: readonly DoctorIssue[]): string[] {
+  const { summary } = result
+  const skippedText = summary.skipped > 0 ? `, ${summary.skipped} skipped` : ""
+  const lines = [
+    `  ${passedChecks(summary.passed)}, ${summary.failed} failed, ${summary.warnings} with warnings${skippedText}`,
+  ]
+  const issueSummary = formatIssueCountSummary(issues)
+  if (issueSummary !== undefined) lines.push(`  ${issueSummary}`)
+  lines.push(`  ${color.dim(`Total: ${summary.total} checks in ${summary.duration}ms`)}`)
+  return lines
+}
 
 export function formatVerbose(result: DoctorResult): string {
   const lines: string[] = []
@@ -45,8 +76,7 @@ export function formatVerbose(result: DoctorResult): string {
 
     lines.push(`${color.bold("Summary")}`)
     lines.push(`${color.dim("\u2500".repeat(40))}`)
-    lines.push(`  ${summary.passed} passed, ${summary.failed} failed, ${summary.warnings} warnings`)
-    lines.push(`  ${color.dim(`Total: ${summary.total} checks in ${summary.duration}ms`)}`)
+    lines.push(...formatCheckSummary(result, allIssues))
     return lines.join("\n")
   }
 
@@ -130,10 +160,13 @@ export function formatVerbose(result: DoctorResult): string {
 
   lines.push(`${color.bold("Summary")}`)
   lines.push(`${color.dim("\u2500".repeat(40))}`)
-  const passText = summary.passed > 0 ? color.green(`${summary.passed} passed`) : `${summary.passed} passed`
+  const passText = summary.passed > 0 ? color.green(passedChecks(summary.passed)) : passedChecks(summary.passed)
   const failText = summary.failed > 0 ? color.red(`${summary.failed} failed`) : `${summary.failed} failed`
-  const warnText = summary.warnings > 0 ? color.yellow(`${summary.warnings} warnings`) : `${summary.warnings} warnings`
-  lines.push(`  ${passText}, ${failText}, ${warnText}`)
+  const warnText = summary.warnings > 0 ? color.yellow(`${summary.warnings} with warnings`) : `${summary.warnings} with warnings`
+  const skipText = summary.skipped > 0 ? `, ${summary.skipped} skipped` : ""
+  lines.push(`  ${passText}, ${failText}, ${warnText}${skipText}`)
+  const issueSummary = formatIssueCountSummary(allIssues)
+  if (issueSummary !== undefined) lines.push(`  ${issueSummary}`)
   lines.push(`  ${color.dim(`Total: ${summary.total} checks in ${summary.duration}ms`)}`)
 
   return lines.join("\n")
