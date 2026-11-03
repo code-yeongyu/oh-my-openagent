@@ -5,6 +5,8 @@ import { delimiter, dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
 
+import { AGENT_DIR_ENV_NAMES } from "../bin/lib/agent-dir.js"
+
 const SOURCE_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
 const roots: string[] = []
 const artifacts = [
@@ -64,17 +66,19 @@ function withoutHostProcesses(fixture: Fixture, env: NodeJS.ProcessEnv): NodeJS.
 // so the child sees only the agent-dir variables a test sets (#10265).
 function withoutInheritedAgentDir(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const isolated: NodeJS.ProcessEnv = { ...env }
-  delete isolated.OMO_CODING_AGENT_DIR
-  delete isolated.SENPI_CODING_AGENT_DIR
-  delete isolated.PI_CODING_AGENT_DIR
+  for (const name of AGENT_DIR_ENV_NAMES) delete isolated[name]
   return isolated
 }
 
-function run(fixture: Fixture, env: NodeJS.ProcessEnv = {}) {
+function run(
+  fixture: Fixture,
+  env: NodeJS.ProcessEnv = {},
+  inheritedEnv: NodeJS.ProcessEnv = process.env,
+) {
   return spawnSync(process.execPath, [fixture.launcher, "doctor"], {
     encoding: "utf8",
     env: withoutHostProcesses(fixture, {
-      ...withoutInheritedAgentDir(process.env),
+      ...withoutInheritedAgentDir(inheritedEnv),
       SENPI_CODING_AGENT_DIR: fixture.agentDir,
       ...env,
     }),
@@ -161,6 +165,23 @@ describe("omo doctor", () => {
         expect(readFileSync(settingsPath, "utf8")).toBe(original)
       })
     }
+  })
+
+  describe("#given an ambient canonical agent directory shadows the fixture", () => {
+    test("#then the copied launcher still reads the fixture settings", () => {
+      const fixture = createFixture()
+      const ambientAgentDir = join(fixture.root, "ambient-agent")
+      writeFile(join(ambientAgentDir, "settings.json"), JSON.stringify({ packages: [] }))
+      writeFile(
+        join(fixture.agentDir, "settings.json"),
+        JSON.stringify({ packages: ["@code-yeongyu/omo-senpi"] }),
+      )
+
+      const result = run(fixture, {}, { ...process.env, OMO_CODING_AGENT_DIR: ambientAgentDir })
+
+      expect(result.status).toBe(0)
+      expect(result.stdout).toContain("WARN duplicate @code-yeongyu/omo-senpi")
+    })
   })
 
   describe("#given settings JSON is malformed", () => {
