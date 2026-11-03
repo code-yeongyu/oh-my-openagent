@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.1.60] - 2026-11-03
+
+### Changed
+
+- Built-in reasoning defaults are back to their values before 5.1.59: daily mode runs Claude Opus 5.5 at medium effort again, and every other rung raised to high in 5.1.59 returns to its previous medium or xhigh setting. ([#12271](https://github.com/code-yeongyu/oh-my-openagent/issues/12271)) ([#12272](https://github.com/code-yeongyu/oh-my-openagent/pull/12272))
+- The `architect` task category can now implement as well as design. Its description and child prompt name broad debugging across many sources (code, logs, git history, issues, docs, configuration, runtime evidence) as a use case, and the child is told it has the full tool set and should carry a requested change through to a verified result. A caller that wants a design write-up without file edits marks the task advisory-only (#12238). Model routing is unchanged. ([#12239](https://github.com/code-yeongyu/oh-my-openagent/pull/12239))
+
+### Fixed
+
+- The native-binary-parity CI check no longer fails when a leftover task-host shard is still running on one side and has already exited on the other: both doctor lines are runtime state. ([#12148](https://github.com/code-yeongyu/oh-my-openagent/issues/12148)) ([#12153](https://github.com/code-yeongyu/oh-my-openagent/pull/12153))
+
 ## [5.1.59] - 2026-11-03
 
 Runs on senpi 2026.11.2-3: the first message of a new session no longer stalls for several seconds, and agent kill/pkill/killall commands that would hit protected processes are refused. ([#12200](https://github.com/code-yeongyu/oh-my-openagent/pull/12200))
