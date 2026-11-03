@@ -811,3 +811,25 @@ describe("createTaskChildPlanner parent independence", () => {
     expect(childUnderFableParent.plan.category).toBe("unspecified-high")
   })
 })
+
+describe("createTaskChildPlanner architect tool contract", () => {
+  // Default contract (#12238): the builtin architect category is a write-capable lane. Only a
+  // curated agentType or an explicit allow/deny list narrows a child's tools (child-options.ts),
+  // so an architect plan carrying any of them would hand the child a read-only surface.
+  test("#given the builtin architect category #when planned #then no agent type or tool narrowing rides the plan", () => {
+    // given
+    const planner = createTaskChildPlanner({}, BUILTIN_AGENTS, () => registry([model("anthropic", "claude-fable-5-1")]))
+
+    // when
+    const result = expectResolved(
+      planner({ prompt: "Fix the off-by-one in src/range.ts.", parent_session_id: "root", depth: 0, category: "architect" }),
+    )
+
+    // then
+    expect(result.plan.category).toBe("architect")
+    expect(result.plan.agentType).toBeUndefined()
+    expect(result.plan.toolAllowlist).toBeUndefined()
+    expect(result.plan.toolDenylist).toBeUndefined()
+    expect(result.plan.promptAppend).toBeDefined()
+  })
+})
