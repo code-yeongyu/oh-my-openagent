@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test"
 import { createOracleAgent } from "./oracle"
 
 describe("createOracleAgent", () => {
-  test("uses xhigh reasoning effort for gpt-5.6", () => {
+  test("uses high reasoning effort for gpt-5.6", () => {
     // given
     const model = "openai/gpt-5.6-sol"
 
@@ -11,14 +11,14 @@ describe("createOracleAgent", () => {
     const agent = createOracleAgent(model)
 
     // then
-    expect(agent.reasoningEffort).toBe("xhigh")
+    expect(agent.reasoningEffort).toBe("high")
   })
 
-  test("uses xhigh reasoning effort for GPT-6 Astra frontier routing", () => {
-    expect(createOracleAgent("github-copilot/gpt-6-astra").reasoningEffort).toBe("xhigh")
+  test("uses high reasoning effort for GPT-6 Astra frontier routing", () => {
+    expect(createOracleAgent("github-copilot/gpt-6-astra").reasoningEffort).toBe("high")
   })
 
-  test("preserves medium reasoning effort for gpt-5.5 fallback", () => {
+  test("preserves high reasoning effort for gpt-5.5 fallback", () => {
     // given
     const model = "openai/gpt-5.5"
 
@@ -26,6 +26,6 @@ describe("createOracleAgent", () => {
     const agent = createOracleAgent(model)
 
     // then
-    expect(agent.reasoningEffort).toBe("medium")
+    expect(agent.reasoningEffort).toBe("high")
   })
 })
