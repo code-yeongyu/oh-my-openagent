@@ -1,5 +1,5 @@
 import { lstatSync, realpath, realpathSync } from "@oh-my-opencode/memory-core/fs"
-import { containedRelativePath, type PathContainmentOptions } from "@oh-my-opencode/utils/path-containment"
+import { containedRelativePath, isDarwinAutomountTriggerPath, type PathContainmentOptions } from "@oh-my-opencode/utils/path-containment"
 import * as path from "node:path"
 
 import type { MemoryIdentityContext } from "./context"
@@ -51,6 +51,8 @@ export function isGrantedProjectMemoryRead(context: MemoryIdentityContext, targe
   // A note that does not exist yet stays readable (the read reports it missing); only its existing
   // ancestors are resolved, so a symlink on the way is still followed before the comparison.
   const lstat = options.lstat ?? lstatSync
+  // A macOS automount trigger is never a granted repo note, and resolving it can park the host loop (#11545).
+  if (!windows && isDarwinAutomountTriggerPath(paths.resolve(target), { platform: options.platform ?? process.platform })) return false
   const resolve = (input: string) => input === target ? canonicalAllowingMissing(input, canonicalPath, lstat, paths) : canonicalPath(input)
   for (const root of roots) {
     try {

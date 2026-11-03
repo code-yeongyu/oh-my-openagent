@@ -119,18 +119,20 @@ export function fakeKeychain(options: { readonly approve?: "allow" | "deny" | "l
   return { items, events, stats, secrets, secretsAs, access, put, cache }
 }
 
-export type SessionProcess = { readonly identity?: Owner; readonly noDialog?: boolean; readonly handOff?: () => Promise<boolean>; readonly home?: string }
+export type SessionProcess = { readonly identity?: Owner; readonly noDialog?: boolean; readonly handOff?: () => Promise<boolean>; readonly home?: string; readonly api?: string }
 
 /** One omo process on the fake machine; a process other than the default has its own approval cache, as a real one does. */
 export async function helperSession(keychain: ReturnType<typeof fakeKeychain>, background = false, proc: SessionProcess = {}) {
   const home = proc.home ?? (await mkdtemp(join(tmpdir(), "omo-helper-session-")))
   if (proc.home === undefined) onTestFinished(() => rm(home, { recursive: true, force: true }))
-  const store = createCredentialStore(API, {
+  const api = proc.api ?? API
+  const store = createCredentialStore(api, {
     secrets: proc.identity === undefined ? keychain.secrets : keychain.secretsAs(proc.identity),
     platform: "darwin",
     lockProbe: async () => "unlocked",
     notice: () => {},
     wait: background ? SESSION_READ_WAIT : INTERACTIVE_READ_WAIT,
+    home,
     keychainHelper: {
       access: async () => keychain.access,
       home,
@@ -141,5 +143,5 @@ export async function helperSession(keychain: ReturnType<typeof fakeKeychain>, b
       ...(proc.handOff === undefined ? {} : { handOff: proc.handOff }),
     },
   })
-  return { store, session: createSession({ api: API, store, home }), home }
+  return { store, session: createSession({ api, store, home }), home }
 }

@@ -82,7 +82,7 @@ export function NavHeader({ stars }: NavHeaderProps): JSX.Element {
       data-scrolled={scrolled ? "true" : "false"}
       className="border-line data-[scrolled=true]:bg-ink-0/72 ease-standard sticky top-0 z-50 w-full border-b bg-transparent transition-colors duration-[var(--dur-micro)] data-[scrolled=true]:backdrop-blur-md"
     >
-      <div className="mx-auto flex h-[60px] w-full max-w-[90rem] items-center justify-between px-4 sm:px-5 lg:px-8">
+      <div className="mx-auto flex h-(--nav-h) w-full max-w-[90rem] items-center justify-between px-4 sm:px-5 lg:px-8">
         <Link href="/" className="focus-ring flex min-h-11 items-center gap-2.5 rounded-[2px]">
           <Image src="/brand/omo-mark.svg" alt="" width={24} height={24} priority />
           <span className="text-text-hi text-[15px] font-medium tracking-[-0.02em]">

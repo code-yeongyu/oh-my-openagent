@@ -50,7 +50,6 @@ describe("runCliInstaller telemetry isolation", () => {
           throw new Error("shutdown failed")
         }),
       })),
-      getPostHogDistinctId: mock(() => "install-distinct-id"),
     }))
 
     const { runCliInstaller } = await import(`./cli-installer?telemetry=${Date.now()}-${Math.random()}`)

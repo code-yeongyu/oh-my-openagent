@@ -91,8 +91,21 @@ export function wrapFileHandle<H extends object>(handle: H): H {
 const promises = resilientNamespace(fsp, "async")
 
 /** EINTR-retried like every call here, and retried while Windows briefly holds the target open. */
-export function rename(from: fsSync.PathLike, to: fsSync.PathLike): Promise<void> {
-  return renameWithContentionRetry(from, to, { rename: promises.rename, platform: process.platform })
+export function rename(from: fsSync.PathLike, to: fsSync.PathLike, admit?: (begin: () => Promise<void>) => Promise<void>): Promise<void> {
+  return renameWithContentionRetry(from, to, {
+    rename: (source, target) => fsp.rename(source, target), platform: process.platform,
+    ...(admit === undefined ? {} : { admit }),
+  })
+}
+
+/** Re-enter the caller's boundary for every EINTR or Windows-contention retry. */
+export function renameSyncWithContentionRetry(
+  from: fsSync.PathLike, to: fsSync.PathLike, dispatch: (begin: () => void) => Promise<void>,
+): Promise<void> {
+  return renameWithContentionRetry(from, to, {
+    platform: process.platform,
+    rename: (source, target) => dispatch(() => fsSync.renameSync(source, target)),
+  })
 }
 const sync = resilientNamespace(fsSync, "sync")
 

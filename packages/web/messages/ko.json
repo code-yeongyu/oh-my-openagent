@@ -12,7 +12,8 @@
     "githubStars": "GitHub 스타 {count}개",
     "openMenu": "메뉴 열기",
     "closeMenu": "메뉴 닫기",
-    "primary": "주 메뉴"
+    "primary": "주 메뉴",
+    "skipToContent": "본문으로 건너뛰기"
   },
   "footer": {
     "brand": "OmO",
@@ -513,5 +514,10 @@
       "discord": "Discord에서 물어보기"
     },
     "privacy": "이 페이지는 신고 내용을 저장하지 않습니다. 다만 앱이 연 링크에 담겨 omo.dev로 전달되었습니다. GitHub에는 직접 이슈를 제출할 때만 전달됩니다."
+  },
+  "notFound": {
+    "title": "페이지를 찾을 수 없습니다.",
+    "body": "링크가 오래되었거나 페이지가 옮겨졌을 수 있습니다.",
+    "home": "홈으로 돌아가기"
   }
 }

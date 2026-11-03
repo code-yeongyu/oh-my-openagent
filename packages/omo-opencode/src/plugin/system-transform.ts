@@ -1,5 +1,7 @@
 import type { DefaultModeConfig } from "../config/schema/default-mode"
 import { reconcileSisyphusRuntimePrompt } from "../agents/sisyphus-runtime-prompt-reconciler"
+import { reconcileNativeModelPrompts } from "../agents/native-model-prompt"
+import type { NativePromptContext } from "../agents/native-prompt-frame"
 
 const ULTRAWORK_MODE_TAG = "<ultrawork-mode>"
 
@@ -17,7 +19,7 @@ function toCanonicalModel(
   model: { id: string; providerID: string } | undefined,
 ): string | undefined {
   if (!model?.id) return undefined
-  if (model.id.includes("/") || !model.providerID) return model.id
+  if (!model.providerID || model.id.startsWith(`${model.providerID}/`)) return model.id
   return `${model.providerID}/${model.id}`
 }
 
@@ -25,6 +27,8 @@ export function createSystemTransformHandler(
   defaultMode?: DefaultModeConfig,
   getUltraworkMessage?: (agentName?: string, modelID?: string) => string,
   ultraworkRestoration?: UltraworkRestoration | null,
+  getToolSnippets?: () => Record<string, string>,
+  getSessionToolPermissions?: (sessionID?: string) => Promise<NativePromptContext["toolPermissions"]>,
 ): (
   input: { sessionID?: string; model: { id: string; providerID: string; [key: string]: unknown } },
   output: { system: string[] },
@@ -35,6 +39,10 @@ export function createSystemTransformHandler(
     // is the only seam that knows the model actually selected at runtime, so
     // rebuild the whole body for the runtime model here (issue #5297/#6966).
     reconcileSisyphusRuntimePrompt(output.system, toCanonicalModel(input.model))
+    const runtimePermissions = await getSessionToolPermissions?.(input.sessionID)
+    const canRefreshTools = !getSessionToolPermissions || runtimePermissions !== undefined
+    reconcileNativeModelPrompts(output.system, toCanonicalModel(input.model),
+      canRefreshTools ? getToolSnippets?.() : undefined, undefined, runtimePermissions)
 
     const restoredGuidance = input.sessionID
       ? ultraworkRestoration?.getSystemTransformGuidance?.(input.sessionID, input.model?.id)

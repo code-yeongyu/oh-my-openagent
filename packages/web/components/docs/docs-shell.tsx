@@ -60,7 +60,7 @@ export function DocsShell({
   )
 
   return (
-    <div className="mx-auto grid min-h-0 w-full max-w-[90rem] grid-cols-[minmax(0,1fr)] lg:h-[calc(100dvh-60px)] lg:grid-cols-[16rem_minmax(0,1fr)]">
+    <div className="mx-auto grid min-h-0 w-full max-w-[90rem] grid-cols-[minmax(0,1fr)] lg:h-[calc(100dvh-var(--nav-h))] lg:grid-cols-[16rem_minmax(0,1fr)]">
       <aside className="border-line min-h-0 min-w-0 border-b lg:overflow-y-auto lg:border-r lg:border-b-0">
         <button
           type="button"

@@ -13,7 +13,7 @@ export type ReadResult =
  * "password-dialog" asks anyway. Only the default may ship until the owner decides.
  */
 export type Row8bChoice = "re-login" | "password-dialog"
-export const ROW_8B_DEFAULT: Row8bChoice = "re-login"
+const ROW_8B_DEFAULT: Row8bChoice = "re-login"
 
 export type ReadFailure = "locked" | "store" | "pending" | "denied"
 export class HelperReadError extends Error {

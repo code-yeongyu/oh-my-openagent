@@ -11,7 +11,7 @@ const OPUS_ZEN = "opencode/claude-opus-5-5"
 const OPUS_API = "anthropic-api/claude-opus-5-5"
 const FABLE = "anthropic-subscription/claude-fable-5-1"
 const FABLE_ZEN = "opencode/claude-fable-5-1"
-const KIMI = "moonshotai/kimi-k3"
+const KIMI = "moonshotai/kimi-k3.1-pro"
 const FLASH = "deepseek/deepseek-flash"
 const LUNA = "openai/gpt-5.6-luna-fast"
 const SOL_FAST = "chatgpt-subscription/gpt-6-sol-fast"
@@ -37,7 +37,7 @@ describe("resolveModelProfile", () => {
       kind: "resolved",
       profile: DAILY_NORMAL,
       provider: "moonshotai",
-      modelId: "kimi-k3",
+      modelId: "kimi-k3.1-pro",
       reasoning: "max",
       skipped: [OPUS_SUBSCRIPTION],
     })
@@ -120,12 +120,12 @@ describe("resolveModelProfile", () => {
 
   it("carries a reasoning suffix written on a user chain entry", () => {
     const result = resolveModelProfile({
-      profiles: { pair: { models: [`${OPUS}:high`] } },
+      profiles: { pair: { models: [`${OPUS}:medium`] } },
       active: "pair",
       availableModels: [OPUS],
     })
 
-    expect(result).toMatchObject({ kind: "resolved", provider: "anthropic", modelId: "claude-opus-5-5", reasoning: "high" })
+    expect(result).toMatchObject({ kind: "resolved", provider: "anthropic", modelId: "claude-opus-5-5", reasoning: "medium" })
   })
 
   it("reports an empty registry as unavailable and lists the chain", () => {
@@ -134,7 +134,7 @@ describe("resolveModelProfile", () => {
     expect(result).toEqual({
       kind: "unavailable",
       profile: DAILY_NORMAL,
-      chain: [OPUS_SUBSCRIPTION, "kimi-coding/kimi-k3", "zai/glm-5.3"],
+      chain: [OPUS_SUBSCRIPTION, "kimi-coding/kimi-k3.1-pro", "zai/glm-5.3"],
     })
   })
 
@@ -177,7 +177,7 @@ describe("builtin chain routing", () => {
     // then
     expect(result).toMatchObject({
       // While FABLE_55_RELEASED is false the 5.5 rung is absent, so listed 5.5 copies are never picked.
-      kind: "resolved", provider: "anthropic-subscription", modelId: FABLE_55_RELEASED ? "claude-fable-5-5" : "claude-fable-5-1", reasoning: "xhigh",
+      kind: "resolved", provider: "anthropic-subscription", modelId: FABLE_55_RELEASED ? "claude-fable-5-5" : "claude-fable-5-1", reasoning: "high",
     })
   })
 
@@ -192,7 +192,7 @@ describe("builtin chain routing", () => {
       kind: "resolved",
       provider: "my-claude-proxy",
       modelId: "claude-opus-5-5",
-      reasoning: "medium",
+      reasoning: "high",
     })
   })
 
@@ -236,7 +236,7 @@ describe("builtin chain routing", () => {
       kind: "resolved",
       provider: "anthropic-subscription",
       modelId: "claude-fable-5-1",
-      reasoning: "xhigh",
+      reasoning: "high",
     })
   })
 
@@ -247,7 +247,7 @@ describe("builtin chain routing", () => {
       kind: "resolved",
       provider: "anthropic-subscription",
       modelId: "claude-opus-5-5",
-      reasoning: "medium",
+      reasoning: "high",
     })
   })
 
@@ -270,7 +270,7 @@ describe("builtin chain routing", () => {
       kind: "resolved",
       provider: "chatgpt-subscription",
       modelId: "gpt-6-astra",
-      reasoning: "medium",
+      reasoning: "high",
     })
   })
 
@@ -300,7 +300,7 @@ describe("builtin chain routing", () => {
       kind: "resolved",
       provider: "chatgpt-subscription",
       modelId: "gpt-6.1-sol",
-      reasoning: "medium",
+      reasoning: "high",
     })
   })
 
@@ -311,7 +311,7 @@ describe("builtin chain routing", () => {
       kind: "resolved",
       provider: "github-copilot",
       modelId: "gpt-5.6-sol",
-      reasoning: "medium",
+      reasoning: "high",
     })
   })
 
@@ -325,7 +325,7 @@ describe("builtin chain routing", () => {
       kind: "resolved",
       provider: "chatgpt-subscription",
       modelId: "gpt-5.6-sol",
-      reasoning: "medium",
+      reasoning: "high",
     })
   })
 
@@ -348,7 +348,7 @@ describe("builtin chain routing", () => {
       kind: "resolved",
       provider: "openai",
       modelId: "gpt-5.6-sol",
-      reasoning: "medium",
+      reasoning: "high",
     })
   })
 
@@ -407,7 +407,7 @@ describe("builtin chain routing", () => {
 
   it("does not silently take another provider when a user overlay names openai and openai is absent", () => {
     const result = resolveModelProfile({
-      profiles: { "geeky-normal": { models: [{ model: "openai/gpt-6-sol", reasoning: "medium" }] } },
+      profiles: { "geeky-normal": { models: [{ model: "openai/gpt-6-sol", reasoning: "high" }] } },
       active: "geeky-normal",
       availableModels: ["chatgpt-subscription/gpt-6-sol"],
     })
@@ -420,7 +420,7 @@ describe("builtin chain routing", () => {
       profiles: {
         "geeky-normal": {
           models: [
-            { model: "openai/gpt-6-sol", reasoning: "high" },
+            { model: "openai/gpt-6-sol", reasoning: "medium" },
             { model: "github-copilot/gpt-6-sol", reasoning: "medium" },
           ],
         },
@@ -439,7 +439,7 @@ describe("builtin chain routing", () => {
 
   it("still matches an unscoped user model through whichever registry provider serves it", () => {
     const result = resolveModelProfile({
-      profiles: { "geeky-normal": { models: [{ model: "gpt-6-sol", reasoning: "medium" }] } },
+      profiles: { "geeky-normal": { models: [{ model: "gpt-6-sol", reasoning: "high" }] } },
       active: "geeky-normal",
       availableModels: ["chatgpt-subscription/gpt-6-sol"],
     })
@@ -448,7 +448,7 @@ describe("builtin chain routing", () => {
       kind: "resolved",
       provider: "chatgpt-subscription",
       modelId: "gpt-6-sol",
-      reasoning: "medium",
+      reasoning: "high",
     })
   })
 

@@ -11,13 +11,17 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "max",
       },
       {
-        providers: ["opencode-go", "kimi-for-coding", "moonshotai", "opencode", "bailian-coding-plan", "moonshotai-cn", "firmware", "ollama-cloud", "aihubmix"],
+        providers: ["opencode-go", "kimi-for-coding", "moonshotai", "moonshotai-cn"],
         model: LATEST_MODEL_BY_FAMILY.kimi,
+      },
+      {
+        providers: ["opencode", "bailian-coding-plan", "firmware", "ollama-cloud", "aihubmix"],
+        model: LATEST_MODEL_BY_FAMILY.kimiK3,
       },
       {
         providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
         model: "gpt-5.6-sol",
-        variant: "medium",
+        variant: "high",
       },
       { providers: ["zai-coding-plan", "opencode", "bailian-coding-plan"], model: "glm-5.2" },
       { providers: ["opencode"], model: "big-pickle" }
@@ -29,12 +33,12 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       {
         providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
         model: "gpt-6-sol",
-        variant: "medium",
+        variant: "high",
       },
       {
         providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
         model: "gpt-5.6-sol",
-        variant: "medium",
+        variant: "high",
       }
     ],
     requiresProvider: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
@@ -42,7 +46,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   oracle: {
     fallbackChain: [
-      { providers: ["openai", "chatgpt-subscription", "opencode"], model: "gpt-5.6-sol", variant: "xhigh" },
+      { providers: ["openai", "chatgpt-subscription", "opencode"], model: "gpt-5.6-sol", variant: "high" },
       { providers: ["github-copilot"], model: "gpt-5.6-sol", variant: "high" },
       {
         providers: ["google", "google-vertex", "opencode"],
@@ -66,7 +70,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       { providers: ["kimi-for-coding"], model: "kimi-for-coding-highspeed", variant: "off" },
       { providers: ["openai", "chatgpt-subscription"], model: LATEST_MODEL_BY_FAMILY.gptLunaFast, variant: "low" },
-      { providers: ["anthropic", "github-copilot"], model: LATEST_MODEL_BY_FAMILY.claudeHaiku, variant: "medium" },
+      { providers: ["anthropic", "github-copilot"], model: LATEST_MODEL_BY_FAMILY.claudeHaiku, variant: "high" },
       { providers: ["deepseek"], model: "deepseek-flash", variant: "max" },
       { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.7-plus" },
       { providers: ["opencode-go"], model: "minimax-m2.7" }
@@ -76,7 +80,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       { providers: ["kimi-for-coding"], model: "kimi-for-coding-highspeed", variant: "off" },
       { providers: ["openai", "chatgpt-subscription"], model: LATEST_MODEL_BY_FAMILY.gptLunaFast, variant: "low" },
-      { providers: ["anthropic", "github-copilot"], model: LATEST_MODEL_BY_FAMILY.claudeHaiku, variant: "medium" },
+      { providers: ["anthropic", "github-copilot"], model: LATEST_MODEL_BY_FAMILY.claudeHaiku, variant: "high" },
       { providers: ["deepseek"], model: "deepseek-flash", variant: "max" },
       { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.7-plus" },
       { providers: ["opencode-go"], model: "minimax-m2.7" }
@@ -95,12 +99,12 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       {
         providers: ["anthropic", "github-copilot", "opencode"],
         model: FABLE_55_LAUNCH.id,
-        variant: "xhigh",
+        variant: "high",
       },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
         model: LATEST_MODEL_BY_FAMILY.claudeFable,
-        variant: "xhigh",
+        variant: "high",
       },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
@@ -108,10 +112,11 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "max",
       },
       {
-        providers: ["opencode-go", "kimi-for-coding", "moonshotai", "opencode"],
+        providers: ["opencode-go", "kimi-for-coding", "moonshotai"],
         model: LATEST_MODEL_BY_FAMILY.kimi,
         variant: "max",
-      }
+      },
+      { providers: ["opencode"], model: LATEST_MODEL_BY_FAMILY.kimiK3, variant: "max" }
     ]),
   },
   metis: {
@@ -132,15 +137,16 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "max",
       },
       {
-        providers: ["opencode-go", "kimi-for-coding", "moonshotai", "opencode"],
+        providers: ["opencode-go", "kimi-for-coding", "moonshotai"],
         model: LATEST_MODEL_BY_FAMILY.kimi,
         variant: "max",
-      }
+      },
+      { providers: ["opencode"], model: LATEST_MODEL_BY_FAMILY.kimiK3, variant: "max" }
     ]),
   },
   momus: {
     fallbackChain: [
-      { providers: ["openai", "chatgpt-subscription"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "xhigh" },
+      { providers: ["openai", "chatgpt-subscription"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "high" },
       { providers: ["github-copilot"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "high" },
       { providers: ["openai", "chatgpt-subscription", "opencode"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "high" },
       {
@@ -168,7 +174,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       {
         providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
         model: "gpt-5.6-sol",
-        variant: "medium",
+        variant: "high",
       },
       { providers: ["opencode-go"], model: "minimax-m3" },
       { providers: ["minimax-coding-plan", "minimax-cn-coding-plan"], model: "MiniMax-M3" },
@@ -182,7 +188,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       {
         providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
         model: "gpt-5.6-sol",
-        variant: "medium",
+        variant: "high",
       },
       { providers: ["opencode-go"], model: "minimax-m3" },
       { providers: ["minimax-coding-plan", "minimax-cn-coding-plan"], model: "MiniMax-M3" },

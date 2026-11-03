@@ -1,10 +1,35 @@
 import { describe, expect, it, onTestFinished } from "bun:test"
 import { spawn } from "node:child_process"
-import { existsSync, mkdtempSync, rmSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { cleanUpReloadRun, ownsHostSocket, type ReloadHost, reloadRootParent } from "./packaged-reload-cleanup.test-support"
+import { cleanUpReloadRun, ownsHostSocket, type ReloadCleanupClock, type ReloadHost, reloadRootParent } from "./packaged-reload-cleanup.test-support"
+
+function fakeClock(): ReloadCleanupClock & { advance(ms: number): Promise<void> } {
+  let now = 0
+  const timers = new Map<() => void, number>()
+  return {
+    now: () => now,
+    schedule(callback, delayMs) {
+      timers.set(callback, now + delayMs)
+      return () => { timers.delete(callback) }
+    },
+    async advance(ms) {
+      const target = now + ms
+      for (;;) {
+        const next = [...timers].sort((a, b) => a[1] - b[1])[0]
+        if (!next || next[1] > target) break
+        now = next[1]
+        timers.delete(next[0])
+        next[0]()
+        // Drain promise continuations before advancing to the next virtual timer.
+        await new Promise<void>((resolve) => setImmediate(resolve))
+      }
+      now = target
+    },
+  }
+}
 
 function fakeHost(): { host: ReloadHost; signals: NodeJS.Signals[] } {
   const signals: NodeJS.Signals[] = []
@@ -44,6 +69,45 @@ function tempRoot(): string {
 }
 
 describe("cleanUpReloadRun", () => {
+  it("#given a supervisor needing four seconds to reap its child #when cleanup uses the default grace #then it removes its internal dir without SIGKILL", async () => {
+    const root = tempRoot()
+    const internalDir = join(root, "senpi-rpc-host-internal-delayed")
+    mkdirSync(internalDir)
+    const clock = fakeClock()
+    const exit = Promise.withResolvers<void>()
+    const signals: NodeJS.Signals[] = []
+    let cancelShutdown: (() => void) | undefined
+    const child = {
+      exitCode: null as number | null,
+      signalCode: null as NodeJS.Signals | null,
+      kill(signal: NodeJS.Signals) {
+        signals.push(signal)
+        if (signal === "SIGTERM") {
+          cancelShutdown = clock.schedule(() => {
+            rmSync(internalDir, { recursive: true })
+            child.exitCode = 0
+            exit.resolve()
+          }, 4_000)
+        } else {
+          cancelShutdown?.()
+          child.signalCode = signal
+          exit.resolve()
+        }
+        return true
+      },
+    }
+    const cleanup = cleanUpReloadRun({
+      root, shutdowns: [], hosts: [{ child, exited: exit.promise }], restore: () => {}, clock,
+    })
+    const outcome = cleanup.then(() => undefined, (error: unknown) => error)
+
+    await clock.advance(4_000)
+
+    expect(await outcome).toBeUndefined()
+    expect(signals).toEqual(["SIGTERM"])
+    expect(existsSync(root)).toBe(false)
+  })
+
   it("#given a plugin shutdown handler that throws #when cleanup runs #then the hosts are still stopped, the root removed and the state restored", async () => {
     // given
     const root = tempRoot()
@@ -65,7 +129,7 @@ describe("cleanUpReloadRun", () => {
     expect(restored).toBe(1)
   })
 
-  it("#given a real host that ignores SIGTERM #when cleanup runs #then it is killed inside the budget and no process is left", async () => {
+  it("#given a real host that ignores SIGTERM where the platform lets it (win32 terminates on SIGTERM) #when cleanup runs #then it is gone inside the budget and no process is left", async () => {
     // given
     const root = tempRoot()
     const child = spawn(process.execPath, ["-e", "process.on('SIGTERM', () => {}); process.stdout.write('ready\\n'); setInterval(() => {}, 1000)"], { stdio: ["ignore", "pipe", "ignore"], windowsHide: true })
@@ -86,7 +150,9 @@ describe("cleanUpReloadRun", () => {
     }), 5_000)
 
     // then
-    expect(outcome.error).toBeUndefined()
+    // Windows has no catchable SIGTERM: kill() terminates the child at once, so no grace overrun is reported there.
+    const graceError = process.platform === "win32" ? undefined : "supervisor did not finish graceful shutdown within 200ms"
+    expect((outcome.error as Error | undefined)?.message).toBe(graceError)
     expect(child.exitCode !== null || child.signalCode !== null).toBe(true)
     expect(() => process.kill(child.pid ?? -1, 0)).toThrow()
     expect(existsSync(root)).toBe(false)
@@ -117,43 +183,46 @@ describe("cleanUpReloadRun", () => {
     expect(restored).toBe(1)
   })
 
-  it("#given a host whose exit arrives 13 s after SIGKILL (a loaded Linux host) #when cleanup runs with the default budget #then it waits for that exit and succeeds", async () => {
+  it("#given a host whose exit arrives 13 s after SIGKILL (a loaded Linux host) #when cleanup runs with the default budget #then it waits for that exit and reports escalation", async () => {
     // given - SIGTERM is ignored; the exit event follows SIGKILL only after the reap a saturated disk delays (#10870)
     const REAP_DELAY_MS = 13_000
     const root = tempRoot()
     const exit = Promise.withResolvers<void>()
     const signals: NodeJS.Signals[] = []
-    let reap: ReturnType<typeof setTimeout> | undefined
-    onTestFinished(() => clearTimeout(reap))
+    const clock = fakeClock()
     const child = {
       exitCode: null as number | null,
       signalCode: null as NodeJS.Signals | null,
       kill(signal: NodeJS.Signals) {
         signals.push(signal)
-        if (signal === "SIGKILL") reap = setTimeout(() => exit.resolve(), REAP_DELAY_MS)
+        if (signal === "SIGKILL") clock.schedule(() => exit.resolve(), REAP_DELAY_MS)
         return true
       },
     }
     let restored = 0
 
     // when
-    const outcome = await settledWithin(cleanUpReloadRun({
+    const cleanup = cleanUpReloadRun({
       root,
       shutdowns: [],
       hosts: [{ child, exited: exit.promise }],
       restore: () => { restored += 1 },
-    }), 30_000)
+      clock,
+    })
+    const outcome = cleanup.then(() => undefined, (error: unknown) => error)
+    await clock.advance(152_000)
 
     // then
-    expect(outcome.error).toBeUndefined()
+    expect((await outcome as Error).message).toBe("supervisor did not finish graceful shutdown within 95000ms")
     expect(signals).toEqual(["SIGTERM", "SIGKILL"])
     expect(existsSync(root)).toBe(false)
     expect(restored).toBe(1)
-  }, 35_000)
+  })
 
-  it("#given a host that ignores SIGTERM #when its grace ends #then it escalates to SIGKILL, succeeds and still restores the state", async () => {
+  it("#given a host that ignores SIGTERM #when its grace ends #then it reports escalation and still restores the state", async () => {
     // given
     const root = tempRoot()
+    mkdirSync(join(root, "senpi-rpc-host-internal-killed"))
     const exit = Promise.withResolvers<void>()
     const signals: NodeJS.Signals[] = []
     const child = {
@@ -177,12 +246,12 @@ describe("cleanUpReloadRun", () => {
     })
 
     // then
-    await expect(cleanup).resolves.toBeUndefined()
+    await expect(cleanup).rejects.toThrow("supervisor did not finish graceful shutdown within 1ms")
     expect(signals).toEqual(["SIGTERM", "SIGKILL"])
     expect(existsSync(root)).toBe(false)
     expect(restored).toBe(1)
   })
-  it("#given a host that never exits even after SIGKILL #when the budget runs out #then it fails with its own diagnosis, restores the state and keeps the root", async () => {
+  it("#given a host that never exits even after SIGKILL #when the budget runs out #then it names both failures, restores the state and removes the root", async () => {
     // given
     const root = tempRoot()
     const signals: NodeJS.Signals[] = []
@@ -209,10 +278,14 @@ describe("cleanUpReloadRun", () => {
 
     // then
     const outcome = await settledWithin(cleanup, 2_000)
-    expect((outcome.error as Error | undefined)?.message).toBe("packaged reload task host did not exit")
+    expect(outcome.error).toBeInstanceOf(AggregateError)
+    expect((outcome.error as AggregateError).errors.map((error: Error) => error.message)).toEqual([
+      "supervisor did not finish graceful shutdown within 50ms",
+      "packaged reload task host did not exit",
+    ])
     expect(signals).toEqual(["SIGTERM", "SIGKILL"])
     expect(restored).toBe(1)
-    expect(existsSync(root)).toBe(true)
+    expect(existsSync(root)).toBe(false)
   })
 })
 

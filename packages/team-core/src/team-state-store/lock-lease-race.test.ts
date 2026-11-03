@@ -21,7 +21,7 @@ const stop = async (child: ReturnType<typeof spawnChild>) => {
 async function heldLock(prefix: string) {
   const root = await createTempDirectory(prefix)
   const lockPath = join(root, "lock")
-  const owner = buildLockRecord("owner")
+  const owner = await buildLockRecord("owner")
   expect(await publishLockRecord(lockPath, owner)).toBe(true)
   return { root, lockPath, owner }
 }
@@ -35,7 +35,7 @@ test("#given the helper died #when a contender tries to reap between restore's c
     beforeRestoreRename: async () => {
       attempts.push({
         reaped: await reapStaleLock(lockPath, Number.POSITIVE_INFINITY),
-        published: await publishLockRecord(lockPath, buildLockRecord("contender")),
+        published: await publishLockRecord(lockPath, await buildLockRecord("contender")),
       })
     },
   })
@@ -59,7 +59,7 @@ test("#given the helper died and a contender already reaped and took the lock #w
   await lease.handOver(child.pid)
   await stop(child)
   expect(await reapStaleLock(lockPath, Number.POSITIVE_INFINITY)).toBe("removed")
-  const contender = buildLockRecord("contender")
+  const contender = await buildLockRecord("contender")
   expect(await publishLockRecord(lockPath, contender)).toBe(true)
 
   // when
@@ -79,7 +79,7 @@ test("#given a reaper holds the guard of the handed-over record #when the client
   await lease.handOver(child.pid)
   const handed = await readFile(lockPath, "utf8")
   const guardPath = `${lockPath}.reclaim-${createHash("sha256").update(handed).digest("hex").slice(0, 16)}`
-  expect(await publishLockRecord(guardPath, buildLockRecord("other-reaper"))).toBe(true)
+  expect(await publishLockRecord(guardPath, await buildLockRecord("other-reaper"))).toBe(true)
 
   // when
   const restored = lease.restore()
@@ -148,7 +148,7 @@ test("#given a client killed right after handing the lock to a live helper #when
 
   // then
   expect(await detectStaleLock(lockPath, Number.POSITIVE_INFINITY)).toBe(false)
-  expect(await publishLockRecord(lockPath, buildLockRecord("contender"))).toBe(false)
+  expect(await publishLockRecord(lockPath, await buildLockRecord("contender"))).toBe(false)
   await stop(helper)
   expect(await detectStaleLock(lockPath, Number.POSITIVE_INFINITY)).toBe(true)
   expect(await withLock(lockPath, async () => "entered", { staleAfterMs: Number.POSITIVE_INFINITY })).toBe("entered")

@@ -13,6 +13,8 @@ test("a connection lost while unresponsive reattaches the same session before th
   const state = Promise.withResolvers<HostSessionLiveness>()
   const recovered = fakeSessionPort()
   await recovered.answerState({ sessionId: "same-child", isStreaming: true })
+  const reattachStarted = Promise.withResolvers<void>()
+  const releaseReattach = Promise.withResolvers<void>()
   let attaches = 0
   const handle = createHostSessionHandle({
     client: { ...first, getState: () => state.promise }, session: FAKE_SESSION,
@@ -21,22 +23,40 @@ test("a connection lost while unresponsive reattaches the same session before th
     reattach: async session => {
       expect(session.sessionPath).toBe(FAKE_SESSION.sessionPath)
       attaches++
+      reattachStarted.resolve()
+      await releaseReattach.promise
       return { client: recovered, session: FAKE_SESSION, attached: true }
     },
   })
-  await clock.advance(45_000)
-  expect(handle.liveness().state).toBe("unresponsive")
-  first.loseTransport()
-  state.reject(Object.assign(new Error("transport lost"), { code: "rpc_transport_gone" }))
-  await clock.advance(0)
-  await clock.advance(30_000)
-  expect(handle.hasExited()).toBe(false)
-  expect(handle.liveness().state).toBe("running")
-  await handle.steer("same task")
-  expect(attaches).toBe(1)
-  expect(recovered.sent.filter(command => command.type === "steer")).toHaveLength(1)
-  expect(recovered.sent.some(command => command.type === "prompt")).toBe(false)
-  await handle.dispose()
+  try {
+    await clock.advance(45_000)
+    expect(handle.liveness().state).toBe("unresponsive")
+    const running = Promise.withResolvers<void>()
+    const unsubscribe = handle.onLiveness(status => {
+      if (status.state === "running") running.resolve()
+    })
+    first.loseTransport()
+    state.reject(Object.assign(new Error("transport lost"), { code: "rpc_transport_gone" }))
+    await clock.advance(0)
+    await clock.advance(30_000)
+    await reattachStarted.promise
+    // Advancing the clock starts the retry; it does not acknowledge an async reattach.
+    expect(handle.liveness().state).toBe("unresponsive")
+    releaseReattach.resolve()
+    await running.promise
+    unsubscribe()
+    // Cross the original unresponsive deadline only after the recovered probe cleared it.
+    await clock.advance(120_000)
+    expect(handle.hasExited()).toBe(false)
+    expect(handle.liveness().state).toBe("running")
+    await handle.steer("same task")
+    expect(attaches).toBe(1)
+    expect(recovered.sent.filter(command => command.type === "steer")).toHaveLength(1)
+    expect(recovered.sent.some(command => command.type === "prompt")).toBe(false)
+  } finally {
+    releaseReattach.resolve()
+    await handle.dispose()
+  }
   expect(clock.pending()).toBe(0)
 })
 

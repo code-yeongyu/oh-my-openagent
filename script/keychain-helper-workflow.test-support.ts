@@ -15,7 +15,7 @@ export const readWorkflow = (name: string): string =>
 export const platformWorkflow = readWorkflow("publish-platform.yml")
 export const publishWorkflow = readWorkflow("publish.yml")
 
-export const stepSchema = z.object({
+const stepSchema = z.object({
   name: z.string().optional(),
   if: z.string().optional(),
   run: z.string().optional(),

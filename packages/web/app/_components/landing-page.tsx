@@ -31,7 +31,7 @@ export async function generateLandingMetadata(): Promise<Metadata> {
 
 export async function LandingPage(): Promise<JSX.Element> {
   return (
-    <div className="flex min-h-screen flex-col overflow-x-clip">
+    <div className="flex min-h-dvh flex-col overflow-x-clip">
       <HeroSection />
       <ProofStripSection />
       <SecretSection />

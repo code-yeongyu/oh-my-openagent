@@ -16,7 +16,7 @@ import type {
 } from "@oh-my-opencode/telemetry-core"
 
 import type { OmoSenpiComponent } from "../../extension/types"
-import { readSessionRole, readSessionTraceparent, resolveStateDir } from "@oh-my-opencode/senpi-task"
+import { readSessionTraceparent, resolveStateDir } from "@oh-my-opencode/senpi-task"
 
 import { sharedTaskTerminalObservers, type TaskTerminalObservers } from "../task/terminal-observers"
 import {
@@ -55,6 +55,7 @@ import {
   OMO_NATIVE_PROPERTY_ALLOWLISTS,
   OMO_NATIVE_SCHEMA_VERSION,
   createOmoNativeProductConfig,
+  getBuiltinSkillsRoot,
   getOmoNativeStateDir,
   hashSessionId,
   withOmoNativeAttribution,
@@ -193,15 +194,14 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
       )
       const hashSession = (rawId: string): string =>
         currentConsent(false) ? (options.hashSessionId ?? hashSessionId)(rawId) : OPTED_OUT_SESSION_HASH
-      // The span keeps the engine's own role name (dev's `omo.session.role`), separate from the closed event vocabulary above.
-      // A host whose session context cannot be read must not stop registration (the event role is `unknown` then).
-      const turnSpanContext = readTurnSpanContext(pi, env)
+      // The span carries the same closed root/child/unknown role as the events: the collector pin refuses any other value.
+      // A host whose session context cannot be read must not stop registration (no inherited traceparent then).
       const turnSpans = createOmoNativeTurnSpans({
         traces: () => state.traces,
         isConsented: () => currentConsent(false),
         isSendAllowed: () => currentConsent(true),
-        sessionRole: turnSpanContext.role,
-        inheritedTraceparent: turnSpanContext.traceparent,
+        sessionRole,
+        inheritedTraceparent: readInheritedTraceparent(pi, env),
       })
       // Every event this session emits goes through here, so one emitted while a turn is open carries that turn's span ids.
       const sessionClient: Pick<EventTelemetryClient, "captureEvent"> = {
@@ -354,7 +354,7 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
         captureEvent: sessionClient.captureEvent,
         diagnostics: (message, details) => ctx.logger.warn(message, details),
         hashSessionId: hashSession,
-        skillsRoot: options.skillsRoot,
+        skillsRoot: options.skillsRoot ?? getBuiltinSkillsRoot(env, ctx.logger),
       })
 
       createOmoNativeNoticeRegistration({
@@ -467,11 +467,7 @@ function installCaptureFacade(
     diagnostics: options.diagnostics,
     distinctId: template.distinctId,
     env: options.env,
-    product: withOmoNativeAttribution(createOmoNativeProductConfig(), {
-      env: options.env,
-      now: options.now,
-      osProvider: options.osProvider,
-    }),
+    product: withOmoNativeAttribution(createOmoNativeProductConfig(), { env: options.env }),
     propertyAllowlist: OMO_NATIVE_PROPERTY_ALLOWLISTS,
     schemaVersion: OMO_NATIVE_SCHEMA_VERSION,
     source: "omo-native-component",
@@ -533,11 +529,11 @@ function cwdOf(eventCtx: unknown): string | undefined {
   return typeof cwd === "string" && cwd.length > 0 ? cwd : undefined
 }
 
-function readTurnSpanContext(pi: unknown, env: NodeJS.ProcessEnv): { readonly role: string; readonly traceparent: string | undefined } {
+function readInheritedTraceparent(pi: unknown, env: NodeJS.ProcessEnv): string | undefined {
   try {
-    return { role: readSessionRole(pi, env) ?? "main", traceparent: readSessionTraceparent(pi, env) }
+    return readSessionTraceparent(pi, env)
   } catch {
-    return { role: "unknown", traceparent: undefined }
+    return undefined
   }
 }
 

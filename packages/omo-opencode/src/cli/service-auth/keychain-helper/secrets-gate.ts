@@ -3,6 +3,7 @@
 // interaction off would see -25308 and report "locked". So calls run one at a time, each to completion, and a silent
 // call turns interaction off only for its own duration.
 
+import { loadBunFfi } from "../../../shared/bun-ffi-shim"
 import { keychainProcessState } from "./process-state"
 
 type InteractionSwitch = (allowed: boolean) => void
@@ -12,7 +13,7 @@ async function loadInteractionSwitch(): Promise<InteractionSwitch | null> {
   if (state.interactionSwitch !== undefined) return state.interactionSwitch
   if (process.platform !== "darwin") return (state.interactionSwitch = null)
   try {
-    const { dlopen, FFIType } = await import("bun:ffi")
+    const { dlopen, FFIType } = await loadBunFfi()
     const security = dlopen("/System/Library/Frameworks/Security.framework/Security", {
       SecKeychainSetUserInteractionAllowed: { args: [FFIType.u8], returns: FFIType.i32 },
     })

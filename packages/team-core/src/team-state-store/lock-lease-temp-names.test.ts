@@ -13,7 +13,7 @@ test("#given leftovers of this lock and in-flight temps of sibling locks #when t
   // given
   const root = await createTempDirectory("lock-lease-temp-names-")
   const lockPath = join(root, "lock")
-  const owner = buildLockRecord("owner")
+  const owner = await buildLockRecord("owner")
   expect(await publishLockRecord(lockPath, owner)).toBe(true)
   const kept = [
     `.lock.x.${UUID}.lease`,

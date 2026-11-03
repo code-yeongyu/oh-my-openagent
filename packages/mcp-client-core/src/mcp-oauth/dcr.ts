@@ -1,5 +1,6 @@
 import { isRecord } from "@oh-my-opencode/utils"
 export type ClientRegistrationRequest = {
+  application_type: "native" | "web"
   redirect_uris: string[]
   client_name: string
   grant_types: ["authorization_code", "refresh_token"]
@@ -8,6 +9,7 @@ export type ClientRegistrationRequest = {
 }
 
 export type ClientCredentials = {
+  issuer?: string
   clientId: string
   clientSecret?: string
 }
@@ -50,6 +52,11 @@ export async function getOrRegisterClient(
 
   const fetchImpl = options.fetch ?? globalThis.fetch
   const request: ClientRegistrationRequest = {
+    application_type: options.redirectUris.some((uri) => {
+      const url = new URL(uri)
+      return (url.protocol === "http:" || url.protocol === "https:")
+        && !["127.0.0.1", "localhost", "[::1]"].includes(url.hostname)
+    }) ? "web" : "native",
     redirect_uris: options.redirectUris,
     client_name: options.clientName,
     grant_types: ["authorization_code", "refresh_token"],

@@ -79,6 +79,8 @@ export function createTaskCancelTool(deps: TaskCancelDeps): ToolDefinition<typeo
     name: "task_cancel",
     label: "Task Cancel",
     description: DESCRIPTION,
+    // Rarely used: searchable and activated by name on first call (#11454).
+    exposure: "search", allowLazyActivation: true, searchKeywords: ["cancel child", "stop task", "abort subagent"],
     parameters: TaskCancelParams,
     execute: (_toolCallId, params) => runTaskCancel(deps.manager, params),
     renderCall: (args, theme) => renderTaskCancelCall(args, theme),

@@ -12,16 +12,16 @@ describe("GitHub Copilot GPT-5.6 and GPT-6 Astra resolution", () => {
 
   test("unspecified-high never borrows Copilot Astra: it takes the Copilot Opus 5.5 rung, and without it falls to the system default", () => {
     const withOpus = new Set(["github-copilot/gpt-6-astra", "github-copilot/claude-opus-5-5"])
-    expect(resolveModelWithFallback({ fallbackChain: CATEGORY_MODEL_REQUIREMENTS["unspecified-high"].fallbackChain, availableModels: withOpus, systemDefaultModel: "system/default" })).toMatchObject({ model: "github-copilot/claude-opus-5-5", variant: "medium" })
+    expect(resolveModelWithFallback({ fallbackChain: CATEGORY_MODEL_REQUIREMENTS["unspecified-high"].fallbackChain, availableModels: withOpus, systemDefaultModel: "system/default" })).toMatchObject({ model: "github-copilot/claude-opus-5-5", variant: "high" })
 
     const gptOnly = new Set(["github-copilot/gpt-6-astra", "github-copilot/gpt-5.6-sol"])
     expect(resolveModelWithFallback({ fallbackChain: CATEGORY_MODEL_REQUIREMENTS["unspecified-high"].fallbackChain, availableModels: gptOnly, systemDefaultModel: "system/default" })).toMatchObject({ model: "system/default" })
   })
 
-  test("ultrabrain falls back to Copilot GPT-5.6 Sol when Astra is absent and deep-low runs it at medium, while deep-high never uses it", () => {
+  test("ultrabrain falls back to Copilot GPT-5.6 Sol when Astra is absent and deep-low runs it at high, while deep-high never uses it", () => {
     const availableModels = new Set(["github-copilot/gpt-5.6-sol"])
     expect(resolveModelWithFallback({ fallbackChain: CATEGORY_MODEL_REQUIREMENTS.ultrabrain.fallbackChain, availableModels, systemDefaultModel: "system/default" })).toMatchObject({ model: "github-copilot/gpt-5.6-sol", variant: "max" })
-    expect(resolveModelWithFallback({ fallbackChain: CATEGORY_MODEL_REQUIREMENTS["deep-low"].fallbackChain, availableModels, systemDefaultModel: "system/default" })).toMatchObject({ model: "github-copilot/gpt-5.6-sol", variant: "medium" })
+    expect(resolveModelWithFallback({ fallbackChain: CATEGORY_MODEL_REQUIREMENTS["deep-low"].fallbackChain, availableModels, systemDefaultModel: "system/default" })).toMatchObject({ model: "github-copilot/gpt-5.6-sol", variant: "high" })
     expect(resolveModelWithFallback({ fallbackChain: CATEGORY_MODEL_REQUIREMENTS["deep-high"].fallbackChain, availableModels, systemDefaultModel: "system/default" })).toMatchObject({ model: "system/default" })
   })
   const selectionCases = [
@@ -29,7 +29,7 @@ describe("GitHub Copilot GPT-5.6 and GPT-6 Astra resolution", () => {
       name: "hephaestus",
       requirement: AGENT_MODEL_REQUIREMENTS.hephaestus,
       expectedModel: "github-copilot/gpt-5.6-sol",
-      expectedVariant: "medium",
+      expectedVariant: "high",
     },
     {
       name: "momus",
@@ -47,7 +47,7 @@ describe("GitHub Copilot GPT-5.6 and GPT-6 Astra resolution", () => {
       name: "deep-low",
       requirement: CATEGORY_MODEL_REQUIREMENTS["deep-low"],
       expectedModel: "github-copilot/gpt-5.6-sol",
-      expectedVariant: "medium",
+      expectedVariant: "high",
     },
     {
       name: "deep-high",
@@ -59,7 +59,7 @@ describe("GitHub Copilot GPT-5.6 and GPT-6 Astra resolution", () => {
       name: "unspecified-low",
       requirement: CATEGORY_MODEL_REQUIREMENTS["unspecified-low"],
       expectedModel: "github-copilot/gpt-5.6-sol",
-      expectedVariant: "medium",
+      expectedVariant: "high",
     },
   ] as const
 
@@ -149,7 +149,7 @@ describe("GitHub Copilot GPT-5.6 and GPT-6 Astra resolution", () => {
     expect(copilotXhighEntries).toEqual([])
   })
 
-  test("momus prefers native Astra xhigh over the Copilot Astra rung when both are available", () => {
+  test("momus prefers native Astra high over the Copilot Astra rung when both are available", () => {
     // given
     const availableModels = new Set(["chatgpt-subscription/gpt-6-astra", "github-copilot/gpt-6-astra"])
 
@@ -164,7 +164,7 @@ describe("GitHub Copilot GPT-5.6 and GPT-6 Astra resolution", () => {
     expect(result).toEqual({
       model: "chatgpt-subscription/gpt-6-astra",
       source: "provider-fallback",
-      variant: "xhigh",
+      variant: "high",
     })
   })
 

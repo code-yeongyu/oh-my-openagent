@@ -12,7 +12,8 @@
     "githubStars": "{count} stelle su GitHub",
     "openMenu": "Apri menu",
     "closeMenu": "Chiudi menu",
-    "primary": "Principale"
+    "primary": "Principale",
+    "skipToContent": "Vai al contenuto"
   },
   "footer": {
     "brand": "OmO",
@@ -513,5 +514,10 @@
       "discord": "Chiedi su Discord"
     },
     "privacy": "Questa pagina non salva la tua segnalazione, ma è stata inviata a omo.dev tramite il link aperto dall'app. Arriva su GitHub solo quando invii personalmente la issue."
+  },
+  "notFound": {
+    "title": "Impossibile trovare questa pagina.",
+    "body": "Il link potrebbe essere vecchio o la pagina potrebbe essere stata spostata.",
+    "home": "Torna alla home"
   }
 }

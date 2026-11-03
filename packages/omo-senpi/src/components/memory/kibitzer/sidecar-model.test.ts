@@ -103,7 +103,7 @@ describe("resolveKibitzerSidecarModel connected-first ordering (#9216)", () => {
   test("#given an anthropic-only registry and a quick pin naming only unconnected providers #when resolved #then the connected builtin rung leads and the pins trail", () => {
     const resolution = resolveKibitzerSidecarModel({ config: unconnectedPin, registry: connectedRegistry(["anthropic/claude-haiku-5-5"]) })
 
-    expect(resolution).toMatchObject({ kind: "resolved", category: "quick", model: "anthropic/claude-haiku-5-5", thinking: "medium" })
+    expect(resolution).toMatchObject({ kind: "resolved", category: "quick", model: "anthropic/claude-haiku-5-5", thinking: "high" })
     if (resolution.kind !== "resolved") throw new Error("unreachable")
     expect(resolution.chain.selectedModel).toBe("anthropic/claude-haiku-5-5")
     expect(resolution.fallbacks.map((candidate) => candidate.model)).toEqual(["openai/gpt-5.6-luna-fast", "apitopia/gpt-5.6-luna-fast"])

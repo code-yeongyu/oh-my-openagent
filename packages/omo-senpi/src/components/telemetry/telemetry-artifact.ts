@@ -59,7 +59,6 @@ const COMMON_PROPERTY_PLACEMENT: Readonly<Record<keyof typeof OMO_NATIVE_COMMON_
   ci: "resource",
   event_id: "record",
   install_hash: "resource",
-  machine_hash: "record",
   package_version: "resource",
   platform: "relay",
   product_name: "relay",
@@ -163,7 +162,6 @@ function eventAttributes(event: string, properties: Readonly<Record<string, OmoN
 } {
   const attributes: [string, ArtifactAttribute][] = [
     ["log.record.uid", { type: "string", pattern: UUID_PATTERN, required: true, posthog_name: "event_id" }],
-    ["omo.machine_hash", { type: "string", pattern: INSTALL_HASH_PATTERN, required: false, relay_only: true, posthog_name: "machine_hash" }],
   ]
   const projection: Record<string, string> = {}
   for (const [property, schema] of Object.entries(properties)) {

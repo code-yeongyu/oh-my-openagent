@@ -5,7 +5,7 @@ import { tolerantFsync } from "../tolerant-fsync"
 import { createLockLease, type LockLease } from "./lock-lease"
 import { publishLockRecord } from "./lock-publish"
 import { removeLockRecordIfUnchanged, type LockReclaimDeps, type LockReclaimOutcome } from "./lock-reclaim"
-import { buildLockRecord, isLockRecordStale, markLockRecordReleased, readLockRecord } from "./lock-record"
+import { buildLockRecord, forgetLockRecord, isLockRecordStale, markLockRecordReleased, readLockRecord } from "./lock-record"
 
 export { type LockLease, LockLeaseLostError } from "./lock-lease"
 export { assertRetryableLockOpenError } from "./lock-publish"
@@ -39,7 +39,7 @@ async function acquireLock(lockPath: string, ownerTag: string, staleAfterMs: num
       throw new Error(`Timed out acquiring lock: ${lockPath}`)
     }
 
-    const record = buildLockRecord(ownerTag)
+    const record = await buildLockRecord(ownerTag)
     if (await publishLockRecord(lockPath, record)) return record
 
     const outcome = await reapStaleLock(lockPath, staleAfterMs)
@@ -64,13 +64,14 @@ export async function withLock<T>(
     // Once released, the record counts as stale for this process, so a failed unlink leaves a
     // leftover that the next acquire reclaims instead of a lock nobody can ever take again.
     markLockRecordReleased(record)
-    await removeLockRecordIfUnchanged(lockPath, record, staleAfterMs)
+    const outcome = await removeLockRecordIfUnchanged(lockPath, record, staleAfterMs)
+    if (outcome === "removed" || outcome === "absent" || outcome === "changed") forgetLockRecord(record)
   }
 }
 
 export async function detectStaleLock(lockPath: string, staleAfterMs: number): Promise<boolean> {
   const observed = await readLockRecord(lockPath)
-  return observed !== null && isLockRecordStale(observed, staleAfterMs)
+  return observed !== null && await isLockRecordStale(observed, staleAfterMs)
 }
 
 export async function reapStaleLock(
@@ -80,7 +81,7 @@ export async function reapStaleLock(
 ): Promise<LockReclaimOutcome> {
   const observed = await readLockRecord(lockPath)
   if (observed === null) return "absent"
-  if (!isLockRecordStale(observed, staleAfterMs)) return "changed"
+  if (!await isLockRecordStale(observed, staleAfterMs)) return "changed"
   return await removeLockRecordIfUnchanged(lockPath, observed.content, staleAfterMs, deps)
 }
 
