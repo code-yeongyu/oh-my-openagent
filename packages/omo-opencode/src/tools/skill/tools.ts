@@ -3,7 +3,7 @@ import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import { TOOL_DESCRIPTION_PREFIX } from "./constants"
 import { shouldInvalidateSkillCacheForSession } from "./session-skill-cache"
-import type { SkillArgs, SkillLoadOptions } from "./types"
+import type { CoreListedSkill, SkillArgs, SkillLoadOptions } from "./types"
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
 import { clearSkillCache, getAllSkills } from "../../features/opencode-skill-loader/skill-content"
 import { injectGitMasterConfig } from "../../features/opencode-skill-loader/skill-content"
@@ -28,6 +28,8 @@ import { reportSkillBlocked, SkillLinkBlockedError } from "@oh-my-opencode/skill
 
 export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
   let cachedDescription: string | null = null
+  // Last list core's Skill.all() returned; undefined until a read succeeds, so nothing is deduped before then.
+  let coreListedSkills: readonly CoreListedSkill[] | undefined
   const rejectedSkills = new Map<string, Error>()
   const onRejected = (name: string, error: Error) => {
     rejectedSkills.set(name, error)
@@ -56,6 +58,7 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
     if (options.nativeSkills) {
       try {
         const nativeAll = await options.nativeSkills.all()
+        coreListedSkills = nativeAll
         mergeNativeSkills(skills, nativeAll, options.disabledSkills, options.directory, onRejected)
       } catch (error) {
         if (error instanceof SkillLinkBlockedError) {
@@ -63,6 +66,7 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
           throw error
         }
         if (!(error instanceof Error)) throw error
+        coreListedSkills = undefined
       }
     }
   }
@@ -93,6 +97,7 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
     const skillInfos = publicSkills.map(loadedSkillToInfo)
     cachedDescription = formatCombinedDescription(skillInfos, commands, {
       includeSkills: options.includeSkillsInDescription,
+      coreListedSkills,
     })
     return cachedDescription
   }
@@ -109,6 +114,7 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
         if (isPromiseLike(nativeAll)) {
           needsAsyncRefresh = true
         } else {
+          coreListedSkills = nativeAll
           mergeNativeSkillInfos(skillInfos, nativeAll, options.disabledSkills, options.directory, onRejected)
         }
       } catch (error) {
@@ -118,6 +124,7 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
 
     cachedDescription = formatCombinedDescription(skillInfos, commandsForDescription, {
       includeSkills: options.includeSkillsInDescription,
+      coreListedSkills,
     })
     if (needsAsyncRefresh) {
       void buildDescription(true)
@@ -158,6 +165,7 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
 
       cachedDescription = formatCombinedDescription(skills.map(loadedSkillToInfo), commands, {
         includeSkills: options.includeSkillsInDescription,
+        coreListedSkills,
       })
 
       if (matchedSkill) {

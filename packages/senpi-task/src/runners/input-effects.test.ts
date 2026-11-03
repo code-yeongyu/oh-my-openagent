@@ -174,6 +174,123 @@ test("#given an earlier-run input whose retry is still in flight #when a later r
   expect(events).toEqual(["effect_uncertain", "steered"])
 })
 
+// #2838 step 4: a queued steer keeps its own id across the child boundary, and a lost acknowledgment is
+// resolved by reading that id from the child before anything is sent again.
+function observedEvents(store: ReturnType<typeof createTaskRecordStore>, until?: string) {
+  const events: string[] = []
+  const reached = Promise.withResolvers<void>()
+  const append = store.appendEvent
+  return {
+    events,
+    reached: reached.promise,
+    store: { ...store, appendEvent: (id: string, event: { type: string; payload: unknown }) => {
+      events.push(event.type)
+      const path = append(id, event)
+      if (event.type === until) reached.resolve()
+      return path
+    } },
+  }
+}
+
+test("#given a caller's own id #when the input is sent #then it goes out under that id and no id is minted", async () => {
+  const { store, taskId } = fixture()
+  const sent: unknown[] = []
+  await createInputEffects({ taskId, store, send: async command => { sent.push(command) } })
+    .send({ type: "steer", message: "queued", clientMessageId: "ps-1-entry" })
+  expect(sent).toEqual([{ type: "steer", message: "queued", clientMessageId: "ps-1-entry" }])
+  expect(store.load(taskId)?.last_effect_id).toBe("ps-1-entry")
+  expect(store.load(taskId)?.effect_seq).toBeUndefined()
+})
+
+test("#given a lost acknowledgment the child admitted #when it is resolved #then the read settles it and nothing is sent again", async () => {
+  const { store, taskId } = fixture()
+  const observed = observedEvents(store, "steered")
+  const sent: unknown[] = []
+  const reads: Array<readonly string[]> = []
+  const effects = createInputEffects({
+    taskId, store: observed.store,
+    send: async command => { sent.push(command); throw new RpcRequestTimeout("steer", 30_000) },
+    read: async ids => { reads.push(ids); return new Map(ids.map(id => [id, "admitted" as const])) },
+  })
+  await expect(effects.send({ type: "steer", message: "once", clientMessageId: "ps-1-entry" })).rejects.toBeInstanceOf(InputUncertainError)
+  await bounded(observed.reached)
+  expect(sent).toHaveLength(1)
+  expect(reads).toEqual([["ps-1-entry"]])
+  expect(observed.events).toEqual(["effect_uncertain", "steered"])
+  expect(store.load(taskId)?.uncertain_inputs).toBeUndefined()
+})
+
+test("#given a lost acknowledgment the child never admitted #when it is resolved #then it is sent again under the same id", async () => {
+  const { store, taskId } = fixture()
+  const observed = observedEvents(store, "steered")
+  const sent: unknown[] = []
+  const effects = createInputEffects({
+    taskId, store: observed.store,
+    send: async command => {
+      sent.push(command)
+      if (sent.length === 1) throw new RpcRequestTimeout("steer", 30_000)
+    },
+    read: async ids => new Map(ids.map(id => [id, "not_admitted" as const])),
+  })
+  await expect(effects.send({ type: "steer", message: "once", clientMessageId: "ps-1-entry" })).rejects.toBeInstanceOf(InputUncertainError)
+  await bounded(observed.reached)
+  expect(sent).toEqual([
+    { type: "steer", message: "once", clientMessageId: "ps-1-entry" },
+    { type: "steer", message: "once", clientMessageId: "ps-1-entry" },
+  ])
+})
+
+test("#given a lost acknowledgment and a failed admission read #when it is resolved #then it stays uncertain and nothing is sent", async () => {
+  const { store, taskId } = fixture()
+  const read = Promise.withResolvers<void>()
+  const sent: unknown[] = []
+  const effects = createInputEffects({
+    taskId, store,
+    send: async command => { sent.push(command); throw new RpcRequestTimeout("steer", 30_000) },
+    read: async () => { read.resolve(); throw new Error("host unreachable") },
+  })
+  await expect(effects.send({ type: "steer", message: "once", clientMessageId: "ps-1-entry" })).rejects.toBeInstanceOf(InputUncertainError)
+  await bounded(read.promise)
+  await bounded(effects.reconcile())
+  expect(sent).toHaveLength(1)
+  expect(store.load(taskId)?.uncertain_inputs?.map(input => input.clientMessageId)).toEqual(["ps-1-entry"])
+})
+
+test("#given an earlier run's input the child admitted #when a later run reconciles #then it is settled, not failed as superseded", async () => {
+  const { dir, store, taskId } = fixture()
+  const first = createInputEffects({ taskId, store, send: async () => { throw new RpcRequestTimeout("steer", 30_000) } })
+  first.stopRetrying()
+  await expect(first.send({ type: "steer", message: "old run", clientMessageId: "ps-1-entry" })).rejects.toBeInstanceOf(InputUncertainError)
+  expect(store.load(taskId)?.uncertain_inputs?.[0]?.run_epoch).toBe(store.load(taskId)?.notification.run_epoch)
+  store.mutate(taskId, record => ({ ...record, notification: { ...record.notification, run_epoch: record.notification.run_epoch + 1 } }))
+  const observed = observedEvents(createTaskRecordStore({ project_dir: dir }))
+  const sent: unknown[] = []
+  await createInputEffects({
+    taskId, store: observed.store, send: async command => { sent.push(command) },
+    read: async ids => new Map(ids.map(id => [id, "admitted" as const])),
+  }).reconcile()
+  expect(sent).toEqual([])
+  expect(observed.events).toEqual(["steered"])
+  expect(store.load(taskId)?.uncertain_inputs).toBeUndefined()
+})
+
+test("#given an earlier run's input and a failed admission read #when a later run reconciles #then it stays uncertain, neither failed nor sent", async () => {
+  const { dir, store, taskId } = fixture()
+  const first = createInputEffects({ taskId, store, send: async () => { throw new RpcRequestTimeout("steer", 30_000) } })
+  first.stopRetrying()
+  await expect(first.send({ type: "steer", message: "old run", clientMessageId: "ps-1-entry" })).rejects.toBeInstanceOf(InputUncertainError)
+  store.mutate(taskId, record => ({ ...record, notification: { ...record.notification, run_epoch: record.notification.run_epoch + 1 } }))
+  const observed = observedEvents(createTaskRecordStore({ project_dir: dir }))
+  const sent: unknown[] = []
+  await createInputEffects({
+    taskId, store: observed.store, send: async command => { sent.push(command) },
+    read: async () => { throw new Error("host unreachable") },
+  }).reconcile()
+  expect(sent).toEqual([])
+  expect(observed.events).toEqual([])
+  expect(createTaskRecordStore({ project_dir: dir }).load(taskId)?.uncertain_inputs?.map(input => input.clientMessageId)).toEqual(["ps-1-entry"])
+})
+
 async function bounded<T>(promise: Promise<T>): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   try {

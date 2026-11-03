@@ -23,6 +23,8 @@ describe("event-bridge session_start recovery chain", () => {
       "capture",
       "onSessionStart",
       "reconcile",
+      // Admission's status sync runs while the background recovery continues (#11335).
+      "statusSync",
       "liveness:task-revived",
       "resumptionStart:2",
       "reclaim",
@@ -49,6 +51,7 @@ describe("event-bridge session_start recovery chain", () => {
       "capture",
       "onSessionStart",
       "reconcile",
+      "statusSync",
       "resumptionStart:0",
       "reclaim",
       "cleanup:start",
@@ -160,6 +163,21 @@ describe("event-bridge before_agent_start", () => {
       expect.objectContaining({ message: expect.objectContaining({ customType: "senpi-task.usage" }) }),
     ])
     expect(order).toEqual(["capture"])
+  })
+})
+
+describe("event-bridge session_compact", () => {
+  it("#given rejected, malformed, and accepted compactions #when they fire #then only accepted compaction forgets task-output status reads", async () => {
+    const { pi, forgottenTaskOutputSessions } = wireHarness("parent-session")
+
+    await pi.dispatch("session_compact", { type: "session_compact", accepted: false }, {})
+    expect(forgottenTaskOutputSessions).toEqual([])
+
+    await pi.dispatch("session_compact", { type: "session_compact" }, {})
+    expect(forgottenTaskOutputSessions).toEqual([])
+
+    await pi.dispatch("session_compact", { type: "session_compact", accepted: true }, {})
+    expect(forgottenTaskOutputSessions).toEqual(["parent-session"])
   })
 })
 

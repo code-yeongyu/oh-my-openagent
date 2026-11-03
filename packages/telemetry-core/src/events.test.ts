@@ -17,7 +17,6 @@ const PRODUCT = {
   defaultApiKey: "default-key",
   defaultHost: "https://posthog.test",
   eventName: "legacy_event",
-  machineIdPrefix: "omo-native:",
   packageName: "@oh-my-opencode/omo-native",
   packageVersion: "5.0.0",
   platform: "omo-senpi",

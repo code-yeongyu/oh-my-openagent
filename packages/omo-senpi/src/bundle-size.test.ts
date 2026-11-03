@@ -1,7 +1,8 @@
 import { describe, expect, it } from "bun:test"
-import { existsSync, statSync } from "node:fs"
+import { existsSync, readFileSync, statSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
+import bundleBudget from "../bundle-budget.json"
 
 const packageRoot = fileURLToPath(new URL("..", import.meta.url))
 const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
@@ -168,7 +169,8 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // batch #10 regen head measures 1,419,994 B (+12,425) after the canonical regen (two clean linux containers, node 24 +
 // bun 1.4.3, byte-identical). Ceiling = that measurement rounded up to the next 5,000 bytes (never below what is measured).
 // Batch #18 measured omo.js at 1,422,712 B with the telemetry lazy chunk; revisit this budget when a trim lands.
-const BUDGET_BYTES = 1_425_000
+// Batch #19 measured omo.js at 1,426,658 B (11 cars); budget = measured + 4 KiB (lead rule). Revisit when a trim lands.
+const BUDGET_BYTES = bundleBudget.omoJsBytes
 
 describe("omo-senpi bundle size budget", () => {
   it("#given the built extension #when its byte size is measured #then it stays within the documented byte budget", () => {
@@ -177,5 +179,17 @@ describe("omo-senpi bundle size budget", () => {
     // A trip here means the bundle grew past budget: split, lazy-load, or trim a dependency.
     // Never raise this ceiling to the failing value.
     expect(bytes).toBeLessThanOrEqual(BUDGET_BYTES)
+  })
+})
+
+describe("omo-senpi bundle size budget has one source", () => {
+  it("#given the two omo.js size checks #when their limits are read #then both come from bundle-budget.json", () => {
+    // One number from one source (lead ruling, batch #20): the build-extension check must not carry its own byte literal.
+    const buildTest = readFileSync(join(packageRoot, "plugin", "scripts", "build-extension.test.mjs"), "utf8")
+    const mainCap = buildTest.match(/expect\(Buffer\.byteLength\(main\)\)\.toBeLessThanOrEqual\(([^)]*)\)/)
+    expect(mainCap, "build-extension.test.mjs must cap the main entry").not.toBeNull()
+    expect(mainCap?.[1]).toBe("bundleBudget.omoJsBytes")
+    expect(buildTest).toContain('from "../../bundle-budget.json"')
+    expect(readFileSync(join(packageRoot, "src", "bundle-size.test.ts"), "utf8")).toContain('from "../bundle-budget.json"')
   })
 })

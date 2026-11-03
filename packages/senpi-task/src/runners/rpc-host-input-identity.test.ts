@@ -34,13 +34,21 @@ for (const launch of ["admitted", "held"] as const) {
       const first = await runTaskSend(parent.manager, { to: taskId, message: "first" }, "parent")
       const second = await runTaskSend(parent.manager, { to: taskId, message: "second" }, "parent")
       if (launch === "held") expect([first.details.kind, second.details.kind]).toEqual(["queued", "queued"])
+      // A message queued behind the launch reaches the child under its own queue entry id (#2838 step 4); one
+      // sent straight to the running child gets the next minted id. Which path a send takes is the send's own
+      // reported outcome: a slow launch can queue a send even when the test does not hold it.
+      const queuedIds = parent.store.load(taskId)?.pending_steering?.map(entry => entry.id) ?? []
       release()
       await bounded(steered)
       const inputs = world.host.commands.filter(command => INPUT_TYPES.includes(command.type))
-      expect(inputs.map(command => command.payload.clientMessageId)).toEqual([
-        `${taskId}:0:1`, `${taskId}:0:2`, `${taskId}:0:3`,
-      ])
-      expect(parent.store.load(taskId)?.host_session?.effect_seq).toBe(3)
+      const ids = inputs.map(command => String(command.payload.clientMessageId))
+      let minted = 1
+      const expected = [`${taskId}:0:1`, ...[first, second].map(sent =>
+        sent.details.kind === "queued" ? "queued" : `${taskId}:0:${++minted}`)]
+      expect(ids.map((id, index) => expected[index] === "queued" && id.startsWith("ps-") ? "queued" : id)).toEqual(expected)
+      expect(new Set(ids).size).toBe(3)
+      if (launch === "held") expect(ids.slice(1)).toEqual(queuedIds)
+      expect(parent.store.load(taskId)?.host_session?.effect_seq).toBe(minted)
     } finally {
       release()
       if (launched !== undefined) await bounded(parent.manager.whenLaunched?.(launched) ?? Promise.resolve())

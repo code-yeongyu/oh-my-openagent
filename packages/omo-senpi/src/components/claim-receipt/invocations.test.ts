@@ -59,6 +59,13 @@ describe("claim-receipt invocations", () => {
     it("#then vp check covers both typecheck and lint", () => {
       expect(invokedKinds("vp check")).toEqual(["typecheck", "lint"])
     })
+
+    it("#then bun check is a typecheck and bun run check stays a script lookup", () => {
+      expect(invokedKinds("bun check")).toEqual(["typecheck"])
+      expect(invokedKinds("bun check --no-script --all -p tsconfig.json")).toEqual(["typecheck"])
+      expect(invokedKinds("cd w && bun check -p a && bun check -p b")).toContain("typecheck")
+      expect(invokedKinds("bun run check")).toEqual(invokedKinds("npm run check"))
+    })
   })
 
   describe("#given checks run remotely, in a loop or through CI readouts", () => {

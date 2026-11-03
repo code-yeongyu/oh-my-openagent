@@ -7,6 +7,7 @@ import { handlePostRequestAuthError, handleStepUpIfNeeded } from "./oauth-handle
 import { EnvironmentGrantPolicy } from "./environment-grant-policy"
 import { createFileGrantStore, type GrantStore } from "./env-grant-store"
 import { policyHash } from "./project-env-policy"
+import { buildRequestOptions } from "./request-options"
 import type {
   McpClient,
   OAuthProviderFactory,
@@ -18,6 +19,7 @@ import type {
 export interface SkillMcpClientOptions {
   cdpUrl?: string
   env?: Readonly<Record<string, string>>
+  signal?: AbortSignal
 }
 
 export function buildSkillMcpClientKey(info: SkillMcpClientInfo, options?: SkillMcpClientOptions): string {
@@ -110,7 +112,7 @@ export class SkillMcpManager {
   async listTools(info: SkillMcpClientInfo, context: SkillMcpServerContext, options?: SkillMcpClientOptions): Promise<Tool[]> {
     const client = await this.getOrCreateClientWithRetry(info, context.config, options)
     return this.collectPages(async (cursor) => {
-      const result = await client.listTools(cursor === undefined ? undefined : { cursor })
+      const result = await client.listTools(cursor === undefined ? undefined : { cursor }, buildRequestOptions(context.config, options))
       return { items: result.tools, nextCursor: result.nextCursor }
     })
   }
@@ -118,7 +120,7 @@ export class SkillMcpManager {
   async listResources(info: SkillMcpClientInfo, context: SkillMcpServerContext, options?: SkillMcpClientOptions): Promise<Resource[]> {
     const client = await this.getOrCreateClientWithRetry(info, context.config, options)
     return this.collectPages(async (cursor) => {
-      const result = await client.listResources(cursor === undefined ? undefined : { cursor })
+      const result = await client.listResources(cursor === undefined ? undefined : { cursor }, buildRequestOptions(context.config, options))
       return { items: result.resources, nextCursor: result.nextCursor }
     })
   }
@@ -126,7 +128,7 @@ export class SkillMcpManager {
   async listPrompts(info: SkillMcpClientInfo, context: SkillMcpServerContext, options?: SkillMcpClientOptions): Promise<Prompt[]> {
     const client = await this.getOrCreateClientWithRetry(info, context.config, options)
     return this.collectPages(async (cursor) => {
-      const result = await client.listPrompts(cursor === undefined ? undefined : { cursor })
+      const result = await client.listPrompts(cursor === undefined ? undefined : { cursor }, buildRequestOptions(context.config, options))
       return { items: result.prompts, nextCursor: result.nextCursor }
     })
   }
@@ -153,13 +155,13 @@ export class SkillMcpManager {
     options?: SkillMcpClientOptions
   ): Promise<Awaited<ReturnType<McpClient["callTool"]>>> {
     return await this.withOperationRetry(info, context.config, options, async (client) => {
-      return await client.callTool({ name, arguments: args })
+      return await client.callTool({ name, arguments: args }, undefined, buildRequestOptions(context.config, options))
     })
   }
 
   async readResource(info: SkillMcpClientInfo, context: SkillMcpServerContext, uri: string, options?: SkillMcpClientOptions): Promise<unknown> {
     return await this.withOperationRetry(info, context.config, options, async (client) => {
-      const result = await client.readResource({ uri })
+      const result = await client.readResource({ uri }, buildRequestOptions(context.config, options))
       return result.contents
     })
   }
@@ -172,7 +174,7 @@ export class SkillMcpManager {
     options?: SkillMcpClientOptions
   ): Promise<unknown> {
     return await this.withOperationRetry(info, context.config, options, async (client) => {
-      const result = await client.getPrompt({ name, arguments: args })
+      const result = await client.getPrompt({ name, arguments: args }, buildRequestOptions(context.config, options))
       return result.messages
     })
   }
@@ -192,6 +194,7 @@ export class SkillMcpManager {
         const client = await this.getOrCreateClientWithRetry(info, config, options)
         return await operation(client)
       } catch (error) {
+        if (options?.signal?.aborted) throw options.signal.reason
         lastError = error instanceof Error ? error : new Error(String(error))
         const errorMessage = lastError.message.toLowerCase()
 

@@ -34,7 +34,7 @@ export {
   parseSpoolName,
   type SpoolEntry,
 } from "./otlp-spool-names"
-import { activeName, batchName, parseSpoolName, QUARANTINE_DIR, sendingName, type SpoolEntry } from "./otlp-spool-names"
+import { batchName, ownersDir, parseSpoolName, QUARANTINE_DIR, sendingName, type SpoolEntry } from "./otlp-spool-names"
 
 const HEX = Array.from({ length: 256 }, (_, index) => index.toString(16).padStart(2, "0"))
 
@@ -292,6 +292,10 @@ export function sweepSpool(ctx: SpoolContext): void {
       const limits = { leaseMs: CLAIM_LEASE_MS, maxAgeMs: ctx.maxAgeMs, isPidAlive: ctx.isPidAlive, self: ctx }
       if (stat !== null && isAbandonedLock(ctx.dir, entry.name, now - stat.mtimeMs, limits)) deleteFile(ctx.dir, entry.name)
     }
+  }
+  // A crashed writer leaves its owner marker behind; it must not keep the spool live for an opt-out purge.
+  for (const entry of listSpool(ownersDir(ctx.dir))) {
+    if (entry.kind === "owner" && isDeadOwner(ctx, entry)) deleteFile(ownersDir(ctx.dir), entry.name)
   }
   for (const entry of listSpool(ctx.dir)) {
     if (entry.kind === "batch" && now - batchCreatedMs(entry.batchId) > ctx.maxAgeMs) {

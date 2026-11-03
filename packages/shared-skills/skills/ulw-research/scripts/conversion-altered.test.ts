@@ -1,5 +1,5 @@
 import { describe, expect, onTestFinished, test } from "bun:test"
-import { copyFileSync, existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -114,6 +114,34 @@ describe("the documented recovery: source snapshot --replace with a verified tex
 		expect(replaced.json.error).toBe("snapshot_pinned")
 		expect(existsSync(join(dir, "sources", "S1", "conversion.json"))).toBe(true)
 	})
+})
+
+test("#given --html whose conversion altered 4.22 #when fact add is refused, the verified text replaces S1, and the row is added, filled and verified #then the replacement is declared text over the kept raw.bin and every step passes", async () => {
+	const dir = session()
+	const s = ["--session-dir", dir]
+	await snapshot(dir)
+	const refused = (await run(["fact", "add", "--source", "S1", "--find", "USD", "--label", "usd_bn", ...s, "--json"])) as { exitCode: number; json: Json }
+	expect([refused.exitCode, refused.json.error]).toEqual([1, "conversion_altered_number"])
+	const verified = join(dir, "verified.txt")
+	writeFileSync(verified, "USD 4.2 billion in revenue.\nStaff grew to 1,250 people.\n")
+	const replaced = (await run(["source", "snapshot", "--id", "S1", "--text", verified, "--replace", ...s])) as { exitCode: number; json: Json }
+	expect([replaced.exitCode, replaced.json.data?.text_source, replaced.json.data?.kind]).toEqual([0, "declared", "page"])
+	expect(existsSync(join(dir, "sources", "S1", "raw.bin"))).toBe(true)
+	const added = (await run(["fact", "add", "--source", "S1", "--find", "USD", "--label", "usd_bn", ...s, "--json"])) as { exitCode: number; json: Json & { message?: string } }
+	expect([added.exitCode, added.json.error, added.json.message]).toEqual([0, undefined, undefined])
+	const row = added.json.data?.row as { value: string; locator: { artifact: string; unit: string } }
+	expect([row.value, row.locator.artifact, row.locator.unit]).toEqual(["4200000000", "text.txt", "bytes"])
+	copyFileSync(join(import.meta.dir, "tests", "fixtures", "fidelity-brief-locked.md"), join(dir, "brief.md"))
+	writeFileSync(join(dir, "report.src.html"), [
+		'<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Revenue</title></head><body><h1>Revenue</h1>',
+		"<h2>Findings</h2><p>Revenue was {{F1:usd_bn}} [S1].</p>",
+		"<h2>How this report was made</h2><p>Collected from one cited public page [S1].</p>",
+		'<h2>Sources</h2><ol><li id="s1">[S1] Revenue page, retrieved 2026-10-01.</li></ol></body></html>',
+	].join("\n"))
+	expect(((await run(["fact", "fill", join(dir, "report.src.html"), "--out", join(dir, "report.html"), ...s])) as { exitCode: number }).exitCode).toBe(0)
+	const report = (await run(["fact", "verify", join(dir, "report.html"), "--sources", join(dir, "sources"), "--brief", join(dir, "brief.md"), ...s])) as { exitCode: number; json: { defects?: unknown[] } }
+	expect([report.exitCode, report.json.defects]).toEqual([0, []])
+	expect((JSON.parse(readFileSync(join(dir, "fidelity-defects.json"), "utf8")) as { defects: { code: string }[] }).defects.map((d) => d.code)).not.toContain("snapshot_not_raw")
 })
 
 test("#given a malformed conversion.json #when fact add reads it #then it is a usage error naming the file, not a crash", async () => {

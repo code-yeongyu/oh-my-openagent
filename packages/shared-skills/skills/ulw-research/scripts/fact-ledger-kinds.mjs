@@ -3,7 +3,6 @@
 // per-kind choices (id prefix, measured exact) from it, and the per-kind table in
 // references/fact-ledger-grammar.md is rendered from it (`node fact-ledger-kinds.mjs --render-grammar`).
 // Also the value primitives the schema shares. Pure functions with no IO; node: builtins only.
-
 import { isCliEntry } from "./entry-guard.mjs"
 import { canonicalUnit, inputScale, RuleError } from "./unit-algebra.mjs"
 import { metadataErrors } from "./unit-metadata.mjs"
@@ -15,7 +14,6 @@ export const DECIMAL = /^-?\d+(?:\.\d+)?$/
 const INTEGER = /^-?\d+$/
 const SHA256 = /^[0-9a-f]{64}$/
 const SOURCE_ID = /^S\d+$/
-
 export const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value)
 export const isString = (value) => typeof value === "string"
 export const isNonEmpty = (value) => typeof value === "string" && value.length > 0
@@ -48,6 +46,7 @@ export function locatorErrors(locator, at) {
 	const errors = []
 	if (!isObject(locator)) return errors
 	if (!isNonEmpty(locator.artifact)) errors.push(`${at}.artifact must be a non-empty string`)
+	if (locator.unit !== undefined && locator.unit !== "bytes") errors.push(`${at}.unit must be bytes`)
 	if (!(isCount(locator.char_start) && isCount(locator.char_end) && locator.char_start <= locator.char_end)) errors.push(`${at}.char_start/char_end must be integers with start <= end`)
 	for (const key of ["page", "line"]) {
 		if (locator[key] !== undefined && !(Number.isInteger(locator[key]) && locator[key] >= 1)) errors.push(`${at}.${key} must be an integer >= 1`)
@@ -87,6 +86,7 @@ export const RULES = Object.freeze({
 	rational_or_null: { cell: "rational or null", says: "null or { num: integer string, den: positive integer string }", test: orNull(isRational) },
 	by_derive: { cell: "reduced rational", says: "a reduced { num: integer string, den: positive integer string }", test: isRational },
 	context_by_derive: { cell: "written by derive (object or null)", says: "null or an object", test: orNull(isObject) },
+	source_context: { cell: "quote context or null (legacy)", says: "null or { prefix, suffix } up to 32 characters each", test: orNull((v) => isObject(v) && Object.keys(v).sort().join(",") === "prefix,suffix" && [v.prefix, v.suffix].every((s) => isString(s) && [...s].length <= 32)) },
 	derived_operation: { cell: "sum/diff/growth/share/ratio/expr", says: "a derived operation", test: (v) => Object.hasOwn(OPERATION_RULES, v) && OPERATION_RULES[v].kind === "derived" },
 	convert_operation: { cell: "`convert`", says: "convert", test: (v) => Object.hasOwn(OPERATION_RULES, v) && OPERATION_RULES[v].kind === "converted" },
 	precision: { cell: "`{ places, sigfigs }`", says: "nonnegative places and positive sigfigs", test: (v) => isObject(v) && Object.keys(v).sort().join(",") === "places,sigfigs" && Number.isSafeInteger(v.places) && v.places >= 0 && Number.isSafeInteger(v.sigfigs) && v.sigfigs >= 1 },
@@ -101,14 +101,13 @@ const unsourced = { source_id: "source_or_null", locator: "locator_or_null", sna
 const row = (cells) => Object.freeze(Object.fromEntries(KIND_COLUMNS.map((column) => [column, cells[column] ?? (["precision", "compatibility"].includes(column) && cells.operation !== "null" ? column : "null")])))
 
 export const KIND_RULES = Object.freeze({
-	measured: row({ fact_id: "f_id", value: "decimal", ...sourced, rationale: "string_or_null", exact: "from_value", context: "null", operation: "null" }),
-	quote: row({ fact_id: "q_id", value: "null", ...sourced, rationale: "string_or_null", exact: "null", context: "null", operation: "null" }),
+	measured: row({ fact_id: "f_id", value: "decimal", ...sourced, rationale: "string_or_null", exact: "from_value", context: "source_context", operation: "null" }),
+	quote: row({ fact_id: "q_id", value: "null", ...sourced, rationale: "string_or_null", exact: "null", context: "source_context", operation: "null" }),
 	derived: row({ fact_id: "f_id", value: "decimal", ...unsourced, rationale: "string_or_null", exact: "by_derive", context: "context_by_derive", operation: "derived_operation" }),
 	assumed: row({ fact_id: "f_id", value: "decimal", ...unsourced, rationale: "non_empty", exact: "rational_or_null", context: "null", operation: "null" }),
 	converted: row({ fact_id: "f_id", value: "decimal", ...unsourced, rationale: "string_or_null", exact: "by_derive", context: "context_by_derive", operation: "convert_operation" }),
 })
 
-/** The id prefix nextId assigns for a kind; an unknown kind gets F and fails validation later. */
 export function idPrefix(kind) {
 	return RULES[KIND_RULES[kind]?.fact_id ?? "f_id"].prefix
 }
@@ -169,7 +168,7 @@ const carriesDerivation = (row) => row.operation !== null || row.operands?.lengt
 /** Dimension 32: a stored exact must equal the row's own value at the value's decimal places. */
 function valueExactDisagreement(row) {
 	const exact = readExact(row.exact)
-	const value = readDecimal(row.value)
+	const value = isString(row.value) ? readDecimal(row.value).replace(/^-(0+(?:\.0+)?)$/, "$1") : row.value
 	if (!isRational(exact) || !isDecimal(value) || roundPlaces(toBig(exact), placesOf(value)) === value) return null
 	return `value ${value} disagrees with exact ${exact.num}/${exact.den} at ${placesOf(value)} decimal places`
 }
@@ -212,7 +211,7 @@ export function kindRuleErrors(candidate, at) {
 		const value = candidate[column] === undefined && LATER_COLUMNS.includes(column) ? null : candidate[column]
 		const rule = RULES[legacy && column === "exact" ? "rational_or_null" : rules[column]]
 		// An exact with unknown keys loads as written (never stripped); readFlaws refuses it at use and at write.
-		if (column === "exact" && hasUnknownExactKeys(value) && !isCurrentDerived(candidate)) continue
+		if (column === "exact" && rules[column] !== "null" && hasUnknownExactKeys(value) && !isCurrentDerived(candidate)) continue
 		if (rule.test(value, candidate)) continue
 		errors.push(`${at}.${column} must be ${rule.says} for a ${candidate.kind} row`)
 		if (rule.detail) errors.push(...rule.detail(value, `${at}.${column}`))

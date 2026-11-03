@@ -13,7 +13,7 @@ import { waitForPromptStart } from "./prompt-start"
 import { loadAgentProfileColors } from "./agent-profile-colors"
 import { suppressRunInput } from "./stdin-suppression"
 import { createTimestampedStdoutController } from "./timestamp-output"
-import { createCliPostHog, getPostHogDistinctId } from "../../shared/posthog"
+import { createCliPostHog } from "../../shared/posthog"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../shared/prompt-async-gate"
 import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failure-classifier"
 import { resolveRunnableRunAgent } from "./runnable-agent-resolver"
@@ -56,9 +56,8 @@ export async function run(options: RunOptions): Promise<number> {
   const abortController = new AbortController()
 
   const posthog = createCliPostHog({ configEnabled: pluginConfig.telemetry })
-  const distinctId = getPostHogDistinctId()
   try {
-    posthog.trackActive(distinctId, "run_started")
+    posthog.trackActive("run_started")
   } catch (error) {
     if (!(error instanceof Error)) {
       void error

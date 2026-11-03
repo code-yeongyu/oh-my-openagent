@@ -4,7 +4,7 @@
 // causality_added, qualifier_dropped (six-token window around the fact span; a :q rendering puts
 // the qualifier inside the span), scope_widened_warn, and the acronym-aware name_outside_quote.
 // The hedge-position heuristic never yields a code; it only sets force_strong for the meaning
-// verifier, as do name_outside_quote and scope_widened_warn. Latin terms match whole words (terms
+// verifier; name_outside_quote and scope_widened_warn also emit minor defects. Latin terms match whole words (terms
 // of four or more letters also match their inflections); Korean terms match as substrings, single
 // syllables as tokens. No model, no IO. Plain Node ESM; Korean strings are \u escapes.
 

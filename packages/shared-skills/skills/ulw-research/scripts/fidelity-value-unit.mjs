@@ -1,7 +1,8 @@
 // Value-mode units live outside the fact element. The documented form is the value then its unit,
 // with or without a space, a Korean particle allowed after it ({{F1:span:value}} m, {{F3:rate:value}}%,
 // {{F21:rev:value}}\uC5B5 \uC6D0\uC73C\uB85C); a currency sign right before the value; the :unit element
-// right after it; or the same visual column's table header. Unknown words are advisory, never guessed units,
+// right after it; or the same visual column's table header. A currency the element's own text carries (fill renders a
+// prefix currency value from its raw text, $<data>$12</data>) binds too: every bound sign, outside or inside, must agree. Unknown words are advisory, never guessed units,
 // unless fill recorded a bound unit for the value: then losing it is a unit edit.
 import { cellsOf, rowsOf } from "./fact-locate.mjs"
 import { unitKey } from "./fidelity-binding.mjs"
@@ -15,7 +16,7 @@ import { dimensionOf, normalizeUnit, spacedAliasUnit } from "./units.mjs"
 const PARTICLES = ["\uC774\uC5C8\uB2E4", "\uC600\uB2E4", "\uC774\uB2E4", "\uC774\uBA70", "\uC774\uACE0", "\uC73C\uB85C", "\uC5D0\uC11C", "\uC5D0\uAC8C", "\uAE4C\uC9C0", "\uBD80\uD130", "\uBCF4\uB2E4", "\uC740", "\uB294", "\uC774", "\uAC00", "\uC744", "\uB97C", "\uC758", "\uC5D0", "\uB85C", "\uC640", "\uACFC", "\uB3C4", "\uB9CC", "\uC529", "\uC778"]
 /** The displayed value, read with the one grouped-number grammar; text around it is sign and unit. */
 const NUMBER = new RegExp(NUMBER_SOURCE, "u")
-const SIGNS = ["US$", "$", "\u20AC", "\u20A9", "\u00A3", "\u00A5"]
+const SIGNS = ["US$", "$", "\u20AC", "\u20A9", "\u00A3", "\u00A5", "USD", "EUR", "GBP", "JPY", "KRW"]
 
 const withoutSuffix = (word, suffixes) => {
 	const suffix = suffixes.find((cur) => word.endsWith(cur) && word.length > cur.length)
@@ -74,8 +75,16 @@ function unitAfter(text, row) {
 
 function signBefore(text) {
 	const trimmed = text.replace(/[\s\u00A0]+$/u, "")
-	const sign = SIGNS.find((s) => trimmed.endsWith(s))
-	return sign ? { token: normalizeUnit(sign) } : null
+	// A letter sign is a whole word: "USD 12", never "XUSD 12".
+	const sign = SIGNS.find((s) => trimmed.endsWith(s) && !(/^[A-Z]/u.test(s) && /[A-Za-z]$/u.test(trimmed.slice(0, -s.length))))
+	return sign ? { token: normalizeUnit(sign), sign: true } : null
+}
+
+/** A currency written after the number inside the element ("12\u20AC", "12\uC6D0"); any other unit there is part of the value. */
+function currencyAfter(text, row) {
+	const found = unitAfter(text, row)
+	const dimension = found && !found.ordinary ? (found.dimension ?? dimensionOf(found.token)) : null
+	return dimension?.startsWith("currency:") ? { token: found.scale ? dimension.slice("currency:".length) : found.token, sign: true } : null
 }
 
 function agrees(found, row) {
@@ -135,21 +144,25 @@ function textAfter(node) {
 	return text
 }
 
-/** Every unit bound to a value-mode element: a currency sign before it, the unit after it (or its :unit element), its column header. */
+const INSIDE = "written inside with"
+/**
+ * Every unit bound to a value-mode element: a currency sign before it, the unit after it (or its :unit element), its
+ * column header, and a currency sign or word inside it (prefix or suffix of the number).
+ */
 function boundUnits(node, row) {
 	const siblings = node.parent.children
 	const at = siblings.indexOf(node)
 	const prev = siblings[at - 1]
 	const shown = proseText(node)
 	const number = NUMBER.exec(shown)
-	const sign = signBefore(`${prev?.tag === "#text" ? prev.text : ""}${number ? shown.slice(0, number.index) : ""}`)
+	const before = signBefore(prev?.tag === "#text" ? prev.text : "")
 	// The element's own text is the row's render: a scale word in it ("3,234\uC5B5", "12 million") is part of the value.
+	const inside = number ? [signBefore(shown.slice(0, number.index)), currencyAfter(shown.slice(number.index + number[0].length), row)] : []
 	const read = unitAfter(textAfter(node), row) ?? (unitElementAfter(siblings, at, row) ? { token: row.unit } : null)
-	const before = sign && { ...sign, sign: true }
 	const header = headerUnit(node)
 	const kind = (unit) => dimensionOf(unit.token)?.split(":")[0]
-	const after = read?.ordinary && ![before, header].some((unit) => unit && kind(unit) === kind(read)) ? null : read
-	return [["preceded by", before], ["followed by", after], ["headed with", header]].filter(([, unit]) => unit)
+	const after = read?.ordinary && ![before, ...inside, header].some((unit) => unit && kind(unit) === kind(read)) ? null : read
+	return [["preceded by", before], ["followed by", after], ["headed with", header], ...inside.map((unit) => [INSIDE, unit])].filter(([, unit]) => unit)
 }
 
 /** Each data-fact element's own fill-map entry: fill writes one element per entry, so ids pair up in document order. */
@@ -168,7 +181,8 @@ export function withBoundUnits(html, entries, rows) {
 	const filled = fillEntriesByNode(all(parseHtml(html)).filter((node) => node.attrs?.["data-fact"] !== undefined), entries)
 	const units = new Map([...filled].flatMap(([node, entry]) => {
 		const row = rows.get(entry.fact_id)
-		const unit = entry.mode === "value" && row && unitKey(row.unit) ? boundUnits(node, row)[0]?.[1].token : null
+		// Only a unit outside the element: the element's own text is the row's render, so it can be no record of a unit beside it.
+		const unit = entry.mode === "value" && row && unitKey(row.unit) ? boundUnits(node, row).find(([where]) => where !== INSIDE)?.[1].token : null
 		return unit ? [[entry, unit]] : []
 	}))
 	return entries.map((entry) => (units.has(entry) ? { ...entry, unit_bound: units.get(entry) } : entry))
@@ -181,7 +195,7 @@ export function withBoundUnits(html, entries, rows) {
 export function valueUnitProblem(node, row, entry = null) {
 	if ((entry?.mode !== "value" && node.attrs["data-fact-mode"] !== "value") || !unitKey(row.unit)) return null
 	const found = boundUnits(node, row)
-	if (found.length === 0 && entry?.unit_bound) return ["unit_mismatch", `value-mode ${row.fact_id} had the unit "${entry.unit_bound}" when filled, but no recognizable unit is bound to it now; its row is in "${row.unit}"`]
+	if (entry?.unit_bound && found.every(([where]) => where === INSIDE)) return ["unit_mismatch", `value-mode ${row.fact_id} had the unit "${entry.unit_bound}" beside it when filled, but no recognizable unit is bound beside it now; its row is in "${row.unit}"`]
 	if (found.length === 0) return ["unit_unbound", `${row.fact_id} has unit "${row.unit}" but no recognizable unit right after its value, before it as a currency sign, or in its column header`]
 	const wrong = found.find(([, unit]) => !agrees(unit, row))
 	return wrong ? ["unit_mismatch", `value-mode ${row.fact_id} is ${wrong[0]} "${wrong[1].token}", but its row is in "${row.unit}"`] : null

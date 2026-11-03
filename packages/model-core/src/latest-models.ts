@@ -6,6 +6,8 @@
  * `@oh-my-opencode/model-core/latest-models` subpath. Not covered: the Codex plugin's data files
  * (`omo-codex/plugin` agent TOMLs, `migrate-codex-config/catalog.mjs`, `model-catalog.json`) still
  * spell `gptAstra`'s id, so a Codex default bump also edits those.
+ * `kimiK3` is the previous Kimi generation, kept for the rungs of providers that do not serve
+ * `kimi` yet (OpenCode Zen, Bailian, Firmware, Ollama Cloud, AIHubMix).
  */
 export const LATEST_MODEL_BY_FAMILY = {
   claudeOpus: "claude-opus-5-5",
@@ -18,7 +20,8 @@ export const LATEST_MODEL_BY_FAMILY = {
   gptLunaFast: "gpt-6-luna-fast",
   glm: "glm-5.3",
   glmFlash: "glm-5.3-flash",
-  kimi: "kimi-k3",
+  kimi: "kimi-k3.1-pro",
+  kimiK3: "kimi-k3",
   geminiPro: "gemini-4-argon",
 } as const
 

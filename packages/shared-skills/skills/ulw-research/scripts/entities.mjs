@@ -16,7 +16,8 @@ const NAMED_ENTITIES = {
 	DiacriticalGrave: "`", lpar: "(", rpar: ")", lsqb: "[", lbrack: "[", rsqb: "]", rbrack: "]",
 }
 
-function decodeOne(body) {
+/** One reference body (between `&` and `;`), or null when unsupported. */
+export function decodeOne(body) {
 	if (Object.hasOwn(NAMED_ENTITIES, body)) return NAMED_ENTITIES[body]
 	if (body[0] !== "#") return null
 	const hex = body[1] === "x" || body[1] === "X"

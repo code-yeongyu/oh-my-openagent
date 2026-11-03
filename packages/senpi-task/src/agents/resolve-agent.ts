@@ -20,6 +20,7 @@ import type { AgentDefinition } from "./types"
 export type ResolveAgentOptions = {
   readonly modelOverride?: string
   readonly omoConfig?: OmoConfig
+  readonly distributeModels?: import("@oh-my-opencode/omo-config-core").ModelDistributor
 }
 
 type AgentPersona = {
@@ -117,7 +118,14 @@ export function resolveAgent<TModel extends SenpiModelPort>(
     ...(definition.variant === undefined ? {} : { variant: definition.variant }),
     ...(definition.reasoningEffort === undefined ? {} : { reasoningEffort: definition.reasoningEffort }),
   }
-  const directModels = agentModelCandidates(definition.model, definition.models, configuredTuning)
+  const configuredModels = agentModelCandidates(
+    definition.models_distribution === "round_robin" && definition.models?.length ? undefined : definition.model,
+    definition.models,
+    configuredTuning,
+  )
+  const directModels = definition.models?.length && options.distributeModels
+    ? options.distributeModels(`agent:${name}`, configuredModels, definition.models_distribution)
+    : configuredModels
   for (const candidate of directModels) {
     attemptedModel = candidate.model
     const found = findExactAgentModel(candidate.model, registry)
@@ -143,6 +151,7 @@ export function resolveAgent<TModel extends SenpiModelPort>(
       omoConfig: options.omoConfig ?? {},
       registry,
       configuredTuning,
+      distributeModels: options.distributeModels,
     })
     if (selection !== undefined) {
       return resolvedAgent(

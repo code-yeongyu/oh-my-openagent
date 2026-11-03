@@ -52,11 +52,20 @@ describe("createSkillSourceCopyFilter", () => {
     expect(shouldCopy(join(root, "engine", "contest", "runtime.py"))).toBe(true)
   })
 
-  test("#given top-level test and tests directories #when filtered #then their runtime resources are kept", () => {
+  test("#given each top-level directory shape #when filtered #then only test and tests are exempt by name", () => {
     const shouldCopy = createSkillSourceCopyFilter(root)
-    for (const name of ["tests", "test"]) {
-      expect(shouldCopy(join(root, name))).toBe(true)
-      expect(shouldCopy(join(root, name, "fixture.md"))).toBe(true)
+    const shapes = [
+      { name: "test", copied: true },
+      { name: "tests", copied: true },
+      { name: "__tests__", copied: false },
+      { name: "foo_test", copied: false },
+      { name: "spec", copied: true },
+      { name: "engine", copied: true },
+    ]
+    for (const { name, copied } of shapes) {
+      expect({ name, dir: shouldCopy(join(root, name)) }).toEqual({ name, dir: copied })
+      expect({ name, file: shouldCopy(join(root, name, "fixture.md")) }).toEqual({ name, file: copied })
+      expect({ name, nested: shouldCopy(join(root, name, "data", "page.html")) }).toEqual({ name, nested: copied })
     }
   })
 

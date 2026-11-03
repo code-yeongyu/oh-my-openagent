@@ -47,7 +47,7 @@ export function CommandBar({ command, prompt = "$", className }: CommandBarProps
     <div
       data-testid="command-bar"
       className={cn(
-        "border-line bg-ink-1 flex h-12 w-full border focus-within:shadow-[inset_0_0_0_1px_var(--accent-32)]",
+        "border-line bg-ink-1 flex h-12 w-full border focus-within:shadow-[inset_0_0_0_1px_var(--ring)]",
         className,
       )}
     >
@@ -65,7 +65,7 @@ export function CommandBar({ command, prompt = "$", className }: CommandBarProps
         onClick={() => copy(command)}
         aria-label={t("copyAria")}
         data-copied={copied ? "true" : undefined}
-        className="copy-cell eyebrow border-line hover:text-text-hi data-[copied=true]:text-accent ease-standard focus-visible:outline-accent-32 w-20 shrink-0 border-l transition-colors duration-[var(--dur-micro)] focus-visible:outline-2 focus-visible:-outline-offset-2"
+        className="copy-cell eyebrow border-line hover:text-text-hi data-[copied=true]:text-accent ease-standard focus-ring-inset w-20 shrink-0 border-l transition-colors duration-[var(--dur-micro)]"
       >
         <span aria-hidden="true" className="copy-wash" />
         <span aria-hidden="true" className="copy-label" data-shown={copied ? "false" : "true"}>

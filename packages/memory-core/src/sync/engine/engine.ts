@@ -34,6 +34,8 @@ interface Failing {
 export interface CycleReport {
   readonly applied: number
   readonly refused: number
+  /** Received items this cycle dropped because their key may never reach this device's files. */
+  readonly rejectedItems: number
   readonly pushed: boolean
   readonly snapshot: number | null
 }
@@ -43,7 +45,13 @@ export class SyncEngine {
   cyclesRun = 0
   private loaded = false
   private running: Promise<CycleReport> | null = null
+  /** A local commit, poll or startup request arrived while a cycle ran: it always gets its own cycle. */
   private rerun = false
+  /**
+   * A stream event arrived while a cycle ran. It reruns only when its head is still beyond what the finished
+   * cycle applied, so the device's own pushed head echoed back by the per-user stream starts no extra cycle.
+   */
+  private rerunOnEvent = false
   /** Set by stop(): no new cycle starts after it, so close() can release the device lease safely. */
   private stopped = false
   private eventHead = 0
@@ -79,7 +87,7 @@ export class SyncEngine {
     this.unsubscribe = this.deps.transport.subscribe({
       onAdvanced: (head) => {
         this.eventHead = Math.max(this.eventHead, head)
-        if (head > this.appliedMirror) this.request()
+        if (head > this.appliedMirror) this.request("event")
       },
       onConnected: (connected) => (connected ? this.stopPolling() : this.poll()),
     })
@@ -93,6 +101,7 @@ export class SyncEngine {
     this.cancelDebounce?.()
     this.stopped = true
     this.rerun = false
+    this.rerunOnEvent = false
     while (this.running !== null) await this.running.catch(() => undefined)
   }
 
@@ -123,10 +132,10 @@ export class SyncEngine {
         this.announceIfChanged(shownBefore)
         for (const w of waiters) w.resolve(report)
         if (this.running === run) this.running = null
-        if (this.rerun && this.eventHead > this.appliedMirror) {
-          this.rerun = false
-          this.request()
-        }
+        const rerun = this.rerun || (this.rerunOnEvent && this.eventHead > this.appliedMirror)
+        this.rerun = false
+        this.rerunOnEvent = false
+        if (rerun) this.request()
       },
       (error: unknown) => {
         const shownBefore = this.shownKey()
@@ -138,15 +147,20 @@ export class SyncEngine {
         this.failing = failing
         // A failure below its threshold (an offline blip) never replaces or clears what is shown: only a
         // successful cycle clears a shown failure.
-        if (isFailureShown(failing.failure.kind, failing.attempts)) this.shown = failing
+        if (isFailureShown(failing.failure.kind, failing.attempts)) {
+          const shown = this.shown
+          this.shown = shown !== null && shownBefore === `${failure.kind}\n${failure.action}`
+            ? { failure, since: shown.since, attempts: shown.attempts + 1 }
+            : failing
+        }
         this.announceIfChanged(shownBefore)
         for (const w of waiters) w.reject(error)
         if (this.running === run) this.running = null
         // A request that arrived during the failed cycle still deserves its cycle: nothing it asked for was done.
-        if (this.rerun) {
-          this.rerun = false
-          this.request()
-        }
+        const rerun = this.rerun || this.rerunOnEvent
+        this.rerun = false
+        this.rerunOnEvent = false
+        if (rerun) this.request()
       },
     )
     return run
@@ -167,10 +181,11 @@ export class SyncEngine {
     }
   }
 
-  private request(): void {
+  private request(trigger: "always" | "event" = "always"): void {
     if (this.stopped) return
     if (this.running !== null) {
-      this.rerun = true
+      if (trigger === "event") this.rerunOnEvent = true
+      else this.rerun = true
       return
     }
     void this.runCycle().catch((error: unknown) => this.deps.log?.(`sync cycle failed: ${String(error)}`))
@@ -253,6 +268,7 @@ export class SyncEngine {
     if (refused === 0) await journal.updateState({ lastSyncedAt: deps.clock.now(), updatedWhileOffline: memories })
     this.appliedMirror = (await journal.state()).applied
     this.cyclesRun += 1
-    return { applied, refused, pushed, snapshot }
+    const rejectedItems = (await journal.state()).rejectedItems - before.rejectedItems
+    return { applied, refused, rejectedItems, pushed, snapshot }
   }
 }

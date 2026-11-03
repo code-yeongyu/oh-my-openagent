@@ -1,6 +1,7 @@
 import { existsSync, realpathSync } from "node:fs"
 import { delimiter, isAbsolute, join, relative, sep } from "node:path"
 import { canonicalAgentDir } from "./agent-dir.js"
+import { OMO_BRAND_LOGO } from "./brand-logo.generated.js"
 import { HERDR_AGENT_MARKER } from "./herdr-agent-hint.js"
 import { nearestNodeBin, packageManifest, packageRoot, readJson, releaseChannel, updateTarget } from "./package-paths.js"
 
@@ -27,6 +28,7 @@ function brandProfile() {
   const changelog = pluginChangelogSource()
   return {
     name: "OmO",
+    logo: OMO_BRAND_LOGO,
     command: "omo",
     displayVersion: packageManifest().version,
     configDir: ".omo",

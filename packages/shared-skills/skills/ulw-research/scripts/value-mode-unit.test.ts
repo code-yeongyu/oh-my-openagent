@@ -3,6 +3,7 @@ import { copyFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { derive } from "./fact-derive.mjs"
 import { valueChecks } from "./fidelity-values.mjs"
 import { buildContext } from "./gates-static.mjs"
 import { parseHtml } from "./html-lite.mjs"
@@ -78,6 +79,18 @@ describe("value-mode unit binding through fact fill and verify", () => {
 
 	test("#given a converted row in value mode followed by its unit #when verified #then display(value, unit) still verifies", async () => {
 		expect(codes(await (await filled(prose("{{F8:span_mm:value}}", " mm"))).verify())).not.toContain("unit_mismatch")
+	})
+
+	test("#given a converted row in value mode rendered with its original in brackets #when the unit beside it is hand-edited #then unit_mismatch blocks", async () => {
+		const ledger = structuredClone(LEDGER)
+		const { row } = derive(ledger, { op: "convert", operands: ["F1"], to: "mm", now: "2026-10-23T08:00:00Z", label: "span_conv" }) as { row: Row }
+		const { verify, edit, text } = await filled(prose(`{{${row.fact_id}:span_conv:value}}`, " mm"), "html", ledger)
+		expect(text).toContain(">320,000 mm (320 m)</data> mm")
+		expect(codes(await verify())).toEqual([])
+		edit("</data> mm", "</data> km")
+		const edited = await verify()
+		expect(codes(edited)).toContain("unit_mismatch")
+		expect(edited.exitCode).toBe(1)
 	})
 
 	test("#given the sign already inside a value-mode element (valueParts falling back to the raw text) #when checked #then it is bound", () => {

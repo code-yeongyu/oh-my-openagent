@@ -11,6 +11,9 @@ import { valueChecks } from "./fidelity-values.mjs"
 import { buildContext } from "./gates-static.mjs"
 import { parseHtml } from "./html-lite.mjs"
 
+/** fact derive stamps observed_at from a caller-supplied clock (#11285); these rows only need a fixed one. */
+const NOW = "2026-10-27T00:00:00.000Z"
+
 type Row = Record<string, unknown> & { fact_id: string }
 type Ledger = { rows: Row[] }
 const FIX = join(import.meta.dir, "tests", "fixtures", "fidelity")
@@ -31,7 +34,7 @@ function measured(id: string, value: string, unit: string, extra: Record<string,
 function derivedReport(rows: Row[], spec: Record<string, unknown>) {
 	const ledger = emptyLedger() as Ledger
 	for (const row of rows) addRow(ledger, row)
-	const result = derive(ledger, spec) as { row?: Row; error?: string }
+	const result = derive(ledger, { now: NOW, ...spec }) as { row?: Row; error?: string }
 	if (!result.row) throw new Error(`derive refused: ${result.error}`)
 	const filled = fill(`<h2>Findings</h2><p>The total is {{${result.row.fact_id}:${result.row.label}}}.</p>`, ledger)
 	if (filled.out === null) throw new Error("fill failed")
@@ -104,7 +107,7 @@ describe("conversion originals bind both halves", () => {
 		for (const pointer of [(id: string) => `{{${id}:span_mm:value}} mm`, (id: string) => `{{${id}:span_mm:value}}{{${id}:span_mm:unit}}`]) {
 			const ledger = emptyLedger() as Ledger
 			addRow(ledger, measured("F1", "320", "m"))
-			const { row } = derive(ledger, { op: "convert", operands: ["F1"], to: "mm", label: "span_mm" }) as { row: Row }
+			const { row } = derive(ledger, { now: NOW, op: "convert", operands: ["F1"], to: "mm", label: "span_mm" }) as { row: Row }
 			const filled = fill(`<h2>Findings</h2><p>The span is ${pointer(row.fact_id)}.</p>`, ledger)
 			expect(valueChecks(buildContext(parseHtml(String(filled.out)), {}), ledger, null, null)).toEqual([])
 		}
@@ -194,7 +197,7 @@ describe("conversion originals: the bracket grammar class", () => {
 	function verdict(input: string, render: Render, lang: "en" | "ko", after = false) {
 		const ledger = emptyLedger() as Ledger
 		addRow(ledger, measured("F1", "320", "m"))
-		const row = (derive(ledger, { op: "convert", operands: ["F1"], to: "mm", label: "span_mm" }) as { row: Row }).row
+		const row = (derive(ledger, { now: NOW, op: "convert", operands: ["F1"], to: "mm", label: "span_mm" }) as { row: Row }).row
 		const filled = fill(render.doc(`{{${row.fact_id}:span_mm}}`, SENTENCE[lang]), ledger, { format: render.format }) as { out: string; fillMap: Parameters<typeof markdownAsHtml>[1] }
 		const site = render.format === "html" ? `>${row.render}</data>` : String(row.render)
 		const edited = filled.out.replace(site, after ? `${site}${input}` : render.format === "html" ? `>${input}</data>` : input)
@@ -267,7 +270,7 @@ describe("conversion originals: what can follow a converted element", () => {
 		const ledger = emptyLedger() as Ledger
 		// The fixture's own source rows: each pins S4 and quotes its sentence, as fact add writes them.
 		for (const id of ["F1", "F3"]) addRow(ledger, structuredClone(rowOf(BASE, id)))
-		const row = (derive(ledger, { op: "convert", operands: ["F1"], to: "mm", label: "span_mm" }) as { row: Row }).row
+		const row = (derive(ledger, { now: NOW, op: "convert", operands: ["F1"], to: "mm", label: "span_mm" }) as { row: Row }).row
 		const filled = fill(render.doc(`{{${row.fact_id}:span_mm}}${after}`, SENTENCE[lang]), ledger, { format: render.format }) as { out: string | null; fillMap: Parameters<typeof markdownAsHtml>[1] }
 		if (filled.out === null) return "fill failed"
 		const report = render.stale ? filled.out.replace("## Findings", "## Findings, revised after the review") : filled.out
