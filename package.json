@@ -161,7 +161,7 @@
     "lint:ratchet": "bun script/lint-ratchet.ts",
     "knip:check": "knip --no-progress --no-config-hints",
     "lint:ratchet:update": "bun script/lint-ratchet.ts --update",
-    "lint": "bun run check:copy && oxlint packages/lsp-tools-mcp packages/lsp-daemon packages/web packages/omo-codex/plugin/components/comment-checker packages/omo-codex/plugin/components/lazycodex-executor-verify packages/omo-codex/plugin/components/lsp packages/omo-codex/plugin/components/rules packages/omo-codex/plugin/components/telemetry packages/omo-codex/plugin/components/ultrawork packages/omo-codex/plugin/components/ulw-execute-continuation packages/omo-codex/plugin/components/ulw-loop"
+    "lint": "bun run check:copy && bun run fmt:check && oxlint packages/lsp-tools-mcp packages/lsp-daemon packages/web packages/omo-codex/plugin/components/comment-checker packages/omo-codex/plugin/components/lazycodex-executor-verify packages/omo-codex/plugin/components/lsp packages/omo-codex/plugin/components/rules packages/omo-codex/plugin/components/telemetry packages/omo-codex/plugin/components/ultrawork packages/omo-codex/plugin/components/ulw-execute-continuation packages/omo-codex/plugin/components/ulw-loop"
   },
   "keywords": [
     "opencode",
