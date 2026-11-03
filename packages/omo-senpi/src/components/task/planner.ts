@@ -1,4 +1,4 @@
-import { isExcludedModel, type OmoConfig } from "@oh-my-opencode/omo-config-core"
+import { createModelDistributor, isExcludedModel, type ModelDistributor, type OmoConfig } from "@oh-my-opencode/omo-config-core"
 
 import { inheritParentFastMode, type ResolveParentServiceTier } from "./fast-mode-inheritance"
 import { NO_REGISTRY_MESSAGE, resolveExplicitPin, type ResolveDefaultRoute } from "./planner-explicit-pin"
@@ -47,10 +47,11 @@ export function createTaskChildPlanner(
   resolveParentServiceTier: ResolveParentServiceTier = () => undefined,
   resolveDefaultRoute?: ResolveDefaultRoute,
 ): ChildPlanner {
+  const distributeModels = createModelDistributor()
   const availableAgents = listAvailableAgents(agents)
   const planChild = (spec: Parameters<ChildPlanner>[0]): PlanResolution => {
     if (spec.subagent_type !== undefined) {
-      const agentResolution = resolveAgentTarget(spec.subagent_type, spec.model, agents, resolveRegistry, omoConfig, resolveDefaultRoute)
+      const agentResolution = resolveAgentTarget(spec.subagent_type, spec.model, agents, resolveRegistry, omoConfig, distributeModels, resolveDefaultRoute)
       return agentResolution ?? unresolvableAgentTarget(spec.subagent_type, availableAgents, resolveRegistry, omoConfig)
     }
 
@@ -80,7 +81,7 @@ export function createTaskChildPlanner(
       }
     }
 
-    const resolution = resolveCategory(categoryName, omoConfig, registry)
+    const resolution = resolveCategory(categoryName, omoConfig, registry, { distributeModels })
     return toPlanResolution(categoryName, resolution, availableAgents)
   }
   return (spec): PlanResolution => {
@@ -101,6 +102,7 @@ function resolveAgentTarget(
   agents: Readonly<Record<string, AgentDefinition>>,
   resolveRegistry: ResolveModelRegistry,
   omoConfig: OmoConfig,
+  distributeModels: ModelDistributor,
   resolveDefaultRoute?: ResolveDefaultRoute,
 ): PlanResolution | undefined {
   if (explicitModel !== undefined && explicitModel.length > 0) {
@@ -112,7 +114,7 @@ function resolveAgentTarget(
   }
 
   const registry = resolveRegistry()
-  const resolution = resolveAgent(agentName, agents, registry, { omoConfig })
+  const resolution = resolveAgent(agentName, agents, registry, { omoConfig, distributeModels })
   if (resolution.kind === "resolved") {
     return { kind: "resolved", plan: toAgentPlan(resolution, undefined) }
   }

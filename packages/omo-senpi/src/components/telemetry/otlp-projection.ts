@@ -2,6 +2,7 @@ import type { OtlpWireProjection, SpanAllowlist, WireAttributes } from "@oh-my-o
 import { isOtlpEvent, type OtlpEvent } from "./otlp-events"
 export { isOtlpEvent } from "./otlp-events"
 
+import { OMO_NATIVE_EVENT_SCHEMAS, type OmoNativePropertySchema } from "./event-schemas"
 import { pinnedModelId } from "./pinned-model-ids"
 
 // Derived from omo-telemetry origin/main 13c6e61b40c49141868e7430e02a7b4b949d0c5d:
@@ -25,7 +26,6 @@ const EVENT_FIELDS: Readonly<Record<OtlpEvent, Readonly<Record<string, string>>>
     "combo_fingerprint": "omo.combo_fingerprint",
     "config_generation": "omo.config_generation",
     "user_category_count": "omo.custom_category_count",
-    "machine_hash": "omo.machine_hash",
     "source": "omo.source",
     "$session_id": "session.id"
   },
@@ -33,7 +33,6 @@ const EVENT_FIELDS: Readonly<Record<OtlpEvent, Readonly<Record<string, string>>>
     "active": "omo.active",
     "backend": "omo.backend",
     "host_platform": "omo.host_platform",
-    "machine_hash": "omo.machine_hash",
     "source": "omo.source",
     "$session_id": "session.id"
   },
@@ -41,20 +40,17 @@ const EVENT_FIELDS: Readonly<Record<OtlpEvent, Readonly<Record<string, string>>>
     "backend": "omo.backend",
     "code": "omo.code",
     "host_platform": "omo.host_platform",
-    "machine_hash": "omo.machine_hash",
     "$session_id": "session.id"
   },
   "computer_use_permission_denied": {
     "backend": "omo.backend",
     "host_platform": "omo.host_platform",
-    "machine_hash": "omo.machine_hash",
     "permission": "omo.permission",
     "scope": "omo.scope",
     "$session_id": "session.id"
   },
   "daily_active": {
     "day_utc": "omo.day_utc",
-    "machine_hash": "omo.machine_hash",
     "reason": "omo.start_trigger",
     "$session_id": "session.id"
   },
@@ -72,7 +68,6 @@ const EVENT_FIELDS: Readonly<Record<OtlpEvent, Readonly<Record<string, string>>>
     "execution_mode": "omo.execution_mode",
     "fallback_attempts": "omo.fallback_attempts",
     "input_tokens": "omo.input_tokens",
-    "machine_hash": "omo.machine_hash",
     "model_id": "omo.model_id",
     "model_source": "omo.model_source",
     "output_tokens": "omo.output_tokens",
@@ -96,20 +91,17 @@ const EVENT_FIELDS: Readonly<Record<OtlpEvent, Readonly<Record<string, string>>>
     "background": "omo.background",
     "batch_size_bucket": "omo.batch_size_bucket",
     "kind": "omo.kind",
-    "machine_hash": "omo.machine_hash",
     "name": "omo.name",
     "$session_id": "session.id"
   },
   "feature_used": {
     "feature": "omo.feature",
-    "machine_hash": "omo.machine_hash",
     "$session_id": "session.id"
   },
   "handoff_hint": {
     "action": "omo.action",
     "context_tokens": "omo.context_tokens",
     "fresh_usd": "omo.fresh_usd",
-    "machine_hash": "omo.machine_hash",
     "model_id": "omo.model_id",
     "next_reply_usd": "omo.next_reply_usd",
     "provider": "omo.provider",
@@ -126,7 +118,6 @@ const EVENT_FIELDS: Readonly<Record<OtlpEvent, Readonly<Record<string, string>>>
     "first_nudge_wake": "omo.first_nudge_wake",
     "generations": "omo.generations",
     "input_tokens": "omo.input_tokens",
-    "machine_hash": "omo.machine_hash",
     "model_top": "omo.model_top",
     "nudge_gap_ms_median": "omo.nudge_gap_ms_median",
     "nudge_gap_ms_p90": "omo.nudge_gap_ms_p90",
@@ -161,7 +152,6 @@ const EVENT_FIELDS: Readonly<Record<OtlpEvent, Readonly<Record<string, string>>>
     "eval_outer_joined_calls": "omo.eval_outer_joined_calls",
     "eval_tool_aggregate_truncated_execution_count": "omo.eval_tool_aggregate_truncated_execution_count",
     "incomplete_calls": "omo.incomplete_calls",
-    "machine_hash": "omo.machine_hash",
     "measured_eval_execution_duration_ms_sum": "omo.measured_eval_execution_duration_ms_sum",
     "measured_eval_nested_tool_duration_ms_sum": "omo.measured_eval_nested_tool_duration_ms_sum",
     "measured_turn_duration_ms_total": "omo.measured_turn_duration_ms_total",
@@ -181,7 +171,6 @@ const EVENT_FIELDS: Readonly<Record<OtlpEvent, Readonly<Record<string, string>>>
     "crashed_engine_version": "omo.crashed_engine_version",
     "crashed_omo_version": "omo.crashed_omo_version",
     "detection": "omo.detection",
-    "machine_hash": "omo.machine_hash",
     "process_kind": "omo.process_kind",
     "shard_kind": "omo.shard_kind",
     "signal": "omo.signal",
@@ -199,7 +188,6 @@ const EVENT_FIELDS: Readonly<Record<OtlpEvent, Readonly<Record<string, string>>>
     "keyword_ultrawork_full": "omo.keyword_ultrawork_full",
     "keyword_ulw_abbrev": "omo.keyword_ulw_abbrev",
     "keyword_variant": "omo.keyword_variant",
-    "machine_hash": "omo.machine_hash",
     "is_real_user_prompt": "omo.prompt.is_real_user",
     "prompt_length_bucket": "omo.prompt_length_bucket",
     "queue_mode": "omo.queue_mode",
@@ -212,7 +200,6 @@ const EVENT_FIELDS: Readonly<Record<OtlpEvent, Readonly<Record<string, string>>>
     "cpu_count": "omo.cpu_count",
     "default_model": "omo.default_model",
     "default_provider": "omo.default_provider",
-    "machine_hash": "omo.machine_hash",
     "memory_bucket": "omo.memory_bucket",
     "model_count": "omo.model_count",
     "provider_count": "omo.provider_count",
@@ -255,7 +242,6 @@ const EVENT_FIELDS: Readonly<Record<OtlpEvent, Readonly<Record<string, string>>>
     "m3_provider": "omo.m3_provider",
     "m3_total_tokens": "omo.m3_total_tokens",
     "m3_turns": "omo.m3_turns",
-    "machine_hash": "omo.machine_hash",
     "model_count": "omo.model_count",
     "other_cost_usd": "omo.other_cost_usd",
     "other_total_tokens": "omo.other_total_tokens",
@@ -278,7 +264,6 @@ const EVENT_FIELDS: Readonly<Record<OtlpEvent, Readonly<Record<string, string>>>
     "$session_id": "session.id"
   },
   "skill_loaded": {
-    "machine_hash": "omo.machine_hash",
     "skill_name": "omo.skill_name",
     "$session_id": "session.id"
   },
@@ -290,7 +275,6 @@ const EVENT_FIELDS: Readonly<Record<OtlpEvent, Readonly<Record<string, string>>>
     "input_tokens": "gen_ai.usage.input_tokens",
     "output_tokens": "gen_ai.usage.output_tokens",
     "reasoning_tokens": "gen_ai.usage.reasoning.output_tokens",
-    "machine_hash": "omo.machine_hash",
     "model_id": "omo.model_id",
     "provider": "omo.provider",
     "sample_rate": "omo.sample_rate",
@@ -368,6 +352,26 @@ const SUPPRESSION_CAUSES = [
   "child_session", "embedded_directive", "skill_expansion", "skill_name_only",
 ]
 
+// The collector refuses a whole record for one unlisted enum value (invalid_enum). A closed string property
+// therefore never leaves raw when its value is outside the client vocabulary: it becomes that vocabulary's own
+// catch-all (custom, then unknown, then other), or is left out when the vocabulary has none.
+const CLOSED_FALLBACKS = ["custom", "unknown", "other"] as const
+
+function closedValues(event: OtlpEvent, property: string): readonly string[] | undefined {
+  const schema: Readonly<Record<string, OmoNativePropertySchema>> | undefined = OMO_NATIVE_EVENT_SCHEMAS[event]
+  return schema?.[property]?.values
+}
+
+function isOutsideClosedVocabulary(event: OtlpEvent, property: string, value: string): boolean {
+  const values = closedValues(event, property)
+  return values !== undefined && !values.includes(value)
+}
+
+function closedFallback(event: OtlpEvent, property: string): string | undefined {
+  const values = closedValues(event, property)
+  return CLOSED_FALLBACKS.find((fallback) => values?.includes(fallback) === true)
+}
+
 export const projectOtlpEvent: OtlpWireProjection = (event, properties) => {
   if (!isOtlpEvent(event)) return {}
   const attributes: WireAttributes = {}
@@ -380,6 +384,9 @@ export const projectOtlpEvent: OtlpWireProjection = (event, properties) => {
       attributes[wire] = pinnedModelId(value)
     } else if (typeof value === "string" && RANKED_MODEL_WIRE_KEYS.has(wire)) {
       attributes[wire] = value === "none" ? value : pinnedModelId(value)
+    } else if (typeof value === "string" && isOutsideClosedVocabulary(event, property, value)) {
+      const fallback = closedFallback(event, property)
+      if (fallback !== undefined) attributes[wire] = fallback
     } else if (typeof value === "string" || typeof value === "boolean" || (typeof value === "number" && Number.isFinite(value))) {
       attributes[wire] = value
     }

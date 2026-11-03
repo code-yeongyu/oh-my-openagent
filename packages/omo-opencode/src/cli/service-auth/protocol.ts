@@ -1,5 +1,6 @@
 import { z } from "zod"
 import { signInHint } from "./accounts-gate"
+import { credentialOwnerSchema } from "./credential-owner"
 import { terminalText } from "./terminal-text"
 
 export class SignInError extends Error {
@@ -8,9 +9,13 @@ export class SignInError extends Error {
 }
 
 export class RequestFailure extends SignInError {
-  constructor(readonly notSent: boolean) {
+  constructor(readonly notSent: boolean, readonly responseStatus?: number) {
     super("Unable to complete the service request. Check the connection and retry.", true)
   }
+}
+
+class InvalidApiResponse extends SignInError {
+  constructor(readonly status: number) { super("The service returned an invalid error response.") }
 }
 
 export const platformSchema = z.enum(["macos", "linux", "windows"])
@@ -23,10 +28,17 @@ export const tokenSchema = z.object({
 export const grantSchema = tokenSchema.extend({
   device: z.object({ id: nonempty, name: nonempty }),
   offlineGrant: nonempty.optional(),
+  owner: credentialOwnerSchema.optional(),
+  writerFloor: z.union([z.literal(1), z.literal(2)]).optional(),
+  freshAuthorizationProof: nonempty.optional(),
 })
 export const credentialSchema = grantSchema.extend({
   signingPrivateKey: nonempty, sealingPrivateKey: nonempty,
   refreshState: z.literal("uncertain").optional(),
+  credentialGeneration: nonempty.optional(),
+  accountId: nonempty.optional(),
+  // Preserve even a malformed journal so the owning transaction fails closed without re-keying.
+  refreshAttempt: z.unknown().optional(),
 })
 export type Credentials = z.infer<typeof credentialSchema>
 export const deviceCodeSchema = z.object({
@@ -51,12 +63,24 @@ export const deviceListSchema = z.object({
   devices: z.array(z.object({ id: nonempty, name: nonempty, revokedAt: timestamp.nullable() })),
 })
 export type ListedDevice = z.infer<typeof deviceListSchema>["devices"][number]
+const currentDeviceListSchema = z.object({
+  devices: z.array(z.object({ id: nonempty, current: z.boolean(), revokedAt: timestamp.nullable() })),
+})
+/** The one unrevoked device the calling token authenticates, or null when the list does not name exactly one. */
+export function currentServiceDevice(body: unknown): string | null {
+  const parsed = currentDeviceListSchema.safeParse(body)
+  if (!parsed.success) return null
+  const current = parsed.data.devices.filter(device => device.current)
+  const only = current.length === 1 ? current[0] : undefined
+  return only !== undefined && only.revokedAt === null ? only.id : null
+}
 export type ChooseDevice = (devices: readonly ListedDevice[]) => Promise<string | null>
 
 const REFUSAL_CODES = [
   "unauthorized", "account_deleted", "reauth_required", "invalid_grant", "device_revoked", "entitlement_required",
   "authorization_pending", "slow_down", "access_denied", "expired_token", "rate_limited",
   "internal", "unavailable", "forbidden", "invalid_request", "not_found",
+  "client_upgrade_required", "writer_floor_mismatch", "service_upgrade_required", "refresh_recovery_expired",
 ] as const
 export type RefusalCode = (typeof REFUSAL_CODES)[number] | "unknown"
 const isKnownRefusal = (code: string): code is (typeof REFUSAL_CODES)[number] => (REFUSAL_CODES as readonly string[]).includes(code)
@@ -78,6 +102,7 @@ export function refusalGuidance(code: RefusalCode, status: number): RefusalGuida
       return "account_deleted"
     case "entitlement_required": case "forbidden": case "access_denied": case "authorization_pending":
       return "account_refused"
+    case "client_upgrade_required": case "writer_floor_mismatch": case "service_upgrade_required": case "refresh_recovery_expired":
     case "unknown":
       if (status === 401) return "sign_in_again"
       if (status === 429) return "wait"
@@ -156,10 +181,10 @@ export async function requestApi(api: string, path: string, init: RequestInit, s
     ].includes(code))
   }
   if (response.status === 204) return null
-  try { body = await response.json() } catch { throw new RequestFailure(false) }
+  try { body = await response.json() } catch { throw new RequestFailure(false, response.status) }
   if (response.ok) return body
   const envelope = envelopeSchema.safeParse(body)
-  if (!envelope.success) throw new SignInError("The service returned an invalid error response.")
+  if (!envelope.success) throw new InvalidApiResponse(response.status)
   const error = envelope.data.error
   const detail = limitSchema.safeParse(error.detail)
   throw new ApiRefusal(error.code, response.status,

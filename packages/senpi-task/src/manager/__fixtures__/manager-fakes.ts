@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { DEFAULT_TEST_TIMEOUT_MS, remainingTestTime } from "../../../../../test-support/test-deadline"
 
 import { OmoTaskSettingsSchema, type OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 
@@ -202,24 +203,31 @@ export function makeManager(options: {
  * `start` reports a launch slower than its report window as still starting, so a test that uses the
  * child's session or emits records to it right after `start` must wait here first.
  */
-const LAUNCH_SETTLEMENT_BOUND_MS = 2_000
-
 type LaunchObserver = { whenLaunched?(taskId: string): Promise<void>; get?: TaskManager["get"] }
 
-export function launchSettled(manager: LaunchObserver, taskId: string): Promise<void>
-export function launchSettled(manager: LaunchObserver, result: StartResult): Promise<string>
-export async function launchSettled(manager: LaunchObserver, input: string | StartResult): Promise<void | string> {
+export function launchSettled(manager: LaunchObserver, taskId: string, testTimeoutMs?: number): Promise<void>
+export function launchSettled(manager: LaunchObserver, result: StartResult, testTimeoutMs?: number): Promise<string>
+export async function launchSettled(
+  manager: LaunchObserver,
+  input: string | StartResult,
+  testTimeoutMs = DEFAULT_TEST_TIMEOUT_MS,
+): Promise<void | string> {
   if (typeof input !== "string" && (input.kind !== "started" || input.starting !== true)) return input.kind
   if (manager.whenLaunched === undefined) throw new Error("the manager exposes no whenLaunched")
   const taskId = typeof input === "string" ? input : input.task_id
+  // This is the manager's latched in-flight promise, not a next-event listener: even a launch
+  // that settled before `start` returned cannot be missed. Subscribe before arming the deadline.
+  const launched = manager.whenLaunched(taskId)
+  // All launches in a test share its budget; each child must not start a new stopwatch.
+  const remainingMs = remainingTestTime(testTimeoutMs)
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
     await Promise.race([
-      manager.whenLaunched(taskId),
+      launched,
       new Promise<never>((_, reject) => {
         timer = setTimeout(() => reject(new Error(
-          `launch settlement bound breached for ${taskId} (${LAUNCH_SETTLEMENT_BOUND_MS} ms)`,
-        )), LAUNCH_SETTLEMENT_BOUND_MS)
+          `awaited whenLaunched(${taskId}); exhausted launch settlement share of ${testTimeoutMs} ms test budget`,
+        )), remainingMs)
       }),
     ])
   } finally {

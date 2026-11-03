@@ -125,6 +125,7 @@ export async function helperSession(keychain: ReturnType<typeof fakeKeychain>, b
     lockProbe: async () => "unlocked",
     notice: () => {},
     wait: background ? SESSION_READ_WAIT : INTERACTIVE_READ_WAIT,
+    home,
     keychainHelper: { access: async () => keychain.access, home, silently: run => run(), ownerMarker: async () => "absent", cache: keychain.cache },
   })
   return { store, session: createSession({ api: API, store, home }), home }

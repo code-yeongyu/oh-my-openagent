@@ -23,7 +23,7 @@ export function promptLockAt(path: string): () => Promise<(() => Promise<void>) 
     try {
       await mkdir(dirname(path), { recursive: true, mode: 0o700 })
       for (let attempt = 0; attempt < 2; attempt++) {
-        const record = buildLockRecord("keychain-prompt")
+        const record = await buildLockRecord("keychain-prompt")
         if (await publishLockRecord(path, record)) {
           granted = true
           return async () => {

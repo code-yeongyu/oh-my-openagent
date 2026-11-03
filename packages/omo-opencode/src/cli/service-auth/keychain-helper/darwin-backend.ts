@@ -77,6 +77,8 @@ export type DarwinBackend = {
   /** The read every caller outside the session lock shares (it may show the one plain approval dialog). */
   readonly read: () => Promise<string | null>
   readonly underLock: (lease: HelperLease) => LockedDarwinStore
+  /** The last read outside the lock found a value the helper does not own yet; only a locked section migrates it. */
+  readonly migrationPending: () => boolean
 }
 
 export function createDarwinBackend(options: {
@@ -108,12 +110,15 @@ export function createDarwinBackend(options: {
     notice: options.notice,
     ...(options.row8b === undefined ? {} : { row8b: options.row8b }),
   }
+  let unowned = false
   return {
     read: async () => {
       const result = await readThroughHelper(deps, true)
+      unowned = result.kind === "value" && result.source !== "owned"
       return result.kind === "value" ? result.value : null
     },
     underLock: lease => lockedDarwinStore(deps, lease),
+    migrationPending: () => unowned,
   }
 }
 

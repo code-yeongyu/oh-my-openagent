@@ -40,7 +40,6 @@
     "changes.md: /bin/omo x5",
     "changes.md: omo doctor x19",
     "changes.md: omo install x2",
-    "changes/unreleased/11370.md: omo run",
     "docs/guide/binary-install.md: /bin/omo",
     "docs/guide/install.md: /bin/omo x5",
     "docs/guide/install.md: command -v omo",
@@ -121,6 +120,7 @@
     "README.pt-br.md: omo doctor"
   ],
   "literal-label": [
-    "packages/omo-opencode/src/cli/account-keys/keystore.ts: =omo"
+    "packages/omo-opencode/src/cli/account-keys/keystore.ts: =omo",
+    "packages/device-service-core/test/local-api/conformance/fixtures/refresher.register.json: /bin/omo x2"
   ]
 }

@@ -18,7 +18,6 @@ export function buildAvailableSkills(
   agentName?: string,
 ): AvailableSkill[] {
   const builtinSkills = createBuiltinSkills({ browserProvider, disabledSkills, teamModeEnabled })
-  const builtinSkillNames = new Set(builtinSkills.map(s => s.name))
 
   const builtinAvailable: AvailableSkill[] = builtinSkills.map((skill) => ({
     name: skill.name,

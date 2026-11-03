@@ -23,6 +23,13 @@ on:
         required: false
         type: string
 
+# A pull_request run measures one head: a newer push makes it meaningless, and each leg holds a Windows, Linux
+# and macOS runner for up to an hour. workflow_dispatch measurement runs key on their own run id, so two manual
+# runs never cancel each other (#11596).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 

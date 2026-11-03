@@ -215,7 +215,7 @@ describe("category activation gating", () => {
       expect(resolveCategory("deep-low", {}, models).kind).toBe("model_unavailable")
     })
 
-    test("#when the registry offers gpt-5.6-sol alone #then deep-low resolves at medium and deep-high stays unavailable", () => {
+    test("#when the registry offers gpt-5.6-sol alone #then deep-low resolves at high and deep-high stays unavailable", () => {
       // given
       const models = registry([model("openai", "gpt-5.6-sol")])
 
@@ -227,7 +227,7 @@ describe("category activation gating", () => {
       if (result.kind !== "resolved") throw new Error("Expected resolved")
       expect(result.spec.provider).toBe("openai")
       expect(result.spec.modelId).toBe("gpt-5.6-sol")
-      expect(result.spec.variant).toBe("medium")
+      expect(result.spec.variant).toBe("high")
       expect(result.availableCategories).toContain("deep-low")
       expect(result.availableCategories).not.toContain("deep-high")
       expect(resolveCategory("deep-high", {}, models).kind).toBe("model_unavailable")
@@ -254,7 +254,7 @@ describe("category activation gating", () => {
   describe("#given a retargeted fallback fixture", () => {
     test("#when visual-engineering resolves on a kimi-only registry #then it is a REAL chain fallback, not a primary hit", () => {
       // given
-      const models = registry([model("kimi-coding", "k3")])
+      const models = registry([model("kimi-coding", "k3.1-pro")])
 
       // when
       const result = resolveCategory("visual-engineering", {}, models)

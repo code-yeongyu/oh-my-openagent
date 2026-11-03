@@ -12,7 +12,8 @@
     "githubStars": "{count} stars on GitHub",
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
-    "primary": "Primary"
+    "primary": "Primary",
+    "skipToContent": "Skip to content"
   },
   "footer": {
     "brand": "OmO",
@@ -513,5 +514,10 @@
       "discord": "Ask on Discord"
     },
     "privacy": "This page doesn't save your report, but it was sent to omo.dev in the link the app opened. It reaches GitHub only when you submit the issue yourself."
+  },
+  "notFound": {
+    "title": "This page could not be found.",
+    "body": "The link may be old, or the page may have moved.",
+    "home": "Back to the home page"
   }
 }

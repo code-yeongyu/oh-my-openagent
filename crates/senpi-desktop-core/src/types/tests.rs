@@ -36,6 +36,29 @@ fn unavailable_capabilities_serialize_the_frozen_camel_case_field_set() {
 }
 
 #[test]
+fn the_intervention_watch_is_reported_as_on_off_or_not_started_only_when_a_backend_has_one() {
+    for (watch, wire) in [
+        (InterventionWatch::On, "on"),
+        (InterventionWatch::Off, "off"),
+        (InterventionWatch::NotStarted, "not_started"),
+    ] {
+        // Given
+        let capabilities = DesktopCapabilities {
+            intervention_watch: Some(watch),
+            ..DesktopCapabilities::unavailable()
+        };
+        // When
+        let value = serde_json::to_value(&capabilities).unwrap();
+        // Then
+        assert_eq!(value["interventionWatch"], json!(wire));
+        let parsed: DesktopCapabilities = serde_json::from_value(value).unwrap();
+        assert_eq!(parsed.intervention_watch, Some(watch));
+    }
+    let absent = serde_json::to_value(DesktopCapabilities::unavailable()).unwrap();
+    assert!(absent.get("interventionWatch").is_none());
+}
+
+#[test]
 fn ax_node_reference_is_named_ref_on_the_wire() {
     // Given
     let node = AxNode {

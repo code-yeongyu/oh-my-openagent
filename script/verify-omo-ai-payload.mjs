@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process"
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync, readFileSync, statSync } from "node:fs"
 import { dirname, posix, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -18,6 +18,9 @@ const REQUIRED_ARTIFACTS = [
   "plugin/extensions/omo.js",
   // The session gateway's SQLite store runs as a worker thread started from this sidecar beside omo.js.
   "plugin/extensions/gateway-store-worker.mjs",
+  // Both inline the macOS sign-in store, which finds the keychain helper two levels up (#11262).
+  "plugin/extensions/omo-device-account.js",
+  "plugin/extensions/omo-feedback.js",
   // Credential-gated skill: not under plugin/skills (never eager-loaded) but the bundled x-search
   // component resolves ../skills-conditional/x-search/SKILL.md, so the payload must ship it.
   "plugin/skills-conditional/x-search/SKILL.md",
@@ -35,6 +38,12 @@ const REQUIRED_ARTIFACTS = [
   // loader with it (bin/lib/daemon-config.js).
   "plugin/runtime/task-config/index.js",
 ]
+
+// The signed keychain helper (#11262) exists only in the release lane, which builds it on macOS
+// (publish.yml passes --release); PR CI packs omo-ai on Linux without it. npm pack lists paths
+// only, so its execute bit is read from the file system.
+const RELEASE_EXECUTABLE_ARTIFACTS = ["bin/darwin/omo-keychain"]
+const releaseMode = process.argv.slice(2).includes("--release")
 
 // A bundle that reads `join(dirname(fileURLToPath(import.meta.url)), "<file>")` needs <file> packed
 // next to it; minified bundles keep this shape with renamed helpers, so the helper names are not matched.
@@ -92,6 +101,14 @@ const pathSet = new Set(paths)
 for (const artifact of REQUIRED_ARTIFACTS) {
   if (!pathSet.has(artifact)) {
     errors.push(`missing artifact: ${artifact}`)
+  }
+}
+
+for (const artifact of releaseMode ? RELEASE_EXECUTABLE_ARTIFACTS : []) {
+  if (!pathSet.has(artifact)) {
+    errors.push(`missing artifact: ${artifact}`)
+  } else if ((statSync(resolve(pkgDir, artifact)).mode & 0o100) === 0) {
+    errors.push(`not executable (u+x): ${artifact}`)
   }
 }
 

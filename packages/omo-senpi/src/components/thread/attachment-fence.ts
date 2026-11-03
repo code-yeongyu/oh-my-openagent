@@ -29,6 +29,12 @@ const TYPED_REFUSAL: ReadonlySet<string> = new Set(["release_session", "extensio
 
 type AttachRefusal = { readonly code: string; readonly errorData?: unknown; readonly frame: RpcObject }
 
+class SessionAttachmentError extends Error {
+  constructor(readonly code: "unknown_session" | "session_identity_mismatch", sessionId: unknown) {
+    super(`${code}:${String(sessionId)}`)
+  }
+}
+
 /**
  * Attaches the selected session on this connection; undefined once attached, else the refusal. A
  * draining host refuses with the v1 code `session_busy_lifecycle` and `errorData.reason:
@@ -48,6 +54,7 @@ async function attachSelectedSession(request: RpcRequest, socketPath: string, se
 function attachRefusalError(refusal: AttachRefusal, socketPath: string, sessionId: unknown): Error {
   if (refusal.code === "host_draining") return new Error(`host_draining:${socketPath}`)
   if (refusal.code === "session_not_attached") return new Error(`session_not_attached:${String(sessionId)}`)
+  if (refusal.code === "unknown_session" || refusal.code === "session_identity_mismatch") return new SessionAttachmentError(refusal.code, sessionId)
   return new Error(`thread RPC request failed: ${JSON.stringify(refusal.frame.error ?? refusal.frame)}`)
 }
 

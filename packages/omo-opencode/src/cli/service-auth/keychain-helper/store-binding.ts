@@ -125,7 +125,12 @@ export function bindKeychainHelper(input: {
 export function lockedStoreView<T>(
   helper: DarwinBackend,
   lease: HelperLease,
-  codec: { readonly parse: (text: string) => T; readonly serialize: (value: T) => string },
+  codec: {
+    readonly parse: (text: string) => T
+    readonly serialize: (value: T) => string
+    /** Assigns derived fields (the credential generation) from the item as a read started now finds it. */
+    readonly amend?: (previous: string | null, next: T) => T
+  },
   mapError: (error: unknown) => unknown,
   done: () => void,
 ): LockedStore<T> {
@@ -145,7 +150,11 @@ export function lockedStoreView<T>(
         const text = await locked.read()
         return text === null ? null : codec.parse(text)
       }),
-    write: (value, intent = "update") => run(() => locked.write(codec.serialize(value), intent)),
+    write: (value, intent = "update") =>
+      run(async () => {
+        const next = codec.amend === undefined ? value : codec.amend(await locked.read(), value)
+        await locked.write(codec.serialize(next), intent)
+      }),
     clear: () => run(() => locked.clear()),
     recover: () => run(() => locked.recover()),
     settle: () => run(() => locked.settle()),
