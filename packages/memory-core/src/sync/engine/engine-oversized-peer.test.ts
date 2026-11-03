@@ -74,3 +74,21 @@ test.each([...RENDER_POINTS])("a crash at %s while the owed edit lands resumes t
   await expectBothEditsOnBoth(a, b)
   expect((await a.syncCommits()).length).toBe(commitsBefore + 1)
 }, TIMEOUT)
+
+test("after a crash between journaling and importing the healing edit, the next cycle journals no second op for the file and both devices agree", async () => {
+  const { a, b } = await heldWithPeerEdit()
+  await a.write("shared.md", note("first\nfrom a\n"))
+  await a.restart(crashAt("captured"))
+  await expect(a.engine.runCycle()).rejects.toBeInstanceOf(CrashInjected)
+  expect((await a.engine.journal.pending()).items.filter((item) => item.key === "shared.md")).toHaveLength(1)
+  await a.restart()
+  const journaled: number[] = []
+  const setPending = a.engine.journal.setPending.bind(a.engine.journal)
+  a.engine.journal.setPending = async (pending) => {
+    journaled.push(pending.items.filter((item) => item.key === "shared.md").length)
+    return setPending(pending)
+  }
+  await a.engine.runCycle()
+  expect(Math.max(...journaled)).toBe(1)
+  await expectBothEditsOnBoth(a, b)
+}, TIMEOUT)
