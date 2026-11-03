@@ -25,6 +25,7 @@
     "packages/memory-core/src/recall/bm25-persist.ts",
     "packages/memory-core/src/sync/keyring-port.ts",
     "packages/omo-codex/scripts/install-local.mjs",
+    "packages/omo-native/test/fixtures/linux-trust-containers/probe.mjs",
     "packages/omo-senpi/plugin/extensions/omo-claim-receipt.js",
     "packages/omo-senpi/plugin/extensions/omo-computer-use.js",
     "packages/omo-senpi/plugin/extensions/omo-desktop-toolkit.js",
