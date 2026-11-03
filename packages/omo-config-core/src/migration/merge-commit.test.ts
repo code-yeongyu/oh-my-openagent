@@ -132,4 +132,94 @@ describe("runMigration", () => {
     expect(fileSystem.existsSync(migrationFixture.sourcePath)).toBe(true)
     expect(fileSystem.existsSync("/home/alice/.omo/.migration-journal.json")).toBe(false)
   })
+
+  test("#given a target carrying schema-synced harness agent keys #when migrating #then migration succeeds and preserves them", () => {
+    // given
+    const fileSystem = new MemoryMigrationFileSystem()
+    fileSystem.files.set(migrationFixture.sourcePath, `{"task":{"default_concurrency":3}}`)
+    fileSystem.files.set(
+      migrationFixture.targetPath,
+      `{"agents":{"sisyphus":{"ultrawork":{"model":"x"},"compaction":{"model":"y"}},"hephaestus":{"allow_non_gpt_model":true}}}`,
+    )
+
+    // when
+    const result = runMigration({
+      env: migrationFixture.env,
+      fileSystem,
+      id: "legacy-task",
+      pid: 100,
+      sources: [{ path: migrationFixture.sourcePath }],
+      targetPath: migrationFixture.targetPath,
+      transform: () => ({ task: { default_concurrency: 3 } }),
+    })
+
+    // then
+    expect(result.status).toBe("migrated")
+    const target = parseFile(fileSystem, migrationFixture.targetPath)
+    expect(target["agents"]).toEqual({
+      sisyphus: { ultrawork: { model: "x" }, compaction: { model: "y" } },
+      hephaestus: { allow_non_gpt_model: true },
+    })
+    expect(target["_migrations"]).toEqual(["legacy-task"])
+  })
+
+  test("#given a target carrying a key unknown to every schema #when migrating #then it is preserved with a kept: diagnostic", () => {
+    // given
+    const fileSystem = new MemoryMigrationFileSystem()
+    fileSystem.files.set(migrationFixture.sourcePath, `{"task":{"default_concurrency":3}}`)
+    fileSystem.files.set(
+      migrationFixture.targetPath,
+      `{"agents":{"sisyphus":{"some_future_key":{"deep":true}}}}`,
+    )
+
+    // when
+    const result = runMigration({
+      env: migrationFixture.env,
+      fileSystem,
+      id: "legacy-task",
+      pid: 100,
+      sources: [{ path: migrationFixture.sourcePath }],
+      targetPath: migrationFixture.targetPath,
+      transform: () => ({ task: { default_concurrency: 3 } }),
+    })
+
+    // then
+    expect(result.status).toBe("migrated")
+    expect(result.diagnostics).toContain(
+      "kept: agents.sisyphus.some_future_key (unknown to migration schema, pre-existing in target, preserved verbatim)",
+    )
+    const target = parseFile(fileSystem, migrationFixture.targetPath)
+    expect(target["agents"]).toEqual({ sisyphus: { some_future_key: { deep: true } } })
+  })
+
+  test("#given a target carrying a retired codegraph key and an unknown key #when migrating #then codegraph is removed while the unknown key is kept", () => {
+    // given
+    const fileSystem = new MemoryMigrationFileSystem()
+    fileSystem.files.set(migrationFixture.sourcePath, `{"task":{"default_concurrency":3}}`)
+    fileSystem.files.set(
+      migrationFixture.targetPath,
+      `{"[codex]":{"codegraph":{"enabled":true}},"agents":{"sisyphus":{"some_future_key":true}}}`,
+    )
+
+    // when
+    const result = runMigration({
+      env: migrationFixture.env,
+      fileSystem,
+      id: "legacy-task",
+      pid: 100,
+      sources: [{ path: migrationFixture.sourcePath }],
+      targetPath: migrationFixture.targetPath,
+      transform: () => ({ task: { default_concurrency: 3 } }),
+    })
+
+    // then
+    expect(result.status).toBe("migrated")
+    expect(result.diagnostics).toContain("removed: [codex].codegraph (retired configuration)")
+    expect(result.diagnostics).toContain(
+      "kept: agents.sisyphus.some_future_key (unknown to migration schema, pre-existing in target, preserved verbatim)",
+    )
+    const target = parseFile(fileSystem, migrationFixture.targetPath)
+    expect((target["[codex]"] as Record<string, unknown>)["codegraph"]).toBeUndefined()
+    expect(target["agents"]).toEqual({ sisyphus: { some_future_key: true } })
+  })
 })
