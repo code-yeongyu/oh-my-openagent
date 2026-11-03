@@ -6,6 +6,7 @@ import { createMemoryIdentityContext, type MemoryIdentityContext } from "./conte
 import { loadedMemoryConfig, memorySettings } from "./memory.test-support"
 import { formatMemoryStatusLine, MEMORY_STATUS_KEY, type GitRepoForStatus } from "./status"
 import { createMemoryReflectionLiveWiring, createReflectionCompletionApi } from "./wiring-reflection-live"
+import type { MemorySessionStateLike } from "./wiring-types"
 import type { SenpiExtensionAPI } from "../../extension/types"
 
 function createFakePi(overrides: {
@@ -192,5 +193,77 @@ describe("bind-time memory footer publish ownership (#12253)", () => {
       await w.settled()
       expect(calls).toEqual([])
     }
+  })
+})
+
+describe("bind-time memory footer across sessions (#12270)", () => {
+  const NOW_MS = 2_000_000_000
+  const COMMITTED_AT_SEC = (NOW_MS - 60_000) / 1000
+  const NO_SEGMENTS = { dirty: false, backlogSteps: 0, streak: 0, parked: false }
+
+  function sessionRecorder(sessionId: string) {
+    const calls: Array<{ key: string; text: string | undefined }> = []
+    return {
+      calls,
+      eventCtx: {
+        sessionManager: { getSessionId: () => sessionId },
+        ui: {
+          setStatus: (key: string, text: string | undefined) => calls.push({ key, text }),
+          notify: () => {},
+        },
+      },
+    }
+  }
+
+  function identityFor(agent: string): MemoryIdentityContext {
+    return createMemoryIdentityContext({
+      identity: agent,
+      identityPaths: buildIdentityPaths("/tmp/bind-owner-root", agent),
+      binding: { identity: agent, repoPathHash: "hash", boundAt: 1 },
+    })
+  }
+
+  function sameStateRepo(): GitRepoForStatus {
+    return {
+      head: async () => "head-sha-1",
+      headCommitTimestamp: async () => COMMITTED_AT_SEC,
+      lsTree: async () => [],
+      show: async () => "",
+      status: async () => "",
+    }
+  }
+
+  function twoSessionWiring(sessions: Map<string, MemorySessionStateLike>): ReturnType<typeof createMemoryReflectionLiveWiring> {
+    return createMemoryReflectionLiveWiring({
+      sessions,
+      loadConfig: () => loadedMemoryConfig(memorySettings()),
+      cwd: () => "/tmp/bind-owner-root",
+      env: {},
+      now: () => NOW_MS,
+      createGitRepo: () => sameStateRepo(),
+    }, { current: undefined }, { current: undefined })
+  }
+
+  test("#given a first session published its footer #when a second session binds to the same git state #then the second session publishes its own footer too", async () => {
+    const first = sessionRecorder("session-a")
+    const second = sessionRecorder("session-b")
+    const firstIdentity = identityFor("agent-a")
+    const secondIdentity = identityFor("agent-b")
+    const w = twoSessionWiring(new Map<string, MemorySessionStateLike>([
+      ["session-a", { context: firstIdentity }],
+      ["session-b", { context: secondIdentity }],
+    ]))
+
+    await w.bind(createFakePi({}), "session-a", firstIdentity, first.eventCtx, () => {})
+    await w.settled()
+    await w.bind(createFakePi({}), "session-b", secondIdentity, second.eventCtx, () => {})
+    await w.settled()
+
+    expect(first.calls).toEqual([
+      { key: MEMORY_STATUS_KEY, text: formatMemoryStatusLine("agent-a", "1m ago", NO_SEGMENTS) },
+    ])
+    expect(second.calls).toEqual([
+      { key: MEMORY_STATUS_KEY, text: formatMemoryStatusLine("agent-b", "1m ago", NO_SEGMENTS) },
+    ])
   })
 })

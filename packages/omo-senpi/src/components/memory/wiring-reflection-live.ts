@@ -152,11 +152,14 @@ export function createMemoryReflectionLiveWiring(
               sessionId,
             }),
           )
-          footerLive.syncActive(sessionId, ui)
-          await footerLive.refresh(sessionId, ui)
         } catch (error) {
           options.logger?.warn("memory reflection completion drain failed", { error: describe(error) })
         }
+        // The footer publish is the one thing a bind must not lose to a drain failure: a throw from
+        // consumePendingReflectionCompletions (e.g. a non-ENOENT readdir error) must still leave the
+        // session with its footer, so sync/refresh run after the try instead of inside it.
+        footerLive.syncActive(sessionId, ui)
+        await footerLive.refresh(sessionId, ui)
       }
       await rpcBridge.current?.sync()
     },

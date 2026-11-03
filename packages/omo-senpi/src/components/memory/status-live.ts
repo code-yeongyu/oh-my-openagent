@@ -106,8 +106,14 @@ export function createMemoryFooterLive(options: MemoryFooterLiveOptions = {}): M
         timer = timers.set(tick, FRAME_INTERVAL_MS)
         return
       }
-      // Nothing was animating: a fresh bind's syncActive must not publish a restore line.
-      if (activeIdentity === undefined) return
+      // Nothing was animating: a fresh bind's syncActive must not publish a restore line, but it
+      // still drops the dedupe cache. The cache is shared by every session in the process and
+      // keyed only on the fingerprint, so without this reset a later session that binds to the
+      // same git state would see an unchanged fingerprint and keep no footer.
+      if (activeIdentity === undefined) {
+        lastFingerprint = undefined
+        return
+      }
       const restoreIdentity = activeIdentity
       const restoreUi = activeUi
       activeIdentity = undefined
