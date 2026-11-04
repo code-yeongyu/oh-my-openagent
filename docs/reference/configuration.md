@@ -1007,7 +1007,8 @@ Selects which multiplexer renders team-mode and subagent panes:
 On `herdr`, background subagent panes follow the same model: one workspace per omo process (`omo-agents-<pid>[-<managerId>]`, mirroring the tmux isolated-session naming) with one tab per subagent, the attach command delivered at spawn. Every `isolation` mode maps to that tab shape, the environment gate is herdr binary presence instead of a tmux session, and a stale sweep closes `omo-agents-<pid>` workspaces whose owning process is gone (skipping any that still host a live agent).
 
 Team runtime state stores herdr pane ids (`wN:pM`, alphanumeric past `w9`) in the same `tmuxLayout` fields; teardown and the stale-workspace sweep branch on that id grammar.
-```
+
+Windows is not supported for `herdr`: the backend only resolves an extension-less `herdr` binary on PATH and only accepts an absolute POSIX path in `HERDR_BIN_PATH` (`C:\...` is rejected), so keep the default `tmux` backend there.
 
 | Option                 | Default         | Description                                                                         |
 | ---------------------- | --------------- | ----------------------------------------------------------------------------------- |
