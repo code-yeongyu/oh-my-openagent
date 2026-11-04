@@ -186,7 +186,6 @@ describe("Senpi compatibility test script", () => {
         JSON.stringify({
           sha256: createHash("sha256").update(astGrepRuntimeContent).digest("hex"),
           mode: 0o755,
-          stagedAtUtc: new Date().toISOString(),
         }),
       )
 

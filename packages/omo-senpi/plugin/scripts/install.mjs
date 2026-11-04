@@ -415,7 +415,7 @@ async function verifyAstGrepRuntimeIntegrity(pluginPath, platform) {
 function isAstGrepRuntimeManifest(value) {
   if (!isRecord(value))
     return false;
-  return typeof value.sha256 === "string" && /^[a-f0-9]{64}$/.test(value.sha256) && typeof value.mode === "number" && Number.isInteger(value.mode) && typeof value.stagedAtUtc === "string" && !Number.isNaN(Date.parse(value.stagedAtUtc));
+  return typeof value.sha256 === "string" && /^[a-f0-9]{64}$/.test(value.sha256) && typeof value.mode === "number" && Number.isInteger(value.mode);
 }
 function astGrepIntegrityError(runtimeEntry, reason) {
   return new Error(`Packed omo-senpi plugin ast-grep MCP runtime integrity error at ${runtimeEntry}: ${reason}`);

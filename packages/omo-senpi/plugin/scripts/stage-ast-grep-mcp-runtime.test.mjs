@@ -5,7 +5,7 @@ import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises
 import { createHash } from "node:crypto"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { checkAstGrepMcpRuntimeFresh } from "./stage-ast-grep-mcp-runtime.mjs"
+import { checkAstGrepMcpRuntimeFresh, stageAstGrepMcpRuntime } from "./stage-ast-grep-mcp-runtime.mjs"
 
 const tempDirs = []
 
@@ -30,7 +30,6 @@ async function makeRuntimeFixture() {
     `${JSON.stringify({
       sha256: createHash("sha256").update(await readFile(targetEntry)).digest("hex"),
       mode: 0o755,
-      stagedAtUtc: "2026-08-03T00:00:00.000Z",
     })}\n`,
     "utf8",
   )
@@ -39,6 +38,20 @@ async function makeRuntimeFixture() {
 
 afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
+})
+
+describe("ast-grep MCP staged runtime manifest", () => {
+  test("#given an unchanged built CLI #when staged twice #then the manifest is byte-identical and holds no time-derived value", async () => {
+    const { sourceEntry, targetEntry, manifestPath } = await makeRuntimeFixture()
+
+    await stageAstGrepMcpRuntime({ sourceEntry, targetEntry })
+    const first = await readFile(manifestPath, "utf8")
+    await stageAstGrepMcpRuntime({ sourceEntry, targetEntry })
+
+    expect(await readFile(manifestPath, "utf8")).toBe(first)
+    expect(Object.keys(JSON.parse(first)).sort()).toEqual(["mode", "sha256"])
+    expect((await checkAstGrepMcpRuntimeFresh({ sourceEntry, targetEntry })).ok).toBe(true)
+  })
 })
 
 describe("ast-grep MCP staged runtime mode policy", () => {

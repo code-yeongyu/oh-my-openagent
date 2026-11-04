@@ -156,7 +156,6 @@ describe("runSenpiInstaller", () => {
       `${JSON.stringify({
         sha256: createHash("sha256").update(original).digest("hex"),
         mode: 0o755,
-        stagedAtUtc: "2026-08-03T00:00:00.000Z",
       }, null, 2)}\n`,
     )
     await writeFile(runtimeEntry, "#!/usr/bin/env node\nthrow new Error('corrupted runtime')\n", "utf8")
@@ -188,6 +187,22 @@ describe("runSenpiInstaller", () => {
     await expect(install).rejects.toThrow("ast-grep MCP runtime integrity error")
     expect(await readSettings(agentDir)).toEqual({ packages: ["keep-me"] })
     expect(await backupFiles(agentDir)).toHaveLength(0)
+  })
+
+  test("#given packed ast-grep manifest still carrying stagedAtUtc #when installing #then integrity validation accepts it", async () => {
+    // given
+    const agentDir = await makeAgentDir()
+    const pluginPath = await makePluginFixture()
+    const homeDir = await makeAgentDir()
+    const manifestPath = join(pluginPath, "runtime", "ast-grep-mcp", "manifest.json")
+    const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Record<string, unknown>
+    await writeFixtureFile(manifestPath, `${JSON.stringify({ ...manifest, stagedAtUtc: "2026-08-03T00:00:00.000Z" })}\n`)
+
+    // when
+    await runSenpiInstaller({ env: { HOME: homeDir, SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+
+    // then
+    expect((await readSettings(agentDir)).packages).toEqual([pluginPath])
   })
 
   test("#given a packed plugin missing the run supervisor #when installing #then artifact validation fails before settings change", async () => {

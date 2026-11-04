@@ -81,7 +81,6 @@ export async function createPluginFixture(options: { readonly runtime?: boolean 
       `${JSON.stringify({
         sha256: createHash("sha256").update(astGrepRuntimeBytes).digest("hex"),
         mode: 0o755,
-        stagedAtUtc: "2026-08-03T00:00:00.000Z",
       }, null, 2)}\n`,
     )
     await writeFixtureFile(join(pluginPath, "runtime", "agent-toolkit", "cli.js"), "export {}\n")

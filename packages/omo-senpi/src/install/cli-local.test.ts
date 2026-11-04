@@ -89,7 +89,6 @@ async function makePackagedPlugin(): Promise<string> {
     `${JSON.stringify({
       sha256: createHash("sha256").update(await readFile(astGrepRuntime)).digest("hex"),
       mode: 0o755,
-      stagedAtUtc: "2026-08-03T00:00:00.000Z",
     }, null, 2)}\n`,
   )
   const toolkitDispatcher = join(pluginPath, "runtime", "agent-toolkit", "cli.js")
