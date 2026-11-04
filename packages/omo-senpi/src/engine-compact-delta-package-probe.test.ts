@@ -93,7 +93,11 @@ async function probePackagedHost(compactFlag: "1" | undefined): Promise<Protocol
     [join(packageDir, packaged.bin.senpi), "--mode", "rpc", "--listen", socketPath],
     { cwd: root, env, stdio: ["ignore", "ignore", "pipe"] },
   )
-  const exited = new Promise<number | null>((resolve) => host.once("exit", (code) => resolve(code)))
+  // A spawn that fails emits 'error' and never 'exit'; settle on either so the wait names it and teardown never hangs.
+  const exited = new Promise<number | null>((resolve) => {
+    host.once("exit", (code) => resolve(code))
+    host.once("error", () => resolve(null))
+  })
   try {
     await waitForListening(host.stderr, socketPath, exited)
     host.stderr.resume()
