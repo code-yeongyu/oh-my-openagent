@@ -102,7 +102,8 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         const outcome = outcomeOf(await attached.command(record))
         return readOnly && outcome.kind === "uncertain" ? { kind: "refused", reason: outcome.reason } : outcome
       } catch (error) {
-        if (readOnly) return { kind: "refused", reason: notSentReason(error) }
+        // The attach succeeded, so a failure without a local API code is a lost reply, not a failed attach.
+        if (readOnly) return { kind: "refused", reason: error instanceof LocalApiError ? error.code : "reply_lost" }
         // Only a code that answers before sending ran nothing. Anything else - a timeout after sending, the attach or
         // connection ending, a broken protocol - may have run on the other device, so it is uncertain and never retried.
         if (error instanceof LocalApiError && error.command_id === undefined && REFUSED_BEFORE_SENDING.has(error.code)) return { kind: "refused", reason: error.code }

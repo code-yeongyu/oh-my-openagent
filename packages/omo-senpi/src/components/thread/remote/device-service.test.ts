@@ -92,6 +92,7 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
     ["the connection closes on a get_state probe", "get_state", () => Promise.reject(new LocalApiError("closed", "the connection closed")), "closed"],
     ["a get_messages read times out after sending", "get_messages", () => Promise.reject(new LocalApiError("request_timeout", "no reply", { command_id: "c1" })), "request_timeout"],
     ["the relay loses the evidence of a get_messages read", "get_messages", async () => state({ state: "uncertain", reason: "request_gone", retryable: false }), "request_gone"],
+    ["the attach ends before a get_state probe's reply", "get_state", () => Promise.reject(new Error("the attach ended before the command settled: closed")), "reply_lost"],
   ] as const)("#given %s #when the read-only record fails #then it is refused with its code, never uncertain, since nothing can have run", async (_label, type, reply, reason) => {
     const l = lifecycle()
     l.answer(reply)

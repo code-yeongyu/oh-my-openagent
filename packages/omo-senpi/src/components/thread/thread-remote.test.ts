@@ -2,6 +2,7 @@ import { afterEach, describe, expect, mock, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { COMMAND_UNCERTAIN_REASONS } from "../../../../device-service-core/src/local-api/vocabulary"
 import type { ThreadToolName, ThreadToolResult } from "./contracts"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import type { AliasHolder, AliasRegistry, JsonObject, RemoteCommandOutcome, RemoteDevice, RemoteSessionRow, RemoteThreadSurface } from "./remote/ports"
@@ -236,6 +237,15 @@ describe("A3: an existing thread is named by id or alias only; a device only to 
     const a = account({ refuse: "closed" })
     const { run } = surface(a.remote)
     expect(await run("thread_read", { thread: "dur-on-b" })).toMatchObject({ kind: "error", error: { code: "host_unavailable", details: { device: "b", reason: "closed" } } })
+  })
+
+  // Every reason the device service can end a read-only record uncertain with, from its own vocabulary (not a copy).
+  test.each(COMMAND_UNCERTAIN_REASONS.map((reason) => [reason]))("#given b's thread_read ends with the relay's %s #when it runs #then the answer is a typed retry, or for an oversized transcript a typed refusal, never update-omo", async (reason) => {
+    const a = account({ refuse: reason })
+    const { run } = surface(a.remote)
+    const read = await run("thread_read", { thread: "dur-on-b" })
+    expect(read).toMatchObject({ kind: "error", error: { code: reason === "record_too_large" ? "unsupported" : "host_unavailable", details: { device: "b", reason } } })
+    if (read.kind === "error") expect(read.error.next_action).not.toContain("Update omo")
   })
 
   test("#given device b is offline #when a tool names b's thread #then it answers device_offline and nothing is queued or sent", async () => {
