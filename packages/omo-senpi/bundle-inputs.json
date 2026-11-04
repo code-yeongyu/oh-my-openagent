@@ -1403,6 +1403,7 @@
     "packages/omo-senpi/src/components/thread/gateway/answer-shape.ts",
     "packages/omo-senpi/src/components/thread/gateway/author.ts",
     "packages/omo-senpi/src/components/thread/gateway/bindings.ts",
+    "packages/omo-senpi/src/components/thread/gateway/causal.ts",
     "packages/omo-senpi/src/components/thread/gateway/completion.ts",
     "packages/omo-senpi/src/components/thread/gateway/constants.ts",
     "packages/omo-senpi/src/components/thread/gateway/decision.ts",

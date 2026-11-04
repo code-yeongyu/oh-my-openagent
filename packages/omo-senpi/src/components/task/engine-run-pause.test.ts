@@ -64,3 +64,52 @@ test("a real task manager pauses nonterminally, resumes the same child and insta
     expect((await manager.waitFor(started.task_id)).status).toBe("completed")
   } finally { unregister(); turn.resolve({ status: "cancelled" }); await manager.cancelTask(started.task_id) }
 })
+
+// #12249: the engine's run fences are holds, so each bumps its pauseSeq past the Stop's, and the
+// Resume event carries the bumped seq. The run's Resume must still reach the child it paused.
+test("a Resume whose engine seq counts the Stop's run fences resumes the paused child", async () => {
+  const cwd = tempProject()
+  const store = createTaskRecordStore({ project_dir: cwd })
+  const barrier = new AdmissionBarrier()
+  const runner = new FakeRunner()
+  const turn = Promise.withResolvers<RunnerOutcome>()
+  const owners: number[] = []
+  const manager = createTaskManager({
+    cwd, store, config: settings({ provider_concurrency: { anthropic: 1 } }), planner: categoryPlanner(), admissionBarrier: barrier,
+    runners: { "in-process": runner, process: runner },
+    childPausePort: {
+      pauseForRun: async (child, owner) => {
+        owners.push(owner.parentPauseSeq)
+        runner.handles.get(child.task_id)?.settle({ status: "cancelled" })
+        return { childSeq: 8 }
+      },
+      resumeTurn: async (_child, request) => {
+        owners.push(request.parentPauseSeq)
+        return { turnId: "fresh-turn", outcome: turn.promise }
+      },
+      holdInput: async () => ({ kind: "held", entryId: "guidance", duplicate: false }),
+    },
+  })
+  const started = await manager.start(baseSpec({ parent_session_id: "parent", root_session_id: "parent" }))
+  if (started.kind !== "started") throw new Error("expected started")
+  let state: EnginePauseState = { pauseSeq: 7, holds: [{ kind: "session_hold", key: "session_hold:7" }] }
+  const pause = createEngineRunPause({
+    stateDir: store.stateDir, manager, barrier,
+    runtime: {
+      getPauseState: () => state,
+      fenceRun: ref => { state = { pauseSeq: state.pauseSeq + 1, holds: [...state.holds, { kind: "run_fence", key: `run_fence:${ref.kind}:${ref.id}` }] } },
+    },
+  })
+  try {
+    await pause.bridge.changed("parent", { pauseSeq: 7, holds: state.holds, change: "paused" })
+    expect(manager.get(started.task_id)?.status).toBe("paused")
+    expect(state.pauseSeq).toBe(8)
+    state = { pauseSeq: 8, holds: [] }
+    await pause.bridge.changed("parent", { ...state, change: "resumed" })
+    expect(manager.get(started.task_id)?.status).toBe("running")
+    expect(owners).toEqual([7, 7])
+    expect(barrier.state("parent").kind).toBe("open")
+    turn.resolve({ status: "completed", finalResponse: "resumed" })
+    expect((await manager.waitFor(started.task_id)).status).toBe("completed")
+  } finally { turn.resolve({ status: "cancelled" }); await manager.cancelTask(started.task_id) }
+})
