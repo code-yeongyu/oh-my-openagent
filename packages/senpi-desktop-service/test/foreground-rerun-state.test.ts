@@ -60,7 +60,8 @@ test("seeded rerun model bounds calls and grants through state changes", async (
 			const explicit = (bits & 4) !== 0;
 			const loseDuringGrant = (bits & 8) !== 0;
 			const cancelDuringGrant = (bits & 16) !== 0;
-			const code = codes[next() % codes.length]!;
+			const code = codes.at(next() % codes.length);
+			if (code === undefined) throw new Error("the code index is always inside codes");
 			const expectedRetry = allowed && !explicit && code === "BackgroundUnavailable";
 			const expectedGrant = expectedRetry && !live;
 			const controller = new AbortController();
