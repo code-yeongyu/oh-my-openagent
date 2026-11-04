@@ -3,6 +3,7 @@ export { type EngineStatus, type SyncFailure, type SyncFailureKind, SyncEngine }
 // The sync sidecar re-exports the Loro loader so a packaged install can prove the wasm beside it loads.
 export { loadLoroRuntime } from "../../crdt/loro-runtime"
 export { caseFold } from "../item/casefold"
+export type { RevocationView } from "../account/revocation-view"
 export { type AccountSessionIdle, type AccountSessionOptions, type AccountSessionOutcome, openAccountSession } from "../account/session"
 export { type ApproveOutcome, approveDevice } from "../account/approve"
 export { type EnableOutcome, enableSync } from "../account/enable"
