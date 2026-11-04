@@ -3,4 +3,5 @@ export { type AccountShowResult, type AccountState, accountStateNotice, classify
 export { type BootstrapDependencies, bootstrapDeviceService, type BootstrapOutcome } from "./bootstrap.ts"
 export { installDeviceService } from "./install.ts"
 export { DEVICE_SERVICE_VERSION } from "./pin.ts"
+export { type AgentDirRegistrant, type RegistrantEvent, startAgentDirRegistrant } from "./registrant.ts"
 export { deviceServiceHost } from "./release/acquire.ts"
