@@ -77,9 +77,16 @@ const FIRST_PAINT_EVENTS = ["input", "before_agent_start"] as const
 // early enough that a short session runs the work it would otherwise lose.
 export const FIRST_PAINT_BACKSTOP_MS = 750
 
+/**
+ * Where this extension generation runs: a fused session (loop and tools in one process, today's only placement)
+ * or the hand of a split session, which executes tools and has no loop, no TUI and so no first paint.
+ */
+export type ExtensionPlacement = "fused" | "hand"
+
 export interface FirstPaintSchedulerOptions {
-  readonly on: (event: string, handler: (payload?: unknown) => void, options?: { previewSafe?: boolean }) => void
+  readonly on: (event: string, handler: (payload?: unknown) => void, options?: { previewSafe?: boolean; runs?: "brain" }) => void
   readonly backstopMs?: number
+  readonly placement?: ExtensionPlacement
 }
 
 /**
@@ -87,6 +94,8 @@ export interface FirstPaintSchedulerOptions {
  * once the gate opens, later work is scheduled on the next tick, because by then the paint is past.
  */
 export function createFirstPaintScheduler(options: FirstPaintSchedulerOptions): StartupWorkScheduler {
+  // A hand never paints: waiting for an edge it cannot see would only hold the work until the backstop.
+  if (options.placement === "hand") return scheduleOnNextTick
   const waiting = new Set<{ readonly run: () => void; readonly timer: ReturnType<typeof setTimeout> }>()
   let opened = false
   const open = (): void => {
@@ -104,7 +113,8 @@ export function createFirstPaintScheduler(options: FirstPaintSchedulerOptions): 
     open()
   }
   for (const event of FIRST_PAINT_EVENTS) {
-    options.on(event, openOnPaint, event === "before_agent_start" ? { previewSafe: true } : undefined)
+    // The edges are loop events: declared for the brain, so the hand's generation of a split session never registers them.
+    options.on(event, openOnPaint, event === "before_agent_start" ? { previewSafe: true, runs: "brain" } : { runs: "brain" })
   }
 
   return (run) => {
