@@ -35,6 +35,7 @@ import { fileURLToPath } from "node:url"
 import { withTelemetryOptOut } from "../../telemetry-opt-out-env.mjs"
 import { requireEngineVersion } from "./engine-version.mjs"
 import { QA_TMP_ROOT } from "./qa-tmp.mjs"
+import { sameVersion } from "../../../../../omo-native/bin/lib/same-version.js"
 
 const here = dirname(fileURLToPath(import.meta.url))
 
@@ -325,14 +326,14 @@ function kitDependenciesPresent() {
 
 /** Install the released engine (and the screen emulators) into the kit once; later calls reuse it. */
 export async function ensureKit() {
-  if (installedEngineVersion() !== ENGINE_VERSION || !kitDependenciesPresent()) {
+  if (!sameVersion(installedEngineVersion(), ENGINE_VERSION) || !kitDependenciesPresent()) {
     mkdirSync(KIT_DIR, { recursive: true })
     writeFileSync(join(KIT_DIR, "package.json"), `${JSON.stringify({ name: "qa-thread-tools-kit", private: true, type: "module", dependencies: KIT_DEPENDENCIES }, null, 2)}\n`)
     const installed = await run(process.execPath, ["install"], { cwd: KIT_DIR })
     if (installed.code !== 0) throw new Error(`kit install failed (${installed.code}):\n${installed.stderr.slice(-2000)}`)
   }
   const version = installedEngineVersion()
-  if (version !== ENGINE_VERSION) throw new Error(`kit engine is ${version}, expected ${ENGINE_VERSION}`)
+  if (!sameVersion(version, ENGINE_VERSION)) throw new Error(`kit engine is ${version}, expected ${ENGINE_VERSION}`)
   return { dir: KIT_DIR, engineVersion: version, engineDist: join(KIT_DIR, "node_modules", "@code-yeongyu", "senpi", "dist") }
 }
 
