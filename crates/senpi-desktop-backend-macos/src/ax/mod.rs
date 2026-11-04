@@ -5,6 +5,7 @@
 mod actions;
 mod date;
 mod foreground;
+pub(crate) mod key_focus;
 pub(crate) mod menus;
 pub(crate) mod open_menu;
 mod point_owner;

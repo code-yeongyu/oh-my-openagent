@@ -272,7 +272,7 @@ fn resolve_authentication() -> Option<AuthenticationSpi> {
     })
 }
 
-fn ensure_skylight_loaded() -> Option<()> {
+pub(super) fn ensure_skylight_loaded() -> Option<()> {
     static LOADED: LazyLock<bool> = LazyLock::new(|| {
         let path = c"/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight";
         // SAFETY: `path` is a static NUL-terminated framework path; the handle
@@ -288,7 +288,7 @@ pub(super) fn raw_symbol(name: &CStr) -> Option<NonNull<c_void>> {
     NonNull::new(unsafe { libc::dlsym(libc::RTLD_DEFAULT, name.as_ptr()) })
 }
 
-fn symbol<T: Copy>(name: &CStr) -> Option<T> {
+pub(super) fn symbol<T: Copy>(name: &CStr) -> Option<T> {
     raw_symbol(name).map(|raw| cast_symbol(raw.as_ptr()))
 }
 

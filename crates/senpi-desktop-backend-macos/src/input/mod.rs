@@ -12,6 +12,9 @@ mod global;
 mod guard;
 mod held;
 mod keymap;
+mod key_front;
+mod key_route;
+mod key_window;
 mod holds;
 mod keys;
 mod menu;
@@ -44,6 +47,8 @@ use senpi_desktop_core::types::{DesktopWindow, Target};
 use crate::capture::MacCapture;
 use crate::skylight;
 use held::{Held, KeyRoute};
+use key_front::EntryFront;
+use key_window::KeyWindow;
 
 pub(crate) use self::canary::CANARY_STOP_REASON;
 pub use self::canary::{CanaryMode, CanaryResult};
@@ -191,21 +196,23 @@ impl MacInput {
                 &self.source, &mut self.held, text, KeyRoute::Global, check_stop, delivered,
             ),
             Target::Window(id) => {
+                let entry_front = EntryFront::now();
                 let window = resolve_window(capture, id)?;
                 let (pid, wid) = window_identity(&window)?;
                 // A remote screen (Screen Sharing, iPhone Mirroring) forwards key
                 // codes and drops the Unicode text: its text goes out as the keys
                 // of the user's layout, mapped in full before anything is posted.
                 if let Some(remote) = remote::remote_screen(pid) {
-                    return self.type_remote(&window, pid, wid, text, remote, mode, capture, check_stop, delivered, None).map(|_| ());
+                    return self.type_remote(&window, pid, wid, text, remote, mode, entry_front, check_stop, delivered, None).map(|_| ());
                 }
                 match mode {
                     DeliveryMode::Background => self.background(|this| {
                         guard::guard(&window, "keyboard", None)?;
-                        guard::prepare_keys(&window, pid, wid, capture)?;
+                        let target = KeyWindow::prepare(&this.source, &window, (pid, wid), entry_front)?;
                         this.last_activated = Some((pid, wid));
+                        let check = || check_stop().and_then(|()| target.check());
                         keys::type_text_interruptible(
-                            &this.source, &mut this.held, text, KeyRoute::Process(pid), check_stop, delivered,
+                            &this.source, &mut this.held, text, KeyRoute::Process(pid), &check, delivered,
                         )
                     }),
                     DeliveryMode::Foreground => skylight::with_foreground(pid, || {
@@ -226,7 +233,8 @@ impl MacInput {
     /// before the first key and a modifier the user holds stops the keys; in
     /// the foreground the keys go out as bare transitions at the HID tap, each
     /// press checked against the front window. `element`, when given, must
-    /// hold focus before the keys ([`element::element_keys`]).
+    /// hold focus before the keys ([`element::element_keys`]). `entry_front`
+    /// was read as the input began ([`KeyWindow`]).
     #[expect(clippy::too_many_arguments, reason = "the typing call's own arguments plus the remote classification")]
     pub(crate) fn type_remote(
         &mut self,
@@ -236,7 +244,7 @@ impl MacInput {
         text: &str,
         remote: remote::RemoteScreen,
         mode: DeliveryMode,
-        capture: &MacCapture,
+        entry_front: EntryFront,
         check_stop: &dyn Fn() -> CoreResult<()>,
         delivered: &mut dyn FnMut(),
         element: Option<&AXUIElement>,
@@ -256,10 +264,11 @@ impl MacInput {
                 let mut physical = (remote == remote::RemoteScreen::KeyEvents)
                     .then(|| remote::physical_modifier_check(window, remote::physical_flags));
                 guard::guard(window, "keyboard", None)?;
-                guard::prepare_keys(window, pid, wid, capture)?;
+                let target = KeyWindow::prepare(&this.source, window, (pid, wid), entry_front)?;
                 this.last_activated = Some((pid, wid));
                 let mut before_press = || {
                     check_stop()?;
+                    target.check()?;
                     physical.as_mut().map_or(Ok(()), |check| check())
                 };
                 let mut send = || {
@@ -303,14 +312,16 @@ impl MacInput {
                 chord::chord(&self.source, &mut self.held, keys, KeyRoute::Global, check_stop)
             }
             Target::Window(id) => {
+                let entry_front = EntryFront::now();
                 let window = resolve_window(capture, id)?;
                 let (pid, wid) = window_identity(&window)?;
                 match mode {
                     DeliveryMode::Background => self.background(|this| {
                         guard::guard(&window, "keyboard", None)?;
-                        guard::prepare_keys(&window, pid, wid, capture)?;
+                        let target = KeyWindow::prepare(&this.source, &window, (pid, wid), entry_front)?;
                         this.last_activated = Some((pid, wid));
-                        chord::chord(&this.source, &mut this.held, keys, KeyRoute::Process(pid), check_stop)
+                        let check = || check_stop().and_then(|()| target.check());
+                        chord::chord(&this.source, &mut this.held, keys, KeyRoute::Process(pid), &check)
                     }),
                     DeliveryMode::Foreground => skylight::with_foreground(pid, || {
                         crate::ax::prepare_foreground_input(&window)?;

@@ -83,6 +83,14 @@ pub(crate) fn scroll_event(
     .map_err(|()| DesktopError::input_failed("failed to create a Quartz scroll event"))
 }
 
+/// A blank tagged event the caller types itself, such as the `AppKit`
+/// application-activated event background keys need ([`super::key_window`]).
+pub(crate) fn blank_event(source: &CGEventSource) -> CoreResult<CGEvent> {
+    CGEvent::new(source.clone())
+        .map(tagged)
+        .map_err(|()| DesktopError::input_failed("failed to create a Quartz activation event"))
+}
+
 /// An event that is read, never posted (the cursor-position probe).
 pub(crate) fn probe_event(source: &CGEventSource) -> CoreResult<CGEvent> {
     CGEvent::new(source.clone())

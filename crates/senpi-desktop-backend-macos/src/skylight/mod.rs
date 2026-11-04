@@ -6,11 +6,13 @@
 //! posting is `SLEventPostToPid` (plus the public per-pid supplement for plain
 //! AppKit) only.
 
+mod activation;
 mod authentication;
 mod partial;
 mod psn;
 mod public_route;
 mod spi;
+mod window_query;
 
 use std::thread;
 use std::time::{Duration, Instant};
@@ -26,7 +28,9 @@ use self::psn::{
     front_process, post_focus_record, process_psn, FocusMarker, ProcessSerialNumber,
     SET_FRONT_NO_WINDOWS,
 };
+pub(crate) use self::activation::{post_activation, sender_connection, set_fields, set_window_location};
 pub(crate) use self::partial::{mark_sent, reporting_partial};
+pub(crate) use self::window_query::window_parent;
 pub(crate) use self::spi::{front_pid, is_available, spaces, spaces_if_available, SpaceSpi};
 use self::spi::required;
 

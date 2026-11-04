@@ -17,6 +17,8 @@ use senpi_desktop_core::keys::KeyName;
 use senpi_desktop_core::protocol_results::AxInputMethod;
 
 use super::held::KeyRoute;
+use super::key_front::EntryFront;
+use super::key_window::KeyWindow;
 use super::{chord, guard, keys, resolve_window, window_identity, MacInput};
 use crate::ax::element;
 use crate::capture::MacCapture;
@@ -32,10 +34,10 @@ const PROBE_TIMEOUT_SECONDS: f32 = 2.0;
 impl MacInput {
     /// Types `text` into `element`, an element of a window the capture
     /// lists. Insertion first ([`inserts_first`]); else, in the background,
-    /// the window is made key without raising it as window-level keys are,
-    /// and the keys go to the process once the element reports focus
-    /// ([`element_keys`]); in the foreground the window is raised under the
-    /// grant first.
+    /// the window is made key behind the user's app as window-level keys are
+    /// ([`KeyWindow`]), and the keys go to the process once the element
+    /// reports focus ([`element_keys`]); in the foreground the window is
+    /// raised under the grant first.
     pub(crate) fn ax_type_text(
         &mut self,
         element: &AXUIElement,
@@ -46,6 +48,7 @@ impl MacInput {
         delivered: &mut dyn FnMut(),
     ) -> CoreResult<ElementDelivery> {
         let _request = self.held.request();
+        let entry_front = EntryFront::now();
         let wid = owner_window(element)?;
         let window = resolve_window(capture, &wid.to_string())?;
         let (pid, wid) = window_identity(&window)?;
@@ -53,7 +56,7 @@ impl MacInput {
         // text goes out as the keys of the user's layout once the element holds
         // focus (plan todo 22).
         if let Some(remote) = super::remote::remote_screen(pid) {
-            return self.type_remote(&window, pid, wid, text, remote, mode, capture, check_stop, delivered, Some(element));
+            return self.type_remote(&window, pid, wid, text, remote, mode, entry_front, check_stop, delivered, Some(element));
         }
         let insert = || crate::ax::insert_into_element(element, text);
         match mode {
@@ -66,15 +69,19 @@ impl MacInput {
                 }
                 self.background(|this| {
                     guard::guard(&window, "keyboard", None)?;
-                    guard::prepare_keys(&window, pid, wid, capture)?;
+                    let target = KeyWindow::prepare(&this.source, &window, (pid, wid), entry_front)?;
                     this.last_activated = Some((pid, wid));
+                    let check = || {
+                        check_stop()?;
+                        target.check()
+                    };
                     element_keys(pid, element, || {
                         keys::type_text_interruptible(
                             &this.source,
                             &mut this.held,
                             text,
                             KeyRoute::Process(pid),
-                            check_stop,
+                            &check,
                             delivered,
                         )
                     })
@@ -104,8 +111,9 @@ impl MacInput {
 impl MacInput {
     /// Presses `keys` in `element`: never inserted, always keys through
     /// [`element_keys`] once the element reports focus, with `check_stop`
-    /// before every key-down; the window is made key without raising in the
-    /// background and raised under the grant in the foreground, as for text.
+    /// and the key-window check before every key-down; the window is made key
+    /// behind the user's app in the background ([`KeyWindow`]) and raised
+    /// under the grant in the foreground, as for text.
     pub(crate) fn ax_key_chord(
         &mut self,
         element: &AXUIElement,
@@ -115,16 +123,21 @@ impl MacInput {
         check_stop: &dyn Fn() -> CoreResult<()>,
     ) -> CoreResult<ElementDelivery> {
         let _request = self.held.request();
+        let entry_front = EntryFront::now();
         let wid = owner_window(element)?;
         let window = resolve_window(capture, &wid.to_string())?;
         let (pid, wid) = window_identity(&window)?;
         match mode {
             DeliveryMode::Background => self.background(|this| {
                 guard::guard(&window, "keyboard", None)?;
-                guard::prepare_keys(&window, pid, wid, capture)?;
+                let target = KeyWindow::prepare(&this.source, &window, (pid, wid), entry_front)?;
                 this.last_activated = Some((pid, wid));
+                let check = || {
+                    check_stop()?;
+                    target.check()
+                };
                 element_keys(pid, element, || {
-                    chord::chord(&this.source, &mut this.held, keys, KeyRoute::Process(pid), check_stop)
+                    chord::chord(&this.source, &mut this.held, keys, KeyRoute::Process(pid), &check)
                 })
             }),
             DeliveryMode::Foreground => skylight::with_foreground(pid, || {

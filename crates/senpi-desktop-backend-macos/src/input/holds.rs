@@ -56,6 +56,7 @@ impl MacInput {
         match target {
             Target::Desktop | Target::Display(_) => action(self, KeyRoute::Global, None),
             Target::Window(id) => {
+                let entry_front = super::key_front::EntryFront::now();
                 let window = resolve_window(capture, id)?;
                 let (pid, wid) = window_identity(&window)?;
                 match mode {
@@ -72,7 +73,7 @@ impl MacInput {
                             refuse_drag_source(press, |x, y| crate::ax::role_at(pid, wid, x, y))?;
                         }
                         if mouse.is_none_or(|hold| !hold.keys.is_empty()) {
-                            guard::prepare_keys(&window, pid, wid, capture)?;
+                            super::key_window::KeyWindow::prepare(&this.source, &window, (pid, wid), entry_front)?;
                             this.last_activated = Some((pid, wid));
                         } else if !window.focused {
                             skylight::activate_without_raise(pid, wid)?;
