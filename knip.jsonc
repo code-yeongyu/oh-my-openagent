@@ -1338,8 +1338,6 @@
       "packages/omo-senpi/src/components/thread/gateway/author.ts": ["AUTHOR_ID_MAX_LENGTH", "AUTHOR_DISPLAY_MAX_LENGTH"],
       // pre-existing at origin dev 4686e425b5: unused export(s) BINDING_SCHEMA_VERSION, BINDING_PLATFORMS, BINDING_STATUSES, COMPLETION_OUTCOMES, BINDING_MAX_TTL_SECONDS, BINDING_DEFAULT_POLICY_ID
       "packages/omo-senpi/src/components/thread/gateway/bindings.ts": ["BINDING_SCHEMA_VERSION", "BINDING_PLATFORMS", "BINDING_STATUSES", "COMPLETION_OUTCOMES", "BINDING_MAX_TTL_SECONDS", "BINDING_DEFAULT_POLICY_ID"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) reaches
-      "packages/omo-senpi/src/components/thread/gateway/causal.ts": ["reaches"],
       // pre-existing at origin dev 4686e425b5: unused export(s) completionOutcome
       "packages/omo-senpi/src/components/thread/gateway/completion.ts": ["completionOutcome"],
       // pre-existing at origin dev 4686e425b5: unused export(s) GATEWAY_SCHEMA_VERSION
