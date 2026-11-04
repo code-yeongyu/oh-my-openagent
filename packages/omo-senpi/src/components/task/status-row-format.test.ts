@@ -152,6 +152,32 @@ describe("backgroundWidgetRows", () => {
   })
 })
 
+describe("run-paused children", () => {
+  it("#given a resident child held by its run's Stop #when rendering the live footer #then it reads paused with a still mark and no climbing clock", () => {
+    // given a child the parent's Stop paused hours after it was created, with no run stats yet
+    const paused = record({
+      task_id: "st_paused", task_summary: "held child", status: "paused", residency_state: "resident", execution_mode: "process",
+      category: "unspecified-high", created_at: "2026-11-03T00:02:45.000Z",
+      run_pause: { parent_session_id: "session-a", parent_pause_seq: 16, run_ref: { kind: "task", id: "st_paused" } },
+    })
+    const now = Date.parse("2026-11-03T05:54:45.000Z")
+
+    // when the footer renders it without live activity, with and without stats
+    const rows = [
+      ...backgroundWidgetRows([paused], new Map(), now, undefined, 220),
+      ...backgroundWidgetRows([paused], new Map(), now, () => ({ runtime_ms: 0, turns: 0, tool_calls: 0 }), 220),
+      ...backgroundWidgetRows([paused], new Map([["st_paused", "running"]]), now, undefined, 220),
+    ]
+
+    // then each row names the pause, never claims motion, and shows no elapsed time since creation
+    for (const row of rows) {
+      expect(row).toStartWith("‖ ")
+      expect(row).toContain("paused")
+      expect(row).not.toMatch(/starting|running|352m/u)
+    }
+  })
+})
+
 describe("automatic recovery residency labeling", () => {
   it("every unfinished parked record shape renders recovery without a cancel hint", () => {
     for (const status of ["pending", "running"] as const) {
