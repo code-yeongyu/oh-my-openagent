@@ -113,6 +113,8 @@ test("#given a persisted declaration with a tool op and an internal op #when a s
   const internal: SessionCallableOp = { op: "workItemStatus", internal: true, parameters: { type: "object", additionalProperties: false, properties: { status: { type: "string" } } } }
   const { tools, store } = await surface([caller], fixtureModule.href, [openDeclaration, internal])
   expect(tools.map((tool) => tool.name)).toEqual(["ext_gw_open"])
+  // placement contract (engine `ToolDefinition.runs`): a thread-family session tool runs on the loop side
+  expect(tools.map((tool) => (tool as { runs?: unknown }).runs)).toEqual(["brain"])
   expect((await store.sessionCallableOps()).map((op) => op.op)).toEqual(["openThread"])
 })
 
