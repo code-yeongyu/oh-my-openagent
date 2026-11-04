@@ -68,7 +68,7 @@ export function createPrewarmDiagnostics(pi: SenpiExtensionAPI, logger: Componen
             logger.warn(`omo-senpi unsafe before_agent_start registration. ${hint}`, registration)
           }
         }
-        pi.on(event, event === "agent_settled"
+        pi.on(event, event === "agent_settled" && options?.settleDelivery !== true
           ? settles.wrap(component, options?.hookLabel ?? "onSettled", handler)
           : handler, options)
       }

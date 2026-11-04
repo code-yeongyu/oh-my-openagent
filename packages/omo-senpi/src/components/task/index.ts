@@ -137,7 +137,10 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
           ),
         ...(ctx.idleCoordinator === undefined ? {} : { coordinator: ctx.idleCoordinator }),
       })
-      registerTaskTools(pi, engine, teamTools.service, teamTools.leadPollers.resolveDefaultTeamRunId, skillInvocations, dagRuntime, ctx.idleCoordinator)
+      const { forgetTaskOutputReads } = registerTaskTools(
+        pi, engine, teamTools.service, teamTools.leadPollers.resolveDefaultTeamRunId,
+        skillInvocations, dagRuntime, ctx.idleCoordinator,
+      )
       registerTeamTools(pi, teamTools)
       registerRemovedTeamWaitHint(pi)
       registerTaskCommands(pi, engine.manager)
@@ -184,6 +187,7 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
           reconcileTeamMailbox: teamTools.reconcileTeamMailbox,
           leadPollers: teamTools.leadPollers,
           resumptionChannels,
+          forgetTaskOutputReads,
           dagReloadSource: createDagReloadSource({
             manager: dagRuntime.manager,
             sessionId: () => engine.runtime.sessionId(),
@@ -265,7 +269,7 @@ function registerTaskTools(
   skillInvocations: SkillInvocationTracker,
   dagRuntime: DagRuntime,
   coordinator?: IdleInjectionCoordinator,
-): void {
+): { forgetTaskOutputReads: (sessionId: string) => void } {
   const resolveCallerSessionId = defaultResolveCallerSessionId
   const manager = engine.manager
   pi.registerTool({
@@ -280,18 +284,21 @@ function registerTaskTools(
     }),
   })
   pi.registerTool({ ...createTaskCancelTool({ manager }) })
-  pi.registerTool({
-    ...createTaskOutputTool({ manager, stateDir: engine.stateDir, resolveCallerSessionId, notices: engine.host.notices.list }),
+  const output = createTaskOutputTool({
+    manager, stateDir: engine.stateDir, resolveCallerSessionId, notices: engine.host.notices.list,
   })
+  const { forgetSession, ...outputTool } = output
+  pi.registerTool({ ...outputTool })
   registerDagTool(pi, engine, dagRuntime)
   registerWorkpoolTool(pi, engine, skillInvocations, coordinator)
   registerEvalHandleHost(pi, engine)
+  return { forgetTaskOutputReads: forgetSession }
 }
 
 
 export function wireDagLifecycle(
   pi: SenpiExtensionAPI,
-  runtime: Pick<DagRuntime, "attach" | "detach" | "pauseForShutdown" | "dispose">,
+  runtime: Pick<DagRuntime, "attach" | "detach" | "pauseForShutdown" | "dispose" | "resend">,
   wireTaskLifecycle: () => Pick<EventBridge, "afterSessionStartReconcile">,
   onAttachError: (error: unknown) => void = () => {},
 ): { readonly lastAttach: () => Promise<void> } {
@@ -309,6 +316,18 @@ export function wireDagLifecycle(
       .then((current) => (current ? runtime.attach(event) : undefined))
       .catch(onAttachError)
   })
+  // #12113: the attach publishes the recovered omo.dag.updated snapshot. Admission does not wait for
+  // it, but a turn does, so the snapshot is on the wire before the turn starts and the turn's own DAG
+  // tools see recovered runs. `latest` never rejects, and its reconcile probes are time-bounded.
+  // A preview pass (prompt-prefix prewarm) starts no turn, so it does not wait.
+  pi.on("before_agent_start", async (payload) => {
+    if (isPreviewPayload(payload)) return undefined
+    await latest
+    return undefined
+  }, { previewSafe: true })
+  // A client reattaching to a retained session gets no session_start. An attach still in flight
+  // publishes on its own, so this only restates an attached bridge.
+  pi.on("session_resumed", () => runtime.resend())
   pi.on("session_shutdown", () => runtime.dispose())
   return { lastAttach: () => latest }
 }
@@ -368,4 +387,8 @@ type TeamToolContext = {
 
 function registerTeamTools(pi: SenpiExtensionAPI, context: TeamToolContext): void {
   for (const tool of buildLeadTeamTools({ service: context.service })) pi.registerTool({ ...tool })
+}
+
+function isPreviewPayload(value: unknown): boolean {
+  return typeof value === "object" && value !== null && "preview" in value && value.preview === true
 }
