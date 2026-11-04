@@ -31,8 +31,38 @@ fn unavailable_capabilities_serialize_the_frozen_camel_case_field_set() {
             "stopReason",
             "integrityLevel",
             "screenLocked",
+            "displayAsleep",
         ]
     );
+}
+
+#[test]
+fn capabilities_from_an_engine_without_display_asleep_read_it_as_awake() {
+    // Given an older engine's capabilities, which have no displayAsleep.
+    let mut value = serde_json::to_value(DesktopCapabilities::unavailable()).unwrap();
+    value.as_object_mut().unwrap().remove("displayAsleep");
+    // When
+    let capabilities: DesktopCapabilities = serde_json::from_value(value).unwrap();
+    // Then
+    assert!(!capabilities.display_asleep);
+}
+
+#[test]
+fn only_capture_input_and_timeout_failures_name_the_lock_or_sleep_state() {
+    use crate::error::{DesktopError, ErrorCode};
+    let asleep = ScreenState { locked: false, display_asleep: true };
+    let both = ScreenState { locked: true, display_asleep: true };
+    let explained = |state: ScreenState, code| state.explain(DesktopError::new(code, "failed")).message;
+    assert_eq!(explained(asleep, ErrorCode::CaptureFailed), "failed (the display is asleep)");
+    assert_eq!(explained(asleep, ErrorCode::InputFailed), "failed (the display is asleep)");
+    assert_eq!(
+        explained(both, ErrorCode::Timeout),
+        "failed (the screen is locked and the display is asleep)"
+    );
+    let locked = ScreenState { locked: true, display_asleep: false };
+    assert_eq!(explained(locked, ErrorCode::InputFailed), "failed (the screen is locked)");
+    assert_eq!(explained(asleep, ErrorCode::WindowNotFound), "failed");
+    assert_eq!(explained(ScreenState::default(), ErrorCode::CaptureFailed), "failed");
 }
 
 #[test]

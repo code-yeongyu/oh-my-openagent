@@ -1235,7 +1235,7 @@ describe("createEventHandler - model fallback", () => {
 
     //#then - restored Sol entry applied after the Kimi rungs
     expect(third.message["model"]).toMatchObject({ providerID: "openai", modelID: "gpt-5.6-sol" })
-    expect(third.message["variant"]).toBe("high")
+    expect(third.message["variant"]).toBe("medium")
 
     //#when - fourth retry cycle
     const fourth = await triggerRetryCycle("openai", "gpt-5.6-sol")

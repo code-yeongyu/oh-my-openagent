@@ -16,7 +16,8 @@ import {
   toPortableBuildPath,
 } from "./build-extension.mjs"
 import { npmPackStage, runBoundedStage, systemTar } from "./bounded-stage.test-support.mjs"
-import { createBuildFixture } from "./build-extension.test-support.mjs"
+import { createBuildFixture, outputPathsIn } from "./build-extension.test-support.mjs"
+import { SENPI_ASTRA_ULTRAWORK_DIRECTIVE, SENPI_ULTRAWORK_DIRECTIVE } from "../../src/components/ultrawork/generated-directive.ts"
 import { runtimePersonaSources } from "./persona-artifacts.mjs"
 import { removeTestRootBestEffort } from "../../../../test-support/held-test-root.mjs"
 
@@ -215,6 +216,27 @@ describe("checkExtensionCurrent", () => {
     expect(advisorRuntime).not.toMatch(/^[\t ]+$/m)
   })
 
+  // Generated payload confinement (#9913): the shared directive parts are dropped from every bundle
+  // that imports the ultrawork module without using the directives. The probe is a line both
+  // directives share, read from the generated module rather than pinned here.
+  test("#given the split extension build #when bundles are inspected #then only the main entry carries the ultrawork directive text", async () => {
+    // given
+    const outputs = await sharedOutputs()
+    const sharedLine = SENPI_ULTRAWORK_DIRECTIVE.split("\n")
+      .filter((line) => /^[A-Za-z0-9 ,.:;()-]+$/.test(line) && SENPI_ASTRA_ULTRAWORK_DIRECTIVE.includes(line))
+      .sort((left, right) => right.length - left.length)[0]
+
+    // when
+    const carriers = []
+    for (const [name, path] of Object.entries(outputPathsIn(outputs.root))) {
+      if ((await readFile(path, "utf8")).includes(sharedLine)) carriers.push(name)
+    }
+
+    // then
+    expect(sharedLine.length).toBeGreaterThan(40)
+    expect(carriers).toEqual(["outputPath"])
+  })
+
   test("#given the split extension build #when metafile inputs are inspected #then task sources live only in the lazy sidecar", async () => {
     // given / when
     const { mainInputs, taskInputs } = await sharedOutputs()
@@ -344,6 +366,8 @@ describe("checkExtensionCurrent", () => {
       "packages/omo-senpi/src/components/memory/commands/memory-unlock.ts",
       "packages/omo-senpi/src/components/memory/commands/search.ts",
       "packages/omo-senpi/src/components/memory/commands/facts.ts",
+      // A dream fire loads its conversation selection from this sidecar (keeps omo.js inside its byte budget).
+      "packages/omo-senpi/src/components/memory/dream-selector.ts",
     ]) {
       expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
       expect(memoryCommandsInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
