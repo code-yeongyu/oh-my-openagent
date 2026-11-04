@@ -192,12 +192,15 @@ export function createMemoryPromptHandler(options: MemoryPromptInjectionOptions)
     }
   }
   return Object.assign(handler, {
-    async prebuild(context: MemoryIdentityContext): Promise<void> {
-      const repo = createRepo(context)
-      const head = await repo.head()
-      if (head === null) return
-      await cache.compile(repo, `${MEMORY_PROMPT_TEMPLATE}:${context.identity}`, blockOptions(context), head)
-      if (options.resolveCompileWarnTokens?.(context.identity) !== undefined) await estimatePressure(repo, head)
+    prebuild(context: MemoryIdentityContext): Promise<void> {
+      // Through the cache, so the shutdown drain's cache.settled() also waits for this HEAD read (#11135).
+      return cache.track(async () => {
+        const repo = createRepo(context)
+        const head = await repo.head()
+        if (head === null) return
+        await cache.compile(repo, `${MEMORY_PROMPT_TEMPLATE}:${context.identity}`, blockOptions(context), head)
+        if (options.resolveCompileWarnTokens?.(context.identity) !== undefined) await estimatePressure(repo, head)
+      })
     },
   })
 }
