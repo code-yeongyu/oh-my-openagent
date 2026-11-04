@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdtempSync, mkdirSync, realpathSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { basename, dirname, join } from "node:path"
 import { rmSyncEfaultTolerant } from "./teardown.test-support"
@@ -380,6 +380,32 @@ describe("reflection worker OS sandbox", () => {
     expect(transform.wasSandboxed).toBe(true)
     expect(transform.warning).toBeUndefined()
     expect(transformed.command).toBe("/usr/bin/bwrap")
+  }, 30_000)
+
+  test.skipIf(process.platform === "win32")("#given a bwrap whose first smoke times out and later ones succeed #when two reflection spawns are transformed #then the first runs unsandboxed and the second gets the sandbox", async () => {
+    // given: a stand-in bwrap whose first invocation never exits; the default probe runs it
+    // because the resolved path exists on this machine.
+    const binDir = mkdtempSync(join(tmpdir(), "omo-memory-sandbox-bwrap-"))
+    roots.push(binDir)
+    const executable = join(binDir, "bwrap")
+    writeFileSync(
+      executable,
+      "#!/bin/sh\nprintf 'spawn\\n' >> \"$0.spawns\"\nif [ ! -e \"$0.hung\" ]; then : > \"$0.hung\"; exec sleep 30; fi\nexit 0\n",
+    )
+    chmodSync(executable, 0o755)
+    const { setup, transform } = build("auto", { platform: "linux", which: () => executable })
+
+    // when
+    const firstResult = transform(spawnArgs(setup.worktree))
+    const first = firstResult instanceof Promise ? await firstResult : firstResult
+    const secondResult = transform(spawnArgs(setup.worktree))
+    const second = secondResult instanceof Promise ? await secondResult : secondResult
+
+    // then
+    expect(first.command).toBe("/bin/sh")
+    expect(second.command).toBe(executable)
+    expect(second.args.slice(-4)).toEqual(["--", "/bin/sh", "-c", "exit 0"])
+    expect(readFileSync(`${executable}.spawns`, "utf8")).toBe("spawn\nspawn\n")
   }, 30_000)
 
   test("#given off policy on Linux #when the transform is built #then the usability probe never runs", () => {

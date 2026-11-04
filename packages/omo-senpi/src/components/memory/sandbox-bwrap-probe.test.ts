@@ -112,6 +112,63 @@ describe.skipIf(process.platform === "win32")("probeBwrapUsability", () => {
     expect(usability.reason).toContain("setting up uid map: Permission denied")
   }, 30_000)
 
+  test("#given a smoke that hangs once and then succeeds #when probed twice #then the timeout is reported once and the second probe runs the smoke again and is usable", async () => {
+    // given: the first invocation marks itself and never exits (exec, so the timeout's SIGKILL
+    // reaches the hung process itself); every later invocation exits 0.
+    const binDir = mkdtempSync(join(tmpdir(), "omo-bwrap-probe-transient-"))
+    const executable = join(binDir, "bwrap")
+    writeFileSync(
+      executable,
+      "#!/bin/sh\nprintf 'spawn\\n' >> \"$0.spawns\"\nif [ ! -e \"$0.hung\" ]; then : > \"$0.hung\"; exec sleep 30; fi\nexit 0\n",
+    )
+    chmodSync(executable, 0o755)
+
+    try {
+      // when
+      const first = await probeBwrapUsability(executable)
+      const second = await probeBwrapUsability(executable)
+
+      // then: a timeout is transient, so it is not memoized like a definitive verdict.
+      expect(first.usable).toBe(false)
+      if (first.usable) throw new Error("expected the first probe to time out")
+      expect(first.reason).toContain("timed out")
+      expect(second).toEqual({ usable: true })
+      expect(readFileSync(`${executable}.spawns`, "utf8")).toBe("spawn\nspawn\n")
+    } finally {
+      rmSync(binDir, { recursive: true, force: true })
+    }
+  }, 30_000)
+
+  test("#given a definitive user-namespace denial #when probed repeatedly #then the verdict stays cached and the smoke runs once", async () => {
+    // given
+    const binDir = mkdtempSync(join(tmpdir(), "omo-bwrap-probe-denied-cached-"))
+    const executable = join(binDir, "bwrap")
+    writeFileSync(
+      executable,
+      "#!/bin/sh\nprintf 'spawn\\n' >> \"$0.spawns\"\necho 'bwrap: setting up uid map: Permission denied' >&2\nexit 1\n",
+    )
+    chmodSync(executable, 0o755)
+
+    try {
+      // when
+      const verdicts = [
+        await probeBwrapUsability(executable),
+        await probeBwrapUsability(executable),
+        await probeBwrapUsability(executable),
+      ]
+
+      // then
+      for (const verdict of verdicts) {
+        expect(verdict.usable).toBe(false)
+        if (verdict.usable) throw new Error("expected an unusable verdict")
+        expect(verdict.reason).toContain("setting up uid map: Permission denied")
+      }
+      expect(readFileSync(`${executable}.spawns`, "utf8")).toBe("spawn\n")
+    } finally {
+      rmSync(binDir, { recursive: true, force: true })
+    }
+  }, 30_000)
+
   test("#given a path that is not an executable at all #when probed #then it is unusable rather than throwing", async () => {
     // when
     const usability = await probeBwrapUsability(join(tmpdir(), "omo-bwrap-probe-absent-binary"))
