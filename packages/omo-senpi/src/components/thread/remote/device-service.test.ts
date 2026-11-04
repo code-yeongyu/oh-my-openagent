@@ -76,6 +76,10 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
   test.each([
     ["the attach ends before the reply", () => Promise.reject(new Error("the attach ended before its reply: closed"))],
     ["the local API times out after sending", () => Promise.reject(new LocalApiError("request_timeout", "no reply", { command_id: "c1" }))],
+    // Client-raised codes with no command_id that the connection can fail a pending command with after sending it.
+    ["the local connection closes after sending", () => Promise.reject(new LocalApiError("closed", "the connection closed"))],
+    ["the service breaks the protocol after sending", () => Promise.reject(new LocalApiError("protocol_violation", "a response to no pending request"))],
+    ["the service fails internally", () => Promise.reject(new LocalApiError("internal", "owner error"))],
   ] as const)("#given %s #when a command was sent #then the outcome is uncertain, never an error to retry, and it is sent once", async (_label, reply) => {
     const l = lifecycle()
     l.answer(reply)
@@ -84,11 +88,11 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
     expect(l.calls.sent).toBe(1)
   })
 
-  test("#given the local API refuses a command before running it #when it answers #then the outcome is refused with its code", async () => {
+  test.each(["not_attached", "command_id_conflict", "method_unclassified", "message_too_long"] as const)("#given the local API refuses a command with %s before running it #when it answers #then the outcome is refused with its code", async (code) => {
     const l = lifecycle()
-    l.answer(() => Promise.reject(new LocalApiError("not_attached", "no such attach")))
+    l.answer(() => Promise.reject(new LocalApiError(code, "refused before dispatch")))
     const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: l.connect })
-    expect(await port.sessionCommand("b", "s1", { type: "abort" })).toEqual({ kind: "refused", reason: "not_attached" })
+    expect(await port.sessionCommand("b", "s1", { type: "abort" })).toEqual({ kind: "refused", reason: code })
   })
 
   test("#given the proven connection closes #when the next call runs #then a new connection is made", async () => {

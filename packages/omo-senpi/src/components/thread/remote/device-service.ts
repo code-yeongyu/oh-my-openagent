@@ -22,6 +22,18 @@ function wireRecord(record: Readonly<Record<string, unknown>>): WireRpc {
   return Object.fromEntries(Object.entries(record).filter(([, value]) => value !== undefined).map(([key, value]) => [key, wireValue(value)]))
 }
 
+// The local API codes that answer a session.command before anything leaves this device: the owner's error responses
+// (dispatch outcomes arrive as session.command_state, never as an error response) and the client's own size check.
+// Everything else - `closed` and `protocol_violation` can fail a command already written to the connection, and
+// `internal` proves nothing about dispatch - may have run on the other device, so it is never reported as refused.
+const REFUSED_BEFORE_SENDING: ReadonlySet<LocalApiError["code"]> = new Set<LocalApiError["code"]>([
+  "unauthenticated", "client_proof_invalid", "invalid_request", "unknown_type", "forbidden", "owner_transfer", "signed_out",
+  "device_mismatch", "device_changed", "account_changed", "device_key_invalid", "service_disabled", "sign_in_required",
+  "plan_required", "activation_pending", "authorization_stale", "peer_not_found", "peer_not_session_client", "session_not_found",
+  "engine_too_old", "not_attached", "command_id_conflict", "message_too_long", "upload_incomplete", "malformed",
+  "method_unclassified", "method_local_only", "host_not_answering", "unsupported",
+])
+
 function outcomeOf(result: CommandResult): RemoteCommandOutcome {
   const { outcome } = result
   if (outcome.state === "engine_refused") return { kind: "refused", reason: outcome.reason }
@@ -69,9 +81,9 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       try {
         return outcomeOf(await attached.command(wireRecord(rpc)))
       } catch (error) {
-        // An owner's refusal (no command_id) ran nothing. Anything else - a timeout after sending, or the attach or
-        // connection ending first - may have run on the other device, so it is uncertain and never retried here.
-        if (error instanceof LocalApiError && error.command_id === undefined) return { kind: "refused", reason: error.code }
+        // Only a code that answers before sending ran nothing. Anything else - a timeout after sending, the attach or
+        // connection ending, a broken protocol - may have run on the other device, so it is uncertain and never retried.
+        if (error instanceof LocalApiError && error.command_id === undefined && REFUSED_BEFORE_SENDING.has(error.code)) return { kind: "refused", reason: error.code }
         return { kind: "uncertain", reason: "reply_lost" }
       }
     },
