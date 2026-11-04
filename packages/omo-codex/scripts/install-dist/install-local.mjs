@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:f2ad355eec078382167caa8ee2c25b6393ad79be1c47f6266dec84e796d2adbf:1939d3601687ca5dd10ae18034a4ff0d7e131a7c7b99e64019cdd034d81fbd5e
+// omo-codex-install:fc1a2a12db3694269682b11cd4506102a8d1a36bdb913fee1976f50aef0edf5a:0ff3cfe974de1cb9a624e6b9807fe1e61af2409d2cfcb0a9e14cb3a59aa2729a
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -20149,6 +20149,7 @@ var OmoTaskSettingsSchema = object({
   state_dir: string2().optional(),
   reattach_on_reconcile: boolean2().optional(),
   resume_children: boolean2().default(true),
+  control_channel: boolean2().optional(),
   warnings: OmoTaskWarningsSchema.default({ unavailable_categories: true }),
   wait: OmoTaskWaitSchema.default({ min_ms: 5000, default_ms: 60000, max_ms: 600000 }),
   team: OmoTaskTeamSettingsSchema.default({
@@ -20199,6 +20200,7 @@ var OmoTaskSettingsLayerSchema = object({
   state_dir: string2().optional(),
   reattach_on_reconcile: boolean2().optional(),
   resume_children: boolean2().optional(),
+  control_channel: boolean2().optional(),
   warnings: OmoTaskWarningsLayerSchema.optional(),
   wait: OmoTaskWaitLayerSchema.optional(),
   team: OmoTaskTeamSettingsLayerSchema.optional(),
