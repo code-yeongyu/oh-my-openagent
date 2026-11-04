@@ -28,7 +28,7 @@ type Sent = { readonly via: "endpoint" | "session" | "read"; readonly device: st
 type Engine = { readonly messages: readonly ThreadTranscriptEntry[]; readonly interrupt: JsonObject; readonly streaming: boolean; readonly pending: number }
 const ENGINE: Engine = { messages: Array.from({ length: 30 }, (_, index) => ({ role: index % 2 === 0 ? "user" : "assistant", content: `message ${index} ${"x".repeat(60)}` })), interrupt: { interrupted: false }, streaming: false, pending: 0 }
 
-function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean; engine?: Engine; failSessionsList?: boolean } = {}) {
+function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean; engine?: Engine; failSessionsList?: boolean; failAliasesOf?: boolean } = {}) {
   const engine = options.engine ?? ENGINE
   const sent: Sent[] = []
   const hops: number[] = []
@@ -64,7 +64,7 @@ function account(options: { plan?: string; online?: boolean; refuse?: string; al
       const held = aliases.get(alias)
       return held === undefined ? { kind: "error", error: { code: "alias_not_found", message: "no such alias" } } : { kind: "ok", value: held }
     },
-    aliasesOf: async (ids) => ({ kind: "ok", value: new Map([...aliases].filter(([, holder]) => ids.includes(holder.session_id)).map(([alias, holder]) => [holder.session_id, alias])) }),
+    aliasesOf: async (ids) => options.failAliasesOf === true ? Promise.reject(new Error("alias registry failed")) : ({ kind: "ok", value: new Map([...aliases].filter(([, holder]) => ids.includes(holder.session_id)).map(([alias, holder]) => [holder.session_id, alias])) }),
   }
   const remote: RemoteThreadSurface = {
     sessions: {
@@ -374,5 +374,67 @@ describe("remote == local: the same call answers the same on b as on this device
     const without = await surface(undefined).run("thread_read", { thread: "local peer" })
     expect(comparable(withRemote)).toEqual(comparable(without))
     expect(withRemote).toMatchObject({ kind: "ok" })
+  })
+})
+
+describe("remote == local, round 2: send modes, handoff, list and alias order", () => {
+  test.each([
+    ["a steer with no expected_turn_id", { delivery: "steer" }],
+    ["a steer with a malformed expected_turn_id", { delivery: "steer", expected_turn_id: "abc" }],
+  ] as const)("#given %s #when it is sent here and to b #then both refuse the same way at send time and b gets nothing", async (_label, args) => {
+    const a = account()
+    const { run } = surface(a.remote)
+    const here = await run("thread_send", { thread: "dur-local", message: "x", ...args })
+    const there = await run("thread_send", { thread: "dur-on-b", message: "x", ...args })
+    expect(comparable(there)).toEqual(comparable(here))
+    expect(here).toMatchObject({ kind: "error" })
+    expect(a.sent).toEqual([])
+  })
+
+  test("#given b is idle #when a steer with an expected turn reaches it #then it is not_steerable, as a steer into an idle session is, and no prompt is sent", async () => {
+    const a = account()
+    const { run } = surface(a.remote)
+    expect(await run("thread_send", { thread: "dur-on-b", message: "x", delivery: "steer", expected_turn_id: "3" })).toMatchObject({ kind: "error", error: { code: "not_steerable" } })
+    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "prompt")).toEqual([])
+  })
+
+  test("#given b is mid-turn #when a steer with a well-formed expected turn reaches it #then it is refused turn_conflict because b's engine cannot confirm the turn yet, and no prompt is sent", async () => {
+    const a = account({ engine: { ...ENGINE, streaming: true, pending: 0 } })
+    const { run } = surface(a.remote)
+    expect(await run("thread_send", { thread: "dur-on-b", message: "x", delivery: "steer", expected_turn_id: "3" })).toMatchObject({ kind: "error", error: { code: "turn_conflict", details: { device: "b", reason: "remote_turn_not_verifiable" } } })
+    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "prompt")).toEqual([])
+  })
+
+  test("#given a follow_up to b while it runs #when it is sent #then it is queued behind b's own pending count", async () => {
+    const a = account({ engine: { ...ENGINE, streaming: true, pending: 2 } })
+    const { run } = surface(a.remote)
+    expect(await run("thread_send", { thread: "dur-on-b", message: "x", delivery: "follow_up" })).toMatchObject({ kind: "ok", delivery: { kind: "queued", queue_position: 2 } })
+    expect(a.sent.find((entry) => entry.rpc?.["type"] === "prompt")?.rpc?.["streamingBehavior"]).toBe("followUp")
+  })
+
+  test("#given b's thread #when thread_handoff names it by id #then the message reaches b and the receipt names the thread, its device and how it was resolved", async () => {
+    const a = account()
+    const { run } = surface(a.remote)
+    expect(await run("thread_handoff", { thread: "dur-on-b", message: "take this" })).toMatchObject({ kind: "ok", resolved_by: "exact_name", thread: { thread_id: "dur-on-b", device: "b" }, delivery: { kind: "started" } })
+    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "prompt").map((entry) => entry.rpc?.["message"])).toEqual(["take this"])
+  })
+
+  test.each([
+    ["the account session list fails", { failSessionsList: true }],
+    ["the alias registry fails", { failAliasesOf: true }],
+  ] as const)("#given %s #when thread_list runs with all_scope #then this device's threads are still listed", async (_label, options) => {
+    const a = account(options)
+    const { run } = surface(a.remote)
+    const listed = await run("thread_list", { all_scope: true })
+    expect(listed).toMatchObject({ kind: "ok" })
+    if (listed.kind !== "ok" || !("threads" in listed)) throw new Error(`thread_list failed: ${JSON.stringify(listed)}`)
+    expect(listed.threads.map((thread) => thread.thread_id)).toContain("dur-local")
+  })
+
+  test("#given two local threads share a name and an alias spelled the same is held by b's thread #when a tool names it #then the alias wins over the ambiguous local name", async () => {
+    const a = account({ aliases: new Map([["twin", { session_id: "dur-on-b", device: "b" }]]) })
+    const twins: ThreadHostSession[] = [{ sessionId: "r1", durableSessionId: "dur-t1", cwd: process.cwd(), name: "twin", status: "open" }, { sessionId: "r2", durableSessionId: "dur-t2", cwd: process.cwd(), name: "twin", status: "open" }]
+    const { run } = surface(a.remote, { sessions: twins })
+    expect(await run("thread_read", { thread: "twin" })).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
   })
 })

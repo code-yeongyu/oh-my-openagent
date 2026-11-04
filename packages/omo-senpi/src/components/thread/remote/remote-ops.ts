@@ -1,5 +1,6 @@
 import type { ThreadToolResult } from "../contracts"
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
+import { REFUSAL_CODES } from "../gateway/result"
 import { INITIAL_SKILLS_CONTEXT_KEY } from "../initial-skills"
 import { threadLink } from "../thread-link"
 import type { ThreadReadInput } from "../contracts"
@@ -123,12 +124,32 @@ export async function openRemote(remote: RemoteThreadSurface, request: RemoteOpe
  * thread_send / thread_handoff to another device's session: one `prompt`, carrying the chain's count (K8, R8.c).
  * Every result field comes from the remote engine: the turn it started, or its own pending-message count.
  */
-export async function promptRemote(remote: RemoteThreadSurface, row: RemoteSessionRow, message: string, hop: number): Promise<ThreadToolResult> {
+export type RemoteSendRequest = { readonly message: string; readonly delivery?: "auto" | "steer" | "follow_up"; readonly expected_turn_id?: string }
+
+/** The send-time refusals a local send makes (tools.ts deliverThroughGateway), in the same words. */
+export function sendArgumentFailure(request: RemoteSendRequest): Failure | undefined {
+  if (request.expected_turn_id !== undefined && !/^\d+$/.test(request.expected_turn_id)) return fail("turn_conflict", `Turn ${request.expected_turn_id} is not a turn of the target session.`, "Read the target again and steer with the turn_id a started or steered result returned.")
+  if (request.delivery === "steer" && request.expected_turn_id === undefined) return fail("invalid_arguments", "A steer needs expected_turn_id (the target's current turn_epoch).", "Fix the arguments and send again.")
+  return undefined
+}
+
+export async function promptRemote(remote: RemoteThreadSurface, row: RemoteSessionRow, request: RemoteSendRequest, hop: number): Promise<ThreadToolResult> {
+  const refused = sendArgumentFailure(request)
+  if (refused !== undefined) return refused
   const offline = await deviceOnline(remote, row.device)
   if (offline !== undefined) return offline
   const state = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_state", sessionId: row.session_id })
   if (state.kind !== "ok") return outcomeFailure(state, row.device)
   const streaming = state.response["isStreaming"] === true
+  if (request.delivery === "steer") {
+    // gateway/decision.ts: a steer needs a running turn; a compacting session or one waiting on a question is not one.
+    const pendingQuestions = state.response["pendingQuestions"]
+    const midTurn = streaming && state.response["isCompacting"] !== true && !(Array.isArray(pendingQuestions) && pendingQuestions.length > 0)
+    if (!midTurn) return fail(REFUSAL_CODES.not_steerable.code, `A steer to ${row.session_id} was refused: not_steerable.`, REFUSAL_CODES.not_steerable.next, { device: row.device })
+    // The other device's engine reports no turn id, so the caller's expected_turn_id cannot be checked there yet.
+    return fail(REFUSAL_CODES.turn_conflict.code, `Turn ${request.expected_turn_id} of ${row.session_id} cannot be confirmed on device ${row.device}.`, REFUSAL_CODES.turn_conflict.next, { device: row.device, reason: "remote_turn_not_verifiable" })
+  }
+  const message = request.message
   const record = remote.chain.stamp({ type: "prompt", sessionId: row.session_id, message, ...(streaming ? { streamingBehavior: "followUp" } : {}) }, hop)
   const sent = await remote.sessions.sessionCommand(row.device, row.session_id, record)
   if (sent.kind !== "ok") return outcomeFailure(sent, row.device)

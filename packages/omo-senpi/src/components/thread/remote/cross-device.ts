@@ -1,7 +1,7 @@
 import type { ThreadToolResult } from "../contracts"
 import { threadToolFailure } from "../errors"
 import { threadLink } from "../thread-link"
-import type { RemoteSessionRow, RemoteThreadSurface } from "./ports"
+import type { AliasRegistry, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 import { aliasFailure, deviceOnline, locateAcross, openRemote, remoteAvailable } from "./remote-ops"
 
 type LocalResolution = { readonly kind: "error"; readonly code: string } | { readonly kind: "ok"; readonly entry: { readonly thread_id: string } }
@@ -18,7 +18,6 @@ export type CrossTarget =
 export async function crossTarget(remote: RemoteThreadSurface | undefined, address: string, local: LocalResolution): Promise<CrossTarget> {
   if (remote === undefined || address === "self") return { kind: "local", address }
   if (local.kind === "ok" && local.entry.thread_id === address) return { kind: "local", address }
-  if (local.kind === "error" && local.code !== "not_found") return { kind: "local", address }
   const unavailable = await remoteAvailable(remote)
   if (unavailable !== undefined) return local.kind === "ok" || unavailable.error.code !== "relay_requires_paid_plan" ? { kind: "local", address } : { kind: "error", result: unavailable }
   let across: Awaited<ReturnType<typeof locateAcross>>
@@ -141,7 +140,13 @@ export async function listAcross(remote: RemoteThreadSurface | undefined, local:
   if (unavailable !== undefined) return { ...local, remote_unavailable: unavailable.error.code }
   const here = await remote.sessions.thisDevice()
   const known = new Set(ids)
-  const others = (await remote.sessions.sessions()).filter((row) => row.device !== here && !known.has(row.session_id))
+  let listed: readonly RemoteSessionRow[]
+  try {
+    listed = await remote.sessions.sessions()
+  } catch {
+    return withAliases(remote, { ...local, remote_unavailable: "host_unavailable" }, ids)
+  }
+  const others = listed.filter((row) => row.device !== here && !known.has(row.session_id))
   const merged: ThreadToolResult = {
     ...local,
     threads: [
@@ -154,7 +159,12 @@ export async function listAcross(remote: RemoteThreadSurface | undefined, local:
 
 async function withAliases(remote: RemoteThreadSurface, listed: ThreadToolResult, ids: readonly string[]): Promise<ThreadToolResult> {
   if (remote.aliases === undefined || listed.kind !== "ok" || !("threads" in listed) || ids.length === 0) return listed
-  const aliases = await remote.aliases.aliasesOf(ids)
+  let aliases: Awaited<ReturnType<AliasRegistry["aliasesOf"]>>
+  try {
+    aliases = await remote.aliases.aliasesOf(ids)
+  } catch {
+    return listed
+  }
   if (aliases.kind === "error") return listed
   return { ...listed, threads: listed.threads.map((thread) => { const alias = aliases.value.get(thread.thread_id); return alias === undefined ? thread : { ...thread, alias } }) }
 }
