@@ -21,7 +21,7 @@ import { CHANNEL_CLOSED_REASONS } from "./vocabulary.ts";
 // Decision 0018 on the local API: the endpoint key a session-less command names, the session.endpoints request and
 // answer, and the command channel's events (protocol-delegated.ts).
 const ENDPOINT_KEY = /^[A-Za-z0-9_-]{22}$/;
-/** A v2 session.list page names at most this many endpoints (relay-spec SESSION_ENDPOINTS_MAX). */
+/** A v2 session.list page names at most this many endpoints (the relay host's session-endpoint bound). */
 const ENDPOINTS_MAX = 16;
 export const endpointKey = (v: unknown, what = "endpoint"): string =>
   typeof v === "string" && ENDPOINT_KEY.test(v) ? v : fail(what);
