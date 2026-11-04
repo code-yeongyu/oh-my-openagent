@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { join } from "node:path"
 import { connectDeviceService, type DeviceService, LocalApiError } from "../src/index.ts"
-import { AGENT_DIR, credential, otherClient, ownerAt, recorder, registers, root, start, useRegistrantWorld } from "./registrant-support.ts"
+import { AGENT_DIR, credential, otherClient, ownerAt, recorder, registeredFor, registers, root, SELF, start, useRegistrantWorld } from "./registrant-support.ts"
 
 // #12379: one register per new (proven connection, device id) pair on one held
 // connection; a refused register never marks the pair registered.
@@ -13,7 +13,7 @@ describe("agent dir registrant: the device pair rule (#12379)", () => {
     const stateDir = join(root(), "device-service")
     const owner = await ownerAt(stateDir)
     const seen = recorder()
-    const first = seen.next(event => event.kind === "registered", "the first register")
+    const first = seen.next(registeredFor(SELF), "the register for the adopted device")
     start({ stateDir, onEvent: seen.onEvent })
     await first
     const other = await otherClient(stateDir)
@@ -21,14 +21,14 @@ describe("agent dir registrant: the device pair rule (#12379)", () => {
     const sameId = seen.next(event => event.kind === "status" && event.deviceId === "dev-self", "the status naming the same device")
     await other.setEnabled(true)
     await sameId
-    expect(registers(owner)).toBe(1)
+    expect(registers(owner)).toBe(2)
 
     const newDevice = seen.next(event => event.kind === "registered" && event.deviceId === "dev-new", "the register for the new device")
     await other.forget()
     await other.adopt(credential("dev-new"))
 
     await newDevice
-    expect(registers(owner)).toBe(2)
+    expect(registers(owner)).toBe(3)
     expect(owner.connections()).toBe(2)
   })
 
@@ -37,7 +37,7 @@ describe("agent dir registrant: the device pair rule (#12379)", () => {
     const stateDir = join(root(), "device-service")
     const owner = await ownerAt(stateDir)
     const seen = recorder()
-    const first = seen.next(event => event.kind === "registered", "the first register")
+    const first = seen.next(registeredFor(SELF), "the register for the adopted device")
     start({ stateDir, onEvent: seen.onEvent })
     await first
 
@@ -45,7 +45,7 @@ describe("agent dir registrant: the device pair rule (#12379)", () => {
     await (await otherClient(stateDir)).adopt(credential("dev-y"))
 
     await newDevice
-    expect(registers(owner)).toBe(2)
+    expect(registers(owner)).toBe(3)
   })
 
 
@@ -53,7 +53,7 @@ describe("agent dir registrant: the device pair rule (#12379)", () => {
     const stateDir = join(root(), "device-service")
     const owner = await ownerAt(stateDir)
     const seen = recorder()
-    const first = seen.next(event => event.kind === "registered", "the first register")
+    const first = seen.next(registeredFor(SELF), "the register for the adopted device")
     start({ stateDir, onEvent: seen.onEvent })
     await first
     const other = await otherClient(stateDir)
@@ -65,34 +65,35 @@ describe("agent dir registrant: the device pair rule (#12379)", () => {
     await other.adopt(credential("dev-self"))
 
     await again
-    expect(registers(owner)).toBe(2)
+    expect(registers(owner)).toBe(3)
   })
 
 
   test("a refused register never marks the pair registered: the next status for that device registers", async () => {
     const stateDir = join(root(), "device-service")
     const owner = await ownerAt(stateDir)
-    let refuse = true
+    let refusing = true
     const connect = async (): Promise<DeviceService> => {
       const service = await connectDeviceService({ version: "5.1.60", stateDir })
       return {
         ...service,
         registerEndpoints: async agentDir => {
-          if (refuse) {
-            refuse = false
-            throw new LocalApiError("internal", "the owner could not store the list")
-          }
+          if (refusing) throw new LocalApiError("internal", "the owner could not store the list")
           await service.registerEndpoints(agentDir)
         },
       }
     }
     const seen = recorder()
-    const refused = seen.next(event => event.kind === "register_failed", "the refused register")
+    const refusedForDevice = seen.next(
+      event => event.kind === "register_failed" && event.deviceId === SELF,
+      "the refused register for the adopted device",
+    )
     start({ stateDir, onEvent: seen.onEvent, connect })
-    await refused
+    await refusedForDevice
     expect(owner.state.endpoints.size).toBe(0)
 
-    const registered = seen.next(event => event.kind === "registered", "the register on the next status")
+    refusing = false
+    const registered = seen.next(registeredFor(SELF), "the register on the next status for the same device")
     await (await otherClient(stateDir)).setEnabled(true)
 
     await registered

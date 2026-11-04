@@ -7,6 +7,7 @@ import { connectDeviceService, type DeviceService } from "../../device-service-c
 import type { LocalRequest } from "../../device-service-core/src/local-api/protocol.ts"
 import { startFakeOwner, type FakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
 import { defaultWorld } from "../../device-service-core/test/local-api/conformance/world.ts"
+import { deviceKeys } from "../../device-service-core/test/local-api/support.ts"
 import { resolveSenpi } from "../bin/lib/package-paths.js"
 
 // #12379 against a REAL engine started the way the desktop starts it:
@@ -123,7 +124,10 @@ async function clientAt(stateDir: string): Promise<DeviceService> {
   return client
 }
 
-const credential = (id: string) => ({ device: { id, name: id }, signingPrivateKey: "AA==", sealingPrivateKey: "AA==" })
+const credential = (id: string) => {
+  const keys = deviceKeys()
+  return { device: { id, name: id }, signingPrivateKey: keys.signing, sealingPrivateKey: keys.sealing }
+}
 
 describe.skipIf(process.platform === "win32")("a real RPC engine registers its own agent dir with the device service (#12379)", () => {
   test("the engine registers the agent dir it runs with, and nothing else, with no manual register", async () => {

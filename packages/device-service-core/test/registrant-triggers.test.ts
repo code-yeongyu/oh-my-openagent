@@ -3,7 +3,8 @@ import { spawn } from "node:child_process"
 import { mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import type { RegistrantSchedule } from "../src/registrant.ts"
-import { AGENT_DIR, ownerAt, recorder, registers, root, start, stopOwner, useRegistrantWorld, within } from "./registrant-support.ts"
+import type { FakeOwner } from "./local-api/conformance/fake-owner.ts"
+import { AGENT_DIR, ownerAt, recorder, registeredFor, registers, root, SELF, start, stopOwner, useRegistrantWorld, within } from "./registrant-support.ts"
 
 // #12379: the registrant registers on every proven connection to a service that starts,
 // restarts or reappears, through a watcher armed before the existence check and the connection's own close, and it
@@ -16,12 +17,13 @@ describe("agent dir registrant: service starts (#12379)", () => {
     const stateDir = join(root(), "device-service")
     const owner = await ownerAt(stateDir)
     const seen = recorder()
-    const registered = seen.next(event => event.kind === "registered", "the first register")
+    const registered = seen.next(registeredFor(SELF), "the register for the adopted device")
     start({ stateDir, onEvent: seen.onEvent })
 
     await registered
     expect([...owner.state.endpoints]).toEqual([AGENT_DIR])
-    expect(registers(owner)).toBe(1)
+    expect(seen.events.filter(event => event.kind === "registered").map(event => event.deviceId)).toEqual([null, SELF])
+    expect(registers(owner)).toBe(2)
   })
 
 
@@ -29,19 +31,19 @@ describe("agent dir registrant: service starts (#12379)", () => {
     const stateDir = join(root(), "device-service")
     const first = await ownerAt(stateDir)
     const seen = recorder()
-    const firstRegister = seen.next(event => event.kind === "registered", "the first register")
+    const firstRegister = seen.next(registeredFor(SELF), "the register for the adopted device")
     start({ stateDir, onEvent: seen.onEvent })
     await firstRegister
 
     const disconnected = seen.next(event => event.kind === "disconnected", "the connection closing")
     await stopOwner(first)
     await disconnected
-    const again = seen.next(event => event.kind === "registered", "the register after the restart")
+    const again = seen.next(registeredFor(SELF), "the register after the restart")
     const second = await ownerAt(stateDir)
 
     await again
     expect([...second.state.endpoints]).toEqual([AGENT_DIR])
-    expect(registers(second)).toBe(1)
+    expect(registers(second)).toBe(2)
   })
 
 
@@ -49,12 +51,12 @@ describe("agent dir registrant: service starts (#12379)", () => {
     const stateDir = join(root(), "device-service")
     const first = await ownerAt(stateDir)
     const seen = recorder()
-    const firstRegister = seen.next(event => event.kind === "registered", "the first register")
+    const firstRegister = seen.next(registeredFor(SELF), "the register for the adopted device")
     // A watcher whose create event is lost or coalesced with the old socket's removal: only the close can trigger.
     start({ stateDir, onEvent: seen.onEvent, watchEndpoint: () => () => {} })
     await firstRegister
 
-    const again = seen.next(event => event.kind === "registered", "the register after the back-to-back restart")
+    const again = seen.next(registeredFor(SELF), "the register after the back-to-back restart")
     await stopOwner(first)
     const second = await ownerAt(stateDir)
 
@@ -66,7 +68,7 @@ describe("agent dir registrant: service starts (#12379)", () => {
   test("a state dir that does not exist yet (relayd installed after the engine started) is watched from its nearest ancestor", async () => {
     const stateDir = join(root(), "home", ".omo", "device-service")
     const seen = recorder()
-    const registered = seen.next(event => event.kind === "registered", "the register once the service starts")
+    const registered = seen.next(registeredFor(SELF), "the register once the service starts")
     start({ stateDir, onEvent: seen.onEvent })
 
     const owner = await ownerAt(stateDir)
@@ -80,7 +82,7 @@ describe("agent dir registrant: service starts (#12379)", () => {
     const stateDir = join(root(), "device-service")
     mkdirSync(stateDir, { mode: 0o700 })
     const seen = recorder()
-    const registered = seen.next(event => event.kind === "registered", "the register of a service started in the gap")
+    const registered = seen.next(registeredFor(SELF), "the register of a service started in the gap")
     let started: Promise<FakeOwner> | undefined
     start({
       stateDir,
@@ -134,20 +136,20 @@ describe("agent dir registrant: service starts (#12379)", () => {
     const stateDir = join(root(), "device-service")
     const first = await ownerAt(stateDir)
     const seen = recorder()
-    const registered = seen.next(event => event.kind === "registered", "the first register")
+    const registered = seen.next(registeredFor(SELF), "the register for the adopted device")
     const registrant = start({ stateDir, onEvent: seen.onEvent })
     await registered
 
     registrant.stop()
     await stopOwner(first)
     const seenByFresh = recorder()
-    const freshRegistered = seenByFresh.next(event => event.kind === "registered", "a live registrant's register on the new service")
+    const freshRegistered = seenByFresh.next(registeredFor(SELF), "a live registrant's register on the new service")
     const second = await ownerAt(stateDir)
     start({ stateDir, onEvent: seenByFresh.onEvent })
     await freshRegistered
 
-    expect(registers(second)).toBe(1)
-    expect(seen.events.filter(event => event.kind === "registered")).toHaveLength(1)
+    expect(registers(second)).toBe(2)
+    expect(seen.events.filter(event => event.kind === "registered")).toHaveLength(2)
   })
 
 
@@ -161,7 +163,7 @@ describe("agent dir registrant: service starts (#12379)", () => {
         `import { startAgentDirRegistrant } from ${JSON.stringify(join(import.meta.dir, "..", "src", "registrant.ts"))}`,
         `const hold = setInterval(() => {}, 1 << 30)`,
         `startAgentDirRegistrant({ version: "5.1.60", agentDir: ${JSON.stringify(AGENT_DIR)}, stateDir: ${JSON.stringify(stateDir)},`,
-        `  onEvent: event => { if (event.kind === "registered") { console.log("REGISTERED"); clearInterval(hold) } } })`,
+        `  onEvent: event => { if (event.kind === "registered" && event.deviceId === "dev-self") { console.log("REGISTERED"); clearInterval(hold) } } })`,
       ].join("\n"),
     )
     const child = spawn(process.execPath, [script], { stdio: ["ignore", "pipe", "inherit"] })

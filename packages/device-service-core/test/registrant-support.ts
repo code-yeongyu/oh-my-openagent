@@ -6,6 +6,7 @@ import { connectDeviceService, type DeviceService } from "../src/index.ts"
 import { type AgentDirRegistrant, type RegistrantEvent, startAgentDirRegistrant } from "../src/registrant.ts"
 import { startFakeOwner, type FakeOwner } from "./local-api/conformance/fake-owner.ts"
 import { defaultWorld } from "./local-api/conformance/world.ts"
+import { deviceKeys } from "./local-api/support.ts"
 
 // The shared world of the agent dir registrant tests (#12379): the fake owner is a real local socket with the
 // mutual proof, and a stopped owner followed by a new one on the same state dir stands in for a relayd restart.
@@ -82,4 +83,12 @@ export async function otherClient(stateDir: string): Promise<DeviceService> {
   return service
 }
 
-export const credential = (id: string) => ({ device: { id, name: id }, signingPrivateKey: "AA==", sealingPrivateKey: "AA==" })
+export const credential = (id: string) => {
+  const keys = deviceKeys()
+  return { device: { id, name: id }, signingPrivateKey: keys.signing, sealingPrivateKey: keys.sealing }
+}
+
+// The default world's adopted device: a new connection registers at the proof and again on the replayed status.
+export const SELF = "dev-self"
+export const registeredFor = (deviceId: string | null) => (event: RegistrantEvent): boolean =>
+  event.kind === "registered" && event.deviceId === deviceId
