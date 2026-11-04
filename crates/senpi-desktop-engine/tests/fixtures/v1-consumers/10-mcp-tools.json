@@ -326,7 +326,11 @@
               }
             }
           },
-          "variable": []
+          "variable": [
+            "/result/content/0/text",
+            "/result/structuredContent/heartbeatFresh",
+            "/result/structuredContent/reason"
+          ]
         }
       ]
     }
