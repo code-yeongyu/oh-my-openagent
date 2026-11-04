@@ -62,6 +62,7 @@ describe("getHerdrAgentsWorkspaceLabel", () => {
 
 describe("spawnHerdrSubagentTab", () => {
   test("creates the workspace on first spawn, pins it on the tab, and delivers the attach command via pane run", async () => {
+    // given
     const authPassword = process.env["OPENCODE_SERVER_PASSWORD"]
     const authPasswordFile = process.env["OPENCODE_SERVER_PASSWORD_FILE"]
     const authUsername = process.env["OPENCODE_SERVER_USERNAME"]
@@ -84,8 +85,10 @@ describe("spawnHerdrSubagentTab", () => {
         return ok("")
       })
 
+      // when
       const result = await spawnHerdrSubagentTab(spawnArgs, deps)
 
+      // then
       expect(result.success).toBe(true)
       expect(result.paneId).toBe("w9:p2")
       expect(result.workspaceId).toBe("w9")
@@ -137,6 +140,7 @@ describe("spawnHerdrSubagentTab", () => {
   })
 
   test.skipIf(process.platform === "win32")("a pane shell consumes the handoff: password arrives via the 0600 file and the file is unlinked before attach", async () => {
+    // given
     const authPassword = process.env["OPENCODE_SERVER_PASSWORD"]
     process.env["OPENCODE_SERVER_PASSWORD"] = fixturePassword
     const cleanupAuthDirectory = createPaneAuthDirectory()
@@ -173,6 +177,7 @@ describe("spawnHerdrSubagentTab", () => {
         "printf auth-ok",
       ].join("\n"), { mode: 0o700 })
 
+      // when
       // simulate the pane shell: the --env vars are exported, the pane run
       // payload is the command line the shell executes
       const child = Bun.spawn(["/bin/sh", "-c", paneRunCommand], {
@@ -185,6 +190,8 @@ describe("spawnHerdrSubagentTab", () => {
         stdout: "pipe",
         stderr: "pipe",
       })
+
+      // then
       expect(await child.exited).toBe(0)
       expect(await new Response(child.stdout).text()).toBe("auth-ok")
       expect(existsSync(passwordFile)).toBe(false)
@@ -198,6 +205,7 @@ describe("spawnHerdrSubagentTab", () => {
   })
 
   test("reuses a workspace discovered by exact label match without creating", async () => {
+    // given
     const { deps, calls } = fakeOps((args) => {
       if (args[0] === "workspace" && args[1] === "list") {
         return ok(envelope({ workspaces: [{ workspace_id: "w2", label: "omo-agents-4242" }] }))
@@ -208,8 +216,10 @@ describe("spawnHerdrSubagentTab", () => {
       return ok("")
     })
 
+    // when
     const result = await spawnHerdrSubagentTab(spawnArgs, deps)
 
+    // then
     expect(result.success).toBe(true)
     expect(result.workspaceId).toBe("w2")
     expect(result.paneId).toBe("w2:p3")
@@ -218,6 +228,7 @@ describe("spawnHerdrSubagentTab", () => {
   })
 
   test("skips discovery entirely when the manager already knows the workspace id", async () => {
+    // given
     const { deps, calls } = fakeOps((args) => {
       if (args[0] === "tab" && args[1] === "create") {
         return ok(envelope({ tab: { tab_id: "w4:t5" }, root_pane: { pane_id: "w4:p5" } }))
@@ -225,13 +236,16 @@ describe("spawnHerdrSubagentTab", () => {
       return ok("")
     })
 
+    // when
     const result = await spawnHerdrSubagentTab({ ...spawnArgs, workspaceId: "w4" }, deps)
 
+    // then
     expect(result.success).toBe(true)
     expect(calls.map((call) => call[0])).toEqual(["tab", "pane"])
   })
 
   test("reports failure without throwing when the tab cannot be created", async () => {
+    // given
     const { deps } = fakeOps((args) => {
       if (args[0] === "workspace" && args[1] === "list") return ok(envelope({ workspaces: [] }))
       if (args[0] === "workspace" && args[1] === "create") {
@@ -240,8 +254,10 @@ describe("spawnHerdrSubagentTab", () => {
       return errorEnvelope("spawn_failed", "tab rejected")
     })
 
+    // when
     const result = await spawnHerdrSubagentTab(spawnArgs, deps)
 
+    // then
     expect(result.success).toBe(false)
     expect(result.error).toContain("tab rejected")
     expect(result.paneId).toBeUndefined()
@@ -267,6 +283,7 @@ describe("herdrClosePaneIfExists", () => {
 
 describe("herdrListWorkspacesByLabelPrefix", () => {
   test("filters by the requested prefix only", async () => {
+    // given
     const { deps } = fakeOps(() => ok(envelope({
       workspaces: [
         { workspace_id: "w1", label: "wb-repricer" },
@@ -275,18 +292,24 @@ describe("herdrListWorkspacesByLabelPrefix", () => {
         { workspace_id: "", label: "omo-agents-broken" },
       ],
     })))
+
+    // when
     const listed = await herdrListWorkspacesByLabelPrefix("omo-agents-", deps)
+
+    // then
     expect(listed).toEqual([{ workspaceId: "w3", label: "omo-agents-111" }])
   })
 })
 
 describe("isHerdrBinaryCallable", () => {
   test("accepts an existing pinned binary and a PATH-resolvable herdr", () => {
-    expect(isHerdrBinaryCallable({ HERDR_BIN_PATH: join(import.meta.dir, "herdr-subagent.test.ts"), PATH: "" })).toBe(true)
-
+    // given
     const dir = mkdtempSync(join(tmpdir(), "omo-herdr-bin-"))
     try {
       writeFileSync(join(dir, "herdr"), "#!/bin/sh\n")
+
+      // when / then
+      expect(isHerdrBinaryCallable({ HERDR_BIN_PATH: join(import.meta.dir, "herdr-subagent.test.ts"), PATH: "" })).toBe(true)
       expect(isHerdrBinaryCallable({ PATH: dir })).toBe(true)
       expect(isHerdrBinaryCallable({ PATH: join(dir, "missing") })).toBe(false)
       expect(isHerdrBinaryCallable({ HERDR_BIN_PATH: "/nonexistent/herdr", PATH: "" })).toBe(false)
@@ -313,13 +336,17 @@ describe("sweepStaleHerdrAgentsWorkspacesWith", () => {
   })
 
   test("closes only workspaces of dead manager pids without live agents", async () => {
+    // given
     const closed: string[] = []
+
+    // when
     const removed = await sweepStaleHerdrAgentsWorkspacesWith(baseDeps({
       closeWorkspace: async (workspaceId) => {
         closed.push(workspaceId)
       },
     }))
 
+    // then
     // w1 (dead pid), w2 (dead pid with manager suffix), w3 (dead pid) close;
     // w4 does not parse (no pid) and is skipped
     expect(removed).toEqual(["omo-agents-111", "omo-agents-222-3", "omo-agents-999"])
@@ -327,28 +354,46 @@ describe("sweepStaleHerdrAgentsWorkspacesWith", () => {
   })
 
   test("keeps the current manager's workspace and workspaces of live managers", async () => {
-    const removed = await sweepStaleHerdrAgentsWorkspacesWith(baseDeps({
+    // given
+    const deps = baseDeps({
       listWorkspaces: async () => [
         { workspaceId: "w1", label: `omo-agents-777` },
         { workspaceId: "w2", label: "omo-agents-888" },
       ],
-    }))
+    })
+
+    // when
+    const removed = await sweepStaleHerdrAgentsWorkspacesWith(deps)
+
+    // then
     expect(removed).toEqual([])
   })
 
   test("keeps a dead manager's workspace while a live agent remains in it", async () => {
-    const removed = await sweepStaleHerdrAgentsWorkspacesWith(baseDeps({
+    // given
+    const deps = baseDeps({
       listAgents: async () => [{ paneId: "w1:p2" }],
-    }))
+    })
+
+    // when
+    const removed = await sweepStaleHerdrAgentsWorkspacesWith(deps)
+
+    // then
     expect(removed).toEqual(["omo-agents-222-3", "omo-agents-999"])
   })
 
   test("survives close failures and keeps sweeping", async () => {
-    const removed = await sweepStaleHerdrAgentsWorkspacesWith(baseDeps({
+    // given
+    const deps = baseDeps({
       closeWorkspace: async (workspaceId) => {
         if (workspaceId === "w1") throw new Error("close refused")
       },
-    }))
+    })
+
+    // when
+    const removed = await sweepStaleHerdrAgentsWorkspacesWith(deps)
+
+    // then
     expect(removed).toEqual(["omo-agents-222-3", "omo-agents-999"])
   })
 })

@@ -37,6 +37,7 @@ const tmuxMgr = { getServerUrl: () => "http://127.0.0.1:1", getCtxServerUrl: () 
 
 describe("createTeamLayout on the herdr backend", () => {
   test("creates one workspace and one tab per member, delivering attach via pane run", async () => {
+    // given
     let tabIndex = 0
     const { ops, calls } = fakeHerdrOps((args) => {
       if (args[0] === "workspace" && args[1] === "create") {
@@ -49,8 +50,10 @@ describe("createTeamLayout on the herdr backend", () => {
       return { success: true, output: "" }
     })
 
+    // when
     const layout = await createTeamLayout("11111111-2222-3333-4444-555555555555", members, tmuxMgr, baseDeps(ops), { multiplexer: "herdr" })
 
+    // then
     expect(layout).not.toBeNull()
     expect(layout?.targetSessionId).toBe("w9")
     expect(layout?.ownedSession).toBe(true)
@@ -74,11 +77,16 @@ describe("createTeamLayout on the herdr backend", () => {
   })
 
   test("never touches tmux and works outside a tmux session", async () => {
+    // given
     const originalTmux = process.env.TMUX
     delete process.env.TMUX
     try {
       const { ops, calls } = fakeHerdrOps(() => ({ success: true, output: "" }))
+
+      // when
       const layout = await createTeamLayout("11111111-2222-3333-4444-555555555555", members.slice(0, 1), tmuxMgr, baseDeps(ops), { multiplexer: "herdr" })
+
+      // then
       // workspace create fails silently in the fake (no workspace_id) -> null,
       // and crucially no tmux command was attempted.
       expect(calls.every((call) => call[0] !== "kill-session")).toBe(true)
@@ -89,6 +97,7 @@ describe("createTeamLayout on the herdr backend", () => {
   })
 
   test("closes the half-built workspace when a member tab fails and no live agent remains", async () => {
+    // given
     let tabIndex = 0
     const { ops, calls } = fakeHerdrOps((args) => {
       if (args[0] === "workspace" && args[1] === "create") {
@@ -105,8 +114,10 @@ describe("createTeamLayout on the herdr backend", () => {
       return { success: true, output: "" }
     })
 
+    // when
     const layout = await createTeamLayout("11111111-2222-3333-4444-555555555555", members, tmuxMgr, baseDeps(ops), { multiplexer: "herdr" })
 
+    // then
     // member 2's tab create fails -> null layout, and the failure rollback
     // checks liveness then closes the workspace it created
     expect(layout).toBeNull()
@@ -116,6 +127,7 @@ describe("createTeamLayout on the herdr backend", () => {
   })
 
   test("keeps the half-built workspace when a live agent remains in it", async () => {
+    // given
     let tabIndex = 0
     const { ops, calls } = fakeHerdrOps((args) => {
       if (args[0] === "workspace" && args[1] === "create") {
@@ -133,13 +145,16 @@ describe("createTeamLayout on the herdr backend", () => {
       return { success: true, output: "" }
     })
 
+    // when
     const layout = await createTeamLayout("11111111-2222-3333-4444-555555555555", members, tmuxMgr, baseDeps(ops), { multiplexer: "herdr" })
 
+    // then
     expect(layout).toBeNull()
     expect(calls).not.toContainEqual(["workspace", "close", "w9"])
   })
 
   test("survives a liveness-probe failure during the failure rollback", async () => {
+    // given
     const { ops, calls } = fakeHerdrOps((args) => {
       if (args[0] === "workspace" && args[1] === "create") {
         return { success: true, output: envelope({ workspace: { workspace_id: "w9" }, root_pane: { pane_id: "w9:p1" } }) }
@@ -150,8 +165,10 @@ describe("createTeamLayout on the herdr backend", () => {
       return { success: false, output: "", error: "tab rejected", code: "spawn_failed" }
     })
 
+    // when
     const layout = await createTeamLayout("11111111-2222-3333-4444-555555555555", members, tmuxMgr, baseDeps(ops), { multiplexer: "herdr" })
 
+    // then
     // rollback is best-effort: probe failure means no close, no throw
     expect(layout).toBeNull()
     expect(calls).not.toContainEqual(["workspace", "close", "w9"])
@@ -160,22 +177,32 @@ describe("createTeamLayout on the herdr backend", () => {
 
 describe("removeTeamLayout on the herdr backend", () => {
   test("closes the workspace when the cleanup target carries herdr panes", async () => {
+    // given
     const { ops, calls } = fakeHerdrOps(() => ({ success: true, output: envelope({ type: "ok" }) }))
+
+    // when
     await removeTeamLayout(
       "11111111-2222-3333-4444-555555555555",
       { ownedSession: true, targetSessionId: "w9", paneIds: ["w9:p2", "w9:p3"] },
       baseDeps(ops),
     )
+
+    // then
     expect(calls).toEqual([["workspace", "close", "w9"]])
   })
 
   test("falls back to per-pane closes without a workspace target", async () => {
+    // given
     const { ops, calls } = fakeHerdrOps(() => ({ success: true, output: envelope({ type: "ok" }) }))
+
+    // when
     await removeTeamLayout(
       "11111111-2222-3333-4444-555555555555",
       { ownedSession: false, targetSessionId: "", paneIds: ["w9:p2"] },
       baseDeps(ops),
     )
+
+    // then
     expect(calls).toEqual([["pane", "close", "w9:p2"]])
   })
 })

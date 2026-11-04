@@ -183,16 +183,19 @@ describe("TmuxSessionManager on the herdr backend", () => {
 	})
 
 	test("#given an existing tracked pane #when a second subagent spawns #then the workspace is reused without a second create", async () => {
+		// given
 		delete process.env.TMUX
 		process.env.HERDR_BIN_PATH = import.meta.path
 
 		const herdr = healthyHerdr()
 		const { ops, calls } = fakeHerdrOps(herdr.script)
 		const manager = buildManager(ops)
-
 		await manager.onSessionCreated(sessionCreatedEvent("sess-1", "first worker"))
+
+		// when
 		await manager.onSessionCreated(sessionCreatedEvent("sess-2", "second worker"))
 
+		// then
 		expect(manager.getTrackedPaneId("sess-1")).toBe("w9:p2")
 		expect(manager.getTrackedPaneId("sess-2")).toBe("w9:p3")
 		// one workspace create for the whole manager lifetime
@@ -205,6 +208,7 @@ describe("TmuxSessionManager on the herdr backend", () => {
 	})
 
 	test("#given tab creation fails #when child session is created #then the session is deferred and later attaches through the herdr path", async () => {
+		// given
 		delete process.env.TMUX
 		process.env.HERDR_BIN_PATH = import.meta.path
 
@@ -217,14 +221,15 @@ describe("TmuxSessionManager on the herdr backend", () => {
 			return herdr.script(args)
 		})
 		const manager = buildManager(ops)
-
 		await manager.onSessionCreated(sessionCreatedEvent())
 		expect(manager.getTrackedPaneId("sess-1")).toBeUndefined()
 
+		// when
 		// the deferred retry loop re-enters the herdr spawn path once herdr recovers
 		failing = false
 		await internalsOf(manager).tryAttachDeferredSession()
 
+		// then
 		expect(manager.getTrackedPaneId("sess-1")).toBe("w9:p2")
 		const paneRunCalls = calls.filter((call) => commandOf(call) === "pane run")
 		expect(paneRunCalls).toHaveLength(1)
@@ -233,6 +238,7 @@ describe("TmuxSessionManager on the herdr backend", () => {
 	})
 
 	test("#given a tracked herdr pane #when the session is deleted #then the pane is closed via pane close and tracking is finalized", async () => {
+		// given
 		delete process.env.TMUX
 		process.env.HERDR_BIN_PATH = import.meta.path
 
@@ -242,8 +248,10 @@ describe("TmuxSessionManager on the herdr backend", () => {
 		await manager.onSessionCreated(sessionCreatedEvent())
 		calls.length = 0
 
+		// when
 		await manager.onSessionDeleted({ sessionID: "sess-1" })
 
+		// then
 		expect(calls).toEqual([["pane", "close", "w9:p2"]])
 		expect(manager.getTrackedPaneId("sess-1")).toBeUndefined()
 
@@ -251,6 +259,7 @@ describe("TmuxSessionManager on the herdr backend", () => {
 	})
 
 	test("#given the pane is already gone #when the session is deleted #then pane_not_found finalizes the close instead of wedging", async () => {
+		// given
 		delete process.env.TMUX
 		process.env.HERDR_BIN_PATH = import.meta.path
 
@@ -264,14 +273,17 @@ describe("TmuxSessionManager on the herdr backend", () => {
 		const manager = buildManager(ops)
 		await manager.onSessionCreated(sessionCreatedEvent())
 
+		// when
 		await manager.onSessionDeleted({ sessionID: "sess-1" })
 
+		// then
 		expect(manager.getTrackedPaneId("sess-1")).toBeUndefined()
 
 		await manager.cleanup()
 	})
 
 	test("#given a real close failure #when the session is deleted #then the session is marked close-pending and stays tracked", async () => {
+		// given
 		delete process.env.TMUX
 		process.env.HERDR_BIN_PATH = import.meta.path
 
@@ -285,8 +297,10 @@ describe("TmuxSessionManager on the herdr backend", () => {
 		const manager = buildManager(ops)
 		await manager.onSessionCreated(sessionCreatedEvent())
 
+		// when
 		await manager.onSessionDeleted({ sessionID: "sess-1" })
 
+		// then
 		expect(manager.getTrackedPaneId("sess-1")).toBe("w9:p2")
 		expect(internalsOf(manager).sessions.get("sess-1")?.closePending).toBe(true)
 
@@ -294,6 +308,7 @@ describe("TmuxSessionManager on the herdr backend", () => {
 	})
 
 	test("#given tracked herdr panes #when cleanup runs #then panes close and the agents workspace is torn down", async () => {
+		// given
 		delete process.env.TMUX
 		process.env.HERDR_BIN_PATH = import.meta.path
 
@@ -304,8 +319,10 @@ describe("TmuxSessionManager on the herdr backend", () => {
 		await manager.onSessionCreated(sessionCreatedEvent("sess-2", "second worker"))
 		calls.length = 0
 
+		// when
 		await manager.cleanup()
 
+		// then
 		const paneCloses = calls.filter((call) => commandOf(call) === "pane close")
 		expect(paneCloses.map((call) => call[2]).sort()).toEqual(["w9:p2", "w9:p3"])
 		const workspaceClose = calls.find((call) => commandOf(call) === "workspace close")
@@ -314,6 +331,7 @@ describe("TmuxSessionManager on the herdr backend", () => {
 	})
 
 	test("#given max close retries with the pane provably gone #when retryPendingCloses runs #then the tracked session finalizes", async () => {
+		// given
 		delete process.env.TMUX
 		process.env.HERDR_BIN_PATH = import.meta.path
 
@@ -333,20 +351,23 @@ describe("TmuxSessionManager on the herdr backend", () => {
 		})
 		const manager = buildManager(ops)
 		await manager.onSessionCreated(sessionCreatedEvent())
-
 		await manager.onSessionDeleted({ sessionID: "sess-1" }) // close fails -> closePending
+
+		// when
 		// retry 1..3 fail; the max-retries handoff verifies liveness via the
 		// agent inventory: the pane is absent, so the close finalizes.
 		await internalsOf(manager).retryPendingCloses()
 		await internalsOf(manager).retryPendingCloses()
 		await internalsOf(manager).retryPendingCloses()
 
+		// then
 		expect(manager.getTrackedPaneId("sess-1")).toBeUndefined()
 
 		await manager.cleanup()
 	})
 
 	test("#given the manager owns a workspace #when a session is created #then the stale sweep lists omo-agents herdr workspaces once", async () => {
+		// given
 		delete process.env.TMUX
 		process.env.HERDR_BIN_PATH = import.meta.path
 
@@ -356,8 +377,10 @@ describe("TmuxSessionManager on the herdr backend", () => {
 		// re-enable the once-per-manager sweep
 		unsafeTestValue<{ staleSweepCompleted: boolean }>(manager).staleSweepCompleted = false
 
+		// when
 		await manager.onSessionCreated(sessionCreatedEvent())
 
+		// then
 		const workspaceLists = calls.filter((call) => commandOf(call) === "workspace list")
 		expect(workspaceLists.length).toBeGreaterThanOrEqual(1)
 
@@ -367,9 +390,11 @@ describe("TmuxSessionManager on the herdr backend", () => {
 
 describe("selectTmuxManagerEnvironmentPredicate on herdr", () => {
 	test("does not require tmux but does require a callable herdr binary", () => {
+		// given
 		delete process.env.TMUX
 		delete process.env.TMUX_PANE
 
+		// when / then
 		process.env.HERDR_BIN_PATH = import.meta.path
 		expect(selectTmuxManagerEnvironmentPredicate("inline", "herdr")()).toBe(true)
 		expect(selectTmuxManagerEnvironmentPredicate("session", "herdr")()).toBe(true)
@@ -379,8 +404,11 @@ describe("selectTmuxManagerEnvironmentPredicate on herdr", () => {
 	})
 
 	test("keeps the tmux gates untouched when multiplexer is tmux or unset", () => {
+		// given
 		delete process.env.TMUX
 		delete process.env.CMUX_SOCKET_PATH
+
+		// when / then
 		expect(selectTmuxManagerEnvironmentPredicate("inline")()).toBe(false)
 		expect(selectTmuxManagerEnvironmentPredicate("window")()).toBe(false)
 		expect(selectTmuxManagerEnvironmentPredicate("inline", "tmux")()).toBe(false)

@@ -75,6 +75,7 @@ describe("parseHerdrEnvelope", () => {
 
 describe("buildHerdrPaneAuthEnv", () => {
   test("returns no auth env when no password is configured", () => {
+    // given
     const saved = {
       password: process.env["OPENCODE_SERVER_PASSWORD"],
       file: process.env["OPENCODE_SERVER_PASSWORD_FILE"],
@@ -84,7 +85,11 @@ describe("buildHerdrPaneAuthEnv", () => {
     delete process.env["OPENCODE_SERVER_PASSWORD_FILE"]
     delete process.env["OPENCODE_SERVER_USERNAME"]
     try {
-      expect(buildHerdrPaneAuthEnv()).toEqual({})
+      // when
+      const env = buildHerdrPaneAuthEnv()
+
+      // then
+      expect(env).toEqual({})
     } finally {
       for (const [key, value] of Object.entries(saved)) {
         if (value === undefined) delete process.env[key]
@@ -94,6 +99,7 @@ describe("buildHerdrPaneAuthEnv", () => {
   })
 
   test("hands off through a single-use 0600 file plus username, never the password", () => {
+    // given
     // Non-secret test fixture, assembled at runtime so secret scanners do not
     // see a literal password-value assignment next to a username assignment.
     const fixturePassword = ["sek", "ret"].join("")
@@ -108,7 +114,10 @@ describe("buildHerdrPaneAuthEnv", () => {
     const cleanupAuthDirectory = createPaneAuthDirectory()
     let passwordFile: string | undefined
     try {
+      // when
       const env = buildHerdrPaneAuthEnv()
+
+      // then
       expect(Object.keys(env).sort()).toEqual(["OPENCODE_SERVER_PASSWORD_FILE", "OPENCODE_SERVER_USERNAME"])
       expect(env["OPENCODE_SERVER_USERNAME"]).toBe("omo-user")
       passwordFile = env["OPENCODE_SERVER_PASSWORD_FILE"]
@@ -131,6 +140,7 @@ describe("buildHerdrPaneAuthEnv", () => {
 
 describe.skipIf(process.platform === "win32")("runHerdrCommandDefault", () => {
   test("resolves herdr through PATH and settles without waiting out the timeout window", async () => {
+    // given
     const dir = mkdtempSync(join(tmpdir(), "omo-herdr-exec-"))
     try {
       // absolute binaries only: the child PATH is the temp dir alone, so a
@@ -138,7 +148,11 @@ describe.skipIf(process.platform === "win32")("runHerdrCommandDefault", () => {
       // (bash does, dash does not) and make the test platform-dependent
       writeFileSync(join(dir, "herdr"), "#!/bin/sh\nexec /bin/echo hi\n", { mode: 0o755 })
       const startedAt = Date.now()
+
+      // when
       const result = await runHerdrCommandDefault(["workspace", "list"], { env: { PATH: dir }, timeoutMs: 20_000 })
+
+      // then
       // a fast exit wins the race and its timer is cleared: the call returns
       // immediately instead of holding the loop for the full window
       expect(result).toEqual({ success: true, output: "hi\n" })
@@ -149,13 +163,18 @@ describe.skipIf(process.platform === "win32")("runHerdrCommandDefault", () => {
   })
 
   test("reports a typed timeout when the command exceeds the deadline", async () => {
+    // given
     const dir = mkdtempSync(join(tmpdir(), "omo-herdr-exec-"))
     try {
       // exec /bin/sleep keeps the child alive past the deadline regardless of
       // PATH (a bare `sleep` would exit 127 under dash and never time out)
       writeFileSync(join(dir, "herdr"), "#!/bin/sh\nexec /bin/sleep 5\n", { mode: 0o755 })
       const startedAt = Date.now()
+
+      // when
       const result = await runHerdrCommandDefault(["agent", "list"], { env: { PATH: dir }, timeoutMs: 100 })
+
+      // then
       expect(result.success).toBe(false)
       expect(result.code).toBe("timeout")
       expect(result.error).toContain("timed out after 100ms")
@@ -169,6 +188,7 @@ describe.skipIf(process.platform === "win32")("runHerdrCommandDefault", () => {
   })
 
   test("clears the watchdog timer once settled: a fast exec does not hold the process for the window", async () => {
+    // given
     const dir = mkdtempSync(join(tmpdir(), "omo-herdr-timer-"))
     try {
       writeFileSync(join(dir, "herdr"), "#!/bin/sh\nexec /bin/echo hi\n", { mode: 0o755 })
@@ -186,9 +206,13 @@ describe.skipIf(process.platform === "win32")("runHerdrCommandDefault", () => {
         `console.log("settled")`,
       ].join("\n"))
       const startedAt = Date.now()
+
+      // when
       const child = Bun.spawn([process.execPath, probe], { stdout: "pipe", stderr: "pipe" })
       const exitCode = await child.exited
       const elapsed = Date.now() - startedAt
+
+      // then
       expect(exitCode).toBe(0)
       expect(await new Response(child.stdout).text()).toBe("settled\n")
       expect(elapsed).toBeLessThan(8_000)
@@ -200,16 +224,26 @@ describe.skipIf(process.platform === "win32")("runHerdrCommandDefault", () => {
 
 describe("herdr ops", () => {
   test("workspace create pins cwd, label, and focus", async () => {
+    // given
     const { deps, calls } = fakeOps(() => ok(envelope({ workspace: { workspace_id: "w9" }, root_pane: { pane_id: "w9:p1" } })))
+
+    // when
     const created = await herdrCreateWorkspace("/repo", "omo-team-x", deps)
+
+    // then
     expect(created.workspaceId).toBe("w9")
     expect(created.rootPaneId).toBe("w9:p1")
     expect(calls[0]).toEqual(["workspace", "create", "--cwd", "/repo", "--label", "omo-team-x", "--no-focus"])
   })
 
   test("tab create always pins the workspace and forwards env", async () => {
+    // given
     const { deps, calls } = fakeOps(() => ok(envelope({ tab: { tab_id: "w9:t2" }, root_pane: { pane_id: "w9:p2" } })))
+
+    // when
     const tab = await herdrCreateTab("w9", "/repo", "worker-1", { OPENCODE_SERVER_PASSWORD_FILE: "/tmp/p" }, deps)
+
+    // then
     expect(tab).toEqual({ paneId: "w9:p2", tabId: "w9:t2" })
     expect(calls[0]).toContain("--workspace")
     expect(calls[0]).toContain("OPENCODE_SERVER_PASSWORD_FILE=/tmp/p")
@@ -217,43 +251,63 @@ describe("herdr ops", () => {
   })
 
   test("pane run and pane read are text-surface commands", async () => {
+    // given
     const { deps, calls } = fakeOps(() => ok(""))
-    await herdrRunPaneCommand("w9:p2", "opencode attach http://x --session s", deps)
-    expect(calls[0]).toEqual(["pane", "run", "w9:p2", "opencode attach http://x --session s"])
-
     const read = fakeOps(() => ok("line1\nline2"))
+
+    // when
+    await herdrRunPaneCommand("w9:p2", "opencode attach http://x --session s", deps)
     const text = await herdrReadPane("w9:p2", 80, read.deps)
+
+    // then
+    expect(calls[0]).toEqual(["pane", "run", "w9:p2", "opencode attach http://x --session s"])
     expect(text).toBe("line1\nline2")
     expect(read.calls[0]).toEqual(["pane", "read", "w9:p2", "--source", "recent-unwrapped", "--lines", "80"])
   })
 
   test("agent list maps the live-agent inventory", async () => {
+    // given
     const { deps } = fakeOps(() => ok(envelope({ agents: [{ pane_id: "w9:p2", name: "a", agent_status: "idle" }] })))
+
+    // when
     const agents = await herdrListAgents(deps)
+
+    // then
     expect(agents).toEqual([{ paneId: "w9:p2", name: "a", status: "idle" }])
   })
 
   test("team workspace listing filters by label prefix", async () => {
+    // given
     const { deps } = fakeOps(() => ok(envelope({
       workspaces: [
         { workspace_id: "w1", label: "user-own" },
         { workspace_id: "w2", label: `${HERDR_TEAM_WORKSPACE_LABEL_PREFIX}abc` },
       ],
     })))
+
+    // when
     const teams = await herdrListTeamWorkspaces(deps)
+
+    // then
     expect(teams).toEqual([{ workspaceId: "w2", label: "omo-team-abc" }])
   })
 
   test("workspace close surfaces typed failures", async () => {
+    // given
     const { deps } = fakeOps(() => ({ success: false, output: "", error: "nope", code: "error" }))
-    expect(herdrCloseWorkspace("w2", deps)).rejects.toThrow("nope")
+
+    // then
+    await expect(herdrCloseWorkspace("w2", deps)).rejects.toThrow("nope")
   })
 })
 
 describe("ensureHerdrServer", () => {
   test("starts the headless server on server_not_running and polls until ready", async () => {
+    // given
     let probes = 0
     const spawnedBox: { argv?: string[] } = {}
+
+    // when
     const state = await ensureHerdrServer({
       runHerdrCommand: async () => {
         probes += 1
@@ -267,6 +321,8 @@ describe("ensureHerdrServer", () => {
       },
       sleep: async () => {},
     })
+
+    // then
     expect(state).toBe("started")
     expect(spawnedBox.argv).toEqual(["herdr", "server"])
     expect(probes).toBeGreaterThanOrEqual(2)
