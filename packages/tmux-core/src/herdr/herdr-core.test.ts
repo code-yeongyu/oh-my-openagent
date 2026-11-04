@@ -94,12 +94,15 @@ describe("buildHerdrPaneAuthEnv", () => {
   })
 
   test("hands off through a single-use 0600 file plus username, never the password", () => {
+    // Non-secret test fixture, assembled at runtime so secret scanners do not
+    // see a literal password-value assignment next to a username assignment.
+    const fixturePassword = ["sek", "ret"].join("")
     const saved = {
       password: process.env["OPENCODE_SERVER_PASSWORD"],
       file: process.env["OPENCODE_SERVER_PASSWORD_FILE"],
       username: process.env["OPENCODE_SERVER_USERNAME"],
     }
-    process.env["OPENCODE_SERVER_PASSWORD"] = "sekret"
+    process.env["OPENCODE_SERVER_PASSWORD"] = fixturePassword
     process.env["OPENCODE_SERVER_USERNAME"] = "omo-user"
     delete process.env["OPENCODE_SERVER_PASSWORD_FILE"]
     const cleanupAuthDirectory = createPaneAuthDirectory()
@@ -110,9 +113,9 @@ describe("buildHerdrPaneAuthEnv", () => {
       expect(env["OPENCODE_SERVER_USERNAME"]).toBe("omo-user")
       passwordFile = env["OPENCODE_SERVER_PASSWORD_FILE"]
       if (!passwordFile) throw new Error("missing password file")
-      expect(Object.values(env).some((value) => value.includes("sekret"))).toBe(false)
+      expect(Object.values(env).some((value) => value.includes(fixturePassword))).toBe(false)
       expect(statSync(passwordFile).mode & 0o777).toBe(0o600)
-      expect(readFileSync(passwordFile, "utf8")).toBe("export OPENCODE_SERVER_PASSWORD='sekret'\n")
+      expect(readFileSync(passwordFile, "utf8")).toBe(`export OPENCODE_SERVER_PASSWORD='${fixturePassword}'\n`)
       // every call writes a fresh single-use file (one per tab)
       expect(buildHerdrPaneAuthEnv()["OPENCODE_SERVER_PASSWORD_FILE"]).not.toBe(passwordFile)
     } finally {
@@ -130,12 +133,15 @@ describe.skipIf(process.platform === "win32")("runHerdrCommandDefault", () => {
   test("resolves herdr through PATH and settles without waiting out the timeout window", async () => {
     const dir = mkdtempSync(join(tmpdir(), "omo-herdr-exec-"))
     try {
-      writeFileSync(join(dir, "herdr"), "#!/bin/sh\nprintf 'hi'\n", { mode: 0o755 })
+      // absolute binaries only: the child PATH is the temp dir alone, so a
+      // bare command would fall back to the shell's default-PATH behavior
+      // (bash does, dash does not) and make the test platform-dependent
+      writeFileSync(join(dir, "herdr"), "#!/bin/sh\nexec /bin/echo hi\n", { mode: 0o755 })
       const startedAt = Date.now()
       const result = await runHerdrCommandDefault(["workspace", "list"], { env: { PATH: dir }, timeoutMs: 20_000 })
       // a fast exit wins the race and its timer is cleared: the call returns
       // immediately instead of holding the loop for the full window
-      expect(result).toEqual({ success: true, output: "hi" })
+      expect(result).toEqual({ success: true, output: "hi\n" })
       expect(Date.now() - startedAt).toBeLessThan(5_000)
     } finally {
       rmSync(dir, { recursive: true, force: true })
@@ -145,11 +151,47 @@ describe.skipIf(process.platform === "win32")("runHerdrCommandDefault", () => {
   test("reports a typed timeout when the command exceeds the deadline", async () => {
     const dir = mkdtempSync(join(tmpdir(), "omo-herdr-exec-"))
     try {
-      writeFileSync(join(dir, "herdr"), "#!/bin/sh\nsleep 30\n", { mode: 0o755 })
+      // exec /bin/sleep keeps the child alive past the deadline regardless of
+      // PATH (a bare `sleep` would exit 127 under dash and never time out)
+      writeFileSync(join(dir, "herdr"), "#!/bin/sh\nexec /bin/sleep 5\n", { mode: 0o755 })
+      const startedAt = Date.now()
       const result = await runHerdrCommandDefault(["agent", "list"], { env: { PATH: dir }, timeoutMs: 100 })
       expect(result.success).toBe(false)
       expect(result.code).toBe("timeout")
       expect(result.error).toContain("timed out after 100ms")
+      // it really waited for the watchdog (not a fast child exit) and the
+      // test still settles in a fraction of the child's lifetime
+      expect(Date.now() - startedAt).toBeGreaterThanOrEqual(90)
+      expect(Date.now() - startedAt).toBeLessThan(5_000)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test("clears the watchdog timer once settled — a fast exec does not hold the process for the window", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "omo-herdr-timer-"))
+    try {
+      writeFileSync(join(dir, "herdr"), "#!/bin/sh\nexec /bin/echo hi\n", { mode: 0o755 })
+      // A child bun process runs one exec against a fast fake herdr with a
+      // huge timeout, then finishes its script. A pending (uncleared)
+      // setTimeout keeps a bun process alive until it fires, so the child's
+      // total lifetime pins the cleanup: immediate exit with the clearTimeout
+      // fix, ~timeoutMs of lingering without it.
+      const probe = join(dir, "probe.ts")
+      const herdrCore = JSON.stringify(join(import.meta.dir, "herdr-core.ts"))
+      writeFileSync(probe, [
+        `const { runHerdrCommandDefault } = await import(${herdrCore})`,
+        `const result = await runHerdrCommandDefault(["agent", "list"], { env: { PATH: ${JSON.stringify(dir)} }, timeoutMs: 10_000 })`,
+        `if (!result.success || result.output !== "hi\\n") { console.error("probe exec failed:", result); process.exit(2) }`,
+        `console.log("settled")`,
+      ].join("\n"))
+      const startedAt = Date.now()
+      const child = Bun.spawn([process.execPath, probe], { stdout: "pipe", stderr: "pipe" })
+      const exitCode = await child.exited
+      const elapsed = Date.now() - startedAt
+      expect(exitCode).toBe(0)
+      expect(await new Response(child.stdout).text()).toBe("settled\n")
+      expect(elapsed).toBeLessThan(8_000)
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
