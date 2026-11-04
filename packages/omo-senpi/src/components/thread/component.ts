@@ -46,8 +46,12 @@ export type ThreadComponentOptions = Partial<Omit<ThreadToolSurfaceOptions, "cal
 }
 
 /**
- * `cause`: the newest delivery whose message the model has taken into its context (a send from this
- * run continues its causal root). A delivery admitted but still waiting in a queue is not a cause yet.
+ * `cause`: the newest gateway delivery whose message the model has taken into its context (a send from
+ * this run continues its causal root). A delivery admitted but still waiting in a queue is not a cause yet.
+ * Only a delivery this session's gateway drain admitted is a gateway delivery (`GatewayAdmissions`):
+ * senpi admits RPC `prompt`/`steer`/`follow_up` input as the same `session_control_delivery` message,
+ * under a client-chosen id with no gateway row, and that input counts as typed input (`local`), so a send
+ * from its run starts a new causal root and never claims a chain this session did not receive (#12317).
  * `consumed`: the deliveries the model has taken into its context since its last final answer (an
  * assistant message without a tool call), read from the engine's own `message_start` of each
  * delivery's custom message. senpi drains a queued follow-up after that answer and before
@@ -85,7 +89,29 @@ function callsTools(message: EngineMessage): boolean {
   return Array.isArray(message.content) && message.content.some((part) => (part as { readonly type?: unknown } | null)?.type === "toolCall")
 }
 
-function noteInput(run: RunContext, message: EngineMessage): void {
+/** Gateway admissions not yet taken into a run, kept by each session's component; bounded against admissions whose message never starts (a refused or dropped turn). */
+const GATEWAY_ADMISSIONS_KEPT = 256
+
+/**
+ * The delivery ids this session's gateway drain handed to the runtime and whose message has not entered a
+ * run yet. Marked by the registrant right before the runtime call (`onGatewayAdmission`), so before the
+ * message can start; taken (and forgotten) when the message starts. An id never marked here is not a
+ * gateway delivery to this session, whatever it names.
+ */
+type GatewayAdmissions = { readonly mark: (deliveryId: string) => void; readonly take: (deliveryId: string) => boolean }
+
+function createGatewayAdmissions(): GatewayAdmissions {
+  const marked = new Set<string>()
+  return {
+    mark: (deliveryId) => {
+      marked.add(deliveryId)
+      if (marked.size > GATEWAY_ADMISSIONS_KEPT) marked.delete(marked.values().next().value as string)
+    },
+    take: (deliveryId) => marked.delete(deliveryId),
+  }
+}
+
+function noteInput(run: RunContext, admissions: GatewayAdmissions, message: EngineMessage): void {
   if (message.role !== "user" && message.role !== "custom") return
   if (run.answered) {
     run.consumed = []
@@ -95,6 +121,10 @@ function noteInput(run: RunContext, message: EngineMessage): void {
   if (message.role === "user") run.local = true
   const deliveryId = deliveryIdOf(message)
   if (deliveryId === undefined) return
+  if (!admissions.take(deliveryId)) {
+    run.local = true
+    return
+  }
   run.cause = deliveryId
   if (!run.consumed.includes(deliveryId)) run.consumed.push(deliveryId)
 }
@@ -138,12 +168,13 @@ function durableIdOf(eventCtx: unknown): string | undefined {
 /**
  * Registers the session's control endpoint so other sessions can reach it through the gateway: the
  * registration is what creates the terminal's `tui` endpoint (or wires the drain on a host session),
- * and the drain is the only path a delivery takes into this session. On an engine without
+ * and the drain is the only path a gateway delivery takes into this session; it announces each one to
+ * `onGatewayAdmission` before the runtime sees it. On an engine without
  * `pi.session` nothing is registered and nothing else changes. Registration runs off the
  * `session_start` path (the inbox watch arms asynchronously); shutdown waits for it and disposes
  * the endpoint before the store, because senpi's clean exit asks `isSessionReferenced` then.
  */
-function registerControlEndpoint(pi: SenpiExtensionAPI, ctx: ComponentContext, options: ThreadComponentOptions, store: GatewayStore, agentDir: () => string, onCommandWake: (durableId: string) => Promise<void>) {
+function registerControlEndpoint(pi: SenpiExtensionAPI, ctx: ComponentContext, options: ThreadComponentOptions, store: GatewayStore, agentDir: () => string, onCommandWake: (durableId: string) => Promise<void>, onGatewayAdmission: (deliveryId: string) => void) {
   const control = options.sessionControl === undefined ? sessionControlOf(pi) : (options.sessionControl ?? undefined)
   if (control === undefined) return undefined
   const runtimeInstance = hostInstanceOf(pi)
@@ -152,6 +183,7 @@ function registerControlEndpoint(pi: SenpiExtensionAPI, ctx: ComponentContext, o
     agentDir,
     store,
     onCommandWake,
+    onGatewayAdmission,
     ...(runtimeInstance === undefined ? {} : { runtimeInstance }),
     log: (line) => ctx.logger.warn(line),
     ...(options.controlEndpointTest === undefined ? {} : { _test: options.controlEndpointTest }),
@@ -210,6 +242,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         if (event.kind === "legacy_mailbox_skipped") ctx.logger.warn(`thread gateway: ${event.items.length} legacy thread mailbox item(s) in ${event.directory} name no session id and were not imported: ${event.items.map((item) => `#${item.message_seq} -> ${JSON.stringify(item.target)}`).join(", ")}`)
       })
       const run: RunContext = { turn: 0, cause: undefined, consumed: [], local: false, answered: true }
+      const admissions = createGatewayAdmissions()
       const completions = createCompletionTracker((durableId, outcome, throughArmSeq) => store.emitCompletions({ now: store.now(), session_durable_id: durableId, outcome, through_arm_seq: throughArmSeq }), {
         retryAfterMs: () => store.busyTimeoutMs,
         onWriteFailed: (error, retrying) =>
@@ -249,7 +282,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
           ctx.logger.warn(`thread gateway: pending completion arms were not read: ${error instanceof Error ? error.message : String(error)}`)
         }
       }
-      const registrant = registerControlEndpoint(pi, ctx, options, store, agentDir, pickUpArms)
+      const registrant = registerControlEndpoint(pi, ctx, options, store, agentDir, pickUpArms, admissions.mark)
       // A question this session relayed to a chat thread and then closed itself (answered here, timed out,
       // cancelled) is closed in the store too, so the connector stops holding that thread's later rows behind
       // it. Only a session that relayed a question touches the store for it; an answer that came through
@@ -320,7 +353,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
       })
       pi.on("message_start", (event) => {
         const message = messageOf(event)
-        if (message !== undefined) noteInput(run, message)
+        if (message !== undefined) noteInput(run, admissions, message)
       })
       pi.on("message_end", (event) => {
         const message = messageOf(event)

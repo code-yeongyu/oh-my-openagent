@@ -178,8 +178,8 @@ async function setup(options: { readonly followUpMode?: "one-at-a-time" | "all";
     await message(toolResultMessage(id))
     return details.result
   }
-  /** The run calls thread_send to the peer session; resolves the causal root the gateway placed that send under. */
-  const sendFromRun = async (text: string): Promise<string | undefined> => {
+  /** The run calls thread_send to the peer session; resolves the delivery it wrote and the causal root the gateway placed it under. */
+  const sendToPeer = async (text: string): Promise<{ readonly delivery_id: string; readonly root: string | undefined }> => {
     const id = `call-${++engine.calls}`
     await message(toolCallMessage(id))
     const tool = tools.find((entry) => entry.name === "thread_send")
@@ -187,7 +187,22 @@ async function setup(options: { readonly followUpMode?: "one-at-a-time" | "all";
     const result = ((await tool.execute(id, { thread: "dur-2", message: text, delivery: "follow_up" }, undefined, undefined, ctx)).details as { readonly result: { readonly kind: string; readonly delivery_id?: string } }).result
     await message(toolResultMessage(id))
     if (result.kind !== "ok" || result.delivery_id === undefined) throw new Error(`thread_send failed: ${JSON.stringify(result)}`)
-    return await rootOf(result.delivery_id)
+    return { delivery_id: result.delivery_id, root: await rootOf(result.delivery_id) }
+  }
+  const sendFromRun = async (text: string): Promise<string | undefined> => (await sendToPeer(text)).root
+  let rpcInputs = 0
+  /**
+   * senpi `session-control-rpc-commands.ts` `admitInput`: a `prompt`, `steer` or `follow_up` sent over the
+   * session's RPC socket is admitted straight into the runtime, past the gateway drain, under the client's
+   * `clientMessageId` (else `tui-rpc-<uuid>`), so the gateway has no `deliveries` row for it.
+   */
+  const rpcInput = (deliverAs: "steer" | "followUp", clientMessageId?: string) =>
+    session.admitExternalMessage({ delivery_id: clientMessageId ?? `tui-rpc-${++rpcInputs}`, text: "from the dashboard", sender: { kind: "external", platform: "rpc" }, deliverAs } as AdmitExternalMessageInput)
+  /** senpi `_queueSteer`: an input admitted as a steer while the run streams enters it at the next tool boundary. */
+  const enterSteer = async () => {
+    const entry = engine.followUps.pop()
+    if (entry === undefined) throw new Error("no steer is waiting")
+    await message(entry)
   }
   const rootOf = async (deliveryId: string): Promise<string | undefined> => (await connectorStore.deliveryView(deliveryId))?.row.root_id
   /** senpi `_promptAgent`: the delivery admitted as `started` begins the run and is its first message. */
@@ -242,7 +257,7 @@ async function setup(options: { readonly followUpMode?: "one-at-a-time" | "all";
     const page = await connectorStore.readOutbox({ now: Date.now(), binding_id: bindingId })
     return page.kind === "ok" ? page.rows.map((row) => `${row.event}:${row.text}`) : []
   }
-  return { bindThread, send, sendFromRun, rootOf, callReport, runStartedDelivery, steerLocal, steerAskUserAnswer, runLocalPrompt, answerAndContinue, answerAndSettle, texts, written: () => completionsWritten(runtimeStore) }
+  return { bindThread, send, sendFromRun, sendToPeer, rpcInput, enterSteer, rootOf, callReport, runStartedDelivery, steerLocal, steerAskUserAnswer, runLocalPrompt, answerAndContinue, answerAndSettle, texts, written: () => completionsWritten(runtimeStore) }
 }
 
 describe("a send from a run continues the causal chain of the message that run consumed", () => {
@@ -272,6 +287,63 @@ describe("a send from a run continues the causal chain of the message that run c
     await s.runStartedDelivery()
 
     expect(await s.sendFromRun("asking the peer")).toBe(await s.rootOf(fromA.delivery_id))
+  })
+})
+
+describe("input sent over the session's RPC socket (#12317)", () => {
+  test("#given a run started by an RPC prompt #when it sends to a peer #then the send is delivered under a new causal root", async () => {
+    const s = await setup()
+    expect(s.rpcInput("followUp")).toMatchObject({ kind: "started" })
+    await s.runStartedDelivery()
+
+    expect(await s.sendFromRun("hi from an RPC-started run")).toMatch(/^root-/)
+  })
+
+  test("#given a terminal run with an RPC follow_up queued behind it #when the engine drains the follow-up and the run sends to a peer #then the send is delivered", async () => {
+    const s = await setup()
+    await s.runLocalPrompt("look at the logs")
+    expect(s.rpcInput("followUp")).toMatchObject({ kind: "queued" })
+    await s.answerAndContinue()
+
+    expect(await s.sendFromRun("hi from the follow-up")).toMatch(/^root-/)
+  })
+
+  test("#given a terminal run #when an RPC steer enters it and the run sends to a peer #then the send is delivered", async () => {
+    const s = await setup()
+    await s.runLocalPrompt("look at the logs")
+    s.rpcInput("steer")
+    await s.enterSteer()
+
+    expect(await s.sendFromRun("hi after the steer")).toMatch(/^root-/)
+  })
+
+  test("#given a run the gateway drain started from thread A #when an RPC steer enters it #then a send still continues A's chain, and the steer counts as local input for an implicit report", async () => {
+    const s = await setup()
+    const a = await s.bindThread("chat-a")
+    const b = await s.bindThread("chat-b")
+    const fromA = await s.send(a, "please do the job")
+    if (fromA.kind !== "ok") throw new Error(`the bound message was not delivered: ${JSON.stringify(fromA)}`)
+    await s.runStartedDelivery()
+    s.rpcInput("steer")
+    await s.enterSteer()
+
+    expect(await s.sendFromRun("asking the peer for A")).toBe(await s.rootOf(fromA.delivery_id))
+    const refused = await s.callReport("report", "whose step?")
+    expect(refused).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+    expect([...(refused.error?.details?.binding_ids ?? [])].sort()).toEqual([a, b].sort())
+  })
+
+  test("#given a real delivery id this session's drain never admitted #when an RPC prompt reuses it as its clientMessageId #then the run's send starts a new root instead of joining that delivery's chain", async () => {
+    const s = await setup()
+    await s.runLocalPrompt("start a chain")
+    const foreign = await s.sendToPeer("a delivery addressed to the peer")
+    await s.answerAndSettle()
+    expect(s.rpcInput("followUp", foreign.delivery_id)).toMatchObject({ kind: "started" })
+    await s.runStartedDelivery()
+
+    const sent = await s.sendToPeer("hi from the forged run")
+    expect(sent.root).toMatch(/^root-/)
+    expect(sent.root).not.toBe(foreign.root)
   })
 })
 

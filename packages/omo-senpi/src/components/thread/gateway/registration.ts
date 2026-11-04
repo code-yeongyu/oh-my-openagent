@@ -109,6 +109,13 @@ export type ControlEndpointRegistrantOptions = {
    * Ordinary edges (idle, submission, the inbox watcher) never call it.
    */
   readonly onCommandWake?: (durableId: string) => Promise<void>
+  /**
+   * Called with a gateway row's delivery id right before the drain hands it to the runtime, so before
+   * its message can start: the only proof this process has that a `session_control_delivery` it sees
+   * came from the gateway. senpi admits RPC `prompt`/`steer`/`follow_up` input the same way, past the
+   * drain, under an id the client picks; those are never announced here.
+   */
+  readonly onGatewayAdmission?: (deliveryId: string) => void
   readonly log?: (line: string) => void
   /** Test seams: the store to use, and drain options (clock, crash hooks, a foreign identity). */
   readonly _test?: {
@@ -194,7 +201,10 @@ export function createControlEndpointRegistrant(options: ControlEndpointRegistra
     const runtime: SessionRuntimePort = {
       phase: (): RuntimePhase => (compacting ? "compacting" : session.isIdle() ? "idle" : openQuestions.size > 0 ? "waiting_question" : "mid_turn"),
       admissionGate: () => control.admissionGate(),
-      admitExternalMessage: (input) => control.admitExternalMessage(input),
+      admitExternalMessage: (input) => {
+        options.onGatewayAdmission?.(input.delivery_id)
+        return control.admitExternalMessage(input)
+      },
       listAdmittedDeliveries: () => control.listAdmittedDeliveries(),
     }
     const drain = createInboxDrain({
