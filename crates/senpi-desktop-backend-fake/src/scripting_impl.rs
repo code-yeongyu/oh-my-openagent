@@ -109,6 +109,7 @@ impl FakeBackend {
     /// out, the focused window answers both reads.
     pub fn read_focus(&mut self, window: &str) -> CoreResult<FakeFocusRead> {
         self.begin(FakeMethod::FocusRead)?;
+        self.window(window)?;
         let read = match self.scripted.focus_reads.iter().position(|read| read.window == window) {
             Some(index) => self.scripted.focus_reads.remove(index),
             None => {
@@ -163,10 +164,12 @@ impl FakeBackend {
     /// The frontmost app's pid: scripted, else the focused window's.
     pub fn frontmost_pid(&mut self) -> CoreResult<Option<u32>> {
         self.begin(FakeMethod::FrontmostPid)?;
-        Ok(self
+        let pid = self
             .scripted
             .frontmost_pid
-            .or_else(|| self.windows.iter().find(|window| window.focused).and_then(|window| window.pid)))
+            .or_else(|| self.windows.iter().find(|window| window.focused).and_then(|window| window.pid));
+        self.record(SinkOp::FrontmostRead { pid });
+        Ok(pid)
     }
 
     /// Moves the coordinate epoch, as a host event would.

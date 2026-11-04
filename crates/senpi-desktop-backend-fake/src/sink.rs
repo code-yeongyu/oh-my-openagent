@@ -162,6 +162,9 @@ pub enum SinkOp {
         at: DesktopPoint,
         hit: Option<FakeHit>,
     },
+    FrontmostRead {
+        pid: Option<u32>,
+    },
     EpochBumped {
         epoch: u64,
         reason: EpochReason,

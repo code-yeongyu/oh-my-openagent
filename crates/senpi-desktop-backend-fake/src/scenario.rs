@@ -18,6 +18,9 @@ use crate::scripting::{
 
 const DEFAULT_CAPTURE_COLOR: [u8; 4] = [32, 96, 160, 255];
 
+/// The farthest a `user_input_timeline` press may sit from backend creation.
+pub const MAX_TIMELINE_MS: u64 = 3_600_000;
+
 /// A parsed scenario. Loaded from JSON, whose top-level keys are snake_case
 /// while embedded core types (`displays`, `windows`, `capabilities`) keep their
 /// camelCase wire form. `capabilities` in JSON is a partial overlay on
@@ -206,6 +209,10 @@ pub enum ScenarioError {
     UnknownWindow(String),
     #[error("ax_node_count names window '{0}', which has no scripted accessibility tree")]
     UnknownAxTree(String),
+    #[error("{0}: nth counts calls from 1, so nth 0 would never fire")]
+    ZeroNth(&'static str),
+    #[error("user_input_timeline t_ms {0} is outside +/-{MAX_TIMELINE_MS} ms")]
+    TimelineOutOfRange(i64),
 }
 
 #[derive(Deserialize)]
@@ -287,6 +294,19 @@ impl TryFrom<RawScenario> for FakeScenario {
         }
         if let Some(unscripted) = raw.ax_node_count.keys().find(|id| !raw.ax.contains_key(*id)) {
             return Err(ScenarioError::UnknownAxTree(unscripted.clone()));
+        }
+        let zero_nth = raw
+            .identity_changes
+            .iter()
+            .map(|change| ("identity_changes", change.nth))
+            .chain(raw.epoch_events.iter().map(|event| ("epoch_events", event.nth)))
+            .chain(raw.displays_change.iter().map(|change| ("displays_change", change.nth)))
+            .find(|(_, nth)| *nth == 0);
+        if let Some((field, _)) = zero_nth {
+            return Err(ScenarioError::ZeroNth(field));
+        }
+        if let Some(press) = raw.user_input_timeline.iter().find(|press| press.t_ms.unsigned_abs() > MAX_TIMELINE_MS) {
+            return Err(ScenarioError::TimelineOutOfRange(press.t_ms));
         }
         let display_count = u32::try_from(raw.displays.len()).unwrap_or(u32::MAX);
         let capabilities = overlay_capabilities(fake_capabilities(display_count), raw.capabilities)?;

@@ -79,11 +79,10 @@ impl FakeUserInput {
             .iter()
             .map(|press| {
                 let offset = std::time::Duration::from_millis(press.t_ms.unsigned_abs());
-                let at = if press.t_ms < 0 {
-                    now.checked_sub(offset).unwrap_or(now)
-                } else {
-                    now + offset
-                };
+                let at = if press.t_ms < 0 { now.checked_sub(offset) } else { now.checked_add(offset) };
+                let at = at.unwrap_or_else(|| {
+                    panic!("user_input_timeline t_ms {} is not representable on this host's monotonic clock", press.t_ms)
+                });
                 UserPress { pid: press.pid, kind: press_kind(press.kind), at }
             })
             .collect();

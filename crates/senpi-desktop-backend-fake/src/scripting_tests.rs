@@ -249,6 +249,38 @@ fn user_input_timeline_lands_past_presses_and_holds_future_ones() {
     assert!(presses.presses[0].at.elapsed() >= std::time::Duration::from_millis(500));
     assert!(fake.user_input().take().presses.is_empty());
     assert_eq!(fake.frontmost_pid().expect("frontmost"), Some(77));
+    assert_eq!(fake.sink().ops(), vec![SinkOp::FrontmostRead { pid: Some(77) }]);
+}
+
+#[test]
+fn user_input_timeline_beyond_an_hour_is_rejected() {
+    for t_ms in [3_600_001_i64, -3_600_001, i64::MIN] {
+        let err = FakeScenario::from_json(&format!(r#"{{"user_input_timeline":[{{"t_ms":{t_ms},"pid":1}}]}}"#))
+            .expect_err("out of range");
+        assert!(err.to_string().contains(&format!("t_ms {t_ms} is outside")), "{err}");
+    }
+    assert!(FakeScenario::from_json(r#"{"user_input_timeline":[{"t_ms":3600000,"pid":1}]}"#).is_ok());
+}
+
+#[test]
+fn nth_zero_is_rejected_for_every_timeline_field() {
+    for (field, json) in [
+        ("identity_changes", r#"{"identity_changes":[{"after_call":"capture","nth":0,"window":"101","new_pid":1,"new_processStart":2}]}"#),
+        ("epoch_events", r#"{"epoch_events":[{"after_call":"capture","nth":0,"reason":"lock"}]}"#),
+        ("displays_change", r#"{"displays_change":{"after_call":"capture","nth":0,"displays":[]}}"#),
+    ] {
+        let json = json.replacen('{', &format!("{{{TWO_WINDOWS},"), 1);
+        let err = FakeScenario::from_json(&json).expect_err(field);
+        assert!(err.to_string().contains(&format!("{field}: nth counts calls from 1")), "{err}");
+    }
+}
+
+#[test]
+fn focus_read_of_an_unknown_window_is_window_not_found() {
+    let mut fake = backend(&format!("{{{TWO_WINDOWS}}}"));
+    let err = fake.read_focus("999").expect_err("unknown window");
+    assert_eq!(err.code, senpi_desktop_core::error::ErrorCode::WindowNotFound);
+    assert!(fake.sink().ops().is_empty());
 }
 
 #[test]
