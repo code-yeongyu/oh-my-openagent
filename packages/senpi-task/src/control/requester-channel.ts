@@ -76,11 +76,13 @@ export function createRequesterChannel(options: RequesterChannelOptions) {
     return advertised(record) ? undefined : "owner_unsupported"
   }
 
+  const requester = { pid: options.hostPid, managerInstance: options.managerInstance }
+
   function register(desired: DesiredState): ControlRegister {
     return {
       version: 1, ...desired,
       ...(desired.guidance === undefined || desired.guidance.length === 0 ? {} : { guidance: desired.guidance }),
-      requester: { pid: options.hostPid, managerInstance: options.managerInstance }, writtenAt: new Date(now()).toISOString(),
+      requester, writtenAt: new Date(now()).toISOString(),
     }
   }
 
@@ -114,5 +116,5 @@ export function createRequesterChannel(options: RequesterChannelOptions) {
     return `running in another omo process (pid ${pid}); this run's Stop/Resume is carried there; its completion is reported to that process's session`
   }
 
-  return { ownedElsewhere, ownerStatus, cannotApply, assertDesired, acceptedAck, lastAck, channel: options.channel, control }
+  return { ownedElsewhere, ownerStatus, cannotApply, assertDesired, acceptedAck, lastAck, channel: options.channel, control, requester }
 }

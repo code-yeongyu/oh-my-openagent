@@ -137,9 +137,11 @@ export class RunPauseController {
       const latest = this.registry.load(parentSessionId)
       return latest?.pauseSeq === pauseSeq && latest.phase === "resumed" && this.registry.barrier.state(parentSessionId).kind === "open"
     }
+    // ONE deadline for the whole pass, as on the Resume path: a watcher tick never holds the chain N x the window.
+    const deadlineAt = this.#now() + REMOTE_DEADLINE_MS
     for (const participant of this.registry.orderedAdmissions(parentSessionId)) {
       if (participant.kind === "held_admission" || !retriedAsRemote(participant, this.effects.isRemote?.(participant) === true)) continue
-      const outcome = await this.#resumeOne(parentSessionId, pauseSeq, resumeId, participant, undefined, credential, current, this.#now() + REMOTE_DEADLINE_MS)
+      const outcome = await this.#resumeOne(parentSessionId, pauseSeq, resumeId, participant, undefined, credential, current, deadlineAt)
       if (outcome === "superseded") break
       if (outcome !== undefined) failures.push(outcome)
     }

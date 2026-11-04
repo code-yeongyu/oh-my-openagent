@@ -5,6 +5,7 @@ import { seedRecord } from "../../../../senpi-task/src/lifecycle/__fixtures__/li
 import { controlDir, registerName } from "../../../../senpi-task/src/control/control-paths"
 import { runTaskOutput } from "../../../../senpi-task/src/tools/output/output"
 import type { PauseParticipant } from "../../../../senpi-task/src/pause/registry"
+import { REMOTE_DEADLINE_MS } from "../../../../senpi-task/src/pause/remote-participants"
 import type { TaskRecord } from "../../../../senpi-task/src/state"
 import { B_PID, cleanupPair, controlPair, T1 } from "./__fixtures__/control-pair"
 
@@ -122,6 +123,21 @@ describe("#12349 part 2 requester cases (design section 7)", () => {
     expect(pair.owner.calls.resume).toBe(1)
     expect(await pair.runPause.controller.endLost("parent-1", 2)).toEqual([])
     expect(pair.calls.endLost).toBe(0)
+  })
+
+  test("#given two lost remote children whose owner never answers #when the released Resume retries #then the pass waits one window, not one per child (review of #12373, LOW)", async () => {
+    const pair = controlPair({ ownerTicks: false })
+    const T2 = "st_00000002"
+    seedRecord(pair.store, { task_id: T2, status: "running", run_epoch: 1, host_pid: B_PID })
+    await pair.advertise()
+    const lost = (key: string): PauseParticipant => ({ key, taskId: key, kind: "task", runRef: { kind: "task", id: key }, runEpoch: 1,
+      state: "lost", lostReason: "resume failed: stale", at: new Date(0).toISOString() })
+    pair.runPause.registry.begin("parent-1", 2, [lost(T1), lost(T2)])
+    pair.runPause.registry.phase("parent-1", 2, "resumed")
+    pair.barrier.release("parent-1", pair.barrier.resume("parent-1", 2, "r-0"))
+    const startedAt = pair.clock()
+    await pair.runPause.controller.retryLost("parent-1", 2)
+    expect(pair.clock() - startedAt).toBeLessThan(2 * REMOTE_DEADLINE_MS)
   })
 
   test("#given B's own held participant with a local cutoff becomes remote #when A Resumes #then ackSeq and observedChildSeq are kept (test 17f)", async () => {

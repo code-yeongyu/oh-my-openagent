@@ -1,6 +1,8 @@
 import { log } from "@oh-my-opencode/utils"
 import type { RequesterChannel } from "../../../../senpi-task/src/control/requester-channel"
 import { writeRegisterLocked } from "../../../../senpi-task/src/control/control-store"
+import { isHostSessionRecord } from "../../../../senpi-task/src/lifecycle/host-session"
+import { CANCEL_PENDING_REASON } from "../../../../senpi-task/src/steering/controls"
 import type { TaskRecord } from "../../../../senpi-task/src/state"
 import type { CancelOutcome } from "../../../../senpi-task/src/steering/types"
 import type { TaskRecordStore } from "../../../../senpi-task/src/store"
@@ -38,8 +40,10 @@ export function createRemoteCancel(ports: RemoteCancelPorts) {
   function cancel(record: TaskRecord, reason: string | undefined): Promise<CancelOutcome> | undefined {
     if (record.status !== "running" && record.status !== "paused") return undefined
     if (!ports.channel.ownedElsewhere(record)) {
-      if (record.cancel_requested === undefined) return undefined
-      return ports.finish(record).then(() => ({ kind: "cancelled", task_id: record.task_id, previous_status: record.status }))
+      // A daemon-hosted child keeps the steering path's omo#11765 join: a repeat cancel answers cancel_pending
+      // while the lifecycle's driver ends the session, so the carry never pre-empts it.
+      if (record.cancel_requested === undefined || isHostSessionRecord(record)) return undefined
+      return ports.finish(record).then(() => finished(record))
     }
     const ownerPid = record.host_pid ?? 0
     if (record.cancel_requested !== undefined) {
@@ -54,7 +58,7 @@ export function createRemoteCancel(ports: RemoteCancelPorts) {
     ports.store.mutate(record.task_id, fresh => {
       if (fresh.cancel_requested !== undefined || !nonTerminal(fresh)) return fresh
       const write = writeRegisterLocked(ports.channel.control, { version: 1, ...register(fresh, reason),
-        requester: { pid: process.pid, managerInstance: "requester" }, writtenAt: new Date(now()).toISOString() })
+        requester: ports.channel.requester, writtenAt: new Date(now()).toISOString() })
       if (write.kind === "refused") return fresh
       carried = true
       return { ...fresh, cancel_requested: { requested_at: new Date(now()).toISOString(), ...(reason === undefined ? {} : { reason }) } }
@@ -63,6 +67,15 @@ export function createRemoteCancel(ports: RemoteCancelPorts) {
     ports.store.appendEvent(record.task_id, { type: "cancel_requested", payload: { unreachable: true, ...(reason === undefined ? {} : { reason }) } })
     arm(record.task_id)
     return Promise.resolve(pending(record))
+  }
+
+  // The answer is the record's own state after the finish: a finish that could not end the child leaves the
+  // cancel pending on the record, and that is what the caller hears.
+  function finished(record: TaskRecord): CancelOutcome {
+    const fresh = ports.store.load(record.task_id) ?? undefined
+    if (fresh?.status === "cancelled") return { kind: "cancelled", task_id: record.task_id, previous_status: record.status }
+    if (fresh !== undefined && TERMINAL.has(fresh.status)) return { kind: "noop", task_id: record.task_id, status: fresh.status, reason: `Task ${record.task_id} is ${fresh.status}, not running.` }
+    return { kind: "cancel_pending", task_id: record.task_id, previous_status: record.status, reason: CANCEL_PENDING_REASON }
   }
 
   function arm(taskId: string): void { watched.add(taskId) }
@@ -75,10 +88,11 @@ export function createRemoteCancel(ports: RemoteCancelPorts) {
       if (record === undefined || TERMINAL.has(record.status) || record.cancel_requested === undefined) { watched.delete(taskId); continue }
       if (ports.channel.ownedElsewhere(record)) {
         if (ports.channel.channel) ports.store.mutate(taskId, fresh => { writeRegisterLocked(ports.channel.control, { version: 1, ...register(fresh, undefined),
-          requester: { pid: process.pid, managerInstance: "requester" }, writtenAt: new Date(now()).toISOString() }); return fresh })
+          requester: ports.channel.requester, writtenAt: new Date(now()).toISOString() }); return fresh })
         continue
       }
-      if (ports.holds(taskId)) continue
+      // This manager holds the live handle: its own with-handle cancel path owns the ending, not the watcher.
+      if (ports.holds(taskId)) { watched.delete(taskId); continue }
       watched.delete(taskId)
       await ports.finish(record).catch((error: unknown) => {
         watched.add(taskId)

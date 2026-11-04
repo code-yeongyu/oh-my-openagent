@@ -59,7 +59,10 @@ export function createRemoteRunPause(ports: RemoteRunPausePorts) {
   async function exchange(record: TaskRecord, state: DesiredState, deadlineAt: number): Promise<Exchange> {
     const reason = ports.channel.cannotApply(record)
     if (reason !== undefined) return { reason }
-    ports.channel.assertDesired(state)
+    // Guidance that does not fit is not truncated (design 3.1): the register is written without it and the
+    // ledger keeps it, so the Stop or Resume itself still reaches the owner instead of waiting on it.
+    const write = ports.channel.assertDesired(state)
+    if (write.kind === "refused" && write.reason === "guidance_too_large") ports.channel.assertDesired({ ...state, guidance: [] })
     for (;;) {
       const ack = ports.channel.acceptedAck(state, record.cancel_requested !== undefined)
       if (ack !== undefined) return { ack }

@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
+import { registerName } from "../../../../senpi-task/src/control/control-paths"
+import { readRegister } from "../../../../senpi-task/src/control/control-store"
 import { taskEventLogPath } from "../../../../senpi-task/src/store/event-log"
 import { parseTaskId } from "../../../../senpi-task/src/state"
 import { B_PID, cleanupPair, controlPair, T1 } from "./__fixtures__/control-pair"
+import { createRemoteCancel } from "./engine-remote-cancel"
 
 afterEach(cleanupPair)
 
@@ -80,6 +83,46 @@ describe("cancel of a child another live process owns (design 3.7)", () => {
     await pair.remoteCancel.cancel(loaded(pair), undefined)
     await pair.inbox.tick()
     expect(await pair.remoteCancel.cancel(loaded(pair), undefined)).toMatchObject({ kind: "owner_cannot_apply", reason: "handle_gone" })
+  })
+})
+
+describe("a cancel this process finishes itself (review of #12373)", () => {
+  const flagged = { cancel_requested: { requested_at: new Date(0).toISOString() } }
+  const ownedHere = (pair: ReturnType<typeof controlPair>) => pair.store.mutate(T1, ({ host_pid: _gone, ...fresh }) => fresh)
+  const localCancel = (pair: ReturnType<typeof controlPair>, holds = false) => createRemoteCancel({ channel: pair.channel, store: pair.store,
+    holds: () => holds, pauseSeq: () => 0, finish: async () => undefined })
+
+  test("#given a daemon-hosted child whose cancel is already pending here #when cancelled again #then the carry declines so the omo#11765 join answers (MEDIUM)", async () => {
+    const pair = controlPair({ record: { ...flagged, runner_kind: "host-session",
+      host_session: { socket: "rpc.sock", routing_id: "routing-1", session_path: "session-1", instance_id: "instance-1" } } })
+    ownedHere(pair)
+    expect(await pair.remoteCancel.cancel(loaded(pair), "again")).toBeUndefined()
+    expect(pair.calls.finish).toBe(0)
+  })
+
+  test("#given a pending cancel whose finish could not end the child #when cancelled again #then cancel_pending, never cancelled (MEDIUM)", async () => {
+    const pair = controlPair({ record: flagged })
+    ownedHere(pair)
+    expect(await localCancel(pair).cancel(loaded(pair), "again")).toMatchObject({ kind: "cancel_pending", task_id: T1 })
+    expect(pair.store.load(T1)?.status).toBe("running")
+  })
+
+  test("#given a carried cancel #when its register is read #then the requester is the channel's own pid and manager (LOW)", async () => {
+    const pair = controlPair()
+    await pair.advertise()
+    await pair.remoteCancel.cancel(loaded(pair), "user stop")
+    const read = readRegister(pair.channel.control, registerName(T1, loaded(pair).parent_session_id))
+    expect(read.kind === "ok" ? read.register.requester : undefined).toEqual(pair.channel.requester)
+    expect(pair.channel.requester.managerInstance).toBe("requester-a")
+  })
+
+  test("#given a watched cancel this manager holds the handle for #when the watcher ticks #then the task leaves the watch set (LOW)", async () => {
+    const pair = controlPair({ record: flagged })
+    ownedHere(pair)
+    const cancel = localCancel(pair, true)
+    cancel.arm(T1)
+    await cancel.tick()
+    expect(cancel.watching()).toEqual([])
   })
 })
 

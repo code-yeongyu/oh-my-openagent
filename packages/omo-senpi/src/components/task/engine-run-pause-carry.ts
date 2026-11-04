@@ -37,8 +37,16 @@ export function createGuidanceCarry(ports: { readonly channel: RequesterChannel;
         ownerPid: record.host_pid ?? 0, guidance, at: record.updated_at,
       })
       if (!added) return refused(taskId, `Task ${taskId} could not join the stopped run; nothing was delivered.`, "Resume the run, then send again.")
-      ports.channel.assertDesired({ taskId, runEpoch: record.notification.run_epoch, parentSessionId: owner.parentSessionId,
+      const write = ports.channel.assertDesired({ taskId, runEpoch: record.notification.run_epoch, parentSessionId: owner.parentSessionId,
         pauseSeq: owner.parentPauseSeq, runRef: prior?.runRef ?? owner.runRef, phase: "paused", guidance })
+      // The register still holds unanswered entries beyond the ledger's count: this entry does not fit (design
+      // 3.1), so it leaves the ledger again and the sender is told; a held answer would name an entry no
+      // register ever carries, and every later write of the run would be refused with it.
+      if (write.kind === "refused" && write.reason === "guidance_too_large") {
+        if (prior === undefined) ports.registry.drop(owner.parentSessionId, owner.parentPauseSeq, taskId)
+        else ports.registry.update(owner.parentSessionId, owner.parentPauseSeq, taskId, { guidance: prior.guidance })
+        return refused(taskId, `guidance_too_large: ${GUIDANCE_TOO_LARGE}`, "Resume the run so its owner takes the messages it holds, then send again.")
+      }
       return { kind: "held", task_id: taskId, pause_seq: owner.parentPauseSeq, entry_id: entry.inputId }
     },
   }
