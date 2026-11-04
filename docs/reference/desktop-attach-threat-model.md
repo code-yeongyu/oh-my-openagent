@@ -84,11 +84,14 @@ the XPC-only files `peers.rs`, `native.rs`, `agent.rs`, `dictionary.rs`,
      including its idle exit, and never re-acquires it; every step below and
      the exit cleanup run under that one hold. A daemon whose try fails (a
      daemon is running, starting or still exiting) exits non-zero at once,
-     without touching the socket or the token. The auto-starting client
-     (`client.rs:114-143`) then retries the whole start, not only the
-     connect, until its start guard (`START_GUARD`, `client.rs:11`) runs out,
-     so a start refused while the previous daemon was still exiting succeeds
-     once that daemon has released the lock. This one rule covers every
+     without touching the socket or the token. A start refused while the
+     previous daemon is still exiting succeeds only because P3b changes the
+     client to retry the whole start ("Start retry" under P3b target,
+     client side). Today's client does not: `exchange_or_start` starts the
+     daemon once (`client.rs:120`) and then only reconnects until
+     `START_GUARD` runs out (`client.rs:121`, loop at `client.rs:79-85`), so
+     with today's client a refused successor leaves nothing bound and the
+     client fails with "daemon did not start". This one rule covers every
      start, not only a cold one:
      - **Already-running daemon:** `--serve` on a live endpoint, or an
        auto-start that lost to a live daemon, exits without unlinking the live
@@ -106,8 +109,8 @@ the XPC-only files `peers.rs`, `native.rs`, `agent.rs`, `dictionary.rs`,
        the socket's inode (device and inode from `lstat`) is still the one
        it bound. It closes the lock fd last, which releases the lock. A
        successor that tries the lock during this window is refused, exits
-       non-zero, and the client's start retry above starts it again after
-       the release. The inode check covers a socket replaced by anything
+       non-zero, and the P3b client start retry starts it again after the
+       release. The inode check covers a socket replaced by anything
        else (a same-uid process, or a daemon started without the lock).
 
      The lock is held across the probe `connect`, the stale-socket unlink, the
@@ -155,6 +158,14 @@ the XPC-only files `peers.rs`, `native.rs`, `agent.rs`, `dictionary.rs`,
   `fstat` that fd, and connect relative to it (`/proc/self/fd/<n>/<name>` on
   Linux; `connectat` exists only on FreeBSD). macOS has no fd-relative
   connect, so there the connect goes by path after the check.
+
+  **Start retry (required P3b client change).** When the connect after an
+  auto-start fails, the Rust client must start the daemon again, not only
+  reconnect, until `START_GUARD` (`client.rs:11`) runs out. Today
+  `exchange_or_start` calls `start_detached` once (`client.rs:120`) and then
+  only reconnects (`client.rs:121`, loop at `client.rs:79-85`). Without this
+  change, a successor refused the instance lock while the previous daemon is
+  exiting leaves nothing bound.
 
   **Server-uid check (every platform with UDS).** After `connect` and before
   writing the first byte, the client reads the server's effective uid on the
@@ -421,7 +432,7 @@ covers an explicit `--serve` path or a loose directory.
 | A second daemon racing a cold start | daemon start (P3b) | instance lock refused before bind; no token written; the first daemon's token is untouched | T25-19 |
 | A daemon started while one is already running (explicit `--serve` or a lost auto-start) | daemon start (P3b) | instance lock refused; exits non-zero; the live socket and token are untouched; clients use the live daemon | T25-22 |
 | Two daemons recovering the same stale socket | daemon start (P3b) | only the lock holder unlinks and binds; the other exits | T25-23 |
-| A daemon exiting while its successor starts, or an orphan's idle exit | daemon exit (P3b) | the exiting daemon removes its socket and token under the hold it took at start (no re-acquire, no wait), only if the socket's inode is the one it bound, then releases the lock; a successor refused during the exit exits non-zero and the client's start retry starts it after the release | T25-24 |
+| A daemon exiting while its successor starts, or an orphan's idle exit | daemon exit (P3b) | the exiting daemon removes its socket and token under the hold it took at start (no re-acquire, no wait), only if the socket's inode is the one it bound, then releases the lock; a successor refused during the exit exits non-zero and the P3b client start retry (a required client change; today's client starts once) starts it after the release | T25-24 |
 | `spawn` inside an omo session | SDK | `ControlRequired{reason: "spawn_inside_session"}` (accident guard). The boundary is the eval permission gate, plus TCC only for a P4b out-of-process kernel without interpreter grants (M3) | SDK spawn tests |
 
 ## Residual risk
@@ -508,7 +519,7 @@ covers an explicit `--serve` path or a loose directory.
 | T25-21 | The SDK refuses `attach` with `ControlRequired{reason: "attach_inside_session"}` when `SENPI_DESKTOP_HOST=1` is set |
 | T25-22 | With a daemon already serving, a second `--serve` on the same endpoint (and an auto-start that finds it) fails its one non-blocking lock try and exits non-zero at once (no wait); the live daemon's socket inode and token bytes are unchanged, and an existing client keeps being served |
 | T25-23 | Two daemons started together over a stale socket: exactly one wins the non-blocking lock try and binds, the other exits non-zero without unlinking anything; the socket that remains is the one the lock holder bound, and its token matches that daemon |
-| T25-24 | A client that auto-starts while the previous daemon is idle-exiting: the first start is refused the lock and exits non-zero, the exiting daemon never blocks on the lock and removes only its own socket and token (inode check), and the client's start retry brings up a daemon that serves within the start guard. Separately, a daemon whose socket was replaced by another process idle-exits without removing the replacement or its token |
+| T25-24 | A client that auto-starts while the previous daemon is idle-exiting: the first start is refused the lock and exits non-zero, the exiting daemon never blocks on the lock and removes only its own socket and token (inode check), and the client's start retry (the required P3b client change) brings up a daemon that serves within the start guard; the same scenario with today's start-once client fails with "daemon did not start", which pins that the change was made. Separately, a daemon whose socket was replaced by another process idle-exits without removing the replacement or its token |
 | T25-25 | The Rust client and the SDK `attach` client, connected to a socket served by another euid (injected through an in-crate `#[cfg(test)]` seam on the connected socket) or whose credential lookup fails, close before writing any byte and do not auto-start; no environment variable or flag in a non-test build reaches the seam |
 | T25-26 | After a SIGKILL, two concurrent auto-starts (two `--oneshot` clients at once) leave exactly one daemon bound, the token file matches that daemon, `--resume` works, and the losing daemon never unlinks the winner's socket |
 
