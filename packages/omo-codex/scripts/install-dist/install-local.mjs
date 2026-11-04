@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:c7a5550f483d58b0d9b497109fb6b16730b59e23f31fff458eefb827690f2f1f:c191182a67b73563fd215edbae7e6188545863d4bf733159499f31fd6affab1c
+// omo-codex-install:f2ad355eec078382167caa8ee2c25b6393ad79be1c47f6266dec84e796d2adbf:1939d3601687ca5dd10ae18034a4ff0d7e131a7c7b99e64019cdd034d81fbd5e
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -10205,7 +10205,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "5.1.58",
+    version: "5.1.60",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -20270,15 +20270,6 @@ var OmoTelemetrySettingsSchema = OmoTelemetrySettingsLayerSchema.extend({
   enabled: boolean2().default(true)
 }).strict();
 
-// packages/omo-config-core/src/schema/device-service.ts
-var OmoDeviceServiceSettingsShape = {
-  enabled: boolean2()
-};
-var OmoDeviceServiceSettingsLayerSchema = object(OmoDeviceServiceSettingsShape).partial().strict();
-var OmoDeviceServiceSettingsSchema = OmoDeviceServiceSettingsLayerSchema.extend({
-  enabled: boolean2().default(true)
-}).strict();
-
 // packages/omo-config-core/src/schema/format-on-mutation.ts
 var mode = _enum(["off", "best-effort", "required"]);
 var languages = record(string2(), boolean2()).optional();
@@ -20321,7 +20312,6 @@ var OmoTypedHarnessConfigSchema = object({
   model_pad: OmoModelPadSchema.optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
-  device_service: OmoDeviceServiceSettingsLayerSchema.optional(),
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),
   computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
@@ -20341,7 +20331,6 @@ var OmoConfigProfileSchema = object({
   model_pad: OmoModelPadSchema.optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
-  device_service: OmoDeviceServiceSettingsLayerSchema.optional(),
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),
   computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
@@ -20366,7 +20355,6 @@ var OmoConfigSchema = object({
   model_pad: OmoModelPadSchema.optional(),
   memory: OmoMemorySettingsSchema.optional(),
   telemetry: OmoTelemetrySettingsSchema.optional(),
-  device_service: OmoDeviceServiceSettingsSchema.optional(),
   side_panel: OmoSidePanelSettingsSchema.optional(),
   computer: OmoComputerSettingsSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
@@ -20394,7 +20382,6 @@ var OmoConfigLayerSchema = object({
   model_pad: OmoModelPadSchema.optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
-  device_service: OmoDeviceServiceSettingsLayerSchema.optional(),
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),
   computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
