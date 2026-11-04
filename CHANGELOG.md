@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.1.60] - 2026-11-03
+
+### Changed
+
+- Built-in reasoning defaults are back to their values before 5.1.59: daily mode runs Claude Opus 5.5 at medium effort again, and every other rung raised to high in 5.1.59 returns to its previous medium or xhigh setting. ([#12271](https://github.com/code-yeongyu/oh-my-openagent/issues/12271)) ([#12272](https://github.com/code-yeongyu/oh-my-openagent/pull/12272))
+- The `architect` task category can now implement as well as design. Its description and child prompt name broad debugging across many sources (code, logs, git history, issues, docs, configuration, runtime evidence) as a use case, and the child is told it has the full tool set and should carry a requested change through to a verified result. A caller that wants a design write-up without file edits marks the task advisory-only (#12238). Model routing is unchanged. ([#12239](https://github.com/code-yeongyu/oh-my-openagent/pull/12239))
+
+### Fixed
+
+- The native-binary-parity CI check no longer fails when a leftover task-host shard is still running on one side and has already exited on the other: both doctor lines are runtime state. ([#12148](https://github.com/code-yeongyu/oh-my-openagent/issues/12148)) ([#12153](https://github.com/code-yeongyu/oh-my-openagent/pull/12153))
+
+## [5.1.59] - 2026-11-03
+
+Runs on senpi 2026.11.2-3: the first message of a new session no longer stalls for several seconds, and agent kill/pkill/killall commands that would hit protected processes are refused. ([#12200](https://github.com/code-yeongyu/oh-my-openagent/pull/12200))
+
+### Fixed
+
+- Memory sync refuses a received item on Windows whose working path git cannot stage (at or past MAX_PATH, which git for Windows opens without `core.longpaths`), dropping it with a receipt before anything is rendered instead of failing the sync commit and wedging the device on every resume (#12199). POSIX behaviour is unchanged. ([#12201](https://github.com/code-yeongyu/oh-my-openagent/pull/12201))
+- The task widget no longer keeps finished team members as `process completed` rows. A member that completes its turn leaves the widget even while its handle stays resident; `/tasks` still lists it and `task_send` still revives it. ([#12160](https://github.com/code-yeongyu/oh-my-openagent/pull/12160))
+- Memory sync validates an item key before it reaches the working tree, the item store or git, so a peer can no longer land a path outside the memory root or inside the repository's own metadata. A key must be a normalized relative path: `..` and `.` segments, absolute paths, drive and UNC prefixes, backslashes, control and format code points, non-NFC text, over-long keys and segments, Windows device names, trailing dots or spaces, and any component git or a file system would fold to `.git` are refused. A refused item is dropped on its own with a receipt, a log line that carries the key's byte length and the rule rather than the key, and a `rejectedItems` count, while the rest of its batch applies and the cursor advances, so one bad item never pauses a device. Local capture uses the same grammar, never follows a symlink out of the memory root, and a file whose name the grammar refuses is reported instead of sent. A path that is valid but spelled with a different Unicode normalization no longer forks one item into two. ([#12152](https://github.com/code-yeongyu/oh-my-openagent/pull/12152), fixes [#12147](https://github.com/code-yeongyu/oh-my-openagent/issues/12147))
+- After a session starts or resumes, workflow (DAG) views now always receive the current run list before the first turn begins, and a client that reconnects to a running session gets it again, so the desktop workflow view no longer stays empty or stale until something changes. A workflow that was still running when the session closed resumes in the background: its state is shown as soon as it is recovered, and the session's first turn no longer waits for the whole workflow to finish. ([#12122](https://github.com/code-yeongyu/oh-my-openagent/pull/12122), fixes [#12113](https://github.com/code-yeongyu/oh-my-openagent/issues/12113))
+- Memory git commands no longer start git's builtin fsmonitor daemon when your git config turns `core.fsmonitor` on. Every git command memory runs now carries `-c core.fsmonitor=false`, the clean-tree `status`, `add` and `diff` included, so no background daemon outlives git and keeps the memory repository busy. ([#12097](https://github.com/code-yeongyu/oh-my-openagent/pull/12097), part of [#10391](https://github.com/code-yeongyu/oh-my-openagent/issues/10391))
+- `fact verify` no longer skips text inside SVG `<foreignObject>`: the ulw-research tokenizer now parses foreignObject subtrees as HTML (the rest of the SVG stays raw), so fact unit/value mutations there are caught and bare numerals must trace to a chart CSV plot value. ([#12040](https://github.com/code-yeongyu/oh-my-openagent/pull/12040), fixes [#11570](https://github.com/code-yeongyu/oh-my-openagent/issues/11570))
+- `task_output` no longer replays an unchanged status snapshot to the same caller: a repeated peek at a task whose status has not moved returns `no_progress` instead of the full record again, which keeps polling loops from refilling the context with identical output. Thanks to @codeg-dev. ([#7662](https://github.com/code-yeongyu/oh-my-openagent/pull/7662))
+
+### Changed
+
+- Every built-in reasoning default that sat at `medium` or `xhigh` now sits at `high`: the default lane `daily-normal` runs `claude-opus-5-5` at `high` (was `medium`), `daily-heavy` and the Fable 5.5 launch rungs drop `xhigh` for `high`, and `geeky-normal`, the deep-low/unspecified/quick category chains, the OpenCode category catalogs, the builtin agent fallback chains and the model-fallback default move with them. Model ids, provider orders and the `low`/`max`/`off` levels are untouched. ([#12094](https://github.com/code-yeongyu/oh-my-openagent/pull/12094), fixes [#12085](https://github.com/code-yeongyu/oh-my-openagent/issues/12085))
+
+### Added
+
+- Add `omo trust ensure --json [--wait] [--lease-pid <pid>]`, answered by the launcher trust stage: it imports within the launch budget, writes the private generation and leases it, so the retention sweep never removes a generation a running process still uses. ([#11969](https://github.com/code-yeongyu/oh-my-openagent/pull/11969), part of [#10762](https://github.com/code-yeongyu/oh-my-openagent/issues/10762))
+- Add the `eval-integrity` shared skill: a read-only audit of whether an eval, benchmark, metric, A/B test, holdout, LLM judge, or user study can support its stated claim, reported under one PASS / FAIL / INCONCLUSIVE verdict line. Thanks to @realsigridjin. ([#7593](https://github.com/code-yeongyu/oh-my-openagent/pull/7593))
+
 ## [5.1.58] - 2026-11-02
 
 Runs on senpi 2026.11.2-1: Claude subscription sign-in works again. ([#12126](https://github.com/code-yeongyu/oh-my-openagent/pull/12126))
