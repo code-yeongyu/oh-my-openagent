@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test"
+import { readFileSync, rmSync, statSync } from "node:fs"
+import { createPaneAuthDirectory } from "../pane-auth"
 import {
   HERDR_TEAM_WORKSPACE_LABEL_PREFIX,
+  buildHerdrPaneAuthEnv,
   herdrCloseWorkspace,
   herdrCreateTab,
   herdrCreateWorkspace,
@@ -64,6 +67,59 @@ describe("parseHerdrEnvelope", () => {
     // pane read/run output is plain text — never an envelope
     expect(parseHerdrEnvelope("plain pane text")).toEqual({ kind: "ok" })
     expect(parseHerdrEnvelope("")).toEqual({ kind: "ok" })
+  })
+})
+
+describe("buildHerdrPaneAuthEnv", () => {
+  test("returns no auth env when no password is configured", () => {
+    const saved = {
+      password: process.env["OPENCODE_SERVER_PASSWORD"],
+      file: process.env["OPENCODE_SERVER_PASSWORD_FILE"],
+      username: process.env["OPENCODE_SERVER_USERNAME"],
+    }
+    delete process.env["OPENCODE_SERVER_PASSWORD"]
+    delete process.env["OPENCODE_SERVER_PASSWORD_FILE"]
+    delete process.env["OPENCODE_SERVER_USERNAME"]
+    try {
+      expect(buildHerdrPaneAuthEnv()).toEqual({})
+    } finally {
+      for (const [key, value] of Object.entries(saved)) {
+        if (value === undefined) delete process.env[key]
+        else process.env[key] = value
+      }
+    }
+  })
+
+  test("hands off through a single-use 0600 file plus username, never the password", () => {
+    const saved = {
+      password: process.env["OPENCODE_SERVER_PASSWORD"],
+      file: process.env["OPENCODE_SERVER_PASSWORD_FILE"],
+      username: process.env["OPENCODE_SERVER_USERNAME"],
+    }
+    process.env["OPENCODE_SERVER_PASSWORD"] = "sekret"
+    process.env["OPENCODE_SERVER_USERNAME"] = "omo-user"
+    delete process.env["OPENCODE_SERVER_PASSWORD_FILE"]
+    const cleanupAuthDirectory = createPaneAuthDirectory()
+    let passwordFile: string | undefined
+    try {
+      const env = buildHerdrPaneAuthEnv()
+      expect(Object.keys(env).sort()).toEqual(["OPENCODE_SERVER_PASSWORD_FILE", "OPENCODE_SERVER_USERNAME"])
+      expect(env["OPENCODE_SERVER_USERNAME"]).toBe("omo-user")
+      passwordFile = env["OPENCODE_SERVER_PASSWORD_FILE"]
+      if (!passwordFile) throw new Error("missing password file")
+      expect(Object.values(env).some((value) => value.includes("sekret"))).toBe(false)
+      expect(statSync(passwordFile).mode & 0o777).toBe(0o600)
+      expect(readFileSync(passwordFile, "utf8")).toBe("export OPENCODE_SERVER_PASSWORD='sekret'\n")
+      // every call writes a fresh single-use file (one per tab)
+      expect(buildHerdrPaneAuthEnv()["OPENCODE_SERVER_PASSWORD_FILE"]).not.toBe(passwordFile)
+    } finally {
+      if (passwordFile) rmSync(passwordFile, { force: true })
+      cleanupAuthDirectory()
+      for (const [key, value] of Object.entries(saved)) {
+        if (value === undefined) delete process.env[key]
+        else process.env[key] = value
+      }
+    }
   })
 })
 

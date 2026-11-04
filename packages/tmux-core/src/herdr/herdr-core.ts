@@ -21,6 +21,7 @@
 import { existsSync, statSync } from "node:fs"
 import { delimiter, join } from "node:path"
 import { spawn } from "@oh-my-opencode/utils/runtime"
+import { createPaneAuthHandoff } from "../pane-auth"
 
 export const HERDR_TEAM_WORKSPACE_LABEL_PREFIX = "omo-team-"
 
@@ -403,18 +404,19 @@ export async function herdrListTeamWorkspaces(
   return herdrListWorkspacesByLabelPrefix(HERDR_TEAM_WORKSPACE_LABEL_PREFIX, deps)
 }
 
-const HERDR_PANE_AUTH_ENV_KEYS = ["OPENCODE_SERVER_PASSWORD", "OPENCODE_SERVER_PASSWORD_FILE", "OPENCODE_SERVER_PASSWORD_DIR", "OPENCODE_SERVER_USERNAME"] as const
-
 /**
- * Pane-auth vars forwarded into herdr tabs via `tab create --env K=V`, so an
- * authenticated opencode server works the same way it does for tmux panes
- * (buildPaneAuthEnvironmentArgs).
+ * Pane-auth handoff for herdr tabs: a fresh single-use 0600 password file
+ * whose path travels via `tab create --env OPENCODE_SERVER_PASSWORD_FILE=...`
+ * — never the password itself, which would be world-readable in the process
+ * list (`herdr tab create --env` argv). The attach line delivered with
+ * `pane run` is wrapped by withPaneAuth, which sources and unlinks the file,
+ * so authenticated attach works exactly like the tmux path
+ * (buildPaneAuthEnvironmentArgs). One call = one file = one tab.
  */
-export function buildHerdrPaneAuthEnv(env: Record<string, string | undefined> = process.env): Record<string, string> {
-  const forwarded: Record<string, string> = {}
-  for (const key of HERDR_PANE_AUTH_ENV_KEYS) {
-    const value = env[key]
-    if (typeof value === "string" && value.length > 0) forwarded[key] = value
-  }
-  return forwarded
+export function buildHerdrPaneAuthEnv(): Record<string, string> {
+  const handoff = createPaneAuthHandoff()
+  if (!handoff) return {}
+  const env: Record<string, string> = { OPENCODE_SERVER_PASSWORD_FILE: handoff.file }
+  if (handoff.username !== undefined) env["OPENCODE_SERVER_USERNAME"] = handoff.username
+  return env
 }

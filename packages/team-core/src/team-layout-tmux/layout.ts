@@ -292,13 +292,14 @@ async function createTeamLayoutHerdr(
     )
 
     const panesByMember: Record<string, string> = {}
-    const authEnv = buildHerdrPaneAuthEnv()
     for (const member of members) {
       const tab = await herdrCreateTab(
         workspace.workspaceId,
         getPaneWorkingDirectory(member),
         member.name,
-        authEnv,
+        // fresh single-use password file per tab: each pane shell sources and
+        // unlinks its own file before attaching
+        buildHerdrPaneAuthEnv(),
         herdrOps,
       )
       panesByMember[member.name] = tab.paneId

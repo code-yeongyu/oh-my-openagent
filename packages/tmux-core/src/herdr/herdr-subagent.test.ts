@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { buildTmuxAttachCommand } from "../tmux-utils/pane-command"
+import { createPaneAuthDirectory } from "../pane-auth"
 import {
   herdrClosePaneIfExists,
   herdrListWorkspacesByLabelPrefix,
@@ -58,7 +59,13 @@ describe("getHerdrAgentsWorkspaceLabel", () => {
 describe("spawnHerdrSubagentTab", () => {
   test("creates the workspace on first spawn, pins it on the tab, and delivers the attach command via pane run", async () => {
     const authPassword = process.env["OPENCODE_SERVER_PASSWORD"]
+    const authPasswordFile = process.env["OPENCODE_SERVER_PASSWORD_FILE"]
+    const authUsername = process.env["OPENCODE_SERVER_USERNAME"]
     process.env["OPENCODE_SERVER_PASSWORD"] = "sekret"
+    delete process.env["OPENCODE_SERVER_PASSWORD_FILE"]
+    delete process.env["OPENCODE_SERVER_USERNAME"]
+    const cleanupAuthDirectory = createPaneAuthDirectory()
+    let passwordFile: string | undefined
     try {
       const { deps, calls } = fakeOps((args) => {
         if (args[0] === "workspace" && args[1] === "list") {
@@ -93,15 +100,94 @@ describe("spawnHerdrSubagentTab", () => {
       expect(tab.slice(0, 9)).toEqual([
         "tab", "create", "--workspace", "w9", "--cwd", "/repo", "--label", "research worker", "--env",
       ])
-      expect(tab).toContain("OPENCODE_SERVER_PASSWORD=sekret")
+      // password auth travels as a single-use 0600 file path, never as the
+      // password itself (--env argv is world-readable in the process list)
+      expect(tab.some((arg) => arg.includes("sekret"))).toBe(false)
+      const fileArg = tab.find((arg) => arg.startsWith("OPENCODE_SERVER_PASSWORD_FILE="))
+      expect(fileArg).toBeDefined()
+      passwordFile = fileArg?.slice("OPENCODE_SERVER_PASSWORD_FILE=".length)
+      expect(passwordFile).toBeDefined()
+      if (!passwordFile) throw new Error("missing password file arg")
+      expect(statSync(passwordFile).mode & 0o777).toBe(0o600)
+      expect(statSync(dirname(passwordFile)).mode & 0o777).toBe(0o700)
+      expect(readFileSync(passwordFile, "utf8")).toBe("export OPENCODE_SERVER_PASSWORD='sekret'\n")
       expect(tab.at(-1)).toBe("--no-focus")
-      // the pane run payload is exactly the attach string activateTmuxPane uses
+      // the pane run payload is exactly the attach string activateTmuxPane
+      // uses, and it sources the same file before attaching
       expect(calls[3]).toEqual([
         "pane", "run", "w9:p2",
         buildTmuxAttachCommand("http://127.0.0.1:4096", "sess-1", "/repo"),
       ])
       expect(calls[3][3]).toContain("opencode attach")
+      expect(calls[3][3]).toContain("OPENCODE_SERVER_PASSWORD_FILE")
     } finally {
+      cleanupAuthDirectory()
+      if (passwordFile) rmSync(passwordFile, { force: true })
+      if (authPassword === undefined) delete process.env["OPENCODE_SERVER_PASSWORD"]
+      else process.env["OPENCODE_SERVER_PASSWORD"] = authPassword
+      if (authPasswordFile === undefined) delete process.env["OPENCODE_SERVER_PASSWORD_FILE"]
+      else process.env["OPENCODE_SERVER_PASSWORD_FILE"] = authPasswordFile
+      if (authUsername === undefined) delete process.env["OPENCODE_SERVER_USERNAME"]
+      else process.env["OPENCODE_SERVER_USERNAME"] = authUsername
+    }
+  })
+
+  test.skipIf(process.platform === "win32")("a pane shell consumes the handoff: password arrives via the 0600 file and the file is unlinked before attach", async () => {
+    const authPassword = process.env["OPENCODE_SERVER_PASSWORD"]
+    process.env["OPENCODE_SERVER_PASSWORD"] = "sekret"
+    const cleanupAuthDirectory = createPaneAuthDirectory()
+    const sandbox = mkdtempSync(join(tmpdir(), "omo-herdr-auth-"))
+    let passwordFile: string | undefined
+    try {
+      const { deps, calls } = fakeOps((args) => {
+        if (args[0] === "workspace" && args[1] === "list") return ok(envelope({ workspaces: [] }))
+        if (args[0] === "workspace" && args[1] === "create") {
+          return ok(envelope({ workspace: { workspace_id: "w9" }, root_pane: { pane_id: "w9:p1" } }))
+        }
+        if (args[0] === "tab" && args[1] === "create") {
+          return ok(envelope({ tab: { tab_id: "w9:t2" }, root_pane: { pane_id: "w9:p2" } }))
+        }
+        return ok("")
+      })
+
+      const result = await spawnHerdrSubagentTab(spawnArgs, deps)
+      expect(result.success).toBe(true)
+      const tab = calls.find((call) => call[0] === "tab" && call[1] === "create")
+      const fileArg = tab?.find((arg) => arg.startsWith("OPENCODE_SERVER_PASSWORD_FILE="))
+      passwordFile = fileArg?.slice("OPENCODE_SERVER_PASSWORD_FILE=".length)
+      if (!passwordFile) throw new Error("missing password file arg")
+      const paneRunCommand = calls.find((call) => call[0] === "pane" && call[1] === "run")?.[3]
+      if (!paneRunCommand) throw new Error("missing pane run command")
+
+      // a fake `opencode` proves the pane shell sees the password in its
+      // environment (not in argv) and that the one-use file is already gone
+      writeFileSync(join(sandbox, "opencode"), [
+        "#!/bin/sh",
+        'test "$OPENCODE_SERVER_PASSWORD" = "sekret" || exit 2',
+        'test ! -e "$OPENCODE_SERVER_PASSWORD_FILE" || exit 3',
+        'for arg in "$@"; do test "$arg" != "sekret" || exit 4; done',
+        "printf auth-ok",
+      ].join("\n"), { mode: 0o700 })
+
+      // simulate the pane shell: the --env vars are exported, the pane run
+      // payload is the command line the shell executes
+      const child = Bun.spawn(["/bin/sh", "-c", paneRunCommand], {
+        env: {
+          ...process.env,
+          PATH: `${sandbox}:${process.env.PATH ?? ""}`,
+          OPENCODE_SERVER_PASSWORD: "",
+          OPENCODE_SERVER_PASSWORD_FILE: passwordFile,
+        },
+        stdout: "pipe",
+        stderr: "pipe",
+      })
+      expect(await child.exited).toBe(0)
+      expect(await new Response(child.stdout).text()).toBe("auth-ok")
+      expect(existsSync(passwordFile)).toBe(false)
+    } finally {
+      cleanupAuthDirectory()
+      if (passwordFile) rmSync(passwordFile, { force: true })
+      rmSync(sandbox, { recursive: true, force: true })
       if (authPassword === undefined) delete process.env["OPENCODE_SERVER_PASSWORD"]
       else process.env["OPENCODE_SERVER_PASSWORD"] = authPassword
     }
