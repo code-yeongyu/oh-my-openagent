@@ -1,12 +1,10 @@
 import {
-  activeParentModelFallback,
   buildLiveStatsTokens,
   recoveryPresentation,
   excerptRendererText,
   formatStatusTarget,
   formatTargetWithModel,
   normalizeRendererText,
-  parseTeamMemberTaskIdentity,
   rendererVisibleWidth,
   selectLiveActivityVerb,
   taskIdentityLabel,
@@ -65,7 +63,6 @@ function recordStatusTarget(record: TaskRecord): string {
     effectiveModel: record.effective_model,
     model: record.model,
     fallbackCount: record.fallback_attempts?.length,
-    parentModelFallback: activeParentModelFallback(record),
   }) ?? "task"
 }
 
@@ -87,18 +84,15 @@ export function formatTaskRow(record: TaskRecord): string {
   return parts.join(" ")
 }
 
-function selectWidgetRecords(records: readonly TaskRecord[], residentTaskIds: ReadonlySet<string>): TaskRecord[] {
-  const active = records.filter((record) => !isTerminal(record.status))
-  const completedResidentMembers = records.filter((record) =>
-    record.status === "completed"
-    && residentTaskIds.has(record.task_id)
-    && parseTeamMemberTaskIdentity(record) !== undefined,
-  )
-  return [...active, ...completedResidentMembers]
+// The live widget shows work that is still running or parked. A finished child leaves it even when
+// its handle stays resident (a team member waiting for mail): `/tasks` lists it and `task_send`
+// revives it, and a revived child is non-terminal again, so its row returns (#12159).
+function selectWidgetRecords(records: readonly TaskRecord[]): TaskRecord[] {
+  return records.filter((record) => !isTerminal(record.status))
 }
 
-export function buildWidgetRows(records: readonly TaskRecord[], residentTaskIds: ReadonlySet<string> = new Set()): string[] {
-  const selected = selectWidgetRecords(records, residentTaskIds)
+export function buildWidgetRows(records: readonly TaskRecord[]): string[] {
+  const selected = selectWidgetRecords(records)
   if (selected.length === 0) return []
   const shown = selected.slice(0, MAX_WIDGET_ROWS).map((record) => formatCompactTaskRow(record, WIDGET_LINE_MAX, true))
   const overflow = selected.length - MAX_WIDGET_ROWS
@@ -134,15 +128,18 @@ function formatLiveBackgroundRow(
   stats?: TaskRunStats,
 ): string {
   const suspended = isSuspended(record)
+  // A child its run's Stop paused is not working either: a resident paused child has no recovery
+  // presentation, so without this it read "running"/"starting" with a clock from its creation.
+  const still = suspended || record.status === "paused"
   // A parked child shows no running time: the record has no park timestamp (`updated_at` moves with
   // every revival attempt), and a climbing timer is what made the row look alive.
-  const elapsed = suspended ? undefined : formatElapsed(record.created_at, now)
-  const frame = suspended
+  const elapsed = still ? undefined : formatElapsed(record.created_at, now)
+  const frame = still
     ? SUSPENDED_MARK
     : SPINNER_FRAMES[Math.floor(now / LIVE_STATUS_REFRESH_MS) % SPINNER_FRAMES.length] ?? SPINNER_FRAMES[0]
   const fullIdentity = liveTaskIdentity(record)
   const fullTarget = recordStatusTarget(record)
-  const fullActivity = suspended
+  const fullActivity = still
     ? normalizeRendererText(recoveryPresentation(record)?.text ?? statusLabel(record))
     : activity === undefined
       ? defaultLiveActivity(stats)
@@ -162,7 +159,7 @@ function formatLiveBackgroundRow(
   // A parked row has no live activity to watch, so which child it is matters more than its route.
   let targetWidth: number
   let identityWidth: number
-  if (suspended) {
+  if (still) {
     identityWidth = Math.min(LIVE_IDENTITY_MAX, rendererVisibleWidth(fullIdentity), LIVE_IDENTITY_MIN + remainingWidth)
     remainingWidth -= Math.max(0, identityWidth - LIVE_IDENTITY_MIN)
     targetWidth = Math.min(rendererVisibleWidth(fullTarget), LIVE_TARGET_MIN + remainingWidth)
@@ -207,17 +204,14 @@ export function backgroundWidgetRows(
   now: number,
   liveStats?: (taskId: string) => TaskRunStats | undefined,
   maxWidth = LIVE_WIDGET_LINE_MAX,
-  residentTaskIds: ReadonlySet<string> = new Set(),
 ): string[] {
-  const selected = selectWidgetRecords(records, residentTaskIds)
+  const selected = selectWidgetRecords(records)
   if (selected.length === 0) return []
   const boundedWidth = Number.isFinite(maxWidth) && maxWidth > 0
     ? Math.min(LIVE_WIDGET_LINE_MAX, Math.floor(maxWidth))
     : LIVE_WIDGET_LINE_MAX
   const shown = selected.slice(0, MAX_WIDGET_ROWS).map((record) =>
-    record.status === "completed"
-      ? formatCompactTaskRow(record, boundedWidth, true)
-      : formatLiveBackgroundRow(record, activity.get(record.task_id), now, boundedWidth, liveStats?.(record.task_id)),
+    formatLiveBackgroundRow(record, activity.get(record.task_id), now, boundedWidth, liveStats?.(record.task_id)),
   )
   const overflow = selected.length - MAX_WIDGET_ROWS
   if (overflow > 0) shown.push(`+${overflow} more`)

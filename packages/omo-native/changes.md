@@ -1,3 +1,11 @@
+## 2026-10-31 - Drop the Claude Code UA floor rewrite of the installed engine (#11964, part of senpi#5131)
+
+`packages/omo-native/bin/lib/claude-code-floor.js` is deleted and `engine-prepare.js` `prepareInstalledEngine` no longer calls `floorClaudeCodeVersion`. senpi#5131 removes the `anthropic` provider's Claude Code OAuth impersonation path and with it the `claudeCodeVersion` declaration in `@earendil-works/pi-ai/dist/api/anthropic-messages.js` and the engine bundle; against such an engine the floor step threw `omo-ai: unsupported Senpi ...: no claudeCodeVersion declaration` on every launch (reported, never fatal) and had nothing left to protect. `senpi-patch.test.ts` (floor-only) is deleted; `engine-prepare-on-launch.test.ts` proves the stamp and the RPC guard without the UA fixture, and the other fixtures stop writing a fake `anthropic-messages.js`. knip entries for the deleted file are removed. Merge order: this lands before omo pins an engine that contains senpi#5131.
+
+## 2026-10-31 - Forward Windows private pipe pairs (#11955)
+
+The shared private descriptor inspector accepts two distinct open pipe descriptors in 5..64 on Windows, refusing aliases (including those in malformed arrays), non-pipes, and runtime IPC descriptors atomically. Pipe detection checks the file-type mode bits because Node's Windows `Stats.isFIFO()` returns false even for an open pipe. The first launcher import captures and removes the table before helper children run. Explicit engine hops preserve the pair's stdio slots, including when capturing stderr, and close owned Windows copies immediately after spawn or a synchronous spawn failure. Shells receive null declarations without either private slot. Receipt-side inherit clearing stays in senpi; the POSIX socket path from #11786 is unchanged.
+
 ## 2026-10-29 - Recover corrupt account credentials (#11832)
 
 Unscoped forget clears the stored credential under the session lock without a read. Scoped forget compares the current device under that lock and reports unreadable ownership as a JSON refusal. Only a well-formed target argument can select scoped deletion; malformed flags are rejected before store access. Explicit adopt replacement tolerates invalid data but not OS storage failures.
