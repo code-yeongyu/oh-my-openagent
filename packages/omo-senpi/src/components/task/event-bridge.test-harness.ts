@@ -190,7 +190,11 @@ export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
     },
   } as unknown as SessionTransitionBridge
 
+  const forgottenTaskOutputSessions: string[] = []
   const state = {
+    forgetTaskOutputReads: (sessionId: string) => {
+      forgottenTaskOutputSessions.push(sessionId)
+    },
     reconcileTeamMailbox: async () => {
       order.push("reclaim")
     },
@@ -244,6 +248,7 @@ export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
     pi,
     calls,
     order,
+    forgottenTaskOutputSessions,
     warnings,
     infos,
     reconcileCalls,

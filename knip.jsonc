@@ -314,8 +314,6 @@
       "packages/memory-core/src/sync/engine/engine-harness.test-support.ts": ["ManualClock", "inProcessLock"],
       // pre-existing at origin dev 4686e425b5: unused export(s) POLL_MS
       "packages/memory-core/src/sync/engine/engine.ts": ["POLL_MS"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) sha256Hex
-      "packages/memory-core/src/sync/engine/fake-server.test-support.ts": ["sha256Hex"],
       // pre-existing at origin dev 4686e425b5: unused export(s) createHttpTransport, SyncHttpError, SyncEngine
       "packages/memory-core/src/sync/engine/index.ts": ["createHttpTransport", "SyncHttpError", "SyncEngine"],
       // pre-existing at origin dev 4686e425b5: unused export(s) MAX_RECEIPTS
@@ -992,8 +990,6 @@
       "packages/omo-senpi/plugin/scripts/build-daemon-launch-spec.mjs": ["DAEMON_LAUNCH_SPEC_FILENAME", "daemonLaunchSpecDocument", "renderDaemonLaunchSpec", "resolveDaemonLaunchSpecOutput", "buildDaemonLaunchSpec", "checkDaemonLaunchSpecCurrent"],
       // pre-existing at origin dev 4686e425b5: unused export(s) GATEWAY_STORE_WORKER_NAME, THREAD_SDK_RELATIVE_PATH
       "packages/omo-senpi/plugin/scripts/build-extension.mjs": ["GATEWAY_STORE_WORKER_NAME", "THREAD_SDK_RELATIVE_PATH"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) outputPathsIn
-      "packages/omo-senpi/plugin/scripts/build-extension.test-support.mjs": ["outputPathsIn"],
       // pre-existing at origin dev 4686e425b5: unused export(s) buildInstallCli, checkInstallCliCurrent
       "packages/omo-senpi/plugin/scripts/build-install.mjs": ["buildInstallCli", "checkInstallCliCurrent"],
       // pre-existing at origin dev 4686e425b5: unused export(s) traceBundleInputs, INSTALL_LIFECYCLES
@@ -3914,6 +3910,7 @@
         "test/fixtures/provisioned-handoff/entry.ts",
         "test/fixtures/senpi-hooks-state-child.mjs",
         "test/fixtures/senpi-hooks-state-consumer.mjs",
+        "test/fixtures/trust-ensure-probe.ts",
         "test/fixtures/trust-stage-probe.ts",
         "test/packed-consumer.mjs",
         "test/teardown.test-support.ts",

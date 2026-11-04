@@ -269,6 +269,12 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
 
 export { reexecProvisionedRuntime } from "./provisioned-handoff"
 
+/** A refusal is 78 (5.2) and a malformed `trust` argv the launcher's usage status 2; an exec keeps the status it propagated. */
+function setTrustExitCode(action: "static" | "import-exec" | "ensure" | "usage" | "refuse"): void {
+  if (action === "refuse") process.exitCode = 78
+  else if (action === "usage") process.exitCode = 2
+}
+
 const STATIC_HELP = `Usage: omo [options] [message...]
        omo <command> [args]
 
@@ -338,7 +344,7 @@ async function main(): Promise<void> {
     }
     const trust = await runTrustStage({ args, argv: process.argv.slice(1) })
     if (trust.action !== "adopt") {
-      if (trust.action === "refuse") process.exitCode = 78
+      setTrustExitCode(trust.action)
       return
     }
     if (await runCompiledLauncher(process.argv.slice(2), execDir)) return
@@ -382,7 +388,7 @@ async function main(): Promise<void> {
     ...(launch.handOff ? { exec: (file: string, argv: string[], env: NodeJS.ProcessEnv) => handOffToProvisionedRuntime(file, { argv, env, launcher: runningExecutable }) } : {}),
   })
   if (trust.action !== "adopt") {
-    if (trust.action === "refuse") process.exitCode = 78
+    setTrustExitCode(trust.action)
     return
   }
   if (isSelfUpdate(process.argv.slice(2)) && parseBuildInfo(manifest.buildInfo) === undefined) {
