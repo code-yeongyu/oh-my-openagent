@@ -157,9 +157,15 @@ pub(super) fn insertion_result(error: AXError) -> CoreResult<()> {
 /// write was attempted and the caller may fall back to keys. An attempted
 /// write never falls through to keys, including a timeout or a mismatch.
 /// Nothing is written once the user has pressed a key or clicked in the
-/// application since the call was admitted ([`check_press`]).
-pub(crate) fn insert_into_element(element: &AXUIElement, text: &str) -> CoreResult<bool> {
-    reporting_partial(|| insert_selected_text(element, text, || Ok(())))
+/// application since the call was admitted ([`check_press`]), and
+/// `behind_user` runs after the probes, right before the write (omp 18.13.1
+/// `macos/ax.rs:1726-1732`).
+pub(crate) fn insert_into_element(
+    element: &AXUIElement,
+    text: &str,
+    behind_user: impl FnOnce() -> CoreResult<()>,
+) -> CoreResult<bool> {
+    reporting_partial(|| insert_selected_text(element, text, behind_user))
 }
 
 /// Inserts `text` into the element holding `pid`'s keyboard focus, only when

@@ -17,6 +17,7 @@ use senpi_desktop_core::keys::KeyName;
 use senpi_desktop_core::protocol_results::AxInputMethod;
 
 use super::held::KeyRoute;
+use super::insertion::{before_write, insert_unless_terminal, is_terminal};
 use super::key_front::EntryFront;
 use super::key_window::KeyWindow;
 use super::{chord, guard, keys, resolve_window, window_identity, MacInput};
@@ -58,7 +59,16 @@ impl MacInput {
         if let Some(remote) = super::remote::remote_screen(pid) {
             return self.type_remote(&window, pid, wid, text, remote, mode, entry_front, check_stop, delivered, Some(element));
         }
-        let insert = || crate::ax::insert_into_element(element, text);
+        // omp 18.13.1 `macos/input.rs:247-252`: text addressed to an element
+        // tries insertion in every mode, never into a terminal, and checks the
+        // target is still behind the user right before the write.
+        let insert = || {
+            insert_unless_terminal(
+                is_terminal(pid),
+                || before_write(mode, entry_front, skylight::front_pid, (pid, wid), check_stop),
+                |behind_user| crate::ax::insert_into_element(element, text, behind_user),
+            )
+        };
         match mode {
             // Insertion is an AX write like `ax.setValue`: it needs no SkyLight
             // posting, so it runs before the receipt canary; keys run under it.

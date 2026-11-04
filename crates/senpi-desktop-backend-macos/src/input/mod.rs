@@ -11,6 +11,7 @@ mod element;
 mod global;
 mod guard;
 mod held;
+mod insertion;
 mod keymap;
 mod key_front;
 mod key_route;
@@ -35,6 +36,9 @@ mod element_tests;
 
 #[cfg(test)]
 mod window_text_tests;
+
+#[cfg(test)]
+mod insertion_tests;
 
 #[cfg(test)]
 mod live;

@@ -10,32 +10,18 @@
 //! Keys arrive through the typing path and get them (W1b E-7). No user
 //! substitution setting is read or changed.
 
+use senpi_desktop_core::backend::DeliveryMode;
 use senpi_desktop_core::error::CoreResult;
 use senpi_desktop_core::protocol_results::AxInputMethod;
 use senpi_desktop_core::types::DesktopWindow;
 
 use super::element::{inserts_first, report_delivered};
 use super::held::KeyRoute;
+use super::insertion::{before_write, insert_unless_terminal, is_terminal};
 use super::key_front::EntryFront;
 use super::key_window::KeyWindow;
 use super::{guard, keys, MacInput};
 use crate::skylight;
-
-/// Terminal emulators: their accessibility text area is the rendered grid,
-/// not the pty's input, so a write the area accepts never reaches the shell
-/// (omp 18.13.1 `macos/process.rs` `is_terminal`).
-const TERMINALS: [&str; 10] = [
-    "co.zeit.hyper",
-    "com.apple.Terminal",
-    "com.github.wez.wezterm",
-    "com.googlecode.iterm2",
-    "com.mitchellh.ghostty",
-    "dev.warp.Warp-Stable",
-    "dev.zed.Zed.Helper",
-    "io.alacritty",
-    "net.kovidgoyal.kitty",
-    "org.alacritty",
-];
 
 impl MacInput {
     /// Types `text` into `window`, behind the user's app; the caller runs it
@@ -54,13 +40,11 @@ impl MacInput {
         delivered: &mut dyn FnMut(),
     ) -> CoreResult<()> {
         let insert = || {
-            if is_terminal(pid) {
-                return Ok(false);
-            }
-            crate::ax::insert_native_text(pid, wid, text, || {
-                check_stop()?;
-                entry_front.require_behind(skylight::front_pid(), pid, wid)
-            })
+            insert_unless_terminal(
+                is_terminal(pid),
+                || before_write(DeliveryMode::Background, entry_front, skylight::front_pid, (pid, wid), check_stop),
+                |behind_user| crate::ax::insert_native_text(pid, wid, text, behind_user),
+            )
         };
         let keys = |delivered: &mut dyn FnMut()| {
             self.background(|this| {
@@ -89,14 +73,4 @@ pub(super) fn background_window_text(
         return Ok(method);
     }
     keys(delivered).map(|()| AxInputMethod::Keys)
-}
-
-fn is_terminal(pid: libc::pid_t) -> bool {
-    objc2_app_kit::NSRunningApplication::runningApplicationWithProcessIdentifier(pid)
-        .and_then(|app| app.bundleIdentifier())
-        .is_some_and(|bundle| is_terminal_bundle(&bundle.to_string()))
-}
-
-pub(super) fn is_terminal_bundle(bundle: &str) -> bool {
-    TERMINALS.contains(&bundle)
 }

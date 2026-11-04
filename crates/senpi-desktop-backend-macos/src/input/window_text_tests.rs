@@ -7,7 +7,7 @@ use std::cell::RefCell;
 use senpi_desktop_core::error::{DesktopError, ErrorCode};
 use senpi_desktop_core::protocol_results::AxInputMethod;
 
-use super::window_text::{background_window_text, is_terminal_bundle};
+use super::window_text::background_window_text;
 
 /// Runs [`background_window_text`] with an insertion that answers `inserted`
 /// and keys that report one delivery per character, recording each step.
@@ -49,13 +49,6 @@ fn keys_follow_only_when_no_write_was_attempted() {
     assert_eq!(steps, ["insert"]);
     assert_eq!(failed.unwrap_err().code, ErrorCode::AxFailed);
     assert_eq!(delivered, 0);
-}
-
-#[test]
-fn a_terminal_takes_keys_never_an_insertion() {
-    assert!(is_terminal_bundle("com.apple.Terminal"));
-    assert!(is_terminal_bundle("com.mitchellh.ghostty"));
-    assert!(!is_terminal_bundle("com.apple.TextEdit"));
 }
 
 #[test]
