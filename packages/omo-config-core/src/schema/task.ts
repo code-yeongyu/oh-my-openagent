@@ -97,7 +97,7 @@ export const OmoTaskSettingsSchema = z.object({
   state_dir: z.string().optional(),
   reattach_on_reconcile: z.boolean().optional(),
   resume_children: z.boolean().default(true),
-  // Carries a run's Stop/Resume/cancel to the live process that owns a child (#12349); unset means on, false keeps part 1.
+  // Carries a run's stop, resume and cancel requests to the live process that owns a child (#12349); unset means on, false keeps part 1.
   control_channel: z.boolean().optional(),
   warnings: OmoTaskWarningsSchema.default({ unavailable_categories: true }),
   wait: OmoTaskWaitSchema.default({ min_ms: 5000, default_ms: 60000, max_ms: 600000 }),
