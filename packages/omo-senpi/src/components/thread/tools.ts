@@ -177,14 +177,15 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
   const fuzzyCandidates = (entries: ThreadAddressEntry[], allScope: boolean | undefined) => allScope === true ? entries : workspaceEntries(entries, options.callerWorkspaceRoot())
   const create: AnyTool = { ...metadata("thread_create"), parameters: threadToolParamSchemas.thread_create, promptGuidelines: [THREAD_FAMILY_PROMPT_GUIDELINES], execute: (id: string, args: ThreadCreateInput, _signal, _onUpdate, ectx) => execute("thread_create", id, args, ectx, async (current, value, _operationId, callerId) => {
     const entries = resolveEntries(options, current)
-    const plan = await planCreate(options.remote, value, (address) => resolution(options, entries, address, callerId, true))
-    if (plan.kind === "done") return plan.result
-    if (plan.kind === "open-local") return await openLocal(current, plan.address, callerId)
+    // Every check a local create makes runs before any device is asked, so another device refuses the same way.
     if (value.name !== undefined) { const conflict = checkNameConflict(entries, value.name); if (conflict.kind === "error") return { kind: "error", error: conflict } as ThreadToolResult }
     const skills = value.skills === undefined || value.skills.length === 0 ? undefined : checkInitialSkills(value.skills)
     if (skills?.kind === "invalid") return failure("invalid_arguments", `Not a skill name: ${skills.names.join(", ")}. Pass the names of installed skills, never a path or text.`, "Pass skill names as listed by the skill index.", { invalid: skills.names })
     const loaded = skills?.kind === "ok" ? skills.names : undefined
-    const session = await options.host.openSession({ cwd: value.cwd, forkFrom: value.fork_from, name: value.name, ...(loaded === undefined ? {} : { initialSkills: loaded }) })
+    const plan = await planCreate(options.remote, { ...value, ...(loaded === undefined ? {} : { skills: loaded }) }, (address) => resolution(options, entries, address, callerId, true))
+    if (plan.kind === "done") return plan.result
+    if (plan.kind === "open-local") return await withAlias(options.remote, value.alias, await openLocal(current, plan.address, callerId))
+    const session = await options.host.openSession({ cwd: value.cwd, forkFrom: plan.forkFrom ?? value.fork_from, name: value.name, ...(loaded === undefined ? {} : { initialSkills: loaded }) })
     return await withAlias(options.remote, value.alias, await recordThreadCreator(options, current, callerId, { kind: "ok", thread: { ...summary(session), ...(loaded === undefined ? {} : { requested_skills: loaded }) }, deduplicated: false }))
   }) }
   const list: AnyTool = {
@@ -195,7 +196,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
   const read: AnyTool = { ...metadata("thread_read"), parameters: threadToolParamSchemas.thread_read, execute: (id: string, args: ThreadReadInput, _signal, _onUpdate, ectx) => execute("thread_read", id, args, ectx, async (current, value, _operationId, callerId) => {
     const target = await crossTarget(options.remote, value.thread, resolution(options, resolveEntries(options, current), value.thread, callerId, true))
     if (target.kind === "error") return target.result
-    if (target.kind === "remote" && options.remote !== undefined) return await readRemote(options.remote, target.row)
+    if (target.kind === "remote" && options.remote !== undefined) return await readRemote(options.remote, target.row, value)
     return readThread(options, current, { ...value, thread: target.kind === "local" ? target.address : value.thread }, callerId)
   }) }
   const send: AnyTool = { ...metadata("thread_send"), parameters: threadToolParamSchemas.thread_send, execute: (id: string, args: ThreadSendInput, _signal, _onUpdate, ectx) => execute("thread_send", id, args, ectx, async (current, value, operationId, callerId) => deliver(current, value.thread, value, operationId, callerId)) }
@@ -209,24 +210,29 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
       const entries = resolveEntries(options, current)
       const target = await crossTarget(options.remote, value.thread, resolution(options, entries, value.thread, callerId, true))
       if (target.kind === "error") return target.result
-      if (target.kind === "remote" && options.remote !== undefined) {
-        if (value.alias !== undefined) { const refused = await renameAlias(options.remote, target.row.session_id, target.row.device, value.alias, operationId); if (refused !== undefined) return refused }
-        if (value.name !== undefined) { const named = await options.remote.sessions.sessionCommand(target.row.device, target.row.session_id, { type: "set_session_name", sessionId: target.row.session_id, name: value.name.trim() }); if (named.kind !== "ok") return outcomeFailure(named, target.row.device) }
-        return { kind: "ok", thread_id: target.row.session_id, name: value.name?.trim() ?? target.row.title, ...(value.alias === undefined ? {} : { alias: value.alias }), device: target.row.device }
+      const remoteRow = target.kind === "remote" && options.remote !== undefined ? target.row : undefined
+      const resolved = remoteRow === undefined ? resolution(options, entries, target.kind === "local" ? target.address : value.thread, callerId, value.all_scope) : undefined
+      if (resolved?.kind === "error") return { kind: "error", error: resolved }
+      const threadId = remoteRow?.session_id ?? (resolved?.kind === "ok" ? resolved.entry.thread_id : value.thread)
+      // Both legs run the same refusals, all before the alias or the name changes anywhere.
+      const name = value.name?.trim()
+      if (name !== undefined) {
+        if (name.length === 0) return failure("invalid_arguments", "The new thread name is empty.", "Pass a non-empty name.")
+        const visible = value.all_scope === true ? entries : workspaceEntries(entries, options.callerWorkspaceRoot())
+        const existing = visible.find((entry) => entry.thread_id !== threadId && normalizeThreadName(entry.name) === normalizeThreadName(name))
+        if (existing !== undefined) return failure("name_conflict", `A thread named "${existing.name}" already exists.`, "Call thread_list and choose another name.")
       }
-      const resolved = resolution(options, entries, target.kind === "local" ? target.address : value.thread, callerId, value.all_scope)
-      if (resolved.kind === "error") return { kind: "error", error: resolved }
-      if (value.alias !== undefined) { const refused = await renameAlias(options.remote, resolved.entry.thread_id, undefined, value.alias, operationId); if (refused !== undefined) return refused }
-      if (value.name === undefined) return { kind: "ok", thread_id: resolved.entry.thread_id, name: resolved.entry.name, ...(value.alias === undefined ? {} : { alias: value.alias }) }
-      const session = targetSession(current, resolved.entry.thread_id)
-      if (session === undefined) return failure("not_resumable", "The thread has no live owner.", "Retry when the target is live.")
-      const name = value.name.trim()
-      if (name.length === 0) return failure("invalid_arguments", "The new thread name is empty.", "Pass a non-empty name.")
-      const visible = value.all_scope === true ? entries : workspaceEntries(entries, options.callerWorkspaceRoot())
-      const existing = visible.find((entry) => entry.thread_id !== resolved.entry.thread_id && normalizeThreadName(entry.name) === normalizeThreadName(name))
-      if (existing !== undefined) return failure("name_conflict", `A thread named "${existing.name}" already exists.`, "Call thread_list and choose another name.")
-      await sessionPort(options, session).setSessionName(routingId(session), name, resolved.entry.thread_id)
-      return { kind: "ok", thread_id: resolved.entry.thread_id, name }
+      const session = remoteRow === undefined && name !== undefined ? targetSession(current, threadId) : undefined
+      if (remoteRow === undefined && name !== undefined && session === undefined) return failure("not_resumable", "The thread has no live owner.", "Retry when the target is live.")
+      if (value.alias !== undefined) { const refused = await renameAlias(options.remote, threadId, remoteRow?.device, value.alias, operationId); if (refused !== undefined) return refused }
+      if (remoteRow !== undefined && options.remote !== undefined) {
+        if (name !== undefined) { const named = await options.remote.sessions.sessionCommand(remoteRow.device, remoteRow.session_id, { type: "set_session_name", sessionId: remoteRow.session_id, name }); if (named.kind !== "ok") return outcomeFailure(named, remoteRow.device) }
+        return { kind: "ok", thread_id: remoteRow.session_id, name: name ?? remoteRow.title, ...(value.alias === undefined ? {} : { alias: value.alias }), device: remoteRow.device }
+      }
+      if (resolved?.kind !== "ok") return failure("not_found", "The thread could not be resolved.", "Call thread_list and retry.")
+      if (name === undefined || session === undefined) return { kind: "ok", thread_id: threadId, name: resolved.entry.name, ...(value.alias === undefined ? {} : { alias: value.alias }) }
+      await sessionPort(options, session).setSessionName(routingId(session), name, threadId)
+      return { kind: "ok", thread_id: threadId, name, ...(value.alias === undefined ? {} : { alias: value.alias }) }
     }),
   }
   const setModel: AnyTool = {
@@ -291,11 +297,37 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
   }
   return { tools: [create, list, read, send, interrupt, handoff, rename, setModel, setReasoning, ...relayTools], dispose }
 
+  /**
+   * A send to another device has no gateway row to carry its idempotency, so it keeps the same promise through the
+   * tool receipt store: a retry under the same key replays the first answer (deduplicated) and sends nothing.
+   */
+  async function remoteOnce(callerId: string, idempotencyKey: string, value: unknown, run: () => Promise<ThreadToolResult>): Promise<ThreadToolResult> {
+    const scope = { principal: `session:${callerId}`, operation: "thread_send:remote", idempotency_key: idempotencyKey }
+    const admission = await store.toolReceiptBegin({ ...scope, now: now(), args_hash: hashArgs(value) })
+    if (admission.kind === "replay") { const first = admission.result as ThreadToolResult; return first.kind === "ok" && "deduplicated" in first ? { ...first, deduplicated: true } as ThreadToolResult : first }
+    if (admission.kind === "conflict") return failure("idempotency_conflict", "The idempotency key was already used with different arguments.", "Retry with a new idempotency_key.")
+    const note = unsettled.get(receiptKey(scope))
+    if (admission.kind === "in_progress" && note !== undefined) return failure("idempotency_uncertain", "The earlier operation may have been delivered.", "Read the target transcript before deciding whether to retry.", { error_note: note })
+    if (admission.kind === "in_progress") return failure("idempotency_in_progress", "The same operation is already in progress.", "Wait for the earlier call to settle, then retry.")
+    if (admission.kind === "uncertain") return failure("idempotency_uncertain", "The earlier operation may have been delivered.", "Read the target transcript before deciding whether to retry.")
+    const unrecorded = (what: string) => (settleError: unknown) => { unsettled.set(receiptKey(scope), `${what}, and its receipt could not be recorded: ${settleError instanceof Error ? settleError.message : String(settleError)}`) }
+    let result: ThreadToolResult
+    try {
+      result = await run()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      await store.toolReceiptSettle({ ...scope, now: now(), error_note: message }).catch(unrecorded(`the send failed (${message})`))
+      throw error
+    }
+    await store.toolReceiptSettle({ ...scope, now: now(), result }).catch(unrecorded("the send ran"))
+    return result
+  }
+
   async function deliver(current: ThreadHostView, address: string, value: ThreadSendInput | ThreadHandoffInput, idempotencyKey: string, callerId: string, resolvedBy?: "exact_name" | "fuzzy"): Promise<ThreadToolResult> {
     if (options.remote !== undefined && current !== PUBLISHED_SEND_VIEW) {
       const target = await crossTarget(options.remote, address, resolution(options, toThreadAddressEntries(sendAddressBook(options, current, address, true)), address, callerId, true))
       if (target.kind === "error") return target.result
-      if (target.kind === "remote") return await promptRemote(options.remote, target.row, value.message, await nextHop())
+      if (target.kind === "remote") { const row = target.row; const remote = options.remote; return await remoteOnce(callerId, idempotencyKey, value, async () => await promptRemote(remote, row, value.message, await nextHop())) }
       address = target.address
     }
     if (current === PUBLISHED_SEND_VIEW) return await deliverThroughGateway(options, engine, current, address, value, idempotencyKey, callerId, resolvedBy)
