@@ -2,7 +2,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import { lstat, mkdir, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises"
+import { lstat, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join, parse } from "node:path"
 import { COMMAND_SHIM_MARKER } from "./codex-cache-command-shim"
@@ -584,25 +584,31 @@ trusted_hash = "sha256:user"
     // given: the standalone omo build bundles the installer, so the marker string sits in its payload
     const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-standalone-home-"))
     const binDir = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-standalone-bin-"))
-    await writeFile(join(codexHome, "config.toml"), "[features]\nplugins = true\n")
-    const standaloneBin = join(binDir, "omo")
-    await writeFile(
-      standaloneBin,
-      Buffer.concat([Buffer.from([0xcf, 0xfa, 0xed, 0xfe]), Buffer.alloc(1024), Buffer.from(`var marker = "${RUNTIME_WRAPPER_MARKER}";\n`)]),
-    )
+    try {
+      await writeFile(join(codexHome, "config.toml"), "[features]\nplugins = true\n")
+      const standaloneBin = join(binDir, "omo")
+      await writeFile(
+        standaloneBin,
+        Buffer.concat([Buffer.from([0xcf, 0xfa, 0xed, 0xfe]), Buffer.alloc(1024), Buffer.from(`var marker = "${RUNTIME_WRAPPER_MARKER}";\n`)]),
+      )
 
-    // when
-    const result = await cleanupCodexLight({
-      codexHome,
-      binDir,
-      platform: "linux",
-      projectDirectory: codexHome,
-      now: () => new Date("2026-06-01T00:00:00Z"),
-    })
+      // when
+      const result = await cleanupCodexLight({
+        codexHome,
+        binDir,
+        platform: "linux",
+        projectDirectory: codexHome,
+        now: () => new Date("2026-06-01T00:00:00Z"),
+      })
 
-    // then
-    expect(result.removedBinLinks).toEqual([])
-    expect(await pathExists(standaloneBin)).toBe(true)
+      // then
+      expect(result.removedBinLinks).toEqual([])
+      expect(await pathExists(standaloneBin)).toBe(true)
+    } finally {
+      // The temp-leak check fails the run on leftovers; remove what this test created (#9766).
+      await rm(codexHome, { recursive: true, force: true })
+      await rm(binDir, { recursive: true, force: true })
+    }
   })
 
   test("#given a managed windows wrapper left on disk with different casing #when cleanup runs #then it is still removed", async () => {
