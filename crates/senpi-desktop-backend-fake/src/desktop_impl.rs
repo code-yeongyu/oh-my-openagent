@@ -4,6 +4,7 @@ use senpi_desktop_core::backend::{AxBackend, Backend, DeliveryMode, ElementDeliv
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::frame::{FrameGeometry, MAX_COMPOSITE_PIXELS};
 use senpi_desktop_core::keys::KeyName;
+use senpi_desktop_core::protocol_results::MenuReport;
 use senpi_desktop_core::types::{
     CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, FrontWindow, Target,
 };
@@ -104,7 +105,7 @@ impl Backend for FakeBackend {
         frame: &FrameGeometry,
         mode: DeliveryMode,
         choice: MenuChoice<'_>,
-    ) -> CoreResult<()> {
+    ) -> CoreResult<Option<MenuReport>> {
         self.pointer_menu_impl(target, ev, frame, mode, choice)
     }
 

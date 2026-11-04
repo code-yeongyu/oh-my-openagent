@@ -28,8 +28,8 @@ use std::time::{Duration, Instant};
 use crate::error::{CoreResult, DesktopError, ErrorCode};
 
 pub use self::choose::listing;
-pub use self::classify::{may_open, may_open_context_menu, opens_menu, watch_timeout};
-pub use self::guard::guard;
+pub use self::classify::{may_open, may_open_context_menu, menu_watch, opens_menu, watch_timeout};
+pub use self::guard::{guard, Watch};
 pub use self::settle::{settle_with, PressChecks};
 
 /// How long a context menu may take to appear after the right-click or
@@ -103,11 +103,7 @@ pub trait Menus {
 pub enum Press<'a> {
     /// A pointer gesture of `kind`, such as "click", delivered to the window
     /// `id` of application `app`.
-    Pointer {
-        kind: &'a str,
-        id: &'a str,
-        app: &'a str,
-    },
+    Pointer { kind: &'a str, id: &'a str, app: &'a str },
     /// An accessibility action, such as `AXPress`.
     Action(&'a str),
 }
@@ -143,11 +139,7 @@ pub const fn stops_the_call(error: &DesktopError) -> bool {
 /// The process that shows the menus of an element of `app_pid` whose window
 /// is `drawn`: the window's owner (`owner_of`), which for a system Open or
 /// Save panel is `openAndSavePanelService`, or else `app_pid`.
-pub fn menu_process(
-    app_pid: i32,
-    drawn: Option<u32>,
-    owner_of: impl FnOnce(u32) -> Option<i32>,
-) -> i32 {
+pub fn menu_process(app_pid: i32, drawn: Option<u32>, owner_of: impl FnOnce(u32) -> Option<i32>) -> i32 {
     drawn.and_then(owner_of).unwrap_or(app_pid)
 }
 
@@ -165,6 +157,8 @@ pub fn new_menu(before: &[MenuWindow], now: &[MenuWindow]) -> Option<MenuWindow>
 
 #[cfg(test)]
 mod fake;
+#[cfg(test)]
+mod guard_list_tests;
 #[cfg(test)]
 mod guard_tests;
 #[cfg(test)]

@@ -1,6 +1,6 @@
 import type { EngineMethod } from "@oh-my-opencode/senpi-desktop-protocol";
 import { ComputerRunError, type FacadeMethod, facadeMethod, type MethodTiers, type RunScope } from "./context";
-import type { CaptureRegion } from "./engine-results";
+import { type CaptureRegion, expectResult, isMenuReport, type MenuReport, optional } from "./engine-results";
 import { callHold } from "./hold-call";
 import { captureScreenshot, type ScreenshotOptions, type ScreenshotResult } from "./screenshot";
 
@@ -77,6 +77,18 @@ export function send(method: FacadeMethod, name: string, engineMethod: EngineMet
 	});
 }
 
+/** Facade `method` sending one press that may open a menu; the engine answers with the menu's items or null. */
+function sendPress(
+	method: FacadeMethod,
+	name: string,
+	engineMethod: EngineMethod,
+	params: object,
+): Promise<MenuReport | null> {
+	return method(name, async ({ call }) =>
+		expectResult(engineMethod, (await call(engineMethod, params)) ?? null, optional(isMenuReport)),
+	);
+}
+
 /**
  * Input helpers aimed at one engine target (`desktop` or a window id). `x`/`y` are pixels of the
  * target's latest capture; the engine owns that frame and fails `InvalidCoordinateFrame` without one.
@@ -101,23 +113,24 @@ export class InputTarget {
 		return this.#method("zoom", (scope) => captureScreenshot(scope, this.#target, options, region));
 	}
 
-	click(x: number, y: number, options?: ClickOptions): Promise<void> {
+	click(x: number, y: number, options?: ClickOptions): Promise<MenuReport | null> {
 		const params = { target: this.#target, x, y, opts: pointerOptions(options), ...menuParam(options) };
-		return send(this.#method, "click", "click", params);
+		return sendPress(this.#method, "click", "click", params);
 	}
 
-	doubleClick(x: number, y: number, options?: ClickOptions): Promise<void> {
+	doubleClick(x: number, y: number, options?: ClickOptions): Promise<MenuReport | null> {
 		const opts = pointerOptions({ ...options, count: 2 });
-		return send(this.#method, "doubleClick", "click", { target: this.#target, x, y, opts });
+		const params = { target: this.#target, x, y, opts, ...menuParam(options) };
+		return sendPress(this.#method, "doubleClick", "click", params);
 	}
 
 	move(x: number, y: number): Promise<void> {
 		return send(this.#method, "move", "moveMouse", { target: this.#target, x, y });
 	}
 
-	drag(points: readonly (readonly [number, number])[], options?: ClickOptions): Promise<void> {
+	drag(points: readonly (readonly [number, number])[], options?: ClickOptions): Promise<MenuReport | null> {
 		const path = points.map(([x, y]) => ({ x, y }));
-		return send(this.#method, "drag", "drag", { target: this.#target, path, opts: pointerOptions(options) });
+		return sendPress(this.#method, "drag", "drag", { target: this.#target, path, opts: pointerOptions(options) });
 	}
 
 	scroll(x: number, y: number, options: ScrollOptions = {}): Promise<void> {

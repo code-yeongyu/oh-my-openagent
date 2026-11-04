@@ -14,9 +14,10 @@ use objc2_core_foundation::CFRetained;
 use senpi_desktop_core::backend::MenuChoice;
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::menus::open_menu::{
-    guard, menu_process, owns_menu, settle_with, Entry, MenuWindow, Menus, Press, PressChecks,
-    CONTROL_MENU_TIMEOUT,
+    guard, may_open, menu_process, opens_menu, owns_menu, settle_with, Entry, MenuWindow, Menus,
+    Press, PressChecks, Watch, CONTROL_MENU_TIMEOUT,
 };
+use senpi_desktop_core::protocol_results::MenuReport;
 
 use super::menus::{bounded_children, element_pid};
 use super::{actions, element};
@@ -139,6 +140,33 @@ fn hit_test(app: &AXUIElement, x: f64, y: f64) -> Option<CFRetained<AXUIElement>
     element::retained_element(output).ok()
 }
 
+/// Whether a click at global point `(x, y)` lands on a menu button or popup
+/// button of `pid`, or on a label or image inside one (up to [`MAX_ASCENT`]
+/// levels of static text, image or group).
+pub(crate) fn opens_menu_at(pid: libc::pid_t, x: f64, y: f64) -> bool {
+    let Ok(app) = element::create_application(pid) else {
+        return false;
+    };
+    if element::set_timeout(&app).is_err() {
+        return false;
+    }
+    let Some(mut found) = hit_test(&app, x, y) else {
+        return false;
+    };
+    for _ in 0..MAX_ASCENT {
+        match element::copy_string(&found, "AXRole").as_deref() {
+            role if opens_menu(role) => return true,
+            Some("AXStaticText" | "AXImage" | "AXGroup") => {}
+            _ => return false,
+        }
+        let Some(parent) = element::copy_element(&found, "AXParent") else {
+            return false;
+        };
+        found = parent;
+    }
+    false
+}
+
 /// The pid of the application whose element is at global point `(x, y)`,
 /// when accessibility can say: a remote view reports the hosting application
 /// rather than the service drawing it.
@@ -158,17 +186,25 @@ pub(crate) fn still_behind(pid: libc::pid_t) -> CoreResult<()> {
     Ok(())
 }
 
-/// `ax.perform` with a menu path: performs `action` on `element`, then chooses
-/// `choice.path` in the menu it opened and closes that menu. A background
-/// application's element is made key in its own application first, without
-/// raising it, so the menu opens where the press lands.
+/// `ax.perform` for an action that may open a menu: performs `action` on
+/// `element`, then chooses `choice.path` in the menu it opened, or (D1, in a
+/// background application) reads its items and closes it. A frontmost
+/// application's menu stays open for the next call unless a path is given. A
+/// background application's element is made key in its own application
+/// first, without raising it, so the menu opens where the press lands.
 pub(super) fn perform_menu(
     element: &AXUIElement,
     action: &str,
     choice: MenuChoice<'_>,
-) -> CoreResult<()> {
+) -> CoreResult<Option<MenuReport>> {
     let native = actions::action_name(action);
     let pid = element_pid(element)?;
+    let background = front_app::current_front_pid() != Some(pid);
+    let watched = choice.path.is_some()
+        || (background && may_open(action, || element::copy_string(element, "AXRole")));
+    if !watched {
+        return actions::perform_requested(element, action).map(|()| None);
+    }
     let drawn = element::owner_window_id(element);
     let menu_pid = menu_process(pid, drawn, capture::window_owner_pid);
     let before = capture::menu_windows(menu_pid).ok_or_else(|| {
@@ -177,7 +213,6 @@ pub(super) fn perform_menu(
              closed; nothing was performed"
         ))
     })?;
-    let background = front_app::current_front_pid() != Some(pid);
     let holds = move || {
         if background {
             still_behind(pid)
@@ -189,6 +224,7 @@ pub(super) fn perform_menu(
         stop: choice.check_stop,
         holds: &holds,
     };
+    let watch = choice.path.map_or(Watch::ListAndClose, Watch::Choose);
     reporting_partial(|| {
         if let (true, Some(wid)) = (background, drawn) {
             skylight::activate_without_raise(pid, wid)?;
@@ -197,7 +233,7 @@ pub(super) fn perform_menu(
             &mut AxMenus::new(menu_pid, pid),
             Press::Action(&native),
             Some(&before),
-            Some(choice.path),
+            watch,
             |_| actions::perform_requested(element, action),
             |menus, before, path| settle_with(menus, before, path, CONTROL_MENU_TIMEOUT, &checks),
         )

@@ -6,7 +6,7 @@ use senpi_desktop_core::protocol_params::{
     AxSelectTextParams, AxTypeTextParams, BringToCurrentSpaceParams, CaptureParams, CaptureRegionParams, ClipboardText, ControlGrantParams, DragParams, KeyChordParams, MenuPathParams, MenuSelectParams, PointParams,
     HoldKeysParams, HoldMouseParams, ObserveParams, RaiseWindowParams, ScrollParams, TypeTextParams,
 };
-use senpi_desktop_core::protocol_results::{AxInputResult, AxTextSelection, ControlStateResult};
+use senpi_desktop_core::protocol_results::{AxInputResult, AxTextSelection, ControlStateResult, MenuReport};
 use senpi_desktop_core::types::{
     AxNode, AxSnapshot, CaptureResult, DesktopCapabilities, DesktopDisplay, DesktopWindow, ObserveResult,
 };
@@ -76,4 +76,7 @@ pub enum Response {
     Clipboard(ClipboardText),
     ControlState(ControlStateResult),
     MenuItems(Vec<MenuItem>),
+    /// A press that may open a menu: the items of a menu it opened and
+    /// closed, or `null` (chosen, or no menu).
+    MenuOutcome(Option<MenuReport>),
 }

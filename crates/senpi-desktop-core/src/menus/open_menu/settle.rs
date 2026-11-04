@@ -55,8 +55,12 @@ pub fn settle_with<M: Menus>(
     let (refusal, items) = match (path, &menu) {
         (Some(path), Some(menu)) => match choose(menus, menu, path) {
             Ok(leaf) => match (checks.stop)().and_then(|()| check_press()).and_then(|()| (checks.holds)()) {
-                Err(error) if stops_the_call(&error) => {
-                    close(menus, window, Some(menu))?;
+                Err(mut error) if stops_the_call(&error) => {
+                    // The stop is what the call reports; a menu that would not
+                    // close is added to it, never swapped for it.
+                    if !close(menus, window, Some(menu)).unwrap_or(false) {
+                        error.message.push_str("; the menu the press opened is still open and keeps the user's keyboard");
+                    }
                     return Err(error);
                 }
                 Err(error) => (Some(error.message), String::new()),

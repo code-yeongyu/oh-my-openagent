@@ -81,7 +81,7 @@ fn a_right_click_with_a_menu_path_chooses_the_item_in_the_menu_it_opened() {
     let mut harness = harness(&finder_like());
     let frame = harness.capture("101");
     let reply = harness.process(right_click(&frame, &["rename"]));
-    assert_eq!(reply, Ok(Response::Unit));
+    assert_eq!(reply, Ok(Response::MenuOutcome(None)));
     assert_eq!(
         menu_ops(&harness),
         [SinkOp::MenuChosen {
@@ -180,7 +180,7 @@ fn show_menu_on_an_element_chooses_the_item_in_the_menu_it_opened() {
         action: "showMenu".to_owned(),
         menu: Some(vec!["Duplicate".to_owned()]),
     }));
-    assert_eq!(reply, Ok(Response::Unit));
+    assert_eq!(reply, Ok(Response::MenuOutcome(None)));
     assert_eq!(
         menu_ops(&harness),
         [SinkOp::MenuChosen {
@@ -224,7 +224,7 @@ fn clicking_a_popup_button_with_a_path_chooses_in_its_menu() {
         opts: None,
         menu: Some(vec!["Rename".to_owned()]),
     }));
-    assert_eq!(reply, Ok(Response::Unit));
+    assert_eq!(reply, Ok(Response::MenuOutcome(None)));
     assert_eq!(
         menu_ops(&harness),
         [SinkOp::MenuChosen {

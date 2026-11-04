@@ -18,6 +18,12 @@ interface ComputerHoldMouseOptions extends ComputerHoldOptions {
 	readonly frameId?: string;
 }
 
+/** What a press that opened a menu did with it: the items of a menu it read and closed with nothing chosen, so the next call can name one with `menu`. */
+interface ComputerMenuReport {
+	/** The menu's items in menu order, disabled ones marked, enabled submenus followed by their items in brackets. */
+	items: string;
+}
+
 /** A press that opens a menu chooses this path of item labels in it and closes the menu before returning. */
 interface ComputerMenuOptions {
 	/** Labels from the opened menu down to a command, matched like `win.menu.select`; an empty path is refused. */
@@ -200,9 +206,9 @@ interface ComputerElement {
 	attributes(): Promise<Record<string, string>>;
 	actions(): Promise<string[]>;
 	/** Perform a native action; with `menu`, choose that path in the menu `AXShowMenu` or a menu control's press opens. */
-	perform(action: string, options?: ComputerMenuOptions): Promise<void>;
+	perform(action: string, options?: ComputerMenuOptions): Promise<ComputerMenuReport | null>;
 	/** Perform the element's native press action; needs no screenshot. With `menu`, choose that path in the menu the press opens. */
-	press(options?: ComputerMenuOptions): Promise<void>;
+	press(options?: ComputerMenuOptions): Promise<ComputerMenuReport | null>;
 	/**
 	 * Press a chord ("cmd+a" or ["cmd", "a"]) in this element without taking the user's focus (macOS); keys go out only
 	 * once the element holds its app's keyboard focus, else `BackgroundUnavailable` (`InputFailed` in the foreground) with
@@ -210,7 +216,7 @@ interface ComputerElement {
 	 */
 	press(chord: string | string[], options?: ComputerDeliveryOptions): Promise<void>;
 	/** Click the element's center with native input; `button: "right"` plus `menu` chooses in its context menu. */
-	click(options?: ComputerClickOptions): Promise<void>;
+	click(options?: ComputerClickOptions): Promise<ComputerMenuReport | null>;
 	/** Two clicks at the element's center with native input. */
 	doubleClick(options?: Omit<ComputerClickOptions, "count">): Promise<void>;
 	/**
@@ -238,10 +244,11 @@ interface ComputerInputTarget {
 	screenshot(options?: ComputerScreenshotOptions): Promise<ComputerScreenshotResult>;
 	/** Fresh native-detail crop; later clicks still use the last full screenshot's coordinates. */
 	zoom(region: ComputerCaptureRegion, options?: ComputerScreenshotOptions): Promise<ComputerScreenshotResult>;
-	click(x: number, y: number, options?: ComputerClickOptions): Promise<void>;
-	doubleClick(x: number, y: number, options?: Omit<ComputerClickOptions, "count">): Promise<void>;
+	/** Resolves with the items of a background menu the click opened and closed (macOS), else null. */
+	click(x: number, y: number, options?: ComputerClickOptions): Promise<ComputerMenuReport | null>;
+	doubleClick(x: number, y: number, options?: Omit<ComputerClickOptions, "count">): Promise<ComputerMenuReport | null>;
 	move(x: number, y: number): Promise<void>;
-	drag(points: Array<[number, number]>, options?: ComputerDragOptions): Promise<void>;
+	drag(points: Array<[number, number]>, options?: ComputerDragOptions): Promise<ComputerMenuReport | null>;
 	scroll(x: number, y: number, options?: ComputerScrollOptions): Promise<void>;
 	type(text: string, options?: ComputerDeliveryOptions): Promise<void>;
 	/** Key chord such as `"cmd+shift+p"` or `["cmd", "shift", "p"]`. */

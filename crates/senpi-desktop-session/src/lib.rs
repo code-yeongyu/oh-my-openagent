@@ -34,6 +34,10 @@ mod worker_holds;
 mod worker_menus;
 mod worker_spaces;
 #[cfg(test)]
+mod worker_menu_background_tests;
+#[cfg(test)]
+mod worker_menu_hold_tests;
+#[cfg(test)]
 mod worker_open_menu_tests;
 #[cfg(test)]
 mod worker_drag_guard_tests;

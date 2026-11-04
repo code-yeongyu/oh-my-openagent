@@ -48,9 +48,32 @@ pub const fn watch_timeout(event: &PointerEvent) -> Duration {
     }
 }
 
+/// How long `event` waits for a menu it may open, or `None` when none is
+/// watched for: in an application behind the user's (`background`), a
+/// secondary press may open a context menu, and a left press on a menu button
+/// or popup button (`on_menu_control`) opens its menu; any press with a
+/// `menu` path waits for its menu wherever it opens. A frontmost
+/// application's menu stays open for the next call, as the user's would.
+/// Nothing is refused for being menu-shaped (D1): a multi-click, a drag or a
+/// hold on a menu control is delivered as the one press that opens the menu.
+pub fn menu_watch(
+    event: &PointerEvent,
+    background: bool,
+    menu: bool,
+    on_menu_control: impl FnOnce() -> bool,
+) -> Option<Duration> {
+    if may_open_context_menu(event) {
+        return (background || menu).then_some(CONTEXT_MENU_TIMEOUT);
+    }
+    if menu {
+        return Some(CONTROL_MENU_TIMEOUT);
+    }
+    (background && on_menu_control()).then_some(CONTROL_MENU_TIMEOUT)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{may_open, may_open_context_menu, watch_timeout};
+    use super::{may_open, may_open_context_menu, menu_watch, watch_timeout};
     use crate::backend::{Modifiers, MouseButton, PointerEvent};
     use crate::menus::open_menu::{CONTEXT_MENU_TIMEOUT, CONTROL_MENU_TIMEOUT};
 
@@ -84,6 +107,41 @@ mod tests {
         assert_eq!(
             watch_timeout(&click(MouseButton::Left, false)),
             CONTROL_MENU_TIMEOUT
+        );
+    }
+
+    #[test]
+    fn a_background_secondary_press_or_menu_control_press_is_watched_even_without_a_path() {
+        let unread = || -> bool { panic!("a secondary press pays no hit-test") };
+        assert_eq!(
+            menu_watch(&click(MouseButton::Right, false), true, false, unread),
+            Some(CONTEXT_MENU_TIMEOUT)
+        );
+        assert_eq!(
+            menu_watch(&click(MouseButton::Right, false), false, false, unread),
+            None
+        );
+        assert_eq!(
+            menu_watch(&click(MouseButton::Right, false), false, true, unread),
+            Some(CONTEXT_MENU_TIMEOUT)
+        );
+        assert_eq!(
+            menu_watch(&click(MouseButton::Left, false), true, false, || true),
+            Some(CONTROL_MENU_TIMEOUT)
+        );
+        assert_eq!(
+            menu_watch(&click(MouseButton::Left, false), true, false, || false),
+            None
+        );
+        // The frontmost app's menu stays open for the next call, as the user's would.
+        let front = || -> bool { panic!("a frontmost press pays no hit-test") };
+        assert_eq!(
+            menu_watch(&click(MouseButton::Left, false), false, false, front),
+            None
+        );
+        assert_eq!(
+            menu_watch(&click(MouseButton::Left, false), false, true, front),
+            Some(CONTROL_MENU_TIMEOUT)
         );
     }
 

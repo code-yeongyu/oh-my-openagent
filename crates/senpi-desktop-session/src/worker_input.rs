@@ -75,16 +75,13 @@ impl Worker {
                 count: options.count,
                 modifiers: options.modifiers,
             };
-            let Some(path) = &params.menu else {
-                return worker.pointer(&target, event, &frame, options.mode);
-            };
             let check_stop = || interrupted(&supervisor, &policy, cancelled, "choosing a menu item");
             let choice = MenuChoice {
-                path,
+                path: params.menu.as_deref(),
                 check_stop: &check_stop,
             };
-            worker.backend()?.pointer_menu(&target, event, &frame, options.mode, choice)?;
-            Ok(Response::Unit)
+            let report = worker.backend()?.pointer_menu(&target, event, &frame, options.mode, choice)?;
+            Ok(Response::MenuOutcome(report))
         })
     }
 
@@ -120,6 +117,8 @@ impl Worker {
                 ParsedPointerOptions::requested_mode(params.opts.as_ref()),
             )
         };
+        let supervisor = self.safety.supervisor.clone();
+        let policy = self.stop_policy();
         self.mutate(&mutation, cancelled, |worker| {
             let options = ParsedPointerOptions::parse(params.opts.as_ref())?;
             let (frame, current) = worker.frame_for(&target, params.frame_id.as_deref())?;
@@ -133,7 +132,15 @@ impl Worker {
                 button: options.button,
                 modifiers: options.modifiers,
             };
-            worker.pointer(&target, event, &frame, options.mode)
+            // A drag that starts on a menu control is one press that opens the
+            // menu (D1): the backend lists and closes it.
+            let check_stop = || interrupted(&supervisor, &policy, cancelled, "dragging");
+            let choice = MenuChoice {
+                path: None,
+                check_stop: &check_stop,
+            };
+            let report = worker.backend()?.pointer_menu(&target, event, &frame, options.mode, choice)?;
+            Ok(Response::MenuOutcome(report))
         })
     }
 

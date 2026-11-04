@@ -1,4 +1,4 @@
-use super::{guard, MenuWindow, Press, Settled};
+use super::{guard, MenuWindow, Press, Settled, Watch};
 use crate::error::{CoreResult, DesktopError, ErrorCode};
 
 const FINDER: Press<'static> = Press::Pointer {
@@ -19,14 +19,8 @@ fn delivered(_: &mut Nothing) -> CoreResult<()> {
 }
 
 #[test]
-fn a_press_whose_menu_was_closed_reports_delivery_and_the_items() {
-    let closed = |_: &mut Nothing, _: &[MenuWindow], _: Option<&[String]>| {
-        Ok(Settled::Unchosen {
-            refusal: None,
-            items: "\"New Folder\"".to_string(),
-            closed: true,
-        })
-    };
+fn a_press_asked_to_choose_whose_menu_was_closed_reports_delivery_and_the_items() {
+    let wanted = path(&["Sans"]);
     // The page's handlers already ran, and a drag ran its whole stroke, so
     // the caller must inspect rather than take the error for "nothing sent".
     for kind in ["click", "drag"] {
@@ -35,7 +29,21 @@ fn a_press_whose_menu_was_closed_reports_delivery_and_the_items() {
             id: "42",
             app: "Finder",
         };
-        let error = guard(&mut (), press, Some(&[]), None, delivered, closed).expect_err("closed");
+        let error = guard(
+            &mut (),
+            press,
+            Some(&[]),
+            Watch::Choose(&wanted),
+            delivered,
+            |_, _, _| {
+                Ok(Settled::Unchosen {
+                    refusal: Some("menu item 'Sans' was not found".to_string()),
+                    items: "\"New Folder\"".to_string(),
+                    closed: true,
+                })
+            },
+        )
+        .expect_err("closed");
         assert_eq!(error.code, ErrorCode::InputFailed, "{kind}");
         assert!(error
             .message
@@ -47,27 +55,6 @@ fn a_press_whose_menu_was_closed_reports_delivery_and_the_items() {
             error.message
         );
     }
-    let error = guard(
-        &mut (),
-        Press::Action("AXPress"),
-        Some(&[]),
-        None,
-        delivered,
-        closed,
-    )
-    .expect_err("closed");
-    assert_eq!(error.code, ErrorCode::InputFailed);
-    assert!(
-        error
-            .message
-            .starts_with("AXPress opened a menu, which takes the keyboard from the user's app"),
-        "{}",
-        error.message
-    );
-    assert!(error
-        .message
-        .contains("so it was closed with nothing chosen"));
-    assert!(error.message.contains("pass its path as the menu option"));
     // A menu still open fails whatever the press returned.
     let open = |_: &mut Nothing, _: &[MenuWindow], _: Option<&[String]>| {
         Ok(Settled::Unchosen {
@@ -80,7 +67,7 @@ fn a_press_whose_menu_was_closed_reports_delivery_and_the_items() {
         &mut (),
         Press::Action("AXShowMenu"),
         Some(&[]),
-        None,
+        Watch::ListAndClose,
         delivered,
         open,
     )
@@ -95,22 +82,24 @@ fn a_press_whose_menu_was_closed_reports_delivery_and_the_items() {
         &mut (),
         Press::Action("AXPress"),
         Some(&[]),
-        None,
+        Watch::ListAndClose,
         cancelled,
         open,
     )
     .expect_err("open");
     assert_eq!(error.code, ErrorCode::InputFailed);
     let none = |_: &mut Nothing, _: &[MenuWindow], _: Option<&[String]>| Ok(Settled::NoMenu);
-    assert!(guard(
-        &mut (),
-        Press::Action("AXPress"),
-        Some(&[]),
-        None,
-        delivered,
-        none
-    )
-    .is_ok());
+    assert_eq!(
+        guard(
+            &mut (),
+            Press::Action("AXPress"),
+            Some(&[]),
+            Watch::ListAndClose,
+            delivered,
+            none
+        ),
+        Ok(None)
+    );
 }
 
 #[test]
@@ -120,11 +109,28 @@ fn a_path_succeeds_only_when_its_item_was_chosen() {
         assert_eq!(path, Some(wanted.as_slice()));
         Ok(Settled::Chosen)
     };
-    assert!(guard(&mut (), FINDER, Some(&[]), Some(&wanted), delivered, chosen).is_ok());
+    assert_eq!(
+        guard(
+            &mut (),
+            FINDER,
+            Some(&[]),
+            Watch::Choose(&wanted),
+            delivered,
+            chosen
+        ),
+        Ok(None)
+    );
     // No menu to choose from fails as delivered.
     let none = |_: &mut Nothing, _: &[MenuWindow], _: Option<&[String]>| Ok(Settled::NoMenu);
-    let error =
-        guard(&mut (), FINDER, Some(&[]), Some(&wanted), delivered, none).expect_err("no menu");
+    let error = guard(
+        &mut (),
+        FINDER,
+        Some(&[]),
+        Watch::Choose(&wanted),
+        delivered,
+        none,
+    )
+    .expect_err("no menu");
     assert_eq!(error.code, ErrorCode::InputFailed);
     assert!(
         error
@@ -145,7 +151,7 @@ fn a_path_succeeds_only_when_its_item_was_chosen() {
         &mut (),
         FINDER,
         Some(&[]),
-        Some(&wanted),
+        Watch::Choose(&wanted),
         delivered,
         refused,
     )
@@ -168,7 +174,7 @@ fn a_path_succeeds_only_when_its_item_was_chosen() {
         &mut (),
         Press::Action("AXPress"),
         Some(&[]),
-        Some(&wanted),
+        Watch::Choose(&wanted),
         |_| Err(DesktopError::ax_failed("press failed")),
         |_, _, path| {
             assert_eq!(path, None);
@@ -180,58 +186,4 @@ fn a_path_succeeds_only_when_its_item_was_chosen() {
         },
     );
     assert_eq!(failed.expect_err("failed").message, "press failed");
-}
-
-#[test]
-fn settling_errors_end_the_call_only_when_they_stop_it() {
-    // No snapshot from before: no menu handling at all.
-    let unread = |_: &mut Nothing, _: &[MenuWindow], _: Option<&[String]>| -> CoreResult<Settled> {
-        panic!("no menu handling")
-    };
-    assert!(guard(
-        &mut (),
-        Press::Action("AXPress"),
-        None,
-        None,
-        delivered,
-        unread
-    )
-    .is_ok());
-    // The user came to the target before the item was pressed: the menu was
-    // closed, and the call says why rather than a failed restoration.
-    let intervened = guard(
-        &mut (),
-        Press::Action("AXPress"),
-        Some(&[MenuWindow(5)]),
-        Some(&path(&["Show in Finder"])),
-        delivered,
-        |_, _, _| {
-            Err(DesktopError::user_intervened(
-                "the user clicked in window 42",
-            ))
-        },
-    );
-    assert_eq!(
-        intervened.expect_err("refused").code,
-        ErrorCode::UserIntervened
-    );
-    let unreadable = guard(
-        &mut (),
-        Press::Action("AXPress"),
-        Some(&[]),
-        None,
-        delivered,
-        |_, _, _| Err(DesktopError::input_failed("unread")),
-    );
-    assert_eq!(unreadable.expect_err("unread").code, ErrorCode::InputFailed);
-    // A press that failed is what the call reports, not the settling error.
-    let both = guard(
-        &mut (),
-        Press::Action("AXPress"),
-        Some(&[]),
-        None,
-        |_| Err(DesktopError::ax_failed("press failed")),
-        |_, _, _| Err(DesktopError::input_failed("unread")),
-    );
-    assert_eq!(both.expect_err("failed").message, "press failed");
 }

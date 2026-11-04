@@ -1,5 +1,5 @@
 {
-  "description": "the menu option (#11459, W3): a background right-click with menu chooses that item in the context menu it opened and closes the menu (result null, audited as a click); a path that matches nothing is InputFailed naming the menu's items with the menu closed; an empty path is InvalidTarget before anything is sent; ax.perform showMenu with menu chooses the item the same way.",
+  "description": "the menu option (#11459, W3): a background right-click with menu chooses that item in the context menu it opened and closes the menu (result null, audited as a click); a path that matches nothing is InputFailed naming the menu's items with the menu closed; an empty path is InvalidTarget before anything is sent; ax.perform showMenu with menu chooses the item the same way. A background right-click without menu (D1) opens, reads and closes the menu and succeeds with the item listing.",
   "scenario": "crates/senpi-desktop-backend-fake/fixtures/menu-option.json",
   "env": {
     "SENPI_DESKTOP_FAKE_CLOCK": "1"
@@ -141,7 +141,7 @@
               "height": 600,
               "sourceWidth": 800,
               "sourceHeight": 600,
-              "scale": 1.0,
+              "scale": 1,
               "target": "101",
               "frameId": "frame-1",
               "note": null,
@@ -170,8 +170,8 @@
         "method": "click",
         "params": {
           "target": "101",
-          "x": 10.0,
-          "y": 10.0,
+          "x": 10,
+          "y": 10,
           "frameId": "frame-1",
           "opts": {
             "button": "right"
@@ -222,8 +222,8 @@
         "method": "click",
         "params": {
           "target": "101",
-          "x": 10.0,
-          "y": 10.0,
+          "x": 10,
+          "y": 10,
           "frameId": "frame-1",
           "opts": {
             "button": "right"
@@ -282,8 +282,8 @@
         "method": "click",
         "params": {
           "target": "101",
-          "x": 10.0,
-          "y": 10.0,
+          "x": 10,
+          "y": 10,
           "frameId": "frame-1",
           "opts": {
             "button": "right"
@@ -389,6 +389,56 @@
               "target": "101",
               "delivery": "background",
               "frameId": null,
+              "code": null,
+              "durationMs": 0,
+              "focusRestored": null,
+              "textLength": null,
+              "textSha256": null,
+              "keys": null
+            }
+          },
+          "variable": [
+            "/params/durationMs",
+            "/params/focusRestored"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 10,
+        "method": "click",
+        "params": {
+          "target": "101",
+          "x": 10,
+          "y": 10,
+          "frameId": "frame-1",
+          "opts": {
+            "button": "right"
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 10,
+            "result": {
+              "items": "\"Add to\" ▸ [\"Bench Holdout\", \"Serif…\"], \"Remove\" (disabled), \"Show in Finder\""
+            }
+          },
+          "variable": []
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "audit",
+            "params": {
+              "action": "click",
+              "target": "101",
+              "delivery": "background",
+              "frameId": "frame-1",
               "code": null,
               "durationMs": 0,
               "focusRestored": null,

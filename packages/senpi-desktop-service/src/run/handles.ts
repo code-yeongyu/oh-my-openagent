@@ -6,7 +6,9 @@ import {
 	type AxTextSelection,
 	type DesktopWindow,
 	type MenuItem,
+	type MenuReport,
 	expectResult,
+	isMenuReport,
 	isAttributePairs,
 	isAxInputResult,
 	isAxNode,
@@ -167,6 +169,12 @@ export class ElementHandle {
 		});
 	}
 
+	#sendPress(method: string, params: object): Promise<MenuReport | null> {
+		return this.#method(method, async ({ call }) =>
+			expectResult("ax.perform", (await call("ax.perform", { ref: this.ref, ...params })) ?? null, optional(isMenuReport)),
+		);
+	}
+
 	#node<T>(method: string, project: (node: AxNode) => T): Promise<T> {
 		return this.#method(method, async ({ call }) =>
 			project(expectResult("ax.node", await call("ax.node", { ref: this.ref }), isAxNode)),
@@ -200,8 +208,8 @@ export class ElementHandle {
 		return this.#node("actions", (node) => node.actions ?? []);
 	}
 
-	perform(action: string, options?: MenuOptions): Promise<void> {
-		return this.#send("perform", "ax.perform", { action, ...menuParam(options) });
+	perform(action: string, options?: MenuOptions): Promise<MenuReport | null> {
+		return this.#sendPress("perform", { action, ...menuParam(options) });
 	}
 
 	/**
@@ -210,17 +218,23 @@ export class ElementHandle {
 	 * only once the element holds its app's keyboard focus and are never sent to an element that did not take it.
 	 * Foreground delivery raises the window first and needs the grant.
 	 */
-	press(options?: MenuOptions): Promise<void>;
+	press(options?: MenuOptions): Promise<MenuReport | null>;
 	press(chord: string | readonly string[], options?: DeliveryOptions): Promise<void>;
-	press(chordOrOptions?: string | readonly string[] | MenuOptions, options?: DeliveryOptions): Promise<void> {
+	press(chordOrOptions?: string | readonly string[] | MenuOptions, options?: DeliveryOptions): Promise<MenuReport | null | void> {
 		if (isChord(chordOrOptions)) {
 			return this.#send("press", "ax.keyChord", { keys: chordKeys(chordOrOptions), opts: pointerOptions(options) });
 		}
-		return this.#send("press", "ax.perform", { action: "press", ...menuParam(chordOrOptions) });
+		return this.#sendPress("press", { action: "press", ...menuParam(chordOrOptions) });
 	}
 
-	click(options?: ClickOptions): Promise<void> {
-		return this.#send("click", "ax.click", { opts: pointerOptions(options), ...menuParam(options) });
+	click(options?: ClickOptions): Promise<MenuReport | null> {
+		return this.#method("click", async ({ call }) =>
+			expectResult(
+				"ax.click",
+				(await call("ax.click", { ref: this.ref, opts: pointerOptions(options), ...menuParam(options) })) ?? null,
+				optional(isMenuReport),
+			),
+		);
 	}
 
 	/** Two clicks at the element's center with native input (`ax.click` with `count: 2`). */

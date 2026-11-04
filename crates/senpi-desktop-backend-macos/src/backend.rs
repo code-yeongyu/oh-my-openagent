@@ -8,6 +8,7 @@ use senpi_desktop_core::error::{CoreResult, DesktopError, TccPermission};
 use senpi_desktop_core::frame::FrameGeometry;
 use senpi_desktop_core::keys::KeyName;
 use senpi_desktop_core::menus::MenuItem;
+use senpi_desktop_core::protocol_results::MenuReport;
 use senpi_desktop_core::types::{
     CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, DisplaySelector,
     FrontWindow, Target,
@@ -160,7 +161,7 @@ impl Backend for MacosBackend {
         _frame: &FrameGeometry,
         mode: DeliveryMode,
         choice: MenuChoice<'_>,
-    ) -> CoreResult<()> {
+    ) -> CoreResult<Option<MenuReport>> {
         Self::require_input_permission()?;
         self.input.pointer_menu(target, event, mode, &self.capture, choice)
     }

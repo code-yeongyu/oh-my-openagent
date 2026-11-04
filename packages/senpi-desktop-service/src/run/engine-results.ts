@@ -181,6 +181,16 @@ export interface MenuItem {
 export const isMenuItem: Guard<MenuItem> = (value): value is MenuItem =>
 	matches(value, MENU_ITEM) && isStringArray(value.path);
 
+/**
+ * What a press that opened a menu did with it: the items of a menu it read and closed with nothing chosen
+ * (so the next call can name one with `menu`). A press that chose its item, or opened no menu, reports null.
+ */
+export interface MenuReport {
+	readonly items: string;
+}
+
+export const isMenuReport: Guard<MenuReport> = (value): value is MenuReport => matches(value, { items: "string" });
+
 export const isCaptureResult: Guard<CaptureResult> = (value): value is CaptureResult =>
 	matches(value, CAPTURE) && (value.region == null ||
 		matches(value.region, { x: "number", y: "number", width: "number", height: "number" }));

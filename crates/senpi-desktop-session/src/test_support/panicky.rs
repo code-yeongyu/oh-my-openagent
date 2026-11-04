@@ -13,6 +13,7 @@ use senpi_desktop_core::error::{CoreResult, DesktopError, PermissionDeniedData, 
 use senpi_desktop_core::frame::FrameGeometry;
 use senpi_desktop_core::keys::KeyName;
 use senpi_desktop_core::menus::MenuItem;
+use senpi_desktop_core::protocol_results::MenuReport;
 use senpi_desktop_core::types::{
     CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, FrontWindow, Target,
 };
@@ -88,7 +89,7 @@ impl Backend for PanickyFake {
         frame: &FrameGeometry,
         mode: DeliveryMode,
         choice: MenuChoice<'_>,
-    ) -> CoreResult<()> {
+    ) -> CoreResult<Option<MenuReport>> {
         self.inner.pointer_menu(target, ev, frame, mode, choice)
     }
     fn type_text(&mut self, target: &Target, text: &str, mode: DeliveryMode) -> CoreResult<()> {

@@ -133,19 +133,13 @@ impl Worker {
             }
             let handle = worker.registry.resolve(reference)?;
             let backend = worker.ax_parts()?.0;
-            match &params.menu {
-                Some(path) => {
-                    let check_stop = || interrupted(&supervisor, &policy, cancelled, "choosing a menu item");
-                    let choice = MenuChoice {
-                        path,
-                        check_stop: &check_stop,
-                    };
-                    backend.perform_menu(&handle, action, choice)?;
-                }
-                None if action.eq_ignore_ascii_case("press") => ax::ax_press(backend, &handle)?,
-                None => backend.perform(&handle, action)?,
-            }
-            Ok(Response::Unit)
+            let check_stop = || interrupted(&supervisor, &policy, cancelled, "choosing a menu item");
+            let choice = MenuChoice {
+                path: params.menu.as_deref(),
+                check_stop: &check_stop,
+            };
+            let report = backend.perform_menu(&handle, action, choice)?;
+            Ok(Response::MenuOutcome(report))
         })
     }
 

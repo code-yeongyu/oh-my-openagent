@@ -18,6 +18,7 @@ mod tree;
 use senpi_desktop_core::drag_guard::StartPoint;
 use senpi_desktop_core::ax::{AxBackend, AxHandle, AxOwner, AxProps};
 use senpi_desktop_core::backend::MenuChoice;
+use senpi_desktop_core::protocol_results::MenuReport;
 use senpi_desktop_core::error::CoreResult;
 use senpi_desktop_core::protocol_results::AxTextSelection;
 use senpi_desktop_core::text_range::TextSelectRequest;
@@ -186,7 +187,7 @@ impl AxBackend for MacAx {
         actions::perform_requested(element(h)?, action)
     }
 
-    fn perform_menu(&mut self, h: &AxHandle, action: &str, choice: MenuChoice<'_>) -> CoreResult<()> {
+    fn perform_menu(&mut self, h: &AxHandle, action: &str, choice: MenuChoice<'_>) -> CoreResult<Option<MenuReport>> {
         self.show_target(h);
         open_menu::perform_menu(element(h)?, action, choice)
     }

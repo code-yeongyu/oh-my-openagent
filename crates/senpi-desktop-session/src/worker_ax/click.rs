@@ -59,14 +59,12 @@ impl Worker {
         };
         let target = Target::Window(window);
         let frame = FrameGeometry::identity_global();
-        match &params.menu {
-            None => self.backend()?.pointer(&target, event, &frame, options.mode)?,
-            Some(path) => {
-                let choice = MenuChoice { path, check_stop };
-                self.backend()?.pointer_menu(&target, event, &frame, options.mode, choice)?;
-            }
-        }
-        Ok(Response::Unit)
+        let choice = MenuChoice {
+            path: params.menu.as_deref(),
+            check_stop,
+        };
+        let report = self.backend()?.pointer_menu(&target, event, &frame, options.mode, choice)?;
+        Ok(Response::MenuOutcome(report))
     }
 
     /// The id of the window that owns `handle`, named in the live window

@@ -2,7 +2,17 @@
 //! press returned, and the errors that report what became of it.
 
 use super::{stops_the_call, MenuWindow, Press, Settled};
-use crate::error::{CoreResult, DesktopError};
+use crate::error::{CoreResult, DesktopError, ErrorCode};
+use crate::protocol_results::MenuReport;
+
+/// What to do with the menu a press opens: choose a path in it, or (D1)
+/// read its items and close it at once, so no background menu is left open
+/// to take the user's keyboard.
+#[derive(Clone, Copy, Debug)]
+pub enum Watch<'a> {
+    Choose(&'a [String]),
+    ListAndClose,
+}
 
 /// Runs `press` on `backend`, then, when `before` lists the target's menu
 /// windows from before it, `settle`s a menu the press opened: it chooses
@@ -21,15 +31,22 @@ pub fn guard<B>(
     backend: &mut B,
     press: Press<'_>,
     before: Option<&[MenuWindow]>,
-    path: Option<&[String]>,
+    watch: Watch<'_>,
     run: impl FnOnce(&mut B) -> CoreResult<()>,
     settle: impl FnOnce(&mut B, &[MenuWindow], Option<&[String]>) -> CoreResult<Settled>,
-) -> CoreResult<()> {
+) -> CoreResult<Option<MenuReport>> {
     let delivered = run(backend);
     let Some(before) = before else {
-        return delivered;
+        return delivered.map(|()| None);
     };
-    let path = if delivered.is_ok() { path } else { None };
+    // A refusal before anything went out opened no menu.
+    if matches!(&delivered, Err(error) if error.code == ErrorCode::BackgroundUnavailable) {
+        return delivered.map(|()| None);
+    }
+    let path = match (&delivered, watch) {
+        (Ok(()), Watch::Choose(path)) => Some(path),
+        _ => None,
+    };
     let settled = settle(backend, before, path);
     match (delivered, settled) {
         (
@@ -40,13 +57,21 @@ pub fn guard<B>(
                 ..
             }),
         ) => Err(DesktopError::input_failed(left_open_message(press, &items))),
+        (
+            Ok(()),
+            Ok(Settled::Unchosen {
+                refusal: None,
+                items,
+                ..
+            }),
+        ) if matches!(watch, Watch::ListAndClose) => Ok(Some(MenuReport { items })),
         (Ok(()), Ok(Settled::Unchosen { refusal, items, .. })) => Err(DesktopError::input_failed(
             unchosen_message(press, refusal.as_deref(), &items),
         )),
-        (Ok(()), Ok(Settled::NoMenu)) if path.is_some() => {
+        (Ok(()), Ok(Settled::NoMenu)) if matches!(watch, Watch::Choose(_)) => {
             Err(DesktopError::input_failed(no_menu_message(press)))
         }
-        (delivered, Ok(_)) => delivered,
+        (delivered, Ok(_)) => delivered.map(|()| None),
         // Settling stopped before pressing an item because the call was
         // cancelled, or the user came to or used the app; the menu was closed.
         (_, Err(error)) if stops_the_call(&error) => Err(error),

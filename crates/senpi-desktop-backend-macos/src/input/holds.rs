@@ -18,7 +18,7 @@ impl MacInput {
         capture: &MacCapture, control: &HoldControl<'_>,
     ) -> CoreResult<()> {
         let _request = self.held.request();
-        self.hold_target(target, mode, capture, None, |this, route, _| {
+        self.hold_target(target, mode, capture, None, control.check, |this, route, _| {
             this.keys_held(keys, route, control, |_| (control.wait)())
         })
     }
@@ -28,7 +28,7 @@ impl MacInput {
         capture: &MacCapture, control: &HoldControl<'_>,
     ) -> CoreResult<()> {
         let _request = self.held.request();
-        self.hold_target(target, mode, capture, Some(hold), |this, key_route, window| {
+        self.hold_target(target, mode, capture, Some(hold), control.check, |this, key_route, window| {
             let route = match (window, mode) {
                 (Some(window), DeliveryMode::Background) => {
                     let (pid, wid) = window_identity(window)?;
@@ -50,6 +50,7 @@ impl MacInput {
     fn hold_target(
         &mut self, target: &Target, mode: DeliveryMode, capture: &MacCapture,
         mouse: Option<&MouseHold<'_>>,
+        check_stop: &dyn Fn() -> CoreResult<()>,
         action: impl FnOnce(&mut Self, KeyRoute, Option<&DesktopWindow>) -> CoreResult<()>,
     ) -> CoreResult<()> {
         match target {
@@ -59,6 +60,11 @@ impl MacInput {
                 let (pid, wid) = window_identity(&window)?;
                 match mode {
                     DeliveryMode::Background => self.background(|this| {
+                        if let Some(hold) = mouse {
+                            if this.hold_as_menu_press(&window, hold, capture, check_stop)?.is_some() {
+                                return Ok(());
+                            }
+                        }
                         guard::guard(&window, if mouse.is_some() { "click" } else { "keyboard" },
                             mouse.map(|hold| hold.button))?;
                         if let Some(hold) = mouse.filter(|hold| hold.button == MouseButton::Left) {
