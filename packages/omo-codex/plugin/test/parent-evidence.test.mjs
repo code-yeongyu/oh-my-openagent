@@ -1,13 +1,13 @@
-import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import test from "node:test";
 import {
+	completionState,
+	nativeWaitState,
 	publishReceipt,
 	resolveCheckDescriptor,
-	nativeWaitState,
-	completionState,
 } from "../scripts/parent-evidence.mjs";
 
 function fixture(t) {
@@ -209,6 +209,39 @@ test("#given latest transcript completion #when actor evidence is missing or bus
 			pendingContinuation: false,
 		}).settled,
 		true,
+	);
+});
+test("#given an aborted current turn #when a late completion arrives #then it cannot settle", () => {
+	const actor = {
+		status: "completed",
+		activeGoal: false,
+		pendingContinuation: false,
+	};
+	assert.deepEqual(
+		completionState(
+			[event("task_started"), event("turn_aborted"), event("task_complete")],
+			actor,
+		),
+		{ turnComplete: false, settled: false },
+	);
+});
+test("#given an older aborted turn #when a new turn completes #then it can settle", () => {
+	const actor = {
+		status: "completed",
+		activeGoal: false,
+		pendingContinuation: false,
+	};
+	assert.deepEqual(
+		completionState(
+			[
+				event("task_started", "older"),
+				event("turn_aborted", "older"),
+				event("task_started"),
+				event("task_complete"),
+			],
+			actor,
+		),
+		{ turnComplete: true, settled: true },
 	);
 });
 test("#given an earlier completion #when a new turn or abort arrives #then settlement is invalidated", () => {

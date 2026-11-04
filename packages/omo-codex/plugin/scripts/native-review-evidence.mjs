@@ -110,6 +110,17 @@ export function nativeReviewEvidence(
 		if (phase === "commentary") return proof;
 	}
 	if (phase === "final_answer" && proof) {
+		if (
+			events
+				.slice(start)
+				.some(
+					(event) =>
+						event.type === "event_msg" &&
+						event.payload.type === "turn_aborted" &&
+						event.payload.turn_id === turnId,
+				)
+		)
+			return null;
 		const terminal = events.findLast(
 			(event) =>
 				event.type === "event_msg" &&

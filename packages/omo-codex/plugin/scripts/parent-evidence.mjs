@@ -153,7 +153,14 @@ export function completionState(events, actor) {
 	const turnComplete = Boolean(
 		start?.payload.turn_id &&
 			last?.payload.type === "task_complete" &&
-			last.payload.turn_id === start.payload.turn_id,
+			last.payload.turn_id === start.payload.turn_id &&
+			!lifecycle
+				.slice(lifecycle.indexOf(start))
+				.some(
+					(event) =>
+						event.payload.type === "turn_aborted" &&
+						event.payload.turn_id === start.payload.turn_id,
+				),
 	);
 	return {
 		turnComplete,

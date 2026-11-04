@@ -155,6 +155,23 @@ test("#given a native final #when latest terminal text or lifecycle differs #the
 		assert.equal(capture(events, "final_answer"), null);
 	}
 });
+test("#given an aborted current turn #when a late final completes #then final proof stays rejected", () => {
+	for (const index of [8, 9]) {
+		const events = fixture();
+		events.splice(index, 0, event("turn_aborted", { turn_id: turn }));
+		assert.equal(capture(events, "final_answer"), null);
+	}
+});
+test("#given an older aborted turn #when a new turn completes #then its final proof remains valid", () => {
+	const events = fixture();
+	events.splice(
+		1,
+		0,
+		event("task_started", { turn_id: "older" }),
+		event("turn_aborted", { turn_id: "older" }),
+	);
+	assert.ok(capture(events, "final_answer"));
+});
 for (const kind of ["function_call", "custom_tool_call"]) {
 	test(`#given ${kind} native read #when matched by call ID and turn #then its corresponding output is preserved`, () => {
 		const events = fixture(kind),
