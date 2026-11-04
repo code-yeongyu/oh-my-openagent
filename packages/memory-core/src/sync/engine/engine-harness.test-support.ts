@@ -15,7 +15,7 @@ import { SyncEngine, type EngineFault } from "./engine"
 import { FakeSealer, FakeVerifier } from "./fake-crypto.test-support"
 import type { FakeSyncServer } from "./fake-server.test-support"
 import { FakeItemStore } from "./fake-store.test-support"
-import type { Clock, ItemStore, SyncRepo, Transport, WriterLock } from "./ports"
+import type { Clock, FreezeSettler, ItemStore, SyncRepo, Transport, WriterLock } from "./ports"
 
 export const ACCOUNT = "acc_test"
 /** Every engine test drives real git processes; under machine load a cycle can take seconds. */
@@ -161,6 +161,8 @@ export interface DeviceOptions {
   readonly realStore?: boolean
   readonly onStatusChange?: () => void
   readonly log?: (line: string) => void
+  /** The account session's freeze settler (rotation on revoke). */
+  readonly freeze?: FreezeSettler
 }
 
 export async function makeDevice(server: FakeSyncServer, name: string, fault?: EngineFault, options: DeviceOptions = {}): Promise<Device> {
@@ -190,6 +192,7 @@ export async function makeDevice(server: FakeSyncServer, name: string, fault?: E
       ...(options.batchBytes === undefined ? {} : { batchBytes: options.batchBytes }),
       ...(options.onStatusChange === undefined ? {} : { onStatusChange: options.onStatusChange }),
       ...(options.log === undefined ? {} : { log: options.log }),
+      ...(options.freeze === undefined ? {} : { freeze: options.freeze }),
       ...(f === undefined ? {} : { fault: f }),
     })
     return { store, engine }
