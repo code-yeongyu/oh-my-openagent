@@ -173,9 +173,9 @@ describe("registerTaskCommands", () => {
     expect(ui.notifications).toEqual(["No tasks in all sessions."])
   })
 
-  it("#given a cancellable task #when /task-kill selects it and confirms #then cancelTask runs for that id", async () => {
-    // given
-    const running = record({ task_id: "st_kill", status: "running" })
+  it.each(["running", "paused"] as const)("#given a %s task #when /task-kill selects it and confirms #then cancelTask runs for that id", async (status) => {
+    // given a live task, or one its run's Stop paused (#12249)
+    const running = record({ task_id: "st_kill", status })
     const manager = fakeManager([running])
     const pi = new FakeExtensionAPI()
     registerTaskCommands(pi, manager)
