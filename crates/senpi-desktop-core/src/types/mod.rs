@@ -12,7 +12,9 @@ mod window;
 
 pub use ax::{AxNode, AxQuery, AxSnapshot, AxSnapshotOptions};
 pub use capture::{CaptureCaps, CaptureMode, CaptureRegion, CaptureResult, DesktopCapture, ObserveResult, DEFAULT_CAPTURE_MAX_BYTES};
-pub use display::{DesktopCapabilities, DesktopDisplay, DisplaySelector, InterventionWatch};
+pub use display::{
+    DesktopCapabilities, DesktopDisplay, DisplaySelector, InterventionWatch, ScreenState,
+};
 pub use window::{DesktopPoint, DesktopWindow, FrontWindow, PointerOptions, Target};
 
 /// `session.open` parameters supplied by the host.
