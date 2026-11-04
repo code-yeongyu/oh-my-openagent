@@ -391,7 +391,9 @@ function placeCausally(ctx: StoreContext, request: EnqueueRequest): CausalPlacem
     if (cause === undefined || cause.target_durable_id !== request.sender_node || (cause.state !== "admitting" && cause.state !== "admitted" && cause.state !== "applied")) {
       return refused("invalid_arguments", "The delivery this send continues is not one the sender received.", { guard: "unknown_cause" })
     }
-    placement = { root_id: cause.root_id, hop: cause.hop + 1, via: [...cause.envelope.via, request.sender_node], new_root: false }
+    // `via` names only the session that sent this hop: with no hop cap a stored path would grow with every hop
+    // (one id per row, quadratic in total), while `hop` already carries the chain's count.
+    placement = { root_id: cause.root_id, hop: cause.hop + 1, via: [request.sender_node], new_root: false }
   } else {
     placement = { root_id: `root-${randomUUID()}`, hop: 1, via: [request.sender_node], new_root: true }
   }

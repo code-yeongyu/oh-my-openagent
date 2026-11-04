@@ -275,6 +275,26 @@ describe("causal_cycle_hop_rate_and_fanout_budgets", () => {
     expect((await h.get("A").store.deliveryView(cause ?? ""))?.row.hop).toBe(70)
   }, 60_000)
 
+  test("#given a chain of 70 hops #when each delivery is stored #then its envelope stays the size of the first one (storage grows linearly with the chain, not with its square) and still records its hop", async () => {
+    const h = open()
+    h.session("A")
+    h.session("B")
+    const sizes: number[] = []
+    let cause: string | undefined
+    for (let hop = 1; hop <= 70; hop++) {
+      const [from, to] = hop % 2 === 1 ? ["A", "B"] : ["B", "A"]
+      cause = okId(await send(h, from, to, "x", cause === undefined ? {} : { cause_delivery_id: cause }))
+      const row = (await h.get(to).store.deliveryView(cause))?.row
+      if (row === undefined) throw new Error(`delivery ${cause} was not stored`)
+      sizes.push(JSON.stringify(row.envelope).length)
+      expect(row.hop).toBe(hop)
+      await h.quiesce()
+      h.clock.now += 5_000
+    }
+    // Ids and hop digits differ by a few bytes between rows; a stored path would add one durable id per hop.
+    expect(Math.max(...sizes) - Math.min(...sizes)).toBeLessThan(16)
+  }, 60_000)
+
   test("#given one sender turn #when it reaches a 17th distinct session #then that send is refused while a second send to a known target passes", async () => {
     const h = open()
     h.session("F")
