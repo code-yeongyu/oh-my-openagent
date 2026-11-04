@@ -1,18 +1,19 @@
 import { createHash } from "node:crypto"
 
-import type { LocalApiClient } from "./local-api/client.ts"
-import type { CommandBlobRef, JsonObject } from "./local-api/protocol.ts"
+import type { CommandBlobRef, JsonObject, LocalEvent } from "./local-api/protocol.ts"
 
 // One device's delegated command channel on this local API connection (decision 0018, docs/local-api.md "Delegated
 // commands"): the engine's reply to each delegated command, and the frames the engine writes unasked on that
 // connection. A body too large for one line arrives as a blob of its UTF-8 JSON and is checked against its declared
-// length and sha256 before it is read.
+// length and sha256 before it is read. The attach feeds it from its own event listener, so an attach still holds
+// exactly one subscription on the connection.
 export type DelegatedChannel = {
   /** The engine's reply to a delegated command; it arrives before the command's final state. */
   readonly takeReply: (commandId: string) => JsonObject | undefined
   readonly onFrame: (listener: (frame: JsonObject) => void) => () => void
   /** A reply or frame that could not be read, or the channel closing; the reason is the service's or the check's. */
   readonly onLoss: (listener: (reason: string) => void) => () => void
+  readonly accept: (event: LocalEvent) => void
   readonly stop: () => void
 }
 
@@ -21,7 +22,7 @@ type Blob = { readonly ref: CommandBlobRef; readonly parts: Buffer[]; received: 
 const isObject = (value: unknown): value is JsonObject =>
   typeof value === "object" && value !== null && !Array.isArray(value)
 
-export function followDelegatedChannel(client: LocalApiClient, device: string): DelegatedChannel {
+export function followDelegatedChannel(device: string): DelegatedChannel {
   const replies = new Map<string, JsonObject>()
   const frames = new Set<(frame: JsonObject) => void>()
   const losses = new Set<(reason: string) => void>()
@@ -41,7 +42,7 @@ export function followDelegatedChannel(client: LocalApiClient, device: string): 
     if (typeof commandId === "string" && isObject(response)) replies.set(commandId, response)
     else lost("a command event with neither a frame nor a reply")
   }
-  const stop = client.onEvent(event => {
+  const accept = (event: LocalEvent): void => {
     switch (event.kind) {
       case "session.command_event":
         if (event.device !== device) return
@@ -82,7 +83,7 @@ export function followDelegatedChannel(client: LocalApiClient, device: string): 
       default:
         return
     }
-  })
+  }
   return {
     takeReply: commandId => {
       const reply = replies.get(commandId)
@@ -97,8 +98,8 @@ export function followDelegatedChannel(client: LocalApiClient, device: string): 
       losses.add(listener)
       return () => losses.delete(listener)
     },
+    accept,
     stop: () => {
-      stop()
       frames.clear()
       losses.clear()
       blobs.clear()

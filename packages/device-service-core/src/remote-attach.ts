@@ -142,6 +142,7 @@ export function openAttach(client: LocalApiClient, device: string, sessionId: st
     if (remote.kind === "detached") finish(remote.reason)
   }
   const stop = client.onEvent(event => {
+    channel?.accept(event)
     const mine = attachEvent(event)
     if (mine === undefined) return
     if (handle === undefined) early.push(mine)
@@ -151,7 +152,7 @@ export function openAttach(client: LocalApiClient, device: string, sessionId: st
   return client.request("session.attach", { device, session_id: sessionId }).then(
     ({ attach }) => {
       handle = attach
-      const delegated = followDelegatedChannel(client, device)
+      const delegated = followDelegatedChannel(device)
       channel = delegated
       if (ended) delegated.stop()
       for (const event of early.splice(0)) if (event.attach === attach) deliver(event)
