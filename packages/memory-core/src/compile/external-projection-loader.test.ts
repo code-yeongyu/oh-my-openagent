@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test"
-import { compileMemoryBlockWithReads } from "./compile"
+import { describe, expect, it, onTestFinished, spyOn } from "bun:test"
+import { MemoryBlockCache } from "./cache"
 import { memory, repoWith } from "./compile.test-support"
 import * as realRenderer from "./external-projection"
 import { createExternalProjectionRendererLoader, EXTERNAL_PROJECTION_RENDERER_FIX } from "./external-projection-loader"
@@ -19,23 +19,32 @@ function failingThenWorkingImport(failures: number) {
 }
 
 describe("external projection renderer loader", () => {
-  it("#given a renderer import that fails #when memory compiles #then the block is compiled without the listing and marked degraded", async () => {
+  it("#given a renderer import that fails once #when the cache compiles one revision twice #then the degraded block is not kept and the next compile renders the listing", async () => {
     // given
     const { repo } = await repoWith([
       { relativePath: "system/persona.md", content: memory("PERSONA_DESCRIPTION", "PERSONA_BODY\n") },
       { relativePath: "reference/details.md", content: memory("REFERENCE_DESCRIPTION", "EXTERNAL_BODY\n") },
     ])
     const warnings: string[] = []
-    const loader = createExternalProjectionRendererLoader(failingThenWorkingImport(1).importRenderer, (message) => warnings.push(message))
+    const degraded: (readonly string[])[] = []
+    const cache = new MemoryBlockCache({
+      loadExternalProjectionRenderer: createExternalProjectionRendererLoader(failingThenWorkingImport(1).importRenderer, (message) => warnings.push(message)),
+      onDegraded: ({ reasons }) => degraded.push(reasons),
+    })
+    const head = await repo.head()
+    const at = Date.now()
 
     // when
-    const compiled = await compileMemoryBlockWithReads(repo, await repo.head(), { agentId: "agent-stale" }, Date.now(), loader)
+    const first = await cache.compile(repo, "prompt {CORE_MEMORY}", { agentId: "agent-stale" }, head, at)
+    const next = await cache.compile(repo, "prompt {CORE_MEMORY}", { agentId: "agent-stale" }, head, at)
 
     // then
-    expect(compiled.block).toContain("PERSONA_BODY")
-    expect(compiled.block).not.toContain("<external_projection>")
-    expect(compiled.degraded).toEqual([expect.stringContaining(STALE_MANIFEST)])
-    expect(compiled.degraded[0]).toContain(EXTERNAL_PROJECTION_RENDERER_FIX)
+    expect(first).toContain("PERSONA_BODY")
+    expect(first).not.toContain("<external_projection>")
+    expect(next).toContain("<external_projection>")
+    expect(next).toContain("details")
+    expect(degraded).toEqual([[expect.stringContaining(STALE_MANIFEST)]])
+    expect(degraded[0]?.[0]).toContain(EXTERNAL_PROJECTION_RENDERER_FIX)
     expect(warnings).toHaveLength(1)
   }, 30_000)
 
@@ -55,16 +64,25 @@ describe("external projection renderer loader", () => {
     expect(warnings[0]).toContain(EXTERNAL_PROJECTION_RENDERER_FIX)
   })
 
-  it("#given a renderer import that failed once #when the next load succeeds #then the real renderer is returned", async () => {
+  it("#given two bundle copies of the loader with the default warning #when both fail #then the process is warned once", async () => {
     // given
-    const load = createExternalProjectionRendererLoader(failingThenWorkingImport(1).importRenderer, () => undefined)
+    const warned = Symbol.for("omo.memory.external-projection-renderer-warned")
+    Reflect.deleteProperty(globalThis, warned)
+    const emitWarning = spyOn(process, "emitWarning").mockImplementation(() => undefined)
+    onTestFinished(() => {
+      emitWarning.mockRestore()
+      Reflect.deleteProperty(globalThis, warned)
+    })
+    const bundles = [
+      createExternalProjectionRendererLoader(failingThenWorkingImport(1).importRenderer),
+      createExternalProjectionRendererLoader(failingThenWorkingImport(1).importRenderer),
+    ]
 
     // when
-    const first = await load()
-    const second = await load()
+    for (const load of bundles) await load()
 
     // then
-    expect("unavailable" in first).toBe(true)
-    expect(second).toEqual({ renderer: realRenderer })
+    expect(emitWarning).toHaveBeenCalledTimes(1)
+    expect(emitWarning.mock.calls[0]?.[1]).toEqual({ code: "OMO_MEMORY_PROJECTION_RENDERER_UNAVAILABLE" })
   })
 })
