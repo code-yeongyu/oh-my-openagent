@@ -1,6 +1,8 @@
 use senpi_desktop_core::error::ErrorCode;
 use senpi_desktop_core::protocol::ERROR_CODES;
-use senpi_desktop_core::report::{ActionEffect, Disposition, FocusRestoration, Progress, ReportMode};
+use senpi_desktop_core::report::{
+    ActionEffect, Disposition, FocusRestoration, Progress, ReportMode,
+};
 use senpi_desktop_core::types::DesktopSessionOptions;
 use serde_json::json;
 
@@ -40,9 +42,15 @@ fn every_error_code_settles_to_one_of_the_seven_pairs() {
                 // When
                 let disposition = settled(Some(code), stage, progress).disposition();
                 // Then
-                assert!(Disposition::ALL.contains(&disposition), "{code:?} {stage:?} {progress:?}");
+                assert!(
+                    Disposition::ALL.contains(&disposition),
+                    "{code:?} {stage:?} {progress:?}"
+                );
                 if stage == Stage::Admission {
-                    assert!(matches!(disposition, Disposition::NotDelivered { .. }), "{code:?}: {disposition:?}");
+                    assert!(
+                        matches!(disposition, Disposition::NotDelivered { .. }),
+                        "{code:?}: {disposition:?}"
+                    );
                 }
             }
         }
@@ -58,10 +66,22 @@ fn gate_refusals_need_the_user_only_for_stops_permissions_and_locks() {
         ErrorCode::PermissionDenied,
         ErrorCode::ScreenLocked,
     ] {
-        assert_eq!(at_admission(code), Disposition::NOT_DELIVERED_AFTER_USER, "{code:?}");
+        assert_eq!(
+            at_admission(code),
+            Disposition::NOT_DELIVERED_AFTER_USER,
+            "{code:?}"
+        );
     }
-    for code in [ErrorCode::TransactionFailed, ErrorCode::InvalidCoordinateFrame, ErrorCode::Cancelled] {
-        assert_eq!(at_admission(code), Disposition::NOT_DELIVERED_SAFE, "{code:?}");
+    for code in [
+        ErrorCode::TransactionFailed,
+        ErrorCode::InvalidCoordinateFrame,
+        ErrorCode::Cancelled,
+    ] {
+        assert_eq!(
+            at_admission(code),
+            Disposition::NOT_DELIVERED_SAFE,
+            "{code:?}"
+        );
     }
 }
 
@@ -69,14 +89,38 @@ fn gate_refusals_need_the_user_only_for_stops_permissions_and_locks() {
 fn errors_raised_while_acting_follow_what_may_have_been_sent() {
     let acting = |code, progress| settled(Some(code), Stage::Acting, progress).disposition();
     let partly = Progress::Counted { count: 2, of: 3 };
-    assert_eq!(acting(ErrorCode::Suspended, partly), Disposition::DELIVERED_UNVERIFIED);
-    assert_eq!(acting(ErrorCode::Cancelled, Progress::Counted { count: 0, of: 3 }), Disposition::NOT_DELIVERED_SAFE);
-    assert_eq!(acting(ErrorCode::Cancelled, Progress::Atomic), Disposition::UNCERTAIN_UNSAFE);
-    assert_eq!(acting(ErrorCode::InputFailed, partly), Disposition::UNCERTAIN_UNKNOWN);
-    assert_eq!(acting(ErrorCode::AxUnconfirmed, Progress::Atomic), Disposition::UNCERTAIN_UNSAFE);
-    assert_eq!(acting(ErrorCode::Internal, Progress::Atomic), Disposition::UNKNOWN);
-    assert_eq!(acting(ErrorCode::InvalidCoordinateFrame, Progress::Atomic), Disposition::NOT_DELIVERED_SAFE);
-    assert_eq!(settled(None, Stage::Acted, Progress::Atomic).disposition(), Disposition::DELIVERED_UNVERIFIED);
+    assert_eq!(
+        acting(ErrorCode::Suspended, partly),
+        Disposition::DELIVERED_UNVERIFIED
+    );
+    assert_eq!(
+        acting(ErrorCode::Cancelled, Progress::Counted { count: 0, of: 3 }),
+        Disposition::NOT_DELIVERED_SAFE
+    );
+    assert_eq!(
+        acting(ErrorCode::Cancelled, Progress::Atomic),
+        Disposition::UNCERTAIN_UNSAFE
+    );
+    assert_eq!(
+        acting(ErrorCode::InputFailed, partly),
+        Disposition::UNCERTAIN_UNKNOWN
+    );
+    assert_eq!(
+        acting(ErrorCode::AxUnconfirmed, Progress::Atomic),
+        Disposition::UNCERTAIN_UNSAFE
+    );
+    assert_eq!(
+        acting(ErrorCode::Internal, Progress::Atomic),
+        Disposition::UNKNOWN
+    );
+    assert_eq!(
+        acting(ErrorCode::InvalidCoordinateFrame, Progress::Atomic),
+        Disposition::NOT_DELIVERED_SAFE
+    );
+    assert_eq!(
+        settled(None, Stage::Acted, Progress::Atomic).disposition(),
+        Disposition::DELIVERED_UNVERIFIED
+    );
 }
 
 #[test]
@@ -85,7 +129,9 @@ fn an_object_mode_click_answers_an_action_report_naming_its_audit() {
     let mut harness = object_harness();
     let frame = harness.capture("101");
     // When
-    let reply = harness.process(click_window(&frame, None)).expect("click succeeds");
+    let reply = harness
+        .process(click_window(&frame, None))
+        .expect("click succeeds");
     // Then
     let Response::Action(report) = reply else {
         panic!("expected an action report, got {reply:?}");
@@ -93,7 +139,11 @@ fn an_object_mode_click_answers_an_action_report_naming_its_audit() {
     assert_eq!(report.disposition, Disposition::DELIVERED_UNVERIFIED);
     assert_eq!(report.effect, ActionEffect::Unverifiable);
     assert_eq!(report.focus_restoration, FocusRestoration::NotNeeded);
-    let audit_id = harness.audits().last().and_then(|event| event.id.clone()).expect("the audit carries an id");
+    let audit_id = harness
+        .audits()
+        .last()
+        .and_then(|event| event.id.clone())
+        .expect("the audit carries an id");
     assert_eq!(report.audit_ids, vec![audit_id]);
 }
 
@@ -101,24 +151,38 @@ fn an_object_mode_click_answers_an_action_report_naming_its_audit() {
 fn a_null_mode_click_stays_unit_with_an_unnumbered_audit() {
     let mut harness = harness(&json!({}));
     let frame = harness.capture("101");
-    let reply = harness.process(click_window(&frame, None)).expect("click succeeds");
+    let reply = harness
+        .process(click_window(&frame, None))
+        .expect("click succeeds");
     assert_eq!(reply, Response::Unit);
-    assert_eq!(harness.audits().last().and_then(|event| event.id.clone()), None);
+    assert_eq!(
+        harness.audits().last().and_then(|event| event.id.clone()),
+        None
+    );
 }
 
 #[test]
 fn object_mode_errors_carry_their_disposition_and_null_mode_errors_do_not() {
     // Given a frame the click does not name, and a click the backend fails
-    let mut object = object_harness_with(&json!({"fail_next": [{"method": "click", "code": "InputFailed"}]}));
+    let mut object =
+        object_harness_with(&json!({"fail_next": [{"method": "click", "code": "InputFailed"}]}));
     object.capture("101");
-    let stale = object.process(click_window("frame-from-another-capture", None)).expect_err("stale frame");
+    let stale = object
+        .process(click_window("frame-from-another-capture", None))
+        .expect_err("stale frame");
     let frame = object.capture("101");
-    let failed = object.process(click_window(&frame, None)).expect_err("injected failure");
+    let failed = object
+        .process(click_window(&frame, None))
+        .expect_err("injected failure");
     let mut null = harness(&json!({}));
     null.capture("101");
-    let plain = null.process(click_window("frame-from-another-capture", None)).expect_err("stale frame");
+    let plain = null
+        .process(click_window("frame-from-another-capture", None))
+        .expect_err("stale frame");
     // Then
-    let disposition = |error: &senpi_desktop_core::error::DesktopError| error.report.as_ref().and_then(|report| report.disposition);
+    let disposition = |error: &senpi_desktop_core::error::DesktopError| {
+        error.report.as_ref().and_then(|report| report.disposition)
+    };
     assert_eq!(stale.code, ErrorCode::InvalidCoordinateFrame);
     assert_eq!(disposition(&stale), Some(Disposition::NOT_DELIVERED_SAFE));
     assert_eq!(failed.code, ErrorCode::InputFailed);
@@ -130,11 +194,18 @@ fn object_mode_errors_carry_their_disposition_and_null_mode_errors_do_not() {
 fn a_stopped_object_mode_session_refuses_with_after_user() {
     let mut harness = object_harness();
     let frame = harness.capture("101");
-    harness.supervisor.trigger_stop(senpi_desktop_safety::StopSource::Hotkey);
-    let error = harness.process(click_window(&frame, None)).expect_err("suspended");
+    harness
+        .supervisor
+        .trigger_stop(senpi_desktop_safety::StopSource::Hotkey);
+    let error = harness
+        .process(click_window(&frame, None))
+        .expect_err("suspended");
     assert_eq!(error.code, ErrorCode::Suspended);
     let report = error.report.expect("object-mode errors carry a report");
-    assert_eq!(report.disposition, Some(Disposition::NOT_DELIVERED_AFTER_USER));
+    assert_eq!(
+        report.disposition,
+        Some(Disposition::NOT_DELIVERED_AFTER_USER)
+    );
     assert_eq!(report.focus_restoration, Some(FocusRestoration::NotNeeded));
 }
 
@@ -149,7 +220,9 @@ fn a_reopen_that_changes_report_mode_recreates_the_backend_and_never_reuses_a_fr
         ..DesktopSessionOptions::default()
     });
     // Then the old frame is gone, and the next capture gets a fresh id
-    let stale = harness.process(click_window(&before, None)).expect_err("frames were dropped");
+    let stale = harness
+        .process(click_window(&before, None))
+        .expect_err("frames were dropped");
     assert_eq!(stale.code, ErrorCode::InvalidCoordinateFrame);
     let after = harness.capture("101");
     assert_ne!(before, after);
