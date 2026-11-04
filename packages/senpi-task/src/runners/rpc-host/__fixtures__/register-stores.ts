@@ -5,7 +5,7 @@ import { readTextIfPresentAsync, type DurableJsonFsAsync } from "../durable-json
 import { registerStoreIndex } from "../store-index"
 
 // The concurrency test proves the index lock loses no registration across processes. Crash durability is
-// durable-json's own contract and tests; here it would only add three fsyncs per write, and on a loaded
+// durable-json's own contract and tests; here it would only add two fsyncs per write, and on a loaded
 // receipt host those flushes - not the lock - decided whether 800 serialized writes fit the test's budget
 // (#11692). The staged-write-then-rename replace is kept, so readers still never see a torn index.
 const atomicReplaceFs: DurableJsonFsAsync = {
