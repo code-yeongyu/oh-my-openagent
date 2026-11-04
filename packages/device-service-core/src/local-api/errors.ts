@@ -1,3 +1,4 @@
+import type { PathRefusal } from "./protocol.ts";
 import type { ClientErrorCode, ErrorCode } from "./vocabulary.ts";
 
 // Every failure the local API reports: an owner's error response (code, reason, action) or one the client raises
@@ -7,6 +8,7 @@ export class LocalApiError extends Error {
   readonly reason: string;
   readonly action: string | null;
   readonly limit_chars?: number;
+  readonly path_refusal?: PathRefusal;
   // On a session.command that timed out: the command_id it was sent under, whose outcome may still arrive.
   readonly command_id?: string;
 
@@ -16,6 +18,7 @@ export class LocalApiError extends Error {
     extra: {
       readonly action?: string | null;
       readonly limit_chars?: number;
+      readonly path_refusal?: PathRefusal;
       readonly command_id?: string;
     } = {},
   ) {
@@ -25,6 +28,7 @@ export class LocalApiError extends Error {
     this.reason = reason;
     this.action = extra.action ?? null;
     if (extra.limit_chars !== undefined) this.limit_chars = extra.limit_chars;
+    if (extra.path_refusal !== undefined) this.path_refusal = extra.path_refusal;
     if (extra.command_id !== undefined) this.command_id = extra.command_id;
   }
 }

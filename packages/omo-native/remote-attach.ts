@@ -11,7 +11,8 @@ import type { CommandStateEvent, JsonObject, RemoteAttach, RemoteAttachEvent, Sn
 // The TUI authenticates a `t-<16 hex>.sock` endpoint with the 32-byte secret beside it on every platform, and on
 // Windows reaches the named pipe derived from that path and secret, so this endpoint follows the same two rules.
 // The endpoint answers only its own plumbing (the attach handshake and the presented row, see `answer`); every other
-// record goes to the host unchanged as `session.command {rpc}`, and the host's engine decides it (DS2b G1, M6).
+// record goes to the host unchanged as a delegated `session.command {rpc}`, and the host's engine decides it (DS2b G1,
+// M6); the engine's reply and the frames it writes on that delegated connection come back to the TUI.
 
 const SECRET_BYTES = 32
 const HANDSHAKE_TIMEOUT_MS = 2_000
@@ -67,7 +68,14 @@ class Presentation {
     if (this.streaming) return
     this.streaming = true
     this.notify(`Attached to ${this.label}`, "info")
-    this.stopStream = this.attach.onEvent(event => this.event(event))
+    const stopEvents = this.attach.onEvent(event => this.event(event))
+    const stopFrames = this.attach.onFrame(frame => this.send("sessionId" in frame ? { ...frame, sessionId: LOCAL_SESSION_ID } : frame))
+    const stopLosses = this.attach.onChannelLoss(reason => this.notify(`Lost a reply or event from the remote device: ${reason}`, "warning"))
+    this.stopStream = () => {
+      stopEvents()
+      stopFrames()
+      stopLosses()
+    }
   }
 
   stop(): void {
@@ -140,14 +148,19 @@ class Presentation {
   }
 
   /**
-   * Every record that is not plumbing: sent to the host unchanged, answered on its own id with the host's outcome.
-   * LOCAL_SESSION_ID names the attached session, so it travels as that session's id, the route the host derives the
-   * engine sessionId from (H1); a record without a sessionId, or naming another one, goes as it is for the host to
-   * decide.
+   * Every record that is not plumbing: sent to the host unchanged, answered on its own id. The engine's own reply,
+   * when the host sent one, goes back verbatim (its refusals included); a host without delegated commands sends only
+   * the outcome, shown as success or as "<state>: <reason>". LOCAL_SESSION_ID names the attached session, so it
+   * travels as that session's id, the route the host derives the engine sessionId from (H1); a record without a
+   * sessionId, or naming another one, goes as it is for the host to decide.
    */
   private async forward(request: JsonObject, type: string): Promise<void> {
     const rpc = request.sessionId === LOCAL_SESSION_ID ? { ...request, sessionId: this.attach.sessionId } : request
-    const outcome = await this.attach.command(rpc)
+    const { outcome, response } = await this.attach.command(rpc)
+    if (response !== undefined) {
+      this.send({ ...response, id: request.id })
+      return
+    }
     if (outcome.state === "engine_applied") {
       this.send({ type: "response", id: request.id, command: type, success: true })
       return

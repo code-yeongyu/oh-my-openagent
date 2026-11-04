@@ -19,6 +19,7 @@ import { lineBytes, LOCAL_INLINE_MAX } from "./limits.ts";
 import type {
   ClientInfo,
   CommandRpc,
+  DelegatedRoute,
   LocalEvent,
   RequestType,
   ResponseData,
@@ -52,10 +53,19 @@ export type LocalApiClient = {
     params: RequestParams<T>,
   ) => Promise<ResponseData[T]>;
   readonly onEvent: (listener: (event: LocalEvent) => void) => () => void;
-  readonly command: (attach: string, rpc: CommandRpc, command_id?: string) => Promise<string>;
+  // omo addition over the vendored client: `route` opts the command into the delegated channel (decision 0018), on
+  // the inline line and on the upload's closing session.command alike.
+  readonly command: (
+    attach: string,
+    rpc: CommandRpc,
+    command_id?: string,
+    route?: DelegatedRoute,
+  ) => Promise<string>;
   readonly list: (
     filter?: SessionFilter,
     onRevision?: (revision: ListingRevision) => void,
+    /** `rows: 2` asks for each row's kind and parent link (#316); a service before it answers invalid_request. */
+    rows?: 2,
   ) => Promise<ListingResult>;
   readonly read: (attach: string, options?: ReadOptions) => Promise<ReadPage>;
   readonly oversizedLines: () => number;
@@ -118,6 +128,7 @@ const sendCommand = async (
   attach: string,
   rpc: CommandRpc,
   command_id: string | undefined,
+  route: DelegatedRoute,
 ): Promise<string> => {
   // Always sent, minted here when the caller gave none: a command whose answer times out may still have been
   // dispatched, and its outcome arrives as session.command_state for this id. A retry of the same record to the same
@@ -140,6 +151,7 @@ const sendCommand = async (
     type: "session.command",
     attach,
     ...id,
+    ...route,
     rpc,
   };
   if (lineBytes(draft) > LOCAL_INLINE_MAX) {
@@ -157,11 +169,14 @@ const sendCommand = async (
     // reported as it is, with no command_id, and a fresh retry is safe.
     await Promise.all(parts);
     return (
-      await connection.request("session.command", { attach, ...id, upload_id }).catch(timedOut)
+      await connection
+        .request("session.command", { attach, ...id, ...route, upload_id })
+        .catch(timedOut)
     ).command_id;
   }
-  return (await connection.request("session.command", { attach, ...id, rpc }).catch(timedOut))
-    .command_id;
+  return (
+    await connection.request("session.command", { attach, ...id, ...route, rpc }).catch(timedOut)
+  ).command_id;
 };
 
 export const connectLocalApi = async (options: ConnectOptions): Promise<LocalApiClient> => {
@@ -188,10 +203,14 @@ export const connectLocalApi = async (options: ConnectOptions): Promise<LocalApi
         listeners.delete(listener);
       };
     },
-    command: (attach, rpc, command_id) => sendCommand(connection, attach, rpc, command_id),
-    list: (filter, onRevision) =>
+    command: (attach, rpc, command_id, route = {}) =>
+      sendCommand(connection, attach, rpc, command_id, route),
+    list: (filter, onRevision, rows) =>
       new Promise<ListingResult>((resolve, reject) => {
-        const params = filter === undefined ? {} : { filter };
+        const params = {
+          ...(filter === undefined ? {} : { filter }),
+          ...(rows === undefined ? {} : { rows }),
+        };
         const watch = (data: { readonly query_id: string }): void =>
           assembler.watchListing(data.query_id, { resolve, reject }, onRevision);
         connection.request("sessions.list", params, watch).catch(reject);

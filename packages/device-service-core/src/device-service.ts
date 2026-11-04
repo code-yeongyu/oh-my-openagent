@@ -25,7 +25,7 @@ export type {
   StatusState,
 } from "./local-api/protocol.ts"
 export { SESSION_ROW_STATES } from "./local-api/protocol.ts"
-export type { AttachEnd, RemoteAttach, RemoteAttachEvent } from "./remote-attach.ts"
+export type { AttachEnd, CommandResult, RemoteAttach, RemoteAttachEvent } from "./remote-attach.ts"
 
 type Env = Readonly<Record<string, string | undefined>>
 

@@ -1,5 +1,6 @@
 import { LOCAL_CHUNK_MAX } from "./limits.ts";
-import type { CommandRpc, LocalRequest, RequestType } from "./protocol.ts";
+import type { CommandRpc, DelegatedRoute, LocalRequest, RequestType } from "./protocol.ts";
+import { endpointKey } from "./validate-delegated.ts";
 import { LOCAL_UPLOAD_PARTS_MAX } from "./upload.ts";
 import {
   base64Bytes,
@@ -28,28 +29,40 @@ export const requestFields = (
 
 const commandIdField = (v: unknown): { readonly command_id?: string } =>
   v === undefined ? {} : { command_id: commandId(v) };
+// Decision 0018: `delegated: true` or an endpoint key opts the command into the client's delegated channel.
+const ROUTE_FIELDS = ["command_id", "delegated", "endpoint"];
+const routeFields = (m: Fields): DelegatedRoute => {
+  const delegated = m["delegated"];
+  if (delegated !== undefined && delegated !== true) return fail("delegated");
+  return {
+    ...(delegated === true ? { delegated: true } : {}),
+    ...(m["endpoint"] === undefined ? {} : { endpoint: endpointKey(m["endpoint"]) }),
+  };
+};
 
 export const COMMAND_REQUEST_VALIDATORS: RequestValidators<
   "session.command" | "session.command_part"
 > = {
   "session.command": (v, id) => {
     if (Object.hasOwn(v, "upload_id")) {
-      const m = requestFields(v, ["attach", "upload_id"], ["command_id"]);
+      const m = requestFields(v, ["attach", "upload_id"], ROUTE_FIELDS);
       return {
         id,
         type: "session.command",
         attach: localId(m["attach"], "attach"),
         ...commandIdField(m["command_id"]),
         upload_id: localId(m["upload_id"], "upload_id"),
+        ...routeFields(m),
       };
     }
-    const m = requestFields(v, ["attach", "rpc"], ["command_id"]);
+    const m = requestFields(v, ["attach", "rpc"], ROUTE_FIELDS);
     return {
       id,
       type: "session.command",
       attach: localId(m["attach"], "attach"),
       ...commandIdField(m["command_id"]),
       rpc: commandRpcOf(m["rpc"]),
+      ...routeFields(m),
     };
   },
   "session.command_part": (v, id) => {

@@ -1,4 +1,10 @@
-import { blobEvents, LOCAL_INLINE_MAX, lineBytes, sha256Hex } from "../../../src/local-api/chunking.ts";
+import {
+  blobEvents,
+  chunkPayload,
+  LOCAL_INLINE_MAX,
+  lineBytes,
+  sha256Hex,
+} from "../../../src/local-api/chunking.ts";
 import { pageListing } from "../../../src/local-api/listing.ts";
 import type {
   CommandRpc,
@@ -163,9 +169,27 @@ const command = (state: OwnerState, conn: Conn, request: SessionCommand): Outcom
   state.bindings.set(command_id, binding);
   state.commands.push(resolved.rpc);
   return ok({ command_id }, () => {
+    if (request.delegated === true && session.delegated !== undefined) {
+      const { data, frames } = session.delegated;
+      for (const frame of frames) sendCommandEvent(conn, state.mint, session.device, { frame });
+      const response = { type: "response", id: resolved.rpc["id"] ?? null, command: resolved.rpc["type"] ?? null, success: true, data };
+      sendCommandEvent(conn, state.mint, session.device, { command_id, response });
+    }
     for (const outcome of session.outcome)
       conn.send(eventOf("session.command_state", { command_id, ...outcome }));
   });
+};
+
+// A command event inline, or, when its line would pass LOCAL_INLINE_MAX, as a blob of the body's UTF-8 JSON.
+const sendCommandEvent = (conn: Conn, mint: () => string, device: string, body: JsonObject): void => {
+  const inline = eventOf("session.command_event", { device, ...body });
+  if (lineBytes(inline) <= LOCAL_INLINE_MAX) return conn.send(inline);
+  const bytes = utf8(JSON.stringify(body));
+  const id = mint();
+  conn.send(eventOf("session.command_event", { device, blob: { id, bytes: bytes.length, sha256: sha256Hex(bytes) } }));
+  for (const { off, b } of chunkPayload(bytes))
+    conn.send(eventOf("session.command_blob_chunk", { id, off, b }));
+  conn.send(eventOf("session.command_blob_done", { id }));
 };
 
 const part = (state: OwnerState, conn: Conn, request: SessionCommandPart): Outcome => {

@@ -2,6 +2,7 @@ import type {
   Capability,
   ClientName,
   ErrorCode,
+  PathRefusalProblem,
   PolicyState,
   RefusedReason,
   SessionRowState,
@@ -11,6 +12,10 @@ import type {
 
 export * from "./vocabulary.ts";
 export * from "./protocol-events.ts";
+export type * from "./protocol-delegated.ts";
+import type { SessionEndpoints, SessionEndpointsData } from "./protocol-delegated.ts";
+import type { SessionCommand, SessionCommandPart } from "./protocol-command.ts";
+export type * from "./protocol-command.ts";
 
 // The local API v1 messages (docs/local-api.md). One JSON object per LF-terminated line: the handshake, then
 // requests {id, type, ...} each answered by exactly one response, and pushed events {type: "event", kind, ...}.
@@ -122,6 +127,8 @@ export type SessionsList = {
   readonly id: string;
   readonly type: "sessions.list";
   readonly filter?: SessionFilter;
+  /** 2: this query's rows may carry `kind`, `parent` and `parent_listed` (#316); absent, they never do. */
+  readonly rows?: 2;
 };
 export type SessionAttach = {
   readonly id: string;
@@ -133,30 +140,6 @@ export type SessionDetach = {
   readonly id: string;
   readonly type: "session.detach";
   readonly attach: string;
-};
-export type SessionCommand =
-  | {
-      readonly id: string;
-      readonly type: "session.command";
-      readonly attach: string;
-      readonly command_id?: string;
-      readonly rpc: CommandRpc;
-    }
-  | {
-      readonly id: string;
-      readonly type: "session.command";
-      readonly attach: string;
-      readonly command_id?: string;
-      readonly upload_id: string;
-    };
-export type SessionCommandPart = {
-  readonly id: string;
-  readonly type: "session.command_part";
-  readonly attach: string;
-  readonly upload_id: string;
-  readonly index: number;
-  readonly count: number;
-  readonly b: string;
 };
 export type SessionRead = {
   readonly id: string;
@@ -197,7 +180,8 @@ export type LocalRequest =
   | SessionCommandPart
   | SessionRead
   | EnforcementReport
-  | ShutdownForUpgrade;
+  | ShutdownForUpgrade
+  | SessionEndpoints;
 export type RequestType = LocalRequest["type"];
 
 export type DeviceRow = {
@@ -228,12 +212,15 @@ export type ResponseData = {
   readonly "session.read": { readonly query_id: string };
   readonly "enforcement.report": Empty;
   readonly "owner.shutdown_for_upgrade": Empty;
+  readonly "session.endpoints": SessionEndpointsData;
 };
+export type PathRefusal = { readonly component: string; readonly problem: PathRefusalProblem };
 export type ErrorBody = {
   readonly code: ErrorCode;
   readonly reason: string;
   readonly action: string | null;
   readonly limit_chars?: number;
+  readonly path_refusal?: PathRefusal;
 };
 export type LocalResponse =
   | { readonly id: string; readonly type: "response"; readonly ok: true; readonly data: JsonObject }

@@ -180,6 +180,42 @@ describe.skipIf(process.platform === "win32")("omo remote attach endpoint", () =
     expect(ownerState().commands).toEqual([bare, foreign])
   })
 
+  test("returns a delegated host's engine reply verbatim, with its data, on the request's own id", async () => {
+    const base = defaultWorld()
+    const [session] = base.sessions
+    if (session === undefined) throw new Error("the default world has a session")
+    const data = { commands: [{ name: "review", source: "extension" }] }
+    const endpoint = await endpointFor({ ...base, sessions: [{ ...session, delegated: { data, frames: [] } }] })
+    const tui = await TuiPeer.connect(endpoint.socketPath)
+    const id = randomUUID()
+    const answer = await tui.answer({ id, type: "get_commands", sessionId: LOCAL_SESSION_ID })
+    expect(answer).toEqual({ type: "response", id, command: "get_commands", success: true, data })
+  })
+
+  test("reassembles a delegated reply too large for one line from its blob", async () => {
+    const base = defaultWorld()
+    const [session] = base.sessions
+    if (session === undefined) throw new Error("the default world has a session")
+    const data = { text: "x".repeat(700_000) }
+    const endpoint = await endpointFor({ ...base, sessions: [{ ...session, delegated: { data, frames: [] } }] })
+    const tui = await TuiPeer.connect(endpoint.socketPath)
+    const answer = await tui.request({ type: "get_last_assistant_text", sessionId: LOCAL_SESSION_ID })
+    expect([answer.success, answer.data]).toEqual([true, data])
+  })
+
+  test("relays the frames the engine writes on the delegated connection, as the presented session", async () => {
+    const base = defaultWorld()
+    const [session] = base.sessions
+    if (session === undefined) throw new Error("the default world has a session")
+    const dialog = { type: "extension_ui_request", id: "dialog-1", method: "confirm", title: "Run it?", sessionId: "rpc-1" }
+    const endpoint = await endpointFor({ ...base, sessions: [{ ...session, delegated: { data: {}, frames: [dialog] } }] })
+    const tui = await TuiPeer.connect(endpoint.socketPath)
+    // Like the attach's records, frames reach the TUI once it subscribed, as the attach TUI does in its handshake.
+    await tui.request({ type: "subscribe_sessions", sessions: { ids: [LOCAL_SESSION_ID] }, mirror: "all" })
+    expect((await tui.request({ type: "prompt", sessionId: LOCAL_SESSION_ID, message: "go" })).success).toBe(true)
+    expect(await tui.record(line => line.id === "dialog-1", "the relayed dialog frame")).toEqual({ ...dialog, sessionId: LOCAL_SESSION_ID })
+  })
+
   test("shows the host's refusal verbatim", async () => {
     const base = defaultWorld()
     const [session] = base.sessions

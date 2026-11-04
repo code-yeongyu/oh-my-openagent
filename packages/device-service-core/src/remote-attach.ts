@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto"
 
+import { type DelegatedChannel, followDelegatedChannel } from "./delegated-channel.ts"
 import type { LocalApiClient } from "./local-api/client.ts"
 import type { ReadPage } from "./local-api/client-assembly.ts"
 import { LocalApiError } from "./local-api/errors.ts"
@@ -22,6 +23,9 @@ export type RemoteAttachEvent =
   | { readonly kind: "records"; readonly attach_id: number; readonly records: readonly JsonObject[] }
   | { readonly kind: "detached"; readonly reason: DetachReason }
 
+/** A forwarded record's outcome: its final command state, and the engine's own reply when the host sent one. */
+export type CommandResult = { readonly outcome: CommandStateEvent; readonly response?: JsonObject }
+
 export type RemoteAttach = {
   readonly device: string
   readonly sessionId: string
@@ -36,11 +40,16 @@ export type RemoteAttach = {
   /** One page of older history; entries too large to fetch are marked `too_large`. */
   readonly read: (options?: { readonly before?: string; readonly tail?: number }) => Promise<ReadPage>
   /**
-   * Sends one engine RPC record, unchanged, to the attached session's host (`session.command {attach, rpc}`) and
-   * settles with the first command state that is not a progress state; its state and reason are the host's or the
-   * engine's. Rejects with the local API's refusal, or when the attach ends first.
+   * Sends one engine RPC record, unchanged, to the attached session's host on this connection's delegated channel
+   * (`session.command {attach, rpc, delegated: true}`) and settles with the first command state that is not a progress
+   * state, plus the engine's reply when the host sent one (a host without delegated commands sends none). Rejects with
+   * the local API's refusal, or when the attach ends first.
    */
-  readonly command: (rpc: CommandRpc) => Promise<CommandStateEvent>
+  readonly command: (rpc: CommandRpc) => Promise<CommandResult>
+  /** The frames the host's engine writes unasked on the delegated channel (dialog requests, session events). */
+  readonly onFrame: (listener: (frame: JsonObject) => void) => () => void
+  /** A delegated reply or frame that was lost, or the channel closing, with the reason. */
+  readonly onChannelLoss: (listener: (reason: string) => void) => () => void
   /** Detaches; afterwards this attach holds no subscription on the connection and `detached` settles "detached". */
   readonly detach: () => Promise<void>
   /** The error a listener threw, which ended the attach with "listener_failed"; undefined otherwise. */
@@ -102,10 +111,12 @@ export function openAttach(client: LocalApiClient, device: string, sessionId: st
   let ended = false
   let failure: unknown
   const commands = new Set<(reason: AttachEnd) => void>()
+  let channel: DelegatedChannel | undefined
   const finish = (reason: AttachEnd) => {
     if (ended) return
     ended = true
     stop()
+    channel?.stop()
     listeners.clear()
     for (const end of [...commands]) end(reason)
     rejectSnapshot(new Error(`the attach ended before its snapshot: ${reason}`))
@@ -140,6 +151,9 @@ export function openAttach(client: LocalApiClient, device: string, sessionId: st
   return client.request("session.attach", { device, session_id: sessionId }).then(
     ({ attach }) => {
       handle = attach
+      const delegated = followDelegatedChannel(client, device)
+      channel = delegated
+      if (ended) delegated.stop()
       for (const event of early.splice(0)) if (event.attach === attach) deliver(event)
       return {
         device,
@@ -153,8 +167,10 @@ export function openAttach(client: LocalApiClient, device: string, sessionId: st
           return () => listeners.delete(listener)
         },
         failure: () => failure,
+        onFrame: listener => delegated.onFrame(listener),
+        onChannelLoss: listener => delegated.onLoss(listener),
         command: rpc =>
-          new Promise<CommandStateEvent>((resolve, reject) => {
+          new Promise<CommandResult>((resolve, reject) => {
             if (ended) return reject(new Error("the attach has ended"))
             // Minted here, before sending, so a state that arrives ahead of the answer is not missed.
             const commandId = randomBytes(16).toString("base64url")
@@ -170,10 +186,11 @@ export function openAttach(client: LocalApiClient, device: string, sessionId: st
               if (event.kind !== "session.command_state" || event.command_id !== commandId) return
               if (PROGRESS_STATES.has(event.state)) return
               settle()
-              resolve(event)
+              const response = delegated.takeReply(commandId)
+              resolve(response === undefined ? { outcome: event } : { outcome: event, response })
             })
             commands.add(end)
-            client.command(attach, rpc, commandId).catch((error: unknown) => {
+            client.command(attach, rpc, commandId, { delegated: true }).catch((error: unknown) => {
               settle()
               reject(error)
             })
