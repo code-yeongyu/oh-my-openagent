@@ -2,15 +2,19 @@
 // array the recovery world's FakeSyncServer appends keyring records to. It speaks the contract
 // 1.17.0 wire for the routes a signed-in device uses (state, entries, keys, batches, uploads,
 // objects, keyring appends) and verifies nothing beyond the base check, so every crypto check in
-// a test is the client's own. The service's revoke freeze is the shared FreezeModel: a revoke through
+// a test is the client's own. `/entries` serves the contract `SyncPullEntry` row minus `object_id`
+// and `bytes`: `batch_id` on batch rows, null on keyring rows. With `entriesBatchId: false` it
+// serves rows without the key, as the service does since it dropped that field from `/entries`.
+// The service's revoke freeze is the shared FreezeModel: a revoke through
 // `DELETE /v1/devices/:id` or `POST /v1/session/sign-out` sets `rotation_pending`, and the rotation
 // admission refuses a rotation that keeps a revoked key.
 
 import { createHash, randomBytes } from "node:crypto"
 
-import type { BatchEntry, KeyringEntry, SyncAuthor, SyncEntry } from "../../crypto/entry.ts"
+import type { KeyringEntry, SyncAuthor, SyncEntry } from "../../crypto/entry.ts"
 import { jcsBytes, sha256B64 } from "../../crypto/vendor/sync-format/jcs.ts"
 import type { KeyringAppendRequest } from "../../recovery/ports.ts"
+import { servedBatchId, type StoredBatchRow } from "../../recovery/testing/fake-server.test-support.ts"
 import { FreezeModel } from "./freeze-model.test-support.ts"
 
 type Pending = { id: string; account: string; commitment: string; answer: unknown; reveal: unknown; expires_at: number }
@@ -57,7 +61,7 @@ const chainRow = ({ seq, base_seq, kind, account, epoch, author, digest, link, k
   seq, base_seq, kind, account, epoch, author, digest, link, keyring_link, record_sig,
 })
 
-export function startChainWireServer(account: string, chain: SyncEntry[], options: { readonly requireConsent?: boolean; readonly stream?: boolean } = {}): ChainWireServer {
+export function startChainWireServer(account: string, chain: SyncEntry[], options: { readonly requireConsent?: boolean; readonly stream?: boolean; readonly entriesBatchId?: boolean } = {}): ChainWireServer {
   const authors = new Map<string, SyncAuthor>()
   const devices = new Map<string, string>()
   const deviceConsent = new Map<string, boolean>()
@@ -109,7 +113,10 @@ export function startChainWireServer(account: string, chain: SyncEntry[], option
           min_client_format: 1,
         })
       }
-      if (req.method === "GET" && path === "/v1/sync/entries") return Response.json({ entries: chain.filter((e) => e.seq > after).map(chainRow) })
+      if (req.method === "GET" && path === "/v1/sync/entries") {
+        const rows = chain.filter((e) => e.seq > after)
+        return Response.json({ entries: rows.map((e) => (options.entriesBatchId === false ? chainRow(e) : { ...chainRow(e), batch_id: servedBatchId(e) })) })
+      }
       if (req.method === "GET" && path === "/v1/sync/keys") return Response.json({ entries: chain.filter((e) => e.kind === "keyring") })
       if (req.method === "GET" && path === "/v1/sync/batches") {
         return Response.json({
@@ -160,9 +167,9 @@ export function startChainWireServer(account: string, chain: SyncEntry[], option
         if (replay !== undefined) return Response.json({ seq: replay[0] })
         if (freeze.pending) return freeze.staleRefusal()
         if (body.base_seq !== chain.length) return refusal(409, "stale_base")
-        const entry: BatchEntry = {
+        const entry: StoredBatchRow = {
           seq: chain.length + 1, base_seq: body.base_seq, kind: "batch", account, epoch: body.epoch, author,
-          digest: body.digest, link: body.link, keyring_link: null, record_sig: body.record_sig,
+          digest: body.digest, link: body.link, keyring_link: null, record_sig: body.record_sig, batch_id: body.idempotency_key,
         }
         chain.push(entry)
         objects.set(entry.seq, { id: body.upload_id, batchId: body.idempotency_key, bytes: up.data })
