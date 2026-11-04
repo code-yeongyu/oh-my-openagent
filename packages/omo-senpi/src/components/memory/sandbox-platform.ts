@@ -156,6 +156,23 @@ export function buildPathSandboxTransform<T extends SandboxableSpawnArgs>(
     }
   }
 
+  // A deferred probe decides per spawn, so the degradation state describes the latest spawn.
+  let spawnWarning = linuxProbeWarning
+  const applyUsability = (spawnArgs: T, usability: SandboxUsability): T => {
+    if (usability.usable) {
+      spawnWarning = undefined
+      return buildTransform(spawnArgs)
+    }
+    const reason = `bwrap cannot create a sandbox: ${usability.reason}`
+    if (input.policy === "required") {
+      const error = new SandboxUnavailableError(platform, reason)
+      if (input.errorRethrow !== undefined) input.errorRethrow(error)
+      throw error
+    }
+    spawnWarning = `${input.surface} sandbox unavailable on ${platform}: ${reason}; running unsandboxed because policy is auto`
+    return spawnArgs
+  }
+
   const linuxTransform = (spawnArgs: T): T | Promise<T> => {
     // If probe error was detected at build time, throw it now
     if (linuxProbeError !== undefined) {
@@ -169,44 +186,18 @@ export function buildPathSandboxTransform<T extends SandboxableSpawnArgs>(
     if (deferAsyncProbe) {
       const probeResult = (input.probe ?? defaultProbe)(executable)
       if (probeResult instanceof Promise) {
-        return probeResult.then((usability) => {
-          if (!usability.usable) {
-            const reason = `bwrap cannot create a sandbox: ${usability.reason}`
-            if (input.policy === "required") {
-              const error = new SandboxUnavailableError(platform, reason)
-              if (input.errorRethrow !== undefined) input.errorRethrow(error)
-              throw error
-            }
-            // Policy is auto - return unsandboxed
-            return spawnArgs
-          }
-          // Sandbox is usable - apply the bwrap transform
-          return buildTransform(spawnArgs)
-        })
-      } else {
-        // Should not happen - we already checked this at build time
-        // But handle it gracefully
-        if (!probeResult.usable) {
-          const reason = `bwrap cannot create a sandbox: ${probeResult.reason}`
-          if (input.policy === "required") {
-            const error = new SandboxUnavailableError(platform, reason)
-            if (input.errorRethrow !== undefined) input.errorRethrow(error)
-            throw error
-          }
-          return spawnArgs
-        }
-        return buildTransform(spawnArgs)
+        return probeResult.then((usability) => applyUsability(spawnArgs, usability))
       }
+      return applyUsability(spawnArgs, probeResult)
     }
     // Synchronous probe already checked and usable
     return buildTransform(spawnArgs)
   }
 
-  const props: { wasSandboxed: boolean; warning?: string } = { wasSandboxed: linuxProbeWarning === undefined }
-  if (linuxProbeWarning !== undefined) {
-    props.warning = linuxProbeWarning
-  }
-  return Object.assign(linuxTransform, props) as GenericSandboxTransform<T>
+  return Object.defineProperties(linuxTransform, {
+    wasSandboxed: { enumerable: true, get: () => spawnWarning === undefined },
+    warning: { enumerable: true, get: () => spawnWarning },
+  }) as GenericSandboxTransform<T>
 }
 
 function buildDarwinProfile(input: {

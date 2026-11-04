@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -175,6 +175,29 @@ describe.skipIf(process.platform === "win32")("probeBwrapUsability", () => {
 
     // then
     expect(usability.usable).toBe(false)
+  }, 30_000)
+
+  test("#given a smoke that could not be spawned #when the path later becomes runnable #then the spawn-error verdict stays cached and the smoke never runs", async () => {
+    // given: a non-executable file makes spawn fail (EACCES) before any script can run.
+    const binDir = mkdtempSync(join(tmpdir(), "omo-bwrap-probe-spawn-error-cached-"))
+    const executable = join(binDir, "bwrap")
+    writeFileSync(executable, "#!/bin/sh\nprintf 'spawn\\n' >> \"$0.spawns\"\nexit 0\n")
+    chmodSync(executable, 0o644)
+
+    try {
+      const first = await probeBwrapUsability(executable)
+      chmodSync(executable, 0o755)
+
+      // when: the same path is probed again after it became runnable
+      const second = await probeBwrapUsability(executable)
+
+      // then: the cached spawn-error verdict answers, and the smoke script never ran
+      expect(first.usable).toBe(false)
+      expect(second).toEqual(first)
+      expect(existsSync(`${executable}.spawns`)).toBe(false)
+    } finally {
+      rmSync(binDir, { recursive: true, force: true })
+    }
   }, 30_000)
 
   test("#given concurrent probes #when both complete #then they share one executable invocation", async () => {
