@@ -1,0 +1,217 @@
+{
+  "description": "window.bringToCurrentSpace (#11463) is a public exec method admitted WITHOUT the control grant (omp parity): with a live host-relay stop path and no control.grant, moving window 101 succeeds and is audited as background; an unknown window fails WindowNotFound and is audited too.",
+  "scenario": "crates/senpi-desktop-backend-fake/fixtures/two-displays-one-window.json",
+  "env": {
+    "SENPI_DESKTOP_FAKE_CLOCK": "1"
+  },
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "session.open",
+        "params": {
+          "allowHostRelayOnlyStop": true,
+          "showCursor": false
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayServer": null,
+                "capture": true,
+                "input": true,
+                "ax": true,
+                "backgroundWindowInput": true,
+                "cursorOverlay": false,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capturePermission": "granted",
+                "inputPermission": "granted",
+                "axPermission": "granted",
+                "displayCount": 2,
+                "focusGuard": true,
+                "stopPath": "none",
+                "stopReason": null,
+                "integrityLevel": null,
+                "screenLocked": false
+              },
+              "resumeToken": "per-process-random"
+            }
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "stopPath.start",
+        "params": {
+          "chord": "ctrl+alt+shift+escape"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "suspended": false,
+              "globalLive": false,
+              "hostRelayLive": true,
+              "heartbeatFresh": false,
+              "stopPath": "host-relay",
+              "reason": null
+            }
+          },
+          "variable": [
+            "/result/heartbeatFresh",
+            "/result/reason"
+          ]
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "stopPath.changed",
+            "params": {
+              "suspended": false,
+              "globalLive": false,
+              "hostRelayLive": true,
+              "heartbeatFresh": false,
+              "stopPath": "host-relay",
+              "reason": null
+            }
+          },
+          "variable": [
+            "/params/heartbeatFresh",
+            "/params/reason"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "stopPath.heartbeat",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "result": null
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "window.bringToCurrentSpace",
+        "params": {
+          "windowId": "101"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "result": null
+          },
+          "variable": []
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "audit",
+            "params": {
+              "action": "window.bringToCurrentSpace",
+              "target": "101",
+              "delivery": "background",
+              "frameId": null,
+              "code": null,
+              "durationMs": 0,
+              "focusRestored": null,
+              "textLength": null,
+              "textSha256": null,
+              "keys": null
+            }
+          },
+          "variable": [
+            "/params/durationMs",
+            "/params/focusRestored"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "window.bringToCurrentSpace",
+        "params": {
+          "windowId": "999"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "error": {
+              "code": -32004,
+              "message": "WindowNotFound",
+              "data": {
+                "code": "WindowNotFound",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message",
+            "/error/data/hint"
+          ]
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "audit",
+            "params": {
+              "action": "window.bringToCurrentSpace",
+              "target": "999",
+              "delivery": "background",
+              "frameId": null,
+              "code": "WindowNotFound",
+              "durationMs": 0,
+              "focusRestored": null,
+              "textLength": null,
+              "textSha256": null,
+              "keys": null
+            }
+          },
+          "variable": [
+            "/params/durationMs",
+            "/params/focusRestored"
+          ]
+        }
+      ]
+    }
+  ]
+}

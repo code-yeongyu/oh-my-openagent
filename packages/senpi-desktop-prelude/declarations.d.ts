@@ -172,6 +172,8 @@ interface ComputerCapabilities {
 	integrityLevel?: string | null;
 	/** Input is refused while the screen is locked. */
 	screenLocked: boolean;
+	/** Every display the session can capture is asleep (macOS); captures and input then fail with a note saying so. */
+	displayAsleep?: boolean;
 }
 
 /** Live accessibility element resolved from a snapshot ref; expired refs throw `StaleRef`. */
@@ -202,6 +204,15 @@ interface ComputerElement {
 	 * element that never takes focus throws `BackgroundUnavailable` (`InputFailed` in the foreground) with nothing typed.
 	 */
 	type(text: string, options?: ComputerDeliveryOptions): Promise<{ method: "inserted" | "keys" }>;
+	/**
+	 * Select `text` inside this element's value without moving focus or sending keys (macOS): the match must be unique
+	 * after `prefix` and before `suffix`; `select` picks the match (default) or a caret at its start or end. The reply is
+	 * the applied selection in UTF-16 units; a following `type` replaces it.
+	 */
+	selectText(
+		text: string,
+		options?: { prefix?: string; suffix?: string; select?: "text" | "start" | "end" },
+	): Promise<{ start: number; length: number; text: string; focused: boolean }>;
 	focus(): Promise<void>;
 	parent(): Promise<ComputerElement | null>;
 	children(): Promise<ComputerElement[]>;
@@ -240,6 +251,8 @@ interface ComputerWindow extends ComputerInputTarget {
 	readonly bounds: ComputerBounds;
 	readonly focused: boolean;
 	raise(): Promise<void>;
+	/** macOS: move this window into the user's current Space without activating it; no grant needed. */
+	bringToCurrentSpace(): Promise<void>;
 	readonly menu: {
 		/** Inspect a menu path without activating the application (empty path = the menu bar). */
 		items(path?: string[]): Promise<ComputerMenuItem[]>;

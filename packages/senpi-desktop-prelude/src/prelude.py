@@ -66,7 +66,7 @@ def _make_computer():
 
     _install(
         _Element,
-        {name: name for name in ("value", "setValue", "bounds", "attributes", "actions", "perform", "press", "click", "type", "focus")},
+        {name: name for name in ("value", "setValue", "bounds", "attributes", "actions", "perform", "press", "click", "type", "selectText", "focus")},
     )
 
     class _Window:
@@ -93,7 +93,7 @@ def _make_computer():
     _install(
         _Window,
         {
-            **{name: name for name in ("screenshot", "zoom", "observe", "click", "doubleClick", "move", "drag", "scroll", "type", "press", "holdKeys", "holdMouse", "ax")},
+            **{name: name for name in ("screenshot", "zoom", "observe", "click", "doubleClick", "move", "drag", "scroll", "type", "press", "holdKeys", "holdMouse", "bringToCurrentSpace", "ax")},
             "raise_": "raise",
         },
     )

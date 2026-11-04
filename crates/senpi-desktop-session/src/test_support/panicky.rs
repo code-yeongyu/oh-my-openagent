@@ -45,6 +45,8 @@ impl Watches {
 pub(crate) struct PanickyFake {
     pub(crate) inner: FakeBackend,
     pub(crate) panics: Panics,
+    pub(crate) awake: super::AwakeHolds,
+    pub(crate) screen: super::FakeScreen,
     pub(crate) watches: Watches,
 }
 
@@ -114,6 +116,9 @@ impl Backend for PanickyFake {
     fn raise_window(&mut self, id: &str) -> CoreResult<()> {
         self.inner.raise_window(id)
     }
+    fn bring_to_current_space(&mut self, id: &str, check_stop: &dyn Fn() -> CoreResult<()>) -> CoreResult<()> {
+        self.inner.bring_to_current_space(id, check_stop)
+    }
     fn hold_keys(
         &mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode,
         control: &senpi_desktop_core::holds::HoldControl<'_>,
@@ -165,6 +170,12 @@ impl Backend for PanickyFake {
     }
     fn screen_locked(&mut self) -> CoreResult<bool> {
         self.inner.screen_locked()
+    }
+    fn hold_display_awake(&mut self) -> Option<senpi_desktop_core::backend::DisplayAwakeHold> {
+        Some(self.awake.hold())
+    }
+    fn screen_probe(&self) -> Option<Arc<dyn senpi_desktop_core::backend::ScreenProbe>> {
+        Some(Arc::new(self.screen.clone()))
     }
     fn watch_user_input(&mut self) {
         self.watches.0.fetch_add(1, Ordering::SeqCst);

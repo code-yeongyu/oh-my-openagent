@@ -55,6 +55,18 @@ pub enum AxInputMethod {
     Keys,
 }
 
+/// `ax.selectText` reply: the selection that was applied, in UTF-16 code
+/// units of the element's value, with the text it covers and whether the
+/// element holds its application's focus.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AxTextSelection {
+    pub start: u32,
+    pub length: u32,
+    pub text: String,
+    pub focused: bool,
+}
+
 /// `ax.typeText` reply.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

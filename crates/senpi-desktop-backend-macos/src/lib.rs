@@ -13,12 +13,15 @@ mod front_app;
 mod launch_gate;
 mod launch_services;
 mod overlay;
+mod power;
 mod release_helper;
 mod responsible;
 mod input;
+mod screen;
 #[cfg(test)]
 mod partial_coverage_tests;
 mod skylight;
+mod spaces;
 mod stop_path;
 
 pub use ax::{is_trusted, MacAx};

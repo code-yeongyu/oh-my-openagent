@@ -109,6 +109,19 @@ describe("runComputerCode", HANG_GUARD, () => {
 		expect(result.displays[2]).toEqual({ type: "text", text: "found main.ts" });
 	});
 
+	it("selects text in an element through ax.selectText and returns the selection", async () => {
+		// Given
+		const { service, log } = await openDesktop();
+
+		// When
+		const result = await run(service, `const el = await desktop.ref("e1"); return el.selectText("beta", { prefix: "alpha ", select: "end" });`);
+
+		// Then
+		expect(result.returnValue).toEqual({ start: 10, length: 0, text: "", focused: true });
+		const selected = log.requests.filter((request) => request.method === "ax.selectText").map((request) => request.params);
+		expect(selected).toEqual([{ ref: "e1", text: "beta", prefix: "alpha ", suffix: undefined, select: "end" }]);
+	});
+
 	it("types into an element through ax.typeText and returns how the text was delivered", async () => {
 		// Given
 		const { service, log } = await openDesktop();

@@ -3,12 +3,14 @@ import { type FacadeMethod, facadeMethod, type RunScope } from "./context";
 import {
 	type AxInputResult,
 	type AxNode,
+	type AxTextSelection,
 	type DesktopWindow,
 	type MenuItem,
 	expectResult,
 	isAttributePairs,
 	isAxInputResult,
 	isAxNode,
+	isAxTextSelection,
 	isMenuItem,
 	isText,
 	listOf,
@@ -29,6 +31,13 @@ export interface AxQuery {
 	readonly title?: string;
 	readonly value?: string;
 	readonly limit?: number;
+}
+
+/** Where `selectText` looks: the match must follow `prefix` and precede `suffix`; `select` picks the match or a caret at its start or end. */
+export interface SelectTextOptions {
+	readonly prefix?: string;
+	readonly suffix?: string;
+	readonly select?: "text" | "start" | "end";
 }
 
 export interface Bounds {
@@ -61,6 +70,11 @@ export class WindowHandle extends InputTarget {
 
 	raise(): Promise<void> {
 		return send(this.#method, "raise", "raiseWindow", { windowId: this.id });
+	}
+
+	/** Moves this window into the user's current Space (macOS) without activating it or switching Spaces. */
+	bringToCurrentSpace(): Promise<void> {
+		return send(this.#method, "bringToCurrentSpace", "window.bringToCurrentSpace", { windowId: this.id });
 	}
 
 	/** The window's native menu: `items` lists children (empty path = the menu bar), `select` invokes a leaf. */
@@ -191,6 +205,17 @@ export class ElementHandle {
 		return this.#method("type", async ({ call }) => {
 			const result = await call("ax.typeText", { ref: this.ref, text, opts: pointerOptions(options) });
 			return expectResult("ax.typeText", result, isAxInputResult);
+		});
+	}
+
+	/**
+	 * Selects `text` inside this element's value by writing its selected range: no key is sent, no focus moves, and the
+	 * value stays. The match must be unique inside the given context. A following `type` replaces the selection.
+	 */
+	selectText(text: string, options?: SelectTextOptions): Promise<AxTextSelection> {
+		return this.#method("selectText", async ({ call }) => {
+			const params = { ref: this.ref, text, prefix: options?.prefix, suffix: options?.suffix, select: options?.select };
+			return expectResult("ax.selectText", await call("ax.selectText", params), isAxTextSelection);
 		});
 	}
 

@@ -104,7 +104,9 @@ impl Guard {
             | MutatingAction::AxPerform
             | MutatingAction::AxSetValue
             | MutatingAction::AxClick
-            | MutatingAction::ClipboardWrite => GuardKind::Delivery,
+            | MutatingAction::AxSelectText
+            | MutatingAction::ClipboardWrite
+            | MutatingAction::BringToCurrentSpace => GuardKind::Delivery,
         }
     }
 

@@ -27,6 +27,8 @@ computer.holdKeys(keys[], { duration, delivery? }) / computer.holdMouse(x, y, { 
     Exec tier, also available on window and display handles and the desktop object inside computer.run. Duration is finite seconds in 0..=100; holdKeys refuses an empty list. Mouse coordinates use the latest full screenshot, never a zoom. Input is always released before the call settles, including errors, cancellation, deadlines and the user's safety stop; keys release in reverse order. Foreground delivery still needs the human-confirmed control grant. Existing run and engine deadlines can interrupt a hold early; give long holds an adequate run budget. Older engines refuse unsupported hold methods without affecting press/click.
 win.raise() → None
     Brings the window to the front (exec tier). Unavailable on Wayland.
+win.bringToCurrentSpace() → None
+    macOS, exec tier, no control grant: moves a window that sits on another Space (Mission Control desktop) into the user's current Space without activating it or switching Spaces; a window already there is left alone. `SpaceMoveDenied` when the user's current Space is fullscreen or system-managed (refused before any move), when macOS will not move the window, or when the user's Space or focus changed meanwhile (the window may have moved: look before retrying); `SpaceUnsupported` on other platforms or macOS versions without the API.
 win.menu.items(path?) → ComputerMenuItem[]
     Read-only (read tier): lists the immediate children of the window's menu at `path`; no argument lists the menu bar. Item fields: title, path (native labels, ellipses included), enabled, checked, hasSubmenu, shortcut.
 win.menu.select(path, { delivery? }?) → None
@@ -41,6 +43,8 @@ computer.elementAt(x, y) / computer.focusedElement() → ComputerElement | null
     `elementAt` takes GLOBAL desktop coordinates, not screenshot pixels.
 el.value() / el.bounds() / el.attributes() / el.actions() / el.parent() / el.children() → reads
 el.setValue(text) / el.perform(action) / el.press() / el.click({ delivery? }?) / el.focus() → mutations
+el.selectText(text, { prefix?, suffix?, select? }?) → { start, length, text, focused }
+    Selects `text` inside THAT element's value (macOS) by writing its selected range: no key sent, no focus moved, value unchanged. The match must be unique; `prefix` / `suffix` disambiguate (an ambiguous match is refused with its offsets, nothing selected); `select: "start" | "end"` places a caret instead; empty `text` with context places a caret. Offsets are UTF-16 units. Then `el.type(...)` replaces the selection.
 el.type(text, { delivery? }?) → { method: "inserted" | "keys" }
     Types into THAT element without taking the user's focus (macOS). A native text field takes the text through its own selection and the value is read back exactly (`inserted`: no key sent, no focus moved, works in a multi-window app); any other element is given app-local focus and takes keys only once the app confirms it has focus (`keys`). An element that never takes focus throws `BackgroundUnavailable` (`InputFailed` in the foreground) naming where the focus is, with a ref; nothing was typed. A secure field's text never appears in an error. Foreground delivery raises the window first and needs the grant.
     Element fields: ref, role, nativeRole, title, description, enabled, focused, childCount. AX actions need no screenshot.
@@ -53,15 +57,15 @@ computer.control.release() → None
 computer.control.state() → { active, reason?, grantedAt? }
 computer.run(fnOrCode, { args?, read_only?, timeout? }?) → value
     One multi-step JS run in the persistent desktop session. Functions receive `{ desktop, wait, assert }` (`desktop` = same helpers) and cannot capture cell closures; `args` pass JSON data, functions, RegExp. Python passes a JS code string only. `read_only: true` needs `computer:read` and blocks mutation; `timeout` is seconds. Not sandboxed.
-computer.capabilities() → { backend, capture, input, ax, backgroundWindowInput, cursorOverlay, deliveryModes, *Permission, stopPath, stopReason?, focusGuard, screenLocked, … }
-    `stopPath` is `global` when the user's stop chord is armed; with `none`, input is refused. `focusGuard` says whether foreground delivery restores the previous front window and cursor.
+computer.capabilities() → { backend, capture, input, ax, backgroundWindowInput, cursorOverlay, deliveryModes, *Permission, stopPath, stopReason?, focusGuard, screenLocked, displayAsleep, … }
+    `stopPath` is `global` when the user's stop chord is armed; with `none`, input is refused. `focusGuard` says whether foreground delivery restores the previous front window and cursor. `displayAsleep` (macOS) is true when every display of the session sleeps; the engine keeps the display awake while you act, and a failure that ends `(the screen is locked)` or `(the display is asleep)` needs the user to unlock or wake the Mac, not a retry.
 computer.close() → None
     Ends the desktop session; later calls fail.
 Rules:
     Observe once per turn before interacting with an app (one screenshot or `ax()` of the target), act, then observe again only when you need fresh state; never re-screenshot after every action.
     PREFER AX over pixels: `win.ax()` → `el.press()` / `el.click()` / `el.type()` / `el.setValue()`.
     Pointer x,y are pixels in the MOST RECENT FULL screenshot of the SAME target; zoom leaves that frame unchanged. AX coordinates are global desktop coordinates; NEVER mix them. `InvalidCoordinateFrame` → re-screenshot that target.
-    `AxUnconfirmed` from an AX action, `setValue`, `el.type()` or focus means the app got the request but never answered (often a modal dialog opened): it may already have taken effect, so observe the window before any retry; NEVER repeat it blindly.
+    `AxUnconfirmed` from an AX action, `setValue`, `el.type()`, `el.selectText()` or focus means the app got the request but never answered (often a modal dialog opened): it may already have taken effect, so observe the window before any retry; NEVER repeat it blindly. Exception: `setValue` on a popup button (`AXPopUpButton`) chooses from its menu and still reports `AxFailed` when the app does not answer.
     `UserIntervened` (macOS) means the user pressed a key or clicked in the app you were driving: either since your last read of its window (the input waited for them to pause up to 5 s, then nothing was sent) or during the input (input sent before their key may have landed, nothing more was sent). Read the window again (win.ax(), win.observe() or win.screenshot()) once they have paused for 5 s before acting on it; NEVER repeat the action as it was. Inspecting single elements does not count as that read.
     Each `win.ax()` starts a ref generation; current and previous refs stay valid, older refs throw `StaleRef`. Re-snapshot; NEVER guess refs.
     Input defaults to `delivery: "background"`. On macOS it leaves the frontmost app, its focused window, the cursor and the destination of the user's next keystroke unchanged, but a clicked target window may rise directly under the user's front window. `BackgroundUnavailable` means use AX or retry with `delivery: "foreground"` (briefly activates the target, then the focus guard restores it). Never assume a background action landed without re-observing.

@@ -103,6 +103,15 @@ pub struct RaiseWindowParams {
     pub window_id: String,
 }
 
+/// `window.bringToCurrentSpace`: the native id of the window to move into the
+/// user's current Space. The window is usually on another Space, so it may be
+/// absent from `windows`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BringToCurrentSpaceParams {
+    pub window_id: String,
+}
+
 /// `control.grant`: `confirmationId` is the host's receipt of the human
 /// confirmation it showed; the engine never sees the confirm itself.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -191,6 +200,22 @@ pub struct AxClickParams {
     #[serde(rename = "ref")]
     pub ref_: String,
     pub opts: Option<PointerOptions>,
+}
+
+/// `ax.selectText`: selects `text` inside the value of the element `ref`
+/// names, disambiguated by the `prefix` and `suffix` around it; `select` is
+/// `text` (the match), `start` or `end` (a caret before or after it).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct AxSelectTextParams {
+    #[serde(rename = "ref")]
+    pub ref_: String,
+    pub text: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prefix: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub suffix: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub select: Option<String>,
 }
 
 /// `ax.typeText`: types `text` into the element `ref` names. Only
