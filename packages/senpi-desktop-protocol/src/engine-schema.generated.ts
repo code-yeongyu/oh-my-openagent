@@ -47,6 +47,7 @@ export const ENGINE_METHODS = [
 	"ax.focus",
 	"ax.click",
 	"ax.typeText",
+	"ax.selectText",
 	"stopPath.start",
 	"stopPath.status",
 	"stopPath.heartbeat",

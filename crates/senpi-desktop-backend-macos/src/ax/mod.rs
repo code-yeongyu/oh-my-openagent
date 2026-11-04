@@ -10,11 +10,14 @@ mod point_owner;
 mod popup;
 pub(crate) mod element;
 mod props;
+mod selection;
 mod text_input;
 mod tree;
 
 use senpi_desktop_core::ax::{AxBackend, AxHandle, AxOwner, AxProps};
 use senpi_desktop_core::error::CoreResult;
+use senpi_desktop_core::protocol_results::AxTextSelection;
+use senpi_desktop_core::text_range::TextSelectRequest;
 use senpi_desktop_core::types::DesktopWindow;
 
 pub use self::element::is_trusted;
@@ -175,6 +178,11 @@ impl AxBackend for MacAx {
         tree::attributes(element(h)?)
     }
 
+    fn select_text(&mut self, h: &AxHandle, request: &TextSelectRequest) -> CoreResult<AxTextSelection> {
+        self.show_target(h);
+        selection::select(element(h)?, request)
+    }
+
     /// `AXWindow`'s CGWindowID: the id `windows()` lists.
     fn owner(&mut self, h: &AxHandle, _windows: &[DesktopWindow]) -> CoreResult<AxOwner> {
         Ok(element::owner_window_id(element(h)?)
@@ -184,6 +192,9 @@ impl AxBackend for MacAx {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod selection_tests;
 
 #[cfg(test)]
 mod text_input_tests;

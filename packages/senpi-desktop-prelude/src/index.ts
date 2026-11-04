@@ -39,6 +39,7 @@ const METHOD_ALLOWLIST: readonly string[] = [
 	"ref",
 	"screenshot",
 	"scroll",
+	"selectText",
 	"setValue",
 	"type",
 	"value",

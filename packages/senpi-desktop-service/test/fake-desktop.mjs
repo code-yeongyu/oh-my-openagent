@@ -212,6 +212,8 @@ export function createDesktop() {
 				return { result: [["AXRole", "AXButton"]] };
 			case "ax.typeText":
 				return { result: { method: "inserted" } };
+			case "ax.selectText":
+				return { result: { start: 10, length: 0, text: "", focused: true } };
 			default:
 				return undefined;
 		}

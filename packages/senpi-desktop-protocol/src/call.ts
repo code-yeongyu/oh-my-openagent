@@ -86,6 +86,7 @@ export const ELEMENT_METHODS: MethodPolicies = {
 	press: "exec",
 	click: "exec",
 	type: "exec",
+	selectText: "exec",
 	focus: "exec",
 	parent: "read",
 	children: "read",

@@ -187,6 +187,24 @@ describe("Python computer facade", () => {
 		]);
 	});
 
+	it("sends el.selectText as a ref-hopped chain and returns the selection", () => {
+		// When
+		const run = runPythonFacade("el = computer.ref('e1')\nout = el.selectText('beta', prefix='alpha ')", {
+			selectText: JSON.stringify({ text: "", details: { value: { start: 6, length: 4, text: "beta", focused: true } }, images: [], hasError: false }),
+		});
+
+		// Then
+		expect(run.error).toBeNull();
+		expect(run.out).toEqual({ start: 6, length: 4, text: "beta", focused: true });
+		expect(run.calls.at(-1)).toEqual({
+			action: "call",
+			chain: [
+				{ method: "ref", args: ["e1"] },
+				{ method: "selectText", args: ["beta", { prefix: "alpha " }] },
+			],
+		});
+	});
+
 	it("sends control helpers as one-step call chains (#9651 B5b)", () => {
 		// When
 		const run = runPythonFacade(
