@@ -267,8 +267,8 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
  * The send path hands the durable id to the engine, which freshly validates the
  * published endpoint and caller's scope. The result keeps the send contract and
  * adds `delivery_id`, `effective_mode` and `endpoint.kind`; an unreachable target is
- * `queued_offline` (the row is durable). A direct reply to the session that messaged this one
- * under the same causal root is refused `loop_detected`: answers travel through thread_read,
+ * `queued_offline` (the row is durable). A chain may come back to a session it passed; only a
+ * session sending to itself is refused `loop_detected`. Answers may also travel through thread_read,
  * thread_report and thread_answer.
  */
 async function deliverThroughGateway(
