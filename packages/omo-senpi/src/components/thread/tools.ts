@@ -28,7 +28,7 @@ import { isLockWaitExceeded } from "./gateway/lock-wait"
 import { createGatewayServices } from "./tools/gateway-services"
 import { listThreads, readThread } from "./tools/read-ops"
 import { createRelayTools } from "./tools/relay-tools"
-import { crossTarget, interruptRemote, listAcross, outcomeFailure, planCreate, promptRemote, readRemote, renameAlias, withAlias } from "./remote/lazy-ops"
+import { crossTarget, deviceOnline, interruptRemote, listAcross, outcomeFailure, planCreate, promptRemote, readRemote, renameAlias, withAlias } from "./remote/lazy-ops"
 import { recordThreadCreator, registerExtensionTools, type ExtensionToolHost } from "./tools/extension-tools"
 export type { ThreadHost, ThreadHostSession, ThreadToolSurfaceOptions } from "./tools/ports"
 export { UNKNOWN_CALLER } from "./tools/ports"
@@ -213,16 +213,19 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
       const resolved = remoteRow === undefined ? resolution(options, entries, target.kind === "local" ? target.address : value.thread, callerId, value.all_scope) : undefined
       if (resolved?.kind === "error") return { kind: "error", error: resolved }
       const threadId = remoteRow?.session_id ?? (resolved?.kind === "ok" ? resolved.entry.thread_id : value.thread)
-      // Both legs run the same refusals, all before the alias or the name changes anywhere.
+      // Both legs run the same refusals, all before the alias or the name changes anywhere: first the target's own
+      // liveness (a local thread with no live owner, as before the remote tools; a remote one on an offline device, A3),
+      // then the name checks.
       const name = value.name?.trim()
+      const session = remoteRow === undefined && name !== undefined ? targetSession(current, threadId) : undefined
+      if (remoteRow === undefined && name !== undefined && session === undefined) return failure("not_resumable", "The thread has no live owner.", "Retry when the target is live.")
+      if (remoteRow !== undefined && options.remote !== undefined) { const offline = await deviceOnline(options.remote, remoteRow.device); if (offline !== undefined) return offline }
       if (name !== undefined) {
         if (name.length === 0) return failure("invalid_arguments", "The new thread name is empty.", "Pass a non-empty name.")
         const visible = value.all_scope === true ? entries : workspaceEntries(entries, options.callerWorkspaceRoot())
         const existing = visible.find((entry) => entry.thread_id !== threadId && normalizeThreadName(entry.name) === normalizeThreadName(name))
         if (existing !== undefined) return failure("name_conflict", `A thread named "${existing.name}" already exists.`, "Call thread_list and choose another name.")
       }
-      const session = remoteRow === undefined && name !== undefined ? targetSession(current, threadId) : undefined
-      if (remoteRow === undefined && name !== undefined && session === undefined) return failure("not_resumable", "The thread has no live owner.", "Retry when the target is live.")
       if (value.alias !== undefined) { const refused = await renameAlias(options.remote, threadId, remoteRow?.device, value.alias, operationId); if (refused !== undefined) return refused }
       if (remoteRow !== undefined && options.remote !== undefined) {
         if (name !== undefined) { const named = await options.remote.sessions.sessionCommand(remoteRow.device, remoteRow.session_id, { type: "set_session_name", sessionId: remoteRow.session_id, name }); if (named.kind !== "ok") return outcomeFailure(named, remoteRow.device) }
@@ -329,7 +332,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
       if (target.kind === "remote") {
         const row = target.row
         const remote = options.remote
-        const request = { message: value.message, ...("delivery" in value && value.delivery !== undefined ? { delivery: value.delivery } : {}), ...("expected_turn_id" in value && value.expected_turn_id !== undefined ? { expected_turn_id: value.expected_turn_id } : {}) }
+        const request = { message: value.message, caller_known: callerId !== UNKNOWN_CALLER, ...("delivery" in value && value.delivery !== undefined ? { delivery: value.delivery } : {}), ...("expected_turn_id" in value && value.expected_turn_id !== undefined ? { expected_turn_id: value.expected_turn_id } : {}) }
         const sent = await remoteOnce(callerId, idempotencyKey, value, async () => await promptRemote(remote, row, request, await nextHop()))
         if (resolvedBy === undefined || sent.kind !== "ok" || !("delivery" in sent)) return sent
         const seen = new Date(row.updated_ms).toISOString()

@@ -106,11 +106,19 @@ export async function planCreate(
   return { kind: "done", result: await withAlias(remote, value.alias, await openRemote(remote, { kind: "create", device: target.id, cwd: value.cwd, name: value.name, skills: value.skills }), target.id) }
 }
 
-/** Claims the alias for a thread just created; a lost race answers alias_taken with the created thread named. */
+/**
+ * Claims the alias for a thread just created. Every failure after the create - a lost race (alias_taken), or the
+ * registry or device service failing outright - answers with the created thread named, so it is never orphaned.
+ */
 export async function withAlias(remote: RemoteThreadSurface | undefined, alias: string | undefined, result: ThreadToolResult, device?: string): Promise<ThreadToolResult> {
   if (remote?.aliases === undefined || alias === undefined || result.kind !== "ok" || !("thread" in result)) return result
-  const holderDevice = device ?? (await remote.sessions.thisDevice()) ?? ""
-  const claimed = await remote.aliases.claim({ alias, holder: { session_id: result.thread.thread_id, device: holderDevice }, idempotency_key: `create:${result.thread.thread_id}` })
+  let claimed: Awaited<ReturnType<AliasRegistry["claim"]>>
+  try {
+    const holderDevice = device ?? (await remote.sessions.thisDevice()) ?? ""
+    claimed = await remote.aliases.claim({ alias, holder: { session_id: result.thread.thread_id, device: holderDevice }, idempotency_key: `create:${result.thread.thread_id}` })
+  } catch (error) {
+    claimed = { kind: "error", error: { code: "alias_registry_unavailable", message: `The thread was created, but its alias could not be claimed: ${error instanceof Error ? error.message : String(error)}.`, details: { reason: "claim_failed" } } }
+  }
   if (claimed.kind === "error") {
     const failed = aliasFailure(claimed.error)
     return { kind: "error", error: { ...failed.error, details: { ...(failed.error.details ?? {}), thread_id: result.thread.thread_id } } }
