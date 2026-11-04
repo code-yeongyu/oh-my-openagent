@@ -193,6 +193,51 @@ describe("memoryGitEnvironment (#12354)", () => {
     expect(result.code).not.toBe(0)
   })
 
+  test.skipIf(process.platform === "win32")("#given mixed-case Git_Config_* names beside the real upper-case list #when memory git runs off Windows #then it applies exactly the config git reads from that environment", async () => {
+    // #given: names are case-sensitive here and git reads only GIT_CONFIG_*; the mixed-case pair comes first in the object
+    const root = scratchRoot()
+    const repo = repoWithRefusingHook(root, "repo")
+    const mirror = repoWithRefusingHook(root, "mirror")
+    const env = {
+      ...process.env,
+      Git_Config_Count: "1",
+      Git_Config_Key_0: `url.${mirror}.insteadOf`,
+      Git_Config_Value_0: "memory-mirror:",
+      GIT_CONFIG_COUNT: "1",
+      GIT_CONFIG_KEY_0: "http.extraHeader",
+      GIT_CONFIG_VALUE_0: "X-Memory-Probe: upper-case list",
+    }
+    const raw = (...argv: string[]) => execFileSync("git", argv, { cwd: repo, env, stdio: "pipe" }).toString().trim()
+    const git = createNodeGitExec()
+
+    // #when
+    const remote = await git.run(["ls-remote", "--get-url", "memory-mirror:"], { cwd: repo, timeoutMs: TIMEOUT_MS, env })
+    const header = await git.run(["config", "--get", "http.extraHeader"], { cwd: repo, timeoutMs: TIMEOUT_MS, env })
+
+    // #then: git itself, given the raw environment, ignores the mixed-case pair and reads the upper-case one
+    expect(raw("ls-remote", "--get-url", "memory-mirror:")).toBe("memory-mirror:")
+    expect(remote.stdout.trim()).toBe("memory-mirror:")
+    expect(raw("config", "--get", "http.extraHeader")).toBe("X-Memory-Probe: upper-case list")
+    expect(header.stdout.trim()).toBe("X-Memory-Probe: upper-case list")
+  })
+
+  test("#given mixed-case GIT_* names on Windows #when building the git environment #then they count as git's own, as git-for-windows reads them", () => {
+    const env = memoryGitEnvironment(
+      {
+        Path: "C:\\Windows",
+        Git_Dir: "C:\\elsewhere\\.git",
+        Git_Config_Count: "2",
+        Git_Config_Key_0: "Core.HooksPath",
+        Git_Config_Value_0: "NUL",
+        Git_Config_Key_1: "safe.directory",
+        Git_Config_Value_1: "*",
+      },
+      "win32",
+    )
+
+    expect(env).toEqual({ Path: "C:\\Windows", GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "safe.directory", GIT_CONFIG_VALUE_0: "*" })
+  })
+
   test("#given an inherited GIT_DIR naming another repository #when memory git reads HEAD #then it reads the memory repository", async () => {
     // #given
     const root = scratchRoot()
