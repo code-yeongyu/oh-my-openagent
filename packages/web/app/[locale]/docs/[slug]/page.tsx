@@ -44,7 +44,7 @@ export default async function GuideDocsPage({ params }: { params: Params }): Pro
     >
       <article className="docs-content" dangerouslySetInnerHTML={{ __html: page.lead }} />
       {page.sections.map((section) => (
-        <section key={section.id} id={section.id} className="scroll-mt-20 lg:scroll-mt-12">
+        <section key={section.id}>
           <article className="docs-content" dangerouslySetInnerHTML={{ __html: section.html }} />
         </section>
       ))}
