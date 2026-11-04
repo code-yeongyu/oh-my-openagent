@@ -15,7 +15,7 @@ export function registerWorkpoolTool(
   pi.registerTool({ ...createWorkpoolTool({
     ...engine.taskToolDeps(sessionId => skills.stateFor(sessionId)),
     workpools,
-  }) })
+  }), runs: "brain" })
   workpools.bindAggregate({
     enqueue: (message, receipts) => {
       if (coordinator === undefined) {

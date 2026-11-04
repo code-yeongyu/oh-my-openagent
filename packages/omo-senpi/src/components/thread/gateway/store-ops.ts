@@ -17,12 +17,9 @@ import { closeSync, constants, mkdirSync, openSync, readdirSync, readFileSync, r
 import { userInfo } from "node:os"
 import { join } from "node:path"
 
-import { closesCycle, type CausalEdge } from "./causal"
 import {
   GATEWAY_RECEIPT_RETENTION_MS,
-  MAX_CAUSAL_DELIVERIES,
   MAX_FANOUT_PER_TURN,
-  MAX_HOPS,
   PAIR_BUCKET_BURST,
   PAIR_BUCKET_REFILL_MS,
   QUEUED_TTL_MS,
@@ -394,34 +391,23 @@ function placeCausally(ctx: StoreContext, request: EnqueueRequest): CausalPlacem
     if (cause === undefined || cause.target_durable_id !== request.sender_node || (cause.state !== "admitting" && cause.state !== "admitted" && cause.state !== "applied")) {
       return refused("invalid_arguments", "The delivery this send continues is not one the sender received.", { guard: "unknown_cause" })
     }
-    placement = { root_id: cause.root_id, hop: cause.hop + 1, via: [...cause.envelope.via, request.sender_node], new_root: false }
+    // `via` names only the session that sent this hop: with no hop cap a stored path would grow with every hop
+    // (one id per row, quadratic in total), while `hop` already carries the chain's count.
+    placement = { root_id: cause.root_id, hop: cause.hop + 1, via: [request.sender_node], new_root: false }
   } else {
     placement = { root_id: `root-${randomUUID()}`, hop: 1, via: [request.sender_node], new_root: true }
   }
   if (request.claimed_root_id !== null && request.claimed_root_id !== placement.root_id) {
     return refused("invalid_arguments", "The causal root is derived by the gateway and cannot be chosen by the caller.", { guard: "forged_root" })
   }
-  if (!placement.new_root) {
-    const root = ctx.sql.one(["expires_at"], "SELECT expires_at FROM causal_roots WHERE root_id = ?", [placement.root_id])
-    if (root === undefined || Number(root.expires_at) <= request.now) {
-      return refused("loop_detected", "This causal chain is older than its lifetime.", { guard: "root_expired", root_id: placement.root_id })
-    }
-  }
   if (request.target_durable_id === request.sender_node) {
     return refused("loop_detected", "A session cannot deliver to itself through the gateway.", { guard: "self_send" })
   }
-  if (placement.hop > MAX_HOPS) {
-    return refused("loop_detected", `This delivery would be hop ${placement.hop}; at most ${MAX_HOPS} are allowed.`, { guard: "hop_limit", hop: placement.hop })
-  }
-  const count = Number(ctx.sql.one(["n"], "SELECT COUNT(*) AS n FROM deliveries WHERE root_id = ? AND state != 'refused'", [placement.root_id])?.n ?? 0)
-  if (count >= MAX_CAUSAL_DELIVERIES) {
-    return refused("loop_detected", `This causal chain already carried ${count} deliveries.`, { guard: "causal_budget", root_id: placement.root_id })
-  }
-  const edges: CausalEdge[] = ctx.sql
-    .all(["from_durable_id", "to_durable_id"], "SELECT from_durable_id, to_durable_id FROM causal_edges WHERE root_id = ?", [placement.root_id])
-    .map((edge) => ({ from: String(edge.from_durable_id), to: String(edge.to_durable_id) }))
-  if (closesCycle(edges, request.sender_node, request.target_durable_id)) {
-    return refused("loop_detected", "The target already leads back to the sender in this causal chain.", { guard: "cycle", root_id: placement.root_id })
+  // K8: a chain has no count limit unless the user sets one, and A->B->A is allowed. An expired root is
+  // bookkeeping only: the chain goes on under a fresh root and keeps its hop count.
+  if (!placement.new_root) {
+    const root = ctx.sql.one(["expires_at"], "SELECT expires_at FROM causal_roots WHERE root_id = ?", [placement.root_id])
+    if (root === undefined || Number(root.expires_at) <= request.now) placement = { ...placement, root_id: `root-${randomUUID()}`, new_root: true }
   }
   return placement
 }
@@ -521,9 +507,6 @@ export async function enqueue(ctx: StoreContext, request: EnqueueRequest): Promi
         placement.root_id, request.sender_principal, request.now, request.now + ROOT_LIFETIME_MS,
       ])
     }
-    write(ctx, "INSERT OR IGNORE INTO causal_edges (root_id, from_durable_id, to_durable_id, delivery_id, created_at) VALUES (?, ?, ?, ?, ?)", [
-      placement.root_id, request.sender_node, request.target_durable_id, request.delivery_id, request.now,
-    ])
     const row: DeliveryRow = {
       delivery_id: request.delivery_id,
       target_durable_id: request.target_durable_id,
