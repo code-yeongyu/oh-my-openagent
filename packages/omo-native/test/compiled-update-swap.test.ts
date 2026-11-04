@@ -83,8 +83,11 @@ describe.skipIf(process.platform === "win32")("downloadAndSwapBinary", () => {
 const BYTES = new TextEncoder().encode("new binary")
 const DIGEST = createHash("sha256").update(BYTES).digest("hex")
 
-function fakeSteps(overrides: Partial<SwapSteps> & { readonly failRename?: (from: string, to: string) => boolean } = {}) {
+const lockedError = () => Object.assign(new Error("EBUSY: resource busy or locked"), { code: "EBUSY" })
+
+function fakeSteps(overrides: Partial<SwapSteps> & { readonly failRename?: (from: string, to: string) => boolean; readonly lockRename?: (from: string, to: string) => boolean } = {}) {
   const files = new Map<string, string>([["C:/omo/omo.exe", "old binary"]])
+  const pauses: number[] = []
   const steps: SwapSteps = {
     download: async (url) => (url.endsWith("SHA256SUMS") ? new TextEncoder().encode(`${DIGEST} *omo-windows-x64.exe\n`) : BYTES),
     probeVersion: () => ({ status: 0, stdout: "omo 9.9.10 (engine: senpi 2026.1.1)\n", stderr: "" }),
@@ -93,6 +96,7 @@ function fakeSteps(overrides: Partial<SwapSteps> & { readonly failRename?: (from
     assertWritableDir: () => undefined,
     rename: (from, to) => {
       if (overrides.failRename?.(from, to) === true) throw new Error("EBUSY: file is locked")
+      if (overrides.lockRename?.(from, to) === true) throw lockedError()
       const content = files.get(from)
       if (content === undefined) throw new Error(`ENOENT ${from}`)
       files.delete(from)
@@ -100,9 +104,11 @@ function fakeSteps(overrides: Partial<SwapSteps> & { readonly failRename?: (from
     },
     remove: (path) => { files.delete(path) },
     tempPath: (destination) => `${destination}.new-test`,
+    asidePath: (destination) => `${destination}.old-test`,
+    pause: async (ms) => { pauses.push(ms) },
     ...overrides,
   }
-  return { files, steps }
+  return { files, steps, pauses }
 }
 
 const winRequest = {
@@ -121,10 +127,42 @@ describe("swapReleaseBinary on win32", () => {
     expect(Object.fromEntries(files)).toEqual({ "C:/omo/omo.exe": "new binary", "C:/omo/omo.exe.old": "old binary" })
   })
 
-  test("#given the second rename fails #then the old binary is renamed back and the error surfaces", async () => {
-    const { files, steps } = fakeSteps({ failRename: (from) => from.endsWith(".new-test") })
+  test("#given the second rename fails for a reason that is not a lock #then it is not retried, the old binary is renamed back and the error surfaces", async () => {
+    const { files, steps, pauses } = fakeSteps({ failRename: (from) => from.endsWith(".new-test") })
     await expect(swapReleaseBinary(winRequest, steps)).rejects.toThrow("EBUSY")
     expect(Object.fromEntries(files)).toEqual({ "C:/omo/omo.exe": "old binary" })
+    expect(pauses).toEqual([])
+  })
+
+  test("#given the previous update's .old is still running and cannot be removed #then the old binary moves to a fresh name and the update lands (#10343)", async () => {
+    const { files, steps } = fakeSteps({
+      remove: (path) => {
+        if (path.endsWith(".old")) throw lockedError()
+        files.delete(path)
+      },
+    })
+    files.set("C:/omo/omo.exe.old", "older binary, still running")
+    await swapReleaseBinary(winRequest, steps)
+    expect(Object.fromEntries(files)).toEqual({
+      "C:/omo/omo.exe": "new binary",
+      "C:/omo/omo.exe.old": "older binary, still running",
+      "C:/omo/omo.exe.old-test": "old binary",
+    })
+  })
+
+  test("#given a scanner briefly holds the binary open #then the locked rename is retried and the update lands (#10343)", async () => {
+    let held = 2
+    const { files, steps, pauses } = fakeSteps({ lockRename: (from) => from === "C:/omo/omo.exe" && held-- > 0 })
+    await swapReleaseBinary(winRequest, steps)
+    expect(Object.fromEntries(files)).toEqual({ "C:/omo/omo.exe": "new binary", "C:/omo/omo.exe.old": "old binary" })
+    expect(pauses).toEqual([250, 500])
+  })
+
+  test("#given the new binary stays locked #then the retries run out, the old binary is put back and the lock error surfaces", async () => {
+    const { files, steps, pauses } = fakeSteps({ lockRename: (from) => from.endsWith(".new-test") })
+    await expect(swapReleaseBinary(winRequest, steps)).rejects.toThrow("EBUSY")
+    expect(Object.fromEntries(files)).toEqual({ "C:/omo/omo.exe": "old binary" })
+    expect(pauses).toEqual([250, 500, 1_000, 2_000, 4_000])
   })
 
   test("#given a directory this user cannot write #then it refuses before downloading anything", async () => {

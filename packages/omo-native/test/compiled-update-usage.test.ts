@@ -70,7 +70,7 @@ describe("compiled omo update argument handling", () => {
       const { result, lookups, installs } = await releaseUpdate(args)
       expect(result.exitCode).toBe(0)
       expect(result.stream ?? "stdout").toBe("stdout")
-      expect(result.output).not.toContain(COMMAND)
+      expect(result.output).toBe(`omo updated 9.9.9 -> 9.9.10 (${DESTINATION}). Restart omo to use it.`)
       expect(lookups).toBe(1)
       expect(installs).toEqual([[ASSET_URL, DESTINATION, "linux", "9.9.10"]])
     })

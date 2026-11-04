@@ -89,6 +89,16 @@ describe("provisioned launch plan", () => {
     expect(childEnv[PROVISIONED_HANDOFF_ENV]).toBeUndefined()
   })
 
+  for (const launcher of ["", `bin/omo${exe}`]) {
+    test(`#given a handoff whose launcher is ${launcher === "" ? "empty" : "relative"} #when the child plans its launch #then no launcher is trusted (#12168)`, () => {
+      const env: NodeJS.ProcessEnv = { [PROVISIONED_HANDOFF_ENV]: expected, [PROVISIONED_LAUNCHER_ENV]: launcher }
+      const launch = planProvisionedLaunch(expected, expected, { env })
+      expect(launch.handOff).toBe(false)
+      expect(launch.launcher).toBeUndefined()
+      expect(env[PROVISIONED_LAUNCHER_ENV]).toBeUndefined()
+    })
+  }
+
   test("#given a launcher variable without a matching handoff marker #when a launch plans #then it is dropped and not trusted (#12168)", () => {
     const env: NodeJS.ProcessEnv = { [PROVISIONED_LAUNCHER_ENV]: join(root, "elsewhere", `omo${exe}`) }
     expect(planProvisionedLaunch(expected, expected, { env }).launcher).toBeUndefined()

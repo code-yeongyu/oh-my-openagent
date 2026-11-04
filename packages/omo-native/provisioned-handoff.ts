@@ -1,5 +1,5 @@
 import { closeSync } from "node:fs"
-import { dirname } from "node:path"
+import { dirname, isAbsolute } from "node:path"
 import { propagateResult, runChild } from "./bin/lib/child-process.js"
 import { inspectPrivateFdTable, PRIVATE_FDS_ENV, privateFdHandoffFor } from "./bin/lib/private-fd-table.js"
 import { isProvisionedExecutable } from "./compile-runtime"
@@ -44,7 +44,7 @@ export function planProvisionedLaunch(
   const launcher = env[PROVISIONED_LAUNCHER_ENV]
   delete env[PROVISIONED_HANDOFF_ENV]
   delete env[PROVISIONED_LAUNCHER_ENV]
-  if (handedOff) return { provision: false, handOff: false, execDir: dirname(expected), ...(launcher ? { launcher } : {}) }
+  if (handedOff) return { provision: false, handOff: false, execDir: dirname(expected), ...(launcher !== undefined && isAbsolute(launcher) ? { launcher } : {}) }
   const provision = !isProvisionedExecutable(runningExecutable, expected)
   return { provision, handOff: provision, execDir: dirname(runningExecutable) }
 }

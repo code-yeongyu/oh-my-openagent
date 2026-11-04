@@ -15,6 +15,9 @@ export type SwapSteps = {
   readonly rename: (from: string, to: string) => void
   readonly remove: (path: string) => void
   readonly tempPath: (destination: string) => string
+  /** A free name to move the replaced binary to when `<destination>.old` is still held open (win32). */
+  readonly asidePath: (destination: string) => string
+  readonly pause: (ms: number) => Promise<void>
 }
 
 export type SwapRequest = {
@@ -34,6 +37,37 @@ function checksumFor(sums: string, asset: string): string | undefined {
     if (match !== null && match[2] === asset) return match[1]
   }
   return undefined
+}
+
+// A running omo.exe can be renamed but not deleted, and Defender or an indexer briefly holds a fresh
+// download open (sharing violation), so a locked rename on win32 is retried before the swap gives up (#10343).
+const LOCKED_CODES = new Set(["EBUSY", "EPERM", "EACCES"])
+const LOCKED_RETRY_MS = [250, 500, 1_000, 2_000, 4_000]
+
+async function renameWhenFree(from: string, to: string, steps: SwapSteps): Promise<void> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      steps.rename(from, to)
+      return
+    } catch (error) {
+      const code = typeof error === "object" && error !== null ? Reflect.get(error, "code") : undefined
+      const delay = LOCKED_RETRY_MS[attempt]
+      if (typeof code !== "string" || !LOCKED_CODES.has(code) || delay === undefined) throw error
+      await steps.pause(delay)
+    }
+  }
+}
+
+// `<dest>.old` from the previous update can still be the image of an omo that is running, so it cannot
+// be removed; the binary being replaced then moves to a fresh name instead of failing the update.
+function asideFor(destination: string, steps: SwapSteps): string {
+  const old = `${destination}.old`
+  try {
+    steps.remove(old)
+    return old
+  } catch {
+    return steps.asidePath(destination)
+  }
 }
 
 // Probe output is echoed into an error the terminal prints: keep one short line with no control characters.
@@ -63,13 +97,12 @@ export async function swapReleaseBinary(request: SwapRequest, steps: SwapSteps):
       steps.rename(next, destination)
       return
     }
-    const old = `${destination}.old`
-    steps.remove(old)
-    steps.rename(destination, old)
+    const old = asideFor(destination, steps)
+    await renameWhenFree(destination, old, steps)
     try {
-      steps.rename(next, destination)
+      await renameWhenFree(next, destination, steps)
     } catch (error) {
-      steps.rename(old, destination)
+      await renameWhenFree(old, destination, steps)
       throw error
     }
   } finally {
@@ -103,6 +136,8 @@ const nodeSwapSteps: SwapSteps = {
   rename: renameSync,
   remove: (path) => rmSync(path, { force: true }),
   tempPath: (destination) => `${destination}.new-${randomBytes(6).toString("hex")}`,
+  asidePath: (destination) => `${destination}.old-${randomBytes(6).toString("hex")}`,
+  pause: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 }
 
 export const downloadAndSwapBinary: ReplaceBinary = (url, destination, platform, version) =>
