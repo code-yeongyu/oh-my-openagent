@@ -38,7 +38,7 @@ export function parseTaskId(value: string): TaskId {
   return value
 }
 
-function isTaskId(value: string): value is TaskId {
+export function isTaskId(value: string): value is TaskId {
   return TASK_ID_PATTERN.test(value)
 }
 

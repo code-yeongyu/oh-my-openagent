@@ -6,7 +6,9 @@ import { deleteRegisterIfUnchanged, readRegister, writeAck, type ControlStore } 
 import type { ControlOwnerPort, ReconcileAnswer, ReconcileResult } from "./owner-port"
 import { reconcileRegister, resumeRecord } from "./owner-reconcile"
 
-export const MAX_FILES_PER_TICK = 64
+// Caps the registers DISPATCHED per tick. The name scan, and the one record load per foreign `want-`
+// name it takes to decide addressing, are bounded by the control directory, not by this constant.
+export const MAX_DISPATCHES_PER_TICK = 64
 const MAX_ATTEMPTS = 10
 const BACKOFF_FLOOR_MS = 1_000
 const BACKOFF_CEILING_MS = 60_000
@@ -35,7 +37,7 @@ export type DispatchContext = {
 
 export type ValidRegister = { readonly name: string; readonly register: ControlRegister; readonly text: string }
 
-function logOnce(context: DispatchContext, name: string, reason: string): void {
+export function logOnce(context: DispatchContext, name: string, reason: string): void {
   const key = `${name}\0${reason}`
   if (context.state.logged.has(key)) return
   context.state.logged.add(key)

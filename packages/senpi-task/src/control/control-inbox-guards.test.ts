@@ -93,6 +93,26 @@ describe("owner inbox guard cases (design section 7)", () => {
     expect(ack(store, T1)).toBeUndefined()
   })
 
+  test("#given a child whose own resumed register is backing off #when the sibling's register releases the own Stop #then that child is resumed inside the transaction (review of #12371 r2, LOW)", async () => {
+    const { store, owner, inbox } = setup([T1, T2])
+    for (const taskId of [T1, T2]) await owner.pauseTask(taskId, run(taskId))
+    owner.barrier?.close("parent-1", 2)
+    const load = owner.load
+    let failNext = true
+    owner.load = taskId => {
+      if (taskId === T1 && failNext) { failNext = false; throw new Error("record read failed") }
+      return load(taskId)
+    }
+    writeRegister(store, controlFor(store), want({ phase: "resumed", resumeId: "r-1" }))
+    await inbox.tick()
+    expect(store.load(T1)?.status).toBe("paused")
+    writeRegister(store, controlFor(store), want({ taskId: T2, runRef: { kind: "task", id: T2 }, phase: "resumed", resumeId: "r-1" }))
+    await inbox.tick()
+    expect(owner.barrier?.state("parent-1")).toEqual({ kind: "open" })
+    expect(ack(store, T1)).toMatchObject({ state: "resumed" })
+    expect(ack(store, T2)).toMatchObject({ state: "resumed" })
+  })
+
   test("#given a register landing after the owner's listing #when the release ran #then that child stays paused and resumes once on a later tick (test 20h, r6-2)", async () => {
     const { store, owner, inbox } = setup([T1, T2])
     for (const taskId of [T1, T2]) await owner.pauseTask(taskId, run(taskId))
