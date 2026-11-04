@@ -92,6 +92,8 @@ export function createSteeringControls(
       return { kind: "noop", task_id: record.task_id, status: record.status, reason: reasonText }
     }
     const reachable = port.liveHandle(record.task_id)
+    const carried = reachable === undefined && expected === undefined ? port.remoteCancel?.(record, reason) : undefined
+    if (carried !== undefined) return carried
     if (reachable === undefined && isHostSessionRecord(record)) return cancelUnhandledHostSession(record, reason, expected)
     const recovering = reachable?.transportRecovering?.() === true
     // The stop already waiting on this child's connection is the cancel; a repeat joins it.
@@ -190,7 +192,7 @@ export function createSteeringControls(
   }
 
   function cancelPending(record: TaskRecord, reason: string = CANCEL_PENDING_REASON): CancelOutcome {
-    return { kind: "cancel_pending", task_id: record.task_id, previous_status: "running", reason,
+    return { kind: "cancel_pending", task_id: record.task_id, previous_status: record.status, reason,
       ...((record.pending_steering?.length ?? 0) > 0 ? { undelivered_messages: record.pending_steering?.length } : {}) }
   }
 

@@ -7,6 +7,7 @@ import { endHostSessionChild } from "./host-session-end"
 import { parkHostSessionOnDaemonLoss, retryDeferredHostSessions, type HostSessionParkOptions } from "./host-session-revive"
 import { registerLifecycleDetachedRevival, registerLifecycleDetachedRevivalRollback, type DestroyCause, type LifecycleDeps } from "./port"
 import { parkTerminalResident } from "./park-terminal-resident"
+import { finishPendingCancel } from "./pending-cancel"
 import { admitResident, reclaimIdleResidents, startIdleResidentReclaimer } from "./residency"
 import { reconcileOnSessionStart } from "./reconcile"
 import { rollbackDetachedRevival, reviveDetachedTerminal } from "./revive-detached"
@@ -38,6 +39,7 @@ export function createTaskLifecycle(deps: LifecycleDeps): TaskLifecycle {
     rollbackDetachedRevival: (prior) => rollbackDetachedRevival(context, prior),
     reclaimIdleResidents: () => reclaimIdleResidents(context),
     parkTerminalResident: (taskId: string) => parkTerminalResident(context, taskId, "cancel"),
+    finishPendingCancel: (record) => finishPendingCancel(context, record),
     hostSessionCancel: {
       end: (record) => endHostSessionChild(context, record),
       drive: (record, sink) => driveHostSessionCancel(context, record, sink),

@@ -7,6 +7,7 @@ import { PauseRegistry, type PauseParticipant } from "../../../../senpi-task/src
 import { RunPauseController, type RunPauseEffects } from "../../../../senpi-task/src/pause/run-controller"
 import { EngineRunPauseBridge, type LostParticipantRecovery } from "./run-pause-bridge"
 import { createWorkpoolRunPauseSource } from "./workpool-run-pause-source"
+import { createRemoteRunPause, type RemoteRunPausePorts } from "./engine-run-pause-remote"
 
 export type RunPauseSource = {
   refs(parentSessionId: string): readonly RunRef[]
@@ -33,8 +34,11 @@ export function createEngineRunPause(ports: {
   readonly runtime: { getPauseState(): EnginePauseState | undefined; fenceRun(runRef: RunRef): void }
   readonly resumeAdmission?: RunPauseEffects["resume"]
   readonly lostRecovery?: LostParticipantRecovery
+  // The requester half of the #12349 control channel; absent in wirings that never carry a Stop.
+  readonly remote?: Omit<RemoteRunPausePorts, "manager" | "registry">
 }) {
   const registry = new PauseRegistry(ports.stateDir, ports.barrier)
+  const remote = ports.remote === undefined ? undefined : createRemoteRunPause({ ...ports.remote, manager: ports.manager, registry })
   const sources = new Set<RunPauseSource>()
   const admission = (record: TaskRecord): PauseParticipant["admission"] => {
     const state = ports.manager.concurrency?.admission(record.task_id, record.notification.run_epoch)
@@ -85,7 +89,10 @@ export function createEngineRunPause(ports: {
     },
     settleCreations: parentSessionId => ports.barrier.creationsSettled(parentSessionId),
     async addFences(_parentSessionId, _pauseSeq, runs) { for (const run of runs) ports.runtime.fenceRun(run) },
-    async pause(participant, owner) {
+    ...(remote === undefined ? {} : { isRemote: participant => remote.isRemote(participant), now: () => remote.now() }),
+    async pause(participant, owner, deadlineAt) {
+      const carried = await remote?.pause(participant, owner, deadlineAt ?? Date.now())
+      if (carried !== undefined) return carried
       const record = participant.taskId === undefined ? undefined : ports.manager.get(participant.taskId)
       if (record === undefined || record.notification.run_epoch !== participant.runEpoch ||
         (record.status !== "running" && record.status !== "paused")) return { kind: "settled" }
@@ -102,8 +109,10 @@ export function createEngineRunPause(ports: {
     },
     observeHold: async (participant, parentSessionId) =>
       participant.taskId === undefined ? undefined : ports.manager.observeTaskHold(participant.taskId, parentSessionId),
-    async resume(participant, request, credential) {
+    async resume(participant, request, credential, deadlineAt) {
       if (participant.key.startsWith("run:")) return { kind: "resumed" }
+      const carried = participant.kind === "held_admission" ? undefined : await remote?.resume(participant, request, credential, deadlineAt ?? Date.now())
+      if (carried !== undefined) return carried
       // A queued admission has no engine to hold it: it is always re-admitted, lost or not.
       if (participant.kind === "held_admission") {
         if (credential === undefined) throw new Error("a queued admission resumes only inside a resume transaction")
@@ -179,6 +188,7 @@ export function createEngineRunPause(ports: {
         ...(allocation === undefined ? {} : { admission: allocation }),
       })
     },
+    remote,
     register(source: RunPauseSource): () => void { sources.add(source); return () => { sources.delete(source) } },
     // A cancelled run leaves the pause ledger: its participants are settled and dropped.
     async forgetRun(parentSessionId: string, runRef: RunRef): Promise<void> {

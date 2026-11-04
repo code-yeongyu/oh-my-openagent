@@ -35,6 +35,7 @@ export async function cancelRef(deps: SteerDeps, ref: HandleRef, ctx: HandleCall
       // This ref's run was stopped; a newer run that started since is not what the receipt reports.
       return { ref, cancelled: true, phase: run.verdict === "live" ? run.phase(ref) : "cancelled" }
     case "cancel_pending":
+    case "owner_cannot_apply":
     case "noop":
     case "released":
     case "not_found":

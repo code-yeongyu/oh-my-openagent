@@ -133,6 +133,18 @@ export class EngineRunPauseBridge {
     })
   }
 
+  // The ack watcher's tick (design 3.2): serialized behind an in-flight Resume of this parent, then the
+  // ledger phase is re-read; a Stop in effect re-asserts and folds, a released Resume retries.
+  tickRemote(parentSessionId: string): Promise<void> {
+    return this.#serialized(parentSessionId, async () => {
+      await this.#resumes.get(parentSessionId)?.pending.catch(() => undefined)
+      const record = this.controller.registry.load(parentSessionId)
+      if (record === undefined || !this.controller.hasRemote(parentSessionId)) return
+      if (record.phase === "propagating" || record.phase === "applied") await this.controller.refreshRemote(parentSessionId, record.pauseSeq)
+      else if (record.phase === "resumed") await this.controller.retryLost(parentSessionId, record.pauseSeq)
+    })
+  }
+
   /** Test observability: the parent's in-flight lost-child recovery, settled once every lost child is resumed or ended. */
   lostRecoverySettled(parentSessionId: string): Promise<void> {
     return this.#recoveries.get(parentSessionId) ?? Promise.resolve()

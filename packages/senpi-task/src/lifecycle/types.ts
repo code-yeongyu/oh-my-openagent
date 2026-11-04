@@ -85,6 +85,8 @@ export type TaskLifecycle = {
   reclaimIdleResidents?(): Promise<readonly string[]>
   // Release a finished child still resident here (task_cancel on a terminal task, omo#9785); false when there is none.
   parkTerminalResident(taskId: string): Promise<boolean>
+  // Finishes a carried cancel whose owner left the record (#12349 cancel watcher): end the session, then cancel.
+  finishPendingCancel?(record: TaskRecord): Promise<unknown>
   // A cancel of a daemon-hosted child this process holds no handle for (omo#11765): its confirmed end, and its retry driver.
   hostSessionCancel?: HostSessionCancelPort
   // Stop the unref'd idle resident reclaimer when its owning session is disposed.

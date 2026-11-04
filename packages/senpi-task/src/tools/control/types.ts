@@ -67,6 +67,7 @@ export type CancelResultDetails =
   | { readonly kind: "cancel_pending"; readonly task_id: string; readonly previous_status: TaskStatus; readonly reason: string; readonly undelivered_messages?: number }
   | { readonly kind: "noop"; readonly task_id: string; readonly status: TaskStatus; readonly reason: string }
   | { readonly kind: "released"; readonly task_id: string; readonly status: TaskStatus; readonly undelivered_messages?: number }
+  | { readonly kind: "owner_cannot_apply"; readonly task_id: string; readonly owner_pid: number; readonly reason: "owner_unsupported" | "handle_gone" | "channel_disabled" }
   | { readonly kind: "not_found"; readonly reason: string }
   | { readonly kind: "invalid_arguments"; readonly reason: string }
 
