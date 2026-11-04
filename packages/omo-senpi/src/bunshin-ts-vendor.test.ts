@@ -1,10 +1,11 @@
 import { describe, expect, it } from "bun:test"
 import { execFileSync } from "node:child_process"
-import { readFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
-import { digestTree } from "../scripts/sync-bunshin-ts.ts"
+import { copyVendored, digestTree } from "../scripts/sync-bunshin-ts.ts"
 
 const packageRoot = fileURLToPath(new URL("..", import.meta.url))
 const vendorRoot = join(packageRoot, "vendor")
@@ -26,6 +27,24 @@ describe("vendored bunshin-ts packages", () => {
     for (const [key, entry] of Object.entries(packages)) {
       expect(Object.keys(entry.files)).toContain("LICENSE")
       expect(digestTree(join(vendorRoot, key))).toEqual(entry.files)
+    }
+  })
+
+  it("#given a build output with a nested package.json #when it is vendored #then only the top-level manifest is left out of both the copy and the digests", () => {
+    const work = mkdtempSync(join(tmpdir(), "vendor-copy-"))
+    try {
+      const out = join(work, "out")
+      mkdirSync(join(out, "types"), { recursive: true })
+      writeFileSync(join(out, "package.json"), '{"name":"pkg"}')
+      writeFileSync(join(out, "index.js"), "export {}")
+      writeFileSync(join(out, "types", "package.json"), '{"type":"module"}')
+      const dest = join(work, "dest")
+      copyVendored(out, dest)
+      expect(existsSync(join(dest, "package.json"))).toBe(false)
+      expect(Object.keys(digestTree(dest))).toEqual(["index.js", "types/package.json"])
+      expect(digestTree(dest)).toEqual(digestTree(out))
+    } finally {
+      rmSync(work, { recursive: true, force: true })
     }
   })
 

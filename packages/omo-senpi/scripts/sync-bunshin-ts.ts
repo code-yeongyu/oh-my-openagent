@@ -36,6 +36,12 @@ const PIN_PATH = join(VENDOR_ROOT, "PIN.json")
 // package.json would make the vendored directory look like a workspace package to the repo's tooling.
 const MANIFEST = "package.json"
 
+// The one rule for what is vendored: everything but the top-level publish manifest. A package.json deeper in the
+// output is package content, so it is copied and digested like any other file.
+const isVendored = (path: string): boolean => path !== MANIFEST
+
+const portable = (root: string, file: string): string => relative(root, file).split(sep).join("/")
+
 const run = async (command: readonly string[], cwd: string): Promise<string> => {
 	const child = Bun.spawn([...command], { cwd, stdout: "pipe", stderr: "pipe" })
 	const [out, err, code] = await Promise.all([
@@ -57,10 +63,14 @@ const walk = (dir: string): string[] =>
 export const digestTree = (dir: string): Record<string, string> =>
 	Object.fromEntries(
 		walk(dir)
-			.map((file) => [relative(dir, file).split(sep).join("/"), sha256(readFileSync(file))] as const)
-			.filter(([path]) => path !== MANIFEST)
+			.map((file) => [portable(dir, file), sha256(readFileSync(file))] as const)
+			.filter(([path]) => isVendored(path))
 			.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
 	)
+
+export const copyVendored = (out: string, dest: string): void => {
+	cpSync(out, dest, { recursive: true, filter: (src) => src === out || isVendored(portable(out, src)) })
+}
 
 const flag = (argv: readonly string[], name: string): string | undefined => {
 	const at = argv.indexOf(name)
@@ -104,7 +114,7 @@ const syncPackage = async (
 		console.log(`${key}: differs from PIN (${drifted.length} file(s)): ${drifted.join(", ") || "manifest only"}`)
 		if (!write) return next
 		rmSync(join(VENDOR_ROOT, key), { recursive: true, force: true })
-		cpSync(out, join(VENDOR_ROOT, key), { recursive: true, filter: (src) => !src.endsWith(`${sep}${MANIFEST}`) })
+		copyVendored(out, join(VENDOR_ROOT, key))
 		return next
 	} finally {
 		rmSync(work, { recursive: true, force: true })
