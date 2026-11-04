@@ -67,6 +67,19 @@ describe("re-login over an item nobody here can read (#11262 addendum row 8b)", 
   })
 })
 
+describe("re-login with a helper released before the eight slots (v5.1.52 to v5.1.60)", () => {
+  test("#given its one .old slot holds a copy nobody here can remove #when the user signs in again #then the same actionable failure, not a generic save error", async () => {
+    const keychain = fakeKeychain({ singleOldSlot: true })
+    keychain.put(A, stored, "runtime", "other")
+    keychain.put(`${A}.old`, stored, "runtime", "other")
+    const { session } = await helperSession(keychain)
+    const failure = session.save(fresh)
+    await expect(failure).rejects.toBeInstanceOf(CredentialStoreError)
+    await expect(failure).rejects.toThrow("Open Keychain Access")
+    expect(keychain.items.get(A)?.owner).toBe("runtime")
+  })
+})
+
 describe("migration with a leftover .old (#11262 RULING-73)", () => {
   test("#given an approvable item and a non-owned .old #when the token is used #then it still migrates to the helper, into the next slot", async () => {
     const keychain = fakeKeychain()

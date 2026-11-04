@@ -23,7 +23,7 @@ export const A = credentialId(API)
  * overwrite keeps the item's owner (m5), a rename works for anyone (m10), a delete by a non-owner is refused (m6).
  * `secrets` is this process's own identity (`bun`); `access` is the signed helper, which counts every approve dialog.
  */
-export function fakeKeychain(options: { readonly approve?: "allow" | "deny" | "locked"; readonly approveGate?: Promise<void>; readonly onApprove?: () => void; readonly failReadWhenMissing?: boolean } = {}) {
+export function fakeKeychain(options: { readonly approve?: "allow" | "deny" | "locked"; readonly approveGate?: Promise<void>; readonly onApprove?: () => void; readonly failReadWhenMissing?: boolean; readonly singleOldSlot?: boolean } = {}) {
   const items = new Map<string, Item>()
   let clock = 1_000
   const events: string[] = []
@@ -97,6 +97,10 @@ export function fakeKeychain(options: { readonly approve?: "allow" | "deny" | "l
         return existing === undefined ? { ok: true, created: true } : { ok: true }
       }
       case "retire": {
+        if (options.singleOldSlot === true) {
+          const renamed = rename(name, oldSlotName(name, 0))
+          return renamed.error === "exists" ? { ok: true, skipped: true } : renamed.ok === true ? { ok: true } : renamed
+        }
         for (let slot = 0; slot < OLD_SLOT_COUNT; slot++) {
           const renamed = rename(name, oldSlotName(name, slot))
           if (renamed.error !== "exists") return renamed.ok === true ? { ok: true, slot } : renamed

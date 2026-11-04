@@ -81,7 +81,7 @@ export function lockedDarwinStore(deps: DarwinStoreDeps, lease: HelperLease): Lo
         // A completed, user-initiated sign-in over an item nobody here can read (row 8b, ruled 2026-10-28): move the old
         // item aside by rename (no approval needed, m10) so the fresh sign-in gets an item this machine can read.
         const retired = await helper({ verb: "retire", account: deps.account })
-        if (retired.reason === "old-slots-full") throw new HelperOldSlotsFull(OLD_SLOTS_FULL_MESSAGE)
+        if (retired.reason === "old-slots-full" || (retired.ok === true && retired.skipped === true)) throw new HelperOldSlotsFull(OLD_SLOTS_FULL_MESSAGE)
         if (retired.ok !== true) throw failed(retired, "replace")
       }
       const written = await helper({ verb: "write", account: deps.account, value })
