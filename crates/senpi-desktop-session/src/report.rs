@@ -5,7 +5,9 @@
 use senpi_desktop_core::error::{ErrorCode, ErrorReport};
 use senpi_desktop_core::methods::Method;
 use senpi_desktop_core::protocol_results::{AuditEvent, AxInputResult};
-use senpi_desktop_core::report::{ActionEffect, ActionReport, End, FocusRestoration, Progress, ReportMode, Settled};
+use senpi_desktop_core::report::{
+    ActionEffect, ActionReport, End, FocusRestoration, Progress, ReportMode, Settled,
+};
 
 use crate::request::Response;
 
@@ -25,7 +27,9 @@ pub(crate) enum Stage {
 /// Unicode scalars, everything else is one indivisible action.
 fn progress(event: &AuditEvent) -> Progress {
     match (event.action, event.text_length, event.text_delivered) {
-        (Method::TypeText | Method::AxTypeText, Some(of), Some(count)) => Progress::Counted { count, of },
+        (Method::TypeText | Method::AxTypeText, Some(of), Some(count)) => {
+            Progress::Counted { count, of }
+        }
         _ => Progress::Atomic,
     }
 }
@@ -33,7 +37,9 @@ fn progress(event: &AuditEvent) -> Progress {
 /// Codes a stop, a cancellation or the user raise between units.
 const fn interruption(code: ErrorCode) -> Option<bool> {
     match code {
-        ErrorCode::Suspended | ErrorCode::StopPathUnavailable | ErrorCode::UserIntervened => Some(true),
+        ErrorCode::Suspended | ErrorCode::StopPathUnavailable | ErrorCode::UserIntervened => {
+            Some(true)
+        }
         ErrorCode::Cancelled => Some(false),
         _ => None,
     }
@@ -55,13 +61,22 @@ const fn needs_user(code: ErrorCode) -> bool {
 /// How a request settled: `None` is success, otherwise the primary error's
 /// code (a restore failure passes the error it followed, or `None`).
 pub(crate) fn settled(primary: Option<ErrorCode>, stage: Stage, progress: Progress) -> Settled {
-    let ran = |end: End| Settled::ran(progress, end).unwrap_or(Settled::Ran { progress: Progress::Atomic, end });
+    let ran = |end: End| {
+        Settled::ran(progress, end).unwrap_or(Settled::Ran {
+            progress: Progress::Atomic,
+            end,
+        })
+    };
     let Some(code) = primary else {
         return ran(End::Completed { verified: false });
     };
     match stage {
-        Stage::Admission => Settled::Refused { needs_user: needs_user(code) },
-        Stage::Acted => ran(End::Interrupted { needs_user: needs_user(code) }),
+        Stage::Admission => Settled::Refused {
+            needs_user: needs_user(code),
+        },
+        Stage::Acted => ran(End::Interrupted {
+            needs_user: needs_user(code),
+        }),
         Stage::Acting => acting(code, progress),
     }
 }
@@ -69,7 +84,12 @@ pub(crate) fn settled(primary: Option<ErrorCode>, stage: Stage, progress: Progre
 /// An error the action itself raised. Every code is listed: a new code must
 /// decide whether it can follow sent input.
 fn acting(code: ErrorCode, progress: Progress) -> Settled {
-    let ran = |end: End| Settled::ran(progress, end).unwrap_or(Settled::Ran { progress: Progress::Atomic, end });
+    let ran = |end: End| {
+        Settled::ran(progress, end).unwrap_or(Settled::Ran {
+            progress: Progress::Atomic,
+            end,
+        })
+    };
     match code {
         ErrorCode::PermissionDenied
         | ErrorCode::CaptureFailed
@@ -89,24 +109,39 @@ fn acting(code: ErrorCode, progress: Progress) -> Settled {
         | ErrorCode::SpaceUnsupported
         | ErrorCode::AmbiguousTarget
         | ErrorCode::CaptureConsentRequired
-        | ErrorCode::ProtectedProcess => Settled::Refused { needs_user: needs_user(code) },
-        ErrorCode::Suspended | ErrorCode::StopPathUnavailable | ErrorCode::UserIntervened | ErrorCode::Cancelled => {
+        | ErrorCode::ProtectedProcess => Settled::Refused {
+            needs_user: needs_user(code),
+        },
+        ErrorCode::Suspended
+        | ErrorCode::StopPathUnavailable
+        | ErrorCode::UserIntervened
+        | ErrorCode::Cancelled => {
             match (progress, interruption(code)) {
                 // Counted input stops between units, so the count is exact.
-                (Progress::Counted { .. }, Some(needs_user)) => ran(End::Interrupted { needs_user }),
+                (Progress::Counted { .. }, Some(needs_user)) => {
+                    ran(End::Interrupted { needs_user })
+                }
                 // An uncounted action cannot say whether it got as far as its first event.
                 _ => ran(End::Uncertain { repeat_known: true }),
             }
         }
         ErrorCode::AxUnconfirmed | ErrorCode::Timeout => ran(End::Uncertain { repeat_known: true }),
         ErrorCode::InputFailed | ErrorCode::AxFailed | ErrorCode::SpaceMoveDenied => {
-            ran(End::Uncertain { repeat_known: false })
+            ran(End::Uncertain {
+                repeat_known: false,
+            })
         }
-        ErrorCode::Internal | ErrorCode::CursorRestoreFailed | ErrorCode::FocusRestoreFailed => Settled::Unknowable,
+        ErrorCode::Internal | ErrorCode::CursorRestoreFailed | ErrorCode::FocusRestoreFailed => {
+            Settled::Unknowable
+        }
     }
 }
 
-pub(crate) fn error_report(primary: Option<ErrorCode>, stage: Stage, event: &AuditEvent) -> ErrorReport {
+pub(crate) fn error_report(
+    primary: Option<ErrorCode>,
+    stage: Stage,
+    event: &AuditEvent,
+) -> ErrorReport {
     let settled = settled(primary, stage, progress(event));
     ErrorReport {
         reason: None,

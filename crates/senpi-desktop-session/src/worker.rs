@@ -12,6 +12,8 @@ use senpi_desktop_core::report::ReportMode;
 use senpi_desktop_core::types::{DesktopCapabilities, DesktopSessionOptions, DesktopWindow, Target};
 
 use crate::audit::ArtifactGc;
+use crate::display_awake::DisplayAwake;
+use crate::screen_notes::ScreenNotes;
 use crate::mutate::SessionSafety;
 use crate::pointer::FrameCache;
 use crate::request::{Op, Response};
@@ -42,6 +44,8 @@ pub(crate) struct Worker {
     pub(crate) instance: u64,
     /// This session's live foreground control grant, when it holds the slot.
     pub(crate) control: Option<crate::grant::ControlGrant>,
+    pub(crate) awake: Arc<DisplayAwake>,
+    pub(crate) notes: ScreenNotes,
     /// Whether this backend's watch of the user's own input was started.
     pub(crate) watching_user_input: bool,
     /// The user's input into the apps this session works in (#11459).
@@ -59,6 +63,7 @@ impl Worker {
         capabilities: Arc<Mutex<DesktopCapabilities>>,
         report_mode: Arc<Mutex<ReportMode>>,
         safety: SessionSafety,
+        (awake, notes): (Arc<DisplayAwake>, ScreenNotes),
     ) -> Self {
         let backend = factory.create(&DesktopSessionOptions {
             show_cursor: false,
@@ -80,11 +85,24 @@ impl Worker {
             gc: ArtifactGc::default(),
             instance: crate::grant::next_instance(),
             control: None,
+            awake,
+            notes,
             watching_user_input: false,
             intervention: crate::intervention::Intervention::new(),
         };
+        worker.install_screen_probe();
         worker.refresh_capabilities();
         worker
+    }
+
+    /// Takes the display-awake hold for an activity request.
+    pub(crate) fn begin_activity(&mut self) {
+        let backend = self.backend.as_mut().ok();
+        self.awake.begin(|| backend.and_then(|backend| backend.hold_display_awake()));
+    }
+
+    fn install_screen_probe(&self) {
+        self.notes.install(self.backend.as_ref().ok().and_then(|backend| backend.screen_probe()));
     }
 
     /// Applies cursor-only display changes in place; every other change
@@ -115,6 +133,7 @@ impl Worker {
                 self.backend = Err(error);
             }
         }
+        self.install_screen_probe();
         self.registry = AxRegistry::with_report_mode(options.report_mode);
         self.frames = FrameCache::default();
         self.options = Some(options);

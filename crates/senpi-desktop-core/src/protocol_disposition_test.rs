@@ -27,7 +27,9 @@ fn serde_and_schema_admit_exactly_the_seven_pairs() {
         for retry in RETRIES {
             let value = json!({"delivery": delivery, "retry": retry});
             let by_serde = serde_json::from_value::<Disposition>(value.clone()).ok();
-            let by_schema = validator.check(&definition("Disposition"), &value, "disposition").is_ok();
+            let by_schema = validator
+                .check(&definition("Disposition"), &value, "disposition")
+                .is_ok();
             // Then they agree
             assert_eq!(by_serde.is_some(), by_schema, "{value}");
             admitted.extend(by_serde);
@@ -37,7 +39,10 @@ fn serde_and_schema_admit_exactly_the_seven_pairs() {
     for disposition in Disposition::ALL {
         assert!(admitted.contains(&disposition), "{disposition:?}");
         let wire = serde_json::to_value(disposition).unwrap();
-        assert_eq!(serde_json::from_value::<Disposition>(wire).unwrap(), disposition);
+        assert_eq!(
+            serde_json::from_value::<Disposition>(wire).unwrap(),
+            disposition
+        );
     }
 }
 
@@ -47,5 +52,7 @@ fn a_disposition_with_an_extra_member_is_rejected() {
     let validator = Validator { root: &schema };
     let value = json!({"delivery": "not_delivered", "retry": "safe", "legacy": true});
     assert!(serde_json::from_value::<Disposition>(value.clone()).is_err());
-    assert!(validator.check(&definition("Disposition"), &value, "disposition").is_err());
+    assert!(validator
+        .check(&definition("Disposition"), &value, "disposition")
+        .is_err());
 }

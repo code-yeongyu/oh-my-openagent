@@ -75,13 +75,27 @@ pub enum Disposition {
 }
 
 impl Disposition {
-    pub const NOT_DELIVERED_SAFE: Self = Self::NotDelivered { retry: RefusedRetry::Safe };
-    pub const NOT_DELIVERED_AFTER_USER: Self = Self::NotDelivered { retry: RefusedRetry::AfterUser };
-    pub const UNCERTAIN_UNSAFE: Self = Self::DeliveryUncertain { retry: UncertainRetry::Unsafe };
-    pub const UNCERTAIN_UNKNOWN: Self = Self::DeliveryUncertain { retry: UncertainRetry::Unknown };
-    pub const DELIVERED_UNVERIFIED: Self = Self::DeliveredUnverified { retry: UnsafeRetry::Unsafe };
-    pub const DELIVERED_VERIFIED: Self = Self::DeliveredVerified { retry: UnsafeRetry::Unsafe };
-    pub const UNKNOWN: Self = Self::Unknown { retry: UnknownRetry::Unknown };
+    pub const NOT_DELIVERED_SAFE: Self = Self::NotDelivered {
+        retry: RefusedRetry::Safe,
+    };
+    pub const NOT_DELIVERED_AFTER_USER: Self = Self::NotDelivered {
+        retry: RefusedRetry::AfterUser,
+    };
+    pub const UNCERTAIN_UNSAFE: Self = Self::DeliveryUncertain {
+        retry: UncertainRetry::Unsafe,
+    };
+    pub const UNCERTAIN_UNKNOWN: Self = Self::DeliveryUncertain {
+        retry: UncertainRetry::Unknown,
+    };
+    pub const DELIVERED_UNVERIFIED: Self = Self::DeliveredUnverified {
+        retry: UnsafeRetry::Unsafe,
+    };
+    pub const DELIVERED_VERIFIED: Self = Self::DeliveredVerified {
+        retry: UnsafeRetry::Unsafe,
+    };
+    pub const UNKNOWN: Self = Self::Unknown {
+        retry: UnknownRetry::Unknown,
+    };
 
     /// Every disposition the wire can carry.
     pub const ALL: [Self; 7] = [
@@ -326,13 +340,19 @@ impl Settled {
             Self::Refused { needs_user } => refused(needs_user),
             Self::Unknowable => Disposition::UNKNOWN,
             Self::Ran { progress, end } => match end {
-                End::Interrupted { needs_user } if matches!(progress, Progress::Counted { count: 0, .. }) => {
+                End::Interrupted { needs_user }
+                    if matches!(progress, Progress::Counted { count: 0, .. }) =>
+                {
                     refused(needs_user)
                 }
-                End::Interrupted { .. } | End::Completed { verified: false } => Disposition::DELIVERED_UNVERIFIED,
+                End::Interrupted { .. } | End::Completed { verified: false } => {
+                    Disposition::DELIVERED_UNVERIFIED
+                }
                 End::Completed { verified: true } => Disposition::DELIVERED_VERIFIED,
                 End::Uncertain { repeat_known: true } => Disposition::UNCERTAIN_UNSAFE,
-                End::Uncertain { repeat_known: false } => Disposition::UNCERTAIN_UNKNOWN,
+                End::Uncertain {
+                    repeat_known: false,
+                } => Disposition::UNCERTAIN_UNKNOWN,
             },
         }
     }
@@ -341,8 +361,16 @@ impl Settled {
     #[must_use]
     pub const fn delivered(&self) -> Option<Delivered> {
         match *self {
-            Self::Ran { progress: Progress::Counted { count, of }, .. } => Some(Delivered { count, of }),
-            Self::Ran { progress: Progress::Atomic, .. } | Self::Refused { .. } | Self::Unknowable => None,
+            Self::Ran {
+                progress: Progress::Counted { count, of },
+                ..
+            } => Some(Delivered { count, of }),
+            Self::Ran {
+                progress: Progress::Atomic,
+                ..
+            }
+            | Self::Refused { .. }
+            | Self::Unknowable => None,
         }
     }
 }
