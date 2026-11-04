@@ -303,7 +303,7 @@ for (const method of ["flush", "captureImmediate"] as const) {
         (error) => String(error),
       )
       await started.promise
-      for (const deadline of deadlines) deadline()
+      for (const deadline of [...deadlines]) deadline()
       acknowledged.resolve(undefined)
       expect(await result).toBe("acknowledged")
     } finally {

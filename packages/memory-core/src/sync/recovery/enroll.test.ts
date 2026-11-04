@@ -11,6 +11,7 @@ import {
   transportFor,
   verified,
 } from "./testing/world.test-support.ts"
+import { writeBatch } from "./testing/write-batch.test-support.ts"
 
 const NOT_BACKED_UP = {
   userVerified: true,
@@ -69,40 +70,48 @@ describe("enrolling and removing recovery passkeys (sync-design section 7)", () 
     })
   })
 
-  test("removal is member-signed, rotates the key out, signals the platform and tells the user to delete it", async () => {
-    const world = await createWorld()
-    const second = await enrollAnother(world)
-    if (!second.ok) throw new Error(second.reason)
-    const outcome = await removeRecoveryKey({
-      account: world.account,
-      rpId: RP_ID,
-      credentialId: second.credentialId,
-      confirmGivingUpRecovery: false,
-      keyring: world.owner.keyring,
-      bridge: {
-        prfSupported: true,
-        enroll: async () => ({ ok: false, reason: "cancelled" }),
-        recoverBegin: async () => ({ ok: false, reason: "cancelled" }),
-        recoverFinish: async () => ({ ok: false, reason: "cancelled" }),
-        recoverAbort: async () => {},
-        signalRemoved: async () => "signalled",
-      },
-      transport: transportFor(world, world.owner),
-      rejections: createRejectionCounter(),
-      anchor: world.anchor,
-    })
-    expect(outcome).toEqual({
-      ok: true,
-      epoch: 2,
-      platformSignal: "signalled",
-      deleteFromPasskeyManager: true,
-    })
-    const state = await verified(world, world.owner)
-    expect(state.received.at(-1)?.wraps.map((wrap) => wrap.id)).toEqual([
-      `device:${world.owner.principal.id}`,
-      `recovery:${world.firstKey}`,
-    ])
-  })
+  // The batch row: enroll and remove walk the served chain past a batch row (#12277).
+  test.each([
+    ["an account with no batch", false],
+    ["an account with a batch written before enrolling", true],
+  ] as const)(
+    "removal is member-signed, rotates the key out, signals the platform and tells the user to delete it: %s",
+    async (_account, withBatch) => {
+      const world = await createWorld()
+      if (withBatch) await writeBatch(world, "kept")
+      const second = await enrollAnother(world)
+      if (!second.ok) throw new Error(second.reason)
+      const outcome = await removeRecoveryKey({
+        account: world.account,
+        rpId: RP_ID,
+        credentialId: second.credentialId,
+        confirmGivingUpRecovery: false,
+        keyring: world.owner.keyring,
+        bridge: {
+          prfSupported: true,
+          enroll: async () => ({ ok: false, reason: "cancelled" }),
+          recoverBegin: async () => ({ ok: false, reason: "cancelled" }),
+          recoverFinish: async () => ({ ok: false, reason: "cancelled" }),
+          recoverAbort: async () => {},
+          signalRemoved: async () => "signalled",
+        },
+        transport: transportFor(world, world.owner),
+        rejections: createRejectionCounter(),
+        anchor: world.anchor,
+      })
+      expect(outcome).toEqual({
+        ok: true,
+        epoch: 2,
+        platformSignal: "signalled",
+        deleteFromPasskeyManager: true,
+      })
+      const state = await verified(world, world.owner)
+      expect(state.received.at(-1)?.wraps.map((wrap) => wrap.id)).toEqual([
+        `device:${world.owner.principal.id}`,
+        `recovery:${world.firstKey}`,
+      ])
+    },
+  )
 
   test("removing the last recovery key needs explicit confirmation", async () => {
     const world = await createWorld()
