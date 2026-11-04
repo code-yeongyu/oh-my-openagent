@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-`bunx oh-my-opencode doctor` — parallel diagnostic checks. `getAllCheckDefinitions()` registers **10** checks; a second function `getCodexCheckDefinitions()` registers **3** Codex-only checks. Four of the category aggregators (System, Config, Tools, Models); the rest register standalone. Catches broken installs, config typos, missing dependencies, provider misconfigurations before they become runtime errors.
+`bunx oh-my-opencode doctor` — parallel diagnostic checks. `getAllCheckDefinitions()` registers **10** checks; a second function `getCodexCheckDefinitions()` registers **3** Codex-only checks. Four are category aggregators (System, Config, Tools, Models); the rest register standalone. Catches broken installs, config typos, missing dependencies, provider misconfigurations before they become runtime errors.
 
 ## COMMAND FLAGS
 
@@ -22,7 +22,7 @@ Registered by `getAllCheckDefinitions()` (10):
 | Check | File | Validates |
 |----------|------|-----------|
 | **SYSTEM** | `checks/system.ts` | OpenCode binary found + version >= `MIN_OPENCODE_VERSION` (`1.4.0`), plugin registered in opencode.json, loaded plugin version matches installed |
-| `bundled-assets` | `checks/bundled-assets.ts` | Required bundled assets (`dist/index.js`, `bin/platform.js`, `dist/skills/frontend/SKILL.md`) exist under the resolved installed package root; catches OpenCode cache installs that omit bundled files and fail silently (#6198). Skips when no installed package resolves. |
+| `bundled-assets` | `checks/bundled-assets.ts` | Required bundled assets (`dist/index.js`, `bin/platform.js`, `dist/skills/frontend/SKILL.md`) exist in the resolved OpenCode-managed install. Honors an exact version pin in the detected config and skips when the install cannot be resolved (#6198). |
 | **CONFIG** | `checks/config.ts` | JSONC validity, Zod schema passes, no unknown keys, model override syntax correct |
 | **TUI_PLUGIN** | `checks/tui-plugin-config.ts` | TUI sidebar plugin entry resolvable |
 | `deprecated-reasoning-keys` | `checks/deprecated-reasoning-keys.ts` | Scans `~/.omo/omo.json[c]` for deprecated `variant` / `reasoningEffort` / `thinking` / `textVerbosity` / `fallback_models` keys, reporting file + dotted path and a `config migrate` hint. Skips the `[opencode]` block and passthrough containers (`provider_options`). Registered with a literal id, NOT in `CHECK_IDS`. |
@@ -106,9 +106,5 @@ doctor command
 
 `framework/constants.ts` `EXIT_CODES` defines only:
 
-```ts
-export const EXIT_CODES = {
-  SUCCESS: 0,
-  FAILURE: 1,
-} as const
-```
+- `SUCCESS: 0` — all checks passed
+- `FAILURE: 1` — one or more failures

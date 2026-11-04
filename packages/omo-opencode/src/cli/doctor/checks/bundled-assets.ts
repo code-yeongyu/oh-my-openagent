@@ -2,7 +2,9 @@ import { existsSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { CHECK_IDS, CHECK_NAMES } from "../framework/constants"
 import type { CheckResult, DoctorIssue } from "../framework/types"
-import { getLoadedPluginVersion } from "./system-loaded-version"
+import { getPluginEntryName } from "../../../shared/plugin-entry-shape"
+import { findOpenCodeInstalledPluginPackage } from "./system-loaded-version"
+import { getPluginInfo } from "./system-plugin"
 
 export const REQUIRED_BUNDLED_ASSETS = [
   "dist/index.js",
@@ -11,6 +13,7 @@ export const REQUIRED_BUNDLED_ASSETS = [
 ] as const
 
 const REINSTALL_FIX = "Delete the version-tagged directory for this package under ~/.cache/opencode/packages (or the path reported below), then restart OpenCode so it reinstalls the plugin, and run `bunx oh-my-openagent doctor` again."
+const EXACT_VERSION = /^\d+\.\d+\.\d+(?:-[\w.-]+)?(?:\+[\w.-]+)?$/
 
 export interface BundledAssetsEvaluation {
   packageRoot: string | null
@@ -43,21 +46,19 @@ function buildMissingAssetIssues(packageRoot: string, missingAssets: string[]): 
 }
 
 export async function checkBundledAssets(): Promise<CheckResult> {
-  const loaded = getLoadedPluginVersion()
-  const installedPackagePath = loaded.installedPackagePath
-  const packageRoot = installedPackagePath && existsSync(installedPackagePath)
-    ? dirname(installedPackagePath)
-    : null
+  const { entry, pinnedVersion, isLocalDev } = getPluginInfo()
+  const pin = entry && pinnedVersion && EXACT_VERSION.test(pinnedVersion)
+    ? { specifier: getPluginEntryName(entry), version: pinnedVersion }
+    : undefined
+  const installedPackagePath = isLocalDev ? null : findOpenCodeInstalledPluginPackage(pin)
+  const packageRoot = installedPackagePath ? dirname(installedPackagePath) : null
 
   if (!packageRoot) {
     return {
       name: CHECK_NAMES[CHECK_IDS.BUNDLED_ASSETS],
       status: "skip",
-      message: "Installed plugin package not found; bundled asset verification skipped.",
-      details: [
-        `Resolved cache dir: ${loaded.cacheDir}`,
-        "The SYSTEM check reports plugin registration problems.",
-      ],
+      message: "No OpenCode-managed plugin package resolved; bundled asset verification skipped.",
+      details: ["The System check reports plugin registration problems."],
       issues: [],
     }
   }
