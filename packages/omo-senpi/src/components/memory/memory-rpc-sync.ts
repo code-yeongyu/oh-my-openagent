@@ -29,24 +29,14 @@ export async function readMemoryRpcSync(read: SyncStatusReader | undefined, repo
       return { state: status.kind }
     case "synced":
       return { state: "synced", lastSyncedAtISO: new Date(status.at).toISOString() }
+    // Both exist only while the engine runs, so their mapping ships with it (sync-status-copy.ts).
+    case "failing":
+    case "frozen":
+      return (await import("#omo-memory-sync-runtime")).failureRpcSync(status)
     case "sync-unavailable":
     // An invalid sync configuration (#10860) also means this device does not sync; the runner logs which variable.
     case "sync-config-invalid":
       return { state: "unavailable" }
-    case "failing": {
-      const { failure } = status
-      return {
-        state: "failing",
-        failure: {
-          kind: failure.kind,
-          reason: failure.reason,
-          action: failure.action,
-          sinceISO: new Date(status.since).toISOString(),
-          attempts: status.attempts,
-          ...(failure.kind === "stranded_lock" ? { paths: failure.paths } : {}),
-        },
-      }
-    }
     default: {
       const unhandled: never = status
       return unhandled
