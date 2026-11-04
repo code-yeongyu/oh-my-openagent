@@ -31,7 +31,7 @@ pub enum MutatingAction {
 }
 
 impl MutatingAction {
-    pub const ALL: [Self; 18] = [
+    pub const ALL: [Self; 19] = [
         Self::Click,
         Self::MoveMouse,
         Self::Drag,
