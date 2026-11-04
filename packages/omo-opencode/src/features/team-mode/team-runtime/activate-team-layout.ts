@@ -1,5 +1,4 @@
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
-import { validatePluginConfig } from "../../../config/validate"
 import type { TmuxSessionManager } from "../../tmux-subagent/manager"
 import { createTeamLayout } from "../team-layout-tmux/layout"
 import type { TeamLayoutResult } from "../team-layout-tmux/layout"
@@ -14,26 +13,6 @@ function normalizeTeamLayout(teamRunId: string, layout: TeamLayoutResult): TeamL
   }
 }
 
-/**
- * Resolve the visualization multiplexer: env override first, then the
- * `tmux.multiplexer` plugin setting from the omo config chain, then tmux.
- */
-export function resolveTeamMultiplexer(
-  projectRoot: string,
-  env: NodeJS.ProcessEnv = process.env,
-): "tmux" | "herdr" {
-  const override = (env["OMO_TMUX_MULTIPLEXER"] ?? "").trim().toLowerCase()
-  if (override === "herdr") return "herdr"
-  if (override === "tmux") return "tmux"
-  try {
-    const multiplexer = validatePluginConfig(projectRoot, env).config?.tmux?.multiplexer
-    if (multiplexer === "herdr") return "herdr"
-  } catch {
-    // Config problems surface through the config validation surfaces.
-  }
-  return "tmux"
-}
-
 export async function activateTeamLayout(
   runtimeState: RuntimeState,
   config: TeamModeConfig,
@@ -42,7 +21,11 @@ export async function activateTeamLayout(
 ): Promise<boolean> {
   if (!config.tmux_visualization || !tmuxMgr) return false
 
-  const multiplexer = resolveTeamMultiplexer(projectRoot)
+  // The manager is constructed with the fully resolved runtime tmux config
+  // (config chain + OMO_TMUX_MULTIPLEXER override), so activation reuses it
+  // instead of re-parsing the config chain. The comparison (rather than a
+  // passthrough) keeps minimal manager stubs on their tmux default.
+  const multiplexer = tmuxMgr.multiplexer === "herdr" ? "herdr" : "tmux"
   const layout = await createTeamLayout(
     runtimeState.teamRunId,
     runtimeState.members.flatMap((member) => member.sessionId && member.agentType !== "leader"

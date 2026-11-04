@@ -9,9 +9,10 @@ export function isTmuxIntegrationEnabled(
 }
 
 /**
- * Apply the OMO_TMUX_MULTIPLEXER env override with the same precedence as
- * the team path (resolveTeamMultiplexer): an explicit "tmux"/"herdr" wins
- * over the config chain; anything else keeps the configured backend.
+ * Apply the OMO_TMUX_MULTIPLEXER env override with the same precedence the
+ * consumers use (the TmuxSessionManager's constructor-time tmuxConfig): an
+ * explicit "tmux"/"herdr" wins over the config chain; anything else keeps
+ * the configured backend.
  */
 function applyMultiplexerEnvOverride(config: TmuxConfig, env: NodeJS.ProcessEnv): TmuxConfig {
   const override = (env["OMO_TMUX_MULTIPLEXER"] ?? "").trim().toLowerCase()

@@ -11,6 +11,12 @@ type Spawn = typeof spawn
 type TeamModeDependencyDeps = {
   readonly spawn?: Spawn
   readonly tmuxEnv?: string
+  /**
+   * The resolved visualization backend. Callers that already loaded the
+   * runtime tmux config (createRuntimeTmuxConfig) thread it here so a
+   * config-only `tmux.multiplexer: "herdr"` is honored; without it only the
+   * OMO_TMUX_MULTIPLEXER env override applies.
+   */
   readonly multiplexer?: "tmux" | "herdr"
   readonly herdrEnv?: string
 }
