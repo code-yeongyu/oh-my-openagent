@@ -110,8 +110,8 @@ describe("thread_rename params", () => {
     expect(outcome.kind).toBe("ok")
   })
 
-  test("#given a rename payload missing name #when parsed #then it returns invalid_arguments as data", () => {
-    const outcome = parseThreadParams(threadToolParamSchemas.thread_rename, { thread: "019233a1-7c2e-7bbb" })
+  test("#given a rename payload missing thread #when parsed #then it returns invalid_arguments as data", () => {
+    const outcome = parseThreadParams(threadToolParamSchemas.thread_rename, { name: "x" })
     expect(outcome).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
   })
 })
@@ -274,6 +274,9 @@ describe("thread error taxonomy", () => {
       "stale_token",
       "already_answered",
       "answer_in_progress",
+      "device_offline",
+      "relay_requires_paid_plan",
+      "alias_taken",
     ])
     expect(new Set(THREAD_ERROR_CODES).size).toBe(THREAD_ERROR_CODES.length)
   })

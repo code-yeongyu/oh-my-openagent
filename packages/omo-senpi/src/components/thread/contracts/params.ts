@@ -29,6 +29,26 @@ const BoundSession = Type.Optional(
 )
 
 export const ThreadCreateParams = Type.Object({
+  thread: Type.Optional(
+    Type.String({
+      minLength: 1,
+      description:
+        "Id or alias of an EXISTING thread to open, on whichever of the account's devices holds it; leave unset to create a new thread. Never combined with device.",
+    }),
+  ),
+  device: Type.Optional(
+    Type.String({
+      minLength: 1,
+      description: "Account device to create the new thread on (from thread_list with all_scope); leave unset to create it on this device. Only for a new thread.",
+    }),
+  ),
+  alias: Type.Optional(
+    Type.String({
+      minLength: 1,
+      maxLength: 64,
+      description: "Account-wide alias for the new thread, usable instead of its id in every thread tool; an alias another thread holds returns alias_taken naming the holder.",
+    }),
+  ),
   name: Type.Optional(
     Type.String({
       description:
@@ -122,12 +142,21 @@ export const ThreadHandoffParams = Type.Object({
 
 export const ThreadRenameParams = Type.Object({
   thread: ThreadAddress,
-  name: Type.String({
-    minLength: 1,
-    maxLength: 200,
-    description:
-      "New display label for the thread; the thread keeps its id as its address, and a label already used by another visible thread returns name_conflict.",
-  }),
+  name: Type.Optional(
+    Type.String({
+      minLength: 1,
+      maxLength: 200,
+      description:
+        "New display label for the thread; the thread keeps its id as its address, and a label already used by another visible thread returns name_conflict.",
+    }),
+  ),
+  alias: Type.Optional(
+    Type.String({
+      minLength: 1,
+      maxLength: 64,
+      description: "New account-wide alias for the thread; an alias another thread holds returns alias_taken naming the holder, and the old alias is freed.",
+    }),
+  ),
   all_scope: AllScope,
   idempotency_key: IdempotencyKey,
 })
