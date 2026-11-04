@@ -438,10 +438,15 @@ describe("remote == local, round 2: send modes, handoff, list and alias order", 
   test("#given a caller with no durable id #when it sends here and to b #then both refuse the same way at send time and b gets nothing", async () => {
     const a = account()
     const { run } = surface(a.remote, { caller: UNKNOWN_CALLER })
-    const here = await run("thread_send", { thread: "dur-local", message: "x" })
-    const there = await run("thread_send", { thread: "dur-on-b", message: "x" })
-    expect(here).toMatchObject({ kind: "error" })
+    const here = await run("thread_send", { thread: "dur-local", message: "x", idempotency_key: "k-here" })
+    const there = await run("thread_send", { thread: "dur-on-b", message: "x", idempotency_key: "k-there" })
+    expect(here).toMatchObject({ kind: "error", error: { code: "caller_context_missing" } })
     expect(comparable(there)).toEqual(comparable(here))
+    // A refusal before any store write leaves no receipt, so a retry under the same key with other args refuses the same way.
+    const hereAgain = await run("thread_send", { thread: "dur-local", message: "y", idempotency_key: "k-here" })
+    const thereAgain = await run("thread_send", { thread: "dur-on-b", message: "y", idempotency_key: "k-there" })
+    expect(hereAgain).toMatchObject({ kind: "error", error: { code: "caller_context_missing" } })
+    expect(comparable(thereAgain)).toEqual(comparable(hereAgain))
     expect(a.sent.filter((entry) => entry.rpc?.["type"] === "prompt")).toEqual([])
   })
 
