@@ -15,6 +15,7 @@ import { ensureVendoredLspDaemonBuilt } from "./script/ensure-vendored-lsp-daemo
 import { installEnvironmentIntegrityCheck } from "./test-support/environment-integrity"
 import { installPostHogTestGuard } from "./test-support/posthog-test-guard"
 import { installHermeticHome } from "./test-hermetic-home"
+import { memoryGitEnvironment } from "./packages/memory-core/src/git/exec-environment"
 import { resetTestDeadline } from "./test-support/test-deadline"
 
 // Installer/doctor integration tests need the vendored lsp-daemon dist that CI builds
@@ -44,6 +45,11 @@ setDefaultTimeout(process.platform === "win32" ? 30_000 : 20_000)
 // back to os.homedir(). Both point at one per-process temp home; see test-hermetic-home.ts.
 installHermeticHome()
 delete process.env.OPENCODE_SERVER_PASSWORD
+// A runner may export git config or repository redirection: a hermetic gate's GIT_CONFIG_COUNT pair sets
+// core.hooksPath=/dev/null, so every git a test started skipped the hooks its own fixture installed (#12354).
+// Tests own their git config (GIT_CONFIG_GLOBAL above), so the names memory git drops are dropped for the run.
+const testGitEnvironment = memoryGitEnvironment(process.env)
+for (const name of Object.keys(process.env)) if (!Object.hasOwn(testGitEnvironment, name)) delete process.env[name]
 
 let isGlobalMockCleanup = false
 const { restoreModuleMocks } = installModuleMockLifecycle(mock, {
