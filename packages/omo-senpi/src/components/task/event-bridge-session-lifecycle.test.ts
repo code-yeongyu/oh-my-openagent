@@ -166,6 +166,36 @@ describe("event-bridge before_agent_start", () => {
   })
 })
 
+describe("event-bridge before_agent_start stale Stop release", () => {
+  it("#given a run-pause bridge #when a preview and then a real turn start #then only the real turn releases a stale Stop for its session, and a failed release is logged without blocking the turn", async () => {
+    // given
+    const released: string[] = []
+    let fail = false
+    const runPause = {
+      restore: async () => {},
+      reconciled: async () => {},
+      changed: async () => {},
+      releaseStale: async (sessionId: string) => {
+        released.push(sessionId)
+        if (fail) throw new Error("resume port down")
+      },
+    }
+    const { pi, warnings } = wireHarness("parent-session", { runPause })
+
+    // when
+    await pi.dispatch("before_agent_start", { type: "before_agent_start", preview: true }, {})
+    await pi.dispatch("before_agent_start", { type: "before_agent_start" }, {})
+    fail = true
+    await pi.dispatch("before_agent_start", { type: "before_agent_start" }, {})
+
+    // then
+    expect(released).toEqual(["parent-session", "parent-session"])
+    expect(warnings).toEqual([
+      { message: "omo-senpi task stale run Stop release failed", details: { error: "Error: resume port down" } },
+    ])
+  })
+})
+
 describe("event-bridge session_compact", () => {
   it("#given rejected, malformed, and accepted compactions #when they fire #then only accepted compaction forgets task-output status reads", async () => {
     const { pi, forgottenTaskOutputSessions } = wireHarness("parent-session")

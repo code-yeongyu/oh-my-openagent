@@ -65,6 +65,17 @@ export class EngineRunPauseBridge {
     return this.#resume(parentSessionId, stop !== undefined && stop <= event.pauseSeq ? stop : event.pauseSeq)
   }
 
+  // A Resume the bridge never acted on (#12249 on an older build, or a lost hold-change event) leaves the
+  // run's Stop applied while the engine holds no Stop at all, so nothing would ever release it. When the
+  // engine's live ledger is at or past the recorded Stop and holds no user Stop, that Stop was released.
+  releaseStale(parentSessionId: string): Promise<void> {
+    const record = this.controller.registry.load(parentSessionId)
+    if (record === undefined || record.phase === "resumed") return Promise.resolve()
+    const state = this.native.getPauseState()
+    if (state === undefined || state.pauseSeq < record.pauseSeq || readEngineRunHold(state).stopped) return Promise.resolve()
+    return this.#resume(parentSessionId, record.pauseSeq)
+  }
+
   #pause(parentSessionId: string, pauseSeq: number): Promise<void> {
     const existing = this.#pauses.get(parentSessionId)
     if (existing?.seq === pauseSeq) return existing.pending
