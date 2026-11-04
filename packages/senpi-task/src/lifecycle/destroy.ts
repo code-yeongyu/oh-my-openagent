@@ -221,7 +221,7 @@ function recordRevivalFailure(context: LifecycleContext, taskId: string): void {
     // Ownership is always checked against this lifecycle context so a foreign resident cannot be
     // stripped while a previous owner is being torn down.
     if (fresh.host_pid !== context.hostPid || fresh.residency_state !== "resident") return fresh
-    const { host_pid: _hostPid, ...rest } = fresh
+    const { host_pid: _hostPid, host_manager_instance: _hostManagerInstance, ...rest } = fresh
     return {
       ...rest,
       residency_state: fresh.execution_mode === "process" ? "rpc_detached" : "persisted_only",

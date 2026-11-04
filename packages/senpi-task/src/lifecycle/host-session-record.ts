@@ -10,7 +10,7 @@ import { nowIso, type LifecycleContext } from "./context"
 export function parkHostSessionRecord(context: LifecycleContext, taskId: string): void {
   context.store.mutate(taskId, (fresh) => {
     if (fresh.residency_state === "rpc_detached" && fresh.host_pid === undefined) return fresh
-    const { host_pid: _hostPid, ...rest } = fresh
+    const { host_pid: _hostPid, host_manager_instance: _hostManagerInstance, ...rest } = fresh
     return { ...rest, residency_state: "rpc_detached", updated_at: nowIso(context) }
   })
 }

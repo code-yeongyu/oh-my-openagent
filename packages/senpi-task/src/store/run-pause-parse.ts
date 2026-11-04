@@ -1,4 +1,4 @@
-import type { RecordedRunPause } from "../state/record-types"
+import type { RecordedRunPause, ResumedRunPause } from "../state/record-types"
 
 type RunKind = RecordedRunPause["run_ref"]["kind"]
 
@@ -8,6 +8,14 @@ function isRunKind(value: unknown): value is RunKind {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+export function parseOptionalResumedRunPause(record: Record<string, unknown>): ResumedRunPause | undefined {
+  const value = record["run_pause_resumed"]
+  if (!isRecord(value) || typeof value.resume_id !== "string" || value.resume_id.length === 0
+    || typeof value.parent_session_id !== "string" || value.parent_session_id.length === 0
+    || typeof value.parent_pause_seq !== "number" || !Number.isSafeInteger(value.parent_pause_seq)) return undefined
+  return { resume_id: value.resume_id, parent_session_id: value.parent_session_id, parent_pause_seq: value.parent_pause_seq }
 }
 
 export function parseOptionalRunPause(record: Record<string, unknown>): RecordedRunPause | undefined {

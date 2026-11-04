@@ -1,6 +1,7 @@
 import type { AdmissionBarrier, ResumeCredential } from "../pause/admission-barrier"
 import type { PauseParticipant } from "../pause/registry"
 import type { TaskRecordStore } from "../store"
+import { withHostClaim } from "../state/host-claim"
 import type { TaskConcurrency } from "./concurrency"
 import type { LaunchContext, LaunchOutcome } from "./launch-task"
 import { buildRespawnManagedSpec, isTerminalRecord } from "./manager-helpers"
@@ -15,6 +16,7 @@ type HeldAdmissionPorts = {
   readonly barrier: AdmissionBarrier
   readonly concurrency: TaskConcurrency
   readonly hostPid: number
+  readonly hostManagerInstance?: string
   readonly runners: Readonly<Record<"in-process" | "process", ManagedRunner>>
   launch(context: LaunchContext): void
 }
@@ -84,7 +86,7 @@ export class HeldAdmissions {
         if (fresh.status !== "pending" || fresh.notification.run_epoch !== record.notification.run_epoch ||
           fresh.host_pid !== record.host_pid) return fresh
         claimed = true
-        return { ...fresh, host_pid: this.#ports.hostPid }
+        return withHostClaim(fresh, this.#ports.hostPid, this.#ports.hostManagerInstance)
       })
       if (!claimed || owned === null) throw new HeldAdmissionError(taskId, "owner_changed")
       const context: LaunchContext = {

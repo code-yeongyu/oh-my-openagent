@@ -24,6 +24,7 @@ export type PoolManagerPorts = {
   readonly options: TaskManagerOptions
   readonly concurrency: TaskConcurrency
   readonly hostPid: number
+  readonly hostManagerInstance?: string
   readonly get: WorkpoolAdmission["get"]
   readonly pending: WorkpoolAdmission["pending"]
   readonly cancel: WorkpoolAdmission["cancel"]
@@ -130,6 +131,7 @@ export function createWorkpoolAdmission(ports: PoolManagerPorts): WorkpoolAdmiss
             if (!current()) return
             if (!input.bind(taskId, epoch)) return
             context = prepareWorkpoolLaunch({ options, workerSpec: pool.worker_spec, taskId, hostPid: ports.hostPid,
+              ...(ports.hostManagerInstance === undefined ? {} : { hostManagerInstance: ports.hostManagerInstance }),
               taskSeq: ports.nextSequence(pool.parent_session_id),
               spec: { ...pool.worker_spec.start,
                 admission,

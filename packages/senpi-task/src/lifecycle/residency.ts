@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto"
 
 import type { TaskRecord } from "../state"
+import { withHostClaim } from "../state/host-claim"
 import { log } from "@oh-my-opencode/utils"
 
 import { acquireSessionAdmissionLease, type AdmissionLeaseTiming } from "./admission-lease"
@@ -180,7 +181,7 @@ export function claimResidencySlot(
   const claimed = context.store.mutate(taskId, (fresh) => {
     if (!reconciliationActive(context) || !expect(fresh)) return fresh
     applied = true
-    return { ...fresh, residency_state: "resident", host_pid: context.hostPid, updated_at: nowIso(context), residency_claim: randomUUID() }
+    return { ...withHostClaim(fresh, context.hostPid, context.hostManagerInstance()), residency_state: "resident", updated_at: nowIso(context), residency_claim: randomUUID() }
   })
   if (claimed === null) return "not_claimable"
   return applied ? "claimed" : "not_claimable"

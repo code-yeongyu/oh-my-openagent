@@ -177,7 +177,7 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
   function parkOwned(taskId: string, handle: ManagedChildHandle, epoch: number, reason: SuspensionReason): void {
     if (ownedRecord(ports, taskId, handle, epoch) === null) return
     ports.store.mutate(taskId, (fresh) => {
-      const { host_pid: _hostPid, ...rest } = fresh
+      const { host_pid: _hostPid, host_manager_instance: _hostManagerInstance, ...rest } = fresh
       return { ...rest, residency_state: "rpc_detached", suspension_reason: reason, updated_at: nowIso(ports.now) }
     })
     ports.store.appendEvent(taskId, { type: "suspended", payload: { reason } })

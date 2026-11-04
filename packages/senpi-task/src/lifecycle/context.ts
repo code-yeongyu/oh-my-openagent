@@ -36,6 +36,8 @@ export type LifecycleContext = {
   readonly signaller: ProcessSignaller
   readonly orphanKillDelayMs: number
   readonly hostPid: number
+  // The claiming task manager inside hostPid, once it exists (#12349).
+  readonly hostManagerInstance: () => string | undefined
   readonly dequeuePending: (taskId: string) => void
   readonly reattachPorts: LifecycleReattachPorts | undefined
   readonly reconcileAdmission: BatchAdmissionOptions
@@ -95,6 +97,7 @@ export function resolveContext(deps: LifecycleDeps): LifecycleContext {
     signaller: deps.signaller ?? defaultSignaller,
     orphanKillDelayMs: deps.orphanKillDelayMs ?? DEFAULT_ORPHAN_KILL_DELAY_MS,
     hostPid: deps.hostPid ?? process.pid,
+    hostManagerInstance: deps.hostManagerInstance ?? (() => undefined),
     dequeuePending: deps.dequeuePending ?? (() => {}),
     reattachPorts: injectedLifecycleReattachPorts(deps),
     reconcileAdmission: deps.reconcileAdmission ?? {},
