@@ -252,7 +252,7 @@ export function createNodeGitExec(runtime: NodeGitExecRuntime = {}): GitExec {
     async run(callerArgv, options) {
       const argv = [...NO_FSMONITOR, ...callerArgv]
       // Never the caller's raw environment: an inherited GIT_CONFIG_* or GIT_DIR would redirect this git (#12354).
-      const environment = memoryGitEnvironment(options.env ?? process.env)
+      const environment = memoryGitEnvironment(options.env ?? process.env, platform)
       try {
         return await runCommand("git", argv, options, environment)
       } catch (error) {

@@ -112,26 +112,30 @@ function configParameterEntries(text: string): Array<{ source: string; key: stri
 }
 
 /** The environment a memory repository's git runs with: `environment` minus inherited repository redirection and hook-defeating config. */
-export function memoryGitEnvironment(environment: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+export function memoryGitEnvironment(environment: NodeJS.ProcessEnv, platform: NodeJS.Platform = process.platform): NodeJS.ProcessEnv {
   const kept: NodeJS.ProcessEnv = {}
-  // Windows environment names are case-insensitive, so `Git_Dir` reaches git as GIT_DIR there.
-  const byUpperName = new Map<string, string | undefined>()
+  // Off Windows, environment names are case-sensitive and git reads only the exact upper-case names, so a
+  // `Git_Config_Count` is an unrelated variable that must not become config here either. Windows names are
+  // case-insensitive (git-for-windows reads `Git_Dir` as GIT_DIR), so there any spelling counts; of two spellings
+  // in one object, the first one is the one read here.
+  const gitName = platform === "win32" ? (name: string) => name.toUpperCase() : (name: string) => name
+  const byGitName = new Map<string, string | undefined>()
   for (const [name, value] of Object.entries(environment)) {
-    const upper = name.toUpperCase()
-    if (!byUpperName.has(upper)) byUpperName.set(upper, value)
-    if (REPOSITORY_LOCAL_GIT_ENV.has(upper) || NUMBERED_CONFIG_PAIR.test(upper)) continue
-    if (upper === CONFIG_COUNT || upper === CONFIG_PARAMETERS) continue
+    const key = gitName(name)
+    if (!byGitName.has(key)) byGitName.set(key, value)
+    if (REPOSITORY_LOCAL_GIT_ENV.has(key) || NUMBERED_CONFIG_PAIR.test(key)) continue
+    if (key === CONFIG_COUNT || key === CONFIG_PARAMETERS) continue
     kept[name] = value
   }
 
-  const pairs = configCountPairs(byUpperName)?.filter(([key]) => !defeatsMemoryHooks(key)) ?? []
+  const pairs = configCountPairs(byGitName)?.filter(([key]) => !defeatsMemoryHooks(key)) ?? []
   if (pairs.length > 0) kept[CONFIG_COUNT] = String(pairs.length)
   pairs.forEach(([key, value], index) => {
     kept[`GIT_CONFIG_KEY_${index}`] = key
     kept[`GIT_CONFIG_VALUE_${index}`] = value
   })
 
-  const parameters = byUpperName.get(CONFIG_PARAMETERS)
+  const parameters = byGitName.get(CONFIG_PARAMETERS)
   const entries = parameters === undefined ? [] : (configParameterEntries(parameters)?.filter((entry) => !defeatsMemoryHooks(entry.key)) ?? [])
   if (entries.length > 0) kept[CONFIG_PARAMETERS] = entries.map((entry) => entry.source).join(" ")
   return kept
