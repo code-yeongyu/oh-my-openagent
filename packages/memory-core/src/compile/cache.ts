@@ -61,7 +61,8 @@ export interface CompiledMemoryBlock {
 
 /**
  * One key's blocks at one revision, one per expiry slot. `first` is the compile that will tell which instants the
- * revision declares; a concurrent caller shares it instead of compiling the same revision twice.
+ * revision declares; a concurrent caller waits for it instead of compiling the same revision twice, and compiles
+ * again only when it degraded.
  */
 interface MemoryBlockCacheEntry {
   readonly variant: string
@@ -130,13 +131,15 @@ export class MemoryBlockCache {
     else entry.blocks.set(slot, pending)
     try {
       const compiled = await pending
-      entry.expiries ??= compiled.expiries
-      // A degraded block serves the callers already waiting on it, but is never kept: the next compile retries.
+      // A degraded block reaches only this caller and any caller that found this same promise under its slot; it
+      // leaves the entry untouched (no slot, no expiries: a failed read drops that file's instant). A caller waiting
+      // on `entry.first`, and every later caller, compiles again.
       if ((await computing).degraded.length > 0) {
         if (entry.first === pending) entry.first = undefined
         if (slot !== undefined && entry.blocks.get(slot) === pending) entry.blocks.delete(slot)
         return compiled
       }
+      entry.expiries ??= compiled.expiries
       entry.blocks.set(expirySlot(compiled.expiries, at), pending)
       return compiled
     } catch (error) {
