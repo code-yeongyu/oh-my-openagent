@@ -1,7 +1,7 @@
 import type { HelperCall, HelperLease, HelperReply } from "./client"
 import { type DarwinReadDeps, HelperReadError, readThroughHelper, type ReadResult } from "./darwin-read"
 import { migrate } from "./migration"
-import { deleteOldSlots, namesFromRead, OLD_SLOT_COUNT, runRecovery } from "./recovery"
+import { deleteOldSlots, namesFromRead, OLD_SLOT_COUNT, oldSlotsOf, runRecovery } from "./recovery"
 
 export type WriteIntent = "fresh-sign-in" | "update"
 
@@ -96,7 +96,7 @@ export function lockedDarwinStore(deps: DarwinStoreDeps, lease: HelperLease): Lo
       // The slots a read reports; when that read fails (a staging item another identity owns, a locked keychain), every
       // slot is attempted, so a failed read never leaves retired copies behind silently.
       const present = await helper({ verb: "read", account: deps.account })
-      const slots = present.error === undefined ? (present.present?.oldSlots ?? []) : ALL_OLD_SLOTS
+      const slots = present.error === undefined ? oldSlotsOf(present) : ALL_OLD_SLOTS
       await deleteOldSlots(deps.account, slots, helper, deleteOwnOld)
       lastRead = null
     },

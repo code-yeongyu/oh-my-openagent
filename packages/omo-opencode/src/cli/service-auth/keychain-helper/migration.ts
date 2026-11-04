@@ -25,11 +25,13 @@ export async function migrate(
   if (!MIGRATABLE.has(source)) return { kind: "skipped", reason: "not-migratable" }
   if ((await helper({ verb: "stage", account, value })).ok !== true) return { kind: "failed", step: "stage" }
   const retired = await helper({ verb: "retire", account })
-  if (retired.error === "exists" && retired.reason === "old-slots-full") {
+  // A helper that predates the eight slots answers `skipped` when its one `.old` slot is taken, and no `slot` on success.
+  if ((retired.error === "exists" && retired.reason === "old-slots-full") || (retired.ok === true && retired.skipped === true)) {
     await helper({ verb: "remove", account: `${account}.staging` })
     return { kind: "skipped", reason: "old-slots-full" }
   }
-  if (retired.ok !== true || retired.slot === undefined) return { kind: "failed", step: "retire" }
+  if (retired.ok !== true) return { kind: "failed", step: "retire" }
+  const slot = retired.slot ?? 0
   if ((await helper({ verb: "promote", account })).ok !== true) return { kind: "failed", step: "promote" }
-  return { kind: "migrated", oldDeleted: await deleteOld(oldSlotName(account, retired.slot), helper, deleteOwnOld) }
+  return { kind: "migrated", oldDeleted: await deleteOld(oldSlotName(account, slot), helper, deleteOwnOld) }
 }

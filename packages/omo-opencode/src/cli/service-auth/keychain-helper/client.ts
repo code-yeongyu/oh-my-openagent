@@ -15,7 +15,8 @@ const helperReplySchema = z
     cdat: z.number(),
     mdat: z.number(),
     partition: z.enum(["ours", "other", "none", "unknown"]),
-    present: z.object({ staging: z.boolean(), old: z.boolean(), oldSlots: z.array(z.number().int().min(0).max(7)) }).strict(),
+    // oldSlots is absent from helpers released before the eight-slot retire (v5.1.52 to v5.1.60): their one slot is `.old`.
+    present: z.object({ staging: z.boolean(), old: z.boolean(), oldSlots: z.array(z.number().int().min(0).max(7)).optional() }).strict(),
     missing: z.boolean(),
     recover: z.boolean(),
     ok: z.boolean(),

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import type { HelperCall, HelperReply } from "./client"
 import { migrate } from "./migration"
-import { namesFromRead, recoveryPlan, runRecovery } from "./recovery"
+import { namesFromRead, oldSlotsOf, recoveryPlan, runRecovery } from "./recovery"
 
 const A = "a".repeat(64)
 
@@ -61,6 +61,24 @@ describe("migration (#11262 design 3.3)", () => {
     const { calls, helper } = scriptedHelper({ "retire <A>": { error: "exists", reason: "old-slots-full" } })
     expect(await migrate(A, "value", "own-identity", helper, async () => false)).toEqual({ kind: "skipped", reason: "old-slots-full" })
     expect(calls).toEqual(["stage <A>", "retire <A>", "remove .staging"])
+  })
+
+  test("#given a helper released before the eight slots #when its retire succeeds without a slot #then .old (slot 0) is the retired copy", async () => {
+    const { calls, helper } = scriptedHelper({ "retire <A>": { ok: true } })
+    expect(await migrate(A, "value", "own-identity", helper, async () => false)).toEqual({ kind: "migrated", oldDeleted: true })
+    expect(calls).toEqual(["stage <A>", "retire <A>", "promote <A>", "remove .old"])
+  })
+
+  test("#given a helper released before the eight slots #when its one .old slot is taken (skipped) #then staging is removed and nothing is promoted", async () => {
+    const { calls, helper } = scriptedHelper({ "retire <A>": { ok: true, skipped: true } })
+    expect(await migrate(A, "value", "own-identity", helper, async () => false)).toEqual({ kind: "skipped", reason: "old-slots-full" })
+    expect(calls).toEqual(["stage <A>", "retire <A>", "remove .staging"])
+  })
+
+  test("#given read replies with and without oldSlots #when the occupied slots are derived #then an older helper's .old is slot 0", () => {
+    expect(oldSlotsOf({ present: { staging: false, old: true } })).toEqual([0])
+    expect(oldSlotsOf({ present: { staging: false, old: false } })).toEqual([])
+    expect(oldSlotsOf({ present: { staging: false, old: true, oldSlots: [0, 3] } })).toEqual([0, 3])
   })
 
   test("#given retired copies in slots 0 and 3 #when recovery deletes old #then both slots are removed", async () => {

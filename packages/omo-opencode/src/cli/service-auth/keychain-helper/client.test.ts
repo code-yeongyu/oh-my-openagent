@@ -45,6 +45,11 @@ describe("keychain helper client (#11262 design 2 and 3.6 R2)", () => {
     expect(events).toEqual([`send {"v":1,"verb":"read","account":"${A}"}`, "reply", "close"])
   })
 
+  test("#given a read reply from a helper released before oldSlots (v5.1.52 to v5.1.60) #when parsed #then it is accepted, not a protocol error", async () => {
+    const { spawn } = fake('{"owned":true,"value":"v","marker":true,"cdat":1,"mdat":2,"present":{"staging":false,"old":true}}')
+    expect(await callHelper("/helper", { verb: "read", account: A }, { spawn })).toEqual({ owned: true, value: "v", marker: true, cdat: 1, mdat: 2, present: { staging: false, old: true } })
+  })
+
   test("#given a mutating call without the session lock #when it runs #then it is refused before any helper starts", async () => {
     const { events, spawn } = fake('{"ok":true}')
     await expect(callHelper("/helper", { verb: "promote", account: A }, { spawn })).rejects.toBeInstanceOf(HelperProtocolError)
