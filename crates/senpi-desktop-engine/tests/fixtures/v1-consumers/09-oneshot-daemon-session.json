@@ -252,7 +252,8 @@
               "stopPath": "global",
               "stopReason": null,
               "integrityLevel": null,
-              "screenLocked": false
+              "screenLocked": false,
+              "displayAsleep": false
             }
           },
           "variable": []
