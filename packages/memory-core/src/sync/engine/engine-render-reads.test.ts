@@ -37,5 +37,6 @@ test("landing N keys in one cycle reads each render record a bounded number of t
   for (const key of keys) expect(await b.read(key)).toBe(`body of ${key}\n`)
   // The cycle reads its records once when it adopts the landed renders. Re-reading them per key
   // costs N(N-1)/2 reads (1,770 here), so any linear bound separates the two shapes.
+  expect(recordReads).toBeGreaterThan(0)
   expect(recordReads).toBeLessThanOrEqual(2 * keys.length)
 }, GIT_TEST_TIMEOUT)
