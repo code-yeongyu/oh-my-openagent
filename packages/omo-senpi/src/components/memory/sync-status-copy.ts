@@ -27,8 +27,8 @@ export function freezeFailure(status: Frozen): { readonly kind: string; readonly
 }
 
 /**
- * The desktop snapshot. Its schema accepts only the current literals, so a freeze is a failure of the
- * "unknown" kind.
+ * The desktop snapshot. Its schema accepts only the current literals, so a freeze, and a held file
+ * (#12284), is a failure of the "unknown" kind; a hold keeps its reason, action and keys.
  */
 export function failureRpcSync(status: Failing | Frozen | Paused): MemoryRpcSync {
   if (status.kind === "frozen") {
@@ -41,7 +41,7 @@ export function failureRpcSync(status: Failing | Frozen | Paused): MemoryRpcSync
 
 function rpcFailure({ failure, since, attempts }: Omit<Failing, "kind">): NonNullable<MemoryRpcSync["failure"]> {
   return {
-    kind: failure.kind,
+    kind: failure.kind === "oversized_item" ? "unknown" : failure.kind,
     reason: failure.reason,
     action: failure.action,
     sinceISO: new Date(since).toISOString(),
