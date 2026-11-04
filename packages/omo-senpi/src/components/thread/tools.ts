@@ -332,7 +332,9 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
       if (target.kind === "remote") {
         const row = target.row
         const remote = options.remote
-        const request = { message: value.message, caller_known: callerId !== UNKNOWN_CALLER, ...("delivery" in value && value.delivery !== undefined ? { delivery: value.delivery } : {}), ...("expected_turn_id" in value && value.expected_turn_id !== undefined ? { expected_turn_id: value.expected_turn_id } : {}) }
+        // Before remoteOnce writes a receipt, exactly where a local gateway send refuses an unknown caller (deliverThroughGateway).
+        if (callerId === UNKNOWN_CALLER) return failure("caller_context_missing", "A gateway send needs the calling session's durable id.", "Retry from a session that passes its execution context.")
+        const request = { message: value.message, ...("delivery" in value && value.delivery !== undefined ? { delivery: value.delivery } : {}), ...("expected_turn_id" in value && value.expected_turn_id !== undefined ? { expected_turn_id: value.expected_turn_id } : {}) }
         const sent = await remoteOnce(callerId, idempotencyKey, value, async () => await promptRemote(remote, row, request, await nextHop()))
         if (resolvedBy === undefined || sent.kind !== "ok" || !("delivery" in sent)) return sent
         const seen = new Date(row.updated_ms).toISOString()

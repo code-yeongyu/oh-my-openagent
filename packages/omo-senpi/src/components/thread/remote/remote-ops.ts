@@ -124,15 +124,15 @@ export async function openRemote(remote: RemoteThreadSurface, request: RemoteOpe
  * thread_send / thread_handoff to another device's session: one `prompt`, carrying the chain's count (K8, R8.c).
  * Every result field comes from the remote engine: the turn it started, or its own pending-message count.
  */
-export type RemoteSendRequest = { readonly message: string; readonly delivery?: "auto" | "steer" | "follow_up"; readonly expected_turn_id?: string; readonly caller_known: boolean }
+export type RemoteSendRequest = { readonly message: string; readonly delivery?: "auto" | "steer" | "follow_up"; readonly expected_turn_id?: string }
 
 /**
  * The send-time refusals a local send makes (tools.ts deliverThroughGateway, then gateway/engine.ts deliver), in the
- * same order and words. The engine's 1 MiB message_too_large cannot be reached by either leg: the shared param schema
- * caps a message at THREAD_MESSAGE_MAX_BYTES before any send.
+ * same order and words; the unknown-caller refusal comes first, in tools.ts, before any receipt is written. The engine's
+ * 1 MiB message_too_large cannot be reached by either leg: the shared param schema caps a message at
+ * THREAD_MESSAGE_MAX_BYTES before any send.
  */
 export function sendArgumentFailure(request: RemoteSendRequest): Failure | undefined {
-  if (!request.caller_known) return fail("caller_context_missing", "A gateway send needs the calling session's durable id.", "Retry from a session that passes its execution context.")
   if (request.expected_turn_id !== undefined && !/^\d+$/.test(request.expected_turn_id)) return fail("turn_conflict", `Turn ${request.expected_turn_id} is not a turn of the target session.`, "Read the target again and steer with the turn_id a started or steered result returned.")
   if (request.delivery === "steer" && request.expected_turn_id === undefined) return fail("invalid_arguments", "A steer needs expected_turn_id (the target's current turn_epoch).", "Fix the arguments and send again.")
   return undefined
