@@ -126,7 +126,9 @@ export async function seededRepo(
     },
     ...(exec === undefined ? {} : { exec }),
   })
-  await repo.init({ seedFiles })
+  // Trusted seeds do not need hook checks; commands under test still get the real hooks.
+  await repo.init({ seedFiles, installHooks: () => undefined })
+  installHooks(repo.dir)
   return repo
 }
 

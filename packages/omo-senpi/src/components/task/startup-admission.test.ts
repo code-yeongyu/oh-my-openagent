@@ -80,6 +80,7 @@ test("DAG attach waits for the session-start reconcile without holding admission
       detach() {},
       pauseForShutdown: async () => {},
       dispose() {},
+      resend() {},
     },
     () => ({ afterSessionStartReconcile: () => gate.promise }),
   )
@@ -89,6 +90,75 @@ test("DAG attach waits for the session-start reconcile without holding admission
   await gate.promise
   await new Promise<void>((resolve) => setImmediate(resolve))
   expect(attached).toHaveLength(1)
+})
+
+// #12113: the attach publishes the recovered omo.dag.updated snapshot, and nothing ordered it
+// against the session's first turn, so a quick turn could settle before any client saw it.
+test("the first turn after session_start starts only once the DAG attach has finished", async () => {
+  const pi = new FakeExtensionAPI()
+  const attach = Promise.withResolvers<void>()
+  const order: string[] = []
+  wireDagLifecycle(
+    pi,
+    {
+      attach: async () => { await attach.promise; order.push("attached") },
+      detach() {},
+      pauseForShutdown: async () => {},
+      dispose() {},
+      resend() {},
+    },
+    () => ({ afterSessionStartReconcile: () => Promise.resolve(true) }),
+  )
+  await pi.dispatch("session_start", { type: "session_start" }, {})
+
+  const turn = pi.dispatch("before_agent_start", { type: "before_agent_start", prompt: "continue" }, {})
+    .then(() => { order.push("turn") })
+  // Drain every queued continuation before releasing the attach: a turn that does not wait has
+  // already finished by now.
+  await new Promise<void>((resolve) => setImmediate(resolve))
+  order.push("released")
+  attach.resolve()
+  await turn
+
+  expect(order).toEqual(["released", "attached", "turn"])
+})
+
+test("a preview pass never waits for a pending DAG attach", async () => {
+  const pi = new FakeExtensionAPI()
+  const attach = Promise.withResolvers<void>()
+  wireDagLifecycle(
+    pi,
+    { attach: () => attach.promise, detach() {}, pauseForShutdown: async () => {}, dispose() {}, resend() {} },
+    () => ({ afterSessionStartReconcile: () => Promise.resolve(true) }),
+  )
+  await pi.dispatch("session_start", { type: "session_start" }, {})
+
+  const preview = pi.dispatch("before_agent_start", { type: "before_agent_start", prompt: "x", preview: true }, {})
+    .then(() => "settled")
+  const outcome = await Promise.race([preview, new Promise<string>((resolve) => setImmediate(() => resolve("blocked")))])
+  attach.resolve()
+
+  expect(outcome).toBe("settled")
+})
+
+test("a client reattaching to a retained session gets the DAG snapshot restated", async () => {
+  const pi = new FakeExtensionAPI()
+  const resent: string[] = []
+  wireDagLifecycle(
+    pi,
+    {
+      attach: async () => {},
+      detach() {},
+      pauseForShutdown: async () => {},
+      dispose() {},
+      resend: () => { resent.push("resend") },
+    },
+    () => ({ afterSessionStartReconcile: () => Promise.resolve(true) }),
+  )
+
+  await pi.dispatch("session_resumed", { type: "session_resumed" }, {})
+
+  expect(resent).toEqual(["resend"])
 })
 
 test("workpool attach waits for the session-start reconcile", async () => {
