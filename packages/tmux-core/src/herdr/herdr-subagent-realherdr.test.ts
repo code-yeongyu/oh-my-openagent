@@ -6,6 +6,7 @@ import {
   herdrCloseWorkspace,
   herdrListWorkspacesByLabelPrefix,
   herdrReadPane,
+  isHerdrBinaryCallable,
   runHerdrCommandDefault,
   HERDR_AGENTS_WORKSPACE_LABEL_PREFIX,
   type HerdrOpsDeps,
@@ -13,17 +14,24 @@ import {
 import { getHerdrAgentsWorkspaceLabel, spawnHerdrSubagentTab, sweepStaleHerdrAgentsWorkspaces } from "./herdr-subagent"
 
 /**
- * Live round-trip for the herdr subagent primitives against a real `herdr`
- * binary (v0.9.x), self-skipping when herdr is not installed. Same harness
- * rules as herdr-core-realherdr.test.ts: restored real HOME/XDG (bun-test
- * preloads sandbox them; herdr derives its socket from them), a tracked
- * server child instead of detached autostart, and bounded probe timeouts
- * because a booting server holds the socket without answering.
+ * Opt-in live round-trip for the herdr subagent primitives against a real
+ * `herdr` binary (v0.9.x): runs only when RUN_HERDR_LIVE=1, otherwise a real
+ * skip — a plain `bun test` must stay hermetic (this suite restores the real
+ * HOME/XDG, so on a herdr machine it would otherwise reach the developer's
+ * live server). A missing herdr binary is a skip too, never a silent pass.
+ *
+ * Same harness rules as herdr-core-realherdr.test.ts: restored real HOME/XDG
+ * (bun-test preloads sandbox them; herdr derives its socket from them), a
+ * tracked server child instead of detached autostart, and bounded probe
+ * timeouts because a booting server holds the socket without answering.
  *
  * The attach command targets a dead port on purpose: this pins delivery
  * (the command line reaches the pane) without needing a real opencode
  * server.
  */
+
+/** Live gate: `RUN_HERDR_LIVE=1 bun test packages/tmux-core`. */
+const LIVE = process.env.RUN_HERDR_LIVE === "1" && isHerdrBinaryCallable()
 function realEnv(): Record<string, string | undefined> {
   const env: Record<string, string | undefined> = { ...process.env }
   env["HOME"] = homedir()
@@ -67,9 +75,7 @@ async function stopOwnedServer(server: SpawnedProcess | null): Promise<void> {
 const DEAD_MANAGER_PID = 4_194_304
 
 describe("herdr subagent (real herdr)", () => {
-  test("spawn delivers the attach command into a real tab; dead panes report gone; the sweep closes dead-manager workspaces", { timeout: 20000 }, async () => {
-    if (!(await runHerdrCommandDefault(["--version"], { env: realEnv(), timeoutMs: 3_000 })).success) return // skip: herdr not installed
-
+  test.skipIf(!LIVE)("spawn delivers the attach command into a real tab; dead panes report gone; the sweep closes dead-manager workspaces", { timeout: 20000 }, async () => {
     let server: SpawnedProcess | null = null
     if (!(await runHerdrCommandDefault(["agent", "list"], { env: realEnv(), timeoutMs: 2_000 })).success) {
       server = spawn(["herdr", "server"], { stdout: "pipe", stderr: "pipe", env: realEnv() })

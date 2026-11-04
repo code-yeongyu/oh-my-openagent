@@ -10,13 +10,18 @@ import {
   herdrRunPaneCommand,
   herdrCloseWorkspace,
   HERDR_TEAM_WORKSPACE_LABEL_PREFIX,
+  isHerdrBinaryCallable,
   runHerdrCommandDefault,
   type HerdrOpsDeps,
 } from "./herdr-core"
 
 /**
- * Integration test against a real `herdr` binary (v0.9.x), self-skipping when
- * herdr is not installed (same policy as the real-tmux suites).
+ * Opt-in integration test against a real `herdr` binary (v0.9.x): runs only
+ * when RUN_HERDR_LIVE=1, otherwise a real skip. A plain `bun test` must be
+ * hermetic everywhere — this suite restores the real HOME/XDG (see below),
+ * so on a herdr machine it would otherwise reach the developer's live
+ * server. (Same policy as the OMO_LIVE_TMUX-gated tmux suite; a missing
+ * herdr binary is a skip too, never a silent pass.)
  *
  * Test-harness notes:
  * - bun-test preloads redirect HOME/XDG into a per-process sandbox; herdr
@@ -27,6 +32,10 @@ import {
  *   ensureHerdrServer's detached autostart the test owns a tracked server
  *   child and stops it in finally (the autostart logic itself is unit-tested).
  */
+
+/** Live gate: `RUN_HERDR_LIVE=1 bun test packages/tmux-core`. */
+const LIVE = process.env.RUN_HERDR_LIVE === "1" && isHerdrBinaryCallable()
+
 function realEnv(): Record<string, string | undefined> {
   const env: Record<string, string | undefined> = { ...process.env }
   env["HOME"] = homedir()
@@ -35,10 +44,6 @@ function realEnv(): Record<string, string | undefined> {
     if (typeof value === "string" && value.includes("omo-test")) delete env[key]
   }
   return env
-}
-
-async function runReal(args: ReadonlyArray<string>): Promise<{ success: boolean; output: string }> {
-  return await runHerdrCommandDefault(args, { env: realEnv() })
 }
 
 const ops: HerdrOpsDeps = {
@@ -74,8 +79,7 @@ async function stopOwnedServer(server: SpawnedProcess | null): Promise<void> {
 }
 
 describe("herdr core (real herdr)", () => {
-  test("workspace + tab + pane run + read + teardown round-trip", { timeout: 20000 }, async () => {
-    if (!(await runReal(["--version"])).success) return // skip: herdr not installed
+  test.skipIf(!LIVE)("workspace + tab + pane run + read + teardown round-trip", { timeout: 20000 }, async () => {
 
     const label = `${HERDR_TEAM_WORKSPACE_LABEL_PREFIX}itest${Date.now().toString(36)}`
     const initiallyRunning = (await runHerdrCommandDefault(["agent", "list"], { env: realEnv(), timeoutMs: 2_000 })).success
