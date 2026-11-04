@@ -98,6 +98,23 @@ describe("pinned helper copies (#11586 review LOWs)", () => {
     expect(sweepDeadPinDirs(root)).toEqual([`omo-keychain-${dead.pid}-aaaaaa`])
     expect(readdirSync(root).sort()).toEqual([`omo-keychain-${process.pid}-bbbbbb`, "omo-keychain-1-cccccc", "omo-keychain-notapid"].sort())
   })
+
+  test.skipIf(process.getuid?.() === 0)("#given a dead owner's pin directory this user cannot delete #when swept #then it is skipped, the sweep goes on, and nothing throws", async () => {
+    const root = tempRoot()
+    const dead = Bun.spawn(["true"])
+    await dead.exited
+    const stuck = join(root, `omo-keychain-${dead.pid}-stuck00`)
+    mkdirSync(stuck)
+    writeFileSync(join(stuck, "omo-keychain"), "helper copy")
+    chmodSync(stuck, 0o500)
+    mkdirSync(join(root, `omo-keychain-${dead.pid}-gone00`))
+    try {
+      expect(sweepDeadPinDirs(root)).toEqual([`omo-keychain-${dead.pid}-gone00`])
+      expect(readdirSync(root)).toEqual([`omo-keychain-${dead.pid}-stuck00`])
+    } finally {
+      chmodSync(stuck, 0o700)
+    }
+  })
 })
 
 describe.skipIf(process.platform !== "darwin")("the per-process signature checker (#11586 review LOW 1)", () => {
