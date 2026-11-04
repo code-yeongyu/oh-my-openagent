@@ -282,7 +282,7 @@ fn ensure_skylight_loaded() -> Option<()> {
     (*LOADED).then_some(())
 }
 
-fn raw_symbol(name: &CStr) -> Option<NonNull<c_void>> {
+pub(super) fn raw_symbol(name: &CStr) -> Option<NonNull<c_void>> {
     // SAFETY: `name` is NUL-terminated and RTLD_DEFAULT is valid for
     // process-wide lookup.
     NonNull::new(unsafe { libc::dlsym(libc::RTLD_DEFAULT, name.as_ptr()) })
@@ -296,7 +296,7 @@ fn symbol<T: Copy>(name: &CStr) -> Option<T> {
 #[path = "spi_tests.rs"]
 mod tests;
 
-fn cast_symbol<T: Copy>(raw: *mut c_void) -> T {
+pub(super) fn cast_symbol<T: Copy>(raw: *mut c_void) -> T {
     const { assert!(mem::size_of::<T>() == mem::size_of::<*mut c_void>()) };
     // SAFETY: Every callsite requests the exact C signature documented in its
     // function-pointer alias, and the size assertion above rules out reading
