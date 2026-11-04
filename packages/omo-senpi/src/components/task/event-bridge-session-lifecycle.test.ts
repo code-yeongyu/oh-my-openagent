@@ -167,26 +167,35 @@ describe("event-bridge before_agent_start", () => {
 })
 
 describe("event-bridge before_agent_start stale Stop release", () => {
-  it("#given a run-pause bridge #when a preview and then a real turn start #then only the real turn releases a stale Stop for its session, and a failed release is logged without blocking the turn", async () => {
+  it("#given a run-pause bridge #when a preview and then real turns start #then only real turns release a stale Stop for their session, a release that never settles does not hold the turn, and a failed release is logged", async () => {
     // given
     const released: string[] = []
-    let fail = false
+    const failure = Promise.withResolvers<void>()
+    const results = [new Promise<void>(() => {}), failure.promise]
     const runPause = {
       restore: async () => {},
       reconciled: async () => {},
       changed: async () => {},
-      releaseStale: async (sessionId: string) => {
+      releaseStale: (sessionId: string) => {
         released.push(sessionId)
-        if (fail) throw new Error("resume port down")
+        return results[released.length - 1] ?? Promise.resolve()
       },
     }
     const { pi, warnings } = wireHarness("parent-session", { runPause })
 
-    // when
+    // when: the first real turn's release never settles (a child resume port that never answers)
     await pi.dispatch("before_agent_start", { type: "before_agent_start", preview: true }, {})
     await pi.dispatch("before_agent_start", { type: "before_agent_start" }, {})
-    fail = true
+    // then: the turn started anyway, and its usage guidance went out
+    expect(pi.messages).toEqual([
+      expect.objectContaining({ message: expect.objectContaining({ customType: "senpi-task.usage" }) }),
+    ])
+
+    // when: the next turn's release fails
     await pi.dispatch("before_agent_start", { type: "before_agent_start" }, {})
+    failure.reject(new Error("resume port down"))
+    // The bridge attached its handler during dispatch, so it runs before this later one.
+    await failure.promise.catch(() => undefined)
 
     // then
     expect(released).toEqual(["parent-session", "parent-session"])

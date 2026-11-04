@@ -278,14 +278,16 @@ export function wireEventBridge(
     )
   })
 
-  pi.on("before_agent_start", async (payload, eventCtx) => {
+  pi.on("before_agent_start", (payload, eventCtx) => {
     if (isPreview(payload)) return undefined
     engine.runtime.captureFrom(asLiveContext(eventCtx))
     const liveSessionId = engine.runtime.sessionId()
-    // A turn the person starts holds no Stop, so a Stop the bridge missed releasing is released here
-    // before the turn can call task; a failure is logged and never blocks the turn.
+    // Every real turn (person, extension or delivery) re-checks the run's Stop against the engine's live
+    // ledger, which is what proves a Stop the bridge missed was released. The release resumes children,
+    // which can take as long as their resume turns, so it runs in the background and never holds the turn;
+    // a failure is logged.
     if (runPause !== undefined && liveSessionId !== undefined) {
-      await runPause.releaseStale(liveSessionId).catch((error: unknown) => {
+      void runPause.releaseStale(liveSessionId).catch((error: unknown) => {
         ctx.logger.warn("omo-senpi task stale run Stop release failed", { error: String(error) })
       })
     }
