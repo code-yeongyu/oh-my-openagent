@@ -47,9 +47,13 @@ installHermeticHome()
 delete process.env.OPENCODE_SERVER_PASSWORD
 // A runner may export git config or repository redirection: a hermetic gate's GIT_CONFIG_COUNT pair sets
 // core.hooksPath=/dev/null, so every git a test started skipped the hooks its own fixture installed (#12354).
-// Tests own their git config (GIT_CONFIG_GLOBAL above), so the names memory git drops are dropped for the run.
+// Tests own their git config (GIT_CONFIG_GLOBAL above), so the names memory git drops are dropped for the run,
+// and so is all injected config: memory git keeps the pairs that leave hooks alone, but a test run stays hermetic.
+const INJECTED_GIT_CONFIG = /^GIT_CONFIG_(?:COUNT|PARAMETERS|KEY_\d+|VALUE_\d+)$/
 const testGitEnvironment = memoryGitEnvironment(process.env)
-for (const name of Object.keys(process.env)) if (!Object.hasOwn(testGitEnvironment, name)) delete process.env[name]
+for (const name of Object.keys(process.env)) {
+  if (!Object.hasOwn(testGitEnvironment, name) || INJECTED_GIT_CONFIG.test(name.toUpperCase())) delete process.env[name]
+}
 
 let isGlobalMockCleanup = false
 const { restoreModuleMocks } = installModuleMockLifecycle(mock, {

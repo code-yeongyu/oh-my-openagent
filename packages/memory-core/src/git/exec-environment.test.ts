@@ -100,6 +100,99 @@ describe("memoryGitEnvironment (#12354)", () => {
     expect(result.code).not.toBe(0)
   })
 
+  test("#given inherited GIT_CONFIG_COUNT pairs beside core.hooksPath #when building the git environment #then only the hook pair is dropped and the rest is renumbered", () => {
+    const env = memoryGitEnvironment({
+      PATH: "/usr/bin",
+      GIT_CONFIG_COUNT: "4",
+      GIT_CONFIG_KEY_0: "url.https://mirror.example.invalid/.insteadOf",
+      GIT_CONFIG_VALUE_0: "https://origin.example.invalid/",
+      GIT_CONFIG_KEY_1: "core.hooksPath",
+      GIT_CONFIG_VALUE_1: "/dev/null",
+      GIT_CONFIG_KEY_2: "http.extraHeader",
+      GIT_CONFIG_VALUE_2: "Authorization: Bearer <redacted>",
+      GIT_CONFIG_KEY_3: "Core.FSMonitor",
+      GIT_CONFIG_VALUE_3: "true",
+      GIT_CONFIG_KEY_4: "safe.directory",
+      GIT_CONFIG_VALUE_4: "ignored by git: past GIT_CONFIG_COUNT",
+    })
+
+    expect(env).toEqual({
+      PATH: "/usr/bin",
+      GIT_CONFIG_COUNT: "2",
+      GIT_CONFIG_KEY_0: "url.https://mirror.example.invalid/.insteadOf",
+      GIT_CONFIG_VALUE_0: "https://origin.example.invalid/",
+      GIT_CONFIG_KEY_1: "http.extraHeader",
+      GIT_CONFIG_VALUE_1: "Authorization: Bearer <redacted>",
+    })
+  })
+
+  test("#given an inherited GIT_CONFIG_PARAMETERS list beside core.hooksPath #when building the git environment #then only the hook entry is dropped", () => {
+    const env = memoryGitEnvironment({
+      GIT_CONFIG_PARAMETERS: "'url.git@mirror:.insteadof'='m:' 'core.hookspath'='/dev/null' 'http.extraheader'='X-Note: it'\\''s'\\!'' 'safe.directory=*' ' core.hooksPath =/x' 'include.path'='/x/hooks.cfg' 'includeIf.gitdir:/m/.path'='/x/hooks.cfg' 'credential.helper'=",
+    })
+
+    expect(env).toEqual({
+      GIT_CONFIG_PARAMETERS: "'url.git@mirror:.insteadof'='m:' 'http.extraheader'='X-Note: it'\\''s'\\!'' 'safe.directory=*' 'credential.helper'=",
+    })
+  })
+
+  test("#given inherited config git itself refuses to parse #when building the git environment #then the unparseable source is dropped whole", () => {
+    expect(memoryGitEnvironment({ GIT_CONFIG_PARAMETERS: " 'a.b'='c'", GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "a.b", GIT_CONFIG_VALUE_0: "c" })).toEqual({
+      GIT_CONFIG_COUNT: "1",
+      GIT_CONFIG_KEY_0: "a.b",
+      GIT_CONFIG_VALUE_0: "c",
+    })
+    expect(memoryGitEnvironment({ GIT_CONFIG_COUNT: "2", GIT_CONFIG_KEY_0: "a.b", GIT_CONFIG_VALUE_0: "c", GIT_CONFIG_PARAMETERS: "'d.e'='f'" })).toEqual({
+      GIT_CONFIG_PARAMETERS: "'d.e'='f'",
+    })
+    expect(memoryGitEnvironment({ GIT_CONFIG_COUNT: "-1", GIT_CONFIG_KEY_0: "a.b", GIT_CONFIG_VALUE_0: "c" })).toEqual({})
+  })
+
+  test.skipIf(process.platform === "win32")("#given inherited url.*.insteadOf and http.extraHeader pairs beside core.hooksPath=/dev/null #when memory git runs #then those pairs apply and the hook still runs", async () => {
+    // #given: a mirror reached only through an inherited insteadOf rewrite, plus the gate's hook-disabling pair
+    const root = scratchRoot()
+    const repo = repoWithRefusingHook(root, "repo")
+    const mirror = repoWithRefusingHook(root, "mirror")
+    const env = {
+      ...process.env,
+      GIT_CONFIG_COUNT: "3",
+      GIT_CONFIG_KEY_0: `url.${mirror}.insteadOf`,
+      GIT_CONFIG_VALUE_0: "memory-mirror:",
+      GIT_CONFIG_KEY_1: "core.hooksPath",
+      GIT_CONFIG_VALUE_1: "/dev/null",
+      GIT_CONFIG_KEY_2: "http.extraHeader",
+      GIT_CONFIG_VALUE_2: "X-Memory-Probe: kept",
+    }
+    const git = createNodeGitExec()
+
+    // #when
+    const header = await git.run(["config", "--get", "http.extraHeader"], { cwd: repo, timeoutMs: TIMEOUT_MS, env })
+    const remote = await git.run(["ls-remote", "--get-url", "memory-mirror:"], { cwd: repo, timeoutMs: TIMEOUT_MS, env })
+    const commit = await git.run(["commit", "--allow-empty", "-m", "memory write"], { cwd: repo, timeoutMs: TIMEOUT_MS, env })
+
+    // #then
+    expect(header.stdout.trim()).toBe("X-Memory-Probe: kept")
+    expect(remote.stdout.trim()).toBe(mirror)
+    expect(commit.stderr).toContain("memory pre-commit: refused")
+    expect(commit.code).not.toBe(0)
+  })
+
+  test.skipIf(process.platform === "win32")("#given an inherited include.path whose file sets core.hooksPath #when a memory commit runs #then the repository's own pre-commit hook still runs", async () => {
+    // #given: the same hook redirection, one include away
+    const root = scratchRoot()
+    const repo = repoWithRefusingHook(root, "repo")
+    const included = join(root, "hooks.cfg")
+    writeFileSync(included, "[core]\n\thooksPath = /dev/null\n")
+    const env = { ...process.env, GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "include.path", GIT_CONFIG_VALUE_0: included, GIT_CONFIG_PARAMETERS: `'includeIf.gitdir:${repo}/.path'='${included}'` }
+
+    // #when
+    const result = await createNodeGitExec().run(["commit", "--allow-empty", "-m", "memory write"], { cwd: repo, timeoutMs: TIMEOUT_MS, env })
+
+    // #then
+    expect(result.stderr).toContain("memory pre-commit: refused")
+    expect(result.code).not.toBe(0)
+  })
+
   test("#given an inherited GIT_DIR naming another repository #when memory git reads HEAD #then it reads the memory repository", async () => {
     // #given
     const root = scratchRoot()
