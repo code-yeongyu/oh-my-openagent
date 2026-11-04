@@ -51,9 +51,10 @@ pub struct Session {
     holds: Mutex<Vec<Weak<senpi_desktop_safety::HoldSignal>>>,
     capabilities: Arc<Mutex<DesktopCapabilities>>,
     timeouts: SessionTimeouts,
-    /// `reportMode` of the last enqueued `open`: the queue is FIFO, so it is
-    /// the mode every later request is served under.
-    report_mode: Mutex<ReportMode>,
+    /// `reportMode` of the last `open` the session thread applied; written by
+    /// the worker, so an open that failed, was abandoned, or is still queued
+    /// never changes it.
+    report_mode: Arc<Mutex<ReportMode>>,
 }
 
 impl Session {
@@ -84,11 +85,13 @@ impl Session {
         let (queue, requests) = flume::unbounded();
         let (ready_tx, ready_rx) = flume::bounded(1);
         let shared = Arc::clone(&capabilities);
+        let report_mode = Arc::new(Mutex::new(ReportMode::Null));
+        let applied_mode = Arc::clone(&report_mode);
         let supervisor = Arc::clone(&safety.supervisor);
         thread::Builder::new()
             .name(THREAD_NAME.to_owned())
             .spawn(move || {
-                let worker = Worker::new(Box::new(factory), shared, safety);
+                let worker = Worker::new(Box::new(factory), shared, applied_mode, safety);
                 // `start` is blocked on this receiver until it arrives.
                 ready_tx.send(()).unwrap_or(());
                 serve(worker, &requests);
@@ -103,7 +106,7 @@ impl Session {
             holds: Mutex::new(Vec::new()),
             capabilities,
             timeouts,
-            report_mode: Mutex::new(ReportMode::Null),
+            report_mode,
         })
     }
 
@@ -118,13 +121,12 @@ impl Session {
     /// backend, refs, frames, stop latch and control grant.
     /// The reply is [`Response::Capabilities`].
     pub fn open(&self, options: DesktopSessionOptions) -> Pending {
-        let mode = options.report_mode;
-        let pending = self.enqueue(|reply| Message::Open { options, reply });
-        *self.report_mode.lock() = mode;
-        pending
+        self.enqueue(|reply| Message::Open { options, reply })
     }
 
-    /// The `reportMode` requests submitted from now on are served under.
+    /// The `reportMode` of the last `open` the session thread applied. A
+    /// request is served under the mode applied when the worker reaches it, so
+    /// read this when its reply is formed, not when it is submitted.
     #[must_use]
     pub fn report_mode(&self) -> ReportMode {
         *self.report_mode.lock()

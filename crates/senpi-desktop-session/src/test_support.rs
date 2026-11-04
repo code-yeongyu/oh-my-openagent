@@ -92,7 +92,8 @@ pub(crate) fn harness_with_slot(overlay: &Value, slot: Arc<crate::grant::Control
         watches: watches.clone(),
     };
     let capabilities = Arc::new(Mutex::new(DesktopCapabilities::unavailable()));
-    let mut worker = Worker::new(Box::new(factory), capabilities, safety);
+    let report_mode = Arc::new(Mutex::new(senpi_desktop_core::report::ReportMode::Null));
+    let mut worker = Worker::new(Box::new(factory), capabilities, report_mode, safety);
     worker.open(DesktopSessionOptions::default());
     let (sink, faults, user_input) = built.lock().clone().expect("open built a backend");
     Harness {

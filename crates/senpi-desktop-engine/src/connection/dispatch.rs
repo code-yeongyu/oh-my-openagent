@@ -25,10 +25,9 @@ pub(super) async fn dispatch(
     }) = queued.recv().await
     {
         let permits = engine.permits(method.spec().effect);
-        let reports = engine.reports_action(method);
         let admitted = tokio::select! {
             biased;
-            _ = &mut cancel => Err(not_dispatched(reports)),
+            _ = &mut cancel => Err(not_dispatched(engine.reports_action(method))),
             permit = permits.acquire_owned() => permit
                 .map_err(|_| Failure::Engine(DesktopError::internal("request permits were closed"))),
         };
@@ -52,7 +51,12 @@ pub(super) async fn dispatch(
                 }
                 None => settle(started.wait(), cancel, || Err(Failure::cancelled())).await,
             };
-            let outcome = if reports { outcome.map_err(Failure::with_race_disposition) } else { outcome };
+            // Read the mode when the reply is formed: only an open the worker applied counts.
+            let outcome = if engine.reports_action(method) {
+                outcome.map_err(Failure::with_race_disposition)
+            } else {
+                outcome
+            };
             drop(permit);
             in_flight.finish(&id);
             deliver(&engine, &out, reply_line(id, outcome))

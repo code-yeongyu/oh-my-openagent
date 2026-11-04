@@ -8,6 +8,7 @@ use senpi_desktop_core::ax::{AxBackend, AxRegistry};
 use senpi_desktop_core::backend::Backend;
 use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode};
 use senpi_desktop_core::protocol_results::AuditEvent;
+use senpi_desktop_core::report::ReportMode;
 use senpi_desktop_core::types::{DesktopCapabilities, DesktopSessionOptions, DesktopWindow, Target};
 
 use crate::audit::ArtifactGc;
@@ -31,6 +32,8 @@ pub(crate) struct Worker {
     pub(crate) registry: AxRegistry,
     pub(crate) frames: FrameCache,
     capabilities: Arc<Mutex<DesktopCapabilities>>,
+    /// Published copy of the applied `reportMode`, read by the session handle.
+    report_mode: Arc<Mutex<ReportMode>>,
     pub(crate) safety: SessionSafety,
     pub(crate) session_id: String,
     pub(crate) run_id: String,
@@ -54,6 +57,7 @@ impl Worker {
     pub(crate) fn new(
         factory: Box<dyn BackendFactory>,
         capabilities: Arc<Mutex<DesktopCapabilities>>,
+        report_mode: Arc<Mutex<ReportMode>>,
         safety: SessionSafety,
     ) -> Self {
         let backend = factory.create(&DesktopSessionOptions {
@@ -69,6 +73,7 @@ impl Worker {
             registry: AxRegistry::default(),
             frames: FrameCache::default(),
             capabilities,
+            report_mode,
             safety,
             session_id: String::new(),
             run_id: String::new(),
@@ -98,6 +103,7 @@ impl Worker {
                 backend.set_show_cursor(options.show_cursor);
             }
             self.options = Some(options);
+            self.publish_report_mode();
             return self.refresh_capabilities();
         }
         self.backend = self.factory.create(&options);
@@ -116,7 +122,14 @@ impl Worker {
         self.run_id = ulid::Ulid::generate().to_string();
         self.gc = ArtifactGc::default();
         self.maybe_gc();
+        self.publish_report_mode();
         self.refresh_capabilities()
+    }
+
+    /// Publishes the mode the registry now serves under; only an open that
+    /// ran to here changes what the session handle reports.
+    fn publish_report_mode(&self) {
+        *self.report_mode.lock() = self.registry.report_mode();
     }
 
     pub(crate) fn artifact_dir(&self) -> PathBuf {
