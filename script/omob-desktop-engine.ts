@@ -15,9 +15,15 @@ export const DESKTOP_ENGINE_SOURCE_PATHS = ["crates", "Cargo.toml", "Cargo.lock"
 
 const FIXTURE = join("script", "release-desktop-engine-fixture.json")
 
-export function desktopEngineCargoArgs(rustTarget: string, withTrustHelper = false): string[] {
-	const helper = withTrustHelper ? ["-p", "omo-engine-trust-helper"] : []
-	return ["build", "--release", "-p", "senpi-desktop-engine", ...helper, "--locked", "--target", rustTarget]
+export function desktopEngineCargoArgs(rustTarget: string): string[] {
+	return ["build", "--release", "-p", "senpi-desktop-engine", "--locked", "--target", rustTarget]
+}
+
+// One cargo call per package, as the release workflows build them: a shared call would unify
+// dependency features across both packages (resolver 2) and build an engine release never ships.
+function desktopEngineCargoCalls(rustTarget: string, withTrustHelper: boolean): [string[]] | [string[], string[]] {
+	const engine = desktopEngineCargoArgs(rustTarget)
+	return withTrustHelper ? [engine, ["build", "--release", "-p", "omo-engine-trust-helper", "--locked", "--target", rustTarget]] : [engine]
 }
 
 /**
@@ -29,7 +35,8 @@ export function desktopEngineFingerprint(repoRoot: string, rustTarget: string, w
 	if (result.error !== undefined) throw result.error
 	if (result.status !== 0) throw new Error(`git ls-tree failed in ${repoRoot}: ${result.stderr.trim()}`)
 	if (result.stdout.trim() === "") throw new Error(`no desktop engine sources (${DESKTOP_ENGINE_SOURCE_PATHS.join(", ")}) at HEAD in ${repoRoot}`)
-	return createHash("sha256").update(desktopEngineCargoArgs(rustTarget, withTrustHelper).join(" ")).update("\n").update(result.stdout).digest("hex")
+	const calls = desktopEngineCargoCalls(rustTarget, withTrustHelper).map((args) => args.join(" ")).join("\n")
+	return createHash("sha256").update(calls).update("\n").update(result.stdout).digest("hex")
 }
 
 interface DesktopEngineStamp {
@@ -93,24 +100,27 @@ export function ensureDesktopEngine(
 		log(`[omob] reusing desktop engine ${entry.source}`)
 		return "reused"
 	}
-	const args = desktopEngineCargoArgs(rustTarget, helper !== undefined)
-	log(`[omob] building desktop engine: cargo ${args.join(" ")}`)
 	rmSync(stampPath, { force: true })
-	// build-omo-binary stages from <repoRoot>/target; a caller's CARGO_TARGET_DIR would build elsewhere.
-	const result = spawnSync("cargo", args, { cwd: repoRoot, stdio: "inherit", env: { ...env, CARGO_TARGET_DIR: join(repoRoot, "target") } })
-	if (result.error !== undefined) {
-		if ((result.error as NodeJS.ErrnoException).code === "ENOENT") {
-			throw new Error(`omob needs a Rust toolchain to build the desktop engine for ${target}: cargo is not on PATH (install Rust from https://rustup.rs)`)
+	const calls = desktopEngineCargoCalls(rustTarget, helper !== undefined)
+	const [engineArgs, helperArgs] = calls
+	for (const args of calls) {
+		log(`[omob] building desktop engine: cargo ${args.join(" ")}`)
+		// build-omo-binary stages from <repoRoot>/target; a caller's CARGO_TARGET_DIR would build elsewhere.
+		const result = spawnSync("cargo", args, { cwd: repoRoot, stdio: "inherit", env: { ...env, CARGO_TARGET_DIR: join(repoRoot, "target") } })
+		if (result.error !== undefined) {
+			if ((result.error as NodeJS.ErrnoException).code === "ENOENT") {
+				throw new Error(`omob needs a Rust toolchain to build the desktop engine for ${target}: cargo is not on PATH (install Rust from https://rustup.rs)`)
+			}
+			throw result.error
 		}
-		throw result.error
-	}
-	if (result.status !== 0) {
-		throw new Error(`cargo ${args.join(" ")} failed with exit code ${result.status ?? 1} (a missing Rust target installs with: rustup target add ${rustTarget})`)
+		if (result.status !== 0) {
+			throw new Error(`cargo ${args.join(" ")} failed with exit code ${result.status ?? 1} (a missing Rust target installs with: rustup target add ${rustTarget})`)
+		}
 	}
 	const identity = binaryIdentity(binary)
-	if (identity === undefined) throw new Error(`cargo ${args.join(" ")} produced no desktop engine at ${binary}`)
+	if (identity === undefined) throw new Error(`cargo ${engineArgs.join(" ")} produced no desktop engine at ${binary}`)
 	if (helper !== undefined && binaryIdentity(helper) === undefined) {
-		throw new Error(`cargo ${args.join(" ")} produced no engine trust helper at ${helper}`)
+		throw new Error(`cargo ${(helperArgs ?? engineArgs).join(" ")} produced no engine trust helper at ${helper}`)
 	}
 	const stamp: DesktopEngineStamp = { fingerprint, ...identity }
 	writeFileSync(stampPath, `${JSON.stringify(stamp)}\n`)

@@ -59,6 +59,16 @@ describe("keychain helper release gate", () => {
     expect(designatedRequirement(`Executable=${FILE}\n`)).toBeUndefined()
   })
 
+  test("reads codesign's annotated requirement as the same requirement", () => {
+    const annotated = KEYCHAIN_HELPER_REQUIREMENT.replace("[field.1.2.840.113635.100.6.2.6]", "[field.1.2.840.113635.100.6.2.6] /* exists */").replace(
+      "[field.1.2.840.113635.100.6.1.13]",
+      "[field.1.2.840.113635.100.6.1.13] /* exists */",
+    )
+    expect(annotated).not.toBe(KEYCHAIN_HELPER_REQUIREMENT)
+    expect(designatedRequirement(`Executable=${FILE}\ndesignated => ${annotated}\n`)).toBe(KEYCHAIN_HELPER_REQUIREMENT)
+    expect(keychainHelperFailures(FILE, codesignFake({ ...DEVELOPER_ID, requirement: annotated }), 0o100755)).toEqual([])
+  })
+
   test("accepts the Developer ID helper the contract describes", () => {
     expect(keychainHelperFailures(FILE, codesignFake(DEVELOPER_ID), 0o100755)).toEqual([])
   })

@@ -1,0 +1,379 @@
+{
+  "request": "session.command",
+  "cases": [
+    {
+      "name": "a prompt answers its command_id, then queued, transport_confirmed, engine_applied",
+      "outcome": "ok",
+      "steps": [
+        {
+          "send": {
+            "id": "att",
+            "type": "session.attach",
+            "device": "dev-peer-1",
+            "session_id": "c2Vzc2lvbi1rZXktMDAwMQ"
+          }
+        },
+        {
+          "expect": {
+            "id": "att",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "attach": "<capture:a>"
+            }
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "session.snapshot",
+            "attach": "<ref:a>",
+            "attach_id": 1
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "session.records",
+            "attach": "<ref:a>",
+            "attach_id": 1
+          }
+        },
+        {
+          "send": {
+            "id": "2",
+            "type": "session.command",
+            "attach": "<ref:a>",
+            "command_id": "Y29tbWFuZC1pZC0wMDAwMQ",
+            "command": {
+              "op": "prompt",
+              "text": "hello"
+            }
+          }
+        },
+        {
+          "expect": {
+            "id": "2",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "command_id": "Y29tbWFuZC1pZC0wMDAwMQ"
+            }
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "session.command_state",
+            "command_id": "Y29tbWFuZC1pZC0wMDAwMQ",
+            "state": "queued",
+            "retryable": false
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "session.command_state",
+            "command_id": "Y29tbWFuZC1pZC0wMDAwMQ",
+            "state": "transport_confirmed",
+            "retryable": false
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "session.command_state",
+            "command_id": "Y29tbWFuZC1pZC0wMDAwMQ",
+            "state": "engine_applied",
+            "retryable": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "a command without command_id gets a minted 22-character id",
+      "outcome": "ok",
+      "steps": [
+        {
+          "send": {
+            "id": "att",
+            "type": "session.attach",
+            "device": "dev-peer-1",
+            "session_id": "c2Vzc2lvbi1rZXktMDAwMQ"
+          }
+        },
+        {
+          "expect": {
+            "id": "att",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "attach": "<capture:a>"
+            }
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "session.snapshot",
+            "attach": "<ref:a>",
+            "attach_id": 1
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "session.records",
+            "attach": "<ref:a>",
+            "attach_id": 1
+          }
+        },
+        {
+          "send": {
+            "id": "2",
+            "type": "session.command",
+            "attach": "<ref:a>",
+            "command": {
+              "op": "abort"
+            }
+          }
+        },
+        {
+          "expect": {
+            "id": "2",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "command_id": "<capture:c>"
+            }
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "session.command_state",
+            "command_id": "<ref:c>",
+            "state": "queued",
+            "retryable": false
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "session.command_state",
+            "command_id": "<ref:c>",
+            "state": "transport_confirmed",
+            "retryable": false
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "session.command_state",
+            "command_id": "<ref:c>",
+            "state": "engine_applied",
+            "retryable": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "a command_id of 24 characters is refused",
+      "outcome": "refusal",
+      "steps": [
+        {
+          "send": {
+            "id": "att",
+            "type": "session.attach",
+            "device": "dev-peer-1",
+            "session_id": "c2Vzc2lvbi1rZXktMDAwMQ"
+          }
+        },
+        {
+          "expect": {
+            "id": "att",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "attach": "<capture:a>"
+            }
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "session.snapshot",
+            "attach": "<ref:a>",
+            "attach_id": 1
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "session.records",
+            "attach": "<ref:a>",
+            "attach_id": 1
+          }
+        },
+        {
+          "send": {
+            "id": "2",
+            "type": "session.command",
+            "attach": "<ref:a>",
+            "command_id": "cmd_0123456789abcdef0123",
+            "command": {
+              "op": "abort"
+            }
+          }
+        },
+        {
+          "expect": {
+            "id": "2",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "invalid_request"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a repeated command_id with another payload is refused command_id_conflict",
+      "outcome": "refusal",
+      "steps": [
+        {
+          "send": {
+            "id": "att",
+            "type": "session.attach",
+            "device": "dev-peer-1",
+            "session_id": "c2Vzc2lvbi1rZXktMDAwMQ"
+          }
+        },
+        {
+          "expect": {
+            "id": "att",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "attach": "<capture:a>"
+            }
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "session.snapshot",
+            "attach": "<ref:a>",
+            "attach_id": 1
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "session.records",
+            "attach": "<ref:a>",
+            "attach_id": 1
+          }
+        },
+        {
+          "send": {
+            "id": "2",
+            "type": "session.command",
+            "attach": "<ref:a>",
+            "command_id": "Y29tbWFuZC1pZC0wMDAwMQ",
+            "command": {
+              "op": "prompt",
+              "text": "one"
+            }
+          }
+        },
+        {
+          "expect": {
+            "id": "2",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "command_id": "Y29tbWFuZC1pZC0wMDAwMQ"
+            }
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "session.command_state",
+            "command_id": "Y29tbWFuZC1pZC0wMDAwMQ",
+            "state": "queued",
+            "retryable": false
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "session.command_state",
+            "command_id": "Y29tbWFuZC1pZC0wMDAwMQ",
+            "state": "transport_confirmed",
+            "retryable": false
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "session.command_state",
+            "command_id": "Y29tbWFuZC1pZC0wMDAwMQ",
+            "state": "engine_applied",
+            "retryable": false
+          }
+        },
+        {
+          "send": {
+            "id": "3",
+            "type": "session.command",
+            "attach": "<ref:a>",
+            "command_id": "Y29tbWFuZC1pZC0wMDAwMQ",
+            "command": {
+              "op": "prompt",
+              "text": "two"
+            }
+          }
+        },
+        {
+          "expect": {
+            "id": "3",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "command_id_conflict"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a command without an attach is refused not_attached",
+      "outcome": "refusal",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "session.command",
+            "attach": "bm8tc3VjaC1hdHRhY2g",
+            "command": {
+              "op": "abort"
+            }
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "not_attached"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

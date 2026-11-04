@@ -13,6 +13,10 @@
 *.yaml text eol=lf
 *.py text eol=lf
 *.sh text eol=lf
+*.tmpl text eol=lf
+*.go text eol=lf
+# programming's go scaffolder copies these templates byte for byte into a project whose .editorconfig says end_of_line = lf.
+packages/shared-skills/skills/programming/scripts/go/templates/* text eol=lf
 # script/build-brand-logo.ts embeds .github/assets/omo-icon-light.svg in SENPI_BRAND; a CRLF checkout must not change it.
 *.svg text eol=lf
 
