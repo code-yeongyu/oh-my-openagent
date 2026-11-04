@@ -1,0 +1,408 @@
+{
+  "description": "the menu option (#11459, W3): a background right-click with menu chooses that item in the context menu it opened and closes the menu (result null, audited as a click); a path that matches nothing is InputFailed naming the menu's items with the menu closed; an empty path is InvalidTarget before anything is sent; ax.perform showMenu with menu chooses the item the same way.",
+  "scenario": "crates/senpi-desktop-backend-fake/fixtures/menu-option.json",
+  "env": {
+    "SENPI_DESKTOP_FAKE_CLOCK": "1"
+  },
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "session.open",
+        "params": {
+          "allowHostRelayOnlyStop": true
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayServer": null,
+                "capture": true,
+                "input": true,
+                "ax": true,
+                "backgroundWindowInput": true,
+                "cursorOverlay": false,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capturePermission": "granted",
+                "inputPermission": "granted",
+                "axPermission": "granted",
+                "displayCount": 1,
+                "focusGuard": true,
+                "stopPath": "none",
+                "stopReason": "no-global-listener",
+                "integrityLevel": null,
+                "screenLocked": false
+              },
+              "resumeToken": "per-process-random"
+            }
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "stopPath.start",
+        "params": {
+          "chord": "ctrl+alt+shift+escape"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "suspended": false,
+              "globalLive": false,
+              "hostRelayLive": true,
+              "heartbeatFresh": true,
+              "stopPath": "host-relay",
+              "reason": null
+            }
+          },
+          "variable": [
+            "/result/heartbeatFresh",
+            "/result/reason"
+          ]
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "stopPath.changed",
+            "params": {
+              "suspended": false,
+              "globalLive": false,
+              "hostRelayLive": true,
+              "heartbeatFresh": true,
+              "stopPath": "host-relay",
+              "reason": null
+            }
+          },
+          "variable": [
+            "/params/heartbeatFresh",
+            "/params/reason"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "stopPath.heartbeat",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "result": null
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "capture",
+        "params": {
+          "target": "101"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "result": {
+              "mode": "inline-png",
+              "data": "iVBORw0KGgo=",
+              "mimeType": "image/png",
+              "artifactPath": null,
+              "width": 800,
+              "height": 600,
+              "sourceWidth": 800,
+              "sourceHeight": 600,
+              "scale": 1.0,
+              "target": "101",
+              "frameId": "frame-1",
+              "note": null,
+              "coordinateWidth": 800,
+              "coordinateHeight": 600,
+              "region": null
+            }
+          },
+          "variable": [
+            "/result/data",
+            "/result/width",
+            "/result/height",
+            "/result/sourceWidth",
+            "/result/sourceHeight",
+            "/result/scale",
+            "/result/coordinateWidth",
+            "/result/coordinateHeight"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "click",
+        "params": {
+          "target": "101",
+          "x": 10.0,
+          "y": 10.0,
+          "frameId": "frame-1",
+          "opts": {
+            "button": "right"
+          },
+          "menu": [
+            "add to",
+            "serif..."
+          ]
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "result": null
+          },
+          "variable": []
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "audit",
+            "params": {
+              "action": "click",
+              "target": "101",
+              "delivery": "background",
+              "frameId": "frame-1",
+              "code": null,
+              "durationMs": 0,
+              "focusRestored": null,
+              "textLength": null,
+              "textSha256": null,
+              "keys": null
+            }
+          },
+          "variable": [
+            "/params/durationMs",
+            "/params/focusRestored"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 6,
+        "method": "click",
+        "params": {
+          "target": "101",
+          "x": 10.0,
+          "y": 10.0,
+          "frameId": "frame-1",
+          "opts": {
+            "button": "right"
+          },
+          "menu": [
+            "Sans"
+          ]
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 6,
+            "error": {
+              "code": -32002,
+              "message": "the click reached window 101 (Font Book) and opened a menu, but menu item 'Sans' was not found, so nothing was chosen and the menu was closed; the click may already have taken effect, so inspect the window before retrying. Items: \"Add to\" ▸ [\"Bench Holdout\", \"Serif…\"], \"Remove\" (disabled), \"Show in Finder\".",
+              "data": {
+                "code": "InputFailed",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/data/hint"
+          ]
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "audit",
+            "params": {
+              "action": "click",
+              "target": "101",
+              "delivery": "background",
+              "frameId": "frame-1",
+              "code": "InputFailed",
+              "durationMs": 0,
+              "focusRestored": null,
+              "textLength": null,
+              "textSha256": null,
+              "keys": null
+            }
+          },
+          "variable": [
+            "/params/durationMs",
+            "/params/focusRestored"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "method": "click",
+        "params": {
+          "target": "101",
+          "x": 10.0,
+          "y": 10.0,
+          "frameId": "frame-1",
+          "opts": {
+            "button": "right"
+          },
+          "menu": []
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 7,
+            "error": {
+              "code": -32005,
+              "message": "menu path must contain 1..=32 labels",
+              "data": {
+                "code": "InvalidTarget",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/code",
+            "/error/data/hint"
+          ]
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "audit",
+            "params": {
+              "action": "click",
+              "target": "101",
+              "delivery": "background",
+              "frameId": "frame-1",
+              "code": "InvalidTarget",
+              "durationMs": 0,
+              "focusRestored": null,
+              "textLength": null,
+              "textSha256": null,
+              "keys": null
+            }
+          },
+          "variable": [
+            "/params/durationMs",
+            "/params/focusRestored"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 8,
+        "method": "ax.snapshot",
+        "params": {
+          "target": "101"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 8,
+            "result": {
+              "text": "- window \"Fonts\" [ref=e1] app=Font Book\n  - row \"Serif\" [ref=e2]",
+              "nodeCount": 2,
+              "truncated": false
+            }
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 9,
+        "method": "ax.perform",
+        "params": {
+          "ref": "e2",
+          "action": "showMenu",
+          "menu": [
+            "Show in Finder"
+          ]
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 9,
+            "result": null
+          },
+          "variable": []
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "audit",
+            "params": {
+              "action": "ax.perform",
+              "target": "101",
+              "delivery": "background",
+              "frameId": null,
+              "code": null,
+              "durationMs": 0,
+              "focusRestored": null,
+              "textLength": null,
+              "textSha256": null,
+              "keys": null
+            }
+          },
+          "variable": [
+            "/params/durationMs",
+            "/params/focusRestored"
+          ]
+        }
+      ]
+    }
+  ]
+}

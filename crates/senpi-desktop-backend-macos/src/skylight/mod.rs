@@ -26,7 +26,7 @@ use self::psn::{
     SET_FRONT_NO_WINDOWS,
 };
 pub(crate) use self::partial::{mark_sent, reporting_partial};
-pub(crate) use self::spi::{front_pid, is_available};
+pub(crate) use self::spi::{front_pid, is_available, spaces, spaces_if_available, SpaceSpi};
 use self::spi::required;
 
 /// Ensures the required background SPI resolved; the error names the missing

@@ -6,8 +6,10 @@
 
 use std::ffi::{c_void, CStr};
 use std::mem;
+use std::ptr::NonNull;
 use std::sync::LazyLock;
 
+use objc2_core_foundation::{CFArray, CFString};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 
 use super::psn::ProcessSerialNumber;
@@ -36,6 +38,33 @@ pub(super) type AuthenticationFactoryFn = unsafe extern "C" fn(
 ) -> *mut c_void;
 
 use core_graphics::geometry::CGPoint;
+
+// Window Space movement (oh-my-pi `desktop/macos/spaces.rs`, MIT). Native ABI
+// reference, not a dependency: yabai `src/misc/extern.h`. In particular,
+// `SLSMoveWindowsToManagedSpace` returns void, not a CGError.
+pub(crate) type SpaceConnectionFn = unsafe extern "C" fn() -> i32;
+pub(crate) type ActiveSpaceFn = unsafe extern "C" fn(i32) -> u64;
+pub(crate) type CopySpacesForWindowsFn = unsafe extern "C" fn(i32, i32, &CFArray) -> *const CFArray;
+pub(crate) type MoveWindowsToSpaceFn = unsafe extern "C" fn(i32, &CFArray, u64);
+pub(crate) type SpaceWindowOwnerFn = unsafe extern "C" fn(i32, u32, *mut i32) -> i32;
+pub(crate) type ConnectionPidFn = unsafe extern "C" fn(i32, *mut libc::pid_t) -> i32;
+pub(crate) type SpaceTypeFn = unsafe extern "C" fn(i32, u64) -> i32;
+pub(crate) type CopyManagedDisplaysFn = unsafe extern "C" fn(i32) -> *const CFArray;
+pub(crate) type DisplayCurrentSpaceFn = unsafe extern "C" fn(i32, &CFString) -> u64;
+
+/// The SkyLight Space functions `window.bringToCurrentSpace` needs; all or
+/// nothing, so a partial set never moves a window it cannot verify.
+pub(crate) struct SpaceSpi {
+    pub(crate) connection: SpaceConnectionFn,
+    pub(crate) active: ActiveSpaceFn,
+    pub(crate) copy_spaces: CopySpacesForWindowsFn,
+    pub(crate) move_windows: MoveWindowsToSpaceFn,
+    pub(crate) window_owner: SpaceWindowOwnerFn,
+    pub(crate) connection_pid: ConnectionPidFn,
+    pub(crate) space_type: SpaceTypeFn,
+    pub(crate) copy_displays: CopyManagedDisplaysFn,
+    pub(crate) display_space: DisplayCurrentSpaceFn,
+}
 
 /// The SPI needed for every background event post.
 pub(super) struct RequiredSpi {
@@ -82,6 +111,13 @@ impl PsnLookup {
 }
 
 static REQUIRED: LazyLock<Option<RequiredSpi>> = LazyLock::new(resolve_required);
+static SPACES: LazyLock<Option<SpaceSpi>> = LazyLock::new(|| {
+    if disabled_by_env() {
+        return None;
+    }
+    ensure_skylight_loaded()?;
+    resolve_spaces(raw_symbol)
+});
 static FOREGROUND: LazyLock<Option<ForegroundSpi>> = LazyLock::new(resolve_foreground);
 pub(super) static AUTHENTICATION: LazyLock<Option<AuthenticationSpi>> = LazyLock::new(resolve_authentication);
 static FRONT_PID: LazyLock<Option<(SLPSGetFrontProcessFn, GetProcessPIDFn)>> = LazyLock::new(|| {
@@ -134,6 +170,50 @@ pub(crate) fn required() -> CoreResult<&'static RequiredSpi> {
 
 pub(super) fn foreground() -> Option<&'static ForegroundSpi> {
     FOREGROUND.as_ref()
+}
+
+/// The Space functions, or `SpaceUnsupported` when this macOS does not export
+/// every one of them.
+pub(crate) fn spaces() -> CoreResult<&'static SpaceSpi> {
+    space_spi_or_unsupported(SPACES.as_ref())
+}
+
+/// The Space functions when the full set resolved (`window_on_another_space`
+/// treats a missing set as unknown, not as an error).
+pub(crate) fn spaces_if_available() -> Option<&'static SpaceSpi> {
+    SPACES.as_ref()
+}
+
+pub(super) fn space_spi_or_unsupported(spi: Option<&SpaceSpi>) -> CoreResult<&SpaceSpi> {
+    spi.ok_or_else(|| {
+        DesktopError::space_unsupported(
+            "this macOS version does not expose the window Space-movement and verification APIs; \
+             move the window manually with Mission Control",
+        )
+    })
+}
+
+/// Resolves the whole Space set through `lookup`; one missing name yields
+/// `None`. The connection prefers SkyLight's name and falls back to the
+/// CoreGraphics alias, as oh-my-pi does.
+pub(super) fn resolve_spaces(lookup: impl Fn(&CStr) -> Option<NonNull<c_void>>) -> Option<SpaceSpi> {
+    // A closure cannot be generic, so it would pin every field to the first
+    // field's type; this fn takes each field's own fn-pointer type instead.
+    fn get<T: Copy>(lookup: &dyn Fn(&CStr) -> Option<NonNull<c_void>>, name: &CStr) -> Option<T> {
+        lookup(name).map(|raw| cast_symbol(raw.as_ptr()))
+    }
+    let lookup: &dyn Fn(&CStr) -> Option<NonNull<c_void>> = &lookup;
+    Some(SpaceSpi {
+        connection: get(lookup, c"SLSMainConnectionID").or_else(|| get(lookup, c"CGSMainConnectionID"))?,
+        active: get(lookup, c"SLSGetActiveSpace").or_else(|| get(lookup, c"CGSGetActiveSpace"))?,
+        copy_spaces: get(lookup, c"SLSCopySpacesForWindows")?,
+        move_windows: get(lookup, c"SLSMoveWindowsToManagedSpace")?,
+        window_owner: get(lookup, c"SLSGetWindowOwner")?,
+        connection_pid: get(lookup, c"SLSConnectionGetPID")?,
+        space_type: get(lookup, c"SLSSpaceGetType")?,
+        copy_displays: get(lookup, c"SLSCopyManagedDisplays")?,
+        display_space: get(lookup, c"SLSManagedDisplayGetCurrentSpace")?,
+    })
 }
 
 /// Whether the SkyLight framework loaded and every required symbol resolved.
@@ -202,14 +282,24 @@ fn ensure_skylight_loaded() -> Option<()> {
     (*LOADED).then_some(())
 }
 
-fn symbol<T: Copy>(name: &CStr) -> Option<T> {
+fn raw_symbol(name: &CStr) -> Option<NonNull<c_void>> {
     // SAFETY: `name` is NUL-terminated and RTLD_DEFAULT is valid for
     // process-wide lookup.
-    let raw = unsafe { libc::dlsym(libc::RTLD_DEFAULT, name.as_ptr()) };
-    if raw.is_null() {
-        return None;
-    }
+    NonNull::new(unsafe { libc::dlsym(libc::RTLD_DEFAULT, name.as_ptr()) })
+}
+
+fn symbol<T: Copy>(name: &CStr) -> Option<T> {
+    raw_symbol(name).map(|raw| cast_symbol(raw.as_ptr()))
+}
+
+#[cfg(test)]
+#[path = "spi_tests.rs"]
+mod tests;
+
+fn cast_symbol<T: Copy>(raw: *mut c_void) -> T {
+    const { assert!(mem::size_of::<T>() == mem::size_of::<*mut c_void>()) };
     // SAFETY: Every callsite requests the exact C signature documented in its
-    // function-pointer alias.
-    Some(unsafe { mem::transmute_copy::<*mut c_void, T>(&raw) })
+    // function-pointer alias, and the size assertion above rules out reading
+    // past the pointer.
+    unsafe { mem::transmute_copy::<*mut c_void, T>(&raw) }
 }

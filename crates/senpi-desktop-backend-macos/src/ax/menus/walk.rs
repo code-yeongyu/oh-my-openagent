@@ -34,7 +34,7 @@ pub(super) fn context(window: &DesktopWindow) -> CoreResult<(CFRetained<AXUIElem
     Ok((app, pid, wid))
 }
 
-pub(super) fn element_pid(element: &AXUIElement) -> CoreResult<libc::pid_t> {
+pub(in crate::ax) fn element_pid(element: &AXUIElement) -> CoreResult<libc::pid_t> {
     let mut pid = 0;
     // SAFETY: `pid` is writable and the retained element outlives the query.
     let error = unsafe { element.pid(NonNull::from(&mut pid)) };
@@ -121,7 +121,7 @@ pub(super) fn required_string(element: &AXUIElement, attribute: &str) -> CoreRes
 /// `optional` treats only "no value" / "unsupported" as no children; any
 /// other AX failure is an error, so a failed read never looks like an empty
 /// menu.
-fn bounded_children(element: &AXUIElement, optional: bool) -> CoreResult<Vec<CFRetained<AXUIElement>>> {
+pub(in crate::ax) fn bounded_children(element: &AXUIElement, optional: bool) -> CoreResult<Vec<CFRetained<AXUIElement>>> {
     let value = match element::copy_attribute_result(element, "AXChildren") {
         Ok(Some(value)) => value,
         Ok(None) | Err(AXError::NoValue | AXError::AttributeUnsupported) if optional => return Ok(Vec::new()),

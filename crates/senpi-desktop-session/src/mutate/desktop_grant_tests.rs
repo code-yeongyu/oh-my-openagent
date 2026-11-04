@@ -19,6 +19,7 @@ fn click(target: &str, frame_id: &str) -> Op {
         y: 10.0,
         frame_id: Some(frame_id.to_owned()),
         opts: None,
+        menu: None,
     })
 }
 
@@ -30,6 +31,7 @@ fn every_input(target: &str, frame_id: &str) -> Vec<(&'static str, Op)> {
         y: 10.0,
         frame_id: Some(frame_id.to_owned()),
         opts: None,
+        menu: None,
     };
     vec![
         ("click", Op::Click(point())),

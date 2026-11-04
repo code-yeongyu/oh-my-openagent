@@ -1,0 +1,345 @@
+{
+  "description": "the drag-and-drop guard (#11459, W3): a background left-button drag or mouse hold from an element that does not track drags (an AXRow) is BackgroundUnavailable before anything is sent, and the same drag from an AXSlider is delivered.",
+  "scenario": "crates/senpi-desktop-backend-fake/fixtures/drag-guard.json",
+  "env": {
+    "SENPI_DESKTOP_FAKE_CLOCK": "1"
+  },
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "session.open",
+        "params": {
+          "allowHostRelayOnlyStop": true
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayServer": null,
+                "capture": true,
+                "input": true,
+                "ax": true,
+                "backgroundWindowInput": true,
+                "cursorOverlay": false,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capturePermission": "granted",
+                "inputPermission": "granted",
+                "axPermission": "granted",
+                "displayCount": 1,
+                "focusGuard": true,
+                "stopPath": "none",
+                "stopReason": "no-global-listener",
+                "integrityLevel": null,
+                "screenLocked": false
+              },
+              "resumeToken": "per-process-random"
+            }
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "stopPath.start",
+        "params": {
+          "chord": "ctrl+alt+shift+escape"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "suspended": false,
+              "globalLive": false,
+              "hostRelayLive": true,
+              "heartbeatFresh": true,
+              "stopPath": "host-relay",
+              "reason": null
+            }
+          },
+          "variable": [
+            "/result/heartbeatFresh",
+            "/result/reason"
+          ]
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "stopPath.changed",
+            "params": {
+              "suspended": false,
+              "globalLive": false,
+              "hostRelayLive": true,
+              "heartbeatFresh": true,
+              "stopPath": "host-relay",
+              "reason": null
+            }
+          },
+          "variable": [
+            "/params/heartbeatFresh",
+            "/params/reason"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "stopPath.heartbeat",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "result": null
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "capture",
+        "params": {
+          "target": "101"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "result": {
+              "mode": "inline-png",
+              "data": "iVBORw0KGgo=",
+              "mimeType": "image/png",
+              "artifactPath": null,
+              "width": 800,
+              "height": 600,
+              "sourceWidth": 800,
+              "sourceHeight": 600,
+              "scale": 1,
+              "target": "101",
+              "frameId": "frame-1",
+              "note": null,
+              "coordinateWidth": 800,
+              "coordinateHeight": 600,
+              "region": null
+            }
+          },
+          "variable": [
+            "/result/data",
+            "/result/width",
+            "/result/height",
+            "/result/sourceWidth",
+            "/result/sourceHeight",
+            "/result/scale",
+            "/result/coordinateWidth",
+            "/result/coordinateHeight"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "drag",
+        "params": {
+          "target": "101",
+          "path": [
+            {
+              "x": 10,
+              "y": 100
+            },
+            {
+              "x": 200,
+              "y": 100
+            },
+            {
+              "x": 400,
+              "y": 100
+            }
+          ],
+          "frameId": "frame-1"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "error": {
+              "code": -32003,
+              "message": "the drag on window 101 (Font Book) starts on an AXRow, where a press can pick up an item for drag and drop, which macOS completes from the user's real pointer and could drop into the user's own window; background drags and holds run only on sliders, scroll bars, splitters and steppers; nothing was sent",
+              "data": {
+                "code": "BackgroundUnavailable",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/data/hint"
+          ]
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "audit",
+            "params": {
+              "action": "drag",
+              "target": "101",
+              "delivery": "background",
+              "frameId": "frame-1",
+              "code": "BackgroundUnavailable",
+              "durationMs": 0,
+              "focusRestored": null,
+              "textLength": null,
+              "textSha256": null,
+              "keys": null
+            }
+          },
+          "variable": [
+            "/params/durationMs",
+            "/params/focusRestored"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 6,
+        "method": "drag",
+        "params": {
+          "target": "101",
+          "path": [
+            {
+              "x": 10,
+              "y": 20
+            },
+            {
+              "x": 200,
+              "y": 20
+            },
+            {
+              "x": 400,
+              "y": 20
+            }
+          ],
+          "frameId": "frame-1"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 6,
+            "result": null
+          },
+          "variable": []
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "audit",
+            "params": {
+              "action": "drag",
+              "target": "101",
+              "delivery": "background",
+              "frameId": "frame-1",
+              "code": null,
+              "durationMs": 0,
+              "focusRestored": null,
+              "textLength": null,
+              "textSha256": null,
+              "keys": null
+            }
+          },
+          "variable": [
+            "/params/durationMs",
+            "/params/focusRestored"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "method": "holdMouse",
+        "params": {
+          "target": "101",
+          "x": 10,
+          "y": 100,
+          "duration": 0.01,
+          "frameId": "frame-1"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 7,
+            "error": {
+              "code": -32003,
+              "message": "the mouse hold on window 101 (Font Book) starts on an AXRow, where a press can pick up an item for drag and drop, which macOS completes from the user's real pointer and could drop into the user's own window; background drags and holds run only on sliders, scroll bars, splitters and steppers; nothing was sent",
+              "data": {
+                "code": "BackgroundUnavailable",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/data/hint"
+          ]
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "audit",
+            "params": {
+              "action": "holdMouse",
+              "target": "101",
+              "delivery": "background",
+              "frameId": "frame-1",
+              "code": "BackgroundUnavailable",
+              "durationMs": 0,
+              "focusRestored": null,
+              "textLength": null,
+              "textSha256": null,
+              "keys": null
+            }
+          },
+          "variable": [
+            "/params/durationMs",
+            "/params/focusRestored"
+          ]
+        }
+      ]
+    }
+  ]
+}

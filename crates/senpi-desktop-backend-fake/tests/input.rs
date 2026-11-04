@@ -152,6 +152,19 @@ fn front_window_round_trip_restores_the_previous_focus() {
 }
 
 #[test]
+fn bringing_a_window_to_the_current_space_records_it_and_leaves_focus() {
+    // Given: window 101 is focused, 202 is not
+    let mut backend = two_window_backend();
+    // When
+    backend.bring_to_current_space("202", &|| Ok(())).expect("moves");
+    let unknown = backend.bring_to_current_space("999", &|| Ok(()));
+    // Then: recorded once, focus unchanged, an unknown window refused
+    assert_eq!(backend.sink().ops(), vec![SinkOp::BringToCurrentSpace { id: "202".into() }]);
+    assert_eq!(focused_id(&mut backend), "101");
+    assert_eq!(unknown.map_err(|error| error.code), Err(ErrorCode::WindowNotFound));
+}
+
+#[test]
 fn release_all_and_warp_are_recorded_in_order() {
     let mut backend = common::fixture_backend();
     let point = DesktopPoint { x: 1.0, y: 2.0 };

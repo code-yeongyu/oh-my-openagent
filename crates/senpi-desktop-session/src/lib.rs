@@ -8,12 +8,15 @@
 mod audit;
 mod budget;
 mod cancel_on_drop;
+mod display_awake;
 mod grant;
 mod intervention;
 mod mutate;
+mod pending;
 mod pointer;
 mod request;
 mod restore;
+mod screen_notes;
 mod selection;
 mod session;
 #[cfg(test)]
@@ -29,6 +32,11 @@ mod worker_clipboard;
 mod worker_input;
 mod worker_holds;
 mod worker_menus;
+mod worker_spaces;
+#[cfg(test)]
+mod worker_open_menu_tests;
+#[cfg(test)]
+mod worker_drag_guard_tests;
 
 pub use grant::ControlSlot;
 pub use mutate::SessionSafety;

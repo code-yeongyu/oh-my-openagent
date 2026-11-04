@@ -18,8 +18,14 @@ interface ComputerHoldMouseOptions extends ComputerHoldOptions {
 	readonly frameId?: string;
 }
 
+/** A press that opens a menu chooses this path of item labels in it and closes the menu before returning. */
+interface ComputerMenuOptions {
+	/** Labels from the opened menu down to a command, matched like `win.menu.select`; an empty path is refused. */
+	menu?: string[];
+}
+
 /** Options for pointer clicks. */
-interface ComputerClickOptions extends ComputerDeliveryOptions {
+interface ComputerClickOptions extends ComputerDeliveryOptions, ComputerMenuOptions {
 	button?: "left" | "right" | "middle";
 	count?: number;
 	modifiers?: string[];
@@ -172,6 +178,8 @@ interface ComputerCapabilities {
 	integrityLevel?: string | null;
 	/** Input is refused while the screen is locked. */
 	screenLocked: boolean;
+	/** Every display the session can capture is asleep (macOS); captures and input then fail with a note saying so. */
+	displayAsleep?: boolean;
 }
 
 /** Live accessibility element resolved from a snapshot ref; expired refs throw `StaleRef`. */
@@ -191,17 +199,27 @@ interface ComputerElement {
 	bounds(): Promise<ComputerBounds | null>;
 	attributes(): Promise<Record<string, string>>;
 	actions(): Promise<string[]>;
-	perform(action: string): Promise<void>;
+	/** Perform a native action; with `menu`, choose that path in the menu `AXShowMenu` or a menu control's press opens. */
+	perform(action: string, options?: ComputerMenuOptions): Promise<void>;
 	/** Perform the element's native press action; needs no screenshot. */
-	press(): Promise<void>;
-	/** Click the element's center with native input. */
-	click(options?: ComputerDeliveryOptions): Promise<void>;
+	press(options?: ComputerMenuOptions): Promise<void>;
+	/** Click the element's center with native input; `button: "right"` plus `menu` chooses in its context menu. */
+	click(options?: ComputerClickOptions): Promise<void>;
 	/**
 	 * Type into this element without taking the user's focus (macOS): a native text field takes the text through its
 	 * own selection (`inserted`), any other element takes keys once it holds its app's keyboard focus (`keys`); an
 	 * element that never takes focus throws `BackgroundUnavailable` (`InputFailed` in the foreground) with nothing typed.
 	 */
 	type(text: string, options?: ComputerDeliveryOptions): Promise<{ method: "inserted" | "keys" }>;
+	/**
+	 * Select `text` inside this element's value without moving focus or sending keys (macOS): the match must be unique
+	 * after `prefix` and before `suffix`; `select` picks the match (default) or a caret at its start or end. The reply is
+	 * the applied selection in UTF-16 units; a following `type` replaces it.
+	 */
+	selectText(
+		text: string,
+		options?: { prefix?: string; suffix?: string; select?: "text" | "start" | "end" },
+	): Promise<{ start: number; length: number; text: string; focused: boolean }>;
 	focus(): Promise<void>;
 	parent(): Promise<ComputerElement | null>;
 	children(): Promise<ComputerElement[]>;
@@ -240,6 +258,8 @@ interface ComputerWindow extends ComputerInputTarget {
 	readonly bounds: ComputerBounds;
 	readonly focused: boolean;
 	raise(): Promise<void>;
+	/** macOS: move this window into the user's current Space without activating it; no grant needed. */
+	bringToCurrentSpace(): Promise<void>;
 	readonly menu: {
 		/** Inspect a menu path without activating the application (empty path = the menu bar). */
 		items(path?: string[]): Promise<ComputerMenuItem[]>;
