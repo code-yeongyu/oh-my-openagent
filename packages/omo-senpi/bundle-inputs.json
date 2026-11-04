@@ -104,6 +104,7 @@
     "packages/memory-core/src/compile/expiry-slot.ts",
     "packages/memory-core/src/compile/external-projection-dirs.ts",
     "packages/memory-core/src/compile/external-projection-limits.ts",
+    "packages/memory-core/src/compile/external-projection-loader.ts",
     "packages/memory-core/src/compile/external-projection-names.ts",
     "packages/memory-core/src/compile/external-projection.ts",
     "packages/memory-core/src/compile/index.ts",
