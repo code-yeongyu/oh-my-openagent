@@ -1,3 +1,7 @@
+## 2026-11-04 - thread_send works in runs started by RPC input (#12317)
+
+`thread/component.ts` claims a `session_control_delivery` as a run's causal `cause` (and `consumed` origin) only when this session's gateway drain admitted it. `gateway/registration.ts` announces each gateway row's id through `onGatewayAdmission` right before `control.admitExternalMessage`, and the component's `GatewayAdmissions` takes the id when its message starts (per session, emptied on take, capped at 256). senpi admits RPC `prompt`/`steer`/`follow_up` input as the same message under a client-chosen id with no gateway row. That input now counts as typed input, so a send from its run starts a new causal root instead of being refused `unknown_cause`. `store-ops.ts` `placeCausally` is unchanged. A forged or foreign id is never claimed, and drain-admitted deliveries still continue their chain.
+
 ## 2026-11-02 - Finished team members leave the task widget (#12160)
 
 The below-editor task widget now shows only running or parked work. A team member that completes its turn leaves the widget even while its handle stays resident, instead of lingering as a `process completed` row until the team shuts down. `/tasks` still lists it, `task_send` still revives it, and its row returns while it runs again. Task lifecycle, residency and messaging are unchanged.
