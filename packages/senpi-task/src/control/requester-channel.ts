@@ -104,5 +104,15 @@ export function createRequesterChannel(options: RequesterChannelOptions) {
     return readAckFile(control, taskId, parentSessionId)
   }
 
-  return { ownedElsewhere, cannotApply, assertDesired, acceptedAck, lastAck, channel: options.channel, control }
+  // The model-facing line for a child another live process runs (design section 5 "Model-facing surface").
+  function ownerStatus(record: TaskRecord): string | undefined {
+    if (!ownedElsewhere(record)) return undefined
+    const pid = record.host_pid ?? 0
+    const last = lastAck(record.task_id, record.parent_session_id)
+    const reason = last?.state === "refused" && last.reason === "handle_gone" ? "handle_gone" : cannotApply(record)
+    if (reason !== undefined) return `owner cannot apply: ${reason} (pid ${pid})`
+    return `running in another omo process (pid ${pid}); this run's Stop/Resume is carried there; its completion is reported to that process's session`
+  }
+
+  return { ownedElsewhere, ownerStatus, cannotApply, assertDesired, acceptedAck, lastAck, channel: options.channel, control }
 }

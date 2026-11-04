@@ -41,12 +41,12 @@ export function controlPair(input: {
   const ownerTicks = { enabled: input.ownerTicks !== false }
   const channel = createRequesterChannel({ stateDir: store.stateDir, store, hostPid: A_PID, managerInstance: "requester-a",
     channel: input.channel !== false, isProcessAlive: pid => alive.has(pid), now: () => clock })
-  const calls = { resumeLost: 0, pause: 0, finish: 0, endLost: 0 }
+  const calls = { resumeLost: 0, pause: 0, finish: 0, endLost: 0, hold: 0 }
   const manager = {
     get: (taskId: string) => store.load(taskId) ?? undefined,
     list: () => store.list().records.map(record => ({ record })),
     pauseTask: async () => { calls.pause += 1; return { childSeq: 0 } },
-    holdTaskInput: async (_taskId: string, entry: { inputId: string }) => ({ kind: "held", entryId: entry.inputId, duplicate: false }),
+    holdTaskInput: async (_taskId: string, entry: { inputId: string }) => { calls.hold += 1; return { kind: "held", entryId: entry.inputId, duplicate: false } },
     observeTaskHold: async () => undefined,
     resumePausedTask: async () => ({ turnId: "local-turn" }),
     resumeLostTask: async () => { calls.resumeLost += 1; return { turnId: "local-turn" } },
@@ -67,6 +67,7 @@ export function controlPair(input: {
   return {
     store, owner, inbox, channel, runPause, barrier, calls, alive, ownerTicks, carry, remoteCancel,
     advance: (ms: number) => { clock += ms },
+    clock: () => clock,
     advertise: async () => { await inbox.tick() },
   }
 }
