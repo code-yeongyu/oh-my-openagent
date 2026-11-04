@@ -168,7 +168,7 @@ describe.skipIf(process.platform === "win32")("runHerdrCommandDefault", () => {
     }
   })
 
-  test("clears the watchdog timer once settled — a fast exec does not hold the process for the window", async () => {
+  test("clears the watchdog timer once settled: a fast exec does not hold the process for the window", async () => {
     const dir = mkdtempSync(join(tmpdir(), "omo-herdr-timer-"))
     try {
       writeFileSync(join(dir, "herdr"), "#!/bin/sh\nexec /bin/echo hi\n", { mode: 0o755 })
