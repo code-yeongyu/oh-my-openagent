@@ -252,16 +252,20 @@ describe("getCodexOmoConfig", () => {
 		writeLegacyOmoConfig(homeDir, JSON.stringify({ "[codex]": { telemetry: { enabled: false } } }))
 		writeOpenCodeConfig(homeDir)
 		let codexResult: ReturnType<typeof runCodexStartupMigration> | undefined
+		let codexWarnings: readonly string[] | undefined
 
 		// when
 		runOpenCodeMigration(homeDir, homeDir, (boundary) => {
 			if (boundary !== "journal-written" || codexResult !== undefined) return
 			codexResult = runCodexStartupMigration({ cwd: homeDir, homeDir })
+			codexWarnings = getCodexOmoConfig({ cwd: homeDir, homeDir, env: {} }).warnings
 		})
 
-		// then
-		if (codexResult === undefined) throw new Error("Expected concurrent Codex migration attempt")
-		expect(codexResult.error).toBe("Configuration migration is already running")
+		// then the peer's live lock is not a failure: Codex reports nothing and migrates on its next start (#12115)
+		if (codexResult === undefined || codexWarnings === undefined) throw new Error("Expected concurrent Codex migration attempt")
+		expect(codexResult.peerMigrating).toBe(true)
+		expect(codexResult.error).toBeUndefined()
+		expect(codexWarnings.filter((warning) => warning.startsWith("omo-codex: configuration migration"))).toEqual([])
 		expect(migrationIds(homeDir)).toEqual([
 			"2026-07-opencode-config-unification",
 			"2026-07-codex-config-jsonc",
