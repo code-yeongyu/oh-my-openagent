@@ -5,7 +5,7 @@ import { syncPinDir } from "../memory-core/src/sync/pin-dir"
 
 import { signInHint } from "../omo-opencode/src/cli/service-auth/accounts-gate"
 import { type CredentialStore, createCredentialStore, INTERACTIVE_READ_WAIT } from "../omo-opencode/src/cli/service-auth/keystore"
-import { ApiRefusal, serviceOrigin, SignInError } from "../omo-opencode/src/cli/service-auth/protocol"
+import { ApiRefusal, type Credentials, serviceOrigin, SignInError } from "../omo-opencode/src/cli/service-auth/protocol"
 import { createSession } from "../omo-opencode/src/cli/service-auth/session"
 
 export interface SyncContext {
@@ -35,7 +35,10 @@ export async function signedInSyncContext(options: SyncContextOptions): Promise<
   const credentials = await store.read()
   if (credentials === null) throw new SignInError(`Not signed in. ${signInHint("first")}`)
   const session = createSession({ api, store })
-  const token = () => session.accessToken()
+  const sameIdentity = (current: Credentials): boolean => current.device.id === credentials.device.id
+    && current.signingPrivateKey === credentials.signingPrivateKey && current.sealingPrivateKey === credentials.sealingPrivateKey
+    && current.credentialGeneration === credentials.credentialGeneration
+  const token = () => session.accessToken(sameIdentity)
   const doFetch = options.fetch ?? fetch
   const me = await doFetch(`${api}/v1/me`, { headers: { authorization: `Bearer ${await token()}` } })
   if (!me.ok) {
