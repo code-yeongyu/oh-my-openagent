@@ -6,30 +6,26 @@
 
 import { advance, applyVerified, capture } from "./apply"
 import type { EngineDeps } from "./engine-deps"
-import { describeSyncFailure, isFailureShown, type SyncFailure } from "./failure"
+import type { SyncFailure } from "./failure"
 import { type EngineState, SyncJournal } from "./journal"
-import { push, staleBackoffMs } from "./push"
-import type { RefusalCode } from "./ports"
+import { pushCycle } from "./push-cycle"
+import type { FreezeReason, RefusalCode } from "./ports"
 import { receive } from "./receive"
+import { StatusTracker } from "./status-tracker"
 
 export { CrashInjected, type EngineFault, INBOUND_POINTS, OUTBOUND_POINTS } from "./engine-deps"
 export type { SyncFailure, SyncFailureKind } from "./failure"
 
 export const POLL_MS = 10_000
 export const LOCAL_DEBOUNCE_MS = 2_000
-const PUSH_ATTEMPTS = 3
 
 export type EngineStatus =
   | { readonly kind: "never_synced" }
   | { readonly kind: "synced"; readonly at: number; readonly updatedWhileOffline: number }
   | { readonly kind: "paused"; readonly seq: number; readonly code: RefusalCode }
+  /** Pushes are frozen by the service until a key rotation lands (sync-design section 7). */
+  | { readonly kind: "frozen"; readonly reason: FreezeReason; readonly since: number }
   | { readonly kind: "failing"; readonly failure: SyncFailure; readonly since: number; readonly attempts: number }
-
-interface Failing {
-  readonly failure: SyncFailure
-  readonly since: number
-  readonly attempts: number
-}
 
 export interface CycleReport {
   readonly applied: number
@@ -60,12 +56,13 @@ export class SyncEngine {
   private unsubscribe: (() => void) | null = null
   private cancelPoll: (() => void) | null = null
   private cancelDebounce: (() => void) | null = null
-  private failing: Failing | null = null
-  /** The failure a UI shows: set once a failure crosses its visibility threshold, cleared only by a successful cycle. */
-  private shown: Failing | null = null
+  private readonly tracker: StatusTracker
+  /** The next cycle settles a service freeze before it pushes: startup, a poll, a state event, or a stream event while frozen. */
+  private settleNext = true
 
   constructor(private readonly deps: EngineDeps) {
     this.journal = new SyncJournal(deps.repo.gitDir)
+    this.tracker = new StatusTracker(() => deps.clock.now())
   }
 
   state(): Promise<EngineState> {
@@ -75,7 +72,8 @@ export class SyncEngine {
   /** What a UI shows: a shown failure until a cycle succeeds, paused at a refused entry, else the last successful sync. */
   async status(): Promise<EngineStatus> {
     // Failing outranks paused on purpose: while no cycle completes nothing moves at all, and a paused refusal shows again after the first good cycle.
-    if (this.shown !== null) return { kind: "failing", ...this.shown }
+    const tracked = this.tracker.tracked()
+    if (tracked !== null) return tracked
     const s = await this.journal.state()
     if (s.paused !== null) return { kind: "paused", seq: s.paused.seq, code: s.paused.code }
     if (s.lastSyncedAt === null) return { kind: "never_synced" }
@@ -87,9 +85,14 @@ export class SyncEngine {
     this.unsubscribe = this.deps.transport.subscribe({
       onAdvanced: (head) => {
         this.eventHead = Math.max(this.eventHead, head)
+        if (this.tracker.frozen !== null) this.settleNext = true
         if (head > this.appliedMirror) this.request("event")
       },
       onConnected: (connected) => (connected ? this.stopPolling() : this.poll()),
+      onStateChanged: () => {
+        this.settleNext = true
+        this.request()
+      },
     })
     this.request()
   }
@@ -121,15 +124,17 @@ export class SyncEngine {
 
   runCycle(): Promise<CycleReport> {
     const previous = this.running ?? Promise.resolve(null)
-    const run = previous.catch(() => null).then(() => this.cycle())
+    let keyAtStart: string | null = null
+    const run = previous.catch(() => null).then(() => {
+      keyAtStart = this.tracker.key()
+      return this.cycle()
+    })
     this.running = run
     const waiters = this.waiters.splice(0)
     void run.then(
       (report) => {
-        const shownBefore = this.shownKey()
-        this.failing = null
-        this.shown = null
-        this.announceIfChanged(shownBefore)
+        this.tracker.succeeded()
+        this.announceIfChanged(keyAtStart)
         for (const w of waiters) w.resolve(report)
         if (this.running === run) this.running = null
         const rerun = this.rerun || (this.rerunOnEvent && this.eventHead > this.appliedMirror)
@@ -138,22 +143,8 @@ export class SyncEngine {
         if (rerun) this.request()
       },
       (error: unknown) => {
-        const shownBefore = this.shownKey()
-        const failure = describeSyncFailure(error)
-        const previous = this.failing
-        const failing = previous?.failure.kind === failure.kind
-          ? { failure, since: previous.since, attempts: previous.attempts + 1 }
-          : { failure, since: this.deps.clock.now(), attempts: 1 }
-        this.failing = failing
-        // A failure below its threshold (an offline blip) never replaces or clears what is shown: only a
-        // successful cycle clears a shown failure.
-        if (isFailureShown(failing.failure.kind, failing.attempts)) {
-          const shown = this.shown
-          this.shown = shown !== null && shownBefore === `${failure.kind}\n${failure.action}`
-            ? { failure, since: shown.since, attempts: shown.attempts + 1 }
-            : failing
-        }
-        this.announceIfChanged(shownBefore)
+        this.tracker.failed(error)
+        this.announceIfChanged(keyAtStart)
         for (const w of waiters) w.reject(error)
         if (this.running === run) this.running = null
         // A request that arrived during the failed cycle still deserves its cycle: nothing it asked for was done.
@@ -166,14 +157,9 @@ export class SyncEngine {
     return run
   }
 
-  /** The shown failure's kind and action: a new stranded lock path changes the action, so it is a change too. */
-  private shownKey(): string | null {
-    return this.shown === null ? null : `${this.shown.failure.kind}\n${this.shown.failure.action}`
-  }
-
-  /** Tells the owner when the shown failure appears, changes or clears; a repeat of the same one is silent. */
-  private announceIfChanged(shownBefore: string | null): void {
-    if (this.shownKey() === shownBefore) return
+  /** Tells the owner when the shown failure or the freeze appears, changes or clears; a repeat of the same one is silent. */
+  private announceIfChanged(before: string | null): void {
+    if (this.tracker.key() === before) return
     try {
       this.deps.onStatusChange?.()
     } catch (error) {
@@ -212,6 +198,7 @@ export class SyncEngine {
   private poll(): void {
     this.stopPolling()
     this.cancelPoll = this.deps.clock.after(POLL_MS, () => {
+      this.settleNext = true
       this.request()
       this.poll()
     })
@@ -255,16 +242,11 @@ export class SyncEngine {
       memories += done.memories
     }
     await inbound()
-    let pushed = false
-    for (let attempt = 0; attempt < PUSH_ATTEMPTS; attempt += 1) {
-      const outcome = await push(deps, journal, deps.batchBytes)
-      if (outcome !== "stale") {
-        pushed = outcome === "pushed"
-        break
-      }
-      await this.sleep(staleBackoffMs(attempt, deps.random))
-      await inbound()
-    }
+    const settleFirst = this.settleNext
+    this.settleNext = false
+    const pushedCycle = await pushCycle({ deps, journal, inbound, sleep: (ms) => this.sleep(ms), settleFirst, frozen: this.tracker.frozen })
+    this.tracker.frozen = pushedCycle.frozen
+    const pushed = pushedCycle.pushed
     if (refused === 0) await journal.updateState({ lastSyncedAt: deps.clock.now(), updatedWhileOffline: memories })
     this.appliedMirror = (await journal.state()).applied
     this.cyclesRun += 1
