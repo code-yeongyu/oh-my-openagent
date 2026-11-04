@@ -5,6 +5,7 @@ import type { GatewayEndpointPort, GatewayWakeReply, ReleaseSessionReply, Releas
 import type { ProvenanceRuntime } from "../gateway/provenance-resolver"
 import type { GatewayStore } from "../gateway/store"
 import type { ThreadTranscriptEntry } from "../reader"
+import type { RemoteThreadSurface } from "../remote/ports"
 
 export type ThreadHostSession = {
   readonly sessionId: string
@@ -127,6 +128,8 @@ export type ThreadToolSurfaceOptions = {
   /** `thread_report {kind: "completion"}` armed a completion (`arm_seq`) for this session; the component writes it at the next settle. */
   readonly onCompletionArmed?: (durableId: string, armSeq: number) => void
   readonly now?: () => number
+  /** Sessions on the account's other devices and the account-wide alias (O8, A3); absent, the tools reach only this device. */
+  readonly remote?: RemoteThreadSurface
 }
 
 
