@@ -29,9 +29,10 @@ export async function backfillRunReceipt(
   runDir: string,
   port?: MemoryReceiptsPort,
   warn?: ReceiptWarn,
-): Promise<void> {
+): Promise<boolean> {
+  // False only when a receipt exists and its write failed; artifacts that yield no receipt never will.
   const receipt = await terminalReceipt(runDir)
-  if (receipt !== undefined) await emitMemoryReceipt(runtimeDir, receipt, port, warn)
+  return receipt === undefined || await emitMemoryReceipt(runtimeDir, receipt, port, warn)
 }
 
 async function terminalReceipt(runDir: string): Promise<MemoryReceiptInput | undefined> {

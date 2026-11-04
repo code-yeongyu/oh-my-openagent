@@ -1,5 +1,7 @@
 import { dirname, join } from "node:path"
 
+import { stat } from "@oh-my-opencode/memory-core/fs"
+
 import {
   ReflectionReservationStore,
   TranscriptJournal,
@@ -51,7 +53,11 @@ export interface MemoryIdentityRuntime {
   readonly reservationPort: ReflectionReservationPort
   readonly runner: SenpiSubprocessRunner
   launch(run: ReservedRun): Promise<void>
-  reconcile(signal?: AbortSignal): Promise<void>
+  /**
+   * One identity-wide recovery pass. `skipUnchanged` returns at once when the last pass left every run
+   * directory reconciled and no run directory was added or removed since.
+   */
+  reconcile(signal?: AbortSignal, options?: { readonly skipUnchanged?: boolean }): Promise<void>
   /** Resolves once every launch started in this process has returned (a detached child may still be running). */
   settled(): Promise<void>
 }
@@ -169,6 +175,30 @@ export function createIdentityRuntime(
   }
 
   let reconciliation: { readonly promise: Promise<void>; readonly signal: AbortSignal | undefined } | undefined
+  // The runs directory's mtime when a pass last finished with nothing left to reconcile. Adding or
+  // removing a run directory changes it, so an equal stamp means a new pass has nothing to do (#12355).
+  let settledRunsStamp: number | undefined
+  const runsDir = join(identity.identityPaths.reflection, "runs")
+  const runsStamp = async (): Promise<number> => {
+    try {
+      return (await stat(runsDir)).mtimeMs
+    } catch (error) {
+      if (error instanceof Error && "code" in error && error.code === "ENOENT") return -1
+      throw error
+    }
+  }
+  const startReconciliation = (signal: AbortSignal | undefined): Promise<void> => {
+    let unsettledRuns: number | undefined
+    return runsStamp().then(async (stamp) => {
+      await reconcileReflectionRuns({
+        identity: asMemoryIdentity(identity), reservation: store, launch,
+        deferOnSchedulerContention: true,
+        onPassComplete: (state) => { unsettledRuns = state.unsettledRuns },
+        ...(signal === undefined ? {} : { signal }),
+      })
+      if (unsettledRuns === 0) settledRunsStamp = stamp
+    })
+  }
   const runtime: MemoryIdentityRuntime = {
     identity,
     store,
@@ -178,7 +208,8 @@ export function createIdentityRuntime(
     async settled(): Promise<void> {
       while (inFlight.size > 0) await Promise.all([...inFlight])
     },
-    async reconcile(signal?: AbortSignal): Promise<void> {
+    async reconcile(signal?: AbortSignal, options: { readonly skipUnchanged?: boolean } = {}): Promise<void> {
+      if (options.skipUnchanged === true && settledRunsStamp !== undefined && await runsStamp() === settledRunsStamp) return
       // One identity-wide pass, including any already-admitted durable transition. Its first
       // observer owns cancellation; an independent caller retries a foreign abort once.
       // Never clear the flight on timeout alone: a committed transition may still be finishing.
@@ -186,11 +217,7 @@ export function createIdentityRuntime(
         signal?.throwIfAborted()
         const flight = reconciliation ??= {
           signal,
-          promise: reconcileReflectionRuns({
-            identity: asMemoryIdentity(identity), reservation: store, launch,
-            deferOnSchedulerContention: true,
-            ...(signal === undefined ? {} : { signal }),
-          }).then(() => undefined).finally(() => { reconciliation = undefined }),
+          promise: startReconciliation(signal).finally(() => { reconciliation = undefined }),
         }
         try {
           await flight.promise

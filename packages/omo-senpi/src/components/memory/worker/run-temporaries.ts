@@ -8,31 +8,36 @@ import { unlinkRunArtifact } from "./run-artifacts"
 // identity, so give them a full day; PID-bearing temporaries also require confirmed death.
 const STRANDED_TEMP_MIN_AGE_MS = 24 * 60 * 60_000
 
+/** Returns how many temporaries it had to leave in place (too young, or an owner not proven dead). */
 export async function sweepStrandedRunTemporaries(
   directory: string,
   now: number,
   pidLiveness: (pid: number) => ProcessLiveness = getPidLiveness,
-): Promise<void> {
+): Promise<number> {
   let entries
   try {
     entries = await readdir(directory, { withFileTypes: true })
   } catch (error) {
-    if (isMissing(error)) return
+    if (isMissing(error)) return 0
     throw error
   }
+  let kept = 0
   for (const entry of entries) {
     if (!entry.isFile()) continue
     const temporary = /\.json\.tmp-(?:(\d+)-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.exec(entry.name)
     if (temporary === null) continue
     const path = join(directory, entry.name)
     try {
-      if ((await stat(path)).mtimeMs > now - STRANDED_TEMP_MIN_AGE_MS) continue
-      if (temporary[1] !== undefined && pidLiveness(Number(temporary[1])) !== "dead") continue
+      if ((await stat(path)).mtimeMs > now - STRANDED_TEMP_MIN_AGE_MS || (temporary[1] !== undefined && pidLiveness(Number(temporary[1])) !== "dead")) {
+        kept += 1
+        continue
+      }
       await unlinkRunArtifact(path)
     } catch (error) {
       if (!isMissing(error)) throw error
     }
   }
+  return kept
 }
 
 function isMissing(error: unknown): boolean {

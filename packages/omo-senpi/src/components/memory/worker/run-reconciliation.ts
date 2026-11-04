@@ -1,5 +1,5 @@
 import { existsSync } from "@oh-my-opencode/memory-core/fs"
-import { readdir } from "@oh-my-opencode/memory-core/fs"
+import { readdir, stat } from "@oh-my-opencode/memory-core/fs"
 import { hostname as readHostname } from "node:os"
 import { join } from "node:path"
 
@@ -13,6 +13,7 @@ import {
 import {
   readRunJson,
   runOutcomeMatchesLedger,
+  writeRunJsonAtomic,
   type RunOutcome,
 } from "./run-artifacts"
 import {
@@ -53,7 +54,18 @@ export interface ReflectionRunReconciliationOptions {
   readonly deferOnSchedulerContention?: boolean
   readonly receipts?: MemoryReceiptsPort
   readonly warn?: ReceiptWarn
+  /** Called when a pass completes, with how many run directories it could not mark reconciled. */
+  readonly onPassComplete?: (state: { readonly unsettledRuns: number }) => void
 }
+
+/**
+ * Marks a terminal run directory whose receipt is backfilled and which holds no temporary, so later
+ * passes skip it. A terminal run never changes again; re-reading every one of them on every pass made
+ * a pass grow with every run the identity ever kept (#12355). The marker is honoured only while it is
+ * at least as new as the run's ledger and terminal sentinels, so a rewritten generation is reconsidered.
+ */
+export const RUN_RECONCILED_MARKER = "reconciled.json"
+const RUN_STATE_FILES = ["ledger.json", "final.json", "abandoned.json", "quarantined.json"] as const
 
 export type ReconcileContext = Required<Pick<ReflectionRunReconciliationOptions, "now" | "hostname">>
   & ReflectionRunReconciliationOptions
@@ -76,18 +88,26 @@ export async function reconcileReflectionRuns(
       join(options.identity.paths.reflection, "completions"), context.now(), context.getPidLiveness,
     )
     const runsDir = join(options.identity.paths.reflection, "runs")
+    let unsettledRuns = 0
     for (const name of await directoryNames(runsDir)) {
       context.signal?.throwIfAborted()
       // A retired-generation dir shares the active reservation's id; settling it through the
       // normal path would complete the live reservation, so it waits for a later pass.
-      if (name === prelaunch.retiredRunId) continue
-      const runDir = join(runsDir, name)
-      await sweepStrandedRunTemporaries(runDir, context.now(), context.getPidLiveness)
-      context.signal?.throwIfAborted()
-      if (["final.json", "abandoned.json", "quarantined.json"].some((file) => existsSync(join(runDir, file)))) {
-        await backfillRunReceipt(options.identity.paths.runtime, runDir, options.receipts, options.warn)
+      if (name === prelaunch.retiredRunId) {
+        unsettledRuns += 1
         continue
       }
+      const runDir = join(runsDir, name)
+      if (await isReconciledRun(runDir)) continue
+      const keptTemporaries = await sweepStrandedRunTemporaries(runDir, context.now(), context.getPidLiveness)
+      context.signal?.throwIfAborted()
+      if (["final.json", "abandoned.json", "quarantined.json"].some((file) => existsSync(join(runDir, file)))) {
+        const backfilled = await backfillRunReceipt(options.identity.paths.runtime, runDir, options.receipts, options.warn)
+        if (backfilled && keptTemporaries === 0) await writeRunJsonAtomic(join(runDir, RUN_RECONCILED_MARKER), { version: 1, runId: name })
+        else unsettledRuns += 1
+        continue
+      }
+      unsettledRuns += 1
       if (!existsSync(join(runDir, "ledger.json"))) continue
       const ledger = await readLedgerOrUndefined(runDir)
       context.signal?.throwIfAborted()
@@ -97,6 +117,7 @@ export async function reconcileReflectionRuns(
     }
     context.signal?.throwIfAborted()
     await sweepReflectionRunOrphans(context)
+    options.onPassComplete?.({ unsettledRuns })
     return results
   } catch (error) {
     if (context.deferOnSchedulerContention && error instanceof LockContentionError) return []
@@ -224,6 +245,25 @@ function deadRunDetail(ledger: ReservationRunLedger, child: "dead" | "absent"): 
 
 function deadProcesses(ledger: ReservationRunLedger): string {
   return `supervisor pid ${ledger.pid ?? "unknown"}, child pid ${ledger.childPid ?? "unknown"}`
+}
+
+async function isReconciledRun(runDir: string): Promise<boolean> {
+  const marked = await modifiedAt(join(runDir, RUN_RECONCILED_MARKER))
+  if (marked === undefined) return false
+  for (const file of RUN_STATE_FILES) {
+    const changed = await modifiedAt(join(runDir, file))
+    if (changed !== undefined && changed > marked) return false
+  }
+  return true
+}
+
+async function modifiedAt(path: string): Promise<number | undefined> {
+  try {
+    return (await stat(path)).mtimeMs
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined
+    throw error
+  }
 }
 
 async function directoryNames(path: string): Promise<readonly string[]> {
