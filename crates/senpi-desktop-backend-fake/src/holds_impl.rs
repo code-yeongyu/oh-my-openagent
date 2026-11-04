@@ -33,6 +33,7 @@ impl FakeBackend {
         control: &HoldControl<'_>,
     ) -> CoreResult<()> {
         self.input_gate(target, mode)?;
+        self.guard_hold(target, hold, mode)?;
         self.deliver_focus(target, mode);
         with_held(
             self,

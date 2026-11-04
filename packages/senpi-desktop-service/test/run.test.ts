@@ -109,6 +109,19 @@ describe("runComputerCode", HANG_GUARD, () => {
 		expect(result.displays[2]).toEqual({ type: "text", text: "found main.ts" });
 	});
 
+	it("selects text in an element through ax.selectText and returns the selection", async () => {
+		// Given
+		const { service, log } = await openDesktop();
+
+		// When
+		const result = await run(service, `const el = await desktop.ref("e1"); return el.selectText("beta", { prefix: "alpha ", select: "end" });`);
+
+		// Then
+		expect(result.returnValue).toEqual({ start: 10, length: 0, text: "", focused: true });
+		const selected = log.requests.filter((request) => request.method === "ax.selectText").map((request) => request.params);
+		expect(selected).toEqual([{ ref: "e1", text: "beta", prefix: "alpha ", suffix: undefined, select: "end" }]);
+	});
+
 	it("types into an element through ax.typeText and returns how the text was delivered", async () => {
 		// Given
 		const { service, log } = await openDesktop();
@@ -272,6 +285,25 @@ describe("runComputerCode", HANG_GUARD, () => {
 		expect(error).toBeInstanceOf(DesktopEngineRpcError);
 		expect(error).toHaveProperty("rpcCode", -32007);
 		expect(error).toHaveProperty("data.code", "InvalidCoordinateFrame");
+	});
+
+	it("forwards a click's menu path as the top-level menu param, never inside opts (#11459)", async () => {
+		// Given
+		const { service, log } = await openDesktop();
+		const code = `
+			const editor = await desktop.window({ app: "Code" });
+			await editor.screenshot({ silent: true });
+			await editor.click(3, 4, { button: "right", menu: ["Add to", "Serif…"] });
+			await editor.click(3, 4, { button: "right" });
+		`;
+
+		// When
+		await run(service, code);
+
+		// Then
+		const clicks = log.requests.filter((request) => request.method === "click").map((request) => request.params);
+		expect(clicks[0]).toEqual({ target: "101", x: 3, y: 4, opts: { button: "right" }, menu: ["Add to", "Serif…"] });
+		expect(clicks[1]).toEqual({ target: "101", x: 3, y: 4, opts: { button: "right" } });
 	});
 
 	it("drives a window handle by its id and reports the engine's audit events for the run", async () => {

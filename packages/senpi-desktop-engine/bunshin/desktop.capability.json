@@ -21,6 +21,7 @@
 		"desktop.holdKeys",
 		"desktop.holdMouse",
 		"desktop.raiseWindow",
+		"desktop.window.bringToCurrentSpace",
 		"desktop.menus.items",
 		"desktop.menus.select",
 		"desktop.clipboard.read",
@@ -38,6 +39,7 @@
 		"desktop.ax.focus",
 		"desktop.ax.click",
 		"desktop.ax.typeText",
+		"desktop.ax.selectText",
 		"desktop.stopPath.status",
 		"desktop.stop"
 	],
@@ -59,6 +61,7 @@
 		"desktop.holdKeys": "mutate",
 		"desktop.holdMouse": "mutate",
 		"desktop.raiseWindow": "mutate",
+		"desktop.window.bringToCurrentSpace": "mutate",
 		"desktop.menus.items": "read",
 		"desktop.menus.select": "mutate",
 		"desktop.clipboard.read": "read",
@@ -76,6 +79,7 @@
 		"desktop.ax.focus": "mutate",
 		"desktop.ax.click": "mutate",
 		"desktop.ax.typeText": "mutate",
+		"desktop.ax.selectText": "mutate",
 		"desktop.stopPath.status": "read",
 		"desktop.stop": "read"
 	},
@@ -1050,6 +1054,19 @@
 			],
 			"additionalProperties": false
 		},
+		"desktop.window.bringToCurrentSpace": {
+			"type": "object",
+			"properties": {
+				"windowId": {
+					"type": "string"
+				}
+			},
+			"required": [
+				"windowId"
+			],
+			"description": "`window.bringToCurrentSpace`: the native id of the window to move into the\nuser's current Space. The window is usually on another Space, so it may be\nabsent from `windows`.",
+			"additionalProperties": false
+		},
 		"desktop.menus.items": {
 			"type": "object",
 			"properties": {
@@ -1478,6 +1495,41 @@
 					"additionalProperties": false
 				}
 			}
+		},
+		"desktop.ax.selectText": {
+			"type": "object",
+			"properties": {
+				"ref": {
+					"type": "string"
+				},
+				"text": {
+					"type": "string"
+				},
+				"prefix": {
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"suffix": {
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"select": {
+					"type": [
+						"string",
+						"null"
+					]
+				}
+			},
+			"required": [
+				"ref",
+				"text"
+			],
+			"description": "`ax.selectText`: selects `text` inside the value of the element `ref`\nnames, disambiguated by the `prefix` and `suffix` around it; `select` is\n`text` (the match), `start` or `end` (a caret before or after it).",
+			"additionalProperties": false
 		},
 		"desktop.stopPath.status": {
 			"type": "object",

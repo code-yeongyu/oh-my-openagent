@@ -182,13 +182,7 @@ pub(crate) fn set_bool(element: &AXUIElement, attribute: &str, value: bool) -> C
 
 /// Model-facing action names (`press`, `show_menu`) -> native `AX*` names.
 pub(super) fn action_name(action: &str) -> String {
-    match action.trim().to_ascii_lowercase().as_str() {
-        "press" => "AXPress".to_string(),
-        "raise" => "AXRaise".to_string(),
-        "showmenu" | "show_menu" => "AXShowMenu".to_string(),
-        _ if action.starts_with("AX") => action.to_string(),
-        _ => format!("AX{action}"),
-    }
+    senpi_desktop_core::ax::native_action_name(action)
 }
 
 #[cfg(test)]

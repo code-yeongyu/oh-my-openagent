@@ -69,6 +69,7 @@ fn click_desktop() -> Op {
         y: 10.0,
         frame_id: None,
         opts: None,
+        menu: None,
     })
 }
 

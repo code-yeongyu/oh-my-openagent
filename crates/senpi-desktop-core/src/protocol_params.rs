@@ -56,6 +56,11 @@ pub struct PointParams {
     /// the call fails `InvalidCoordinateFrame`.
     pub frame_id: Option<String>,
     pub opts: Option<PointerOptions>,
+    /// `click` only: the path of item labels to choose in the menu the click
+    /// opens (a context menu, or a menu button's or popup button's menu);
+    /// the menu is closed before the call returns (#11459).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub menu: Option<Vec<String>>,
 }
 
 /// `drag`: a pointer path in the pixels of the target's latest frame.
@@ -100,6 +105,15 @@ pub struct KeyChordParams {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RaiseWindowParams {
+    pub window_id: String,
+}
+
+/// `window.bringToCurrentSpace`: the native id of the window to move into the
+/// user's current Space. The window is usually on another Space, so it may be
+/// absent from `windows`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BringToCurrentSpaceParams {
     pub window_id: String,
 }
 
@@ -177,6 +191,11 @@ pub struct AxPerformParams {
     #[serde(rename = "ref")]
     pub ref_: String,
     pub action: String,
+    /// The path of item labels to choose in the menu the action opens
+    /// (`AXShowMenu`, or `AXPress` on a menu button or popup button); the
+    /// menu is closed before the call returns (#11459).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub menu: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -191,6 +210,26 @@ pub struct AxClickParams {
     #[serde(rename = "ref")]
     pub ref_: String,
     pub opts: Option<PointerOptions>,
+    /// The path of item labels to choose in the menu the click opens; the
+    /// menu is closed before the call returns (#11459).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub menu: Option<Vec<String>>,
+}
+
+/// `ax.selectText`: selects `text` inside the value of the element `ref`
+/// names, disambiguated by the `prefix` and `suffix` around it; `select` is
+/// `text` (the match), `start` or `end` (a caret before or after it).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct AxSelectTextParams {
+    #[serde(rename = "ref")]
+    pub ref_: String,
+    pub text: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prefix: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub suffix: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub select: Option<String>,
 }
 
 /// `ax.typeText`: types `text` into the element `ref` names. Only

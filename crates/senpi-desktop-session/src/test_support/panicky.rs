@@ -8,7 +8,7 @@ use image::RgbaImage;
 use parking_lot::Mutex;
 use senpi_desktop_backend_fake::{FakeBackend, FakeMethod};
 use senpi_desktop_core::ax::{AxBackend, AxHandle};
-use senpi_desktop_core::backend::{Backend, DeliveryMode, ElementDelivery, PointerEvent};
+use senpi_desktop_core::backend::{Backend, DeliveryMode, ElementDelivery, MenuChoice, PointerEvent};
 use senpi_desktop_core::error::{CoreResult, DesktopError, PermissionDeniedData, TccPermission};
 use senpi_desktop_core::frame::FrameGeometry;
 use senpi_desktop_core::keys::KeyName;
@@ -81,6 +81,16 @@ impl Backend for PanickyFake {
     ) -> CoreResult<()> {
         self.inner.pointer(target, ev, frame, mode)
     }
+    fn pointer_menu(
+        &mut self,
+        target: &Target,
+        ev: PointerEvent,
+        frame: &FrameGeometry,
+        mode: DeliveryMode,
+        choice: MenuChoice<'_>,
+    ) -> CoreResult<()> {
+        self.inner.pointer_menu(target, ev, frame, mode, choice)
+    }
     fn type_text(&mut self, target: &Target, text: &str, mode: DeliveryMode) -> CoreResult<()> {
         self.inner.type_text(target, text, mode)
     }
@@ -115,6 +125,9 @@ impl Backend for PanickyFake {
     }
     fn raise_window(&mut self, id: &str) -> CoreResult<()> {
         self.inner.raise_window(id)
+    }
+    fn bring_to_current_space(&mut self, id: &str, check_stop: &dyn Fn() -> CoreResult<()>) -> CoreResult<()> {
+        self.inner.bring_to_current_space(id, check_stop)
     }
     fn hold_keys(
         &mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode,

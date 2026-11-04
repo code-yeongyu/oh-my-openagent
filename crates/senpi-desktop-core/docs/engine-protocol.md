@@ -31,6 +31,7 @@ Protocol version `1`, ABI `senpi-desktop/1`. JSON-RPC 2.0, one JSON message per 
 | `holdKeys` | exec | no | no | `HoldKeysParams` | `null` | `ErrorCode` |
 | `holdMouse` | exec | no | no | `HoldMouseParams` | `null` | `ErrorCode` |
 | `raiseWindow` | exec | no | no | `RaiseWindowParams` | `null` | `ErrorCode` |
+| `window.bringToCurrentSpace` | exec | no | no | `BringToCurrentSpaceParams` | `null` | `ErrorCode` |
 | `menus.items` | read | no | no | `MenuPathParams` | `Vec<MenuItem>` | `ErrorCode` |
 | `menus.select` | exec | no | no | `MenuSelectParams` | `null` | `ErrorCode` |
 | `clipboard.read` | read | no | no | `EmptyParams` | `ClipboardText` | `ErrorCode` |
@@ -48,6 +49,7 @@ Protocol version `1`, ABI `senpi-desktop/1`. JSON-RPC 2.0, one JSON message per 
 | `ax.focus` | exec | no | no | `AxRefParams` | `null` | `ErrorCode` |
 | `ax.click` | exec | no | no | `AxClickParams` | `null` | `ErrorCode` |
 | `ax.typeText` | exec | no | no | `AxTypeTextParams` | `AxInputResult` | `ErrorCode` |
+| `ax.selectText` | exec | no | no | `AxSelectTextParams` | `AxTextSelection` | `ErrorCode` |
 | `stopPath.start` | exec | yes | no | `StopPathStartParams` | `StopPathStatus` | `ErrorCode`; `-32601` hostOnly via a bridge |
 | `stopPath.status` | read | no | no | `EmptyParams` | `StopPathStatus` | `ErrorCode` |
 | `stopPath.heartbeat` | read | yes | no | `EmptyParams` | `null` | `ErrorCode`; `-32601` hostOnly via a bridge |

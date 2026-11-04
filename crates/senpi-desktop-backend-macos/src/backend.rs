@@ -3,7 +3,7 @@
 
 use image::RgbaImage;
 use senpi_desktop_core::ax::{AxBackend, AxHandle};
-use senpi_desktop_core::backend::{Backend, DeliveryMode, ElementDelivery, PointerEvent};
+use senpi_desktop_core::backend::{Backend, DeliveryMode, ElementDelivery, MenuChoice, PointerEvent};
 use senpi_desktop_core::error::{CoreResult, DesktopError, TccPermission};
 use senpi_desktop_core::frame::FrameGeometry;
 use senpi_desktop_core::keys::KeyName;
@@ -153,6 +153,18 @@ impl Backend for MacosBackend {
         self.input.pointer(target, event, mode, &self.capture)
     }
 
+    fn pointer_menu(
+        &mut self,
+        target: &Target,
+        event: PointerEvent,
+        _frame: &FrameGeometry,
+        mode: DeliveryMode,
+        choice: MenuChoice<'_>,
+    ) -> CoreResult<()> {
+        Self::require_input_permission()?;
+        self.input.pointer_menu(target, event, mode, &self.capture, choice)
+    }
+
     fn type_text(&mut self, target: &Target, text: &str, mode: DeliveryMode) -> CoreResult<()> {
         Self::require_input_permission()?;
         self.show_typing_target(target);
@@ -259,6 +271,11 @@ impl Backend for MacosBackend {
     fn raise_window(&mut self, id: &str) -> CoreResult<()> {
         Self::require_input_permission()?;
         self.raise(id)
+    }
+
+    fn bring_to_current_space(&mut self, id: &str, check_stop: &dyn Fn() -> CoreResult<()>) -> CoreResult<()> {
+        Self::require_input_permission()?;
+        crate::spaces::bring_to_current_space(id, check_stop)
     }
 
     fn ax(&mut self) -> Option<&mut dyn AxBackend> {

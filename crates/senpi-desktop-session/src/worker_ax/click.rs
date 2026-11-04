@@ -4,9 +4,10 @@
 //! ref's snapshot target.
 
 use senpi_desktop_core::ax::{AxHandle, AxOwner};
-use senpi_desktop_core::backend::PointerEvent;
+use senpi_desktop_core::backend::{MenuChoice, PointerEvent};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::frame::FrameGeometry;
+use senpi_desktop_core::menus::validate_path;
 use senpi_desktop_core::protocol_params::AxClickParams;
 use senpi_desktop_core::types::{DesktopWindow, Target};
 use senpi_desktop_safety::MutatingAction;
@@ -15,6 +16,7 @@ use crate::mutate::Mutation;
 use crate::pointer::ParsedPointerOptions;
 use crate::request::Response;
 use crate::worker::{Audited, Worker};
+use crate::worker_input::interrupted;
 
 impl Worker {
     /// Clicks the centre of the element's bounds in the window that owns it.
@@ -25,11 +27,19 @@ impl Worker {
     ) -> CoreResult<Audited> {
         let mode = ParsedPointerOptions::requested_mode(params.opts.as_ref());
         let mutation = Mutation::new(MutatingAction::AxClick, self.ref_target(&params.ref_), mode);
-        self.mutate(&mutation, cancelled, |worker| worker.ax_click_now(params))
+        let supervisor = self.safety.supervisor.clone();
+        let policy = self.stop_policy();
+        self.mutate(&mutation, cancelled, |worker| {
+            let check_stop = || interrupted(&supervisor, &policy, cancelled, "choosing a menu item");
+            worker.ax_click_now(params, &check_stop)
+        })
     }
 
-    fn ax_click_now(&mut self, params: &AxClickParams) -> CoreResult<Response> {
+    fn ax_click_now(&mut self, params: &AxClickParams, check_stop: &dyn Fn() -> CoreResult<()>) -> CoreResult<Response> {
         let options = ParsedPointerOptions::parse(params.opts.as_ref())?;
+        if let Some(path) = &params.menu {
+            validate_path(path, false)?;
+        }
         let handle: AxHandle = self.registry.resolve(&params.ref_)?;
         let bounds = self
             .ax_parts()?
@@ -47,12 +57,15 @@ impl Worker {
             count: options.count,
             modifiers: options.modifiers,
         };
-        self.backend()?.pointer(
-            &Target::Window(window),
-            event,
-            &FrameGeometry::identity_global(),
-            options.mode,
-        )?;
+        let target = Target::Window(window);
+        let frame = FrameGeometry::identity_global();
+        match &params.menu {
+            None => self.backend()?.pointer(&target, event, &frame, options.mode)?,
+            Some(path) => {
+                let choice = MenuChoice { path, check_stop };
+                self.backend()?.pointer_menu(&target, event, &frame, options.mode, choice)?;
+            }
+        }
         Ok(Response::Unit)
     }
 

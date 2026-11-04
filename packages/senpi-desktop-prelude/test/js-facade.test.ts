@@ -278,6 +278,32 @@ describe("JavaScript computer facade", () => {
 		]);
 	});
 
+	it("sends el.selectText as a ref-hopped chain and returns the selection", async () => {
+		// Given
+		const selection = { start: 6, length: 4, text: "beta", focused: true };
+		const kernel = loadJsFacade((args) => {
+			const chain = Array.isArray(args.chain) ? args.chain : [];
+			if (chain.length === 1 && chain[0].method === "ref") return { text: "", details: { value: ELEMENT_SNAPSHOT } };
+			return { text: "", details: { value: selection } };
+		});
+
+		// When
+		const value = await kernel.run(`
+			const el = await computer.ref("e1");
+			return el.selectText("beta", { prefix: "alpha " });
+		`);
+
+		// Then
+		expect(value).toEqual(selection);
+		expect(kernel.calls.at(-1)).toEqual({
+			action: "call",
+			chain: [
+				{ method: "ref", args: ["e1"] },
+				{ method: "selectText", args: ["beta", { prefix: "alpha " }] },
+			],
+		});
+	});
+
 	it("sends control helpers as one-step call chains (#9651 B5b)", async () => {
 		// Given
 		const kernel = loadJsFacade(() => ({ text: "", details: { value: { active: true } } }));

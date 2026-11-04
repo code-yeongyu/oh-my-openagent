@@ -9,7 +9,16 @@ export interface DeliveryOptions {
 	readonly delivery?: string;
 }
 
-export interface ClickOptions extends DeliveryOptions {
+/**
+ * The path of item labels to choose in the menu a press opens (a context menu, or a menu button's or popup
+ * button's menu); the menu is closed before the call returns, chosen or not. Labels match like
+ * `win.menu.select`: case-insensitively, a trailing ellipsis ignored, each label naming exactly one item.
+ */
+export interface MenuOptions {
+	readonly menu?: readonly string[];
+}
+
+export interface ClickOptions extends DeliveryOptions, MenuOptions {
 	readonly button?: string;
 	readonly count?: number;
 	readonly modifiers?: readonly string[];
@@ -41,6 +50,11 @@ function validateHoldDuration(duration: number): void {
 export function pointerOptions(options: ClickOptions = {}): object {
 	const { button, count, modifiers, delivery } = options;
 	return { button, count, modifiers, deliveryMode: delivery };
+}
+
+/** The engine `menu` param of a press that opens a menu; absent when no path was given. */
+export function menuParam(options: MenuOptions = {}): { readonly menu?: readonly string[] } {
+	return options.menu === undefined ? {} : { menu: [...options.menu] };
 }
 
 function chordKeys(chord: string | readonly string[]): readonly string[] {
@@ -83,7 +97,8 @@ export class InputTarget {
 	}
 
 	click(x: number, y: number, options?: ClickOptions): Promise<void> {
-		return send(this.#method, "click", "click", { target: this.#target, x, y, opts: pointerOptions(options) });
+		const params = { target: this.#target, x, y, opts: pointerOptions(options), ...menuParam(options) };
+		return send(this.#method, "click", "click", params);
 	}
 
 	doubleClick(x: number, y: number, options?: ClickOptions): Promise<void> {
