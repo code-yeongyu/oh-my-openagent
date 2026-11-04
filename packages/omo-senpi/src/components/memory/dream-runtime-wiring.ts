@@ -1,3 +1,5 @@
+import type { InFlightReads } from "@oh-my-opencode/memory-core"
+
 import { createDreamTriggerWiring, resolveDreamTriggerSettings } from "./dream-trigger"
 import { resolveMemorySettings } from "./identity-runtime"
 import { sessionIdFrom } from "./wiring-context"
@@ -9,8 +11,10 @@ export function buildDreamTriggerWiring(
   runtimeWiring: MemoryRuntimeWiring,
   activeSession: { current?: string },
   hasUserActivity: (sessionId: string) => boolean,
+  work: InFlightReads,
 ) {
   return createDreamTriggerWiring({
+    work,
     resolveSession: (eventCtx) => {
       const sessionId = sessionIdFrom(eventCtx)
       return sessionId !== undefined && hasUserActivity(sessionId) ? runtimeWiring.dreamSessionFor(eventCtx) : undefined
