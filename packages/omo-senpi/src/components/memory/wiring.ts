@@ -102,6 +102,45 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
   )
   const { resolveContext, journalWiringFor, factsWiringFor, runtimeFor } = runtimeWiring
 
+  // The identity-wide recovery pass walks every run directory the identity ever kept, so it can outlast
+  // the two-second settle budget. Awaited on the turn end it cost every turn that budget and was cancelled
+  // before it could record success, so the next turn started it again. It runs beside the turn instead:
+  // once per session, cancelled only when the session is retired, and the shutdown drain lets a durable
+  // transition it already admitted finish.
+  const sessionReconciles = new Map<string, { readonly controller: AbortController; readonly done: Promise<void> }>()
+  const startSessionReconcile = (sessionId: string, identity: MemoryIdentityContext): void => {
+    if (sessionReconciles.has(sessionId)) return
+    const controller = new AbortController()
+    const { signal } = controller
+    const done = userActivity.reconcileOnce(sessionId, async () => {
+      try {
+        await runtimeFor(identity).reconcile(signal)
+        signal.throwIfAborted()
+      } catch (error) {
+        signal.throwIfAborted()
+        if (options.logger !== undefined) logBindReconcileFailure(options.logger, error)
+      }
+      if (resolveContext(sessionId) !== identity) return
+      pressureDreamAdmission.requestDeferred(sessionId)
+    }).catch((error: unknown) => {
+      // A retired session's pass is not a failure: the next bind or settle retries from durable state.
+      if (signal.aborted) return
+      options.logger?.warn("omo-senpi memory reconciliation failed after a turn", {
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }).finally(() => {
+      if (sessionReconciles.get(sessionId)?.controller === controller) sessionReconciles.delete(sessionId)
+    })
+    sessionReconciles.set(sessionId, { controller, done })
+  }
+  const retireSessionReconcile = (sessionId: string): Promise<void> | undefined => {
+    const flight = sessionReconciles.get(sessionId)
+    if (flight === undefined) return undefined
+    sessionReconciles.delete(sessionId)
+    flight.controller.abort(new DOMException("Memory session retired", "AbortError"))
+    return flight.done
+  }
+
   const nudgeWiring = createMemoryNudgeWiring({
     resolveContext,
     resolveSettings: (identity) => {
@@ -262,18 +301,7 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
           if (identity !== undefined) {
             observer?.phase("onSettled.reflection.staleHolder")
             await recoverStaleHolderAfterTurn(sessionId, identity, eventCtx, observer?.signal)
-            observer?.phase("onSettled.reflection.reconcile")
-            await userActivity.reconcileOnce(sessionId, async () => {
-              try {
-                await runtimeFor(identity).reconcile(observer?.signal)
-                observer?.signal.throwIfAborted()
-              } catch (error) {
-                observer?.signal.throwIfAborted()
-                if (options.logger !== undefined) logBindReconcileFailure(options.logger, error)
-              }
-              if (resolveContext(sessionId) !== identity) return
-              pressureDreamAdmission.requestDeferred(sessionId)
-            })
+            startSessionReconcile(sessionId, identity)
           }
           observer?.phase("onSettled.status.sync")
           if (resolveContext(sessionId) !== identity) return
@@ -292,6 +320,7 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
         })
       })
       activeSession.current = sessionId
+      void retireSessionReconcile(sessionId)
       userActivity.reset(sessionId)
       pressureDreamAdmission.reset(sessionId)
       lastEventCtx.current = eventCtx
@@ -329,6 +358,8 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
       // shutdown, which Windows reports as EBUSY/EFAULT on the next remove (#10154).
       await shutdownDrain.raceDetached(input, "maintenance-settle", () => maintenance.settled())
       await shutdownDrain.raceDetached(input, "status-settle", () => reflectionLive.settled())
+      const reconciling = retireSessionReconcile(input.sessionId)
+      if (reconciling !== undefined) await shutdownDrain.raceDetached(input, "reconcile-settle", () => reconciling)
       // A recall ranking saves the repository's terms into its `.git` after the prompt; let that write finish.
       await shutdownDrain.raceDetached(input, "recall-store-settle", () => corpusCache.settled())
       await shutdownDrain.raceDetached(input, "memory-block-settle", () => promptCache.settled())
