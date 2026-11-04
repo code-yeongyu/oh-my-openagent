@@ -1,4 +1,4 @@
-// Mirror of senpi `core/sensitive-output` (2026.10.30-1). senpi does not export that module from its
+// Mirror of senpi `core/sensitive-output` (2026.10.31-2). senpi does not export that module from its
 // package entry and omo-senpi may only import senpi types, so the sidecar carries the same rules verbatim:
 // the environment-assignment and bearer patterns here, and senpi-ai's `redactCredentialShapes` in
 // `sensitive-output-shapes.ts`. senpi also replaces the config reference values it resolved in its own process
