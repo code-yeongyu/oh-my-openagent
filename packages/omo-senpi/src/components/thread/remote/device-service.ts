@@ -1,4 +1,4 @@
-import { connectDeviceService, type CommandResult, type DeviceService, type RemoteAttach } from "@oh-my-opencode/device-service-core"
+import { connectDeviceService, LocalApiError, type CommandResult, type DeviceService, type RemoteAttach } from "@oh-my-opencode/device-service-core"
 import type { JsonObject, RemoteCommandOutcome, RemoteSessionsPort } from "./ports"
 
 export type DeviceServiceSessionsOptions = {
@@ -64,7 +64,17 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
     // Relay daemon #393 adds the attach-less `session.command {device, endpoint, rpc}`; until this client carries it,
     // a session-less record on another device is refused typed instead of being sent through an unrelated attach.
     endpointCommand: async () => ({ kind: "refused", reason: "endpoint_command_unavailable" }),
-    sessionCommand: async (device, sessionId, rpc) => outcomeOf(await (await attach(device, sessionId)).command(wireRecord(rpc))),
+    sessionCommand: async (device, sessionId, rpc) => {
+      const attached = await attach(device, sessionId)
+      try {
+        return outcomeOf(await attached.command(wireRecord(rpc)))
+      } catch (error) {
+        // An owner's refusal (no command_id) ran nothing. Anything else - a timeout after sending, or the attach or
+        // connection ending first - may have run on the other device, so it is uncertain and never retried here.
+        if (error instanceof LocalApiError && error.command_id === undefined) return { kind: "refused", reason: error.code }
+        return { kind: "uncertain", reason: "reply_lost" }
+      }
+    },
     read: async (device, sessionId, tail) => {
       const page = await (await attach(device, sessionId)).read({ tail })
       const entries: JsonObject[] = page.entries.flatMap((item) => ("entry" in item && typeof item.entry === "object" && item.entry !== null && !Array.isArray(item.entry) ? [item.entry as JsonObject] : []))

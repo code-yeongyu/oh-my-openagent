@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import type { CommandResult, DeviceService, RemoteAttach } from "@oh-my-opencode/device-service-core"
+import { LocalApiError, type CommandResult, type DeviceService, type RemoteAttach } from "@oh-my-opencode/device-service-core"
 import { createDeviceServiceSessions } from "./device-service"
 import { createLazyRemoteSurface } from "./lazy-remote"
 
@@ -50,5 +50,69 @@ describe("device-service adapter of the thread tools' account surface", () => {
     expect(String(first)).toContain("sidecar missing")
     expect(await surface.sessions.status()).toEqual({ state: "connected" })
     expect(loads).toBe(2)
+  })
+})
+
+describe("device-service adapter: lost replies and connection lifecycle", () => {
+  const lifecycle = () => {
+    const calls = { connect: 0, attach: 0, sent: 0 }
+    let closeService: () => void = () => {}
+    let detachAttach: () => void = () => {}
+    let commandAnswer: () => Promise<CommandResult> = async () => state({ state: "engine_applied" }, {})
+    const service = () => {
+      calls.connect += 1
+      return {
+        status: async () => ({ state: "connected" }),
+        attach: async () => {
+          calls.attach += 1
+          return { command: async () => { calls.sent += 1; return await commandAnswer() }, read: async () => ({ entries: [], next_before: null }), detached: new Promise<string>((resolve) => { detachAttach = () => resolve("detached") }) } as unknown as RemoteAttach
+        },
+        closed: new Promise<void>((resolve) => { closeService = resolve }),
+      } as unknown as DeviceService
+    }
+    return { calls, connect: async () => service(), close: () => closeService(), detach: () => detachAttach(), answer: (next: () => Promise<CommandResult>) => { commandAnswer = next } }
+  }
+
+  test.each([
+    ["the attach ends before the reply", () => Promise.reject(new Error("the attach ended before its reply: closed"))],
+    ["the local API times out after sending", () => Promise.reject(new LocalApiError("request_timeout", "no reply", { command_id: "c1" }))],
+  ] as const)("#given %s #when a command was sent #then the outcome is uncertain, never an error to retry, and it is sent once", async (_label, reply) => {
+    const l = lifecycle()
+    l.answer(reply)
+    const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: l.connect })
+    expect(await port.sessionCommand("b", "s1", { type: "prompt", message: "x" })).toEqual({ kind: "uncertain", reason: "reply_lost" })
+    expect(l.calls.sent).toBe(1)
+  })
+
+  test("#given the local API refuses a command before running it #when it answers #then the outcome is refused with its code", async () => {
+    const l = lifecycle()
+    l.answer(() => Promise.reject(new LocalApiError("not_attached", "no such attach")))
+    const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: l.connect })
+    expect(await port.sessionCommand("b", "s1", { type: "abort" })).toEqual({ kind: "refused", reason: "not_attached" })
+  })
+
+  test("#given the proven connection closes #when the next call runs #then a new connection is made", async () => {
+    const l = lifecycle()
+    const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: l.connect })
+    await port.status()
+    const closed = new Promise<void>((resolve) => queueMicrotask(resolve))
+    l.close()
+    await closed
+    await Promise.resolve()
+    await port.status()
+    expect(l.calls.connect).toBe(2)
+  })
+
+  test("#given a session's attach ends #when the next command for that session runs #then a new attach is opened", async () => {
+    const l = lifecycle()
+    const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: l.connect })
+    await port.sessionCommand("b", "s1", { type: "abort" })
+    await port.sessionCommand("b", "s1", { type: "abort" })
+    expect(l.calls.attach).toBe(1)
+    l.detach()
+    await Promise.resolve()
+    await Promise.resolve()
+    await port.sessionCommand("b", "s1", { type: "abort" })
+    expect(l.calls.attach).toBe(2)
   })
 })
