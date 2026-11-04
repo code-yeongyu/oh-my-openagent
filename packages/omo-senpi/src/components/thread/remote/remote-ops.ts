@@ -1,7 +1,10 @@
 import type { ThreadToolResult } from "../contracts"
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
+import { INITIAL_SKILLS_CONTEXT_KEY } from "../initial-skills"
 import { threadLink } from "../thread-link"
-import { transcriptRole } from "../tools/internals"
+import type { ThreadReadInput } from "../contracts"
+import type { ThreadTranscriptEntry } from "../reader"
+import { liveReadResult } from "../tools/read-ops"
 import type { AliasError, AliasHolder, JsonObject, RemoteCommandOutcome, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 
 type Failure = { readonly kind: "error"; readonly error: ThreadToolFailure }
@@ -83,21 +86,22 @@ function openedId(response: JsonObject): string | undefined {
 }
 
 export type RemoteOpen =
-  | { readonly kind: "create"; readonly device: string; readonly cwd?: string; readonly name?: string }
+  | { readonly kind: "create"; readonly device: string; readonly cwd?: string; readonly name?: string; readonly skills?: readonly string[] }
   | { readonly kind: "open"; readonly row: RemoteSessionRow }
-  | { readonly kind: "fork"; readonly row: RemoteSessionRow; readonly cwd?: string; readonly name?: string }
+  | { readonly kind: "fork"; readonly row: RemoteSessionRow; readonly cwd?: string; readonly name?: string; readonly skills?: readonly string[] }
 
 /** create / open / fork on another device: one `open_session` on its engine endpoint (#393's attach-less shape). */
 export async function openRemote(remote: RemoteThreadSurface, request: RemoteOpen): Promise<ThreadToolResult> {
   const device = request.kind === "create" ? request.device : request.row.device
   const offline = await deviceOnline(remote, device)
   if (offline !== undefined) return offline
-  const record: JsonObject = request.kind === "create"
+  const skills = request.kind === "open" || request.skills === undefined || request.skills.length === 0 ? {} : { context: { [INITIAL_SKILLS_CONTEXT_KEY]: JSON.stringify(request.skills) } }
+  const opened: JsonObject = request.kind === "create"
     ? { type: "open_session", retain_on_disconnect: true, ...(request.cwd === undefined ? {} : { cwd: request.cwd }) }
     : request.kind === "open"
       ? { type: "open_session", retain_on_disconnect: true, sessionPath: request.row.path }
       : { type: "open_session", retain_on_disconnect: true, forkFrom: request.row.session_id, ...(request.cwd === undefined ? {} : { cwd: request.cwd }) }
-  const outcome = await remote.sessions.endpointCommand(device, record)
+  const outcome = await remote.sessions.endpointCommand(device, { ...opened, ...skills })
   if (outcome.kind !== "ok") return outcomeFailure(outcome, device)
   const threadId = request.kind === "open" ? request.row.session_id : openedId(outcome.response)
   if (threadId === undefined) return fail("internal_error", `Device ${device} opened a session but did not name it.`, "Call thread_list with all_scope to find the new thread.", { device })
@@ -115,7 +119,10 @@ export async function openRemote(remote: RemoteThreadSurface, request: RemoteOpe
   }
 }
 
-/** thread_send / thread_handoff to another device's session: one `prompt`, carrying the chain's count (K8, R8.c). */
+/**
+ * thread_send / thread_handoff to another device's session: one `prompt`, carrying the chain's count (K8, R8.c).
+ * Every result field comes from the remote engine: the turn it started, or its own pending-message count.
+ */
 export async function promptRemote(remote: RemoteThreadSurface, row: RemoteSessionRow, message: string, hop: number): Promise<ThreadToolResult> {
   const offline = await deviceOnline(remote, row.device)
   if (offline !== undefined) return offline
@@ -125,37 +132,31 @@ export async function promptRemote(remote: RemoteThreadSurface, row: RemoteSessi
   const record = remote.chain.stamp({ type: "prompt", sessionId: row.session_id, message, ...(streaming ? { streamingBehavior: "followUp" } : {}) }, hop)
   const sent = await remote.sessions.sessionCommand(row.device, row.session_id, record)
   if (sent.kind !== "ok") return outcomeFailure(sent, row.device)
-  const turnId = typeof sent.response["turnId"] === "string" ? sent.response["turnId"] : ""
-  return {
-    kind: "ok",
-    thread_id: row.session_id,
-    link: threadLink(row.session_id, row.title),
-    delivery: streaming ? { kind: "queued", queue_position: 1 } : { kind: "started", turn_id: turnId },
-    message_seq: 0,
-    deduplicated: false,
-    device: row.device,
-  }
+  const turnId = sent.response["turnId"]
+  if (!streaming && typeof turnId === "string" && turnId.length > 0) return { kind: "ok", thread_id: row.session_id, link: threadLink(row.session_id, row.title), delivery: { kind: "started", turn_id: turnId }, deduplicated: false, device: row.device }
+  const after = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_state", sessionId: row.session_id })
+  const pending = after.kind === "ok" ? after.response["pendingMessageCount"] : undefined
+  if (typeof pending !== "number" || !Number.isInteger(pending) || pending < 1) return fail("idempotency_uncertain", `Device ${row.device} accepted the message but did not report where it waits.`, "Read the thread before deciding whether to send again.", { device: row.device })
+  return { kind: "ok", thread_id: row.session_id, link: threadLink(row.session_id, row.title), delivery: { kind: "queued", queue_position: pending }, deduplicated: false, device: row.device }
 }
 
+/** The local engine's own `interrupt` record, so an idle session answers interrupted:false exactly as on this device. */
 export async function interruptRemote(remote: RemoteThreadSurface, row: RemoteSessionRow, turnId: string | undefined): Promise<ThreadToolResult> {
   const offline = await deviceOnline(remote, row.device)
   if (offline !== undefined) return offline
-  const outcome = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "abort", sessionId: row.session_id })
+  const outcome = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "interrupt", sessionId: row.session_id, ...(turnId === undefined ? {} : { turnId }) })
   if (outcome.kind !== "ok") return outcomeFailure(outcome, row.device)
-  return { kind: "ok", thread_id: row.session_id, ...(turnId === undefined ? {} : { turn_id: turnId }), interrupted: true }
+  const reported = outcome.response["turnId"]
+  return { kind: "ok", thread_id: row.session_id, ...(typeof reported === "string" ? { turn_id: reported } : {}), interrupted: outcome.response["interrupted"] === true }
 }
 
-export async function readRemote(remote: RemoteThreadSurface, row: RemoteSessionRow): Promise<ThreadToolResult> {
+/** The local engine's `get_messages`, read through the same bounded reader as a live local thread (cursor, max_bytes, truncated). */
+export async function readRemote(remote: RemoteThreadSurface, row: RemoteSessionRow, window: ThreadReadInput): Promise<ThreadToolResult> {
   const offline = await deviceOnline(remote, row.device)
   if (offline !== undefined) return offline
-  const outcome = await remote.sessions.read(row.device, row.session_id, 200)
+  const outcome = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_messages", sessionId: row.session_id })
   if (outcome.kind !== "ok") return outcomeFailure(outcome, row.device)
-  const entries = Array.isArray(outcome.response["entries"]) ? outcome.response["entries"] : []
-  const items = entries.flatMap((entry, seq) => {
-    if (typeof entry !== "object" || entry === null) return []
-    const role = Reflect.get(entry, "role")
-    const content = Reflect.get(entry, "content")
-    return typeof content === "string" ? [{ seq, role: transcriptRole(role), content }] : []
-  })
-  return { kind: "ok", thread_id: row.session_id, link: threadLink(row.session_id, row.title), items, truncated: false, source: "live_host", device: row.device }
+  const messages = Array.isArray(outcome.response["messages"]) ? outcome.response["messages"] as ThreadTranscriptEntry[] : []
+  const result = liveReadResult(row.session_id, row.title, messages, window)
+  return result.kind === "ok" ? { ...result, device: row.device } as ThreadToolResult : result
 }

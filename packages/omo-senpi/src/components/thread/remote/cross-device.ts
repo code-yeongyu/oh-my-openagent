@@ -21,8 +21,13 @@ export async function crossTarget(remote: RemoteThreadSurface | undefined, addre
   if (local.kind === "error" && local.code !== "not_found") return { kind: "local", address }
   const unavailable = await remoteAvailable(remote)
   if (unavailable !== undefined) return local.kind === "ok" || unavailable.error.code !== "relay_requires_paid_plan" ? { kind: "local", address } : { kind: "error", result: unavailable }
-  const across = await locateAcross(remote, address)
-  if ("error" in across) return { kind: "error", result: across }
+  let across: Awaited<ReturnType<typeof locateAcross>>
+  try {
+    across = await locateAcross(remote, address)
+  } catch {
+    return { kind: "local", address }
+  }
+  if ("error" in across) return local.kind === "ok" ? { kind: "local", address } : { kind: "error", result: across }
   if (across.where === "remote") return { kind: "remote", row: across.row }
   if (across.where === "here") return { kind: "local", address: across.session_id }
   return { kind: "local", address }
@@ -44,7 +49,7 @@ async function targetDevice(remote: RemoteThreadSurface, device: string): Promis
 }
 
 export type CreatePlan =
-  | { readonly kind: "local" }
+  | { readonly kind: "local"; readonly forkFrom?: string }
   | { readonly kind: "open-local"; readonly address: string }
   | { readonly kind: "done"; readonly result: ThreadToolResult }
 
@@ -54,7 +59,7 @@ export type CreatePlan =
  */
 export async function planCreate(
   remote: RemoteThreadSurface | undefined,
-  value: { readonly thread?: string; readonly device?: string; readonly fork_from?: string; readonly cwd?: string; readonly name?: string; readonly alias?: string },
+  value: { readonly thread?: string; readonly device?: string; readonly fork_from?: string; readonly cwd?: string; readonly name?: string; readonly alias?: string; readonly skills?: readonly string[] },
   local: (address: string) => LocalResolution,
 ): Promise<CreatePlan> {
   if (value.thread !== undefined && value.device !== undefined) return { kind: "done", result: invalid("An existing thread is named by its id or alias only, never with a device.", "Drop device; the thread's device is found from the account's session list.") }
@@ -72,7 +77,7 @@ export async function planCreate(
   if (value.thread !== undefined) {
     const target = await crossTarget(remote, value.thread, local(value.thread))
     if (target.kind === "error") return { kind: "done", result: target.result }
-    if (target.kind === "remote") return { kind: "done", result: await openRemote(remote, { kind: "open", row: target.row }) }
+    if (target.kind === "remote") return { kind: "done", result: await withAlias(remote, value.alias, await openRemote(remote, { kind: "open", row: target.row }), target.row.device) }
     return { kind: "open-local", address: target.address }
   }
   if (value.fork_from !== undefined) {
@@ -84,8 +89,14 @@ export async function planCreate(
         if ("result" in wanted) return { kind: "done", result: wanted.result }
         if (wanted.id !== source.row.device) return { kind: "done", result: invalid("A fork is created on the device that holds its source thread.", "Drop device, or fork a thread on the device you name.") }
       }
-      return { kind: "done", result: await withAlias(remote, value.alias, await openRemote(remote, { kind: "fork", row: source.row, cwd: value.cwd, name: value.name }), source.row.device) }
+      return { kind: "done", result: await withAlias(remote, value.alias, await openRemote(remote, { kind: "fork", row: source.row, cwd: value.cwd, name: value.name, skills: value.skills }), source.row.device) }
     }
+    if (value.device !== undefined) {
+      const wanted = await targetDevice(remote, value.device)
+      if ("result" in wanted) return { kind: "done", result: wanted.result }
+      if (wanted.id !== undefined) return { kind: "done", result: invalid("A fork is created on the device that holds its source thread.", "Drop device, or fork a thread on the device you name.") }
+    }
+    return { kind: "local", forkFrom: source.address }
   }
   if (value.device === undefined) return { kind: "local" }
   const unavailable = await remoteAvailable(remote)
@@ -93,7 +104,7 @@ export async function planCreate(
   const target = await targetDevice(remote, value.device)
   if ("result" in target) return { kind: "done", result: target.result }
   if (target.id === undefined) return { kind: "local" }
-  return { kind: "done", result: await withAlias(remote, value.alias, await openRemote(remote, { kind: "create", device: target.id, cwd: value.cwd, name: value.name }), target.id) }
+  return { kind: "done", result: await withAlias(remote, value.alias, await openRemote(remote, { kind: "create", device: target.id, cwd: value.cwd, name: value.name, skills: value.skills }), target.id) }
 }
 
 /** Claims the alias for a thread just created; a lost race answers alias_taken with the created thread named. */
