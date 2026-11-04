@@ -1,5 +1,5 @@
-import type { MachineHubTransport } from "@sisyphuslabs/bunshin-ts"
-import { createRelayTransport, relayStatus } from "@sisyphuslabs/bunshin-ts-relay"
+import type { MachineHubTransport } from "../../vendor/bunshin-ts/index.js"
+import { createRelayTransport, relayStatus } from "../../vendor/bunshin-ts-relay/index.js"
 
 const TRANSPORT_CHOICE_ENV = "BUNSHIN_TS_TRANSPORT"
 const DEVICE_SERVICE_STATE_DIR_ENV = "OMO_DEVICE_SERVICE_STATE_DIR"

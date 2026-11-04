@@ -1522,6 +1522,8 @@
     "packages/omo-senpi/src/install/plugin-artifacts.ts",
     "packages/omo-senpi/src/install/senpi-settings.ts",
     "packages/omo-senpi/tsconfig.json",
+    "packages/omo-senpi/vendor/bunshin-ts-relay/index.js",
+    "packages/omo-senpi/vendor/bunshin-ts/index.js",
     "packages/senpi-desktop-engine/package.json",
     "packages/senpi-desktop-engine/src/acquire.ts",
     "packages/senpi-desktop-engine/src/checksums.ts",

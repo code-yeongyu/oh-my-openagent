@@ -63,12 +63,11 @@ describe("omo-senpi bundle purity", () => {
       const { toolkitSdkInputs } = built
       expect(toolkitSdkInputs.length).toBeGreaterThan(0)
       expect(toolkitSdkInputs.filter(input => input.replaceAll("\\\\", "/").includes("node_modules/"))).toEqual([])
-      // The bunshin-ts SDK is its two npm packages by design; what must never ride along is the senpi runtime.
+      // The bunshin-ts SDK is its entry files, the two vendored packages and their one npm dependency; no senpi runtime.
       const bunshinTsInputs = built.bunshinTsInputs.map(input => input.replaceAll("\\", "/"))
-      expect(bunshinTsInputs.filter(input => !input.includes("node_modules/") && !/src\/extension\/bunshin-ts-[a-z-]+\.ts$/.test(input))).toEqual([])
-      expect(bunshinTsInputs.filter(input => /node_modules\/(@code-yeongyu\/senpi|@earendil-works|@mariozechner)\//.test(input))).toEqual([])
-      expect(bunshinTsInputs.some(input => input.includes("node_modules/@sisyphuslabs/bunshin-ts/"))).toBe(true)
-      expect(bunshinTsInputs.some(input => input.includes("node_modules/@sisyphuslabs/bunshin-ts-relay/"))).toBe(true)
+      expect(bunshinTsInputs.filter(input => !/(src\/extension\/bunshin-ts-[a-z-]+\.ts|\/vendor\/bunshin-ts(-relay)?\/index\.js|\/node_modules\/@sinclair\/typebox\/.+)$/.test(input))).toEqual([])
+      expect(bunshinTsInputs.some(input => input.endsWith("/vendor/bunshin-ts/index.js"))).toBe(true)
+      expect(bunshinTsInputs.some(input => input.endsWith("/vendor/bunshin-ts-relay/index.js"))).toBe(true)
       // The sidecar gets the PostHog class from the main bundle; its gzip/Sentry top-level code must not come along.
       const { telemetryRecoveryInputs } = built
       expect(telemetryRecoveryInputs.length).toBeGreaterThan(0)

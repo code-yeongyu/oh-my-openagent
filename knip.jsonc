@@ -9,7 +9,8 @@
   // Remove an entry when its finding is fixed. Root-workspace file ignores live at the top level (knip reads the root
   // workspace's ignoreIssues only there).
   // Third-party projects vendored as git submodules; the build materializes them, they are not this repository's code.
-  "ignore": ["packages/shared-skills/upstreams/**"],
+  // The bunshin-ts build output vendored byte for byte (pinned by packages/omo-senpi/vendor/PIN.json) is upstream code too.
+  "ignore": ["packages/shared-skills/upstreams/**", "packages/omo-senpi/vendor/**"],
   // Unused exports already present at origin dev 4686e425b5, named per symbol. knip has no per-symbol ignore and a file-wide
   // ignoreIssues "exports" entry would also hide a new unused export in that file, so script/knip-preexisting-exports.ts
   // (shared byte for byte with omo-relay-daemon, sha256-pinned by script/knip-coverage.test.ts) drops exactly these names, and

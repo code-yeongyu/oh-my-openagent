@@ -73,8 +73,7 @@
     "@oh-my-opencode/team-core": "workspace:*",
     "@oh-my-opencode/telemetry-core": "workspace:*",
     "@oh-my-opencode/utils": "workspace:*",
-    "@sisyphuslabs/bunshin-ts": "0.1.0",
-    "@sisyphuslabs/bunshin-ts-relay": "0.1.0",
+    "@sinclair/typebox": "0.34.52",
     "typebox": "1.3.34"
   },
   "peerDependencies": {

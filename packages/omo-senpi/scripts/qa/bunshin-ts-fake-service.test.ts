@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { connect } from "@sisyphuslabs/bunshin-ts"
-import { createRelayTransport, relayStatus } from "@sisyphuslabs/bunshin-ts-relay"
+import { connect } from "../../vendor/bunshin-ts/index.js"
+import { createRelayTransport, relayStatus } from "../../vendor/bunshin-ts-relay/index.js"
 
 import { FAKE_DEVICES, startFakeDeviceService, type FakeDeviceService } from "./bunshin-ts-fake-service"
 
