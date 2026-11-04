@@ -36,6 +36,10 @@ const REFUSED_BEFORE_SENDING: ReadonlySet<LocalApiError["code"]> = new Set<Local
 
 const notSentReason = (error: unknown): string => (error instanceof LocalApiError ? error.code : "attach_failed")
 
+// The engine records the thread tools send that change nothing on the other device (thread_read, the pre-send probe).
+// Like the port's read, every failure of one is a typed refusal: there is nothing that may have run.
+const READ_ONLY_RECORDS: ReadonlySet<string> = new Set(["get_state", "get_messages"])
+
 function outcomeOf(result: CommandResult): RemoteCommandOutcome {
   const { outcome } = result
   if (outcome.state === "engine_refused") return { kind: "refused", reason: outcome.reason }
@@ -93,9 +97,12 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       } catch (error) {
         return { kind: "refused", reason: notSentReason(error) }
       }
+      const readOnly = READ_ONLY_RECORDS.has(String(rpc["type"]))
       try {
-        return outcomeOf(await attached.command(record))
+        const outcome = outcomeOf(await attached.command(record))
+        return readOnly && outcome.kind === "uncertain" ? { kind: "refused", reason: outcome.reason } : outcome
       } catch (error) {
+        if (readOnly) return { kind: "refused", reason: notSentReason(error) }
         // Only a code that answers before sending ran nothing. Anything else - a timeout after sending, the attach or
         // connection ending, a broken protocol - may have run on the other device, so it is uncertain and never retried.
         if (error instanceof LocalApiError && error.command_id === undefined && REFUSED_BEFORE_SENDING.has(error.code)) return { kind: "refused", reason: error.code }

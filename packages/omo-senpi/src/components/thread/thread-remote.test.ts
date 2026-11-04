@@ -232,6 +232,12 @@ describe("A3: an existing thread is named by id or alias only; a device only to 
     expect(a.sent).toEqual([])
   })
 
+  test("#given b's thread_read is refused because the command never reached b's engine #when it runs #then it is host_unavailable with a plain retry, not an update-omo answer", async () => {
+    const a = account({ refuse: "closed" })
+    const { run } = surface(a.remote)
+    expect(await run("thread_read", { thread: "dur-on-b" })).toMatchObject({ kind: "error", error: { code: "host_unavailable", details: { device: "b", reason: "closed" } } })
+  })
+
   test("#given device b is offline #when a tool names b's thread #then it answers device_offline and nothing is queued or sent", async () => {
     const a = account({ online: false })
     const { run, store } = surface(a.remote)

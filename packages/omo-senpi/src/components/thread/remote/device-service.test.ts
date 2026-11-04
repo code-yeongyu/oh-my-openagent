@@ -88,6 +88,17 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
     expect(l.calls.sent).toBe(0)
   })
 
+  test.each([
+    ["the connection closes on a get_state probe", "get_state", () => Promise.reject(new LocalApiError("closed", "the connection closed")), "closed"],
+    ["a get_messages read times out after sending", "get_messages", () => Promise.reject(new LocalApiError("request_timeout", "no reply", { command_id: "c1" })), "request_timeout"],
+    ["the relay loses the evidence of a get_messages read", "get_messages", async () => state({ state: "uncertain", reason: "request_gone", retryable: false }), "request_gone"],
+  ] as const)("#given %s #when the read-only record fails #then it is refused with its code, never uncertain, since nothing can have run", async (_label, type, reply, reason) => {
+    const l = lifecycle()
+    l.answer(reply)
+    const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: l.connect })
+    expect(await port.sessionCommand("b", "s1", { type, sessionId: "s1" })).toEqual({ kind: "refused", reason })
+  })
+
   test("#given a record that is not JSON #when it is commanded #then it is refused before any attach or send", async () => {
     const l = lifecycle()
     const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: l.connect })

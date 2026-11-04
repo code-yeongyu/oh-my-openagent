@@ -24,10 +24,15 @@ export async function remoteAvailable(remote: RemoteThreadSurface): Promise<Fail
   return undefined
 }
 
+// Refusals that mean the command never reached the other device's engine (a lost connection, an attach that failed, a
+// read-only record whose answer was lost): retrying is safe, and nothing about that device needs updating.
+const UNREACHED: ReadonlySet<string> = new Set(["closed", "protocol_violation", "internal", "read_failed", "request_timeout", "handshake_timeout", "attach_failed", "host_not_answering", "peer_not_found", "request_gone", "no_receipt", "transport_expired", "unconfirmed", "engine_stale", "engine_restarted"])
+
 export function outcomeFailure(outcome: Exclude<RemoteCommandOutcome, { readonly kind: "ok" }>, device: string): Failure {
   if (outcome.kind === "uncertain") return fail("idempotency_uncertain", `The command to device ${device} may or may not have run (${outcome.reason}).`, "Read the thread before deciding whether to retry.", { device, reason: outcome.reason })
   if (outcome.reason === "capability_missing") return fail("scope_denied", `Device ${device} does not grant this command.`, "Allow commands from this device on the other device, then retry.", { device, reason: outcome.reason })
   if (outcome.reason === "host_detached") return fail("host_unavailable", `Device ${device} is not attached to the relay.`, "Retry when that device is signed in and online.", { device, reason: outcome.reason })
+  if (UNREACHED.has(outcome.reason)) return fail("host_unavailable", `Device ${device} could not be reached (${outcome.reason}); nothing ran there.`, "Retry; nothing needs to be checked first.", { device, reason: outcome.reason })
   return fail("unsupported", `Device ${device} refused the command (${outcome.reason}).`, "Update omo on that device, or address a thread on this device.", { device, reason: outcome.reason })
 }
 
