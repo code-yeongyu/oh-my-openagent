@@ -1,4 +1,8 @@
 import { describe, expect, test } from "bun:test"
+import { mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { pathToFileURL } from "node:url"
 import { type ApprovalAnswer, type ApprovalClock, createApprovalCache, isEntryValid } from "./approval-cache"
 
 function fakeClock(start: number) {
@@ -89,5 +93,29 @@ describe("process approval cache (#11262 3.2 steps 3-4, addendum rows 12, 13, 22
     expect(cache.consume(attributes)).toBe("refreshed")
     attributes = { cdat: 10, mdat: Math.floor(time.clock.nowSeconds()) }
     expect(cache.consume(attributes)).toBeNull()
+  })
+})
+
+describe("the default clock outside Bun (#11586 review LOW: service-auth.generated.js also runs under Node)", () => {
+  test("#given the default clock under Node #when an own write must wait out its second #then it waits and re-stamps instead of throwing", async () => {
+    // Under Node, a Bun-only sleep threw ReferenceError here once afterOwnWrite had to wait for the next second.
+    const script = [
+      'const { createApprovalCache } = await import(process.argv[1]);',
+      'const cache = createApprovalCache();',
+      'const second = Math.floor(Date.now() / 1000);',
+      'await cache.approve(async () => ({ kind: "approved", value: "v", attributes: { cdat: 1, mdat: second - 5 } }));',
+      'await cache.afterOwnWrite("own", async () => ({ cdat: 1, mdat: second }));',
+      'process.stdout.write(String(Math.floor(Date.now() / 1000) > second));',
+    ].join("\n")
+    const outdir = mkdtempSync(join(tmpdir(), "approval-cache-node-"))
+    try {
+      const built = await Bun.build({ entrypoints: [new URL("./approval-cache.ts", import.meta.url).pathname], outdir, target: "node", format: "esm" })
+      expect(built.success).toBe(true)
+      const node = Bun.spawn(["node", "--input-type=module", "-e", script, pathToFileURL(built.outputs[0]!.path).href], { stdout: "pipe", stderr: "pipe" })
+      const [out, err, code] = await Promise.all([new Response(node.stdout).text(), new Response(node.stderr).text(), node.exited])
+      expect({ code, out, err }).toEqual({ code: 0, out: "true", err: "" })
+    } finally {
+      rmSync(outdir, { recursive: true, force: true })
+    }
   })
 })

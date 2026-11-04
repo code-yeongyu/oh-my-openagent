@@ -28,7 +28,11 @@ export function sweepDeadPinDirs(root: string = tmpdir()): readonly string[] {
   for (const entry of entries) {
     const owner = OWNED_DIR.exec(entry)?.[1]
     if (owner === undefined || Number(owner) === process.pid || isAlive(Number(owner))) continue
-    rmSync(join(root, entry), { recursive: true, force: true })
+    try {
+      rmSync(join(root, entry), { recursive: true, force: true })
+    } catch {
+      continue
+    }
     removed.push(entry)
   }
   return removed
