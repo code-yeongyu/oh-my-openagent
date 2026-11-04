@@ -157,15 +157,19 @@ export const runHerdrCommandDefault: RunHerdrCommand = async (args, options = {}
     const stderrPromise = new Response(subprocess.stderr).text()
     const timeoutMs = options.timeoutMs ?? HERDR_DEFAULT_EXEC_TIMEOUT_MS
     const abortController = new AbortController()
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined
     const exitCodeOrTimeout = await Promise.race<number | "timeout">([
       subprocess.exited,
       new Promise<"timeout">((resolve) => {
-        setTimeout(() => {
+        // cleared once the race settles so a fast exit never leaves the
+        // timer holding the event loop for the full timeout window
+        timeoutHandle = setTimeout(() => {
           abortController.abort()
           resolve("timeout")
         }, timeoutMs)
       }),
     ])
+    clearTimeout(timeoutHandle)
     if (exitCodeOrTimeout === "timeout") {
       void subprocess.exited.catch(() => undefined)
       void stdoutPromise.catch(() => "")

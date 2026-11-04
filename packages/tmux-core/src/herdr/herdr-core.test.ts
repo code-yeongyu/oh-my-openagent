@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test"
-import { readFileSync, rmSync, statSync } from "node:fs"
+import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { createPaneAuthDirectory } from "../pane-auth"
 import {
   HERDR_TEAM_WORKSPACE_LABEL_PREFIX,
@@ -15,6 +17,7 @@ import {
   herdrWorkspaceIdFromPaneId,
   ensureHerdrServer,
   parseHerdrEnvelope,
+  runHerdrCommandDefault,
   type HerdrExecResult,
   type HerdrOpsDeps,
   type RunHerdrCommand,
@@ -119,6 +122,36 @@ describe("buildHerdrPaneAuthEnv", () => {
         if (value === undefined) delete process.env[key]
         else process.env[key] = value
       }
+    }
+  })
+})
+
+describe.skipIf(process.platform === "win32")("runHerdrCommandDefault", () => {
+  test("resolves herdr through PATH and settles without waiting out the timeout window", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "omo-herdr-exec-"))
+    try {
+      writeFileSync(join(dir, "herdr"), "#!/bin/sh\nprintf 'hi'\n", { mode: 0o755 })
+      const startedAt = Date.now()
+      const result = await runHerdrCommandDefault(["workspace", "list"], { env: { PATH: dir }, timeoutMs: 20_000 })
+      // a fast exit wins the race and its timer is cleared: the call returns
+      // immediately instead of holding the loop for the full window
+      expect(result).toEqual({ success: true, output: "hi" })
+      expect(Date.now() - startedAt).toBeLessThan(5_000)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test("reports a typed timeout when the command exceeds the deadline", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "omo-herdr-exec-"))
+    try {
+      writeFileSync(join(dir, "herdr"), "#!/bin/sh\nsleep 30\n", { mode: 0o755 })
+      const result = await runHerdrCommandDefault(["agent", "list"], { env: { PATH: dir }, timeoutMs: 100 })
+      expect(result.success).toBe(false)
+      expect(result.code).toBe("timeout")
+      expect(result.error).toContain("timed out after 100ms")
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
     }
   })
 })
