@@ -57,7 +57,12 @@ export function menuParam(options: MenuOptions = {}): { readonly menu?: readonly
 	return options.menu === undefined ? {} : { menu: [...options.menu] };
 }
 
-function chordKeys(chord: string | readonly string[]): readonly string[] {
+/** True for a key chord (`"cmd+a"` or `["cmd", "a"]`), false for an options object or nothing. */
+export function isChord(value: string | readonly string[] | object | undefined): value is string | readonly string[] {
+	return typeof value === "string" || Array.isArray(value);
+}
+
+export function chordKeys(chord: string | readonly string[]): readonly string[] {
 	if (typeof chord !== "string") return chord;
 	return chord
 		.split("+")

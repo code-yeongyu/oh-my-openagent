@@ -16,7 +16,17 @@ import {
 	listOf,
 	optional,
 } from "./engine-results";
-import { type ClickOptions, type DeliveryOptions, InputTarget, type MenuOptions, menuParam, pointerOptions, send } from "./input-target";
+import {
+	chordKeys,
+	type ClickOptions,
+	type DeliveryOptions,
+	InputTarget,
+	isChord,
+	type MenuOptions,
+	menuParam,
+	pointerOptions,
+	send,
+} from "./input-target";
 import { observeWindow, type ObserveOptions, type ObservationResult } from "./observe";
 export {
 	type ClickOptions,
@@ -194,12 +204,28 @@ export class ElementHandle {
 		return this.#send("perform", "ax.perform", { action, ...menuParam(options) });
 	}
 
-	press(options?: MenuOptions): Promise<void> {
-		return this.#send("press", "ax.perform", { action: "press", ...menuParam(options) });
+	/**
+	 * Without a chord, the element's native press action; `menu` chooses that path in the menu the press opens. With a
+	 * chord (`"cmd+a"` or `["cmd", "a"]`), that chord pressed in this element without taking the user's focus: keys go out
+	 * only once the element holds its app's keyboard focus and are never sent to an element that did not take it.
+	 * Foreground delivery raises the window first and needs the grant.
+	 */
+	press(options?: MenuOptions): Promise<void>;
+	press(chord: string | readonly string[], options?: DeliveryOptions): Promise<void>;
+	press(chordOrOptions?: string | readonly string[] | MenuOptions, options?: DeliveryOptions): Promise<void> {
+		if (isChord(chordOrOptions)) {
+			return this.#send("press", "ax.keyChord", { keys: chordKeys(chordOrOptions), opts: pointerOptions(options) });
+		}
+		return this.#send("press", "ax.perform", { action: "press", ...menuParam(chordOrOptions) });
 	}
 
 	click(options?: ClickOptions): Promise<void> {
 		return this.#send("click", "ax.click", { opts: pointerOptions(options), ...menuParam(options) });
+	}
+
+	/** Two clicks at the element's center with native input (`ax.click` with `count: 2`). */
+	doubleClick(options?: Omit<ClickOptions, "count">): Promise<void> {
+		return this.#send("doubleClick", "ax.click", { opts: pointerOptions({ ...options, count: 2 }) });
 	}
 
 	/**

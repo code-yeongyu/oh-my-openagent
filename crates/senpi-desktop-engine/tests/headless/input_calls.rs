@@ -30,6 +30,7 @@ pub fn input_calls() -> [(&'static str, Value); 16] {
         ("ax.click", json!({"ref": "e1"})),
         ("ax.typeText", json!({"ref": "e1", "text": "hi"})),
         ("ax.selectText", json!({"ref": "e1", "text": "hi"})),
+        ("ax.keyChord", json!({"ref": "e1", "keys": ["enter"]})),
         ("clipboard.write", json!({"text": "hi"})),
     ]
 }

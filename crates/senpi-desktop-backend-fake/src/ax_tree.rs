@@ -115,6 +115,9 @@ impl AxTree {
             .get_mut(&id)
             .ok_or_else(|| DesktopError::ax_failed(format!("unknown fake AX node {id}")))?;
         entry.props.value = Some(value.to_string());
+        // A replaced value puts the caret after it, as a field does: the next
+        // insertion appends instead of landing at the old caret.
+        entry.selection = None;
         Ok(())
     }
 
@@ -137,6 +140,12 @@ impl AxTree {
             length: 0,
         });
         Ok(())
+    }
+
+    /// Selects the node's whole value, as `cmd+a` does in a text field.
+    pub(crate) fn select_all(&mut self, id: u64) -> CoreResult<()> {
+        let length = self.value(id)?.map_or(0, |value| value.encode_utf16().count());
+        self.select(id, Utf16Range { start: 0, length })
     }
 
     /// Selects `range` of the node's value; the range must lie inside it.

@@ -122,6 +122,28 @@ describe("runComputerCode", HANG_GUARD, () => {
 		expect(selected).toEqual([{ ref: "e1", text: "beta", prefix: "alpha ", suffix: undefined, select: "end" }]);
 	});
 
+	it("routes el.press(chord) to ax.keyChord, a bare el.press() to the press action, and el.doubleClick to a two-click ax.click", async () => {
+		// Given
+		const { service, log } = await openDesktop();
+
+		// When
+		await run(
+			service,
+			`const el = await desktop.ref("e1"); await el.press("cmd+a"); await el.press(["shift", "tab"], { delivery: "foreground" }); await el.press(); await el.doubleClick({ button: "left" });`,
+		);
+
+		// Then
+		const sent = log.requests
+			.filter((request) => ["ax.keyChord", "ax.perform", "ax.click"].includes(request.method))
+			.map((request) => [request.method, request.params]);
+		expect(sent).toEqual([
+			["ax.keyChord", { ref: "e1", keys: ["cmd", "a"], opts: {} }],
+			["ax.keyChord", { ref: "e1", keys: ["shift", "tab"], opts: { deliveryMode: "foreground" } }],
+			["ax.perform", { ref: "e1", action: "press" }],
+			["ax.click", { ref: "e1", opts: { button: "left", count: 2 } }],
+		]);
+	});
+
 	it("types into an element through ax.typeText and returns how the text was delivered", async () => {
 		// Given
 		const { service, log } = await openDesktop();

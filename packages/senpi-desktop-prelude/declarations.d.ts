@@ -201,10 +201,18 @@ interface ComputerElement {
 	actions(): Promise<string[]>;
 	/** Perform a native action; with `menu`, choose that path in the menu `AXShowMenu` or a menu control's press opens. */
 	perform(action: string, options?: ComputerMenuOptions): Promise<void>;
-	/** Perform the element's native press action; needs no screenshot. */
+	/** Perform the element's native press action; needs no screenshot. With `menu`, choose that path in the menu the press opens. */
 	press(options?: ComputerMenuOptions): Promise<void>;
+	/**
+	 * Press a chord ("cmd+a" or ["cmd", "a"]) in this element without taking the user's focus (macOS); keys go out only
+	 * once the element holds its app's keyboard focus, else `BackgroundUnavailable` (`InputFailed` in the foreground) with
+	 * nothing sent.
+	 */
+	press(chord: string | string[], options?: ComputerDeliveryOptions): Promise<void>;
 	/** Click the element's center with native input; `button: "right"` plus `menu` chooses in its context menu. */
 	click(options?: ComputerClickOptions): Promise<void>;
+	/** Two clicks at the element's center with native input. */
+	doubleClick(options?: Omit<ComputerClickOptions, "count">): Promise<void>;
 	/**
 	 * Type into this element without taking the user's focus (macOS): a native text field takes the text through its
 	 * own selection (`inserted`), any other element takes keys once it holds its app's keyboard focus (`keys`); an

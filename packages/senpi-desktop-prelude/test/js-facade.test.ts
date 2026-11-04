@@ -278,6 +278,31 @@ describe("JavaScript computer facade", () => {
 		]);
 	});
 
+	it("sends el.press(chord) and el.doubleClick as ref-hopped chains with their arguments", async () => {
+		// Given
+		const kernel = loadJsFacade((args) => {
+			const chain = Array.isArray(args.chain) ? args.chain : [];
+			if (chain.length === 1 && chain[0].method === "ref") return { text: "", details: { value: ELEMENT_SNAPSHOT } };
+			return { text: "", details: { value: null } };
+		});
+
+		// When
+		await kernel.run(`
+			const el = await computer.ref("e1");
+			await el.press("cmd+a");
+			await el.press();
+			await el.doubleClick({ delivery: "foreground" });
+		`);
+
+		// Then
+		const hops = kernel.calls.slice(1).map((call) => (call.chain as { method: string; args: unknown[] }[])[1]);
+		expect(hops).toEqual([
+			{ method: "press", args: ["cmd+a"] },
+			{ method: "press", args: [] },
+			{ method: "doubleClick", args: [{ delivery: "foreground" }] },
+		]);
+	});
+
 	it("sends el.selectText as a ref-hopped chain and returns the selection", async () => {
 		// Given
 		const selection = { start: 6, length: 4, text: "beta", focused: true };

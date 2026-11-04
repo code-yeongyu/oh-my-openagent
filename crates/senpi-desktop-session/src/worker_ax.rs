@@ -197,6 +197,9 @@ fn truncate(value: String) -> String {
 }
 
 mod click;
+mod key_chord;
+#[cfg(test)]
+mod key_chord_tests;
 #[cfg(test)]
 mod tests;
 mod select_text;

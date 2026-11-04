@@ -25,6 +25,7 @@ pub enum MutatingAction {
     AxClick,
     AxTypeText,
     AxSelectText,
+    AxKeyChord,
     ClipboardWrite,
     MenuSelect,
 }
@@ -47,6 +48,7 @@ impl MutatingAction {
         Self::AxClick,
         Self::AxTypeText,
         Self::AxSelectText,
+        Self::AxKeyChord,
         Self::ClipboardWrite,
         Self::MenuSelect,
     ];
@@ -71,6 +73,7 @@ impl MutatingAction {
             Self::AxClick => Method::AxClick,
             Self::AxTypeText => Method::AxTypeText,
             Self::AxSelectText => Method::AxSelectText,
+            Self::AxKeyChord => Method::AxKeyChord,
             Self::ClipboardWrite => Method::ClipboardWrite,
             Self::MenuSelect => Method::MenusSelect,
         }
@@ -93,6 +96,7 @@ impl MutatingAction {
             | Self::AxClick
             | Self::AxTypeText
             | Self::AxSelectText
+            | Self::AxKeyChord
             | Self::ClipboardWrite
             | Self::MenuSelect => false,
         }
