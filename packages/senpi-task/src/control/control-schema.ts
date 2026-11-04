@@ -83,7 +83,8 @@ function readGuidance(value: unknown): readonly ControlGuidance[] {
   if (!Array.isArray(value) || value.length > GUIDANCE_MAX_ENTRIES) throw new SchemaError("guidance")
   return value.map(entry => {
     const shape = object(entry, ["inputId", "revision", "text"])
-    const text = typeof shape.text === "string" ? shape.text : ""
+    if (typeof shape.text !== "string") throw new SchemaError("guidance text")
+    const text = shape.text
     if (bytes(text) > GUIDANCE_MAX_BYTES) throw new SchemaError("guidance entry too large")
     return { inputId: str(shape.inputId), revision: int(shape.revision), text }
   })

@@ -2,9 +2,9 @@ import { watch, type FSWatcher } from "node:fs"
 import { log } from "@oh-my-opencode/utils"
 import type { TaskRecordStore } from "../store"
 import { defaultControlFsEnv, listControlFiles, removeControlFile, type ControlFsEnv } from "./control-fs"
-import { controlDir } from "./control-paths"
+import { controlDir, parseControlFileName } from "./control-paths"
 import type { ControlStore } from "./control-store"
-import { createDispatchState, dispatchRegister, dispatchTransactionChild, MAX_FILES_PER_TICK, validRegister, type DispatchContext, type ValidRegister } from "./inbox-dispatch"
+import { createDispatchState, dispatchRegister, dispatchTransactionChild, MAX_FILES_PER_TICK, registerDue, validRegister, type DispatchContext, type ValidRegister } from "./inbox-dispatch"
 import { ADVERTISEMENT_RENEW_MS, readProcessStartTime, renewAdvertisement, sweepAdvertisements, withdrawAdvertisement } from "./owner-advertisement"
 import type { ControlOwnerPort } from "./owner-port"
 
@@ -93,8 +93,12 @@ export class ControlInbox {
         ...(startTime(this.options.hostPid) === undefined ? {} : { processStartTime: startTime(this.options.hostPid) }) },
       holder: taskId => members.find(member => member.port.holds(taskId))?.port,
     }
-    const files = listControlFiles(controlDir(this.options.stateDir), this.#control.env).filter(file => file.name.startsWith("want-"))
-    const registers = files.slice(0, MAX_FILES_PER_TICK).flatMap(file => validRegister(context, file.name) ?? [])
+    // Filter, THEN cap: a register addressed elsewhere, already answered, or backing off never takes one of
+    // the tick's slots, so stale registers cannot starve a fresh one (review of #12371).
+    const files = listControlFiles(controlDir(this.options.stateDir), this.#control.env)
+      .filter(file => this.#addressedHere(context, file.name))
+    const registers = files.flatMap(file => validRegister(context, file.name) ?? [])
+      .filter(entry => registerDue(context, entry)).slice(0, MAX_FILES_PER_TICK)
     for (const entry of registers) {
       const holder = context.holder(entry.register.taskId)
       const scoped = holder === undefined ? context : { ...context, owner: { ...context.owner, managerInstance: holder.managerInstance } }
@@ -104,6 +108,15 @@ export class ControlInbox {
       }
     }
     if (now - this.#sweptAt >= SWEEP_MS) { this.#sweptAt = now; this.#sweep(now) }
+  }
+
+  // Name-only: this owner reads a register only for a task one of its managers holds, or one recorded
+  // as hosted by this process (answered handle_gone once); other hosts' registers are never opened.
+  #addressedHere(context: DispatchContext, name: string): boolean {
+    const parsed = parseControlFileName(name)
+    if (parsed?.kind !== "want") return false
+    if (context.holder(parsed.taskId) !== undefined) return true
+    return this.options.store.load(parsed.taskId)?.host_pid === this.options.hostPid
   }
 
   #renew(members: readonly Member[], now: number): void {

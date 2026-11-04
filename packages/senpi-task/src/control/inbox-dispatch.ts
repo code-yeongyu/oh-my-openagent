@@ -91,13 +91,18 @@ function recordFailure(context: DispatchContext, entry: ValidRegister, error: un
   if (capped && failures >= MAX_ATTEMPTS) answerRegister(context, entry, { state: "refused", reason: "owner_failed", final: false })
 }
 
+// A register still owed an answer: its content was not answered yet and its backoff has elapsed.
+export function registerDue(context: DispatchContext, entry: ValidRegister): boolean {
+  return context.state.answered.get(entry.name) !== entry.text && backoffDue(context, entry)
+}
+
 export type Dispatched = ReconcileResult | { readonly kind: "skipped" }
 
 // One register, once per content: an answered content is not acted on again until the requester
 // rewrites it; a failing one backs off 1 s .. 60 s and stops at owner_failed after 10 attempts,
 // except a cancel-final record, which is never parked.
 export async function dispatchRegister(context: DispatchContext, entry: ValidRegister): Promise<Dispatched> {
-  if (context.state.answered.get(entry.name) === entry.text || !backoffDue(context, entry)) return { kind: "skipped" }
+  if (!registerDue(context, entry)) return { kind: "skipped" }
   const port = context.holder(entry.register.taskId)
   if (port === undefined) {
     const record = context.store.load(entry.register.taskId)
