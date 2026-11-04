@@ -21,6 +21,7 @@ mod menu;
 mod menu_key;
 mod post;
 mod remote;
+mod window_text;
 
 pub(crate) use keymap::run_helper as run_keymap_helper;
 mod release;
@@ -31,6 +32,9 @@ mod tests;
 
 #[cfg(test)]
 mod element_tests;
+
+#[cfg(test)]
+mod window_text_tests;
 
 #[cfg(test)]
 mod live;
@@ -206,14 +210,8 @@ impl MacInput {
                     return self.type_remote(&window, pid, wid, text, remote, mode, entry_front, check_stop, delivered, None).map(|_| ());
                 }
                 match mode {
-                    DeliveryMode::Background => self.background(|this| {
-                        guard::guard(&window, "keyboard", None)?;
-                        let target = KeyWindow::prepare(&this.source, &window, (pid, wid), entry_front)?;
-                        this.last_activated = Some((pid, wid));
-                        let check = || check_stop().and_then(|()| target.check());
-                        keys::type_text_interruptible(
-                            &this.source, &mut this.held, text, KeyRoute::Process(pid), &check, delivered,
-                        )
+                    DeliveryMode::Background => skylight::reporting_partial(|| {
+                        self.type_window_background(&window, (pid, wid), text, entry_front, check_stop, delivered)
                     }),
                     DeliveryMode::Foreground => skylight::with_foreground(pid, || {
                         crate::ax::prepare_foreground_input(&window)?;

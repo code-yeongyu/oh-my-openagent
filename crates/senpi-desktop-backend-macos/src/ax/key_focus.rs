@@ -77,6 +77,12 @@ impl KeyFocus {
         focused != wid && self.element_window == Some(wid) && parent_of(wid) == Some(focused)
     }
 
+    /// Whether text inserted into the focused element lands in `wid`: the
+    /// element is in `wid`, or keys for `wid` would reach it.
+    pub(crate) fn holds_text_for(&self, wid: u32, parent_of: impl Fn(u32) -> Option<u32>) -> bool {
+        self.element_window == Some(wid) || self.destination(wid, parent_of) == KeyDestination::Target
+    }
+
     /// Whether keyboard focus sits in an overlay window such as Finder's
     /// inline rename field or a popover: one attached to `wid` while `wid`,
     /// or nothing, is reported focused; or `wid` itself while it is attached
@@ -114,17 +120,24 @@ pub(crate) fn focused_window<E>(
 }
 
 pub(crate) fn key_focus(pid: libc::pid_t) -> KeyFocus {
+    key_focus_and_element(pid).0
+}
+
+/// [`key_focus`] and the focused element it read.
+pub(crate) fn key_focus_and_element(pid: libc::pid_t) -> (KeyFocus, Option<CFRetained<AXUIElement>>) {
     let Some(app) = probe_application(pid) else {
-        return KeyFocus {
+        let unreadable = KeyFocus {
             window: FocusedWindow::Unreadable,
             element_window: None,
         };
+        return (unreadable, None);
     };
     let read = copy_attribute_result(&app, "AXFocusedWindow")
         .map(|window| window.and_then(|window| window.downcast::<AXUIElement>().ok()));
     let window = focused_window(read, |window| mapped_id(window));
-    let element_window = copy_element(&app, "AXFocusedUIElement").and_then(|element| innermost_window_id(&element));
-    KeyFocus { window, element_window }
+    let element = copy_element(&app, "AXFocusedUIElement");
+    let element_window = element.as_deref().and_then(innermost_window_id);
+    (KeyFocus { window, element_window }, element)
 }
 
 /// The first window id mapped on `element` or, through `AXParent`, its

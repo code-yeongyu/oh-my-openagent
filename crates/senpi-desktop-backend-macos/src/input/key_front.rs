@@ -36,6 +36,16 @@ impl EntryFront {
     fn came_forward(self, front: Option<libc::pid_t>, pid: libc::pid_t) -> bool {
         front == Some(pid) && self.0 != Some(pid)
     }
+
+    /// Refuses once window `wid`'s `pid` has come to the front (`front`)
+    /// since the input began: the user may have just picked it, and a write
+    /// would land in the field they took over (omp 18.13.1 `require_behind`).
+    pub(super) fn require_behind(self, front: Option<libc::pid_t>, pid: libc::pid_t, wid: u32) -> CoreResult<()> {
+        if self.came_forward(front, pid) {
+            return Err(front_refusal(FrontTarget::CameForward, wid));
+        }
+        Ok(())
+    }
 }
 
 pub(super) fn front_target(
@@ -121,6 +131,15 @@ mod tests {
         assert_eq!(front_target(front, Some(TARGET), TARGET, || false), FrontTarget::UserSibling);
         assert_eq!(front_refusal(FrontTarget::UserSibling, 7).code, ErrorCode::UserIntervened);
         assert_eq!(front_refusal(FrontTarget::Unknown, 7).code, ErrorCode::BackgroundUnavailable);
+    }
+
+    #[test]
+    fn a_write_refuses_once_the_target_came_forward() {
+        let behind = EntryFront(Some(USER));
+        assert!(behind.require_behind(Some(USER), TARGET, 7).is_ok());
+        assert_eq!(behind.require_behind(Some(TARGET), TARGET, 7).unwrap_err().code, ErrorCode::UserIntervened);
+        // A target already in front as the input began did not come forward.
+        assert!(EntryFront(Some(TARGET)).require_behind(Some(TARGET), TARGET, 7).is_ok());
     }
 
     #[test]

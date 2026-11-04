@@ -15,8 +15,9 @@ use super::element::{
     attribute_settable, copy_attribute_result, copy_element, copy_held_attribute, copy_range, copy_string,
     element_gone,
 };
+use super::key_focus::key_focus_and_element;
 use super::props::truncate_chars;
-use crate::skylight::{mark_sent, reporting_partial};
+use crate::skylight::{mark_sent, reporting_partial, window_parent};
 
 /// How many `AXParent` hops the surface walk follows before giving up.
 const MAX_ANCESTRY_DEPTH: usize = 64;
@@ -158,10 +159,36 @@ pub(super) fn insertion_result(error: AXError) -> CoreResult<()> {
 /// Nothing is written once the user has pressed a key or clicked in the
 /// application since the call was admitted ([`check_press`]).
 pub(crate) fn insert_into_element(element: &AXUIElement, text: &str) -> CoreResult<bool> {
-    reporting_partial(|| insert_selected_text(element, text))
+    reporting_partial(|| insert_selected_text(element, text, || Ok(())))
 }
 
-fn insert_selected_text(element: &AXUIElement, text: &str) -> CoreResult<bool> {
+/// Inserts `text` into the element holding `pid`'s keyboard focus, only when
+/// that element belongs to window `wid` exactly: a field in a sheet belongs
+/// to the sheet, not to the window it is attached to (omp 18.13.1
+/// `insert_native_text`). `Ok(false)` means no write was attempted.
+/// `behind_user` runs after the probes, right before the write: a probe can
+/// block while the user brings the application forward and takes over the
+/// field.
+pub(crate) fn insert_native_text(
+    pid: libc::pid_t,
+    wid: u32,
+    text: &str,
+    behind_user: impl FnOnce() -> CoreResult<()>,
+) -> CoreResult<bool> {
+    let (focus, Some(element)) = key_focus_and_element(pid) else {
+        return Ok(false);
+    };
+    if !focus.holds_text_for(wid, window_parent) {
+        return Ok(false);
+    }
+    insert_selected_text(&element, text, behind_user)
+}
+
+fn insert_selected_text(
+    element: &AXUIElement,
+    text: &str,
+    behind_user: impl FnOnce() -> CoreResult<()>,
+) -> CoreResult<bool> {
     let role = copy_held_attribute(element, "AXRole")?
         .and_then(|value| value.downcast::<CFString>().ok())
         .map(|value| value.to_string());
@@ -187,6 +214,7 @@ fn insert_selected_text(element: &AXUIElement, text: &str) -> CoreResult<bool> {
         return Ok(false);
     };
     let secure = is_secure(element);
+    behind_user()?;
     check_press()?;
     let attribute = CFString::from_str("AXSelectedText");
     let value = CFString::from_str(text);

@@ -151,7 +151,7 @@ impl MacInput {
 }
 
 /// Every scalar of an inserted text is delivered at once.
-fn report_delivered(text: &str, delivered: &mut dyn FnMut()) {
+pub(super) fn report_delivered(text: &str, delivered: &mut dyn FnMut()) {
     for _ in text.chars() {
         delivered();
     }

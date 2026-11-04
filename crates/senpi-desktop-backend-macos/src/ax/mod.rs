@@ -28,7 +28,7 @@ use senpi_desktop_core::types::DesktopWindow;
 pub use self::element::is_trusted;
 pub(crate) use self::foreground::{make_frontmost, prepare_foreground_input};
 pub(crate) use self::point_owner::ensure_points_owned;
-pub(crate) use self::text_input::insert_into_element;
+pub(crate) use self::text_input::{insert_into_element, insert_native_text};
 use self::element::{element, handle};
 
 #[derive(Debug, Default)]

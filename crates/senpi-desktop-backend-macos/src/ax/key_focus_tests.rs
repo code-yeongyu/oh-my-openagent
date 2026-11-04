@@ -62,6 +62,18 @@ fn a_popover_field_reaches_the_popover_while_its_parent_is_reported() {
 }
 
 #[test]
+fn inserted_text_lands_only_in_a_field_of_the_target() {
+    // E-7: doc2's text area holds TextEdit's focus while Notes is in front.
+    assert!(focus(FocusedWindow::Id(TARGET), Some(TARGET)).holds_text_for(TARGET, parent_of));
+    assert!(focus(FocusedWindow::Unreported, Some(TARGET)).holds_text_for(TARGET, parent_of));
+    // A field in another window of the app is never written for the target.
+    assert!(!focus(FocusedWindow::Id(SIBLING), Some(SIBLING)).holds_text_for(TARGET, parent_of));
+    assert!(!focus(FocusedWindow::Unreadable, Some(SIBLING)).holds_text_for(TARGET, parent_of));
+    // A field in a sheet attached to the target belongs to the sheet.
+    assert!(!focus(FocusedWindow::Id(OVERLAY), Some(OVERLAY)).holds_text_for(TARGET, parent_of));
+}
+
+#[test]
 fn only_a_no_value_answer_means_no_focused_window() {
     let id_of = |id: &u32| Some(*id);
     assert_eq!(focused_window(Ok(Some(TARGET)), id_of), FocusedWindow::Id(TARGET));
