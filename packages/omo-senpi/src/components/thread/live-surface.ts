@@ -455,3 +455,5 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
     ...sessionMethods(undefined, call),
   }
 }
+
+export { createDeviceServiceSessions } from "./remote/device-service"
