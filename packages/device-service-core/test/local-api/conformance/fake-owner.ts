@@ -18,6 +18,7 @@ import {
   type ClientInfo,
   type ErrorCode,
   type JsonObject,
+  type LocalRequest,
 } from "../../../src/local-api/protocol.ts";
 import { listenLocal, type LocalListener, type Transport } from "../../../src/local-api/transport.ts";
 import { UploadAssembler } from "../../../src/local-api/upload.ts";
@@ -43,6 +44,8 @@ export type FakeOwnerOptions = {
   readonly now?: () => number;
   /** The welcome's capabilities; every required one by default. A narrower list stands in for an older service. */
   readonly capabilities?: readonly Capability[];
+  /** Called after each authenticated request was answered, so a test can await one instead of polling the state. */
+  readonly onRequest?: (type: LocalRequest["type"]) => void;
 };
 
 const noopSecure: SecureFile = async () => {};
@@ -169,6 +172,7 @@ export const startFakeOwner = async (options: FakeOwnerOptions): Promise<FakeOwn
           : { id: request.id, type: "response", ok: true, data: outcome.reply.data },
       );
       outcome.after?.();
+      options.onRequest?.(request.type);
     };
     const decoder = new LineDecoder(
       (line) => {
