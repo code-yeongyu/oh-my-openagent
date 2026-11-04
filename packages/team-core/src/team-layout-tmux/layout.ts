@@ -1,6 +1,7 @@
 import {
   buildPaneAuthEnvironmentArgs, withPaneAuth, escapeTmuxFormat, isServerRunning, runTmuxCommand,
   herdrCreateWorkspace, herdrCreateTab, herdrRunPaneCommand, herdrCloseWorkspace, herdrClosePane,
+  herdrListAgents,
   isHerdrPaneId, HERDR_TEAM_WORKSPACE_LABEL_PREFIX, buildHerdrPaneAuthEnv,
   defaultHerdrOpsDeps,
   type MultiplexerBackend, type TmuxCommandResult, type HerdrOpsDeps,
@@ -278,6 +279,7 @@ async function createTeamLayoutHerdr(
     deps.log("herdr visualization configured but herdr ops unavailable, skipping")
     return null
   }
+  let workspaceId: string | undefined
   try {
     const serverUrl = tmuxMgr.getServerUrl()
     if (!(await deps.isServerRunning(serverUrl))) {
@@ -290,6 +292,7 @@ async function createTeamLayoutHerdr(
       `${HERDR_TEAM_WORKSPACE_LABEL_PREFIX}${teamRunId}`,
       herdrOps,
     )
+    workspaceId = workspace.workspaceId
 
     const panesByMember: Record<string, string> = {}
     for (const member of members) {
@@ -317,7 +320,32 @@ async function createTeamLayoutHerdr(
   } catch (error) {
     const errorMessage = error instanceof Error ? String(error) : String(error)
     deps.log("herdr team layout unavailable, skipping", { teamRunId, error: errorMessage })
+    await closeHerdrWorkspaceIfClean(workspaceId, herdrOps, deps, teamRunId)
     return null
+  }
+}
+
+/**
+ * Best-effort rollback after a partial layout failure: a half-built team
+ * otherwise leaves the workspace and its already-created tabs behind with no
+ * runtime state pointing at them. Close the workspace only when no live
+ * agent remains in it — a tab whose attach is already running is the user's
+ * window into an in-flight team and must survive.
+ */
+async function closeHerdrWorkspaceIfClean(
+  workspaceId: string | undefined,
+  herdrOps: HerdrOpsDeps,
+  deps: TeamLayoutDeps,
+  teamRunId: string,
+): Promise<void> {
+  if (!workspaceId) return
+  try {
+    const agents = await herdrListAgents(herdrOps)
+    if (agents.some((agent) => agent.paneId.startsWith(`${workspaceId}:`))) return
+    await herdrCloseWorkspace(workspaceId, herdrOps)
+  } catch (error) {
+    const errorMessage = error instanceof Error ? String(error) : String(error)
+    deps.log("herdr team layout failure cleanup skipped", { teamRunId, workspaceId, error: errorMessage })
   }
 }
 

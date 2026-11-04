@@ -87,6 +87,75 @@ describe("createTeamLayout on the herdr backend", () => {
       if (originalTmux !== undefined) process.env.TMUX = originalTmux
     }
   })
+
+  test("closes the half-built workspace when a member tab fails and no live agent remains", async () => {
+    let tabIndex = 0
+    const { ops, calls } = fakeHerdrOps((args) => {
+      if (args[0] === "workspace" && args[1] === "create") {
+        return { success: true, output: envelope({ workspace: { workspace_id: "w9" }, root_pane: { pane_id: "w9:p1" } }) }
+      }
+      if (args[0] === "tab" && args[1] === "create") {
+        tabIndex += 1
+        if (tabIndex > 1) return { success: false, output: "", error: "tab rejected", code: "spawn_failed" }
+        return { success: true, output: envelope({ tab: { tab_id: "w9:t2" }, root_pane: { pane_id: "w9:p2" } }) }
+      }
+      if (args[0] === "agent" && args[1] === "list") {
+        return { success: true, output: envelope({ agents: [] }) }
+      }
+      return { success: true, output: "" }
+    })
+
+    const layout = await createTeamLayout("11111111-2222-3333-4444-555555555555", members, tmuxMgr, baseDeps(ops), { multiplexer: "herdr" })
+
+    // member 2's tab create fails -> null layout, and the failure rollback
+    // checks liveness then closes the workspace it created
+    expect(layout).toBeNull()
+    const agentList = calls.find((call) => call[0] === "agent" && call[1] === "list")
+    expect(agentList).toBeDefined()
+    expect(calls).toContainEqual(["workspace", "close", "w9"])
+  })
+
+  test("keeps the half-built workspace when a live agent remains in it", async () => {
+    let tabIndex = 0
+    const { ops, calls } = fakeHerdrOps((args) => {
+      if (args[0] === "workspace" && args[1] === "create") {
+        return { success: true, output: envelope({ workspace: { workspace_id: "w9" }, root_pane: { pane_id: "w9:p1" } }) }
+      }
+      if (args[0] === "tab" && args[1] === "create") {
+        tabIndex += 1
+        if (tabIndex > 1) return { success: false, output: "", error: "tab rejected", code: "spawn_failed" }
+        return { success: true, output: envelope({ tab: { tab_id: "w9:t2" }, root_pane: { pane_id: "w9:p2" } }) }
+      }
+      if (args[0] === "agent" && args[1] === "list") {
+        // member 1's attach is already running: the workspace survives
+        return { success: true, output: envelope({ agents: [{ pane_id: "w9:p2", name: "worker-1" }] }) }
+      }
+      return { success: true, output: "" }
+    })
+
+    const layout = await createTeamLayout("11111111-2222-3333-4444-555555555555", members, tmuxMgr, baseDeps(ops), { multiplexer: "herdr" })
+
+    expect(layout).toBeNull()
+    expect(calls).not.toContainEqual(["workspace", "close", "w9"])
+  })
+
+  test("survives a liveness-probe failure during the failure rollback", async () => {
+    const { ops, calls } = fakeHerdrOps((args) => {
+      if (args[0] === "workspace" && args[1] === "create") {
+        return { success: true, output: envelope({ workspace: { workspace_id: "w9" }, root_pane: { pane_id: "w9:p1" } }) }
+      }
+      if (args[0] === "agent" && args[1] === "list") {
+        return { success: false, output: "", error: "server went away", code: "server_not_running" }
+      }
+      return { success: false, output: "", error: "tab rejected", code: "spawn_failed" }
+    })
+
+    const layout = await createTeamLayout("11111111-2222-3333-4444-555555555555", members, tmuxMgr, baseDeps(ops), { multiplexer: "herdr" })
+
+    // rollback is best-effort: probe failure means no close, no throw
+    expect(layout).toBeNull()
+    expect(calls).not.toContainEqual(["workspace", "close", "w9"])
+  })
 })
 
 describe("removeTeamLayout on the herdr backend", () => {
