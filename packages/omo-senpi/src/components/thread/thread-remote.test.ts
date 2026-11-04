@@ -6,7 +6,7 @@ import type { ThreadToolName, ThreadToolResult } from "./contracts"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import type { AliasHolder, AliasRegistry, JsonObject, RemoteCommandOutcome, RemoteDevice, RemoteSessionRow, RemoteThreadSurface } from "./remote/ports"
 import type { ThreadTranscriptEntry } from "./reader"
-import { createThreadTools, type ThreadHost, type ThreadHostSession } from "./tools"
+import { createThreadTools, UNKNOWN_CALLER, type ThreadHost, type ThreadHostSession } from "./tools"
 
 // Cross-device thread tools (brain/hand plan r6: O8, SC-R8, R8.c, A3, A5) over a fake account: device "here" is this
 // machine, device "b" is another signed-in device. The fakes record every relay call so each case can assert
@@ -28,7 +28,7 @@ type Sent = { readonly via: "endpoint" | "session" | "read"; readonly device: st
 type Engine = { readonly messages: readonly ThreadTranscriptEntry[]; readonly interrupt: JsonObject; readonly streaming: boolean; readonly pending: number }
 const ENGINE: Engine = { messages: Array.from({ length: 30 }, (_, index) => ({ role: index % 2 === 0 ? "user" : "assistant", content: `message ${index} ${"x".repeat(60)}` })), interrupt: { interrupted: false }, streaming: false, pending: 0 }
 
-function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean; engine?: Engine; failSessionsList?: boolean; failAliasesOf?: boolean } = {}) {
+function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean; engine?: Engine; failSessionsList?: boolean; failAliasesOf?: boolean; failClaim?: boolean } = {}) {
   const engine = options.engine ?? ENGINE
   const sent: Sent[] = []
   const hops: number[] = []
@@ -45,6 +45,7 @@ function account(options: { plan?: string; online?: boolean; refuse?: string; al
   const devices: RemoteDevice[] = [{ device: "here", label: "this mac", online: true }, { device: "b", label: "studio", online: options.online ?? true }]
   const registry: AliasRegistry = {
     claim: async ({ alias, holder }) => {
+      if (options.failClaim === true) throw new Error("alias registry failed")
       const held = aliases.get(alias)
       if (held !== undefined && held.session_id !== holder.session_id) return { kind: "error", error: { code: "alias_taken", message: `alias ${alias} is taken`, details: { holder: held } } }
       aliases.set(alias, holder)
@@ -82,7 +83,7 @@ function account(options: { plan?: string; online?: boolean; refuse?: string; al
   return { remote, sent, hops, aliases }
 }
 
-function surface(remote: RemoteThreadSurface | undefined, extra: { callerCause?: () => string | undefined; sessions?: ThreadHostSession[]; engine?: Engine } = {}) {
+function surface(remote: RemoteThreadSurface | undefined, extra: { callerCause?: () => string | undefined; sessions?: ThreadHostSession[]; engine?: Engine; caller?: string; diskSessions?: readonly string[] } = {}) {
   const engine = extra.engine ?? ENGINE
   const local: ThreadHostSession = { sessionId: "route-local", durableSessionId: "dur-local", cwd: process.cwd(), name: "local peer", status: "open" }
   const sessions = extra.sessions ?? [local]
@@ -109,11 +110,14 @@ function surface(remote: RemoteThreadSurface | undefined, extra: { callerCause?:
   directories.push(agentDir)
   const store = createGatewayStore({ agentDir })
   stores.push(store)
-  const tools = createThreadTools({ host, store, stateDirectory: join(agentDir, "state"), callerSessionId: () => "dur-caller", callerWorkspaceRoot: () => process.cwd(), remote, ...(extra.callerCause === undefined ? {} : { callerCause: extra.callerCause }) })
+  // Session files with no live owner: the address book lists them from disk, and no host holds them.
+  const disk = (extra.diskSessions ?? []).map((id) => ({ durable_id: id, name: null, cwd: process.cwd(), created_at: "2026-11-01T00:00:00Z", updated_at: null, session_path: join(agentDir, `${id}.jsonl`), source_host: null }))
+  const caller = extra.caller ?? "dur-caller"
+  const tools = createThreadTools({ host, store, stateDirectory: join(agentDir, "state"), diskSessions: () => disk, callerSessionId: () => caller, callerWorkspaceRoot: () => process.cwd(), remote, ...(extra.callerCause === undefined ? {} : { callerCause: extra.callerCause }) })
   const run = async (name: ThreadToolName, args: unknown): Promise<ThreadToolResult> => {
     const tool = tools.find((candidate) => candidate.name === name)
     if (tool === undefined) throw new Error(`${name} is not registered`)
-    return (await tool.execute(`call-${Math.random()}`, args, undefined, undefined, { sessionManager: { getSessionId: () => "dur-caller" } } as never)).details.result as ThreadToolResult
+    return (await tool.execute(`call-${Math.random()}`, args, undefined, undefined, { sessionManager: { getSessionId: () => caller } } as never)).details.result as ThreadToolResult
   }
   return { run, openSession, store }
 }
@@ -429,6 +433,35 @@ describe("remote == local, round 2: send modes, handoff, list and alias order", 
     expect(listed).toMatchObject({ kind: "ok" })
     if (listed.kind !== "ok" || !("threads" in listed)) throw new Error(`thread_list failed: ${JSON.stringify(listed)}`)
     expect(listed.threads.map((thread) => thread.thread_id)).toContain("dur-local")
+  })
+
+  test("#given a caller with no durable id #when it sends here and to b #then both refuse the same way at send time and b gets nothing", async () => {
+    const a = account()
+    const { run } = surface(a.remote, { caller: UNKNOWN_CALLER })
+    const here = await run("thread_send", { thread: "dur-local", message: "x" })
+    const there = await run("thread_send", { thread: "dur-on-b", message: "x" })
+    expect(here).toMatchObject({ kind: "error" })
+    expect(comparable(there)).toEqual(comparable(here))
+    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "prompt")).toEqual([])
+  })
+
+  test("#given no remote surface and a thread with no live owner #when thread_rename gives it a blank name #then it is not_resumable, as before the remote tools", async () => {
+    const { run } = surface(undefined, { diskSessions: ["dur-disk"] })
+    expect(await run("thread_rename", { thread: "dur-disk", name: "   " })).toMatchObject({ kind: "error", error: { code: "not_resumable" } })
+  })
+
+  test("#given device b is offline #when thread_rename renames b's thread and moves its alias #then it is device_offline, the alias did not move, and nothing is sent", async () => {
+    const a = account({ online: false, aliases: new Map([["bee", { session_id: "dur-on-b", device: "b" }]]) })
+    const { run } = surface(a.remote)
+    expect(await run("thread_rename", { thread: "dur-on-b", name: "renamed", alias: "wasp" })).toMatchObject({ kind: "error", error: { code: "device_offline", details: { device: "b" } } })
+    expect([...a.aliases.keys()]).toEqual(["bee"])
+    expect(a.sent).toEqual([])
+  })
+
+  test("#given the alias registry fails while thread_create claims an alias #when the thread was already created on b #then the error names the created thread, so it is not lost", async () => {
+    const a = account({ failClaim: true })
+    const { run } = surface(a.remote)
+    expect(await run("thread_create", { device: "studio", alias: "bee" })).toMatchObject({ kind: "error", error: { code: "host_unavailable", details: { thread_id: "dur-new-on-b" } } })
   })
 
   test("#given two local threads share a name and an alias spelled the same is held by b's thread #when a tool names it #then the alias wins over the ambiguous local name", async () => {

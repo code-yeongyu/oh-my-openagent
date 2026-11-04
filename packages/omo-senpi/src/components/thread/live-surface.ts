@@ -458,4 +458,4 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
 
 export { createDeviceServiceSessions } from "./remote/device-service"
 export { crossTarget, listAcross, planCreate, renameAlias, withAlias } from "./remote/cross-device"
-export { interruptRemote, outcomeFailure, promptRemote, readRemote } from "./remote/remote-ops"
+export { deviceOnline, interruptRemote, outcomeFailure, promptRemote, readRemote } from "./remote/remote-ops"
