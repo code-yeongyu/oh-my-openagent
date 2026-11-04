@@ -164,15 +164,16 @@ describe("#12349 part 2 requester cases (design section 7)", () => {
     expect(readFileSync(path, "utf8")).toContain("keep me")
   })
 
-  test("#given a watcher tick racing the user's Resume #when both run #then the owner resumes the child exactly once (test 17j)", async () => {
-    const pair = controlPair({ record: pausedUnderA })
-    await pair.owner.pauseTask(T1, OWNER)
+  test("#given a watcher tick arriving while the user's Resume is in flight #when both run #then the tick waits behind the Resume (test 17j, r6-3)", async () => {
+    const pair = controlPair({ ownerTicks: false, record: pausedUnderA })
     await pair.advertise()
     seed(pair, "held_remote", { remoteAckSeq: 2 })
-    const resumed = pair.runPause.bridge.changed("parent-1", { change: "resumed", pauseSeq: 2, holds: [] })
-    const ticked = pair.runPause.bridge.tickRemote("parent-1")
+    const order: string[] = []
+    const resumed = pair.runPause.bridge.changed("parent-1", { change: "resumed", pauseSeq: 2, holds: [] }).then(() => { order.push("resume") })
+    const ticked = pair.runPause.bridge.tickRemote("parent-1").then(() => { order.push("tick") })
     await Promise.all([resumed, ticked])
-    expect(pair.owner.calls.resume).toBe(1)
+    expect(order).toEqual(["resume", "tick"])
+    expect(pair.runPause.registry.load("parent-1")?.phase).toBe("resumed")
   })
 
   test("#given four un-acked remote children #when A Resumes #then the barrier leaves resuming within ONE 3 s deadline (test 20b)", async () => {
