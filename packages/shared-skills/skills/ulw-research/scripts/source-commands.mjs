@@ -143,7 +143,9 @@ function declareOverKeptRaw(sourcesDir, id, input) {
 	const dir = join(sourcesDir, String(id))
 	if (input.kind !== "converted-only" || !existsSync(join(dir, "raw.bin")) || !existsSync(join(dir, "meta.json"))) return
 	const before = JSON.parse(readFileSync(join(dir, "meta.json"), "utf8"))
-	Object.assign(input, { url: before.url, raw: readFileSync(join(dir, "raw.bin")), kind: before.kind, declared: true })
+	const raw = readFileSync(join(dir, "raw.bin"))
+	if (sha256Of(raw) !== before.sha256) throw new CliError(`snapshot_hash_mismatch: ${id} raw.bin no longer matches its pinned hash`)
+	Object.assign(input, { url: before.url, raw, kind: before.kind, observed_at: before.observed_at, declared: true })
 	delete input.path
 }
 

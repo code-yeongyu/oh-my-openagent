@@ -11,6 +11,7 @@ import { createMemoryIdentityContext, type MemoryIdentityContext } from "./conte
 import { registerMemoryGuard } from "./guard"
 import { TRANSIENT_DIRNAME } from "./transient-identity"
 import { componentContext } from "./memory.test-support"
+import { AUTOMOUNT_TRIGGER_CASES, withAutomountTrap } from "../../automount-trap.test-support"
 
 const roots: string[] = []
 
@@ -284,3 +285,13 @@ function transientFixture(): GuardFixture & { readonly durableForeignFile: strin
     otherRunFile,
   }
 }
+
+describe("memory guard never resolves a macOS automount trigger (#11545)", () => {
+  test.each([...AUTOMOUNT_TRIGGER_CASES])("#given a tool path %s on darwin #when the guard classifies it #then it is allowed without resolving the trigger", async (path) => {
+    const setup = fixture()
+    const touched = await withAutomountTrap(async () => {
+      expect(await dispatch(setup, "read", { path })).toBeUndefined()
+    })
+    expect(touched).toEqual([])
+  })
+})

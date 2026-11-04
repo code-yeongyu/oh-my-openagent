@@ -211,6 +211,7 @@ This table is the `[opencode].agents` surface only. Shared-base agents use the c
 | ----------------- | ----------------------- | --------------------------------------------------------------- |
 | `model`           | string                  | Model override (`provider/model`)                               |
 | `models`          | array                   | Ordered model chain; entries are strings or per-model objects   |
+| `models_distribution` | `sequential \| round_robin` | Starting model policy for new children; defaults to `sequential` |
 | `fallback_models` | string\|array           | Deprecated compatibility fallback chain                         |
 | `reasoning`       | string                  | Canonical reasoning level or harness-native preset token        |
 | `temperature`     | number                  | Sampling temperature                                            |
@@ -360,6 +361,7 @@ Domain-specific model delegation used by the `task()` tool. When the main agent 
 | ------------------- | ------------- | ------- | ------------------------------------------------------------------- |
 | `model`             | string        | -       | Model override                                                      |
 | `models`            | array         | -       | Ordered model chain; entries are strings or per-model objects       |
+| `models_distribution` | `sequential \| round_robin` | `sequential` | Rotate the starting entry per new child with `round_robin` |
 | `fallback_models`   | string\|array | -       | Deprecated compatibility fallback chain                            |
 | `reasoning`         | string        | -       | Canonical reasoning level or harness-native preset token            |
 | `temperature`       | number        | -       | Sampling temperature                                                |

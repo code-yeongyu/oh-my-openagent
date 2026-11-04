@@ -1,7 +1,7 @@
 import { X509Certificate } from "node:crypto"
 
 type Candidate = { readonly der: Buffer; readonly index: number }
-type DropCause = "pem-noncanonical" | "pem-read-error" | "recognized-block-has-headers" | "aux-block-unverified"
+export type DropCause = "pem-noncanonical" | "pem-read-error" | "recognized-block-has-headers" | "aux-block-unverified"
   | "ordinary-block-not-indexable" | "ordinary-block-unparseable"
 type DefaultFileCandidates =
   | { readonly kind: "kept"; readonly certificates: readonly Candidate[] }

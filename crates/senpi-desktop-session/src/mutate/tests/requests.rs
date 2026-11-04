@@ -10,7 +10,7 @@ use crate::request::Op;
 use crate::test_support::{click_window, Harness};
 
 /// A valid request for each gated action against the owner test's fixture.
-pub(super) fn request_for(harness: &mut Harness, action: MutatingAction) -> Op {
+pub(crate) fn request_for(harness: &mut Harness, action: MutatingAction) -> Op {
     let frame = harness.capture("101");
     let frame_id = Some(frame.clone());
     let reference = harness.focused_ref();

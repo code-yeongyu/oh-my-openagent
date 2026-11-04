@@ -184,9 +184,14 @@ describe("resolveSenpiLaunch", () => {
   }, 30_000)
 
   test("#given the real restricted PATH fallback #when launched #then Senpi prints its version", () => {
-    // given
-    const node = Bun.which("node")
-    if (node === null) throw new Error("node is required")
+    // given: the launcher's execPath is the parent's own process.execPath, a real interpreter.
+    // `node` on PATH can be a version-manager shim (mise, asdf, Volta) that re-resolves the real
+    // binary through PATH, so it exits 1 once PATH is narrowed to the shim's own directory.
+    const nodeOnPath = Bun.which("node")
+    if (nodeOnPath === null) throw new Error("node is required")
+    const probe = Bun.spawnSync([nodeOnPath, "-p", "process.execPath"])
+    if (probe.exitCode !== 0) throw new Error(`node -p process.execPath failed: ${probe.stderr.toString()}`)
+    const node = probe.stdout.toString().trim()
     const nodeDir = dirname(node)
     const cli = join(import.meta.dir, "..", "..", "..", "..", "node_modules", "@code-yeongyu", "senpi", "dist", "cli.js")
     const launch = resolveSenpiLaunch({ PATH: nodeDir }, runtime({

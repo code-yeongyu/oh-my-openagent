@@ -1,186 +1,246 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, it } from "bun:test"
 
-import { createNativeEditionNudgeHook, NATIVE_NUDGE_TOAST_MESSAGE, NATIVE_NUDGE_TOAST_TITLE } from "./hook"
-import type { NudgeStateStore } from "./state"
-import { NUDGE_STATE_VERSION, type NudgeState, type NudgeStateRead } from "./types"
-import { NATIVE_EDITION_INSTALL_COMMAND } from "../../cli/native-edition-hint"
+import {
+  createNativeEditionNudgeHook,
+  isInteractiveLaunch,
+  NATIVE_NUDGE_TOAST_MESSAGE,
+  NATIVE_NUDGE_TOAST_TITLE,
+} from "./hook"
+import type { NudgeState, NudgeStateRead, NudgeStateStore } from "./index"
 
-const NOW = 1_700_000_000_000
+type ToastCall = { body: { title: string; message: string; variant: string; duration: number } }
 
-type ToastCall = { title: string; message: string }
+type TuiBehavior = "resolve" | "reject" | "throw-sync" | "never-settle" | "missing"
 
-function fakeCtx(overrides: { toastAvailable?: boolean; onToast?: () => void } = {}) {
-  const toasts: ToastCall[] = []
-  const showToast = async (input: { body: { title: string; message: string } }) => {
-    overrides.onToast?.()
-    toasts.push({ title: input.body.title, message: input.body.message })
+function nudgeState(decision: NudgeState["decision"]): NudgeState {
+  return {
+    schemaVersion: 1,
+    autoShows: 0,
+    lastShownAt: null,
+    nextEligibleAt: 0,
+    decision,
+    decidedAt: null,
+    writtenBy: "test",
   }
-  const ctx = {
-    client: { tui: overrides.toastAvailable === false ? {} : { showToast } },
-  } as unknown as Parameters<typeof createNativeEditionNudgeHook>[0]
-  return { ctx, toasts }
 }
 
-function fakeStore(initial: NudgeStateRead, options: { writable?: boolean; writeFails?: boolean } = {}) {
-  let current = initial
+function fakeStore(state: NudgeStateRead): NudgeStateStore & { readonly writes: NudgeState[] } {
   const writes: NudgeState[] = []
-  const store: NudgeStateStore = {
-    read: () => current,
-    write: (state) => {
-      if (options.writeFails === true) return false
-      writes.push(state)
-      current = state
+  return {
+    writes,
+    read: () => writes.at(-1) ?? state,
+    write: (next) => {
+      writes.push(next)
       return true
     },
-    probeWritable: () => options.writable !== false,
+    probeWritable: () => true,
   }
-  return { store, writes }
 }
 
-function hookFor(
-  ctxAndToasts: ReturnType<typeof fakeCtx>,
-  store: NudgeStateStore,
-  deps: { installed?: boolean; childSession?: boolean } = {},
-) {
-  return createNativeEditionNudgeHook(ctxAndToasts.ctx, {
+function createCtx(options: {
+  behavior?: TuiBehavior
+  state?: NudgeStateRead
+  nativeInstalled?: boolean
+}) {
+  const toasts: ToastCall[] = []
+  const behavior = options.behavior ?? "resolve"
+  const store = fakeStore(options.state ?? "missing")
+  const nativeInstalled = options.nativeInstalled ?? false
+
+  // The real SDK's showToast reads `this._client` (sdk.gen.js), so this mock does the same: an
+  // unbound call fails exactly the way it fails against the real OpenCode client.
+  const tui = {
+    _client: { ready: true },
+    showToast(arg: ToastCall) {
+      if (this?._client?.ready !== true) {
+        throw new TypeError("undefined is not an object (evaluating 'this._client')")
+      }
+      toasts.push(arg)
+      if (behavior === "reject") return Promise.reject(new Error("tui unavailable"))
+      if (behavior === "throw-sync") throw new Error("client disposed")
+      if (behavior === "never-settle") return new Promise<never>(() => {})
+      return Promise.resolve()
+    },
+  }
+
+  const ctx = {
+    client: behavior === "missing" ? {} : { tui },
+    directory: "/tmp/test",
+  } as unknown as Parameters<typeof createNativeEditionNudgeHook>[0]
+
+  const deps = {
     store,
-    detectNativeEdition: () => deps.installed === true,
-    now: () => NOW,
+    detectNativeEdition: () => nativeInstalled,
     interactive: () => true,
-    version: "test",
-  })
+  }
+  return { ctx, deps, toasts, store }
 }
 
 function sessionCreated(parentID?: string) {
-  return { event: { type: "session.created", properties: { info: parentID === undefined ? {} : { parentID } } } }
+  return {
+    event: {
+      type: "session.created",
+      properties: { info: parentID ? { parentID } : {} },
+    },
+  }
 }
 
-describe("the nudge reaches the real toast surface", () => {
-  test("#given an eligible first session #when the event fires #then exactly one toast carries the install command", async () => {
-    // given
-    const surface = fakeCtx()
-    const { store } = fakeStore("missing")
+describe("createNativeEditionNudgeHook", () => {
+  it("#given a top-level session #then recommends OmO Native with the omo.dev link", async () => {
+    const { ctx, deps, toasts } = createCtx({})
+    const hook = createNativeEditionNudgeHook(ctx, deps)
 
-    // when
-    await hookFor(surface, store).event(sessionCreated())
+    await hook.event(sessionCreated())
 
-    // then
-    expect(surface.toasts).toHaveLength(1)
-    expect(surface.toasts[0]?.title).toBe(NATIVE_NUDGE_TOAST_TITLE)
-    expect(surface.toasts[0]?.message).toBe(NATIVE_NUDGE_TOAST_MESSAGE)
-    expect(surface.toasts[0]?.message).toContain(NATIVE_EDITION_INSTALL_COMMAND)
+    expect(toasts).toHaveLength(1)
+    expect(toasts[0]?.body.title).toBe(NATIVE_NUDGE_TOAST_TITLE)
+    expect(toasts[0]?.body.message).toBe(NATIVE_NUDGE_TOAST_MESSAGE)
+    expect(toasts[0]?.body.message).toContain("https://omo.dev")
   })
 
-  test("#given repeated session events in one process #when they fire #then the toast is shown exactly once", async () => {
-    // given
-    const surface = fakeCtx()
-    const { store } = fakeStore("missing")
-    const hook = hookFor(surface, store)
+  it("#given two session starts in one process #then the toast fires once per launch", async () => {
+    const { ctx, deps, toasts } = createCtx({})
+    const hook = createNativeEditionNudgeHook(ctx, deps)
 
-    // when
-    await hook.event(sessionCreated())
     await hook.event(sessionCreated())
     await hook.event(sessionCreated())
 
-    // then
-    expect(surface.toasts).toHaveLength(1)
+    expect(toasts).toHaveLength(1)
   })
 
-  test("#given a non-session event #when it fires #then nothing is shown", async () => {
-    // given
-    const surface = fakeCtx()
-    const { store } = fakeStore("missing")
+  it("#given a child session #then no toast fires", async () => {
+    const { ctx, deps, toasts } = createCtx({})
+    const hook = createNativeEditionNudgeHook(ctx, deps)
 
-    // when
-    await hookFor(surface, store).event({ event: { type: "session.idle", properties: {} } })
+    await hook.event(sessionCreated("ses_parent"))
 
-    // then
-    expect(surface.toasts).toHaveLength(0)
-  })
-})
-
-describe("the nudge stays silent for a user who cannot act on it", () => {
-  test("#given the native edition is already installed #when the event fires #then nothing is shown", async () => {
-    // given
-    const surface = fakeCtx()
-    const { store } = fakeStore("missing")
-
-    // when
-    await hookFor(surface, store, { installed: true }).event(sessionCreated())
-
-    // then
-    expect(surface.toasts).toHaveLength(0)
+    expect(toasts).toHaveLength(0)
   })
 
-  test("#given a child session #when the event fires #then nothing is shown", async () => {
-    // given
-    const surface = fakeCtx()
-    const { store } = fakeStore("missing")
+  it("#given a non-session event #then no toast fires", async () => {
+    const { ctx, deps, toasts } = createCtx({})
+    const hook = createNativeEditionNudgeHook(ctx, deps)
 
-    // when
-    await hookFor(surface, store).event(sessionCreated("parent-1"))
+    await hook.event({ event: { type: "session.idle", properties: {} } })
 
-    // then
-    expect(surface.toasts).toHaveLength(0)
+    expect(toasts).toHaveLength(0)
   })
 
-  test("#given the user said never #when the event fires #then nothing is shown", async () => {
-    // given
-    const surface = fakeCtx()
-    const state: NudgeState = {
-      schemaVersion: NUDGE_STATE_VERSION,
-      autoShows: 0,
-      lastShownAt: null,
-      nextEligibleAt: NOW,
-      decision: "never",
-      decidedAt: NOW,
-      writtenBy: "test",
-    }
-    const { store } = fakeStore(state)
+  it("#given a recorded never opt-out #then no toast fires and nothing is written", async () => {
+    const { ctx, deps, toasts, store } = createCtx({ state: nudgeState("never") })
+    const hook = createNativeEditionNudgeHook(ctx, deps)
 
-    // when
-    await hookFor(surface, store).event(sessionCreated())
+    await hook.event(sessionCreated())
 
-    // then
-    expect(surface.toasts).toHaveLength(0)
+    expect(toasts).toHaveLength(0)
+    expect(store.writes).toHaveLength(0)
   })
 
-  test("#given the toast API is unavailable #when the event fires #then nothing is shown and no state is claimed", async () => {
-    // given
-    const surface = fakeCtx({ toastAvailable: false })
-    const { store, writes } = fakeStore("missing")
+  it("#given a completed migration #then no toast fires", async () => {
+    const { ctx, deps, toasts } = createCtx({ state: nudgeState("migrated") })
+    const hook = createNativeEditionNudgeHook(ctx, deps)
 
-    // when
-    await hookFor(surface, store).event(sessionCreated())
+    await hook.event(sessionCreated())
 
-    // then
-    expect(surface.toasts).toHaveLength(0)
-    expect(writes).toHaveLength(0)
-  })
-})
-
-describe("a nudge that cannot be recorded is never shown", () => {
-  test("#given the state write fails #when the event fires #then the toast is suppressed", async () => {
-    // given
-    const surface = fakeCtx()
-    const { store } = fakeStore("missing", { writeFails: true })
-
-    // when
-    await hookFor(surface, store).event(sessionCreated())
-
-    // then
-    expect(surface.toasts).toHaveLength(0)
+    expect(toasts).toHaveLength(0)
   })
 
-  test("#given an unwritable state directory #when the event fires #then the toast is suppressed", async () => {
-    // given
-    const surface = fakeCtx()
-    const { store } = fakeStore("missing", { writable: false })
+  it("#given a snoozed decision #then the toast waits until the promised eligibility time", async () => {
+    const nextEligibleAt = 7 * 24 * 60 * 60 * 1000
+    let now = nextEligibleAt - 1
+    const { ctx, deps, toasts, store } = createCtx({
+      state: { ...nudgeState("snoozed"), nextEligibleAt },
+    })
+    const hook = createNativeEditionNudgeHook(ctx, { ...deps, now: () => now })
 
-    // when
-    await hookFor(surface, store).event(sessionCreated())
+    await hook.event(sessionCreated())
+    expect(toasts).toHaveLength(0)
+    now = nextEligibleAt
+    await hook.event(sessionCreated())
+    await hook.event(sessionCreated())
 
-    // then
-    expect(surface.toasts).toHaveLength(0)
+    expect(toasts).toHaveLength(1)
+    expect(store.writes.map((write) => write.autoShows)).toEqual([1])
+  })
+
+  it("#given OmO Native already installed #then no toast fires", async () => {
+    const { ctx, deps, toasts } = createCtx({ nativeInstalled: true })
+    const hook = createNativeEditionNudgeHook(ctx, deps)
+
+    await hook.event(sessionCreated())
+
+    expect(toasts).toHaveLength(0)
+  })
+
+  it("#given no toast API #then the hook resolves without throwing", async () => {
+    const { ctx, deps } = createCtx({ behavior: "missing" })
+    const hook = createNativeEditionNudgeHook(ctx, deps)
+
+    await hook.event(sessionCreated())
+  })
+
+  it("#given a rejecting toast API #then the hook resolves without throwing", async () => {
+    const { ctx, deps } = createCtx({ behavior: "reject" })
+    const hook = createNativeEditionNudgeHook(ctx, deps)
+
+    await hook.event(sessionCreated())
+  })
+
+  it("#given a synchronously throwing toast API #then the hook resolves without throwing", async () => {
+    const { ctx, deps } = createCtx({ behavior: "throw-sync" })
+    const hook = createNativeEditionNudgeHook(ctx, deps)
+
+    await hook.event(sessionCreated())
+  })
+
+  it("#given a toast that never settles #then startup is not delayed", async () => {
+    let settle: (() => void) | undefined
+    const gate = new Promise<void>((resolve) => {
+      settle = resolve
+    })
+    const { ctx, deps, toasts } = createCtx({ behavior: "never-settle" })
+    const hook = createNativeEditionNudgeHook(ctx, deps)
+
+    const outcome = await Promise.race([
+      hook.event(sessionCreated()).then(() => "event-resolved" as const),
+      gate.then(() => "gate-elapsed" as const),
+    ])
+    settle?.()
+
+    expect(outcome).toBe("event-resolved")
+    expect(toasts).toHaveLength(1)
+  })
+
+  it("#given a CI or non-interactive launch #then no toast fires and nothing is recorded", async () => {
+    const { ctx, deps, toasts, store } = createCtx({})
+    const hook = createNativeEditionNudgeHook(ctx, { ...deps, interactive: () => false })
+
+    await hook.event(sessionCreated())
+
+    expect(toasts).toHaveLength(0)
+    expect(store.writes).toHaveLength(0)
+  })
+
+  it("#given the launch environment #then CI, OMO_NON_INTERACTIVE and a non-TTY stdout count as non-interactive", () => {
+    expect(isInteractiveLaunch({}, true)).toBe(true)
+    expect(isInteractiveLaunch({ CI: "true" }, true)).toBe(false)
+    expect(isInteractiveLaunch({ OMO_NON_INTERACTIVE: "1" }, true)).toBe(false)
+    expect(isInteractiveLaunch({}, false)).toBe(false)
+    expect(isInteractiveLaunch({}, undefined)).toBe(false)
+  })
+
+  it("#given a shown toast #then the show is recorded and the next launch waits for the interval", async () => {
+    const start = 1_000_000
+    const first = createCtx({})
+    await createNativeEditionNudgeHook(first.ctx, { ...first.deps, now: () => start }).event(sessionCreated())
+    expect(first.toasts).toHaveLength(1)
+    const recorded = first.store.writes.at(-1)
+    expect(recorded?.autoShows).toBe(1)
+    expect(recorded?.lastShownAt).toBe(start)
+
+    const nextLaunch = createCtx({ state: recorded })
+    const before = recorded ? recorded.nextEligibleAt - 1 : start
+    await createNativeEditionNudgeHook(nextLaunch.ctx, { ...nextLaunch.deps, now: () => before }).event(sessionCreated())
+    expect(nextLaunch.toasts).toHaveLength(0)
   })
 })

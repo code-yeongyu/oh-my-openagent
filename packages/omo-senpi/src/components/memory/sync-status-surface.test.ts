@@ -11,6 +11,24 @@ const failing = (kind: "offline" | "auth_expired", reason: string, action: strin
   failure: { kind, reason, action },
 })
 
+test("#given a failure starts in the background #when its repo becomes active #then its unseen failure is announced once (#11059)", async () => {
+  const notices: Array<{ message: string; level: string }> = []
+  const notifier = createSyncStatusNotifier(async () => failing("offline", "Cannot reach the service.", "Check your connection."))
+  const ui = { notify: (message: string, level: "info" | "warning" | "error") => notices.push({ message, level }) }
+  await deliverSyncStatusChange({
+    repo: "/repo", isActiveRepo: false, notifier, ui,
+    refreshFooter: () => {}, pushRpc: async () => {},
+  })
+  expect(notices).toEqual([])
+
+  await notifier.changed("/repo", ui)
+  await notifier.changed("/repo", ui)
+
+  expect(notices).toEqual([
+    { message: "Memory sync is blocked. Cannot reach the service. Check your connection.", level: "warning" },
+  ])
+})
+
 test("#given sync transitions #when the notifier hears them #then the person gets one notice per failure kind with its reason and action, and one on recovery (omo #10637)", async () => {
   let status: EngineStatus | null = { kind: "synced", at: 1, updatedWhileOffline: 0 }
   const notices: Array<{ message: string; level: string }> = []
