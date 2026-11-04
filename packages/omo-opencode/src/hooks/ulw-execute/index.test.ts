@@ -7,6 +7,7 @@ import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
 import { createUlwExecuteHook } from "./index"
 import { createAtlasHook } from "../atlas"
+import type { AtlasRetryScheduler } from "../atlas/types"
 import {
   writeBoulderState,
   clearBoulderState,
@@ -874,37 +875,21 @@ You are starting an Atlas work session.
       mkdirSync(plansDir, { recursive: true })
       writeFileSync(join(plansDir, "atlas-plan.md"), "# Plan\n- [ ] Task 1\n- [ ] Task 2")
 
-      const capturedTimers = new Map<number, { callback: Function; cleared: boolean }>()
+      // Atlas's retry runs on an injected scheduler, so this test drives only the hook's own timer; patching the
+      // global setTimeout would also capture long timers other modules schedule in the same process (#10770).
+      const capturedTimers = new Map<number, { callback: () => Promise<void> }>()
       let nextTimerId = 4000
+      const retryScheduler: AtlasRetryScheduler = (callback) => {
+        const id = nextTimerId++
+        capturedTimers.set(id, { callback })
+        return { cancel: () => { capturedTimers.delete(id) } }
+      }
       let backgroundRunning = true
-      const originalSetTimeout = globalThis.setTimeout
-      const originalClearTimeout = globalThis.clearTimeout
       const originalDateNow = Date.now
       let fakeNow = 10000
       const promptAsyncMock = spyOn({
         promptAsync: async (_request: unknown) => undefined,
       }, "promptAsync")
-
-      globalThis.setTimeout = unsafeTestValue<typeof setTimeout>(((callback: Function, delay?: number, ...args: unknown[]) => {
-        const normalized = typeof delay === "number" ? delay : 0
-        if (normalized >= 5000) {
-          const id = nextTimerId++
-          capturedTimers.set(id, { callback: () => callback(...args), cleared: false })
-          return unsafeTestValue<ReturnType<typeof setTimeout>>(id)
-        }
-
-        return originalSetTimeout(callback as Parameters<typeof originalSetTimeout>[0], delay)
-      }))
-
-      globalThis.clearTimeout = unsafeTestValue<typeof clearTimeout>(((id?: number | ReturnType<typeof setTimeout>) => {
-        if (typeof id === "number" && capturedTimers.has(id)) {
-          capturedTimers.get(id)!.cleared = true
-          capturedTimers.delete(id)
-          return
-        }
-
-        originalClearTimeout(id as Parameters<typeof originalClearTimeout>[0])
-      }))
 
       Date.now = () => fakeNow
 
@@ -922,6 +907,7 @@ You are starting an Atlas work session.
       const ulwExecuteHook = createUlwExecuteHook(ctx)
       const atlasHook = createAtlasHook(ctx, {
         directory: testDir,
+        retryScheduler,
         backgroundManager: unsafeTestValue<NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"]>({
           getTasksByParentSession: () => backgroundRunning ? [{ status: "running" }] : [],
         }),
@@ -931,13 +917,13 @@ You are starting an Atlas work session.
         parts: [{ type: "text", text: createUlwExecutePrompt({ userRequest: "atlas-plan" }) }],
       }
 
+      // Fire only the timers pending when the call starts: a fired callback that schedules another timer adds it
+      // to capturedTimers, and iterating the live map would keep firing that chain forever (#10770).
       async function firePendingTimers(): Promise<void> {
-        for (const [id, entry] of capturedTimers) {
-          if (!entry.cleared) {
-            capturedTimers.delete(id)
-            fakeNow += 6000
-            await entry.callback()
-          }
+        for (const [id, entry] of [...capturedTimers]) {
+          capturedTimers.delete(id)
+          fakeNow += 6000
+          await entry.callback()
         }
       }
 
@@ -957,8 +943,6 @@ You are starting an Atlas work session.
         expect(readBoulderState(testDir)?.agent).toBe("atlas")
         expect(promptAsyncMock).toHaveBeenCalledTimes(1)
       } finally {
-        globalThis.setTimeout = originalSetTimeout
-        globalThis.clearTimeout = originalClearTimeout
         Date.now = originalDateNow
         promptAsyncMock.mockRestore()
       }
