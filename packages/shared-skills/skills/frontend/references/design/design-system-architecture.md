@@ -73,11 +73,11 @@ rather than borders, creating layers you feel more than see."
 | H1 | 36px / 2.25rem | 700 | 1.2 | -0.015em | Section headers |
 | H2 | 28px / 1.75rem | 600 | 1.3 | -0.01em | Subsection headers |
 | H3 | 22px / 1.375rem | 600 | 1.4 | 0 | Card titles |
-| Body/lg | 18px / 1.125rem | 400 | 1.6 | 0 | Lead paragraphs |
+| Body/lg | 18px / 1.125rem | 400 | 1.6 | 0 | Lead paragraphs, in the secondary ink |
 | Body | 16px / 1rem | 400 | 1.6 | 0 | Default text |
-| Body/sm | 14px / 0.875rem | 400 | 1.5 | 0 | Secondary info |
+| Body/sm | 14px / 0.875rem | 400 | 1.5 | 0 | Secondary info, in the secondary ink |
 | Caption | 12px / 0.75rem | 500 | 1.4 | 0.02em | Labels, metadata |
-| Overline | 11px / 0.6875rem | 600 | 1.3 | 0.08em | Section labels, uppercase |
+| Overline | 11px / 0.6875rem | 600 | 1.3 | 0.08em | Field, table and metadata labels, uppercase; by default not a label above a heading, unless the chosen route asks for one (`references/perfection/craft-floor.md`) |
 
 ### Font Stack
 - Primary: [specify — e.g. "Inter, system-ui, -apple-system, sans-serif"]

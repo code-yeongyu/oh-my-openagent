@@ -100,7 +100,13 @@ export function resolveCategory<TModel extends SenpiModelPort>(
     return { kind: "not_found", category: categoryName, availableCategories: gatedAvailableCategories(omoConfig, senpiModelRegistry) }
   }
 
-  const config = { ...builtinConfig, ...userConfig }
+  const mergedConfig = { ...builtinConfig, ...userConfig }
+  const config = mergedConfig.models && options.distributeModels
+    ? {
+        ...mergedConfig,
+        models: [...options.distributeModels(`category:${categoryName}`, mergedConfig.models, mergedConfig.models_distribution)],
+      }
+    : mergedConfig
   const availableModelsResult = parseAvailableModels(senpiModelRegistry.getAvailable())
   const availableModels = availableModelsResult.models
   if (!availableModelsResult.validContainer) {
@@ -236,7 +242,10 @@ export function resolveCategory<TModel extends SenpiModelPort>(
         availableModels: availableModelSet,
       })
   const runtimeModelChain = buildRuntimeModelChain({
-    candidates: [...categoryModelCandidates(config), ...chainCandidates],
+    candidates: [
+      ...categoryModelCandidates(config),
+      ...(canonicalChain !== undefined && config.models_distribution === "round_robin" ? [] : chainCandidates),
+    ],
     selectedModel: selection.selectedModel,
     availableModels: availableModelSet,
     source: "category",

@@ -107,6 +107,16 @@ jobs:
           OMO_DESKTOP_PRELUDE_PYTHON_DIAGNOSTICS: ${{ runner.os == 'Windows' && '1' || '0' }}
         run: bun run test:desktop
 
+      # omo#10762 design 9.3: the engine trust helper against real Security.framework objects, through the
+      # production decoder and selectEngineTrust. It reads the runner's stores for the contract only.
+      - name: Engine trust helper (macOS)
+        if: runner.os == 'macOS'
+        env:
+          OMO_ENGINE_TRUST_HELPER_TARGET_DIR: ${{ github.workspace }}/target/debug
+        run: |
+          cargo build -p omo-engine-trust-helper --bins --examples --locked
+          bun test packages/omo-native/test/macos-trust-helper.macos.test.ts
+
       # The runner is disposable, so the live clipboard round-trip may overwrite its clipboard.
       - name: System clipboard round-trip
         if: runner.os != 'Linux'

@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 import { afterAll } from "bun:test"
-import { existsSync, mkdtempSync, readdirSync, readFileSync } from "node:fs"
+import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { createConnection } from "node:net"
 import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
@@ -36,6 +36,7 @@ export function installHermeticHome(): HermeticHome {
   delete process.env.OPENCODE_CONFIG_DIR
   delete process.env.CLAUDE_CONFIG_DIR
   installHermeticSecrets()
+  installHermeticGitConfig(home)
   // Loaded now, not at teardown: a cold engine import costs about a second under load, which must not come out
   // of the stop deadline (#11630).
   const engine = preloadTaskHostEngine()
@@ -73,6 +74,26 @@ function installHermeticSecrets(): void {
       delete: async (key: { readonly service: string; readonly name: string }) => values.delete(keyOf(key)),
     },
   })
+}
+
+// git >= 2.47 follows a commit, merge, fetch or push with a detached `git maintenance run --auto`. No test started
+// it, so no teardown waits for it, and it keeps writing .git/objects/pack while the test removes its scratch
+// repository: the directory survives the temp-root leak check (#11742; per-fixture fixes before it: #10177, #10945).
+// This global config turns that off for every git child of a test, including git started by a CLI under test.
+// A repository's own config still outranks it, so a test that turns auto maintenance on for its repository keeps it.
+// - maintenance.auto=false: no automatic maintenance after any command.
+// - maintenance.autoDetach=false, gc.autoDetach=false: where a repository turns it back on, it runs in the foreground
+//   and has finished when the git command returns.
+// gc.auto is left alone: commands reach `gc --auto` only through auto maintenance, and product code reads gc.auto to
+// pick its own repository defaults.
+const HERMETIC_GIT_CONFIG = "[maintenance]\n\tauto = false\n\tautoDetach = false\n[gc]\n\tautoDetach = false\n"
+
+function installHermeticGitConfig(home: string): void {
+  const path = join(home, ".gitconfig")
+  writeFileSync(path, HERMETIC_GIT_CONFIG)
+  // HOME already names this file. GIT_CONFIG_GLOBAL also reaches a child started with its own HOME, and replaces a
+  // global config path the run inherited, which git would read instead of ~/.gitconfig.
+  process.env.GIT_CONFIG_GLOBAL = path
 }
 
 /** Runs the teardown after the check even when the check throws; when both throw, both errors are reported. */

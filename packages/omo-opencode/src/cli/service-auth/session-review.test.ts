@@ -1,6 +1,6 @@
 import { expect, onTestFinished, spyOn, test } from "bun:test"
 import { createSession } from "./session"
-import { fakeApi, grant, memorySecrets, privateKeys, refusal, temporaryHome } from "./test-support"
+import { clock, fakeApi, grant, memorySecrets, privateKeys, refusal, temporaryHome } from "./test-support"
 
 const expired = { ...grant, ...privateKeys, accessTokenExpiresAt: "2000-01-01T00:00:00Z" }
 
@@ -9,18 +9,19 @@ for (const code of ["ENOTFOUND", "ECONNREFUSED", "ENETUNREACH", "EHOSTUNREACH", 
     const api = fakeApi(() => Response.json({ ...grant, refreshToken: "rotated" }))
     const store = memorySecrets().store(api)
     await store.write(expired)
+    const persisted = await store.read()
     const session = createSession({ api, store, home: await temporaryHome() })
     const fetcher = spyOn(globalThis, "fetch").mockRejectedValueOnce(Object.assign(new Error(grant.refreshToken), { code }))
     onTestFinished(() => fetcher.mockRestore())
     const error = await session.accessToken().catch(error => error)
     expect(error).toMatchObject({ retryable: true })
-    expect(await store.read()).toEqual(expired)
+    expect(await store.read()).toEqual(persisted)
     expect(await session.accessToken()).toBe(grant.accessToken)
   })
 }
 
 for (const mode of ["500", "502", "500-terminal-code", "lost-response", "timeout", "invalid-json", "invalid-grant-shape"]) {
-  test(`refresh retains keys but never resends a possibly consumed token after ${mode}`, async () => {
+  test(`refresh retains keys without replaying a possibly consumed legacy token after ${mode}`, async () => {
     let requests = 0
     const api = fakeApi(() => {
       requests++
@@ -40,9 +41,10 @@ for (const mode of ["500", "502", "500-terminal-code", "lost-response", "timeout
       }, { preconnect: globalThis.fetch.preconnect }))
       onTestFinished(() => fetcher.mockRestore())
     }
-    await expect(createSession({ api, store, home }).accessToken()).rejects.toThrow()
+    const { now } = clock()
+    await expect(createSession({ api, store, home, now }).accessToken()).rejects.toThrow()
     expect(await store.read()).toMatchObject({ ...expired, refreshState: "uncertain" })
-    await expect(createSession({ api, store, home }).accessToken()).rejects.toThrow()
+    await expect(createSession({ api, store, home, now }).accessToken()).rejects.toThrow()
     expect(requests + sent).toBe(1)
   })
 }
@@ -65,9 +67,10 @@ test("failed rotated-token persistence retains the pre-send uncertainty marker",
     await base.write(value)
   } }
   const home = await temporaryHome()
-  await expect(createSession({ api, store, home }).accessToken()).rejects.toThrow()
+  const { now } = clock()
+  await expect(createSession({ api, store, home, now }).accessToken()).rejects.toThrow()
   expect(await base.read()).toMatchObject({ ...expired, refreshState: "uncertain" })
-  await expect(createSession({ api, store: base, home }).accessToken()).rejects.toThrow()
+  await expect(createSession({ api, store: base, home, now }).accessToken()).rejects.toThrow()
   expect(requests).toBe(1)
 })
 
@@ -76,10 +79,11 @@ test("failed pre-send journal persistence sends no rotating request", async () =
   const api = fakeApi(() => { requests++; return Response.json(grant) })
   const base = memorySecrets().store(api)
   await base.write(expired)
+  const persisted = await base.read()
   const store = { ...base, write: async () => { throw new Error("synthetic store failure") } }
   await expect(createSession({ api, store, home: await temporaryHome() }).accessToken()).rejects.toThrow()
   expect(requests).toBe(0)
-  expect(await base.read()).toEqual(expired)
+  expect(await base.read()).toEqual(persisted)
 })
 
 for (const outcome of ["approved", "offline", "refused"]) {

@@ -33,6 +33,13 @@ const sessionEventContext = (): unknown => ({
 })
 
 const signedIn: DeviceAccountSource = async () => ({
+  kind: "cli",
+  descriptor: { genesis: "unsupported", rpId: null, userName: null, serviceOrigin: "http://127.0.0.1:9", accountId: "acct-wiring", serviceDeviceId: "service-device", syncPrincipalId: "principal", publicKeys: { signing: "signing", sealing: "sealing" }, generation: "fixture", incarnation: "cli" },
+  signal: new AbortController().signal,
+  boundary: async dispatch => dispatch(),
+  forOperation: async () => { throw new Error("unused") },
+  serviceDeviceId: "service-device",
+  isCurrent: async () => true,
   api: "http://127.0.0.1:9",
   accountId: "acct-wiring",
   keyring: async (build) => {

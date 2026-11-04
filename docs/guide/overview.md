@@ -80,7 +80,7 @@ User Request
     +--> task(category: "...")        -> the category worker (fresh session, category's model + skills)
     +--> task(subagent_type: "explore")    -> fast codebase grep
     +--> task(subagent_type: "librarian")  -> documentation and OSS code search
-    +--> task(category: "architect")       -> the architect consult lane (read-only design advice)
+    +--> task(category: "architect")       -> the architect lane (design + broad debugging, edits when needed)
     +--> [Kibitzer]                        -> resident memory recall sidecar, read-only, nudges only
 
 Planning path (same session, no agent switching):
@@ -173,7 +173,7 @@ Override specific categories or curated agents in `omo.json`:
     // Design consultation: Fable 5 max
     "architect": { "model": "anthropic/claude-fable-5-1", "reasoning": "max" },
 
-    // Frontend/UI work: Fable 5 max, then Opus 5 max, then Kimi K3 max
+    // Frontend/UI work: Fable 5 max, then Opus 5 max, then Kimi K3.1 Pro max
     "visual-engineering": { "model": "anthropic/claude-fable-5-1", "reasoning": "max" },
 
     // Hard logic: GPT-6 Astra max, then GPT-5.6 Sol max
@@ -191,7 +191,7 @@ Override specific categories or curated agents in `omo.json`:
     // Low-effort fallback: Claude Sonnet 5.5 medium, then MiMo V2.6 Pro and Grok 4.7
     "unspecified-low": { "model": "anthropic/claude-sonnet-5-5", "reasoning": "medium" },
 
-    // High-effort fallback: Opus 5, then GLM 5.3 and Kimi K3
+    // High-effort fallback: Opus 5, then GLM 5.3 and Kimi K3.1 Pro
     "unspecified-high": { "model": "anthropic/claude-opus-5-5", "reasoning": "medium" },
 
     // Prose and documentation

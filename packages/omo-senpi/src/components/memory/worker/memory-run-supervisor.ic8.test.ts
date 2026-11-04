@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { existsSync } from "node:fs"
-import { readFile, rm } from "node:fs/promises"
+import { readFile, rm, stat } from "node:fs/promises"
 import { join } from "node:path"
 import {
   createMemoryRunSupervisorIc8Harness,
@@ -105,7 +105,7 @@ describe("memory run supervisor IC-8 containment", () => {
     ).rejects.toThrow("taskkill failed with exit code 1")
   })
 
-  test("#given injected Windows and a child that exits during grace #when the hard deadline arrives #then the supervisor cancels forced taskkill", async () => {
+  test("#given injected Windows and a child that exits during grace #when the hard deadline arrives #then the deadline tree-kill runs and the supervisor's forced kill stays unused", async () => {
     // given
     const { runDir, clockPath, childExited } = await makeRun("graceful")
     const supervisor = launchSupervisor(runDir, clockPath, "win32")
@@ -120,14 +120,42 @@ describe("memory run supervisor IC-8 containment", () => {
       readonly timedOut: boolean
       readonly childExit: { readonly code: number | null; readonly signal: string | null }
     }
+    const invocationPath = join(runDir, "taskkill-invocation.json")
+    await waitForPath(invocationPath)
+    const invocationBeforeGrace = JSON.parse(await readFile(invocationPath, "utf8")) as { readonly args: string[] }
+    const invocationMtimeBeforeGrace = (await stat(invocationPath)).mtimeMs
     await advanceClock(clockPath, 3_000)
 
-    // then
+    // then: the deadline tree-kill terminated the model; no second, forced grace kill follows.
     expect(result).toEqual({ code: 0, signal: null })
     expect(outcome.timedOut).toBe(true)
-    if (process.platform === "win32") expect(outcome.childExit).toEqual({ code: null, signal: "SIGTERM" })
-    else expect(outcome.childExit).toEqual({ code: 0, signal: null })
-    expect(existsSync(join(runDir, "taskkill-invocation.json"))).toBe(false)
+    // Real Windows ends the killed model with exit code 1; elsewhere the taskkill fixture SIGKILLs it.
+    if (process.platform === "win32") expect(outcome.childExit).toEqual({ code: 1, signal: null })
+    else expect(outcome.childExit).toEqual({ code: null, signal: "SIGKILL" })
+    expect(invocationBeforeGrace.args.slice(-4)).toEqual(["/pid", expect.any(String), "/T", "/F"])
+    expect((await stat(invocationPath)).mtimeMs).toBe(invocationMtimeBeforeGrace)
+  }, 60_000)
+
+  test("#given a model with a live grandchild #when the hard deadline arrives on injected Windows #then the model's whole tree is terminated", async () => {
+    // Runtime regression for the parked reflection runs: child-exit recorded SIGTERM while the
+    // agent's descendants kept working for another hour. Only the model CLI died before the fix.
+    // The injected win32 branch and taskkill fixture run on every host, so this guards Linux and
+    // macOS CI too.
+    const { runDir, clockPath, childExited } = await makeRun("with-grandchild")
+    const supervisor = launchSupervisor(runDir, clockPath, "win32")
+    const exit = waitForExit(supervisor)
+    await waitForPath(join(runDir, "child-started.json"))
+    const grandchild = JSON.parse(await readFile(join(runDir, "grandchild.json"), "utf8")) as { readonly pid: number }
+    trackProcessGroup(grandchild.pid)
+    expect(processGroupIsAlive(grandchild.pid)).toBe(true)
+
+    await advanceClock(clockPath, 2_000)
+    await childExited
+    const result = await exit
+
+    expect(result).toEqual({ code: 0, signal: null })
+    expect(processGroupIsAlive(grandchild.pid)).toBe(false)
+    untrackProcessGroup(grandchild.pid)
   }, 60_000)
 
   for (const platform of IC8_PLATFORMS) {
@@ -144,7 +172,6 @@ describe("memory run supervisor IC-8 containment", () => {
       await advanceClock(clockPath, 2_000)
       if (supervisor.pid === undefined) throw new Error("supervisor pid is required")
       await waitForPath(join(runDir, `${platform === "win32" ? "win32-graceful" : "posix-SIGTERM"}-${supervisor.pid}.json`))
-      expect(existsSync(join(runDir, "taskkill-invocation.json"))).toBe(false)
       if (nativeWindowsGraceWins) {
         await childExited
         await waitForPath(join(runDir, "outcome.json"))
@@ -156,7 +183,8 @@ describe("memory run supervisor IC-8 containment", () => {
       // then
       const outcome = JSON.parse(await readFile(join(runDir, "outcome.json"), "utf8")) as Record<string, unknown>
       expect(outcome.timedOut).toBe(true)
-      if (platform === "win32" && !nativeWindowsGraceWins) {
+      // Windows terminates the model's whole tree at the deadline (taskkill /T /F), not just the CLI.
+      if (platform === "win32") {
         const invocationPath = join(runDir, "taskkill-invocation.json")
         await waitForPath(invocationPath)
         const invocation = JSON.parse(await readFile(invocationPath, "utf8")) as { readonly args: string[] }

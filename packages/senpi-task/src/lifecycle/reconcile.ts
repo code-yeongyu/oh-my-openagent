@@ -64,20 +64,14 @@ async function reconcileRecords(
       || fresh.notification.run_epoch !== record.notification.run_epoch || fresh.updated_at !== record.updated_at
       || fresh.residency_state !== record.residency_state || fresh.status !== record.status) {
       excludedFromRevival.add(record.task_id)
-      outcomes.push({ task_id: record.task_id, kind: "foreign_live_owner", reason: "ownership changed during probe" })
+      outcomes.push(ownedElsewhere(record.task_id, parentSessionId, "ownership changed during probe"))
       continue
     }
     if (foreign) {
       // Scoped admission re-reads the store rather than this candidate array. Carry the
       // ownership exclusion into that selector too, or a suspended live-owner child is claimed.
       excludedFromRevival.add(record.task_id)
-      outcomes.push(parentSessionId === undefined
-        ? {
-            task_id: record.task_id,
-            kind: "foreign_live_owner",
-            reason: `child owned by live process pid=${record.host_pid}`,
-          }
-        : { task_id: record.task_id, kind: "deferred", reason: "foreign_live_owner" })
+      outcomes.push(ownedElsewhere(record.task_id, parentSessionId, `child owned by live process pid=${record.host_pid}`))
       continue
     }
     if (hasLiveResidentHandle(context, record.task_id)) {
@@ -142,6 +136,14 @@ async function reconcileRecords(
     (taskId) => newestSessionPath(context, taskId),
   ))
   return { outcomes }
+}
+
+// A scoped pass that loses a record to another owner defers it, wherever it lost the race: the
+// deferral is what arms its fenced retry should that owner die. The legacy sweep only reports.
+function ownedElsewhere(taskId: string, parentSessionId: string | undefined, legacyReason: string): ReconcileOutcome {
+  return parentSessionId === undefined
+    ? { task_id: taskId, kind: "foreign_live_owner", reason: legacyReason }
+    : { task_id: taskId, kind: "deferred", reason: "foreign_live_owner" }
 }
 
 export async function reconcileLegacyRecord(context: LifecycleContext, observed: TaskRecord): Promise<ReconcileOutcome> {

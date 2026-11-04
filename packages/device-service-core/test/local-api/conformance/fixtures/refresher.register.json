@@ -1,0 +1,75 @@
+{
+  "request": "refresher.register",
+  "cases": [
+    {
+      "name": "an absolute binary path and a semver register",
+      "outcome": "ok",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "refresher.register",
+            "binary_path": "/usr/local/bin/omo",
+            "version": "2.0.0"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": true,
+            "data": {}
+          }
+        }
+      ]
+    },
+    {
+      "name": "a relative binary path is refused",
+      "outcome": "refusal",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "refresher.register",
+            "binary_path": "bin/omo",
+            "version": "2.0.0"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "invalid_request"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a version that is not semver is refused",
+      "outcome": "refusal",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "refresher.register",
+            "binary_path": "/usr/local/bin/omo",
+            "version": "latest"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "invalid_request"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

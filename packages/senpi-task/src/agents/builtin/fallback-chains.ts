@@ -49,10 +49,11 @@ export const AGENT_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFal
       variant: "max",
     },
     {
-      providers: ["opencode-go", "kimi-for-coding", "moonshotai", "opencode"],
+      providers: ["opencode-go", "kimi-for-coding", "moonshotai"],
       model: LATEST_MODEL_BY_FAMILY.kimi,
       variant: "max",
-    }
+    },
+    { providers: ["opencode"], model: LATEST_MODEL_BY_FAMILY.kimiK3, variant: "max" }
   ]),
   "plan-reviewer": [
     { providers: ["chatgpt-subscription", "openai"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "xhigh" },
