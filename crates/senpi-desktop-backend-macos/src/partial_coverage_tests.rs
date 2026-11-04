@@ -16,8 +16,9 @@ const BACKGROUND_WRAPPERS: [&str; 3] = [
 ];
 
 /// The background arms that exist today, as `file: count`.
-const BACKGROUND_ARMS: [(&str, usize); 5] = [
-    ("input/mod.rs", 4),
+const BACKGROUND_ARMS: [(&str, usize); 6] = [
+    ("input/mod.rs", 1),
+    ("input/keyboard.rs", 3),
     ("input/element.rs", 2),
     ("input/holds.rs", 1),
     ("input/menu.rs", 1),
