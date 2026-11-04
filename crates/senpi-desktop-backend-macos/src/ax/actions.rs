@@ -12,6 +12,7 @@ use senpi_desktop_core::intervention::check_press;
 use super::date;
 use super::element::{self, ax_result, copy_date};
 use super::popup;
+use super::text_input;
 use crate::skylight::{mark_sent, reporting_partial};
 
 pub(crate) fn perform(element: &AXUIElement, action: &str) -> CoreResult<()> {
@@ -38,6 +39,8 @@ pub(super) trait AxRequests {
     fn send_action(&self, action: &CFString) -> AXError;
     fn write_attribute(&self, attribute: &CFString, value: &CFType) -> AXError;
     fn read_date(&self, attribute: &str) -> Option<f64>;
+    fn read_text(&self, attribute: &str) -> Option<String>;
+    fn is_secure(&self) -> bool;
 }
 
 impl AxRequests for AXUIElement {
@@ -55,6 +58,14 @@ impl AxRequests for AXUIElement {
 
     fn read_date(&self, attribute: &str) -> Option<f64> {
         copy_date(self, attribute)
+    }
+
+    fn read_text(&self, attribute: &str) -> Option<String> {
+        element::copy_string(self, attribute)
+    }
+
+    fn is_secure(&self) -> bool {
+        text_input::is_secure(self)
     }
 }
 
@@ -104,15 +115,20 @@ pub(super) fn write_value(element: &(impl AxRequests + ?Sized), value: &str) -> 
     }
 }
 
+/// An accepted write is read back exactly, as typed insertion is
+/// ([`text_input::text_readback`]): a field that reverted or reformatted the
+/// text has not been shown to hold it, and a secure field's text never enters
+/// the error (oh-my-pi 18.13.1 `MacAx::set_value` `verify_text_value`).
 fn set_string_value(element: &(impl AxRequests + ?Sized), value: &str) -> CoreResult<()> {
     check_press()?;
-    let value = CFString::from_str(value);
-    let error = sent(element.write_attribute(&CFString::from_str("AXValue"), &value));
+    let text = CFString::from_str(value);
+    let error = sent(element.write_attribute(&CFString::from_str("AXValue"), &text));
     request_result(
         error,
         "setting AXValue",
         "AXValue is not settable; no typing fallback was attempted",
-    )
+    )?;
+    text_input::text_readback(value, value, element.read_text("AXValue").as_deref(), element.is_secure())
 }
 
 /// Date and time controls publish `AXValue` as a `CFDate` and refuse the same
