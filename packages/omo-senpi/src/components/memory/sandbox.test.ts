@@ -200,7 +200,7 @@ describe("reflection worker OS sandbox", () => {
 
   test("#given Linux with bwrap available #when spawn arguments are transformed #then the root is read-only while worktree and git state are rebound writable", async () => {
     // given
-    const { setup, transform } = build("required", { platform: "linux", which: () => "/usr/bin/bwrap" })
+    const { setup, transform } = build("required", { platform: "linux", which: () => "/usr/bin/bwrap", probe: () => ({ usable: true }) })
 
     // when
     const result = transform(spawnArgs(setup.worktree))
@@ -237,6 +237,7 @@ describe("reflection worker OS sandbox", () => {
       env: original.env,
       platform: "linux",
       which: () => "/usr/bin/bwrap",
+      probe: () => ({ usable: true }),
     })
 
     // when
@@ -261,6 +262,7 @@ describe("reflection worker OS sandbox", () => {
       env: original.env,
       platform: "linux",
       which: () => "/usr/bin/bwrap",
+      probe: () => ({ usable: true }),
     })
 
     // when
