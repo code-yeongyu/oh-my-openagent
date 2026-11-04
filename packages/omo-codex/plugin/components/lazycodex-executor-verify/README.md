@@ -95,3 +95,100 @@ The checker exits nonzero on failed assertions. Store stdout/stderr separately
 retain the original descriptor bytes and independently verify saved output.
 Never infer argv from a shell string or relax validation to accept an output
 document. Correcting metadata does not retroaccept a failure or approve source.
+
+## Read-only review callers
+
+Inspect the installed role before assigning deliverables. Metis and other
+read-only reviewers return native commentary and final text; never ask them to
+write plans, partials, evidence, logs, checker scripts or descriptors. The parent
+owns those artifacts. Request a JSON object with a nonempty string `status` and
+arrays `findings` and `gaps` in commentary and final output. Required bootstrap
+messages may precede the first valid commentary.
+
+The optional parent API also exports:
+
+- `nativeReviewEvidence(lines, agentId, turnId, phase)` captures the first valid
+  commentary or exact terminal final from complete, unmodified native JSONL
+  lines. Commentary uses the inclusive 8-response/10-tool early gate, counting
+  cumulative observed events. Preserve tighter task bounds and independently
+  check the watcher counters at first observation too; a late observation cannot
+  borrow an earlier event's smaller count.
+- `verifyNativeReviewEvidence(lines, proof, agentId, turnId, phase)` compares a
+  saved proof with the actual native actor, current turn, assistant phase, raw
+  event bytes/text and hashes. A final additionally requires exact matching
+  latest `task_complete` text and no later assistant message/start/abort.
+- `nativeToolOutputEvidence(lines, agentId, turnId, callId)` pairs one actual
+  `function_call` with `function_call_output`, or `custom_tool_call` with
+  `custom_tool_call_output`, using the same native call ID and turn. It preserves
+  raw event bytes, hashes and the complete output value; it does not infer that
+  the command was read-only or that its output satisfies the task. The parent
+  must inspect the actual tool operation and independently check the source/read
+  result, allowed scope, modality and permissions.
+
+These are observations, not admission, a watchdog, a scheduler or acceptance.
+The parent must read real native transcript bytes; do not reconstruct events,
+forge actor/turn bindings or replace a transcript with parsed/pretty text.
+Malformed or unsupported structured output fails closed. Preserve mandatory
+citation metadata: never strip it to force JSON parsing to succeed; report the
+incompatibility instead. Keep all original failed proofs and receipts.
+
+### Normal CLI and task-local ownership
+
+Run Node-based preparation, capture, watcher and checker scripts through the
+normal Node CLI. `functions.exec` can invoke `exec_command`, but it and restricted
+`node_repl` kernels are not the Node CLI and may lack `process`. Resolve the actual
+executable there and pass its absolute path as data/argv; do not evaluate
+`process.execPath` or import CLI entrypoints inside the restricted kernel.
+The import-only parent API is separate from the CLI entrypoint.
+
+Before dispatch, copy `native-review-capture.mjs`, `native-review-evidence.mjs`,
+`parent-evidence.mjs` and `entry-guard.mjs` from the resolved plugin's `scripts/`
+into the task-owned evidence directory. Copy the external adapter's watcher
+there too, pin all approved hashes and bind the copies as task inputs. Run the
+local watcher, and use the same local helper in the independent parent checker.
+Shared installed scripts are templates, not task output directories. Register
+unique raw/meta/final/checker output paths before the worker starts.
+
+The copied CLI writes proof JSON to stdout without editing the transcript or
+publishing acceptance:
+
+```text
+node TASK/native-review-capture.mjs capture TRANSCRIPT ACTOR TURN commentary
+node TASK/native-review-capture.mjs capture TRANSCRIPT ACTOR TURN final_answer
+node TASK/native-review-capture.mjs verify TRANSCRIPT ACTOR TURN final_answer PROOF_JSON
+node TASK/native-review-capture.mjs tool-output TRANSCRIPT ACTOR TURN CALL_ID
+```
+
+Replace all placeholders and use the verified absolute Node executable in a
+collector descriptor's explicit argv. The CLI requires complete UTF-8 JSONL.
+Keep native stdout/proof files separate from the descriptor and from parsed
+reports. A setup fixture runner expecting `READ_OK` and a marker is not an
+ordinary review checker: critique acceptance must check the assigned source and
+task-specific result while keeping the native provenance gates.
+
+Test the **complete** capture-to-checker CLI/argv/artifact pipeline offline before
+spending a native setup attempt, using retained copies and positive/rejection
+cases. Include both native output families, actor/turn/phase/call-ID mismatches,
+altered proofs/text/hashes and event/observation budget failures. A syntax check
+or isolated parser test is insufficient. Bind the exact tested checker bytes.
+Require successful preparation and valid descriptor/inputs before dependent
+ledger initialization or collection. Offline replay is not new native proof and
+does not authorize retrying or accepting a historical failed run.
+
+### Accounting and acceptance remain separate
+
+Keep genuine native admission/attachment, current-chat runtime/tool/route gates,
+the external cumulative response/tool/time watchdog, actual served requests,
+independent checking, normal collector publication and actor/goal/continuation
+settlement. Capture alone never accepts a task or approves a critique's findings.
+The executor stop hook does not grant a read-only role file-write permission.
+
+A normally completed child with a failed parent capture/checker is rejected,
+not interrupted. Retain its actual sends with `accepted=false` and
+`interrupted=false`; reserve interrupted accounting for genuinely interrupted
+requests. Preserve a misclassified historical receipt with an explicit caveat
+instead of rewriting it. Distinguish verified post-final counts, in-flight
+checkpoints and estimates. Final replies and text-only handoffs still consume
+response allowance. Unused tool allowance cannot reopen an exhausted response
+budget or expired deadline; repair does not authorize replenishment, a new worker
+or retroactive acceptance. Another chat still needs its own applicable gates.
