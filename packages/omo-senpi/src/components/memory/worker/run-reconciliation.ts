@@ -64,7 +64,7 @@ export interface ReflectionRunReconciliationOptions {
  * a pass grow with every run the identity ever kept (#12355). The marker is honoured only while it is
  * at least as new as the run's ledger and terminal sentinels, so a rewritten generation is reconsidered.
  */
-export const RUN_RECONCILED_MARKER = "reconciled.json"
+const RUN_RECONCILED_MARKER = "reconciled.json"
 const RUN_STATE_FILES = ["ledger.json", "final.json", "abandoned.json", "quarantined.json"] as const
 
 export type ReconcileContext = Required<Pick<ReflectionRunReconciliationOptions, "now" | "hostname">>
