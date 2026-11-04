@@ -175,28 +175,28 @@ export function createIdentityRuntime(
   }
 
   let reconciliation: { readonly promise: Promise<void>; readonly signal: AbortSignal | undefined } | undefined
-  // The runs directory's mtime when a pass last finished with nothing left to reconcile. Adding or
-  // removing a run directory changes it, so an equal stamp means a new pass has nothing to do (#12355).
-  let settledRunsStamp: number | undefined
-  const runsDir = join(identity.identityPaths.reflection, "runs")
-  const runsStamp = async (): Promise<number> => {
-    try {
-      return (await stat(runsDir)).mtimeMs
-    } catch (error) {
-      if (error instanceof Error && "code" in error && error.code === "ENOENT") return -1
-      throw error
-    }
-  }
+  // Taken before a pass that then left nothing to reconcile and no reservation held. A reservation write
+  // replaces active.lock or pending.json, and adding or removing a run directory changes runs/, so an equal
+  // stamp means no state a new pass would act on has changed (#12355). The reflection directory's own mtime
+  // is not used: the scheduler lock is created and removed there by every pass.
+  let settledRunsStamp: string | undefined
+  const reflectionDir = identity.identityPaths.reflection
+  const runsDir = join(reflectionDir, "runs")
+  const reservationPaths = [join(reflectionDir, "active.lock"), join(reflectionDir, "pending.json")]
+  const runsStamp = async (): Promise<string> =>
+    (await Promise.all([runsDir, ...reservationPaths].map(modifiedAt))).join(":")
   const startReconciliation = (signal: AbortSignal | undefined): Promise<void> => {
     let unsettledRuns: number | undefined
     return runsStamp().then(async (stamp) => {
+      settledRunsStamp = undefined
       await reconcileReflectionRuns({
         identity: asMemoryIdentity(identity), reservation: store, launch,
         deferOnSchedulerContention: true,
         onPassComplete: (state) => { unsettledRuns = state.unsettledRuns },
         ...(signal === undefined ? {} : { signal }),
       })
-      if (unsettledRuns === 0) settledRunsStamp = stamp
+      const reserved = (await Promise.all(reservationPaths.map(modifiedAt))).some((mtime) => mtime !== -1)
+      if (unsettledRuns === 0 && !reserved) settledRunsStamp = stamp
     })
   }
   const runtime: MemoryIdentityRuntime = {
@@ -243,6 +243,15 @@ export function createIdentityRuntime(
  */
 function pinnedAgentDirEnv(agentDir: string): NodeJS.ProcessEnv {
   return Object.fromEntries(AGENT_DIR_ENV_NAMES.map((name) => [name, agentDir]))
+}
+
+async function modifiedAt(path: string): Promise<number> {
+  try {
+    return (await stat(path)).mtimeMs
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return -1
+    throw error
+  }
 }
 
 function sameConversations(a: readonly string[], b: readonly string[]): boolean {

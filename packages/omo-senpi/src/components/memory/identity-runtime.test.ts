@@ -547,5 +547,30 @@ test("#given a pass that left every run reconciled #when later passes may skip a
 
   // then
   expect(passes.mock.calls.length).toBeGreaterThan(afterForced)
+
+  // when: the empty run directory goes away, the latch is set again, then another process reserves
+  await rm(join(runsDir, "run-new"), { recursive: true })
+  await runtime.reconcile(undefined, { skipUnchanged: true })
+  const latched = passes.mock.calls.length
+  await runtime.reconcile(undefined, { skipUnchanged: true })
+  expect(passes.mock.calls.length).toBe(latched)
+  // A reservation another process took and then died holding: no run directory was created.
+  await writeFile(join(identity.identityPaths.reflection, "pending.json"), "")
+  // The pass reads the reservation through this stub, so the planted file is only the on-disk signal.
+  passes.mockImplementation(async () => ({}))
+  await runtime.reconcile(undefined, { skipUnchanged: true })
+  await rm(join(identity.identityPaths.reflection, "pending.json"))
+
+  // then
+  expect(passes.mock.calls.length).toBeGreaterThan(latched)
+
+  // when: a pass ends while a reservation is held
+  await writeFile(join(identity.identityPaths.reflection, "active.lock"), "")
+  await runtime.reconcile()
+  const afterHeld = passes.mock.calls.length
+  await runtime.reconcile(undefined, { skipUnchanged: true }).catch(() => undefined)
+
+  // then: the latch was not set, so the next turn-end call runs a pass
+  expect(passes.mock.calls.length).toBeGreaterThan(afterHeld)
   passes.mockRestore()
 })
