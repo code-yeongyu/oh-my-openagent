@@ -113,7 +113,8 @@ export function createEngineRunPause(ports: {
         }
         throw new Error("held admission resumption port is not configured")
       }
-      if (participant.state === "lost" && participant.taskId !== undefined) {
+      // A retried owned_elsewhere child goes the same way: a later Resume may run with no transaction.
+      if ((participant.state === "lost" || participant.state === "owned_elsewhere") && participant.taskId !== undefined) {
         const resumed = await ports.manager.resumeLostTask(participant.taskId, {
           ...request, ...(credential === undefined ? {} : { resumeCredential: credential }),
         })

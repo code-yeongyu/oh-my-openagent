@@ -24,7 +24,8 @@ export type EngineResumeReceipt =
   | { readonly released: false; readonly reason: "stale" | "not_held" | "wrong_parent" }
   | { readonly released: true; readonly otherHoldLive?: boolean; readonly turnId?: string }
 
-export type EngineInheritReceipt = { readonly childSeq: number } | { readonly refused: "wrong_parent" }
+// "owned_elsewhere": another live host holds the child; this run never takes custody of it (#12349).
+export type EngineInheritReceipt = { readonly childSeq: number } | { readonly refused: "wrong_parent" | "owned_elsewhere" }
 
 // The engine's extension-context method that releases a run's fence when the run is cancelled
 // (senpi#3871, releaseFences("run_cancelled", [runRef])). The ONE place its name is spelled.

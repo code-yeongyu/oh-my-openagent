@@ -17,12 +17,16 @@ export type PauseParticipant = {
     readonly sequence: number
     readonly phase: "pre_grant" | "post_grant" | "parked"
   }
-  readonly state: "pending" | "held" | "resuming" | "resumed" | "held_by_user" | "restorable" | "lost"
+  // "owned_elsewhere": the Resume found another live host still holding the child; it stays paused
+  // there, is never ended as lost, and a later Resume retries it (#12349).
+  readonly state: "pending" | "held" | "resuming" | "resumed" | "held_by_user" | "restorable" | "lost" | "owned_elsewhere"
   readonly ackSeq?: number
   readonly observedChildSeq?: number
   readonly resumeTurnId?: string
   // Why a participant left the run's custody without acknowledging the pause.
   readonly lostReason?: string
+  // The live host that held an owned_elsewhere participant at the last attempt.
+  readonly ownerPid?: number
   readonly at: string
 }
 

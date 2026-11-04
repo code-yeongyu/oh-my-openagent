@@ -150,3 +150,49 @@ test("delta LOW: a propagation failure Resume runs past is recorded as the lost 
   expect(h.registry.require(PARENT).participants.st_b?.lostReason).toContain("fence write failed")
   expect(h.resumed).toEqual([])
 })
+
+function ownedElsewhere(): Error {
+  return Object.assign(new Error("paused child st_b is still held by live host 4242; it is never run on two hosts"), {
+    code: "paused_child_owned_elsewhere", ownerPid: 4242,
+  })
+}
+
+test("#12349: a paused child another live host still holds stays paused as owned_elsewhere, never lost and never ended", async () => {
+  const endedKeys: string[] = []
+  let attempts = 0
+  const h = hostOver({
+    pause: async () => ({ kind: "held", childSeq: 0 }),
+    resume: async () => { attempts += 1; throw ownedElsewhere() },
+    endLost: async participant => { endedKeys.push(participant.key); return true },
+  }, { delaysMs: [5, 30], sleep: async () => undefined })
+
+  await stopThenResume(h)
+  await within(h.bridge.lostRecoverySettled(PARENT), "the lost-child recovery to settle")
+
+  expect(h.registry.require(PARENT).participants.st_b).toMatchObject({ state: "owned_elsewhere", ownerPid: 4242 })
+  expect(h.registry.require(PARENT).participants.st_b?.lostReason).toBeUndefined()
+  expect(endedKeys).toEqual([])
+  expect(attempts).toBe(1)
+  expect(h.barrier.state(PARENT)).toEqual({ kind: "open" })
+})
+
+test("#12349: a later Resume retries an owned_elsewhere child and resumes it once its owner let it go", async () => {
+  let ownerAlive = true
+  const states: string[] = []
+  const h = hostOver({
+    pause: async () => ({ kind: "held", childSeq: 0 }),
+    resume: async participant => {
+      states.push(participant.state)
+      if (ownerAlive) throw ownedElsewhere()
+      return { kind: "resumed", turnId: "turn-b" }
+    },
+  }, { delaysMs: [5], sleep: async () => undefined })
+
+  await stopThenResume(h)
+  expect(h.registry.require(PARENT).participants.st_b?.state).toBe("owned_elsewhere")
+  ownerAlive = false
+  await h.bridge.reconciled(PARENT)
+
+  expect(states).toEqual(["held", "owned_elsewhere"])
+  expect(h.registry.require(PARENT).participants.st_b?.state).toBe("resumed")
+})
