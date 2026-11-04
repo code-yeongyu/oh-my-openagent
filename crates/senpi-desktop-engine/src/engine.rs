@@ -155,7 +155,8 @@ impl Engine {
     }
 
     /// Whether `method`'s reply is an object-mode action report: the session
-    /// queued an open with `reportMode: "object"` and `method` mutates.
+    /// thread last applied an open with `reportMode: "object"` and `method`
+    /// mutates.
     pub fn reports_action(&self, method: Method) -> bool {
         method.reports_action() && self.session.report_mode() == ReportMode::Object
     }
