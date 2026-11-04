@@ -170,9 +170,6 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // bun 1.4.3, byte-identical). Ceiling = that measurement rounded up to the next 5,000 bytes (never below what is measured).
 // Batch #18 measured omo.js at 1,422,712 B with the telemetry lazy chunk; revisit this budget when a trim lands.
 // Batch #19 measured omo.js at 1,426,658 B (11 cars); budget = measured + 4 KiB (lead rule). Revisit when a trim lands.
-// #11578 (session-lock lease, #11262) on dev 72a6bae47e: dev measures 1,459,597 B against 1,460,160; the lease head
-// measures 1,461,396 B (+1,799: handOver/restore and the lease record in team-core locks). Ceiling = measured + 4 KiB
-// (lead rule) = 1,465,492, which also holds the stacked store PR #11589 (1,461,509 B). Revisit when a trim lands.
 const BUDGET_BYTES = bundleBudget.omoJsBytes
 
 describe("omo-senpi bundle size budget", () => {
