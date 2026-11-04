@@ -1480,6 +1480,7 @@
     "packages/omo-senpi/src/components/thread/reader.ts",
     "packages/omo-senpi/src/components/thread/remote/cross-device.ts",
     "packages/omo-senpi/src/components/thread/remote/device-service.ts",
+    "packages/omo-senpi/src/components/thread/remote/lazy-ops.ts",
     "packages/omo-senpi/src/components/thread/remote/lazy-remote.ts",
     "packages/omo-senpi/src/components/thread/remote/remote-ops.ts",
     "packages/omo-senpi/src/components/thread/sdk.ts",
