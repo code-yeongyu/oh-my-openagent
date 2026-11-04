@@ -1,4 +1,4 @@
-import { lstatSync, statSync } from "node:fs"
+import { existsSync, lstatSync, statSync } from "node:fs"
 import * as nodeFs from "node:fs"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path"
@@ -120,6 +120,16 @@ function findAncestorDirectories(cwd: string, homeDir: string): readonly string[
   return ancestors
 }
 
+function creationAncestors(ancestors: readonly string[], userConfigParent: string): readonly string[] {
+  const bounded: string[] = []
+  for (const ancestor of ancestors) {
+    if (ancestor === resolve(userConfigParent)) break
+    bounded.push(ancestor)
+    if (existsSync(join(ancestor, ".git"))) break
+  }
+  return bounded
+}
+
 function isExistingDirectory(path: string): boolean {
   try {
     return statSync(path).isDirectory()
@@ -205,7 +215,13 @@ export function resolveOmoConfigWatchTargetResolution(
       }
     }
 
-    for (const ancestorDirectory of ancestorDirectories) targets.push(creationTarget(ancestorDirectory))
+    // A creation target watches a whole directory, and on macOS (FSEvents) every change beneath it reaches
+    // the session, so an ancestor reaching HOME woke every session on any write in HOME. Stop at the project
+    // root (the first directory holding .git) and at the user config directory's parent, which the
+    // user-config target above already watches. Existing .omo directories higher up stay watched.
+    for (const ancestorDirectory of creationAncestors(ancestorDirectories, dirname(userConfigDirectory))) {
+      targets.push(creationTarget(ancestorDirectory))
+    }
   }
 
   const senpiProtectedPaths = resolveSenpiProtectedPaths(env)

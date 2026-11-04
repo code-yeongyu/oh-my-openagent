@@ -61,7 +61,7 @@ function targetFor(paths: readonly { readonly path: string; readonly filterGlobs
 }
 
 describe("resolveOmoConfigWatchTargets", () => {
-  it("#given nested project configs #when resolving targets #then watches user scope, every existing .omo directory, and each cwd-to-home ancestor", () => {
+  it("#given nested project configs #when resolving targets #then watches user scope, every existing .omo directory, and each cwd ancestor below the user config parent", () => {
     const fixture = createFixture()
     const userConfigDirectory = join(fixture.homeDir, ".omo")
     mkdirSync(userConfigDirectory, { recursive: true })
@@ -99,8 +99,22 @@ describe("resolveOmoConfigWatchTargets", () => {
       fixture.cwd,
       fixture.projectDir,
       fixture.workDir,
-      fixture.homeDir,
     ])
+  })
+
+  it("#given a project root holding .git #when resolving targets #then creation watches stop at the root while higher .omo directories stay watched", () => {
+    const fixture = createFixture()
+    mkdirSync(join(fixture.homeDir, ".omo"), { recursive: true })
+    mkdirSync(join(fixture.projectDir, ".git"))
+    writeProjectConfig(fixture.workDir)
+
+    const targets = resolveOmoConfigWatchTargets({ cwd: fixture.cwd, env: fixtureEnv(fixture), platform: "linux" })
+
+    expect(targets.filter((target) => target.filterGlobs.includes("/.omo")).map((target) => target.path)).toEqual([
+      fixture.cwd,
+      fixture.projectDir,
+    ])
+    expect(targetFor(targets, join(fixture.workDir, ".omo"), "/omo.jsonc")).toBe(true)
   })
 
   it("#given a newly created ancestor .omo directory #when resolving targets #then keeps watching its config files after a rejected creation", () => {
