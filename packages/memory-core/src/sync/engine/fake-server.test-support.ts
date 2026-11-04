@@ -125,10 +125,18 @@ export class FakeSyncServer {
     return { snapshot, entries, head: this.head, more: later.length > limit }
   }
 
+  /** The service's revoke freeze: while set, every append is refused `stale_base`. */
+  frozen = false
+
+  /** Announces `sync.state.changed` to every subscriber. */
+  stateChanged(): void {
+    for (const l of this.listeners) l.onStateChanged()
+  }
+
   private append(request: Parameters<Transport["append"]>[0], author: string): AppendResult {
     const known = this.byBatch.get(request.batchId)
     if (known !== undefined) return { ok: true, seq: known }
-    const ok = request.baseSeq === this.head
+    const ok = request.baseSeq === this.head && !this.frozen
     this.appends.push({ batchId: request.batchId, baseSeq: request.baseSeq, ok })
     if (!ok) return { ok: false, error: "stale_base", head: this.head }
     const upload = this.uploads.get(request.uploadId)

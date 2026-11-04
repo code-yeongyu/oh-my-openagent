@@ -261,6 +261,7 @@ function registerTaskFlags(pi: SenpiExtensionAPI): void {
 // senpi-task tool factories return fully-typed ToolDefinitions whose typed renderCall breaks a plain
 // structural assignment to the registerTool(Record) seam; spreading each into a fresh object literal
 // lands it through the record-shaped registration boundary without a cast (no behavioural change).
+// Subagent, workflow and team tools run on the loop side of a split session (engine `ToolDefinition.runs`).
 function registerTaskTools(
   pi: SenpiExtensionAPI,
   engine: TaskEngine,
@@ -274,6 +275,7 @@ function registerTaskTools(
   const manager = engine.manager
   pi.registerTool({
     ...createTaskTool(engine.taskToolDeps((sessionId: string) => skillInvocations.stateFor(sessionId))),
+    runs: "brain",
   })
   pi.registerTool({
     ...createTaskSendTool({
@@ -282,13 +284,14 @@ function registerTaskTools(
       deliverLateOutcome: createLateSendOutcomeDeliverer(pi, () => engine.runtime.sessionId()),
       teamRouting: { service: teamService, from: TEAM_LEAD_SENTINEL, ...(resolveDefaultTeamRunId !== undefined ? { resolveDefaultTeamRunId } : {}) },
     }),
+    runs: "brain",
   })
-  pi.registerTool({ ...createTaskCancelTool({ manager }) })
+  pi.registerTool({ ...createTaskCancelTool({ manager }), runs: "brain" })
   const output = createTaskOutputTool({
     manager, stateDir: engine.stateDir, resolveCallerSessionId, notices: engine.host.notices.list,
   })
   const { forgetSession, ...outputTool } = output
-  pi.registerTool({ ...outputTool })
+  pi.registerTool({ ...outputTool, runs: "brain" })
   registerDagTool(pi, engine, dagRuntime)
   registerWorkpoolTool(pi, engine, skillInvocations, coordinator)
   registerEvalHandleHost(pi, engine)
@@ -386,7 +389,7 @@ type TeamToolContext = {
 }
 
 function registerTeamTools(pi: SenpiExtensionAPI, context: TeamToolContext): void {
-  for (const tool of buildLeadTeamTools({ service: context.service })) pi.registerTool({ ...tool })
+  for (const tool of buildLeadTeamTools({ service: context.service })) pi.registerTool({ ...tool, runs: "brain" })
 }
 
 function isPreviewPayload(value: unknown): boolean {
