@@ -142,7 +142,7 @@ fn a_background_drag_from_a_slider_is_delivered() {
     let frame = harness.capture("101");
     assert_eq!(
         harness.process(drag(&frame, 20.0, None)),
-        Ok(Response::Unit)
+        Ok(Response::MenuOutcome(None))
     );
     assert_eq!(drags(&harness).len(), 1);
 }
@@ -154,7 +154,7 @@ fn a_foreground_drag_from_a_row_is_not_the_guards_business() {
     let frame = harness.capture("101");
     assert_eq!(
         harness.process(drag(&frame, 100.0, delivery("foreground"))),
-        Ok(Response::Unit)
+        Ok(Response::MenuOutcome(None))
     );
     assert_eq!(drags(&harness).len(), 1);
 }
@@ -218,7 +218,7 @@ fn without_the_guard_a_background_drag_from_a_row_still_delivers() {
     let frame = harness.capture("101");
     assert_eq!(
         harness.process(drag(&frame, 100.0, None)),
-        Ok(Response::Unit)
+        Ok(Response::MenuOutcome(None))
     );
     assert_eq!(drags(&harness).len(), 1);
 }
