@@ -5,7 +5,9 @@ use senpi_desktop_core::frame::FrameGeometry;
 use senpi_desktop_core::types::{CaptureCaps, DesktopPoint, Target};
 use senpi_desktop_core::user_input::{UserInputFeed, UserPressKind};
 
-use crate::scripting::{EpochReason, FakeFocusRead, FakeIdentityRead, FocusRecordKind, FocusRecordOutcome};
+use crate::scripting::{
+    EpochReason, FakeFocusRead, FakeIdentityRead, FocusRecordKind, FocusRecordOutcome,
+};
 use crate::{FakeBackend, FakeMethod, FakeScenario, ScenarioError, SinkOp};
 
 fn fixtures() -> PathBuf {
@@ -13,7 +15,9 @@ fn fixtures() -> PathBuf {
 }
 
 fn v2() -> FakeBackend {
-    FakeBackend::new(FakeScenario::load(&fixtures().join("v2-scripting.json")).expect("v2 fixture parses"))
+    FakeBackend::new(
+        FakeScenario::load(&fixtures().join("v2-scripting.json")).expect("v2 fixture parses"),
+    )
 }
 
 fn backend(json: &str) -> FakeBackend {
@@ -26,12 +30,21 @@ const TWO_WINDOWS: &str = r#""windows":[
 
 fn capture(backend: &mut FakeBackend, window: &str) {
     backend
-        .capture(&Target::Window(window.to_owned()), &CaptureCaps::default(), &[])
+        .capture(
+            &Target::Window(window.to_owned()),
+            &CaptureCaps::default(),
+            &[],
+        )
         .expect("capture");
 }
 
 fn ops_matching(backend: &FakeBackend, keep: impl Fn(&SinkOp) -> bool) -> Vec<SinkOp> {
-    backend.sink().ops().into_iter().filter(|op| keep(op)).collect()
+    backend
+        .sink()
+        .ops()
+        .into_iter()
+        .filter(|op| keep(op))
+        .collect()
 }
 
 #[test]
@@ -40,11 +53,15 @@ fn every_existing_fixture_parses_with_todays_defaults() {
     let mut checked = 0;
     for entry in std::fs::read_dir(fixtures()).expect("fixtures dir") {
         let path = entry.expect("entry").path();
-        if path.file_name().is_some_and(|name| name == "v2-scripting.json") {
+        if path
+            .file_name()
+            .is_some_and(|name| name == "v2-scripting.json")
+        {
             continue;
         }
         // When
-        let scenario = FakeScenario::load(&path).unwrap_or_else(|err| panic!("{}: {err}", path.display()));
+        let scenario =
+            FakeScenario::load(&path).unwrap_or_else(|err| panic!("{}: {err}", path.display()));
         // Then
         let defaults = FakeScenario::default();
         assert_eq!(scenario.identity, defaults.identity, "{}", path.display());
@@ -64,15 +81,26 @@ fn empty_scenario_hooks_answer_todays_behavior() {
     let mut fake = backend(&format!("{{{TWO_WINDOWS}}}"));
     assert_eq!(fake.window_identity("101").expect("identity"), None);
     assert_eq!(fake.frontmost_pid().expect("frontmost"), Some(4242));
-    assert_eq!(fake.hit_read(DesktopPoint { x: 1.0, y: 1.0 }).expect("hit"), None);
     assert_eq!(
-        fake.record_focus(FocusRecordKind::Short, "102").expect("record"),
+        fake.hit_read(DesktopPoint { x: 1.0, y: 1.0 }).expect("hit"),
+        None
+    );
+    assert_eq!(
+        fake.record_focus(FocusRecordKind::Short, "102")
+            .expect("record"),
         FocusRecordOutcome::TookEffect
     );
-    assert_eq!((fake.epoch(), fake.ax_deadline_ms(), fake.stop_marker()), (0, None, None));
+    assert_eq!(
+        (fake.epoch(), fake.ax_deadline_ms(), fake.stop_marker()),
+        (0, None, None)
+    );
     capture(&mut fake, "101");
     fake.windows().expect("windows");
-    assert!(ops_matching(&fake, |op| matches!(op, SinkOp::IdentityChanged { .. } | SinkOp::EpochBumped { .. })).is_empty());
+    assert!(ops_matching(&fake, |op| matches!(
+        op,
+        SinkOp::IdentityChanged { .. } | SinkOp::EpochBumped { .. }
+    ))
+    .is_empty());
 }
 
 #[test]
@@ -81,17 +109,32 @@ fn v2_fixture_parses_every_field() {
     assert_eq!(scenario.identity["101"].process_start, 1_700_000_000);
     assert_eq!(scenario.identity_changes[0].after_call, FakeMethod::Capture);
     assert_eq!(scenario.identity_changes[0].nth, 1);
-    assert_eq!(scenario.identity_changes[0].new_process_start, 1_700_000_999);
+    assert_eq!(
+        scenario.identity_changes[0].new_process_start,
+        1_700_000_999
+    );
     assert_eq!(scenario.focus_reads.len(), 1);
-    assert_eq!(scenario.focus_record_effects[&FocusRecordKind::Full].len(), 2);
+    assert_eq!(
+        scenario.focus_record_effects[&FocusRecordKind::Full].len(),
+        2
+    );
     assert!(scenario.hit_at[0].secure);
     assert_eq!(scenario.user_input_timeline[0].t_ms, -500);
     assert_eq!(scenario.frontmost_pid, Some(4242));
     assert_eq!(scenario.ax_deadline_ms, Some(50));
     assert_eq!(scenario.ax_node_count["101"], 10_000);
     assert_eq!(scenario.epoch_events[0].reason, EpochReason::Lock);
-    assert_eq!(scenario.displays_change.as_ref().map(|change| change.after_call), Some(FakeMethod::Click));
-    assert_eq!(scenario.stop_marker.as_deref(), Some("/var/run/senpi-desktop/stop"));
+    assert_eq!(
+        scenario
+            .displays_change
+            .as_ref()
+            .map(|change| change.after_call),
+        Some(FakeMethod::Click)
+    );
+    assert_eq!(
+        scenario.stop_marker.as_deref(),
+        Some("/var/run/senpi-desktop/stop")
+    );
 }
 
 #[test]
@@ -117,7 +160,10 @@ fn identity_change_takes_effect_after_the_named_call() {
             process_start: 1_700_000_999,
         }]
     );
-    let front = fake.front_window().expect("front").expect("a focused window");
+    let front = fake
+        .front_window()
+        .expect("front")
+        .expect("a focused window");
     assert_eq!((front.pid, front.window_id.as_deref()), (5151, Some("101")));
 }
 
@@ -135,17 +181,27 @@ fn identity_change_waits_for_the_nth_call() {
 fn identity_read_reports_pid_and_start_and_records_the_read() {
     let mut fake = v2();
     let read = fake.window_identity("102").expect("identity");
-    assert_eq!(read, Some(FakeIdentityRead { pid: 4242, process_start: 1_700_000_000 }));
+    assert_eq!(
+        read,
+        Some(FakeIdentityRead {
+            pid: 4242,
+            process_start: 1_700_000_000
+        })
+    );
     assert_eq!(
         fake.sink().ops(),
-        vec![SinkOp::IdentityRead { window: "102".to_owned(), identity: read }]
+        vec![SinkOp::IdentityRead {
+            window: "102".to_owned(),
+            identity: read
+        }]
     );
     assert!(fake.window_identity("999").is_err());
 }
 
 #[test]
 fn identity_for_an_unknown_window_is_rejected() {
-    let err = FakeScenario::from_json(r#"{"identity":{"9":{"processStart":1}}}"#).expect_err("unknown window");
+    let err = FakeScenario::from_json(r#"{"identity":{"9":{"processStart":1}}}"#)
+        .expect_err("unknown window");
     assert!(err.to_string().contains("unknown window '9'"), "{err}");
     let err = FakeScenario::from_json(
         r#"{"identity_changes":[{"after_call":"capture","window":"9","new_pid":1,"new_processStart":2}]}"#,
@@ -180,7 +236,13 @@ fn focus_reads_are_served_in_order_then_fall_back_to_the_focused_window() {
             {{"window":"102","focused_window":"102","focused_element_window":"101"}}]}}"#
     ));
     let first = fake.read_focus("102").expect("first");
-    assert_eq!((first.focused_window.as_deref(), first.focused_element_window), (Some("101"), None));
+    assert_eq!(
+        (
+            first.focused_window.as_deref(),
+            first.focused_element_window
+        ),
+        (Some("101"), None)
+    );
     let second = fake.read_focus("102").expect("second");
     assert_eq!(second.focused_element_window.as_deref(), Some("101"));
     let fallback = fake.read_focus("102").expect("fallback");
@@ -192,7 +254,10 @@ fn focus_reads_are_served_in_order_then_fall_back_to_the_focused_window() {
             focused_element_window: Some("101".to_owned()),
         }
     );
-    assert_eq!(ops_matching(&fake, |op| matches!(op, SinkOp::FocusRead(_))).len(), 3);
+    assert_eq!(
+        ops_matching(&fake, |op| matches!(op, SinkOp::FocusRead(_))).len(),
+        3
+    );
 }
 
 #[test]
@@ -200,12 +265,36 @@ fn focus_records_follow_the_effects_table_and_are_recorded() {
     // Given: short does nothing, full works on its second try, the AX write fails
     let mut fake = v2();
     // When / Then
-    assert_eq!(fake.record_focus(FocusRecordKind::Short, "102").expect("short"), FocusRecordOutcome::NoEffect);
-    assert_eq!(fake.read_focus("102").expect("scripted").focused_window.as_deref(), Some("101"));
-    assert_eq!(fake.record_focus(FocusRecordKind::Full, "102").expect("full 1"), FocusRecordOutcome::NoEffect);
+    assert_eq!(
+        fake.record_focus(FocusRecordKind::Short, "102")
+            .expect("short"),
+        FocusRecordOutcome::NoEffect
+    );
+    assert_eq!(
+        fake.read_focus("102")
+            .expect("scripted")
+            .focused_window
+            .as_deref(),
+        Some("101")
+    );
+    assert_eq!(
+        fake.record_focus(FocusRecordKind::Full, "102")
+            .expect("full 1"),
+        FocusRecordOutcome::NoEffect
+    );
     assert!(fake.record_focus(FocusRecordKind::AxWrite, "102").is_err());
-    assert_eq!(fake.record_focus(FocusRecordKind::Full, "102").expect("full 2"), FocusRecordOutcome::TookEffect);
-    assert_eq!(fake.read_focus("102").expect("default").focused_element_window.as_deref(), Some("102"));
+    assert_eq!(
+        fake.record_focus(FocusRecordKind::Full, "102")
+            .expect("full 2"),
+        FocusRecordOutcome::TookEffect
+    );
+    assert_eq!(
+        fake.read_focus("102")
+            .expect("default")
+            .focused_element_window
+            .as_deref(),
+        Some("102")
+    );
     let outcomes: Vec<_> = fake
         .sink()
         .ops()
@@ -229,9 +318,19 @@ fn focus_records_follow_the_effects_table_and_are_recorded() {
 #[test]
 fn hit_read_matches_within_half_a_point_and_records_misses_too() {
     let mut fake = v2();
-    let hit = fake.hit_read(DesktopPoint { x: 120.4, y: 139.6 }).expect("hit").expect("a scripted hit");
-    assert_eq!((hit.role.as_str(), hit.label.as_deref(), hit.secure), ("textfield", Some("Password"), true));
-    assert_eq!(fake.hit_read(DesktopPoint { x: 121.0, y: 140.0 }).expect("miss"), None);
+    let hit = fake
+        .hit_read(DesktopPoint { x: 120.4, y: 139.6 })
+        .expect("hit")
+        .expect("a scripted hit");
+    assert_eq!(
+        (hit.role.as_str(), hit.label.as_deref(), hit.secure),
+        ("textfield", Some("Password"), true)
+    );
+    assert_eq!(
+        fake.hit_read(DesktopPoint { x: 121.0, y: 140.0 })
+            .expect("miss"),
+        None
+    );
     let reads = ops_matching(&fake, |op| matches!(op, SinkOp::HitRead { .. }));
     assert_eq!(reads.len(), 2);
     assert!(matches!(&reads[1], SinkOp::HitRead { hit: None, .. }));
@@ -245,33 +344,59 @@ fn user_input_timeline_lands_past_presses_and_holds_future_ones() {
     ));
     let presses = fake.user_input().take();
     assert_eq!(presses.presses.len(), 1);
-    assert_eq!((presses.presses[0].pid, presses.presses[0].kind), (4242, UserPressKind::Key));
+    assert_eq!(
+        (presses.presses[0].pid, presses.presses[0].kind),
+        (4242, UserPressKind::Key)
+    );
     assert!(presses.presses[0].at.elapsed() >= std::time::Duration::from_millis(500));
     assert!(fake.user_input().take().presses.is_empty());
     assert_eq!(fake.frontmost_pid().expect("frontmost"), Some(77));
-    assert_eq!(fake.sink().ops(), vec![SinkOp::FrontmostRead { pid: Some(77) }]);
+    assert_eq!(
+        fake.sink().ops(),
+        vec![SinkOp::FrontmostRead { pid: Some(77) }]
+    );
 }
 
 #[test]
 fn user_input_timeline_beyond_an_hour_is_rejected() {
     for t_ms in [3_600_001_i64, -3_600_001, i64::MIN] {
-        let err = FakeScenario::from_json(&format!(r#"{{"user_input_timeline":[{{"t_ms":{t_ms},"pid":1}}]}}"#))
-            .expect_err("out of range");
-        assert!(err.to_string().contains(&format!("t_ms {t_ms} is outside")), "{err}");
+        let err = FakeScenario::from_json(&format!(
+            r#"{{"user_input_timeline":[{{"t_ms":{t_ms},"pid":1}}]}}"#
+        ))
+        .expect_err("out of range");
+        assert!(
+            err.to_string().contains(&format!("t_ms {t_ms} is outside")),
+            "{err}"
+        );
     }
-    assert!(FakeScenario::from_json(r#"{"user_input_timeline":[{"t_ms":3600000,"pid":1}]}"#).is_ok());
+    assert!(
+        FakeScenario::from_json(r#"{"user_input_timeline":[{"t_ms":3600000,"pid":1}]}"#).is_ok()
+    );
 }
 
 #[test]
 fn nth_zero_is_rejected_for_every_timeline_field() {
     for (field, json) in [
-        ("identity_changes", r#"{"identity_changes":[{"after_call":"capture","nth":0,"window":"101","new_pid":1,"new_processStart":2}]}"#),
-        ("epoch_events", r#"{"epoch_events":[{"after_call":"capture","nth":0,"reason":"lock"}]}"#),
-        ("displays_change", r#"{"displays_change":{"after_call":"capture","nth":0,"displays":[]}}"#),
+        (
+            "identity_changes",
+            r#"{"identity_changes":[{"after_call":"capture","nth":0,"window":"101","new_pid":1,"new_processStart":2}]}"#,
+        ),
+        (
+            "epoch_events",
+            r#"{"epoch_events":[{"after_call":"capture","nth":0,"reason":"lock"}]}"#,
+        ),
+        (
+            "displays_change",
+            r#"{"displays_change":{"after_call":"capture","nth":0,"displays":[]}}"#,
+        ),
     ] {
         let json = json.replacen('{', &format!("{{{TWO_WINDOWS},"), 1);
         let err = FakeScenario::from_json(&json).expect_err(field);
-        assert!(err.to_string().contains(&format!("{field}: nth counts calls from 1")), "{err}");
+        assert!(
+            err.to_string()
+                .contains(&format!("{field}: nth counts calls from 1")),
+            "{err}"
+        );
     }
 }
 
@@ -279,7 +404,10 @@ fn nth_zero_is_rejected_for_every_timeline_field() {
 fn focus_read_of_an_unknown_window_is_window_not_found() {
     let mut fake = backend(&format!("{{{TWO_WINDOWS}}}"));
     let err = fake.read_focus("999").expect_err("unknown window");
-    assert_eq!(err.code, senpi_desktop_core::error::ErrorCode::WindowNotFound);
+    assert_eq!(
+        err.code,
+        senpi_desktop_core::error::ErrorCode::WindowNotFound
+    );
     assert!(fake.sink().ops().is_empty());
 }
 
@@ -310,7 +438,10 @@ fn ax_node_count_pads_the_tree_and_deadline_is_exposed() {
 fn ax_node_count_needs_a_scripted_tree() {
     let err = FakeScenario::from_json(&format!(r#"{{{TWO_WINDOWS},"ax_node_count":{{"102":5}}}}"#))
         .expect_err("no tree");
-    assert!(err.to_string().contains("ax_node_count names window '102'"), "{err}");
+    assert!(
+        err.to_string().contains("ax_node_count names window '102'"),
+        "{err}"
+    );
 }
 
 #[test]
@@ -325,8 +456,14 @@ fn epoch_events_bump_after_the_nth_call_and_record_the_reason() {
     assert_eq!(
         ops_matching(&fake, |op| matches!(op, SinkOp::EpochBumped { .. })),
         vec![
-            SinkOp::EpochBumped { epoch: 1, reason: EpochReason::Lock },
-            SinkOp::EpochBumped { epoch: 2, reason: EpochReason::Restart },
+            SinkOp::EpochBumped {
+                epoch: 1,
+                reason: EpochReason::Lock
+            },
+            SinkOp::EpochBumped {
+                epoch: 2,
+                reason: EpochReason::Restart
+            },
         ]
     );
 }
@@ -336,17 +473,33 @@ fn displays_change_swaps_the_displays_and_bumps_a_display_epoch() {
     // Given: the display list empties after the first click
     let mut fake = v2();
     assert_eq!(fake.displays().expect("before").len(), 1);
-    let click = PointerEvent::Click { x: 5.0, y: 5.0, button: MouseButton::Left, count: 1, modifiers: Modifiers::default() };
+    let click = PointerEvent::Click {
+        x: 5.0,
+        y: 5.0,
+        button: MouseButton::Left,
+        count: 1,
+        modifiers: Modifiers::default(),
+    };
     let frame = FrameGeometry::for_displays(&[]);
-    fake.pointer(&Target::Desktop, click, &frame, DeliveryMode::Background).expect("click");
+    fake.pointer(&Target::Desktop, click, &frame, DeliveryMode::Background)
+        .expect("click");
     // When
     let displays = fake.displays().expect("after");
     // Then
     assert!(displays.is_empty());
     assert_eq!(fake.capabilities().display_count, 0);
     assert_eq!(
-        ops_matching(&fake, |op| matches!(op, SinkOp::DisplaysChanged { .. } | SinkOp::EpochBumped { .. })),
-        vec![SinkOp::DisplaysChanged { count: 0 }, SinkOp::EpochBumped { epoch: 1, reason: EpochReason::Display }]
+        ops_matching(&fake, |op| matches!(
+            op,
+            SinkOp::DisplaysChanged { .. } | SinkOp::EpochBumped { .. }
+        )),
+        vec![
+            SinkOp::DisplaysChanged { count: 0 },
+            SinkOp::EpochBumped {
+                epoch: 1,
+                reason: EpochReason::Display
+            }
+        ]
     );
 }
 

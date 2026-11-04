@@ -164,7 +164,10 @@ pub(crate) struct Timeline {
 
 impl Timeline {
     pub(crate) fn new(waiting: Vec<(FakeMethod, u32, TimelineEvent)>) -> Self {
-        Self { waiting, ..Self::default() }
+        Self {
+            waiting,
+            ..Self::default()
+        }
     }
 
     /// Events due now, then counts `method`'s call and arms the events it
