@@ -7,6 +7,7 @@ import { CrashInjected, type EngineFault } from "./engine"
 import { type Device, GIT_TEST_TIMEOUT, makeDevice } from "./engine-harness.test-support"
 import { FakeSyncServer } from "./fake-server.test-support"
 import type { OutgoingBatch, PendingItem, PendingOps } from "./outbox"
+import type { FreezeOutcome } from "./ports"
 
 // Storage contract of the outbox journal (#12286): pending.json is an index whose items' ops live
 // in segment files and whose in-flight batch's bytes live in a batch file. Builds before #12286
@@ -125,6 +126,30 @@ test("a conversion cut short before the index is rewritten keeps the old journal
 
   expect(await a.engine.runCycle()).toMatchObject({ pushed: true })
   expect(server.entries.filter((e) => e.batchId === sent.batchId)).toHaveLength(1)
+  expect(await pendingFiles(a)).toEqual([])
+  await receivesAll(server, keys)
+}, GIT_TEST_TIMEOUT)
+
+test("a frozen account refuses every append; no refused cycle leaves its sealed batch behind, and the backlog pushes once it thaws", async () => {
+  const server = new FakeSyncServer()
+  let outcome: FreezeOutcome = { kind: "frozen", reason: "unverified" }
+  const a = await makeDevice(server, "a", undefined, { batchBytes: 64, freeze: { settle: async () => outcome } })
+  devices.push(a)
+  const keys = ["one.md", "two.md", "three.md"]
+  for (const key of keys) await a.write(key, `${key} body\n`)
+  server.frozen = true
+  for (let cycle = 1; cycle <= 4; cycle += 1) {
+    expect(await a.engine.runCycle()).toMatchObject({ pushed: false })
+    expect(server.appends.filter((append) => !append.ok)).toHaveLength(cycle)
+    // The refused batch left the index, so its bytes left the disk: only the named segments stay.
+    const index = await readIndex(a)
+    expect(index.outgoing).toBeNull()
+    expect((await pendingFiles(a)).sort()).toEqual([...new Set(index.items.map((item) => item.segment))].sort())
+  }
+
+  server.frozen = false
+  outcome = { kind: "clear" }
+  expect(await a.engine.runCycle()).toMatchObject({ pushed: true })
   expect(await pendingFiles(a)).toEqual([])
   await receivesAll(server, keys)
 }, GIT_TEST_TIMEOUT)

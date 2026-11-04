@@ -92,7 +92,11 @@ async function pushOne(deps: EngineDeps, journal: SyncJournal, batchBytes: numbe
     recordSig: out.recordSig,
   })
   if (!result.ok) {
-    await journal.setPending({ items: (await journal.pending()).items, outgoing: null })
+    // The refused batch leaves the index, so its sealed file goes too: a freeze refuses every
+    // cycle, and each would otherwise leave one more batch behind.
+    const dropped: PendingOps = { items: (await journal.pending()).items, outgoing: null }
+    await journal.setPending(dropped)
+    await journal.outbox.sweep(dropped)
     return "stale"
   }
   deps.fault?.("append-landed")

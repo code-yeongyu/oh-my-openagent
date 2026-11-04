@@ -23,8 +23,10 @@ const PER_ITEM_INDEX_BYTES = 256
 const body = (n: number): string => Array.from({ length: 64 }, (_, line) => `item ${n} line ${String(line).padStart(2, "0")} ${"x".repeat(48)}\n`).join("")
 const journalFile = (path: unknown): boolean => /[/\\]omo-sync[/\\]/.test(String(path))
 const sizeOf = (data: unknown): number => (typeof data === "string" ? Buffer.byteLength(data) : data instanceof Uint8Array ? data.byteLength : 0)
+const bytesRead = (result: unknown): number =>
+  typeof result === "object" && result !== null && "bytesRead" in result && typeof result.bytesRead === "number" ? result.bytesRead : 0
 
-test("pushing a backlog of many batches never reads or writes a journal file larger than one batch plus an index", async () => {
+test("pushing a backlog of many batches never reads or writes a journal file larger than one batch plus an index, and reads only the ops of the batch it seals", async () => {
   const server = new FakeSyncServer()
   const a = await makeDevice(server, "a", (at) => {
     if (at === "persisted") throw new CrashInjected(at)
@@ -36,8 +38,35 @@ test("pushing a backlog of many batches never reads or writes a journal file lar
   await expect(a.engine.runCycle()).rejects.toBeInstanceOf(CrashInjected)
   await a.restart()
 
+  // Ops are read through file handles (open + read), which readFile does not see. Their bytes are
+  // counted per sealed batch: a window closes when that batch's sealed file is written.
+  const realOpen = resilient.open
+  const realWriteFile = resilient.writeFile
+  let opsRead = 0
+  const opsPerBatch: number[] = []
+  const opens = spyOn(resilient, "open").mockImplementation(async (...args) => {
+    const handle = await realOpen(...args)
+    if (!journalFile(args[0])) return handle
+    return new Proxy(handle, {
+      get(target, property) {
+        const value: unknown = Reflect.get(target, property)
+        if (property !== "read" || typeof value !== "function") return value
+        return async (...readArgs: unknown[]) => {
+          const result: unknown = await Reflect.apply(value, target, readArgs)
+          opsRead += bytesRead(result)
+          return result
+        }
+      },
+    })
+  })
   const reads = spyOn(resilient, "readFile")
-  const writes = spyOn(resilient, "writeFile")
+  const writes = spyOn(resilient, "writeFile").mockImplementation((file, data, options) => {
+    if (journalFile(file) && /batch-[^/\\]+\.bin/.test(String(file))) {
+      opsPerBatch.push(opsRead)
+      opsRead = 0
+    }
+    return realWriteFile(file, data, options)
+  })
   const sizes: { path: string; bytes: number }[] = []
   try {
     expect(await a.engine.runCycle()).toMatchObject({ pushed: true })
@@ -48,6 +77,7 @@ test("pushing a backlog of many batches never reads or writes a journal file lar
     }
     for (const call of writes.mock.calls) if (journalFile(call[0])) sizes.push({ path: String(call[0]), bytes: sizeOf(call[1]) })
   } finally {
+    opens.mockRestore()
     reads.mockRestore()
     writes.mockRestore()
   }
@@ -57,6 +87,11 @@ test("pushing a backlog of many batches never reads or writes a journal file lar
   const bound = 2 * BATCH_BYTES + PER_ITEM_INDEX_BYTES * ITEMS
   expect(sizes.length).toBeGreaterThan(0)
   expect(sizes.filter((s) => s.bytes > bound)).toEqual([])
+  // Every batch's ops were read, each window within one batch, and nothing was read after the last seal.
+  expect(opsPerBatch).toHaveLength(server.entries.length)
+  expect(opsPerBatch.every((bytes) => bytes > 0)).toBe(true)
+  expect(opsPerBatch.filter((bytes) => bytes > BATCH_BYTES)).toEqual([])
+  expect(opsRead).toBe(0)
 
   const b = await makeDevice(server, "b")
   devices.push(b)
