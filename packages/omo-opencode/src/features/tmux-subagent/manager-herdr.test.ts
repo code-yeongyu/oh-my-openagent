@@ -145,7 +145,7 @@ afterEach(() => {
 
 describe("TmuxSessionManager on the herdr backend", () => {
 	test("#given herdr multiplexer without tmux #when child session is created #then a tab spawns in the agents workspace with the attach command delivered via pane run", async () => {
-		// given — no TMUX env at all; eligibility comes from the herdr binary
+		// given - no TMUX env at all; eligibility comes from the herdr binary
 		delete process.env.TMUX
 		delete process.env.TMUX_PANE
 		process.env.HERDR_BIN_PATH = import.meta.path
@@ -158,7 +158,7 @@ describe("TmuxSessionManager on the herdr backend", () => {
 		// when
 		await manager.onSessionCreated(sessionCreatedEvent())
 
-		// then — tmux surfaces are never touched
+		// then - tmux surfaces are never touched
 		expect(mockQueryWindowState).not.toHaveBeenCalled()
 		expect(mockExecuteActions).not.toHaveBeenCalled()
 
@@ -323,7 +323,7 @@ describe("TmuxSessionManager on the herdr backend", () => {
 			if (args[0] === "pane" && args[1] === "close") {
 				closeFailures += 1
 				if (closeFailures <= 4) return errorEnvelope("server_error", "wedged")
-				// after retries give up, the pane is simply gone
+				// after retries give up, the pane is gone
 				return errorEnvelope("pane_not_found", "pane w9:p2 not found")
 			}
 			if (args[0] === "agent" && args[1] === "list") {

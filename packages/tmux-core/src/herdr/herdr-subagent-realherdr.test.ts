@@ -16,7 +16,7 @@ import { getHerdrAgentsWorkspaceLabel, spawnHerdrSubagentTab, sweepStaleHerdrAge
 /**
  * Opt-in live round-trip for the herdr subagent primitives against a real
  * `herdr` binary (v0.9.x): runs only when RUN_HERDR_LIVE=1, otherwise a real
- * skip — a plain `bun test` must stay hermetic (this suite restores the real
+ * skip - a plain `bun test` must stay hermetic (this suite restores the real
  * HOME/XDG, so on a herdr machine it would otherwise reach the developer's
  * live server). A missing herdr binary is a skip too, never a silent pass.
  *
@@ -71,7 +71,7 @@ async function stopOwnedServer(server: SpawnedProcess | null): Promise<void> {
   ])
 }
 
-/** A pid far beyond any pid_max — dead by construction for the sweep arm. */
+/** A pid far beyond any pid_max - dead by construction for the sweep arm. */
 const DEAD_MANAGER_PID = 4_194_304
 
 describe("herdr subagent (real herdr)", () => {
@@ -82,16 +82,16 @@ describe("herdr subagent (real herdr)", () => {
       void new Response(server.stdout).text().catch(() => "")
       void new Response(server.stderr).text().catch(() => "")
       if (!(await waitForServer(8_000))) {
-        // Boot contention rather than a product failure — skip like the core suite does.
+        // Boot contention rather than a product failure - skip like the core suite does.
         await stopOwnedServer(server)
         return
       }
     }
 
-    // workspace of the live test manager (current pid — the sweep must skip it)
+    // workspace of the live test manager (current pid - the sweep must skip it)
     const liveLabel = getHerdrAgentsWorkspaceLabel(process.pid, `${Date.now().toString(36)}t`)
     let liveWorkspaceId: string | null = null
-    // workspace of a provably dead manager pid — the sweep must close it
+    // workspace of a provably dead manager pid - the sweep must close it
     const deadLabel = `${HERDR_AGENTS_WORKSPACE_LABEL_PREFIX}${DEAD_MANAGER_PID}`
     let deadWorkspaceId: string | null = null
 
@@ -115,7 +115,7 @@ describe("herdr subagent (real herdr)", () => {
       const text = await herdrReadPane(spawned.paneId as string, 30, ops)
       expect(text).toContain("opencode attach")
 
-      // closing the pane leaves the workspace's root tab behind — that is the
+      // closing the pane leaves the workspace's root tab behind - that is the
       // documented herdr model (the manager closes the workspace at cleanup)
       expect(await herdrClosePaneIfExists(spawned.paneId as string, ops)).toBe("closed")
 

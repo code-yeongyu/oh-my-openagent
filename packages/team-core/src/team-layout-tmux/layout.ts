@@ -329,7 +329,7 @@ async function createTeamLayoutHerdr(
  * Best-effort rollback after a partial layout failure: a half-built team
  * otherwise leaves the workspace and its already-created tabs behind with no
  * runtime state pointing at them. Close the workspace only when no live
- * agent remains in it — a tab whose attach is already running is the user's
+ * agent remains in it - a tab whose attach is already running is the user's
  * window into an in-flight team and must survive.
  */
 async function closeHerdrWorkspaceIfClean(

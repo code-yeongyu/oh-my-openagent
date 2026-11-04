@@ -981,7 +981,7 @@ skill execution paths, not new values of `browser_automation_engine.provider`.
 
 ### Tmux Integration
 
-Run background subagents in separate tmux panes. Requires running inside tmux with `opencode --port <port>`. With `multiplexer: "herdr"` the same subagent panes render as herdr tabs instead (see `multiplexer` below) and no tmux session is required — only a `herdr` binary on PATH (or `HERDR_BIN_PATH`).
+Run background subagents in separate tmux panes. Requires running inside tmux with `opencode --port <port>`. With `multiplexer: "herdr"` the same subagent panes render as herdr tabs instead (see `multiplexer` below) and no tmux session is required - only a `herdr` binary on PATH (or `HERDR_BIN_PATH`).
 
 ```json
 {
@@ -997,7 +997,7 @@ Run background subagents in separate tmux panes. Requires running inside tmux wi
 }
 ```
 
-#### `multiplexer` — visualization backend
+#### `multiplexer` - visualization backend
 
 Selects which multiplexer renders team-mode and subagent panes:
 
@@ -1018,7 +1018,7 @@ Windows is not supported for `herdr`: the backend only resolves an extension-les
 | `main_pane_min_width`  | `120`           | Min main pane columns                                                               |
 | `agent_pane_min_width` | `40`            | Min agent pane columns                                                              |
 | `isolation`            | `inline`        | `inline` / `window` / `session`                                                     |
-| `multiplexer`          | `tmux`          | `tmux` / `herdr` — herdr renders subagent and team panes as tabs, no tmux needed     |
+| `multiplexer`          | `tmux`          | `tmux` / `herdr` - herdr renders subagent and team panes as tabs, no tmux needed     |
 
 ### Git Master
 

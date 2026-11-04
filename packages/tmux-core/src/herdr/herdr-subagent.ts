@@ -6,7 +6,7 @@
  * isolation mode maps to the same shape: one workspace per manager process
  * (`omo-agents-<pid>[-<managerId>]`, mirroring `getIsolatedSessionName`) with
  * one tab per subagent. Tabs are cheap, so there is no grid-capacity
- * arithmetic — the spawn decision is only session readiness.
+ * arithmetic - the spawn decision is only session readiness.
  *
  * The tab's root pane starts as a plain shell; the `opencode attach` line
  * (the exact string `activateTmuxPane` respawns a tmux pane with) is
@@ -30,7 +30,7 @@ import {
   type HerdrOpsDeps,
 } from "./herdr-core"
 
-/** `omo-agents-<pid>` / `omo-agents-<pid>-<managerId>` — same grammar as tmux isolated sessions. */
+/** `omo-agents-<pid>` / `omo-agents-<pid>-<managerId>` - same grammar as tmux isolated sessions. */
 export const HERDR_AGENTS_WORKSPACE_LABEL_PATTERN = /^omo-agents-(\d+)(?:-([A-Za-z0-9]+))?$/
 
 export function getHerdrAgentsWorkspaceLabel(pid: number = process.pid, managerId?: string): string {
@@ -52,7 +52,7 @@ export type HerdrSubagentSpawnArgs = {
   readonly description: string
   readonly cwd: string
   readonly serverUrl: string
-  /** Known workspace id (manager cache) — skips label discovery and creation. */
+  /** Known workspace id (manager cache) - skips label discovery and creation. */
   readonly workspaceId?: string
   /** Label used to find or create the workspace when its id is unknown. */
   readonly workspaceLabel: string
@@ -164,7 +164,7 @@ export async function sweepStaleHerdrAgentsWorkspaces(
       log: () => undefined,
     })
   } catch {
-    // herdr or its server absent — nothing to sweep (same policy as the
+    // herdr or its server absent - nothing to sweep (same policy as the
     // tmux sweeps when not inside tmux).
     return []
   }

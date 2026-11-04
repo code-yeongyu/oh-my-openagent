@@ -198,7 +198,7 @@ export class TmuxSessionManager {
    * The resolved visualization backend. The manager is constructed with the
    * fully resolved runtime tmux config (config chain + OMO_TMUX_MULTIPLEXER
    * override), so this is the one source of truth for callers that must gate
-   * herdr-only work — e.g. team-mode's stale-workspace sweep, which must
+   * herdr-only work - e.g. team-mode's stale-workspace sweep, which must
    * never spawn herdr on a default tmux install.
    */
   get multiplexer(): MultiplexerBackend {
@@ -288,7 +288,7 @@ export class TmuxSessionManager {
 
   /**
    * Spawn one subagent tab in the manager's herdr workspace and deliver the
-   * attach command. Every isolation mode maps to this tab shape on herdr —
+   * attach command. Every isolation mode maps to this tab shape on herdr -
    * there is no caller-window arithmetic. Returns the pane id, or null to
    * defer.
    */
@@ -363,7 +363,7 @@ export class TmuxSessionManager {
    * inventory is herdr's liveness authority (names clear when agents exit),
    * so an attached pane absent from the list is provably dead and the tracked
    * close finalizes. A pane that never attached is not agent-scoped, so its
-   * liveness is unknown — arm the retry cooldown and let a later pass try
+   * liveness is unknown - arm the retry cooldown and let a later pass try
    * again, mirroring the tmux zombie-pane cooldown semantics.
    */
   private async finalizeHerdrForceRemoveCandidate(
@@ -1332,7 +1332,7 @@ export class TmuxSessionManager {
 
     const title = info.title ?? "Subagent"
 
-    // On herdr subagent panes are tabs in the manager's own workspace — no
+    // On herdr subagent panes are tabs in the manager's own workspace - no
     // caller pane is required. On tmux the source pane anchors the grid.
     if (!this.isHerdrBackend() && !this.sourcePaneId) {
       this.deps.log("[tmux-session-manager] no source pane id")

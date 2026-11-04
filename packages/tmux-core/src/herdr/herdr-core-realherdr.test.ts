@@ -18,7 +18,7 @@ import {
 /**
  * Opt-in integration test against a real `herdr` binary (v0.9.x): runs only
  * when RUN_HERDR_LIVE=1, otherwise a real skip. A plain `bun test` must be
- * hermetic everywhere — this suite restores the real HOME/XDG (see below),
+ * hermetic everywhere - this suite restores the real HOME/XDG (see below),
  * so on a herdr machine it would otherwise reach the developer's live
  * server. (Same policy as the OMO_LIVE_TMUX-gated tmux suite; a missing
  * herdr binary is a skip too, never a silent pass.)
@@ -26,7 +26,7 @@ import {
  * Test-harness notes:
  * - bun-test preloads redirect HOME/XDG into a per-process sandbox; herdr
  *   derives its socket from those, so every call runs with a restored real
- *   environment (os.homedir() still names the real home — see
+ *   environment (os.homedir() still names the real home - see
  *   test-hermetic-home.ts).
  * - the harness janitor kills detached stdio:"ignore" children, so instead of
  *   ensureHerdrServer's detached autostart the test owns a tracked server
@@ -115,7 +115,7 @@ describe("herdr core (real herdr)", () => {
       const teams = await herdrListTeamWorkspaces(ops)
       expect(teams.some((team) => team.workspaceId === workspaceId)).toBe(true)
 
-      // A plain shell pane hosts no agent — the inventory stays empty, which
+      // A plain shell pane hosts no agent - the inventory stays empty, which
       // is exactly what the stale-workspace sweep keys off.
       const agents = await herdrListAgents(ops)
       expect(agents.every((agent) => !agent.paneId.startsWith(`${workspaceId}:`))).toBe(true)

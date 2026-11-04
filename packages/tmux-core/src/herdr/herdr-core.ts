@@ -224,7 +224,7 @@ export async function ensureHerdrServer(
         throw new Error("herdr binary not found; install from https://herdr.dev or set HERDR_BIN_PATH")
       }
       // Any other failure while the server answers means a genuinely broken
-      // command — do not paper over it with a server restart.
+      // command - do not paper over it with a server restart.
       if (probe.code !== undefined) throw new Error(probe.error ?? "herdr probe failed")
     }
     if (attempt > 0) break
@@ -314,7 +314,7 @@ export async function herdrCreateTab(
 
 /**
  * Deliver a shell command (the `opencode attach ...` line) into a pane.
- * `pane run` acknowledges admission silently — no JSON envelope.
+ * `pane run` acknowledges admission silently - no JSON envelope.
  */
 export async function herdrRunPaneCommand(
   paneId: string,
@@ -341,7 +341,7 @@ export async function herdrReadPane(
 /**
  * Liveness through the live-agent inventory: agent names clear when agents
  * exit, so a pane absent from the list is provably dead. A plain shell pane
- * (placeholder before attach) is not agent-scoped — callers treat that as
+ * (placeholder before attach) is not agent-scoped - callers treat that as
  * "unknown" via herdrListAgents.
  */
 export async function herdrListAgents(
@@ -411,7 +411,7 @@ export async function herdrListTeamWorkspaces(
 /**
  * Pane-auth handoff for herdr tabs: a fresh single-use 0600 password file
  * whose path travels via `tab create --env OPENCODE_SERVER_PASSWORD_FILE=...`
- * — never the password itself, which would be world-readable in the process
+ * - never the password itself, which would be world-readable in the process
  * list (`herdr tab create --env` argv). The attach line delivered with
  * `pane run` is wrapped by withPaneAuth, which sources and unlinks the file,
  * so authenticated attach works exactly like the tmux path

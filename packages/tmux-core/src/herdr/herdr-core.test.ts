@@ -67,7 +67,7 @@ describe("parseHerdrEnvelope", () => {
     expect(parseHerdrEnvelope(envelope({ agents: [] }))).toEqual({ kind: "ok", result: { agents: [] } })
     expect(parseHerdrEnvelope('{"error":{"code":"server_not_running","message":"down"}}'))
       .toEqual({ kind: "error", code: "server_not_running", message: "down" })
-    // pane read/run output is plain text — never an envelope
+    // pane read/run output is plain text - never an envelope
     expect(parseHerdrEnvelope("plain pane text")).toEqual({ kind: "ok" })
     expect(parseHerdrEnvelope("")).toEqual({ kind: "ok" })
   })
