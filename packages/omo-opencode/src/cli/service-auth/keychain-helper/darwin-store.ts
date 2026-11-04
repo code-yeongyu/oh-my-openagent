@@ -1,7 +1,7 @@
 import type { HelperCall, HelperLease, HelperReply } from "./client"
 import { type DarwinReadDeps, HelperReadError, readThroughHelper, type ReadResult } from "./darwin-read"
 import { migrate } from "./migration"
-import { deleteOldSlots, namesFromRead, runRecovery } from "./recovery"
+import { deleteOldSlots, namesFromRead, oldSlotsOf, runRecovery } from "./recovery"
 
 export type WriteIntent = "fresh-sign-in" | "update"
 
@@ -92,7 +92,7 @@ export function lockedDarwinStore(deps: DarwinStoreDeps, lease: HelperLease): Lo
       else if (removed.ok !== true) throw failed(removed, "remove")
       await helper({ verb: "remove", account: `${deps.account}.staging` })
       const present = await helper({ verb: "read", account: deps.account })
-      await deleteOldSlots(deps.account, present.present?.oldSlots ?? [], helper, deleteOwnOld)
+      await deleteOldSlots(deps.account, oldSlotsOf(present), helper, deleteOwnOld)
       lastRead = null
     },
   }

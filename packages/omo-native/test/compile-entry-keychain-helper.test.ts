@@ -18,6 +18,7 @@ describe("compiled binary: the keychain helper beside it serves every command (#
       process.exitCode = exitCode ?? 0
     }
     expect(keychainProcessState().entryCandidates[0]).toBe(compiledKeychainHelper(execDir))
-    expect(compiledKeychainHelper("/opt/omo")).toBe("/opt/omo/bin/darwin/omo-keychain")
+    // RULING-74, desktop#5057: omo-keychain directly beside the runtime binary.
+    expect(compiledKeychainHelper("/opt/omo")).toBe("/opt/omo/omo-keychain")
   })
 })

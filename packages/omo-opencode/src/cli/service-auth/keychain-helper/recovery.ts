@@ -25,10 +25,15 @@ export function recoveryPlan(names: MigrationNames): readonly RecoveryStep[] {
   return []
 }
 
+/** The occupied old slots; a helper that predates `oldSlots` has only slot 0 (`.old`). */
+export function oldSlotsOf(reply: HelperReply): readonly number[] {
+  return reply.present?.oldSlots ?? (reply.present?.old === true ? [0] : [])
+}
+
 /** The names present, from one `read` reply (its `present` field comes from silent attribute reads). */
 export function namesFromRead(reply: HelperReply): MigrationNames {
   const original = reply.owned === false || (reply.owned === true && reply.recover !== true)
-  return { original, staging: reply.present?.staging === true, old: reply.present?.old === true, oldSlots: reply.present?.oldSlots ?? [] }
+  return { original, staging: reply.present?.staging === true, old: reply.present?.old === true, oldSlots: oldSlotsOf(reply) }
 }
 
 export type HelperCaller = (call: HelperCall) => Promise<HelperReply>
