@@ -455,3 +455,6 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
     ...sessionMethods(undefined, call),
   }
 }
+
+export { crossTarget, listAcross, planCreate, renameAlias, withAlias } from "./remote/cross-device"
+export { interruptRemote, outcomeFailure, promptRemote, readRemote } from "./remote/remote-ops"
