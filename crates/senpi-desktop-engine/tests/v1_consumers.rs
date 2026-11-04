@@ -16,7 +16,7 @@
 mod common;
 
 use std::collections::BTreeMap;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::mpsc;
@@ -200,10 +200,20 @@ fn oneshot(env: &[(String, String)], socket: &str, request: &Value) -> Vec<Value
     .spawn()
     .expect("oneshot spawns");
     writeln!(child.stdin.take().expect("stdin"), "{request}").expect("request written");
-    let output = child.wait_with_output().expect("oneshot exits");
-    assert!(output.status.success(), "{output:?}");
-    String::from_utf8(output.stdout)
-        .expect("oneshot output is UTF-8")
+    let mut stdout = child.stdout.take().expect("stdout is piped");
+    let (sender, read) = mpsc::channel();
+    thread::spawn(move || {
+        let mut text = String::new();
+        let _ = sender.send(stdout.read_to_string(&mut text).map(|_| text));
+    });
+    let Ok(text) = read.recv_timeout(HANG_GUARD) else {
+        let _ = child.kill();
+        let _ = child.wait();
+        panic!("--oneshot did not answer {request} within the hang guard");
+    };
+    let status = child.wait().expect("oneshot exits");
+    assert!(status.success(), "{status:?}");
+    text.expect("oneshot output is UTF-8")
         .lines()
         .map(|line| serde_json::from_str(line).expect("every output line is JSON"))
         .collect()
@@ -383,6 +393,9 @@ fn every_v1_consumer_case_replays_against_the_engine_binary() {
     let corpus = corpus();
     assert!(!corpus.is_empty(), "the v1 consumer corpus is empty");
     // When
+    for (name, _) in corpus.iter().filter(|(_, case)| !replayable(case)) {
+        eprintln!("v1 consumer case {name} skipped: its daemon transport needs a unix socket");
+    }
     let failures: Vec<String> = corpus
         .iter()
         .enumerate()
