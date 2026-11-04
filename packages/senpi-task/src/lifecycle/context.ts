@@ -7,6 +7,7 @@ import type { TaskRecordStore } from "../store"
 import {
   DEFAULT_HOST_SESSION_RETRY_POLICY,
   type HostEndpointPort,
+  type HostGenerationView,
   type HostSessionCloser,
   type HostSessionProbe,
   type HostSessionRetryPolicy,
@@ -51,6 +52,7 @@ export type LifecycleContext = {
   // session path. `hostSessionClose` is the ONLY way a session this process does not hold is ended.
   readonly hostSessionProbe: HostSessionProbe
   readonly hostSessionClose: HostSessionCloser | undefined
+  readonly hostGenerationView: HostGenerationView | undefined
   readonly hostRetry: HostSessionRetryPolicy
   readonly hostEndpoint: HostEndpointPort
   readonly hostCloseTimeoutMs: number
@@ -103,6 +105,7 @@ export function resolveContext(deps: LifecycleDeps): LifecycleContext {
     kernelToolBindings: deps.kernelToolBindings,
     hostSessionProbe: deps.hostSessionProbe ?? defaultHostSessionProbe(),
     hostSessionClose: deps.hostSessionClose ?? defaultHostSessionCloser,
+    hostGenerationView: deps.hostGenerationView,
     hostRetry: deps.hostRetry ?? DEFAULT_HOST_SESSION_RETRY_POLICY,
     hostEndpoint: deps.hostEndpoint,
     hostCloseTimeoutMs: deps.hostCloseTimeoutMs ?? DEFAULT_HOST_CLOSE_TIMEOUT_MS,

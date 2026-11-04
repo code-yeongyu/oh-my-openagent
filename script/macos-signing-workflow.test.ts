@@ -22,7 +22,7 @@ const bashRuns = spawnSync("bash", ["-c", "exit 0"]).status === 0
 const posixBashTest = test.skipIf(process.platform === "win32" || !bashRuns)
 const anyBashTest = test.skipIf(!bashRuns)
 
-const stepsSchema = z.array(z.object({ name: z.string().optional(), if: z.string().optional() }))
+const stepsSchema = z.array(z.object({ name: z.string().optional(), if: z.string().optional(), run: z.string().optional() }))
 const jobs = z.object({ jobs: z.object({
   "desktop-engine": z.object({ steps: stepsSchema }),
   build: z.object({ steps: stepsSchema }),
@@ -64,6 +64,21 @@ describe("macOS signing in the platform publish workflow", () => {
     expect(stepIndex(engine, "Stage desktop engine release asset")).toBeLessThan(signEngine)
     expect(signEngine).toBeLessThan(stepIndex(engine, "Upload desktop engine artifact"))
     expect(engine[signEngine]?.if).toContain("startsWith(matrix.host, 'darwin-')")
+  })
+
+  test("builds, signs and verifies the Darwin engine trust helper before the engine artifact is uploaded", () => {
+    const engine = jobs["desktop-engine"].steps
+    const build = stepIndex(engine, "Build engine trust helper")
+    const sign = stepIndex(engine, "Sign Darwin engine trust helper")
+    const upload = stepIndex(engine, "Upload desktop engine artifact")
+
+    expect(build).toBeLessThan(sign)
+    expect(sign).toBeLessThan(upload)
+    expect(engine[sign]?.if).toBe("startsWith(matrix.host, 'darwin-')")
+    const run = engine[sign]?.run ?? ""
+    const signs = run.indexOf("bash .github/scripts/macos-sign-and-notarize.sh --sign-only")
+    expect(signs).toBeGreaterThanOrEqual(0)
+    expect(run.indexOf('codesign -dv --verbose=2 "$HELPER"')).toBeGreaterThan(signs)
   })
 
   posixBashTest("the release digest describes the signed bytes, not the unsigned build output", () => {

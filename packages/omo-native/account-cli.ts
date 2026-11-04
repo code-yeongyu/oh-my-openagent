@@ -6,11 +6,13 @@ import {
   type CredentialStore,
   CredentialStoreError,
   INTERACTIVE_READ_WAIT,
+  InvalidCredentialState,
   KeychainLockedError,
   SecretServiceUnavailableError,
 } from "../omo-opencode/src/cli/service-auth/keystore"
 import { type Credentials, credentialSchema, serviceOrigin, SignInError } from "../omo-opencode/src/cli/service-auth/protocol"
 import { createSession, type Session, SessionEnded } from "../omo-opencode/src/cli/service-auth/session"
+import { RecoveryExhausted, RecoveryPending } from "../omo-opencode/src/cli/service-auth/owned-refresh"
 
 // `omo account` lets the desktop share this machine's one OS-keychain credential with `omo login`
 // (one sync device per machine). It is a machine interface: one JSON line on stdout, secrets only on
@@ -62,7 +64,9 @@ const parseInput = (text: string): Credentials | null => {
   try {
     const parsed = credentialSchema.safeParse(JSON.parse(text))
     if (!parsed.success) return null
-    const { refreshState: _ignored, ...credentials } = parsed.data
+    // Local recovery markers are not fresh-adoption input. Keep service owner/proof fields
+    // for the protocol-2 adoption adapter; they do not activate protocol 2 on their own.
+    const { refreshState: _state, refreshAttempt: _attempt, ...credentials } = parsed.data
     return credentials
   } catch {
     return null
@@ -88,29 +92,29 @@ async function adopt(dependencies: AccountCommandDependencies, replace: boolean)
     if (!keepCurrent) await dependencies.store.write(incoming)
     await session.clearSignedOutMarker()
     return reply(dependencies, { adopted: true, device: deviceOf(incoming) })
-  })
+  }, { replaceInvalid: replace })
 }
 
 async function token(dependencies: AccountCommandDependencies): Promise<number> {
   const session = sessionOf(dependencies)
-  if ((await dependencies.store.read()) === null) return signedOut(dependencies, session)
   try {
-    const accessToken = await session.accessToken()
-    const current = await dependencies.store.read()
+    const current = await session.accessSnapshot()
     if (current === null) return signedOut(dependencies, session)
-    return reply(dependencies, { accessToken, accessTokenExpiresAt: current.accessTokenExpiresAt, device: deviceOf(current) })
+    return reply(dependencies, {
+      accessToken: current.accessToken, accessTokenExpiresAt: current.accessTokenExpiresAt,
+      device: deviceOf(current), ...(current.owner === undefined ? {} : { owner: current.owner }),
+    })
   } catch (error) {
     // Storage failures keep their own outcome; another native read can repeat the same timeout.
     if (error instanceof CredentialStoreError) throw error
+    if (error instanceof SessionEnded || error instanceof RecoveryExhausted) return reply(dependencies, { ended: { code: error.code } }, ACCOUNT_EXIT.ended)
+    if (error instanceof RecoveryPending) return reply(dependencies, { uncertain: { deadline: new Date(error.deadline).toISOString() } }, ACCOUNT_EXIT.uncertain)
     const after = await dependencies.store.read()
     dependencies.error(error instanceof Error ? error.message : "omo account token: the refresh failed")
     // The refusal code tells the desktop why the sign-in ended (desktop#3522); the message never leaves stderr.
     // Any other error with the item gone means another process signed out (forget/logout) meanwhile.
-    if (after === null)
-      return error instanceof SessionEnded
-        ? reply(dependencies, { ended: { code: error.code } }, ACCOUNT_EXIT.ended)
-        : signedOut(dependencies, session)
-    if (after.refreshState === "uncertain") return ACCOUNT_EXIT.uncertain
+    if (after === null) return signedOut(dependencies, session)
+    if (after.refreshState === "uncertain") return reply(dependencies, { ended: { code: "refresh_recovery_expired" } }, ACCOUNT_EXIT.ended)
     return ACCOUNT_EXIT.failed
   }
 }
@@ -151,11 +155,31 @@ async function runVerb(dependencies: AccountCommandDependencies, args: readonly 
     }
     case "forget": {
       const session = sessionOf(dependencies)
-      await session.update(async () => dependencies.store.clear())
+      if (flags.length > 0) {
+        const device = flags[1]
+        if (flags.length !== 2 || flags[0] !== "--device" || device === undefined || device === "" || device.startsWith("--")) {
+          dependencies.error("omo account forget: use forget or forget --device <id>")
+          return ACCOUNT_EXIT.invalid
+        }
+        try {
+          return await session.update(async current => {
+            if (current !== null && current.device.id !== device) {
+              return reply(dependencies, { forgotten: false, device: deviceOf(current) }, ACCOUNT_EXIT.conflict)
+            }
+            await dependencies.store.clear()
+            return reply(dependencies, { forgotten: true })
+          })
+        } catch (error) {
+          if (!(error instanceof InvalidCredentialState)) throw error
+          dependencies.error(error.message)
+          return reply(dependencies, { forgotten: false, error: "unreadable-credential" }, ACCOUNT_EXIT.failed)
+        }
+      }
+      await session.forget()
       return reply(dependencies, { forgotten: true })
     }
     default:
-      dependencies.error("usage: omo account show [--account <id>]|adopt [--replace]|token|export|forget")
+      dependencies.error("usage: omo account show [--account <id>]|adopt [--replace]|token|export|forget [--device <id>]")
       return ACCOUNT_EXIT.invalid
   }
 }

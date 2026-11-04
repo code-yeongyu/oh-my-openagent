@@ -1,8 +1,8 @@
 /** The per-repo changelog-gate config: the only file that differs between repos. */
 export const GATE_CONFIG = {
   releaseBranchPattern: /^release\//,
-  // publish.yml opens the release-state PR with GH_PAT, so its author is this account.
-  releaseActors: ["sisyphus-dev-ai"],
+  // No releaseActors list: check-pr-changelog.ts identifies the release-state PR by publish.yml's marker on a
+  // release branch in this repository, never by who opened it (#11704).
   // Unused here: check-pr-changelog.ts passes the shipped-surface classifier (changelog-shipping-policy.mjs) as
   // isUserFacing, which replaces the root rule for every verdict (#10841).
   userFacingRoots: [],

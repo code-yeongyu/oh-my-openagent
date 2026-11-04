@@ -21,6 +21,7 @@
     "packages/isolation-core/src/owner.ts",
     "packages/isolation-core/src/process-identity.ts",
     "packages/isolation-core/src/sweep.ts",
+    "packages/memory-core/src/compile/external-projection.ts",
     "packages/memory-core/src/recall/bm25-persist.ts",
     "packages/memory-core/src/sync/keyring-port.ts",
     "packages/omo-codex/scripts/install-local.mjs",

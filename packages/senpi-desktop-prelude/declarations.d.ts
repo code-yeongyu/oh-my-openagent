@@ -209,6 +209,12 @@ interface ComputerElement {
 	press(options?: ComputerMenuOptions): Promise<ComputerMenuReport | null>;
 	/** Click the element's center with native input; `button: "right"` plus `menu` chooses in its context menu. */
 	click(options?: ComputerClickOptions): Promise<ComputerMenuReport | null>;
+	/**
+	 * Type into this element without taking the user's focus (macOS): a native text field takes the text through its
+	 * own selection (`inserted`), any other element takes keys once it holds its app's keyboard focus (`keys`); an
+	 * element that never takes focus throws `BackgroundUnavailable` (`InputFailed` in the foreground) with nothing typed.
+	 */
+	type(text: string, options?: ComputerDeliveryOptions): Promise<{ method: "inserted" | "keys" }>;
 	focus(): Promise<void>;
 	parent(): Promise<ComputerElement | null>;
 	children(): Promise<ComputerElement[]>;

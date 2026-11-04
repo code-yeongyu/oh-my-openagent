@@ -269,6 +269,6 @@ pub(crate) fn interrupted(
 
 /// Only the delivery mode matters for these requests, but malformed options
 /// still fail like they do for a click.
-fn delivery(options: Option<&PointerOptions>) -> CoreResult<DeliveryMode> {
+pub(crate) fn delivery(options: Option<&PointerOptions>) -> CoreResult<DeliveryMode> {
     ParsedPointerOptions::parse(options).map(|options| options.mode)
 }

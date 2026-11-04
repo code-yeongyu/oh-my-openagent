@@ -1,3 +1,4 @@
+import { buildNativeAgentPrompt } from "./native-model-prompt"
 import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode, AgentPromptMetadata } from "./types";
 import { buildClaudeThinkingConfig, isGpt5_6Model, isGpt6Model, isGptModel } from "./types";
@@ -293,13 +294,13 @@ export function createMomusAgent(model: string): AgentConfig {
     model,
     temperature: 0.1,
     ...restrictions,
-    prompt: MOMUS_DEFAULT_PROMPT,
+    prompt: buildNativeAgentPrompt(model, MOMUS_DEFAULT_PROMPT),
   } as AgentConfig;
 
   if (isGpt5_6Model(model) || isGpt6Model(model)) {
     return {
       ...base,
-      prompt: MOMUS_GPT_5_6_PROMPT,
+      prompt: buildNativeAgentPrompt(model, MOMUS_GPT_5_6_PROMPT),
       reasoningEffort: "high",
       textVerbosity: "high",
     } as AgentConfig;
@@ -308,7 +309,7 @@ export function createMomusAgent(model: string): AgentConfig {
   if (isGptModel(model)) {
     return {
       ...base,
-      prompt: MOMUS_GPT_PROMPT,
+      prompt: buildNativeAgentPrompt(model, MOMUS_GPT_PROMPT),
       reasoningEffort: "medium",
       textVerbosity: "high",
     } as AgentConfig;

@@ -11,6 +11,7 @@ mod point_owner;
 mod popup;
 pub(crate) mod element;
 mod props;
+mod text_input;
 mod tree;
 
 use senpi_desktop_core::ax::{AxBackend, AxHandle, AxOwner, AxProps};
@@ -22,6 +23,7 @@ use senpi_desktop_core::types::DesktopWindow;
 pub use self::element::is_trusted;
 pub(crate) use self::foreground::{make_frontmost, prepare_foreground_input};
 pub(crate) use self::point_owner::ensure_points_owned;
+pub(crate) use self::text_input::insert_into_element;
 use self::element::{element, handle};
 
 #[derive(Debug, Default)]
@@ -38,7 +40,7 @@ impl MacAx {
         Self { overlay }
     }
 
-    fn show_target(&self, h: &AxHandle) {
+    pub(crate) fn show_target(&self, h: &AxHandle) {
         if !self.overlay.available() {
             return;
         }
@@ -190,6 +192,9 @@ impl AxBackend for MacAx {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod text_input_tests;
 
 #[cfg(test)]
 mod live_tests;

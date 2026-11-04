@@ -97,6 +97,7 @@ impl Engine {
             Method::AxSetValue => op(Op::AxSetValue(parse(params)?)),
             Method::AxFocus => op(Op::AxFocus(parse(params)?)),
             Method::AxClick => op(Op::AxClick(parse(params)?)),
+            Method::AxTypeText => op(Op::AxTypeText(parse(params)?)),
             Method::StopPathStatus => {
                 parse::<EmptyParams>(params)?;
                 Ok(Route::Immediate(to_result(self.stop_paths().status())))
