@@ -27,7 +27,8 @@ The body is wrapped at lines 173-176 as `(async () => {<code>})()` and evaluated
 `runInContext(..., { timeout })`;
 every resume after an `await` is a bounded `runInContext` drain (`resumeVm`, line 126).
 
-The module comment says it plainly: "The vm is not a security boundary." The prelude guide agrees
+The doc comment of `runComputerCode` says it plainly (`runtime.ts:90-93`, repeated in
+`packages/senpi-desktop-service/README.md:19`): "The vm is not a security boundary." The prelude guide agrees
 (`packages/senpi-desktop-prelude/docs/computer.md:55`, "Not sandboxed"). Concretely:
 
 - Every function placed in the context (`desktop.click`, `wait`, `assert`, the `tool` proxy, `console.log`)
@@ -112,8 +113,9 @@ record).
 
 ## 4. Bridge surface
 
-Exactly two bridged names cross into the VM, `computer` (alias `desktop`) and `assert`; `console` is
-VM-local output:
+The cell exposes exactly two run names, `computer` (alias `desktop`) and `assert`, plus `console` for output.
+Only `computer` is bridged to the host; `assert` and `console` are implemented inside the VM and make no host
+call (an `assert` failure reaches the host only as the run's rejection):
 
 | Global | Under quickjs |
 |---|---|
@@ -236,7 +238,7 @@ counterpart that asserts the `ReferenceError` (row 32); no test is skipped.
 | M2 | `packages/omo-senpi/scripts/qa/computer-control-live-macos-scenarios.mjs:149` | `wait` | `interrupted` live scenario: acquire the grant, then `await wait(30000)` to keep the run open while the driver aborts it | `wait` -> `computer.verify` with a condition that never holds and a 30 s deadline (keeps a host call in flight, so the abort still cancels it); until verify exists the driver pins `computer.run_sandbox: "vm"` |
 | M3 | `packages/senpi-desktop-prelude/docs/computer.md:54` | `wait` (doc) | guide entry: functions receive `{ desktop, wait, assert }`; "Not sandboxed" | when quickjs is selectable, the guide says functions receive `{ computer, desktop, assert }` under quickjs, `wait` -> `computer.verify`, and states the sandbox per setting (regenerated guide, P14) |
 | M4 | `packages/senpi-desktop-prelude/README.md:22` | `wait` (doc) | documents the serialized `computer.run(fn)` call `({ desktop, wait, assert }, ...args)` | same doc change as M3, in step with M5 |
-| M5 | `packages/senpi-desktop-prelude/src/prelude.js:132` | `wait` (generated) | `computer.run(fn)` serializes every function as `return await (fn)({ desktop, wait, assert }, ...args);` | **blocks every function-form run under quickjs**: the shorthand `wait` is a reference, so even a function that never uses `wait` throws `ReferenceError`. The generated call must stop naming absent globals (pass `{ desktop, computer: desktop, assert }` under quickjs, or one runtime-provided scope object). Owner: the prelude rows (P4a/P14), which must also regenerate the two tracked `assets.generated.json` copies and `test/assets.sha256.json` (plan row 26, `senpi-desktop-prelude/scripts/generate-assets.ts`); a prerequisite of the default flip; row 32's quickjs tests include a body in this generated shape |
+| M5 | `packages/senpi-desktop-prelude/src/prelude.js:132` | `wait` (generated) | `computer.run(fn)` serializes every function as `return await (fn)({ desktop, wait, assert }, ...args);` | **blocks every function-form run under quickjs**: the shorthand `wait` is a reference, so even a function that never uses `wait` throws `ReferenceError`. The generated call must stop naming absent globals (pass `{ desktop, computer: desktop, assert }` under quickjs, or one runtime-provided scope object). Owner: the prelude rows (P4a/P14), which must also regenerate the two tracked `assets.generated.json` copies and `test/assets.sha256.json` (plan row 26, `senpi-desktop-prelude/scripts/generate-assets.ts`); a prerequisite of the default flip; the test harness that executes the generated body, `packages/senpi-desktop-prelude/test/js-facade.test.ts:141` (`new AsyncFunction("desktop", "wait", "assert", code)`), changes in the same PR; row 32's quickjs tests include a body in this generated shape |
 | M6 | `packages/senpi-desktop-tool/src/cua-actions.ts:147` | `wait` (generated) | `actionsScript()`: the CUA adapter's batch body; the published `wait` action runs `await wait(a.ms)` | host-generated from schema-validated JSON, not model-written JS, so sandboxing it gains nothing, ON CONDITION that every model-provided value enters the script only through `JSON.stringify` (`cua-actions.ts:147-148`: `actions` and `bounds`); any change that splices model text into the script any other way voids this exemption and moves the body to quickjs. The CUA adapter keeps running its batches under `vm` whatever `computer.run_sandbox` says. Mechanism (row 22): `ComputerRunRequest` (`run/runtime.ts:30`, internal, not a published parameter) gains `origin: "model" | "host"`, default `model`; the CUA adapter's path (`cua-adapter.ts:63-66` -> `tool.ts:98-110` -> `runComputerCode`) passes `host`, and the dispatcher sends every `host` run to `vm` (row 22 test 12). This holds until P14 executes CUA actions directly through the SDK (where `wait` is a host sleep, no script). Published `computer_actions` parameters do not change |
 | M7 | `packages/senpi-desktop-tool/test/control.test.ts:97` | `wait` | "sends control.revoke when the tool call is aborted mid-run while granted": holds the run with `wait(() => false, { timeout: 4000 })` | vm-only today (the test exercises vm); a quickjs counterpart holds the run with `computer.verify` once it exists |
 | M8 | `packages/senpi-desktop-tool/test/execute.test.ts:121` | `tool` | tool-level run that calls `tool.read` through the host pipeline | not available under quickjs; vm-only |
@@ -259,8 +261,9 @@ Model-facing contract text. The model reads these before it writes a run body, a
 | M19 | `packages/senpi-desktop-tool/src/params.ts:41` | `wait`, `tool` (contract text) | `code` parameter description of the `run` action (published) | see below |
 | M20 | `packages/senpi-desktop-tool/src/params.ts:77` | `wait`, `tool` (contract text) | `code` parameter description of the flat schema (published) | see below |
 | M21 | `packages/senpi-desktop-tool/src/tool-definition.ts:27` | `wait`, `tool` (contract text) | `computer` tool description the model reads | see below |
+| M22 | `packages/senpi-desktop-service/README.md:18` | `wait`, `tool` (developer docs) | the service README: the run context's globals are `desktop`, `wait(ms \| predicate, ...)`, `assert`, `console` and `tool.<name>(params)` | developer-facing, not read by the model: row 22 updates it with the dispatch to describe both modes (vm: all five; quickjs: `computer`/`desktop`, `assert`, `console`) |
 
-Migration for M9-M21: while `vm` is the default these texts are accurate. Once `quickjs` is selectable (row 32)
+Migration for M9-M21 (M22 is the developer README, migrated by row 22 as its row says): while `vm` is the default these texts are accurate. Once `quickjs` is selectable (row 32)
 they are inaccurate for a session that selects it; this document is the record of that until the flip. Plan row
 36 freezes `published-parameters.fixture.json`, so the text cannot change inside this plan. The flip's follow-up
 PR makes the descriptions setting-neutral or per-setting (`computer`/`desktop` and `assert` always; `wait` and
@@ -271,7 +274,7 @@ Not rows: the doc comment at `runtime.ts:91` names the vm globals but is impleme
 (row 22 updates it with the dispatch); `packages/senpi-desktop-prelude/src/prelude.py:200` builds
 `{"action": "run", "code": code}` from a code string the caller wrote, a pass-through with no scope of its own.
 
-The remaining bodies (134 of 155 scanned entries) need no change: they use only `desktop`/`computer`,
+The remaining bodies (134 of 156 scanned entries) need no change: they use only `desktop`/`computer`,
 `assert`, `console` and plain JS, including the display-handle bodies that depend on section 4's third handle
 kind (`display.test.ts`, `zoom.test.ts`, `global-input-grant.test.ts`, `computer-use-e2e.mjs:144`,
 `fused-equivalence-e2e.mjs:215`).
@@ -405,10 +408,10 @@ CUA adapter's generated batch body is found; producer sources under `packages/se
 computer-use component are scanned whether or not they mention a run call), and in Markdown each `computer.run(` / `action: "run"` entry; in-scope
 `const` strings, `[...].join()` and `it.each`/`[...].map` tables are expanded. A second pass parses every
 other string literal of those files; one that fails to parse is still listed when a regex sees `tool.`,
-`wait(`, or a backticked `` `tool` `` / `` `wait` ``. Model-facing contract text (a backticked `desktop` followed
-by a backticked `wait` or `tool`) in source literals, Markdown lines and JSON lines (the fixture, the goldens) is
-a matrix row of its own (M9-M21). `.py` files are walked for `"action": "run"` dicts. The script and its full output are attached to the
-PR as evidence (#12230); its summary at 7ad7757ad9:
+`wait(`, or a backticked `` `tool` `` / `` `wait` ``. Contract text (a backticked `desktop` followed
+by a backticked `wait` or `tool`, with or without its own signature inside the backticks) in source literals, Markdown lines and JSON lines (the fixture, the goldens) is
+a matrix row of its own (M9-M22). `.py` files are walked for `"action": "run"` dicts. The script and its full output are kept as local
+evidence of the row (`.omo/evidence/` is never committed; the PR body carries their sha256 lines); its summary at 7ad7757ad9:
 
 ```text
 A  packages/senpi-desktop-service/test/run.test.ts  bodies=20  tool_or_wait=1
@@ -430,6 +433,7 @@ B  packages/senpi-desktop-prelude/src/prelude.js  bodies=1  tool_or_wait=1
 B  packages/senpi-desktop-prelude/src/prelude.py  bodies=2  tool_or_wait=0
 B  packages/senpi-desktop-prelude/test/js-facade.test.ts  bodies=2  tool_or_wait=0
 B  packages/senpi-desktop-prelude/test/py-facade.test.ts  bodies=1  tool_or_wait=0
+B  packages/senpi-desktop-service/README.md  bodies=1  tool_or_wait=1
 B  packages/senpi-desktop-service/test/control-boundaries.test.ts  bodies=4  tool_or_wait=0
 B  packages/senpi-desktop-service/test/display.test.ts  bodies=5  tool_or_wait=0
 B  packages/senpi-desktop-service/test/holds.test.ts  bodies=7  tool_or_wait=0
@@ -454,7 +458,7 @@ B  packages/senpi-desktop-service/test/global-input-grant.test.ts  bodies=7  too
 B  script/qa/desktop/macos/scenarios-input.ts  bodies=3  tool_or_wait=0
 B  script/qa/desktop/macos/scenarios-safety.ts  bodies=1  tool_or_wait=0
 
-## totals: bodies=155 (tier A 41, tier B 114); referencing tool/wait=21; bodies that did not parse=5
+## totals: bodies=156 (tier A 41, tier B 115); referencing tool/wait=22; bodies that did not parse=5
 
 ROW A packages/senpi-desktop-service/test/run.test.ts:303 refs=tool kind=helper run() :: return (await tool.read({ path: "notes.txt" })).content[0].text;
 ROW A packages/omo-senpi/scripts/qa/computer-control-live-macos-scenarios.mjs:149 refs=wait kind=helper run() :: const state = await desktop.control.acquire({ reason: __SUB__ }); await wait(30000); return JSON.stringify(state)
@@ -471,6 +475,7 @@ ROW B packages/omo-senpi/scripts/qa/fused-equivalence-golden/linux-x64/E21.json:
 ROW B packages/omo-senpi/src/components/computer-use/published-parameters.fixture.json:42 refs=tool,wait kind=contract text (json) :: "description": "run (required): JavaScript async function body; `desktop`, `wait`, `assert`, `tool` in sco [...]
 ROW B packages/senpi-desktop-prelude/README.md:22 refs=wait kind=markdown entry :: - `{ action: "run", code, read_only?, timeout? }`: `code` is an async function body. `computer.run(fn, { args })` serializes `fn` and each argument (JSON dat [...]
 ROW B packages/senpi-desktop-prelude/src/prelude.js:132 refs=wait kind=generated code = ... :: return await (__SUB__)({ desktop, wait, assert }__SUB__);
+ROW B packages/senpi-desktop-service/README.md:18 refs=tool,wait kind=contract text (markdown) :: - The context's globals are `desktop` (the facade), `wait(ms | predicate, {timeout, interval})`, `assert(condition, message)`, `console`, and  [...]
 ROW B packages/senpi-desktop-tool/src/cua-actions.ts:147 refs=wait kind=code-shaped literal :: const actions = __SUB__; let bounds = __SUB__; const steps = []; const outside = (x, y) => bounds !== null && (x < 0 || y < 0 || x >= bounds.widt [...]
 ROW B packages/senpi-desktop-tool/src/params.ts:41 refs=tool,wait kind=contract text :: JavaScript async function body; `desktop`, `wait`, `assert`, `tool` in scope; `return` sets the value
 ROW B packages/senpi-desktop-tool/src/params.ts:77 refs=tool,wait kind=contract text :: run (required): JavaScript async function body; `desktop`, `wait`, `assert`, `tool` in scope; `return` sets the value
@@ -479,6 +484,6 @@ ROW B packages/senpi-desktop-tool/test/control.test.ts:97 refs=wait kind=object 
 ROW B packages/senpi-desktop-tool/test/execute.test.ts:121 refs=tool kind=object action:run :: return await tool.read({ path: "a.txt" });
 ```
 
-Matrix rows M1-M21 equal the scan's 21 flagged entries (8 run bodies or scope docs, 13 contract texts). The 5 bodies the parser could not read cleanly are the
+Matrix rows M1-M22 equal the scan's 22 flagged entries (8 run bodies or scope docs, 13 model-facing contract texts, 1 developer README). The 5 bodies the parser could not read cleanly are the
 three `"private typed text"` telemetry fixtures (prose, not code), `prelude.js:132` (flagged anyway, M5) and
 `script/qa/desktop/macos/scenario.ts:67` (a `${...}` prefix fragment; no `tool`/`wait`).
