@@ -41,7 +41,7 @@ export function controlPair(input: {
   const ownerTicks = { enabled: input.ownerTicks !== false }
   const channel = createRequesterChannel({ stateDir: store.stateDir, store, hostPid: A_PID, managerInstance: "requester-a",
     channel: input.channel !== false, isProcessAlive: pid => alive.has(pid), now: () => clock })
-  const calls = { resumeLost: 0, pause: 0, finish: 0 }
+  const calls = { resumeLost: 0, pause: 0, finish: 0, endLost: 0 }
   const manager = {
     get: (taskId: string) => store.load(taskId) ?? undefined,
     list: () => store.list().records.map(record => ({ record })),
@@ -51,7 +51,7 @@ export function controlPair(input: {
     resumePausedTask: async () => ({ turnId: "local-turn" }),
     resumeLostTask: async () => { calls.resumeLost += 1; return { turnId: "local-turn" } },
     cancelTask: async () => ({ kind: "noop", task_id: T1, status: "running", reason: "n/a" }),
-    endLostPausedTask: () => false,
+    endLostPausedTask: () => { calls.endLost += 1; return true },
   } as unknown as TaskManager & TaskPauseMethods
   const wait = async (): Promise<void> => {
     clock += 100

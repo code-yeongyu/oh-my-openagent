@@ -82,6 +82,17 @@ describe("a run's Stop and Resume carried to the live owner (#12349 part 2)", ()
     expect(pair.owner.calls.resume).toBe(0)
   })
 
+  test("#given a lost participant a live owner still holds #when the lost recovery ends lost runs #then it is never ended (test 20)", async () => {
+    const pair = controlPair({ ownerTicks: false })
+    await pair.advertise()
+    seedLedger(pair, "lost", { lostReason: "still held by live host" })
+    pair.runPause.registry.phase("parent-1", 2, "resumed")
+    const failures = await pair.runPause.controller.endLost("parent-1", 2)
+    expect(failures).toEqual([])
+    expect(participant(pair)?.state).toBe("lost")
+    expect(pair.calls.endLost).toBe(0)
+  })
+
   test("#given a remote participant whose owner died #when A Resumes #then the handoff restores and resumes it locally once (17e)", async () => {
     const pair = controlPair({ record: pausedUnderA })
     seedLedger(pair, "owned_elsewhere")
