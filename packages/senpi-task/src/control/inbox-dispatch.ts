@@ -67,7 +67,7 @@ function ackFor(context: DispatchContext, register: ControlRegister, answer: Rec
   }
 }
 
-export function answerRegister(context: DispatchContext, entry: ValidRegister, answer: ReconcileAnswer): void {
+function answerRegister(context: DispatchContext, entry: ValidRegister, answer: ReconcileAnswer): void {
   if (!writeAck(context.control, ackFor(context, entry.register, answer))) {
     logOnce(context, entry.name, "ack_write_failed")
     return

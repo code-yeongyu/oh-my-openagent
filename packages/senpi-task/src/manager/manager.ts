@@ -947,6 +947,8 @@ class TaskManagerImpl implements TaskManager {
     return tracker?.runStartEpoch === undefined ? undefined : { runStartEpoch: tracker.runStartEpoch, stats: tracker.snapshot(this.#now()) }
   }
 
+  get managerInstance(): string { return this.#managerInstance }
+  holdsLiveHandle(taskId: string): boolean { return this.#live.has(taskId) }
   residentTaskIds(): readonly string[] { return [...new Set([...this.#live.keys(), ...this.#cleanupOwners.keys()])] }
 
   residencyChanged(parentSessionId: string): Promise<void> { return this.#residency.changed(parentSessionId) }

@@ -229,6 +229,8 @@ export function wireEventBridge(
         return record === undefined ? [] : [record.parent_session_id]
       }))
       : new Set([parentSessionId])
+    // The inbox lets go of this session's handles before suspension tears any of them down (#12349).
+    await engine.controlOwner?.release()
     for (const sessionId of parentSessionIds) {
       const continuing = reason === "new" || reason === "quit"
         ? engine.manager.list({ scope: "parent-session", session_id: sessionId })

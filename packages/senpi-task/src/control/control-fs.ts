@@ -5,7 +5,7 @@ import {
 } from "node:fs"
 import { join } from "node:path"
 
-export const CONTROL_FILE_MAX_BYTES = 16 * 1024
+const CONTROL_FILE_MAX_BYTES = 16 * 1024
 
 export type ControlFsEnv = {
   readonly platform: NodeJS.Platform
@@ -96,7 +96,6 @@ export function readControlFile(dir: string, name: string, env: ControlFsEnv): C
   }
   if (before.isSymbolicLink() || !before.isFile() || before.nlink !== 1) return { kind: "refused", reason: "file_unsafe" }
   if (env.platform !== "win32" && (before.uid !== env.uid || (before.mode & 0o7777) !== 0o600)) return { kind: "refused", reason: "file_unsafe" }
-  if (before.size > CONTROL_FILE_MAX_BYTES) return { kind: "refused", reason: "file_oversized" }
   const flags = env.platform === "win32" ? constants.O_RDONLY : constants.O_RDONLY | constants.O_NOFOLLOW
   let descriptor: number | undefined
   try {

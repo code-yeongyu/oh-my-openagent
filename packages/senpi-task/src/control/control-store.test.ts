@@ -75,6 +75,16 @@ describe("control register max-merge (design 3.1, tests 11 and 12)", () => {
   })
 })
 
+describe("win32 control files (test 22)", () => {
+  test("#given the win32 flag set #when a register is written and read back #then it round-trips without uid or mode checks", () => {
+    const { store } = setup()
+    const win32 = { ...defaultControlFsEnv(), platform: "win32" as const }
+    const control = { stateDir: store.stateDir, env: win32 }
+    expect(writeRegister(store, control, register()).kind).toBe("written")
+    expect(readRegister(control, registerName("st_00000001", "parent-1")).kind).toBe("ok")
+  })
+})
+
 describe.if(posix)("control directory and file rules (design 3.1 / 3.3 step 1, test 15)", () => {
   test("#given control/ is a symlink #when a requester writes #then it refuses and nothing lands at the link target", () => {
     const { store, control } = setup()

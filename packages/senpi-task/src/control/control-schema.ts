@@ -1,8 +1,8 @@
 import type { RunRef } from "../pause/ports"
 
 export const GUIDANCE_MAX_ENTRIES = 8
-export const GUIDANCE_MAX_BYTES = 1024
-export const CANCEL_REASON_MAX_BYTES = 1024
+const GUIDANCE_MAX_BYTES = 1024
+const CANCEL_REASON_MAX_BYTES = 1024
 
 export type ControlPhase = "paused" | "resumed" | "cancelled"
 export type ControlGuidance = { readonly inputId: string; readonly revision: number; readonly text: string }
@@ -23,7 +23,7 @@ export type ControlRegister = {
 }
 
 // Closed set; an ack never carries free text.
-export const ACK_REASONS = [
+const ACK_REASONS = [
   "not_in_ancestry", "epoch_moved", "stale", "handle_gone", "owner_held", "owner_failed", "native_pause_unavailable", "settled",
 ] as const
 export type AckReason = (typeof ACK_REASONS)[number]
@@ -79,7 +79,7 @@ function runRef(value: unknown): RunRef {
   return { kind: oneOf(shape.kind, ["dag", "task", "workpool", "team"] as const), id: str(shape.id) }
 }
 
-export function readGuidance(value: unknown): readonly ControlGuidance[] {
+function readGuidance(value: unknown): readonly ControlGuidance[] {
   if (!Array.isArray(value) || value.length > GUIDANCE_MAX_ENTRIES) throw new SchemaError("guidance")
   return value.map(entry => {
     const shape = object(entry, ["inputId", "revision", "text"])

@@ -2,7 +2,7 @@ import { GUIDANCE_MAX_ENTRIES, type ControlGuidance, type ControlRegister } from
 
 // The one total order a register moves along (design 3.1): run epoch first, then a sticky
 // `cancelled` above everything in its epoch, then (pauseSeq, paused < resumed).
-export function compareRegisters(a: ControlRegister, b: ControlRegister): number {
+function compareRegisters(a: ControlRegister, b: ControlRegister): number {
   if (a.runEpoch !== b.runEpoch) return a.runEpoch - b.runEpoch
   const aCancelled = a.phase === "cancelled"
   const bCancelled = b.phase === "cancelled"
@@ -37,10 +37,4 @@ export function mergeRegister(prior: ControlRegister | undefined, incoming: Cont
   const register: ControlRegister = { ...base, ...(guidance.length === 0 ? {} : { guidance }),
     ...(winner === prior ? { requester: incoming.requester, writtenAt: incoming.writtenAt } : {}) }
   return { kind: "merged", register, changed: comparable(register) !== comparable(prior) }
-}
-
-export function withoutGuidance(register: ControlRegister, inputIds: ReadonlySet<string>): ControlRegister {
-  const remaining = (register.guidance ?? []).filter(entry => !inputIds.has(entry.inputId))
-  const { guidance: _all, ...base } = register
-  return remaining.length === 0 ? base : { ...base, guidance: remaining }
 }

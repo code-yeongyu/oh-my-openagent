@@ -1,12 +1,10 @@
 import { readFileSync } from "node:fs"
-import { listControlFiles, removeControlFile } from "./control-fs"
+import { listControlFiles, readControlFile, removeControlFile } from "./control-fs"
 import { ownersDir } from "./control-paths"
-import { parseAdvertisement, type OwnerAdvertisement } from "./control-schema"
-import { readAdvertisement, removeAdvertisement, writeAdvertisement, type ControlStore } from "./control-store"
-import { readControlFile } from "./control-fs"
+import { parseAdvertisement } from "./control-schema"
+import { removeAdvertisement, writeAdvertisement, type ControlStore } from "./control-store"
 
 export const ADVERTISEMENT_RENEW_MS = 5_000
-export const ADVERTISEMENT_LIVE_MS = 15_000
 const DAY_MS = 24 * 60 * 60 * 1000
 
 // Linux exposes a process's start (clock ticks since boot) in /proc; elsewhere it is not read and
@@ -19,38 +17,6 @@ export function readProcessStartTime(pid: number, platform: NodeJS.Platform = pr
     const start = Number(fields[19])
     return Number.isSafeInteger(start) ? start : undefined
   } catch { return undefined }
-}
-
-export type AdvertisementLiveness = {
-  readonly now: () => number
-  readonly isProcessAlive: (pid: number) => boolean
-  readonly processStartTime?: (pid: number) => number | undefined
-}
-
-// LIVE answers only "is there a reader for a register addressed to this child"; it never declares
-// a process dead (design 3.1.3).
-export function isAdvertisementLive(advertisement: OwnerAdvertisement, liveness: AdvertisementLiveness): boolean {
-  const renewed = Date.parse(advertisement.renewedAt)
-  if (!Number.isFinite(renewed) || liveness.now() - renewed > ADVERTISEMENT_LIVE_MS) return false
-  if (!liveness.isProcessAlive(advertisement.pid)) return false
-  const recorded = advertisement.processStartTime
-  const current = recorded === undefined ? undefined : liveness.processStartTime?.(advertisement.pid)
-  return recorded === undefined || current === undefined || recorded === current
-}
-
-export function liveAdvertisementFor(control: ControlStore, pid: number, managerInstance: string | undefined,
-  liveness: AdvertisementLiveness): OwnerAdvertisement | undefined {
-  if (managerInstance !== undefined) {
-    const exact = readAdvertisement(control, pid, managerInstance)
-    return exact !== undefined && isAdvertisementLive(exact, liveness) ? exact : undefined
-  }
-  for (const { name } of listControlFiles(ownersDir(control.stateDir), control.env)) {
-    if (!name.startsWith(`${pid}-`)) continue
-    const read = readControlFile(ownersDir(control.stateDir), name, control.env)
-    const advertisement = read.kind === "ok" ? parseAdvertisement(read.text) : undefined
-    if (advertisement?.pid === pid && isAdvertisementLive(advertisement, liveness)) return advertisement
-  }
-  return undefined
 }
 
 export function renewAdvertisement(control: ControlStore, input: {

@@ -3,8 +3,8 @@ import { join } from "node:path"
 
 // The control channel of #12349 part 2 lives beside the task records: one directory per store,
 // one desired-state register and one acknowledgement per (child, parent session).
-export const CONTROL_DIR = "control"
-export const OWNERS_DIR = "owners"
+const CONTROL_DIR = "control"
+const OWNERS_DIR = "owners"
 
 export function controlDir(stateDir: string): string {
   return join(stateDir, CONTROL_DIR)

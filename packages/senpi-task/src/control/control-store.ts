@@ -26,7 +26,7 @@ export type RegisterWrite =
   | { readonly kind: "refused"; readonly reason: "control_dir_unsafe" | "write_failed" | "guidance_too_large" | "no_record" }
 
 // Callers already inside the task's record lock (the cancel carry's one mutation) use this form.
-export function writeRegisterLocked(control: ControlStore, incoming: ControlRegister): RegisterWrite {
+function writeRegisterLocked(control: ControlStore, incoming: ControlRegister): RegisterWrite {
   const name = registerName(incoming.taskId, incoming.parentSessionId)
   const prior = readRegister(control, name)
   if (prior.kind === "refused" && prior.reason === "control_dir_unsafe") return { kind: "refused", reason: "control_dir_unsafe" }
@@ -75,11 +75,6 @@ export function writeAdvertisement(control: ControlStore, advertisement: OwnerAd
   if (!ensureControlDir(controlDir(control.stateDir), control.env, true)) return false
   const name = advertisementName(advertisement.pid, advertisement.managerInstance)
   return writeControlFile(ownersDir(control.stateDir), name, JSON.stringify(advertisement), control.env).kind === "written"
-}
-
-export function readAdvertisement(control: ControlStore, pid: number, managerInstance: string): OwnerAdvertisement | undefined {
-  const read = readControlFile(ownersDir(control.stateDir), advertisementName(pid, managerInstance), control.env)
-  return read.kind === "ok" ? parseAdvertisement(read.text) : undefined
 }
 
 export function removeAdvertisement(control: ControlStore, pid: number, managerInstance: string): void {
