@@ -22,7 +22,7 @@ const B_ROW: RemoteSessionRow = { device: "b", session_id: "dur-on-b", title: "o
 
 type Sent = { readonly via: "endpoint" | "session" | "read"; readonly device: string; readonly session?: string; readonly rpc?: JsonObject }
 
-function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder> } = {}) {
+function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean } = {}) {
   const sent: Sent[] = []
   const hops: number[] = []
   const aliases = options.aliases ?? new Map<string, AliasHolder>()
@@ -67,7 +67,7 @@ function account(options: { plan?: string; online?: boolean; refuse?: string; al
       sessionCommand: async (device, session, rpc) => { sent.push({ via: "session", device, session, rpc }); return answer(rpc) },
       read: async (device, session) => { sent.push({ via: "read", device, session }); return { kind: "ok", response: { entries: [{ role: "user", content: "hi b" }, { role: "assistant", content: "hello from b" }] } } },
     },
-    aliases: registry,
+    ...(options.noRegistry === true ? {} : { aliases: registry }),
     chain: { stamp: (record, hop) => { hops.push(hop); return { ...record, chain_count: hop } } },
   }
   return { remote, sent, hops, aliases }
@@ -224,6 +224,25 @@ describe("A3: an existing thread is named by id or alias only; a device only to 
     expect(await run("thread_send", { thread: "dur-on-b", message: "x" })).toMatchObject({ kind: "error", error: { code: "device_offline", details: { device: "b" } } })
     expect(a.sent).toEqual([])
     expect(await store.list()).toEqual([])
+  })
+})
+
+describe("the device service is not connected, or the alias registry is not there yet", () => {
+  test("#given remote sessions turned off on this device #when a tool names this device's thread by name and another device's by id #then both answer exactly as without a remote surface: the local one works and the other is not_found", async () => {
+    const a = account({ plan: "disabled" })
+    const { run } = surface(a.remote)
+    expect(await run("thread_send", { thread: "local peer", message: "local" })).toMatchObject({ kind: "ok", thread_id: "dur-local" })
+    expect(await run("thread_send", { thread: "dur-on-b", message: "remote" })).toMatchObject({ kind: "error", error: { code: "not_found" } })
+    expect(await run("thread_create", { device: "b" })).toMatchObject({ kind: "error", error: { code: "host_unavailable", details: { state: "disabled" } } })
+    expect(a.sent).toEqual([])
+  })
+
+  test("#given no alias registry #when thread_create sets an alias #then it is host_unavailable and nothing is created; a create without an alias works", async () => {
+    const a = account({ noRegistry: true })
+    const { run, openSession } = surface(a.remote)
+    expect(await run("thread_create", { alias: "x" })).toMatchObject({ kind: "error", error: { code: "host_unavailable" } })
+    expect(openSession).not.toHaveBeenCalled()
+    expect(await run("thread_create", {})).toMatchObject({ kind: "ok", thread: { thread_id: "dur-created-here" } })
   })
 })
 

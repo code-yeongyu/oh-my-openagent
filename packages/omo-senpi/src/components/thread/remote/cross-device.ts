@@ -18,14 +18,17 @@ export type CrossTarget =
 export async function crossTarget(remote: RemoteThreadSurface | undefined, address: string, local: LocalResolution): Promise<CrossTarget> {
   if (remote === undefined || address === "self") return { kind: "local", address }
   if (local.kind === "ok" && local.entry.thread_id === address) return { kind: "local", address }
+  if (local.kind === "error" && local.code !== "not_found") return { kind: "local", address }
   const unavailable = await remoteAvailable(remote)
-  if (unavailable !== undefined) return local.kind === "ok" ? { kind: "local", address } : { kind: "error", result: unavailable }
+  if (unavailable !== undefined) return local.kind === "ok" || unavailable.error.code !== "relay_requires_paid_plan" ? { kind: "local", address } : { kind: "error", result: unavailable }
   const across = await locateAcross(remote, address)
   if ("error" in across) return { kind: "error", result: across }
   if (across.where === "remote") return { kind: "remote", row: across.row }
   if (across.where === "here") return { kind: "local", address: across.session_id }
   return { kind: "local", address }
 }
+
+const ALIASES_UNAVAILABLE: ThreadToolResult = { kind: "error", error: threadToolFailure("host_unavailable", "Thread aliases need the account's alias registry, which this device cannot reach.", "Create or address the thread by its id; retry the alias later.") }
 
 const invalid = (message: string, next: string): ThreadToolResult => ({ kind: "error", error: threadToolFailure("invalid_arguments", message, next) })
 
@@ -61,6 +64,7 @@ export async function planCreate(
     return value.thread === undefined ? { kind: "local" } : { kind: "open-local", address: value.thread }
   }
   if (value.alias !== undefined) {
+    if (remote.aliases === undefined) return { kind: "done", result: ALIASES_UNAVAILABLE }
     const held = await remote.aliases.resolve(value.alias)
     if (held.kind === "ok") return { kind: "done", result: { kind: "error", error: threadToolFailure("alias_taken", `The alias ${value.alias} is held by another thread.`, "Choose another alias; the holder is named in details.", { holder: held.value }) } }
     if (held.error.code !== "alias_not_found") return { kind: "done", result: aliasFailure(held.error) }
@@ -94,7 +98,7 @@ export async function planCreate(
 
 /** Claims the alias for a thread just created; a lost race answers alias_taken with the created thread named. */
 export async function withAlias(remote: RemoteThreadSurface | undefined, alias: string | undefined, result: ThreadToolResult, device?: string): Promise<ThreadToolResult> {
-  if (remote === undefined || alias === undefined || result.kind !== "ok" || !("thread" in result)) return result
+  if (remote?.aliases === undefined || alias === undefined || result.kind !== "ok" || !("thread" in result)) return result
   const holderDevice = device ?? (await remote.sessions.thisDevice()) ?? ""
   const claimed = await remote.aliases.claim({ alias, holder: { session_id: result.thread.thread_id, device: holderDevice }, idempotency_key: `create:${result.thread.thread_id}` })
   if (claimed.kind === "error") {
@@ -106,7 +110,7 @@ export async function withAlias(remote: RemoteThreadSurface | undefined, alias: 
 
 /** thread_rename's alias half: claim when the thread holds none, else an atomic rename; a duplicate is alias_taken. */
 export async function renameAlias(remote: RemoteThreadSurface | undefined, threadId: string, device: string | undefined, alias: string, key: string): Promise<ThreadToolResult | undefined> {
-  if (remote === undefined) return { kind: "error", error: threadToolFailure("host_unavailable", "Aliases need this device signed in to the account's device service.", "Sign in, then retry.") }
+  if (remote?.aliases === undefined) return ALIASES_UNAVAILABLE
   const current = await remote.aliases.aliasesOf([threadId])
   if (current.kind === "error") return aliasFailure(current.error)
   const from = current.value.get(threadId)
@@ -138,7 +142,7 @@ export async function listAcross(remote: RemoteThreadSurface | undefined, local:
 }
 
 async function withAliases(remote: RemoteThreadSurface, listed: ThreadToolResult, ids: readonly string[]): Promise<ThreadToolResult> {
-  if (listed.kind !== "ok" || !("threads" in listed) || ids.length === 0) return listed
+  if (remote.aliases === undefined || listed.kind !== "ok" || !("threads" in listed) || ids.length === 0) return listed
   const aliases = await remote.aliases.aliasesOf(ids)
   if (aliases.kind === "error") return listed
   return { ...listed, threads: listed.threads.map((thread) => { const alias = aliases.value.get(thread.thread_id); return alias === undefined ? thread : { ...thread, alias } }) }

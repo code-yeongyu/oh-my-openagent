@@ -74,6 +74,7 @@ export type AliasRegistry = {
 /** Everything the tools need to reach past this machine. Absent: the tools are exactly the local ones. */
 export type RemoteThreadSurface = {
   readonly sessions: RemoteSessionsPort
-  readonly aliases: AliasRegistry
+  /** Absent until the account service's alias registry ships: aliases are then refused typed, never guessed. */
+  readonly aliases?: AliasRegistry
   readonly chain: ChainCountWire
 }

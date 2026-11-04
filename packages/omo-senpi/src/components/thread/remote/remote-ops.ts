@@ -9,8 +9,14 @@ const fail = (code: ThreadToolFailure["code"], message: string, next: string, de
 
 /** A5: the relay is paid only; on any other plan the remote path answers this, never a silent failure or a queue. */
 export async function remoteAvailable(remote: RemoteThreadSurface): Promise<Failure | undefined> {
-  const { state } = await remote.sessions.status()
+  let state: string
+  try {
+    state = (await remote.sessions.status()).state
+  } catch (error) {
+    return fail("host_unavailable", "This device's device service is not reachable.", "Install or start the device service, then retry.", { reason: error instanceof Error ? error.message : String(error) })
+  }
   if (state === "plan_required") return fail("relay_requires_paid_plan", "Reaching sessions on other devices needs a paid plan; this account's plan has no relay.", "Upgrade the plan to use other devices, or work with threads on this device.")
+  if (state !== "connected") return fail("host_unavailable", `Other devices are not reachable from this device right now (${state}).`, "Sign in, turn remote sessions on, or wait for the device service to connect, then retry.", { state })
   return undefined
 }
 
@@ -43,6 +49,7 @@ export async function locateAcross(remote: RemoteThreadSurface, address: string)
   const rows = await remote.sessions.sessions()
   const byId = rows.find((row) => row.session_id === address)
   if (byId !== undefined) return byId.device === here ? { where: "here", session_id: byId.session_id } : { where: "remote", row: byId }
+  if (remote.aliases === undefined) return { where: "none" }
   const alias = await remote.aliases.resolve(address)
   if (alias.kind === "error") {
     if (alias.error.code === "alias_not_found" || alias.error.code === "alias_invalid") return { where: "none" }
