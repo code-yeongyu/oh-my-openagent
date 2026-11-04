@@ -101,12 +101,14 @@ describe("getOpenCodeVersion (installer)", () => {
       }))
       const setTimeoutSpy = spyOn(globalThis, "setTimeout").mockImplementation(immediateSetTimeout)
 
-      const result = await getOpenCodeVersion()
+      try {
+        const result = await getOpenCodeVersion()
 
-      expect(result).toBe(null)
-      expect(killCalls).toEqual(["SIGTERM", "SIGKILL"])
-
-      setTimeoutSpy.mockRestore()
+        expect(result).toBe(null)
+        expect(killCalls).toEqual(["SIGTERM", "SIGKILL"])
+      } finally {
+        setTimeoutSpy.mockRestore()
+      }
     })
   })
 
@@ -133,11 +135,13 @@ describe("getOpenCodeVersion (installer)", () => {
       }))
       const setTimeoutSpy = spyOn(globalThis, "setTimeout").mockImplementation(immediateSetTimeout)
 
-      const result = await getOpenCodeVersion()
+      try {
+        const result = await getOpenCodeVersion()
 
-      expect(result).toBe(null)
-
-      setTimeoutSpy.mockRestore()
+        expect(result).toBe(null)
+      } finally {
+        setTimeoutSpy.mockRestore()
+      }
     })
   })
 

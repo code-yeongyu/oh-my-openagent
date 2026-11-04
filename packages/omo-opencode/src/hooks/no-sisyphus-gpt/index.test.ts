@@ -119,10 +119,10 @@ describe("no-sisyphus-gpt hook", () => {
     // then Sisyphus remains selected with its configured Sol effort
     expect(showToast).toHaveBeenCalledTimes(0)
     expect(output.message.agent).toBeUndefined()
-    expect(output.message.variant).toBe("high")
+    expect(output.message.variant).toBe("medium")
   })
 
-  test("sets high variant for gpt-5.5 model when native Sisyphus support is used", async () => {
+  test("sets medium variant for gpt-5.5 model when native Sisyphus support is used", async () => {
     // given - sisyphus with gpt-5.5 model and no selected variant
     const showToast = spyOn({ fn: async () => ({}) }, "fn")
     const hook = createNoSisyphusGptHook(createHookContext(showToast))
@@ -139,7 +139,7 @@ describe("no-sisyphus-gpt hook", () => {
     // then - Sisyphus stays active and receives its configured GPT-5.5 variant
     expect(showToast).toHaveBeenCalledTimes(0)
     expect(output.message.agent).toBeUndefined()
-    expect(output.message.variant).toBe("high")
+    expect(output.message.variant).toBe("medium")
   })
 
   test("preserves selected variant for gpt-5.5 model when native Sisyphus support is used", async () => {
