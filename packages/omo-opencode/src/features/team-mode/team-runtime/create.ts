@@ -136,7 +136,13 @@ export async function createTeamRun(
   const activeTeams = await listActiveTeams(config)
   const activeRunIds = new Set(activeTeams.map((t) => t.teamRunId))
   sweepStaleTeamSessions(activeRunIds).catch(() => {})
-  sweepStaleHerdrTeamWorkspaces(activeRunIds).catch(() => {})
+  // The herdr sweep spawns `herdr workspace list` and can close omo-team-*
+  // workspaces, so it must only run for users who actually selected the
+  // herdr backend — never on a default tmux install (or a machine that just
+  // happens to have herdr installed).
+  if (tmuxMgr?.multiplexer === "herdr") {
+    sweepStaleHerdrTeamWorkspaces(activeRunIds).catch(() => {})
+  }
 
   const baseDir = resolveBaseDir(config)
   await ensureBaseDirs(baseDir)

@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import type { TmuxConfig } from "../../config/schema"
+import type { MultiplexerBackend, TmuxConfig } from "../../config/schema"
 import type { TrackedSession, CapacityConfig, WindowState } from "./types"
 import * as sharedModule from "../../shared"
 import { resolveSessionEventID } from "../../shared/event-session-id"
@@ -192,6 +192,17 @@ export class TmuxSessionManager {
   }
   private isEnabled(): boolean {
     return this.tmuxConfig.enabled && this.deps.isInsideTmux()
+  }
+
+  /**
+   * The resolved visualization backend. The manager is constructed with the
+   * fully resolved runtime tmux config (config chain + OMO_TMUX_MULTIPLEXER
+   * override), so this is the one source of truth for callers that must gate
+   * herdr-only work — e.g. team-mode's stale-workspace sweep, which must
+   * never spawn herdr on a default tmux install.
+   */
+  get multiplexer(): MultiplexerBackend {
+    return this.tmuxConfig.multiplexer
   }
 
   /** Subagent panes render through the herdr backend instead of tmux. */
