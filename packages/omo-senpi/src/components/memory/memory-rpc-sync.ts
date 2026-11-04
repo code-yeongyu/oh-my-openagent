@@ -2,7 +2,7 @@
 // footer reads, so the desktop shows what the TUI shows. Omitted while this device does not sync the
 // repository (sync off, signed out, or another process holds the engine), and when the read fails.
 
-import type { Failing, SyncFailureKind } from "@oh-my-opencode/memory-core/sync-engine"
+import type { SyncFailureKind } from "@oh-my-opencode/memory-core/sync-engine"
 
 import type { SyncStatusReader } from "./sync-status-surface"
 
@@ -24,18 +24,6 @@ export interface MemoryRpcSync {
   }
 }
 
-function rpcFailure({ failure, since, attempts }: Failing): NonNullable<MemoryRpcSync["failure"]> {
-  return {
-    kind: failure.kind,
-    reason: failure.reason,
-    action: failure.action,
-    sinceISO: new Date(since).toISOString(),
-    attempts,
-    ...(failure.kind === "stranded_lock" ? { paths: failure.paths } : {}),
-    ...(failure.kind === "oversized_item" ? { keys: failure.keys, stuckKeys: failure.stuck, limitBytes: failure.limitBytes } : {}),
-  }
-}
-
 export async function readMemoryRpcSync(read: SyncStatusReader | undefined, repo: string): Promise<MemoryRpcSync | undefined> {
   if (read === undefined) return undefined
   const status = await read(repo).catch(() => null)
@@ -44,15 +32,18 @@ export async function readMemoryRpcSync(read: SyncStatusReader | undefined, repo
     case "never_synced":
       return { state: status.kind }
     case "paused":
-      return status.held === undefined ? { state: "paused" } : { state: "paused", failure: rpcFailure(status.held) }
+      // A pause that carries held files (#12284) exists only while the engine runs too, so its mapping ships with it.
+      return status.held === undefined ? { state: "paused" } : (await import("#omo-memory-sync-runtime")).failureRpcSync(status)
     case "synced":
       return { state: "synced", lastSyncedAtISO: new Date(status.at).toISOString() }
+    // Both exist only while the engine runs, so their mapping ships with it (sync-status-copy.ts).
+    case "failing":
+    case "frozen":
+      return (await import("#omo-memory-sync-runtime")).failureRpcSync(status)
     case "sync-unavailable":
     // An invalid sync configuration (#10860) also means this device does not sync; the runner logs which variable.
     case "sync-config-invalid":
       return { state: "unavailable" }
-    case "failing":
-      return { state: "failing", failure: rpcFailure(status) }
     default: {
       const unhandled: never = status
       return unhandled

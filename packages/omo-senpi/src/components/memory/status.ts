@@ -160,7 +160,10 @@ async function readSyncState(context: MemoryIdentityContext, syncStatus: SyncSta
   const none = { syncBlocked: false, syncHeld: false }
   if (syncStatus === undefined) return none
   try {
-    const failure = shownSyncFailure(await syncStatus(context.identityPaths.repo))
+    const status = await syncStatus(context.identityPaths.repo)
+    // A service freeze blocks every push (#12280), like a failing cycle; a held file alone only holds (#12284).
+    if (status?.kind === "frozen") return { syncBlocked: true, syncHeld: false }
+    const failure = shownSyncFailure(status)
     if (failure === undefined) return none
     return failure.kind === "oversized_item" ? { syncBlocked: false, syncHeld: true } : { syncBlocked: true, syncHeld: false }
   } catch {

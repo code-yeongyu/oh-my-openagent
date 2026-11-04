@@ -57,6 +57,38 @@ export interface StreamHandlers {
   readonly onAdvanced: (head: number) => void
   /** The stream connected (true) or dropped (false); while down the engine polls. */
   readonly onConnected: (connected: boolean) => void
+  /** `sync.state.changed`: the account state moved without an append (a rotation is pending, or sync was toggled). */
+  readonly onStateChanged: () => void
+}
+
+/**
+ * Why pushes are frozen (sync-design section 7, rotation on revoke), as a closed set of codes. The
+ * presentation layer owns every word shown for them.
+ */
+export type FreezeReason =
+  | "rotating"
+  | "waiting_recovery"
+  | "waiting_unsupported_freeze"
+  | "unverified"
+  | "device_list_unusable"
+  | "self_revoked"
+  | "refused"
+  | "flag_stuck"
+  | "no_epoch_key"
+  | "rate_limited"
+  | "unavailable"
+
+/** What one settle of a service freeze found or did. */
+export type FreezeOutcome =
+  | { readonly kind: "clear" }
+  | { readonly kind: "rotated" }
+  | { readonly kind: "adopted" }
+  | { readonly kind: "not_member" }
+  | { readonly kind: "frozen"; readonly reason: FreezeReason }
+
+/** Ends a service freeze by rotating the account key when this device may (the account session's settler). */
+export interface FreezeSettler {
+  settle(): Promise<FreezeOutcome>
 }
 
 export interface Transport {
