@@ -12,7 +12,9 @@ test("a probe-only RPC extension announces the actual request once, including wi
     const probed = withProbeRequestExtension({ ...spec, probeProviderRequest: true })
     const path = probed.extensions?.[0]
     if (path === undefined) throw new Error("missing request extension")
-    expect(statSync(path).mode & 0o777).toBe(0o600)
+    // Windows has no POSIX permission bits (stat reports 0o666 for any writable file), so the private mode is
+    // asserted where it is enforced; the rest of the test runs on every platform.
+    if (process.platform !== "win32") expect(statSync(path).mode & 0o777).toBe(0o600)
     const extension = await import(path)
     let request: (() => void) | undefined
     const emitted: string[] = []
