@@ -74,6 +74,20 @@ describe("pinned helper copies (#11586 review LOWs)", () => {
     }
   })
 
+  test("#given a signature check that throws #when pinning #then a typed unavailable, no copy left behind, and the next attempt runs again", async () => {
+    const root = tempRoot()
+    const source = join(root, "omo-keychain")
+    const pins = join(root, "pins")
+    mkdirSync(pins, { mode: 0o700 })
+    writeFileSync(source, "signed helper, throwing checker case")
+    const throwing = async (): Promise<"valid"> => {
+      throw new Error("checker crashed")
+    }
+    expect(await pinVerifiedCopy(source, throwing, pins)).toEqual({ kind: "unavailable", reason: "checker crashed" })
+    expect(readdirSync(pins)).toEqual([])
+    expect((await pinVerifiedCopy(source, alwaysValid, pins)).kind).toBe("pinned")
+  })
+
   test("#given a source that vanishes before the copy #when resolving #then a typed unavailable result, never a rejection", async () => {
     const root = tempRoot()
     const source = join(root, "omo-keychain")

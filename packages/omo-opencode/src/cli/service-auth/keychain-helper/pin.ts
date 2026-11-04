@@ -69,7 +69,14 @@ async function copyAndVerify(source: string, verify: (path: string) => Promise<S
     await rm(target, { force: true })
     return { kind: "unavailable", reason: error instanceof Error ? error.message : String(error) }
   }
-  if ((await verify(target)) === "valid") return { kind: "pinned", path: target }
+  let verdict: SignatureVerdict
+  try {
+    verdict = await verify(target)
+  } catch (error) {
+    await rm(target, { force: true })
+    return { kind: "unavailable", reason: error instanceof Error ? error.message : String(error) }
+  }
+  if (verdict === "valid") return { kind: "pinned", path: target }
   await rm(target, { force: true })
   return { kind: "invalid" }
 }
