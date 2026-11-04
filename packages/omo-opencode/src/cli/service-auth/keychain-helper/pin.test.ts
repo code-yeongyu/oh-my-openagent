@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { resolveHelperAccess } from "./access"
@@ -35,6 +35,45 @@ describe("pinned helper copies (#11586 review LOWs)", () => {
     expect(third.kind === "pinned" && first.kind === "pinned" && third.path !== first.path).toBe(true)
   })
 
+  test("#given a pin directory that cannot be written #when pinning #then the copy failure is a typed unavailable", async () => {
+    const root = tempRoot()
+    const source = join(root, "omo-keychain")
+    const pins = join(root, "pins")
+    mkdirSync(pins, { mode: 0o500 })
+    writeFileSync(source, "signed helper")
+    const result = await pinVerifiedCopy(source, alwaysValid, pins)
+    chmodSync(pins, 0o700)
+    expect(result.kind).toBe("unavailable")
+  })
+
+  test("#given a reused pin that no longer verifies #when pinning again #then a fresh copy replaces it", async () => {
+    const root = tempRoot()
+    const source = join(root, "omo-keychain")
+    const pins = join(root, "pins")
+    mkdirSync(pins, { mode: 0o700 })
+    writeFileSync(source, "signed helper")
+    const first = await pinVerifiedCopy(source, alwaysValid, pins)
+    if (first.kind !== "pinned") throw new Error(`expected pinned, got ${first.kind}`)
+    const second = await pinVerifiedCopy(source, async path => (path === first.path ? "invalid" : "valid"), pins)
+    expect(second.kind === "pinned" && second.path !== first.path).toBe(true)
+  })
+
+  test("#given TMPDIR does not exist #when pinning into the process directory #then unavailable, and a later attempt succeeds", async () => {
+    const root = tempRoot()
+    const source = join(root, "omo-keychain")
+    writeFileSync(source, "signed helper, tmpdir case")
+    const previous = process.env.TMPDIR
+    process.env.TMPDIR = join(root, "missing")
+    try {
+      expect((await pinVerifiedCopy(source, alwaysValid)).kind).toBe("unavailable")
+      mkdirSync(join(root, "missing"))
+      expect((await pinVerifiedCopy(source, alwaysValid)).kind).toBe("pinned")
+    } finally {
+      if (previous === undefined) delete process.env.TMPDIR
+      else process.env.TMPDIR = previous
+    }
+  })
+
   test("#given a source that vanishes before the copy #when resolving #then a typed unavailable result, never a rejection", async () => {
     const root = tempRoot()
     const source = join(root, "omo-keychain")
@@ -58,6 +97,23 @@ describe("pinned helper copies (#11586 review LOWs)", () => {
     }
     expect(sweepDeadPinDirs(root)).toEqual([`omo-keychain-${dead.pid}-aaaaaa`])
     expect(readdirSync(root).sort()).toEqual([`omo-keychain-${process.pid}-bbbbbb`, "omo-keychain-1-cccccc", "omo-keychain-notapid"].sort())
+  })
+
+  test.skipIf(process.getuid?.() === 0)("#given a dead owner's pin directory this user cannot delete #when swept #then it is skipped, the sweep goes on, and nothing throws", async () => {
+    const root = tempRoot()
+    const dead = Bun.spawn(["true"])
+    await dead.exited
+    const stuck = join(root, `omo-keychain-${dead.pid}-stuck00`)
+    mkdirSync(stuck)
+    writeFileSync(join(stuck, "omo-keychain"), "helper copy")
+    chmodSync(stuck, 0o500)
+    mkdirSync(join(root, `omo-keychain-${dead.pid}-gone00`))
+    try {
+      expect(sweepDeadPinDirs(root)).toEqual([`omo-keychain-${dead.pid}-gone00`])
+      expect(readdirSync(root)).toEqual([`omo-keychain-${dead.pid}-stuck00`])
+    } finally {
+      chmodSync(stuck, 0o700)
+    }
   })
 })
 
