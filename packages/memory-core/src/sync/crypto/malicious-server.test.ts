@@ -169,9 +169,15 @@ describe("MEDIUM 3: vetoed-epoch batches are fully verified before the veto appl
 })
 
 describe("MEDIUM 4: the SyncEntry envelope is a closed schema", () => {
-  test("a keyring row with an unknown top-level field is refused as bad_envelope", async () => {
+  // A keyring row reaches the chain as the `/keys` record, which has no batch_id: the contract sets
+  // batch_id exactly on batches, so any batch_id on a keyring row is as foreign as an unknown key.
+  test.each([
+    ["an unknown top-level field", { server_note: "trust me" }],
+    ["batch_id: null", { batch_id: null }],
+    ["a well-formed batch_id", { batch_id: "A".repeat(22) }],
+  ] as const)("a keyring row with %s is refused as bad_envelope", async (_extra, extra) => {
     const empty = emptyChain(ACCOUNT, fixtureAnchor())
-    const result = await run([served({ ...record("genesis"), server_note: "trust me" })], empty)
+    const result = await run([served({ ...record("genesis"), ...extra })], empty)
     expectRefusedOnce(result, empty, { seq: 1, reason: "bad_envelope" })
   })
 
@@ -191,10 +197,18 @@ describe("MEDIUM 4: the SyncEntry envelope is a closed schema", () => {
     expectRefusedOnce(result, empty, { seq: 1, reason: "bad_envelope" })
   })
 
-  test("a batch row with an unknown field, an open author or a malformed wrap row is refused", async () => {
+  // batch_id is the one key a batch row may add (the contract's, checked like its readBatchId); a
+  // present batch_id that is null or not 16 bytes of unpadded base64url is refused, not ignored.
+  test("a batch row with an unknown field, a bad batch_id, an open author or a malformed wrap row is refused", async () => {
     const state = await verified(mainChain())
     const batch = await appendBatch(headOf(state), objectNamed("batch-c-epoch3.omob").sha256, 3, keyringFor("owner"))
-    for (const bad of [{ ...batch, server_note: 1 }, { ...batch, author: { ...batch.author, extra: true } }, { ...batch, seq: "9" }]) {
+    const badBatchIds = [null, "A".repeat(21), "A".repeat(23), `${"A".repeat(21)}+`, `${"A".repeat(21)}=`, 7]
+    for (const bad of [
+      { ...batch, server_note: 1 },
+      ...badBatchIds.map((batch_id) => ({ ...batch, batch_id })),
+      { ...batch, author: { ...batch.author, extra: true } },
+      { ...batch, seq: "9" },
+    ]) {
       const result = await run([served(bad)], state)
       expectRefusedOnce(result, state, { seq: batch.seq, reason: "bad_envelope" })
     }
