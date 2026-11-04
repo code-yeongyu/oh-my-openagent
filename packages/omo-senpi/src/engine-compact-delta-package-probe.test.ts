@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process"
-import { existsSync, mkdirSync, readFileSync, watch } from "node:fs"
+import { mkdirSync, readFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { createConnection } from "node:net"
 import { dirname, join } from "node:path"
@@ -26,19 +26,25 @@ const pinnedVersion = omoSenpi.devDependencies["@code-yeongyu/senpi"]
 
 type ProtocolInfo = { readonly serverVersion: string; readonly capabilities: readonly string[] }
 
-function waitForSocket(dir: string, socketPath: string, exited: Promise<number | null>): Promise<void> {
+// Readiness is the host's own signal: it prints `senpi rpc listening on unix://<path>` once the socket is bound.
+// A directory watch is not one: macOS does not report a bound socket as a change event, so the wait never ended.
+function waitForListening(stderr: NodeJS.ReadableStream, socketPath: string, exited: Promise<number | null>): Promise<void> {
+  const ready = `senpi rpc listening on unix://${socketPath}`
   return new Promise((resolve, reject) => {
-    const watcher = watch(dir)
-    const timer = setTimeout(() => finish(new Error(`host never bound ${socketPath}`)), 60_000)
+    let seen = ""
+    const timer = setTimeout(() => finish(new Error(`host never reported listening on ${socketPath}; stderr: ${seen.slice(0, 2000)}`)), 60_000)
     function finish(error?: Error) {
       clearTimeout(timer)
-      watcher.close()
+      stderr.off("data", onData)
       if (error) reject(error)
       else resolve()
     }
-    watcher.on("change", () => existsSync(socketPath) && finish())
-    void exited.then((code) => finish(new Error(`host exited (${code}) before binding`)))
-    if (existsSync(socketPath)) finish()
+    function onData(chunk: Buffer | string) {
+      seen += chunk.toString()
+      if (seen.includes(ready)) finish()
+    }
+    stderr.on("data", onData)
+    void exited.then((code) => finish(new Error(`host exited (${code}) before listening; stderr: ${seen.slice(0, 2000)}`)))
   })
 }
 
@@ -71,15 +77,16 @@ async function probePackagedHost(compactFlag: "1" | undefined): Promise<Protocol
   const agentDir = join(root, "agent")
   mkdirSync(agentDir, { mode: 0o755 })
   const socketPath = join(root, "h.sock")
+  // The runner's own session (PI_SESSION_FILE, SENPI_RUNTIME, OMO_* roots) must not reach the probed host.
+  const inherited = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^(PI_|SENPI_|OMO_)/.test(key)))
   const env: NodeJS.ProcessEnv = {
-    ...process.env,
+    ...inherited,
     HOME: root,
     SENPI_CODING_AGENT_DIR: agentDir,
     OMO_CODING_AGENT_DIR: agentDir,
     PI_CODING_AGENT_DIR: agentDir,
     OMO_DISABLE_POSTHOG: "true",
   }
-  delete env.SENPI_ENGINE_SOCKET_COMPACT_UPDATES
   if (compactFlag !== undefined) env.SENPI_ENGINE_SOCKET_COMPACT_UPDATES = compactFlag
   const host = spawn(
     process.execPath,
@@ -88,7 +95,8 @@ async function probePackagedHost(compactFlag: "1" | undefined): Promise<Protocol
   )
   const exited = new Promise<number | null>((resolve) => host.once("exit", (code) => resolve(code)))
   try {
-    await waitForSocket(root, socketPath, exited)
+    await waitForListening(host.stderr, socketPath, exited)
+    host.stderr.resume()
     return await requestProtocolInfo(socketPath)
   } finally {
     host.kill("SIGTERM")
