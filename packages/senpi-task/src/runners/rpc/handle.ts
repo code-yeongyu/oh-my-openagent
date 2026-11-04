@@ -11,7 +11,7 @@ import type {
   TerminateOptions,
 } from "../types"
 import { RpcCommandError, RpcRequestTimeout } from "./errors"
-import { startHeartbeat, unresponsiveMessage } from "./heartbeat"
+import { heartbeatRequestId, startHeartbeat, unresponsiveMessage } from "./heartbeat"
 import { recordTaskChildDeath } from "./crash-record"
 import { classifyChildExit } from "./exit-mapping"
 import { createHandleListeners } from "../rpc-host/handle-listeners"
@@ -136,7 +136,7 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     intervalMs: heartbeatIntervalMs,
     paused: () => outcome !== undefined || client.exited || child.stdin?.writableEnded === true || child.stdin?.destroyed === true,
     probe: async () => {
-      const response = await client.send({ type: "get_state" })
+      const response = await client.send({ type: "get_state", id: heartbeatRequestId() })
       assertOk(response, "get_state")
       return response
     },
