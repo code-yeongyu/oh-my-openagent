@@ -33,7 +33,7 @@ function assertNever(value: never): never {
 
 /**
  * Fans engine notifications out to host listeners. The host only surfaces them: the engine
- * persists audit records itself, and `engine.log` has no host consumer.
+ * persists audit records itself, and `engine.log` and `epoch.changed` have no host consumer yet.
  */
 export class NotificationHub {
 	readonly #audit = new Set<Listener<AuditEvent>>();
@@ -85,6 +85,7 @@ export class NotificationHub {
 				}
 				return;
 			case "engine.log":
+			case "epoch.changed":
 				return;
 			default:
 				assertNever(method);
