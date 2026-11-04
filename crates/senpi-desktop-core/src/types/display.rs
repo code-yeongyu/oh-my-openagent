@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use super::DesktopWindow;
-use crate::error::{CoreResult, DesktopError};
+use crate::error::{CoreResult, DesktopError, ErrorCode};
 
 /// Monitor geometry in both global logical desktop coordinates and composite
 /// screenshot pixels.
@@ -121,6 +121,10 @@ pub struct DesktopCapabilities {
     /// Windows mandatory integrity level of the engine process.
     pub integrity_level: Option<String>,
     pub screen_locked: bool,
+    /// Every display the session can capture is asleep (macOS; read live on
+    /// each `capabilities` call). Other backends always report `false`.
+    #[serde(default)]
+    pub display_asleep: bool,
     /// Captures run through the legacy `screencapture` path, not the
     /// ScreenCaptureKit worker (B9: macOS < 14, helper missing, or the
     /// helper failed to start).
@@ -167,8 +171,46 @@ impl DesktopCapabilities {
             stop_reason: None,
             integrity_level: None,
             screen_locked: false,
+            display_asleep: false,
             legacy_capture: false,
             intervention_watch: None,
         }
+    }
+}
+
+/// Lock and display-sleep state of the user session, read live per call.
+/// Only macOS detects display sleep; other backends report both as `false`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ScreenState {
+    pub locked: bool,
+    pub display_asleep: bool,
+}
+
+impl ScreenState {
+    /// The note appended to a failure while the session is locked or the
+    /// display is asleep, the likeliest cause the raw error does not name.
+    pub const fn failure_note(self) -> Option<&'static str> {
+        match (self.locked, self.display_asleep) {
+            (true, true) => Some("the screen is locked and the display is asleep"),
+            (true, false) => Some("the screen is locked"),
+            (false, true) => Some("the display is asleep"),
+            (false, false) => None,
+        }
+    }
+
+    /// The failures a lock or a sleeping display can cause without saying so.
+    pub const fn explains(code: ErrorCode) -> bool {
+        matches!(code, ErrorCode::CaptureFailed | ErrorCode::InputFailed | ErrorCode::Timeout)
+    }
+
+    /// Appends [`Self::failure_note`] to a message [`Self::explains`]; every
+    /// other error, and every error while the screen is unlocked and awake,
+    /// is returned unchanged.
+    #[must_use]
+    pub fn explain(self, mut error: DesktopError) -> DesktopError {
+        if let Some(note) = self.failure_note().filter(|_| Self::explains(error.code)) {
+            error.message = format!("{} ({note})", error.message);
+        }
+        error
     }
 }
