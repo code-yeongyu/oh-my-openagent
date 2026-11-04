@@ -34,6 +34,8 @@ const REFUSED_BEFORE_SENDING: ReadonlySet<LocalApiError["code"]> = new Set<Local
   "method_unclassified", "method_local_only", "host_not_answering", "unsupported",
 ])
 
+const notSentReason = (error: unknown): string => (error instanceof LocalApiError ? error.code : "attach_failed")
+
 function outcomeOf(result: CommandResult): RemoteCommandOutcome {
   const { outcome } = result
   if (outcome.state === "engine_refused") return { kind: "refused", reason: outcome.reason }
@@ -77,9 +79,22 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
     // a session-less record on another device is refused typed instead of being sent through an unrelated attach.
     endpointCommand: async () => ({ kind: "refused", reason: "endpoint_command_unavailable" }),
     sessionCommand: async (device, sessionId, rpc) => {
-      const attached = await attach(device, sessionId)
+      // Before the command goes out nothing can have run: an attach that fails (session_not_found, peer_not_found,
+      // host_not_answering, a lost connection) or a record that is not JSON is refused with its code, typed.
+      let attached: RemoteAttach
+      let record: WireRpc
       try {
-        return outcomeOf(await attached.command(wireRecord(rpc)))
+        record = wireRecord(rpc)
+      } catch {
+        return { kind: "refused", reason: "invalid_record" }
+      }
+      try {
+        attached = await attach(device, sessionId)
+      } catch (error) {
+        return { kind: "refused", reason: notSentReason(error) }
+      }
+      try {
+        return outcomeOf(await attached.command(record))
       } catch (error) {
         // Only a code that answers before sending ran nothing. Anything else - a timeout after sending, the attach or
         // connection ending, a broken protocol - may have run on the other device, so it is uncertain and never retried.
@@ -88,7 +103,13 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       }
     },
     read: async (device, sessionId, tail) => {
-      const page = await (await attach(device, sessionId)).read({ tail })
+      // A read changes nothing on the other device, so every failure is a typed refusal, never uncertain.
+      let page: Awaited<ReturnType<RemoteAttach["read"]>>
+      try {
+        page = await (await attach(device, sessionId)).read({ tail })
+      } catch (error) {
+        return { kind: "refused", reason: notSentReason(error) }
+      }
       const entries: JsonObject[] = page.entries.flatMap((item) => ("entry" in item && typeof item.entry === "object" && item.entry !== null && !Array.isArray(item.entry) ? [item.entry as JsonObject] : []))
       return { kind: "ok", response: { entries } }
     },

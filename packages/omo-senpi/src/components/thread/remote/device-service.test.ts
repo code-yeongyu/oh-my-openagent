@@ -59,19 +59,42 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
     let closeService: () => void = () => {}
     let detachAttach: () => void = () => {}
     let commandAnswer: () => Promise<CommandResult> = async () => state({ state: "engine_applied" }, {})
+    let attachFailure: Error | undefined
     const service = () => {
       calls.connect += 1
       return {
         status: async () => ({ state: "connected" }),
         attach: async () => {
           calls.attach += 1
+          if (attachFailure !== undefined) throw attachFailure
           return { command: async () => { calls.sent += 1; return await commandAnswer() }, read: async () => ({ entries: [], next_before: null }), detached: new Promise<string>((resolve) => { detachAttach = () => resolve("detached") }) } as unknown as RemoteAttach
         },
         closed: new Promise<void>((resolve) => { closeService = resolve }),
       } as unknown as DeviceService
     }
-    return { calls, connect: async () => service(), close: () => closeService(), detach: () => detachAttach(), answer: (next: () => Promise<CommandResult>) => { commandAnswer = next } }
+    return { calls, connect: async () => service(), close: () => closeService(), detach: () => detachAttach(), answer: (next: () => Promise<CommandResult>) => { commandAnswer = next }, failAttach: (error: Error) => { attachFailure = error } }
   }
+
+  test.each([
+    ["the session is not on that device", new LocalApiError("session_not_found", "no such session"), "session_not_found"],
+    ["the host does not answer the attach", new LocalApiError("host_not_answering", "no answer"), "host_not_answering"],
+    ["the connection is lost before the attach", new Error("socket gone"), "attach_failed"],
+  ] as const)("#given %s #when a command or a read is made #then each is refused typed with its code and no command is sent", async (_label, error, reason) => {
+    const l = lifecycle()
+    l.failAttach(error)
+    const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: l.connect })
+    expect(await port.sessionCommand("b", "s1", { type: "abort" })).toEqual({ kind: "refused", reason })
+    expect(await port.read("b", "s1", 10)).toEqual({ kind: "refused", reason })
+    expect(l.calls.sent).toBe(0)
+  })
+
+  test("#given a record that is not JSON #when it is commanded #then it is refused before any attach or send", async () => {
+    const l = lifecycle()
+    const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: l.connect })
+    expect(await port.sessionCommand("b", "s1", { type: "prompt", message: Number.NaN })).toEqual({ kind: "refused", reason: "invalid_record" })
+    expect(l.calls.attach).toBe(0)
+    expect(l.calls.sent).toBe(0)
+  })
 
   test.each([
     ["the attach ends before the reply", () => Promise.reject(new Error("the attach ended before its reply: closed"))],
