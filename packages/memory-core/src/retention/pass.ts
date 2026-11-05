@@ -96,10 +96,13 @@ export async function runRuntimeRetention(options: RuntimeRetentionOptions): Pro
     })
     capResume = cap.cursor
   }
+  // A cap that could not even measure hands its resume point back unchanged; marked stalled, it waits
+  // for the next interval instead of re-running retention at every bind (#12538 review r5 L1).
+  const capStalled = cap?.skipped.includes("measure-over-budget") === true
   if (budget.stopped !== undefined || capResume !== undefined) {
     await writeRetentionResumePoints(options.paths.runtime, {
       ...(budget.stopped === undefined ? {} : { cursor: budget.stopped }),
-      ...(capResume === undefined ? {} : { cap: capResume }),
+      ...(capResume === undefined ? {} : { cap: capResume, ...(capStalled ? { capStalled: true as const } : {}) }),
     })
     if (budget.aborted) options.signal?.throwIfAborted()
   } else if (stored.cursor !== undefined || stored.cap !== undefined) {

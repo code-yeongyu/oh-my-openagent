@@ -11,7 +11,7 @@ import {
   LockContentionError,
   createLockRecord,
   memoryMaintenanceLockPath,
-  retentionCursorPath,
+  retentionResumePending,
   sweepEmptyTranscriptJournals,
   withLock,
   type RuntimeRetentionPolicy,
@@ -128,9 +128,12 @@ export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}):
     }
   }
 
-  /** Due when no completed pass is stamped within the interval, or an interrupted pass left a cursor. */
+  /**
+   * Due when no completed pass is stamped within the interval, or an interrupted pass left work to resume;
+   * a cap resume point whose pass could not even measure waits for the interval (#12538 review r5 L1).
+   */
   async function retentionDue(context: MemoryIdentityContext, repo: GitMemoryRepo): Promise<boolean> {
-    if (existsSync(retentionCursorPath(context.identityPaths.runtime))) return true
+    if (await retentionResumePending(context.identityPaths.runtime)) return true
     const last = Number(await repo.configGet(RETENTION_STAMP_CONFIG_KEY) ?? Number.NaN)
     return !(Number.isFinite(last) && now() - last < intervalMs)
   }
@@ -154,8 +157,11 @@ export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}):
       if (summary.removed > 0 || report.skipped.length > 0 || report.cursor !== undefined) {
         options.logger?.info("omo-senpi memory runtime retention", { identity: context.identity, ...summary })
       }
-      // The completion stamp is written after the work, so an interrupted pass resumes at the next bind.
-      if (report.cursor === undefined) await repo.configSet(RETENTION_STAMP_CONFIG_KEY, String(now()))
+      // The completion stamp is written after the work, so an interrupted pass resumes at the next bind. A
+      // pass whose stores finished and whose cap could not even measure is stamped too: its cap resume
+      // point is kept for the next due pass, which comes at the interval (#12538 review r5 L1).
+      const capStalled = report.cap?.skipped.includes("measure-over-budget") === true
+      if (report.cursor === undefined || capStalled) await repo.configSet(RETENTION_STAMP_CONFIG_KEY, String(now()))
       if (report.cap !== undefined && report.cap.exceededBytes > 0) {
         // "Nothing evictable" only when the cap walked every tier: a budget stop (cursor), a measurement
         // past the budget and skipped journal tiers all leave evictable data for the next pass.
