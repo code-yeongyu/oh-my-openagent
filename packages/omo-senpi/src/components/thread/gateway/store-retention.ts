@@ -58,8 +58,8 @@ export function sweepRetention(ctx: StoreContext, now: number, receiptBatch = RE
     "DELETE FROM deliveries WHERE delivery_id IN (SELECT d.delivery_id FROM deliveries d WHERE d.state IN ('applied', 'refused') AND d.updated_at <= ? AND NOT EXISTS (SELECT 1 FROM receipts r WHERE r.delivery_id = d.delivery_id) LIMIT ?)",
     [now - DELIVERY_RETENTION_MS, batch],
   )
-  // An expired root refuses every continuation (`root_expired`) whether or not its row exists, so
-  // its edges no longer guard a cycle; the root row goes once its edges are gone.
+  // An expired root is bookkeeping only (a continuation starts a fresh root), and edges are no longer
+  // written; rows from older builds go here, and the root row goes once its edges are gone.
   const causalEdges = write(
     ctx,
     "DELETE FROM causal_edges WHERE rowid IN (SELECT e.rowid FROM causal_edges e JOIN causal_roots r ON r.root_id = e.root_id WHERE r.expires_at <= ? LIMIT ?)",
