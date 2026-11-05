@@ -82,6 +82,7 @@ const deviceAccountEntryPath = join(packageRoot, "src", "components", "memory", 
 const memoryCommandsEntryPath = join(packageRoot, "src", "components", "memory", "commands", "runtime.ts")
 const sessionHistoryEntryPath = join(packageRoot, "src", "components", "onboarding", "session-history", "runtime.ts")
 const recallStoreEntryPath = join(packageRoot, "src", "components", "memory", "recall-store-runtime.ts")
+const deviceServiceEntryPath = join(packageRoot, "src", "components", "device-service", "runtime.ts")
 const telemetryPosthogEntryPath = join(packageRoot, "src", "components", "telemetry", "posthog-runtime.ts")
 const telemetryOtlpEntryPath = join(packageRoot, "src", "components", "telemetry", "otlp-runtime.ts")
 // The sync engine sidecar carries the Loro runtime; its wasm is emitted beside it under this fixed name
@@ -114,6 +115,7 @@ const deviceAccountOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? plug
 const memoryCommandsOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-memory-commands.js")
 const sessionHistoryOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-session-history.js")
 const recallStoreOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-recall-store.js")
+const deviceServiceOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-device-service.js")
 const telemetryPosthogOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-telemetry-posthog.js")
 const telemetryOtlpOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-telemetry-otlp.js")
 const memorySyncOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-memory-sync.js")
@@ -140,6 +142,7 @@ const externalSpecifiers = [
   "#omo-memory-commands-runtime",
   "#omo-session-history-runtime",
   "#omo-recall-store-runtime",
+  "#omo-device-service-runtime",
   // memory-core's lazy <external_projection> renderer; the plugin manifest maps it to the recall-store sidecar.
   "#memory-external-projection",
   "#omo-telemetry-posthog-runtime",
@@ -192,6 +195,7 @@ export const extensionBuildPaths = {
   memoryCommandsOutputPath,
   sessionHistoryOutputPath,
   recallStoreOutputPath,
+  deviceServiceOutputPath,
   telemetryPosthogOutputPath,
   telemetryOtlpOutputPath,
   memorySyncOutputPath,
@@ -227,6 +231,7 @@ export function resolveOutputs(options) {
     memoryCommandsOutput: sibling(options.memoryCommandsOutputPath, memoryCommandsOutputPath, "omo-memory-commands.js"),
     sessionHistoryOutput: sibling(options.sessionHistoryOutputPath, sessionHistoryOutputPath, "omo-session-history.js"),
     recallStoreOutput: sibling(options.recallStoreOutputPath, recallStoreOutputPath, "omo-recall-store.js"),
+    deviceServiceOutput: sibling(options.deviceServiceOutputPath, deviceServiceOutputPath, "omo-device-service.js"),
     telemetryPosthogOutput: sibling(options.telemetryPosthogOutputPath, telemetryPosthogOutputPath, "omo-telemetry-posthog.js"),
     telemetryOtlpOutput: sibling(options.telemetryOtlpOutputPath, telemetryOtlpOutputPath, "omo-telemetry-otlp.js"),
     memorySyncOutput: sibling(options.memorySyncOutputPath, memorySyncOutputPath, "omo-memory-sync.js"),
@@ -269,6 +274,7 @@ export async function buildExtension(options = {}) {
     memoryCommandsOutput,
     sessionHistoryOutput,
     recallStoreOutput,
+    deviceServiceOutput,
     telemetryPosthogOutput,
     telemetryOtlpOutput,
     memorySyncOutput,
@@ -296,6 +302,7 @@ export async function buildExtension(options = {}) {
   const memoryCommandsInputs = await buildEntry(memoryCommandsEntryPath, memoryCommandsOutput, buildDefines)
   const sessionHistoryInputs = await buildEntry(sessionHistoryEntryPath, sessionHistoryOutput, buildDefines)
   const recallStoreInputs = await buildEntry(recallStoreEntryPath, recallStoreOutput, buildDefines)
+  const deviceServiceInputs = await buildEntry(deviceServiceEntryPath, deviceServiceOutput, buildDefines)
   const telemetryPosthogInputs = await buildEntry(telemetryPosthogEntryPath, telemetryPosthogOutput, buildDefines)
   const telemetryOtlpInputs = await buildEntry(telemetryOtlpEntryPath, telemetryOtlpOutput, buildDefines)
   const memorySyncInputs = await buildEntry(memorySyncEntryPath, memorySyncOutput, buildDefines, externalSpecifiers, { assets: true })
@@ -332,6 +339,7 @@ export async function buildExtension(options = {}) {
     memoryCommandsInputs,
     sessionHistoryInputs,
     recallStoreInputs,
+    deviceServiceInputs,
     telemetryPosthogInputs,
     telemetryOtlpInputs,
     memorySyncInputs,
