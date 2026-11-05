@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -303,10 +303,26 @@ describe("onboarding entry", () => {
       await h.start()
       const results = await h.prompt()
       const content = String((results[0] as { message: { content: unknown } }).message.content)
-      // #12544 review: `disabled_skills` hides the skill from the `/skill:` surface, but the
-      // first-run tour is gated separately by `omo-senpi-onboarding-disabled`, so the name form stands.
+      // An empty listing with no config disabling the skill reads as unshadowed (fail-open):
+      // the host may predate `getCommands` or discovery may not have run yet.
       expect(content).toContain("built-in `onboarding` skill")
       expect(content).not.toContain("/onboarding/SKILL.md")
+    })
+
+    test("#given onboarding is in disabled_skills #when prompting #then the context falls back to the built-in path", async () => {
+      const dir = freshDir()
+      mkdirSync(join(dir, ".omo"), { recursive: true })
+      writeFileSync(join(dir, ".omo", "omo.jsonc"), JSON.stringify({ disabled_skills: ["onboarding"] }))
+      const h = createOnboardingHarness(dir, "disabled", "rpc")
+      h.pi.cwd = dir
+      h.pi.getCommands = () => []
+      await h.start()
+      const results = await h.prompt()
+      const content = String((results[0] as { message: { content: unknown } }).message.content)
+      // #12544 review follow-up: with `onboarding` in `disabled_skills` the name form points
+      // at nothing on the `/skill:` surface, so the tour falls back to the built-in path.
+      expect(content).toContain(`Follow ${join(getBuiltinSkillsRoot(), "onboarding", "SKILL.md")}.`)
+      expect(content).not.toContain("built-in `onboarding` skill")
     })
   })
 

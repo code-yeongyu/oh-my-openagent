@@ -392,9 +392,6 @@
   "packages/omo-senpi/src/components/onboarding/claim-takeover-race.test.ts": {
     "typescript/no-non-null-assertion": 1
   },
-  "packages/omo-senpi/src/components/onboarding/component.test.ts": {
-    "typescript/no-non-null-assertion": 1
-  },
   "packages/omo-senpi/src/components/onboarding/state.test.ts": {
     "typescript/no-non-null-assertion": 1
   },

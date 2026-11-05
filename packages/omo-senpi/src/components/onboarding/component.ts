@@ -3,7 +3,7 @@ import { join } from "node:path"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { getBuiltinSkillsRoot, getOmoNativeStateDir } from "../telemetry/product-identity"
-import { resolveBundledSkillProvenance } from "../bundled-skills/contributed-skill"
+import { readDisabledSkills, resolveBundledSkillProvenance } from "../bundled-skills/contributed-skill"
 import { readAgentEndOutcome } from "../ulw-execute-continuation/agent-end-eligibility"
 import { loadOnboardingScanRuntime } from "./scan-component"
 import type { OnboardingScanEnvironment } from "./scan-runtime"
@@ -126,13 +126,17 @@ export function createOnboardingComponent(
       // it is shadowed. The path form is the old behavior's escape hatch, not a new default:
       // two installs at different paths still produce byte-identical context unless a shadow
       // is present. `disabled_skills` hiding `onboarding` leaves no listing entry, so the name
-      // form stands: the disable removes the skill from the `/skill:` surface, while the
-      // first-run tour itself is gated separately by `omo-senpi-onboarding-disabled`.
+      // form would point at nothing on the `/skill:` surface; that case falls back to the path
+      // too (#12544 review follow-up), because the tour itself is gated separately by
+      // `omo-senpi-onboarding-disabled` and still runs.
       const builtinOnboardingSkill = join(getBuiltinSkillsRoot(), "onboarding", "SKILL.md")
-      const tour = (): string =>
-        resolveBundledSkillProvenance(pi, "onboarding", builtinOnboardingSkill).shadowed
+      const tour = (): string => {
+        const shadowed = resolveBundledSkillProvenance(pi, "onboarding", builtinOnboardingSkill).shadowed
+        const disabled = readDisabledSkills(pi.cwd ?? process.cwd(), process.env).has("onboarding")
+        return shadowed || disabled
           ? `Follow ${builtinOnboardingSkill}.`
           : "Follow the built-in `onboarding` skill."
+      }
       const scanEnvironment = dependencies.scanEnvironment ?? (() => ({}))
       // The first onboarding turn awaits only `omo setup`'s sources (sessions: false): its rows, value
       // summary and migration inventory. Session digests are read by a second scan that starts only

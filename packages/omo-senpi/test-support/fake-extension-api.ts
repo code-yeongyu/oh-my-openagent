@@ -111,6 +111,15 @@ export class FakeExtensionAPI implements SenpiExtensionAPI {
   // Absent by default, like a host that predates senpi#3684; a test installs the engine's limit store.
   getSubscriptionLimits?: SenpiExtensionAPI["getSubscriptionLimits"]
   onSubscriptionLimits?: SenpiExtensionAPI["onSubscriptionLimits"]
+  // Absent by default, like a host that predates `getCommands`; a test installs the listing.
+  // #12544 review: the onboarding harness assigns this, so it must exist on the fake type.
+  // Declared as a method (not a property) so test subclasses may override it with a method.
+  getCommands?(): readonly {
+    readonly name: string
+    readonly description?: string
+    readonly source: string
+    readonly sourceInfo?: { readonly path?: string }
+  }[]
   // Absent by default, like a host that predates senpi#3864; a test installs a recorder for run completions.
   lifecycle?: SenpiExtensionAPI["lifecycle"]
 
