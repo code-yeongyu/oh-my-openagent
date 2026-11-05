@@ -76,8 +76,9 @@ export function scanOmoBins(environment) {
     const owner = resolveOwner(binPath)
     const kind = classify(owner)
     const standalone = kind === "foreign" ? standaloneBinaryVersion(binPath, environment.homeDir, environment.isWindows) : null
+    const broken = standalone === null ? brokenLaunchTarget(binPath, owner, environment.homeDir) : undefined
     entries.push(standalone === null
-      ? { binPath, directory, owner, kind }
+      ? { binPath, directory, owner, kind, ...(broken === undefined ? {} : { broken }) }
       : { binPath, directory, owner: { name: STANDALONE_LABEL, version: standalone }, kind: "standalone" })
   }
   return entries
@@ -112,6 +113,29 @@ function pathExists(path) {
   } catch {
     return false
   }
+}
+
+// A Codex Light wrapper launches a cached CLI through node; the cache path it names
+// must exist, or the wrapper can never run. Returns the missing target, or undefined
+// when the wrapper launches something that exists (or names no resolvable target).
+function brokenLaunchTarget(binPath, owner, homeDir) {
+  if (owner === null || owner.name !== "lazycodex") return undefined
+  const shim = readFileHead(binPath, SHIM_READ_LIMIT)
+  const target = shim === undefined ? null : codexLightCacheTarget(shim, homeDir)
+  if (target === null) return undefined
+  return pathExists(target) ? undefined : target
+}
+
+// The runtime target the Light generator writes into the wrapper: the first quoted
+// path through the sisyphuslabs cache. `~` and `$HOME` resolve against the home dir;
+// anything else must already be absolute to be resolvable.
+function codexLightCacheTarget(shim, homeDir) {
+  const match = shim.match(/["']([^"']*plugins[\\/]cache[\\/]sisyphuslabs[\\/]omo[\\/][^"']+)["']/)
+  if (match === null) return null
+  const raw = match[1]
+  if (raw.startsWith("~/") || raw.startsWith("~\\")) return join(homeDir, raw.slice(2))
+  if (raw.startsWith("$HOME/") || raw.startsWith("$HOME\\")) return join(homeDir, raw.slice(6))
+  return isAbsolute(raw) || win32.isAbsolute(raw) ? raw : null
 }
 
 function resolveOwner(binPath) {
@@ -295,11 +319,18 @@ function omoInstallRemoval(entry, bunRoot) {
   return `npm uninstall -g omo-ai --prefix ${shellQuote(prefix)}`
 }
 
-export function formatMigrationLines({ shadowing, nativeDirectory, legacyPackages, registrations, restoreCommand, omoInstalls = [], bunRoot = "", standalone = false }) {
+export function formatMigrationLines({ shadowing, nativeDirectory, legacyPackages, registrations, restoreCommand, omoInstalls = [], bunRoot = "", standalone = false, broken = [] }) {
   const lines = []
   const first = omoInstalls[0]
   const target = first?.kind === "standalone" || (first === undefined && standalone) ? "the standalone omo binary" : "omo-ai"
+  // A wrapper whose launch target is gone is broken wherever it sits on PATH, even
+  // behind the install that runs; it gets its own line and never the repair offer
+  // meant for a working older edition.
+  for (const entry of broken) {
+    lines.push(`WARN broken omo on PATH: ${entry.binPath} launches ${entry.broken}; remove it`)
+  }
   for (const entry of shadowing) {
+    if (entry.broken !== undefined) continue
     const fix = entry.kind === "legacy" && target === "omo-ai"
       ? `${repairCommand()} (repairs it), or remove that file.`
       : nativeDirectory === null
@@ -307,7 +338,10 @@ export function formatMigrationLines({ shadowing, nativeDirectory, legacyPackage
         : `remove that file, or move ${nativeDirectory} ahead of ${entry.directory} on PATH.`
     lines.push(`WARN another omo precedes ${target} on PATH: ${entry.binPath} (${ownerLabel(entry.owner)}). Fix: ${fix}`)
   }
-  const shadowedOmo = omoInstalls.slice(1).filter((entry) => entry.kind !== first.kind || entry.kind === "standalone")
+  // Every further install is a second copy, whatever its kind: two omo-ai installs
+  // of different versions, or from different managers, are the same warning. The
+  // only exception is the same file reached through two PATH spellings.
+  const shadowedOmo = omoInstalls.slice(1).filter((entry) => realPathOf(entry.binPath) !== realPathOf(first.binPath))
   if (shadowedOmo.length > 0) {
     const others = shadowedOmo.map((entry) => `${entry.binPath} (${ownerLabel(entry.owner)})`).join(", ")
     const removals = shadowedOmo.map((entry) => omoInstallRemoval(entry, bunRoot)).join(" and ")
@@ -362,5 +396,6 @@ export function migrationReport(options, restoreCommand) {
     omoInstalls,
     bunRoot: environment.bunRoot,
     standalone: options.standalone === true,
+    broken: bins.filter((entry) => entry.broken !== undefined),
   }), ...openCodeRoutingReport({ env, homeDir })]
 }
