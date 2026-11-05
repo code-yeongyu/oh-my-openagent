@@ -129,7 +129,7 @@ export function createOnboardingComponent(
       // form would point at nothing on the `/skill:` surface; that case falls back to the path
       // too (#12544 review follow-up), because the tour itself is gated separately by
       // `omo-senpi-onboarding-disabled` and still runs.
-      const builtinOnboardingSkill = join(getBuiltinSkillsRoot(), "onboarding", "SKILL.md")
+      const builtinOnboardingSkill = join(getBuiltinSkillsRoot(process.env, componentContext.logger), "onboarding", "SKILL.md")
       const tour = (): string => {
         const shadowed = resolveBundledSkillProvenance(pi, "onboarding", builtinOnboardingSkill).shadowed
         const disabled = readDisabledSkills(pi.cwd ?? process.cwd(), process.env).has("onboarding")

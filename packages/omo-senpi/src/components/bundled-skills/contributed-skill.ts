@@ -63,7 +63,7 @@ export function resolveBundledSkillProvenance(
  * senpi appends extension skill paths after the user, project, settings and package skills it has
  * already loaded, keeps the first skill of each name, and reports every later one as a "Skill
  * conflicts" collision (#9160). A same-name skill that is already loaded wins either way, so ours
- * yields without a word — even when the listing carries no `sourceInfo.path` for it, because the
+ * yields without a word, even when the listing carries no `sourceInfo.path` for it, because the
  * entry still occupies the name and contributing ours would collide. Our own copy left over from
  * an earlier pass is not a rival. `disabled_skills` hides the skill exactly as it hides a bundled
  * one.

@@ -34,7 +34,7 @@
         },
         {
          "type": "text",
-         "text": "Answer fully; greet in their language; offer a one-line tour. On request/acceptance: Follow <omo-repo>/packages/omo-senpi/plugin/skills//onboarding/SKILL.md. Migration inventory (from the same scan omo setup runs): \n\nOnboarding scan <uuid:1> (the same scan omo setup and the desktop app run; one row per found item):\n- detect senpi [harness: found] - 0 login(s), 0 importable\nValue summary: nothing found to carry over."
+         "text": "Answer fully; greet in their language; offer a one-line tour. On request/acceptance: Follow the built-in `onboarding` skill. Migration inventory (from the same scan omo setup runs): \n\nOnboarding scan <uuid:1> (the same scan omo setup and the desktop app run; one row per found item):\n- detect senpi [harness: found] - 0 login(s), 0 importable\nValue summary: nothing found to carry over."
         }
        ]
       }
@@ -963,7 +963,7 @@
         },
         {
          "type": "text",
-         "text": "Answer fully; greet in their language; offer a one-line tour. On request/acceptance: Follow <omo-repo>/packages/omo-senpi/plugin/skills//onboarding/SKILL.md. Migration inventory (from the same scan omo setup runs): \n\nOnboarding scan <uuid:1> (the same scan omo setup and the desktop app run; one row per found item):\n- detect senpi [harness: found] - 0 login(s), 0 importable\nValue summary: nothing found to carry over."
+         "text": "Answer fully; greet in their language; offer a one-line tour. On request/acceptance: Follow the built-in `onboarding` skill. Migration inventory (from the same scan omo setup runs): \n\nOnboarding scan <uuid:1> (the same scan omo setup and the desktop app run; one row per found item):\n- detect senpi [harness: found] - 0 login(s), 0 importable\nValue summary: nothing found to carry over."
         }
        ]
       },
@@ -1905,7 +1905,7 @@
         },
         {
          "type": "text",
-         "text": "Answer fully; greet in their language; offer a one-line tour. On request/acceptance: Follow <omo-repo>/packages/omo-senpi/plugin/skills//onboarding/SKILL.md. Migration inventory (from the same scan omo setup runs): \n\nOnboarding scan <uuid:1> (the same scan omo setup and the desktop app run; one row per found item):\n- detect senpi [harness: found] - 0 login(s), 0 importable\nValue summary: nothing found to carry over."
+         "text": "Answer fully; greet in their language; offer a one-line tour. On request/acceptance: Follow the built-in `onboarding` skill. Migration inventory (from the same scan omo setup runs): \n\nOnboarding scan <uuid:1> (the same scan omo setup and the desktop app run; one row per found item):\n- detect senpi [harness: found] - 0 login(s), 0 importable\nValue summary: nothing found to carry over."
         }
        ]
       },
@@ -5798,7 +5798,7 @@
       "message": {
        "role": "custom",
        "customType": "omo-onboarding:context",
-       "content": "Answer fully; greet in their language; offer a one-line tour. On request/acceptance: Follow <omo-repo>/packages/omo-senpi/plugin/skills//onboarding/SKILL.md. Migration inventory (from the same scan omo setup runs): \n\nOnboarding scan <uuid:3> (the same scan omo setup and the desktop app run; one row per found item):\n- detect senpi [harness: found] - 0 login(s), 0 importable\nValue summary: nothing found to carry over.",
+       "content": "Answer fully; greet in their language; offer a one-line tour. On request/acceptance: Follow the built-in `onboarding` skill. Migration inventory (from the same scan omo setup runs): \n\nOnboarding scan <uuid:3> (the same scan omo setup and the desktop app run; one row per found item):\n- detect senpi [harness: found] - 0 login(s), 0 importable\nValue summary: nothing found to carry over.",
        "display": false,
        "timestamp": "<ts:message.timestamp:10>"
       }
@@ -5808,7 +5808,7 @@
       "message": {
        "role": "custom",
        "customType": "omo-onboarding:context",
-       "content": "Answer fully; greet in their language; offer a one-line tour. On request/acceptance: Follow <omo-repo>/packages/omo-senpi/plugin/skills//onboarding/SKILL.md. Migration inventory (from the same scan omo setup runs): \n\nOnboarding scan <uuid:3> (the same scan omo setup and the desktop app run; one row per found item):\n- detect senpi [harness: found] - 0 login(s), 0 importable\nValue summary: nothing found to carry over.",
+       "content": "Answer fully; greet in their language; offer a one-line tour. On request/acceptance: Follow the built-in `onboarding` skill. Migration inventory (from the same scan omo setup runs): \n\nOnboarding scan <uuid:3> (the same scan omo setup and the desktop app run; one row per found item):\n- detect senpi [harness: found] - 0 login(s), 0 importable\nValue summary: nothing found to carry over.",
        "display": false,
        "timestamp": "<ts:message.timestamp:11>"
       }
@@ -8521,7 +8521,7 @@
        {
         "role": "custom",
         "customType": "omo-onboarding:context",
-        "content": "Answer fully; greet in their language; offer a one-line tour. On request/acceptance: Follow <omo-repo>/packages/omo-senpi/plugin/skills//onboarding/SKILL.md. Migration inventory (from the same scan omo setup runs): \n\nOnboarding scan <uuid:3> (the same scan omo setup and the desktop app run; one row per found item):\n- detect senpi [harness: found] - 0 login(s), 0 importable\nValue summary: nothing found to carry over.",
+        "content": "Answer fully; greet in their language; offer a one-line tour. On request/acceptance: Follow the built-in `onboarding` skill. Migration inventory (from the same scan omo setup runs): \n\nOnboarding scan <uuid:3> (the same scan omo setup and the desktop app run; one row per found item):\n- detect senpi [harness: found] - 0 login(s), 0 importable\nValue summary: nothing found to carry over.",
         "display": false,
         "timestamp": "<ts:messages.timestamp:4>"
        },
@@ -9597,7 +9597,7 @@
     {
      "type": "custom_message",
      "customType": "omo-onboarding:context",
-     "content": "Answer fully; greet in their language; offer a one-line tour. On request/acceptance: Follow <omo-repo>/packages/omo-senpi/plugin/skills//onboarding/SKILL.md. Migration inventory (from the same scan omo setup runs): \n\nOnboarding scan <uuid:2> (the same scan omo setup and the desktop app run; one row per found item):\n- detect senpi [harness: found] - 0 login(s), 0 importable\nValue summary: nothing found to carry over.",
+     "content": "Answer fully; greet in their language; offer a one-line tour. On request/acceptance: Follow the built-in `onboarding` skill. Migration inventory (from the same scan omo setup runs): \n\nOnboarding scan <uuid:2> (the same scan omo setup and the desktop app run; one row per found item):\n- detect senpi [harness: found] - 0 login(s), 0 importable\nValue summary: nothing found to carry over.",
      "display": false,
      "id": "<id:12>",
      "parentId": "<id:11>",
