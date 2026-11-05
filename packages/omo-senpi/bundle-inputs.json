@@ -657,6 +657,7 @@
     "packages/omo-config-core/src/schema/task.ts",
     "packages/omo-config-core/src/schema/team.ts",
     "packages/omo-config-core/src/schema/telemetry.ts",
+    "packages/omo-config-core/src/user-only-settings.ts",
     "packages/omo-config-core/src/writer/index.ts",
     "packages/omo-config-core/src/writer/surgical-edit.ts",
     "packages/omo-config-core/src/writer/types.ts",

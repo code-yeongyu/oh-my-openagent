@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:d841cc5b140b2b0bd00e666f3df8541b7fc83dbe68dc154d491667fe8add1601:8619daa216f1712153ee46273b0075c1c5ffd9959c1e4b75294af1365d5967eb
+// omo-codex-install:102fb04a0614bf4409a0dc63500f9fc8e860c5ecff2c45e834f8aa7d79a9e161:b178c741d50b8d9487c1c312739fa8560e334ada9b4f125afb9d0c7d71b8b46a
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -48,7 +48,7 @@ import {
   writeFileSync
 } from "node:fs";
 import { randomUUID } from "node:crypto";
-import { dirname as dirname8 } from "node:path";
+import { dirname as dirname10 } from "node:path";
 function isToleratedFsyncError(error) {
   if (!(error instanceof Error))
     return false;
@@ -86,7 +86,7 @@ function writeFileAtomically(filePath, content, options = {}) {
     }
     if (platform === "win32")
       return;
-    const directoryFileDescriptor = openSync(dirname8(filePath), "r");
+    const directoryFileDescriptor = openSync(dirname10(filePath), "r");
     try {
       tolerantFsyncSync(directoryFileDescriptor, fsyncImpl);
     } finally {
@@ -19714,982 +19714,6 @@ function isPlainRecord2(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-// node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/scanner.js
-function createScanner(text, ignoreTrivia = false) {
-  const len = text.length;
-  let pos = 0, value = "", tokenOffset = 0, token = 16, lineNumber = 0, lineStartOffset = 0, tokenLineStartOffset = 0, prevTokenLineStartOffset = 0, scanError = 0;
-  function scanHexDigits(count, exact) {
-    let digits = 0;
-    let value = 0;
-    while (digits < count || !exact) {
-      let ch = text.charCodeAt(pos);
-      if (ch >= 48 && ch <= 57) {
-        value = value * 16 + ch - 48;
-      } else if (ch >= 65 && ch <= 70) {
-        value = value * 16 + ch - 65 + 10;
-      } else if (ch >= 97 && ch <= 102) {
-        value = value * 16 + ch - 97 + 10;
-      } else {
-        break;
-      }
-      pos++;
-      digits++;
-    }
-    if (digits < count) {
-      value = -1;
-    }
-    return value;
-  }
-  function setPosition(newPosition) {
-    pos = newPosition;
-    value = "";
-    tokenOffset = 0;
-    token = 16;
-    scanError = 0;
-  }
-  function scanNumber() {
-    let start = pos;
-    if (text.charCodeAt(pos) === 48) {
-      pos++;
-    } else {
-      pos++;
-      while (pos < text.length && isDigit(text.charCodeAt(pos))) {
-        pos++;
-      }
-    }
-    if (pos < text.length && text.charCodeAt(pos) === 46) {
-      pos++;
-      if (pos < text.length && isDigit(text.charCodeAt(pos))) {
-        pos++;
-        while (pos < text.length && isDigit(text.charCodeAt(pos))) {
-          pos++;
-        }
-      } else {
-        scanError = 3;
-        return text.substring(start, pos);
-      }
-    }
-    let end = pos;
-    if (pos < text.length && (text.charCodeAt(pos) === 69 || text.charCodeAt(pos) === 101)) {
-      pos++;
-      if (pos < text.length && text.charCodeAt(pos) === 43 || text.charCodeAt(pos) === 45) {
-        pos++;
-      }
-      if (pos < text.length && isDigit(text.charCodeAt(pos))) {
-        pos++;
-        while (pos < text.length && isDigit(text.charCodeAt(pos))) {
-          pos++;
-        }
-        end = pos;
-      } else {
-        scanError = 3;
-      }
-    }
-    return text.substring(start, end);
-  }
-  function scanString() {
-    let result = "", start = pos;
-    while (true) {
-      if (pos >= len) {
-        result += text.substring(start, pos);
-        scanError = 2;
-        break;
-      }
-      const ch = text.charCodeAt(pos);
-      if (ch === 34) {
-        result += text.substring(start, pos);
-        pos++;
-        break;
-      }
-      if (ch === 92) {
-        result += text.substring(start, pos);
-        pos++;
-        if (pos >= len) {
-          scanError = 2;
-          break;
-        }
-        const ch2 = text.charCodeAt(pos++);
-        switch (ch2) {
-          case 34:
-            result += '"';
-            break;
-          case 92:
-            result += "\\";
-            break;
-          case 47:
-            result += "/";
-            break;
-          case 98:
-            result += "\b";
-            break;
-          case 102:
-            result += "\f";
-            break;
-          case 110:
-            result += `
-`;
-            break;
-          case 114:
-            result += "\r";
-            break;
-          case 116:
-            result += "\t";
-            break;
-          case 117:
-            const ch3 = scanHexDigits(4, true);
-            if (ch3 >= 0) {
-              result += String.fromCharCode(ch3);
-            } else {
-              scanError = 4;
-            }
-            break;
-          default:
-            scanError = 5;
-        }
-        start = pos;
-        continue;
-      }
-      if (ch >= 0 && ch <= 31) {
-        if (isLineBreak(ch)) {
-          result += text.substring(start, pos);
-          scanError = 2;
-          break;
-        } else {
-          scanError = 6;
-        }
-      }
-      pos++;
-    }
-    return result;
-  }
-  function scanNext() {
-    value = "";
-    scanError = 0;
-    tokenOffset = pos;
-    lineStartOffset = lineNumber;
-    prevTokenLineStartOffset = tokenLineStartOffset;
-    if (pos >= len) {
-      tokenOffset = len;
-      return token = 17;
-    }
-    let code = text.charCodeAt(pos);
-    if (isWhiteSpace(code)) {
-      do {
-        pos++;
-        value += String.fromCharCode(code);
-        code = text.charCodeAt(pos);
-      } while (isWhiteSpace(code));
-      return token = 15;
-    }
-    if (isLineBreak(code)) {
-      pos++;
-      value += String.fromCharCode(code);
-      if (code === 13 && text.charCodeAt(pos) === 10) {
-        pos++;
-        value += `
-`;
-      }
-      lineNumber++;
-      tokenLineStartOffset = pos;
-      return token = 14;
-    }
-    switch (code) {
-      case 123:
-        pos++;
-        return token = 1;
-      case 125:
-        pos++;
-        return token = 2;
-      case 91:
-        pos++;
-        return token = 3;
-      case 93:
-        pos++;
-        return token = 4;
-      case 58:
-        pos++;
-        return token = 6;
-      case 44:
-        pos++;
-        return token = 5;
-      case 34:
-        pos++;
-        value = scanString();
-        return token = 10;
-      case 47:
-        const start = pos - 1;
-        if (text.charCodeAt(pos + 1) === 47) {
-          pos += 2;
-          while (pos < len) {
-            if (isLineBreak(text.charCodeAt(pos))) {
-              break;
-            }
-            pos++;
-          }
-          value = text.substring(start, pos);
-          return token = 12;
-        }
-        if (text.charCodeAt(pos + 1) === 42) {
-          pos += 2;
-          const safeLength = len - 1;
-          let commentClosed = false;
-          while (pos < safeLength) {
-            const ch = text.charCodeAt(pos);
-            if (ch === 42 && text.charCodeAt(pos + 1) === 47) {
-              pos += 2;
-              commentClosed = true;
-              break;
-            }
-            pos++;
-            if (isLineBreak(ch)) {
-              if (ch === 13 && text.charCodeAt(pos) === 10) {
-                pos++;
-              }
-              lineNumber++;
-              tokenLineStartOffset = pos;
-            }
-          }
-          if (!commentClosed) {
-            pos++;
-            scanError = 1;
-          }
-          value = text.substring(start, pos);
-          return token = 13;
-        }
-        value += String.fromCharCode(code);
-        pos++;
-        return token = 16;
-      case 45:
-        value += String.fromCharCode(code);
-        pos++;
-        if (pos === len || !isDigit(text.charCodeAt(pos))) {
-          return token = 16;
-        }
-      case 48:
-      case 49:
-      case 50:
-      case 51:
-      case 52:
-      case 53:
-      case 54:
-      case 55:
-      case 56:
-      case 57:
-        value += scanNumber();
-        return token = 11;
-      default:
-        while (pos < len && isUnknownContentCharacter(code)) {
-          pos++;
-          code = text.charCodeAt(pos);
-        }
-        if (tokenOffset !== pos) {
-          value = text.substring(tokenOffset, pos);
-          switch (value) {
-            case "true":
-              return token = 8;
-            case "false":
-              return token = 9;
-            case "null":
-              return token = 7;
-          }
-          return token = 16;
-        }
-        value += String.fromCharCode(code);
-        pos++;
-        return token = 16;
-    }
-  }
-  function isUnknownContentCharacter(code) {
-    if (isWhiteSpace(code) || isLineBreak(code)) {
-      return false;
-    }
-    switch (code) {
-      case 125:
-      case 93:
-      case 123:
-      case 91:
-      case 34:
-      case 58:
-      case 44:
-      case 47:
-        return false;
-    }
-    return true;
-  }
-  function scanNextNonTrivia() {
-    let result;
-    do {
-      result = scanNext();
-    } while (result >= 12 && result <= 15);
-    return result;
-  }
-  return {
-    setPosition,
-    getPosition: () => pos,
-    scan: ignoreTrivia ? scanNextNonTrivia : scanNext,
-    getToken: () => token,
-    getTokenValue: () => value,
-    getTokenOffset: () => tokenOffset,
-    getTokenLength: () => pos - tokenOffset,
-    getTokenStartLine: () => lineStartOffset,
-    getTokenStartCharacter: () => tokenOffset - prevTokenLineStartOffset,
-    getTokenError: () => scanError
-  };
-}
-function isWhiteSpace(ch) {
-  return ch === 32 || ch === 9;
-}
-function isLineBreak(ch) {
-  return ch === 10 || ch === 13;
-}
-function isDigit(ch) {
-  return ch >= 48 && ch <= 57;
-}
-var CharacterCodes;
-(function(CharacterCodes) {
-  CharacterCodes[CharacterCodes["lineFeed"] = 10] = "lineFeed";
-  CharacterCodes[CharacterCodes["carriageReturn"] = 13] = "carriageReturn";
-  CharacterCodes[CharacterCodes["space"] = 32] = "space";
-  CharacterCodes[CharacterCodes["_0"] = 48] = "_0";
-  CharacterCodes[CharacterCodes["_1"] = 49] = "_1";
-  CharacterCodes[CharacterCodes["_2"] = 50] = "_2";
-  CharacterCodes[CharacterCodes["_3"] = 51] = "_3";
-  CharacterCodes[CharacterCodes["_4"] = 52] = "_4";
-  CharacterCodes[CharacterCodes["_5"] = 53] = "_5";
-  CharacterCodes[CharacterCodes["_6"] = 54] = "_6";
-  CharacterCodes[CharacterCodes["_7"] = 55] = "_7";
-  CharacterCodes[CharacterCodes["_8"] = 56] = "_8";
-  CharacterCodes[CharacterCodes["_9"] = 57] = "_9";
-  CharacterCodes[CharacterCodes["a"] = 97] = "a";
-  CharacterCodes[CharacterCodes["b"] = 98] = "b";
-  CharacterCodes[CharacterCodes["c"] = 99] = "c";
-  CharacterCodes[CharacterCodes["d"] = 100] = "d";
-  CharacterCodes[CharacterCodes["e"] = 101] = "e";
-  CharacterCodes[CharacterCodes["f"] = 102] = "f";
-  CharacterCodes[CharacterCodes["g"] = 103] = "g";
-  CharacterCodes[CharacterCodes["h"] = 104] = "h";
-  CharacterCodes[CharacterCodes["i"] = 105] = "i";
-  CharacterCodes[CharacterCodes["j"] = 106] = "j";
-  CharacterCodes[CharacterCodes["k"] = 107] = "k";
-  CharacterCodes[CharacterCodes["l"] = 108] = "l";
-  CharacterCodes[CharacterCodes["m"] = 109] = "m";
-  CharacterCodes[CharacterCodes["n"] = 110] = "n";
-  CharacterCodes[CharacterCodes["o"] = 111] = "o";
-  CharacterCodes[CharacterCodes["p"] = 112] = "p";
-  CharacterCodes[CharacterCodes["q"] = 113] = "q";
-  CharacterCodes[CharacterCodes["r"] = 114] = "r";
-  CharacterCodes[CharacterCodes["s"] = 115] = "s";
-  CharacterCodes[CharacterCodes["t"] = 116] = "t";
-  CharacterCodes[CharacterCodes["u"] = 117] = "u";
-  CharacterCodes[CharacterCodes["v"] = 118] = "v";
-  CharacterCodes[CharacterCodes["w"] = 119] = "w";
-  CharacterCodes[CharacterCodes["x"] = 120] = "x";
-  CharacterCodes[CharacterCodes["y"] = 121] = "y";
-  CharacterCodes[CharacterCodes["z"] = 122] = "z";
-  CharacterCodes[CharacterCodes["A"] = 65] = "A";
-  CharacterCodes[CharacterCodes["B"] = 66] = "B";
-  CharacterCodes[CharacterCodes["C"] = 67] = "C";
-  CharacterCodes[CharacterCodes["D"] = 68] = "D";
-  CharacterCodes[CharacterCodes["E"] = 69] = "E";
-  CharacterCodes[CharacterCodes["F"] = 70] = "F";
-  CharacterCodes[CharacterCodes["G"] = 71] = "G";
-  CharacterCodes[CharacterCodes["H"] = 72] = "H";
-  CharacterCodes[CharacterCodes["I"] = 73] = "I";
-  CharacterCodes[CharacterCodes["J"] = 74] = "J";
-  CharacterCodes[CharacterCodes["K"] = 75] = "K";
-  CharacterCodes[CharacterCodes["L"] = 76] = "L";
-  CharacterCodes[CharacterCodes["M"] = 77] = "M";
-  CharacterCodes[CharacterCodes["N"] = 78] = "N";
-  CharacterCodes[CharacterCodes["O"] = 79] = "O";
-  CharacterCodes[CharacterCodes["P"] = 80] = "P";
-  CharacterCodes[CharacterCodes["Q"] = 81] = "Q";
-  CharacterCodes[CharacterCodes["R"] = 82] = "R";
-  CharacterCodes[CharacterCodes["S"] = 83] = "S";
-  CharacterCodes[CharacterCodes["T"] = 84] = "T";
-  CharacterCodes[CharacterCodes["U"] = 85] = "U";
-  CharacterCodes[CharacterCodes["V"] = 86] = "V";
-  CharacterCodes[CharacterCodes["W"] = 87] = "W";
-  CharacterCodes[CharacterCodes["X"] = 88] = "X";
-  CharacterCodes[CharacterCodes["Y"] = 89] = "Y";
-  CharacterCodes[CharacterCodes["Z"] = 90] = "Z";
-  CharacterCodes[CharacterCodes["asterisk"] = 42] = "asterisk";
-  CharacterCodes[CharacterCodes["backslash"] = 92] = "backslash";
-  CharacterCodes[CharacterCodes["closeBrace"] = 125] = "closeBrace";
-  CharacterCodes[CharacterCodes["closeBracket"] = 93] = "closeBracket";
-  CharacterCodes[CharacterCodes["colon"] = 58] = "colon";
-  CharacterCodes[CharacterCodes["comma"] = 44] = "comma";
-  CharacterCodes[CharacterCodes["dot"] = 46] = "dot";
-  CharacterCodes[CharacterCodes["doubleQuote"] = 34] = "doubleQuote";
-  CharacterCodes[CharacterCodes["minus"] = 45] = "minus";
-  CharacterCodes[CharacterCodes["openBrace"] = 123] = "openBrace";
-  CharacterCodes[CharacterCodes["openBracket"] = 91] = "openBracket";
-  CharacterCodes[CharacterCodes["plus"] = 43] = "plus";
-  CharacterCodes[CharacterCodes["slash"] = 47] = "slash";
-  CharacterCodes[CharacterCodes["formFeed"] = 12] = "formFeed";
-  CharacterCodes[CharacterCodes["tab"] = 9] = "tab";
-})(CharacterCodes || (CharacterCodes = {}));
-
-// node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/string-intern.js
-var cachedSpaces = new Array(20).fill(0).map((_, index) => {
-  return " ".repeat(index);
-});
-var maxCachedValues = 200;
-var cachedBreakLinesWithSpaces = {
-  " ": {
-    "\n": new Array(maxCachedValues).fill(0).map((_, index) => {
-      return `
-` + " ".repeat(index);
-    }),
-    "\r": new Array(maxCachedValues).fill(0).map((_, index) => {
-      return "\r" + " ".repeat(index);
-    }),
-    "\r\n": new Array(maxCachedValues).fill(0).map((_, index) => {
-      return `\r
-` + " ".repeat(index);
-    })
-  },
-  "\t": {
-    "\n": new Array(maxCachedValues).fill(0).map((_, index) => {
-      return `
-` + "\t".repeat(index);
-    }),
-    "\r": new Array(maxCachedValues).fill(0).map((_, index) => {
-      return "\r" + "\t".repeat(index);
-    }),
-    "\r\n": new Array(maxCachedValues).fill(0).map((_, index) => {
-      return `\r
-` + "\t".repeat(index);
-    })
-  }
-};
-
-// node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/parser.js
-var ParseOptions;
-(function(ParseOptions) {
-  ParseOptions.DEFAULT = {
-    allowTrailingComma: false
-  };
-})(ParseOptions || (ParseOptions = {}));
-function parse3(text, errors = [], options = ParseOptions.DEFAULT) {
-  let currentProperty = null;
-  let currentParent = [];
-  const previousParents = [];
-  function onValue(value) {
-    if (Array.isArray(currentParent)) {
-      currentParent.push(value);
-    } else if (currentProperty !== null) {
-      currentParent[currentProperty] = value;
-    }
-  }
-  const visitor = {
-    onObjectBegin: () => {
-      const object = {};
-      onValue(object);
-      previousParents.push(currentParent);
-      currentParent = object;
-      currentProperty = null;
-    },
-    onObjectProperty: (name) => {
-      currentProperty = name;
-    },
-    onObjectEnd: () => {
-      currentParent = previousParents.pop();
-    },
-    onArrayBegin: () => {
-      const array = [];
-      onValue(array);
-      previousParents.push(currentParent);
-      currentParent = array;
-      currentProperty = null;
-    },
-    onArrayEnd: () => {
-      currentParent = previousParents.pop();
-    },
-    onLiteralValue: onValue,
-    onError: (error, offset, length) => {
-      errors.push({ error, offset, length });
-    }
-  };
-  visit(text, visitor, options);
-  return currentParent[0];
-}
-function visit(text, visitor, options = ParseOptions.DEFAULT) {
-  const _scanner = createScanner(text, false);
-  const _jsonPath = [];
-  let suppressedCallbacks = 0;
-  function toNoArgVisit(visitFunction) {
-    return visitFunction ? () => suppressedCallbacks === 0 && visitFunction(_scanner.getTokenOffset(), _scanner.getTokenLength(), _scanner.getTokenStartLine(), _scanner.getTokenStartCharacter()) : () => true;
-  }
-  function toOneArgVisit(visitFunction) {
-    return visitFunction ? (arg) => suppressedCallbacks === 0 && visitFunction(arg, _scanner.getTokenOffset(), _scanner.getTokenLength(), _scanner.getTokenStartLine(), _scanner.getTokenStartCharacter()) : () => true;
-  }
-  function toOneArgVisitWithPath(visitFunction) {
-    return visitFunction ? (arg) => suppressedCallbacks === 0 && visitFunction(arg, _scanner.getTokenOffset(), _scanner.getTokenLength(), _scanner.getTokenStartLine(), _scanner.getTokenStartCharacter(), () => _jsonPath.slice()) : () => true;
-  }
-  function toBeginVisit(visitFunction) {
-    return visitFunction ? () => {
-      if (suppressedCallbacks > 0) {
-        suppressedCallbacks++;
-      } else {
-        let cbReturn = visitFunction(_scanner.getTokenOffset(), _scanner.getTokenLength(), _scanner.getTokenStartLine(), _scanner.getTokenStartCharacter(), () => _jsonPath.slice());
-        if (cbReturn === false) {
-          suppressedCallbacks = 1;
-        }
-      }
-    } : () => true;
-  }
-  function toEndVisit(visitFunction) {
-    return visitFunction ? () => {
-      if (suppressedCallbacks > 0) {
-        suppressedCallbacks--;
-      }
-      if (suppressedCallbacks === 0) {
-        visitFunction(_scanner.getTokenOffset(), _scanner.getTokenLength(), _scanner.getTokenStartLine(), _scanner.getTokenStartCharacter());
-      }
-    } : () => true;
-  }
-  const onObjectBegin = toBeginVisit(visitor.onObjectBegin), onObjectProperty = toOneArgVisitWithPath(visitor.onObjectProperty), onObjectEnd = toEndVisit(visitor.onObjectEnd), onArrayBegin = toBeginVisit(visitor.onArrayBegin), onArrayEnd = toEndVisit(visitor.onArrayEnd), onLiteralValue = toOneArgVisitWithPath(visitor.onLiteralValue), onSeparator = toOneArgVisit(visitor.onSeparator), onComment = toNoArgVisit(visitor.onComment), onError = toOneArgVisit(visitor.onError);
-  const disallowComments = options && options.disallowComments;
-  const allowTrailingComma = options && options.allowTrailingComma;
-  function scanNext() {
-    while (true) {
-      const token = _scanner.scan();
-      switch (_scanner.getTokenError()) {
-        case 4:
-          handleError(14);
-          break;
-        case 5:
-          handleError(15);
-          break;
-        case 3:
-          handleError(13);
-          break;
-        case 1:
-          if (!disallowComments) {
-            handleError(11);
-          }
-          break;
-        case 2:
-          handleError(12);
-          break;
-        case 6:
-          handleError(16);
-          break;
-      }
-      switch (token) {
-        case 12:
-        case 13:
-          if (disallowComments) {
-            handleError(10);
-          } else {
-            onComment();
-          }
-          break;
-        case 16:
-          handleError(1);
-          break;
-        case 15:
-        case 14:
-          break;
-        default:
-          return token;
-      }
-    }
-  }
-  function handleError(error, skipUntilAfter = [], skipUntil = []) {
-    onError(error);
-    if (skipUntilAfter.length + skipUntil.length > 0) {
-      let token = _scanner.getToken();
-      while (token !== 17) {
-        if (skipUntilAfter.indexOf(token) !== -1) {
-          scanNext();
-          break;
-        } else if (skipUntil.indexOf(token) !== -1) {
-          break;
-        }
-        token = scanNext();
-      }
-    }
-  }
-  function parseString(isValue) {
-    const value = _scanner.getTokenValue();
-    if (isValue) {
-      onLiteralValue(value);
-    } else {
-      onObjectProperty(value);
-      _jsonPath.push(value);
-    }
-    scanNext();
-    return true;
-  }
-  function parseLiteral() {
-    switch (_scanner.getToken()) {
-      case 11:
-        const tokenValue = _scanner.getTokenValue();
-        let value = Number(tokenValue);
-        if (isNaN(value)) {
-          handleError(2);
-          value = 0;
-        }
-        onLiteralValue(value);
-        break;
-      case 7:
-        onLiteralValue(null);
-        break;
-      case 8:
-        onLiteralValue(true);
-        break;
-      case 9:
-        onLiteralValue(false);
-        break;
-      default:
-        return false;
-    }
-    scanNext();
-    return true;
-  }
-  function parseProperty() {
-    if (_scanner.getToken() !== 10) {
-      handleError(3, [], [2, 5]);
-      return false;
-    }
-    parseString(false);
-    if (_scanner.getToken() === 6) {
-      onSeparator(":");
-      scanNext();
-      if (!parseValue()) {
-        handleError(4, [], [2, 5]);
-      }
-    } else {
-      handleError(5, [], [2, 5]);
-    }
-    _jsonPath.pop();
-    return true;
-  }
-  function parseObject() {
-    onObjectBegin();
-    scanNext();
-    let needsComma = false;
-    while (_scanner.getToken() !== 2 && _scanner.getToken() !== 17) {
-      if (_scanner.getToken() === 5) {
-        if (!needsComma) {
-          handleError(4, [], []);
-        }
-        onSeparator(",");
-        scanNext();
-        if (_scanner.getToken() === 2 && allowTrailingComma) {
-          break;
-        }
-      } else if (needsComma) {
-        handleError(6, [], []);
-      }
-      if (!parseProperty()) {
-        handleError(4, [], [2, 5]);
-      }
-      needsComma = true;
-    }
-    onObjectEnd();
-    if (_scanner.getToken() !== 2) {
-      handleError(7, [2], []);
-    } else {
-      scanNext();
-    }
-    return true;
-  }
-  function parseArray() {
-    onArrayBegin();
-    scanNext();
-    let isFirstElement = true;
-    let needsComma = false;
-    while (_scanner.getToken() !== 4 && _scanner.getToken() !== 17) {
-      if (_scanner.getToken() === 5) {
-        if (!needsComma) {
-          handleError(4, [], []);
-        }
-        onSeparator(",");
-        scanNext();
-        if (_scanner.getToken() === 4 && allowTrailingComma) {
-          break;
-        }
-      } else if (needsComma) {
-        handleError(6, [], []);
-      }
-      if (isFirstElement) {
-        _jsonPath.push(0);
-        isFirstElement = false;
-      } else {
-        _jsonPath[_jsonPath.length - 1]++;
-      }
-      if (!parseValue()) {
-        handleError(4, [], [4, 5]);
-      }
-      needsComma = true;
-    }
-    onArrayEnd();
-    if (!isFirstElement) {
-      _jsonPath.pop();
-    }
-    if (_scanner.getToken() !== 4) {
-      handleError(8, [4], []);
-    } else {
-      scanNext();
-    }
-    return true;
-  }
-  function parseValue() {
-    switch (_scanner.getToken()) {
-      case 3:
-        return parseArray();
-      case 1:
-        return parseObject();
-      case 10:
-        return parseString(true);
-      default:
-        return parseLiteral();
-    }
-  }
-  scanNext();
-  if (_scanner.getToken() === 17) {
-    if (options.allowEmptyContent) {
-      return true;
-    }
-    handleError(4, [], []);
-    return false;
-  }
-  if (!parseValue()) {
-    handleError(4, [], []);
-    return false;
-  }
-  if (_scanner.getToken() !== 17) {
-    handleError(9, [], []);
-  }
-  return true;
-}
-
-// node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/main.js
-var ScanError;
-(function(ScanError) {
-  ScanError[ScanError["None"] = 0] = "None";
-  ScanError[ScanError["UnexpectedEndOfComment"] = 1] = "UnexpectedEndOfComment";
-  ScanError[ScanError["UnexpectedEndOfString"] = 2] = "UnexpectedEndOfString";
-  ScanError[ScanError["UnexpectedEndOfNumber"] = 3] = "UnexpectedEndOfNumber";
-  ScanError[ScanError["InvalidUnicode"] = 4] = "InvalidUnicode";
-  ScanError[ScanError["InvalidEscapeCharacter"] = 5] = "InvalidEscapeCharacter";
-  ScanError[ScanError["InvalidCharacter"] = 6] = "InvalidCharacter";
-})(ScanError || (ScanError = {}));
-var SyntaxKind;
-(function(SyntaxKind) {
-  SyntaxKind[SyntaxKind["OpenBraceToken"] = 1] = "OpenBraceToken";
-  SyntaxKind[SyntaxKind["CloseBraceToken"] = 2] = "CloseBraceToken";
-  SyntaxKind[SyntaxKind["OpenBracketToken"] = 3] = "OpenBracketToken";
-  SyntaxKind[SyntaxKind["CloseBracketToken"] = 4] = "CloseBracketToken";
-  SyntaxKind[SyntaxKind["CommaToken"] = 5] = "CommaToken";
-  SyntaxKind[SyntaxKind["ColonToken"] = 6] = "ColonToken";
-  SyntaxKind[SyntaxKind["NullKeyword"] = 7] = "NullKeyword";
-  SyntaxKind[SyntaxKind["TrueKeyword"] = 8] = "TrueKeyword";
-  SyntaxKind[SyntaxKind["FalseKeyword"] = 9] = "FalseKeyword";
-  SyntaxKind[SyntaxKind["StringLiteral"] = 10] = "StringLiteral";
-  SyntaxKind[SyntaxKind["NumericLiteral"] = 11] = "NumericLiteral";
-  SyntaxKind[SyntaxKind["LineCommentTrivia"] = 12] = "LineCommentTrivia";
-  SyntaxKind[SyntaxKind["BlockCommentTrivia"] = 13] = "BlockCommentTrivia";
-  SyntaxKind[SyntaxKind["LineBreakTrivia"] = 14] = "LineBreakTrivia";
-  SyntaxKind[SyntaxKind["Trivia"] = 15] = "Trivia";
-  SyntaxKind[SyntaxKind["Unknown"] = 16] = "Unknown";
-  SyntaxKind[SyntaxKind["EOF"] = 17] = "EOF";
-})(SyntaxKind || (SyntaxKind = {}));
-var parse4 = parse3;
-var ParseErrorCode;
-(function(ParseErrorCode) {
-  ParseErrorCode[ParseErrorCode["InvalidSymbol"] = 1] = "InvalidSymbol";
-  ParseErrorCode[ParseErrorCode["InvalidNumberFormat"] = 2] = "InvalidNumberFormat";
-  ParseErrorCode[ParseErrorCode["PropertyNameExpected"] = 3] = "PropertyNameExpected";
-  ParseErrorCode[ParseErrorCode["ValueExpected"] = 4] = "ValueExpected";
-  ParseErrorCode[ParseErrorCode["ColonExpected"] = 5] = "ColonExpected";
-  ParseErrorCode[ParseErrorCode["CommaExpected"] = 6] = "CommaExpected";
-  ParseErrorCode[ParseErrorCode["CloseBraceExpected"] = 7] = "CloseBraceExpected";
-  ParseErrorCode[ParseErrorCode["CloseBracketExpected"] = 8] = "CloseBracketExpected";
-  ParseErrorCode[ParseErrorCode["EndOfFileExpected"] = 9] = "EndOfFileExpected";
-  ParseErrorCode[ParseErrorCode["InvalidCommentToken"] = 10] = "InvalidCommentToken";
-  ParseErrorCode[ParseErrorCode["UnexpectedEndOfComment"] = 11] = "UnexpectedEndOfComment";
-  ParseErrorCode[ParseErrorCode["UnexpectedEndOfString"] = 12] = "UnexpectedEndOfString";
-  ParseErrorCode[ParseErrorCode["UnexpectedEndOfNumber"] = 13] = "UnexpectedEndOfNumber";
-  ParseErrorCode[ParseErrorCode["InvalidUnicode"] = 14] = "InvalidUnicode";
-  ParseErrorCode[ParseErrorCode["InvalidEscapeCharacter"] = 15] = "InvalidEscapeCharacter";
-  ParseErrorCode[ParseErrorCode["InvalidCharacter"] = 16] = "InvalidCharacter";
-})(ParseErrorCode || (ParseErrorCode = {}));
-function printParseErrorCode(code) {
-  switch (code) {
-    case 1:
-      return "InvalidSymbol";
-    case 2:
-      return "InvalidNumberFormat";
-    case 3:
-      return "PropertyNameExpected";
-    case 4:
-      return "ValueExpected";
-    case 5:
-      return "ColonExpected";
-    case 6:
-      return "CommaExpected";
-    case 7:
-      return "CloseBraceExpected";
-    case 8:
-      return "CloseBracketExpected";
-    case 9:
-      return "EndOfFileExpected";
-    case 10:
-      return "InvalidCommentToken";
-    case 11:
-      return "UnexpectedEndOfComment";
-    case 12:
-      return "UnexpectedEndOfString";
-    case 13:
-      return "UnexpectedEndOfNumber";
-    case 14:
-      return "InvalidUnicode";
-    case 15:
-      return "InvalidEscapeCharacter";
-    case 16:
-      return "InvalidCharacter";
-  }
-  return "<unknown ParseErrorCode>";
-}
-
-// packages/utils/src/ast-grep/install-script.ts
-import { spawn as spawn2 } from "node:child_process";
-import { existsSync as existsSync3 } from "node:fs";
-import { join as join19 } from "node:path";
-
-// packages/utils/src/ast-grep/sg-manifest.ts
-function normalizeRuntimePlatform(platform = process.platform) {
-  if (platform === "darwin" || platform === "linux" || platform === "win32")
-    return platform;
-  return "linux";
-}
-function normalizeRuntimeArch(arch = process.arch) {
-  if (arch === "arm64" || arch === "aarch64")
-    return "arm64";
-  return "x64";
-}
-function runtimeSlug(platform = process.platform, arch = process.arch) {
-  return `${normalizeRuntimePlatform(platform)}-${normalizeRuntimeArch(arch)}`;
-}
-
-// packages/utils/src/ast-grep/install-script.ts
-var AST_GREP_BIN_DIR_ENV_KEY = "OMO_AST_GREP_BIN_DIR";
-var KILL_GRACE_MS = 1000;
-var AST_GREP_INSTALL_TIMEOUT_MS = 30000;
-function astGrepRuntimeDir(baseDir, platform = process.platform, arch = process.arch) {
-  return join19(baseDir, "runtime", "ast-grep", runtimeSlug(platform, arch));
-}
-function isMissingExecutable(error) {
-  if (!("code" in error))
-    return false;
-  return error.code === "ENOENT";
-}
-function defaultSpawnProcess(command, args, options) {
-  const child = spawn2(command, args, {
-    cwd: options.cwd,
-    env: options.env,
-    stdio: "ignore",
-    windowsHide: true
-  });
-  let settled = false;
-  const outcome = new Promise((resolve) => {
-    const settle = (result) => {
-      if (settled)
-        return;
-      settled = true;
-      resolve(result);
-    };
-    child.once("error", (error) => {
-      settle({ kind: "spawn-error", error, missingExecutable: isMissingExecutable(error) });
-    });
-    child.once("exit", (code, signal) => {
-      settle({ kind: "exit", code, signal });
-    });
-  });
-  return {
-    kill: () => {
-      if (!child.killed)
-        child.kill();
-    },
-    outcome
-  };
-}
-function scriptPathForPlatform(skillDir, platform) {
-  return join19(skillDir, platform === "win32" ? "install.ps1" : "install.sh");
-}
-function invocationsForPlatform(scriptPath, platform) {
-  if (platform !== "win32")
-    return [{ command: "bash", args: [scriptPath] }];
-  const args = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptPath];
-  return [{ command: "pwsh", args }, { command: "powershell.exe", args }];
-}
-async function runInvocation(input) {
-  const child = input.spawnProcess(input.invocation.command, input.invocation.args, { cwd: input.skillDir, env: input.env });
-  let timedOut = false;
-  let terminateDeadline;
-  let terminateDeadlineGrace;
-  const killIgnored = new Promise((_, reject) => {
-    terminateDeadline = () => reject(new Error("ast-grep install child ignored termination"));
-  });
-  const timeout = setTimeout(() => {
-    timedOut = true;
-    child.kill();
-    terminateDeadlineGrace = setTimeout(() => terminateDeadline?.(), KILL_GRACE_MS);
-  }, input.timeoutMs);
-  try {
-    const outcome = await Promise.race([child.outcome, killIgnored]);
-    if (timedOut)
-      return { kind: "timed-out" };
-    return outcome;
-  } catch (error) {
-    if (error instanceof Error && error.message.includes("ignored termination")) {
-      return { kind: "spawn-error", error, missingExecutable: false };
-    }
-    throw error;
-  } finally {
-    clearTimeout(timeout);
-    if (terminateDeadlineGrace !== undefined)
-      clearTimeout(terminateDeadlineGrace);
-  }
-}
-function failedReason(outcome) {
-  return outcome.error.message;
-}
-async function runAstGrepSkillInstall(options) {
-  const platform = options.platform ?? process.platform;
-  const fileExists = options.fileExists ?? existsSync3;
-  const scriptPath = scriptPathForPlatform(options.skillDir, platform);
-  if (!fileExists(scriptPath))
-    return { kind: "skipped", reason: `missing ${scriptPath}` };
-  const env = { ...options.env ?? process.env, [AST_GREP_BIN_DIR_ENV_KEY]: options.targetDir };
-  const spawnProcess = options.spawnProcess ?? defaultSpawnProcess;
-  const timeoutMs = options.timeoutMs ?? AST_GREP_INSTALL_TIMEOUT_MS;
-  const invocations = invocationsForPlatform(scriptPath, platform);
-  try {
-    for (const invocation of invocations) {
-      const outcome = await runInvocation({ env, invocation, skillDir: options.skillDir, spawnProcess, timeoutMs });
-      if (outcome.kind === "timed-out")
-        return { kind: "timed-out" };
-      if (outcome.kind === "exit") {
-        if (outcome.code === 0)
-          return { kind: "succeeded" };
-        return { kind: "failed", reason: `${invocation.command} exited ${outcome.code ?? outcome.signal ?? "without status"}` };
-      }
-      if (platform === "win32" && outcome.missingExecutable && invocation.command === "pwsh")
-        continue;
-      return { kind: "failed", reason: failedReason(outcome) };
-    }
-    return { kind: "failed", reason: "no ast-grep install shell was available" };
-  } catch (error) {
-    if (error instanceof Error)
-      return { kind: "failed", reason: error.message };
-    return { kind: "failed", reason: String(error) };
-  }
-}
-
 // packages/omo-config-core/src/user-only-settings.ts
 var USER_ONLY_SETTINGS = [
   ["mcp_env_allowlist"],
@@ -21567,10 +20591,10 @@ function canonicalizeLegacyHarnessBlocks(document) {
 }
 
 // packages/omo-config-core/src/loader/types.ts
-import { existsSync as existsSync4, lstatSync, readFileSync as readFileSync2, realpathSync as realpathSync2 } from "node:fs";
+import { existsSync as existsSync3, lstatSync, readFileSync as readFileSync2, realpathSync as realpathSync2 } from "node:fs";
 var MERGED_OMO_CONFIG_PATH = "(merged omo config)";
 var DEFAULT_READ_FILE_SYSTEM = {
-  existsSync: existsSync4,
+  existsSync: existsSync3,
   lstatSync,
   readFileSync: readFileSync2,
   realpathSync: realpathSync2
@@ -21618,6 +20642,847 @@ function collectUnionedList(key, options) {
     }
   }
   return [...names];
+}
+
+// node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/scanner.js
+function createScanner(text, ignoreTrivia = false) {
+  const len = text.length;
+  let pos = 0, value = "", tokenOffset = 0, token = 16, lineNumber = 0, lineStartOffset = 0, tokenLineStartOffset = 0, prevTokenLineStartOffset = 0, scanError = 0;
+  function scanHexDigits(count, exact) {
+    let digits = 0;
+    let value = 0;
+    while (digits < count || !exact) {
+      let ch = text.charCodeAt(pos);
+      if (ch >= 48 && ch <= 57) {
+        value = value * 16 + ch - 48;
+      } else if (ch >= 65 && ch <= 70) {
+        value = value * 16 + ch - 65 + 10;
+      } else if (ch >= 97 && ch <= 102) {
+        value = value * 16 + ch - 97 + 10;
+      } else {
+        break;
+      }
+      pos++;
+      digits++;
+    }
+    if (digits < count) {
+      value = -1;
+    }
+    return value;
+  }
+  function setPosition(newPosition) {
+    pos = newPosition;
+    value = "";
+    tokenOffset = 0;
+    token = 16;
+    scanError = 0;
+  }
+  function scanNumber() {
+    let start = pos;
+    if (text.charCodeAt(pos) === 48) {
+      pos++;
+    } else {
+      pos++;
+      while (pos < text.length && isDigit(text.charCodeAt(pos))) {
+        pos++;
+      }
+    }
+    if (pos < text.length && text.charCodeAt(pos) === 46) {
+      pos++;
+      if (pos < text.length && isDigit(text.charCodeAt(pos))) {
+        pos++;
+        while (pos < text.length && isDigit(text.charCodeAt(pos))) {
+          pos++;
+        }
+      } else {
+        scanError = 3;
+        return text.substring(start, pos);
+      }
+    }
+    let end = pos;
+    if (pos < text.length && (text.charCodeAt(pos) === 69 || text.charCodeAt(pos) === 101)) {
+      pos++;
+      if (pos < text.length && text.charCodeAt(pos) === 43 || text.charCodeAt(pos) === 45) {
+        pos++;
+      }
+      if (pos < text.length && isDigit(text.charCodeAt(pos))) {
+        pos++;
+        while (pos < text.length && isDigit(text.charCodeAt(pos))) {
+          pos++;
+        }
+        end = pos;
+      } else {
+        scanError = 3;
+      }
+    }
+    return text.substring(start, end);
+  }
+  function scanString() {
+    let result = "", start = pos;
+    while (true) {
+      if (pos >= len) {
+        result += text.substring(start, pos);
+        scanError = 2;
+        break;
+      }
+      const ch = text.charCodeAt(pos);
+      if (ch === 34) {
+        result += text.substring(start, pos);
+        pos++;
+        break;
+      }
+      if (ch === 92) {
+        result += text.substring(start, pos);
+        pos++;
+        if (pos >= len) {
+          scanError = 2;
+          break;
+        }
+        const ch2 = text.charCodeAt(pos++);
+        switch (ch2) {
+          case 34:
+            result += '"';
+            break;
+          case 92:
+            result += "\\";
+            break;
+          case 47:
+            result += "/";
+            break;
+          case 98:
+            result += "\b";
+            break;
+          case 102:
+            result += "\f";
+            break;
+          case 110:
+            result += `
+`;
+            break;
+          case 114:
+            result += "\r";
+            break;
+          case 116:
+            result += "\t";
+            break;
+          case 117:
+            const ch3 = scanHexDigits(4, true);
+            if (ch3 >= 0) {
+              result += String.fromCharCode(ch3);
+            } else {
+              scanError = 4;
+            }
+            break;
+          default:
+            scanError = 5;
+        }
+        start = pos;
+        continue;
+      }
+      if (ch >= 0 && ch <= 31) {
+        if (isLineBreak(ch)) {
+          result += text.substring(start, pos);
+          scanError = 2;
+          break;
+        } else {
+          scanError = 6;
+        }
+      }
+      pos++;
+    }
+    return result;
+  }
+  function scanNext() {
+    value = "";
+    scanError = 0;
+    tokenOffset = pos;
+    lineStartOffset = lineNumber;
+    prevTokenLineStartOffset = tokenLineStartOffset;
+    if (pos >= len) {
+      tokenOffset = len;
+      return token = 17;
+    }
+    let code = text.charCodeAt(pos);
+    if (isWhiteSpace(code)) {
+      do {
+        pos++;
+        value += String.fromCharCode(code);
+        code = text.charCodeAt(pos);
+      } while (isWhiteSpace(code));
+      return token = 15;
+    }
+    if (isLineBreak(code)) {
+      pos++;
+      value += String.fromCharCode(code);
+      if (code === 13 && text.charCodeAt(pos) === 10) {
+        pos++;
+        value += `
+`;
+      }
+      lineNumber++;
+      tokenLineStartOffset = pos;
+      return token = 14;
+    }
+    switch (code) {
+      case 123:
+        pos++;
+        return token = 1;
+      case 125:
+        pos++;
+        return token = 2;
+      case 91:
+        pos++;
+        return token = 3;
+      case 93:
+        pos++;
+        return token = 4;
+      case 58:
+        pos++;
+        return token = 6;
+      case 44:
+        pos++;
+        return token = 5;
+      case 34:
+        pos++;
+        value = scanString();
+        return token = 10;
+      case 47:
+        const start = pos - 1;
+        if (text.charCodeAt(pos + 1) === 47) {
+          pos += 2;
+          while (pos < len) {
+            if (isLineBreak(text.charCodeAt(pos))) {
+              break;
+            }
+            pos++;
+          }
+          value = text.substring(start, pos);
+          return token = 12;
+        }
+        if (text.charCodeAt(pos + 1) === 42) {
+          pos += 2;
+          const safeLength = len - 1;
+          let commentClosed = false;
+          while (pos < safeLength) {
+            const ch = text.charCodeAt(pos);
+            if (ch === 42 && text.charCodeAt(pos + 1) === 47) {
+              pos += 2;
+              commentClosed = true;
+              break;
+            }
+            pos++;
+            if (isLineBreak(ch)) {
+              if (ch === 13 && text.charCodeAt(pos) === 10) {
+                pos++;
+              }
+              lineNumber++;
+              tokenLineStartOffset = pos;
+            }
+          }
+          if (!commentClosed) {
+            pos++;
+            scanError = 1;
+          }
+          value = text.substring(start, pos);
+          return token = 13;
+        }
+        value += String.fromCharCode(code);
+        pos++;
+        return token = 16;
+      case 45:
+        value += String.fromCharCode(code);
+        pos++;
+        if (pos === len || !isDigit(text.charCodeAt(pos))) {
+          return token = 16;
+        }
+      case 48:
+      case 49:
+      case 50:
+      case 51:
+      case 52:
+      case 53:
+      case 54:
+      case 55:
+      case 56:
+      case 57:
+        value += scanNumber();
+        return token = 11;
+      default:
+        while (pos < len && isUnknownContentCharacter(code)) {
+          pos++;
+          code = text.charCodeAt(pos);
+        }
+        if (tokenOffset !== pos) {
+          value = text.substring(tokenOffset, pos);
+          switch (value) {
+            case "true":
+              return token = 8;
+            case "false":
+              return token = 9;
+            case "null":
+              return token = 7;
+          }
+          return token = 16;
+        }
+        value += String.fromCharCode(code);
+        pos++;
+        return token = 16;
+    }
+  }
+  function isUnknownContentCharacter(code) {
+    if (isWhiteSpace(code) || isLineBreak(code)) {
+      return false;
+    }
+    switch (code) {
+      case 125:
+      case 93:
+      case 123:
+      case 91:
+      case 34:
+      case 58:
+      case 44:
+      case 47:
+        return false;
+    }
+    return true;
+  }
+  function scanNextNonTrivia() {
+    let result;
+    do {
+      result = scanNext();
+    } while (result >= 12 && result <= 15);
+    return result;
+  }
+  return {
+    setPosition,
+    getPosition: () => pos,
+    scan: ignoreTrivia ? scanNextNonTrivia : scanNext,
+    getToken: () => token,
+    getTokenValue: () => value,
+    getTokenOffset: () => tokenOffset,
+    getTokenLength: () => pos - tokenOffset,
+    getTokenStartLine: () => lineStartOffset,
+    getTokenStartCharacter: () => tokenOffset - prevTokenLineStartOffset,
+    getTokenError: () => scanError
+  };
+}
+function isWhiteSpace(ch) {
+  return ch === 32 || ch === 9;
+}
+function isLineBreak(ch) {
+  return ch === 10 || ch === 13;
+}
+function isDigit(ch) {
+  return ch >= 48 && ch <= 57;
+}
+var CharacterCodes;
+(function(CharacterCodes) {
+  CharacterCodes[CharacterCodes["lineFeed"] = 10] = "lineFeed";
+  CharacterCodes[CharacterCodes["carriageReturn"] = 13] = "carriageReturn";
+  CharacterCodes[CharacterCodes["space"] = 32] = "space";
+  CharacterCodes[CharacterCodes["_0"] = 48] = "_0";
+  CharacterCodes[CharacterCodes["_1"] = 49] = "_1";
+  CharacterCodes[CharacterCodes["_2"] = 50] = "_2";
+  CharacterCodes[CharacterCodes["_3"] = 51] = "_3";
+  CharacterCodes[CharacterCodes["_4"] = 52] = "_4";
+  CharacterCodes[CharacterCodes["_5"] = 53] = "_5";
+  CharacterCodes[CharacterCodes["_6"] = 54] = "_6";
+  CharacterCodes[CharacterCodes["_7"] = 55] = "_7";
+  CharacterCodes[CharacterCodes["_8"] = 56] = "_8";
+  CharacterCodes[CharacterCodes["_9"] = 57] = "_9";
+  CharacterCodes[CharacterCodes["a"] = 97] = "a";
+  CharacterCodes[CharacterCodes["b"] = 98] = "b";
+  CharacterCodes[CharacterCodes["c"] = 99] = "c";
+  CharacterCodes[CharacterCodes["d"] = 100] = "d";
+  CharacterCodes[CharacterCodes["e"] = 101] = "e";
+  CharacterCodes[CharacterCodes["f"] = 102] = "f";
+  CharacterCodes[CharacterCodes["g"] = 103] = "g";
+  CharacterCodes[CharacterCodes["h"] = 104] = "h";
+  CharacterCodes[CharacterCodes["i"] = 105] = "i";
+  CharacterCodes[CharacterCodes["j"] = 106] = "j";
+  CharacterCodes[CharacterCodes["k"] = 107] = "k";
+  CharacterCodes[CharacterCodes["l"] = 108] = "l";
+  CharacterCodes[CharacterCodes["m"] = 109] = "m";
+  CharacterCodes[CharacterCodes["n"] = 110] = "n";
+  CharacterCodes[CharacterCodes["o"] = 111] = "o";
+  CharacterCodes[CharacterCodes["p"] = 112] = "p";
+  CharacterCodes[CharacterCodes["q"] = 113] = "q";
+  CharacterCodes[CharacterCodes["r"] = 114] = "r";
+  CharacterCodes[CharacterCodes["s"] = 115] = "s";
+  CharacterCodes[CharacterCodes["t"] = 116] = "t";
+  CharacterCodes[CharacterCodes["u"] = 117] = "u";
+  CharacterCodes[CharacterCodes["v"] = 118] = "v";
+  CharacterCodes[CharacterCodes["w"] = 119] = "w";
+  CharacterCodes[CharacterCodes["x"] = 120] = "x";
+  CharacterCodes[CharacterCodes["y"] = 121] = "y";
+  CharacterCodes[CharacterCodes["z"] = 122] = "z";
+  CharacterCodes[CharacterCodes["A"] = 65] = "A";
+  CharacterCodes[CharacterCodes["B"] = 66] = "B";
+  CharacterCodes[CharacterCodes["C"] = 67] = "C";
+  CharacterCodes[CharacterCodes["D"] = 68] = "D";
+  CharacterCodes[CharacterCodes["E"] = 69] = "E";
+  CharacterCodes[CharacterCodes["F"] = 70] = "F";
+  CharacterCodes[CharacterCodes["G"] = 71] = "G";
+  CharacterCodes[CharacterCodes["H"] = 72] = "H";
+  CharacterCodes[CharacterCodes["I"] = 73] = "I";
+  CharacterCodes[CharacterCodes["J"] = 74] = "J";
+  CharacterCodes[CharacterCodes["K"] = 75] = "K";
+  CharacterCodes[CharacterCodes["L"] = 76] = "L";
+  CharacterCodes[CharacterCodes["M"] = 77] = "M";
+  CharacterCodes[CharacterCodes["N"] = 78] = "N";
+  CharacterCodes[CharacterCodes["O"] = 79] = "O";
+  CharacterCodes[CharacterCodes["P"] = 80] = "P";
+  CharacterCodes[CharacterCodes["Q"] = 81] = "Q";
+  CharacterCodes[CharacterCodes["R"] = 82] = "R";
+  CharacterCodes[CharacterCodes["S"] = 83] = "S";
+  CharacterCodes[CharacterCodes["T"] = 84] = "T";
+  CharacterCodes[CharacterCodes["U"] = 85] = "U";
+  CharacterCodes[CharacterCodes["V"] = 86] = "V";
+  CharacterCodes[CharacterCodes["W"] = 87] = "W";
+  CharacterCodes[CharacterCodes["X"] = 88] = "X";
+  CharacterCodes[CharacterCodes["Y"] = 89] = "Y";
+  CharacterCodes[CharacterCodes["Z"] = 90] = "Z";
+  CharacterCodes[CharacterCodes["asterisk"] = 42] = "asterisk";
+  CharacterCodes[CharacterCodes["backslash"] = 92] = "backslash";
+  CharacterCodes[CharacterCodes["closeBrace"] = 125] = "closeBrace";
+  CharacterCodes[CharacterCodes["closeBracket"] = 93] = "closeBracket";
+  CharacterCodes[CharacterCodes["colon"] = 58] = "colon";
+  CharacterCodes[CharacterCodes["comma"] = 44] = "comma";
+  CharacterCodes[CharacterCodes["dot"] = 46] = "dot";
+  CharacterCodes[CharacterCodes["doubleQuote"] = 34] = "doubleQuote";
+  CharacterCodes[CharacterCodes["minus"] = 45] = "minus";
+  CharacterCodes[CharacterCodes["openBrace"] = 123] = "openBrace";
+  CharacterCodes[CharacterCodes["openBracket"] = 91] = "openBracket";
+  CharacterCodes[CharacterCodes["plus"] = 43] = "plus";
+  CharacterCodes[CharacterCodes["slash"] = 47] = "slash";
+  CharacterCodes[CharacterCodes["formFeed"] = 12] = "formFeed";
+  CharacterCodes[CharacterCodes["tab"] = 9] = "tab";
+})(CharacterCodes || (CharacterCodes = {}));
+
+// node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/string-intern.js
+var cachedSpaces = new Array(20).fill(0).map((_, index) => {
+  return " ".repeat(index);
+});
+var maxCachedValues = 200;
+var cachedBreakLinesWithSpaces = {
+  " ": {
+    "\n": new Array(maxCachedValues).fill(0).map((_, index) => {
+      return `
+` + " ".repeat(index);
+    }),
+    "\r": new Array(maxCachedValues).fill(0).map((_, index) => {
+      return "\r" + " ".repeat(index);
+    }),
+    "\r\n": new Array(maxCachedValues).fill(0).map((_, index) => {
+      return `\r
+` + " ".repeat(index);
+    })
+  },
+  "\t": {
+    "\n": new Array(maxCachedValues).fill(0).map((_, index) => {
+      return `
+` + "\t".repeat(index);
+    }),
+    "\r": new Array(maxCachedValues).fill(0).map((_, index) => {
+      return "\r" + "\t".repeat(index);
+    }),
+    "\r\n": new Array(maxCachedValues).fill(0).map((_, index) => {
+      return `\r
+` + "\t".repeat(index);
+    })
+  }
+};
+
+// node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/parser.js
+var ParseOptions;
+(function(ParseOptions) {
+  ParseOptions.DEFAULT = {
+    allowTrailingComma: false
+  };
+})(ParseOptions || (ParseOptions = {}));
+function parse3(text, errors = [], options = ParseOptions.DEFAULT) {
+  let currentProperty = null;
+  let currentParent = [];
+  const previousParents = [];
+  function onValue(value) {
+    if (Array.isArray(currentParent)) {
+      currentParent.push(value);
+    } else if (currentProperty !== null) {
+      currentParent[currentProperty] = value;
+    }
+  }
+  const visitor = {
+    onObjectBegin: () => {
+      const object = {};
+      onValue(object);
+      previousParents.push(currentParent);
+      currentParent = object;
+      currentProperty = null;
+    },
+    onObjectProperty: (name) => {
+      currentProperty = name;
+    },
+    onObjectEnd: () => {
+      currentParent = previousParents.pop();
+    },
+    onArrayBegin: () => {
+      const array = [];
+      onValue(array);
+      previousParents.push(currentParent);
+      currentParent = array;
+      currentProperty = null;
+    },
+    onArrayEnd: () => {
+      currentParent = previousParents.pop();
+    },
+    onLiteralValue: onValue,
+    onError: (error, offset, length) => {
+      errors.push({ error, offset, length });
+    }
+  };
+  visit(text, visitor, options);
+  return currentParent[0];
+}
+function visit(text, visitor, options = ParseOptions.DEFAULT) {
+  const _scanner = createScanner(text, false);
+  const _jsonPath = [];
+  let suppressedCallbacks = 0;
+  function toNoArgVisit(visitFunction) {
+    return visitFunction ? () => suppressedCallbacks === 0 && visitFunction(_scanner.getTokenOffset(), _scanner.getTokenLength(), _scanner.getTokenStartLine(), _scanner.getTokenStartCharacter()) : () => true;
+  }
+  function toOneArgVisit(visitFunction) {
+    return visitFunction ? (arg) => suppressedCallbacks === 0 && visitFunction(arg, _scanner.getTokenOffset(), _scanner.getTokenLength(), _scanner.getTokenStartLine(), _scanner.getTokenStartCharacter()) : () => true;
+  }
+  function toOneArgVisitWithPath(visitFunction) {
+    return visitFunction ? (arg) => suppressedCallbacks === 0 && visitFunction(arg, _scanner.getTokenOffset(), _scanner.getTokenLength(), _scanner.getTokenStartLine(), _scanner.getTokenStartCharacter(), () => _jsonPath.slice()) : () => true;
+  }
+  function toBeginVisit(visitFunction) {
+    return visitFunction ? () => {
+      if (suppressedCallbacks > 0) {
+        suppressedCallbacks++;
+      } else {
+        let cbReturn = visitFunction(_scanner.getTokenOffset(), _scanner.getTokenLength(), _scanner.getTokenStartLine(), _scanner.getTokenStartCharacter(), () => _jsonPath.slice());
+        if (cbReturn === false) {
+          suppressedCallbacks = 1;
+        }
+      }
+    } : () => true;
+  }
+  function toEndVisit(visitFunction) {
+    return visitFunction ? () => {
+      if (suppressedCallbacks > 0) {
+        suppressedCallbacks--;
+      }
+      if (suppressedCallbacks === 0) {
+        visitFunction(_scanner.getTokenOffset(), _scanner.getTokenLength(), _scanner.getTokenStartLine(), _scanner.getTokenStartCharacter());
+      }
+    } : () => true;
+  }
+  const onObjectBegin = toBeginVisit(visitor.onObjectBegin), onObjectProperty = toOneArgVisitWithPath(visitor.onObjectProperty), onObjectEnd = toEndVisit(visitor.onObjectEnd), onArrayBegin = toBeginVisit(visitor.onArrayBegin), onArrayEnd = toEndVisit(visitor.onArrayEnd), onLiteralValue = toOneArgVisitWithPath(visitor.onLiteralValue), onSeparator = toOneArgVisit(visitor.onSeparator), onComment = toNoArgVisit(visitor.onComment), onError = toOneArgVisit(visitor.onError);
+  const disallowComments = options && options.disallowComments;
+  const allowTrailingComma = options && options.allowTrailingComma;
+  function scanNext() {
+    while (true) {
+      const token = _scanner.scan();
+      switch (_scanner.getTokenError()) {
+        case 4:
+          handleError(14);
+          break;
+        case 5:
+          handleError(15);
+          break;
+        case 3:
+          handleError(13);
+          break;
+        case 1:
+          if (!disallowComments) {
+            handleError(11);
+          }
+          break;
+        case 2:
+          handleError(12);
+          break;
+        case 6:
+          handleError(16);
+          break;
+      }
+      switch (token) {
+        case 12:
+        case 13:
+          if (disallowComments) {
+            handleError(10);
+          } else {
+            onComment();
+          }
+          break;
+        case 16:
+          handleError(1);
+          break;
+        case 15:
+        case 14:
+          break;
+        default:
+          return token;
+      }
+    }
+  }
+  function handleError(error, skipUntilAfter = [], skipUntil = []) {
+    onError(error);
+    if (skipUntilAfter.length + skipUntil.length > 0) {
+      let token = _scanner.getToken();
+      while (token !== 17) {
+        if (skipUntilAfter.indexOf(token) !== -1) {
+          scanNext();
+          break;
+        } else if (skipUntil.indexOf(token) !== -1) {
+          break;
+        }
+        token = scanNext();
+      }
+    }
+  }
+  function parseString(isValue) {
+    const value = _scanner.getTokenValue();
+    if (isValue) {
+      onLiteralValue(value);
+    } else {
+      onObjectProperty(value);
+      _jsonPath.push(value);
+    }
+    scanNext();
+    return true;
+  }
+  function parseLiteral() {
+    switch (_scanner.getToken()) {
+      case 11:
+        const tokenValue = _scanner.getTokenValue();
+        let value = Number(tokenValue);
+        if (isNaN(value)) {
+          handleError(2);
+          value = 0;
+        }
+        onLiteralValue(value);
+        break;
+      case 7:
+        onLiteralValue(null);
+        break;
+      case 8:
+        onLiteralValue(true);
+        break;
+      case 9:
+        onLiteralValue(false);
+        break;
+      default:
+        return false;
+    }
+    scanNext();
+    return true;
+  }
+  function parseProperty() {
+    if (_scanner.getToken() !== 10) {
+      handleError(3, [], [2, 5]);
+      return false;
+    }
+    parseString(false);
+    if (_scanner.getToken() === 6) {
+      onSeparator(":");
+      scanNext();
+      if (!parseValue()) {
+        handleError(4, [], [2, 5]);
+      }
+    } else {
+      handleError(5, [], [2, 5]);
+    }
+    _jsonPath.pop();
+    return true;
+  }
+  function parseObject() {
+    onObjectBegin();
+    scanNext();
+    let needsComma = false;
+    while (_scanner.getToken() !== 2 && _scanner.getToken() !== 17) {
+      if (_scanner.getToken() === 5) {
+        if (!needsComma) {
+          handleError(4, [], []);
+        }
+        onSeparator(",");
+        scanNext();
+        if (_scanner.getToken() === 2 && allowTrailingComma) {
+          break;
+        }
+      } else if (needsComma) {
+        handleError(6, [], []);
+      }
+      if (!parseProperty()) {
+        handleError(4, [], [2, 5]);
+      }
+      needsComma = true;
+    }
+    onObjectEnd();
+    if (_scanner.getToken() !== 2) {
+      handleError(7, [2], []);
+    } else {
+      scanNext();
+    }
+    return true;
+  }
+  function parseArray() {
+    onArrayBegin();
+    scanNext();
+    let isFirstElement = true;
+    let needsComma = false;
+    while (_scanner.getToken() !== 4 && _scanner.getToken() !== 17) {
+      if (_scanner.getToken() === 5) {
+        if (!needsComma) {
+          handleError(4, [], []);
+        }
+        onSeparator(",");
+        scanNext();
+        if (_scanner.getToken() === 4 && allowTrailingComma) {
+          break;
+        }
+      } else if (needsComma) {
+        handleError(6, [], []);
+      }
+      if (isFirstElement) {
+        _jsonPath.push(0);
+        isFirstElement = false;
+      } else {
+        _jsonPath[_jsonPath.length - 1]++;
+      }
+      if (!parseValue()) {
+        handleError(4, [], [4, 5]);
+      }
+      needsComma = true;
+    }
+    onArrayEnd();
+    if (!isFirstElement) {
+      _jsonPath.pop();
+    }
+    if (_scanner.getToken() !== 4) {
+      handleError(8, [4], []);
+    } else {
+      scanNext();
+    }
+    return true;
+  }
+  function parseValue() {
+    switch (_scanner.getToken()) {
+      case 3:
+        return parseArray();
+      case 1:
+        return parseObject();
+      case 10:
+        return parseString(true);
+      default:
+        return parseLiteral();
+    }
+  }
+  scanNext();
+  if (_scanner.getToken() === 17) {
+    if (options.allowEmptyContent) {
+      return true;
+    }
+    handleError(4, [], []);
+    return false;
+  }
+  if (!parseValue()) {
+    handleError(4, [], []);
+    return false;
+  }
+  if (_scanner.getToken() !== 17) {
+    handleError(9, [], []);
+  }
+  return true;
+}
+
+// node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/main.js
+var ScanError;
+(function(ScanError) {
+  ScanError[ScanError["None"] = 0] = "None";
+  ScanError[ScanError["UnexpectedEndOfComment"] = 1] = "UnexpectedEndOfComment";
+  ScanError[ScanError["UnexpectedEndOfString"] = 2] = "UnexpectedEndOfString";
+  ScanError[ScanError["UnexpectedEndOfNumber"] = 3] = "UnexpectedEndOfNumber";
+  ScanError[ScanError["InvalidUnicode"] = 4] = "InvalidUnicode";
+  ScanError[ScanError["InvalidEscapeCharacter"] = 5] = "InvalidEscapeCharacter";
+  ScanError[ScanError["InvalidCharacter"] = 6] = "InvalidCharacter";
+})(ScanError || (ScanError = {}));
+var SyntaxKind;
+(function(SyntaxKind) {
+  SyntaxKind[SyntaxKind["OpenBraceToken"] = 1] = "OpenBraceToken";
+  SyntaxKind[SyntaxKind["CloseBraceToken"] = 2] = "CloseBraceToken";
+  SyntaxKind[SyntaxKind["OpenBracketToken"] = 3] = "OpenBracketToken";
+  SyntaxKind[SyntaxKind["CloseBracketToken"] = 4] = "CloseBracketToken";
+  SyntaxKind[SyntaxKind["CommaToken"] = 5] = "CommaToken";
+  SyntaxKind[SyntaxKind["ColonToken"] = 6] = "ColonToken";
+  SyntaxKind[SyntaxKind["NullKeyword"] = 7] = "NullKeyword";
+  SyntaxKind[SyntaxKind["TrueKeyword"] = 8] = "TrueKeyword";
+  SyntaxKind[SyntaxKind["FalseKeyword"] = 9] = "FalseKeyword";
+  SyntaxKind[SyntaxKind["StringLiteral"] = 10] = "StringLiteral";
+  SyntaxKind[SyntaxKind["NumericLiteral"] = 11] = "NumericLiteral";
+  SyntaxKind[SyntaxKind["LineCommentTrivia"] = 12] = "LineCommentTrivia";
+  SyntaxKind[SyntaxKind["BlockCommentTrivia"] = 13] = "BlockCommentTrivia";
+  SyntaxKind[SyntaxKind["LineBreakTrivia"] = 14] = "LineBreakTrivia";
+  SyntaxKind[SyntaxKind["Trivia"] = 15] = "Trivia";
+  SyntaxKind[SyntaxKind["Unknown"] = 16] = "Unknown";
+  SyntaxKind[SyntaxKind["EOF"] = 17] = "EOF";
+})(SyntaxKind || (SyntaxKind = {}));
+var parse4 = parse3;
+var ParseErrorCode;
+(function(ParseErrorCode) {
+  ParseErrorCode[ParseErrorCode["InvalidSymbol"] = 1] = "InvalidSymbol";
+  ParseErrorCode[ParseErrorCode["InvalidNumberFormat"] = 2] = "InvalidNumberFormat";
+  ParseErrorCode[ParseErrorCode["PropertyNameExpected"] = 3] = "PropertyNameExpected";
+  ParseErrorCode[ParseErrorCode["ValueExpected"] = 4] = "ValueExpected";
+  ParseErrorCode[ParseErrorCode["ColonExpected"] = 5] = "ColonExpected";
+  ParseErrorCode[ParseErrorCode["CommaExpected"] = 6] = "CommaExpected";
+  ParseErrorCode[ParseErrorCode["CloseBraceExpected"] = 7] = "CloseBraceExpected";
+  ParseErrorCode[ParseErrorCode["CloseBracketExpected"] = 8] = "CloseBracketExpected";
+  ParseErrorCode[ParseErrorCode["EndOfFileExpected"] = 9] = "EndOfFileExpected";
+  ParseErrorCode[ParseErrorCode["InvalidCommentToken"] = 10] = "InvalidCommentToken";
+  ParseErrorCode[ParseErrorCode["UnexpectedEndOfComment"] = 11] = "UnexpectedEndOfComment";
+  ParseErrorCode[ParseErrorCode["UnexpectedEndOfString"] = 12] = "UnexpectedEndOfString";
+  ParseErrorCode[ParseErrorCode["UnexpectedEndOfNumber"] = 13] = "UnexpectedEndOfNumber";
+  ParseErrorCode[ParseErrorCode["InvalidUnicode"] = 14] = "InvalidUnicode";
+  ParseErrorCode[ParseErrorCode["InvalidEscapeCharacter"] = 15] = "InvalidEscapeCharacter";
+  ParseErrorCode[ParseErrorCode["InvalidCharacter"] = 16] = "InvalidCharacter";
+})(ParseErrorCode || (ParseErrorCode = {}));
+function printParseErrorCode(code) {
+  switch (code) {
+    case 1:
+      return "InvalidSymbol";
+    case 2:
+      return "InvalidNumberFormat";
+    case 3:
+      return "PropertyNameExpected";
+    case 4:
+      return "ValueExpected";
+    case 5:
+      return "ColonExpected";
+    case 6:
+      return "CommaExpected";
+    case 7:
+      return "CloseBraceExpected";
+    case 8:
+      return "CloseBracketExpected";
+    case 9:
+      return "EndOfFileExpected";
+    case 10:
+      return "InvalidCommentToken";
+    case 11:
+      return "UnexpectedEndOfComment";
+    case 12:
+      return "UnexpectedEndOfString";
+    case 13:
+      return "UnexpectedEndOfNumber";
+    case 14:
+      return "InvalidUnicode";
+    case 15:
+      return "InvalidEscapeCharacter";
+    case 16:
+      return "InvalidCharacter";
+  }
+  return "<unknown ParseErrorCode>";
 }
 
 // packages/omo-config-core/src/loader/layer-validation.ts
@@ -21920,7 +21785,7 @@ function validateConfigLayer(path, data, scope) {
 
 // packages/omo-config-core/src/loader/paths.ts
 import { userInfo } from "node:os";
-import { dirname as dirname9, join as join20, posix, resolve as resolve7 } from "node:path";
+import { dirname as dirname8, join as join19, posix, resolve as resolve7 } from "node:path";
 
 // packages/omo-config-core/src/internal/posix-path.ts
 function toPosixPath2(path) {
@@ -21935,14 +21800,14 @@ function resolveHomeDir(env = process.env) {
   return homeDir.startsWith("/") ? posix.resolve(homeDir) : toPosixPath2(resolve7(homeDir));
 }
 function resolveUserOmoConfigDirectory(env = process.env) {
-  return join20(resolveHomeDir(env), ".omo");
+  return join19(resolveHomeDir(env), ".omo");
 }
 function detectUserOmoJsonPath(env, fileSystem) {
   const configDir = resolveUserOmoConfigDirectory(env);
-  const jsoncPath = join20(configDir, "omo.jsonc");
+  const jsoncPath = join19(configDir, "omo.jsonc");
   if (fileSystem.existsSync(jsoncPath))
     return jsoncPath;
-  const jsonPath = join20(configDir, "omo.json");
+  const jsonPath = join19(configDir, "omo.json");
   return fileSystem.existsSync(jsonPath) ? jsonPath : jsoncPath;
 }
 function isSymlinkedProjectPath(path, fileSystem) {
@@ -21960,13 +21825,13 @@ function isLoadableProjectConfigFile(path, fileSystem) {
   return fileSystem.existsSync(path) && !isSymlinkedProjectPath(path, fileSystem);
 }
 function detectOmoJsonPath(dir, fileSystem) {
-  const omoDir = join20(dir, ".omo");
+  const omoDir = join19(dir, ".omo");
   if (isSymlinkedProjectPath(omoDir, fileSystem))
     return null;
-  const jsoncPath = join20(omoDir, "omo.jsonc");
+  const jsoncPath = join19(omoDir, "omo.jsonc");
   if (isLoadableProjectConfigFile(jsoncPath, fileSystem))
     return jsoncPath;
-  const jsonPath = join20(omoDir, "omo.json");
+  const jsonPath = join19(omoDir, "omo.json");
   return isLoadableProjectConfigFile(jsonPath, fileSystem) ? jsonPath : null;
 }
 function realpathOrSelf(path, fileSystem) {
@@ -21991,7 +21856,7 @@ function findProjectConfigPathsFarthestFirst(cwd, homeDir, fileSystem, accountHo
       nearestFirst.push(configPath);
     if (isHomeDir)
       break;
-    const parentDir = dirname9(currentDir);
+    const parentDir = dirname8(currentDir);
     if (parentDir === currentDir)
       break;
     currentDir = parentDir;
@@ -22287,7 +22152,7 @@ function recordAt(value, key) {
 
 // packages/omo-codex/src/install/codex-marketplace-snapshot.ts
 import { cp as cp4, mkdir as mkdir6, rename as rename5, rm as rm8, writeFile as writeFile6 } from "node:fs/promises";
-import { join as join21, sep as sep7 } from "node:path";
+import { join as join20, sep as sep7 } from "node:path";
 var INSTALLED_MARKETPLACES_DIR = ".tmp/marketplaces";
 async function writeInstalledMarketplaceSnapshot(input) {
   const marketplaceRoot = installedMarketplaceRoot(input.codexHome, input.marketplace.name);
@@ -22300,21 +22165,21 @@ async function writeInstalledMarketplaceSnapshot(input) {
   return snapshotPlugins;
 }
 function installedMarketplaceRoot(codexHome, marketplaceName) {
-  return join21(codexHome, INSTALLED_MARKETPLACES_DIR, marketplaceName);
+  return join20(codexHome, INSTALLED_MARKETPLACES_DIR, marketplaceName);
 }
 async function writeMarketplaceManifest(marketplaceRoot, marketplace) {
-  const manifestDir = join21(marketplaceRoot, ".agents", "plugins");
+  const manifestDir = join20(marketplaceRoot, ".agents", "plugins");
   await mkdir6(manifestDir, { recursive: true });
-  const tempPath = join21(manifestDir, `.marketplace-${process.pid}-${Date.now()}.json.tmp`);
+  const tempPath = join20(manifestDir, `.marketplace-${process.pid}-${Date.now()}.json.tmp`);
   await writeFile6(tempPath, `${JSON.stringify(marketplace, null, "\t")}
 `);
-  await rename5(tempPath, join21(manifestDir, "marketplace.json"));
+  await rename5(tempPath, join20(manifestDir, "marketplace.json"));
 }
 async function writeSnapshotPlugin(marketplaceRoot, plugin) {
-  const pluginsDir = join21(marketplaceRoot, "plugins");
+  const pluginsDir = join20(marketplaceRoot, "plugins");
   await mkdir6(pluginsDir, { recursive: true });
-  const targetPath = join21(pluginsDir, plugin.name);
-  const tempPath = join21(pluginsDir, `.tmp-${plugin.name}-${process.pid}-${Date.now()}`);
+  const targetPath = join20(pluginsDir, plugin.name);
+  const tempPath = join20(pluginsDir, `.tmp-${plugin.name}-${process.pid}-${Date.now()}`);
   await rm8(tempPath, { recursive: true, force: true });
   await cp4(plugin.sourcePath, tempPath, {
     recursive: true,
@@ -22336,15 +22201,15 @@ function shouldCopyMarketplaceSourcePath(path, root) {
 
 // packages/omo-codex/src/install/link-cached-plugin-agents.ts
 import { copyFile, lstat as lstat11, mkdir as mkdir7, readdir as readdir8, readFile as readFile17, rm as rm12, writeFile as writeFile9 } from "node:fs/promises";
-import { basename as basename4, join as join26 } from "node:path";
+import { basename as basename4, join as join25 } from "node:path";
 
 // packages/omo-codex/src/install/agent-model-overrides.ts
 import { readFile as readFile14, rm as rm9, writeFile as writeFile8 } from "node:fs/promises";
-import { join as join23 } from "node:path";
+import { join as join22 } from "node:path";
 
 // packages/omo-codex/src/install/preserved-agent-settings.ts
 import { lstat as lstat8, readFile as readFile13, readdir as readdir7, writeFile as writeFile7 } from "node:fs/promises";
-import { join as join22 } from "node:path";
+import { join as join21 } from "node:path";
 
 // packages/omo-codex/src/install/managed-agent-reasoning-defaults.ts
 var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
@@ -22537,7 +22402,7 @@ function resolveManagedAgentReasoning(input) {
 
 // packages/omo-codex/src/install/preserved-agent-settings.ts
 async function capturePreservedAgentReasoning(input) {
-  const agentsDir = join22(input.codexHome, "agents");
+  const agentsDir = join21(input.codexHome, "agents");
   if (!await exists2(agentsDir))
     return new Map;
   const preserved = new Map;
@@ -22545,7 +22410,7 @@ async function capturePreservedAgentReasoning(input) {
   for (const entry of agentEntries) {
     if (!entry.name.endsWith(".toml"))
       continue;
-    const content = await readTextIfExists(join22(agentsDir, entry.name));
+    const content = await readTextIfExists(join21(agentsDir, entry.name));
     if (content === null)
       continue;
     const effort = extractReasoningEffort(content);
@@ -22559,7 +22424,7 @@ async function capturePreservedAgentReasoning(input) {
   return preserved;
 }
 async function capturePreservedAgentServiceTier(input) {
-  const agentsDir = join22(input.codexHome, "agents");
+  const agentsDir = join21(input.codexHome, "agents");
   if (!await exists2(agentsDir))
     return new Map;
   const preserved = new Map;
@@ -22567,7 +22432,7 @@ async function capturePreservedAgentServiceTier(input) {
   for (const entry of agentEntries) {
     if (!entry.name.endsWith(".toml"))
       continue;
-    const content = await readTextIfExists(join22(agentsDir, entry.name));
+    const content = await readTextIfExists(join21(agentsDir, entry.name));
     if (content === null)
       continue;
     preserved.set(agentNameFromToml(entry.name), extractServiceTier(content));
@@ -22756,7 +22621,7 @@ async function applyAgentOverride(input) {
   await writeFile8(input.linkPath, content);
 }
 function receiptPath(codexHome) {
-  return join23(codexHome, "agents", RECEIPT_FILE);
+  return join22(codexHome, "agents", RECEIPT_FILE);
 }
 function parseJson(content) {
   try {
@@ -22789,7 +22654,7 @@ function handEditedAgentModel(installedModel, receipt) {
 
 // packages/omo-codex/src/install/retired-managed-agent-purge.ts
 import { lstat as lstat9, readFile as readFile15, rm as rm10 } from "node:fs/promises";
-import { join as join24 } from "node:path";
+import { join as join23 } from "node:path";
 var RETIRED_MANAGED_AGENT_FILES = [
   {
     fileName: "codex-ultrawork-reviewer.toml",
@@ -22801,11 +22666,11 @@ var RETIRED_MANAGED_AGENT_FILES = [
   }
 ];
 async function purgeRetiredManagedAgentFiles(input) {
-  const agentsDir = join24(input.codexHome, "agents");
+  const agentsDir = join23(input.codexHome, "agents");
   if (!await exists3(agentsDir))
     return;
   for (const retiredAgent of RETIRED_MANAGED_AGENT_FILES) {
-    const agentPath = join24(agentsDir, retiredAgent.fileName);
+    const agentPath = join23(agentsDir, retiredAgent.fileName);
     if (!await exists3(agentPath))
       continue;
     const agentStat = await lstat9(agentPath);
@@ -22848,12 +22713,12 @@ function nodeErrorCode2(error) {
 // packages/omo-codex/src/install/default-agent-role.ts
 import { createHash as createHash3 } from "node:crypto";
 import { lstat as lstat10, readFile as readFile16, rm as rm11 } from "node:fs/promises";
-import { join as join25 } from "node:path";
+import { join as join24 } from "node:path";
 var REGISTRATION = { name: "default", configFile: "./agents/default.toml" };
 async function installDefaultAgentRole(input) {
-  const target = join25(input.codexHome, "agents", "default.toml");
-  const receipt = join25(input.codexHome, "agents", ".lazycodex-default.sha256");
-  const configPath = join25(input.codexHome, "config.toml");
+  const target = join24(input.codexHome, "agents", "default.toml");
+  const receipt = join24(input.codexHome, "agents", ".lazycodex-default.sha256");
+  const configPath = join24(input.codexHome, "config.toml");
   const config = await readIfPresent(configPath);
   const entry = await lstat10(target).catch((error) => {
     if (error instanceof Error && "code" in error && error.code === "ENOENT")
@@ -22914,7 +22779,7 @@ async function linkCachedPluginAgents(input) {
     await writeManifest(input.pluginRoot, []);
     return [];
   }
-  const agentsDir = join26(input.codexHome, "agents");
+  const agentsDir = join25(input.codexHome, "agents");
   await mkdir7(agentsDir, { recursive: true });
   const previousReceipts = await readAgentModelReceipts(input.codexHome);
   const receipts = new Map;
@@ -22922,7 +22787,7 @@ async function linkCachedPluginAgents(input) {
   for (const agentPath of bundledAgents) {
     const agentFileName = basename4(agentPath);
     const agentName = agentNameFromToml2(agentFileName);
-    const linkPath = join26(agentsDir, agentFileName);
+    const linkPath = join25(agentsDir, agentFileName);
     receipts.set(agentName, await syncAgentFile({ ...input, agentName, agentPath, linkPath, previousReceipt: previousReceipts.get(agentName) }));
     linked.push({ name: agentFileName, path: linkPath, target: agentPath });
   }
@@ -22962,7 +22827,7 @@ async function syncAgentFile(input) {
   };
 }
 async function discoverBundledAgents(pluginRoot) {
-  const componentsRoot = join26(pluginRoot, "components");
+  const componentsRoot = join25(pluginRoot, "components");
   if (!await exists4(componentsRoot))
     return [];
   const componentEntries = await readdir8(componentsRoot, { withFileTypes: true });
@@ -22970,14 +22835,14 @@ async function discoverBundledAgents(pluginRoot) {
   for (const entry of componentEntries) {
     if (!entry.isDirectory())
       continue;
-    const agentsRoot = join26(componentsRoot, entry.name, "agents");
+    const agentsRoot = join25(componentsRoot, entry.name, "agents");
     if (!await exists4(agentsRoot))
       continue;
     const agentEntries = await readdir8(agentsRoot, { withFileTypes: true });
     for (const file of agentEntries) {
       if (!file.isFile() || !file.name.endsWith(".toml"))
         continue;
-      agents.push(join26(agentsRoot, file.name));
+      agents.push(join25(agentsRoot, file.name));
     }
   }
   agents.sort();
@@ -22997,7 +22862,7 @@ async function prepareReplacement(linkPath) {
   await rm12(linkPath, { force: true });
 }
 async function writeManifest(pluginRoot, agentPaths) {
-  const manifestPath = join26(pluginRoot, MANIFEST_FILE);
+  const manifestPath = join25(pluginRoot, MANIFEST_FILE);
   const payload = { agents: [...agentPaths].sort() };
   await writeFile9(manifestPath, `${JSON.stringify(payload, null, "\t")}
 `);
@@ -23069,10 +22934,10 @@ function agentNameFromToml3(fileName) {
 
 // packages/omo-codex/src/install/codex-marketplace.ts
 import { readFile as readFile18 } from "node:fs/promises";
-import { join as join27 } from "node:path";
+import { join as join26 } from "node:path";
 var DEFAULT_MARKETPLACE_PATH = "packages/omo-codex/marketplace.json";
 async function readMarketplace(repoRoot, options) {
-  const marketplacePath = options?.marketplacePath ?? join27(repoRoot, DEFAULT_MARKETPLACE_PATH);
+  const marketplacePath = options?.marketplacePath ?? join26(repoRoot, DEFAULT_MARKETPLACE_PATH);
   const raw = await readFile18(marketplacePath, "utf8");
   const parsed = JSON.parse(raw);
   if (!isPlainRecord(parsed))
@@ -23091,10 +22956,10 @@ async function readMarketplace(repoRoot, options) {
 function resolvePluginSource(repoRoot, plugin, options) {
   const sourcePath = localSourcePath(options?.pathOverride ?? plugin.source);
   const relativePath = sourcePath.slice(2);
-  return join27(repoRoot, ...relativePath.split(/[\\/]/));
+  return join26(repoRoot, ...relativePath.split(/[\\/]/));
 }
 async function readPluginManifest(pluginRoot) {
-  const raw = await readFile18(join27(pluginRoot, ".codex-plugin", "plugin.json"), "utf8");
+  const raw = await readFile18(join26(pluginRoot, ".codex-plugin", "plugin.json"), "utf8");
   const parsed = JSON.parse(raw);
   if (!isPlainRecord(parsed))
     throw new Error(`${pluginRoot} plugin.json must be an object`);
@@ -23176,10 +23041,10 @@ function validateLocalSourcePath(path) {
 
 // packages/omo-codex/src/install/lazycodex-version-stamp.ts
 import { readdir as readdir9, readFile as readFile19, writeFile as writeFile10 } from "node:fs/promises";
-import { join as join28 } from "node:path";
+import { join as join27 } from "node:path";
 async function readDistributionManifest(repoRoot) {
   try {
-    const parsed = JSON.parse(await readFile19(join28(repoRoot, "package.json"), "utf8"));
+    const parsed = JSON.parse(await readFile19(join27(repoRoot, "package.json"), "utf8"));
     if (!isPlainRecord(parsed) || typeof parsed.version !== "string" || parsed.version.trim().length === 0)
       return;
     return {
@@ -23203,19 +23068,19 @@ function resolveLazyCodexPluginVersion(input) {
   return input.manifestVersion ?? "local";
 }
 async function stampLazyCodexPluginVersion(input) {
-  const manifestPath = join28(input.pluginRoot, ".codex-plugin", "plugin.json");
+  const manifestPath = join27(input.pluginRoot, ".codex-plugin", "plugin.json");
   const hookPaths = await readPluginHookPaths(manifestPath);
   await stampJsonVersion(manifestPath, input.version);
-  await stampJsonVersion(join28(input.pluginRoot, "package.json"), input.version);
+  await stampJsonVersion(join27(input.pluginRoot, "package.json"), input.version);
   for (const hookPath of hookPaths) {
-    await stampHookStatusMessages(join28(input.pluginRoot, hookPath), input.version);
+    await stampHookStatusMessages(join27(input.pluginRoot, hookPath), input.version);
   }
   await stampComponentVersions(input);
 }
 async function writeLazyCodexInstallSnapshot(input) {
   if (input.distributionManifest === undefined)
     return;
-  await writeFile10(join28(input.pluginRoot, "lazycodex-install.json"), `${JSON.stringify({
+  await writeFile10(join27(input.pluginRoot, "lazycodex-install.json"), `${JSON.stringify({
     packageName: input.distributionManifest.name,
     version: input.distributionManifest.version
   }, null, "\t")}
@@ -23272,16 +23137,16 @@ async function stampHookStatusMessages(path, version) {
 async function stampComponentVersions(input) {
   let entries;
   try {
-    entries = await readdir9(join28(input.pluginRoot, "components"));
+    entries = await readdir9(join27(input.pluginRoot, "components"));
   } catch (error) {
     if (error instanceof Error)
       return;
     throw error;
   }
   for (const entry of entries) {
-    const componentRoot = join28(input.pluginRoot, "components", entry);
-    await stampJsonVersion(join28(componentRoot, "package.json"), input.version);
-    await stampHookStatusMessages(join28(componentRoot, "hooks", "hooks.json"), input.version);
+    const componentRoot = join27(input.pluginRoot, "components", entry);
+    await stampJsonVersion(join27(componentRoot, "package.json"), input.version);
+    await stampHookStatusMessages(join27(componentRoot, "hooks", "hooks.json"), input.version);
   }
 }
 function stampHookGroups(hooks, version) {
@@ -23311,7 +23176,7 @@ function normalizeHookStatusVersion(version) {
 
 // packages/omo-codex/src/install/codex-project-local-cleanup.ts
 import { copyFile as copyFile2, lstat as lstat12, readFile as readFile20, writeFile as writeFile11 } from "node:fs/promises";
-import { dirname as dirname10, join as join29, resolve as resolve8 } from "node:path";
+import { dirname as dirname9, join as join28, resolve as resolve8 } from "node:path";
 var LEGACY_AGENT_CONFLICT_KEYS = ["max_threads"];
 var PROJECT_LOCAL_ARTIFACT_PATHS = [
   ".codex/hooks.json",
@@ -23414,37 +23279,37 @@ async function findProjectLocalCodexConfigs(startDirectory, codexHome) {
   if (startDirectoryStat !== null && !startDirectoryStat.isDirectory()) {
     throw new ProjectLocalCleanupStartDirectoryError(startDirectory);
   }
-  const codexHomeConfigPath = codexHome === undefined ? null : join29(resolve8(codexHome), "config.toml");
+  const codexHomeConfigPath = codexHome === undefined ? null : join28(resolve8(codexHome), "config.toml");
   let current = resolve8(startDirectory);
   const configPathsFromCwd = [];
   while (true) {
-    const configPath = join29(current, ".codex", "config.toml");
+    const configPath = join28(current, ".codex", "config.toml");
     if (await isRegularProjectLocalConfig(current, configPath)) {
       if (codexHomeConfigPath === null || resolve8(configPath) !== codexHomeConfigPath) {
         configPathsFromCwd.push(configPath);
       }
     }
-    if (await exists5(join29(current, ".git"))) {
+    if (await exists5(join28(current, ".git"))) {
       return configPathsFromCwd.length === 0 ? null : {
         projectRoot: current,
         configPaths: [...configPathsFromCwd].reverse(),
         artifactRoots: artifactRootsForConfigPaths(configPathsFromCwd)
       };
     }
-    const parent = dirname10(current);
+    const parent = dirname9(current);
     if (parent === current) {
       const nearestConfigPath = configPathsFromCwd[0];
       return nearestConfigPath === undefined ? null : {
-        projectRoot: dirname10(dirname10(nearestConfigPath)),
+        projectRoot: dirname9(dirname9(nearestConfigPath)),
         configPaths: [nearestConfigPath],
-        artifactRoots: [dirname10(dirname10(nearestConfigPath))]
+        artifactRoots: [dirname9(dirname9(nearestConfigPath))]
       };
     }
     current = parent;
   }
 }
 async function isRegularProjectLocalConfig(directory, configPath) {
-  const codexDirStat = await maybeLstat(join29(directory, ".codex"));
+  const codexDirStat = await maybeLstat(join28(directory, ".codex"));
   if (codexDirStat === null || !codexDirStat.isDirectory() || codexDirStat.isSymbolicLink())
     return false;
   const configStat = await maybeLstat(configPath);
@@ -23453,7 +23318,7 @@ async function isRegularProjectLocalConfig(directory, configPath) {
 function artifactRootsForConfigPaths(configPaths) {
   const roots = [];
   for (const configPath of configPaths) {
-    const root = dirname10(dirname10(configPath));
+    const root = dirname9(dirname9(configPath));
     if (!roots.includes(root))
       roots.push(root);
   }
@@ -23464,7 +23329,7 @@ async function collectProjectLocalArtifacts(projectRoots) {
   const seenPaths = new Set;
   for (const projectRoot of projectRoots) {
     for (const relativePath of PROJECT_LOCAL_ARTIFACT_PATHS) {
-      const artifactPath = join29(projectRoot, relativePath);
+      const artifactPath = join28(projectRoot, relativePath);
       if (seenPaths.has(artifactPath))
         continue;
       const entryStat = await maybeLstat(artifactPath);
@@ -23542,7 +23407,7 @@ function formatUnknownError(error) {
 import { createHash as createHash4 } from "node:crypto";
 import { lstat as lstat13, readFile as readFile22, readdir as readdir11, rm as rm13 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join as join30, posix as posix2 } from "node:path";
+import { join as join29, posix as posix2 } from "node:path";
 
 // packages/omo-codex/src/install/lsp-daemon-reaper-attestation.ts
 import { execFile } from "node:child_process";
@@ -23715,7 +23580,7 @@ async function readBinary(readFileImpl, path) {
 var LEGACY_EXIT_WAIT_TIMEOUT_MS = 5000;
 var LEGACY_VERSION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/;
 async function reapLspDaemons(codexHome, deps = {}) {
-  const daemonRoot = join30(codexHome, "codex-lsp", "daemon");
+  const daemonRoot = join29(codexHome, "codex-lsp", "daemon");
   const platform = deps.platform ?? process.platform;
   const tmpDir = deps.tmpDir ?? tmpdir();
   const probe = deps.probeLegacyJsonRpc ?? probeLegacyJsonRpcEndpoint;
@@ -23725,7 +23590,7 @@ async function reapLspDaemons(codexHome, deps = {}) {
   const entries = await readdir11(daemonRoot, { withFileTypes: true }).catch(() => []);
   const results = [];
   for (const entry of [...entries].sort((left, right) => left.name.localeCompare(right.name))) {
-    const versionPath = join30(daemonRoot, entry.name);
+    const versionPath = join29(daemonRoot, entry.name);
     const parsedVersion = parseVersionEntry(entry.name);
     if (parsedVersion === null || !entry.isDirectory()) {
       await removeVersionDir(versionPath);
@@ -23773,7 +23638,7 @@ function parseVersionEntry(entryName) {
   return LEGACY_VERSION_PATTERN.test(version) ? version : null;
 }
 async function readLegacyMetadata(input) {
-  const pidText = await readRegularTrimmedFile(join30(input.versionPath, "daemon.pid"));
+  const pidText = await readRegularTrimmedFile(join29(input.versionPath, "daemon.pid"));
   if (pidText === "non_regular")
     return { kind: "remove", reason: "removed non-regular legacy daemon metadata" };
   if (pidText === null)
@@ -23781,7 +23646,7 @@ async function readLegacyMetadata(input) {
   const pid = Number.parseInt(pidText, 10);
   if (!Number.isInteger(pid) || pid <= 0)
     return { kind: "remove", reason: "removed malformed legacy daemon metadata" };
-  const endpointText = await readRegularTrimmedFile(join30(input.versionPath, "daemon.endpoint"));
+  const endpointText = await readRegularTrimmedFile(join29(input.versionPath, "daemon.endpoint"));
   if (endpointText === "non_regular")
     return { kind: "remove", reason: "removed non-regular legacy daemon metadata" };
   if (endpointText === null)
@@ -23860,7 +23725,7 @@ function processIsRunning(pid) {
 
 // packages/omo-codex/src/install/codex-installer-bin-dir.ts
 import { homedir } from "node:os";
-import { join as join31, resolve as resolve9 } from "node:path";
+import { join as join30, resolve as resolve9 } from "node:path";
 function resolveCodexInstallerBinDir(input) {
   const explicitBinDir = input.binDir ?? input.env?.CODEX_LOCAL_BIN_DIR;
   if (explicitBinDir !== undefined && explicitBinDir.trim().length > 0)
@@ -23869,22 +23734,22 @@ function resolveCodexInstallerBinDir(input) {
   const defaultCodexHome = resolve9(homeDir, ".codex");
   const resolvedCodexHome = resolve9(input.codexHome);
   if (resolvedCodexHome !== defaultCodexHome)
-    return join31(resolvedCodexHome, "bin");
+    return join30(resolvedCodexHome, "bin");
   return resolve9(homeDir, ".local", "bin");
 }
 
 // packages/omo-codex/src/install/codex-installed-bin-dir.ts
 import { readFile as readFile23, readdir as readdir12, writeFile as writeFile12 } from "node:fs/promises";
-import { join as join32 } from "node:path";
+import { join as join31 } from "node:path";
 var INSTALLED_BIN_DIR_MANIFEST = ".installed-bin-dir.json";
 async function writeInstalledCodexBinDir(input) {
-  await writeFile12(join32(input.pluginRoot, INSTALLED_BIN_DIR_MANIFEST), `${JSON.stringify({ binDir: input.binDir }, null, 2)}
+  await writeFile12(join31(input.pluginRoot, INSTALLED_BIN_DIR_MANIFEST), `${JSON.stringify({ binDir: input.binDir }, null, 2)}
 `);
 }
 
 // packages/omo-codex/src/install/codex-git-bash-hooks.ts
 import { readFile as readFile24, writeFile as writeFile13 } from "node:fs/promises";
-import { join as join33 } from "node:path";
+import { join as join32 } from "node:path";
 var WINDOWS_ONLY_GIT_BASH_HOOKS = new Set([
   "./hooks/pre-tool-use-recommending-git-bash-mcp.json",
   "./hooks/post-compact-resetting-git-bash-mcp-reminder.json"
@@ -23892,7 +23757,7 @@ var WINDOWS_ONLY_GIT_BASH_HOOKS = new Set([
 async function removeGitBashHooksOffWindows(input) {
   if (input.platform === "win32")
     return;
-  const manifestPath = join33(input.pluginRoot, ".codex-plugin", "plugin.json");
+  const manifestPath = join32(input.pluginRoot, ".codex-plugin", "plugin.json");
   const parsed = JSON.parse(await readFile24(manifestPath, "utf8"));
   if (!isPlainRecord(parsed) || !Array.isArray(parsed.hooks))
     return;
@@ -23905,6 +23770,143 @@ async function removeGitBashHooksOffWindows(input) {
 
 // packages/omo-codex/src/install/install-ast-grep-sg.ts
 import { join as join34 } from "node:path";
+
+// packages/utils/src/ast-grep/install-script.ts
+import { spawn as spawn2 } from "node:child_process";
+import { existsSync as existsSync4 } from "node:fs";
+import { join as join33 } from "node:path";
+
+// packages/utils/src/ast-grep/sg-manifest.ts
+function normalizeRuntimePlatform(platform = process.platform) {
+  if (platform === "darwin" || platform === "linux" || platform === "win32")
+    return platform;
+  return "linux";
+}
+function normalizeRuntimeArch(arch = process.arch) {
+  if (arch === "arm64" || arch === "aarch64")
+    return "arm64";
+  return "x64";
+}
+function runtimeSlug(platform = process.platform, arch = process.arch) {
+  return `${normalizeRuntimePlatform(platform)}-${normalizeRuntimeArch(arch)}`;
+}
+
+// packages/utils/src/ast-grep/install-script.ts
+var AST_GREP_BIN_DIR_ENV_KEY = "OMO_AST_GREP_BIN_DIR";
+var KILL_GRACE_MS = 1000;
+var AST_GREP_INSTALL_TIMEOUT_MS = 30000;
+function astGrepRuntimeDir(baseDir, platform = process.platform, arch = process.arch) {
+  return join33(baseDir, "runtime", "ast-grep", runtimeSlug(platform, arch));
+}
+function isMissingExecutable(error) {
+  if (!("code" in error))
+    return false;
+  return error.code === "ENOENT";
+}
+function defaultSpawnProcess(command, args, options) {
+  const child = spawn2(command, args, {
+    cwd: options.cwd,
+    env: options.env,
+    stdio: "ignore",
+    windowsHide: true
+  });
+  let settled = false;
+  const outcome = new Promise((resolve) => {
+    const settle = (result) => {
+      if (settled)
+        return;
+      settled = true;
+      resolve(result);
+    };
+    child.once("error", (error) => {
+      settle({ kind: "spawn-error", error, missingExecutable: isMissingExecutable(error) });
+    });
+    child.once("exit", (code, signal) => {
+      settle({ kind: "exit", code, signal });
+    });
+  });
+  return {
+    kill: () => {
+      if (!child.killed)
+        child.kill();
+    },
+    outcome
+  };
+}
+function scriptPathForPlatform(skillDir, platform) {
+  return join33(skillDir, platform === "win32" ? "install.ps1" : "install.sh");
+}
+function invocationsForPlatform(scriptPath, platform) {
+  if (platform !== "win32")
+    return [{ command: "bash", args: [scriptPath] }];
+  const args = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptPath];
+  return [{ command: "pwsh", args }, { command: "powershell.exe", args }];
+}
+async function runInvocation(input) {
+  const child = input.spawnProcess(input.invocation.command, input.invocation.args, { cwd: input.skillDir, env: input.env });
+  let timedOut = false;
+  let terminateDeadline;
+  let terminateDeadlineGrace;
+  const killIgnored = new Promise((_, reject) => {
+    terminateDeadline = () => reject(new Error("ast-grep install child ignored termination"));
+  });
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    child.kill();
+    terminateDeadlineGrace = setTimeout(() => terminateDeadline?.(), KILL_GRACE_MS);
+  }, input.timeoutMs);
+  try {
+    const outcome = await Promise.race([child.outcome, killIgnored]);
+    if (timedOut)
+      return { kind: "timed-out" };
+    return outcome;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("ignored termination")) {
+      return { kind: "spawn-error", error, missingExecutable: false };
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+    if (terminateDeadlineGrace !== undefined)
+      clearTimeout(terminateDeadlineGrace);
+  }
+}
+function failedReason(outcome) {
+  return outcome.error.message;
+}
+async function runAstGrepSkillInstall(options) {
+  const platform = options.platform ?? process.platform;
+  const fileExists = options.fileExists ?? existsSync4;
+  const scriptPath = scriptPathForPlatform(options.skillDir, platform);
+  if (!fileExists(scriptPath))
+    return { kind: "skipped", reason: `missing ${scriptPath}` };
+  const env = { ...options.env ?? process.env, [AST_GREP_BIN_DIR_ENV_KEY]: options.targetDir };
+  const spawnProcess = options.spawnProcess ?? defaultSpawnProcess;
+  const timeoutMs = options.timeoutMs ?? AST_GREP_INSTALL_TIMEOUT_MS;
+  const invocations = invocationsForPlatform(scriptPath, platform);
+  try {
+    for (const invocation of invocations) {
+      const outcome = await runInvocation({ env, invocation, skillDir: options.skillDir, spawnProcess, timeoutMs });
+      if (outcome.kind === "timed-out")
+        return { kind: "timed-out" };
+      if (outcome.kind === "exit") {
+        if (outcome.code === 0)
+          return { kind: "succeeded" };
+        return { kind: "failed", reason: `${invocation.command} exited ${outcome.code ?? outcome.signal ?? "without status"}` };
+      }
+      if (platform === "win32" && outcome.missingExecutable && invocation.command === "pwsh")
+        continue;
+      return { kind: "failed", reason: failedReason(outcome) };
+    }
+    return { kind: "failed", reason: "no ast-grep install shell was available" };
+  } catch (error) {
+    if (error instanceof Error)
+      return { kind: "failed", reason: error.message };
+    return { kind: "failed", reason: String(error) };
+  }
+}
+
+// packages/omo-codex/src/install/install-ast-grep-sg.ts
 function describeResult(result) {
   if (result.kind === "succeeded")
     return null;

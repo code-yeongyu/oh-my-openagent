@@ -1,4 +1,4 @@
-import { isPlainRecord } from "@oh-my-opencode/utils"
+import { isPlainRecord } from "@oh-my-opencode/utils/record-type-guard"
 
 import type { PrunedConfigPath } from "./loader/prune-invalid-leaves"
 import type { OmoConfigSourceScope } from "./loader/types"
