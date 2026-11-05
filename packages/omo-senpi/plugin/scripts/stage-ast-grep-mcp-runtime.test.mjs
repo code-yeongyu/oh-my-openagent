@@ -52,6 +52,16 @@ describe("ast-grep MCP staged runtime manifest", () => {
     expect(Object.keys(JSON.parse(first)).sort()).toEqual(["mode", "sha256"])
     expect((await checkAstGrepMcpRuntimeFresh({ sourceEntry, targetEntry })).ok).toBe(true)
   })
+
+  test("#given a manifest still carrying stagedAtUtc #when checked #then matching content is current", async () => {
+    const fixture = await makeRuntimeFixture()
+    const manifest = JSON.parse(await readFile(fixture.manifestPath, "utf8"))
+    await writeFile(fixture.manifestPath, `${JSON.stringify({ ...manifest, stagedAtUtc: "2026-08-03T00:00:00.000Z" })}\n`, "utf8")
+
+    const result = await checkAstGrepMcpRuntimeFresh({ ...fixture, platform: "win32" })
+
+    expect(result.ok).toBe(true)
+  })
 })
 
 describe("ast-grep MCP staged runtime mode policy", () => {
