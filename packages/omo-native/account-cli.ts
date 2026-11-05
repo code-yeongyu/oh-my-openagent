@@ -12,7 +12,9 @@ import {
 } from "../omo-opencode/src/cli/service-auth/keystore"
 import { type Credentials, credentialSchema, serviceOrigin, SignInError } from "../omo-opencode/src/cli/service-auth/protocol"
 import { registerHelperCandidates } from "../omo-opencode/src/cli/service-auth/keychain-helper/darwin-backend"
-import { createSession, type Session, SessionEnded } from "../omo-opencode/src/cli/service-auth/session"
+import { type BeforeKeysDiscarded, createSession, discardedOf, type Session, SessionEnded } from "../omo-opencode/src/cli/service-auth/session"
+import { retireSyncPinOnDiscard } from "../omo-opencode/src/cli/service-auth/sync-pin-retire"
+import { retireSyncDevice } from "../memory-core/src/sync/device-retire"
 import { RecoveryExhausted, RecoveryPending } from "../omo-opencode/src/cli/service-auth/owned-refresh"
 
 // `omo account` lets the desktop share this machine's one OS-keychain credential with `omo login`
@@ -39,6 +41,8 @@ export interface AccountCommandDependencies {
   readonly store: CredentialStore
   readonly home?: string
   readonly pinDir: () => string
+  /** Retires the memory-sync pin of a principal whose keys this command discards (#12280); absent, none is retired. */
+  readonly beforeKeysDiscarded?: BeforeKeysDiscarded
   readonly readStdin: () => Promise<string>
   readonly output: (line: string) => void
   readonly error: (line: string) => void
@@ -51,8 +55,14 @@ const reply = (dependencies: AccountCommandDependencies, value: unknown, code: n
   return code
 }
 
+const retireHook = (dependencies: AccountCommandDependencies): BeforeKeysDiscarded =>
+  dependencies.beforeKeysDiscarded ?? (async () => undefined)
+
 const sessionOf = (dependencies: AccountCommandDependencies): Session =>
-  createSession({ api: dependencies.api, store: dependencies.store, ...(dependencies.home === undefined ? {} : { home: dependencies.home }) })
+  createSession({
+    api: dependencies.api, store: dependencies.store, beforeKeysDiscarded: retireHook(dependencies),
+    ...(dependencies.home === undefined ? {} : { home: dependencies.home }),
+  })
 
 async function signedOut(dependencies: AccountCommandDependencies, session: Session): Promise<number> {
   const marker = await session.signedOutMarker()
@@ -90,6 +100,7 @@ async function adopt(dependencies: AccountCommandDependencies, replace: boolean)
       current.device.id === incoming.device.id &&
       current.refreshState !== "uncertain" &&
       Date.parse(current.accessTokenExpiresAt) > Date.parse(incoming.accessTokenExpiresAt)
+    if (current !== null && current.device.id !== incoming.device.id) await retireHook(dependencies)(discardedOf(current, "replaced"))
     if (!keepCurrent) await dependencies.store.write(incoming)
     await session.clearSignedOutMarker()
     return reply(dependencies, { adopted: true, device: deviceOf(incoming) })
@@ -167,6 +178,7 @@ async function runVerb(dependencies: AccountCommandDependencies, args: readonly 
             if (current !== null && current.device.id !== device) {
               return reply(dependencies, { forgotten: false, device: deviceOf(current) }, ACCOUNT_EXIT.conflict)
             }
+            if (current !== null) await retireHook(dependencies)(discardedOf(current, "forget"))
             await dependencies.store.clear()
             return reply(dependencies, { forgotten: true })
           })
@@ -179,8 +191,18 @@ async function runVerb(dependencies: AccountCommandDependencies, args: readonly 
       await session.forget()
       return reply(dependencies, { forgotten: true })
     }
+    case "retire-sync": {
+      // The desktop's discard of its own sealed session (#12280): the pin of that account is retired.
+      const account = flags[0] === "--account" && flags.length === 2 ? flags[1] : undefined
+      if (account === undefined || account === "" || account.startsWith("--")) {
+        dependencies.error("omo account retire-sync: use retire-sync --account <id>")
+        return ACCOUNT_EXIT.invalid
+      }
+      await retireSyncDevice({ pinDir: dependencies.pinDir(), account })
+      return reply(dependencies, { retired: true })
+    }
     default:
-      dependencies.error("usage: omo account show [--account <id>]|adopt [--replace]|token|export|forget [--device <id>]")
+      dependencies.error("usage: omo account show [--account <id>]|adopt [--replace]|token|export|forget [--device <id>]|retire-sync --account <id>")
       return ACCOUNT_EXIT.invalid
   }
 }
@@ -219,6 +241,10 @@ export async function runAccountCommand(args: readonly string[], options: { read
         return store
       },
       pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())),
+      beforeKeysDiscarded: retireSyncPinOnDiscard({
+        pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())),
+        log: line => process.stderr.write(`${line}\n`),
+      }),
       readStdin: () => new Response(Bun.stdin.stream()).text(),
       output: line => process.stdout.write(`${line}\n`),
       error: line => process.stderr.write(`${line}\n`),
