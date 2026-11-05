@@ -1,5 +1,6 @@
 import { fork } from "node:child_process";
 import { join } from "node:path";
+import { remainingTestTime } from "../../../../../../../test-support/test-deadline";
 
 const running = new Set<ReturnType<typeof childWriter>>();
 export async function cleanupWriters(): Promise<void> {
@@ -46,7 +47,7 @@ export function childWriter(rootPath: string, mode: string, now = Date.now()) {
 		wait(name: string) {
 			if (seen.has(name)) return Promise.resolve();
 			return new Promise<void>((resolve, reject) => {
-				const timeout = setTimeout(() => reject(new Error(`IPC timeout: ${name}`)), 10_000);
+				const timeout = setTimeout(() => reject(new Error(`IPC message ${name} did not arrive within the test budget`)), remainingTestTime());
 				pending.set(name, {
 					resolve: () => {
 						clearTimeout(timeout);

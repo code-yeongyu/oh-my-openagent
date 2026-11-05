@@ -8,6 +8,7 @@ import { ApfsBackend, cloneWithSymbols } from "./apfs"
 import { IsolationUnavailableError } from "../backend"
 import { repo } from "./git-fixture"
 import { ensureIsolation, cleanupIsolation } from "../ensure"
+import { testBudgetSignal } from "../../../../test-support/test-deadline"
 
 async function withPlatform<T>(platform: NodeJS.Platform, fn: () => Promise<T>): Promise<T> {
   const saved = process.platform
@@ -31,7 +32,7 @@ mac("APFS clones 5000 files COW, skips FIFO/socket, and never follows entry syml
   const fifo = Bun.spawn(["mkfifo", join(lower, "fifo")])
   expect(await fifo.exited).toBe(0)
   const socket = createServer()
-  const listening = once(socket, "listening", { signal: AbortSignal.timeout(5000) })
+  const listening = once(socket, "listening", { signal: testBudgetSignal("the fsmonitor socket to listen") })
   socket.listen(join(lower, ".git/fsmonitor--daemon.ipc"))
   await listening
   try {

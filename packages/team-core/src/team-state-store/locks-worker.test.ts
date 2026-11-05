@@ -11,6 +11,7 @@ import { removeLockRecordIfUnchanged } from "./lock-reclaim"
 import { buildLockRecord, markLockRecordHeld, markLockRecordReleased } from "./lock-record"
 import { detectStaleLock, reapStaleLock, withLock } from "./locks"
 import { installLockWorkerObserver } from "./lock-worker-lifetime"
+import { testBudgetSignal, useTestTimeout } from "../../../../test-support/test-deadline"
 
 installLockWorkerObserver()
 
@@ -76,6 +77,7 @@ async function fixture() {
 }
 
 test("a sibling worker cannot reap or enter a live worker's lock", async () => {
+  useTestTimeout(30_000)
   // given
   const f = await fixture()
   try {
@@ -110,6 +112,7 @@ test("a sibling worker cannot reap or enter a live worker's lock", async () => {
 }, 30_000)
 
 test("host-observed worker exit allows a sibling to reclaim its lock", async () => {
+  useTestTimeout(30_000)
   const f = await fixture()
   try {
     const a = await f.worker()
@@ -146,6 +149,7 @@ test("a legacy module UUID mismatch is not evidence of PID reuse", async () => {
 
 for (const observed of [false, true]) {
   test(`an exited worker with ${observed ? "late" : "no"} host registration ${observed ? "can" : "cannot"} be reclaimed`, async () => {
+    useTestTimeout(30_000)
     const f = await fixture()
     try {
       const host = await f.worker(true)
@@ -230,7 +234,7 @@ test("lock observation does not keep a finished worker alive", async () => {
   const f = await fixture()
   const owner = new Worker(new URL("./lock-worker-exit.fixture.ts", import.meta.url), { workerData: f.lockPath })
   try {
-    const exited = once(owner, "exit", { signal: AbortSignal.timeout(10_000) })
+    const exited = once(owner, "exit", { signal: testBudgetSignal("the lock owner worker to exit") })
     await Promise.all([reply(owner, "ready"), reply(owner, "registered")])
     owner.postMessage("finish")
     expect(await exited).toEqual([0])
