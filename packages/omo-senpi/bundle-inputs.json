@@ -390,6 +390,7 @@
     "packages/memory-core/src/sync/engine/landing.ts",
     "packages/memory-core/src/sync/engine/legacy-cycle.ts",
     "packages/memory-core/src/sync/engine/open.ts",
+    "packages/memory-core/src/sync/engine/outbox.ts",
     "packages/memory-core/src/sync/engine/push-cycle.ts",
     "packages/memory-core/src/sync/engine/push.ts",
     "packages/memory-core/src/sync/engine/receive.ts",

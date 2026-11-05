@@ -10,7 +10,7 @@ afterEach(async () => {
   for (const d of devices.splice(0)) await d.dispose()
 })
 
-const item = (key: string, bytes: number) => ({ key, ops: "A".repeat(Math.ceil((bytes * 4) / 3)) })
+const item = (key: string, bytes: number) => ({ key, bytes })
 
 test("pending ops split between items so no batch exceeds the plaintext bound, in capture order", () => {
   const limit = 1_000

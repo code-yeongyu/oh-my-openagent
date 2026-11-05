@@ -25,9 +25,10 @@ import { isSyncItemKey } from "../item"
 import { removeAtomic, writeAtomic } from "./atomic"
 import type { EngineDeps } from "./engine-deps"
 import { acceptedItems, acceptedKeys, rejectItem } from "./item-keys"
-import { type CycleRecord, fromBase64, type RenderRecord, type SyncJournal, toBase64, type WireItem } from "./journal"
+import { type CycleRecord, fromBase64, type RenderRecord, type SyncJournal } from "./journal"
 import { fsRefusal, prepareLanding, readWorking, throughSymlink } from "./landing"
 import { adoptLegacyRenders } from "./legacy-cycle"
+import type { PendingItem } from "./outbox"
 import { diskLister, type ItemPaths, itemPaths, landingPath, scanWorkingTree } from "./working-tree"
 
 export interface Applied {
@@ -73,8 +74,6 @@ async function readCaptured(deps: EngineDeps, journal: SyncJournal, key: string,
   }
 }
 
-const sameItem = (a: WireItem, b: WireItem): boolean => a.key === b.key && a.ops === b.ops
-
 const textHash = (text: string | null): string => createHash("sha256").update(text === null ? "\u0000absent" : `t:${text}`).digest("hex")
 
 const latestByKey = (records: readonly RenderRecord[]): Map<string, RenderRecord> => {
@@ -102,25 +101,34 @@ export async function capture(deps: EngineDeps, journal: SyncJournal, resuming: 
   if (resuming !== null) await adoptLandedRenders(deps, journal, resuming, files)
   const known = await acceptedKeys(deps, journal, "capture", deps.store.keys())
   const keys = [...new Set([...known, ...files.byKey.keys()])].sort()
-  const captured: WireItem[] = []
+  // Each item's ops are appended to the journal as they are captured, so the capture holds an
+  // index entry per item, never the whole set's ops (#12286).
+  const captured: PendingItem[] = []
   const texts = new Map<string, string | null>()
-  for (const key of keys) {
-    const path = landingPath(files, key)
-    if (path === null) continue
-    const text = await readCaptured(deps, journal, key, path, files.byKey.has(key))
-    if (text === undefined) continue
-    const ops = await deps.store.capture(key, text)
-    if (ops === null) continue
-    captured.push({ key, ops: toBase64(ops) })
-    texts.set(key, text)
+  const segment = journal.outbox.segment()
+  try {
+    for (const key of keys) {
+      const path = landingPath(files, key)
+      if (path === null) continue
+      const text = await readCaptured(deps, journal, key, path, files.byKey.has(key))
+      if (text === undefined) continue
+      const ops = await deps.store.capture(key, text)
+      if (ops === null) continue
+      captured.push(await segment.add(key, ops))
+      texts.set(key, text)
+    }
+    await segment.finish()
+  } finally {
+    await segment.discard()
   }
   if (captured.length === 0) return 0
   const pending = await journal.pending()
-  const fresh = captured.filter((c) => !pending.items.some((p) => sameItem(p, c)))
+  const queued = new Set(pending.items.map((p) => p.digest))
+  const fresh = captured.filter((c) => !queued.has(c.digest))
   await journal.setPending({ ...pending, items: [...pending.items, ...fresh] })
   deps.fault?.("captured")
   for (const item of captured) {
-    await deps.store.apply(item.key, fromBase64(item.ops))
+    await deps.store.apply(item.key, await journal.outbox.readOps(item))
     // The captured text is now what the item's doc holds; without this the next capture sees the
     // same edit again and pushes it again (and a restarted device would not reload the item).
     await deps.store.markMaterialized(item.key, texts.get(item.key) ?? null)
