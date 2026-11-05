@@ -17,10 +17,17 @@ export function retentionCursorPath(runtimeDir: string): string {
 
 export async function readRetentionCursor(runtimeDir: string): Promise<RetentionCursor | undefined> {
   try {
-    const parsed = JSON.parse(await readFile(retentionCursorPath(runtimeDir), "utf8")) as { readonly cursor?: { readonly store?: unknown; readonly lastName?: unknown } }
+    const parsed = JSON.parse(await readFile(retentionCursorPath(runtimeDir), "utf8")) as {
+      readonly cursor?: { readonly store?: unknown; readonly lastName?: unknown; readonly tier?: unknown; readonly clock?: unknown }
+    }
     const cursor = parsed.cursor
     if (typeof cursor?.store !== "string") return undefined
-    return typeof cursor.lastName === "string" ? { store: cursor.store, lastName: cursor.lastName } : { store: cursor.store }
+    return {
+      store: cursor.store,
+      ...(typeof cursor.lastName === "string" ? { lastName: cursor.lastName } : {}),
+      ...(typeof cursor.tier === "string" ? { tier: cursor.tier } : {}),
+      ...(typeof cursor.clock === "number" && Number.isFinite(cursor.clock) ? { clock: cursor.clock } : {}),
+    }
   } catch {
     return undefined
   }

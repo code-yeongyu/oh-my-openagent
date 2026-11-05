@@ -30,3 +30,25 @@ export {
   type RuntimeRetentionOptions,
   type RuntimeRetentionReport,
 } from "./pass"
+export {
+  RUNTIME_CAP_JOURNAL_FLOOR_MS,
+  RUNTIME_CAP_KEPT_UNFOLDED_RUNS,
+  RUNTIME_CAP_SIDECAR_FLOOR_MS,
+  runRuntimeSizeCap,
+  type RuntimeCapEviction,
+  type RuntimeCapKeepReason,
+  type RuntimeCapTier,
+  type RuntimeSizeCapOptions,
+  type RuntimeSizeCapReport,
+} from "./cap"
+export { countRuntimePastRetention, measureUnreflectedJournalBytes, type RuntimePastRetention } from "./past-retention"
+export {
+  DEFAULT_RUNTIME_MAX_BYTES,
+  RUNTIME_SIZE_WARN_RATIO,
+  formatRuntimeBytes,
+  measureRuntimeSize,
+  runtimeSizeStanding,
+  type RuntimeSize,
+  type RuntimeSizeStanding,
+  type RuntimeStoreSize,
+} from "./size"

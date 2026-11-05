@@ -15,3 +15,8 @@ export function resolveRuntimeRetentionPolicy(settings: OmoMemorySettings, ident
 }
 
 export { resolveForeignIdentityDiscardUnreflected } from "@oh-my-opencode/memory-core"
+
+/** `memory.runtime.max_bytes` for one identity (`0` = unbounded): `agents.<id>.runtime` wins. */
+export function resolveRuntimeMaxBytes(settings: OmoMemorySettings, identity: string): number {
+  return settings.agents[identity]?.runtime?.max_bytes ?? settings.runtime.max_bytes
+}

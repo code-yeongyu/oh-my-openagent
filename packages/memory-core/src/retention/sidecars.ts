@@ -16,7 +16,7 @@ import { LockContentionError, acquireLock, createLockRecord, releaseLock, type L
 import type { RetentionKeepReason } from "./policy"
 
 export const KIBITZER_SIDECAR_OWNER_LOCK_PURPOSE = "recall-sidecar"
-const KIBITZER_SIDECAR_TOMBSTONE_PREFIX = ".prune-"
+export const KIBITZER_SIDECAR_TOMBSTONE_PREFIX = ".prune-"
 export const KIBITZER_ENCODED_SESSION_PATTERN = /^[A-Za-z0-9_-]+$/
 const SIDECARS_DIRNAME = "sidecars"
 const OWNER_LOCK_PREFIX = "recall-sidecar."
@@ -187,3 +187,6 @@ function errorCode(error: unknown): string | undefined {
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
+
+/** The cap (cap.ts) evicts one sidecar through the same owner-lock claim, with its 1 h floor as the idle window. */
+export { claimAndRemove as claimKibitzerSidecar }

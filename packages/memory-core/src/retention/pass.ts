@@ -5,6 +5,7 @@
 // continues there; a pass that completes deletes the cursor.
 
 import { PassBudget, type RetentionCursor } from "./budget"
+import { runRuntimeSizeCap, type RuntimeSizeCapReport } from "./cap"
 import { pruneCompletions } from "./completions"
 import { LazyRetentionGuard } from "./guard"
 import { pruneTranscriptJournals } from "./journals"
@@ -19,6 +20,8 @@ import { clearRetentionCursor, readRetentionCursor, writeRetentionCursor } from 
 export interface RuntimeRetentionOptions extends Omit<RetentionContext, "budget"> {
   /** Encoded sidecar directory names this process's live sessions own. */
   readonly ownedSidecars?: ReadonlySet<string>
+  /** `memory.runtime.max_bytes`: when set, the size cap (design 3) runs after retention; `0` measures only. */
+  readonly maxBytes?: number
 }
 
 export interface RuntimeRetentionReport {
@@ -36,6 +39,8 @@ export interface RuntimeRetentionReport {
   readonly unreflectedGate?: UnreflectedRetentionGate
   /** Set when the pass stopped early (budget or abort); persisted for the next pass. */
   readonly cursor?: RetentionCursor
+  /** Present when `maxBytes` was set and retention finished inside the budget. */
+  readonly cap?: RuntimeSizeCapReport
 }
 
 const EMPTY: RetentionStoreResult = { removed: [], kept: {} }
@@ -68,6 +73,23 @@ export async function runRuntimeRetention(options: RuntimeRetentionOptions): Pro
   })
   const ledgers = await pruneRecallLedgers(context)
   const recallRuns = await pruneLegacyRecallRuns(context)
+  // The cap (design 3) runs last, inside what is left of the same budget, and resumes its own tier walk
+  // from a `cap` cursor in the same cursor file.
+  let cap: RuntimeSizeCapReport | undefined
+  if (options.maxBytes !== undefined && budget.stopped === undefined) {
+    cap = await runRuntimeSizeCap({
+      ...options,
+      maxBytes: options.maxBytes,
+      budgetMs: budget.remainingMs(),
+      measureSignal: options.signal === undefined
+        ? AbortSignal.timeout(budget.remainingMs())
+        : AbortSignal.any([options.signal, AbortSignal.timeout(budget.remainingMs())]),
+      ...(resume?.store === "cap" && resume.tier !== undefined && resume.clock !== undefined && resume.lastName !== undefined
+        ? { resume: { store: "cap", tier: resume.tier, clock: resume.clock, lastName: resume.lastName } }
+        : {}),
+    })
+    if (cap.cursor !== undefined) budget.stopped = cap.cursor
+  }
   if (budget.stopped !== undefined) {
     await writeRetentionCursor(options.paths.runtime, budget.stopped)
     if (budget.aborted) options.signal?.throwIfAborted()
@@ -86,6 +108,7 @@ export async function runRuntimeRetention(options: RuntimeRetentionOptions): Pro
     recallRuns,
     ...(unreflectedGate === undefined ? {} : { unreflectedGate }),
     ...(budget.stopped === undefined ? {} : { cursor: budget.stopped }),
+    ...(cap === undefined ? {} : { cap }),
   }
 }
 
@@ -96,7 +119,7 @@ export function summarizeRuntimeRetention(report: RuntimeRetentionReport): {
 } {
   const stores = [report.runs, report.completions, report.reflectionSessions, report.journals, report.sidecars, report.ledgers]
   return {
-    removed: stores.reduce((total, store) => total + store.removed.length, 0) + (report.recallRuns === "removed" ? 1 : 0),
+    removed: stores.reduce((total, store) => total + store.removed.length, 0) + (report.recallRuns === "removed" ? 1 : 0) + (report.cap?.evicted.length ?? 0),
     runs: report.runs.removed.length,
     completions: report.completions.removed.length,
     reflectionSessions: report.reflectionSessions.removed.length,
@@ -106,5 +129,14 @@ export function summarizeRuntimeRetention(report: RuntimeRetentionReport): {
     recallRuns: report.recallRuns,
     skipped: report.skipped,
     ...(report.cursor === undefined ? {} : { interruptedAt: report.cursor.store }),
+    ...(report.cap === undefined ? {} : {
+      capBytes: report.cap.maxBytes,
+      bytesBefore: report.cap.beforeBytes,
+      bytesAfter: report.cap.afterBytes,
+      evicted: report.cap.evicted.length,
+      evictedBytes: report.cap.evicted.reduce((total, entry) => total + entry.bytes, 0),
+      overCapBytes: report.cap.exceededBytes,
+      capKeptHighWater: Object.entries(report.cap.kept).filter(([, reason]) => reason === "high-water").map(([name]) => name),
+    }),
   }
 }

@@ -9,7 +9,7 @@ import { join } from "node:path"
 import { buildIdentityPaths, type MemoryIdentityPaths } from "../identity/layout"
 import { TranscriptJournal } from "../journal/store"
 
-const DAY_MS = 24 * 60 * 60 * 1000
+export const DAY_MS = 24 * 60 * 60 * 1000
 export const NOW = Date.parse("2026-11-05T00:00:00.000Z")
 export const now = (): number => NOW
 export const daysAgo = (days: number): number => NOW - days * DAY_MS

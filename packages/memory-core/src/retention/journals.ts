@@ -218,3 +218,17 @@ async function stampPruned(statePath: string, now: number): Promise<void> {
     throw error
   }
 }
+
+/**
+ * Lock-free verdict for one journal under `context.policy` and `gate`; the cap passes its tier floors
+ * as the policy and an open gate to learn each journal's class, then applies the switch and gate itself.
+ */
+export async function classifyTranscriptJournal(
+  context: RetentionContext,
+  dir: string,
+  gate: UnreflectedRetentionGate = { open: true },
+): Promise<Verdict> {
+  return judge(context, dir, false, gate)
+}
+
+export { removeUnderLock as removeTranscriptJournalUnderLock }

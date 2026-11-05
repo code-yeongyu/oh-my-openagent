@@ -53,6 +53,26 @@ export function resolveGlobalMemorySettings(input: { readonly env: OmoConfigEnv 
   return { runtime: memory.runtime, agents: memory.agents }
 }
 
+/** `memory.runtime.max_bytes` for `omo doctor`: the resolved default and every `agents.<id>.runtime` override. */
+export type MemoryRuntimeCaps = {
+  readonly maxBytes: number
+  readonly agents: Readonly<Record<string, number>>
+  /** `memory.runtime.discard_unreflected_journals` and its `agents.<id>.runtime` overrides. */
+  readonly discardUnreflectedJournals: boolean
+  readonly discardAgents: Readonly<Record<string, boolean>>
+}
+
+export function resolveMemoryRuntimeCaps(input: { readonly cwd: string; readonly env: OmoConfigEnv }): MemoryRuntimeCaps {
+  const memory = loadOmoConfig({ cwd: input.cwd, env: input.env, harness: "senpi" }).config.memory ?? OmoMemorySettingsSchema.parse({})
+  const agents: Record<string, number> = {}
+  const discardAgents: Record<string, boolean> = {}
+  for (const [id, override] of Object.entries(memory.agents)) {
+    if (override.runtime?.max_bytes !== undefined) agents[id] = override.runtime.max_bytes
+    if (override.runtime?.discard_unreflected_journals !== undefined) discardAgents[id] = override.runtime.discard_unreflected_journals
+  }
+  return { maxBytes: memory.runtime.max_bytes, agents, discardUnreflectedJournals: memory.runtime.discard_unreflected_journals, discardAgents }
+}
+
 export function resolveDaemonTaskSettings(input: { readonly cwd: string; readonly env: OmoConfigEnv }): DaemonTaskSettings {
   // The same config view the extension's task runner loads (omo-senpi config-resolution: harness "senpi").
   const loaded = loadOmoConfig({ cwd: input.cwd, env: input.env, harness: "senpi" })

@@ -6,7 +6,7 @@ import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import { buildDreamTriggerWiring } from "./dream-runtime-wiring"
 import { resolveMemorySettings } from "./identity-runtime"
 import { createMemoryMaintenance } from "./memory-maintenance"
-import { resolveRuntimeRetentionPolicy } from "./memory-runtime-retention"
+import { resolveRuntimeMaxBytes, resolveRuntimeRetentionPolicy } from "./memory-runtime-retention"
 import { resolveAgentReflectionSettings } from "./reflection-settings"
 import { encodeKibitzerSessionId } from "./kibitzer/observe-paths"
 import { createMemoryNudgeWiring } from "./nudge-wiring"
@@ -170,6 +170,8 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
       resolveRuntimeRetentionPolicy(resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory), context.identity),
     reflectionEnabled: (context) =>
       resolveAgentReflectionSettings(options.loadConfig({ cwd: options.cwd() }).config.memory, context.identity).enabled,
+    resolveMaxBytes: (context) =>
+      resolveRuntimeMaxBytes(resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory), context.identity),
     ownedSidecars: () => new Set([...options.sessions.keys()].map(encodeKibitzerSessionId)),
     // Driver 2 never runs under CI or in a task child; foreign identities use the global layer only.
     hostSweep: () => process.env.CI !== undefined || process.env.OMO_SENPI_TASK_RPC_CHILD === "1"

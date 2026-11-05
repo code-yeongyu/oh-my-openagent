@@ -2,6 +2,7 @@ import { existsSync } from "@oh-my-opencode/memory-core/fs"
 import { dirname } from "node:path"
 
 import {
+  DEFAULT_RUNTIME_MAX_BYTES,
   DEFAULT_RUNTIME_RETENTION,
   readHostSweepState,
   type ForeignMemoryRuntimeSettings,
@@ -40,6 +41,8 @@ export interface MemoryMaintenanceOptions {
   readonly resolveRetention?: (context: MemoryIdentityContext) => RuntimeRetentionPolicy
   /** `memory.reflection.enabled` for the identity: the health gate only guards identities that reflect. */
   readonly reflectionEnabled?: (context: MemoryIdentityContext) => boolean
+  /** `memory.runtime.max_bytes` for this identity (`0` = unbounded); defaults to the documented 2 GiB. */
+  readonly resolveMaxBytes?: (context: MemoryIdentityContext) => number
   /** Encoded sidecar directory names this process's live sessions own. */
   readonly ownedSidecars?: () => ReadonlySet<string>
   /**
@@ -88,9 +91,10 @@ const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000
  *   exit) cancels it and stops a running git, and every failure is logged, never raised.
  * - Runtime retention (#10144) runs inside the same gate, after the pack: one pass per identity per
  *   interval removes folded reflection runs, idle journals, sidecars and legacy stores past their
- *   `memory.runtime` windows. It is abort-aware between items and logs one summary line. The pass and
- *   the host sweep load from the memory commands sidecar only when one is due, which keeps them out of
- *   the entry bundle; a failed load is logged like any other failure of that step.
+ *   `memory.runtime` windows; the size cap then evicts oldest-first down to `max_bytes` (#10144, design 3).
+ *   It is abort-aware between items and logs one summary line. The pass and the host sweep load from the
+ *   memory commands sidecar only when one is due, which keeps them out of the entry bundle; a failed load
+ *   is logged like any other failure of that step.
  * - Empty transcript journals left by older builds (#9737) are swept once per identity per process, at
  *   once rather than behind the delay: control sessions exit within seconds and dispose() would cancel it.
  */
@@ -138,6 +142,7 @@ export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}):
       const report = await runRuntimeRetention({
         paths: context.identityPaths,
         policy: options.resolveRetention?.(context) ?? DEFAULT_RUNTIME_RETENTION,
+        maxBytes: options.resolveMaxBytes?.(context) ?? DEFAULT_RUNTIME_MAX_BYTES,
         now,
         signal,
         reflectionEnabled: options.reflectionEnabled?.(context) ?? true,
@@ -151,6 +156,13 @@ export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}):
       }
       // The completion stamp is written after the work, so an interrupted pass resumes at the next bind.
       if (report.cursor === undefined) await repo.configSet(RETENTION_STAMP_CONFIG_KEY, String(now()))
+      if (report.cap !== undefined && report.cap.exceededBytes > 0) {
+        options.logger?.warn("omo-senpi memory runtime cap exceeded, nothing evictable", {
+          identity: context.identity,
+          overCapBytes: report.cap.exceededBytes,
+          kept: report.cap.kept,
+        })
+      }
     } catch (error) {
       if (signal.aborted) throw error
       options.logger?.warn("omo-senpi memory runtime retention failed", {
