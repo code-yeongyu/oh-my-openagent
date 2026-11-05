@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:f2ad355eec078382167caa8ee2c25b6393ad79be1c47f6266dec84e796d2adbf:1939d3601687ca5dd10ae18034a4ff0d7e131a7c7b99e64019cdd034d81fbd5e
+// omo-codex-install:1218f62d476dd8deab5bfa77fbece7c202510c391383c731ff2f240d20d6af5a:f9df7ace5ed990704f18d9b41551e1db559fa69b564a8fea080b11d74e662460
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -20270,6 +20270,15 @@ var OmoTelemetrySettingsSchema = OmoTelemetrySettingsLayerSchema.extend({
   enabled: boolean2().default(true)
 }).strict();
 
+// packages/omo-config-core/src/schema/device-service.ts
+var OmoDeviceServiceSettingsShape = {
+  enabled: boolean2()
+};
+var OmoDeviceServiceSettingsLayerSchema = object(OmoDeviceServiceSettingsShape).partial().strict();
+var OmoDeviceServiceSettingsSchema = OmoDeviceServiceSettingsLayerSchema.extend({
+  enabled: boolean2().default(true)
+}).strict();
+
 // packages/omo-config-core/src/schema/format-on-mutation.ts
 var mode = _enum(["off", "best-effort", "required"]);
 var languages = record(string2(), boolean2()).optional();
@@ -20312,6 +20321,7 @@ var OmoTypedHarnessConfigSchema = object({
   model_pad: OmoModelPadSchema.optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+  device_service: OmoDeviceServiceSettingsLayerSchema.optional(),
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),
   computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
@@ -20331,6 +20341,7 @@ var OmoConfigProfileSchema = object({
   model_pad: OmoModelPadSchema.optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+  device_service: OmoDeviceServiceSettingsLayerSchema.optional(),
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),
   computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
@@ -20355,6 +20366,7 @@ var OmoConfigSchema = object({
   model_pad: OmoModelPadSchema.optional(),
   memory: OmoMemorySettingsSchema.optional(),
   telemetry: OmoTelemetrySettingsSchema.optional(),
+  device_service: OmoDeviceServiceSettingsSchema.optional(),
   side_panel: OmoSidePanelSettingsSchema.optional(),
   computer: OmoComputerSettingsSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
@@ -20382,6 +20394,7 @@ var OmoConfigLayerSchema = object({
   model_pad: OmoModelPadSchema.optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+  device_service: OmoDeviceServiceSettingsLayerSchema.optional(),
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),
   computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
