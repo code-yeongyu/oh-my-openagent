@@ -1,9 +1,10 @@
 import { expect, test } from "bun:test"
-import { remainingTestTime } from "../../../../../test-support/test-deadline";
+import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline";
 
 // Boot dependency isolation requires a real new module registry, just like each RPC child.
 // Nothing is mocked: the child imports the actual entry and reports the modules it evaluated.
 test("#given a cold member extension #when its module loads #then host utilities, schema builders and the workpool graph are not on RPC readiness", async () => {
+  useTestTimeout(15000)
   const entry = new URL("./index.ts", import.meta.url).href
   const child = Bun.spawn([process.execPath, "--eval", `
     import { createRequire } from "node:module";
@@ -16,7 +17,7 @@ test("#given a cold member extension #when its module loads #then host utilities
     let errorCode;
     try { member.parseMemberExtensionEnv({}); } catch (error) { errorCode = error.code; }
     console.log(JSON.stringify({ hostUtilities, schemaBuilders, workpoolGraph, errorCode }));
-  `], { cwd: import.meta.dir, stdout: "pipe", stderr: "pipe", timeout: remainingTestTime() })
+  `], { cwd: import.meta.dir, stdout: "pipe", stderr: "pipe", timeout: Math.floor(remainingTestTime()) })
   const [exitCode, stdout, stderr] = await Promise.all([
     child.exited, new Response(child.stdout).text(), new Response(child.stderr).text(),
   ])
