@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
-import { bounded } from "../lifecycle/__fixtures__/live-parent-clock"
+import { bounded, LIVE_PARENT_TEARDOWN_BOUND_MS } from "../lifecycle/__fixtures__/live-parent-clock"
 import { baseSpec, cleanupProjects, launchSettled, makeManager } from "../manager/__fixtures__/manager-fakes"
 import { createRpcManagedRunner } from "../manager/runner"
 import { hostRunnerHarness } from "./rpc-host.test-support"
@@ -67,8 +67,8 @@ describe("host first-prompt refusal cleanup", () => {
     } finally {
       releasePrompt()
       release.resolve()
-      await bounded(runner.settleTeardowns())
-      await bounded(manager.settleLaunchesForShutdown?.(2_000) ?? Promise.resolve())
+      await bounded(runner.settleTeardowns(), LIVE_PARENT_TEARDOWN_BOUND_MS)
+      await bounded(manager.settleLaunchesForShutdown?.(2_000) ?? Promise.resolve(), LIVE_PARENT_TEARDOWN_BOUND_MS)
     }
   })
 })

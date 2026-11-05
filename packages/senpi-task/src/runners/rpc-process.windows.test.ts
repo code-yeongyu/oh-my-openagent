@@ -4,7 +4,6 @@ import { dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 import { expect, test } from "bun:test"
 import { windowsTreeKillArgs } from "../../../memory-core/src/concurrency/windows-process-tree.mjs"
-import { remainingTestTime, useTestTimeout } from "../../../../test-support/test-deadline"
 
 const isWin32 = process.platform === "win32"
 const probePath = fileURLToPath(
@@ -67,7 +66,6 @@ async function terminateProcessTree(child: ChildProcess): Promise<void> {
 test.skipIf(!isWin32)(
   "#given a console-less parent #when the default RPC child starts #then windowsHide suppresses its console",
   async () => {
-    useTestTimeout(PROBE_TIMEOUT_MS + CLEANUP_TIMEOUT_MS + 10_000)
     // given
     const probe = spawn(process.execPath, [probePath], {
       cwd: dirname(probePath),
@@ -104,7 +102,7 @@ test.skipIf(!isWin32)(
       deadline.cancel()
       if (!closeObserved) {
         await terminateProcessTree(probe)
-        const cleanupDeadline = createDeadline(remainingTestTime(), "Windows console probe cleanup")
+        const cleanupDeadline = createDeadline(CLEANUP_TIMEOUT_MS, "Windows console probe cleanup")
         try {
           await Promise.race([close, cleanupDeadline.promise])
         } finally {

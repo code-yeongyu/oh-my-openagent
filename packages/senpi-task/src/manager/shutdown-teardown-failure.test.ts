@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, jest, test } from "bun:test"
 import { setImmediate } from "node:timers/promises"
 
-import { bounded } from "../lifecycle/__fixtures__/live-parent-clock"
+import { bounded, LIVE_PARENT_TEARDOWN_BOUND_MS } from "../lifecycle/__fixtures__/live-parent-clock"
 import { readEvents } from "../lifecycle/__fixtures__/lifecycle-fakes"
 import { baseSpec, cleanupProjects, FakeRunner, makeHandle, makeManager } from "./__fixtures__/manager-fakes"
 import type { ManagedRunner } from "./types"
@@ -61,8 +61,8 @@ describe("shutdown teardown failure containment", () => {
         jest.useRealTimers()
         clearTimeout(timer)
         release.resolve()
-        await bounded(starting)
-        await bounded(manager.whenLaunched?.(taskId) ?? Promise.resolve())
+        await bounded(starting, LIVE_PARENT_TEARDOWN_BOUND_MS)
+        await bounded(manager.whenLaunched?.(taskId) ?? Promise.resolve(), LIVE_PARENT_TEARDOWN_BOUND_MS)
       }
       expect(manager.residentTaskIds()).not.toContain(taskId)
       expect(disposed).toBe(true)
