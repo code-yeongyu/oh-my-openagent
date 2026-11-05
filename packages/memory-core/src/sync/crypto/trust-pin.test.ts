@@ -11,7 +11,8 @@ import * as cryptoIndex from "./index.ts"
 import { createRejectionCounter } from "./rejection.ts"
 import { genesisEntry, newDeviceKeyring, newRecoveryCredential } from "./testing/genesis.ts"
 import { ACCOUNT, fixtureAnchor, mainChain, record } from "./testing/sync-v1.test-support.ts"
-import { forgetTrustAnchor, loadTrustAnchor, pinTrustAnchor, TrustPinError } from "./trust-pin.ts"
+import { retireSyncDevice } from "../device-retire.ts"
+import { forgetTrustAnchor, loadTrustAnchor, pinTrustAnchor, rootChangedSinceRetired, TrustPinError } from "./trust-pin.ts"
 
 const dirs: string[] = []
 afterEach(() => {
@@ -181,5 +182,37 @@ describe("publishing the pin is durable, and a lost race is decided by the winne
     const loaded = await loadTrustAnchor(dir, ACCOUNT)
     expect(loaded.ok && loaded.anchor.genesisDigest).toBe(winner.genesisDigest)
     expect(readdirSync(join(dir, "trust-anchor"))).toEqual([dirname(relative(join(dir, "trust-anchor"), pinPath(dir)))])
+  })
+})
+
+// #12280 R-B5: a retired pin never blocks a ceremony, and a ceremony that pins a different root than the
+// one retired is flagged (a non-blocking notice), never refused.
+describe("a pin retired when its principal's keys are discarded (#12280)", () => {
+  test("#given a retired pin #when a ceremony pins the same root #then no root change is reported", async () => {
+    const dir = stateDir()
+    const candidate = await provenCandidate()
+    await pinTrustAnchor(dir, ACCOUNT, candidate)
+    await retireSyncDevice({ pinDir: dir, account: ACCOUNT })
+    await expectNoAnchor(dir, "no_pin")
+    await pinTrustAnchor(dir, ACCOUNT, candidate)
+    expect(await rootChangedSinceRetired(dir, ACCOUNT, candidate.genesisDigest)).toBe(false)
+  })
+
+  test("#given a retired pin #when a ceremony pins a different root #then it is pinned, not refused, and the change is reported", async () => {
+    const dir = stateDir()
+    await pinned(dir)
+    await retireSyncDevice({ pinDir: dir, account: ACCOUNT })
+    const other = await otherCandidate()
+    expect((await pinTrustAnchor(dir, ACCOUNT, other)).genesisDigest).toBe(other.genesisDigest)
+    expect(await rootChangedSinceRetired(dir, ACCOUNT, other.genesisDigest)).toBe(true)
+  })
+
+  test("#given no pin ever retired #then no root change is reported", async () => {
+    const dir = stateDir()
+    expect(await rootChangedSinceRetired(dir, ACCOUNT, (await provenCandidate()).genesisDigest)).toBe(false)
+  })
+
+  test("the retire seam stays out of the crypto barrel", () => {
+    expect(Object.keys(cryptoIndex)).not.toContain("retireSyncDevice")
   })
 })

@@ -21,7 +21,7 @@ for (const scenario of ["terminal", "network", "body", "management", "unknown-co
     await store.write({ ...grant, ...privateKeys, accessTokenExpiresAt: "2000-01-01T00:00:00Z" })
     const action = scenario === "management" || scenario === "unknown-code"
       ? requestApi(api, "/v1/device/token", jsonRequest({ deviceCode: minted.deviceCode }))
-      : createSession({ api, store, home: await temporaryHome() }).accessToken()
+      : createSession({ beforeKeysDiscarded: async () => undefined, api, store, home: await temporaryHome() }).accessToken()
     const error: unknown = await action.catch(error => error)
     expect(error).toBeInstanceOf(Error)
     for (const secret of secrets) expect(`${String(error)} ${JSON.stringify(error)} ${inspect(error)}`).not.toContain(secret)
@@ -30,7 +30,7 @@ for (const scenario of ["terminal", "network", "body", "management", "unknown-co
 
 for (const origin of ["http://example.com", "http://localhost:8080", "http://127.0.0.1", "http://[::1]:8080", "file:///tmp/test", "javascript:alert(1)"]) {
   test(`API override rejects insecure origin ${origin}`, () => {
-    expect(() => createSession({ api: origin, store: memorySecrets().store("https://example.com") })).toThrow()
+    expect(() => createSession({ beforeKeysDiscarded: async () => undefined, api: origin, store: memorySecrets().store("https://example.com") })).toThrow()
   })
 }
 
