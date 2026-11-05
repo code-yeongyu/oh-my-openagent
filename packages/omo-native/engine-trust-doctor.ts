@@ -1,8 +1,8 @@
 import { readFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
-/** The marker fields doctor reads: where the generation lives and which one it is. */
-export type EngineTrustDoctorMarker = { readonly file: string; readonly sha256: string }
+/** The marker fields doctor reads: where the generation lives, which one it is, and whether OS roots made it. */
+export type EngineTrustDoctorMarker = { readonly file: string; readonly sha256: string; readonly automatic: "os" | "fallback" }
 
 type DropFields = { file?: unknown; cause?: unknown; blockIndex?: unknown; narrowing?: unknown }
 
@@ -10,7 +10,11 @@ type DropFields = { file?: unknown; cause?: unknown; blockIndex?: unknown; narro
  * Design revision 11: a default-file drop is visible at the diagnostic level only, so every line is INFO.
  * The last import-exec or ensure record of the adopted generation is the one that made it.
  */
-export function engineTrustDoctorLines(input: { readonly marker: EngineTrustDoctorMarker | undefined; readonly records: readonly unknown[] }): string[] {
+export function engineTrustDoctorLines(input: {
+  readonly platform: NodeJS.Platform
+  readonly marker: EngineTrustDoctorMarker | undefined
+  readonly records: readonly unknown[]
+}): string[] {
   const { marker } = input
   if (marker === undefined) return []
   const made = input.records.filter((record): record is { codes: unknown[] } => {
@@ -25,6 +29,8 @@ export function engineTrustDoctorLines(input: { readonly marker: EngineTrustDoct
   if (drop !== undefined) {
     return [`INFO engine trust: default file ${String(drop.file)} dropped: ${String(drop.cause)}, block ${String(drop.blockIndex)}, narrowing=${String(drop.narrowing)}`]
   }
+  // Only a macOS generation built from OS roots read the default file; any other generation has no status to state.
+  if (input.platform !== "darwin" || marker.automatic !== "os") return []
   return [`INFO engine trust: generation ${marker.sha256.slice(0, 12)}, default-file: ${malformed.length > 0 ? "unreadable" : "kept"}`]
 }
 

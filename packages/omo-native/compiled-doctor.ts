@@ -60,7 +60,7 @@ function computerUseLines(input: CompiledDoctorInput, env: NodeJS.ProcessEnv): P
 async function trustLines(options: CompiledDoctorOptions): Promise<string[]> {
   if (options.trustLines) return options.trustLines()
   const marker = adoptedEngineTrust()
-  return engineTrustDoctorLines({ marker, records: await readEngineTrustRecords(marker) })
+  return engineTrustDoctorLines({ platform: process.platform, marker, records: await readEngineTrustRecords(marker) })
 }
 
 function coverageLines(input: CompiledDoctorInput, env: NodeJS.ProcessEnv): Promise<string[]> {

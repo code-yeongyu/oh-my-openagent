@@ -10,25 +10,25 @@ const other = "f".repeat(64)
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
 
-const marker = (file = "/trust/gen.pem") => ({ file, sha256: sha })
+const marker = (file = "/trust/gen.pem", automatic: "os" | "fallback" = "os") => ({ file, sha256: sha, automatic })
 const drop = { code: "openssl-default-file-malformed", file: "/etc/ssl/cert.pem", cause: "ordinary-block-unparseable", blockIndex: 3, narrowing: true }
 const record = (generation: string, action: string, codes: unknown[]) => ({ v: 1, at: "2026-11-05T00:00:00.000Z", pid: 1, kind: "long-lived", action, generation, codes })
 
 describe("engine trust doctor lines (design revision 11)", () => {
   test("#given the marker's generation dropped the default file #when formatted #then one INFO line names the file, cause, block and narrowing", () => {
-    expect(engineTrustDoctorLines({ marker: marker(), records: [record(sha, "import-exec", [{ code: "trust-generation-recognized" }, drop])] })).toEqual([
+    expect(engineTrustDoctorLines({ platform: "darwin", marker: marker(), records: [record(sha, "import-exec", [{ code: "trust-generation-recognized" }, drop])] })).toEqual([
       "INFO engine trust: default file /etc/ssl/cert.pem dropped: ordinary-block-unparseable, block 3, narrowing=true",
     ])
   })
 
   test("#given the marker's generation kept the default file #when formatted #then one INFO line says kept", () => {
-    expect(engineTrustDoctorLines({ marker: marker(), records: [record(sha, "ensure", [])] })).toEqual([
+    expect(engineTrustDoctorLines({ platform: "darwin", marker: marker(), records: [record(sha, "ensure", [])] })).toEqual([
       "INFO engine trust: generation 0123456789ab, default-file: kept",
     ])
   })
 
   test("#given the default file could not be read #when formatted #then the line says unreadable, never kept", () => {
-    expect(engineTrustDoctorLines({ marker: marker(), records: [record(sha, "import-exec", [{ code: "openssl-default-file-malformed" }])] })).toEqual([
+    expect(engineTrustDoctorLines({ platform: "darwin", marker: marker(), records: [record(sha, "import-exec", [{ code: "openssl-default-file-malformed" }])] })).toEqual([
       "INFO engine trust: generation 0123456789ab, default-file: unreadable",
     ])
   })
@@ -41,13 +41,21 @@ describe("engine trust doctor lines (design revision 11)", () => {
       record(sha, "adopt", [drop]),
       record(other, "import-exec", [drop]),
     ]
-    expect(engineTrustDoctorLines({ marker: marker(), records })).toEqual(["INFO engine trust: generation 0123456789ab, default-file: kept"])
+    expect(engineTrustDoctorLines({ platform: "darwin", marker: marker(), records })).toEqual(["INFO engine trust: generation 0123456789ab, default-file: kept"])
+  })
+
+  test("#given a generation that never read the default file #when formatted #then doctor states no default-file status", () => {
+    const records = [record(sha, "ensure", [])]
+    expect(engineTrustDoctorLines({ platform: "linux", marker: marker(), records })).toEqual([])
+    expect(engineTrustDoctorLines({ platform: "win32", marker: marker(), records })).toEqual([])
+    expect(engineTrustDoctorLines({ platform: "darwin", marker: marker("/trust/gen.pem", "fallback"), records })).toEqual([])
+    expect(engineTrustDoctorLines({ platform: "darwin", marker: marker("/trust/gen.pem", "fallback"), records: [record(sha, "ensure", [{ code: "openssl-default-file-malformed" }])] })).toEqual([])
   })
 
   test("#given no marker or no record of its generation #when formatted #then doctor prints nothing", () => {
-    expect(engineTrustDoctorLines({ marker: undefined, records: [record(sha, "ensure", [drop])] })).toEqual([])
-    expect(engineTrustDoctorLines({ marker: marker(), records: [record(other, "ensure", [drop]), record(sha, "adopt", [])] })).toEqual([])
-    expect(engineTrustDoctorLines({ marker: marker(), records: [] })).toEqual([])
+    expect(engineTrustDoctorLines({ platform: "darwin", marker: undefined, records: [record(sha, "ensure", [drop])] })).toEqual([])
+    expect(engineTrustDoctorLines({ platform: "darwin", marker: marker(), records: [record(other, "ensure", [drop]), record(sha, "adopt", [])] })).toEqual([])
+    expect(engineTrustDoctorLines({ platform: "darwin", marker: marker(), records: [] })).toEqual([])
   })
 
   test("#given the rotated and the current log beside the generation #when read #then the newest record wins and broken lines are skipped", async () => {
@@ -56,7 +64,7 @@ describe("engine trust doctor lines (design revision 11)", () => {
     writeFileSync(join(dir, "diagnostics.1.jsonl"), `${JSON.stringify(record(sha, "ensure", []))}\n`)
     writeFileSync(join(dir, "diagnostics.jsonl"), `not json\n${JSON.stringify(record(sha, "import-exec", [drop]))}\n{"trunc`)
     const records = await readEngineTrustRecords(marker(join(dir, `${sha}.pem`)))
-    expect(engineTrustDoctorLines({ marker: marker(), records })).toEqual([
+    expect(engineTrustDoctorLines({ platform: "darwin", marker: marker(), records })).toEqual([
       "INFO engine trust: default file /etc/ssl/cert.pem dropped: ordinary-block-unparseable, block 3, narrowing=true",
     ])
   })
