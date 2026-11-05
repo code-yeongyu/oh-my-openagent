@@ -42,7 +42,7 @@ function manualDeadlines() {
       waiting.push({ step, expire: resolve })
       arrived.emit("armed")
     }),
-    armed: () => once(arrived, "armed", { signal: testBudgetSignal() }),
+    armed: () => once(arrived, "armed", { signal: testBudgetSignal("arrived to emit 'armed'") }),
     expireAll: () => { for (const entry of waiting.splice(0)) entry.expire() },
     pendingSteps: () => waiting.map((entry) => entry.step),
   }
@@ -65,7 +65,7 @@ function watchEvents(store: TaskRecordStore) {
       return path
     },
   }
-  const next = (type: string, taskId: string) => once(events, `${type}:${taskId}`, { signal: testBudgetSignal() })
+  const next = (type: string, taskId: string) => once(events, `${type}:${taskId}`, { signal: testBudgetSignal(`the ${type}:${taskId} event`) })
   return { watched, next }
 }
 

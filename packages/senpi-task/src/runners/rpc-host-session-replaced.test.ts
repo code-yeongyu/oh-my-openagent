@@ -146,7 +146,7 @@ describe("a child whose session the host replaces", () => {
     const live = child.world.host.sessions().find((session) => session.sessionPath === sessionFile)
     if (live === undefined) throw new Error("the host holds no session at the replaced path")
     child.world.host.completeTurn(live.routingId, "done after replace")
-    const done = await child.parent.manager.waitFor(child.record.task_id, { signal: testBudgetSignal() })
+    const done = await child.parent.manager.waitFor(child.record.task_id, { signal: testBudgetSignal("child.parent.manager.waitFor to settle") })
     expect(done.status).toBe("completed")
     expect(done.final_response).toBe("done after replace")
   })

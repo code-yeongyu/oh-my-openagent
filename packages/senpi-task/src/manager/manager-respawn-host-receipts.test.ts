@@ -34,7 +34,7 @@ describe("receipt-driven host respawn lifecycle", () => {
       await f.resumed
       expect(statuses).toContain("interrupted")
       expect(f.host.commands.filter((command) => command.type === "prompt")).toHaveLength(2)
-      const final = f.manager.waitFor(f.record.task_id, { signal: testBudgetSignal() })
+      const final = f.manager.waitFor(f.record.task_id, { signal: testBudgetSignal("f.manager.waitFor to settle") })
       const session = f.host.sessions()[0]
       if (session === undefined) throw new Error("missing host session")
       f.host.completeTurn(session.routingId, "CONTINUATION ANSWER")
@@ -76,7 +76,7 @@ describe("receipt-driven host respawn lifecycle", () => {
   test("a failed turn receipt enters the existing child-turn failure path and renders its reason", async () => {
     const f = await stoppedChild({ state: "done", outcome: { kind: "error", reason: "provider_unavailable", detail: "Synthetic provider was unavailable.", action: "Retry the child after the provider recovers." } })
     await f.manager.reattach(f.record, f.result.handle)
-    const failed = await f.manager.waitFor(f.record.task_id, { signal: testBudgetSignal() })
+    const failed = await f.manager.waitFor(f.record.task_id, { signal: testBudgetSignal("f.manager.waitFor to settle") })
     expect(failed.status).toBe("error")
     expect(failed.final_response).toBeUndefined()
     await assertRenderedReason(f)
@@ -92,7 +92,7 @@ describe("receipt-driven host respawn lifecycle", () => {
     await f.manager.sendToTask({ idOrName: f.record.task_id, message: "continue", callerSessionId: "parent" })
     f.startContinuation()
     await started.promise
-    const completed = f.manager.waitFor(f.record.task_id, { signal: testBudgetSignal() })
+    const completed = f.manager.waitFor(f.record.task_id, { signal: testBudgetSignal("f.manager.waitFor to settle") })
     const session = f.host.sessions()[0]
     if (session === undefined) throw new Error("missing explicitly resumed session")
     f.host.completeTurn(session.routingId, "EXPLICIT ANSWER")

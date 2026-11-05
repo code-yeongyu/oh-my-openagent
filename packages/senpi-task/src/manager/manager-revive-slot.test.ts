@@ -21,7 +21,7 @@ describe("TaskManager revive concurrency slot", () => {
       expect((await h.manager.interruptTask(h.record.task_id)).kind).toBe("noop")
       expect((await h.send("AGAIN")).kind).toBe("revived")
       expect(h.store.load(h.record.task_id)?.notification.run_epoch).toBe(2)
-      const terminal = h.manager.waitFor(h.record.task_id, { signal: testBudgetSignal() })
+      const terminal = h.manager.waitFor(h.record.task_id, { signal: testBudgetSignal("h.manager.waitFor to settle") })
       h.fake.settle({ status: "completed", finalResponse: "DONE" })
       await terminal
       const next = await h.manager.start({ prompt: "next", parent_session_id: "parent", depth: 1 })
@@ -47,7 +47,7 @@ describe("TaskManager revive concurrency slot", () => {
     })
     const a = await manager.start(baseSpec({ name: "a" }))
     if (a.kind !== "started") throw new Error("expected started")
-    const firstTerminal = manager.waitFor(a.task_id, { signal: testBudgetSignal() })
+    const firstTerminal = manager.waitFor(a.task_id, { signal: testBudgetSignal("manager.waitFor to settle") })
     inProcess.handles.get(a.task_id)?.settle({ status: "completed", finalResponse: "first" })
     await firstTerminal
     expect(store.load(a.task_id)?.status).toBe("completed")
@@ -63,7 +63,7 @@ describe("TaskManager revive concurrency slot", () => {
     expect(b.status).toBe("pending")
 
     // when the revived task A completes a second time, releasing the re-acquired slot
-    const nextRunning = once(events, `running:${b.task_id}`, { signal: testBudgetSignal() })
+    const nextRunning = once(events, `running:${b.task_id}`, { signal: testBudgetSignal(`the running:${b.task_id} event`) })
     inProcess.handles.get(a.task_id)?.settle({ status: "completed", finalResponse: "second" })
     await nextRunning
 

@@ -136,7 +136,7 @@ describe("runtime fallback of a daemon-session child", () => {
     const task = await owner.start(baseSpec({ execution_mode: "process" }))
     if (task.kind !== "started") throw new Error("expected the task to start")
     runner.watchedTaskId = task.task_id
-    const finished = owner.waitFor(task.task_id, { signal: testBudgetSignal() })
+    const finished = owner.waitFor(task.task_id, { signal: testBudgetSignal("owner.waitFor to settle") })
 
     try {
       // when: the first rung fails and, while the daemon is still closing its session, the next

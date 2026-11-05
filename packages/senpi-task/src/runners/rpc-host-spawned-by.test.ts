@@ -99,7 +99,7 @@ test.each(["fresh", "keep_alive"] as const)("workpool %s worker keeps ancestry a
     // when two items run in fresh workers or the same resident worker
     const ids: string[] = []
     for (const key of ["first", "second"]) {
-      const dispatched = pools.waitForEvent(pool.pool_id, "dispatched", testBudgetSignal())
+      const dispatched = pools.waitForEvent(pool.pool_id, "dispatched", testBudgetSignal("pools.waitForEvent to settle"))
       pools.push(caller, pool.pool_id, [{ key, input: key }])
       const event = await dispatched
       if (event.task_id === undefined || event.run_epoch === undefined) throw new Error("worker task missing")
@@ -110,7 +110,7 @@ test.each(["fresh", "keep_alive"] as const)("workpool %s worker keeps ancestry a
       }).results[0]?.status).toBe("accepted")
       const session = f.host.sessions().find((entry) => entry.sessionPath.includes(event.task_id ?? "missing"))
       if (session === undefined) throw new Error("worker session missing")
-      const idle = pools.waitForEvent(pool.pool_id, "worker_idle", testBudgetSignal())
+      const idle = pools.waitForEvent(pool.pool_id, "worker_idle", testBudgetSignal("pools.waitForEvent to settle"))
       f.host.completeTurn(session.routingId, "done")
       await idle
     }

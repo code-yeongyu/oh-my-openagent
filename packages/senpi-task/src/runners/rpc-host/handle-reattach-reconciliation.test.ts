@@ -55,7 +55,7 @@ describe("host recovery adopts a turn finished during the transport gap", () => 
 
         // A later outcome must still reach the manager, proving its tracker remains armed.
         host.failReply("get_state", undefined)
-        const finished = manager.waitFor(record.task_id, { signal: testBudgetSignal() })
+        const finished = manager.waitFor(record.task_id, { signal: testBudgetSignal("manager.waitFor to settle") })
         host.completeTurn(handle.hostSession.routingId, "LIVE TURN ANSWER")
         expect((await finished).final_response).toBe("LIVE TURN ANSWER")
       } finally {

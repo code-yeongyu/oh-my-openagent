@@ -161,7 +161,7 @@ describe("reconcile of a dead workpool worker", () => {
     // given
     const pool = fixture({ config: { default_execution_mode: "process" } })
     const created = pool.manager.workpools.create(pool.caller, poolInput)
-    const dispatched = pool.manager.workpools.waitForEvent(created.pool_id, "dispatched", testBudgetSignal())
+    const dispatched = pool.manager.workpools.waitForEvent(created.pool_id, "dispatched", testBudgetSignal("pool.manager.workpools.waitForEvent to settle"))
     pool.manager.workpools.push(pool.caller, created.pool_id, [{ key: "once", input: "non-replayable work" }])
     const event = await dispatched
     if (event.task_id === undefined) throw new Error("the pool dispatched no worker")

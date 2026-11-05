@@ -86,7 +86,7 @@ describe("runtime fallback over a live daemon session", () => {
       // timer armed before the grace clock is frozen, so it arrives in real time either way.
       const releaseClose = lateReply ? host.holdReply("close_session") : undefined
       const lateClose = releaseClose === undefined ? undefined : setTimeout(releaseClose, 200)
-      const settled = acknowledged ? undefined : manager.waitFor(task.task_id, { signal: testBudgetSignal() })
+      const settled = acknowledged ? undefined : manager.waitFor(task.task_id, { signal: testBudgetSignal("manager.waitFor to settle") })
       const nextOpened = acknowledged ? host.waitForCommand("prompt") : undefined
       let timeout: ReturnType<typeof setTimeout> | undefined
       // Arm a real watchdog before freezing the grace clock: socket I/O still runs in real time.

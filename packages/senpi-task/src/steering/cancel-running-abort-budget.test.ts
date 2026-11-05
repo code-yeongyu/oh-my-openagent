@@ -41,7 +41,7 @@ function manualDeadline() {
       waiting.push(resolve)
       armed.emit("armed")
     }),
-    armed: () => once(armed, "armed", { signal: testBudgetSignal() }),
+    armed: () => once(armed, "armed", { signal: testBudgetSignal("armed to emit 'armed'") }),
     expire: () => { for (const resolve of waiting.splice(0)) resolve() },
   }
 }

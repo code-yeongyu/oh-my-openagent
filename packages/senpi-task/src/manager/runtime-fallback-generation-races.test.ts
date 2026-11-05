@@ -91,7 +91,7 @@ describe("generations of one task during a runtime-fallback close", () => {
         try {
           // when
           if (ending === "completes") {
-            const done = manager.waitFor(task.task_id, { signal: testBudgetSignal() })
+            const done = manager.waitFor(task.task_id, { signal: testBudgetSignal("manager.waitFor to settle") })
             newer.settle({ status: "completed", finalResponse: "newer result" })
             await done
           } else if (ending === "is interrupted") {

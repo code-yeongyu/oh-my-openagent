@@ -10,7 +10,7 @@ import type { WorkpoolEvent, WorkpoolYield } from "../types"
 import { testBudgetSignal } from "../../../../../test-support/test-deadline"
 
 export { bounded, deferred }
-export const signal = () => testBudgetSignal()
+export const signal = () => testBudgetSignal("the awaited workpool event")
 export function deliveryFixture(options: {
   readonly mode?: "fresh" | "keep_alive"
   readonly agent?: string

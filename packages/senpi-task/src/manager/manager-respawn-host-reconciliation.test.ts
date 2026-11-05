@@ -72,7 +72,7 @@ describe("respawn reconciliation on the real host runner", () => {
       expect(f.store.load(f.record.task_id)?.status).toBe("running")
       expect(f.store.load(f.record.task_id)?.final_response).toBeUndefined()
       f.host.failReply("get_state", undefined)
-      const finished = f.manager.waitFor(f.record.task_id, { signal: testBudgetSignal() })
+      const finished = f.manager.waitFor(f.record.task_id, { signal: testBudgetSignal("f.manager.waitFor to settle") })
       const session = f.host.sessions()[0]
       if (session === undefined) throw new Error("missing attached session")
       f.host.completeTurn(session.routingId, "LIVE RESPAWN ANSWER")
@@ -87,7 +87,7 @@ describe("respawn reconciliation on the real host runner", () => {
     expect(await f.result.handle.waitForOutcome()).toEqual({ status: "completed", finalResponse: "REAL FINAL ANSWER" })
     expect(f.host.commands.filter((command) => command.type === "prompt")).toHaveLength(1)
     await f.manager.reattach(f.record, f.result.handle)
-    expect((await f.manager.waitFor(f.record.task_id, { signal: testBudgetSignal() })).final_response).toBe("REAL FINAL ANSWER")
+    expect((await f.manager.waitFor(f.record.task_id, { signal: testBudgetSignal("f.manager.waitFor to settle") })).final_response).toBe("REAL FINAL ANSWER")
     expect(f.store.load(f.record.task_id)?.host_session?.adopted_entry_id).toEqual(expect.any(String))
     await f.result.handle.dispose()
   })

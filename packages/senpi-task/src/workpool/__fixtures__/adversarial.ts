@@ -8,7 +8,7 @@ import { bounded, deferred, fixture, poolInput } from "./admission"
 import type { SpawnAdmission } from "../../manager/types"
 import { testBudgetSignal } from "../../../../../test-support/test-deadline"
 
-const signal = () => testBudgetSignal()
+const signal = () => testBudgetSignal("the awaited workpool event")
 export function runAdversarialCases(): void {
   test("#given keep-alive reuse #when interrupted repeatedly #then epochs release once and stale yields cannot bind", async () => {
     // given

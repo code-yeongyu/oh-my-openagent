@@ -5,7 +5,6 @@ import { createServer, type Socket } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fakeHostTransport } from "../__fixtures__/fake-host-transport"
-import { testBudgetSignal } from "../../../../../../test-support/test-deadline"
 
 type Frame = Record<string, unknown>
 export type ContractHostOptions = {
@@ -212,12 +211,12 @@ export async function withContractHost(options: ContractHostOptions, exercise: (
     })
   }))
   try {
-    const listening = once(server, "listening", { signal: testBudgetSignal("the contract host to listen") })
+    const listening = once(server, "listening", { signal: AbortSignal.timeout(2000) })
     server.listen(transport.listenAddress)
     await listening
     await exercise({ socket, root, recordPath, frames, mutations, permissionPreset: () => preset, drain: () => { draining = true } })
   } finally {
-    const closed = once(server, "close", { signal: testBudgetSignal("the contract host to close") })
+    const closed = once(server, "close", { signal: AbortSignal.timeout(2000) })
     for (const client of sockets) client.destroy()
     server.close()
     await closed

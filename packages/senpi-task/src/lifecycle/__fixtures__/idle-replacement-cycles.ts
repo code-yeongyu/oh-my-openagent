@@ -52,7 +52,7 @@ export async function idleReplacementCycles() {
     return ids
   }
   const completeFour = async (ids: readonly string[]) => {
-    const terminals = ids.map((id) => manager.waitFor(id, { signal: testBudgetSignal() }))
+    const terminals = ids.map((id) => manager.waitFor(id, { signal: testBudgetSignal("manager.waitFor to settle") }))
     for (const id of ids) {
       const handle = runner.handles.get(id)
       assert(handle)

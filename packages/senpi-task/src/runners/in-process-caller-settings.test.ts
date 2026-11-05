@@ -7,7 +7,8 @@ import { InProcessRunner } from "./in-process"
 import { remainingTestTime, useTestTimeout } from "../../../../test-support/test-deadline"
 
 // The configured stream-start guard is tiny; the engine default is 300 s. A guard that has not fired
-// this long after the request was sent is the default one, so the test fails here instead of hanging.
+// within the remaining test budget after the request was sent is the default one, so the test fails
+// here by name instead of hanging.
 
 let world: CallerSettingsWorld | undefined
 afterEach(() => {

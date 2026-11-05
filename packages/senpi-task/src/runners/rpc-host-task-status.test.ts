@@ -48,7 +48,7 @@ async function finishedChild(): Promise<{ readonly world: HostWorld; readonly pa
   if (taskId === undefined || session === undefined) throw new Error("the child did not start on the host")
   const completed = patchSeen(world.host, "completed")
   world.host.completeTurn(session.routingId, "DONE")
-  const settled = await parent.manager.waitFor(taskId, { signal: testBudgetSignal() })
+  const settled = await parent.manager.waitFor(taskId, { signal: testBudgetSignal("parent.manager.waitFor to settle") })
   expect(settled.status).toBe("completed")
   await within(completed, "the completed task_status patch")
   return { world, parent, taskId, sessionPath: session.sessionPath }

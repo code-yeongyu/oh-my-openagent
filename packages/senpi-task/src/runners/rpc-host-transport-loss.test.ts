@@ -65,7 +65,7 @@ function recordAt(parent: ParentSession, index: number): TaskRecord {
 }
 
 async function settled(parent: ParentSession, taskId: string): Promise<TaskRecord> {
-  return await parent.manager.waitFor(taskId, { signal: testBudgetSignal() })
+  return await parent.manager.waitFor(taskId, { signal: testBudgetSignal("parent.manager.waitFor to settle") })
 }
 
 /** Resolve once the host has seen `count` commands of `type`; checking and arming happen in one tick. */

@@ -8,7 +8,7 @@ import { testBudgetSignal } from "../../../../../test-support/test-deadline"
 const failures: unknown[] = []
 export function failureEvidence(name: string, data: unknown): void { failures.push({ name, data }); evidence("failure", failures) }
 const record = failureEvidence
-const signal = () => testBudgetSignal()
+const signal = () => testBudgetSignal("the awaited workpool event")
 export function runCapacityCases(): void {
   const cases = [
     { name: "global", config: { default_concurrency: 5, global_concurrency: 1 }, other: "other/model" },

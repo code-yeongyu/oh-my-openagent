@@ -93,7 +93,7 @@ describe("every run-stats tracker is tagged with the run it measures", () => {
     // given
     const f = fixture()
     const pool = f.manager.workpools.create(f.caller, { ...poolInput, mode: "keep_alive" })
-    const first = f.manager.workpools.waitForEvent(pool.pool_id, "dispatched", testBudgetSignal())
+    const first = f.manager.workpools.waitForEvent(pool.pool_id, "dispatched", testBudgetSignal("f.manager.workpools.waitForEvent to settle"))
     f.manager.workpools.push(f.caller, pool.pool_id, [{ key: "a", input: 1 }])
     const dispatched = await bounded(first)
     const taskId = dispatched.task_id
@@ -103,7 +103,7 @@ describe("every run-stats tracker is tagged with the run it measures", () => {
     await f.manager.waitFor(taskId)
 
     // when
-    const second = f.manager.workpools.waitForEvent(pool.pool_id, "dispatched", testBudgetSignal())
+    const second = f.manager.workpools.waitForEvent(pool.pool_id, "dispatched", testBudgetSignal("f.manager.workpools.waitForEvent to settle"))
     f.manager.workpools.push(f.caller, pool.pool_id, [{ key: "b", input: 2 }])
     const reused = await bounded(second)
 

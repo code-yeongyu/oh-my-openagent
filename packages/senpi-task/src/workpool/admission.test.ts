@@ -7,7 +7,7 @@ import type { SpawnAdmission } from "../manager/types"
 import { failureEvidence, runCapacityCases, runModeCases, runReloadCases } from "./__fixtures__/cases"
 import { testBudgetSignal } from "../../../../test-support/test-deadline"
 
-const signal = () => testBudgetSignal()
+const signal = () => testBudgetSignal("the awaited workpool event")
 
 test("#given exhausted lanes #when push returns before grant #then IDs are durable and exactly one dispatch follows grant", async () => {
   // given

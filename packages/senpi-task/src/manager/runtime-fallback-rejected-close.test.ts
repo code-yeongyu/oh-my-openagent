@@ -75,7 +75,7 @@ describe("runtime fallback whose failed-rung close is never acknowledged", () =>
     const [original] = host.sessions()
     if (original === undefined) throw new Error("expected the failed rung's session")
     host.withholdReply("close_session")
-    const settled = manager.waitFor(task.task_id, { signal: testBudgetSignal() })
+    const settled = manager.waitFor(task.task_id, { signal: testBudgetSignal("manager.waitFor to settle") })
 
     try {
       // when

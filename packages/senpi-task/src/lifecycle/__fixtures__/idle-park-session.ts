@@ -43,7 +43,7 @@ export async function parkRealSession() {
   seedRecord(store, { task_id: id, host_pid: process.pid, updated_at: new Date(1000).toISOString() })
   store.mutate(id, (r) => ({ ...r, final_response: "REAL_SESSION_SENTINEL", spawn_spec: { version: 1, cwd: store.stateDir, prompt: "must not replay" } }))
   const events = new EventEmitter()
-  const settled = once(events, "suspended", { signal: testBudgetSignal() })
+  const settled = once(events, "suspended", { signal: testBudgetSignal("events to emit 'suspended'") })
   let tick: () => void = () => { throw new Error("scheduler not registered") }
   let now = 1000
   const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store: { ...store, appendEvent: (taskId, event) => {

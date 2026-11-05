@@ -131,7 +131,7 @@ describe("a session the host parks parks its task record", () => {
     // given
     const child = await oneChild()
     child.world.host.completeTurn(child.routingId, "DONE_SENTINEL")
-    const completed = await child.parent.manager.waitFor(child.record.task_id, { signal: testBudgetSignal() })
+    const completed = await child.parent.manager.waitFor(child.record.task_id, { signal: testBudgetSignal("child.parent.manager.waitFor to settle") })
     expect(completed.status).toBe("completed")
     expect(child.parent.store.load(child.record.task_id)?.residency_state).toBe("resident")
     const seen = parkSeen(child)
@@ -165,7 +165,7 @@ describe("a session the host parks parks its task record", () => {
     const live = child.world.host.sessions().find((session) => session.sessionPath === child.record.host_session?.session_path)
     if (live === undefined) throw new Error("the revived session is not open on the host")
     child.world.host.completeTurn(live.routingId, "DONE_AFTER_REVIVAL")
-    const done = await child.parent.manager.waitFor(child.record.task_id, { signal: testBudgetSignal() })
+    const done = await child.parent.manager.waitFor(child.record.task_id, { signal: testBudgetSignal("child.parent.manager.waitFor to settle") })
     expect(done).toMatchObject({ status: "completed", final_response: "DONE_AFTER_REVIVAL" })
     expect(concurrencyOf(child.parent).getCount(HOST_CHILD_MODEL)).toBe(0)
   })
@@ -175,7 +175,7 @@ describe("a session the host parks parks its task record", () => {
     const child = await oneChild({ transcripts: true })
     const paths = child.parent.sessionPaths()
     child.world.host.completeTurn(child.routingId, "DONE_SENTINEL")
-    await child.parent.manager.waitFor(child.record.task_id, { signal: testBudgetSignal() })
+    await child.parent.manager.waitFor(child.record.task_id, { signal: testBudgetSignal("child.parent.manager.waitFor to settle") })
     const seen = parkSeen(child)
     child.world.host.handoff()
     await seen

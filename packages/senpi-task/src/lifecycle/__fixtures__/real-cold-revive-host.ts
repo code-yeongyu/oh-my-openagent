@@ -48,7 +48,7 @@ export async function realColdReviveHostSession(): Promise<HostColdReviveResult>
     // The child answers its turn, so the record settles terminal - the only thing the idle
     // reclaimer ever parks.
     world.host.completeTurn(session.routingId, "COLD_HOST_SENTINEL")
-    const settled = await parent.manager.waitFor(taskId, { signal: testBudgetSignal() })
+    const settled = await parent.manager.waitFor(taskId, { signal: testBudgetSignal("parent.manager.waitFor to settle") })
     assert.equal(settled.status, "completed")
 
     now += settings.resident_idle_timeout_ms + 1

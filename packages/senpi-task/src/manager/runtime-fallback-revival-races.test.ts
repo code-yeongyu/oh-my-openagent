@@ -96,7 +96,7 @@ describe("lifecycle revivals racing the runtime-fallback close", () => {
         const revivedControl = runner.handles.get(task.task_id)
         runner.finishClose.resolve()
         await oldLeaseReturned.promise
-        const done = manager.waitFor(task.task_id, { signal: testBudgetSignal() })
+        const done = manager.waitFor(task.task_id, { signal: testBudgetSignal("manager.waitFor to settle") })
         revivedControl?.settle({ status: "completed", finalResponse: "revived run result" })
 
         // then

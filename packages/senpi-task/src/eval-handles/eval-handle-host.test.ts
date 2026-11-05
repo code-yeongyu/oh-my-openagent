@@ -431,7 +431,7 @@ describe("EvalHandleHost over real task children", () => {
     const fallbackStart = runner.nextStart()
     runner.handles.get(started.task_id)?.settle({ status: "error", failure: { kind: "child-turn-failed", message: "provider capacity exhausted" } })
     await fallbackStart
-    const terminal = manager.waitFor(started.task_id, { signal: testBudgetSignal() })
+    const terminal = manager.waitFor(started.task_id, { signal: testBudgetSignal("manager.waitFor to settle") })
     await manager.cancelTask(started.task_id, "end the fallback run")
     await terminal
     watch.close()

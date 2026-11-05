@@ -126,7 +126,7 @@ describe("idle suspension", () => {
     const id = "st_00000205"
     seedRecord(store, { task_id: id, host_pid: process.pid, updated_at: OLD })
     const events = new EventEmitter()
-    const entered = once(events, "abort", { signal: testBudgetSignal() })
+    const entered = once(events, "abort", { signal: testBudgetSignal("events to emit 'abort'") })
     const release = Promise.withResolvers<void>()
     const handle = fakeHandle(id, "in-process", trace)
     registry.add({ ...handle, abort: async () => { await handle.abort(); events.emit("abort"); await release.promise } })

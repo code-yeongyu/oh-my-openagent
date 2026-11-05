@@ -8,6 +8,7 @@ import { Worker } from "node:worker_threads"
 
 import { createDagFileStore, DagJournalCorruptError } from "./store"
 import type { DagRunEvent, DagRunId } from "./types"
+import { remainingTestTime } from "../../../../test-support/test-deadline"
 
 const cleanupRoots: string[] = []
 const runId = "run-1" as DagRunId
@@ -498,7 +499,7 @@ describe("createDagFileStore locks and retention", () => {
       Atomics.store(signal, 0, 1)
       Atomics.notify(signal, 0)
       while (Atomics.load(signal, 0) !== 2) {
-        if (Atomics.wait(signal, 0, 1, 1_000) === "timed-out") throw new Error("lock observer timed out")
+        if (Atomics.wait(signal, 0, 1, remainingTestTime()) === "timed-out") throw new Error("the lock observer did not answer within the test budget")
       }
       observedPresence.push(Atomics.load(signal, 1) === 1)
       Atomics.store(signal, 0, 0)

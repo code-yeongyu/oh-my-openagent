@@ -25,7 +25,7 @@ function deferred() {
 }
 
 async function bounded(event: Promise<void>): Promise<void> {
-  const signal = testBudgetSignal()
+  const signal = testBudgetSignal("the awaited lease-parking event")
   let abort = () => {}
   const timeout = new Promise<never>((_, reject) => {
     abort = () => reject(signal.reason)
@@ -113,7 +113,7 @@ async function completes(levels: number, batch = false) {
   const fixture = tree(levels, false, batch)
   const parent = await fixture.start()
   if (parent.kind !== "started") throw new Error(JSON.stringify(parent))
-  const waiting = fixture.manager.waitFor(parent.task_id, { signal: testBudgetSignal() })
+  const waiting = fixture.manager.waitFor(parent.task_id, { signal: testBudgetSignal("fixture.manager.waitFor to settle") })
   fixture.begin.resolve()
   try {
     const record = await waiting.catch((cause: unknown) => {
@@ -158,10 +158,10 @@ test.each([[false], [true]])("promotion resumes the parent over cap without wait
     expect(output.details).toMatchObject({ kind: "status", snapshot: { lease: "held" } })
     expect(fixture.concurrency.getCount("fixture/model")).toBe(2)
     fixture.finishParent.resolve()
-    await fixture.manager.waitFor(parent.task_id, { signal: testBudgetSignal() })
+    await fixture.manager.waitFor(parent.task_id, { signal: testBudgetSignal("fixture.manager.waitFor to settle") })
     expect(fixture.concurrency.getCount("fixture/model")).toBe(1)
     fixture.finishLeaf.resolve()
-    for (const { record } of fixture.manager.list({ scope: "all" })) await fixture.manager.waitFor(record.task_id, { signal: testBudgetSignal() })
+    for (const { record } of fixture.manager.list({ scope: "all" })) await fixture.manager.waitFor(record.task_id, { signal: testBudgetSignal("fixture.manager.waitFor to settle") })
     expect(fixture.concurrency.hasFreeSlot("fixture/model")).toBe(true)
   } finally {
     fixture.finishParent.resolve()
@@ -184,7 +184,7 @@ test("task_output shows parked; task_cancel drops a parked parent without reacqu
     const epoch = fixture.manager.get(parent.task_id)!.notification.run_epoch
     await runTaskCancel(fixture.manager, { task_id: parent.task_id })
     fixture.finishLeaf.resolve()
-    for (const { record } of fixture.manager.list({ scope: "all" })) await fixture.manager.waitFor(record.task_id, { signal: testBudgetSignal() })
+    for (const { record } of fixture.manager.list({ scope: "all" })) await fixture.manager.waitFor(record.task_id, { signal: testBudgetSignal("fixture.manager.waitFor to settle") })
     expect(fixture.concurrency.leaseState(parent.task_id, epoch)).toBeUndefined()
     expect(fixture.concurrency.hasFreeSlot("fixture/model")).toBe(true)
   } finally {
