@@ -1,5 +1,5 @@
 import { afterAll, afterEach, describe, expect, test } from "bun:test"
-import { spawn } from "node:child_process"
+import { spawn, spawnSync } from "node:child_process"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { createServer } from "node:net"
 import { tmpdir } from "node:os"
@@ -16,6 +16,50 @@ describe("hermetic memory home (#9469)", () => {
     const path = relative(home, memory)
     expect(path).toBe(join(".omo", "memory"))
     expect(isAbsolute(path)).toBe(false)
+  })
+})
+
+describe("hermetic git config (#11742)", () => {
+  const dirs: string[] = []
+  afterEach(() => {
+    for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
+  })
+
+  function scratch(): string {
+    const dir = mkdtempSync(join(tmpdir(), "omo-hermetic-git-"))
+    dirs.push(dir)
+    return dir
+  }
+
+  // GIT_TRACE prints every child command git starts before starting it, so the commit's own stderr says whether it
+  // left an automatic maintenance run behind: nothing here waits on timing.
+  function commitTrace(env: NodeJS.ProcessEnv, repoConfig: readonly (readonly [string, string])[] = []): string {
+    const dir = scratch()
+    const git = (...args: string[]) => spawnSync("git", args, { cwd: dir, env, encoding: "utf8" })
+    git("init", "-q", "-b", "main")
+    for (const [key, value] of repoConfig) git("config", key, value)
+    writeFileSync(join(dir, "file.txt"), "content\n")
+    git("add", "-A")
+    const result = git("-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "commit", "-q", "-m", "probe")
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stderr).toContain("built-in: git commit")
+    return result.stderr
+  }
+
+  const AUTO_MAINTENANCE = /run_command: git (maintenance run --auto|gc --auto)/
+
+  test("#given the hermetic home #when a test commits #then git starts no automatic maintenance", () => {
+    expect(commitTrace({ ...process.env, GIT_TRACE: "1" })).not.toMatch(AUTO_MAINTENANCE)
+  })
+
+  test("#given a child started with its own HOME #when it commits #then git starts no automatic maintenance", () => {
+    expect(commitTrace({ ...process.env, GIT_TRACE: "1", HOME: scratch() })).not.toMatch(AUTO_MAINTENANCE)
+  })
+
+  test("#given a repository that turns auto maintenance back on #when it commits #then the run is not detached", () => {
+    const trace = commitTrace({ ...process.env, GIT_TRACE: "1" }, [["maintenance.auto", "true"]])
+    expect(trace).toMatch(/run_command: git maintenance run --auto/)
+    expect(trace).not.toMatch(/run_command: git maintenance run --auto[^\n]* --detach/)
   })
 })
 

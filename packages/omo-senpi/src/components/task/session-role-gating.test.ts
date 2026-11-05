@@ -8,6 +8,9 @@ import type { ComponentContext, ComponentLogger } from "../../extension/types"
 import { createTaskComponent } from "./index"
 import { wireSessionStartProcessSweep } from "./process-sweep"
 
+// This suite is not about job widgets: keep the task component off the real senpi job-widget host.
+const noJobWidgetHost = async (): Promise<Record<string, never>> => ({})
+
 const tempRoots: string[] = []
 
 afterEach(() => {
@@ -52,7 +55,7 @@ describe("task component session-role gating", () => {
     const pi = piForRole(undefined)
 
     // when
-    await createTaskComponent({ resolveCwd: tempProject }).register(pi, ctxFor(pi, logger()))
+    await createTaskComponent({ loadJobWidgetHost: noJobWidgetHost, resolveCwd: tempProject }).register(pi, ctxFor(pi, logger()))
 
     // then
     expect(toolNames(pi)).toContain("task")
@@ -64,7 +67,7 @@ describe("task component session-role gating", () => {
     const pi = piForRole("child")
 
     // when
-    await createTaskComponent({ resolveCwd: tempProject }).register(pi, ctxFor(pi, logger()))
+    await createTaskComponent({ loadJobWidgetHost: noJobWidgetHost, resolveCwd: tempProject }).register(pi, ctxFor(pi, logger()))
 
     // then
     expect(toolNames(pi)).toContain("task")
@@ -75,7 +78,7 @@ describe("task component session-role gating", () => {
     const pi = piForRole("dag_child")
 
     // when
-    await createTaskComponent({ resolveCwd: tempProject }).register(pi, ctxFor(pi, logger()))
+    await createTaskComponent({ loadJobWidgetHost: noJobWidgetHost, resolveCwd: tempProject }).register(pi, ctxFor(pi, logger()))
 
     // then
     expect(toolNames(pi)).toEqual([])
@@ -86,7 +89,7 @@ describe("task component session-role gating", () => {
     const pi = piForRole("member")
 
     // when
-    await createTaskComponent({ resolveCwd: tempProject }).register(pi, ctxFor(pi, logger()))
+    await createTaskComponent({ loadJobWidgetHost: noJobWidgetHost, resolveCwd: tempProject }).register(pi, ctxFor(pi, logger()))
 
     // then
     expect(toolNames(pi)).toEqual([])

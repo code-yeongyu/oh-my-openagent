@@ -285,3 +285,66 @@ close to the source.
   ban, and the common-typeface ban.
   The upstream `NOTICE.md` names only the MIT-licensed `platform-design-skills` origin of
   its iOS and Android references, none of which is used here.
+
+---
+
+## 7. frontend-detect SDK: Impeccable detector logic and a StyleGallery reflow check
+
+`frontend/scripts/detect/` (the SDK, its rules under `rules/`, the CLI, and their tests),
+`frontend/references/perfection/detect.md`, and the development parity scripts
+`packages/shared-skills/scripts/detect-parity.ts`, `detect-source-parity.ts` and `detect-parity-oracle.ts` reimplement in TypeScript the rule logic of
+the Impeccable detector (`crates/core`, `crates/detect`, `crates/foundation/src/registry.rs`)
+at the upstream commit named in section 6. No Rust or JavaScript source is copied; the rule
+ids, thresholds, exemptions and the `data-impeccable-ignore` waiver attribute follow
+upstream so findings stay comparable, and the unit tests model upstream's fixture cases.
+The license, copyright line and license text pointer in section 6 apply to this derived
+work as well. `detect-parity-oracle.ts` is not shipped in the skill: at development time it
+loads the prebuilt in-page detector from a local Impeccable checkout to record reference
+findings, and copies none of it.
+
+- **Changes (Apache-2.0 §4(b)):** a new TypeScript implementation over a browser-captured
+  page snapshot instead of upstream's Rust engine and WASM bundle; every rule description
+  and fix hint is rewritten; `low-contrast` is an error rather than a warning; project
+  allowlists (`allowFonts`, `allowEasings`) and design tokens are configuration rather than
+  files; our own `data-detect-ignore` waiver is added beside upstream's; telemetry, the
+  hosted design-direction service, the edit hook, the live mode and the browser extension
+  are not ported.
+
+The `viewport-reflow` rule and the reflow pass in `detect.ts` (render at 320, 375, 768,
+1024 and 1440 px, append an unbroken stress string at 320 px, report horizontal overflow)
+follow the layout verification matrix and `tests/pattern-runtime.spec.mjs` of StyleGallery.
+
+- Source: https://github.com/changeroa/StyleGallery
+- Adapted from upstream commit: 0bf928f6269b1cb6cf24f04e0bf28a8ce2bbc0ff
+- Code licensed under the MIT License; documentation under CC BY 4.0:
+
+```
+MIT License
+
+Copyright (c) 2026 IYEN
+
+This license applies to the source code in this repository: scripts, CLI and
+MCP server implementations, the website and server code under `site/`,
+validators, and test code. The Markdown documentation, pattern and recipe
+prose, and domain documents are licensed separately under CC BY 4.0; see
+LICENSE-DOCS. Third-party material adapted into this repository keeps its
+original rights; see NOTICE.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```

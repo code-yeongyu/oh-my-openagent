@@ -37,6 +37,7 @@
 		"desktop.ax.setValue",
 		"desktop.ax.focus",
 		"desktop.ax.click",
+		"desktop.ax.typeText",
 		"desktop.stopPath.status",
 		"desktop.stop"
 	],
@@ -74,6 +75,7 @@
 		"desktop.ax.setValue": "mutate",
 		"desktop.ax.focus": "mutate",
 		"desktop.ax.click": "mutate",
+		"desktop.ax.typeText": "mutate",
 		"desktop.stopPath.status": "read",
 		"desktop.stop": "read"
 	},
@@ -1366,6 +1368,74 @@
 			"required": [
 				"ref"
 			],
+			"additionalProperties": false,
+			"definitions": {
+				"PointerOptions": {
+					"type": "object",
+					"properties": {
+						"button": {
+							"type": [
+								"string",
+								"null"
+							],
+							"default": null
+						},
+						"count": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint32",
+							"minimum": 0,
+							"default": null
+						},
+						"modifiers": {
+							"type": [
+								"array",
+								"null"
+							],
+							"items": {
+								"type": "string"
+							},
+							"default": null
+						},
+						"deliveryMode": {
+							"type": [
+								"string",
+								"null"
+							],
+							"default": null
+						}
+					},
+					"additionalProperties": false
+				}
+			}
+		},
+		"desktop.ax.typeText": {
+			"type": "object",
+			"properties": {
+				"ref": {
+					"type": "string"
+				},
+				"text": {
+					"type": "string"
+				},
+				"opts": {
+					"anyOf": [
+						{
+							"$ref": "#/definitions/PointerOptions"
+						},
+						{
+							"type": "null"
+						}
+					]
+				}
+			},
+			"required": [
+				"ref",
+				"text"
+			],
+			"description": "`ax.typeText`: types `text` into the element `ref` names. Only\n`opts.deliveryMode` is read: an omitted delivery is background (no focus\nchange for the user); `foreground` raises the element's window under the\ncontrol grant, like `ax.click`.",
 			"additionalProperties": false,
 			"definitions": {
 				"PointerOptions": {

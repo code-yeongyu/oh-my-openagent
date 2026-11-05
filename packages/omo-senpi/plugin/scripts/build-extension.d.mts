@@ -14,11 +14,13 @@ export interface BuildExtensionOptions {
   memoryCommandsOutputPath?: string
   sessionHistoryOutputPath?: string
   recallStoreOutputPath?: string
+  deviceServiceOutputPath?: string
   telemetryPosthogOutputPath?: string
   memorySyncOutputPath?: string
   threadClientOutputPath?: string
   telemetryRecoveryOutputPath?: string
   feedbackOutputPath?: string
+  desktopToolkitOutputPath?: string
   claimReceiptOutputPath?: string
   computerUseOutputPath?: string
   gatewayStoreWorkerOutputPath?: string
@@ -38,11 +40,13 @@ export function buildExtension(options?: BuildExtensionOptions): Promise<{
   memoryCommandsInputs: string[]
   sessionHistoryInputs: string[]
   recallStoreInputs: string[]
+  deviceServiceInputs: string[]
   telemetryPosthogInputs: string[]
   memorySyncInputs: string[]
   threadClientInputs: string[]
   telemetryRecoveryInputs: string[]
   feedbackInputs: string[]
+  desktopToolkitInputs: string[]
   claimReceiptInputs: string[]
   computerUseInputs: string[]
   toolkitSdkInputs: string[]

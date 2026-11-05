@@ -89,3 +89,5 @@ clap = { version = "=4.6.7", features = ["derive"] }
 ulid = "=3.0.0"
 sha2 = "=0.10.9"
 proptest = "=1.11.0"
+# omo engine trust helper (omo#10762): Security.framework facts; already locked through objc2-core-services.
+objc2-security = "=0.3.2"

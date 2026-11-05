@@ -9,6 +9,7 @@ import {
 
 import { pinnedModelId } from "./pinned-model-ids"
 import { maskProviderAndModel } from "./product-identity"
+import type { TelemetrySessionRole } from "./session-role"
 
 /**
  * The `gen_ai.provider.name` well-known values for our provider ids (D-P VALUE table); an id with no
@@ -29,7 +30,7 @@ export type OmoNativeTurnSpansOptions = {
   readonly isConsented: () => boolean
   /** The fresh send-time consent read, taken at the moment a span would end and so be exported. */
   readonly isSendAllowed: () => boolean
-  readonly sessionRole: string
+  readonly sessionRole: TelemetrySessionRole
   readonly inheritedTraceparent: string | undefined
 }
 

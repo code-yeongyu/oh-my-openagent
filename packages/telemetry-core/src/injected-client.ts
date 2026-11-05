@@ -1,5 +1,6 @@
 import { getTelemetryApiKey, getTelemetryHost, hasTelemetryApiKey, shouldDisableTelemetry } from "./env"
 import { getDefaultTelemetryOsProvider } from "./machine-id"
+import { toTelemetryTerminalProgram } from "./terminal-program"
 import type {
   TelemetryCaptureProperties,
   TelemetryClient,
@@ -145,7 +146,7 @@ function getSharedProperties(input: CreateTelemetryClientInput): TelemetryCaptur
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     shell: getShellName(process.env.SHELL),
     ci: Boolean(process.env.CI),
-    terminal: process.env.TERM_PROGRAM,
+    terminal: toTelemetryTerminalProgram(process.env.TERM_PROGRAM),
     ...input.product.additionalProperties,
   }
 }

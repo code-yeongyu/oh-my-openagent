@@ -90,10 +90,10 @@ export const SCENARIOS = {
   },
   "daily-normal-kimi": {
     omoConfig: { model_profile: "daily-normal" },
-    mockModels: ["mock-1", "kimi-k3"],
+    mockModels: ["mock-1", "kimi-k3.1-pro"],
     cliModel: undefined,
     registerProviders: ["kimi-coding"],
-    expect: { model: "kimi-k3", provider: "kimi-coding", notice: APPLIED_TYPE, thinking: "max" },
+    expect: { model: "kimi-k3.1-pro", provider: "kimi-coding", notice: APPLIED_TYPE, thinking: "max" },
   },
   "daily-normal-glm": {
     omoConfig: { model_profile: "daily-normal" },
@@ -117,17 +117,17 @@ export const SCENARIOS = {
   },
   unset: {
     omoConfig: {},
-    mockModels: ["mock-1", "kimi-k3"],
+    mockModels: ["mock-1", "kimi-k3.1-pro"],
     cliModel: undefined,
     registerProviders: ["kimi-coding"],
-    expect: { model: "kimi-k3", provider: "kimi-coding", notice: APPLIED_TYPE, thinking: "max" },
+    expect: { model: "kimi-k3.1-pro", provider: "kimi-coding", notice: APPLIED_TYPE, thinking: "max" },
   },
   "unset-skips-gateway": {
     omoConfig: {},
-    mockModels: ["mock-1", "anthropic/claude-opus-5-5", "kimi-k3"],
+    mockModels: ["mock-1", "anthropic/claude-opus-5-5", "kimi-k3.1-pro"],
     cliModel: undefined,
     registerProviders: ["opengateway", "kimi-coding"],
-    expect: { model: "kimi-k3", provider: "kimi-coding", notice: APPLIED_TYPE, thinking: "max" },
+    expect: { model: "kimi-k3.1-pro", provider: "kimi-coding", notice: APPLIED_TYPE, thinking: "max" },
   },
   // Unset starts on Daily · Normal (#10029): with GLM connected beside GPT, its GLM rung wins.
   "unset-gpt-6-1-sol": {

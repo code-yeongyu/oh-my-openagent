@@ -3,6 +3,7 @@ import { appendFile, cp, mkdir, mkdtemp, readdir, readFile, rm, utimes, writeFil
 import { tmpdir } from "node:os"
 import { dirname, join, parse } from "node:path"
 import { fileURLToPath } from "node:url"
+import bundleBudget from "../../bundle-budget.json" with { type: "json" }
 
 import { PERSONA_ASSET_FILES } from "@oh-my-opencode/memory-core/personas"
 
@@ -15,7 +16,8 @@ import {
   toPortableBuildPath,
 } from "./build-extension.mjs"
 import { npmPackStage, runBoundedStage, systemTar } from "./bounded-stage.test-support.mjs"
-import { createBuildFixture } from "./build-extension.test-support.mjs"
+import { createBuildFixture, outputPathsIn } from "./build-extension.test-support.mjs"
+import { SENPI_ASTRA_ULTRAWORK_DIRECTIVE, SENPI_ULTRAWORK_DIRECTIVE } from "../../src/components/ultrawork/generated-directive.ts"
 import { runtimePersonaSources } from "./persona-artifacts.mjs"
 import { removeTestRootBestEffort } from "../../../../test-support/held-test-root.mjs"
 
@@ -214,6 +216,27 @@ describe("checkExtensionCurrent", () => {
     expect(advisorRuntime).not.toMatch(/^[\t ]+$/m)
   })
 
+  // Generated payload confinement (#9913): the shared directive parts are dropped from every bundle
+  // that imports the ultrawork module without using the directives. The probe is a line both
+  // directives share, read from the generated module rather than pinned here.
+  test("#given the split extension build #when bundles are inspected #then only the main entry carries the ultrawork directive text", async () => {
+    // given
+    const outputs = await sharedOutputs()
+    const sharedLine = SENPI_ULTRAWORK_DIRECTIVE.split("\n")
+      .filter((line) => /^[A-Za-z0-9 ,.:;()-]+$/.test(line) && SENPI_ASTRA_ULTRAWORK_DIRECTIVE.includes(line))
+      .sort((left, right) => right.length - left.length)[0]
+
+    // when
+    const carriers = []
+    for (const [name, path] of Object.entries(outputPathsIn(outputs.root))) {
+      if ((await readFile(path, "utf8")).includes(sharedLine)) carriers.push(name)
+    }
+
+    // then
+    expect(sharedLine.length).toBeGreaterThan(40)
+    expect(carriers).toEqual(["outputPath"])
+  })
+
   test("#given the split extension build #when metafile inputs are inspected #then task sources live only in the lazy sidecar", async () => {
     // given / when
     const { mainInputs, taskInputs } = await sharedOutputs()
@@ -282,6 +305,15 @@ describe("checkExtensionCurrent", () => {
     expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith("packages/omo-senpi/src/components/feedback/index.ts"))).toBe(true)
   })
 
+  test("#given offered desktop toolkits #when bundle inputs are inspected #then the runtime is lazy and carries no third-party dependencies", async () => {
+    const { mainInputs, desktopToolkitInputs } = await sharedOutputs()
+    for (const suffix of ["/desktop-toolkit/runtime.ts", "/desktop-toolkit/thread-tools.ts"]) {
+      expect(mainInputs.some(input => toPortableBuildPath(input).endsWith(suffix))).toBe(false)
+      expect(desktopToolkitInputs.some(input => toPortableBuildPath(input).endsWith(suffix))).toBe(true)
+    }
+    expect(desktopToolkitInputs.filter(input => toPortableBuildPath(input).includes("node_modules/"))).toEqual([])
+  })
+
   test("#given lazy thread registration #when bundle inputs are inspected #then live RPC implementation is confined to its sidecar", async () => {
     const { mainInputs, threadClientInputs } = await sharedOutputs()
     const suffix = "/components/thread/live-surface.ts"
@@ -334,6 +366,8 @@ describe("checkExtensionCurrent", () => {
       "packages/omo-senpi/src/components/memory/commands/memory-unlock.ts",
       "packages/omo-senpi/src/components/memory/commands/search.ts",
       "packages/omo-senpi/src/components/memory/commands/facts.ts",
+      // A dream fire loads its conversation selection from this sidecar (keeps omo.js inside its byte budget).
+      "packages/omo-senpi/src/components/memory/dream-selector.ts",
     ]) {
       expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
       expect(memoryCommandsInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
@@ -367,6 +401,20 @@ describe("checkExtensionCurrent", () => {
       expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
       expect(deviceAccountInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
     }
+  })
+
+  test("#given the split extension build #when device-service inputs are inspected #then the start-up bootstrap runtime loads only from its lazy entry", async () => {
+    const { mainInputs, deviceServiceInputs, deviceServiceOutputPath, outputPath } = await sharedOutputs()
+    for (const suffix of [
+      "packages/omo-senpi/src/components/device-service/runtime.ts",
+      "packages/omo-senpi/src/components/device-service/runner.ts",
+    ]) {
+      expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
+      expect(deviceServiceInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
+    }
+    expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith("packages/omo-senpi/src/components/device-service/index.ts"))).toBe(true)
+    expect(await readFile(outputPath, "utf8")).toContain('import("#omo-device-service-runtime")')
+    expect(await readFile(deviceServiceOutputPath, "utf8")).not.toContain("#omo-device-service-runtime")
   })
 
   test("#given the split extension build #when onboarding inputs are inspected #then the session-history scan loads only from its lazy entry", async () => {
@@ -430,7 +478,7 @@ describe("checkExtensionCurrent", () => {
     // old 1_419_425 + 4_096 cap); this branch 1,423,766 B after the persisted-opt-out spool purge (node 24, bun 1.4.4,
     // linux x64). Base reset to the measurement with the standing 4,096 B headroom; bundle-size.test.ts's 1,425,000 B
     // budget stays the binding package ceiling.
-    expect(Buffer.byteLength(main)).toBeLessThanOrEqual(1_423_766 + 4_096)
+    expect(Buffer.byteLength(main)).toBeLessThanOrEqual(bundleBudget.omoJsBytes)
     expect(await readFile(telemetryOtlpOutputPath, "utf8")).not.toContain("#omo-telemetry-otlp-runtime")
   })
 
@@ -511,6 +559,9 @@ describe("checkExtensionCurrent", () => {
     expect(main).toContain('import("#omo-device-account-runtime")')
     expect(main).toContain('import("#omo-session-history-runtime")')
     expect(main).toContain('import("#omo-recall-store-runtime")')
+    expect(main).toContain('import("#memory-external-projection")')
+    // The <external_projection> renderer (its legend is the marker) ships in the recall-store sidecar, not the entry.
+    expect(main).not.toContain("stand for similar names")
     expect(main).toContain('import("#omo-telemetry-posthog-runtime")')
     expect(main).toContain('import("#omo-telemetry-otlp-runtime")')
     expect(main).toContain('import("#omo-thread-client-runtime")')
@@ -518,6 +569,7 @@ describe("checkExtensionCurrent", () => {
     expect(posthog).toContain('import("#telemetry-immediate-send")')
     expect(main).toContain('import("#omo-memory-sync-runtime")')
     expect(main).toContain('import("#omo-feedback-runtime")')
+    expect(main).toContain('import("#omo-desktop-toolkit-runtime")')
     expect(main).toContain('import("#omo-claim-receipt-runtime")')
     expect(task).toMatch(/^\/\/ omo:[A-Za-z0-9_-]{43}:[A-Za-z0-9_-]{43}/)
     expect(main).not.toContain('import("#omo-agent-toolkit-runtime")')
@@ -532,10 +584,13 @@ describe("checkExtensionCurrent", () => {
       "#omo-device-account-runtime": "./extensions/omo-device-account.js",
       "#omo-session-history-runtime": "./extensions/omo-session-history.js",
       "#omo-recall-store-runtime": "./extensions/omo-recall-store.js",
+      "#memory-external-projection": "./extensions/omo-recall-store.js",
+      "#omo-device-service-runtime": "./extensions/omo-device-service.js",
       "#omo-telemetry-posthog-runtime": "./extensions/omo-telemetry-posthog.js",
       "#omo-telemetry-otlp-runtime": "./extensions/omo-telemetry-otlp.js",
       "#omo-memory-sync-runtime": "./extensions/omo-memory-sync.js",
       "#omo-feedback-runtime": "./extensions/omo-feedback.js",
+      "#omo-desktop-toolkit-runtime": "./extensions/omo-desktop-toolkit.js",
       "#omo-claim-receipt-runtime": "./extensions/omo-claim-receipt.js",
       "#omo-thread-client-runtime": "./extensions/omo-thread-client.js",
       "#omo-telemetry-recovery-runtime": "./extensions/omo-telemetry-recovery.js",
