@@ -12,6 +12,8 @@ mod fake_listener;
 mod mcp;
 mod oneshot;
 mod outbox;
+#[cfg(unix)]
+mod peer;
 mod route;
 mod rpc;
 mod selftest;
@@ -129,10 +131,13 @@ fn main() -> ExitCode {
             idle,
             daemon,
         } => with_engine(|engine| async move {
-            daemon::open_daemon_session(&engine, &daemon, &client::token_file(&endpoint)).await?;
-            serve::run_serve(engine, &endpoint, idle)
-                .await
-                .map_err(|error| format!("--serve {endpoint}: {error}"))
+            let failed = |error: std::io::Error| format!("--serve {endpoint}: {error}");
+            let mut bound = serve::bind(&endpoint).map_err(failed)?;
+            daemon::open_daemon_session(&engine, &daemon).await?;
+            bound
+                .write_token(engine.stop_paths().resume_token())
+                .map_err(|error| format!("--serve {endpoint}: cannot write the resume token: {error}"))?;
+            serve::run_serve(engine, bound, idle).await.map_err(failed)
         }),
     }
 }
