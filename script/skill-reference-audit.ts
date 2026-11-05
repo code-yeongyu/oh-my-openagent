@@ -347,10 +347,12 @@ const CATEGORY = /["']?category["']?\s*[=:]\s*["']([A-Za-z0-9_.-]+)["']/g
 const TASK_CALL_OPEN = /\b(?:task|call_omo_agent|delegate_task)\s*\(/g
 const SKILL_RELATIVE_PATH = /`(\.{1,2}\/[^`\s]+\.md|(?:references|scripts|assets|templates)\/[^`\s]+)`/g
 const SKILL_OWNER = /`([a-z0-9][a-z0-9-]*)`(?:'s\b|\s+skill\b)|\bload\s+`([a-z0-9][a-z0-9-]*)`/g
+// A conditional mention of a skill the user's own project may define ("some repositories define one project-locally") names no shipped target.
+const PROJECT_LOCAL_MENTION = /\bproject[- ]local(?:ly)?\b/i
 const CONDITIONAL_WORD = /\b(?:when|whenever|if|where|unless)\b/i
 // An optional mention names availability of the skill or of a harness surface, never a generic "has": "when the \`x\`
 // skill is available", "if the session lists the \`x\` skill", "where the harness has a dependency-graph surface".
-const AVAILABILITY_WORD = /\b(?:available|exists?|listed|lists|provides|installed|present|is (?:driving|active|running|enabled))\b|\b(?:session|harness|environment|runtime)\b[^.]{0,60}\b(?:has|have|gives|provides)\b/i
+const AVAILABILITY_WORD = /\b(?:is available|are available|is listed|are listed|lists|provides|is installed|is (?:driving|active|running|enabled))\b|\b(?:session|harness|environment|runtime)\b[^.]{0,60}\b(?:has|have|gives|provides)\b/i
 
 function taskCallBodies(content: string): { readonly start: number; readonly body: string }[] {
   const bodies: { start: number; body: string }[] = []
@@ -593,7 +595,7 @@ function auditFile(file: AuditedFile, catalog: ReferenceCatalog, repoRoot: strin
 
     const optional = isOptionalMention(content, raw.index)
     const missingIn = optional
-      ? SHIPPED_EDITIONS.some((edition) => byEdition[edition].has(name)) || byEdition.repo.has(name)
+      ? SHIPPED_EDITIONS.some((edition) => byEdition[edition].has(name)) || PROJECT_LOCAL_MENTION.test(sentenceAround(content, raw.index)) || (editions.includes("repo") && byEdition.repo.has(name))
         ? []
         : editions
       : editions.filter((edition) => !byEdition[edition].has(name))
