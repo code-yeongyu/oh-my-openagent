@@ -5,7 +5,7 @@ export {
   type RuntimeRetentionPolicy,
 } from "./policy"
 export { type RetentionCursor, type RetentionStore } from "./budget"
-export { RETENTION_STAMP_CONFIG_KEY, retentionCursorPath, retentionResumePending } from "./stamp"
+export { RETENTION_STAMP_CONFIG_KEY, retentionResumePending } from "./stamp"
 export { readUnreflectedRetentionGate, type UnreflectedRetentionGate } from "./reflection-health-signal"
 export {
   KIBITZER_ENCODED_SESSION_PATTERN,
