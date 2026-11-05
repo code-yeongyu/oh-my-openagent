@@ -151,6 +151,10 @@ impl AxBackend for MacAx {
         Ok(tree::children(element(h)?).into_iter().map(handle).collect())
     }
 
+    fn identifier(&mut self, h: &AxHandle) -> CoreResult<Option<String>> {
+        Ok(element::copy_string(element(h)?, "AXIdentifier"))
+    }
+
     fn parent(&mut self, h: &AxHandle) -> CoreResult<Option<AxHandle>> {
         Ok(tree::parent(element(h)?).map(handle))
     }
