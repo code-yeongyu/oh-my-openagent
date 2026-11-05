@@ -39,11 +39,11 @@ test("#given quit and reopening the same stopped native session #when the person
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 100_000, maxTokens: 1024 }],
   })
   const closers: Array<() => Promise<void>> = []
-  async function bounded<T>(promise: Promise<T>): Promise<T> {
+  async function bounded<T>(promise: Promise<T>, what: string): Promise<T> {
     let timer: ReturnType<typeof setTimeout> | undefined
     try {
       return await Promise.race([promise, new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error("native hold transition did not settle")), remainingTestTime())
+        timer = setTimeout(() => reject(new Error(`native hold transition (${what}) did not settle within the test budget`)), remainingTestTime())
       })])
     } finally { clearTimeout(timer) }
   }
@@ -113,7 +113,7 @@ test("#given quit and reopening the same stopped native session #when the person
     const first = await start(firstManager, false)
     await first.session.prompt("Start the sandbox task.")
     await first.session.stop()
-    await bounded(first.paused)
+    await bounded(first.paused, "first.paused")
     expect(first.pauseRegistry.require(first.parent).participants.child?.state).toBe("held")
     const sessionFile = firstManager.getSessionFile()
     if (sessionFile === undefined) throw new Error("sandbox session was not persisted")
@@ -131,11 +131,11 @@ test("#given quit and reopening the same stopped native session #when the person
     expect(await manager.start(input)).toMatchObject({ kind: "held" })
     // A real person prompt releases the engine's restored Stop. No synthetic hold event or Resume command.
     await second.session.prompt("Continue working.")
-    await bounded(second.resumeSettled)
+    await bounded(second.resumeSettled, "second.resumeSettled")
     const admitted = await manager.start(input)
     expect(admitted.kind).toBe("started")
     if (admitted.kind === "started") await manager.cancelTask(admitted.task_id)
-    await bounded(second.released)
+    await bounded(second.released, "second.released")
     expect(second.pauseRegistry.require(second.parent)).toMatchObject({
       phase: "resumed", participants: { child: { state: "lost", lostReason: expect.stringContaining("respawn_failed") } },
     })

@@ -105,7 +105,6 @@ describe("facts wiring settle enqueue", () => {
   }, 30_000)
 
   test("#given facts enabled and a new journal delta #when settle runs #then one queue file is published", async () => {
-    useTestTimeout(30_000)
     // given
     const paths = await fixture()
     await seedJournal(paths, 2)
@@ -120,7 +119,6 @@ describe("facts wiring settle enqueue", () => {
   }, 30_000)
 
   test("#given the same cursor #when settle runs twice #then no duplicate entry is published", async () => {
-    useTestTimeout(30_000)
     // given
     const paths = await fixture()
     await seedJournal(paths, 2)
@@ -136,7 +134,6 @@ describe("facts wiring settle enqueue", () => {
   }, 30_000)
 
   test("#given facts disabled #when settle runs #then nothing is enqueued", async () => {
-    useTestTimeout(30_000)
     // given
     const paths = await fixture()
     await seedJournal(paths, 2)
@@ -151,7 +148,6 @@ describe("facts wiring settle enqueue", () => {
   }, 30_000)
 
   test("#given an empty journal #when settle runs #then nothing is enqueued", async () => {
-    useTestTimeout(30_000)
     // given
     const paths = await fixture()
     const wiring = wiringFor(paths, true)
@@ -165,7 +161,6 @@ describe("facts wiring settle enqueue", () => {
   }, 30_000)
 
   test("#given a pre-aborted drain signal #when final-delta enqueue is requested #then no journal read or queue mutation starts", async () => {
-    useTestTimeout(30_000)
     const paths = await fixture()
     const controller = new AbortController()
     controller.abort()
@@ -190,7 +185,6 @@ describe("facts wiring settle enqueue", () => {
   }, 30_000)
 
   test("#given abort arrives while the final journal delta is being read #when enqueue reaches the queue boundary #then no queue mutation starts", async () => {
-    useTestTimeout(30_000)
     const paths = await fixture()
     const controller = new AbortController()
     const wiring = createMemoryFactsWiring({
@@ -214,7 +208,6 @@ describe("facts wiring settle enqueue", () => {
 
 describe("facts wiring session_start reconcile", () => {
   test("#given an inherited queue and default debounce #when the first settled turn arrives #then the backlog launches immediately", async () => {
-    useTestTimeout(30_000)
     const paths = await fixture()
     await seedJournal(paths, 2)
     await wiringFor(paths, true).enqueueSettled(SESSION)
@@ -239,7 +232,6 @@ describe("facts wiring session_start reconcile", () => {
   }, 30_000)
 
   test("#given backlog remains after a first-turn launch #when the same session rebinds and its next real turn settles #then backlog launches again", async () => {
-    useTestTimeout(30_000)
     const paths = await fixture()
     await seedJournal(paths, 2)
     await wiringFor(paths, true).enqueueSettled(SESSION)
@@ -264,7 +256,6 @@ describe("facts wiring session_start reconcile", () => {
   }, 30_000)
 
   test("#given a leftover queue file from a crashed run #when reconcile runs #then it is reported launchable", async () => {
-    useTestTimeout(30_000)
     // given: a settle published an entry that no extractor ever consumed
     const paths = await fixture()
     await seedJournal(paths, 2)
@@ -281,7 +272,6 @@ describe("facts wiring session_start reconcile", () => {
   }, 30_000)
 
   test("#given facts disabled #when reconcile runs #then no leftover work is reported", async () => {
-    useTestTimeout(30_000)
     // given
     const paths = await fixture()
     await seedJournal(paths, 2)
@@ -295,7 +285,6 @@ describe("facts wiring session_start reconcile", () => {
   }, 30_000)
 
   test("#given a consumed batch #when reconcile runs #then nothing is left to relaunch", async () => {
-    useTestTimeout(30_000)
     // given
     const paths = await fixture()
     await seedJournal(paths, 2)

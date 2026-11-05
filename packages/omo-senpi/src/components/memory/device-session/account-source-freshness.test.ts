@@ -128,7 +128,6 @@ describe("authoritative credential reads under the shared lock", () => {
 
   for (const rotated of ["signingPrivateKey", "sealingPrivateKey"] as const) {
     test(`#given a captured CLI account #when another store rotates the ${rotated === "signingPrivateKey" ? "signing" : "sealing"} key #then signing, a service mutation and the pin rename are all refused`, async () => {
-      useTestTimeout(30_000)
       const f = await fixture()
       await f.store.write(credential("device-a"))
       const served: string[] = []
@@ -168,7 +167,6 @@ describe("authoritative credential reads under the shared lock", () => {
   }
 
   test("#given a captured CLI account #when one authoritative read is transiently empty #then that read fails closed and the next resolve of the same generation is live", async () => {
-    useTestTimeout(30_000)
     const f = await fixture()
     await f.store.write(credential("device-a"))
     const source = createCliAccountSource({ api: ORIGIN, store: f.store, home: f.home, fetch: identity("account-a", () => "device-a", []) })
@@ -188,7 +186,6 @@ describe("authoritative credential reads under the shared lock", () => {
   }, 30_000)
 
   test("#given a captured CLI account #when the device signs out #then the account is retired and the next resolve is signed out", async () => {
-    useTestTimeout(30_000)
     const f = await fixture()
     await f.store.write(credential("device-a"))
     const source = createCliAccountSource({ api: ORIGIN, store: f.store, home: f.home, fetch: identity("account-a", () => "device-a", []) })
@@ -208,7 +205,6 @@ describe("authoritative credential reads under the shared lock", () => {
   // change exactly one of the two facts the capture compares.
   for (const changed of ["keys only", "generation only"] as const) {
     test(`#given a captured CLI account #when the stored credential changes its ${changed} #then the next boundary is refused`, async () => {
-      useTestTimeout(30_000)
       const f = await fixture()
       await f.store.write(credential("device-a"))
       const account = await createCliAccountSource({ api: ORIGIN, store: f.store, home: f.home, fetch: identity("account-a", () => "device-a", []) })()
@@ -227,7 +223,6 @@ describe("authoritative credential reads under the shared lock", () => {
   }
 
   test("#given no writer #when the same operations run #then each is admitted (same-identity control)", async () => {
-    useTestTimeout(30_000)
     const f = await fixture()
     await f.store.write(credential("device-a"))
     const served: string[] = []
@@ -252,7 +247,6 @@ describe("authoritative credential reads under the shared lock", () => {
 describe("legacy credential capture", () => {
   for (const reply of ["the replacement's device", "the restored device"] as const) {
     test(`#given legacy A replaced by B while B's identity reply is held, then A restored #when the reply names ${reply} #then no capability is issued and A keeps no account`, async () => {
-      useTestTimeout(30_000)
       const f = await fixture()
       const a = credential("device-a")
       await writeFile(f.secretFile, JSON.stringify(a))

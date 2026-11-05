@@ -11,7 +11,6 @@ import { seedTerminalRun } from "./facts-run-prune.test-support"
 import { fixture, onlyRunDir, runnerOptions } from "./facts-runner.test-support"
 import type { FactsFailurePort } from "./facts-failure-recording"
 import { writeRunJsonAtomic } from "./worker/run-artifacts"
-import { useTestTimeout } from "../../../../../test-support/test-deadline"
 
 const ABANDONED_RUN_ID = "facts-abandoned-1"
 const ABANDONED_BATCH_ID = "11111111-1111-4111-8111-111111111111"
@@ -74,7 +73,6 @@ async function ledgerBatchId(runDir: string): Promise<string> {
 
 describe("facts terminal failure recording", () => {
   test("#given a child that exits non-zero #when the run finalizes #then one streak entry is recorded for the queued endpoint", async () => {
-    useTestTimeout(30_000)
     // given: the recorded failure identity is the run's per-launch batchId, never its dir name.
     //
     const { root, identity, queue } = await fixture()
@@ -101,7 +99,6 @@ describe("facts terminal failure recording", () => {
   }, 30_000)
 
   test("#given a failing run #when the failure store is written #then no terminal sentinel exists yet", async () => {
-    useTestTimeout(30_000)
     // given: the ordering contract - a crash between the record and the sentinel is safe,
     // the reverse order would lose the increment forever.
     const { root, identity, queue } = await fixture()
@@ -121,7 +118,6 @@ describe("facts terminal failure recording", () => {
   }, 30_000)
 
   test("#given finalize crashed after the failure record #when reconcile replays the same runId #then the streak stays at one", async () => {
-    useTestTimeout(30_000)
     // given: the record landed, the sentinel did not - exactly the crash window the ordering buys.
     const { root, identity, queue } = await fixture()
     const crashing = new FactsExtractorRunner(runnerOptions(root, identity, queue, "fail", {
@@ -148,7 +144,6 @@ describe("facts terminal failure recording", () => {
   }, 30_000)
 
   test("#given a run of unknown liveness past its deadline #when reconcile abandons it #then the failure record precedes the sentinel", async () => {
-    useTestTimeout(30_000)
     // given
     const { root, identity, queue } = await fixture()
     const runDir = await seedUnknownLivenessRun(identity.paths.facts)
@@ -167,7 +162,6 @@ describe("facts terminal failure recording", () => {
   }, 30_000)
 
   test("#given a real store #when a run is abandoned #then the queued endpoint carries the unknown_liveness reason", async () => {
-    useTestTimeout(30_000)
     // given
     const { root, identity, queue } = await fixture()
     await seedUnknownLivenessRun(identity.paths.facts)
@@ -190,7 +184,6 @@ describe("facts terminal failure recording", () => {
   }, 30_000)
 
   test("#given a parent_dirty finalize #when the run ends #then the endpoint is recorded with the parent_dirty reason", async () => {
-    useTestTimeout(30_000)
     // given
     const { root, identity, queue } = await fixture()
     let dirty = true
@@ -215,7 +208,6 @@ describe("facts terminal failure recording", () => {
   }, 30_000)
 
   test("#given a recorded failure #when a later run commits #then the endpoint's record is cleared after consumption", async () => {
-    useTestTimeout(30_000)
     // given
     const { root, identity, queue } = await fixture()
     const store = new FactsFailureStore({ identityPaths: identity.paths, now: () => RECORDED_AT })
@@ -238,7 +230,6 @@ describe("facts terminal failure recording", () => {
   }, 30_000)
 
   test("#given a queued endpoint with a stale record #when the run yields no facts #then the record is cleared too", async () => {
-    useTestTimeout(30_000)
     // given
     const { root, identity, queue } = await fixture()
     const store = new FactsFailureStore({ identityPaths: identity.paths, now: () => RECORDED_AT })
@@ -259,7 +250,6 @@ describe("facts terminal failure recording", () => {
   }, 30_000)
 
   test("#given no user-selected model can resolve #when a launch is attempted #then the queue stays pending without recording an extraction failure", async () => {
-    useTestTimeout(30_000)
     // given
     const { root, identity, queue } = await fixture()
     const runner = new FactsExtractorRunner({
@@ -282,7 +272,6 @@ describe("facts terminal failure recording", () => {
   }, 30_000)
 
   test("#given an aborted drain #when launch is refused before reservation #then nothing is recorded", async () => {
-    useTestTimeout(30_000)
     // given
     const { root, identity, queue } = await fixture()
     const aborted = new AbortController()
@@ -298,7 +287,6 @@ describe("facts terminal failure recording", () => {
   }, 30_000)
 
   test("#given five consecutive failing runs #when each finalizes #then the endpoint parks with a null eligibility", async () => {
-    useTestTimeout(60_000)
     // given
     const { root, identity, queue } = await fixture()
     const store = new FactsFailureStore({ identityPaths: identity.paths })
@@ -320,7 +308,6 @@ describe("facts terminal failure recording", () => {
   }, 60_000)
 
   test("#given retention keeps freeing the attempt name #when six launches fail #then the streak still parks the endpoint", async () => {
-    useTestTimeout(60_000)
     // given: the incident shape - retention evicts this digest's only run, so the retry reserves
     // the SAME `facts-<digest>-1` name. A run-name failure identity would read every genuine
     // failure as a crash replay of the pruned run and pin the streak at 1 forever.
@@ -361,7 +348,6 @@ describe("facts terminal failure recording", () => {
   }, 60_000)
 
   test("#given a run ledger #when the run reserves its directory #then queued endpoints carry their snapshot boundary", async () => {
-    useTestTimeout(30_000)
     // given
     const { root, identity, queue } = await fixture()
     const runner = new FactsExtractorRunner(runnerOptions(root, identity, queue, "fail"))
