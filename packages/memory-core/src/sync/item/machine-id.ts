@@ -10,6 +10,7 @@ import { execFile } from "node:child_process"
 import { createHash } from "node:crypto"
 
 import { readFile } from "../../fs/resilient"
+import { win32SystemExecutable } from "../../process/win32-system-tools"
 
 export function deviceFingerprint(machineId: string, stateDir: string): string {
   return createHash("sha256").update(`omo-item-device:${machineId}\0${stateDir}`).digest("hex")
@@ -38,7 +39,7 @@ async function platformMachineId(): Promise<string | null> {
     return /"IOPlatformUUID" = "([^"]+)"/.exec(out ?? "")?.[1] ?? null
   }
   if (process.platform === "win32") {
-    const out = await run("reg", ["query", "HKLM\\SOFTWARE\\Microsoft\\Cryptography", "/v", "MachineGuid"])
+    const out = await run(win32SystemExecutable("reg.exe"), ["query", "HKLM\\SOFTWARE\\Microsoft\\Cryptography", "/v", "MachineGuid"])
     return /MachineGuid\s+REG_SZ\s+(\S+)/.exec(out ?? "")?.[1] ?? null
   }
   return null

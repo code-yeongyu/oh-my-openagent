@@ -29,6 +29,9 @@
     "./process-start-time": {
       "import": "./src/locks/process-start-time.ts"
     },
+    "./win32-system-tools": {
+      "import": "./src/process/win32-system-tools.ts"
+    },
     "./keyring": {
       "import": "./src/sync/keyring-port.ts"
     },

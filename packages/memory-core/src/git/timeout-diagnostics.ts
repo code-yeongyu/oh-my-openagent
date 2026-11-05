@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process"
 import { mkdirSync, writeFileSync } from "../fs/resilient"
 import { join } from "node:path"
+import { win32SystemExecutable } from "../process/win32-system-tools"
 
 // Opt-in evidence for a git that outlives its timeout (omo #10821): on Windows CI one `git add` stalls
 // past 30 s and its repository stays locked long after the kill, and no run has reproduced it on
@@ -14,7 +15,7 @@ const SNAPSHOT_TIMEOUT_MS = 15_000
 
 function processSnapshot(pid: number): string {
   const command = process.platform === "win32"
-    ? spawnSync("powershell", ["-NoProfile", "-Command", [
+    ? spawnSync(win32SystemExecutable("powershell.exe"), ["-NoProfile", "-Command", [
       "Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,CreationDate,CommandLine | Format-Table -AutoSize -Wrap | Out-String -Width 400",
       // Thread states for the git and every child it started, in case the stalled work runs in a child.
       `@(${pid}) + @(Get-CimInstance Win32_Process -Filter "ParentProcessId=${pid}" | ForEach-Object { $_.ProcessId }) | ForEach-Object { "threads of $_"; (Get-Process -Id $_ -ErrorAction SilentlyContinue).Threads | Group-Object ThreadState,WaitReason -NoElement | Format-Table -AutoSize | Out-String }`,

@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process"
 import { readFile } from "../fs/resilient"
+import { win32SystemExecutable } from "../process/win32-system-tools"
 import { readDarwinProcessStartSeconds, readWin32ProcessCreationFiletime } from "./process-start-time"
 
 function errorCode(error: unknown): string | undefined {
@@ -42,7 +43,7 @@ async function readWin32StartIdentity(pid: number): Promise<string | null> {
   if (creationFiletime !== null) return `win32-creation-filetime:${creationFiletime}`
   // Only when kernel32 is unreachable through bun:ffi: PowerShell can resolve CreationDate for any
   // visible process, at the cost of one process spawn under a 2 s budget per probe.
-  const value = await execFileText("powershell.exe", [
+  const value = await execFileText(win32SystemExecutable("powershell.exe"), [
     "-NoProfile",
     "-Command",
     `(Get-Process -Id ${pid} -ErrorAction SilentlyContinue).StartTime.ToUniversalTime().ToString('o')`,
