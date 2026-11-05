@@ -826,6 +826,7 @@
     "packages/omo-senpi/src/components/config-watch/index.ts",
     "packages/omo-senpi/src/components/config-watch/paths.ts",
     "packages/omo-senpi/src/components/config-watch/validate.ts",
+    "packages/omo-senpi/src/components/desktop-toolkit/hand-lifetime.ts",
     "packages/omo-senpi/src/components/desktop-toolkit/host-tool-execution.ts",
     "packages/omo-senpi/src/components/desktop-toolkit/host-tool-routes.ts",
     "packages/omo-senpi/src/components/desktop-toolkit/index.ts",

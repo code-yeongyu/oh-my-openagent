@@ -1,4 +1,5 @@
 import type { OmoSenpiComponent } from "../../extension/types"
+import { DESKTOP_TOOLKIT_SIDE } from "./hand-lifetime"
 
 export const DESKTOP_TOOLKIT_TOOL_NAME = "omo_desktop_toolkit"
 export const TOOLKIT_REQUEST_EVENT = "omo.toolkit.request"
@@ -30,7 +31,7 @@ export function createDesktopToolkitComponent(options: { readonly timeoutMs?: nu
           type: "object", properties: { op: { type: "string", enum: ["acquire"] }, toolkit: { type: "string" } },
           required: ["op", "toolkit"], additionalProperties: false,
         },
-        exposure: "eval", permissionParser: () => [], executionMode: "parallel",
+        exposure: "eval", permissionParser: () => [], executionMode: "parallel", ...DESKTOP_TOOLKIT_SIDE,
         async execute(_id: string, params: { readonly op?: unknown; readonly toolkit?: unknown }) {
           const reason = params.op === "acquire" && typeof params.toolkit === "string" && params.toolkit !== "" ? "unavailable" : "invalid_request"
           const details = { ok: false, reason }
