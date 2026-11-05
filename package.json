@@ -242,7 +242,7 @@
     "jsonc-parser": "^3.3.1",
     "knip": "6.43.0",
     "node-pty": "^1.1.0",
-    "omowright": "github:code-yeongyu/omowright#a38cb92adef0f0ae91a00e9e455caff3886c8c65",
+    "omowright": "github:code-yeongyu/omowright#19963907ddab133ff7d87640a7589dc68e8d7b66",
     "oxc-parser": "0.148.0",
     "oxlint": "1.89.0",
     "picocolors": "^1.1.1",
