@@ -129,7 +129,9 @@
     "packages/omo-senpi/plugin/extensions/omo.js: omo doctor",
     "packages/omo-senpi/src/components/memory/commands/doctor-reservation.ts: omo doctor x2",
     "packages/memory-core/src/retention/host-step.ts: omo doctor",
-    "packages/omo-native/test/doctor-retention-fix.test.ts: omo doctor"
+    "packages/omo-native/test/doctor-retention-fix.test.ts: omo doctor x2",
+    "packages/omo-native/task-config-entry.ts: omo doctor",
+    "knip.jsonc: omo doctor"
   ],
   "literal-label": [
     "packages/omo-opencode/src/cli/account-keys/keystore.ts: =omo",

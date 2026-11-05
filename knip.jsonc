@@ -514,8 +514,6 @@
       "packages/omo-native/bin/lib/bun-runtime.js": ["BUN_MIN_VERSION", "resolveBunGuard", "findNodeBinary"],
       // pre-existing at origin dev 4686e425b5: unused export(s) COMPUTER_USE_RUNTIME
       "packages/omo-native/bin/lib/computer-use-doctor.js": ["COMPUTER_USE_RUNTIME"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) TASK_CONFIG_RUNTIME
-      "packages/omo-native/bin/lib/daemon-config.js": ["TASK_CONFIG_RUNTIME"],
       // pre-existing at origin dev 4686e425b5: unused export(s) aggregateEndpoints
       "packages/omo-native/bin/lib/daemon-status.js": ["aggregateEndpoints"],
       // pre-existing at origin dev 4686e425b5: unused export(s) omoInstallsOnPath, findLegacyPackages, findOpenCodeRegistrations, formatMigrationLines, openCodeRoutingReport
