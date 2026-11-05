@@ -11,6 +11,7 @@ import {
 import { getOnboardingMarkerMtime } from "../onboarding/state"
 import { getOmoNativeStateDir } from "../telemetry/product-identity"
 import { gitToplevel } from "./git-helpers"
+import { INIT_DEEP_ADVISOR_SIDE } from "./hand-lifetime"
 import type { AdvisorPreflight } from "./runtime"
 
 declare const OMO_SENPI_BUNDLED: boolean
@@ -55,7 +56,7 @@ export function createInitDeepAdvisorComponent(
             ctx.logger.warn("init-deep-advisor failed", { error })
           })
         })
-      })
+      }, INIT_DEEP_ADVISOR_SIDE)
     },
   }
 }

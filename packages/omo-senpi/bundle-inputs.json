@@ -857,6 +857,7 @@
     "packages/omo-senpi/src/components/init-deep-advisor/drift.ts",
     "packages/omo-senpi/src/components/init-deep-advisor/eligibility.ts",
     "packages/omo-senpi/src/components/init-deep-advisor/git-helpers.ts",
+    "packages/omo-senpi/src/components/init-deep-advisor/hand-lifetime.ts",
     "packages/omo-senpi/src/components/init-deep-advisor/index.ts",
     "packages/omo-senpi/src/components/init-deep-advisor/proposed-data.ts",
     "packages/omo-senpi/src/components/init-deep-advisor/runtime.ts",
