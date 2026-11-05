@@ -147,5 +147,5 @@ export async function helperSession(keychain: ReturnType<typeof fakeKeychain>, b
       ...(proc.handOff === undefined ? {} : { handOff: proc.handOff }),
     },
   })
-  return { store, session: createSession({ api, store, home }), home }
+  return { store, session: createSession({ beforeKeysDiscarded: async () => undefined, api, store, home }), home }
 }
