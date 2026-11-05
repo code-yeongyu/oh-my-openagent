@@ -51,8 +51,20 @@ function looseObjects(dir: string): number {
 
 function recorder() {
   const info: string[] = []
+  const infoData: { message: string; data?: Record<string, unknown> }[] = []
   const warn: string[] = []
-  return { info, warn, logger: { info: (message: string) => info.push(message), warn: (message: string) => warn.push(message) } }
+  return {
+    info,
+    infoData,
+    warn,
+    logger: {
+      info: (message: string, data?: Record<string, unknown>) => {
+        info.push(message)
+        infoData.push({ message, ...(data === undefined ? {} : { data }) })
+      },
+      warn: (message: string) => warn.push(message),
+    },
+  }
 }
 
 describe("createMemoryMaintenance", () => {
@@ -467,5 +479,54 @@ describe("host sweep driver 2 (6b, A34 in-session half)", () => {
 
     expect(existsSync(foreignRun)).toBe(true)
     expect(existsSync(join(memoryRoot, "runtime-sweep.json"))).toBe(false)
+  }, 60_000)
+})
+
+describe("runtime size cap inside the maintenance pass (B08)", () => {
+  const NOW = Date.parse("2026-11-05T00:00:00.000Z")
+  const DAY = 24 * 60 * 60 * 1000
+
+  async function identityWithYoungRuns() {
+    const { context } = await identityWithHistory(0)
+    const runDirs: string[] = []
+    for (const [index, days] of [[3, 3], [4, 2], [5, 1]] as const) {
+      const runDir = join(context.identityPaths.reflection, "runs", `reflection-run-${index}`)
+      await mkdir(runDir, { recursive: true })
+      await writeFile(join(runDir, "final.json"), JSON.stringify({ runId: `reflection-run-${index}`, outcome: "merged", finishedAt: new Date(NOW - days * DAY).toISOString() }))
+      await writeFile(join(runDir, "child-1.log"), Buffer.alloc(64 * 1024, 1))
+      runDirs.push(runDir)
+    }
+    return { context, runDirs }
+  }
+
+  test("#given an identity over its cap #when the pass runs #then the cap evicts the oldest folded runs and logs the figures", async () => {
+    const { context, runDirs } = await identityWithYoungRuns()
+    const log = recorder()
+    const maintenance = createMemoryMaintenance({ logger: log.logger, delayMs: 0, now: () => NOW, resolveMaxBytes: () => 1 })
+
+    maintenance.schedule(context)
+    await maintenance.settled()
+
+    expect(runDirs.map((dir) => existsSync(dir))).toEqual([false, false, true])
+    const line = log.infoData.find((entry) => entry.message === "omo-senpi memory runtime retention")
+    expect(line?.data?.evicted).toBe(2)
+    expect(line?.data?.capBytes).toBe(1)
+    expect(log.warn).toEqual(["omo-senpi memory runtime cap exceeded, nothing evictable"])
+  }, 60_000)
+
+  test("#given another process holds the maintenance lock #when the pass comes due #then the cap skips without waiting or evicting", async () => {
+    const { context, runDirs } = await identityWithYoungRuns()
+    const log = recorder()
+    const maintenance = createMemoryMaintenance({ logger: log.logger, delayMs: 0, now: () => NOW, resolveMaxBytes: () => 1 })
+    const holder = await createLockRecord("memory-maintenance", { runId: "other-process" })
+
+    await withLock(memoryMaintenanceLockPath(context.identityPaths.locks), holder, async () => {
+      maintenance.schedule(context)
+      await maintenance.settled()
+    }, { waitTimeoutMs: 0 })
+
+    expect(runDirs.every((dir) => existsSync(dir))).toBe(true)
+    expect(log.info).toEqual([])
+    expect(log.warn).toEqual([])
   }, 60_000)
 })
