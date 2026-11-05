@@ -173,3 +173,29 @@ import { PrWatchManager, projectGitHubHost } from ${modulePath("manager.ts")};
   expect(Number(readFileSync(`${f.path}.dispatches`, "utf8"))).toBe(1)
   expect(pendingPrWatchWakes(registry.read())).toEqual([])
 }, 15_000)
+
+
+test("GHES host is inferred from the project and explicit mismatched URLs fail before authentication", async () => {
+  const f = fixture(), directory = join(f.path, "../project")
+  const oldHost = process.env.GH_HOST
+  delete process.env.GH_HOST
+  try {
+    execFileSync("git", ["init", "--quiet", directory])
+    execFileSync("git", ["-C", directory, "remote", "add", "origin", "git@git.example.com:acme/widget.git"])
+    expect(projectGitHubHost(directory)).toBe("git.example.com")
+    const client = createOpencodeClient({ baseUrl: "http://127.0.0.1:1" })
+    const host = new GitHubPrWatchHost(new GitHubReadTransport({ host: projectGitHubHost(directory) }))
+    let actors = 0
+    host.actor = async () => { actors++; return "alice" }
+    const manager = new PrWatchManager({ client, directory }, f.path, undefined, host)
+    managers.push(manager)
+    await expect(manager.watch("https://github.com/acme/widget/pull/1", "ses_host")).rejects.toThrow("PR host differs")
+    expect(actors).toBe(0)
+    const registration = await manager.watch("https://git.example.com/acme/widget/pull/1", "ses_host")
+    expect(registration.reference).toBe("acme/widget#1")
+    expect(registration.host).toBe("git.example.com")
+  } finally {
+    if (oldHost === undefined) delete process.env.GH_HOST
+    else process.env.GH_HOST = oldHost
+  }
+})

@@ -5,7 +5,7 @@ export function createPrWatchTools(manager: PrWatchManager): Record<string, Tool
   return {
     watch_pull_request: tool({
       description: "Watch a GitHub pull request once per minute on the host. Only real check, external remark, or conflict transitions wake this session; observations never authorize merging.",
-      args: { reference: tool.schema.string().describe("owner/repo#number") },
+      args: { reference: tool.schema.string().describe("owner/repo#number or https://host/owner/repo/pull/number (host must match project GitHub remote or GH_HOST)") },
       async execute(args, context) {
         return JSON.stringify(await manager.watch(args.reference, context.sessionID, context.directory))
       },
