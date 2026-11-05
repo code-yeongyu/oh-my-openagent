@@ -72,7 +72,7 @@ describe("omo doctor --fix retention step (A38 CLI half)", () => {
       writeFileSync(join(dir, "child-1.log"), Buffer.alloc(64 * 1024, 1))
     }
 
-    const result = await reflectionLockFix({ env: { OMO_MEMORY_HOME: memory }, home })
+    const result = await reflectionLockFix({ env: { OMO_MEMORY_HOME: memory }, home, loadTaskConfig })
 
     expect(result.failed).toBe(false)
     expect([1, 2, 3].map((index) => existsSync(join(runs, `reflection-run-${index}`)))).toEqual([false, false, true])
