@@ -5,6 +5,7 @@ import type { OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { createOmoNativeProductConfig } from "../telemetry/product-identity"
 import type { FeedbackDraft, FeedbackKind, UploadRedactor } from "./draft"
+import { FEEDBACK_SESSION_SIDE } from "./hand-lifetime"
 import { feedbackRuntimeLoadFailure, loadFeedbackRuntime, type FeedbackRuntimeLoader, type FeedbackRuntimeModule } from "./runtime-loader"
 import type { FeedbackCommandUi, FeedbackCore, FeedbackSessionLike } from "./runtime"
 import type { ReportTransport, SubmitResult } from "./submit"
@@ -60,13 +61,13 @@ export function createFeedbackComponent(options: FeedbackComponentOptions = {}):
         if (id === undefined) return
         liveSessions.set(id, ctx as SessionLike)
         latestSessionId = id
-      })
+      }, FEEDBACK_SESSION_SIDE)
       pi.on("session_shutdown", (_payload, ctx) => {
         const id = sessionIdOf(ctx as SessionLike | undefined)
         if (id === undefined) return
         liveSessions.delete(id)
         if (latestSessionId === id) latestSessionId = [...liveSessions.keys()].at(-1)
-      })
+      }, FEEDBACK_SESSION_SIDE)
       const sessionForRpc = (input: unknown): SessionLike | undefined => {
         const requested: unknown = Reflect.get(Object(input), "sessionId")
         if (requested === null) return undefined
