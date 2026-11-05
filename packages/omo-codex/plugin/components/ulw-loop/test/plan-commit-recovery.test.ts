@@ -18,7 +18,6 @@ import { applySpawnBudgetGuards } from "../src/spawn-guard.js";
 import { runStopResumeHook } from "../src/stop-resume-hook.js";
 import { childWriter, cleanupWriters } from "./fixtures/commit-child.js";
 import { leaseClock } from "./fixtures/lease-clock.js";
-import { remainingTestTime } from "../../../../../../test-support/test-deadline";
 
 let root: string;
 let dir: string;
@@ -37,7 +36,7 @@ function signal() {
 		throw new Error("signal not initialized");
 	};
 	const promise = new Promise<void>((done, reject) => {
-		const timeout = setTimeout(() => reject(new Error("signal waited out the test budget")), remainingTestTime());
+		const timeout = setTimeout(() => reject(new Error("signal timed out")), 5_000);
 		resolve = () => {
 			clearTimeout(timeout);
 			done();

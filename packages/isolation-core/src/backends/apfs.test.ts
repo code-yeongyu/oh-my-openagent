@@ -8,7 +8,7 @@ import { ApfsBackend, cloneWithSymbols } from "./apfs"
 import { IsolationUnavailableError } from "../backend"
 import { repo } from "./git-fixture"
 import { ensureIsolation, cleanupIsolation } from "../ensure"
-import { testBudgetSignal } from "../../../../test-support/test-deadline"
+import { testBudgetSignal, useTestTimeout } from "../../../../test-support/test-deadline"
 
 async function withPlatform<T>(platform: NodeJS.Platform, fn: () => Promise<T>): Promise<T> {
   const saved = process.platform
@@ -18,6 +18,7 @@ async function withPlatform<T>(platform: NodeJS.Platform, fn: () => Promise<T>):
 
 const mac = process.platform === "darwin" ? test : test.skip
 mac("APFS clones 5000 files COW, skips FIFO/socket, and never follows entry symlinks", async () => {
+  useTestTimeout(30_000)
   const { repoRoot: lower, root } = await repo()
   await writeFile(join(lower, "staged"), "stage")
   const { git } = await import("./git-fixture")

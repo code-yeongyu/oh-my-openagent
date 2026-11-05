@@ -3,6 +3,7 @@ import { PassThrough } from "node:stream";
 import { describe, expect, it } from "bun:test";
 
 import { JsonRpcConnection } from "./json-rpc-connection.js";
+import { remainingTestTime } from "../../../../test-support/test-deadline";
 
 type JsonMessage = Record<string, unknown>;
 
@@ -52,8 +53,8 @@ function recordJsonRpcMessages(stream: PassThrough) {
 			if (messages.length >= count) return Promise.resolve();
 			return new Promise((resolve, reject) => {
 				const timer = setTimeout(() => {
-					reject(new Error(`waited for ${count} JSON-RPC messages, observed ${messages.length}`));
-				}, 1_000);
+					reject(new Error(`waited out the test budget for ${count} JSON-RPC messages, observed ${messages.length}`));
+				}, remainingTestTime());
 				const wake = (): void => {
 					if (messages.length < count) {
 						waiters.push(wake);

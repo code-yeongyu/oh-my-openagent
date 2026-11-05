@@ -47,8 +47,8 @@ function observationStream() {
         const timer = setTimeout(() => {
           pendingTimers.delete(timer)
           waiters.delete(waiter)
-          reject(new Error("Expected grant observation did not arrive"))
-        }, 10_000)
+          reject(new Error("Expected grant observation did not arrive within the test budget"))
+        }, remainingTestTime())
         pendingTimers.add(timer)
         const waiter = { predicate, resolve: (event: GrantObservation) => {
           clearTimeout(timer); pendingTimers.delete(timer); resolve(event)

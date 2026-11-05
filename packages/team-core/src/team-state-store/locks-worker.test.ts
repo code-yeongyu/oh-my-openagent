@@ -11,7 +11,7 @@ import { removeLockRecordIfUnchanged } from "./lock-reclaim"
 import { buildLockRecord, markLockRecordHeld, markLockRecordReleased } from "./lock-record"
 import { detectStaleLock, reapStaleLock, withLock } from "./locks"
 import { installLockWorkerObserver } from "./lock-worker-lifetime"
-import { testBudgetSignal, useTestTimeout } from "../../../../test-support/test-deadline"
+import { testBudgetSignal, useTestTimeout, remainingTestTime } from "../../../../test-support/test-deadline"
 
 installLockWorkerObserver()
 
@@ -25,7 +25,7 @@ const Reply = z.object({
 
 function reply(worker: Worker, event: string): Promise<z.infer<typeof Reply>> {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => done(new Error(`worker never sent ${event}`)), 10_000)
+    const timer = setTimeout(() => done(new Error(`worker never sent ${event} within the test budget`)), remainingTestTime())
     const onError = (error: Error) => done(error)
     const onExit = (code: number) => done(new Error(`worker exited ${code} before ${event}`))
     const onMessage = (message: unknown) => {

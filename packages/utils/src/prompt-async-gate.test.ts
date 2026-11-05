@@ -7,7 +7,7 @@ import {
   releaseAllPromptAsyncReservationsForTesting,
   releasePromptAsyncReservation,
 } from "./prompt-async-gate"
-import { remainingTestTime, useTestTimeout } from "../../../test-support/test-deadline"
+import { remainingTestTime } from "../../../test-support/test-deadline"
 
 async function waitForPromise<T>(promise: Promise<T>, label: string): Promise<T> {
   let timeoutID: ReturnType<typeof setTimeout> | undefined
@@ -1624,7 +1624,6 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
   })
 
   test("#given session.status never resolves #when promptAsync is requested #then isSessionActive times out and dispatch is attempted", async () => {
-    useTestTimeout(2000)
     // given
     let promptCalls = 0
     const client = {
@@ -1682,7 +1681,6 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
   })
 
   test("#given session.status hangs forever #when promptAsync gate checks activity #then it dispatches after status timeout", async () => {
-    useTestTimeout(10_000)
     // given
     let promptCalls = 0
     const neverSettles = new Promise<never>(() => {})

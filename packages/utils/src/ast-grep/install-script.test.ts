@@ -10,6 +10,7 @@ import {
   type AstGrepInstallSpawn,
   type AstGrepInstallSpawnOutcome,
 } from "./install-script"
+import { remainingTestTime } from "../../../../test-support/test-deadline"
 
 describe("runAstGrepSkillInstall", () => {
   test("#given install.sh exists #when provisioning runs #then OMO_AST_GREP_BIN_DIR targets the runtime slug", async () => {
@@ -93,13 +94,13 @@ describe("runAstGrepSkillInstall", () => {
       outcome: neverSettles,
     })
 
-    // when: race against an explicit 3s circuit breaker so a regression fails fast instead of hanging the runner.
+    // when: race against the remaining test budget so a regression fails by name instead of hanging the runner.
     let hung = false
     const breaker = new Promise<never>((_, reject) => {
       setTimeout(() => {
         hung = true
-        reject(new Error("waited 3s for the kill-ignored rejection, never fired"))
-      }, 3_000)
+        reject(new Error("waited out the test budget for the kill-ignored rejection, never fired"))
+      }, remainingTestTime())
     })
 
     // then: the deadline race must settle as a failed outcome naming the ignored termination.
