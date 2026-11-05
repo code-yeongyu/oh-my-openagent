@@ -15,7 +15,7 @@ Web access for the hosts the user's browser cannot open (WAF / 403 / Cloudflare 
 User request
   |
   +- a page the user's browser can open (read, click, screenshot, QA, login)  NOT this skill (browser skill, attached engine)
-  +- simple search query ------------------------------ NOT this skill (use web-search)
+  +- simple search query ------------------------------ NOT this skill (use web search)
   |
   +- URL blocked / 403 / Cloudflare / WAF ------------- TIER 1  insane-search
   +- YouTube/Vimeo/TikTok subtitles or metadata ------- TIER 1  insane-search (yt-dlp)
