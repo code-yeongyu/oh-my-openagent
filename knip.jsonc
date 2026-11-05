@@ -2956,6 +2956,10 @@
         "scripts/qa/agent-toolkit-sdk-plan-audit.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/ast-grep-mcp-e2e.mjs",
+        // A hand-run QA driver like the others in this list; this branch adds it.
+        "scripts/qa/category-chain-reasoning-e2e.mjs",
+        // A hand-run QA driver like the others in this list; this branch adds it.
+        "scripts/qa/category-chain-reasoning-mock-provider.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/claim-receipt-e2e.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
