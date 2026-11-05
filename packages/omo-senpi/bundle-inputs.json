@@ -820,6 +820,7 @@
     "packages/omo-senpi/src/components/computer-use/settings.ts",
     "packages/omo-senpi/src/components/computer-use/telemetry.ts",
     "packages/omo-senpi/src/components/config-resolution/index.ts",
+    "packages/omo-senpi/src/components/config-startup/hand-lifetime.ts",
     "packages/omo-senpi/src/components/config-startup/index.ts",
     "packages/omo-senpi/src/components/config-startup/metadata-launch.ts",
     "packages/omo-senpi/src/components/config-startup/opencode-routing-notice.ts",
