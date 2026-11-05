@@ -777,6 +777,7 @@
     "packages/omo-senpi/plugin/scripts/stage-x-search-skill.mjs",
     "packages/omo-senpi/src/components/agent-home/resolve-agent-home.ts",
     "packages/omo-senpi/src/components/ast-grep/index.ts",
+    "packages/omo-senpi/src/components/browser-bridge/hand-lifetime.ts",
     "packages/omo-senpi/src/components/browser-bridge/index.ts",
     "packages/omo-senpi/src/components/builtin-mcps/index.ts",
     "packages/omo-senpi/src/components/bundled-skills/contributed-skill.ts",

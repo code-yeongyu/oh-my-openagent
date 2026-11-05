@@ -1,8 +1,10 @@
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
+import { hostBrowserBridgeLifecycle, type BrowserBridgeLifecycleSource } from "./hand-lifetime"
+
+export { BROWSER_STOP_RPC } from "./hand-lifetime"
 
 export const BROWSER_BRIDGE_TOOL_NAME = "omo_browser_bridge"
 export const BROWSER_STATE_EVENT = "omo.browser.state"
-export const BROWSER_STOP_RPC = "omo.browser.stop"
 
 const PARAMETERS = {
   type: "object",
@@ -36,7 +38,12 @@ function reply(details: Record<string, unknown>) {
  * stopped browser use, and `status` reports whether they did. The app's Stop arrives as the
  * `omo.browser.stop` request and holds until the user sends their next message.
  */
-export function createBrowserBridgeComponent(): OmoSenpiComponent {
+export interface BrowserBridgeComponentOptions {
+  /** The Stop and user-message source of a hand scope of a split session; absent on a fused session. */
+  readonly lifecycle?: (pi: SenpiExtensionAPI) => BrowserBridgeLifecycleSource | undefined
+}
+
+export function createBrowserBridgeComponent(options: BrowserBridgeComponentOptions = {}): OmoSenpiComponent {
   return {
     name: "browser-bridge",
     register(pi: SenpiExtensionAPI, _ctx: ComponentContext): void {
@@ -65,15 +72,12 @@ export function createBrowserBridgeComponent(): OmoSenpiComponent {
         },
       })
 
-      pi.rpc?.handle?.(BROWSER_STOP_RPC, () => {
+      const lifecycle = options.lifecycle?.(pi) ?? hostBrowserBridgeLifecycle(pi)
+      lifecycle.onStop(() => {
         stopped = true
-        return { stopped }
       })
-
-      pi.on("input", (payload: unknown) => {
-        const source = (payload as { source?: unknown } | null)?.source
-        if (source !== "extension") stopped = false
-        return undefined
+      lifecycle.onUserMessage(() => {
+        stopped = false
       })
     },
   }
