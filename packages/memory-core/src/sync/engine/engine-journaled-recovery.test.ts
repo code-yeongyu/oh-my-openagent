@@ -6,7 +6,7 @@
 import { writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
-import { afterEach, expect, test } from "bun:test"
+import { afterEach, expect, spyOn, test } from "bun:test"
 
 import { loadLoroRuntime } from "../../crdt/loro-runtime"
 import { CrashInjected } from "./engine"
@@ -169,4 +169,44 @@ test("a revive of a held file a peer deleted, crashed between journaling and imp
   expect(await a.read("shared.md")).toBe(note("first\nfrom a\nmore\n"))
   expect(await b.read("shared.md")).toBe(note("first\nfrom a\nmore\n"))
   expect(await a.engine.status()).toMatchObject({ kind: "synced" })
+}, TIMEOUT)
+
+/** A device whose next capture crashes once after the doc is persisted: its op stays pending, marked imported. */
+async function crashedAfterPersist(name: string) {
+  let armed = true
+  const crash = (at: string) => {
+    if (armed && at === "persisted") {
+      armed = false
+      throw new CrashInjected(at)
+    }
+  }
+  const device = await makeDevice(new FakeSyncServer(), name, crash, { realStore: true })
+  devices.push(device)
+  await device.write("kept.md", note("kept\n"))
+  await expect(device.engine.runCycle()).rejects.toBeInstanceOf(CrashInjected)
+  const [entry, ...rest] = (await device.engine.journal.pending()).items
+  expect(rest).toEqual([])
+  expect(entry).toMatchObject({ key: "kept.md", imported: true })
+  if (entry === undefined) throw new Error("no pending entry")
+  return { device, entry }
+}
+
+test("capture recovery never re-reads an op the doc already holds", async () => {
+  const { device } = await crashedAfterPersist("a")
+  const adopt = spyOn(device.store, "adoptJournaled")
+  expect(await device.engine.runCycle()).toMatchObject({ pushed: true })
+  expect(adopt).not.toHaveBeenCalled()
+}, TIMEOUT)
+
+test("an entry whose imported mark was lost is checked once against the doc, never imported twice", async () => {
+  // A crash between persisting the doc and writing the mark, or an older build dropping the field.
+  const { device, entry } = await crashedAfterPersist("b")
+  const { imported: _lost, ...unmarked } = entry
+  await device.engine.journal.setPending({ items: [unmarked], outgoing: null })
+  const adopt = spyOn(device.store, "adoptJournaled")
+  const versionBefore = await device.store.version("kept.md")
+  expect(await device.engine.runCycle()).toMatchObject({ pushed: true })
+  expect(adopt).toHaveBeenCalledTimes(1)
+  expect(await adopt.mock.results[0]?.value).toBe("held")
+  expect(await device.store.version("kept.md")).toBe(versionBefore)
 }, TIMEOUT)
