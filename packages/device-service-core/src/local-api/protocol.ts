@@ -11,6 +11,9 @@ import type {
 
 export * from "./vocabulary.ts";
 export * from "./protocol-events.ts";
+export type * from "./protocol-control.ts";
+
+import type { ControlAttachGet, ControlAttachSet, ControlAttachState } from "./protocol-control.ts";
 
 // The local API v1 messages (docs/local-api.md). One JSON object per LF-terminated line: the handshake, then
 // requests {id, type, ...} each answered by exactly one response, and pushed events {type: "event", kind, ...}.
@@ -208,7 +211,9 @@ export type LocalRequest =
   | SessionCommandPart
   | SessionRead
   | EnforcementReport
-  | ShutdownForUpgrade;
+  | ShutdownForUpgrade
+  | ControlAttachGet
+  | ControlAttachSet;
 export type RequestType = LocalRequest["type"];
 
 export type DeviceRow = {
@@ -239,6 +244,8 @@ export type ResponseData = {
   readonly "session.read": { readonly query_id: string };
   readonly "enforcement.report": Empty;
   readonly "owner.shutdown_for_upgrade": Empty;
+  readonly "control.attach.get": ControlAttachState;
+  readonly "control.attach.set": ControlAttachState;
 };
 export type ErrorBody = {
   readonly code: ErrorCode;
