@@ -50,7 +50,7 @@ export async function runRuntimeRetention(options: RuntimeRetentionOptions): Pro
   const completions = await pruneCompletions(context, guard)
   const reflectionSessions = await pruneLegacyReflectionSessions(context, guard)
   const unreflectedGate = options.policy.discardUnreflectedJournals
-    ? await readUnreflectedRetentionGate(options.paths.reflection, options.reflectionEnabled ?? true, () => budget.admit("journals"))
+    ? await readUnreflectedRetentionGate(options.paths.reflection, options.reflectionEnabled ?? true, () => budget.proceed("journals"))
     : undefined
   const journals = await pruneTranscriptJournals(context, guard, unreflectedGate)
   const sidecarResult = await pruneKibitzerSidecars({

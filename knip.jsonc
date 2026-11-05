@@ -561,7 +561,8 @@
       // pre-existing at origin dev 4d3161eabd (#11430, 950c2dd65f): unused export(s) HashDirectoryRuntimeError
       "packages/omo-native/openssl-hash-dir.ts": ["HashDirectoryRuntimeError"],
       // pre-existing at origin dev 4686e425b5: unused export(s) resolveDaemonTaskSettings
-      "packages/omo-native/task-config-entry.ts": ["resolveDaemonTaskSettings"],
+      // resolveGlobalMemorySettings: read by omo doctor --fix through the staged plugin/runtime/task-config bundle (#12479)
+      "packages/omo-native/task-config-entry.ts": ["resolveDaemonTaskSettings", "resolveGlobalMemorySettings"],
       // pre-existing at origin dev 4686e425b5: unused export(s) SOURCE_ROOT
       "packages/omo-native/test/bun-bin-shim.fixture.ts": ["SOURCE_ROOT"],
       // pre-existing at origin dev 4686e425b5: unused export(s) identityRealpath, existsOnly

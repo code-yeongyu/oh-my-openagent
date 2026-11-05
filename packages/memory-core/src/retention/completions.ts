@@ -20,8 +20,8 @@ export async function pruneCompletions(context: RetentionContext, lazyGuard: Laz
   const records: Completion[] = []
   for (const name of await listNames(dir)) {
     if (!name.endsWith(".json")) continue
-    // Classifying reads every record: it stops on the same budget and abort signal as the removals.
-    if (context.budget?.admit("completions") === false) return tally.result()
+    // Classifying reads metadata only: it stops on the abort signal, never on the time budget.
+    if (context.budget?.proceed("completions") === false) return tally.result()
     const runId = name.slice(0, -".json".length)
     const record = await readCompletion(join(dir, name), runId)
     if (record === undefined) tally.keep(runId, "malformed")

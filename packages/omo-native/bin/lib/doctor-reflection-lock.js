@@ -4,7 +4,8 @@
 // a live holder or no lock prints nothing. `omo doctor --fix` runs the shared reaper
 // (stale-lock-reaper.ts) with its minimal settle on every durable identity (#11976).
 
-import { existsSync, readdirSync, readFileSync } from "node:fs"
+import { existsSync, readdirSync } from "node:fs"
+import { createRequire } from "node:module"
 import { homedir } from "node:os"
 import { basename, join, resolve } from "node:path"
 import {
@@ -18,7 +19,10 @@ import {
   sweepHostIdentities,
   sweepIdentityOrphanWorktrees,
 } from "./reflection-lock.generated.js"
-import { parseJsonc } from "./jsonc.js"
+import { TASK_CONFIG_RUNTIME } from "./daemon-config.js"
+import { packageRoot } from "./package-paths.js"
+
+const requireRuntime = createRequire(import.meta.url)
 
 const MEMORY_ROOT_ENV_VAR = "OMO_MEMORY_HOME"
 
@@ -82,28 +86,22 @@ function orphanLines(identity, report, dryRun) {
   return lines
 }
 
+function loadTaskConfigRuntime() {
+  return requireRuntime(join(packageRoot, "plugin", TASK_CONFIG_RUNTIME))
+}
+
 // The memory settings of the user's GLOBAL omo config only (omo.jsonc, else omo.json under ~/.omo):
-// `--fix` sweeps identities of every project, so it never reads a project layer (REVIEW-4 M-b). The
-// `[native]` block wins key by key over the base, as the loader folds it. Unreadable means no settings,
-// which keeps unreflected journal input.
-export function readGlobalMemorySettings(home = homedir()) {
-  const jsonc = join(home, ".omo", "omo.jsonc")
-  const path = existsSync(jsonc) ? jsonc : join(home, ".omo", "omo.json")
+// `--fix` sweeps identities of every project, so it never reads a project layer (REVIEW-4 M-b). They
+// are resolved by the session's own loader (`[senpi]`, `[native]`, the active profile, merged per agent
+// and per runtime key) through the staged task-config runtime (task-config-entry.ts). Unreadable config
+// or a runtime that cannot load means no settings, which keeps unreflected journal input.
+export function readGlobalMemorySettings(home = homedir(), options = {}) {
   try {
-    const document = parseJsonc(readFileSync(path, "utf8"))
-    const base = isRecord(document?.memory) ? document.memory : {}
-    const native = isRecord(document?.["[native]"]?.memory) ? document["[native]"].memory : {}
-    return {
-      runtime: { ...(isRecord(base.runtime) ? base.runtime : {}), ...(isRecord(native.runtime) ? native.runtime : {}) },
-      agents: { ...(isRecord(base.agents) ? base.agents : {}), ...(isRecord(native.agents) ? native.agents : {}) },
-    }
+    const runtime = (options.loadTaskConfig ?? loadTaskConfigRuntime)()
+    return runtime.resolveGlobalMemorySettings({ env: { ...(options.env ?? process.env), HOME: home, USERPROFILE: home } })
   } catch {
     return undefined
   }
-}
-
-function isRecord(value) {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
 }
 
 // `omo doctor --fix`: driver 1 of the host sweep (memory-core reflection/host-sweep.ts). Every identity
@@ -132,7 +130,10 @@ export async function reflectionLockFix(options = {}) {
       return [`FAIL ${identity.name} orphan worktree sweep failed: ${error instanceof Error ? error.message : String(error)}`]
     }
   }
-  const settings = options.memorySettings ?? readGlobalMemorySettings(options.home ?? homedir())
+  const settings = options.memorySettings ?? readGlobalMemorySettings(options.home ?? homedir(), {
+    env: options.env ?? process.env,
+    ...(options.loadTaskConfig === undefined ? {} : { loadTaskConfig: options.loadTaskConfig }),
+  })
   const retention = createRetentionHostSweepStep({ ...(settings === undefined ? {} : { settings }), ...(probe.now === undefined ? {} : { now: probe.now }), dryRun })
   const retain = async (identity) => {
     const lines = await retention(identity)

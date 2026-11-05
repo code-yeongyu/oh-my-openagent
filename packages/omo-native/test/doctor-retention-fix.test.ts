@@ -95,20 +95,21 @@ describe("omo doctor --fix resolves the global memory settings as the config loa
     expect(existsSync(removed)).toBe(false)
   })
 
-  test("#given a global config with a base, a legacy [senpi] block, a [native] block and an active profile #when the CLI reads it #then it equals the memory settings the session loader resolves from the same file", () => {
+  const BASE = {
+    runtime: { discard_unreflected_journals: true, retention_days: 9 },
+    agents: { "agent-a": { runtime: { discard_unreflected_journals: false, pass_budget_ms: 5_000 } } },
+  }
+  const PROFILES = { work: { memory: { runtime: { abandoned_journal_days: 21 }, agents: { "agent-c": { runtime: { discard_unreflected_journals: false } } } } } }
+
+  test.each([
+    ["a [native] block", { memory: BASE, "[native]": { memory: { agents: { "agent-a": { recall: { tool_budget: 4 } } } } }, profiles: PROFILES }],
+    ["only the legacy [senpi] block", { memory: BASE, "[senpi]": { memory: { runtime: { completions_days: 12 }, agents: { "agent-b": { runtime: { retention_days: 3 } } } } }, profiles: PROFILES }],
+  ] as const)("#given a global config with a base, %s and an active profile #when the CLI reads it #then it equals the memory settings the session loader resolves from the same file", (_name, document) => {
     const home = scratch()
     const project = join(home, "project")
     mkdirSync(join(home, ".omo"), { recursive: true })
     mkdirSync(project, { recursive: true })
-    writeFileSync(join(home, ".omo", "omo.jsonc"), `// user layer\n${JSON.stringify({
-      memory: {
-        runtime: { discard_unreflected_journals: true, retention_days: 9 },
-        agents: { "agent-a": { runtime: { discard_unreflected_journals: false, pass_budget_ms: 5_000 } } },
-      },
-      "[senpi]": { memory: { runtime: { completions_days: 12 }, agents: { "agent-b": { runtime: { retention_days: 3 } } } } },
-      "[native]": { memory: { agents: { "agent-a": { recall: { tool_budget: 4 } } } } },
-      profiles: { work: { memory: { runtime: { abandoned_journal_days: 21 }, agents: { "agent-c": { runtime: { discard_unreflected_journals: false } } } } } },
-    })}\n`)
+    writeFileSync(join(home, ".omo", "omo.jsonc"), `// user layer\n${JSON.stringify(document)}\n`)
     const env = { HOME: home, OMO_PROFILE: "work" }
 
     const session = loadOmoConfig({ cwd: project, env, harness: "senpi" }).config.memory
@@ -116,7 +117,11 @@ describe("omo doctor --fix resolves the global memory settings as the config loa
 
     expect(session).toBeDefined()
     expect(cli).toEqual({ runtime: session?.runtime, agents: session?.agents })
-    expect(cli?.runtime).toMatchObject({ discard_unreflected_journals: true, retention_days: 9, completions_days: 12, abandoned_journal_days: 21 })
+    expect(cli?.runtime).toMatchObject({ discard_unreflected_journals: true, retention_days: 9, abandoned_journal_days: 21 })
     expect(cli?.agents["agent-a"]?.runtime?.discard_unreflected_journals).toBe(false)
+    if ("[senpi]" in document) {
+      expect(cli?.runtime.completions_days).toBe(12)
+      expect(cli?.agents["agent-b"]?.runtime?.retention_days).toBe(3)
+    }
   })
 })
