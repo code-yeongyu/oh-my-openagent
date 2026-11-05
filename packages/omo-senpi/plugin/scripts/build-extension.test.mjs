@@ -366,6 +366,8 @@ describe("checkExtensionCurrent", () => {
       "packages/omo-senpi/src/components/memory/commands/memory-unlock.ts",
       "packages/omo-senpi/src/components/memory/commands/search.ts",
       "packages/omo-senpi/src/components/memory/commands/facts.ts",
+      // A dream fire loads its conversation selection from this sidecar (keeps omo.js inside its byte budget).
+      "packages/omo-senpi/src/components/memory/dream-selector.ts",
     ]) {
       expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
       expect(memoryCommandsInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
@@ -399,6 +401,20 @@ describe("checkExtensionCurrent", () => {
       expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
       expect(deviceAccountInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
     }
+  })
+
+  test("#given the split extension build #when device-service inputs are inspected #then the start-up bootstrap runtime loads only from its lazy entry", async () => {
+    const { mainInputs, deviceServiceInputs, deviceServiceOutputPath, outputPath } = await sharedOutputs()
+    for (const suffix of [
+      "packages/omo-senpi/src/components/device-service/runtime.ts",
+      "packages/omo-senpi/src/components/device-service/runner.ts",
+    ]) {
+      expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
+      expect(deviceServiceInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
+    }
+    expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith("packages/omo-senpi/src/components/device-service/index.ts"))).toBe(true)
+    expect(await readFile(outputPath, "utf8")).toContain('import("#omo-device-service-runtime")')
+    expect(await readFile(deviceServiceOutputPath, "utf8")).not.toContain("#omo-device-service-runtime")
   })
 
   test("#given the split extension build #when onboarding inputs are inspected #then the session-history scan loads only from its lazy entry", async () => {
@@ -569,6 +585,7 @@ describe("checkExtensionCurrent", () => {
       "#omo-session-history-runtime": "./extensions/omo-session-history.js",
       "#omo-recall-store-runtime": "./extensions/omo-recall-store.js",
       "#memory-external-projection": "./extensions/omo-recall-store.js",
+      "#omo-device-service-runtime": "./extensions/omo-device-service.js",
       "#omo-telemetry-posthog-runtime": "./extensions/omo-telemetry-posthog.js",
       "#omo-telemetry-otlp-runtime": "./extensions/omo-telemetry-otlp.js",
       "#omo-memory-sync-runtime": "./extensions/omo-memory-sync.js",

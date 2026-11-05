@@ -5,7 +5,7 @@ import { isAbsolute, relative, sep } from "node:path"
 import { validateMemoryPath } from "@oh-my-opencode/memory-core"
 
 import { selectRecentDreamConversations } from "../dream-selector"
-import { resolveDreamTriggerSettings } from "../dream-trigger"
+import { resolveDreamTriggerSettings } from "../dream-trigger-gates"
 import { parseCommandArgs } from "./args"
 import { stageDreamTranscript } from "./dream-staging"
 import {
