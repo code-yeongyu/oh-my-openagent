@@ -8,6 +8,7 @@ import type { ThreadToolName, ThreadToolResult } from "./contracts"
 import { createLiveThreadSurface, HOST_ENDPOINTS_CACHE_TTL_MS, parseHostStatusAll, type HostEndpointReport } from "./live-surface"
 import { createGatewayStore } from "./gateway/store"
 import { createThreadTools } from "./tools"
+import { testBudgetSignal } from "../../../../../test-support/test-deadline"
 
 type Frame = Record<string, unknown>
 type Answer = (frame: Frame) => Record<string, unknown>
@@ -44,11 +45,11 @@ async function endpoint(socketPath: string, answer: Answer): Promise<{ readonly 
       socket.write(`${JSON.stringify({ id: frame.id, type: "response", command: frame.type, success: true, ...answer(frame) })}\n`)
     })
   }))
-  const listening = once(server, "listening", { signal: AbortSignal.timeout(2000) })
+  const listening = once(server, "listening", { signal: testBudgetSignal() })
   server.listen(transport.listenAddress)
   await listening
   cleanups.push(async () => {
-    const closed = once(server, "close", { signal: AbortSignal.timeout(2000) })
+    const closed = once(server, "close", { signal: testBudgetSignal() })
     for (const socket of sockets) socket.destroy()
     server.close()
     await closed

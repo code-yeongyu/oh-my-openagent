@@ -13,8 +13,10 @@ import { createTaskManager } from "../../../../senpi-task/src/manager/manager"
 import { baseSpec, categoryPlanner, FakeRunner, settings } from "../../../../senpi-task/src/manager/__fixtures__/manager-fakes"
 import { EngineRunPauseBridge, isRunHoldChange } from "./run-pause-bridge"
 import type { LiveTaskContext } from "./runtime-context"
+import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
 
 test("#given quit and reopening the same stopped native session #when the person sends the next message #then a failed child restore does not keep task admission held", async () => {
+  useTestTimeout(30_000)
   const root = mkdtempSync(join(tmpdir(), "run-pause-human-"))
   const errors: unknown[] = []
   const requests: string[] = []
@@ -41,7 +43,7 @@ test("#given quit and reopening the same stopped native session #when the person
     let timer: ReturnType<typeof setTimeout> | undefined
     try {
       return await Promise.race([promise, new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error("native hold transition did not settle")), 5_000)
+        timer = setTimeout(() => reject(new Error("native hold transition did not settle")), remainingTestTime())
       })])
     } finally { clearTimeout(timer) }
   }

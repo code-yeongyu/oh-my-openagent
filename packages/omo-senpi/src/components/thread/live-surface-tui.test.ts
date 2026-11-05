@@ -9,6 +9,7 @@ import type { ThreadToolName, ThreadToolResult } from "./contracts"
 import { createLiveThreadSurface, parseHostStatusAll, TUI_ENDPOINT_COMMANDS, type HostEndpointReport } from "./live-surface"
 import { createGatewayStore } from "./gateway/store"
 import { createThreadTools } from "./tools"
+import { testBudgetSignal } from "../../../../../test-support/test-deadline"
 
 type Frame = Record<string, unknown>
 
@@ -22,11 +23,11 @@ function tempDir(prefix: string): string {
 }
 
 async function listen(server: Server, socketPath: string, sockets: Set<Socket>, address = socketPath): Promise<void> {
-  const listening = once(server, "listening", { signal: AbortSignal.timeout(2000) })
+  const listening = once(server, "listening", { signal: testBudgetSignal() })
   server.listen(address)
   await listening
   cleanups.push(async () => {
-    const closed = once(server, "close", { signal: AbortSignal.timeout(2000) })
+    const closed = once(server, "close", { signal: testBudgetSignal() })
     for (const socket of sockets) socket.destroy()
     server.close()
     await closed

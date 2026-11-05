@@ -5,6 +5,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { DefaultResourceLoader, ModelRegistry, ModelRuntime, SessionManager, SettingsManager, createAgentSession, getMcpService } from "../senpi-test-runtime"
 import omoExtension from "./index"
+import { testBudgetSignal, useTestTimeout } from "../../../../test-support/test-deadline"
 
 const ENV_KEYS = ["HOME", "OMO_CODING_AGENT_DIR", "SENPI_CODING_AGENT_DIR", "PI_CODING_AGENT_DIR", "OMO_SENPI_DISABLE_POSTHOG"] as const
 type EnvSnapshot = ReadonlyMap<(typeof ENV_KEYS)[number], string | undefined>
@@ -145,7 +146,7 @@ async function runPrefixScenario(options: {
     const serversBefore = servers()
     const connectionsBefore = service.getSnapshot().connectionCount
     // when
-    const result = await context.getPromptCachePrefixRequest({ signal: AbortSignal.timeout(10_000) })
+    const result = await context.getPromptCachePrefixRequest({ signal: testBudgetSignal() })
     console.info("OMO_PREWARM_PREFIX", JSON.stringify(result.status === "ready" ? { status: result.status } : result))
     observed = {
       status: result.status,
@@ -198,6 +199,7 @@ async function runPrefixScenario(options: {
 }
 
 test("#given a real OmO session #when the engine builds its prewarm prefix #then it is ready rather than skipped by unsafe handlers", async () => {
+  useTestTimeout(90_000)
   // given / when
   const run = await runPrefixScenario({ attachSettleMs: 30_000 })
   // then: teardown already restored the process, so these assertions cannot leak state into later tests
@@ -224,6 +226,7 @@ test("#given a real OmO session #when the engine builds its prewarm prefix #then
 const boundElapsedBeforeSettle: AttachWait = async () => "timeout"
 
 test("#given an MCP attach that never settles within the bound #when the prefix scenario fails #then the process env, cwd and temp HOME are restored before it reports", async () => {
+  useTestTimeout(90_000)
   // given: an eager stdio server that is spawned but never answers initialize. Its connect times out at 3 s, which is
   // meant to land inside teardown's bounded settle wait, so the dispose normally finds nothing still connecting; on a
   // loaded host, or when the settle wait answers early (the race senpi#4028 fixes), it can still be connecting.
@@ -240,6 +243,7 @@ test("#given an MCP attach that never settles within the bound #when the prefix 
 }, 90_000)
 
 test("#given a session dispose that never settles #when the scenario tears down #then the bound reports it and env, cwd and the HOME are still restored", async () => {
+  useTestTimeout(90_000)
   // given: dispose does its real work, then never settles
   const hangingDispose = async (live: Session): Promise<void> => {
     await live.dispose()

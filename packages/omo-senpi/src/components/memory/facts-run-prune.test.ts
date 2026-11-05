@@ -22,9 +22,11 @@ import {
   seedTerminalRun,
 } from "./facts-run-prune.test-support"
 import { writeRunJsonAtomic } from "./worker/run-artifacts"
+import { useTestTimeout } from "../../../../../test-support/test-deadline"
 
 describe("terminal facts run pruning", () => {
   test("#given 25 terminal runs #when pruning keeps the last 20 #then the newest 20 survive deterministically", async () => {
+    useTestTimeout(30_000)
     // #given
     const { factsDir, locksDir } = await fixture()
     for (let index = 0; index < 25; index += 1) {
@@ -45,6 +47,7 @@ describe("terminal facts run pruning", () => {
   }, 30_000)
 
   test("#given the newest run alone exceeds the byte cap #when pruning runs #then the newest is still kept", async () => {
+    useTestTimeout(30_000)
     // #given: the cap alone would delete everything; the newest-always-kept rule overrides it.
     const { factsDir, locksDir } = await fixture()
     await seedTerminalRun({ factsDir, runId: "facts-bbbb-1", finishedAt: instant(1), bytes: 4_096 })
@@ -59,6 +62,7 @@ describe("terminal facts run pruning", () => {
   }, 30_000)
 
   test("#given terminal runs past the byte cap #when pruning runs #then only the newest-first prefix under the cap survives", async () => {
+    useTestTimeout(30_000)
     // #given
     const { factsDir, locksDir } = await fixture()
     for (let index = 1; index <= 4; index += 1) {
@@ -75,6 +79,7 @@ describe("terminal facts run pruning", () => {
   }, 30_000)
 
   test("#given runs finishing in the same instant #when pruning sorts them #then the run id breaks the tie deterministically", async () => {
+    useTestTimeout(30_000)
     // #given
     const { factsDir, locksDir } = await fixture()
     await seedTerminalRun({ factsDir, runId: "facts-dddd-1", finishedAt: instant(5) })
@@ -89,6 +94,7 @@ describe("terminal facts run pruning", () => {
   }, 30_000)
 
   test("#given a non-terminal run dir #when pruning runs #then it is never pruned", async () => {
+    useTestTimeout(30_000)
     // #given
     const { factsDir, locksDir } = await fixture()
     await seedNonTerminalRun(factsDir, "facts-live-1")
@@ -104,6 +110,7 @@ describe("terminal facts run pruning", () => {
   }, 30_000)
 
   test("#given a malformed sentinel #when pruning runs #then the mismatched run is never pruned", async () => {
+    useTestTimeout(30_000)
     // #given: sentinel runId disagrees with the dir name, so the record cannot be trusted.
     const { factsDir, locksDir } = await fixture()
     await seedTerminalRun({
@@ -125,6 +132,7 @@ describe("terminal facts run pruning", () => {
   }, 30_000)
 
   test("#given a live process holding a run's finalize lock #when pruning runs #then that run survives", async () => {
+    useTestTimeout(30_000)
     // #given: a real child process owns finalize-<runId>.lock, so the lock cannot be recovered.
     const { factsDir, locksDir } = await fixture()
     await seedTerminalRun({ factsDir, runId: "facts-gggg-1", finishedAt: instant(1) })
@@ -141,6 +149,7 @@ describe("terminal facts run pruning", () => {
   }, 30_000)
 
   test("#given a leftover prune tombstone #when session-start maintenance sweeps #then the tombstone is removed", async () => {
+    useTestTimeout(30_000)
     // #given: a crash between the tombstone rename and its deletion.
     const { factsDir } = await fixture()
     const tombstone = join(factsDir, "runs", ".prune-facts-hhhh-1-11111111-1111-4111-8111-111111111111")
@@ -157,6 +166,7 @@ describe("terminal facts run pruning", () => {
   }, 30_000)
 
   test("#given pruning frees a lower attempt name #when a higher attempt survives #then the sequence stays monotonic", async () => {
+    useTestTimeout(30_000)
     // #given: two attempts of one digest, both terminal.
     const { factsDir, locksDir } = await fixture()
     const first = await reserveRun(factsDir, locksDir, instant(1))
@@ -176,6 +186,7 @@ describe("terminal facts run pruning", () => {
   }, 30_000)
 
   test("#given every trace of a digest is pruned #when it reserves again #then the attempt name IS reused", async () => {
+    useTestTimeout(30_000)
     // #given: the high-water mark lives on disk, so evicting the last trace restarts the count.
     // This is deliberate: failure-streak identity keys on the ledger's per-launch batchId, not on
     // the run name, so a reused name cannot be mistaken for the pruned run's failure.
@@ -194,6 +205,7 @@ describe("terminal facts run pruning", () => {
   }, 30_000)
 
   test("#given the facts-runs lock held by a live process #when a reservation runs #then it waits rather than racing the scan", async () => {
+    useTestTimeout(30_000)
     // #given
     const { factsDir, locksDir } = await fixture()
     await holdLock(factsRunsLockPath(locksDir))
@@ -214,6 +226,7 @@ describe("terminal facts run pruning", () => {
   }, 30_000)
 
   test("#given a tombstone rename #when the deletion runs #then the facts-runs lock is already released", async () => {
+    useTestTimeout(30_000)
     // #given: rm -rf must never happen under the shared runs lock.
     const { factsDir, locksDir } = await fixture()
     await seedTerminalRun({ factsDir, runId: "facts-iiii-1", finishedAt: instant(1) })
