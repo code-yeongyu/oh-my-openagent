@@ -30,6 +30,11 @@ export type RunPauseEffects = {
   observeHold?(participant: PauseParticipant, parentSessionId: string): Promise<ObservedHold | undefined>
 }
 
+function ownedElsewherePid(error: unknown): number | undefined {
+  if (typeof error !== "object" || error === null || !("code" in error) || error.code !== "paused_child_owned_elsewhere") return undefined
+  return "ownerPid" in error && typeof error.ownerPid === "number" ? error.ownerPid : undefined
+}
+
 type ResumeTransaction = { readonly pauseSeq: number; readonly resumeId: string; readonly credential: ResumeCredential }
 
 export type ResumeFailure = { readonly key: string; readonly reason: string }
@@ -120,7 +125,7 @@ export class RunPauseController {
       return latest?.pauseSeq === pauseSeq && latest.phase === "resumed" && this.registry.barrier.state(parentSessionId).kind === "open"
     }
     for (const participant of this.registry.orderedAdmissions(parentSessionId)) {
-      if (participant.state !== "lost") continue
+      if (participant.state !== "lost" && participant.state !== "owned_elsewhere") continue
       const outcome = await this.#resumeOne(parentSessionId, pauseSeq, resumeId, participant, undefined, credential, current)
       if (outcome === "superseded") break
       if (outcome !== undefined) failures.push(outcome)
@@ -181,6 +186,13 @@ export class RunPauseController {
         ...(cutoff === undefined ? {} : { childSeqCutoff: cutoff }),
       }, credential)
     } catch (error) {
+      const ownerPid = ownedElsewherePid(error)
+      if (ownerPid !== undefined) {
+        // Another live host holds the child: it is that host's run, not a lost one, and never ended here.
+        log("[senpi-task] run resume left a child its live owner holds", { parentSessionId, pauseSeq, key: participant.key, ownerPid })
+        this.registry.update(parentSessionId, pauseSeq, participant.key, { state: "owned_elsewhere", ownerPid, lostReason: undefined })
+        return current() ? { key: participant.key, reason: `owned_elsewhere: held by live host ${ownerPid}` } : "superseded"
+      }
       const reason = `resume failed: ${error instanceof Error ? error.message : String(error)}`
       log("[senpi-task] run resume failed for a lost participant", { parentSessionId, pauseSeq, key: participant.key, reason })
       this.registry.update(parentSessionId, pauseSeq, participant.key, { state: "lost", lostReason: reason })
@@ -192,7 +204,7 @@ export class RunPauseController {
       state: "held_by_user", observedChildSeq: result.childSeq,
     })
     else this.registry.update(parentSessionId, pauseSeq, participant.key, {
-      state: "resumed", lostReason: undefined, ...(result.turnId === undefined ? {} : { resumeTurnId: result.turnId }),
+      state: "resumed", lostReason: undefined, ownerPid: undefined, ...(result.turnId === undefined ? {} : { resumeTurnId: result.turnId }),
     })
     return undefined
   }

@@ -311,6 +311,8 @@ class TaskManagerImpl implements TaskManager {
         reattach: (paused, handle) => this.reattach(paused, handle),
         liveHandle: taskId => this.#live.get(taskId)?.handle,
       }, record),
+      ownedByLiveHost: record => record.host_pid !== undefined && record.host_pid !== this.#hostPid
+        && (options.isProcessAlive ?? defaultSignaller.isAlive)(record.host_pid),
       track: (taskId, handle, model, epoch, turn) => this.#outcome.trackOutcome(taskId, handle, model, epoch, turn),
     })
     this.#outcome = createOutcomeTracker({
