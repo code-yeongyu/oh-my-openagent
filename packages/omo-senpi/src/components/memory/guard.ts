@@ -15,6 +15,8 @@ const FILE_TOOL_NAMES = ["read", "write", "edit", "ls", "find", "grep", "glob"] 
 const ENUMERATION_TOOL_NAMES = new Set(["ls", "find", "grep", "glob"])
 const PATH_ARGUMENT_NAMES = ["path", "filePath", "file_path", "target"] as const
 const NODE_PATH = { isAbsolute, relative, resolve }
+/** Per session; past it an ancestor call is denied rather than left unchecked. */
+const MAX_PENDING_ANCESTOR_CHECKS = 256
 const BASH_ADVISORY = "omo-senpi memory guard advisory: bash command references another memory identity; shell text is not blocked because this soft guard is not a security boundary"
 
 export interface MemoryGuardOptions {
@@ -107,11 +109,11 @@ export function registerMemoryGuard(
     }
     if (ancestor === undefined) return undefined
     // The result is re-checked on tool_result; a call that cannot be matched to its result is not allowed.
-    if (event.toolCallId === undefined) {
-      return { block: true, reason: ancestorDenyReason(ancestor.toolName, ancestor.rawPath, { kind: "unlisted", area: ancestor.areas[0] ?? ancestor.rawPath }) }
-    }
     const sessionId = readSessionId(eventContext)
     const pending = pendingAncestorChecks.get(sessionId) ?? new Map<string, PendingAncestorCheck>()
+    if (event.toolCallId === undefined || pending.size >= MAX_PENDING_ANCESTOR_CHECKS) {
+      return { block: true, reason: ancestorDenyReason(ancestor.toolName, ancestor.rawPath, { kind: "unlisted", area: ancestor.areas[0] ?? ancestor.rawPath }) }
+    }
     pending.set(event.toolCallId, ancestor)
     pendingAncestorChecks.set(sessionId, pending)
     return undefined
@@ -130,14 +132,29 @@ export function registerMemoryGuard(
 
     const scan = listForeignRoots(check)
     if (scan.kind === "clear") return undefined
-    // null, not undefined: the host keeps the tool's own details (grep's matches) for an undefined value.
+    // An empty object, not null or undefined: every host merge takes `override.details ?? result.details`,
+    // so only a non-nullish value drops the tool's own details (grep's matches and file paths). `{}` is what
+    // the host's own error results carry, and the grep, ls and find renderers fall back to the text for it.
     return {
       content: [{ type: "text", text: ancestorDenyReason(check.toolName, check.rawPath, scan) }],
       isError: true,
-      details: null,
+      details: {},
     }
   })
 
+  // A call blocked by a later handler, or aborted before it ran, ends without a tool_result. For executed
+  // calls the host runs tool_result before tool_execution_end, so releasing here never skips a re-check.
+  pi.on("tool_execution_end", (payload, eventContext) => {
+    if (!isRecord(payload) || typeof payload.toolCallId !== "string") return
+    const sessionId = readSessionId(eventContext)
+    const pending = pendingAncestorChecks.get(sessionId)
+    pending?.delete(payload.toolCallId)
+    if (pending?.size === 0) pendingAncestorChecks.delete(sessionId)
+  })
+  // No result of a finished run can still arrive.
+  pi.on("agent_end", (_payload, eventContext) => {
+    pendingAncestorChecks.delete(readSessionId(eventContext))
+  })
   pi.on("session_shutdown", (_payload, eventContext) => {
     pendingAncestorChecks.delete(readSessionId(eventContext))
   })

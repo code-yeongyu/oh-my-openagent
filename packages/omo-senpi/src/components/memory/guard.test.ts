@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, relative } from "node:path"
+import { fileURLToPath, pathToFileURL } from "node:url"
 import { rmSyncEfaultTolerant } from "./teardown.test-support"
 
 import { buildIdentityPaths } from "@oh-my-opencode/memory-core"
@@ -302,6 +303,22 @@ describe("memory guard never resolves a macOS automount trigger (#11545)", () =>
 
 const ENUMERATION_TOOLS = ["ls", "find", "grep", "glob"] as const
 
+type ToolResultShape = { readonly content: unknown; readonly details?: unknown; readonly structuredContent?: unknown }
+type HostFinalize = (
+  body: Record<string, unknown>,
+  executed: { readonly result: ToolResultShape; readonly isError: boolean },
+  pipeline: { readonly afterToolCall: () => Promise<unknown> },
+) => Promise<{ readonly result: ToolResultShape; readonly isError: boolean }>
+
+// The host's real after-hook merge (`finalizeBody`, mirroring agent-loop `finalizeExecutedToolCall`); it is not on
+// senpi's export map, so it is loaded from the installed dist the way senpi-test-runtime.ts loads its modules.
+const { finalizeBody } = await import(pathToFileURL(join(
+  dirname(fileURLToPath(import.meta.resolve("@code-yeongyu/senpi"))),
+  "core",
+  "execution",
+  "executor-body.js",
+)).href) as { readonly finalizeBody: HostFinalize }
+
 type AncestorSetup = {
   readonly pi: FakeExtensionAPI
   readonly omoHome: string
@@ -526,11 +543,22 @@ describe("memory guard ancestor enumeration (#12301)", () => {
     const result = replaced[0] as Record<string, unknown>
     expect(Object.keys(result).sort()).toEqual(["content", "details", "isError"])
     expect(result.isError).toBe(true)
-    expect(result.details).toBeNull()
     const content = result.content as readonly { readonly type: string; readonly text: string }[]
     expect(content).toHaveLength(1)
     expect(content[0]?.type).toBe("text")
     expectAncestorDenied({ block: true, reason: content[0]?.text }, ["late-id"])
+
+    // What the host persists and renders: its merge keeps the tool's own details for a nullish override.
+    const toolResult = {
+      content: [{ type: "text", text: "late-id/repo/system/persona.md:1: secret" }],
+      details: { version: 1, matches: [{ path: "late-id/repo/system/persona.md", line: 1, text: "secret" }], fileMatches: [{ path: "late-id/repo/system/persona.md" }] },
+      structuredContent: { files: ["late-id/repo/system/persona.md"] },
+    }
+    const merged = await finalizeBody({}, { result: toolResult, isError: false }, { afterToolCall: async () => result })
+    expect(merged.isError).toBe(true)
+    expect(merged.result.content).toEqual(content)
+    expect(merged.result.structuredContent).toBeUndefined()
+    expect(merged.result.details).toEqual({})
   })
 
   test("#given an allowed ancestor enumeration #when an area becomes unlistable before its result #then the whole result is replaced by the deny", async () => {
@@ -540,7 +568,37 @@ describe("memory guard ancestor enumeration (#12301)", () => {
     writeFileSync(setup.transientRoot, "not a directory")
     const replaced = await finish(setup, "find", setup.memoryRoot, "call-error")
 
-    expect(replaced).toEqual([{ content: [expect.objectContaining({ type: "text" })], isError: true, details: null }])
+    expect(replaced).toEqual([{ content: [expect.objectContaining({ type: "text" })], isError: true, details: {} }])
+  })
+
+  test("#given ancestor calls whose results never arrive #when the pending bound is reached #then further ancestor calls are denied until the run ends", async () => {
+    const setup = ancestorFixture()
+    let allowed = 0
+    let denied: unknown
+    while (allowed < 10_000) {
+      denied = await enumerate(setup, "grep", setup.memoryRoot, `call-${allowed}`)
+      if (denied !== undefined) break
+      allowed += 1
+    }
+
+    expect(allowed).toBeGreaterThan(0)
+    expect(allowed).toBeLessThan(10_000)
+    expectAncestorDenied(denied, [])
+    await setup.pi.dispatch("agent_end", { type: "agent_end", messages: [] }, { sessionManager: { getSessionId: () => "session-1" } })
+    expect(await enumerate(setup, "grep", setup.memoryRoot, "call-after-run")).toBeUndefined()
+  })
+
+  test("#given a call another handler blocked #when its tool execution ends without a result #then its pending slot is released", async () => {
+    const setup = ancestorFixture()
+    let allowed = 0
+    while (allowed < 10_000 && await enumerate(setup, "grep", setup.memoryRoot, `call-${allowed}`) === undefined) allowed += 1
+    expect(allowed).toBeLessThan(10_000)
+
+    await setup.pi.dispatch("tool_execution_end", { type: "tool_execution_end", toolCallId: "call-0", toolName: "grep", result: {}, isError: true }, {
+      sessionManager: { getSessionId: () => "session-1" },
+    })
+
+    expect(await enumerate(setup, "grep", setup.memoryRoot, "call-next")).toBeUndefined()
   })
 
   test("#given an allowed ancestor enumeration #when nothing changes before its result #then the result passes through untouched", async () => {
