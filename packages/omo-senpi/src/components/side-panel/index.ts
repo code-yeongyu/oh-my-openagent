@@ -28,6 +28,9 @@ export interface SidePanelComponentOptions extends SidePanelRuntimeOptions {
  * panel itself lives in `runtime.ts`, built as its own bundle and imported the first time a
  * session starts with the panel on, so a run without the panel loads none of it.
  */
+// The panel is drawn by the UI that runs with the loop; on a split session the hand has no screen to refresh.
+const LOOP_SIDE = { runs: "brain" } as const
+
 export function createSidePanelComponent(options: SidePanelComponentOptions = {}): OmoSenpiComponent {
   const loadSettings = options.loadSettings ?? defaultLoadSettings
   const loadRuntime = options.loadRuntime ?? loadBundledRuntime
@@ -87,16 +90,16 @@ export function createSidePanelComponent(options: SidePanelComponentOptions = {}
         }
         if (started !== epoch) return undefined
         return await loaded.sessionStart(settings, eventCtx)
-      })
+      }, LOOP_SIDE)
 
       // The host awaits these handlers and every tool call queues behind them, so each one starts the
       // panel's reads and returns at once; a read that lands after its session ended is discarded.
-      pi.on("turn_end", (_payload: unknown, eventCtx: unknown) => controller?.refresh(eventCtx))
-      pi.on("agent_settled", (_payload: unknown, eventCtx: unknown) => controller?.refresh(eventCtx))
-      pi.on("message_end", (_payload: unknown, eventCtx: unknown) => controller?.refresh(eventCtx))
-      pi.on("tool_execution_start", (payload: unknown, eventCtx: unknown) => controller?.toolStart(payload, eventCtx))
-      pi.on("tool_execution_end", () => controller?.toolEnd())
-      pi.on("input", () => controller?.input())
+      pi.on("turn_end", (_payload: unknown, eventCtx: unknown) => controller?.refresh(eventCtx), LOOP_SIDE)
+      pi.on("agent_settled", (_payload: unknown, eventCtx: unknown) => controller?.refresh(eventCtx), LOOP_SIDE)
+      pi.on("message_end", (_payload: unknown, eventCtx: unknown) => controller?.refresh(eventCtx), LOOP_SIDE)
+      pi.on("tool_execution_start", (payload: unknown, eventCtx: unknown) => controller?.toolStart(payload, eventCtx), LOOP_SIDE)
+      pi.on("tool_execution_end", () => controller?.toolEnd(), LOOP_SIDE)
+      pi.on("input", () => controller?.input(), LOOP_SIDE)
 
       const teardown = (): undefined => {
         epoch += 1
@@ -105,7 +108,7 @@ export function createSidePanelComponent(options: SidePanelComponentOptions = {}
       // Only the committed end of a session: senpi fires session_shutdown on new, resume, fork and
       // quit. session_before_switch can still be cancelled, or be followed by a step that throws, and
       // the session would then carry on without its panel.
-      pi.on("session_shutdown", teardown)
+      pi.on("session_shutdown", teardown, LOOP_SIDE)
     },
   }
 }
