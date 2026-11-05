@@ -111,15 +111,17 @@ describe("verified acquisition of the device service", () => {
     expect(existsSync(state)).toBe(false)
   })
 
-  test("the compiled-in key set is the service's release-key.json parsed strictly; until the mint it is the refusing placeholder", async () => {
+  test("the compiled-in key set is the service's release-key.json parsed strictly: the minted operational and recovery keys, both strict, so acquisition goes past the key check", async () => {
     const committed = JSON.parse(readFileSync(join(import.meta.dir, "../src/release/release-key.json"), "utf8"))
     expect(DEVICE_SERVICE_RELEASE_KEYS).toEqual(committed.public_keys_hex)
-    expect(DEVICE_SERVICE_RELEASE_KEYS.some(hex => !strictEd25519Key(bytes(hex)))).toBe(true)
+    expect(DEVICE_SERVICE_RELEASE_KEYS).toHaveLength(2)
+    expect(DEVICE_SERVICE_RELEASE_KEYS.every(hex => strictEd25519Key(bytes(hex)))).toBe(true)
     const state = stateDir()
     const served = serveRelease(new Map())
     const { releaseKeys: _unused, ...defaults } = options(state, served, "")
-    expect(await acquireDeviceService(defaults)).toMatchObject({ ok: false, refusal: "release_key_invalid" })
-    expect(served.requested).toEqual([])
+    const result = await acquireDeviceService(defaults)
+    expect(result).not.toMatchObject({ refusal: "release_key_invalid" })
+    expect(served.requested.length).toBeGreaterThan(0)
   })
 
   test("a release signed by either key of the set installs: the recovery key verifies when the operational key did not sign", async () => {
