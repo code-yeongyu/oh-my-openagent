@@ -34,8 +34,7 @@ export type ThisDeviceState = (typeof THIS_DEVICE_STATES)[number];
 export const CLIENT_NAMES = ["desktop", "omo", "installer", "sdk"] as const;
 export type ClientName = (typeof CLIENT_NAMES)[number];
 export const CAPABILITIES = ["sessions", "devices", "enforcement", "upgrade", "control"] as const;
-// #267: a service that serves machine operations also lists "machine"; one that does not answers every machine.*
-// request unsupported.
+// A service that also serves machine operations lists "machine"; this client uses none of them but accepts the word.
 export const OPTIONAL_CAPABILITIES = ["machine"] as const;
 export type Capability = (typeof CAPABILITIES)[number] | (typeof OPTIONAL_CAPABILITIES)[number];
 export const REFUSED_REASONS = ["version", "data_home_required", "malformed"] as const;

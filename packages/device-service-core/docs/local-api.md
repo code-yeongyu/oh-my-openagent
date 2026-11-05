@@ -94,7 +94,7 @@ cache: a restarted service has a new one. The service answers every request othe
 present for `desktop` clients only. The service reads `v` before the shape. `refused` reasons: `version` (another
 `v`), `data_home_required` (a desktop client without it), `malformed` (anything else, including a first line that is
 not a `hello`). `welcome.owner` is `service`; `capabilities` are `sessions`, `devices`, `enforcement`, `upgrade`, `control`,
-and `machine` when the service serves machine operations (this client sends no machine request);
+and `machine` when the service serves machine operations (a client accepts the word and may use none of them);
 `welcome.state` is the current `Status`. A client refuses a `welcome` of another `v` the same way (`version`).
 
 The message `type` values are `hello`, `welcome`, `refused`, `response`, `event` and the request types below.
@@ -129,6 +129,8 @@ value). Requests are answered in any order; clients correlate by `id`.
 | `session.read`               | `attach`, `before_entry_id?`, `tail?` (1-200)                            | `{query_id}`                                                         | then `session.read_result`                                            |
 | `enforcement.report`         | `generation`, `data_home`, `environments`, `complete`                    | `{}`                                                                 | desktop clients only, for their own `data_home`                       |
 | `owner.shutdown_for_upgrade` | `target_version` (semver)                                                | `{}`                                                                 | installer clients only; the service then stops                        |
+| `control.attach.get`         |                                                                          | `{attached, changedAt}`                                              | desktop and CLI clients; never set reads attached with changedAt ""   |
+| `control.attach.set`         | `attached` (boolean)                                                     | `{attached, changedAt}`                                              | desktop and CLI clients; persists; detached refuses other devices     |
 
 Keys for `device.adopt`: the standard base64 (padded) of the key's PKCS#8 DER, 48 bytes: the body of a PEM file without
 its header, footer and line breaks. The signing key is Ed25519 (OID 1.3.101.112), the sealing key X25519

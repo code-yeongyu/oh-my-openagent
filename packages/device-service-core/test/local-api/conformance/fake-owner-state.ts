@@ -1,6 +1,7 @@
 import type {
   ClientInfo,
   CommandRpc,
+  ControlAttachState,
   EnforcementReport,
   ErrorCode,
   JsonObject,
@@ -31,6 +32,7 @@ export type OwnerState = {
   readonly endpoints: Set<string>;
   readonly reports: Omit<EnforcementReport, "id" | "type">[];
   refresher: { readonly binary_path: string; readonly version: string } | null;
+  attach: ControlAttachState;
   readonly now: () => number;
   readonly mint: () => string;
   stop: () => Promise<void>;

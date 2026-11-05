@@ -165,6 +165,14 @@ const empty = (v: unknown): Empty => {
   return {};
 };
 const one = (v: unknown, name: string): unknown => exactly(v, [name], [], "data")[name];
+const attachState = (v: unknown) => {
+  const m = exactly(v, ["attached", "changedAt"], [], "data");
+  const changedAt = m["changedAt"];
+  return {
+    attached: bool(m["attached"], "attached"),
+    changedAt: typeof changedAt === "string" ? changedAt : fail("changedAt"),
+  };
+};
 const DATA: { readonly [T in RequestType]: (v: unknown) => ResponseData[T] } = {
   authenticate: empty,
   "status.get": statusOf,
@@ -191,6 +199,8 @@ const DATA: { readonly [T in RequestType]: (v: unknown) => ResponseData[T] } = {
   "enforcement.report": empty,
   "owner.shutdown_for_upgrade": empty,
   "session.endpoints": endpointsData,
+  "control.attach.get": attachState,
+  "control.attach.set": attachState,
 };
 
 export type ValidResponse<T extends RequestType> =
