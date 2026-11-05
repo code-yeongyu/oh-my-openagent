@@ -67,8 +67,16 @@ function fakeEngine(root: string): { readonly path: string; readonly log: string
   const path = join(root, "fake-engine.mjs")
   const log = join(root, "requests.jsonl")
   writeFileSync(path, `#!/usr/bin/env node
-import { appendFileSync } from "node:fs";
+import { appendFileSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline";
+if (process.env.OMO_TEST_ENV_LOG) {
+  writeFileSync(process.env.OMO_TEST_ENV_LOG, JSON.stringify({
+    DISPLAY: process.env.DISPLAY,
+    XAUTHORITY: process.env.XAUTHORITY,
+    WAYLAND_DISPLAY: process.env.WAYLAND_DISPLAY ?? null,
+    OMO_TEST_INHERITED: process.env.OMO_TEST_INHERITED
+  }));
+}
 const replies = {
   "engine.hello": { protocolVersion: "1", engineVersion: "0.1.0", buildSha: "fixture", abi: "senpi-desktop/1" },
   capabilities: {
@@ -204,6 +212,48 @@ describe("computer use doctor rendering", () => {
 })
 
 describe("computer use doctor probe", () => {
+  test("#given engine env in Native config #when doctor starts the engine #then only the child receives overrides and removals", async () => {
+    // given
+    const home = mkdtempSync(join(tmpdir(), "omo-computer-doctor-env-"))
+    roots.push(home)
+    const engine = fakeEngine(home)
+    const envLog = join(home, "environment.json")
+    mkdirSync(join(home, ".omo"))
+    writeFileSync(join(home, ".omo", "omo.jsonc"), JSON.stringify({
+      "[native]": {
+        computer: {
+          engine_path: engine.path,
+          env: { DISPLAY: ":98", XAUTHORITY: "/tmp/configured-Xauthority", WAYLAND_DISPLAY: null },
+        },
+      },
+    }))
+    const env = {
+      HOME: home,
+      DISPLAY: ":7",
+      XAUTHORITY: "/tmp/inherited-Xauthority",
+      WAYLAND_DISPLAY: "wayland-old",
+      OMO_TEST_INHERITED: "kept",
+      OMO_TEST_REQUEST_LOG: engine.log,
+      OMO_TEST_ENV_LOG: envLog,
+    }
+    const originalEnv = { ...env }
+
+    // when
+    const report = await computerUseDoctorReport({
+      cwd: home, env, version: "5.1.60", packageRoot: join(home, "package"),
+      platform: "linux", arch: "x64", launchEngine: runEngineScript,
+      timeoutMs: PROBE_HANG_CEILING_MS,
+    })
+
+    // then
+    expect(report.kind).toBe("ready")
+    expect(JSON.parse(readFileSync(envLog, "utf8"))).toEqual({
+      DISPLAY: ":98", XAUTHORITY: "/tmp/configured-Xauthority",
+      WAYLAND_DISPLAY: null, OMO_TEST_INHERITED: "kept",
+    })
+    expect(env).toEqual(originalEnv)
+  }, PROBE_HANG_CEILING_MS + 5_000)
+
   test("#given a verified release cache #when inspected #then doctor probes it without fetching", async () => {
     const home = mkdtempSync(join(tmpdir(), "omo-computer-doctor-cache-"))
     roots.push(home)

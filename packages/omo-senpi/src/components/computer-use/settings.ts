@@ -23,6 +23,7 @@ export function toComputerSettingsInput(block: OmoComputerSettings | undefined):
             scanIntervalMs: block.screenshot_gc.scan_interval_ms,
           },
     enginePath: block.engine_path,
+    env: block.env,
     cuaAdapter: block.cua_adapter,
   }
   return JSON.parse(JSON.stringify(input)) as ComputerSettingsInput
@@ -30,4 +31,16 @@ export function toComputerSettingsInput(block: OmoComputerSettings | undefined):
 
 export function resolveOmoComputerSettings(block: OmoComputerSettings | undefined, platform: string): ComputerSettings {
   return resolveComputerSettings(toComputerSettingsInput(block), platform)
+}
+
+export function resolveComputerEngineEnv(
+  overrides: ComputerSettings["env"],
+  parent: Readonly<Record<string, string | undefined>> = process.env,
+): NodeJS.ProcessEnv {
+  const env = { ...parent }
+  for (const [key, value] of Object.entries(overrides ?? {})) {
+    if (value === null) delete env[key]
+    else env[key] = value
+  }
+  return env
 }

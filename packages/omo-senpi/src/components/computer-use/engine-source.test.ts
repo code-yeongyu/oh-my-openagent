@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { createHash, randomUUID } from "node:crypto"
+import { once } from "node:events"
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
@@ -22,6 +23,38 @@ afterEach(() => {
 })
 
 describe("omo release version for engine acquisition", () => {
+  test("#given an engine child environment #when an explicit executable starts #then it receives overrides without changing the parent", async () => {
+    // given
+    const root = packageDir({})
+    const entry = join(root, "environment.ts")
+    const executable = join(root, process.platform === "win32" ? "engine.exe" : "engine")
+    writeFileSync(entry, `process.stdout.write(JSON.stringify({
+      DISPLAY: process.env.DISPLAY,
+      WAYLAND_DISPLAY: process.env.WAYLAND_DISPLAY ?? null,
+      OMO_TEST_INHERITED: process.env.OMO_TEST_INHERITED
+    }))`)
+    const build = await Bun.build({ entrypoints: [entry], compile: { outfile: executable } })
+    if (!build.success) throw new Error(build.logs.map((log) => log.message).join("\n"))
+    const originalDisplay = process.env.DISPLAY
+    const childEnv: NodeJS.ProcessEnv = { ...process.env, DISPLAY: ":98", OMO_TEST_INHERITED: "kept" }
+    delete childEnv.WAYLAND_DISPLAY
+    const start = defaultEngineChild({}, undefined, childEnv)(executable)
+
+    // when
+    const child = await start()
+    const closed = once(child, "close")
+    let output = ""
+    for await (const chunk of child.stdout) output += chunk
+    const [code] = await closed
+
+    // then
+    expect(code).toBe(0)
+    expect(JSON.parse(output)).toEqual({
+      DISPLAY: ":98", WAYLAND_DISPLAY: null, OMO_TEST_INHERITED: "kept",
+    })
+    expect(process.env.DISPLAY).toBe(originalDisplay)
+  }, 30_000)
+
   test("#given a sidecar #when described #then status names its source without starting it", () => {
     const root = packageDir({ name: "omo", version: "5.1.4" })
     const sidecar = join(root, "bin", "native", "prebuilds", "darwin-arm64", "senpi-desktop-engine")

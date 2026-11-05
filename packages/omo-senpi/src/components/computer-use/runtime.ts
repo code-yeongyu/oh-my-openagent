@@ -12,6 +12,7 @@ import { confirmComputerControl } from "./control-confirm"
 import { defaultEngineChild, describeEngineSource } from "./engine-source"
 import { engineErrorCode, TrackedDesktopService, type TrackedDesktopServiceOptions } from "./engine-status"
 import { describeEnginePermissions } from "./permission-status"
+import { resolveComputerEngineEnv } from "./settings"
 
 export interface ComputerUseRuntimeOptions {
   readonly settings: ComputerSettings
@@ -31,7 +32,8 @@ export interface ComputerUseRuntimeOptions {
  * Creating it starts nothing; the engine starts on the first activation.
  */
 export function createComputerUseRuntime(options: ComputerUseRuntimeOptions) {
-  const engineChild = options.engineChild ?? defaultEngineChild()
+  const engineChild = options.engineChild
+    ?? defaultEngineChild(process.env, undefined, resolveComputerEngineEnv(options.settings.env))
   const service = new TrackedDesktopService({
     createChild: engineChild(options.settings.enginePath),
     onError: (error) => options.onEngineError(engineErrorCode(error)),

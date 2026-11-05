@@ -30,6 +30,9 @@ export const OmoComputerSettingsLayerSchema = z
       .partial()
       .strict(),
     engine_path: z.string().min(1),
+    env: z.record(z.string(), z.string().nullable()).describe(
+      "Environment overrides for the desktop engine child only. String values override inherited values; null removes an inherited variable. Values are literal.",
+    ),
     cua_adapter: z.boolean(),
   })
   .partial()
@@ -58,5 +61,6 @@ export const COMPUTER_HARNESS_SUPPORT: Record<ComputerSettingPath, readonly OmoH
   "computer.audit_log": ["native"],
   "computer.screenshot_gc": ["native"],
   "computer.engine_path": ["native"],
+  "computer.env": ["native"],
   "computer.cua_adapter": ["native"],
 } as const

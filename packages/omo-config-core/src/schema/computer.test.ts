@@ -27,6 +27,7 @@ describe("computer settings schema", () => {
       audit_log: { enabled: false },
       screenshot_gc: { enabled: true, stale_ms: 0, scan_interval_ms: 60_000 },
       engine_path: "/opt/engine",
+      env: { DISPLAY: ":98", XAUTHORITY: "/tmp/Xauthority", WAYLAND_DISPLAY: null },
       cua_adapter: true,
     } as const
 
@@ -47,6 +48,18 @@ describe("computer settings schema", () => {
     // then
     expect(result.success).toBe(false)
   })
+
+  test.each([42, true, { nested: "value" }])(
+    "#given a non-string environment value %j #when parsed #then config rejects it",
+    (value) => {
+      // given
+      const block = { env: { DISPLAY: value } }
+      // when
+      const result = OmoComputerSettingsSchema.safeParse(block)
+      // then
+      expect(result.success).toBe(false)
+    },
+  )
 
   test("#given a root config with a computer block #when parsed #then the block is kept", () => {
     // given

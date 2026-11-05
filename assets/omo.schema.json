@@ -2579,6 +2579,19 @@
           "type": "string",
           "minLength": 1
         },
+        "env": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": "Environment overrides for the desktop engine child only. String values override inherited values; null removes an inherited variable. Values are literal."
+        },
         "cua_adapter": {
           "type": "boolean"
         }
@@ -4955,6 +4968,19 @@
             "engine_path": {
               "type": "string",
               "minLength": 1
+            },
+            "env": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "description": "Environment overrides for the desktop engine child only. String values override inherited values; null removes an inherited variable. Values are literal."
             },
             "cua_adapter": {
               "type": "boolean"
@@ -7333,6 +7359,19 @@
               "type": "string",
               "minLength": 1
             },
+            "env": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "description": "Environment overrides for the desktop engine child only. String values override inherited values; null removes an inherited variable. Values are literal."
+            },
             "cua_adapter": {
               "type": "boolean"
             }
@@ -9709,6 +9748,19 @@
             "engine_path": {
               "type": "string",
               "minLength": 1
+            },
+            "env": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "description": "Environment overrides for the desktop engine child only. String values override inherited values; null removes an inherited variable. Values are literal."
             },
             "cua_adapter": {
               "type": "boolean"
@@ -12093,6 +12145,19 @@
                 "type": "string",
                 "minLength": 1
               },
+              "env": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "description": "Environment overrides for the desktop engine child only. String values override inherited values; null removes an inherited variable. Values are literal."
+              },
               "cua_adapter": {
                 "type": "boolean"
               }
@@ -14469,6 +14534,19 @@
                   "engine_path": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "env": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "description": "Environment overrides for the desktop engine child only. String values override inherited values; null removes an inherited variable. Values are literal."
                   },
                   "cua_adapter": {
                     "type": "boolean"
@@ -16847,6 +16925,19 @@
                     "type": "string",
                     "minLength": 1
                   },
+                  "env": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "description": "Environment overrides for the desktop engine child only. String values override inherited values; null removes an inherited variable. Values are literal."
+                  },
                   "cua_adapter": {
                     "type": "boolean"
                   }
@@ -19223,6 +19314,19 @@
                   "engine_path": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "env": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "description": "Environment overrides for the desktop engine child only. String values override inherited values; null removes an inherited variable. Values are literal."
                   },
                   "cua_adapter": {
                     "type": "boolean"

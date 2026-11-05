@@ -111,9 +111,44 @@ Put the `computer` block in `~/.omo/omo.jsonc` (or `~/.omo/omo.json`) for your a
 | `screenshot_gc.stale_ms` | `43200000` (12 hours) | Age after which a screenshot file is deleted |
 | `screenshot_gc.scan_interval_ms` | `1800000` (30 minutes) | How often stale screenshots are swept |
 | `engine_path` | unset | Use this engine binary instead of locating or downloading one |
+| `env` | unset | Override environment variables for the engine child only; string values set variables and `null` removes inherited variables |
 | `cua_adapter` | `false` | Also register `computer_actions`, OpenAI computer-use actions over the same permissions, audit and stop path |
 
 The schema is `packages/omo-config-core/src/schema/computer.ts`; the defaults are resolved in `packages/senpi-desktop-tool/src/settings.ts`. An invalid block is reported in the log and the component stays unregistered for that session. Start a new session after changing the file.
+
+### Connect to an existing Linux desktop from a terminal
+
+An SSH or terminal session may not inherit the environment of the desktop you want to use. Set
+`computer.env` to connect the engine to an existing X11 or Wayland session without exporting variables
+in your shell. For example, if an X11 server is already running on `:98`:
+
+```jsonc
+{
+  "[native]": {
+    "computer": {
+      "env": {
+        "DISPLAY": ":98",
+        "XAUTHORITY": "/absolute/path/to/Xauthority",
+        "WAYLAND_DISPLAY": null
+      }
+    }
+  }
+}
+```
+
+The configured strings override inherited values. Unmentioned variables remain inherited, including
+the session D-Bus address used by accessibility. A `null` value removes an inherited variable; removing
+`WAYLAND_DISPLAY` matters when selecting X11 because Wayland otherwise takes precedence. If the
+desktop uses a different session bus, include its `DBUS_SESSION_BUS_ADDRESS` as well.
+
+Values are literal: OmO does not expand `$VARIABLES`, `~`, or shell commands. Use the authority file
+for that desktop and your account. This setting does not start a display server, create a desktop,
+grant OS permissions, or change the environment of OmO, shell commands, MCPs or other tools. Engine
+lookup and downloads also keep their original environment. `computer.display` still selects a
+monitor after the engine has connected; it is not the X11 server address.
+
+Start a new OmO session after changing `env`, then check `/computer status`. `omo doctor` uses the same
+environment overrides for its engine probe.
 
 `await computer.display(id)` returns a screenshot/input handle for one display; `"active"` follows focus and `"all"` composites every display. For example, `await (await computer.display("all")).screenshot()` observes every monitor without reopening or changing the session default. Each target has its own screenshot frame. `computer.displays()` lists all known monitors; its pixel rectangles describe the `"all"` composite, not the default active capture. Active chooses the monitor with the largest focused-window intersection; ties or missing focus use the primary display.
 

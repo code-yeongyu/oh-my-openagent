@@ -50,16 +50,20 @@ export function omoReleaseVersion(env: Env): string | undefined {
  * `computer.engine_path` wins; an omo launch acquires the engine for its own release (local install
  * first, then the verified GitHub release download); anything else uses the synchronous locator.
  */
-export function defaultEngineChild(env: Env = process.env, locatorOptions?: DesktopEngineLocatorOptions): (enginePath: string | undefined) => ChildFactory {
+export function defaultEngineChild(
+  env: Env = process.env,
+  locatorOptions?: DesktopEngineLocatorOptions,
+  childEnv?: NodeJS.ProcessEnv,
+): (enginePath: string | undefined) => ChildFactory {
   return (enginePath) => {
-    if (enginePath !== undefined) return explicitEngineChild(enginePath)
+    if (enginePath !== undefined) return explicitEngineChild(enginePath, childEnv)
     const version = omoReleaseVersion(env)
-    if (version !== undefined) return acquiringEngineChildFactory({ version })
-    if (locatorOptions === undefined) return engineChildFactory()
+    if (version !== undefined) return acquiringEngineChildFactory({ version, env: childEnv })
+    if (locatorOptions === undefined) return engineChildFactory(undefined, childEnv)
     return () => {
       const located = locateDesktopEngine(locatorOptions)
       if (located.path === null) throw new DesktopEngineUnavailableError(located.diagnostic)
-      return engineChildFactory(located.path)()
+      return engineChildFactory(located.path, childEnv)()
     }
   }
 }
@@ -87,7 +91,7 @@ export function describeEngineSource(
     : `native-unavailable for ${resolved.notInstalled.host}: ${resolved.notInstalled.cause}`
 }
 
-function explicitEngineChild(enginePath: string): ChildFactory {
+function explicitEngineChild(enginePath: string, env?: NodeJS.ProcessEnv): ChildFactory {
   const host = getDesktopEngineHost()
   const diagnostic = explicitPathDiagnostic(enginePath, host, process.platform)
   if (diagnostic !== undefined) {
@@ -95,5 +99,5 @@ function explicitEngineChild(enginePath: string): ChildFactory {
       throw new DesktopEngineUnavailableError(diagnostic)
     }
   }
-  return engineChildFactory(enginePath)
+  return engineChildFactory(enginePath, env)
 }

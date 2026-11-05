@@ -31,6 +31,11 @@ export const ComputerSettingsSchema = Type.Object(
 			),
 		),
 		enginePath: Type.Optional(Type.String({ minLength: 1, description: "Override the located engine binary" })),
+		env: Type.Optional(
+			Type.Record(Type.String(), Type.Union([Type.String(), Type.Null()]), {
+				description: "Desktop engine environment overrides; null removes an inherited variable. Values are literal.",
+			}),
+		),
 		cuaAdapter: Type.Optional(
 			Type.Boolean({ default: false, description: "Also register computer_actions (OpenAI computer-use actions)" }),
 		),
@@ -54,6 +59,7 @@ export interface ComputerSettings {
 	readonly auditLog: { readonly enabled: boolean };
 	readonly screenshotGc: { readonly enabled: boolean; readonly staleMs: number; readonly scanIntervalMs: number };
 	readonly enginePath: string | undefined;
+	readonly env: Readonly<Record<string, string | null>> | undefined;
 	readonly cuaAdapter: boolean;
 }
 
@@ -94,6 +100,7 @@ export function resolveComputerSettings(raw: unknown, platform: string = process
 			scanIntervalMs: value.screenshotGc?.scanIntervalMs ?? 1_800_000,
 		},
 		enginePath: value.enginePath,
+		env: value.env,
 		cuaAdapter: value.cuaAdapter ?? false,
 	};
 }
