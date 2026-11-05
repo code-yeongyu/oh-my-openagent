@@ -131,6 +131,21 @@ describe("quarantine of runs reconciliation cannot recover", () => {
     expect(existsSync(join(item.runDir, "quarantined.json"))).toBe(false)
   }, 30_000)
 
+  test("#given an unreadable ledger under a dead launcher and a signal that fires right after the sentinel is written #when reconciled #then the reservation is still released in the same call (C29 3, DESIGN.r4 c.21)", async () => {
+    // given
+    const item = await fixture()
+    await writeFile(join(item.runDir, "ledger.json"), "{ not json")
+    const controller = new AbortController()
+    const port: MemoryReceiptsPort = { append: async (runtimeDir: string, input: MemoryReceiptInput) => { controller.abort(); return (await appendMemoryReceiptOnce(runtimeDir, input)) !== undefined } }
+
+    // when
+    await reconcileReflectionRuns({ identity: item.identity, reservation: item.store, ...deadLauncher(), signal: controller.signal, receipts: port }).catch(() => undefined)
+
+    // then
+    expect(existsSync(join(item.runDir, "quarantined.json"))).toBe(true)
+    expect((await item.store.readState()).active).toBeUndefined()
+  }, 30_000)
+
   test("#given the same settled run while another settler holds its finalize lock #when reconciled #then nothing is released (REVIEW-3 R2 control)", async () => {
     // given
     const item = await fixture()

@@ -445,7 +445,7 @@ async function releaseReservation(context: ReaperContext, runId: string): Promis
 }
 
 type MinimalSettle =
-  | { readonly settled: true; readonly pendingRunId?: string }
+  | { readonly settled: true; readonly pendingRunId?: string; readonly alreadyReleased?: boolean }
   | { readonly settled: false; readonly reason: string }
 
 async function settleActiveMinimally(context: ReaperContext, decision: Extract<StaleLockDecision, { kind: "reap" }>): Promise<MinimalSettle> {
@@ -461,8 +461,14 @@ async function settleActiveMinimally(context: ReaperContext, decision: Extract<S
       await abandonRun(context, runDir, runId, "launch_interrupted", reservedAt, identity, active)
       return { settled: true }
     }
-    // An earlier settle wrote the sentinel and stopped before releasing (REVIEW-2 N2): only release.
-    if (decision.action === "terminal-recorded" || decision.action === "release-settled") return { settled: true }
+    // An earlier settle wrote the sentinel and stopped before releasing (REVIEW-2 N2): only release,
+    // inside this finalize lock and after the re-decide above (DESIGN.r4 c.20).
+    if (decision.action === "terminal-recorded" || decision.action === "release-settled") {
+      const released = await releaseReservation(context, runId)
+      return released.released
+        ? { settled: true, alreadyReleased: true, ...(released.pendingRunId === undefined ? {} : { pendingRunId: released.pendingRunId }) }
+        : { settled: false, reason: "the reservation changed before it could be released" }
+    }
     if (decision.action !== "processes-dead" && decision.action !== "ledger-unreadable") return { settled: false, reason: `${decision.action} is not settled from here` }
     const ledger = await readLedger(runDir, {})
     const fields = ledger.present ? ledger.fields : {}
@@ -481,6 +487,7 @@ async function settleActiveMinimally(context: ReaperContext, decision: Extract<S
   })
   if (written === "busy") return { settled: false, reason: "a session is finalizing it" }
   if (!written.settled) return written
+  if (written.alreadyReleased === true) return written
   const released = await releaseReservation(context, runId)
   if (!released.released) return { settled: false, reason: "the reservation changed before it could be released" }
   return { settled: true, ...(released.pendingRunId === undefined ? {} : { pendingRunId: released.pendingRunId }) }

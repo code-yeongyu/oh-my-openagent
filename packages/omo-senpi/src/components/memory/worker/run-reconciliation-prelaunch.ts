@@ -47,7 +47,8 @@ export async function reconcilePrelaunch(context: ReconcileContext): Promise<Pre
   // An earlier settle wrote this generation's sentinel and stopped before releasing (DESIGN.r3 c.14).
   if (await isSettledUnderDeadLauncher(context.identity.paths.reflection, context)) {
     // Under the run's finalize lock without waiting (REVIEW-3 R2): a settler still holding it finishes first.
-    const released = await withRunFinalizeLock(context.identity.paths.locks, active.runId, () => releaseReservationAsFailed(context, active.runId))
+    const released = await withRunFinalizeLock(context.identity.paths.locks, active.runId, async () =>
+      await isSettledUnderDeadLauncher(context.identity.paths.reflection, context) ? releaseReservationAsFailed(context, active.runId) : undefined)
     return released === undefined ? {} : { result: released, retiredRunId: active.runId }
   }
   const ghost = await classifyGhostActive({ identity: context.identity, active })
@@ -235,8 +236,9 @@ export async function quarantineRun(
   return active === undefined ? { runId, outcome: "failed" } : releaseReservationAsFailed(context, runId)
 }
 
+// No abort check here (DESIGN.r4 c.21): callers check before any sentinel write, so a written sentinel
+// is always followed by its release in the same call.
 async function releaseReservationAsFailed(context: ReconcileContext, runId: string): Promise<ReflectionRunReconcileResult> {
-  context.signal?.throwIfAborted()
   const transition = await context.reservation.complete(
     runId,
     "failed",
