@@ -17,6 +17,7 @@ import { Buffer } from "node:buffer"
 import * as fsSync from "node:fs"
 import * as fsp from "node:fs/promises"
 
+import { currentDeviceFiles, deviceFs, refuseSyncOnDevice, type MemoryDeviceFiles } from "./device-scope"
 import { renameWithContentionRetry } from "./rename-contention"
 import { fsErrorCode, retryOnEintr, retryOnEintrSync } from "./retry"
 import { isExclusiveFlag, openSyncWithExclusivePolicy, writeHandleAll, writePathAll } from "./write-all"
@@ -92,6 +93,8 @@ const promises = resilientNamespace(fsp, "async")
 
 /** EINTR-retried like every call here, and retried while Windows briefly holds the target open. */
 export function rename(from: fsSync.PathLike, to: fsSync.PathLike, admit?: (begin: () => Promise<void>) => Promise<void>): Promise<void> {
+  const device = currentDeviceFiles()
+  if (device !== undefined) return deviceFs.rename(device, from, to)
   return renameWithContentionRetry(from, to, {
     rename: (source, target) => fsp.rename(source, target), platform: process.platform,
     ...(admit === undefined ? {} : { admit }),
@@ -109,45 +112,66 @@ export function renameSyncWithContentionRetry(
 }
 const sync = resilientNamespace(fsSync, "sync")
 
-export const {
-  access,
-  chmod,
-  copyFile,
-  cp,
-  link,
-  lstat,
-  mkdir,
-  mkdtemp,
-  readFile,
-  readdir,
-  readlink,
-  realpath,
-  rm,
-  rmdir,
-  stat,
-  statfs,
-  unlink,
-} = promises
+type AnyFunction = (...args: never[]) => unknown
 
-export const {
-  accessSync,
-  chmodSync,
-  fsyncSync,
-  linkSync,
-  lstatSync,
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  realpathSync,
-  statSync,
-  unlinkSync,
-  writeFileSync,
-  writeSync,
-} = sync
+/** Inside a device scope (a split session's memory store), `device` serves the call; outside it, the local call as before. */
+function deviceAware<F extends AnyFunction>(local: F, device: (files: MemoryDeviceFiles, ...args: Parameters<F>) => unknown): F {
+  return ((...args: Parameters<F>) => {
+    const files = currentDeviceFiles()
+    return files === undefined ? local(...args) : device(files, ...args)
+  }) as F
+}
+
+function unsupportedOnDevice(operation: string) {
+  return (): never => deviceFs.unsupported(operation)
+}
+
+function refusedSync<F extends AnyFunction>(operation: string, local: F): F {
+  const guarded = ((...args: Parameters<F>) => {
+    refuseSyncOnDevice(operation)
+    return local(...args)
+  }) as F
+  const native: unknown = Reflect.get(local, "native")
+  if (typeof native === "function") Object.assign(guarded, { native: refusedSync(`${operation}.native`, native as AnyFunction) })
+  return guarded
+}
+
+export const access = deviceAware(promises.access, (files, path) => deviceFs.access(files, path as never))
+export const chmod = deviceAware(promises.chmod, unsupportedOnDevice("chmod"))
+export const copyFile = deviceAware(promises.copyFile, unsupportedOnDevice("copyFile"))
+export const cp = deviceAware(promises.cp, unsupportedOnDevice("cp"))
+export const link = deviceAware(promises.link, unsupportedOnDevice("link"))
+export const lstat = deviceAware(promises.lstat, (files, path) => deviceFs.stat(files, path as never))
+export const mkdir = deviceAware(promises.mkdir, (files, path, options) => deviceFs.mkdir(files, path as never, options))
+export const mkdtemp = deviceAware(promises.mkdtemp, unsupportedOnDevice("mkdtemp"))
+export const readFile = deviceAware(promises.readFile, (files, path, options) => deviceFs.readFile(files, path as never, options))
+export const readdir = deviceAware(promises.readdir, (files, path, options) => deviceFs.readdir(files, path as never, options))
+export const readlink = deviceAware(promises.readlink, unsupportedOnDevice("readlink"))
+export const realpath = deviceAware(promises.realpath, unsupportedOnDevice("realpath"))
+export const rm = deviceAware(promises.rm, (files, path, options) => deviceFs.rm(files, path as never, options))
+export const rmdir = deviceAware(promises.rmdir, (files, path) => deviceFs.rm(files, path as never, { recursive: true }))
+export const stat = deviceAware(promises.stat, (files, path) => deviceFs.stat(files, path as never))
+export const statfs = deviceAware(promises.statfs, unsupportedOnDevice("statfs"))
+export const unlink = deviceAware(promises.unlink, (files, path) => deviceFs.unlink(files, path as never))
+
+export const accessSync = refusedSync("accessSync", sync.accessSync)
+export const chmodSync = refusedSync("chmodSync", sync.chmodSync)
+export const fsyncSync = refusedSync("fsyncSync", sync.fsyncSync)
+export const linkSync = refusedSync("linkSync", sync.linkSync)
+export const lstatSync = refusedSync("lstatSync", sync.lstatSync)
+export const mkdirSync = refusedSync("mkdirSync", sync.mkdirSync)
+export const readFileSync = refusedSync("readFileSync", sync.readFileSync)
+export const readdirSync = refusedSync("readdirSync", sync.readdirSync)
+export const realpathSync = refusedSync("realpathSync", sync.realpathSync)
+export const statSync = refusedSync("statSync", sync.statSync)
+export const unlinkSync = refusedSync("unlinkSync", sync.unlinkSync)
+export const writeFileSync = refusedSync("writeFileSync", sync.writeFileSync)
+export const writeSync = refusedSync("writeSync", sync.writeSync)
 
 export const { constants, watch } = fsSync
 
 export const open: typeof fsp.open = async (...args) => {
+  if (currentDeviceFiles() !== undefined) deviceFs.unsupported("open")
   const openOnce = (): Promise<fsp.FileHandle> => fsp.open(...args)
   const handle = await (isExclusiveFlag(args[1] ?? "r") ? openOnce() : retryOnEintr(openOnce))
   return wrapFileHandle(handle)
@@ -158,6 +182,8 @@ function isHandleTarget(value: fsSync.PathLike | fsp.FileHandle): value is fsp.F
 }
 
 export const writeFile: typeof fsp.writeFile = async (file, data, options) => {
+  const device = currentDeviceFiles()
+  if (device !== undefined) return deviceFs.writeFile(device, file as never, data, options)
   if (typeof data !== "string" && !(data instanceof Uint8Array)) {
     return fsp.writeFile(file, data, options)
   }
@@ -172,6 +198,8 @@ export const writeFile: typeof fsp.writeFile = async (file, data, options) => {
 }
 
 export const appendFile: typeof fsp.appendFile = async (path, data, options) => {
+  const device = currentDeviceFiles()
+  if (device !== undefined) return deviceFs.appendFile(device, path as never, data, options)
   if (typeof data !== "string" && !(data instanceof Uint8Array)) {
     return fsp.appendFile(path, data, options)
   }
@@ -184,8 +212,10 @@ export const appendFile: typeof fsp.appendFile = async (path, data, options) => 
   return writePathAll(path, data, options ?? undefined, "a")
 }
 
-export const openSync: typeof fsSync.openSync = (path, flags, mode) =>
-  openSyncWithExclusivePolicy(fsSync.openSync, path, flags, mode ?? undefined)
+export const openSync: typeof fsSync.openSync = (path, flags, mode) => {
+  refuseSyncOnDevice("openSync")
+  return openSyncWithExclusivePolicy(fsSync.openSync, path, flags, mode ?? undefined)
+}
 
 // close(2) leaves the descriptor state unspecified after EINTR, so retrying risks closing
 // a reused fd; treat EINTR as closed, matching wrapFileHandle's close mapping.
@@ -200,8 +230,19 @@ export function closeSync(fd: number): void {
 // Node parity: existsSync never throws, but unlike node's, transient EINTR is retried
 // instead of being misread as "missing".
 export function existsSync(path: fsSync.PathLike): boolean {
+  refuseSyncOnDevice("existsSync")
   try {
     retryOnEintrSync(() => fsSync.statSync(path))
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** `existsSync`'s answer, asynchronously: on a split session's device files as well as on the local disk. */
+export async function exists(path: fsSync.PathLike): Promise<boolean> {
+  try {
+    await stat(path)
     return true
   } catch {
     return false

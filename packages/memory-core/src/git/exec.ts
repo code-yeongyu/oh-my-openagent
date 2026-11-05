@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process"
+import { currentDeviceFiles, type MemoryDeviceFiles } from "../fs/device-scope"
 import { existsSync } from "../fs/resilient"
 import { win32 } from "node:path"
 import { GitAbortedError, GitNotFoundError, GitTimeoutError } from "./errors"
@@ -249,6 +250,8 @@ export function createNodeGitExec(runtime: NodeGitExecRuntime = {}): GitExec {
 
   return {
     async run(callerArgv, options) {
+      const device = currentDeviceFiles()
+      if (device !== undefined) return runGitOnDevice(device, callerArgv, options)
       const argv = [...NO_FSMONITOR, ...callerArgv]
       const environment = options.env ?? process.env
       try {
@@ -268,6 +271,35 @@ export function createNodeGitExec(runtime: NodeGitExecRuntime = {}): GitExec {
         throw error
       }
     },
+  }
+}
+
+/**
+ * Git on a split session's device: the device spawns it under its own git globals (fsmonitor off included) and holds the
+ * memory git-activity lock while it runs. Only the GIT_* variables the caller set beyond its own environment travel.
+ */
+async function runGitOnDevice(files: MemoryDeviceFiles, argv: readonly string[], options: GitExecOptions): Promise<GitExecResult> {
+  const startedAt = Date.now()
+  const env: Record<string, string> = {}
+  for (const [key, value] of Object.entries(options.env ?? {})) {
+    if (key.startsWith("GIT_") && value !== undefined && process.env[key] !== value) env[key] = value
+  }
+  const result = await files.run({
+    exe: "git",
+    argv,
+    cwd: options.cwd,
+    ...(Object.keys(env).length === 0 ? {} : { env }),
+    ...(options.stdin === undefined ? {} : { stdin: Buffer.from(options.stdin) }),
+    timeoutMs: options.timeoutMs,
+    activityLock: true,
+  }, options.signal === undefined ? undefined : { signal: options.signal })
+  const stdoutBytes = Buffer.from(result.stdout)
+  return {
+    code: result.code ?? 1,
+    stdout: stdoutBytes.toString("utf8"),
+    stderr: result.stderr,
+    stdoutBytes,
+    termination: { signal: result.signal as NodeJS.Signals | null, elapsedMs: Date.now() - startedAt },
   }
 }
 

@@ -1,16 +1,20 @@
-import { existsSync } from "../fs/resilient"
-import { mkdir, readdir, readFile, rename, rm, stat, unlink, writeFile } from "../fs/resilient"
+import { exists, mkdir, readdir, readFile, rename, rm, stat, unlink, writeFile } from "../fs/resilient"
 import { dirname, join, relative } from "node:path"
 import type { GitCommitAuthor, GitMemoryRepo } from "../git"
 import { isMissingDescriptionError, isMissingFrontmatterError, parseMemoryFile, renderMemoryFile, type ParsedMemoryFile } from "../memfs/frontmatter"
 import { describeDescriptionViolation } from "../memfs/frontmatter-validation"
-import { validateMemoryPath, validateRepositoryPath } from "../memfs/paths"
+import { confineMemoryPathOnDevice, validateMemoryPath, type ValidateMemoryPathOptions } from "../memfs/paths"
 import { MemoryPatchHunkError, MemoryPatchParseError, applyMemoryPatch } from "./patch-apply"
 import type { ClaimReceipt } from "../provenance"
 import { isLegacyUserHeader, readHeader, stampReceipt } from "./claim-frontmatter"
 import { commitMemoryWrite, type MemoryWriteLock } from "./commit-write"
 import { describeRepairs, repairLeakedArguments } from "./leaked-arguments"
 import { MemoryToolError } from "./tool-errors"
+import { isOnDevice } from "../fs/device-scope"
+
+/** apply_patch on a split session's device files: refused before anything is read or written, with the way through. */
+export const SPLIT_APPLY_PATCH_REFUSAL =
+  "apply_patch is not available yet on a session whose tools run on another device; nothing was changed. Use create, str_replace, insert, delete, rename or update_description for this edit."
 
 export type MemoryCommand =
   | "create"
@@ -104,6 +108,7 @@ async function applyCommand(root: string, params: MemoryToolParams): Promise<App
     case "rename": return move(root, params)
     case "update_description": return updateDescription(root, params)
     case "apply_patch": {
+      if (isOnDevice()) throw new MemoryToolError(SPLIT_APPLY_PATCH_REFUSAL)
       const input = required(params.input, "input", "apply_patch")
       return applyMemoryPatch(root, input, params.provenance?.claim)
     }
@@ -113,8 +118,8 @@ async function applyCommand(root: string, params: MemoryToolParams): Promise<App
 async function create(root: string, params: MemoryToolParams): Promise<AppliedCommand> {
   const source = required(params.file_path, "file_path", "create")
   const description = acceptableDescription(params.description, "create")
-  const path = validateMemoryPath(root, source, { fieldName: "file_path" })
-  if (existsSync(path)) throw toolError(`create: block already exists at ${source}`)
+  const path = await validatedMemoryPath(root, source, { fieldName: "file_path" })
+  if (await exists(path)) throw toolError(`create: block already exists at ${source}`)
   await mkdir(dirname(path), { recursive: true })
   await writeFile(path, renderMemoryFile(stampReceipt(undefined, { description }, params.file_text ?? "", params.provenance?.claim), params.file_text ?? ""), "utf8")
   return affected(root, path)
@@ -124,7 +129,7 @@ async function strReplace(root: string, params: MemoryToolParams): Promise<Appli
   const source = required(params.file_path, "file_path", "str_replace")
   const oldString = required(params.old_string, "old_string", "str_replace")
   const newString = required(params.new_string, "new_string", "str_replace")
-  const path = validateMemoryPath(root, source, { fieldName: "file_path" })
+  const path = await validatedMemoryPath(root, source, { fieldName: "file_path" })
   const file = await loadEditable(path, source)
   const index = file.body.indexOf(oldString)
   if (index < 0) throw toolError("str_replace: old_string was not found in the target memory block")
@@ -139,7 +144,7 @@ async function insert(root: string, params: MemoryToolParams): Promise<AppliedCo
   if (typeof params.insert_line !== "number" || Number.isNaN(params.insert_line)) {
     throw toolError("insert: 'insert_line' must be a number")
   }
-  const path = validateMemoryPath(root, source, { fieldName: "file_path" })
+  const path = await validatedMemoryPath(root, source, { fieldName: "file_path" })
   const file = await loadEditable(path, source)
   const lines = file.body.length > 0 ? file.body.split("\n") : []
   const line = Math.max(1, Math.floor(params.insert_line))
@@ -150,14 +155,14 @@ async function insert(root: string, params: MemoryToolParams): Promise<AppliedCo
 
 async function remove(root: string, params: MemoryToolParams): Promise<AppliedCommand> {
   const source = required(params.file_path, "file_path", "delete")
-  const repositoryPath = validateRepositoryPath(root, source, "file_path")
-  if (existsSync(repositoryPath) && (await stat(repositoryPath)).isDirectory()) {
+  const repositoryPath = await validatedMemoryPath(root, source, { fieldName: "file_path", toolPath: false })
+  if ((await exists(repositoryPath)) && (await stat(repositoryPath)).isDirectory()) {
     await assertDirectoryEditable(repositoryPath, root)
     const tracked = await collectFiles(repositoryPath, root)
     await rm(repositoryPath, { recursive: true, force: false })
     return { affectedPaths: tracked }
   }
-  const path = validateMemoryPath(root, source, { fieldName: "file_path" })
+  const path = await validatedMemoryPath(root, source, { fieldName: "file_path" })
   await loadEditable(path, source)
   await unlink(path)
   return affected(root, path)
@@ -166,9 +171,9 @@ async function remove(root: string, params: MemoryToolParams): Promise<AppliedCo
 async function move(root: string, params: MemoryToolParams): Promise<AppliedCommand> {
   const oldSource = required(params.old_path, "old_path", "rename")
   const newSource = required(params.new_path, "new_path", "rename")
-  const oldPath = validateMemoryPath(root, oldSource, { fieldName: "old_path" })
-  const newPath = validateMemoryPath(root, newSource, { fieldName: "new_path" })
-  if (existsSync(newPath)) throw toolError(`rename: destination already exists at ${newSource}`)
+  const oldPath = await validatedMemoryPath(root, oldSource, { fieldName: "old_path" })
+  const newPath = await validatedMemoryPath(root, newSource, { fieldName: "new_path" })
+  if (await exists(newPath)) throw toolError(`rename: destination already exists at ${newSource}`)
   const loaded = await loadEditable(oldPath, oldSource)
   await mkdir(dirname(newPath), { recursive: true })
   await rename(oldPath, newPath)
@@ -179,7 +184,7 @@ async function move(root: string, params: MemoryToolParams): Promise<AppliedComm
 async function updateDescription(root: string, params: MemoryToolParams): Promise<AppliedCommand> {
   const source = required(params.file_path, "file_path", "update_description")
   const description = acceptableDescription(params.description, "update_description")
-  const path = validateMemoryPath(root, source, { fieldName: "file_path" })
+  const path = await validatedMemoryPath(root, source, { fieldName: "file_path" })
   const content = await readUtf8(path, source)
   let parsed: ParsedMemoryFile | undefined
   try {
@@ -303,4 +308,11 @@ function toolError(message: string, cause?: unknown): MemoryToolError {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+/** Path validation that also holds on a split session's device files (the symlink check runs there, asynchronously). */
+async function validatedMemoryPath(root: string, input: string, options: ValidateMemoryPathOptions): Promise<string> {
+  const path = validateMemoryPath(root, input, { ...options, deviceConfinement: "deferred" })
+  await confineMemoryPathOnDevice(root, path)
+  return path
 }

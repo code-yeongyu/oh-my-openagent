@@ -1,4 +1,4 @@
-import { existsSync } from "@oh-my-opencode/memory-core/fs"
+import { exists } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 import { memoryHookChecker } from "./worker/spawn-supervisor-support"
 
@@ -12,6 +12,7 @@ import {
   installHooks,
   memoryWriterLockPath,
   normalizeMemoryFrontmatter,
+  isOnDevice,
   withLock,
   type GitCommitAuthor,
   type MemoryIdentityPaths,
@@ -34,6 +35,9 @@ export interface MemoryEngineSession {
 
 const normalizedRepos = new Set<string>()
 
+export const SPLIT_UNINITIALIZED_MESSAGE =
+  "the memory repository on this device is not set up yet; open one session on the device itself, then memory writes work from here too"
+
 export interface MemoryEngineSessionOptions {
   readonly lockWaitTimeoutMs?: number
   readonly lockRetryDelayMs?: number
@@ -50,14 +54,17 @@ export async function prepareMemoryEngineSession(
   const repo = new GitMemoryRepo({ dir: identityPaths.repo, agentId: identity })
   const lock = createMemoryWriterLock(identity, identityPaths, options)
   const author: GitCommitAuthor = { agentId: identity, authorName: identity }
-  if (!existsSync(join(identityPaths.repo, ".git"))) {
+  if (!(await exists(join(identityPaths.repo, ".git")))) {
+    // A split session's first write would install hooks that name this machine's checker; the device sets up its own.
+    if (isOnDevice()) throw new MemoryToolError(SPLIT_UNINITIALIZED_MESSAGE)
     await lock("memory-write", async () => {
-      if (!existsSync(join(identityPaths.repo, ".git"))) {
+      if (!(await exists(join(identityPaths.repo, ".git")))) {
         await repo.init({ seedFiles: buildDefaultSeedFiles(), installHooks: (dir) => { installHooks(dir, { checker: memoryHookChecker() }) } })
       }
     })
   }
-  if (normalizedRepos.has(identityPaths.repo)) return { repo, lock, author }
+  // The repair installs the same machine-local hooks, so a split session leaves it to a session on the device.
+  if (normalizedRepos.has(identityPaths.repo) || isOnDevice()) return { repo, lock, author }
   if (!(await frontmatterNormalizationPending(repo))) {
     normalizedRepos.add(identityPaths.repo)
     return { repo, lock, author }

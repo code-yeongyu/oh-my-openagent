@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "../fs/resilient"
+import { chmodSync, exists, existsSync, mkdirSync, readFile, readFileSync, stat, statSync, writeFileSync } from "../fs/resilient"
 import { isAbsolute, join, resolve } from "node:path"
 import { COMMIT_MSG_HOOK_SCRIPT, type MemoryHookChecker, withMemoryHookChecker } from "./hooks-commit-msg"
 import { POST_COMMIT_HOOK_SCRIPT, PRE_COMMIT_HOOK_SCRIPT } from "./hooks-scripts"
@@ -61,6 +61,21 @@ export function resolveCommonGitDir(repoPath: string): string {
   const commonDirFile = join(gitDir, "commondir")
   if (!existsSync(commonDirFile)) return gitDir
   return absolutize(readFileSync(commonDirFile, "utf8").trim(), gitDir)
+}
+
+/** {@link resolveCommonGitDir} over async reads, so it also resolves on a split session's device files. */
+export async function resolveCommonGitDirAsync(repoPath: string): Promise<string> {
+  const dotGit = join(repoPath, ".git")
+  if (!(await exists(dotGit)) || (await stat(dotGit)).isDirectory()) return dotGit
+
+  const pointer = (await readFile(dotGit, "utf8")).trim()
+  const match = /^gitdir:\s*(.+)$/.exec(pointer)
+  if (!match?.[1]) return dotGit
+
+  const gitDir = absolutize(match[1].trim(), repoPath)
+  const commonDirFile = join(gitDir, "commondir")
+  if (!(await exists(commonDirFile))) return gitDir
+  return absolutize((await readFile(commonDirFile, "utf8")).trim(), gitDir)
 }
 
 function absolutize(path: string, base: string): string {

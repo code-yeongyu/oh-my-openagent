@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { EINTR_RETRY_CAP, link, mkdir, open, unlink, writeHandleAll } from "../fs/resilient"
 import type { FileHandle } from "../fs/resilient"
+import { currentDeviceFiles, type MemoryDeviceFiles } from "../fs/device-scope"
 import path from "node:path"
 
 import { CANDIDATE_UNLINK_ATTEMPTS, forgetLeakedCandidate, trackLeakedCandidate } from "./candidate-sweep"
@@ -104,7 +105,20 @@ async function publishFallback(lockPath: string, record: LockRecord): Promise<bo
   }
 }
 
+/** On a split session's device files the lock is one exclusive create of the record; EEXIST is the lost race. */
+async function publishOnDevice(files: MemoryDeviceFiles, lockPath: string, record: LockRecord): Promise<boolean> {
+  try {
+    await files.write(lockPath, new TextEncoder().encode(`${JSON.stringify(record)}\n`), { exclusive: true })
+    return true
+  } catch (error) {
+    if (errorCode(error) === "exists") return false
+    throw error
+  }
+}
+
 export async function publishExclusive(lockPath: string, record: LockRecord): Promise<boolean> {
+  const device = currentDeviceFiles()
+  if (device !== undefined) return publishOnDevice(device, lockPath, record)
   await mkdir(path.dirname(lockPath), { recursive: true, mode: 0o700 })
   const { candidatePath, handle } = await openFreshCandidate(lockPath)
   try {

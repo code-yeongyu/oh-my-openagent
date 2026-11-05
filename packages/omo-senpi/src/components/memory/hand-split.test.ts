@@ -11,9 +11,10 @@ import { existsSync } from "node:fs"
 import { lstat, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
-import { GitMemoryRepo, buildIdentityPaths } from "@oh-my-opencode/memory-core"
+import { GitMemoryRepo, SPLIT_APPLY_PATCH_REFUSAL, buildIdentityPaths } from "@oh-my-opencode/memory-core"
 
 import { createMemoryBinding } from "./binding"
+import { SPLIT_UNINITIALIZED_MESSAGE } from "./engine-session"
 import { createMemoryIdentityContext } from "./context"
 import { IDENTITY, git, testRoot, textOf } from "./tools.test-support"
 import { createMemoryTools, type MemoryToolExecutionResult } from "./tools"
@@ -35,26 +36,37 @@ function remoteDeviceFiles(loopRoot: string, deviceRoot: string) {
   }
   const mapText = (text: string): string => text.split(loopRoot).join(deviceRoot)
   const record = (op: string, path: string): void => { ops.push(`${op} ${path.slice(loopRoot.length)}`) }
+  // The engine's typed error codes, as a hand's file channel reports them.
+  const typed = async <T>(operation: () => Promise<T>): Promise<T> => {
+    try {
+      return await operation()
+    } catch (error) {
+      const code = (error as { code?: unknown }).code
+      const typedCode = code === "ENOENT" ? "not_found" : code === "EEXIST" ? "exists" : code === "EISDIR" ? "not_a_file" : "io"
+      throw Object.assign(new Error(`${typedCode}: ${String(error)}`), { code: typedCode })
+    }
+  }
   return {
     ops,
     files: {
-      async read(path: string) { record("read", path); return new Uint8Array(await readFile(onDevice(path))) },
-      async write(path: string, data: Uint8Array, options?: { exclusive?: boolean }) {
+      read: (path: string) => typed(async () => { record("read", path); return new Uint8Array(await readFile(onDevice(path))) }),
+      write: (path: string, data: Uint8Array, options?: { exclusive?: boolean }) => typed(async () => {
         record("write", path)
         await mkdir(join(onDevice(path), ".."), { recursive: true })
         await writeFile(onDevice(path), data, { flag: options?.exclusive === true ? "wx" : "w" })
-      },
-      async list(path: string) { record("list", path); return (await readdir(onDevice(path))).sort() },
-      async stat(path: string) {
+      }),
+      list: (path: string) => typed(async () => { record("list", path); return (await readdir(onDevice(path))).sort() }),
+      stat: (path: string) => typed(async () => {
         record("stat", path)
         const stats = await lstat(onDevice(path))
         return { kind: stats.isFile() ? "file" : stats.isDirectory() ? "directory" : "other", size: stats.size, mtimeMs: stats.mtimeMs } as const
-      },
-      async rename(from: string, to: string) { record("rename", from); await rename(onDevice(from), onDevice(to)) },
-      async remove(path: string) { record("remove", path); await rm(onDevice(path), { recursive: true, force: true }) },
-      async mkdir(path: string) { record("mkdir", path); await mkdir(onDevice(path), { recursive: true }) },
+      }),
+      rename: (from: string, to: string) => typed(async () => { record("rename", from); await rename(onDevice(from), onDevice(to)) }),
+      remove: (path: string) => typed(async () => { record("remove", path); await lstat(onDevice(path)); await rm(onDevice(path), { recursive: true }) }),
+      mkdir: (path: string) => typed(async () => { record("mkdir", path); await mkdir(onDevice(path), { recursive: true }) }),
       run(request: DeviceRun) {
-        ops.push(`run ${request.exe} ${request.argv.filter((arg) => !arg.startsWith("-")).slice(0, 1).join(" ")}`)
+        const subcommand = request.argv.find((arg, index) => !arg.startsWith("-") && request.argv[index - 1] !== "-c")
+        ops.push(`run ${request.exe} ${subcommand ?? ""}`)
         return new Promise<{ code: number | null; signal: string | null; stdout: Uint8Array; stderr: string }>((resolve, reject) => {
           const env = Object.fromEntries(Object.entries(request.env ?? {}).map(([key, value]) => [key, mapText(value)]))
           const child = spawn(request.exe, request.argv.map(mapText), { cwd: onDevice(request.cwd), env: { ...process.env, ...env }, windowsHide: true })
@@ -71,12 +83,14 @@ function remoteDeviceFiles(loopRoot: string, deviceRoot: string) {
   }
 }
 
-async function splitFixture() {
+type Execute = (...args: unknown[]) => Promise<MemoryToolExecutionResult>
+
+async function splitFixture(options: { readonly initialized?: boolean } = {}) {
   const root = await testRoot("omo-senpi-memory-split-")
   const loopRoot = join(root, "loop-machine")
   const deviceRoot = join(root, "device")
   const devicePaths = buildIdentityPaths(deviceRoot, IDENTITY)
-  await new GitMemoryRepo({ dir: devicePaths.repo, agentId: IDENTITY }).init({ authorName: "Memory Split Test" })
+  if (options.initialized !== false) await new GitMemoryRepo({ dir: devicePaths.repo, agentId: IDENTITY }).init({ authorName: "Memory Split Test" })
   const loopPaths = buildIdentityPaths(loopRoot, IDENTITY)
   const binding = createMemoryBinding({ identity: IDENTITY, repoPath: loopPaths.repo, boundAt: Date.now() })
   const context = createMemoryIdentityContext({ identity: IDENTITY, identityPaths: loopPaths, binding })
@@ -100,13 +114,57 @@ describe("memory tool on a split session", () => {
     )
 
     // then
-    expect(result.isError).toBeUndefined()
     expect(textOf(result)).toContain("committed")
+    expect(result.isError).toBeUndefined()
     expect(await readFile(join(devicePaths.repo, "notes/split.md"), "utf8")).toContain("lives on the device")
     expect(await git(new GitMemoryRepo({ dir: devicePaths.repo, agentId: IDENTITY }), ["log", "-1", "--format=%s"])).toBe("remember the split")
     expect(existsSync(loopRoot)).toBe(false)
     expect(device.ops.filter((op) => op.startsWith("write ") && op.endsWith("/notes/split.md"))).toHaveLength(1)
     expect(device.ops.some((op) => op === "run git commit")).toBe(true)
+  })
+
+  it("#given a split session #when the memory tool is asked for apply_patch #then it refuses with the typed explanation and changes nothing", async () => {
+    // given
+    const { devicePaths, context, device } = await splitFixture()
+    const repo = new GitMemoryRepo({ dir: devicePaths.repo, agentId: IDENTITY })
+    const headBefore = await git(repo, ["rev-parse", "HEAD"])
+    const [tool] = createMemoryTools(() => context)
+
+    // when
+    const result = await (tool.execute as Execute)(
+      "call-2",
+      { command: "apply_patch", reason: "patch on the split", input: "*** Begin Patch\n*** Add File: notes/p.md\n+x\n*** End Patch" },
+      undefined,
+      undefined,
+      { deviceFiles: device.files },
+    )
+
+    // then
+    expect(result.isError).toBe(true)
+    expect(textOf(result)).toBe(`memory: ${SPLIT_APPLY_PATCH_REFUSAL}`)
+    expect(await git(repo, ["rev-parse", "HEAD"])).toBe(headBefore)
+    expect(device.ops.filter((op) => op.startsWith("write ") && !op.includes("/locks/"))).toEqual([])
+  })
+
+  it("#given a device with no memory repository yet #when the memory tool writes on a split session #then it refuses with the typed explanation and creates nothing", async () => {
+    // given
+    const { loopRoot, devicePaths, context, device } = await splitFixture({ initialized: false })
+    const [tool] = createMemoryTools(() => context)
+
+    // when
+    const result = await (tool.execute as Execute)(
+      "call-3",
+      { command: "create", reason: "first write", file_path: "notes/first.md", description: "First", file_text: "x" },
+      undefined,
+      undefined,
+      { deviceFiles: device.files },
+    )
+
+    // then
+    expect(result.isError).toBe(true)
+    expect(textOf(result)).toBe(`memory: ${SPLIT_UNINITIALIZED_MESSAGE}`)
+    expect(existsSync(join(devicePaths.repo, ".git"))).toBe(false)
+    expect(existsSync(loopRoot)).toBe(false)
   })
 
   it("#given the memory tool #when it is defined #then it is declared to run where the loop runs", () => {
