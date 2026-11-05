@@ -97,6 +97,43 @@ describe("retention as a host-sweep step (6b driver 2 / --fix; A34, A38 driver h
     expect(existsSync(join(memoryRoot, "agents", "id-05", "runtime", "reflection", "runs", "reflection-run-1"))).toBe(true)
   })
 
+  test("#given global retention_days 30 and an agent override of 3 #when the host sweep step visits #then each identity keeps the windows its global layer sets (REVIEW-5 M1)", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "memory-host-windows-"))
+    roots.push(memoryRoot)
+    const wide = buildIdentityPaths(memoryRoot, "id-wide")
+    const narrow = buildIdentityPaths(memoryRoot, "id-narrow")
+    for (const paths of [wide, narrow]) {
+      await mkdir(paths.repo, { recursive: true })
+      await reflectionRun(paths, "reflection-run-1", { finishedAt: daysAgo(10) })
+      await reflectionRun(paths, "reflection-run-9", { finishedAt: daysAgo(1) })
+    }
+    const step = createRetentionHostSweepStep({ settings: { runtime: { retention_days: 30 }, agents: { "id-narrow": { runtime: { retention_days: 3 } } } }, now })
+
+    await sweepHostIdentities({ memoryRoot, steps: [step], now })
+
+    expect(existsSync(join(wide.reflection, "runs", "reflection-run-1"))).toBe(true)
+    expect(existsSync(join(narrow.reflection, "runs", "reflection-run-1"))).toBe(false)
+  })
+
+  test("#given an identity this process hosts #when the host sweep step visits it #then the step skips it and leaves its own pass's decisions alone (REVIEW-5 M2)", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "memory-host-hosted-"))
+    roots.push(memoryRoot)
+    const hosted = buildIdentityPaths(memoryRoot, "id-hosted")
+    const foreign = buildIdentityPaths(memoryRoot, "id-foreign")
+    for (const paths of [hosted, foreign]) {
+      await mkdir(paths.repo, { recursive: true })
+      await reflectionRun(paths, "reflection-run-1", { finishedAt: daysAgo(8) })
+      await reflectionRun(paths, "reflection-run-9", { finishedAt: daysAgo(1) })
+    }
+    const step = createRetentionHostSweepStep({ now, isHostedIdentity: (name) => name === "id-hosted" })
+
+    const result = await sweepHostIdentities({ memoryRoot, steps: [step], now })
+
+    if (result.status !== "swept") throw new Error("expected a sweep")
+    expect(existsSync(join(hosted.reflection, "runs", "reflection-run-1"))).toBe(true)
+    expect(existsSync(join(foreign.reflection, "runs", "reflection-run-1"))).toBe(false)
+  })
+
   test("#given global settings #when the foreign-identity switch resolves #then only global on plus no override-off counts as on", () => {
     expect(resolveForeignIdentityDiscardUnreflected(SETTINGS, "id-14")).toBe(false)
     expect(resolveForeignIdentityDiscardUnreflected(SETTINGS, "id-15")).toBe(true)

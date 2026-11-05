@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { existsSync } from "node:fs"
-import { chmod, mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises"
+import { chmod, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import { acquireLock, createLockRecord, releaseLock } from "../locks"
@@ -827,5 +827,22 @@ describe("runtime retention: a no-op visit takes no lock and writes nothing (R3,
       reflection: (await stat(paths.reflection)).mtimeMs,
       transcript: (await stat(join(paths.transcripts, "fresh"))).mtimeMs,
     }).toEqual(before)
+  })
+})
+
+describe("one journal that cannot be read (REVIEW-5 L1)", () => {
+  test("#given a journal whose state.json cannot be read #when the pass runs #then that journal is kept as state-unreadable and the rest of the pass still runs", async () => {
+    const paths = await identity()
+    await journal(paths, "s-a-broken", "fully", daysAgo(10))
+    await journal(paths, "s-b-full", "fully", daysAgo(10))
+    const broken = join(paths.transcripts, "s-a-broken", "state.json")
+    await rm(broken)
+    await mkdir(broken)
+
+    const report = await runRuntimeRetention({ paths, policy: DEFAULT_RUNTIME_RETENTION, now })
+
+    expect(report.journals.kept["s-a-broken"]).toBe("state-unreadable")
+    expect(report.journals.removed).toEqual(["s-b-full"])
+    expect(report.cursor).toBeUndefined()
   })
 })
