@@ -38,7 +38,8 @@
                 "stopPath": "none",
                 "stopReason": "no-global-listener",
                 "integrityLevel": null,
-                "screenLocked": false
+                "screenLocked": false,
+                "displayAsleep": false
               },
               "resumeToken": "per-process-random"
             }

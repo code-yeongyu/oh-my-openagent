@@ -32,6 +32,9 @@ const withinDepth = (value: unknown): boolean => {
 
 const COMMON = ["seq", "base_seq", "kind", "account", "epoch", "author", "digest", "link", "keyring_link", "record_sig"]
 
+/** The contract's batch id (its `readBatchId`): 16 bytes as unpadded base64url. */
+const isBatchId = (value: unknown): boolean => typeof value === "string" && /^[A-Za-z0-9_-]{22}$/.test(value)
+
 const authorHolds = (author: unknown): boolean => {
   if (!isRow(author)) return false
   if (author["kind"] === "device") {
@@ -49,6 +52,11 @@ const wrapsHold = (wraps: unknown): boolean =>
  * The closed transport schema of one served chain row (sync-design section 6): exactly the fields
  * of its kind, each of the right shape, before any check reads them. A batch row carrying a body
  * keeps the merged receiver's own code. Everything else that does not match is `bad_envelope`.
+ *
+ * A batch row may also carry the contract's `batch_id`, which `/v1/sync/entries` served before the
+ * service dropped it there. It is checked for shape here and never read: the sealed header's id is
+ * bound to the `/v1/sync/batches` row where the object opens (`engine/receive.ts`), and the chain
+ * never opens objects. A present `batch_id` that is null or malformed is refused, not ignored.
  */
 export const envelopeRefusal = (entry: SyncEntry): EnvelopeRejection | null => {
   const row: unknown = entry
@@ -58,7 +66,8 @@ export const envelopeRefusal = (entry: SyncEntry): EnvelopeRejection | null => {
     isText(row["account"]) && isText(row["digest"]) && isText(row["link"]) && isText(row["record_sig"]) && authorHolds(row["author"])
   if (row["kind"] === "batch") {
     if ("body" in row) return "batch_with_body"
-    return common && hasExactly(row, COMMON) && row["keyring_link"] === null ? null : "bad_envelope"
+    const closed = hasExactly(row, COMMON) || (hasExactly(row, [...COMMON, "batch_id"]) && isBatchId(row["batch_id"]))
+    return common && closed && row["keyring_link"] === null ? null : "bad_envelope"
   }
   if (row["kind"] !== "keyring") return "bad_envelope"
   const shaped = hasExactly(row, [...COMMON, "body", "wraps"]) && isText(row["keyring_link"]) && isRow(row["body"]) && wrapsHold(row["wraps"])
