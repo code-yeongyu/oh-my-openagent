@@ -17,6 +17,10 @@ mod method;
 mod remote_impl;
 mod scenario;
 mod scenario_nodes;
+mod scripting;
+mod scripting_impl;
+#[cfg(test)]
+mod scripting_tests;
 mod sink;
 mod user_input_impl;
 
@@ -28,6 +32,10 @@ pub use remote_impl::FakeRemoteScreen;
 pub use scenario::{
     fake_capabilities, DelayMs, FakeAxNode, FakeBounds, FakeMenuNode, FakeScenario, ResizeWindow,
     ScenarioError, ScriptedFailure,
+};
+pub use scripting::{
+    DisplaysChange, EpochEvent, EpochReason, FakeFocusRead, FakeHit, FakeIdentityRead, FakeWindowIdentity,
+    FocusRecordKind, FocusRecordOutcome, IdentityChange, TimedUserPress,
 };
 pub use sink::{RecordedPointer, RecordingSink, SinkOp};
 pub use user_input_impl::{FakeUserInput, ScriptedPressKind, ScriptedUserPress};
