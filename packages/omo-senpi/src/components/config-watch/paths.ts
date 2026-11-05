@@ -123,7 +123,9 @@ function findAncestorDirectories(cwd: string, homeDir: string): readonly string[
 function creationAncestors(ancestors: readonly string[], userConfigParent: string): readonly string[] {
   const bounded: string[] = []
   for (const ancestor of ancestors) {
-    if (ancestor === resolve(userConfigParent)) break
+    // The filesystem root is never a creation target: outside HOME and outside any repo the walk would
+    // otherwise reach it, and a watch on "/" receives every change on the disk.
+    if (ancestor === resolve(userConfigParent) || dirname(ancestor) === ancestor) break
     bounded.push(ancestor)
     if (existsSync(join(ancestor, ".git"))) break
   }
