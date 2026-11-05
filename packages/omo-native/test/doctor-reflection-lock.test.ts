@@ -141,6 +141,28 @@ describe("omo doctor --fix reflection locks (#11976)", () => {
     expect(existsSync(join(worktrees, `${old}-reflection-run-8`))).toBe(true)
   })
 
+  test("#given an other-host lock, a live launcher and a torn lock beside a live run, each with a reapable sibling #when --fix runs #then only the siblings are released (C05, C07, C09 positive controls)", async () => {
+    const root = memoryHome()
+    const other = identity(root, "agent-d")
+    write(join(other, "active.lock"), { runId: "reflection-run-64", request: { trigger: "manual", conversationIds: [], snapshots: [] }, reservedAt: new Date(NOW - 10 * 60_000).toISOString(), launcherPid: 11096, launcherHostname: "other-host", launcherProcessStart: null })
+    const live = identity(root, "agent-live")
+    write(join(live, "active.lock"), { runId: "reflection-run-64", request: { trigger: "manual", conversationIds: [], snapshots: [] }, reservedAt: new Date(NOW - 10 * 60_000).toISOString(), launcherPid: 4242, launcherHostname: HOST, launcherProcessStart: null })
+    const torn = identity(root, "agent-torn")
+    write(join(torn, "active.lock"), "{\"runId\":")
+    utimesSync(join(torn, "active.lock"), new Date(NOW - 2 * 60 * 60_000), new Date(NOW - 2 * 60 * 60_000))
+    write(join(torn, "runs", "reflection-run-63", "ledger.json"), { version: 1, runId: "reflection-run-63", pid: 4243, processStart: "s" })
+    utimesSync(join(torn, "runs", "reflection-run-63"), new Date(NOW - 2 * 60 * 60_000), new Date(NOW - 2 * 60 * 60_000))
+    const sibling = identity(root, "agent-sibling")
+    launchInterrupted(sibling)
+    const pids: Record<number, "alive" | "dead"> = { 4242: "alive", 4243: "alive" }
+    const result = await reflectionLockFix({ env: { OMO_MEMORY_HOME: root }, reflectionLockProbe: { hostname: () => HOST, now: () => NOW, getPidLiveness: (pid: number) => pids[pid] ?? "dead", getProcessStartIdentity: async () => "s" } })
+    expect(existsSync(join(other, "active.lock"))).toBe(true)
+    expect(existsSync(join(live, "active.lock"))).toBe(true)
+    expect(existsSync(join(torn, "active.lock"))).toBe(true)
+    expect(existsSync(join(sibling, "active.lock"))).toBe(false)
+    expect(result.lines).toContain("FIXED agent-sibling active.lock run reflection-run-64 (launch-interrupted)")
+  })
+
   test("#given a runtime lock whose owner pid is gone #when --fix runs #then the lock is reclaimed and counted", async () => {
     const root = memoryHome()
     const reflectionDir = identity(root, "agent-a")
