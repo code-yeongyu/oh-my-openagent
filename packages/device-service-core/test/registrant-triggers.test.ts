@@ -122,7 +122,7 @@ describe("agent dir registrant: service starts (#12379)", () => {
 
     for (let attempt = 2; attempt <= 4; attempt += 1) {
       const run = await retry
-      retry = nextScheduled(`retry ${attempt} being scheduled`)
+      if (attempt < 4) retry = nextScheduled(`retry ${attempt} being scheduled`)
       run()
     }
 
