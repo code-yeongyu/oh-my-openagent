@@ -9,13 +9,14 @@ import { OMO_SENPI_TASK_RPC_CHILD } from "@oh-my-opencode/senpi-task/rpc-spawn"
 
 import type { ComponentLogger } from "../../extension/types"
 import { loadSenpiOmoConfig } from "../config-resolution"
+import { isCi, type RegistrantStartOptions, startRegistrantAtStart } from "./registrant-start"
 import { type BootstrapReport, runBootstrapWorker } from "./runner"
 
 export interface ProcessLatch {
   claimed: boolean
 }
 
-export interface DeviceServiceRuntimeOptions {
+export interface DeviceServiceRuntimeOptions extends RegistrantStartOptions {
   /** Claimed by the first bootstrap; the default lives on globalThis, so any copy of this module in the process shares it. */
   readonly latch?: ProcessLatch
   readonly env?: Readonly<Record<string, string | undefined>>
@@ -41,11 +42,6 @@ function processLatch(): ProcessLatch {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
-
-const isCi = (env: Readonly<Record<string, string | undefined>>): boolean => {
-  const ci = env.CI?.trim().toLowerCase()
-  return ci !== undefined && ci !== "" && ci !== "0" && ci !== "false"
-}
 
 // Stops that are not the user's to act on at start-up: signed out, or no credential store to tell whether anyone is
 // signed in at all (a machine without a keyring must not warn on every start).
@@ -81,4 +77,18 @@ export async function bootstrapAtStart(eventCtx: unknown, logger: ComponentLogge
   }
   if (report === undefined) logger.warn("device service bootstrap answered no report")
   else if ("notice" in report && !QUIET_STOPS.has(report.state)) notify(report.notice, "warning")
+}
+
+/**
+ * One qualifying session start: the TUI bootstrap (install, adopt, first register) for a tui session, and the
+ * engine's long-lived agent dir registrant for a tui or rpc engine (#12379). The registrant starts first and never
+ * waits on the bootstrap worker.
+ */
+export async function startAtSession(eventCtx: unknown, logger: ComponentLogger, options: DeviceServiceRuntimeOptions = {}): Promise<void> {
+  startRegistrantAtStart(eventCtx, logger, {
+    ...options,
+    env: options.env ?? process.env,
+    loadConfig: options.loadConfig ?? loadSenpiOmoConfig,
+  })
+  if (isRecord(eventCtx) && eventCtx.mode === "tui") await bootstrapAtStart(eventCtx, logger, options)
 }
