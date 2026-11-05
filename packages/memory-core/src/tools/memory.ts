@@ -10,11 +10,6 @@ import { isLegacyUserHeader, readHeader, stampReceipt } from "./claim-frontmatte
 import { commitMemoryWrite, type MemoryWriteLock } from "./commit-write"
 import { describeRepairs, repairLeakedArguments } from "./leaked-arguments"
 import { MemoryToolError } from "./tool-errors"
-import { isOnDevice } from "../fs/device-scope"
-
-/** apply_patch on a split session's device files: refused before anything is read or written, with the way through. */
-export const SPLIT_APPLY_PATCH_REFUSAL =
-  "apply_patch is not available yet on a session whose tools run on another device; nothing was changed. Use create, str_replace, insert, delete, rename or update_description for this edit."
 
 export type MemoryCommand =
   | "create"
@@ -108,7 +103,6 @@ async function applyCommand(root: string, params: MemoryToolParams): Promise<App
     case "rename": return move(root, params)
     case "update_description": return updateDescription(root, params)
     case "apply_patch": {
-      if (isOnDevice()) throw new MemoryToolError(SPLIT_APPLY_PATCH_REFUSAL)
       const input = required(params.input, "input", "apply_patch")
       return applyMemoryPatch(root, input, params.provenance?.claim)
     }
