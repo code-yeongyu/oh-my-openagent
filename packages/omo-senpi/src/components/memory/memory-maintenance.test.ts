@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { execFileSync } from "node:child_process"
 import { existsSync, realpathSync } from "node:fs"
-import { mkdir, mkdtemp, stat, utimes, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, stat, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import {
+  DEFAULT_RUNTIME_RETENTION,
   GitMemoryRepo,
   TranscriptJournal,
   buildIdentityPaths,
@@ -417,6 +418,56 @@ describe("retention stamp and resume (A33 maintenance half)", () => {
     expect(existsSync(join(runs, "reflection-run-1"))).toBe(true)
     expect((await stat(context.identityPaths.runtime)).mtimeMs).toBe(runtimeMtime)
     expect((await stat(context.identityPaths.reflection)).mtimeMs).toBe(reflectionMtime)
+  }, 60_000)
+})
+
+describe("a cap that cannot measure inside the budget is throttled to the interval (#12538 review r5 L1)", () => {
+  const NOW = Date.parse("2026-11-05T00:00:00.000Z")
+  const HOUR = 60 * 60 * 1000
+  const resume = { store: "cap", tier: "folded-run", clock: 0, lastName: "reflection-run-0" }
+  // A pass budget of 0 ms: the stores are empty, so the store walk finishes, and the cap's size walk
+  // always overruns what is left, so the cap can never measure runtime/.
+  const zeroBudget = { resolveRetention: () => ({ ...DEFAULT_RUNTIME_RETENTION, passBudgetMs: 0 }), resolveMaxBytes: () => 1 }
+
+  test("#given a stored cap resume point and a size walk that always overruns #when the pass runs #then it stamps omo.retentionAt and the next bind inside the interval does not run retention", async () => {
+    const { context, repo } = await identityWithHistory(0)
+    const cursorFile = join(context.identityPaths.runtime, "retention.json")
+    await mkdir(context.identityPaths.runtime, { recursive: true })
+    await writeFile(cursorFile, JSON.stringify({ version: 1, cap: resume }))
+
+    const first = recorder()
+    const stalled = createMemoryMaintenance({ logger: first.logger, delayMs: 0, now: () => NOW, ...zeroBudget })
+    stalled.schedule(context)
+    await stalled.settled()
+
+    expect(first.info).toContain("omo-senpi memory runtime retention")
+    expect(await repo.configGet("omo.retentionAt")).toBe(String(NOW))
+    const kept = await readFile(cursorFile, "utf8")
+    expect((JSON.parse(kept) as { cap?: unknown }).cap).toEqual(resume)
+
+    const second = recorder()
+    const later = createMemoryMaintenance({ logger: second.logger, delayMs: 0, now: () => NOW + HOUR, ...zeroBudget })
+    later.schedule(context)
+    await later.settled()
+
+    expect(second.info.filter((message) => message === "omo-senpi memory runtime retention")).toEqual([])
+    expect(await repo.configGet("omo.retentionAt")).toBe(String(NOW))
+    expect(await readFile(cursorFile, "utf8")).toBe(kept)
+  }, 60_000)
+
+  test("#given a fresh omo.retentionAt and a cap resume point left by a pass that made progress #when the next bind runs #then retention resumes the cap and completes", async () => {
+    const { context, repo } = await identityWithHistory(0)
+    const cursorFile = join(context.identityPaths.runtime, "retention.json")
+    await mkdir(context.identityPaths.runtime, { recursive: true })
+    await writeFile(cursorFile, JSON.stringify({ version: 1, cap: resume }))
+    await repo.configSet("omo.retentionAt", String(NOW - HOUR))
+
+    const maintenance = createMemoryMaintenance({ delayMs: 0, now: () => NOW, resolveMaxBytes: () => 1 })
+    maintenance.schedule(context)
+    await maintenance.settled()
+
+    expect(existsSync(cursorFile)).toBe(false)
+    expect(await repo.configGet("omo.retentionAt")).toBe(String(NOW))
   }, 60_000)
 })
 
