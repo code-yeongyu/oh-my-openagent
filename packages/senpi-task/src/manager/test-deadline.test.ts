@@ -5,6 +5,7 @@ import {
   remainingTestTime,
   resetTestDeadline,
   testBudgetSignal,
+  useTestTimeout,
 } from "../../../../test-support/test-deadline"
 
 const originalNow = performance.now
@@ -81,16 +82,22 @@ const waitPrimitives = [
   },
 ] as const
 
-test.each(waitPrimitives)("#given part of the test budget spent #when $primitive arms its deadline #then it gets exactly the remaining budget", ({ wait }) => {
+const declaredBudgets = waitPrimitives.flatMap((row) => [
+  { ...row, budget: "the suite default", declared: undefined, timeoutMs: DEFAULT_TEST_TIMEOUT_MS },
+  { ...row, budget: "a shorter declared 15 s timeout", declared: 15_000, timeoutMs: 15_000 },
+])
+
+test.each(declaredBudgets)("#given $budget with part of it spent #when $primitive arms its deadline #then it gets exactly the remaining share of that budget", ({ wait, declared, timeoutMs }) => {
   // given
   const timers = fakeTimers()
+  if (declared !== undefined) useTestTimeout(declared)
   now += 5_000
 
   // when
   void wait(new Promise<never>(() => undefined)).catch(() => undefined)
 
   // then
-  expect(timers.armed).toEqual([DEFAULT_TEST_TIMEOUT_MS * 0.9 - 5_000])
+  expect(timers.armed).toEqual([timeoutMs * 0.9 - 5_000])
 })
 
 test.each(waitPrimitives)("#given a stalled runner #when the awaited event arrives after the stall #then $primitive resolves with it", async ({ wait }) => {

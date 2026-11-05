@@ -13,8 +13,8 @@ afterAll(() => {
   resetTestDeadline()
 })
 
-// A hosted Windows runner stall measured on #10814: events that take ~100 ms took 2-4 s.
-const STALL_MS = 4_000
+// Longer than both old fixed bounds (2 s live-parent, 5 s workpool), so the old helpers fail by behaviour.
+const STALL_MS = 6_000
 
 function fakeTimeouts() {
   const pending: { readonly due: number; readonly fire: () => void }[] = []
