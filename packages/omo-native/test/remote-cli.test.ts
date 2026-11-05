@@ -1,12 +1,17 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { chmodSync, mkdtempSync, rmSync } from "node:fs"
+import { generateKeyPairSync } from "node:crypto"
+import { chmodSync, existsSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { connectDeviceService } from "../../device-service-core/src/index.ts"
 import { startFakeOwner, type FakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
 import { defaultWorld, OFFLINE_PEER, PEER, SESSION_ID } from "../../device-service-core/test/local-api/conformance/world.ts"
-import { ago, prepareRemoteAttach, REMOTE_EXIT, runRemoteVerb } from "../remote-cli"
+import { createCredentialStore } from "../../omo-opencode/src/cli/service-auth/keystore"
+import { runAccountVerb } from "../account-cli"
+import { type BootstrapSetup, deviceServiceBootstrapSetup } from "../remote-bootstrap"
+import { prepareRemoteAttach, REMOTE_EXIT, runRemoteVerb } from "../remote-cli"
+import { ago } from "../remote-render"
 
 const NOW = 1_790_000_400_000
 const owners: FakeOwner[] = []
@@ -26,7 +31,26 @@ const privateDir = (): string => {
 
 const SIGNED_IN = { exitCode: 0, stdout: JSON.stringify({ signedIn: true, device: { id: "dev-self", name: "This Mac" }, refreshState: "ok" }) }
 
-async function run(args: readonly string[], stateDir?: string, account = SIGNED_IN) {
+const credential = () => ({
+  device: { id: "dev-self", name: "This Mac" },
+  signingPrivateKey: generateKeyPairSync("ed25519").privateKey.export({ format: "der", type: "pkcs8" }).toString("base64"),
+  sealingPrivateKey: generateKeyPairSync("x25519").privateKey.export({ format: "der", type: "pkcs8" }).toString("base64"),
+})
+
+const AGENT_DIR = "/home/user/.omo/agent"
+const OMO_BINARY = "/opt/omo/bin/omo"
+
+// The fake owner serves service_version 1.4.0, so pinning 1.4.0 makes a running owner current.
+const testBootstrap = (overrides: Partial<BootstrapSetup> = {}): BootstrapSetup => ({
+  pinVersion: "1.4.0",
+  install: async () => ({ ok: false, state: "service_degraded", action: "This test installs nothing." }),
+  credential: async () => credential(),
+  refresher: { binaryPath: OMO_BINARY, version: "5.1.58" },
+  agentDir: AGENT_DIR,
+  ...overrides,
+})
+
+async function run(args: readonly string[], stateDir?: string, account = SIGNED_IN, bootstrap = testBootstrap()) {
   let dir = stateDir
   if (dir === undefined) {
     const owner = await startFakeOwner({ stateDir: privateDir(), world: defaultWorld() })
@@ -44,6 +68,7 @@ async function run(args: readonly string[], stateDir?: string, account = SIGNED_
       now: () => NOW,
       output: line => out.push(line),
       error: line => err.push(line),
+      bootstrap,
     },
     args,
   )
@@ -102,6 +127,38 @@ describe("omo remote", () => {
     expect(err[0]).toBe(message)
   })
 
+  // D1 (#12051): the per-device opt-out is the host attach control (control.attach.get/set).
+  test("control reads the attach setting, and control off/on set it", async () => {
+    const owner = await startFakeOwner({ stateDir: privateDir(), world: defaultWorld() })
+    owners.push(owner)
+    const fresh = await run(["control", "--json"], owner.stateDir)
+    expect([fresh.code, JSON.parse(fresh.out.join(""))]).toEqual([REMOTE_EXIT.ok, { attached: true, changedAt: "" }])
+    const off = await run(["control", "off"], owner.stateDir)
+    expect(off.code).toBe(REMOTE_EXIT.ok)
+    expect(off.out[0]).toStartWith("Remote control is off")
+    expect(owner.state.attach.attached).toBe(false)
+    const after = await run(["control", "--json"], owner.stateDir)
+    expect(JSON.parse(after.out.join(""))).toMatchObject({ attached: false })
+    const on = await run(["control", "on", "--json"], owner.stateDir)
+    expect(JSON.parse(on.out.join(""))).toMatchObject({ attached: true })
+    expect(owner.state.attach.attached).toBe(true)
+  })
+
+  test("control refuses a value other than on or off before contacting the service", async () => {
+    const { code, err } = await run(["control", "maybe"], join(privateDir(), "absent"))
+    expect(code).toBe(REMOTE_EXIT.usage)
+    expect(err[0]).toBe("omo remote control: the value is on or off")
+  })
+
+  test("control names a service too old to have the attach setting instead of sending it", async () => {
+    const owner = await startFakeOwner({ stateDir: privateDir(), world: defaultWorld(), capabilities: ["sessions", "devices", "enforcement", "upgrade"] })
+    owners.push(owner)
+    const { code, err } = await run(["control", "off"], owner.stateDir)
+    expect(code).toBe(REMOTE_EXIT.unavailable)
+    expect(err).toEqual(["The OmO device service on this device does not have remote control yet. Update OmO, then try again."])
+    expect(owner.state.log).not.toContain("control.attach.set")
+  })
+
   test("reports a missing or stopped service without a stack", async () => {
     const missing = await run(["status"], join(privateDir(), "absent"))
     expect(missing.code).toBe(REMOTE_EXIT.unavailable)
@@ -125,6 +182,68 @@ describe("omo remote bootstrap: omo account show first", () => {
     owners.push(owner)
     const { code, err, out } = await run(["status"], owner.stateDir, account)
     expect([code, err, out]).toEqual([REMOTE_EXIT.unavailable, [notice], []])
+  })
+})
+
+// The start-up bootstrap's worker: one JSON line the engine component reads, exit 0 connected, 3 stopped.
+describe("omo remote bootstrap", () => {
+  test("a running service at the pin is set up for this sign-in and reports connected", async () => {
+    const owner = await startFakeOwner({ stateDir: privateDir(), world: defaultWorld() })
+    owners.push(owner)
+    const { code, out } = await run(["bootstrap", "--json"], owner.stateDir)
+    expect(code).toBe(REMOTE_EXIT.ok)
+    expect(JSON.parse(out.join(""))).toMatchObject({ state: "connected", status: { state: "connected" } })
+    expect(owner.state.adoptions).toBe(1)
+    expect(owner.state.refresher).toEqual({ binary_path: OMO_BINARY, version: "5.1.58" })
+    expect([...owner.state.endpoints]).toEqual([AGENT_DIR])
+  })
+
+  test("signed out stops with the signed_out state and touches no service", async () => {
+    const owner = await startFakeOwner({ stateDir: privateDir(), world: defaultWorld() })
+    owners.push(owner)
+    const { code, out } = await run(["bootstrap", "--json"], owner.stateDir, { exitCode: 4, stdout: '{"signedIn":false}' })
+    expect(code).toBe(REMOTE_EXIT.unavailable)
+    expect(JSON.parse(out.join(""))).toMatchObject({ state: "signed_out" })
+    expect(owner.state.log).toEqual([])
+  })
+
+  // A Linux machine with no Secret Service (headless, WSL, containers) has no store, so nothing can prove a sign-in:
+  // the worker reports its own store_unavailable state, which the start-up component keeps quiet.
+  test("no credential store in an isolated HOME reports store_unavailable and touches no service", async () => {
+    const owner = await startFakeOwner({ stateDir: privateDir(), world: defaultWorld() })
+    owners.push(owner)
+    const home = privateDir()
+    const noSecretService = {
+      get: async () => {
+        throw new Error("Cannot autolaunch D-Bus without X11 $DISPLAY")
+      },
+      set: async () => {},
+      delete: async () => false,
+    }
+    const api = "https://api.omo.dev"
+    const store = createCredentialStore(api, { secrets: noSecretService, platform: "linux", lockProbe: async () => "unknown", home })
+    const lines: string[] = []
+    const exitCode = await runAccountVerb(
+      { api, store, home, pinDir: () => join(home, "pins"), readStdin: async () => "", output: line => lines.push(line), error: () => {} },
+      ["show"],
+    )
+    const { code, out } = await run(["bootstrap", "--json"], owner.stateDir, { exitCode, stdout: lines.join("\n") })
+    expect(code).toBe(REMOTE_EXIT.unavailable)
+    expect(JSON.parse(out.join(""))).toMatchObject({ state: "store_unavailable" })
+    expect(owner.state.log).toEqual([])
+  })
+
+  // Until the device service release key is published, this build's own install refuses before any download or write.
+  test("this build's real install fails closed into update_required with its notice, writing nothing", async () => {
+    const stateDir = join(privateDir(), "device-service")
+    const setup = deviceServiceBootstrapSetup({ stateDir, credential: async () => credential(), binaryPath: OMO_BINARY, agentDir: AGENT_DIR })
+    const { code, out } = await run(["bootstrap", "--json"], stateDir, SIGNED_IN, setup)
+    expect(code).toBe(REMOTE_EXIT.unavailable)
+    expect(JSON.parse(out.join(""))).toEqual({
+      state: "update_required",
+      notice: "This omo build cannot verify device service releases. Update OmO.",
+    })
+    expect(existsSync(join(stateDir, "bin"))).toBe(false)
   })
 })
 
