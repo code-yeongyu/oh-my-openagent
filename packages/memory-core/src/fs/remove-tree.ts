@@ -3,7 +3,8 @@ import { join } from "node:path"
 import { chmod, lstat, readdir, rm } from "./resilient"
 
 const RETRYABLE_ON_WIN32 = new Set(["EPERM", "EACCES", "EBUSY", "ENOTEMPTY"])
-const PERMISSION_CODES = new Set(["EPERM", "EACCES"])
+// darwin reports a read-only directory's undeletable children as ENOTEMPTY from the final rmdir.
+const PERMISSION_CODES = new Set(["EPERM", "EACCES", "ENOTEMPTY"])
 const WIN32_BUSY_RETRIES = 5
 
 function errorCode(error: unknown): string | undefined {
@@ -14,8 +15,8 @@ function errorCode(error: unknown): string | undefined {
  * Removes a file or directory tree, tolerating read-only content (H2). Reflection and facts runs
  * chmod their payload files to 0o400; on POSIX that never blocks an unlink, but on win32 it sets the
  * read-only attribute and `unlink` fails with EPERM, and a 0o500 directory blocks removal on every
- * platform. On a permission failure the tree is made writable (files 0o600, directories 0o700) and
- * removed once more. ENOENT is success.
+ * platform (darwin surfaces it as ENOTEMPTY). On a permission failure the tree is made writable
+ * (files 0o600, directories 0o700) and removed once more. ENOENT is success.
  */
 export async function removeTree(path: string, platform: NodeJS.Platform = process.platform): Promise<void> {
   try {
