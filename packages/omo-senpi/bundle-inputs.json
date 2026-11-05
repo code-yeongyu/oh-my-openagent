@@ -1535,6 +1535,7 @@
     "packages/omo-senpi/src/components/x-search/auth.ts",
     "packages/omo-senpi/src/components/x-search/client.ts",
     "packages/omo-senpi/src/components/x-search/format.ts",
+    "packages/omo-senpi/src/components/x-search/hand-lifetime.ts",
     "packages/omo-senpi/src/components/x-search/index.ts",
     "packages/omo-senpi/src/components/x-search/params.ts",
     "packages/omo-senpi/src/components/x-search/tool.ts",
