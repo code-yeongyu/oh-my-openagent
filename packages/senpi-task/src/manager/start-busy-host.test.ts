@@ -9,7 +9,7 @@ import { createTaskLifecycle } from "../lifecycle"
 import { hostLifecycleDeps } from "../lifecycle/__fixtures__/host-session-fakes"
 import { isRevivalCandidate } from "../lifecycle/revival-selection"
 import { FakeRunner, baseSpec, cleanupProjects, launchSettled, makeManager, settings } from "./__fixtures__/manager-fakes"
-import { resetTestDeadline } from "../../../../test-support/test-deadline"
+import { resetTestDeadline, useTestTimeout } from "../../../../test-support/test-deadline"
 
 afterEach(cleanupProjects)
 
@@ -177,6 +177,7 @@ describe("task start against a busy host (#10042)", () => {
   for (const elapsedMs of [2_500, 11_000]) {
     test(`#given a gated cold launch #when its guard clock advances ${elapsedMs}ms within the test budget #then the child completes`, async () => {
       // given - the runner gate is the launch seam; no real machine or socket timing is needed.
+      useTestTimeout(15_000)
       const held = new BusyHostRunner()
       const h = makeManager({ inProcess: held })
       const started = await bounded(h.manager.start(baseSpec({ run_in_background: true })))
@@ -219,6 +220,7 @@ describe("task start against a busy host (#10042)", () => {
   }
 
   test("#given a launch that never settles #when its fixture deadline expires #then it fails within the bound naming the task and budget", async () => {
+    useTestTimeout(15_000)
     // given
     const held = new BusyHostRunner()
     const h = makeManager({ inProcess: held })

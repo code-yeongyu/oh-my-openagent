@@ -1,3 +1,4 @@
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 import type { IdleReclaimerScheduler, IdleReclaimerTimer } from "../port"
 
 export function signal<T>() {
@@ -8,13 +9,21 @@ export function signal<T>() {
   return { promise, resolve }
 }
 
+/**
+ * Awaits a lifecycle event with a named failure. The deadline is the test's remaining budget, not a
+ * fresh stopwatch: a fixed 2 s bound fired on hosted Windows whenever the runner stalled although the
+ * event still arrived (#10814).
+ */
 export async function bounded<T>(promise: Promise<T>): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
     return await Promise.race([
       promise,
       new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error("live-parent lifecycle event did not arrive")), 2_000)
+        timer = setTimeout(
+          () => reject(new Error("live-parent lifecycle event did not arrive within the test budget")),
+          remainingTestTime(),
+        )
       }),
     ])
   } finally {
