@@ -52,7 +52,7 @@ async function withRpc(
     await listening
     await exercise(createLiveThreadSurface({} as never, { env: { SENPI_RPC_SOCKET: socketPath }, statusAll: NO_ENUMERATION, registry: NO_REGISTRY }), frames)
   } finally {
-    const closed = once(server, "close", { signal: testBudgetSignal("server to emit 'close'") })
+    const closed = once(server, "close", { signal: AbortSignal.timeout(2000) })
     for (const socket of sockets) socket.destroy()
     server.close()
     await closed

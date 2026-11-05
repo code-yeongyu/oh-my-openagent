@@ -93,7 +93,7 @@ async function stopChildren(children: ReadonlyArray<{
 }>): Promise<void> {
   const results = await Promise.allSettled(children.map(async ({ child, exit }) => {
     if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL")
-    await withTimeout(exit, remainingTestTime(), "child did not exit during cleanup")
+    await withTimeout(exit, 10_000, "child did not exit during cleanup")
   }))
   const failure = results.find((result): result is PromiseRejectedResult => result.status === "rejected")
   if (failure !== undefined) throw failure.reason

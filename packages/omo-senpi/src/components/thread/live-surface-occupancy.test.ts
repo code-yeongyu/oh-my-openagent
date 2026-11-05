@@ -55,7 +55,7 @@ async function releasedHost(exercise: (socket: string, root: string) => Promise<
   try {
     await exercise(socketPath, root)
   } finally {
-    const closed = once(server, "close", { signal: testBudgetSignal("server to emit 'close'") })
+    const closed = once(server, "close", { signal: AbortSignal.timeout(2000) })
     server.close()
     await closed
   }

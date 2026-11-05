@@ -173,7 +173,6 @@ describe("supervised child outcome authority", () => {
   }, 5_000)
 
   test("#given a supervisor that never publishes #when the parent deadline expires #then publication timeout is reported", async () => {
-    useTestTimeout(30_000)
     // given
     const runDir = await mkdtemp(join(tmpdir(), "supervisor-no-outcome-"))
     roots.push(runDir)
@@ -226,7 +225,7 @@ describe("supervised child outcome authority", () => {
       await expect(run).rejects.toThrow("memory run supervisor did not publish an outcome before its deadline")
     } finally {
       await writeFile(join(runDir, "release"), "")
-      expect(await waitForRunSentinel(join(runDir, "released.json"), Date.now() + remainingTestTime(), Date.now)).toBe("present")
+      expect(await waitForRunSentinel(join(runDir, "released.json"), Date.now() + 5_000, Date.now)).toBe("present")
     }
   }, 30_000)
 })

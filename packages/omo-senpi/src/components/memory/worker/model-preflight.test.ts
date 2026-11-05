@@ -11,6 +11,8 @@ import { identityMatches, killIfAlive, pidAlive, pidTerminalWithin, readPidFileW
 import { remainingTestTime, useTestTimeout } from "../../../../../../test-support/test-deadline"
 
 const roots: string[] = []
+/** Fail-safe wait in finally for a leaked grandchild: fixed, because the test budget may already be spent there. */
+const HELPER_FAILSAFE_BOUND_MS = 5_000
 
 
 afterEach(async () => {
@@ -316,7 +318,7 @@ control.once("error", () => process.exit(0))
       const leaked = grandchildIdentityForCleanup ?? await readPidOnce(grandchildPidPath, "grandchild.mjs")
       if (leaked !== null) {
         killIfAlive(leaked)
-        await pidTerminalWithin(leaked, remainingTestTime())
+        await pidTerminalWithin(leaked, HELPER_FAILSAFE_BOUND_MS)
       }
     }
   }, 30_000)
