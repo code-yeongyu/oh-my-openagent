@@ -990,8 +990,6 @@
       "packages/omo-senpi/plugin/scripts/build-daemon-launch-spec.mjs": ["DAEMON_LAUNCH_SPEC_FILENAME", "daemonLaunchSpecDocument", "renderDaemonLaunchSpec", "resolveDaemonLaunchSpecOutput", "buildDaemonLaunchSpec", "checkDaemonLaunchSpecCurrent"],
       // pre-existing at origin dev 4686e425b5: unused export(s) GATEWAY_STORE_WORKER_NAME, THREAD_SDK_RELATIVE_PATH
       "packages/omo-senpi/plugin/scripts/build-extension.mjs": ["GATEWAY_STORE_WORKER_NAME", "THREAD_SDK_RELATIVE_PATH"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) outputPathsIn
-      "packages/omo-senpi/plugin/scripts/build-extension.test-support.mjs": ["outputPathsIn"],
       // pre-existing at origin dev 4686e425b5: unused export(s) buildInstallCli, checkInstallCliCurrent
       "packages/omo-senpi/plugin/scripts/build-install.mjs": ["buildInstallCli", "checkInstallCliCurrent"],
       // pre-existing at origin dev 4686e425b5: unused export(s) traceBundleInputs, INSTALL_LIFECYCLES
@@ -1338,8 +1336,6 @@
       "packages/omo-senpi/src/components/thread/gateway/author.ts": ["AUTHOR_ID_MAX_LENGTH", "AUTHOR_DISPLAY_MAX_LENGTH"],
       // pre-existing at origin dev 4686e425b5: unused export(s) BINDING_SCHEMA_VERSION, BINDING_PLATFORMS, BINDING_STATUSES, COMPLETION_OUTCOMES, BINDING_MAX_TTL_SECONDS, BINDING_DEFAULT_POLICY_ID
       "packages/omo-senpi/src/components/thread/gateway/bindings.ts": ["BINDING_SCHEMA_VERSION", "BINDING_PLATFORMS", "BINDING_STATUSES", "COMPLETION_OUTCOMES", "BINDING_MAX_TTL_SECONDS", "BINDING_DEFAULT_POLICY_ID"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) reaches
-      "packages/omo-senpi/src/components/thread/gateway/causal.ts": ["reaches"],
       // pre-existing at origin dev 4686e425b5: unused export(s) completionOutcome
       "packages/omo-senpi/src/components/thread/gateway/completion.ts": ["completionOutcome"],
       // pre-existing at origin dev 4686e425b5: unused export(s) GATEWAY_SCHEMA_VERSION
@@ -2627,6 +2623,7 @@
         "test/local-api/support.ts",
         "test/local-api/support-windows.ts",
         "test/local-api/conformance/*.ts",
+        "test/registrant-support.ts",
         "test/release-fixture.ts",
         "test/strict-ed25519/native-control.ts",
       ],
@@ -2923,6 +2920,7 @@
         "scripts/qa/fused-equivalence-e2e.mjs",
         "src/components/claim-receipt/runtime.ts",
         "src/components/computer-use/runtime.ts",
+        "src/components/device-service/runtime.ts",
         "src/components/feedback/runtime.ts",
         "src/components/memory/commands/runtime.ts",
         "src/components/memory/device-session/account-runtime.ts",
@@ -4193,6 +4191,7 @@
         "extensions/omo-memory-palace.js",
         "extensions/omo-memory-sync.js",
         "extensions/omo-recall-store.js",
+        "extensions/omo-device-service.js",
         "extensions/omo-session-history.js",
         "extensions/omo-task.js",
         "extensions/omo-telemetry-otlp.js",
