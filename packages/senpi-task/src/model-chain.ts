@@ -30,7 +30,7 @@ export function recordReasoning(record: ResolvedModelRecord): string | undefined
  * model may be listed twice at different levels on purpose - run it thinking first and retry it
  * with thinking off - and collapsing those into one rung drops the retry the user configured.
  */
-export function rungKey(model: string, reasoning: string | undefined): string {
+function rungKey(model: string, reasoning: string | undefined): string {
   return reasoning === undefined ? model : `${model}:${reasoning}`
 }
 
