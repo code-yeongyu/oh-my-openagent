@@ -12,6 +12,15 @@ changes must do and prove:
 - **Stop-marker policy**: stop persistence stays XPC-only, and the daemon
   restart path is pinned for v1 consumers. This is plan row 31.
 
+Reading the references: a "plan row N" is one numbered deliverable of the
+computer-use v2 work tracked under #12229, delivered as one PR; "P3a", "P3b"
+and "P4b" are phases of that work (P3a is this document, P3b is the
+concurrent `--serve` and `attach` change above, and P4b is the later phase
+that may run the py kernel as a separate process); a "Q decision N" is a
+numbered product decision by the maintainer, restated where it is used; and
+"DESIGN §n" names a section of the internal computer-use v2 design notes,
+whose relevant content this document restates in place.
+
 Paths are relative to `crates/` unless they start with `packages/` or `docs/`.
 A bare file name (`client.rs`, `connection.rs`, `engine.rs`, `main.rs`, ...)
 means `senpi-desktop-engine/src/<name>`, and a bare `tests/...` means
@@ -103,8 +112,11 @@ the XPC-only files `peers.rs`, `native.rs`, `agent.rs`, `dictionary.rs`,
      - **Restart while the old daemon is exiting, or an orphan's idle exit:**
        today the idle exit removes the socket by path
        (`std::fs::remove_file(endpoint)`, `serve.rs:44`), which deletes a
-       live successor's socket. The exiting daemon stops accepting, then
-       removes its socket and token under the hold it took at start (it
+       live successor's socket. The exiting daemon must first close its
+       listener fd, then remove its socket and token. Stopping accepts
+       while the listener stays open is not enough: a client's `connect`
+       still completes into the backlog and is reset when the fd closes,
+       losing the request. The removal runs under the hold it took at start (it
        does not take the lock again, so the exit never blocks), and only if
        the socket's inode (device and inode from `lstat`) is still the one
        it bound. It closes the lock fd last, which releases the lock. A
@@ -166,6 +178,13 @@ the XPC-only files `peers.rs`, `native.rs`, `agent.rs`, `dictionary.rs`,
   only reconnects (`client.rs:121`, loop at `client.rs:79-85`). Without this
   change, a successor refused the instance lock while the previous daemon is
   exiting leaves nothing bound.
+
+  The client also retries a request once when its connection is reset before
+  the first reply byte arrives, which covers a `connect` that reached an
+  exiting daemon just before it closed its listener. A reset after the first
+  reply byte is an error, not a retry. A daemon that crashes mid-request also
+  resets before replying, so the retried request may already have run; that
+  is why the retry is limited to one.
 
   **Server-uid check (every platform with UDS).** After `connect` and before
   writing the first byte, the client reads the server's effective uid on the
@@ -432,7 +451,7 @@ covers an explicit `--serve` path or a loose directory.
 | A second daemon racing a cold start | daemon start (P3b) | instance lock refused before bind; no token written; the first daemon's token is untouched | T25-19 |
 | A daemon started while one is already running (explicit `--serve` or a lost auto-start) | daemon start (P3b) | instance lock refused; exits non-zero; the live socket and token are untouched; clients use the live daemon | T25-22 |
 | Two daemons recovering the same stale socket | daemon start (P3b) | only the lock holder unlinks and binds; the other exits | T25-23 |
-| A daemon exiting while its successor starts, or an orphan's idle exit | daemon exit (P3b) | the exiting daemon removes its socket and token under the hold it took at start (no re-acquire, no wait), only if the socket's inode is the one it bound, then releases the lock; a successor refused during the exit exits non-zero and the P3b client start retry (a required client change; today's client starts once) starts it after the release | T25-24 |
+| A daemon exiting while its successor starts, or an orphan's idle exit | daemon exit (P3b) | the exiting daemon closes its listener fd, then removes its socket and token under the hold it took at start (no re-acquire, no wait), only if the socket's inode is the one it bound, then releases the lock; a successor refused during the exit exits non-zero and the P3b client start retry (a required client change; today's client starts once) starts it after the release | T25-24 |
 | `spawn` inside an omo session | SDK | `ControlRequired{reason: "spawn_inside_session"}` (accident guard). The boundary is the eval permission gate, plus TCC only for a P4b out-of-process kernel without interpreter grants (M3) | SDK spawn tests |
 
 ## Residual risk
@@ -519,7 +538,7 @@ covers an explicit `--serve` path or a loose directory.
 | T25-21 | The SDK refuses `attach` with `ControlRequired{reason: "attach_inside_session"}` when `SENPI_DESKTOP_HOST=1` is set |
 | T25-22 | With a daemon already serving, a second `--serve` on the same endpoint (and an auto-start that finds it) fails its one non-blocking lock try and exits non-zero at once (no wait); the live daemon's socket inode and token bytes are unchanged, and an existing client keeps being served |
 | T25-23 | Two daemons started together over a stale socket: exactly one wins the non-blocking lock try and binds, the other exits non-zero without unlinking anything; the socket that remains is the one the lock holder bound, and its token matches that daemon |
-| T25-24 | A client that auto-starts while the previous daemon is idle-exiting: the first start is refused the lock and exits non-zero, the exiting daemon never blocks on the lock and removes only its own socket and token (inode check), and the client's start retry (the required P3b client change) brings up a daemon that serves within the start guard; the same scenario with today's start-once client fails with "daemon did not start", which pins that the change was made. Separately, a daemon whose socket was replaced by another process idle-exits without removing the replacement or its token |
+| T25-24 | A client that auto-starts while the previous daemon is idle-exiting: the first start is refused the lock and exits non-zero, the exiting daemon never blocks on the lock and removes only its own socket and token (inode check), and the client's start retry (the required P3b client change) brings up a daemon that serves within the start guard. A client whose `connect` lands while the old daemon is exiting still gets its reply: the exiting daemon closes its listener before removing the socket, and a reset before the first reply byte is retried once. The same scenario with today's start-once client fails with "daemon did not start", which pins that the change was made. Separately, a daemon whose socket was replaced by another process idle-exits without removing the replacement or its token |
 | T25-25 | The Rust client and the SDK `attach` client, connected to a socket served by another euid (injected through an in-crate `#[cfg(test)]` seam on the connected socket) or whose credential lookup fails, close before writing any byte and do not auto-start; no environment variable or flag in a non-test build reaches the seam |
 | T25-26 | After a SIGKILL, two concurrent auto-starts (two `--oneshot` clients at once) leave exactly one daemon bound, the token file matches that daemon, `--resume` works, and the losing daemon never unlinks the winner's socket |
 
