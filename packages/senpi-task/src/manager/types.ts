@@ -309,6 +309,9 @@ export type TaskManagerOptions = {
   readonly hostPid?: number
   // Test seam and diagnostics: the id this manager writes as host_manager_instance (#12349).
   readonly managerInstance?: string
+  // The #12349 guidance carry for a child another live process holds, bound once the run pause exists.
+  readonly remoteHeldSend?: () => import("./held-send").RemoteHeldSend | undefined
+  readonly remoteCancel?: () => import("../steering/types").SteeringPort["remoteCancel"] | undefined
   // Whether a recorded owner host still runs; defaults to the lifecycle's signal-0 probe.
   readonly isProcessAlive?: (pid: number) => boolean
   // The parent engine's RUNTIME-ONLY kernel-tool capability map (item 6). Shared with the runner so

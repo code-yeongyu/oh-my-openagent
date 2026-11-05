@@ -14,6 +14,13 @@ export type HeldSendPorts = {
   holdTaskInput(taskId: string, input: HeldTaskInput): Promise<EngineHoldInputResult>
   noteParticipant(record: TaskRecord, owner: RunPauseOwner, childSeq: number): void
   load(taskId: string): TaskRecord | undefined
+  // The requester half of the #12349 channel for a child another live process (or a sibling manager) holds.
+  remote?(): RemoteHeldSend | undefined
+}
+
+export type RemoteHeldSend = {
+  ownedElsewhere(record: TaskRecord): boolean
+  carry(record: TaskRecord, owner: RunPauseOwner, text: string): Promise<SendOutcome>
 }
 
 const SETTLED_RESIDENT = new Set(["completed", "error", "interrupted"])
@@ -34,8 +41,12 @@ export function createHeldSend(barrier: AdmissionBarrier, ports: HeldSendPorts) 
     const root = record.root_session_id ?? record.parent_session_id
     const state = barrier.state(root)
     // A live send never carries a Resume credential, so `resuming` holds it exactly like `closed`.
-    if (state.kind === "open" || !holdsInChild(record, ports)) return undefined
+    if (state.kind === "open") return undefined
     const runRef = record.owner === undefined ? { kind: "task" as const, id: record.task_id } : { kind: "dag" as const, id: record.owner.runId }
+    // Checked before holdsInChild, which is false for a handle-less running record; never reaches rehold.
+    const remote = ports.remote?.()
+    if (remote?.ownedElsewhere(record) === true) return remote.carry(record, { parentSessionId: root, parentPauseSeq: state.pauseSeq, runRef }, message)
+    if (!holdsInChild(record, ports)) return undefined
     return sendWhileHeld(ports, record, message, { parentSessionId: root, parentPauseSeq: state.pauseSeq, runRef })
   }
 }

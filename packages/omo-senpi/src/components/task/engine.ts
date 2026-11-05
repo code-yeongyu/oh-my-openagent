@@ -62,6 +62,8 @@ import type { ChildPausePort, ChildCreationPort } from "../../../../senpi-task/s
 import type { TaskPauseMethods } from "../../../../senpi-task/src/manager/run-pause"
 import { createEngineRunPause } from "./engine-run-pause"
 import { registerControlOwner, type ControlOwnerRegistration } from "./engine-control-owner"
+import { composeControlRequester, type ControlRequester } from "./engine-control-requester"
+import { defaultSignaller } from "../../../../senpi-task/src/lifecycle/context"
 import { nativeChildPausePort } from "../../../../senpi-task/src/pause/native-child-pause"
 
 export { admitAdapter } from "./engine-admission"
@@ -70,6 +72,7 @@ export interface TaskEngine {
   readonly runPause?: ReturnType<typeof createEngineRunPause>
   // This session's membership in the process control inbox (#12349); released before shutdown suspends handles.
   readonly controlOwner?: ControlOwnerRegistration
+  readonly controlRequester?: ControlRequester
   readonly admissionBarrier: AdmissionBarrier
   readonly manager: TaskManager & TaskPauseMethods
   // The session's package-aware inherited extension list, shared with every child-launch producer.
@@ -251,7 +254,10 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     omoConfig: deps.omoConfig,
     settings,
   })
+  let controlRequester: ControlRequester | undefined
   const manager = createTaskManager({
+    remoteHeldSend: () => controlRequester?.carry(),
+    remoteCancel: () => controlRequester?.cancel,
     onChildLiveness: (record, status) => {
       if (record.parent_session_id === runtime.sessionId()) notifyHostLiveness(deps.pi, deps.coordinator, record, status, () => runtime.parentState().kind === "streaming")
     },
@@ -293,7 +299,11 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     }),
   })
   managerRef = manager
-  const runPause = createEngineRunPause({ stateDir: baseStore.stateDir, manager, barrier: admissionBarrier, runtime })
+  controlRequester = composeControlRequester({ stateDir: baseStore.stateDir, store: storeChain.store, manager, lifecycle,
+    channel: settings.control_channel !== false, isProcessAlive: defaultSignaller.isAlive })
+  const runPause = createEngineRunPause({ stateDir: baseStore.stateDir, manager, barrier: admissionBarrier, runtime, remote: controlRequester.remote })
+  controlRequester.bind(runPause)
+  controlRequester.start(() => runtime.sessionId())
   const controlOwner = registerControlOwner({
     stateDir: baseStore.stateDir, store: storeChain.store, manager, barrier: admissionBarrier, runPause,
     sessionId: () => runtime.sessionId(), ownsRecord: record => registry.ownsRecord?.(record) === true,
@@ -316,6 +326,7 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
   return {
     runPause,
     controlOwner,
+    controlRequester,
     admissionBarrier,
     manager,
     resolveInheritedExtensions,

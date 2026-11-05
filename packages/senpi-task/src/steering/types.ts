@@ -53,6 +53,8 @@ export type SteeringPort = {
   // A cancel that must wait for the child's lost connection: until `stopSettled`, only the cancel ends
   // that run, so no failure the stop itself causes is written over it.
   stopRequested?(taskId: string): void
+  // #12349: a handle-less child another live process owns is cancelled through its owner, or refused typed.
+  remoteCancel?(record: TaskRecord, reason: string | undefined): Promise<CancelOutcome> | undefined
   stopSettled?(taskId: string): void
   // A reopened child handed back parked runs nowhere: no epoch of it keeps a lane slot.
   releaseTaskLeases?(taskId: string): void
@@ -127,6 +129,8 @@ export type CancelOutcome =
   | { readonly kind: "released"; readonly task_id: string; readonly status: TaskStatus; readonly undelivered_messages?: number }
   /** The caller named an earlier run (`expectedRunEpoch`) and the task has moved on; nothing was cancelled. */
   | { readonly kind: "stale"; readonly task_id: string; readonly status: TaskStatus; readonly run_epoch: number; readonly reason: string }
+  // The child runs in another live omo process that cannot take this cancel from here (#12349 compatibility edge).
+  | { readonly kind: "owner_cannot_apply"; readonly task_id: string; readonly owner_pid: number; readonly reason: "owner_unsupported" | "handle_gone" | "channel_disabled" }
   | { readonly kind: "not_found"; readonly reason: string }
 
 // senpi#3266: the result of re-dispatching a flagged "resumed, waiting for input" task onto a

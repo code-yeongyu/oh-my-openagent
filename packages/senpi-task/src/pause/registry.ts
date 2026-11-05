@@ -3,6 +3,8 @@ import { join } from "node:path"
 import { randomUUID } from "node:crypto"
 import { AdmissionBarrier, type AdmissionState } from "./admission-barrier"
 import type { RunRef } from "./ports"
+import type { ControlGuidance } from "../control/control-schema"
+import type { OwnerCannotApply } from "../control/requester-channel"
 
 export type PauseParticipant = {
   readonly key: string
@@ -19,7 +21,8 @@ export type PauseParticipant = {
   }
   // "owned_elsewhere": the Resume found another live host still holding the child; it stays paused
   // there, is never ended as lost, and a later Resume retries it (#12349).
-  readonly state: "pending" | "held" | "resuming" | "resumed" | "held_by_user" | "restorable" | "lost" | "owned_elsewhere"
+  // "held_remote": the live owner acknowledged this Stop through the control channel; its cutoff is the owner's (#12349).
+  readonly state: "pending" | "held" | "resuming" | "resumed" | "held_by_user" | "restorable" | "lost" | "owned_elsewhere" | "held_remote"
   readonly ackSeq?: number
   readonly observedChildSeq?: number
   readonly resumeTurnId?: string
@@ -27,6 +30,13 @@ export type PauseParticipant = {
   readonly lostReason?: string
   // The live host that held an owned_elsewhere participant at the last attempt.
   readonly ownerPid?: number
+  // Remote acknowledgement of this pause seq, kept apart from the local ackSeq/observedChildSeq cutoff.
+  readonly remoteAckSeq?: number
+  readonly remoteChildSeq?: number
+  // Why the owner cannot apply this run's request (design 3.3 compatibility edges).
+  readonly reason?: OwnerCannotApply
+  // Guidance carried to a remote owner until an ack reports each entry's outcome.
+  readonly guidance?: readonly ControlGuidance[]
   readonly at: string
 }
 

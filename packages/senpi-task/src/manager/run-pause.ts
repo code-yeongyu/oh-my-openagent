@@ -221,6 +221,13 @@ export function createTaskRunPause(ports: {
     const record = load(taskId)
     if (record.status !== "running" && record.status !== "paused") return { notHeld: true }
     let cutoff = request.childSeqCutoff
+    const saved = savedRunOwner(record)
+    // A paused child its dead owner left under THIS run is restored and resumed here (#12349 handoff);
+    // any other handle-less paused record keeps the notHeld answer.
+    if (cutoff === undefined && record.status === "paused" && ports.liveHandle(taskId) === undefined
+      && saved?.parentSessionId === request.parentSessionId && saved.runRef.kind === request.runRef.kind && saved.runRef.id === request.runRef.id) {
+      return resumePausedTask(taskId, { ...request, parentPauseSeq: saved.parentPauseSeq, childSeqCutoff: 0 })
+    }
     if (cutoff === undefined) {
       const observed = await observeTaskHold(taskId, request.parentSessionId)
       if (observed?.held !== true) return { notHeld: true }

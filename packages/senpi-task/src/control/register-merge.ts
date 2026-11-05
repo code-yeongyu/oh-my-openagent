@@ -27,11 +27,15 @@ export type RegisterMerge =
 const comparable = ({ writtenAt: _at, requester: _requester, ...rest }: ControlRegister): string => JSON.stringify(rest)
 
 // Nothing lower is written over something higher; guidance merges by inputId (highest revision)
-// within one epoch and is carried across a seq move until an ack reports its outcome.
-export function mergeRegister(prior: ControlRegister | undefined, incoming: ControlRegister): RegisterMerge {
+// within one epoch and is carried across a seq move until an ack reports its outcome: a prior entry the
+// owner's ack already answered is removed (design 3.1 "only an acked entry is removed"), so the register's
+// guidance stays the ledger-derived set and acked entries never count against the 8-entry bound.
+export function mergeRegister(prior: ControlRegister | undefined, incoming: ControlRegister,
+  acked: ReadonlySet<string> = new Set()): RegisterMerge {
   if (prior === undefined) return { kind: "merged", register: incoming, changed: true }
   const winner = compareRegisters(incoming, prior) > 0 ? incoming : prior
-  const guidance = prior.runEpoch === incoming.runEpoch ? mergeGuidance(prior.guidance, incoming.guidance) : winner.guidance ?? []
+  const carried = prior.guidance?.filter(entry => !acked.has(entry.inputId))
+  const guidance = prior.runEpoch === incoming.runEpoch ? mergeGuidance(carried, incoming.guidance) : winner.guidance ?? []
   if (guidance.length > GUIDANCE_MAX_ENTRIES) return { kind: "guidance_too_large" }
   const { guidance: _dropped, ...base } = winner
   const register: ControlRegister = { ...base, ...(guidance.length === 0 ? {} : { guidance }),

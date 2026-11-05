@@ -1614,8 +1614,6 @@
       "packages/senpi-task/src/state/start-failure.ts": ["MODEL_START_FAILURE_REASONS"],
       // pre-existing at origin dev 4686e425b5: unused export(s) formatLiveSpend, formatCostUsd, formatCacheHitPercent, toolCountSuffix
       "packages/senpi-task/src/status-line.ts": ["formatLiveSpend", "formatCostUsd", "formatCacheHitPercent", "toolCountSuffix"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) CANCEL_PENDING_REASON
-      "packages/senpi-task/src/steering/controls.ts": ["CANCEL_PENDING_REASON"],
       // pre-existing at origin dev 4686e425b5: unused export(s) DEFAULT_SEND_DELIVERY
       "packages/senpi-task/src/steering/index.ts": ["DEFAULT_SEND_DELIVERY"],
       // pre-existing at origin dev 4686e425b5: unused export(s) R0_FAILURE_KINDS, R0_MODEL_START_FAILURE_REASONS, R0_HOST_START_FAILURE_REASONS, R0_SESSION_START_FAILURE_REASONS

@@ -2,6 +2,9 @@ import { log } from "@oh-my-opencode/utils"
 import type { AdmissionParticipant, ResumeCredential } from "./admission-barrier"
 import type { ObservedHold, RunPauseOwner, RunRef } from "./ports"
 import { PauseRegistry, type PauseParticipant } from "./registry"
+import { inRemoteClass, REMOTE_DEADLINE_MS, remoteFailure, retriedAsRemote, writeRemote, type RemoteResult } from "./remote-participants"
+import { pauseRemote, resumeRemote } from "./remote-steps"
+import { holdOrLose, observe, propagate } from "./propagate"
 
 export type ResumeParticipantRequest = RunPauseOwner & {
   readonly resumeId: string
@@ -13,14 +16,17 @@ export type RunPauseEffects = {
   quiesce(parentSessionId: string, pauseSeq: number): void | Promise<void>
   settleCreations?(parentSessionId: string, pauseSeq: number): Promise<void>
   addFences(parentSessionId: string, pauseSeq: number, runs: readonly RunRef[]): Promise<void>
-  pause(participant: PauseParticipant, owner: RunPauseOwner): Promise<
-    { readonly kind: "held"; readonly childSeq: number } | { readonly kind: "settled" } | { readonly kind: "pending" }>
+  pause(participant: PauseParticipant, owner: RunPauseOwner, deadlineAt?: number): Promise<
+    { readonly kind: "held"; readonly childSeq: number } | { readonly kind: "settled" } | { readonly kind: "pending" } | RemoteResult>
   dispatchGuidance(parentSessionId: string, pauseSeq: number, resumeId: string): Promise<void>
   // `credential` is undefined only when a later Resume retries a lost participant after a restart,
   // when admission is already open and no resume transaction is live.
-  resume(participant: PauseParticipant, request: ResumeParticipantRequest, credential: ResumeCredential | undefined): Promise<
+  resume(participant: PauseParticipant, request: ResumeParticipantRequest, credential: ResumeCredential | undefined, deadlineAt?: number): Promise<
     { readonly kind: "resumed"; readonly turnId?: string } | { readonly kind: "held_by_user"; readonly childSeq: number }
-    | { readonly kind: "settled" }>
+    | { readonly kind: "settled" } | RemoteResult>
+  // The fresh record says another live process (or a sibling manager here) holds this child (#12349).
+  isRemote?(participant: PauseParticipant): boolean
+  now?(): number
   install(parentSessionId: string, pauseSeq: number, credential: ResumeCredential): Promise<void>
   acknowledgeInstalled(parentSessionId: string, pauseSeq: number, resumeId: string): Promise<void>
   cancel(participant: PauseParticipant, parentSessionId: string): Promise<void>
@@ -59,15 +65,15 @@ export class RunPauseController {
     await this.effects.addFences(parentSessionId, pauseSeq, runs)
     await quiesced
     if (this.registry.require(parentSessionId).pauseSeq !== pauseSeq) return
-    if (!await this.#propagate(parentSessionId, pauseSeq)) return
+    if (!await propagate(this.#steps(), parentSessionId, pauseSeq)) return
     await this.effects.settleCreations?.(parentSessionId, pauseSeq)
     if (this.registry.require(parentSessionId).pauseSeq !== pauseSeq) return
-    if (!await this.#propagate(parentSessionId, pauseSeq)) return
+    if (!await propagate(this.#steps(), parentSessionId, pauseSeq)) return
     // A participant that never acknowledged is out of the run's custody; it must never hold the
     // Stop open, or neither Resume nor a person's message could reopen admission.
     for (const participant of Object.values(this.registry.require(parentSessionId).participants)) {
-      if (participant.state === "held" || participant.state === "restorable" || participant.state === "lost") continue
-      await this.#holdOrLose(parentSessionId, pauseSeq, participant, "never acknowledged the pause")
+      if (participant.state === "held" || participant.state === "restorable" || participant.state === "lost" || inRemoteClass(participant)) continue
+      await holdOrLose(this.#steps(), parentSessionId, pauseSeq, participant, "never acknowledged the pause")
     }
     this.registry.phase(parentSessionId, pauseSeq, "applied")
   }
@@ -94,9 +100,16 @@ export class RunPauseController {
     const transaction = { pauseSeq, resumeId, credential }
     this.#resuming.set(parentSessionId, transaction)
     const failures: ResumeFailure[] = []
-    for (const participant of this.registry.orderedAdmissions(parentSessionId)) {
+    const ordered = this.registry.orderedAdmissions(parentSessionId).filter(participant => participant.state !== "resumed")
+    const remote = ordered.filter(participant => this.#remote(participant))
+    // Every remote participant is asked at once against ONE deadline; locals keep the sequential path.
+    const deadlineAt = this.#now() + REMOTE_DEADLINE_MS
+    const remoteOutcomes = await Promise.all(remote.map(participant => this.#resumeOne(parentSessionId, pauseSeq, resumeId, participant,
+      undefined, credential, () => this.#current(parentSessionId, transaction), deadlineAt)))
+    if (remoteOutcomes.includes("superseded")) return { kind: "superseded" }
+    for (const outcome of remoteOutcomes) if (outcome !== undefined && outcome !== "superseded") failures.push(outcome)
+    for (const participant of ordered.filter(entry => !remote.includes(entry))) {
       if (!this.#current(parentSessionId, transaction)) return { kind: "superseded" }
-      if (participant.state === "resumed") continue
       const outcome = await this.#resumeOne(parentSessionId, pauseSeq, resumeId, participant,
         requested.childSeqCutoffs[participant.key], credential, () => this.#current(parentSessionId, transaction))
       if (outcome === "superseded") return { kind: "superseded" }
@@ -124,9 +137,11 @@ export class RunPauseController {
       const latest = this.registry.load(parentSessionId)
       return latest?.pauseSeq === pauseSeq && latest.phase === "resumed" && this.registry.barrier.state(parentSessionId).kind === "open"
     }
+    // ONE deadline for the whole pass, as on the Resume path: a watcher tick never holds the chain N x the window.
+    const deadlineAt = this.#now() + REMOTE_DEADLINE_MS
     for (const participant of this.registry.orderedAdmissions(parentSessionId)) {
-      if (participant.state !== "lost" && participant.state !== "owned_elsewhere") continue
-      const outcome = await this.#resumeOne(parentSessionId, pauseSeq, resumeId, participant, undefined, credential, current)
+      if (participant.kind === "held_admission" || !retriedAsRemote(participant, this.effects.isRemote?.(participant) === true)) continue
+      const outcome = await this.#resumeOne(parentSessionId, pauseSeq, resumeId, participant, undefined, credential, current, deadlineAt)
       if (outcome === "superseded") break
       if (outcome !== undefined) failures.push(outcome)
     }
@@ -139,6 +154,12 @@ export class RunPauseController {
       && Object.values(record.participants).some(participant => participant.state === "lost")
   }
 
+  // A remote participant whose desired state is not acknowledged yet keeps the ack watcher running (design 3.2).
+  hasRemote(parentSessionId: string): boolean {
+    const record = this.registry.load(parentSessionId)
+    return record !== undefined && Object.values(record.participants).some(participant => inRemoteClass(participant))
+  }
+
   // After the bounded retries a released Resume still could not reach these participants: each run
   // ends with its reason, so no child stays paused under a Stop nobody holds any more (#12249).
   async endLost(parentSessionId: string, pauseSeq: number): Promise<readonly ResumeFailure[]> {
@@ -146,7 +167,7 @@ export class RunPauseController {
     const record = this.registry.load(parentSessionId)
     if (record === undefined || record.pauseSeq !== pauseSeq || record.phase !== "resumed" || this.effects.endLost === undefined) return failures
     for (const participant of Object.values(record.participants)) {
-      if (participant.state !== "lost") continue
+      if (participant.state !== "lost" || this.effects.isRemote?.(participant) === true) continue
       const reason = participant.lostReason ?? "never acknowledged the pause"
       try {
         if (await this.effects.endLost(participant, reason)) this.registry.drop(parentSessionId, pauseSeq, participant.key)
@@ -161,13 +182,17 @@ export class RunPauseController {
   // engine to observe yet. Never let one unavailable child prevent the parent's Resume.
   async #resumeOne(
     parentSessionId: string, pauseSeq: number, resumeId: string, participant: PauseParticipant,
-    frozenCutoff: number | undefined, credential: ResumeCredential | undefined, current: () => boolean,
+    frozenCutoff: number | undefined, credential: ResumeCredential | undefined, current: () => boolean, deadlineAt?: number,
   ): Promise<ResumeFailure | "superseded" | undefined> {
+    // Classified BEFORE the lost skip and the cutoff rule: a remote child's cutoff is its owner's (design 3.2).
+    if (participant.kind !== "held_admission" && (inRemoteClass(participant) || this.effects.isRemote?.(participant) === true)) {
+      return resumeRemote(this.#steps(), { parentSessionId, pauseSeq, resumeId, participant, credential, current, deadlineAt })
+    }
     const outsideCustody = participant.state === "lost" || participant.state === "pending"
     const acknowledged = participant.ackSeq === pauseSeq && participant.observedChildSeq !== undefined
     let cutoff = frozenCutoff ?? (acknowledged ? participant.observedChildSeq : undefined)
     if (outsideCustody && !acknowledged && participant.kind !== "held_admission") {
-      const observed = await this.#observe(parentSessionId, participant)
+      const observed = await observe(this.#steps(), parentSessionId, participant)
       if (!current()) return "superseded"
       if (observed?.held !== true) {
         const lostReason = participant.lostReason ?? "never acknowledged the pause"
@@ -199,6 +224,10 @@ export class RunPauseController {
       return current() ? { key: participant.key, reason } : "superseded"
     }
     if (!current()) return "superseded"
+    if (result.kind === "remote") {
+      writeRemote(this.registry, parentSessionId, pauseSeq, participant.key, result)
+      return remoteFailure(participant.key, result)
+    }
     if (result.kind === "settled") this.registry.drop(parentSessionId, pauseSeq, participant.key)
     else if (result.kind === "held_by_user") this.registry.update(parentSessionId, pauseSeq, participant.key, {
       state: "held_by_user", observedChildSeq: result.childSeq,
@@ -207,6 +236,28 @@ export class RunPauseController {
       state: "resumed", lostReason: undefined, ownerPid: undefined, ...(result.turnId === undefined ? {} : { resumeTurnId: result.turnId }),
     })
     return undefined
+  }
+
+  // The ack watcher's tick while the Stop is in effect: re-assert each remote participant's register,
+  // fold its ack, and hand a participant whose owner died to the local pause (design 3.2).
+  async refreshRemote(parentSessionId: string, pauseSeq: number): Promise<void> {
+    const record = this.registry.load(parentSessionId)
+    if (record === undefined || record.pauseSeq !== pauseSeq || (record.phase !== "propagating" && record.phase !== "applied")) return
+    const remote = Object.values(record.participants).filter(participant => inRemoteClass(participant))
+    const deadlineAt = this.#now()
+    await Promise.all(remote.map(participant => pauseRemote(this.#steps(), parentSessionId, pauseSeq, participant, deadlineAt)))
+  }
+
+  #remote(participant: PauseParticipant): boolean {
+    return participant.kind !== "held_admission" && (inRemoteClass(participant) || this.effects.isRemote?.(participant) === true)
+  }
+
+  #steps() {
+    return { registry: this.registry, effects: this.effects, now: () => this.#now() }
+  }
+
+  #now(): number {
+    return this.effects.now?.() ?? Date.now()
   }
 
   released(parentSessionId: string, pauseSeq: number, resumeId: string): boolean {
@@ -238,51 +289,6 @@ export class RunPauseController {
       const current = this.registry.require(parentSessionId)
       this.registry.drop(parentSessionId, current.pauseSeq, participant.key)
     }
-  }
-
-  async #propagate(parentSessionId: string, pauseSeq: number): Promise<boolean> {
-    for (const key of Object.keys(this.registry.require(parentSessionId).participants)) {
-      const record = this.registry.require(parentSessionId)
-      if (record.pauseSeq !== pauseSeq) return false
-      const participant = record.participants[key]
-      if (participant === undefined || participant.state === "held" || participant.state === "restorable" || participant.state === "lost") continue
-      if (participant.kind === "held_admission") {
-        this.registry.update(parentSessionId, pauseSeq, key, { state: "held", ackSeq: pauseSeq })
-        continue
-      }
-      let result: Awaited<ReturnType<RunPauseEffects["pause"]>> | { readonly kind: "lost"; readonly reason: string }
-      try {
-        result = await this.effects.pause(participant, { parentSessionId, parentPauseSeq: pauseSeq, runRef: participant.runRef })
-      } catch (error) {
-        result = { kind: "lost", reason: error instanceof Error ? error.message : String(error) }
-      }
-      if (this.registry.require(parentSessionId).pauseSeq !== pauseSeq) return false
-      if (result.kind === "lost") await this.#holdOrLose(parentSessionId, pauseSeq, participant, result.reason)
-      else if (result.kind === "settled") this.registry.drop(parentSessionId, pauseSeq, key)
-      else if (result.kind === "held") this.registry.update(parentSessionId, pauseSeq, key, {
-        state: "held", ackSeq: pauseSeq, observedChildSeq: result.childSeq,
-      })
-    }
-    return true
-  }
-
-  #observe(parentSessionId: string, participant: PauseParticipant): Promise<ObservedHold | undefined> {
-    return this.effects.observeHold?.(participant, parentSessionId).catch((error: unknown) => {
-      log("[senpi-task] run hold observation failed", { parentSessionId, key: participant.key, error: error instanceof Error ? error.message : String(error) })
-      return undefined
-    }) ?? Promise.resolve(undefined)
-  }
-
-  // Only a child its engine does not hold is lost: a failed pause request can land after the hold.
-  async #holdOrLose(parentSessionId: string, pauseSeq: number, participant: PauseParticipant, reason: string): Promise<void> {
-    const observed = await this.#observe(parentSessionId, participant)
-    if (this.registry.require(parentSessionId).pauseSeq !== pauseSeq) return
-    if (observed?.held === true) {
-      this.registry.update(parentSessionId, pauseSeq, participant.key, { state: "held", ackSeq: pauseSeq, observedChildSeq: observed.childSeq })
-      return
-    }
-    log("[senpi-task] run pause lost a participant", { parentSessionId, pauseSeq, key: participant.key, reason })
-    this.registry.update(parentSessionId, pauseSeq, participant.key, { state: "lost", lostReason: reason })
   }
 
   #current(parentSessionId: string, transaction: ResumeTransaction): boolean {
