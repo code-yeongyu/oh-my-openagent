@@ -18,8 +18,9 @@ pub const ABI: &str = "senpi-desktop/1";
 /// `features`. A host sends `reportMode: "object"` only to an engine that
 /// lists `action-report`. `frame-identity`: window frames are re-checked
 /// against the captured window's owning process; `frame-consume`: pointer
-/// options take `consume`.
-pub const FEATURES: &[&str] = &["action-report", "frame-identity", "frame-consume"];
+/// options take `consume`; `trace`: `trace: true` adds per-stage `timings`
+/// to action reports and a redacted JSONL trace beside the audit log.
+pub const FEATURES: &[&str] = &["action-report", "frame-identity", "frame-consume", "trace"];
 
 /// Standard JSON-RPC 2.0 error codes the engine emits.
 pub const PARSE_ERROR: i64 = -32_700;

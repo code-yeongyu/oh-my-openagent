@@ -28,6 +28,7 @@ use crate::grant::ControlSlot;
 use crate::report::{error_report, ReportExtras, Stage};
 use crate::restore::{Guard, TransactionError};
 use crate::session::guarded;
+use crate::timings::{StageClock, TimedStage};
 use crate::worker::Worker;
 
 /// Serializes input transactions across every session of the process
@@ -81,6 +82,8 @@ pub(crate) struct Mutation<'a> {
     pub(crate) keys: Option<&'a [String]>,
     /// How far the transaction got; decides the object-mode disposition.
     pub(crate) stage: Cell<Stage>,
+    /// Stage durations, reported only in `trace: true` sessions.
+    pub(crate) timings: StageClock,
 }
 
 impl Mutation<'_> {
@@ -95,6 +98,7 @@ impl Mutation<'_> {
             text_delivered: Cell::new(0),
             keys: None,
             stage: Cell::new(Stage::Admission),
+            timings: StageClock::new(),
         }
     }
 }
@@ -218,9 +222,11 @@ impl Worker {
         match (result, report) {
             (Ok(value), _) => {
                 let hit = self.report_extras.take().and_then(|extras| extras.hit);
+                let traced = self.options.as_ref().is_some_and(|options| options.trace);
                 self.report_extras.set(Some(ReportExtras {
                     route: route(mutation),
                     hit,
+                    timings: traced.then(|| mutation.timings.take()),
                 }));
                 Ok((value, event))
             }
@@ -249,7 +255,10 @@ impl Worker {
             Ok(watch) => watch,
             Err(refused) => return (Err(TransactionError::Primary(refused)), None),
         };
-        let guard = match Guard::begin(self, mutation.action, mutation.delivery) {
+        let begun = mutation
+            .timings
+            .time(TimedStage::Capture, || Guard::begin(self, mutation.action, mutation.delivery));
+        let guard = match begun {
             Ok(guard) => guard,
             Err(error) => return (Err(TransactionError::Primary(error)), None),
         };
@@ -257,12 +266,14 @@ impl Worker {
             Some(stopped) => Err(stopped),
             None => {
                 mutation.stage.set(Stage::Acting);
-                guarded(|| act(self))
+                mutation.timings.time(TimedStage::Dispatch, || guarded(|| act(self)))
             }
         };
         if result.is_ok() {
             mutation.stage.set(Stage::Acted);
-            result = self.after_action(mutation, result);
+            result = mutation
+                .timings
+                .time(TimedStage::Verify, || self.after_action(mutation, result));
         }
         if let Err(primary) = &mut result {
             // Recorded on the primary error, never in place of it.
@@ -270,7 +281,7 @@ impl Worker {
                 primary.message = format!("{}; releasing held input also failed: {release}", primary.message);
             }
         }
-        guard.restore(self, result)
+        mutation.timings.time(TimedStage::Restore, || guard.restore(self, result))
     }
 
     /// Waits for the transaction lock, giving up when a stop or a
