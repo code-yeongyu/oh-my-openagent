@@ -7,9 +7,9 @@ export type FingerprintRow = {
   checksRunning?: boolean; state?: string; url?: string; lastRemarksReadAt?: number | null;
 }
 export type FingerprintBaseline = Record<string, { statusFingerprint?: string; remarksFingerprint?: string; lastRemarksReadAt?: number | null }>
-export function parsePullRequest(value: string): PullRequestReference
-export function buildBatches(keys: string[]): FingerprintBatch[]
-export function decodeBatch(batch: FingerprintBatch, response: unknown, previous?: FingerprintBaseline, now?: number): {
+declare function parsePullRequest(value: string): PullRequestReference
+declare function buildBatches(keys: string[]): FingerprintBatch[]
+declare function decodeBatch(batch: FingerprintBatch, response: unknown, previous?: FingerprintBaseline, now?: number): {
   rateLimit: { cost?: number; remaining?: number; resetAt?: string } | null;
   errors: unknown[]; rows: FingerprintRow[];
 }

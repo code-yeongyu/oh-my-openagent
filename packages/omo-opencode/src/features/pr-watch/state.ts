@@ -58,7 +58,7 @@ function hash(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex")
 }
 
-export function normalizePrReference(reference: string): string {
+function normalizePrReference(reference: string): string {
   const match = /^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)#([1-9]\d*)$/.exec(reference)
   if (!match || !Number.isSafeInteger(Number(match[3]))) throw new Error("Expected owner/repo#number")
   return `${match[1].toLowerCase()}/${match[2].toLowerCase()}#${Number(match[3])}`
