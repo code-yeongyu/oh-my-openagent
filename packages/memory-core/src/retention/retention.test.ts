@@ -181,6 +181,23 @@ describe("runtime retention: reflection run directories", () => {
     expect(existsSync(tombstone)).toBe(false)
   })
 
+  test("#given four crash tombstones and a spent budget #when the pass runs #then tombstone removal is admitted against pass_budget_ms like any removal (REVIEW-8 L1)", async () => {
+    const paths = await identity()
+    for (const suffix of ["a1", "b2", "c3", "d4"]) {
+      const tombstone = join(runsDir(paths), `.prune-reflection-run-2-${suffix}`)
+      await mkdir(tombstone, { recursive: true })
+      await writeJson(join(tombstone, "final.json"), { runId: "reflection-run-2", outcome: "merged" })
+    }
+    await reflectionRun(paths, "reflection-run-9", { finishedAt: daysAgo(1) })
+    let clock = NOW
+
+    await runRuntimeRetention({ paths, policy: { ...DEFAULT_RUNTIME_RETENTION, passBudgetMs: 1_000 }, now: () => (clock += 600) })
+
+    const left = (await tombstones(runsDir(paths))).length
+    expect(left).toBeGreaterThan(0)
+    expect(left).toBeLessThan(4)
+  })
+
   test("#given read-only payload files in a folded run and in a crash tombstone #when the pass runs #then both are removed completely (A25)", async () => {
     const paths = await identity()
     await reflectionRun(paths, "reflection-run-5", { readOnlyPayload: true })
