@@ -1,11 +1,12 @@
 import { spawn } from "node:child_process"
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
+import { mkdirSync, readFileSync, rmSync } from "node:fs"
 import { createRequire } from "node:module"
-import { tmpdir } from "node:os"
 import { createConnection } from "node:net"
 import { dirname, join } from "node:path"
 import { describe, expect, it, onTestFinished } from "bun:test"
 
+import { MAX_SHARD_BIND_PATH } from "../../senpi-task/src/runners/rpc-host/shard-socket"
+import { shortSocketDir } from "../../senpi-task/src/runners/rpc-host/short-socket-dir.test-support"
 import { testTempDir } from "../test-support/temp-dir"
 
 // O01 package probe (senpi#4272, PLAN rows X06/T7): the senpi engine omo actually ships, launched from its
@@ -27,23 +28,10 @@ const pinnedVersion = omoSenpi.devDependencies["@code-yeongyu/senpi"]
 
 type ProtocolInfo = { readonly serverVersion: string; readonly capabilities: readonly string[] }
 
-// Mirrored from senpi's prepareSocketPath (MAX_SOCKET_PATH_BYTES): the host refuses a longer --listen path and
-// exits 1 before binding. The installed senpi package does not export the constant.
-const ENGINE_MAX_SOCKET_PATH_BYTES = 103
-const SOCKET_DIR_PREFIX = "omo-o01-sock-"
-const SOCKET_NAME = "h.sock"
-
-// The parent of the probe's socket dir. The runner's TMPDIR decides it whenever the socket still fits the engine's
-// limit there. The root suite's preload nests TMPDIR one level deeper (`<TMPDIR>/omo-test-run-XXXXXX`), so a long
-// runner TMPDIR pushed the path past the limit only in the whole-suite run (#12557); that falls back to /tmp.
-function probeSocketParent(base: string = tmpdir()): string {
-  return Buffer.byteLength(join(base, `${SOCKET_DIR_PREFIX}XXXXXX`, SOCKET_NAME)) <= ENGINE_MAX_SOCKET_PATH_BYTES ? base : "/tmp"
-}
-
 function probeSocketPath(): string {
-  const dir = mkdtempSync(join(probeSocketParent(), SOCKET_DIR_PREFIX))
+  const { dir, socket } = shortSocketDir("o01-probe", "h.sock")
   onTestFinished(() => rmSync(dir, { recursive: true, force: true }))
-  return join(dir, SOCKET_NAME)
+  return socket
 }
 
 // Readiness is the host's own signal: it prints `senpi rpc listening on unix://<path>` once the socket is bound.
@@ -137,12 +125,11 @@ describe.skipIf(process.platform === "win32")("packaged senpi engine compact del
   // #12557: the root suite's preload nests TMPDIR one level deeper than a package run, and a long runner TMPDIR
   // then put `<TMPDIR>/<probe dir>/h.sock` over the engine's limit, so the host exited 1 before binding.
   it("#given a runner TMPDIR too deep for the engine's socket limit #when the packaged host is probed #then it still binds and answers", async () => {
-    const deep = join(testTempDir("omo-o01-deep-"), "d".repeat(ENGINE_MAX_SOCKET_PATH_BYTES))
+    const deep = join(testTempDir("omo-o01-deep-"), "d".repeat(MAX_SHARD_BIND_PATH))
     mkdirSync(deep)
     const previous = process.env.TMPDIR
     process.env.TMPDIR = deep
     try {
-      expect(probeSocketParent()).toBe("/tmp")
       const info = await probePackagedHost(undefined)
 
       expect(info.serverVersion).toBe(pinnedVersion)
