@@ -73,14 +73,15 @@ you hit and ask.
 
 ```js
 const session = await omowright.connectBrowserSkill({ name: "<task>", focused: false })
+const sync = async () => (await session.cooperate("sync")).context_id                      // one context per gated action
 try {
-  await session.navigate("https://example.com/", { waitUntil: "load" })
-  const { tree, refs, css } = await omowright.bskSnapshot(session, { interactive: true })  // OmOWright tree + refs, no trace in the page
-  await session.click({ selector: css.e3 })                                                 // css[ref] is null inside shadow roots:
+  await session.navigate("https://example.com/", { waitUntil: "load" })                    // the blank tab's first navigation needs none
+  const { tree, refs, css } = await omowright.bskSnapshot(session, { interactive: true, context: await sync() })  // OmOWright tree + refs, no trace in the page
+  await session.click({ selector: css.e3 }, { context: await sync() })                      // css[ref] is null inside shadow roots:
   const vom = await session.observe({ maxTokens: 4000 })                                    //   then read the daemon's own tree ...
-  await session.click("@e7")                                                                //   ... and click its @eN ref
-  await session.fill(css.e5, "hello")
-  await session.press("Enter")
+  await session.click("@e7", { context: await sync() })                                     //   ... and click its @eN ref
+  await session.fill(css.e5, "hello", { context: await sync() })
+  await session.press("Enter", { context: await sync() })
   await session.waitForNavigation({ waitUntil: "load" })
   const shot = await session.screenshot()                                                   // { buffer, width, height, captureId }
 } finally {
@@ -95,6 +96,14 @@ try {
 4. **Borrow a user tab explicitly** (`tabList({ scope: "user" })`, `tabBorrow(id)`, `tabReturn(id)`).
    Borrowing prompts the user; never invent tab ids and never repeat a denied borrow.
 5. **Always `stop()` the session,** on success and on failure.
+6. **Sync before every gated action (BrowserSkill 0.4+).** The user can work in the task tab while you
+   do, so the extension refuses navigation (except the blank tab's first), every input, `evaluate`
+   (and so `bskSnapshot`), `tabClose`, `resize`, `emulate`, `observe({ probeHover: true })` and
+   `screenshot({ fullPage: true })` with `permission_denied` / `data.reason: "cooperation_sync_required"`
+   unless the call carries `{ context }` from the latest `session.cooperate("sync")`. A context is good
+   for one action; plain reads (`observe`, `snapshot`, `getHtml`, `screenshot()`, `console`, `network`,
+   `waitForNavigation`) need none. On that refusal call `session.cooperate("wait", { timeoutMs: 25_000 })`
+   until it reports `ready`, read the page again and replan; never replay the refused action blindly.
 
 Every method, its options, and the failure codes are in [references/commands.md](references/commands.md).
 

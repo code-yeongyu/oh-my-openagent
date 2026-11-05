@@ -57,6 +57,21 @@ neighbouring row.
 | Navigate | `session.navigate(url, { waitUntil: "load" \| "domcontentloaded" \| "networkidle" \| "commit", timeoutMs })`, `back()`, `forward()`, `reload({ hard })`, `waitForNavigation()` |
 | Window | `session.resize(width, height)`, `session.emulate({ overrides: { width, mobile } })` |
 
+## Shared control (BrowserSkill 0.4+)
+
+```js
+const { context_id } = await session.cooperate("sync")             // what the user is doing in the tab right now
+await session.click("@e3", { context: context_id })                  // one context, one action; sync again for the next
+await session.click("@e4", { context: (await session.cooperate("sync")).context_id, dependsOn: ["@e2"] })
+await session.cooperate("wait", { timeoutMs: 25_000 })               // after cooperation_sync_required: wait for `ready`, read, replan
+```
+
+Gated (need `{ context }`): navigation except the blank tab's first, every method under Acting,
+`evaluate` and so `bskSnapshot`, `tabClose`, `observe({ probeHover: true })` and
+`screenshot({ fullPage: true })`. `dependsOn` narrows the check to the observed regions the decision
+used. Option keys are checked: anything besides a method's own options and `{ context, dependsOn }`
+(for example `contextId`) throws a `TypeError` instead of silently sending no context.
+
 Traps:
 
 - `select` takes the option's **value attribute**, not its visible label.
@@ -96,7 +111,8 @@ Every refusal is a `BskRpcError` with the daemon's own `code`:
 | `no_browser_connected` | no extension attached | run the onboarding script, relay the human step, wait |
 | `not_found` | stale ref or unknown session | read again; if the session is gone, start a new one |
 | `invalid_params` | wrong option shape | fix the call, do not retry as-is |
-| `permission_denied` | `evaluate` on a tab outside the Agent Window, or a denied borrow | stop; the user said no |
+| `permission_denied` with `data.reason: "cooperation_sync_required"` | a gated action without the latest `cooperate("sync")` context | `cooperate("wait")` until `ready`, read again, replan; never replay blindly |
+| `permission_denied` (other) | `evaluate` on a tab outside the Agent Window, or a denied borrow | stop; the user said no |
 | `timeout` | the tool did not finish in its budget | read the page state before retrying once |
 | `user_aborted` | the user pressed Stop in the browser | stop the task and report |
 | `cdp_failed` | the page cannot be attached (restricted URL, DevTools open) | say which page and why |
