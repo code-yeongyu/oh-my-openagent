@@ -91,7 +91,7 @@ const DiagnosticsParams = Type.Object({
         Type.Literal("hint"),
         Type.Literal("all"),
       ],
-      { description: "Filter by severity level" },
+      { description: "Filter by severity level (default: all)" },
     ),
   ),
 })
@@ -128,7 +128,7 @@ const SymbolsParams = Type.Object({
     description: "'document' for file symbols, 'workspace' for project-wide search",
   }),
   query: Type.Optional(Type.String({ description: "Symbol name to search (required for workspace scope)" })),
-  limit: Type.Optional(Type.Number({ description: "Max results (default: 200)" })),
+  limit: Type.Optional(Type.Number({ description: "Max results (default and maximum: 200; larger values are clamped to 200)" })),
 })
 
 export const lsp_diagnostics = defineTool({
@@ -157,7 +157,7 @@ export const lsp_goto_definition = defineTool({
 export const lsp_find_references = defineTool({
   name: "lsp_find_references",
   label: "LSP Find References",
-  description: "Find ALL usages/references of a symbol across the entire workspace.",
+  description: "Find usages/references of a symbol across the workspace. Output lists at most the first 200; when there are more, the first line reports the total.",
   parameters: ReferencesParams,
   renderCall: renderFindReferencesCall,
   renderResult: renderFindReferencesResult,
