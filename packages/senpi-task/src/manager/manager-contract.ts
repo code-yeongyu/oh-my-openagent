@@ -27,6 +27,9 @@ export type TaskManager = {
   sendToTask(input: SendInput): Promise<SendOutcome>
   interruptTask(idOrName: string): Promise<InterruptOutcome>
   cancelTask(idOrName: string, reason?: string, options?: CancelOptions): Promise<CancelOutcome>
+  // The id this manager writes as host_manager_instance, and whether it holds the child's live handle (#12349).
+  readonly managerInstance?: string
+  holdsLiveHandle?(taskId: string): boolean
   // senpi#3266: one-step re-dispatch of a flagged "resumed, waiting for input" task onto a fresh
   // live session, replaying its persisted prompt under the same task identity and a new run epoch.
   // Optional: minimal manager fakes (and the DAG test doubles) never serve a redispatch.

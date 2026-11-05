@@ -222,6 +222,7 @@ export type LifecycleDeps = {
   // Pid of THIS host process. Defaults to process.pid; injectable so reconciliation tests can
   // simulate cross-process ownership deterministically.
   readonly hostPid?: number
+  readonly hostManagerInstance?: () => string | undefined
   // Remove a queued (never-launched) child from the concurrency queue when session shutdown
   // suspends it. Defaults to a no-op; the manager wires its real dequeue through here.
   readonly dequeuePending?: (taskId: string) => void

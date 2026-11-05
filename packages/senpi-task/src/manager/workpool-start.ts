@@ -1,4 +1,5 @@
 import { createTaskRecord, type TaskRecord } from "../state"
+import { withHostClaim } from "../state/host-claim"
 import { WorkpoolError, type WorkpoolSpec } from "../workpool/types"
 import { buildManagedSpec, buildRecordInput, buildSpawnSpecV1 } from "./manager-helpers"
 import type { ManagedRunner, ManagedStartSpec, ManagerStartSpec, TaskManagerOptions } from "./types"
@@ -19,6 +20,7 @@ export function prepareWorkpoolLaunch(input: {
   readonly taskId: string
   readonly taskSeq: number
   readonly hostPid: number
+  readonly hostManagerInstance?: string
 }): WorkpoolLaunch {
   const { options, workerSpec, spec, taskId } = input
   const executionMode = workerSpec.start.execution_mode
@@ -28,7 +30,7 @@ export function prepareWorkpoolLaunch(input: {
     throw new WorkpoolError("delivery_uncertain", "An existing worker launch cannot be replayed.")
   }
   const draft = prior ?? createTaskRecord(buildRecordInput({ spec, plan: workerSpec.plan, name: taskId, executionMode, taskSeq: input.taskSeq }))
-  const claimed = { ...draft, task_id: taskId, host_pid: input.hostPid, notify_on_terminal: false }
+  const claimed = { ...withHostClaim({ ...draft, task_id: taskId }, input.hostPid, input.hostManagerInstance), notify_on_terminal: false }
   const built = buildManagedSpec({
     record: claimed,
     spec,

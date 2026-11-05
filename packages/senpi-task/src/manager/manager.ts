@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import { mkdirSync } from "node:fs"
 import { join } from "node:path"
 
@@ -13,6 +13,7 @@ import { RpcProcessRunner } from "../runners/rpc-process"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
 import { createTaskRecord, isSpawnSpecV1, nextRunEpoch, parseTaskId, syncTaskIdFloor } from "../state"
 import { TaskIdSpaceExhaustedError } from "../state/id"
+import { withHostClaim } from "../state/host-claim"
 import type { AwaitingInputReason, EffectiveModelRecord, LiveRunStats, ResolvedModelRecord, TaskRecord, TaskRunStats } from "../state"
 import { reopenSelfResumedTurn, type SelfResumedTurnPorts } from "./self-resumed-turn"
 import { createSteeringEngine } from "../steering"
@@ -172,6 +173,7 @@ class TaskManagerImpl implements TaskManager {
   readonly #now: () => number
   readonly #runStats = new Map<string, RunStatsTracker>()
   readonly #hostPid: number
+  readonly #managerInstance: string
   readonly #concurrency: TaskConcurrency
   readonly #rpcRespawnRunner: RpcRespawnRunner
   readonly #names = new NameRegistry()
@@ -233,6 +235,7 @@ class TaskManagerImpl implements TaskManager {
     }
     this.#now = options.now ?? Date.now
     this.#hostPid = options.hostPid ?? process.pid
+    this.#managerInstance = options.managerInstance ?? randomUUID()
     this.#rpcRespawnRunner = options.rpcRespawnRunner ?? new RpcProcessRunner()
     this.#concurrency = options.concurrency ?? new TaskConcurrency({
       default_concurrency: options.config.default_concurrency,
@@ -242,7 +245,7 @@ class TaskManagerImpl implements TaskManager {
     })
     this.#heldAdmissions = new HeldAdmissions({
       store: options.store, barrier: options.admissionBarrier, concurrency: this.#concurrency,
-      hostPid: this.#hostPid, runners: options.runners,
+      hostPid: this.#hostPid, hostManagerInstance: this.#managerInstance, runners: options.runners,
       launch: context => {
         if (context.record.notify_on_terminal) this.#background.add(context.record.task_id)
         void this.#trackLaunch(context.record.task_id, context).catch((error: unknown) => {
@@ -306,7 +309,8 @@ class TaskManagerImpl implements TaskManager {
       ...(options.admissionBarrier === undefined ? {} : { barrier: options.admissionBarrier }),
       liveHandle: taskId => this.#live.get(taskId)?.handle,
       restore: record => restorePausedChild({
-        store: options.store, hostPid: this.#hostPid, isProcessAlive: options.isProcessAlive ?? defaultSignaller.isAlive,
+        store: options.store, hostPid: this.#hostPid, hostManagerInstance: this.#managerInstance,
+        isProcessAlive: options.isProcessAlive ?? defaultSignaller.isAlive,
         respawn: (paused, sessionPath) => this.respawn(paused, sessionPath, undefined, { paused: true }),
         reattach: (paused, handle) => this.reattach(paused, handle),
         liveHandle: taskId => this.#live.get(taskId)?.handle,
@@ -332,7 +336,7 @@ class TaskManagerImpl implements TaskManager {
       parkSlot: (taskId, epoch) => this.#runPause.park(taskId, epoch),
     })
     this.workpools = createWorkpoolEngine(options.store.stateDir, createWorkpoolAdmission({
-      options, concurrency: this.#concurrency, hostPid: this.#hostPid,
+      options, concurrency: this.#concurrency, hostPid: this.#hostPid, hostManagerInstance: this.#managerInstance,
       get: taskId => this.get(taskId), pending: taskId => this.hasPendingSends(taskId),
       cancel: taskId => this.cancelTask(taskId), waitFor: (taskId, signal) => this.waitFor(taskId, { signal }),
       nextSequence: parent => this.#taskSequence.next(parent), launch: context => this.#launch(context),
@@ -511,7 +515,7 @@ class TaskManagerImpl implements TaskManager {
         ...(owner === undefined ? {} : { owner }),
       }, this.#now())
       const taskId = spec.admission?.taskId ?? draft.task_id
-      const claimDraft: TaskRecord = { ...draft, task_id: taskId, name: requestedRegistration?.name ?? taskId, host_pid: this.#hostPid }
+      const claimDraft: TaskRecord = withHostClaim({ ...draft, task_id: taskId, name: requestedRegistration?.name ?? taskId }, this.#hostPid, this.#managerInstance)
       claimed = claimTaskRecord(this.#options.store, claimDraft, {
         nameFollowsId: requestedRegistration === undefined,
         ...(requestedRegistration === undefined
@@ -943,6 +947,8 @@ class TaskManagerImpl implements TaskManager {
     return tracker?.runStartEpoch === undefined ? undefined : { runStartEpoch: tracker.runStartEpoch, stats: tracker.snapshot(this.#now()) }
   }
 
+  get managerInstance(): string { return this.#managerInstance }
+  holdsLiveHandle(taskId: string): boolean { return this.#live.has(taskId) }
   residentTaskIds(): readonly string[] { return [...new Set([...this.#live.keys(), ...this.#cleanupOwners.keys()])] }
 
   residencyChanged(parentSessionId: string): Promise<void> { return this.#residency.changed(parentSessionId) }
@@ -1086,7 +1092,7 @@ class TaskManagerImpl implements TaskManager {
       if (fresh.status !== "running" || fresh.host_pid !== this.#hostPid) return fresh
       if (fresh.child_session_id !== undefined || fresh.host_session !== undefined || fresh.pid !== undefined) return fresh
       parked = true
-      const { host_pid: _hostPid, started_at: _startedAt, ...rest } = fresh
+      const { host_pid: _hostPid, host_manager_instance: _hostManagerInstance, started_at: _startedAt, ...rest } = fresh
       return { ...rest, residency_state: "persisted_only", updated_at: nowIso(this.#now) }
     })
     if (parked) {

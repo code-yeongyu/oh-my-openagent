@@ -219,6 +219,17 @@ export class RunPauseController {
     return true
   }
 
+  // The control inbox released this parent's Stop through the owner's own barrier (#12349): record it as
+  // released without writing the shared ledger, so a later Resume of that Stop here is a no-op.
+  noteRemoteRelease(parentSessionId: string, pauseSeq: number, resumeId: string, credential: ResumeCredential): void {
+    this.#resuming.delete(parentSessionId)
+    this.#released.set(parentSessionId, { pauseSeq, resumeId, credential })
+  }
+
+  releasedSeq(parentSessionId: string): number | undefined {
+    return this.#released.get(parentSessionId)?.pauseSeq
+  }
+
   async cancel(parentSessionId: string, runRef: RunRef): Promise<void> {
     const selected = Object.values(this.registry.require(parentSessionId).participants)
       .filter(entry => JSON.stringify(entry.runRef) === JSON.stringify(runRef))

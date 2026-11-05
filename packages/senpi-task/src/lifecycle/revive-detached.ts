@@ -20,7 +20,7 @@ export function rollbackDetachedRevival(
     if (fresh.host_pid !== context.hostPid || fresh.residency_state !== "resident" || fresh.killed === true || (!claimed && !running)) return fresh
     rolledBack = true
     const {
-      host_pid: _hostPid,
+      host_pid: _hostPid, host_manager_instance: _hostManagerInstance,
       final_response: _freshFinal,
       error_message: _freshError,
       failure_kind: _freshFailureKind,

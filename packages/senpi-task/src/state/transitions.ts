@@ -118,13 +118,13 @@ function applyTransitionFields(record: TaskRecord, transition: TaskTransition): 
     case "persist_only": {
       // In-process suspension: the owning engine is gone, so host_pid AND the last child pid are
       // both meaningless. Status, epochs, terminal fields, and run stats ride through untouched.
-      const { host_pid: _hostPid, pid: _pid, ...rest } = record
+      const { host_pid: _hostPid, host_manager_instance: _hostManagerInstance, pid: _pid, ...rest } = record
       return rest
     }
     case "detach_rpc": {
       // RPC suspension: only host ownership is gone. The last pid is RETAINED so reconcile can
       // still detect and terminate the orphaned OS process before any replacement spawns.
-      const { host_pid: _hostPid, ...rest } = record
+      const { host_pid: _hostPid, host_manager_instance: _hostManagerInstance, ...rest } = record
       return rest
     }
     case "evict":

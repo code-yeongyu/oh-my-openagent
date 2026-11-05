@@ -111,6 +111,8 @@ export class EngineRunPauseBridge {
     const before = registry.load(parentSessionId)
     if (before === undefined || before.pauseSeq !== pauseSeq) return
     if (before.phase === "resumed") return this.#retryLost(parentSessionId, pauseSeq)
+    // Another process's register already released this Stop through our own barrier (#12349).
+    if (registry.barrier.state(parentSessionId).kind === "open" && (this.controller.releasedSeq(parentSessionId) ?? 0) >= pauseSeq) return
     // Resume still runs after a failed propagation, so admission reopens; the failure is logged and
     // kept as the reason each unacknowledged participant left the run's custody.
     await this.#pause(parentSessionId, pauseSeq).catch((error: unknown) => {

@@ -132,6 +132,12 @@ export type RecordedRunPause = {
   readonly run_ref: { readonly kind: "dag" | "task" | "workpool" | "team"; readonly id: string }
 }
 
+export type ResumedRunPause = {
+  readonly resume_id: string
+  readonly parent_session_id: string
+  readonly parent_pause_seq: number
+}
+
 export type TaskRecord = TaskRecordInput & TaskStartFailureRecordFields & {
   readonly effect_seq?: number
   /** The exact id of the last identified input this task sent; reconciliation reads its receipt by it. */
@@ -150,6 +156,8 @@ export type TaskRecord = TaskRecordInput & TaskStartFailureRecordFields & {
   readonly terminal_at?: string
   readonly pid?: number
   readonly host_pid?: number
+  // The task manager inside host_pid that claimed the record; cleared with host_pid (#12349).
+  readonly host_manager_instance?: string
   readonly child_session_id?: string
   readonly spawn_spec?: TaskSpawnSpec
   /** Mirrors TaskRecordInput.effective_model; see there. */
@@ -198,6 +206,8 @@ export type TaskRecord = TaskRecordInput & TaskStartFailureRecordFields & {
   readonly recovery_deadline_at?: number
   // The run that paused this child (senpi#3811): a restarted host re-holds it under exactly this owner.
   readonly run_pause?: RecordedRunPause
+  // The run Resume that cleared run_pause: a late register naming it never re-pauses the child (#12349).
+  readonly run_pause_resumed?: ResumedRunPause
   readonly runner_kind?: RunnerKind
   readonly host_session?: HostSessionIdentity
   readonly fallback_handoff_epoch?: number

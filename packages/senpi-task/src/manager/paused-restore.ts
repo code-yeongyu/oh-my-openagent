@@ -2,6 +2,7 @@ import type { ReattachResult, RespawnResult } from "../lifecycle/port"
 import { newestSessionPath } from "../lifecycle/session-path"
 import type { RunPauseOwner } from "../pause/ports"
 import type { TaskRecord } from "../state"
+import { withHostClaim } from "../state/host-claim"
 import type { TaskRecordStore } from "../store"
 import type { ManagedChildHandle } from "./child-handle"
 
@@ -22,6 +23,7 @@ export class PausedChildOwnedElsewhereError extends Error {
 export type PausedRestorePorts = {
   readonly store: TaskRecordStore
   readonly hostPid: number
+  readonly hostManagerInstance?: string
   isProcessAlive(pid: number): boolean
   respawn(record: TaskRecord, sessionPath: string): Promise<RespawnResult>
   reattach(record: TaskRecord, handle: ManagedChildHandle): Promise<ReattachResult>
@@ -51,7 +53,7 @@ export async function restorePausedChild(ports: PausedRestorePorts, record: Task
     if (fresh.status !== "paused" || fresh.killed === true || fresh.host_pid !== owner
       || fresh.notification.run_epoch !== record.notification.run_epoch) return fresh
     claimed = true
-    return { ...fresh, host_pid: ports.hostPid, residency_state: "resident" }
+    return { ...withHostClaim(fresh, ports.hostPid, ports.hostManagerInstance), residency_state: "resident" }
   })
   const current = ports.store.load(taskId)
   if (!claimed || current === null || current === undefined) throw new Error(`paused child ${taskId} changed before its restore`)

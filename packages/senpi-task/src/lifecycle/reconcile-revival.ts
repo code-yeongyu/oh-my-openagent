@@ -157,7 +157,7 @@ function disposeSuspendedTerminalWithoutTranscript(
         || fresh.host_pid !== observed.host_pid || fresh.notification.run_epoch !== observed.notification.run_epoch) return fresh
       if (!isSuspendedResidency(fresh.residency_state) || !TERMINAL_STATUSES.has(fresh.status)) return fresh
       applied = true
-      const { host_pid: _hostPid, ...rest } = fresh
+      const { host_pid: _hostPid, host_manager_instance: _hostManagerInstance, ...rest } = fresh
       return { ...rest, residency_state: "disposed", updated_at: nowIso(context) }
     })
   } catch {

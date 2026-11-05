@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto"
 import type { TaskRecord } from "../state"
+import { withHostClaim } from "../state/host-claim"
 import { salvageCrashedIsolation } from "../isolation"
 import { type LifecycleContext, nowIso } from "./context"
 import { destroyResidentTask } from "./destroy"
@@ -61,11 +62,10 @@ export async function expireSuspendedChild(
             return fresh
           claimed = true
           return {
-            ...fresh,
+            ...withHostClaim(fresh, context.hostPid, context.hostManagerInstance()),
             killed: true,
             failure_kind: "suspended_unresumable",
             error_message: reason,
-            host_pid: context.hostPid,
             residency_claim: token,
             ...(isHostSessionRecord(fresh)
               ? {

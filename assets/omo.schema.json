@@ -1123,6 +1123,9 @@
           "default": true,
           "type": "boolean"
         },
+        "control_channel": {
+          "type": "boolean"
+        },
         "warnings": {
           "default": {
             "unavailable_categories": true
@@ -3690,6 +3693,9 @@
             "resume_children": {
               "type": "boolean"
             },
+            "control_channel": {
+              "type": "boolean"
+            },
             "warnings": {
               "type": "object",
               "properties": {
@@ -6067,6 +6073,9 @@
             "resume_children": {
               "type": "boolean"
             },
+            "control_channel": {
+              "type": "boolean"
+            },
             "warnings": {
               "type": "object",
               "properties": {
@@ -8442,6 +8451,9 @@
               "type": "boolean"
             },
             "resume_children": {
+              "type": "boolean"
+            },
+            "control_channel": {
               "type": "boolean"
             },
             "warnings": {
@@ -10827,6 +10839,9 @@
               "resume_children": {
                 "type": "boolean"
               },
+              "control_channel": {
+                "type": "boolean"
+              },
               "warnings": {
                 "type": "object",
                 "properties": {
@@ -13202,6 +13217,9 @@
                     "type": "boolean"
                   },
                   "resume_children": {
+                    "type": "boolean"
+                  },
+                  "control_channel": {
                     "type": "boolean"
                   },
                   "warnings": {
@@ -15581,6 +15599,9 @@
                   "resume_children": {
                     "type": "boolean"
                   },
+                  "control_channel": {
+                    "type": "boolean"
+                  },
                   "warnings": {
                     "type": "object",
                     "properties": {
@@ -17956,6 +17977,9 @@
                     "type": "boolean"
                   },
                   "resume_children": {
+                    "type": "boolean"
+                  },
+                  "control_channel": {
                     "type": "boolean"
                   },
                   "warnings": {
