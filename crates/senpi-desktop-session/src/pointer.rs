@@ -1,6 +1,8 @@
 //! Parsed pointer options and the per-target capture frame cache.
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::OnceLock;
 
 use senpi_desktop_core::backend::{DeliveryMode, Modifiers, MouseButton};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
@@ -41,24 +43,38 @@ struct CapturedFrame {
     geometry: FrameGeometry,
 }
 
+/// Captures recorded by this engine process, across every session and
+/// re-open: a frame id is never issued twice.
+static CAPTURES: AtomicU64 = AtomicU64::new(0);
+
+/// Tells this engine process's frame ids from another's.
+fn engine_instance() -> &'static str {
+    static INSTANCE: OnceLock<String> = OnceLock::new();
+    INSTANCE.get_or_init(|| ulid::Ulid::generate().to_string().to_ascii_lowercase())
+}
+
+/// `frame-<engine instance>-<process-wide counter>`: a stale id from before
+/// a session re-open, or from another engine, never equals a fresh one.
+fn next_frame_id() -> String {
+    let capture = CAPTURES.fetch_add(1, Ordering::Relaxed).saturating_add(1);
+    format!("frame-{}-{capture}", engine_instance())
+}
+
 /// The latest capture of every target; coordinate input maps through it.
 #[derive(Clone, Default)]
 pub(crate) struct FrameCache {
-    captures: u64,
     latest: HashMap<String, CapturedFrame>,
 }
 
 impl FrameCache {
-    /// Restores delivered frames without recycling an abandoned frame id.
-    pub(crate) fn restore(&mut self, mut delivered: Self) {
-        delivered.captures = delivered.captures.max(self.captures);
+    /// Restores delivered frames; ids are process-wide, so none is recycled.
+    pub(crate) fn restore(&mut self, delivered: Self) {
         *self = delivered;
     }
 
     /// Records a new capture of `target` and returns its frame id.
     pub(crate) fn record(&mut self, target: &Target, geometry: FrameGeometry) -> String {
-        self.captures = self.captures.saturating_add(1);
-        let id = format!("frame-{}", self.captures);
+        let id = next_frame_id();
         let frame = CapturedFrame {
             id: id.clone(),
             geometry,

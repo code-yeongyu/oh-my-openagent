@@ -49,6 +49,8 @@ export {
 	type AuditEvent,
 	type DesktopCapabilities,
 	type EngineLog,
+	type EpochChanged,
+	type EpochReason,
 	type LogLevel,
 	type StopPathKind,
 	type StopPathStatus,

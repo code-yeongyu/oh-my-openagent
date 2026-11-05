@@ -1,5 +1,5 @@
 {
-  "description": "engine.hello reports protocol version 1 and ABI senpi-desktop/1 and echoes number and string ids verbatim; engine version and build sha vary per build.",
+  "description": "engine.hello reports protocol version 1, ABI senpi-desktop/1 and the opt-in features it supports (P1a: action-report), and echoes number and string ids verbatim; engine version and build sha vary per build.",
   "scenario": "crates/senpi-desktop-backend-fake/fixtures/two-displays-one-window.json",
   "env": {},
   "steps": [
@@ -19,7 +19,10 @@
               "protocolVersion": "1",
               "engineVersion": "0.0.0",
               "buildSha": "unknown",
-              "abi": "senpi-desktop/1"
+              "abi": "senpi-desktop/1",
+              "features": [
+                "action-report"
+              ]
             }
           },
           "variable": [
@@ -45,7 +48,10 @@
               "protocolVersion": "1",
               "engineVersion": "0.0.0",
               "buildSha": "unknown",
-              "abi": "senpi-desktop/1"
+              "abi": "senpi-desktop/1",
+              "features": [
+                "action-report"
+              ]
             }
           },
           "variable": [
