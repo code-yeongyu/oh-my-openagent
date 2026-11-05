@@ -5,7 +5,7 @@
  },
  "platform": "darwin-arm64",
  "runtimes": {
-  "harness": "node@24.14.1",
+  "harness": "node@24.22.0",
   "child": "bun@1.4.4 @code-yeongyu/senpi@2026.11.3-3 (pinned)"
  },
  "hashes": {
