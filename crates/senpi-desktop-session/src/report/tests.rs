@@ -246,3 +246,33 @@ fn an_object_mode_ax_type_text_keeps_its_method_and_adds_a_report() {
     let report = result.report.expect("object mode adds the report");
     assert_eq!(report.disposition, Disposition::DELIVERED_UNVERIFIED);
 }
+
+#[test]
+fn a_refusal_raised_after_units_were_sent_keeps_the_delivered_count() {
+    // Given typing that sent 2 of 3 scalars before the backend refused the rest
+    let partly = Progress::Counted { count: 2, of: 3 };
+    for code in [
+        ErrorCode::BackgroundUnavailable,
+        ErrorCode::WindowNotFound,
+        ErrorCode::PermissionDenied,
+        ErrorCode::ScreenLocked,
+    ] {
+        // When it settles
+        let shape = settled(Some(code), Stage::Acting, partly);
+        // Then it reports the partial delivery, not "nothing delivered"
+        assert_eq!(
+            shape.disposition(),
+            Disposition::DELIVERED_UNVERIFIED,
+            "{code:?}"
+        );
+        let delivered = shape.delivered().map(|d| (d.count, d.of));
+        assert_eq!(delivered, Some((2, 3)), "{code:?}");
+    }
+    // A refusal before the first unit is still not_delivered.
+    let none = settled(
+        Some(ErrorCode::BackgroundUnavailable),
+        Stage::Acting,
+        Progress::Counted { count: 0, of: 3 },
+    );
+    assert_eq!(none.disposition(), Disposition::NOT_DELIVERED_SAFE);
+}
