@@ -804,6 +804,7 @@
     "packages/omo-senpi/src/components/comment-checker/index.ts",
     "packages/omo-senpi/src/components/comment-checker/resolver.ts",
     "packages/omo-senpi/src/components/comment-checker/runner.ts",
+    "packages/omo-senpi/src/components/comment-checker/scope.ts",
     "packages/omo-senpi/src/components/comment-checker/utils.ts",
     "packages/omo-senpi/src/components/computer-use/control-confirm.ts",
     "packages/omo-senpi/src/components/computer-use/engine-probe.ts",

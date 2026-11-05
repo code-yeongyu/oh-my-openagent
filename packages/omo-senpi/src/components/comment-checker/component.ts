@@ -8,6 +8,7 @@ import { reportCommentCheckerFailure } from "./failure-notice"
 import { parseToolResultContext, parseToolResultEvent, toApplyPatchHookInputs, toHookInput } from "./hook-input"
 import { resolveSenpiCommentCheckerBinary } from "./resolver"
 import { defaultRunCommentChecker } from "./runner"
+import { createCheckerSessions } from "./scope"
 import type { BinaryResolutionState, CommentCheckerComponentOptions } from "./types"
 import { getString, normalizeFeedbackText } from "./utils"
 
@@ -19,13 +20,18 @@ export function createCommentCheckerComponent(options: CommentCheckerComponentOp
   let ensuring: Promise<string | null> | undefined
   let inertForSession = false
   let missingBinaryNoticeLogged = false
-  const reportedFilesThisTurn = new Set<string>()
+  const sessions = createCheckerSessions()
 
   return {
     name: "comment-checker",
     register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
-      pi.on("turn_start", () => {
-        reportedFilesThisTurn.clear()
+      pi.on("turn_start", (_payload, eventContext) => {
+        sessions.of(eventContext).reportedFilesThisTurn.clear()
+        return undefined
+      })
+
+      pi.on("session_shutdown", (_payload, eventContext) => {
+        sessions.end(eventContext)
         return undefined
       })
 
@@ -35,13 +41,15 @@ export function createCommentCheckerComponent(options: CommentCheckerComponentOp
           return undefined
         }
 
+        const session = sessions.of(eventContext)
+        if (session.checkerFailed) return undefined
         const toolContext = parseToolResultContext(eventContext)
         const rawPath = getString(event.input.path)
         const patchInputs = event.toolName === "apply_patch" ? toApplyPatchHookInputs(event, toolContext) : []
         if (rawPath === undefined && patchInputs.length === 0) return undefined
         const absolutePath = rawPath === undefined ? undefined : (isAbsolute(rawPath) ? rawPath : resolve(toolContext.cwd, rawPath))
         const paths = patchInputs.length > 0 ? patchInputs.map((input) => input.tool_input.file_path).filter((path): path is string => typeof path === "string") : absolutePath ? [absolutePath] : []
-        const uniquePaths = paths.filter((path, index) => paths.indexOf(path) === index).filter((path) => !reportedFilesThisTurn.has(path))
+        const uniquePaths = paths.filter((path, index) => paths.indexOf(path) === index).filter((path) => !session.reportedFilesThisTurn.has(path))
         if (uniquePaths.length === 0) return undefined
 
         ensuring ??= ensureBinaryPath(resolveBinary, downloadBinary, {
@@ -78,14 +86,14 @@ export function createCommentCheckerComponent(options: CommentCheckerComponentOp
           if (typeof path !== "string" || !uniquePaths.includes(path)) continue
           const result = await check({ binaryPath: resolvedBinaryPath, hookInput })
           if (result.failure !== undefined) {
-            // A checker that cannot start fails the same way on every edit; stop re-running it (#8850).
-            inertForSession = true
+            // A checker that cannot start fails the same way on every edit; stop re-running it for this session (#8850).
+            session.checkerFailed = true
             reportCommentCheckerFailure(ctx.logger, eventContext, resolvedBinaryPath, result.failure)
             break
           }
           const message = normalizeFeedbackText(result.message)
           if (result.hasComments && message.length > 0) {
-            reportedFilesThisTurn.add(path)
+            session.reportedFilesThisTurn.add(path)
             feedback.push(`${COMMENT_CHECKER_FEEDBACK_HEADER} ${path}:\n${message}`)
           }
         }
