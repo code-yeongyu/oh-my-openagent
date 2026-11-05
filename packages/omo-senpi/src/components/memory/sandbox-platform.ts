@@ -1,5 +1,8 @@
 import { existsSync, lstatSync, mkdirSync, realpathSync } from "@oh-my-opencode/memory-core/fs"
+import { homedir } from "node:os"
 import { dirname, join } from "node:path"
+
+import { attestUsernsRoots, inheritedTrustPaths, USERNS_ROOTS_ENV } from "../../../../omo-native/trust-userns"
 
 import type { ReflectionSpawnArgs } from "./worker/spawn"
 
@@ -142,8 +145,19 @@ export function buildPathSandboxTransform<T extends SandboxableSpawnArgs>(
     // names that exact directory instead of dying or widening to an existing ancestor. Only here,
     // when bwrap will actually bind it: an off or unavailable sandbox must not create the path.
     for (const writableDir of writableDirs) createPlannedDirNoFollow(writableDir, input.surface)
+    // The child's own TMPDIR is the sandbox's private tmpfs; the parent's would be read-only inside.
+    // The engine trust stage inside the user namespace sees root as the overflow uid, so it trusts
+    // only the root-owned ancestors attested here by inode (senpi#5334).
     return {
       ...spawnArgs,
+      env: {
+        ...spawnArgs.env,
+        TMPDIR: "/tmp",
+        [USERNS_ROOTS_ENV]: attestUsernsRoots([
+          join(spawnArgs.env.HOME ?? homedir(), ".omo", "engine-trust"),
+          ...inheritedTrustPaths(spawnArgs.env.SENPI_ENGINE_TRUST),
+        ]),
+      },
       command: executable,
       args: [
         "--ro-bind", "/", "/",
@@ -154,6 +168,23 @@ export function buildPathSandboxTransform<T extends SandboxableSpawnArgs>(
         "--", innerCommand, ...spawnArgs.args,
       ],
     }
+  }
+
+  // A deferred probe decides per spawn, so the degradation state describes the latest spawn.
+  let spawnWarning = linuxProbeWarning
+  const applyUsability = (spawnArgs: T, usability: SandboxUsability): T => {
+    if (usability.usable) {
+      spawnWarning = undefined
+      return buildTransform(spawnArgs)
+    }
+    const reason = `bwrap cannot create a sandbox: ${usability.reason}`
+    if (input.policy === "required") {
+      const error = new SandboxUnavailableError(platform, reason)
+      if (input.errorRethrow !== undefined) input.errorRethrow(error)
+      throw error
+    }
+    spawnWarning = `${input.surface} sandbox unavailable on ${platform}: ${reason}; running unsandboxed because policy is auto`
+    return spawnArgs
   }
 
   const linuxTransform = (spawnArgs: T): T | Promise<T> => {
@@ -169,44 +200,18 @@ export function buildPathSandboxTransform<T extends SandboxableSpawnArgs>(
     if (deferAsyncProbe) {
       const probeResult = (input.probe ?? defaultProbe)(executable)
       if (probeResult instanceof Promise) {
-        return probeResult.then((usability) => {
-          if (!usability.usable) {
-            const reason = `bwrap cannot create a sandbox: ${usability.reason}`
-            if (input.policy === "required") {
-              const error = new SandboxUnavailableError(platform, reason)
-              if (input.errorRethrow !== undefined) input.errorRethrow(error)
-              throw error
-            }
-            // Policy is auto - return unsandboxed
-            return spawnArgs
-          }
-          // Sandbox is usable - apply the bwrap transform
-          return buildTransform(spawnArgs)
-        })
-      } else {
-        // Should not happen - we already checked this at build time
-        // But handle it gracefully
-        if (!probeResult.usable) {
-          const reason = `bwrap cannot create a sandbox: ${probeResult.reason}`
-          if (input.policy === "required") {
-            const error = new SandboxUnavailableError(platform, reason)
-            if (input.errorRethrow !== undefined) input.errorRethrow(error)
-            throw error
-          }
-          return spawnArgs
-        }
-        return buildTransform(spawnArgs)
+        return probeResult.then((usability) => applyUsability(spawnArgs, usability))
       }
+      return applyUsability(spawnArgs, probeResult)
     }
     // Synchronous probe already checked and usable
     return buildTransform(spawnArgs)
   }
 
-  const props: { wasSandboxed: boolean; warning?: string } = { wasSandboxed: linuxProbeWarning === undefined }
-  if (linuxProbeWarning !== undefined) {
-    props.warning = linuxProbeWarning
-  }
-  return Object.assign(linuxTransform, props) as GenericSandboxTransform<T>
+  return Object.defineProperties(linuxTransform, {
+    wasSandboxed: { enumerable: true, get: () => spawnWarning === undefined },
+    warning: { enumerable: true, get: () => spawnWarning },
+  }) as GenericSandboxTransform<T>
 }
 
 function buildDarwinProfile(input: {
