@@ -102,7 +102,7 @@ test("logout waits for journal persistence acknowledgment before dispatching ref
       dispatched++
       return original(input, init)
     }, { preconnect: original.preconnect }))
-  const logout = createSession({ api, store, home: await temporaryHome() }).logout()
+  const logout = createSession({ beforeKeysDiscarded: async () => undefined, api, store, home: await temporaryHome() }).logout()
   onTestFinished(async () => { permit.resolve(); await logout; fetcher.mockRestore() })
   await Promise.race([entered.promise, logout.then(() => { throw new Error("logout skipped its journal") })])
   expect(dispatched).toBe(0)

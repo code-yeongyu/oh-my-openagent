@@ -7,7 +7,10 @@ import { loginDevice } from "./device-flow"
 import { createCredentialStore, INTERACTIVE_READ_WAIT } from "./keystore"
 import { BrowserUnavailable, loginLoopback } from "./loopback"
 import { type ChooseDevice, type ListedDevice, RequestFailure, serviceOrigin, SignInError } from "./protocol"
+import { resolveMemoryRoot, syncPinDir } from "@oh-my-opencode/memory-core/sync-device-retire"
+
 import { createSession, type Session } from "./session"
+import { retireSyncPinOnDiscard } from "./sync-pin-retire"
 import { terminalText } from "./terminal-text"
 
 // Probe the service before anything user-visible (a browser tab, a device code) so an
@@ -62,7 +65,10 @@ async function run(action: "login" | "logout" | "whoami", options: Options): Pro
   try {
     const api = serviceOrigin(options.api ?? process.env.OMO_SERVICE_API_URL ?? "https://api.omo.dev")
     const store = createCredentialStore(api, { wait: INTERACTIVE_READ_WAIT })
-    const session = createSession({ api, store, signal: controller.signal })
+    const session = createSession({
+      api, store, signal: controller.signal,
+      beforeKeysDiscarded: retireSyncPinOnDiscard({ pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())), log: (line) => console.error(line) }),
+    })
     if (action === "logout") {
       const revoked = await session.logout()
       console.log("Signed out of OmO. Stored credentials and device keys were removed.")
