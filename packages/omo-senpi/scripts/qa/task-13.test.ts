@@ -121,7 +121,7 @@ function runNode(args: string[], env: Record<string, string | undefined> = {}) {
 		cwd: repoRoot,
 		env: { ...process.env, ...env },
 		encoding: "utf8",
-		timeout: remainingTestTime(),
+		timeout: Math.floor(remainingTestTime()),
 	});
 }
 

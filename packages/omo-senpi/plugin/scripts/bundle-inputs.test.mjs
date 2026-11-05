@@ -182,7 +182,7 @@ describe("under an install lifecycle", () => {
           cwd: repoRoot,
           env: { ...process.env, npm_lifecycle_event: lifecycle, TMPDIR: tmp, TMP: tmp, TEMP: tmp },
           encoding: "utf8",
-          timeout: remainingTestTime(),
+          timeout: Math.floor(remainingTestTime()),
         })
         expect(result.status).not.toBe(0)
         expect(result.status).not.toBeNull()

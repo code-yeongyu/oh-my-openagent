@@ -94,7 +94,7 @@ async function runInSandbox(mode: "prepare" | "adopt" | "unattested", options: {
   const separator = sandboxed.args.indexOf("--")
   const args = [...sandboxed.args.slice(0, separator), ...(options.extraMounts?.(setup.root) ?? []), ...sandboxed.args.slice(separator)]
   const child = Bun.spawn([sandboxed.command, ...args], {
-    cwd: setup.worktree, env: sandboxed.env, stdout: "pipe", stderr: "pipe", timeout: remainingTestTime(),
+    cwd: setup.worktree, env: sandboxed.env, stdout: "pipe", stderr: "pipe", timeout: Math.floor(remainingTestTime()),
   })
   const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
   return { code, stderr, outcome: JSON.parse(stdout) as Outcome }

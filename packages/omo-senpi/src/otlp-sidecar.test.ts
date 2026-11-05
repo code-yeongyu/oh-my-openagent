@@ -61,7 +61,7 @@ console.log(JSON.stringify({ resolved, captured, diagnostics, error }))
       const child = Bun.spawn([process.execPath, "--eval", probe], {
         cwd: packageRoot,
         env: { PATH: process.env.PATH, HOME: home, TMPDIR: process.env.TMPDIR, OMO_TELEMETRY_INGEST_KEY: "" },
-        stdout: "pipe", stderr: "pipe", timeout: remainingTestTime(),
+        stdout: "pipe", stderr: "pipe", timeout: Math.floor(remainingTestTime()),
       })
       ;[exitCode, stdout, stderr] = await Promise.all([
         child.exited, new Response(child.stdout).text(), new Response(child.stderr).text(),
