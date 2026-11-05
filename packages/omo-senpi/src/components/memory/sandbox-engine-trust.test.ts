@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
 import { prepareTrustDirectory, writeTrustGeneration } from "../../../../omo-native/trust-generation"
-import { USERNS_ROOTS_ENV } from "../../../../omo-native/trust-userns"
+import { readUsernsView, USERNS_ROOTS_ENV } from "../../../../omo-native/trust-userns"
 import { buildSandboxTransform } from "./sandbox"
 import { probeBwrapUsability } from "./sandbox-bwrap-probe"
 import { rmSyncEfaultTolerant } from "./teardown.test-support"
@@ -185,7 +185,17 @@ test("#given a stale inherited attestation #when the Linux transform wraps the c
   expect(result.env.TMPDIR).toBe("/tmp")
   const attested = result.env[USERNS_ROOTS_ENV]
   expect(attested).not.toBe("stale")
-  if (attested !== undefined) expect((JSON.parse(attested) as [string, string][]).map(([path]) => path)).toContain("/")
+  // On an initial-namespace Linux host "/" is always attested (the launcher
+  // walks to the root), so a transform that drops the variable must fail here
+  // instead of passing through the undefined guard (#12120, #12119). Inside a
+  // user namespace the launcher writes nothing and undefined stays acceptable.
+  const paths = attested === undefined ? undefined : (JSON.parse(attested) as [string, string][]).map(([path]) => path)
+  const inInitialNamespace = process.platform === "linux" && !readUsernsView(process.env).namespaced
+  if (inInitialNamespace) {
+    expect(paths).toContain("/")
+  } else if (paths !== undefined) {
+    expect(paths).toContain("/")
+  }
 })
 
 test("#given the macOS sandbox #when it wraps the child #then it never writes the Linux attestation", async () => {
