@@ -27,6 +27,29 @@ export interface ResolveContributedSkillOptions {
   readonly env: Record<string, string | undefined>
 }
 
+export type BundledSkillProvenance =
+  | { readonly shadowed: false }
+  | { readonly shadowed: true; readonly ownerPath: string | undefined }
+
+/**
+ * Which file the session's skills listing resolves for `name`, compared with the bundled copy at
+ * `builtinPath`. senpi appends extension skill paths after the user, project, settings and package
+ * skills it has already loaded and keeps the first skill of each name, so a same-name user or
+ * project skill wins and the built-in drops out of the listing (#12544 review). No entry reads as
+ * unshadowed: the host may predate `getCommands`, discovery may not have run yet, or
+ * `disabled_skills` may hide the skill, and in all three the name form is the fail-open default.
+ */
+export function resolveBundledSkillProvenance(
+  pi: SenpiExtensionAPI,
+  name: string,
+  builtinPath: string,
+): BundledSkillProvenance {
+  const loaded = pi.getCommands?.().find((entry) => entry.source === "skill" && entry.name === `skill:${name}`)
+  const ownerPath = loaded?.sourceInfo?.path
+  if (ownerPath === undefined || canonicalPath(ownerPath) === canonicalPath(builtinPath)) return { shadowed: false }
+  return { shadowed: true, ownerPath }
+}
+
 /**
  * One `resources_discover` pass for a skill an omo component contributes on its own (computer-use,
  * x-search), as opposed to the bundled skills directory.
@@ -39,13 +62,9 @@ export interface ResolveContributedSkillOptions {
  */
 export function resolveContributedSkill(options: ResolveContributedSkillOptions): ContributedSkill {
   if (readDisabledSkills(options.cwd, options.env).has(options.name)) return { kind: "disabled" }
-  const command = `skill:${options.name}`
-  const loaded = options.pi.getCommands?.().find((entry) => entry.source === "skill" && entry.name === command)
   const path = options.path()
-  if (loaded === undefined) return { kind: "contributed", path }
-  const ownerPath = loaded.sourceInfo?.path
-  if (ownerPath !== undefined && canonicalPath(ownerPath) === canonicalPath(path)) return { kind: "contributed", path }
-  return { kind: "yielded", ownerPath }
+  const provenance = resolveBundledSkillProvenance(options.pi, options.name, path)
+  return provenance.shadowed ? { kind: "yielded", ownerPath: provenance.ownerPath } : { kind: "contributed", path }
 }
 
 export function readDiscoverCwd(payload: unknown): string | undefined {

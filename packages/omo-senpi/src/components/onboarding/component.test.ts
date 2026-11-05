@@ -265,6 +265,51 @@ describe("onboarding entry", () => {
     })
   }
 
+  describe("onboarding skill provenance (#12544 review)", () => {
+    test("#given a user skill named onboarding wins the listing #when prompting #then the context falls back to the built-in path", async () => {
+      const dir = freshDir()
+      const h = createOnboardingHarness(dir, "shadowed", "rpc")
+      h.pi.getCommands = () => [{
+        name: "skill:onboarding",
+        source: "skill",
+        sourceInfo: { path: join(dir, "user-skills", "onboarding", "SKILL.md") },
+      }]
+      await h.start()
+      const results = await h.prompt()
+      const content = String((results[0] as { message: { content: unknown } }).message.content)
+      expect(content).toContain(`Follow ${join(getBuiltinSkillsRoot(), "onboarding", "SKILL.md")}.`)
+      expect(content).not.toContain("built-in `onboarding` skill")
+    })
+
+    test("#given the listing resolves onboarding to the built-in file #when prompting #then the context names the skill, not its path", async () => {
+      const dir = freshDir()
+      const h = createOnboardingHarness(dir, "listed", "rpc")
+      h.pi.getCommands = () => [{
+        name: "skill:onboarding",
+        source: "skill",
+        sourceInfo: { path: join(getBuiltinSkillsRoot(), "onboarding", "SKILL.md") },
+      }]
+      await h.start()
+      const results = await h.prompt()
+      const content = String((results[0] as { message: { content: unknown } }).message.content)
+      expect(content).toContain("built-in `onboarding` skill")
+      expect(content).not.toContain("/onboarding/SKILL.md")
+    })
+
+    test("#given onboarding is hidden from the listing (disabled_skills) #when prompting #then the context still names the built-in skill", async () => {
+      const dir = freshDir()
+      const h = createOnboardingHarness(dir, "hidden", "rpc")
+      h.pi.getCommands = () => []
+      await h.start()
+      const results = await h.prompt()
+      const content = String((results[0] as { message: { content: unknown } }).message.content)
+      // #12544 review: `disabled_skills` hides the skill from the `/skill:` surface, but the
+      // first-run tour is gated separately by `omo-senpi-onboarding-disabled`, so the name form stands.
+      expect(content).toContain("built-in `onboarding` skill")
+      expect(content).not.toContain("/onboarding/SKILL.md")
+    })
+  })
+
   test("#given two installs at different paths #when each prompts #then the onboarding context is byte-identical (#12150)", async () => {
     const variable = "OMO_BUNDLED_SKILLS_DIR"
     const previous = process.env[variable]
