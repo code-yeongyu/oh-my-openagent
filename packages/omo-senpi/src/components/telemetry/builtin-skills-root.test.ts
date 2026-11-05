@@ -88,7 +88,10 @@ describe("getBuiltinSkillsRoot follows the bundled-skills resolver (#11626)", ()
       await onboarding.start()
       const tour = messageContents(await onboarding.prompt())
       expect(tour).toHaveLength(1)
-      expect(tour[0]).toContain(`${expected}/onboarding/SKILL.md`)
+      // #12150: the onboarding context names the skill by its stable name and carries no
+      // install path, so it is identical whatever directory the loader resolved.
+      expect(tour[0]).toContain("built-in `onboarding` skill")
+      expect(tour[0]).not.toContain(expected)
 
       const repo = makeCoverageRepo()
       const advisor = createHarness(repo, "Run now")

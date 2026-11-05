@@ -1,7 +1,7 @@
 import type { ExtensionContext, SessionStartEvent } from "@code-yeongyu/senpi"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
-import { getBuiltinSkillsRoot, getOmoNativeStateDir } from "../telemetry/product-identity"
+import { getOmoNativeStateDir } from "../telemetry/product-identity"
 import { readAgentEndOutcome } from "../ulw-execute-continuation/agent-end-eligibility"
 import { loadOnboardingScanRuntime } from "./scan-component"
 import type { OnboardingScanEnvironment } from "./scan-runtime"
@@ -114,7 +114,10 @@ export function createOnboardingComponent(
     name: "onboarding",
     register(pi: SenpiExtensionAPI, componentContext: ComponentContext): void {
       const stateDir = dependencies.stateDir ?? getOmoNativeStateDir(process.env)
-      const tour = `Follow ${getBuiltinSkillsRoot(process.env, componentContext.logger)}/onboarding/SKILL.md.`
+      // #12150: the tour names the skill, never its install path, so the context is identical
+      // for identical builds whatever the install location. The skills listing resolves
+      // the built-in `onboarding` skill by name.
+      const tour = "Follow the built-in `onboarding` skill."
       const scanEnvironment = dependencies.scanEnvironment ?? (() => ({}))
       // The first onboarding turn awaits only `omo setup`'s sources (sessions: false): its rows, value
       // summary and migration inventory. Session digests are read by a second scan that starts only
