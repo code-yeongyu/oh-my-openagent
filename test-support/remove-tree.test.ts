@@ -60,39 +60,36 @@ describe("removeTree", () => {
 })
 
 describe("removeTreeSync", () => {
-  test("#given a vanishing child #when recursively removing #then the fixture parent is gone", () => {
-    const root = mkdtempSync(join(tmpdir(), "omo-root-sweep-"))
-    mkdirSync(join(root, "omo-test-run-a.removing"))
-    try {
-      removeTreeSync(root, { maxRetries: 2, retryDelay: 0 })
-      expect(lstatSync(root, { throwIfNoEntry: false })).toBeUndefined()
-    } finally {
-      rmSync(root, { recursive: true, force: true })
-    }
-  })
-
-  for (const stays of [false, true]) {
-    test(`#given a remover silently leaves a path (permanent: ${stays}) #when removing #then it retries or throws at the bound`, () => {
-      const root = mkdtempSync(join(tmpdir(), "omo-remove-tree-"))
-      let calls = 0
-      const remove = () => {
-        calls++
-        if (!stays && calls === 2) rmSync(root, { recursive: true, force: true })
-      }
-      try {
-        const run = () => removeTreeSync(root, { maxRetries: 2, retryDelay: 0 }, remove)
-        if (stays) {
-          expect(run).toThrow(expect.objectContaining({ code: "ENOTEMPTY", path: root }))
-          expect(calls).toBe(3)
-        } else {
-          run()
-          expect(calls).toBe(2)
-          expect(lstatSync(root, { throwIfNoEntry: false })).toBeUndefined()
+  // The remover returns normally while the path is still there: Bun's forced recursive rm does exactly that when a
+  // concurrent remover deletes a child mid-walk (#11806). Both helpers must report it, never pass it as removed.
+  const helpers = {
+    sync: (root: string, remove: () => void) => Promise.resolve().then(() => removeTreeSync(root, { maxRetries: 2, retryDelay: 0 }, remove)),
+    async: (root: string, remove: () => void) => removeTree(root, { maxRetries: 2, retryDelay: 0 }, async () => remove()),
+  }
+  for (const [helper, run] of Object.entries(helpers)) {
+    for (const stays of [false, true]) {
+      test(`#given a remover silently leaves a path (${helper}, permanent: ${stays}) #when removing #then it retries or throws at the bound`, async () => {
+        const root = mkdtempSync(join(tmpdir(), "omo-remove-tree-"))
+        mkdirSync(join(root, "omo-test-run-a.removing"))
+        let calls = 0
+        const remove = () => {
+          calls++
+          if (!stays && calls === 2) rmSync(root, { recursive: true, force: true })
         }
-      } finally {
-        rmSync(root, { recursive: true, force: true })
-      }
-    })
+        try {
+          if (stays) {
+            await expect(run(root, remove)).rejects.toMatchObject({ code: "ENOTEMPTY", path: root })
+            expect(calls).toBe(3)
+          } else {
+            await run(root, remove)
+            expect(calls).toBe(2)
+            expect(lstatSync(root, { throwIfNoEntry: false })).toBeUndefined()
+          }
+        } finally {
+          rmSync(root, { recursive: true, force: true })
+        }
+      })
+    }
   }
 
   test("#given a transient EBUSY once #when removing #then it retries and succeeds", () => {
