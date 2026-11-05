@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test"
 import { fileURLToPath } from "node:url"
+import { remainingTestTime } from "../../../../../test-support/test-deadline";
 
 // Use a fresh module registry: the test preload and neighboring host tests already load workpool.
 // The mock records module evaluation, not registration, so an eager import cannot hide behind
@@ -23,7 +24,7 @@ test("#given a session with no member identity #when its shared extension loads 
     let errorCode = null;
     try { await register({}); } catch (error) { errorCode = error.code; }
     console.log(JSON.stringify({ evaluations, errorCode }));
-  `], { cwd: import.meta.dir, stdout: "pipe", stderr: "pipe", timeout: 10000 })
+  `], { cwd: import.meta.dir, stdout: "pipe", stderr: "pipe", timeout: remainingTestTime() })
   const [exitCode, stdout, stderr] = await Promise.all([
     child.exited, new Response(child.stdout).text(), new Response(child.stderr).text(),
   ])

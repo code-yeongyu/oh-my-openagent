@@ -1,5 +1,5 @@
 // allow: SIZE_OK - one end-to-end fixture proves the assembled manager, scheduler, task manager, wait surface, SDK, and durable store agree across all happy-path graph shapes.
-import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import * as fs from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -21,13 +21,16 @@ import {
 } from "./scheduler"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagNodeId, DagRunEvent, DagRunId } from "./types"
-import { remainingTestTime } from "../../../../test-support/test-deadline"
+import { remainingTestTime, useTestTimeout } from "../../../../test-support/test-deadline"
 
 // bunfig preloads test-setup.ts to raise the default timeout, but Bun honours a preload's
 // setDefaultTimeout only for the FIRST test file of a run; every later file silently reverts to
 // the built-in 5000ms. Windows job 96304719047 in run 32328567654 measured the diamond case at
 // 5759ms against that 5000ms floor. Set the floor here, where Bun does honour it.
-setDefaultTimeout(process.platform === "win32" ? 60_000 : 20_000)
+const FILE_TEST_TIMEOUT_MS = process.platform === "win32" ? 60_000 : 20_000
+setDefaultTimeout(FILE_TEST_TIMEOUT_MS)
+// Budget waits read the declared timeout, not the suite default (#10814).
+beforeEach(() => useTestTimeout(FILE_TEST_TIMEOUT_MS))
 
 const cleanupRoots: string[] = []
 const parentSessionId = "session-e2e-parent"
@@ -386,9 +389,9 @@ function runFiles(store: DagFileStore): readonly string[] {
   return fs.readdirSync(store.paths.runs).filter((entry) => entry.endsWith(".json")).sort()
 }
 
-function within<T>(promise: Promise<T>, ms = remainingTestTime()): Promise<T> {
+function within<T>(promise: Promise<T>, what: string, ms = remainingTestTime()): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error(`timed out after ${ms}ms`)), ms)
+    const timeout = setTimeout(() => reject(new Error(`waited out the test budget (${ms} ms) for ${what}`)), ms)
     void promise.then(
       (value) => {
         clearTimeout(timeout)
@@ -616,7 +619,7 @@ describe("DAG happy-path end to end", () => {
 
     // when
     const started = await sdk.start(input)
-    const waited = await within(sdk.wait(started.run_id))
+    const waited = await within(sdk.wait(started.run_id), "sdk.wait(started.run_id)")
 
     // then
     expect(waited.details.result.status).toBe("failed")

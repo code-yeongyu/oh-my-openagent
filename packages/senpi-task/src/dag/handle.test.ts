@@ -95,9 +95,9 @@ function counts(nodes: readonly DagNode[]): DagNodeCounts {
   return paused === 0 ? tally : { ...tally, paused }
 }
 
-function within<T>(promise: Promise<T>, ms = remainingTestTime()): Promise<T> {
+function within<T>(promise: Promise<T>, what: string, ms = remainingTestTime()): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error(`timed out after ${ms}ms`)), ms)
+    const timeout = setTimeout(() => reject(new Error(`waited out the test budget (${ms} ms) for ${what}`)), ms)
     void promise.then(
       (value) => {
         clearTimeout(timeout)
@@ -279,7 +279,7 @@ describe("createDagWaitSurface wait terminal projection", () => {
     })
 
     // when
-    const result = await within(surface.wait(runId, parentSessionId))
+    const result = await within(surface.wait(runId, parentSessionId), "surface.wait(runId, parentSessionId)")
 
     // then
     expect(result.status).toBe("completed")
