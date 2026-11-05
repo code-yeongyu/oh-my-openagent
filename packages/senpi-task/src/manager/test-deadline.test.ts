@@ -1,5 +1,11 @@
-import { afterAll, expect, test } from "bun:test"
-import { DEFAULT_TEST_TIMEOUT_MS, remainingTestTime, resetTestDeadline } from "../../../../test-support/test-deadline"
+import { afterAll, expect, spyOn, test } from "bun:test"
+import {
+  awaitWithinTestBudget,
+  DEFAULT_TEST_TIMEOUT_MS,
+  remainingTestTime,
+  resetTestDeadline,
+  testBudgetSignal,
+} from "../../../../test-support/test-deadline"
 
 const originalNow = performance.now
 let now = 0
@@ -18,4 +24,97 @@ test("#given an earlier test #when its clock exhausts the launch budget #then no
 test("#given the next test #when its preload resets the stopwatch #then it has its own launch budget", () => {
   expect(remainingTestTime()).toBe(DEFAULT_TEST_TIMEOUT_MS * 0.9)
   expect(remainingTestTime(15_000)).toBe(13_500)
+})
+
+// One fake clock for both wait primitives: a timer or timeout signal is due at `now + delay`, and `elapse`
+// fires everything that came due, the way a stalled runner delivers its overdue timers at once.
+function fakeTimers() {
+  const pending: { readonly due: number; readonly fire: () => void }[] = []
+  const armed: number[] = []
+  spyOn(globalThis, "setTimeout").mockImplementation(((fire: () => void, delay?: number) => {
+    armed.push(delay ?? 0)
+    pending.push({ due: now + (delay ?? 0), fire })
+    return pending.length as unknown as ReturnType<typeof setTimeout>
+  }) as unknown as typeof setTimeout)
+  spyOn(globalThis, "clearTimeout").mockImplementation(() => undefined)
+  spyOn(AbortSignal, "timeout").mockImplementation((delay: number) => {
+    const controller = new AbortController()
+    armed.push(delay)
+    pending.push({ due: now + delay, fire: () => controller.abort(new DOMException("The operation timed out.", "TimeoutError")) })
+    return controller.signal
+  })
+  return {
+    armed,
+    elapse(ms: number): void {
+      now += ms
+      for (const timer of pending.splice(0)) if (timer.due <= now) timer.fire()
+    },
+  }
+}
+
+function deferred<T>() {
+  let resolve: (value: T) => void = () => undefined
+  const promise = new Promise<T>((done) => {
+    resolve = done
+  })
+  return { promise, resolve }
+}
+
+const settle = <T,>(waited: Promise<T>) =>
+  waited.then(
+    (value) => ({ status: "resolved" as const, value }),
+    (error: unknown) => ({ status: "rejected" as const, name: error instanceof Error || error instanceof DOMException ? error.name : typeof error }),
+  )
+
+const waitPrimitives = [
+  { primitive: "awaitWithinTestBudget", wait: <T,>(event: Promise<T>) => awaitWithinTestBudget(event, "the awaited event"), failure: "Error" },
+  {
+    primitive: "testBudgetSignal",
+    wait: <T,>(event: Promise<T>) => {
+      const signal = testBudgetSignal()
+      return new Promise<T>((resolve, reject) => {
+        signal.addEventListener("abort", () => reject(signal.reason), { once: true })
+        void event.then(resolve)
+      })
+    },
+    failure: "TimeoutError",
+  },
+] as const
+
+test.each(waitPrimitives)("#given part of the test budget spent #when $primitive arms its deadline #then it gets exactly the remaining budget", ({ wait }) => {
+  // given
+  const timers = fakeTimers()
+  now += 5_000
+
+  // when
+  void wait(new Promise<never>(() => undefined)).catch(() => undefined)
+
+  // then
+  expect(timers.armed).toEqual([DEFAULT_TEST_TIMEOUT_MS * 0.9 - 5_000])
+})
+
+test.each(waitPrimitives)("#given a stalled runner #when the awaited event arrives after the stall #then $primitive resolves with it", async ({ wait }) => {
+  // given
+  const timers = fakeTimers()
+  const event = deferred<string>()
+  const waited = settle(wait(event.promise))
+
+  // when
+  timers.elapse(4_000)
+  event.resolve("arrived")
+
+  // then
+  expect(await waited).toEqual({ status: "resolved", value: "arrived" })
+})
+
+test.each(waitPrimitives)("#given an event that never comes #when the remaining budget runs out #then $primitive fails on its own before the test times out", async ({ wait, failure }) => {
+  // given
+  const timers = fakeTimers()
+  const waited = settle(wait(new Promise<never>(() => undefined)))
+
+  // when
+  timers.elapse(DEFAULT_TEST_TIMEOUT_MS * 0.9)
+
+  // then
+  expect(await waited).toEqual({ status: "rejected", name: failure })
 })
