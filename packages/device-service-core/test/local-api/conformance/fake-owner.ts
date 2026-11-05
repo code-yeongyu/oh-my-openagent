@@ -14,6 +14,7 @@ import { LocalApiError } from "../../../src/local-api/errors.ts";
 import { encodeLine, LineDecoder, parseLine } from "../../../src/local-api/framing.ts";
 import {
   CAPABILITIES,
+  type Capability,
   type ClientInfo,
   type ErrorCode,
   type JsonObject,
@@ -40,6 +41,8 @@ export type FakeOwnerOptions = {
   readonly world: World;
   readonly secure?: SecureFile;
   readonly now?: () => number;
+  /** The welcome's capabilities; every required one by default. A narrower list stands in for an older service. */
+  readonly capabilities?: readonly Capability[];
 };
 
 const noopSecure: SecureFile = async () => {};
@@ -86,6 +89,7 @@ export const startFakeOwner = async (options: FakeOwnerOptions): Promise<FakeOwn
     endpoints: new Set(),
     reports: [],
     refresher: null,
+    attach: { attached: true, changedAt: "" },
     now: options.now ?? Date.now,
     mint: mintId,
     stop: async () => {},
@@ -125,7 +129,7 @@ export const startFakeOwner = async (options: FakeOwnerOptions): Promise<FakeOwn
           owner: "service",
           server_proof: serverProof(token, hello.hello.client_nonce, transport.endpoint),
           server_nonce: serverNonce,
-          capabilities: [...CAPABILITIES],
+          capabilities: options.capabilities ?? [...CAPABILITIES],
           state: state.status,
         });
         phase = "proof";

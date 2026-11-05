@@ -36,7 +36,7 @@ import { buildSenpiArgs, shouldPrintCompiledBanner, trustLaunchKind } from "./co
 import { runLoroSmoke } from "./loro-smoke"
 import { runAccountCommand } from "./account-cli"
 import { registerHelperCandidates } from "../omo-opencode/src/cli/service-auth/keychain-helper/darwin-backend"
-import { runRemoteAttachCommand, runRemoteCommand } from "./remote-cli"
+import { runRemoteAttachCommand, runRemoteCommand } from "./remote-entry"
 import { runSyncCommand } from "./sync-cli"
 import { spawnSync } from "node:child_process"
 import { compiledRollbackMigration } from "./compiled-rollback"
