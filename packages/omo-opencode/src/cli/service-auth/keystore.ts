@@ -21,8 +21,11 @@ export type SealedStore<T> = {
   readonly read: () => Promise<T | null>
   /** A read started now that never joins a coalesced read begun earlier; credential transactions use it under the lock. */
   readonly readAuthoritative: () => Promise<T | null>
-  /** `intent` matters only to the keychain helper: row 8b retires an unreadable item only on a fresh sign-in. */
-  readonly write: (value: T, intent?: WriteIntent) => Promise<void>
+  /**
+   * `intent` matters only to the keychain helper: row 8b retires an unreadable item only on a fresh sign-in, and runs
+   * `beforeRetire` first so the caller can report that discard.
+   */
+  readonly write: (value: T, intent?: WriteIntent, beforeRetire?: () => Promise<void>) => Promise<void>
   readonly clear: () => Promise<void>
   /** Before the session lock: settles any approval, so no access dialog is ever open while the lock is held. */
   readonly prepare?: () => Promise<void>
@@ -147,7 +150,7 @@ export function createCredentialStore(
       const view = await held()
       return view === null ? store.readAuthoritative() : view.read()
     },
-    write: (value, intent) => locked(view => view.write(value, intent), () => store.write(value)),
+    write: (value, intent, beforeRetire) => locked(view => view.write(value, intent, beforeRetire), () => store.write(value)),
     clear: () => locked(view => view.clear(), store.clear),
     ...(store.prepare === undefined ? {} : { prepare: store.prepare }),
     underLock,

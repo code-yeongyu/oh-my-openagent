@@ -132,7 +132,8 @@ export function createSession(options: {
           stored = null
         }
         if (stored !== null && stored.device.id !== value.device.id) await beforeKeysDiscarded(discardedOf(stored, "replaced"))
-        await store.write(value, "fresh-sign-in")
+        // An item nobody here can read reads as missing above; row 8b moving it aside is still a discard, reported first.
+        await store.write(value, "fresh-sign-in", () => beforeKeysDiscarded({ kind: "unreadable" }))
         await clearSignedOutMarker(markerPath)
       })
     },

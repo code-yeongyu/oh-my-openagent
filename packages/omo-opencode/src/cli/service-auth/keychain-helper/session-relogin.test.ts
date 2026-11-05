@@ -3,6 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { CredentialStoreError } from "../keystore"
+import type { DiscardedCredential } from "../session"
 import { A, credentials, fakeKeychain, helperSession } from "./fake-keychain.test-support"
 
 const stored = JSON.stringify(credentials)
@@ -18,11 +19,19 @@ describe("re-login over an item nobody here can read (#11262 addendum row 8b)", 
     expect(keychain.stats.approves).toBe(0)
   })
 
-  test("#given that state #when the user signs in again #then the old item moves to .old and the new one is the helper's, and later reads need no dialog", async () => {
+  test("#given that state #when the user signs in again #then the discard is reported, the old item moves to .old and the new one is the helper's, and later reads need no dialog", async () => {
     const keychain = fakeKeychain()
     keychain.put(A, stored, "runtime", "other")
-    const { store, session } = await helperSession(keychain)
+    // #12303's contract: every discard of stored keys is reported first, this unreadable one included.
+    const beforeKeysDiscarded = Object.assign(
+      async (discarded: DiscardedCredential) => {
+        keychain.events.push(`discarded ${discarded.kind}`)
+      },
+      { wantsAccount: async () => false },
+    )
+    const { store, session } = await helperSession(keychain, false, { beforeKeysDiscarded })
     await session.save(fresh)
+    expect(keychain.events.filter(event => event === "discarded unreadable" || event.startsWith("retire"))).toEqual(["discarded unreadable", "retire <A>"])
     expect(keychain.items.get(A)).toMatchObject({ owner: "helper", marker: true })
     expect(JSON.parse(keychain.items.get(A)?.value ?? "null")).toEqual({ ...fresh, credentialGeneration: expect.any(String) })
     expect(keychain.items.get(`${A}.old`)?.owner).toBe("runtime")

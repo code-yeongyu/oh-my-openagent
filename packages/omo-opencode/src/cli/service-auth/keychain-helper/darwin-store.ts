@@ -18,7 +18,8 @@ export type LockedDarwinStore = {
   readonly recover: () => Promise<void>
   readonly read: () => Promise<string | null>
   readonly settle: () => Promise<void>
-  readonly write: (value: string, intent: WriteIntent) => Promise<void>
+  /** `beforeRetire` runs once, just before row 8b moves an unreadable item aside (the session reports that discard). */
+  readonly write: (value: string, intent: WriteIntent, beforeRetire?: () => Promise<void>) => Promise<void>
   readonly clear: () => Promise<void>
 }
 
@@ -61,7 +62,7 @@ export function lockedDarwinStore(deps: DarwinStoreDeps, lease: HelperLease): Lo
       if (outcome.kind === "skipped" && outcome.reason === "old-slots-full") deps.notice(`omo: ${OLD_SLOTS_FULL_MESSAGE}`)
       if (outcome.kind === "failed") deps.notice(`omo: the macOS keychain item could not be moved to OmO's keychain helper (${outcome.step}); it keeps working as before.`)
     },
-    async write(value, intent) {
+    async write(value, intent, beforeRetire) {
       const state = await deps.access.call({ verb: "read", account: deps.account })
       if (state.error !== undefined) throw failed(state, "check")
       if (state.owned === false) {
@@ -80,6 +81,7 @@ export function lockedDarwinStore(deps: DarwinStoreDeps, lease: HelperLease): Lo
         }
         // A completed, user-initiated sign-in over an item nobody here can read (row 8b, ruled 2026-10-28): move the old
         // item aside by rename (no approval needed, m10) so the fresh sign-in gets an item this machine can read.
+        await beforeRetire?.()
         const retired = await helper({ verb: "retire", account: deps.account })
         if (retired.reason === "old-slots-full" || (retired.ok === true && retired.skipped === true)) throw new HelperOldSlotsFull(OLD_SLOTS_FULL_MESSAGE)
         if (retired.ok !== true) throw failed(retired, "replace")

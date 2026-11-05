@@ -17,7 +17,7 @@ import { gatedSecrets } from "./secrets-gate"
 /** The session-lock view of a store (#11262 design 3.3, 3.4, 3.6): every keychain change inside one locked section. */
 export type LockedStore<T> = {
   readonly read: () => Promise<T | null>
-  readonly write: (value: T, intent?: WriteIntent) => Promise<void>
+  readonly write: (value: T, intent?: WriteIntent, beforeRetire?: () => Promise<void>) => Promise<void>
   readonly clear: () => Promise<void>
   readonly recover: () => Promise<void>
   readonly settle: () => Promise<void>
@@ -174,10 +174,10 @@ export function lockedStoreView<T>(
         const text = await locked.read()
         return text === null ? null : codec.parse(text)
       }),
-    write: (value, intent = "update") =>
+    write: (value, intent = "update", beforeRetire) =>
       run(async () => {
         const next = codec.amend === undefined ? value : codec.amend(await locked.read(), value)
-        await locked.write(codec.serialize(next), intent)
+        await locked.write(codec.serialize(next), intent, beforeRetire)
       }),
     clear: () => run(() => locked.clear()),
     recover: () => run(() => locked.recover()),

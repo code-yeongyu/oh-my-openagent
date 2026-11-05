@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { onTestFinished } from "bun:test"
 import { createCredentialStore, credentialId, INTERACTIVE_READ_WAIT, SESSION_READ_WAIT, type SecretApi } from "../keystore"
 import type { Credentials } from "../protocol"
-import { createSession } from "../session"
+import { type BeforeKeysDiscarded, createSession } from "../session"
 import { grant, privateKeys } from "../test-support"
 import type { HelperAccess } from "./access"
 import { createApprovalCache } from "./approval-cache"
@@ -123,7 +123,14 @@ export function fakeKeychain(options: { readonly approve?: "allow" | "deny" | "l
   return { items, events, stats, secrets, secretsAs, access, put, cache }
 }
 
-export type SessionProcess = { readonly identity?: Owner; readonly noDialog?: boolean; readonly handOff?: () => Promise<boolean>; readonly home?: string; readonly api?: string }
+export type SessionProcess = {
+  readonly identity?: Owner
+  readonly noDialog?: boolean
+  readonly handOff?: () => Promise<boolean>
+  readonly home?: string
+  readonly api?: string
+  readonly beforeKeysDiscarded?: BeforeKeysDiscarded
+}
 
 /** One omo process on the fake machine; a process other than the default has its own approval cache, as a real one does. */
 export async function helperSession(keychain: ReturnType<typeof fakeKeychain>, background = false, proc: SessionProcess = {}) {
@@ -147,5 +154,5 @@ export async function helperSession(keychain: ReturnType<typeof fakeKeychain>, b
       ...(proc.handOff === undefined ? {} : { handOff: proc.handOff }),
     },
   })
-  return { store, session: createSession({ beforeKeysDiscarded: async () => undefined, api, store, home }), home }
+  return { store, session: createSession({ beforeKeysDiscarded: proc.beforeKeysDiscarded ?? (async () => undefined), api, store, home }), home }
 }
