@@ -830,6 +830,129 @@ describe("runtime retention: a no-op visit takes no lock and writes nothing (R3,
   })
 })
 
+describe("runtime retention: a state.json behind its transcript (REVIEW-6 M1)", () => {
+  const FOUR_ROWS = [
+    { kind: "user" as const, messageId: "u1", text: "first" },
+    { kind: "assistant" as const, messageId: "a1", textBlocks: ["first answer"] },
+    { kind: "user" as const, messageId: "u2", text: "second" },
+    { kind: "assistant" as const, messageId: "a2", textBlocks: ["second answer"] },
+  ]
+
+  /** Appends u2/a2 to the transcript while the platform refuses the state rename, then ages the journal. */
+  async function appendBehindState(dir: string, idleSince: number): Promise<void> {
+    const refusing = new TranscriptJournal({
+      journalDir: dir,
+      now: () => new Date(idleSince),
+      renameFile: async () => { throw Object.assign(new Error("rename refused"), { code: "EPERM" }) },
+    })
+    await expect(refusing.reconcile(FOUR_ROWS)).rejects.toThrow("rename refused")
+    await ageTree(dir, idleSince)
+  }
+
+  test("#given a fully-reflected journal whose transcript gained rows after its last state write #when the default pass runs #then the transcript is kept as state-behind-transcript", async () => {
+    const paths = await identity()
+    const sibling = await journal(paths, "s-full", "fully", daysAgo(8))
+    const dir = await journal(paths, "s-stale", "fully", daysAgo(8))
+    await appendBehindState(dir, daysAgo(8))
+
+    const report = await runRuntimeRetention({ paths, policy: DEFAULT_RUNTIME_RETENTION, now })
+
+    expect(report.journals.removed).toEqual(["s-full"])
+    expect(report.journals.kept["s-stale"]).toBe("state-behind-transcript")
+    expect(await readFile(join(dir, "transcript.jsonl"), "utf8")).toContain("second answer")
+    expect(existsSync(join(sibling, "transcript.jsonl"))).toBe(false)
+  })
+
+  test("#given a partly-reflected journal whose transcript gained rows after its last state write #when the pass runs with the switch on #then it is kept as state-behind-transcript", async () => {
+    const paths = await identity()
+    const dir = await journal(paths, "s-stale", "partly", daysAgo(15))
+    // A third step lands past the partly-reflected state while the state rename is refused.
+    const refusing = new TranscriptJournal({
+      journalDir: dir,
+      renameFile: async () => { throw Object.assign(new Error("rename refused"), { code: "EPERM" }) },
+    })
+    await expect(refusing.reconcile([...FOUR_ROWS, { kind: "assistant", messageId: "a5", textBlocks: ["third answer"] }])).rejects.toThrow("rename refused")
+    await ageTree(dir, daysAgo(15))
+
+    const report = await retention(paths)
+
+    expect(report.journals.kept["s-stale"]).toBe("state-behind-transcript")
+    expect(await readFile(join(dir, "transcript.jsonl"), "utf8")).toContain("third answer")
+  })
+
+  test("#given rows land behind the state between the lock-free selection and the claim #when the pass re-checks under the lock #then the transcript is kept as state-behind-transcript", async () => {
+    const paths = await identity()
+    const dir = await journal(paths, "s-race", "fully", daysAgo(8))
+
+    const report = await runRuntimeRetention({
+      paths, policy: DEFAULT_RUNTIME_RETENTION, now,
+      beforeJournalClaim: async (sessionId) => {
+        if (sessionId === "s-race") await appendBehindState(dir, daysAgo(8))
+      },
+    })
+
+    expect(report.journals.kept["s-race"]).toBe("state-behind-transcript")
+    expect(await readFile(join(dir, "transcript.jsonl"), "utf8")).toContain("second answer")
+  })
+})
+
+describe("runtime retention: classify loops and the health gate are bounded (REVIEW-6 L)", () => {
+  test("#given more unfolded runs than the budget covers #when the pass classifies them #then it stops inside the runs store, persists that cursor and the next pass finishes", async () => {
+    const paths = await identity()
+    for (let index = 1; index <= 10; index += 1) await reflectionRun(paths, `reflection-run-${index}`, { outcome: "failed", finishedAt: daysAgo(60) })
+    let clock = NOW
+
+    const first = await runRuntimeRetention({ paths, policy: { ...DEFAULT_RUNTIME_RETENTION, passBudgetMs: 1_000 }, now: () => (clock += 400) })
+
+    expect(first.cursor).toEqual({ store: "runs" })
+    expect(Object.keys(first.runs.kept).length).toBeLessThan(10)
+    expect(JSON.parse(await readFile(join(paths.runtime, "retention.json"), "utf8"))).toEqual({ version: 1, cursor: { store: "runs" } })
+
+    const second = await runRuntimeRetention({ paths, policy: DEFAULT_RUNTIME_RETENTION, now })
+
+    expect(Object.keys(second.runs.kept)).toHaveLength(10)
+    expect(second.cursor).toBeUndefined()
+    expect(existsSync(join(paths.runtime, "retention.json"))).toBe(false)
+  })
+
+  test("#given more unreadable completion records than the budget covers #when the pass classifies them #then it stops inside the completions store and persists that cursor", async () => {
+    const paths = await identity()
+    for (let index = 1; index <= 10; index += 1) await writeJson(join(completionsDir(paths), `reflection-run-${index}.json`), {})
+    let clock = NOW
+
+    const report = await runRuntimeRetention({ paths, policy: { ...DEFAULT_RUNTIME_RETENTION, passBudgetMs: 1_000 }, now: () => (clock += 400) })
+
+    expect(report.cursor).toEqual({ store: "completions" })
+    expect(Object.keys(report.completions.kept).length).toBeLessThan(10)
+  })
+
+  test("#given an abort while the runs are classified #when the pass notices it #then the pass rejects with the cursor at the runs store", async () => {
+    const paths = await identity()
+    for (let index = 1; index <= 10; index += 1) await reflectionRun(paths, `reflection-run-${index}`, { outcome: "failed", finishedAt: daysAgo(60) })
+    const controller = new AbortController()
+    let calls = 0
+
+    await expect(runRuntimeRetention({
+      paths, policy: DEFAULT_RUNTIME_RETENTION, signal: controller.signal,
+      now: () => { calls += 1; if (calls === 3) controller.abort(); return NOW },
+    })).rejects.toThrow()
+
+    const persisted = JSON.parse(await readFile(join(paths.runtime, "retention.json"), "utf8")) as { cursor: { store: string } }
+    expect(persisted.cursor).toEqual({ store: "runs" })
+  })
+
+  test("#given discard_unreflected_journals is off #when the pass runs on a parked identity #then the health gate is not read", async () => {
+    const paths = await identity()
+    await writeJson(join(paths.reflection, "park.json"), { parkedAt: iso(daysAgo(1)) })
+
+    const off = await runRuntimeRetention({ paths, policy: DEFAULT_RUNTIME_RETENTION, now })
+    const on = await retention(paths)
+
+    expect(off.unreflectedGate).toBeUndefined()
+    expect(on.unreflectedGate).toEqual({ open: false, newest: { kind: "parked", at: iso(daysAgo(1)) } })
+  })
+})
+
 describe("one journal that cannot be read (REVIEW-5 L1)", () => {
   test("#given a journal whose state.json cannot be read #when the pass runs #then that journal is kept as state-unreadable and the rest of the pass still runs", async () => {
     const paths = await identity()
