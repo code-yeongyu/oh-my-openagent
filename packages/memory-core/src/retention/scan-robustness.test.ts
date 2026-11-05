@@ -1,13 +1,16 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
-import { mkdir, writeFile } from "node:fs/promises"
+import { existsSync } from "node:fs"
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import type { MemoryIdentityPaths } from "../identity/layout"
+import { withLocalJournalLock, type JournalLock } from "../journal/lock"
 import { readReflectionRetentionGuard } from "./guard"
 import { measureRuntimeCapEvictableBytes, runRuntimeSizeCap, type RuntimeCapCursor, type RuntimeSizeCapOptions } from "./cap"
 import { countRuntimePastRetention, measureUnreflectedJournalBytes } from "./past-retention"
+import { runRuntimeRetention } from "./pass"
 import { DEFAULT_RUNTIME_RETENTION } from "./policy"
-import { ageTree, cleanupRoots, daysAgo, identity, journal, now, reflectionRun } from "./retention.test-support"
+import { ageTree, cleanupRoots, daysAgo, identity, journal, now, reflectionRun, runsDir, writeJson } from "./retention.test-support"
 import { measureRuntimeSize } from "./size"
 
 afterEach(cleanupRoots)
@@ -118,5 +121,111 @@ describe("a resumed cap pass that walks no new item keeps its cursor (#12538 rev
 
     expect(report.evicted).toEqual([])
     expect(report.cursor).toEqual(resume)
+  })
+})
+
+const cursorFile = (paths: MemoryIdentityPaths): string => join(paths.runtime, "retention.json")
+
+async function persistedCursors(paths: MemoryIdentityPaths): Promise<{ readonly cursor?: unknown; readonly cap?: unknown } | undefined> {
+  if (!existsSync(cursorFile(paths))) return undefined
+  return JSON.parse(await readFile(cursorFile(paths), "utf8")) as { readonly cursor?: unknown; readonly cap?: unknown }
+}
+
+async function liveRuns(paths: MemoryIdentityPaths): Promise<string[]> {
+  return (await readdir(runsDir(paths))).filter((name) => !name.startsWith(".prune-")).sort()
+}
+
+/** 13 failed runs 60..48 days old: retention never removes them, the cap's tier 6 may evict the oldest 3. */
+async function unfoldedRuns(paths: MemoryIdentityPaths): Promise<{ readonly runs: string[]; readonly at: number[] }> {
+  const runs: string[] = []
+  const at: number[] = []
+  for (let index = 1; index <= 13; index += 1) {
+    const finishedAt = daysAgo(61 - index)
+    runs.push(await reflectionRun(paths, `reflection-run-${index}`, { outcome: "failed", finishedAt }).then(() => `reflection-run-${index}`))
+    at.push(finishedAt)
+  }
+  return { runs, at }
+}
+
+describe("a saved cap resume point never stops retention (#12538 review r4 M)", () => {
+  // A pass budget of 0 ms: one item per store walk is admitted, and the cap's size walk always overruns
+  // what is left, so the cap never makes progress on its own.
+  const ZERO_BUDGET = { ...UNREFLECTED_ON, passBudgetMs: 0 }
+
+  test("#given an identity over its cap with a stored cap resume point and a size walk that overruns the budget #when passes repeat #then retention still removes the runs and the journal past their windows and the cap keeps its resume point", async () => {
+    const paths = await identity()
+    for (let index = 1; index <= 4; index += 1) await reflectionRun(paths, `reflection-run-${index}`, { finishedAt: daysAgo(60 - index) })
+    const stale = await journal(paths, "j-fully", "fully", daysAgo(60))
+    const resume: RuntimeCapCursor = { store: "cap", tier: "folded-run", clock: 0, lastName: "reflection-run-0" }
+    // The shape a pass of #12538@237e8d01d1 persisted: the cap's resume point as the pass's only cursor.
+    await writeJson(cursorFile(paths), { version: 1, cursor: resume })
+
+    const capResumePoints: unknown[] = []
+    for (let pass = 0; pass < 10; pass += 1) {
+      await runRuntimeRetention({ paths, policy: ZERO_BUDGET, now, maxBytes: 1 })
+      capResumePoints.push((await persistedCursors(paths))?.cap)
+    }
+
+    // The newest folded run (also the run-id high water) stays as the anchor.
+    expect(await liveRuns(paths)).toEqual(["reflection-run-4"])
+    expect(existsSync(join(stale, "transcript.jsonl"))).toBe(false)
+    expect(capResumePoints).toEqual(Array.from({ length: 10 }, () => resume))
+  })
+
+  test("#given a stored store cursor and a stored cap resume point #when the pass runs with budget #then the store walk resumes at its cursor and the cap resumes its tier after its own resume point", async () => {
+    const paths = await identity()
+    const { runs, at } = await unfoldedRuns(paths)
+    const resume: RuntimeCapCursor = { store: "cap", tier: "unfolded-run", clock: (at[0]! + at[1]!) / 2, lastName: runs[0]! }
+    await writeJson(cursorFile(paths), { version: 1, cursor: { store: "journals", lastName: "s-05" }, cap: resume })
+
+    const report = await runRuntimeRetention({ paths, policy: UNREFLECTED_ON, now, maxBytes: 1 })
+
+    expect(report.cap?.evicted.map((entry) => entry.name)).toEqual([runs[1], runs[2]])
+    expect(await liveRuns(paths)).toEqual([runs[0]!, ...runs.slice(3)].sort())
+    expect(await persistedCursors(paths)).toBeUndefined()
+  })
+
+  test("#given a stored cap resume point #when a pass's cap makes no progress and the next pass has budget #then the first keeps the resume point and the second resumes there and completes", async () => {
+    const paths = await identity()
+    const { runs, at } = await unfoldedRuns(paths)
+    const resume: RuntimeCapCursor = { store: "cap", tier: "unfolded-run", clock: (at[0]! + at[1]!) / 2, lastName: runs[0]! }
+    await writeJson(cursorFile(paths), { version: 1, cap: resume })
+
+    const stalled = await runRuntimeRetention({ paths, policy: ZERO_BUDGET, now, maxBytes: 1 })
+
+    expect(stalled.cap?.skipped).toContain("measure-over-budget")
+    expect(stalled.cap?.evicted).toEqual([])
+    expect((await persistedCursors(paths))?.cap).toEqual(resume)
+
+    const resumed = await runRuntimeRetention({ paths, policy: UNREFLECTED_ON, now, maxBytes: 1 })
+
+    expect(resumed.cap?.evicted.map((entry) => entry.name)).toEqual([runs[1], runs[2]])
+    expect(resumed.cap?.cursor).toBeUndefined()
+    expect(await persistedCursors(paths)).toBeUndefined()
+  })
+})
+
+describe("a journal that turns unreadable before the cap's locked eviction (#12538 review r4 L)", () => {
+  test("#given a journal whose state.json becomes a directory after classification, as its lock is taken #when the cap evicts the journal tiers #then that journal is kept as state-unreadable and the next journal is still evicted", async () => {
+    const paths = await identity()
+    await foldedRuns(paths, 2, 1024)
+    const race = await journal(paths, "j-race", "fully", daysAgo(60))
+    const good = await journal(paths, "j-zz-good", "fully", daysAgo(60))
+    const raced: string[] = []
+    const journalLock: JournalLock = async (lockPath, task, signal) => {
+      if (lockPath === join(race, "state.lock")) {
+        raced.push(lockPath)
+        await rm(join(race, "state.json"))
+        await mkdir(join(race, "state.json"))
+      }
+      return withLocalJournalLock(lockPath, task, signal)
+    }
+
+    const report = await cap(paths, 1, { journalLock })
+
+    expect(raced).toHaveLength(1)
+    expect(report.kept["j-race"]).toBe("state-unreadable")
+    expect(report.evicted.map((entry) => entry.name)).toContain("j-zz-good")
+    expect(existsSync(join(good, "transcript.jsonl"))).toBe(false)
   })
 })
