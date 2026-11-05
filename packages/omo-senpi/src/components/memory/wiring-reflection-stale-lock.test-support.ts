@@ -25,7 +25,7 @@ import { createMemoryMaintenance } from "./memory-maintenance"
 import { createMemoryWiring, type MemoryWiringOptions } from "./wiring"
 import { writeRunJsonAtomic } from "./worker/run-artifacts"
 import type { ReservationStatePort } from "./worker/run-finalization-types"
-import { reconcileReflectionRuns, type ReflectionRunReconcileResult } from "./worker/run-reconciliation"
+import { reconcileReflectionRuns, type ReflectionRunReconcileResult, type ReflectionRunReconciliationOptions } from "./worker/run-reconciliation"
 
 const fixtures: Array<{ readonly root: string; shutdown: () => Promise<void> }> = []
 const SESSION_ID = "session-1"
@@ -87,7 +87,12 @@ function observeContention(store: ReservationStatePort, contention: SchedulerCon
   }
 }
 
-export async function staleLockFixture(seams?: ActiveHolderSeams, options: { readonly reconcileReleases?: boolean; readonly createFactsExtractor?: MemoryWiringOptions["createFactsExtractor"] } = {}) {
+export async function staleLockFixture(seams?: ActiveHolderSeams, options: {
+  readonly reconcileReleases?: boolean
+  readonly createFactsExtractor?: MemoryWiringOptions["createFactsExtractor"]
+  /** Process and sentinel seams for the real reconciliation the runtime runs. */
+  readonly reconcileSeams?: Pick<ReflectionRunReconciliationOptions, "getPidLiveness" | "waitForOutcome">
+} = {}) {
   const eventCtx = createEventCtx()
   const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-reflection-stale-lock-")))
   const fixture = { root, shutdown: async (): Promise<void> => {} }
@@ -127,7 +132,7 @@ export async function staleLockFixture(seams?: ActiveHolderSeams, options: { rea
     store,
     reservationPort: store,
     launch,
-    async reconcile(): Promise<void> {
+    async reconcile(_signal?: AbortSignal, reconcileOptions?: { readonly waitPolicy?: "deadline" | "none" }): Promise<void> {
       reconciles.count += 1
       // Passes are numbered from 1 (the count after this call); a mark holds the count before the step under test.
       const pass = reconciles.count
@@ -135,7 +140,11 @@ export async function staleLockFixture(seams?: ActiveHolderSeams, options: { rea
       if (options.reconcileReleases === false) return
       const reservation = observeContention(store, reconciles.contention, pass)
       try {
-        reconciles.results.push({ pass, results: await reconcileReflectionRuns({ identity: memoryIdentity, reservation, launch, deferOnSchedulerContention: true }) })
+        reconciles.results.push({ pass, results: await reconcileReflectionRuns({
+          identity: memoryIdentity, reservation, launch, deferOnSchedulerContention: true,
+          ...(reconcileOptions?.waitPolicy === undefined ? {} : { waitPolicy: reconcileOptions.waitPolicy }),
+          ...options.reconcileSeams,
+        }) })
       } catch (error) {
         // The wiring swallows a reconcile failure into its logger; keep it for the diagnosis, then rethrow unchanged.
         reconciles.errors.push({ pass, error: error instanceof Error ? `${error.name}: ${error.message}` : String(error) })

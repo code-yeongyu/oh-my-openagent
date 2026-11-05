@@ -4,7 +4,7 @@ import { mkdir, readFile, utimes, writeFile } from "node:fs/promises"
 import { hostname } from "node:os"
 import { join } from "node:path"
 
-import { createReflectionWorktree } from "@oh-my-opencode/memory-core"
+import { createReflectionWorktree, getPidLiveness } from "@oh-my-opencode/memory-core"
 
 import { writeRunJsonAtomic } from "./worker/run-artifacts"
 import { activeRunId, cleanupStaleLockFixtures, deadPid, settleTurn, staleLockFixture } from "./wiring-reflection-stale-lock.test-support"
@@ -48,6 +48,28 @@ async function processesDied(item: Fixture): Promise<string> {
     gitFilePath: worktree.gitFilePath, gitFileSnapshot: worktree.gitFileSnapshot, commonConfigPath: worktree.commonConfigPath, commonConfigSnapshot: worktree.commonConfigSnapshot,
   })
   await launcherDied(item, pid)
+  return runId
+}
+
+async function runDoctorFix(item: Fixture): Promise<string> {
+  const command = item.pi.commands.find((entry) => entry.name === "doctor")
+  if (command === undefined) throw new Error("doctor command not registered")
+  const handler = command.options.handler as (args: string, ctx: unknown) => Promise<string>
+  return handler("--fix", item.eventCtx)
+}
+
+// A sibling run outside the reservation whose supervisor is live and whose deadline is ten minutes out.
+async function liveSibling(item: Fixture, pid: number): Promise<string> {
+  const runId = "reflection-run-40"
+  const hardDeadlineAt = Date.now() + 600_000
+  const runDir = join(item.paths.reflection, "runs", runId)
+  await mkdir(runDir, { recursive: true, mode: 0o700 })
+  await writeRunJsonAtomic(join(runDir, "ledger.json"), {
+    version: 1, runId, attempt: 1, kind: "reflection", trigger: "manual", startedAt: new Date().toISOString(),
+    hardDeadlineAt, terminationGraceMs: 100, deadlineAt: hardDeadlineAt + 100, mergePolicy: "auto",
+    pid, processStart: null, worktreeDir: "/nonexistent/worktree", worktreeBranch: `reflection/${runId}`, baseSha: "0".repeat(40),
+    gitFilePath: "/nonexistent/worktree/.git", gitFileSnapshot: "gitdir: /nonexistent", commonConfigPath: "/nonexistent/config", commonConfigSnapshot: null,
+  })
   return runId
 }
 
@@ -119,6 +141,32 @@ describe("the stale reflection-lock reaper in a session (#11976)", () => {
     expect(readdirSync(item.paths.reflection).filter((name) => name.startsWith("active.lock.torn-"))).toHaveLength(1)
     expect(await activeRunId(item)).toBeUndefined()
     expect(staleNotices(item)).toEqual([])
+  }, 30_000)
+
+  test("#given case A beside a sibling run whose supervisor is live #when /doctor --fix runs #then the lock is reaped without waiting on the sibling's deadline", async () => {
+    // given
+    const SIBLING_SUPERVISOR = 2_147_000_001
+    const waits: string[] = []
+    const item = await staleLockFixture(undefined, {
+      reconcileSeams: {
+        getPidLiveness: (pid) => pid === SIBLING_SUPERVISOR ? "alive" : getPidLiveness(pid),
+        waitForOutcome: async (path) => {
+          waits.push(path)
+          return "timeout"
+        },
+      },
+    })
+    const runId = await launchInterrupted(item)
+    const sibling = await liveSibling(item, SIBLING_SUPERVISOR)
+
+    // when
+    const reply = await runDoctorFix(item)
+
+    // then
+    expect(waits).toEqual([])
+    expect(reply).toContain(`FIXED agent-test active.lock run ${runId} (launch-interrupted)`)
+    expect(await activeRunId(item)).not.toBe(runId)
+    expect(existsSync(join(item.paths.reflection, "runs", sibling, "abandoned.json"))).toBe(false)
   }, 30_000)
 
   test("#given case B whose first settle throws #when later turns settle #then the throw is not memoized and the next turn settles the run (#10395 item 2)", async () => {

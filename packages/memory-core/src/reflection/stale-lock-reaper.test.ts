@@ -343,7 +343,7 @@ describe("stale reflection-lock reaper, minimal settle from the CLI (#11976)", (
   test("#given case E: active.lock truncated to half a JSON object and no live run #when the reaper runs #then it is moved aside byte-identical with a lock_torn receipt", async () => {
     // given
     const paths = reaperIdentity()
-    const torn = JSON.stringify({ runId: RUN, launcherPid: 4301, launcherHostname: HOST, request: { trigger: "manual" } }).slice(0, 70)
+    const torn = JSON.stringify({ runId: RUN, launcherPid: 4301, launcherHostname: HOST, request: { trigger: "manual" } }).slice(0, 90)
     writeJson(join(paths.reflection, "active.lock"), torn)
     age(join(paths.reflection, "active.lock"), 2 * 60 * 60_000)
     pendingRun(paths)
@@ -362,6 +362,43 @@ describe("stale reflection-lock reaper, minimal settle from the CLI (#11976)", (
     expect(report.after).toEqual({ state: "none" })
     expect(readJson(join(paths.reflection, "run-id.json")).highWater).toBe(65)
     expect(readFileSync(join(paths.reflection, "pending.json"))).toEqual(pendingBefore)
+  })
+
+  test("#given case E cut inside the launcher hostname, after the launcher pid #when the reaper runs #then the torn lock is kept because its host is unknown", async () => {
+    // given
+    const paths = reaperIdentity()
+    const torn = JSON.stringify({ runId: RUN, launcherPid: 4301, launcherHostname: HOST, request: { trigger: "manual" } }).slice(0, 70)
+    writeJson(join(paths.reflection, "active.lock"), torn)
+    age(join(paths.reflection, "active.lock"), 2 * 60 * 60_000)
+    const before = treeHash(paths.root)
+
+    // when
+    const report = await runStaleLockReaper({ runtimeDir: paths.runtime, probe: probe() })
+
+    // then
+    expect(report.decision).toEqual({ kind: "stuck", runId: "unknown", reason: "active.lock is not valid JSON and its launcher host is unknown" })
+    expect(report.action).toBe("kept")
+    expect(readFileSync(join(paths.reflection, "active.lock"), "utf8")).toBe(torn)
+    expect(treeHash(paths.root)).toBe(before)
+  })
+
+  test("#given a dead launcher whose detached supervisor has not recorded its pid yet, inside the hard deadline #when the reaper runs #then the run and its reservation are kept", async () => {
+    // given
+    const paths = reaperIdentity()
+    activeLock(paths)
+    const hardDeadlineAt = NOW + 30 * 60_000
+    writeJson(join(runDir(paths, RUN), "ledger.json"), validLedger(RUN, { launching: true, pid: undefined, childPid: undefined, hardDeadlineAt, deadlineAt: hardDeadlineAt + 100 }))
+    const before = treeHash(paths.root)
+
+    // when
+    const report = await runStaleLockReaper({ runtimeDir: paths.runtime, probe: probe() })
+
+    // then
+    expect(report.decision).toEqual({ kind: "stuck", runId: RUN, reason: "its supervisor is still launching and its hard deadline has not passed" })
+    expect(report.action).toBe("kept")
+    expect(existsSync(join(runDir(paths, RUN), "abandoned.json"))).toBe(false)
+    expect(readJson(join(paths.reflection, "active.lock")).runId).toBe(RUN)
+    expect(treeHash(paths.root)).toBe(before)
   })
 
   test("#given case E with a run dir whose supervisor is alive #when the reaper runs #then the torn lock is kept and the reason says a live run exists", async () => {
