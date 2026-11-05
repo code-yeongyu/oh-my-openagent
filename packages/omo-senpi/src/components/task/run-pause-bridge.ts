@@ -14,7 +14,7 @@ export type LostParticipantRecovery = {
 
 export class EngineRunPauseBridge {
   readonly #pauses = new Map<string, { readonly seq: number; readonly pending: Promise<void> }>()
-  readonly #resumes = new Map<string, { readonly seq: number; readonly pending: Promise<void> }>()
+  readonly #resumes = new Map<string, { readonly seq: number; readonly pending: Promise<void>; settled: boolean }>()
   readonly #retries = new Map<string, Promise<void>>()
   readonly #recoveries = new Map<string, Promise<void>>()
 
@@ -65,6 +65,21 @@ export class EngineRunPauseBridge {
     return this.#resume(parentSessionId, stop !== undefined && stop <= event.pauseSeq ? stop : event.pauseSeq)
   }
 
+  // A Resume the bridge never acted on (#12249 on an older build, or a lost hold-change event) leaves the
+  // run's Stop applied while the engine holds no Stop at all, so nothing would ever release it. When the
+  // engine's live ledger is at or past the recorded Stop and holds no user Stop, that Stop was released.
+  // Only a Stop left `applied` with no Resume in flight is stale: a Resume `changed()` already started (the
+  // ordinary Stop-then-message path) or a `resuming` ledger is left to the path that owns it.
+  releaseStale(parentSessionId: string): Promise<void> {
+    const record = this.controller.registry.load(parentSessionId)
+    if (record === undefined || record.phase !== "applied") return Promise.resolve()
+    const inFlight = this.#resumes.get(parentSessionId)
+    if (inFlight?.seq === record.pauseSeq && !inFlight.settled) return Promise.resolve()
+    const state = this.native.getPauseState()
+    if (state === undefined || state.pauseSeq < record.pauseSeq || readEngineRunHold(state).stopped) return Promise.resolve()
+    return this.#resume(parentSessionId, record.pauseSeq)
+  }
+
   #pause(parentSessionId: string, pauseSeq: number): Promise<void> {
     const existing = this.#pauses.get(parentSessionId)
     if (existing?.seq === pauseSeq) return existing.pending
@@ -82,9 +97,12 @@ export class EngineRunPauseBridge {
     // A repeated Resume at the same Stop retries the participants the first one could not resume.
     if (existing?.seq === pauseSeq) return existing.pending.then(() => this.#retryLost(parentSessionId, pauseSeq))
     const pending = this.#resumeAfterPropagation(parentSessionId, pauseSeq)
-    const entry = { seq: pauseSeq, pending }
+    const entry = { seq: pauseSeq, pending, settled: false }
     this.#resumes.set(parentSessionId, entry)
-    void pending.catch(() => { if (this.#resumes.get(parentSessionId) === entry) this.#resumes.delete(parentSessionId) })
+    void pending.then(() => { entry.settled = true }, () => {
+      entry.settled = true
+      if (this.#resumes.get(parentSessionId) === entry) this.#resumes.delete(parentSessionId)
+    })
     return pending
   }
 
