@@ -38,7 +38,7 @@ function longActiveRecord(): TaskRecord {
 }
 
 describe("buildWidgetRows", () => {
-  it("#given completed resident team members beside active records #when building rows #then only the active records render", () => {
+  it("#given finished records beside a running record #when building rows #then finished records leave the widget and the running one stays", () => {
     // given finished members whose handles are still resident (revivable), an ordinary finished task, and a running member
     const alpha = record({ task_id: "st_alpha", name: "team:12345678-1234-1234-1234-123456789abc:alpha", task_summary: "settled alpha", status: "completed" })
     const beta = record({ task_id: "st_beta", name: "team:12345678-1234-1234-1234-123456789abc:beta", task_summary: "settled beta", status: "completed" })
