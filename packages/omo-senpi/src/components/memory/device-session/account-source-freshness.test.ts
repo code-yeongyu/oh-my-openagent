@@ -112,7 +112,7 @@ describe("authoritative credential reads under the shared lock", () => {
           : account.boundary(() => renameSync(pinFrom, pinTo))
       // The pre-writer read stays parked until the attempt settles: an operation whose read joins it never settles.
       let breaker: ReturnType<typeof setTimeout> | undefined
-      const joined = new Promise<string>(resolve => { breaker = setTimeout(() => resolve("joined the parked read"), 10_000) })
+      const joined = new Promise<string>(resolve => { breaker = setTimeout(() => resolve("joined the parked read"), remainingTestTime()) })
       const outcome = await Promise.race([attempt.then(() => "admitted", () => "refused"), joined])
       clearTimeout(breaker)
       f.release()

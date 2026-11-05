@@ -7,6 +7,7 @@ import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { expect, test } from "bun:test"
 import { windowsTreeKillArgs } from "../../../memory-core/src/concurrency/windows-process-tree.mjs"
+import { remainingTestTime, useTestTimeout } from "../../../../test-support/test-deadline"
 
 const isWin32 = process.platform === "win32"
 const driverPath = fileURLToPath(new URL("./task-rpc-e2e.mjs", import.meta.url))
@@ -116,6 +117,7 @@ test("#given the driver reports FAIL #when individual checks look green #then th
 test.skipIf(!isWin32)(
   "#given the production task driver #when process mode runs on Windows #then it reaches a real RPC child",
   async () => {
+    useTestTimeout(DRIVER_TIMEOUT_MS + CLEANUP_TIMEOUT_MS + 10_000)
     // given
     const driver = spawn(process.execPath, [driverPath], {
       cwd: process.cwd(),
@@ -157,7 +159,7 @@ test.skipIf(!isWin32)(
       deadline.cancel()
       if (!closeObserved) {
         await terminateProcessTree(driver)
-        const cleanupDeadline = createDeadline(CLEANUP_TIMEOUT_MS, "Windows production RPC driver cleanup")
+        const cleanupDeadline = createDeadline(remainingTestTime(), "Windows production RPC driver cleanup")
         try {
           await Promise.race([close, cleanupDeadline.promise])
         } finally {

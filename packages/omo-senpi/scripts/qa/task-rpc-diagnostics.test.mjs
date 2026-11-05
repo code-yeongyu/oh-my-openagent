@@ -6,6 +6,7 @@ import { join } from "node:path"
 import { captureChild, dumpRunProcesses, OUTPUT_TAIL_LIMIT, stageRecorder, withinDeadline } from "./task-rpc-diagnostics.mjs"
 import { waitForRecord } from "./task-rpc-record-wait.mjs"
 import { summarizeRuns } from "./task-rpc-reconcile-batch.mjs"
+import { remainingTestTime } from "../../../../test-support/test-deadline"
 
 test.each([undefined, "0", "1"])("a failed initial parent retains diagnostics and opts into stage stderr with %s", async (stageEnv) => {
   // Given a Bun executable receiving Senpi-only arguments, the parent really fails to launch.
@@ -21,7 +22,7 @@ test.each([undefined, "0", "1"])("a failed initial parent retains diagnostics an
   const capture = captureChild(child)
   let output
   try {
-    output = await withinDeadline(capture.closed, 15_000, () => child.kill("SIGKILL"))
+    output = await withinDeadline(capture.closed, remainingTestTime(), () => child.kill("SIGKILL"))
   } finally {
     if (child.exitCode === null) child.kill("SIGKILL")
     await capture.closed

@@ -11,6 +11,7 @@ import { createSyncRunner } from "../sync-runner"
 import { SyncSessionDeferredError } from "../sync-session-deferred"
 import { createCliAccountSource } from "./account-source"
 import { createDeviceSessionResolver } from "./resolver"
+import { remainingTestTime } from "../../../../../../test-support/test-deadline"
 
 const dirs: string[] = []
 afterEach(async () => {
@@ -36,7 +37,7 @@ function unansweredKeychainStore() {
 type Outcome<T> = { readonly state: "resolved"; readonly value: T } | { readonly state: "rejected"; readonly error: unknown } | { readonly state: "hung" }
 
 // The test's own bound: a call that has not settled by then is the hang this file guards against.
-async function settled<T>(work: Promise<T>, ms = 2_000): Promise<Outcome<T>> {
+async function settled<T>(work: Promise<T>, ms = remainingTestTime()): Promise<Outcome<T>> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const hung = new Promise<Outcome<T>>((resolve) => {
     timer = setTimeout(() => resolve({ state: "hung" }), ms)

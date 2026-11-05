@@ -4,6 +4,7 @@ import { join } from "node:path"
 
 import { OWNER_STALE_MS, SUMMARY_TTL_MS, summaryDir } from "./session-summary-storage"
 import { createTempStateDirs } from "./session-summary.test-support"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 // Crash-safety contract (plan todo 8, cases a-f), proven with real processes on real files: each fixture
 // process runs the production recorder and storage, the test kills it with SIGKILL (or the fixture kills
@@ -11,7 +12,6 @@ import { createTempStateDirs } from "./session-summary.test-support"
 // window exactly once, under the window's own id.
 
 const FIXTURE = join(import.meta.dir, "session-summary-process.test-support.ts")
-const WAIT_MS = 15_000
 const T0 = 1_700_000_000_000
 const STALE = OWNER_STALE_MS + 1
 
@@ -51,7 +51,7 @@ function startFixture(dir: string, now: number, mode = "ack", platform?: typeof 
   let sent = 0
   const bounded = <T>(work: Promise<T>, what: string) => Promise.race([
     work,
-    new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`waited ${WAIT_MS} ms for ${what}`)), WAIT_MS).unref()),
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`waited out the test budget for ${what}`)), remainingTestTime()).unref()),
   ])
   const exited = proc.exited.then(() => proc.exitCode)
   return {

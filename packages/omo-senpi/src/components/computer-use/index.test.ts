@@ -14,14 +14,13 @@ import type { ChildFactory } from "@oh-my-opencode/senpi-desktop-service"
 import type { ComponentContext, ComponentLogger } from "../../extension/types"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { COMPUTER_UNAVAILABLE_MESSAGE, createComputerUseComponent } from "./index"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const FAKE_ENGINE = join(
   dirname(fileURLToPath(import.meta.url)),
   "../../../../senpi-desktop-service/test/fake-engine.mjs",
 )
 const RECEIVED = "recv "
-const HANG_GUARD_MS = 10_000
-
 class HostApi extends FakeExtensionAPI {
   active: string[] = ["read", "bash"]
   readonly executed: string[] = []
@@ -104,7 +103,7 @@ function fakeEngine(): EngineLog {
     nth: (method, n) =>
       new Promise((resolve, reject) => {
         if (methods.filter((seen) => seen === method).length >= n) return resolve()
-        const timer = setTimeout(() => reject(new Error(`waited ${HANG_GUARD_MS}ms for ${method} #${n}`)), HANG_GUARD_MS)
+        const timer = setTimeout(() => reject(new Error(`waited out the test budget for ${method} #${n}`)), remainingTestTime())
         waiters.push({ method, n, resolve: () => (clearTimeout(timer), resolve()) })
       }),
   }

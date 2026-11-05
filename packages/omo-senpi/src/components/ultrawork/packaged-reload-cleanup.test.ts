@@ -5,6 +5,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { cleanUpReloadRun, ownsHostSocket, type ReloadCleanupClock, type ReloadHost, reloadRootParent } from "./packaged-reload-cleanup.test-support"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 function fakeClock(): ReloadCleanupClock & { advance(ms: number): Promise<void> } {
   let now = 0
@@ -135,7 +136,7 @@ describe("cleanUpReloadRun", () => {
     const child = spawn(process.execPath, ["-e", "process.on('SIGTERM', () => {}); process.stdout.write('ready\\n'); setInterval(() => {}, 1000)"], { stdio: ["ignore", "pipe", "ignore"], windowsHide: true })
     onTestFinished(() => { if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL") })
     const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()))
-    await settledWithin(new Promise<void>((resolve) => child.stdout?.once("data", () => resolve())), 10_000)
+    await settledWithin(new Promise<void>((resolve) => child.stdout?.once("data", () => resolve())), remainingTestTime())
     let restored = 0
 
     // when
@@ -147,7 +148,7 @@ describe("cleanUpReloadRun", () => {
       budgetMs: 4_000,
       termGraceMs: 200,
       killWaitMs: 3_000,
-    }), 5_000)
+    }), remainingTestTime())
 
     // then
     // Windows has no catchable SIGTERM: kill() terminates the child at once, so no grace overrun is reported there.
@@ -174,7 +175,7 @@ describe("cleanUpReloadRun", () => {
       budgetMs: 600,
       termGraceMs: 100,
       killWaitMs: 100,
-    }), 2_000)
+    }), remainingTestTime())
 
     // then
     expect((outcome.error as Error | undefined)?.message).toBe("packaged reload plugin shutdown did not settle in time")
@@ -277,7 +278,7 @@ describe("cleanUpReloadRun", () => {
     })
 
     // then
-    const outcome = await settledWithin(cleanup, 2_000)
+    const outcome = await settledWithin(cleanup, remainingTestTime())
     expect(outcome.error).toBeInstanceOf(AggregateError)
     expect((outcome.error as AggregateError).errors.map((error: Error) => error.message)).toEqual([
       "supervisor did not finish graceful shutdown within 50ms",

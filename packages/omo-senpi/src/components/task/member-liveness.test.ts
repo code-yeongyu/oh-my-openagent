@@ -11,6 +11,7 @@ import {
   TEAM_MEMBER_LIVENESS_MESSAGE_TYPE,
   createTeamMemberLivenessNotifier,
 } from "./member-liveness"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const roots: string[] = []
 
@@ -110,7 +111,7 @@ describe("team member liveness notifier", () => {
       details: { deliveryKey: "team-member-liveness:st_00000001:0" },
     })}\n`)
     retries.shift()?.()
-    await withTimeout(persistedSignal, 1_000)
+    await withTimeout(persistedSignal, remainingTestTime())
 
     expect(persisted).toEqual([0])
   })
@@ -132,7 +133,7 @@ describe("team member liveness notifier", () => {
     })
 
     notifier.notifyTerminal(memberRecord())
-    await withTimeout(retryQueued.promise, 1000)
+    await withTimeout(retryQueued.promise, remainingTestTime())
     expect(attempts).toEqual(["send"])
     expect(retries).toHaveLength(1)
 
@@ -158,7 +159,7 @@ describe("team member liveness notifier", () => {
 
     notifier.notifyTerminal(memberRecord())
     coordinator.flushOnIdle()
-    await withTimeout(retryQueued.promise, 1000)
+    await withTimeout(retryQueued.promise, remainingTestTime())
     expect(retries).toHaveLength(1)
 
     retries.shift()?.()

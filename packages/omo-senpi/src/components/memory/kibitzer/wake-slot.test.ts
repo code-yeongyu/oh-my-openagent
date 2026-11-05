@@ -13,6 +13,7 @@ import {
   type KibitzerWakeAdmission,
   type KibitzerWakeLease,
 } from "./wake-slot"
+import { remainingTestTime } from "../../../../../../test-support/test-deadline"
 
 const dirs: string[] = []
 afterEach(async () => {
@@ -68,7 +69,7 @@ describe("createKibitzerWakeSlot", () => {
     )
 
     try {
-      await withinMs(Promise.all([waits[0], waits[1]]), "the first two admissions", 5_000)
+      await withinMs(Promise.all([waits[0], waits[1]]), "the first two admissions", remainingTestTime())
       expect(order).toEqual([0, 1])
 
       for (let next = 2; next < 10; next += 1) {
@@ -76,7 +77,7 @@ describe("createKibitzerWakeSlot", () => {
         if (releasing === undefined) throw new Error(`session ${next - 2} never acquired`)
         live -= 1
         expect(await releasing.release()).toBe(true)
-        await withinMs(waits[next] ?? Promise.resolve(), `admission ${next}`, 5_000)
+        await withinMs(waits[next] ?? Promise.resolve(), `admission ${next}`, remainingTestTime())
         expect(order).toEqual(Array.from({ length: next + 1 }, (_, index) => index))
         expect(live).toBe(2)
       }
@@ -98,7 +99,7 @@ describe("createKibitzerWakeSlot", () => {
     const second = acquired(await slot.acquire())
 
     const started = Date.now()
-    const refused = await withinMs(slot.acquire(), "the busy admission", 5_000)
+    const refused = await withinMs(slot.acquire(), "the busy admission", remainingTestTime())
 
     expect(refused.status).toBe("busy")
     if (refused.status !== "busy") throw new Error("unreachable")
@@ -107,7 +108,7 @@ describe("createKibitzerWakeSlot", () => {
     expect(await tickets(dir)).toEqual([])
 
     expect(await first.release()).toBe(true)
-    const admitted = await withinMs(slot.acquire(), "the admission after a release", 5_000)
+    const admitted = await withinMs(slot.acquire(), "the admission after a release", remainingTestTime())
     expect(admitted.status).toBe("acquired")
     expect(acquired(admitted).slot).toBe(1)
     await Promise.all([acquired(admitted).release(), second.release()])
@@ -123,7 +124,7 @@ describe("createKibitzerWakeSlot", () => {
     const waiting = slot.acquire(controller.signal)
     controller.abort()
 
-    expect(await withinMs(waiting, "the aborted admission", 5_000)).toEqual({ status: "aborted" })
+    expect(await withinMs(waiting, "the aborted admission", remainingTestTime())).toEqual({ status: "aborted" })
     expect(await tickets(dir)).toEqual([])
     await Promise.all([first.release(), second.release()])
   })
@@ -138,14 +139,14 @@ describe("createKibitzerWakeSlot", () => {
     // A live owner (this very process) keeps the slot: the wake waits and leaves busy, the record untouched.
     const liveRecord = `${JSON.stringify(own)}\n`
     await writeFile(recallWakeLockPath(dir, 1), liveRecord)
-    const refused = await withinMs(slot.acquire(), "the busy admission against a live owner", 5_000)
+    const refused = await withinMs(slot.acquire(), "the busy admission against a live owner", remainingTestTime())
     expect(refused.status).toBe("busy")
     expect(await readFile(recallWakeLockPath(dir, 1), "utf8")).toBe(liveRecord)
 
     // A dead pid is proof: the slot is reclaimed and re-recorded for the new owner.
     const dead: LockRecord = { ...own, pid: 99_999_999, process_start: "proc-start-epoch:0" }
     await writeFile(recallWakeLockPath(dir, 1), `${JSON.stringify(dead)}\n`)
-    const reclaimed = await withinMs(slot.acquire(), "the reclaimed admission", 5_000)
+    const reclaimed = await withinMs(slot.acquire(), "the reclaimed admission", remainingTestTime())
     expect(reclaimed.status).toBe("acquired")
     expect((JSON.parse(await readFile(recallWakeLockPath(dir, 1), "utf8")) as LockRecord).nonce).not.toBe(dead.nonce)
     expect(await acquired(reclaimed).release()).toBe(true)
@@ -154,7 +155,7 @@ describe("createKibitzerWakeSlot", () => {
     const unprovable: LockRecord = { ...own, process_start: "unavailable" }
     const unprovableRecord = `${JSON.stringify(unprovable)}\n`
     await writeFile(recallWakeLockPath(dir, 1), unprovableRecord)
-    expect((await withinMs(slot.acquire(), "the busy admission against an unprovable owner", 5_000)).status).toBe("busy")
+    expect((await withinMs(slot.acquire(), "the busy admission against an unprovable owner", remainingTestTime())).status).toBe("busy")
     expect(await readFile(recallWakeLockPath(dir, 1), "utf8")).toBe(unprovableRecord)
     expect(await tickets(dir)).toEqual([])
   })

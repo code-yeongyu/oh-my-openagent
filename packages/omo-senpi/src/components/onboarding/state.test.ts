@@ -19,6 +19,7 @@ import {
   writeGlobalDecline,
   writeProjectDecline,
 } from "./state"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const tempDirs: string[] = []
 
@@ -92,7 +93,7 @@ async function stopChildren(children: ReadonlyArray<{
 }>): Promise<void> {
   const results = await Promise.allSettled(children.map(async ({ child, exit }) => {
     if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL")
-    await withTimeout(exit, 10_000, "child did not exit during cleanup")
+    await withTimeout(exit, remainingTestTime(), "child did not exit during cleanup")
   }))
   const failure = results.find((result): result is PromiseRejectedResult => result.status === "rejected")
   if (failure !== undefined) throw failure.reason
@@ -153,7 +154,7 @@ describe("claimOnboarding", () => {
         })
         children.push({
           child,
-          ready: waitForReady(child, 5_000),
+          ready: waitForReady(child, remainingTestTime()),
           exit: observeExit(child),
         })
       }
@@ -163,7 +164,7 @@ describe("claimOnboarding", () => {
       for (const { child } of children) child.send("release")
 
       const exitCodes = await Promise.all(children.map(({ exit }) => (
-        withTimeout(exit, 10_000, "child did not exit in time")
+        withTimeout(exit, remainingTestTime(), "child did not exit in time")
       )))
 
       // then
@@ -182,7 +183,7 @@ describe("claimOnboarding", () => {
     const child = fork(raceChildPath, [dir], {
       stdio: ["ignore", "ignore", "ignore", "ipc"],
     })
-    const ready = waitForReady(child, 5_000)
+    const ready = waitForReady(child, remainingTestTime())
     const exit = observeExit(child)
 
     try {

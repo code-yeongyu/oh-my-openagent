@@ -3,6 +3,7 @@ import type { Worker } from "node:worker_threads"
 
 import type { GatewayStore } from "./store"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
+import { remainingTestTime } from "../../../../../../test-support/test-deadline"
 
 let harness: GatewayHarness | undefined
 afterEach(async () => { await harness?.dispose(); harness = undefined })
@@ -41,8 +42,8 @@ test("#given a store with no call in flight #when the idle interval passes #then
   expect(await store.registerStoreExtension(alpha)).toEqual({ kind: "ok", value: { version: 1 } })
   expect(await store.extensionCall("alpha", "put", { name: "alpha", id: 1, value: "before" })).toEqual({ kind: "ok", value: { value: "before" } })
 
-  expect(await within(retired.promise, 5_000, "the idle worker to retire")).toBe(log.workers[0] as Worker)
-  await within(log.exits[0] as Promise<number>, 5_000, "the retired worker thread to exit")
+  expect(await within(retired.promise, remainingTestTime(), "the idle worker to retire")).toBe(log.workers[0] as Worker)
+  await within(log.exits[0] as Promise<number>, remainingTestTime(), "the retired worker thread to exit")
 
   expect(await store.extensionCall("alpha", "put", { name: "alpha", id: 2, value: "after" })).toEqual({ kind: "ok", value: { value: "after" } })
   expect(await insertionOrder(store)).toEqual({ kind: "ok", value: [{ id: 1, value: "before" }, { id: 2, value: "after" }] })
@@ -68,9 +69,9 @@ test("#given writes before, during and after an idle retire #when the retire fir
   expect(await store.registerStoreExtension(alpha)).toEqual({ kind: "ok", value: { version: 1 } })
   expect(await store.extensionCall("alpha", "put", { name: "alpha", id: 1, value: "before" })).toEqual({ kind: "ok", value: { value: "before" } })
 
-  const { write: duringWrite } = await within(during.promise, 5_000, "the idle retire to start")
-  expect(await within(duringWrite, 5_000, "the write made during the retire to settle")).toEqual({ kind: "ok", value: { value: "during" } })
-  await within(retired.promise, 5_000, "the retired worker to finish closing")
+  const { write: duringWrite } = await within(during.promise, remainingTestTime(), "the idle retire to start")
+  expect(await within(duringWrite, remainingTestTime(), "the write made during the retire to settle")).toEqual({ kind: "ok", value: { value: "during" } })
+  await within(retired.promise, remainingTestTime(), "the retired worker to finish closing")
   expect(await store.extensionCall("alpha", "put", { name: "alpha", id: 3, value: "after" })).toEqual({ kind: "ok", value: { value: "after" } })
 
   // `put` is a plain INSERT: a replayed write would fail on the primary key instead of being hidden.
@@ -91,8 +92,8 @@ test("#given a worker that is retiring #when the store is disposed #then dispose
     },
   })
   await store.stats()
-  const { done } = await within(disposal.promise, 5_000, "the idle retire to start")
-  await within(done, 5_000, "dispose to resolve")
+  const { done } = await within(disposal.promise, remainingTestTime(), "the idle retire to start")
+  await within(done, remainingTestTime(), "dispose to resolve")
   expect(exited).toBe(true)
 })
 
@@ -103,7 +104,7 @@ test("#given a target session whose store worker retired #when a peer sends to i
   const retired = signal<Worker>()
   const target = h.session("B", { storeOptions: { _test: { idleRetireMs: 1, onWorkerRetired: retired.fire } } })
   await target.store.identity()
-  await within(retired.promise, 5_000, "the target's idle worker to retire")
+  await within(retired.promise, remainingTestTime(), "the target's idle worker to retire")
 
   const result = await h.get("A").engine.deliver({ sender: { kind: "session", durable_id: "A" }, target: "B", text: "after the retire" })
   await h.quiesce()

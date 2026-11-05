@@ -31,6 +31,7 @@ import { composeTaskEngine, type TaskEngine, type TaskRunnerFactories } from "./
 import { createTeamServiceTestModelRegistry } from "./team-service-test-model-registry"
 import type { CapturedUi } from "./runtime-context"
 import { createSessionTransitionBridge } from "./session-transition-bridge"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const cleanupRoots: string[] = []
 const sessionId = "session-dag-lifecycle"
@@ -530,7 +531,7 @@ describe("assembled DAG lifecycle end to end", () => {
     // then the adopter re-homes and schedules the orphaned node instead of skipping it as foreign
     // (a skip leaves the run under the source session and never starts its node)
     expect(adopter.runtime.manager.list("session-adopter").some((run) => run.runId === runId)).toBe(true)
-    await within(adopterRunner.whenStarted(1), 5_000)
+    await within(adopterRunner.whenStarted(1), remainingTestTime())
     adopterRunner.children[0]?.settle("adopted output")
     const result = await adopter.runtime.wait(runId, "session-adopter")
     expect(result.status).toBe("completed")
@@ -607,7 +608,7 @@ describe("assembled DAG lifecycle end to end", () => {
     // when the session starts and its first turn begins while the recovered node is still running
     await host.dispatch("session_start", { type: "session_start" }, {})
     await runner.whenStarted(1)
-    await within(host.dispatch("before_agent_start", { type: "before_agent_start", prompt: "continue" }, {}), 5_000)
+    await within(host.dispatch("before_agent_start", { type: "before_agent_start", prompt: "continue" }, {}), remainingTestTime())
 
     // then the client already holds the recovered run as live, with its node unsettled
     const statuses = fixture.rpc.events

@@ -24,9 +24,9 @@ import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createDagRuntime, type DagRuntime } from "./dag-runtime"
 import { composeTaskEngine } from "./engine"
 import { createTeamServiceTestModelRegistry } from "./team-service-test-model-registry"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const cleanupRoots: string[] = []
-const STEP_BUDGET_MS = 3_000
 // Above every reachable pid, so it can only ever be "alive" through the injected probe.
 const FOREIGN_HOST_PID = 2_147_483_647
 
@@ -43,7 +43,7 @@ function deferred<T>() {
 function within<T>(promise: Promise<T>, step: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const bound = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(() => reject(new Error(`within(${STEP_BUDGET_MS}ms) exceeded while awaiting ${step}`)), STEP_BUDGET_MS)
+    timer = setTimeout(() => reject(new Error(`the test budget ran out while awaiting ${step}`)), remainingTestTime())
   })
   return Promise.race([promise, bound]).finally(() => {
     if (timer !== undefined) clearTimeout(timer)

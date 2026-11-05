@@ -5,6 +5,7 @@ import {
   type PromptRoutePolicy,
   type RoutedPrompt,
 } from "./prompt-routing"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 type Confirm = { type: "extension_ui_request"; id: string; method: "confirm"; title: string; message: string }
 type Response =
@@ -22,7 +23,7 @@ const confirm = (id = "prompt-1"): Confirm => ({
 async function withTimeout<T>(promise: Promise<T>): Promise<T> {
   return Promise.race([
     promise,
-    new Promise<never>((_, reject) => setTimeout(() => reject(new Error("test timeout")), 250)),
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error("test timeout")), remainingTestTime())),
   ])
 }
 

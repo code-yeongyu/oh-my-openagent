@@ -9,6 +9,7 @@ import { gatewayOutboxMarkerPath } from "./gateway/paths"
 import { createGatewayStore } from "./gateway/store"
 import { createThreadSdk } from "./sdk"
 import type { ThreadHost, ThreadHostSession } from "./tools"
+import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
 
 /**
  * A session relays a pending ask_user question to its bound chat thread (`thread_report` kind question
@@ -19,7 +20,6 @@ import type { ThreadHost, ThreadHostSession } from "./tools"
  */
 
 const HOST_SOCKET = "/tmp/i-0123456789abcdef.sock"
-const EVENT_WAIT_MS = 10_000
 const directories: string[] = []
 const cleanups: (() => Promise<void>)[] = []
 afterEach(async () => {
@@ -33,7 +33,7 @@ type CapturedTool = { readonly name: string; readonly execute: (id: string, args
 function within<T>(work: Promise<T>, what: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const expired = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`waited ${EVENT_WAIT_MS} ms for ${what}`)), EVENT_WAIT_MS)
+    timer = setTimeout(() => reject(new Error(`waited out the test budget for ${what}`)), remainingTestTime())
   })
   return Promise.race([work, expired]).finally(() => clearTimeout(timer))
 }
@@ -148,6 +148,7 @@ async function setup() {
 }
 
 test("#given a session relayed two ask_user questions to its chat thread #when it answers one in its own client #then that question is no longer pending, a chat answer to it is already_answered, and the other stays pending", async () => {
+  useTestTimeout(30_000)
   const s = await setup()
   const first = await s.relay("ask-1")
   const second = await s.relay("ask-2")
@@ -162,6 +163,7 @@ test("#given a session relayed two ask_user questions to its chat thread #when i
 }, 30_000)
 
 test("#given a relayed question #when a thread_answer claim is handed over and then lands #then a connector reading the outbox sees it in flight first and delivered after, with a marker for the change", async () => {
+  useTestTimeout(30_000)
   const s = await setup()
   const asked = await s.relay("ask-claim")
   const claim = await s.connectorStore.claimAnswer({ now: Date.now(), binding_id: s.bindingId, reply_token: asked.reply_token, answer: "option two" })
@@ -173,6 +175,7 @@ test("#given a relayed question #when a thread_answer claim is handed over and t
 }, 30_000)
 
 test("#given a relayed question #when a thread_answer claim's hand-off fails and is released #then the connector reads it pending again, with a marker for the change", async () => {
+  useTestTimeout(30_000)
   const s = await setup()
   const asked = await s.relay("ask-release")
   const claim = await s.connectorStore.claimAnswer({ now: Date.now(), binding_id: s.bindingId, reply_token: asked.reply_token, answer: "option two" })
@@ -183,6 +186,7 @@ test("#given a relayed question #when a thread_answer claim's hand-off fails and
 }, 30_000)
 
 test("#given a thread_answer claim being handed over #when the session closes the question itself and the hand-off then fails #then the release does not reopen it and a later answer is already_answered", async () => {
+  useTestTimeout(30_000)
   const s = await setup()
   const asked = await s.relay("ask-race")
   const claim = await s.connectorStore.claimAnswer({ now: Date.now(), binding_id: s.bindingId, reply_token: asked.reply_token, answer: "option two" })
@@ -198,6 +202,7 @@ test("#given a thread_answer claim being handed over #when the session closes th
 }, 30_000)
 
 test("#given a thread_answer claim being handed over #when the session takes that relayed answer, announcing the close before the relay confirms #then the question keeps the relayed answer and its author", async () => {
+  useTestTimeout(30_000)
   const s = await setup()
   const asked = await s.relay("ask-taken")
   const author = { platform_user_id: "U1", display: "Alice" }
@@ -212,6 +217,7 @@ test("#given a thread_answer claim being handed over #when the session takes tha
 }, 30_000)
 
 test("#given a session's ask_user question closes while its relay report is still being written #when the report finishes #then the row it wrote is closed too", async () => {
+  useTestTimeout(30_000)
   const s = await setup()
   const written = await s.relay("ask-early", () => s.closeLocally("ask-early"))
   expect(s.closes).toHaveLength(1)
@@ -220,6 +226,7 @@ test("#given a session's ask_user question closes while its relay report is stil
 }, 30_000)
 
 test("#given a session's ask_user question closes before its relay report starts #when the report then runs #then the row it writes is closed and a chat answer to it is already_answered", async () => {
+  useTestTimeout(30_000)
   const s = await setup()
   s.askLocally("ask-before")
   s.closeLocally("ask-before")
@@ -232,6 +239,7 @@ test("#given a session's ask_user question closes before its relay report starts
 }, 30_000)
 
 test("#given an ask_user request closed before any report #when a new question opens under the same request id and is reported #then the new row stays pending", async () => {
+  useTestTimeout(30_000)
   const s = await setup()
   s.closeLocally("ask-reused")
   s.askLocally("ask-reused")

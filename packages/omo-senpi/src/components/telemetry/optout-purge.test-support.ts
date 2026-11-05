@@ -17,6 +17,7 @@ import {
   createSilentLogger,
   type RecordedTransport,
 } from "./telemetry.test-support"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 // No process can hold this pid, so the real liveness probe reports its owner dead.
 export const DEAD_PID = 0x7fff_fff0
@@ -167,7 +168,7 @@ export function createWatchedTransport(): WatchedTransport {
   }
   return {
     ...recorded,
-    summariesSent: (sessionHash, count, timeoutMs = 2_000) => new Promise<void>((resolve, reject) => {
+    summariesSent: (sessionHash, count, timeoutMs = remainingTestTime()) => new Promise<void>((resolve, reject) => {
       const timer = setTimeout(() => {
         waiters.delete(check)
         reject(new Error(`expected ${count} session_summary rows for ${sessionHash}, saw ${sentSeqs(recorded, sessionHash).length}`))

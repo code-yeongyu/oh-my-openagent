@@ -9,9 +9,9 @@ import { gatewayInboxDirectory } from "./paths"
 import { createGatewayHarness, type GatewayHarness, type HarnessSession } from "./testing/harness"
 import { resumeProcess, suspendProcess } from "./testing/job-control"
 import type { GatewayStoreEvent, GatewayStoreTestHooks } from "./types"
+import { remainingTestTime, useTestTimeout } from "../../../../../../test-support/test-deadline"
 
 const SENDER = fileURLToPath(new URL("./testing/sender-process.ts", import.meta.url))
-const STEP_TIMEOUT_MS = 20_000
 // win32 has no job control: nothing there can suspend a process the way SIGSTOP does
 const jobControl = process.platform !== "win32"
 
@@ -38,7 +38,7 @@ function killedBySigkill(child: ReturnType<typeof Bun.spawn>): boolean {
 function within<T>(promise: Promise<T>, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const expired = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`waited ${STEP_TIMEOUT_MS} ms for ${label}, it never happened`)), STEP_TIMEOUT_MS)
+    timer = setTimeout(() => reject(new Error(`waited out the test budget for ${label}, it never happened`)), remainingTestTime())
   })
   return Promise.race([promise, expired]).finally(() => clearTimeout(timer))
 }
@@ -162,6 +162,7 @@ describe("notification_before_publication_barrier", () => {
 
 describe("drain_busy_retry_past_the_lock_wait_bound", () => {
   test.skipIf(!jobControl)("#given a sender SIGSTOPped holding the write lock past the store's lock-wait bound #when the drain gives up and the sender continues #then the drain's own busy retry admits the row with no other trigger, and it ends applied exactly once", async () => {
+    useTestTimeout(60_000)
     const h = (harness = createGatewayHarness())
     const b = h.session("B", { storeOptions: { _test: { busyTimeoutMs: 100, lockWaitMaxMs: 600 } } })
     const sender = spawnSender(h, { beforeDbCommit: "pause" })
