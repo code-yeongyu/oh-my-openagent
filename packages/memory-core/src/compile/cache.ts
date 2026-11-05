@@ -4,6 +4,7 @@ import type { CompiledBlockStore } from "./block-persist"
 import { compileMemoryBlockWithReads, type CompileMemoryBlockOptions, type MemoryExpiry } from "./compile"
 import { expirySlot } from "./expiry-slot"
 import { DEFAULT_EXTERNAL_PROJECTION_LIMITS } from "./external-projection-limits"
+import { loadExternalProjectionRenderer, type ExternalProjectionRendererLoad } from "./external-projection-loader"
 import { InFlightReads } from "./in-flight-reads"
 
 export const MEMORY_TEMPLATE_STRUCTURE_VERSION = "senpi-memory-v2"
@@ -47,6 +48,8 @@ export interface MemoryBlockCacheOptions {
   readonly storeBudgetMs?: number
   /** The clock `expires` is evaluated against when a compile names no instant. */
   readonly now?: () => number
+  /** Loads the `<external_projection>` renderer; defaults to the bundled `#memory-external-projection` sidecar. */
+  readonly loadExternalProjectionRenderer?: () => Promise<ExternalProjectionRendererLoad>
 }
 
 const DEFAULT_STORE_BUDGET_MS = 25
@@ -59,7 +62,8 @@ export interface CompiledMemoryBlock {
 
 /**
  * One key's blocks at one revision, one per expiry slot. `first` is the compile that will tell which instants the
- * revision declares; a concurrent caller shares it instead of compiling the same revision twice.
+ * revision declares; a concurrent caller waits for it instead of compiling the same revision twice, and compiles
+ * again only when it degraded.
  */
 interface MemoryBlockCacheEntry {
   readonly variant: string
@@ -77,6 +81,10 @@ export class MemoryBlockCache {
 
   constructor(options: MemoryBlockCacheOptions = {}) {
     this.options = options
+  }
+
+  private get loadRenderer(): () => Promise<ExternalProjectionRendererLoad> {
+    return this.options.loadExternalProjectionRenderer ?? loadExternalProjectionRenderer
   }
 
   get size(): number {
@@ -126,13 +134,22 @@ export class MemoryBlockCache {
     const existing = slot === undefined ? undefined : entry.blocks.get(slot)
     if (existing !== undefined) return existing
 
-    const pending = revision === null
-      ? compileMemoryBlockWithReads(repo, null, options, at)
+    const computing = revision === null
+      ? compileMemoryBlockWithReads(repo, null, options, at, this.loadRenderer)
       : this.compileStored(repo, `block:${key}:${JSON.stringify(options)}`, revision, options, at)
+    const pending = computing.then(({ block, expiries }): CompiledMemoryBlock => ({ block, expiries }))
     if (slot === undefined) entry.first = pending
     else entry.blocks.set(slot, pending)
     try {
       const compiled = await pending
+      // A degraded block reaches only this caller and any caller that found this same promise under its slot; it
+      // leaves the entry untouched (no slot, no expiries: a failed read drops that file's instant). A caller waiting
+      // on `entry.first`, and every later caller, compiles again.
+      if ((await computing).degraded.length > 0) {
+        if (entry.first === pending) entry.first = undefined
+        if (slot !== undefined && entry.blocks.get(slot) === pending) entry.blocks.delete(slot)
+        return compiled
+      }
       entry.expiries ??= compiled.expiries
       entry.blocks.set(expirySlot(compiled.expiries, at), pending)
       return compiled
@@ -162,17 +179,17 @@ export class MemoryBlockCache {
     revision: string,
     options: CompileMemoryBlockOptions,
     asOfMs: number,
-  ): Promise<CompiledMemoryBlock> {
+  ): Promise<CompiledMemoryBlock & { readonly degraded: readonly string[] }> {
     const store = this.options.store === undefined ? undefined : await this.storeWithin(repo.dir)
     const key = this.persistKey(revision, name)
     const stored = store === undefined ? undefined : await store.getBlock(key)
     if (stored !== undefined && stored.slot === expirySlot(stored.expiries, asOfMs)) {
-      return { block: stored.block, expiries: stored.expiries }
+      return { block: stored.block, expiries: stored.expiries, degraded: [] }
     }
-    const { block, degraded, expiries } = await compileMemoryBlockWithReads(repo, revision, options, asOfMs)
+    const { block, degraded, expiries } = await compileMemoryBlockWithReads(repo, revision, options, asOfMs, this.loadRenderer)
     if (degraded.length > 0) this.options.onDegraded?.({ dir: repo.dir, revision, reasons: degraded })
     else store?.putBlock(key, { block, expiries, slot: expirySlot(expiries, asOfMs) })
-    return { block, expiries }
+    return { block, expiries, degraded }
   }
 
   private persistKey(revision: string, name: string): string {
