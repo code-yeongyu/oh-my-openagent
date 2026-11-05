@@ -4,6 +4,7 @@ import { join } from "node:path"
 
 import {
   discardReflectionWorktree,
+  getPidLiveness,
   GitMemoryRepo,
   RESERVATION_EVIDENCE_FILENAME,
   writeQuarantine,
@@ -152,8 +153,14 @@ async function recordedProcessesDead(context: ReconcileContext, runDir: string):
   const pid = (key: string) => typeof raw[key] === "number" ? raw[key] as number : undefined
   const start = (key: string) => typeof raw[key] === "string" || raw[key] === null ? raw[key] as string | null : undefined
   for (const [pidKey, startKey] of [["pid", "processStart"], ["childPid", "childProcessStart"]] as const) {
-    const verdict = await classifyRunProcess(pid(pidKey), start(startKey), context)
-    if (verdict !== "dead" && verdict !== "absent") return false
+    const recordedPid = pid(pidKey)
+    const verdict = await classifyRunProcess(recordedPid, start(startKey), context)
+    if (verdict === "dead" || verdict === "absent") continue
+    // A pid with no recorded start cannot be checked for reuse, but a pid the kernel no longer knows
+    // is gone either way, so it never strands the lock (#11920).
+    if (verdict === "unknown" && recordedPid !== undefined && start(startKey) === undefined
+      && (context.getPidLiveness ?? getPidLiveness)(recordedPid) === "dead") continue
+    return false
   }
   return true
 }

@@ -80,6 +80,20 @@ describe("quarantine of runs reconciliation cannot recover", () => {
     expect((await item.store.readState()).active?.runId).toBe("run-orphan")
   }, 30_000)
 
+  test("#given an unparseable ledger whose recorded supervisor pid is gone and has no recorded start under a dead launcher #when reconciled #then the run is quarantined and the reservation released (#11920)", async () => {
+    // given
+    const item = await fixture()
+    const { processStart: _start, childPid: _childPid, childProcessStart: _childStart, ...withoutStarts } = item.ledger as Record<string, unknown>
+    await writeFile(join(item.runDir, "ledger.json"), JSON.stringify({ ...withoutStarts, mergePolicy: "future-policy", launching: false, pid: 424242 }))
+
+    // when
+    await reconcileReflectionRuns({ identity: item.identity, reservation: item.store, ...deadLauncher() })
+
+    // then
+    expect(await quarantine(item)).toMatchObject({ runId: "run-orphan", reason: "ledger_unreadable" })
+    expect((await item.store.readState()).active).toBeUndefined()
+  }, 30_000)
+
   test("#given a run dir with no prelaunch or ledger still inside the launch window under a dead launcher #when reconciled #then it is left alone", async () => {
     // given
     const item = await fixture()
