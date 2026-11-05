@@ -200,7 +200,6 @@ describe("dispatchInternalPrompt live-server-route routing", () => {
   })
 
   test("#given live dispatch hangs past dispatchTimeoutMs #when dispatchInternalPrompt runs #then result is failed with timeout error original client is not called and route is marked unavailable", async () => {
-    useTestTimeout(5_000)
     //#given
     let liveCalls = 0
     let origCalls = 0

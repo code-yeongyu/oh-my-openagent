@@ -5,7 +5,6 @@ import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { z } from "zod"
-import { testBudgetSignal } from "../../../../../test-support/test-deadline"
 
 const probeResults = z.array(z.object({
   platform: z.string(),
@@ -46,7 +45,7 @@ describe("comment-checker release download", () => {
       },
       stdout: "pipe",
       stderr: "pipe",
-      signal: testBudgetSignal("the downloader child to exit"),
+      signal: AbortSignal.timeout(10_000),
     })
 
     // when the downloader handles an unavailable release endpoint for every target
