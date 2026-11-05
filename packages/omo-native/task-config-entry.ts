@@ -62,6 +62,7 @@ export type MemoryRuntimeCaps = {
   readonly discardAgents: Readonly<Record<string, boolean>>
 }
 
+/** Consumed by member access on the bundled task-config runtime (bin/lib/doctor-memory-runtime.js), which knip cannot trace. @public */
 export function resolveMemoryRuntimeCaps(input: { readonly cwd: string; readonly env: OmoConfigEnv }): MemoryRuntimeCaps {
   const memory = loadOmoConfig({ cwd: input.cwd, env: input.env, harness: "senpi" }).config.memory ?? OmoMemorySettingsSchema.parse({})
   const agents: Record<string, number> = {}

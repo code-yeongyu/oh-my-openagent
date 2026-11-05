@@ -73,7 +73,7 @@ function capText(maxBytes) {
   return maxBytes > 0 ? `${formatRuntimeBytes(maxBytes)} cap` : "no cap"
 }
 
-export function formatMemoryRuntimeLines(identities, totalBytes) {
+function formatMemoryRuntimeLines(identities, totalBytes) {
   if (identities.length === 0) return []
   const bySize = [...identities].sort((left, right) => right.bytes - left.bytes || left.identity.localeCompare(right.identity))
   const lines = bySize.slice(0, LISTED_IDENTITIES).map((entry) => {

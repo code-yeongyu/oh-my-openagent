@@ -6,7 +6,7 @@ export {
 } from "./policy"
 export { type RetentionCursor, type RetentionStore } from "./budget"
 export { RETENTION_STAMP_CONFIG_KEY, retentionCursorPath } from "./stamp"
-export { type UnreflectedRetentionGate } from "./reflection-health-signal"
+export { readUnreflectedRetentionGate, type UnreflectedRetentionGate } from "./reflection-health-signal"
 export {
   KIBITZER_ENCODED_SESSION_PATTERN,
   KIBITZER_SIDECAR_OWNER_LOCK_PURPOSE,
@@ -31,12 +31,8 @@ export {
   type RuntimeRetentionReport,
 } from "./pass"
 export {
-  RUNTIME_CAP_JOURNAL_FLOOR_MS,
-  RUNTIME_CAP_KEPT_UNFOLDED_RUNS,
-  RUNTIME_CAP_SIDECAR_FLOOR_MS,
   describeRuntimeCapExcess,
   measureRuntimeCapEvictableBytes,
-  runRuntimeSizeCap,
   type RuntimeCapEvictableOptions,
   type RuntimeCapExcess,
   type RuntimeCapEviction,
@@ -48,7 +44,6 @@ export {
 export { countRuntimePastRetention, measureUnreflectedJournalBytes, type RuntimePastRetention } from "./past-retention"
 export {
   DEFAULT_RUNTIME_MAX_BYTES,
-  RUNTIME_SIZE_WARN_RATIO,
   formatRuntimeBytes,
   measureRuntimeSize,
   measureRuntimeSizeWithinBudget,

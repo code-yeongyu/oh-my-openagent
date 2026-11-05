@@ -22,7 +22,6 @@ export { sweepIdentityOrphanWorktrees } from "./identity-orphan-sweep"
 export {
   DEFAULT_RUNTIME_MAX_BYTES,
   formatRuntimeBytes,
-  measureRuntimeSize,
   measureRuntimeSizeWithinBudget,
   runtimeSizeStanding,
 } from "../retention/size"

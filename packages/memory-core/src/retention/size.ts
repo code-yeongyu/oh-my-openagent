@@ -20,7 +20,7 @@ export interface RuntimeSize {
 /** `memory.runtime.max_bytes` default per identity; `0` means unbounded. */
 export const DEFAULT_RUNTIME_MAX_BYTES = 2 * 1024 * 1024 * 1024
 /** Both doctor surfaces warn from this share of the cap on. */
-export const RUNTIME_SIZE_WARN_RATIO = 0.8
+const RUNTIME_SIZE_WARN_RATIO = 0.8
 
 export interface RuntimeSizeStanding {
   readonly level: "ok" | "warn"
@@ -48,7 +48,7 @@ export function formatRuntimeBytes(bytes: number): string {
 
 const SPLIT_STORES = new Set(["reflection", "recall"])
 
-export function chargedBytes(stats: Pick<Stats, "blocks" | "size">): number {
+function chargedBytes(stats: Pick<Stats, "blocks" | "size">): number {
   const blocks = stats.blocks
   if (typeof blocks === "number" && Number.isFinite(blocks) && (blocks > 0 || stats.size === 0)) return blocks * 512
   return stats.size

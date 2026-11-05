@@ -61,7 +61,7 @@ function resolveForeignIdentityRetentionPolicy(settings: ForeignMemoryRuntimeSet
 }
 
 /** `max_bytes` for a foreign identity: the agent override, else the global value, else the shipped default. */
-export function resolveForeignIdentityMaxBytes(settings: ForeignMemoryRuntimeSettings | undefined, identity: string): number {
+function resolveForeignIdentityMaxBytes(settings: ForeignMemoryRuntimeSettings | undefined, identity: string): number {
   return window(settings, identity, "max_bytes", DEFAULT_RUNTIME_MAX_BYTES)
 }
 

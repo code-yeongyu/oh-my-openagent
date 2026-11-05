@@ -96,9 +96,9 @@ export interface RuntimeSizeCapReport {
   readonly unreflectedHeldBytes: number
 }
 
-export const RUNTIME_CAP_SIDECAR_FLOOR_MS = 60 * 60 * 1000
-export const RUNTIME_CAP_JOURNAL_FLOOR_MS = 24 * 60 * 60 * 1000
-export const RUNTIME_CAP_KEPT_UNFOLDED_RUNS = 10
+const RUNTIME_CAP_SIDECAR_FLOOR_MS = 60 * 60 * 1000
+const RUNTIME_CAP_JOURNAL_FLOOR_MS = 24 * 60 * 60 * 1000
+const RUNTIME_CAP_KEPT_UNFOLDED_RUNS = 10
 
 const CAP_KEEP_REASONS: ReadonlySet<string> = new Set<RuntimeCapKeepReason>(["reserved", "reflection-unhealthy", "unreflected-retention-off", "high-water", "newest", "newest-unfolded", "reserved", "locked", "recent", "live", "owned", "changed-during-removal"])
 
