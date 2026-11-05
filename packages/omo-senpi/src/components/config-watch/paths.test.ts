@@ -165,6 +165,18 @@ describe("resolveOmoConfigWatchTargets", () => {
     expect(paths.every((path) => dirname(path) !== path)).toBe(true)
   })
 
+  it("#given cwd outside HOME under a directory that contains HOME #when resolving targets #then that directory is not a creation target", () => {
+    const fixture = createFixture()
+    mkdirSync(join(fixture.homeDir, ".omo"), { recursive: true })
+    const shared = join(dirname(fixture.homeDir), "shared", "runs", "x")
+    mkdirSync(shared, { recursive: true })
+
+    const paths = creationPaths(resolveOmoConfigWatchTargets({ cwd: shared, env: fixtureEnv(fixture), platform: "linux" }))
+
+    expect(paths).toEqual([shared, dirname(shared), dirname(dirname(shared))])
+    expect(paths).not.toContain(dirname(fixture.homeDir))
+  })
+
   it("#given a newly created ancestor .omo directory #when resolving targets #then keeps watching its config files after a rejected creation", () => {
     const fixture = createFixture()
 

@@ -123,9 +123,10 @@ function findAncestorDirectories(cwd: string, homeDir: string): readonly string[
 function creationAncestors(ancestors: readonly string[], userConfigParent: string): readonly string[] {
   const bounded: string[] = []
   for (const ancestor of ancestors) {
-    // The filesystem root is never a creation target: outside HOME and outside any repo the walk would
-    // otherwise reach it, and a watch on "/" receives every change on the disk.
-    if (ancestor === resolve(userConfigParent) || dirname(ancestor) === ancestor) break
+    // Never watch the user config parent or anything that contains it (a watch there receives every write
+    // in HOME), nor the filesystem root: outside HOME and outside any repo the walk would otherwise reach it,
+    // and a watch on "/" receives every change on the disk.
+    if (containsPath(ancestor, resolve(userConfigParent)) || dirname(ancestor) === ancestor) break
     bounded.push(ancestor)
     if (existsSync(join(ancestor, ".git"))) break
   }
