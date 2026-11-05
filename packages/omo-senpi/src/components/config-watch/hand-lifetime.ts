@@ -9,4 +9,4 @@ export interface ConfigWatchLifecycleSource {
 }
 
 /** On a fused session the registration ends with `session_shutdown`, which only the loop side emits. */
-export const CONFIG_WATCH_SHUTDOWN_SIDE: BeforeAgentStartHandlerOptions = { runs: "brain" }
+export const CONFIG_WATCH_SHUTDOWN_SIDE: Pick<BeforeAgentStartHandlerOptions, "runs"> = { runs: "brain" }

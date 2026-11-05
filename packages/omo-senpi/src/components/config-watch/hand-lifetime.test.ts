@@ -5,6 +5,8 @@
 // lifecycle source instead. The registration of each scope must live exactly as long as that scope.
 
 import { describe, expect, it } from "bun:test"
+import { dirname, join } from "node:path"
+import { fileURLToPath, pathToFileURL } from "node:url"
 
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import type { ConfigWatchLifecycleSource } from "./hand-lifetime"
@@ -58,6 +60,41 @@ class HandScope {
 
 const ctx: ComponentContext = { logger: { info() {}, warn() {}, error() {} }, config: { getFlag: () => undefined } }
 
+type ExtensionSide = "brain" | "hand"
+
+interface SenpiLoader {
+  loadExtensionFromFactory(
+    factory: (pi: unknown) => Promise<void>,
+    cwd: string,
+    eventBus: unknown,
+    runtime: unknown,
+    extensionPath: string,
+    session: { sessionKind: "interactive"; sessionContext: Record<string, string>; side?: ExtensionSide },
+  ): Promise<{ readonly handlers: Map<string, unknown[]> }>
+  createExtensionRuntime(): unknown
+}
+
+const senpiDistDir = dirname(fileURLToPath(import.meta.resolve("@code-yeongyu/senpi")))
+const loader = (await import(pathToFileURL(join(senpiDistDir, "core", "extensions", "loader.js")).href)) as SenpiLoader
+const eventBus = (await import(pathToFileURL(join(senpiDistDir, "core", "event-bus.js")).href)) as { createEventBus(): unknown }
+
+async function shutdownHandlersLoadedFor(side: ExtensionSide | undefined): Promise<number> {
+  const component = createConfigWatchComponent({
+    resolveCwd: () => "/project",
+    resolveTargets: () => [{ path: "/project/.omo", kind: "dir", filterGlobs: ["omo.json", "omo.jsonc"] }],
+    createValidator: () => ({ validate: () => ({ ok: true }) }),
+  })
+  const loaded = await loader.loadExtensionFromFactory(
+    async (pi) => component.register(pi as SenpiExtensionAPI, ctx),
+    process.cwd(),
+    eventBus.createEventBus(),
+    loader.createExtensionRuntime(),
+    "<config-watch>",
+    { sessionKind: "interactive", sessionContext: {}, ...(side === undefined ? {} : { side }) },
+  )
+  return (loaded.handlers.get("session_shutdown") ?? []).length
+}
+
 function handComponent(scopes: Map<SenpiExtensionAPI, HandScope>) {
   return createConfigWatchComponent({
     resolveCwd: () => "/project",
@@ -68,6 +105,18 @@ function handComponent(scopes: Map<SenpiExtensionAPI, HandScope>) {
 }
 
 describe("config-watch on the hand side of a split session", () => {
+  it("#given senpi's own loader #when config-watch loads for each side #then only the loop side and a fused session keep the session_shutdown release", async () => {
+    // when
+    const counts = {
+      hand: await shutdownHandlersLoadedFor("hand"),
+      brain: await shutdownHandlersLoadedFor("brain"),
+      fused: await shutdownHandlersLoadedFor(undefined),
+    }
+
+    // then
+    expect(counts).toEqual({ hand: 0, brain: 1, fused: 1 })
+  })
+
   it("#given a hand scope's registration #when the scope closes #then every config-watch listener is released once", () => {
     // given
     const scope = new HandScope()
