@@ -3,6 +3,11 @@ import { X509Certificate } from "node:crypto"
 type Candidate = { readonly der: Buffer; readonly index: number }
 export type DropCause = "pem-noncanonical" | "pem-read-error" | "recognized-block-has-headers" | "aux-block-unverified"
   | "ordinary-block-not-indexable" | "ordinary-block-unparseable"
+/** 4.4 item 6: whether dropping the whole file for this cause trusts less than plain Bun. */
+export const DROP_CAUSE_NARROWING: Readonly<Record<DropCause, boolean>> = {
+  "pem-noncanonical": true, "pem-read-error": false, "recognized-block-has-headers": false,
+  "ordinary-block-not-indexable": false, "ordinary-block-unparseable": true, "aux-block-unverified": true,
+}
 type DefaultFileCandidates =
   | { readonly kind: "kept"; readonly certificates: readonly Candidate[] }
   | { readonly kind: "dropped"; readonly cause: DropCause; readonly blockIndex: number; readonly narrowing: boolean }
@@ -141,11 +146,7 @@ export function readDefaultFileCandidates(
   const certificates: Candidate[] = []
   let blockIndex = 0
   const drop = (cause: DropCause, index = blockIndex): DefaultFileCandidates => ({
-    kind: "dropped", cause, blockIndex: index,
-    narrowing: {
-      "pem-noncanonical": true, "pem-read-error": false, "recognized-block-has-headers": false,
-      "ordinary-block-not-indexable": false, "ordinary-block-unparseable": true, "aux-block-unverified": true,
-    }[cause],
+    kind: "dropped", cause, blockIndex: index, narrowing: DROP_CAUSE_NARROWING[cause],
   })
   let label: string | undefined
   let headerEnd = -1
