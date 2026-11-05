@@ -13,7 +13,10 @@ relay daemon, in source or binary form) are proprietary work:
    license provided by the owner of the applicable component.
 3. The public `omo-ai` package is not covered by this agreement. It remains under its own
    Sustainable Use License and only downloads the closed artifact described here; nothing in
-   this agreement changes that package's license.
+   this agreement changes that package's license. The compiled bunshin-ts and bunshin-ts-relay
+   client libraries built from this software may be distributed, unmodified and with this
+   agreement attached, inside the omo-ai and omo-senpi packages and their source repositories;
+   this permission covers only that bundled copy and grants no other right.
 
 ## End-User License (proprietary)
 
