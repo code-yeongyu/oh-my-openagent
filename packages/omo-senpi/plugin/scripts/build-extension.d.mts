@@ -50,6 +50,7 @@ export function buildExtension(options?: BuildExtensionOptions): Promise<{
   desktopToolkitInputs: string[]
   claimReceiptInputs: string[]
   computerUseInputs: string[]
+  computerRunWorkerInputs: string[]
   toolkitSdkInputs: string[]
   bunshinTsInputs: string[]
   rollbackRuntimeInputs: string[]
