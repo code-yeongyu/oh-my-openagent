@@ -6,7 +6,7 @@
 
 use image::RgbaImage;
 
-use crate::ax::{AxHandle, AxProps};
+use crate::ax::{AxHandle, AxObserved, AxProps};
 use crate::error::{CoreResult, DesktopError, TccPermission};
 use crate::frame::FrameGeometry;
 use crate::keys::KeyName;
@@ -353,6 +353,13 @@ pub trait AxBackend {
     fn element_at(&mut self, x: f64, y: f64) -> CoreResult<Option<AxHandle>>;
     fn focused_element(&mut self) -> CoreResult<Option<AxHandle>>;
     fn attributes(&mut self, h: &AxHandle) -> CoreResult<Vec<(String, String)>>;
+
+    /// [`Self::props`] for object-mode sessions, with how each field was read
+    /// and whether the element is a secure text field. Backends that cannot
+    /// tell keep this default: no evidence, never secure.
+    fn observe(&mut self, h: &AxHandle) -> CoreResult<AxObserved> {
+        self.props(h).map(AxObserved::plain)
+    }
 
     /// The window that owns `h`, read live from the platform and named as
     /// `windows` (the live [`Backend::windows`]) lists it. Backends that
