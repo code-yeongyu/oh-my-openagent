@@ -2,7 +2,7 @@ import { access, mkdir, readFile, unlink, writeFile } from "../fs/resilient"
 import { dirname, relative } from "node:path"
 
 import { isMissingFrontmatterError, parseMemoryFile, renderMemoryFile } from "../memfs/frontmatter"
-import { MemoryPathError, validateMemoryPath } from "../memfs/paths"
+import { MemoryPathError, confineMemoryPathOnDevice, validateMemoryPath } from "../memfs/paths"
 import type { ClaimReceipt } from "../provenance"
 import { hasLegacyUserHeader, restampContent } from "./claim-frontmatter"
 import {
@@ -32,9 +32,10 @@ async function applyOperations(root: string, operations: readonly PatchOperation
   // content before and after, never from the batch shape.
   const strippedPaths: string[] = []
 
-  const resolvePath = (input: string, fieldName: string): { absolute: string; relative: string } => {
+  const resolvePath = async (input: string, fieldName: string): Promise<{ absolute: string; relative: string }> => {
     try {
-      const absolute = validateMemoryPath(root, input, { fieldName })
+      const absolute = validateMemoryPath(root, input, { fieldName, deviceConfinement: "deferred" })
+      await confineMemoryPathOnDevice(root, absolute)
       return { absolute, relative: relative(root, absolute).replace(/\\/g, "/") }
     } catch (error) {
       if (!(error instanceof MemoryPathError)) throw error
@@ -58,7 +59,7 @@ async function applyOperations(root: string, operations: readonly PatchOperation
 
   for (const operation of operations) {
     if (operation.kind === "add") {
-      const target = resolvePath(operation.targetPath, "Add File path")
+      const target = await resolvePath(operation.targetPath, "Add File path")
       if (pendingWrites.has(target.absolute)) {
         throw new Error(`memory apply_patch: duplicate add/update target in patch: ${target.relative}`)
       }
@@ -72,7 +73,7 @@ async function applyOperations(root: string, operations: readonly PatchOperation
     }
 
     if (operation.kind === "delete") {
-      const target = resolvePath(operation.targetPath, "Delete File path")
+      const target = await resolvePath(operation.targetPath, "Delete File path")
       const parsed = parseForTool(await loadCurrent(target))
       assertEditable(parsed.frontmatter.read_only, target.relative)
       pendingWrites.delete(target.absolute)
@@ -81,8 +82,8 @@ async function applyOperations(root: string, operations: readonly PatchOperation
       continue
     }
 
-    const source = resolvePath(operation.sourcePath, "Update File path")
-    const target = resolvePath(operation.targetPath, "Move to path")
+    const source = await resolvePath(operation.sourcePath, "Update File path")
+    const target = await resolvePath(operation.targetPath, "Move to path")
     const current = await loadCurrent(source)
     assertEditable(parseForTool(current).frontmatter.read_only, source.relative)
     let next = current
