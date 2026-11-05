@@ -30,7 +30,7 @@ and the `dialog.url` getter). A listener can answer it itself, which replaces th
 dialog; a listener that only observes leaves it to the policy:
 
 ```js
-page.on("dialog", (dialog) => dialog.type() === "prompt" ? dialog.accept("agent@example.com") : dialog.dismiss())
+page.on("dialog", (dialog) => dialog.type() === "prompt" ? dialog.accept("42") : dialog.dismiss())
 ```
 
 A dialog is answered once; a second `accept()` / `dismiss()` throws. A run that hangs on
