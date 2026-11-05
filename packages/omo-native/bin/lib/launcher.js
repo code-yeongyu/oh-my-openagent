@@ -19,6 +19,7 @@ import { removeLegacyServiceCredentials } from "./legacy-service-credentials.js"
 import { adoptLegacyFlatState, canonicalAgentDir } from "./agent-dir.js"
 import { senpiEnvironment } from "./engine-environment.js"
 import { withHerdrAgentHint } from "./herdr-agent-hint.js"
+import { isEngineProtocolMode } from "./mode-flags.js"
 import { packageManifest, packageRoot, readJson, releaseBanner, resolveSenpi, updateTarget } from "./package-paths.js"
 import { runSelfUpdate } from "./self-update.js"
 import { isSelfUpdate } from "./update-args.js"
@@ -79,7 +80,7 @@ function notice(line) {
 }
 
 function isInteractiveDefault(args) {
-  return process.stderr.isTTY === true && !args.includes("-p") && !args.includes("--print")
+  return process.stderr.isTTY === true && !args.includes("-p") && !args.includes("--print") && !isEngineProtocolMode(args)
 }
 
 /**
