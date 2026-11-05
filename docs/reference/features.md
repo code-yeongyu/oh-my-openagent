@@ -533,7 +533,10 @@ trace in the page. `bskDoctor()` / `bskOnboard()` (wrapped by the skill's
 and register the Web Store extension in the one browser the user actually uses
 (OS default browser, running app, recent use; `--browser=<id>` overrides, and the
 doctor reports `choose-browser` instead of guessing when those disagree) so the
-user's only step is one **Enable** click. Never launch against, clone, or clear the user's live profile; never fall
+user's only step is one **Enable** click. With BrowserSkill 0.4 the user can keep working in the
+same tab: every page action carries `{ context }` from a fresh `session.cooperate("sync")`, and a
+`cooperation_sync_required` refusal means `session.cooperate("wait")`, then sync and replan.
+Never launch against, clone, or clear the user's live profile; never fall
 back to the owned engine for a page that needs their login.
 
 **Browser QA capabilities (choose the tier that supports the criterion)**:
