@@ -7,6 +7,10 @@
 //!   the `--serve` daemon the first request auto-starts with no session flags;
 //! - `mcp`: the `--mcp` stdio server over the same kind of daemon.
 //!
+//! A `oneshot` step may instead carry a `control` the user or a supervisor
+//! performs: `start-daemon` (a `--serve` daemon the test owns),
+//! `restart-daemon` (SIGKILL it and serve again) or `resume` (`--resume`).
+//!
 //! The corpus freezes today's replies before any v2 behavior change: each
 //! step's messages must deep-equal the expected ones modulo the declared
 //! `variable` JSON pointers (present, any value), in any order within the step,
@@ -58,8 +62,21 @@ struct Case {
 
 #[derive(Deserialize)]
 struct Step {
+    #[serde(default)]
+    control: Option<Control>,
+    #[serde(default)]
     send: Value,
+    #[serde(default)]
     expect: Vec<Expected>,
+}
+
+/// An out-of-band step: what a user or supervisor does between requests.
+#[derive(Deserialize, Clone, Copy, Debug)]
+#[serde(rename_all = "kebab-case")]
+enum Control {
+    StartDaemon,
+    RestartDaemon,
+    Resume,
 }
 
 #[derive(Deserialize)]
@@ -178,6 +195,46 @@ fn private_dir(dir: &std::path::Path) {
     std::fs::create_dir_all(dir).expect("temp dir");
 }
 
+/// A `--serve` daemon the test owns, so a step can kill and restart it.
+struct ServeDaemon(Child);
+
+impl ServeDaemon {
+    fn start(env: &[(String, String)], socket: &str) -> Result<Self, String> {
+        let mut child = engine_command(
+            env,
+            &["--enable-daemon", "--serve", socket, "--idle-ms", "60000"],
+        )
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| format!("--serve spawns: {error}"))?;
+        let stderr = child.stderr.take().expect("stderr is piped");
+        let (sender, ready) = mpsc::channel();
+        thread::spawn(move || {
+            let mut announced = false;
+            for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+                if !announced && line.contains("serving on") {
+                    announced = true;
+                    let _ = sender.send(());
+                }
+            }
+        });
+        let daemon = Self(child);
+        ready
+            .recv_timeout(HANG_GUARD)
+            .map_err(|_| "--serve did not announce `serving on` within the hang guard".to_owned())?;
+        Ok(daemon)
+    }
+}
+
+impl Drop for ServeDaemon {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+
 impl Drop for DaemonDir {
     fn drop(&mut self) {
         // A leftover dir in the temp dir is harmless; the next run uses a new name.
@@ -238,6 +295,7 @@ enum Driver {
     Stdio(Engine),
     Oneshot {
         env: Vec<(String, String)>,
+        daemon: Option<ServeDaemon>,
         dir: DaemonDir,
     },
     Mcp {
@@ -258,6 +316,7 @@ impl Driver {
             }
             Transport::Oneshot => Self::Oneshot {
                 env,
+                daemon: None,
                 dir: DaemonDir::new(index),
             },
             Transport::Mcp => {
@@ -288,12 +347,39 @@ impl Driver {
                 engine.send(message);
                 (0..expected).map(|_| engine.next()).collect()
             }
-            Self::Oneshot { env, dir } => oneshot(env, &dir.socket(), message),
+            Self::Oneshot { env, dir, .. } => oneshot(env, &dir.socket(), message),
             Self::Mcp { child, .. } => {
                 child.send(message);
                 (0..expected).map(|_| child.next()).collect()
             }
         }
+    }
+
+    fn control(&mut self, control: Control) -> Result<(), String> {
+        let Self::Oneshot { env, daemon, dir } = self else {
+            return Err(format!("{control:?} needs the oneshot transport"));
+        };
+        let socket = dir.socket();
+        match control {
+            Control::StartDaemon => *daemon = Some(ServeDaemon::start(env, &socket)?),
+            Control::RestartDaemon => {
+                // SIGKILL: no exit cleanup runs, the socket and token file stay behind.
+                drop(daemon.take().ok_or("restart-daemon before start-daemon")?);
+                *daemon = Some(ServeDaemon::start(env, &socket)?);
+            }
+            Control::Resume => {
+                let output = engine_command(
+                    env,
+                    &["--enable-daemon", "--resume", "--endpoint", &socket],
+                )
+                .output()
+                .map_err(|error| format!("--resume runs: {error}"))?;
+                if !output.status.success() {
+                    return Err(format!("--resume failed: {output:?}"));
+                }
+            }
+        }
+        Ok(())
     }
 
     fn finish(self) -> Vec<Value> {
@@ -319,6 +405,12 @@ fn replay(index: usize, name: &str, case: &Case) -> Result<(), String> {
     );
     let mut driver = Driver::start(index, case.transport, env);
     for (index, step) in case.steps.iter().enumerate() {
+        if let Some(control) = step.control {
+            driver
+                .control(control)
+                .map_err(|error| format!("{name}: steps/{index}: {error}"))?;
+            continue;
+        }
         let mut actual = driver.exchange(&step.send, step.expect.len());
         for (slot, expected) in step.expect.iter().enumerate() {
             let Some(found) = actual.iter().position(|message| matches(expected, message)) else {
