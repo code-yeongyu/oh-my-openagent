@@ -244,6 +244,62 @@ describe("computer tool execute", HANG_GUARD, () => {
 		expect(open?.params).toMatchObject({ macosCanary });
 	});
 
+	// Contract: tool result `details.report` (SDK ActionReport) for omo sessions; fails if the service stops asking for
+	// object reports, the tool drops them, or a pre-features engine's `null` stops mapping to the legacy report.
+	it.each([
+		["an engine advertising action-report", { FAKE_ENGINE_FEATURES: '["action-report"]' }, "object", {
+			disposition: { delivery: "delivered_unverified", retry: "unsafe" },
+			effect: "unverifiable",
+			focusRestoration: "not_needed",
+			auditIds: ["audit-typeText"],
+			legacy: false,
+		}],
+		["a v1 engine without features", {}, undefined, {
+			disposition: { delivery: "delivered_unverified", retry: "unsafe" },
+			effect: "unverifiable",
+			focusRestoration: "not_confirmed",
+			auditIds: [],
+			legacy: true,
+		}],
+	] as const)("returns the input action's report in details for %s", async (_engine, env, reportMode, report) => {
+		// Given
+		const { handle, log } = desktopFixture({}, env);
+		const params = {
+			action: "call" as const,
+			chain: [{ method: "window", args: [{ app: "Code" }] }, { method: "type", args: ["hi"] }],
+		};
+
+		// When
+		const result = await toolFor(handle).execute("call-report", params, undefined, undefined, hostContext());
+
+		// Then
+		const open = log.requests.find((request) => request.method === "session.open");
+		expect({
+			reportMode: (open?.params as { reportMode?: string } | undefined)?.reportMode,
+			report: result.details.report,
+			reports: result.details.reports,
+		}).toMatchObject({ reportMode, report, reports: undefined });
+	});
+
+	it("lists every input action's report in send order and leaves a read-only run without one", async () => {
+		// Given
+		const { handle } = desktopFixture({}, { FAKE_ENGINE_FEATURES: '["action-report"]' });
+		const tool = toolFor(handle);
+		const code = "const win = await desktop.window('101'); await win.type('a'); await win.press('enter');";
+
+		// When
+		const sent = await tool.execute("call-run", { action: "run", code }, undefined, undefined, hostContext());
+		const read = await tool.execute("call-read", { action: "call", chain: [{ method: "windows" }] }, undefined,
+			undefined, hostContext());
+
+		// Then
+		expect({
+			auditIds: sent.details.reports?.map((report) => report.auditIds),
+			last: sent.details.report?.auditIds,
+			read: "report" in read.details,
+		}).toEqual({ auditIds: [["audit-typeText"], ["audit-keyChord"]], last: ["audit-keyChord"], read: false });
+	});
+
 	it("arms the configured stop chord once across repeated calls", async () => {
 		// Given
 		const { handle, log } = desktopFixture({ stopHotkey: "ctrl+alt+shift+f12" });
