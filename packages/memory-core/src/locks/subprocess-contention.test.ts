@@ -17,6 +17,7 @@ import {
   readPidFileWhenWritten,
 } from "./process-liveness.test-support"
 import { removeTree } from "../../../../test-support/remove-tree"
+import { remainingTestTime } from "../../../../test-support/test-deadline"
 
 const workerPath = fileURLToPath(new URL("./subprocess-worker.ts", import.meta.url))
 const temporaryDirectories: string[] = []
@@ -65,7 +66,7 @@ function waitForOutput(child: ChildProcessWithoutNullStreams, expected: string):
 
 function waitForExit(child: ChildProcessWithoutNullStreams): Promise<{ code: number | null; signal: NodeJS.Signals | null }> {
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error("timed out waiting for child exit")), 5_000)
+    const timeout = setTimeout(() => reject(new Error("timed out waiting for child exit")), remainingTestTime())
     child.once("exit", (code, signal) => {
       clearTimeout(timeout)
       resolve({ code, signal })

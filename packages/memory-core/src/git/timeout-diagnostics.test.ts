@@ -6,6 +6,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { GIT_TIMEOUT_DIAGNOSTICS_ENV, recordGitTimeout } from "./timeout-diagnostics"
+import { remainingTestTime } from "../../../../test-support/test-deadline"
 
 const roots: string[] = []
 const stops: Array<() => void> = []
@@ -31,7 +32,7 @@ describe("git timeout diagnostics on Windows (#10821)", () => {
     const parent = spawn(process.execPath, ["-e", PARENT], { stdio: ["ignore", "pipe", "ignore"], windowsHide: true })
     stops.push(() => parent.kill("SIGKILL"))
     const childPid = await new Promise<number>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error("waited 20 s for the stand-in to print its child pid")), 20_000)
+      const timer = setTimeout(() => reject(new Error("waited out the test budget for the stand-in to print its child pid")), remainingTestTime())
       parent.stdout.on("data", (chunk: Buffer) => {
         const pid = Number(chunk.toString("utf8").match(/CHILD (\d+)/)?.[1])
         if (Number.isSafeInteger(pid) && pid > 0) {

@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test"
 
 import { b64urlOfHex, createHttpTransport, hexOfB64url, SyncAuthError, SyncHttpError, SyncNetworkError } from "./http-transport"
 import { startWireServer, type WireServer } from "./wire-server.test-support"
+import { remainingTestTime } from "../../../../../../test-support/test-deadline"
 
 const servers: WireServer[] = []
 afterEach(async () => {
@@ -106,7 +107,7 @@ test("the event stream delivers sync.advanced heads and reports the connection",
   const connected: boolean[] = []
   let stop: () => void = () => undefined
   const first = new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("waited 10s for sync.advanced, never fired")), 10_000)
+    const timer = setTimeout(() => reject(new Error("waited out the test budget for sync.advanced, never fired")), remainingTestTime())
     stop = b.subscribe({
       onAdvanced: (head) => {
         heads.push(head)
@@ -133,7 +134,7 @@ test("#given a subscribed device #when another device is signed out through the 
   const { server, a, b } = await pair()
   let stop: () => void = () => undefined
   const changed = new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("waited 10s for sync.state.changed, never fired")), 10_000)
+    const timer = setTimeout(() => reject(new Error("waited out the test budget for sync.state.changed, never fired")), remainingTestTime())
     stop = a.subscribe({
       onAdvanced: () => undefined,
       onConnected: (up) => {
