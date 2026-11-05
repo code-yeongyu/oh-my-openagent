@@ -21,4 +21,3 @@ export function worktreeFromLedger(identity: MemoryIdentity, ledger: Reservation
     exec: createNodeGitExec(),
   }
 }
-
