@@ -1,9 +1,14 @@
+import { homedir } from "node:os"
+
 import { InFlightReads, MemoryBlockCache, runStaleLockReaper } from "@oh-my-opencode/memory-core"
 
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import { buildDreamTriggerWiring } from "./dream-runtime-wiring"
 import { resolveMemorySettings } from "./identity-runtime"
 import { createMemoryMaintenance } from "./memory-maintenance"
+import { resolveRuntimeRetentionPolicy } from "./memory-runtime-retention"
+import { resolveAgentReflectionSettings } from "./reflection-settings"
+import { encodeKibitzerSessionId } from "./kibitzer/observe-paths"
 import { createMemoryNudgeWiring } from "./nudge-wiring"
 import type { PalacePeopleOptions } from "./palace/people"
 import { registerMemoryFilesystemPolicy } from "./policy-guard"
@@ -161,6 +166,15 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
   const kibitzerRef: { current?: KibitzerComposition } = {}
   const maintenance = (options.createMaintenance ?? createMemoryMaintenance)({
     isLiveSession: (sessionId) => options.sessions.has(sessionId),
+    resolveRetention: (context) =>
+      resolveRuntimeRetentionPolicy(resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory), context.identity),
+    reflectionEnabled: (context) =>
+      resolveAgentReflectionSettings(options.loadConfig({ cwd: options.cwd() }).config.memory, context.identity).enabled,
+    ownedSidecars: () => new Set([...options.sessions.keys()].map(encodeKibitzerSessionId)),
+    // Driver 2 never runs under CI or in a task child; foreign identities use the global layer only.
+    hostSweep: () => process.env.CI !== undefined || process.env.OMO_SENPI_TASK_RPC_CHILD === "1"
+      ? undefined
+      : { settings: resolveMemorySettings(options.loadConfig({ cwd: homedir() }).config.memory) },
     ...(options.logger === undefined ? {} : { logger: options.logger }),
   })
 

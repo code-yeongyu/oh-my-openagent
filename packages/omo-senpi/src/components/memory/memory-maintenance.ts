@@ -1,12 +1,23 @@
 import { existsSync } from "@oh-my-opencode/memory-core/fs"
+import { dirname } from "node:path"
 
 import {
+  DEFAULT_RUNTIME_RETENTION,
+  createRetentionHostSweepStep,
+  readHostSweepState,
+  sweepHostIdentities,
+  type ForeignMemoryRuntimeSettings,
+  RETENTION_STAMP_CONFIG_KEY,
   GitMemoryRepo,
   LockContentionError,
   createLockRecord,
   memoryMaintenanceLockPath,
+  retentionCursorPath,
+  runRuntimeRetention,
+  summarizeRuntimeRetention,
   sweepEmptyTranscriptJournals,
   withLock,
+  type RuntimeRetentionPolicy,
 } from "@oh-my-opencode/memory-core"
 
 import type { MemoryIdentityContext } from "./context"
@@ -28,7 +39,22 @@ export interface MemoryMaintenanceOptions {
   readonly timeoutMs?: number
   readonly now?: () => number
   readonly isLiveSession?: (sessionId: string) => boolean
+  /** `memory.runtime` windows for this identity; defaults to the documented ones. */
+  readonly resolveRetention?: (context: MemoryIdentityContext) => RuntimeRetentionPolicy
+  /** `memory.reflection.enabled` for the identity: the health gate only guards identities that reflect. */
+  readonly reflectionEnabled?: (context: MemoryIdentityContext) => boolean
+  /** Encoded sidecar directory names this process's live sessions own. */
+  readonly ownedSidecars?: () => ReadonlySet<string>
+  /**
+   * Driver 2 of the host sweep (design 6b): undefined disables it (CI, task children, print runs);
+   * otherwise it returns the GLOBAL memory settings that foreign identities are swept with.
+   */
+  readonly hostSweep?: () => { readonly settings?: ForeignMemoryRuntimeSettings } | undefined
 }
+
+const HOST_SWEEP_IDENTITIES_PER_PASS = 25
+const HOST_SWEEP_SLICE_MS = 30_000
+const HOST_SWEEP_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000
 
 export interface MemoryMaintenance {
   /** Schedules one background pass for this identity; repeated calls in this process are no-ops. */
@@ -63,6 +89,9 @@ const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000
  *   writer has just created is never removed.
  * - Off the hot path: it starts after a delay, the timer never keeps a process alive, `dispose()` (session
  *   exit) cancels it and stops a running git, and every failure is logged, never raised.
+ * - Runtime retention (#10144) runs inside the same gate, after the pack: one pass per identity per
+ *   interval removes folded reflection runs, idle journals, sidecars and legacy stores past their
+ *   `memory.runtime` windows. It is abort-aware between items and logs one summary line.
  * - Empty transcript journals left by older builds (#9737) are swept once per identity per process, at
  *   once rather than behind the delay: control sessions exit within seconds and dispose() would cancel it.
  */
@@ -96,6 +125,62 @@ export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}):
     }
   }
 
+  /** Due when no completed pass is stamped within the interval, or an interrupted pass left a cursor. */
+  async function retentionDue(context: MemoryIdentityContext, repo: GitMemoryRepo): Promise<boolean> {
+    if (existsSync(retentionCursorPath(context.identityPaths.runtime))) return true
+    const last = Number(await repo.configGet(RETENTION_STAMP_CONFIG_KEY) ?? Number.NaN)
+    return !(Number.isFinite(last) && now() - last < intervalMs)
+  }
+
+  async function retain(context: MemoryIdentityContext, repo: GitMemoryRepo, signal: AbortSignal): Promise<void> {
+    try {
+      const report = await runRuntimeRetention({
+        paths: context.identityPaths,
+        policy: options.resolveRetention?.(context) ?? DEFAULT_RUNTIME_RETENTION,
+        now,
+        signal,
+        reflectionEnabled: options.reflectionEnabled?.(context) ?? true,
+        ...(options.isLiveSession === undefined ? {} : { isLiveSession: options.isLiveSession }),
+        ...(options.ownedSidecars === undefined ? {} : { ownedSidecars: options.ownedSidecars() }),
+        warn: (message, fields) => options.logger?.warn(message, { identity: context.identity, ...fields }),
+      })
+      const summary = summarizeRuntimeRetention(report)
+      if (summary.removed > 0 || report.skipped.length > 0 || report.cursor !== undefined) {
+        options.logger?.info("omo-senpi memory runtime retention", { identity: context.identity, ...summary })
+      }
+      // The completion stamp is written after the work, so an interrupted pass resumes at the next bind.
+      if (report.cursor === undefined) await repo.configSet(RETENTION_STAMP_CONFIG_KEY, String(now()))
+    } catch (error) {
+      if (signal.aborted) throw error
+      options.logger?.warn("omo-senpi memory runtime retention failed", {
+        identity: context.identity,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
+  /** One bounded slice of the host-wide sweep, after this identity's own pass, when the round is due. */
+  async function sweepHost(context: MemoryIdentityContext, signal: AbortSignal): Promise<void> {
+    const host = options.hostSweep?.()
+    if (host === undefined) return
+    const memoryRoot = dirname(dirname(context.identityPaths.root))
+    const state = await readHostSweepState(memoryRoot)
+    const completedAt = state.completedAt === undefined ? Number.NaN : Date.parse(state.completedAt)
+    if (state.cursor === undefined && Number.isFinite(completedAt) && now() - completedAt < HOST_SWEEP_INTERVAL_MS) return
+    const deadline = now() + HOST_SWEEP_SLICE_MS
+    const result = await sweepHostIdentities({
+      memoryRoot,
+      steps: [createRetentionHostSweepStep({ ...(host.settings === undefined ? {} : { settings: host.settings }), now, signal, deadline })],
+      maxIdentities: HOST_SWEEP_IDENTITIES_PER_PASS,
+      budgetMs: HOST_SWEEP_SLICE_MS,
+      now,
+      signal,
+    })
+    if (result.status === "swept" && result.lines.length > 0) {
+      options.logger?.info("omo-senpi memory host sweep", { visited: result.visited.length, completed: result.completed, lines: result.lines })
+    }
+  }
+
   async function run(context: MemoryIdentityContext, signal: AbortSignal): Promise<void> {
     // A transient identity has no repo until it is promoted.
     if (!existsSync(context.identityPaths.repo)) return
@@ -105,16 +190,22 @@ export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}):
         signal.throwIfAborted()
         const repo = createRepo(context)
         const last = Number(await repo.configGet(STAMP_KEY) ?? Number.NaN)
-        if (Number.isFinite(last) && now() - last < intervalMs) return
-        await repo.configSet(STAMP_KEY, String(now()))
-        const result = await repo.maintain({ minLooseObjects, timeoutMs, signal })
-        if (result.status === "packed") {
-          options.logger?.info("omo-senpi memory repo packed", {
-            identity: context.identity,
-            looseObjectsBefore: result.looseObjectsBefore,
-            looseObjectsAfter: result.looseObjectsAfter,
-          })
+        if (!(Number.isFinite(last) && now() - last < intervalMs)) {
+          await repo.configSet(STAMP_KEY, String(now()))
+          const result = await repo.maintain({ minLooseObjects, timeoutMs, signal })
+          if (result.status === "packed") {
+            options.logger?.info("omo-senpi memory repo packed", {
+              identity: context.identity,
+              looseObjectsBefore: result.looseObjectsBefore,
+              looseObjectsAfter: result.looseObjectsAfter,
+            })
+          }
         }
+        if (await retentionDue(context, repo)) await retain(context, repo, signal)
+        await sweepHost(context, signal).catch((error: unknown) => {
+          if (signal.aborted) throw error
+          options.logger?.warn("omo-senpi memory host sweep failed", { error: error instanceof Error ? error.message : String(error) })
+        })
       }, { waitTimeoutMs: 0 })
     } catch (error) {
       // Another session or process holds the pass: it is that runner's job, not a failure.

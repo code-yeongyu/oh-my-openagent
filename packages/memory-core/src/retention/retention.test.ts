@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { existsSync } from "node:fs"
-import { chmod, mkdir, readFile, readdir, writeFile } from "node:fs/promises"
+import { chmod, mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import { acquireLock, createLockRecord, releaseLock } from "../locks"
-import { runFinalizationLockPath } from "../locks/domains"
+import { reflectionSchedulerLockPath, runFinalizationLockPath } from "../locks/domains"
+import { ReflectionReservationStore } from "../reflection/reservation"
 import { TranscriptJournal } from "../journal/store"
 import { sweepEmptyTranscriptJournals } from "../journal/sweep"
 import { DEFAULT_RUNTIME_RETENTION, runRuntimeRetention, type RuntimeRetentionOptions } from "./index"
@@ -16,7 +17,9 @@ import {
   daysAgo,
   exitedPid,
   identity,
+  iso,
   journal,
+  NOW,
   now,
   readOnlyPayload,
   reflectionRun,
@@ -30,8 +33,10 @@ import type { MemoryIdentityPaths } from "../identity/layout"
 
 afterEach(cleanupRoots)
 
+const UNREFLECTED_ON = { ...DEFAULT_RUNTIME_RETENTION, discardUnreflectedJournals: true }
+
 function retention(paths: MemoryIdentityPaths, extra: Partial<RuntimeRetentionOptions> = {}) {
-  return runRuntimeRetention({ paths, policy: DEFAULT_RUNTIME_RETENTION, now, ...extra })
+  return runRuntimeRetention({ paths, policy: UNREFLECTED_ON, now, ...extra })
 }
 
 async function tombstones(dir: string): Promise<string[]> {
@@ -55,11 +60,13 @@ describe("runtime retention: reflection run directories", () => {
 
   test("#given a folded run whose file was touched recently #when the pass runs #then it is kept as recent (A02)", async () => {
     const paths = await identity()
+    await reflectionRun(paths, "reflection-run-4", { finishedAt: daysAgo(8) })
     const dir = await reflectionRun(paths, "reflection-run-5")
     await ageTree(join(dir, "child-1.log"), daysAgo(2))
     await reflectionRun(paths, "reflection-run-9", { finishedAt: daysAgo(1) })
 
     const report = await retention(paths)
+    expect(report.runs.removed).toEqual(["reflection-run-4"])
 
     expect(report.runs.kept["reflection-run-5"]).toBe("recent")
     expect(existsSync(dir)).toBe(true)
@@ -67,10 +74,12 @@ describe("runtime retention: reflection run directories", () => {
 
   test("#given a folded run whose final.json names another run #when the pass runs #then it is kept as malformed (A03)", async () => {
     const paths = await identity()
+    await reflectionRun(paths, "reflection-run-4", { finishedAt: daysAgo(8) })
     const dir = await reflectionRun(paths, "reflection-run-5", { finalRunId: "reflection-run-4" })
     await reflectionRun(paths, "reflection-run-9", { finishedAt: daysAgo(1) })
 
     const report = await retention(paths)
+    expect(report.runs.removed).toEqual(["reflection-run-4"])
 
     expect(report.runs.kept["reflection-run-5"]).toBe("malformed")
     expect(existsSync(dir)).toBe(true)
@@ -78,12 +87,14 @@ describe("runtime retention: reflection run directories", () => {
 
   test("#given failed, abandoned and quarantined runs 60 days old #when the pass runs #then all are kept as unfolded terminal (A04)", async () => {
     const paths = await identity()
+    await reflectionRun(paths, "reflection-run-4", { finishedAt: daysAgo(8) })
     await reflectionRun(paths, "reflection-run-1", { outcome: "failed", finishedAt: daysAgo(60) })
     await reflectionRun(paths, "reflection-run-2", { sentinel: "abandoned", finishedAt: daysAgo(60) })
     await reflectionRun(paths, "reflection-run-3", { sentinel: "quarantined", finishedAt: daysAgo(60) })
     await reflectionRun(paths, "reflection-run-9", { finishedAt: daysAgo(1) })
 
     const report = await retention(paths)
+    expect(report.runs.removed).toEqual(["reflection-run-4"])
 
     for (const runId of ["reflection-run-1", "reflection-run-2", "reflection-run-3"]) {
       expect(report.runs.kept[runId]).toBe("unfolded-terminal")
@@ -93,10 +104,12 @@ describe("runtime retention: reflection run directories", () => {
 
   test("#given a run dir with a ledger and no sentinel 60 days old #when the pass runs #then it is kept for the reaper (A05)", async () => {
     const paths = await identity()
+    await reflectionRun(paths, "reflection-run-4", { finishedAt: daysAgo(8) })
     await reflectionRun(paths, "reflection-run-1", { sentinel: "none", finishedAt: daysAgo(60) })
     await reflectionRun(paths, "reflection-run-9", { finishedAt: daysAgo(1) })
 
     const report = await retention(paths)
+    expect(report.runs.removed).toEqual(["reflection-run-4"])
 
     expect(report.runs.kept["reflection-run-1"]).toBe("no-terminal")
     expect(existsSync(join(runsDir(paths), "reflection-run-1"))).toBe(true)
@@ -104,6 +117,7 @@ describe("runtime retention: reflection run directories", () => {
 
   test("#given folded runs that are the pending and the active reservation #when the pass runs #then both are kept as reserved (A06)", async () => {
     const paths = await identity()
+    await reflectionRun(paths, "reflection-run-2", { finishedAt: daysAgo(8) })
     await reflectionRun(paths, "reflection-run-3")
     await reflectionRun(paths, "reflection-run-4")
     await reflectionRun(paths, "reflection-run-9", { finishedAt: daysAgo(1) })
@@ -111,6 +125,7 @@ describe("runtime retention: reflection run directories", () => {
     await reservation(paths, "pending.json", "reflection-run-4")
 
     const report = await retention(paths)
+    expect(report.runs.removed).toEqual(["reflection-run-2"])
 
     expect(report.runs.kept["reflection-run-3"]).toBe("reserved")
     expect(report.runs.kept["reflection-run-4"]).toBe("reserved")
@@ -132,6 +147,7 @@ describe("runtime retention: reflection run directories", () => {
 
   test("#given a folded run whose finalize lock is held live #when the pass runs #then it is kept as locked without waiting (A08)", async () => {
     const paths = await identity()
+    await reflectionRun(paths, "reflection-run-4", { finishedAt: daysAgo(8) })
     await reflectionRun(paths, "reflection-run-5")
     await reflectionRun(paths, "reflection-run-9", { finishedAt: daysAgo(1) })
     await mkdir(paths.locks, { recursive: true })
@@ -140,6 +156,7 @@ describe("runtime retention: reflection run directories", () => {
     await acquireLock(lockPath, holder)
     try {
       const report = await retention(paths)
+      expect(report.runs.removed).toEqual(["reflection-run-4"])
       expect(report.runs.kept["reflection-run-5"]).toBe("locked")
       expect(existsSync(join(runsDir(paths), "reflection-run-5"))).toBe(true)
     } finally {
@@ -212,7 +229,7 @@ describe("runtime retention: completion records", () => {
 
     const mark = JSON.parse(await readFile(join(paths.reflection, "run-id.json"), "utf8")) as { highWater: number }
     expect(mark.highWater).toBe(149)
-    expect(report.completions.removed.sort()).toEqual(["reflection-run-1", "reflection-run-60"])
+    expect([...report.completions.removed].sort()).toEqual(["reflection-run-1", "reflection-run-60"])
   })
 })
 
@@ -229,16 +246,19 @@ describe("runtime retention: transcript journals", () => {
     expect(typeof state.transcript_pruned_at).toBe("string")
     expect(state.reflected_through_message_id).toBe("a1")
     expect(state.reflected_completed_steps).toBe(1)
-    const sweep = await sweepEmptyTranscriptJournals({ transcriptsDir: paths.transcripts, now, minIdleMs: 0 })
+    expect(state.reflected_through_byte_offset).toBeUndefined()
+    const sweep = await sweepEmptyTranscriptJournals({ transcriptsDir: paths.transcripts, now: () => Date.now() + 60_000, minIdleMs: 0 })
     expect(sweep.removed).toEqual([])
     expect(sweep.kept["state-content"]).toBe(1)
   })
 
   test("#given a fully-reflected journal with a pending compaction #when the pass runs #then it is kept (A12)", async () => {
     const paths = await identity()
+    await journal(paths, "s-sibling", "fully", daysAgo(8))
     const dir = await journal(paths, "s-full", "fully", daysAgo(8), { pendingCompaction: true })
 
     const report = await retention(paths)
+    expect(report.journals.removed).toEqual(["s-sibling"])
 
     expect(report.journals.kept["s-full"]).toBe("pending-compaction")
     expect(existsSync(join(dir, "transcript.jsonl"))).toBe(true)
@@ -276,6 +296,7 @@ describe("runtime retention: transcript journals", () => {
 
   test("#given never-reflected journals that are recent, live or locked #when the pass runs #then all are kept with their reason (A15)", async () => {
     const paths = await identity()
+    await journal(paths, "s-sibling", "fully", daysAgo(8))
     await journal(paths, "s-recent", "never", daysAgo(13))
     await journal(paths, "s-live", "never", daysAgo(15))
     const locked = await journal(paths, "s-locked", "never", daysAgo(15))
@@ -283,9 +304,10 @@ describe("runtime retention: transcript journals", () => {
     await ageTree(locked, daysAgo(15))
 
     const report = await retention(paths, { isLiveSession: (sessionId) => sessionId === "s-live" })
+    expect(report.journals.removed).toEqual(["s-sibling"])
 
     expect(report.journals.kept).toEqual({ "s-recent": "recent", "s-live": "live", "s-locked": "locked" })
-    expect(report.journals.removed).toEqual([])
+    expect(report.journals.removed).toEqual(["s-sibling"])
   })
 
   test("#given a partly-reflected journal idle past the abandoned window #when the pass runs #then only the transcript goes and the anchor and counts survive (A16)", async () => {
@@ -301,6 +323,7 @@ describe("runtime retention: transcript journals", () => {
     expect(state.reflected_completed_steps).toBe(1)
     expect(state.steps_since_last_successful_reflection).toBe(1)
     expect(typeof state.transcript_pruned_at).toBe("string")
+    expect(state.reflected_through_byte_offset).toBeUndefined()
   })
 
   test("#given a partly-reflected journal younger than the abandoned window #when the pass runs #then it is kept", async () => {
@@ -314,6 +337,7 @@ describe("runtime retention: transcript journals", () => {
 
   test("#given a journal whose state.json does not parse #when the pass runs #then it is kept as unreadable (A19)", async () => {
     const paths = await identity()
+    await journal(paths, "s-sibling", "fully", daysAgo(8))
     const dir = join(paths.transcripts, "s-broken")
     await mkdir(dir, { recursive: true })
     await writeFile(join(dir, "state.json"), "{not json")
@@ -321,6 +345,7 @@ describe("runtime retention: transcript journals", () => {
     await ageTree(dir, daysAgo(60))
 
     const report = await retention(paths)
+    expect(report.journals.removed).toEqual(["s-sibling"])
 
     expect(report.journals.kept["s-broken"]).toBe("state-unreadable")
     expect(existsSync(join(dir, "transcript.jsonl"))).toBe(true)
@@ -341,8 +366,24 @@ describe("runtime retention: recall stores", () => {
     const liveRecord = await createLockRecord("recall-sidecar")
     await acquireLock(liveLock, liveRecord)
     try {
-      const report = await retention(paths, { ownedSidecars: new Set([encode("owned")]) })
+      const lockFreeAtDelete: boolean[] = []
+      const report = await retention(paths, {
+        ownedSidecars: new Set([encode("owned")]),
+        beforeTombstoneDelete: async (tombstone) => {
+          if (!tombstone.includes(join("recall", "sidecars"))) return
+          const probe = await createLockRecord("recall-sidecar")
+          try {
+            await acquireLock(deadLock, probe, { waitTimeoutMs: 0 })
+            lockFreeAtDelete.push(true)
+            await releaseLock(deadLock, probe)
+          } catch {
+            lockFreeAtDelete.push(false)
+          }
+        },
+      })
+      expect(lockFreeAtDelete).toEqual([true])
       expect(report.sidecars.removed).toEqual([encode("dead-owner")])
+      expect(report.sidecars.kept).toEqual({ [encode("owned")]: "owned", [encode("live-owner")]: "locked" })
       expect(existsSync(dead)).toBe(false)
       expect(existsSync(owned)).toBe(true)
       expect(existsSync(live)).toBe(true)
@@ -397,5 +438,394 @@ describe("runtime retention: recall stores", () => {
 
     expect(report.reflectionSessions.removed).toEqual(["reflection-run-3"])
     expect(existsSync(entry)).toBe(false)
+  })
+})
+
+describe("runtime retention: discard_unreflected_journals (LEAD D1: off by default, switchable on; A37)", () => {
+  async function fixture() {
+    const paths = await identity()
+    return {
+      paths,
+      never: await journal(paths, "s-never", "never", daysAgo(60)),
+      partly: await journal(paths, "s-partly", "partly", daysAgo(60)),
+      noSteps: await journal(paths, "s-nosteps", "no-steps", daysAgo(60)),
+      fully: await journal(paths, "s-full", "fully", daysAgo(8)),
+    }
+  }
+
+  test("#given the shipped default policy #when 60-day never-reflected, partly-reflected and no-steps journals are swept #then all three are kept and only the J1 sibling is truncated", async () => {
+    const { paths, never, partly, noSteps, fully } = await fixture()
+
+    const report = await runRuntimeRetention({ paths, policy: DEFAULT_RUNTIME_RETENTION, now })
+
+    expect(DEFAULT_RUNTIME_RETENTION.discardUnreflectedJournals).toBe(false)
+    expect(report.journals.kept).toEqual({ "s-never": "unreflected-retention-off", "s-nosteps": "unreflected-retention-off", "s-partly": "unreflected-retention-off" })
+    expect(report.journals.removed).toEqual(["s-full"])
+    for (const dir of [never, partly, noSteps]) expect(existsSync(join(dir, "transcript.jsonl"))).toBe(true)
+    expect(existsSync(join(fully, "transcript.jsonl"))).toBe(false)
+  })
+
+  test("#given discard_unreflected_journals switched on #when the same journals are swept on a healthy identity #then the never-reflected and no-steps journals go and the partly-reflected one is truncated", async () => {
+    const { paths, never, partly, noSteps, fully } = await fixture()
+
+    const report = await runRuntimeRetention({ paths, policy: { ...DEFAULT_RUNTIME_RETENTION, discardUnreflectedJournals: true }, now })
+
+    expect(report.journals.removed).toEqual(["s-full", "s-never", "s-nosteps", "s-partly"])
+    expect(existsSync(never)).toBe(false)
+    expect(existsSync(noSteps)).toBe(false)
+    expect(existsSync(join(partly, "transcript.jsonl"))).toBe(false)
+    expect(existsSync(join(fully, "transcript.jsonl"))).toBe(false)
+  })
+})
+
+describe("runtime retention: journals of an in-flight reservation (J0, A32)", () => {
+  async function dreamOn(paths: MemoryIdentityPaths) {
+    const journals = new Map<string, TranscriptJournal>()
+    const journalFor = async (id: string) => {
+      const existing = journals.get(id)
+      if (existing !== undefined) return existing
+      const created = new TranscriptJournal({ journalDir: join(paths.transcripts, id) })
+      journals.set(id, created)
+      return created
+    }
+    let runs = 0
+    const store = new ReflectionReservationStore({
+      identity: { id: "agent-test", safeSlug: "agent-test", paths },
+      config: { stepCount: 1, onCompaction: true },
+      getJournal: journalFor,
+      createRunId: () => `reflection-run-${(runs += 1)}`,
+      launcherIdentity: async () => ({ pid: process.pid, hostname: "fixture-host", processStart: "fixture" }),
+    })
+    const reserve = async (id: string) => {
+      const snapshot = await (await journalFor(id)).captureReflectionSnapshot()
+      if (snapshot === null) throw new Error(`expected a snapshot for ${id}`)
+      return store.tryReserve({ trigger: "dream", origin: "shutdown", conversationIds: [id], snapshots: [{ conversationId: id, snapshot }] })
+    }
+    return { store, reserve }
+  }
+
+  test("#given a dream active on X and pending on Y #when retention runs and the dream then merges #then X and Y are kept as reserved and X lands its anchor with counted steps", async () => {
+    const paths = await identity()
+    for (const id of ["X", "Y", "Z"]) await journal(paths, id, "never", daysAgo(15))
+    const { store, reserve } = await dreamOn(paths)
+    const active = await reserve("X")
+    const pending = await reserve("Y")
+    expect(active.status).toBe("active")
+    expect(pending.status).toBe("pending")
+    // The #11976 shape: a reservation stuck for days, so its capture stamp is as old as the files.
+    for (const id of ["X", "Y"]) {
+      const statePath = join(paths.transcripts, id, "state.json")
+      const state = JSON.parse(await readFile(statePath, "utf8")) as Record<string, unknown>
+      await writeFile(statePath, JSON.stringify({ ...state, last_reflection_started_at: iso(daysAgo(15)) }))
+    }
+    for (const id of ["X", "Y", "Z"]) await ageTree(join(paths.transcripts, id), daysAgo(15))
+
+    const report = await retention(paths)
+
+    expect(report.journals.kept["X"]).toBe("reserved")
+    expect(report.journals.kept["Y"]).toBe("reserved")
+    expect(report.journals.removed).toEqual(["Z"])
+    if (active.status !== "active") throw new Error("expected an active dream")
+    await store.complete(active.run.runId, "merged")
+    const state = JSON.parse(await readFile(join(paths.transcripts, "X", "state.json"), "utf8")) as Record<string, unknown>
+    expect(state.reflected_through_message_id).toBe("a1")
+    expect(state.reflected_completed_steps).toBe(1)
+    expect(existsSync(join(paths.transcripts, "X", "transcript.jsonl"))).toBe(true)
+  })
+
+  test("#given the scheduler lock is held by a reservation in progress #when retention runs #then every journal rule is skipped", async () => {
+    const paths = await identity()
+    const dir = await journal(paths, "Z", "never", daysAgo(15))
+    const fully = await journal(paths, "F", "fully", daysAgo(15))
+    await mkdir(paths.locks, { recursive: true })
+    const holder = await createLockRecord("reflection-scheduler")
+    const lockPath = reflectionSchedulerLockPath(paths.locks)
+    await acquireLock(lockPath, holder)
+    try {
+      const report = await retention(paths)
+      expect(report.skipped).toEqual(["reflection-scheduler-busy"])
+      expect(report.journals.removed).toEqual([])
+      expect(existsSync(dir)).toBe(true)
+      expect(existsSync(join(fully, "transcript.jsonl"))).toBe(true)
+    } finally {
+      await releaseLock(lockPath, holder)
+    }
+  })
+})
+
+describe("runtime retention: unclassified journal states (L1, A30)", () => {
+  async function rawJournal(paths: MemoryIdentityPaths, sessionId: string, state: Record<string, unknown>): Promise<string> {
+    const dir = join(paths.transcripts, sessionId)
+    await writeJson(join(dir, "state.json"), { schema_version: "v3_assistant_steps", ...state })
+    await writeFile(join(dir, "transcript.jsonl"), `${JSON.stringify({ kind: "assistant", text: "a", captured_at: "2026-10-01T00:00:00.000Z", source_line_id: "a1:assistant", source_message_id: "a1" })}\n`)
+    await ageTree(dir, daysAgo(60))
+    return dir
+  }
+
+  test("#given three journals in shapes no rule names and a never-reflected sibling #when the pass runs #then the three are kept as unclassified and the sibling is removed", async () => {
+    const paths = await identity()
+    const anchoredZero = await rawJournal(paths, "anchored-zero", { total_completed_steps: 1, reflected_completed_steps: 0, steps_since_last_successful_reflection: 1, reflected_through_message_id: "a1" })
+    const countedNoAnchor = await rawJournal(paths, "counted-no-anchor", { total_completed_steps: 1, reflected_completed_steps: 1, steps_since_last_successful_reflection: 0 })
+    const negative = await rawJournal(paths, "negative", { total_completed_steps: 2, reflected_completed_steps: -1, steps_since_last_successful_reflection: 3, reflected_through_message_id: "a1" })
+    const sibling = await journal(paths, "sibling", "never", daysAgo(15))
+
+    const report = await retention(paths)
+
+    expect(report.journals.kept).toEqual({ "anchored-zero": "unclassified", "counted-no-anchor": "unclassified", negative: "unclassified" })
+    expect(report.journals.removed).toEqual(["sibling"])
+    for (const dir of [anchoredZero, countedNoAnchor, negative]) expect(existsSync(join(dir, "transcript.jsonl"))).toBe(true)
+    expect(existsSync(sibling)).toBe(false)
+  })
+})
+
+describe("runtime retention: reflection-health gate for unreflected input (N4, A27)", () => {
+  async function completionWith(paths: MemoryIdentityPaths, runId: string, outcome: string, at: number): Promise<void> {
+    await writeJson(join(completionsDir(paths), `${runId}.json`), {
+      schemaVersion: 1, runId, identity: "agent-test", category: "quick", conversationIds: [], trigger: "manual",
+      outcome, startedAt: iso(at - 60_000), finishedAt: iso(at), delivery: { status: "consumed" },
+    })
+  }
+
+  const shapes: Record<string, { readonly open: boolean; readonly enabled?: boolean; readonly write: (paths: MemoryIdentityPaths) => Promise<void> }> = {
+    "(i) newest failed 2 d ago, no success": { open: false, write: (paths) => completionWith(paths, "reflection-run-1", "failed", daysAgo(2)) },
+    "(ii) newest failed 20 d ago, no success": { open: false, write: (paths) => completionWith(paths, "reflection-run-1", "failed", daysAgo(20)) },
+    "(iii) only abandoned and quarantined run dirs": {
+      open: false,
+      write: async (paths) => {
+        await reflectionRun(paths, "reflection-run-1", { sentinel: "abandoned", finishedAt: daysAgo(20) })
+        await reflectionRun(paths, "reflection-run-2", { sentinel: "quarantined", finishedAt: daysAgo(20) })
+      },
+    },
+    "(iv) parked, newest completion a success 30 d ago": {
+      open: false,
+      write: async (paths) => {
+        await completionWith(paths, "reflection-run-1", "merged", daysAgo(30))
+        await writeJson(join(paths.reflection, "park.json"), { version: 1, streak: 3, parkedAt: iso(daysAgo(29)) })
+      },
+    },
+    "(v) newest merged 3 d ago after older failures": {
+      open: true,
+      write: async (paths) => {
+        await completionWith(paths, "reflection-run-1", "failed", daysAgo(9))
+        await completionWith(paths, "reflection-run-2", "timed_out", daysAgo(8))
+        await completionWith(paths, "reflection-run-3", "merged", daysAgo(3))
+      },
+    },
+    "(vi) no terminal event at all": { open: true, write: async () => undefined },
+    "(viii) merged 10 d ago, quarantined today by the reaper for a 30-day-old generation": {
+      open: true,
+      write: async (paths) => {
+        await completionWith(paths, "reflection-run-1", "merged", daysAgo(10))
+        await reflectionRun(paths, "reflection-run-2", { sentinel: "quarantined", finishedAt: daysAgo(30), sentinelWrittenAt: daysAgo(0) })
+      },
+    },
+    "(vii) reflection disabled, newest failed": { open: true, enabled: false, write: (paths) => completionWith(paths, "reflection-run-1", "failed", daysAgo(2)) },
+  }
+
+  for (const [shape, setup] of Object.entries(shapes)) {
+    test(`#given ${shape} #when the pass runs with abandoned_journal_days 14 #then unreflected input is ${setup.open ? "removed" : "kept as reflection-unhealthy"}`, async () => {
+      const paths = await identity()
+      await setup.write(paths)
+      const never = await journal(paths, "s-never", "never", daysAgo(15))
+      const partly = await journal(paths, "s-partly", "partly", daysAgo(15))
+
+      const report = await retention(paths, setup.enabled === undefined ? {} : { reflectionEnabled: setup.enabled })
+
+      if (setup.open) {
+        expect(report.journals.removed).toEqual(["s-never", "s-partly"])
+        expect(existsSync(never)).toBe(false)
+        expect(existsSync(join(partly, "transcript.jsonl"))).toBe(false)
+        expect(report.unreflectedGate.open).toBe(true)
+      } else {
+        expect(report.journals.kept).toEqual({ "s-never": "reflection-unhealthy", "s-partly": "reflection-unhealthy" })
+        expect(existsSync(join(never, "transcript.jsonl"))).toBe(true)
+        expect(existsSync(join(partly, "transcript.jsonl"))).toBe(true)
+        expect(report.unreflectedGate.open).toBe(false)
+        expect(report.unreflectedGate.newest?.kind).toMatch(/^(failed|abandoned|quarantined|parked)$/)
+      }
+    })
+  }
+
+  test("#given a closed gate #when a fully-reflected journal is past retention #then J1 still truncates it (the gate guards only unreflected input)", async () => {
+    const paths = await identity()
+    await completionWith(paths, "reflection-run-1", "failed", daysAgo(2))
+    const fully = await journal(paths, "s-full", "fully", daysAgo(8))
+
+    const report = await retention(paths)
+
+    expect(report.journals.removed).toEqual(["s-full"])
+    expect(existsSync(join(fully, "transcript.jsonl"))).toBe(false)
+  })
+})
+
+describe("runtime retention: a refused claim rename (L3, A31)", () => {
+  test("#given a folded run whose rename to a tombstone fails with EPERM #when the pass runs #then it is kept as claim-failed with no tombstone, and the next pass removes it", async () => {
+    const paths = await identity()
+    const dir = await reflectionRun(paths, "reflection-run-5", { readOnlyPayload: true })
+    await reflectionRun(paths, "reflection-run-9", { finishedAt: daysAgo(1) })
+    const refuse = async (from: string) => {
+      if (from.endsWith("reflection-run-5")) throw Object.assign(new Error("EPERM: operation not permitted, rename"), { code: "EPERM" })
+    }
+
+    const first = await retention(paths, { beforeClaimRename: refuse })
+
+    expect(first.runs.kept["reflection-run-5"]).toBe("claim-failed")
+    expect(existsSync(dir)).toBe(true)
+    expect(existsSync(join(dir, "transcript-payload.json"))).toBe(true)
+    expect(await tombstones(runsDir(paths))).toEqual([])
+
+    const second = await retention(paths)
+    expect(second.runs.removed).toEqual(["reflection-run-5"])
+    expect(existsSync(dir)).toBe(false)
+  })
+
+  test("#given a sidecar whose rename to a tombstone fails #when the pass runs #then it is kept as claim-failed", async () => {
+    const paths = await identity()
+    const dir = await sidecar(paths, "stale", daysAgo(8))
+    const report = await retention(paths, {
+      beforeClaimRename: async (from) => {
+        if (from === dir) throw Object.assign(new Error("EPERM"), { code: "EPERM" })
+      },
+    })
+    expect(report.sidecars.kept[Buffer.from("stale", "utf8").toString("base64url")]).toBe("claim-failed")
+    expect(existsSync(dir)).toBe(true)
+  })
+})
+
+describe("runtime retention: a capture racing a journal claim (N1, A35)", () => {
+  async function storeFor(paths: MemoryIdentityPaths) {
+    const store = new ReflectionReservationStore({
+      identity: { id: "agent-test", safeSlug: "agent-test", paths },
+      config: { stepCount: 1, onCompaction: true },
+      getJournal: async (id) => new TranscriptJournal({ journalDir: join(paths.transcripts, id) }),
+      createRunId: () => "reflection-run-1",
+      launcherIdentity: async () => ({ pid: process.pid, hostname: "fixture-host", processStart: "fixture" }),
+    })
+    return store
+  }
+
+  test("#given the dream captures X after the guard is read but before the claim #when the pass reaches X #then X is kept recent and the dream merges intact rows (a)", async () => {
+    const paths = await identity()
+    await journal(paths, "X", "never", daysAgo(15))
+    const store = await storeFor(paths)
+    let captured: Awaited<ReturnType<TranscriptJournal["captureReflectionSnapshot"]>> = null
+
+    const report = await retention(paths, {
+      beforeJournalClaim: async (sessionId) => {
+        if (sessionId === "X") captured = await new TranscriptJournal({ journalDir: join(paths.transcripts, "X") }).captureReflectionSnapshot()
+      },
+    })
+
+    expect(captured).not.toBeNull()
+    expect(report.journals.kept["X"]).toBe("recent")
+    const reserved = await store.tryReserve({ trigger: "dream", origin: "shutdown", conversationIds: ["X"], snapshots: [{ conversationId: "X", snapshot: captured! }] })
+    if (reserved.status !== "active") throw new Error("expected an active dream")
+    await store.complete(reserved.run.runId, "merged")
+    const state = JSON.parse(await readFile(join(paths.transcripts, "X", "state.json"), "utf8")) as Record<string, unknown>
+    expect(state.reflected_through_message_id).toBe("a1")
+    expect(state.reflected_completed_steps).toBe(1)
+  })
+
+  test("#given the pass claims X first #when the dream then captures #then the capture is null for a removed (J2) and a truncated (J3) journal (b, c)", async () => {
+    const paths = await identity()
+    await journal(paths, "X", "never", daysAgo(15))
+    await journal(paths, "P", "partly", daysAgo(15))
+
+    const report = await retention(paths)
+
+    expect(report.journals.removed).toEqual(["P", "X"])
+    expect(await new TranscriptJournal({ journalDir: join(paths.transcripts, "X") }).captureReflectionSnapshot()).toBeNull()
+    expect(await new TranscriptJournal({ journalDir: join(paths.transcripts, "P") }).captureReflectionSnapshot()).toBeNull()
+  })
+
+  test("#given a journal whose last capture started inside the window though its files look old #when the pass re-checks under the lock #then it is kept recent", async () => {
+    const paths = await identity()
+    const dir = await journal(paths, "S", "never", daysAgo(15))
+    const statePath = join(dir, "state.json")
+    const state = JSON.parse(await readFile(statePath, "utf8")) as Record<string, unknown>
+    await writeFile(statePath, JSON.stringify({ ...state, last_reflection_started_at: iso(daysAgo(1)) }))
+    await ageTree(dir, daysAgo(15))
+
+    const report = await retention(paths)
+
+    expect(report.journals.kept["S"]).toBe("recent")
+    expect(existsSync(dir)).toBe(true)
+  })
+})
+
+describe("runtime retention: pass budget and resume cursor (H4, N3, A33)", () => {
+  test("#given 30 folded runs and a budget that admits 12 #when two passes run #then pass 1 persists a cursor and pass 2 resumes, finishes and deletes it", async () => {
+    const paths = await identity()
+    for (let index = 1; index <= 30; index += 1) await reflectionRun(paths, `reflection-run-${index}`, { finishedAt: daysAgo(10) })
+    await reflectionRun(paths, "reflection-run-99", { finishedAt: daysAgo(1) })
+    let clock = NOW
+    const cursorPath = join(paths.runtime, "retention.json")
+
+    const first = await runRuntimeRetention({
+      paths, policy: { ...UNREFLECTED_ON, passBudgetMs: 60_000 }, now: () => clock,
+      beforeTombstoneDelete: async () => { clock += 5_000 },
+    })
+
+    expect(first.runs.removed).toHaveLength(12)
+    expect(first.cursor).toEqual({ store: "runs", lastName: first.runs.removed.at(-1) })
+    const persisted = JSON.parse(await readFile(cursorPath, "utf8")) as Record<string, unknown>
+    expect(persisted).toEqual({ version: 1, cursor: first.cursor })
+
+    const second = await runRuntimeRetention({ paths, policy: UNREFLECTED_ON, now: () => NOW })
+
+    expect(second.runs.removed).toHaveLength(18)
+    expect(second.cursor).toBeUndefined()
+    expect(existsSync(cursorPath)).toBe(false)
+    const left = (await readdir(runsDir(paths))).sort()
+    expect(left).toEqual(["reflection-run-99"])
+  })
+
+  test("#given an abort between items #when the pass stops #then the cursor is persisted and the pass rejects", async () => {
+    const paths = await identity()
+    for (let index = 1; index <= 5; index += 1) await reflectionRun(paths, `reflection-run-${index}`, { finishedAt: daysAgo(10) })
+    await reflectionRun(paths, "reflection-run-99", { finishedAt: daysAgo(1) })
+    const controller = new AbortController()
+    let removed = 0
+
+    await expect(runRuntimeRetention({
+      paths, policy: UNREFLECTED_ON, now, signal: controller.signal,
+      beforeTombstoneDelete: async () => { removed += 1; if (removed === 2) controller.abort() },
+    })).rejects.toThrow()
+
+    const persisted = JSON.parse(await readFile(join(paths.runtime, "retention.json"), "utf8")) as { cursor: { store: string; lastName: string } }
+    expect(persisted.cursor.store).toBe("runs")
+    expect(existsSync(join(runsDir(paths), persisted.cursor.lastName))).toBe(false)
+    expect((await readdir(runsDir(paths))).filter((name) => !name.startsWith(".prune-"))).toHaveLength(4)
+  })
+})
+
+describe("runtime retention: a no-op visit takes no lock and writes nothing (R3, A36 core half)", () => {
+  test("#given an identity whose stores hold only fresh items #when the pass visits it #then it records the visit, acquires no lock and changes no runtime mtime", async () => {
+    const paths = await identity()
+    await reflectionRun(paths, "reflection-run-1", { finishedAt: daysAgo(1) })
+    await journal(paths, "fresh", "fully", daysAgo(1))
+    await mkdir(paths.locks, { recursive: true })
+    await ageTree(paths.root, daysAgo(8))
+    const before = {
+      runtime: (await stat(paths.runtime)).mtimeMs,
+      locks: (await stat(paths.locks)).mtimeMs,
+      reflection: (await stat(paths.reflection)).mtimeMs,
+      transcript: (await stat(join(paths.transcripts, "fresh"))).mtimeMs,
+    }
+
+    const report = await retention(paths)
+
+    expect(report.runs.kept["reflection-run-1"]).toBe("anchor")
+    expect(report.journals.kept["fresh"]).toBe("recent")
+    expect(report.highWater).toBeUndefined()
+    expect(report.skipped).toEqual([])
+    expect(await readdir(paths.locks)).toEqual([])
+    expect(existsSync(join(paths.reflection, "run-id.json"))).toBe(false)
+    expect({
+      runtime: (await stat(paths.runtime)).mtimeMs,
+      locks: (await stat(paths.locks)).mtimeMs,
+      reflection: (await stat(paths.reflection)).mtimeMs,
+      transcript: (await stat(join(paths.transcripts, "fresh"))).mtimeMs,
+    }).toEqual(before)
   })
 })

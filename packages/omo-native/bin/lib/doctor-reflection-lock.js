@@ -4,11 +4,12 @@
 // a live holder or no lock prints nothing. `omo doctor --fix` runs the shared reaper
 // (stale-lock-reaper.ts) with its minimal settle on every durable identity (#11976).
 
-import { existsSync, readdirSync } from "node:fs"
+import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { basename, join, resolve } from "node:path"
 import {
   classifyReflectionLockHolder,
+  createRetentionHostSweepStep,
   decideStaleReflectionLock,
   decideStrandedRun,
   formatStaleLockFixLines,
@@ -17,6 +18,7 @@ import {
   sweepHostIdentities,
   sweepIdentityOrphanWorktrees,
 } from "./reflection-lock.generated.js"
+import { parseJsonc } from "./jsonc.js"
 
 const MEMORY_ROOT_ENV_VAR = "OMO_MEMORY_HOME"
 
@@ -80,6 +82,30 @@ function orphanLines(identity, report, dryRun) {
   return lines
 }
 
+// The memory settings of the user's GLOBAL omo config only (omo.jsonc, else omo.json under ~/.omo):
+// `--fix` sweeps identities of every project, so it never reads a project layer (REVIEW-4 M-b). The
+// `[native]` block wins key by key over the base, as the loader folds it. Unreadable means no settings,
+// which keeps unreflected journal input.
+export function readGlobalMemorySettings(home = homedir()) {
+  const jsonc = join(home, ".omo", "omo.jsonc")
+  const path = existsSync(jsonc) ? jsonc : join(home, ".omo", "omo.json")
+  try {
+    const document = parseJsonc(readFileSync(path, "utf8"))
+    const base = isRecord(document?.memory) ? document.memory : {}
+    const native = isRecord(document?.["[native]"]?.memory) ? document["[native]"].memory : {}
+    return {
+      runtime: { ...(isRecord(base.runtime) ? base.runtime : {}), ...(isRecord(native.runtime) ? native.runtime : {}) },
+      agents: { ...(isRecord(base.agents) ? base.agents : {}), ...(isRecord(native.agents) ? native.agents : {}) },
+    }
+  } catch {
+    return undefined
+  }
+}
+
+function isRecord(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+}
+
 // `omo doctor --fix`: driver 1 of the host sweep (memory-core reflection/host-sweep.ts). Every identity
 // with a runtime/ is visited, repo or not, resuming at the persisted cursor; a repo-less identity gets
 // the reaper and the lock sweep, never the git-backed orphan sweep.
@@ -106,7 +132,14 @@ export async function reflectionLockFix(options = {}) {
       return [`FAIL ${identity.name} orphan worktree sweep failed: ${error instanceof Error ? error.message : String(error)}`]
     }
   }
-  const result = await sweepHostIdentities({ memoryRoot: memory, steps: [reap, orphans], dryRun })
+  const settings = options.memorySettings ?? readGlobalMemorySettings(options.home ?? homedir())
+  const retention = createRetentionHostSweepStep({ ...(settings === undefined ? {} : { settings }), ...(probe.now === undefined ? {} : { now: probe.now }), dryRun })
+  const retain = async (identity) => {
+    const lines = await retention(identity)
+    if (lines.some((line) => line.startsWith("FAIL "))) failed = true
+    return lines
+  }
+  const result = await sweepHostIdentities({ memoryRoot: memory, steps: [reap, orphans, retain], dryRun })
   if (result.status === "busy") return { lines: ["INFO another sweep is running on this host; try again when it finishes"], failed: false }
   const lines = result.lines.filter((line) => !/^INFO \S+ locks reclaimed 0, kept 0$/.test(line))
   if (lines.length === 0) lines.push(dryRun ? "INFO nothing to fix" : "PASS no stale reflection locks")

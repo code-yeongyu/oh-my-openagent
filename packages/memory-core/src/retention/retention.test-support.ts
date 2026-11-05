@@ -67,6 +67,8 @@ export type RunShape = {
   readonly finalRunId?: string
   readonly sentinel?: "final" | "abandoned" | "quarantined" | "none"
   readonly readOnlyPayload?: boolean
+  /** Write time of an abandoned/quarantined sentinel; defaults to `finishedAt`. */
+  readonly sentinelWrittenAt?: number
 }
 
 /** A reflection run dir with a ledger, a child log and the requested terminal sentinel. */
@@ -84,9 +86,9 @@ export async function reflectionRun(paths: MemoryIdentityPaths, runId: string, s
       finishedAt: iso(finishedAt),
     })
   } else if (sentinel === "abandoned") {
-    await writeJson(join(dir, "abandoned.json"), { runId, reason: "launch_interrupted", abandonedAt: iso(finishedAt) })
+    await writeJson(join(dir, "abandoned.json"), { runId, reason: "launch_interrupted", generation: iso(finishedAt), abandonedAt: iso(shape.sentinelWrittenAt ?? finishedAt) })
   } else if (sentinel === "quarantined") {
-    await writeJson(join(dir, "quarantined.json"), { runId, reason: "ledger_unreadable", quarantinedAt: iso(finishedAt) })
+    await writeJson(join(dir, "quarantined.json"), { runId, reason: "ledger_unreadable", generation: iso(finishedAt), quarantinedAt: iso(shape.sentinelWrittenAt ?? finishedAt) })
   }
   if (shape.readOnlyPayload === true) await readOnlyPayload(dir)
   await ageTree(dir, shape.mtime ?? finishedAt)

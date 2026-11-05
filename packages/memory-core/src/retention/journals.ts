@@ -1,0 +1,188 @@
+// Transcript journals (`transcripts/<sessionId>/`, design 2.3), classified from state.json:
+// - fully reflected (J1): `transcript.jsonl` goes after `retentionDays` idle and state.json is
+//   stamped `transcript_pruned_at`, so a resumed session rebuilds it against the kept anchor;
+// - never reflected / no steps (J2): the whole journal goes after `abandonedJournalDays` idle;
+//   a resumed session recreates it with the same initial cursor it had;
+// - partly reflected (J3): `transcript.jsonl` goes after `abandonedJournalDays`, stamped like J1.
+// The scan is lock-free; every predicate is re-checked under the journal's own lock, files are
+// unlinked under it, and the directory itself is removed only after release (never recursively).
+
+import { randomUUID } from "node:crypto"
+import { join } from "node:path"
+
+import { existsSync, lstat, readFile, rename, rm, rmdir, unlink, writeFile } from "../fs/resilient"
+import { JournalLockTimeoutError, withLocalJournalLock, type JournalLock } from "../journal/lock"
+import type { LazyRetentionGuard } from "./guard"
+import type { UnreflectedRetentionGate } from "./reflection-health-signal"
+import { DAY_MS, StoreTally, errorCode, listNames, type RetentionContext, type RetentionKeepReason, type RetentionStoreResult } from "./policy"
+
+const TRANSCRIPT = "transcript.jsonl"
+const STATE = "state.json"
+const LOCK = "state.lock"
+
+type JournalClass = "fully" | "never" | "partly"
+type Verdict = { readonly kind: JournalClass } | RetentionKeepReason
+
+export async function pruneTranscriptJournals(
+  context: RetentionContext,
+  lazyGuard: LazyRetentionGuard,
+  gate: UnreflectedRetentionGate,
+  lock: JournalLock = withLocalJournalLock,
+): Promise<RetentionStoreResult> {
+  const tally = new StoreTally()
+  for (const sessionId of await listNames(context.paths.transcripts)) {
+    if (context.budget?.skip("journals", sessionId) === true) continue
+    if (context.budget?.admit("journals") === false) break
+    const outcome = await visitJournal(context, lazyGuard, gate, lock, sessionId)
+    if (outcome === "removed") tally.removed.push(sessionId)
+    else if (outcome !== undefined) tally.keep(sessionId, outcome)
+    context.budget?.done("journals", sessionId)
+  }
+  return tally.result()
+}
+
+async function visitJournal(
+  context: RetentionContext,
+  lazyGuard: LazyRetentionGuard,
+  gate: UnreflectedRetentionGate,
+  lock: JournalLock,
+  sessionId: string,
+): Promise<"removed" | RetentionKeepReason | undefined> {
+  const dir = join(context.paths.transcripts, sessionId)
+  const stats = await lstat(dir).catch(() => undefined)
+  if (stats === undefined || !stats.isDirectory()) return undefined
+  if (context.isLiveSession?.(sessionId) === true) return "live"
+  if (existsSync(join(dir, LOCK))) return "locked"
+  const first = await judge(context, dir, false, gate)
+  if (typeof first === "string") return first
+  // A candidate: only now is the reservation guard taken (J0 reads the reserved conversations).
+  const guard = await lazyGuard.get()
+  if (guard === undefined) return "scheduler-busy"
+  if (guard.reservedConversationIds.has(sessionId)) return "reserved"
+  await context.beforeJournalClaim?.(sessionId)
+  return removeUnderLock(context, dir, lock, gate)
+}
+
+async function judge(context: RetentionContext, dir: string, holdingLock: boolean, gate: UnreflectedRetentionGate): Promise<Verdict> {
+  const state = await readState(join(dir, STATE))
+  if (state === "unreadable") return "state-unreadable"
+  const kind = classify(state)
+  if (typeof kind === "string") return kind
+  if (kind.kind !== "never" && !existsSync(join(dir, TRANSCRIPT))) return "pruned"
+  if (kind.kind !== "fully" && !context.policy.discardUnreflectedJournals) return "unreflected-retention-off"
+  if (kind.kind !== "fully" && !gate.open) return "reflection-unhealthy"
+  const days = kind.kind === "fully" ? context.policy.retentionDays : context.policy.abandonedJournalDays
+  const cutoff = context.now() - days * DAY_MS
+  const newest = await newestFileMtime(dir, holdingLock)
+  if (newest === undefined || newest > cutoff) return "recent"
+  const startedAt = typeof state?.last_reflection_started_at === "string" ? Date.parse(state.last_reflection_started_at) : Number.NaN
+  if (!Number.isNaN(startedAt) && startedAt > cutoff) return "recent"
+  return kind
+}
+
+function classify(state: Record<string, unknown> | undefined): { readonly kind: JournalClass } | RetentionKeepReason {
+  if (state === undefined) return { kind: "never" }
+  const total = count(state.total_completed_steps)
+  const reflected = count(state.reflected_completed_steps)
+  const since = count(state.steps_since_last_successful_reflection)
+  if (total === undefined || reflected === undefined || since === undefined) return "unclassified"
+  const anchor = typeof state.reflected_through_message_id === "string" && state.reflected_through_message_id.length > 0
+  if (reflected === 0 && !anchor) return { kind: "never" }
+  if (total > 0 && since === 0 && anchor) return state.pending_compaction === true ? "pending-compaction" : { kind: "fully" }
+  if (reflected > 0 && since > 0 && anchor) return { kind: "partly" }
+  return "unclassified"
+}
+
+/** An absent count is 0 (older states omit it); a present one must be a non-negative integer. */
+function count(value: unknown): number | undefined {
+  if (value === undefined) return 0
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : undefined
+}
+
+async function readState(path: string): Promise<Record<string, unknown> | undefined | "unreadable"> {
+  let raw: string
+  try {
+    raw = await readFile(path, "utf8")
+  } catch (error) {
+    if (errorCode(error) === "ENOENT") return undefined
+    throw error
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : "unreadable"
+  } catch {
+    return "unreadable"
+  }
+}
+
+/**
+ * Newest mtime over the directory and its files. Under the lock the lock file is this pass's own and
+ * creating it moved the directory mtime, so only the other files are judged (as journal/sweep.ts).
+ */
+async function newestFileMtime(dir: string, holdingLock: boolean): Promise<number | undefined> {
+  let newest = holdingLock ? 0 : (await lstat(dir).catch(() => undefined))?.mtimeMs
+  if (newest === undefined) return undefined
+  for (const name of await listNames(dir)) {
+    if (holdingLock && name === LOCK) continue
+    const stamp = (await lstat(join(dir, name)).catch(() => undefined))?.mtimeMs
+    if (stamp !== undefined && stamp > newest) newest = stamp
+  }
+  return newest
+}
+
+async function removeUnderLock(
+  context: RetentionContext,
+  dir: string,
+  lock: JournalLock,
+  gate: UnreflectedRetentionGate,
+): Promise<"removed" | RetentionKeepReason> {
+  let verdict: Verdict
+  try {
+    verdict = await lock(join(dir, LOCK), async () => {
+      const current = await judge(context, dir, true, gate)
+      if (typeof current === "string") return current
+      if (current.kind === "never") {
+        await unlinkIfPresent(join(dir, STATE))
+        await unlinkIfPresent(join(dir, TRANSCRIPT))
+      } else {
+        await stampPruned(join(dir, STATE), context.now())
+        await unlinkIfPresent(join(dir, TRANSCRIPT))
+      }
+      return current
+    })
+  } catch (error) {
+    if (error instanceof JournalLockTimeoutError) return "locked"
+    throw error
+  }
+  if (typeof verdict === "string") return verdict
+  if (verdict.kind !== "never") return "removed"
+  try {
+    await rmdir(dir)
+    return "removed"
+  } catch (error) {
+    const code = errorCode(error)
+    if (code === "ENOENT") return "removed"
+    if (code === "ENOTEMPTY" || code === "EEXIST") return "changed-during-removal"
+    throw error
+  }
+}
+
+async function unlinkIfPresent(path: string): Promise<void> {
+  await unlink(path).catch((error: unknown) => {
+    if (errorCode(error) !== "ENOENT") throw error
+  })
+}
+
+async function stampPruned(statePath: string, now: number): Promise<void> {
+  const state = await readState(statePath)
+  if (state === "unreadable" || state === undefined) throw new Error(`journal state vanished under its lock: ${statePath}`)
+  const temporary = `${statePath}.tmp-${randomUUID()}`
+  try {
+    const { reflected_through_byte_offset: _offset, ...kept } = state
+    await writeFile(temporary, `${JSON.stringify({ ...kept, transcript_pruned_at: new Date(now).toISOString() }, null, 2)}\n`, "utf8")
+    await rename(temporary, statePath)
+  } catch (error) {
+    await rm(temporary, { force: true })
+    throw error
+  }
+}

@@ -64,6 +64,7 @@ describe("OmoMemorySettingsSchema defaults", () => {
       },
       project_scope: { nudge: false, recall: false },
       projection: { max_entries_per_directory: 12, max_bytes: 4096 },
+      runtime: { retention_days: 10, abandoned_journal_days: 21, completions_days: 45, pass_budget_ms: 30000, discard_unreflected_journals: true },
       compile_warn_tokens: 50000,
       agents: {
         "backend-lead": {
@@ -381,16 +382,18 @@ describe("memory.recall.query_expansion", () => {
 
 describe("memory.runtime retention settings (A24)", () => {
   test("#given an empty memory block #when parsed #then the documented retention defaults apply", () => {
-    expect(OmoMemorySettingsSchema.parse({}).runtime).toEqual({ retention_days: 7, abandoned_journal_days: 14, completions_days: 30 })
+    expect(OmoMemorySettingsSchema.parse({}).runtime).toEqual({ retention_days: 7, abandoned_journal_days: 14, completions_days: 30, pass_budget_ms: 60000, discard_unreflected_journals: false })
+    expect(OmoMemorySettingsSchema.parse({ runtime: { discard_unreflected_journals: true } }).runtime.discard_unreflected_journals).toBe(true)
   })
 
   test("#given explicit windows and an agent override #when parsed #then the values are kept on the block, the layer and the agent", () => {
     const parsed = OmoMemorySettingsSchema.parse({
-      runtime: { retention_days: 3, abandoned_journal_days: 5 },
-      agents: { "agent-a": { runtime: { retention_days: 30 } } },
+      runtime: { retention_days: 3, abandoned_journal_days: 5, pass_budget_ms: 5000 },
+      agents: { "agent-a": { runtime: { retention_days: 30, pass_budget_ms: 1000 } } },
     })
-    expect(parsed.runtime).toEqual({ retention_days: 3, abandoned_journal_days: 5, completions_days: 30 })
-    expect(parsed.agents["agent-a"]?.runtime).toEqual({ retention_days: 30 })
+    expect(parsed.runtime).toEqual({ retention_days: 3, abandoned_journal_days: 5, completions_days: 30, pass_budget_ms: 5000, discard_unreflected_journals: false })
+    expect(OmoMemorySettingsSchema.parse({ agents: { b: { runtime: { discard_unreflected_journals: true } } } }).agents.b?.runtime).toEqual({ discard_unreflected_journals: true })
+    expect(parsed.agents["agent-a"]?.runtime).toEqual({ retention_days: 30, pass_budget_ms: 1000 })
     expect(OmoMemorySettingsLayerSchema.parse({ runtime: { completions_days: 60 } }).runtime).toEqual({ completions_days: 60 })
   })
 
@@ -398,6 +401,9 @@ describe("memory.runtime retention settings (A24)", () => {
     expect(OmoMemorySettingsSchema.safeParse({ runtime: { keep_forever: true } }).success).toBe(false)
     expect(OmoMemorySettingsSchema.safeParse({ runtime: { retention_days: 1.5 } }).success).toBe(false)
     expect(OmoMemorySettingsSchema.safeParse({ runtime: { abandoned_journal_days: 0 } }).success).toBe(false)
+    expect(OmoMemorySettingsSchema.safeParse({ runtime: { discard_unreflected_journals: "yes" } }).success).toBe(false)
+    expect(OmoMemorySettingsSchema.safeParse({ runtime: { pass_budget_ms: 0 } }).success).toBe(false)
+    expect(OmoMemorySettingsSchema.safeParse({ runtime: { pass_budget_ms: 2.5 } }).success).toBe(false)
     expect(OmoMemorySettingsLayerSchema.safeParse({ runtime: { completions_days: "30" } }).success).toBe(false)
     expect(OmoMemorySettingsSchema.safeParse({ agents: { a: { runtime: { retention_days: -1 } } } }).success).toBe(false)
   })
