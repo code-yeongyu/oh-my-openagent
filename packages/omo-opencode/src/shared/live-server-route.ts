@@ -361,6 +361,18 @@ export function isPreSendConnectionFailure(error: unknown): boolean {
   return false
 }
 
+// The session probe cannot always tell a stray listener from the owner: a
+// portless TUI still reports the fallback serverUrl, so an unrelated server on
+// that port answers health and 500s the session probe, which keeps the live
+// route. A wake it accepted that never reached the session history settles the
+// question, so the retry for that session goes through the in-process client.
+export function demoteLiveRouteForSession(sessionID: string): void {
+  for (const registration of registrations.values()) {
+    setSessionAffinity(registration, sessionID, false)
+  }
+  log("[live-server-route] demoted live route for session after a wake left no trace", { sessionID })
+}
+
 export function markLiveRouteUnavailable(reason: string): void {
   for (const registration of registrations.values()) {
     registration.available = false

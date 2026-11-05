@@ -17,6 +17,7 @@ export type PendingParentWake = {
   toolCallDeferralStartedAt?: number
   allowEmptyAssistantTurnRetry?: boolean
   noAssistantOutputRetryCount?: number
+  lostDispatchRetry?: boolean
   gateHoldExpiresAt?: number
 }
 
@@ -48,6 +49,7 @@ export function cloneParentWake(wake: PendingParentWake): PendingParentWake {
     ...(wake.noAssistantOutputRetryCount !== undefined
       ? { noAssistantOutputRetryCount: wake.noAssistantOutputRetryCount }
       : {}),
+    ...(wake.lostDispatchRetry !== undefined ? { lostDispatchRetry: wake.lostDispatchRetry } : {}),
     ...(wake.gateHoldExpiresAt !== undefined ? { gateHoldExpiresAt: wake.gateHoldExpiresAt } : {}),
   }
 }

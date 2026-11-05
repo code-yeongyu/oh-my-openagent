@@ -1,4 +1,5 @@
 import { log } from "../../shared"
+import { demoteLiveRouteForSession } from "../../shared/live-server-route"
 import type { PendingParentWake } from "./parent-wake-dedupe"
 import type { ParentWakeDispatchedTracker } from "./parent-wake-dispatched-tracker"
 import type { ParentWakeSessionInspector } from "./parent-wake-session-inspector"
@@ -40,6 +41,15 @@ export async function handleDispatchedParentWakeWindowElapsed(
     return
   }
 
+  const promptRecorded = await input.sessionInspector.hasRecordedPromptMessageAfterDispatchedWake(
+    input.sessionID,
+    input.wake,
+  )
+  if (!promptRecorded) {
+    demoteLiveRouteForSession(input.sessionID)
+    input.wake.lostDispatchRetry = true
+  }
+
   input.dispatchedTracker.clearWake(input.sessionID)
   input.wake.noAssistantOutputRetryCount = retryCount + 1
   input.requeueWake(input.wake)
@@ -47,6 +57,7 @@ export async function handleDispatchedParentWakeWindowElapsed(
   log("[background-agent] Requeued dispatched parent wake after no assistant output:", {
     sessionID: input.sessionID,
     retryCount: input.wake.noAssistantOutputRetryCount,
+    promptRecorded,
   })
 }
 

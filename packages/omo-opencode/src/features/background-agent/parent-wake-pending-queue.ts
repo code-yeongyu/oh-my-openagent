@@ -62,6 +62,7 @@ export class ParentWakePendingQueue {
       if (notificationsChanged) {
         delete pendingWake.noReplyAdmittedAt
         delete pendingWake.noAssistantOutputRetryCount
+        delete pendingWake.lostDispatchRetry
       }
       return
     }
@@ -90,6 +91,7 @@ export class ParentWakePendingQueue {
       pendingWake.noReplyAdmittedAt ??= latestWake.noReplyAdmittedAt
       pendingWake.toolCallDeferralStartedAt ??= latestWake.toolCallDeferralStartedAt
       pendingWake.allowEmptyAssistantTurnRetry ||= latestWake.allowEmptyAssistantTurnRetry
+      pendingWake.lostDispatchRetry ||= latestWake.lostDispatchRetry
       if (latestWake.gateHoldExpiresAt !== undefined) {
         pendingWake.gateHoldExpiresAt = latestWake.gateHoldExpiresAt
       }
