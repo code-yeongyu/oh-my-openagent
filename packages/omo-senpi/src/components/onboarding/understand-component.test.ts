@@ -200,10 +200,10 @@ describe("omo.onboarding.understand RPC (#10480)", () => {
 
     // when
     const response = await rpc.call(ONBOARDING_UNDERSTAND_RPC_METHOD, { scanId, model: UNDERSTAND_MODEL, consent: true })
-    const events = await rpc.understandDone(String(response["understandId"]))
 
     // then
-    expect(typeof response["understandId"]).toBe("string")
+    expect(response).toEqual({ understandId: expect.any(String) })
+    const events = await rpc.understandDone(String(response["understandId"]))
     expect(events.at(-1)?.candidates?.[0]?.sources).toEqual(["codex:codex-0", "codex:codex-1"])
     expect(rpc.starts).toHaveLength(1)
     expect(await rpc.call(ONBOARDING_APPLY_RPC_METHOD, { scanId, stages: [] })).toMatchObject({ kind: "unavailable" })
