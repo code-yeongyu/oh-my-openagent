@@ -6,9 +6,8 @@ const HEX_KEY = /^[0-9a-f]{64}$/
 
 // release-key.json is a byte copy of the device service's own packages/relayd/release-key.json: the release key SET
 // (an operational and a recovery key, verified any-of). Parsed by the same rules as the service's parseReleaseKey, so
-// a file the service would refuse never becomes a different set here. Until the keys are minted the set is one
-// all-zeros placeholder, which strictEd25519Key refuses, so every acquisition stops with release_key_invalid before it
-// downloads anything.
+// a file the service would refuse never becomes a different set here. A set that fails strictEd25519Key (the old
+// all-zeros placeholder did) stops every acquisition with release_key_invalid before it downloads anything.
 export const parseReleaseKeySet = (value: unknown): readonly string[] => {
   if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error("release key: not an object")
   if (Object.keys(value).toSorted().join(",") !== "alg,public_keys_hex")

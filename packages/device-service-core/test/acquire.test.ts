@@ -79,6 +79,18 @@ describe("verified acquisition of the device service", () => {
     expect(served.requested.some(url => url.endsWith(deviceServiceAssetName(HOST)))).toBe(false)
   })
 
+  test("a release signed by a key outside the two-key set is refused as signature and nothing is written", async () => {
+    const operational = releaseKey()
+    const recovery = releaseKey()
+    const outsider = releaseKey()
+    const state = stateDir()
+    const served = serveRelease(buildRelease({ key: outsider, host: HOST }))
+    const result = await acquireDeviceService({ ...options(state, served, ""), releaseKeys: [operational.publicHex, recovery.publicHex] })
+    expect(result).toMatchObject({ ok: false, refusal: "signature" })
+    expect(existsSync(state)).toBe(false)
+    expect(served.requested.some(url => url.endsWith(deviceServiceAssetName(HOST)))).toBe(false)
+  })
+
   test("identity-point release key and identity signature are refused", async () => {
     const identity = corpus.ed25519[0]
     expect(identity?.id).toBe("SE1")
