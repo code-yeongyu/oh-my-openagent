@@ -13,6 +13,7 @@ import { createAccountHttp } from "./http.ts"
 import { principalOf } from "./join.ts"
 import { ACCOUNT } from "./testing/genesis-enable.test-support.ts"
 import { revokeWorld, within, type World, type WorldDevice } from "./testing/revoke-world.test-support.ts"
+import { useTestTimeout } from "../../../../../test-support/test-deadline"
 
 const TIMEOUT = GIT_TEST_TIMEOUT * 4
 
@@ -29,6 +30,7 @@ async function opensEpoch(w: World, device: WorldDevice, epoch: number): Promise
 }
 
 test("R-A1 #given A and B syncing #when B is revoked #then A rotates B out, its next batch lands at epoch 2, and B's kept keys cannot open it", async () => {
+  useTestTimeout(TIMEOUT)
   const w = await revokeWorld()
   try {
     const b = await w.join("b", 20)
@@ -57,6 +59,7 @@ test("R-A1 #given A and B syncing #when B is revoked #then A rotates B out, its 
 
 for (const route of ["DELETE /v1/devices/:self", "POST /v1/session/sign-out"] as const) {
   test(`R-A11 #given A and B syncing #when B signs out through ${route} #then it is handled exactly like a revoke`, async () => {
+    useTestTimeout(TIMEOUT)
     const w = await revokeWorld()
     try {
       const b = await w.join("b", 20)
@@ -78,6 +81,7 @@ for (const route of ["DELETE /v1/devices/:self", "POST /v1/session/sign-out"] as
 }
 
 test("R-A11(c) rule 7 #given A rotated B out #when the flag stays set with no new record and no new revoke #then A appends nothing and reports flag_stuck, and a later revoke lets exactly one more rotation through", async () => {
+  useTestTimeout(TIMEOUT)
   const w = await revokeWorld()
   try {
     const b = await w.join("b", 20)
@@ -106,6 +110,7 @@ test("R-A11(c) rule 7 #given A rotated B out #when the flag stays set with no ne
 }, TIMEOUT)
 
 test("R-A5 #given C offline with a pending edit across B's revoke and A's rotation #when C comes back #then it verifies the rotation and pushes at epoch 2", async () => {
+  useTestTimeout(TIMEOUT)
   const w = await revokeWorld()
   try {
     const b = await w.join("b", 20)
@@ -127,6 +132,7 @@ test("R-A5 #given C offline with a pending edit across B's revoke and A's rotati
 }, TIMEOUT)
 
 test("R-A5 (old client) #given A runs a client without rotation on revoke #when B is revoked #then A stays frozen until upgraded C rotates, then A resumes", async () => {
+  useTestTimeout(TIMEOUT)
   const w = await revokeWorld()
   try {
     const b = await w.join("b", 20)
@@ -148,6 +154,7 @@ test("R-A5 (old client) #given A runs a client without rotation on revoke #when 
 }, TIMEOUT)
 
 test("R-A9 (idle member) #given C frozen with nothing pending and the stream up #when A's rotation is admitted #then C leaves frozen after the keyring event, with no local edit", async () => {
+  useTestTimeout(TIMEOUT)
   const w = await revokeWorld({ stream: true })
   try {
     const b = await w.join("b", 20)

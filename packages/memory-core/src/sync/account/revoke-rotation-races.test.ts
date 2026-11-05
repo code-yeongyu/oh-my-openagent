@@ -6,11 +6,13 @@ import { expect, test } from "bun:test"
 
 import { GIT_TEST_TIMEOUT } from "../engine/engine-harness.test-support.ts"
 import { revokeWorld, within } from "./testing/revoke-world.test-support.ts"
+import { useTestTimeout } from "../../../../../test-support/test-deadline"
 
 const TIMEOUT = GIT_TEST_TIMEOUT * 4
 const ids = (...devices: { readonly keyring: { principal(): { readonly id: string } } }[]) => devices.map((d) => d.keyring.principal().id).sort()
 
 test("R-A2 #given A and C both frozen at one head #when C's rotation is admitted while A's is parked #then A loses, adopts C's, and both push at epoch 2", async () => {
+  useTestTimeout(TIMEOUT)
   const w = await revokeWorld()
   try {
     const b = await w.join("b", 20)
@@ -36,6 +38,7 @@ test("R-A2 #given A and C both frozen at one head #when C's rotation is admitted
 }, TIMEOUT)
 
 test("R-A3(a) #given B and D revoked before A settles #then one rotation excludes both", async () => {
+  useTestTimeout(TIMEOUT)
   const w = await revokeWorld()
   try {
     const b = await w.join("b", 20)
@@ -54,6 +57,7 @@ test("R-A3(a) #given B and D revoked before A settles #then one rotation exclude
 }, TIMEOUT)
 
 test("R-A3(b) #given A's rotation parked after its device read #when D is revoked before admission #then the service refuses forbidden, A re-reads once and its second append excludes D", async () => {
+  useTestTimeout(TIMEOUT)
   const w = await revokeWorld()
   try {
     const b = await w.join("b", 20)
@@ -78,6 +82,7 @@ test("R-A3(b) #given A's rotation parked after its device read #when D is revoke
 }, TIMEOUT)
 
 test("R-A3(c) #given A rotated B out #when D is revoked after that rotation landed #then the flag is set again and a second rotation reaches epoch 3", async () => {
+  useTestTimeout(TIMEOUT)
   const w = await revokeWorld()
   try {
     const b = await w.join("b", 20)
@@ -100,6 +105,7 @@ test("R-A3(c) #given A rotated B out #when D is revoked after that rotation land
 }, TIMEOUT)
 
 test("R-A4 #given A's rotation parked #when an approval of E is admitted first #then A gets stale_base, rebuilds from the new fold, and its rotation includes E", async () => {
+  useTestTimeout(TIMEOUT)
   const w = await revokeWorld()
   try {
     const b = await w.join("b", 20)

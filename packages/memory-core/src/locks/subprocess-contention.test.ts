@@ -17,7 +17,7 @@ import {
   readPidFileWhenWritten,
 } from "./process-liveness.test-support"
 import { removeTree } from "../../../../test-support/remove-tree"
-import { remainingTestTime } from "../../../../test-support/test-deadline"
+import { remainingTestTime, useTestTimeout } from "../../../../test-support/test-deadline"
 
 const workerPath = fileURLToPath(new URL("./subprocess-worker.ts", import.meta.url))
 const temporaryDirectories: string[] = []
@@ -48,7 +48,7 @@ async function killAndAwait(child: ChildProcess): Promise<void> {
 function waitForOutput(child: ChildProcessWithoutNullStreams, expected: string): Promise<void> {
   return new Promise((resolve, reject) => {
     let output = ""
-    const timeout = setTimeout(() => reject(new Error(`timed out waiting for ${expected}; stderr=${child.stderr.read() ?? ""}`)), 5_000)
+    const timeout = setTimeout(() => reject(new Error(`timed out waiting for ${expected}; stderr=${child.stderr.read() ?? ""}`)), remainingTestTime())
     const onData = (chunk: Buffer): void => {
       output += chunk.toString("utf8")
       if (!output.includes(expected)) return
@@ -106,6 +106,7 @@ afterEach(async () => {
 
 describe("real subprocess lock contention", () => {
   test("#given two Bun subprocess writers #when they contend on one counter #then critical-section log entries never interleave", async () => {
+    useTestTimeout(10_000)
     // #given
     const fixture = await createFixture()
     const first = spawnWorker(["gated-increment", fixture.lockPath, fixture.counterPath, fixture.logPath, "first"])
@@ -129,6 +130,7 @@ describe("real subprocess lock contention", () => {
   }, 10_000)
 
   test("#given a SIGKILLed Bun lock holder #when another process acquires #then proven-dead ownership is recovered", async () => {
+    useTestTimeout(10_000)
     // #given
     const fixture = await createFixture()
     const holder = spawnWorker(["hold", fixture.lockPath, fixture.counterPath, fixture.logPath, "killed"])
@@ -148,6 +150,7 @@ describe("real subprocess lock contention", () => {
   }, 10_000)
 
   test("#given a live Bun lock holder #when a contender tries immediately #then the live owner is never stolen", async () => {
+    useTestTimeout(10_000)
     // #given
     const fixture = await createFixture()
     const holder = spawnWorker(["hold", fixture.lockPath, fixture.counterPath, fixture.logPath, "live"])
@@ -171,6 +174,7 @@ describe("subprocess lock holder lifecycle", () => {
   // parked on an unsettled top-level await busy-polls one core under Bun forever (#7335).
 
   test("#given a hold-mode worker that reported entered #when the parent ends its stdin #then the worker exits by itself within the bound", async () => {
+    useTestTimeout(30_000)
     // #given
     const fixture = await createFixture()
     const holder = spawnWorker(["hold", fixture.lockPath, fixture.counterPath, fixture.logPath, "orphan"])
@@ -189,6 +193,7 @@ describe("subprocess lock holder lifecycle", () => {
   }, 30_000)
 
   test("#given a wrapper that spawns the hold-mode worker and SIGKILLs itself once entered #when the wrapper dies #then the ORIGINAL worker is terminal within the bound", async () => {
+    useTestTimeout(30_000)
     // #given: a wrapper that spawns the real worker with a wrapper-owned stdin pipe, records the
     // worker's own pid once it holds the lock, waits for this test to acknowledge that it has
     // snapshotted the worker's identity, then SIGKILLs itself. The test observes THAT original
@@ -272,6 +277,7 @@ process.stdin.resume()
   let teardownProbe: ChildProcessWithoutNullStreams | null = null
 
   test("#given a hold-mode worker still holding the lock when its test ends #when the test returns #then it is handed to afterEach", async () => {
+    useTestTimeout(30_000)
     // #given
     const fixture = await createFixture()
     const holder = spawnWorker(["hold", fixture.lockPath, fixture.counterPath, fixture.logPath, "teardown"])
@@ -286,6 +292,7 @@ process.stdin.resume()
   }, 30_000)
 
   test("#given the holder handed to afterEach #when afterEach has run #then no tracked child remains alive", async () => {
+    useTestTimeout(30_000)
     const holder = teardownProbe
     teardownProbe = null
     try {

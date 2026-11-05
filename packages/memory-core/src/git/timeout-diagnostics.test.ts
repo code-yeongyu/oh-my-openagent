@@ -6,7 +6,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { GIT_TIMEOUT_DIAGNOSTICS_ENV, recordGitTimeout } from "./timeout-diagnostics"
-import { remainingTestTime } from "../../../../test-support/test-deadline"
+import { remainingTestTime, useTestTimeout } from "../../../../test-support/test-deadline"
 
 const roots: string[] = []
 const stops: Array<() => void> = []
@@ -26,6 +26,7 @@ const PARENT = [
 
 describe("git timeout diagnostics on Windows (#10821)", () => {
   test.skipIf(process.platform !== "win32")("#given a timed-out process with a child #when its timeout is recorded #then the thread states of the process and its child are both in the record", async () => {
+    useTestTimeout(60_000)
     // #given
     const root = realpathSync.native(await mkdtemp(join(tmpdir(), "git-timeout-threads-")))
     roots.push(root)
