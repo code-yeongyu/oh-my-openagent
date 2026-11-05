@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, relative } from "node:path"
 import { rmSyncEfaultTolerant } from "./teardown.test-support"
@@ -173,9 +173,13 @@ describe("memory cross-identity guard", () => {
       block: true,
       reason: `cross-identity memory access denied: ls to ${setup.agentsRoot} belongs to another memory identity`,
     })
+    expect(await dispatch(setup, "ls", { path: join(memoryRoot, TRANSIENT_DIRNAME) })).toEqual({
+      block: true,
+      reason: `cross-identity memory access denied: ls to ${join(memoryRoot, TRANSIENT_DIRNAME)} belongs to another memory identity`,
+    })
     expect(await dispatch(setup, "grep", { path: memoryRoot })).toEqual({
       block: true,
-      reason: `cross-identity memory access denied: grep to ${memoryRoot} belongs to another memory identity`,
+      reason: `cross-identity memory access denied: grep to ${memoryRoot} would enumerate another memory identity found under ${setup.agentsRoot}`,
     })
     expect(await dispatch(setup, "read", { path: memoryRoot })).toBeUndefined()
   })
@@ -293,5 +297,212 @@ describe("memory guard never resolves a macOS automount trigger (#11545)", () =>
       expect(await dispatch(setup, "read", { path })).toBeUndefined()
     })
     expect(touched).toEqual([])
+  })
+})
+
+const ENUMERATION_TOOLS = ["ls", "find", "grep", "glob"] as const
+
+type AncestorSetup = {
+  readonly pi: FakeExtensionAPI
+  readonly omoHome: string
+  readonly memoryRoot: string
+  readonly agentsRoot: string
+  readonly transientRoot: string
+  readonly workspace: string
+  readonly own: MemoryIdentityContext
+}
+
+// A realpath'd omo home so the lexical and canonical forms of every memory path agree; only the bound identity
+// "global" exists unless a test adds more.
+function ancestorFixture(options: { readonly transientToken?: string; readonly createOwn?: boolean } = {}): AncestorSetup {
+  const omoHome = realpathSync(mkdtempSync(join(tmpdir(), "omo-memory-guard-ancestor-")))
+  const workspace = realpathSync(mkdtempSync(join(tmpdir(), "omo-memory-guard-ancestor-workspace-")))
+  roots.push(omoHome, workspace)
+  const memoryRoot = join(omoHome, "memory")
+  const durablePaths = buildIdentityPaths(memoryRoot, "global")
+  const ownPaths = options.transientToken === undefined
+    ? durablePaths
+    : buildIdentityPaths(join(memoryRoot, TRANSIENT_DIRNAME, options.transientToken), "global")
+  if (options.createOwn !== false) mkdirSync(ownPaths.repo, { recursive: true })
+
+  const own = createMemoryIdentityContext({
+    identity: "global",
+    identityPaths: ownPaths,
+    ...(options.transientToken === undefined ? {} : { durableRoot: durablePaths.root }),
+    binding: { identity: "global", repoPathHash: "hash", boundAt: 1 },
+  })
+  const pi = new FakeExtensionAPI()
+  registerMemoryGuard(pi, componentContext(), { getContext: () => own, resolveCwd: () => workspace })
+  return {
+    pi,
+    omoHome,
+    memoryRoot,
+    agentsRoot: dirname(durablePaths.root),
+    transientRoot: join(memoryRoot, TRANSIENT_DIRNAME),
+    workspace,
+    own,
+  }
+}
+
+async function enumerate(setup: AncestorSetup, toolName: string, path: string, toolCallId = "call-1"): Promise<unknown> {
+  const results = await setup.pi.dispatch("tool_call", { type: "tool_call", toolCallId, toolName, input: { path } }, {
+    sessionManager: { getSessionId: () => "session-1" },
+  })
+  return results[0]
+}
+
+async function finish(setup: AncestorSetup, toolName: string, path: string, toolCallId = "call-1"): Promise<unknown[]> {
+  const results = await setup.pi.dispatch("tool_result", {
+    type: "tool_result",
+    toolCallId,
+    toolName,
+    input: { path },
+    content: [{ type: "text", text: "memory/agents/global/repo/system/persona.md" }],
+    structuredContent: { files: ["memory/agents/global/repo/system/persona.md"] },
+    details: { matches: ["persona.md"] },
+    isError: false,
+  }, { sessionManager: { getSessionId: () => "session-1" } })
+  return results.filter((result) => result !== undefined)
+}
+
+function expectAncestorDenied(result: unknown, hiddenNames: readonly string[]): void {
+  expect(result).toMatchObject({ block: true })
+  const reason = (result as { readonly reason: string }).reason
+  expect(reason.startsWith("cross-identity memory access denied: ")).toBe(true)
+  for (const name of hiddenNames) expect(reason).not.toContain(name)
+}
+
+describe("memory guard ancestor enumeration (#12301)", () => {
+  test("#given a single durable identity and no transient runs #when any enumeration tool targets the omo home or memory root #then it is allowed", async () => {
+    const setup = ancestorFixture()
+
+    for (const tool of ENUMERATION_TOOLS) {
+      expect(await enumerate(setup, tool, setup.omoHome)).toBeUndefined()
+      expect(await enumerate(setup, tool, setup.memoryRoot)).toBeUndefined()
+    }
+  })
+
+  test("#given a single identity and an empty transient-runs directory #when the memory root is enumerated #then it is allowed", async () => {
+    const setup = ancestorFixture()
+    mkdirSync(setup.transientRoot)
+
+    expect(await enumerate(setup, "grep", setup.memoryRoot)).toBeUndefined()
+  })
+
+  test("#given a single transient run and no durable identity #when the memory root is enumerated #then its own token is not foreign", async () => {
+    const setup = ancestorFixture({ transientToken: "tok-1" })
+
+    expect(await enumerate(setup, "find", setup.memoryRoot)).toBeUndefined()
+  })
+
+  test("#given a symlink to the omo home #when it is enumerated with a single identity #then the canonical ancestor is allowed", async () => {
+    const setup = ancestorFixture()
+    const link = join(setup.workspace, "omo-link")
+    symlinkSync(setup.omoHome, link, process.platform === "win32" ? "junction" : "dir")
+
+    expect(await enumerate(setup, "grep", link)).toBeUndefined()
+  })
+
+  test("#given the own identity directory differs from the bound id only by case #when the memory root is enumerated #then case-insensitive volumes allow it and case-sensitive ones deny it", async () => {
+    const setup = ancestorFixture({ createOwn: false })
+    mkdirSync(join(setup.agentsRoot, "Global", "repo"), { recursive: true })
+    const caseInsensitive = existsSync(join(setup.agentsRoot, "global"))
+
+    const result = await enumerate(setup, "grep", setup.memoryRoot)
+
+    if (caseInsensitive) expect(result).toBeUndefined()
+    else expectAncestorDenied(result, ["Global"])
+  })
+
+  test("#given a repo-less foreign identity #when any enumeration tool targets the memory root #then it stays denied without naming the identity", async () => {
+    const setup = ancestorFixture()
+    const transcript = join(setup.agentsRoot, "foreign-x", "runtime", "transcripts", "x.jsonl")
+    mkdirSync(dirname(transcript), { recursive: true })
+    writeFileSync(transcript, "secret")
+
+    for (const tool of ENUMERATION_TOOLS) expectAncestorDenied(await enumerate(setup, tool, setup.memoryRoot), ["foreign-x"])
+  })
+
+  test("#given a live transient run beside a durable session #when any enumeration tool targets the omo home #then it stays denied", async () => {
+    const setup = ancestorFixture()
+    mkdirSync(join(setup.transientRoot, "tok-live", "agents", "global", "runtime", "transcripts"), { recursive: true })
+
+    for (const tool of ENUMERATION_TOOLS) expectAncestorDenied(await enumerate(setup, tool, setup.omoHome), ["tok-live"])
+  })
+
+  test("#given a transient session while the durable identity exists on disk #when the memory root is enumerated #then it stays denied", async () => {
+    const setup = ancestorFixture({ transientToken: "tok-1" })
+    mkdirSync(join(setup.agentsRoot, "global", "repo"), { recursive: true })
+
+    expectAncestorDenied(await enumerate(setup, "grep", setup.memoryRoot), [])
+  })
+
+  test("#given a second identity under the run's own transient token #when the memory root is enumerated #then it stays denied (kept deny)", async () => {
+    const setup = ancestorFixture({ transientToken: "tok-1" })
+    mkdirSync(join(setup.transientRoot, "tok-1", "agents", "other-id", "runtime"), { recursive: true })
+
+    expectAncestorDenied(await enumerate(setup, "grep", setup.memoryRoot), ["other-id"])
+  })
+
+  test.each(["file", "dangling symlink", "alias symlink of the own root"] as const)("#given a %s entry in the agents area #when the memory root is enumerated #then any non-own entry denies", async (kind) => {
+    const setup = ancestorFixture()
+    const entry = join(setup.agentsRoot, "evil")
+    if (kind === "file") writeFileSync(entry, "not an identity")
+    else if (kind === "dangling symlink") symlinkSync(join(setup.agentsRoot, "missing"), entry)
+    else symlinkSync(setup.own.identityPaths.root, entry, process.platform === "win32" ? "junction" : "dir")
+
+    expectAncestorDenied(await enumerate(setup, "grep", setup.memoryRoot), ["evil"])
+  })
+
+  test("#given a memory area that is a file #when the memory root is enumerated #then the unlistable area denies", async () => {
+    const setup = ancestorFixture()
+    writeFileSync(setup.transientRoot, "not a directory")
+
+    expectAncestorDenied(await enumerate(setup, "grep", setup.memoryRoot), [])
+  })
+
+  test("#given a second identity appears between two calls #when the memory root is enumerated again #then the second call is denied", async () => {
+    const setup = ancestorFixture()
+
+    expect(await enumerate(setup, "grep", setup.memoryRoot, "call-a")).toBeUndefined()
+    mkdirSync(join(setup.agentsRoot, "second", "runtime"), { recursive: true })
+
+    expectAncestorDenied(await enumerate(setup, "grep", setup.memoryRoot, "call-b"), ["second"])
+  })
+
+  test("#given an allowed ancestor enumeration #when a foreign identity appears before its result #then the whole result is replaced by the deny", async () => {
+    const setup = ancestorFixture()
+
+    expect(await enumerate(setup, "grep", setup.memoryRoot, "call-race")).toBeUndefined()
+    mkdirSync(join(setup.agentsRoot, "late-id", "runtime"), { recursive: true })
+    const replaced = await finish(setup, "grep", setup.memoryRoot, "call-race")
+
+    expect(replaced).toHaveLength(1)
+    const result = replaced[0] as Record<string, unknown>
+    expect(Object.keys(result).sort()).toEqual(["content", "details", "isError"])
+    expect(result.isError).toBe(true)
+    expect(result.details).toBeNull()
+    const content = result.content as readonly { readonly type: string; readonly text: string }[]
+    expect(content).toHaveLength(1)
+    expect(content[0]?.type).toBe("text")
+    expectAncestorDenied({ block: true, reason: content[0]?.text }, ["late-id"])
+  })
+
+  test("#given an allowed ancestor enumeration #when an area becomes unlistable before its result #then the whole result is replaced by the deny", async () => {
+    const setup = ancestorFixture()
+
+    expect(await enumerate(setup, "find", setup.memoryRoot, "call-error")).toBeUndefined()
+    writeFileSync(setup.transientRoot, "not a directory")
+    const replaced = await finish(setup, "find", setup.memoryRoot, "call-error")
+
+    expect(replaced).toEqual([{ content: [expect.objectContaining({ type: "text" })], isError: true, details: null }])
+  })
+
+  test("#given an allowed ancestor enumeration #when nothing changes before its result #then the result passes through untouched", async () => {
+    const setup = ancestorFixture()
+
+    expect(await enumerate(setup, "grep", setup.memoryRoot, "call-quiet")).toBeUndefined()
+
+    expect(await finish(setup, "grep", setup.memoryRoot, "call-quiet")).toEqual([])
   })
 })
