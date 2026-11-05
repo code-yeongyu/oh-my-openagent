@@ -4,6 +4,7 @@ import {
   type OmoConfigWatchTarget,
   type OmoConfigWatchTargetResolution,
 } from "./paths"
+import { CONFIG_WATCH_SHUTDOWN_SIDE, type ConfigWatchLifecycleSource } from "./hand-lifetime"
 import { createOmoConfigValidator, type OmoConfigValidator } from "./validate"
 
 const CONFIG_WATCH_REGISTER = "config-watch:register"
@@ -38,6 +39,8 @@ export interface ConfigWatchComponentOptions {
   readonly resolveTargets?: (options: { readonly cwd: string }) => readonly OmoConfigWatchTarget[]
   readonly resolveTargetResolution?: (options: { readonly cwd: string }) => OmoConfigWatchTargetResolution
   readonly createValidator?: (options: { readonly cwd: string }) => OmoConfigValidator
+  /** The scope close of a hand of a split session; absent on a fused session, which ends with `session_shutdown`. */
+  readonly lifecycle?: (pi: SenpiExtensionAPI) => ConfigWatchLifecycleSource | undefined
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -83,8 +86,11 @@ export function createConfigWatchComponent(options: ConfigWatchComponentOptions 
   return {
     name: "config-watch",
     register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
-      releasePrevious?.()
-      releasePrevious = undefined
+      const scopeLifecycle = options.lifecycle?.(pi)
+      if (scopeLifecycle === undefined) {
+        releasePrevious?.()
+        releasePrevious = undefined
+      }
 
       const events = pi.events
       if (events === undefined) {
@@ -216,11 +222,15 @@ export function createConfigWatchComponent(options: ConfigWatchComponentOptions 
         clearRetryTimer()
         release(unsubscribes)
       }
-      releasePrevious = dispose
-      pi.on(SESSION_SHUTDOWN, () => {
-        dispose()
-        if (releasePrevious === dispose) releasePrevious = undefined
-      })
+      if (scopeLifecycle === undefined) {
+        releasePrevious = dispose
+        pi.on(SESSION_SHUTDOWN, () => {
+          dispose()
+          if (releasePrevious === dispose) releasePrevious = undefined
+        }, CONFIG_WATCH_SHUTDOWN_SIDE)
+      } else {
+        scopeLifecycle.onClose(dispose)
+      }
       emitRegistration()
     },
   }
