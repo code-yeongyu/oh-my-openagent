@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto"
+import { createHash, randomBytes } from "node:crypto"
 
 export type PrWatchEvent = {
   key: string
@@ -10,6 +10,7 @@ export type PrWatchRegistration = {
   id: string
   reference: string
   sessionID: string
+  host?: string
   directory?: string
   generation: number
   actor: string
@@ -18,6 +19,7 @@ export type PrWatchRegistration = {
   reason?: string
   commentOnlyWakes: number
   unreadableSince?: number
+  observed?: boolean
   told: string[]
 }
 
@@ -26,6 +28,8 @@ export type PrWatchWake = {
   watchID: string
   generation: number
   events: PrWatchEvent[]
+  retryAt?: number
+  messageID?: string
   status: "pending" | "delivered"
 }
 
@@ -40,6 +44,7 @@ export type PrWatchSnapshot = {
 
 export type PrWatchState = {
   version: 1
+  nextPollAt?: number
   registrations: Record<string, PrWatchRegistration>
   outbox: Record<string, PrWatchWake>
   snapshots: Record<string, PrWatchSnapshot>
@@ -68,7 +73,7 @@ export function registerPrWatch(state: PrWatchState, reference: string, sessionI
   if (old?.active) return old
   const registration: PrWatchRegistration = {
     id, reference: normalized, sessionID, actor: actor.toLowerCase(), startedAt: now,
-    generation: (old?.generation ?? 0) + 1, active: true, commentOnlyWakes: 0, told: [],
+    generation: old ? old.generation + 1 : randomBytes(6).readUIntBE(0, 6) + 1, active: true, observed: false, commentOnlyWakes: 0, told: [],
   }
   state.registrations[id] = registration
   return registration
@@ -94,11 +99,12 @@ export function recordPrWatchEvents(
   // A read started before unwatch, rewatch or session teardown cannot resurrect delivery.
   if (!registration?.active || registration.generation !== captured.generation) return
   const fresh = events.filter((event) => !registration.told.includes(event.key))
+  // Only the current observation needs suppression; old changes live in the durable outbox.
+  registration.told = events.map((event) => event.key)
   if (fresh.length === 0) return
   const id = hash([registration.id, registration.generation, fresh.map((event) => event.key)])
   const wake: PrWatchWake = { id, watchID: registration.id, generation: registration.generation, events: [...fresh], status: "pending" }
   // Persist both event progress and the outbox in one atomic snapshot. Progress does not mean delivered.
-  registration.told.push(...fresh.map((event) => event.key))
   state.outbox[id] = wake
   const commentOnly = fresh.every((event) => event.kind === "comment")
   registration.commentOnlyWakes = commentOnly ? registration.commentOnlyWakes + 1 : 0
@@ -130,5 +136,30 @@ export function pendingPrWatchWakes(state: PrWatchState): PrWatchWake[] {
 export function acknowledgePrWatchWake(state: PrWatchState, wakeID: string): void {
   const wake = state.outbox[wakeID]
   const registration = wake && state.registrations[wake.watchID]
-  if (wake && registration?.generation === wake.generation) wake.status = "delivered"
+  if (wake && registration?.generation === wake.generation) delete state.outbox[wakeID]
+}
+
+// OpenCode message ids sort by their timestamp prefix. Persist once, before attempting delivery.
+export function orderedPrWatchMessageID(latest?: string): string {
+  // Match OpenCode Identifier.ascending's six-byte (millisecond << 12) prefix.
+  let time = (BigInt(Date.now()) * 0x1000n) & 0xffffffffffffn
+  if (latest && /^msg_[0-9a-f]{12}/.test(latest)) {
+    const previous = BigInt(`0x${latest.slice(4, 16)}`)
+    if (previous >= time) time = previous + 1n
+  }
+  return `msg_${time.toString(16).padStart(12, "0")}${randomBytes(7).toString("hex")}`
+}
+
+export function prunePrWatchState(state: PrWatchState): void {
+  for (const [id, wake] of Object.entries(state.outbox)) {
+    if (wake.status === "delivered" || state.registrations[wake.watchID]?.generation !== wake.generation) delete state.outbox[id]
+  }
+  const pending = new Set(Object.values(state.outbox).map(wake => wake.watchID))
+  for (const [id, row] of Object.entries(state.registrations)) {
+    if (!row.active && !pending.has(id)) delete state.registrations[id]
+  }
+  const references = new Set(Object.values(state.registrations).filter(row => row.active).map(row => row.reference))
+  for (const reference of Object.keys(state.snapshots)) {
+    if (!references.has(reference)) delete state.snapshots[reference]
+  }
 }

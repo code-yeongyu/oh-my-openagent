@@ -13,7 +13,7 @@ export function prWatchTransitions(previous: PrWatchSnapshot | undefined, curren
   if (details) {
     for (const check of details.checks) {
       if (["FAILURE", "ERROR", "TIMED_OUT", "ACTION_REQUIRED", "CANCELLED", "STARTUP_FAILURE"].includes(check.conclusion ?? "")) {
-        events.push({ key: `failed:${details.head}:${check.id}:${check.conclusion}`, kind: "check_failed", fact: `Check ${check.name} reported ${check.conclusion} on ${details.head}.` })
+        events.push({ key: `failed:${details.head}:${check.id}:${check.conclusion}`, kind: "check_failed", fact: `Check ${JSON.stringify(check.name)} reported ${check.conclusion} on ${details.head}.` })
       }
     }
     if (checksPassed(current) && (!previous || details.head !== previous.details?.head || !checksPassed(previous))) {
@@ -24,8 +24,9 @@ export function prWatchTransitions(previous: PrWatchSnapshot | undefined, curren
     }
   }
   for (const remark of current.activity?.remarks ?? []) {
+    if (previous?.activity?.remarks.some(old => old.id === remark.id && old.updatedAt === remark.updatedAt)) continue
     if (remark.author.toLowerCase() === registration.actor || Date.parse(remark.updatedAt) < registration.startedAt) continue
-    events.push({ key: `remark:${remark.id}:${remark.updatedAt}`, kind: "comment", fact: `${remark.author} added or edited a ${remark.kind}: ${remark.url}` })
+    events.push({ key: `remark:${remark.id}:${remark.updatedAt}`, kind: "comment", fact: `${JSON.stringify(remark.author)} added or edited a ${remark.kind}: ${JSON.stringify(remark.url)}` })
   }
   return events
 }

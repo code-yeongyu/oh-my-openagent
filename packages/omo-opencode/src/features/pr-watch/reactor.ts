@@ -1,7 +1,7 @@
 import { GitHubReadDeferred } from "./transport"
 import { GitHubPrWatchHost } from "./github"
 import { PrWatchRegistry } from "./registry"
-import { recordPrWatchEvents, recordPrWatchReadFailure, stopPrWatch, type PrWatchSnapshot } from "./state"
+import { recordPrWatchEvents, recordPrWatchReadFailure, type PrWatchSnapshot } from "./state"
 import { prWatchTransitions } from "./transitions"
 
 export class PrWatchReactor {
@@ -9,7 +9,7 @@ export class PrWatchReactor {
 
   async pass(now: number): Promise<void> {
     const before = this.registry.read()
-    const captured = Object.values(before.registrations).filter((registration) => registration.active).map((row) => ({ ...row }))
+    const captured = Object.values(before.registrations).filter((registration) => registration.active && (!registration.host || registration.host === this.host.transport.host)).map((row) => ({ ...row }))
     const references = [...new Set(captured.map((registration) => registration.reference))]
     if (!references.length) return
     let fingerprints
@@ -38,18 +38,27 @@ export class PrWatchReactor {
           candidate.lastRemarksReadAt = now
           if (fingerprint?.result === "ok") candidate.remarksFingerprint = fingerprint.remarksFingerprint
         }
+        if (candidate.details?.mergeable === "UNKNOWN" && previous?.details) {
+          candidate.details = { ...candidate.details, mergeable: previous.details.mergeable }
+        }
         await this.registry.transaction((state) => {
           const registrations = captured.filter((registration) => registration.reference === reference)
-          state.snapshots[reference] = candidate
+          // A cancelled in-flight read must not recreate orphan snapshots.
+          if (registrations.some(row => state.registrations[row.id]?.generation === row.generation)) state.snapshots[reference] = candidate
           for (const capturedRegistration of registrations) {
             const live = state.registrations[capturedRegistration.id]
             if (!live?.active || live.generation !== capturedRegistration.generation) continue
             delete live.unreadableSince
+            const events = prWatchTransitions(live.observed ? previous : undefined, candidate, live)
             if (candidate.details?.state === "MERGED" || candidate.details?.state === "CLOSED") {
-              stopPrWatch(state, live.id, `pr_${candidate.details.state.toLowerCase()}`)
-              continue
+              events.push({ key: `terminal:${candidate.details.state}`, kind: "stopped", fact: `PR ${candidate.details.state.toLowerCase()}. Watching has stopped; pending observations are still delivered.` })
+              recordPrWatchEvents(state, capturedRegistration, events)
+              live.active = false
+              live.reason = `pr_${candidate.details.state.toLowerCase()}`
+            } else {
+              recordPrWatchEvents(state, capturedRegistration, events)
             }
-            recordPrWatchEvents(state, capturedRegistration, prWatchTransitions(previous, candidate, live))
+            live.observed = true
           }
         })
       } catch (error) {
