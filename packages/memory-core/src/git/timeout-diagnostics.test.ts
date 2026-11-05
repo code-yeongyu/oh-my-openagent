@@ -52,3 +52,39 @@ describe("git timeout diagnostics on Windows (#10821)", () => {
     expect(record.processes).toContain(`threads of ${childPid}`)
   }, 60_000)
 })
+
+async function readRecord(directory: string): Promise<{ pid: number; argv: string[]; timeoutMs: number; processes: string }> {
+  const [file] = await readdir(directory)
+  return JSON.parse(await readFile(join(directory, file ?? ""), "utf8"))
+}
+
+describe("recordGitTimeout snapshot contract (#12145)", () => {
+  test("#given an injected snapshot naming the pid #when git times out #then the record carries that table", async () => {
+    // #given
+    const directory = await mkdtemp(join(tmpdir(), "git-timeout-record-"))
+    roots.push(directory)
+    const pid = 4242
+    const table = `  ${pid}  1  Ss   0:00.00 /usr/local/bin/git add -A\n`
+    // #when
+    recordGitTimeout({ [GIT_TIMEOUT_DIAGNOSTICS_ENV]: directory }, pid, ["add", "-A"], directory, 2_000, () => table)
+    // #then
+    const record = await readRecord(directory)
+    expect(record.pid).toBe(pid)
+    expect(record.timeoutMs).toBe(2_000)
+    expect(record.processes).toBe(table)
+    expect(record.processes).toContain(String(pid))
+  })
+
+  test("#given an injected snapshot that fails #when git times out #then the record carries the failure form", async () => {
+    // #given
+    const directory = await mkdtemp(join(tmpdir(), "git-timeout-record-"))
+    roots.push(directory)
+    const pid = 4242
+    // #when
+    recordGitTimeout({ [GIT_TIMEOUT_DIAGNOSTICS_ENV]: directory }, pid, ["add", "-A"], directory, 2_000, () => "process snapshot failed: spawnSync ps ETIMEDOUT")
+    // #then
+    const record = await readRecord(directory)
+    expect(record.pid).toBe(pid)
+    expect(record.processes).toBe("process snapshot failed: spawnSync ps ETIMEDOUT")
+  })
+})
