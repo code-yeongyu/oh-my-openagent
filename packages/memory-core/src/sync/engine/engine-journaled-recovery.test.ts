@@ -3,15 +3,30 @@
 // is the captured text, so a later revert or delete still reaches the peer. A journaled op this device
 // cannot import is left alone, never sent, and never fails the cycle.
 
+import { writeFile } from "node:fs/promises"
+import { join } from "node:path"
+
 import { afterEach, expect, test } from "bun:test"
 
 import { loadLoroRuntime } from "../../crdt/loro-runtime"
 import { CrashInjected } from "./engine"
 import { type Device, makeDevice } from "./engine-harness.test-support"
 import { FakeSyncServer } from "./fake-server.test-support"
-import { toBase64 } from "./journal"
+import { toBase64, type WireItem } from "./journal"
 
 const TIMEOUT = 60_000
+
+/** Writes pending.json the way an older build did: inline base64 ops, which the outbox converts on read (#12286). */
+const writeInlinePending = (device: Device, items: readonly unknown[]): Promise<void> =>
+  writeFile(join(device.repo.gitDir, "omo-sync", "pending.json"), `${JSON.stringify({ items, outgoing: null })}\n`)
+
+/** The pending journal holds exactly this one op, unchanged. */
+async function expectOnlyPending(device: Device, item: WireItem): Promise<void> {
+  const [kept, ...rest] = (await device.engine.journal.pending()).items
+  expect(rest).toEqual([])
+  expect(kept?.key).toBe(item.key)
+  if (kept !== undefined) expect(toBase64(await device.engine.journal.outbox.readOps(kept))).toBe(item.ops)
+}
 
 const devices: Device[] = []
 afterEach(async () => {
@@ -76,10 +91,10 @@ test("a journaled op under a foreign peer that the doc lacks stays queued, is ne
   const item = { key: "x.md", ops: toBase64(foreign.export({ mode: "update" })) }
   foreign.free()
   const versionBefore = await a.store.version("x.md")
-  await a.engine.journal.setPending({ items: [item], outgoing: null })
+  await writeInlinePending(a, [item])
   expect(await a.engine.runCycle()).toMatchObject({ held: ["x.md"] })
   expect(await a.store.version("x.md")).toBe(versionBefore)
-  expect((await a.engine.journal.pending()).items).toEqual([item])
+  await expectOnlyPending(a, item)
   expect(await a.engine.status()).toMatchObject({ kind: "failing", failure: { kind: "oversized_item", stuck: ["x.md"] } })
   await b.engine.runCycle()
   expect(await b.read("x.md")).toBe(note("mine\n"))
@@ -100,10 +115,10 @@ test("a journaled op under this device's peer whose earlier ops the doc lacks is
   const item = { key: "dep.md", ops: toBase64(source.export({ mode: "update", from: mid })) }
   source.free()
   const versionBefore = await a.store.version("dep.md")
-  await a.engine.journal.setPending({ items: [item], outgoing: null })
+  await writeInlinePending(a, [item])
   expect(await a.engine.runCycle()).toMatchObject({ held: ["dep.md"] })
   expect(await a.store.version("dep.md")).toBe(versionBefore)
-  expect((await a.engine.journal.pending()).items).toEqual([item])
+  await expectOnlyPending(a, item)
   expect(await a.engine.status()).toMatchObject({ kind: "failing", failure: { kind: "oversized_item", stuck: ["dep.md"] } })
   await b.engine.runCycle()
   expect(await b.read("dep.md")).toBeNull()

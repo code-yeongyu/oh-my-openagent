@@ -1,15 +1,16 @@
-import type { WireItem } from "./journal"
-
 /** sync-design §6: at most 8 MiB of plaintext per batch, a hard bound. */
 export const MAX_BATCH_BYTES = 8 * 1024 * 1024
 
-/** The plaintext bytes one item adds to a batch. */
-export const itemBytes = (item: WireItem): number => Math.floor((item.ops.length * 3) / 4)
+/** A pending item as the batch split sees it: its key and its ops' plaintext size. */
+export interface SizedItem {
+  readonly key: string
+  readonly bytes: number
+}
 
-export interface PushPlan {
-  readonly batches: readonly (readonly WireItem[])[]
+export interface PushPlan<T extends SizedItem> {
+  readonly batches: readonly (readonly T[])[]
   /** Pending items left out of every batch, in capture order; they stay pending. */
-  readonly held: readonly WireItem[]
+  readonly held: readonly T[]
 }
 
 /**
@@ -19,14 +20,14 @@ export interface PushPlan {
  * still batched, so one oversized item never stops the rest of the device's changes. `withheld` keys
  * (ops this device must not send) are held the same way, from their first op on.
  */
-export function planBatches(items: readonly WireItem[], limit = MAX_BATCH_BYTES, withheld: ReadonlySet<string> = new Set()): PushPlan {
-  const batches: WireItem[][] = []
-  const held: WireItem[] = []
+export function planBatches<T extends SizedItem>(items: readonly T[], limit = MAX_BATCH_BYTES, withheld: ReadonlySet<string> = new Set()): PushPlan<T> {
+  const batches: T[][] = []
+  const held: T[] = []
   const heldKeys = new Set<string>(withheld)
-  let current: WireItem[] = []
+  let current: T[] = []
   let size = 0
   for (const item of items) {
-    const bytes = itemBytes(item)
+    const bytes = item.bytes
     if (bytes > limit || heldKeys.has(item.key)) {
       heldKeys.add(item.key)
       held.push(item)

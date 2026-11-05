@@ -143,7 +143,11 @@ export async function advance(deps: EngineDeps, journal: SyncJournal, start: Cyc
     deps.fault?.(point)
   }
   if (cycle.stage === "merged") {
-    const latest = latestByKey(await journal.renders(cycle.id))
+    const records = await journal.renders(cycle.id)
+    const latest = latestByKey(records)
+    // Records are append-only and only this loop appends them, so the next seq is counted here,
+    // never re-read from the journal per key: that read parses every earlier record (#12285).
+    let seq = records.at(-1)?.seq ?? 0
     for (const key of [...cycle.keys]) {
       // A held key's file carries an edit capture could not take (#12284): rendering the doc over it
       // would erase that edit, so the key leaves the cycle and is owed this cycle's render instead, in
@@ -170,7 +174,8 @@ export async function advance(deps: EngineDeps, journal: SyncJournal, start: Cyc
       // Invariant 6: this (key, frontier) already rendered, landed and untouched.
       if (prior !== undefined && prior.frontier === frontier && journal.renderLanded(cycle.id, prior) && textHash(working) === prior.hash) continue
       const text = deps.store.render(key, working)
-      const record: RenderRecord = { seq: await journal.nextRenderSeq(cycle.id), key, frontier, hash: textHash(text), text }
+      seq += 1
+      const record: RenderRecord = { seq, key, frontier, hash: textHash(text), text }
       // A crash at `staged` leaves a staged file with no record at this seq; it must not survive
       // into a delete record, where a present staged file means "landed" (invariant 4).
       await removeAtomic(journal.stagedPath(cycle.id, record.seq))

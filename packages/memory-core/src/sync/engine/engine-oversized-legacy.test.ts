@@ -3,6 +3,9 @@
 // normal hold-until-it-fits path. The emulation below is exactly what that build left behind: the
 // edit captured, imported and made the baseline, then journaled as pending and never sent.
 
+import { writeFile } from "node:fs/promises"
+import { join } from "node:path"
+
 import { afterEach, expect, test } from "bun:test"
 
 import { CrashInjected } from "./engine"
@@ -12,6 +15,18 @@ import { toBase64, type WireItem } from "./journal"
 
 const TIMEOUT = 60_000
 const BOUND = 4096
+
+/** Writes pending.json the way an older build did: inline base64 ops, which the outbox converts on read (#12286). */
+const writeInlinePending = (device: Device, items: readonly unknown[]): Promise<void> =>
+  writeFile(join(device.repo.gitDir, "omo-sync", "pending.json"), `${JSON.stringify({ items, outgoing: null })}\n`)
+
+/** The pending journal holds exactly this one op, unchanged. */
+async function expectOnlyPending(device: Device, item: WireItem): Promise<void> {
+  const [kept, ...rest] = (await device.engine.journal.pending()).items
+  expect(rest).toEqual([])
+  expect(kept?.key).toBe(item.key)
+  if (kept !== undefined) expect(toBase64(await device.engine.journal.outbox.readOps(kept))).toBe(item.ops)
+}
 
 const devices: Device[] = []
 afterEach(async () => {
@@ -39,7 +54,7 @@ async function oldBuildCapture(device: Device, key: string, text: string): Promi
   await device.store.persist()
   const item = { key, ops: toBase64(ops) }
   const pending = await device.engine.journal.pending()
-  await device.engine.journal.setPending({ items: [...pending.items, item], outgoing: null })
+  await writeInlinePending(device, [...pending.items, item])
   return item
 }
 
@@ -116,7 +131,7 @@ test("an op the old build journaled but never imported is dropped, and the file 
   await a.write("legacy.md", t.big)
   const ops = await a.store.capture("legacy.md", t.big)
   if (ops === null) throw new Error("emulation: nothing captured")
-  await a.engine.journal.setPending({ items: [{ key: "legacy.md", ops: toBase64(ops) }], outgoing: null })
+  await writeInlinePending(a, [{ key: "legacy.md", ops: toBase64(ops) }])
   await a.write("legacy.md", t.fits)
   expect(await a.engine.runCycle()).toMatchObject({ pushed: true, held: [] })
   expect(await pendingKeys(a)).toEqual([])
@@ -131,9 +146,9 @@ test("a queued op this device cannot attribute to itself stays queued and is nam
   devices.push(a)
   await a.engine.runCycle()
   const foreign = { key: "foreign.md", ops: toBase64(new Uint8Array(BOUND * 2).fill(7)) }
-  await a.engine.journal.setPending({ items: [foreign], outgoing: null })
+  await writeInlinePending(a, [foreign])
   expect(await a.engine.runCycle()).toMatchObject({ held: ["foreign.md"] })
-  expect((await a.engine.journal.pending()).items).toEqual([foreign])
+  await expectOnlyPending(a, foreign)
   expect(await a.engine.status()).toMatchObject({ kind: "failing", failure: { kind: "oversized_item", keys: ["foreign.md"], stuck: ["foreign.md"] } })
   expect(lines.filter((line) => line.startsWith("sync.item.stuck"))).toEqual([`sync.item.stuck len=${Buffer.byteLength("foreign.md")} ops=1`])
 }, TIMEOUT)

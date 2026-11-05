@@ -1,20 +1,33 @@
 // The local half of a cycle's locked section: this device's edits become journaled pending ops
 // before anything remote lands (sync-design §5). An edit larger than one batch may carry is held,
 // never journaled, sliced or truncated (#12284); an older build's queued ops of that size are wound
-// back into their files first, so they follow the same hold-until-it-fits path (review M1).
+// back into their files first, so they follow the same hold-until-it-fits path (review M1). Each
+// captured item's ops go into one outbox segment as they are captured, so a capture holds an index
+// entry per item, never the whole set's ops (#12286).
 
 import { isSyncItemKey } from "../item"
 import { adoptLandedRenders } from "./apply"
-import { itemBytes, planBatches } from "./batches"
+import { planBatches } from "./batches"
 import type { EngineDeps } from "./engine-deps"
 import { batchBound, heldPrint } from "./held"
 import { acceptedKeys, rejectItem } from "./item-keys"
-import { type CycleRecord, fromBase64, type SyncJournal, toBase64, type WireItem } from "./journal"
+import type { CycleRecord, SyncJournal } from "./journal"
 import { fsRefusal, readWorking, throughSymlink } from "./landing"
+import type { PendingItem } from "./outbox"
 import { diskLister, type ItemPaths, itemPaths, landingPath, scanWorkingTree } from "./working-tree"
 
-const sameItem = (a: WireItem, b: WireItem): boolean => a.key === b.key && a.ops === b.ops
 const keyLength = (key: string): number => Buffer.byteLength(key, "utf8")
+
+/**
+ * Marks the pending entries whose ops this device's doc now holds, so the recovery below never reads
+ * them again: a cycle then reads only the ops of the batch it seals (#12286). A crash before the mark
+ * only repeats one recovery check, which then finds the ops already held.
+ */
+async function markImported(journal: SyncJournal, digests: ReadonlySet<string>): Promise<void> {
+  if (digests.size === 0) return
+  const now = await journal.pending()
+  await journal.setPending({ ...now, items: now.items.map((item) => (digests.has(item.digest) && item.imported !== true ? { ...item, imported: true as const } : item)) })
+}
 
 /**
  * Working files by item key (#12147), with a capture receipt for every symlink (never entered, so
@@ -59,24 +72,26 @@ async function readCaptured(deps: EngineDeps, journal: SyncJournal, key: string,
  */
 async function rewindQueued(deps: EngineDeps, journal: SyncJournal): Promise<void> {
   const pending = await journal.pending()
-  const carried = pending.outgoing?.items ?? []
-  const queued = planBatches(pending.items.filter((item) => !carried.some((o) => sameItem(o, item))), batchBound(deps)).held
+  const carried = new Set((pending.outgoing?.items ?? []).map((item) => item.digest))
+  const queued = planBatches(pending.items.filter((item) => !carried.has(item.digest)), batchBound(deps)).held
   if (queued.length === 0) return
-  const rewound: WireItem[] = []
+  const rewound = new Set<string>()
   for (const key of [...new Set(queued.map((item) => item.key))]) {
     const items = queued.filter((item) => item.key === key)
-    if ((await deps.store.rewind(key, items.map((item) => fromBase64(item.ops)))) === "kept") {
+    const ops: Uint8Array[] = []
+    for (const item of items) ops.push(await journal.outbox.readOps(item))
+    if ((await deps.store.rewind(key, ops)) === "kept") {
       deps.log?.(`sync.item.stuck len=${keyLength(key)} ops=${items.length}`)
       continue
     }
-    rewound.push(...items)
+    for (const item of items) rewound.add(item.digest)
     deps.log?.(`sync.item.rewound len=${keyLength(key)} ops=${items.length}`)
   }
-  if (rewound.length === 0) return
+  if (rewound.size === 0) return
   await deps.store.persist()
   deps.fault?.("rewound")
   const now = await journal.pending()
-  await journal.setPending({ ...now, items: now.items.filter((item) => !rewound.some((r) => sameItem(r, item))) })
+  await journal.setPending({ ...now, items: now.items.filter((item) => !rewound.has(item.digest)) })
 }
 
 /**
@@ -84,21 +99,28 @@ async function rewindQueued(deps: EngineDeps, journal: SyncJournal): Promise<voi
  * 2-3): each pending op the push would send is imported into its doc with the baseline its capture
  * recorded, so the next capture journals nothing new. Returns the keys of ops this device must not
  * import (foreign, missing deps, undecodable): they stay pending, are withheld from the push with every
- * later op of their key, and are named stuck. Oldest first; never throws.
+ * later op of their key, and are named stuck. Oldest first; never throws for an op it cannot import (a damaged journal entry
+ * fails the cycle, never the wire). Entries already marked imported are skipped unread.
  */
 async function adoptJournaled(deps: EngineDeps, journal: SyncJournal): Promise<ReadonlySet<string>> {
   const sendable = planBatches((await journal.pending()).items, batchBound(deps)).batches.flat()
   const withheld = new Set<string>()
+  const adopted = new Set<string>()
   let imported = false
   for (const item of sendable) {
+    if (item.imported === true) continue
     if (withheld.has(item.key) || isSyncItemKey(item.key) !== null) continue
-    const outcome = await deps.store.adoptJournaled(item.key, fromBase64(item.ops))
+    const outcome = await deps.store.adoptJournaled(item.key, await journal.outbox.readOps(item))
     if (outcome === "imported") imported = true
-    if (outcome !== "refused") continue
+    if (outcome !== "refused") {
+      adopted.add(item.digest)
+      continue
+    }
     withheld.add(item.key)
     deps.log?.(`sync.item.stuck len=${keyLength(item.key)} ops=1`)
   }
   if (imported) await deps.store.persist()
+  await markImported(journal, adopted)
   return withheld
 }
 
@@ -123,40 +145,48 @@ export async function capture(deps: EngineDeps, journal: SyncJournal, resuming: 
   const known = await acceptedKeys(deps, journal, "capture", deps.store.keys())
   const keys = [...new Set([...known, ...files.byKey.keys()])].sort()
   const prints = (await journal.state()).held?.prints ?? {}
-  const captured: WireItem[] = []
+  const captured: PendingItem[] = []
   const held = new Map<string, string>()
   const texts = new Map<string, string | null>()
-  for (const key of keys) {
-    const path = landingPath(files, key)
-    if (path === null) continue
-    const text = await readCaptured(deps, journal, key, path, files.byKey.has(key))
-    if (text === undefined) continue
-    const prior = prints[key]
-    const unchanged = prior !== undefined && prior === heldPrint(text, await deps.store.version(key))
-    const ops = unchanged ? null : await deps.store.capture(key, text)
-    if (ops === null && !unchanged) continue
-    const item = ops === null ? null : { key, ops: toBase64(ops) }
-    if (item === null || itemBytes(item) > batchBound(deps)) {
-      // The doc did not move (held ops are never imported), so this version is the one the next cycle compares.
-      held.set(key, unchanged && prior !== undefined ? prior : heldPrint(text, await deps.store.version(key)))
-      await rejectItem(deps, journal, "capture", key, "oversized")
-      continue
+  const segment = journal.outbox.segment()
+  try {
+    for (const key of keys) {
+      const path = landingPath(files, key)
+      if (path === null) continue
+      const text = await readCaptured(deps, journal, key, path, files.byKey.has(key))
+      if (text === undefined) continue
+      const prior = prints[key]
+      const unchanged = prior !== undefined && prior === heldPrint(text, await deps.store.version(key))
+      const ops = unchanged ? null : await deps.store.capture(key, text)
+      if (ops === null && !unchanged) continue
+      // Checked before the segment sees it: a held edit is never journaled (#12284).
+      if (ops === null || ops.byteLength > batchBound(deps)) {
+        // The doc did not move (held ops are never imported), so this version is the one the next cycle compares.
+        held.set(key, unchanged && prior !== undefined ? prior : heldPrint(text, await deps.store.version(key)))
+        await rejectItem(deps, journal, "capture", key, "oversized")
+        continue
+      }
+      captured.push(await segment.add(key, ops))
+      texts.set(key, text)
     }
-    captured.push(item)
-    texts.set(key, text)
+    await segment.finish()
+  } finally {
+    await segment.discard()
   }
   if (captured.length === 0) return { held, withheld }
   const pending = await journal.pending()
-  const fresh = captured.filter((c) => !pending.items.some((p) => sameItem(p, c)))
+  const queued = new Set(pending.items.map((p) => p.digest))
+  const fresh = captured.filter((c) => !queued.has(c.digest))
   await journal.setPending({ ...pending, items: [...pending.items, ...fresh] })
   deps.fault?.("captured")
   for (const item of captured) {
-    await deps.store.apply(item.key, fromBase64(item.ops))
+    await deps.store.apply(item.key, await journal.outbox.readOps(item))
     // The captured text is now what the item's doc holds; without this the next capture sees the
     // same edit again and pushes it again (and a restarted device would not reload the item).
     await deps.store.markMaterialized(item.key, texts.get(item.key) ?? null)
   }
   await deps.store.persist()
+  await markImported(journal, new Set(captured.map((c) => c.digest)))
   deps.fault?.("persisted")
   return { held, withheld }
 }
