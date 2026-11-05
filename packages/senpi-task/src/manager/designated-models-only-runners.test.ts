@@ -8,6 +8,7 @@ import { cleanupProjects } from "./__fixtures__/manager-fakes"
 import { runCategoryChild as runChild, runCategoryChildren, type DesignatedChildInput } from "./__fixtures__/designated-child"
 import { chainIds } from "./__fixtures__/model-chain-ids"
 import type { ModelChainWorld } from "./__fixtures__/model-chain-world"
+import { useTestTimeout } from "../../../../test-support/test-deadline"
 
 // #12006 / #11781 on every runner: a process child and a host session build their settings from the
 // user's settings file, where senpi's own fallback (user chains over the shipped defaults) is on, and
@@ -29,6 +30,7 @@ describe.each(["in-process", "process", "host"] as const)("a %s child runs only 
   const userChains = { [primary]: [parent, second], [opus55]: [parent, second] }
 
   test("#given the user's settings chain its only model to the parent's and another model #when that model hits its usage limit #then no other model is called and the task fails typed", async () => {
+    useTestTimeout(60_000)
     // given / when
     const { record, world } = await runCategoryChild({
       runner,
@@ -46,6 +48,7 @@ describe.each(["in-process", "process", "host"] as const)("a %s child runs only 
   }, 60_000)
 
   test("#given a two-model chain and user chains that name other models #when both are refused #then only the two designated models ran, and the shipped default after the second never did", async () => {
+    useTestTimeout(60_000)
     // given / when
     const { record, world } = await runCategoryChild({
       runner,
@@ -63,6 +66,7 @@ describe.each(["in-process", "process", "host"] as const)("a %s child runs only 
   }, 60_000)
 
   test("#given a two-model chain whose first model is spent #when the second works #then the child completes on the second and calls nothing else", async () => {
+    useTestTimeout(60_000)
     // given / when
     const { record, world } = await runCategoryChild({
       runner,
@@ -82,6 +86,7 @@ describe.each(["in-process", "process", "host"] as const)("senpi's shipped defau
   const { opus55, opus5 } = chainIds(runner)
 
   test("#given no user fallback chains and a child designated only claude-opus-5-5 #when it hits its usage limit #then claude-opus-5 is never called and the task fails typed", async () => {
+    useTestTimeout(60_000)
     // given: claude-opus-5 is served on another account, so only the shipped default could reach it.
     // Precondition: the engine still ships that chain, or this case would pass without proving anything.
     const { SettingsManager } = await loadSenpiBarrel()
@@ -102,6 +107,7 @@ describe("each child's designated chain on one socket host stays its own session
   const { primary, second, parent, opus55, opus5 } = chainIds("host")
 
   test("#given two children started together on one host with different chains #when every designated model is spent #then each walks only its own chain and the user's settings file is byte-identical", async () => {
+    useTestTimeout(90_000)
     // given: A's chain keeps fallback on and has no opus55 key, so on B's session it would let the shipped
     // default reach opus5; B's turns fallback off, so on A's session A would never reach its second model.
     const scripts = { [primary]: ["quota"], [second]: ["quota"], [opus55]: ["quota"] } as const

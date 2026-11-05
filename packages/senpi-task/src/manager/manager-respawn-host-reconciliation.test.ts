@@ -7,7 +7,7 @@ import { createTaskRecord } from "../state"
 import { createTaskRecordStore } from "../store"
 import { cleanupProjects, makeManager, tempProject } from "./__fixtures__/manager-fakes"
 import { respawnManagedTask } from "./manager-respawn"
-import { testBudgetSignal } from "../../../../test-support/test-deadline"
+import { testBudgetSignal, useTestTimeout } from "../../../../test-support/test-deadline"
 
 const harness = hostRunnerHarness()
 afterEach(async () => { await harness.release(); cleanupProjects() })
@@ -59,6 +59,7 @@ async function detachedChild(deadline = false, aborted = false, rejectState = fa
 
 describe("respawn reconciliation on the real host runner", () => {
   test("a rejected get_state preserves the attached child and arms manager tracking without input", async () => {
+    useTestTimeout(5_000)
     const f = await detachedChild(false, false, true)
     try {
       expect(f.result.handle.kind).toBe("host-session")

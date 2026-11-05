@@ -6,9 +6,10 @@ import { RpcProcessRunner } from "../runners/rpc-process"
 import { spawnFakeChild } from "../runners/rpc/__fixtures__/spawn-fake"
 import { baseSpec, cleanupProjects, makeManager } from "./__fixtures__/manager-fakes"
 import { createRpcManagedRunner } from "./runner"
-import { remainingTestTime } from "../../../../test-support/test-deadline"
+import { remainingTestTime, useTestTimeout } from "../../../../test-support/test-deadline"
 
 test("#given a delayed first-write refusal #when teardown holds its live child #then start reports start_failed", async () => {
+  useTestTimeout(10_000)
   const writing = Promise.withResolvers<(error: Error) => void>()
   const terminating = Promise.withResolvers<void>()
   const release = Promise.withResolvers<void>()

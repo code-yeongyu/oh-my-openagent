@@ -4,7 +4,7 @@ import { PauseRegistry, type PauseParticipant } from "../pause/registry"
 import { createTaskRecordStore } from "../store"
 import { createTaskManager } from "./manager"
 import { baseSpec, categoryPlanner, cleanupProjects, FakeRunner, launchSettled, settings, tempProject } from "./__fixtures__/manager-fakes"
-import { remainingTestTime } from "../../../../test-support/test-deadline"
+import { remainingTestTime, useTestTimeout } from "../../../../test-support/test-deadline"
 
 afterEach(cleanupProjects)
 
@@ -64,6 +64,7 @@ test("Stop withdraws the queued first launch without releasing a foreign root's 
 })
 
 test.each([false, true])("held first launch resumes once with original identity and allocation (fresh manager: %s)", async freshManager => {
+  useTestTimeout(15000)
   const { make, store } = fixture()
   const barrier = new AdmissionBarrier()
   const runner = new FakeRunner()

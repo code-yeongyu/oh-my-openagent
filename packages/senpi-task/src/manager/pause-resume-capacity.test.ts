@@ -3,7 +3,7 @@ import { AdmissionBarrier } from "../pause/admission-barrier"
 import { createTaskRecordStore } from "../store"
 import { createTaskManager } from "./manager"
 import { baseSpec, categoryPlanner, cleanupProjects, FakeRunner, launchSettled, settings, tempProject } from "./__fixtures__/manager-fakes"
-import { remainingTestTime } from "../../../../test-support/test-deadline"
+import { remainingTestTime, useTestTimeout } from "../../../../test-support/test-deadline"
 
 afterEach(cleanupProjects)
 
@@ -14,6 +14,7 @@ function bounded<T>(promise: Promise<T>): Promise<T> {
 }
 
 test.each([false, true])("design 40: a second Stop disarms a capacity-waiting Resume (fresh owner: %s)", async freshOwner => {
+  useTestTimeout(15000)
   const cwd = tempProject()
   const runner = new FakeRunner()
   let barrier = new AdmissionBarrier()

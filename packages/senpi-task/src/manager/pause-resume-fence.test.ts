@@ -4,7 +4,7 @@ import { createTaskRecordStore } from "../store"
 import { createTaskManager } from "./manager"
 import { baseSpec, categoryPlanner, cleanupProjects, FakeRunner, launchSettled, settings, tempProject } from "./__fixtures__/manager-fakes"
 import type { RunnerOutcome } from "./child-handle"
-import { remainingTestTime } from "../../../../test-support/test-deadline"
+import { remainingTestTime, useTestTimeout } from "../../../../test-support/test-deadline"
 
 afterEach(cleanupProjects)
 
@@ -15,6 +15,7 @@ function bounded<T>(promise: Promise<T>): Promise<T> {
 }
 
 test.each([false, true])("design 40: stale Resume cannot modify newer ownership (Resume 2 started: %s)", async newerResume => {
+  useTestTimeout(15000)
   const cwd = tempProject()
   const store = createTaskRecordStore({ project_dir: cwd })
   const runner = new FakeRunner()

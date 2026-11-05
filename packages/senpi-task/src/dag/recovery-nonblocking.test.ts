@@ -18,6 +18,7 @@ import { createDagRecovery } from "./recovery"
 import { createDagScheduler } from "./scheduler"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagNode, DagNodeId, DagRunEvent, DagRunId } from "./types"
+import { useTestTimeout } from "../../../../test-support/test-deadline"
 
 type DagRunEventType = DagRunEvent["type"]
 
@@ -221,6 +222,7 @@ function awaitJournalEvents(
 
 describe("DAG resume without blocking on a reattached child", () => {
   test("#given a paused run whose first node is still running #when the session resumes #then reuse and dag.run.resumed land while that child keeps running", async () => {
+    useTestTimeout(30_000)
     // given - the production checkpoint shape: the still-running node is ordered FIRST, so the old
     // blocking reconcile hit it before it ever emitted a reuse event for the completed sibling.
     const projectDir = tempProject()
@@ -274,6 +276,7 @@ describe("DAG resume without blocking on a reattached child", () => {
   }, 30_000)
 
   test("#given a scheduler built with pre-attached tasks #when a node is retried #then the fresh instance does not re-attach the settled child", async () => {
+    useTestTimeout(30_000)
     // given - a run that already settled through a pre-attached reattachment, with one failed node
     const projectDir = tempProject()
     const store = createDagFileStore({ project_dir: projectDir })

@@ -13,7 +13,7 @@ import { runTaskOutput } from "../output/output"
 import { runTaskCancel } from "../control/cancel"
 import { buildTaskExecute } from "./execute"
 import { TaskToolParams } from "./params"
-import { testBudgetSignal } from "../../../../../test-support/test-deadline"
+import { testBudgetSignal, useTestTimeout } from "../../../../../test-support/test-deadline"
 
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
@@ -128,11 +128,21 @@ async function completes(levels: number, batch = false) {
   }
 }
 
-test("real runner: P foreground-waits for C at cap 1 and completes", () => completes(2), 25_000)
-test("real runner: P -> C -> G completes at cap 1", () => completes(3), 25_000)
-test("real runner: foreground batch frees the parent's lease", () => completes(2, true), 25_000)
+test("real runner: P foreground-waits for C at cap 1 and completes", () => {
+  useTestTimeout(25_000)
+  return completes(2)
+}, 25_000)
+test("real runner: P -> C -> G completes at cap 1", () => {
+  useTestTimeout(25_000)
+  return completes(3)
+}, 25_000)
+test("real runner: foreground batch frees the parent's lease", () => {
+  useTestTimeout(25_000)
+  return completes(2, true)
+}, 25_000)
 
 test.each([[false], [true]])("promotion resumes the parent over cap without waiting for its child (batch=%s)", async (batch) => {
+  useTestTimeout(25_000)
   const fixture = tree(2, true, batch, true)
   const parent = await fixture.start()
   if (parent.kind !== "started") throw new Error(JSON.stringify(parent))
@@ -161,6 +171,7 @@ test.each([[false], [true]])("promotion resumes the parent over cap without wait
 }, 25_000)
 
 test("task_output shows parked; task_cancel drops a parked parent without reacquiring", async () => {
+  useTestTimeout(25_000)
   const fixture = tree(2, true)
   const parent = await fixture.start()
   if (parent.kind !== "started") throw new Error(JSON.stringify(parent))
