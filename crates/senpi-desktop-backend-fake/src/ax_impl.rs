@@ -85,6 +85,7 @@ impl AxBackend for FakeBackend {
             node,
             action: action.to_string(),
         });
+        self.open_next_surface();
         reply.confirm(&format!("AX action '{action}'"))
     }
 

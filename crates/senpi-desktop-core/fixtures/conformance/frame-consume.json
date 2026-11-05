@@ -31,7 +31,8 @@
                 "key-priming",
                 "epoch",
                 "interaction-lock",
-                "intervention-policy"
+                "intervention-policy",
+                "dangerous-chord-force"
               ]
             }
           },

@@ -53,8 +53,7 @@ impl Worker {
                         let to_window = matches!(Target::parse(&mutation.target), Target::Window(_));
                         worker.report_extras.set(Some(ReportExtras {
                             route: Some(event_route(to_window, mode)),
-                            hit: None,
-                            timings: None,
+                            ..ReportExtras::default()
                         }));
                     }
                     Ok(Response::AxInput(AxInputResult { method, report: None }))

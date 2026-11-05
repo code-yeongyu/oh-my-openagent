@@ -33,6 +33,15 @@ pub struct FakeAxNode {
     pub actions: Vec<String>,
     #[serde(default)]
     pub children: Vec<FakeAxNode>,
+    /// Until this many milliseconds after its first read, the node reads
+    /// hidden (no bounds) and disabled, like a control a sheet is still
+    /// animating in.
+    #[serde(default)]
+    pub ready_after_ms: Option<u64>,
+    /// Its first this-many reads report bounds shifted by the read count,
+    /// like an element still moving into place.
+    #[serde(default)]
+    pub moving_reads: u32,
 }
 
 /// One scripted menu item and its submenu.
@@ -61,4 +70,14 @@ pub struct FakeBounds {
 
 pub(crate) const fn enabled_by_default() -> bool {
     true
+}
+
+/// A window an action opens: the next AX `perform` or pointer click that
+/// lands adds it to the window list, with its accessibility tree.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FakeOpening {
+    pub window: senpi_desktop_core::types::DesktopWindow,
+    #[serde(default)]
+    pub ax: Option<FakeAxNode>,
 }
