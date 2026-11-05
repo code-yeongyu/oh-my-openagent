@@ -3,9 +3,15 @@ import type { ChainState } from "../crypto/chain.ts";
 import type { Authority } from "../crypto/fold.ts";
 import type { RecoveryKey } from "../crypto/parse.ts";
 import type { RejectionCounter } from "../crypto/rejection.ts";
+import {
+	pinTrustAnchor,
+	rootChangedSinceRetired,
+	TrustPinError,
+} from "../crypto/trust-pin.ts";
 import type {
 	KeyringAppendRequest,
 	RecoverBridgeResult,
+	RecoveryEvent,
 	RecoveryTransport,
 	TransportRefusal,
 } from "./ports.ts";
@@ -101,4 +107,32 @@ export const rotationStored = async (
 		authority.members.get(device.id)?.signing_public_key ===
 			device.signing_public_key
 	);
+};
+
+/**
+ * Pins the root the confirmed join proved (a ceremony pin), and reports whether it differs from the
+ * root this device held before its keys were discarded (#12280): a notice, never a refusal.
+ */
+export const pinRecoveredRoot = async (
+	input: {
+		readonly stateDir: string;
+		readonly account: string;
+		readonly onEvent?: (event: RecoveryEvent) => void;
+	},
+	pin: PinCandidate,
+): Promise<
+	| { readonly ok: false }
+	| { readonly ok: true; readonly changed: { readonly rootChanged?: true } }
+> => {
+	try {
+		await pinTrustAnchor(input.stateDir, input.account, pin);
+	} catch (error) {
+		if (error instanceof TrustPinError && error.problem === "pin_conflict")
+			return { ok: false };
+		throw error;
+	}
+	if (!(await rootChangedSinceRetired(input.stateDir, input.account, pin.genesisDigest)))
+		return { ok: true, changed: {} };
+	input.onEvent?.("sync.trust.root_changed");
+	return { ok: true, changed: { rootChanged: true } };
 };

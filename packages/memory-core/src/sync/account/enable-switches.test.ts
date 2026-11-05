@@ -8,6 +8,12 @@ import { enableSync } from "./enable.ts"
 import { createAccountHttp } from "./http.ts"
 import { createPairingHttp } from "./pairing-http.ts"
 import { ACCOUNT, fixture } from "./testing/genesis-enable.test-support.ts"
+import { readdir } from "node:fs/promises"
+import { join } from "node:path"
+import { forgetTrustAnchor, loadTrustAnchor } from "../crypto/trust-pin.ts"
+import { approveDevice } from "./approve.ts"
+import { joinAccount, principalOf } from "./join.ts"
+import { openAccountSession } from "./session.ts"
 
 const cleanups: (() => Promise<void>)[] = []
 afterEach(async () => { for (const close of cleanups.splice(0).reverse()) await close() })
@@ -73,4 +79,55 @@ test("a failed device switch never disables the account or reports success", asy
   } })).rejects.toThrow("synthetic write failure")
   expect(f.server.switches).toEqual(['/v1/account/sync {"enabled":true}'])
   expect(f.ceremonies()).toBe(0)
+})
+
+// #12280 R-B5: after a retire, no read path re-learns the pin from the served chain; only the pairing
+// ceremony pins again (the #10298 rule).
+test("#given a joined device whose pin was retired #when it opens a session and runs enable against a valid served chain #then no pin is written, and only the pairing join pins again", async () => {
+  const f = await fixture()
+  cleanups.push(f.close)
+  expect(await enableSync(f.input)).toEqual({ kind: "joined", created: true })
+  const second = await deviceKeyring(20)
+  const token = f.server.tokenFor(principalOf(second), "service-second")
+  const http = { baseUrl: f.server.url, token: () => token }
+  const joiner = { account: ACCOUNT, keyring: second, pinDir: join(f.input.pinDir, "second"), chain: createAccountHttp(http), pairing: createPairingHttp(http) }
+  /** A ceremony clock whose sleep resolves on the next server write, never on time. */
+  const mailbox = () => {
+    let queued = 0
+    let waiter: (() => void) | undefined
+    return {
+      signal() { if (waiter) { const resolve = waiter; waiter = undefined; resolve() } else queued++ },
+      sleep: async () => {
+        if (queued > 0) { queued--; return }
+        await new Promise<void>((resolve) => { waiter = resolve })
+      },
+      now: () => 0,
+    }
+  }
+  const pairOnce = async () => {
+    const approver = mailbox()
+    const joining = mailbox()
+    const pending = Promise.withResolvers<string>()
+    const before = new Set(f.server.pending().map((row) => row.id))
+    f.server.onWrite = () => {
+      approver.signal()
+      joining.signal()
+      const id = f.server.pending().find((row) => !before.has(row.id))?.id
+      if (id !== undefined) pending.resolve(id)
+    }
+    const joined = joinAccount({ ...joiner, clock: joining, showCode: () => undefined })
+    expect((await approveDevice({ ...f.input, clock: approver, pendingId: await pending.promise, confirmCode: async () => true })).kind).toBe("approved")
+    const outcome = await joined
+    f.server.onWrite = null
+    return outcome
+  }
+  expect(await enableSync({ ...joiner, serviceDeviceId: "service-second" })).toEqual({ kind: "join_required" })
+  expect(await pairOnce()).toEqual({ kind: "joined" })
+
+  await forgetTrustAnchor(joiner.pinDir, ACCOUNT)
+  const anchors = async () => (await readdir(join(joiner.pinDir, "trust-anchor"))).filter((name) => !name.includes(".retired-"))
+  expect(await openAccountSession({ ...http, account: ACCOUNT, keyring: second, pinDir: joiner.pinDir, spaceId: new Uint8Array(16).fill(3) })).toEqual({ ok: false, reason: "no_pin" })
+  expect(await enableSync({ ...joiner, serviceDeviceId: "service-second" })).toEqual({ kind: "join_required" })
+  expect(await anchors()).toEqual([])
+  expect((await loadTrustAnchor(joiner.pinDir, ACCOUNT)).ok).toBe(false)
 })
