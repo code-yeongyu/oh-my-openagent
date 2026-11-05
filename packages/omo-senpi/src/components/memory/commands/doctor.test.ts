@@ -132,8 +132,8 @@ describe("/doctor", () => {
 
   test("#given an unknown repair flag #when doctor runs #then audit refuses it", async () => {
     const { pi, ctx } = await harness()
-    const text = await invoke(pi, "doctor", "--json --fix", ctx)
-    expect(text).toContain("unknown flag --fix")
+    const text = await invoke(pi, "doctor", "--json --repair", ctx)
+    expect(text).toContain("unknown flag --repair")
     expect(ctx.ui.notifications.at(-1)?.level).toBe("error")
   })
 
