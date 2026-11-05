@@ -378,3 +378,27 @@ describe("memory.recall.query_expansion", () => {
     expect(OmoMemorySettingsLayerSchema.safeParse({ agents: { research: { recall } } }).success).toBe(false)
   })
 })
+
+describe("memory.runtime retention settings (A24)", () => {
+  test("#given an empty memory block #when parsed #then the documented retention defaults apply", () => {
+    expect(OmoMemorySettingsSchema.parse({}).runtime).toEqual({ retention_days: 7, abandoned_journal_days: 14, completions_days: 30 })
+  })
+
+  test("#given explicit windows and an agent override #when parsed #then the values are kept on the block, the layer and the agent", () => {
+    const parsed = OmoMemorySettingsSchema.parse({
+      runtime: { retention_days: 3, abandoned_journal_days: 5 },
+      agents: { "agent-a": { runtime: { retention_days: 30 } } },
+    })
+    expect(parsed.runtime).toEqual({ retention_days: 3, abandoned_journal_days: 5, completions_days: 30 })
+    expect(parsed.agents["agent-a"]?.runtime).toEqual({ retention_days: 30 })
+    expect(OmoMemorySettingsLayerSchema.parse({ runtime: { completions_days: 60 } }).runtime).toEqual({ completions_days: 60 })
+  })
+
+  test("#given an unknown runtime key or a non-integer window #when parsed #then the strict schema rejects it", () => {
+    expect(OmoMemorySettingsSchema.safeParse({ runtime: { keep_forever: true } }).success).toBe(false)
+    expect(OmoMemorySettingsSchema.safeParse({ runtime: { retention_days: 1.5 } }).success).toBe(false)
+    expect(OmoMemorySettingsSchema.safeParse({ runtime: { abandoned_journal_days: 0 } }).success).toBe(false)
+    expect(OmoMemorySettingsLayerSchema.safeParse({ runtime: { completions_days: "30" } }).success).toBe(false)
+    expect(OmoMemorySettingsSchema.safeParse({ agents: { a: { runtime: { retention_days: -1 } } } }).success).toBe(false)
+  })
+})

@@ -318,3 +318,51 @@ describe("createMemoryMaintenance", () => {
     expect(existsSync(dir)).toBe(true)
   }, 30_000)
 })
+
+describe("runtime retention inside the maintenance pass (A23)", () => {
+  const NOW = Date.parse("2026-11-05T00:00:00.000Z")
+  const DAY = 24 * 60 * 60 * 1000
+
+  async function identityWithOldRun() {
+    const { context, repo } = await identityWithHistory(0)
+    const runDir = join(context.identityPaths.reflection, "runs", "reflection-run-1")
+    await mkdir(runDir, { recursive: true })
+    await writeFile(join(runDir, "final.json"), JSON.stringify({ runId: "reflection-run-1", outcome: "merged", finishedAt: new Date(NOW - 8 * DAY).toISOString() }))
+    await utimes(join(runDir, "final.json"), new Date(NOW - 8 * DAY), new Date(NOW - 8 * DAY))
+    await utimes(runDir, new Date(NOW - 8 * DAY), new Date(NOW - 8 * DAY))
+    const newest = join(context.identityPaths.reflection, "runs", "reflection-run-2")
+    await mkdir(newest, { recursive: true })
+    await writeFile(join(newest, "final.json"), JSON.stringify({ runId: "reflection-run-2", outcome: "merged", finishedAt: new Date(NOW - DAY).toISOString() }))
+    return { context, repo, runDir }
+  }
+
+  test("#given a fresh maintenance stamp #when a pass is scheduled #then retention does not run", async () => {
+    const { context, repo, runDir } = await identityWithOldRun()
+    await repo.configSet("omo.maintenanceAt", String(NOW - 60_000))
+    const log = recorder()
+    const maintenance = createMemoryMaintenance({ logger: log.logger, delayMs: 0, now: () => NOW })
+
+    maintenance.schedule(context)
+    await maintenance.settled()
+
+    expect(existsSync(runDir)).toBe(true)
+    expect(log.info.filter((message) => message === "omo-senpi memory runtime retention")).toEqual([])
+  })
+
+  test("#given a stale stamp and two sessions scheduling at once #when their passes come due #then retention runs exactly once", async () => {
+    const { context, runDir } = await identityWithOldRun()
+    const first = recorder()
+    const second = recorder()
+    const a = createMemoryMaintenance({ logger: first.logger, delayMs: 0, now: () => NOW })
+    const b = createMemoryMaintenance({ logger: second.logger, delayMs: 0, now: () => NOW })
+
+    a.schedule(context)
+    b.schedule(context)
+    await Promise.all([a.settled(), b.settled()])
+
+    expect(existsSync(runDir)).toBe(false)
+    const runs = [...first.info, ...second.info].filter((message) => message === "omo-senpi memory runtime retention")
+    expect(runs).toEqual(["omo-senpi memory runtime retention"])
+    expect([...first.warn, ...second.warn]).toEqual([])
+  }, 60_000)
+})
