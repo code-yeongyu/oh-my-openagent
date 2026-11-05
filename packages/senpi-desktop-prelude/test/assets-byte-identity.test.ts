@@ -21,6 +21,8 @@ describe("computer prelude published bytes", () => {
 		["declarations", "COMPUTER_DECLARATIONS"],
 		["documentation", "COMPUTER_DOCUMENTATION"],
 		["safety", "COMPUTER_SAFETY"],
+		["guide", "COMPUTER_GUIDE"],
+		["methodTable", "COMPUTER_METHOD_TABLE"],
 	] as const)("keeps %s byte-identical to dev (#9113)", (field, fixtureName) => {
 		expect(sha256(computerPreludeAssets[field])).toBe(fixture[fixtureName]);
 	});

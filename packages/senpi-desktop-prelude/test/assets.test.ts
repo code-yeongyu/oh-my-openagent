@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { ASSETS_JSON_PATH, renderAssetsJson } from "../scripts/generate-assets";
 import { computerPreludeAssets } from "../src/index";
 import { loadJsFacade, runPythonFacade, windowResponder } from "./harness";
-import { COMPOSED_HELPERS, javascriptHelperNames } from "./helper-names";
+import { javascriptHelperNames } from "./helper-names";
 
 function escapeRegExp(text: string): string {
 	return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -40,8 +40,8 @@ describe("computer prelude assets", () => {
 	});
 
 	it("documents every facade helper as a call in the model-facing docs", async () => {
-		// Given: verify and drill are documented with the generated guide, not in this docs revision
-		const helpers = [...new Set(await javascriptHelperNames())].filter((name) => !COMPOSED_HELPERS.includes(name));
+		// Given
+		const helpers = [...new Set(await javascriptHelperNames())];
 
 		// When
 		const undocumented = helpers.filter(

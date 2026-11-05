@@ -9,6 +9,11 @@ export const COMPUTER_SKILL_NAME = "computer-use";
 const COMPUTER_SKILL_DESCRIPTION =
 	"Experimental computer use. MUST read before driving the desktop with the computer tool: every helper, coordinate frames, accessibility refs, background vs foreground delivery, the stop and resume rules, and the safety rules for consequential actions.";
 
+/**
+ * The skill is composed of the hand-written rules (prelude docs/computer-guide.md), the method table generated
+ * from the SDK facade manifest, and the safety rules. The kernel helper reference stays in the eval prompt's
+ * prelude block (docs/computer.md), which the model already sees while the tool is active.
+ */
 export function computerSkillMarkdown(): string {
 	return [
 		"---",
@@ -22,11 +27,15 @@ export function computerSkillMarkdown(): string {
 		"",
 		"Find the `computer` tool with `tool_search` (query `computer`). Once it is active, eval cells get the `computer` global in the next cell.",
 		"",
-		"Availability is unknown until `computer.capabilities()` has returned in this session: never tell the user computer use is available or unavailable before that; on `native-unavailable` repeat the host and reason the message names. A `capturePermission`, `inputPermission` or `axPermission` the task needs that is not `granted` is a setup step only the user can do: name the missing permission (on macOS, Screen Recording or Accessibility for the named app that launched OmO, in System Settings > Privacy & Security, then fully quit and relaunch that app) and stop instead of working around it. When the target is ambiguous, or an action still fails after a fresh observation, ask the user instead of guessing.",
+		"Availability is unknown until `computer.capabilities()` has returned in this session: say nothing about it before that, and on `native-unavailable` repeat the host and reason given. A needed `capturePermission`, `inputPermission` or `axPermission` that is not `granted` only the user can fix: name it (macOS: Screen Recording or Accessibility for the app that launched OmO, in System Settings > Privacy & Security, then fully quit and relaunch that app) and stop. When the target is ambiguous, or an action still fails after a fresh observation, ask the user instead of guessing.",
 		"",
-		"## Reference",
+		computerPreludeAssets.guide.trim(),
 		"",
-		computerPreludeAssets.documentation.trim(),
+		"## Methods",
+		"",
+		"Each kernel helper's signature is in the eval prompt's `computer` prelude block.",
+		"",
+		computerPreludeAssets.methodTable.trim(),
 		"",
 		"## Safety",
 		"",

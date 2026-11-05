@@ -32,12 +32,12 @@ const PRELUDE_ASSET_FIELDS: readonly (readonly [field: string, marker: string, s
   [
     "COMPUTER_PRELUDE_JAVASCRIPT",
     "computer.run() expects a function or code string",
-    "7963947945cb137f8d069dd1e70c03b044857e0a7f643655fd0baafec1a1872d",
+    "8b7f470076a701cf610cd47008a8c67af9ba82dfa7aef482b93710e08607e053",
   ],
   [
     "COMPUTER_PRELUDE_PYTHON",
     "Positional args with trailing Nones dropped",
-    "db75c3498604c0ee87fa4e28a0b669bd8baa7860794978dd515f5c89636c7e7d",
+    "3443b1b8b751778c54742ae905a266a48aa0d558b91b3e3eddda9f3e6277c28a",
   ],
   [
     "COMPUTER_DECLARATIONS",
@@ -47,9 +47,19 @@ const PRELUDE_ASSET_FIELDS: readonly (readonly [field: string, marker: string, s
   [
     "COMPUTER_DOCUMENTATION",
     "host desktop facade, experimental (present while the `computer` tool is active)",
-    "a8e7ff148e778faa82182fa5b1c81169abf71c09490fc57766a9713df3533baf",
+    "0b201854464397611feb5fa587ff7aa951982f379a648b64dc9a6122672a278e",
   ],
   ["COMPUTER_SAFETY", "<critical>", "bd44e5231c66f4b65c9ac41f8e37234bf6ec70dea6242042ec7246b1a8658db2"],
+  [
+    "COMPUTER_GUIDE",
+    "Native app windows, menus and fields.",
+    "020c56e5f710999a492c41a6290dc5dbc8cc7415582e219835fcc719b3eeed1e",
+  ],
+  [
+    "COMPUTER_METHOD_TABLE",
+    "| SDK method | Returns | Tier, policy | Kernel helper |",
+    "0b97203504e0850746b9225c258d715b7aae0af34001495baec18ee8ece1b328",
+  ],
 ]
 
 const roots: string[] = []

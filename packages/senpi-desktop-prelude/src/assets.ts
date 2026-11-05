@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /**
- * The five prelude and doc assets, generated into `assets.generated.json` by
+ * The prelude and doc assets, generated into `assets.generated.json` by
  * `scripts/generate-assets.ts`; field names are the historical generated-constant names.
  */
 export type PreludeAssets = {
@@ -12,6 +12,8 @@ export type PreludeAssets = {
 	readonly COMPUTER_DECLARATIONS: string;
 	readonly COMPUTER_DOCUMENTATION: string;
 	readonly COMPUTER_SAFETY: string;
+	readonly COMPUTER_GUIDE: string;
+	readonly COMPUTER_METHOD_TABLE: string;
 };
 
 const ASSET_FIELDS = [
@@ -20,6 +22,8 @@ const ASSET_FIELDS = [
 	"COMPUTER_DECLARATIONS",
 	"COMPUTER_DOCUMENTATION",
 	"COMPUTER_SAFETY",
+	"COMPUTER_GUIDE",
+	"COMPUTER_METHOD_TABLE",
 ] as const satisfies readonly (keyof PreludeAssets)[];
 
 // import.meta.dir is Bun-only: the senpi extension bundle loads under plain Node through jiti, where

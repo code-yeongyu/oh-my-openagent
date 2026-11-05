@@ -20,7 +20,10 @@ const ASSETS: Readonly<Record<string, string>> = {
 	COMPUTER_DECLARATIONS: "declarations.d.ts",
 	COMPUTER_DOCUMENTATION: "docs/computer.md",
 	COMPUTER_SAFETY: "docs/computer-safety.md",
+	COMPUTER_GUIDE: "docs/computer-guide.md",
 };
+
+const documentationPath = join(packageDir, "docs", "computer.md");
 
 export const ASSETS_JSON_PATH = join(packageDir, "src", "assets.generated.json");
 /** The prelude's committed copy of the SDK manifest; `test/facade-manifest.test.ts` pins it to the SDK's bytes. */
@@ -33,6 +36,13 @@ export interface ManifestMethod {
 	readonly method: string;
 	readonly tier: Tier;
 	readonly wire: readonly string[];
+}
+
+/** A manifest entry with the signature fields the guide's method table prints. */
+export interface ManifestEntry extends ManifestMethod {
+	readonly params: readonly { readonly name: string; readonly optional: boolean }[];
+	readonly returns: string;
+	readonly policy: string;
 }
 
 /**
@@ -145,10 +155,10 @@ const KERNEL_OMITTED: Readonly<Record<string, string>> = {
 	"Events.on": "the SDK event stream is for in-process callers; kernels see epochs as superseded/StaleRef errors",
 };
 
-export function readManifestCopy(): readonly ManifestMethod[] {
+export function readManifestCopy(): readonly ManifestEntry[] {
 	const parsed = JSON.parse(readFileSync(MANIFEST_COPY_PATH, "utf8")) as { readonly methods?: unknown };
 	if (!Array.isArray(parsed.methods)) throw new Error(`${MANIFEST_COPY_PATH} has no methods array`);
-	return parsed.methods as readonly ManifestMethod[];
+	return parsed.methods as readonly ManifestEntry[];
 }
 
 /** Each chain method's tier per surface, checked against the manifest: every manifest method lands somewhere. */
@@ -285,6 +295,67 @@ function renderPreludePy(current: string): string {
 	return replaceRegion(current, "src/prelude.py", body, "#", "    ");
 }
 
+/** The name each handle surface goes by in the docs and the guide. */
+const HANDLE_NAMES: Readonly<Record<Surface, string>> = { desktop: "computer", display: "display", window: "win", element: "el" };
+
+/** The docs line that heads the generated helper-tier block; the indented lines below it are rewritten. */
+const HELPER_TIERS_HEADER = "Permission tier per helper (from the SDK facade manifest; a denied call throws):";
+
+/** Rewrites the helper-tier block of docs/computer.md: one line per handle, its helpers split by tier. */
+function renderDocumentation(current: string, tables: Record<Surface, [string, Tier, string][]>): string {
+	const lines = current.split("\n");
+	const start = lines.indexOf(HELPER_TIERS_HEADER);
+	if (start < 0) throw new Error(`docs/computer.md: missing the line "${HELPER_TIERS_HEADER}"`);
+	let end = start + 1;
+	while (end < lines.length && lines[end]?.startsWith("    ")) end += 1;
+	const body = (Object.keys(HANDLE_NAMES) as Surface[]).map((surface) => {
+		const composed = COMPOSED_HELPERS.filter((helper) => helper.surface === surface);
+		const rows: [string, Tier][] = [
+			...tables[surface].map(([method, tier]): [string, Tier] => [method, tier]),
+			...composed.map((helper): [string, Tier] => [helper.helper, "read"]),
+		];
+		const list = (tier: Tier): string => rows.filter(([, t]) => t === tier).map(([method]) => method).join(", ");
+		const exec = list("exec");
+		return `    ${HANDLE_NAMES[surface]}: read ${list("read")}${exec === "" ? "" : `; exec ${exec}`}`;
+	});
+	return [...lines.slice(0, start + 1), ...body, ...lines.slice(end)].join("\n");
+}
+
+const returnType = (text: string): string => text.replace(/^Promise<(.*)>$/, "$1").replace(/\breadonly /g, "");
+
+/**
+ * The guide's method table: one row per facade-manifest method (signature, return, tier and policy) with the
+ * kernel helpers that wrap it, `-` when only SDK callers reach it.
+ */
+function renderMethodTable(manifest: readonly ManifestEntry[]): string {
+	const helpers = new Map<string, Map<string, Surface[]>>();
+	const add = (source: string, helper: string, surface: Surface): void => {
+		const bySurface = helpers.get(source) ?? new Map<string, Surface[]>();
+		bySurface.set(helper, [...(bySurface.get(helper) ?? []), surface]);
+		helpers.set(source, bySurface);
+	};
+	for (const [surface, bindings] of Object.entries(CHAIN_BINDINGS) as [Surface, readonly ChainBinding[]][]) {
+		for (const binding of bindings) if (binding.source !== null) add(binding.source, binding.method, surface);
+	}
+	for (const composed of COMPOSED_HELPERS) add(composed.source, composed.helper, composed.surface);
+	const rows = manifest.map((entry) => {
+		const params = entry.params.map((param) => `${param.name}${param.optional ? "?" : ""}`).join(", ");
+		const tier = entry.policy === "none" ? entry.tier : `${entry.tier}, ${entry.policy}`;
+		// Helpers on the same handles as the one before them print as `.name` (`el.value, .bounds`).
+		let previous = "";
+		const kernel = [...(helpers.get(entry.method) ?? new Map<string, Surface[]>())]
+			.map(([helper, surfaces]) => {
+				const handles = surfaces.map((surface) => HANDLE_NAMES[surface]).join("/");
+				const text = handles === previous ? `.${helper}` : `${handles}.${helper}`;
+				previous = handles;
+				return text;
+			})
+			.join(", ");
+		return `| ${entry.method}(${params}) | ${returnType(entry.returns)} | ${tier} | ${kernel === "" ? "-" : kernel} |`;
+	});
+	return ["| SDK method | Returns | Tier, policy | Kernel helper |", "|---|---|---|---|", ...rows, ""].join("\n");
+}
+
 export function renderGeneratedSources(): Map<string, string> {
 	const tables = resolveTiers(readManifestCopy());
 	const read = (path: string): string => readFileSync(path, "utf8");
@@ -298,6 +369,7 @@ export function renderGeneratedSources(): Map<string, string> {
 	sources.set(pyPath, renderPreludePy(read(pyPath)));
 	sources.set(protocolAllowlistTestPath, renderProtocolAllowlistTest(read(protocolAllowlistTestPath)));
 	sources.set(helperNamesPath, renderHelperNames(read(helperNamesPath)));
+	sources.set(documentationPath, renderDocumentation(read(documentationPath), tables));
 	return sources;
 }
 
@@ -305,6 +377,7 @@ export function renderAssetsJson(): string {
 	const entries = Object.entries(ASSETS).map(([name, path]) => {
 		return [name, readFileSync(join(packageDir, path), "utf8")] as const;
 	});
+	entries.push(["COMPUTER_METHOD_TABLE", renderMethodTable(readManifestCopy())]);
 	return `${JSON.stringify(Object.fromEntries(entries), null, "\t")}\n`;
 }
 

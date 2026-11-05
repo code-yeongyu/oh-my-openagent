@@ -75,6 +75,14 @@ export const computerPreludeAssets = {
 	get safety(): string {
 		return preludeAssets().COMPUTER_SAFETY;
 	},
+	/** Hand-written usage rules of the `computer-use` skill (docs/computer-guide.md). */
+	get guide(): string {
+		return preludeAssets().COMPUTER_GUIDE;
+	},
+	/** The skill's method table, generated from facade-manifest.json: one row per SDK facade method. */
+	get methodTable(): string {
+		return preludeAssets().COMPUTER_METHOD_TABLE;
+	},
 	exports: ["computer"],
 	methodAllowlist: METHOD_ALLOWLIST,
 };
