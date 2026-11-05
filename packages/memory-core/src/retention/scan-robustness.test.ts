@@ -228,4 +228,29 @@ describe("a journal that turns unreadable before the cap's locked eviction (#125
     expect(report.evicted.map((entry) => entry.name)).toContain("j-zz-good")
     expect(existsSync(join(good, "transcript.jsonl"))).toBe(false)
   })
+
+  test("#given the caller aborts inside the journal lock of the cap's last candidate #when the cap evicts the journal tiers #then the cap rejects with the abort instead of keeping that journal as state-unreadable (#12538 review r5 L2)", async () => {
+    const paths = await identity()
+    await foldedRuns(paths, 2, 1024)
+    const first = await journal(paths, "j-first", "fully", daysAgo(60))
+    const last = await journal(paths, "j-zz-last", "fully", daysAgo(60))
+    const controller = new AbortController()
+    const locked: string[] = []
+    const journalLock: JournalLock = async (lockPath, task, signal) => {
+      locked.push(lockPath)
+      if (lockPath === join(last, "state.lock")) {
+        // The caller aborts while this candidate's lock is taken, and the lock reports it as a signal-aware lock does.
+        controller.abort()
+        controller.signal.throwIfAborted()
+      }
+      return withLocalJournalLock(lockPath, task, signal)
+    }
+
+    // A cap that kept the aborted journal as state-unreadable would resolve, and its pass could stamp itself complete.
+    await expect(cap(paths, 1, { journalLock, signal: controller.signal })).rejects.toMatchObject({ name: "AbortError" })
+
+    expect(locked).toEqual([join(first, "state.lock"), join(last, "state.lock")])
+    expect(existsSync(join(first, "transcript.jsonl"))).toBe(false)
+    expect(existsSync(join(last, "transcript.jsonl"))).toBe(true)
+  })
 })
