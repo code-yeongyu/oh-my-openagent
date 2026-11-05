@@ -85,7 +85,7 @@ ast-grep-skill/
 
 1. **Wraps `sg`** with a single Python 3 stdlib script that works the same on macOS, Linux, Windows, WSL, Git Bash.
 2. **Validates patterns offline** before calling `sg` — catches the regex-misuse class of mistakes (`\w`, `.*`, `|`, `[a-z]`) plus language-specific traps (Python trailing colons, JS/Go/Rust missing function bodies).
-3. **Resolves the binary** through 6 candidate paths: cached → PATH (with Linux `setgroups` collision detection) → Homebrew. Falls through to a clear install hint with copy-paste commands.
+3. **Resolves the binary** through 5 candidates: `OMO_AST_GREP_SG_PATH` override → OMO runtime dirs → cached → PATH (with Linux `setgroups` collision detection) → Homebrew. Falls through to a clear install hint with copy-paste commands.
 4. **Runs the two-pass write trick** when applying rewrites — `sg run` silently ignores `--update-all` when `--json` is set, so `replace --apply` runs two invocations: pass 1 collects JSON matches, pass 2 mutates files.
 5. **Ships per-OS installers** that try every reasonable package manager and fall back to a GitHub release tarball.
 6. **Documents the failure modes** the model will hit (regex misuse, incomplete patterns, `--update-all` + `--json` trap, scope/type questions ast-grep can't answer) in `references/pitfalls.md`.

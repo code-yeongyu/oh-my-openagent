@@ -48,4 +48,4 @@ bash tests/smoke.sh          # or: pwsh tests/smoke.ps1
 # direct:  sg run -p '<PATTERN>' --lang ts path
 ```
 
-- Parent: [`packages/shared-skills/AGENTS.md`](../../AGENTS.md).
+- Parent (source checkout only, not shipped with the installed skill): `packages/shared-skills/AGENTS.md`.

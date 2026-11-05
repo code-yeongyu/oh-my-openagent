@@ -159,11 +159,11 @@ Is there unsafe code in the changeset?
   │       NO  → Run Miri Level 2 (strict provenance).
   │             Miri fails?
   │               YES → Stop. Classify. Fix. Prove. Then continue.
-  │               NO  → Proceed with the original task.
+  │               NO  → Proceed with the original task; run Levels 3 and 4 before it ships.
   NO → Proceed normally.
 ```
 
-This is not optional. **Every `unsafe` block gets Miri'd before it ships.**
+This is not optional. **Every `unsafe` block passes Miri Levels 3 and 4 before it ships.**
 
 ## SAFETY Comment Standard
 

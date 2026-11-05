@@ -5,9 +5,9 @@ Every pattern in this file has been verified against the canonical syntax. They 
 Use them with the helper:
 
 ```bash
-ast-grep-helper search '<PATTERN>' --lang <LANG> [path]
-ast-grep-helper replace '<PATTERN>' '<REWRITE>' --lang <LANG> [path]   # dry-run
-ast-grep-helper replace '<PATTERN>' '<REWRITE>' --lang <LANG> [path] --apply
+python3 scripts/ast_grep_helper.py search '<PATTERN>' [path] --lang <LANG>
+python3 scripts/ast_grep_helper.py replace '<PATTERN>' '<REWRITE>' [path] --lang <LANG>   # dry-run
+python3 scripts/ast_grep_helper.py replace '<PATTERN>' '<REWRITE>' [path] --lang <LANG> --apply
 ```
 
 Or directly:
@@ -132,7 +132,7 @@ sg run -p 'print($$$A)' -r 'logger.info($$$A)' --lang py --update-all .
 # Optional[X] -> X | None
 sg run -p 'Optional[$T]' -r '$T | None' --lang py --update-all .
 
-# from typing import List -> remove (built-in list works in 3.9+)
+# from typing import List -> annotate for manual removal (built-in list works in 3.9+)
 sg run -p 'from typing import List' -r 'from typing import List  # TODO: remove, use list' --lang py --update-all .
 ```
 
