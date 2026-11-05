@@ -57,7 +57,15 @@ describe("the omo remote bootstrap worker", () => {
     await expect(runBootstrapWorker(omoBin, { schedule: atOnce })).rejects.toBeInstanceOf(BootstrapWorkerTimeout)
   })
 
+  // Bun words a missing executable differently per OS (POSIX "ENOENT", Windows "Executable not found in $PATH").
   test("an omo binary that cannot start rejects with the spawn error", async () => {
-    await expect(runBootstrapWorker(join(scratch(), "missing-omo"))).rejects.toThrow("ENOENT")
+    const failure = await runBootstrapWorker(join(scratch(), "missing-omo")).then(
+      () => undefined,
+      (error: unknown) => error,
+    )
+    expect(failure).toBeInstanceOf(Error)
+    expect(failure).not.toBeInstanceOf(BootstrapWorkerTimeout)
+    const { code, message } = failure as NodeJS.ErrnoException
+    expect(`${code ?? ""} ${message}`).toMatch(/ENOENT|Executable not found/)
   })
 })
