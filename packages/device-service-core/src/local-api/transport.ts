@@ -138,7 +138,11 @@ export const listenLocal = async (
   };
 };
 
-export const connectLocal = (stateDir: string): Promise<Transport> =>
+// `background`: the socket never keeps the process alive (an engine's long-lived registrant connection).
+export const connectLocal = (
+  stateDir: string,
+  options: { readonly background?: boolean } = {},
+): Promise<Transport> =>
   new Promise((resolve, reject) => {
     const port = process.platform === "win32" ? readEndpointPort(stateDir) : undefined;
     const endpoint = port === undefined ? UNIX_ENDPOINT : tcpEndpoint(port);
@@ -146,6 +150,7 @@ export const connectLocal = (stateDir: string): Promise<Transport> =>
       port === undefined
         ? createConnection({ path: join(stateDir, SOCKET_FILE) })
         : createConnection({ host: "127.0.0.1", port });
+    if (options.background === true) socket.unref();
     socket.once("error", reject);
     socket.once("connect", () => {
       socket.off("error", reject);
