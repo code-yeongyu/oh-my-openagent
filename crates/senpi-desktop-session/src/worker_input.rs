@@ -233,7 +233,7 @@ impl Worker {
             return;
         }
         let hit = self.backend().and_then(|backend| backend.hit_at(x, y)).ok().flatten().map(action_hit);
-        self.report_extras.set(Some(ReportExtras { route: None, hit }));
+        self.report_extras.set(Some(ReportExtras { route: None, hit, timings: None }));
     }
 
     /// Object mode, window targets: once input was sent, judges it against
