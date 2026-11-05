@@ -92,6 +92,9 @@ fn the_intervention_watch_is_reported_as_on_off_or_not_started_only_when_a_backe
 fn ax_node_reference_is_named_ref_on_the_wire() {
     // Given
     let node = AxNode {
+        evidence: None,
+        subtree_truncated: false,
+        secure: false,
         ref_: "e1".into(),
         role: "button".into(),
         native_role: "AXButton".into(),

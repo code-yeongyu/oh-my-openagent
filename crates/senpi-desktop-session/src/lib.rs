@@ -14,6 +14,7 @@ mod intervention;
 mod mutate;
 mod pending;
 mod pointer;
+mod report;
 mod request;
 mod restore;
 mod screen_notes;

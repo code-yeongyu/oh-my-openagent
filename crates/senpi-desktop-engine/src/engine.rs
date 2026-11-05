@@ -5,8 +5,9 @@
 use std::sync::Arc;
 
 use senpi_desktop_core::error::{CoreResult, DesktopError};
-use senpi_desktop_core::methods::{Effect, Notification};
-use senpi_desktop_core::protocol::{ABI, PROTOCOL_VERSION};
+use senpi_desktop_core::methods::{Effect, Method, Notification};
+use senpi_desktop_core::report::ReportMode;
+use senpi_desktop_core::protocol::{ABI, FEATURES, PROTOCOL_VERSION};
 use senpi_desktop_core::protocol_results::{HelloResult, SessionOpenResult};
 use senpi_desktop_core::types::{DesktopCapabilities, DesktopSessionOptions};
 use senpi_desktop_safety::{Clock, FakeClock, MonotonicClock, ResumeToken, Supervisor};
@@ -122,6 +123,7 @@ impl Engine {
                 .unwrap_or("unknown")
                 .to_owned(),
             abi: ABI.to_owned(),
+            features: Some(FEATURES.iter().map(|feature| (*feature).to_owned()).collect()),
         }
     }
 
@@ -150,6 +152,13 @@ impl Engine {
     /// The installed fake clock, when `SENPI_DESKTOP_FAKE_CLOCK=1` set one.
     pub fn fake_clock(&self) -> Option<&FakeClock> {
         self.fake_clock.as_deref()
+    }
+
+    /// Whether `method`'s reply is an object-mode action report: the session
+    /// thread last applied an open with `reportMode: "object"` and `method`
+    /// mutates.
+    pub fn reports_action(&self, method: Method) -> bool {
+        method.reports_action() && self.session.report_mode() == ReportMode::Object
     }
 
     pub fn permits(&self, effect: Effect) -> Arc<Semaphore> {

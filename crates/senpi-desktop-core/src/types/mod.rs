@@ -5,17 +5,19 @@ use std::path::PathBuf;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::report::ReportMode;
+
 mod ax;
 mod capture;
 mod display;
 mod window;
 
-pub use ax::{AxNode, AxQuery, AxSnapshot, AxSnapshotOptions};
+pub use ax::{AxCut, AxEvidence, AxNode, AxQuery, AxSnapshot, AxSnapshotOptions, EvidenceState};
 pub use capture::{CaptureCaps, CaptureMode, CaptureRegion, CaptureResult, DesktopCapture, ObserveResult, DEFAULT_CAPTURE_MAX_BYTES};
 pub use display::{
-    DesktopCapabilities, DesktopDisplay, DisplaySelector, InterventionWatch, ScreenState,
+    DesktopCapabilities, DesktopDisplay, DisplaySelector, InterventionWatch, ScreenState, WindowInput,
 };
-pub use window::{DesktopPoint, DesktopWindow, FrontWindow, PointerOptions, Target};
+pub use window::{DesktopPoint, DesktopWindow, FrontWindow, PointerOptions, Target, WindowIdentity};
 
 /// `session.open` parameters supplied by the host.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -35,6 +37,34 @@ pub struct DesktopSessionOptions {
     pub artifact_dir: Option<PathBuf>,
     pub screenshot_gc: ScreenshotGc,
     pub capture_caps: CaptureCaps,
+    /// `object` makes every mutating request return an `ActionReport` and its
+    /// errors carry `disposition`; send it only to an engine whose
+    /// `engine.hello` lists `action-report`.
+    pub report_mode: ReportMode,
+    /// What a background action does when the user is using the target app.
+    pub intervention: InterventionPolicy,
+    /// macOS background key priming; accepted and stored, not acted on yet.
+    pub macos_key_priming: KeyPriming,
+    /// Per-request timing traces; accepted and stored, not acted on yet.
+    pub trace: bool,
+}
+
+/// What a background action does when the user is using the target app.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum InterventionPolicy {
+    Continue,
+    #[default]
+    Pause,
+}
+
+/// Whether macOS background keys first make the target window key.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum KeyPriming {
+    On,
+    #[default]
+    Off,
 }
 
 const fn default_show_cursor() -> bool {
@@ -52,6 +82,10 @@ impl Default for DesktopSessionOptions {
             artifact_dir: None,
             screenshot_gc: ScreenshotGc::default(),
             capture_caps: CaptureCaps::default(),
+            report_mode: ReportMode::default(),
+            intervention: InterventionPolicy::default(),
+            macos_key_priming: KeyPriming::default(),
+            trace: false,
         }
     }
 }

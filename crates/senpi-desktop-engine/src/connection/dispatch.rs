@@ -5,7 +5,8 @@ use crate::{
     rpc::{reply_line, Failure},
     settle::{settle, settle_hold},
 };
-use senpi_desktop_core::error::DesktopError;
+use senpi_desktop_core::error::{DesktopError, ErrorReport};
+use senpi_desktop_core::report::Disposition;
 use std::sync::Arc;
 use tokio::{sync::mpsc, task::JoinSet};
 
@@ -26,7 +27,7 @@ pub(super) async fn dispatch(
         let permits = engine.permits(method.spec().effect);
         let admitted = tokio::select! {
             biased;
-            _ = &mut cancel => Err(Failure::cancelled()),
+            _ = &mut cancel => Err(not_dispatched(engine.reports_action(method))),
             permit = permits.acquire_owned() => permit
                 .map_err(|_| Failure::Engine(DesktopError::internal("request permits were closed"))),
         };
@@ -50,6 +51,12 @@ pub(super) async fn dispatch(
                 }
                 None => settle(started.wait(), cancel, || Err(Failure::cancelled())).await,
             };
+            // Read the mode when the reply is formed: only an open the worker applied counts.
+            let outcome = if engine.reports_action(method) {
+                outcome.map_err(Failure::with_race_disposition)
+            } else {
+                outcome
+            };
             drop(permit);
             in_flight.finish(&id);
             deliver(&engine, &out, reply_line(id, outcome))
@@ -62,6 +69,17 @@ pub(super) async fn dispatch(
     }
     while let Some(joined) = waiters.join_next().await {
         report(joined);
+    }
+}
+
+/// A cancel that landed before the request reached the session: nothing ran.
+fn not_dispatched(reports: bool) -> Failure {
+    match Failure::cancelled() {
+        Failure::Engine(error) if reports => Failure::Engine(error.with_report(ErrorReport {
+            disposition: Some(Disposition::NOT_DELIVERED_SAFE),
+            ..ErrorReport::default()
+        })),
+        failure => failure,
     }
 }
 

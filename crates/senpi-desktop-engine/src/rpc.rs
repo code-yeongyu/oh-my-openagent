@@ -1,7 +1,8 @@
 //! JSON-RPC reply lines: the engine's failure kinds and their wire error
 //! objects `{code, message, data}`.
 
-use senpi_desktop_core::error::{DesktopError, ErrorCode};
+use senpi_desktop_core::error::{DesktopError, ErrorCode, ErrorReport};
+use senpi_desktop_core::report::Disposition;
 use senpi_desktop_core::protocol::{
     rpc_error_code, EngineErrorData, JsonRpcVersion, MethodRejection, MethodRejectionData, RequestId,
     RpcError, RpcErrorData, RpcFailure, RpcSuccess, INVALID_PARAMS, INVALID_REQUEST, METHOD_NOT_FOUND,
@@ -30,18 +31,44 @@ impl Failure {
         ))
     }
 
+    /// An object-mode reply the waiter wrote without the worker's verdict: a
+    /// `Cancelled` or `Timeout` that raced a running request may have sent
+    /// input, so it is `delivery_uncertain/unsafe` with no `delivered` count.
+    /// An error that already carries the worker's report is left alone.
+    #[must_use]
+    pub fn with_race_disposition(self) -> Self {
+        match self {
+            Self::Engine(error)
+                if error.report.is_none() && matches!(error.code, ErrorCode::Cancelled | ErrorCode::Timeout) =>
+            {
+                Self::Engine(error.with_report(ErrorReport {
+                    disposition: Some(Disposition::UNCERTAIN_UNSAFE),
+                    ..ErrorReport::default()
+                }))
+            }
+            other => other,
+        }
+    }
+
     fn into_rpc_error(self) -> RpcError {
         match self {
-            Self::Engine(error) => RpcError {
-                code: rpc_error_code(error.code),
-                message: error.message,
-                data: Some(RpcErrorData::Engine(EngineErrorData {
-                    code: error.code,
-                    hint: None,
-                    permission: error.permission,
-                    capture_unavailable: error.capture_unavailable.map(|data| *data),
-                })),
-            },
+            Self::Engine(error) => {
+                let report = error.report.map(|report| *report).unwrap_or_default();
+                RpcError {
+                    code: rpc_error_code(error.code),
+                    message: error.message,
+                    data: Some(RpcErrorData::Engine(EngineErrorData {
+                        code: error.code,
+                        hint: None,
+                        permission: error.permission,
+                        capture_unavailable: error.capture_unavailable.map(|data| *data),
+                        reason: report.reason,
+                        disposition: report.disposition,
+                        delivered: report.delivered,
+                        focus_restoration: report.focus_restoration,
+                    })),
+                }
+            }
             Self::Rejected(reason) => RpcError {
                 code: METHOD_NOT_FOUND,
                 message: "Method not found".to_owned(),
