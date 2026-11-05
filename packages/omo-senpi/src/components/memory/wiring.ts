@@ -116,7 +116,7 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
     const { signal } = controller
     const done = userActivity.reconcileOnce(sessionId, async () => {
       try {
-        await runtimeFor(identity).reconcile(signal)
+        await runtimeFor(identity).reconcile(signal, { skipUnchanged: true })
         signal.throwIfAborted()
       } catch (error) {
         signal.throwIfAborted()
