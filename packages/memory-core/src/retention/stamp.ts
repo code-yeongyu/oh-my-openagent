@@ -1,12 +1,15 @@
-// The resume cursor of an interrupted pass (design 6, N3): `runtime/retention.json` holds ONLY a
-// cursor, is written only when a pass stops early, and is deleted when a pass completes. The
-// completion stamp lives in the memory repo's git config (`omo.retentionAt`), written by the caller.
+// The resume points of an interrupted pass (design 6, N3): `runtime/retention.json` holds ONLY the
+// store walk's cursor and, in its own `cap` field, the size cap's resume point; it is written only
+// when one of them stopped early and deleted when neither did. The cap's resume point is read only by
+// the cap, so it never makes the store walk skip a store (#12538 review r4 M). The completion stamp
+// lives in the memory repo's git config (`omo.retentionAt`), written by the caller.
 
 import { randomUUID } from "node:crypto"
 import { join } from "node:path"
 
 import { readFile, rename, rm, writeFile } from "../fs/resilient"
 import type { RetentionCursor } from "./budget"
+import type { RuntimeCapCursor } from "./cap"
 
 export const RETENTION_STAMP_CONFIG_KEY = "omo.retentionAt"
 const CURSOR_FILE = "retention.json"
@@ -15,29 +18,46 @@ export function retentionCursorPath(runtimeDir: string): string {
   return join(runtimeDir, CURSOR_FILE)
 }
 
-export async function readRetentionCursor(runtimeDir: string): Promise<RetentionCursor | undefined> {
-  try {
-    const parsed = JSON.parse(await readFile(retentionCursorPath(runtimeDir), "utf8")) as {
-      readonly cursor?: { readonly store?: unknown; readonly lastName?: unknown; readonly tier?: unknown; readonly clock?: unknown }
-    }
-    const cursor = parsed.cursor
-    if (typeof cursor?.store !== "string") return undefined
-    return {
-      store: cursor.store,
-      ...(typeof cursor.lastName === "string" ? { lastName: cursor.lastName } : {}),
-      ...(typeof cursor.tier === "string" ? { tier: cursor.tier } : {}),
-      ...(typeof cursor.clock === "number" && Number.isFinite(cursor.clock) ? { clock: cursor.clock } : {}),
-    }
-  } catch {
-    return undefined
-  }
+export interface RetentionResumePoints {
+  /** Where the store walk resumes. */
+  readonly cursor?: RetentionCursor
+  /** Where the size cap resumes its tier walk. */
+  readonly cap?: RuntimeCapCursor
 }
 
-export async function writeRetentionCursor(runtimeDir: string, cursor: RetentionCursor): Promise<void> {
+interface StoredCursor {
+  readonly store?: unknown
+  readonly lastName?: unknown
+  readonly tier?: unknown
+  readonly clock?: unknown
+}
+
+export async function readRetentionResumePoints(runtimeDir: string): Promise<RetentionResumePoints> {
+  let parsed: { readonly cursor?: StoredCursor; readonly cap?: StoredCursor }
+  try {
+    parsed = JSON.parse(await readFile(retentionCursorPath(runtimeDir), "utf8")) as typeof parsed
+  } catch {
+    return {}
+  }
+  // A file written before the cap had its own field holds the cap's resume point as the cursor.
+  if (parsed.cursor?.store === "cap") return capResumePoint(parsed.cursor)
+  const cap = capResumePoint(parsed.cap)
+  const cursor = parsed.cursor
+  if (typeof cursor?.store !== "string") return cap
+  return { cursor: { store: cursor.store, ...(typeof cursor.lastName === "string" ? { lastName: cursor.lastName } : {}) }, ...cap }
+}
+
+function capResumePoint(cursor: StoredCursor | undefined): RetentionResumePoints {
+  if (cursor?.store !== "cap" || typeof cursor.tier !== "string" || typeof cursor.lastName !== "string") return {}
+  if (typeof cursor.clock !== "number" || !Number.isFinite(cursor.clock)) return {}
+  return { cap: { store: "cap", tier: cursor.tier, clock: cursor.clock, lastName: cursor.lastName } }
+}
+
+export async function writeRetentionResumePoints(runtimeDir: string, points: RetentionResumePoints): Promise<void> {
   const target = retentionCursorPath(runtimeDir)
   const temporary = `${target}.tmp-${randomUUID()}`
   try {
-    await writeFile(temporary, `${JSON.stringify({ version: 1, cursor })}\n`, { encoding: "utf8", mode: 0o600 })
+    await writeFile(temporary, `${JSON.stringify({ version: 1, ...points })}\n`, { encoding: "utf8", mode: 0o600 })
     await rename(temporary, target)
   } catch (error) {
     await rm(temporary, { force: true })

@@ -61,7 +61,7 @@ export interface RuntimeSizeCapOptions extends Omit<RetentionContext, "policy"> 
   readonly resume?: RuntimeCapCursor
 }
 
-/** The `cap` entry of the pass's single cursor file (`runtime/retention.json`, owned by the pass). */
+/** The cap's own resume point: the `cap` field of the pass's cursor file (`runtime/retention.json`, owned by the pass). */
 export interface RuntimeCapCursor {
   readonly store: "cap"
   readonly tier: string
@@ -423,7 +423,12 @@ async function journalCandidates(
           name: entry.name,
           at: entry.at,
           measuredPath: transcriptOnly ? join(dir, "transcript.jsonl") : dir,
-          evict: async () => capOutcome(await removeTranscriptJournalUnderLock(context, dir, lock, realGate)),
+          // A journal that turns unreadable between its classification and the locked eviction is kept
+          // with that reason, as the pass's own visit keeps it (#12538 review r4 L); an abort propagates.
+          evict: async () => capOutcome(await removeTranscriptJournalUnderLock(context, dir, lock, realGate).catch((error: unknown): RuntimeCapKeepReason => {
+            if (options.signal?.aborted === true) throw error
+            return "state-unreadable"
+          })),
         }
       })
   return {

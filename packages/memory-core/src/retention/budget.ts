@@ -5,15 +5,13 @@
 // removal item a pass reaches always runs, so a store whose classification alone outlasts the budget
 // still moves forward. Classification (`proceed`) is a metadata read: only the abort signal stops it.
 
-const RETENTION_STORES = ["runs", "completions", "reflection-sessions", "journals", "sidecars", "ledgers", "recall-runs", "cap"] as const
+// The size cap, which runs after these, keeps its own resume point beside this cursor (stamp.ts).
+const RETENTION_STORES = ["runs", "completions", "reflection-sessions", "journals", "sidecars", "ledgers", "recall-runs"] as const
 export type RetentionStore = (typeof RETENTION_STORES)[number]
 
 export interface RetentionCursor {
   readonly store: string
   readonly lastName?: string
-  /** Size-cap cursor only (store `cap`): the eviction tier and that tier's ordering clock of `lastName`. */
-  readonly tier?: string
-  readonly clock?: number
 }
 
 export class PassBudget {

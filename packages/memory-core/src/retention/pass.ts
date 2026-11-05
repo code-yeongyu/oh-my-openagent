@@ -2,10 +2,11 @@
 // journal rules run only when the reservation guard could be read (it also records the run-id mark
 // first). The walk is bounded by `passBudgetMs` and by the abort signal, checked between items: a
 // pass that stops early persists a resume cursor in `runtime/retention.json` and the next pass
-// continues there; a pass that completes deletes the cursor.
+// continues there; a pass that completes deletes the cursor. The size cap keeps its own resume point
+// in the same file, which only the cap reads: every pass walks the stores whatever the cap left.
 
 import { PassBudget, type RetentionCursor } from "./budget"
-import { runRuntimeSizeCap, type RuntimeSizeCapReport } from "./cap"
+import { runRuntimeSizeCap, type RuntimeCapCursor, type RuntimeSizeCapReport } from "./cap"
 import { pruneCompletions } from "./completions"
 import { LazyRetentionGuard } from "./guard"
 import { pruneTranscriptJournals } from "./journals"
@@ -15,7 +16,7 @@ import { pruneRecallLedgers } from "./recall-ledgers"
 import { pruneReflectionRuns } from "./reflection-runs"
 import { readUnreflectedRetentionGate, type UnreflectedRetentionGate } from "./reflection-health-signal"
 import { pruneKibitzerSidecars } from "./sidecars"
-import { clearRetentionCursor, readRetentionCursor, writeRetentionCursor } from "./stamp"
+import { clearRetentionCursor, readRetentionResumePoints, writeRetentionResumePoints } from "./stamp"
 
 export interface RuntimeRetentionOptions extends Omit<RetentionContext, "budget"> {
   /** Encoded sidecar directory names this process's live sessions own. */
@@ -42,8 +43,8 @@ export interface RuntimeRetentionReport {
   readonly recallRuns: LegacyRecallRunsOutcome
   /** Read only when `discardUnreflectedJournals` is on; undefined when off or when the pass stopped while reading it. */
   readonly unreflectedGate?: UnreflectedRetentionGate
-  /** Set when the pass stopped early (budget or abort); persisted for the next pass. */
-  readonly cursor?: RetentionCursor
+  /** Set when the pass stopped early (budget or abort), the store walk's or else the cap's; persisted for the next pass. */
+  readonly cursor?: RetentionCursor | RuntimeCapCursor
   /** Present when `maxBytes` was set and retention finished inside the budget. */
   readonly cap?: RuntimeSizeCapReport
 }
@@ -52,8 +53,8 @@ const EMPTY: RetentionStoreResult = { removed: [], kept: {} }
 
 export async function runRuntimeRetention(options: RuntimeRetentionOptions): Promise<RuntimeRetentionReport> {
   options.signal?.throwIfAborted()
-  const resume = await readRetentionCursor(options.paths.runtime)
-  const budget = new PassBudget(options.now, options.policy.passBudgetMs, options.signal, resume)
+  const stored = await readRetentionResumePoints(options.paths.runtime)
+  const budget = new PassBudget(options.now, options.policy.passBudgetMs, options.signal, stored.cursor)
   const context: RetentionContext = { ...options, budget }
   const guard = new LazyRetentionGuard(context)
   const runs = await pruneReflectionRuns(context, guard)
@@ -79,7 +80,9 @@ export async function runRuntimeRetention(options: RuntimeRetentionOptions): Pro
   const ledgers = await pruneRecallLedgers(context)
   const recallRuns = await pruneLegacyRecallRuns(context)
   // The cap (design 3) runs last, inside what is left of the same budget, and resumes its own tier walk
-  // from a `cap` cursor in the same cursor file.
+  // from its own resume point, which the store walk never reads (#12538 review r4 M). A pass that stops
+  // before the cap keeps that resume point; a pass without a cap drops it.
+  let capResume = options.maxBytes === undefined ? undefined : stored.cap
   let cap: RuntimeSizeCapReport | undefined
   if (options.maxBytes !== undefined && budget.stopped === undefined) {
     cap = await runRuntimeSizeCap({
@@ -89,18 +92,20 @@ export async function runRuntimeRetention(options: RuntimeRetentionOptions): Pro
       measureSignal: options.signal === undefined
         ? AbortSignal.timeout(budget.remainingMs())
         : AbortSignal.any([options.signal, AbortSignal.timeout(budget.remainingMs())]),
-      ...(resume?.store === "cap" && resume.tier !== undefined && resume.clock !== undefined && resume.lastName !== undefined
-        ? { resume: { store: "cap", tier: resume.tier, clock: resume.clock, lastName: resume.lastName } }
-        : {}),
+      ...(capResume === undefined ? {} : { resume: capResume }),
     })
-    if (cap.cursor !== undefined) budget.stopped = cap.cursor
+    capResume = cap.cursor
   }
-  if (budget.stopped !== undefined) {
-    await writeRetentionCursor(options.paths.runtime, budget.stopped)
+  if (budget.stopped !== undefined || capResume !== undefined) {
+    await writeRetentionResumePoints(options.paths.runtime, {
+      ...(budget.stopped === undefined ? {} : { cursor: budget.stopped }),
+      ...(capResume === undefined ? {} : { cap: capResume }),
+    })
     if (budget.aborted) options.signal?.throwIfAborted()
-  } else if (resume !== undefined) {
+  } else if (stored.cursor !== undefined || stored.cap !== undefined) {
     await clearRetentionCursor(options.paths.runtime)
   }
+  const cursor = budget.stopped ?? cap?.cursor
   return {
     ...(guard.value === undefined ? {} : { highWater: guard.value.highWater }),
     skipped: guard.busy ? ["reflection-scheduler-busy"] : [],
@@ -112,7 +117,7 @@ export async function runRuntimeRetention(options: RuntimeRetentionOptions): Pro
     ledgers,
     recallRuns,
     ...(unreflectedGate === undefined ? {} : { unreflectedGate }),
-    ...(budget.stopped === undefined ? {} : { cursor: budget.stopped }),
+    ...(cursor === undefined ? {} : { cursor }),
     ...(cap === undefined ? {} : { cap }),
   }
 }
