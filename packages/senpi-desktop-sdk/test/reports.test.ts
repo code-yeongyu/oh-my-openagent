@@ -129,7 +129,7 @@ describe("errors", () => {
 	});
 
 	it("#given a transport kind this SDK does not have #when connecting #then it refuses", async () => {
-		const transport = { kind: "attach", endpoint: "/nowhere" } as unknown as Parameters<typeof connect>[0];
+		const transport = { kind: "spawn" } as unknown as Parameters<typeof connect>[0];
 
 		await expect(connect(transport)).rejects.toMatchObject({
 			code: "InvalidTarget",
