@@ -14,6 +14,7 @@ import { dirname, join } from "node:path"
 import { tmpdir } from "node:os"
 import { spawnSync } from "node:child_process"
 import { pathToFileURL } from "node:url"
+import { remainingTestTime } from "../../../test-support/test-deadline"
 
 const packageRoot = join(import.meta.dir, "..")
 const pluginRoot = join(packageRoot, "plugin")
@@ -70,7 +71,7 @@ describe("omo-senpi local-path runtime dependencies", () => {
     const result = spawnSync(
       "node",
       ["--input-type=module", "-e", `await import(${JSON.stringify(importedExtensionUrl)})`],
-      { cwd: join(root, "host"), encoding: "utf8", timeout: 10_000 },
+      { cwd: join(root, "host"), encoding: "utf8", timeout: remainingTestTime() },
     )
 
     expect(result.error).toBeUndefined()

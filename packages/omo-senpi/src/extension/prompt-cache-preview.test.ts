@@ -5,7 +5,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { DefaultResourceLoader, ModelRegistry, ModelRuntime, SessionManager, SettingsManager, createAgentSession, getMcpService } from "../senpi-test-runtime"
 import omoExtension from "./index"
-import { testBudgetSignal, useTestTimeout } from "../../../../test-support/test-deadline"
+import { testBudgetSignal, useTestTimeout, remainingTestTime } from "../../../../test-support/test-deadline"
 
 const ENV_KEYS = ["HOME", "OMO_CODING_AGENT_DIR", "SENPI_CODING_AGENT_DIR", "PI_CODING_AGENT_DIR", "OMO_SENPI_DISABLE_POSTHOG"] as const
 type EnvSnapshot = ReadonlyMap<(typeof ENV_KEYS)[number], string | undefined>
@@ -154,8 +154,9 @@ async function runPrefixScenario(options: {
       messages: result.status === "ready" ? result.request.context.messages : undefined,
       serversBefore, serversAfter: servers(), connectionsBefore,
       connectionsAfter: service.getSnapshot().connectionCount,
-      // Anything the preview started would still be pending here; await that signal, bounded.
-      settledAfterPreview: await service.whenAttachSettled(10_000),
+      // Anything the preview started would still be pending here; await that signal within the test budget,
+      // keeping the three teardown steps of the budget for the teardown below.
+      settledAfterPreview: await service.whenAttachSettled(Math.max(0, remainingTestTime() - 3 * (options.teardownStepMs ?? TEARDOWN_STEP_MS))),
     }
   } catch (caught) {
     failure = caught

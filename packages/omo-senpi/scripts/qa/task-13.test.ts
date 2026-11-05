@@ -13,6 +13,7 @@ import registerMockProvider, {
 } from "./mock-provider/index.ts";
 
 import { describe, expect, test } from "bun:test";
+import { remainingTestTime } from "../../../../test-support/test-deadline";
 
 interface ChildProcessModule {
 	spawnSync(
@@ -120,7 +121,7 @@ function runNode(args: string[], env: Record<string, string | undefined> = {}) {
 		cwd: repoRoot,
 		env: { ...process.env, ...env },
 		encoding: "utf8",
-		timeout: 30_000,
+		timeout: remainingTestTime(),
 	});
 }
 
