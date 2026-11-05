@@ -224,7 +224,8 @@ async function main() {
     engineRetryObservation: {
       head: headRequest === undefined ? null : `omo-mock/${headRequest.model}:${headRequest.thinking ?? "none"}`,
       walkedTo: retry.childRequests[1] === undefined ? null : `omo-mock/${retry.childRequests[1].model}`,
-      note: "senpi's candidate scan skips a chain entry whose model equals the current model, so a same-model rung is never walked; recorded, not asserted",
+      walkedToThinking: retry.childRequests[1]?.thinking ?? null,
+      note: "where the engine's retry controller goes after the head request fails; an entry without a level inherits the running one, and senpi#3287/#3318 made a same-model rung its own position, so an engine without that fix walks to another model here",
     },
     realSenpiUntouched,
     realSenpiChangedPaths: qaAttributedPaths,
