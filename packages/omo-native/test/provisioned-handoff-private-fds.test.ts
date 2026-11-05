@@ -5,6 +5,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { Socket } from "node:net"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
+import { testBudgetSignal, useTestTimeout } from "../../../test-support/test-deadline"
 
 const HANDOFF = resolve(import.meta.dir, "../provisioned-handoff.ts")
 
@@ -12,6 +13,7 @@ const HANDOFF = resolve(import.meta.dir, "../provisioned-handoff.ts")
 // descriptors on Bun, so a launch carrying private descriptors must reach the runtime as a child.
 describe.skipIf(process.platform === "win32")("provisioned runtime handoff with private descriptors", () => {
   test("keeps the descriptor readable and its table in the provisioned runtime", async () => {
+    useTestTimeout(60_000)
     const root = mkdtempSync(join(tmpdir(), "omo-handoff-fd-"))
     try {
       // given: a provisioned runtime stand-in that records the table and answers on fd 5
@@ -30,9 +32,9 @@ describe.skipIf(process.platform === "win32")("provisioned runtime handoff with 
       let received = ""
       child.stderr?.on("data", (chunk: Buffer) => { stderr += chunk.toString() })
       channel.on("data", (chunk: Buffer) => { received += chunk.toString() })
-      const ended = once(channel, "end", { signal: AbortSignal.timeout(20_000) })
+      const ended = once(channel, "end", { signal: testBudgetSignal("the private channel to end") })
       // when: the launch hands off to the provisioned runtime
-      const [code] = await once(child, "exit", { signal: AbortSignal.timeout(20_000) })
+      const [code] = await once(child, "exit", { signal: testBudgetSignal("the handoff child to exit") })
       await ended
       // then: the runtime received both the table and a working descriptor
       expect(code, stderr).toBe(0)
@@ -44,6 +46,7 @@ describe.skipIf(process.platform === "win32")("provisioned runtime handoff with 
   }, 60_000)
 
   test("closes a named socket it cannot forward, so its peer sees EOF while the runtime still runs", async () => {
+    useTestTimeout(60_000)
     const root = mkdtempSync(join(tmpdir(), "omo-handoff-discard-"))
     try {
       // given: a runtime that stays up until fd 5's peer goes away, and a named socket at 24 (above 5..15)
@@ -61,9 +64,9 @@ describe.skipIf(process.platform === "win32")("provisioned runtime handoff with 
       const [channel, high] = [slots[5], slots[24]]
       if (!(channel instanceof Socket) || !(high instanceof Socket)) throw new Error("no private sockets")
       high.resume()
-      const exited = once(child, "exit", { signal: AbortSignal.timeout(20_000) })
+      const exited = once(child, "exit", { signal: testBudgetSignal("the handoff child to exit") })
       // when: the handoff is running
-      await once(high, "end", { signal: AbortSignal.timeout(20_000) })
+      await once(high, "end", { signal: testBudgetSignal("fd 24 to reach EOF") })
       // then: fd 24 reached EOF while the parent still waits on the runtime; ending fd 5 lets it finish
       expect(child.exitCode).toBeNull()
       channel.end()
