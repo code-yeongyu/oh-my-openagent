@@ -14,6 +14,8 @@ import {
   formatStaleLockFixLines,
   reclaimDeadOwnerLocks,
   runStaleLockReaper,
+  sweepHostIdentities,
+  sweepIdentityOrphanWorktrees,
 } from "./reflection-lock.generated.js"
 
 const MEMORY_ROOT_ENV_VAR = "OMO_MEMORY_HOME"
@@ -70,22 +72,43 @@ export async function reflectionLockReport(options = {}) {
   return lines
 }
 
+function orphanLines(identity, report, dryRun) {
+  if (report.skipped !== undefined) return []
+  const lines = report.removed.map((target) => `${dryRun ? "WOULD FIX" : "FIXED"} ${identity} removed orphan ${target}`)
+  if (dryRun) lines.push(...report.kept.map((entry) => `KEPT ${identity} worktree ${entry.target} (${entry.reason})`))
+  lines.push(...report.failed.map((entry) => `KEPT ${identity} orphan ${entry.target} (${entry.detail})`))
+  return lines
+}
+
+// `omo doctor --fix`: driver 1 of the host sweep (memory-core reflection/host-sweep.ts). Every identity
+// with a runtime/ is visited, repo or not, resuming at the persisted cursor; a repo-less identity gets
+// the reaper and the lock sweep, never the git-backed orphan sweep.
 export async function reflectionLockFix(options = {}) {
-  const agentsRoot = join(memoryRoot(options.env ?? process.env), "agents")
-  const lines = []
+  const memory = memoryRoot(options.env ?? process.env)
+  const dryRun = options.dryRun === true
+  const probe = options.reflectionLockProbe ?? {}
   let failed = false
-  for (const identityRoot of options.listIdentities?.(agentsRoot) ?? listDurableIdentities(agentsRoot)) {
-    const identity = basename(identityRoot)
-    const runtimeDir = join(identityRoot, "runtime")
+  const reap = async (identity) => {
     try {
-      const report = await runStaleLockReaper({ runtimeDir, probe: options.reflectionLockProbe ?? {}, dryRun: options.dryRun === true })
-      const locks = options.dryRun === true ? undefined : await reclaimDeadOwnerLocks(join(runtimeDir, "locks"))
-      lines.push(...formatStaleLockFixLines(identity, report, locks))
+      const report = await runStaleLockReaper({ runtimeDir: identity.runtimeDir, probe, dryRun })
+      const locks = dryRun ? undefined : await reclaimDeadOwnerLocks(join(identity.runtimeDir, "locks"))
+      return formatStaleLockFixLines(identity.name, report, locks)
     } catch (error) {
       failed = true
-      lines.push(`FAIL ${identity} reflection lock fix failed: ${error instanceof Error ? error.message : String(error)}`)
+      return [`FAIL ${identity.name} reflection lock fix failed: ${error instanceof Error ? error.message : String(error)}`]
     }
   }
-  if (lines.length === 0) lines.push(options.dryRun === true ? "INFO nothing to fix" : "PASS no stale reflection locks")
+  const orphans = async (identity) => {
+    try {
+      return orphanLines(identity.name, await sweepIdentityOrphanWorktrees(identity.root, { now: (probe.now ?? Date.now)(), dryRun }), dryRun)
+    } catch (error) {
+      failed = true
+      return [`FAIL ${identity.name} orphan worktree sweep failed: ${error instanceof Error ? error.message : String(error)}`]
+    }
+  }
+  const result = await sweepHostIdentities({ memoryRoot: memory, steps: [reap, orphans], dryRun })
+  if (result.status === "busy") return { lines: ["INFO another sweep is running on this host; try again when it finishes"], failed: false }
+  const lines = result.lines.filter((line) => !/^INFO \S+ locks reclaimed 0, kept 0$/.test(line))
+  if (lines.length === 0) lines.push(dryRun ? "INFO nothing to fix" : "PASS no stale reflection locks")
   return { lines, failed }
 }

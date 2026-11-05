@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs"
 import { hostname, tmpdir } from "node:os"
 import { dirname, join, relative } from "node:path"
 
@@ -95,6 +95,7 @@ describe("omo doctor --fix reflection locks (#11976)", () => {
     launchInterrupted(c)
     write(join(c, "runs", "reflection-run-64", "ledger.json"), "{ torn")
     write(join(identity(root, "agent-e"), "active.lock"), "{\"runId\":")
+    utimesSync(join(identity(root, "agent-e"), "active.lock"), new Date(NOW - 2 * 60 * 60_000), new Date(NOW - 2 * 60 * 60_000))
     const before = treeHash(root)
     const result = await reflectionLockFix({ env: { OMO_MEMORY_HOME: root }, reflectionLockProbe: fixProbe, dryRun: true })
     expect(result.lines).toEqual(expect.arrayContaining([
@@ -103,6 +104,41 @@ describe("omo doctor --fix reflection locks (#11976)", () => {
       "WOULD FIX agent-e active.lock run unknown (lock-torn)",
     ]))
     expect(treeHash(root)).toBe(before)
+  })
+
+  test("#given an identity with a runtime/ but no repo/ holding a dead launcher's lock and a dead sidecar owner lock #when --fix runs #then both are released (C27)", async () => {
+    const root = memoryHome()
+    const reflectionDir = identity(root, "agent-norepo", false)
+    launchInterrupted(reflectionDir)
+    write(join(reflectionDir, "..", "locks", "recall-sidecar.y.lock"), { pid: 2147483646, process_start: "gone", hostname: hostname(), nonce: "n", created_at: new Date(NOW).toISOString(), purpose: "recall-sidecar" })
+    const result = await reflectionLockFix({ env: { OMO_MEMORY_HOME: root }, reflectionLockProbe: fixProbe })
+    expect(result.lines).toContain("FIXED agent-norepo active.lock run reflection-run-64 (launch-interrupted)")
+    expect(existsSync(join(reflectionDir, "active.lock"))).toBe(false)
+    expect(existsSync(join(reflectionDir, "..", "locks", "recall-sidecar.y.lock"))).toBe(false)
+  })
+
+  test("#given a repo identity with a stray worktree dir of a quarantined run past the grace window and one of a live run #when --fix runs (and --dry-run before it) #then the stray goes, the live one stays with its reason (C28)", async () => {
+    const root = memoryHome()
+    const reflectionDir = identity(root, "agent-git")
+    const repo = join(reflectionDir, "..", "..", "repo")
+    expect(Bun.spawnSync(["git", "init", "-q", repo]).exitCode).toBe(0)
+    const worktrees = join(reflectionDir, "..", "worktrees")
+    const old = NOW - 60 * 60_000
+    write(join(reflectionDir, "runs", "reflection-run-7", "quarantined.json"), { version: 1, runId: "reflection-run-7" })
+    write(join(worktrees, `${old}-reflection-run-7`, "file"), "x")
+    write(join(reflectionDir, "runs", "reflection-run-8", "prelaunch.json"), { runId: "reflection-run-8" })
+    utimesSync(join(reflectionDir, "runs", "reflection-run-8", "prelaunch.json"), new Date(NOW), new Date(NOW))
+    write(join(worktrees, `${old}-reflection-run-8`, "file"), "x")
+    const dry = await reflectionLockFix({ env: { OMO_MEMORY_HOME: root }, reflectionLockProbe: fixProbe, dryRun: true })
+    expect(dry.lines).toEqual(expect.arrayContaining([
+      `WOULD FIX agent-git removed orphan ${join(worktrees, `${old}-reflection-run-7`)}`,
+      `KEPT agent-git worktree ${join(worktrees, `${old}-reflection-run-8`)} (live)`,
+    ]))
+    expect(existsSync(join(worktrees, `${old}-reflection-run-7`))).toBe(true)
+    const result = await reflectionLockFix({ env: { OMO_MEMORY_HOME: root }, reflectionLockProbe: fixProbe })
+    expect(result.lines).toContain(`FIXED agent-git removed orphan ${join(worktrees, `${old}-reflection-run-7`)}`)
+    expect(existsSync(join(worktrees, `${old}-reflection-run-7`))).toBe(false)
+    expect(existsSync(join(worktrees, `${old}-reflection-run-8`))).toBe(true)
   })
 
   test("#given a runtime lock whose owner pid is gone #when --fix runs #then the lock is reclaimed and counted", async () => {

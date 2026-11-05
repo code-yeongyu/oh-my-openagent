@@ -7,3 +7,5 @@ export {
   reclaimDeadOwnerLocks,
   runStaleLockReaper,
 } from "./stale-lock-reaper"
+export { sweepHostIdentities } from "./host-sweep"
+export { sweepIdentityOrphanWorktrees } from "./identity-orphan-sweep"
