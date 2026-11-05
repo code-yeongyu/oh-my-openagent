@@ -203,12 +203,9 @@ function buildReferenceCatalog(repoRoot: string): ReferenceCatalog {
   const opencodeLocalSkills = opencodeLocalRoots.map((root) => addRoot(root))
 
   const senpiSkills = new Set([...sharedSkills, ...nativeSenpiSkills, xSearch, ...engineSkills])
-  const opencodeSkills = new Set([
-    ...sharedSkills,
-    ...loaderBuiltinSkills,
-    ...BuiltinSkillNameSchema.options,
-    ...opencodeLocalSkills,
-  ])
+  // `.opencode/skills` here is this repository's own project-local set: OpenCode discovers that directory only in the
+  // user's project and config dirs, so it never reaches a user's session and is no part of the shipped catalog.
+  const opencodeSkills = new Set([...sharedSkills, ...loaderBuiltinSkills, ...BuiltinSkillNameSchema.options])
   // The Codex sync synthesizes `ultrawork` from the canonical prompts-core directive.
   const codexSkills = new Set([...sharedSkills, ...codexComponentSkills, "ultrawork", ...CODEX_SYSTEM_SKILL_NAMES])
 
@@ -310,6 +307,17 @@ function collectAuditedFiles(repoRoot: string): AuditedFile[] {
     files.push(basename(file.path) === "codex.md" ? { ...file, editions: ["codex"], taskDialect: "codex" } : file)
   }
 
+  // Agent prompts written in TypeScript: OpenCode's agents and the Senpi task engine's builtin agents.
+  for (const [agentsRoot, edition] of [
+    [join(packagesRoot, "omo-opencode", "src", "agents"), "opencode"],
+    [join(packagesRoot, "senpi-task", "src", "agents"), "senpi"],
+  ] as const) {
+    for (const path of listFilesRecursive(agentsRoot)) {
+      if (!path.endsWith(".ts") || NON_SHIPPED_FILE.test(toPortable(relative(repoRoot, path)))) continue
+      files.push({ path, editions: [edition], skillRoot: undefined, taskDialect: edition })
+    }
+  }
+
   const senpiComponentsRoot = join(packagesRoot, "omo-senpi", "src", "components")
   for (const path of listFilesRecursive(senpiComponentsRoot)) {
     if (!path.endsWith(".md") || basename(path) === "AGENTS.md" || path.startsWith(xSearchRoot)) continue
@@ -340,7 +348,9 @@ const TASK_CALL_OPEN = /\b(?:task|call_omo_agent|delegate_task)\s*\(/g
 const SKILL_RELATIVE_PATH = /`(\.{1,2}\/[^`\s]+\.md|(?:references|scripts|assets|templates)\/[^`\s]+)`/g
 const SKILL_OWNER = /`([a-z0-9][a-z0-9-]*)`(?:'s\b|\s+skill\b)|\bload\s+`([a-z0-9][a-z0-9-]*)`/g
 const CONDITIONAL_WORD = /\b(?:when|whenever|if|where|unless)\b/i
-const AVAILABILITY_WORD = /\b(?:available|exists?|listed|lists|provides?|has|have|installed|present|driving|active|running|enabled)\b/i
+// An optional mention names availability of the skill or of a harness surface, never a generic "has": "when the \`x\`
+// skill is available", "if the session lists the \`x\` skill", "where the harness has a dependency-graph surface".
+const AVAILABILITY_WORD = /\b(?:available|exists?|listed|lists|provides|installed|present|is (?:driving|active|running|enabled))\b|\b(?:session|harness|environment|runtime)\b[^.]{0,60}\b(?:has|have|gives|provides)\b/i
 
 function taskCallBodies(content: string): { readonly start: number; readonly body: string }[] {
   const bodies: { start: number; body: string }[] = []

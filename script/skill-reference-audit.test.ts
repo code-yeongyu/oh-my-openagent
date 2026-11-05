@@ -86,6 +86,12 @@ describe("skill reference audit", () => {
     ])
   })
 
+  test("#given a conditional about the project rather than the skill #when audited #then the mention is still required in every edition", () => {
+    expect(audit("skills/main/three-b.md", "If the project has a React app, load the `teammode` skill.\n", ["opencode", "codex"])).toEqual([
+      { referenceClass: "skill-name", reference: "teammode", missingIn: ["opencode"], suggestion: "team-mode" },
+    ])
+  })
+
   test("#given a skill-relative path in the wrong directory #when audited #then the existing file with that name is suggested", () => {
     expect(audit("skills/main/references/python/libraries.md", "See `references/httpx2.md` first.\n", ["codex"])).toEqual([
       { referenceClass: "skill-path", reference: "references/httpx2.md", missingIn: ["codex"], suggestion: "references/python/httpx2.md" },
