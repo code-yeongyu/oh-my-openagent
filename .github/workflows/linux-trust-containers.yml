@@ -8,12 +8,8 @@ on:
   pull_request:
     branches: [master, dev]
     paths:
-      - "packages/omo-native/linux-trust-bundle.ts"
-      - "packages/omo-native/trust-acquisition.ts"
-      - "packages/omo-native/trust-stage.ts"
-      - "packages/omo-native/trust-generation.ts"
-      - "packages/omo-native/openssl-default-file.ts"
-      - "packages/omo-native/engine-trust-policy.ts"
+      - "packages/omo-native/*trust*.ts"
+      - "packages/omo-native/openssl-*.ts"
       - "packages/omo-native/compile-entry.ts"
       - "packages/omo-native/test/linux-trust-containers.test.ts"
       - "packages/omo-native/test/fixtures/linux-trust-containers/**"
@@ -22,12 +18,8 @@ on:
   push:
     branches: [master, dev]
     paths:
-      - "packages/omo-native/linux-trust-bundle.ts"
-      - "packages/omo-native/trust-acquisition.ts"
-      - "packages/omo-native/trust-stage.ts"
-      - "packages/omo-native/trust-generation.ts"
-      - "packages/omo-native/openssl-default-file.ts"
-      - "packages/omo-native/engine-trust-policy.ts"
+      - "packages/omo-native/*trust*.ts"
+      - "packages/omo-native/openssl-*.ts"
       - "packages/omo-native/compile-entry.ts"
       - "packages/omo-native/test/linux-trust-containers.test.ts"
       - "packages/omo-native/test/fixtures/linux-trust-containers/**"
