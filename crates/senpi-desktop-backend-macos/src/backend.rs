@@ -16,7 +16,7 @@ use senpi_desktop_core::user_input::UserPresses;
 
 use crate::ax::{is_trusted, MacAx};
 use crate::capture::{MacCapture, Screencapture};
-use crate::input::{CanaryMode, CanaryResult, MacInput, UserInputWatch};
+use crate::input::{CanaryMode, CanaryResult, MacInput, RawFeed, UserInputWatch};
 
 mod capabilities;
 mod raise;
@@ -31,6 +31,8 @@ pub struct MacosBackend {
     overlay: crate::overlay::Overlay,
     screen: std::sync::Arc<crate::screen::MacScreen>,
     user_input: UserInputWatch,
+    /// The watch's feed shared by the session and key priming, once started.
+    raw_feed: Option<std::sync::Arc<RawFeed>>,
 }
 
 impl MacosBackend {
@@ -43,6 +45,7 @@ impl MacosBackend {
             ax: MacAx::with_overlay(overlay.clone()),
             overlay,
             user_input: UserInputWatch::default(),
+            raw_feed: None,
         })
     }
 
@@ -315,13 +318,27 @@ impl Backend for MacosBackend {
 
     fn watch_user_input(&mut self) {
         self.user_input.start();
+        if self.raw_feed.is_none() {
+            if let Some(feed) = self.user_input.feed() {
+                let raw = std::sync::Arc::new(RawFeed::new(feed));
+                self.input.set_raw_feed(std::sync::Arc::clone(&raw));
+                self.raw_feed = Some(raw);
+            }
+        }
     }
 
     fn take_user_presses(&mut self) -> UserPresses {
-        self.user_input.take()
+        // Presses key priming already drained wait in the raw feed.
+        match &self.raw_feed {
+            Some(raw) => senpi_desktop_core::user_input::UserInputFeed::take(&**raw),
+            None => self.user_input.take(),
+        }
     }
 
     fn user_input_feed(&mut self) -> Option<std::sync::Arc<dyn senpi_desktop_core::user_input::UserInputFeed>> {
-        self.user_input.feed()
+        match &self.raw_feed {
+            Some(raw) => Some(std::sync::Arc::clone(raw) as std::sync::Arc<dyn senpi_desktop_core::user_input::UserInputFeed>),
+            None => self.user_input.feed(),
+        }
     }
 }
