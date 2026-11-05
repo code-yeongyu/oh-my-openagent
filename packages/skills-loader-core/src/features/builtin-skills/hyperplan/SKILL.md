@@ -21,7 +21,7 @@ Before starting, verify:
 
 Each member is a `kind: "category"` team member. They route through `sisyphus-junior` with the category's model and prompt-append shaping their behavior. The `prompt` field below is the **system prompt** that establishes their adversarial identity.
 
-Required categories are `unspecified-low`, `unspecified-high`, `ultrabrain`, and `artistry`. Include `deep-low` only when that category is enabled; if `deep` is disabled or unavailable, retry without only the researcher member and state the degraded roster.
+Required categories are `unspecified-low`, `unspecified-high`, `ultrabrain`, and `artistry`. Include `deep-low` only when that category is enabled; if `deep-low` is disabled or unavailable, retry without only the researcher member and state the degraded roster.
 
 ### CATEGORY CHARACTERISTICS REFERENCE
 
