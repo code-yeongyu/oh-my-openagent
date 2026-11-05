@@ -33,7 +33,9 @@ export interface ComputerUseRuntimeOptions {
  */
 export function createComputerUseRuntime(options: ComputerUseRuntimeOptions) {
   const engineChild = options.engineChild
-    ?? defaultEngineChild(process.env, undefined, resolveComputerEngineEnv(options.settings.env))
+    ?? defaultEngineChild(process.env, undefined, options.settings.env === undefined
+      ? undefined
+      : resolveComputerEngineEnv(options.settings.env))
   const service = new TrackedDesktopService({
     createChild: engineChild(options.settings.enginePath),
     onError: (error) => options.onEngineError(engineErrorCode(error)),

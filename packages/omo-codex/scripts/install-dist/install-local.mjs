@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:1218f62d476dd8deab5bfa77fbece7c202510c391383c731ff2f240d20d6af5a:f9df7ace5ed990704f18d9b41551e1db559fa69b564a8fea080b11d74e662460
+// omo-codex-install:d841cc5b140b2b0bd00e666f3df8541b7fc83dbe68dc154d491667fe8add1601:8619daa216f1712153ee46273b0075c1c5ffd9959c1e4b75294af1365d5967eb
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -48,7 +48,7 @@ import {
   writeFileSync
 } from "node:fs";
 import { randomUUID } from "node:crypto";
-import { dirname as dirname10 } from "node:path";
+import { dirname as dirname8 } from "node:path";
 function isToleratedFsyncError(error) {
   if (!(error instanceof Error))
     return false;
@@ -86,7 +86,7 @@ function writeFileAtomically(filePath, content, options = {}) {
     }
     if (platform === "win32")
       return;
-    const directoryFileDescriptor = openSync(dirname10(filePath), "r");
+    const directoryFileDescriptor = openSync(dirname8(filePath), "r");
     try {
       tolerantFsyncSync(directoryFileDescriptor, fsyncImpl);
     } finally {
@@ -19235,6 +19235,15 @@ function record(keyType, valueType, params) {
     ...normalizeParams(params)
   });
 }
+function partialRecord(keyType, valueType, params) {
+  return new ZodRecord({
+    type: "record",
+    keyType,
+    valueType,
+    ...normalizeParams(params),
+    partial: true
+  });
+}
 var ZodEnum = /* @__PURE__ */ $constructor("ZodEnum", (inst, def) => {
   $ZodEnum.init(inst, def);
   ZodType.init(inst, def);
@@ -19700,870 +19709,9 @@ function withoutRetiredCategoryKeys(entry) {
 var OmoCategoryConfigSchema = preprocess((value) => isRecord4(value) ? withoutRetiredCategoryKeys(normalizeLegacyModelFields(value)) : value, OmoCategoryConfigObjectSchema);
 var OmoCategoriesConfigSchema = record(string2(), OmoCategoryConfigSchema);
 
-// packages/omo-config-core/src/schema/computer.ts
-var positiveInteger = number2().int().positive();
-var nonNegativeInteger = number2().int().nonnegative();
-var OmoComputerSettingsLayerSchema = object({
-  enabled: boolean2().describe("Experimental: register the computer tool in OmO Native sessions (default: on where the host is supported; false leaves it unregistered)"),
-  display: string2().min(1),
-  showCursor: boolean2().describe("Show the display-only macOS cursor overlay (default: true; false hides it)"),
-  max_width: positiveInteger,
-  max_height: positiveInteger,
-  screenshot_max_bytes: positiveInteger,
-  stop_hotkey: string2().min(1),
-  allow_host_relay_only_stop: boolean2(),
-  macos_canary: _enum(["session", "off"]),
-  audit_log: object({ enabled: boolean2() }).partial().strict(),
-  screenshot_gc: object({ enabled: boolean2(), stale_ms: nonNegativeInteger, scan_interval_ms: nonNegativeInteger }).partial().strict(),
-  engine_path: string2().min(1),
-  cua_adapter: boolean2()
-}).partial().strict().describe("Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host.");
-var OmoComputerSettingsSchema = OmoComputerSettingsLayerSchema;
-
-// packages/omo-config-core/src/schema/git-master.ts
-var GIT_ENV_ASSIGNMENT_PATTERN = /^(?:[A-Za-z_][A-Za-z0-9_]*=[A-Za-z0-9_-]*)(?: [A-Za-z_][A-Za-z0-9_]*=[A-Za-z0-9_-]*)*$/;
-var GitEnvPrefixSchema = string2().refine((value) => value === "" || GIT_ENV_ASSIGNMENT_PATTERN.test(value), {
-  message: 'git_env_prefix must be empty or use shell-safe env assignments like "GIT_MASTER=1"'
-});
-var OmoGitMasterSettingsShape = {
-  commit_footer: union([boolean2(), string2()]),
-  include_co_authored_by: boolean2(),
-  git_env_prefix: GitEnvPrefixSchema
-};
-var OmoGitMasterSettingsLayerSchema = object(OmoGitMasterSettingsShape).partial().strict();
-var OmoGitMasterSettingsSchema = OmoGitMasterSettingsLayerSchema.extend({
-  commit_footer: union([boolean2(), string2()]).default(false),
-  include_co_authored_by: boolean2().default(true),
-  git_env_prefix: GitEnvPrefixSchema.default("GIT_MASTER=1")
-}).strict();
-
-// packages/omo-config-core/src/schema/harness.ts
-var HARNESS_IDS = ["codex", "opencode", "omo"];
-var OMO_CONFIG_HARNESS_IDS = ["opencode", "native", "codex"];
-var OmoHarnessIdSchema = _enum(OMO_CONFIG_HARNESS_IDS);
-var OMO_CONFIG_LEGACY_HARNESS_ALIASES = { senpi: "native" };
-var OMO_CONFIG_LEGACY_HARNESS_IDS = Object.keys(OMO_CONFIG_LEGACY_HARNESS_ALIASES);
-
-// packages/omo-config-core/src/schema/memory-agreements.ts
-var OMO_MEMORY_AGREEMENTS_DEFAULTS = { enabled: true, needs_human_threshold: 3, max_items: 64 };
-var OmoMemoryAgreementsSchema = object({
-  enabled: boolean2().default(OMO_MEMORY_AGREEMENTS_DEFAULTS.enabled),
-  needs_human_threshold: number2().int().min(1).default(OMO_MEMORY_AGREEMENTS_DEFAULTS.needs_human_threshold),
-  max_items: number2().int().min(8).max(256).default(OMO_MEMORY_AGREEMENTS_DEFAULTS.max_items)
-}).strict();
-var OmoMemoryAgreementsLayerSchema = object({
-  enabled: boolean2().optional(),
-  needs_human_threshold: number2().int().min(1).optional(),
-  max_items: number2().int().min(8).max(256).optional()
-}).strict();
-
-// packages/omo-config-core/src/schema/memory.ts
-var OmoMemoryReflectionTriggerSchema = object({
-  step_count: number2().int().nonnegative().default(25),
-  on_compaction: boolean2().default(true)
-}).strict();
-var OmoMemoryReflectionSchema = object({
-  enabled: boolean2().default(true),
-  trigger: OmoMemoryReflectionTriggerSchema.default({ step_count: 25, on_compaction: true }),
-  merge: _enum(["auto", "integration"]).default("auto"),
-  category: string2().min(1).default("quick"),
-  timeout_minutes: number2().int().positive().default(15),
-  max_concurrent_runs: number2().int().positive().default(1),
-  sandbox: _enum(["auto", "required", "off"]).default("auto")
-}).strict();
-var OmoMemorySyncSchema = object({
-  remote: string2().min(1).optional(),
-  enabled: boolean2().default(true)
-}).strict();
-var OmoMemorySearchSchema = object({
-  enabled: boolean2().default(true)
-}).strict();
-var OmoMemoryRecallEventCapsSchema = object({
-  tool_args: number2().int().nonnegative().default(400),
-  result_head: number2().int().nonnegative().default(600),
-  assistant: number2().int().nonnegative().default(1500),
-  prompt: number2().int().nonnegative().default(4000)
-}).strict();
-var OmoMemoryRecallSchema = object({
-  enabled: boolean2().default(true),
-  max_items: number2().int().min(1).max(5).default(2),
-  category: string2().min(1).default("quick"),
-  event_caps: OmoMemoryRecallEventCapsSchema.default({ tool_args: 400, result_head: 600, assistant: 1500, prompt: 4000 }),
-  sidecar_max_tokens: number2().int().positive().default(48000),
-  max_concurrent_wakes: number2().int().positive().default(2),
-  tool_budget: number2().int().positive().default(8),
-  query_expansion: boolean2().default(false)
-}).strict();
-var OmoMemoryProjectScopeSchema = object({
-  nudge: boolean2().default(true),
-  recall: boolean2().default(true)
-}).strict();
-var OmoMemoryProjectScopeLayerSchema = object({
-  nudge: boolean2().optional(),
-  recall: boolean2().optional()
-}).strict();
-var OmoMemoryNudgeSchema = object({
-  enabled: boolean2().default(true),
-  every_user_turns: number2().int().min(1).default(10)
-}).strict();
-var OmoMemoryFactsSchema = object({
-  enabled: boolean2().default(true),
-  debounce_settles: number2().int().min(1).default(4),
-  model: string2().min(1).optional()
-}).strict();
-var OmoMemoryDreamSchema = object({
-  enabled: boolean2().default(true),
-  idle_minutes: number2().int().min(0).default(30),
-  min_hours_between: number2().int().min(1).default(24),
-  shutdown_launch: boolean2().default(true),
-  auto_select_max: number2().int().min(1).max(10).default(5),
-  auto_select_max_chars: number2().int().min(1e4).default(150000)
-}).strict();
-var OmoMemoryPeopleSchema = object({
-  enabled: boolean2().default(true),
-  max_entries: number2().int().min(1).max(100).default(40),
-  max_entry_chars: number2().int().min(50).max(500).default(200)
-}).strict();
-var OmoMemorySoulSchema = object({
-  edit_notice: boolean2().default(true)
-}).strict();
-var OmoMemoryWriteNoticeSchema = object({
-  enabled: boolean2().default(true)
-}).strict();
-var OmoMemoryReflectionTriggerLayerSchema = object({
-  step_count: number2().int().nonnegative().optional(),
-  on_compaction: boolean2().optional()
-}).strict();
-var OmoMemoryReflectionLayerSchema = object({
-  enabled: boolean2().optional(),
-  trigger: OmoMemoryReflectionTriggerLayerSchema.optional(),
-  merge: _enum(["auto", "integration"]).optional(),
-  category: string2().min(1).optional(),
-  timeout_minutes: number2().int().positive().optional(),
-  max_concurrent_runs: number2().int().positive().optional(),
-  sandbox: _enum(["auto", "required", "off"]).optional()
-}).strict();
-var OmoMemorySyncLayerSchema = object({
-  remote: string2().min(1).optional(),
-  enabled: boolean2().optional()
-}).strict();
-var OmoMemorySearchLayerSchema = object({
-  enabled: boolean2().optional()
-}).strict();
-var OmoMemoryRecallEventCapsLayerSchema = object({
-  tool_args: number2().int().nonnegative().optional(),
-  result_head: number2().int().nonnegative().optional(),
-  assistant: number2().int().nonnegative().optional(),
-  prompt: number2().int().nonnegative().optional()
-}).strict();
-var OmoMemoryRecallLayerSchema = object({
-  enabled: boolean2().optional(),
-  max_items: number2().int().min(1).max(5).optional(),
-  category: string2().min(1).optional(),
-  event_caps: OmoMemoryRecallEventCapsLayerSchema.optional(),
-  sidecar_max_tokens: number2().int().positive().optional(),
-  max_concurrent_wakes: number2().int().positive().optional(),
-  tool_budget: number2().int().positive().optional(),
-  query_expansion: boolean2().optional()
-}).strict();
-var OmoMemoryNudgeLayerSchema = object({
-  enabled: boolean2().optional(),
-  every_user_turns: number2().int().min(1).optional()
-}).strict();
-var OmoMemoryFactsLayerSchema = object({
-  enabled: boolean2().optional(),
-  debounce_settles: number2().int().min(1).optional(),
-  model: string2().min(1).optional()
-}).strict();
-var OmoMemoryDreamLayerSchema = object({
-  enabled: boolean2().optional(),
-  idle_minutes: number2().int().min(0).optional(),
-  min_hours_between: number2().int().min(1).optional(),
-  shutdown_launch: boolean2().optional(),
-  auto_select_max: number2().int().min(1).max(10).optional(),
-  auto_select_max_chars: number2().int().min(1e4).optional()
-}).strict();
-var OmoMemoryPeopleLayerSchema = object({
-  enabled: boolean2().optional(),
-  max_entries: number2().int().min(1).max(100).optional(),
-  max_entry_chars: number2().int().min(50).max(500).optional()
-}).strict();
-var OmoMemorySoulLayerSchema = object({
-  edit_notice: boolean2().optional()
-}).strict();
-var OmoMemoryWriteNoticeLayerSchema = object({
-  enabled: boolean2().optional()
-}).strict();
-var OmoMemoryProjectionSchema = object({
-  max_entries_per_directory: number2().int().min(0).default(0),
-  max_bytes: number2().int().min(0).default(40960)
-}).strict();
-var OmoMemoryProjectionLayerSchema = object({
-  max_entries_per_directory: number2().int().min(0).optional(),
-  max_bytes: number2().int().min(0).optional()
-}).strict();
-var OmoMemoryAgentOverridesSchema = object({
-  enabled: boolean2().optional(),
-  agent: string2().min(1).optional(),
-  reflection: OmoMemoryReflectionLayerSchema.omit({ max_concurrent_runs: true }).optional(),
-  nudge: OmoMemoryNudgeLayerSchema.optional(),
-  facts: OmoMemoryFactsLayerSchema.optional(),
-  dream: OmoMemoryDreamLayerSchema.optional(),
-  people: OmoMemoryPeopleLayerSchema.optional(),
-  agreements: OmoMemoryAgreementsLayerSchema.optional(),
-  soul: OmoMemorySoulLayerSchema.optional(),
-  write_notice: OmoMemoryWriteNoticeLayerSchema.optional(),
-  sync: OmoMemorySyncLayerSchema.optional(),
-  search: OmoMemorySearchLayerSchema.optional(),
-  recall: OmoMemoryRecallLayerSchema.optional(),
-  projection: OmoMemoryProjectionLayerSchema.optional(),
-  compile_warn_tokens: number2().int().positive().optional()
-}).strict();
-var OmoMemoryAutoIdentitySchema = _enum(["path", "git"]);
-var OmoMemorySettingsSchema = object({
-  enabled: boolean2().default(true),
-  agent: string2().min(1).default("auto"),
-  auto_identity: OmoMemoryAutoIdentitySchema.default("path"),
-  reflection: OmoMemoryReflectionSchema.default({
-    enabled: true,
-    trigger: { step_count: 25, on_compaction: true },
-    merge: "auto",
-    category: "quick",
-    timeout_minutes: 15,
-    max_concurrent_runs: 1,
-    sandbox: "auto"
-  }),
-  nudge: OmoMemoryNudgeSchema.default({ enabled: true, every_user_turns: 10 }),
-  facts: OmoMemoryFactsSchema.default({ enabled: true, debounce_settles: 4 }),
-  dream: OmoMemoryDreamSchema.default({
-    enabled: true,
-    idle_minutes: 30,
-    min_hours_between: 24,
-    shutdown_launch: true,
-    auto_select_max: 5,
-    auto_select_max_chars: 150000
-  }),
-  people: OmoMemoryPeopleSchema.default({ enabled: true, max_entries: 40, max_entry_chars: 200 }),
-  agreements: OmoMemoryAgreementsSchema.default(OMO_MEMORY_AGREEMENTS_DEFAULTS),
-  soul: OmoMemorySoulSchema.default({ edit_notice: true }),
-  write_notice: OmoMemoryWriteNoticeSchema.default({ enabled: true }),
-  sync: OmoMemorySyncSchema.default({ enabled: true }),
-  search: OmoMemorySearchSchema.default({ enabled: true }),
-  recall: OmoMemoryRecallSchema.default({
-    enabled: true,
-    max_items: 2,
-    category: "quick",
-    event_caps: { tool_args: 400, result_head: 600, assistant: 1500, prompt: 4000 },
-    sidecar_max_tokens: 48000,
-    max_concurrent_wakes: 2,
-    tool_budget: 8,
-    query_expansion: false
-  }),
-  project_scope: OmoMemoryProjectScopeSchema.default({ nudge: true, recall: true }),
-  projection: OmoMemoryProjectionSchema.default({ max_entries_per_directory: 0, max_bytes: 40960 }),
-  compile_warn_tokens: number2().int().positive().default(30000),
-  agents: record(string2(), OmoMemoryAgentOverridesSchema).default({})
-}).strict();
-var OmoMemorySettingsLayerSchema = object({
-  enabled: boolean2().optional(),
-  agent: string2().min(1).optional(),
-  auto_identity: OmoMemoryAutoIdentitySchema.optional(),
-  reflection: OmoMemoryReflectionLayerSchema.optional(),
-  nudge: OmoMemoryNudgeLayerSchema.optional(),
-  facts: OmoMemoryFactsLayerSchema.optional(),
-  dream: OmoMemoryDreamLayerSchema.optional(),
-  people: OmoMemoryPeopleLayerSchema.optional(),
-  agreements: OmoMemoryAgreementsLayerSchema.optional(),
-  soul: OmoMemorySoulLayerSchema.optional(),
-  write_notice: OmoMemoryWriteNoticeLayerSchema.optional(),
-  sync: OmoMemorySyncLayerSchema.optional(),
-  search: OmoMemorySearchLayerSchema.optional(),
-  recall: OmoMemoryRecallLayerSchema.optional(),
-  project_scope: OmoMemoryProjectScopeLayerSchema.optional(),
-  projection: OmoMemoryProjectionLayerSchema.optional(),
-  compile_warn_tokens: number2().int().positive().optional(),
-  agents: record(string2(), OmoMemoryAgentOverridesSchema).optional()
-}).strict();
-
-// packages/omo-config-core/src/schema/model-catalog.ts
-function isRecord5(value) {
+// packages/utils/src/record-type-guard.ts
+function isPlainRecord2(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-var OmoModelCatalogEntryInputSchema = object({
-  model: string2(),
-  reasoning: OmoReasoningSchema.optional(),
-  variant: string2().optional(),
-  reasoningEffort: OmoReasoningEffortSchema.optional()
-}).strict();
-var OmoModelCatalogEntrySchema = preprocess((value) => isRecord5(value) ? normalizeLegacyModelFields(value) : value, OmoModelCatalogEntryInputSchema);
-var OmoModelCatalogSchema = record(string2(), OmoModelCatalogEntrySchema);
-var OmoModelCatalogEntryLayerInputSchema = OmoModelCatalogEntryInputSchema.partial();
-var OmoModelCatalogEntryLayerSchema = preprocess((value) => isRecord5(value) ? normalizeLegacyModelFields(value) : value, OmoModelCatalogEntryLayerInputSchema);
-var OmoModelCatalogLayerSchema = record(string2(), OmoModelCatalogEntryLayerSchema);
-
-// packages/omo-config-core/src/schema/model-pad.ts
-var OmoModelPadLabelsSchema = object({
-  daily: string2().optional(),
-  geeky: string2().optional(),
-  normal: string2().optional(),
-  heavy: string2().optional()
-}).strict();
-var OmoModelPadSchema = object({
-  labels: OmoModelPadLabelsSchema.optional()
-}).strict();
-
-// packages/omo-config-core/src/schema/model-profile.ts
-function isRecord6(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-var OmoModelProfileInputSchema = object({
-  display_name: string2().optional(),
-  caution: string2().optional(),
-  family: _enum(["daily", "geeky"]).optional(),
-  tier: _enum(["normal", "heavy"]).optional(),
-  models: array(union([string2(), OmoFallbackModelObjectSchema])).optional()
-}).strict();
-var OmoModelProfileSchema = preprocess((value) => isRecord6(value) ? normalizeLegacyModelFields(value) : value, OmoModelProfileInputSchema);
-var OmoModelProfilesSchema = record(string2(), OmoModelProfileSchema);
-var OmoModelProfileLayerInputSchema = OmoModelProfileInputSchema.partial();
-var OmoModelProfileLayerSchema = preprocess((value) => isRecord6(value) ? normalizeLegacyModelFields(value) : value, OmoModelProfileLayerInputSchema);
-var OmoModelProfilesLayerSchema = record(string2(), OmoModelProfileLayerSchema);
-
-// packages/omo-config-core/src/schema/side-panel.ts
-var OmoSidePanelWidthSchema = union([number2().int().min(24).max(160), string2().regex(/^(?:1\d|[2-4]\d|50)%$/)]);
-var OmoSidePanelSectionsShape = {
-  session: boolean2(),
-  goal: boolean2(),
-  context: boolean2(),
-  usage: boolean2(),
-  agents: boolean2(),
-  tools: boolean2(),
-  files: boolean2(),
-  memory: boolean2()
-};
-var OmoSidePanelSectionsLayerSchema = object(OmoSidePanelSectionsShape).partial().strict();
-var OmoSidePanelSectionsSchema = OmoSidePanelSectionsLayerSchema.extend({
-  session: boolean2().default(true),
-  goal: boolean2().default(true),
-  context: boolean2().default(true),
-  usage: boolean2().default(false),
-  agents: boolean2().default(true),
-  tools: boolean2().default(true),
-  files: boolean2().default(true),
-  memory: boolean2().default(true)
-}).strict();
-var OmoSidePanelSettingsShape = {
-  enabled: boolean2(),
-  width: OmoSidePanelWidthSchema,
-  min_columns: number2().int().min(60).max(400),
-  clickable: boolean2(),
-  usage_poll_seconds: number2().int().min(60).max(3600),
-  sections: OmoSidePanelSectionsLayerSchema
-};
-var OmoSidePanelSettingsLayerSchema = object(OmoSidePanelSettingsShape).partial().strict();
-var OmoSidePanelSettingsSchema = OmoSidePanelSettingsLayerSchema.extend({
-  enabled: boolean2().default(false),
-  width: OmoSidePanelWidthSchema.default("26%"),
-  min_columns: number2().int().min(60).max(400).default(120),
-  clickable: boolean2().default(true),
-  usage_poll_seconds: number2().int().min(60).max(3600).default(150),
-  sections: OmoSidePanelSectionsSchema.default({
-    session: true,
-    goal: true,
-    context: true,
-    usage: false,
-    agents: true,
-    tools: true,
-    files: true,
-    memory: true
-  })
-}).strict();
-
-// packages/omo-config-core/src/schema/task.ts
-import { availableParallelism } from "node:os";
-var DEFAULT_RESIDENCY_MAX_CHILDREN = "unlimited";
-var ResidencyMaxChildrenInputSchema = union([number2().int().nonnegative(), literal("unlimited")]);
-var OmoTaskWaitSchema = object({
-  min_ms: number2().int().positive().default(5000),
-  default_ms: number2().int().positive().default(60000),
-  max_ms: number2().int().positive().default(600000)
-}).strict();
-var OmoTaskTeamSettingsSchema = object({
-  max_members: number2().int().min(1).max(8).default(8),
-  max_parallel_members: number2().int().min(1).max(8).default(4),
-  max_wall_clock_minutes: number2().int().positive().default(120)
-}).strict();
-var OmoTaskWarningsSchema = object({
-  unavailable_categories: boolean2().default(true)
-}).strict();
-var IsolationBackendKindSchema = _enum([
-  "auto",
-  "apfs",
-  "btrfs",
-  "zfs",
-  "reflink",
-  "overlayfs",
-  "block-clone",
-  "rcopy"
-]);
-var OmoTaskIsolationSchema = object({
-  enabled: boolean2().default(false),
-  backend: IsolationBackendKindSchema.default("auto"),
-  apply: boolean2().default(true),
-  merge: _enum(["patch", "branch"]).default("patch"),
-  commits: _enum(["generic", "ai"]).default("generic")
-}).strict();
-var isolationDefaults = OmoTaskIsolationSchema.parse({});
-var OmoTaskIsolationLayerSchema = object({
-  enabled: boolean2().optional(),
-  backend: IsolationBackendKindSchema.optional(),
-  apply: boolean2().optional(),
-  merge: _enum(["patch", "branch"]).optional(),
-  commits: _enum(["generic", "ai"]).optional()
-}).strict();
-var OmoTaskDagSettingsSchema = object({
-  max_nodes_per_run: number2().int().positive().default(64),
-  max_runs_per_session: number2().int().positive().default(16),
-  subscriber_ring: number2().int().positive().default(1000),
-  heartbeat_ms: number2().int().positive().default(15000),
-  history_default_limit: number2().int().positive().default(256),
-  history_max_limit: number2().int().positive().default(1000),
-  retention_days: number2().int().positive().default(7),
-  max_prompt_bytes: number2().int().positive().default(262144)
-}).strict();
-var OmoTaskSettingsSchema = object({
-  isolation: OmoTaskIsolationSchema.default(isolationDefaults),
-  default_execution_mode: _enum(["auto", "in-process", "process"]).default("auto"),
-  process_runner: _enum(["host", "child-process"]).default("host"),
-  host_engine_policy: _enum(["upgrade", "fallback"]).default("upgrade"),
-  host_idle_exit_ms: number2().int().positive().optional(),
-  host_shard_prewarm: _enum(["off", "first-turn", "session-start"]).default("first-turn"),
-  default_concurrency: number2().int().nonnegative().default(5),
-  global_concurrency: number2().int().nonnegative().default(8),
-  provider_concurrency: record(string2(), number2().int().nonnegative()).optional(),
-  model_concurrency: record(string2(), number2().int().nonnegative()).optional(),
-  max_depth: number2().int().nonnegative().default(1),
-  residency_max_children: ResidencyMaxChildrenInputSchema.default(DEFAULT_RESIDENCY_MAX_CHILDREN),
-  resident_idle_timeout_ms: number2().int().positive().max(Number.MAX_SAFE_INTEGER).default(900000),
-  ttl_ms: number2().int().positive().default(86400000),
-  state_dir: string2().optional(),
-  reattach_on_reconcile: boolean2().optional(),
-  resume_children: boolean2().default(true),
-  warnings: OmoTaskWarningsSchema.default({ unavailable_categories: true }),
-  wait: OmoTaskWaitSchema.default({ min_ms: 5000, default_ms: 60000, max_ms: 600000 }),
-  team: OmoTaskTeamSettingsSchema.default({
-    max_members: 8,
-    max_parallel_members: 4,
-    max_wall_clock_minutes: 120
-  }),
-  dag: OmoTaskDagSettingsSchema.optional()
-}).strict();
-var OmoTaskDagSettingsLayerSchema = object({
-  max_nodes_per_run: number2().int().positive().optional(),
-  max_runs_per_session: number2().int().positive().optional(),
-  subscriber_ring: number2().int().positive().optional(),
-  heartbeat_ms: number2().int().positive().optional(),
-  history_default_limit: number2().int().positive().optional(),
-  history_max_limit: number2().int().positive().optional(),
-  retention_days: number2().int().positive().optional(),
-  max_prompt_bytes: number2().int().positive().optional()
-}).strict();
-var OmoTaskWaitLayerSchema = object({
-  min_ms: number2().int().positive().optional(),
-  default_ms: number2().int().positive().optional(),
-  max_ms: number2().int().positive().optional()
-}).strict();
-var OmoTaskTeamSettingsLayerSchema = object({
-  max_members: number2().int().min(1).max(8).optional(),
-  max_parallel_members: number2().int().min(1).max(8).optional(),
-  max_wall_clock_minutes: number2().int().positive().optional()
-}).strict();
-var OmoTaskWarningsLayerSchema = object({
-  unavailable_categories: boolean2().optional()
-}).strict();
-var OmoTaskSettingsLayerSchema = object({
-  isolation: OmoTaskIsolationLayerSchema.optional(),
-  default_execution_mode: _enum(["auto", "in-process", "process"]).optional(),
-  process_runner: _enum(["host", "child-process"]).optional(),
-  host_engine_policy: _enum(["upgrade", "fallback"]).optional(),
-  host_idle_exit_ms: number2().int().positive().optional(),
-  host_shard_prewarm: _enum(["off", "first-turn", "session-start"]).optional(),
-  default_concurrency: number2().int().nonnegative().optional(),
-  global_concurrency: number2().int().nonnegative().optional(),
-  provider_concurrency: record(string2(), number2().int().nonnegative()).optional(),
-  model_concurrency: record(string2(), number2().int().nonnegative()).optional(),
-  max_depth: number2().int().nonnegative().optional(),
-  residency_max_children: ResidencyMaxChildrenInputSchema.optional(),
-  resident_idle_timeout_ms: number2().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
-  ttl_ms: number2().int().positive().optional(),
-  state_dir: string2().optional(),
-  reattach_on_reconcile: boolean2().optional(),
-  resume_children: boolean2().optional(),
-  warnings: OmoTaskWarningsLayerSchema.optional(),
-  wait: OmoTaskWaitLayerSchema.optional(),
-  team: OmoTaskTeamSettingsLayerSchema.optional(),
-  dag: OmoTaskDagSettingsLayerSchema.optional()
-}).strict();
-function resolveOmoTaskSettings(input, resolveParallelism = availableParallelism) {
-  const record2 = record(string2(), unknown()).parse(input);
-  return OmoTaskSettingsSchema.parse({
-    ...record2,
-    residency_max_children: record2["residency_max_children"] ?? DEFAULT_RESIDENCY_MAX_CHILDREN,
-    global_concurrency: record2["global_concurrency"] ?? Math.max(8, resolveParallelism() * 2)
-  });
-}
-
-// packages/omo-config-core/src/schema/team.ts
-var OmoTeamMemberBaseSchema = object({
-  name: string2().min(1).regex(/^[a-z0-9-]+$/),
-  cwd: string2().optional(),
-  worktreePath: string2().optional(),
-  subscriptions: array(string2()).optional(),
-  backendType: _enum(["in-process", "tmux"]).default("in-process"),
-  color: string2().optional(),
-  isActive: boolean2().default(true)
-}).strict();
-var OmoTeamCategoryMemberSchema = OmoTeamMemberBaseSchema.extend({
-  kind: literal("category"),
-  category: string2().min(1),
-  prompt: string2().min(1)
-});
-var OmoTeamSubagentMemberSchema = OmoTeamMemberBaseSchema.extend({
-  kind: literal("subagent_type"),
-  subagent_type: string2().min(1),
-  prompt: string2().optional()
-});
-var OmoTeamMemberSchema = discriminatedUnion("kind", [
-  OmoTeamCategoryMemberSchema,
-  OmoTeamSubagentMemberSchema
-]);
-var OmoTeamSpecBaseSchema = object({
-  version: literal(1).default(1),
-  name: string2().min(1).regex(/^[a-z0-9-]+$/).optional(),
-  description: string2().optional(),
-  createdAt: number2().int().positive().optional(),
-  leadAgentId: string2().optional(),
-  teamAllowedPaths: array(string2()).optional(),
-  sessionPermission: string2().optional(),
-  members: array(OmoTeamMemberSchema).min(1).max(8)
-}).strict();
-var OmoTeamSpecSchema = OmoTeamSpecBaseSchema.superRefine((teamSpec, ctx) => {
-  if (teamSpec.leadAgentId === undefined && teamSpec.members.length > 1) {
-    ctx.addIssue({
-      code: "custom",
-      message: "leadAgentId required when a team has multiple members",
-      path: ["leadAgentId"]
-    });
-  }
-});
-var OmoTeamSpecLayerSchema = OmoTeamSpecBaseSchema.partial();
-var OmoTeamsConfigSchema = record(string2(), OmoTeamSpecSchema);
-var OmoTeamsConfigLayerSchema = record(string2(), OmoTeamSpecLayerSchema);
-
-// packages/omo-config-core/src/schema/telemetry.ts
-var OmoTelemetrySettingsShape = {
-  enabled: boolean2(),
-  rawTurnSampleRate: number2().min(0).max(1)
-};
-var OmoTelemetrySettingsLayerSchema = object(OmoTelemetrySettingsShape).partial().strict();
-var OmoTelemetrySettingsSchema = OmoTelemetrySettingsLayerSchema.extend({
-  enabled: boolean2().default(true)
-}).strict();
-
-// packages/omo-config-core/src/schema/device-service.ts
-var OmoDeviceServiceSettingsShape = {
-  enabled: boolean2()
-};
-var OmoDeviceServiceSettingsLayerSchema = object(OmoDeviceServiceSettingsShape).partial().strict();
-var OmoDeviceServiceSettingsSchema = OmoDeviceServiceSettingsLayerSchema.extend({
-  enabled: boolean2().default(true)
-}).strict();
-
-// packages/omo-config-core/src/schema/format-on-mutation.ts
-var mode = _enum(["off", "best-effort", "required"]);
-var languages = record(string2(), boolean2()).optional();
-var OmoFormatOnMutationLayerSchema = object({
-  mode: mode.optional(),
-  languages,
-  maxFileBytes: number2().int().positive().optional(),
-  timeoutMs: number2().int().positive().optional()
-}).strict();
-var OmoFormatOnMutationSchema = OmoFormatOnMutationLayerSchema.extend({
-  mode: mode.default("best-effort"),
-  maxFileBytes: number2().int().positive().default(1048576),
-  timeoutMs: number2().int().positive().default(3000)
-}).strict();
-
-// packages/omo-config-core/src/schema/provenance.ts
-var OmoProvenanceSettingsSchema = object({
-  workspaces: array(object({
-    name: string2().trim().min(1).regex(/\S/),
-    git_owners: array(string2().trim().min(1).regex(/\S/)).optional(),
-    paths: array(string2().trim().min(1).regex(/\S/)).optional()
-  }).strict()).optional()
-}).strict();
-
-// packages/omo-config-core/src/schema/config.ts
-var OmoOpenCodeHarnessConfigSchema = record(string2(), unknown());
-var OmoDisabledSkillsSchema = array(string2());
-var OmoExcludedModelsSchema = array(string2());
-var OmoTypedHarnessConfigSchema = object({
-  provenance: OmoProvenanceSettingsSchema.optional(),
-  formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
-  categories: OmoCategoriesConfigSchema.optional(),
-  agents: OmoAgentsConfigSchema.optional(),
-  git_master: OmoGitMasterSettingsLayerSchema.optional(),
-  task: OmoTaskSettingsLayerSchema.optional(),
-  teams: OmoTeamsConfigLayerSchema.optional(),
-  models: OmoModelCatalogLayerSchema.optional(),
-  model_profiles: OmoModelProfilesLayerSchema.optional(),
-  model_profile: string2().optional(),
-  model_pad: OmoModelPadSchema.optional(),
-  memory: OmoMemorySettingsLayerSchema.optional(),
-  telemetry: OmoTelemetrySettingsLayerSchema.optional(),
-  device_service: OmoDeviceServiceSettingsLayerSchema.optional(),
-  side_panel: OmoSidePanelSettingsLayerSchema.optional(),
-  computer: OmoComputerSettingsLayerSchema.optional(),
-  disabled_skills: OmoDisabledSkillsSchema.optional(),
-  exclude_models: OmoExcludedModelsSchema.optional()
-}).strict();
-var OmoConfigProfileSchema = object({
-  provenance: OmoProvenanceSettingsSchema.optional(),
-  formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
-  categories: OmoCategoriesConfigSchema.optional(),
-  agents: OmoAgentsConfigSchema.optional(),
-  git_master: OmoGitMasterSettingsLayerSchema.optional(),
-  task: OmoTaskSettingsLayerSchema.optional(),
-  teams: OmoTeamsConfigLayerSchema.optional(),
-  models: OmoModelCatalogLayerSchema.optional(),
-  model_profiles: OmoModelProfilesLayerSchema.optional(),
-  model_profile: string2().optional(),
-  model_pad: OmoModelPadSchema.optional(),
-  memory: OmoMemorySettingsLayerSchema.optional(),
-  telemetry: OmoTelemetrySettingsLayerSchema.optional(),
-  device_service: OmoDeviceServiceSettingsLayerSchema.optional(),
-  side_panel: OmoSidePanelSettingsLayerSchema.optional(),
-  computer: OmoComputerSettingsLayerSchema.optional(),
-  disabled_skills: OmoDisabledSkillsSchema.optional(),
-  exclude_models: OmoExcludedModelsSchema.optional(),
-  "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
-  "[native]": OmoTypedHarnessConfigSchema.optional(),
-  "[senpi]": OmoTypedHarnessConfigSchema.optional(),
-  "[codex]": OmoTypedHarnessConfigSchema.optional()
-}).strict();
-var OmoConfigSchema = object({
-  provenance: OmoProvenanceSettingsSchema.optional(),
-  formatOnMutation: OmoFormatOnMutationSchema.optional(),
-  $schema: string2().optional(),
-  categories: OmoCategoriesConfigSchema.optional(),
-  agents: OmoAgentsConfigSchema.optional(),
-  git_master: OmoGitMasterSettingsSchema.optional(),
-  task: OmoTaskSettingsSchema.optional(),
-  teams: OmoTeamsConfigSchema.optional(),
-  models: OmoModelCatalogSchema.optional(),
-  model_profiles: OmoModelProfilesSchema.optional(),
-  model_profile: string2().optional(),
-  model_pad: OmoModelPadSchema.optional(),
-  memory: OmoMemorySettingsSchema.optional(),
-  telemetry: OmoTelemetrySettingsSchema.optional(),
-  device_service: OmoDeviceServiceSettingsSchema.optional(),
-  side_panel: OmoSidePanelSettingsSchema.optional(),
-  computer: OmoComputerSettingsSchema.optional(),
-  disabled_skills: OmoDisabledSkillsSchema.optional(),
-  exclude_models: OmoExcludedModelsSchema.optional(),
-  "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
-  "[native]": OmoTypedHarnessConfigSchema.optional(),
-  "[senpi]": OmoTypedHarnessConfigSchema.optional(),
-  "[codex]": OmoTypedHarnessConfigSchema.optional(),
-  profiles: record(string2(), OmoConfigProfileSchema).default({}),
-  _migrations: array(string2()).optional(),
-  legacy_migrations: record(string2(), unknown()).optional()
-}).strict();
-var OmoConfigLayerSchema = object({
-  provenance: OmoProvenanceSettingsSchema.optional(),
-  formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
-  $schema: string2().optional(),
-  categories: OmoCategoriesConfigSchema.optional(),
-  agents: OmoAgentsConfigSchema.optional(),
-  git_master: OmoGitMasterSettingsLayerSchema.optional(),
-  task: OmoTaskSettingsLayerSchema.optional(),
-  teams: OmoTeamsConfigLayerSchema.optional(),
-  models: OmoModelCatalogLayerSchema.optional(),
-  model_profiles: OmoModelProfilesLayerSchema.optional(),
-  model_profile: string2().optional(),
-  model_pad: OmoModelPadSchema.optional(),
-  memory: OmoMemorySettingsLayerSchema.optional(),
-  telemetry: OmoTelemetrySettingsLayerSchema.optional(),
-  device_service: OmoDeviceServiceSettingsLayerSchema.optional(),
-  side_panel: OmoSidePanelSettingsLayerSchema.optional(),
-  computer: OmoComputerSettingsLayerSchema.optional(),
-  disabled_skills: OmoDisabledSkillsSchema.optional(),
-  exclude_models: OmoExcludedModelsSchema.optional(),
-  "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
-  "[native]": OmoTypedHarnessConfigSchema.optional(),
-  "[senpi]": OmoTypedHarnessConfigSchema.optional(),
-  "[codex]": OmoTypedHarnessConfigSchema.optional(),
-  profiles: record(string2(), OmoConfigProfileSchema).optional(),
-  _migrations: array(string2()).optional(),
-  legacy_migrations: record(string2(), unknown()).optional()
-}).strict();
-
-// packages/omo-config-core/src/schema/legacy-category-names.ts
-var LEGACY_CATEGORY_NAME_ALIASES = { deep: "deep-low" };
-function canonicalCategoryName(name) {
-  return Object.hasOwn(LEGACY_CATEGORY_NAME_ALIASES, name) ? LEGACY_CATEGORY_NAME_ALIASES[name] : name;
-}
-function isRecord7(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-function joinPath(path, segment) {
-  return [...path, segment].join(".");
-}
-function canonicalizeCategoriesRecord(categories, path, renames) {
-  const result = {};
-  for (const [name, definition] of Object.entries(categories)) {
-    const canonical = canonicalCategoryName(name);
-    if (canonical === name) {
-      result[name] = definition;
-      continue;
-    }
-    const dropped = Object.hasOwn(categories, canonical);
-    renames.push({ canonical, dropped, legacy: name, path: joinPath(path, name) });
-    if (!dropped)
-      result[canonical] = definition;
-  }
-  return result;
-}
-function canonicalizeValue(value, path, renames) {
-  if (Array.isArray(value)) {
-    return value.map((entry, index) => canonicalizeValue(entry, [...path, String(index)], renames));
-  }
-  if (!isRecord7(value))
-    return value;
-  const result = {};
-  for (const [key, entry] of Object.entries(value)) {
-    if (key === "categories" && isRecord7(entry)) {
-      result[key] = canonicalizeCategoriesRecord(entry, [...path, key], renames);
-      continue;
-    }
-    if (key === "category" && typeof entry === "string") {
-      const canonical = canonicalCategoryName(entry);
-      if (canonical !== entry) {
-        renames.push({ canonical, dropped: false, legacy: entry, path: joinPath(path, key) });
-      }
-      result[key] = canonical;
-      continue;
-    }
-    result[key] = canonicalizeValue(entry, [...path, key], renames);
-  }
-  return result;
-}
-function canonicalizeLegacyCategoryNames(document) {
-  const renames = [];
-  const canonicalized = isRecord7(document) ? canonicalizeValue(document, [], renames) : {};
-  return { document: canonicalized, renames };
-}
-
-// packages/omo-config-core/src/schema/legacy-harness-names.ts
-function canonicalHarnessName(name) {
-  return Object.hasOwn(OMO_CONFIG_LEGACY_HARNESS_ALIASES, name) ? OMO_CONFIG_LEGACY_HARNESS_ALIASES[name] : name;
-}
-function harnessBlockKey(harness) {
-  return `[${harness}]`;
-}
-function legacyHarnessOfBlockKey(key) {
-  if (!key.startsWith("[") || !key.endsWith("]"))
-    return;
-  const harness = key.slice(1, -1);
-  return Object.hasOwn(OMO_CONFIG_LEGACY_HARNESS_ALIASES, harness) ? harness : undefined;
-}
-function isRecord8(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-function canonicalizeBlocksIn(container, path, renames) {
-  const result = {};
-  for (const [key, value] of Object.entries(container)) {
-    const legacyHarness = legacyHarnessOfBlockKey(key);
-    if (legacyHarness === undefined) {
-      result[key] = value;
-      continue;
-    }
-    const canonical = harnessBlockKey(canonicalHarnessName(legacyHarness));
-    const dropped = Object.hasOwn(container, canonical);
-    renames.push({ canonical, dropped, legacy: key, path: [...path, key].join(".") });
-    if (!dropped)
-      result[canonical] = value;
-  }
-  return result;
-}
-function canonicalizeLegacyHarnessBlocks(document) {
-  if (!isRecord8(document))
-    return { document: {}, renames: [] };
-  const renames = [];
-  const canonicalized = canonicalizeBlocksIn(document, [], renames);
-  const profiles = canonicalized["profiles"];
-  if (isRecord8(profiles)) {
-    const canonicalProfiles = {};
-    for (const [name, profile] of Object.entries(profiles)) {
-      canonicalProfiles[name] = isRecord8(profile) ? canonicalizeBlocksIn(profile, ["profiles", name], renames) : profile;
-    }
-    canonicalized["profiles"] = canonicalProfiles;
-  }
-  return { document: canonicalized, renames };
-}
-
-// packages/omo-config-core/src/loader/types.ts
-import { existsSync as existsSync3, lstatSync, readFileSync as readFileSync2, realpathSync as realpathSync2 } from "node:fs";
-var MERGED_OMO_CONFIG_PATH = "(merged omo config)";
-var DEFAULT_READ_FILE_SYSTEM = {
-  existsSync: existsSync3,
-  lstatSync,
-  readFileSync: readFileSync2,
-  realpathSync: realpathSync2
-};
-
-// packages/omo-config-core/src/loader/disabled-skills.ts
-function toRecord(value) {
-  if (value === null || typeof value !== "object" || Array.isArray(value))
-    return;
-  return value;
-}
-function namesAt(record, key) {
-  const value = record?.[key];
-  if (!Array.isArray(value))
-    return [];
-  return value.filter((entry) => typeof entry === "string" && entry.trim() !== "");
-}
-function harnessBlockKeys(harness) {
-  const canonical = canonicalHarnessName(harness);
-  const legacy = Object.entries(OMO_CONFIG_LEGACY_HARNESS_ALIASES).filter(([, target]) => target === canonical).map(([name]) => harnessBlockKey(name));
-  return [harnessBlockKey(canonical), ...legacy];
-}
-function scopesOf(config, harness) {
-  if (harness === undefined)
-    return [config];
-  return [config, ...harnessBlockKeys(harness).map((key) => toRecord(config[key]))];
-}
-function collectExcludedModels(options) {
-  return collectUnionedList("exclude_models", options);
-}
-function collectUnionedList(key, options) {
-  const names = new Set;
-  for (const layer of options.layers) {
-    const config = toRecord(layer.config);
-    if (config === undefined)
-      continue;
-    const profile = options.profile === undefined ? undefined : toRecord(toRecord(config["profiles"])?.[options.profile]);
-    const scopes = [
-      ...scopesOf(config, options.harness),
-      ...profile === undefined ? [] : scopesOf(profile, options.harness)
-    ];
-    for (const scope of scopes) {
-      for (const name of namesAt(scope, key))
-        names.add(name.trim());
-    }
-  }
-  return [...names];
 }
 
 // node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/scanner.js
@@ -21407,6 +20555,1071 @@ function printParseErrorCode(code) {
   return "<unknown ParseErrorCode>";
 }
 
+// packages/utils/src/ast-grep/install-script.ts
+import { spawn as spawn2 } from "node:child_process";
+import { existsSync as existsSync3 } from "node:fs";
+import { join as join19 } from "node:path";
+
+// packages/utils/src/ast-grep/sg-manifest.ts
+function normalizeRuntimePlatform(platform = process.platform) {
+  if (platform === "darwin" || platform === "linux" || platform === "win32")
+    return platform;
+  return "linux";
+}
+function normalizeRuntimeArch(arch = process.arch) {
+  if (arch === "arm64" || arch === "aarch64")
+    return "arm64";
+  return "x64";
+}
+function runtimeSlug(platform = process.platform, arch = process.arch) {
+  return `${normalizeRuntimePlatform(platform)}-${normalizeRuntimeArch(arch)}`;
+}
+
+// packages/utils/src/ast-grep/install-script.ts
+var AST_GREP_BIN_DIR_ENV_KEY = "OMO_AST_GREP_BIN_DIR";
+var KILL_GRACE_MS = 1000;
+var AST_GREP_INSTALL_TIMEOUT_MS = 30000;
+function astGrepRuntimeDir(baseDir, platform = process.platform, arch = process.arch) {
+  return join19(baseDir, "runtime", "ast-grep", runtimeSlug(platform, arch));
+}
+function isMissingExecutable(error) {
+  if (!("code" in error))
+    return false;
+  return error.code === "ENOENT";
+}
+function defaultSpawnProcess(command, args, options) {
+  const child = spawn2(command, args, {
+    cwd: options.cwd,
+    env: options.env,
+    stdio: "ignore",
+    windowsHide: true
+  });
+  let settled = false;
+  const outcome = new Promise((resolve) => {
+    const settle = (result) => {
+      if (settled)
+        return;
+      settled = true;
+      resolve(result);
+    };
+    child.once("error", (error) => {
+      settle({ kind: "spawn-error", error, missingExecutable: isMissingExecutable(error) });
+    });
+    child.once("exit", (code, signal) => {
+      settle({ kind: "exit", code, signal });
+    });
+  });
+  return {
+    kill: () => {
+      if (!child.killed)
+        child.kill();
+    },
+    outcome
+  };
+}
+function scriptPathForPlatform(skillDir, platform) {
+  return join19(skillDir, platform === "win32" ? "install.ps1" : "install.sh");
+}
+function invocationsForPlatform(scriptPath, platform) {
+  if (platform !== "win32")
+    return [{ command: "bash", args: [scriptPath] }];
+  const args = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptPath];
+  return [{ command: "pwsh", args }, { command: "powershell.exe", args }];
+}
+async function runInvocation(input) {
+  const child = input.spawnProcess(input.invocation.command, input.invocation.args, { cwd: input.skillDir, env: input.env });
+  let timedOut = false;
+  let terminateDeadline;
+  let terminateDeadlineGrace;
+  const killIgnored = new Promise((_, reject) => {
+    terminateDeadline = () => reject(new Error("ast-grep install child ignored termination"));
+  });
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    child.kill();
+    terminateDeadlineGrace = setTimeout(() => terminateDeadline?.(), KILL_GRACE_MS);
+  }, input.timeoutMs);
+  try {
+    const outcome = await Promise.race([child.outcome, killIgnored]);
+    if (timedOut)
+      return { kind: "timed-out" };
+    return outcome;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("ignored termination")) {
+      return { kind: "spawn-error", error, missingExecutable: false };
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+    if (terminateDeadlineGrace !== undefined)
+      clearTimeout(terminateDeadlineGrace);
+  }
+}
+function failedReason(outcome) {
+  return outcome.error.message;
+}
+async function runAstGrepSkillInstall(options) {
+  const platform = options.platform ?? process.platform;
+  const fileExists = options.fileExists ?? existsSync3;
+  const scriptPath = scriptPathForPlatform(options.skillDir, platform);
+  if (!fileExists(scriptPath))
+    return { kind: "skipped", reason: `missing ${scriptPath}` };
+  const env = { ...options.env ?? process.env, [AST_GREP_BIN_DIR_ENV_KEY]: options.targetDir };
+  const spawnProcess = options.spawnProcess ?? defaultSpawnProcess;
+  const timeoutMs = options.timeoutMs ?? AST_GREP_INSTALL_TIMEOUT_MS;
+  const invocations = invocationsForPlatform(scriptPath, platform);
+  try {
+    for (const invocation of invocations) {
+      const outcome = await runInvocation({ env, invocation, skillDir: options.skillDir, spawnProcess, timeoutMs });
+      if (outcome.kind === "timed-out")
+        return { kind: "timed-out" };
+      if (outcome.kind === "exit") {
+        if (outcome.code === 0)
+          return { kind: "succeeded" };
+        return { kind: "failed", reason: `${invocation.command} exited ${outcome.code ?? outcome.signal ?? "without status"}` };
+      }
+      if (platform === "win32" && outcome.missingExecutable && invocation.command === "pwsh")
+        continue;
+      return { kind: "failed", reason: failedReason(outcome) };
+    }
+    return { kind: "failed", reason: "no ast-grep install shell was available" };
+  } catch (error) {
+    if (error instanceof Error)
+      return { kind: "failed", reason: error.message };
+    return { kind: "failed", reason: String(error) };
+  }
+}
+
+// packages/omo-config-core/src/user-only-settings.ts
+var USER_ONLY_SETTINGS = [
+  ["mcp_env_allowlist"],
+  ["computer", "env"]
+];
+var COMPUTER_ENV_ALLOWLIST = ["DISPLAY", "XAUTHORITY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR"];
+function applyUserOnlySettings(data, scope) {
+  const dropped = [];
+  const allowedEnvKeys = new Set(COMPUTER_ENV_ALLOWLIST);
+  function settings(value, prefix) {
+    if (!isPlainRecord2(value))
+      return value;
+    const config = { ...value };
+    if (scope === "project") {
+      for (const [section, field] of USER_ONLY_SETTINGS) {
+        if (field === undefined) {
+          delete config[section];
+        } else if (isPlainRecord2(config[section]) && Object.hasOwn(config[section], field)) {
+          const block = { ...config[section] };
+          delete block[field];
+          config[section] = block;
+          if (section === "computer") {
+            const path = [...prefix, section, field];
+            dropped.push({ path, key: path.join("."), message: "Only user configuration may set computer.env" });
+          }
+        }
+      }
+    } else if (isPlainRecord2(config.computer) && isPlainRecord2(config.computer.env)) {
+      const env = Object.fromEntries(Object.entries(config.computer.env).filter(([key]) => {
+        if (allowedEnvKeys.has(key))
+          return true;
+        const path = [...prefix, "computer", "env", key];
+        dropped.push({ path, key: path.join("."), message: `Allowed environment keys: ${COMPUTER_ENV_ALLOWLIST.join(", ")}` });
+        return false;
+      }));
+      config.computer = { ...config.computer, env };
+    }
+    return config;
+  }
+  function container(value, prefix) {
+    const config = settings(value, prefix);
+    if (!isPlainRecord2(config))
+      return config;
+    for (const harness of ["[opencode]", "[native]", "[senpi]", "[codex]"]) {
+      if (Object.hasOwn(config, harness))
+        config[harness] = settings(config[harness], [...prefix, harness]);
+    }
+    return config;
+  }
+  const value = container(data, []);
+  if (isPlainRecord2(value) && isPlainRecord2(value.profiles)) {
+    value.profiles = Object.fromEntries(Object.entries(value.profiles).map(([name, profile]) => [
+      name,
+      container(profile, ["profiles", name])
+    ]));
+  }
+  return { value, dropped };
+}
+
+// packages/omo-config-core/src/schema/computer.ts
+var positiveInteger = number2().int().positive();
+var nonNegativeInteger = number2().int().nonnegative();
+var OmoComputerSettingsLayerSchema = object({
+  enabled: boolean2().describe("Experimental: register the computer tool in OmO Native sessions (default: on where the host is supported; false leaves it unregistered)"),
+  display: string2().min(1),
+  showCursor: boolean2().describe("Show the display-only macOS cursor overlay (default: true; false hides it)"),
+  max_width: positiveInteger,
+  max_height: positiveInteger,
+  screenshot_max_bytes: positiveInteger,
+  stop_hotkey: string2().min(1),
+  allow_host_relay_only_stop: boolean2(),
+  macos_canary: _enum(["session", "off"]),
+  audit_log: object({ enabled: boolean2() }).partial().strict(),
+  screenshot_gc: object({ enabled: boolean2(), stale_ms: nonNegativeInteger, scan_interval_ms: nonNegativeInteger }).partial().strict(),
+  engine_path: string2().min(1),
+  env: partialRecord(_enum(COMPUTER_ENV_ALLOWLIST), string2().nullable()).describe("User-only (~/.omo/omo.jsonc, including its harness and profile blocks). Desktop engine overrides for DISPLAY, XAUTHORITY, WAYLAND_DISPLAY and XDG_RUNTIME_DIR only; project settings and other keys are ignored with a config warning. Strings are literal overrides; null removes an inherited variable."),
+  cua_adapter: boolean2()
+}).partial().strict().describe("Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host.");
+var OmoComputerSettingsSchema = OmoComputerSettingsLayerSchema;
+
+// packages/omo-config-core/src/schema/git-master.ts
+var GIT_ENV_ASSIGNMENT_PATTERN = /^(?:[A-Za-z_][A-Za-z0-9_]*=[A-Za-z0-9_-]*)(?: [A-Za-z_][A-Za-z0-9_]*=[A-Za-z0-9_-]*)*$/;
+var GitEnvPrefixSchema = string2().refine((value) => value === "" || GIT_ENV_ASSIGNMENT_PATTERN.test(value), {
+  message: 'git_env_prefix must be empty or use shell-safe env assignments like "GIT_MASTER=1"'
+});
+var OmoGitMasterSettingsShape = {
+  commit_footer: union([boolean2(), string2()]),
+  include_co_authored_by: boolean2(),
+  git_env_prefix: GitEnvPrefixSchema
+};
+var OmoGitMasterSettingsLayerSchema = object(OmoGitMasterSettingsShape).partial().strict();
+var OmoGitMasterSettingsSchema = OmoGitMasterSettingsLayerSchema.extend({
+  commit_footer: union([boolean2(), string2()]).default(false),
+  include_co_authored_by: boolean2().default(true),
+  git_env_prefix: GitEnvPrefixSchema.default("GIT_MASTER=1")
+}).strict();
+
+// packages/omo-config-core/src/schema/harness.ts
+var HARNESS_IDS = ["codex", "opencode", "omo"];
+var OMO_CONFIG_HARNESS_IDS = ["opencode", "native", "codex"];
+var OmoHarnessIdSchema = _enum(OMO_CONFIG_HARNESS_IDS);
+var OMO_CONFIG_LEGACY_HARNESS_ALIASES = { senpi: "native" };
+var OMO_CONFIG_LEGACY_HARNESS_IDS = Object.keys(OMO_CONFIG_LEGACY_HARNESS_ALIASES);
+
+// packages/omo-config-core/src/schema/memory-agreements.ts
+var OMO_MEMORY_AGREEMENTS_DEFAULTS = { enabled: true, needs_human_threshold: 3, max_items: 64 };
+var OmoMemoryAgreementsSchema = object({
+  enabled: boolean2().default(OMO_MEMORY_AGREEMENTS_DEFAULTS.enabled),
+  needs_human_threshold: number2().int().min(1).default(OMO_MEMORY_AGREEMENTS_DEFAULTS.needs_human_threshold),
+  max_items: number2().int().min(8).max(256).default(OMO_MEMORY_AGREEMENTS_DEFAULTS.max_items)
+}).strict();
+var OmoMemoryAgreementsLayerSchema = object({
+  enabled: boolean2().optional(),
+  needs_human_threshold: number2().int().min(1).optional(),
+  max_items: number2().int().min(8).max(256).optional()
+}).strict();
+
+// packages/omo-config-core/src/schema/memory.ts
+var OmoMemoryReflectionTriggerSchema = object({
+  step_count: number2().int().nonnegative().default(25),
+  on_compaction: boolean2().default(true)
+}).strict();
+var OmoMemoryReflectionSchema = object({
+  enabled: boolean2().default(true),
+  trigger: OmoMemoryReflectionTriggerSchema.default({ step_count: 25, on_compaction: true }),
+  merge: _enum(["auto", "integration"]).default("auto"),
+  category: string2().min(1).default("quick"),
+  timeout_minutes: number2().int().positive().default(15),
+  max_concurrent_runs: number2().int().positive().default(1),
+  sandbox: _enum(["auto", "required", "off"]).default("auto")
+}).strict();
+var OmoMemorySyncSchema = object({
+  remote: string2().min(1).optional(),
+  enabled: boolean2().default(true)
+}).strict();
+var OmoMemorySearchSchema = object({
+  enabled: boolean2().default(true)
+}).strict();
+var OmoMemoryRecallEventCapsSchema = object({
+  tool_args: number2().int().nonnegative().default(400),
+  result_head: number2().int().nonnegative().default(600),
+  assistant: number2().int().nonnegative().default(1500),
+  prompt: number2().int().nonnegative().default(4000)
+}).strict();
+var OmoMemoryRecallSchema = object({
+  enabled: boolean2().default(true),
+  max_items: number2().int().min(1).max(5).default(2),
+  category: string2().min(1).default("quick"),
+  event_caps: OmoMemoryRecallEventCapsSchema.default({ tool_args: 400, result_head: 600, assistant: 1500, prompt: 4000 }),
+  sidecar_max_tokens: number2().int().positive().default(48000),
+  max_concurrent_wakes: number2().int().positive().default(2),
+  tool_budget: number2().int().positive().default(8),
+  query_expansion: boolean2().default(false)
+}).strict();
+var OmoMemoryProjectScopeSchema = object({
+  nudge: boolean2().default(true),
+  recall: boolean2().default(true)
+}).strict();
+var OmoMemoryProjectScopeLayerSchema = object({
+  nudge: boolean2().optional(),
+  recall: boolean2().optional()
+}).strict();
+var OmoMemoryNudgeSchema = object({
+  enabled: boolean2().default(true),
+  every_user_turns: number2().int().min(1).default(10)
+}).strict();
+var OmoMemoryFactsSchema = object({
+  enabled: boolean2().default(true),
+  debounce_settles: number2().int().min(1).default(4),
+  model: string2().min(1).optional()
+}).strict();
+var OmoMemoryDreamSchema = object({
+  enabled: boolean2().default(true),
+  idle_minutes: number2().int().min(0).default(30),
+  min_hours_between: number2().int().min(1).default(24),
+  shutdown_launch: boolean2().default(true),
+  auto_select_max: number2().int().min(1).max(10).default(5),
+  auto_select_max_chars: number2().int().min(1e4).default(150000)
+}).strict();
+var OmoMemoryPeopleSchema = object({
+  enabled: boolean2().default(true),
+  max_entries: number2().int().min(1).max(100).default(40),
+  max_entry_chars: number2().int().min(50).max(500).default(200)
+}).strict();
+var OmoMemorySoulSchema = object({
+  edit_notice: boolean2().default(true)
+}).strict();
+var OmoMemoryWriteNoticeSchema = object({
+  enabled: boolean2().default(true)
+}).strict();
+var OmoMemoryReflectionTriggerLayerSchema = object({
+  step_count: number2().int().nonnegative().optional(),
+  on_compaction: boolean2().optional()
+}).strict();
+var OmoMemoryReflectionLayerSchema = object({
+  enabled: boolean2().optional(),
+  trigger: OmoMemoryReflectionTriggerLayerSchema.optional(),
+  merge: _enum(["auto", "integration"]).optional(),
+  category: string2().min(1).optional(),
+  timeout_minutes: number2().int().positive().optional(),
+  max_concurrent_runs: number2().int().positive().optional(),
+  sandbox: _enum(["auto", "required", "off"]).optional()
+}).strict();
+var OmoMemorySyncLayerSchema = object({
+  remote: string2().min(1).optional(),
+  enabled: boolean2().optional()
+}).strict();
+var OmoMemorySearchLayerSchema = object({
+  enabled: boolean2().optional()
+}).strict();
+var OmoMemoryRecallEventCapsLayerSchema = object({
+  tool_args: number2().int().nonnegative().optional(),
+  result_head: number2().int().nonnegative().optional(),
+  assistant: number2().int().nonnegative().optional(),
+  prompt: number2().int().nonnegative().optional()
+}).strict();
+var OmoMemoryRecallLayerSchema = object({
+  enabled: boolean2().optional(),
+  max_items: number2().int().min(1).max(5).optional(),
+  category: string2().min(1).optional(),
+  event_caps: OmoMemoryRecallEventCapsLayerSchema.optional(),
+  sidecar_max_tokens: number2().int().positive().optional(),
+  max_concurrent_wakes: number2().int().positive().optional(),
+  tool_budget: number2().int().positive().optional(),
+  query_expansion: boolean2().optional()
+}).strict();
+var OmoMemoryNudgeLayerSchema = object({
+  enabled: boolean2().optional(),
+  every_user_turns: number2().int().min(1).optional()
+}).strict();
+var OmoMemoryFactsLayerSchema = object({
+  enabled: boolean2().optional(),
+  debounce_settles: number2().int().min(1).optional(),
+  model: string2().min(1).optional()
+}).strict();
+var OmoMemoryDreamLayerSchema = object({
+  enabled: boolean2().optional(),
+  idle_minutes: number2().int().min(0).optional(),
+  min_hours_between: number2().int().min(1).optional(),
+  shutdown_launch: boolean2().optional(),
+  auto_select_max: number2().int().min(1).max(10).optional(),
+  auto_select_max_chars: number2().int().min(1e4).optional()
+}).strict();
+var OmoMemoryPeopleLayerSchema = object({
+  enabled: boolean2().optional(),
+  max_entries: number2().int().min(1).max(100).optional(),
+  max_entry_chars: number2().int().min(50).max(500).optional()
+}).strict();
+var OmoMemorySoulLayerSchema = object({
+  edit_notice: boolean2().optional()
+}).strict();
+var OmoMemoryWriteNoticeLayerSchema = object({
+  enabled: boolean2().optional()
+}).strict();
+var OmoMemoryProjectionSchema = object({
+  max_entries_per_directory: number2().int().min(0).default(0),
+  max_bytes: number2().int().min(0).default(40960)
+}).strict();
+var OmoMemoryProjectionLayerSchema = object({
+  max_entries_per_directory: number2().int().min(0).optional(),
+  max_bytes: number2().int().min(0).optional()
+}).strict();
+var OmoMemoryAgentOverridesSchema = object({
+  enabled: boolean2().optional(),
+  agent: string2().min(1).optional(),
+  reflection: OmoMemoryReflectionLayerSchema.omit({ max_concurrent_runs: true }).optional(),
+  nudge: OmoMemoryNudgeLayerSchema.optional(),
+  facts: OmoMemoryFactsLayerSchema.optional(),
+  dream: OmoMemoryDreamLayerSchema.optional(),
+  people: OmoMemoryPeopleLayerSchema.optional(),
+  agreements: OmoMemoryAgreementsLayerSchema.optional(),
+  soul: OmoMemorySoulLayerSchema.optional(),
+  write_notice: OmoMemoryWriteNoticeLayerSchema.optional(),
+  sync: OmoMemorySyncLayerSchema.optional(),
+  search: OmoMemorySearchLayerSchema.optional(),
+  recall: OmoMemoryRecallLayerSchema.optional(),
+  projection: OmoMemoryProjectionLayerSchema.optional(),
+  compile_warn_tokens: number2().int().positive().optional()
+}).strict();
+var OmoMemoryAutoIdentitySchema = _enum(["path", "git"]);
+var OmoMemorySettingsSchema = object({
+  enabled: boolean2().default(true),
+  agent: string2().min(1).default("auto"),
+  auto_identity: OmoMemoryAutoIdentitySchema.default("path"),
+  reflection: OmoMemoryReflectionSchema.default({
+    enabled: true,
+    trigger: { step_count: 25, on_compaction: true },
+    merge: "auto",
+    category: "quick",
+    timeout_minutes: 15,
+    max_concurrent_runs: 1,
+    sandbox: "auto"
+  }),
+  nudge: OmoMemoryNudgeSchema.default({ enabled: true, every_user_turns: 10 }),
+  facts: OmoMemoryFactsSchema.default({ enabled: true, debounce_settles: 4 }),
+  dream: OmoMemoryDreamSchema.default({
+    enabled: true,
+    idle_minutes: 30,
+    min_hours_between: 24,
+    shutdown_launch: true,
+    auto_select_max: 5,
+    auto_select_max_chars: 150000
+  }),
+  people: OmoMemoryPeopleSchema.default({ enabled: true, max_entries: 40, max_entry_chars: 200 }),
+  agreements: OmoMemoryAgreementsSchema.default(OMO_MEMORY_AGREEMENTS_DEFAULTS),
+  soul: OmoMemorySoulSchema.default({ edit_notice: true }),
+  write_notice: OmoMemoryWriteNoticeSchema.default({ enabled: true }),
+  sync: OmoMemorySyncSchema.default({ enabled: true }),
+  search: OmoMemorySearchSchema.default({ enabled: true }),
+  recall: OmoMemoryRecallSchema.default({
+    enabled: true,
+    max_items: 2,
+    category: "quick",
+    event_caps: { tool_args: 400, result_head: 600, assistant: 1500, prompt: 4000 },
+    sidecar_max_tokens: 48000,
+    max_concurrent_wakes: 2,
+    tool_budget: 8,
+    query_expansion: false
+  }),
+  project_scope: OmoMemoryProjectScopeSchema.default({ nudge: true, recall: true }),
+  projection: OmoMemoryProjectionSchema.default({ max_entries_per_directory: 0, max_bytes: 40960 }),
+  compile_warn_tokens: number2().int().positive().default(30000),
+  agents: record(string2(), OmoMemoryAgentOverridesSchema).default({})
+}).strict();
+var OmoMemorySettingsLayerSchema = object({
+  enabled: boolean2().optional(),
+  agent: string2().min(1).optional(),
+  auto_identity: OmoMemoryAutoIdentitySchema.optional(),
+  reflection: OmoMemoryReflectionLayerSchema.optional(),
+  nudge: OmoMemoryNudgeLayerSchema.optional(),
+  facts: OmoMemoryFactsLayerSchema.optional(),
+  dream: OmoMemoryDreamLayerSchema.optional(),
+  people: OmoMemoryPeopleLayerSchema.optional(),
+  agreements: OmoMemoryAgreementsLayerSchema.optional(),
+  soul: OmoMemorySoulLayerSchema.optional(),
+  write_notice: OmoMemoryWriteNoticeLayerSchema.optional(),
+  sync: OmoMemorySyncLayerSchema.optional(),
+  search: OmoMemorySearchLayerSchema.optional(),
+  recall: OmoMemoryRecallLayerSchema.optional(),
+  project_scope: OmoMemoryProjectScopeLayerSchema.optional(),
+  projection: OmoMemoryProjectionLayerSchema.optional(),
+  compile_warn_tokens: number2().int().positive().optional(),
+  agents: record(string2(), OmoMemoryAgentOverridesSchema).optional()
+}).strict();
+
+// packages/omo-config-core/src/schema/model-catalog.ts
+function isRecord5(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+var OmoModelCatalogEntryInputSchema = object({
+  model: string2(),
+  reasoning: OmoReasoningSchema.optional(),
+  variant: string2().optional(),
+  reasoningEffort: OmoReasoningEffortSchema.optional()
+}).strict();
+var OmoModelCatalogEntrySchema = preprocess((value) => isRecord5(value) ? normalizeLegacyModelFields(value) : value, OmoModelCatalogEntryInputSchema);
+var OmoModelCatalogSchema = record(string2(), OmoModelCatalogEntrySchema);
+var OmoModelCatalogEntryLayerInputSchema = OmoModelCatalogEntryInputSchema.partial();
+var OmoModelCatalogEntryLayerSchema = preprocess((value) => isRecord5(value) ? normalizeLegacyModelFields(value) : value, OmoModelCatalogEntryLayerInputSchema);
+var OmoModelCatalogLayerSchema = record(string2(), OmoModelCatalogEntryLayerSchema);
+
+// packages/omo-config-core/src/schema/model-pad.ts
+var OmoModelPadLabelsSchema = object({
+  daily: string2().optional(),
+  geeky: string2().optional(),
+  normal: string2().optional(),
+  heavy: string2().optional()
+}).strict();
+var OmoModelPadSchema = object({
+  labels: OmoModelPadLabelsSchema.optional()
+}).strict();
+
+// packages/omo-config-core/src/schema/model-profile.ts
+function isRecord6(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+var OmoModelProfileInputSchema = object({
+  display_name: string2().optional(),
+  caution: string2().optional(),
+  family: _enum(["daily", "geeky"]).optional(),
+  tier: _enum(["normal", "heavy"]).optional(),
+  models: array(union([string2(), OmoFallbackModelObjectSchema])).optional()
+}).strict();
+var OmoModelProfileSchema = preprocess((value) => isRecord6(value) ? normalizeLegacyModelFields(value) : value, OmoModelProfileInputSchema);
+var OmoModelProfilesSchema = record(string2(), OmoModelProfileSchema);
+var OmoModelProfileLayerInputSchema = OmoModelProfileInputSchema.partial();
+var OmoModelProfileLayerSchema = preprocess((value) => isRecord6(value) ? normalizeLegacyModelFields(value) : value, OmoModelProfileLayerInputSchema);
+var OmoModelProfilesLayerSchema = record(string2(), OmoModelProfileLayerSchema);
+
+// packages/omo-config-core/src/schema/side-panel.ts
+var OmoSidePanelWidthSchema = union([number2().int().min(24).max(160), string2().regex(/^(?:1\d|[2-4]\d|50)%$/)]);
+var OmoSidePanelSectionsShape = {
+  session: boolean2(),
+  goal: boolean2(),
+  context: boolean2(),
+  usage: boolean2(),
+  agents: boolean2(),
+  tools: boolean2(),
+  files: boolean2(),
+  memory: boolean2()
+};
+var OmoSidePanelSectionsLayerSchema = object(OmoSidePanelSectionsShape).partial().strict();
+var OmoSidePanelSectionsSchema = OmoSidePanelSectionsLayerSchema.extend({
+  session: boolean2().default(true),
+  goal: boolean2().default(true),
+  context: boolean2().default(true),
+  usage: boolean2().default(false),
+  agents: boolean2().default(true),
+  tools: boolean2().default(true),
+  files: boolean2().default(true),
+  memory: boolean2().default(true)
+}).strict();
+var OmoSidePanelSettingsShape = {
+  enabled: boolean2(),
+  width: OmoSidePanelWidthSchema,
+  min_columns: number2().int().min(60).max(400),
+  clickable: boolean2(),
+  usage_poll_seconds: number2().int().min(60).max(3600),
+  sections: OmoSidePanelSectionsLayerSchema
+};
+var OmoSidePanelSettingsLayerSchema = object(OmoSidePanelSettingsShape).partial().strict();
+var OmoSidePanelSettingsSchema = OmoSidePanelSettingsLayerSchema.extend({
+  enabled: boolean2().default(false),
+  width: OmoSidePanelWidthSchema.default("26%"),
+  min_columns: number2().int().min(60).max(400).default(120),
+  clickable: boolean2().default(true),
+  usage_poll_seconds: number2().int().min(60).max(3600).default(150),
+  sections: OmoSidePanelSectionsSchema.default({
+    session: true,
+    goal: true,
+    context: true,
+    usage: false,
+    agents: true,
+    tools: true,
+    files: true,
+    memory: true
+  })
+}).strict();
+
+// packages/omo-config-core/src/schema/task.ts
+import { availableParallelism } from "node:os";
+var DEFAULT_RESIDENCY_MAX_CHILDREN = "unlimited";
+var ResidencyMaxChildrenInputSchema = union([number2().int().nonnegative(), literal("unlimited")]);
+var OmoTaskWaitSchema = object({
+  min_ms: number2().int().positive().default(5000),
+  default_ms: number2().int().positive().default(60000),
+  max_ms: number2().int().positive().default(600000)
+}).strict();
+var OmoTaskTeamSettingsSchema = object({
+  max_members: number2().int().min(1).max(8).default(8),
+  max_parallel_members: number2().int().min(1).max(8).default(4),
+  max_wall_clock_minutes: number2().int().positive().default(120)
+}).strict();
+var OmoTaskWarningsSchema = object({
+  unavailable_categories: boolean2().default(true)
+}).strict();
+var IsolationBackendKindSchema = _enum([
+  "auto",
+  "apfs",
+  "btrfs",
+  "zfs",
+  "reflink",
+  "overlayfs",
+  "block-clone",
+  "rcopy"
+]);
+var OmoTaskIsolationSchema = object({
+  enabled: boolean2().default(false),
+  backend: IsolationBackendKindSchema.default("auto"),
+  apply: boolean2().default(true),
+  merge: _enum(["patch", "branch"]).default("patch"),
+  commits: _enum(["generic", "ai"]).default("generic")
+}).strict();
+var isolationDefaults = OmoTaskIsolationSchema.parse({});
+var OmoTaskIsolationLayerSchema = object({
+  enabled: boolean2().optional(),
+  backend: IsolationBackendKindSchema.optional(),
+  apply: boolean2().optional(),
+  merge: _enum(["patch", "branch"]).optional(),
+  commits: _enum(["generic", "ai"]).optional()
+}).strict();
+var OmoTaskDagSettingsSchema = object({
+  max_nodes_per_run: number2().int().positive().default(64),
+  max_runs_per_session: number2().int().positive().default(16),
+  subscriber_ring: number2().int().positive().default(1000),
+  heartbeat_ms: number2().int().positive().default(15000),
+  history_default_limit: number2().int().positive().default(256),
+  history_max_limit: number2().int().positive().default(1000),
+  retention_days: number2().int().positive().default(7),
+  max_prompt_bytes: number2().int().positive().default(262144)
+}).strict();
+var OmoTaskSettingsSchema = object({
+  isolation: OmoTaskIsolationSchema.default(isolationDefaults),
+  default_execution_mode: _enum(["auto", "in-process", "process"]).default("auto"),
+  process_runner: _enum(["host", "child-process"]).default("host"),
+  host_engine_policy: _enum(["upgrade", "fallback"]).default("upgrade"),
+  host_idle_exit_ms: number2().int().positive().optional(),
+  host_shard_prewarm: _enum(["off", "first-turn", "session-start"]).default("first-turn"),
+  default_concurrency: number2().int().nonnegative().default(5),
+  global_concurrency: number2().int().nonnegative().default(8),
+  provider_concurrency: record(string2(), number2().int().nonnegative()).optional(),
+  model_concurrency: record(string2(), number2().int().nonnegative()).optional(),
+  max_depth: number2().int().nonnegative().default(1),
+  residency_max_children: ResidencyMaxChildrenInputSchema.default(DEFAULT_RESIDENCY_MAX_CHILDREN),
+  resident_idle_timeout_ms: number2().int().positive().max(Number.MAX_SAFE_INTEGER).default(900000),
+  ttl_ms: number2().int().positive().default(86400000),
+  state_dir: string2().optional(),
+  reattach_on_reconcile: boolean2().optional(),
+  resume_children: boolean2().default(true),
+  warnings: OmoTaskWarningsSchema.default({ unavailable_categories: true }),
+  wait: OmoTaskWaitSchema.default({ min_ms: 5000, default_ms: 60000, max_ms: 600000 }),
+  team: OmoTaskTeamSettingsSchema.default({
+    max_members: 8,
+    max_parallel_members: 4,
+    max_wall_clock_minutes: 120
+  }),
+  dag: OmoTaskDagSettingsSchema.optional()
+}).strict();
+var OmoTaskDagSettingsLayerSchema = object({
+  max_nodes_per_run: number2().int().positive().optional(),
+  max_runs_per_session: number2().int().positive().optional(),
+  subscriber_ring: number2().int().positive().optional(),
+  heartbeat_ms: number2().int().positive().optional(),
+  history_default_limit: number2().int().positive().optional(),
+  history_max_limit: number2().int().positive().optional(),
+  retention_days: number2().int().positive().optional(),
+  max_prompt_bytes: number2().int().positive().optional()
+}).strict();
+var OmoTaskWaitLayerSchema = object({
+  min_ms: number2().int().positive().optional(),
+  default_ms: number2().int().positive().optional(),
+  max_ms: number2().int().positive().optional()
+}).strict();
+var OmoTaskTeamSettingsLayerSchema = object({
+  max_members: number2().int().min(1).max(8).optional(),
+  max_parallel_members: number2().int().min(1).max(8).optional(),
+  max_wall_clock_minutes: number2().int().positive().optional()
+}).strict();
+var OmoTaskWarningsLayerSchema = object({
+  unavailable_categories: boolean2().optional()
+}).strict();
+var OmoTaskSettingsLayerSchema = object({
+  isolation: OmoTaskIsolationLayerSchema.optional(),
+  default_execution_mode: _enum(["auto", "in-process", "process"]).optional(),
+  process_runner: _enum(["host", "child-process"]).optional(),
+  host_engine_policy: _enum(["upgrade", "fallback"]).optional(),
+  host_idle_exit_ms: number2().int().positive().optional(),
+  host_shard_prewarm: _enum(["off", "first-turn", "session-start"]).optional(),
+  default_concurrency: number2().int().nonnegative().optional(),
+  global_concurrency: number2().int().nonnegative().optional(),
+  provider_concurrency: record(string2(), number2().int().nonnegative()).optional(),
+  model_concurrency: record(string2(), number2().int().nonnegative()).optional(),
+  max_depth: number2().int().nonnegative().optional(),
+  residency_max_children: ResidencyMaxChildrenInputSchema.optional(),
+  resident_idle_timeout_ms: number2().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
+  ttl_ms: number2().int().positive().optional(),
+  state_dir: string2().optional(),
+  reattach_on_reconcile: boolean2().optional(),
+  resume_children: boolean2().optional(),
+  warnings: OmoTaskWarningsLayerSchema.optional(),
+  wait: OmoTaskWaitLayerSchema.optional(),
+  team: OmoTaskTeamSettingsLayerSchema.optional(),
+  dag: OmoTaskDagSettingsLayerSchema.optional()
+}).strict();
+function resolveOmoTaskSettings(input, resolveParallelism = availableParallelism) {
+  const record2 = record(string2(), unknown()).parse(input);
+  return OmoTaskSettingsSchema.parse({
+    ...record2,
+    residency_max_children: record2["residency_max_children"] ?? DEFAULT_RESIDENCY_MAX_CHILDREN,
+    global_concurrency: record2["global_concurrency"] ?? Math.max(8, resolveParallelism() * 2)
+  });
+}
+
+// packages/omo-config-core/src/schema/team.ts
+var OmoTeamMemberBaseSchema = object({
+  name: string2().min(1).regex(/^[a-z0-9-]+$/),
+  cwd: string2().optional(),
+  worktreePath: string2().optional(),
+  subscriptions: array(string2()).optional(),
+  backendType: _enum(["in-process", "tmux"]).default("in-process"),
+  color: string2().optional(),
+  isActive: boolean2().default(true)
+}).strict();
+var OmoTeamCategoryMemberSchema = OmoTeamMemberBaseSchema.extend({
+  kind: literal("category"),
+  category: string2().min(1),
+  prompt: string2().min(1)
+});
+var OmoTeamSubagentMemberSchema = OmoTeamMemberBaseSchema.extend({
+  kind: literal("subagent_type"),
+  subagent_type: string2().min(1),
+  prompt: string2().optional()
+});
+var OmoTeamMemberSchema = discriminatedUnion("kind", [
+  OmoTeamCategoryMemberSchema,
+  OmoTeamSubagentMemberSchema
+]);
+var OmoTeamSpecBaseSchema = object({
+  version: literal(1).default(1),
+  name: string2().min(1).regex(/^[a-z0-9-]+$/).optional(),
+  description: string2().optional(),
+  createdAt: number2().int().positive().optional(),
+  leadAgentId: string2().optional(),
+  teamAllowedPaths: array(string2()).optional(),
+  sessionPermission: string2().optional(),
+  members: array(OmoTeamMemberSchema).min(1).max(8)
+}).strict();
+var OmoTeamSpecSchema = OmoTeamSpecBaseSchema.superRefine((teamSpec, ctx) => {
+  if (teamSpec.leadAgentId === undefined && teamSpec.members.length > 1) {
+    ctx.addIssue({
+      code: "custom",
+      message: "leadAgentId required when a team has multiple members",
+      path: ["leadAgentId"]
+    });
+  }
+});
+var OmoTeamSpecLayerSchema = OmoTeamSpecBaseSchema.partial();
+var OmoTeamsConfigSchema = record(string2(), OmoTeamSpecSchema);
+var OmoTeamsConfigLayerSchema = record(string2(), OmoTeamSpecLayerSchema);
+
+// packages/omo-config-core/src/schema/telemetry.ts
+var OmoTelemetrySettingsShape = {
+  enabled: boolean2(),
+  rawTurnSampleRate: number2().min(0).max(1)
+};
+var OmoTelemetrySettingsLayerSchema = object(OmoTelemetrySettingsShape).partial().strict();
+var OmoTelemetrySettingsSchema = OmoTelemetrySettingsLayerSchema.extend({
+  enabled: boolean2().default(true)
+}).strict();
+
+// packages/omo-config-core/src/schema/device-service.ts
+var OmoDeviceServiceSettingsShape = {
+  enabled: boolean2()
+};
+var OmoDeviceServiceSettingsLayerSchema = object(OmoDeviceServiceSettingsShape).partial().strict();
+var OmoDeviceServiceSettingsSchema = OmoDeviceServiceSettingsLayerSchema.extend({
+  enabled: boolean2().default(true)
+}).strict();
+
+// packages/omo-config-core/src/schema/format-on-mutation.ts
+var mode = _enum(["off", "best-effort", "required"]);
+var languages = record(string2(), boolean2()).optional();
+var OmoFormatOnMutationLayerSchema = object({
+  mode: mode.optional(),
+  languages,
+  maxFileBytes: number2().int().positive().optional(),
+  timeoutMs: number2().int().positive().optional()
+}).strict();
+var OmoFormatOnMutationSchema = OmoFormatOnMutationLayerSchema.extend({
+  mode: mode.default("best-effort"),
+  maxFileBytes: number2().int().positive().default(1048576),
+  timeoutMs: number2().int().positive().default(3000)
+}).strict();
+
+// packages/omo-config-core/src/schema/provenance.ts
+var OmoProvenanceSettingsSchema = object({
+  workspaces: array(object({
+    name: string2().trim().min(1).regex(/\S/),
+    git_owners: array(string2().trim().min(1).regex(/\S/)).optional(),
+    paths: array(string2().trim().min(1).regex(/\S/)).optional()
+  }).strict()).optional()
+}).strict();
+
+// packages/omo-config-core/src/schema/config.ts
+var OmoOpenCodeHarnessConfigSchema = record(string2(), unknown());
+var OmoDisabledSkillsSchema = array(string2());
+var OmoExcludedModelsSchema = array(string2());
+var OmoMcpEnvAllowlistSchema = array(string2()).describe("User-only environment variable names passed to OpenCode MCP servers. Project configuration is ignored.");
+var OmoTypedHarnessConfigSchema = object({
+  provenance: OmoProvenanceSettingsSchema.optional(),
+  formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
+  categories: OmoCategoriesConfigSchema.optional(),
+  agents: OmoAgentsConfigSchema.optional(),
+  git_master: OmoGitMasterSettingsLayerSchema.optional(),
+  task: OmoTaskSettingsLayerSchema.optional(),
+  teams: OmoTeamsConfigLayerSchema.optional(),
+  models: OmoModelCatalogLayerSchema.optional(),
+  model_profiles: OmoModelProfilesLayerSchema.optional(),
+  model_profile: string2().optional(),
+  model_pad: OmoModelPadSchema.optional(),
+  memory: OmoMemorySettingsLayerSchema.optional(),
+  telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+  device_service: OmoDeviceServiceSettingsLayerSchema.optional(),
+  side_panel: OmoSidePanelSettingsLayerSchema.optional(),
+  computer: OmoComputerSettingsLayerSchema.optional(),
+  disabled_skills: OmoDisabledSkillsSchema.optional(),
+  exclude_models: OmoExcludedModelsSchema.optional()
+}).strict();
+var OmoConfigProfileSchema = object({
+  mcp_env_allowlist: OmoMcpEnvAllowlistSchema.optional(),
+  provenance: OmoProvenanceSettingsSchema.optional(),
+  formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
+  categories: OmoCategoriesConfigSchema.optional(),
+  agents: OmoAgentsConfigSchema.optional(),
+  git_master: OmoGitMasterSettingsLayerSchema.optional(),
+  task: OmoTaskSettingsLayerSchema.optional(),
+  teams: OmoTeamsConfigLayerSchema.optional(),
+  models: OmoModelCatalogLayerSchema.optional(),
+  model_profiles: OmoModelProfilesLayerSchema.optional(),
+  model_profile: string2().optional(),
+  model_pad: OmoModelPadSchema.optional(),
+  memory: OmoMemorySettingsLayerSchema.optional(),
+  telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+  device_service: OmoDeviceServiceSettingsLayerSchema.optional(),
+  side_panel: OmoSidePanelSettingsLayerSchema.optional(),
+  computer: OmoComputerSettingsLayerSchema.optional(),
+  disabled_skills: OmoDisabledSkillsSchema.optional(),
+  exclude_models: OmoExcludedModelsSchema.optional(),
+  "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
+  "[native]": OmoTypedHarnessConfigSchema.optional(),
+  "[senpi]": OmoTypedHarnessConfigSchema.optional(),
+  "[codex]": OmoTypedHarnessConfigSchema.optional()
+}).strict();
+var OmoConfigSchema = object({
+  mcp_env_allowlist: OmoMcpEnvAllowlistSchema.optional(),
+  provenance: OmoProvenanceSettingsSchema.optional(),
+  formatOnMutation: OmoFormatOnMutationSchema.optional(),
+  $schema: string2().optional(),
+  categories: OmoCategoriesConfigSchema.optional(),
+  agents: OmoAgentsConfigSchema.optional(),
+  git_master: OmoGitMasterSettingsSchema.optional(),
+  task: OmoTaskSettingsSchema.optional(),
+  teams: OmoTeamsConfigSchema.optional(),
+  models: OmoModelCatalogSchema.optional(),
+  model_profiles: OmoModelProfilesSchema.optional(),
+  model_profile: string2().optional(),
+  model_pad: OmoModelPadSchema.optional(),
+  memory: OmoMemorySettingsSchema.optional(),
+  telemetry: OmoTelemetrySettingsSchema.optional(),
+  device_service: OmoDeviceServiceSettingsSchema.optional(),
+  side_panel: OmoSidePanelSettingsSchema.optional(),
+  computer: OmoComputerSettingsSchema.optional(),
+  disabled_skills: OmoDisabledSkillsSchema.optional(),
+  exclude_models: OmoExcludedModelsSchema.optional(),
+  "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
+  "[native]": OmoTypedHarnessConfigSchema.optional(),
+  "[senpi]": OmoTypedHarnessConfigSchema.optional(),
+  "[codex]": OmoTypedHarnessConfigSchema.optional(),
+  profiles: record(string2(), OmoConfigProfileSchema).default({}),
+  _migrations: array(string2()).optional(),
+  legacy_migrations: record(string2(), unknown()).optional()
+}).strict();
+var OmoConfigLayerSchema = object({
+  mcp_env_allowlist: OmoMcpEnvAllowlistSchema.optional(),
+  provenance: OmoProvenanceSettingsSchema.optional(),
+  formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
+  $schema: string2().optional(),
+  categories: OmoCategoriesConfigSchema.optional(),
+  agents: OmoAgentsConfigSchema.optional(),
+  git_master: OmoGitMasterSettingsLayerSchema.optional(),
+  task: OmoTaskSettingsLayerSchema.optional(),
+  teams: OmoTeamsConfigLayerSchema.optional(),
+  models: OmoModelCatalogLayerSchema.optional(),
+  model_profiles: OmoModelProfilesLayerSchema.optional(),
+  model_profile: string2().optional(),
+  model_pad: OmoModelPadSchema.optional(),
+  memory: OmoMemorySettingsLayerSchema.optional(),
+  telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+  device_service: OmoDeviceServiceSettingsLayerSchema.optional(),
+  side_panel: OmoSidePanelSettingsLayerSchema.optional(),
+  computer: OmoComputerSettingsLayerSchema.optional(),
+  disabled_skills: OmoDisabledSkillsSchema.optional(),
+  exclude_models: OmoExcludedModelsSchema.optional(),
+  "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
+  "[native]": OmoTypedHarnessConfigSchema.optional(),
+  "[senpi]": OmoTypedHarnessConfigSchema.optional(),
+  "[codex]": OmoTypedHarnessConfigSchema.optional(),
+  profiles: record(string2(), OmoConfigProfileSchema).optional(),
+  _migrations: array(string2()).optional(),
+  legacy_migrations: record(string2(), unknown()).optional()
+}).strict();
+
+// packages/omo-config-core/src/schema/legacy-category-names.ts
+var LEGACY_CATEGORY_NAME_ALIASES = { deep: "deep-low" };
+function canonicalCategoryName(name) {
+  return Object.hasOwn(LEGACY_CATEGORY_NAME_ALIASES, name) ? LEGACY_CATEGORY_NAME_ALIASES[name] : name;
+}
+function isRecord7(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function joinPath(path, segment) {
+  return [...path, segment].join(".");
+}
+function canonicalizeCategoriesRecord(categories, path, renames) {
+  const result = {};
+  for (const [name, definition] of Object.entries(categories)) {
+    const canonical = canonicalCategoryName(name);
+    if (canonical === name) {
+      result[name] = definition;
+      continue;
+    }
+    const dropped = Object.hasOwn(categories, canonical);
+    renames.push({ canonical, dropped, legacy: name, path: joinPath(path, name) });
+    if (!dropped)
+      result[canonical] = definition;
+  }
+  return result;
+}
+function canonicalizeValue(value, path, renames) {
+  if (Array.isArray(value)) {
+    return value.map((entry, index) => canonicalizeValue(entry, [...path, String(index)], renames));
+  }
+  if (!isRecord7(value))
+    return value;
+  const result = {};
+  for (const [key, entry] of Object.entries(value)) {
+    if (key === "categories" && isRecord7(entry)) {
+      result[key] = canonicalizeCategoriesRecord(entry, [...path, key], renames);
+      continue;
+    }
+    if (key === "category" && typeof entry === "string") {
+      const canonical = canonicalCategoryName(entry);
+      if (canonical !== entry) {
+        renames.push({ canonical, dropped: false, legacy: entry, path: joinPath(path, key) });
+      }
+      result[key] = canonical;
+      continue;
+    }
+    result[key] = canonicalizeValue(entry, [...path, key], renames);
+  }
+  return result;
+}
+function canonicalizeLegacyCategoryNames(document) {
+  const renames = [];
+  const canonicalized = isRecord7(document) ? canonicalizeValue(document, [], renames) : {};
+  return { document: canonicalized, renames };
+}
+
+// packages/omo-config-core/src/schema/legacy-harness-names.ts
+function canonicalHarnessName(name) {
+  return Object.hasOwn(OMO_CONFIG_LEGACY_HARNESS_ALIASES, name) ? OMO_CONFIG_LEGACY_HARNESS_ALIASES[name] : name;
+}
+function harnessBlockKey(harness) {
+  return `[${harness}]`;
+}
+function legacyHarnessOfBlockKey(key) {
+  if (!key.startsWith("[") || !key.endsWith("]"))
+    return;
+  const harness = key.slice(1, -1);
+  return Object.hasOwn(OMO_CONFIG_LEGACY_HARNESS_ALIASES, harness) ? harness : undefined;
+}
+function isRecord8(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function canonicalizeBlocksIn(container, path, renames) {
+  const result = {};
+  for (const [key, value] of Object.entries(container)) {
+    const legacyHarness = legacyHarnessOfBlockKey(key);
+    if (legacyHarness === undefined) {
+      result[key] = value;
+      continue;
+    }
+    const canonical = harnessBlockKey(canonicalHarnessName(legacyHarness));
+    const dropped = Object.hasOwn(container, canonical);
+    renames.push({ canonical, dropped, legacy: key, path: [...path, key].join(".") });
+    if (!dropped)
+      result[canonical] = value;
+  }
+  return result;
+}
+function canonicalizeLegacyHarnessBlocks(document) {
+  if (!isRecord8(document))
+    return { document: {}, renames: [] };
+  const renames = [];
+  const canonicalized = canonicalizeBlocksIn(document, [], renames);
+  const profiles = canonicalized["profiles"];
+  if (isRecord8(profiles)) {
+    const canonicalProfiles = {};
+    for (const [name, profile] of Object.entries(profiles)) {
+      canonicalProfiles[name] = isRecord8(profile) ? canonicalizeBlocksIn(profile, ["profiles", name], renames) : profile;
+    }
+    canonicalized["profiles"] = canonicalProfiles;
+  }
+  return { document: canonicalized, renames };
+}
+
+// packages/omo-config-core/src/loader/types.ts
+import { existsSync as existsSync4, lstatSync, readFileSync as readFileSync2, realpathSync as realpathSync2 } from "node:fs";
+var MERGED_OMO_CONFIG_PATH = "(merged omo config)";
+var DEFAULT_READ_FILE_SYSTEM = {
+  existsSync: existsSync4,
+  lstatSync,
+  readFileSync: readFileSync2,
+  realpathSync: realpathSync2
+};
+
+// packages/omo-config-core/src/loader/disabled-skills.ts
+function toRecord(value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value))
+    return;
+  return value;
+}
+function namesAt(record, key) {
+  const value = record?.[key];
+  if (!Array.isArray(value))
+    return [];
+  return value.filter((entry) => typeof entry === "string" && entry.trim() !== "");
+}
+function harnessBlockKeys(harness) {
+  const canonical = canonicalHarnessName(harness);
+  const legacy = Object.entries(OMO_CONFIG_LEGACY_HARNESS_ALIASES).filter(([, target]) => target === canonical).map(([name]) => harnessBlockKey(name));
+  return [harnessBlockKey(canonical), ...legacy];
+}
+function scopesOf(config, harness) {
+  if (harness === undefined)
+    return [config];
+  return [config, ...harnessBlockKeys(harness).map((key) => toRecord(config[key]))];
+}
+function collectExcludedModels(options) {
+  return collectUnionedList("exclude_models", options);
+}
+function collectUnionedList(key, options) {
+  const names = new Set;
+  for (const layer of options.layers) {
+    const config = toRecord(layer.config);
+    if (config === undefined)
+      continue;
+    const profile = options.profile === undefined ? undefined : toRecord(toRecord(config["profiles"])?.[options.profile]);
+    const scopes = [
+      ...scopesOf(config, options.harness),
+      ...profile === undefined ? [] : scopesOf(profile, options.harness)
+    ];
+    for (const scope of scopes) {
+      for (const name of namesAt(scope, key))
+        names.add(name.trim());
+    }
+  }
+  return [...names];
+}
+
 // packages/omo-config-core/src/loader/layer-validation.ts
 import { createHash as createHash2 } from "node:crypto";
 
@@ -21665,27 +21878,29 @@ var validateLayerRecord = (record) => {
   const parsed = OmoConfigLayerSchema.safeParse(record);
   return parsed.success ? { success: true } : { success: false, issues: parsed.error.issues };
 };
-function validateConfigLayer(path, data) {
+function validateConfigLayer(path, data, scope) {
   const sanitized = sanitizeUnsafeKeys(data);
-  const record = toRecord2(sanitized.value);
+  const protectedSettings = applyUserOnlySettings(sanitized.value, scope);
+  const record = toRecord2(protectedSettings.value);
   const unsafeIssuePaths = sanitized.issues.flatMap((issue) => issue.keys.map((key) => [...issue.path, key].join(".")));
   const unsafeDiagnostics = unsafeIssuePaths.length === 0 ? [] : [{ kind: "unknown-keys", message: `Ignored unknown keys in ${path}: ${unsafeIssuePaths.join(", ")}`, path, issuePaths: unsafeIssuePaths }];
-  const validation = OmoConfigLayerSchema.safeParse(sanitized.value);
+  const sourceDiagnostics = [...unsafeDiagnostics, ...invalidValueDiagnostics(path, protectedSettings.dropped)];
+  const validation = OmoConfigLayerSchema.safeParse(protectedSettings.value);
   if (validation.success) {
     if (record !== null)
-      return { loaded: true, diagnostics: unsafeDiagnostics, value: record };
+      return { loaded: true, diagnostics: sourceDiagnostics, value: record };
     return {
       loaded: false,
       diagnostics: [{ kind: "validation", message: `Invalid omo config at ${path}: root must be an object`, path }]
     };
   }
-  const rejected = { loaded: false, diagnostics: [validationDiagnostic(path, validation.error.issues)] };
+  const rejected = { loaded: false, diagnostics: [...sourceDiagnostics, validationDiagnostic(path, validation.error.issues)] };
   const unknownIssues = unrecognizedKeyIssues(validation.error.issues);
   if (record === null)
     return rejected;
   let candidate = record;
   let issues = validation.error.issues;
-  const diagnostics = [...unsafeDiagnostics];
+  const diagnostics = [...sourceDiagnostics];
   if (unknownIssues.length > 0) {
     const { issuePaths, stripped } = stripUnrecognizedKeys(record, unknownIssues);
     if (issuePaths.length > 0) {
@@ -21705,7 +21920,7 @@ function validateConfigLayer(path, data) {
 
 // packages/omo-config-core/src/loader/paths.ts
 import { userInfo } from "node:os";
-import { dirname as dirname8, join as join19, posix, resolve as resolve7 } from "node:path";
+import { dirname as dirname9, join as join20, posix, resolve as resolve7 } from "node:path";
 
 // packages/omo-config-core/src/internal/posix-path.ts
 function toPosixPath2(path) {
@@ -21720,14 +21935,14 @@ function resolveHomeDir(env = process.env) {
   return homeDir.startsWith("/") ? posix.resolve(homeDir) : toPosixPath2(resolve7(homeDir));
 }
 function resolveUserOmoConfigDirectory(env = process.env) {
-  return join19(resolveHomeDir(env), ".omo");
+  return join20(resolveHomeDir(env), ".omo");
 }
 function detectUserOmoJsonPath(env, fileSystem) {
   const configDir = resolveUserOmoConfigDirectory(env);
-  const jsoncPath = join19(configDir, "omo.jsonc");
+  const jsoncPath = join20(configDir, "omo.jsonc");
   if (fileSystem.existsSync(jsoncPath))
     return jsoncPath;
-  const jsonPath = join19(configDir, "omo.json");
+  const jsonPath = join20(configDir, "omo.json");
   return fileSystem.existsSync(jsonPath) ? jsonPath : jsoncPath;
 }
 function isSymlinkedProjectPath(path, fileSystem) {
@@ -21745,13 +21960,13 @@ function isLoadableProjectConfigFile(path, fileSystem) {
   return fileSystem.existsSync(path) && !isSymlinkedProjectPath(path, fileSystem);
 }
 function detectOmoJsonPath(dir, fileSystem) {
-  const omoDir = join19(dir, ".omo");
+  const omoDir = join20(dir, ".omo");
   if (isSymlinkedProjectPath(omoDir, fileSystem))
     return null;
-  const jsoncPath = join19(omoDir, "omo.jsonc");
+  const jsoncPath = join20(omoDir, "omo.jsonc");
   if (isLoadableProjectConfigFile(jsoncPath, fileSystem))
     return jsoncPath;
-  const jsonPath = join19(omoDir, "omo.json");
+  const jsonPath = join20(omoDir, "omo.json");
   return isLoadableProjectConfigFile(jsonPath, fileSystem) ? jsonPath : null;
 }
 function realpathOrSelf(path, fileSystem) {
@@ -21776,7 +21991,7 @@ function findProjectConfigPathsFarthestFirst(cwd, homeDir, fileSystem, accountHo
       nearestFirst.push(configPath);
     if (isHomeDir)
       break;
-    const parentDir = dirname8(currentDir);
+    const parentDir = dirname9(currentDir);
     if (parentDir === currentDir)
       break;
     currentDir = parentDir;
@@ -21914,7 +22129,7 @@ function readConfigSource(path, scope, fileSystem) {
       source: { exists: true, loaded: false, path, scope }
     };
   }
-  const layer = validateConfigLayer(path, parsed.data);
+  const layer = validateConfigLayer(path, parsed.data, scope);
   return layer.loaded ? { diagnostics: layer.diagnostics, source: { exists: true, loaded: true, path, scope }, value: layer.value } : { diagnostics: layer.diagnostics, source: { exists: true, loaded: false, path, scope } };
 }
 function legacyCategoryDiagnostic(path, renames) {
@@ -22072,7 +22287,7 @@ function recordAt(value, key) {
 
 // packages/omo-codex/src/install/codex-marketplace-snapshot.ts
 import { cp as cp4, mkdir as mkdir6, rename as rename5, rm as rm8, writeFile as writeFile6 } from "node:fs/promises";
-import { join as join20, sep as sep7 } from "node:path";
+import { join as join21, sep as sep7 } from "node:path";
 var INSTALLED_MARKETPLACES_DIR = ".tmp/marketplaces";
 async function writeInstalledMarketplaceSnapshot(input) {
   const marketplaceRoot = installedMarketplaceRoot(input.codexHome, input.marketplace.name);
@@ -22085,21 +22300,21 @@ async function writeInstalledMarketplaceSnapshot(input) {
   return snapshotPlugins;
 }
 function installedMarketplaceRoot(codexHome, marketplaceName) {
-  return join20(codexHome, INSTALLED_MARKETPLACES_DIR, marketplaceName);
+  return join21(codexHome, INSTALLED_MARKETPLACES_DIR, marketplaceName);
 }
 async function writeMarketplaceManifest(marketplaceRoot, marketplace) {
-  const manifestDir = join20(marketplaceRoot, ".agents", "plugins");
+  const manifestDir = join21(marketplaceRoot, ".agents", "plugins");
   await mkdir6(manifestDir, { recursive: true });
-  const tempPath = join20(manifestDir, `.marketplace-${process.pid}-${Date.now()}.json.tmp`);
+  const tempPath = join21(manifestDir, `.marketplace-${process.pid}-${Date.now()}.json.tmp`);
   await writeFile6(tempPath, `${JSON.stringify(marketplace, null, "\t")}
 `);
-  await rename5(tempPath, join20(manifestDir, "marketplace.json"));
+  await rename5(tempPath, join21(manifestDir, "marketplace.json"));
 }
 async function writeSnapshotPlugin(marketplaceRoot, plugin) {
-  const pluginsDir = join20(marketplaceRoot, "plugins");
+  const pluginsDir = join21(marketplaceRoot, "plugins");
   await mkdir6(pluginsDir, { recursive: true });
-  const targetPath = join20(pluginsDir, plugin.name);
-  const tempPath = join20(pluginsDir, `.tmp-${plugin.name}-${process.pid}-${Date.now()}`);
+  const targetPath = join21(pluginsDir, plugin.name);
+  const tempPath = join21(pluginsDir, `.tmp-${plugin.name}-${process.pid}-${Date.now()}`);
   await rm8(tempPath, { recursive: true, force: true });
   await cp4(plugin.sourcePath, tempPath, {
     recursive: true,
@@ -22121,15 +22336,15 @@ function shouldCopyMarketplaceSourcePath(path, root) {
 
 // packages/omo-codex/src/install/link-cached-plugin-agents.ts
 import { copyFile, lstat as lstat11, mkdir as mkdir7, readdir as readdir8, readFile as readFile17, rm as rm12, writeFile as writeFile9 } from "node:fs/promises";
-import { basename as basename4, join as join25 } from "node:path";
+import { basename as basename4, join as join26 } from "node:path";
 
 // packages/omo-codex/src/install/agent-model-overrides.ts
 import { readFile as readFile14, rm as rm9, writeFile as writeFile8 } from "node:fs/promises";
-import { join as join22 } from "node:path";
+import { join as join23 } from "node:path";
 
 // packages/omo-codex/src/install/preserved-agent-settings.ts
 import { lstat as lstat8, readFile as readFile13, readdir as readdir7, writeFile as writeFile7 } from "node:fs/promises";
-import { join as join21 } from "node:path";
+import { join as join22 } from "node:path";
 
 // packages/omo-codex/src/install/managed-agent-reasoning-defaults.ts
 var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
@@ -22322,7 +22537,7 @@ function resolveManagedAgentReasoning(input) {
 
 // packages/omo-codex/src/install/preserved-agent-settings.ts
 async function capturePreservedAgentReasoning(input) {
-  const agentsDir = join21(input.codexHome, "agents");
+  const agentsDir = join22(input.codexHome, "agents");
   if (!await exists2(agentsDir))
     return new Map;
   const preserved = new Map;
@@ -22330,7 +22545,7 @@ async function capturePreservedAgentReasoning(input) {
   for (const entry of agentEntries) {
     if (!entry.name.endsWith(".toml"))
       continue;
-    const content = await readTextIfExists(join21(agentsDir, entry.name));
+    const content = await readTextIfExists(join22(agentsDir, entry.name));
     if (content === null)
       continue;
     const effort = extractReasoningEffort(content);
@@ -22344,7 +22559,7 @@ async function capturePreservedAgentReasoning(input) {
   return preserved;
 }
 async function capturePreservedAgentServiceTier(input) {
-  const agentsDir = join21(input.codexHome, "agents");
+  const agentsDir = join22(input.codexHome, "agents");
   if (!await exists2(agentsDir))
     return new Map;
   const preserved = new Map;
@@ -22352,7 +22567,7 @@ async function capturePreservedAgentServiceTier(input) {
   for (const entry of agentEntries) {
     if (!entry.name.endsWith(".toml"))
       continue;
-    const content = await readTextIfExists(join21(agentsDir, entry.name));
+    const content = await readTextIfExists(join22(agentsDir, entry.name));
     if (content === null)
       continue;
     preserved.set(agentNameFromToml(entry.name), extractServiceTier(content));
@@ -22541,7 +22756,7 @@ async function applyAgentOverride(input) {
   await writeFile8(input.linkPath, content);
 }
 function receiptPath(codexHome) {
-  return join22(codexHome, "agents", RECEIPT_FILE);
+  return join23(codexHome, "agents", RECEIPT_FILE);
 }
 function parseJson(content) {
   try {
@@ -22574,7 +22789,7 @@ function handEditedAgentModel(installedModel, receipt) {
 
 // packages/omo-codex/src/install/retired-managed-agent-purge.ts
 import { lstat as lstat9, readFile as readFile15, rm as rm10 } from "node:fs/promises";
-import { join as join23 } from "node:path";
+import { join as join24 } from "node:path";
 var RETIRED_MANAGED_AGENT_FILES = [
   {
     fileName: "codex-ultrawork-reviewer.toml",
@@ -22586,11 +22801,11 @@ var RETIRED_MANAGED_AGENT_FILES = [
   }
 ];
 async function purgeRetiredManagedAgentFiles(input) {
-  const agentsDir = join23(input.codexHome, "agents");
+  const agentsDir = join24(input.codexHome, "agents");
   if (!await exists3(agentsDir))
     return;
   for (const retiredAgent of RETIRED_MANAGED_AGENT_FILES) {
-    const agentPath = join23(agentsDir, retiredAgent.fileName);
+    const agentPath = join24(agentsDir, retiredAgent.fileName);
     if (!await exists3(agentPath))
       continue;
     const agentStat = await lstat9(agentPath);
@@ -22633,12 +22848,12 @@ function nodeErrorCode2(error) {
 // packages/omo-codex/src/install/default-agent-role.ts
 import { createHash as createHash3 } from "node:crypto";
 import { lstat as lstat10, readFile as readFile16, rm as rm11 } from "node:fs/promises";
-import { join as join24 } from "node:path";
+import { join as join25 } from "node:path";
 var REGISTRATION = { name: "default", configFile: "./agents/default.toml" };
 async function installDefaultAgentRole(input) {
-  const target = join24(input.codexHome, "agents", "default.toml");
-  const receipt = join24(input.codexHome, "agents", ".lazycodex-default.sha256");
-  const configPath = join24(input.codexHome, "config.toml");
+  const target = join25(input.codexHome, "agents", "default.toml");
+  const receipt = join25(input.codexHome, "agents", ".lazycodex-default.sha256");
+  const configPath = join25(input.codexHome, "config.toml");
   const config = await readIfPresent(configPath);
   const entry = await lstat10(target).catch((error) => {
     if (error instanceof Error && "code" in error && error.code === "ENOENT")
@@ -22699,7 +22914,7 @@ async function linkCachedPluginAgents(input) {
     await writeManifest(input.pluginRoot, []);
     return [];
   }
-  const agentsDir = join25(input.codexHome, "agents");
+  const agentsDir = join26(input.codexHome, "agents");
   await mkdir7(agentsDir, { recursive: true });
   const previousReceipts = await readAgentModelReceipts(input.codexHome);
   const receipts = new Map;
@@ -22707,7 +22922,7 @@ async function linkCachedPluginAgents(input) {
   for (const agentPath of bundledAgents) {
     const agentFileName = basename4(agentPath);
     const agentName = agentNameFromToml2(agentFileName);
-    const linkPath = join25(agentsDir, agentFileName);
+    const linkPath = join26(agentsDir, agentFileName);
     receipts.set(agentName, await syncAgentFile({ ...input, agentName, agentPath, linkPath, previousReceipt: previousReceipts.get(agentName) }));
     linked.push({ name: agentFileName, path: linkPath, target: agentPath });
   }
@@ -22747,7 +22962,7 @@ async function syncAgentFile(input) {
   };
 }
 async function discoverBundledAgents(pluginRoot) {
-  const componentsRoot = join25(pluginRoot, "components");
+  const componentsRoot = join26(pluginRoot, "components");
   if (!await exists4(componentsRoot))
     return [];
   const componentEntries = await readdir8(componentsRoot, { withFileTypes: true });
@@ -22755,14 +22970,14 @@ async function discoverBundledAgents(pluginRoot) {
   for (const entry of componentEntries) {
     if (!entry.isDirectory())
       continue;
-    const agentsRoot = join25(componentsRoot, entry.name, "agents");
+    const agentsRoot = join26(componentsRoot, entry.name, "agents");
     if (!await exists4(agentsRoot))
       continue;
     const agentEntries = await readdir8(agentsRoot, { withFileTypes: true });
     for (const file of agentEntries) {
       if (!file.isFile() || !file.name.endsWith(".toml"))
         continue;
-      agents.push(join25(agentsRoot, file.name));
+      agents.push(join26(agentsRoot, file.name));
     }
   }
   agents.sort();
@@ -22782,7 +22997,7 @@ async function prepareReplacement(linkPath) {
   await rm12(linkPath, { force: true });
 }
 async function writeManifest(pluginRoot, agentPaths) {
-  const manifestPath = join25(pluginRoot, MANIFEST_FILE);
+  const manifestPath = join26(pluginRoot, MANIFEST_FILE);
   const payload = { agents: [...agentPaths].sort() };
   await writeFile9(manifestPath, `${JSON.stringify(payload, null, "\t")}
 `);
@@ -22854,10 +23069,10 @@ function agentNameFromToml3(fileName) {
 
 // packages/omo-codex/src/install/codex-marketplace.ts
 import { readFile as readFile18 } from "node:fs/promises";
-import { join as join26 } from "node:path";
+import { join as join27 } from "node:path";
 var DEFAULT_MARKETPLACE_PATH = "packages/omo-codex/marketplace.json";
 async function readMarketplace(repoRoot, options) {
-  const marketplacePath = options?.marketplacePath ?? join26(repoRoot, DEFAULT_MARKETPLACE_PATH);
+  const marketplacePath = options?.marketplacePath ?? join27(repoRoot, DEFAULT_MARKETPLACE_PATH);
   const raw = await readFile18(marketplacePath, "utf8");
   const parsed = JSON.parse(raw);
   if (!isPlainRecord(parsed))
@@ -22876,10 +23091,10 @@ async function readMarketplace(repoRoot, options) {
 function resolvePluginSource(repoRoot, plugin, options) {
   const sourcePath = localSourcePath(options?.pathOverride ?? plugin.source);
   const relativePath = sourcePath.slice(2);
-  return join26(repoRoot, ...relativePath.split(/[\\/]/));
+  return join27(repoRoot, ...relativePath.split(/[\\/]/));
 }
 async function readPluginManifest(pluginRoot) {
-  const raw = await readFile18(join26(pluginRoot, ".codex-plugin", "plugin.json"), "utf8");
+  const raw = await readFile18(join27(pluginRoot, ".codex-plugin", "plugin.json"), "utf8");
   const parsed = JSON.parse(raw);
   if (!isPlainRecord(parsed))
     throw new Error(`${pluginRoot} plugin.json must be an object`);
@@ -22961,10 +23176,10 @@ function validateLocalSourcePath(path) {
 
 // packages/omo-codex/src/install/lazycodex-version-stamp.ts
 import { readdir as readdir9, readFile as readFile19, writeFile as writeFile10 } from "node:fs/promises";
-import { join as join27 } from "node:path";
+import { join as join28 } from "node:path";
 async function readDistributionManifest(repoRoot) {
   try {
-    const parsed = JSON.parse(await readFile19(join27(repoRoot, "package.json"), "utf8"));
+    const parsed = JSON.parse(await readFile19(join28(repoRoot, "package.json"), "utf8"));
     if (!isPlainRecord(parsed) || typeof parsed.version !== "string" || parsed.version.trim().length === 0)
       return;
     return {
@@ -22988,19 +23203,19 @@ function resolveLazyCodexPluginVersion(input) {
   return input.manifestVersion ?? "local";
 }
 async function stampLazyCodexPluginVersion(input) {
-  const manifestPath = join27(input.pluginRoot, ".codex-plugin", "plugin.json");
+  const manifestPath = join28(input.pluginRoot, ".codex-plugin", "plugin.json");
   const hookPaths = await readPluginHookPaths(manifestPath);
   await stampJsonVersion(manifestPath, input.version);
-  await stampJsonVersion(join27(input.pluginRoot, "package.json"), input.version);
+  await stampJsonVersion(join28(input.pluginRoot, "package.json"), input.version);
   for (const hookPath of hookPaths) {
-    await stampHookStatusMessages(join27(input.pluginRoot, hookPath), input.version);
+    await stampHookStatusMessages(join28(input.pluginRoot, hookPath), input.version);
   }
   await stampComponentVersions(input);
 }
 async function writeLazyCodexInstallSnapshot(input) {
   if (input.distributionManifest === undefined)
     return;
-  await writeFile10(join27(input.pluginRoot, "lazycodex-install.json"), `${JSON.stringify({
+  await writeFile10(join28(input.pluginRoot, "lazycodex-install.json"), `${JSON.stringify({
     packageName: input.distributionManifest.name,
     version: input.distributionManifest.version
   }, null, "\t")}
@@ -23057,16 +23272,16 @@ async function stampHookStatusMessages(path, version) {
 async function stampComponentVersions(input) {
   let entries;
   try {
-    entries = await readdir9(join27(input.pluginRoot, "components"));
+    entries = await readdir9(join28(input.pluginRoot, "components"));
   } catch (error) {
     if (error instanceof Error)
       return;
     throw error;
   }
   for (const entry of entries) {
-    const componentRoot = join27(input.pluginRoot, "components", entry);
-    await stampJsonVersion(join27(componentRoot, "package.json"), input.version);
-    await stampHookStatusMessages(join27(componentRoot, "hooks", "hooks.json"), input.version);
+    const componentRoot = join28(input.pluginRoot, "components", entry);
+    await stampJsonVersion(join28(componentRoot, "package.json"), input.version);
+    await stampHookStatusMessages(join28(componentRoot, "hooks", "hooks.json"), input.version);
   }
 }
 function stampHookGroups(hooks, version) {
@@ -23096,7 +23311,7 @@ function normalizeHookStatusVersion(version) {
 
 // packages/omo-codex/src/install/codex-project-local-cleanup.ts
 import { copyFile as copyFile2, lstat as lstat12, readFile as readFile20, writeFile as writeFile11 } from "node:fs/promises";
-import { dirname as dirname9, join as join28, resolve as resolve8 } from "node:path";
+import { dirname as dirname10, join as join29, resolve as resolve8 } from "node:path";
 var LEGACY_AGENT_CONFLICT_KEYS = ["max_threads"];
 var PROJECT_LOCAL_ARTIFACT_PATHS = [
   ".codex/hooks.json",
@@ -23199,37 +23414,37 @@ async function findProjectLocalCodexConfigs(startDirectory, codexHome) {
   if (startDirectoryStat !== null && !startDirectoryStat.isDirectory()) {
     throw new ProjectLocalCleanupStartDirectoryError(startDirectory);
   }
-  const codexHomeConfigPath = codexHome === undefined ? null : join28(resolve8(codexHome), "config.toml");
+  const codexHomeConfigPath = codexHome === undefined ? null : join29(resolve8(codexHome), "config.toml");
   let current = resolve8(startDirectory);
   const configPathsFromCwd = [];
   while (true) {
-    const configPath = join28(current, ".codex", "config.toml");
+    const configPath = join29(current, ".codex", "config.toml");
     if (await isRegularProjectLocalConfig(current, configPath)) {
       if (codexHomeConfigPath === null || resolve8(configPath) !== codexHomeConfigPath) {
         configPathsFromCwd.push(configPath);
       }
     }
-    if (await exists5(join28(current, ".git"))) {
+    if (await exists5(join29(current, ".git"))) {
       return configPathsFromCwd.length === 0 ? null : {
         projectRoot: current,
         configPaths: [...configPathsFromCwd].reverse(),
         artifactRoots: artifactRootsForConfigPaths(configPathsFromCwd)
       };
     }
-    const parent = dirname9(current);
+    const parent = dirname10(current);
     if (parent === current) {
       const nearestConfigPath = configPathsFromCwd[0];
       return nearestConfigPath === undefined ? null : {
-        projectRoot: dirname9(dirname9(nearestConfigPath)),
+        projectRoot: dirname10(dirname10(nearestConfigPath)),
         configPaths: [nearestConfigPath],
-        artifactRoots: [dirname9(dirname9(nearestConfigPath))]
+        artifactRoots: [dirname10(dirname10(nearestConfigPath))]
       };
     }
     current = parent;
   }
 }
 async function isRegularProjectLocalConfig(directory, configPath) {
-  const codexDirStat = await maybeLstat(join28(directory, ".codex"));
+  const codexDirStat = await maybeLstat(join29(directory, ".codex"));
   if (codexDirStat === null || !codexDirStat.isDirectory() || codexDirStat.isSymbolicLink())
     return false;
   const configStat = await maybeLstat(configPath);
@@ -23238,7 +23453,7 @@ async function isRegularProjectLocalConfig(directory, configPath) {
 function artifactRootsForConfigPaths(configPaths) {
   const roots = [];
   for (const configPath of configPaths) {
-    const root = dirname9(dirname9(configPath));
+    const root = dirname10(dirname10(configPath));
     if (!roots.includes(root))
       roots.push(root);
   }
@@ -23249,7 +23464,7 @@ async function collectProjectLocalArtifacts(projectRoots) {
   const seenPaths = new Set;
   for (const projectRoot of projectRoots) {
     for (const relativePath of PROJECT_LOCAL_ARTIFACT_PATHS) {
-      const artifactPath = join28(projectRoot, relativePath);
+      const artifactPath = join29(projectRoot, relativePath);
       if (seenPaths.has(artifactPath))
         continue;
       const entryStat = await maybeLstat(artifactPath);
@@ -23327,7 +23542,7 @@ function formatUnknownError(error) {
 import { createHash as createHash4 } from "node:crypto";
 import { lstat as lstat13, readFile as readFile22, readdir as readdir11, rm as rm13 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join as join29, posix as posix2 } from "node:path";
+import { join as join30, posix as posix2 } from "node:path";
 
 // packages/omo-codex/src/install/lsp-daemon-reaper-attestation.ts
 import { execFile } from "node:child_process";
@@ -23500,7 +23715,7 @@ async function readBinary(readFileImpl, path) {
 var LEGACY_EXIT_WAIT_TIMEOUT_MS = 5000;
 var LEGACY_VERSION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/;
 async function reapLspDaemons(codexHome, deps = {}) {
-  const daemonRoot = join29(codexHome, "codex-lsp", "daemon");
+  const daemonRoot = join30(codexHome, "codex-lsp", "daemon");
   const platform = deps.platform ?? process.platform;
   const tmpDir = deps.tmpDir ?? tmpdir();
   const probe = deps.probeLegacyJsonRpc ?? probeLegacyJsonRpcEndpoint;
@@ -23510,7 +23725,7 @@ async function reapLspDaemons(codexHome, deps = {}) {
   const entries = await readdir11(daemonRoot, { withFileTypes: true }).catch(() => []);
   const results = [];
   for (const entry of [...entries].sort((left, right) => left.name.localeCompare(right.name))) {
-    const versionPath = join29(daemonRoot, entry.name);
+    const versionPath = join30(daemonRoot, entry.name);
     const parsedVersion = parseVersionEntry(entry.name);
     if (parsedVersion === null || !entry.isDirectory()) {
       await removeVersionDir(versionPath);
@@ -23558,7 +23773,7 @@ function parseVersionEntry(entryName) {
   return LEGACY_VERSION_PATTERN.test(version) ? version : null;
 }
 async function readLegacyMetadata(input) {
-  const pidText = await readRegularTrimmedFile(join29(input.versionPath, "daemon.pid"));
+  const pidText = await readRegularTrimmedFile(join30(input.versionPath, "daemon.pid"));
   if (pidText === "non_regular")
     return { kind: "remove", reason: "removed non-regular legacy daemon metadata" };
   if (pidText === null)
@@ -23566,7 +23781,7 @@ async function readLegacyMetadata(input) {
   const pid = Number.parseInt(pidText, 10);
   if (!Number.isInteger(pid) || pid <= 0)
     return { kind: "remove", reason: "removed malformed legacy daemon metadata" };
-  const endpointText = await readRegularTrimmedFile(join29(input.versionPath, "daemon.endpoint"));
+  const endpointText = await readRegularTrimmedFile(join30(input.versionPath, "daemon.endpoint"));
   if (endpointText === "non_regular")
     return { kind: "remove", reason: "removed non-regular legacy daemon metadata" };
   if (endpointText === null)
@@ -23645,7 +23860,7 @@ function processIsRunning(pid) {
 
 // packages/omo-codex/src/install/codex-installer-bin-dir.ts
 import { homedir } from "node:os";
-import { join as join30, resolve as resolve9 } from "node:path";
+import { join as join31, resolve as resolve9 } from "node:path";
 function resolveCodexInstallerBinDir(input) {
   const explicitBinDir = input.binDir ?? input.env?.CODEX_LOCAL_BIN_DIR;
   if (explicitBinDir !== undefined && explicitBinDir.trim().length > 0)
@@ -23654,22 +23869,22 @@ function resolveCodexInstallerBinDir(input) {
   const defaultCodexHome = resolve9(homeDir, ".codex");
   const resolvedCodexHome = resolve9(input.codexHome);
   if (resolvedCodexHome !== defaultCodexHome)
-    return join30(resolvedCodexHome, "bin");
+    return join31(resolvedCodexHome, "bin");
   return resolve9(homeDir, ".local", "bin");
 }
 
 // packages/omo-codex/src/install/codex-installed-bin-dir.ts
 import { readFile as readFile23, readdir as readdir12, writeFile as writeFile12 } from "node:fs/promises";
-import { join as join31 } from "node:path";
+import { join as join32 } from "node:path";
 var INSTALLED_BIN_DIR_MANIFEST = ".installed-bin-dir.json";
 async function writeInstalledCodexBinDir(input) {
-  await writeFile12(join31(input.pluginRoot, INSTALLED_BIN_DIR_MANIFEST), `${JSON.stringify({ binDir: input.binDir }, null, 2)}
+  await writeFile12(join32(input.pluginRoot, INSTALLED_BIN_DIR_MANIFEST), `${JSON.stringify({ binDir: input.binDir }, null, 2)}
 `);
 }
 
 // packages/omo-codex/src/install/codex-git-bash-hooks.ts
 import { readFile as readFile24, writeFile as writeFile13 } from "node:fs/promises";
-import { join as join32 } from "node:path";
+import { join as join33 } from "node:path";
 var WINDOWS_ONLY_GIT_BASH_HOOKS = new Set([
   "./hooks/pre-tool-use-recommending-git-bash-mcp.json",
   "./hooks/post-compact-resetting-git-bash-mcp-reminder.json"
@@ -23677,7 +23892,7 @@ var WINDOWS_ONLY_GIT_BASH_HOOKS = new Set([
 async function removeGitBashHooksOffWindows(input) {
   if (input.platform === "win32")
     return;
-  const manifestPath = join32(input.pluginRoot, ".codex-plugin", "plugin.json");
+  const manifestPath = join33(input.pluginRoot, ".codex-plugin", "plugin.json");
   const parsed = JSON.parse(await readFile24(manifestPath, "utf8"));
   if (!isPlainRecord(parsed) || !Array.isArray(parsed.hooks))
     return;
@@ -23690,143 +23905,6 @@ async function removeGitBashHooksOffWindows(input) {
 
 // packages/omo-codex/src/install/install-ast-grep-sg.ts
 import { join as join34 } from "node:path";
-
-// packages/utils/src/ast-grep/install-script.ts
-import { spawn as spawn2 } from "node:child_process";
-import { existsSync as existsSync4 } from "node:fs";
-import { join as join33 } from "node:path";
-
-// packages/utils/src/ast-grep/sg-manifest.ts
-function normalizeRuntimePlatform(platform = process.platform) {
-  if (platform === "darwin" || platform === "linux" || platform === "win32")
-    return platform;
-  return "linux";
-}
-function normalizeRuntimeArch(arch = process.arch) {
-  if (arch === "arm64" || arch === "aarch64")
-    return "arm64";
-  return "x64";
-}
-function runtimeSlug(platform = process.platform, arch = process.arch) {
-  return `${normalizeRuntimePlatform(platform)}-${normalizeRuntimeArch(arch)}`;
-}
-
-// packages/utils/src/ast-grep/install-script.ts
-var AST_GREP_BIN_DIR_ENV_KEY = "OMO_AST_GREP_BIN_DIR";
-var KILL_GRACE_MS = 1000;
-var AST_GREP_INSTALL_TIMEOUT_MS = 30000;
-function astGrepRuntimeDir(baseDir, platform = process.platform, arch = process.arch) {
-  return join33(baseDir, "runtime", "ast-grep", runtimeSlug(platform, arch));
-}
-function isMissingExecutable(error) {
-  if (!("code" in error))
-    return false;
-  return error.code === "ENOENT";
-}
-function defaultSpawnProcess(command, args, options) {
-  const child = spawn2(command, args, {
-    cwd: options.cwd,
-    env: options.env,
-    stdio: "ignore",
-    windowsHide: true
-  });
-  let settled = false;
-  const outcome = new Promise((resolve) => {
-    const settle = (result) => {
-      if (settled)
-        return;
-      settled = true;
-      resolve(result);
-    };
-    child.once("error", (error) => {
-      settle({ kind: "spawn-error", error, missingExecutable: isMissingExecutable(error) });
-    });
-    child.once("exit", (code, signal) => {
-      settle({ kind: "exit", code, signal });
-    });
-  });
-  return {
-    kill: () => {
-      if (!child.killed)
-        child.kill();
-    },
-    outcome
-  };
-}
-function scriptPathForPlatform(skillDir, platform) {
-  return join33(skillDir, platform === "win32" ? "install.ps1" : "install.sh");
-}
-function invocationsForPlatform(scriptPath, platform) {
-  if (platform !== "win32")
-    return [{ command: "bash", args: [scriptPath] }];
-  const args = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptPath];
-  return [{ command: "pwsh", args }, { command: "powershell.exe", args }];
-}
-async function runInvocation(input) {
-  const child = input.spawnProcess(input.invocation.command, input.invocation.args, { cwd: input.skillDir, env: input.env });
-  let timedOut = false;
-  let terminateDeadline;
-  let terminateDeadlineGrace;
-  const killIgnored = new Promise((_, reject) => {
-    terminateDeadline = () => reject(new Error("ast-grep install child ignored termination"));
-  });
-  const timeout = setTimeout(() => {
-    timedOut = true;
-    child.kill();
-    terminateDeadlineGrace = setTimeout(() => terminateDeadline?.(), KILL_GRACE_MS);
-  }, input.timeoutMs);
-  try {
-    const outcome = await Promise.race([child.outcome, killIgnored]);
-    if (timedOut)
-      return { kind: "timed-out" };
-    return outcome;
-  } catch (error) {
-    if (error instanceof Error && error.message.includes("ignored termination")) {
-      return { kind: "spawn-error", error, missingExecutable: false };
-    }
-    throw error;
-  } finally {
-    clearTimeout(timeout);
-    if (terminateDeadlineGrace !== undefined)
-      clearTimeout(terminateDeadlineGrace);
-  }
-}
-function failedReason(outcome) {
-  return outcome.error.message;
-}
-async function runAstGrepSkillInstall(options) {
-  const platform = options.platform ?? process.platform;
-  const fileExists = options.fileExists ?? existsSync4;
-  const scriptPath = scriptPathForPlatform(options.skillDir, platform);
-  if (!fileExists(scriptPath))
-    return { kind: "skipped", reason: `missing ${scriptPath}` };
-  const env = { ...options.env ?? process.env, [AST_GREP_BIN_DIR_ENV_KEY]: options.targetDir };
-  const spawnProcess = options.spawnProcess ?? defaultSpawnProcess;
-  const timeoutMs = options.timeoutMs ?? AST_GREP_INSTALL_TIMEOUT_MS;
-  const invocations = invocationsForPlatform(scriptPath, platform);
-  try {
-    for (const invocation of invocations) {
-      const outcome = await runInvocation({ env, invocation, skillDir: options.skillDir, spawnProcess, timeoutMs });
-      if (outcome.kind === "timed-out")
-        return { kind: "timed-out" };
-      if (outcome.kind === "exit") {
-        if (outcome.code === 0)
-          return { kind: "succeeded" };
-        return { kind: "failed", reason: `${invocation.command} exited ${outcome.code ?? outcome.signal ?? "without status"}` };
-      }
-      if (platform === "win32" && outcome.missingExecutable && invocation.command === "pwsh")
-        continue;
-      return { kind: "failed", reason: failedReason(outcome) };
-    }
-    return { kind: "failed", reason: "no ast-grep install shell was available" };
-  } catch (error) {
-    if (error instanceof Error)
-      return { kind: "failed", reason: error.message };
-    return { kind: "failed", reason: String(error) };
-  }
-}
-
-// packages/omo-codex/src/install/install-ast-grep-sg.ts
 function describeResult(result) {
   if (result.kind === "succeeded")
     return null;

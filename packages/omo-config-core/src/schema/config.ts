@@ -35,6 +35,10 @@ export const OmoDisabledSkillsSchema = z.array(z.string())
  */
 export const OmoExcludedModelsSchema = z.array(z.string())
 
+const OmoMcpEnvAllowlistSchema = z.array(z.string()).describe(
+  "User-only environment variable names passed to OpenCode MCP servers. Project configuration is ignored.",
+)
+
 export const OmoTypedHarnessConfigSchema = z.object({
   provenance: OmoProvenanceSettingsSchema.optional(),
   formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
@@ -57,6 +61,7 @@ export const OmoTypedHarnessConfigSchema = z.object({
 }).strict()
 
 export const OmoConfigProfileSchema = z.object({
+  mcp_env_allowlist: OmoMcpEnvAllowlistSchema.optional(),
   provenance: OmoProvenanceSettingsSchema.optional(),
   formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
   categories: OmoCategoriesConfigSchema.optional(),
@@ -82,6 +87,7 @@ export const OmoConfigProfileSchema = z.object({
 }).strict()
 
 export const OmoConfigSchema = z.object({
+  mcp_env_allowlist: OmoMcpEnvAllowlistSchema.optional(),
   provenance: OmoProvenanceSettingsSchema.optional(),
   formatOnMutation: OmoFormatOnMutationSchema.optional(),
   $schema: z.string().optional(),
@@ -111,6 +117,7 @@ export const OmoConfigSchema = z.object({
 }).strict()
 
 export const OmoConfigLayerSchema = z.object({
+  mcp_env_allowlist: OmoMcpEnvAllowlistSchema.optional(),
   provenance: OmoProvenanceSettingsSchema.optional(),
   formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
   $schema: z.string().optional(),

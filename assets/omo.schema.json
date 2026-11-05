@@ -5,6 +5,13 @@
   "description": "Configuration schema for the omo.json / omo.jsonc harness-neutral config surface",
   "type": "object",
   "properties": {
+    "mcp_env_allowlist": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "User-only environment variable names passed to OpenCode MCP servers. Project configuration is ignored."
+    },
     "provenance": {
       "type": "object",
       "properties": {
@@ -9817,6 +9824,13 @@
       "additionalProperties": {
         "type": "object",
         "properties": {
+          "mcp_env_allowlist": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "User-only environment variable names passed to OpenCode MCP servers. Project configuration is ignored."
+          },
           "provenance": {
             "type": "object",
             "properties": {
