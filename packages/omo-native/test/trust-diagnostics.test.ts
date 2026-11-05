@@ -226,6 +226,30 @@ describe("closed code set", () => {
     ])
   })
 
+  test("#given a structured default-file drop #when appending #then reads back the file, cause, block index and narrowing (design r11)", async () => {
+    const drop = { code: "openssl-default-file-malformed", file: "/etc/ssl/cert.pem", cause: "aux-block-unverified", blockIndex: 2, narrowing: true } as const
+    await appendTrustDiagnostic(directory, {
+      kind: "long-lived", action: "import-exec", generation, codes: [drop, { code: "openssl-default-file-malformed" }],
+    }, clock)
+    const [record] = await lines(file()) as { codes: unknown }[]
+    expect(record?.codes).toEqual([drop, { code: "openssl-default-file-malformed" }])
+  })
+
+  test.each([
+    ["another file", { file: "/etc/ssl/other.pem" }],
+    ["an unknown cause", { cause: "bad-luck" }],
+    ["a negative block index", { blockIndex: -1 }],
+    ["a fractional block index", { blockIndex: 1.5 }],
+    ["a narrowing that is not the cause's", { cause: "pem-read-error", narrowing: true }],
+    ["a narrowing that is not a boolean", { narrowing: "true" }],
+    ["a missing field", { narrowing: undefined }],
+    ["an extra field", { subject: "CN=Example Root" }],
+  ])("#given a default-file drop with %s #when appending #then rejects", async (_label, change) => {
+    const drop: Record<string, unknown> = { code: "openssl-default-file-malformed", file: "/etc/ssl/cert.pem", cause: "pem-noncanonical", blockIndex: 0, narrowing: true, ...change }
+    for (const key of Object.keys(drop)) if (drop[key] === undefined) delete drop[key]
+    await reject({ kind: "long-lived", action: "import-exec", generation, codes: [drop] })
+  })
+
   test("#given every field-carrying code #when appending #then writes exactly the catalog fields", async () => {
     await appendTrustDiagnostic(directory, {
       kind: "one-shot-network", action: "refuse", generation, check: "loaded-set",
