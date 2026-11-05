@@ -13,6 +13,12 @@ export type DreamSelectionRuntimeModule = Pick<
   "computeUnreflectedVolumeFast" | "loadConversations" | "selectLoadedConversations"
 >
 
+/** The runtime retention pass and host sweep the maintenance pass loads from the same sidecar (`memory-maintenance.ts`). */
+export type MemoryRetentionRuntimeModule = Pick<
+  typeof CommandsRuntime,
+  "createRetentionHostSweepStep" | "runRuntimeRetention" | "summarizeRuntimeRetention" | "sweepHostIdentities"
+>
+
 export const MEMORY_COMMANDS_RUNTIME_ARTIFACT = "extensions/omo-memory-commands.js"
 
 /** One shared import per process; a failed import is not cached, so the next invocation retries. */
@@ -27,7 +33,9 @@ export function createMemoryCommandsRuntimeLoader<Module>(importRuntime: () => P
   }
 }
 
-export const loadMemoryCommandsRuntime: () => Promise<MemoryCommandsRuntimeModule & DreamSelectionRuntimeModule> =
+export const loadMemoryCommandsRuntime: () => Promise<
+  MemoryCommandsRuntimeModule & DreamSelectionRuntimeModule & MemoryRetentionRuntimeModule
+> =
   createMemoryCommandsRuntimeLoader(() => import("#omo-memory-commands-runtime"))
 
 export function memoryCommandsRuntimeLoadFailure(command: string, error: unknown): string {

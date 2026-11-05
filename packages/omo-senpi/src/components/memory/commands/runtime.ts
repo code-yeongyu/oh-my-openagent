@@ -20,6 +20,8 @@ import type { MemoryCommandContext, MemoryCommandDeps, MemoryCommandHandler } fr
 export { planFactsMutation, FactsPlanParentDirtyError } from "@oh-my-opencode/memory-core"
 // Dream conversation loading and selection run only when a dream fires, so the entry bundle loads them from here.
 export { computeUnreflectedVolumeFast, loadConversations, selectLoadedConversations } from "../dream-selector"
+// The background maintenance pass runs runtime retention and the host sweep only when one is due, so the entry bundle loads them from here.
+export { createRetentionHostSweepStep, runRuntimeRetention, summarizeRuntimeRetention, sweepHostIdentities } from "../memory-retention-pass"
 
 type CommandRegistrar = (pi: MemoryCommandPort, deps: MemoryCommandDeps) => void
 

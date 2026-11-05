@@ -3,9 +3,7 @@ import { dirname } from "node:path"
 
 import {
   DEFAULT_RUNTIME_RETENTION,
-  createRetentionHostSweepStep,
   readHostSweepState,
-  sweepHostIdentities,
   type ForeignMemoryRuntimeSettings,
   RETENTION_STAMP_CONFIG_KEY,
   GitMemoryRepo,
@@ -13,13 +11,12 @@ import {
   createLockRecord,
   memoryMaintenanceLockPath,
   retentionCursorPath,
-  runRuntimeRetention,
-  summarizeRuntimeRetention,
   sweepEmptyTranscriptJournals,
   withLock,
   type RuntimeRetentionPolicy,
 } from "@oh-my-opencode/memory-core"
 
+import { loadMemoryCommandsRuntime } from "./commands/runtime-loader"
 import type { MemoryIdentityContext } from "./context"
 
 /** Logger surface the scheduler needs. */
@@ -91,7 +88,9 @@ const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000
  *   exit) cancels it and stops a running git, and every failure is logged, never raised.
  * - Runtime retention (#10144) runs inside the same gate, after the pack: one pass per identity per
  *   interval removes folded reflection runs, idle journals, sidecars and legacy stores past their
- *   `memory.runtime` windows. It is abort-aware between items and logs one summary line.
+ *   `memory.runtime` windows. It is abort-aware between items and logs one summary line. The pass and
+ *   the host sweep load from the memory commands sidecar only when one is due, which keeps them out of
+ *   the entry bundle; a failed load is logged like any other failure of that step.
  * - Empty transcript journals left by older builds (#9737) are swept once per identity per process, at
  *   once rather than behind the delay: control sessions exit within seconds and dispose() would cancel it.
  */
@@ -134,6 +133,8 @@ export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}):
 
   async function retain(context: MemoryIdentityContext, repo: GitMemoryRepo, signal: AbortSignal): Promise<void> {
     try {
+      const { runRuntimeRetention, summarizeRuntimeRetention } = await loadMemoryCommandsRuntime()
+      signal.throwIfAborted()
       const report = await runRuntimeRetention({
         paths: context.identityPaths,
         policy: options.resolveRetention?.(context) ?? DEFAULT_RUNTIME_RETENTION,
@@ -172,6 +173,8 @@ export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}):
     const state = await readHostSweepState(memoryRoot)
     const completedAt = state.completedAt === undefined ? Number.NaN : Date.parse(state.completedAt)
     if (state.cursor === undefined && Number.isFinite(completedAt) && now() - completedAt < HOST_SWEEP_INTERVAL_MS) return
+    const { createRetentionHostSweepStep, sweepHostIdentities } = await loadMemoryCommandsRuntime()
+    signal.throwIfAborted()
     const deadline = now() + HOST_SWEEP_SLICE_MS
     const result = await sweepHostIdentities({
       memoryRoot,

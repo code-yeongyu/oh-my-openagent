@@ -1050,6 +1050,7 @@
     "packages/omo-senpi/src/components/memory/memory-notice-spec.ts",
     "packages/omo-senpi/src/components/memory/memory-notice-wiring.ts",
     "packages/omo-senpi/src/components/memory/memory-reporter.ts",
+    "packages/omo-senpi/src/components/memory/memory-retention-pass.ts",
     "packages/omo-senpi/src/components/memory/memory-rpc-bridge.ts",
     "packages/omo-senpi/src/components/memory/memory-rpc-journal-state.ts",
     "packages/omo-senpi/src/components/memory/memory-rpc-reflections.ts",
