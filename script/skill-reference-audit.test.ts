@@ -86,6 +86,13 @@ describe("skill reference audit", () => {
     ])
   })
 
+  test("#given an optional mention whose name exists only in this repository's own local skills #when audited #then it is reported unless the text says the skill is project-local", () => {
+    const repoOnlyCatalog: ReferenceCatalog = { ...catalog, skills: { ...catalog.skills, repo: new Set([...catalog.skills.repo, "work-with-pr"]) } }
+    const path = writeFixture("skills/main/repo-only.md", "When the session lists the `work-with-pr` skill, use it.\nIf the environment provides a `work-with-pr` skill (some repositories define one project-locally), use it.\n")
+    const file: AuditedFile = { path, editions: ["senpi"], skillRoot: join(fixtureRoot, "skills", "main"), taskDialect: "senpi" }
+    expect(auditSkillReferences(fixtureRoot, { catalog: repoOnlyCatalog, files: [file] }).map((finding) => [finding.line, finding.reference])).toEqual([[1, "work-with-pr"]])
+  })
+
   test("#given a conditional about the project rather than the skill #when audited #then the mention is still required in every edition", () => {
     expect(audit("skills/main/three-b.md", "If the project has a React app, load the `teammode` skill.\n", ["opencode", "codex"])).toEqual([
       { referenceClass: "skill-name", reference: "teammode", missingIn: ["opencode"], suggestion: "team-mode" },
