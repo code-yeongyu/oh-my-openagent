@@ -1,25 +1,16 @@
-// The reflection run-id high water (#7095, H1 of #10144/#11976). The allocator mints one past the
-// highest `reflection-run-N` it can still see; anything that removes or moves the highest trace aside
-// would otherwise let that id be minted again and collide with its durable completion record. The
-// six on-disk sources are scanned here so the allocator and every remover read the same answer, and
-// `run-id.json` keeps a mark that survives the removal of the trace it came from.
-
+import { randomUUID } from "node:crypto"
 import { join } from "node:path"
 
-import { readFile, readdir } from "../fs/resilient"
-import { readJsonOptional, writeJsonAtomic } from "./reservation-files"
+import { mkdir, readFile, readdir, rename, rm, writeFile } from "../fs/resilient"
+import type { MemoryIdentityPaths } from "../identity/layout"
 
-export const RUN_ID_HIGH_WATER_FILENAME = "run-id.json"
-
+export const REFLECTION_RUN_ID_PREFIX = "reflection-run-"
 /** `reflection-run-7`, `reflection-run-7.json`, and the epoch-prefixed `1755000000000-reflection-run-7`. */
 const RUN_ID_NAME = /^(?:\d+-)?reflection-run-(\d+)(?:\.json)?$/
 const RESERVATION_STATE_FILES = ["active.lock", "pending.json"] as const
+const RUN_ID_MARK_FILE = "run-id.json"
 
-export interface RunIdHighWaterPaths {
-  readonly reflection: string
-  readonly reflectionSessions: string
-  readonly worktrees: string
-}
+export type RunIdHighWaterPaths = Pick<MemoryIdentityPaths, "reflection" | "reflectionSessions" | "worktrees">
 
 export function reflectionRunNumber(name: string): number {
   const digits = RUN_ID_NAME.exec(name)?.[1]
@@ -28,53 +19,68 @@ export function reflectionRunNumber(name: string): number {
   return Number.isSafeInteger(parsed) ? parsed : 0
 }
 
-async function highestNamedRun(directory: string): Promise<number> {
-  const names = await readdir(directory).catch(() => [] as string[])
-  return names.reduce((highest, name) => Math.max(highest, reflectionRunNumber(name)), 0)
-}
-
 /**
- * Live reservations hold an id before any completion record or run directory exists for it. An
- * unreadable reservation contributes nothing here; the reservation store reports it itself.
+ * The highest run number any trace on disk still carries (H1): completion records, run dirs, legacy
+ * reflection-session dirs, worktrees, and the live reservation files. The allocator mints one past
+ * it, so every removal path exempts the trace that carries it.
  */
-async function highestReservedRun(reflectionDir: string): Promise<number> {
-  const reserved = await Promise.all(
-    RESERVATION_STATE_FILES.map(async (name) => {
-      const runId = await readFile(join(reflectionDir, name), "utf8")
-        .then((raw) => (JSON.parse(raw) as { readonly runId?: unknown }).runId)
-        .catch(() => undefined)
-      return typeof runId === "string" ? reflectionRunNumber(runId) : 0
-    }),
-  )
-  return Math.max(0, ...reserved)
-}
-
-export async function scanRunIdHighWater(paths: RunIdHighWaterPaths): Promise<number> {
+export async function scanReflectionRunHighWater(paths: RunIdHighWaterPaths): Promise<number> {
   const scanned = await Promise.all([
     highestNamedRun(join(paths.reflection, "completions")),
     highestNamedRun(join(paths.reflection, "runs")),
     highestNamedRun(paths.reflectionSessions),
     highestNamedRun(paths.worktrees),
-    highestReservedRun(paths.reflection),
+    ...RESERVATION_STATE_FILES.map((name) => reservedRun(join(paths.reflection, name))),
   ])
   return Math.max(0, ...scanned)
 }
 
-/** The recorded mark; 0 when `run-id.json` is missing or unreadable, which falls back to the scan. */
-export async function readRecordedRunIdHighWater(reflectionDir: string): Promise<number> {
+async function highestNamedRun(directory: string): Promise<number> {
+  const names = await readdir(directory).catch(() => [] as string[])
+  return names.reduce((highest, name) => Math.max(highest, reflectionRunNumber(name)), 0)
+}
+
+/** Unreadable reservation state contributes nothing: the reservation store reports it itself. */
+async function reservedRun(path: string): Promise<number> {
+  const runId = await readFile(path, "utf8")
+    .then((raw) => (JSON.parse(raw) as { readonly runId?: unknown }).runId)
+    .catch(() => undefined)
+  return typeof runId === "string" ? reflectionRunNumber(runId) : 0
+}
+
+export function reflectionRunIdMarkPath(reflectionDir: string): string {
+  return join(reflectionDir, RUN_ID_MARK_FILE)
+}
+
+/** The durable high-water mark (H1 Guard 2), or undefined when absent or unreadable (scan only). */
+export async function readReflectionRunIdMark(reflectionDir: string): Promise<number | undefined> {
   try {
-    const value = await readJsonOptional(join(reflectionDir, RUN_ID_HIGH_WATER_FILENAME))
-    const highWater = typeof value === "object" && value !== null ? (value as { highWater?: unknown }).highWater : undefined
-    return typeof highWater === "number" && Number.isSafeInteger(highWater) && highWater > 0 ? highWater : 0
+    const parsed: unknown = JSON.parse(await readFile(reflectionRunIdMarkPath(reflectionDir), "utf8"))
+    if (!parsed || typeof parsed !== "object") return undefined
+    const highWater = (parsed as { readonly highWater?: unknown }).highWater
+    return typeof highWater === "number" && Number.isSafeInteger(highWater) && highWater >= 0 ? highWater : undefined
   } catch {
-    return 0
+    return undefined
   }
 }
 
-/** Raises the recorded mark to `highWater`; it never lowers it. Callers hold the scheduler lock. */
-export async function recordRunIdHighWater(reflectionDir: string, highWater: number): Promise<number> {
-  const recorded = await readRecordedRunIdHighWater(reflectionDir)
-  const next = Math.max(recorded, highWater)
-  if (next > recorded) await writeJsonAtomic(join(reflectionDir, RUN_ID_HIGH_WATER_FILENAME), { version: 1, highWater: next })
+/**
+ * Raises the durable mark to `highWater` and never lowers it. The caller holds the
+ * `reflection-scheduler` lock, the lock the allocator mints under, so read-max-write cannot race.
+ */
+export async function recordReflectionRunIdMark(reflectionDir: string, highWater: number): Promise<number> {
+  const current = await readReflectionRunIdMark(reflectionDir)
+  const next = Math.max(current ?? 0, highWater)
+  if (current === next) return next
+  await mkdir(reflectionDir, { recursive: true, mode: 0o700 })
+  const target = reflectionRunIdMarkPath(reflectionDir)
+  const temporary = `${target}.tmp-${randomUUID()}`
+  try {
+    await writeFile(temporary, `${JSON.stringify({ version: 1, highWater: next })}\n`, { encoding: "utf8", mode: 0o600 })
+    await rename(temporary, target)
+  } catch (error) {
+    await rm(temporary, { force: true })
+    throw error
+  }
   return next
 }

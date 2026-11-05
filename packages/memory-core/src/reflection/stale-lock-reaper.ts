@@ -19,7 +19,7 @@ import type { ReservedRun } from "./machine"
 import { REFLECTION_ORPHAN_GRACE_MS } from "./orphan-sweep"
 import { RESERVATION_EVIDENCE_FILENAME, writeQuarantine } from "./quarantine"
 import { isReservedRun, moveTornReservationAside } from "./reservation-files"
-import { recordRunIdHighWater, scanRunIdHighWater } from "./run-id-high-water"
+import { recordReflectionRunIdMark, scanReflectionRunHighWater } from "./run-id-high-water"
 import { parseReservationRunLedger } from "./run-ledger"
 import { classifyRecordedProcess } from "./run-process"
 import { classifyReflectionLockHolder, reflectionLauncherLiveness, type ReflectionLockProbe, type ReflectionLockVerdict } from "./stale-holder"
@@ -386,9 +386,9 @@ async function reapTornLock(context: ReaperContext, paths: { reflectionSessions:
     if (again.kind !== "reap" || again.action !== "lock-torn") return false
     const bytes = await readFile(join(context.reflectionDir, "active.lock"), "utf8")
     const named = [...bytes.matchAll(TORN_RUN_ID)].map((match) => Number.parseInt(match[1] ?? "0", 10)).filter(Number.isSafeInteger)
-    const scanned = await scanRunIdHighWater({ reflection: context.reflectionDir, ...paths })
+    const scanned = await scanReflectionRunHighWater({ reflection: context.reflectionDir, ...paths })
     const highWater = Math.max(scanned, ...named)
-    if (highWater > 0) await recordRunIdHighWater(context.reflectionDir, highWater)
+    if (highWater > 0) await recordReflectionRunIdMark(context.reflectionDir, highWater)
     const at = new Date(context.now())
     const name = await moveTornReservationAside(context.reflectionDir, bytes, at)
     if (name === undefined) return false
