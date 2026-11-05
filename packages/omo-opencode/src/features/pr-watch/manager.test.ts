@@ -199,3 +199,44 @@ test("GHES host is inferred from the project and explicit mismatched URLs fail b
     else process.env.GH_HOST = oldHost
   }
 })
+
+
+test("legacy pending wake keeps its original hash-shaped receipt identity", async () => {
+  const f = fixture(), registry = await f.seed()
+  const wake = pendingPrWatchWakes(registry.read())[0]
+  if (!wake) throw new Error("Missing legacy pending wake")
+  f.receipts.push({ info: { id: `msg_${wake.id.slice(0, 32)}`, role: "user" }, parts: [] })
+  await f.manager().tick()
+  expect(f.dispatches()).toBe(0)
+  expect(pendingPrWatchWakes(registry.read())).toEqual([])
+})
+
+test("new delivery id sorts after the session's latest user message", async () => {
+  const f = fixture(), registry = await f.seed()
+  const time = ((BigInt(Date.now()) + 1000n) * 0x1000n) & 0xffffffffffffn
+  const latest = `msg_${time.toString(16).padStart(12, "0")}zzzzzzzzzzzzzz`
+  f.receipts.push({ info: { id: latest, role: "user" }, parts: [] })
+  await f.manager().tick()
+  expect(f.dispatches()).toBe(1)
+  const pending = pendingPrWatchWakes(registry.read())[0]
+  if (!pending?.messageID) throw new Error("Missing persisted delivery id")
+  expect(pending.messageID > latest).toBe(true)
+  expect(pending.messageID).toMatch(/^msg_[0-9a-f]{26}$/)
+})
+
+
+test("idle legacy delivered wakes, stopped registrations and snapshots are pruned on boot", async () => {
+  const f = fixture(), registry = await f.seed()
+  const old = registry.read()
+  for (const wake of Object.values(old.outbox)) wake.status = "delivered"
+  old.snapshots["orphan/repo#1"] = { transition: 500 }
+  writeFileSync(f.path, JSON.stringify(old))
+  const manager = f.manager()
+  // Constructor schedules immediately even though this file has no active or pending work.
+  for (let i = 0; i < 100 && Object.keys(registry.read().outbox).length; i++) await new Promise(resolve => setTimeout(resolve, 5))
+  expect(registry.read().outbox).toEqual({})
+  expect(registry.read().registrations).toEqual({})
+  expect(registry.read().snapshots).toEqual({})
+  expect(f.dispatches()).toBe(0)
+  await manager.shutdown()
+})
