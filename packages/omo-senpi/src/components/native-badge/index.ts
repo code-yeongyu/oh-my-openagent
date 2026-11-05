@@ -1,5 +1,6 @@
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { createNativeBadgeStatus, resolveNativeBadgeText } from "./footer-badge"
+import { NATIVE_BADGE_HANDLER_SIDE } from "./hand-lifetime"
 
 export function createNativeBadgeComponent(options: { env?: NodeJS.ProcessEnv } = {}): OmoSenpiComponent {
   return {
@@ -10,8 +11,8 @@ export function createNativeBadgeComponent(options: { env?: NodeJS.ProcessEnv } 
         badge.publish(eventCtx)
         return undefined
       }
-      pi.on("session_start", publish)
-      pi.on("agent_settled", publish)
+      pi.on("session_start", publish, NATIVE_BADGE_HANDLER_SIDE)
+      pi.on("agent_settled", publish, NATIVE_BADGE_HANDLER_SIDE)
     },
   }
 }
