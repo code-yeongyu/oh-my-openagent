@@ -8,6 +8,7 @@ mod ax;
 mod backend;
 mod capture;
 mod cursor;
+mod epoch_sources;
 mod focus;
 mod front_app;
 mod launch_gate;
