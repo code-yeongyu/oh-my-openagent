@@ -63,11 +63,21 @@ posix("a FIFO at a received key's path is refused with a receipt instead of bloc
     expect(await made.exited).toBe(0)
     // The pre-fix code read the leaf here, which blocks on a FIFO until a writer opens it. The
     // bounded race keeps that run from hanging the suite: it settles as a timeout instead.
-    const settled = await Promise.race([
-      prepareLanding(root, key).then((result) => ({ kind: "landed" as const, result })),
-      new Promise<{ kind: "timed-out" }>((resolve) => setTimeout(() => resolve({ kind: "timed-out" }), 5_000)),
-    ])
-    expect(settled).toEqual({ kind: "landed", result: { refused: "non-regular-file" } })
+    // #12568 review: clear the 5-second race timer once `prepareLanding` wins, so the test
+    // does not leave a stray timer alive after it settles.
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+    const timeout = new Promise<{ kind: "timed-out" }>((resolve) => {
+      timeoutId = setTimeout(() => resolve({ kind: "timed-out" }), 5_000)
+    })
+    try {
+      const settled = await Promise.race([
+        prepareLanding(root, key).then((result) => ({ kind: "landed" as const, result })),
+        timeout,
+      ])
+      expect(settled).toEqual({ kind: "landed", result: { refused: "non-regular-file" } })
+    } finally {
+      if (timeoutId !== undefined) clearTimeout(timeoutId)
+    }
   } finally {
     await rm(root, { recursive: true, force: true })
   }
