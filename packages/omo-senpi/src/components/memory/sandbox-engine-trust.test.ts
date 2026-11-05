@@ -9,7 +9,8 @@ import { buildSandboxTransform } from "./sandbox"
 import { probeBwrapUsability } from "./sandbox-bwrap-probe"
 import { rmSyncEfaultTolerant } from "./teardown.test-support"
 import type { ReflectionSpawnArgs } from "./worker/spawn"
-import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
+import { useTestTimeout } from "../../../../../test-support/test-deadline"
+import { spawnTimeout } from "../../../test-support/spawn-timeout"
 
 const bwrap = process.platform === "linux" ? Bun.which("bwrap") : null
 const bwrapUsable = bwrap !== null && (await probeBwrapUsability(bwrap)).usable
@@ -94,7 +95,7 @@ async function runInSandbox(mode: "prepare" | "adopt" | "unattested", options: {
   const separator = sandboxed.args.indexOf("--")
   const args = [...sandboxed.args.slice(0, separator), ...(options.extraMounts?.(setup.root) ?? []), ...sandboxed.args.slice(separator)]
   const child = Bun.spawn([sandboxed.command, ...args], {
-    cwd: setup.worktree, env: sandboxed.env, stdout: "pipe", stderr: "pipe", timeout: Math.floor(remainingTestTime()),
+    cwd: setup.worktree, env: sandboxed.env, stdout: "pipe", stderr: "pipe", timeout: spawnTimeout(),
   })
   const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
   return { code, stderr, outcome: JSON.parse(stdout) as Outcome }

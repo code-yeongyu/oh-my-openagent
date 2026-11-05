@@ -44,6 +44,8 @@ type Observed = {
   settledAfterPreview: Settle
 }
 const TEARDOWN_STEP_MS = 15_000
+/** The attach wait's share of the test budget: what is left after the three teardown steps the scenario reserves. */
+const attachBudget = (teardownStepMs: number): number => Math.max(0, remainingTestTime() - 3 * teardownStepMs)
 
 /** Resolves or rejects with `step`, or rejects once `ms` passes so a hung teardown step cannot hold the test. */
 async function bounded<T>(step: Promise<T>, ms: number, label: string): Promise<T> {
@@ -202,7 +204,7 @@ async function runPrefixScenario(options: {
 test("#given a real OmO session #when the engine builds its prewarm prefix #then it is ready rather than skipped by unsafe handlers", async () => {
   useTestTimeout(90_000)
   // given / when
-  const run = await runPrefixScenario({ attachSettleMs: 30_000 })
+  const run = await runPrefixScenario({ attachSettleMs: attachBudget(TEARDOWN_STEP_MS) })
   // then: teardown already restored the process, so these assertions cannot leak state into later tests
   if (run.failure !== undefined) throw run.failure
   expect(run.teardown.errors).toEqual([])
@@ -251,7 +253,7 @@ test("#given a session dispose that never settles #when the scenario tears down 
     await new Promise<void>(() => {})
   }
   // when
-  const run = await runPrefixScenario({ attachSettleMs: 30_000, teardownStepMs: 1_000, disposeSession: hangingDispose })
+  const run = await runPrefixScenario({ attachSettleMs: attachBudget(1_000), teardownStepMs: 1_000, disposeSession: hangingDispose })
   // then
   expect(run.failure).toBeUndefined()
   expect(run.teardown.errors.map(String)).toEqual(["Error: session.dispose() did not settle within 1000 ms"])

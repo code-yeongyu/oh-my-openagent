@@ -118,7 +118,7 @@ function host(input: {
       if (Date.now() > deadline) throw new Error(`waited out the test budget for ${label}, never fired`)
       await new Promise<void>((resolve) => {
         waiters.push(resolve)
-        setTimeout(resolve, EVENT_TIMEOUT_MS).unref?.()
+        setTimeout(resolve, Math.min(EVENT_TIMEOUT_MS, Math.max(0, deadline - Date.now()))).unref?.()
       })
     }
   }
