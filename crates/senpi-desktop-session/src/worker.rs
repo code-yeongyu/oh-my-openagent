@@ -57,6 +57,8 @@ pub(crate) struct Worker {
     pub(crate) report_extras: Rc<Cell<Option<crate::report::ReportExtras>>>,
     /// The coordinate epoch; moves supersede frames and expire refs.
     pub(crate) epochs: crate::epoch::Epochs,
+    /// The last activity, for the object-mode idle flush.
+    pub(crate) idle: crate::idle::Idle,
 }
 
 /// A mutating request's reply and the audit event it emitted.
@@ -98,6 +100,7 @@ impl Worker {
             intervention: crate::intervention::Intervention::new(),
             report_extras: Rc::default(),
             epochs: crate::epoch::Epochs::default(),
+            idle: crate::idle::Idle::default(),
         };
         worker.install_screen_probe();
         worker.refresh_capabilities();
@@ -157,6 +160,7 @@ impl Worker {
         self.gc = ArtifactGc::default();
         self.maybe_gc();
         self.publish_report_mode();
+        self.mark_active();
         self.refresh_capabilities()
     }
 
@@ -198,12 +202,15 @@ impl Worker {
             self.attach_user_input_feed();
             self.drain_user_input();
         }
+        self.flush_if_idle();
+        self.mark_active();
         self.apply_epoch();
         let result = self.serve(op, cancelled);
         if matches!(&result, Err(error) if error.code == ErrorCode::SpaceUnsupported) {
             self.epochs.record(senpi_desktop_core::protocol_results::EpochReason::Space);
         }
         self.apply_epoch();
+        self.mark_active();
         result
     }
 

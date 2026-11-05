@@ -11,6 +11,7 @@ mod cancel_on_drop;
 mod display_awake;
 mod epoch;
 mod grant;
+mod idle;
 mod intervention;
 mod lock;
 mod mutate;

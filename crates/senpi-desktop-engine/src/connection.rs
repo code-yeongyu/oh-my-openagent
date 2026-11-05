@@ -14,11 +14,11 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use parking_lot::Mutex;
-use senpi_desktop_core::error::DesktopError;
+use senpi_desktop_core::error::{DesktopError, ErrorReport};
 use senpi_desktop_core::methods::Method;
 use senpi_desktop_core::protocol::{MethodRejection, RequestId, RpcRequest};
 use serde_json::Value;
-use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
 use tokio::sync::mpsc::error::{SendError, TrySendError};
 use tokio::sync::{mpsc, oneshot};
 
@@ -30,6 +30,10 @@ use dispatch::dispatch;
 
 /// Reply lines buffered ahead of a slow reader of the output.
 const OUTBOUND_CAPACITY: usize = 256;
+
+/// The longest request line, newline excluded (DESIGN 9, request size); a
+/// longer one is discarded unread and answered `request_too_large`.
+pub(crate) const MAX_REQUEST_BYTES: usize = 1 << 20;
 
 struct Queued {
     id: RequestId,
@@ -231,15 +235,18 @@ async fn read_requests<R: AsyncRead + Unpin>(
     let mut reader = BufReader::new(reader);
     let mut line = Vec::new();
     loop {
-        line.clear();
-        if reader.read_until(b'\n', &mut line).await? == 0 {
-            return Ok(());
-        }
-        let text = line.trim_ascii();
-        if text.is_empty() {
-            continue;
-        }
-        let Some(reply) = handle_line(engine, text, queue, in_flight) else {
+        let reply = match read_line(&mut reader, &mut line).await? {
+            Line::End => return Ok(()),
+            Line::TooLarge => Some(failure_line(None, Failure::Engine(request_too_large()))),
+            Line::Read => {
+                let text = line.trim_ascii();
+                if text.is_empty() {
+                    continue;
+                }
+                handle_line(engine, text, queue, in_flight)
+            }
+        };
+        let Some(reply) = reply else {
             continue;
         };
         if deliver(engine, out, reply).await.is_err() {
@@ -247,6 +254,54 @@ async fn read_requests<R: AsyncRead + Unpin>(
             return Ok(());
         }
     }
+}
+
+enum Line {
+    End,
+    Read,
+    /// Longer than [`MAX_REQUEST_BYTES`]: discarded, so its id is unknown.
+    TooLarge,
+}
+
+/// Reads one line into `line`, keeping at most [`MAX_REQUEST_BYTES`] of it in
+/// memory; the rest of an oversized line is consumed and dropped.
+async fn read_line<R: AsyncBufRead + Unpin>(reader: &mut R, line: &mut Vec<u8>) -> io::Result<Line> {
+    line.clear();
+    let mut too_large = false;
+    loop {
+        let available = reader.fill_buf().await?;
+        if available.is_empty() {
+            return Ok(match (too_large, line.is_empty()) {
+                (true, _) => Line::TooLarge,
+                (false, true) => Line::End,
+                (false, false) => Line::Read,
+            });
+        }
+        let newline = available.iter().position(|&byte| byte == b'\n');
+        let content = &available[..newline.unwrap_or(available.len())];
+        if !too_large && line.len() + content.len() > MAX_REQUEST_BYTES {
+            too_large = true;
+            *line = Vec::new();
+        }
+        if !too_large {
+            line.extend_from_slice(content);
+        }
+        let consumed = newline.map_or(available.len(), |index| index + 1);
+        reader.consume(consumed);
+        if newline.is_some() {
+            return Ok(if too_large { Line::TooLarge } else { Line::Read });
+        }
+    }
+}
+
+fn request_too_large() -> DesktopError {
+    DesktopError::internal(format!(
+        "the request line is longer than {MAX_REQUEST_BYTES} bytes and was discarded; send smaller requests"
+    ))
+    .with_report(ErrorReport {
+        reason: Some("request_too_large".to_owned()),
+        ..ErrorReport::default()
+    })
 }
 
 /// The immediate reply to one input line, if any.
@@ -342,4 +397,52 @@ async fn write_lines<W: AsyncWrite + Unpin>(
         writer.flush().await?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod line_cap_tests {
+    use tokio::io::BufReader;
+
+    use super::{read_line, Line, MAX_REQUEST_BYTES};
+
+    async fn lines(input: Vec<u8>) -> Vec<(bool, usize)> {
+        let mut reader = BufReader::with_capacity(4096, input.as_slice());
+        let mut line = Vec::new();
+        let mut read = Vec::new();
+        loop {
+            match read_line(&mut reader, &mut line).await.expect("in-memory reads succeed") {
+                Line::End => return read,
+                Line::TooLarge => read.push((true, line.len())),
+                Line::Read => read.push((false, line.len())),
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn an_oversized_line_is_dropped_and_the_next_line_still_reads() {
+        // Given
+        let mut input = vec![b'x'; MAX_REQUEST_BYTES + 1];
+        input.extend_from_slice(b"\nok\n");
+        // When
+        let read = lines(input).await;
+        // Then
+        assert_eq!(read, vec![(true, 0), (false, 2)]);
+    }
+
+    #[tokio::test]
+    async fn a_line_of_exactly_the_cap_is_read_whole() {
+        // Given
+        let mut input = vec![b'x'; MAX_REQUEST_BYTES];
+        input.push(b'\n');
+        // When
+        let read = lines(input).await;
+        // Then
+        assert_eq!(read, vec![(false, MAX_REQUEST_BYTES)]);
+    }
+
+    #[tokio::test]
+    async fn an_unterminated_last_line_is_still_read_or_refused() {
+        assert_eq!(lines(b"tail".to_vec()).await, vec![(false, 4)]);
+        assert_eq!(lines(vec![b'x'; MAX_REQUEST_BYTES + 7]).await, vec![(true, 0)]);
+    }
 }

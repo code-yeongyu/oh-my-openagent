@@ -629,3 +629,34 @@ fn a_second_engine_is_refused_input_busy_while_the_first_holds_the_lock_then_pro
     first.drain();
     second.drain();
 }
+
+/// A 900 KiB text, under the engine's 1 MiB request line cap with its envelope.
+const UNDER_CAP_BYTES: usize = 900 * 1024;
+const OVER_CAP_BYTES: usize = 2 * 1024 * 1024;
+
+#[test]
+fn a_null_mode_session_takes_a_900_kib_request_and_refuses_a_2_mib_one_and_stays_usable() {
+    // Given
+    let dir = LockDir::new();
+    let mut engine = null_mode_engine(&Scenario::two_displays_with(&json!({})), &dir);
+    let under = "a".repeat(UNDER_CAP_BYTES);
+    // When
+    let written = engine.invoke("clipboard.write", json!({"text": under}));
+    // Then: today's v1 reply
+    assert_eq!(written["result"], Value::Null, "{}", written["error"]);
+    // When: a request line over the cap
+    engine.request(7, "clipboard.write", json!({"text": "b".repeat(OVER_CAP_BYTES)}));
+    let refused = loop {
+        let message = engine.next();
+        if message.get("id").is_some() {
+            break message;
+        }
+    };
+    // Then: a structured error with an unknown id; the request never ran
+    assert_eq!(refused["id"], Value::Null, "{refused}");
+    assert_eq!(refused["error"]["data"]["code"], json!("Internal"), "{refused}");
+    assert_eq!(refused["error"]["data"]["reason"], json!("request_too_large"), "{refused}");
+    let read = engine.invoke("clipboard.read", json!({}));
+    assert_eq!(read["result"]["text"].as_str().map(str::len), Some(UNDER_CAP_BYTES));
+    engine.drain();
+}
