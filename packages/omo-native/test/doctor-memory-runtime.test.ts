@@ -70,6 +70,35 @@ describe("omo doctor memory runtime sizes (B11)", () => {
     expect(on.lines.filter((line) => line.includes("discard_unreflected_journals off"))).toEqual([])
   })
 
+  test("#given an identity over its cap with folded runs to evict and an unreflected journal, switch off #when the report runs #then it measures the evictable bytes and does not blame the unreflected journals (#12538 review M1)", async () => {
+    const root = memoryHome()
+    const runtime = identity(root, "agent-a", 900_000)
+    writeFileSync(join(runtime, "transcripts", "s1", "state.json"), JSON.stringify({ total_completed_steps: 2, reflected_completed_steps: 0 }))
+    for (const index of [1, 2, 3]) {
+      const dir = join(runtime, "reflection", "runs", `reflection-run-${index}`)
+      mkdirSync(dir, { recursive: true })
+      writeFileSync(join(dir, "final.json"), JSON.stringify({ runId: `reflection-run-${index}`, outcome: "merged", finishedAt: new Date(Date.now() - (4 - index) * 86_400_000).toISOString() }))
+      writeFileSync(join(dir, "child-1.log"), Buffer.alloc(300_000, 1))
+    }
+    const total = (await measureRuntimeSize(runtime)).bytes
+
+    const report = await memoryRuntimeReport({ env: { OMO_MEMORY_HOME: root }, maxBytesFor: () => total - 100_000 })
+
+    expect(report.identities[0]?.evictableBytes).toBeGreaterThanOrEqual(600_000)
+    expect(report.lines.filter((line) => line.includes("discard_unreflected_journals off"))).toEqual([])
+  })
+
+  test("#given the measurement deadline has fired #when the report runs #then the identity reports size unknown with the budget instead of a number (#12538 review L5)", async () => {
+    const root = memoryHome()
+    identity(root, "agent-a", 900_000)
+
+    const report = await memoryRuntimeReport({ env: { OMO_MEMORY_HOME: root }, maxBytesFor: () => 1_000_000, measureBudgetMs: 60_000, measureSignal: AbortSignal.abort() })
+
+    expect(report.identities[0]?.sizeUnknown?.budgetMs).toBe(60_000)
+    expect(report.totalBytes).toBe(0)
+    expect(report.lines.some((line) => line.startsWith("WARN ") && line.includes("(agent-a)"))).toBe(true)
+  })
+
   test("#given an unbounded cap #when the report runs #then sizes are measured and nothing warns (B06)", async () => {
     const root = memoryHome()
     identity(root, "agent-a", 900_000)

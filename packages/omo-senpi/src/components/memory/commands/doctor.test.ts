@@ -788,6 +788,24 @@ describe("doctor runtime size (B10)", () => {
     expect(report.checks.find((check: { name: string }) => check.name === "runtime-size")?.detail).toContain("discard_unreflected_journals off")
   })
 
+  test("#given a runtime over its cap with folded runs to evict and an unreflected journal, switch off #when doctor runs #then it reports the evictable bytes and does not blame the unreflected journals (#12538 review M1)", async () => {
+    const RUN_BYTES = 2 * 1024 * 1024
+    const { pi, ctx, identityPaths } = await sizedIdentity((bytes) => bytes + 5 * 1024 * 1024)
+    await writeFile(join(identityPaths.transcripts, "s-big", "state.json"), JSON.stringify({ total_completed_steps: 3, reflected_completed_steps: 0, steps_since_last_successful_reflection: 3 }))
+    for (const index of [1, 2, 3]) {
+      const dir = join(identityPaths.reflection, "runs", `reflection-run-${index}`)
+      await mkdir(dir, { recursive: true })
+      await writeFile(join(dir, "final.json"), JSON.stringify({ runId: `reflection-run-${index}`, outcome: "merged", finishedAt: new Date(Date.parse("2026-11-01T00:00:00.000Z") + index * 1000).toISOString() }))
+      await writeFile(join(dir, "child-1.log"), Buffer.alloc(RUN_BYTES, 1))
+    }
+
+    const report = JSON.parse(await invoke(pi, "doctor", "--json", ctx))
+
+    expect(report.runtimeSize.bytes).toBeGreaterThan(report.runtimeSize.maxBytes)
+    expect(report.runtimeSize.evictableBytes).toBeGreaterThanOrEqual(2 * RUN_BYTES)
+    expect(report.checks.find((check: { name: string }) => check.name === "runtime-size")?.detail).not.toContain("discard_unreflected_journals off")
+  })
+
   test("#given the switch on over its cap #when doctor runs #then no held-by-unreflected remainder is reported", async () => {
     const { pi, ctx, identityPaths } = await sizedIdentity((bytes) => Math.floor(bytes / 2), { discard_unreflected_journals: true })
     await writeFile(join(identityPaths.transcripts, "s-big", "state.json"), JSON.stringify({ total_completed_steps: 3, reflected_completed_steps: 0, steps_since_last_successful_reflection: 3 }))

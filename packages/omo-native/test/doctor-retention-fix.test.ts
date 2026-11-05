@@ -57,6 +57,27 @@ describe("omo doctor --fix retention step (A38 CLI half)", () => {
     expect(result.lines.some((line: string) => line.startsWith("FIXED agent-on retention removed 1"))).toBe(true)
   })
 
+  test("#given a global max_bytes the identity exceeds #when --fix runs #then the cap evicts its oldest folded runs and keeps the newest (#12538 review L2)", async () => {
+    const home = scratch()
+    const memory = join(home, "memory")
+    mkdirSync(join(home, ".omo"), { recursive: true })
+    writeFileSync(join(home, ".omo", "omo.jsonc"), JSON.stringify({ memory: { runtime: { max_bytes: 1 } } }))
+    mkdirSync(join(memory, "agents", "agent-big", "repo"), { recursive: true })
+    const runs = join(memory, "agents", "agent-big", "runtime", "reflection", "runs")
+    const at = Date.now()
+    for (const index of [1, 2, 3]) {
+      const dir = join(runs, `reflection-run-${index}`)
+      mkdirSync(dir, { recursive: true })
+      writeFileSync(join(dir, "final.json"), JSON.stringify({ runId: `reflection-run-${index}`, outcome: "merged", finishedAt: new Date(at - (4 - index) * DAY).toISOString() }))
+      writeFileSync(join(dir, "child-1.log"), Buffer.alloc(64 * 1024, 1))
+    }
+
+    const result = await reflectionLockFix({ env: { OMO_MEMORY_HOME: memory }, home })
+
+    expect(result.failed).toBe(false)
+    expect([1, 2, 3].map((index) => existsSync(join(runs, `reflection-run-${index}`)))).toEqual([false, false, true])
+  })
+
   test("#given no global config #when --fix runs #then unreflected input is kept (switch off)", async () => {
     const home = scratch()
     const memory = join(home, "memory")

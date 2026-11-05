@@ -5,7 +5,7 @@ import { join } from "node:path"
 
 import { acquireLock, createLockRecord, reflectionSchedulerLockPath, releaseLock } from "../locks"
 import { scanReflectionRunHighWater } from "../reflection/run-id-high-water"
-import { runRuntimeSizeCap, type RuntimeSizeCapOptions } from "./cap"
+import { measureRuntimeCapEvictableBytes, runRuntimeSizeCap, type RuntimeSizeCapOptions } from "./cap"
 import { readReflectionRetentionGuard } from "./guard"
 import { DEFAULT_RUNTIME_RETENTION, runRuntimeRetention } from "./index"
 import {
@@ -487,6 +487,20 @@ describe("runtime size cap: pass budget and cursor (B16, H4; r3 N8, N3)", () => 
     expect(await liveNames(runsDir(paths))).toEqual(runs.toSorted())
   })
 
+  test("#given the caller's signal aborts during the measurement walk #when the cap runs #then it rejects with the abort instead of recording measure-over-budget (#12538 review L3)", async () => {
+    const paths = await identity()
+    const runs = await foldedRuns(paths, 4)
+    const caller = new AbortController()
+    // The first clock read starts the measurement walk; the caller is disposed right there.
+    const clock = () => {
+      caller.abort()
+      return 0
+    }
+
+    await expect(cap(paths, 1, { signal: caller.signal, measureSignal: caller.signal, budgetMs: 60_000, clock })).rejects.toMatchObject({ name: "AbortError" })
+    expect(await liveNames(runsDir(paths))).toEqual(runs.toSorted())
+  })
+
   test("#given an identity under its cap #when the cap runs #then it writes nothing under runtime/", async () => {
     const paths = await identity()
     await foldedRuns(paths, 2)
@@ -496,6 +510,28 @@ describe("runtime size cap: pass budget and cursor (B16, H4; r3 N8, N3)", () => 
 
     expect(report.evicted).toEqual([])
     expect((await readdir(paths.runtime, { recursive: true })).sort()).toEqual(before)
+  })
+})
+
+describe("runtime size cap: what the next pass could evict, for the doctors (#12538 review M1)", () => {
+  test("#given folded runs and a never-reflected journal with the default switch #when the evictable bytes are measured #then they count the folded runs below the newest and nothing under runtime/ changes", async () => {
+    const paths = await identity()
+    const runs = await foldedRuns(paths, 4)
+    await journal(paths, "j-never", "never", daysAgo(60))
+    const before = (await readdir(paths.runtime, { recursive: true })).sort()
+
+    const evictable = await measureRuntimeCapEvictableBytes({ paths, policy: UNREFLECTED_DEFAULT, now })
+
+    expect(evictable).toBe(await bytesOf(paths, runs.slice(0, 3)))
+    expect((await readdir(paths.runtime, { recursive: true })).sort()).toEqual(before)
+  })
+
+  test("#given only the newest folded run and a never-reflected journal with the default switch #when the evictable bytes are measured #then nothing is evictable", async () => {
+    const paths = await identity()
+    await foldedRuns(paths, 1)
+    await journal(paths, "j-never", "never", daysAgo(60))
+
+    expect(await measureRuntimeCapEvictableBytes({ paths, policy: UNREFLECTED_DEFAULT, now })).toBe(0)
   })
 })
 

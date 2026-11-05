@@ -11,6 +11,7 @@ import {
   buildIdentityPaths,
   createLockRecord,
   memoryMaintenanceLockPath,
+  reflectionSchedulerLockPath,
   withLock,
 } from "@oh-my-opencode/memory-core"
 
@@ -512,6 +513,23 @@ describe("runtime size cap inside the maintenance pass (B08)", () => {
     expect(line?.data?.evicted).toBe(2)
     expect(line?.data?.capBytes).toBe(1)
     expect(log.warn).toEqual(["omo-senpi memory runtime cap exceeded, nothing evictable"])
+  }, 60_000)
+
+  test("#given the reflection-scheduler lock is busy so the journal tiers are skipped #when the over-cap pass runs #then it does not log nothing-evictable (#12538 review L4)", async () => {
+    const { context, runDirs } = await identityWithYoungRuns()
+    const log = recorder()
+    const maintenance = createMemoryMaintenance({ logger: log.logger, delayMs: 0, now: () => NOW, resolveMaxBytes: () => 1 })
+    const holder = await createLockRecord("reflection-scheduler", { runId: "other-process" })
+    await mkdir(context.identityPaths.locks, { recursive: true })
+
+    await withLock(reflectionSchedulerLockPath(context.identityPaths.locks), holder, async () => {
+      maintenance.schedule(context)
+      await maintenance.settled()
+    }, { waitTimeoutMs: 0 })
+
+    expect(runDirs.map((dir) => existsSync(dir))).toEqual([false, false, true])
+    expect(log.warn).not.toContain("omo-senpi memory runtime cap exceeded, nothing evictable")
+    expect(log.warn).toEqual(["omo-senpi memory runtime cap exceeded, eviction continues next pass"])
   }, 60_000)
 
   test("#given another process holds the maintenance lock #when the pass comes due #then the cap skips without waiting or evicting", async () => {
