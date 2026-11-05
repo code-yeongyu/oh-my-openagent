@@ -166,6 +166,11 @@ export function reserveTransition(
   request: ReflectionRequest,
   runId: string,
 ): { readonly state: ReservationState; readonly result: "active" | "pending" } {
+  // A pending run whose active run was released without promoting it (the CLI reaper cannot launch)
+  // goes first, carrying this request with it.
+  if (!state.active && state.pending) {
+    return { state: { active: { runId: state.pending.runId, request: mergeRequests(state.pending.request, request) } }, result: "active" }
+  }
   if (!state.active) return { state: { active: { runId, request } }, result: "active" }
   const pending = state.pending
     ? { runId: state.pending.runId, request: mergeRequests(state.pending.request, request) }

@@ -117,13 +117,13 @@ export interface ReaperScenario {
   readonly expected: StaleLockDecision
 }
 
-function stuckHolder(change: { files?: Record<string, FileState | undefined>; pids?: Facts["pids"]; mtimes?: Record<string, number> } = {}): ReaperFacts {
+function stuckHolder(change: { files?: Record<string, FileState | undefined>; pids?: Facts["pids"]; starts?: Facts["starts"]; mtimes?: Record<string, number> } = {}): ReaperFacts {
   const files: Record<string, FileState> = { [LOCK]: lock({ reservedAt: RESERVED_AT, request: { trigger: "manual", conversationIds: [], snapshots: [] } }) }
   for (const [path, state] of Object.entries(change.files ?? {})) {
     if (state === undefined) delete files[path]
     else files[path] = state
   }
-  return { files, pids: change.pids ?? {}, starts: {}, mtimes: change.mtimes ?? {} }
+  return { files, pids: change.pids ?? {}, starts: change.starts ?? {}, mtimes: change.mtimes ?? {} }
 }
 
 const reap = (action: string, reason: string): StaleLockDecision => ({ kind: "reap", action, runId: RUN, reason } as StaleLockDecision)
@@ -132,11 +132,11 @@ const kept = (runId: string, reason: string): StaleLockDecision => ({ kind: "stu
 export const REAPER_SCENARIOS: readonly ReaperScenario[] = [
   { name: "no lock", facts: stuckHolder({ files: { [LOCK]: undefined } }), expected: { kind: "none" } },
   { name: "a live launcher", facts: stuckHolder({ pids: { [LAUNCHER]: "alive" } }), expected: { kind: "none" } },
-  { name: "a dead holder with a recorded outcome", rule: "finalize", facts: deadHolder(), expected: { kind: "finalize", runId: RUN } },
+  { name: "a dead holder with a recorded outcome", rule: "finalize", facts: { ...deadHolder(), mtimes: {} }, expected: { kind: "finalize", runId: RUN } },
   { name: "a dead launcher still inside the launch window", rule: "launch-window", facts: stuckHolder({ files: { [LOCK]: lock({ reservedAt: new Date(REAPER_NOW - 20_000).toISOString(), request: { trigger: "manual", conversationIds: [], snapshots: [] } }) } }), expected: kept(RUN, "its launcher is gone but the launch window has not closed") },
   { name: "a dead launcher with no ledger", rule: "launch-interrupted", facts: stuckHolder(), expected: reap("launch-interrupted", `launcher pid ${LAUNCHER} is gone and the run never started`) },
   { name: "a dead launcher whose run already recorded a terminal state", rule: "terminal-recorded", facts: stuckHolder({ files: { [join(RUN_DIR, "abandoned.json")]: "{}", [LEDGER]: ledger() } }), expected: reap("terminal-recorded", "the run already recorded its terminal state") },
-  { name: "a dead launcher whose supervisor is alive", rule: "run-process-alive", facts: stuckHolder({ files: { [LEDGER]: ledger() }, pids: { [SUPERVISOR]: "alive" } }), expected: kept(RUN, `its supervisor pid ${SUPERVISOR} is still running`) },
+  { name: "a dead launcher whose supervisor is alive", rule: "run-process-alive", facts: stuckHolder({ files: { [LEDGER]: ledger({ processStart: RECORDED_START }) }, pids: { [SUPERVISOR]: "alive" }, starts: { [SUPERVISOR]: RECORDED_START } }), expected: kept(RUN, `its supervisor pid ${SUPERVISOR} is still running`) },
   { name: "a dead launcher whose child cannot be checked", facts: stuckHolder({ files: { [LEDGER]: ledger() }, pids: { [CHILD]: "unknown" } }), expected: kept(RUN, `its child pid ${CHILD} could not be checked`) },
   { name: "a valid ledger whose processes are dead", rule: "processes-dead", facts: stuckHolder({ files: { [LEDGER]: ledger() } }), expected: reap("processes-dead", "its launcher, supervisor and child are all gone and it recorded no outcome") },
   { name: "an unparseable ledger whose processes are dead", rule: "ledger-unreadable", facts: stuckHolder({ files: { [LEDGER]: ledger({ deadlineAt: 1 }) } }), expected: reap("ledger-unreadable", "its ledger cannot be read and its recorded processes are gone") },
@@ -156,7 +156,7 @@ export interface StrandedScenario {
 }
 
 const STRANDED = join(REFLECTION_DIR, "runs", "reflection-run-50")
-const strandedFacts = (files: Record<string, FileState>, mtimes: Record<string, number> = {}, pids: Facts["pids"] = {}): ReaperFacts => ({ files, pids, starts: {}, mtimes })
+const strandedFacts = (files: Record<string, FileState>, mtimes: Record<string, number> = {}, pids: Facts["pids"] = {}, starts: Facts["starts"] = {}): ReaperFacts => ({ files, pids, starts, mtimes })
 
 export const STRANDED_RUN_DIR = STRANDED
 
@@ -164,7 +164,7 @@ export const STRANDED_SCENARIOS: readonly StrandedScenario[] = [
   { name: "a bare dir inside the grace window", rule: "stranded-young", facts: strandedFacts({}, { [STRANDED]: REAPER_NOW - 2 * 60_000 }), expected: { kind: "keep", reason: "it is inside the launch grace window" } },
   { name: "a bare dir past the grace window", rule: "stranded-launch-interrupted", facts: strandedFacts({}, { [STRANDED]: REAPER_NOW - 20 * 60_000 }), expected: { kind: "reap", action: "launch-interrupted", reason: "it never got a ledger" } },
   { name: "prelaunch.json only, past the grace window", facts: strandedFacts({ [join(STRANDED, "prelaunch.json")]: "{}" }, { [join(STRANDED, "prelaunch.json")]: REAPER_NOW - 20 * 60_000, [STRANDED]: REAPER_NOW }), expected: { kind: "reap", action: "launch-interrupted", reason: "it never got a ledger" } },
-  { name: "a ledger whose supervisor is alive", rule: "stranded-process-alive", facts: strandedFacts({ [join(STRANDED, "ledger.json")]: ledger({ runId: "reflection-run-50" }) }, {}, { [SUPERVISOR]: "alive" }), expected: { kind: "keep", reason: `its supervisor pid ${SUPERVISOR} is still running` } },
+  { name: "a ledger whose supervisor is alive", rule: "stranded-process-alive", facts: strandedFacts({ [join(STRANDED, "ledger.json")]: ledger({ runId: "reflection-run-50", processStart: RECORDED_START }) }, {}, { [SUPERVISOR]: "alive" }, { [SUPERVISOR]: RECORDED_START }), expected: { kind: "keep", reason: `its supervisor pid ${SUPERVISOR} is still running` } },
   { name: "a valid ledger whose processes are dead", rule: "stranded-processes-dead", facts: strandedFacts({ [join(STRANDED, "ledger.json")]: ledger({ runId: "reflection-run-50" }) }), expected: { kind: "reap", action: "processes-dead", reason: "its supervisor and child are gone and it recorded no outcome" } },
   { name: "an unreadable ledger whose processes are dead", rule: "stranded-ledger-unreadable", facts: strandedFacts({ [join(STRANDED, "ledger.json")]: "{ torn" }), expected: { kind: "reap", action: "ledger-unreadable", reason: "its ledger cannot be read and its recorded processes are gone" } },
 ]

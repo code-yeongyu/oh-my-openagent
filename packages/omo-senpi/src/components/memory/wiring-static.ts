@@ -1,6 +1,7 @@
 import { homedir } from "node:os"
 import { join } from "node:path"
 
+import { formatStaleLockFixLines, reclaimDeadOwnerLocks, runStaleLockReaper } from "@oh-my-opencode/memory-core"
 import type { MemoryBlockCache, ReservedRun, TranscriptProjection } from "@oh-my-opencode/memory-core"
 
 import type { ComponentContext, SenpiExtensionAPI, SettleObserver } from "../../extension/types"
@@ -217,6 +218,19 @@ export function registerMemoryStatic(input: {
       promptCache.clear()
       projectionPins.requestRefresh()
     },
+    reflectionLockFix: async (sessionId, { dryRun }) => {
+      const identity = resolveContext(sessionId)
+      if (identity === undefined) return []
+      const runtime = runtimeFor(identity)
+      const report = await runStaleLockReaper({
+        runtimeDir: identity.identityPaths.runtime,
+        settle: () => runtime.reconcile(),
+        dryRun,
+        ...(options.reflectionHolderSeams === undefined ? {} : { probe: options.reflectionHolderSeams }),
+      })
+      const locks = dryRun ? undefined : await reclaimDeadOwnerLocks(identity.identityPaths.locks)
+      return formatStaleLockFixLines(identity.identity, report, locks)
+    },
     reflectionSink: {
       request: async (request) => {
         if (activeSession.current === undefined) throw new Error("no bound memory session")
@@ -245,7 +259,7 @@ export function registerMemoryStatic(input: {
         return {
           disposition: "pending",
           runId: result.run.runId,
-          ...(recovery.verdict.state === "dead" && recovery.notice === undefined ? { recoveredRunId: recovery.verdict.runId } : {}),
+          ...(recovery.recoveredRunId === undefined ? {} : { recoveredRunId: recovery.recoveredRunId }),
           ...(recovery.notice === undefined ? {} : { stuck: recovery.notice }),
         }
       },

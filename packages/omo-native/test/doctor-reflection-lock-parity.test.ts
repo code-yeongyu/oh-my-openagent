@@ -30,7 +30,7 @@ describe("the session and omo doctor --fix take the same stale-lock decision (#1
     "#given %s #when the source and the generated bundle decide the active lock #then they agree",
     async (_name, scenario) => {
       const source = await decideStaleReflectionLock(REFLECTION_DIR, reaperProbeFor(scenario.facts))
-      const cli = await decideReflectionLock(REFLECTION_DIR, reaperProbeFor(scenario.facts))
+      const cli: unknown = await decideReflectionLock(REFLECTION_DIR, reaperProbeFor(scenario.facts))
       expect(cli).toEqual(source)
       expect(source.decision).toEqual(scenario.expected)
     },
@@ -40,7 +40,8 @@ describe("the session and omo doctor --fix take the same stale-lock decision (#1
     "#given %s #when the source and the generated bundle decide a stranded run #then they agree",
     async (_name, scenario) => {
       const source = await decideStrandedRun(STRANDED_RUN_DIR, reaperProbeFor(scenario.facts))
-      expect(await decideStrandedReflectionRun(STRANDED_RUN_DIR, reaperProbeFor(scenario.facts))).toEqual(source)
+      const cli: unknown = await decideStrandedReflectionRun(STRANDED_RUN_DIR, reaperProbeFor(scenario.facts))
+      expect(cli).toEqual(source)
       expect(source).toEqual(scenario.expected)
     },
   )

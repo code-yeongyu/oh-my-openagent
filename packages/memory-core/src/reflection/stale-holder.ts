@@ -75,7 +75,7 @@ function stuck(runId: string, reason: string): ReflectionLockVerdict {
 
 // A live pid still counts as gone when its recorded start identity proves the pid was reused: the rule
 // reconciliation applies (worker/run-liveness.ts). An unreadable or incomparable start keeps it live.
-async function launcherLiveness(pid: number, recordedStart: unknown, probe: ReflectionLockProbe): Promise<ProcessLiveness> {
+export async function reflectionLauncherLiveness(pid: number, recordedStart: unknown, probe: ReflectionLockProbe): Promise<ProcessLiveness> {
   const liveness = (probe.getPidLiveness ?? getPidLiveness)(pid)
   if (liveness !== "alive" || typeof recordedStart !== "string") return liveness
   const actualStart = await (probe.getProcessStartIdentity ?? getProcessStartIdentity)(pid).catch(() => null)
@@ -98,7 +98,7 @@ export async function classifyReflectionLockHolder(
   const launcherHostname = typeof fields.launcherHostname === "string" ? fields.launcherHostname : undefined
   if (launcherPid === undefined || launcherHostname === undefined) return stuck(runId, "its launcher identity is missing") // rule:launcher-identity
   if (launcherHostname !== (probe.hostname ?? readHostname)()) return stuck(runId, `it is owned by host ${launcherHostname}, which cannot be checked from here`) // rule:other-host
-  const launcher = await launcherLiveness(launcherPid, fields.launcherProcessStart, probe)
+  const launcher = await reflectionLauncherLiveness(launcherPid, fields.launcherProcessStart, probe)
   if (launcher === "alive") return { state: "live", runId } // rule:launcher-alive
   if (launcher === "unknown") return stuck(runId, `launcher pid ${launcherPid} could not be checked`) // rule:launcher-unknown
   const runDir = join(reflectionDir, "runs", runId)

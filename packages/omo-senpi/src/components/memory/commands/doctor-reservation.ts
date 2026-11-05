@@ -8,7 +8,7 @@ import { join } from "node:path"
 import type { DoctorCheck } from "./doctor-checks"
 import { defaultIsProcessAlive, type MemoryCommandIdentity } from "./types"
 
-const GHOST_REMEDIATION = "a current runtime reclaims it at session start; on older builds delete runtime/reflection/active.lock after confirming no reflection run is active"
+const GHOST_REMEDIATION = "a current runtime reclaims it at session start; otherwise run `omo doctor --fix` (or /doctor --fix)"
 
 export async function checkGhostReservation(
   identityPaths: MemoryCommandIdentity["identityPaths"],
@@ -21,7 +21,7 @@ export async function checkGhostReservation(
     parsed = JSON.parse(await readFile(activePath, "utf8"))
   } catch (error) {
     if (error instanceof SyntaxError) {
-      return { name: "reservation", level: "warn", detail: `active.lock is not valid JSON; delete it after confirming no reflection run is active` }
+      return { name: "reservation", level: "warn", detail: "active.lock is not valid JSON; run `omo doctor --fix` (or /doctor --fix), which moves it aside when no reflection run is live" }
     }
     throw error
   }

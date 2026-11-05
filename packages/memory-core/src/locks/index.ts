@@ -36,3 +36,5 @@ export {
 } from "./recall-wake-domain"
 export type { RecallWakeLease, RecallWakeLeaseOptions } from "./recall-wake-domain"
 export { acquireReflectionRunLease } from "./reflection-run-domain"
+export { sweepDeadOwnerLocks } from "./dead-owner-sweep"
+export type { DeadOwnerSweepOptions } from "./dead-owner-sweep"

@@ -75,7 +75,7 @@ async function collectLiveRunIds(context: ReflectionOrphanSweepContext): Promise
   const runsDir = join(context.identity.paths.reflection, "runs")
   for (const runId of await runDirectoryNames(runsDir)) {
     const runDir = join(runsDir, runId)
-    if (existsSync(join(runDir, "final.json")) || existsSync(join(runDir, "abandoned.json"))) continue
+    if (["final.json", "abandoned.json", "quarantined.json"].some((file) => existsSync(join(runDir, file)))) continue
     // prelaunch.json is written before the worktree exists, so it claims the directory early.
     if (!existsSync(join(runDir, "ledger.json")) && !existsSync(join(runDir, "prelaunch.json"))) continue
     live.add(runId)
@@ -85,7 +85,7 @@ async function collectLiveRunIds(context: ReflectionOrphanSweepContext): Promise
 
 async function runDirectoryNames(path: string): Promise<readonly string[]> {
   try {
-    return (await readdir(path, { withFileTypes: true })).filter((entry) => entry.isDirectory()).map((entry) => entry.name)
+    return (await readdir(path, { withFileTypes: true })).filter((entry) => entry.isDirectory() && !entry.name.startsWith(".")).map((entry) => entry.name)
   } catch (error) {
     if (error instanceof Error && "code" in error && error.code === "ENOENT") return []
     throw error

@@ -4,11 +4,15 @@ import { hostname as readHostname } from "node:os"
 import { join } from "node:path"
 
 import {
+  decideStrandedRun,
   LockContentionError,
+  writeAbandoned,
   type MemoryIdentity,
   type ProcessLiveness,
+  type ReservationState,
   type ReservedRun,
 } from "@oh-my-opencode/memory-core"
+import { stat } from "@oh-my-opencode/memory-core/fs"
 
 import {
   readRunJson,
@@ -27,7 +31,7 @@ import { classifyRunProcess, signalRecordedProcessGroup, waitUntil as waitForTim
 import { quarantineRun, reconcilePrelaunch } from "./run-reconciliation-prelaunch"
 import { RunTerminalClaimUnrecoverableError } from "./run-terminal-claim"
 import { parseReservationRunLedger, type ReservationRunLedger } from "./reservation-run-ledger"
-import type { MemoryReceiptsPort, ReceiptWarn } from "../receipts-port"
+import { emitMemoryReceipt, runReceipt, type MemoryReceiptsPort, type ReceiptWarn } from "../receipts-port"
 import { sweepReflectionRunOrphans, type ReflectionSweepLogger } from "./run-reconciliation-sweep"
 import { waitForRunSentinel, type SentinelWaitResult } from "./run-sentinel"
 import { sweepStrandedRunTemporaries } from "./run-temporaries"
@@ -76,6 +80,11 @@ export async function reconcileReflectionRuns(
       join(options.identity.paths.reflection, "completions"), context.now(), context.getPidLiveness,
     )
     const runsDir = join(options.identity.paths.reflection, "runs")
+    let reservation: ReservationState | undefined
+    const reserved = async (): Promise<ReservationState> => {
+      reservation ??= await context.reservation.readState(context.deferOnSchedulerContention ? { waitTimeoutMs: 0 } : undefined)
+      return reservation
+    }
     for (const name of await directoryNames(runsDir)) {
       context.signal?.throwIfAborted()
       // A retired-generation dir shares the active reservation's id; settling it through the
@@ -88,10 +97,17 @@ export async function reconcileReflectionRuns(
         await backfillRunReceipt(options.identity.paths.runtime, runDir, options.receipts, options.warn)
         continue
       }
-      if (!existsSync(join(runDir, "ledger.json"))) continue
-      const ledger = await readLedgerOrUndefined(runDir)
+      const ledger = existsSync(join(runDir, "ledger.json")) ? await readLedgerOrUndefined(runDir) : undefined
       context.signal?.throwIfAborted()
-      if (ledger === undefined) continue
+      if (ledger === undefined) {
+        // No ledger, or one that cannot be read: the active run is prelaunch's, any other run that is
+        // provably dead gets its terminal sentinel here so it stops counting as live (#11920, #11976).
+        const state = await reserved()
+        if (name === state.active?.runId || name === state.pending?.runId) continue
+        const settled = await settleStrandedRun(context, runDir, name)
+        if (settled !== undefined) results.push(settled)
+        continue
+      }
       const result = await reconcileRunOrQuarantine(context, runDir, ledger)
       if (result !== undefined) results.push({ runId: result.runId, outcome: result.outcome })
     }
@@ -119,6 +135,38 @@ async function reconcileRunOrQuarantine(
     context.signal?.throwIfAborted()
     return quarantineRun(context, runDir, ledger.runId, "terminal_claim_unrecoverable", ledger, active?.runId === ledger.runId ? active : undefined)
   }
+}
+
+async function settleStrandedRun(context: ReconcileContext, runDir: string, runId: string): Promise<ReflectionRunReconcileResult | undefined> {
+  const decision = await decideStrandedRun(runDir, context)
+  context.signal?.throwIfAborted()
+  // A valid ledger never reaches here: reconcileRun settles it with worktree-tip recovery.
+  if (decision.kind === "keep" || decision.action === "processes-dead") return undefined
+  const lenient = await readRunJson<unknown>(join(runDir, "ledger.json")).then(
+    (value) => (typeof value === "object" && value !== null ? value as Record<string, unknown> : {}),
+    () => ({} as Record<string, unknown>),
+  )
+  const prelaunch = join(runDir, "prelaunch.json")
+  const since = await stat(existsSync(prelaunch) ? prelaunch : runDir).then((status) => status.mtimeMs, () => context.now())
+  const run = {
+    kind: lenient.kind === "dream" ? "dream" as const : "reflection" as const,
+    trigger: typeof lenient.trigger === "string" ? lenient.trigger : "unknown",
+    ...(typeof lenient.origin === "string" ? { origin: lenient.origin } : {}),
+    startedAt: typeof lenient.startedAt === "string" ? lenient.startedAt : new Date(since).toISOString(),
+  }
+  if (decision.action === "ledger-unreadable") return quarantineRun(context, runDir, runId, "ledger_unreadable", undefined, undefined, run)
+  await writeAbandoned(runDir, {
+    version: 1,
+    runId,
+    abandonedAt: new Date(context.now()).toISOString(),
+    reason: "launch_interrupted",
+    generation: run.startedAt,
+    kind: run.kind,
+    trigger: run.trigger,
+    ...(run.origin === undefined ? {} : { origin: run.origin }),
+  })
+  await emitMemoryReceipt(context.identity.paths.runtime, runReceipt({ runId, ...run }, "abandoned", { reason: "launch_interrupted" }), context.receipts, context.warn)
+  return { runId, outcome: "failed" }
 }
 
 async function readLedgerOrUndefined(runDir: string): Promise<ReservationRunLedger | undefined> {
@@ -229,7 +277,7 @@ function deadProcesses(ledger: ReservationRunLedger): string {
 async function directoryNames(path: string): Promise<readonly string[]> {
   try {
     return (await readdir(path, { withFileTypes: true }))
-      .filter((entry) => entry.isDirectory())
+      .filter((entry) => entry.isDirectory() && !entry.name.startsWith("."))
       .map((entry) => entry.name)
       .sort()
   } catch (error) {

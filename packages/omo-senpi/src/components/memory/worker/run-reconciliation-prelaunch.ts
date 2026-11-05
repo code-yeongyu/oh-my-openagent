@@ -4,16 +4,16 @@ import { join } from "node:path"
 
 import {
   discardReflectionWorktree,
-  getPidLiveness,
   GitMemoryRepo,
   RESERVATION_EVIDENCE_FILENAME,
+  writeAbandoned,
   writeQuarantine,
   type QuarantineReason,
   type ReservedRun,
 } from "@oh-my-opencode/memory-core"
 
 import { emitMemoryReceipt, runReceipt, type RunReceiptLedger } from "../receipts-port"
-import { parseRunPrelaunchArtifact, readRunJson, writeRunJsonAtomic } from "./run-artifacts"
+import { parseRunPrelaunchArtifact, readRunJson } from "./run-artifacts"
 import { classifyGhostActive } from "./run-ghost-active"
 import { classifyRunProcess, isLauncherDead } from "./run-liveness"
 import type { ReconcileContext, ReflectionRunReconcileResult } from "./run-reconciliation"
@@ -111,7 +111,7 @@ async function recordInterruptedLaunch(context: ReconcileContext, runDir: string
   const kind = active.request.trigger === "dream" ? "dream" : "reflection"
   const origin = active.request.origin
   await mkdir(runDir, { recursive: true, mode: 0o700 })
-  await writeRunJsonAtomic(join(runDir, "abandoned.json"), {
+  await writeAbandoned(runDir, {
     version: 1,
     runId: active.runId,
     abandonedAt: new Date(context.now()).toISOString(),
@@ -153,14 +153,8 @@ async function recordedProcessesDead(context: ReconcileContext, runDir: string):
   const pid = (key: string) => typeof raw[key] === "number" ? raw[key] as number : undefined
   const start = (key: string) => typeof raw[key] === "string" || raw[key] === null ? raw[key] as string | null : undefined
   for (const [pidKey, startKey] of [["pid", "processStart"], ["childPid", "childProcessStart"]] as const) {
-    const recordedPid = pid(pidKey)
-    const verdict = await classifyRunProcess(recordedPid, start(startKey), context)
-    if (verdict === "dead" || verdict === "absent") continue
-    // A pid with no recorded start cannot be checked for reuse, but a pid the kernel no longer knows
-    // is gone either way, so it never strands the lock (#11920).
-    if (verdict === "unknown" && recordedPid !== undefined && start(startKey) === undefined
-      && (context.getPidLiveness ?? getPidLiveness)(recordedPid) === "dead") continue
-    return false
+    const verdict = await classifyRunProcess(pid(pidKey), start(startKey), context)
+    if (verdict !== "dead" && verdict !== "absent") return false
   }
   return true
 }
@@ -186,14 +180,16 @@ export async function quarantineRun(
   reason: QuarantineReason,
   ledger: ReservationRunLedger | undefined,
   active: ReservedRun | undefined,
+  /** A run outside the reservation with an unreadable ledger: what could still be read of it. */
+  stranded?: Omit<RunReceiptLedger, "runId">,
 ): Promise<ReflectionRunReconcileResult> {
-  const generation = ledger?.startedAt ?? active?.reservedAt
+  const generation = ledger?.startedAt ?? active?.reservedAt ?? stranded?.startedAt
   if (generation === undefined) throw new Error(`No durable generation to quarantine ${runId}`)
-  const origin = ledger?.origin ?? active?.request.origin
+  const origin = ledger?.origin ?? active?.request.origin ?? stranded?.origin
   const run: RunReceiptLedger = {
-    kind: ledger?.kind ?? (active?.request.trigger === "dream" ? "dream" : "reflection"),
+    kind: ledger?.kind ?? (active === undefined ? stranded?.kind : undefined) ?? (active?.request.trigger === "dream" ? "dream" : "reflection"),
     runId,
-    trigger: ledger?.trigger ?? active?.request.trigger ?? "unknown",
+    trigger: ledger?.trigger ?? active?.request.trigger ?? stranded?.trigger ?? "unknown",
     ...(origin === undefined ? {} : { origin }),
     startedAt: generation,
   }

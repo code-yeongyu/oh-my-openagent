@@ -326,7 +326,7 @@ describe("dead-owner runtime locks (#11976, 4.5)", () => {
     const result = await reclaimDeadOwnerLocks(paths.locks)
 
     // then
-    expect(result.reclaimed.sort()).toEqual(["finalize-facts-1.lock", "recall-sidecar.c2Vzc2lvbg.lock"])
+    expect([...result.reclaimed].sort()).toEqual(["finalize-facts-1.lock", "recall-sidecar.c2Vzc2lvbg.lock"])
     expect(result.kept.map((entry) => entry.name)).toEqual(["notice.lock"])
     expect(existsSync(join(paths.locks, "notice.lock"))).toBe(true)
   })

@@ -1,4 +1,4 @@
-import { InFlightReads, MemoryBlockCache } from "@oh-my-opencode/memory-core"
+import { InFlightReads, MemoryBlockCache, runStaleLockReaper } from "@oh-my-opencode/memory-core"
 
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import { buildDreamTriggerWiring } from "./dream-runtime-wiring"
@@ -268,7 +268,13 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
             observer?.phase("onSettled.reflection.reconcile")
             await userActivity.reconcileOnce(sessionId, async () => {
               try {
-                await runtimeFor(identity).reconcile(observer?.signal)
+                // The reaper moves a torn active.lock aside first (reconciliation cannot read past it), then reconciles.
+                await runStaleLockReaper({
+                  runtimeDir: identity.identityPaths.runtime,
+                  settle: () => runtimeFor(identity).reconcile(observer?.signal),
+                  settleAlways: true,
+                  ...(options.reflectionHolderSeams === undefined ? {} : { probe: options.reflectionHolderSeams }),
+                })
                 observer?.signal.throwIfAborted()
               } catch (error) {
                 observer?.signal.throwIfAborted()

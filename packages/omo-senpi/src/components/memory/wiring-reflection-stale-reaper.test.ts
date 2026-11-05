@@ -42,7 +42,7 @@ async function processesDied(item: Fixture): Promise<string> {
   await writeRunJsonAtomic(join(runDir, "prelaunch.json"), { version: 1, runId, worktreeDir: worktree.dir, worktreeBranch: worktree.branch })
   const hardDeadlineAt = Date.now() + 600_000
   await writeRunJsonAtomic(join(runDir, "ledger.json"), {
-    version: 1, runId, attempt: 1, conversationIds: ["session-1"], kind: "reflection", trigger: "manual",
+    version: 1, runId, attempt: 1, category: "quick", conversationIds: ["session-1"], kind: "reflection", trigger: "manual",
     startedAt: new Date().toISOString(), hardDeadlineAt, terminationGraceMs: 100, deadlineAt: hardDeadlineAt + 100, mergePolicy: "auto",
     pid, childPid: pid, worktreeDir: worktree.dir, worktreeBranch: worktree.branch, baseSha: worktree.baseSha,
     gitFilePath: worktree.gitFilePath, gitFileSnapshot: worktree.gitFileSnapshot, commonConfigPath: worktree.commonConfigPath, commonConfigSnapshot: worktree.commonConfigSnapshot,
@@ -106,6 +106,7 @@ describe("the stale reflection-lock reaper in a session (#11976)", () => {
     // given
     const item = await staleLockFixture()
     await settleTurn(item)
+    await mkdir(item.paths.reflection, { recursive: true })
     await writeFile(join(item.paths.reflection, "active.lock"), "{\"runId\":\"reflection-run-64\",\"req", { mode: 0o600 })
 
     // when
