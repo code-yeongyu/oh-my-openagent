@@ -45,11 +45,11 @@ async function endpoint(socketPath: string, answer: Answer): Promise<{ readonly 
       socket.write(`${JSON.stringify({ id: frame.id, type: "response", command: frame.type, success: true, ...answer(frame) })}\n`)
     })
   }))
-  const listening = once(server, "listening", { signal: testBudgetSignal() })
+  const listening = once(server, "listening", { signal: testBudgetSignal("the live-surface endpoint server to listen") })
   server.listen(transport.listenAddress)
   await listening
   cleanups.push(async () => {
-    const closed = once(server, "close", { signal: testBudgetSignal() })
+    const closed = once(server, "close", { signal: AbortSignal.timeout(2000) })
     for (const socket of sockets) socket.destroy()
     server.close()
     await closed

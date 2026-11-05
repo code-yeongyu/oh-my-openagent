@@ -6,9 +6,10 @@ import { join } from "node:path"
 import { captureChild, dumpRunProcesses, OUTPUT_TAIL_LIMIT, stageRecorder, withinDeadline } from "./task-rpc-diagnostics.mjs"
 import { waitForRecord } from "./task-rpc-record-wait.mjs"
 import { summarizeRuns } from "./task-rpc-reconcile-batch.mjs"
-import { remainingTestTime } from "../../../../test-support/test-deadline"
+import { remainingTestTime, useTestTimeout } from "../../../../test-support/test-deadline"
 
 test.each([undefined, "0", "1"])("a failed initial parent retains diagnostics and opts into stage stderr with %s", async (stageEnv) => {
+  useTestTimeout(20_000)
   // Given a Bun executable receiving Senpi-only arguments, the parent really fails to launch.
   const env = { ...process.env }
   delete env.OMO_RECONCILE_STAGES

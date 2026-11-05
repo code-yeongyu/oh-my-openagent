@@ -47,12 +47,12 @@ async function withRpc(
     })
   }))
   try {
-    const listening = once(server, "listening", { signal: testBudgetSignal() })
+    const listening = once(server, "listening", { signal: testBudgetSignal("server to emit 'listening'") })
     server.listen(transport.listenAddress)
     await listening
     await exercise(createLiveThreadSurface({} as never, { env: { SENPI_RPC_SOCKET: socketPath }, statusAll: NO_ENUMERATION, registry: NO_REGISTRY }), frames)
   } finally {
-    const closed = once(server, "close", { signal: testBudgetSignal() })
+    const closed = once(server, "close", { signal: testBudgetSignal("server to emit 'close'") })
     for (const socket of sockets) socket.destroy()
     server.close()
     await closed

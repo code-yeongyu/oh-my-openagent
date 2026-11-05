@@ -49,13 +49,13 @@ async function releasedHost(exercise: (socket: string, root: string) => Promise<
       }
     })
   }))
-  const listening = once(server, "listening", { signal: testBudgetSignal() })
+  const listening = once(server, "listening", { signal: testBudgetSignal("server to emit 'listening'") })
   server.listen(transport.listenAddress)
   await listening
   try {
     await exercise(socketPath, root)
   } finally {
-    const closed = once(server, "close", { signal: testBudgetSignal() })
+    const closed = once(server, "close", { signal: testBudgetSignal("server to emit 'close'") })
     server.close()
     await closed
   }

@@ -96,7 +96,7 @@ describe("eval handle host beside completion notifications", () => {
     const seen: string[] = []
     const drained = (async () => { for await (const snapshot of watch.updates) seen.push(snapshot.phase) })()
 
-    const terminal = manager.waitFor(started.task_id, { signal: testBudgetSignal() })
+    const terminal = manager.waitFor(started.task_id, { signal: testBudgetSignal("manager.waitFor to settle") })
     complete("done")
     await terminal
     watch.close()

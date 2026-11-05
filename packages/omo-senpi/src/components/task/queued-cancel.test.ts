@@ -15,7 +15,7 @@ for (const resident of [true, false]) {
     try {
       if (resident) {
         await h.send()
-        const terminal = h.manager.waitFor(h.record.task_id, { signal: testBudgetSignal() })
+        const terminal = h.manager.waitFor(h.record.task_id, { signal: testBudgetSignal("h.manager.waitFor to settle") })
         h.fake.settle({ status: "completed", finalResponse: "DONE" })
         await terminal
       }

@@ -13,7 +13,7 @@ import { startChainWireServer } from "../../../../memory-core/src/sync/account/t
 import { testBudgetSignal, useTestTimeout } from "../../../../../test-support/test-deadline"
 
 async function receive(worker: Worker, kind: string): Promise<unknown> {
-  for await (const args of on(worker, "message", { signal: testBudgetSignal() })) {
+  for await (const args of on(worker, "message", { signal: testBudgetSignal(`the worker's ${kind} message`) })) {
     const parsed = z.object({ kind: z.string(), result: z.unknown().optional() }).safeParse(args[0])
     if (parsed.success && parsed.data.kind === kind) return parsed.data.result
   }

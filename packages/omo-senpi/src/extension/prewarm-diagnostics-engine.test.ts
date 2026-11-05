@@ -47,7 +47,7 @@ test("#given a real session with a late unsafe component #when draft prewarm ski
   const manager = SessionManager.inMemory(root)
   let session: Awaited<ReturnType<typeof createAgentSession>>["session"] | undefined
   let unsubscribe: (() => void) | undefined
-  const signal = testBudgetSignal()
+  const signal = testBudgetSignal("the prewarm diagnostics entry")
   const recorded = Promise.withResolvers<void>()
   const onAbort = () => recorded.reject(new Error("prewarm did not append its entry"))
   signal.addEventListener("abort", onAbort, { once: true })

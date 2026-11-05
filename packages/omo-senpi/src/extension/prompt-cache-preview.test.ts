@@ -146,7 +146,7 @@ async function runPrefixScenario(options: {
     const serversBefore = servers()
     const connectionsBefore = service.getSnapshot().connectionCount
     // when
-    const result = await context.getPromptCachePrefixRequest({ signal: testBudgetSignal() })
+    const result = await context.getPromptCachePrefixRequest({ signal: testBudgetSignal("context.getPromptCachePrefixRequest to settle") })
     console.info("OMO_PREWARM_PREFIX", JSON.stringify(result.status === "ready" ? { status: result.status } : result))
     observed = {
       status: result.status,
