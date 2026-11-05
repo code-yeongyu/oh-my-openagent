@@ -2,7 +2,7 @@ import { join } from "node:path"
 
 import { writeJsonAtomic } from "./reservation-files"
 
-export const ABANDONED_FILENAME = "abandoned.json"
+const ABANDONED_FILENAME = "abandoned.json"
 
 export type AbandonedReason = "launch_interrupted" | "processes_dead"
 

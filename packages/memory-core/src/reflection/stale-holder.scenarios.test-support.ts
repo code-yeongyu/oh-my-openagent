@@ -90,7 +90,7 @@ export function probeFor(facts: Facts): ReflectionLockProbe {
 }
 
 // The reaper's decision table (stale-lock-reaper.ts) over the same holder: one scenario per `rule:` tag.
-export const REAPER_NOW = Date.parse("2026-11-05T06:00:00.000Z")
+const REAPER_NOW = Date.parse("2026-11-05T06:00:00.000Z")
 const RUN_DIR = join(REFLECTION_DIR, "runs", RUN)
 const LEDGER = join(RUN_DIR, "ledger.json")
 const SUPERVISOR = 4201

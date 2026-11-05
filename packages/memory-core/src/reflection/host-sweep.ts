@@ -11,7 +11,7 @@ import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "../fs/res
 import { LockContentionError, withLock } from "../locks/acquire"
 import { createLockRecord } from "../locks/lock-record"
 
-export const HOST_SWEEP_STATE_FILE = "runtime-sweep.json"
+const HOST_SWEEP_STATE_FILE = "runtime-sweep.json"
 export const HOST_SWEEP_LOCK_FILE = "runtime-sweep.lock"
 
 export interface HostSweepState {
@@ -32,9 +32,9 @@ export type HostSweepStep = (identity: HostSweepIdentity) => Promise<readonly st
 export interface HostSweepOptions {
   readonly memoryRoot: string
   readonly steps: readonly HostSweepStep[]
-  /** Stop after this many identities (the bounded driver); absent means every identity once. */
+  /** Halt after this many identities (the bounded driver); absent means every identity once. */
   readonly maxIdentities?: number
-  /** Stop once this much time has passed (checked between identities). */
+  /** Halt once this much time has passed (checked between identities). */
   readonly budgetMs?: number
   readonly now?: () => number
   readonly signal?: AbortSignal
@@ -55,7 +55,7 @@ async function isDirectory(path: string): Promise<boolean> {
 }
 
 /** Every `agents/<id>` that has a `runtime/`, repo or not, in sorted order. */
-export async function listRuntimeIdentities(memoryRoot: string): Promise<readonly HostSweepIdentity[]> {
+async function listRuntimeIdentities(memoryRoot: string): Promise<readonly HostSweepIdentity[]> {
   const agentsRoot = join(memoryRoot, "agents")
   let names: string[]
   try {

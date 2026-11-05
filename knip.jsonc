@@ -2640,6 +2640,8 @@
         "**/*.test-d.ts",
         "src/git/test-repo-config.test-support.ts",
         "src/recall/bm25-persist.ts",
+        // bundled by path by script/build-reflection-lock.ts into the doctor CLI's reflection-lock.generated.js
+        "src/reflection/reflection-lock-bundle.ts",
         "src/sync/item/test-support.ts",
         "src/sync/account/testing/credential-writer.test-support.ts",
         "src/sync/keyring-port.ts",

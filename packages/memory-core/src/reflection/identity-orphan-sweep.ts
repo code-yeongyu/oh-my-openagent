@@ -25,7 +25,7 @@ async function reservedRunId(path: string): Promise<string | undefined> {
  * runs, plus every run dir with a ledger or prelaunch file and no terminal sentinel (a quarantined run
  * is terminal, REVIEW-1 M2).
  */
-export async function collectReflectionLiveRunIds(reflectionDir: string): Promise<ReadonlySet<string>> {
+async function collectReflectionLiveRunIds(reflectionDir: string): Promise<ReadonlySet<string>> {
   const live = new Set<string>()
   for (const name of ["active.lock", "pending.json"]) {
     const runId = await reservedRunId(join(reflectionDir, name))
