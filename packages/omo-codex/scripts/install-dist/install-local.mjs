@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:8d81b2fc55958c373709f0d10bf77d2381adbc2dc6a561e3fef000989f9688f1:0ff593233f60c3fd060cdc3d90fa08785a4fe723f97ff26a3cbda2d50b9aafa7
+// omo-codex-install:e4cf398570813ed8029ba503d7e9da3f9bb79761c4cb603276f6e024a8272717:edf194f68b2079d323dbb09f945339fd39835f7324c4cbff4df94bdbce74f86f
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -10205,7 +10205,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "5.1.61",
+    version: "5.1.60",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -19907,14 +19907,16 @@ var OmoMemoryRuntimeSchema = object({
   abandoned_journal_days: number2().int().min(1).default(14),
   completions_days: number2().int().min(1).default(30),
   pass_budget_ms: number2().int().min(1).default(60000),
-  discard_unreflected_journals: boolean2().default(false)
+  discard_unreflected_journals: boolean2().default(false),
+  max_bytes: number2().int().min(0).default(2 * 1024 * 1024 * 1024)
 }).strict();
 var OmoMemoryRuntimeLayerSchema = object({
   retention_days: number2().int().min(1).optional(),
   abandoned_journal_days: number2().int().min(1).optional(),
   completions_days: number2().int().min(1).optional(),
   pass_budget_ms: number2().int().min(1).optional(),
-  discard_unreflected_journals: boolean2().optional()
+  discard_unreflected_journals: boolean2().optional(),
+  max_bytes: number2().int().min(0).optional()
 }).strict();
 var OmoMemoryAgentOverridesSchema = object({
   enabled: boolean2().optional(),
@@ -19976,7 +19978,7 @@ var OmoMemorySettingsSchema = object({
   }),
   project_scope: OmoMemoryProjectScopeSchema.default({ nudge: true, recall: true }),
   projection: OmoMemoryProjectionSchema.default({ max_entries_per_directory: 0, max_bytes: 40960 }),
-  runtime: OmoMemoryRuntimeSchema.default({ retention_days: 7, abandoned_journal_days: 14, completions_days: 30, pass_budget_ms: 60000, discard_unreflected_journals: false }),
+  runtime: OmoMemoryRuntimeSchema.default({ retention_days: 7, abandoned_journal_days: 14, completions_days: 30, pass_budget_ms: 60000, discard_unreflected_journals: false, max_bytes: 2 * 1024 * 1024 * 1024 }),
   compile_warn_tokens: number2().int().positive().default(30000),
   agents: record(string2(), OmoMemoryAgentOverridesSchema).default({})
 }).strict();
