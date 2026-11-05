@@ -419,6 +419,7 @@
     "packages/memory-core/src/sync/item/index.ts",
     "packages/memory-core/src/sync/item/key-writers.ts",
     "packages/memory-core/src/sync/item/key.ts",
+    "packages/memory-core/src/sync/item/line-update.ts",
     "packages/memory-core/src/sync/item/machine-id.ts",
     "packages/memory-core/src/sync/item/render-for-disk.ts",
     "packages/memory-core/src/sync/item/render.ts",
