@@ -8,7 +8,7 @@ import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import type { MemoryIdentityContext } from "./context"
 import { registerReceiptReadGuard } from "./receipt-read-guard"
 import { isGrantedProjectMemoryRead } from "./project-memory-grants"
-import { isWithin as isWithinPath, scanForeignRoots, type ForeignRootScan } from "./guard-foreign-roots"
+import { isWithin as isWithinPath, scanForeignRoots, type AreaEntry, type ForeignRootScan } from "./guard-foreign-roots"
 import { TRANSIENT_DIRNAME } from "./transient-identity"
 
 const FILE_TOOL_NAMES = ["read", "write", "edit", "ls", "find", "grep", "glob"] as const
@@ -30,7 +30,9 @@ type ToolCall = {
 
 /** What an ancestor enumeration was cleared against, re-listed when its result arrives. */
 type AncestorCheck = {
-  readonly deniedRoots: readonly string[]
+  /** Each physical memory area once, by its canonical form. */
+  readonly areas: readonly string[]
+  /** Own roots to compare listed entries against, including the lexical own root re-rooted under its canonical area. */
   readonly ownRoots: readonly string[]
 }
 
@@ -101,12 +103,12 @@ export function registerMemoryGuard(
       }
       const scan = listForeignRoots(verdict)
       if (scan.kind !== "clear") return { block: true, reason: ancestorDenyReason(event.toolName, rawPath, scan) }
-      ancestor = { deniedRoots: verdict.deniedRoots, ownRoots: verdict.ownRoots, toolName: event.toolName, rawPath }
+      ancestor = { areas: verdict.areas, ownRoots: verdict.ownRoots, toolName: event.toolName, rawPath }
     }
     if (ancestor === undefined) return undefined
     // The result is re-checked on tool_result; a call that cannot be matched to its result is not allowed.
     if (event.toolCallId === undefined) {
-      return { block: true, reason: ancestorDenyReason(ancestor.toolName, ancestor.rawPath, { kind: "unlisted", area: ancestor.deniedRoots[0] ?? ancestor.rawPath }) }
+      return { block: true, reason: ancestorDenyReason(ancestor.toolName, ancestor.rawPath, { kind: "unlisted", area: ancestor.areas[0] ?? ancestor.rawPath }) }
     }
     const sessionId = readSessionId(eventContext)
     const pending = pendingAncestorChecks.get(sessionId) ?? new Map<string, PendingAncestorCheck>()
@@ -142,7 +144,11 @@ export function registerMemoryGuard(
 }
 
 function listForeignRoots(check: AncestorCheck): ForeignRootScan {
-  return scanForeignRoots(check.deniedRoots, check.ownRoots, (dir) => readdirSync(dir), NODE_PATH)
+  return scanForeignRoots(check.areas, check.ownRoots, readAreaEntries, NODE_PATH)
+}
+
+function readAreaEntries(dir: string): readonly AreaEntry[] {
+  return readdirSync(dir, { withFileTypes: true }).map((entry) => ({ name: entry.name, isFile: entry.isFile() }))
 }
 
 /** Names only the memory area, never the identity found in it. */
@@ -258,10 +264,28 @@ function classifyTarget(rawPath: string, cwd: string, roots: GuardRoots, recursi
   let ancestor = false
   for (const candidate of candidates) {
     if (ownRoots.some((root) => isWithin(root, candidate))) continue
+    // Also denies a direct read of a stray file such as agents/.DS_Store, which the ancestor scan skips;
+    // the structural rule over-approximates there, harmlessly.
     if (deniedRoots.some((root) => isWithin(root, candidate))) return { kind: "inside" }
     if (recursive && deniedRoots.some((root) => isWithin(candidate, root))) ancestor = true
   }
-  return ancestor ? { kind: "ancestor", deniedRoots, ownRoots } : undefined
+  return ancestor ? { kind: "ancestor", ...ancestorScanInputs(roots, ownRoots) } : undefined
+}
+
+/**
+ * The verdict must not depend on which path form reached a directory: list each physical area once by its
+ * canonical form, and compare against the own roots plus the lexical own root re-rooted under the canonical
+ * area (a case-variant own directory under a symlinked home lists as `<canonical>/agents/Global`).
+ */
+function ancestorScanInputs(roots: GuardRoots, ownRoots: readonly string[]): AncestorCheck {
+  const areas = roots.deniedRoots.map((root) => ({ lexical: root, canonical: canonicalizeFromNearestExisting(root) ?? root }))
+  const rerooted = areas
+    .filter((area) => isWithin(area.lexical, roots.ownRoot))
+    .map((area) => resolve(area.canonical, relative(area.lexical, roots.ownRoot)))
+  return {
+    areas: uniquePaths(areas.map((area) => area.canonical)),
+    ownRoots: uniquePaths([...ownRoots, ...rerooted]),
+  }
 }
 
 function canonicalizeFromNearestExisting(target: string): string | undefined {

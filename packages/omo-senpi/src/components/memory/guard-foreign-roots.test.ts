@@ -11,12 +11,15 @@ const MEMORY = "C:\\Users\\Bear\\.omo\\memory"
 const AGENTS = `${MEMORY}\\agents`
 const TRANSIENT = `${MEMORY}\\transient-runs`
 
-function listing(entries: Record<string, readonly string[] | NodeJS.ErrnoException>): (dir: string) => readonly string[] {
+// A bare name is a directory entry; `{ name, isFile: true }` is a regular file.
+type FakeEntry = string | { readonly name: string; readonly isFile: boolean }
+
+function listing(entries: Record<string, readonly FakeEntry[] | NodeJS.ErrnoException>): (dir: string) => readonly { readonly name: string; readonly isFile: boolean }[] {
   return (dir) => {
     const value = entries[dir]
     if (value === undefined) throw Object.assign(new Error(`ENOENT: ${dir}`), { code: "ENOENT" })
     if (value instanceof Error) throw value
-    return value
+    return value.map((entry) => typeof entry === "string" ? { name: entry, isFile: false } : entry)
   }
 }
 
@@ -40,6 +43,17 @@ describe("scanForeignRoots under win32 path forms (#12301)", () => {
     const scan = scanForeignRoots([AGENTS, TRANSIENT], [`${AGENTS}\\global`], listing({ [AGENTS]: ["global", "other"] }), win32)
 
     expect(scan).toEqual({ kind: "foreign", area: AGENTS })
+  })
+
+  test("#given regular files beside the own identity in every area #when the areas are listed #then files are not identities", () => {
+    const scan = scanForeignRoots(
+      [AGENTS, TRANSIENT],
+      [`${AGENTS}\\global`],
+      listing({ [AGENTS]: ["global", { name: "desktop.ini", isFile: true }], [TRANSIENT]: [{ name: "Thumbs.db", isFile: true }] }),
+      win32,
+    )
+
+    expect(scan).toEqual({ kind: "clear" })
   })
 
   test("#given an entry that differs from the own root only by case #when compared with posix rules #then it is foreign", () => {

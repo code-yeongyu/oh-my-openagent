@@ -179,7 +179,7 @@ describe("memory cross-identity guard", () => {
     })
     expect(await dispatch(setup, "grep", { path: memoryRoot })).toEqual({
       block: true,
-      reason: `cross-identity memory access denied: grep to ${memoryRoot} would enumerate another memory identity found under ${setup.agentsRoot}`,
+      reason: `cross-identity memory access denied: grep to ${memoryRoot} would enumerate another memory identity found under ${realpathSync(setup.agentsRoot)}`,
     })
     expect(await dispatch(setup, "read", { path: memoryRoot })).toBeUndefined()
   })
@@ -314,10 +314,13 @@ type AncestorSetup = {
 
 // A realpath'd omo home so the lexical and canonical forms of every memory path agree; only the bound identity
 // "global" exists unless a test adds more.
-function ancestorFixture(options: { readonly transientToken?: string; readonly createOwn?: boolean } = {}): AncestorSetup {
-  const omoHome = realpathSync(mkdtempSync(join(tmpdir(), "omo-memory-guard-ancestor-")))
+function ancestorFixture(options: { readonly transientToken?: string; readonly createOwn?: boolean; readonly symlinkedHome?: boolean } = {}): AncestorSetup {
+  const realHome = realpathSync(mkdtempSync(join(tmpdir(), "omo-memory-guard-ancestor-")))
   const workspace = realpathSync(mkdtempSync(join(tmpdir(), "omo-memory-guard-ancestor-workspace-")))
-  roots.push(omoHome, workspace)
+  roots.push(realHome, workspace)
+  // With symlinkedHome every memory path the guard sees is lexical through a link, so lexical and canonical differ.
+  const omoHome = options.symlinkedHome === true ? join(workspace, "omo-home-link") : realHome
+  if (options.symlinkedHome === true) symlinkSync(realHome, omoHome, process.platform === "win32" ? "junction" : "dir")
   const memoryRoot = join(omoHome, "memory")
   const durablePaths = buildIdentityPaths(memoryRoot, "global")
   const ownPaths = options.transientToken === undefined
@@ -344,8 +347,9 @@ function ancestorFixture(options: { readonly transientToken?: string; readonly c
   }
 }
 
-async function enumerate(setup: AncestorSetup, toolName: string, path: string, toolCallId = "call-1"): Promise<unknown> {
-  const results = await setup.pi.dispatch("tool_call", { type: "tool_call", toolCallId, toolName, input: { path } }, {
+async function enumerate(setup: AncestorSetup, toolName: string, path: string, toolCallId: string | null = "call-1"): Promise<unknown> {
+  const call = { type: "tool_call", toolName, input: { path }, ...(toolCallId === null ? {} : { toolCallId }) }
+  const results = await setup.pi.dispatch("tool_call", call, {
     sessionManager: { getSessionId: () => "session-1" },
   })
   return results[0]
@@ -414,6 +418,40 @@ describe("memory guard ancestor enumeration (#12301)", () => {
     else expectAncestorDenied(result, ["Global"])
   })
 
+  test("#given a case-variant own directory under a symlinked omo home #when the memory root is enumerated through the link #then the verdict matches the canonical one", async () => {
+    const setup = ancestorFixture({ createOwn: false, symlinkedHome: true })
+    mkdirSync(join(setup.agentsRoot, "Global", "repo"), { recursive: true })
+    const caseInsensitive = existsSync(join(setup.agentsRoot, "global"))
+
+    const result = await enumerate(setup, "grep", setup.memoryRoot)
+
+    if (caseInsensitive) expect(result).toBeUndefined()
+    else expectAncestorDenied(result, ["Global"])
+  })
+
+  test("#given regular files such as .DS_Store in the memory areas #when the memory root is enumerated with a single identity #then they are not identities and it is allowed", async () => {
+    const setup = ancestorFixture()
+    mkdirSync(setup.transientRoot)
+    writeFileSync(join(setup.agentsRoot, ".DS_Store"), "finder")
+    writeFileSync(join(setup.transientRoot, "desktop.ini"), "explorer")
+
+    for (const tool of ENUMERATION_TOOLS) expect(await enumerate(setup, tool, setup.memoryRoot)).toBeUndefined()
+  })
+
+  test("#given a symlink named .DS_Store in the agents area #when the memory root is enumerated #then the entry type, not its name, denies", async () => {
+    const setup = ancestorFixture()
+    mkdirSync(join(setup.omoHome, "elsewhere"))
+    symlinkSync(join(setup.omoHome, "elsewhere"), join(setup.agentsRoot, ".DS_Store"), process.platform === "win32" ? "junction" : "dir")
+
+    expectAncestorDenied(await enumerate(setup, "grep", setup.memoryRoot), [".DS_Store"])
+  })
+
+  test("#given an ancestor enumeration without a toolCallId #when nothing foreign exists #then it is denied because its result cannot be re-checked", async () => {
+    const setup = ancestorFixture()
+
+    expectAncestorDenied(await enumerate(setup, "grep", setup.memoryRoot, null), [])
+  })
+
   test("#given a repo-less foreign identity #when any enumeration tool targets the memory root #then it stays denied without naming the identity", async () => {
     const setup = ancestorFixture()
     const transcript = join(setup.agentsRoot, "foreign-x", "runtime", "transcripts", "x.jsonl")
@@ -444,14 +482,21 @@ describe("memory guard ancestor enumeration (#12301)", () => {
     expectAncestorDenied(await enumerate(setup, "grep", setup.memoryRoot), ["other-id"])
   })
 
-  test.each(["file", "dangling symlink", "alias symlink of the own root"] as const)("#given a %s entry in the agents area #when the memory root is enumerated #then any non-own entry denies", async (kind) => {
+  test.each([
+    ["file", false],
+    ["dangling symlink", true],
+    ["alias symlink of the own root", true],
+  ] as const)("#given a %s entry in the agents area #when the memory root is enumerated #then denied is %p (a regular file cannot be an identity root)", async (kind, denied) => {
     const setup = ancestorFixture()
     const entry = join(setup.agentsRoot, "evil")
     if (kind === "file") writeFileSync(entry, "not an identity")
     else if (kind === "dangling symlink") symlinkSync(join(setup.agentsRoot, "missing"), entry)
     else symlinkSync(setup.own.identityPaths.root, entry, process.platform === "win32" ? "junction" : "dir")
 
-    expectAncestorDenied(await enumerate(setup, "grep", setup.memoryRoot), ["evil"])
+    const result = await enumerate(setup, "grep", setup.memoryRoot)
+
+    if (denied) expectAncestorDenied(result, ["evil"])
+    else expect(result).toBeUndefined()
   })
 
   test("#given a memory area that is a file #when the memory root is enumerated #then the unlistable area denies", async () => {
