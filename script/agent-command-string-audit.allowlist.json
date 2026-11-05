@@ -84,6 +84,7 @@
     "packages/omo-native/test/doctor-stale-engines.test.ts: omo doctor x4",
     "packages/omo-native/test/doctor-transient-memory.test.ts: omo doctor",
     "packages/omo-native/test/doctor.test.ts: omo doctor x2",
+    "packages/omo-native/test/keychain-helper-doctor.test.ts: omo doctor",
     "packages/omo-native/test/launch-spec-mode.test.ts: omo doctor x2",
     "packages/omo-native/test/model-chains.test.ts: omo doctor",
     "packages/omo-opencode/src/cli/doctor/checks/codex-components.test.ts: omo doctor",
