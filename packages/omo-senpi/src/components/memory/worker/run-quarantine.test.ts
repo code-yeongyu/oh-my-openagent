@@ -110,6 +110,8 @@ describe("quarantine of runs reconciliation cannot recover", () => {
     expect(JSON.parse(await readFile(join(strandedDir, "quarantined.json"), "utf8"))).toMatchObject({ runId: "run-stranded", reason: "ledger_unreadable", generation: item.ledger.startedAt })
     expect((await receipts(item)).filter((receipt) => receipt.kind !== "facts" && receipt.runId === "run-stranded").map((receipt) => receipt.event)).toEqual(["quarantined"])
     expect(existsSync(stranded.dir)).toBe(false)
+    const branch = Bun.spawnSync(["git", "-C", item.identity.paths.repo, "show-ref", "--verify", `refs/heads/${stranded.branch}`])
+    expect(branch.exitCode).not.toBe(0)
   }, 30_000)
 
   test("#given the active run already has its abandoned.json for this generation under a dead launcher #when reconciled #then only the release happens and no second sentinel is written (C29)", async () => {

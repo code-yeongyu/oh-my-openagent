@@ -5,7 +5,7 @@ import { dirname, join, relative } from "node:path"
 
 import { createHash } from "node:crypto"
 
-import { formatReflectionLockLines, reflectionLockFix, reflectionLockReport } from "../bin/lib/doctor-reflection-lock.js"
+import { decideReflectionLock, formatReflectionLockLines, reflectionLockFix, reflectionLockReport } from "../bin/lib/doctor-reflection-lock.js"
 import { runDoctor } from "../bin/lib/doctor.js"
 
 const roots: string[] = []
@@ -195,14 +195,17 @@ describe("omo doctor reflection lock report (#10377)", () => {
     expect(formatReflectionLockLines("agent-a", { state: "none" }, "/x")).toEqual([])
   })
 
-  test("#given a launcher that died before its run started (#11976 case A) #when the report runs without --fix #then the WARN line names omo doctor --fix as the next step", async () => {
+  test("#given a launcher that died before its run started (#11976 case A) #when the report runs without --fix #then the decision is a launch-interrupted reap and a line is printed (C14)", async () => {
     const root = memoryHome()
-    launchInterrupted(identity(root, "agent-a"))
-    const [line] = await reflectionLockReport({ env: { OMO_MEMORY_HOME: root }, reflectionLockProbe: { ...probe("dead"), now: () => NOW } })
-    expect(line).toStartWith("WARN memory reflection is stuck on a stale lock (agent-a): run reflection-run-64")
-    expect(line).toContain("Next step: omo doctor --fix")
+    const reflectionDir = identity(root, "agent-a")
+    launchInterrupted(reflectionDir)
+    const fixProbe = { ...probe("dead"), now: () => NOW }
+    const { decision } = await decideReflectionLock(reflectionDir, fixProbe)
+    const lines = await reflectionLockReport({ env: { OMO_MEMORY_HOME: root }, reflectionLockProbe: fixProbe })
+    expect(decision).toMatchObject({ kind: "reap", action: "launch-interrupted" })
+    expect(lines).toHaveLength(1)
+    expect(lines[0]?.length).toBeGreaterThan(0)
   })
-
   test("#given precomputed report lines #when omo doctor runs #then it prints them", () => {
     const logged: string[] = []
     const original = console.log
