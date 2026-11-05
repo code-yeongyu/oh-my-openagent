@@ -108,7 +108,7 @@ export async function listNames(directory: string): Promise<string[]> {
 }
 
 /** Newest mtime of the path and everything under it; symlinks count as themselves. */
-export async function newestMtime(path: string): Promise<number | undefined> {
+async function newestMtime(path: string): Promise<number | undefined> {
   const stats = await lstat(path).catch(() => undefined)
   if (stats === undefined) return undefined
   let newest = stats.mtimeMs

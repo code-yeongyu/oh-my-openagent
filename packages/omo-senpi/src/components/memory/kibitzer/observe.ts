@@ -54,9 +54,9 @@ export {
   encodeKibitzerSessionId,
   kibitzerSidecarOwnerLockPath,
   kibitzerSidecarSessionDir,
-  kibitzerSidecarsRoot,
   kibitzerWakesFile,
 } from "./observe-paths"
+export { kibitzerSidecarsRoot } from "@oh-my-opencode/memory-core"
 export { KIBITZER_SIDECAR_RETENTION_MS, pruneKibitzerSidecars, type PruneKibitzerSidecarsOptions, type PruneKibitzerSidecarsResult } from "./observe-prune"
 export { KIBITZER_WAKE_RECORD_MAX_CHARS, kibitzerWakeRecord, redactKibitzerWakeReason, type KibitzerWakeRecord } from "./observe-record"
 

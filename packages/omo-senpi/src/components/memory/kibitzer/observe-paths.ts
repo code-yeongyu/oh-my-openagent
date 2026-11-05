@@ -7,16 +7,13 @@ import { join } from "node:path"
 import {
   KIBITZER_ENCODED_SESSION_PATTERN,
   KIBITZER_SIDECAR_OWNER_LOCK_PURPOSE,
-  KIBITZER_SIDECAR_TOMBSTONE_PREFIX,
   kibitzerSidecarOwnerLockPathFor,
   kibitzerSidecarsRoot,
 } from "@oh-my-opencode/memory-core"
 
-export { kibitzerSidecarsRoot }
 export const KIBITZER_WAKES_FILENAME = "wakes.ndjson"
 export const OWNER_LOCK_PURPOSE = KIBITZER_SIDECAR_OWNER_LOCK_PURPOSE
-export const PRUNE_TOMBSTONE_PREFIX = KIBITZER_SIDECAR_TOMBSTONE_PREFIX
-export const ENCODED_SESSION_PATTERN = KIBITZER_ENCODED_SESSION_PATTERN
+const ENCODED_SESSION_PATTERN = KIBITZER_ENCODED_SESSION_PATTERN
 
 /** Unpadded URL-safe base64 of the id's UTF-8 bytes: injective, and every output is a safe path segment. */
 export function encodeKibitzerSessionId(sessionId: string): string {

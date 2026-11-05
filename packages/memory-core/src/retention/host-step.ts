@@ -47,7 +47,7 @@ function window(settings: ForeignMemoryRuntimeSettings | undefined, identity: st
  * The retention policy for an identity the host sweep visits (REVIEW-5 M1): the same windows the
  * session resolves, read from the global layer and its `agents.<id>.runtime` override.
  */
-export function resolveForeignIdentityRetentionPolicy(settings: ForeignMemoryRuntimeSettings | undefined, identity: string): RuntimeRetentionPolicy {
+function resolveForeignIdentityRetentionPolicy(settings: ForeignMemoryRuntimeSettings | undefined, identity: string): RuntimeRetentionPolicy {
   return {
     retentionDays: window(settings, identity, "retention_days", DEFAULT_RUNTIME_RETENTION.retentionDays),
     abandonedJournalDays: window(settings, identity, "abandoned_journal_days", DEFAULT_RUNTIME_RETENTION.abandonedJournalDays),

@@ -14,7 +14,7 @@ import { reflectionRunNumber } from "../reflection/run-id-high-water"
 import { reservedRunIds, type LazyRetentionGuard } from "./guard"
 import { DAY_MS, StoreTally, describeError, errorCode, idleSince, listNames, type RetentionContext, type RetentionStoreResult } from "./policy"
 
-export const RETENTION_TOMBSTONE_PREFIX = ".prune-"
+const RETENTION_TOMBSTONE_PREFIX = ".prune-"
 const FOLDED_OUTCOMES = new Set(["merged", "no_changes"])
 const TERMINAL_SENTINELS = ["abandoned.json", "quarantined.json"] as const
 
@@ -118,7 +118,7 @@ async function claimAndRemove(
 }
 
 /** A tombstone is unreachable by name; a failed delete is retried by the next pass. */
-export async function removeTombstone(path: string, context: Pick<RetentionContext, "warn">): Promise<boolean> {
+async function removeTombstone(path: string, context: Pick<RetentionContext, "warn">): Promise<boolean> {
   try {
     await removeTree(path)
     return true

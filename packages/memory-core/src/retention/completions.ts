@@ -10,7 +10,7 @@ import type { LazyRetentionGuard } from "./guard"
 import { DAY_MS, StoreTally, listNames, type RetentionContext, type RetentionStoreResult } from "./policy"
 
 /** `readReflectionHealth` reads the latest records for its streak and last-success window. */
-export const COMPLETIONS_KEEP_NEWEST = 50
+const COMPLETIONS_KEEP_NEWEST = 50
 
 type Completion = { readonly runId: string; readonly finishedAt: number; readonly consumed: boolean }
 

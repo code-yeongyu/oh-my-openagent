@@ -19,7 +19,7 @@ export interface ReflectionRetentionGuard {
  * removed (H1 Guard 2). Contention means a reservation is in progress: the reflection stores are
  * skipped for this pass rather than waited on.
  */
-export async function readReflectionRetentionGuard(context: RetentionContext): Promise<ReflectionRetentionGuard | undefined> {
+async function readReflectionRetentionGuard(context: RetentionContext): Promise<ReflectionRetentionGuard | undefined> {
   await mkdir(context.paths.locks, { recursive: true, mode: 0o700 })
   const record = await createLockRecord("reflection-scheduler", { runId: "runtime-retention" })
   try {

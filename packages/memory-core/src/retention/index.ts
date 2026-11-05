@@ -4,15 +4,13 @@ export {
   type RetentionStoreResult,
   type RuntimeRetentionPolicy,
 } from "./policy"
-export { RETENTION_TOMBSTONE_PREFIX } from "./reflection-runs"
-export { RETENTION_STORES, type RetentionCursor, type RetentionStore } from "./budget"
-export { RETENTION_STAMP_CONFIG_KEY, readRetentionCursor, retentionCursorPath } from "./stamp"
-export { readUnreflectedRetentionGate, type UnreflectedRetentionGate } from "./reflection-health-signal"
+export { type RetentionCursor, type RetentionStore } from "./budget"
+export { RETENTION_STAMP_CONFIG_KEY, retentionCursorPath } from "./stamp"
+export { type UnreflectedRetentionGate } from "./reflection-health-signal"
 export {
   KIBITZER_ENCODED_SESSION_PATTERN,
   KIBITZER_SIDECAR_OWNER_LOCK_PURPOSE,
   KIBITZER_SIDECAR_RETENTION_MS,
-  KIBITZER_SIDECAR_TOMBSTONE_PREFIX,
   kibitzerSidecarOwnerLockPathFor,
   kibitzerSidecarsRoot,
   pruneKibitzerSidecars,
@@ -22,7 +20,6 @@ export {
 export {
   createRetentionHostSweepStep,
   resolveForeignIdentityDiscardUnreflected,
-  resolveForeignIdentityRetentionPolicy,
   type ForeignMemoryRuntimeSettings,
   type ForeignRuntimeLayer,
   type RetentionHostSweepStepOptions,

@@ -3,7 +3,7 @@
 // finished is a complete resume point: the next pass skips every earlier store and every name up to
 // and including `lastName` in the cursor's store. An item in flight always finishes.
 
-export const RETENTION_STORES = ["runs", "completions", "reflection-sessions", "journals", "sidecars", "ledgers", "recall-runs"] as const
+const RETENTION_STORES = ["runs", "completions", "reflection-sessions", "journals", "sidecars", "ledgers", "recall-runs"] as const
 export type RetentionStore = (typeof RETENTION_STORES)[number]
 
 export interface RetentionCursor {

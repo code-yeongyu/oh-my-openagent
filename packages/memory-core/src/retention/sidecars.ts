@@ -16,7 +16,7 @@ import { LockContentionError, acquireLock, createLockRecord, releaseLock, type L
 import type { RetentionKeepReason } from "./policy"
 
 export const KIBITZER_SIDECAR_OWNER_LOCK_PURPOSE = "recall-sidecar"
-export const KIBITZER_SIDECAR_TOMBSTONE_PREFIX = ".prune-"
+const KIBITZER_SIDECAR_TOMBSTONE_PREFIX = ".prune-"
 export const KIBITZER_ENCODED_SESSION_PATTERN = /^[A-Za-z0-9_-]+$/
 const SIDECARS_DIRNAME = "sidecars"
 const OWNER_LOCK_PREFIX = "recall-sidecar."

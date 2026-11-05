@@ -234,7 +234,7 @@ export const OmoMemoryProjectionLayerSchema = z.object({
 // reclaimable disk); switched on, it runs only while reflection is healthy for the identity.
 // ---------------------------------------------------------------------------
 
-export const OmoMemoryRuntimeSchema = z.object({
+const OmoMemoryRuntimeSchema = z.object({
   retention_days: z.number().int().min(1).default(7),
   abandoned_journal_days: z.number().int().min(1).default(14),
   completions_days: z.number().int().min(1).default(30),
@@ -242,7 +242,7 @@ export const OmoMemoryRuntimeSchema = z.object({
   discard_unreflected_journals: z.boolean().default(false),
 }).strict()
 
-export const OmoMemoryRuntimeLayerSchema = z.object({
+const OmoMemoryRuntimeLayerSchema = z.object({
   retention_days: z.number().int().min(1).optional(),
   abandoned_journal_days: z.number().int().min(1).optional(),
   completions_days: z.number().int().min(1).optional(),
