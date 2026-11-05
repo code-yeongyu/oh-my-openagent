@@ -69,11 +69,11 @@ describe("persistent PR watch reactor", () => {
     await store.transaction(state => registerPrWatch(state, "acme/widget#1", "one", "alice", 0))
     await reactor.pass(100)
     await store.transaction(state => { for (const wake of pendingPrWatchWakes(state)) acknowledgePrWatchWake(state, wake.id) })
-    host.detail.head = "head2"; host.detail.checks[0]!.id = "run:2"; host.status = "status-2"
+    host.detail.head = "head2"; present(host.detail.checks[0]).id = "run:2"; host.status = "status-2"
     await reactor.pass(200)
     const wakes = pendingPrWatchWakes(store.read())
     expect(wakes.length).toBe(1)
-    expect(wakes[0]!.events).toEqual([{ key: "green:head2:2", kind: "checks_passed", fact: "Required checks passed on head2 (all checks are used when GitHub marks none required)." }])
+    expect(present(wakes[0]).events).toEqual([{ key: "green:head2:2", kind: "checks_passed", fact: "Required checks passed on head2 (all checks are used when GitHub marks none required)." }])
     await reactor.pass(300)
     expect(pendingPrWatchWakes(store.read()).length).toBe(1)
   })
@@ -84,8 +84,8 @@ describe("persistent PR watch reactor", () => {
     const reopened = new PrWatchRegistry(store.path)
     const wakes = pendingPrWatchWakes(reopened.read())
     expect(wakes.length).toBe(1)
-    expect(reopened.read().registrations[wakes[0]!.watchID]!.told).toEqual(wakes[0]!.events.map((event) => event.key))
-    await reopened.transaction((state) => acknowledgePrWatchWake(state, wakes[0]!.id))
+    expect(present(reopened.read().registrations[present(wakes[0]).watchID]).told).toEqual(present(wakes[0]).events.map((event) => event.key))
+    await reopened.transaction((state) => acknowledgePrWatchWake(state, present(wakes[0]).id))
     await new PrWatchReactor(reopened, host).pass(200)
     expect(pendingPrWatchWakes(new PrWatchRegistry(store.path).read())).toEqual([])
   })
@@ -98,7 +98,7 @@ describe("persistent PR watch reactor", () => {
     await store.transaction((state) => { stopPrWatch(state, old.id, "unwatched"); registerPrWatch(state, "acme/widget#1", "one", "alice", 150) })
     release(); await pass
     expect(pendingPrWatchWakes(store.read())).toEqual([])
-    expect(store.read().registrations[old.id]!.generation).toBe(3)
+    expect(present(store.read().registrations[old.id]).generation).toBe(3)
   })
   test("rate limits skip without failing a watch; unreadable fallback stops after 15 minutes with a queued reason", async () => {
     const store = registry(), host = new Host()
@@ -106,13 +106,13 @@ describe("persistent PR watch reactor", () => {
     host.rateLimited = true
     await new PrWatchReactor(store, host).pass(100)
     expect(host.reads).toEqual({ fingerprints: 1, details: 0, activity: 0 })
-    expect(store.read().registrations[registration.id]!.unreadableSince).toBeUndefined()
+    expect(present(store.read().registrations[registration.id]).unreadableSince).toBeUndefined()
     host.rateLimited = false; host.missing = true; host.fail = true
     const reactor = new PrWatchReactor(store, host)
     await reactor.pass(200); await reactor.pass(200 + 15 * 60_000)
     const state = new PrWatchRegistry(store.path).read()
-    expect(state.registrations[registration.id]!.reason).toBe("host_unreadable_fifteen_minutes")
-    expect(pendingPrWatchWakes(state)[0]!.events[0]!.fact).toContain("Host unreadable")
+    expect(present(state.registrations[registration.id]).reason).toBe("host_unreadable_fifteen_minutes")
+    expect(present(present(pendingPrWatchWakes(state)[0]).events[0]).fact).toContain("Host unreadable")
   })
   test("deferred GitHub reads preserve acknowledged baseline and do not start unreadability timeout", async () => {
     const store = registry(), host = new Host(), reactor = new PrWatchReactor(store, host)
@@ -122,7 +122,7 @@ describe("persistent PR watch reactor", () => {
     host.status = "changed"; host.deferred = true
     await reactor.pass(200)
     expect(store.read().snapshots[registration.reference]).toEqual(baseline)
-    expect(store.read().registrations[registration.id]!.unreadableSince).toBeUndefined()
+    expect(present(store.read().registrations[registration.id]).unreadableSince).toBeUndefined()
   })
   test("ten consecutive comment-only wakes stop with reason, and actor comments do not generate a wake", async () => {
     const store = registry(), host = new Host()
@@ -133,8 +133,8 @@ describe("persistent PR watch reactor", () => {
     expect(pendingPrWatchWakes(store.read())).toEqual([])
     for (let i = 0; i < 10; i++) await store.transaction((state) => recordPrWatchEvents(state, registration, [{ key: `remark:${i}`, kind: "comment", fact: `external comment ${i}` }]))
     const state = store.read()
-    expect(state.registrations[registration.id]!.active).toBe(false)
-    expect(state.registrations[registration.id]!.reason).toBe("ten_consecutive_comment_only_wakes")
+    expect(present(state.registrations[registration.id]).active).toBe(false)
+    expect(present(state.registrations[registration.id]).reason).toBe("ten_consecutive_comment_only_wakes")
     expect(pendingPrWatchWakes(state).length).toBe(10)
   })
   test("corrupt durable state fails loudly and is never silently overwritten", () => {
@@ -162,3 +162,8 @@ test("project plugin instances share host registry/poller until the last owner r
   expect(restarted.registry.path).toBe(one.registry.path)
   await restarted.shutdown()
 })
+
+function present<T>(value: T | undefined): T {
+  if (value === undefined) throw new Error("Expected fixture value")
+  return value
+}

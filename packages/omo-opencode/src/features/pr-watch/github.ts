@@ -64,7 +64,8 @@ export class GitHubPrWatchHost {
       cursors.add(next)
       cursor = next
     } while (true)
-    return { ...details!, checks: [...new Map(checks.map(check => [check.id, check])).values()] }
+    if (!details) throw new Error("GitHub PR detail missing")
+    return { ...details, checks: [...new Map(checks.map(check => [check.id, check])).values()] }
   }
 
   async activity(reference: string): Promise<PrActivity> {

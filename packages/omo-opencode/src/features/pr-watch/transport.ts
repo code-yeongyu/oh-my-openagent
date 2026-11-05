@@ -132,7 +132,8 @@ export class GitHubReadTransport {
     if (!response.ok) throw new Error(`GitHub read failed (${response.status})`)
     const etag = response.headers.get("etag")
     if (query === undefined && etag) {
-      if (this.#cache.size >= 256 && !this.#cache.has(url)) this.#cache.delete(this.#cache.keys().next().value!)
+      const oldest = this.#cache.keys().next()
+      if (this.#cache.size >= 256 && !this.#cache.has(url) && !oldest.done) this.#cache.delete(oldest.value)
       this.#cache.set(url, { etag, value: structuredClone(value) })
     }
     return value as T

@@ -57,7 +57,7 @@ describe("shared GitHub PR watch transport", () => {
     const transport = new GitHubReadTransport({ env: { GITHUB_TOKEN: "token" }, fetch: fixture.request })
     const first = await transport.rest<{ login: string }>("/user"); first.login = "modified"
     expect(await transport.rest("/user")).toEqual({ login: "alice" })
-    expect(fixture.calls[1]!.headers.get("if-none-match")).toBe("cached")
+    expect(present(fixture.calls[1]).headers.get("if-none-match")).toBe("cached")
   })
   test("primary GraphQL budget defers only GraphQL until reset; partial errors survive", async () => {
     let now = 1000
@@ -115,3 +115,8 @@ describe("complete PR watch reads", () => {
     await expect(new GitHubPrWatchHost(transport(failed)).activity("acme/widget#1")).rejects.toThrow("GitHub read failed")
   })
 })
+
+function present<T>(value: T | undefined): T {
+  if (value === undefined) throw new Error("Expected fixture value")
+  return value
+}
