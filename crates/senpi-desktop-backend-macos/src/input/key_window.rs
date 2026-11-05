@@ -22,6 +22,7 @@ use super::key_route::{
     attached_under, key_refusal, key_verdict, keyboard_conflict, keys_still_reach, unmapped_keyboard_refusal,
     KeyVerdict, KeyboardConflict,
 };
+use super::key_trace::{self, KeyStep};
 use crate::ax::key_focus::{focused_window_id, key_focus, reports_active, window_records, KeyDestination, KeyFocus};
 use crate::skylight::{front_pid, post_activation, sender_connection, set_fields, set_window_location, window_parent};
 
@@ -75,6 +76,7 @@ impl KeyWindow {
         (pid, wid): (libc::pid_t, u32),
         entry_front: EntryFront,
     ) -> CoreResult<Self> {
+        key_trace::record(KeyStep::KeyWindow);
         let conflict = conflict_now(pid, wid);
         if conflict == Some(KeyboardConflict::Unmapped) {
             return Err(unmapped_keyboard_refusal(wid));

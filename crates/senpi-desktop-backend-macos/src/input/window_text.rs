@@ -19,6 +19,7 @@ use super::element::{inserts_first, report_delivered};
 use super::held::KeyRoute;
 use super::insertion::{before_write, insert_unless_terminal, is_terminal};
 use super::key_front::EntryFront;
+use super::key_trace::{self, KeyStep};
 use super::key_window::KeyWindow;
 use super::{guard, keys, MacInput};
 use crate::skylight;
@@ -43,7 +44,10 @@ impl MacInput {
             insert_unless_terminal(
                 is_terminal(pid),
                 || before_write(DeliveryMode::Background, entry_front, skylight::front_pid, (pid, wid), check_stop),
-                |behind_user| crate::ax::insert_native_text(pid, wid, text, behind_user),
+                |behind_user| {
+                    key_trace::record(KeyStep::Insert);
+                    crate::ax::insert_native_text(pid, wid, text, behind_user)
+                },
             )
         };
         let keys = |delivered: &mut dyn FnMut()| {

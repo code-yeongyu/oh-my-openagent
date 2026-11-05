@@ -16,6 +16,7 @@ mod keyboard;
 mod keymap;
 mod key_front;
 mod key_route;
+mod key_trace;
 mod key_window;
 mod holds;
 mod keys;
@@ -40,6 +41,9 @@ mod window_text_tests;
 
 #[cfg(test)]
 mod insertion_tests;
+
+#[cfg(test)]
+mod keyboard_wiring_tests;
 
 #[cfg(test)]
 mod live;

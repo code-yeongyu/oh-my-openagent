@@ -44,25 +44,39 @@ impl MacInput {
             Target::Window(id) => {
                 let entry_front = EntryFront::now();
                 let window = resolve_window(capture, id)?;
-                let (pid, wid) = window_identity(&window)?;
-                // A remote screen (Screen Sharing, iPhone Mirroring) forwards key
-                // codes and drops the Unicode text: its text goes out as the keys
-                // of the user's layout, mapped in full before anything is posted.
-                if let Some(remote) = remote::remote_screen(pid) {
-                    return self.type_remote(&window, pid, wid, text, remote, mode, entry_front, check_stop, delivered, None).map(|_| ());
-                }
-                match mode {
-                    DeliveryMode::Background => skylight::reporting_partial(|| {
-                        self.type_window_background(&window, (pid, wid), text, entry_front, check_stop, delivered)
-                    }),
-                    DeliveryMode::Foreground => skylight::with_foreground(pid, || {
-                        crate::ax::prepare_foreground_input(&window)?;
-                        keys::type_text_interruptible(
-                            &self.source, &mut self.held, text, KeyRoute::Global, check_stop, delivered,
-                        )
-                    }),
-                }
+                self.type_window(&window, text, mode, entry_front, check_stop, delivered)
             }
+        }
+    }
+
+    /// Text for `window`, once [`Self::type_text_interruptible`] resolved it;
+    /// `entry_front` was read before that ([`KeyWindow`]).
+    pub(super) fn type_window(
+        &mut self,
+        window: &DesktopWindow,
+        text: &str,
+        mode: DeliveryMode,
+        entry_front: EntryFront,
+        check_stop: &dyn Fn() -> CoreResult<()>,
+        delivered: &mut dyn FnMut(),
+    ) -> CoreResult<()> {
+        let (pid, wid) = window_identity(window)?;
+        // A remote screen (Screen Sharing, iPhone Mirroring) forwards key
+        // codes and drops the Unicode text: its text goes out as the keys
+        // of the user's layout, mapped in full before anything is posted.
+        if let Some(remote) = remote::remote_screen(pid) {
+            return self.type_remote(window, pid, wid, text, remote, mode, entry_front, check_stop, delivered, None).map(|_| ());
+        }
+        match mode {
+            DeliveryMode::Background => skylight::reporting_partial(|| {
+                self.type_window_background(window, (pid, wid), text, entry_front, check_stop, delivered)
+            }),
+            DeliveryMode::Foreground => skylight::with_foreground(pid, || {
+                crate::ax::prepare_foreground_input(window)?;
+                keys::type_text_interruptible(
+                    &self.source, &mut self.held, text, KeyRoute::Global, check_stop, delivered,
+                )
+            }),
         }
     }
 
@@ -154,21 +168,34 @@ impl MacInput {
             Target::Window(id) => {
                 let entry_front = EntryFront::now();
                 let window = resolve_window(capture, id)?;
-                let (pid, wid) = window_identity(&window)?;
-                match mode {
-                    DeliveryMode::Background => self.background(|this| {
-                        guard::guard(&window, "keyboard", None)?;
-                        let target = KeyWindow::prepare(&this.source, &window, (pid, wid), entry_front)?;
-                        this.last_activated = Some((pid, wid));
-                        let check = || check_stop().and_then(|()| target.check());
-                        chord::chord(&this.source, &mut this.held, keys, KeyRoute::Process(pid), &check)
-                    }),
-                    DeliveryMode::Foreground => skylight::with_foreground(pid, || {
-                        crate::ax::prepare_foreground_input(&window)?;
-                        chord::chord(&self.source, &mut self.held, keys, KeyRoute::Global, check_stop)
-                    }),
-                }
+                self.chord_window(&window, keys, mode, entry_front, check_stop)
             }
+        }
+    }
+
+    /// A key chord for `window`, once [`Self::key_chord`] resolved it;
+    /// `entry_front` was read before that ([`KeyWindow`]).
+    pub(super) fn chord_window(
+        &mut self,
+        window: &DesktopWindow,
+        keys: &[KeyName],
+        mode: DeliveryMode,
+        entry_front: EntryFront,
+        check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<()> {
+        let (pid, wid) = window_identity(window)?;
+        match mode {
+            DeliveryMode::Background => self.background(|this| {
+                guard::guard(window, "keyboard", None)?;
+                let target = KeyWindow::prepare(&this.source, window, (pid, wid), entry_front)?;
+                this.last_activated = Some((pid, wid));
+                let check = || check_stop().and_then(|()| target.check());
+                chord::chord(&this.source, &mut this.held, keys, KeyRoute::Process(pid), &check)
+            }),
+            DeliveryMode::Foreground => skylight::with_foreground(pid, || {
+                crate::ax::prepare_foreground_input(window)?;
+                chord::chord(&self.source, &mut self.held, keys, KeyRoute::Global, check_stop)
+            }),
         }
     }
 }
