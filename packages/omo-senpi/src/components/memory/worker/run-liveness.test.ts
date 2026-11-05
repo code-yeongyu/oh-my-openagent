@@ -67,6 +67,29 @@ describe("run process liveness across start-identity schemes", () => {
     expect(verdict).toBe("dead")
   })
 
+  test.each([
+    ["no recorded start", undefined, "dead"],
+    ["a null recorded start", null, "dead"],
+  ] as const)("#given a pid the kernel no longer knows and %s #when classified #then it is dead, so an unreadable ledger never strands the lock (#11920)", async (_name, recordedStart, expected) => {
+    // when
+    const verdict = await classifyRunProcess(424242, recordedStart, { getPidLiveness: dead, getProcessStartIdentity: async () => null })
+
+    // then
+    expect(verdict).toBe(expected)
+  })
+
+  test.each([
+    ["alive", undefined, "unknown"],
+    ["alive", null, "unknown"],
+    ["unknown", undefined, "unknown"],
+  ] as const)("#given a pid whose liveness is %s and recorded start %p #when classified #then reuse cannot be checked and it stays unknown", async (liveness, recordedStart, expected) => {
+    // when
+    const verdict = await classifyRunProcess(222, recordedStart, { getPidLiveness: () => liveness, getProcessStartIdentity: async () => "proc-start-epoch:1" })
+
+    // then
+    expect(verdict).toBe(expected)
+  })
+
   test("#given scheme-less legacy identities that differ #when classified #then raw inequality still means pid reuse", async () => {
     // when
     const verdict = await classifyRunProcess(222, "supervisor-start", {

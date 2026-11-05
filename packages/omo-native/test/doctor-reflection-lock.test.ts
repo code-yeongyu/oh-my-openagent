@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
-import { dirname, join } from "node:path"
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { hostname, tmpdir } from "node:os"
+import { dirname, join, relative } from "node:path"
 
-import { formatReflectionLockLines, reflectionLockReport } from "../bin/lib/doctor-reflection-lock.js"
+import { createHash } from "node:crypto"
+
+import { formatReflectionLockLines, reflectionLockFix, reflectionLockReport } from "../bin/lib/doctor-reflection-lock.js"
 import { runDoctor } from "../bin/lib/doctor.js"
 
 const roots: string[] = []
@@ -49,6 +51,71 @@ test("#given an outcome.json that is not valid JSON on disk #when the report run
 
 const probe = (liveness: "alive" | "dead" | "unknown") => ({ getPidLiveness: () => liveness, hostname: () => HOST })
 
+const NOW = Date.parse("2026-11-05T06:00:00.000Z")
+
+function launchInterrupted(reflectionDir: string): void {
+  write(join(reflectionDir, "active.lock"), {
+    runId: "reflection-run-64", request: { trigger: "manual", conversationIds: [], snapshots: [] },
+    reservedAt: new Date(NOW - 10 * 60_000).toISOString(), launcherPid: 11096, launcherHostname: HOST, launcherProcessStart: null,
+  })
+}
+
+function treeHash(root: string): string {
+  const hash = createHash("sha256")
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      const path = join(dir, entry.name)
+      hash.update(relative(root, path))
+      if (entry.isDirectory()) walk(path)
+      else hash.update(readFileSync(path))
+    }
+  }
+  walk(root)
+  return hash.digest("hex")
+}
+
+describe("omo doctor --fix reflection locks (#11976)", () => {
+  const fixProbe = { ...probe("dead"), now: () => NOW }
+
+  test("#given a launcher that died before its run started #when --fix runs #then the lock is released and the line names the identity, the run and the action", async () => {
+    const root = memoryHome()
+    const reflectionDir = identity(root, "agent-a")
+    launchInterrupted(reflectionDir)
+    const result = await reflectionLockFix({ env: { OMO_MEMORY_HOME: root }, reflectionLockProbe: fixProbe })
+    expect(result.failed).toBe(false)
+    expect(result.lines).toContain("FIXED agent-a active.lock run reflection-run-64 (launch-interrupted)")
+    expect(existsSync(join(reflectionDir, "active.lock"))).toBe(false)
+    expect(existsSync(join(reflectionDir, "runs", "reflection-run-64", "abandoned.json"))).toBe(true)
+  })
+
+  test("#given case A, case C and case E on three identities #when --fix --dry-run runs #then it prints the three decisions and changes nothing", async () => {
+    const root = memoryHome()
+    launchInterrupted(identity(root, "agent-a"))
+    const c = identity(root, "agent-c")
+    launchInterrupted(c)
+    write(join(c, "runs", "reflection-run-64", "ledger.json"), "{ torn")
+    write(join(identity(root, "agent-e"), "active.lock"), "{\"runId\":")
+    const before = treeHash(root)
+    const result = await reflectionLockFix({ env: { OMO_MEMORY_HOME: root }, reflectionLockProbe: fixProbe, dryRun: true })
+    expect(result.lines).toEqual(expect.arrayContaining([
+      "WOULD FIX agent-a active.lock run reflection-run-64 (launch-interrupted)",
+      "WOULD FIX agent-c active.lock run reflection-run-64 (ledger-unreadable)",
+      "WOULD FIX agent-e active.lock run unknown (lock-torn)",
+    ]))
+    expect(treeHash(root)).toBe(before)
+  })
+
+  test("#given a runtime lock whose owner pid is gone #when --fix runs #then the lock is reclaimed and counted", async () => {
+    const root = memoryHome()
+    const reflectionDir = identity(root, "agent-a")
+    const locks = join(reflectionDir, "..", "locks")
+    write(join(locks, "recall-sidecar.x.lock"), { pid: 2147483646, process_start: "gone", hostname: hostname(), nonce: "n", created_at: new Date(NOW).toISOString(), purpose: "recall-sidecar" })
+    const result = await reflectionLockFix({ env: { OMO_MEMORY_HOME: root }, reflectionLockProbe: fixProbe })
+    expect(result.lines).toContain("INFO agent-a locks reclaimed 1, kept 0")
+    expect(existsSync(join(locks, "recall-sidecar.x.lock"))).toBe(false)
+  })
+})
+
 // The rules themselves are pinned by the shared decision's tests (memory-core stale-holder.test.ts)
 // and the session/CLI parity test; these cover the report surface.
 describe("omo doctor reflection lock report (#10377)", () => {
@@ -90,6 +157,14 @@ describe("omo doctor reflection lock report (#10377)", () => {
 
   test("#given no lock #when formatted #then nothing is printed", () => {
     expect(formatReflectionLockLines("agent-a", { state: "none" }, "/x")).toEqual([])
+  })
+
+  test("#given a launcher that died before its run started (#11976 case A) #when the report runs without --fix #then the WARN line names omo doctor --fix as the next step", async () => {
+    const root = memoryHome()
+    launchInterrupted(identity(root, "agent-a"))
+    const [line] = await reflectionLockReport({ env: { OMO_MEMORY_HOME: root }, reflectionLockProbe: { ...probe("dead"), now: () => NOW } })
+    expect(line).toStartWith("WARN memory reflection is stuck on a stale lock (agent-a): run reflection-run-64")
+    expect(line).toContain("Next step: omo doctor --fix")
   })
 
   test("#given precomputed report lines #when omo doctor runs #then it prints them", () => {

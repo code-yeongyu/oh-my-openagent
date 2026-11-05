@@ -5,7 +5,7 @@ import { mkdir, readFile, rm, utimes, writeFile } from "node:fs/promises"
 import { hostname } from "node:os"
 import { join } from "node:path"
 
-import { appendMemoryReceiptOnce, readMemoryReceipts, receiptIdentity, type MemoryReceiptInput } from "@oh-my-opencode/memory-core"
+import { appendMemoryReceiptOnce, createReflectionWorktree, readMemoryReceipts, receiptIdentity, type MemoryReceiptInput } from "@oh-my-opencode/memory-core"
 
 import type { MemoryReceiptsPort } from "../receipts-port"
 import { writeRunJsonAtomic } from "./run-artifacts"
@@ -92,6 +92,24 @@ describe("quarantine of runs reconciliation cannot recover", () => {
     // then
     expect(await quarantine(item)).toMatchObject({ runId: "run-orphan", reason: "ledger_unreadable" })
     expect((await item.store.readState()).active).toBeUndefined()
+  }, 30_000)
+
+  test("#given a NON-active run dir with an unreadable ledger and dead recorded pids #when reconciled #then it is quarantined, no longer live, and the orphan sweep reclaims its worktree (#11920)", async () => {
+    // given
+    const item = await fixture()
+    const stranded = await createReflectionWorktree(item.repo, "run-stranded", item.identity.paths.worktrees)
+    const strandedDir = join(item.identity.paths.reflection, "runs", "run-stranded")
+    await mkdir(strandedDir, { recursive: true })
+    await writeFile(join(strandedDir, "ledger.json"), JSON.stringify({ ...item.ledger, runId: "run-stranded", worktreeDir: stranded.dir, deadlineAt: 1, pid: 424243 }))
+    const later = Date.now() + 60 * 60_000
+
+    // when
+    await reconcileReflectionRuns({ identity: item.identity, reservation: item.store, ...deadLauncher(), now: () => later })
+
+    // then
+    expect(JSON.parse(await readFile(join(strandedDir, "quarantined.json"), "utf8"))).toMatchObject({ runId: "run-stranded", reason: "ledger_unreadable", generation: item.ledger.startedAt })
+    expect((await receipts(item)).filter((receipt) => receipt.kind !== "facts" && receipt.runId === "run-stranded").map((receipt) => receipt.event)).toEqual(["quarantined"])
+    expect(existsSync(stranded.dir)).toBe(false)
   }, 30_000)
 
   test("#given a run dir with no prelaunch or ledger still inside the launch window under a dead launcher #when reconciled #then it is left alone", async () => {
