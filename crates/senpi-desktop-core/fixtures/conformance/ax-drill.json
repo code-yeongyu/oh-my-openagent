@@ -1,5 +1,5 @@
 {
-  "description": "computer-use v2 P9b drill-down, reportMode object: after a skeleton snapshot (generation 1), ax.snapshot with root set to a cut ref reads only that subtree into sub-generation 2 whose parent is 1; ax.node on a ref of the parent snapshot still resolves and so does a ref of the drill; after two newer top-level snapshots the drill root of generation 1 is gone and a drill on it fails StaleRef (control).",
+  "description": "computer-use v2 P9b drill-down, reportMode object: after a skeleton snapshot (generation 1), ax.snapshot with root set to a cut ref reads only that subtree into sub-generation 2 whose parent is 1; ax.node on a ref of the parent snapshot still resolves and so does a ref of the drill; after eight newer top-level snapshots the drill root of generation 1 is gone and a drill on it fails StaleRef (control).",
   "scenario": "crates/senpi-desktop-backend-fake/fixtures/v2-ax-web.json",
   "env": {},
   "steps": [
@@ -405,6 +405,246 @@
             }
           },
           "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 101,
+        "method": "ax.snapshot",
+        "params": {
+          "target": "101",
+          "opts": {
+            "skeleton": true,
+            "maxNodes": 3
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 101,
+            "result": {
+              "text": "- window \"Docs - Browser\" [ref=e102] app=Browser (focused) [... 1 more]\n  - toolbar [ref=e103] [... 2 more]\n    - button \"Back\" [ref=e104]\n… truncated (3 nodes)",
+              "nodeCount": 3,
+              "truncated": true,
+              "generation": 5,
+              "complete": false,
+              "nodesObserved": 3,
+              "cuts": [
+                {
+                  "ref": "e102",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e103",
+                  "childCount": 2
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 102,
+        "method": "ax.snapshot",
+        "params": {
+          "target": "101",
+          "opts": {
+            "skeleton": true,
+            "maxNodes": 3
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 102,
+            "result": {
+              "text": "- window \"Docs - Browser\" [ref=e105] app=Browser (focused) [... 1 more]\n  - toolbar [ref=e106] [... 2 more]\n    - button \"Back\" [ref=e107]\n… truncated (3 nodes)",
+              "nodeCount": 3,
+              "truncated": true,
+              "generation": 6,
+              "complete": false,
+              "nodesObserved": 3,
+              "cuts": [
+                {
+                  "ref": "e105",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e106",
+                  "childCount": 2
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 103,
+        "method": "ax.snapshot",
+        "params": {
+          "target": "101",
+          "opts": {
+            "skeleton": true,
+            "maxNodes": 3
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 103,
+            "result": {
+              "text": "- window \"Docs - Browser\" [ref=e108] app=Browser (focused) [... 1 more]\n  - toolbar [ref=e109] [... 2 more]\n    - button \"Back\" [ref=e110]\n… truncated (3 nodes)",
+              "nodeCount": 3,
+              "truncated": true,
+              "generation": 7,
+              "complete": false,
+              "nodesObserved": 3,
+              "cuts": [
+                {
+                  "ref": "e108",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e109",
+                  "childCount": 2
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 104,
+        "method": "ax.snapshot",
+        "params": {
+          "target": "101",
+          "opts": {
+            "skeleton": true,
+            "maxNodes": 3
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 104,
+            "result": {
+              "text": "- window \"Docs - Browser\" [ref=e111] app=Browser (focused) [... 1 more]\n  - toolbar [ref=e112] [... 2 more]\n    - button \"Back\" [ref=e113]\n… truncated (3 nodes)",
+              "nodeCount": 3,
+              "truncated": true,
+              "generation": 8,
+              "complete": false,
+              "nodesObserved": 3,
+              "cuts": [
+                {
+                  "ref": "e111",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e112",
+                  "childCount": 2
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 105,
+        "method": "ax.snapshot",
+        "params": {
+          "target": "101",
+          "opts": {
+            "skeleton": true,
+            "maxNodes": 3
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 105,
+            "result": {
+              "text": "- window \"Docs - Browser\" [ref=e114] app=Browser (focused) [... 1 more]\n  - toolbar [ref=e115] [... 2 more]\n    - button \"Back\" [ref=e116]\n… truncated (3 nodes)",
+              "nodeCount": 3,
+              "truncated": true,
+              "generation": 9,
+              "complete": false,
+              "nodesObserved": 3,
+              "cuts": [
+                {
+                  "ref": "e114",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e115",
+                  "childCount": 2
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 106,
+        "method": "ax.snapshot",
+        "params": {
+          "target": "101",
+          "opts": {
+            "skeleton": true,
+            "maxNodes": 3
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 106,
+            "result": {
+              "text": "- window \"Docs - Browser\" [ref=e117] app=Browser (focused) [... 1 more]\n  - toolbar [ref=e118] [... 2 more]\n    - button \"Back\" [ref=e119]\n… truncated (3 nodes)",
+              "nodeCount": 3,
+              "truncated": true,
+              "generation": 10,
+              "complete": false,
+              "nodesObserved": 3,
+              "cuts": [
+                {
+                  "ref": "e117",
+                  "childCount": 1
+                },
+                {
+                  "ref": "e118",
+                  "childCount": 2
+                }
+              ]
+            }
+          }
         }
       ]
     },
