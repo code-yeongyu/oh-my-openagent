@@ -8,6 +8,9 @@ import { fakeHostTransport } from "../__fixtures__/fake-host-transport"
 
 type Frame = Record<string, unknown>
 export type ContractHostOptions = {
+  /** Bound for the server's listen and close waits. Defaults to a fixed 2 s: the child script ask-host-default-root.ts
+   * runs this helper without a per-test budget. Test bodies use withBudgetedContractHost, which passes the test budget. */
+  readonly deadline?: (what: string) => AbortSignal
   readonly legacy?: boolean
   readonly auth?: boolean
   readonly durableId?: string
@@ -64,6 +67,8 @@ export const ATTACH_GATE_EXEMPT: ReadonlySet<string> = new Set([
 ])
 
 /** Enforces the public v1.1 wire contract, including connection-local attachment ownership. */
+const fixedContractHostBound = (_what: string): AbortSignal => AbortSignal.timeout(2000)
+
 export async function withContractHost(options: ContractHostOptions, exercise: (host: ContractHost) => Promise<void>): Promise<void> {
   const root = mkdtempSync(join(tmpdir(), "rpc-client-"))
   const socket = join(root, "rpc.sock")
@@ -211,12 +216,12 @@ export async function withContractHost(options: ContractHostOptions, exercise: (
     })
   }))
   try {
-    const listening = once(server, "listening", { signal: AbortSignal.timeout(2000) })
+    const listening = once(server, "listening", { signal: (options.deadline ?? fixedContractHostBound)("the contract host to listen") })
     server.listen(transport.listenAddress)
     await listening
     await exercise({ socket, root, recordPath, frames, mutations, permissionPreset: () => preset, drain: () => { draining = true } })
   } finally {
-    const closed = once(server, "close", { signal: AbortSignal.timeout(2000) })
+    const closed = once(server, "close", { signal: (options.deadline ?? fixedContractHostBound)("the contract host to close") })
     for (const client of sockets) client.destroy()
     server.close()
     await closed

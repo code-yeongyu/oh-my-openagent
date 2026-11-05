@@ -11,7 +11,6 @@ import { collisionStore } from "./__fixtures__/collision-store"
 import { FakeRunner, baseSpec, categoryPlanner, cleanupProjects, flush, makeManager, settings, tempProject } from "./__fixtures__/manager-fakes"
 import { createTaskManager } from "./manager"
 import { SUBPROCESS_DEADLINE_MS, describeChild, runSignalledChild } from "./__fixtures__/signalled-child"
-import { useTestTimeout } from "../../../../test-support/test-deadline"
 
 function firstAllocationFailsStore(inner: TaskRecordStore): TaskRecordStore {
   let armed = true
@@ -208,7 +207,6 @@ describe("TaskManager claim characterization", () => {
   test.each(["seed", "warm-cache", "diagnostics"])(
     "#given an isolated manager process #when %s seeds from disk #then it succeeds",
     async (mode) => {
-      useTestTimeout(SUBPROCESS_DEADLINE_MS + 5_000)
       await expectSeedFloorChildModeToSucceed(mode)
     },
     SUBPROCESS_DEADLINE_MS + 5_000,
