@@ -24,17 +24,23 @@ export async function pruneReflectionRuns(context: RetentionContext, lazyGuard: 
   const runsDir = join(context.paths.reflection, "runs")
   const tally = new StoreTally()
   const folded: Folded[] = []
+  const crashTombstones: string[] = []
   for (const name of await listNames(runsDir)) {
     // Classifying reads metadata only: it stops on the abort signal, never on the time budget.
     if (context.budget?.proceed("runs") === false) return tally.result()
     const runDir = join(runsDir, name)
     if (name.startsWith(RETENTION_TOMBSTONE_PREFIX)) {
-      await removeTombstone(runDir, context)
+      crashTombstones.push(runDir)
       continue
     }
     const classified = await classify(runDir, name)
     if (typeof classified === "string") tally.keep(name, classified)
     else folded.push(classified)
+  }
+  // Removing a crash tombstone is removal work, so each one is admitted against the pass budget.
+  for (const runDir of crashTombstones) {
+    if (context.budget?.admit("runs") === false) return tally.result()
+    await removeTombstone(runDir, context)
   }
   const newest = folded.reduce<Folded | undefined>((best, run) =>
     best === undefined || run.finishedAt > best.finishedAt || (run.finishedAt === best.finishedAt && run.name > best.name) ? run : best, undefined)
