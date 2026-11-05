@@ -2,6 +2,7 @@ import { spawn } from "node:child_process"
 import { existsSync } from "../fs/resilient"
 import { win32 } from "node:path"
 import { GitAbortedError, GitNotFoundError, GitTimeoutError } from "./errors"
+import { memoryGitEnvironment } from "./exec-environment"
 import { holdGitActivityShared } from "./git-activity-lock"
 import { recordGitTimeout } from "./timeout-diagnostics"
 
@@ -250,7 +251,8 @@ export function createNodeGitExec(runtime: NodeGitExecRuntime = {}): GitExec {
   return {
     async run(callerArgv, options) {
       const argv = [...NO_FSMONITOR, ...callerArgv]
-      const environment = options.env ?? process.env
+      // Never the caller's raw environment: an inherited GIT_CONFIG_* or GIT_DIR would redirect this git (#12354).
+      const environment = memoryGitEnvironment(options.env ?? process.env, platform)
       try {
         return await runCommand("git", argv, options, environment)
       } catch (error) {

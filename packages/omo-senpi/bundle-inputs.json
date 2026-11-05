@@ -182,6 +182,7 @@
     "packages/memory-core/src/git/commit-outcome.ts",
     "packages/memory-core/src/git/config-lock.ts",
     "packages/memory-core/src/git/errors.ts",
+    "packages/memory-core/src/git/exec-environment.ts",
     "packages/memory-core/src/git/exec.ts",
     "packages/memory-core/src/git/git-activity-lock.ts",
     "packages/memory-core/src/git/index.ts",
