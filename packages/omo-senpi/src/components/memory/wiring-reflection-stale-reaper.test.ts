@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { existsSync, readdirSync } from "node:fs"
-import { mkdir, readFile, writeFile } from "node:fs/promises"
+import { mkdir, readFile, utimes, writeFile } from "node:fs/promises"
 import { hostname } from "node:os"
 import { join } from "node:path"
 
@@ -44,7 +44,7 @@ async function processesDied(item: Fixture): Promise<string> {
   await writeRunJsonAtomic(join(runDir, "ledger.json"), {
     version: 1, runId, attempt: 1, category: "quick", conversationIds: ["session-1"], kind: "reflection", trigger: "manual",
     startedAt: new Date().toISOString(), hardDeadlineAt, terminationGraceMs: 100, deadlineAt: hardDeadlineAt + 100, mergePolicy: "auto",
-    pid, childPid: pid, worktreeDir: worktree.dir, worktreeBranch: worktree.branch, baseSha: worktree.baseSha,
+    pid, processStart: null, childPid: pid, childProcessStart: null, worktreeDir: worktree.dir, worktreeBranch: worktree.branch, baseSha: worktree.baseSha,
     gitFilePath: worktree.gitFilePath, gitFileSnapshot: worktree.gitFileSnapshot, commonConfigPath: worktree.commonConfigPath, commonConfigSnapshot: worktree.commonConfigSnapshot,
   })
   await launcherDied(item, pid)
@@ -108,6 +108,8 @@ describe("the stale reflection-lock reaper in a session (#11976)", () => {
     await settleTurn(item)
     await mkdir(item.paths.reflection, { recursive: true })
     await writeFile(join(item.paths.reflection, "active.lock"), "{\"runId\":\"reflection-run-64\",\"req", { mode: 0o600 })
+    const old = new Date(Date.now() - 2 * 60 * 60_000)
+    await utimes(join(item.paths.reflection, "active.lock"), old, old)
 
     // when
     await settleTurn(item)

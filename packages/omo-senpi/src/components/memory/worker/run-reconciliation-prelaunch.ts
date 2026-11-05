@@ -114,8 +114,13 @@ export async function reconcilePrelaunch(context: ReconcileContext): Promise<Pre
     if (!cleanup.worktreeRemoved || !cleanup.branchRemoved) return {}
   }
   context.signal?.throwIfAborted()
-  await recordInterruptedLaunch(context, runDir, active)
-  return { result: await releaseReservationAsFailed(context, active.runId) }
+  // The sentinel and its release share the finalize lock (REVIEW-4 M-a): a concurrent release-settled
+  // in another session cannot slip in between them.
+  const interrupted = await withRunFinalizeLock(context.identity.paths.locks, active.runId, async () => {
+    await recordInterruptedLaunch(context, runDir, active)
+    return releaseReservationAsFailed(context, active.runId)
+  })
+  return interrupted === undefined ? {} : { result: interrupted }
 }
 
 async function withRunFinalizeLock<T>(locksDir: string, runId: string, task: () => Promise<T>): Promise<T | undefined> {
@@ -197,7 +202,8 @@ async function quarantineUnderDeadLauncher(
 ): Promise<PrelaunchReconcile> {
   if (active.launcherPid === undefined || active.launcherHostname !== context.hostname()) return {}
   if (!(await isLauncherDead(active.launcherPid, active.launcherProcessStart, context))) return {}
-  return { result: await quarantineRun(context, runDir, active.runId, reason, ledger, active), retiredRunId: active.runId }
+  const result = await withRunFinalizeLock(context.identity.paths.locks, active.runId, () => quarantineRun(context, runDir, active.runId, reason, ledger, active))
+  return result === undefined ? {} : { result, retiredRunId: active.runId }
 }
 
 /** Generation is `ledger.startedAt`, else `reservedAt`: the sentinel alone must yield the receipt's identity. */
