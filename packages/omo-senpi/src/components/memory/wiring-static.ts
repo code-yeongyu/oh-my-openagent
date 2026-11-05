@@ -224,7 +224,8 @@ export function registerMemoryStatic(input: {
       const runtime = runtimeFor(identity)
       const report = await runStaleLockReaper({
         runtimeDir: identity.identityPaths.runtime,
-        settle: () => runtime.reconcile(),
+        // Interactive: like the per-turn pass, never wait on another run's deadline here.
+        settle: () => runtime.reconcile(undefined, { waitPolicy: "none" }),
         dryRun,
         ...(options.reflectionHolderSeams === undefined ? {} : { probe: options.reflectionHolderSeams }),
       })

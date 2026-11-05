@@ -153,6 +153,16 @@ async function recordedProcesses(ledger: Record<string, unknown>, probe: StaleLo
   return { live: false }
 }
 
+// A valid ledger the launcher wrote with `launching: true` before its detached supervisor recorded a pid:
+// both pids read absent while that supervisor may still be starting, so reconciliation keeps it until the
+// hard deadline (run-reconciliation.ts), and so does the reaper.
+function stillLaunching(ledger: { readonly fields: Record<string, unknown>; readonly valid: boolean }, now: number): boolean {
+  const hardDeadlineAt = ledger.fields.hardDeadlineAt
+  return ledger.valid && ledger.fields.launching === true && typeof hardDeadlineAt === "number" && now <= hardDeadlineAt
+}
+
+const STILL_LAUNCHING = "its supervisor is still launching and its hard deadline has not passed"
+
 function validLedger(value: unknown, runId: string): boolean {
   try {
     return parseReservationRunLedger(value).runId === runId
@@ -185,6 +195,8 @@ async function tornLockBlocker(reflectionDir: string, bytes: string, probe: Stal
   const host = TORN_LAUNCHER_HOST.exec(bytes)?.[1]
   if (host !== undefined && host !== (probe.hostname ?? readHostname)()) return `its launcher is on host ${host}` // rule:torn-other-host
   const pid = TORN_LAUNCHER_PID.exec(bytes)?.[1]
+  // The reservation writes the pid before the hostname, so a pid with no complete host may be another host's.
+  if (pid !== undefined && host === undefined) return "its launcher host is unknown" // rule:torn-host-unknown
   if (pid !== undefined && await reflectionLauncherLiveness(Number.parseInt(pid, 10), TORN_LAUNCHER_START.exec(bytes)?.[1], probe) !== "dead") {
     return `its launcher pid ${pid} may still be alive` // rule:torn-launcher-alive
   }
@@ -196,6 +208,7 @@ async function tornLockBlocker(reflectionDir: string, bytes: string, probe: Stal
     const at = await modifiedAt(runDir, probe)
     if (at === undefined || now - at <= REFLECTION_ORPHAN_GRACE_MS) return `run ${name} is a young run dir` // rule:torn-young-run-dir
     const ledger = await readLedger(runDir, probe)
+    if (ledger.present && stillLaunching(ledger, now)) return `run ${name} is still launching` // rule:torn-launching-run
     if (ledger.present && (await recordedProcesses(ledger.fields, probe, classifyRecordedProcess)).live) return `run ${name} may still be live` // rule:torn-live-run
   }
   return undefined
@@ -242,6 +255,7 @@ async function decideStuck(reflectionDir: string, verdict: Extract<ReflectionLoc
     }
     return { kind: "reap", action: "launch-interrupted", runId, reason: `launcher pid ${launcherPid} is gone and the run never started` } // rule:launch-interrupted
   }
+  if (stillLaunching(ledger, (probe.now ?? Date.now)())) return { kind: "stuck", runId, reason: STILL_LAUNCHING } // rule:run-launching
   const processes = await recordedProcesses(ledger.fields, probe, ledger.valid ? classifyRecordedProcess : classifyRecordedProcessLenient)
   if (processes.live) return { kind: "stuck", runId, reason: processes.reason } // rule:run-process-alive
   if (ledger.valid) return { kind: "reap", action: "processes-dead", runId, reason: "its launcher, supervisor and child are all gone and it recorded no outcome" } // rule:processes-dead
@@ -280,6 +294,7 @@ export async function decideStrandedRun(runDir: string, probe: StaleLockProbe = 
     }
     return { kind: "reap", action: "no-ledger", reason: "it never got a ledger" } // rule:stranded-no-ledger
   }
+  if (stillLaunching(ledger, (probe.now ?? Date.now)())) return { kind: "keep", reason: STILL_LAUNCHING } // rule:stranded-launching
   const processes = await recordedProcesses(ledger.fields, probe, ledger.valid ? classifyRecordedProcess : classifyRecordedProcessLenient)
   if (processes.live) return { kind: "keep", reason: processes.reason } // rule:stranded-process-alive
   if (ledger.valid) return { kind: "reap", action: "processes-dead", reason: "its supervisor and child are gone and it recorded no outcome" } // rule:stranded-processes-dead
