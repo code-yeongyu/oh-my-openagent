@@ -51,7 +51,7 @@ export interface MemoryIdentityRuntime {
   readonly reservationPort: ReflectionReservationPort
   readonly runner: SenpiSubprocessRunner
   launch(run: ReservedRun): Promise<void>
-  reconcile(signal?: AbortSignal): Promise<void>
+  reconcile(signal?: AbortSignal, options?: { readonly waitPolicy?: "deadline" | "none" }): Promise<void>
   /** Resolves once every launch started in this process has returned (a detached child may still be running). */
   settled(): Promise<void>
 }
@@ -185,7 +185,16 @@ export function createIdentityRuntime(
     async settled(): Promise<void> {
       while (inFlight.size > 0) await Promise.all([...inFlight])
     },
-    async reconcile(signal?: AbortSignal): Promise<void> {
+    async reconcile(signal?: AbortSignal, options?: { readonly waitPolicy?: "deadline" | "none" }): Promise<void> {
+      // The per-turn pass never waits on a run's deadline, so it does not join or start the shared flight.
+      if (options?.waitPolicy === "none") {
+        await reconcileReflectionRuns({
+          identity: asMemoryIdentity(identity), reservation: store, launch,
+          deferOnSchedulerContention: true, waitPolicy: "none",
+          ...(signal === undefined ? {} : { signal }),
+        })
+        return
+      }
       // One identity-wide pass, including any already-admitted durable transition. Its first
       // observer owns cancellation; an independent caller retries a foreign abort once.
       // Never clear the flight on timeout alone: a committed transition may still be finishing.

@@ -35,6 +35,13 @@ import type { MemoryWiring, MemoryWiringOptions } from "./wiring-types"
 
 export type { MemorySessionStateLike, MemoryWiring, MemoryWiringOptions } from "./wiring-types"
 
+const PER_TURN_SETTLE_BUDGET_MS = 10_000
+
+function boundedTurnSignal(signal: AbortSignal | undefined): AbortSignal {
+  const budget = AbortSignal.timeout(PER_TURN_SETTLE_BUDGET_MS)
+  return signal === undefined ? budget : AbortSignal.any([signal, budget])
+}
+
 export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
   // Persisted compiled blocks: a relaunch reads the block of a commit an earlier process compiled (the store ships
   // in the lazily loaded recall-store sidecar). Keyed by the build, so an upgrade never reads an older build's bytes.
@@ -69,7 +76,8 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
     try {
       const recovery = await recoverStaleReflectionHolder({
         reflectionDir: identity.identityPaths.reflection,
-        reconcile: () => runtimeFor(identity).reconcile(signal),
+        // Per turn: no deadline waits (DESIGN.r3 c.15); the 10 s bound is only an outer guard.
+        reconcile: () => runtimeFor(identity).reconcile(boundedTurnSignal(signal), { waitPolicy: "none" }),
         // A holder that one reconciliation could not release is reported, not reconciled every turn.
         shouldReconcile: (runId) => {
           signal?.throwIfAborted()

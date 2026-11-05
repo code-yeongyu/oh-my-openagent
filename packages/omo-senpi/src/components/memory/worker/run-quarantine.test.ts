@@ -5,7 +5,7 @@ import { mkdir, readFile, rm, utimes, writeFile } from "node:fs/promises"
 import { hostname } from "node:os"
 import { join } from "node:path"
 
-import { appendMemoryReceiptOnce, createReflectionWorktree, readMemoryReceipts, receiptIdentity, type MemoryReceiptInput } from "@oh-my-opencode/memory-core"
+import { appendMemoryReceiptOnce, createLockRecord, createReflectionWorktree, readMemoryReceipts, receiptIdentity, runFinalizationLockPath, withLock, type MemoryReceiptInput } from "@oh-my-opencode/memory-core"
 
 import type { MemoryReceiptsPort } from "../receipts-port"
 import { writeRunJsonAtomic } from "./run-artifacts"
@@ -127,6 +127,21 @@ describe("quarantine of runs reconciliation cannot recover", () => {
     expect((await item.store.readState()).active).toBeUndefined()
     expect(await readFile(join(item.runDir, "abandoned.json"), "utf8")).toBe(sentinel)
     expect(existsSync(join(item.runDir, "quarantined.json"))).toBe(false)
+  }, 30_000)
+
+  test("#given the same settled run while another settler holds its finalize lock #when reconciled #then nothing is released (REVIEW-3 R2 control)", async () => {
+    // given
+    const item = await fixture()
+    const active = JSON.parse(await readFile(join(item.identity.paths.reflection, "active.lock"), "utf8"))
+    await writeRunJsonAtomic(join(item.runDir, "abandoned.json"), { version: 1, runId: "run-orphan", reason: "processes_dead", generation: active.reservedAt })
+
+    // when
+    const results = await withLock(runFinalizationLockPath(item.identity.paths.locks, "run-orphan"), await createLockRecord("reflection-finalize", { runId: "run-orphan" }), () =>
+      reconcileReflectionRuns({ identity: item.identity, reservation: item.store, ...deadLauncher() }))
+
+    // then
+    expect(results).not.toContainEqual({ runId: "run-orphan", outcome: "failed" })
+    expect((await item.store.readState()).active?.runId).toBe("run-orphan")
   }, 30_000)
 
   test("#given a lone pending.json the CLI left behind #when the session reconciles #then it promotes the pending run under its own pid and launches it (C25)", async () => {

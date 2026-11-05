@@ -54,6 +54,11 @@ export interface ReflectionRunReconciliationOptions {
   readonly logger?: ReflectionSweepLogger
   /** Bind-time maintenance defers when another session is scheduling this identity. */
   readonly deferOnSchedulerContention?: boolean
+  /**
+   * "none" (the per-turn path, DESIGN.r3 c.15): a run that would need a deadline wait is left for a later
+   * pass and the loop moves on; never a terminal outcome. Session start keeps "deadline".
+   */
+  readonly waitPolicy?: "deadline" | "none"
   readonly receipts?: MemoryReceiptsPort
   readonly warn?: ReceiptWarn
 }
@@ -176,6 +181,7 @@ async function reconcileRun(
   context.signal?.throwIfAborted()
   if (ledger.queued === true && (supervisor === "alive" || supervisor === "unknown")) return undefined
   if (supervisor === "alive" || supervisor === "unknown") {
+    if (context.waitPolicy === "none") return undefined
     const wait = context.waitForOutcome ?? ((path, deadlineAt, signal) => waitForRunSentinel(path, deadlineAt, context.now, signal))
     await wait(outcomePath, ledger.deadlineAt, context.signal)
     // The sentinel's abort result is also "timeout". It is NOT evidence the run timed out:
@@ -224,6 +230,7 @@ async function reconcileDeadSupervisor(
   if (child === "dead" || child === "absent") {
     return await failReservationRun(context, runDir, ledger, "failed", deadRunDetail(ledger, child), RECOVER_TIP)
   }
+  if (context.waitPolicy === "none") return undefined
   const wait = context.waitUntil ?? ((deadlineAt, signal) => waitForTime(deadlineAt, context.now, signal))
   await wait(ledger.hardDeadlineAt, context.signal)
   context.signal?.throwIfAborted()

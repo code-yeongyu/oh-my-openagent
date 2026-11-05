@@ -4,11 +4,15 @@ import { join } from "node:path"
 
 import {
   classifyRecordedProcessLenient,
+  createLockRecord,
   discardReflectionWorktree,
   GitMemoryRepo,
   isSettledUnderDeadLauncher,
+  LockContentionError,
+  runFinalizationLockPath,
   RESERVATION_EVIDENCE_FILENAME,
   writeAbandoned,
+  withLock,
   writeQuarantine,
   type QuarantineReason,
   type ReservedRun,
@@ -42,7 +46,9 @@ export async function reconcilePrelaunch(context: ReconcileContext): Promise<Pre
   }
   // An earlier settle wrote this generation's sentinel and stopped before releasing (DESIGN.r3 c.14).
   if (await isSettledUnderDeadLauncher(context.identity.paths.reflection, context)) {
-    return { result: await releaseReservationAsFailed(context, active.runId), retiredRunId: active.runId }
+    // Under the run's finalize lock without waiting (REVIEW-3 R2): a settler still holding it finishes first.
+    const released = await withRunFinalizeLock(context.identity.paths.locks, active.runId, () => releaseReservationAsFailed(context, active.runId))
+    return released === undefined ? {} : { result: released, retiredRunId: active.runId }
   }
   const ghost = await classifyGhostActive({ identity: context.identity, active })
   context.signal?.throwIfAborted()
@@ -109,6 +115,15 @@ export async function reconcilePrelaunch(context: ReconcileContext): Promise<Pre
   context.signal?.throwIfAborted()
   await recordInterruptedLaunch(context, runDir, active)
   return { result: await releaseReservationAsFailed(context, active.runId) }
+}
+
+async function withRunFinalizeLock<T>(locksDir: string, runId: string, task: () => Promise<T>): Promise<T | undefined> {
+  try {
+    return await withLock(runFinalizationLockPath(locksDir, runId), await createLockRecord("reflection-finalize", { runId }), task, { waitTimeoutMs: 0 })
+  } catch (error) {
+    if (error instanceof LockContentionError) return undefined
+    throw error
+  }
 }
 
 /**
