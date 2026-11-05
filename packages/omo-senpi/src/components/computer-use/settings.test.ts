@@ -19,14 +19,14 @@ describe("computer settings bridge", () => {
     })
   })
 
-  test("#given no computer block #when resolved #then the reserved keys keep today's behavior", () => {
+  test("#given no computer block #when resolved #then intervention continues and the other reserved keys keep today's behavior", () => {
     // when
     const { runSandbox, intervention, macosKeyPriming, trace } = resolveOmoComputerSettings(undefined, "darwin")
 
     // then
     expect({ runSandbox, intervention, macosKeyPriming, trace }).toEqual({
       runSandbox: "vm",
-      intervention: "pause",
+      intervention: "continue",
       macosKeyPriming: "off",
       trace: false,
     })
