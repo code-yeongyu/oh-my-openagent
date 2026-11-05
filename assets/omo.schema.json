@@ -2596,7 +2596,7 @@
             "continue",
             "pause"
           ],
-          "description": "What a background action does while the user uses the target app (default: pause)"
+          "description": "What a background action does while the user uses the target app (default: continue)"
         },
         "macos_key_priming": {
           "type": "string",
@@ -5001,7 +5001,7 @@
                 "continue",
                 "pause"
               ],
-              "description": "What a background action does while the user uses the target app (default: pause)"
+              "description": "What a background action does while the user uses the target app (default: continue)"
             },
             "macos_key_priming": {
               "type": "string",
@@ -7406,7 +7406,7 @@
                 "continue",
                 "pause"
               ],
-              "description": "What a background action does while the user uses the target app (default: pause)"
+              "description": "What a background action does while the user uses the target app (default: continue)"
             },
             "macos_key_priming": {
               "type": "string",
@@ -9811,7 +9811,7 @@
                 "continue",
                 "pause"
               ],
-              "description": "What a background action does while the user uses the target app (default: pause)"
+              "description": "What a background action does while the user uses the target app (default: continue)"
             },
             "macos_key_priming": {
               "type": "string",
@@ -12222,7 +12222,7 @@
                   "continue",
                   "pause"
                 ],
-                "description": "What a background action does while the user uses the target app (default: pause)"
+                "description": "What a background action does while the user uses the target app (default: continue)"
               },
               "macos_key_priming": {
                 "type": "string",
@@ -14627,7 +14627,7 @@
                       "continue",
                       "pause"
                     ],
-                    "description": "What a background action does while the user uses the target app (default: pause)"
+                    "description": "What a background action does while the user uses the target app (default: continue)"
                   },
                   "macos_key_priming": {
                     "type": "string",
@@ -17032,7 +17032,7 @@
                       "continue",
                       "pause"
                     ],
-                    "description": "What a background action does while the user uses the target app (default: pause)"
+                    "description": "What a background action does while the user uses the target app (default: continue)"
                   },
                   "macos_key_priming": {
                     "type": "string",
@@ -19437,7 +19437,7 @@
                       "continue",
                       "pause"
                     ],
-                    "description": "What a background action does while the user uses the target app (default: pause)"
+                    "description": "What a background action does while the user uses the target app (default: continue)"
                   },
                   "macos_key_priming": {
                     "type": "string",
