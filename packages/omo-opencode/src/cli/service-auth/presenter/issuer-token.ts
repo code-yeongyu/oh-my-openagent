@@ -1,5 +1,6 @@
-// Offline checks of the account issuer's ES256 tokens, written from the D11 phase-1 design (section 2.2). Each token
-// kind pins its own audience and type as code constants, so no other token signed by the same keys passes.
+// Offline checks of the account issuer's ES256 tokens, written from the D11 designs (phase 1 section 2.2, secret
+// phase 3.1-3.2 and 6.5). Each token kind pins its own audience and type as code constants, so no other token
+// signed by the same keys passes.
 
 export interface IssuerKey {
   readonly kty: "EC"
@@ -11,6 +12,8 @@ export interface IssuerKey {
 
 const SKEW_S = 60
 const PRESENTER = { aud: "omo-mcp-presenter", typ: "mcp_presenter", maxLifeS: 900 } as const
+const SECRET_HOST = { aud: "omo-secret-host", typ: "secret_host", maxLifeS: 900 } as const
+const STEP_UP = { aud: "omo-secret-answer", typ: "secret_answer", maxLifeS: 120 } as const
 
 function fromBase64Url(text: string): Uint8Array<ArrayBuffer> | undefined {
   if (text === "" || !/^[A-Za-z0-9_-]+$/.test(text) || text.length % 4 === 1) return undefined
@@ -103,4 +106,39 @@ export async function checkPresenterAttestation(claims: Record<string, unknown>,
   if (lifetime(iat, exp, nowS, PRESENTER.maxLifeS) !== "ok") return { ok: false, reason: "attestation_expired" }
   if (jkt !== (await okpThumbprint(presenterKey))) return { ok: false, reason: "attestation_key_mismatch" }
   return { ok: true, acc, dev, dname, exp, jti }
+}
+
+export interface HostTokenClaims {
+  readonly acc: string
+  readonly hin: string
+  readonly sid: string
+}
+
+/** A secret host token (secret-phase design 3.2) bound to `hostKey`; undefined when anything does not hold. */
+export async function checkSecretHostToken(claims: Record<string, unknown>, issuer: string, nowS: number, hostKey: Uint8Array): Promise<HostTokenClaims | undefined> {
+  if (claims["aud"] !== SECRET_HOST.aud || claims["typ"] !== SECRET_HOST.typ || claims["iss"] !== issuer) return undefined
+  const { iat, exp, jti, acc, dev, dname, hin, sid } = claims
+  const jkt = confirmationKey(claims)
+  if (!whole(iat) || !whole(exp) || exp <= iat || !nonEmpty(jti) || !nonEmpty(acc) || !displayText(dev) || !displayText(dname) || !displayText(hin) || !displayText(sid) || !digest32(jkt))
+    return undefined
+  if (lifetime(iat, exp, nowS, SECRET_HOST.maxLifeS) !== "ok" || jkt !== (await okpThumbprint(hostKey))) return undefined
+  return { acc, hin, sid }
+}
+
+export type StepUpCheck =
+  | { readonly ok: true; readonly stepUp: { readonly acc: string; readonly dev: string; readonly jti: string; readonly exp: number; readonly hdev: string } }
+  | { readonly ok: false; readonly reason: "stepup_malformed" | "stepup_signature" | "stepup_audience" | "stepup_expired" | "stepup_key_mismatch" | "stepup_binding" }
+
+/** A step-up token (secret-phase design 6.4 step 4, 6.5) for `presenterKey` and binding hash `req`. */
+export async function checkStepUpToken(claims: Record<string, unknown>, issuer: string, nowS: number, presenterKey: Uint8Array, req: string): Promise<StepUpCheck> {
+  if (claims["aud"] !== STEP_UP.aud || claims["typ"] !== STEP_UP.typ || claims["iss"] !== issuer) return { ok: false, reason: "stepup_audience" }
+  const { iat, exp, jti, acc, dev, hdev, uv, cred } = claims
+  const jkt = confirmationKey(claims)
+  if (!whole(iat) || !whole(exp) || exp <= iat || !nonEmpty(jti) || !nonEmpty(acc) || !displayText(dev) || !displayText(hdev)
+    || !digest32(claims["req"]) || !digest32(cred) || !digest32(jkt) || uv !== true)
+    return { ok: false, reason: "stepup_malformed" }
+  if (exp - iat > STEP_UP.maxLifeS || iat > nowS + SKEW_S || exp <= nowS) return { ok: false, reason: "stepup_expired" }
+  if (jkt !== (await okpThumbprint(presenterKey))) return { ok: false, reason: "stepup_key_mismatch" }
+  if (claims["req"] !== req) return { ok: false, reason: "stepup_binding" }
+  return { ok: true, stepUp: { acc, dev, jti, exp, hdev } }
 }
