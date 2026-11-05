@@ -46,9 +46,14 @@ export function sharedHelperAccess(resolve: () => Promise<HelperAccess>): Promis
   if (state.helperAccess !== undefined) return state.helperAccess
   const started = resolve()
   state.helperAccess = started
-  void started.then(access => {
-    if (access.kind === "unavailable" && state.helperAccess === started) state.helperAccess = undefined
-  })
+  void started.then(
+    access => {
+      if (access.kind === "unavailable" && state.helperAccess === started) state.helperAccess = undefined
+    },
+    () => {
+      if (state.helperAccess === started) state.helperAccess = undefined
+    },
+  )
   return started
 }
 

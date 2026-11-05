@@ -102,7 +102,16 @@ export async function pinVerifiedCopy(
   const known = pinned.get(identity)
   if (known !== undefined) {
     const result = await known
-    if (result.kind !== "pinned" || (await verify(result.path)) === "valid") return result
+    if (result.kind !== "pinned") return result
+    let verdict: SignatureVerdict
+    try {
+      verdict = await verify(result.path)
+    } catch (error) {
+      pinned.delete(identity)
+      await rm(result.path, { force: true })
+      return { kind: "unavailable", reason: error instanceof Error ? error.message : String(error) }
+    }
+    if (verdict === "valid") return result
   }
   const created = Promise.resolve(dir ?? processPinDir()).then(
     target => copyAndVerify(source, verify, target),

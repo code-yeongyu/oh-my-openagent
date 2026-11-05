@@ -34,6 +34,18 @@ describe("a failed helper resolution is retried, never kept for the process (#11
     expect(resolver.calls()).toBe(2)
   })
 
+  test("#given the first resolution rejects #when asked again #then it resolves again instead of keeping the rejection", async () => {
+    let calls = 0
+    const resolve = async (): Promise<HelperAccess> => {
+      calls += 1
+      if (calls === 1) throw new Error("checker crashed")
+      return ready
+    }
+    await expect(sharedHelperAccess(resolve)).rejects.toThrow("checker crashed")
+    expect((await sharedHelperAccess(resolve)).kind).toBe("ready")
+    expect(calls).toBe(2)
+  })
+
   test.skipIf(!isDarwin)("#given no helper on the first resolve #when the store asks again after one appears #then it gets a backend, not a cached null", async () => {
     installUnmarkedSecrets()
     const binding = () =>

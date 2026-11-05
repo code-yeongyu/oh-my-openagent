@@ -24,10 +24,17 @@ export async function resolveHelperAccess(
   } = {},
 ): Promise<HelperAccess> {
   const verify = options.verify ?? processSignatureChecker()
-  const location = await locateHelper(candidates, verify)
-  if (location.kind !== "found") return location
-  const pin = await (options.pin ?? pinVerifiedCopy)(location.path, verify)
-  if (pin.kind === "invalid") return { kind: "invalid", rejected: [location.path] }
+  let source: string
+  let pin: PinResult
+  try {
+    const location = await locateHelper(candidates, verify)
+    if (location.kind !== "found") return location
+    source = location.path
+    pin = await (options.pin ?? pinVerifiedCopy)(source, verify)
+  } catch (error) {
+    return { kind: "unavailable", reason: error instanceof Error ? error.message : String(error) }
+  }
+  if (pin.kind === "invalid") return { kind: "invalid", rejected: [source] }
   if (pin.kind === "unavailable") return { kind: "unavailable", reason: pin.reason }
   const pinned = pin.path
   const spawn = options.spawn ?? spawnDetachedHelper
@@ -35,7 +42,10 @@ export async function resolveHelperAccess(
     kind: "ready",
     path: pinned,
     call: async (call, lease) => {
-      if ((await verify(pinned)) !== "valid")
+      const verdict = await verify(pinned).catch((error: unknown) => {
+        throw new HelperProtocolError(`OmO's keychain helper could not be checked before it ran: ${error instanceof Error ? error.message : String(error)}`)
+      })
+      if (verdict !== "valid")
         throw new HelperProtocolError("OmO's keychain helper changed on disk and failed its signature check; it was not run.")
       return callHelper(pinned, call, { spawn, ...(lease === undefined ? {} : { lease }) })
     },
