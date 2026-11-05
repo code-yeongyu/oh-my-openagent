@@ -21,11 +21,14 @@ export type HarnessSession = {
   readonly drain: InboxDrain
   readonly engine: GatewayEngine
   online: boolean
+  /** False models a live session whose control endpoint never registered: its host answers a wake with nothing admitted. */
+  drainRegistered: boolean
 }
 
 export type SessionOptions = {
   readonly cwd?: string
   readonly online?: boolean
+  readonly drainRegistered?: boolean
   readonly name?: string
   readonly storeOptions?: Partial<GatewayStoreOptions>
 }
@@ -100,6 +103,7 @@ export function createGatewayHarness(options: { readonly startAt?: number } = {}
       const target = sessions.get(endpoint.socket.slice("fake:".length))
       if (target === undefined || !target.online) throw new Error(`endpoint ${endpoint.socket} is unreachable`)
       wakes.push({ delivery_ids: deliveryIds, target: target.id })
+      if (!target.drainRegistered) return { admitted: [] }
       return toSessionControlDrainResult(await track(target.drain.drain({ reason: "command", delivery_ids: deliveryIds })))
     },
   }
@@ -110,7 +114,7 @@ export function createGatewayHarness(options: { readonly startAt?: number } = {}
     const sessionStore = store(sessionOptions.storeOptions)
     const drain = createInboxDrain({ store: sessionStore, runtime, durableId: id, sessionPath: () => runtime.sessionPath, now })
     const engine = engineFor(sessionStore, cwd)
-    const created: HarnessSession = { id, cwd, runtime, store: sessionStore, drain, engine, online: sessionOptions.online ?? true }
+    const created: HarnessSession = { id, cwd, runtime, store: sessionStore, drain, engine, online: sessionOptions.online ?? true, drainRegistered: sessionOptions.drainRegistered ?? true }
     runtime.onEmitted(() => void track(drain.drain({ reason: "emitted" })))
     runtime.onIdle(() => void track(drain.drain({ reason: "idle" })))
     if (sessionOptions.name !== undefined) names.set(id, sessionOptions.name)

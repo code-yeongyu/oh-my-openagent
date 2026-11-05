@@ -125,6 +125,30 @@ describe("turn_epoch_cas_and_fifo", () => {
   })
 })
 
+describe("wake_reached_no_drain", () => {
+  test("#given an idle live session whose control endpoint never registered #when A sends auto and follow_up #then nothing starts and each result says queued_offline, not queued", async () => {
+    const h = open()
+    h.session("A")
+    const target = h.session("T", { drainRegistered: false })
+    for (const mode of ["auto", "follow_up"] as const) {
+      expect(summary(await send(h, "A", "T", `brief ${mode}`, { mode }))).toBe("queued_offline")
+    }
+    await h.quiesce()
+    expect(h.wakes.filter((wake) => wake.target === "T")).toHaveLength(2)
+    expect(target.runtime.listAdmittedDeliveries().pending).toEqual([])
+    expect((await target.store.list({ target_durable_id: "T" })).map((row) => row.state)).toEqual(["queued", "queued"])
+  })
+
+  test("#given a live drain holding an earlier delivery behind the user's draft #when another delivery is sent #then it stays queued, because the drain reported the held row", async () => {
+    const h = open()
+    h.session("A")
+    const target = h.session("T")
+    target.runtime.editorHold = "draft"
+    expect(summary(await send(h, "A", "T", "first"))).toBe("queued")
+    expect(summary(await send(h, "A", "T", "second"))).toBe("queued")
+  })
+})
+
 describe("repeated_wake_during_streaming", () => {
   test("#given B streams #when M1 is queued and three more wakes arrive before the turn ends #then the follow-up is enqueued once and applied once, after it is emitted", async () => {
     const h = open()
