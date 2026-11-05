@@ -385,6 +385,12 @@ pub trait AxBackend {
         self.props(h).map(AxObserved::plain)
     }
 
+    /// The element's stable developer identifier (`AXIdentifier`, UIA
+    /// `AutomationId`). Backends that cannot read one keep this default.
+    fn identifier(&mut self, _h: &AxHandle) -> CoreResult<Option<String>> {
+        Ok(None)
+    }
+
     /// The window that owns `h`, read live from the platform and named as
     /// `windows` (the live [`Backend::windows`]) lists it. Backends that
     /// cannot name it keep this default.

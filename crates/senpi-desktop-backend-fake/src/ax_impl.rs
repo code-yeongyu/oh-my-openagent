@@ -67,6 +67,10 @@ impl AxBackend for FakeBackend {
         })
     }
 
+    fn identifier(&mut self, h: &AxHandle) -> CoreResult<Option<String>> {
+        self.ax_tree.identifier(node_id(h)?)
+    }
+
     fn parent(&mut self, h: &AxHandle) -> CoreResult<Option<AxHandle>> {
         self.begin(FakeMethod::AxParent)?;
         Ok(self.ax_tree.parent(node_id(h)?)?.map(AxHandle::Id))
@@ -137,6 +141,10 @@ const fn presence(present: bool) -> EvidenceState {
         EvidenceState::Absent
     }
 }
+
+#[cfg(test)]
+#[path = "ax_web_tests.rs"]
+mod web_tests;
 
 #[cfg(test)]
 mod tests {
