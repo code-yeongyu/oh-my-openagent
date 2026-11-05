@@ -439,20 +439,13 @@ fn focus_read_of_an_unknown_window_is_window_not_found() {
 fn ax_node_count_pads_the_tree_and_deadline_is_exposed() {
     let mut fake = v2();
     assert_eq!(fake.ax_deadline_ms(), Some(50));
+    let window = fake
+        .windows()
+        .expect("windows")
+        .into_iter()
+        .find(|window| window.id == "101")
+        .expect("scripted window 101");
     let ax = fake.ax().expect("ax");
-    let window = senpi_desktop_core::types::DesktopWindow {
-        id: "101".to_owned(),
-        title: String::new(),
-        app: String::new(),
-        pid: None,
-        x: 0,
-        y: 0,
-        width: 1,
-        height: 1,
-        focused: true,
-        is_on_screen: None,
-        elevated: None,
-    };
     let root = ax.window_root(&window).expect("root");
     assert_eq!(ax.props(&root).expect("props").child_count, 9_999);
     assert_eq!(ax.children(&root).expect("children").len(), 9_999);
