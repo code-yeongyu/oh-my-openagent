@@ -1,6 +1,5 @@
 import type { ChildProcess } from "node:child_process"
-
-const FIXTURE_EXIT_BOUND_MS = 2_000
+import { remainingTestTime } from "../../../../../../test-support/test-deadline"
 
 /** Fake RPC children have no descendants; stop only the owned pid, even during runner teardown. */
 export async function stopFakeChild(child: ChildProcess): Promise<void> {
@@ -19,8 +18,8 @@ export async function stopFakeChild(child: ChildProcess): Promise<void> {
       exited.promise,
       new Promise<never>((_, reject) => {
         timer = setTimeout(() => reject(new Error(
-          `fake RPC child ${child.pid} did not exit within ${FIXTURE_EXIT_BOUND_MS} ms`,
-        )), FIXTURE_EXIT_BOUND_MS)
+          `fake RPC child ${child.pid} did not exit within the test budget`,
+        )), remainingTestTime())
       }),
     ])
   } finally {

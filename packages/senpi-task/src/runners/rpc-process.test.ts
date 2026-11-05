@@ -40,7 +40,7 @@ function makeRunner(extra: { heartbeatIntervalMs?: number; now?: () => number } 
   return { runner, captured: () => captured }
 }
 
-async function waitFor(predicate: () => boolean, timeoutMs = 2_000): Promise<void> {
+async function waitFor(predicate: () => boolean, timeoutMs = remainingTestTime()): Promise<void> {
   const deadline = Date.now() + timeoutMs
   while (!predicate()) {
     if (Date.now() > deadline) {

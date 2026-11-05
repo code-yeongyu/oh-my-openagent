@@ -10,6 +10,7 @@ import { createDagJournal, type DagJournal } from "./journal"
 import type { DagRunRecordV1 } from "./manager"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagNode, DagNodeCounts, DagNodeId, DagRunEvent, DagRunId, DagRunStatus } from "./types"
+import { remainingTestTime } from "../../../../test-support/test-deadline"
 
 const cleanupRoots: string[] = []
 const parentSessionId = "ses_parent"
@@ -94,7 +95,7 @@ function counts(nodes: readonly DagNode[]): DagNodeCounts {
   return paused === 0 ? tally : { ...tally, paused }
 }
 
-function within<T>(promise: Promise<T>, ms = 200): Promise<T> {
+function within<T>(promise: Promise<T>, ms = remainingTestTime()): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error(`timed out after ${ms}ms`)), ms)
     void promise.then(

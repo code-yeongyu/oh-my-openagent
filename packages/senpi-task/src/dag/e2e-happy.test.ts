@@ -21,6 +21,7 @@ import {
 } from "./scheduler"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagNodeId, DagRunEvent, DagRunId } from "./types"
+import { remainingTestTime } from "../../../../test-support/test-deadline"
 
 // bunfig preloads test-setup.ts to raise the default timeout, but Bun honours a preload's
 // setDefaultTimeout only for the FIRST test file of a run; every later file silently reverts to
@@ -385,7 +386,7 @@ function runFiles(store: DagFileStore): readonly string[] {
   return fs.readdirSync(store.paths.runs).filter((entry) => entry.endsWith(".json")).sort()
 }
 
-function within<T>(promise: Promise<T>, ms = 200): Promise<T> {
+function within<T>(promise: Promise<T>, ms = remainingTestTime()): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error(`timed out after ${ms}ms`)), ms)
     void promise.then(

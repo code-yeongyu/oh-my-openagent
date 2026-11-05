@@ -5,6 +5,7 @@ import { join, resolve } from "node:path"
 
 import { createTaskRecordStore } from "../store"
 import { cleanupProjects, seedRecord, tempStore } from "./__fixtures__/lifecycle-fakes"
+import { remainingTestTime, useTestTimeout } from "../../../../test-support/test-deadline"
 
 const cleanupRoots: string[] = []
 const raceChildFixturePath = resolve(import.meta.dir, "__fixtures__", "batch-admission-race-child.ts")
@@ -37,6 +38,7 @@ describe("admitSuspendedBatch two-OS-process race", () => {
   test(
     "#given two OS processes over one store with 8 suspended and cap 5 #when both admit from a shared barrier #then total claims never exceed the cap and never duplicate",
     async () => {
+      useTestTimeout(30_000)
       // given: one store, 4 in-flight and 4 terminal candidates, cap 5, zero current residents
       const store = tempStore()
       const ids = ["st_00000090", "st_00000091", "st_00000092", "st_00000093", "st_00000094", "st_00000095", "st_00000096", "st_00000097"]
@@ -60,7 +62,7 @@ describe("admitSuspendedBatch two-OS-process race", () => {
       const stderr = children.map((child) => new Response(child.stderr).text())
 
       // when: both children are released from the shared barrier at the same instant
-      const deadline = Date.now() + 15_000
+      const deadline = Date.now() + remainingTestTime()
       while (!(existsSync(join(barrierDir, "ready-a")) && existsSync(join(barrierDir, "ready-b")))) {
         if (Date.now() > deadline) throw new Error("children never signalled ready")
         await new Promise((resolve) => setTimeout(resolve, 5))

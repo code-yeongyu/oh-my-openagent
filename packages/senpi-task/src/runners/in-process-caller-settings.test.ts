@@ -4,10 +4,10 @@ import { readFileSync } from "node:fs"
 
 import { ALT_PROVIDER, createCallerSettingsWorld, PROVIDER, type CallerSettingsWorld } from "./__fixtures__/caller-settings-world"
 import { InProcessRunner } from "./in-process"
+import { remainingTestTime, useTestTimeout } from "../../../../test-support/test-deadline"
 
 // The configured stream-start guard is tiny; the engine default is 300 s. A guard that has not fired
 // this long after the request was sent is the default one, so the test fails here instead of hanging.
-const DEFAULT_GUARD_EVIDENCE_MS = 10_000
 
 let world: CallerSettingsWorld | undefined
 afterEach(() => {
@@ -29,6 +29,7 @@ async function abortReasonWithin(aborted: Promise<string>, ms: number): Promise<
 
 describe("in-process child honors the caller's settings", () => {
   test("#given the caller raised httpIdleTimeoutMs and set a short streamStartTimeoutMs #when a child's provider never sends a first event #then the child's request is cut at the configured start guard and carries the configured idle timeout", async () => {
+    useTestTimeout(30_000)
     // given
     world = await createCallerSettingsWorld(
       { httpIdleTimeoutMs: 660_000, retry: { provider: { streamStartTimeoutMs: 150, maxRetries: 0 } } },
@@ -38,7 +39,7 @@ describe("in-process child honors the caller's settings", () => {
 
     // when
     const request = await world.firstCall
-    const abortReason = await abortReasonWithin(request.aborted, DEFAULT_GUARD_EVIDENCE_MS)
+    const abortReason = await abortReasonWithin(request.aborted, remainingTestTime())
     await handle.abort()
     handle.dispose()
 

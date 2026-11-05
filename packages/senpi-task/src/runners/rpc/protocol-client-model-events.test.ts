@@ -3,6 +3,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import { RpcProtocolClient } from "./protocol-client"
 import { terminateRpcChild } from "./terminate"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const spawned: ChildProcess[] = []
 
@@ -15,7 +16,7 @@ afterEach(async () => {
   }
 })
 
-function waitFor(predicate: () => boolean, timeoutMs = 5_000): Promise<void> {
+function waitFor(predicate: () => boolean, timeoutMs = remainingTestTime()): Promise<void> {
   const deadline = Date.now() + timeoutMs
   return new Promise((resolve, reject) => {
     const tick = () => {

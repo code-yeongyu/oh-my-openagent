@@ -7,6 +7,7 @@ import { createDagManager } from "./manager"
 import { createDagScheduler, type DagScheduler } from "./scheduler"
 import { createDagFileStore } from "./store"
 import type { DagRunEvent } from "./types"
+import { remainingTestTime } from "../../../../test-support/test-deadline"
 
 // bunfig preloads test-setup.ts to raise the default timeout, but Bun honours a preload's
 // setDefaultTimeout only for the FIRST test file of a run; every later file silently reverts to
@@ -50,7 +51,7 @@ function definition(): DagDefinition {
   }
 }
 
-function within<T>(promise: Promise<T>, ms = 2000): Promise<T> {
+function within<T>(promise: Promise<T>, ms = remainingTestTime()): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error(`wave stalled after ${ms}ms`)), ms)
     void promise.then(

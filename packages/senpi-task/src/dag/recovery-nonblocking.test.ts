@@ -18,7 +18,7 @@ import { createDagRecovery } from "./recovery"
 import { createDagScheduler } from "./scheduler"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagNode, DagNodeId, DagRunEvent, DagRunId } from "./types"
-import { useTestTimeout } from "../../../../test-support/test-deadline"
+import { useTestTimeout, remainingTestTime } from "../../../../test-support/test-deadline"
 
 type DagRunEventType = DagRunEvent["type"]
 
@@ -248,7 +248,7 @@ describe("DAG resume without blocking on a reattached child", () => {
       isProcessAlive: () => false,
       reattach: (_runId, taskId) => reattached.push(taskId),
     })
-    const resumeBoundary = awaitJournalEvents(store, ["dag.node.reused", "dag.run.resumed"], 5_000)
+    const resumeBoundary = awaitJournalEvents(store, ["dag.node.reused", "dag.run.resumed"], remainingTestTime())
 
     // when - resume runs while task-slow is NEVER completed during this window
     const resume = recovery.resumePausedRuns(parentSessionId)

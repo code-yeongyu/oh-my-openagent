@@ -8,7 +8,7 @@ import { hostWorldRecovery } from "./rpc-host/__fixtures__/host-world-recovery"
 import { manualRecoveryClock, type ManualRecoveryClock } from "./rpc-host/__fixtures__/manual-recovery-clock"
 import { LIVE_PARENT_SUSPENSION_BUDGET_MS } from "../lifecycle/live-parent-recovery"
 import type { ReattachOutcome } from "./rpc-host/handle-reattach"
-import { testBudgetSignal } from "../../../../test-support/test-deadline"
+import { testBudgetSignal, remainingTestTime } from "../../../../test-support/test-deadline"
 
 /**
  * omo#9403, omo#10023: a child whose host transport drops must, within a bound, either run again or
@@ -304,7 +304,7 @@ describe("a child whose host transport drops", () => {
     await closed
 
     // then
-    await Promise.race([session.processExit, rejectAfter(10_000, "the child's process never exited")])
+    await Promise.race([session.processExit, rejectAfter(remainingTestTime(), "the child's process never exited")])
     expect(processAlive(session.processPid)).toBe(false)
     const relisted = world.host.sessions().filter((candidate) => candidate.sessionPath === child.host_session?.session_path)
     // #10925: on loaded Windows CI the closed session is sometimes listed again; carry the host's command

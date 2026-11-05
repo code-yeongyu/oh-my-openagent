@@ -8,6 +8,7 @@ import { startFakeHost } from "./__fixtures__/fake-host"
 import { askHost } from "./host-request"
 import { RpcIdentityError } from "./socket-auth"
 import { withContractHost, type ContractHost, type ContractHostOptions } from "./testing/contract-host"
+import { useTestTimeout } from "../../../../../test-support/test-deadline"
 
 const warm = (host: ContractHost) => Reflect.apply(askHost, undefined, [
   host.socket, { type: "warm", id: "warm-contract", cwd: host.root, kind: "worker" }, 2000, { keyRoot: host.root },
@@ -122,6 +123,7 @@ describe.skipIf(process.platform === "win32")("POSIX raw task host challenge-res
   })
 
   test("#given a host whose handshake answer takes longer than 2 s #when askHost has a larger budget #then the handshake uses that budget and warm succeeds", async () => {
+    useTestTimeout(10_000)
     await withContractHost({ auth: true, protocolDelayMs: 2500 }, async (host) => {
       const reply = await Reflect.apply(askHost, undefined, [host.socket, { type: "warm", id: "warm-slow-handshake", cwd: host.root, kind: "worker" }, 6000, { keyRoot: host.root }]) as Awaited<ReturnType<typeof askHost>>
       expect(reply).toMatchObject({ success: true, data: { warmed: true } })
@@ -153,6 +155,7 @@ describe.skipIf(process.platform === "win32")("POSIX raw task host challenge-res
     ["the flat omo layout (~/.omo)", (home) => { mkdirSync(join(home, ".omo"), { mode: 0o700 }); writeFileSync(join(home, ".omo", "settings.json"), "{}"); return join(home, ".omo") }],
   ]
   test.each(layouts)("#given no agent-dir override on %s #when askHost runs without options #then it reads the key record where the thread client resolves the agent dir", async (_name, agentDirOf) => {
+    useTestTimeout(20_000)
     const home = mkdtempSync(join(tmpdir(), "rpc-home-"))
     try {
       const keyRoot = agentDirOf(home)

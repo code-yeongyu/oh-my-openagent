@@ -21,6 +21,7 @@ import { applyDagSchedulerEvent, createDagScheduler, DagNodeControlError, type D
 import { createDagJournal } from "./journal"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagNode, DagNodeId, DagRunEvent, DagRunId } from "./types"
+import { remainingTestTime } from "../../../../test-support/test-deadline"
 
 // bunfig preloads test-setup.ts to raise the default timeout, but Bun honours a preload's
 // setDefaultTimeout only for the FIRST test file of a run; every later file silently reverts to
@@ -45,7 +46,7 @@ function deferred<T>(): {
   return { promise, resolve }
 }
 
-function within<T>(promise: Promise<T>, ms = 200): Promise<T> {
+function within<T>(promise: Promise<T>, ms = remainingTestTime()): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error(`timed out after ${ms}ms`)), ms)
     void promise.then(
@@ -565,14 +566,14 @@ describe("#8020 scheduler quiescence", () => {
     const manager = new GatedManager({ autoComplete: false })
     const { scheduler, store } = schedulerFixture(definition([node("live"), node("next", ["live"])]), manager)
     const running = scheduler.run()
-    await within(admitted.promise, 3000)
+    await within(admitted.promise, remainingTestTime())
     let quiesced = false
     const suspending = scheduler.suspend().then(() => { quiesced = true })
     expect(quiesced).toBe(false)
     const seq = scheduler.snapshot().checkpointSeq
     release.resolve()
-    await within(suspending, 3000)
-    await within(running, 3000)
+    await within(suspending, remainingTestTime())
+    await within(running, remainingTestTime())
     manager.complete("live")
     await scheduler.whenIdle()
     expect(store.readCheckpoint<DagRunRecordV1>(runId)?.checkpointSeq).toBe(seq)
@@ -589,9 +590,9 @@ describe("#8020 scheduler quiescence", () => {
       if (event.type === "dag.node.task-attached") attached.resolve()
     })
     const running = scheduler.run()
-    await within(attached.promise, 3000)
+    await within(attached.promise, remainingTestTime())
     await scheduler.suspend()
-    await within(running, 3000)
+    await within(running, remainingTestTime())
     const before = scheduler.snapshot()
     manager.complete("live")
     await scheduler.whenIdle()
