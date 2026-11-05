@@ -12,20 +12,30 @@ const START_GUARD: Duration = Duration::from_secs(10);
 const BUSY_GUARD: Duration = Duration::from_secs(5);
 const CONNECT_RETRY: Duration = Duration::from_millis(20);
 
-/// `$XDG_RUNTIME_DIR/senpi-desktop/<uid>.sock`, else a private per-user
-/// directory under the temp dir; the directory is created 0700.
+/// `<runtime-dir>/senpi-desktop/<uid>.sock` in the per-user runtime directory
+/// the machine-wide interaction lock also lives in
+/// ([`senpi_desktop_session::user_runtime_dir`]); there is no temp-directory
+/// fallback.
 ///
 /// # Errors
-/// The runtime directory cannot be created.
+/// The platform names no per-user runtime directory, or it cannot be created.
 pub fn default_endpoint() -> io::Result<String> {
     if cfg!(windows) {
         let user = std::env::var("USERNAME").unwrap_or_else(|_| "user".to_owned());
         return Ok(format!(r"\\.\pipe\senpi-desktop-{user}"));
     }
-    let base = std::env::var_os("XDG_RUNTIME_DIR").map_or_else(std::env::temp_dir, PathBuf::from);
-    let dir = base.join("senpi-desktop");
-    let owner = private_dir(&dir)?;
-    Ok(dir.join(format!("{owner}.sock")).to_string_lossy().into_owned())
+    unix_endpoint()
+}
+
+#[cfg(unix)]
+fn unix_endpoint() -> io::Result<String> {
+    let dir = senpi_desktop_session::user_runtime_dir()?;
+    Ok(dir.entry("sock").to_string_lossy().into_owned())
+}
+
+#[cfg(not(unix))]
+fn unix_endpoint() -> io::Result<String> {
+    Err(io::Error::new(io::ErrorKind::Unsupported, "no unix socket endpoint on this platform"))
 }
 
 /// The resume token file beside `endpoint`.
@@ -35,22 +45,6 @@ pub fn token_file(endpoint: &str) -> PathBuf {
         return std::env::temp_dir().join(format!("{name}.resume"));
     }
     Path::new(endpoint).with_extension("resume")
-}
-
-#[cfg(unix)]
-fn private_dir(dir: &Path) -> io::Result<u32> {
-    use std::os::unix::fs::{DirBuilderExt, MetadataExt};
-
-    std::fs::DirBuilder::new()
-        .recursive(true)
-        .mode(0o700)
-        .create(dir)?;
-    Ok(std::fs::metadata(dir)?.uid())
-}
-
-#[cfg(not(unix))]
-fn private_dir(dir: &Path) -> io::Result<u32> {
-    std::fs::create_dir_all(dir).map(|()| 0)
 }
 
 /// Sends one request and reads its reply line.
