@@ -155,7 +155,8 @@ describe("thread tools across host endpoints", () => {
     const read = await w.run("thread_read", { thread: "dur-desktop" })
 
     // then
-    expect(sent).toMatchObject({ kind: "ok", thread_id: "dur-desktop", delivery: { kind: "queued" }, endpoint: { kind: "rpc_host" } })
+    // The fake host answers the wake with nothing admitted and runs no drain, so nothing will start the message (#12486).
+    expect(sent).toMatchObject({ kind: "ok", thread_id: "dur-desktop", delivery: { kind: "queued_offline" }, endpoint: { kind: "rpc_host" } })
     expect(read).toMatchObject({ kind: "ok", source: "live_host", items: [{ role: "assistant", content: JSON.stringify("from dur-desktop") }] })
     const perSession = new Set(["wake", "get_messages"])
     const shardPerSession = shardHost.frames.filter((frame) => perSession.has(String(frame.type)))
