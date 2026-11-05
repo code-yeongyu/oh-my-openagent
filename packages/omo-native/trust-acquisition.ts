@@ -14,6 +14,7 @@ import type { FallbackReason, TrustDiagnosticEntry } from "./trust-diagnostics"
 /** 4.4 item 6: the one OpenSSL default-file drop of a generation, as `trust ensure --json` reports it. */
 export interface DefaultFileDrop {
   readonly code: "openssl-default-file-malformed"
+  readonly file: string
   readonly cause: DropCause
   readonly blockIndex: number
   readonly narrowing: boolean
@@ -171,7 +172,7 @@ async function native(options: TrustAcquisitionOptions, signal: AbortSignal): Pr
       for (const { der: bytes } of parsed.certificates) add(new X509Certificate(bytes), "openssl-default-file")
     } else {
       codes.push({ code: "openssl-default-file-malformed" }, { code: parsed.cause })
-      defaultFileDrop = { code: "openssl-default-file-malformed", cause: parsed.cause, blockIndex: parsed.blockIndex, narrowing: parsed.narrowing }
+      defaultFileDrop = { code: "openssl-default-file-malformed", file: "/etc/ssl/cert.pem", cause: parsed.cause, blockIndex: parsed.blockIndex, narrowing: parsed.narrowing }
     }
   } else codes.push({ code: "openssl-default-file-malformed" })
   if (signal.aborted) return fallback("helper-timeout")

@@ -118,7 +118,7 @@ test("a fallback ensure is reported as a fallback, keeps the closure and holds o
 
 test("a dropped OpenSSL default file is reported in the ensure result as defaultFileDrop (design 4.4 item 6)", async () => {
   const dir = await directory()
-  const drop = { code: "openssl-default-file-malformed", cause: "ordinary-block-unparseable", blockIndex: 3, narrowing: true } as const
+  const drop = { code: "openssl-default-file-malformed", file: "/etc/ssl/cert.pem", cause: "ordinary-block-unparseable", blockIndex: 3, narrowing: true } as const
   const { out } = await ensure(dir, ["--json"], {
     acquire: async () => ({
       certificates: [ca], fallbackReason: null, defaultFileDrop: drop,
