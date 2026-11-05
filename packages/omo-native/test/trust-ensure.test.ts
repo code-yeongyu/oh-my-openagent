@@ -116,6 +116,26 @@ test("a fallback ensure is reported as a fallback, keeps the closure and holds o
   expect(text.startsWith(`# omo-engine-trust-generation v1 user=${value.user}\n`)).toBe(true)
 })
 
+test("a dropped OpenSSL default file is reported in the ensure result as defaultFileDrop (design 4.4 item 6)", async () => {
+  const dir = await directory()
+  const drop = { code: "openssl-default-file-malformed", cause: "ordinary-block-unparseable", blockIndex: 3, narrowing: true } as const
+  const { out } = await ensure(dir, ["--json"], {
+    acquire: async () => ({
+      certificates: [ca], fallbackReason: null, defaultFileDrop: drop,
+      codes: [{ code: "openssl-default-file-malformed" }, { code: "ordinary-block-unparseable" }],
+    }),
+  })
+  const value = parsed(out) as Ensured & { defaultFileDrop?: unknown }
+  expect(value.automatic).toBe("os")
+  expect(value.defaultFileDrop).toEqual(drop)
+})
+
+test("a kept OpenSSL default file leaves defaultFileDrop out of the ensure result", async () => {
+  const dir = await directory()
+  const value = JSON.parse((await ensure(dir, ["--json"])).out) as Record<string, unknown>
+  expect("defaultFileDrop" in value).toBe(false)
+})
+
 test("--lease-pid writes { v, pid, bootAtMs } by rename, and a second lease by the same pid replaces the first", async () => {
   const dir = await directory()
   const first = parsed((await ensure(dir, ["--json", "--lease-pid", String(process.pid)])).out)
