@@ -10,7 +10,7 @@ import { AGENT_TOOLKIT_SDK_ROOT_ENV, createSdkRootProvisioning } from "./sdk-roo
 import { IdleInjectionCoordinator } from "./idle-injection-coordinator"
 import { deliverItems } from "./deliver-items"
 import { publishWakeQueueBaselineOnSessionStart, publishWakeQueueChildWork } from "./wake-queue-source"
-import { createFirstPaintScheduler, createStartupDeferral, type StartupWorkScheduler } from "./startup-deferral"
+import { createFirstPaintScheduler, createStartupDeferral, type ExtensionPlacement, type StartupWorkScheduler } from "./startup-deferral"
 import { installToolCaptureRegistry } from "./tool-capture-registry"
 import { createPrewarmDiagnostics } from "./prewarm-diagnostics"
 import type { ComponentContext, ComponentLogger, OmoSenpiComponent, SenpiExtensionAPI } from "./types"
@@ -21,6 +21,11 @@ export interface ComposeOmoSenpiExtensionOptions {
   /** Test seam for the startup deferral; production uses its next-tick scheduler. */
   scheduleStartupWork?: StartupWorkScheduler
   env?: NodeJS.ProcessEnv
+  /**
+   * Where this generation runs. senpi does not report its side to an extension yet, so production composes as
+   * "fused" (today); the hand reads it once the host exposes the side of a split session.
+   */
+  placement?: () => ExtensionPlacement
 }
 
 const REQUIRED_CAPABILITIES = [
@@ -175,7 +180,10 @@ export function composeOmoSenpiExtension(
     // as the idle coordinator: a session that ends before the gate opens must not start a
     // half-session's worth of work on a dead API.
     const startupDeferral = createStartupDeferral({
-      schedule: options.scheduleStartupWork ?? createFirstPaintScheduler({ on: (event, handler, registrationOptions) => pi.on(event, handler, registrationOptions) }),
+      schedule: options.scheduleStartupWork ?? createFirstPaintScheduler({
+        on: (event, handler, registrationOptions) => pi.on(event, handler, registrationOptions),
+        placement: options.placement?.() ?? "fused",
+      }),
       onError: (label, error) => logger.warn("omo-senpi deferred startup work failed", { label, error }),
     })
     pi.on("session_shutdown", () => startupDeferral.retire())

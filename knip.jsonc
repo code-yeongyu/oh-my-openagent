@@ -2937,6 +2937,7 @@
         "src/components/telemetry/posthog-runtime.ts",
         "src/components/telemetry/session-summary-recovery.ts",
         "src/components/thread/live-surface.ts",
+        "src/extension/hand-browser-placement.test-fixture.ts",
         "src/extension/omo-task.ts",
       ],
       "ignoreFiles": [
