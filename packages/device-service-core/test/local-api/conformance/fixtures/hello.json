@@ -23,7 +23,7 @@
             "v": 1,
             "owner": "service",
             "server_proof": "<server_proof>",
-            "capabilities": ["sessions", "devices", "enforcement", "upgrade"],
+            "capabilities": ["sessions", "devices", "enforcement", "upgrade", "control"],
             "state": {
               "state": "connected"
             }
