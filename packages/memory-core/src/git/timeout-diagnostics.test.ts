@@ -59,32 +59,21 @@ async function readRecord(directory: string): Promise<{ pid: number; argv: strin
 }
 
 describe("recordGitTimeout snapshot contract (#12145)", () => {
-  test("#given an injected snapshot naming the pid #when git times out #then the record carries that table", async () => {
+  test.each([
+    { label: "an injected snapshot naming the pid", snapshot: () => `  4242  1  Ss   0:00.00 /usr/local/bin/git add -A\n` },
+    { label: "an injected snapshot that fails with a timeout", snapshot: () => "process snapshot failed: spawnSync ps ETIMEDOUT" },
+  ])("#given $label #when git times out #then the record carries that snapshot through", async ({ snapshot }) => {
     // #given
     const directory = await mkdtemp(join(tmpdir(), "git-timeout-record-"))
     roots.push(directory)
     const pid = 4242
-    const table = `  ${pid}  1  Ss   0:00.00 /usr/local/bin/git add -A\n`
+    const expected = snapshot()
     // #when
-    recordGitTimeout({ [GIT_TIMEOUT_DIAGNOSTICS_ENV]: directory }, pid, ["add", "-A"], directory, 2_000, () => table)
+    recordGitTimeout({ [GIT_TIMEOUT_DIAGNOSTICS_ENV]: directory }, pid, ["add", "-A"], directory, 2_000, snapshot)
     // #then
     const record = await readRecord(directory)
     expect(record.pid).toBe(pid)
     expect(record.timeoutMs).toBe(2_000)
-    expect(record.processes).toBe(table)
-    expect(record.processes).toContain(String(pid))
-  })
-
-  test("#given an injected snapshot that fails #when git times out #then the record carries the failure form", async () => {
-    // #given
-    const directory = await mkdtemp(join(tmpdir(), "git-timeout-record-"))
-    roots.push(directory)
-    const pid = 4242
-    // #when
-    recordGitTimeout({ [GIT_TIMEOUT_DIAGNOSTICS_ENV]: directory }, pid, ["add", "-A"], directory, 2_000, () => "process snapshot failed: spawnSync ps ETIMEDOUT")
-    // #then
-    const record = await readRecord(directory)
-    expect(record.pid).toBe(pid)
-    expect(record.processes).toBe("process snapshot failed: spawnSync ps ETIMEDOUT")
+    expect(record.processes).toBe(expected)
   })
 })
