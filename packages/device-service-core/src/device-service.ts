@@ -2,14 +2,16 @@ import { homedir } from "node:os"
 import { join } from "node:path"
 import { SOCKET_FILE } from "./local-api/access.ts"
 import { connectLocalApi, type ConnectOptions, type LocalApiClient } from "./local-api/client.ts"
-import { ENDPOINT_FILE } from "./local-api/transport.ts"
+import { connectLocal, ENDPOINT_FILE } from "./local-api/transport.ts"
 import type { ListingResult, ListingRevision } from "./local-api/client-assembly.ts"
-import type { DeviceRef, DeviceRow, SessionFilter, Status } from "./local-api/protocol.ts"
+import type { Capability, ControlAttachState, DeviceRef, DeviceRow, SessionFilter, Status } from "./local-api/protocol.ts"
 import { openAttach, type RemoteAttach } from "./remote-attach.ts"
 
 export type { ListingResult, ListingRevision, ReadPage, ReadPageEntry } from "./local-api/client-assembly.ts"
 export { LocalApiError } from "./local-api/errors.ts"
 export type {
+  Capability,
+  ControlAttachState,
   DetachReason,
   DeviceRef,
   DeviceRow,
@@ -44,12 +46,17 @@ export function deviceServiceEndpointPath(stateDir: string, platform: NodeJS.Pla
 
 export type DeviceService = {
   readonly serviceVersion: string
+  /** What the service advertised in its welcome; `control` means it has the host attach setting. */
+  readonly capabilities: readonly Capability[]
   /** The status the service sent in its welcome. */
   readonly initialStatus: Status
   readonly status: () => Promise<Status>
   /** Calls `listener` with the current status, then after every change, until the returned function is called. */
   readonly watchStatus: (listener: (status: Status) => void) => Promise<() => void>
   readonly setEnabled: (enabled: boolean) => Promise<boolean>
+  /** Whether this account's other devices may view and command this device's sessions (the per-device opt-out). */
+  readonly attachControl: () => Promise<ControlAttachState>
+  readonly setAttachControl: (attached: boolean) => Promise<ControlAttachState>
   /** The binary the service runs to refresh its access token (absolute path) and that binary's version. */
   readonly registerRefresher: (binaryPath: string, version: string) => Promise<void>
   /** Hands the signed-in device and its keys (base64 PKCS#8 DER) to the service; never logged or echoed. */
@@ -76,6 +83,8 @@ export type ConnectDeviceServiceOptions = {
   /** The version of this omo build, reported to the service in its hello. */
   readonly version: string
   readonly stateDir?: string
+  /** The connection never keeps the process alive: a long-lived engine-side client, not a CLI verb. */
+  readonly background?: boolean
   /** Test seam: the local API connection (the vendored v1 client by default). */
   readonly connect?: (options: ConnectOptions) => Promise<LocalApiClient>
 }
@@ -83,9 +92,14 @@ export type ConnectDeviceServiceOptions = {
 /** Opens a proven connection to this device's service (mutual proof before any request) and returns the typed SDK. */
 export async function connectDeviceService(options: ConnectDeviceServiceOptions): Promise<DeviceService> {
   const stateDir = options.stateDir ?? deviceServiceStateDir()
-  const client = await (options.connect ?? connectLocalApi)({ stateDir, client: { name: "omo", version: options.version } })
+  const client = await (options.connect ?? connectLocalApi)({
+    stateDir,
+    client: { name: "omo", version: options.version },
+    ...(options.background === true ? { transport: () => connectLocal(stateDir, { background: true }) } : {}),
+  })
   return {
     serviceVersion: client.welcome.service_version,
+    capabilities: client.welcome.capabilities,
     initialStatus: client.welcome.state,
     status: () => client.request("status.get", {}),
     watchStatus: async listener => {
@@ -101,6 +115,8 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
       return stop
     },
     setEnabled: async enabled => (await client.request("service.set_enabled", { enabled })).enabled,
+    attachControl: () => client.request("control.attach.get", {}),
+    setAttachControl: attached => client.request("control.attach.set", { attached }),
     registerRefresher: async (binaryPath, version) => {
       await client.request("refresher.register", { binary_path: binaryPath, version })
     },
