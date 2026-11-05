@@ -74,7 +74,7 @@ test("#given the afterDbCommit seam #when a joined enqueue reaches COMMIT #then 
   useTestTimeout(20_000)
   const agentDir = mkdtempSync(join(tmpdir(), "gateway-wake-"))
   const child = Bun.spawn([process.execPath, fileURLToPath(new URL("./testing/extension-wake-driver.mjs", import.meta.url)), "commitHook", agentDir], { stdout: "pipe", stderr: "pipe" })
-  const watchdog = setTimeout(() => child.kill(), remainingTestTime())
+  const watchdog = setTimeout(() => { console.error("the wake-marker child did not exit within the test budget; killing it"); child.kill() }, remainingTestTime())
   try {
     const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
     expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
@@ -94,7 +94,7 @@ test("#given a crash after COMMIT #when the store reopens #then the committed de
   const h = (harness = createGatewayHarness())
   const agentDir = mkdtempSync(join(tmpdir(), "gateway-wake-"))
   const child = Bun.spawn([process.execPath, fileURLToPath(new URL("./testing/extension-wake-driver.mjs", import.meta.url)), "crashAfterCommit", agentDir], { stdout: "pipe", stderr: "pipe" })
-  const watchdog = setTimeout(() => child.kill(), remainingTestTime())
+  const watchdog = setTimeout(() => { console.error("the wake-marker child did not exit within the test budget; killing it"); child.kill() }, remainingTestTime())
   try {
     const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
     expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
@@ -125,7 +125,7 @@ test("#given a crash between marker and COMMIT #when the store reopens #then rec
   const agentDir = mkdtempSync(join(tmpdir(), "gateway-wake-"))
   const inbox = gatewayInboxDirectory(agentDir, "target")
   const child = Bun.spawn([process.execPath, fileURLToPath(new URL("./testing/extension-wake-driver.mjs", import.meta.url)), "crashBeforeCommit", agentDir], { stdout: "pipe", stderr: "pipe" })
-  const watchdog = setTimeout(() => child.kill(), remainingTestTime())
+  const watchdog = setTimeout(() => { console.error("the wake-marker child did not exit within the test budget; killing it"); child.kill() }, remainingTestTime())
   let store: GatewayStore | undefined
   try {
     // The driver prints ENQUEUED once the joined enqueue has returned (its marker is on disk) while COMMIT never runs.

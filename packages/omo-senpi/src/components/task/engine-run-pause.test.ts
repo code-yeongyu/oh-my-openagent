@@ -160,7 +160,7 @@ test("releaseStale returns at once while a Resume is in flight and starts no sec
     // Circuit breaker only: a releaseStale that joined the in-flight Resume would never return here.
     const outcome = await Promise.race([
       pause.bridge.releaseStale("parent").then(() => "returned" as const),
-      new Promise<"blocked">(resolve => { breaker = setTimeout(() => resolve("blocked"), remainingTestTime()) }),
+      new Promise<"releaseStale still blocked at the end of the test budget">(resolve => { breaker = setTimeout(() => resolve("releaseStale still blocked at the end of the test budget"), remainingTestTime()) }),
     ])
     expect(outcome).toBe("returned")
     expect(resumeCalls).toBe(1)

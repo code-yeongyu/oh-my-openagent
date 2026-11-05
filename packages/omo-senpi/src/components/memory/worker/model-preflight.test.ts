@@ -302,14 +302,14 @@ control.once("error", () => process.exit(0))
         expect(identityMatches(grandchildIdentity) && pidAlive(grandchildIdentity.pid)).toBe(true)
         // The grandchild writes its pid file BEFORE connect(); awaiting its explicit connected
         // marker guarantees the control snapshot below contains its socket on every runner.
-        expect(await waitForFileToExist(grandchildConnectedPath, remainingTestTime())).toBe(true)
+        expect({ "grandchild connected marker written": await waitForFileToExist(grandchildConnectedPath, remainingTestTime()) }).toEqual({ "grandchild connected marker written": true })
         const helperClosures = [...connections].map((socket) => new Promise<void>((resolve) => {
           if (socket.destroyed) return resolve()
           socket.once("close", () => resolve())
         }))
         closeControlChannel(control, connections)
         await Promise.all(helperClosures)
-        expect(await pidTerminalWithin(grandchildIdentity, remainingTestTime())).toBe(true)
+        expect({ "grandchild exited": await pidTerminalWithin(grandchildIdentity, remainingTestTime()) }).toEqual({ "grandchild exited": true })
       }
     } finally {
       // Fail-safe: even when an assertion above failed - or when the win32 branch never captured an

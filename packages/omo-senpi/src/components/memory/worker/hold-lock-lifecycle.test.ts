@@ -155,7 +155,7 @@ child.stdout.on("data", (chunk) => {
       // liveness probe against the captured identity) instead of being asserted from a single
       // point-in-time probe, because the holder's death trails the wrapper's by a beat.
       if (holderIdentityForCleanup !== null) {
-        expect(await pidTerminalWithin(holderIdentityForCleanup, remainingTestTime())).toBe(true)
+        expect({ "lock holder exited": await pidTerminalWithin(holderIdentityForCleanup, remainingTestTime()) }).toEqual({ "lock holder exited": true })
       } else {
         expect(pidAlive(holderPid)).toBe(false)
       }
@@ -163,7 +163,7 @@ child.stdout.on("data", (chunk) => {
       // its stdin-EOF path, which is what writes the marker. Windows tears the whole tree down
       // with the wrapper, so the holder never gets to run that handler - the marker is a
       // graceful-shutdown observable there, not a termination one.
-      if (process.platform !== "win32") expect(await waitForFileToExist(marker, remainingTestTime())).toBe(true)
+      if (process.platform !== "win32") expect({ "marker written": await waitForFileToExist(marker, remainingTestTime()) }).toEqual({ "marker written": true })
     } finally {
       wrapper.kill("SIGKILL")
       if (holderIdentityForCleanup !== null) killIfAlive(holderIdentityForCleanup)

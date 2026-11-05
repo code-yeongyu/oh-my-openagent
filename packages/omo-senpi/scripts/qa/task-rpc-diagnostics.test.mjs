@@ -23,7 +23,7 @@ test.each([undefined, "0", "1"])("a failed initial parent retains diagnostics an
   const capture = captureChild(child)
   let output
   try {
-    output = await withinDeadline(capture.closed, remainingTestTime(), () => child.kill("SIGKILL"))
+    output = await withinDeadline(capture.closed, remainingTestTime(), () => child.kill("SIGKILL")).catch((error) => { throw new Error("the captured child did not close within the test budget", { cause: error }) })
   } finally {
     if (child.exitCode === null) child.kill("SIGKILL")
     await capture.closed

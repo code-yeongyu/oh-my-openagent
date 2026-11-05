@@ -30,7 +30,7 @@ test("#given two processes released together #when ensuring the same extension #
     const exited = new Promise<number | null>((resolve, reject) => { child.once("exit", resolve); child.once("error", reject) })
     return { child, ready, exited, output: () => output, stderr: () => stderr }
   })
-  const timeout = setTimeout(() => { for (const racer of racers) racer.child.kill("SIGKILL") }, remainingTestTime())
+  const timeout = setTimeout(() => { console.error("the racing store-extension children did not exit within the test budget; killing them"); for (const racer of racers) racer.child.kill("SIGKILL") }, remainingTestTime())
   try {
     await Promise.all(racers.map((racer) => racer.ready))
     for (const racer of racers) racer.child.send("go")

@@ -55,12 +55,6 @@ function deferred<T>() {
   return { promise, resolve }
 }
 
-/**
- * A single awaited step must settle well inside Bun's 5s per-test budget. 3s leaves room for a
- * loaded Windows runner (this test measured 802ms idle and 1339ms on a PR runner) while still
- * failing before the suite-level timeout, so the failure names the step instead of the test.
- */
-
 /** Wall-clock budget for the multi-run cancellation case; see its trailing comment. */
 const TEST_BUDGET_MS = 20_000
 
