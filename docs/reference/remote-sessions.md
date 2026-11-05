@@ -5,13 +5,15 @@ account. It talks to the OmO device service on this device, which holds the conn
 devices; `omo remote` never connects to another machine itself. `status`, `devices`, `sessions` and
 `control` print a table, `enable` and `disable` print one sentence, and with `--json` each prints the
 SDK's typed value as one JSON line instead; `attach` takes no `--json`
-(`packages/omo-native/remote-cli.ts`).
+(`packages/omo-native/remote-cli.ts`). `bootstrap` prints the status rows when it connects, or a
+notice on stderr when it stops; with `--json` it prints one JSON line, `{state, status}` when it
+connects or `{state, notice}` when it stops (`packages/omo-native/remote-bootstrap.ts`).
 
 ```bash
 omo remote status [--json]       # the device service's connection state
 omo remote devices [--json]      # the devices on this account
 omo remote sessions [--device D] [--project P] [--state running|idle|ended] [--json]
-omo remote enable | disable      # turn remote sessions on or off for this device
+omo remote enable | disable [--json]   # turn remote sessions on or off for this device
 omo remote control [on|off]      # whether your other devices may view and command this device's sessions
 omo remote bootstrap [--json]    # set up the device service for your sign-in (every omo start runs it)
 omo remote attach <device>/<session>   # watch a session on another device
@@ -20,6 +22,13 @@ omo remote attach <device>/<session>   # watch a session on another device
 Exit codes: `0` done, `1` the operation failed, `2` usage error, `3` unavailable (signed out, the
 device service is not set up or not running, or it lacks the feature). `omo remote bootstrap` exits `3`
 for every stop, including a failed verification or install.
+
+## What you need
+
+- The same OmO account signed in on every device you want to reach. `omo remote` has no pairing
+  command: it reaches the devices signed in to your account.
+- The OmO device service set up and running on each device (see [Install and update](#install-and-update)).
+- A plan that includes remote sessions. Without one, `omo remote status` shows `Plan required`.
 
 ## Before any command runs
 
