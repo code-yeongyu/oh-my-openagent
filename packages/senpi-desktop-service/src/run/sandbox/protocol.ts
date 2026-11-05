@@ -21,9 +21,20 @@ export interface SandboxWorkerData {
 	readonly wasmPath: string;
 	/** One Int32 the host sets to interrupt the VM at its next checkpoint. */
 	readonly interrupt: SharedArrayBuffer;
-	/** Names of the VM globals that call the host; row 22 ships none. */
+	/** Names of the VM globals that call the host. */
 	readonly bridge: readonly string[];
+	/** VM-side setup run after the prelude, before the body. */
+	readonly setup?: SandboxSetup;
 	readonly limits: SandboxWorkerLimits;
+}
+
+/**
+ * VM source of a function `(callHost, data) => void`, evaluated in the VM and called once before the body:
+ * `callHost(name, args)` is the prelude's bridged call (a promise), `data` is the string `data` below.
+ */
+export interface SandboxSetup {
+	readonly source: string;
+	readonly data: string;
 }
 
 /** An error that left the VM, described as data. */
@@ -35,6 +46,14 @@ export interface SandboxErrorPayload {
 	readonly reason?: string;
 	/** JSON of a thrown non-object value (`throw "x"`), rethrown as that value on the host. */
 	readonly thrown?: string;
+	/**
+	 * A bridged call's host error: the host keeps the error under this token and rethrows it unchanged when the
+	 * VM error carrying the token leaves the run uncaught.
+	 */
+	readonly hostError?: string;
+	/** The host error's `data` (JSON) and JSON-RPC `rpcCode`, readable by the body that catches it. */
+	readonly data?: unknown;
+	readonly rpcCode?: number;
 }
 
 export type WorkerToHostMessage =
