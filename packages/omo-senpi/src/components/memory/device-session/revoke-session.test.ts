@@ -6,7 +6,7 @@
 import { expect, test } from "bun:test"
 import { execFileSync } from "node:child_process"
 import { createHash, generateKeyPairSync } from "node:crypto"
-import { chmod, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises"
+import { chmod, type FileHandle, mkdir, mkdtemp, open, readdir, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -84,9 +84,18 @@ async function revokedDevice(code: string, options: { readonly onContract?: bool
     await runner.acquire("agent", paths, { enabled: true }, { profile: "auto", projectDir: project })
     expect(tokenFn).toBeDefined()
     if (value !== null) value = { ...value, accessTokenExpiresAt: new Date(Date.now() - 1_000).toISOString() }
-    if (options.lockPinRoot === true) await chmod(pinParent, 0o500)
+    // A pin that cannot be renamed: POSIX refuses the rename in a read-only parent; Windows ignores those
+    // mode bits but refuses to rename a directory while a file inside it is open.
+    let held: FileHandle | undefined
+    if (options.lockPinRoot === true) {
+      if (process.platform === "win32") held = await open(pinFile, "r")
+      else await chmod(pinParent, 0o500)
+    }
     const token = await tokenFn?.().then(() => "token", (error: unknown) => (error instanceof Error ? error.name : "thrown"))
-    if (options.lockPinRoot === true) await chmod(pinParent, 0o700)
+    if (options.lockPinRoot === true) {
+      if (held !== undefined) await held.close()
+      else await chmod(pinParent, 0o700)
+    }
     const pinKept = await readFile(pinFile, "utf8").then(() => true, () => false)
     const retired = (await readdir(pinParent)).filter((name) => name.includes(".retired-"))
     return { token, keysKept: value !== null, pinKept, retired: retired.length, logs }
