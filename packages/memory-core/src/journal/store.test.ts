@@ -227,6 +227,8 @@ describe("stale journal lock recovery", () => {
     expect(existsSync(lockPath)).toBe(false)
   })
 
+  // Waits the full 5 s acquisition deadline before it can throw, and bun gives every file after the
+  // first in a plain `bun test` run only its 5 s default, so this test carries its own budget.
   it("#given a lock file owned by a live process #when the wait deadline passes #then it throws and the live lock is never stolen", async () => {
     // given
     const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-journal-lock-")))
@@ -245,7 +247,7 @@ describe("stale journal lock recovery", () => {
     expect((failure as Error).name).toBe("JournalLockTimeoutError")
     expect(taskRuns).toBe(0)
     expect(await readFile(lockPath, "utf8")).toBe(`${process.pid}\n`)
-  })
+  }, 15_000)
 })
 
   it("#given an injected journal lock #when flush runs #then the lock is never invoked", async () => {
