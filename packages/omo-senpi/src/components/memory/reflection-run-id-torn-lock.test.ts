@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, utimesSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -27,7 +27,9 @@ describe("run-id high water across a torn active.lock (#11976 C17)", () => {
     // given
     const paths = identity()
     mkdirSync(join(paths.reflection, "runs", "reflection-run-60"), { recursive: true })
+    utimesSync(join(paths.reflection, "runs", "reflection-run-60"), new Date("2026-11-05T04:00:00.000Z"), new Date("2026-11-05T04:00:00.000Z"))
     writeFileSync(join(paths.reflection, "active.lock"), "{\"runId\":\"reflection-run-66\",\"request\":{\"trig")
+    utimesSync(join(paths.reflection, "active.lock"), new Date("2026-11-05T04:00:00.000Z"), new Date("2026-11-05T04:00:00.000Z"))
 
     // when
     await runStaleLockReaper({ runtimeDir: paths.runtime, probe })
@@ -41,6 +43,7 @@ describe("run-id high water across a torn active.lock (#11976 C17)", () => {
     // given
     const paths = identity()
     writeFileSync(join(paths.reflection, "active.lock"), "{\"runId\":\"reflection-run-6")
+    utimesSync(join(paths.reflection, "active.lock"), new Date("2026-11-05T04:00:00.000Z"), new Date("2026-11-05T04:00:00.000Z"))
 
     // when
     await runStaleLockReaper({ runtimeDir: paths.runtime, probe })
