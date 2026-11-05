@@ -166,12 +166,8 @@ export function reserveTransition(
   request: ReflectionRequest,
   runId: string,
 ): { readonly state: ReservationState; readonly result: "active" | "pending" } {
-  // A pending run whose active run was released without promoting it (the CLI reaper cannot launch)
-  // goes first, carrying this request with it.
-  if (!state.active && state.pending) {
-    return { state: { active: { runId: state.pending.runId, request: mergeRequests(state.pending.request, request) } }, result: "active" }
-  }
-  if (!state.active) return { state: { active: { runId, request } }, result: "active" }
+  // A lone pending (left by a release without promotion) stays queued behind the new active run.
+  if (!state.active) return { state: { active: { runId, request }, ...(state.pending === undefined ? {} : { pending: state.pending }) }, result: "active" }
   const pending = state.pending
     ? { runId: state.pending.runId, request: mergeRequests(state.pending.request, request) }
     : { runId, request }
@@ -260,6 +256,22 @@ export function completeTransition(
     return { state: {}, finalize, clearPendingCompaction }
   }
   return { state: { active: pending }, finalize, clearPendingCompaction, launch: pending }
+}
+
+/**
+ * A pending run left behind when its active run was released without promotion (the CLI reaper,
+ * DESIGN.r2 4.1b): the next session promotes it exactly as completeTransition would have, dropping
+ * a request whose journals no longer trigger it. `reserveTransition` is deliberately not changed.
+ */
+export function promoteTransition(
+  state: ReservationState,
+  journals: ReadonlyMap<string, JournalSnapshot>,
+  config: TriggerConfig,
+): { readonly state: ReservationState; readonly launch?: ReservedRun } {
+  if (state.active !== undefined || state.pending === undefined) return { state }
+  const pending = capPendingRun(state.pending)
+  if (!isStillTriggered(pending.request, journals, config)) return { state: {} }
+  return { state: { active: pending }, launch: pending }
 }
 
 function makeRequest(

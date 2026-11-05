@@ -18,6 +18,8 @@ import { writeAbandoned, type AbandonedReason } from "./abandoned"
 import type { ReservedRun } from "./machine"
 import { REFLECTION_ORPHAN_GRACE_MS } from "./orphan-sweep"
 import { RESERVATION_EVIDENCE_FILENAME, writeQuarantine } from "./quarantine"
+import { claimRunTerminal, readRunTerminalPublication, runTerminalClaimMatches } from "./terminal-claim"
+import { releaseReservationWithoutPromotion } from "./release-without-promotion"
 import { isReservedRun, moveTornReservationAside } from "./reservation-files"
 import { recordReflectionRunIdMark, scanReflectionRunHighWater } from "./run-id-high-water"
 import { parseReservationRunLedger } from "./run-ledger"
@@ -99,6 +101,15 @@ async function hasTerminalSentinel(runDir: string, probe: StaleLockProbe): Promi
   return false
 }
 
+// The outcome a `final.json` records: undefined when there is none, "unknown" when it cannot be read.
+async function readFinalOutcome(runDir: string, probe: StaleLockProbe): Promise<string | undefined> {
+  const read = await readText(join(runDir, "final.json"), probe)
+  if (read.kind === "missing") return undefined
+  const parsed = read.kind === "text" ? parseJson(read.text) : { ok: false as const }
+  const outcome = parsed.ok ? fieldsOf(parsed.value).outcome : undefined
+  return typeof outcome === "string" ? outcome : "unknown"
+}
+
 type RecordedProcesses = { readonly live: false } | { readonly live: true; readonly reason: string }
 
 // The supervisor and child a ledger recorded. A valid ledger is read with the strict classifier the
@@ -168,7 +179,11 @@ async function decideStuck(reflectionDir: string, verdict: Extract<ReflectionLoc
   const runDir = join(reflectionDir, "runs", runId)
   if (await exists(join(runDir, "outcome.json"), probe)) return passThrough
   if (!isReservedRun(parsed.value)) return tornLock(reflectionDir, "active.lock is not a reservation", probe)
-  if (await hasTerminalSentinel(runDir, probe)) return { kind: "reap", action: "terminal-recorded", runId, reason: "the run already recorded its terminal state" } // rule:terminal-recorded
+  const finalOutcome = await readFinalOutcome(runDir, probe)
+  if (finalOutcome === "merged" || finalOutcome === "no_changes") {
+    return { kind: "stuck", runId, reason: "it finished with a folded outcome that only a session can settle; open a session" } // rule:final-folded
+  }
+  if (finalOutcome !== undefined || await hasTerminalSentinel(runDir, probe)) return { kind: "reap", action: "terminal-recorded", runId, reason: "the run already recorded its terminal state" } // rule:terminal-recorded
   const ledger = await readLedger(runDir, probe)
   if (!ledger.present) {
     const reservedAt = typeof fields.reservedAt === "string" ? Date.parse(fields.reservedAt) : Number.NaN
@@ -245,11 +260,15 @@ export interface StaleLockReaperReport {
   readonly tombstones: readonly TombstoneReport[]
   readonly warnings: readonly string[]
   readonly dryRun: boolean
+  /** A queued run left in `pending.json` for the next session (never promoted from the CLI). */
+  readonly pendingKept?: string
+  readonly keptReason?: string
 }
 
 interface ReaperContext {
   readonly runtimeDir: string
   readonly reflectionDir: string
+  readonly transcriptsDir: string
   readonly locksDir: string
   readonly probe: StaleLockProbe
   readonly now: () => number
@@ -334,6 +353,13 @@ async function quarantineRun(context: ReaperContext, runDir: string, runId: stri
   await emitReceipt(context, { kind: identity.kind, runId, trigger: identity.origin ?? identity.trigger, event: "quarantined", generation, reason: "ledger_unreadable" })
 }
 
+async function reservedRunId(path: string): Promise<string | undefined> {
+  const raw = await readFile(path, "utf8").catch(() => undefined)
+  const parsed = raw === undefined ? undefined : parseJson(raw)
+  const runId = parsed?.ok === true ? fieldsOf(parsed.value).runId : undefined
+  return typeof runId === "string" ? runId : undefined
+}
+
 async function readActiveFields(reflectionDir: string): Promise<Record<string, unknown> | undefined> {
   const raw = await readFile(join(reflectionDir, "active.lock"), "utf8").catch(() => undefined)
   if (raw === undefined) return undefined
@@ -341,44 +367,61 @@ async function readActiveFields(reflectionDir: string): Promise<Record<string, u
   return parsed.ok ? fieldsOf(parsed.value) : undefined
 }
 
-// Releases the reservation without promoting `pending.json`: the CLI cannot launch it, and a pending
-// run promoted under the CLI's pid would itself be reaped as an interrupted launch. The next evaluate
-// promotes it (machine.ts reserveTransition).
-async function releaseReservation(context: ReaperContext, runId: string): Promise<boolean> {
-  const released = await underLock(reflectionSchedulerLockPath(context.locksDir), "reflection-scheduler", async () => {
-    const active = await readActiveFields(context.reflectionDir)
-    if (active?.runId !== runId) return false
-    await unlink(join(context.reflectionDir, "active.lock"))
-    return true
-  })
-  return released === true
+async function releaseReservation(context: ReaperContext, runId: string): Promise<{ readonly released: boolean; readonly pendingRunId?: string }> {
+  try {
+    return await releaseReservationWithoutPromotion({
+      reflectionDir: context.reflectionDir,
+      transcriptsDir: context.transcriptsDir,
+      locksDir: context.locksDir,
+      runId,
+      now: () => new Date(context.now()),
+    })
+  } catch (error) {
+    if (error instanceof LockContentionError) return { released: false }
+    throw error
+  }
 }
 
-async function settleActiveMinimally(context: ReaperContext, decision: Extract<StaleLockDecision, { kind: "reap" }>): Promise<boolean> {
+type MinimalSettle =
+  | { readonly settled: true; readonly pendingRunId?: string }
+  | { readonly settled: false; readonly reason: string }
+
+async function settleActiveMinimally(context: ReaperContext, decision: Extract<StaleLockDecision, { kind: "reap" }>): Promise<MinimalSettle> {
   const runId = decision.runId
   const runDir = join(context.reflectionDir, "runs", runId)
-  const written = await underLock(runFinalizationLockPath(context.locksDir, runId), "reflection-finalize", async () => {
+  const written = await underLock(runFinalizationLockPath(context.locksDir, runId), "reflection-finalize", async (): Promise<MinimalSettle> => {
     const again = (await decideStaleReflectionLock(context.reflectionDir, context.probe)).decision
-    if (again.kind !== "reap" || again.action !== decision.action || again.runId !== runId) return false
+    if (again.kind !== "reap" || again.action !== decision.action || again.runId !== runId) return { settled: false, reason: "the decision changed" }
     const active = await readActiveFields(context.reflectionDir) ?? {}
     const identity = identityFromReservation(active)
     const reservedAt = isoOr(active.reservedAt, new Date(context.now()).toISOString())
     if (decision.action === "launch-interrupted") {
       await abandonRun(context, runDir, runId, "launch_interrupted", reservedAt, identity, active)
-    } else if (decision.action === "processes-dead" || decision.action === "ledger-unreadable") {
-      const ledger = await readLedger(runDir, {})
-      const fields = ledger.present ? ledger.fields : {}
-      const generation = isoOr(fields.startedAt, reservedAt)
-      if (decision.action === "processes-dead") {
-        await abandonRun(context, runDir, runId, "processes_dead", generation, identityFromLedger(fields, identity))
-      } else {
-        await quarantineRun(context, runDir, runId, generation, identityFromLedger(fields, identity), isReservedRun(active) ? active : undefined)
-      }
+      return { settled: true }
     }
-    return true
+    // An earlier settle wrote the sentinel and stopped before releasing (REVIEW-2 N2): only release.
+    if (decision.action === "terminal-recorded") return { settled: true }
+    if (decision.action !== "processes-dead" && decision.action !== "ledger-unreadable") return { settled: false, reason: `${decision.action} is not settled from here` }
+    const ledger = await readLedger(runDir, {})
+    const fields = ledger.present ? ledger.fields : {}
+    const attempt = typeof fields.attempt === "number" ? fields.attempt : undefined
+    const published = readRunTerminalPublication(runDir, attempt)
+    if (published !== undefined) return { settled: false, reason: `the run is already ${published === "settled" ? "settled" : "publishing its outcome"}` }
+    const claim = await claimRunTerminal(runDir, { runId, attempt: attempt ?? 1 }, "abandon", context.probe)
+    if (!runTerminalClaimMatches(claim, { runId, attempt: attempt ?? 1 }, "abandon")) return { settled: false, reason: "another process claimed the run" }
+    const generation = isoOr(fields.startedAt, reservedAt)
+    if (decision.action === "processes-dead") {
+      await abandonRun(context, runDir, runId, "processes_dead", generation, identityFromLedger(fields, identity))
+    } else {
+      await quarantineRun(context, runDir, runId, generation, identityFromLedger(fields, identity), isReservedRun(active) ? active : undefined)
+    }
+    return { settled: true }
   })
-  if (written !== true) return false
-  return releaseReservation(context, runId)
+  if (written === "busy") return { settled: false, reason: "a session is finalizing it" }
+  if (!written.settled) return written
+  const released = await releaseReservation(context, runId)
+  if (!released.released) return { settled: false, reason: "the reservation changed before it could be released" }
+  return { settled: true, ...(released.pendingRunId === undefined ? {} : { pendingRunId: released.pendingRunId }) }
 }
 
 async function reapTornLock(context: ReaperContext, paths: { reflectionSessions: string; worktrees: string }): Promise<boolean> {
@@ -464,6 +507,7 @@ export async function runStaleLockReaper(options: StaleLockReaperOptions): Promi
   const context: ReaperContext = {
     runtimeDir: options.runtimeDir,
     reflectionDir: join(options.runtimeDir, "reflection"),
+    transcriptsDir: join(options.runtimeDir, "transcripts"),
     locksDir: join(options.runtimeDir, "locks"),
     probe,
     now: probe.now ?? Date.now,
@@ -474,13 +518,19 @@ export async function runStaleLockReaper(options: StaleLockReaperOptions): Promi
   const { verdict: before, decision } = await decideStaleReflectionLock(context.reflectionDir, probe)
   const minimal = options.settle === undefined
   let action: StaleLockReaperAction
+  let pendingKept: string | undefined
+  let keptReason: string | undefined
   if (options.dryRun === true) {
     action = decision.kind === "reap" ? "would-reap" : decision.kind === "none" ? "none" : "kept"
+    if (decision.kind === "reap") pendingKept = await reservedRunId(join(context.reflectionDir, "pending.json"))
   } else if (decision.kind === "reap" && decision.action === "lock-torn") {
     action = await reapTornLock(context, paths) ? "reaped" : "kept"
   } else if (decision.kind === "reap" || decision.kind === "finalize") {
     if (options.settle === undefined) {
-      action = decision.kind === "reap" && await settleActiveMinimally(context, decision) ? "reaped" : "kept"
+      const settled = decision.kind === "reap" ? await settleActiveMinimally(context, decision) : { settled: false as const, reason: "it recorded its outcome; open a session to finalize it" }
+      action = settled.settled ? "reaped" : "kept"
+      if (settled.settled && settled.pendingRunId !== undefined) pendingKept = settled.pendingRunId
+      if (!settled.settled) keptReason = settled.reason
     } else if (options.shouldSettle?.(decision.runId) === false) {
       action = "settle-declined"
     } else {
@@ -494,7 +544,11 @@ export async function runStaleLockReaper(options: StaleLockReaperOptions): Promi
   const stranded = minimal ? await strandedRuns(context, options.dryRun !== true) : []
   const tombstones = minimal ? await removeTombstones(context, options.dryRun !== true) : []
   const after = options.dryRun === true ? before : await classifyReflectionLockHolder(context.reflectionDir, probe)
-  return { before, decision, action, after, stranded, tombstones, warnings: context.warnings, dryRun: options.dryRun === true }
+  return {
+    before, decision, action, after, stranded, tombstones, warnings: context.warnings, dryRun: options.dryRun === true,
+    ...(pendingKept === undefined ? {} : { pendingKept }),
+    ...(keptReason === undefined ? {} : { keptReason }),
+  }
 }
 
 export interface DeadOwnerLockReport {
@@ -519,13 +573,17 @@ export function formatStaleLockFixLines(identity: string, report: StaleLockReape
   const { decision } = report
   if (decision.kind === "reap" || decision.kind === "finalize") {
     const label = decision.kind === "reap" ? decision.action : "finalize"
-    if (report.action === "would-reap") lines.push(`WOULD FIX ${identity} active.lock run ${decision.runId} (${label})`)
+    if (report.action === "would-reap") {
+      lines.push(`WOULD FIX ${identity} active.lock run ${decision.runId} (${label})`)
+      if (report.pendingKept !== undefined) lines.push(`INFO ${identity} pending ${report.pendingKept} stays queued for the next session`)
+    }
     else if (report.action === "reaped" || (report.action === "settled" && (report.after.state === "none" || ("runId" in report.after && report.after.runId !== decision.runId)))) {
       lines.push(`FIXED ${identity} active.lock run ${decision.runId} (${label})`)
+      if (report.pendingKept !== undefined) lines.push(`INFO ${identity} pending ${report.pendingKept} kept for the next session`)
     } else if (decision.kind === "finalize" && report.action === "kept") {
       lines.push(`KEPT ${identity} active.lock run ${decision.runId} (it recorded its outcome; open a session to finalize it)`)
     } else {
-      lines.push(`KEPT ${identity} active.lock run ${decision.runId} (${label} did not release the lock)`)
+      lines.push(`KEPT ${identity} active.lock run ${decision.runId} (${report.keptReason ?? `${label} did not release the lock`})`)
     }
   } else if (decision.kind === "stuck") {
     lines.push(`KEPT ${identity} active.lock run ${decision.runId} (${decision.reason})`)

@@ -33,7 +33,12 @@ export async function reconcilePrelaunch(context: ReconcileContext): Promise<Pre
     context.deferOnSchedulerContention ? { waitTimeoutMs: 0 } : undefined,
   )).active
   context.signal?.throwIfAborted()
-  if (active === undefined) return {}
+  if (active === undefined) {
+    const promoted = await context.reservation.promotePending?.(context.deferOnSchedulerContention ? { waitTimeoutMs: 0 } : undefined)
+    context.signal?.throwIfAborted()
+    if (promoted !== undefined) context.launch?.(promoted)
+    return {}
+  }
   const ghost = await classifyGhostActive({ identity: context.identity, active })
   context.signal?.throwIfAborted()
   if (ghost.ghost && ghost.reason === "missing-identity") {

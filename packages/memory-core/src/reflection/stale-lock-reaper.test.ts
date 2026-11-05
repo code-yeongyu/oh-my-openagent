@@ -2,6 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
+import { withLock } from "../locks/acquire"
+import { runFinalizationLockPath } from "../locks/domains"
 import { createLockRecord } from "../locks/lock-record"
 import { readMemoryReceipts } from "../receipts"
 import { ReflectionReservationStore } from "./reservation"
@@ -79,11 +81,12 @@ describe("stale reflection-lock reaper, minimal settle from the CLI (#11976)", (
     expect(existsSync(join(paths.reflection, "active.lock"))).toBe(true)
   })
 
-  test("#given case B: a valid ledger whose supervisor and child are dead and no outcome #when the reaper runs #then abandoned.json(processes_dead), a receipt, the lock released and the pending run kept for the next evaluate", async () => {
+  test("#given case B: a valid ledger whose supervisor and child are dead and no outcome, and a queued pending run #when the CLI reaper runs #then abandoned.json(processes_dead), a receipt, the lock released and pending.json left byte-identical (C02)", async () => {
     // given
     const paths = reaperIdentity()
     activeLock(paths)
     pendingRun(paths)
+    const pendingBefore = readFileSync(join(paths.reflection, "pending.json"))
     writeJson(join(runDir(paths, RUN), "ledger.json"), validLedger(RUN))
 
     // when
@@ -91,13 +94,30 @@ describe("stale reflection-lock reaper, minimal settle from the CLI (#11976)", (
 
     // then
     expect(report.decision).toMatchObject({ kind: "reap", action: "processes-dead" })
+    expect(report.pendingKept).toBe("reflection-run-65")
     expect(readJson(join(runDir(paths, RUN), "abandoned.json"))).toMatchObject({ runId: RUN, reason: "processes_dead", generation: validLedger(RUN).startedAt })
+    expect(readJson(join(runDir(paths, RUN), "terminal-claim.json"))).toMatchObject({ kind: "abandon", runId: RUN })
     expect(await receiptEvents(paths.runtime)).toEqual([{ runId: RUN, event: "abandoned", reason: "processes_dead" }])
     expect(existsSync(join(paths.reflection, "active.lock"))).toBe(false)
-    expect(readJson(join(paths.reflection, "pending.json")).runId).toBe("reflection-run-65")
+    expect(readFileSync(join(paths.reflection, "pending.json"))).toEqual(pendingBefore)
   })
 
-  test("#given case B released by the CLI #when the next request is evaluated #then the pending run is promoted to active", async () => {
+  test("#given an automatic run released by the CLI #when it is released #then its conversations get the failure backoff a failed completion applies", async () => {
+    // given
+    const paths = reaperIdentity()
+    activeLock(paths, { request: { trigger: "step-count", conversationIds: ["conversation-a"], snapshots: [] } })
+    writeJson(join(runDir(paths, RUN), "ledger.json"), validLedger(RUN))
+    const journal = new TranscriptJournal({ journalDir: join(paths.transcripts, "conversation-a") })
+    await journal.reconcile([{ kind: "assistant", messageId: "assistant-1", textBlocks: ["hello"] }])
+
+    // when
+    await runStaleLockReaper({ runtimeDir: paths.runtime, probe: probe() })
+
+    // then
+    expect((await journal.getState()).consecutive_failures).toBe(1)
+  })
+
+  test("#given a lone pending run the CLI left behind #when the next session promotes it #then it becomes active under that session's pid and pending.json is gone (C25)", async () => {
     // given
     const paths = reaperIdentity()
     activeLock(paths)
@@ -109,15 +129,131 @@ describe("stale reflection-lock reaper, minimal settle from the CLI (#11976)", (
       identity: { id: "agent-a", safeSlug: "agent-a", paths },
       config: {},
       getJournal: async () => journal,
-      createRunId: () => "reflection-run-66",
+      launcherIdentity: async () => ({ pid: 777, hostname: HOST, processStart: null }),
     })
 
     // when
-    const result = await store.tryReserve({ trigger: "manual", conversationIds: ["conversation-a"], snapshots: [] })
+    const promoted = await store.promotePending()
 
     // then
-    expect(result).toMatchObject({ status: "active", run: { runId: "reflection-run-65" } })
-    expect((await store.readState()).pending).toBeUndefined()
+    expect(promoted).toMatchObject({ runId: "reflection-run-65", launcherPid: 777 })
+    expect(await store.readState()).toEqual({ active: expect.objectContaining({ runId: "reflection-run-65", launcherPid: 777 }) })
+  })
+
+  test("#given a lone pending step-count run whose journal no longer triggers it #when the next session promotes #then it is dropped as completeTransition would (C25)", async () => {
+    // given
+    const paths = reaperIdentity()
+    writeJson(join(paths.reflection, "pending.json"), { runId: "reflection-run-65", request: { trigger: "step-count", conversationIds: ["conversation-a"], snapshots: [] } })
+    const journal = new TranscriptJournal({ journalDir: join(paths.transcripts, "conversation-a") })
+    const store = new ReflectionReservationStore({ identity: { id: "agent-a", safeSlug: "agent-a", paths }, config: { stepCount: 5 }, getJournal: async () => journal })
+
+    // when
+    const promoted = await store.promotePending()
+
+    // then
+    expect(promoted).toBeUndefined()
+    expect(await store.readState()).toEqual({})
+  })
+
+  test("#given a lone pending run #when a new request is reserved before any promotion #then reserveTransition is unchanged: the new request is active and the old pending stays queued (C25)", async () => {
+    // given
+    const paths = reaperIdentity()
+    pendingRun(paths)
+    const journal = new TranscriptJournal({ journalDir: join(paths.transcripts, "conversation-a") })
+    const store = new ReflectionReservationStore({ identity: { id: "agent-a", safeSlug: "agent-a", paths }, config: {}, getJournal: async () => journal, createRunId: () => "reflection-run-66" })
+
+    // when
+    const result = await store.tryReserve({ trigger: "manual", conversationIds: ["conversation-b"], snapshots: [] })
+
+    // then
+    expect(result).toMatchObject({ status: "active", run: { runId: "reflection-run-66" } })
+    expect((await store.readState()).pending?.runId).toBe("reflection-run-65")
+  })
+
+  test("#given a session holds the run's finalize lock #when the CLI reaper races it #then it keeps the run and writes nothing (C26 i)", async () => {
+    // given
+    const paths = reaperIdentity()
+    activeLock(paths)
+    writeJson(join(runDir(paths, RUN), "ledger.json"), validLedger(RUN))
+    const before = treeHash(paths.reflection)
+    let report: Awaited<ReturnType<typeof runStaleLockReaper>> | undefined
+
+    // when
+    await withLock(runFinalizationLockPath(paths.locks, RUN), await createLockRecord("reflection-finalize", { runId: RUN }), async () => {
+      report = await runStaleLockReaper({ runtimeDir: paths.runtime, probe: probe() })
+    })
+
+    // then
+    expect(report).toMatchObject({ action: "kept", keptReason: "a session is finalizing it" })
+    expect(treeHash(paths.reflection)).toBe(before)
+  })
+
+  test("#given the run is already publishing its outcome #when the CLI reaper settles it #then it stops before any claim and releases nothing (C26 iii)", async () => {
+    // given
+    const paths = reaperIdentity()
+    activeLock(paths)
+    writeJson(join(runDir(paths, RUN), "ledger.json"), validLedger(RUN, { attempt: 1 }))
+    writeJson(join(runDir(paths, RUN), "publishing.json"), { version: 1, runId: RUN, attempt: 1, finishedAt: new Date(NOW).toISOString() })
+
+    // when
+    const report = await runStaleLockReaper({ runtimeDir: paths.runtime, probe: probe() })
+
+    // then
+    expect(report).toMatchObject({ action: "kept", keptReason: "the run is already publishing its outcome" })
+    expect(existsSync(join(runDir(paths, RUN), "terminal-claim.json"))).toBe(false)
+    expect(existsSync(join(runDir(paths, RUN), "abandoned.json"))).toBe(false)
+    expect(existsSync(join(paths.reflection, "active.lock"))).toBe(true)
+  })
+
+  test("#given a live process already claimed the run for publication #when the CLI reaper settles it #then it keeps the run (C26)", async () => {
+    // given
+    const paths = reaperIdentity()
+    activeLock(paths)
+    writeJson(join(runDir(paths, RUN), "ledger.json"), validLedger(RUN))
+    writeJson(join(runDir(paths, RUN), "terminal-claim.json"), { version: 1, kind: "publish", runId: RUN, attempt: 1, claimantPid: 9191 })
+
+    // when
+    const report = await runStaleLockReaper({ runtimeDir: paths.runtime, probe: probe({ 9191: "alive" }) })
+
+    // then
+    expect(report).toMatchObject({ action: "kept", keptReason: "another process claimed the run" })
+    expect(existsSync(join(runDir(paths, RUN), "abandoned.json"))).toBe(false)
+  })
+
+  test("#given an earlier settle wrote abandoned.json and stopped before releasing #when the reaper runs again #then it only releases the lock (C29, REVIEW-2 N2)", async () => {
+    // given
+    const paths = reaperIdentity()
+    activeLock(paths)
+    pendingRun(paths)
+    const pendingBefore = readFileSync(join(paths.reflection, "pending.json"))
+    writeJson(join(runDir(paths, RUN), "ledger.json"), validLedger(RUN))
+    writeJson(join(runDir(paths, RUN), "abandoned.json"), { version: 1, runId: RUN, reason: "processes_dead" })
+    const sentinel = readFileSync(join(runDir(paths, RUN), "abandoned.json"))
+
+    // when
+    const report = await runStaleLockReaper({ runtimeDir: paths.runtime, probe: probe() })
+
+    // then
+    expect(report).toMatchObject({ decision: { kind: "reap", action: "terminal-recorded" }, action: "reaped", pendingKept: "reflection-run-65" })
+    expect(existsSync(join(paths.reflection, "active.lock"))).toBe(false)
+    expect(readFileSync(join(runDir(paths, RUN), "abandoned.json"))).toEqual(sentinel)
+    expect(readFileSync(join(paths.reflection, "pending.json"))).toEqual(pendingBefore)
+    expect(await receiptEvents(paths.runtime)).toEqual([])
+  })
+
+  test("#given the active run finished merged under a dead launcher #when the CLI reaper runs #then it keeps the lock for a session to settle", async () => {
+    // given
+    const paths = reaperIdentity()
+    activeLock(paths)
+    writeJson(join(runDir(paths, RUN), "ledger.json"), validLedger(RUN))
+    writeJson(join(runDir(paths, RUN), "final.json"), { version: 1, runId: RUN, outcome: "merged", finishedAt: new Date(NOW).toISOString() })
+
+    // when
+    const report = await runStaleLockReaper({ runtimeDir: paths.runtime, probe: probe() })
+
+    // then
+    expect(report.decision).toMatchObject({ kind: "stuck" })
+    expect(existsSync(join(paths.reflection, "active.lock"))).toBe(true)
   })
 
   test("#given case C (#11920): a ledger whose deadline does not add up and a recorded pid with no start that is dead #when the reaper runs #then the run is quarantined as ledger_unreadable and the lock released", async () => {
