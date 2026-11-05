@@ -107,7 +107,9 @@ try {
    `session.cooperate("wait", { timeoutMs: 25_000 })` until it reports `ready`, read the page again
    and decide afresh; never replay the refused action blindly.
 8. **Pass only the options a method takes.** A gated action throws a `TypeError` on any other key
-   (a misspelt `contextId` would otherwise send no context).
+   (a misspelt `contextId` would otherwise send no context). `bskSnapshot` and
+   `screenshot({ fullPage: true })` do not throw: they drop the stray key, and the daemon then
+   refuses the call with `cooperation_sync_required`.
 
 Every method, its options, and the failure codes are in [references/commands.md](references/commands.md).
 

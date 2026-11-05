@@ -44,7 +44,9 @@ await session.fill("#q", "hello", { clearBefore: true, context: await sync() })
 - `dependsOn: ["@e2", ...]` narrows the check to the observed regions your decision used.
 - A gated action accepts only its own options plus `{ context, dependsOn }`; any other key
   (`contextId`, a stray option copied from another method) throws a `TypeError` before anything is
-  sent.
+  sent. Two exceptions: `bskSnapshot` and `screenshot({ fullPage: true })` pass unknown keys
+  through instead of throwing, so a misspelt `contextId` there sends no context and the daemon
+  refuses the call with `cooperation_sync_required`.
 - Never replay a refused action blindly: the page may have changed under the person's hands.
 
 ## Targets
