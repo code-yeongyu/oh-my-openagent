@@ -44,6 +44,7 @@ import { TASK_COMPLETION_MESSAGE_TYPE } from "./parent-notifier"
 import { renderCategoryUnavailable, renderTaskCompletion, renderTeamMemberLiveness } from "./renderers"
 import { createResumptionChannelEmitter } from "./resumption-channel-emitter"
 import { createTeamMailboxReconciler, createTeamService } from "./team-service"
+import { onLoopSide } from "./session-plane"
 import { createSessionTransitionBridge } from "./session-transition-bridge"
 import { createSkillInvocationTracker, type SkillInvocationTracker } from "./skill-invocation-tracker"
 import { wireSessionStartProcessSweep } from "./process-sweep"
@@ -71,7 +72,8 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
   const loadConfig = options.loadConfig ?? loadSenpiOmoConfig
   return {
     name: "task",
-    async register(pi: SenpiExtensionAPI, ctx: ComponentContext): Promise<void> {
+    async register(hostPi: SenpiExtensionAPI, ctx: ComponentContext): Promise<void> {
+      const pi = onLoopSide(hostPi)
       // One extension set serves every session of the shared daemon, so the component gates itself
       // on what THIS session is. A DAG child never boots a task engine (parity with the per-child
       // launch, which drops omo's own `-e` entry for DAG-owned children) and a team member gets the
