@@ -61,6 +61,13 @@ describe("computer settings schema", () => {
     },
   )
 
+  test.each(["LD_PRELOAD", "PATH", "DBUS_SESSION_BUS_ADDRESS", "OTHER"])(
+    "#given forbidden environment key %s #when parsed #then the public schema rejects it",
+    (key) => {
+      expect(OmoComputerSettingsSchema.safeParse({ env: { DISPLAY: ":98", [key]: "value" } }).success).toBe(false)
+    },
+  )
+
   test("#given a root config with a computer block #when parsed #then the block is kept", () => {
     // given
     const config = { computer: { enabled: false } }

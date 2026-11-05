@@ -1,4 +1,4 @@
-import type { OmoComputerSettings } from "@oh-my-opencode/omo-config-core"
+import { COMPUTER_ENV_ALLOWLIST, type OmoComputerSettings } from "@oh-my-opencode/omo-config-core"
 import { type ComputerSettings, type ComputerSettingsInput, resolveComputerSettings } from "@oh-my-opencode/senpi-desktop-tool/registration"
 
 export function toComputerSettingsInput(block: OmoComputerSettings | undefined): ComputerSettingsInput | undefined {
@@ -38,9 +38,11 @@ export function resolveComputerEngineEnv(
   parent: Readonly<Record<string, string | undefined>> = process.env,
 ): NodeJS.ProcessEnv {
   const env = { ...parent }
-  for (const [key, value] of Object.entries(overrides ?? {})) {
-    if (value === null) delete env[key]
-    else env[key] = value
+  for (const key of COMPUTER_ENV_ALLOWLIST) {
+    const value = overrides?.[key]
+    // Keep an explicit unset through the doctor probe's merge with process.env.
+    if (value === null) env[key] = undefined
+    else if (value !== undefined) env[key] = value
   }
   return env
 }

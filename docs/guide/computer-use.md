@@ -111,7 +111,7 @@ Put the `computer` block in `~/.omo/omo.jsonc` (or `~/.omo/omo.json`) for your a
 | `screenshot_gc.stale_ms` | `43200000` (12 hours) | Age after which a screenshot file is deleted |
 | `screenshot_gc.scan_interval_ms` | `1800000` (30 minutes) | How often stale screenshots are swept |
 | `engine_path` | unset | Use this engine binary instead of locating or downloading one |
-| `env` | unset | Override environment variables for the engine child only; string values set variables and `null` removes inherited variables |
+| `env` | unset | User-only engine overrides for `DISPLAY`, `XAUTHORITY`, `WAYLAND_DISPLAY`, `XDG_RUNTIME_DIR`; strings set variables and `null` removes inherited variables |
 | `cua_adapter` | `false` | Also register `computer_actions`, OpenAI computer-use actions over the same permissions, audit and stop path |
 
 The schema is `packages/omo-config-core/src/schema/computer.ts`; the defaults are resolved in `packages/senpi-desktop-tool/src/settings.ts`. An invalid block is reported in the log and the component stays unregistered for that session. Start a new session after changing the file.
@@ -119,8 +119,16 @@ The schema is `packages/omo-config-core/src/schema/computer.ts`; the defaults ar
 ### Connect to an existing Linux desktop from a terminal
 
 An SSH or terminal session may not inherit the environment of the desktop you want to use. Set
-`computer.env` to connect the engine to an existing X11 or Wayland session without exporting variables
-in your shell. For example, if an X11 server is already running on `:98`:
+`computer.env` in your user `~/.omo/omo.jsonc` to connect the engine to an existing X11 or Wayland
+session without exporting variables in your shell. The setting is user-only, including the user's
+own `[native]`, profile and profile `[native]` blocks. Project configuration cannot set or override
+it, even through harness or profile inheritance.
+
+Only `DISPLAY`, `XAUTHORITY`, `WAYLAND_DISPLAY` and `XDG_RUNTIME_DIR` are allowed. Other keys, such as
+`LD_PRELOAD`, are dropped individually; the valid entries still apply. Startup configuration
+diagnostics and `omo doctor` name each ignored key without printing its value.
+
+For example, if an X11 server is already running on `:98`, put this in `~/.omo/omo.jsonc`:
 
 ```jsonc
 {
@@ -138,8 +146,7 @@ in your shell. For example, if an X11 server is already running on `:98`:
 
 The configured strings override inherited values. Unmentioned variables remain inherited, including
 the session D-Bus address used by accessibility. A `null` value removes an inherited variable; removing
-`WAYLAND_DISPLAY` matters when selecting X11 because Wayland otherwise takes precedence. If the
-desktop uses a different session bus, include its `DBUS_SESSION_BUS_ADDRESS` as well.
+`WAYLAND_DISPLAY` matters when selecting X11 because Wayland otherwise takes precedence.
 
 Values are literal: OmO does not expand `$VARIABLES`, `~`, or shell commands. Use the authority file
 for that desktop and your account. This setting does not start a display server, create a desktop,

@@ -3,9 +3,10 @@ import { createHash } from "node:crypto"
 import type * as z from "zod"
 
 import { OmoConfigLayerSchema } from "../schema"
+import { applyUserOnlySettings } from "../user-only-settings"
 import { isUnsafeObjectKey } from "./merge"
 import { pruneInvalidConfigPaths, type PrunedConfigPath, type PruneValidator } from "./prune-invalid-leaves"
-import type { OmoConfigDiagnostic } from "./types"
+import type { OmoConfigDiagnostic, OmoConfigSourceScope } from "./types"
 
 export type OmoConfigLayerValidation =
   | { readonly loaded: true; readonly diagnostics: readonly OmoConfigDiagnostic[]; readonly value: Record<string, unknown> }
@@ -151,29 +152,31 @@ const validateLayerRecord: PruneValidator = (record) => {
  * `invalid-value` diagnostic. A root that is not an object, an issue on the root, an exhausted
  * prune bound, or a file with nothing valid left rejects the file with its validation diagnostic.
  */
-export function validateConfigLayer(path: string, data: unknown): OmoConfigLayerValidation {
+export function validateConfigLayer(path: string, data: unknown, scope: OmoConfigSourceScope): OmoConfigLayerValidation {
   const sanitized = sanitizeUnsafeKeys(data)
-  const record = toRecord(sanitized.value)
+  const protectedSettings = applyUserOnlySettings(sanitized.value, scope)
+  const record = toRecord(protectedSettings.value)
   const unsafeIssuePaths = sanitized.issues.flatMap((issue) => issue.keys.map((key) => [...issue.path, key].join(".")))
-  const unsafeDiagnostics: OmoConfigDiagnostic[] = unsafeIssuePaths.length === 0
+  const unsafeDiagnostics: readonly OmoConfigDiagnostic[] = unsafeIssuePaths.length === 0
     ? []
     : [{ kind: "unknown-keys", message: `Ignored unknown keys in ${path}: ${unsafeIssuePaths.join(", ")}`, path, issuePaths: unsafeIssuePaths }]
-  const validation = OmoConfigLayerSchema.safeParse(sanitized.value)
+  const sourceDiagnostics = [...unsafeDiagnostics, ...invalidValueDiagnostics(path, protectedSettings.dropped)]
+  const validation = OmoConfigLayerSchema.safeParse(protectedSettings.value)
   if (validation.success) {
-    if (record !== null) return { loaded: true, diagnostics: unsafeDiagnostics, value: record }
+    if (record !== null) return { loaded: true, diagnostics: sourceDiagnostics, value: record }
     return {
       loaded: false,
       diagnostics: [{ kind: "validation", message: `Invalid omo config at ${path}: root must be an object`, path }],
     }
   }
 
-  const rejected = { loaded: false, diagnostics: [validationDiagnostic(path, validation.error.issues)] } as const
+  const rejected = { loaded: false, diagnostics: [...sourceDiagnostics, validationDiagnostic(path, validation.error.issues)] } as const
   const unknownIssues = unrecognizedKeyIssues(validation.error.issues)
   if (record === null) return rejected
 
   let candidate = record
   let issues: readonly z.core.$ZodIssue[] = validation.error.issues
-  const diagnostics: OmoConfigDiagnostic[] = [...unsafeDiagnostics]
+  const diagnostics: OmoConfigDiagnostic[] = [...sourceDiagnostics]
   if (unknownIssues.length > 0) {
     const { issuePaths, stripped } = stripUnrecognizedKeys(record, unknownIssues)
     if (issuePaths.length > 0) {

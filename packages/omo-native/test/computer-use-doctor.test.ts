@@ -238,20 +238,28 @@ describe("computer use doctor probe", () => {
     }
     const originalEnv = { ...env }
 
-    // when
-    const report = await computerUseDoctorReport({
-      cwd: home, env, version: "5.1.60", packageRoot: join(home, "package"),
-      platform: "linux", arch: "x64", launchEngine: runEngineScript,
-      timeoutMs: PROBE_HANG_CEILING_MS,
-    })
+    const originalWayland = process.env.WAYLAND_DISPLAY
+    process.env.WAYLAND_DISPLAY = "wayland-parent"
+    try {
+      // when
+      const report = await computerUseDoctorReport({
+        cwd: home, env, version: "5.1.60", packageRoot: join(home, "package"),
+        platform: "linux", arch: "x64", launchEngine: runEngineScript,
+        timeoutMs: PROBE_HANG_CEILING_MS,
+      })
 
-    // then
-    expect(report.kind).toBe("ready")
-    expect(JSON.parse(readFileSync(envLog, "utf8"))).toEqual({
-      DISPLAY: ":98", XAUTHORITY: "/tmp/configured-Xauthority",
-      WAYLAND_DISPLAY: null, OMO_TEST_INHERITED: "kept",
-    })
-    expect(env).toEqual(originalEnv)
+      // then
+      expect(report.kind).toBe("ready")
+      expect(JSON.parse(readFileSync(envLog, "utf8"))).toEqual({
+        DISPLAY: ":98", XAUTHORITY: "/tmp/configured-Xauthority",
+        WAYLAND_DISPLAY: null, OMO_TEST_INHERITED: "kept",
+      })
+      expect(env).toEqual(originalEnv)
+      expect(process.env.WAYLAND_DISPLAY).toBe("wayland-parent")
+    } finally {
+      if (originalWayland === undefined) delete process.env.WAYLAND_DISPLAY
+      else process.env.WAYLAND_DISPLAY = originalWayland
+    }
   }, PROBE_HANG_CEILING_MS + 5_000)
 
   test("#given a verified release cache #when inspected #then doctor probes it without fetching", async () => {
