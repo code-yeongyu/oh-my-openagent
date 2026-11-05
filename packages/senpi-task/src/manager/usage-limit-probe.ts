@@ -1,3 +1,5 @@
+import { log } from "@oh-my-opencode/utils"
+
 import type { ManagedChildEvent, ManagedChildHandle, RunnerOutcome } from "./child-handle"
 import type { UsageLimitProbe } from "./usage-limit-memory"
 import { PROBE_REQUEST_EVENT } from "../runners/probe-request"
@@ -13,7 +15,8 @@ function answered(event: ManagedChildEvent): boolean {
  * The outcome of the one same-provider rung an ambiguous usage limit hopped onto (#11383), bounded: a rung that has
  * not started answering within `timeoutMs` fails with the original limit plus the timeout, so a silent probe confirms
  * the provider's account limit instead of holding the task until the reset. `onAnswered` fires once the rung starts
- * answering, so its later failures are its own.
+ * answering, so its later failures are its own. A rung that times out is aborted before the outcome resolves, so a
+ * provider answer that arrives after the deadline cannot run tools for a task already reported as failed.
  */
 export function boundedProbeOutcome(input: {
   readonly handle: ManagedChildHandle
@@ -44,6 +47,9 @@ export function boundedProbeOutcome(input: {
       if (!stopped && timer === undefined) {
         timer = schedule(() => {
           stop()
+          void input.handle.abort().catch((error: unknown) => {
+            log("senpi-task usage-limit probe abort failed", { taskId: input.handle.task_id, error: String(error) })
+          })
           resolve({
             status: "error",
             failure: {

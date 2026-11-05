@@ -81,7 +81,7 @@ describe("an ambiguous usage limit's same-provider probe (#11383)", () => {
     }
   }, 10_000)
 
-  test("#given the probe rung never answers #when the probe timeout passes #then the child fails with the provider's limit and a later child is refused without a call", async () => {
+  test("#given the probe rung never answers #when the probe timeout passes #then the child fails with the provider's limit, the silent child is stopped, and a later child is refused without a call", async () => {
     // given
     const manager = await managerFor({ [PRIMARY]: ["weekly", "weekly"], [SIBLING]: ["silent"] }, chain(SIBLING))
     try {
@@ -92,6 +92,7 @@ describe("an ambiguous usage limit's same-provider probe (#11383)", () => {
       expect(first.status).toBe("error")
       expect(first.error_message).toContain(RESET)
       expect(calls()).toEqual([PRIMARY, SIBLING])
+      expect(world?.aborts() ?? 0).toBeGreaterThanOrEqual(1)
 
       const second = await runChild(manager)
       expect(second.status).toBe("error")

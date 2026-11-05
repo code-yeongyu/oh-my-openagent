@@ -27,6 +27,8 @@ export type ModelChainWorld = {
   readonly settingsPath: string
   readonly calls: readonly ProviderCall[]
   toolRuns(): number
+  /** How many times a child started by `runner()` was aborted before `dispose()`. */
+  aborts(): number
   runner(): ManagedRunner
   engineRunner(kind: EngineRunnerKind): Promise<ManagedRunner>
   /** The settings file an engine runner reads, copied byte for byte from `settingsPath` when it starts. */
@@ -62,6 +64,7 @@ export async function createModelChainWorld(
   const calls: ProviderCall[] = []
   const handles = new Set<ManagedChildHandle>()
   let toolRuns = 0
+  let aborts = 0
 
   for (const [provider, ids] of Object.entries(MODELS)) {
     Reflect.apply(modelRegistry.registerProvider, modelRegistry, [provider, {
@@ -102,6 +105,7 @@ export async function createModelChainWorld(
       return [...calls, ...engines.flatMap((engine) => engine.calls.map((model) => ({ model, toolResults: 0 })))]
     },
     toolRuns: () => toolRuns,
+    aborts: () => aborts,
     runner: () => {
       const runner = createInProcessManagedRunner(new InProcessRunner({ sharedParentTools: [countTool] }), (spec) => {
         const [provider, id] = (spec.model ?? "").split("/")
@@ -109,7 +113,8 @@ export async function createModelChainWorld(
         return { agentDir, projectTrusted: false, modelRegistry, modelRuntime, ...(model === undefined ? {} : { model }) }
       })
       return { ...runner, start: async spec => {
-        const handle = await runner.start(spec)
+        const started = await runner.start(spec)
+        const handle: ManagedChildHandle = { ...started, abort: async () => { aborts += 1; await started.abort() } }
         handles.add(handle)
         return handle
       } }
