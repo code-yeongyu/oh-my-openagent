@@ -251,7 +251,11 @@ describe("omo doctor migration checks", () => {
       installPackage(join(sandbox.npmPrefix, "lib", "node_modules"), sandbox.npmBin, "omo-ai", version)
     }
 
-    test("#then it is reported as broken and the repair installer is not offered for it", () => {
+    // POSIX-only (#12560): these fixtures build a POSIX wrapper marked with `#`, but Windows
+    // PATH scanning looks for `omo.cmd` and marks ownership with `rem`, so a dead wrapper is
+    // never classified on that runner. They stay gated until `rem` is accepted.
+    // (`describe.runIf` does not exist in this Bun; the file's `test.skipIf` idiom is used.)
+    test.skipIf(process.platform === "win32")("#then it is reported as broken and the repair installer is not offered for it", () => {
       const sandbox = createSandbox()
       const { localBin, target } = installDeadWrapper(sandbox)
       installBunNativeVersion(sandbox, "5.0.1")
@@ -267,7 +271,7 @@ describe("omo doctor migration checks", () => {
       expect(duplicate).toContain("(omo-ai@5.0.0-0.beta.7) never runs")
     })
 
-    test("#then it is still reported when it sits after both omo-ai installs", () => {
+    test.skipIf(process.platform === "win32")("#then it is still reported when it sits after both omo-ai installs", () => {
       const sandbox = createSandbox()
       const { localBin, target } = installDeadWrapper(sandbox)
       installBunNativeVersion(sandbox, "5.0.1")
@@ -292,7 +296,8 @@ describe("omo doctor migration checks", () => {
       expect(lines.some((line) => line.startsWith("WARN broken omo on PATH:"))).toBe(false)
     })
 
-    test("#then a wrapper whose node fallback exists but whose bun target is gone is reported broken", () => {
+    // POSIX-only (#12560): same POSIX wrapper / `rem` marker gap as above.
+    test.skipIf(process.platform === "win32")("#then a wrapper whose node fallback exists but whose bun target is gone is reported broken", () => {
       const sandbox = createSandbox()
       const { localBin, target } = installDeadWrapper(sandbox)
       writeFile(nodeFallbackTarget(sandbox), "#!/usr/bin/env node\n")
