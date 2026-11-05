@@ -18,12 +18,18 @@
 //                        Its variant does the same with A's text area focused first. Priming runs only in a
 //                        reportMode:"object" session, so until omo opens those (plan row 36) this FAILS with
 //                        BackgroundUnavailable; that is not a priming failure.
+//   chrome-two-window-typing, dense-window-observe
+//                        SDK-lane scenarios (plan row 34, computer-control-live-macos-sdk.mjs): the driver spawns
+//                        the engine through the desktop SDK in an object-mode session instead of a senpi session.
+//                        Two Chrome windows with background typing into the non-key one, and a >= 5,000-node Safari
+//                        page observed at the 3,000 ms deadline (cuts, drill, depth-3 skeleton token budget).
 //
 // macOS charges Accessibility to the app that launched the engine, and the engine refuses to run as its own
 // responsible process: start this from Terminal (or the app holding the grants), never from a disclaimed spawn.
 //
 // Usage: SENPI_BIN=<senpi> bun computer-control-live-macos.mjs --engine <path> [--evidence-dir <dir>] [--only a,b]
-//        [--disable-skylight]
+//        [--disable-skylight] [--dense-rows <n>]
+//        bun computer-control-live-macos.mjs --list   (prints every scenario name, one per line, on any host)
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
@@ -45,6 +51,7 @@ import {
 	toolResults,
 } from "./computer-control-live-macos-scenarios.mjs";
 import { desktopScenarios } from "./computer-control-live-macos-desktop.mjs";
+import { sdkScenarios } from "./computer-control-live-macos-sdk.mjs";
 import { createSandbox, seedSandbox } from "./drive.mjs";
 import { isolatedChildEnv } from "./sandbox-child-env.mjs";
 
@@ -66,6 +73,7 @@ const enginePath = resolve(
 const evidenceDir = argValue("--evidence-dir");
 const only = argValue("--only")?.split(",");
 const skylightDisabled = process.argv.includes("--disable-skylight");
+const denseRows = Number(argValue("--dense-rows") ?? 2_000);
 
 const offSpaceRun = `
 const w = await desktop.window({ title: ${JSON.stringify(TARGET_TITLE)} });
@@ -364,6 +372,16 @@ function startSession(steps, { preset = "ask", print, env: scenarioEnv = {}, com
 	return { sandbox, events, send, until, agentEnds, close, exited, observed: {} };
 }
 
+const allScenarios = { ...scenarios, ...desktopScenarios, ...offSpaceScenario, ...twoWindowScenarios, ...sdkScenarios };
+if (process.argv.includes("--list")) {
+	console.log(Object.keys(allScenarios).join("\n"));
+	process.exit(0);
+}
+if (!Number.isInteger(denseRows) || denseRows < 1) {
+	console.log(JSON.stringify({ verdict: "FAIL", reason: "--dense-rows needs a positive integer" }));
+	process.exit(1);
+}
+
 if (process.platform !== "darwin") {
 	console.log(
 		JSON.stringify({
@@ -398,8 +416,29 @@ const before = protectedFiles.map(digest);
 const report = [];
 openTarget();
 try {
-	for (const [name, scenario] of Object.entries({ ...scenarios, ...desktopScenarios, ...offSpaceScenario, ...twoWindowScenarios })) {
+	for (const [name, scenario] of Object.entries(allScenarios)) {
 		if (only !== undefined && !only.includes(name)) continue;
+		if (typeof scenario === "function") {
+			// An SDK-lane scenario: it owns its engine child and windows, and returns its own checks.
+			const started = Date.now();
+			let result;
+			let error;
+			try {
+				result = await scenario({ enginePath, denseRows });
+			} catch (caught) {
+				error = caught instanceof Error ? caught.message : String(caught);
+			}
+			const checks = (result?.checks ?? []).map(([label, ok]) => ({ label, ok }));
+			const pass = error === undefined && checks.length > 0 && checks.every((check) => check.ok);
+			const elapsedMs = Date.now() - started;
+			report.push({ name, pass, error, elapsedMs, checks });
+			if (evidenceDir !== undefined) {
+				const body = `${JSON.stringify({ name, pass, error, elapsedMs, checks, evidence: result?.evidence ?? null }, null, 2)}\n`;
+				writeFileSync(join(evidenceDir, `${name}.json`), body);
+				writeFileSync(join(evidenceDir, `${name}.json.sha256`), `${createHash("sha256").update(body).digest("hex")}  ${name}.json\n`);
+			}
+			continue;
+		}
 		const before = await scenario.setup?.();
 		let steps = scenario.steps;
 		if (typeof steps === "function") {
