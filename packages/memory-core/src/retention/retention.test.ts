@@ -6,6 +6,7 @@ import { join } from "node:path"
 import { acquireLock, createLockRecord, releaseLock } from "../locks"
 import { reflectionSchedulerLockPath, runFinalizationLockPath } from "../locks/domains"
 import { ReflectionReservationStore } from "../reflection/reservation"
+import { recordReflectionRunIdMark } from "../reflection/run-id-high-water"
 import { TranscriptJournal } from "../journal/store"
 import { sweepEmptyTranscriptJournals } from "../journal/sweep"
 import { DEFAULT_RUNTIME_RETENTION, runRuntimeRetention, type RuntimeRetentionOptions } from "./index"
@@ -896,49 +897,61 @@ describe("runtime retention: a state.json behind its transcript (REVIEW-6 M1)", 
   })
 })
 
+/** A signal that reads as aborted from its `limit`-th check on: an abort that lands between two classified items. */
+function abortedFromCheck(limit: number): AbortSignal {
+  let checks = 0
+  const reason = new Error("retention aborted by the test")
+  const signal = {
+    get aborted() {
+      checks += 1
+      return checks >= limit
+    },
+    reason,
+    throwIfAborted() {
+      if (signal.aborted) throw reason
+    },
+  }
+  return signal as unknown as AbortSignal
+}
+
+async function resumeAt(paths: MemoryIdentityPaths, cursor: { readonly store: string; readonly lastName?: string }): Promise<void> {
+  await writeJson(join(paths.runtime, "retention.json"), { version: 1, cursor })
+}
+
 describe("runtime retention: classify loops and the health gate are bounded (REVIEW-6 L)", () => {
-  test("#given more unfolded runs than the budget covers #when the pass classifies them #then it stops inside the runs store, persists that cursor and the next pass finishes", async () => {
+  test("#given more unfolded runs than the time budget would cover #when the pass classifies them #then classification is not stopped by the budget and the pass finishes without a cursor", async () => {
     const paths = await identity()
     for (let index = 1; index <= 10; index += 1) await reflectionRun(paths, `reflection-run-${index}`, { outcome: "failed", finishedAt: daysAgo(60) })
     let clock = NOW
 
-    const first = await runRuntimeRetention({ paths, policy: { ...DEFAULT_RUNTIME_RETENTION, passBudgetMs: 1_000 }, now: () => (clock += 400) })
+    const report = await runRuntimeRetention({ paths, policy: { ...DEFAULT_RUNTIME_RETENTION, passBudgetMs: 1_000 }, now: () => (clock += 400) })
 
-    expect(first.cursor).toEqual({ store: "runs" })
-    expect(Object.keys(first.runs.kept).length).toBeLessThan(10)
-    expect(JSON.parse(await readFile(join(paths.runtime, "retention.json"), "utf8"))).toEqual({ version: 1, cursor: { store: "runs" } })
-
-    const second = await runRuntimeRetention({ paths, policy: DEFAULT_RUNTIME_RETENTION, now })
-
-    expect(Object.keys(second.runs.kept)).toHaveLength(10)
-    expect(second.cursor).toBeUndefined()
+    expect(Object.keys(report.runs.kept)).toHaveLength(10)
+    expect(report.cursor).toBeUndefined()
     expect(existsSync(join(paths.runtime, "retention.json"))).toBe(false)
   })
 
-  test("#given more unreadable completion records than the budget covers #when the pass classifies them #then it stops inside the completions store and persists that cursor", async () => {
+  test("#given more unreadable completion records than the time budget would cover #when the pass classifies them #then every record is classified in one pass", async () => {
     const paths = await identity()
     for (let index = 1; index <= 10; index += 1) await writeJson(join(completionsDir(paths), `reflection-run-${index}.json`), {})
     let clock = NOW
 
     const report = await runRuntimeRetention({ paths, policy: { ...DEFAULT_RUNTIME_RETENTION, passBudgetMs: 1_000 }, now: () => (clock += 400) })
 
-    expect(report.cursor).toEqual({ store: "completions" })
-    expect(Object.keys(report.completions.kept).length).toBeLessThan(10)
+    expect(Object.keys(report.completions.kept)).toHaveLength(10)
+    expect(report.cursor).toBeUndefined()
   })
 
-  test("#given an abort while the runs are classified #when the pass notices it #then the pass rejects with the cursor at the runs store", async () => {
+  test("#given a pass resumed at journals #when an abort lands while the runs are classified #then the pass rejects and the persisted cursor stays at the journals resume point", async () => {
     const paths = await identity()
     for (let index = 1; index <= 10; index += 1) await reflectionRun(paths, `reflection-run-${index}`, { outcome: "failed", finishedAt: daysAgo(60) })
-    const controller = new AbortController()
-    let calls = 0
+    await resumeAt(paths, { store: "journals", lastName: "s-05" })
 
-    await expect(runRuntimeRetention({
-      paths, policy: DEFAULT_RUNTIME_RETENTION, signal: controller.signal,
-      now: () => { calls += 1; if (calls === 3) controller.abort(); return NOW },
-    })).rejects.toThrow()
+    await expect(runRuntimeRetention({ paths, policy: DEFAULT_RUNTIME_RETENTION, now, signal: abortedFromCheck(4) })).rejects.toThrow("retention aborted by the test")
 
-    const persisted = JSON.parse(await readFile(join(paths.runtime, "retention.json"), "utf8")) as { cursor: { store: string } }
-    expect(persisted.cursor).toEqual({ store: "runs" })
+    const persisted = JSON.parse(await readFile(join(paths.runtime, "retention.json"), "utf8")) as { cursor: unknown }
+    expect(persisted.cursor).toEqual({ store: "journals", lastName: "s-05" })
+    expect(await readdir(runsDir(paths))).toHaveLength(10)
   })
 
   test("#given discard_unreflected_journals is off #when the pass runs on a parked identity #then the health gate is not read", async () => {
@@ -950,6 +963,105 @@ describe("runtime retention: classify loops and the health gate are bounded (REV
 
     expect(off.unreflectedGate).toBeUndefined()
     expect(on.unreflectedGate).toEqual({ open: false, newest: { kind: "parked", at: iso(daysAgo(1)) } })
+  })
+})
+
+describe("runtime retention: a resumed or oversized pass always moves forward (REVIEW-7 L1)", () => {
+  test("#given a pass resumed at {journals, s-05} #when the budget is spent while the runs are classified #then the journals resume point is kept and the next journal is processed", async () => {
+    const paths = await identity()
+    for (let index = 1; index <= 10; index += 1) await reflectionRun(paths, `reflection-run-${index}`, { outcome: "failed", finishedAt: daysAgo(60) })
+    for (let index = 1; index <= 8; index += 1) await journal(paths, `s-0${index}`, "fully", daysAgo(10))
+    await resumeAt(paths, { store: "journals", lastName: "s-05" })
+    let clock = NOW
+
+    const report = await runRuntimeRetention({ paths, policy: { ...DEFAULT_RUNTIME_RETENTION, passBudgetMs: 1_000 }, now: () => (clock += 400) })
+
+    expect(report.cursor).toEqual({ store: "journals", lastName: "s-06" })
+    expect(report.journals.removed).toEqual(["s-06"])
+    for (const sessionId of ["s-01", "s-02", "s-03", "s-04", "s-05"]) {
+      expect(existsSync(join(paths.transcripts, sessionId, "transcript.jsonl"))).toBe(true)
+    }
+  })
+
+  test("#given 40 folded runs and a budget smaller than one pass's work #when passes repeat #then every removable run is gone within a bounded number of passes", async () => {
+    const paths = await identity()
+    for (let index = 1; index <= 40; index += 1) await reflectionRun(paths, `reflection-run-${index}`, { finishedAt: daysAgo(10) })
+    let clock = NOW
+    let passes = 0
+
+    for (; passes < 40; passes += 1) {
+      const report = await runRuntimeRetention({ paths, policy: { ...DEFAULT_RUNTIME_RETENTION, passBudgetMs: 1_000 }, now: () => (clock += 400) })
+      if (report.cursor === undefined) break
+    }
+
+    expect(passes).toBeLessThan(40)
+    // The newest folded run (name order breaks the finishedAt tie) and the run-id high water stay as anchors.
+    expect((await readdir(runsDir(paths))).filter((name) => !name.startsWith(".prune-")).sort()).toEqual(["reflection-run-40", "reflection-run-9"])
+  })
+})
+
+describe("runtime retention: run-id high water under the scheduler lock (M9, A29)", () => {
+  test("A29 #given a pass that recorded highWater 40 and released the lock #when a mint records 41 under the lock and a later pass records its own scan #then run-id.json keeps 41", async () => {
+    const paths = await identity()
+    await reflectionRun(paths, "reflection-run-1", { finishedAt: daysAgo(10) })
+    await reflectionRun(paths, "reflection-run-40", { finishedAt: daysAgo(9) })
+    await writeJson(join(paths.reflectionSessions, "reflection-run-2", "session.json"), {})
+    await ageTree(paths.reflectionSessions, daysAgo(8))
+    const mint = async (): Promise<void> => {
+      const holder = await createLockRecord("reflection-scheduler", { runId: "reflection-run-41" })
+      const lockPath = reflectionSchedulerLockPath(paths.locks)
+      await acquireLock(lockPath, holder, { waitTimeoutMs: 0 })
+      try {
+        await recordReflectionRunIdMark(paths.reflection, 41)
+      } finally {
+        await releaseLock(lockPath, holder)
+      }
+    }
+
+    const first = await retention(paths, { beforeTombstoneDelete: mint })
+
+    expect(first.highWater).toBe(40)
+    expect(first.runs.removed).toEqual(["reflection-run-1"])
+    expect(first.reflectionSessions.removed).toEqual(["reflection-run-2"])
+    expect((JSON.parse(await readFile(join(paths.reflection, "run-id.json"), "utf8")) as { highWater: number }).highWater).toBe(41)
+
+    await reflectionRun(paths, "reflection-run-3", { finishedAt: daysAgo(10) })
+    const second = await retention(paths)
+
+    expect(second.highWater).toBe(40)
+    expect(second.runs.removed).toEqual(["reflection-run-3"])
+    expect((JSON.parse(await readFile(join(paths.reflection, "run-id.json"), "utf8")) as { highWater: number }).highWater).toBe(41)
+  })
+
+  test("A29 #given a mint in progress holds the scheduler lock #when retention runs #then every reflection-store rule is skipped and the pass reports reflection-scheduler-busy", async () => {
+    const paths = await identity()
+    await reflectionRun(paths, "reflection-run-1", { finishedAt: daysAgo(10) })
+    await reflectionRun(paths, "reflection-run-5", { finishedAt: daysAgo(9) })
+    for (let index = 100; index <= 150; index += 1) await completion(paths, `reflection-run-${index}`, { status: "consumed", finishedAt: daysAgo(31 + 150 - index) })
+    await writeJson(join(paths.reflectionSessions, "reflection-run-3", "session.json"), {})
+    await ageTree(paths.reflectionSessions, daysAgo(8))
+    await mkdir(paths.locks, { recursive: true })
+    const holder = await createLockRecord("reflection-scheduler", { runId: "reflection-run-151" })
+    const lockPath = reflectionSchedulerLockPath(paths.locks)
+    await acquireLock(lockPath, holder)
+    try {
+      const report = await retention(paths)
+
+      expect(report.skipped).toEqual(["reflection-scheduler-busy"])
+      expect(report.highWater).toBeUndefined()
+      expect(report.runs.kept["reflection-run-1"]).toBe("scheduler-busy")
+      expect(report.completions.kept["reflection-run-100"]).toBe("scheduler-busy")
+      expect(report.reflectionSessions.kept["reflection-run-3"]).toBe("scheduler-busy")
+      expect(report.runs.removed).toEqual([])
+      expect(report.completions.removed).toEqual([])
+      expect(report.reflectionSessions.removed).toEqual([])
+      expect(existsSync(join(runsDir(paths), "reflection-run-1"))).toBe(true)
+      expect(existsSync(join(completionsDir(paths), "reflection-run-100.json"))).toBe(true)
+      expect(existsSync(join(paths.reflectionSessions, "reflection-run-3"))).toBe(true)
+      expect(existsSync(join(paths.reflection, "run-id.json"))).toBe(false)
+    } finally {
+      await releaseLock(lockPath, holder)
+    }
   })
 })
 

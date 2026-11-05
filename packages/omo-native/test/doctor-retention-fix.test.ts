@@ -3,7 +3,13 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync }
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { loadOmoConfig } from "@oh-my-opencode/omo-config-core"
+
 import { readGlobalMemorySettings, reflectionLockFix } from "../bin/lib/doctor-reflection-lock.js"
+import * as taskConfigRuntime from "../task-config-entry"
+
+// The staged plugin/runtime/task-config bundle is built from task-config-entry.ts; tests load the source.
+const loadTaskConfig = () => taskConfigRuntime
 
 const roots: string[] = []
 afterEach(() => {
@@ -43,7 +49,7 @@ describe("omo doctor --fix retention step (A38 CLI half)", () => {
     const kept = neverReflected(memory, "agent-off")
     const removed = neverReflected(memory, "agent-on")
 
-    const result = await reflectionLockFix({ env: { OMO_MEMORY_HOME: memory }, home })
+    const result = await reflectionLockFix({ env: { OMO_MEMORY_HOME: memory }, home, loadTaskConfig })
 
     expect(result.failed).toBe(false)
     expect(existsSync(join(kept, "transcript.jsonl"))).toBe(true)
@@ -56,8 +62,8 @@ describe("omo doctor --fix retention step (A38 CLI half)", () => {
     const memory = join(home, "memory")
     const kept = neverReflected(memory, "agent-plain")
 
-    expect(readGlobalMemorySettings(home)).toBeUndefined()
-    await reflectionLockFix({ env: { OMO_MEMORY_HOME: memory }, home })
+    expect(readGlobalMemorySettings(home, { loadTaskConfig })).toBeUndefined()
+    await reflectionLockFix({ env: { OMO_MEMORY_HOME: memory }, home, loadTaskConfig })
 
     expect(existsSync(join(kept, "transcript.jsonl"))).toBe(true)
   })
@@ -66,6 +72,51 @@ describe("omo doctor --fix retention step (A38 CLI half)", () => {
     const home = scratch()
     mkdirSync(join(home, ".omo"), { recursive: true })
     writeFileSync(join(home, ".omo", "omo.json"), JSON.stringify({ memory: { runtime: { discard_unreflected_journals: false } }, "[native]": { memory: { runtime: { discard_unreflected_journals: true } } } }))
-    expect(readGlobalMemorySettings(home)?.runtime).toEqual({ discard_unreflected_journals: true })
+    expect(readGlobalMemorySettings(home, { loadTaskConfig })?.runtime.discard_unreflected_journals).toBe(true)
+  })
+})
+
+describe("omo doctor --fix resolves the global memory settings as the config loader does (REVIEW-7 L2)", () => {
+  test("#given a [native].agents.<id> entry without runtime #when --fix runs with the global switch on #then that identity keeps its base runtime switch off and its journal stays", async () => {
+    const home = scratch()
+    const memory = join(home, "memory")
+    mkdirSync(join(home, ".omo"), { recursive: true })
+    writeFileSync(join(home, ".omo", "omo.jsonc"), JSON.stringify({
+      memory: { runtime: { discard_unreflected_journals: true }, agents: { "agent-off": { runtime: { discard_unreflected_journals: false } } } },
+      "[native]": { memory: { agents: { "agent-off": { recall: { tool_budget: 4 } } } } },
+    }))
+    const kept = neverReflected(memory, "agent-off")
+    const removed = neverReflected(memory, "agent-on")
+
+    const result = await reflectionLockFix({ env: { OMO_MEMORY_HOME: memory }, home, loadTaskConfig })
+
+    expect(result.failed).toBe(false)
+    expect(existsSync(join(kept, "transcript.jsonl"))).toBe(true)
+    expect(existsSync(removed)).toBe(false)
+  })
+
+  test("#given a global config with a base, a legacy [senpi] block, a [native] block and an active profile #when the CLI reads it #then it equals the memory settings the session loader resolves from the same file", () => {
+    const home = scratch()
+    const project = join(home, "project")
+    mkdirSync(join(home, ".omo"), { recursive: true })
+    mkdirSync(project, { recursive: true })
+    writeFileSync(join(home, ".omo", "omo.jsonc"), `// user layer\n${JSON.stringify({
+      memory: {
+        runtime: { discard_unreflected_journals: true, retention_days: 9 },
+        agents: { "agent-a": { runtime: { discard_unreflected_journals: false, pass_budget_ms: 5_000 } } },
+      },
+      "[senpi]": { memory: { runtime: { completions_days: 12 }, agents: { "agent-b": { runtime: { retention_days: 3 } } } } },
+      "[native]": { memory: { agents: { "agent-a": { recall: { tool_budget: 4 } } } } },
+      profiles: { work: { memory: { runtime: { abandoned_journal_days: 21 }, agents: { "agent-c": { runtime: { discard_unreflected_journals: false } } } } } },
+    })}\n`)
+    const env = { HOME: home, OMO_PROFILE: "work" }
+
+    const session = loadOmoConfig({ cwd: project, env, harness: "senpi" }).config.memory
+    const cli = readGlobalMemorySettings(home, { env, loadTaskConfig })
+
+    expect(session).toBeDefined()
+    expect(cli).toEqual({ runtime: session?.runtime, agents: session?.agents })
+    expect(cli?.runtime).toMatchObject({ discard_unreflected_journals: true, retention_days: 9, completions_days: 12, abandoned_journal_days: 21 })
+    expect(cli?.agents["agent-a"]?.runtime?.discard_unreflected_journals).toBe(false)
   })
 })
