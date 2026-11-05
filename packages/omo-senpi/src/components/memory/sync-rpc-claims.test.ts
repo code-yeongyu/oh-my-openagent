@@ -7,6 +7,7 @@ import { once } from "node:events"
 import { createSyncRpcClaims } from "./sync-rpc-claims"
 import { observeLockWorker } from "../../../../team-core/src/team-state-store/lock-worker-lifetime"
 import type { SyncRpcAuthority, SyncRpcIdentity } from "./sync-rpc-ports"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const roots: string[] = []
 const workers: Worker[] = []
@@ -29,7 +30,7 @@ async function root() {
 }
 function message(worker: Worker, kind: string): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
-    const deadline = setTimeout(() => finish(new Error(`worker did not send ${kind}`)), 10_000)
+    const deadline = setTimeout(() => finish(new Error(`worker did not send ${kind} within the test budget`)), remainingTestTime())
     const receive = (value: unknown) => {
       if (typeof value === "object" && value !== null && "kind" in value && value.kind === kind) finish(undefined, value)
     }

@@ -10,6 +10,7 @@ import { createMemoryIdentityContext, type MemoryIdentityContext } from "../cont
 import { createKibitzerDelivery } from "./delivery"
 import { MemoryFakeExtensionAPI, memorySettings } from "../memory.test-support"
 import { createRecallDrain } from "../recall-drain"
+import { remainingTestTime } from "../../../../../../test-support/test-deadline"
 
 const nudge: RecallNudge = { path: "memory/rollouts.md", hint: "Drain nodes before rollout." }
 const dirs: string[] = []
@@ -75,7 +76,7 @@ describe("kibitzer observability contract", () => {
     await wakeDelivery.accept("wake-session", wake.context, [nudge])
     coordinator.enqueue({ key: "task-completion:1", source: "task-completion", content: "done" })
     coordinator.flushOnIdle()
-    await Promise.race([wakeReady, new Promise<void>((_, r) => setTimeout(() => r(new Error("wake ready timeout")), 5000))])
+    await Promise.race([wakeReady, new Promise<void>((_, r) => setTimeout(() => r(new Error("wake ready did not arrive within the test budget")), remainingTestTime()))])
 
     const prompt = await fixture()
     const promptEntries: unknown[] = []
