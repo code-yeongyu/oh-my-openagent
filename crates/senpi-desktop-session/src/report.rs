@@ -109,8 +109,14 @@ fn acting(code: ErrorCode, progress: Progress) -> Settled {
         | ErrorCode::SpaceUnsupported
         | ErrorCode::AmbiguousTarget
         | ErrorCode::CaptureConsentRequired
-        | ErrorCode::ProtectedProcess => Settled::Refused {
-            needs_user: needs_user(code),
+        | ErrorCode::ProtectedProcess => match progress {
+            // Raised between units after some were sent: report the partial delivery.
+            Progress::Counted { count, .. } if count > 0 => ran(End::Interrupted {
+                needs_user: needs_user(code),
+            }),
+            Progress::Counted { .. } | Progress::Atomic => Settled::Refused {
+                needs_user: needs_user(code),
+            },
         },
         ErrorCode::Suspended
         | ErrorCode::StopPathUnavailable
