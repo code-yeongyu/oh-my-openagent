@@ -6,7 +6,7 @@ import type { ToolCallEventResult, ToolResultEventResult } from "@code-yeongyu/s
 
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import type { MemoryIdentityContext } from "./context"
-import { registerReceiptReadGuard } from "./receipt-read-guard"
+import { unverifiedReceiptNotice } from "./receipt-read-guard"
 import { isGrantedProjectMemoryRead } from "./project-memory-grants"
 import { isWithin as isWithinPath, scanForeignRoots, type AreaEntry, type ForeignRootScan } from "./guard-foreign-roots"
 import { TRANSIENT_DIRNAME } from "./transient-identity"
@@ -67,7 +67,6 @@ export function registerMemoryGuard(
   const warnedBashSessions = new Set<string>()
   // Per session, the ancestor enumerations allowed at tool_call whose results are still outstanding.
   const pendingAncestorChecks = new Map<string, Map<string, PendingAncestorCheck>>()
-  registerReceiptReadGuard(pi)
 
   pi.on("tool_call", (payload, eventContext): ToolCallEventResult | undefined => {
     const context = options.getContext(eventContext)
@@ -119,9 +118,14 @@ export function registerMemoryGuard(
     return undefined
   })
 
+  // ONE tool_result registration for the whole guard: senpi runs a PostToolUse hook (one hookRunId index) per
+  // handler on every tool call, and the EQ goldens pin that count. The ancestor re-check (enumeration tools) and
+  // the receipt notice (read tools) never apply to the same call; a replaced result is final.
+  pi.on("tool_result", (payload, eventContext) => recheckAncestorResult(payload, eventContext) ?? unverifiedReceiptNotice(payload))
+
   // The host checks only the enumeration root, so an identity created while the walk ran would be read.
   // Re-list the areas once the result exists and, if anything foreign appeared, replace the whole result.
-  pi.on("tool_result", (payload, eventContext): ToolResultEventResult | undefined => {
+  function recheckAncestorResult(payload: unknown, eventContext: unknown): ToolResultEventResult | undefined {
     if (!isRecord(payload) || typeof payload.toolCallId !== "string") return undefined
     const sessionId = readSessionId(eventContext)
     const pending = pendingAncestorChecks.get(sessionId)
@@ -140,20 +144,18 @@ export function registerMemoryGuard(
       isError: true,
       details: {},
     }
-  })
+  }
 
-  // A call blocked by a later handler, or aborted before it ran, ends without a tool_result. For executed
-  // calls the host runs tool_result before tool_execution_end, so releasing here never skips a re-check.
+  // A call blocked by a later handler, or aborted before it ran, ends without a tool_result. On the agent loop
+  // an executed call reaches tool_result before tool_execution_end; the Cursor exec bridge emits
+  // tool_execution_end first, so its result skips the re-check, but that path discards a tool_result override
+  // anyway. Pending checks are never released on agent_end: a nested walk from a background cell can outlive a run.
   pi.on("tool_execution_end", (payload, eventContext) => {
     if (!isRecord(payload) || typeof payload.toolCallId !== "string") return
     const sessionId = readSessionId(eventContext)
     const pending = pendingAncestorChecks.get(sessionId)
     pending?.delete(payload.toolCallId)
     if (pending?.size === 0) pendingAncestorChecks.delete(sessionId)
-  })
-  // No result of a finished run can still arrive.
-  pi.on("agent_end", (_payload, eventContext) => {
-    pendingAncestorChecks.delete(readSessionId(eventContext))
   })
   pi.on("session_shutdown", (_payload, eventContext) => {
     pendingAncestorChecks.delete(readSessionId(eventContext))

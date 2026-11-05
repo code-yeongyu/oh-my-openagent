@@ -180,7 +180,7 @@ describe("memory cross-identity guard", () => {
     })
     expect(await dispatch(setup, "grep", { path: memoryRoot })).toEqual({
       block: true,
-      reason: `cross-identity memory access denied: grep to ${memoryRoot} would enumerate another memory identity found under ${realpathSync(setup.agentsRoot)}`,
+      reason: `cross-identity memory access denied: grep to ${memoryRoot} would enumerate another memory identity found under ${realpathSync.native(setup.agentsRoot)}`,
     })
     expect(await dispatch(setup, "read", { path: memoryRoot })).toBeUndefined()
   })
@@ -571,7 +571,16 @@ describe("memory guard ancestor enumeration (#12301)", () => {
     expect(replaced).toEqual([{ content: [expect.objectContaining({ type: "text" })], isError: true, details: {} }])
   })
 
-  test("#given ancestor calls whose results never arrive #when the pending bound is reached #then further ancestor calls are denied until the run ends", async () => {
+  test("#given the guard is registered #when its post-tool hooks are counted #then it adds exactly one tool_result handler", () => {
+    // Host contract: senpi runs one PostToolUse hook (one hookRunId index) per tool_result handler on EVERY tool
+    // call, and the EQ goldens (fused-equivalence-golden E21-E24) pin that count; the ancestor re-check and the
+    // receipt notice therefore share one registration.
+    const setup = ancestorFixture()
+
+    expect(setup.pi.handlers.filter(({ event }) => event === "tool_result")).toHaveLength(1)
+  })
+
+  test("#given ancestor calls whose results never arrive #when the pending bound is reached #then further ancestor calls are denied until a slot is released", async () => {
     const setup = ancestorFixture()
     let allowed = 0
     let denied: unknown
@@ -584,8 +593,13 @@ describe("memory guard ancestor enumeration (#12301)", () => {
     expect(allowed).toBeGreaterThan(0)
     expect(allowed).toBeLessThan(10_000)
     expectAncestorDenied(denied, [])
+    // A run ending does not release pending checks: a nested walk started from a background cell can outlive it.
     await setup.pi.dispatch("agent_end", { type: "agent_end", messages: [] }, { sessionManager: { getSessionId: () => "session-1" } })
-    expect(await enumerate(setup, "grep", setup.memoryRoot, "call-after-run")).toBeUndefined()
+    expectAncestorDenied(await enumerate(setup, "grep", setup.memoryRoot, "call-after-run"), [])
+    await setup.pi.dispatch("tool_execution_end", { type: "tool_execution_end", toolCallId: "call-0", toolName: "grep", result: {}, isError: true }, {
+      sessionManager: { getSessionId: () => "session-1" },
+    })
+    expect(await enumerate(setup, "grep", setup.memoryRoot, "call-after-release")).toBeUndefined()
   })
 
   test("#given a call another handler blocked #when its tool execution ends without a result #then its pending slot is released", async () => {
