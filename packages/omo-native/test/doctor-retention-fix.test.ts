@@ -48,7 +48,7 @@ describe("omo doctor --fix retention step (A38 CLI half)", () => {
     expect(result.failed).toBe(false)
     expect(existsSync(join(kept, "transcript.jsonl"))).toBe(true)
     expect(existsSync(removed)).toBe(false)
-    expect(result.lines.some((line) => line.startsWith("FIXED agent-on retention removed 1"))).toBe(true)
+    expect(result.lines.some((line: string) => line.startsWith("FIXED agent-on retention removed 1"))).toBe(true)
   })
 
   test("#given no global config #when --fix runs #then unreflected input is kept (switch off)", async () => {
