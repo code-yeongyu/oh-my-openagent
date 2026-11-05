@@ -72,6 +72,35 @@ describe("describeModelChains", () => {
     expect(artistry.rungs[0]).toEqual({ model: "anthropic/claude-fable-5-1", source: "built-in", state: "excluded", excludedBy: "claude-fable-*" })
   })
 
+  test("#given a chain that repeats a model at a second thinking level #when the listed chain is described #then the repeat is its own rung next to the level that runs", () => {
+    // given: the model repeats at two efforts on the same provider
+    const repeated = "anthropic/claude-opus-5-5"
+    const config: OmoConfig = {
+      agents: {
+        probe: {
+          models: [
+            { model: repeated, reasoning: "xhigh" },
+            { model: repeated, reasoning: "low" },
+          ],
+        },
+      },
+    }
+    const models = [
+      { provider: "anthropic", id: "claude-opus-5-5" },
+      { provider: "anthropic", id: "claude-fable-5-1" },
+    ]
+    const registry = {
+      getAvailable: () => models,
+      find: (provider: string, id: string) => models.find((model) => model.provider === provider && model.id === id),
+    }
+
+    // when
+    const probe = describeModelChains(config, registry).agents.find((candidate) => candidate.name === "probe")
+
+    // then: the list keeps both declared efforts instead of collapsing them into one model
+    expect(probe?.rungs.filter((rung) => rung.model === repeated).length).toBe(2)
+  })
+
   test("#given a builtin agent with rungs nobody is logged in for #when described #then those rungs are marked no-login with their providers", () => {
     // when
     const explore = entry({}, "agents", "explore")

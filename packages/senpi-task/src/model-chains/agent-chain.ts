@@ -6,6 +6,7 @@ import { resolveAgent } from "../agents/resolve-agent"
 import type { AgentDefinition } from "../agents/types"
 import { resolveCategory } from "../category/resolver"
 import type { SenpiModelPort, SenpiModelRegistryPort } from "../category/types"
+import { recordReasoning } from "../model-chain"
 import { categoryRuntimeChain } from "./category-chain"
 import { builtinRungs, classifyRungs, type DeclaredRung } from "./rungs"
 import type { ModelChainEntry } from "./types"
@@ -35,6 +36,7 @@ export function describeAgentChain<TModel extends SenpiModelPort>(
     ...agentModelCandidates(definition?.model, definition?.models, {}).map((candidate): DeclaredRung => ({
       model: candidate.model,
       source: fromConfig.has(candidate.model) ? "omo.json" : "built-in",
+      variant: candidate.reasoningEffort ?? candidate.variant,
     })),
     ...(definition?.categories ?? []).flatMap((category) =>
       categoryRuntimeChain(resolveCategory(category, config, registry)).map((model): DeclaredRung => ({ model, source: `category:${category}` }))
@@ -42,14 +44,22 @@ export function describeAgentChain<TModel extends SenpiModelPort>(
     ...builtinRungs(Object.hasOwn(AGENT_FALLBACK_CHAINS, name) ? AGENT_FALLBACK_CHAINS[name] : undefined, available),
   ]
   const result = resolveAgent(name, agents, registry, { omoConfig: config })
-  const runtime = result.kind === "resolved" ? [result.model, ...(result.fallback_models ?? []).map((model) => model.display)] : []
+  const resolved = result.kind === "resolved" ? result : undefined
+  const runtime = resolved === undefined ? [] : [resolved.model, ...(resolved.fallback_models ?? []).map((model) => model.display)]
+  const variantByModel = new Map(
+    [...(resolved?.requested_model === undefined ? [] : [resolved.requested_model]), ...(resolved?.fallback_models ?? [])]
+      .flatMap((record) => {
+        const variant = recordReasoning(record)
+        return variant === undefined ? [] : [[record.display, variant] as const]
+      }),
+  )
   return {
     kind: "agent",
     name,
     status: result.kind === "resolved" ? "resolved" : "unavailable",
     ...(runtime[0] === undefined ? {} : { primary: runtime[0] }),
     runtime,
-    rungs: classifyRungs(declared, runtime, available, config.exclude_models),
+    rungs: classifyRungs(declared, runtime, available, config.exclude_models, variantByModel),
     ...(result.kind === "model_unavailable"
       ? { reason: result.attemptedModel === undefined ? "no rung is usable" : `${result.attemptedModel} is not usable` }
       : {}),
