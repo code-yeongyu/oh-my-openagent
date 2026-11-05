@@ -220,8 +220,9 @@ export function resolveOmoConfigWatchTargetResolution(
 
     // A creation target watches a whole directory, and on macOS (FSEvents) every change beneath it reaches
     // the session, so an ancestor reaching HOME woke every session on any write in HOME. Stop at the project
-    // root (the first directory holding .git) and at the user config directory's parent, which the
-    // user-config target above already watches. Existing .omo directories higher up stay watched.
+    // root (the first directory holding .git), and never include the user config directory's parent (which
+    // the user-config target above already watches), any directory containing it, or the filesystem root.
+    // Existing .omo directories higher up stay watched.
     for (const ancestorDirectory of creationAncestors(ancestorDirectories, dirname(userConfigDirectory))) {
       targets.push(creationTarget(ancestorDirectory))
     }
