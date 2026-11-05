@@ -223,12 +223,23 @@ async function stampPruned(statePath: string, now: number): Promise<void> {
  * Lock-free verdict for one journal under `context.policy` and `gate`; the cap passes its tier floors
  * as the policy and an open gate to learn each journal's class, then applies the switch and gate itself.
  */
-export async function classifyTranscriptJournal(
+/**
+ * One `transcripts/` entry for the cap and the doctors' scans, tolerant like the pass's visit: a name
+ * that is not a directory is skipped (undefined), and an entry whose judgement throws (a state.json that
+ * is a directory, an I/O error) is kept as `state-unreadable` so the scan goes on. An abort propagates.
+ */
+export async function classifyJournalEntry(
   context: RetentionContext,
   dir: string,
   gate: UnreflectedRetentionGate = { open: true },
-): Promise<Verdict> {
-  return judge(context, dir, false, gate)
+): Promise<Verdict | undefined> {
+  context.signal?.throwIfAborted()
+  const stats = await lstat(dir).catch(() => undefined)
+  if (stats === undefined || !stats.isDirectory()) return undefined
+  return judge(context, dir, false, gate).catch((error: unknown): RetentionKeepReason => {
+    if (context.signal?.aborted === true) throw error
+    return "state-unreadable"
+  })
 }
 
 export { removeUnderLock as removeTranscriptJournalUnderLock }

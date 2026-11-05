@@ -14,7 +14,7 @@ import { withLocalJournalLock, type JournalLock } from "../journal/lock"
 import { reflectionRunNumber, scanReflectionRunHighWater } from "../reflection/run-id-high-water"
 import { readReflectionRetentionGuard, readReservations, reservedRunIds } from "./guard"
 import { readUnreflectedRetentionGate } from "./reflection-health-signal"
-import { classifyTranscriptJournal, removeTranscriptJournalUnderLock } from "./journals"
+import { classifyJournalEntry, removeTranscriptJournalUnderLock } from "./journals"
 import { DAY_MS, listNames, newestMtime, type RetentionContext, type RuntimeRetentionPolicy } from "./policy"
 import { RETENTION_TOMBSTONE_PREFIX, claimReflectionRun, classifyReflectionRun, removeTombstone } from "./reflection-runs"
 import {
@@ -34,7 +34,7 @@ export type RuntimeCapTier =
   | "partly-reflected-transcript"
   | "unfolded-run"
 
-export type RuntimeCapKeepReason = "reserved" | "reflection-unhealthy" | "unreflected-retention-off" | "high-water" | "newest" | "newest-unfolded" | "reserved" | "locked" | "recent" | "live" | "owned" | "changed-during-removal"
+export type RuntimeCapKeepReason = "reserved" | "reflection-unhealthy" | "unreflected-retention-off" | "high-water" | "newest" | "newest-unfolded" | "reserved" | "locked" | "recent" | "live" | "owned" | "changed-during-removal" | "state-unreadable"
 
 export interface RuntimeSizeCapOptions extends Omit<RetentionContext, "policy"> {
   readonly policy: RuntimeRetentionPolicy
@@ -100,7 +100,7 @@ const RUNTIME_CAP_SIDECAR_FLOOR_MS = 60 * 60 * 1000
 const RUNTIME_CAP_JOURNAL_FLOOR_MS = 24 * 60 * 60 * 1000
 const RUNTIME_CAP_KEPT_UNFOLDED_RUNS = 10
 
-const CAP_KEEP_REASONS: ReadonlySet<string> = new Set<RuntimeCapKeepReason>(["reserved", "reflection-unhealthy", "unreflected-retention-off", "high-water", "newest", "newest-unfolded", "reserved", "locked", "recent", "live", "owned", "changed-during-removal"])
+const CAP_KEEP_REASONS: ReadonlySet<string> = new Set<RuntimeCapKeepReason>(["reserved", "reflection-unhealthy", "unreflected-retention-off", "high-water", "newest", "newest-unfolded", "reserved", "locked", "recent", "live", "owned", "changed-during-removal", "state-unreadable"])
 
 function capOutcome(outcome: string): "removed" | RuntimeCapKeepReason {
   if (outcome === "removed") return "removed"
@@ -127,6 +127,8 @@ export async function runRuntimeSizeCap(options: RuntimeSizeCapOptions): Promise
   const measureStart = clock()
   // The caller's deadline aborts a long walk; the clock check below covers a walk that finished late.
   const budgetSignal = options.measureSignal
+  // A resumed pass that walks no new item hands its cursor back, so the resume point survives (#12538 review r3 L2).
+  const keptResume = options.resume === undefined ? {} : { cursor: options.resume }
   let beforeBytes: number
   try {
     beforeBytes = (await measureRuntimeSize(options.paths.runtime, budgetSignal === undefined ? {} : { signal: budgetSignal })).bytes
@@ -135,7 +137,7 @@ export async function runRuntimeSizeCap(options: RuntimeSizeCapOptions): Promise
     options.signal?.throwIfAborted()
     if (budgetSignal?.aborted !== true) throw error
     skipped.push("measure-over-budget")
-    return { maxBytes: options.maxBytes, beforeBytes: 0, afterBytes: 0, exceededBytes: 0, evicted, kept, skipped, measureMs: clock() - measureStart, unreflectedHeldBytes: 0 }
+    return { maxBytes: options.maxBytes, beforeBytes: 0, afterBytes: 0, exceededBytes: 0, evicted, kept, skipped, measureMs: clock() - measureStart, unreflectedHeldBytes: 0, ...keptResume }
   }
   const measureEnd = clock()
   const measureMs = measureEnd - measureStart
@@ -143,7 +145,7 @@ export async function runRuntimeSizeCap(options: RuntimeSizeCapOptions): Promise
   const unchanged = () => ({ ...base, afterBytes: beforeBytes, exceededBytes: options.maxBytes > 0 ? Math.max(0, beforeBytes - options.maxBytes) : 0 })
   if (options.budgetMs !== undefined && measureMs > options.budgetMs) {
     skipped.push("measure-over-budget")
-    return unchanged()
+    return { ...unchanged(), ...keptResume }
   }
   // Nothing under runtime/ is written unless the identity is over its cap: the guard (which may create
   // locks/ and raise run-id.json) and every claim run only past this point.
@@ -160,7 +162,7 @@ export async function runRuntimeSizeCap(options: RuntimeSizeCapOptions): Promise
       if (isBeforeCursor(candidate, options.resume)) continue
       options.signal?.throwIfAborted()
       if (clock() >= deadline) {
-        if (last !== undefined) cursor = { store: "cap", tier: last.tier, clock: last.at, lastName: last.name }
+        cursor = last === undefined ? options.resume : { store: "cap", tier: last.tier, clock: last.at, lastName: last.name }
         break walk
       }
       const size = await measureTreeBytes(candidate.measuredPath)
@@ -192,6 +194,8 @@ export interface RuntimeCapEvictableOptions {
   /** `memory.reflection.enabled` for the identity; when false the health gate never closes. */
   readonly reflectionEnabled?: boolean
   readonly journalFloorMs?: number
+  /** The doctors' measurement deadline: once it fires the measure rejects with the abort (#12538 review r3 M2). */
+  readonly signal?: AbortSignal
 }
 
 /**
@@ -208,7 +212,10 @@ export async function measureRuntimeCapEvictableBytes(options: RuntimeCapEvictab
   }
   let bytes = 0
   for (const tier of await tiers({ ...options, maxBytes: 0 }, guard, {}, { suspendedSince: undefined, heldBytes: 0 })) {
-    for (const candidate of await tier()) bytes += await measureTreeBytes(candidate.measuredPath)
+    for (const candidate of await tier()) {
+      options.signal?.throwIfAborted()
+      bytes += await measureTreeBytes(candidate.measuredPath)
+    }
   }
   return bytes
 }
@@ -279,7 +286,10 @@ async function tiers(
     reservedConversationIds: new Set<string>(),
   }
   const runs = await runCandidates(options, runGuard, kept)
-  const journals = guard === undefined ? undefined : journalCandidates(options, guard.reservedConversationIds, kept)
+  // Journals are classified only when the walk reaches their first tier, so a pass that fits on tier 1
+  // reads no transcript (#12538 review r3 L1).
+  let journalScan: ReturnType<typeof journalCandidates> | undefined
+  const journals = async () => guard === undefined ? undefined : await (journalScan ??= journalCandidates(options, guard.reservedConversationIds, kept))
   const unfolded = async (entries: readonly Candidate[]): Promise<readonly Candidate[]> => {
     if (entries.length === 0) return entries
     const hold = async (reason: RuntimeCapKeepReason): Promise<readonly Candidate[]> => {
@@ -300,10 +310,10 @@ async function tiers(
   }
   return [
     async () => runs.folded,
-    async () => (await journals)?.fully ?? [],
+    async () => (await journals())?.fully ?? [],
     () => sidecarCandidates(options, kept),
-    async () => unfolded((await journals)?.never ?? []),
-    async () => unfolded((await journals)?.partly ?? []),
+    async () => unfolded((await journals())?.never ?? []),
+    async () => unfolded((await journals())?.partly ?? []),
     async () => runs.unfolded,
   ]
 }
@@ -398,8 +408,9 @@ async function journalCandidates(
       kept[sessionId] = "reserved"
       continue
     }
-    const verdict = await classifyTranscriptJournal(classifyContext, dir)
-    if (typeof verdict === "string") continue
+    const verdict = await classifyJournalEntry(classifyContext, dir)
+    if (verdict === "state-unreadable") kept[sessionId] = "state-unreadable"
+    if (verdict === undefined || typeof verdict === "string") continue
     found[verdict.kind].push({ name: sessionId, at: (await newestMtime(dir)) ?? 0 })
   }
   const toCandidates = (entries: { name: string; at: number }[], tier: RuntimeCapTier, transcriptOnly: boolean): Candidate[] =>

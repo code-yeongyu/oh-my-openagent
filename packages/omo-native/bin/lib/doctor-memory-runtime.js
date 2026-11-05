@@ -97,7 +97,7 @@ function formatMemoryRuntimeLines(identities, totalBytes) {
     const excess = describeRuntimeCapExcess({
       overCapBytes: entry.maxBytes > 0 ? entry.bytes - entry.maxBytes : 0,
       evictableBytes: entry.evictableBytes ?? 0,
-      unreflectedBytes: entry.unreflectedBytes,
+      unreflectedBytes: entry.unreflectedBytes ?? 0,
       discardUnreflectedJournals: entry.discardUnreflectedJournals,
     })
     // Over the cap, the excess line says what the next pass does; the near-cap line is for 80-100 %.
@@ -118,7 +118,7 @@ function formatMemoryRuntimeLines(identities, totalBytes) {
  * @param options.discardFor the resolved `memory.runtime.discard_unreflected_journals` for one identity (default: the shipped false)
  * @param options.measureBudgetMs each identity's measurement deadline, the one `/doctor` uses (default: the shipped pass_budget_ms)
  * @param options.measureSignal a caller deadline that replaces the per-identity timer
- * @returns {Promise<{ identities: { identity: string, bytes: number, maxBytes: number, unreflectedBytes: number, discardUnreflectedJournals: boolean, evictableBytes?: number, sizeUnknown?: { budgetMs: number, at: string } }[], totalBytes: number, lines: string[] }>}
+ * @returns {Promise<{ identities: { identity: string, bytes: number, maxBytes: number, unreflectedBytes?: number, discardUnreflectedJournals: boolean, evictableBytes?: number, sizeUnknown?: { budgetMs: number, at: string } }[], totalBytes: number, lines: string[] }>}
  */
 export async function memoryRuntimeReport(options = {}) {
   const root = memoryRoot(options.env ?? process.env)
@@ -131,22 +131,36 @@ export async function memoryRuntimeReport(options = {}) {
     const paths = buildIdentityPaths(root, identity)
     const maxBytes = maxBytesFor(identity)
     const discardUnreflectedJournals = discardFor(identity)
-    const measured = await measureRuntimeSizeWithinBudget(paths.runtime, {
-      budgetMs,
-      now: Date.now(),
-      ...(options.measureSignal === undefined ? {} : { signal: options.measureSignal }),
-    })
+    // One deadline per identity bounds the size walk and the journal scans that read whole transcripts.
+    const signal = options.measureSignal ?? AbortSignal.timeout(budgetMs)
+    const startedAt = Date.now()
+    const measured = await measureRuntimeSizeWithinBudget(paths.runtime, { budgetMs, now: startedAt, signal })
     if ("sizeUnknown" in measured) {
-      identities.push({ identity, bytes: 0, maxBytes, unreflectedBytes: 0, discardUnreflectedJournals, sizeUnknown: measured.sizeUnknown })
+      identities.push({ identity, bytes: 0, maxBytes, discardUnreflectedJournals, sizeUnknown: measured.sizeUnknown })
       continue
     }
     const bytes = measured.size.bytes
     const policy = { ...DEFAULT_RUNTIME_RETENTION, discardUnreflectedJournals }
-    const unreflectedBytes = await measureUnreflectedJournalBytes({ paths, policy })
-    const evictableBytes = maxBytes > 0 && bytes > maxBytes
-      ? await measureRuntimeCapEvictableBytes({ paths, policy, now: Date.now })
-      : undefined
-    identities.push({ identity, bytes, maxBytes, unreflectedBytes, discardUnreflectedJournals, ...(evictableBytes === undefined ? {} : { evictableBytes }) })
+    const overCap = maxBytes > 0 && bytes > maxBytes
+    let unreflectedBytes
+    let evictableBytes
+    try {
+      // Printed only on the over-cap line, and only with the switch off.
+      unreflectedBytes = overCap && !discardUnreflectedJournals ? await measureUnreflectedJournalBytes({ paths, policy, signal }) : undefined
+      evictableBytes = overCap ? await measureRuntimeCapEvictableBytes({ paths, policy, now: Date.now, signal }) : undefined
+    } catch (error) {
+      if (!signal.aborted) throw error
+      identities.push({ identity, bytes: 0, maxBytes, discardUnreflectedJournals, sizeUnknown: { budgetMs, at: new Date(startedAt).toISOString() } })
+      continue
+    }
+    identities.push({
+      identity,
+      bytes,
+      maxBytes,
+      discardUnreflectedJournals,
+      ...(unreflectedBytes === undefined ? {} : { unreflectedBytes }),
+      ...(evictableBytes === undefined ? {} : { evictableBytes }),
+    })
   }
   const totalBytes = identities.reduce((sum, entry) => sum + entry.bytes, 0)
   return { identities, totalBytes, lines: formatMemoryRuntimeLines(identities, totalBytes) }

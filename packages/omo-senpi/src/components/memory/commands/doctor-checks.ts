@@ -25,6 +25,7 @@ import {
   type MemoryIdentityPaths,
   type RuntimePastRetention,
   type RuntimeRetentionPolicy,
+  type RuntimeSize,
   type RuntimeStoreSize,
 } from "@oh-my-opencode/memory-core"
 
@@ -303,8 +304,11 @@ export interface RuntimeSizeReport {
   readonly stores: readonly RuntimeStoreSize[]
   readonly pastRetention: RuntimePastRetention
   readonly unclassifiedJournals: number
-  /** Bytes in never/partly-reflected journals, which only `discard_unreflected_journals` lets the cap evict. */
-  readonly unreflectedBytes: number
+  /**
+   * Bytes in never/partly-reflected journals, which only `discard_unreflected_journals` lets the cap evict.
+   * Measured only where the over-cap line prints it: over the cap with the switch off.
+   */
+  readonly unreflectedBytes?: number
   readonly discardUnreflectedJournals: boolean
   /** Over the cap only: bytes the next cap pass could evict now (memory-core measureRuntimeCapEvictableBytes). */
   readonly evictableBytes?: number
@@ -317,46 +321,70 @@ export async function checkRuntimeSize(
   identityPaths: MemoryIdentityPaths,
   input: { readonly maxBytes: number; readonly policy: RuntimeRetentionPolicy; readonly now: number; readonly reflectionEnabled: boolean; readonly discardUnreflectedJournals: boolean; readonly measureBudgetMs?: number; readonly measureSignal?: AbortSignal },
 ): Promise<{ readonly check: DoctorCheck; readonly report: RuntimeSizeReport }> {
+  // One deadline bounds the whole measurement: the size walk and the journal scans that read transcripts.
+  const signal = input.measureSignal ?? (input.measureBudgetMs === undefined ? undefined : AbortSignal.timeout(input.measureBudgetMs))
   const measured = await measureRuntimeSizeWithinBudget(identityPaths.runtime, {
     now: input.now,
     ...(input.measureBudgetMs === undefined ? {} : { budgetMs: input.measureBudgetMs }),
-    ...(input.measureSignal === undefined ? {} : { signal: input.measureSignal }),
+    ...(signal === undefined ? {} : { signal }),
   })
-  if ("sizeUnknown" in measured) {
-    const { budgetMs, at } = measured.sizeUnknown
-    return {
-      check: { name: "runtime-size", level: "warn", detail: `size unknown: measurement exceeded ${budgetMs} ms on ${at}` },
-      report: {
-        bytes: 0,
-        sizeUnknown: { budgetMs, at },
-        maxBytes: input.maxBytes,
-        stores: [],
-        pastRetention: { runs: 0, journals: 0, sidecars: 0, unclassifiedJournals: 0 },
-        unclassifiedJournals: 0,
-        unreflectedBytes: 0,
-        discardUnreflectedJournals: input.discardUnreflectedJournals,
-      },
-    }
+  if ("sizeUnknown" in measured) return sizeUnknownResult(measured.sizeUnknown, input)
+  try {
+    return await measuredRuntimeSize(identityPaths, measured.size, input, signal)
+  } catch (error) {
+    if (signal?.aborted !== true) throw error
+    return sizeUnknownResult({ budgetMs: input.measureBudgetMs ?? 0, at: new Date(input.now).toISOString() }, input)
   }
-  const size = measured.size
-  const pastRetention = await countRuntimePastRetention({ paths: identityPaths, policy: input.policy, now: () => input.now, reflectionEnabled: input.reflectionEnabled })
+}
+
+function sizeUnknownResult(
+  sizeUnknown: { readonly budgetMs: number; readonly at: string },
+  input: { readonly maxBytes: number; readonly discardUnreflectedJournals: boolean },
+): { readonly check: DoctorCheck; readonly report: RuntimeSizeReport } {
+  const { budgetMs, at } = sizeUnknown
+  return {
+    check: { name: "runtime-size", level: "warn", detail: `size unknown: measurement exceeded ${budgetMs} ms on ${at}` },
+    report: {
+      bytes: 0,
+      sizeUnknown: { budgetMs, at },
+      maxBytes: input.maxBytes,
+      stores: [],
+      pastRetention: { runs: 0, journals: 0, sidecars: 0, unclassifiedJournals: 0 },
+      unclassifiedJournals: 0,
+      discardUnreflectedJournals: input.discardUnreflectedJournals,
+    },
+  }
+}
+
+async function measuredRuntimeSize(
+  identityPaths: MemoryIdentityPaths,
+  size: RuntimeSize,
+  input: { readonly maxBytes: number; readonly policy: RuntimeRetentionPolicy; readonly now: number; readonly reflectionEnabled: boolean; readonly discardUnreflectedJournals: boolean },
+  signal: AbortSignal | undefined,
+): Promise<{ readonly check: DoctorCheck; readonly report: RuntimeSizeReport }> {
+  const deadline = signal === undefined ? {} : { signal }
+  const pastRetention = await countRuntimePastRetention({ paths: identityPaths, policy: input.policy, now: () => input.now, reflectionEnabled: input.reflectionEnabled, ...deadline })
   const gate = input.discardUnreflectedJournals ? await readUnreflectedRetentionGate(identityPaths.reflection, input.reflectionEnabled) : undefined
   const suspendedSince = gate?.open === false ? gate.newest?.at : undefined
-  const unreflectedBytes = await measureUnreflectedJournalBytes({ paths: identityPaths, policy: input.policy })
   const standing = runtimeSizeStanding(size.bytes, input.maxBytes)
   const overCap = input.maxBytes > 0 ? size.bytes - input.maxBytes : 0
+  // The over-cap line is the only place the unreflected bytes are printed, and only with the switch off.
+  const unreflectedBytes = overCap > 0 && !input.discardUnreflectedJournals
+    ? await measureUnreflectedJournalBytes({ paths: identityPaths, policy: input.policy, ...deadline })
+    : undefined
   const evictableBytes = overCap > 0
     ? await measureRuntimeCapEvictableBytes({
       paths: identityPaths,
       policy: { ...input.policy, discardUnreflectedJournals: input.discardUnreflectedJournals },
       now: () => input.now,
       reflectionEnabled: input.reflectionEnabled,
+      ...deadline,
     })
     : undefined
   const excess = describeRuntimeCapExcess({
     overCapBytes: overCap,
     evictableBytes: evictableBytes ?? 0,
-    unreflectedBytes,
+    unreflectedBytes: unreflectedBytes ?? 0,
     discardUnreflectedJournals: input.discardUnreflectedJournals,
   })
   const stores = size.stores.slice(0, 3)
@@ -367,7 +395,7 @@ export async function checkRuntimeSize(
     stores,
     pastRetention,
     unclassifiedJournals: pastRetention.unclassifiedJournals,
-    unreflectedBytes,
+    ...(unreflectedBytes === undefined ? {} : { unreflectedBytes }),
     discardUnreflectedJournals: input.discardUnreflectedJournals,
     ...(evictableBytes === undefined ? {} : { evictableBytes }),
     ...(suspendedSince === undefined ? {} : { suspendedSince }),

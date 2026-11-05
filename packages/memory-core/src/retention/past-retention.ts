@@ -7,7 +7,7 @@ import { join } from "node:path"
 import { lstat } from "../fs/resilient"
 import type { MemoryIdentityPaths } from "../identity/layout"
 import { reflectionRunNumber, scanReflectionRunHighWater } from "../reflection/run-id-high-water"
-import { classifyTranscriptJournal } from "./journals"
+import { classifyJournalEntry } from "./journals"
 import { readUnreflectedRetentionGate } from "./reflection-health-signal"
 import { DAY_MS, idleSince, listNames, type RuntimeRetentionPolicy } from "./policy"
 import { RETENTION_TOMBSTONE_PREFIX, classifyReflectionRun } from "./reflection-runs"
@@ -28,6 +28,8 @@ export async function countRuntimePastRetention(input: {
   readonly now: () => number
   readonly isLiveSession?: (sessionId: string) => boolean
   readonly reflectionEnabled?: boolean
+  /** The doctors' measurement deadline; once it fires the count rejects with the abort. */
+  readonly signal?: AbortSignal
 }): Promise<RuntimePastRetention> {
   const cutoff = input.now() - input.policy.retentionDays * DAY_MS
   const runsDir = join(input.paths.reflection, "runs")
@@ -47,11 +49,13 @@ export async function countRuntimePastRetention(input: {
 
   let journals = 0
   let unclassifiedJournals = 0
-  const context = { paths: input.paths, policy: input.policy, now: input.now }
+  const context = { paths: input.paths, policy: input.policy, now: input.now, ...(input.signal === undefined ? {} : { signal: input.signal }) }
   const gate = await readUnreflectedRetentionGate(input.paths.reflection, input.reflectionEnabled ?? true)
   for (const sessionId of await listNames(input.paths.transcripts)) {
     if (input.isLiveSession?.(sessionId) === true) continue
-    const verdict: string | object = await classifyTranscriptJournal(context, join(input.paths.transcripts, sessionId), gate)
+    // A stray file is skipped and an unreadable journal is kept, as the pass does (#12538 review r3 M1).
+    const verdict = await classifyJournalEntry(context, join(input.paths.transcripts, sessionId), gate)
+    if (verdict === undefined) continue
     if (typeof verdict !== "string") journals += 1
     else if (verdict === "unclassified") unclassifiedJournals += 1
   }
@@ -74,17 +78,21 @@ export async function countRuntimePastRetention(input: {
 export async function measureUnreflectedJournalBytes(input: {
   readonly paths: MemoryIdentityPaths
   readonly policy: RuntimeRetentionPolicy
+  /** The doctors' measurement deadline: each journal reads its whole transcript, so the walk stops once it fires. */
+  readonly signal?: AbortSignal
 }): Promise<number> {
   // Age does not matter here: every unreflected journal counts, so the classifier's idle window is open.
   const context = {
     paths: input.paths,
     now: () => Number.POSITIVE_INFINITY,
     policy: { ...input.policy, retentionDays: 0, abandonedJournalDays: 0, discardUnreflectedJournals: true },
+    ...(input.signal === undefined ? {} : { signal: input.signal }),
   }
   let bytes = 0
   for (const sessionId of await listNames(input.paths.transcripts)) {
     const dir = join(input.paths.transcripts, sessionId)
-    const verdict = await classifyTranscriptJournal(context, dir)
+    const verdict = await classifyJournalEntry(context, dir)
+    if (verdict === undefined) continue
     // A transcript holding rows its state never counted is unreflected input kept in place.
     if (verdict === "state-behind-transcript") bytes += await measureTreeBytes(dir)
     if (typeof verdict === "string") continue
