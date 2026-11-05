@@ -296,7 +296,7 @@ describe("onboarding entry", () => {
       expect(content).not.toContain("/onboarding/SKILL.md")
     })
 
-    test("#given onboarding is hidden from the listing (disabled_skills) #when prompting #then the context still names the built-in skill", async () => {
+    test("#given the skills listing is empty #when prompting #then the context still names the built-in skill", async () => {
       const dir = freshDir()
       const h = createOnboardingHarness(dir, "hidden", "rpc")
       h.pi.getCommands = () => []

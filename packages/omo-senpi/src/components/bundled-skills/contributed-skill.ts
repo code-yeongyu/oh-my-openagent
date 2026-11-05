@@ -29,7 +29,7 @@ export interface ResolveContributedSkillOptions {
 
 export type BundledSkillProvenance =
   | { readonly shadowed: false }
-  | { readonly shadowed: true; readonly ownerPath: string | undefined }
+  | { readonly shadowed: true }
 
 /**
  * Which file the session's skills listing resolves for `name`, compared with the bundled copy at
@@ -53,7 +53,7 @@ export function resolveBundledSkillProvenance(
   const loaded = pi.getCommands?.().find((entry) => entry.source === "skill" && entry.name === `skill:${name}`)
   const ownerPath = loaded?.sourceInfo?.path
   if (ownerPath === undefined || canonicalPath(ownerPath) === canonicalPath(builtinPath)) return { shadowed: false }
-  return { shadowed: true, ownerPath }
+  return { shadowed: true }
 }
 
 /**
