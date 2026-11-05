@@ -292,6 +292,8 @@ async function tiers(
     // `discard_unreflected_journals` (default off) gates every rule that deletes unreflected input.
     if (options.policy.discardUnreflectedJournals !== true) return hold("unreflected-retention-off")
     const health = await readUnreflectedRetentionGate(options.paths.reflection, options.reflectionEnabled ?? true)
+    // No admit callback is passed, so the gate is always read; an unread gate would count as closed.
+    if (health === undefined) return hold("reflection-unhealthy")
     if (health.open) return entries
     if (health.newest !== undefined) gate.suspendedSince = health.newest.at
     return hold("reflection-unhealthy")
