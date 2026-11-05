@@ -24,6 +24,8 @@ function repairCommand() {
 }
 
 const CODEX_LIGHT_WRAPPER_MARKER = "# OMO_GENERATED_RUNTIME_WRAPPER"
+// The Windows `.cmd` wrapper writes `rem OMO_GENERATED_RUNTIME_WRAPPER` instead, so it never
+// matches this marker and broken detection does not run for `.cmd` files (pre-existing limit).
 const CODEX_LIGHT_CACHE_VERSION = /[\\/]plugins[\\/]cache[\\/]sisyphuslabs[\\/]omo[\\/]([^\\/"'\s]+)[\\/]/
 const WINDOWS_BIN_SUFFIXES = ["", ".cmd", ".ps1", ".exe"]
 const OWNER_WALK_UP_LIMIT = 6
@@ -115,9 +117,10 @@ function pathExists(path) {
   }
 }
 
-// A Codex Light wrapper launches a cached CLI through node; the cache path it names
-// must exist, or the wrapper can never run. Returns the missing target, or undefined
-// when the wrapper launches something that exists (or names no resolvable target).
+// A Codex Light wrapper launches a cached CLI through bun, with a node fallback when no bun
+// is found; the cache path it names must exist, or the wrapper can never run. Returns the
+// missing target, or undefined when the wrapper launches something that exists (or names no
+// resolvable target).
 function brokenLaunchTarget(binPath, owner, homeDir) {
   if (owner === null || owner.name !== "lazycodex") return undefined
   const shim = readFileHead(binPath, SHIM_READ_LIMIT)
@@ -126,13 +129,19 @@ function brokenLaunchTarget(binPath, owner, homeDir) {
   return pathExists(target) ? undefined : target
 }
 
-// The runtime target the Light generator writes into the wrapper: the first quoted
-// path through the sisyphuslabs cache. `~` and `$HOME` resolve against the home dir;
+// The runtime target the Light generator writes into the wrapper: the `exec "$BUN_BINARY" ...`
+// line (POSIX) or `"%BUN_BINARY%" ... %*` (Windows), the file the wrapper actually runs — the
+// same lines packages/omo-opencode/src/cli/doctor/checks/codex-runtime-wrapper.ts already
+// parses. The first quoted cache path in the file is the optional node fallback
+// (dist/cli-node/index.js), not the runtime target, so reading it would flag a working wrapper
+// broken and miss a wrapper that really fails. `~` and `$HOME` resolve against the home dir;
 // anything else must already be absolute to be resolvable.
 function codexLightCacheTarget(shim, homeDir) {
-  const match = shim.match(/["']([^"']*plugins[\\/]cache[\\/]sisyphuslabs[\\/]omo[\\/][^"']+)["']/)
-  if (match === null) return null
-  const raw = match[1]
+  const posix = shim.match(/exec "\$BUN_BINARY" "([^"]+)" "\$@"/)
+  const windows = posix === null ? shim.match(/"%+BUN_BINARY%+"\s+"([^"]+)"\s+%+\*/) : null
+  const raw = posix?.[1] ?? windows?.[1]
+  if (raw === undefined) return null
+  if (!/[\\/]plugins[\\/]cache[\\/]sisyphuslabs[\\/]omo[\\/]/.test(raw)) return null
   if (raw.startsWith("~/") || raw.startsWith("~\\")) return join(homeDir, raw.slice(2))
   if (raw.startsWith("$HOME/") || raw.startsWith("$HOME\\")) return join(homeDir, raw.slice(6))
   return isAbsolute(raw) || win32.isAbsolute(raw) ? raw : null
@@ -227,6 +236,18 @@ function realPathOf(path) {
   }
 }
 
+// Two paths name the same install when they resolve to the same file. A hardlink shares the
+// inode, and one npm prefix listed twice with different letter case on Windows is the same
+// directory; realpath collapses neither, so compare dev/ino and fall back to realpath.
+function fileIdentity(path) {
+  try {
+    const stats = statSync(path)
+    return `${stats.dev}:${stats.ino}`
+  } catch {
+    return realPathOf(path)
+  }
+}
+
 // Only regular files: readFileSync on a FIFO blocks until a writer opens it, hanging the doctor.
 function readWholeFile(path) {
   try {
@@ -265,7 +286,7 @@ export function findLegacyPackages(environment) {
       const packageDir = join(modules, name)
       const owner = readManifest(join(packageDir, "package.json"))
       if (owner?.name !== name) continue
-      const key = realPathOf(packageDir)
+      const key = fileIdentity(packageDir)
       if (seen.has(key)) continue
       seen.add(key)
       found.push({ manager, name, version: owner.version, packageDir })
@@ -341,7 +362,14 @@ export function formatMigrationLines({ shadowing, nativeDirectory, legacyPackage
   // Every further install is a second copy, whatever its kind: two omo-ai installs
   // of different versions, or from different managers, are the same warning. The
   // only exception is the same file reached through two PATH spellings.
-  const shadowedOmo = omoInstalls.slice(1).filter((entry) => realPathOf(entry.binPath) !== realPathOf(first.binPath))
+  const seenInstalls = new Set()
+  if (first !== undefined) seenInstalls.add(fileIdentity(first.binPath))
+  const shadowedOmo = omoInstalls.slice(1).filter((entry) => {
+    const key = fileIdentity(entry.binPath)
+    if (seenInstalls.has(key)) return false
+    seenInstalls.add(key)
+    return true
+  })
   if (shadowedOmo.length > 0) {
     const others = shadowedOmo.map((entry) => `${entry.binPath} (${ownerLabel(entry.owner)})`).join(", ")
     const removals = shadowedOmo.map((entry) => omoInstallRemoval(entry, bunRoot)).join(" and ")

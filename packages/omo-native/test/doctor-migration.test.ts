@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync,
 import { tmpdir } from "node:os"
 import { delimiter, dirname, join, parse, relative } from "node:path"
 import { migrationReport, resolveMigrationEnvironment, scanOmoBins, shadowingOmoBins } from "../bin/lib/doctor-migration.js"
+import { posixRuntimeWrapper } from "../../omo-codex/src/install/codex-cache-runtime-wrapper"
 import { runDoctor } from "../bin/lib/doctor.js"
 import { updateTarget } from "../bin/lib/package-paths.js"
 
@@ -229,12 +230,16 @@ describe("omo doctor migration checks", () => {
 
   describe("#given a dead Codex Light wrapper whose cached runtime is gone (#12110)", () => {
     const cacheTarget = (sandbox: Sandbox, version = "4.16.2"): string =>
-      join(sandbox.home, ".codex", "plugins", "cache", "sisyphuslabs", "omo", version, "bin", "omo.js")
+      join(sandbox.home, ".codex", "plugins", "cache", "sisyphuslabs", "omo", version, "dist", "cli", "index.js")
+    const nodeFallbackTarget = (sandbox: Sandbox, version = "4.16.2"): string =>
+      join(sandbox.home, ".codex", "plugins", "cache", "sisyphuslabs", "omo", version, "dist", "cli-node", "index.js")
 
     function installDeadWrapper(sandbox: Sandbox): { localBin: string; target: string } {
       const localBin = join(sandbox.home, ".local", "bin")
       const target = cacheTarget(sandbox)
-      writeFile(join(localBin, "omo"), `#!/bin/sh\n# OMO_GENERATED_RUNTIME_WRAPPER\nexec node "${target}" "$@"\n`)
+      // The fixture is a real generated wrapper: its bun line runs dist/cli/index.js and its
+      // node fallback lines name dist/cli-node/index.js.
+      writeFile(join(localBin, "omo"), posixRuntimeWrapper("omo", target, join(sandbox.home, ".codex"), localBin, nodeFallbackTarget(sandbox)))
       return { localBin, target }
     }
 
@@ -273,7 +278,7 @@ describe("omo doctor migration checks", () => {
       expect(lines.some((line) => line === `WARN broken omo on PATH: ${join(localBin, "omo")} launches ${target}; remove it`)).toBe(true)
     })
 
-    test("#then a wrapper whose cached runtime exists keeps the repair line and is not reported broken", () => {
+    test("#then a wrapper whose bun target exists while its node fallback is gone keeps the repair line and is not reported broken", () => {
       const sandbox = createSandbox()
       const { localBin } = installDeadWrapper(sandbox)
       writeFile(cacheTarget(sandbox), "#!/usr/bin/env node\n")
@@ -285,6 +290,17 @@ describe("omo doctor migration checks", () => {
       expect(lines[0]).toContain("(lazycodex@4.16.2)")
       expect(lines[0]).toContain(REPAIR)
       expect(lines.some((line) => line.startsWith("WARN broken omo on PATH:"))).toBe(false)
+    })
+
+    test("#then a wrapper whose node fallback exists but whose bun target is gone is reported broken", () => {
+      const sandbox = createSandbox()
+      const { localBin, target } = installDeadWrapper(sandbox)
+      writeFile(nodeFallbackTarget(sandbox), "#!/usr/bin/env node\n")
+      installBunNative(sandbox)
+
+      const lines = report(sandbox, [localBin, sandbox.bunBin])
+
+      expect(lines.some((line) => line === `WARN broken omo on PATH: ${join(localBin, "omo")} launches ${target}; remove it`)).toBe(true)
     })
   })
 
