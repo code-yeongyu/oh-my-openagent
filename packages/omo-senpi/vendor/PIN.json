@@ -4,16 +4,16 @@
 		"bunshin-ts": {
 			"name": "@sisyphuslabs/bunshin-ts",
 			"version": "0.1.0",
-			"commit": "04c5f30480f18483de78377eba4aad1974277777",
+			"commit": "1a7cf8fc49528195c0f22a1886d593ba5b34b5cc",
 			"packageDir": "packages/bunshin-ts",
 			"dependencies": {
 				"@sinclair/typebox": "^0.34.52"
 			},
 			"files": {
-				"LICENSE": "5fd1beb9c54803caa5a7c310f0e1f887b1831bb10c92ee6cd05e248ce4ff12e0",
+				"LICENSE": "80ecedb83344fb3d85c0ae989eb902181f033ac491e1eb5dacb2bebb7fc2816e",
 				"README.md": "2382f908f7b6ba5b7404d1ca8a454a1382cc5d33341244125bfb1be81eaf27e1",
 				"index.d.ts": "070ce47e794d2ff5ce0dcec3c6a5a47bab6f52a2f9bf9fbdb294e61dd5ce42f3",
-				"index.js": "12f2856b4413ae537fd2ceb6c2c37de7ba61f3dabab28b661c6d2a016ea8b1df",
+				"index.js": "820af345cd441312c2e2a44c2f6a5ab5b577c3173deaa29f43ef5600ea35d255",
 				"types/bunshin-ts/src/bunshin-nodes.d.ts": "09066e328630d16aab34ca41c8538f79b429fe87ec95adf5ad82d20397a3f2b1",
 				"types/bunshin-ts/src/client-errors.d.ts": "f0b9eebad7c08752e2469206cecfb075e5fe3becb3bbb15985394d20fa8cd55a",
 				"types/bunshin-ts/src/command-handle.d.ts": "4702704d63619e03b292e13200c35d41f9ebc8db69112c33a2714edc24b7e9a2",
@@ -57,14 +57,14 @@
 		"bunshin-ts-relay": {
 			"name": "@sisyphuslabs/bunshin-ts-relay",
 			"version": "0.1.0",
-			"commit": "a7f34a31bf9d711c646ab7fc376442172b64579e",
+			"commit": "5479f21082d3f1bba3f9f4c4d3c5219b7013ad88",
 			"packageDir": "packages/bunshin-ts-relay",
 			"dependencies": {},
 			"files": {
-				"LICENSE": "5fd1beb9c54803caa5a7c310f0e1f887b1831bb10c92ee6cd05e248ce4ff12e0",
+				"LICENSE": "80ecedb83344fb3d85c0ae989eb902181f033ac491e1eb5dacb2bebb7fc2816e",
 				"README.md": "0ea57a428022d660522a5629651bfc84028dfd58c7bb948eab2504c42eb3fdcb",
 				"index.d.ts": "b96ae1ccdd1a975c26cc7c540d278e33268a2775f6905c3694d8d8e241005b6d",
-				"index.js": "68552314db88fe5f74605ea039a9e0d125434e74d226623fb7e5661336430967",
+				"index.js": "ef5a48864e6be7b210be44a97a8cb5bcf6e1bec295f7cd9518c14578c66b7f3a",
 				"types/src/errors.d.ts": "4823d1ce3a8c2cf5dbf35e64a71a7ce624de43cf2c3a34a76901d15b9b4a6987",
 				"types/src/index.d.ts": "4b48df4632d6288cb060697482a3896d7e1816dd92e81e7ce62e7d9684fc0367",
 				"types/src/transport.d.ts": "1c4ac9a2f79ce92e52830176b8f2bd24abd933e404097d7dfc1898957a98a77b",
