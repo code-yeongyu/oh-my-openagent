@@ -160,6 +160,11 @@ export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}):
   }
 
   /** One bounded slice of the host-wide sweep, after this identity's own pass, when the round is due. */
+  // Every identity a session in this process bound (REVIEW-5 M2). The host sweep skips them: their own
+  // pass ran with live sessions, owned sidecars and the project layer, which a foreign visit lacks.
+  // Kept after a session exits, which only ever keeps more.
+  const hosted = new Set<string>()
+
   async function sweepHost(context: MemoryIdentityContext, signal: AbortSignal): Promise<void> {
     const host = options.hostSweep?.()
     if (host === undefined) return
@@ -170,7 +175,7 @@ export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}):
     const deadline = now() + HOST_SWEEP_SLICE_MS
     const result = await sweepHostIdentities({
       memoryRoot,
-      steps: [createRetentionHostSweepStep({ ...(host.settings === undefined ? {} : { settings: host.settings }), now, signal, deadline })],
+      steps: [createRetentionHostSweepStep({ ...(host.settings === undefined ? {} : { settings: host.settings }), isHostedIdentity: (name) => hosted.has(name), now, signal, deadline })],
       maxIdentities: HOST_SWEEP_IDENTITIES_PER_PASS,
       budgetMs: HOST_SWEEP_SLICE_MS,
       now,
@@ -216,6 +221,7 @@ export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}):
 
   return {
     schedule(context): void {
+      hosted.add(context.identity)
       if (scheduled.has(context.identity)) return
       scheduled.add(context.identity)
       if (!swept.has(context.identity)) {

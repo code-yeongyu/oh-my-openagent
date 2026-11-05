@@ -22,7 +22,9 @@ export {
 export {
   createRetentionHostSweepStep,
   resolveForeignIdentityDiscardUnreflected,
+  resolveForeignIdentityRetentionPolicy,
   type ForeignMemoryRuntimeSettings,
+  type ForeignRuntimeLayer,
   type RetentionHostSweepStepOptions,
 } from "./host-step"
 export {

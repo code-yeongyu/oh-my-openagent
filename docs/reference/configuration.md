@@ -809,7 +809,9 @@ run directories, completion records, per-session transcript journals, recall sid
 The background maintenance pass (at most once every 12 hours per identity, the same pass that
 packs the memory repository) removes what is past these windows. Anything a live session owns,
 anything locked, reserved or not yet finished, and the newest and highest-numbered reflection run
-are always kept. Identities no session binds any more are not visited by this pass.
+are always kept. Identities no session on this machine binds any more are visited by the host sweep
+(a bounded slice after a bound identity's own pass, at most once every 12 hours per machine) and by
+`omo doctor --fix`; identities a session in the running process binds are left to their own pass.
 
 | Option                           | Default | Description                                                                                      |
 | -------------------------------- | ------- | ------------------------------------------------------------------------------------------------ |
@@ -819,7 +821,7 @@ are always kept. Identities no session binds any more are not visited by this pa
 | `runtime.completions_days`       | `30`    | Days before a delivered completion record (beyond the newest 50) and a recall ledger are removed  |
 | `runtime.pass_budget_ms`         | `60000` | Time one pass may spend on one identity; an interrupted pass resumes where it stopped at the next session start |
 
-Every key accepts a per-agent override under `agents.<id>.runtime`. For identities a session does not host (`omo doctor --fix` and the background host sweep), only the global config counts: unreflected input is discarded there only when the global `discard_unreflected_journals` is on and that identity's own override does not turn it off. A transcript removed from a
+Every key accepts a per-agent override under `agents.<id>.runtime`. For identities a session does not host (`omo doctor --fix` and the background host sweep), only the global config counts: every window comes from the global `runtime` and that identity's own global `agents.<id>.runtime` override, and unreflected input is discarded there only when the global `discard_unreflected_journals` is on and that identity's own override does not turn it off. A transcript removed from a
 journal keeps its reflection cursor in `state.json`; a resumed session rebuilds the transcript from
 its own history and continues after the last reflected message.
 

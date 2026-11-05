@@ -8,12 +8,20 @@ import { dirname } from "node:path"
 import { buildIdentityPaths } from "../identity/layout"
 import type { HostSweepIdentity, HostSweepStep } from "../reflection/host-sweep"
 import { runRuntimeRetention, summarizeRuntimeRetention } from "./pass"
-import { DEFAULT_RUNTIME_RETENTION } from "./policy"
+import { DEFAULT_RUNTIME_RETENTION, type RuntimeRetentionPolicy } from "./policy"
 
 /** The memory settings shape this decision reads; plain data so the CLI bundle can pass parsed JSON. */
+export interface ForeignRuntimeLayer {
+  readonly retention_days?: unknown
+  readonly abandoned_journal_days?: unknown
+  readonly completions_days?: unknown
+  readonly pass_budget_ms?: unknown
+  readonly discard_unreflected_journals?: unknown
+}
+
 export interface ForeignMemoryRuntimeSettings {
-  readonly runtime?: { readonly discard_unreflected_journals?: unknown }
-  readonly agents?: Readonly<Record<string, { readonly runtime?: { readonly discard_unreflected_journals?: unknown } } | undefined>>
+  readonly runtime?: ForeignRuntimeLayer
+  readonly agents?: Readonly<Record<string, { readonly runtime?: ForeignRuntimeLayer } | undefined>>
 }
 
 /**
@@ -27,8 +35,35 @@ export function resolveForeignIdentityDiscardUnreflected(settings: ForeignMemory
   return settings.agents?.[identity]?.runtime?.discard_unreflected_journals !== false
 }
 
+/** A non-negative finite number from the agent override, else the global value, else the default. */
+function window(settings: ForeignMemoryRuntimeSettings | undefined, identity: string, key: keyof Omit<ForeignRuntimeLayer, "discard_unreflected_journals">, fallback: number): number {
+  for (const value of [settings?.agents?.[identity]?.runtime?.[key], settings?.runtime?.[key]]) {
+    if (typeof value === "number" && Number.isFinite(value) && value >= 0) return value
+  }
+  return fallback
+}
+
+/**
+ * The retention policy for an identity the host sweep visits (REVIEW-5 M1): the same windows the
+ * session resolves, read from the global layer and its `agents.<id>.runtime` override.
+ */
+export function resolveForeignIdentityRetentionPolicy(settings: ForeignMemoryRuntimeSettings | undefined, identity: string): RuntimeRetentionPolicy {
+  return {
+    retentionDays: window(settings, identity, "retention_days", DEFAULT_RUNTIME_RETENTION.retentionDays),
+    abandonedJournalDays: window(settings, identity, "abandoned_journal_days", DEFAULT_RUNTIME_RETENTION.abandonedJournalDays),
+    completionsDays: window(settings, identity, "completions_days", DEFAULT_RUNTIME_RETENTION.completionsDays),
+    passBudgetMs: window(settings, identity, "pass_budget_ms", DEFAULT_RUNTIME_RETENTION.passBudgetMs),
+    discardUnreflectedJournals: resolveForeignIdentityDiscardUnreflected(settings, identity),
+  }
+}
+
 export interface RetentionHostSweepStepOptions {
   readonly settings?: ForeignMemoryRuntimeSettings
+  /**
+   * Identities this process hosts (REVIEW-5 M2). Their own pass already ran with live sessions, owned
+   * sidecars and the project layer, so the host sweep must not visit them again with less context.
+   */
+  readonly isHostedIdentity?: (name: string) => boolean
   readonly now?: () => number
   readonly signal?: AbortSignal
   /** End of the driver's slice: each identity's budget is `min(pass budget, slice remaining)`. */
@@ -41,15 +76,13 @@ export function createRetentionHostSweepStep(options: RetentionHostSweepStepOpti
   const now = options.now ?? Date.now
   return async (identity: HostSweepIdentity) => {
     if (options.dryRun === true) return []
-    const remaining = options.deadline === undefined ? DEFAULT_RUNTIME_RETENTION.passBudgetMs : Math.max(1, options.deadline - now())
+    if (options.isHostedIdentity?.(identity.name) === true) return []
+    const policy = resolveForeignIdentityRetentionPolicy(options.settings, identity.name)
+    const remaining = options.deadline === undefined ? policy.passBudgetMs : Math.max(1, options.deadline - now())
     try {
       const report = await runRuntimeRetention({
         paths: buildIdentityPaths(dirname(dirname(identity.root)), identity.name),
-        policy: {
-          ...DEFAULT_RUNTIME_RETENTION,
-          discardUnreflectedJournals: resolveForeignIdentityDiscardUnreflected(options.settings, identity.name),
-          passBudgetMs: Math.min(DEFAULT_RUNTIME_RETENTION.passBudgetMs, remaining),
-        },
+        policy: { ...policy, passBudgetMs: Math.min(policy.passBudgetMs, remaining) },
         now,
         reflectionEnabled: true,
         ...(options.signal === undefined ? {} : { signal: options.signal }),

@@ -42,7 +42,8 @@ export class PassBudget {
     const exhausted = this.signal?.aborted === true || this.now() - this.startedAt >= this.budgetMs
     if (!exhausted) return true
     this.aborted = this.signal?.aborted === true
-    this.stopped = this.last ?? { store }
+    // Nothing finished this pass: a resume point inside this very store is still the resume point.
+    this.stopped = this.last ?? (this.resume?.store === store ? this.resume : { store })
     return false
   }
 

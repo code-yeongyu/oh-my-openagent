@@ -33,7 +33,11 @@ export async function pruneTranscriptJournals(
   for (const sessionId of await listNames(context.paths.transcripts)) {
     if (context.budget?.skip("journals", sessionId) === true) continue
     if (context.budget?.admit("journals") === false) break
-    const outcome = await visitJournal(context, lazyGuard, gate, lock, sessionId)
+    // One journal that cannot be read is kept with its reason; it never stops the rest of the pass.
+    const outcome = await visitJournal(context, lazyGuard, gate, lock, sessionId).catch((error: unknown): RetentionKeepReason => {
+      if (context.signal?.aborted === true) throw error
+      return "state-unreadable"
+    })
     if (outcome === "removed") tally.removed.push(sessionId)
     else if (outcome !== undefined) tally.keep(sessionId, outcome)
     context.budget?.done("journals", sessionId)

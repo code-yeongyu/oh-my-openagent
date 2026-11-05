@@ -7,6 +7,7 @@ import { join } from "node:path"
 
 import {
   GitMemoryRepo,
+  TranscriptJournal,
   buildIdentityPaths,
   createLockRecord,
   memoryMaintenanceLockPath,
@@ -432,6 +433,27 @@ describe("host sweep driver 2 (6b, A34 in-session half)", () => {
 
     expect(existsSync(foreignRun)).toBe(false)
     expect(existsSync(join(memoryRoot, "runtime-sweep.json"))).toBe(true)
+  }, 60_000)
+
+  test("#given a bound identity whose live session has a fully reflected journal past retention #when the pass runs with driver 2 on #then the host sweep does not revisit the bound identity and the journal stays (REVIEW-5 M2)", async () => {
+    const { context } = await identityWithHistory(0)
+    const journalDir = join(context.identityPaths.transcripts, "live-session")
+    const journal = new TranscriptJournal({ journalDir, now: () => new Date(NOW - 20 * DAY) })
+    await journal.reconcile([
+      { kind: "user", messageId: "u1", text: "first" },
+      { kind: "assistant", messageId: "a1", textBlocks: ["first answer"] },
+    ])
+    const snapshot = await journal.captureReflectionSnapshot()
+    if (snapshot === null) throw new Error("expected a snapshot")
+    await journal.finalizeReflection(snapshot, true)
+    for (const name of ["state.json", "transcript.jsonl"]) await utimes(join(journalDir, name), new Date(NOW - 20 * DAY), new Date(NOW - 20 * DAY))
+    await utimes(journalDir, new Date(NOW - 20 * DAY), new Date(NOW - 20 * DAY))
+    const maintenance = createMemoryMaintenance({ delayMs: 0, now: () => NOW, isLiveSession: (id) => id === "live-session", hostSweep: () => ({}) })
+
+    maintenance.schedule(context)
+    await maintenance.settled()
+
+    expect(existsSync(join(journalDir, "transcript.jsonl"))).toBe(true)
   }, 60_000)
 
   test("#given driver 2 disabled (CI, task child) #when the pass runs #then foreign identities are untouched", async () => {
