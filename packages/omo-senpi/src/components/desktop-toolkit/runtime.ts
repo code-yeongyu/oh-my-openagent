@@ -5,6 +5,7 @@ import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../
 import { DESKTOP_TOOLKIT_TOOL_NAME, TOOLKIT_REQUEST_EVENT, TOOLKIT_GRANT_RPC, TOOLKITS_CONTEXT_KEY, type ToolkitGrant } from "./index"
 import { callThreadTool, listThreadTools } from "./thread-tools"
 import { callingSessionId, createHostToolRoutes } from "./host-tool-routes"
+import { DESKTOP_TOOLKIT_SIDE } from "./hand-lifetime"
 import { type LoadSdk, registerHostToolExecution } from "./host-tool-execution"
 
 const DEFAULT_ACQUIRE_TIMEOUT_MS = 15_000
@@ -133,6 +134,7 @@ export function createDesktopToolkitRuntime(options: { readonly timeoutMs?: numb
         exposure: "eval",
         permissionParser: () => [],
         executionMode: "parallel",
+        ...DESKTOP_TOOLKIT_SIDE,
         async execute(_toolCallId: string, params: { readonly op?: unknown; readonly toolkit?: unknown }) {
           const toolkit = typeof params.toolkit === "string" ? params.toolkit : ""
           if (params.op !== "acquire" || toolkit === "") return reply({ ok: false, reason: "invalid_request" })
@@ -203,6 +205,7 @@ export function createDesktopToolkitRuntime(options: { readonly timeoutMs?: numb
               label: name,
               description: tool.description ?? "",
               parameters: tool.inputSchema,
+              ...DESKTOP_TOOLKIT_SIDE,
               async execute(_id: string, args: Record<string, unknown>, signal?: AbortSignal, _onUpdate?: unknown, callCtx?: unknown) {
                 const caller = callingSessionId(callCtx)
                 // Never substitute the registering session when the caller has no grant.
@@ -240,7 +243,7 @@ export function createDesktopToolkitRuntime(options: { readonly timeoutMs?: numb
           deferUntilAfterFirstPaint(ctx, "desktop thread toolkit", () =>
             state.startupPending ? discover(sessionId, state) : undefined)
         }
-      })
+      }, DESKTOP_TOOLKIT_SIDE)
       // The first real turn joins the bounded startup attempt. After a failure, retries run in the background without
       // waiting, on the turns RETRY_GAPS_IN_TURNS allows, so an app that never answers cannot hold any prompt for the
       // timeout and is not asked on every turn forever.
@@ -257,7 +260,7 @@ export function createDesktopToolkitRuntime(options: { readonly timeoutMs?: numb
           else if (state.running === undefined && retryDue(state)) void discover(sessionId, state)
         }
         return Promise.all(pending)
-      }, { previewSafe: true })
+      }, { ...DESKTOP_TOOLKIT_SIDE, previewSafe: true })
       pi.on("session_shutdown", (_event, eventCtx) => {
         const sessionId = callingSessionId(eventCtx)
         if (sessionId === undefined) return
@@ -268,7 +271,7 @@ export function createDesktopToolkitRuntime(options: { readonly timeoutMs?: numb
           grants.delete(key)
         }
         routes.clear(sessionId)
-      })
+      }, DESKTOP_TOOLKIT_SIDE)
     },
   }
 }
