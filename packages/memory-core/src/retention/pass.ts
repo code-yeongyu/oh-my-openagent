@@ -32,7 +32,8 @@ export interface RuntimeRetentionReport {
   readonly sidecars: RetentionStoreResult
   readonly ledgers: RetentionStoreResult
   readonly recallRuns: LegacyRecallRunsOutcome
-  readonly unreflectedGate: UnreflectedRetentionGate
+  /** Read only when `discardUnreflectedJournals` is on; undefined when off or when the pass stopped while reading it. */
+  readonly unreflectedGate?: UnreflectedRetentionGate
   /** Set when the pass stopped early (budget or abort); persisted for the next pass. */
   readonly cursor?: RetentionCursor
 }
@@ -48,7 +49,9 @@ export async function runRuntimeRetention(options: RuntimeRetentionOptions): Pro
   const runs = await pruneReflectionRuns(context, guard)
   const completions = await pruneCompletions(context, guard)
   const reflectionSessions = await pruneLegacyReflectionSessions(context, guard)
-  const unreflectedGate = await readUnreflectedRetentionGate(options.paths.reflection, options.reflectionEnabled ?? true)
+  const unreflectedGate = options.policy.discardUnreflectedJournals
+    ? await readUnreflectedRetentionGate(options.paths.reflection, options.reflectionEnabled ?? true, () => budget.admit("journals"))
+    : undefined
   const journals = await pruneTranscriptJournals(context, guard, unreflectedGate)
   const sidecarResult = await pruneKibitzerSidecars({
     recallDir: options.paths.recall,
@@ -81,7 +84,7 @@ export async function runRuntimeRetention(options: RuntimeRetentionOptions): Pro
     sidecars: { removed: [...sidecarResult.pruned].sort(), kept: sidecarResult.keptReasons },
     ledgers,
     recallRuns,
-    unreflectedGate,
+    ...(unreflectedGate === undefined ? {} : { unreflectedGate }),
     ...(budget.stopped === undefined ? {} : { cursor: budget.stopped }),
   }
 }

@@ -25,6 +25,8 @@ export async function pruneReflectionRuns(context: RetentionContext, lazyGuard: 
   const tally = new StoreTally()
   const folded: Folded[] = []
   for (const name of await listNames(runsDir)) {
+    // Classifying reads every run: it stops on the same budget and abort signal as the removals.
+    if (context.budget?.admit("runs") === false) return tally.result()
     const runDir = join(runsDir, name)
     if (name.startsWith(RETENTION_TOMBSTONE_PREFIX)) {
       await removeTombstone(runDir, context)

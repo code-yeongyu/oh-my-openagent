@@ -635,13 +635,13 @@ describe("runtime retention: reflection-health gate for unreflected input (N4, A
         expect(report.journals.removed).toEqual(["s-never", "s-partly"])
         expect(existsSync(never)).toBe(false)
         expect(existsSync(join(partly, "transcript.jsonl"))).toBe(false)
-        expect(report.unreflectedGate.open).toBe(true)
+        expect(report.unreflectedGate?.open).toBe(true)
       } else {
         expect(report.journals.kept).toEqual({ "s-never": "reflection-unhealthy", "s-partly": "reflection-unhealthy" })
         expect(existsSync(join(never, "transcript.jsonl"))).toBe(true)
         expect(existsSync(join(partly, "transcript.jsonl"))).toBe(true)
-        expect(report.unreflectedGate.open).toBe(false)
-        expect(report.unreflectedGate.newest?.kind).toMatch(/^(failed|abandoned|quarantined|parked)$/)
+        expect(report.unreflectedGate?.open).toBe(false)
+        expect(report.unreflectedGate?.newest?.kind).toMatch(/^(failed|abandoned|quarantined|parked)$/)
       }
     })
   }

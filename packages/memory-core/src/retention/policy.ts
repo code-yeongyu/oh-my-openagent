@@ -51,6 +51,7 @@ export type RetentionKeepReason =
   | "reflection-unhealthy"
   | "unreflected-retention-off"
   | "changed-during-removal"
+  | "state-behind-transcript"
 
 export interface RetentionStoreResult {
   readonly removed: readonly string[]

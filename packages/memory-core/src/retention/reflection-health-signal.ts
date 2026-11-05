@@ -21,7 +21,15 @@ export interface UnreflectedRetentionGate {
   readonly newest?: { readonly kind: Exclude<ReflectionTerminalKind, "success">; readonly at: string }
 }
 
-export async function readUnreflectedRetentionGate(reflectionDir: string, reflectionEnabled: boolean): Promise<UnreflectedRetentionGate> {
+/**
+ * `admit` is asked before each record is read; once it answers false the walk stops and the gate is
+ * undefined (unknown), so no unreflected input is judged on a partial read.
+ */
+export async function readUnreflectedRetentionGate(
+  reflectionDir: string,
+  reflectionEnabled: boolean,
+  admit: () => boolean = () => true,
+): Promise<UnreflectedRetentionGate | undefined> {
   if (!reflectionEnabled) return { open: true }
   const parkedAt = await readJson(join(reflectionDir, "park.json")).then((park) => stringField(park, "parkedAt"))
   if (parkedAt !== undefined) return { open: false, newest: { kind: "parked", at: parkedAt } }
@@ -33,6 +41,7 @@ export async function readUnreflectedRetentionGate(reflectionDir: string, reflec
   const completions = join(reflectionDir, "completions")
   for (const name of await listNames(completions)) {
     if (!name.endsWith(".json")) continue
+    if (!admit()) return undefined
     const record = await readJson(join(completions, name))
     const outcome = stringField(record, "outcome")
     const at = parse(stringField(record, "finishedAt"))
@@ -42,6 +51,7 @@ export async function readUnreflectedRetentionGate(reflectionDir: string, reflec
   }
   const runs = join(reflectionDir, "runs")
   for (const name of await listNames(runs)) {
+    if (!admit()) return undefined
     // A sentinel is dated by its run's `generation` (when the run was reserved), never by when the
     // reaper wrote it: a stale run settled today must not read as today's failure (R4).
     const abandoned = parse(stringField(await readJson(join(runs, name, "abandoned.json")), "generation"))
