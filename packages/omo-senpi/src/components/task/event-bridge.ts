@@ -17,7 +17,7 @@ import { isRunHoldChange, type EngineRunPauseBridge } from "./run-pause-bridge"
 export const TASK_USAGE_HINT_FLAG = "omo-task-usage-hint"
 
 type EventBridgeState = {
-  readonly runPause?: Pick<EngineRunPauseBridge, "restore" | "reconciled" | "changed">
+  readonly runPause?: Pick<EngineRunPauseBridge, "restore" | "reconciled" | "changed" | "releaseStale">
   readonly reconcileTeamMailbox: () => Promise<void>
   readonly leadPollers: Pick<LeadPollerLifecycle, "tick" | "shutdown">
   readonly resumptionChannels: Pick<ResumptionChannelEmitter, "emitSessionStart" | "emitShutdown">
@@ -283,8 +283,18 @@ export function wireEventBridge(
   pi.on("before_agent_start", (payload, eventCtx) => {
     if (isPreview(payload)) return undefined
     engine.runtime.captureFrom(asLiveContext(eventCtx))
+    const liveSessionId = engine.runtime.sessionId()
+    // Every real turn (person, extension or delivery) re-checks the run's Stop against the engine's live
+    // ledger, which is what proves a Stop the bridge missed was released. The release resumes children,
+    // which can take as long as their resume turns, so it runs in the background and never holds the turn;
+    // a failure is logged.
+    if (runPause !== undefined && liveSessionId !== undefined) {
+      void runPause.releaseStale(liveSessionId).catch((error: unknown) => {
+        ctx.logger.warn("omo-senpi task stale run Stop release failed", { error: String(error) })
+      })
+    }
     if (ctx.config.getFlag(TASK_USAGE_HINT_FLAG) === false) return undefined
-    const sessionId = engine.runtime.sessionId() ?? "unknown-session"
+    const sessionId = liveSessionId ?? "unknown-session"
     if (!guidanceGuard(sessionId)) return undefined
     pi.sendMessage(
       { customType: "senpi-task.usage", content: TASK_USAGE_GUIDANCE, display: false, details: {} },

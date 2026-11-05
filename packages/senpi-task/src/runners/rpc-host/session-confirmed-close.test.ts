@@ -50,6 +50,7 @@ async function closureFixture(hostState: "answers" | "stalled" | "gone", acked: 
     sendExtensionUIResponse: unexpected, getAvailableModels: unexpected,
     getEntries: unexpected, switchSession: unexpected,
   }
+  clock = fakeClock()
   const client = new HostSessionClient({
     socketPath: "/tmp/confirmed-close/rpc.sock",
     ports: {
@@ -64,7 +65,6 @@ async function closureFixture(hostState: "answers" | "stalled" | "gone", acked: 
   clients.push(client)
   const path = "/tmp/sessions/close-proof.jsonl"
   const opened = await client.open(childOpenInput(path))
-  clock = fakeClock()
   const handle = createHostSessionHandle({
     client, session: { routingId: opened.sessionId, sessionPath: path, instanceId: opened.instanceId },
     taskId: "st_close_proof", heartbeatIntervalMs: 10_000, now: clock.now,

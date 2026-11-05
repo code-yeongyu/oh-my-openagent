@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test"
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync, watch } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join, sep } from "node:path"
+import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { gatewayInboxDirectory, gatewayRootDirectory } from "./paths"
@@ -15,6 +15,23 @@ const bind = (session: string) => ({
   principal: "fixture",
   binding: { platform: "custom", account_id: "bot", chat_id: session, session_durable_id: session, ttl_seconds: null },
 })
+
+/** Reads `stream` until a whole line equals `line`; `found` is false when the stream ends first. */
+async function readUntilLine(stream: ReadableStream<Uint8Array>, line: string): Promise<{ found: boolean; text: string }> {
+  const reader = stream.getReader()
+  const decoder = new TextDecoder()
+  let text = ""
+  try {
+    for (;;) {
+      const chunk = await reader.read()
+      if (chunk.done) return { found: false, text }
+      text += decoder.decode(chunk.value, { stream: true })
+      if (text.split("\n").slice(0, -1).includes(line)) return { found: true, text }
+    }
+  } finally {
+    reader.releaseLock()
+  }
+}
 
 test("#given a blocked inbox path #when a joined enqueue commits #then the call refuses, nothing commits, and a later retry wakes", async () => {
   const h = (harness = createGatewayHarness())
@@ -103,27 +120,16 @@ test("#given a crash between marker and COMMIT #when the store reopens #then rec
   const h = (harness = createGatewayHarness())
   const agentDir = mkdtempSync(join(tmpdir(), "gateway-wake-"))
   const inbox = gatewayInboxDirectory(agentDir, "target")
-  const inboxRoot = join(gatewayRootDirectory(agentDir), "inbox")
-  mkdirSync(inboxRoot, { recursive: true })
-  const markerAppeared = new Promise<string>((resolve, reject) => {
-    const watcher = watch(inboxRoot, { recursive: true }, (_event, filename) => {
-      if (typeof filename !== "string") return
-      const name = filename.split(sep).join("/")
-      if (!name.startsWith("target/") || !existsSync(join(inboxRoot, name)) || !statSync(join(inboxRoot, name)).isFile()) return
-      clearTimeout(deadline)
-      watcher.close()
-      resolve(name)
-    })
-    const deadline = setTimeout(() => {
-      watcher.close()
-      reject(new Error("waited 10s for the joined wake marker, never appeared"))
-    }, 10_000)
-  })
   const child = Bun.spawn([process.execPath, fileURLToPath(new URL("./testing/extension-wake-driver.mjs", import.meta.url)), "crashBeforeCommit", agentDir], { stdout: "pipe", stderr: "pipe" })
   const watchdog = setTimeout(() => child.kill(), 15_000)
   let store: GatewayStore | undefined
   try {
-    await markerAppeared
+    // The driver prints ENQUEUED once the joined enqueue has returned (its marker is on disk) while COMMIT never runs.
+    // A recursive watch on the inbox is not used: on macOS it is FSEvents-backed and can drop a create made by another
+    // process right after the watch is armed, so the wait timed out with the marker already written (#12455).
+    const enqueued = await readUntilLine(child.stdout, "ENQUEUED")
+    if (!enqueued.found) throw new Error(`the driver ended before its joined enqueue returned: stdout=${JSON.stringify(enqueued.text)} stderr=${JSON.stringify(await new Response(child.stderr).text())}`)
+    expect(readdirSync(inbox)).toHaveLength(1)
     child.kill()
     await child.exited
     store = h.store({ agentDir })
