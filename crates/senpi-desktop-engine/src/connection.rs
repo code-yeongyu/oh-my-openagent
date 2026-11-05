@@ -249,6 +249,7 @@ async fn deliver(
     out: &mpsc::Sender<String>,
     reply: String,
 ) -> Result<(), SendError<String>> {
+    engine.announce_epochs();
     out.send(reply).await?;
     for line in engine.outbox().drain() {
         out.send(line).await?;

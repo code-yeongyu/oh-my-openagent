@@ -11,6 +11,7 @@ use crate::error::{CoreResult, DesktopError, TccPermission};
 use crate::frame::FrameGeometry;
 use crate::keys::KeyName;
 pub use crate::protocol_results::AxInputMethod;
+use crate::protocol_results::EpochReason;
 use crate::report::ReportMode;
 use crate::types::{
     CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, DisplaySelector, FrontWindow,
@@ -328,6 +329,20 @@ pub trait Backend: Send {
     fn user_input_feed(&mut self) -> Option<std::sync::Arc<dyn UserInputFeed>> {
         None
     }
+
+    /// Host events that move the session's coordinate epoch, readable while
+    /// the backend is busy; `None` where the backend observes none.
+    fn epoch_source(&self) -> Option<std::sync::Arc<dyn EpochSource>> {
+        None
+    }
+}
+
+/// Host events that invalidate every frame and ref (display reconfiguration,
+/// sleep, a Space switch), safe to read from any thread.
+pub trait EpochSource: Send + Sync {
+    /// Why the epoch moved, for every move since this source was built from
+    /// the `seen`-th on. A source that samples the host samples here.
+    fn moves_since(&self, seen: usize) -> Vec<EpochReason>;
 }
 
 /// Live lock and display-sleep state, safe to read from any thread.

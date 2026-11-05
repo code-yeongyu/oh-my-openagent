@@ -159,6 +159,13 @@ impl Engine {
         }
     }
 
+    /// Queues `epoch.changed` for every epoch move the session saw.
+    pub fn announce_epochs(&self) {
+        for change in self.session.epoch_changes() {
+            self.outbox.push(Notification::EpochChanged, &change);
+        }
+    }
+
     /// The installed fake clock, when `SENPI_DESKTOP_FAKE_CLOCK=1` set one.
     pub fn fake_clock(&self) -> Option<&FakeClock> {
         self.fake_clock.as_deref()

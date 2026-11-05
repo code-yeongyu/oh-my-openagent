@@ -27,7 +27,8 @@
                 "frame-identity",
                 "frame-consume",
                 "ax-partial",
-                "trace"
+                "trace",
+                "epoch"
               ]
             }
           },
