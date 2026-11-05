@@ -41,7 +41,16 @@ export async function awaitWithinTestBudget<T>(event: Promise<T>, what: string):
   }
 }
 
-/** An abort signal for an awaited event that fires when the current test's remaining budget runs out. */
-export function testBudgetSignal(): AbortSignal {
-  return AbortSignal.timeout(remainingTestTime())
+/**
+ * An abort signal for an awaited event that fires when the current test's remaining budget runs out. Its reason is
+ * a TimeoutError naming `what`, so a shard failure says which event never came.
+ */
+export function testBudgetSignal(what = "the awaited event"): AbortSignal {
+  const controller = new AbortController()
+  const timer = setTimeout(
+    () => controller.abort(new DOMException(`waited out the test budget for ${what}`, "TimeoutError")),
+    remainingTestTime(),
+  )
+  timer.unref?.()
+  return controller.signal
 }

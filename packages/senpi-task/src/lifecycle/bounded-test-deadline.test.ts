@@ -1,4 +1,4 @@
-import { afterAll, expect, spyOn, test } from "bun:test"
+import { afterAll, afterEach, expect, mock, spyOn, test } from "bun:test"
 import { DEFAULT_TEST_TIMEOUT_MS, resetTestDeadline } from "../../../../test-support/test-deadline"
 import { bounded as boundedLifecycleEvent, signal } from "./__fixtures__/live-parent-clock"
 import { bounded as boundedWorkpoolEvent } from "../workpool/__fixtures__/admission"
@@ -12,6 +12,7 @@ afterAll(() => {
   performance.now = originalNow
   resetTestDeadline()
 })
+afterEach(() => mock.restore())
 
 // Longer than both old fixed bounds (2 s live-parent, 5 s workpool), so the old helpers fail by behaviour.
 const STALL_MS = 6_000
@@ -26,7 +27,9 @@ function fakeTimeouts() {
   return {
     stall(ms: number): void {
       now += ms
-      for (const timer of pending.splice(0)) if (timer.due <= now) timer.fire()
+      const due = pending.filter((timer) => timer.due <= now)
+      pending.splice(0, pending.length, ...pending.filter((timer) => timer.due > now))
+      for (const timer of due) timer.fire()
     },
   }
 }

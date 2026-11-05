@@ -1,4 +1,4 @@
-import { afterAll, expect, spyOn, test } from "bun:test"
+import { afterAll, afterEach, expect, mock, spyOn, test } from "bun:test"
 import {
   awaitWithinTestBudget,
   DEFAULT_TEST_TIMEOUT_MS,
@@ -16,6 +16,9 @@ afterAll(() => {
   performance.now = originalNow
   resetTestDeadline()
 })
+// Package-local runs do not load the root preload that restores spies, so this file restores its own.
+afterEach(() => mock.restore())
+const realTimers = { setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout }
 
 test("#given an earlier test #when its clock exhausts the launch budget #then no time remains", () => {
   now += DEFAULT_TEST_TIMEOUT_MS * 2
@@ -38,17 +41,13 @@ function fakeTimers() {
     return pending.length as unknown as ReturnType<typeof setTimeout>
   }) as unknown as typeof setTimeout)
   spyOn(globalThis, "clearTimeout").mockImplementation(() => undefined)
-  spyOn(AbortSignal, "timeout").mockImplementation((delay: number) => {
-    const controller = new AbortController()
-    armed.push(delay)
-    pending.push({ due: now + delay, fire: () => controller.abort(new DOMException("The operation timed out.", "TimeoutError")) })
-    return controller.signal
-  })
   return {
     armed,
     elapse(ms: number): void {
       now += ms
-      for (const timer of pending.splice(0)) if (timer.due <= now) timer.fire()
+      const due = pending.filter((timer) => timer.due <= now)
+      pending.splice(0, pending.length, ...pending.filter((timer) => timer.due > now))
+      for (const timer of due) timer.fire()
     },
   }
 }
@@ -124,4 +123,10 @@ test.each(waitPrimitives)("#given an event that never comes #when the remaining 
 
   // then
   expect(await waited).toEqual({ status: "rejected", name: failure })
+})
+
+test("#given the rows above replaced the timers #when a later test runs #then it sees the real setTimeout and clearTimeout again", () => {
+  // then
+  expect(globalThis.setTimeout).toBe(realTimers.setTimeout)
+  expect(globalThis.clearTimeout).toBe(realTimers.clearTimeout)
 })
