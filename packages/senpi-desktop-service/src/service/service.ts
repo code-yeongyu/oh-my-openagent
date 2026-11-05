@@ -39,15 +39,18 @@ export class DesktopService {
 	readonly #hub = new NotificationHub();
 	#lifecycle: Promise<unknown> = Promise.resolve();
 	#connection: Connection | undefined;
+	#backend: DesktopCapabilities["backend"] | undefined;
 	#desired: DesiredSession | undefined;
 	readonly #grants = new ControlGrants();
 	readonly #consent: FullAccessConsent;
+	readonly #fullAccess: () => boolean;
 	/** The user's stop, held by the host: only a stop sets it and only a successful resume clears it (#10788). */
 	#stopLatched = false;
 
 	constructor(options: DesktopServiceOptions = {}) {
 		this.#createChild = options.createChild ?? engineChildFactory();
-		this.#consent = new FullAccessConsent(this.#grants, options.fullAccess ?? (() => false));
+		this.#fullAccess = options.fullAccess ?? (() => false);
+		this.#consent = new FullAccessConsent(this.#grants, this.#fullAccess);
 		this.#hub.onStopPathChange((status) => {
 			if (status.suspended) this.#stopLatched = true;
 		});
@@ -101,6 +104,36 @@ export class DesktopService {
 		if (method === "control.revoke") return this.#grants.revoke(request);
 		if (isGlobalInput(method, params)) return this.#consent.send(connection, method, params, options);
 		return request();
+	}
+
+	/**
+	 * Whether this live, unstopped macOS session allows the D2 foreground rerun: full access, or a grant a
+	 * human approved that may still be live. An automatic (full-access) grant never counts on its own: once
+	 * full access ends it is fenced, and this reads false.
+	 */
+	foregroundAllowed(): boolean {
+		return this.#connection?.rpc.alive === true && this.#backend === "quartz" && !this.#stopLatched
+			&& (this.#fullAccess() || (this.#grants.possiblyLive && !this.#grants.automaticLive));
+	}
+
+	/** A grant this service sent may still hold (human-approved or automatic). */
+	possiblyLive(): boolean {
+		return this.#grants.possiblyLive;
+	}
+
+	/** A possibly-live grant that only full access authorized. */
+	automaticGrantLive(): boolean {
+		return this.#grants.automaticLive;
+	}
+
+	/**
+	 * The automatic full-access grant for a foreground rerun (D2): no confirm, headless included, fenced when
+	 * full access ends. Returns false and grants nothing outside full access.
+	 */
+	async grantForFullAccess(signal: AbortSignal): Promise<boolean> {
+		const connection = await this.#live();
+		await this.#consent.fence(connection);
+		return this.#consent.grantForFullAccess(connection, { signal });
 	}
 
 	/** Reports a failure nobody awaits (a best-effort revoke) to `onError` listeners instead of dropping it. */
@@ -249,6 +282,7 @@ export class DesktopService {
 		if (opened === undefined) throw malformed("session.open");
 		// The token stays inside the service: only `resume()` sends it back.
 		connection.resumeToken = opened.resumeToken;
+		this.#backend = opened.capabilities.backend;
 		return opened.capabilities;
 	}
 
@@ -273,7 +307,10 @@ export class DesktopService {
 
 	#drop(connection: Connection): void {
 		clearInterval(connection.heartbeat);
-		if (this.#connection === connection) this.#connection = undefined;
+		if (this.#connection === connection) {
+			this.#connection = undefined;
+			this.#backend = undefined;
+		}
 	}
 }
 

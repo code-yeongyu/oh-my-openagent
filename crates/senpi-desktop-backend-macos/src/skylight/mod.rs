@@ -6,10 +6,13 @@
 //! posting is `SLEventPostToPid` (plus the public per-pid supplement for plain
 //! AppKit) only.
 
+mod activation;
 mod authentication;
 mod partial;
 mod psn;
+mod public_route;
 mod spi;
+mod window_query;
 
 use std::thread;
 use std::time::{Duration, Instant};
@@ -25,19 +28,16 @@ use self::psn::{
     front_process, post_focus_record, process_psn, FocusMarker, ProcessSerialNumber,
     SET_FRONT_NO_WINDOWS,
 };
+pub(crate) use self::activation::{post_activation, sender_connection, set_fields, set_window_location};
 pub(crate) use self::partial::{mark_sent, reporting_partial};
-pub(crate) use self::spi::{front_pid, is_available};
+pub(crate) use self::window_query::window_parent;
+pub(crate) use self::spi::{front_pid, is_available, spaces, spaces_if_available, SpaceSpi};
 use self::spi::required;
 
 /// Ensures the required background SPI resolved; the error names the missing
 /// SkyLight symbols.
 pub(crate) fn require_spi() -> CoreResult<()> {
     required().map(|_| ())
-}
-
-#[link(name = "CoreGraphics", kind = "framework")]
-unsafe extern "C" {
-    fn CGEventPostToPid(pid: libc::pid_t, event: core_graphics::sys::CGEventRef);
 }
 
 fn event_ptr(event: &CGEvent) -> *mut std::ffi::c_void {
@@ -91,18 +91,17 @@ pub(crate) fn post_routed(pid: libc::pid_t, event: &CGEvent) -> CoreResult<()> {
     Ok(())
 }
 
-/// Posts a pointer event through SkyLight and the public per-pid queue. The
-/// public post supplements a successful SkyLight post for plain AppKit; it is
-/// never a fallback.
+/// Posts a pointer event through SkyLight and, where it is a separate
+/// function, the public per-pid queue ([`public_route`]). The public post
+/// supplements a successful SkyLight post for plain AppKit; it is never a
+/// fallback.
 pub(crate) fn post_dual(pid: libc::pid_t, event: &CGEvent) -> CoreResult<()> {
     let spi = required()?;
     // SAFETY: `event` remains retained for both posts and `post_to_pid` was
     // atomically resolved with its exact ABI.
     unsafe { (spi.post_to_pid)(pid, event_ptr(event)) };
     mark_sent();
-    // SAFETY: `event` remains retained for the synchronous public
-    // CoreGraphics post to the same process.
-    unsafe { CGEventPostToPid(pid, event.as_ptr()) };
+    public_route::post(pid, event);
     Ok(())
 }
 

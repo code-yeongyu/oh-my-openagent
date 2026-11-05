@@ -55,6 +55,18 @@ pub enum AxInputMethod {
     Keys,
 }
 
+/// `ax.selectText` reply: the selection that was applied, in UTF-16 code
+/// units of the element's value, with the text it covers and whether the
+/// element holds its application's focus.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AxTextSelection {
+    pub start: u32,
+    pub length: u32,
+    pub text: String,
+    pub focused: bool,
+}
+
 /// `ax.typeText` reply.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -83,6 +95,18 @@ pub struct StopPathStatus {
     /// Why input is not allowed, when it is not (e.g. `no-global-listener`,
     /// `heartbeat-stale`).
     pub reason: Option<String>,
+}
+
+/// What a press that opens a menu did with it (#11459): the items of the
+/// menu it opened and closed with nothing chosen, as a listing the next call
+/// can pick from with `menu:`. A press that chose its item, or opened no
+/// menu, reports `null`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MenuReport {
+    /// The menu's items in menu order, disabled ones marked, enabled
+    /// submenus followed by their items in brackets.
+    pub items: String,
 }
 
 /// The `audit` notification: one per mutating request, success or failure.

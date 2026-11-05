@@ -8,11 +8,12 @@ use image::RgbaImage;
 use parking_lot::Mutex;
 use senpi_desktop_backend_fake::{FakeBackend, FakeMethod};
 use senpi_desktop_core::ax::{AxBackend, AxHandle};
-use senpi_desktop_core::backend::{Backend, DeliveryMode, ElementDelivery, PointerEvent};
+use senpi_desktop_core::backend::{Backend, DeliveryMode, ElementDelivery, MenuChoice, PointerEvent};
 use senpi_desktop_core::error::{CoreResult, DesktopError, PermissionDeniedData, TccPermission};
 use senpi_desktop_core::frame::FrameGeometry;
 use senpi_desktop_core::keys::KeyName;
 use senpi_desktop_core::menus::MenuItem;
+use senpi_desktop_core::protocol_results::MenuReport;
 use senpi_desktop_core::types::{
     CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, FrontWindow, Target,
 };
@@ -81,6 +82,16 @@ impl Backend for PanickyFake {
     ) -> CoreResult<()> {
         self.inner.pointer(target, ev, frame, mode)
     }
+    fn pointer_menu(
+        &mut self,
+        target: &Target,
+        ev: PointerEvent,
+        frame: &FrameGeometry,
+        mode: DeliveryMode,
+        choice: MenuChoice<'_>,
+    ) -> CoreResult<Option<MenuReport>> {
+        self.inner.pointer_menu(target, ev, frame, mode, choice)
+    }
     fn type_text(&mut self, target: &Target, text: &str, mode: DeliveryMode) -> CoreResult<()> {
         self.inner.type_text(target, text, mode)
     }
@@ -110,11 +121,23 @@ impl Backend for PanickyFake {
     ) -> CoreResult<ElementDelivery> {
         self.inner.ax_type_text(h, text, mode, check_stop, delivered)
     }
+    fn ax_key_chord(
+        &mut self,
+        h: &AxHandle,
+        keys: &[KeyName],
+        mode: DeliveryMode,
+        check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<ElementDelivery> {
+        self.inner.ax_key_chord(h, keys, mode, check_stop)
+    }
     fn key_chord(&mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode) -> CoreResult<()> {
         self.inner.key_chord(target, keys, mode)
     }
     fn raise_window(&mut self, id: &str) -> CoreResult<()> {
         self.inner.raise_window(id)
+    }
+    fn bring_to_current_space(&mut self, id: &str, check_stop: &dyn Fn() -> CoreResult<()>) -> CoreResult<()> {
+        self.inner.bring_to_current_space(id, check_stop)
     }
     fn hold_keys(
         &mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode,

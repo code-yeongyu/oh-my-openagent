@@ -21,6 +21,7 @@
 		"desktop.holdKeys",
 		"desktop.holdMouse",
 		"desktop.raiseWindow",
+		"desktop.window.bringToCurrentSpace",
 		"desktop.menus.items",
 		"desktop.menus.select",
 		"desktop.clipboard.read",
@@ -38,6 +39,8 @@
 		"desktop.ax.focus",
 		"desktop.ax.click",
 		"desktop.ax.typeText",
+		"desktop.ax.selectText",
+		"desktop.ax.keyChord",
 		"desktop.stopPath.status",
 		"desktop.stop"
 	],
@@ -59,6 +62,7 @@
 		"desktop.holdKeys": "mutate",
 		"desktop.holdMouse": "mutate",
 		"desktop.raiseWindow": "mutate",
+		"desktop.window.bringToCurrentSpace": "mutate",
 		"desktop.menus.items": "read",
 		"desktop.menus.select": "mutate",
 		"desktop.clipboard.read": "read",
@@ -76,6 +80,8 @@
 		"desktop.ax.focus": "mutate",
 		"desktop.ax.click": "mutate",
 		"desktop.ax.typeText": "mutate",
+		"desktop.ax.selectText": "mutate",
+		"desktop.ax.keyChord": "mutate",
 		"desktop.stopPath.status": "read",
 		"desktop.stop": "read"
 	},
@@ -408,6 +414,16 @@
 							"type": "null"
 						}
 					]
+				},
+				"menu": {
+					"type": [
+						"array",
+						"null"
+					],
+					"items": {
+						"type": "string"
+					},
+					"description": "`click` only: the path of item labels to choose in the menu the click\nopens (a context menu, or a menu button's or popup button's menu);\nthe menu is closed before the call returns (#11459)."
 				}
 			},
 			"required": [
@@ -489,6 +505,16 @@
 							"type": "null"
 						}
 					]
+				},
+				"menu": {
+					"type": [
+						"array",
+						"null"
+					],
+					"items": {
+						"type": "string"
+					},
+					"description": "`click` only: the path of item labels to choose in the menu the click\nopens (a context menu, or a menu button's or popup button's menu);\nthe menu is closed before the call returns (#11459)."
 				}
 			},
 			"required": [
@@ -1050,6 +1076,19 @@
 			],
 			"additionalProperties": false
 		},
+		"desktop.window.bringToCurrentSpace": {
+			"type": "object",
+			"properties": {
+				"windowId": {
+					"type": "string"
+				}
+			},
+			"required": [
+				"windowId"
+			],
+			"description": "`window.bringToCurrentSpace`: the native id of the window to move into the\nuser's current Space. The window is usually on another Space, so it may be\nabsent from `windows`.",
+			"additionalProperties": false
+		},
 		"desktop.menus.items": {
 			"type": "object",
 			"properties": {
@@ -1311,6 +1350,16 @@
 				},
 				"action": {
 					"type": "string"
+				},
+				"menu": {
+					"type": [
+						"array",
+						"null"
+					],
+					"items": {
+						"type": "string"
+					},
+					"description": "The path of item labels to choose in the menu the action opens\n(`AXShowMenu`, or `AXPress` on a menu button or popup button); the\nmenu is closed before the call returns (#11459)."
 				}
 			},
 			"required": [
@@ -1363,6 +1412,16 @@
 							"type": "null"
 						}
 					]
+				},
+				"menu": {
+					"type": [
+						"array",
+						"null"
+					],
+					"items": {
+						"type": "string"
+					},
+					"description": "The path of item labels to choose in the menu the click opens; the\nmenu is closed before the call returns (#11459)."
 				}
 			},
 			"required": [
@@ -1436,6 +1495,112 @@
 				"text"
 			],
 			"description": "`ax.typeText`: types `text` into the element `ref` names. Only\n`opts.deliveryMode` is read: an omitted delivery is background (no focus\nchange for the user); `foreground` raises the element's window under the\ncontrol grant, like `ax.click`.",
+			"additionalProperties": false,
+			"definitions": {
+				"PointerOptions": {
+					"type": "object",
+					"properties": {
+						"button": {
+							"type": [
+								"string",
+								"null"
+							],
+							"default": null
+						},
+						"count": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint32",
+							"minimum": 0,
+							"default": null
+						},
+						"modifiers": {
+							"type": [
+								"array",
+								"null"
+							],
+							"items": {
+								"type": "string"
+							},
+							"default": null
+						},
+						"deliveryMode": {
+							"type": [
+								"string",
+								"null"
+							],
+							"default": null
+						}
+					},
+					"additionalProperties": false
+				}
+			}
+		},
+		"desktop.ax.selectText": {
+			"type": "object",
+			"properties": {
+				"ref": {
+					"type": "string"
+				},
+				"text": {
+					"type": "string"
+				},
+				"prefix": {
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"suffix": {
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"select": {
+					"type": [
+						"string",
+						"null"
+					]
+				}
+			},
+			"required": [
+				"ref",
+				"text"
+			],
+			"description": "`ax.selectText`: selects `text` inside the value of the element `ref`\nnames, disambiguated by the `prefix` and `suffix` around it; `select` is\n`text` (the match), `start` or `end` (a caret before or after it).",
+			"additionalProperties": false
+		},
+		"desktop.ax.keyChord": {
+			"type": "object",
+			"properties": {
+				"ref": {
+					"type": "string"
+				},
+				"keys": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"opts": {
+					"anyOf": [
+						{
+							"$ref": "#/definitions/PointerOptions"
+						},
+						{
+							"type": "null"
+						}
+					]
+				}
+			},
+			"required": [
+				"ref",
+				"keys"
+			],
+			"description": "`ax.keyChord`: presses the chord `keys` in the element `ref` names, as\nkeys once the element holds its application's keyboard focus (never\nunconfirmed). Only `opts.deliveryMode` is read: an omitted delivery is\nbackground (no focus change for the user); `foreground` raises the\nelement's window under the control grant, like `ax.typeText`.",
 			"additionalProperties": false,
 			"definitions": {
 				"PointerOptions": {

@@ -22,15 +22,16 @@ Protocol version `1`, ABI `senpi-desktop/1`. JSON-RPC 2.0, one JSON message per 
 | `capture` | read | no | no | `CaptureParams` | `CaptureResult` | `ErrorCode` |
 | `captureRegion` | read | no | no | `CaptureRegionParams` | `CaptureResult` | `ErrorCode` |
 | `observe` | read | no | no | `ObserveParams` | `ObserveResult` | `ErrorCode` |
-| `click` | exec | no | no | `PointParams` | `null` | `ErrorCode` |
+| `click` | exec | no | no | `PointParams` | `Option<MenuReport>` | `ErrorCode` |
 | `moveMouse` | exec | no | no | `PointParams` | `null` | `ErrorCode` |
-| `drag` | exec | no | no | `DragParams` | `null` | `ErrorCode` |
+| `drag` | exec | no | no | `DragParams` | `Option<MenuReport>` | `ErrorCode` |
 | `scroll` | exec | no | no | `ScrollParams` | `null` | `ErrorCode` |
 | `typeText` | exec | no | no | `TypeTextParams` | `null` | `ErrorCode` |
 | `keyChord` | exec | no | no | `KeyChordParams` | `null` | `ErrorCode` |
 | `holdKeys` | exec | no | no | `HoldKeysParams` | `null` | `ErrorCode` |
 | `holdMouse` | exec | no | no | `HoldMouseParams` | `null` | `ErrorCode` |
 | `raiseWindow` | exec | no | no | `RaiseWindowParams` | `null` | `ErrorCode` |
+| `window.bringToCurrentSpace` | exec | no | no | `BringToCurrentSpaceParams` | `null` | `ErrorCode` |
 | `menus.items` | read | no | no | `MenuPathParams` | `Vec<MenuItem>` | `ErrorCode` |
 | `menus.select` | exec | no | no | `MenuSelectParams` | `null` | `ErrorCode` |
 | `clipboard.read` | read | no | no | `EmptyParams` | `ClipboardText` | `ErrorCode` |
@@ -43,11 +44,13 @@ Protocol version `1`, ABI `senpi-desktop/1`. JSON-RPC 2.0, one JSON message per 
 | `ax.attributes` | read | no | no | `AxRefParams` | `Vec<(String, String)>` | `ErrorCode` |
 | `ax.children` | read | no | no | `AxRefParams` | `Vec<AxNode>` | `ErrorCode` |
 | `ax.parent` | read | no | no | `AxRefParams` | `Option<AxNode>` | `ErrorCode` |
-| `ax.perform` | exec | no | no | `AxPerformParams` | `null` | `ErrorCode` |
+| `ax.perform` | exec | no | no | `AxPerformParams` | `Option<MenuReport>` | `ErrorCode` |
 | `ax.setValue` | exec | no | no | `AxSetValueParams` | `null` | `ErrorCode` |
 | `ax.focus` | exec | no | no | `AxRefParams` | `null` | `ErrorCode` |
-| `ax.click` | exec | no | no | `AxClickParams` | `null` | `ErrorCode` |
+| `ax.click` | exec | no | no | `AxClickParams` | `Option<MenuReport>` | `ErrorCode` |
 | `ax.typeText` | exec | no | no | `AxTypeTextParams` | `AxInputResult` | `ErrorCode` |
+| `ax.selectText` | exec | no | no | `AxSelectTextParams` | `AxTextSelection` | `ErrorCode` |
+| `ax.keyChord` | exec | no | no | `AxKeyChordParams` | `null` | `ErrorCode` |
 | `stopPath.start` | exec | yes | no | `StopPathStartParams` | `StopPathStatus` | `ErrorCode`; `-32601` hostOnly via a bridge |
 | `stopPath.status` | read | no | no | `EmptyParams` | `StopPathStatus` | `ErrorCode` |
 | `stopPath.heartbeat` | read | yes | no | `EmptyParams` | `null` | `ErrorCode`; `-32601` hostOnly via a bridge |

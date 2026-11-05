@@ -99,3 +99,14 @@ pub fn element_at_node(
 pub fn ax_press(backend: &mut dyn AxBackend, handle: &AxHandle) -> CoreResult<()> {
     backend.perform(handle, "press")
 }
+
+/// Model-facing action names (`press`, `show_menu`) -> native `AX*` names.
+pub fn native_action_name(action: &str) -> String {
+    match action.trim().to_ascii_lowercase().as_str() {
+        "press" => "AXPress".to_string(),
+        "raise" => "AXRaise".to_string(),
+        "showmenu" | "show_menu" => "AXShowMenu".to_string(),
+        _ if action.starts_with("AX") => action.to_string(),
+        _ => format!("AX{action}"),
+    }
+}

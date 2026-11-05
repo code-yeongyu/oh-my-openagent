@@ -61,6 +61,7 @@ fn foreground_click(frame: &str) -> Op {
             delivery_mode: Some("foreground".to_owned()),
             ..PointerOptions::default()
         }),
+        menu: None,
     })
 }
 
@@ -71,6 +72,7 @@ fn background_click() -> Op {
         y: 10.0,
         frame_id: None,
         opts: None,
+        menu: None,
     })
 }
 
@@ -136,7 +138,7 @@ async fn a_second_sessions_grant_is_refused_and_close_releases_the_slot() {
         Response::ControlState(ControlStateResult { active: true, .. })
     ));
     let frame = capture(&second).await;
-    assert_eq!(second.submit(foreground_click(&frame)).wait().await, Ok(Response::Unit));
+    assert_eq!(second.submit(foreground_click(&frame)).wait().await, Ok(Response::MenuOutcome(None)));
     second.close().wait().await.expect("closes");
 }
 
@@ -159,7 +161,7 @@ async fn foreground_delivery_needs_the_grant_and_a_suspension_revokes_it() {
         .expect("grants");
     assert_eq!(
         session.submit(foreground_click(&frame)).wait().await,
-        Ok(Response::Unit)
+        Ok(Response::MenuOutcome(None))
     );
     // When: the user stops and then resumes
     supervisor.trigger_stop(StopSource::Hotkey);
@@ -216,7 +218,7 @@ async fn cursor_only_reconfiguration_preserves_frame_ax_ref_and_grant() {
     assert!(state(&session).await.active);
     assert_eq!(
         session.submit(foreground_click(&frame)).wait().await,
-        Ok(Response::Unit)
+        Ok(Response::MenuOutcome(None))
     );
     assert!(matches!(
         session

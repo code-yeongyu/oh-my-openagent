@@ -11,13 +11,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::menus::MenuItem;
 use crate::protocol_params::{
-    AdvanceClockParams, AxClickParams, AxElementAtParams, AxPerformParams, AxQueryParams, AxRefParams,
-    AxSetValueParams, AxSnapshotParams, AxTypeTextParams, CancelParams, CaptureParams, CaptureRegionParams, ClipboardText, ControlGrantParams, DragParams,
+    AdvanceClockParams, AxClickParams, AxElementAtParams, AxKeyChordParams, AxPerformParams, AxQueryParams, AxRefParams,
+    AxSelectTextParams, AxSetValueParams, AxSnapshotParams, AxTypeTextParams, BringToCurrentSpaceParams, CancelParams, CaptureParams, CaptureRegionParams, ClipboardText, ControlGrantParams, DragParams,
     EmptyParams, HoldKeysParams, HoldMouseParams, KeyChordParams, MenuPathParams, MenuSelectParams, ObserveParams, PointParams, RaiseWindowParams, ScrollParams, StopPathResumeParams,
     StopPathStartParams, StopPathStopParams, TypeTextParams,
 };
 use crate::protocol_results::{
-    AuditEvent, AxInputResult, ControlStateResult, EngineLog, HelloResult, SessionOpenResult, StopPathStatus,
+    AuditEvent, AxInputResult, AxTextSelection, ControlStateResult, EngineLog, HelloResult, SessionOpenResult, StopPathStatus, MenuReport,
 };
 use crate::types::{
     AxNode, AxSnapshot, CaptureResult, DesktopCapabilities, DesktopDisplay, DesktopSessionOptions, DesktopWindow, ObserveResult,
@@ -97,15 +97,16 @@ method_table! {
     Capture = "capture", Read, Public, CaptureParams => CaptureResult;
     CaptureRegion = "captureRegion", Read, Public, CaptureRegionParams => CaptureResult;
     Observe = "observe", Read, Public, ObserveParams => ObserveResult;
-    Click = "click", Exec, Public, PointParams => ();
+    Click = "click", Exec, Public, PointParams => Option<MenuReport>;
     MoveMouse = "moveMouse", Exec, Public, PointParams => ();
-    Drag = "drag", Exec, Public, DragParams => ();
+    Drag = "drag", Exec, Public, DragParams => Option<MenuReport>;
     Scroll = "scroll", Exec, Public, ScrollParams => ();
     TypeText = "typeText", Exec, Public, TypeTextParams => ();
     KeyChord = "keyChord", Exec, Public, KeyChordParams => ();
     HoldKeys = "holdKeys", Exec, Public, HoldKeysParams => ();
     HoldMouse = "holdMouse", Exec, Public, HoldMouseParams => ();
     RaiseWindow = "raiseWindow", Exec, Public, RaiseWindowParams => ();
+    RaiseToSpace = "window.bringToCurrentSpace", Exec, Public, BringToCurrentSpaceParams => ();
     MenusItems = "menus.items", Read, Public, MenuPathParams => Vec<MenuItem>;
     MenusSelect = "menus.select", Exec, Public, MenuSelectParams => ();
     ClipboardRead = "clipboard.read", Read, Public, EmptyParams => ClipboardText;
@@ -118,11 +119,13 @@ method_table! {
     AxAttributes = "ax.attributes", Read, Public, AxRefParams => Vec<(String, String)>;
     AxChildren = "ax.children", Read, Public, AxRefParams => Vec<AxNode>;
     AxParent = "ax.parent", Read, Public, AxRefParams => Option<AxNode>;
-    AxPerform = "ax.perform", Exec, Public, AxPerformParams => ();
+    AxPerform = "ax.perform", Exec, Public, AxPerformParams => Option<MenuReport>;
     AxSetValue = "ax.setValue", Exec, Public, AxSetValueParams => ();
     AxFocus = "ax.focus", Exec, Public, AxRefParams => ();
-    AxClick = "ax.click", Exec, Public, AxClickParams => ();
+    AxClick = "ax.click", Exec, Public, AxClickParams => Option<MenuReport>;
     AxTypeText = "ax.typeText", Exec, Public, AxTypeTextParams => AxInputResult;
+    AxSelectText = "ax.selectText", Exec, Public, AxSelectTextParams => AxTextSelection;
+    AxKeyChord = "ax.keyChord", Exec, Public, AxKeyChordParams => ();
     StopPathStart = "stopPath.start", Exec, HostOnly, StopPathStartParams => StopPathStatus;
     StopPathStatus = "stopPath.status", Read, Public, EmptyParams => StopPathStatus;
     StopPathHeartbeat = "stopPath.heartbeat", Read, HostOnly, EmptyParams => ();

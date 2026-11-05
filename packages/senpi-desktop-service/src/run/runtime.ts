@@ -18,6 +18,7 @@ import {
 	RunOutput,
 } from "./context";
 import { createDesktopFacade } from "./facade";
+import { withForegroundRerun } from "./foreground-rerun";
 import { createWait, type WaitOptions } from "./wait";
 
 /** The host's tool pipeline (senpi `executeTool`): validation, permission, and lazy activation stay host-side. */
@@ -37,7 +38,10 @@ export interface ComputerRunRequest {
 
 /** `DesktopService` surface used by the run facade; `control.grant`/`revoke` stay host-only. */
 export interface ComputerRunHost {
-	readonly service: Pick<DesktopService, "call" | "onAudit" | "revokeControl" | "reportError">;
+	readonly service: Pick<
+		DesktopService,
+		"call" | "onAudit" | "revokeControl" | "reportError" | "foregroundAllowed" | "possiblyLive" | "grantForFullAccess"
+	>;
 	readonly executeTool: ExecuteTool;
 	/** Human confirmation behind `desktop.control.acquire`; absent: headless, never grants (#9651 B5b). */
 	readonly confirmControl?: ConfirmControl;
@@ -136,7 +140,18 @@ export async function runComputerCode(request: ComputerRunRequest, host: Compute
 		promise.then(schedule, schedule);
 		return promise;
 	};
-	const call: EngineCall = (method, params) => host.service.call(method, params, { signal });
+	const engineCall: EngineCall = (method, params) => host.service.call(method, params, { signal });
+	// D2 (#11464 todo 24): one wrapper on the run's channel, so window handles and element handles are covered too.
+	const call = withForegroundRerun(
+		engineCall,
+		{
+			foregroundAllowed: () => host.service.foregroundAllowed(),
+			possiblyLive: () => host.service.possiblyLive(),
+			grantForFullAccess: (abort) => host.service.grantForFullAccess(abort),
+		},
+		context.output,
+		signal,
+	);
 	const wait = createWait(signal, timeoutMs);
 	const print = (...values: readonly unknown[]) => context.output.text(format(...values));
 	const sandbox = vm.createContext(

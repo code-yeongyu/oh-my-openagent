@@ -1,6 +1,8 @@
 //! Menu-path matching shared by every platform's menu backend: which item a
 //! requested label names, and whether it may be invoked as a command.
 
+pub mod open_menu;
+
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 

@@ -24,6 +24,7 @@ pub enum FakeMethod {
     MousePress,
     MouseRelease,
     RaiseWindow,
+    BringToCurrentSpace,
     ReleaseAll,
     CursorPosition,
     WarpCursor,
@@ -39,6 +40,8 @@ pub enum FakeMethod {
     AxSetValue,
     AxFocus,
     AxTypeText,
+    AxSelectText,
+    AxKeyChord,
     AxElementAt,
     AxFocusedElement,
     AxAttributes,
@@ -58,6 +61,8 @@ pub enum AxWrite {
     AxFocus,
     /// The insertion write of `ax.typeText` into a native text field.
     AxTypeText,
+    /// The selected-range write of `ax.selectText`.
+    AxSelectText,
 }
 
 impl AxWrite {
@@ -67,6 +72,7 @@ impl AxWrite {
             Self::AxSetValue => FakeMethod::AxSetValue,
             Self::AxFocus => FakeMethod::AxFocus,
             Self::AxTypeText => FakeMethod::AxTypeText,
+            Self::AxSelectText => FakeMethod::AxSelectText,
         }
     }
 }
