@@ -7,6 +7,7 @@ import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { readDiscoverCwd, resolveContributedSkill } from "../bundled-skills/contributed-skill"
 import { hasXaiCredential } from "./auth"
 import type { XSearchFetch } from "./client"
+import { X_SEARCH_SKILL_SIDE } from "./hand-lifetime"
 import { createXSearchTool } from "./tool"
 
 export { createXSearchTool, X_SEARCH_TOOL_NAME, X_SEARCH_TOOL_DESCRIPTION } from "./tool"
@@ -71,7 +72,7 @@ export function createXSearchComponent(options: XSearchComponentOptions = {}): O
           env,
         })
         return skill.kind === "contributed" ? { skillPaths: [skill.path] } : undefined
-      })
+      }, X_SEARCH_SKILL_SIDE)
     },
   }
 }
