@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs"
+import { adoptedEngineTrust } from "@code-yeongyu/senpi/engine-trust"
 import { join } from "node:path"
 import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import { doctorCoverageLines } from "./bin/lib/category-coverage.js"
@@ -13,6 +14,7 @@ import { needsSetupSuggestion, type detectHarnesses } from "./bin/lib/setup-dete
 import { compiledDiagnosticRuntimeLoader, loadCompiledCoverageEngine } from "./compiled-diagnostic-runtime"
 import { configDoctorLines } from "./config-doctor-runtime"
 import { claudeCodeDoctorLines } from "./claude-code-doctor"
+import { engineTrustDoctorLines, readEngineTrustRecords } from "./engine-trust-doctor"
 
 type DaemonEngine = { run(args: string[], options: { env: Record<string, string | undefined> }): { exitCode: number; stdout: string; stderr: string } }
 
@@ -22,6 +24,7 @@ export type CompiledDoctorOptions = {
   readonly platform?: NodeJS.Platform
   readonly coverageLines?: () => Promise<string[]>
   readonly computerUseLines?: () => Promise<string[]>
+  readonly trustLines?: () => Promise<string[]>
   readonly list?: () => { pid: number; ppid: number; elapsed: string; tty: string; command: string }[]
   readonly kill?: (pid: number, signal: NodeJS.Signals) => void
 }
@@ -51,6 +54,13 @@ function computerUseLines(input: CompiledDoctorInput, env: NodeJS.ProcessEnv): P
     version: input.version,
     env: { ...env, OMO_PACKAGE_DIR: env.OMO_PACKAGE_DIR ?? input.execDir },
   })
+}
+
+/** Design revision 11: the adopted generation's default-file outcome, INFO only, from the trust log beside it. */
+async function trustLines(options: CompiledDoctorOptions): Promise<string[]> {
+  if (options.trustLines) return options.trustLines()
+  const marker = adoptedEngineTrust()
+  return engineTrustDoctorLines({ platform: process.platform, marker, records: await readEngineTrustRecords(marker) })
 }
 
 function coverageLines(input: CompiledDoctorInput, env: NodeJS.ProcessEnv): Promise<string[]> {
@@ -104,6 +114,7 @@ export async function runCompiledDoctor(input: CompiledDoctorInput): Promise<voi
   lines.push(...piConfigReport({ env: options.env, homeDir: options.homeDir }))
   lines.push(...staleEngineReport(options))
   lines.push(...transientMemoryReport({ env }))
+  lines.push(...await trustLines(options))
   const [computerUse, coverage] = await Promise.all([computerUseLines(input, env), coverageLines(input, env)])
   if (computerUse.some((line) => line.startsWith("FAIL "))) failed = true
   lines.push(...computerUse, ...claudeCodeDoctorLines({ runtimeDir: input.execDir, env }), ...coverage)
