@@ -1,4 +1,4 @@
-import { afterEach } from "bun:test"
+import { afterEach, beforeEach } from "bun:test"
 import { chmodSync, mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -7,7 +7,7 @@ import { type AgentDirRegistrant, type RegistrantEvent, startAgentDirRegistrant 
 import { startFakeOwner, type FakeOwner } from "./local-api/conformance/fake-owner.ts"
 import { defaultWorld } from "./local-api/conformance/world.ts"
 import { deviceKeys } from "./local-api/support.ts"
-import { remainingTestTime } from "../../../test-support/test-deadline"
+import { remainingTestTime, resetTestDeadline } from "../../../test-support/test-deadline"
 
 // The shared world of the agent dir registrant tests (#12379): the fake owner is a real local socket with the
 // mutual proof, and a stopped owner followed by a new one on the same state dir stands in for a relayd restart.
@@ -19,6 +19,9 @@ const services: DeviceService[] = []
 const dirs: string[] = []
 
 export function useRegistrantWorld(): void {
+  // The root preload resets the per-test deadline; this package's own bunfig does not, so a package-local run
+  // would otherwise share one deadline across the file and starve every wait after the first slow test.
+  beforeEach(() => resetTestDeadline())
   afterEach(async () => {
     for (const registrant of registrants.splice(0)) registrant.stop()
     for (const service of services.splice(0)) service.close()

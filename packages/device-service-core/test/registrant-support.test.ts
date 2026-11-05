@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, expect, spyOn, test } from "bun:test"
+import { afterAll, afterEach, beforeEach, expect, mock, spyOn, test } from "bun:test"
 import { DEFAULT_TEST_TIMEOUT_MS, resetTestDeadline } from "../../../test-support/test-deadline"
 import { within } from "./registrant-support.ts"
 
@@ -9,6 +9,9 @@ const originalNow = performance.now
 let now = 0
 performance.now = () => now
 beforeEach(() => resetTestDeadline())
+// Package-local runs do not load the root preload that restores spies, so this file restores its own.
+afterEach(() => mock.restore())
+const realTimers = { setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout }
 afterAll(() => {
   performance.now = originalNow
   resetTestDeadline()
@@ -27,7 +30,9 @@ function slowHost() {
     armed,
     elapse(ms: number): void {
       now += ms
-      for (const timer of pending.splice(0)) if (timer.due <= now) timer.fire()
+      const due = pending.filter((timer) => timer.due <= now)
+      pending.splice(0, pending.length, ...pending.filter((timer) => timer.due > now))
+      for (const timer of due) timer.fire()
     },
   }
 }
@@ -74,4 +79,10 @@ test("#given an event that never comes #when the test budget runs out #then with
 
   // then
   expect(await waited).toEqual({ status: "rejected", message: "error" })
+})
+
+test("#given the tests above replaced the timers #when a later test runs #then it sees the real setTimeout and clearTimeout again", () => {
+  // then
+  expect(globalThis.setTimeout).toBe(realTimers.setTimeout)
+  expect(globalThis.clearTimeout).toBe(realTimers.clearTimeout)
 })
