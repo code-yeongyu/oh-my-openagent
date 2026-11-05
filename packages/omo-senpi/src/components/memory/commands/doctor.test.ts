@@ -777,6 +777,27 @@ describe("doctor runtime size (B10)", () => {
     expect(report.runtimeSize.unclassifiedJournals).toBe(1)
   })
 
+  test("#given a runtime under its cap holding an unreflected journal #when doctor runs #then the unreflected bytes, which only the over-cap line prints, are not measured (#12538 review r3 M2)", async () => {
+    const { pi, ctx, identityPaths } = await sizedIdentity((bytes) => bytes * 4)
+    await writeFile(join(identityPaths.transcripts, "s-big", "state.json"), JSON.stringify({ total_completed_steps: 3, reflected_completed_steps: 0, steps_since_last_successful_reflection: 3 }))
+
+    const report = JSON.parse(await invoke(pi, "doctor", "--json", ctx))
+
+    expect(report.runtimeSize.bytes).toBeGreaterThan(4 * 1024 * 1024)
+    expect(report.runtimeSize.unreflectedBytes).toBeUndefined()
+  })
+
+  test("#given transcripts holding a stray file and an unreadable state.json #when doctor runs #then the runtime-size check still reports (#12538 review r3 M1)", async () => {
+    const { pi, ctx, identityPaths } = await sizedIdentity((bytes) => Math.floor(bytes / 2))
+    await writeFile(join(identityPaths.transcripts, ".DS_Store"), "x")
+    await mkdir(join(identityPaths.transcripts, "s-torn", "state.json"), { recursive: true })
+
+    const report = JSON.parse(await invoke(pi, "doctor", "--json", ctx))
+
+    expect(report.runtimeSize.bytes).toBeGreaterThan(4 * 1024 * 1024)
+    expect(report.checks.find((check: { name: string }) => check.name === "runtime-size")).toBeDefined()
+  })
+
   test("#given a runtime over its cap held by unreflected journals and the default switch (off) #when doctor runs #then runtime-size reports the held bytes (r4 R1)", async () => {
     const { pi, ctx, identityPaths } = await sizedIdentity((bytes) => Math.floor(bytes / 2))
     await writeFile(join(identityPaths.transcripts, "s-big", "state.json"), JSON.stringify({ total_completed_steps: 3, reflected_completed_steps: 0, steps_since_last_successful_reflection: 3 }))

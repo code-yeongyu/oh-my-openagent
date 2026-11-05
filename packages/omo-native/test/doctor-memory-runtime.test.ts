@@ -70,6 +70,28 @@ describe("omo doctor memory runtime sizes (B11)", () => {
     expect(on.lines.filter((line) => line.includes("discard_unreflected_journals off"))).toEqual([])
   })
 
+  test("#given an identity under its cap holding an unreflected journal #when the report runs #then the unreflected bytes, which only the over-cap line prints, are not measured (#12538 review r3 M2)", async () => {
+    const root = memoryHome()
+    const runtime = identity(root, "agent-a", 900_000)
+    writeFileSync(join(runtime, "transcripts", "s1", "state.json"), JSON.stringify({ total_completed_steps: 2, reflected_completed_steps: 0 }))
+
+    const report = await memoryRuntimeReport({ env: { OMO_MEMORY_HOME: root }, maxBytesFor: () => 10_000_000 })
+
+    expect(report.identities[0]?.bytes).toBeGreaterThan(900_000)
+    expect(report.identities[0]?.unreflectedBytes).toBeUndefined()
+  })
+
+  test("#given an identity whose transcripts hold a stray file and an unreadable state.json #when the report runs #then it still reports the identity (#12538 review r3 M1)", async () => {
+    const root = memoryHome()
+    const runtime = identity(root, "agent-a", 900_000)
+    writeFileSync(join(runtime, "transcripts", ".DS_Store"), "x")
+    mkdirSync(join(runtime, "transcripts", "s2", "state.json"), { recursive: true })
+
+    const report = await memoryRuntimeReport({ env: { OMO_MEMORY_HOME: root }, maxBytesFor: () => 100_000 })
+
+    expect(report.identities[0]?.bytes).toBeGreaterThan(900_000)
+  })
+
   test("#given an identity over its cap with folded runs to evict and an unreflected journal, switch off #when the report runs #then it measures the evictable bytes and does not blame the unreflected journals (#12538 review M1)", async () => {
     const root = memoryHome()
     const runtime = identity(root, "agent-a", 900_000)
