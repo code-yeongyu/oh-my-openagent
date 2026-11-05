@@ -24,6 +24,8 @@ export type RunPauseEffects = {
   install(parentSessionId: string, pauseSeq: number, credential: ResumeCredential): Promise<void>
   acknowledgeInstalled(parentSessionId: string, pauseSeq: number, resumeId: string): Promise<void>
   cancel(participant: PauseParticipant, parentSessionId: string): Promise<void>
+  // Ends the run of a participant no Resume could reach; false when it is not this host's to end.
+  endLost?(participant: PauseParticipant, reason: string): Promise<boolean>
   // The child's engine view of this parent's hold; undefined when it reports none.
   observeHold?(participant: PauseParticipant, parentSessionId: string): Promise<ObservedHold | undefined>
 }
@@ -122,6 +124,30 @@ export class RunPauseController {
       const outcome = await this.#resumeOne(parentSessionId, pauseSeq, resumeId, participant, undefined, credential, current)
       if (outcome === "superseded") break
       if (outcome !== undefined) failures.push(outcome)
+    }
+    return failures
+  }
+
+  hasLost(parentSessionId: string, pauseSeq: number): boolean {
+    const record = this.registry.load(parentSessionId)
+    return record?.pauseSeq === pauseSeq && record.phase === "resumed"
+      && Object.values(record.participants).some(participant => participant.state === "lost")
+  }
+
+  // After the bounded retries a released Resume still could not reach these participants: each run
+  // ends with its reason, so no child stays paused under a Stop nobody holds any more (#12249).
+  async endLost(parentSessionId: string, pauseSeq: number): Promise<readonly ResumeFailure[]> {
+    const failures: ResumeFailure[] = []
+    const record = this.registry.load(parentSessionId)
+    if (record === undefined || record.pauseSeq !== pauseSeq || record.phase !== "resumed" || this.effects.endLost === undefined) return failures
+    for (const participant of Object.values(record.participants)) {
+      if (participant.state !== "lost") continue
+      const reason = participant.lostReason ?? "never acknowledged the pause"
+      try {
+        if (await this.effects.endLost(participant, reason)) this.registry.drop(parentSessionId, pauseSeq, participant.key)
+      } catch (error) {
+        failures.push({ key: participant.key, reason: `ending the lost run failed: ${error instanceof Error ? error.message : String(error)}` })
+      }
     }
     return failures
   }
