@@ -8,7 +8,7 @@ import { parseExtraCaCertificates } from "./compiled-ca-trust"
 import { trustLaunchKind } from "./compile-args"
 import { reexecProvisionedRuntime } from "./provisioned-handoff"
 import { appendTrustDiagnostic, type TrustDiagnosticEntry, type TrustDiagnosticInput } from "./trust-diagnostics"
-import { acquireEngineTrust, type TrustAcquisition, type TrustAcquisitionOptions } from "./trust-acquisition"
+import { acquireEngineTrust, type DefaultFileDrop, type TrustAcquisition, type TrustAcquisitionOptions } from "./trust-acquisition"
 import {
   certificateSet, createTrustDefaults, leaseTrustGeneration, prepareTrustDirectory, recoverUserExtras,
   retainTrustGeneration, temporaryTrustDirectory, trustDirectory, TrustStorageError, verifyTrustDefaults,
@@ -17,6 +17,7 @@ import {
 
 type Check = "file" | "loaded-set" | "provenance" | "extras"
 type Refusal = "trust-load-mismatch" | "trust-exec-loop" | "trust-user-extras-unrecoverable" | "trust-path-unrepresentable"
+  | "trust-userns-unattested"
 export type TrustStageResult =
   | { readonly action: "static" | "adopt" | "import-exec" | "ensure" | "usage" }
   | { readonly action: "refuse"; readonly code: Refusal; readonly check: Check | null }
@@ -134,7 +135,9 @@ export async function runTrustStage(options: TrustStageOptions): Promise<TrustSt
       ? "point NODE_EXTRA_CA_CERTS at your own CA file, or unset it, and start omo again"
       : code === "trust-path-unrepresentable"
         ? "set TMPDIR to a writable private path without the directory-list separator and start omo again"
-        : "if SENPI_ENGINE_TRUST or SENPI_ENGINE_TRUST_HOP is saved in an environment you reuse, remove both and start omo again"
+        : code === "trust-userns-unattested"
+          ? "omo cannot see who owns the directories above its trust directory inside this user namespace (bwrap, flatpak or a rootless container); start omo outside that sandbox, or through omo's own memory sandbox"
+          : "if SENPI_ENGINE_TRUST or SENPI_ENGINE_TRUST_HOP is saved in an environment you reuse, remove both and start omo again"
     ;(options.stderr ?? ((line) => process.stderr.write(line)))(`omo: ${code}${check ? ` (${check})` : ""}; ${action}\n`)
     return { action: "refuse", code, check }
   }
@@ -154,6 +157,7 @@ export async function runTrustStage(options: TrustStageOptions): Promise<TrustSt
    * 5.3 order: U, the bounded import, the closure, the immutable generation, its lease, then the
    * retention sweep. The lease precedes the sweep so no sweep sees the new generation unpinned.
    */
+  let defaultFileDrop: DefaultFileDrop | undefined
   const generate = async (closure: boolean, leasePid: number | null) => {
     let user: Awaited<ReturnType<typeof recoverUserExtras>>
     try { user = await recoverUserExtras(value(env, "NODE_EXTRA_CA_CERTS", platform), loaded, addressed !== undefined) } catch (error) {
@@ -165,6 +169,7 @@ export async function runTrustStage(options: TrustStageOptions): Promise<TrustSt
       deadlineMs: kind === "one-shot-network" ? 20_000 : 1500, environment: env, platform, helper: options.helper,
     })
     codes.push(...imported.codes)
+    defaultFileDrop = imported.defaultFileDrop
     if (imported.fallbackReason !== null) codes.push({ code: imported.fallbackReason })
     let defaults: EngineTrustMarker["defaults"] = null
     if (closure) {
@@ -199,7 +204,7 @@ export async function runTrustStage(options: TrustStageOptions): Promise<TrustSt
     await record({ kind, action: "ensure", generation: generation.sha256, codes: diagnostics })
     const { file, sha256, automatic, fallbackReason, user, defaults } = generation
     ;(options.stdout ?? ((line) => process.stdout.write(line)))(
-      `${JSON.stringify({ v: 1, file, sha256, automatic, fallbackReason, user, defaults, diagnostics })}\n`)
+      `${JSON.stringify({ v: 1, file, sha256, automatic, fallbackReason, user, defaults, diagnostics, defaultFileDrop })}\n`)
     return { action: "ensure" }
   }
 
