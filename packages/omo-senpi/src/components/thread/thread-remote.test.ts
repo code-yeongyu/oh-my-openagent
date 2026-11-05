@@ -1,126 +1,10 @@
-import { afterEach, describe, expect, mock, test } from "bun:test"
-import { mkdtempSync, rmSync } from "node:fs"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
-import type { ThreadToolName, ThreadToolResult } from "./contracts"
-import { createGatewayStore, type GatewayStore } from "./gateway/store"
-import type { AliasHolder, AliasRegistry, JsonObject, RemoteCommandOutcome, RemoteDevice, RemoteSessionRow, RemoteThreadSurface } from "./remote/ports"
-import type { ThreadTranscriptEntry } from "./reader"
-import { createThreadTools, UNKNOWN_CALLER, type ThreadHost, type ThreadHostSession } from "./tools"
+import { afterEach, describe, expect, test } from "bun:test"
+import type { ThreadToolResult } from "./contracts"
+import { type ThreadHostSession } from "./tools"
+import { B_ROW, comparable, createRemoteThreadFixture } from "./thread-remote-fixture"
 
-// Cross-device thread tools (brain/hand plan r6: O8, SC-R8, R8.c, A3, A5) over a fake account: device "here" is this
-// machine, device "b" is another signed-in device. The fakes record every relay call so each case can assert
-// both what the tool answered and what it sent (or that it sent nothing).
-
-const directories: string[] = []
-const stores: GatewayStore[] = []
-afterEach(async () => {
-  await Promise.all(stores.splice(0).map((store) => store.dispose()))
-  for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
-})
-
-const B_ROW: RemoteSessionRow = { device: "b", session_id: "dur-on-b", title: "on b", project: "/work/b", path: "/home/b/.omo/agent/sessions/dur-on-b.jsonl", state: "idle", updated_ms: 1_700_000_000_000 }
-
-type Sent = { readonly via: "endpoint" | "session" | "read"; readonly device: string; readonly session?: string; readonly rpc?: JsonObject }
-
-// One engine for both legs: what this device's host answers and what device b's engine answers are the same data,
-// so a remote result can be compared with the local result of the same call.
-type Engine = { readonly messages: readonly ThreadTranscriptEntry[]; readonly interrupt: JsonObject; readonly streaming: boolean; readonly pending: number }
-const ENGINE: Engine = { messages: Array.from({ length: 30 }, (_, index) => ({ role: index % 2 === 0 ? "user" : "assistant", content: `message ${index} ${"x".repeat(60)}` })), interrupt: { interrupted: false }, streaming: false, pending: 0 }
-
-function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean; engine?: Engine; failSessionsList?: boolean; failAliasesOf?: boolean; failClaim?: boolean } = {}) {
-  const engine = options.engine ?? ENGINE
-  const sent: Sent[] = []
-  const hops: number[] = []
-  const aliases = options.aliases ?? new Map<string, AliasHolder>()
-  const answer = (rpc: JsonObject): RemoteCommandOutcome => {
-    if (options.refuse !== undefined) return { kind: "refused", reason: options.refuse }
-    if (rpc["type"] === "open_session") return { kind: "ok", response: { sessionId: "rpc-9", state: { durableSessionId: rpc["sessionPath"] === undefined ? "dur-new-on-b" : "dur-on-b" } } }
-    if (rpc["type"] === "get_state") return { kind: "ok", response: { isStreaming: engine.streaming, pendingMessageCount: engine.pending } }
-    if (rpc["type"] === "get_messages") return { kind: "ok", response: { messages: [...engine.messages] } }
-    if (rpc["type"] === "interrupt") return { kind: "ok", response: engine.interrupt }
-    if (rpc["type"] === "prompt") return { kind: "ok", response: { turnId: "turn-b" } }
-    return { kind: "ok", response: {} }
-  }
-  const devices: RemoteDevice[] = [{ device: "here", label: "this mac", online: true }, { device: "b", label: "studio", online: options.online ?? true }]
-  const registry: AliasRegistry = {
-    claim: async ({ alias, holder }) => {
-      if (options.failClaim === true) throw new Error("alias registry failed")
-      const held = aliases.get(alias)
-      if (held !== undefined && held.session_id !== holder.session_id) return { kind: "error", error: { code: "alias_taken", message: `alias ${alias} is taken`, details: { holder: held } } }
-      aliases.set(alias, holder)
-      return { kind: "ok", value: { alias, holder } }
-    },
-    rename: async ({ session_id, from, to }) => {
-      const held = aliases.get(to)
-      if (held !== undefined && held.session_id !== session_id) return { kind: "error", error: { code: "alias_taken", message: `alias ${to} is taken`, details: { holder: held } } }
-      const holder = aliases.get(from)
-      if (holder === undefined) return { kind: "error", error: { code: "alias_not_found", message: "no such alias" } }
-      aliases.delete(from)
-      aliases.set(to, holder)
-      return { kind: "ok", value: { alias: to, holder } }
-    },
-    release: async ({ alias }) => ({ kind: "ok", value: { released: aliases.delete(alias) } }),
-    resolve: async (alias) => {
-      const held = aliases.get(alias)
-      return held === undefined ? { kind: "error", error: { code: "alias_not_found", message: "no such alias" } } : { kind: "ok", value: held }
-    },
-    aliasesOf: async (ids) => options.failAliasesOf === true ? Promise.reject(new Error("alias registry failed")) : ({ kind: "ok", value: new Map([...aliases].filter(([, holder]) => ids.includes(holder.session_id)).map(([alias, holder]) => [holder.session_id, alias])) }),
-  }
-  const remote: RemoteThreadSurface = {
-    sessions: {
-      status: async () => ({ state: options.plan ?? "connected" }),
-      thisDevice: async () => "here",
-      devices: async () => devices,
-      sessions: async () => { if (options.failSessionsList === true) throw new Error("account list failed"); return [B_ROW] },
-      endpointCommand: async (device, rpc) => { sent.push({ via: "endpoint", device, rpc }); return answer(rpc) },
-      sessionCommand: async (device, session, rpc) => { sent.push({ via: "session", device, session, rpc }); return answer(rpc) },
-      read: async (device, session) => { sent.push({ via: "read", device, session }); return { kind: "ok", response: { entries: [{ role: "user", content: "hi b" }, { role: "assistant", content: "hello from b" }] } } },
-    },
-    ...(options.noRegistry === true ? {} : { aliases: registry }),
-    chain: { stamp: (record, hop) => { hops.push(hop); return { ...record, chain_count: hop } } },
-  }
-  return { remote, sent, hops, aliases }
-}
-
-function surface(remote: RemoteThreadSurface | undefined, extra: { callerCause?: () => string | undefined; sessions?: ThreadHostSession[]; engine?: Engine; caller?: string; diskSessions?: readonly string[] } = {}) {
-  const engine = extra.engine ?? ENGINE
-  const local: ThreadHostSession = { sessionId: "route-local", durableSessionId: "dur-local", cwd: process.cwd(), name: "local peer", status: "open" }
-  const sessions = extra.sessions ?? [local]
-  const openSession = mock(async () => {
-    const created: ThreadHostSession = { sessionId: "route-created", durableSessionId: "dur-created-here", cwd: process.cwd(), name: null, status: "open" }
-    sessions.push(created)
-    return created
-  })
-  const host: ThreadHost = {
-    socket: "/tmp/thread-remote-test.sock",
-    listSessions: async () => sessions,
-    openSession,
-    getMessages: async () => [...engine.messages],
-    getState: async () => ({ isStreaming: false }),
-    prompt: async () => ({ turnId: "turn-local" }),
-    interrupt: async () => engine.interrupt,
-    setSessionName: async () => {},
-    setModel: async (_s, provider, id) => ({ provider, id }),
-    getAvailableModels: async () => [],
-    setThinkingLevel: async () => {},
-    getAvailableThinkingLevels: async () => [],
-  }
-  const agentDir = mkdtempSync(join(tmpdir(), "thread-remote-"))
-  directories.push(agentDir)
-  const store = createGatewayStore({ agentDir })
-  stores.push(store)
-  // Session files with no live owner: the address book lists them from disk, and no host holds them.
-  const disk = (extra.diskSessions ?? []).map((id) => ({ durable_id: id, name: null, cwd: process.cwd(), created_at: "2026-11-01T00:00:00Z", updated_at: null, session_path: join(agentDir, `${id}.jsonl`), source_host: null }))
-  const caller = extra.caller ?? "dur-caller"
-  const tools = createThreadTools({ host, store, stateDirectory: join(agentDir, "state"), diskSessions: () => disk, callerSessionId: () => caller, callerWorkspaceRoot: () => process.cwd(), remote, ...(extra.callerCause === undefined ? {} : { callerCause: extra.callerCause }) })
-  const run = async (name: ThreadToolName, args: unknown): Promise<ThreadToolResult> => {
-    const tool = tools.find((candidate) => candidate.name === name)
-    if (tool === undefined) throw new Error(`${name} is not registered`)
-    return (await tool.execute(`call-${Math.random()}`, args, undefined, undefined, { sessionManager: { getSessionId: () => caller } } as never)).details.result as ThreadToolResult
-  }
-  return { run, openSession, store }
-}
+const { account, surface, cleanup } = createRemoteThreadFixture()
+afterEach(cleanup)
 
 describe("SC-R8: from this device on another (create, list, open, status, prompt, abort, fork)", () => {
   test("#given no session on device b #when thread_create names device b #then one attach-less open_session goes to b's engine endpoint and the thread is b's", async () => {
@@ -148,45 +32,11 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     expect(a.sent).toEqual([{ via: "endpoint", device: "b", rpc: { type: "open_session", retain_on_disconnect: true, sessionPath: B_ROW.path } }])
   })
 
-  test("#given a running thread on b #when thread_read, thread_send and thread_interrupt name it #then messages, state, prompt and interrupt reach b's session", async () => {
-    const a = account({ engine: { ...ENGINE, messages: [{ role: "user", content: "hi b" }, { role: "assistant", content: "hello from b" }], interrupt: { turnId: "turn-b", interrupted: true } } })
-    const { run } = surface(a.remote)
-    expect(await run("thread_read", { thread: "dur-on-b" })).toMatchObject({ kind: "ok", device: "b", items: [{ role: "user", content: JSON.stringify("hi b") }, { role: "assistant", content: JSON.stringify("hello from b") }] })
-    expect(await run("thread_send", { thread: "dur-on-b", message: "do the thing" })).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b", delivery: { kind: "started", turn_id: "turn-b" } })
-    expect(await run("thread_interrupt", { thread: "dur-on-b" })).toMatchObject({ kind: "ok", thread_id: "dur-on-b", turn_id: "turn-b", interrupted: true })
-    expect(a.sent.map((entry) => [entry.via, entry.rpc?.["type"]])).toEqual([["session", "get_messages"], ["session", "get_state"], ["session", "prompt"], ["session", "interrupt"]])
-  })
-
   test("#given a thread on b #when thread_create forks it #then the fork is opened on b from that source", async () => {
     const a = account()
     const { run } = surface(a.remote)
     expect(await run("thread_create", { fork_from: "dur-on-b" })).toMatchObject({ kind: "ok", thread: { thread_id: "dur-new-on-b", device: "b" } })
     expect(a.sent[0]).toEqual({ via: "endpoint", device: "b", rpc: { type: "open_session", retain_on_disconnect: true, forkFrom: "dur-on-b" } })
-  })
-
-  test.each([
-    ["capability_missing", "scope_denied"],
-    ["host_detached", "host_unavailable"],
-  ])("#given b refuses with %s #when a command reaches it #then the tool answers %s, as data, with the device named", async (reason, code) => {
-    const a = account({ refuse: reason })
-    const { run } = surface(a.remote)
-    expect(await run("thread_send", { thread: "dur-on-b", message: "x" })).toMatchObject({ kind: "error", error: { code, details: { device: "b", reason } } })
-  })
-})
-
-describe("K8 / R8.c: a chain carries its count across devices; no count or cost limit by default", () => {
-  test("#given a caller with no cause and then one running on a hop-1 delivery #when it sends to b #then the wire gets hop 1 and then hop 2, with no cost field", async () => {
-    const a = account()
-    let cause: string | undefined
-    const { run } = surface(a.remote, { callerCause: () => cause })
-    await run("thread_send", { thread: "dur-on-b", message: "start of a chain" })
-    const local = await run("thread_send", { thread: "dur-local", message: "a hop-1 delivery" })
-    if (local.kind !== "ok" || !("delivery_id" in local) || local.delivery_id === undefined) throw new Error(`local send failed: ${JSON.stringify(local)}`)
-    cause = local.delivery_id
-    await run("thread_send", { thread: "dur-on-b", message: "continues the chain" })
-    expect(a.hops).toEqual([1, 2])
-    const prompts = a.sent.filter((entry) => entry.rpc?.["type"] === "prompt").map((entry) => entry.rpc ?? {})
-    expect(prompts.map((record) => [record["chain_count"], Object.keys(record).some((key) => /cost/i.test(key))])).toEqual([[1, false], [2, false]])
   })
 })
 
@@ -274,13 +124,6 @@ describe("A5: the relay is paid only", () => {
   })
 })
 
-// Q 11-04: a remote call answers exactly like the same call on this device. Each row runs one call on this
-// device's thread and on b's, and compares the answers with only the identity fields (thread id, link, device) removed.
-const comparable = (result: ThreadToolResult): unknown => {
-  const { thread_id: _id, link: _link, device: _device, ...rest } = result as Record<string, unknown>
-  return rest
-}
-
 describe("remote == local: the same call answers the same on b as on this device", () => {
   test.each([
     ["thread_read, a byte budget smaller than the transcript", "thread_read", { max_bytes: 800 }],
@@ -335,24 +178,6 @@ describe("remote == local: the same call answers the same on b as on this device
     expect(a.sent.find((entry) => entry.rpc?.["type"] === "open_session")?.rpc?.["context"]).toEqual({ initial_skills: JSON.stringify(["programming"]) })
   })
 
-  test("#given a send to b #when the same idempotency_key is used twice #then b gets one prompt and the retry replays the first answer as deduplicated", async () => {
-    const a = account()
-    const { run } = surface(a.remote)
-    const first = await run("thread_send", { thread: "dur-on-b", message: "once", idempotency_key: "k1" })
-    const again = await run("thread_send", { thread: "dur-on-b", message: "once", idempotency_key: "k1" })
-    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "prompt")).toHaveLength(1)
-    expect(first).toMatchObject({ kind: "ok", deduplicated: false })
-    expect(again).toMatchObject({ kind: "ok", deduplicated: true, delivery: (first as { delivery: unknown }).delivery })
-  })
-
-  test("#given b is busy with 3 pending messages #when a message is sent #then it is queued at the position b reports and no gateway sequence is invented", async () => {
-    const a = account({ engine: { ...ENGINE, streaming: true, pending: 3 } })
-    const { run } = surface(a.remote)
-    const sent = await run("thread_send", { thread: "dur-on-b", message: "later" })
-    expect(sent).toMatchObject({ kind: "ok", delivery: { kind: "queued", queue_position: 3 } })
-    expect("message_seq" in sent).toBe(false)
-  })
-
   test("#given a fork source on this device #when thread_create forks it naming device b, and forks it by its alias #then the first is invalid_arguments with nothing opened, the second forks the resolved id here", async () => {
     const a = account({ aliases: new Map([["mine", { session_id: "dur-local", device: "here" }]]) })
     const { run, openSession } = surface(a.remote)
@@ -382,46 +207,6 @@ describe("remote == local: the same call answers the same on b as on this device
 })
 
 describe("remote == local, round 2: send modes, handoff, list and alias order", () => {
-  test.each([
-    ["a steer with no expected_turn_id", { delivery: "steer" }],
-    ["a steer with a malformed expected_turn_id", { delivery: "steer", expected_turn_id: "abc" }],
-  ] as const)("#given %s #when it is sent here and to b #then both refuse the same way at send time and b gets nothing", async (_label, args) => {
-    const a = account()
-    const { run } = surface(a.remote)
-    const here = await run("thread_send", { thread: "dur-local", message: "x", ...args })
-    const there = await run("thread_send", { thread: "dur-on-b", message: "x", ...args })
-    expect(comparable(there)).toEqual(comparable(here))
-    expect(here).toMatchObject({ kind: "error" })
-    expect(a.sent).toEqual([])
-  })
-
-  test("#given b is idle #when a steer with an expected turn reaches it #then it is not_steerable, as a steer into an idle session is, and no prompt is sent", async () => {
-    const a = account()
-    const { run } = surface(a.remote)
-    expect(await run("thread_send", { thread: "dur-on-b", message: "x", delivery: "steer", expected_turn_id: "3" })).toMatchObject({ kind: "error", error: { code: "not_steerable" } })
-    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "prompt")).toEqual([])
-  })
-
-  test("#given b is mid-turn #when a steer with a well-formed expected turn reaches it #then it is refused turn_conflict because b's engine cannot confirm the turn yet, and no prompt is sent", async () => {
-    const a = account({ engine: { ...ENGINE, streaming: true, pending: 0 } })
-    const { run } = surface(a.remote)
-    expect(await run("thread_send", { thread: "dur-on-b", message: "x", delivery: "steer", expected_turn_id: "3" })).toMatchObject({ kind: "error", error: { code: "turn_conflict", details: { device: "b", reason: "remote_turn_not_verifiable" } } })
-    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "prompt")).toEqual([])
-  })
-
-  test("#given a follow_up to b while it runs #when it is sent #then it is queued behind b's own pending count", async () => {
-    const a = account({ engine: { ...ENGINE, streaming: true, pending: 2 } })
-    const { run } = surface(a.remote)
-    expect(await run("thread_send", { thread: "dur-on-b", message: "x", delivery: "follow_up" })).toMatchObject({ kind: "ok", delivery: { kind: "queued", queue_position: 2 } })
-    expect(a.sent.find((entry) => entry.rpc?.["type"] === "prompt")?.rpc?.["streamingBehavior"]).toBe("followUp")
-  })
-
-  test("#given b's thread #when thread_handoff names it by id #then the message reaches b and the receipt names the thread, its device and how it was resolved", async () => {
-    const a = account()
-    const { run } = surface(a.remote)
-    expect(await run("thread_handoff", { thread: "dur-on-b", message: "take this" })).toMatchObject({ kind: "ok", resolved_by: "exact_name", thread: { thread_id: "dur-on-b", device: "b" }, delivery: { kind: "started" } })
-    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "prompt").map((entry) => entry.rpc?.["message"])).toEqual(["take this"])
-  })
 
   test.each([
     ["the account session list fails", { failSessionsList: true }],
@@ -433,21 +218,6 @@ describe("remote == local, round 2: send modes, handoff, list and alias order", 
     expect(listed).toMatchObject({ kind: "ok" })
     if (listed.kind !== "ok" || !("threads" in listed)) throw new Error(`thread_list failed: ${JSON.stringify(listed)}`)
     expect(listed.threads.map((thread) => thread.thread_id)).toContain("dur-local")
-  })
-
-  test("#given a caller with no durable id #when it sends here and to b #then both refuse the same way at send time and b gets nothing", async () => {
-    const a = account()
-    const { run } = surface(a.remote, { caller: UNKNOWN_CALLER })
-    const here = await run("thread_send", { thread: "dur-local", message: "x", idempotency_key: "k-here" })
-    const there = await run("thread_send", { thread: "dur-on-b", message: "x", idempotency_key: "k-there" })
-    expect(here).toMatchObject({ kind: "error", error: { code: "caller_context_missing" } })
-    expect(comparable(there)).toEqual(comparable(here))
-    // A refusal before any store write leaves no receipt, so a retry under the same key with other args refuses the same way.
-    const hereAgain = await run("thread_send", { thread: "dur-local", message: "y", idempotency_key: "k-here" })
-    const thereAgain = await run("thread_send", { thread: "dur-on-b", message: "y", idempotency_key: "k-there" })
-    expect(hereAgain).toMatchObject({ kind: "error", error: { code: "caller_context_missing" } })
-    expect(comparable(thereAgain)).toEqual(comparable(hereAgain))
-    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "prompt")).toEqual([])
   })
 
   test("#given no remote surface and a thread with no live owner #when thread_rename gives it a blank name #then it is not_resumable, as before the remote tools", async () => {
