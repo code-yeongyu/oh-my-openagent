@@ -1,5 +1,4 @@
 import {
-  classifyRecordedProcess,
   getPidLiveness as readPidLiveness,
   getProcessStartIdentity as readProcessStartIdentity,
   startIdentitiesComparable,
@@ -23,17 +22,19 @@ function recordedStartWasReused(recorded: string, actual: string): boolean {
   return startIdentitiesComparable(recorded, actual) && recorded !== actual
 }
 
-/**
- * Liveness first (#11920): a pid the kernel no longer knows is dead whatever start was recorded; the
- * recorded start only decides whether a live pid was reused. memory-core owns the rule so the CLI
- * reaper decides the same way.
- */
-export function classifyRunProcess(
+export async function classifyRunProcess(
   pid: number | undefined,
   recordedStart: string | null | undefined,
   seams: RunLivenessSeams,
 ): Promise<RunProcessVerdict> {
-  return classifyRecordedProcess(pid, recordedStart, seams)
+  if (pid === undefined) return "absent"
+  if (recordedStart === undefined) return "unknown"
+  const liveness = (seams.getPidLiveness ?? readPidLiveness)(pid)
+  if (liveness === "dead") return "dead"
+  if (liveness === "unknown") return "unknown"
+  const actualStart = await (seams.getProcessStartIdentity ?? readProcessStartIdentity)(pid)
+  if (recordedStart === null || actualStart === null) return "unknown"
+  return recordedStartWasReused(recordedStart, actualStart) ? "dead" : "alive"
 }
 
 /** Launcher liveness: dead on ESRCH, or on a live pid whose recorded start identity proves reuse. */

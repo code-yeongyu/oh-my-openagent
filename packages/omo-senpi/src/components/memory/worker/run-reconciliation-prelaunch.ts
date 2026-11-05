@@ -3,6 +3,7 @@ import { mkdir, readdir, stat } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
 import {
+  classifyRecordedProcessLenient,
   discardReflectionWorktree,
   GitMemoryRepo,
   RESERVATION_EVIDENCE_FILENAME,
@@ -15,7 +16,7 @@ import {
 import { emitMemoryReceipt, runReceipt, type RunReceiptLedger } from "../receipts-port"
 import { parseRunPrelaunchArtifact, readRunJson } from "./run-artifacts"
 import { classifyGhostActive } from "./run-ghost-active"
-import { classifyRunProcess, isLauncherDead } from "./run-liveness"
+import { isLauncherDead } from "./run-liveness"
 import type { ReconcileContext, ReflectionRunReconcileResult } from "./run-reconciliation"
 import { parseReservationRunLedger, type ReservationRunLedger } from "./reservation-run-ledger"
 
@@ -153,7 +154,8 @@ async function recordedProcessesDead(context: ReconcileContext, runDir: string):
   const pid = (key: string) => typeof raw[key] === "number" ? raw[key] as number : undefined
   const start = (key: string) => typeof raw[key] === "string" || raw[key] === null ? raw[key] as string | null : undefined
   for (const [pidKey, startKey] of [["pid", "processStart"], ["childPid", "childProcessStart"]] as const) {
-    const verdict = await classifyRunProcess(pid(pidKey), start(startKey), context)
+    // Lenient on purpose (#11920): an unparseable ledger has no queued/launching state to protect.
+    const verdict = await classifyRecordedProcessLenient(pid(pidKey), start(startKey), context)
     if (verdict !== "dead" && verdict !== "absent") return false
   }
   return true

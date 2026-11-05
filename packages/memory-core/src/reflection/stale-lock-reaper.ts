@@ -21,7 +21,7 @@ import { RESERVATION_EVIDENCE_FILENAME, writeQuarantine } from "./quarantine"
 import { isReservedRun, moveTornReservationAside } from "./reservation-files"
 import { recordReflectionRunIdMark, scanReflectionRunHighWater } from "./run-id-high-water"
 import { parseReservationRunLedger } from "./run-ledger"
-import { classifyRecordedProcess } from "./run-process"
+import { classifyRecordedProcess, classifyRecordedProcessLenient, type RecordedProcessClassifier } from "./run-process"
 import { classifyReflectionLockHolder, reflectionLauncherLiveness, type ReflectionLockProbe, type ReflectionLockVerdict } from "./stale-holder"
 
 export const REFLECTION_LAUNCH_WINDOW_MS = 60_000
@@ -101,12 +101,13 @@ async function hasTerminalSentinel(runDir: string, probe: StaleLockProbe): Promi
 
 type RecordedProcesses = { readonly live: false } | { readonly live: true; readonly reason: string }
 
-// The supervisor and child a ledger recorded, read leniently: an unparseable ledger records none.
-async function recordedProcesses(ledger: Record<string, unknown>, probe: StaleLockProbe): Promise<RecordedProcesses> {
+// The supervisor and child a ledger recorded. A valid ledger is read with the strict classifier the
+// session uses; only an unparseable one is read leniently (DESIGN.r2 4.3).
+async function recordedProcesses(ledger: Record<string, unknown>, probe: StaleLockProbe, classify: RecordedProcessClassifier): Promise<RecordedProcesses> {
   for (const [role, pidKey, startKey] of [["supervisor", "pid", "processStart"], ["child", "childPid", "childProcessStart"]] as const) {
     const pid = typeof ledger[pidKey] === "number" ? ledger[pidKey] as number : undefined
     const start = typeof ledger[startKey] === "string" || ledger[startKey] === null ? ledger[startKey] as string | null : undefined
-    const verdict = await classifyRecordedProcess(pid, start, probe)
+    const verdict = await classify(pid, start, probe)
     if (verdict === "alive") return { live: true, reason: `its ${role} pid ${pid} is still running` }
     if (verdict === "unknown") return { live: true, reason: `its ${role} pid ${pid} could not be checked` }
   }
@@ -137,7 +138,7 @@ async function liveRunBesideTornLock(reflectionDir: string, probe: StaleLockProb
     const runDir = join(runsDir, name)
     if (await hasTerminalSentinel(runDir, probe)) continue
     const ledger = await readLedger(runDir, probe)
-    if (ledger.present && (await recordedProcesses(ledger.fields, probe)).live) return name
+    if (ledger.present && (await recordedProcesses(ledger.fields, probe, classifyRecordedProcess)).live) return name
   }
   return undefined
 }
@@ -176,7 +177,7 @@ async function decideStuck(reflectionDir: string, verdict: Extract<ReflectionLoc
     }
     return { kind: "reap", action: "launch-interrupted", runId, reason: `launcher pid ${launcherPid} is gone and the run never started` } // rule:launch-interrupted
   }
-  const processes = await recordedProcesses(ledger.fields, probe)
+  const processes = await recordedProcesses(ledger.fields, probe, ledger.valid ? classifyRecordedProcess : classifyRecordedProcessLenient)
   if (processes.live) return { kind: "stuck", runId, reason: processes.reason } // rule:run-process-alive
   if (ledger.valid) return { kind: "reap", action: "processes-dead", runId, reason: "its launcher, supervisor and child are all gone and it recorded no outcome" } // rule:processes-dead
   return { kind: "reap", action: "ledger-unreadable", runId, reason: "its ledger cannot be read and its recorded processes are gone" } // rule:ledger-unreadable
@@ -202,7 +203,7 @@ export async function decideStrandedRun(runDir: string, probe: StaleLockProbe = 
     }
     return { kind: "reap", action: "launch-interrupted", reason: "it never got a ledger" } // rule:stranded-launch-interrupted
   }
-  const processes = await recordedProcesses(ledger.fields, probe)
+  const processes = await recordedProcesses(ledger.fields, probe, ledger.valid ? classifyRecordedProcess : classifyRecordedProcessLenient)
   if (processes.live) return { kind: "keep", reason: processes.reason } // rule:stranded-process-alive
   if (ledger.valid) return { kind: "reap", action: "processes-dead", reason: "its supervisor and child are gone and it recorded no outcome" } // rule:stranded-processes-dead
   return { kind: "reap", action: "ledger-unreadable", reason: "its ledger cannot be read and its recorded processes are gone" } // rule:stranded-ledger-unreadable

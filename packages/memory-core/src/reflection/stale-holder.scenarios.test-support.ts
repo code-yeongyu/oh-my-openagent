@@ -101,7 +101,7 @@ function ledger(fields: Record<string, unknown> = {}): string {
   return JSON.stringify({
     version: 1, runId: RUN, kind: "reflection", trigger: "manual", startedAt: RESERVED_AT,
     hardDeadlineAt: 1_000, terminationGraceMs: 100, deadlineAt: 1_100, mergePolicy: "auto",
-    pid: SUPERVISOR, childPid: CHILD, worktreeDir: "/w", worktreeBranch: "b", baseSha: "0", gitFilePath: "/w/.git",
+    pid: SUPERVISOR, processStart: null, childPid: CHILD, childProcessStart: null, worktreeDir: "/w", worktreeBranch: "b", baseSha: "0", gitFilePath: "/w/.git",
     gitFileSnapshot: "g", commonConfigPath: "/c", commonConfigSnapshot: null, ...fields,
   })
 }
