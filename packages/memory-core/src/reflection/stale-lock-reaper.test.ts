@@ -322,8 +322,11 @@ describe("stale reflection-lock reaper, minimal settle from the CLI (#11976)", (
   test("#given case E: active.lock truncated to half a JSON object and no live run #when the reaper runs #then it is moved aside byte-identical with a lock_torn receipt", async () => {
     // given
     const paths = reaperIdentity()
-    const torn = JSON.stringify({ runId: RUN, request: { trigger: "manual" } }).slice(0, 30)
+    const torn = JSON.stringify({ runId: RUN, launcherPid: 4301, launcherHostname: HOST, request: { trigger: "manual" } }).slice(0, 70)
     writeJson(join(paths.reflection, "active.lock"), torn)
+    age(join(paths.reflection, "active.lock"), 2 * 60 * 60_000)
+    pendingRun(paths)
+    const pendingBefore = readFileSync(join(paths.reflection, "pending.json"))
 
     // when
     const report = await runStaleLockReaper({ runtimeDir: paths.runtime, probe: probe() })
@@ -336,6 +339,8 @@ describe("stale reflection-lock reaper, minimal settle from the CLI (#11976)", (
     expect(readFileSync(join(paths.reflection, aside[0] ?? ""), "utf8")).toBe(torn)
     expect((await receiptEvents(paths.runtime)).map((receipt) => receipt.reason)).toEqual(["lock_torn"])
     expect(report.after).toEqual({ state: "none" })
+    expect(readJson(join(paths.reflection, "run-id.json")).highWater).toBe(65)
+    expect(readFileSync(join(paths.reflection, "pending.json"))).toEqual(pendingBefore)
   })
 
   test("#given case E with a run dir whose supervisor is alive #when the reaper runs #then the torn lock is kept and the reason says a live run exists", async () => {
@@ -343,6 +348,8 @@ describe("stale reflection-lock reaper, minimal settle from the CLI (#11976)", (
     const paths = reaperIdentity()
     writeJson(join(paths.reflection, "active.lock"), "{\"runId\":")
     writeJson(join(runDir(paths, RUN), "ledger.json"), validLedger(RUN))
+    age(join(paths.reflection, "active.lock"), 2 * 60 * 60_000)
+    age(runDir(paths, RUN), 2 * 60 * 60_000)
 
     // when
     const report = await runStaleLockReaper({ runtimeDir: paths.runtime, probe: probe({ 4201: "alive" }) })
@@ -412,6 +419,7 @@ describe("stale reflection-lock reaper, minimal settle from the CLI (#11976)", (
     writeJson(join(runDir(c, RUN), "ledger.json"), "{ torn")
     const e = reaperIdentity("agent-e")
     writeJson(join(e.reflection, "active.lock"), "{\"runId\":")
+    age(join(e.reflection, "active.lock"), 2 * 60 * 60_000)
     const before = [treeHash(a.root), treeHash(c.root), treeHash(e.root)]
 
     // when
@@ -504,6 +512,8 @@ describe("win32: the reaper with real process liveness and start identities (#11
     const supervisor = await killedChild()
     writeJson(join(paths.reflection, "active.lock"), "{\"runId\":")
     writeJson(join(runDir(paths, RUN), "ledger.json"), validLedger(RUN, { pid: supervisor.pid, processStart: supervisor.start, childPid: undefined }))
+    age(join(paths.reflection, "active.lock"), 2 * 60 * 60_000)
+    age(runDir(paths, RUN), 2 * 60 * 60_000)
 
     // when
     const report = await runStaleLockReaper({ runtimeDir: paths.runtime, probe: { now: () => NOW } })

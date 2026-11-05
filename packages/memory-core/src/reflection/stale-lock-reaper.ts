@@ -142,21 +142,40 @@ async function readLedger(runDir: string, probe: StaleLockProbe): Promise<{ read
     : { present: true, fields: {}, valid: false }
 }
 
-async function liveRunBesideTornLock(reflectionDir: string, probe: StaleLockProbe): Promise<string | undefined> {
+export const TORN_LOCK_MIN_AGE_MS = 60 * 60_000
+
+const TORN_LAUNCHER_PID = /"launcherPid"\s*:\s*(\d+)/
+const TORN_LAUNCHER_HOST = /"launcherHostname"\s*:\s*"([^"]*)"/
+const TORN_LAUNCHER_START = /"launcherProcessStart"\s*:\s*"([^"]*)"/
+
+// The fail-closed conditions under which a torn active.lock may be moved aside (DESIGN.r2 4.4, M4);
+// the first one that fails is the reason it is kept.
+async function tornLockBlocker(reflectionDir: string, bytes: string, probe: StaleLockProbe): Promise<string | undefined> {
+  const now = (probe.now ?? Date.now)()
+  const lockAt = await modifiedAt(join(reflectionDir, "active.lock"), probe)
+  if (lockAt === undefined || now - lockAt <= TORN_LOCK_MIN_AGE_MS) return "it is recent" // rule:torn-recent
+  const host = TORN_LAUNCHER_HOST.exec(bytes)?.[1]
+  if (host !== undefined && host !== (probe.hostname ?? readHostname)()) return `its launcher is on host ${host}` // rule:torn-other-host
+  const pid = TORN_LAUNCHER_PID.exec(bytes)?.[1]
+  if (pid !== undefined && await reflectionLauncherLiveness(Number.parseInt(pid, 10), TORN_LAUNCHER_START.exec(bytes)?.[1], probe) !== "dead") {
+    return `its launcher pid ${pid} may still be alive` // rule:torn-launcher-alive
+  }
   const runsDir = join(reflectionDir, "runs")
   for (const name of await listDirectory(runsDir, probe)) {
     if (name.startsWith(".")) continue
     const runDir = join(runsDir, name)
     if (await hasTerminalSentinel(runDir, probe)) continue
+    const at = await modifiedAt(runDir, probe)
+    if (at === undefined || now - at <= REFLECTION_ORPHAN_GRACE_MS) return `run ${name} is a young run dir` // rule:torn-young-run-dir
     const ledger = await readLedger(runDir, probe)
-    if (ledger.present && (await recordedProcesses(ledger.fields, probe, classifyRecordedProcess)).live) return name
+    if (ledger.present && (await recordedProcesses(ledger.fields, probe, classifyRecordedProcess)).live) return `run ${name} may still be live` // rule:torn-live-run
   }
   return undefined
 }
 
-async function tornLock(reflectionDir: string, reason: string, probe: StaleLockProbe): Promise<StaleLockDecision> {
-  const live = await liveRunBesideTornLock(reflectionDir, probe)
-  if (live !== undefined) return { kind: "stuck", runId: "unknown", reason: `${reason} and run ${live} may still be live` } // rule:torn-live-run
+async function tornLock(reflectionDir: string, bytes: string, reason: string, probe: StaleLockProbe): Promise<StaleLockDecision> {
+  const blocker = await tornLockBlocker(reflectionDir, bytes, probe)
+  if (blocker !== undefined) return { kind: "stuck", runId: "unknown", reason: `${reason} and ${blocker}` }
   return { kind: "reap", action: "lock-torn", runId: "unknown", reason } // rule:lock-torn
 }
 
@@ -165,12 +184,12 @@ async function decideStuck(reflectionDir: string, verdict: Extract<ReflectionLoc
   const lock = await readText(join(reflectionDir, "active.lock"), probe)
   if (lock.kind !== "text") return passThrough
   const parsed = parseJson(lock.text)
-  if (!parsed.ok) return tornLock(reflectionDir, "active.lock is not valid JSON", probe)
+  if (!parsed.ok) return tornLock(reflectionDir, lock.text, "active.lock is not valid JSON", probe)
   const fields = fieldsOf(parsed.value)
   const launcherPid = typeof fields.launcherPid === "number" ? fields.launcherPid : undefined
   const launcherHostname = typeof fields.launcherHostname === "string" ? fields.launcherHostname : undefined
   if (launcherPid === undefined || launcherHostname === undefined) {
-    if (!isReservedRun(parsed.value)) return tornLock(reflectionDir, "active.lock is not a reservation", probe)
+    if (!isReservedRun(parsed.value)) return tornLock(reflectionDir, lock.text, "active.lock is not a reservation", probe)
     return { kind: "stuck", runId: verdict.runId, reason: "its launcher identity is missing; a session reconciles it" } // rule:legacy-lock
   }
   if (launcherHostname !== (probe.hostname ?? readHostname)()) return passThrough
@@ -178,7 +197,7 @@ async function decideStuck(reflectionDir: string, verdict: Extract<ReflectionLoc
   const runId = verdict.runId
   const runDir = join(reflectionDir, "runs", runId)
   if (await exists(join(runDir, "outcome.json"), probe)) return passThrough
-  if (!isReservedRun(parsed.value)) return tornLock(reflectionDir, "active.lock is not a reservation", probe)
+  if (!isReservedRun(parsed.value)) return tornLock(reflectionDir, lock.text, "active.lock is not a reservation", probe)
   const finalOutcome = await readFinalOutcome(runDir, probe)
   if (finalOutcome === "merged" || finalOutcome === "no_changes") {
     return { kind: "stuck", runId, reason: "it finished with a folded outcome that only a session can settle; open a session" } // rule:final-folded

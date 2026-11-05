@@ -126,6 +126,8 @@ function stuckHolder(change: { files?: Record<string, FileState | undefined>; pi
   return { files, pids: change.pids ?? {}, starts: change.starts ?? {}, mtimes: change.mtimes ?? {} }
 }
 
+const TORN_OLD = REAPER_NOW - 2 * 60 * 60_000
+
 const reap = (action: string, reason: string): StaleLockDecision => ({ kind: "reap", action, runId: RUN, reason } as StaleLockDecision)
 const kept = (runId: string, reason: string): StaleLockDecision => ({ kind: "stuck", runId, reason })
 
@@ -142,9 +144,13 @@ export const REAPER_SCENARIOS: readonly ReaperScenario[] = [
   { name: "a valid ledger whose processes are dead", rule: "processes-dead", facts: stuckHolder({ files: { [LEDGER]: ledger() } }), expected: reap("processes-dead", "its launcher, supervisor and child are all gone and it recorded no outcome") },
   { name: "an unparseable ledger whose processes are dead", rule: "ledger-unreadable", facts: stuckHolder({ files: { [LEDGER]: ledger({ deadlineAt: 1 }) } }), expected: reap("ledger-unreadable", "its ledger cannot be read and its recorded processes are gone") },
   { name: "a ledger that is not JSON whose pids cannot be read", facts: stuckHolder({ files: { [LEDGER]: "{ torn" } }), expected: reap("ledger-unreadable", "its ledger cannot be read and its recorded processes are gone") },
-  { name: "a torn active.lock and no live run", rule: "lock-torn", facts: stuckHolder({ files: { [LOCK]: "{\"runId\":" } }), expected: { kind: "reap", action: "lock-torn", runId: "unknown", reason: "active.lock is not valid JSON" } },
-  { name: "a wrong-shape active.lock", facts: stuckHolder({ files: { [LOCK]: "null" } }), expected: { kind: "reap", action: "lock-torn", runId: "unknown", reason: "active.lock is not a reservation" } },
-  { name: "a torn active.lock beside a run whose supervisor is alive", rule: "torn-live-run", facts: stuckHolder({ files: { [LOCK]: "{", [LEDGER]: ledger() }, pids: { [SUPERVISOR]: "alive" } }), expected: kept("unknown", `active.lock is not valid JSON and run ${RUN} may still be live`) },
+  { name: "a torn active.lock and no live run", rule: "lock-torn", facts: stuckHolder({ files: { [LOCK]: "{\"runId\":" }, mtimes: { [LOCK]: TORN_OLD } }), expected: { kind: "reap", action: "lock-torn", runId: "unknown", reason: "active.lock is not valid JSON" } },
+  { name: "a wrong-shape active.lock", facts: stuckHolder({ files: { [LOCK]: "null" }, mtimes: { [LOCK]: TORN_OLD } }), expected: { kind: "reap", action: "lock-torn", runId: "unknown", reason: "active.lock is not a reservation" } },
+  { name: "a torn active.lock written ten minutes ago", rule: "torn-recent", facts: stuckHolder({ files: { [LOCK]: "{\"runId\":" }, mtimes: { [LOCK]: REAPER_NOW - 10 * 60_000 } }), expected: kept("unknown", "active.lock is not valid JSON and it is recent") },
+  { name: "a torn active.lock naming another host", rule: "torn-other-host", facts: stuckHolder({ files: { [LOCK]: `{"runId":"${RUN}","launcherPid":${LAUNCHER},"launcherHostname":"other-host","laun` }, mtimes: { [LOCK]: TORN_OLD } }), expected: kept("unknown", "active.lock is not valid JSON and its launcher is on host other-host") },
+  { name: "a torn active.lock whose launcher is alive", rule: "torn-launcher-alive", facts: stuckHolder({ files: { [LOCK]: `{"runId":"${RUN}","launcherPid":${LAUNCHER},"laun` }, pids: { [LAUNCHER]: "alive" }, mtimes: { [LOCK]: TORN_OLD } }), expected: kept("unknown", `active.lock is not valid JSON and its launcher pid ${LAUNCHER} may still be alive`) },
+  { name: "a torn active.lock beside a run dir five minutes old", rule: "torn-young-run-dir", facts: stuckHolder({ files: { [LOCK]: "{", [join(RUN_DIR, "prelaunch.json")]: "{}" }, mtimes: { [LOCK]: TORN_OLD, [RUN_DIR]: REAPER_NOW - 5 * 60_000 } }), expected: kept("unknown", `active.lock is not valid JSON and run ${RUN} is a young run dir`) },
+  { name: "a torn active.lock beside a run whose supervisor is alive", rule: "torn-live-run", facts: stuckHolder({ files: { [LOCK]: "{", [LEDGER]: ledger() }, pids: { [SUPERVISOR]: "alive" }, mtimes: { [LOCK]: TORN_OLD, [RUN_DIR]: TORN_OLD } }), expected: kept("unknown", `active.lock is not valid JSON and run ${RUN} may still be live`) },
   { name: "a legacy reservation without launcher identity", rule: "legacy-lock", facts: stuckHolder({ files: { [LOCK]: JSON.stringify({ runId: RUN, request: { trigger: "manual", conversationIds: [], snapshots: [] } }) } }), expected: kept(RUN, "its launcher identity is missing; a session reconciles it") },
   { name: "another host", facts: stuckHolder({ files: { [LOCK]: lock({ launcherHostname: "other-host", request: { trigger: "manual", conversationIds: [], snapshots: [] } }) } }), expected: kept(RUN, "it is owned by host other-host, which cannot be checked from here") },
 ]
