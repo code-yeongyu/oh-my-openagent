@@ -237,6 +237,12 @@ describe("team e2e process cleanup", () => {
   // #12129: the fake root pid must never equal the test runner's own pid —
   // `windowsTreeKillArgs` refuses `rootPid === process.pid` (self-kill guard),
   // so the literal 4242 failed whenever the runner happened to get pid 4242.
+  // It also failed when the runner got pid 4243 or 4245: the taskkill cases
+  // build their mock tree as root+1/+2/+3, so the runner's own pid landed
+  // inside it, and the ancestor guard in `windows-process-tree.mjs:52-58`
+  // strips the runner and its ancestors from the kill list, changing the
+  // expected taskkill args. `process.pid + 1` keeps the whole mock tree
+  // clear of the runner's pid.
   const FAKE_ROOT_PID = process.pid + 1
 
   it("#given a Windows npm senpi shim #when the spawn invocation is resolved #then Node launches the package CLI without cmd shell forwarding", () => {
@@ -388,7 +394,6 @@ describe("team e2e process cleanup", () => {
     // when the runner's pid collides with the target, and the fake root pid
     // used above must never be that pid.
     const calls: Array<{ command: string; args: readonly string[] }> = []
-    expect(FAKE_ROOT_PID).not.toBe(process.pid)
 
     // when
     const result = await runtime.terminateProcessTree(process.pid, {
