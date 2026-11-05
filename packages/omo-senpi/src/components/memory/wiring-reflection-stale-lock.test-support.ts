@@ -6,6 +6,7 @@ import { join } from "node:path"
 
 import {
   GitMemoryRepo,
+  InFlightReads,
   LockContentionError,
   ReflectionReservationStore,
   TranscriptJournal,
@@ -149,7 +150,10 @@ export async function staleLockFixture(seams?: ActiveHolderSeams, options: { rea
     binding: { identity: "agent-test", repoPathHash: "hash", boundAt: 1 },
   })
   const settlements: Array<() => Promise<void>> = []
+  // The shutdown drain's tracker: a settle's identity reconcile runs detached from the turn and is tracked here.
+  const work = new InFlightReads()
   const wiring = createMemoryWiring({
+    work,
     sessions: new Map([[SESSION_ID, { context: identity }]]),
     loadConfig: () => loadedMemoryConfig(memorySettings()),
     cwd: () => root,
@@ -178,7 +182,7 @@ export async function staleLockFixture(seams?: ActiveHolderSeams, options: { rea
   const pi = new MemoryFakeExtensionAPI()
   wiring.registerStatic(pi, componentContext())
   await wiring.afterBind(pi, SESSION_ID, identity, eventCtx)
-  return { root, paths, memoryIdentity, repo, journal, store, launched, reconciles, holders, pi, eventCtx }
+  return { root, paths, memoryIdentity, repo, journal, store, launched, reconciles, holders, pi, eventCtx, work }
 }
 
 type Fixture = Awaited<ReturnType<typeof staleLockFixture>>
@@ -191,6 +195,8 @@ export async function settleTurn(item: Fixture): Promise<void> {
   await item.pi.dispatch("input_disposition", { type: "input_disposition", inputId, disposition: "started" }, item.eventCtx)
   await item.pi.dispatch("agent_end", { aborted: false, willRetry: false }, item.eventCtx)
   await item.pi.dispatch("agent_settled", {}, item.eventCtx)
+  // The turn ends before its identity reconcile does; a settled turn here includes that pass's outcome.
+  await item.work.settled()
 }
 
 // The shape from #10377: the child finished and recorded its outcome, publish had claimed the run,

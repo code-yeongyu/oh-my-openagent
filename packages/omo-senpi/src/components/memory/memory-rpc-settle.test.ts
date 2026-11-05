@@ -171,7 +171,8 @@ test.each(["reflection", "journal"] as const)("#given %s work outlives the obser
       type: "message", id: "answer-1",
       message: { role: "assistant", content: [{ type: "text", text: "Done." }] },
     })
-    jest.useFakeTimers()
+    // The journal variant jumps the clock to the observer budget; reflection must settle on its own clock.
+    if (held === "journal") jest.useFakeTimers()
     // Senpi awaits extension handlers before emitting these two host events.
     settling = pi.dispatch("agent_settled", {}, eventCtx).then(() => {
       sequence.push("agent_settled", "agent_idle")
@@ -179,17 +180,17 @@ test.each(["reflection", "journal"] as const)("#given %s work outlives the obser
     await entered.promise
     // Even a held journal lock must not postpone the observation of the completed answer.
     expect(sequence).toEqual([0, 1])
-    jest.advanceTimersByTime(2_000)
+    if (held === "journal") jest.advanceTimersByTime(2_000)
     await settling
 
     expect(sequence).toEqual([0, 1, "agent_settled", "agent_idle"])
-    expect(context.logs).toContainEqual(expect.objectContaining({
+    // Reflection recovery runs beside the turn, so only the awaited journal phase reaches the observer budget.
+    const stall = expect.objectContaining({
       message: "extension_handler_stalled",
-      details: expect.objectContaining({
-        hook: held === "reflection" ? "onSettled.reflection.reconcile" : "onSettled.journal.reconcileSession",
-        stage: "timeout",
-      }),
-    }))
+      details: expect.objectContaining({ hook: "onSettled.journal.reconcileSession", stage: "timeout" }),
+    })
+    if (held === "journal") expect(context.logs).toContainEqual(stall)
+    else expect(context.logs).not.toContainEqual(expect.objectContaining({ message: "extension_handler_stalled" }))
     // The assertion above completed while recovery was still held by this test.
     release.resolve()
     await finished.promise

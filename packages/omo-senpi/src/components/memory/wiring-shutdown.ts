@@ -22,6 +22,8 @@ export interface MemorySessionShutdownParts {
   readonly resolveContext: (sessionId: string) => MemoryIdentityContext | undefined
   readonly factsWiringFor: (identity: MemoryIdentityContext) => { readonly cancelActive?: () => Promise<unknown> }
   readonly resetSession: (sessionId: string) => void
+  /** Cancels the session's detached identity reconcile and returns it, so the drain lets an admitted transition finish. */
+  readonly retireReconcile: (sessionId: string) => Promise<void> | undefined
 }
 
 export async function runMemorySessionShutdown(parts: MemorySessionShutdownParts, input: ShutdownDrainInput): Promise<void> {
@@ -37,6 +39,8 @@ export async function runMemorySessionShutdown(parts: MemorySessionShutdownParts
   // shutdown, which Windows reports as EBUSY/EFAULT on the next remove (#10154).
   await drain.raceDetached(input, "maintenance-settle", () => parts.maintenance.settled())
   await drain.raceDetached(input, "status-settle", () => parts.reflectionLive.settled())
+  const reconciling = parts.retireReconcile(input.sessionId)
+  if (reconciling !== undefined) await drain.raceDetached(input, "reconcile-settle", () => reconciling)
   // A recall ranking saves the repository's terms into its `.git` after the prompt; let that write finish.
   await drain.raceDetached(input, "recall-store-settle", () => parts.corpusCache.settled())
   await drain.raceDetached(input, "memory-block-settle", () => parts.promptCache.settled())

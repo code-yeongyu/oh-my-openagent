@@ -9,6 +9,7 @@ import { TranscriptJournal, resolveMemoryIdentity, type TranscriptEntry } from "
 
 import type { ComponentLogger } from "../../extension/types"
 import { createMemoryComponent } from "./index"
+import { withinMs } from "./kibitzer/sidecar.test-support"
 import { componentContext, loadedMemoryConfig, memorySettings, MemoryFakeExtensionAPI, sessionContext } from "./memory.test-support"
 import {
   SESSION_SHUTDOWN_DRAIN_BUDGET_MS,
@@ -370,7 +371,19 @@ describe("session shutdown drain budget", () => {
     tempDirs.push(root)
     await writeFile(join(root, "memory"), "not a directory", "utf8")
     const pi = new MemoryFakeExtensionAPI()
-    const ctx = componentContext()
+    const recorded = componentContext()
+    // The recovery pass runs beside the turn, so the settle returns before it fails: wait for its own log line.
+    const failureLogged = Promise.withResolvers<void>()
+    const ctx = {
+      ...recorded,
+      logger: {
+        ...recorded.logger,
+        warn: (message: string, details?: unknown) => {
+          recorded.logger.warn(message, details)
+          if (message === "memory bind-time reconcile failed") failureLogged.resolve()
+        },
+      },
+    }
     createMemoryComponent({
       env: { OMO_MEMORY_HOME: join(root, "memory") },
       loadConfig: () => loadedMemoryConfig(memorySettings({ facts: { enabled: false, debounce_settles: 4 } })),
@@ -383,6 +396,9 @@ describe("session shutdown drain budget", () => {
     await pi.dispatch("input", { source: "interactive", inputId: "reconcile-input", text: "Continue." }, eventCtx)
     await pi.dispatch("input_disposition", { inputId: "reconcile-input", disposition: "started" }, eventCtx)
     await pi.dispatch("agent_settled", {}, eventCtx)
+    await withinMs(failureLogged.promise, "bind-time reconcile failure logged", 5_000)
+    // The shutdown drain awaits the retired pass, so nothing it started outlives this test's memory home.
+    await pi.dispatch("session_shutdown", { type: "session_shutdown", reason: "quit" }, eventCtx)
 
     // then
     expect(ctx.logs.filter((entry) => entry.message === "memory bind-time reconcile failed")).toHaveLength(1)
