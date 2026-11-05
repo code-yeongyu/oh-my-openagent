@@ -1198,6 +1198,7 @@
     "packages/omo-senpi/src/components/model-profile/request-auth.ts",
     "packages/omo-senpi/src/components/model-profile/resolve.ts",
     "packages/omo-senpi/src/components/native-badge/footer-badge.ts",
+    "packages/omo-senpi/src/components/native-badge/hand-lifetime.ts",
     "packages/omo-senpi/src/components/native-badge/index.ts",
     "packages/omo-senpi/src/components/onboarding/claim-owner.ts",
     "packages/omo-senpi/src/components/onboarding/component.ts",
