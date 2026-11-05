@@ -122,12 +122,16 @@ test("a dropped OpenSSL default file is reported in the ensure result as default
   const { out } = await ensure(dir, ["--json"], {
     acquire: async () => ({
       certificates: [ca], fallbackReason: null, defaultFileDrop: drop,
-      codes: [{ code: "openssl-default-file-malformed" }, { code: "ordinary-block-unparseable" }],
+      codes: [drop],
     }),
   })
   const value = parsed(out) as Ensured & { defaultFileDrop?: unknown }
   expect(value.automatic).toBe("os")
   expect(value.defaultFileDrop).toEqual(drop)
+  // Revision 11: the generation's one log record names the file, cause and block index too.
+  const log = await records(dir)
+  expect(log).toHaveLength(1)
+  expect(log[0]).toMatchObject({ action: "ensure", generation: value.sha256, codes: [drop] })
 })
 
 test("a kept OpenSSL default file leaves defaultFileDrop out of the ensure result", async () => {
