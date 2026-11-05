@@ -3,6 +3,7 @@ import { dirname, join } from "node:path"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { acquireClaudeCode, cachedExecutablePath, type ClaudeCodeDownloadProgress, type ClaudeCodePin } from "./acquire"
 import { findOnPath } from "./find-on-path"
+import { CLAUDE_CODE_TURN_SIDE } from "./hand-lifetime"
 
 export const CLAUDE_CODE_PROVIDER = "anthropic-subscription"
 export const CLAUDE_CODE_PIN_FILE = "claude-code-pin.json"
@@ -114,8 +115,8 @@ export function createClaudeCodeComponent(options: ClaudeCodeComponentOptions = 
       // A user prompt runs `input` before senpi's auth check (agent-session prompt(): emitInput, then
       // checkAuth, then before_agent_start), so a `claude login`-only user needs the executable there.
       // A turn an extension starts (sendMessage triggerTurn) skips `input` and reaches before_agent_start.
-      pi.on("input", onTurn)
-      pi.on("before_agent_start", onTurn, { previewSafe: true })
+      pi.on("input", onTurn, CLAUDE_CODE_TURN_SIDE)
+      pi.on("before_agent_start", onTurn, { ...CLAUDE_CODE_TURN_SIDE, previewSafe: true })
     },
   }
 }

@@ -795,6 +795,7 @@
     "packages/omo-senpi/src/components/claim-receipt/verdict.ts",
     "packages/omo-senpi/src/components/claude-code/acquire.ts",
     "packages/omo-senpi/src/components/claude-code/find-on-path.ts",
+    "packages/omo-senpi/src/components/claude-code/hand-lifetime.ts",
     "packages/omo-senpi/src/components/claude-code/index.ts",
     "packages/omo-senpi/src/components/comment-checker/component.ts",
     "packages/omo-senpi/src/components/comment-checker/constants.ts",
