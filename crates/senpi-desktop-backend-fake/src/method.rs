@@ -45,6 +45,11 @@ pub enum FakeMethod {
     AxOwner,
     MenuItems,
     MenuSelect,
+    WindowIdentity,
+    FocusRead,
+    FocusRecord,
+    HitRead,
+    FrontmostPid,
 }
 
 /// The AX writes a scenario can leave unanswered (`ax_cannot_complete`):
