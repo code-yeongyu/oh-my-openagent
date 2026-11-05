@@ -2405,6 +2405,16 @@
       },
       "additionalProperties": false
     },
+    "device_service": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": true,
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
     "side_panel": {
       "type": "object",
       "properties": {
@@ -4796,6 +4806,15 @@
           },
           "additionalProperties": false
         },
+        "device_service": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
         "side_panel": {
           "type": "object",
           "properties": {
@@ -7164,6 +7183,15 @@
           },
           "additionalProperties": false
         },
+        "device_service": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
         "side_panel": {
           "type": "object",
           "properties": {
@@ -9528,6 +9556,15 @@
               "type": "number",
               "minimum": 0,
               "maximum": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "device_service": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
             }
           },
           "additionalProperties": false
@@ -11906,6 +11943,15 @@
             },
             "additionalProperties": false
           },
+          "device_service": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
           "side_panel": {
             "type": "object",
             "properties": {
@@ -14270,6 +14316,15 @@
                     "type": "number",
                     "minimum": 0,
                     "maximum": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "device_service": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
                   }
                 },
                 "additionalProperties": false
@@ -16642,6 +16697,15 @@
                 },
                 "additionalProperties": false
               },
+              "device_service": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
               "side_panel": {
                 "type": "object",
                 "properties": {
@@ -19006,6 +19070,15 @@
                     "type": "number",
                     "minimum": 0,
                     "maximum": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "device_service": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
                   }
                 },
                 "additionalProperties": false
