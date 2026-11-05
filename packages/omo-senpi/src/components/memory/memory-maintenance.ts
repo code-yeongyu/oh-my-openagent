@@ -157,11 +157,18 @@ export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}):
       // The completion stamp is written after the work, so an interrupted pass resumes at the next bind.
       if (report.cursor === undefined) await repo.configSet(RETENTION_STAMP_CONFIG_KEY, String(now()))
       if (report.cap !== undefined && report.cap.exceededBytes > 0) {
-        options.logger?.warn("omo-senpi memory runtime cap exceeded, nothing evictable", {
-          identity: context.identity,
-          overCapBytes: report.cap.exceededBytes,
-          kept: report.cap.kept,
-        })
+        // "Nothing evictable" only when the cap walked every tier: a budget stop (cursor), a measurement
+        // past the budget and skipped journal tiers all leave evictable data for the next pass.
+        const unfinished = [...(report.cap.cursor === undefined ? [] : ["budget"]), ...report.cap.skipped]
+        options.logger?.warn(
+          unfinished.length === 0 ? "omo-senpi memory runtime cap exceeded, nothing evictable" : "omo-senpi memory runtime cap exceeded, eviction continues next pass",
+          {
+            identity: context.identity,
+            overCapBytes: report.cap.exceededBytes,
+            ...(unfinished.length === 0 ? {} : { reason: unfinished }),
+            kept: report.cap.kept,
+          },
+        )
       }
     } catch (error) {
       if (signal.aborted) throw error

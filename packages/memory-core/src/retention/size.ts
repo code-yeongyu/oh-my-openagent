@@ -91,6 +91,29 @@ export async function measureTreeBytes(path: string, signal?: AbortSignal): Prom
   return bytes
 }
 
+export interface RuntimeSizeUnknown {
+  readonly budgetMs: number
+  /** ISO time the measurement gave up. */
+  readonly at: string
+}
+
+/**
+ * The doctors' measurement (`/doctor` and `omo doctor`): {@link measureRuntimeSize} under a deadline of
+ * `budgetMs` (or the caller's `signal`), so a huge tree reports "size unknown" instead of stalling.
+ */
+export async function measureRuntimeSizeWithinBudget(
+  runtimeDir: string,
+  input: { readonly budgetMs?: number; readonly signal?: AbortSignal; readonly now: number },
+): Promise<{ readonly size: RuntimeSize } | { readonly sizeUnknown: RuntimeSizeUnknown }> {
+  const signal = input.signal ?? (input.budgetMs === undefined ? undefined : AbortSignal.timeout(input.budgetMs))
+  try {
+    return { size: await measureRuntimeSize(runtimeDir, signal === undefined ? {} : { signal }) }
+  } catch (error) {
+    if (signal?.aborted !== true) throw error
+    return { sizeUnknown: { budgetMs: input.budgetMs ?? 0, at: new Date(input.now).toISOString() } }
+  }
+}
+
 export async function measureRuntimeSize(runtimeDir: string, options: { readonly signal?: AbortSignal } = {}): Promise<RuntimeSize> {
   const signal = options.signal
   signal?.throwIfAborted()

@@ -1,14 +1,16 @@
 // Retention as a host-sweep step (design 6b): the same pass a bound session runs, applied to an
 // identity this process does not host. Foreign identities get the conservative inputs: no live
 // sessions are known (none are hosted here), reflection counts as enabled for the health gate, the
-// owned-sidecar set is empty, and the unreflected-input switch comes from the GLOBAL config only.
+// owned-sidecar set is empty, and the unreflected-input switch comes from the GLOBAL config only. The
+// size cap runs too, with its journal floor raised to `retention_days` because liveness is unknown.
 
 import { dirname } from "node:path"
 
 import { buildIdentityPaths } from "../identity/layout"
 import type { HostSweepIdentity, HostSweepStep } from "../reflection/host-sweep"
 import { runRuntimeRetention, summarizeRuntimeRetention } from "./pass"
-import { DEFAULT_RUNTIME_RETENTION, type RuntimeRetentionPolicy } from "./policy"
+import { DAY_MS, DEFAULT_RUNTIME_RETENTION, type RuntimeRetentionPolicy } from "./policy"
+import { DEFAULT_RUNTIME_MAX_BYTES } from "./size"
 
 /** The memory settings shape this decision reads; plain data so the CLI bundle can pass parsed JSON. */
 export interface ForeignRuntimeLayer {
@@ -16,6 +18,7 @@ export interface ForeignRuntimeLayer {
   readonly abandoned_journal_days?: unknown
   readonly completions_days?: unknown
   readonly pass_budget_ms?: unknown
+  readonly max_bytes?: unknown
   readonly discard_unreflected_journals?: unknown
 }
 
@@ -57,6 +60,11 @@ function resolveForeignIdentityRetentionPolicy(settings: ForeignMemoryRuntimeSet
   }
 }
 
+/** `max_bytes` for a foreign identity: the agent override, else the global value, else the shipped default. */
+export function resolveForeignIdentityMaxBytes(settings: ForeignMemoryRuntimeSettings | undefined, identity: string): number {
+  return window(settings, identity, "max_bytes", DEFAULT_RUNTIME_MAX_BYTES)
+}
+
 export interface RetentionHostSweepStepOptions {
   readonly settings?: ForeignMemoryRuntimeSettings
   /**
@@ -83,13 +91,15 @@ export function createRetentionHostSweepStep(options: RetentionHostSweepStepOpti
       const report = await runRuntimeRetention({
         paths: buildIdentityPaths(dirname(dirname(identity.root)), identity.name),
         policy: { ...policy, passBudgetMs: Math.min(policy.passBudgetMs, remaining) },
+        maxBytes: resolveForeignIdentityMaxBytes(options.settings, identity.name),
+        journalFloorMs: policy.retentionDays * DAY_MS,
         now,
         reflectionEnabled: true,
         ...(options.signal === undefined ? {} : { signal: options.signal }),
       })
       const summary = summarizeRuntimeRetention(report)
       if (summary.removed === 0 && report.cursor === undefined) return []
-      const counts = `runs ${summary.runs}, completions ${summary.completions}, journals ${summary.journals}, sidecars ${summary.sidecars}, ledgers ${summary.ledgers}, legacy ${summary.reflectionSessions}${report.recallRuns === "removed" ? " + recall/runs" : ""}`
+      const counts = `runs ${summary.runs}, completions ${summary.completions}, journals ${summary.journals}, sidecars ${summary.sidecars}, ledgers ${summary.ledgers}, legacy ${summary.reflectionSessions}${report.recallRuns === "removed" ? " + recall/runs" : ""}${report.cap === undefined || report.cap.evicted.length === 0 ? "" : `, size cap ${report.cap.evicted.length}`}`
       return [`FIXED ${identity.name} retention removed ${summary.removed} (${counts})${report.cursor === undefined ? "" : `; resumes at ${report.cursor.store}`}`]
     } catch (error) {
       if (options.signal?.aborted === true) throw error

@@ -40,7 +40,8 @@ export async function reservedRunIds(reflectionDir: string): Promise<ReadonlySet
   return (await readReservations(reflectionDir)).runIds
 }
 
-async function readReservations(reflectionDir: string): Promise<{ readonly runIds: Set<string>; readonly conversationIds: Set<string> }> {
+/** Run ids and conversation ids named by `active.lock` and `pending.json`, read lock-free (the doctors' estimate). */
+export async function readReservations(reflectionDir: string): Promise<{ readonly runIds: Set<string>; readonly conversationIds: Set<string> }> {
   const runIds = new Set<string>()
   const conversationIds = new Set<string>()
   for (const name of ["active.lock", "pending.json"]) {

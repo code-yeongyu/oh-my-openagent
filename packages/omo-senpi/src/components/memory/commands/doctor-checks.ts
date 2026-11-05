@@ -11,9 +11,11 @@ import {
   V1_PERSONA_SEED_SHA256,
   auditMemoryRepo,
   countRuntimePastRetention,
+  describeRuntimeCapExcess,
   formatRuntimeBytes,
   isMemoryContentPath,
-  measureRuntimeSize,
+  measureRuntimeCapEvictableBytes,
+  measureRuntimeSizeWithinBudget,
   measureUnreflectedJournalBytes,
   parseLockRecord,
   readUnreflectedRetentionGate,
@@ -304,6 +306,8 @@ export interface RuntimeSizeReport {
   /** Bytes in never/partly-reflected journals, which only `discard_unreflected_journals` lets the cap evict. */
   readonly unreflectedBytes: number
   readonly discardUnreflectedJournals: boolean
+  /** Over the cap only: bytes the next cap pass could evict now (memory-core measureRuntimeCapEvictableBytes). */
+  readonly evictableBytes?: number
   /** Abandoned-journal retention is suspended by the health gate since this failed completion. */
   readonly suspendedSince?: string
 }
@@ -313,14 +317,13 @@ export async function checkRuntimeSize(
   identityPaths: MemoryIdentityPaths,
   input: { readonly maxBytes: number; readonly policy: RuntimeRetentionPolicy; readonly now: number; readonly reflectionEnabled: boolean; readonly discardUnreflectedJournals: boolean; readonly measureBudgetMs?: number; readonly measureSignal?: AbortSignal },
 ): Promise<{ readonly check: DoctorCheck; readonly report: RuntimeSizeReport }> {
-  const signal = input.measureSignal ?? (input.measureBudgetMs === undefined ? undefined : AbortSignal.timeout(input.measureBudgetMs))
-  let size: Awaited<ReturnType<typeof measureRuntimeSize>>
-  try {
-    size = await measureRuntimeSize(identityPaths.runtime, signal === undefined ? {} : { signal })
-  } catch (error) {
-    if (signal?.aborted !== true) throw error
-    const at = new Date(input.now).toISOString()
-    const budgetMs = input.measureBudgetMs ?? 0
+  const measured = await measureRuntimeSizeWithinBudget(identityPaths.runtime, {
+    now: input.now,
+    ...(input.measureBudgetMs === undefined ? {} : { budgetMs: input.measureBudgetMs }),
+    ...(input.measureSignal === undefined ? {} : { signal: input.measureSignal }),
+  })
+  if ("sizeUnknown" in measured) {
+    const { budgetMs, at } = measured.sizeUnknown
     return {
       check: { name: "runtime-size", level: "warn", detail: `size unknown: measurement exceeded ${budgetMs} ms on ${at}` },
       report: {
@@ -335,12 +338,27 @@ export async function checkRuntimeSize(
       },
     }
   }
+  const size = measured.size
   const pastRetention = await countRuntimePastRetention({ paths: identityPaths, policy: input.policy, now: () => input.now, reflectionEnabled: input.reflectionEnabled })
   const gate = input.discardUnreflectedJournals ? await readUnreflectedRetentionGate(identityPaths.reflection, input.reflectionEnabled) : undefined
   const suspendedSince = gate?.open === false ? gate.newest?.at : undefined
   const unreflectedBytes = await measureUnreflectedJournalBytes({ paths: identityPaths, policy: input.policy })
   const standing = runtimeSizeStanding(size.bytes, input.maxBytes)
   const overCap = input.maxBytes > 0 ? size.bytes - input.maxBytes : 0
+  const evictableBytes = overCap > 0
+    ? await measureRuntimeCapEvictableBytes({
+      paths: identityPaths,
+      policy: { ...input.policy, discardUnreflectedJournals: input.discardUnreflectedJournals },
+      now: () => input.now,
+      reflectionEnabled: input.reflectionEnabled,
+    })
+    : undefined
+  const excess = describeRuntimeCapExcess({
+    overCapBytes: overCap,
+    evictableBytes: evictableBytes ?? 0,
+    unreflectedBytes,
+    discardUnreflectedJournals: input.discardUnreflectedJournals,
+  })
   const stores = size.stores.slice(0, 3)
   const report: RuntimeSizeReport = {
     bytes: size.bytes,
@@ -351,6 +369,7 @@ export async function checkRuntimeSize(
     unclassifiedJournals: pastRetention.unclassifiedJournals,
     unreflectedBytes,
     discardUnreflectedJournals: input.discardUnreflectedJournals,
+    ...(evictableBytes === undefined ? {} : { evictableBytes }),
     ...(suspendedSince === undefined ? {} : { suspendedSince }),
   }
   const cap = input.maxBytes > 0 ? `${standing.percent}% of the ${formatRuntimeBytes(input.maxBytes)} cap` : "no cap"
@@ -361,11 +380,11 @@ export async function checkRuntimeSize(
     ...(largest === "" ? [] : [`largest: ${largest}`]),
     `past retention: ${pastRetention.runs} runs, ${pastRetention.journals} journals, ${pastRetention.sidecars} sidecars`,
     ...(pastRetention.unclassifiedJournals > 0 ? [`${pastRetention.unclassifiedJournals} unclassified journals kept`] : []),
-    ...(overCap > 0 && !input.discardUnreflectedJournals && unreflectedBytes > 0
-      ? [`cap exceeded by ${formatRuntimeBytes(overCap)}, nothing evictable; held by unreflected journals: ${formatRuntimeBytes(unreflectedBytes)} (discard_unreflected_journals off)`]
-      : []),
+    ...(excess === undefined ? [] : [excess]),
     ...(suspendedSince === undefined ? [] : [`abandoned-journal retention suspended since ${suspendedSince} (reflection is failing)`]),
-    ...(standing.level === "warn" ? [`the next maintenance pass evicts the oldest runtime data down to the cap${past > 0 ? " after retention frees what is past its window" : ""}; raise memory.runtime.max_bytes, or set it to 0, to keep more`] : []),
+    // Over the cap the excess line already says what the next pass evicts; this one is for 80-100 %.
+    ...(standing.level === "warn" && excess === undefined ? [`the next maintenance pass evicts the oldest runtime data down to the cap${past > 0 ? " after retention frees what is past its window" : ""}`] : []),
+    ...(standing.level === "warn" ? ["raise memory.runtime.max_bytes, or set it to 0, to keep more"] : []),
   ].join("; ")
   return { check: { name: "runtime-size", level: standing.level, detail }, report }
 }

@@ -9,9 +9,10 @@
 import { join } from "node:path"
 
 import { lstat } from "../fs/resilient"
+import type { MemoryIdentityPaths } from "../identity/layout"
 import { withLocalJournalLock, type JournalLock } from "../journal/lock"
 import { reflectionRunNumber, scanReflectionRunHighWater } from "../reflection/run-id-high-water"
-import { readReflectionRetentionGuard, reservedRunIds } from "./guard"
+import { readReflectionRetentionGuard, readReservations, reservedRunIds } from "./guard"
 import { readUnreflectedRetentionGate } from "./reflection-health-signal"
 import { classifyTranscriptJournal, removeTranscriptJournalUnderLock } from "./journals"
 import { DAY_MS, listNames, newestMtime, type RetentionContext, type RuntimeRetentionPolicy } from "./policy"
@@ -23,7 +24,7 @@ import {
   kibitzerSidecarOwnerLockPathFor,
   kibitzerSidecarsRoot,
 } from "./sidecars"
-import { measureRuntimeSize, measureTreeBytes } from "./size"
+import { formatRuntimeBytes, measureRuntimeSize, measureTreeBytes } from "./size"
 
 export type RuntimeCapTier =
   | "folded-run"
@@ -130,6 +131,8 @@ export async function runRuntimeSizeCap(options: RuntimeSizeCapOptions): Promise
   try {
     beforeBytes = (await measureRuntimeSize(options.paths.runtime, budgetSignal === undefined ? {} : { signal: budgetSignal })).bytes
   } catch (error) {
+    // A disposed caller is an abort, never a budget stop: the pass must not stamp itself complete.
+    options.signal?.throwIfAborted()
     if (budgetSignal?.aborted !== true) throw error
     skipped.push("measure-over-budget")
     return { maxBytes: options.maxBytes, beforeBytes: 0, afterBytes: 0, exceededBytes: 0, evicted, kept, skipped, measureMs: clock() - measureStart, unreflectedHeldBytes: 0 }
@@ -180,6 +183,65 @@ export async function runRuntimeSizeCap(options: RuntimeSizeCapOptions): Promise
     ...(gate.suspendedSince === undefined ? {} : { suspendedSince: gate.suspendedSince }),
     ...(cursor === undefined ? {} : { cursor }),
   }
+}
+
+export interface RuntimeCapEvictableOptions {
+  readonly paths: MemoryIdentityPaths
+  readonly policy: RuntimeRetentionPolicy
+  readonly now: () => number
+  /** `memory.reflection.enabled` for the identity; when false the health gate never closes. */
+  readonly reflectionEnabled?: boolean
+  readonly journalFloorMs?: number
+}
+
+/**
+ * Bytes the next cap pass could evict now, for the doctors (#12538 review M1): every tier's candidates,
+ * from a lock-free read of the run-id high water and the reservations, and nothing is written. The
+ * doctors see neither live sessions nor the claims' locks, so this is an upper bound.
+ */
+export async function measureRuntimeCapEvictableBytes(options: RuntimeCapEvictableOptions): Promise<number> {
+  const reservations = await readReservations(options.paths.reflection)
+  const guard = {
+    highWater: await scanReflectionRunHighWater(options.paths),
+    reserved: reservations.runIds,
+    reservedConversationIds: reservations.conversationIds,
+  }
+  let bytes = 0
+  for (const tier of await tiers({ ...options, maxBytes: 0 }, guard, {}, { suspendedSince: undefined, heldBytes: 0 })) {
+    for (const candidate of await tier()) bytes += await measureTreeBytes(candidate.measuredPath)
+  }
+  return bytes
+}
+
+export interface RuntimeCapExcess {
+  /** Bytes over `max_bytes`; nothing is described at or under the cap. */
+  readonly overCapBytes: number
+  /** {@link measureRuntimeCapEvictableBytes}. */
+  readonly evictableBytes: number
+  /** Bytes in never/partly-reflected journals. */
+  readonly unreflectedBytes: number
+  readonly discardUnreflectedJournals: boolean
+}
+
+/**
+ * The over-cap line both doctors print (`/doctor` and `omo doctor`). "Nothing evictable; held by
+ * unreflected journals" is said only when no tier has anything to evict and the unreflected journals
+ * the switch keeps are enough to hold the excess; otherwise the line says what the next pass evicts.
+ */
+export function describeRuntimeCapExcess(input: RuntimeCapExcess): string | undefined {
+  if (input.overCapBytes <= 0) return undefined
+  const over = `cap exceeded by ${formatRuntimeBytes(input.overCapBytes)}`
+  const held = !input.discardUnreflectedJournals && input.unreflectedBytes > 0
+    ? `held by unreflected journals: ${formatRuntimeBytes(input.unreflectedBytes)} (discard_unreflected_journals off)`
+    : undefined
+  if (input.evictableBytes >= input.overCapBytes) {
+    return `${over}; the next maintenance pass evicts it (${formatRuntimeBytes(input.evictableBytes)} evictable)`
+  }
+  if (input.evictableBytes > 0) {
+    return `${over}; the next maintenance pass evicts up to ${formatRuntimeBytes(input.evictableBytes)} of it${held === undefined ? "" : `; ${held}`}`
+  }
+  if (held !== undefined && input.overCapBytes <= input.unreflectedBytes) return `${over}, nothing evictable; ${held}`
+  return `${over}, nothing evictable: live sessions, reserved runs and the newest runs are never evicted${held === undefined ? "" : `; ${held}`}`
 }
 
 function isBeforeCursor(candidate: Candidate, cursor: RuntimeCapCursor | undefined): boolean {
