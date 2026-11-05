@@ -276,3 +276,46 @@ describe("line ops between devices on this build (seeded property)", () => {
     }
   })
 })
+
+describe("spread-out edits on a long note stay line-exact (review of #12295 at 75a943f4fc)", () => {
+  // Two single-line edits about 2,000 lines apart on one device (edit near the top, append at the
+  // bottom) must stay two small hunks: no untouched line duplicated, no replaced line brought back.
+  const size = 2_100
+  const original = Array.from({ length: size }, (_, k) => `note line ${k}`)
+  const body = (lines: readonly string[]): string => `${HDR}${lines.join("\n")}\n`
+  const countOf = (lines: readonly string[], line: string): number => lines.filter((l) => l === line).length
+
+  async function concurrent(a: readonly string[], b: readonly string[]): Promise<string[]> {
+    const docA = await newDoc("1")
+    const docB = await newDoc("2")
+    captureInto(docA, "", [], body(original))
+    docB.import(docA.export({ mode: "update" }))
+    const base = renderItem(docA) ?? ""
+    const f1 = itemFrontier(docA)
+    const updA = captureItem(docA, base, f1, body(a))
+    const updB = captureItem(docB, base, f1, body(b))
+    if (updA === null || updB === null) throw new Error("capture produced no update")
+    for (const doc of [docA, docB]) for (const update of [updA, updB]) doc.import(update)
+    expect(renderItem(docA)).toBe(renderItem(docB))
+    const out = bodyLines(renderItem(docA) ?? "")
+    docA.free()
+    docB.free()
+    return out
+  }
+
+  const topAndAppend = (tag: string): string[] => [`TOP ${tag}`, ...original.slice(1), `appended ${tag}`]
+
+  test("both devices edit near the top and append at the bottom: every untouched line exactly once", async () => {
+    const lines = await concurrent(topAndAppend("A"), topAndAppend("B"))
+    for (const line of original.slice(1)) expect(countOf(lines, line), line).toBe(1)
+    for (const line of ["TOP A", "TOP B", "appended A", "appended B"]) expect(countOf(lines, line), line).toBe(1)
+  })
+
+  test("one device spreads its edits, the other replaces a middle line: the replaced line stays gone", async () => {
+    const b = original.map((line, k) => (k === 1_000 ? "middle replaced by B" : line))
+    const lines = await concurrent(topAndAppend("A"), b)
+    expect(countOf(lines, "note line 1000")).toBe(0)
+    expect(countOf(lines, "middle replaced by B")).toBe(1)
+    for (const line of original.slice(1)) if (line !== "note line 1000") expect(countOf(lines, line), line).toBe(1)
+  })
+})
