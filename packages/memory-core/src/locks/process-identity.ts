@@ -7,12 +7,12 @@ function errorCode(error: unknown): string | undefined {
   return typeof error.code === "string" ? error.code : undefined
 }
 
-async function execFileText(command: string, args: string[]): Promise<string | null> {
+async function execFileText(command: string, args: string[], env?: NodeJS.ProcessEnv): Promise<string | null> {
   return await new Promise((resolve) => {
     // powershell.exe is a console-subsystem binary, and under a Node runtime (no bun:ffi, so the
     // kernel32 fast path below can never answer) this fallback runs on EVERY pid probe. Without
     // windowsHide each probe flashes a console Windows foregrounds, stealing focus (#8501).
-    execFile(command, args, { encoding: "utf8", timeout: 2_000, windowsHide: true }, (error, stdout) => {
+    execFile(command, args, { encoding: "utf8", timeout: 2_000, windowsHide: true, env }, (error, stdout) => {
       if (error !== null) {
         resolve(null)
         return
@@ -80,7 +80,10 @@ async function readProcessStartIdentity(pid: number): Promise<string | null> {
     if (getPidLiveness(pid) === "dead") return null
     const startSeconds = await readDarwinProcessStartSeconds(pid)
     if (startSeconds !== null) return `proc-start-epoch:${startSeconds}`
-    const value = await execFileText("/bin/ps", ["-o", "lstart=", "-p", String(pid)])
+    // `ps -o lstart=` prints local time, so two readers with different TZ settings
+    // see the same pid as different identities. Pin the child to UTC so the
+    // identity is timezone-independent (#12108).
+    const value = await execFileText("/bin/ps", ["-o", "lstart=", "-p", String(pid)], { ...process.env, TZ: "UTC" })
     return value === null ? null : `ps-lstart:${value.replace(/\s+/g, " ")}`
   }
   if (process.platform === "win32") return await readWin32StartIdentity(pid)
