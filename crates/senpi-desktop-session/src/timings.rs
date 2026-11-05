@@ -1,7 +1,9 @@
 //! Per-stage timings of one mutating request (`trace: true` sessions). The
 //! transaction times each stage it runs; the report carries them as
 //! [`StageTimings`] in microseconds. Stages the request never reached, and
-//! stages no code path runs yet (`axResolve`, `prime`), stay absent.
+//! stages no code path runs yet (`prime`), stay absent. `axResolve` is the
+//! object-mode actionability battery, auto-wait included, and is part of
+//! the `dispatch` stage it runs in.
 
 use std::cell::Cell;
 use std::time::Instant;
@@ -10,6 +12,7 @@ use senpi_desktop_core::report::StageTimings;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TimedStage {
+    AxResolve,
     Capture,
     Dispatch,
     Verify,
@@ -46,6 +49,7 @@ impl StageClock {
     fn add(&self, stage: TimedStage, micros: u64) {
         let mut timings = self.timings.get();
         let slot = match stage {
+            TimedStage::AxResolve => &mut timings.ax_resolve,
             TimedStage::Capture => &mut timings.capture,
             TimedStage::Dispatch => &mut timings.dispatch,
             TimedStage::Verify => &mut timings.verify,

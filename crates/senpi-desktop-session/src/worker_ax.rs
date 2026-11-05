@@ -1,5 +1,9 @@
 //! Accessibility requests. Refs (`eN`) resolve through the session's
-//! registry; a ref older than the previous snapshot fails `StaleRef`.
+//! registry; a ref older than the previous snapshot fails `StaleRef`. In an
+//! object-mode session every action first passes the actionability battery
+//! ([`crate::actionability`]).
+
+use std::cell::Cell;
 
 use senpi_desktop_core::ax::{self, register_node};
 use senpi_desktop_core::backend::DeliveryMode;
@@ -11,6 +15,8 @@ use senpi_desktop_safety::MutatingAction;
 
 use crate::mutate::Mutation;
 use crate::request::Response;
+use crate::timings::TimedStage;
+use crate::worker_input::interrupted;
 use crate::worker::{Audited, Worker};
 
 /// Attribute values longer than this are cut with an ellipsis.
@@ -108,8 +114,14 @@ impl Worker {
             self.ref_target(reference),
             DeliveryMode::Background,
         );
-        self.mutate(&mutation, cancelled, |worker| {
+        let interrupted = self.battery_interruption(cancelled);
+        let baseline = Cell::new(None);
+        let audited = self.mutate(&mutation, cancelled, |worker| {
             let handle = worker.registry.resolve(reference)?;
+            mutation.timings.time(TimedStage::AxResolve, || {
+                worker.actionable(reference, &handle, Some(action), &interrupted)
+            })?;
+            baseline.set(worker.element_surface_baseline(&handle));
             let backend = worker.ax_parts()?.0;
             if action.eq_ignore_ascii_case("press") {
                 ax::ax_press(backend, &handle)?;
@@ -117,7 +129,20 @@ impl Worker {
                 backend.perform(&handle, action)?;
             }
             Ok(Response::Unit)
-        })
+        })?;
+        self.report_opened_surfaces(baseline.take());
+        Ok(audited)
+    }
+
+    /// The stop and cancellation check the actionability battery runs
+    /// before each read of the element it waits on.
+    pub(crate) fn battery_interruption<'a>(
+        &self,
+        cancelled: &'a dyn Fn() -> bool,
+    ) -> impl Fn() -> CoreResult<()> + 'a {
+        let supervisor = self.safety.supervisor.clone();
+        let policy = self.stop_policy();
+        move || interrupted(&supervisor, &policy, cancelled, "waiting for the element to become actionable")
     }
 
     pub(crate) fn ax_set_value(
@@ -134,8 +159,12 @@ impl Worker {
                 DeliveryMode::Background,
             )
         };
+        let interrupted = self.battery_interruption(cancelled);
         self.mutate(&mutation, cancelled, |worker| {
             let handle = worker.registry.resolve(reference)?;
+            mutation.timings.time(TimedStage::AxResolve, || {
+                worker.actionable(reference, &handle, None, &interrupted)
+            })?;
             worker.ax_parts()?.0.set_value(&handle, value)?;
             Ok(Response::Unit)
         })
@@ -147,8 +176,12 @@ impl Worker {
             self.ref_target(reference),
             DeliveryMode::Background,
         );
+        let interrupted = self.battery_interruption(cancelled);
         self.mutate(&mutation, cancelled, |worker| {
             let handle = worker.registry.resolve(reference)?;
+            mutation.timings.time(TimedStage::AxResolve, || {
+                worker.actionable(reference, &handle, None, &interrupted)
+            })?;
             worker.ax_parts()?.0.focus(&handle)?;
             Ok(Response::Unit)
         })

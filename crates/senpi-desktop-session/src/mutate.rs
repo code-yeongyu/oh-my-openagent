@@ -180,6 +180,7 @@ fn settled_report(
     let mut report = error_report(primary, stage, event);
     if let Some(preset) = preset {
         report.reason = preset.reason;
+        report.next_call = preset.next_call;
         report.disposition = preset.disposition.or(report.disposition);
     }
     report
@@ -242,6 +243,7 @@ impl Worker {
                     route: route(mutation),
                     hit,
                     timings: traced.then(|| mutation.timings.take()),
+                    opened_surfaces: Vec::new(),
                 }));
                 Ok((value, event))
             }
