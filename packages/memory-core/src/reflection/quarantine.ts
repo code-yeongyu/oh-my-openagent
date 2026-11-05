@@ -10,6 +10,7 @@ export type QuarantineReason =
   | "ledger_unreadable"
   | "prelaunch_missing_after_deadline"
   | "terminal_claim_unrecoverable"
+  | "stranded_no_ledger"
 
 export interface QuarantineRecord {
   readonly version: 1

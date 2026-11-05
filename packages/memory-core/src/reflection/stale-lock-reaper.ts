@@ -17,7 +17,7 @@ import { appendMemoryReceiptOnce, type MemoryReceiptInput } from "../receipts/re
 import { writeAbandoned, type AbandonedReason } from "./abandoned"
 import type { ReservedRun } from "./machine"
 import { REFLECTION_ORPHAN_GRACE_MS } from "./orphan-sweep"
-import { RESERVATION_EVIDENCE_FILENAME, writeQuarantine } from "./quarantine"
+import { RESERVATION_EVIDENCE_FILENAME, writeQuarantine, type QuarantineReason } from "./quarantine"
 import { claimRunTerminal, readRunTerminalPublication, runTerminalClaimMatches } from "./terminal-claim"
 import { releaseReservationWithoutPromotion } from "./release-without-promotion"
 import { isReservedRun, moveTornReservationAside } from "./reservation-files"
@@ -29,7 +29,7 @@ import { classifyReflectionLockHolder, reflectionLauncherLiveness, type Reflecti
 export const REFLECTION_LAUNCH_WINDOW_MS = 60_000
 export const STRANDED_RUN_GRACE_MS = REFLECTION_LAUNCH_WINDOW_MS + REFLECTION_ORPHAN_GRACE_MS
 
-export type StaleLockReapAction = "launch-interrupted" | "processes-dead" | "ledger-unreadable" | "lock-torn" | "terminal-recorded"
+export type StaleLockReapAction = "launch-interrupted" | "processes-dead" | "ledger-unreadable" | "lock-torn" | "terminal-recorded" | "release-settled"
 
 export type StaleLockDecision =
   | { readonly kind: "none" }
@@ -39,7 +39,7 @@ export type StaleLockDecision =
 
 export type StrandedRunDecision =
   | { readonly kind: "keep"; readonly reason: string }
-  | { readonly kind: "reap"; readonly action: "launch-interrupted" | "processes-dead" | "ledger-unreadable"; readonly reason: string }
+  | { readonly kind: "reap"; readonly action: "no-ledger" | "processes-dead" | "ledger-unreadable"; readonly reason: string }
 
 export interface StaleLockProbe extends ReflectionLockProbe {
   readonly now?: () => number
@@ -108,6 +108,34 @@ async function readFinalOutcome(runDir: string, probe: StaleLockProbe): Promise<
   const parsed = read.kind === "text" ? parseJson(read.text) : { ok: false as const }
   const outcome = parsed.ok ? fieldsOf(parsed.value).outcome : undefined
   return typeof outcome === "string" ? outcome : "unknown"
+}
+
+// An abandoned.json or quarantined.json that settles THIS reservation (DESIGN.r3 13b c.14): same run id,
+// and a generation no older than the reservation (or equal to the ledger's start).
+async function settledSentinel(runDir: string, runId: string, active: Record<string, unknown>, probe: StaleLockProbe): Promise<"match" | "other-generation" | undefined> {
+  for (const name of ["abandoned.json", "quarantined.json"]) {
+    const read = await readText(join(runDir, name), probe)
+    if (read.kind === "missing") continue
+    const parsed = read.kind === "text" ? parseJson(read.text) : { ok: false as const }
+    const sentinel = parsed.ok ? fieldsOf(parsed.value) : {}
+    if (sentinel.runId !== runId || typeof sentinel.generation !== "string") return "other-generation"
+    const generation = Date.parse(sentinel.generation)
+    const reservedAt = typeof active.reservedAt === "string" ? Date.parse(active.reservedAt) : Number.NaN
+    const ledger = await readLedger(runDir, probe)
+    const startedAt = ledger.present ? ledger.fields.startedAt : undefined
+    if ((Number.isFinite(generation) && Number.isFinite(reservedAt) && generation >= reservedAt) || startedAt === sentinel.generation) return "match"
+    return "other-generation"
+  }
+  return undefined
+}
+
+/**
+ * The session's first reconcile check (DESIGN.r3 13b c.14): the active reservation's launcher is dead on
+ * this host and its run already has a sentinel for this generation, so only the release is missing.
+ */
+export async function isSettledUnderDeadLauncher(reflectionDir: string, probe: StaleLockProbe = {}): Promise<boolean> {
+  const { decision } = await decideStaleReflectionLock(reflectionDir, probe)
+  return decision.kind === "reap" && decision.action === "release-settled"
 }
 
 type RecordedProcesses = { readonly live: false } | { readonly live: true; readonly reason: string }
@@ -202,7 +230,10 @@ async function decideStuck(reflectionDir: string, verdict: Extract<ReflectionLoc
   if (finalOutcome === "merged" || finalOutcome === "no_changes") {
     return { kind: "stuck", runId, reason: "it finished with a folded outcome that only a session can settle; open a session" } // rule:final-folded
   }
-  if (finalOutcome !== undefined || await hasTerminalSentinel(runDir, probe)) return { kind: "reap", action: "terminal-recorded", runId, reason: "the run already recorded its terminal state" } // rule:terminal-recorded
+  if (finalOutcome !== undefined) return { kind: "reap", action: "terminal-recorded", runId, reason: "the run already recorded its terminal state" } // rule:terminal-recorded
+  const settled = await settledSentinel(runDir, runId, fields, probe)
+  if (settled === "match") return { kind: "reap", action: "release-settled", runId, reason: "it was already settled and only the release is missing" } // rule:release-settled
+  if (settled === "other-generation") return { kind: "stuck", runId, reason: "its run dir holds a terminal record from another generation" } // rule:settled-other-generation
   const ledger = await readLedger(runDir, probe)
   if (!ledger.present) {
     const reservedAt = typeof fields.reservedAt === "string" ? Date.parse(fields.reservedAt) : Number.NaN
@@ -227,15 +258,27 @@ export async function decideStaleReflectionLock(
   return { verdict, decision: await decideStuck(reflectionDir, verdict, probe) }
 }
 
+/** When a ledger-less run dir was last launched: its prelaunch.json's mtime, else the dir's own (DESIGN.r3 c.16). */
+export async function strandedSince(runDir: string, probe: StaleLockProbe = {}): Promise<number | undefined> {
+  const prelaunch = join(runDir, "prelaunch.json")
+  return await exists(prelaunch, probe) ? await modifiedAt(prelaunch, probe) : await modifiedAt(runDir, probe)
+}
+
 export async function decideStrandedRun(runDir: string, probe: StaleLockProbe = {}): Promise<StrandedRunDecision> {
   const ledger = await readLedger(runDir, probe)
   if (!ledger.present) {
-    const prelaunch = join(runDir, "prelaunch.json")
-    const since = await exists(prelaunch, probe) ? await modifiedAt(prelaunch, probe) : await modifiedAt(runDir, probe)
+    const prelaunch = await readText(join(runDir, "prelaunch.json"), probe)
+    if (prelaunch.kind === "text") {
+      const parsed = parseJson(prelaunch.text)
+      const named = parsed.ok ? fieldsOf(parsed.value).runId : undefined
+      if (typeof named !== "string") return { kind: "keep", reason: "its prelaunch.json cannot be read" } // rule:stranded-prelaunch-unreadable
+      if (named !== basename(runDir)) return { kind: "keep", reason: "its prelaunch.json names another run" } // rule:stranded-prelaunch-mismatch
+    }
+    const since = await strandedSince(runDir, probe)
     if (since === undefined || (probe.now ?? Date.now)() - since <= STRANDED_RUN_GRACE_MS) {
       return { kind: "keep", reason: "it is inside the launch grace window" } // rule:stranded-young
     }
-    return { kind: "reap", action: "launch-interrupted", reason: "it never got a ledger" } // rule:stranded-launch-interrupted
+    return { kind: "reap", action: "no-ledger", reason: "it never got a ledger" } // rule:stranded-no-ledger
   }
   const processes = await recordedProcesses(ledger.fields, probe, ledger.valid ? classifyRecordedProcess : classifyRecordedProcessLenient)
   if (processes.live) return { kind: "keep", reason: processes.reason } // rule:stranded-process-alive
@@ -356,7 +399,7 @@ async function abandonRun(context: ReaperContext, runDir: string, runId: string,
   await emitReceipt(context, { kind: identity.kind, runId, trigger: identity.origin ?? identity.trigger, event: "abandoned", generation, reason })
 }
 
-async function quarantineRun(context: ReaperContext, runDir: string, runId: string, generation: string, identity: RunIdentity, reservation?: ReservedRun): Promise<void> {
+async function quarantineRun(context: ReaperContext, runDir: string, runId: string, generation: string, identity: RunIdentity, reservation?: ReservedRun, reason: QuarantineReason = "ledger_unreadable"): Promise<void> {
   const evidence = [...(await readdir(runDir).catch(() => [] as string[])).sort(), ...(reservation === undefined ? [] : [RESERVATION_EVIDENCE_FILENAME])]
   await writeQuarantine(runDir, {
     version: 1,
@@ -365,11 +408,11 @@ async function quarantineRun(context: ReaperContext, runDir: string, runId: stri
     trigger: identity.trigger,
     ...(identity.origin === undefined ? {} : { origin: identity.origin }),
     generation,
-    reason: "ledger_unreadable",
+    reason,
     quarantinedAt: new Date(context.now()).toISOString(),
     evidence,
   }, reservation)
-  await emitReceipt(context, { kind: identity.kind, runId, trigger: identity.origin ?? identity.trigger, event: "quarantined", generation, reason: "ledger_unreadable" })
+  await emitReceipt(context, { kind: identity.kind, runId, trigger: identity.origin ?? identity.trigger, event: "quarantined", generation, reason })
 }
 
 async function reservedRunId(path: string): Promise<string | undefined> {
@@ -419,7 +462,7 @@ async function settleActiveMinimally(context: ReaperContext, decision: Extract<S
       return { settled: true }
     }
     // An earlier settle wrote the sentinel and stopped before releasing (REVIEW-2 N2): only release.
-    if (decision.action === "terminal-recorded") return { settled: true }
+    if (decision.action === "terminal-recorded" || decision.action === "release-settled") return { settled: true }
     if (decision.action !== "processes-dead" && decision.action !== "ledger-unreadable") return { settled: false, reason: `${decision.action} is not settled from here` }
     const ledger = await readLedger(runDir, {})
     const fields = ledger.present ? ledger.fields : {}
@@ -462,6 +505,54 @@ async function reapTornLock(context: ReaperContext, paths: { reflectionSessions:
   return moved === true
 }
 
+async function settleStrandedRunUnderLock(context: ReaperContext, runDir: string, runId: string, decision: Extract<StrandedRunDecision, { kind: "reap" }>): Promise<boolean> {
+  const since = await strandedSince(runDir, {})
+  const applied = await underLock(runFinalizationLockPath(context.locksDir, runId), "reflection-finalize", async () => {
+    if (await hasTerminalSentinel(runDir, {})) return false
+    const ledger = await readLedger(runDir, {})
+    const fields = ledger.present ? ledger.fields : {}
+    const unknown: RunIdentity = { kind: "reflection", trigger: "unknown" }
+    const fallback = new Date(since ?? context.now()).toISOString()
+    if (decision.action === "no-ledger") {
+      await quarantineRun(context, runDir, runId, fallback, unknown, undefined, "stranded_no_ledger")
+      return true
+    }
+    const generation = isoOr(fields.startedAt, fallback)
+    if (decision.action === "processes-dead") await abandonRun(context, runDir, runId, "processes_dead", generation, identityFromLedger(fields, unknown))
+    else await quarantineRun(context, runDir, runId, generation, identityFromLedger(fields, unknown))
+    return true
+  })
+  return applied === true
+}
+
+export interface QuarantineStrandedRunOptions {
+  readonly runtimeDir: string
+  readonly runDir: string
+  readonly runId: string
+  readonly decision: Extract<StrandedRunDecision, { kind: "reap" }>
+  readonly now?: () => number
+  readonly appendReceipt?: (runtimeDir: string, input: MemoryReceiptInput) => Promise<unknown>
+}
+
+/**
+ * The one writer for a run dir outside the reservation that never settled (DESIGN.r3 13b c.16): the
+ * session's reconcile and the CLI reaper both settle it here, under its finalize lock, re-checking
+ * that no sentinel appeared. Returns false when the lock is held or a sentinel already exists.
+ */
+export async function quarantineStrandedRun(options: QuarantineStrandedRunOptions): Promise<boolean> {
+  const context: ReaperContext = {
+    runtimeDir: options.runtimeDir,
+    reflectionDir: join(options.runtimeDir, "reflection"),
+    transcriptsDir: join(options.runtimeDir, "transcripts"),
+    locksDir: join(options.runtimeDir, "locks"),
+    probe: {},
+    now: options.now ?? Date.now,
+    appendReceipt: options.appendReceipt ?? appendMemoryReceiptOnce,
+    warnings: [],
+  }
+  return settleStrandedRunUnderLock(context, options.runDir, options.runId, options.decision)
+}
+
 async function strandedRuns(context: ReaperContext, apply: boolean): Promise<StrandedRunReport[]> {
   const runsDir = join(context.reflectionDir, "runs")
   const reserved = new Set<string>()
@@ -480,23 +571,7 @@ async function strandedRuns(context: ReaperContext, apply: boolean): Promise<Str
       reports.push({ runId, decision, applied: false })
       continue
     }
-    const applied = await underLock(runFinalizationLockPath(context.locksDir, runId), "reflection-finalize", async () => {
-      if (await hasTerminalSentinel(runDir, {})) return false
-      const ledger = await readLedger(runDir, {})
-      const fields = ledger.present ? ledger.fields : {}
-      const unknown: RunIdentity = { kind: "reflection", trigger: "unknown" }
-      if (decision.action === "launch-interrupted") {
-        const prelaunch = join(runDir, "prelaunch.json")
-        const since = await exists(prelaunch, {}) ? await modifiedAt(prelaunch, {}) : await modifiedAt(runDir, {})
-        await abandonRun(context, runDir, runId, "launch_interrupted", new Date(since ?? context.now()).toISOString(), unknown)
-        return true
-      }
-      const since = await modifiedAt(runDir, {})
-      const generation = isoOr(fields.startedAt, new Date(since ?? context.now()).toISOString())
-      if (decision.action === "processes-dead") await abandonRun(context, runDir, runId, "processes_dead", generation, identityFromLedger(fields, unknown))
-      else await quarantineRun(context, runDir, runId, generation, identityFromLedger(fields, unknown))
-      return true
-    })
+    const applied = await settleStrandedRunUnderLock(context, runDir, runId, decision)
     reports.push({ runId, decision, applied: applied === true })
   }
   return reports

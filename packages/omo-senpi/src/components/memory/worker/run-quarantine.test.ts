@@ -112,6 +112,41 @@ describe("quarantine of runs reconciliation cannot recover", () => {
     expect(existsSync(stranded.dir)).toBe(false)
   }, 30_000)
 
+  test("#given the active run already has its abandoned.json for this generation under a dead launcher #when reconciled #then only the release happens and no second sentinel is written (C29)", async () => {
+    // given
+    const item = await fixture()
+    const active = JSON.parse(await readFile(join(item.identity.paths.reflection, "active.lock"), "utf8"))
+    await writeRunJsonAtomic(join(item.runDir, "abandoned.json"), { version: 1, runId: "run-orphan", reason: "processes_dead", generation: active.reservedAt })
+    const sentinel = await readFile(join(item.runDir, "abandoned.json"), "utf8")
+
+    // when
+    const results = await reconcileReflectionRuns({ identity: item.identity, reservation: item.store, ...deadLauncher() })
+
+    // then
+    expect(results).toContainEqual({ runId: "run-orphan", outcome: "failed" })
+    expect((await item.store.readState()).active).toBeUndefined()
+    expect(await readFile(join(item.runDir, "abandoned.json"), "utf8")).toBe(sentinel)
+    expect(existsSync(join(item.runDir, "quarantined.json"))).toBe(false)
+  }, 30_000)
+
+  test("#given a lone pending.json the CLI left behind #when the session reconciles #then it promotes the pending run under its own pid and launches it (C25)", async () => {
+    // given
+    const item = await fixture()
+    const pending = { runId: "run-queued", request: { trigger: "manual", conversationIds: ["conversation-1"], snapshots: [] } }
+    await rm(join(item.identity.paths.reflection, "active.lock"))
+    await writeFile(join(item.identity.paths.reflection, "pending.json"), JSON.stringify(pending))
+    const launched: string[] = []
+
+    // when
+    await reconcileReflectionRuns({ identity: item.identity, reservation: item.store, launch: (run) => launched.push(run.runId), ...deadLauncher() })
+
+    // then
+    expect(launched).toEqual(["run-queued"])
+    const state = await item.store.readState()
+    expect(state.active?.runId).toBe("run-queued")
+    expect(state.pending).toBeUndefined()
+  }, 30_000)
+
   test("#given a run dir with no prelaunch or ledger still inside the launch window under a dead launcher #when reconciled #then it is left alone", async () => {
     // given
     const item = await fixture()

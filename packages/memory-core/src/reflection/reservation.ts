@@ -220,6 +220,15 @@ export class ReflectionReservationStore {
         snapshots.set(conversationId, { conversationId, state: await journal.getState(), snapshot: null })
       }
       const transition = promoteTransition(current, snapshots, this.options.config)
+      // The same park gate tryReserve applies (DESIGN.r3 c.17): a parked identity drops an automatic run.
+      const now = this.now().toISOString()
+      const park = await this.parkFile.read()
+      const gate = transition.launch === undefined ? undefined : gateReflectionRequest(park, transition.launch.request, now)
+      if (gate?.kind === "parked") {
+        await this.writeStateUnlocked({})
+        return undefined
+      }
+      if (gate?.kind === "probe") await this.parkFile.write(markReflectionProbe(park, now))
       const promoted = await this.withLaunchOwner(transition.launch)
       await this.writeStateUnlocked(promoted === undefined ? transition.state : { ...transition.state, active: promoted })
       return promoted

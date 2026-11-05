@@ -5,14 +5,13 @@ import { join } from "node:path"
 
 import {
   decideStrandedRun,
+  quarantineStrandedRun,
   LockContentionError,
-  writeAbandoned,
   type MemoryIdentity,
   type ProcessLiveness,
   type ReservationState,
   type ReservedRun,
 } from "@oh-my-opencode/memory-core"
-import { stat } from "@oh-my-opencode/memory-core/fs"
 
 import {
   readRunJson,
@@ -31,7 +30,7 @@ import { classifyRunProcess, signalRecordedProcessGroup, waitUntil as waitForTim
 import { quarantineRun, reconcilePrelaunch } from "./run-reconciliation-prelaunch"
 import { RunTerminalClaimUnrecoverableError } from "./run-terminal-claim"
 import { parseReservationRunLedger, type ReservationRunLedger } from "./reservation-run-ledger"
-import { emitMemoryReceipt, runReceipt, type MemoryReceiptsPort, type ReceiptWarn } from "../receipts-port"
+import { emitMemoryReceipt, type MemoryReceiptsPort, type ReceiptWarn } from "../receipts-port"
 import { sweepReflectionRunOrphans, type ReflectionSweepLogger } from "./run-reconciliation-sweep"
 import { waitForRunSentinel, type SentinelWaitResult } from "./run-sentinel"
 import { sweepStrandedRunTemporaries } from "./run-temporaries"
@@ -142,31 +141,15 @@ async function settleStrandedRun(context: ReconcileContext, runDir: string, runI
   context.signal?.throwIfAborted()
   // A valid ledger never reaches here: reconcileRun settles it with worktree-tip recovery.
   if (decision.kind === "keep" || decision.action === "processes-dead") return undefined
-  const lenient = await readRunJson<unknown>(join(runDir, "ledger.json")).then(
-    (value) => (typeof value === "object" && value !== null ? value as Record<string, unknown> : {}),
-    () => ({} as Record<string, unknown>),
-  )
-  const prelaunch = join(runDir, "prelaunch.json")
-  const since = await stat(existsSync(prelaunch) ? prelaunch : runDir).then((status) => status.mtimeMs, () => context.now())
-  const run = {
-    kind: lenient.kind === "dream" ? "dream" as const : "reflection" as const,
-    trigger: typeof lenient.trigger === "string" ? lenient.trigger : "unknown",
-    ...(typeof lenient.origin === "string" ? { origin: lenient.origin } : {}),
-    startedAt: typeof lenient.startedAt === "string" ? lenient.startedAt : new Date(since).toISOString(),
-  }
-  if (decision.action === "ledger-unreadable") return quarantineRun(context, runDir, runId, "ledger_unreadable", undefined, undefined, run)
-  await writeAbandoned(runDir, {
-    version: 1,
+  const settled = await quarantineStrandedRun({
+    runtimeDir: context.identity.paths.runtime,
+    runDir,
     runId,
-    abandonedAt: new Date(context.now()).toISOString(),
-    reason: "launch_interrupted",
-    generation: run.startedAt,
-    kind: run.kind,
-    trigger: run.trigger,
-    ...(run.origin === undefined ? {} : { origin: run.origin }),
+    decision,
+    now: context.now,
+    appendReceipt: (runtimeDir, input) => emitMemoryReceipt(runtimeDir, input, context.receipts, context.warn),
   })
-  await emitMemoryReceipt(context.identity.paths.runtime, runReceipt({ runId, ...run }, "abandoned", { reason: "launch_interrupted" }), context.receipts, context.warn)
-  return { runId, outcome: "failed" }
+  return settled ? { runId, outcome: "failed" } : undefined
 }
 
 async function readLedgerOrUndefined(runDir: string): Promise<ReservationRunLedger | undefined> {

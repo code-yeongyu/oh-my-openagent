@@ -6,6 +6,7 @@ import {
   classifyRecordedProcessLenient,
   discardReflectionWorktree,
   GitMemoryRepo,
+  isSettledUnderDeadLauncher,
   RESERVATION_EVIDENCE_FILENAME,
   writeAbandoned,
   writeQuarantine,
@@ -38,6 +39,10 @@ export async function reconcilePrelaunch(context: ReconcileContext): Promise<Pre
     context.signal?.throwIfAborted()
     if (promoted !== undefined) context.launch?.(promoted)
     return {}
+  }
+  // An earlier settle wrote this generation's sentinel and stopped before releasing (DESIGN.r3 c.14).
+  if (await isSettledUnderDeadLauncher(context.identity.paths.reflection, context)) {
+    return { result: await releaseReservationAsFailed(context, active.runId), retiredRunId: active.runId }
   }
   const ghost = await classifyGhostActive({ identity: context.identity, active })
   context.signal?.throwIfAborted()
@@ -187,16 +192,14 @@ export async function quarantineRun(
   reason: QuarantineReason,
   ledger: ReservationRunLedger | undefined,
   active: ReservedRun | undefined,
-  /** A run outside the reservation with an unreadable ledger: what could still be read of it. */
-  stranded?: Omit<RunReceiptLedger, "runId">,
 ): Promise<ReflectionRunReconcileResult> {
-  const generation = ledger?.startedAt ?? active?.reservedAt ?? stranded?.startedAt
+  const generation = ledger?.startedAt ?? active?.reservedAt
   if (generation === undefined) throw new Error(`No durable generation to quarantine ${runId}`)
-  const origin = ledger?.origin ?? active?.request.origin ?? stranded?.origin
+  const origin = ledger?.origin ?? active?.request.origin
   const run: RunReceiptLedger = {
-    kind: ledger?.kind ?? (active === undefined ? stranded?.kind : undefined) ?? (active?.request.trigger === "dream" ? "dream" : "reflection"),
+    kind: ledger?.kind ?? (active?.request.trigger === "dream" ? "dream" : "reflection"),
     runId,
-    trigger: ledger?.trigger ?? active?.request.trigger ?? stranded?.trigger ?? "unknown",
+    trigger: ledger?.trigger ?? active?.request.trigger ?? "unknown",
     ...(origin === undefined ? {} : { origin }),
     startedAt: generation,
   }

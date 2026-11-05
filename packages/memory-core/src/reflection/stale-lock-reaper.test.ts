@@ -155,6 +155,27 @@ describe("stale reflection-lock reaper, minimal settle from the CLI (#11976)", (
     expect(await store.readState()).toEqual({})
   })
 
+  test.each([
+    ["parked within the probe interval", 60_000, undefined],
+    ["parked past the probe interval", 3 * 24 * 60 * 60_000, "reflection-run-65"],
+  ] as const)("#given a lone automatic pending run on an identity %s #when the next session promotes #then the park gate decides it exactly as tryReserve would (C25)", async (_name, parkedFor, expected) => {
+    // given
+    const paths = reaperIdentity()
+    writeJson(join(paths.reflection, "pending.json"), { runId: "reflection-run-65", request: { trigger: "step-count", conversationIds: ["conversation-a"], snapshots: [] } })
+    writeJson(join(paths.reflection, "park.json"), { version: 1, streak: 5, parkedAt: new Date(NOW - parkedFor).toISOString() })
+    const journal = new TranscriptJournal({ journalDir: join(paths.transcripts, "conversation-a") })
+    await journal.reconcile([{ kind: "assistant", messageId: "assistant-1", textBlocks: ["hello"] }])
+    const store = new ReflectionReservationStore({ identity: { id: "agent-a", safeSlug: "agent-a", paths }, config: { stepCount: 1 }, getJournal: async () => journal, now: () => new Date(NOW) })
+
+    // when
+    const promoted = await store.promotePending()
+
+    // then
+    expect(promoted?.runId).toBe(expected)
+    expect((await store.readState()).active?.runId).toBe(expected)
+    expect(existsSync(join(paths.reflection, "pending.json"))).toBe(false)
+  })
+
   test("#given a lone pending run #when a new request is reserved before any promotion #then reserveTransition is unchanged: the new request is active and the old pending stays queued (C25)", async () => {
     // given
     const paths = reaperIdentity()
@@ -227,14 +248,14 @@ describe("stale reflection-lock reaper, minimal settle from the CLI (#11976)", (
     pendingRun(paths)
     const pendingBefore = readFileSync(join(paths.reflection, "pending.json"))
     writeJson(join(runDir(paths, RUN), "ledger.json"), validLedger(RUN))
-    writeJson(join(runDir(paths, RUN), "abandoned.json"), { version: 1, runId: RUN, reason: "processes_dead" })
+    writeJson(join(runDir(paths, RUN), "abandoned.json"), { version: 1, runId: RUN, reason: "processes_dead", generation: validLedger(RUN).startedAt })
     const sentinel = readFileSync(join(runDir(paths, RUN), "abandoned.json"))
 
     // when
     const report = await runStaleLockReaper({ runtimeDir: paths.runtime, probe: probe() })
 
     // then
-    expect(report).toMatchObject({ decision: { kind: "reap", action: "terminal-recorded" }, action: "reaped", pendingKept: "reflection-run-65" })
+    expect(report).toMatchObject({ decision: { kind: "reap", action: "release-settled" }, action: "reaped", pendingKept: "reflection-run-65" })
     expect(existsSync(join(paths.reflection, "active.lock"))).toBe(false)
     expect(readFileSync(join(runDir(paths, RUN), "abandoned.json"))).toEqual(sentinel)
     expect(readFileSync(join(paths.reflection, "pending.json"))).toEqual(pendingBefore)
@@ -390,7 +411,7 @@ describe("stale reflection-lock reaper, minimal settle from the CLI (#11976)", (
     expect(treeHash(paths.root)).toBe(before)
   })
 
-  test("#given stranded dirs: prelaunch.json only 20 min old, a bare dir 2 min old, a bare dir 20 min old #when the reaper runs #then the first and third are abandoned(launch_interrupted) and the second is kept", async () => {
+  test("#given stranded dirs: prelaunch.json only 20 min old, a bare dir 2 min old, a bare dir 20 min old, a prelaunch.json naming another run #when the reaper runs #then the first and third are quarantined as stranded_no_ledger at their own mtime and the rest are kept (C11, C24)", async () => {
     // given
     const paths = reaperIdentity()
     writeJson(join(runDir(paths, "reflection-run-10"), "prelaunch.json"), { version: 1, runId: "reflection-run-10", worktreeDir: "/x", worktreeBranch: "b" })
@@ -399,15 +420,20 @@ describe("stale reflection-lock reaper, minimal settle from the CLI (#11976)", (
     age(runDir(paths, "reflection-run-11"), 2 * 60_000)
     mkdirSync(runDir(paths, "reflection-run-12"), { recursive: true })
     age(runDir(paths, "reflection-run-12"), 20 * 60_000)
+    writeJson(join(runDir(paths, "reflection-run-13"), "prelaunch.json"), { version: 1, runId: "reflection-run-9", worktreeDir: "/x", worktreeBranch: "b" })
+    age(join(runDir(paths, "reflection-run-13"), "prelaunch.json"), 20 * 60_000)
 
     // when
     const report = await runStaleLockReaper({ runtimeDir: paths.runtime, probe: probe() })
 
     // then
-    expect(report.stranded.map((entry) => [entry.runId, entry.applied])).toEqual([["reflection-run-10", true], ["reflection-run-11", false], ["reflection-run-12", true]])
-    expect(readJson(join(runDir(paths, "reflection-run-10"), "abandoned.json"))).toMatchObject({ reason: "launch_interrupted" })
-    expect(existsSync(join(runDir(paths, "reflection-run-11"), "abandoned.json"))).toBe(false)
-    expect(readJson(join(runDir(paths, "reflection-run-12"), "abandoned.json"))).toMatchObject({ reason: "launch_interrupted" })
+    expect(report.stranded.map((entry) => [entry.runId, entry.applied])).toEqual([["reflection-run-10", true], ["reflection-run-11", false], ["reflection-run-12", true], ["reflection-run-13", false]])
+    expect(readJson(join(runDir(paths, "reflection-run-10"), "quarantined.json"))).toMatchObject({ reason: "stranded_no_ledger", kind: "reflection", trigger: "unknown", generation: new Date(NOW - 20 * 60_000).toISOString() })
+    expect(existsSync(join(runDir(paths, "reflection-run-11"), "quarantined.json"))).toBe(false)
+    expect(readJson(join(runDir(paths, "reflection-run-12"), "quarantined.json"))).toMatchObject({ reason: "stranded_no_ledger", generation: new Date(NOW - 20 * 60_000).toISOString() })
+    expect(existsSync(join(runDir(paths, "reflection-run-13"), "quarantined.json"))).toBe(false)
+    expect(report.stranded[3]?.decision).toEqual({ kind: "keep", reason: "its prelaunch.json names another run" })
+    expect((await receiptEvents(paths.runtime)).map((entry) => [entry.runId, entry.reason]).sort()).toEqual([["reflection-run-10", "stranded_no_ledger"], ["reflection-run-12", "stranded_no_ledger"]])
   })
 
   test("#given case A, case C and case E on three identities #when the reaper runs as a dry run #then it reports each decision and changes nothing", async () => {
@@ -448,7 +474,7 @@ describe("stale reflection-lock reaper, minimal settle from the CLI (#11976)", (
 
     // then
     expect(readJson(join(runDir(paths, RUN), "abandoned.json"))).toMatchObject({ reason: "processes_dead" })
-    expect(readJson(join(runDir(paths, "reflection-run-12"), "abandoned.json"))).toMatchObject({ reason: "launch_interrupted" })
+    expect(readJson(join(runDir(paths, "reflection-run-12"), "quarantined.json"))).toMatchObject({ reason: "stranded_no_ledger" })
     expect(readFileSync(join(runDir(paths, RUN), "reflection-task.md"), "utf8")).toBe("payload")
     expect(report.tombstones).toEqual([{ name: ".prune-reflection-run-3-0b1c", removed: true }])
     expect(existsSync(tombstone)).toBe(false)
