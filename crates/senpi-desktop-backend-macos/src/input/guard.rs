@@ -1,9 +1,12 @@
 //! Background-delivery policy: the app guard and the sole-window keyboard
 //! rule. Decisions only - no event posting happens here.
 
+use std::cell::Cell;
+
 use senpi_desktop_core::backend::{MouseButton, PointerEvent};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
-use senpi_desktop_core::types::DesktopWindow;
+use senpi_desktop_core::report::ReportMode;
+use senpi_desktop_core::types::{DesktopWindow, KeyPriming};
 
 use crate::capture::MacCapture;
 use crate::skylight;
@@ -33,7 +36,62 @@ pub(super) fn guard(window: &DesktopWindow, kind: &str, button: Option<MouseButt
     Ok(())
 }
 
-/// Prepares background keyboard delivery for `window`, or refuses it.
+/// The session options background keys route by, stored by the backend's
+/// setters on the session thread that owns it and sends its input.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct KeySession {
+    priming: KeyPriming,
+    report_mode: ReportMode,
+}
+
+thread_local! {
+    static KEY_SESSION: Cell<KeySession> = const {
+        Cell::new(KeySession { priming: KeyPriming::Off, report_mode: ReportMode::Null })
+    };
+}
+
+/// Stores the session's `macosKeyPriming` option.
+pub(crate) fn set_key_priming(priming: KeyPriming) {
+    KEY_SESSION.with(|session| session.set(KeySession { priming, ..session.get() }));
+}
+
+/// Stores the session's `reportMode`.
+pub(crate) fn set_key_report_mode(report_mode: ReportMode) {
+    KEY_SESSION.with(|session| session.set(KeySession { report_mode, ..session.get() }));
+}
+
+/// How background keys reach the target window.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum KeyDelivery {
+    /// Priming off or a `reportMode: "null"` session: the sole-window rule.
+    SoleWindow,
+    /// Priming on in a `reportMode: "object"` session (DESIGN 7 steps 1-6).
+    Primed,
+}
+
+fn key_delivery() -> KeyDelivery {
+    let session = KEY_SESSION.with(Cell::get);
+    if session.priming == KeyPriming::On && session.report_mode == ReportMode::Object {
+        KeyDelivery::Primed
+    } else {
+        KeyDelivery::SoleWindow
+    }
+}
+
+/// Prepares background keyboard delivery for `window`, or refuses it. Both
+/// deliveries take the sole-window rule until the priming procedure lands.
+pub(super) fn prepare_keys(
+    window: &DesktopWindow,
+    pid: libc::pid_t,
+    wid: u32,
+    capture: &MacCapture,
+) -> CoreResult<()> {
+    match key_delivery() {
+        KeyDelivery::SoleWindow | KeyDelivery::Primed => sole_window_keys(window, pid, wid, capture),
+    }
+}
+
+/// The sole-window rule for background keys.
 ///
 /// macOS posts key events to a *process*, which hands them to whichever window
 /// it treats as key; unlike pointer events they carry no window id. Delivery is
@@ -41,7 +99,7 @@ pub(super) fn guard(window: &DesktopWindow, kind: &str, button: Option<MouseButt
 /// into another of the user's windows. `DesktopWindow::focused` cannot
 /// disambiguate: xcap reports every window owned by the active application as
 /// focused on macOS.
-pub(super) fn prepare_keys(
+fn sole_window_keys(
     window: &DesktopWindow,
     pid: libc::pid_t,
     wid: u32,
@@ -78,5 +136,25 @@ pub(super) const fn pointer_button(event: &PointerEvent) -> Option<MouseButton> 
     match event {
         PointerEvent::Click { button, .. } | PointerEvent::Drag { button, .. } => Some(*button),
         PointerEvent::Move { .. } | PointerEvent::Scroll { .. } => None,
+    }
+}
+
+#[cfg(test)]
+mod key_session_tests {
+    use super::*;
+
+    #[test]
+    fn only_priming_on_in_an_object_session_selects_the_primed_delivery() {
+        let cases = [
+            (KeyPriming::Off, ReportMode::Null, KeyDelivery::SoleWindow),
+            (KeyPriming::Off, ReportMode::Object, KeyDelivery::SoleWindow),
+            (KeyPriming::On, ReportMode::Null, KeyDelivery::SoleWindow),
+            (KeyPriming::On, ReportMode::Object, KeyDelivery::Primed),
+        ];
+        for (priming, report_mode, expected) in cases {
+            set_key_priming(priming);
+            set_key_report_mode(report_mode);
+            assert_eq!(key_delivery(), expected, "{priming:?} {report_mode:?}");
+        }
     }
 }
