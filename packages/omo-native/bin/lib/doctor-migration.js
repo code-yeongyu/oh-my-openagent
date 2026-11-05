@@ -1,6 +1,6 @@
 import { closeSync, lstatSync, openSync, readFileSync, readSync, realpathSync, statSync } from "node:fs"
 import { homedir } from "node:os"
-import { delimiter, dirname, isAbsolute, join, win32 } from "node:path"
+import { delimiter, dirname, isAbsolute, join, normalize, win32 } from "node:path"
 import { parseJsonc } from "./jsonc.js"
 import { releaseChannel } from "./package-paths.js"
 import { opencodeConfigSources } from "./setup-opencode-assets.js"
@@ -126,7 +126,12 @@ function brokenLaunchTarget(binPath, owner, homeDir) {
   const shim = readFileHead(binPath, SHIM_READ_LIMIT)
   const target = shim === undefined ? null : codexLightCacheTarget(shim, homeDir)
   if (target === null) return undefined
-  return pathExists(target) ? undefined : target
+  // The POSIX wrapper writes its target with forward slashes (toPosixPath), so
+  // normalize the separators before reporting it: on Windows the broken line must
+  // use backslashes like every other path in the report, or it never matches the
+  // platform form the caller compares against (CI run 42027565394).
+  const normalized = normalize(target)
+  return pathExists(normalized) ? undefined : normalized
 }
 
 // The runtime target the Light generator writes into the wrapper: the `exec "$BUN_BINARY" ...`
