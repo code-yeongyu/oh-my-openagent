@@ -11,7 +11,7 @@ import { existsSync } from "node:fs"
 import { lstat, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
-import { GitMemoryRepo, SPLIT_APPLY_PATCH_REFUSAL, buildIdentityPaths } from "@oh-my-opencode/memory-core"
+import { GitMemoryRepo, buildIdentityPaths } from "@oh-my-opencode/memory-core"
 
 import { createMemoryBinding } from "./binding"
 import { SPLIT_UNINITIALIZED_MESSAGE } from "./engine-session"
@@ -123,27 +123,27 @@ describe("memory tool on a split session", () => {
     expect(device.ops.some((op) => op === "run git commit")).toBe(true)
   })
 
-  it("#given a split session #when the memory tool is asked for apply_patch #then it refuses with the typed explanation and changes nothing", async () => {
+  it("#given a split session #when the memory tool applies a patch #then the patched block and its commit land on the device only", async () => {
     // given
-    const { devicePaths, context, device } = await splitFixture()
+    const { loopRoot, devicePaths, context, device } = await splitFixture()
     const repo = new GitMemoryRepo({ dir: devicePaths.repo, agentId: IDENTITY })
-    const headBefore = await git(repo, ["rev-parse", "HEAD"])
     const [tool] = createMemoryTools(() => context)
 
     // when
     const result = await (tool.execute as Execute)(
       "call-2",
-      { command: "apply_patch", reason: "patch on the split", input: "*** Begin Patch\n*** Add File: notes/p.md\n+x\n*** End Patch" },
+      { command: "apply_patch", reason: "patch on the split", input: "*** Begin Patch\n*** Add File: notes/patched.md\n+patched on the device\n*** End Patch" },
       undefined,
       undefined,
       { deviceFiles: device.files },
     )
 
     // then
-    expect(result.isError).toBe(true)
-    expect(textOf(result)).toBe(`memory: ${SPLIT_APPLY_PATCH_REFUSAL}`)
-    expect(await git(repo, ["rev-parse", "HEAD"])).toBe(headBefore)
-    expect(device.ops.filter((op) => op.startsWith("write ") && !op.includes("/locks/"))).toEqual([])
+    expect(textOf(result)).toContain("committed")
+    expect(result.isError).toBeUndefined()
+    expect(await readFile(join(devicePaths.repo, "notes/patched.md"), "utf8")).toContain("patched on the device")
+    expect(await git(repo, ["log", "-1", "--format=%s"])).toBe("patch on the split")
+    expect(existsSync(loopRoot)).toBe(false)
   })
 
   it("#given a device with no memory repository yet #when the memory tool writes on a split session #then it refuses with the typed explanation and creates nothing", async () => {
