@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import {
   ADOPTION_MARKER,
+  AGENT_DIR_MODE,
   adoptLegacyFlatState,
   canonicalAgentDir,
   legacyFlatAgentDir,
@@ -36,6 +37,23 @@ afterEach(() => {
 })
 
 describe("omo agent directory", () => {
+  describe("#given a host umask of 0002 and legacy flat state to adopt", () => {
+    describe("#when the canonical directory is created", () => {
+      test.skipIf(process.platform === "win32")("#then it is owner-only, not group-writable", () => {
+        const home = createHome()
+        write(join(legacyFlatAgentDir(home), "settings.json"), FLAT_SETTINGS)
+        const previous = process.umask(0o002)
+        try {
+          adoptLegacyFlatState({}, home)
+        } finally {
+          process.umask(previous)
+        }
+        const mode = statSync(canonicalAgentDir({}, home)).mode & 0o777
+        expect(mode).toBe(AGENT_DIR_MODE)
+      })
+    })
+  })
+
   describe("#given no explicit override", () => {
     describe("#when the agent directory is resolved", () => {
       test("#then it is the canonical branded location", () => {

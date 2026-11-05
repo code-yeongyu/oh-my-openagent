@@ -47,6 +47,17 @@ export function legacyFlatAgentDir(home) {
   return join(home, ".omo")
 }
 
+/**
+ * Owner-only mode for every directory this module creates. The RPC socket host refuses a key
+ * directory that is group- or world-writable (`unsafe_key_record`), so an agent directory created
+ * with the process umask alone breaks startup on hosts whose umask is 0002 (#12546).
+ */
+export const AGENT_DIR_MODE = 0o700
+
+function ensureAgentDir(path) {
+  mkdirSync(path, { recursive: true, mode: AGENT_DIR_MODE })
+}
+
 function timestamp() {
   return new Date().toISOString().replace(/[-:]/g, "")
 }
@@ -108,7 +119,7 @@ export function adoptLegacyFlatState(env = process.env, home = runtimeHome(env))
     if (!existsSync(source)) continue
     const target = join(canonical, file)
     if (!existsSync(target)) {
-      mkdirSync(canonical, { recursive: true })
+      ensureAgentDir(canonical)
       copyFileSync(source, target)
       result.copied.push(file)
       continue
@@ -121,7 +132,7 @@ export function adoptLegacyFlatState(env = process.env, home = runtimeHome(env))
 
   result.adopted = result.copied.length > 0 || result.backfilled.length > 0
   if (!parseFailed && (result.adopted || existsSync(canonical))) {
-    mkdirSync(canonical, { recursive: true })
+    ensureAgentDir(canonical)
     writeFileSync(join(canonical, ADOPTION_MARKER), `${flat}\n`)
   }
   return result
