@@ -105,6 +105,9 @@ export function isExtensionContext(v: unknown): v is ExtensionContext {
   return isRecord(v) && "ui" in v
 }
 
+// The flow follows the loop's prompts, turns and UI; on a split session the hand only executes the tools.
+const LOOP_SIDE = { runs: "brain" } as const
+
 export function createOnboardingComponent(
   dependencies: OnboardingComponentDependencies = defaultDependencies,
 ): OmoSenpiComponent {
@@ -236,7 +239,7 @@ export function createOnboardingComponent(
           release(ctx)
           throw error
         }
-      })
+      }, LOOP_SIDE)
 
       // Preview-safe: a preview neither claims onboarding nor starts the background history read.
       pi.on("before_agent_start", async (event, ctx) => {
@@ -259,20 +262,20 @@ export function createOnboardingComponent(
               : `Answer fully; greet in their language; offer a one-line tour. On request/acceptance: ${tour}`),
           },
         }
-      }, { previewSafe: true })
+      }, { previewSafe: true, ...LOOP_SIDE })
 
       pi.on("agent_start", (_event, ctx) => {
         if (ownsRun(ctx) && pending) {
           pending.active = true
           pending.end = undefined
         }
-      })
+      }, LOOP_SIDE)
       pi.on("agent_end", (event, ctx) => {
         if (!ownsRun(ctx) || !pending?.active) return
         pending.end = event
         const outcome = readAgentEndOutcome(event)
         if (!outcome.willRetry && outcome.blockedBy !== null) release(ctx)
-      })
+      }, LOOP_SIDE)
       pi.on("agent_settled", (_event, ctx) => {
         if (!ownsRun(ctx) || !pending?.active) return
         // The host can join a late user abort onto the same agent_end object.
@@ -285,15 +288,15 @@ export function createOnboardingComponent(
             // Fail-open like the claim: the held claim still keeps this install from re-onboarding.
           }
         }
-      })
+      }, LOOP_SIDE)
       pi.on("input_disposition", (event, ctx) => {
         if (ownsRun(ctx) && pending && !pending.active
           && isRecord(event) && event.disposition === "rejected") release(ctx)
-      })
+      }, LOOP_SIDE)
       for (const event of ["session_abort", "session_shutdown"]) {
         pi.on(event, (_event, ctx) => {
           if (ownsRun(ctx)) release(ctx)
-        })
+        }, LOOP_SIDE)
       }
     },
   }
