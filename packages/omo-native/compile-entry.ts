@@ -45,7 +45,7 @@ import { applyCachedClaudeCode } from "../omo-senpi/src/components/claude-code/i
 import { buildSenpiArgs, shouldPrintCompiledBanner, trustLaunchKind } from "./compile-args"
 import { runLoroSmoke } from "./loro-smoke"
 import { runAccountCommand } from "./account-cli"
-import { runRemoteAttachCommand, runRemoteCommand } from "./remote-cli"
+import { runRemoteAttachCommand, runRemoteCommand } from "./remote-entry"
 import { runSyncCommand } from "./sync-cli"
 import { spawnSync } from "node:child_process"
 import { compiledRollbackMigration } from "./compiled-rollback"

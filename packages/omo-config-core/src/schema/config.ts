@@ -13,6 +13,7 @@ import { OmoSidePanelSettingsLayerSchema, OmoSidePanelSettingsSchema } from "./s
 import { OmoTaskSettingsLayerSchema, OmoTaskSettingsSchema } from "./task"
 import { OmoTeamsConfigLayerSchema, OmoTeamsConfigSchema } from "./team"
 import { OmoTelemetrySettingsLayerSchema, OmoTelemetrySettingsSchema } from "./telemetry"
+import { OmoDeviceServiceSettingsLayerSchema, OmoDeviceServiceSettingsSchema } from "./device-service"
 import { OmoFormatOnMutationLayerSchema, OmoFormatOnMutationSchema } from "./format-on-mutation"
 import { OmoProvenanceSettingsSchema } from "./provenance"
 
@@ -49,6 +50,7 @@ export const OmoTypedHarnessConfigSchema = z
     model_pad: OmoModelPadSchema.optional(),
     memory: OmoMemorySettingsLayerSchema.optional(),
     telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+    device_service: OmoDeviceServiceSettingsLayerSchema.optional(),
     side_panel: OmoSidePanelSettingsLayerSchema.optional(),
     computer: OmoComputerSettingsLayerSchema.optional(),
     disabled_skills: OmoDisabledSkillsSchema.optional(),
@@ -71,6 +73,7 @@ export const OmoConfigProfileSchema = z
     model_pad: OmoModelPadSchema.optional(),
     memory: OmoMemorySettingsLayerSchema.optional(),
     telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+    device_service: OmoDeviceServiceSettingsLayerSchema.optional(),
     side_panel: OmoSidePanelSettingsLayerSchema.optional(),
     computer: OmoComputerSettingsLayerSchema.optional(),
     disabled_skills: OmoDisabledSkillsSchema.optional(),
@@ -98,6 +101,7 @@ export const OmoConfigSchema = z
     model_pad: OmoModelPadSchema.optional(),
     memory: OmoMemorySettingsSchema.optional(),
     telemetry: OmoTelemetrySettingsSchema.optional(),
+    device_service: OmoDeviceServiceSettingsSchema.optional(),
     side_panel: OmoSidePanelSettingsSchema.optional(),
     computer: OmoComputerSettingsSchema.optional(),
     disabled_skills: OmoDisabledSkillsSchema.optional(),
@@ -128,6 +132,7 @@ export const OmoConfigLayerSchema = z
     model_pad: OmoModelPadSchema.optional(),
     memory: OmoMemorySettingsLayerSchema.optional(),
     telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+    device_service: OmoDeviceServiceSettingsLayerSchema.optional(),
     side_panel: OmoSidePanelSettingsLayerSchema.optional(),
     computer: OmoComputerSettingsLayerSchema.optional(),
     disabled_skills: OmoDisabledSkillsSchema.optional(),

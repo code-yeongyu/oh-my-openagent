@@ -197,24 +197,27 @@ describe("registerTaskCommands", () => {
     expect(ui.notifications).toEqual(["No tasks in all sessions."])
   })
 
-  it("#given a cancellable task #when /task-kill selects it and confirms #then cancelTask runs for that id", async () => {
-    // given
-    const running = record({ task_id: "st_kill", status: "running" })
-    const manager = fakeManager([running])
-    const pi = new FakeExtensionAPI()
-    registerTaskCommands(pi, manager)
-    const { ctx, ui } = commandCtx("session-a", "tui", {
-      select: (_title, options) => Promise.resolve(options[0]),
-      confirm: () => Promise.resolve(true),
-    })
+  it.each(["running", "paused"] as const)(
+    "#given a %s task #when /task-kill selects it and confirms #then cancelTask runs for that id",
+    async (status) => {
+      // given a live task, or one its run's Stop paused (#12249)
+      const running = record({ task_id: "st_kill", status })
+      const manager = fakeManager([running])
+      const pi = new FakeExtensionAPI()
+      registerTaskCommands(pi, manager)
+      const { ctx, ui } = commandCtx("session-a", "tui", {
+        select: (_title, options) => Promise.resolve(options[0]),
+        confirm: () => Promise.resolve(true),
+      })
 
-    // when
-    await invoke(pi, "task-kill", "", ctx)
+      // when
+      await invoke(pi, "task-kill", "", ctx)
 
-    // then the selector was shown and the chosen task cancelled
-    expect(ui.selectCalls).toHaveLength(1)
-    expect(manager.cancelled).toEqual(["st_kill"])
-  })
+      // then the selector was shown and the chosen task cancelled
+      expect(ui.selectCalls).toHaveLength(1)
+      expect(manager.cancelled).toEqual(["st_kill"])
+    },
+  )
 
   it("#given a task with a description #when /task-kill lists options #then the human label leads and the id trails", async () => {
     // given

@@ -17,8 +17,8 @@ const dirs: string[] = []
 
 // The store index is the host runner's admission precondition, and the rpc-host-sharding plan keeps the host
 // runner off win32 (U6: "the host runner is never used on win32"; Must NOT: "`RpcHostRunner` still unused
-// there"). A throughput case - 800 new stores, each a whole-index rewrite and fsync under one lock - measures
-// a path no win32 session takes, and a windows-latest runner spends over 60 s on those serialized fsyncs.
+// there"). The 800-store case - 32 processes, each new store a whole-index rewrite under one lock - measures
+// lock contention on a path no win32 session takes.
 const posixHostRunnerTest = test.skipIf(process.platform === "win32")
 
 afterEach(() => {

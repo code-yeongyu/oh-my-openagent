@@ -135,15 +135,18 @@ function formatLiveBackgroundRow(
   stats?: TaskRunStats,
 ): string {
   const suspended = isSuspended(record)
+  // A child its run's Stop paused is not working either: a resident paused child has no recovery
+  // presentation, so without this it read "running"/"starting" with a clock from its creation.
+  const still = suspended || record.status === "paused"
   // A parked child shows no running time: the record has no park timestamp (`updated_at` moves with
   // every revival attempt), and a climbing timer is what made the row look alive.
-  const elapsed = suspended ? undefined : formatElapsed(record.created_at, now)
-  const frame = suspended
+  const elapsed = still ? undefined : formatElapsed(record.created_at, now)
+  const frame = still
     ? SUSPENDED_MARK
     : (SPINNER_FRAMES[Math.floor(now / LIVE_STATUS_REFRESH_MS) % SPINNER_FRAMES.length] ?? SPINNER_FRAMES[0])
   const fullIdentity = liveTaskIdentity(record)
   const fullTarget = recordStatusTarget(record)
-  const fullActivity = suspended
+  const fullActivity = still
     ? normalizeRendererText(recoveryPresentation(record)?.text ?? statusLabel(record))
     : activity === undefined
       ? defaultLiveActivity(stats)
@@ -163,7 +166,7 @@ function formatLiveBackgroundRow(
   // A parked row has no live activity to watch, so which child it is matters more than its route.
   let targetWidth: number
   let identityWidth: number
-  if (suspended) {
+  if (still) {
     identityWidth = Math.min(LIVE_IDENTITY_MAX, rendererVisibleWidth(fullIdentity), LIVE_IDENTITY_MIN + remainingWidth)
     remainingWidth -= Math.max(0, identityWidth - LIVE_IDENTITY_MIN)
     targetWidth = Math.min(rendererVisibleWidth(fullTarget), LIVE_TARGET_MIN + remainingWidth)

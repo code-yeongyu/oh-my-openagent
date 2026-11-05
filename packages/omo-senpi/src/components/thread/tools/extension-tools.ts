@@ -65,6 +65,7 @@ function extensionTool(options: ThreadToolSurfaceOptions, op: DeclaredSessionOp)
     label: op.registeredName,
     description: op.description,
     parameters: op.parameters,
+    runs: "brain",
     execute: async (_toolCallId: string, args: unknown, _signal: unknown, _onUpdate: unknown, ectx: unknown) => {
       await options.ensureHost?.()
       const view = await hostView(options, { offline: true })

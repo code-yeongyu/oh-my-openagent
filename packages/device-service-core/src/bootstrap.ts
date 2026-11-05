@@ -13,7 +13,12 @@ import { compareVersions } from "./release/version.ts"
 const BOOTSTRAP_STOPPED_EXIT = 3
 
 export type BootstrapStopState =
-  "signed_out" | "keychain_locked" | "service_degraded" | "account_unavailable" | "update_required"
+  | "signed_out"
+  | "keychain_locked"
+  | "store_unavailable"
+  | "service_degraded"
+  | "account_unavailable"
+  | "update_required"
 
 export type BootstrapOutcome =
   | { readonly kind: "connected"; readonly status: Status; readonly service: DeviceService }
@@ -41,7 +46,8 @@ export type BootstrapDependencies = {
 const ACCOUNT_STOP: Readonly<Record<Exclude<AccountState["kind"], "signed_in">, BootstrapStopState>> = {
   signed_out: "signed_out",
   keychain_locked: "keychain_locked",
-  store_unavailable: "service_degraded",
+  // No credential store means no proof of a sign-in either: its own state, so a caller can tell it from a broken service.
+  store_unavailable: "store_unavailable",
   account_unavailable: "account_unavailable",
 }
 

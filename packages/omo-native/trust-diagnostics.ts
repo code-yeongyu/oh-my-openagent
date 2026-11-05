@@ -46,6 +46,7 @@ const REFUSAL_CODES = [
   "trust-exec-loop",
   "trust-user-extras-unrecoverable",
   "trust-path-unrepresentable",
+  "trust-userns-unattested",
 ] as const
 
 /** The section 4 importer modules own the codes they emit; their exported types are the source of truth. */
@@ -84,6 +85,7 @@ const PLAIN_CODES = [
   ...REFUSAL_CODES,
   "trust-marker-foreign",
   "trust-dir-unsafe",
+  "trust-dir-readonly",
   "trust-lease-failed",
   "trust-generation-recognized",
   "trust-standalone-opt-in",

@@ -6,6 +6,7 @@ import { basename, dirname, join, resolve } from "node:path"
 import type { EngineTrustMarker } from "@code-yeongyu/senpi/engine-trust"
 import type { TrustDiagnosticEntry } from "./trust-diagnostics"
 import { pidAnswersSignalZero, sweepTrustRetention } from "./trust-retention"
+import { attestedOverflowRoot, readUsernsView, type UsernsView } from "./trust-userns"
 
 const MAX_BYTES = 8 * 1024 * 1024
 const GENERATION_PREFIX = "# omo-engine-trust-generation"
@@ -15,7 +16,9 @@ const leases = new Set<string>()
 const bootAtMs = Date.now() - uptime() * 1000
 
 export class TrustStorageError extends Error {
-  constructor(readonly code: "trust-user-extras-unrecoverable" | "trust-path-unrepresentable") {
+  constructor(
+    readonly code: "trust-user-extras-unrecoverable" | "trust-path-unrepresentable" | "trust-userns-unattested",
+  ) {
     super(code)
   }
 }
@@ -62,18 +65,62 @@ function owned(stat: { uid: number; mode: number }, mode: number): boolean {
   return process.platform === "win32" || (stat.uid === process.getuid?.() && (stat.mode & 0o777) === mode)
 }
 
+export interface AncestorStat {
+  readonly directory: boolean
+  readonly symlink: boolean
+  readonly mode: number
+  readonly uid: number
+  readonly dev: bigint
+  readonly ino: bigint
+}
+
+export type AncestorVerdict = "ok" | "unsafe-directory" | "unsafe-ancestor" | "unattested"
+
+/**
+ * One ancestor of a trust directory: a real directory, never a link, not group/other-writable unless
+ * sticky, and owned by root or the current uid. Inside a user namespace an overflow-owned ancestor counts
+ * as root only when the launcher attested that exact path and inode (senpi#5334); any other unmapped owner
+ * there is the named refusal, because the real owner cannot be seen.
+ */
+export function judgeAncestor(
+  view: UsernsView | null,
+  path: string,
+  stat: AncestorStat,
+  selfUid: number | undefined,
+  platform: NodeJS.Platform,
+): AncestorVerdict {
+  if (!stat.directory || stat.symlink) return "unsafe-directory"
+  if (platform === "win32") return "ok"
+  if ((stat.mode & 0o022) !== 0 && (stat.mode & 0o1000) === 0) return "unsafe-ancestor"
+  if (stat.uid === 0 || stat.uid === selfUid) return "ok"
+  if (view !== null && attestedOverflowRoot(view, path, stat)) return "ok"
+  if (view?.namespaced && (view.overflowUid === null || stat.uid === view.overflowUid)) return "unattested"
+  return "unsafe-ancestor"
+}
+
 /** Ancestors may be system-owned (/home, /tmp); none may redirect through a link. */
 async function ancestors(path: string): Promise<void> {
   let current = resolve(path)
+  const view = process.platform === "linux" ? readUsernsView(process.env) : null
   for (;;) {
-    const stat = await fs.lstat(current)
-    if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error("unsafe trust directory")
-    if (process.platform !== "win32") {
-      const sticky = (stat.mode & 0o1000) !== 0
-      if ((stat.uid !== 0 && stat.uid !== process.getuid?.()) || ((stat.mode & 0o022) !== 0 && !sticky)) {
-        throw new Error("unsafe trust ancestor")
-      }
-    }
+    const stat = await fs.lstat(current, { bigint: true })
+    const verdict = judgeAncestor(
+      view,
+      current,
+      {
+        directory: stat.isDirectory(),
+        symlink: stat.isSymbolicLink(),
+        mode: Number(stat.mode),
+        uid: Number(stat.uid),
+        dev: stat.dev,
+        ino: stat.ino,
+      },
+      process.getuid?.(),
+      process.platform,
+    )
+    if (verdict === "unsafe-directory") throw new Error("unsafe trust directory")
+    if (verdict === "unsafe-ancestor") throw new Error("unsafe trust ancestor")
+    if (verdict === "unattested") throw new TrustStorageError("trust-userns-unattested")
     const parent = dirname(current)
     if (parent === current) return
     current = parent
@@ -118,6 +165,14 @@ export async function prepareTrustDirectory(requested: string, platform: NodeJS.
   } catch {
     directory = await temporaryTrustDirectory(platform)
     codes.push({ code: "trust-dir-unsafe" })
+  }
+  if (directory === requested && platform === "linux") {
+    try {
+      await fs.access(requested, constants.W_OK)
+    } catch {
+      directory = await temporaryTrustDirectory(platform)
+      codes.push({ code: "trust-dir-readonly" })
+    }
   }
   if (directory.includes(platform === "win32" ? ";" : ":")) throw new TrustStorageError("trust-path-unrepresentable")
   return { directory, codes }

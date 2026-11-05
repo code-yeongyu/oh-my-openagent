@@ -182,6 +182,7 @@ export async function openDesktopSyncAccount(wire: DesktopSyncEngineWire, home?:
     chain: background.chain,
     pairing: background.pairing,
     devices: background.devices,
+    revocationView: background.revocationView,
     transport,
     boundary,
     forOperation,

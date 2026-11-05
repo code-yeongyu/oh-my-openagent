@@ -32,8 +32,10 @@ export type ThisDeviceState = (typeof THIS_DEVICE_STATES)[number]
 
 export const CLIENT_NAMES = ["desktop", "omo", "installer"] as const
 export type ClientName = (typeof CLIENT_NAMES)[number]
-export const CAPABILITIES = ["sessions", "devices", "enforcement", "upgrade"] as const
-export type Capability = (typeof CAPABILITIES)[number]
+export const CAPABILITIES = ["sessions", "devices", "enforcement", "upgrade", "control"] as const
+// A service that also serves machine operations lists "machine"; this client uses none of them but accepts the word.
+export const OPTIONAL_CAPABILITIES = ["machine"] as const
+export type Capability = (typeof CAPABILITIES)[number] | (typeof OPTIONAL_CAPABILITIES)[number]
 export const REFUSED_REASONS = ["version", "data_home_required", "malformed"] as const
 export type RefusedReason = (typeof REFUSED_REASONS)[number]
 

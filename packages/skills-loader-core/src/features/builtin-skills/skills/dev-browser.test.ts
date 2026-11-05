@@ -202,6 +202,8 @@ if (process.platform !== "win32" && hasLsof)
         const holder = await startPortHolder("exit")
 
         const exitCode = await runRelease("bash", httpPort, holder.port, undefined, "set -u\n", 0)
+        // The holder records TERM in its own handler; with no grace window the release exits before that can run.
+        await exitedWithin(holder.child, 5_000)
 
         expect(exitCode).toBe(0)
         expect(holder.receivedTerm()).toBe(true)

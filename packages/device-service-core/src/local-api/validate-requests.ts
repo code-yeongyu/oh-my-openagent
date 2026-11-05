@@ -75,6 +75,14 @@ const VALIDATORS: RequestValidators<RequestType> = {
     bare(v)
     return { id, type: "status.subscribe" }
   },
+  "control.attach.get": (v, id) => {
+    bare(v)
+    return { id, type: "control.attach.get" }
+  },
+  "control.attach.set": (v, id) => {
+    const attached = bool(requestFields(v, ["attached"])["attached"], "attached")
+    return { id, type: "control.attach.set", attached }
+  },
   "service.set_enabled": (v, id) => {
     const enabled = bool(requestFields(v, ["enabled"])["enabled"], "enabled")
     return { id, type: "service.set_enabled", enabled }

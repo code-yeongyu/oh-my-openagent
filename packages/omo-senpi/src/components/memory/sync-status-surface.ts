@@ -30,7 +30,12 @@ export function createSyncStatusNotifier(read: SyncStatusReader): SyncStatusNoti
       // A failed read says nothing about sync, so it changes no notice; the next change reads again.
       const status = await read(repo).catch(() => undefined)
       if (status === undefined) return
-      const failure = status?.kind === "failing" ? status.failure : undefined
+      const failure =
+        status?.kind === "failing"
+          ? status.failure
+          : status?.kind === "frozen"
+            ? (await import("#omo-memory-sync-runtime")).freezeFailure(status)
+            : undefined
       const previous = announced.get(repo)
       if (failure === undefined) {
         announced.delete(repo)

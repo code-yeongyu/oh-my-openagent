@@ -48,6 +48,7 @@ export function createDeviceSessionResolver(options: {
         keyring: account.keyring,
         chain: account.chain,
         transport: account.transport,
+        revocationView: account.revocationView,
         pinDir: options.pinDir,
         spaceId: Uint8Array.from(Buffer.from(resolved.spaceId, "hex")),
       })

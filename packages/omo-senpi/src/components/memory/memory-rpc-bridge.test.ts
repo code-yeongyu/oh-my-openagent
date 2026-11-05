@@ -766,6 +766,34 @@ describe("memory rpc bridge sync field (omo #10637)", () => {
     bridge.dispose()
   })
 
+  // #12280 R-A9: the desktop's status schema accepts only the current `state` and `failure.kind` literals
+  // (omo-desktop-app contracts), so a freeze reaches it as a failure of the existing "unknown" kind.
+  test("#given pushes frozen until a key rotation lands #when the status is pulled #then the snapshot carries a failing state of the unknown kind, inside the desktop's literal sets", async () => {
+    const context = await contextFixture()
+    const host = rpcHost()
+    const bridge = createMemoryRpcBridge(host.pi, {
+      resolveContext: () => context,
+      activeRun: () => undefined,
+      createGitRepo: () => stubRepo(),
+      syncStatus: async () => ({
+        kind: "frozen",
+        reason: "device_list_unusable",
+        since: Date.parse("2026-11-03T10:00:00.000Z"),
+      }),
+    })
+    bridge.attach("session-1")
+    const snapshot = (await host.handlers.get(MEMORY_STATUS_RPC_METHOD)?.({})) as MemoryRpcSnapshot
+    expect(["never_synced", "synced", "paused", "failing", "unavailable"]).toContain(String(snapshot.sync?.state))
+    expect(["stranded_lock", "auth_expired", "offline", "unknown"]).toContain(String(snapshot.sync?.failure?.kind))
+    expect(snapshot.sync).toMatchObject({
+      state: "failing",
+      failure: { kind: "unknown", sinceISO: "2026-11-03T10:00:00.000Z", attempts: 1 },
+    })
+    expect(snapshot.sync?.failure?.reason).toEqual(expect.any(String))
+    expect(snapshot.sync?.failure?.action).toEqual(expect.any(String))
+    bridge.dispose()
+  })
+
   const cases: ReadonlyArray<readonly [string, SyncStatusReader, MemoryRpcSync | undefined]> = [
     [
       "synced",

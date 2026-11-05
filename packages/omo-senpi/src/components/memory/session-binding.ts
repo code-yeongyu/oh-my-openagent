@@ -8,6 +8,7 @@ import {
   resolveAutoIdentity,
   resolveMemoryIdentity,
   resolveMemoryRoot,
+  type InFlightReads,
 } from "@oh-my-opencode/memory-core"
 
 import type { ComponentContext } from "../../extension/types"
@@ -65,6 +66,8 @@ export interface SessionBinderDeps {
   readonly loadConfig: (options?: { readonly cwd?: string }) => SenpiOmoConfigResult
   readonly sessions: Map<string, SessionState>
   readonly wiring: Pick<ReturnType<typeof createMemoryWiring>, "afterBind">
+  /** The memory work the session_shutdown drain awaits; the bind-time reconcile floats past the bind, so it is tracked here. */
+  readonly work: InFlightReads
   readonly syncRunner: SyncRunner
   readonly isEnabled: (config: OmoMemorySettings) => boolean
   readonly resolveConfig: (loaded: SenpiOmoConfigResult) => OmoMemorySettings
@@ -161,9 +164,12 @@ export function createSessionBinder(deps: SessionBinderDeps): SessionBinder {
     pi.appendEntry(MEMORY_BINDING_CUSTOM_TYPE, binding, { startupBookkeeping: true })
     // Bind-time reconcile floats past the bind by design, but its rejection must not
     // float: an unhandled rejection is attributed to whatever code is running when it lands.
-    void wiring.afterBind(pi, surface.id, state.context, eventCtx).catch((error: unknown) => {
-      logBindReconcileFailure(ctx.logger, error)
-    })
+    const context = state.context
+    void deps.work
+      .track(() => wiring.afterBind(pi, surface.id, context, eventCtx))
+      .catch((error: unknown) => {
+        logBindReconcileFailure(ctx.logger, error)
+      })
   }
 }
 

@@ -9,6 +9,7 @@ export type { HostLivenessStatus } from "../../state/host-liveness"
 
 export const HOST_UNRESPONSIVE_DEADLINE_MS = 120_000
 const MAX_BACKOFF_MS = 30_000
+const STOPPED = Symbol("host heartbeat stopped")
 
 export interface HostHeartbeatInput {
   readonly taskId: string
@@ -106,11 +107,12 @@ export function startHostHeartbeat(input: HostHeartbeatInput) {
     probePending = true
     probeMissed = false
     schedule(HEARTBEAT_DEADLINE_MS)
+    // A stop that settles before this launch (a teardown continuation queued ahead of it) sends no probe (#11673).
     void Promise.resolve()
-      .then(input.probe)
+      .then<HostSessionLiveness | typeof STOPPED>(() => (stopped ? STOPPED : input.probe()))
       .then(
         (state) => {
-          if (!active() || status.state === "terminal-pending") return
+          if (state === STOPPED || !active() || status.state === "terminal-pending") return
           failures = 0
           clearTimeout(deadline)
           if (status.state !== "running") publish({ state: "running" })

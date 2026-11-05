@@ -232,6 +232,8 @@ describe("omo-senpi task component wiring", () => {
     )
 
     expect(toolNames(pi)).toEqual([...ALL_TOOL_NAMES].sort())
+    // placement contract (engine `ToolDefinition.runs`): subagent, workflow and team tools run on the loop side
+    expect(pi.tools.filter((tool) => tool["runs"] !== "brain").map((tool) => tool["name"])).toEqual([])
     // the /tasks and /task-kill commands registered
     expect(pi.commands.map((entry) => entry.name).sort()).toEqual([...TASK_COMMANDS].sort())
     // Peer mail is a plain injected turn; completion, member liveness, and the dead-chain category

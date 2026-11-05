@@ -1,5 +1,6 @@
 import { z } from "zod"
-import type { AccountHttp, PairingHttp } from "@oh-my-opencode/memory-core/sync-engine"
+import type { AccountHttp, PairingHttp, RevocationView } from "@oh-my-opencode/memory-core/sync-engine"
+import { parseRevocationView } from "@oh-my-opencode/memory-core/sync-account-ports"
 import type { SyncDevice } from "@oh-my-opencode/memory-core/sync-engine"
 import {
   decodeRecoveryWraps,
@@ -33,6 +34,7 @@ export function desktopSyncAccountPorts(
   readonly chain: AccountHttp
   readonly pairing: PairingHttp
   readonly devices: () => Promise<readonly SyncDevice[]>
+  readonly revocationView: () => Promise<RevocationView>
 } {
   const json = async (request: Readonly<Record<string, unknown>>) => syncJson(await call(request))
   const append = async (op: "appendKeys" | "recoveryJoin", request: AppendRequest) => {
@@ -94,5 +96,7 @@ export function desktopSyncAccountPorts(
       },
     },
     devices: async () => SyncDevices.parse(await json({ op: "devices" })).devices,
+    // The rotator reads the raw reply: the strict SyncDevices schema refuses a row of an unknown kind or platform.
+    revocationView: async () => parseRevocationView(await json({ op: "devices" })),
   }
 }

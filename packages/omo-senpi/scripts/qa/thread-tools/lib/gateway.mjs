@@ -401,11 +401,11 @@ export const PATCHES = {
     from: /let ([\w$]+)=([\w$]+)\?\.config\.test_hooks\[([\w$]+)\];/,
     to: 'let $1=$2?.config.test_hooks[$3]??("afterDbCommit"===$3?process.env.THREAD_QA_AFTER_DB_COMMIT:void 0);',
   },
-  /** `loop-guard --mutant`: the cycle guard of the store worker answers "no cycle", so the scenario must FAIL. */
-  cycle_check_off: {
+  /** `loop-guard --mutant`: the store worker refuses every chain past hop 2 (a hidden count limit), so the scenario must FAIL. */
+  hop_cap_2: {
     file: "extensions/gateway-store-worker.mjs",
-    from: /([\w$]+\.sender_node,[\w$]+\.target_durable_id\))\?([\w$]+\("loop_detected","The target already leads back to the sender in this causal chain.")/,
-    to: "$1&&false?$2",
+    from: /([\w$]+)\.target_durable_id===\1\.sender_node\)return ([\w$]+)\("loop_detected","A session cannot deliver to itself through the gateway.",\{guard:"self_send"\}\);if\(!([\w$]+)\.new_root\)/,
+    to: '$1.target_durable_id===$1.sender_node||$3.hop>2)return $2("loop_detected","A session cannot deliver to itself through the gateway.",{guard:"self_send"});if(!$3.new_root)',
   },
 }
 

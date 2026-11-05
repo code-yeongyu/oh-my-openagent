@@ -25,7 +25,7 @@ import {
 } from "./release-signature.ts"
 import { compareVersions } from "./version.ts"
 
-export { type DeviceServiceHost, deviceServiceAssetName } from "./release-assets.ts"
+export { type DeviceServiceHost, deviceServiceAssetName, deviceServiceHost } from "./release-assets.ts"
 export { DEVICE_SERVICE_RELEASE_KEY, verifyReleaseSignature } from "./release-signature.ts"
 
 const DEVICE_SERVICE_ORIGIN = "https://get.omo.dev"

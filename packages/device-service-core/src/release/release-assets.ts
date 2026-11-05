@@ -21,6 +21,15 @@ const DEVICE_SERVICE_HOSTS = [
 ] as const
 export type DeviceServiceHost = (typeof DEVICE_SERVICE_HOSTS)[number]
 
+const isDeviceServiceHost = (value: string): value is DeviceServiceHost =>
+  DEVICE_SERVICE_HOSTS.some((host) => host === value)
+
+/** The release host of this platform and architecture, or undefined where no device service release exists. */
+export const deviceServiceHost = (platform: NodeJS.Platform, arch: string): DeviceServiceHost | undefined => {
+  const host = `${platform === "win32" ? "windows" : platform}-${arch}`
+  return isDeviceServiceHost(host) ? host : undefined
+}
+
 export const deviceServiceAssetName = (host: DeviceServiceHost): string =>
   host.startsWith("windows-") ? `omo-device-service-${host}.exe` : `omo-device-service-${host}`
 

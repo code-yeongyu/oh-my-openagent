@@ -135,6 +135,7 @@ describe("Senpi compatibility test script", () => {
       await writeFile(join(pluginRoot, "extensions", "omo-memory-commands.js"), "export {}\n")
       await writeFile(join(pluginRoot, "extensions", "omo-session-history.js"), "export {}\n")
       await writeFile(join(pluginRoot, "extensions", "omo-recall-store.js"), "export {}\n")
+      await writeFile(join(pluginRoot, "extensions", "omo-device-service.js"), "export {}\n")
       await writeFile(join(pluginRoot, "extensions", "omo-telemetry-posthog.js"), "export {}\n")
       await writeFile(join(pluginRoot, "extensions", "omo-telemetry-otlp.js"), "export {}\n")
       await writeFile(join(pluginRoot, "extensions", "omo-memory-sync.js"), "export {}\n")

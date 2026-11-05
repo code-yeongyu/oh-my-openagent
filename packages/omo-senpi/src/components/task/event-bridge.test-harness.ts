@@ -33,6 +33,8 @@ type HarnessOptions = {
   readonly summary?: SuspendSummary
   // This engine's task store directory (`engine.stateDir`).
   readonly stateDir?: string
+  // The run-pause bridge the event bridge drives (absent: run-pause wiring is off).
+  readonly runPause?: Parameters<typeof wireEventBridge>[5]["runPause"]
 }
 
 export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
@@ -205,6 +207,7 @@ export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
         order.push("leadShutdown")
       },
     },
+    ...(options.runPause === undefined ? {} : { runPause: options.runPause }),
     resumptionChannels: {
       emitSessionStart: async () => {
         const count = options.resumptionChannelCount ?? 0

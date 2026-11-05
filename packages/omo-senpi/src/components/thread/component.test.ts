@@ -1094,6 +1094,16 @@ describe("thread component production registration", () => {
     expect(f.tools.map((tool) => tool.name)).toEqual(SEVENTEEN)
   })
 
+  // Placement contract (engine `ToolDefinition.runs`): thread tools run on the loop side of a split session.
+  test("declares every thread tool for the loop side of a split session", () => {
+    const f = api()
+    createThreadComponent({ host: host(), stateDirectory: "/tmp/thread-test-state" }).register(
+      f.pi as never,
+      context([]) as never,
+    )
+    expect(f.tools.filter((tool) => tool.runs !== "brain").map((tool) => tool.name)).toEqual([])
+  })
+
   test("registers the family regardless of the context flag", () => {
     const f = api()
     createThreadComponent({ host: host(), stateDirectory: "/tmp/thread-test-state" }).register(

@@ -66,6 +66,9 @@ export async function hangAfterEnqueue(tx, binding) {
     text: "hello",
   })
   if (result.kind !== "ok") throw new Error(JSON.stringify(result))
+  // The enqueue wrote the wake marker before it returned, and COMMIT never runs: tell the parent on stdout,
+  // which cannot miss the line the way a cross-process file watch can miss the marker's creation.
+  console.log("ENQUEUED")
   return new Promise(() => {})
 }
 

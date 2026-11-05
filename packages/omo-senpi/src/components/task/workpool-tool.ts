@@ -17,6 +17,7 @@ export function registerWorkpoolTool(
       ...engine.taskToolDeps((sessionId) => skills.stateFor(sessionId)),
       workpools,
     }),
+    runs: "brain",
   })
   workpools.bindAggregate({
     enqueue: (message, receipts) => {

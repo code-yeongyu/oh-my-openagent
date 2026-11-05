@@ -99,6 +99,7 @@ async function compactionFixture(): Promise<CompactionFixture> {
           launches.push(run.request)
         },
         reconcile: async () => {},
+        settled: async () => {},
       } as unknown as MemoryIdentityRuntime
     },
   }).register(pi, ctx)
