@@ -85,6 +85,8 @@ export async function measureUnreflectedJournalBytes(input: {
   for (const sessionId of await listNames(input.paths.transcripts)) {
     const dir = join(input.paths.transcripts, sessionId)
     const verdict = await classifyTranscriptJournal(context, dir)
+    // A transcript holding rows its state never counted is unreflected input kept in place.
+    if (verdict === "state-behind-transcript") bytes += await measureTreeBytes(dir)
     if (typeof verdict === "string") continue
     if (verdict.kind === "never") bytes += await measureTreeBytes(dir)
     else if (verdict.kind === "partly") bytes += await measureTreeBytes(join(dir, "transcript.jsonl"))
