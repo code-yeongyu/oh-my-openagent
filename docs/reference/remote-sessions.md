@@ -2,8 +2,10 @@
 
 `omo remote` lists and watches the OmO sessions running on the other devices signed in to your
 account. It talks to the OmO device service on this device, which holds the connection to your other
-devices; `omo remote` never connects to another machine itself. Every command prints a table, or the
-SDK's typed value as one JSON line with `--json` (`packages/omo-native/remote-cli.ts`).
+devices; `omo remote` never connects to another machine itself. `status`, `devices`, `sessions` and
+`control` print a table, `enable` and `disable` print one sentence, and with `--json` each prints the
+SDK's typed value as one JSON line instead; `attach` takes no `--json`
+(`packages/omo-native/remote-cli.ts`).
 
 ```bash
 omo remote status [--json]       # the device service's connection state
@@ -16,7 +18,8 @@ omo remote attach <device>/<session>   # watch a session on another device
 ```
 
 Exit codes: `0` done, `1` the operation failed, `2` usage error, `3` unavailable (signed out, the
-device service is not set up or not running, or it lacks the feature).
+device service is not set up or not running, or it lacks the feature). `omo remote bootstrap` exits `3`
+for every stop, including a failed verification or install.
 
 ## Before any command runs
 
@@ -61,8 +64,9 @@ now: anything you type is refused with "remote input not enabled yet: this view 
 
 ## Command outcomes
 
-A command sent to a remote session (through the device service SDK,
-`packages/device-service-core/src/local-api/protocol-events.ts`) reports one of these outcomes:
+These are the outcomes the device service's local API reports for a command sent to a remote session
+(`packages/device-service-core/src/local-api/protocol-events.ts`). `omo remote` itself sends no
+commands today (`attach` is observe-only); clients of the local API see these words:
 
 | Outcome | Meaning | Retry offered |
 | --- | --- | --- |
@@ -82,19 +86,24 @@ The text of one command is limited to 1,000,000 characters and 3,000,000 bytes o
 
 ## Install and update
 
-Every interactive `omo` start runs `omo remote bootstrap` in the background, in its own process with
-a 10-minute deadline (`packages/omo-senpi/src/components/device-service/runner.ts`). When you are
-signed in, it acquires the device service version this omo build pins from
-`https://get.omo.dev/<channel>/device-service/<version>/` and installs it, then connects
-(`packages/device-service-core/src/release/acquire.ts`). Before anything is written:
+An interactive `omo` start (a TUI session started by the `omo` launcher) runs `omo remote bootstrap` in
+the background, once per process, in its own process with a 10-minute deadline
+(`packages/omo-senpi/src/components/device-service/runner.ts`). It does not run under CI or in task
+children, and `device_service.enabled: false` in `omo.json` turns it off. When you are signed in, it
+connects to a running device service at the pinned version or newer; only when none runs, or the
+running one is older, does it acquire the pinned version from
+`https://get.omo.dev/<channel>/device-service/<version>/`, install it and connect
+(`packages/device-service-core/src/bootstrap.ts`, `src/release/acquire.ts`). Before anything is
+written:
 
 - `checksums.txt` must carry a valid signature under the release key built into omo;
 - every downloaded file must match its sha256 in `checksums.txt`;
 - `latest.json` must name the pinned version, and its `min_engine_version` must not be newer than the
-  engine omo ships with (otherwise: update OmO);
-- on macOS, the binary's code signature must verify.
+  engine omo ships with (otherwise: update OmO).
 
-A verified release is moved into place as a whole under `<state dir>/bin/<version>/`. A download that
+The verified files are then written to a staging directory under `<state dir>/bin/`. On macOS the
+binary's code signature must verify there; a failure removes the staging directory. Only then is the
+release moved into place as a whole under `<state dir>/bin/<version>/`. A download that
 fails verification is not installed and the command says so. The state dir is `~/.omo/device-service`
 (macOS and Linux) or `%LOCALAPPDATA%\OmO\device-service` (Windows).
 
