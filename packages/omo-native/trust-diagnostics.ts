@@ -4,7 +4,7 @@ import { join } from "node:path"
 
 import type { Diagnostic as PolicyDiagnostic } from "./engine-trust-policy"
 import type { LinuxBundleRead, LinuxBundleSelection } from "./linux-trust-bundle"
-import type { DropCause as DefaultFileDropCause } from "./openssl-default-file"
+import { DROP_CAUSE_NARROWING, type DropCause as DefaultFileDropCause } from "./openssl-default-file"
 import type { HashDirectoryDiagnostic } from "./openssl-hash-dir"
 
 /** 6.2: each fallback reason, mapped to its one 6.6 catalog action. */
@@ -99,8 +99,17 @@ type FallbackStatus = {
     readonly action: (typeof FALLBACK_ACTIONS)[R]
   }
 }[FallbackReason]
+/** 4.4 item 6, revision 11: the one OpenSSL default-file drop of a generation, named for doctor and the log. */
+export interface DefaultFileDropEntry {
+  readonly code: "openssl-default-file-malformed"
+  readonly file: "/etc/ssl/cert.pem"
+  readonly cause: DefaultFileDropCause
+  readonly blockIndex: number
+  readonly narrowing: boolean
+}
 export type TrustDiagnosticEntry =
   | { readonly code: (typeof PLAIN_CODES)[number] }
+  | DefaultFileDropEntry
   | FallbackStatus
   | { readonly code: "tls-verify-text-in-output"; readonly heuristic: true; readonly pattern: VerifyPattern }
 export type TrustDiagnosticCode = TrustDiagnosticEntry["code"]
@@ -164,6 +173,19 @@ function entry(value: unknown): TrustDiagnosticEntry {
       const { heuristic, pattern } = value as { heuristic?: unknown; pattern?: unknown }
       if (heuristic !== true) throw new TrustDiagnosticRecordError("trust diagnostic hint must carry heuristic: true")
       return { code, heuristic: true, pattern: oneOf(VERIFY_PATTERNS, pattern, "pattern") }
+    }
+    case "openssl-default-file-malformed": {
+      // The plain form stays: a default file that could not be read has no cause or block.
+      if (Object.keys(value).length === 1) return { code }
+      keys(value, ["code", "file", "cause", "blockIndex", "narrowing"], "default-file drop")
+      const { file, cause, blockIndex, narrowing } = value as { file?: unknown; cause?: unknown; blockIndex?: unknown; narrowing?: unknown }
+      if (file !== "/etc/ssl/cert.pem") throw new TrustDiagnosticRecordError("trust diagnostic default-file drop names another file")
+      const known = oneOf(Object.keys(DROP_CAUSE_NARROWING) as DefaultFileDropCause[], cause, "cause")
+      if (typeof blockIndex !== "number" || !Number.isSafeInteger(blockIndex) || blockIndex < 0) {
+        throw new TrustDiagnosticRecordError("trust diagnostic block index is not a block index")
+      }
+      if (narrowing !== DROP_CAUSE_NARROWING[known]) throw new TrustDiagnosticRecordError("trust diagnostic narrowing is not the cause's")
+      return { code, file, cause: known, blockIndex, narrowing: DROP_CAUSE_NARROWING[known] }
     }
     default:
       keys(value, ["code"], "code")
