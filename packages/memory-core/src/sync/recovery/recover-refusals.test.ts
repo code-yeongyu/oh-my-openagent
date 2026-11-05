@@ -36,8 +36,8 @@ import {
 	transportFor,
 	verified,
 	type World,
-	writeBatch,
 } from "./testing/world.test-support.ts";
+import { writeBatch } from "./testing/write-batch.test-support.ts";
 
 const recover = (
 	world: World,

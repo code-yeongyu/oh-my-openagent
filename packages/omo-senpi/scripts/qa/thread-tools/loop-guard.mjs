@@ -2,9 +2,10 @@
 /**
  * loop-guard (todo 16, IS-6 loop safety), three parts on real surfaces:
  *
- * 1. Cycle: three pty TUIs. A's user asks A to send to B; B's model, running on that delivery, sends
- *    to C; C's model, running on B's, sends to A. The third send closes A -> B -> C -> A under one
- *    causal root and is refused `loop_detected` (`guard: "cycle"`); A never receives it.
+ * 1. Chain back to the start: three pty TUIs. A's user asks A to send to B; B's model, running on that
+ *    delivery, sends to C; C's model, running on B's, sends to A. The third send closes
+ *    A -> B -> C -> A under one causal root and is DELIVERED (K8: thread chains have no count limit
+ *    unless the user sets one, and A->B->A is allowed); A's row carries hop 3.
  * 2. Fan-out: one turn of A sends to 17 distinct live sessions (opened on one Desktop-thread shard
  *    host, `i-*`); 16 are accepted and exactly one is refused `overloaded` (`budget: "fanout"`).
  * 3. Burst: 9 concurrent `omo thread send`s to one target: 8 pass, the 9th is `overloaded`
@@ -12,10 +13,11 @@
  *    TIME-UNDER-TEST EXCEPTION: the refill is the behavior under test, so this one wait is a
  *    deliberate 5 s wall-clock pause, recorded in the report; nothing else here waits on time.
  *
- * `--mutant`: runs against a build whose store worker answers "no cycle" (patch `cycle_check_off`).
- * Part 1 must then FAIL, which is the proof this scenario can fail. Give it its own `--evidence-dir`.
+ * `--mutant`: runs against a build whose store worker refuses every chain past hop 2 (patch `hop_cap_2`,
+ * a hidden count limit). Part 1 must then FAIL, which is the proof this scenario can fail. Give it its
+ * own `--evidence-dir`.
  */
-import { allToolResults, assistantTexts, awaitTuiEndpoint, cliSend, deliveryEntries, hasFlag, openHostSession, runScenario, startShardHost, storeRows, toolCallResults, waitFor } from "./lib/gateway.mjs"
+import { allToolResults, awaitTuiEndpoint, cliSend, deliveryEntries, hasFlag, openHostSession, runScenario, startShardHost, storeRows, toolCallResults, waitFor } from "./lib/gateway.mjs"
 
 const MUTANT = hasFlag("--mutant")
 const FANOUT_TARGETS = 17
@@ -23,9 +25,9 @@ const BURST = 8
 const REFILL_WAIT_MS = 5_000
 
 await runScenario("loop-guard", async ({ report, fake, scratch, install, startTui }) => {
-  report.log(MUTANT ? "MUTANT RUN: cycle check disabled in the store worker (patch cycle_check_off); part 1 is expected to FAIL" : "normal run")
+  report.log(MUTANT ? "MUTANT RUN: a hop-2 cap in the store worker (patch hop_cap_2); part 1 is expected to FAIL" : "normal run")
 
-  // ------------------------------------------------------------------ 1. cycle A -> B -> C -> A
+  // ------------------------------------------------------------------ 1. chain A -> B -> C -> A
   const tuis = {}
   for (const name of ["a", "b", "c"]) {
     const tui = await startTui(`tui-${name}`)
@@ -46,16 +48,15 @@ await runScenario("loop-guard", async ({ report, fake, scratch, install, startTu
     return ["tui-b", "tui-c", "tui-a"].every((thread) => byTarget.has(thread)) ? byTarget : undefined
   }, { label: "three thread_send results (A->B, B->C, C->A)", timeoutMs: 120_000 })
   const [first, second, third] = [sends.get("tui-b"), sends.get("tui-c"), sends.get("tui-a")]
-  report.assert("cycle-hop1-and-hop2-delivered", first?.kind === "ok" && second?.kind === "ok", `a->b=${first?.kind} b->c=${second?.kind}`)
-  report.assert(
-    "cycle-closing-send-refused",
-    third?.kind === "error" && third.error?.code === "loop_detected" && third.error?.details?.guard === "cycle",
-    JSON.stringify(third).slice(0, 400),
-  )
-  // Every chain delivery to A would share hop 1's root; there must be none.
+  report.assert("chain-hop1-and-hop2-delivered", first?.kind === "ok" && second?.kind === "ok", `a->b=${first?.kind} b->c=${second?.kind}`)
+  report.assert("chain-back-to-a-accepted", third?.kind === "ok", JSON.stringify(third).slice(0, 400))
+  // The delivery to A continues hop 1's root and carries the chain's count.
   const [hop1Row] = await storeRows(scratch.agentDir, "SELECT root_id FROM deliveries WHERE delivery_id = ?", [first?.delivery_id ?? ""])
-  const toA = await storeRows(scratch.agentDir, "SELECT delivery_id, state FROM deliveries WHERE root_id = ? AND target_durable_id = ?", [hop1Row?.root_id ?? "", tuis.a.endpoint.durableId])
-  report.assert("cycle-nothing-reaches-a", toA.length === 0 && !assistantTexts(tuis.a.endpoint.sessionPath).some((text) => text.includes("QA-TOKEN-hop3")), `rows_to_a_under_root=${JSON.stringify(toA)} a_entries=${deliveryEntries(tuis.a.endpoint.sessionPath).length}`)
+  const toA = await waitFor(async () => {
+    const rows = await storeRows(scratch.agentDir, "SELECT delivery_id, state, hop FROM deliveries WHERE root_id = ? AND target_durable_id = ?", [hop1Row?.root_id ?? "", tuis.a.endpoint.durableId])
+    return rows.length === 1 && rows[0].state === "applied" ? rows : undefined
+  }, { label: "the A->B->C->A delivery applied in A", timeoutMs: 120_000 })
+  report.assert("chain-reaches-a-with-hop-3", Number(toA[0].hop) === 3 && deliveryEntries(tuis.a.endpoint.sessionPath).length >= 1, `rows_to_a_under_root=${JSON.stringify(toA)} a_entries=${deliveryEntries(tuis.a.endpoint.sessionPath).length}`)
 
   // ------------------------------------------------------------------ 2. fan-out cap
   const shard = await startShardHost(scratch, install, `qa-loop-guard-${process.pid}`)
@@ -92,4 +93,4 @@ await runScenario("loop-guard", async ({ report, fake, scratch, install, startTu
   await new Promise((resolvePromise) => setTimeout(resolvePromise, REFILL_WAIT_MS))
   const refilled = await cliSend(scratch, install, burstTarget, "QA-TOKEN-burst-after-refill")
   report.assert("burst-refills-after-5s", refilled.json?.kind === "ok", refilled.stdout.trim().slice(0, 200))
-}, MUTANT ? { patches: ["cycle_check_off"], installName: "omo-ai-loop-guard-mutant" } : {})
+}, MUTANT ? { patches: ["hop_cap_2"], installName: "omo-ai-loop-guard-mutant" } : {})
