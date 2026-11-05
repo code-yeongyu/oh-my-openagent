@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { createDagLeaseWatch, type DagLeaseWatchTimers } from "./recovery-lease-watch"
+import { remainingTestTime } from "../../../../test-support/test-deadline"
 
 class ManualTimers implements DagLeaseWatchTimers {
   readonly #timers = new Map<number, { readonly callback: () => void; readonly ms: number }>()
@@ -104,7 +105,7 @@ describe("DAG lease watch", () => {
       watch.watch(2_147_483_647, resolve)
     })
     const budget = new Promise<never>((_resolve, reject) => {
-      setTimeout(() => reject(new Error("lease watch did not fire within 2s")), 2_000)
+      setTimeout(() => reject(new Error("lease watch did not fire within the test budget")), remainingTestTime())
     })
 
     // when / then

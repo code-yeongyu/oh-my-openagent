@@ -4,6 +4,7 @@ import { coldReviveHarness } from "../lifecycle/__fixtures__/cold-revive-harness
 import { LEGACY_RUN_START_EPOCH, type TaskRecord } from "../state"
 import { bounded, fixture, poolInput } from "../workpool/__fixtures__/admission"
 import { FakeRunner, baseSpec, cleanupProjects, flush, makeManager } from "./__fixtures__/manager-fakes"
+import { testBudgetSignal } from "../../../../test-support/test-deadline"
 
 afterEach(cleanupProjects)
 
@@ -92,7 +93,7 @@ describe("every run-stats tracker is tagged with the run it measures", () => {
     // given
     const f = fixture()
     const pool = f.manager.workpools.create(f.caller, { ...poolInput, mode: "keep_alive" })
-    const first = f.manager.workpools.waitForEvent(pool.pool_id, "dispatched", AbortSignal.timeout(5000))
+    const first = f.manager.workpools.waitForEvent(pool.pool_id, "dispatched", testBudgetSignal())
     f.manager.workpools.push(f.caller, pool.pool_id, [{ key: "a", input: 1 }])
     const dispatched = await bounded(first)
     const taskId = dispatched.task_id
@@ -102,7 +103,7 @@ describe("every run-stats tracker is tagged with the run it measures", () => {
     await f.manager.waitFor(taskId)
 
     // when
-    const second = f.manager.workpools.waitForEvent(pool.pool_id, "dispatched", AbortSignal.timeout(5000))
+    const second = f.manager.workpools.waitForEvent(pool.pool_id, "dispatched", testBudgetSignal())
     f.manager.workpools.push(f.caller, pool.pool_id, [{ key: "b", input: 2 }])
     const reused = await bounded(second)
 

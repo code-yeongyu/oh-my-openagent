@@ -4,12 +4,13 @@ import { createTaskRecordStore } from "../store"
 import { createTaskManager } from "./manager"
 import { baseSpec, categoryPlanner, cleanupProjects, FakeRunner, launchSettled, settings, tempProject } from "./__fixtures__/manager-fakes"
 import type { RunnerOutcome } from "./child-handle"
+import { remainingTestTime } from "../../../../test-support/test-deadline"
 
 afterEach(cleanupProjects)
 
 function bounded<T>(promise: Promise<T>): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
-  const deadline = new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error("Resume signal did not arrive")), 5000) })
+  const deadline = new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error("Resume signal did not arrive")), remainingTestTime()) })
   return Promise.race([promise, deadline]).finally(() => { if (timer !== undefined) clearTimeout(timer) })
 }
 

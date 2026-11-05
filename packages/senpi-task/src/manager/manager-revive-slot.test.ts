@@ -4,6 +4,7 @@ import { EventEmitter, once } from "node:events"
 import { createTaskRecordStore } from "../store"
 import { coldReviveHarness } from "../lifecycle/__fixtures__/cold-revive-harness"
 import { FakeRunner, baseSpec, cleanupProjects, makeManager, settings, tempProject } from "./__fixtures__/manager-fakes"
+import { testBudgetSignal } from "../../../../test-support/test-deadline"
 
 afterEach(cleanupProjects)
 
@@ -20,7 +21,7 @@ describe("TaskManager revive concurrency slot", () => {
       expect((await h.manager.interruptTask(h.record.task_id)).kind).toBe("noop")
       expect((await h.send("AGAIN")).kind).toBe("revived")
       expect(h.store.load(h.record.task_id)?.notification.run_epoch).toBe(2)
-      const terminal = h.manager.waitFor(h.record.task_id, { signal: AbortSignal.timeout(5000) })
+      const terminal = h.manager.waitFor(h.record.task_id, { signal: testBudgetSignal() })
       h.fake.settle({ status: "completed", finalResponse: "DONE" })
       await terminal
       const next = await h.manager.start({ prompt: "next", parent_session_id: "parent", depth: 1 })
@@ -46,7 +47,7 @@ describe("TaskManager revive concurrency slot", () => {
     })
     const a = await manager.start(baseSpec({ name: "a" }))
     if (a.kind !== "started") throw new Error("expected started")
-    const firstTerminal = manager.waitFor(a.task_id, { signal: AbortSignal.timeout(5000) })
+    const firstTerminal = manager.waitFor(a.task_id, { signal: testBudgetSignal() })
     inProcess.handles.get(a.task_id)?.settle({ status: "completed", finalResponse: "first" })
     await firstTerminal
     expect(store.load(a.task_id)?.status).toBe("completed")
@@ -62,7 +63,7 @@ describe("TaskManager revive concurrency slot", () => {
     expect(b.status).toBe("pending")
 
     // when the revived task A completes a second time, releasing the re-acquired slot
-    const nextRunning = once(events, `running:${b.task_id}`, { signal: AbortSignal.timeout(5000) })
+    const nextRunning = once(events, `running:${b.task_id}`, { signal: testBudgetSignal() })
     inProcess.handles.get(a.task_id)?.settle({ status: "completed", finalResponse: "second" })
     await nextRunning
 

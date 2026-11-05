@@ -8,6 +8,7 @@ import { hostWorldRecovery } from "./rpc-host/__fixtures__/host-world-recovery"
 import { manualRecoveryClock, type ManualRecoveryClock } from "./rpc-host/__fixtures__/manual-recovery-clock"
 import { LIVE_PARENT_SUSPENSION_BUDGET_MS } from "../lifecycle/live-parent-recovery"
 import type { ReattachOutcome } from "./rpc-host/handle-reattach"
+import { testBudgetSignal } from "../../../../test-support/test-deadline"
 
 /**
  * omo#9403, omo#10023: a child whose host transport drops must, within a bound, either run again or
@@ -64,7 +65,7 @@ function recordAt(parent: ParentSession, index: number): TaskRecord {
 }
 
 async function settled(parent: ParentSession, taskId: string): Promise<TaskRecord> {
-  return await parent.manager.waitFor(taskId, { signal: AbortSignal.timeout(10_000) })
+  return await parent.manager.waitFor(taskId, { signal: testBudgetSignal() })
 }
 
 /** Resolve once the host has seen `count` commands of `type`; checking and arming happen in one tick. */

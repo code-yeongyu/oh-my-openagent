@@ -11,6 +11,7 @@ import { stopFakeChild } from "./rpc/__fixtures__/stop-fake-child"
 import { spawnFakeChild } from "./rpc/__fixtures__/spawn-fake"
 import { RpcProcessRunner } from "./rpc-process"
 import type { RpcRunnerSpec } from "./types"
+import { remainingTestTime } from "../../../../test-support/test-deadline"
 
 const isWin32 = process.platform === "win32"
 const children: ChildProcess[] = []
@@ -276,7 +277,7 @@ describe("RpcProcessRunner", () => {
     await Promise.race([
       heartbeatObserved,
       new Promise<never>((_, reject) => {
-        const timeout = setTimeout(() => reject(new Error("timed out waiting for heartbeat update")), 2_000)
+        const timeout = setTimeout(() => reject(new Error("timed out waiting for heartbeat update")), remainingTestTime())
         timeout.unref?.()
       }),
     ])

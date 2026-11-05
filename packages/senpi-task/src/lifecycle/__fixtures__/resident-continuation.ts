@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import { coldReviveHarness } from "./cold-revive-harness"
+import { testBudgetSignal } from "../../../../../test-support/test-deadline"
 
 type Terminal = "completed" | "interrupted" | "error"
 
@@ -24,7 +25,7 @@ export async function acknowledgedResidentContinuation(status: Terminal) {
     fault = false
     const marker = h.store.load(h.record.task_id)?.revive_delivery_uncertain
     assert.equal(marker?.run_epoch, 1)
-    const terminal = h.manager.waitFor(h.record.task_id, { signal: AbortSignal.timeout(5000) })
+    const terminal = h.manager.waitFor(h.record.task_id, { signal: testBudgetSignal() })
     if (status === "interrupted") assert.equal((await h.manager.interruptTask(h.record.task_id)).kind, "interrupted")
     h.fake.settle(status === "error"
       ? { status: "error", failure: { kind: "session_unavailable", message: "FIXTURE_FAILURE" } }
@@ -64,14 +65,14 @@ export async function generationAcrossContinuations(generation?: number) {
     assert.equal(h.store.load(h.record.task_id)?.config_generation, generation)
     assert.equal((await h.send()).kind, "revived")
     assert.equal(h.store.load(h.record.task_id)?.config_generation, generation)
-    const first = h.manager.waitFor(h.record.task_id, { signal: AbortSignal.timeout(5000) })
+    const first = h.manager.waitFor(h.record.task_id, { signal: testBudgetSignal() })
     h.fake.settle({ status: "completed", finalResponse: "FIRST" })
     await first
     assert.equal(h.store.load(h.record.task_id)?.config_generation, generation)
     assert.equal((await h.send("WARM_CONTINUATION")).kind, "revived")
     assert.equal(h.resumed.length, 1)
     assert.equal(h.store.load(h.record.task_id)?.config_generation, generation)
-    const second = h.manager.waitFor(h.record.task_id, { signal: AbortSignal.timeout(5000) })
+    const second = h.manager.waitFor(h.record.task_id, { signal: testBudgetSignal() })
     h.fake.settle({ status: "completed", finalResponse: "SECOND" })
     await second
     assert.equal(h.store.load(h.record.task_id)?.config_generation, generation)

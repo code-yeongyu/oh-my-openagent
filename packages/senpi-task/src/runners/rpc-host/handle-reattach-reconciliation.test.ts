@@ -4,6 +4,7 @@ import { isHostSessionHandle } from "../rpc-host"
 import { cleanupProjects, makeManager, tempProject } from "../../manager/__fixtures__/manager-fakes"
 import { adaptRpcHandle } from "../../manager/child-handle"
 import { createTaskRecord } from "../../state"
+import { testBudgetSignal } from "../../../../../test-support/test-deadline"
 
 const harness = hostRunnerHarness()
 afterEach(async () => { await harness.release(); cleanupProjects() })
@@ -53,7 +54,7 @@ describe("host recovery adopts a turn finished during the transport gap", () => 
 
         // A later outcome must still reach the manager, proving its tracker remains armed.
         host.failReply("get_state", undefined)
-        const finished = manager.waitFor(record.task_id, { signal: AbortSignal.timeout(5_000) })
+        const finished = manager.waitFor(record.task_id, { signal: testBudgetSignal() })
         host.completeTurn(handle.hostSession.routingId, "LIVE TURN ANSWER")
         expect((await finished).final_response).toBe("LIVE TURN ANSWER")
       } finally {

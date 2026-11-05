@@ -13,6 +13,7 @@ import { runTaskOutput } from "../output/output"
 import { runTaskCancel } from "../control/cancel"
 import { buildTaskExecute } from "./execute"
 import { TaskToolParams } from "./params"
+import { testBudgetSignal } from "../../../../../test-support/test-deadline"
 
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
@@ -24,7 +25,7 @@ function deferred() {
 }
 
 async function bounded(event: Promise<void>): Promise<void> {
-  const signal = AbortSignal.timeout(20_000)
+  const signal = testBudgetSignal()
   let abort = () => {}
   const timeout = new Promise<never>((_, reject) => {
     abort = () => reject(signal.reason)
@@ -112,7 +113,7 @@ async function completes(levels: number, batch = false) {
   const fixture = tree(levels, false, batch)
   const parent = await fixture.start()
   if (parent.kind !== "started") throw new Error(JSON.stringify(parent))
-  const waiting = fixture.manager.waitFor(parent.task_id, { signal: AbortSignal.timeout(20_000) })
+  const waiting = fixture.manager.waitFor(parent.task_id, { signal: testBudgetSignal() })
   fixture.begin.resolve()
   try {
     const record = await waiting.catch((cause: unknown) => {
@@ -147,10 +148,10 @@ test.each([[false], [true]])("promotion resumes the parent over cap without wait
     expect(output.details).toMatchObject({ kind: "status", snapshot: { lease: "held" } })
     expect(fixture.concurrency.getCount("fixture/model")).toBe(2)
     fixture.finishParent.resolve()
-    await fixture.manager.waitFor(parent.task_id, { signal: AbortSignal.timeout(20_000) })
+    await fixture.manager.waitFor(parent.task_id, { signal: testBudgetSignal() })
     expect(fixture.concurrency.getCount("fixture/model")).toBe(1)
     fixture.finishLeaf.resolve()
-    for (const { record } of fixture.manager.list({ scope: "all" })) await fixture.manager.waitFor(record.task_id, { signal: AbortSignal.timeout(20_000) })
+    for (const { record } of fixture.manager.list({ scope: "all" })) await fixture.manager.waitFor(record.task_id, { signal: testBudgetSignal() })
     expect(fixture.concurrency.hasFreeSlot("fixture/model")).toBe(true)
   } finally {
     fixture.finishParent.resolve()
@@ -172,7 +173,7 @@ test("task_output shows parked; task_cancel drops a parked parent without reacqu
     const epoch = fixture.manager.get(parent.task_id)!.notification.run_epoch
     await runTaskCancel(fixture.manager, { task_id: parent.task_id })
     fixture.finishLeaf.resolve()
-    for (const { record } of fixture.manager.list({ scope: "all" })) await fixture.manager.waitFor(record.task_id, { signal: AbortSignal.timeout(20_000) })
+    for (const { record } of fixture.manager.list({ scope: "all" })) await fixture.manager.waitFor(record.task_id, { signal: testBudgetSignal() })
     expect(fixture.concurrency.leaseState(parent.task_id, epoch)).toBeUndefined()
     expect(fixture.concurrency.hasFreeSlot("fixture/model")).toBe(true)
   } finally {

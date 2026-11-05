@@ -7,6 +7,7 @@ import { createTaskLifecycle } from "../create"
 import { runTaskOutput } from "../../tools/output/output"
 import { FakeRegistry, seedRecord, settings, tempStore } from "./lifecycle-fakes"
 import { NO_HOST_ENDPOINT } from "../host-session"
+import { testBudgetSignal } from "../../../../../test-support/test-deadline"
 
 /** Restores a deterministic real AgentSession; never sends a prompt or calls a provider. */
 export async function parkRealSession() {
@@ -42,7 +43,7 @@ export async function parkRealSession() {
   seedRecord(store, { task_id: id, host_pid: process.pid, updated_at: new Date(1000).toISOString() })
   store.mutate(id, (r) => ({ ...r, final_response: "REAL_SESSION_SENTINEL", spawn_spec: { version: 1, cwd: store.stateDir, prompt: "must not replay" } }))
   const events = new EventEmitter()
-  const settled = once(events, "suspended", { signal: AbortSignal.timeout(5000) })
+  const settled = once(events, "suspended", { signal: testBudgetSignal() })
   let tick: () => void = () => { throw new Error("scheduler not registered") }
   let now = 1000
   const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store: { ...store, appendEvent: (taskId, event) => {

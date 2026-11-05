@@ -10,6 +10,7 @@ import { baseSpec, cleanupProjects, launchSettled, settings, tempProject } from 
 import { createTaskManager } from "./manager"
 import type { ManagedRunner } from "./types"
 import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
+import { testBudgetSignal } from "../../../../test-support/test-deadline"
 
 // Invariant: every committed state of a record whose failed rung was never confirmed closed still names
 // that rung's session, so a parent that dies after any single write leaves recovery something to close.
@@ -74,7 +75,7 @@ describe("runtime fallback whose failed-rung close is never acknowledged", () =>
     const [original] = host.sessions()
     if (original === undefined) throw new Error("expected the failed rung's session")
     host.withholdReply("close_session")
-    const settled = manager.waitFor(task.task_id, { signal: AbortSignal.timeout(10_000) })
+    const settled = manager.waitFor(task.task_id, { signal: testBudgetSignal() })
 
     try {
       // when

@@ -5,6 +5,7 @@ import { bounded } from "../lifecycle/__fixtures__/live-parent-clock"
 import { readEvents } from "../lifecycle/__fixtures__/lifecycle-fakes"
 import { baseSpec, cleanupProjects, FakeRunner, makeHandle, makeManager } from "./__fixtures__/manager-fakes"
 import type { ManagedRunner } from "./types"
+import { remainingTestTime } from "../../../../test-support/test-deadline"
 
 afterEach(cleanupProjects)
 
@@ -36,7 +37,7 @@ describe("shutdown teardown failure containment", () => {
       const starting = manager.start(baseSpec({ execution_mode: "process" }))
       const taskId = await bounded(entered.promise)
       const watchdog = Promise.withResolvers<never>()
-      const timer = setTimeout(() => watchdog.reject(new Error("shutdown did not contain teardown failure")), 2_000)
+      const timer = setTimeout(() => watchdog.reject(new Error("shutdown did not contain teardown failure")), remainingTestTime())
       const shutdownBoundMs = 5_000
       jest.useFakeTimers()
       try {

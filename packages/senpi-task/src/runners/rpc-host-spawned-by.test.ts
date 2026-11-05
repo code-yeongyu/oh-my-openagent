@@ -7,6 +7,7 @@ import { baseSpec, cleanupProjects, launchSettled, makeManager, settings } from 
 import { normalizeSenpiTeamSpec, spawnTeamMembers } from "../team"
 import { bounded } from "../workpool/__fixtures__/admission"
 import { hostRunnerHarness } from "./rpc-host.test-support"
+import { testBudgetSignal } from "../../../../test-support/test-deadline"
 
 const harness = hostRunnerHarness()
 afterEach(async () => {
@@ -98,7 +99,7 @@ test.each(["fresh", "keep_alive"] as const)("workpool %s worker keeps ancestry a
     // when two items run in fresh workers or the same resident worker
     const ids: string[] = []
     for (const key of ["first", "second"]) {
-      const dispatched = pools.waitForEvent(pool.pool_id, "dispatched", AbortSignal.timeout(5000))
+      const dispatched = pools.waitForEvent(pool.pool_id, "dispatched", testBudgetSignal())
       pools.push(caller, pool.pool_id, [{ key, input: key }])
       const event = await dispatched
       if (event.task_id === undefined || event.run_epoch === undefined) throw new Error("worker task missing")
@@ -109,7 +110,7 @@ test.each(["fresh", "keep_alive"] as const)("workpool %s worker keeps ancestry a
       }).results[0]?.status).toBe("accepted")
       const session = f.host.sessions().find((entry) => entry.sessionPath.includes(event.task_id ?? "missing"))
       if (session === undefined) throw new Error("worker session missing")
-      const idle = pools.waitForEvent(pool.pool_id, "worker_idle", AbortSignal.timeout(5000))
+      const idle = pools.waitForEvent(pool.pool_id, "worker_idle", testBudgetSignal())
       f.host.completeTurn(session.routingId, "done")
       await idle
     }

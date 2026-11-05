@@ -7,6 +7,7 @@ import { FakeRunner, tempProject, settings } from "../../manager/__fixtures__/ma
 import { createManagerResidencyRegistry } from "../../../../omo-senpi/src/components/task/residency-registry"
 import { createTaskLifecycle } from "../create"
 import { NO_HOST_ENDPOINT } from "../host-session"
+import { testBudgetSignal } from "../../../../../test-support/test-deadline"
 
 /** Four active turns share one parent, lane cap and residency cap across four replacement cycles. */
 export async function idleReplacementCycles() {
@@ -51,7 +52,7 @@ export async function idleReplacementCycles() {
     return ids
   }
   const completeFour = async (ids: readonly string[]) => {
-    const terminals = ids.map((id) => manager.waitFor(id, { signal: AbortSignal.timeout(5000) }))
+    const terminals = ids.map((id) => manager.waitFor(id, { signal: testBudgetSignal() }))
     for (const id of ids) {
       const handle = runner.handles.get(id)
       assert(handle)

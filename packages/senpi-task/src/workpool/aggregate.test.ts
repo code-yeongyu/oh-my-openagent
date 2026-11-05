@@ -8,6 +8,7 @@ import { createTaskRecordStore } from "../store"
 import { bounded, fixture, fixtureHandle, poolInput } from "./__fixtures__/admission"
 import type { WorkpoolAggregateMessage, WorkpoolAggregatePort } from "./aggregate"
 import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
+import { testBudgetSignal } from "../../../../test-support/test-deadline"
 
 function acking(messages: WorkpoolAggregateMessage[]): WorkpoolAggregatePort {
   return { enqueue: (message, receipts) => { messages.push(message); receipts.ack() } }
@@ -53,7 +54,7 @@ test("#given keyed yields then close #when results are terminal #then one input-
   const messages: WorkpoolAggregateMessage[] = []
   f.manager.workpools.bindAggregate(acking(messages))
   const pool = f.manager.workpools.create(f.caller, poolInput)
-  const dispatched = f.manager.workpools.waitForEvent(pool.pool_id, "dispatched", AbortSignal.timeout(5000))
+  const dispatched = f.manager.workpools.waitForEvent(pool.pool_id, "dispatched", testBudgetSignal())
   f.manager.workpools.push(f.caller, pool.pool_id, [{ key: "b", input: 2 }])
   const event = await bounded(dispatched)
   expect(event.task_id).toBeDefined()
@@ -82,7 +83,7 @@ test("#given cancel of unstarted items #when a lane is held #then waiters are re
   const f = fixture()
   f.concurrency.tryAcquire("test/model", "st_00000001", 0)
   const pool = f.manager.workpools.create(f.caller, poolInput)
-  const waiting = f.manager.workpools.waitForEvent(pool.pool_id, "waiting", AbortSignal.timeout(5000))
+  const waiting = f.manager.workpools.waitForEvent(pool.pool_id, "waiting", testBudgetSignal())
   f.manager.workpools.push(f.caller, pool.pool_id, [{ key: "a", input: 1 }])
   await bounded(waiting)
   expect(f.starts).toHaveLength(0)

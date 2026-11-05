@@ -8,6 +8,7 @@ import { adaptRpcHandle } from "../manager/child-handle"
 import { childSpec, hostRunnerHarness } from "./rpc-host.test-support"
 import { HostSessionClient } from "./rpc-host/session-client"
 import { RpcRequestTimeout } from "./rpc/errors"
+import { remainingTestTime } from "../../../../test-support/test-deadline"
 
 afterEach(cleanupSteering)
 
@@ -118,7 +119,7 @@ for (const conflict of [false, true]) {
 async function bounded<T>(promise: Promise<T>): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   try { return await Promise.race([promise, new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error("host input did not arrive")), 5_000)
+    timer = setTimeout(() => reject(new Error("host input did not arrive")), remainingTestTime())
   })]) } finally { clearTimeout(timer) }
 }
 

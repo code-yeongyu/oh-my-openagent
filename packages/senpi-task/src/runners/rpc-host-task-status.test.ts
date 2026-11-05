@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import type { FakeHost } from "./rpc-host/__fixtures__/fake-host"
 import { startHostWorld, type HostWorld, type ParentSession } from "./rpc-host/__fixtures__/host-world"
+import { remainingTestTime, testBudgetSignal } from "../../../../test-support/test-deadline"
 
 /**
  * omo#10778: the host learns that a daemon-hosted task is finished the moment its record turns
@@ -31,7 +32,7 @@ function within<T>(work: Promise<T>, what: string): Promise<T> {
   return Promise.race([
     work,
     new Promise<never>((_, reject) => {
-      const timer = setTimeout(() => reject(new Error(`waited 10s for ${what}, it never arrived`)), 10_000)
+      const timer = setTimeout(() => reject(new Error(`waited out the test budget for ${what}, it never arrived`)), remainingTestTime())
       timer.unref?.()
     }),
   ])
@@ -47,7 +48,7 @@ async function finishedChild(): Promise<{ readonly world: HostWorld; readonly pa
   if (taskId === undefined || session === undefined) throw new Error("the child did not start on the host")
   const completed = patchSeen(world.host, "completed")
   world.host.completeTurn(session.routingId, "DONE")
-  const settled = await parent.manager.waitFor(taskId, { signal: AbortSignal.timeout(10_000) })
+  const settled = await parent.manager.waitFor(taskId, { signal: testBudgetSignal() })
   expect(settled.status).toBe("completed")
   await within(completed, "the completed task_status patch")
   return { world, parent, taskId, sessionPath: session.sessionPath }

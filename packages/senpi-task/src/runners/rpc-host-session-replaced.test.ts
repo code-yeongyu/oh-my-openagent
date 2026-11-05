@@ -6,6 +6,7 @@ import type { TaskRecord } from "../state"
 import type { FakeHostOptions } from "./rpc-host/__fixtures__/fake-host"
 import { startHostWorld, type HostWorld, type ParentSession } from "./rpc-host/__fixtures__/host-world"
 import type { HostSessionReplaced } from "./rpc-host/session-client"
+import { testBudgetSignal } from "../../../../test-support/test-deadline"
 
 /**
  * F9 / omo#10018 (child half): a raw client can issue `new_session` on a child's routing handle;
@@ -145,7 +146,7 @@ describe("a child whose session the host replaces", () => {
     const live = child.world.host.sessions().find((session) => session.sessionPath === sessionFile)
     if (live === undefined) throw new Error("the host holds no session at the replaced path")
     child.world.host.completeTurn(live.routingId, "done after replace")
-    const done = await child.parent.manager.waitFor(child.record.task_id, { signal: AbortSignal.timeout(10_000) })
+    const done = await child.parent.manager.waitFor(child.record.task_id, { signal: testBudgetSignal() })
     expect(done.status).toBe("completed")
     expect(done.final_response).toBe("done after replace")
   })

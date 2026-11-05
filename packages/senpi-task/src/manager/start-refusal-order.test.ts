@@ -6,6 +6,7 @@ import { RpcProcessRunner } from "../runners/rpc-process"
 import { spawnFakeChild } from "../runners/rpc/__fixtures__/spawn-fake"
 import { baseSpec, cleanupProjects, makeManager } from "./__fixtures__/manager-fakes"
 import { createRpcManagedRunner } from "./runner"
+import { remainingTestTime } from "../../../../test-support/test-deadline"
 
 test("#given a delayed first-write refusal #when teardown holds its live child #then start reports start_failed", async () => {
   const writing = Promise.withResolvers<(error: Error) => void>()
@@ -14,7 +15,7 @@ test("#given a delayed first-write refusal #when teardown holds its live child #
   const terminated = Promise.withResolvers<void>()
   const startSettled = Promise.withResolvers<void>()
   const watchdog = Promise.withResolvers<never>()
-  const watchdogTimer = setTimeout(() => watchdog.reject(new Error("start-refusal ordering did not settle within 2s")), 2_000)
+  const watchdogTimer = setTimeout(() => watchdog.reject(new Error("start-refusal ordering did not settle within the test budget")), remainingTestTime())
   let child: ChildProcess | undefined
   let terminationStarted = false
   let settledKind: string | undefined
