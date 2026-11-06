@@ -73,6 +73,46 @@ fn requests_after_session_close_fail_closed() {
 }
 
 #[test]
+fn an_object_mode_mutation_after_session_close_is_not_delivered_and_safe_to_retry() {
+    // Given an object-mode session that was closed.
+    let mut engine = Engine::spawn(&[fake_backend(TWO_DISPLAYS)]);
+    engine.call(1, "session.open", json!({"reportMode": "object"}));
+    assert_eq!(
+        engine.call(2, "session.close", json!({}))["result"],
+        Value::Null
+    );
+    // When a mutating and a read request follow the close.
+    let click = engine.call(3, "click", json!({"target": "101", "x": 10.0, "y": 10.0}));
+    let displays = engine.call(4, "displays", json!({}));
+    // Then the mutation's refusal says nothing was sent; the read carries no disposition.
+    assert_eq!(error_code(&click), &json!("Closed"));
+    assert_eq!(
+        click["error"]["data"]["disposition"],
+        json!({"delivery": "not_delivered", "retry": "safe"})
+    );
+    assert_eq!(error_code(&displays), &json!("Closed"));
+    assert_eq!(displays["error"]["data"].get("disposition"), None);
+}
+
+#[test]
+fn a_null_mode_mutation_after_session_close_carries_no_disposition() {
+    // Given a null-mode session that was closed.
+    let mut engine = Engine::spawn(&[fake_backend(TWO_DISPLAYS)]);
+    engine.call(1, "session.open", json!({}));
+    assert_eq!(
+        engine.call(2, "session.close", json!({}))["result"],
+        Value::Null
+    );
+    // When a mutating request follows the close.
+    let click = engine.call(3, "click", json!({"target": "101", "x": 10.0, "y": 10.0}));
+    // Then the legacy Closed reply is unchanged.
+    assert_eq!(
+        click["error"],
+        json!({"code": -32012, "message": "desktop session is closed", "data": {"code": "Closed", "hint": null}})
+    );
+}
+
+#[test]
 fn a_capabilities_request_sent_after_a_stuck_capture_is_answered_before_its_timeout() {
     // Given: capture sleeps 5 s in the backend; the deadline is 500 ms.
     let mut engine = Engine::spawn(&[

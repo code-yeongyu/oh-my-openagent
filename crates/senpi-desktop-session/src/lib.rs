@@ -14,6 +14,7 @@ mod intervention;
 mod mutate;
 mod pending;
 mod pointer;
+mod report;
 mod request;
 mod restore;
 mod screen_notes;
@@ -35,6 +36,7 @@ mod worker_menus;
 
 pub use grant::ControlSlot;
 pub use mutate::SessionSafety;
+pub use pending::RequestMode;
 pub use request::{Op, Response};
 pub use selection::{BackendFactory, BackendSelection, SelectionError};
 pub use session::{Pending, Session, THREAD_NAME};

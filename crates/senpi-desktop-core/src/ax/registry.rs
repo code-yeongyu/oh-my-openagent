@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use super::AxHandle;
 use crate::error::{CoreResult, DesktopError};
+use crate::report::ReportMode;
 
 /// Hard ceiling on live refs across all targets.
 const MAX_ENTRIES: usize = 5_000;
@@ -20,6 +21,9 @@ pub struct AxRegistry {
     next_ref: u64,
     generations: HashMap<String, u64>,
     entries: HashMap<u64, Registered>,
+    /// The session's `reportMode`: core and session code read it here so
+    /// object-mode-only members are filled in one place.
+    report_mode: ReportMode,
 }
 
 impl Default for AxRegistry {
@@ -28,11 +32,26 @@ impl Default for AxRegistry {
             next_ref: 1,
             generations: HashMap::new(),
             entries: HashMap::new(),
+            report_mode: ReportMode::Null,
         }
     }
 }
 
 impl AxRegistry {
+    /// An empty registry of a session opened with `report_mode`.
+    #[must_use]
+    pub fn with_report_mode(report_mode: ReportMode) -> Self {
+        Self {
+            report_mode,
+            ..Self::default()
+        }
+    }
+
+    #[must_use]
+    pub const fn report_mode(&self) -> ReportMode {
+        self.report_mode
+    }
+
     /// Restores delivered generations without recycling refs from an abandoned reply.
     pub fn restore(&mut self, mut delivered: Self) {
         delivered.next_ref = delivered.next_ref.max(self.next_ref);

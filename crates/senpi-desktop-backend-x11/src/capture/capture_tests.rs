@@ -127,6 +127,7 @@ fn window_capture_keeps_the_full_frame_and_clears_the_off_root_area() {
     assert_eq!(image.get_pixel(80, 0).0, [0, 0, 0, 0]);
     assert_eq!(image.get_pixel(0, 100).0, [0, 0, 0, 0]);
     let full = DesktopWindow {
+        identity: None,
         id: "77".into(),
         title: String::new(),
         app: String::new(),
@@ -145,6 +146,7 @@ fn window_capture_keeps_the_full_frame_and_clears_the_off_root_area() {
 #[test]
 fn an_unchanged_partially_offscreen_window_keeps_a_targetable_full_frame() {
     let current = DesktopWindow {
+        identity: None,
         id: "78".into(),
         title: String::new(),
         app: String::new(),

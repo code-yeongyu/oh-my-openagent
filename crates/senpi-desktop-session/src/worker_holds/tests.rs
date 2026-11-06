@@ -137,6 +137,38 @@ fn invalid_hold_duration_and_empty_keys_send_no_input() {
 }
 
 #[test]
+fn an_object_mode_hold_refused_for_its_duration_before_mutate_is_not_delivered_and_safe() {
+    use senpi_desktop_core::report::{Disposition, ReportMode};
+    use senpi_desktop_core::types::DesktopSessionOptions;
+    // Given an object-mode session and a hold whose duration bypassed parsing.
+    let mut harness = harness(&json!({}));
+    harness.worker.open(DesktopSessionOptions {
+        report_mode: ReportMode::Object,
+        ..DesktopSessionOptions::default()
+    });
+    // When `hold_duration` refuses it before `mutate` runs.
+    let error = harness.process(keys(f64::NAN)).unwrap_err();
+    // Then the refusal says nothing was sent and a retry is safe.
+    assert_eq!(error.code, ErrorCode::Internal);
+    assert_eq!(
+        error.report.and_then(|report| report.disposition),
+        Some(Disposition::NOT_DELIVERED_SAFE)
+    );
+    assert!(transitions(&harness).is_empty());
+}
+
+#[test]
+fn a_null_mode_hold_refused_for_its_duration_carries_no_report() {
+    // Given a null-mode session.
+    let mut harness = harness(&json!({}));
+    // When the same refusal happens.
+    let error = harness.process(keys(f64::NAN)).unwrap_err();
+    // Then the legacy reply is unchanged: no report at all.
+    assert_eq!(error.code, ErrorCode::Internal);
+    assert_eq!(error.report, None);
+}
+
+#[test]
 fn bounded_mouse_uses_full_frame_after_zoom_and_releases_partial_press() {
     // Given a full input frame followed by a native-detail zoom.
     let mut harness = harness(&json!({}));
