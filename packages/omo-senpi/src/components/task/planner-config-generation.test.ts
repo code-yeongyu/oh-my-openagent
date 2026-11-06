@@ -159,4 +159,66 @@ describe("category config generations at the planner seam", () => {
     expect(result.kind).toBe("error")
     expect(generations.current()).toBeUndefined()
   })
+
+  test("#given a config getter whose override appears after planner creation #when planning again #then the new model resolves and the generation bumps", () => {
+    // given
+    let override: OmoConfig["categories"] = {
+      quick: { model: "kimi-coding/kimi-for-coding-highspeed-unlocked" },
+    }
+    const models: FakeModel[] = [
+      { provider: "kimi-coding", id: "kimi-for-coding-highspeed-unlocked" },
+      { provider: "meta", id: "muse-spark-1.3-contributor" },
+    ]
+    const generations = createCategoryConfigGenerations()
+    const resolveRegistry = (): TaskModelRegistry => registry(models)
+    const getOmoConfig = (): OmoConfig => ({ categories: override })
+    const planner = createGenerationObservingPlanner({
+      planner: createTaskChildPlanner(getOmoConfig, {}, resolveRegistry),
+      omoConfig: getOmoConfig,
+      resolveRegistry,
+      generations,
+    })
+    const first = plan(planner, "quick")
+    const before = generations.current()?.generation
+
+    // when a mid-session omo.json(c) edit adds the override after the planner was composed
+    override = { quick: { model: "meta/muse-spark-1.3-contributor" } }
+    const second = plan(planner, "quick")
+
+    // then the live config reaches the plan and the effective map gets a new generation
+    expect(first.kind).toBe("resolved")
+    if (first.kind === "resolved") expect(first.plan.model).toBe("kimi-coding/kimi-for-coding-highspeed-unlocked")
+    expect(before).toBe(0)
+    expect(second.kind).toBe("resolved")
+    if (second.kind === "resolved") expect(second.plan.model).toBe("meta/muse-spark-1.3-contributor")
+    expect(generations.current()?.generation).toBe(1)
+  })
+
+  test("#given a config getter whose content never changes #when planning twice #then the same generation is reused", () => {
+    // given
+    const getOmoConfig = (): OmoConfig => ({
+      categories: { quick: { model: "kimi-coding/kimi-for-coding-highspeed-unlocked" } },
+    })
+    const models: FakeModel[] = [
+      { provider: "kimi-coding", id: "kimi-for-coding-highspeed-unlocked" },
+    ]
+    const generations = createCategoryConfigGenerations()
+    const resolveRegistry = (): TaskModelRegistry => registry(models)
+    const planner = createGenerationObservingPlanner({
+      planner: createTaskChildPlanner(getOmoConfig, {}, resolveRegistry),
+      omoConfig: getOmoConfig,
+      resolveRegistry,
+      generations,
+    })
+
+    // when
+    plan(planner, "quick")
+    const before = generations.current()?.generation
+    const second = plan(planner, "quick")
+
+    // then
+    expect(second.kind).toBe("resolved")
+    expect(before).toBe(0)
+    expect(generations.current()?.generation).toBe(0)
+  })
 })
