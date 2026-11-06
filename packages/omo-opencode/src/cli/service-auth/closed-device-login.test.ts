@@ -5,13 +5,12 @@ import { SERVICE_ACCOUNTS_CLOSED_MESSAGE } from "./commands"
 import { fakeApi, minted, temporaryHome } from "./test-support"
 
 // #12639: while accounts are closed, the device-code sign-in (`login --device`, `login --no-browser`) is the one terminal
-// sign-in a computer with no browser or desktop app has, so it reaches the device flow through both entries. Every
-// other closed service-account argv keeps refusing (accounts-closed.test.ts), and the build switch stays closed.
+// sign-in a computer with no browser or desktop app has. The npm launcher (which dispatches through the committed
+// service-auth bundle) runs the device flow end to end; the compiled entry hands it past its static refusal
+// (trustLaunchKind), after which it re-runs the same command in a fresh process, so that half is proved at its own seam.
+// Every other closed service-account argv keeps refusing (accounts-closed.test.ts).
 const root = resolve(import.meta.dir, "../../../../..")
-const entries = {
-  launcher: join(root, "packages", "omo-native", "bin", "omo.js"),
-  compiled: join(root, "packages", "omo-native", "compile-entry.ts"),
-}
+const launcher = join(root, "packages", "omo-native", "bin", "omo.js")
 const deviceLogins = [["login", "--device"], ["login", "--no-browser"]] as const
 
 async function run(entry: string, args: readonly string[]) {
@@ -45,11 +44,11 @@ async function run(entry: string, args: readonly string[]) {
   return { stdout, stderr, code, paths }
 }
 
-for (const [name, entry] of Object.entries(entries)) {
+{
   test.each(deviceLogins.map(args => [args.join(" "), args] as const))(
-    `#given accounts are closed #when the ${name} runs omo %s #then it runs the device flow and stores nothing on a denial`,
+    `#given accounts are closed #when the launcher runs omo %s #then it runs the device flow and stores nothing on a denial`,
     async (_argv, args) => {
-      const result = await run(entry, args)
+      const result = await run(launcher, args)
       expect(result.stdout).toContain(`User code: ${minted.userCode}`)
       expect(result.stdout).toContain(`Matching code: ${minted.matchingCode}`)
       expect(result.paths).toContain("/v1/device/code")

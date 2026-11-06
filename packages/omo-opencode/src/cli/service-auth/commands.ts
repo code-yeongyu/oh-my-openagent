@@ -129,6 +129,10 @@ function refuseClosedServiceAuth(): never {
 
 function configureClosedServiceAuthCommands(program: Command): void {
   for (const name of SERVICE_AUTH_COMMANDS) {
+    if (name === "login") {
+      configureClosedDeviceLogin(program)
+      continue
+    }
     const command = program.command(name, { hidden: true }).helpOption(false).allowUnknownOption().allowExcessArguments()
       .action(() => {
         console.error(SERVICE_ACCOUNTS_CLOSED_MESSAGE)
@@ -137,6 +141,23 @@ function configureClosedServiceAuthCommands(program: Command): void {
     // `omo help <name>` calls the subcommand's help() directly, bypassing its action.
     command.help = refuseClosedServiceAuth
   }
+}
+
+// While accounts are closed, the one terminal sign-in is the device code, for a computer with no browser or desktop app
+// (#12639). The approval page keeps the service's own access policy, so this admits nobody the service does not admit.
+// Every other closed argv (plain login, --accounts, a stray option or argument) refuses exactly as before.
+function configureClosedDeviceLogin(program: Command): void {
+  const command = program.command("login", { hidden: true }).helpOption(false).allowUnknownOption().allowExcessArguments()
+    .option("--device").option("--no-browser").option("--api <url>")
+    .action((options: Options) => {
+      if ((options.device !== true && options.browser !== false) || command.args.length > 0) {
+        console.error(SERVICE_ACCOUNTS_CLOSED_MESSAGE)
+        process.exitCode = 1
+        return
+      }
+      return run("login", { ...options, device: true })
+    })
+  command.help = refuseClosedServiceAuth
 }
 
 export function configureServiceAuthCommands(program: Command, open = serviceAccountsOpen()): void {
