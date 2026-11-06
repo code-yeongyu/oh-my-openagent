@@ -972,6 +972,7 @@
     "packages/omo-senpi/src/components/memory/facts-runner.ts",
     "packages/omo-senpi/src/components/memory/facts-terminal-writes.ts",
     "packages/omo-senpi/src/components/memory/facts-wiring.ts",
+    "packages/omo-senpi/src/components/memory/guard-foreign-roots.ts",
     "packages/omo-senpi/src/components/memory/guard.ts",
     "packages/omo-senpi/src/components/memory/hook-work.ts",
     "packages/omo-senpi/src/components/memory/identity-adoption.ts",
