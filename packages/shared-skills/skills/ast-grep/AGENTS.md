@@ -41,7 +41,7 @@ Subcommands: `search`, `replace` (dry-run; `--apply` to write), `scan`, `test`, 
 
 ```bash
 # from packages/shared-skills/skills/ast-grep/
-python3 scripts/ast_grep_helper.py search '<PATTERN>' --lang ts [path]
+python3 scripts/ast_grep_helper.py search '<PATTERN>' [path] --lang <LANG>
 python3 scripts/ast_grep_helper.py replace '<PATTERN>' '<REWRITE>' --lang ts   # dry-run; add --apply
 python3 scripts/ast_grep_helper.py doctor
 bash tests/smoke.sh          # or: pwsh tests/smoke.ps1

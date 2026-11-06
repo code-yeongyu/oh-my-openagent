@@ -73,7 +73,7 @@ The dag surface is built to be driven from an eval cell: the JS SDK is a thin pr
 
 ```js
 const sdk = await import(`${env("OMO_DAG_SDK_ROOT")}/sdk.js`)
-const targets = [...new Bun.Glob("packages/*/src/index.ts").scan(".")]
+const targets = await Array.fromAsync(new Bun.Glob("packages/*/src/index.ts").scan("."))
 const slug = (path) => path.split("/")[1]   // "packages/<name>/src/index.ts" -> "<name>"
 const auditId = (t) => `audit-${slug(t)}`
 const today = new Date().toISOString().slice(0, 10)
