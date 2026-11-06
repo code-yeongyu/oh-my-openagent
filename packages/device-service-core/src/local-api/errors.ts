@@ -11,6 +11,9 @@ export class LocalApiError extends Error {
   readonly path_refusal?: PathRefusal;
   // On a session.command that timed out: the command_id it was sent under, whose outcome may still arrive.
   readonly command_id?: string;
+  // Set when the call failed before any session.command was written (for example the endpoint lookup an endpoint
+  // command makes first): nothing was dispatched, so a caller may treat it as refused and retry safely.
+  readonly not_sent?: true;
 
   constructor(
     code: ErrorCode | ClientErrorCode,
@@ -20,6 +23,7 @@ export class LocalApiError extends Error {
       readonly limit_chars?: number;
       readonly path_refusal?: PathRefusal;
       readonly command_id?: string;
+      readonly not_sent?: true;
     } = {},
   ) {
     super(`${code}: ${reason}`);
@@ -30,6 +34,7 @@ export class LocalApiError extends Error {
     if (extra.limit_chars !== undefined) this.limit_chars = extra.limit_chars;
     if (extra.path_refusal !== undefined) this.path_refusal = extra.path_refusal;
     if (extra.command_id !== undefined) this.command_id = extra.command_id;
+    if (extra.not_sent === true) this.not_sent = true;
   }
 }
 
