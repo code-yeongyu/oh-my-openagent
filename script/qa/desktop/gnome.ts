@@ -36,8 +36,16 @@ function usage(message: string): never {
 	process.exit(2);
 }
 
-function run(command: string, args: string[]): { status: number | null; stdout: string } {
-	const child = spawnSync(command, args, { encoding: "utf8", timeout: 10_000 });
+type Observer = "gnome-extensions" | "busctl" | "gdbus";
+
+function run(command: Observer, args: string[]): { status: number | null; stdout: string } {
+	const options = { encoding: "utf8", timeout: 10_000 } as const;
+	const child =
+		command === "gnome-extensions"
+			? spawnSync("gnome-extensions", args, options)
+			: command === "busctl"
+				? spawnSync("busctl", args, options)
+				: spawnSync("gdbus", args, options);
 	return { status: child.status, stdout: child.stdout ?? "" };
 }
 
@@ -129,10 +137,11 @@ if (process.platform !== "linux") usage(`runs on the Linux host under test, not 
 if (!(process.env.XDG_CURRENT_DESKTOP ?? "").split(":").some((name) => name.toLowerCase() === "gnome")) {
 	usage("XDG_CURRENT_DESKTOP does not name GNOME: run inside a GNOME Wayland session");
 }
-for (const tool of ["gnome-extensions", "gdbus"]) {
-	if (spawnSync(tool, ["--help"], { encoding: "utf8" }).error !== undefined) {
-		usage(`${tool} is not installed: it is this script's independent observer`);
-	}
+if (spawnSync("gnome-extensions", ["--help"], { encoding: "utf8" }).error !== undefined) {
+	usage("gnome-extensions is not installed: it is this script's independent observer");
+}
+if (spawnSync("gdbus", ["--help"], { encoding: "utf8" }).error !== undefined) {
+	usage("gdbus is not installed: it is this script's independent observer");
 }
 
 const engineBinary = (() => {
