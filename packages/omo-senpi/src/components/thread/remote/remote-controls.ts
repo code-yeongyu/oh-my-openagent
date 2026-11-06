@@ -54,9 +54,15 @@ export async function setModelRemote(remote: RemoteThreadSurface, row: RemoteSes
   if (held !== undefined) {
     const tried = await set(held)
     if (tried.kind === "ok") return applied(tried, held)
-    // The held catalog may predate the model leaving that device: answer as a fresh catalog would.
+    // A set that may have run is answered as one, exactly as on dev; nothing more is sent.
+    if (tried.kind === "uncertain") return outcomeFailure(tried, row.device)
+    // A refused set may come from a held catalog that predates the model leaving that device: answer as a fresh catalog
+    // would - its failure, or the model it matches set - and the set's own refusal when the re-read cannot be made.
     const rematched = await fresh()
-    return rematched.kind === "match" ? outcomeFailure(tried, row.device) : rematched
+    if (rematched.kind !== "match") return rematched.kind === "error" && rematched.error.code !== "model_not_found" && rematched.error.code !== "model_ambiguous" ? outcomeFailure(tried, row.device) : rematched
+    if (rematched.model.provider === held.provider && rematched.model.id === held.id) return outcomeFailure(tried, row.device)
+    const retried = await set(rematched.model)
+    return retried.kind === "ok" ? applied(retried, rematched.model) : outcomeFailure(retried, row.device)
   }
   const matched = listed.local === true ? await fresh() : matchModel(modelsOf(replyData(listed.response)["models"]), request.model, request.provider)
   if (matched.kind !== "match") return matched

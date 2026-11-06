@@ -144,6 +144,9 @@ describe("device-service adapter: relay round trips per thread op", () => {
     const engine = { model: models[0], streaming: false }
     // Runs before the command's reply when set: an event of the session that lands while the command is in flight.
     let beforeReply: (() => void) | undefined
+    // How the next set_model ends instead of applying, and how catalog reads end after it (a channel that lost one reply).
+    let nextSet: { readonly state: "uncertain" | "engine_refused"; readonly reason: string; readonly catalogAfter?: string } | undefined
+    let catalogRefused: string | undefined
     const data = (rpc: JsonObject): JsonObject => {
       switch (rpc["type"]) {
         case "get_state": return { isStreaming: engine.streaming, model: engine.model, pendingMessageCount: 0 }
@@ -171,45 +174,41 @@ describe("device-service adapter: relay round trips per thread op", () => {
       onEvent: (listener: (event: JsonObject) => void) => { listeners.add(listener); return () => listeners.delete(listener) },
       command: async (_attach: string, rpc: JsonObject, commandId: string) => {
         frames.push("session.command")
+        const scripted = rpc["type"] === "set_model" ? nextSet : rpc["type"] === "get_available_models" && catalogRefused !== undefined ? { state: "engine_refused" as const, reason: catalogRefused } : undefined
+        if (rpc["type"] === "set_model") { nextSet = undefined; if (scripted !== undefined && "catalogAfter" in scripted) catalogRefused = scripted.catalogAfter }
         const known = rpc["type"] !== "set_model" || models.some((model) => model.provider === rpc["provider"] && model.id === rpc["modelId"])
         const response = known ? { type: "response", command: rpc["type"], success: true, data: data(rpc) } : { type: "response", command: "set_model", success: false, error: "Model not found" }
         const before = beforeReply
         beforeReply = undefined
         queueMicrotask(() => {
           before?.()
+          if (scripted !== undefined) return emit({ type: "event", kind: "session.command_state", command_id: commandId, state: scripted.state, reason: scripted.reason, retryable: false })
           emit({ type: "event", kind: "session.command_event", device: "b", command_id: commandId, response })
           emit({ type: "event", kind: "session.command_state", command_id: commandId, state: "engine_applied", retryable: false })
         })
         return commandId
       },
-      read: async () => {
-        frames.push("session.read")
-        const before = beforeReply
-        beforeReply = undefined
-        before?.()
-        return { entries: [{ entry_id: "e1", entry: { role: "user", content: "hi" } }], next_before: null }
-      },
+      read: async () => { frames.push("session.read"); return { entries: [], next_before: null } },
       list: async () => { frames.push("sessions.list"); return { query_id: "q", revision: 1, rows: [], incomplete: [], devices: {} } },
       endpointCommand: async () => { frames.push("session.command"); return "c" },
       oversizedLines: () => 0,
       close: () => close(),
       closed,
     }
-    const record = () => emit({ type: "event", kind: "session.records", attach: "a1", attach_id: 1, records: [{ type: "message_update" }] })
+    // The host re-established the attach: a new snapshot replaces the session's state.
+    const snapshot = () => emit({ type: "event", kind: "session.snapshot", attach: "a1", attach_id: 2, cursor: { marker_id: "m", last_entry_id: null }, state: {}, entries: [], history_truncated: false, oldest_entry_id: null })
     const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: () => connectDeviceService({ version: "0.0.0-test", stateDir: "/unused", connect: async () => client as never }) })
     const surface: RemoteThreadSurface = { sessions: port, chain: { stamp: (rpc) => rpc } }
     let seen = 0
     // The relay frames since the last call.
     const take = (): string[] => { const sent = frames.slice(seen).filter((frame) => RELAY_FRAMES.has(frame)); seen = frames.length; return sent }
-    // An engine event on the session's delegated channel, and that channel closing.
-    const frame = () => emit({ type: "event", kind: "session.command_event", device: "b", frame: { type: "agent_start" } })
-    const channelClosed = () => emit({ type: "event", kind: "session.channel_closed", device: "b", reason: "idle" })
-    // The device's catalog loses a model after this device read it.
+    // The device's catalog changes after this device read it.
     const removeModel = (id: string) => { models.splice(models.findIndex((model) => model.id === id), 1) }
-    return { port, surface, take, record, frame, channelClosed, removeModel, inFlight: (event: () => void) => { beforeReply = event } }
+    const addModel = (model: { provider: string; id: string }) => { models.push(model) }
+    return { port, surface, take, snapshot, removeModel, addModel, setEnds: (end: NonNullable<typeof nextSet>) => { nextSet = end }, inFlight: (event: () => void) => { beforeReply = event } }
   }
 
-  test("#given one remote session #when the thread ops run in turn #then the attach is opened once, status and the transcript are read from the device every time, a held session.read page and an exact catalog model are answered here, and each command is one round trip", async () => {
+  test("#given one remote session #when the thread ops run in turn #then the attach is opened once, status and the transcript are read from the device every time, an exact model in the held catalog is one set_model, and each command is one round trip", async () => {
     const w = relayWorld()
     const view = { thread: "s1" } as ThreadReadInput
     const steps: Array<[string, () => Promise<unknown>]> = [
@@ -217,8 +216,6 @@ describe("device-service adapter: relay round trips per thread op", () => {
       ["status", () => w.port.sessionCommand("b", "s1", { type: "get_state", sessionId: "s1" })],
       ["view (cold)", () => readRemote(w.surface, row, view)],
       ["view", () => readRemote(w.surface, row, view)],
-      ["session.read (cold)", () => w.port.read("b", "s1", 20)],
-      ["session.read", () => w.port.read("b", "s1", 20)],
       ["send", () => promptRemote(w.surface, row, { message: "x" }, 0)],
       ["status after send", () => w.port.sessionCommand("b", "s1", { type: "get_state", sessionId: "s1" })],
       ["model (cold catalog)", () => setModelRemote(w.surface, row, { model: "m2" })],
@@ -237,8 +234,6 @@ describe("device-service adapter: relay round trips per thread op", () => {
       ["status", ["session.command"]],
       ["view (cold)", ["session.command"]],
       ["view", ["session.command"]],
-      ["session.read (cold)", ["session.read"]],
-      ["session.read", []],
       ["send", ["session.command", "session.command"]],
       ["status after send", ["session.command"]],
       ["model (cold catalog)", ["session.command", "session.command"]],
@@ -249,23 +244,39 @@ describe("device-service adapter: relay round trips per thread op", () => {
     ])
   })
 
-  test("#given a held session.read page #when the session writes a record, a frame or loses its channel, or a record lands while a read is in flight #then the next read goes to the other device, and the in-flight page is not kept", async () => {
+  test("#given a held catalog #when the host re-establishes the attach, or does so while the catalog is being read #then the next exact model switch reads the catalog again", async () => {
     const w = relayWorld()
-    const page = () => w.port.read("b", "s1", 20)
-    await page()
+    await setModelRemote(w.surface, row, { model: "m2" })
+    w.snapshot()
     w.take()
-    for (const happened of [w.record, w.frame, w.channelClosed]) {
-      happened()
-      await page()
-      expect(w.take()).toEqual(["session.read"])
-    }
-    w.record()
-    w.inFlight(w.record)
-    await page()
-    await page()
-    expect(w.take()).toEqual(["session.read", "session.read"])
-    await page()
-    expect(w.take()).toEqual([])
+    w.inFlight(w.snapshot)
+    await setModelRemote(w.surface, row, { model: "a/m1" })
+    expect(w.take()).toEqual(["session.command", "session.command"])
+    await setModelRemote(w.surface, row, { model: "a/m2" })
+    expect(w.take()).toEqual(["session.command", "session.command"])
+    await setModelRemote(w.surface, row, { model: "a/m1" })
+    expect(w.take()).toEqual(["session.command"])
+  })
+
+  test("#given a held catalog #when the exact set may have run (its reply lost) and the channel then refuses the catalog read #then the answer is idempotency_uncertain, as on dev, and nothing is re-read", async () => {
+    const w = relayWorld()
+    await setModelRemote(w.surface, row, { model: "m2" })
+    w.take()
+    w.setEnds({ state: "uncertain", reason: "request_gone", catalogAfter: "host_not_answering" })
+    const result = await setModelRemote(w.surface, row, { model: "a/m1" })
+    expect(result.kind === "error" ? result.error.code : result.kind).toBe("idempotency_uncertain")
+    expect(w.take()).toEqual(["session.command"])
+  })
+
+  test("#given a held catalog whose exact model the device replaced #when the set is refused and a fresh catalog matches another model by a later rung #then that model is set, as a fresh catalog would", async () => {
+    const w = relayWorld()
+    await setModelRemote(w.surface, row, { model: "m2" })
+    w.take()
+    w.removeModel("m1")
+    w.addModel({ provider: "x", id: "a/m1-v2" })
+    const result = await setModelRemote(w.surface, row, { model: "a/m1" })
+    expect(result.kind === "ok" && "model" in result ? result.model : result).toEqual({ provider: "x", id: "a/m1-v2" })
+    expect(w.take()).toEqual(["session.command", "session.command", "session.command"])
   })
 
   test.each([
