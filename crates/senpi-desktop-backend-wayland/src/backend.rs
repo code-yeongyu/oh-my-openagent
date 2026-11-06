@@ -158,6 +158,13 @@ impl WaylandBackend {
         self.hyprland_pointer(&hyprland, &window, event)
     }
 
+    /// The event's points are global logical points anchored on the window's
+    /// current AT-SPI origin: `FrameGeometry::map_point` re-anchors a window
+    /// frame on the window `windows()` lists now, and AX clicks use AT-SPI
+    /// coordinates. So that origin is the one subtracted, and the remaining
+    /// offset is placed on the Hyprland rect. A window capture crops at that
+    /// same Hyprland rect (see [`WaylandBackend::capture`]), so pixel
+    /// `(px, py)` of the frame lands at the rect's origin plus `(px, py)`.
     pub(crate) fn hyprland_pointer(
         &mut self,
         hyprland: &hyprland::Hyprland,
@@ -169,6 +176,22 @@ impl WaylandBackend {
         self.connect_input()?
             .window_pointer(event, origin, &placement.rect, &placement.covering)
     }
+}
+
+/// The frame of a window capture Hyprland could not place: its pixels are
+/// shown, but no coordinate input is mapped through them, because a click
+/// would be placed at a rect the crop was not taken from.
+pub(crate) fn unplaced_frame(image: RgbaImage, error: &DesktopError) -> (RgbaImage, FrameGeometry) {
+    let frame = FrameGeometry::pixels_only(
+        image.width(),
+        image.height(),
+        format!(
+            "Hyprland could not place this window ({}), so the crop is not known to show where window \
+             pointer input would land",
+            error.message
+        ),
+    );
+    (image, frame)
 }
 
 const LAYOUT_CHANGED: &str = "the Wayland display layout changed since the last capture, whose pixels were \
@@ -209,19 +232,43 @@ impl Backend for WaylandBackend {
 
     /// Reads the layout of an already connected libei session only; capture
     /// never opens an input session. A layout that cannot be read leaves the
-    /// geometry unproven, so the frame refuses coordinate input.
+    /// geometry unproven, so the frame refuses coordinate input. On Hyprland a
+    /// window is cropped at its Hyprland rect (one `clients` + `monitors` read
+    /// per capture), the rect window pointer input is placed at; a window
+    /// Hyprland cannot place gets a frame that refuses coordinate input.
     fn capture(&mut self, target: &Target, _caps: &CaptureCaps, _exclude_window_titles: &[String]) -> CoreResult<(RgbaImage, FrameGeometry)> {
         let layout = match &mut self.input {
             Input::Connected(libei) => libei.regions().ok(),
             Input::Untried | Input::Failed(_) => None,
         };
+        let hyprland = match target {
+            Target::Window(_) => match self.compositor() {
+                Detection::Ipc(hyprland) => Some(hyprland.clone()),
+                Detection::NotHyprland | Detection::IpcMissing => None,
+            },
+            Target::Desktop | Target::Display(_) => None,
+        };
+        let mut unplaced = None;
         let ax = &mut self.ax;
-        let captured = self.capture.capture(target, layout.as_deref(), || match ax {
-            Ok(ax) => ax.windows(),
-            Err(error) => Err(error.clone()),
+        let captured = self.capture.capture(target, layout.as_deref(), || {
+            let windows = match ax {
+                Ok(ax) => ax.windows(),
+                Err(error) => Err(error.clone()),
+            }?;
+            Ok(match (&hyprland, target) {
+                (Some(hyprland), Target::Window(id)) => {
+                    let (windows, refused) = hyprland.place_in(windows, id);
+                    unplaced = refused;
+                    windows
+                }
+                _ => windows,
+            })
         })?;
         self.frame_layout = layout.filter(|_| self.capture.eis_derived);
-        Ok(captured)
+        Ok(match unplaced {
+            Some(error) => unplaced_frame(captured.0, &error),
+            None => captured,
+        })
     }
 
     fn pointer(
@@ -236,7 +283,7 @@ impl Backend for WaylandBackend {
             if !matches!(self.compositor(), Detection::Ipc(_)) {
                 return Self::window_input_error(target, "pointer input");
             }
-            if let Some(layout) = derived_from {
+            if let Some(layout) = derived_from.filter(|_| *frame != FrameGeometry::identity_global()) {
                 if self.connect_input()?.regions()? != layout {
                     return Err(DesktopError::invalid_coordinate_frame(LAYOUT_CHANGED));
                 }
