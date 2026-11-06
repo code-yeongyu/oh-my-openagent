@@ -1,10 +1,32 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { COMMAND_UNCERTAIN_REASONS } from "../../../../device-service-core/src/local-api/vocabulary"
 import type { ThreadToolResult } from "./contracts"
 import { type ThreadHostSession } from "./tools"
 import { B_ROW, comparable, createRemoteThreadFixture } from "./thread-remote-fixture"
 
 const { account, surface, cleanup } = createRemoteThreadFixture()
 afterEach(cleanup)
+
+describe("thread_set_model on another device", () => {
+  test("#given a thread on b #when thread_set_model names it #then the model is matched against b's own list and set_model goes to b's session, with nothing changed on this device", async () => {
+    const a = account()
+    const { run } = surface(a.remote)
+    const result = await run("thread_set_model", { thread: "dur-on-b", model: "opus" })
+    expect(result).toEqual({ kind: "ok", thread_id: "dur-on-b", model: { provider: "anthropic", id: "claude-opus" }, device: "b" })
+    expect(a.sent.map((entry) => [entry.via, entry.device, entry.session, entry.rpc])).toEqual([
+      ["session", "b", "dur-on-b", { type: "get_available_models", sessionId: "dur-on-b" }],
+      ["session", "b", "dur-on-b", { type: "set_model", sessionId: "dur-on-b", provider: "anthropic", modelId: "claude-opus" }],
+    ])
+  })
+
+  test("#given b refuses the command #when thread_set_model targets b's thread #then the refusal is typed and set_model is never sent", async () => {
+    const a = account({ refuse: "capability_missing" })
+    const { run } = surface(a.remote)
+    const result = await run("thread_set_model", { thread: "dur-on-b", model: "opus" })
+    expect(result).toMatchObject({ kind: "error", error: { code: "scope_denied" } })
+    expect(a.sent.map((entry) => entry.rpc?.["type"])).toEqual(["get_available_models"])
+  })
+})
 
 describe("SC-R8: from this device on another (create, list, open, status, prompt, abort, fork)", () => {
   test("#given no session on device b #when thread_create names device b #then one attach-less open_session goes to b's engine endpoint and the thread is b's", async () => {
@@ -37,6 +59,15 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     const { run } = surface(a.remote)
     expect(await run("thread_create", { fork_from: "dur-on-b" })).toMatchObject({ kind: "ok", thread: { thread_id: "dur-new-on-b", device: "b" } })
     expect(a.sent[0]).toEqual({ via: "endpoint", device: "b", rpc: { type: "open_session", retain_on_disconnect: true, forkFrom: "dur-on-b" } })
+  })
+
+  test("#given b's engine answers open_session with its real envelope (ids under data) #when thread_create creates and forks on b #then each succeeds with the durable id, falling back to data.sessionId when no durable id is named", async () => {
+    const a = account()
+    const { run } = surface(a.remote)
+    expect(await run("thread_create", { device: "studio" })).toMatchObject({ kind: "ok", thread: { thread_id: "dur-new-on-b", device: "b" } })
+    expect(await run("thread_create", { fork_from: "dur-on-b" })).toMatchObject({ kind: "ok", thread: { thread_id: "dur-new-on-b", device: "b" } })
+    const bare = account({ openData: { sessionId: "bmV3LXNlc3Npb24tMDAwMQ" } })
+    expect(await surface(bare.remote).run("thread_create", { device: "studio" })).toMatchObject({ kind: "ok", thread: { thread_id: "bmV3LXNlc3Npb24tMDAwMQ", device: "b" } })
   })
 })
 
@@ -80,6 +111,21 @@ describe("A3: an existing thread is named by id or alias only; a device only to 
     expect(await run("thread_rename", { thread: "renamed", alias: "other" })).toMatchObject({ kind: "error", error: { code: "alias_taken", details: { holder: { session_id: "dur-on-b" } } } })
     expect(await run("thread_rename", { thread: "renamed" })).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
     expect(a.sent).toEqual([])
+  })
+
+  test("#given b's thread_read is refused because the command never reached b's engine #when it runs #then it is host_unavailable with a plain retry, not an update-omo answer", async () => {
+    const a = account({ refuse: "closed" })
+    const { run } = surface(a.remote)
+    expect(await run("thread_read", { thread: "dur-on-b" })).toMatchObject({ kind: "error", error: { code: "host_unavailable", details: { device: "b", reason: "closed" } } })
+  })
+
+  // Every reason the device service can end a read-only record uncertain with, from its own vocabulary (not a copy).
+  test.each(COMMAND_UNCERTAIN_REASONS.map((reason) => [reason]))("#given b's thread_read ends with the relay's %s #when it runs #then the answer is a typed retry, or for an oversized transcript a typed refusal, never update-omo", async (reason) => {
+    const a = account({ refuse: reason })
+    const { run } = surface(a.remote)
+    const read = await run("thread_read", { thread: "dur-on-b" })
+    expect(read).toMatchObject({ kind: "error", error: { code: reason === "record_too_large" ? "unsupported" : "host_unavailable", details: { device: "b", reason } } })
+    if (read.kind === "error") expect(read.error.next_action).not.toContain("Update omo")
   })
 
   test("#given device b is offline #when a tool names b's thread #then it answers device_offline and nothing is queued or sent", async () => {
