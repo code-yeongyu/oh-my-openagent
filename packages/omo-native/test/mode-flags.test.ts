@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
@@ -33,7 +33,10 @@ interface Launch {
  * environment are recorded instead of replacing the probe.
  */
 function launch(args: readonly string[]): Launch {
-  const root = mkdtempSync(join(tmpdir(), "omo-mode-flags-"))
+  // The launcher derives the extension path from its own module URL, which the runtime canonicalizes, so the sandbox
+  // root is canonicalized here too: /var -> /private/var on macOS and 8.3 short names on Windows would otherwise
+  // make the expected path differ from the handed one on every platform whose temp dir is a symlink (#12458).
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "omo-mode-flags-")))
   roots.push(root)
   const packageRoot = join(root, "app")
   cpSync(join(SOURCE_ROOT, "bin"), join(packageRoot, "bin"), { recursive: true })
