@@ -76,8 +76,8 @@ export type ThreadHost = {
   readonly wake?: (sessionId: string, deliveryIds: readonly string[], durable_session_id?: string) => Promise<GatewayWakeReply>
   /** Hands a quiet host session to another runtime (`release_session`); hosts only. */
   readonly releaseSession?: (sessionId: string, request: ReleaseSessionRequest, durable_session_id?: string) => Promise<ReleaseSessionReply>
-  /** Closes one session on its host (`close_session`); hosts only, a terminal keeps its own session. */
-  readonly closeSession?: (sessionId: string, durable_session_id?: string) => Promise<void>
+  /** Ends one session on its host for every client that holds it; hosts only, a terminal keeps its own session. */
+  readonly closeSession?: (sessionId: string, durable_session_id?: string) => Promise<ThreadCloseOutcome>
   /** Every endpoint at once; absent on a single-endpoint host, whose `listSessions` is the view. */
   readonly listView?: (request?: ThreadHostViewRequest) => Promise<ThreadHostView>
   /** Fresh identity validation on exactly one published endpoint, without enumeration. */
@@ -137,3 +137,6 @@ export type ThreadToolSurfaceOptions = {
 
 /** Placeholder the component supplies when the host passes no per-call caller identity. */
 export const UNKNOWN_CALLER = "unknown-caller"
+
+/** How a close ended: the session ended, no live session held it any more, or another client still holds it. */
+export type ThreadCloseOutcome = "closed" | "not_live" | "held_elsewhere"

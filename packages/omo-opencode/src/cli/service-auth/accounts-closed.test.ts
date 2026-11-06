@@ -13,7 +13,8 @@ const entries = {
   compiled: join(root, "packages", "omo-native", "compile-entry.ts"),
 }
 const invocations = [
-  ["login"], ["login", "--device"], ["login", "--no-browser", "--api", "https://example.invalid"], ["login", "--help"],
+  // #12639: `login --device` and `login --no-browser` run the device flow while closed (closed-device-login.test.ts).
+  ["login"], ["login", "--accounts", "https://example.invalid"], ["login", "--api", "https://example.invalid"], ["login", "--help"],
   ["logout"], ["whoami"], ["whoami", "--help"],
 ]
 
