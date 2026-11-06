@@ -99,6 +99,11 @@ export class EventAssembler {
       case "session.attach_pending":
       case "session.command_state":
       case "session.upload_abort":
+      // The delegated channel (0018) is the caller's to follow too: frames and replies by device, blobs by id.
+      case "session.command_event":
+      case "session.command_blob_chunk":
+      case "session.command_blob_done":
+      case "session.channel_closed":
         return;
       default:
         return assertNever(event);

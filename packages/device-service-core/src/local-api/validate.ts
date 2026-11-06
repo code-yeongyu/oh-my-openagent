@@ -30,6 +30,7 @@ import {
   semver,
   uint,
 } from "./validate-fields.ts";
+import { endpointsData } from "./validate-delegated.ts";
 import { isRequestType, REQUEST_TYPES, validateRequestFields } from "./validate-requests.ts";
 import {
   deviceRef,
@@ -197,6 +198,7 @@ const DATA: { readonly [T in RequestType]: (v: unknown) => ResponseData[T] } = {
   "session.read": (v) => ({ query_id: localId(one(v, "query_id"), "query_id") }),
   "enforcement.report": empty,
   "owner.shutdown_for_upgrade": empty,
+  "session.endpoints": endpointsData,
   "control.attach.get": attachState,
   "control.attach.set": attachState,
 };
