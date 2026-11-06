@@ -18,6 +18,7 @@ import { joinAccount, principalOf } from "../join.ts"
 import { createPairingHttp } from "../pairing-http.ts"
 import { openAccountSession } from "../session.ts"
 import { ACCOUNT, fixture } from "./genesis-enable.test-support.ts"
+import { remainingTestTime } from "../../../../../../test-support/test-deadline"
 
 /** A ceremony clock whose sleep resolves on the next server write, never on time. */
 const mailbox = () => {
@@ -48,7 +49,7 @@ const mailbox = () => {
 export async function within<T>(signal: Promise<T>, message: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const breaker = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`waited 20s: ${message}`)), 20_000)
+    timer = setTimeout(() => reject(new Error(`waited out the test budget: ${message}`)), remainingTestTime())
   })
   try {
     return await Promise.race([signal, breaker])

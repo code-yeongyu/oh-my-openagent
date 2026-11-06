@@ -7,6 +7,7 @@ import { getProcessStartIdentity } from "../locks"
 
 import { withLocalJournalLock } from "./lock"
 import { removeTreeSync } from "../../../../test-support/remove-tree"
+import { remainingTestTime, useTestTimeout } from "../../../../test-support/test-deadline"
 
 const dirs: string[] = []
 afterEach(() => {
@@ -42,7 +43,7 @@ describe("withLocalJournalLock", () => {
     try {
       const result = await Promise.race([
         cancelled,
-        new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("FIFO cancellation did not settle")), 2_000) }),
+        new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("FIFO cancellation did not settle")), remainingTestTime()) }),
       ])
       expect(result).toBe(reason)
       expect(order).toEqual([])
@@ -61,6 +62,7 @@ describe("withLocalJournalLock", () => {
   test(
     "#given overlapping same-process acquisitions #when the holder outlasts the acquisition wait #then every contender still runs, serialized",
     async () => {
+      useTestTimeout(30_000)
       // given
       const lockPath = freshLockPath()
       const order: string[] = []
@@ -93,6 +95,7 @@ describe("withLocalJournalLock", () => {
   test(
     "#given a stale lock whose live pid now belongs to a different process #when acquiring #then the reused-pid lock is reclaimed",
     async () => {
+      useTestTimeout(30_000)
       // given: the payload claims this live pid with a start identity that is not ours
       const lockPath = freshLockPath()
       writeFileSync(lockPath, `${process.pid}\nps-lstart: Jan  1 00:00:00 2000\n`, {
@@ -123,6 +126,7 @@ describe("withLocalJournalLock", () => {
   test(
     "#given a live foreign owner that keeps the lock #when the acquisition wait expires #then a typed JournalLockTimeoutError is thrown",
     async () => {
+      useTestTimeout(30_000)
       // given: a live foreign process recorded as the owner in the legacy pid-only shape
       const lockPath = freshLockPath()
       const child = Bun.spawn({

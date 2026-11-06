@@ -20,6 +20,7 @@ import { type AccountHttp, createAccountHttp } from "./http.ts"
 import { parseRevocationView, type RevocationView } from "./revocation-view.ts"
 import { ACCOUNT } from "./testing/genesis-enable.test-support.ts"
 import { revokeWorld, type World, type WorldDevice } from "./testing/revoke-world.test-support.ts"
+import { useTestTimeout } from "../../../../../test-support/test-deadline"
 
 const TIMEOUT = GIT_TEST_TIMEOUT * 4
 let scopes = 0
@@ -51,6 +52,7 @@ const without = (list: { devices: Record<string, unknown>[] }, device: WorldDevi
   ({ devices: list.devices.filter((row) => row["syncPrincipal"] !== device.keyring.principal().id) })
 
 test("R-A10(a,b) #given a frozen account #when the device list shows this device revoked, or names no principal #then the settler appends nothing", async () => {
+  useTestTimeout(TIMEOUT)
   const w = await revokeWorld()
   try {
     const b = await w.join("b", 20)
@@ -70,6 +72,7 @@ test("R-A10(a,b) #given a frozen account #when the device list shows this device
 }, TIMEOUT)
 
 test("R-A10(c,d) #given a row of an unknown kind and platform and a member no row names #then the rotation proceeds, keeps the unlisted member, and counts it", async () => {
+  useTestTimeout(TIMEOUT)
   const w = await revokeWorld()
   try {
     const b = await w.join("b", 20)
@@ -88,6 +91,7 @@ test("R-A10(c,d) #given a row of an unknown kind and platform and a member no ro
 }, TIMEOUT)
 
 test("R-A10(e) #given a list that omits a member the service's register holds as revoked #then one append is refused forbidden, one re-read changes nothing, and no second append follows", async () => {
+  useTestTimeout(TIMEOUT)
   const w = await revokeWorld()
   try {
     const b = await w.join("b", 20)
@@ -111,6 +115,7 @@ test("R-A10(e) #given a list that omits a member the service's register holds as
 }, TIMEOUT)
 
 test("#given a state route serving a head the verified chain cannot reach #then the settler reports unverified and appends nothing", async () => {
+  useTestTimeout(TIMEOUT)
   const w = await revokeWorld()
   try {
     const b = await w.join("b", 20)
@@ -134,6 +139,7 @@ test("#given a state route serving a head the verified chain cannot reach #then 
 }, TIMEOUT)
 
 test("#given two sessions of one device for one account #when both settle at once #then one rotation is sent and both report it", async () => {
+  useTestTimeout(TIMEOUT)
   const w = await revokeWorld()
   try {
     const b = await w.join("b", 20)
@@ -150,6 +156,7 @@ test("#given two sessions of one device for one account #when both settle at onc
 }, TIMEOUT)
 
 test("R-A7(b) #given this process rotated once #when it appends a recovery-key removal whose own rotation did not follow #then its settler rotates again (the keyring head moved), not flag_stuck", async () => {
+  useTestTimeout(TIMEOUT)
   const w = await revokeWorld()
   try {
     const b = await w.join("b", 20)

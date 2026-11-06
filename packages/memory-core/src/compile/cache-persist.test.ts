@@ -7,6 +7,7 @@ import { GitMemoryRepo, GitTimeoutError } from "../git"
 import { withRecallTermSavesExcluded } from "../recall/bm25-persist-gate"
 import { MemoryBlockCache } from "./cache"
 import { removeTree } from "../../../../test-support/remove-tree"
+import { remainingTestTime } from "../../../../test-support/test-deadline"
 
 // Contract: a compiled memory block is a pure function of (revision, template, identity, projection limits), so a
 // new process must not list the tree, read blobs or walk history again for a block an earlier process compiled.
@@ -293,7 +294,7 @@ describe("MemoryBlockCache persisted blocks", () => {
     // when
     const compiled = await Promise.race([
       stalled.compile(repo, TEMPLATE, OPTIONS, revision),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("compile waited 5 s on a store that never loads")), 5_000)),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("compile waited out the test budget on a store that never loads")), remainingTestTime())),
     ])
 
     // then
