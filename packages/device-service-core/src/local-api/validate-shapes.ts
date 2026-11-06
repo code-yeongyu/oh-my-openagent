@@ -1,6 +1,7 @@
 import {
   SESSION_DEVICE_MAX_CHARS,
   SESSION_ID_MAX_CHARS,
+  SESSION_KIND_MAX_CHARS,
   SESSION_SUMMARY_PATH_MAX_CHARS,
   SESSION_SUMMARY_PROJECT_MAX_CHARS,
   SESSION_SUMMARY_TITLE_MAX_CHARS,
@@ -10,6 +11,7 @@ import type {
   DeviceRow,
   ErrorBody,
   ListingRow,
+  PathRefusal,
   Policy,
   ReadEntry,
   SnapshotBody,
@@ -25,6 +27,7 @@ import {
   LABEL_MAX_CHARS,
   nullable,
   oneOf,
+  PATH_MAX_CHARS,
   REASON_MAX_CHARS,
   sha256Field,
   text,
@@ -33,6 +36,7 @@ import {
 import {
   ERROR_CODES,
   LISTING_SOURCES,
+  PATH_REFUSAL_PROBLEMS,
   POLICY_STATES,
   SESSION_ROW_STATES,
   STATUS_STATES,
@@ -140,9 +144,28 @@ const ROW_FIELDS = [
   "source",
   "as_of",
 ];
-export const listingRowOf = (v: unknown): ListingRow => {
-  const m = exactly(v, ROW_FIELDS, [], "listing row");
+const ROW_KIND = new RegExp(`^[a-z][a-z0-9_-]{0,${SESSION_KIND_MAX_CHARS - 1}}$`);
+const rowLinks = (m: {
+  readonly [key: string]: unknown;
+}): Pick<ListingRow, "kind" | "parent" | "parent_listed"> => {
+  const kind = m["kind"];
+  if (Object.hasOwn(m, "parent") !== Object.hasOwn(m, "parent_listed")) fail("parent_listed");
   return {
+    ...(kind === undefined
+      ? {}
+      : { kind: typeof kind === "string" && ROW_KIND.test(kind) ? kind : fail("row kind") }),
+    ...(m["parent"] === undefined
+      ? {}
+      : {
+          parent: sessionId(m["parent"]),
+          parent_listed: bool(m["parent_listed"], "parent_listed"),
+        }),
+  };
+};
+export const listingRowOf = (v: unknown): ListingRow => {
+  const m = exactly(v, ROW_FIELDS, ["kind", "parent", "parent_listed"], "listing row");
+  return {
+    ...rowLinks(m),
     device: deviceId(m["device"]),
     session_id: sessionId(m["session_id"]),
     title: text(m["title"], SESSION_SUMMARY_TITLE_MAX_CHARS, "title", 0),
@@ -200,11 +223,21 @@ export const readEntryOf = (v: unknown): ReadEntry => {
   };
 };
 
+const pathRefusalOf = (v: unknown): PathRefusal => {
+  const m = exactly(v, ["component", "problem"], [], "error.path_refusal");
+  return {
+    component: text(m["component"], PATH_MAX_CHARS, "error.path_refusal.component"),
+    problem: oneOf(PATH_REFUSAL_PROBLEMS, m["problem"], "error.path_refusal.problem"),
+  };
+};
+
 export const errorBodyOf = (v: unknown): ErrorBody => {
-  const m = exactly(v, ["code", "reason", "action"], ["limit_chars"], "error");
+  const m = exactly(v, ["code", "reason", "action"], ["limit_chars", "path_refusal"], "error");
   const code = oneOf(ERROR_CODES, m["code"], "error.code");
   const limit = m["limit_chars"];
   if ((code === "message_too_long") !== (limit !== undefined)) return fail("error.limit_chars");
+  const refusal = m["path_refusal"];
+  if (refusal !== undefined && code !== "forbidden") return fail("error.path_refusal");
   return {
     code,
     reason: text(m["reason"], REASON_MAX_CHARS, "error.reason", 0),
@@ -212,5 +245,6 @@ export const errorBodyOf = (v: unknown): ErrorBody => {
     ...(limit === undefined
       ? {}
       : { limit_chars: uint(limit, 1, MILLIS_MAX, "error.limit_chars") }),
+    ...(refusal === undefined ? {} : { path_refusal: pathRefusalOf(refusal) }),
   };
 };
