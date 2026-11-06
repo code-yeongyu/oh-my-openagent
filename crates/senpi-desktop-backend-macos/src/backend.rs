@@ -316,6 +316,10 @@ impl Backend for MacosBackend {
         Some(self.screen.clone())
     }
 
+    fn epoch_source(&self) -> Option<std::sync::Arc<dyn senpi_desktop_core::backend::EpochSource>> {
+        Some(crate::epoch_sources::MacEpochs::new())
+    }
+
     fn watch_user_input(&mut self) {
         self.user_input.start();
         if self.raw_feed.is_none() {

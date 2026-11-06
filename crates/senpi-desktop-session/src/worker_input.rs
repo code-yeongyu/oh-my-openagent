@@ -43,6 +43,9 @@ impl Worker {
         frame: &FrameGeometry,
         mode: DeliveryMode,
     ) -> CoreResult<Response> {
+        if self.epochs.probe().moved() {
+            return Err(crate::epoch::superseded_before_input());
+        }
         self.backend()?.pointer(target, event, frame, mode)?;
         Ok(Response::Unit)
     }
@@ -192,7 +195,11 @@ impl Worker {
             let mode = delivery(params.opts.as_ref())?;
             worker.takeover_gate(&target, mode)?;
             secure.set(worker.typing_into_secure_field(&target));
-            let check_stop = || interrupted(&supervisor, &policy, cancelled, "typing");
+            let epoch = worker.epochs.probe();
+            let check_stop = || {
+                interrupted(&supervisor, &policy, cancelled, "typing")?;
+                epoch_unmoved(&epoch, mutation.text_delivered.get() > 0)
+            };
             worker.backend()?.type_text_interruptible(
                 &target,
                 &params.text,
@@ -291,7 +298,12 @@ impl Worker {
             let keys = parse_keys(&params.keys)?;
             let mode = delivery(params.opts.as_ref())?;
             worker.takeover_gate(&target, mode)?;
-            let check_stop = || interrupted(&supervisor, &policy, cancelled, "pressing keys");
+            let epoch = worker.epochs.probe();
+            let pressed = std::cell::Cell::new(false);
+            let check_stop = || {
+                interrupted(&supervisor, &policy, cancelled, "pressing keys")?;
+                epoch_unmoved(&epoch, pressed.replace(true))
+            };
             worker.backend()?.key_chord_interruptible(&target, &keys, mode, &check_stop)?;
             Ok(Response::Unit)
         })
@@ -367,6 +379,18 @@ pub(crate) fn interrupted(
         Err(DesktopError::new(ErrorCode::Cancelled, format!("the request was cancelled while {doing}")))
     } else {
         Ok(())
+    }
+}
+
+/// The epoch probe of an interruptible input call, run after
+/// [`interrupted`] before each event: a move before the first event refuses
+/// it (nothing sent); a move after `sent` input ends it with the delivery
+/// unknown.
+fn epoch_unmoved(epoch: &crate::epoch::EpochProbe, sent: bool) -> CoreResult<()> {
+    match (epoch.moved(), sent) {
+        (false, _) => Ok(()),
+        (true, false) => Err(crate::epoch::superseded_before_input()),
+        (true, true) => Err(crate::epoch::superseded_mid_input()),
     }
 }
 

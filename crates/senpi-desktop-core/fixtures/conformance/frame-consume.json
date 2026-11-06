@@ -28,7 +28,8 @@
                 "frame-consume",
                 "ax-partial",
                 "trace",
-                "key-priming"
+                "key-priming",
+                "epoch"
               ]
             }
           },
