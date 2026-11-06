@@ -27,13 +27,13 @@ USAGE
 
 EXAMPLES
     # Find all console.log calls in TypeScript
-    ast_grep_helper.py search 'console.log($MSG)' --lang ts src/
+    ast_grep_helper.py search 'console.log($MSG)' src/ --lang ts
 
     # Migrate console.log -> logger.info (dry-run preview)
-    ast_grep_helper.py replace 'console.log($MSG)' 'logger.info($MSG)' --lang ts src/
+    ast_grep_helper.py replace 'console.log($MSG)' 'logger.info($MSG)' src/ --lang ts
 
     # Apply the same replacement
-    ast_grep_helper.py replace 'console.log($MSG)' 'logger.info($MSG)' --lang ts src/ --apply
+    ast_grep_helper.py replace 'console.log($MSG)' 'logger.info($MSG)' src/ --lang ts --apply
 
     # Validate a pattern offline (no sg call, no filesystem access)
     ast_grep_helper.py validate '\\w+' --lang ts

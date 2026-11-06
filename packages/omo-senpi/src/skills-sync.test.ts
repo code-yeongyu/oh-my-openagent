@@ -16,6 +16,7 @@ const expectedSkillNames = [
   "dag-library",
   "data-scientist",
   "debugging",
+  "eval-integrity",
   "frontend",
   "git-master",
   "give-me-tips",
@@ -81,8 +82,6 @@ const pendingPersonaNameRetirements: readonly {
   readonly linePattern: RegExp
 }[] = [
   { pathSuffix: "coding-agent-sessions/references/opencode.md", linePattern: /`Sisyphus-Junior`/ },
-  { pathSuffix: "frontend/references/designpowers/lane-a-direction.md", linePattern: /\bPrometheus\b/ },
-  { pathSuffix: "frontend/references/designpowers/routing.md", linePattern: /\bPrometheus\b/ },
 ]
 
 function listDirectoryNames(path: string): string[] {
@@ -138,7 +137,7 @@ describe("OMO Senpi scoped skill sync", () => {
     expect([...telemetrySkillNames].sort()).toEqual(listDirectoryNames(skillsRoot))
   })
 
-  test("#given synced skill output #when inspected #then exactly 26 roots exist with valid names", () => {
+  test("#given synced skill output #when inspected #then exactly 27 roots exist with valid names", () => {
     const actualNames = listDirectoryNames(skillsRoot)
     expect(actualNames).toEqual([...expectedSkillNames].sort())
 
