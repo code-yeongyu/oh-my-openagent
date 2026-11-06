@@ -107,6 +107,7 @@ No default profiles ship. A profile exists only when you write one under `profil
   "memory": {},         // MemorySettings (Native harness)
   "git_master": { "include_co_authored_by": true, "commit_footer": false }, // sisyphus-dev-ai co-author trailer (on by default) and opt-in commit footer (Native harness)
   "telemetry": { "enabled": true }, // telemetry (Native harness), enabled by default
+  "device_service": { "enabled": true }, // the device service start-up bootstrap (Native harness), enabled by default
   "disabled_skills": [], // skill names hidden on every harness, unioned across layers
   "exclude_models": [], // models no category, agent, profile or task pin may run, unioned across layers (Native harness)
   "[opencode]": {},     // OpenCode plugin config, freeform (see configuration.md)
@@ -175,6 +176,20 @@ The optional `telemetry` block controls OmO Native product telemetry in Senpi. `
 ```
 
 The block may also appear at the shared top level or in profile layers and follows the normal resolution order. Because typed config objects are strict, an older `@oh-my-opencode/omo-config-core` version that predates this key rejects a file containing `telemetry` instead of ignoring it. See [Mixed-version compatibility](#mixed-version-compatibility) before sharing one config across versions.
+
+### `device_service` (Native harness)
+
+Every interactive `omo` start, once you are signed in, makes sure this device's OmO device service is installed at the version this build pins, connected, and holding your signed-in device, so your other signed-in devices can see and command its sessions. It runs in the background after the screen is up, never delays the start, and says something only when it stops on a problem you can fix (a locked keychain, an update to install); a signed-out start is silent. `device_service.enabled` is a boolean and defaults to `true`. Set it to `false` to skip the bootstrap entirely: nothing is installed and nothing connects.
+
+Whether your other devices may control this one is a separate, per-device setting held by the running service: `omo remote control` prints it, and `omo remote control off` / `omo remote control on` change it. The bootstrap never changes that setting.
+
+```jsonc
+{
+  "device_service": {
+    "enabled": false
+  }
+}
+```
 
 ### `memory` (Native harness)
 

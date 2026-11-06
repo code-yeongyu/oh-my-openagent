@@ -40,7 +40,10 @@ export async function startEngineRunner(kind: EngineRunnerKind, input: EngineInp
   const home = join(input.root, "home")
   const agentDir = engineAgentDir(input.root, kind)
   mkdirSync(home, { recursive: true })
-  mkdirSync(agentDir, { recursive: true })
+  // #12131: the senpi host refuses a group/other-writable agent dir
+  // (`key_publication_failed: unsafe_key_record`), so pin the mode explicitly
+  // instead of inheriting the process umask (0002 hosts failed 5/13).
+  mkdirSync(agentDir, { recursive: true, mode: 0o700 })
   const providers = startHttpProviders(input.scripts)
   copyFileSync(input.settingsPath, join(agentDir, "settings.json"))
   writeFileSync(join(agentDir, "models.json"), providers.modelsJson)
