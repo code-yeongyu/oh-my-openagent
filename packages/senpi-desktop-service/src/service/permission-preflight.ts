@@ -4,7 +4,7 @@ import { type DesktopCapabilities, ENGINE_ABI, PROTOCOL_VERSION } from "@oh-my-o
 import { isDesktopCapabilities, isRecord, parseHello } from "./parse";
 
 /** Bounds the fresh engine's `engine.hello` + `capabilities`, the budget `computer-use-doctor` gives its probe. */
-export const PERMISSION_PROBE_TIMEOUT_MS = 5_000;
+const PERMISSION_PROBE_TIMEOUT_MS = 5_000;
 
 type Capabilities = Omit<DesktopCapabilities, "cursorOverlay"> & { readonly cursorOverlay?: boolean };
 
