@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process"
 import { existsSync } from "node:fs"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
 import { isEngineCommand } from "./engine-commands.js"
 import { spawnNode } from "./child-process.js"
 import { privateFdHandoff } from "./private-fds.js"
@@ -18,6 +19,9 @@ import { migrateLegacyBunGlobalManifest } from "./legacy-bun-global-migration.js
 import { removeLegacyServiceCredentials } from "./legacy-service-credentials.js"
 import { adoptLegacyFlatState, canonicalAgentDir } from "./agent-dir.js"
 import { senpiEnvironment } from "./engine-environment.js"
+import { withPresenterEnforcement } from "./presenter-enforcement.js"
+
+const ENGINE_ENTRY = join(dirname(fileURLToPath(import.meta.url)), "engine-entry.mjs")
 import { withHerdrAgentHint } from "./herdr-agent-hint.js"
 import { packageManifest, packageRoot, readJson, releaseBanner, resolveSenpi, updateTarget } from "./package-paths.js"
 import { runSelfUpdate } from "./self-update.js"
@@ -49,20 +53,20 @@ function preparedSenpi() {
 async function spawnSenpi(args, withExtension) {
   const senpi = preparedSenpi()
   const finalArgs = withExtension
-    ? ["--extension", join(packageRoot, "plugin"), ...args]
+    ? ["--extension", join(packageRoot, "plugin"), ...withPresenterEnforcement(args)]
     : args
   const env = senpiEnvironment(senpi.packageRoot)
   if (withExtension) withHerdrAgentHint(env, args)
   const handoff = privateFdHandoff(env)
   if (handoff === undefined && process.platform !== "win32" && typeof process.execve === "function") {
     try {
-      process.execve(process.execPath, [process.execPath, senpi.cliPath, ...finalArgs], env)
+      process.execve(process.execPath, [process.execPath, ENGINE_ENTRY, senpi.cliPath, ...finalArgs], env)
       return
     } catch {
       // A failed replacement still uses the signal-aware child path below.
     }
   }
-  await spawnNode(senpi.cliPath, finalArgs, handoff ?? { env })
+  await spawnNode(ENGINE_ENTRY, [senpi.cliPath, ...finalArgs], handoff ?? { env })
 }
 
 // `omo remote attach`: the engine's attach TUI runs as a signal-forwarding child, never an execve replacement,

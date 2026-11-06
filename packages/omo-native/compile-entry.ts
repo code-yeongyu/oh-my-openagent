@@ -37,6 +37,8 @@ import { runLoroSmoke } from "./loro-smoke"
 import { runAccountCommand } from "./account-cli"
 import { runRemoteAttachCommand, runRemoteCommand } from "./remote-entry"
 import { runSyncCommand } from "./sync-cli"
+import { registerPresenterAccountAuthority } from "@code-yeongyu/senpi/presenter-authority"
+import { omoPresenterAuthority } from "./presenter-authority"
 import { spawnSync } from "node:child_process"
 import { compiledRollbackMigration } from "./compiled-rollback"
 import { refuseRetiredCommand } from "./bin/lib/retired-command.js"
@@ -350,6 +352,7 @@ async function main(): Promise<void> {
     process.argv.splice(2, process.argv.length - 2, ...buildSenpiArgs(process.argv.slice(2), execDir))
     Object.assign(process.env, remapSenpiEnvironment(process.env, execDir))
     await registerEngineRuntimeModules()
+    registerPresenterAccountAuthority(omoPresenterAuthority(process.env))
     await import("../../node_modules/@code-yeongyu/senpi/dist/cli.js") // literal: see import note above
     return
   }
@@ -427,6 +430,7 @@ async function main(): Promise<void> {
   applyCachedClaudeCode(process.env, execDir)
   if (isInternalSupervisorLaunch(process.argv.slice(2)) && await runInternalSupervisor(process.argv.slice(2))) return
   await registerEngineRuntimeModules()
+  registerPresenterAccountAuthority(omoPresenterAuthority(process.env))
   await import("../../node_modules/@code-yeongyu/senpi/dist/cli.js") // literal: see import note above
 }
 
