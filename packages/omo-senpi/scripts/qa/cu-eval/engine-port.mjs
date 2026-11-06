@@ -6,6 +6,8 @@
 import { spawn } from "node:child_process"
 import { createInterface } from "node:readline"
 
+import { withTelemetryOptOut } from "../telemetry-opt-out-env.mjs"
+
 /** The stop chord the eval arms; the host relay heartbeat below keeps the stop path live. */
 const STOP_CHORD = "ctrl+alt+shift+escape"
 /** Same cadence as the desktop service (`HEARTBEAT_MS`). */
@@ -100,7 +102,7 @@ function delay(ms) {
  */
 export function engineLauncher({ enginePath, env, session = {}, onReply, opened }) {
   return async (settings) => {
-    const child = spawn(enginePath, ["--stdio"], { stdio: "pipe", env, windowsHide: true })
+    const child = spawn(enginePath, ["--stdio"], { stdio: "pipe", env: withTelemetryOptOut(env), windowsHide: true })
     const port = createEnginePort(child, { onReply })
     let heartbeat
     try {

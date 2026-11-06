@@ -16,11 +16,13 @@ import { cpus, loadavg, platform, tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
+import { withTelemetryOptOut } from "../telemetry-opt-out-env.mjs"
+
 const here = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(here, "..", "..", "..", "..", "..")
 
 if (process.versions.bun === undefined) {
-  const child = spawnSync("bun", [fileURLToPath(import.meta.url), ...process.argv.slice(2)], { stdio: "inherit" })
+  const child = spawnSync("bun", [fileURLToPath(import.meta.url), ...process.argv.slice(2)], { stdio: "inherit", env: withTelemetryOptOut(process.env) })
   if (child.error !== undefined) {
     console.log(JSON.stringify({ verdict: "FAIL", reason: `the bench needs bun on PATH to load the SDK: ${child.error.message}` }))
     process.exit(1)
