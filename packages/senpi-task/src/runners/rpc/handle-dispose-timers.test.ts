@@ -12,11 +12,14 @@ afterEach(() => clock?.restore())
 
 // #11673: a disposed stdio child owns no timer, and nothing it started before teardown can arm one after it.
 // Each scenario tears the child (or its heartbeat) down, then returns every command or probe issued afterwards.
-// Proof rows fail on the pre-#11687 base with a pending timer (verified by reverting the isDetached guards
-// in protocol-client.ts and re-running this file: adopted turn, abort, steer and EPIPE fail, 5 pass 4 fail).
-// The exited-child row is a regression guard, not proof: it passes on that base through the exited-child path
-// (requests for an exited child are refused before any deadline is armed), so it must not be cited as proof
-// of the dispose-timer fix. The proof for the dispose path rests on the heartbeat, abort and steer rows.
+// Proof rows fail on the pre-#11687 base: reverting the two isDetached guards from a8149ef39f in
+// protocol-client.ts gives 5 pass / 4 fail (adopted turn, abort, steer and EPIPE fail with a pending timer);
+// the actual pre-#11687 base also lacks the write() guard from ec364ff18a, and then the extension-UI row
+// fails too (a late extension_ui_response is written) while adopted turn, abort and steer fail with a late
+// command sent instead, 4 pass / 5 fail. The exited-child row is a regression guard, not proof: it passes
+// on that base through the exited-child path (requests for an exited child are refused before any deadline
+// is armed), so it must not be cited as proof of the dispose-timer fix. The proof for the dispose path
+// rests on the adopted-turn, abort, steer, EPIPE and extension-UI rows.
 type Scenario = () => Promise<readonly string[]>
 
 function stdioChild() {

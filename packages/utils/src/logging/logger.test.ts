@@ -72,8 +72,15 @@ describe("#given a bound utils logger", () => {
       globalThis.setTimeout = realSetTimeout
       globalThis.clearTimeout = realClearTimeout
     }
-    // then: the real 500 ms flush interval writes the line without any fake-clock advance
-    await Bun.sleep(900)
+    // then: the real 500 ms flush interval writes the line without any fake-clock advance.
+    // Poll for the write with a bounded deadline instead of a fixed sleep: a fixed 900 ms
+    // wait leaves the 500 ms flush only a 400 ms margin, so a loaded runner could flake
+    // the test and every run pays ~0.9 s.
+    const deadline = Date.now() + 5_000
+    while (Date.now() < deadline) {
+      if (fs.existsSync(logFilePath) && fs.readFileSync(logFilePath, "utf8").includes("LOGGER-FAKE-CLOCK")) break
+      await Bun.sleep(25)
+    }
     expect(fs.readFileSync(logFilePath, "utf8")).toContain("LOGGER-FAKE-CLOCK")
   })
 })
