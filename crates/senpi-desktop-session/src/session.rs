@@ -7,6 +7,7 @@ use std::thread;
 
 use parking_lot::Mutex;
 use senpi_desktop_core::error::{CoreResult, DesktopError};
+use senpi_desktop_core::report::ReportMode;
 use senpi_desktop_core::types::{DesktopCapabilities, DesktopSessionOptions};
 use tokio::time::Instant;
 
@@ -36,6 +37,7 @@ enum Message {
         op: Op,
         reply: Reply,
         signal: Arc<senpi_desktop_safety::HoldSignal>,
+        mode: crate::pending::RequestMode,
     },
     /// Drops the backend, acknowledges, and ends the thread.
     Close {
@@ -52,6 +54,10 @@ pub struct Session {
     holds: Mutex<Vec<Weak<senpi_desktop_safety::HoldSignal>>>,
     capabilities: Arc<Mutex<DesktopCapabilities>>,
     timeouts: SessionTimeouts,
+    /// `reportMode` of the last `open` the session thread applied; written by
+    /// the worker, so an open that failed, was abandoned, or is still queued
+    /// never changes it.
+    report_mode: Arc<Mutex<ReportMode>>,
     awake: Arc<DisplayAwake>,
     notes: ScreenNotes,
     _stop_observer: Arc<dyn Fn() + Send + Sync>,
@@ -85,6 +91,8 @@ impl Session {
         let (queue, requests) = flume::unbounded();
         let (ready_tx, ready_rx) = flume::bounded(1);
         let shared = Arc::clone(&capabilities);
+        let report_mode = Arc::new(Mutex::new(ReportMode::Null));
+        let applied_mode = Arc::clone(&report_mode);
         let supervisor = Arc::clone(&safety.supervisor);
         let awake = Arc::new(DisplayAwake::default());
         let stop_observer = awake.observe_stops(&supervisor);
@@ -93,7 +101,7 @@ impl Session {
         thread::Builder::new()
             .name(THREAD_NAME.to_owned())
             .spawn(move || {
-                let worker = Worker::new(Box::new(factory), shared, safety, screen);
+                let worker = Worker::new(Box::new(factory), shared, applied_mode, safety, screen);
                 // `start` is blocked on this receiver until it arrives.
                 ready_tx.send(()).unwrap_or(());
                 serve(worker, &requests);
@@ -108,6 +116,7 @@ impl Session {
             holds: Mutex::new(Vec::new()),
             capabilities,
             timeouts,
+            report_mode,
             awake,
             notes,
             _stop_observer: stop_observer,
@@ -132,18 +141,28 @@ impl Session {
         self.enqueue(|reply| Message::Open { options, reply })
     }
 
+    /// The `reportMode` of the last `open` the session thread applied. One
+    /// request's mode is [`Pending::request_mode`]: an open applied after the
+    /// request started must not re-shape its reply.
+    #[must_use]
+    pub fn report_mode(&self) -> ReportMode {
+        *self.report_mode.lock()
+    }
+
     /// Enqueues `op` behind every earlier request.
     pub fn submit(&self, op: Op) -> Pending {
         let budget = self.timeouts.budget_for(&op);
         let is_hold = matches!(op, Op::HoldKeys(_) | Op::HoldMouse(_));
         let display = op_display(&op);
         let signal = self.supervisor.hold_signal();
+        let mode = crate::pending::RequestMode::new(self.report_mode());
         let mut pending = self.enqueue(|reply| {
             let mut holds = self.holds.lock();
             holds.retain(|hold| hold.strong_count() > 0);
             holds.push(Arc::downgrade(&signal));
-            Message::Op { op, reply, signal: Arc::clone(&signal) }
+            Message::Op { op, reply, signal: Arc::clone(&signal), mode: mode.clone() }
         });
+        pending.mode = Some(mode);
         pending.cancellation = Some(crate::cancel_on_drop::CancelOnDrop(signal));
         pending.budget = budget;
         pending.deadline = Instant::now() + budget;
@@ -229,7 +248,9 @@ fn serve(mut worker: Worker, requests: &flume::Receiver<Message>) {
                 worker.awake.finish(std::time::Instant::now());
                 (reply, opened)
             }
-            Message::Op { op, reply, signal } => {
+            Message::Op { op, reply, signal, mode } => {
+                // The mode this request is served under, fixed before it runs.
+                mode.set(worker.registry.report_mode());
                 // `$/cancel` or a deadline drops the waiter: that is the
                 // request's cancellation signal while it runs.
                 worker.hold_signal = Some(signal);
