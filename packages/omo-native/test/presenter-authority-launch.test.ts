@@ -13,10 +13,15 @@ const OMO_BIN = join(import.meta.dir, "..", "bin", "omo.js")
 const HOST_READY = "senpi rpc listening on"
 const started: ChildProcess[] = []
 const homes: string[] = []
-afterEach(() => {
-  for (const child of started.splice(0)) child.kill("SIGKILL")
+afterEach(async () => {
+  for (const child of started.splice(0)) {
+    if (child.exitCode !== null || child.signalCode !== null) continue
+    const exited = new Promise(resolve => child.once("exit", resolve))
+    child.kill("SIGKILL")
+    await exited
+  }
   for (const home of homes.splice(0)) rmSync(home, { recursive: true, force: true })
-})
+}, 60_000)
 
 type Frame = Record<string, unknown>
 
