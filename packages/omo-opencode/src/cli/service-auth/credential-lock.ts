@@ -3,10 +3,10 @@ import { createHash } from "node:crypto"
 import { mkdir } from "node:fs/promises"
 import { homedir } from "node:os"
 import { join } from "node:path"
-import { withLock } from "@oh-my-opencode/team-core/team-state-store/locks"
+import { type LockLease, withLock } from "@oh-my-opencode/team-core/team-state-store/locks"
 import { serviceOrigin } from "./protocol"
 
-const held = new AsyncLocalStorage<ReadonlySet<string>>()
+const held = new AsyncLocalStorage<ReadonlyMap<string, LockLease>>()
 
 /**
  * The one per-origin lock and desktop generation record (account-transport-api v7 section 4.1). The CLI, desktop main
@@ -18,13 +18,22 @@ export function credentialLockPaths(api: string, home = homedir()): { readonly d
   return { directory, lock: join(directory, `${id}.lock`), desktopRecord: join(directory, `${id}.desktop-generation.json`) }
 }
 
-/** Writers and effect boundaries share one origin lock; nested session writes retain ownership. */
-export async function withCredentialLock<T>(api: string, action: () => Promise<T>, home = homedir(), ownerTag = "cli-session"): Promise<T> {
+/** The lease of the origin lock this async context already holds, or undefined outside that lock. */
+export function heldCredentialLease(api: string, home = homedir()): LockLease | undefined {
+  return held.getStore()?.get(credentialLockPaths(api, home).lock)
+}
+
+/**
+ * Writers and effect boundaries share one origin lock; nested session writes retain ownership and see the outer lease,
+ * which the keychain helper needs to take the lock over for a mutation (#11262 design 3.6).
+ */
+export async function withCredentialLock<T>(api: string, action: (lease: LockLease) => Promise<T>, home = homedir(), ownerTag = "cli-session"): Promise<T> {
   const { directory, lock } = credentialLockPaths(api, home)
   const owned = held.getStore()
-  if (owned?.has(lock)) return action()
+  const outer = owned?.get(lock)
+  if (outer !== undefined) return action(outer)
   await mkdir(directory, { recursive: true, mode: 0o700 })
-  return withLock(lock, () => held.run(new Set([...owned ?? [], lock]), action), {
+  return withLock(lock, lease => held.run(new Map([...owned ?? [], [lock, lease]]), () => action(lease)), {
     ownerTag, staleAfterMs: Number.POSITIVE_INFINITY,
   })
 }

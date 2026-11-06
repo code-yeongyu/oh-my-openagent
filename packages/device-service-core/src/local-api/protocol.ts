@@ -16,6 +16,9 @@ export type * from "./protocol-delegated.ts";
 import type { SessionEndpoints, SessionEndpointsData } from "./protocol-delegated.ts";
 import type { SessionCommand, SessionCommandPart } from "./protocol-command.ts";
 export type * from "./protocol-command.ts";
+export type * from "./protocol-control.ts";
+
+import type { ControlAttachGet, ControlAttachSet, ControlAttachState } from "./protocol-control.ts";
 
 // The local API v1 messages (docs/local-api.md). One JSON object per LF-terminated line: the handshake, then
 // requests {id, type, ...} each answered by exactly one response, and pushed events {type: "event", kind, ...}.
@@ -181,7 +184,9 @@ export type LocalRequest =
   | SessionRead
   | EnforcementReport
   | ShutdownForUpgrade
-  | SessionEndpoints;
+  | SessionEndpoints
+  | ControlAttachGet
+  | ControlAttachSet;
 export type RequestType = LocalRequest["type"];
 
 export type DeviceRow = {
@@ -213,6 +218,8 @@ export type ResponseData = {
   readonly "enforcement.report": Empty;
   readonly "owner.shutdown_for_upgrade": Empty;
   readonly "session.endpoints": SessionEndpointsData;
+  readonly "control.attach.get": ControlAttachState;
+  readonly "control.attach.set": ControlAttachState;
 };
 export type PathRefusal = { readonly component: string; readonly problem: PathRefusalProblem };
 export type ErrorBody = {

@@ -57,6 +57,7 @@ function readyReport(overrides: Partial<Extract<ComputerUseDoctorReport, { kind:
       focusGuard: true,
       stopPath: "global",
       screenLocked: false,
+      displayAsleep: false,
     },
     ...overrides,
   }
@@ -101,7 +102,7 @@ describe("computer use doctor rendering", () => {
       "PASS computer use engine: ready (explicit) /tmp/senpi-desktop-engine (version 0.1.0, ABI senpi-desktop/1, protocol 1)",
       "PASS computer use backend: quartz (Quartz WindowServer)",
       "PASS computer use permissions: capture=granted input=granted accessibility=granted",
-      "PASS computer use display: count=2 screenLocked=false",
+      "PASS computer use display: count=2 screenLocked=false displayAsleep=false",
       "PASS computer use stop path: global",
     ])
   })
@@ -143,8 +144,19 @@ describe("computer use doctor rendering", () => {
 
     // then
     expect(lines).toContain("WARN computer use permissions: capture=denied input=denied accessibility=denied")
-    expect(lines).toContain("WARN computer use display: count=0 screenLocked=true")
+    expect(lines).toContain("WARN computer use display: count=0 screenLocked=true displayAsleep=false")
     expect(lines).toContain("WARN computer use stop path: none reason=portal-unavailable")
+  })
+
+  test("#given every display of the session asleep #when rendered #then the display line warns and says so", () => {
+    // given
+    const report = readyReport({ capabilities: { ...readyReport().capabilities, displayAsleep: true } })
+
+    // when
+    const lines = formatComputerUseDoctorLines(report)
+
+    // then
+    expect(lines).toContain("WARN computer use display: count=2 screenLocked=false displayAsleep=true")
   })
 
   test("#given a quarantined engine #when rendered #then the diagnostic and every tried path are visible", () => {

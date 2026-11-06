@@ -1,3 +1,25 @@
+## 2026-11-05 - An applied onboarding scan stays retained for understanding (#12509)
+
+`omo.onboarding.apply` used to delete the scan from the process-wide store before applying it, so `omo.onboarding.understand` on the same `scanId`, which the desktop sends right after About you's apply, answered `unavailable`. Apply now marks the held scan `applied` (checked and set before its first `await`, so racing applies still produce one success) and leaves it retained with its in-memory digests until the ten-minute TTL or the eight-scan eviction removes it; a failed or expired scan is still dropped at apply. A second apply answers `unavailable` as before. The understand refusal no longer lists "was applied" among its causes.
+
+## 2026-11-04 - A timed-out bwrap probe is not cached (#12378)
+
+`probeBwrapUsability` used to memoize every verdict for the process lifetime, including a smoke test that hit its 3000 ms timeout. Under `auto` every later reflection child then ran unsandboxed, and under `required` every later reflection was refused. Only definitive verdicts are memoized now (exited 0, exited nonzero such as the user-namespace denial, or spawn failure). A timeout is returned to its caller and the next spawn's probe runs the smoke again. Concurrent callers still share one in-flight smoke.
+
+Because a timed-out spawn now runs unsandboxed under `auto` while the next one re-probes, the deferred (async) probe path reports per spawn: the transform's `wasSandboxed` and `warning` describe the latest spawn instead of the build-time guess, and `identity-runtime` logs `memory reflection sandbox degraded` when the state changes to a new degradation reason (and `memory reflection sandbox restored` when it recovers), never once per spawn. `required` still fails closed. A test also pins that a spawn-error verdict stays cached (the smoke never runs again).
+
+## 2026-11-04 - The next turn releases a run Stop whose Resume was missed (#12343)
+
+When the run-pause bridge misses the Resume of a user Stop, the pause ledger stays `applied` with admission closed while the engine holds no Stop, and no later hold-change event can arrive. `EngineRunPauseBridge.releaseStale()` resumes the recorded Stop through the normal Resume path when the engine's live ledger is at or past it and holds no user Stop, and every real `before_agent_start` starts it in the background. It acts only on a Stop left `applied` with no Resume already in flight, so the ordinary Stop-then-message path keeps its own Resume, and the turn never waits on child resume turns; a failure is logged.
+
+## 2026-11-03 - Run-paused task children resume and never stay paused forever (#12268)
+
+A user Stop pauses the background children of that run. The run's Resume now reaches them: the bridge resumes the recorded Stop whenever the resumed event's seq is at or above it, because the Stop's own `run_fence` holds raise the engine seq. A participant the released Resume could not restore is retried on a bounded schedule; one still lost after that has its paused run ended as `error` with `failure_kind: session_unavailable`, its lane slot freed and its parent notified. A paused child a live foreign host owns is never ended. The widget renders a paused child as paused with no clock, and `/task-kill` lists paused children.
+
+## 2026-10-28 - Memory shutdown waits for in-flight memory work (#11671)
+
+`MemoryBlockCache.settled()` and `RecallCorpusCache.settled()` now cover every call from its first repository read (HEAD, the persisted-store load, the compile or corpus load) through a shared `InFlightReads` tracker, and the prompt prebuild runs its HEAD read through `MemoryBlockCache.track()`. The memory component registers its hooks through `trackMemoryHooks()`, which tracks every hook's promise (`session_shutdown` itself excepted) and every memory tool execute in one component-wide tracker (on quit the host runs the drain before it aborts a running tool); the bind-time reconcile, the registration-time transient sweep, the sync-status refresh, pressure dream requests and idle dream fires run through it too, and the shutdown drain awaits it in a `memory-work-settle` step that runs last, after the drain's own steps (`wiring-shutdown.ts`), so work that stalls cannot starve the facts enqueue, the skills-usage flush or the shutdown evaluators. To keep `omo.js` inside its byte budget, the dream conversation selection (`dream-selector.ts`) moves out of the entry bundle into the memory commands sidecar (`extensions/omo-memory-commands.js`), which a dream fire loads through the shared commands loader only when it selects conversations.
+
 ## 2026-11-02 - Finished team members leave the task widget (#12160)
 
 The below-editor task widget now shows only running or parked work. A team member that completes its turn leaves the widget even while its handle stays resident, instead of lingering as a `process completed` row until the team shuts down. `/tasks` still lists it, `task_send` still revives it, and its row returns while it runs again. Task lifecycle, residency and messaging are unchanged.
