@@ -46,6 +46,57 @@ const notSentReason = (error: unknown): string => (error instanceof LocalApiErro
 // Like the port's read, every failure of one is a typed refusal: there is nothing that may have run.
 const READ_ONLY_RECORDS: ReadonlySet<string> = new Set(["get_state", "get_messages"])
 
+// The reads answered from the session's local mirror once one full read of them is held. A state or message read is
+// held until the session's attach shows anything happening there (a record, a frame on its channel, a new snapshot, a
+// pending or lost channel) or this device sends it a command; the model catalog changes with none of those, so it is
+// held until a new snapshot or the attach ends. Each is also bounded in age, in case the session's stream stalls.
+const MIRRORED_RECORDS: ReadonlySet<string> = new Set(["get_state", "get_messages", "get_available_models"])
+const MIRROR_MAX_AGE_MS = 30_000
+const CATALOG_MAX_AGE_MS = 600_000
+
+type Held = { readonly response: JsonObject; readonly at: number; readonly catalog: boolean }
+
+/**
+ * One remote session's mirror: the last full answer of each read, kept while nothing has happened on the session since
+ * that read was sent (`generation` counts what happened), so a read answered here costs no round trip.
+ */
+function createMirror(attached: RemoteAttach) {
+  const held = new Map<string, Held>()
+  let generation = 0
+  const changed = (): void => {
+    generation += 1
+    for (const [key, value] of held) if (!value.catalog) held.delete(key)
+  }
+  attached.onEvent((event) => {
+    if (event.kind === "snapshot") {
+      generation += 1
+      held.clear()
+    } else changed()
+  })
+  attached.onFrame(changed)
+  attached.onChannelLoss(changed)
+  return {
+    generation: () => generation,
+    changed,
+    get: (key: string): JsonObject | undefined => {
+      const value = held.get(key)
+      if (value === undefined) return undefined
+      if (Date.now() - value.at <= (value.catalog ? CATALOG_MAX_AGE_MS : MIRROR_MAX_AGE_MS)) return value.response
+      held.delete(key)
+      return undefined
+    },
+    // Kept only when nothing happened on the session while the read was out: its answer may predate that change.
+    keep: (key: string, response: JsonObject, sentAt: number, catalog: boolean): void => {
+      if (sentAt === generation) held.set(key, { response, at: Date.now(), catalog })
+    },
+  }
+}
+
+type Mirror = ReturnType<typeof createMirror>
+type Session = { readonly attached: RemoteAttach; readonly mirror: Mirror }
+
+const mirrorKey = (record: WireRpc): string => JSON.stringify(Object.entries(record).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+
 function outcomeOf(result: CommandResult): RemoteCommandOutcome {
   const { outcome } = result
   if (outcome.state === "engine_refused") return { kind: "refused", reason: outcome.reason }
@@ -64,11 +115,12 @@ function outcomeOf(result: CommandResult): RemoteCommandOutcome {
 
 /**
  * The account half of the thread tools over this device's device service: one proven connection, rebuilt after it
- * closes or fails, and one attach per remote session, dropped when it ends.
+ * closes or fails, and one attach per remote session, kept across ops and dropped when it ends (the next op attaches
+ * again), with the session's read mirror on it: a command costs one round trip, and a warm status or view none.
  */
 export function createDeviceServiceSessions(options: DeviceServiceSessionsOptions): RemoteSessionsPort {
   let service: Promise<DeviceService> | undefined
-  const attaches = new Map<string, Promise<RemoteAttach>>()
+  const attaches = new Map<string, Promise<Session>>()
   const connect = options.connect ?? (() => connectDeviceService({ version: options.version }))
   const retryDelay = options.retryDelay ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)))
   const svc = (): Promise<DeviceService> => service ??= connect().then(
@@ -78,12 +130,15 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
     },
     (error: unknown) => { service = undefined; throw error },
   )
-  const attach = (device: string, sessionId: string): Promise<RemoteAttach> => {
+  const attach = (device: string, sessionId: string): Promise<Session> => {
     const key = `${device}\u0000${sessionId}`
     const known = attaches.get(key)
     if (known !== undefined) return known
     const opened = svc().then((connected) => connected.attach(device, sessionId)).then(
-      (attached) => { void attached.detached.then(() => attaches.delete(key)); return attached },
+      (attached) => {
+        void attached.detached.then(() => { if (attaches.get(key) === opened) attaches.delete(key) })
+        return { attached, mirror: createMirror(attached) }
+      },
       (error: unknown) => { attaches.delete(key); throw error },
     )
     attaches.set(key, opened)
@@ -119,10 +174,10 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         return { kind: "uncertain", reason: "reply_lost" }
       }
     },
-    sessionCommand: async (device, sessionId, rpc) => {
+    sessionCommand: async (device, sessionId, rpc, commandOptions) => {
       // Before the command goes out nothing can have run: an attach that fails (session_not_found, peer_not_found,
       // host_not_answering, a lost connection) or a record that is not JSON is refused with its code, typed.
-      let attached: RemoteAttach
+      let session: Session
       let record: WireRpc
       try {
         record = wireRecord(rpc)
@@ -130,15 +185,29 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         return { kind: "refused", reason: "invalid_record" }
       }
       try {
-        attached = await attach(device, sessionId)
+        session = await attach(device, sessionId)
       } catch (error) {
         return { kind: "refused", reason: notSentReason(error) }
       }
-      const readOnly = READ_ONLY_RECORDS.has(String(rpc["type"]))
+      const { attached, mirror } = session
+      const type = String(rpc["type"])
+      const readOnly = READ_ONLY_RECORDS.has(type)
+      const mirrored = MIRRORED_RECORDS.has(type)
+      const key = mirrorKey(record)
+      if (mirrored && commandOptions?.fresh !== true) {
+        const held = mirror.get(key)
+        if (held !== undefined) return { kind: "ok", response: held, local: true }
+      }
+      // Any other record may change the session, so nothing held about it is answered again, sent or not.
+      if (!mirrored) mirror.changed()
+      const sentAt = mirror.generation()
       try {
         const outcome = outcomeOf(await attached.command(record))
+        if (!mirrored) mirror.changed()
+        else if (outcome.kind === "ok") mirror.keep(key, outcome.response, sentAt, type === "get_available_models")
         return readOnly && outcome.kind === "uncertain" ? { kind: "refused", reason: outcome.reason } : outcome
       } catch (error) {
+        if (!mirrored) mirror.changed()
         // The attach succeeded, so a failure without a local API code is a lost reply, not a failed attach.
         if (readOnly) return { kind: "refused", reason: error instanceof LocalApiError ? error.code : "reply_lost" }
         // Only a code that answers before sending ran nothing. Anything else - a timeout after sending, the attach or
@@ -149,24 +218,37 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
     },
     read: async (device, sessionId, tail) => {
       // A read changes nothing on the other device, so every failure is a typed refusal, never uncertain.
+      let session: Session
+      try {
+        session = await attach(device, sessionId)
+      } catch (error) {
+        return { kind: "refused", reason: notSentReason(error) }
+      }
+      const key = `session.read\u0000${tail}`
+      const held = session.mirror.get(key)
+      if (held !== undefined) return { kind: "ok", response: held, local: true }
+      const sentAt = session.mirror.generation()
       let page: Awaited<ReturnType<RemoteAttach["read"]>>
       try {
-        page = await (await attach(device, sessionId)).read({ tail })
+        page = await session.attached.read({ tail })
       } catch (error) {
         return { kind: "refused", reason: notSentReason(error) }
       }
       const entries: JsonObject[] = page.entries.flatMap((item) => ("entry" in item && typeof item.entry === "object" && item.entry !== null && !Array.isArray(item.entry) ? [item.entry as JsonObject] : []))
+      session.mirror.keep(key, { entries }, sentAt, false)
       return { kind: "ok", response: { entries } }
     },
-    locate: async (device, engineId) => {
+    locate: async (device, engineId, knownKey) => {
       let connected: DeviceService
       try {
         connected = await svc()
       } catch (error) {
         return { kind: "refused", reason: notSentReason(error) }
       }
+      // A create reply that already names the session's listing key needs no session.locate round trip.
       let key: string
-      try {
+      if (knownKey !== undefined) key = knownKey
+      else try {
         key = (await connected.locate(device, engineId)).key
       } catch (error) {
         return { kind: "refused", reason: error instanceof LocalApiError ? error.code : "locate_failed" }

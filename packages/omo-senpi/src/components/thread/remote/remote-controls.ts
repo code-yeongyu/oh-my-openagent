@@ -17,16 +17,23 @@ const modelsOf = (value: unknown): ModelChoice[] =>
 
 /**
  * thread_set_model on another device: the same rule as here, matched against that thread's own catalog
- * (`get_available_models`), then its engine's `set_model` on the session, both through the session's command path.
+ * (`get_available_models`, held by the session's mirror after its first read, and read again when the held one has no
+ * match), then its engine's `set_model` on the session, whose reply confirms the model: one round trip once warm.
  */
 export async function setModelRemote(remote: RemoteThreadSurface, row: RemoteSessionRow, request: { readonly model: string; readonly provider?: string | undefined }): Promise<ThreadToolResult> {
   const offline = await deviceOnline(remote, row.device)
   if (offline !== undefined) return offline
   const empty = modelPatternFailure(request.model)
   if (empty !== undefined) return empty
-  const listed = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_available_models", sessionId: row.session_id })
+  const catalog = { type: "get_available_models", sessionId: row.session_id }
+  const listed = await remote.sessions.sessionCommand(row.device, row.session_id, catalog)
   if (listed.kind !== "ok") return outcomeFailure(listed, row.device)
-  const matched = matchModel(modelsOf(replyData(listed.response)["models"]), request.model, request.provider)
+  let matched = matchModel(modelsOf(replyData(listed.response)["models"]), request.model, request.provider)
+  if (matched.kind !== "match" && listed.local === true) {
+    const relisted = await remote.sessions.sessionCommand(row.device, row.session_id, catalog, { fresh: true })
+    if (relisted.kind !== "ok") return outcomeFailure(relisted, row.device)
+    matched = matchModel(modelsOf(replyData(relisted.response)["models"]), request.model, request.provider)
+  }
   if (matched.kind !== "match") return matched
   const set = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "set_model", sessionId: row.session_id, provider: matched.model.provider, modelId: matched.model.id })
   if (set.kind !== "ok") return outcomeFailure(set, row.device)
