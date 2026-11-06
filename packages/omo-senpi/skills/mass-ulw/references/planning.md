@@ -51,7 +51,7 @@ Specialty categories - chosen by the KIND of work, never by difficulty:
 | --- | --- |
 | `visual-engineering` | Frontend, UI, styling, animation. |
 | `writing` | Docs, prose, technical writing. |
-| `git` | Git operations only. |
+| `git` | Git operations only, and only when this session's omo config defines a `git` category: it is not built in, and an unconfigured category name is refused. |
 | `deep-low` | Hairy debugging or cross-module reasoning a ladder rung could not hold, settled from what the worker reads. |
 | `deep-high` | The same, when the central decision cannot be settled from evidence: a trade-off, a cross-package contract, a mechanism with no in-repo pattern, or correctness argued from invariants. |
 | `ultrabrain` | At most ONE node per graph - the single genuinely hard reasoning problem everything else depends on. |
@@ -67,18 +67,21 @@ A graph whose every node is `deep-low` or `deep-high` is a routing failure: it p
 
 ## Eval orchestration patterns
 
-The dag surface is built to be driven from an eval cell: the JS SDK is a thin proxy over the `workflow` tool, and a settled run returns every node's output text to the cell (`result.nodes[id].output`). That makes the cell the meta-orchestrator AROUND runs, not just a launcher. The patterns below are all standard practice - use them.
+The dag surface is built to be driven from an eval cell: the JS SDK is a thin proxy over the `workflow` tool, and a settled run returns every node's output text to the cell (`sdk.wait` resolves with the tool envelope, so the text is `(await sdk.wait(runId)).details.result.nodes[id].output`). That makes the cell the meta-orchestrator AROUND runs, not just a launcher. The patterns below are all standard practice - use them.
 
 **Data-driven graph construction.** Build the node list in a loop from runtime data, so fan-out width is decided by what actually exists, not by what you guessed up front:
 
 ```js
 const sdk = await import(`${env("OMO_DAG_SDK_ROOT")}/sdk.js`)
-const targets = await glob("packages/*/src/index.ts")
+const targets = await Array.fromAsync(new Bun.Glob("packages/*/src/index.ts").scan("."))
+const slug = (path) => path.split("/")[1]   // "packages/<name>/src/index.ts" -> "<name>"
+const auditId = (t) => `audit-${slug(t)}`
+const today = new Date().toISOString().slice(0, 10)
 const dag = sdk.define({ key: `audit-${today}`, name: "Repo audit" })
 for (const t of targets) {
-  dag.node({ id: `audit-${slug(t)}`, category: "quick", prompt: `TASK: Audit ${t} for stale API references. DELIVERABLE: ... VERIFY: ... STOP WHEN: ...` })
+  dag.node({ id: auditId(t), category: "quick", prompt: `TASK: Audit ${t} for stale API references. DELIVERABLE: ... VERIFY: ... STOP WHEN: ...` })
 }
-dag.node({ id: "synthesize", category: "unspecified-high", prompt: "...", dependsOn: targets.map(slug) })
+dag.node({ id: "synthesize", category: "unspecified-high", prompt: "...", dependsOn: targets.map(auditId) })
 const run = await sdk.start(dag)
 ```
 
@@ -86,7 +89,7 @@ const run = await sdk.start(dag)
 
 ```js
 const probe = await sdk.wait((await sdk.start(probeDag)).run_id)
-const findings = probe.nodes["probe"].output
+const findings = probe.details.result.nodes["probe"].output
 if (findings.includes("critical")) {
   const fix = sdk.define({ key: `fix-${today}`, name: "Fix" })
   fix.node({ id: "fix", category: "deep-low", prompt: `TASK: ... FINDINGS:\n${findings}` })
@@ -98,7 +101,7 @@ if (findings.includes("critical")) {
 
 **Trigger-launched runs.** A run does not have to start from a user turn: a monitor hit, a goal-loop wake, or a task-completion notification can be the trigger, and the cell that fires on the wake builds and starts the next graph. Conditional pipelines live in your code, never in the definition - the graph itself has no branch construct.
 
-**Adaptive retries.** Read `result.nodes[id].error`, then recover IN PLACE on the same run: `retry` re-runs the failed nodes, and `amend` re-runs them with an edited definition. A new key is never the retry mechanism - it starts a different run (the one exception is a chain node that fails while its siblings still run; see the Failure playbook). Re-issuing the SAME definition under the old key returns the existing run untouched (`reused: true`), so it never retries anything on its own.
+**Adaptive retries.** Read `details.result.nodes[id].error` on the waited envelope, then recover IN PLACE on the same run: `retry` re-runs the failed nodes, and `amend` re-runs them with an edited definition. A new key is never the retry mechanism - it starts a different run (the one exception is a chain node that fails while its siblings still run; see the Failure playbook). Re-issuing the SAME definition under the old key returns the existing run untouched (`reused: true`), so it never retries anything on its own.
 
 **Settle wakes drive the cell.** Call `start` and return. The session wakes when a run settles or pauses, never on a single node's completion. To act on part of a run before the rest settles, give that part its own run, or `monitor` the handoff file of the node that part ends in (its prompt writes the file as its final act) and start a separate run from it; `amend` and `retry` refuse a running run. `snapshot(run_id)` is a one-off read for a midpoint decision. Use `wait()` only inside a detached cell.
 
@@ -113,7 +116,7 @@ The dag is not the only fan-out surface, and picking the wrong one strands the r
 - **A dag** when the work is stage-shaped: every stage you can already write goes into one graph and hands off through files, and runs chain only where the next stage's shape depends on what was found. Journaled resume, idempotent keys, and the `/dag` view come free.
 - **A `team_create` team** when workers must talk DURING the work: broadcasting leads the moment they surface, multi-round debate, or members accumulating investigation context across re-tasking. A dag node takes ONE prompt at dispatch; `send` can steer or revive that node's child afterwards, but the graph has no mid-run conversation between nodes.
 - **A plain ulw-research request goes to the team path.** Cross-critique and expand loops are team mechanics; use a dag for the independent harvest stages only.
-- **A MASS research request goes to the dag path, at mass scale.** When the user combines the mass trigger with research ("mass ulw research", "mulw research", "ulw mass research"), they asked for over-collection no roster of 8 members can produce: run the harvest as cluster runs under the section below, and keep a team only for the debate rounds the claim graph needs. Either path inherits ulw-research's delivery gates - rendered-page visual QA, then the proofread pass - for any report or PDF deliverable.
+- **A MASS research request goes to the dag path, at mass scale.** When the user combines the mass trigger with research ("mass ulw research", "mulw research", "ulw mass research"), they asked for over-collection no roster of 8 members can produce: run the harvest as cluster runs under the section below, and keep a team only for the debate rounds the claim graph needs. Either path inherits ulw-research's delivery gates in order - static gates, fidelity gate, layout gates, rendered-page visual QA, then the proofread pass - for any report or PDF deliverable.
 
 ## Mass research - over-collect through per-angle chains, then reduce
 
