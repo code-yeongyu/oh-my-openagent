@@ -10,6 +10,7 @@ mod backend;
 mod capture;
 mod compositor {
     pub mod hyprland;
+    pub mod kwin;
 }
 mod input;
 #[cfg(test)]
