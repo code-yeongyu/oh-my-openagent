@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:e6dc4b2a3f5241ff9999bc7eef65456420390b5a0066d12b93ead546a81a7d24:4eb0776bb3a37d119ca5b3fccdcab7d8b2f3f3840b6d11cf3d50263f3af0ec27
+// omo-codex-install:b837866f052aeaebdb29434aa060c717e1588680ac2d27dd6470c3aa46bf6ce0:339b2606b7d2b32746534d242fc03fa67d973e14ef9d15e8669dbf08c420dba7
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -10205,7 +10205,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "5.1.57",
+    version: "5.1.62",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -20270,6 +20270,15 @@ var OmoTelemetrySettingsSchema = OmoTelemetrySettingsLayerSchema.extend({
   enabled: boolean2().default(true)
 }).strict();
 
+// packages/omo-config-core/src/schema/device-service.ts
+var OmoDeviceServiceSettingsShape = {
+  enabled: boolean2()
+};
+var OmoDeviceServiceSettingsLayerSchema = object(OmoDeviceServiceSettingsShape).partial().strict();
+var OmoDeviceServiceSettingsSchema = OmoDeviceServiceSettingsLayerSchema.extend({
+  enabled: boolean2().default(true)
+}).strict();
+
 // packages/omo-config-core/src/schema/format-on-mutation.ts
 var mode = _enum(["off", "best-effort", "required"]);
 var languages = record(string2(), boolean2()).optional();
@@ -20312,6 +20321,7 @@ var OmoTypedHarnessConfigSchema = object({
   model_pad: OmoModelPadSchema.optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+  device_service: OmoDeviceServiceSettingsLayerSchema.optional(),
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),
   computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
@@ -20331,6 +20341,7 @@ var OmoConfigProfileSchema = object({
   model_pad: OmoModelPadSchema.optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+  device_service: OmoDeviceServiceSettingsLayerSchema.optional(),
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),
   computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
@@ -20355,6 +20366,7 @@ var OmoConfigSchema = object({
   model_pad: OmoModelPadSchema.optional(),
   memory: OmoMemorySettingsSchema.optional(),
   telemetry: OmoTelemetrySettingsSchema.optional(),
+  device_service: OmoDeviceServiceSettingsSchema.optional(),
   side_panel: OmoSidePanelSettingsSchema.optional(),
   computer: OmoComputerSettingsSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
@@ -20382,6 +20394,7 @@ var OmoConfigLayerSchema = object({
   model_pad: OmoModelPadSchema.optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+  device_service: OmoDeviceServiceSettingsLayerSchema.optional(),
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),
   computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
@@ -21845,13 +21858,6 @@ function resolveOmoConfigView(options) {
 }
 
 // packages/omo-config-core/src/loader/loader.ts
-function positionAt(content, offset) {
-  const before = content.slice(0, offset);
-  const lineStart = before.lastIndexOf(`
-`) + 1;
-  return { line: before.split(`
-`).length, column: offset - lineStart + 1 };
-}
 function parseJsoncSafe(content) {
   const errors = [];
   const data = parse4(content.charCodeAt(0) === 65279 ? content.slice(1) : content, errors, {
@@ -21898,14 +21904,12 @@ function readConfigSource(path, scope, fileSystem) {
     };
   }
   const parsed = parseJsoncSafe(content);
-  const firstError = parsed.errors[0];
-  if (firstError !== undefined) {
+  if (parsed.errors.length > 0) {
     return {
       diagnostics: [{
         kind: "parse",
         message: `JSONC parse error in ${path}: ${parsed.errors.map((error) => error.message).join(", ")}`,
-        path,
-        position: positionAt(content.charCodeAt(0) === 65279 ? content.slice(1) : content, firstError.offset)
+        path
       }],
       source: { exists: true, loaded: false, path, scope }
     };

@@ -14,9 +14,11 @@ import { LocalApiError } from "../../../src/local-api/errors.ts";
 import { encodeLine, LineDecoder, parseLine } from "../../../src/local-api/framing.ts";
 import {
   CAPABILITIES,
+  type Capability,
   type ClientInfo,
   type ErrorCode,
   type JsonObject,
+  type LocalRequest,
 } from "../../../src/local-api/protocol.ts";
 import { listenLocal, type LocalListener, type Transport } from "../../../src/local-api/transport.ts";
 import { UploadAssembler } from "../../../src/local-api/upload.ts";
@@ -40,6 +42,10 @@ export type FakeOwnerOptions = {
   readonly world: World;
   readonly secure?: SecureFile;
   readonly now?: () => number;
+  /** The welcome's capabilities; every required one by default. A narrower list stands in for an older service. */
+  readonly capabilities?: readonly Capability[];
+  /** Called after each authenticated request was answered, so a test can await one instead of polling the state. */
+  readonly onRequest?: (type: LocalRequest["type"]) => void;
 };
 
 const noopSecure: SecureFile = async () => {};
@@ -86,6 +92,7 @@ export const startFakeOwner = async (options: FakeOwnerOptions): Promise<FakeOwn
     endpoints: new Set(),
     reports: [],
     refresher: null,
+    attach: { attached: true, changedAt: "" },
     now: options.now ?? Date.now,
     mint: mintId,
     stop: async () => {},
@@ -125,7 +132,7 @@ export const startFakeOwner = async (options: FakeOwnerOptions): Promise<FakeOwn
           owner: "service",
           server_proof: serverProof(token, hello.hello.client_nonce, transport.endpoint),
           server_nonce: serverNonce,
-          capabilities: [...CAPABILITIES],
+          capabilities: options.capabilities ?? [...CAPABILITIES],
           state: state.status,
         });
         phase = "proof";
@@ -165,6 +172,7 @@ export const startFakeOwner = async (options: FakeOwnerOptions): Promise<FakeOwn
           : { id: request.id, type: "response", ok: true, data: outcome.reply.data },
       );
       outcome.after?.();
+      options.onRequest?.(request.type);
     };
     const decoder = new LineDecoder(
       (line) => {
