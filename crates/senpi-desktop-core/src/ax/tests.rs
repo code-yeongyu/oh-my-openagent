@@ -86,6 +86,7 @@ fn p(role: &str, title: Option<&str>) -> AxProps {
 }
 fn window() -> DesktopWindow {
     DesktopWindow {
+        identity: None,
         id: "7".into(),
         title: "Title".into(),
         app: "Safari".into(),

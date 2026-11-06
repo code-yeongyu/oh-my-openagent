@@ -58,6 +58,11 @@ export async function push(deps: EngineDeps, journal: SyncJournal, batchBytes = 
 async function pushOne(deps: EngineDeps, journal: SyncJournal, batchBytes: number): Promise<PushOutcome> {
   const pending = await journal.pending()
   let out = pending.outgoing
+  if (out !== null && deps.sealer.sealedBySelf !== undefined && !(await deps.sealer.sealedBySelf(out))) {
+    deps.log?.("sync: the journaled batch was sealed by a previous principal of this device; re-sealing it")
+    await journal.setPending({ items: pending.items, outgoing: null })
+    out = null
+  }
   if (out === null) {
     const first = splitBatches(pending.items, batchBytes)[0]
     if (first === undefined) return "idle"

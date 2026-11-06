@@ -1,9 +1,11 @@
 import { existsSync } from "node:fs"
+import { adoptedEngineTrust } from "@code-yeongyu/senpi/engine-trust"
 import { join } from "node:path"
 import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import { doctorCoverageLines } from "./bin/lib/category-coverage.js"
 import { doctorComputerUseLines } from "./bin/lib/computer-use-doctor.js"
 import { daemonReportLines } from "./bin/lib/daemon.js"
+import { keychainHelperDoctorLines } from "./bin/lib/keychain-helper-doctor.js"
 import { reapStaleEngines, staleEngineReport, transientMemoryReport, warningsForSettings } from "./bin/lib/doctor.js"
 import { migrationReport } from "./bin/lib/doctor-migration.js"
 import { runDoctorModels } from "./bin/lib/model-chains.js"
@@ -13,6 +15,7 @@ import { needsSetupSuggestion, type detectHarnesses } from "./bin/lib/setup-dete
 import { compiledDiagnosticRuntimeLoader, loadCompiledCoverageEngine } from "./compiled-diagnostic-runtime"
 import { configDoctorLines } from "./config-doctor-runtime"
 import { claudeCodeDoctorLines } from "./claude-code-doctor"
+import { engineTrustDoctorLines, readEngineTrustRecords } from "./engine-trust-doctor"
 
 type DaemonEngine = { run(args: string[], options: { env: Record<string, string | undefined> }): { exitCode: number; stdout: string; stderr: string } }
 
@@ -22,6 +25,8 @@ export type CompiledDoctorOptions = {
   readonly platform?: NodeJS.Platform
   readonly coverageLines?: () => Promise<string[]>
   readonly computerUseLines?: () => Promise<string[]>
+  readonly keychainHelperLines?: () => string[]
+  readonly trustLines?: () => Promise<string[]>
   readonly list?: () => { pid: number; ppid: number; elapsed: string; tty: string; command: string }[]
   readonly kill?: (pid: number, signal: NodeJS.Signals) => void
 }
@@ -51,6 +56,13 @@ function computerUseLines(input: CompiledDoctorInput, env: NodeJS.ProcessEnv): P
     version: input.version,
     env: { ...env, OMO_PACKAGE_DIR: env.OMO_PACKAGE_DIR ?? input.execDir },
   })
+}
+
+/** Design revision 11: the adopted generation's default-file outcome, INFO only, from the trust log beside it. */
+async function trustLines(options: CompiledDoctorOptions): Promise<string[]> {
+  if (options.trustLines) return options.trustLines()
+  const marker = adoptedEngineTrust()
+  return engineTrustDoctorLines({ platform: process.platform, marker, records: await readEngineTrustRecords(marker) })
 }
 
 function coverageLines(input: CompiledDoctorInput, env: NodeJS.ProcessEnv): Promise<string[]> {
@@ -95,6 +107,7 @@ export async function runCompiledDoctor(input: CompiledDoctorInput): Promise<voi
   const launchSpec = launchSpecDoctorLines(join(input.execDir, "plugin"))
   if (launchSpec.some((line) => line.startsWith("FAIL "))) failed = true
   lines.push(...launchSpec)
+  lines.push(...(input.options?.keychainHelperLines?.() ?? keychainHelperDoctorLines({ packageRoot: input.execDir, helperRelPath: "omo-keychain" })))
   if (input.engine !== undefined) {
     lines.push(...daemonReportLines({ engine: input.engine, pluginRoot: join(input.execDir, "plugin"), agentDir: canonicalAgentDir(), env: process.env, platform: process.platform }))
   }
@@ -104,6 +117,7 @@ export async function runCompiledDoctor(input: CompiledDoctorInput): Promise<voi
   lines.push(...piConfigReport({ env: options.env, homeDir: options.homeDir }))
   lines.push(...staleEngineReport(options))
   lines.push(...transientMemoryReport({ env }))
+  lines.push(...await trustLines(options))
   const [computerUse, coverage] = await Promise.all([computerUseLines(input, env), coverageLines(input, env)])
   if (computerUse.some((line) => line.startsWith("FAIL "))) failed = true
   lines.push(...computerUse, ...claudeCodeDoctorLines({ runtimeDir: input.execDir, env }), ...coverage)

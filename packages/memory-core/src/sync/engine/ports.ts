@@ -158,6 +158,12 @@ export interface SealedBatch {
 /** The outgoing half of the crypto port: encrypt and sign a batch for upload. */
 export interface Sealer {
   seal(batchId: string, baseSeq: number, payload: BatchPayload): Promise<SealedBatch>
+  /**
+   * Whether a batch sealed earlier carries this session's own record signature. A journal can hold a
+   * batch a previous principal of this machine sealed (its keys were discarded, then a new principal
+   * re-joined, #12280): that batch is re-sealed, never sent.
+   */
+  sealedBySelf?(sealed: { readonly baseSeq: number; readonly digest: string; readonly epoch: number; readonly link: string; readonly recordSig: string }): Promise<boolean>
 }
 
 /** The item model (#10203 device API) as the engine uses it. */

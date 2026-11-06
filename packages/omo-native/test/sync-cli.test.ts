@@ -30,7 +30,8 @@ async function context(overrides: { readonly keys?: number; readonly pending?: P
     listPending: async () => overrides.pending ?? [],
     openPending: unused, readPending: unused, answerPending: unused, revealPending: unused,
   }
-  return { account: "acct", serviceDeviceId: "dev_svc", keyring: createInMemoryDeviceKeyring("p"), pinDir: await temporaryHome(), chain, pairing }
+  const authority = { signal: new AbortController().signal, admit: <T>(dispatch: () => T): T => dispatch() }
+  return { account: "acct", serviceDeviceId: "dev_svc", keyring: createInMemoryDeviceKeyring("p"), pinDir: await temporaryHome(), chain, pairing, authority }
 }
 
 async function runSync(args: string[], dependencies: Partial<SyncCommandDependencies>): Promise<{ readonly out: string[]; readonly err: string[]; readonly exit: typeof process.exitCode }> {
