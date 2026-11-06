@@ -26,6 +26,10 @@ export type ThreadSummary = {
   readonly controls?: readonly ("send" | "read" | "rename" | "set_model" | "set_reasoning" | "interrupt")[]
   /** `thread_create` only: the initial skills attached to the new thread (`initial-skills.ts`). */
   readonly skills?: readonly string[]
+  /** The account device that holds the thread, when it is not this device's (A3: resolved from the account's session list). */
+  readonly device?: string
+  /** The thread's account-wide alias, usable instead of its id in every thread tool. */
+  readonly alias?: string
 }
 
 /**
@@ -67,7 +71,13 @@ export type ThreadCreateResult =
   | ThreadDataError
 
 export type ThreadListResult =
-  | { readonly kind: "ok"; readonly threads: readonly ThreadResultSummary[]; readonly scope: "workspace" | "all" }
+  | {
+      readonly kind: "ok"
+      readonly threads: readonly ThreadResultSummary[]
+      readonly scope: "workspace" | "all"
+      /** Set when the account's other devices could not be listed (A5: `relay_requires_paid_plan`, or the device service is unreachable). */
+      readonly remote_unavailable?: string
+    }
   | ThreadDataError
 
 export type ThreadReadResult =
@@ -82,6 +92,7 @@ export type ThreadReadResult =
       /** Set on the JSONL fallback for a thread whose endpoint is dead: the file may lag the session. */
       readonly source_incomplete?: boolean
       readonly error_note?: string
+      readonly device?: string
     }
   | ThreadDataError
 
@@ -91,13 +102,20 @@ export type ThreadSendResult =
       readonly thread_id: string
       readonly link: string
       readonly delivery: ThreadDelivery
-      readonly message_seq: number
+      /** The gateway row's sequence; absent for a session on another device, which has no row here. */
+      readonly message_seq?: number
       readonly deduplicated: boolean
+      readonly device?: string
     } & ThreadGatewayDeliveryFacts)
   | ThreadDataError
 
 export type ThreadInterruptResult =
   | { readonly kind: "ok"; readonly thread_id: string; readonly turn_id?: string; readonly interrupted: boolean }
+  | ThreadDataError
+
+/** `closed` is false when no live owner held the thread, so there was nothing to close. */
+export type ThreadCloseResult =
+  | { readonly kind: "ok"; readonly thread_id: string; readonly closed: boolean; readonly device?: string }
   | ThreadDataError
 
 export type ThreadHandoffResult =
@@ -116,11 +134,11 @@ export type ThreadThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" 
 export type ThreadReasoningScope = "session" | "turn"
 
 export type ThreadRenameResult =
-  | { readonly kind: "ok"; readonly thread_id: string; readonly name: string }
+  | { readonly kind: "ok"; readonly thread_id: string; readonly name: string; readonly alias?: string; readonly device?: string }
   | ThreadDataError
 
 export type ThreadSetModelResult =
-  | { readonly kind: "ok"; readonly thread_id: string; readonly model: { readonly provider: string; readonly id: string } }
+  | { readonly kind: "ok"; readonly thread_id: string; readonly model: { readonly provider: string; readonly id: string }; readonly device?: string }
   | ThreadDataError
 
 export type ThreadSetReasoningResult =
@@ -201,6 +219,7 @@ export type ThreadToolResult =
   | ThreadReadResult
   | ThreadSendResult
   | ThreadInterruptResult
+  | ThreadCloseResult
   | ThreadHandoffResult
   | ThreadRenameResult
   | ThreadSetModelResult

@@ -101,6 +101,14 @@ export const dispatch = (state: OwnerState, conn: Conn, request: LocalRequest): 
         ? refuse("unsupported", "that device names no engine endpoints")
         : ok({ endpoints: [...endpoints] });
     }
+    case "session.locate": {
+      const located = state.world.located?.[request.device];
+      if (located === undefined) return refuse("unsupported", "that device takes no locate probe");
+      const key = located[request.engine_id];
+      return key === undefined
+        ? refuse("session_not_found", "no session of that device has that engine id")
+        : ok({ device: request.device, key, session: `${request.device}.${key}` });
+    }
     default:
       return assertNever(request);
   }

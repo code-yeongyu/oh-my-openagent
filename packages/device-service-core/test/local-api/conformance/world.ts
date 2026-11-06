@@ -46,6 +46,11 @@ export type World = {
   readonly sessions: readonly WorldSession[];
   // Decision 0018: the engine endpoint keys of the devices whose host takes delegated commands; others answer unsupported.
   readonly endpoints?: { readonly [device: string]: readonly string[] };
+  // #393 part B: per device, the session key a durable engine id locates; a device absent answers unsupported.
+  readonly located?: { readonly [device: string]: { readonly [engineId: string]: string } };
+  // #393: what a host engine endpoint answers to an attach-less session.command {device, endpoint, rpc}: the engine's
+  // reply data (sent as session.command_event before the states) and the outcome states.
+  readonly endpointCommand?: { readonly data: JsonObject; readonly outcome: readonly CommandOutcome[] };
 };
 
 export const PEER = "dev-peer-1";
