@@ -154,4 +154,14 @@ describe("#given test files with mechanically detectable junk", () => {
       })
     }
   })
+
+  test("#when many comments precede a delay #then a named delay is still reported and zero remains exempt", async () => {
+    const comments = "/* c */ ".repeat(28)
+    writeFileSync(join(root, "src", "comments.test.ts"), `await Bun.sleep(${comments}POLL_MS)\nawait Bun.sleep(${comments}0)\n`)
+    const { code, findings } = await run(["src/comments.test.ts"])
+    expect({ code, findings: findings.map(({ line, rule }) => [line, rule]) }).toEqual({
+      code: 1,
+      findings: [[1, "fixed-sleep"]],
+    })
+  })
 })
