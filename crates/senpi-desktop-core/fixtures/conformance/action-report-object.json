@@ -1,0 +1,314 @@
+{
+  "description": "reportMode object (computer-use v2 P1a): engine.hello lists the action-report feature; a completed background click answers an ActionReport delivered_unverified/unsafe with effect unverifiable and auditIds naming its audit notification, which carries that id; a click refused for a stale frame carries data.disposition not_delivered/safe and focusRestoration.",
+  "scenario": "crates/senpi-desktop-backend-fake/fixtures/two-displays-one-window.json",
+  "env": {
+    "SENPI_DESKTOP_FAKE_CLOCK": "1"
+  },
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "engine.hello",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "protocolVersion": "1",
+              "engineVersion": "0.0.0",
+              "buildSha": "unknown",
+              "abi": "senpi-desktop/1",
+              "features": [
+                "action-report"
+              ]
+            }
+          },
+          "variable": [
+            "/result/engineVersion",
+            "/result/buildSha"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "session.open",
+        "params": {
+          "allowHostRelayOnlyStop": true,
+          "showCursor": false,
+          "reportMode": "object"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayServer": null,
+                "capture": true,
+                "input": true,
+                "ax": true,
+                "backgroundWindowInput": true,
+                "cursorOverlay": false,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capturePermission": "granted",
+                "inputPermission": "granted",
+                "axPermission": "granted",
+                "displayCount": 2,
+                "focusGuard": true,
+                "stopPath": "none",
+                "stopReason": "no-global-listener",
+                "integrityLevel": null,
+                "screenLocked": false
+              },
+              "resumeToken": "per-process-random"
+            }
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "stopPath.start",
+        "params": {
+          "chord": "ctrl+alt+shift+escape"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "result": {
+              "suspended": false,
+              "globalLive": false,
+              "hostRelayLive": true,
+              "heartbeatFresh": true,
+              "stopPath": "host-relay",
+              "reason": null
+            }
+          },
+          "variable": [
+            "/result/heartbeatFresh",
+            "/result/reason"
+          ]
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "stopPath.changed",
+            "params": {
+              "suspended": false,
+              "globalLive": false,
+              "hostRelayLive": true,
+              "heartbeatFresh": true,
+              "stopPath": "host-relay",
+              "reason": null
+            }
+          },
+          "variable": [
+            "/params/heartbeatFresh",
+            "/params/reason"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "stopPath.heartbeat",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "result": null
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "capture",
+        "params": {
+          "target": "101",
+          "caps": {
+            "maxWidth": 640
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "result": {
+              "mode": "inline-png",
+              "data": "base64-png",
+              "mimeType": "image/png",
+              "artifactPath": null,
+              "width": 640,
+              "height": 480,
+              "sourceWidth": 800,
+              "sourceHeight": 600,
+              "coordinateWidth": 640,
+              "coordinateHeight": 480,
+              "region": null,
+              "scale": 0.8,
+              "target": "101",
+              "frameId": "frame-01m6fpgstw33ky1ae8azckv6j9-1",
+              "note": null
+            }
+          },
+          "variable": [
+            "/result/data",
+            "/result/frameId"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 6,
+        "method": "click",
+        "params": {
+          "target": "101",
+          "x": 10.0,
+          "y": 10.0
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 6,
+            "result": {
+              "disposition": {
+                "delivery": "delivered_unverified",
+                "retry": "unsafe"
+              },
+              "effect": "unverifiable",
+              "focusRestoration": "not_needed",
+              "auditIds": [
+                "01M6FPGT7M2120RGBWA9PKTN56"
+              ]
+            }
+          },
+          "variable": [
+            "/result/auditIds/0"
+          ]
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "audit",
+            "params": {
+              "action": "click",
+              "target": "101",
+              "delivery": "background",
+              "frameId": null,
+              "code": null,
+              "durationMs": 0,
+              "focusRestored": null,
+              "textLength": null,
+              "textSha256": null,
+              "keys": null,
+              "id": "01M6FPGT7M2120RGBWA9PKTN56"
+            }
+          },
+          "variable": [
+            "/params/durationMs",
+            "/params/focusRestored",
+            "/params/id"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "method": "click",
+        "params": {
+          "target": "101",
+          "x": 10.0,
+          "y": 10.0,
+          "frameId": "frame-from-another-capture"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 7,
+            "error": {
+              "code": -32007,
+              "message": "the frame is not the target's latest capture; capture it again before coordinate input",
+              "data": {
+                "code": "InvalidCoordinateFrame",
+                "hint": null,
+                "disposition": {
+                  "delivery": "not_delivered",
+                  "retry": "safe"
+                },
+                "focusRestoration": "not_needed"
+              }
+            }
+          },
+          "variable": [
+            "/error/message"
+          ]
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "audit",
+            "params": {
+              "action": "click",
+              "target": "101",
+              "delivery": "background",
+              "frameId": "frame-from-another-capture",
+              "code": "InvalidCoordinateFrame",
+              "durationMs": 0,
+              "focusRestored": null,
+              "textLength": null,
+              "textSha256": null,
+              "keys": null,
+              "id": "01M6FPGTMT3V4VBMGKDHKJC01A"
+            }
+          },
+          "variable": [
+            "/params/durationMs",
+            "/params/focusRestored",
+            "/params/id"
+          ]
+        }
+      ]
+    }
+  ]
+}
