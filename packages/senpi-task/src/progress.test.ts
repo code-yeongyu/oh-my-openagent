@@ -122,6 +122,59 @@ describe("child task progress", () => {
     )
   })
 
+  test("#given senpi's fallback switch #when model_changed carries the level before a bare retry_fallback_applied #then the display keeps the applied level", () => {
+    // #7934: senpi emits model_changed (source "fallback", the clamped thinkingLevel) from switchModel, then
+    // retry_fallback_applied whose `to` is the bare provider/model_id selector with no level and no thinking field.
+    const progress = createChildProgress(
+      "st_00000005",
+      { category: "deep", resolvedModel: RESOLVED_MODEL },
+      1_000,
+      () => 2_000,
+    )
+
+    const fallbackSwitch = { type: "model_changed", model: { provider: "openai-codex", id: "gpt-5.6-sol" }, thinkingLevel: "high", source: "fallback" }
+    const fallbackApplied = { type: "retry_fallback_applied", from: "kimi-coding/kimi-k3-unlocked", to: "openai-codex/gpt-5.6-sol", chainKey: "deep", reason: "hard-error" }
+    progress.accept(fallbackSwitch)
+    progress.accept(fallbackApplied)
+
+    expect(progress.details().progress.activity).toBe(
+      "st_00000005 · category:deep(openai-codex/gpt-5.6-sol:high) · fallback:1 · starting",
+    )
+  })
+
+  test("#given a model_changed for another model #when a bare retry_fallback_applied follows #then no stale level is attached", () => {
+    const progress = createChildProgress(
+      "st_00000007",
+      { category: "deep", resolvedModel: RESOLVED_MODEL },
+      1_000,
+      () => 2_000,
+    )
+
+    const otherModelSwitch = { type: "model_changed", model: { provider: "anthropic", id: "claude-opus-5-5" }, thinkingLevel: "max", source: "fallback" }
+    const fallbackApplied = { type: "retry_fallback_applied", from: "kimi-coding/kimi-k3-unlocked", to: "openai-codex/gpt-5.6-sol", chainKey: "deep", reason: "hard-error" }
+    progress.accept(otherModelSwitch)
+    progress.accept(fallbackApplied)
+
+    expect(progress.details().progress.activity).toBe(
+      "st_00000007 · category:deep(openai-codex/gpt-5.6-sol) · fallback:1 · starting",
+    )
+  })
+
+  test("#given a fallback event with thinking in selector #when no explicit thinking field #then the selector suffix is preserved", () => {
+    const progress = createChildProgress(
+      "st_00000006",
+      { category: "deep", resolvedModel: RESOLVED_MODEL },
+      1_000,
+      () => 2_000,
+    )
+
+    progress.accept({ type: "retry_fallback_applied", to: "openai-codex/gpt-5.6-sol:high" })
+
+    expect(progress.details().progress.activity).toBe(
+      "st_00000006 · category:deep(openai-codex/gpt-5.6-sol:high) · fallback:1 · starting",
+    )
+  })
+
   test("#given no events yet #when composed #then activity has no turn-zero noise beyond the base status", () => {
     // given
     const progress = createChildProgress("st_00000003", { category: "deep" }, 1_000, () => 1_000)
