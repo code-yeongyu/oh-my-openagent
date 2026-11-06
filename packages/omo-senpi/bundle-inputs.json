@@ -1640,6 +1640,7 @@
     "packages/senpi-task/src/agent-home.ts",
     "packages/senpi-task/src/agents/agent-model-entry.ts",
     "packages/senpi-task/src/agents/agent-model-registry.ts",
+    "packages/senpi-task/src/agents/agent-persona.ts",
     "packages/senpi-task/src/agents/agent-tool-policy.ts",
     "packages/senpi-task/src/agents/builtin/code-reviewer.ts",
     "packages/senpi-task/src/agents/builtin/explore.ts",

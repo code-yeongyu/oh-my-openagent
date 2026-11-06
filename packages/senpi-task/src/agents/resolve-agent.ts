@@ -14,6 +14,7 @@ import {
   type ParsedAgentModel,
 } from "./agent-model-registry"
 import { agentToolPolicy } from "./agent-tool-policy"
+import { agentPersona } from "./agent-persona"
 import { AGENT_FALLBACK_CHAINS } from "./builtin/fallback-chains"
 import { canonicalAgentName } from "./builtin/legacy-agent-names"
 import type { AgentDefinition } from "./types"
@@ -24,7 +25,7 @@ export type ResolveAgentOptions = {
   readonly distributeModels?: import("@oh-my-opencode/omo-config-core").ModelDistributor
 }
 
-type AgentPersona = {
+export type AgentPersona = {
   readonly agentType: string
   readonly instructions?: string
   readonly toolAllowlist?: readonly string[]
@@ -229,18 +230,6 @@ export function resolveAgent<TModel extends SenpiModelPort>(
   }
 }
 
-function agentPersona(name: string, definition: AgentDefinition): AgentPersona {
-  const agentExecutionMode = toExecutionMode(definition.executionMode)
-  return {
-    agentType: name,
-    ...(definition.prompt !== undefined ? { instructions: definition.prompt } : {}),
-    ...agentToolPolicy(definition),
-    ...(agentExecutionMode !== undefined ? { agentExecutionMode } : {}),
-    ...(definition.allowedSubagents !== undefined ? { allowedSubagents: definition.allowedSubagents } : {}),
-    ...(definition.maxDepth !== undefined ? { maxDepth: definition.maxDepth } : {}),
-  }
-}
-
 function firstConfiguredModel(definition: AgentDefinition): string | undefined {
   const entry = definition.models?.[0]
   if (entry === undefined) return undefined
@@ -277,12 +266,3 @@ function resolvedAgent(
   }
 }
 
-function toExecutionMode(value: string | undefined): AgentPersona["agentExecutionMode"] {
-  switch (value) {
-    case "in-process":
-    case "process":
-      return value
-    default:
-      return undefined
-  }
-}

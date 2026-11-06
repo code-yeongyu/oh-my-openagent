@@ -1,4 +1,6 @@
 import type { DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
+import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
+import type { AgentDefinition, PlanResolutionError } from "@oh-my-opencode/senpi-task"
 
 export type ChainFailureTarget = { readonly category: string } | { readonly agent: string }
 
@@ -56,4 +58,36 @@ export function chainUnavailableText(
  */
 export function pinnedModelUnavailableText(target: ChainFailureTarget, pinnedModel: string): string {
   return `${targetKind(target)} "${targetName(target)}" is pinned to "${pinnedModel}", which this machine's model registry does not serve: that provider is not connected, or it does not list that model id. Fix: connect the provider, or re-pick ${chainFixKey(target)} in Settings. No child was spawned.`
+}
+
+export type AgentUnavailable = {
+  readonly attemptedModel: string | undefined
+  readonly attempted_chain?: readonly DelegateFallbackEntry[]
+  readonly missing_providers?: readonly string[]
+}
+
+// A category refusal: a dead chain names every model and the fix, a pin the registry cannot serve
+// names the pin. Any other model_unavailable keeps the resolver's own text.
+export function categoryModelFailureText(error: PlanResolutionError, omoConfig: OmoConfig): string | undefined {
+  const category = error.category
+  if (category === undefined) return undefined
+  if (error.attempted_chain !== undefined) {
+    return chainUnavailableText({ category }, error.attempted_chain, error.missing_providers ?? [], error.unlisted_provider_model)
+  }
+  const pinned = omoConfig.categories?.[category]?.model
+  return pinned === undefined ? undefined : pinnedModelUnavailableText({ category }, pinned)
+}
+
+export function agentModelFailureText(
+  agentName: string,
+  resolution: AgentUnavailable,
+  agents: Readonly<Record<string, AgentDefinition>>,
+): string {
+  if (resolution.attempted_chain !== undefined) {
+    return chainUnavailableText({ agent: agentName }, resolution.attempted_chain, resolution.missing_providers ?? [], undefined)
+  }
+  const pinned = Object.hasOwn(agents, agentName) ? agents[agentName]?.model : undefined
+  return pinned === undefined
+    ? `No available model for agent "${agentName}" (attempted ${resolution.attemptedModel ?? "none"}).`
+    : pinnedModelUnavailableText({ agent: agentName }, pinned)
 }

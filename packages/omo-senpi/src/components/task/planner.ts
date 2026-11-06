@@ -2,7 +2,7 @@ import { createModelDistributor, isExcludedModel, type ModelDistributor, type Om
 
 import { inheritParentFastMode, type ResolveParentServiceTier } from "./fast-mode-inheritance"
 import { NO_REGISTRY_MESSAGE, resolveExplicitPin, type ResolveDefaultRoute } from "./planner-explicit-pin"
-import { chainUnavailableText, pinnedModelUnavailableText } from "./model-error-text"
+import { agentModelFailureText, categoryModelFailureText } from "./model-error-text"
 import {
   resolveAgent,
   resolveCategory,
@@ -10,12 +10,10 @@ import {
   type ChildPlanner,
   type ExplicitPinRuntime,
   type PlanResolution,
-  type PlanResolutionError,
   type ResolvedAgentResult,
   type SenpiModelPort,
   type SenpiModelRegistryPort,
 } from "@oh-my-opencode/senpi-task"
-import type { DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
 
 type ResolvedPlan = Extract<PlanResolution, { readonly kind: "resolved" }>["plan"]
 type ResolvedModelMetadata = NonNullable<ResolvedPlan["resolved_model"]>
@@ -198,38 +196,6 @@ function toAgentPlan(resolution: ResolvedAgentResult, explicitModel: ResolvedMod
     ...(resolution.allowedSubagents !== undefined ? { allowedSubagents: resolution.allowedSubagents } : {}),
     ...(resolution.maxDepth !== undefined ? { maxDepth: resolution.maxDepth } : {}),
   }
-}
-
-type AgentUnavailable = {
-  readonly attemptedModel: string | undefined
-  readonly attempted_chain?: readonly DelegateFallbackEntry[]
-  readonly missing_providers?: readonly string[]
-}
-
-// A category refusal: a dead chain names every model and the fix, a pin the registry cannot serve
-// names the pin. Any other model_unavailable keeps the resolver's own text.
-function categoryModelFailureText(error: PlanResolutionError, omoConfig: OmoConfig): string | undefined {
-  const category = error.category
-  if (category === undefined) return undefined
-  if (error.attempted_chain !== undefined) {
-    return chainUnavailableText({ category }, error.attempted_chain, error.missing_providers ?? [], error.unlisted_provider_model)
-  }
-  const pinned = omoConfig.categories?.[category]?.model
-  return pinned === undefined ? undefined : pinnedModelUnavailableText({ category }, pinned)
-}
-
-function agentModelFailureText(
-  agentName: string,
-  resolution: AgentUnavailable,
-  agents: Readonly<Record<string, AgentDefinition>>,
-): string {
-  if (resolution.attempted_chain !== undefined) {
-    return chainUnavailableText({ agent: agentName }, resolution.attempted_chain, resolution.missing_providers ?? [], undefined)
-  }
-  const pinned = Object.hasOwn(agents, agentName) ? agents[agentName]?.model : undefined
-  return pinned === undefined
-    ? `No available model for agent "${agentName}" (attempted ${resolution.attemptedModel ?? "none"}).`
-    : pinnedModelUnavailableText({ agent: agentName }, pinned)
 }
 
 function listAvailableAgents(agents: Readonly<Record<string, AgentDefinition>>): readonly string[] {  return Object.entries(agents)
