@@ -22,7 +22,7 @@ User request
   +- archive snapshot of a dead or changed page ------- TIER 1  insane-search (surrogates, provenance-tagged)
   |
   +- Chinese platform (xhs/douyin/weibo/bilibili/v2ex/wechat)  TIER 1.5 agent-reach
-  +- podcast transcript / stock forum ----------------- TIER 1.5 agent-reach
+  +- podcast transcript ------------------------------- TIER 1.5 agent-reach
   +- Twitter feed / LinkedIn profile / GitHub via CLI - TIER 1.5 agent-reach
   |
   +- Tier 1/1.5 returned empty or partial ------------- TIER 2  2a owned engine (stealth)
@@ -71,8 +71,8 @@ The full engine harness (rules R1-R7, the Phase 0 official-API index, the no-sit
 | search | Exa AI | [references/agent-reach/search.md](references/agent-reach/search.md) |
 
 ```bash
-mcporter call 'douyin.parse_douyin_video_info(url: "<URL>")'   # douyin, zero-config
-curl -s "https://r.jina.ai/https://weibo.com/<uid>/<pid>"      # weibo via Jina
+mcporter call 'douyin.parse_douyin_video_info(share_link: "<URL>")'   # douyin, zero-config
+curl -s -H "Authorization: Bearer ${JINA_API_KEY}" "https://r.jina.ai/https://weibo.com/<uid>/<pid>"   # weibo via Jina (key required)
 yt-dlp --dump-json "<bilibili-url>"                            # Bilibili (overseas: add --cookies-from-browser)
 curl -s "https://www.v2ex.com/api/topics/hot.json"            # V2EX public API
 ```
@@ -115,17 +115,19 @@ When the blocked flow needs the user's account, drive the browser they are alrea
 
 ### Cookie login (cross-platform)
 
-`scripts/extract_cookies.py` reads cookies from a local Chromium-family or Firefox-family browser and optionally injects them into the running CDP session. It resolves browser profile paths and decrypts cookie values per-OS (macOS Keychain, Linux libsecret, Windows DPAPI):
+A login the user holds goes through Tier 2b, never through their cookies: the `browser` skill forbids copying a session out of the user's real browser profile (`references/owned-engine/network.md`, Cookies).
+
+`scripts/extract_cookies.py` reads cookies from the default profile store of a local Chromium-family or Firefox-family browser and optionally injects them over CDP. It resolves browser profile paths and decrypts cookie values per-OS (macOS Keychain, Linux libsecret, Windows DPAPI). Because it always reads that default store, run it only where that browser profile is not the user's live profile (for example a dedicated automation account whose browser the task owns); on the user's own machine it would copy their session, so use Tier 2b instead.
 
 ```bash
 # Extract cookies to a file:
 mkdir -p ~/.local/state/omo-cookies
 python3 -B scripts/extract_cookies.py --browser chrome --domain youtube.com --output ~/.local/state/omo-cookies/youtube.cookies.json
-# Extract and inject into the running CDP session:
+# Extract and inject over CDP (needs a browser started with --remote-debugging-port=9242; connectPipe opens no port):
 python3 -B scripts/extract_cookies.py --browser chrome --domain youtube.com --inject --cdp 9242
 ```
 
-Cookie export files are written with owner-only `0600` permissions. Do not place live auth cookies in shared temp directories or commit them to a repo. Cookie injection sends values to CDP over stdin rather than argv. Cookies apply on next navigation — reload after injecting. Google services use fingerprint-bound tokens that may not transfer across browser profiles. Limits in [references/chrome-stealth.md](references/chrome-stealth.md).
+For a Tier 2a owned page, load the exported file and call `omowright.injectCookies(page, cookies)` instead (see [references/chrome-stealth.md](references/chrome-stealth.md)). Cookie export files are written with owner-only `0600` permissions. Do not place live auth cookies in shared temp directories or commit them to a repo. Cookie injection sends values to CDP over stdin rather than argv. Cookies apply on next navigation — reload after injecting. Google services use fingerprint-bound tokens that may not transfer across browser profiles. Limits in [references/chrome-stealth.md](references/chrome-stealth.md).
 
 ## Reference docs
 
@@ -139,7 +141,8 @@ Cookie export files are written with owner-only `0600` permissions. Do not place
 
 ```bash
 # agent-reach auth: set the channel-specific env vars from each tool's docs only if you have access
-# insane-search needs no env vars — it auto-installs deps on first run
+# insane-search: JINA_API_KEY only for the Jina Reader route (the engine skips that surrogate without it)
+# insane-search Python deps: the install one-liner in references/insane-search/README.md
 ```
 
 ## Anti-patterns

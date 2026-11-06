@@ -12,7 +12,7 @@ computer.windows({ app?, title? }?) → ComputerWindowInfo[]
 computer.window(idOrFilter) → ComputerWindow
     Exactly one window; zero or several matches throw listing candidates. Handle fields: id, app, title, pid, bounds, focused.
 computer.focusedWindow() → ComputerWindow | null
-computer.screenshot({ silent? }?) / win.screenshot({ silent? }?) → { target, frameId, width, height, sourceWidth, sourceHeight, scale, path? }
+computer.screenshot({ silent? }?) / win.screenshot({ silent? }?) → { target, frameId, width, height, sourceWidth, sourceHeight, coordinateWidth, coordinateHeight, scale, path? }
     The root captures the focused monitor by default (primary fallback), not the all-display composite. Auto-displays the image unless `silent: true`. Wayland uses the first display the portal reports, not a known compositor primary.
 computer.zoom({ x, y, width, height }, { silent?, frameId? }?) / win.zoom(...) → { target, frameId, width, height, sourceWidth, sourceHeight, coordinateWidth, coordinateHeight, region, scale, path? }
     Fresh native-detail crop of a region in the SAME target's last full screenshot. Desktop/display zoom pins the displays that full frame captured, even after focus moves. Zoom pixels are NOT input coordinates: later clicks still use the last full screenshot's coordinateWidth/coordinateHeight and frameId. A missing/stale full frame or invalid rectangle throws InvalidCoordinateFrame; take a new full screenshot. Same helper on display handles.

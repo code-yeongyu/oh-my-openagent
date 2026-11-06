@@ -1,7 +1,7 @@
 # Swift — LSP setup
 
 - **Builtin server:** `sourcekit-lsp` — `sourcekit-lsp`
-- **Extensions:** `.swift .objc .objcpp`
+- **Extensions:** `.swift .m .mm`
 - **Install hint:** `Included with Xcode or the Swift toolchain`
 
 ## Install
@@ -20,13 +20,13 @@ command -v sourcekit-lsp
 
 ## Configure
 
-Builtin — usually NO config needed (auto-resolved by extension). Configure only to set priority, init options, override extensions, or disable. Same JSON shape in `.codex/lsp-client.json` (Codex) AND `.opencode/lsp.json` (OpenCode/omo):
+Builtin — usually NO config needed (auto-resolved by extension). Configure only to set priority, init options, override extensions, or disable. Same JSON shape in every harness's project config (per-harness paths: the Configure step in `SKILL.md`):
 
 ```json
 { "lsp": { "sourcekit-lsp": { "priority": 100 } } }
 ```
 
-For builtin ids in a PROJECT config, `command` is supplied automatically — only set `priority`/`initialization`/`extensions`/`disabled`/`env`. A fully custom (non-builtin) server with its own `command` must go in the USER config (`~/.codex/lsp-client.json`).
+For builtin ids in a PROJECT config, `command` is supplied automatically — only set `priority`/`initialization`/`extensions`/`disabled` (a project entry drops `env`). `env`, and a fully custom (non-builtin) server with its own `command`, must go in your harness's USER config (see the Configure step in `SKILL.md`).
 
 ### Initialization options (only if commonly needed)
 
@@ -41,7 +41,7 @@ None commonly required. For best results the project needs a **SwiftPM `Package.
 - **PATH:** `sourcekit-lsp` on PATH; reopen shell after install (or after `xcode-select -s`).
 - **Wrong toolchain (macOS):** point `xcode-select` at the right Xcode/toolchain; mismatches cause stale or missing results.
 - **No `Package.swift` / compile db:** add a SwiftPM manifest or generate `compile_commands.json` for accurate indexing.
-- **Objective-C (`.objc`/`.objcpp`):** needs a compilation database to resolve headers and frameworks.
+- **Objective-C (`.m`/`.mm`):** needs a compilation database to resolve headers and frameworks.
 - **First build slow:** the server builds the module graph on first open; wait for it.
 
 ## Verify
