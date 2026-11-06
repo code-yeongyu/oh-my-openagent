@@ -260,4 +260,5 @@ export type RecoveryEvent =
 	| "sync.recovery.recovered"
 	| "sync.recovery.joined_read_only"
 	| "sync.recovery.recover_refused"
-	| "sync.recovery.removed";
+	| "sync.recovery.removed"
+	| "sync.trust.root_changed";

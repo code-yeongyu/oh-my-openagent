@@ -25,6 +25,7 @@ import {
   type DagRunRecordV1,
   type DagRunSnapshot,
   type DagScheduler,
+  type InstalledDagRun,
   type OwnedStartResult,
 } from "@oh-my-opencode/senpi-task/dag"
 
@@ -78,6 +79,8 @@ export interface DagRuntime {
   attach(event?: unknown): Promise<void>
   sync(): void
   detach(): void
+  /** Restates the current `omo.dag.updated` snapshot for a client that reattached. */
+  resend(): void
   /** Retires live schedulers without cancelling them, then persists the pause. Await before teardown. */
   pauseForShutdown(): Promise<void>
   dispose(): void
@@ -282,6 +285,19 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
         runId,
         error: error instanceof Error ? error.message : String(error),
       })
+    })
+  }
+
+  // A run recovery installed keeps running in its own scheduler: register it like any re-entry so
+  // `ensureScheduled` and `isRunHeldInProcess` see it instead of starting a second scheduler.
+  const adoptInstalled = (installed: InstalledDagRun): void => {
+    const record = store.readCheckpoint<DagRunRecordV1>(installed.runId)
+    if (record === null) throw new Error("installed DAG checkpoint is missing")
+    adoptReentry(installed.runId, { scheduler: installed.scheduler, record,
+      run: installed.settled.then(outcome => {
+        if (outcome.kind !== "resumed" || outcome.record === undefined) throw new Error(`installed DAG ended without a resumed outcome: ${outcome.kind}`)
+        return outcome.record
+      }),
     })
   }
 
@@ -514,7 +530,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
   const recoverPausedRuns = async (scope: RecoveryScope): Promise<void> => {
     let outcomes: readonly DagRecoveryOutcome[]
     try {
-      outcomes = await recovery.resumePausedRuns(scope.sessionId, scope.forkSourceSessionId)
+      outcomes = await recovery.installPausedRuns(scope.sessionId, adoptInstalled, scope.forkSourceSessionId)
     } finally {
       clearSubscriptions(recoveryTaskSubscriptions)
     }
@@ -547,16 +563,7 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
       if (schedulers.get(runId)?.running === undefined) schedulers.delete(runId)
     },
     recovery,
-    adopt: installed => {
-      const record = store.readCheckpoint<DagRunRecordV1>(installed.runId)
-      if (record === null) throw new Error("installed DAG checkpoint is missing")
-      adoptReentry(installed.runId, { scheduler: installed.scheduler, record,
-        run: installed.settled.then(outcome => {
-          if (outcome.kind !== "resumed" || outcome.record === undefined) throw new Error(`installed DAG ended without a resumed outcome: ${outcome.kind}`)
-          return outcome.record
-        }),
-      })
-    },
+    adopt: adoptInstalled,
     cancel: async runId => {
       const record = store.readCheckpoint<DagRunRecordV1>(runId)
       if (record !== null) await controller(runId, record.parentSessionId).scheduler.cancel(runId, "run_cancelled")
@@ -611,6 +618,9 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
       bridge.sync()
       bridge.notifyStoreMutation()
       statusUi.scheduleSync()
+    },
+    resend() {
+      bridge.resend()
     },
     detach() {
       durableEventListener = () => undefined
