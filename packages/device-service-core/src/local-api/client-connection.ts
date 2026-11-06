@@ -119,8 +119,14 @@ export class ClientConnection {
             throw error
           }
           if (!response.ok) {
-            const { code, reason, action, limit_chars } = response.error
-            reject(new LocalApiError(code, reason, limit_chars === undefined ? { action } : { action, limit_chars }))
+            const { code, reason, action, limit_chars, path_refusal } = response.error
+            reject(
+              new LocalApiError(code, reason, {
+                action,
+                ...(limit_chars === undefined ? {} : { limit_chars }),
+                ...(path_refusal === undefined ? {} : { path_refusal }),
+              }),
+            )
             return
           }
           onAnswer?.(response.data)

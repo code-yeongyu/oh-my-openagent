@@ -183,7 +183,10 @@ export async function runSyncRpcOperation(
       auth.admit(() => undefined)
       switch (result.kind) {
         case "joined":
-          record.enable = { kind: result.created === true ? "first_device_created" : "joined" }
+          record.enable = {
+            kind: result.created === true ? "first_device_created" : "joined",
+            ...(result.rootChanged && { rootChanged: true }),
+          }
           break
         case "needs_first_device":
           record.enable = result

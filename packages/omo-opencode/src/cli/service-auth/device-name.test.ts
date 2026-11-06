@@ -19,13 +19,21 @@ describe("default device name", () => {
       }
       return Response.json(grant)
     })
-    await loginDevice(createSession({ api, store: memorySecrets().store(api), home: await temporaryHome() }), {
-      name,
-      platform: "linux",
-      ...clock(),
-      show: () => {},
-      chooseDevice: async () => null,
-    })
+    await loginDevice(
+      createSession({
+        beforeKeysDiscarded: async () => undefined,
+        api,
+        store: memorySecrets().store(api),
+        home: await temporaryHome(),
+      }),
+      {
+        name,
+        platform: "linux",
+        ...clock(),
+        show: () => {},
+        chooseDevice: async () => null,
+      },
+    )
     expect(sent).toBe(true)
   })
 

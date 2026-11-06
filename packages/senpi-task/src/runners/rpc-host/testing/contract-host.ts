@@ -34,6 +34,8 @@ export type ContractHostOptions = {
   readonly refuseProtocolInfo?: boolean
   /** Refuses any client proof with auth_failed (frame 4). */
   readonly rejectProof?: boolean
+  /** A session with no file yet: unload_session refuses it `unsupported` (senpi session-unload.ts `loaded`). */
+  readonly unwritten?: boolean
 }
 export type ContractHost = {
   readonly socket: string
@@ -48,6 +50,8 @@ export type ContractHost = {
    * attach_session / reclaim_session refused `session_busy_lifecycle` + `host_draining`.
    */
   readonly drain: () => void
+  /** Whether the session is still on the host: false once a close or an unload ended it. */
+  readonly live: () => boolean
 }
 
 /**
@@ -130,6 +134,8 @@ export async function withContractHost(
   // Host-wide, unlike attachments: a session that left the host is unknown to every later connection.
   let gone = options.attachRefusal === "unknown_session"
   let draining = false
+  // Ended by a close or an unload: gone for every connection and no longer listed.
+  let ended = false
   const server = createServer((client) =>
     transport.authenticate(client, () => {
       // A draining host disconnects a newly arriving client; only an admitted connection sees the attach refusal.
@@ -248,7 +254,7 @@ export async function withContractHost(
             continue
           }
           if (frame.type === "list_sessions") {
-            respond(frame, { sessions: [session()] })
+            respond(frame, { sessions: ended ? [] : [session()] })
             continue
           }
           if (frame.type === "warm") {
@@ -268,12 +274,55 @@ export async function withContractHost(
             continue
           }
           // Only session-scoped commands are gated, as the host's attachment gate reads `sessionId`; its exempt reads pass.
+          // close_session skips the gate, but close() refuses a connection that holds no attachment with unknown_session
+          // and releases nothing (senpi session-router-close.ts close(), senpi#1782). An attached close releases only the
+          // caller's hold (drainAttachments: false), so the session ends only when no other client holds it.
+          if (frame.type === "close_session") {
+            if (gone || (!options.legacy && !attached)) {
+              respond(frame, undefined, "unknown_session", {})
+              continue
+            }
+            attached = false
+            mutations.push(frame)
+            if (!options.otherAttachments) {
+              gone = true
+              ended = true
+            }
+            respond(frame, {})
+            continue
+          }
           if (!options.legacy && !attached && !ATTACH_GATE_EXEMPT.has(String(frame.type))) {
             respond(frame, undefined, "session_not_attached", {
               reason: "this connection is not attached to that session",
               action:
                 "attach first with attach_session { sessionId, durableSessionId } or open_session { sessionPath }",
             })
+            continue
+          }
+          // unload_session answers its refusals as data (senpi session-unload.ts): a session with no file is unsupported,
+          // other holders refuse it unless force; otherwise every attachment is drained and the session ends for all.
+          if (frame.type === "unload_session") {
+            if (options.unwritten) {
+              respond(frame, {
+                outcome: "refused",
+                reason: "unsupported",
+                detail: "the session has no file to reopen it by",
+              })
+              continue
+            }
+            if (options.otherAttachments && frame.force !== true) {
+              respond(frame, {
+                outcome: "refused",
+                reason: "attached",
+                detail: `${options.otherAttachments} other client(s) attached`,
+              })
+              continue
+            }
+            mutations.push(frame)
+            gone = true
+            ended = true
+            attached = false
+            respond(frame, { outcome: "unloaded", sessionPath })
             continue
           }
           if (frame.type === "get_messages") {
@@ -338,6 +387,7 @@ export async function withContractHost(
       drain: () => {
         draining = true
       },
+      live: () => !ended,
     })
   } finally {
     const closed = once(server, "close", { signal: AbortSignal.timeout(2000) })

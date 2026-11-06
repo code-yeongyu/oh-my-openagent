@@ -15,6 +15,7 @@ import {
   reviewWorkAnchor,
   ulwExecuteOriginalCompletion,
   ulwExecuteOriginalHardRule,
+  ulwExecuteOriginalRootScope,
 } from "../scripts/sync-skills.mjs"
 import { removeCodexSkillOverlays } from "./sync-skills-test-support.mjs"
 
@@ -45,6 +46,10 @@ test("#given shared skill source anchors #when Codex overlays are applied #then 
   assert.ok(
     ulwExecuteSource.includes(ulwExecuteOriginalHardRule),
     "ulw-execute hard-rule anchor drifted from shared source",
+  )
+  assert.ok(
+    ulwExecuteSource.includes(ulwExecuteOriginalRootScope),
+    "ulw-execute root-scope anchor drifted from shared source",
   )
   assert.ok(reviewWorkSource.includes(reviewWorkAnchor), "review-work anchor drifted from shared source")
 

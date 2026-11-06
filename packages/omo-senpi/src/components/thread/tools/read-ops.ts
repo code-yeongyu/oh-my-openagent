@@ -1,6 +1,6 @@
 import { workspaceEntries } from "../addressing"
 import type { ThreadReadInput, ThreadToolResult } from "../contracts"
-import { readTranscript } from "../reader"
+import { readTranscript, type ThreadTranscriptEntry } from "../reader"
 import { threadLink } from "../thread-link"
 import {
   addressBook,
@@ -71,12 +71,22 @@ export async function readThread(
   const session = targetSession(current, resolved.entry.thread_id)
   if (session === undefined) return readDegraded(options, current, resolved.entry.thread_id, value)
   const messages = await sessionPort(options, session).getMessages(routingId(session))
+  return liveReadResult(resolved.entry.thread_id, resolved.entry.name, messages, value)
+}
+
+/** A live session's transcript through the bounded reader; the same window rules on this device and on another one. */
+export function liveReadResult(
+  threadId: string,
+  title: string | undefined,
+  messages: readonly ThreadTranscriptEntry[],
+  value: ThreadReadInput,
+): ThreadToolResult {
   const live = readTranscript({ kind: "live", entries: () => messages }, readWindow(value))
   if (live.kind === "error") return { kind: "error", error: live.error }
   return {
     kind: "ok",
-    thread_id: resolved.entry.thread_id,
-    link: threadLink(resolved.entry.thread_id, resolved.entry.name),
+    thread_id: threadId,
+    link: threadLink(threadId, title),
     items: live.items.map((item, index) => ({
       seq: index + 1,
       role: transcriptRole(item.role),

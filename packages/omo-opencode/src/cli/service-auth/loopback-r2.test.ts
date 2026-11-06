@@ -11,37 +11,48 @@ for (const result of ["false", "reject"]) {
       return Response.json(grant)
     })
     const store = memorySecrets().store(api)
-    await loginLoopback(createSession({ api, store, home: await temporaryHome() }), {
-      accounts: "https://signin.omo.dev",
-      name: "Test",
-      platform: "linux",
-      chooseDevice: async () => null,
-      open: async (url) => {
-        const ask = new URL(url)
-        const callback = new URL(ask.searchParams.get("redirect_uri") ?? "")
-        callback.searchParams.set("state", ask.searchParams.get("state") ?? "")
-        callback.searchParams.set("code", "one-use-code")
-        expect((await fetch(callback)).status).toBe(200)
-        if (result === "reject") throw new Error("opener exited unsuccessfully")
-        return false
+    await loginLoopback(
+      createSession({ beforeKeysDiscarded: async () => undefined, api, store, home: await temporaryHome() }),
+      {
+        accounts: "https://signin.omo.dev",
+        name: "Test",
+        platform: "linux",
+        chooseDevice: async () => null,
+        open: async (url) => {
+          const ask = new URL(url)
+          const callback = new URL(ask.searchParams.get("redirect_uri") ?? "")
+          callback.searchParams.set("state", ask.searchParams.get("state") ?? "")
+          callback.searchParams.set("code", "one-use-code")
+          expect((await fetch(callback)).status).toBe(200)
+          if (result === "reject") throw new Error("opener exited unsuccessfully")
+          return false
+        },
       },
-    })
+    )
     expect(exchanges).toBe(1)
     expect((await store.read())?.refreshToken).toBe(grant.refreshToken)
   })
   test(`opener ${result} without a callback still allows device fallback`, async () => {
     const api = fakeApi(() => Response.json(grant))
     await expect(
-      loginLoopback(createSession({ api, store: memorySecrets().store(api), home: await temporaryHome() }), {
-        accounts: "https://signin.omo.dev",
-        name: "Test",
-        platform: "linux",
-        chooseDevice: async () => null,
-        open: async () => {
-          if (result === "reject") throw new Error("opener unavailable")
-          return false
+      loginLoopback(
+        createSession({
+          beforeKeysDiscarded: async () => undefined,
+          api,
+          store: memorySecrets().store(api),
+          home: await temporaryHome(),
+        }),
+        {
+          accounts: "https://signin.omo.dev",
+          name: "Test",
+          platform: "linux",
+          chooseDevice: async () => null,
+          open: async () => {
+            if (result === "reject") throw new Error("opener unavailable")
+            return false
+          },
         },
-      }),
+      ),
     ).rejects.toBeInstanceOf(BrowserUnavailable)
   })
 }

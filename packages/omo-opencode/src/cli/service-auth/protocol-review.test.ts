@@ -37,7 +37,12 @@ for (const scenario of ["terminal", "network", "body", "management", "unknown-co
     const action =
       scenario === "management" || scenario === "unknown-code"
         ? requestApi(api, "/v1/device/token", jsonRequest({ deviceCode: minted.deviceCode }))
-        : createSession({ api, store, home: await temporaryHome() }).accessToken()
+        : createSession({
+            beforeKeysDiscarded: async () => undefined,
+            api,
+            store,
+            home: await temporaryHome(),
+          }).accessToken()
     const error: unknown = await action.catch((error) => error)
     expect(error).toBeInstanceOf(Error)
     for (const secret of secrets)
@@ -54,7 +59,13 @@ for (const origin of [
   "javascript:alert(1)",
 ]) {
   test(`API override rejects insecure origin ${origin}`, () => {
-    expect(() => createSession({ api: origin, store: memorySecrets().store("https://example.com") })).toThrow()
+    expect(() =>
+      createSession({
+        beforeKeysDiscarded: async () => undefined,
+        api: origin,
+        store: memorySecrets().store("https://example.com"),
+      }),
+    ).toThrow()
   })
 }
 

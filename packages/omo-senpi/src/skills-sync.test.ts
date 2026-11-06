@@ -80,11 +80,7 @@ const retiredNameAllowedMarker = /<!-- retired-name-allowed -->\s*$/
 const pendingPersonaNameRetirements: readonly {
   readonly pathSuffix: string
   readonly linePattern: RegExp
-}[] = [
-  { pathSuffix: "coding-agent-sessions/references/opencode.md", linePattern: /`Sisyphus-Junior`/ },
-  { pathSuffix: "frontend/references/designpowers/lane-a-direction.md", linePattern: /\bPrometheus\b/ },
-  { pathSuffix: "frontend/references/designpowers/routing.md", linePattern: /\bPrometheus\b/ },
-]
+}[] = [{ pathSuffix: "coding-agent-sessions/references/opencode.md", linePattern: /`Sisyphus-Junior`/ }]
 
 function listDirectoryNames(path: string): string[] {
   if (!existsSync(path)) {

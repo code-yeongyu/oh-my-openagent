@@ -77,6 +77,7 @@ describe("binary/npm parity comparison", () => {
         "INFO omo 5.1.4 (engine: senpi 2026.9.29-5)",
         "PASS computer use engine: native/senpi-desktop-engine",
         "INFO Claude Code 2.1.284: not downloaded yet",
+        "INFO engine trust: generation 0123456789ab, default-file: kept",
       ],
     })
     expect(compareRuns(binary, npm)).toEqual([])

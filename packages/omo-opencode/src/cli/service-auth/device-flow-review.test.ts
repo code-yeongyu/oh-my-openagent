@@ -11,13 +11,21 @@ test("device polling stops immediately on off-contract 401 reauth_required", asy
     return refusal("reauth_required", undefined, 401)
   })
   await expect(
-    loginDevice(createSession({ api, store: memorySecrets().store(api), home: await temporaryHome() }), {
-      name: "Test",
-      platform: "linux",
-      ...clock(),
-      show: () => {},
-      chooseDevice: async () => null,
-    }),
+    loginDevice(
+      createSession({
+        beforeKeysDiscarded: async () => undefined,
+        api,
+        store: memorySecrets().store(api),
+        home: await temporaryHome(),
+      }),
+      {
+        name: "Test",
+        platform: "linux",
+        ...clock(),
+        show: () => {},
+        chooseDevice: async () => null,
+      },
+    ),
   ).rejects.toThrow()
   expect(polls).toBe(1)
 })
@@ -38,15 +46,23 @@ for (const verificationUri of [
       return Response.json(grant)
     })
     await expect(
-      loginDevice(createSession({ api, store: memorySecrets().store(api), home: await temporaryHome() }), {
-        name: "Test",
-        platform: "linux",
-        ...clock(),
-        show: () => {
-          shown = true
+      loginDevice(
+        createSession({
+          beforeKeysDiscarded: async () => undefined,
+          api,
+          store: memorySecrets().store(api),
+          home: await temporaryHome(),
+        }),
+        {
+          name: "Test",
+          platform: "linux",
+          ...clock(),
+          show: () => {
+            shown = true
+          },
+          chooseDevice: async () => null,
         },
-        chooseDevice: async () => null,
-      }),
+      ),
     ).rejects.toThrow()
     expect(shown).toBe(false)
     expect(polls).toBe(0)
@@ -59,15 +75,23 @@ test("device display strips terminal sequences without rewriting a normal verifi
     Response.json(request.url.endsWith("/code") ? { ...minted, verificationUri } : grant),
   )
   const shown: string[] = []
-  await loginDevice(createSession({ api, store: memorySecrets().store(api), home: await temporaryHome() }), {
-    name: "Test",
-    platform: "linux",
-    ...clock(),
-    show: (code) => {
-      shown.push(code.verificationUri)
+  await loginDevice(
+    createSession({
+      beforeKeysDiscarded: async () => undefined,
+      api,
+      store: memorySecrets().store(api),
+      home: await temporaryHome(),
+    }),
+    {
+      name: "Test",
+      platform: "linux",
+      ...clock(),
+      show: (code) => {
+        shown.push(code.verificationUri)
+      },
+      chooseDevice: async () => null,
     },
-    chooseDevice: async () => null,
-  })
+  )
   expect(shown).toEqual([`${minted.verificationUri}&x=red`])
 })
 
@@ -82,13 +106,21 @@ for (const retryAfter of ["12", "999999999", "Tue, 01 Jan 2030 00:00:17 GMT", "i
       if (retryAfter) response.headers.set("retry-after", retryAfter)
       return response
     })
-    await loginDevice(createSession({ api, store: memorySecrets().store(api), home: await temporaryHome() }), {
-      name: "Test",
-      platform: "linux",
-      ...time,
-      show: () => {},
-      chooseDevice: async () => null,
-    })
+    await loginDevice(
+      createSession({
+        beforeKeysDiscarded: async () => undefined,
+        api,
+        store: memorySecrets().store(api),
+        home: await temporaryHome(),
+      }),
+      {
+        name: "Test",
+        platform: "linux",
+        ...time,
+        show: () => {},
+        chooseDevice: async () => null,
+      },
+    )
     const delay =
       retryAfter === "999999999" ? 60_000 : retryAfter === "12" || retryAfter.startsWith("Tue") ? 12_000 : 10_000
     expect(time.delays).toEqual([5000, delay])
@@ -107,13 +139,21 @@ test("429 backoff stops at absolute device expiry without another poll", async (
     return response
   })
   await expect(
-    loginDevice(createSession({ api, store: memorySecrets().store(api), home: await temporaryHome() }), {
-      name: "Test",
-      platform: "linux",
-      ...time,
-      show: () => {},
-      chooseDevice: async () => null,
-    }),
+    loginDevice(
+      createSession({
+        beforeKeysDiscarded: async () => undefined,
+        api,
+        store: memorySecrets().store(api),
+        home: await temporaryHome(),
+      }),
+      {
+        name: "Test",
+        platform: "linux",
+        ...time,
+        show: () => {},
+        chooseDevice: async () => null,
+      },
+    ),
   ).rejects.toThrow()
   expect(time.delays).toEqual([5000, 15000])
   expect(polls).toBe(1)

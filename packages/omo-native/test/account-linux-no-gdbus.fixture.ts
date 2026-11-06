@@ -16,5 +16,6 @@ Object.defineProperty(Bun, "secrets", {
       values.set(name, value)
     },
     delete: async ({ name }: { readonly name: string }) => values.delete(name),
+    [Symbol.for("omo.test.injectedSecrets")]: true,
   },
 })

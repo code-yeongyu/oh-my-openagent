@@ -21,12 +21,12 @@ export type { TaskSendTeamRouting } from "./send-shutdown"
 
 const DESCRIPTION = [
   "Send a message to a child task or team member, keyed by to.",
-  "Plain-text messages always steer a running child immediately.",
+  "Plain-text messages steer a running child immediately when nothing is ahead of them; while earlier messages are queued or draining, or the child is still launching, suspended or unresponsive, the message is queued and delivered in order.",
   "A plain-text message to a parked in-process or detached RPC child with a transcript and recorded launch spec resumes that session after eligible finished runs. Killed, cancelled, and lost children never revive; unfinished parked children automatically resume or end within the recovery budget.",
   "redispatch:true (no message) re-dispatches a task flagged 'resumed, waiting for input' onto a fresh live session, replaying its persisted prompt; the old dead session is abandoned.",
-  "message is required and accepts a plain string or a structured shutdown object {type:'shutdown_request'} or {type:'shutdown_response', approve, reason?}; structured messages are lead-only and need team_run_id (defaults to your single owned team).",
+  "message is required (except with redispatch:true) and accepts a plain string or a structured shutdown object {type:'shutdown_request'} or {type:'shutdown_response', approve, reason?}; structured messages are lead-only and need team_run_id (defaults to your single owned team).",
   "To retire a member: send {type:'shutdown_request'}, then after it wraps up {type:'shutdown_response', approve:true}.",
-  "Addressing: a child task id/name goes to the live session; a team member name goes to the durable mailbox; '*' broadcasts to every member (lead-only). Plain-text bodies are capped by the team payload limit (default 32 KB); split larger payloads or send a file path.",
+  "Addressing: a child task id/name goes to the live session; a team member name goes to the durable mailbox; '*' broadcasts to every member (lead-only). Messages to team members and '*' are capped by the team payload limit (default 32 KB; split larger payloads or send a file path); messages to a child task have no such cap.",
   "Cross-session: a child owned by another session is refused unless you pass all_scope=true.",
   "Team messages always steer into the recipient's running turn.",
   "One-shot agents (plan-reviewer) always refuse task_send in every state; spawn a new plan-reviewer instead.",

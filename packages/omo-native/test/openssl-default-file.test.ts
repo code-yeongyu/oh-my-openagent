@@ -127,7 +127,17 @@ const fixtures = [
   },
   { id: "mid-cr", text: rootPem + "plain\rtext\n", expected: dropped("pem-noncanonical", 1, true) },
   { id: "form-feed", text: rootPem + "plain\ftext\n", expected: dropped("pem-noncanonical", 1, true) },
-  { id: "high-byte", text: rootPem + "plain\u00fftext\n", expected: dropped("pem-noncanonical", 1, true) },
+  // Fedora's tls-ca-bundle.pem carries UTF-8 comment lines between blocks; PEM_read_bio skips text outside blocks.
+  {
+    id: "non-ascii-comment",
+    text: `${pem(hex("3000"), "OTHER")}\n# NetLock Arany (Class Gold) F\u0151tan\u00fas\u00edtv\u00e1ny\n${rootPem}`,
+    expected: { ...kept, certificates: [{ der: rootDer, index: 1 }] },
+  },
+  {
+    id: "non-ascii-in-block",
+    text: rootPem.replace(/\n([A-Za-z0-9+/=]+)\n/, "\n$1\u00e9\n"),
+    expected: dropped("pem-noncanonical", 0, true),
+  },
   { id: "lowercase-label", text: rootPem + pem(hex("3000"), "other"), expected: dropped("pem-noncanonical", 1, true) },
   { id: "crlf", text: rootPem.replaceAll("\n", "\r\n"), expected: kept },
   {
@@ -368,7 +378,7 @@ test.skipIf(process.platform === "win32")(
           "long-label",
           "mid-cr",
           "form-feed",
-          "high-byte",
+          "non-ascii-in-block",
           "lowercase-label",
           "blank-body",
           "space-only-header-line",

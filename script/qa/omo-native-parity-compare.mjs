@@ -110,6 +110,10 @@ export const DOCTOR_EXPECTED_ONLY = {
       "the binary pins the Claude Code it downloads for the anthropic-subscription lane (#9262); npm has no pin",
     ],
     ["PASS Claude Code", "the same pinned Claude Code, once it is downloaded"],
+    [
+      "INFO engine trust",
+      "the engine-trust section is part of the compiled doctor only; the npm launcher's doctor has none (omo#10762)",
+    ],
   ],
 }
 

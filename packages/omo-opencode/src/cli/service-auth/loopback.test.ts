@@ -28,7 +28,7 @@ describe("loopback sign-in", () => {
       exchanges++
       return Response.json(grant)
     })
-    const session = createSession({ api, store: secrets.store(api), home })
+    const session = createSession({ beforeKeysDiscarded: async () => undefined, api, store: secrets.store(api), home })
     await loginLoopback(session, {
       accounts: "https://signin.omo.dev",
       name: "Test CLI",
@@ -95,20 +95,28 @@ describe("loopback sign-in", () => {
       codes.push(body.code)
       return codes.length === 1 ? refusal("entitlement_required", limitDetail, 403) : Response.json(grant)
     })
-    await loginLoopback(createSession({ api, store: secrets.store(api), home: await temporaryHome() }), {
-      accounts: "https://signin.omo.dev",
-      name: "Test",
-      platform: "linux",
-      chooseDevice: async () => "old",
-      open: async (url) => {
-        const ask = new URL(url)
-        const callback = new URL(ask.searchParams.get("redirect_uri") ?? "")
-        callback.searchParams.set("state", ask.searchParams.get("state") ?? "")
-        callback.searchParams.set("code", `code-${++opened}`)
-        await fetch(callback, { proxy: "" })
-        return true
+    await loginLoopback(
+      createSession({
+        beforeKeysDiscarded: async () => undefined,
+        api,
+        store: secrets.store(api),
+        home: await temporaryHome(),
+      }),
+      {
+        accounts: "https://signin.omo.dev",
+        name: "Test",
+        platform: "linux",
+        chooseDevice: async () => "old",
+        open: async (url) => {
+          const ask = new URL(url)
+          const callback = new URL(ask.searchParams.get("redirect_uri") ?? "")
+          callback.searchParams.set("state", ask.searchParams.get("state") ?? "")
+          callback.searchParams.set("code", `code-${++opened}`)
+          await fetch(callback, { proxy: "" })
+          return true
+        },
       },
-    })
+    )
     expect(codes).toEqual(["code-1", "code-2"])
   })
 })

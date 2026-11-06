@@ -124,7 +124,12 @@ test("logout waits for journal persistence acknowledgment before dispatching ref
       { preconnect: original.preconnect },
     ),
   )
-  const logout = createSession({ api, store, home: await temporaryHome() }).logout()
+  const logout = createSession({
+    beforeKeysDiscarded: async () => undefined,
+    api,
+    store,
+    home: await temporaryHome(),
+  }).logout()
   onTestFinished(async () => {
     permit.resolve()
     await logout

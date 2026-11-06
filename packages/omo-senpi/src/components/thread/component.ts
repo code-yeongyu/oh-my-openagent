@@ -20,6 +20,8 @@ import {
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { registerThreadTools, UNKNOWN_CALLER, type ThreadToolSurfaceOptions } from "./tools"
 import { createLazyLiveThreadSurface } from "./lazy-live-surface"
+import { createLazyRemoteSurface } from "./remote/lazy-remote"
+import { createOmoNativeProductConfig } from "../telemetry/product-identity"
 import { defaultThreadStateDirectory } from "./live-surface-paths"
 
 /**
@@ -317,6 +319,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
           callerRunDeliveries: () => [...run.consumed],
           callerRunHasLocalInput: () => run.local,
           onCompletionArmed: (durableId, armSeq) => completions.arm(durableId, armSeq),
+          remote: options.remote ?? createLazyRemoteSurface({ version: createOmoNativeProductConfig().packageVersion }),
         },
         (line) => ctx.logger.warn(line),
       )

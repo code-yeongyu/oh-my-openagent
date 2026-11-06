@@ -72,6 +72,9 @@ function installHermeticSecrets(): void {
         values.set(keyOf(key), key.value)
       },
       delete: async (key: { readonly service: string; readonly name: string }) => values.delete(keyOf(key)),
+      // Marked as injected: on darwin an unmarked stand-in counts as the real store and reaches the signed helper and
+      // the login Keychain (store-binding.ts, #11262).
+      [Symbol.for("omo.test.injectedSecrets")]: true,
     },
   })
 }

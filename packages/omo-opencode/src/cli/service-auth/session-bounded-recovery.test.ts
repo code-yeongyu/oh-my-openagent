@@ -26,7 +26,13 @@ test.each(["missing", "invalid", "unprovable"] as const)(
           }
     await store.write({ ...expired, refreshState: "uncertain", ...attempt })
     const time = clock()
-    const session = createSession({ api, store, home: await temporaryHome(), now: time.now })
+    const session = createSession({
+      beforeKeysDiscarded: async () => undefined,
+      api,
+      store,
+      home: await temporaryHome(),
+      now: time.now,
+    })
 
     await expect(session.accessToken()).rejects.toMatchObject({
       code: "refresh_recovery_expired",
@@ -55,7 +61,13 @@ test("legacy exhaustion preserves the unanswered journal without sending", async
     },
   }
   await store.write(original)
-  const session = createSession({ api, store, home: await temporaryHome(), now: time.now })
+  const session = createSession({
+    beforeKeysDiscarded: async () => undefined,
+    api,
+    store,
+    home: await temporaryHome(),
+    now: time.now,
+  })
 
   await expect(session.accessToken()).rejects.toThrow()
   expect(sends).toBe(0)

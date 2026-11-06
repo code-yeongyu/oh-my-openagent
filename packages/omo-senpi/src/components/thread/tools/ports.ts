@@ -10,6 +10,7 @@ import type {
 import type { ProvenanceRuntime } from "../gateway/provenance-resolver"
 import type { GatewayStore } from "../gateway/store"
 import type { ThreadTranscriptEntry } from "../reader"
+import type { RemoteThreadSurface } from "../remote/ports"
 
 export type ThreadHostSession = {
   readonly sessionId: string
@@ -51,6 +52,7 @@ export type ThreadSessionPort = Pick<
   | "getAvailableThinkingLevels"
   | "wake"
   | "releaseSession"
+  | "closeSession"
 >
 
 /**
@@ -125,6 +127,8 @@ export type ThreadHost = {
     request: ReleaseSessionRequest,
     durable_session_id?: string,
   ) => Promise<ReleaseSessionReply>
+  /** Ends one session on its host for every client that holds it; hosts only, a terminal keeps its own session. */
+  readonly closeSession?: (sessionId: string, durable_session_id?: string) => Promise<ThreadCloseOutcome>
   /** Every endpoint at once; absent on a single-endpoint host, whose `listSessions` is the view. */
   readonly listView?: (request?: ThreadHostViewRequest) => Promise<ThreadHostView>
   /** Fresh identity validation on exactly one published endpoint, without enumeration. */
@@ -180,7 +184,12 @@ export type ThreadToolSurfaceOptions = {
   /** `thread_report {kind: "completion"}` armed a completion (`arm_seq`) for this session; the component writes it at the next settle. */
   readonly onCompletionArmed?: (durableId: string, armSeq: number) => void
   readonly now?: () => number
+  /** Sessions on the account's other devices and the account-wide alias (O8, A3); absent, the tools reach only this device. */
+  readonly remote?: RemoteThreadSurface
 }
 
 /** Placeholder the component supplies when the host passes no per-call caller identity. */
 export const UNKNOWN_CALLER = "unknown-caller"
+
+/** How a close ended: the session ended, no live session held it any more, or another client still holds it. */
+export type ThreadCloseOutcome = "closed" | "not_live" | "held_elsewhere"

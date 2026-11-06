@@ -45,6 +45,7 @@ import { applyCachedClaudeCode } from "../omo-senpi/src/components/claude-code/i
 import { buildSenpiArgs, shouldPrintCompiledBanner, trustLaunchKind } from "./compile-args"
 import { runLoroSmoke } from "./loro-smoke"
 import { runAccountCommand } from "./account-cli"
+import { registerHelperCandidates } from "../omo-opencode/src/cli/service-auth/keychain-helper/darwin-backend"
 import { runRemoteAttachCommand, runRemoteCommand } from "./remote-entry"
 import { runSyncCommand } from "./sync-cli"
 import { spawnSync } from "node:child_process"
@@ -156,6 +157,11 @@ type CompiledLauncherSeams = {
   readonly threadSdk?: (options: Record<string, unknown>) => Promise<{ sdk?: unknown; error?: string }>
 }
 
+/** RULING-74: the runtime's keychain helper sits directly beside the binary (the desktop layout); every command uses it first. */
+export function compiledKeychainHelper(execDir: string): string {
+  return join(execDir, "omo-keychain")
+}
+
 export async function runCompiledLauncher(
   args: string[],
   execDir: string,
@@ -164,6 +170,7 @@ export async function runCompiledLauncher(
   migration: CompiledLauncherOptions = {},
   seams: CompiledLauncherSeams = {},
 ): Promise<boolean> {
+  registerHelperCandidates([compiledKeychainHelper(execDir)])
   if (args[0] === "loro-smoke") {
     process.exitCode = await runLoroSmoke()
     return true

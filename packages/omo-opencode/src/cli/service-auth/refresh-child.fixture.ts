@@ -7,6 +7,7 @@ if (!api || !home) throw new Error("missing fake API or home")
 const session = createSession({
   api,
   home,
+  beforeKeysDiscarded: async () => undefined,
   store: {
     async read() {
       const response = await fetch(`${api}/fake-store`, { proxy: "" })

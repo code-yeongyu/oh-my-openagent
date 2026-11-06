@@ -10,7 +10,12 @@ for (const code of ["ENOTFOUND", "ECONNREFUSED", "ENETUNREACH", "EHOSTUNREACH", 
     const store = memorySecrets().store(api)
     await store.write(expired)
     const persisted = await store.read()
-    const session = createSession({ api, store, home: await temporaryHome() })
+    const session = createSession({
+      beforeKeysDiscarded: async () => undefined,
+      api,
+      store,
+      home: await temporaryHome(),
+    })
     const fetcher = spyOn(globalThis, "fetch").mockRejectedValueOnce(
       Object.assign(new Error(grant.refreshToken), { code }),
     )
@@ -59,9 +64,13 @@ for (const mode of [
       onTestFinished(() => fetcher.mockRestore())
     }
     const { now } = clock()
-    await expect(createSession({ api, store, home, now }).accessToken()).rejects.toThrow()
+    await expect(
+      createSession({ beforeKeysDiscarded: async () => undefined, api, store, home, now }).accessToken(),
+    ).rejects.toThrow()
     expect(await store.read()).toMatchObject({ ...expired, refreshState: "uncertain" })
-    await expect(createSession({ api, store, home, now }).accessToken()).rejects.toThrow()
+    await expect(
+      createSession({ beforeKeysDiscarded: async () => undefined, api, store, home, now }).accessToken(),
+    ).rejects.toThrow()
     expect(requests + sent).toBe(1)
   })
 }
@@ -70,7 +79,14 @@ test("explicit invalid_grant refresh refusal clears credentials", async () => {
   const api = fakeApi(() => refusal("invalid_grant"))
   const store = memorySecrets().store(api)
   await store.write(expired)
-  await expect(createSession({ api, store, home: await temporaryHome() }).accessToken()).rejects.toThrow()
+  await expect(
+    createSession({
+      beforeKeysDiscarded: async () => undefined,
+      api,
+      store,
+      home: await temporaryHome(),
+    }).accessToken(),
+  ).rejects.toThrow()
   expect(await store.read()).toBeNull()
 })
 
@@ -91,9 +107,13 @@ test("failed rotated-token persistence retains the pre-send uncertainty marker",
   }
   const home = await temporaryHome()
   const { now } = clock()
-  await expect(createSession({ api, store, home, now }).accessToken()).rejects.toThrow()
+  await expect(
+    createSession({ beforeKeysDiscarded: async () => undefined, api, store, home, now }).accessToken(),
+  ).rejects.toThrow()
   expect(await base.read()).toMatchObject({ ...expired, refreshState: "uncertain" })
-  await expect(createSession({ api, store: base, home, now }).accessToken()).rejects.toThrow()
+  await expect(
+    createSession({ beforeKeysDiscarded: async () => undefined, api, store: base, home, now }).accessToken(),
+  ).rejects.toThrow()
   expect(requests).toBe(1)
 })
 
@@ -112,7 +132,14 @@ test("failed pre-send journal persistence sends no rotating request", async () =
       throw new Error("synthetic store failure")
     },
   }
-  await expect(createSession({ api, store, home: await temporaryHome() }).accessToken()).rejects.toThrow()
+  await expect(
+    createSession({
+      beforeKeysDiscarded: async () => undefined,
+      api,
+      store,
+      home: await temporaryHome(),
+    }).accessToken(),
+  ).rejects.toThrow()
   expect(requests).toBe(0)
   expect(await base.read()).toEqual(persisted)
 })
@@ -141,7 +168,12 @@ for (const outcome of ["approved", "offline", "refused"]) {
     }
     const store = memorySecrets().store(api)
     await store.write(expired)
-    const result = await createSession({ api, store, home: await temporaryHome() }).logout()
+    const result = await createSession({
+      beforeKeysDiscarded: async () => undefined,
+      api,
+      store,
+      home: await temporaryHome(),
+    }).logout()
     expect(await store.read()).toBeNull()
     expect(result).toBe(outcome === "approved")
     expect(outcome === "offline" ? attempts : calls).toEqual(

@@ -1064,12 +1064,13 @@ describe("thread component settle never waits on the gateway store", () => {
   })
 })
 
-const SEVENTEEN = [
+const EIGHTEEN = [
   "thread_create",
   "thread_list",
   "thread_read",
   "thread_send",
   "thread_interrupt",
+  "thread_close",
   "thread_handoff",
   "thread_rename",
   "thread_set_model",
@@ -1085,13 +1086,13 @@ const SEVENTEEN = [
 ]
 
 describe("thread component production registration", () => {
-  test("registers all seventeen tools when a test host is supplied", () => {
+  test("registers all eighteen tools when a test host is supplied", () => {
     const f = api()
     createThreadComponent({ host: host(), stateDirectory: "/tmp/thread-test-state" }).register(
       f.pi as never,
       context([]) as never,
     )
-    expect(f.tools.map((tool) => tool.name)).toEqual(SEVENTEEN)
+    expect(f.tools.map((tool) => tool.name)).toEqual(EIGHTEEN)
   })
 
   // Placement contract (engine `ToolDefinition.runs`): thread tools run on the loop side of a split session.
@@ -1110,15 +1111,15 @@ describe("thread component production registration", () => {
       f.pi as never,
       context([]) as never,
     )
-    expect(f.tools.map((tool) => tool.name)).toEqual(SEVENTEEN)
+    expect(f.tools.map((tool) => tool.name)).toEqual(EIGHTEEN)
   })
 
-  test("registers all seventeen tools when a test host is supplied and no host flag exists", () => {
+  test("registers all eighteen tools when a test host is supplied and no host flag exists", () => {
     const f = api()
     createThreadComponent({ host: host(), stateDirectory: "/tmp/thread-test-state" }).register(
       f.pi as never,
       context([]) as never,
     )
-    expect(f.tools).toHaveLength(17)
+    expect(f.tools).toHaveLength(18)
   })
 })

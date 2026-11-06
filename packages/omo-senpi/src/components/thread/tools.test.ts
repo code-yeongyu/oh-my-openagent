@@ -127,7 +127,7 @@ describe("thread tool registration", () => {
     expect(f.setModel.mock.calls[0]).toEqual(["route-peer", "openai", "gpt-x", "dur-peer"])
   })
 
-  test("registers exactly the seventeen contract tools with search metadata", () => {
+  test("registers exactly the eighteen contract tools with search metadata", () => {
     const tools: Record<string, unknown>[] = []
     const f = fixture()
     registerThreadTools(
@@ -140,6 +140,7 @@ describe("thread tool registration", () => {
       "thread_read",
       "thread_send",
       "thread_interrupt",
+      "thread_close",
       "thread_handoff",
       "thread_rename",
       "thread_set_model",

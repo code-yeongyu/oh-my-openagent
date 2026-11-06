@@ -154,7 +154,12 @@ describe("a credential read the OS store does not answer", () => {
       notice: quiet,
       wait: bounded,
     })
-    const session = createSession({ api, store: a, home: await temporaryHome() })
+    const session = createSession({
+      beforeKeysDiscarded: async () => undefined,
+      api,
+      store: a,
+      home: await temporaryHome(),
+    })
     expectApprovalPending(await settled(session.accessToken()))
     approval.resolve(item)
     await approval.promise
@@ -219,7 +224,12 @@ describe("a credential read the OS store does not answer", () => {
       notice: quiet,
       wait: bounded,
     })
-    const session = createSession({ api: "https://api.omo.dev", store, home: await temporaryHome() })
+    const session = createSession({
+      beforeKeysDiscarded: async () => undefined,
+      api: "https://api.omo.dev",
+      store,
+      home: await temporaryHome(),
+    })
     expectApprovalPending(await settled(session.accessToken()))
     expectApprovalPending(await settled(session.accessToken()))
   })

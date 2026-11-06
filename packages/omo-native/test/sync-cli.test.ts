@@ -51,6 +51,7 @@ async function context(
     answerPending: unused,
     revealPending: unused,
   }
+  const authority = { signal: new AbortController().signal, admit: <T>(dispatch: () => T): T => dispatch() }
   return {
     account: "acct",
     serviceDeviceId: "dev_svc",
@@ -58,6 +59,7 @@ async function context(
     pinDir: await temporaryHome(),
     chain,
     pairing,
+    authority,
   }
 }
 

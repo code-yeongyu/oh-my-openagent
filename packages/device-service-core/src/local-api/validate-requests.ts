@@ -1,6 +1,7 @@
 import { SESSION_PROJECT_MAX_CHARS, SESSION_READ_TAIL_MAX } from "./spec-proto.ts"
 import type { EnvironmentReport, LocalRequest, RequestType, SessionFilter } from "./protocol.ts"
 import { COMMAND_REQUEST_VALIDATORS, requestFields, type RequestValidators } from "./validate-command.ts"
+import { DELEGATED_REQUEST_VALIDATORS } from "./validate-delegated.ts"
 import {
   absolutePath,
   base64Bytes,
@@ -63,6 +64,7 @@ const agentDir = (v: Fields): string => absolutePath(requestFields(v, ["agent_di
 
 const VALIDATORS: RequestValidators<RequestType> = {
   ...COMMAND_REQUEST_VALIDATORS,
+  ...DELEGATED_REQUEST_VALIDATORS,
   authenticate: (v, id) => {
     const m = requestFields(v, ["client_proof"])
     return { id, type: "authenticate", client_proof: text(m["client_proof"], 64, "client_proof") }
@@ -122,10 +124,14 @@ const VALIDATORS: RequestValidators<RequestType> = {
     return { id, type: "devices.list" }
   },
   "sessions.list": (v, id) => {
-    const filter = requestFields(v, [], ["filter"])["filter"]
-    return filter === undefined
-      ? { id, type: "sessions.list" }
-      : { id, type: "sessions.list", filter: filterOf(filter) }
+    const { filter, rows } = requestFields(v, [], ["filter", "rows"])
+    if (rows !== undefined && rows !== 2) return fail("rows")
+    return {
+      id,
+      type: "sessions.list",
+      ...(filter === undefined ? {} : { filter: filterOf(filter) }),
+      ...(rows === undefined ? {} : { rows }),
+    }
   },
   "session.attach": (v, id) => {
     const m = requestFields(v, ["device", "session_id"])

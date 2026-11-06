@@ -222,7 +222,7 @@ async function immutableFile(
   directory: string,
   prefix: string,
   text: string,
-): Promise<{ file: string; sha256: string }> {
+): Promise<{ file: string; sha256: string; codes: TrustDiagnosticEntry[] }> {
   if (Buffer.byteLength(text) > MAX_BYTES) throw new Error("trust generation exceeds 8 MiB")
   const sha256 = digest(text)
   const file = join(directory, `${prefix}${sha256}.pem`)
@@ -230,14 +230,18 @@ async function immutableFile(
     if ((await readOwnedTrustFile(file)) === text) {
       // Reuse is use: retention ranks by mtime, and the caller is about to hand this path out (5.3).
       const now = new Date()
-      await fs.utimes(file, now, now).catch(() => {})
-      return { file, sha256 }
+      // A failed refresh leaves this generation ranked as old, so it is reported like a failed lease.
+      const codes: TrustDiagnosticEntry[] = await fs.utimes(file, now, now).then(
+        () => [],
+        () => [{ code: "trust-lease-failed" }],
+      )
+      return { file, sha256, codes }
     }
   } catch (error) {
     if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error
   }
   await atomicWrite(file, text)
-  return { file, sha256 }
+  return { file, sha256, codes: [] }
 }
 
 export async function recoverUserExtras(
@@ -291,9 +295,16 @@ export async function writeTrustGeneration(
   const userFile =
     user.length === 0 ? null : await immutableFile(directory, "u-", USER_HEADER + serializeCertificates(user))
   const header = `${GENERATION_PREFIX} v1 user=${userFile?.sha256 ?? "none"}\n`
+  const generation = await immutableFile(
+    directory,
+    "",
+    header + serializeCertificates([...automatic, ...extras, ...user]),
+  )
   return {
-    ...(await immutableFile(directory, "", header + serializeCertificates([...automatic, ...extras, ...user]))),
+    file: generation.file,
+    sha256: generation.sha256,
     user: userFile?.sha256 ?? null,
+    codes: [...(userFile?.codes ?? []), ...generation.codes],
   }
 }
 

@@ -8,4 +8,5 @@ export {
   quietNotice,
 } from "./keystore"
 export { type Credentials, SignInError, serviceOrigin } from "./protocol"
-export { createSession, type Session } from "./session"
+export { type BeforeKeysDiscarded, createSession, type DiscardedCredential, type Session } from "./session"
+export { retireSyncPinOnDiscard } from "./sync-pin-retire"
