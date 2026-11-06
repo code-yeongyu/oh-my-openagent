@@ -170,6 +170,9 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // bun 1.4.3, byte-identical). Ceiling = that measurement rounded up to the next 5,000 bytes (never below what is measured).
 // Batch #18 measured omo.js at 1,422,712 B with the telemetry lazy chunk; revisit this budget when a trim lands.
 // Batch #19 measured omo.js at 1,426,658 B (11 cars); budget = measured + 4 KiB (lead rule). Revisit when a trim lands.
+// #12161 (win32 PATH-only git resolver + System32 cmd.exe batch launch, security path) measured omo.js at 1,462,494 B on
+// dev 053ce97861 + #12161; budget = measured + 4 KiB = 1,466,590 (lead ruling A: a lazy chunk would add a load-time
+// failure mode to the security check). Revisit when a trim lands.
 const BUDGET_BYTES = bundleBudget.omoJsBytes
 
 describe("omo-senpi bundle size budget", () => {
