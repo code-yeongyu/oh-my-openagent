@@ -28,12 +28,14 @@
 | Configuration field reference | [docs/reference/configuration.md](reference/configuration.md) |
 | Harness-neutral `omo.json` config reference | [docs/reference/omo-json.md](reference/omo-json.md) |
 | Native `computer` tool contract | [docs/reference/computer.md](reference/computer.md) |
+| `computer.run` QuickJS sandbox threat model and compatibility matrix | [docs/reference/computer-run-sandbox-threat-model.md](reference/computer-run-sandbox-threat-model.md) |
 | Feature-by-feature reference | [docs/reference/features.md](reference/features.md) |
 | CLI command reference | [docs/reference/cli.md](reference/cli.md) |
 | Engine hosts per session, `omo daemon`, migration and rollback | [docs/reference/omo-daemon.md](reference/omo-daemon.md) |
 | `omo thread` CLI and thread SDK for scripts and connectors (JSON shapes, exit codes) | [docs/reference/omo-thread.md](reference/omo-thread.md) |
 | `omo remote`: sessions on your other devices (verbs, states, command outcomes, device service install) | [docs/reference/remote-sessions.md](reference/remote-sessions.md) |
 | Engine trust under a user namespace (bwrap sandbox, inode attestation) | [docs/reference/engine-trust-user-namespaces.md](reference/engine-trust-user-namespaces.md) |
+| Desktop engine attach and `--serve` multi-connection threat model | [docs/reference/desktop-attach-threat-model.md](reference/desktop-attach-threat-model.md) |
 | Known issues & workarounds | [docs/reference/known-issues.md](reference/known-issues.md) |
 | `prompt_async_gate` deep-dive | [docs/reference/prompt-async-gate-rfc.md](reference/prompt-async-gate-rfc.md) |
 | Shared core multi-PR extraction QA | [docs/reference/shared-core-multi-pr.md](reference/shared-core-multi-pr.md) |

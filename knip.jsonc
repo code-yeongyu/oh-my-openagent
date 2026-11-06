@@ -3671,6 +3671,8 @@
         "src/cli/service-auth/accounts-closed.fixture.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "src/cli/service-auth/cli-keystore.fixture.ts",
+        // a --preload fixture: closed-device-login.test.ts runs it in a launcher child, nothing imports it (#12639)
+        "src/cli/service-auth/closed-device-login.fixture.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "src/cli/service-auth/refresh-child.fixture.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
