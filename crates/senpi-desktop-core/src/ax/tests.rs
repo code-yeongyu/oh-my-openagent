@@ -232,3 +232,49 @@ fn bounds_center_hit_test_is_global_and_frameless() {
     );
     assert!(matches!(registry.resolve("e1").unwrap(), AxHandle::Id(2)));
 }
+
+fn clamped_tree() -> Mock {
+    let mut m = Mock {
+        props: [
+            (1, p("window", Some("Title"))),
+            (2, p("group", None)),
+            (3, p("button", Some("Go"))),
+        ]
+        .into(),
+        children: [(1, vec![2]), (2, vec![3])].into(),
+    };
+    m.props.get_mut(&2).unwrap().child_count = 1;
+    m
+}
+
+#[test]
+fn an_object_mode_depth_clamp_keeps_the_node_and_counts_its_children() {
+    // Given: depth 1 stops above the button.
+    let mut registry = AxRegistry::with_report_mode(crate::report::ReportMode::Object);
+    let options = AxSnapshotOptions {
+        max_depth: Some(1),
+        ..AxSnapshotOptions::default()
+    };
+    // When
+    let s = snapshot(&mut clamped_tree(), &mut registry, &window(), &options).unwrap();
+    // Then: the anonymous group stays as the cut, rendered with its count.
+    assert_eq!((s.complete, s.truncated, s.nodes_observed), (Some(false), true, Some(2)));
+    assert_eq!(s.cuts.len(), 1);
+    assert_eq!(s.cuts[0].child_count, 1);
+    assert!(s.text.contains(&format!("- group [ref={}] [... 1 more]", s.cuts[0].ref_)), "{}", s.text);
+    assert!(registry.subtree_truncated(&s.cuts[0].ref_));
+}
+
+#[test]
+fn a_null_mode_depth_clamp_keeps_todays_reply() {
+    // Given / When
+    let options = AxSnapshotOptions {
+        max_depth: Some(1),
+        ..AxSnapshotOptions::default()
+    };
+    let s = snapshot(&mut clamped_tree(), &mut AxRegistry::default(), &window(), &options).unwrap();
+    // Then: no partial members, no cut marker, the empty group filtered out.
+    assert_eq!((s.complete, s.nodes_observed, s.cuts.len()), (None, None, 0));
+    assert!(s.truncated);
+    assert_eq!(s.text, "- window \"Title\" [ref=e1] app=Safari (focused)\n… truncated (2 nodes)");
+}
