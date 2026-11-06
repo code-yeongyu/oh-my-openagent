@@ -7,6 +7,7 @@ import { resolveMemoryRoot } from "../memory-core/src/identity/layout"
 import { syncPinDir } from "../memory-core/src/sync/pin-dir"
 import { createCredentialStore, type CredentialStore, SESSION_READ_WAIT } from "../omo-opencode/src/cli/service-auth/keystore"
 import { serviceOrigin } from "../omo-opencode/src/cli/service-auth/protocol"
+import { retireSyncPinOnDiscard } from "../omo-opencode/src/cli/service-auth/sync-pin-retire"
 import { runAccountVerb } from "./account-cli"
 import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import packageJson from "./package.json" with { type: "json" }
@@ -29,6 +30,7 @@ async function inProcessAccountShow(): Promise<AccountShowResult> {
         return store
       },
       pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())),
+      beforeKeysDiscarded: retireSyncPinOnDiscard({ pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())), log: () => {} }),
       readStdin: async () => "",
       output: line => lines.push(line),
       error: () => {},

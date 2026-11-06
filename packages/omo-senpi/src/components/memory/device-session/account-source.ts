@@ -10,6 +10,7 @@ import {
   type CredentialStore,
   createSession,
   currentServiceDevice,
+  retireSyncPinOnDiscard,
   KeychainApprovalPendingError,
   quietNotice,
   serviceOrigin,
@@ -86,6 +87,10 @@ export function createCliAccountSource(options: {
   readonly store?: CredentialStore
   readonly fetch?: typeof fetch
   readonly home?: string
+  /** This host's trust-pin directory: a pin is retired when the keys that earned it are discarded (#12280); absent, none is. */
+  readonly pinDir?: string
+  /** The host's logger: one warning per pin a discard could not retire. */
+  readonly logger?: { warn(line: string): void }
 }): () => Promise<CliDeviceAccount | null> {
   const configured = options.api === undefined ? options.env?.OMO_SERVICE_API_URL : undefined
   let api: string
@@ -96,6 +101,9 @@ export function createCliAccountSource(options: {
     throw error
   }
   const doFetch = options.fetch ?? fetch
+  const pinDir = options.pinDir
+  const beforeKeysDiscarded = pinDir === undefined ? async () => undefined
+    : retireSyncPinOnDiscard({ pinDir: () => pinDir, log: (line) => options.logger?.warn(line) })
   let active: { readonly generation: string; readonly abort: AbortController } | undefined
   // A keychain waiting for its approval dialog is not a signed-out device: sync defers this pass and retries.
   return async () => {
@@ -122,7 +130,10 @@ export function createCliAccountSource(options: {
       throw error
     }
     if (credentials === null) { active?.abort.abort(); active = undefined; return null }
-    const session = createSession({ api, store, ...(options.home === undefined ? {} : { home: options.home }) })
+    const session = createSession({
+      api, store, ...(options.home === undefined ? {} : { home: options.home }),
+      beforeKeysDiscarded,
+    })
     // One credential transaction captures a concrete generation before the first token or identity await: a legacy
     // credential is stamped and re-read under the lock, so an absent generation is never a wildcard afterwards.
     const initial = await session.update(async current => {

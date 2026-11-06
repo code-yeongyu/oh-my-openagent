@@ -1,4 +1,4 @@
-import { afterEach } from "bun:test"
+import { afterEach, beforeEach } from "bun:test"
 import { chmodSync, mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -7,6 +7,7 @@ import { type AgentDirRegistrant, type RegistrantEvent, startAgentDirRegistrant 
 import { startFakeOwner, type FakeOwner } from "./local-api/conformance/fake-owner.ts"
 import { defaultWorld } from "./local-api/conformance/world.ts"
 import { deviceKeys } from "./local-api/support.ts"
+import { remainingTestTime, resetTestDeadline } from "../../../test-support/test-deadline"
 
 // The shared world of the agent dir registrant tests (#12379): the fake owner is a real local socket with the
 // mutual proof, and a stopped owner followed by a new one on the same state dir stands in for a relayd restart.
@@ -18,6 +19,9 @@ const services: DeviceService[] = []
 const dirs: string[] = []
 
 export function useRegistrantWorld(): void {
+  // The root preload resets the per-test deadline; this package's own bunfig does not, so a package-local run
+  // would otherwise share one deadline across the file and starve every wait after the first slow test.
+  beforeEach(() => resetTestDeadline())
   afterEach(async () => {
     for (const registrant of registrants.splice(0)) registrant.stop()
     for (const service of services.splice(0)) service.close()
@@ -45,10 +49,12 @@ export const stopOwner = async (owner: FakeOwner): Promise<void> => {
   await owner.stop()
 }
 
-export const within = <T>(promise: Promise<T>, what: string, ms = 10_000): Promise<T> => {
+// The deadline is what is left of the current test's own budget, not a fresh 10 s stopwatch: a waiter armed at
+// the start of a test must not expire while the test itself still has time, however slow the host is (#10814).
+export const within = <T>(promise: Promise<T>, what: string, ms = remainingTestTime()): Promise<T> => {
   let timer: ReturnType<typeof setTimeout> | undefined
   const expired = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`waited ${ms} ms for ${what}, it never came`)), ms)
+    timer = setTimeout(() => reject(new Error(`waited out the test budget (${Math.round(ms)} ms) for ${what}, it never came`)), ms)
   })
   return Promise.race([promise, expired]).finally(() => clearTimeout(timer))
 }

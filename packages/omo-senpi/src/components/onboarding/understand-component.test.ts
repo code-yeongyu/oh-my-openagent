@@ -188,10 +188,13 @@ describe("omo.onboarding.understand RPC (#10480)", () => {
     expect(rpc.starts).toHaveLength(0)
   })
 
-  test("#given an applied scan #when understanding is requested #then its digests were released with it and it is unavailable", async () => {
+  test("#given an applied scan #when understanding is requested #then it reads that scan's digests, as the desktop's About you then Understanding you does (#12508)", async () => {
     // given
     const { environment } = await profile()
-    const rpc = host({ environment, turn: async () => "completed" })
+    const rpc = host({ environment, turn: async ({ record }) => {
+      await record("The user tests with bun.")
+      return "completed"
+    } })
     const scanId = await rpc.scan()
     expect(await rpc.call(ONBOARDING_APPLY_RPC_METHOD, { scanId, stages: [] })).toMatchObject({ scanId, applied: [] })
 
@@ -199,7 +202,29 @@ describe("omo.onboarding.understand RPC (#10480)", () => {
     const response = await rpc.call(ONBOARDING_UNDERSTAND_RPC_METHOD, { scanId, model: UNDERSTAND_MODEL, consent: true })
 
     // then
+    expect(response).toEqual({ understandId: expect.any(String) })
+    const events = await rpc.understandDone(String(response["understandId"]))
+    expect(events.at(-1)?.candidates?.[0]?.sources).toEqual(["codex:codex-0", "codex:codex-1"])
+    expect(rpc.starts).toHaveLength(1)
+    expect(await rpc.call(ONBOARDING_APPLY_RPC_METHOD, { scanId, stages: [] })).toMatchObject({ kind: "unavailable" })
+  })
+
+  test("#given an applied scan older than its ten-minute retention #when understanding is requested #then it is unavailable", async () => {
+    // given
+    const { environment } = await profile()
+    const scanStore = createOnboardingScanStore()
+    let now = 1_000_000_000_000
+    const rpc = host({ environment, turn: async () => "completed", scanStore, now: () => now })
+    const scanId = await rpc.scan()
+    expect(await rpc.call(ONBOARDING_APPLY_RPC_METHOD, { scanId, stages: [] })).toMatchObject({ scanId, applied: [] })
+    now += ONBOARDING_SCAN_TTL_MS + 1
+
+    // when
+    const response = await rpc.call(ONBOARDING_UNDERSTAND_RPC_METHOD, { scanId, model: UNDERSTAND_MODEL, consent: true })
+
+    // then
     expect(response).toMatchObject({ kind: "unavailable" })
+    expect(scanStore.scans.has(scanId)).toBe(false)
     expect(rpc.starts).toHaveLength(0)
   })
 
