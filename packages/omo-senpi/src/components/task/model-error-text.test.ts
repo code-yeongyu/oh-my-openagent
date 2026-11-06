@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import type { DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
 
-import { categoryModelFailureText, chainUnavailableText, pinnedModelUnavailableText } from "./model-error-text"
+import { agentModelFailureText, categoryModelFailureText, chainUnavailableText, pinnedModelUnavailableText } from "./model-error-text"
 
 const CHAIN: readonly DelegateFallbackEntry[] = [
   { providers: ["kimi-coding", "kimi-for-coding"], model: "kimi-for-coding-highspeed" },
@@ -90,5 +90,43 @@ describe("model refusals", () => {
     // then
     expect(text).toContain("categories.quick.model")
     expect(text).not.toContain("old-alias")
+  })
+
+  test("#given a category pinned through a models list #when rendered #then it names that pin instead of the dead chain", () => {
+    // given: the schema accepts `models: [...]` with no scalar `model`, and this refusal carries no
+    // chain, so nothing else names the model the user actually pinned
+    const error = {
+      code: "model_unavailable" as const,
+      message: "resolver text",
+      category: "quick",
+    }
+    const omoConfig = { categories: { quick: { models: ["custom-proxy/gpt-6-astra"] } } }
+
+    // when
+    const text = categoryModelFailureText(error, omoConfig as never, undefined)
+
+    // then: the pin is the cause, so the reader is told which pin failed, not to set the key again
+    expect(text).toContain("custom-proxy/gpt-6-astra")
+    expect(text).toContain("is pinned to")
+    expect(text).not.toContain("its chain needs")
+  })
+
+  test("#given a pinned agent reached through a retired alias #when rendered #then the pin is named under the canonical agent", () => {
+    // given: the resolver reports the canonical name, and the config key holds the pin
+    const agents = { "omo-native-code-reviewer": { models: [{ model: "custom-proxy/gpt-6-astra" }] } }
+    const resolution = {
+      agent: "omo-native-code-reviewer",
+      attemptedModel: undefined,
+      attempted_chain: CHAIN,
+      missing_providers: ["openai"],
+    }
+
+    // when
+    const text = agentModelFailureText("omo-senpi-code-reviewer", resolution, agents as never)
+
+    // then
+    expect(text).toContain("custom-proxy/gpt-6-astra")
+    expect(text).toContain("agents.omo-native-code-reviewer.model")
+    expect(text).not.toContain("omo-senpi-code-reviewer")
   })
 })

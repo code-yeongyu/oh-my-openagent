@@ -66,6 +66,7 @@ export function pinnedModelUnavailableText(target: ChainFailureTarget, pinnedMod
 }
 
 export type AgentUnavailable = {
+  readonly agent?: string
   readonly attemptedModel: string | undefined
   readonly attempted_chain?: readonly DelegateFallbackEntry[]
   readonly missing_providers?: readonly string[]
@@ -85,12 +86,19 @@ export function categoryModelFailureText(
   if (error.attempted_chain !== undefined) {
     return chainUnavailableText({ category }, error.attempted_chain, error.missing_providers ?? [], error.unlisted_provider_model)
   }
-  const pinned = omoConfig.categories?.[category]?.model
+  // A pin can be written either way the schema allows: a scalar model or a models list.
+  const pinned = firstConfiguredPin(omoConfig.categories?.[category])
   return pinned === undefined ? undefined : pinnedModelUnavailableText({ category }, pinned)
 }
 
-function firstModelEntry(definition: AgentDefinition | undefined): string | undefined {
-  const entry = definition?.models?.[0]
+type ModelPinConfig = {
+  readonly model?: string | undefined
+  readonly models?: readonly (string | { readonly model: string })[] | undefined
+}
+
+function firstConfiguredPin(config: ModelPinConfig | undefined): string | undefined {
+  if (config?.model !== undefined) return config.model
+  const entry = config?.models?.[0]
   if (entry === undefined) return undefined
   return typeof entry === "string" ? entry : entry.model
 }
@@ -100,13 +108,16 @@ export function agentModelFailureText(
   resolution: AgentUnavailable,
   agents: Readonly<Record<string, AgentDefinition>>,
 ): string {
-  const definition = Object.hasOwn(agents, agentName) ? agents[agentName] : undefined
+  // The resolver canonicalizes a retired alias, so the pin and the Settings key live under that
+  // name; keying the lookup on the requested alias missed the pin entirely.
+  const agent = resolution.agent ?? agentName
+  const definition = Object.hasOwn(agents, agent) ? agents[agent] : undefined
   // A pin is the cause of the failure, so it wins over the chain that the pin replaced: refusing
   // with the chain text told a pinned agent's caller to set the key it had already set.
-  const pinned = definition?.model ?? firstModelEntry(definition)
-  if (pinned !== undefined) return pinnedModelUnavailableText({ agent: agentName }, pinned)
+  const pinned = firstConfiguredPin(definition)
+  if (pinned !== undefined) return pinnedModelUnavailableText({ agent }, pinned)
   if (resolution.attempted_chain !== undefined) {
-    return chainUnavailableText({ agent: agentName }, resolution.attempted_chain, resolution.missing_providers ?? [], undefined)
+    return chainUnavailableText({ agent }, resolution.attempted_chain, resolution.missing_providers ?? [], undefined)
   }
-  return `No available model for agent "${agentName}" (attempted ${resolution.attemptedModel ?? "none"}).`
+  return `No available model for agent "${agent}" (attempted ${resolution.attemptedModel ?? "none"}).`
 }
