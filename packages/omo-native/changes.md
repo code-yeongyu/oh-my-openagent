@@ -1,3 +1,7 @@
+## 2026-11-06 - `omo update` replaces the installed binary (#12626)
+
+The compiled launcher hands off to `~/.omo/binary-runtime/<version>/omo`, and that runtime copy is what answers `omo update`, so the printed replace command targeted the copy. The next launch re-materialized the copy from the launcher (`materializeProvisionedExecutable`), which undid the update. `handOffToProvisionedRuntime` now passes the launcher path in `OMO_PROVISIONED_LAUNCHER` beside `OMO_PROVISIONED_HANDOFF`. `planProvisionedLaunch` returns it as `launcher`, and drops both markers. A marker that is relative or names the runtime copy is ignored. `compiledUpdate` replaces `launch.launcher`. When only the runtime copy is known (it was started directly), it prints the documented installer (`install.sh` / `install.ps1`) and exits 1 instead of a replace command the next launch would undo. Package-manager detection now sees the real install path too.
+
 ## 2026-11-05 - Doctor reports a broken omo wrapper and duplicate omo-ai installs (#12534)
 
 `omo doctor` now reports a generated `omo` wrapper whose cached runtime is gone, and warns when two different omo-ai installs are both on PATH. Windows `.cmd` wrappers are not covered by the broken check: they write `rem OMO_GENERATED_RUNTIME_WRAPPER` while the check looks for the `#` marker.

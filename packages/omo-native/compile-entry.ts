@@ -384,7 +384,9 @@ async function main(): Promise<void> {
     args,
     executable: launch.handOff ? expected : process.execPath,
     helper: helperPath !== null && helperEntry !== undefined ? { path: helperPath, sha256: helperEntry.sha256 } : undefined,
-    ...(launch.handOff ? { exec: (file: string, argv: string[], env: NodeJS.ProcessEnv) => handOffToProvisionedRuntime(file, { argv, env }) } : {}),
+    ...(launch.handOff
+      ? { exec: (file: string, argv: string[], env: NodeJS.ProcessEnv) => handOffToProvisionedRuntime(file, { argv, env, launcher: launch.launcher }) }
+      : {}),
   })
   if (trust.action !== "adopt") {
     setTrustExitCode(trust.action)
@@ -394,7 +396,9 @@ async function main(): Promise<void> {
     const result = await compiledUpdate({
       omoAiVersion: manifest.omoAiVersion,
       releaseTarget: manifest.releaseTarget,
-      destination: runningExecutable,
+      // The handed-off runtime copy answers here; the binary to replace is the one the user launched.
+      destination: launch.launcher ?? runningExecutable,
+      provisioned: expected,
       platform: process.platform,
       arch: process.arch,
       fetchReleases: fetchGitHubReleases,
@@ -411,6 +415,7 @@ async function main(): Promise<void> {
     if (marker === undefined) throw new Error("trust stage did not record its adopted generation")
     await handOffToProvisionedRuntime(expected, {
       env: buildTrustLaunchEnvironment(process.env, { marker, hop: false, platform: process.platform }),
+      launcher: launch.launcher,
     })
     return
   }
