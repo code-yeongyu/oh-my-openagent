@@ -1351,6 +1351,7 @@
     "packages/omo-senpi/src/components/task/lead-poller-lifecycle.ts",
     "packages/omo-senpi/src/components/task/member-liveness.ts",
     "packages/omo-senpi/src/components/task/memory-reporter.ts",
+    "packages/omo-senpi/src/components/task/model-error-text.ts",
     "packages/omo-senpi/src/components/task/own-task-identity.ts",
     "packages/omo-senpi/src/components/task/owned-member-liveness.ts",
     "packages/omo-senpi/src/components/task/parent-notifier.ts",
