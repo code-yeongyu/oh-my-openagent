@@ -2,8 +2,6 @@ import { existsSync } from "@oh-my-opencode/memory-core/fs"
 import { dirname } from "node:path"
 
 import {
-  DEFAULT_RUNTIME_MAX_BYTES,
-  DEFAULT_RUNTIME_RETENTION,
   readHostSweepState,
   type ForeignMemoryRuntimeSettings,
   RETENTION_STAMP_CONFIG_KEY,
@@ -52,8 +50,6 @@ export interface MemoryMaintenanceOptions {
   readonly hostSweep?: () => { readonly settings?: ForeignMemoryRuntimeSettings } | undefined
 }
 
-const HOST_SWEEP_IDENTITIES_PER_PASS = 25
-const HOST_SWEEP_SLICE_MS = 30_000
 const HOST_SWEEP_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000
 
 export interface MemoryMaintenance {
@@ -140,42 +136,21 @@ export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}):
 
   async function retain(context: MemoryIdentityContext, repo: GitMemoryRepo, signal: AbortSignal): Promise<void> {
     try {
-      const { runRuntimeRetention, summarizeRuntimeRetention } = await loadMemoryCommandsRuntime()
+      const { runMaintenanceRetention } = await loadMemoryCommandsRuntime()
       signal.throwIfAborted()
-      const report = await runRuntimeRetention({
+      await runMaintenanceRetention({
+        identity: context.identity,
         paths: context.identityPaths,
-        policy: options.resolveRetention?.(context) ?? DEFAULT_RUNTIME_RETENTION,
-        maxBytes: options.resolveMaxBytes?.(context) ?? DEFAULT_RUNTIME_MAX_BYTES,
-        now,
+        repo,
         signal,
+        now,
+        ...(options.resolveRetention === undefined ? {} : { policy: options.resolveRetention(context) }),
+        ...(options.resolveMaxBytes === undefined ? {} : { maxBytes: options.resolveMaxBytes(context) }),
         reflectionEnabled: options.reflectionEnabled?.(context) ?? true,
         ...(options.isLiveSession === undefined ? {} : { isLiveSession: options.isLiveSession }),
         ...(options.ownedSidecars === undefined ? {} : { ownedSidecars: options.ownedSidecars() }),
-        warn: (message, fields) => options.logger?.warn(message, { identity: context.identity, ...fields }),
+        ...(options.logger === undefined ? {} : { info: options.logger.info.bind(options.logger), warn: options.logger.warn.bind(options.logger) }),
       })
-      const summary = summarizeRuntimeRetention(report)
-      if (summary.removed > 0 || report.skipped.length > 0 || report.cursor !== undefined) {
-        options.logger?.info("omo-senpi memory runtime retention", { identity: context.identity, ...summary })
-      }
-      // The completion stamp is written after the work, so an interrupted pass resumes at the next bind. A
-      // pass whose stores finished and whose cap could not even measure is stamped too: its cap resume
-      // point is kept for the next due pass, which comes at the interval (#12538 review r5 L1).
-      const capStalled = report.cap?.skipped.includes("measure-over-budget") === true
-      if (report.cursor === undefined || capStalled) await repo.configSet(RETENTION_STAMP_CONFIG_KEY, String(now()))
-      if (report.cap !== undefined && report.cap.exceededBytes > 0) {
-        // "Nothing evictable" only when the cap walked every tier: a budget stop (cursor), a measurement
-        // past the budget and skipped journal tiers all leave evictable data for the next pass.
-        const unfinished = [...(report.cap.cursor === undefined ? [] : ["budget"]), ...report.cap.skipped]
-        options.logger?.warn(
-          unfinished.length === 0 ? "omo-senpi memory runtime cap exceeded, nothing evictable" : "omo-senpi memory runtime cap exceeded, eviction continues next pass",
-          {
-            identity: context.identity,
-            overCapBytes: report.cap.exceededBytes,
-            ...(unfinished.length === 0 ? {} : { reason: unfinished }),
-            kept: report.cap.kept,
-          },
-        )
-      }
     } catch (error) {
       if (signal.aborted) throw error
       options.logger?.warn("omo-senpi memory runtime retention failed", {
@@ -198,20 +173,16 @@ export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}):
     const state = await readHostSweepState(memoryRoot)
     const completedAt = state.completedAt === undefined ? Number.NaN : Date.parse(state.completedAt)
     if (state.cursor === undefined && Number.isFinite(completedAt) && now() - completedAt < HOST_SWEEP_INTERVAL_MS) return
-    const { createRetentionHostSweepStep, sweepHostIdentities } = await loadMemoryCommandsRuntime()
+    const { runMaintenanceHostSweep } = await loadMemoryCommandsRuntime()
     signal.throwIfAborted()
-    const deadline = now() + HOST_SWEEP_SLICE_MS
-    const result = await sweepHostIdentities({
+    await runMaintenanceHostSweep({
       memoryRoot,
-      steps: [createRetentionHostSweepStep({ ...(host.settings === undefined ? {} : { settings: host.settings }), isHostedIdentity: (name) => hosted.has(name), now, signal, deadline })],
-      maxIdentities: HOST_SWEEP_IDENTITIES_PER_PASS,
-      budgetMs: HOST_SWEEP_SLICE_MS,
-      now,
+      ...(host.settings === undefined ? {} : { settings: host.settings }),
+      isHostedIdentity: (name) => hosted.has(name),
       signal,
+      now,
+      ...(options.logger === undefined ? {} : { info: options.logger.info.bind(options.logger) }),
     })
-    if (result.status === "swept" && result.lines.length > 0) {
-      options.logger?.info("omo-senpi memory host sweep", { visited: result.visited.length, completed: result.completed, lines: result.lines })
-    }
   }
 
   async function run(context: MemoryIdentityContext, signal: AbortSignal): Promise<void> {

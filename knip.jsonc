@@ -492,8 +492,6 @@
       "packages/omo-config-core/src/schema/agent.ts": ["OmoAgentModelEntrySchema", "OmoAgentPermissionSchema"],
       // pre-existing at origin dev 4686e425b5: unused export(s) OmoHarnessIdSchema, OmoOpenCodeHarnessConfigSchema, OmoDisabledSkillsSchema, OmoExcludedModelsSchema
       "packages/omo-config-core/src/schema/config.ts": ["OmoHarnessIdSchema", "OmoOpenCodeHarnessConfigSchema", "OmoDisabledSkillsSchema", "OmoExcludedModelsSchema"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) LEGACY_CATEGORY_NAME_ALIASES
-      "packages/omo-config-core/src/schema/legacy-category-names.ts": ["LEGACY_CATEGORY_NAME_ALIASES"],
       // pre-existing at origin dev 4686e425b5: unused export(s) OmoMemoryReflectionTriggerSchema, OmoMemoryReflectionSchema, OmoMemorySyncSchema, OmoMemorySearchSchema, OmoMemoryRecallEventCapsSchema, OmoMemoryProjectScopeSchema, OmoMemoryProjectScopeLayerSchema, OmoMemoryNudgeSchema, OmoMemoryFactsSchema, OmoMemoryDreamSchema and 18 more
       "packages/omo-config-core/src/schema/memory.ts": ["OmoMemoryReflectionTriggerSchema", "OmoMemoryReflectionSchema", "OmoMemorySyncSchema", "OmoMemorySearchSchema", "OmoMemoryRecallEventCapsSchema", "OmoMemoryProjectScopeSchema", "OmoMemoryProjectScopeLayerSchema", "OmoMemoryNudgeSchema", "OmoMemoryFactsSchema", "OmoMemoryDreamSchema", "OmoMemoryPeopleSchema", "OmoMemorySoulSchema", "OmoMemoryWriteNoticeSchema", "OmoMemoryReflectionTriggerLayerSchema", "OmoMemoryReflectionLayerSchema", "OmoMemorySyncLayerSchema", "OmoMemorySearchLayerSchema", "OmoMemoryRecallEventCapsLayerSchema", "OmoMemoryNudgeLayerSchema", "OmoMemoryFactsLayerSchema", "OmoMemoryDreamLayerSchema", "OmoMemoryPeopleLayerSchema", "OmoMemorySoulLayerSchema", "OmoMemoryWriteNoticeLayerSchema", "OmoMemoryProjectionSchema", "OmoMemoryProjectionLayerSchema", "OmoMemoryAgentOverridesSchema", "OmoMemoryAutoIdentitySchema"],
       // pre-existing at origin dev 4686e425b5: unused export(s) OmoModelCatalogEntrySchema, OmoModelCatalogEntryLayerSchema
@@ -633,8 +631,8 @@
       "packages/omo-opencode/src/config/schema.ts": ["AnyMcpNameSchema", "McpNameSchema"],
       // pre-existing at origin dev 4686e425b5: unused export(s) AgentDefinitionPathSchema
       "packages/omo-opencode/src/config/schema/agent-definitions.ts": ["AgentDefinitionPathSchema"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) BuiltinAgentNameSchema, OverridableAgentNameSchema, AgentNameSchema
-      "packages/omo-opencode/src/config/schema/agent-names.ts": ["BuiltinAgentNameSchema", "OverridableAgentNameSchema", "AgentNameSchema"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) AgentNameSchema
+      "packages/omo-opencode/src/config/schema/agent-names.ts": ["AgentNameSchema"],
       // pre-existing at origin dev 4686e425b5: unused export(s) FallbackModelStringArraySchema, FallbackModelObjectArraySchema, FallbackModelMixedArraySchema
       "packages/omo-opencode/src/config/schema/fallback-models.ts": ["FallbackModelStringArraySchema", "FallbackModelObjectArraySchema", "FallbackModelMixedArraySchema"],
       // pre-existing at origin dev 4686e425b5: unused export(s) PermissionValueSchema
@@ -1675,8 +1673,8 @@
       "packages/shared-skills/index.d.ts": ["sharedSkillsRootPath"],
       // pre-existing at origin dev 4686e425b5: unused export(s) designpowersUpstreamName, excludedDesignpowersSkills, designpowersAgentFiles
       "packages/shared-skills/scripts/designpowers-refs-manifest.mjs": ["designpowersUpstreamName", "excludedDesignpowersSkills", "designpowersAgentFiles"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) sharedSkillsRoot, tasteSkillFiles, uiUxDbFileRenames, brandDesignFiles, designMaterializeMap, uiUxDbMaterializeMap, keptDesignRelativePaths
-      "packages/shared-skills/scripts/frontend-refs-manifest.mjs": ["sharedSkillsRoot", "tasteSkillFiles", "uiUxDbFileRenames", "brandDesignFiles", "designMaterializeMap", "uiUxDbMaterializeMap", "keptDesignRelativePaths"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) sharedSkillsRoot, tasteSkillFiles, uiUxDbFileRenames, brandDesignFiles, designMaterializeMap, uiUxDbMaterializeMap
+      "packages/shared-skills/scripts/frontend-refs-manifest.mjs": ["sharedSkillsRoot", "tasteSkillFiles", "uiUxDbFileRenames", "brandDesignFiles", "designMaterializeMap", "uiUxDbMaterializeMap"],
       // pre-existing at origin dev 4686e425b5: unused export(s) __scriptPath
       "packages/shared-skills/scripts/materialize-frontend-refs.mjs": ["__scriptPath"],
       // pre-existing at origin dev 4686e425b5: unused export(s) ignoredSkillSourceDirNames, ignoredSkillSourceFileNames, createSkillSourceCopyFilter

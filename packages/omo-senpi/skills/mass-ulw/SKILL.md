@@ -44,7 +44,7 @@ const run = await sdk.start(dag)
 const result = await sdk.wait(run.run_id)
 ```
 
-`define` builds the definition and rejects duplicate node ids locally, before anything is started. `start`, `attach`, `snapshot`, `wait`, and `cancel` are the whole surface.
+`define` builds the definition and rejects duplicate node ids locally, before anything is started. `start`, `attach`, `snapshot`, `wait`, and `cancel` drive a run; `retry`, `send`, and `amend` (below) recover its nodes.
 
 Python cells cannot import the ESM SDK; call `tool.workflow({...})` directly with the same payload shape the SDK produces - note the SDK passes `detach: false` on `wait`, so a blocking Python wait is `tool.workflow({"action": "wait", "run_id": run_id, "detach": False})`; without it the tool detaches against a live run and returns the current snapshot. Prefer a JS cell whenever the run involves any orchestration beyond a single `start` + `wait`.
 
@@ -68,7 +68,7 @@ await sdk.cancel(runId, "superseded by a new plan")
 
 ## Recovering one node - retry, send, amend
 
-A settled run is not a dead end. Three verbs act on a SINGLE node, so one bad node never costs you the whole graph, and every node that already finished keeps its cached result:
+A settled run is not a dead end. Three verbs recover failed or stale nodes without restarting the graph, and every node that already finished keeps its cached result:
 
 ```js
 await sdk.retry(runId)                                  // every failed/cancelled node gets a fresh attempt

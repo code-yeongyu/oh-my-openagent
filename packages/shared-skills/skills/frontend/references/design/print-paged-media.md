@@ -73,4 +73,4 @@ pdftoppm -png -r 150 report.pdf out/page   # one PNG per page
 
 Read every page image for: blank or near-empty pages, a block stranded alone after a keep-together push, a table or figure split mid-exhibit, a heading orphaned at a page foot, clipped or overflowing text, and a running header or footer that drifted or vanished.
 
-Extracting the text proves the words are present. It cannot see any defect in this list - layout is exactly the information that extraction discards. Fix, re-render, and look again until the pages are clean; the same standard governs the `ulw-research` delivery gate and the `mass-ulw` verification wave.
+Extracting the text proves the words are present. It cannot see any defect in this list - layout is exactly the information that extraction discards. Fix, re-render, and look again until the pages are clean. The `ulw-research` delivery gate and the `mass-ulw` verification wave hold the same page-by-page inspection standard; `ulw-research` bounds its repair loop (its `repair decide` stop rules) and ships any residual defect listed in its manifest.

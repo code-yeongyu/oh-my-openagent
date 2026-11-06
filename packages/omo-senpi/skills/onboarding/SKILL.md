@@ -16,8 +16,11 @@ Detect the user's language from their message and respond in that language for t
 conversation. The skill is written in English; your output is not. Match them exactly, including
 tone.
 
-Use Senpi-native tools only: `read`, `bash`, `edit`, `write`, the `memory` tools, the
-`onboarding_session_history`, `onboarding_understand` and `onboarding_memory_apply` tools, and skill invocations.
+Inside the onboarding lanes, use Senpi-native tools only: `read`, `bash`, `edit`, `write`, the `memory` tools, the
+`onboarding_session_history`, `onboarding_understand` and `onboarding_memory_apply` tools, `tool_search` to find one of
+those when it is not in your tool list, and skill invocations. Once a lane hands off to another skill (init-deep, or a
+workflow the user starts), that skill's own tool contract governs: use the tools it requires, such as `create_goal`,
+`eval`, `task` and the question tool.
 
 Your context carries the `Onboarding scan` block: the engine already ran the one scan the desktop
 app and `omo setup` use, with one row per item it found on this computer (sign-ins, providers, MCP
@@ -289,8 +292,10 @@ record the decline through the memory tools and finish the conversation graceful
 send-off in their language, an invitation to come back with `omo --onboard` on OmO Native or
 `senpi --onboard` on a plain senpi install, and nothing more.
 
-After init-deep finishes, tell the user in their language that init-deep ran through mass-ulw's
-DAG orchestration — the work was spread across parallel child agents in dependency-ordered
-waves rather than done by one session. Then introduce mass-ulw: `mass ulw` is how you bring that
-same multi-agent orchestration to any big job, and combined requests such as `mass ulw
+After init-deep finishes, tell the user in their language which path it took. On its dag path, say
+that init-deep ran through mass-ulw's DAG orchestration — the work was spread across parallel child
+agents in dependency-ordered waves rather than done by one session. On its inline path (a repo too
+small for a dag), say that it mapped the project with a few parallel explore agents and wrote the
+files itself. Then introduce mass-ulw: `mass ulw` is how you bring that
+DAG orchestration to any big job, and combined requests such as `mass ulw
 research`, `mass ulw loop`, and `mass ulw plan` load mass-ulw alongside each of those workflows.
