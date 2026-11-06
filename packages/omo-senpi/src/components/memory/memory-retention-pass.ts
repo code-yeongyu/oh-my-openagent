@@ -16,8 +16,6 @@ import {
   type RuntimeRetentionPolicy,
 } from "@oh-my-opencode/memory-core"
 
-export { createRetentionHostSweepStep, runRuntimeRetention, summarizeRuntimeRetention, sweepHostIdentities }
-
 type Log = (message: string, data?: Record<string, unknown>) => void
 
 export interface MaintenanceRetentionInput {
