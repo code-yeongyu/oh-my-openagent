@@ -9,11 +9,15 @@
 //   interrupted          prompt 1 acquires (approved), then waits; the client sends `abort` once the engine has
 //                        audited control.grant. Prompt 2 raises: refused ControlRequired.
 //   declined             prompt 1 acquires (the client declines) and raises: refused ControlRequired, no grant.
+//   off-space-capture    full access: resolves the dialog window, switches one Space right (ctrl+right, so a second
+//                        Space must exist), screenshots the now off-Space window, switches back. Expects a frame
+//                        (SkyLight); with --disable-skylight it expects CaptureUnavailable reason off-space.
 //
 // macOS charges Accessibility to the app that launched the engine, and the engine refuses to run as its own
 // responsible process: start this from Terminal (or the app holding the grants), never from a disclaimed spawn.
 //
 // Usage: SENPI_BIN=<senpi> bun computer-control-live-macos.mjs --engine <path> [--evidence-dir <dir>] [--only a,b]
+//        [--disable-skylight]
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
@@ -55,6 +59,49 @@ const enginePath = resolve(
 );
 const evidenceDir = argValue("--evidence-dir");
 const only = argValue("--only")?.split(",");
+const skylightDisabled = process.argv.includes("--disable-skylight");
+
+const offSpaceRun = `
+const w = await desktop.window({ title: ${JSON.stringify(TARGET_TITLE)} });
+await desktop.press("ctrl+right");
+await new Promise((resolveWait) => setTimeout(resolveWait, 1500));
+let shot, error;
+try { shot = await w.screenshot({ silent: true }); } catch (caught) { error = String(caught?.code ?? "") + " " + String(caught?.message ?? caught); }
+await desktop.press("ctrl+left");
+return JSON.stringify({ offSpace: { width: shot?.width ?? 0, height: shot?.height ?? 0, error: error ?? null } });
+`;
+
+const offSpaceScenario = {
+	"off-space-capture": {
+		preset: "full-access",
+		env: skylightDisabled ? { SENPI_DESKTOP_DISABLE_SKYLIGHT: "1" } : {},
+		steps: [
+			{ type: "tool_call", name: "computer", arguments: { action: "run", code: offSpaceRun } },
+			{ type: "text", text: "done" },
+		],
+		drive: async (session) => {
+			session.send({ type: "prompt", message: "control QA: capture the dialog from another Space" });
+			await session.until("agent_end", () => session.agentEnds() >= 1);
+		},
+		verify: ({ results }) => {
+			const raw = results[0] ?? "";
+			const match = /\{"offSpace":\{[^}]*\}\}/.exec(raw.replaceAll('\\"', '"'));
+			const outcome = match === null ? undefined : JSON.parse(match[0]).offSpace;
+			return skylightDisabled
+				? [
+						["the run reported its off-Space outcome", outcome !== undefined],
+						[
+							"without SkyLight the off-Space window is CaptureUnavailable off-space",
+							String(outcome?.error).includes("CaptureUnavailable") || String(outcome?.error).includes("another Space"),
+						],
+					]
+				: [
+						["the run reported its off-Space outcome", outcome !== undefined],
+						["the off-Space window was captured", outcome?.error === null && outcome.width > 0 && outcome.height > 0],
+					];
+		},
+	},
+};
 
 const scrubbedEnv = () =>
 	Object.fromEntries(
@@ -101,7 +148,7 @@ async function dialogClosed(timeoutMs) {
 }
 
 // One senpi rpc session; `steps` is the mock provider's whole script across both prompts.
-function startSession(steps, { preset = "ask", print } = {}) {
+function startSession(steps, { preset = "ask", print, env: scenarioEnv = {} } = {}) {
 	const sandbox = createSandbox();
 	seedSandbox(sandbox);
 	mkdirSync(join(sandbox.cwd, ".omo"), { recursive: true });
@@ -143,6 +190,7 @@ function startSession(steps, { preset = "ask", print } = {}) {
 				XDG_CACHE_HOME: sandbox.xdgCacheHome,
 				PI_OFFLINE: "1",
 				OMO_SENPI_QA: "1",
+				...scenarioEnv,
 			},
 			stdio: [print === undefined ? "pipe" : "ignore", "pipe", "pipe"],
 			detached: true,
@@ -250,7 +298,7 @@ const before = protectedFiles.map(digest);
 const report = [];
 openTarget();
 try {
-	for (const [name, scenario] of Object.entries({ ...scenarios, ...desktopScenarios })) {
+	for (const [name, scenario] of Object.entries({ ...scenarios, ...desktopScenarios, ...offSpaceScenario })) {
 		if (only !== undefined && !only.includes(name)) continue;
 		let steps = scenario.steps;
 		if (typeof steps === "function") {
