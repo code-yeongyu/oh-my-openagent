@@ -95,6 +95,12 @@ export const dispatch = (state: OwnerState, conn: Conn, request: LocalRequest): 
     case "session.command_part":
     case "session.read":
       return sessionHandler(state, conn, request);
+    case "session.endpoints": {
+      const endpoints = state.world.endpoints?.[request.device];
+      return endpoints === undefined
+        ? refuse("unsupported", "that device names no engine endpoints")
+        : ok({ endpoints: [...endpoints] });
+    }
     default:
       return assertNever(request);
   }
