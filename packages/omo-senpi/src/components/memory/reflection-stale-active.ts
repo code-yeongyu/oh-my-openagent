@@ -14,7 +14,7 @@ import {
 } from "@oh-my-opencode/memory-core"
 import { dirname } from "node:path"
 
-import { loadMemoryCommandsRuntime } from "./commands/runtime-loader"
+import { loadMemoryCommandsRuntime, type ReflectionLockRuntimeModule } from "./commands/runtime-loader"
 
 export type ActiveHolderVerdict = ReflectionLockVerdict
 export type ActiveHolderSeams = StaleLockProbe
@@ -66,4 +66,32 @@ export async function recoverStaleReflectionHolder(input: {
   }
   const reason = decision.kind === "stuck" ? decision.reason : NOT_RELEASED
   return { verdict: before, notice: staleReflectionLockNotice(input.reflectionDir, { runId: decision.runId, reason }) }
+}
+
+/**
+ * The once-per-session reconcile: the reaper moves a torn active.lock aside first (reconciliation cannot read past
+ * it), then reconciles. When the commands sidecar cannot load (a damaged install), the load failure is reported
+ * and the reconcile still runs directly, so every session keeps reconciling once.
+ */
+export async function reconcileThroughStaleLockReaper(input: {
+  readonly runtimeDir: string
+  readonly reconcile: () => Promise<void>
+  readonly probe?: StaleLockProbe
+  readonly onLoadFailure: (error: unknown) => void
+  readonly loadRuntime?: () => Promise<Pick<ReflectionLockRuntimeModule, "runStaleLockReaper">>
+}): Promise<void> {
+  let runtime: Pick<ReflectionLockRuntimeModule, "runStaleLockReaper">
+  try {
+    runtime = await (input.loadRuntime ?? loadMemoryCommandsRuntime)()
+  } catch (error) {
+    input.onLoadFailure(error)
+    await input.reconcile()
+    return
+  }
+  await runtime.runStaleLockReaper({
+    runtimeDir: input.runtimeDir,
+    settle: input.reconcile,
+    settleAlways: true,
+    ...(input.probe === undefined ? {} : { probe: input.probe }),
+  })
 }
