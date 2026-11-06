@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs"
+import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, relative, sep } from "node:path"
 
@@ -9,6 +9,8 @@ import { join, relative, sep } from "node:path"
 // pinned commit from that checkout (git archive, so the checkout itself is never touched), installs the exported tree
 // from its own lockfile, runs the package's own publish build and compares the output with the PIN digests. A mismatch
 // exits 1; --write replaces the vendored copy and the PIN instead. --commit <package>=<sha> re-pins a package.
+// The one change made to the build output: the runtime JS reaches its npm dependencies through omo-senpi's own
+// `#bunshin-ts-dep/<name>` imports (pinDependencyImports below), never by bare name.
 // Run from the repo root:
 //   bun packages/omo-senpi/scripts/sync-bunshin-ts.ts --bunshin-ts <checkout> --bunshin-ts-relay <checkout> [--write]
 // src/bunshin-ts-vendor.test.ts holds the vendored bytes to PIN.json between syncs.
@@ -39,6 +41,37 @@ const MANIFEST = "package.json"
 // The one rule for what is vendored: everything but the top-level publish manifest. A package.json deeper in the
 // output is package content, so it is copied and digested like any other file.
 const isVendored = (path: string): boolean => path !== MANIFEST
+
+// senpi's Bun extension registry claims bare package names process-wide (`@sinclair/typebox` is its own typebox 1.x),
+// so an unbundled import of the vendored JS by bare name loads whichever copy that registry holds. Each import of a
+// declared dependency goes through this package.json `imports` prefix instead, which maps `<prefix><name>` and
+// `<prefix><name>/*` to omo-senpi's own exactly pinned install of that dependency.
+export const DEPENDENCY_IMPORT_PREFIX = "#bunshin-ts-dep/"
+
+const ownsSpecifier = (name: string, specifier: string): boolean => specifier === name || specifier.startsWith(`${name}/`)
+
+export const pinDependencyImports = (source: string, dependencies: readonly string[]): string => {
+	const pinned = source.replace(
+		/(\bfrom\s*|\bimport\s*)(["'])([^"']+)\2/g,
+		(statement, keyword: string, quote: string, specifier: string) =>
+			dependencies.some((name) => ownsSpecifier(name, specifier))
+				? `${keyword}${quote}${DEPENDENCY_IMPORT_PREFIX}${specifier}${quote}`
+				: statement,
+	)
+	const bare = new Bun.Transpiler({ loader: "js" })
+		.scanImports(pinned)
+		.map((entry) => entry.path)
+		.filter((specifier) => dependencies.some((name) => ownsSpecifier(name, specifier)))
+	if (bare.length > 0) throw new Error(`bare dependency imports left after pinning: ${[...new Set(bare)].join(", ")}`)
+	return pinned
+}
+
+const rewriteDependencyImports = (out: string, dependencies: readonly string[]): void => {
+	if (dependencies.length === 0) return
+	for (const file of walk(out).filter((path) => /\.[cm]?js$/.test(path))) {
+		writeFileSync(file, pinDependencyImports(readFileSync(file, "utf8"), dependencies))
+	}
+}
 
 const portable = (root: string, file: string): string => relative(root, file).split(sep).join("/")
 
@@ -98,6 +131,7 @@ const syncPackage = async (
 	try {
 		const out = await buildAt(checkout, pinned, commit, work)
 		const manifest = JSON.parse(readFileSync(join(out, MANIFEST), "utf8")) as PublishManifest
+		rewriteDependencyImports(out, Object.keys(manifest.dependencies ?? {}))
 		const next: PinnedPackage = {
 			...pinned,
 			name: manifest.name,

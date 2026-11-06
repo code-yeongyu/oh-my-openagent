@@ -80,7 +80,7 @@ const attachEvent = (event: LocalEvent): AttachEvent | undefined => {
 // (close_session, unload_session) answers after the host ended the attachment (relay daemon #359 sends attach_ended on
 // the session stream, the reply rides the channel), and a channel that closes ends the command uncertain itself
 // (docs/local-api.md "Delegated commands"). The bound is the local API's own request timeout.
-export const ENDED_COMMAND_WAIT_MS = 30_000
+const ENDED_COMMAND_WAIT_MS = 30_000
 
 // The sender ledger's progress states (local API command_state): every other state ends the command.
 export const PROGRESS_STATES: ReadonlySet<CommandStateEvent["state"]> = new Set(["queued", "transport_confirmed", "engine_dispatched"])
