@@ -15,12 +15,22 @@ export interface DesktopSessionOpenParams {
 		readonly coordinateSafe?: boolean;
 		readonly maxBytes?: number;
 	};
+	/** `object` asks for an `ActionReport` per exec; sent only when asked and the engine advertises `action-report`. */
+	readonly reportMode?: "null" | "object";
+	/** Sent whenever the engine advertises `intervention-policy`; omitted means the engine default `pause`. */
+	readonly intervention?: "continue" | "pause";
+	/** Sent whenever the engine advertises `key-priming`; omitted means the engine default `off`. */
+	readonly macosKeyPriming?: "on" | "off";
+	/** Sent whenever the engine advertises `trace`; omitted means the engine default `false`. */
+	readonly trace?: boolean;
 }
 
 /** One live engine child and its process-local safety state. */
 export interface Connection {
 	readonly rpc: RpcClient;
 	resumeToken: string;
+	/** `engine.hello` features of this child; `[]` until the hello reply and from engines that predate the list. */
+	features: readonly string[];
 	armedChord: string | undefined;
 	heartbeat: NodeJS.Timeout | undefined;
 }

@@ -8,6 +8,7 @@ import {
 	expectResult,
 	isAxNode,
 	isDisplay,
+	isExecResult,
 	isText,
 	isWindow,
 	listOf,
@@ -110,7 +111,7 @@ export function createDesktopFacade(scope: RunScope) {
 				),
 			write: (text: string): Promise<void> =>
 				method("clipboard.write", async ({ call }) => {
-					await call("clipboard.write", { text });
+					expectResult("clipboard.write", await call("clipboard.write", { text }), isExecResult);
 				}),
 		},
 		control: createControlFacade(scope, method),
