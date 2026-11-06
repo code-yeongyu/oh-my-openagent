@@ -133,10 +133,10 @@ export const COMPOSED_HELPERS: readonly ComposedHelper[] = [
 ];
 
 /** Tool actions of their own (`{ action }` without a chain); not call-chain methods. */
-export const ACTION_HELPERS: readonly string[] = ["run", "capabilities", "close"];
+const ACTION_HELPERS: readonly string[] = ["run", "capabilities", "close"];
 
 /** Manifest methods no kernel helper wraps, each with the reason; a new manifest method must land in one place. */
-export const KERNEL_OMITTED: Readonly<Record<string, string>> = {
+const KERNEL_OMITTED: Readonly<Record<string, string>> = {
 	"Computer.batch": "kernels sequence steps with computer.run(fn)",
 	"Computer.close": "the kernel close() is the tool's close action, which ends the host session",
 	"ControlLease.release": "kernels release the grant with computer.control.release()",
@@ -203,11 +203,11 @@ export function resolveTiers(manifest: readonly ManifestMethod[]): Record<Surfac
 	return tables;
 }
 
-export function chainMethodUnion(): string[] {
+function chainMethodUnion(): string[] {
 	return [...new Set(Object.values(CHAIN_BINDINGS).flatMap((bindings) => bindings.map((b) => b.method)))].sort();
 }
 
-export function genericMethods(surface: Surface): string[] {
+function genericMethods(surface: Surface): string[] {
 	return CHAIN_BINDINGS[surface].filter((binding) => binding.generic).map((binding) => binding.method);
 }
 
@@ -235,7 +235,7 @@ const TABLE_DOCS: Readonly<Record<Surface, readonly [constName: string, doc: str
 
 const tsKey = (name: string): string => (/^\w+$/.test(name) ? name : JSON.stringify(name));
 
-export function renderProtocolCall(current: string, tables: Record<Surface, [string, Tier, string][]>): string {
+function renderProtocolCall(current: string, tables: Record<Surface, [string, Tier, string][]>): string {
 	const body = (Object.keys(TABLE_DOCS) as Surface[])
 		.map((surface) => {
 			const [constName, doc] = TABLE_DOCS[surface];
@@ -246,19 +246,19 @@ export function renderProtocolCall(current: string, tables: Record<Surface, [str
 	return replaceRegion(current, protocolCallPath, body, "//", "");
 }
 
-export function renderPreludeIndex(current: string): string {
+function renderPreludeIndex(current: string): string {
 	const rows = chainMethodUnion().map((method) => `\t"${method}",\n`);
 	const body = `const METHOD_ALLOWLIST: readonly string[] = [\n${rows.join("")}];\n`;
 	return replaceRegion(current, "src/index.ts", body, "//", "");
 }
 
-export function renderProtocolAllowlistTest(current: string): string {
+function renderProtocolAllowlistTest(current: string): string {
 	const rows = chainMethodUnion().map((method) => `\t"${method}",\n`);
 	const body = `const CHAIN_METHOD_SNAPSHOT = [\n${rows.join("")}];\n`;
 	return replaceRegion(current, protocolAllowlistTestPath, body, "//", "");
 }
 
-export function renderHelperNames(current: string): string {
+function renderHelperNames(current: string): string {
 	const list = (names: readonly string[]): string => `[${[...new Set(names)].sort().map((n) => JSON.stringify(n)).join(", ")}]`;
 	const body =
 		`export const CHAIN_METHODS: readonly string[] = ${list(chainMethodUnion())};\n` +
@@ -271,14 +271,14 @@ const jsList = (methods: readonly string[]): string => `[${methods.map((method) 
 const pyTuple = (methods: readonly string[]): string =>
 	`(${methods.map((method) => JSON.stringify(method)).join(", ")}${methods.length === 1 ? "," : ""})`;
 
-export function renderPreludeJs(current: string): string {
+function renderPreludeJs(current: string): string {
 	const body = (["desktop", "display", "window", "element"] as const)
 		.map((surface) => `\tconst ${surface}ValueMethods = ${jsList(genericMethods(surface))};\n`)
 		.join("");
 	return replaceRegion(current, "src/prelude.js", body, "//", "\t");
 }
 
-export function renderPreludePy(current: string): string {
+function renderPreludePy(current: string): string {
 	const body = (["desktop", "display", "window", "element"] as const)
 		.map((surface) => `    _${surface.toUpperCase()}_METHODS = ${pyTuple(genericMethods(surface))}\n`)
 		.join("");
