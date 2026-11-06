@@ -4,14 +4,14 @@ import { sign } from "node:crypto"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import corpus from "../src/strict-ed25519/strict-ed25519-corpus.json"
-import { strictEd25519Key } from "../src/strict-ed25519/strict-ed25519.ts"
 import {
   acquireDeviceService,
   type AcquireOptions,
-  DEVICE_SERVICE_RELEASE_KEY,
+  DEVICE_SERVICE_RELEASE_KEYS,
   deviceServiceAssetName,
   verifyReleaseSignature,
 } from "../src/release/acquire.ts"
+import { parseReleaseKeySet } from "../src/release/release-signature.ts"
 import { buildRelease, ENGINE_VERSION, PIN_VERSION, RELEASE_ORIGIN, releaseKey, serveRelease } from "./release-fixture.ts"
 import { nativeEd25519Verify } from "./strict-ed25519/native-control.ts"
 
@@ -39,7 +39,7 @@ const options = (state: string, served: ReturnType<typeof serveRelease>, publicH
   stateDir: state,
   engineVersion: ENGINE_VERSION,
   origin: RELEASE_ORIGIN,
-  releaseKey: publicHex,
+  releaseKeys: [publicHex],
   fetch: served.fetch,
   ...extra,
 })
@@ -69,11 +69,23 @@ describe("verified acquisition of the device service", () => {
     const release = buildRelease({ key, host: HOST, signedBytes: () => new TextEncoder().encode("other bytes") })
     const checksums = release.get("checksums.txt") ?? new Uint8Array()
     const signature = release.get("checksums.txt.sig") ?? new Uint8Array()
-    expect(await verifyReleaseSignature(bytes(key.publicHex), signature, checksums)).toEqual({ ok: false, refusal: "signature" })
+    expect(await verifyReleaseSignature([bytes(key.publicHex)], signature, checksums)).toEqual({ ok: false, refusal: "signature" })
 
     const state = stateDir()
     const served = serveRelease(release)
     expect(await acquireDeviceService(options(state, served, key.publicHex))).toMatchObject({ ok: false, refusal: "signature" })
+    expect(existsSync(state)).toBe(false)
+    expect(served.requested.some(url => url.endsWith(deviceServiceAssetName(HOST)))).toBe(false)
+  })
+
+  test("a release signed by a key outside the two-key set is refused as signature and nothing is written", async () => {
+    const operational = releaseKey()
+    const recovery = releaseKey()
+    const outsider = releaseKey()
+    const state = stateDir()
+    const served = serveRelease(buildRelease({ key: outsider, host: HOST }))
+    const result = await acquireDeviceService({ ...options(state, served, ""), releaseKeys: [operational.publicHex, recovery.publicHex] })
+    expect(result).toMatchObject({ ok: false, refusal: "signature" })
     expect(existsSync(state)).toBe(false)
     expect(served.requested.some(url => url.endsWith(deviceServiceAssetName(HOST)))).toBe(false)
   })
@@ -85,7 +97,7 @@ describe("verified acquisition of the device service", () => {
     const signature = bytes(identity?.sig ?? "")
     const checksums = buildRelease({ key: releaseKey(), host: HOST }).get("checksums.txt") ?? new Uint8Array()
 
-    expect(await verifyReleaseSignature(key, signature, checksums)).toEqual({ ok: false, refusal: "malformed" })
+    expect(await verifyReleaseSignature([key], signature, checksums)).toEqual({ ok: false, refusal: "malformed" })
     expect(await nativeEd25519Verify(key, signature, new Uint8Array(checksums))).toBe(true)
 
     const state = stateDir()
@@ -100,24 +112,65 @@ describe("verified acquisition of the device service", () => {
     const release = buildRelease({ key, host: HOST })
     const checksums = release.get("checksums.txt") ?? new Uint8Array()
     const signature = release.get("checksums.txt.sig") ?? new Uint8Array()
-    expect(await verifyReleaseSignature(bytes(key.publicHex), signature, checksums)).toEqual({ ok: true })
+    expect(await verifyReleaseSignature([bytes(key.publicHex)], signature, checksums)).toEqual({ ok: true })
 
     const malleated = new Uint8Array([...signature.slice(0, 32), ...scalarBytes(scalar(signature.slice(32)) + L)])
-    expect(await verifyReleaseSignature(bytes(key.publicHex), malleated, checksums)).toEqual({ ok: false, refusal: "malformed" })
+    expect(await verifyReleaseSignature([bytes(key.publicHex)], malleated, checksums)).toEqual({ ok: false, refusal: "malformed" })
     const state = stateDir()
     const served = serveRelease(new Map([...release, ["checksums.txt.sig", malleated]]))
     expect(await acquireDeviceService(options(state, served, key.publicHex))).toMatchObject({ ok: false, refusal: "malformed" })
     expect(existsSync(state)).toBe(false)
   })
 
-  test("the compiled-in release key is the refusing placeholder, so the default acquisition stops before any download", async () => {
-    expect(DEVICE_SERVICE_RELEASE_KEY).toBe("00".repeat(32))
-    expect(strictEd25519Key(bytes(DEVICE_SERVICE_RELEASE_KEY))).toBe(false)
+  test("the compiled-in key set is the service's release-key.json parsed strictly: the minted operational and recovery keys, both strict, so acquisition goes past the key check", async () => {
+    // #12580 item 1: the published set, in order. Comparing against the same release-key.json it is parsed from passed
+    // for any other two strict keys and for a swap, so the check has to name the two hex values themselves.
+    expect(DEVICE_SERVICE_RELEASE_KEYS).toEqual([
+      "6c6781a91888e3e5be10d1b27466319a7d5adf2a7d2b254f4118eda9cbcb4465",
+      "ca9407b484a30ac7f09cb152455176f1e03fc6ca3446ff930bc7587215759016",
+    ])
     const state = stateDir()
     const served = serveRelease(new Map())
-    const { releaseKey: _unused, ...defaults } = options(state, served, "")
-    expect(await acquireDeviceService(defaults)).toMatchObject({ ok: false, refusal: "release_key_invalid" })
-    expect(served.requested).toEqual([])
+    const { releaseKeys: _unused, ...defaults } = options(state, served, "")
+    const result = await acquireDeviceService(defaults)
+    expect(result).not.toMatchObject({ refusal: "release_key_invalid" })
+    expect(served.requested.length).toBeGreaterThan(0)
+  })
+
+  test("a release signed by either key of the set installs: the recovery key verifies when the operational key did not sign", async () => {
+    const operational = releaseKey()
+    const recovery = releaseKey()
+    const state = stateDir()
+    const served = serveRelease(buildRelease({ key: recovery, host: HOST }))
+    const result = await acquireDeviceService({ ...options(state, served, ""), releaseKeys: [operational.publicHex, recovery.publicHex] })
+    expect(result).toMatchObject({ ok: true, version: PIN_VERSION })
+  })
+
+  test("a set holding the placeholder next to a real key, or repeating a key, is refused before any download and names a build defect instead of an update", async () => {
+    const key = releaseKey()
+    for (const releaseKeys of [[key.publicHex, "00".repeat(32)], [key.publicHex, key.publicHex], []]) {
+      const state = stateDir()
+      const served = serveRelease(buildRelease({ key, host: HOST }))
+      const result = await acquireDeviceService({ ...options(state, served, ""), releaseKeys })
+      expect(result).toMatchObject({ ok: false, refusal: "release_key_invalid" })
+      expect(result.ok ? "" : result.action).toBe(
+        "This omo build carries no usable device service release key, so it cannot verify device service releases. That is a defect in this build: report it with /bug.",
+      )
+      expect(served.requested).toEqual([])
+    }
+  })
+
+  test("release-key.json is parsed by the service's rules: another field, another alg, a repeated key or a non-lowercase key is refused", () => {
+    const hex = "ab".repeat(32)
+    expect(parseReleaseKeySet({ alg: "Ed25519", public_keys_hex: [hex] })).toEqual([hex])
+    for (const bad of [
+      { alg: "Ed25519", public_keys_hex: [hex], key_ids: ["a"] },
+      { alg: "Ed448", public_keys_hex: [hex] },
+      { alg: "Ed25519", public_keys_hex: [hex, hex] },
+      { alg: "Ed25519", public_keys_hex: [hex.toUpperCase()] },
+      { alg: "Ed25519", public_keys_hex: hex },
+    ])
+      expect(() => parseReleaseKeySet(bad)).toThrow()
   })
 
   test("checksum mismatch aborts before any write", async () => {

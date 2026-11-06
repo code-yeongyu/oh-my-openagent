@@ -222,6 +222,13 @@ impl Started {
         self.pending.hold_signal()
     }
 
+    /// Whether `method`'s reply carries an action report: fixed per request,
+    /// so an open applied after it started cannot re-shape it.
+    pub fn reports_action(&self, method: Method) -> impl Fn() -> bool {
+        let mode = self.pending.request_mode();
+        move || method.reports_action() && mode.as_ref().is_some_and(|mode| mode.get() == ReportMode::Object)
+    }
+
     /// # Errors
     /// The session's error for this request.
     pub async fn wait(self) -> Result<Value, Failure> {

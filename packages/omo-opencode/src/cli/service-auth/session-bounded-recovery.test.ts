@@ -17,7 +17,7 @@ test.each(["missing", "invalid", "unprovable"] as const)("an uncertain %s journa
   }
   await store.write({ ...expired, refreshState: "uncertain", ...attempt })
   const time = clock()
-  const session = createSession({ api, store, home: await temporaryHome(), now: time.now })
+  const session = createSession({ beforeKeysDiscarded: async () => undefined, api, store, home: await temporaryHome(), now: time.now })
 
   await expect(session.accessToken()).rejects.toMatchObject({ code: "refresh_recovery_expired", deviceRevoked: false })
   expect(sends).toBe(0)
@@ -33,7 +33,7 @@ test("legacy exhaustion preserves the unanswered journal without sending", async
     idempotencyKey: "j".repeat(43), attempts: 1, nextAttemptAt: "2000-01-01T00:00:00Z",
   } }
   await store.write(original)
-  const session = createSession({ api, store, home: await temporaryHome(), now: time.now })
+  const session = createSession({ beforeKeysDiscarded: async () => undefined, api, store, home: await temporaryHome(), now: time.now })
 
   await expect(session.accessToken()).rejects.toThrow()
   expect(sends).toBe(0)

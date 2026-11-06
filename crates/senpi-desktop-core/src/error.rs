@@ -183,6 +183,19 @@ impl DesktopError {
         self
     }
 
+    /// Attaches an object-mode report carrying only `disposition`, unless the
+    /// error already carries the worker's report.
+    #[must_use]
+    pub fn with_fallback_disposition(self, disposition: Disposition) -> Self {
+        if self.report.is_some() {
+            return self;
+        }
+        self.with_report(ErrorReport {
+            disposition: Some(disposition),
+            ..ErrorReport::default()
+        })
+    }
+
     pub fn permission_denied(message: impl Into<String>) -> Self {
         Self::new(ErrorCode::PermissionDenied, message)
     }

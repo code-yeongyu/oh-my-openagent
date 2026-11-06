@@ -43,7 +43,7 @@
                 "integrityLevel": null,
                 "screenLocked": false
               },
-              "resumeToken": "01M6FPH588BH8Z11QCNJK5GR1N01M6FPH588ZB8VWDY3P3YA0C6D"
+              "resumeToken": "per-process-random"
             }
           },
           "variable": [
@@ -93,7 +93,7 @@
                 "integrityLevel": null,
                 "screenLocked": false
               },
-              "resumeToken": "01M6FPH588BH8Z11QCNJK5GR1N01M6FPH588ZB8VWDY3P3YA0C6D"
+              "resumeToken": "per-process-random"
             }
           },
           "variable": [

@@ -231,6 +231,28 @@ fn a_reopen_that_changes_report_mode_recreates_the_backend_and_never_reuses_a_fr
 }
 
 #[test]
+fn a_null_mode_session_keeps_the_v1_frame_id_shape_and_object_mode_gets_the_process_wide_one() {
+    // Given a v1 (reportMode null) session
+    let mut legacy = harness(&json!({}));
+    // When it captures twice
+    let first = legacy.capture("101");
+    let second = legacy.capture("101");
+    // Then the ids keep the v1 shape `frame-<n>`, counted per open
+    assert_eq!((first.as_str(), second.as_str()), ("frame-1", "frame-2"));
+    // And a null-mode reopen restarts the v1 count as it always did
+    legacy.worker.open(DesktopSessionOptions::default());
+    assert_eq!(legacy.capture("101"), "frame-1");
+    // While an object-mode session gets `frame-<engine instance>-<counter>`
+    let mut object = object_harness();
+    let id = object.capture("101");
+    let parts: Vec<&str> = id.splitn(3, '-').collect();
+    assert_eq!(parts.len(), 3, "{id}");
+    assert_eq!(parts[0], "frame");
+    assert_eq!(parts[1].len(), 26, "{id}");
+    assert!(parts[2].parse::<u64>().is_ok(), "{id}");
+}
+
+#[test]
 fn an_object_mode_ax_type_text_keeps_its_method_and_adds_a_report() {
     let mut harness = object_harness();
     let reference = harness.focused_ref();

@@ -72,7 +72,7 @@
                 "integrityLevel": null,
                 "screenLocked": false
               },
-              "resumeToken": "01M6FPGVF6ZKMWSW9NPQGKHNNA01M6FPGVF6TCQCXE9PPTG0TME8"
+              "resumeToken": "per-process-random"
             }
           },
           "variable": [
@@ -179,7 +179,7 @@
               "region": null,
               "scale": 0.8,
               "target": "101",
-              "frameId": "frame-01m6fpgx7gkcx1n93j1b0ww1pz-1",
+              "frameId": "frame-1",
               "note": null
             }
           },

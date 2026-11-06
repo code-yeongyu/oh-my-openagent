@@ -1,6 +1,6 @@
 # Kotlin — LSP setup
 
-- **Builtin server:** `kotlin-ls` — `kotlin-lsp`
+- **Builtin server:** `kotlin-ls` — `kotlin-lsp --stdio`
 - **Extensions:** `.kt .kts`
 - **Install hint:** `https://github.com/Kotlin/kotlin-lsp`
 
@@ -22,17 +22,17 @@ command -v kotlin-lsp
 
 ## Configure
 
-Builtin — usually NO config needed (auto-resolved by extension). Configure only to set priority, init options, override extensions, or disable. Same JSON shape in `.codex/lsp-client.json` (Codex) AND `.opencode/lsp.json` (OpenCode/omo):
+Builtin — usually NO config needed (auto-resolved by extension). Configure only to set priority, init options, override extensions, or disable. Same JSON shape in every harness's project config (per-harness paths: the Configure step in `SKILL.md`):
 
 ```json
 { "lsp": { "kotlin-ls": { "priority": 100 } } }
 ```
 
-For builtin ids in a PROJECT config, `command` is supplied automatically — only set `priority`/`initialization`/`extensions`/`disabled`/`env`. A fully custom (non-builtin) server with its own `command` must go in the USER config (`~/.codex/lsp-client.json`).
+For builtin ids in a PROJECT config, `command` is supplied automatically — only set `priority`/`initialization`/`extensions`/`disabled` (a project entry drops `env`). `env`, and a fully custom (non-builtin) server with its own `command`, must go in your harness's USER config (see the Configure step in `SKILL.md`).
 
 ### Initialization options (only if commonly needed)
 
-None commonly required. If `kotlin-lsp` cannot find a Java runtime, set `JAVA_HOME`:
+None commonly required. If `kotlin-lsp` cannot find a Java runtime, set `JAVA_HOME` (USER config only; a project entry drops `env`):
 
 ```json
 { "lsp": { "kotlin-ls": { "env": { "JAVA_HOME": "/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home" } } } }
