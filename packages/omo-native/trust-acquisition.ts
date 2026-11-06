@@ -29,6 +29,7 @@ export interface TrustAcquisitionOptions {
   readonly linux?: {
     osRelease(): Promise<string | null>
     available(): Promise<readonly string[]>
+    /** The bounded bundle reader; macOS reads its OpenSSL default file (/etc/ssl/cert.pem) through it too. */
     read(path: string): Promise<LinuxBundleRead>
   }
   readonly deadline?: (expire: () => void, milliseconds: number) => () => void
@@ -159,7 +160,7 @@ async function native(options: TrustAcquisitionOptions, signal: AbortSignal): Pr
     certificates.push({ ...fact, source, settings: { user: null, admin: null, system: null } })
   }
   let defaultFileDrop: DefaultFileDrop | undefined
-  const file = await readLinuxBundle("/etc/ssl/cert.pem", fs)
+  const file = await (options.linux?.read ?? ((path: string) => readLinuxBundle(path, fs)))("/etc/ssl/cert.pem")
   if (file.kind === "success") {
     const parsed = readDefaultFileCandidates(file.bytes, () => false)
     if (parsed.kind === "kept") {
