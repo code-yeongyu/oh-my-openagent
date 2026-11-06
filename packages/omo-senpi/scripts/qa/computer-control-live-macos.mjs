@@ -47,6 +47,7 @@ import {
 import { desktopScenarios } from "./computer-control-live-macos-desktop.mjs";
 import { createSandbox, seedSandbox } from "./drive.mjs";
 import { isolatedChildEnv } from "./sandbox-child-env.mjs";
+import { withTelemetryOptOut } from "./telemetry-opt-out-env.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, "..", "..", "..", "..");
@@ -279,7 +280,7 @@ function startSession(steps, { preset = "ask", print, env: scenarioEnv = {}, com
 		],
 		{
 			cwd: sandbox.cwd,
-			env: {
+			env: withTelemetryOptOut({
 				...isolatedChildEnv(scrubbedEnv(), sandbox.agentDir),
 				OMO_CODING_AGENT_DIR: sandbox.agentDir,
 				SENPI_CODING_AGENT_DIR: sandbox.agentDir,
@@ -291,7 +292,7 @@ function startSession(steps, { preset = "ask", print, env: scenarioEnv = {}, com
 				PI_OFFLINE: "1",
 				OMO_SENPI_QA: "1",
 				...scenarioEnv,
-			},
+			}),
 			stdio: [print === undefined ? "pipe" : "ignore", "pipe", "pipe"],
 			detached: true,
 		},
