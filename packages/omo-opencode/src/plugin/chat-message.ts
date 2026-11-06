@@ -109,8 +109,14 @@ export function createChatMessageHandler(args: {
     }
 
     const originalPromptText = extractGoalPromptText(output.parts)
-    const slashCommand = detectSlashCommand(extractPromptText(output.parts))
-    if (slashCommand?.command === "stop-continuation") {
+    const promptTextForSlash = extractPromptText(output.parts)
+    const slashCommand = detectSlashCommand(promptTextForSlash)
+    // Keep the stop trigger anchored to the start of the message so that a
+    // mere mention of /stop-continuation in prose does not stop continuations.
+    const isStartAnchoredStopCommand =
+      slashCommand?.command === "stop-continuation" &&
+      /^\s*\/stop-continuation(?:\s|$)/i.test(promptTextForSlash)
+    if (isStartAnchoredStopCommand) {
       stopContinuation({
         directory: ctx.directory,
         hooks,
