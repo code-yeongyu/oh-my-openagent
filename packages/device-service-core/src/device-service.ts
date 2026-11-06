@@ -127,7 +127,9 @@ export type DeviceService = {
    * attach: relay daemon #393's `session.command {device, endpoint, rpc}`, on the key `session.endpoints` lists first.
    * Settles like an attach's command: the first command state that is not a progress state, plus the engine's reply.
    * Rejects with the local API's refusal (`unsupported` when the device lists no endpoint, before anything is sent), or
-   * when the connection closes or no final state arrives within ENDPOINT_COMMAND_WAIT_MS.
+   * when the connection closes or no final state arrives within ENDPOINT_COMMAND_WAIT_MS. Every failure before
+   * `session.command` is written (the `session.endpoints` lookup, whatever its code) is a `LocalApiError` with
+   * `not_sent: true`; a `session.command` that times out after sending carries its `command_id` instead.
    */
   readonly endpointCommand: (device: string, rpc: CommandRpc) => Promise<CommandResult>
   readonly close: () => void
