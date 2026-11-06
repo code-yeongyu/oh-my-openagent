@@ -311,6 +311,19 @@ describe("omo remote bootstrap: this build's install", () => {
     expect([runs, existsSync(join(stateDir, "bin"))]).toEqual([[], false])
   })
 
+  test("a release endpoint that has never published the pinned version stops as not_published, writing nothing", async () => {
+    const served = serveRelease(new Map(), DEVICE_SERVICE_VERSION)
+    const { code, result, runs, stateDir } = await bootstrapWith({ fetch: served.fetch })
+    expect([code, result]).toEqual([
+      REMOTE_EXIT.unavailable,
+      {
+        state: "not_published",
+        notice: `Remote devices are not available in this omo build yet: OmO device service ${DEVICE_SERVICE_VERSION} has not been published.`,
+      },
+    ])
+    expect([runs, existsSync(join(stateDir, "bin"))]).toEqual([[], false])
+  })
+
   test("an unreachable release endpoint stops with the download notice, writing nothing", async () => {
     const requested: string[] = []
     const unreachable = async (url: string): Promise<Response> => {
