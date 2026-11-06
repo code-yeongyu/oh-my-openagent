@@ -1127,6 +1127,14 @@ jobs:
         if: needs.ci-mode.outputs.run_heavy == 'true'
         run: bun run build:omo-native
 
+      - name: Run built-runtime guard over the omo-native tree
+        if: needs.ci-mode.outputs.run_heavy == 'true'
+        # The guard's built-tree case fails when a staged omowright runtime
+        # is missing from KNOWN_BUILT_RUNTIMES (#12242): this job is the
+        # only CI path that runs build:omo-native, so it is the only place
+        # the omo-native copy can be probed.
+        run: bun test script/no-raw-tls-client-built.test.ts
+
       - name: Verify omo-ai payload
         if: needs.ci-mode.outputs.run_heavy == 'true'
         run: node script/verify-omo-ai-payload.mjs
@@ -1152,6 +1160,7 @@ jobs:
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
             - Builds the omo-native package.
+            - Runs the built-runtime guard over the tree where build:omo-native ran, so a staged omowright runtime cannot drop out of KNOWN_BUILT_RUNTIMES unnoticed (#12242).
             - Verifies the omo-ai tarball payload whitelist.
             - Runs `npm publish --dry-run` to confirm publishability without publishing.
           JOB_SUMMARY_NEXT: Inspect the failing build, payload verifier, or dry-run publish step.
