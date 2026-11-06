@@ -55,6 +55,8 @@ pub(crate) struct Worker {
     /// The route and hit of the mutating request being served, for its
     /// object-mode report.
     pub(crate) report_extras: Rc<Cell<Option<crate::report::ReportExtras>>>,
+    /// The coordinate epoch; moves supersede frames and expire refs.
+    pub(crate) epochs: crate::epoch::Epochs,
 }
 
 /// A mutating request's reply and the audit event it emitted.
@@ -95,6 +97,7 @@ impl Worker {
             watching_user_input: false,
             intervention: crate::intervention::Intervention::new(),
             report_extras: Rc::default(),
+            epochs: crate::epoch::Epochs::default(),
         };
         worker.install_screen_probe();
         worker.refresh_capabilities();
@@ -140,6 +143,12 @@ impl Worker {
             }
         }
         self.install_screen_probe();
+        let (source, screen) = self
+            .backend
+            .as_ref()
+            .ok()
+            .map_or((None, None), |backend| (backend.epoch_source(), backend.screen_probe()));
+        self.epochs.arm(options.report_mode == ReportMode::Object, source, screen);
         self.registry = AxRegistry::with_report_mode(options.report_mode);
         self.frames = FrameCache::with_report_mode(options.report_mode);
         self.options = Some(options);
@@ -189,7 +198,13 @@ impl Worker {
             self.attach_user_input_feed();
             self.drain_user_input();
         }
-        self.serve(op, cancelled)
+        self.apply_epoch();
+        let result = self.serve(op, cancelled);
+        if matches!(&result, Err(error) if error.code == ErrorCode::SpaceUnsupported) {
+            self.epochs.record(senpi_desktop_core::protocol_results::EpochReason::Space);
+        }
+        self.apply_epoch();
+        result
     }
 
     fn serve(&mut self, op: Op, cancelled: &dyn Fn() -> bool) -> CoreResult<Response> {

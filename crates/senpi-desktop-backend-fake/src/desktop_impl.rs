@@ -300,4 +300,8 @@ impl Backend for FakeBackend {
         }
         Some(self.user_input())
     }
+
+    fn epoch_source(&self) -> Option<std::sync::Arc<dyn senpi_desktop_core::backend::EpochSource>> {
+        Some(self.recorded_epochs())
+    }
 }

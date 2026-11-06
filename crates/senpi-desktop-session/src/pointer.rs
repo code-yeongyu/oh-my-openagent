@@ -42,6 +42,9 @@ impl ParsedPointerOptions {
 #[derive(Clone)]
 struct CapturedFrame {
     id: String,
+    /// This engine process's capture number; an epoch move supersedes every
+    /// capture up to the one current then.
+    seq: u64,
     geometry: FrameGeometry,
     /// Set once an action sent with `consume: true` delivered through this
     /// frame. It lives in the cache entry, so restoring a checkpoint taken
@@ -61,9 +64,9 @@ fn engine_instance() -> &'static str {
 
 /// `frame-<engine instance>-<process-wide counter>`: a stale id from before
 /// a session re-open, or from another engine, never equals a fresh one.
-fn next_frame_id() -> String {
+fn next_frame_id() -> (String, u64) {
     let capture = CAPTURES.fetch_add(1, Ordering::Relaxed).saturating_add(1);
-    format!("frame-{}-{capture}", engine_instance())
+    (format!("frame-{}-{capture}", engine_instance()), capture)
 }
 
 /// The latest capture of every target; coordinate input maps through it.
@@ -75,6 +78,8 @@ pub(crate) struct FrameCache {
     /// Captures this open recorded; the v1 id counter.
     captures: u64,
     latest: HashMap<String, CapturedFrame>,
+    /// Captures numbered up to this one were taken before the last epoch move.
+    superseded_through: u64,
 }
 
 impl FrameCache {
@@ -87,21 +92,36 @@ impl FrameCache {
     }
 
     /// Restores delivered frames without recycling an abandoned v1 frame id;
-    /// object-mode ids are process-wide, so none is recycled there either.
+    /// object-mode ids are process-wide, so none is recycled there either,
+    /// and an epoch move since the checkpoint still supersedes them.
     pub(crate) fn restore(&mut self, mut delivered: Self) {
         delivered.captures = delivered.captures.max(self.captures);
+        let superseded_through = self.superseded_through.max(delivered.superseded_through);
         *self = delivered;
+        self.superseded_through = superseded_through;
+    }
+
+    /// The epoch moved: every capture taken so far is superseded, by name or
+    /// as the target's latest.
+    pub(crate) fn supersede_all(&mut self) {
+        self.superseded_through = CAPTURES.load(Ordering::Relaxed);
+    }
+
+    fn superseded(&self, frame: &CapturedFrame) -> bool {
+        frame.seq <= self.superseded_through
     }
 
     /// Records a new capture of `target` and returns its frame id.
     pub(crate) fn record(&mut self, target: &Target, geometry: FrameGeometry) -> String {
         self.captures = self.captures.saturating_add(1);
+        let (object_id, seq) = next_frame_id();
         let id = match self.report_mode {
             ReportMode::Null => format!("frame-{}", self.captures),
-            ReportMode::Object => next_frame_id(),
+            ReportMode::Object => object_id,
         };
         let frame = CapturedFrame {
             id: id.clone(),
+            seq,
             geometry,
             consumed: false,
         };
@@ -126,6 +146,7 @@ impl FrameCache {
         let Some(requested) = frame_id else {
             return match latest {
                 None => Some(FrameRefusal::FrameRequired),
+                Some(frame) if self.superseded(frame) => Some(FrameRefusal::Superseded),
                 Some(frame) if frame.consumed => Some(FrameRefusal::Consumed),
                 Some(_) => None,
             };
@@ -137,7 +158,7 @@ impl FrameCache {
         match latest {
             _ if elsewhere => Some(FrameRefusal::WrongTarget),
             None => Some(FrameRefusal::NoCapture),
-            Some(frame) if frame.id != requested => Some(FrameRefusal::Superseded),
+            Some(frame) if frame.id != requested || self.superseded(frame) => Some(FrameRefusal::Superseded),
             Some(frame) if frame.consumed => Some(FrameRefusal::Consumed),
             Some(_) => None,
         }
