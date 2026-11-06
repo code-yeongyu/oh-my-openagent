@@ -29,6 +29,7 @@ import { DAEMON_LAUNCH_SPEC_FILENAME, DaemonLaunchSpecError, readDaemonLaunchSpe
 import { shareDaemonEnsure } from "./daemon-single-flight"
 import { classifyEnsureFailure } from "./ensure-failure"
 import { ensureHostClaimingOwner } from "./owner-claim"
+import { ensureRpcKeyDirectory } from "./rpc-key-dir"
 import { writeStartedShardSidecar } from "./shard-sidecar"
 import { log } from "@oh-my-opencode/utils"
 
@@ -155,6 +156,11 @@ async function ensureTaskDaemonOnce(
     upgrade: launch.upgrade,
     policy: launch.policy,
   }
+  // #12194: heal `<agentDir>/rpc` before the engine starts the host — a 0775 directory
+  // left by an ambient-umask creator makes the host supervisor refuse its own key
+  // record (`unsafe_key_record`) at publish time, so the daemon never starts. The
+  // heal never throws; an unhealable directory still fails with the engine's own error.
+  ensureRpcKeyDirectory(input.agentDir)
   const ensured = await ensureHostClaimingOwner(host, request).catch((error: unknown) => {
     throw new HostUnavailableError(classifyEnsureFailure(error), {
       fallbackAllowed: false,
