@@ -17,6 +17,9 @@ import {
   type MemoryIdentityPaths,
   type RuntimeRetentionPolicy,
 } from "@oh-my-opencode/memory-core"
+import type { OmoMemorySettings } from "@oh-my-opencode/omo-config-core"
+
+import { resolveRuntimeMaxBytes, resolveRuntimeRetentionPolicy } from "./memory-runtime-retention"
 
 export { retentionResumePending }
 
@@ -30,6 +33,7 @@ export interface MaintenanceRetentionInput {
   readonly now: () => number
   readonly policy?: RuntimeRetentionPolicy
   readonly maxBytes?: number
+  readonly settings?: OmoMemorySettings
   readonly reflectionEnabled: boolean
   readonly isLiveSession?: (sessionId: string) => boolean
   readonly ownedSidecars?: ReadonlySet<string>
@@ -41,8 +45,8 @@ export interface MaintenanceRetentionInput {
 export async function runMaintenanceRetention(input: MaintenanceRetentionInput): Promise<void> {
   const report = await runRuntimeRetention({
     paths: input.paths,
-    policy: input.policy ?? DEFAULT_RUNTIME_RETENTION,
-    maxBytes: input.maxBytes ?? DEFAULT_RUNTIME_MAX_BYTES,
+    policy: input.policy ?? (input.settings === undefined ? DEFAULT_RUNTIME_RETENTION : resolveRuntimeRetentionPolicy(input.settings, input.identity)),
+    maxBytes: input.maxBytes ?? (input.settings === undefined ? DEFAULT_RUNTIME_MAX_BYTES : resolveRuntimeMaxBytes(input.settings, input.identity)),
     now: input.now,
     signal: input.signal,
     reflectionEnabled: input.reflectionEnabled,

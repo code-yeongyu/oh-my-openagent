@@ -14,6 +14,7 @@ import {
   withLock,
   type RuntimeRetentionPolicy,
 } from "@oh-my-opencode/memory-core"
+import type { OmoMemorySettings } from "@oh-my-opencode/omo-config-core"
 
 import { loadMemoryCommandsRuntime } from "./commands/runtime-loader"
 import type { MemoryIdentityContext } from "./context"
@@ -41,6 +42,8 @@ export interface MemoryMaintenanceOptions {
   readonly reflectionEnabled?: (context: MemoryIdentityContext) => boolean
   /** `memory.runtime.max_bytes` for this identity (`0` = unbounded); defaults to the documented 2 GiB. */
   readonly resolveMaxBytes?: (context: MemoryIdentityContext) => number
+  /** The memory settings an identity's `memory.runtime` windows and cap resolve from, in the sidecar; the two resolvers above win. */
+  readonly memorySettings?: (context: MemoryIdentityContext) => OmoMemorySettings
   /** Encoded sidecar directory names this process's live sessions own. */
   readonly ownedSidecars?: () => ReadonlySet<string>
   /**
@@ -153,6 +156,7 @@ export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}):
         now,
         ...(options.resolveRetention === undefined ? {} : { policy: options.resolveRetention(context) }),
         ...(options.resolveMaxBytes === undefined ? {} : { maxBytes: options.resolveMaxBytes(context) }),
+        ...(options.memorySettings === undefined ? {} : { settings: options.memorySettings(context) }),
         reflectionEnabled: options.reflectionEnabled?.(context) ?? true,
         ...(options.isLiveSession === undefined ? {} : { isLiveSession: options.isLiveSession }),
         ...(options.ownedSidecars === undefined ? {} : { ownedSidecars: options.ownedSidecars() }),
