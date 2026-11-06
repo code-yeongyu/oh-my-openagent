@@ -15,7 +15,7 @@ beforeAll(async () => {
   await mkdir(join(repoRoot, packageDir, "test"), { recursive: true })
   await writeFile(join(repoRoot, packageDir, "value.ts"), "export const value = 1\n")
   await writeFile(join(repoRoot, packageDir, "test", "value.test.ts"),
-    "import { expect, test } from \"bun:test\"\nimport { value } from \"../value\"\ntest(\"value is one\", () => expect(value).toBe(1))\n")
+    "import { expect, test } from \"bun:test\"\nimport { value } from \"../value\"\ntest(\"value is one\", () => expect(value.toFixed(0)).toBe(\"1\"))\n")
 })
 afterAll(async () => {
   if (repoRoot) await rm(repoRoot, { recursive: true, force: true })
@@ -35,5 +35,12 @@ describe("design 9.7 mutation harness", () => {
   test("#given a mutation the named test catches #when run #then it is killed and the real file is unchanged", async () => {
     expect(await runMutation(row("= 1", "= 2"), { repoRoot, packageDir })).toMatchObject({ verdict: "killed", failing: 1 })
     expect(await readFile(join(repoRoot, packageDir, "value.ts"), "utf8")).toBe("export const value = 1\n")
+  }, 60_000)
+
+  test.each([
+    ["a runtime error inside the named test", "= null as unknown as number"],
+    ["a crash while the module loads", "= (() => { throw new Error(\"load\") })()"],
+  ])("#given %s #when run #then it is crashed, never killed", async (_name, replace) => {
+    expect(await runMutation(row("= 1", replace), { repoRoot, packageDir })).toMatchObject({ verdict: "crashed", failing: 0 })
   }, 60_000)
 })
