@@ -1,0 +1,3 @@
+### Fixed
+
+- A reflection or dream run no longer fails completion validation when omo writes its own bookkeeping to the memory repo's git config: the worktree snapshot comparison strips the omo-owned `[omo]` section (for example the `omo.maintenanceAt` maintenance stamp) from `.git/config` on both sides, so a key omo itself writes while a run is in flight no longer reads as a tampered worktree. Every other config byte still has to match, and a non-omo config change still fails the run. Follow-up to [#12191](https://github.com/code-yeongyu/oh-my-openagent/pull/12191), which moved the maintenance stamp out of the config. ([#9962](https://github.com/code-yeongyu/oh-my-openagent/issues/9962))

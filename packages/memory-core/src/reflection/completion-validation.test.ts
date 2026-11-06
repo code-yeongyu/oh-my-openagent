@@ -93,6 +93,45 @@ describe("reflection completion validation", () => {
     expect(existsSync(worktree.dir)).toBe(false)
     expect(await branchExists(parentDir, worktree.branch)).toBe(false)
   })
+
+  it("#given the maintenance stamp lands in the common config mid-run #when finalized #then the run still completes", async () => {
+    // #given
+    const { parentDir, worktree } = await fixture("stamp")
+    await worktree.parent.configSet("omo.maintenanceAt", String(Date.now()))
+
+    // #when
+    const result = await finalizeReflectionWorktree(worktree, {
+      mode: "auto",
+      summary: "stamp",
+      withWriterLock: async (operation) => operation(),
+    })
+
+    // #then
+    expect(result.status).toBe("no_changes")
+    expect(result.cleanup).toEqual({ worktreeRemoved: true, branchRemoved: true })
+    expect(existsSync(worktree.dir)).toBe(false)
+    expect(await branchExists(parentDir, worktree.branch)).toBe(false)
+  })
+
+  it("#given a non-omo common config change mid-run #when finalized #then validation still fails and cleans up", async () => {
+    // #given
+    const { parentDir, worktree } = await fixture("user-rename")
+    await worktree.parent.configSet("user.name", "Someone Else")
+
+    // #when
+    const result = await finalizeReflectionWorktree(worktree, {
+      mode: "auto",
+      summary: "renamed",
+      withWriterLock: async (operation) => operation(),
+    })
+
+    // #then
+    expect(result.status).toBe("failed")
+    expect(result.detail).toContain("administration")
+    expect(result.cleanup).toEqual({ worktreeRemoved: true, branchRemoved: true })
+    expect(existsSync(worktree.dir)).toBe(false)
+    expect(await branchExists(parentDir, worktree.branch)).toBe(false)
+  })
 })
 
 async function branchExists(parentDir: string, branch: string): Promise<boolean> {
