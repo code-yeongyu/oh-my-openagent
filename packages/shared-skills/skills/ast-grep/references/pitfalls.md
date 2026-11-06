@@ -1,6 +1,6 @@
 # Pitfalls — what breaks patterns and how to fix them
 
-This is the failure-mode field guide. The `scripts/ast_grep_helper.py validate` subcommand mechanically checks for the items in §1 before calling `sg`; the rest are lower-frequency but still common.
+This is the failure-mode field guide. The `scripts/ast_grep_helper.py validate` subcommand mechanically checks the §1 items for backslash escapes, `.*`/`.+`, character classes, and `|` alternation before calling `sg` (it does not detect `^`/`$` anchors), plus the missing-body and trailing-colon cases from §2; the rest are lower-frequency but still common.
 
 ---
 
@@ -126,9 +126,9 @@ If you actually want two independent captures, name them differently: `$X = $Y`.
 
 ---
 
-## 6. `$$$` is greedy then commits
+## 6. `$$$` is lazy and never backtracks
 
-`$$$` does **not** backtrack. It captures as much as possible, then commits. If your pattern needs a non-greedy match, structure it differently:
+`$$$` does **not** backtrack. It stops at the first node that lets the rest of the pattern match, then commits — on `foo($$$A, b, $$$C)` against `foo(a, c, b, b, c)`, `$$$A` is `[a, c]`, not `[a, c, b]`. If your pattern needs more to land in `$$$A`, structure it differently:
 
 ```ts
 // You want "match foo($X), where $X is any single arg"

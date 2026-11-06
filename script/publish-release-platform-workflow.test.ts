@@ -247,7 +247,7 @@ describe("release binary asset lane in the platform publish workflow", () => {
     }
   }, SUBPROCESS_TEST_TIMEOUT_MS)
 
-  test("verifies precisely twelve launchers, the keychain helper and six engines on reruns without publishing", () => {
+  test("verifies precisely twelve launchers, the keychain helper, the capability file and six engines on reruns without publishing", () => {
     // Given a synthetic release with canonical names and independently computed hashes.
     const root = mkdtempSync(join(tmpdir(), "omo-engine-assets-"))
     try {
@@ -264,7 +264,11 @@ describe("release binary asset lane in the platform publish workflow", () => {
         writeFileSync(join(assets, name), bytes)
         return `${createHash("sha256").update(bytes).digest("hex")}  ${name}`
       }
-      writeFileSync(join(assets, "SHA256SUMS"), `${binaries.map(checksum).join("\n")}\n`)
+      // The capability file is required with its exact contract bytes (RULING-77, #11613).
+      const capabilities = '{"keychainHandoff":1}\n'
+      writeFileSync(join(assets, "omo-runtime-capabilities.json"), capabilities)
+      const capabilitiesLine = `${createHash("sha256").update(capabilities).digest("hex")}  omo-runtime-capabilities.json`
+      writeFileSync(join(assets, "SHA256SUMS"), `${[...binaries.map(checksum), capabilitiesLine].join("\n")}\n`)
       writeFileSync(join(assets, "senpi-desktop-engine-checksums.txt"), `${engines.map((name) => checksum(name ?? "")).join("\n")}\n`)
       const gh = join(root, "gh")
       writeFileSync(gh, "#!/bin/bash\n[ \"$1\" = release ] && [ \"$2\" = download ] || exit 1\ncp \"$ASSET_SOURCE_DIR\"/* \"${@: -1}/\"\n")
@@ -288,7 +292,7 @@ describe("release binary asset lane in the platform publish workflow", () => {
       // When every release asset exists, the actual workflow verification passes.
       const complete = execute()
       expect(complete.status, complete.stderr).toBe(0)
-      expect(complete.stdout).toContain("Verified 21 release assets")
+      expect(complete.stdout).toContain("Verified 22 release assets")
 
       // When the keychain helper asset is absent, the release cannot go green either.
       unlinkSync(join(assets, "omo-keychain-darwin-universal"))

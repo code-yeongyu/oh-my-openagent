@@ -57,6 +57,30 @@
       ]
     },
     {
+      "name": "an sdk hello is welcomed",
+      "outcome": "ok",
+      "handshake": "none",
+      "steps": [
+        {
+          "send": {
+            "type": "hello",
+            "v": 1,
+            "client": {
+              "name": "sdk",
+              "version": "0.1.0"
+            },
+            "client_nonce": "<nonce>"
+          }
+        },
+        {
+          "expect": {
+            "type": "welcome",
+            "server_proof": "<server_proof>"
+          }
+        }
+      ]
+    },
+    {
       "name": "v 2 is refused version and closed",
       "outcome": "refusal",
       "handshake": "none",
@@ -123,6 +147,34 @@
               "name": "desktop",
               "version": "2.0.0",
               "data_home": "relative/home"
+            },
+            "client_nonce": "<nonce>"
+          }
+        },
+        {
+          "expect": {
+            "type": "refused",
+            "reason": "malformed"
+          }
+        },
+        {
+          "expect_closed": true
+        }
+      ]
+    },
+    {
+      "name": "an sdk hello with a data_home is refused malformed",
+      "outcome": "refusal",
+      "handshake": "none",
+      "steps": [
+        {
+          "send": {
+            "type": "hello",
+            "v": 1,
+            "client": {
+              "name": "sdk",
+              "version": "0.1.0",
+              "data_home": "/home/user/.config/omo"
             },
             "client_nonce": "<nonce>"
           }

@@ -82,17 +82,15 @@ Should I proceed with [recommendation], or would you prefer differently?
 
 ## Step 0.3: Create Initial Todos
 
-**IMMEDIATELY after understanding the request, create todos:**
+**IMMEDIATELY after understanding the request, create these todos with the session's todo tool (all pending):**
 
 \`\`\`
-TodoWrite([
-  {"id": "phase-1", "content": "PHASE 1: Codebase Analysis - launch parallel explore agents", "status": "pending", "priority": "high"},
-  {"id": "phase-2", "content": "PHASE 2: Build Codemap - map dependencies and impact zones", "status": "pending", "priority": "high"},
-  {"id": "phase-3", "content": "PHASE 3: Test Assessment - analyze test coverage and verification strategy", "status": "pending", "priority": "high"},
-  {"id": "phase-4", "content": "PHASE 4: Plan Generation - invoke Plan agent for detailed refactoring plan", "status": "pending", "priority": "high"},
-  {"id": "phase-5", "content": "PHASE 5: Execute Refactoring - step-by-step with continuous verification", "status": "pending", "priority": "high"},
-  {"id": "phase-6", "content": "PHASE 6: Final Verification - full test suite and regression check", "status": "pending", "priority": "high"}
-])
+- phase-1: PHASE 1: Codebase Analysis - launch parallel explore agents
+- phase-2: PHASE 2: Build Codemap - map dependencies and impact zones
+- phase-3: PHASE 3: Test Assessment - analyze test coverage and verification strategy
+- phase-4: PHASE 4: Plan Generation - invoke Plan agent for detailed refactoring plan
+- phase-5: PHASE 5: Execute Refactoring - step-by-step with continuous verification
+- phase-6: PHASE 6: Final Verification - full test suite and regression check
 \`\`\`
 
 ---
@@ -155,14 +153,14 @@ While background agents are running, use direct tools:
 
 \`\`\`typescript
 // Find definition(s)
-LspGotoDefinition(filePath, line, character)  // Where is it defined?
+lsp_goto_definition(filePath, line, character)  // Where is it defined?
 
 // Find ALL usages across workspace
-LspFindReferences(filePath, line, character, includeDeclaration=true)
+lsp_find_references(filePath, line, character, includeDeclaration=true)
 
 // Get file structure
-LspDocumentSymbols(filePath)  // Hierarchical outline
-LspWorkspaceSymbols(filePath, query="[target_symbol]")  // Search by name
+lsp_symbols(filePath, scope="document")  // Hierarchical outline
+lsp_symbols(filePath, scope="workspace", query="[target_symbol]")  // Search by name
 
 // Get current diagnostics
 lsp_diagnostics(filePath)  // Errors, warnings before we start
@@ -171,8 +169,8 @@ lsp_diagnostics(filePath)  // Errors, warnings before we start
 ### AST-Grep Skill for Pattern Analysis:
 
 \`\`\`bash
-// Find structural patterns
-python3 scripts/ast_grep_helper.py search 'function $NAME($$$) { $$$ }' --lang ts src/
+// Find structural patterns — run this from the ast-grep skill's directory; this skill ships no scripts/
+python3 scripts/ast_grep_helper.py search 'function $NAME($$$) { $$$ }' src/ --lang ts
 
 # Preview refactoring first
 sg --pattern '[old_pattern]' --rewrite '[new_pattern]' --lang ts src/
@@ -181,7 +179,7 @@ sg --pattern '[old_pattern]' --rewrite '[new_pattern]' --lang ts src/
 ### Grep for Text Patterns:
 
 \`\`\`
-grep(pattern="[search_term]", path="src/", include="*.ts")
+grep(pattern="[search_term]", path="src/")  // narrow to *.ts with the grep tool's file-filter parameter
 \`\`\`
 
 ## 1.3: Collect Background Results
@@ -318,6 +316,11 @@ Which approach do you prefer?
 - Unit: \`bun test\` / \`npm test\` / \`pytest\` / etc.
 - Integration: [command if exists]
 - Type check: \`tsc --noEmit\` / \`pyright\` / etc.
+- Lint: [project's linter command, the one Phase 6.3 runs]
+
+### Baseline (before any change)
+- Pass counts: [X/Y passing per test command above]
+- lsp_diagnostics: [pre-existing diagnostics recorded in Phase 1.2]
 
 ### Verification Checkpoints
 After each refactoring step:
@@ -381,17 +384,14 @@ After receiving plan from Plan agent:
 
 ## 4.3: Register Detailed Todos
 
-Convert Plan agent output into granular todos:
+Convert Plan agent output into granular todos with the session's todo tool (each step from the plan becomes a todo, followed by its verify todo):
 
 \`\`\`
-TodoWrite([
-  // Each step from the plan becomes a todo
-  {"id": "refactor-1", "content": "Step 1: [description]", "status": "pending", "priority": "high"},
-  {"id": "verify-1", "content": "Verify Step 1: run tests", "status": "pending", "priority": "high"},
-  {"id": "refactor-2", "content": "Step 2: [description]", "status": "pending", "priority": "medium"},
-  {"id": "verify-2", "content": "Verify Step 2: run tests", "status": "pending", "priority": "medium"},
-  // ... continue for all steps
-])
+- refactor-1: Step 1: [description]
+- verify-1: Verify Step 1: run tests
+- refactor-2: Step 2: [description]
+- verify-2: Verify Step 2: run tests
+- ... continue for all steps
 \`\`\`
 
 **Mark phase-4 as completed.**
@@ -425,8 +425,8 @@ lsp_rename(filePath, line, character, newName)  // Execute rename
 // Preview first
 sg --pattern '[pattern]' --rewrite '[rewrite]' --lang ts path/to/file.ts
 
-// If preview looks good, execute
-python3 scripts/ast_grep_helper.py replace '[pattern]' '[rewrite]' --lang ts path/to/file.ts --apply
+// If preview looks good, execute (from the ast-grep skill's directory)
+python3 scripts/ast_grep_helper.py replace '[pattern]' '[rewrite]' path/to/file.ts --lang ts --apply
 \`\`\`
 
 **For Structural Changes:**
@@ -519,7 +519,7 @@ bun run build  # or npm run build, etc.
 \`\`\`typescript
 // Check all changed files
 for (file of changedFiles) {
-  lsp_diagnostics(file)  // Must all be clean
+  lsp_diagnostics(file)  // Must be clean or same as the Phase 1 baseline: zero new diagnostics
 }
 \`\`\`
 
@@ -585,8 +585,8 @@ You already know these tools. Use them intelligently:
 
 ## LSP Tools
 Leverage LSP tools for precision analysis. Key patterns:
-- **Understand before changing**: \`LspGotoDefinition\` to grasp context
-- **Impact analysis**: \`LspFindReferences\` to map all usages before modification
+- **Understand before changing**: \`lsp_goto_definition\` to grasp context
+- **Impact analysis**: \`lsp_find_references\` to map all usages before modification
 - **Safe refactoring**: \`lsp_prepare_rename\` → \`lsp_rename\` for symbol renames
 - **Continuous verification**: \`lsp_diagnostics\` after every change
 
@@ -650,7 +650,7 @@ Then choose the path:
 - **Team path (5.1-T)**: when the plan recommends \`team\` AND \`file_independent_steps >= 3\`. Members execute in parallel, Lead orchestrates, a \`deep-high\` verifier lives outside the team.
 - **Legacy path (5.1-L)**: otherwise. Use the original 5.1 / 5.2 / 5.3 flow from above.
 
-Record the chosen path in the TodoWrite list.
+Record the chosen path in the todo list.
 
 ## Phase 5.1-T: \`refactor-squad\` team execution
 
@@ -658,9 +658,9 @@ Record the chosen path in the TodoWrite list.
 
 1. When the session lists the \`team-mode\` skill, load it for lifecycle, message protocol, and limits.
 2. Call \`team_list\` and verify no active \`refactor-squad\` run exists; if one does, shutdown + delete the orphan before proceeding.
-3. If \`~/.omo/teams/refactor-squad/config.json\` is missing, write it using the spec below.
+3. If the project-level spec \`.omo/teams/refactor-squad/config.json\` (under the project root) is missing, write it using the spec below.
 
-**Team spec** (\`~/.omo/teams/refactor-squad/config.json\`):
+**Team spec** (\`<project root>/.omo/teams/refactor-squad/config.json\`):
 
 \`\`\`json
 {
@@ -724,7 +724,7 @@ While any team task is \`pending | claimed | in_progress\`:
     prompt=<files touched + verify-spec commands + instruction to return "PASS" or "FAIL:<failing test + specific error + suggested revert hunks>">
   )
   \`\`\`
-  If \`deep\` is unavailable, fall back to \`category="unspecified-high"\`. Do not create a commit checkpoint until the verifier returns PASS.
+  If \`deep-high\` is unavailable, fall back to \`category="unspecified-high"\`. Do not create a commit checkpoint until the verifier returns PASS.
 - On a verifier PASS: make the commit checkpoint for that step (see original 5.3). Proceed.
 - On a verifier FAIL: Lead decides:
   - **Retry with fix hint**: \`team_task_update(status=pending)\` on the original step + \`team_send_message(teamRunId=<id>, to=<original member>, summary="retry", body=<specific failure from verifier>)\`. Runtime reassigns.
@@ -741,7 +741,7 @@ If Phase 5 used the team path, dismantle \`refactor-squad\` BEFORE producing the
 2. \`team_delete(teamRunId=<id>)\`.
 3. \`team_list\` to confirm no residual \`refactor-squad\` run.
 
-The \`~/.omo/teams/refactor-squad/config.json\` declaration stays on disk; next session reuses it.
+The \`.omo/teams/refactor-squad/config.json\` declaration stays on disk in the project; next session reuses it.
 
 Append to the 6.6 summary a "Dispatch path" line and, when team path was used, team metrics (teamRunId, tasks created, verifier runs, team lifetime).
 
