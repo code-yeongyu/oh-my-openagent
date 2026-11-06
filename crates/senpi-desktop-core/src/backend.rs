@@ -11,9 +11,10 @@ use crate::error::{CoreResult, DesktopError, TccPermission};
 use crate::frame::FrameGeometry;
 use crate::keys::KeyName;
 pub use crate::protocol_results::AxInputMethod;
+use crate::report::ReportMode;
 use crate::types::{
     CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, DisplaySelector, FrontWindow,
-    ScreenState, Target,
+    KeyPriming, ScreenState, Target,
 };
 use crate::user_input::{UserInputFeed, UserPresses};
 
@@ -131,6 +132,14 @@ pub trait Backend: Send {
 
     /// Updates the display-only virtual cursor without changing admission.
     fn set_show_cursor(&mut self, _enabled: bool) {}
+
+    /// The session's `macosKeyPriming` option; backends without key priming
+    /// ignore it.
+    fn set_key_priming(&mut self, _mode: KeyPriming) {}
+
+    /// The session's `reportMode`; backends whose input does not depend on it
+    /// ignore it.
+    fn set_report_mode(&mut self, _mode: ReportMode) {}
 
     fn displays(&mut self) -> CoreResult<Vec<DesktopDisplay>>;
     fn windows(&mut self) -> CoreResult<Vec<DesktopWindow>>;

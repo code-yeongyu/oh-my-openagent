@@ -1,14 +1,15 @@
 //! Pointer and keyboard requests. Coordinates are pixels of the target's
 //! latest capture and map through its frame to global logical points.
 
+use senpi_desktop_core::ax::AxOwner;
 use senpi_desktop_core::backend::{DeliveryMode, PointerEvent};
-use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode};
+use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode, ErrorReport};
 use senpi_desktop_core::frame::{FrameGeometry, PointHit};
 use senpi_desktop_core::keys::parse_keys;
 use senpi_desktop_core::protocol_params::{
     DragParams, KeyChordParams, PointParams, ScrollParams, TypeTextParams,
 };
-use senpi_desktop_core::report::{ActionHit, Disposition, ReportMode};
+use senpi_desktop_core::report::{ActionEffect, ActionHit, Disposition, ReportMode};
 use senpi_desktop_core::types::{DesktopWindow, PointerOptions, Target};
 
 use senpi_desktop_safety::{GateError, MutatingAction, StopPolicy, Supervisor};
@@ -186,8 +187,11 @@ impl Worker {
         };
         let supervisor = self.safety.supervisor.clone();
         let policy = self.stop_policy();
-        self.mutate(&mutation, cancelled, |worker| {
+        let secure = std::cell::Cell::new(false);
+        let (response, event) = self.mutate(&mutation, cancelled, |worker| {
             let mode = delivery(params.opts.as_ref())?;
+            worker.takeover_gate(&target, mode)?;
+            secure.set(worker.typing_into_secure_field(&target));
             let check_stop = || interrupted(&supervisor, &policy, cancelled, "typing");
             worker.backend()?.type_text_interruptible(
                 &target,
@@ -197,7 +201,74 @@ impl Worker {
                 &mut || mutation.text_delivered.set(mutation.text_delivered.get().saturating_add(1)),
             )?;
             Ok(Response::Unit)
-        })
+        })?;
+        if !secure.get() {
+            return Ok((response, event));
+        }
+        // A secure field's value is never read back: the write stays
+        // unverifiable, and the report says why.
+        let extras = self.report_extras.take().unwrap_or_default();
+        let mut report = crate::report::success_report(&event, extras);
+        report.effect = ActionEffect::Unverifiable;
+        report.warning = Some("secure_field".to_owned());
+        Ok((Response::Action(Box::new(report)), event))
+    }
+
+    /// DESIGN 7 step 0, for background keys in an object-mode session: when
+    /// the target window's app is frontmost and the user pressed a key or
+    /// clicked in it within [`crate::intervention::TAKEOVER_MS`], nothing is
+    /// sent. Without a front-window read or a watch there is no evidence, and
+    /// the input proceeds as before.
+    fn takeover_gate(&mut self, target: &Target, mode: DeliveryMode) -> CoreResult<()> {
+        if self.registry.report_mode() != ReportMode::Object
+            || mode != DeliveryMode::Background
+            || !matches!(target, Target::Window(_))
+        {
+            return Ok(());
+        }
+        let Some(window) = self.window(target).ok().filter(|window| window.pid.is_some()) else {
+            return Ok(());
+        };
+        let front = self.backend()?.front_window().ok().flatten();
+        if front.is_none_or(|front| Some(front.pid) != window.pid) {
+            return Ok(());
+        }
+        let Some(idle) = window.pid.and_then(|pid| self.user_active_in(pid)) else {
+            return Ok(());
+        };
+        Err(DesktopError::background_unavailable(format!(
+            "the user is using {} (last input {:.1} s ago) and it is the frontmost app; nothing was sent; \
+             retry once they pause",
+            window.app,
+            idle as f64 / 1000.0,
+        ))
+        .with_report(ErrorReport {
+            reason: Some("user_active_in_target".to_owned()),
+            disposition: Some(Disposition::NOT_DELIVERED_AFTER_USER),
+            ..ErrorReport::default()
+        }))
+    }
+
+    /// Object mode: whether the element that takes the keys is a secure text
+    /// field, read as the target window's focused element and the hit at its
+    /// center. A read that fails says no.
+    fn typing_into_secure_field(&mut self, target: &Target) -> bool {
+        let Target::Window(id) = target else { return false };
+        if self.registry.report_mode() != ReportMode::Object {
+            return false;
+        }
+        let Ok(backend) = self.backend() else { return false };
+        let Ok(windows) = backend.windows() else { return false };
+        let center = {
+            let Some(ax) = backend.ax() else { return false };
+            let Ok(Some(element)) = ax.focused_element() else { return false };
+            if !matches!(ax.owner(&element, &windows), Ok(AxOwner::Window(owner)) if owner == *id) {
+                return false;
+            }
+            let Some(bounds) = ax.props(&element).ok().and_then(|props| props.bounds) else { return false };
+            (bounds.x + bounds.width / 2.0, bounds.y + bounds.height / 2.0)
+        };
+        backend.hit_at(center.0, center.1).ok().flatten().is_some_and(|hit| hit.secure)
     }
 
     pub(crate) fn key_chord(
@@ -219,6 +290,7 @@ impl Worker {
         self.mutate(&mutation, cancelled, |worker| {
             let keys = parse_keys(&params.keys)?;
             let mode = delivery(params.opts.as_ref())?;
+            worker.takeover_gate(&target, mode)?;
             let check_stop = || interrupted(&supervisor, &policy, cancelled, "pressing keys");
             worker.backend()?.key_chord_interruptible(&target, &keys, mode, &check_stop)?;
             Ok(Response::Unit)
@@ -336,3 +408,7 @@ pub(crate) fn delivery(options: Option<&PointerOptions>) -> CoreResult<DeliveryM
 #[cfg(test)]
 #[path = "worker_input/frame_tests.rs"]
 mod frame_tests;
+
+#[cfg(test)]
+#[path = "worker_input/takeover_tests.rs"]
+mod takeover_tests;

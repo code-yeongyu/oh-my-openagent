@@ -129,6 +129,14 @@ impl Backend for MacosBackend {
         MacosBackend::set_show_cursor(self, enabled);
     }
 
+    fn set_key_priming(&mut self, mode: senpi_desktop_core::types::KeyPriming) {
+        crate::input::set_key_priming(mode);
+    }
+
+    fn set_report_mode(&mut self, mode: senpi_desktop_core::report::ReportMode) {
+        crate::input::set_key_report_mode(mode);
+    }
+
     fn displays(&mut self) -> CoreResult<Vec<DesktopDisplay>> {
         self.capture.all_displays()
     }
