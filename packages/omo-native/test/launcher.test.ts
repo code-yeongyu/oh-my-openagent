@@ -218,7 +218,8 @@ await runLauncher(["say", "hi", "-e", "/user/plugin"])
       const handed = JSON.parse(readFileSync(execCapture, "utf8"))
       expect(handed.file).toBe(process.execPath)
       expect(handed.argv).toEqual([
-        process.execPath, join(fixture.packageRoot, "node_modules", "@code-yeongyu", "senpi", "dist", "cli.js"),
+        process.execPath, join(fixture.packageRoot, "bin", "lib", "engine-entry.mjs"),
+        join(fixture.packageRoot, "node_modules", "@code-yeongyu", "senpi", "dist", "cli.js"),
         "--extension", join(fixture.packageRoot, "plugin"), "say", "hi", "-e", "/user/plugin",
       ])
       expect(handed.env.OMO_CODING_AGENT_DIR).toBe(join(fixture.root, "agent"))

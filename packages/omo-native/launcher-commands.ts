@@ -2,3 +2,4 @@ export { runServiceAuthCommand } from "../omo-opencode/src/cli/service-auth/comm
 export { runAccountCommand } from "./account-cli"
 export { runSyncCommand } from "./sync-cli"
 export { runRemoteAttachCommand, runRemoteCommand } from "./remote-entry"
+export { omoPresenterAuthority } from "./presenter-authority"

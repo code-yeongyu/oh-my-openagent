@@ -1,10 +1,12 @@
 import { createHash, randomUUID } from "node:crypto"
+import { homedir } from "node:os"
 import { basename } from "node:path"
 import type { z } from "zod"
 import { signInRoute } from "./accounts-gate"
 import { credentialSchema, type Credentials, serviceOrigin, SignInError } from "./protocol"
 import { probeSecretServiceLock, type SecretServiceLockProbe } from "./secret-service-lock"
 import { withCredentialLock } from "./credential-lock"
+import { accountRecordPath, clearAccountRecord, writeAccountRecord } from "./presenter/account-record"
 
 type SecretKey = { readonly service: string; readonly name: string }
 export type SecretApi = {
@@ -86,6 +88,8 @@ export function createCredentialStore(
     readonly home?: string
   } = {},
 ): CredentialStore {
+  const recordPath = accountRecordPath(options.home ?? homedir(), credentialId(api))
+  let written: Credentials | undefined
   const store = createSealedStore(api, "omo-cli", credentialSchema, options.secrets, options.platform, options.lockProbe, options.notice, options.wait,
     (current, value) => {
       const sameIdentity = current !== null && current.device.id === value.device.id
@@ -94,17 +98,32 @@ export function createCredentialStore(
         && (value.accountId === undefined || current.accountId === undefined || current.accountId === value.accountId)
       const accountId = value.accountId ?? (sameIdentity ? current?.accountId : undefined)
       // An incoming snapshot cannot restore its old generation after A -> B -> A or clear.
-      return {
+      written = {
         ...value,
         ...(accountId === undefined ? {} : { accountId }),
         credentialGeneration: sameIdentity ? current?.credentialGeneration ?? randomUUID() : randomUUID(),
       }
+      return written
     })
+  const recordWritten = async (): Promise<void> => {
+    const accountId = written?.accountId
+    const credentialGeneration = written?.credentialGeneration
+    await (accountId === undefined || credentialGeneration === undefined
+      ? clearAccountRecord(recordPath)
+      : writeAccountRecord(recordPath, { accountId, credentialGeneration }))
+  }
   return {
     read: store.read,
     readAuthoritative: store.readAuthoritative,
-    write: value => withCredentialLock(api, () => store.write(value), options.home),
-    clear: () => withCredentialLock(api, store.clear, options.home),
+    write: value => withCredentialLock(api, async () => {
+      written = undefined
+      await store.write(value)
+      await recordWritten()
+    }, options.home),
+    clear: () => withCredentialLock(api, async () => {
+      await store.clear()
+      await clearAccountRecord(recordPath)
+    }, options.home),
   }
 }
 

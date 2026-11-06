@@ -1,3 +1,4 @@
+import { withPresenterEnforcement } from "./bin/lib/presenter-enforcement.js"
 import { join } from "node:path"
 
 import { isEngineCommand } from "./bin/lib/engine-commands.js"
@@ -43,7 +44,7 @@ export function buildSenpiArgs(args: string[], execDir: string): string[] {
   // RPC task child lists this plugin itself, so injecting it here would load the plugin into a
   // bare child or load it twice.
   if (ownsExtensions) return args
-  return ["--extension", join(execDir, "plugin"), ...args]
+  return ["--extension", join(execDir, "plugin"), ...withPresenterEnforcement(args)]
 }
 
 export function shouldPrintCompiledBanner(args: string[], stderrIsTTY: boolean): boolean {
