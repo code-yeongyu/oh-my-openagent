@@ -66,16 +66,15 @@ function repointSegment(path: string, text: string, targets: LinkTargets, movedF
     const [destinationPath = "", ...anchorParts] = destination.split("#")
     if (!isRepoRelative(destinationPath)) return whole
     const anchor = anchorParts.length > 0 ? `#${anchorParts.join("#")}` : ""
-    const here = posix.normalize(posix.join(posix.dirname(path), destinationPath))
-    if (escapes(here) || resolves(here, targets.live, false)) return whole
-    const before = movedFrom === undefined ? here : posix.normalize(posix.join(posix.dirname(movedFrom), destinationPath))
-    if (escapes(before)) return whole
-    const successor = targets.removed.get(before)
-    const nextTarget = successor === undefined
-      ? (before !== here && resolves(before, targets.live, false) ? before : undefined)
-      : successor.kind === "moved" ? successor.path : successor.kind === "archived" ? ARCHIVE_PATH : undefined
+    // The link's own target is where it resolved when written: from the note's old folder when the note moved.
+    const original = posix.normalize(posix.join(posix.dirname(movedFrom ?? path), destinationPath))
+    if (escapes(original)) return whole
+    const successor = targets.removed.get(original)
     if (successor?.kind === "removed") return label
-    if (nextTarget === undefined) return whole
+    const nextTarget = successor === undefined
+      ? (resolves(original, targets.live, false) ? original : undefined)
+      : successor.kind === "moved" ? successor.path : ARCHIVE_PATH
+    if (nextTarget === undefined || nextTarget === posix.normalize(posix.join(posix.dirname(path), destinationPath))) return whole
     const next = `${posix.relative(posix.dirname(path), nextTarget)}${successor?.kind === "archived" ? "" : anchor}`
     const replaced = /\s/.test(next) && !raw.trim().startsWith("<") ? `<${next}>` : next
     return `[${label}](${raw.replace(destination, replaced)})`

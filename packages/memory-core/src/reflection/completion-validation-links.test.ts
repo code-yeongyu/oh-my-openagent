@@ -1,50 +1,13 @@
 import { afterEach, describe, expect, it, setDefaultTimeout } from "bun:test"
-import { realpathSync } from "node:fs"
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
-import { dirname, join } from "node:path"
+import { mkdir } from "node:fs/promises"
+import { join } from "node:path"
 import { auditMemoryRepo } from "../audit/audit"
-import { GitMemoryRepo, createNodeGitExec } from "../git"
 import { validateCompletion } from "./completion-validation"
-import { createReflectionWorktree, finalizeReflectionWorktree } from "./worktree"
-import { removeTree } from "../../../../test-support/remove-tree"
+import { LINK_TEST_TIMEOUT_MS, cleanupLinkFixtures, INVALID, commitAll, git, linkFixture as fixture, note, put, read } from "./completion-links.test-support"
+import { finalizeReflectionWorktree } from "./worktree"
 
-const roots: string[] = []
-const exec = createNodeGitExec()
-const note = (description: string, body: string): string => `---\ndescription: ${description}\n---\n\n${body}`
-const INVALID = "x".repeat(1100)
-
-setDefaultTimeout(process.platform === "win32" ? 30_000 : 20_000)
-
-afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 })))
-})
-
-async function fixture(seedFiles: Record<string, string>) {
-  const root = realpathSync.native(await mkdtemp(join(tmpdir(), "reflection-links-")))
-  roots.push(root)
-  const repo = new GitMemoryRepo({ dir: join(root, "memory"), agentId: "agent-one" })
-  await repo.init({ seedFiles: Object.entries(seedFiles).map(([relativePath, content]) => ({ relativePath, content })) })
-  return createReflectionWorktree(repo, "run-1", join(root, "worktrees"))
-}
-
-async function git(dir: string, ...argv: string[]): Promise<string> {
-  const result = await exec.run(argv, { cwd: dir, timeoutMs: 30_000 })
-  if (result.code !== 0) throw new Error(result.stderr)
-  return result.stdout.trim()
-}
-
-async function commitAll(dir: string, message: string): Promise<void> {
-  await git(dir, "add", "-A")
-  await git(dir, "-c", "user.email=fixture@example.com", "-c", "user.name=fixture", "commit", "-qm", message)
-}
-
-async function put(dir: string, path: string, content: string): Promise<void> {
-  await mkdir(dirname(join(dir, path)), { recursive: true })
-  await writeFile(join(dir, path), content)
-}
-
-const read = (dir: string, path: string): Promise<string> => readFile(join(dir, path), "utf8")
+setDefaultTimeout(LINK_TEST_TIMEOUT_MS)
+afterEach(cleanupLinkFixtures)
 
 describe("reflection completion repoints links to the notes a run removed (#12642)", () => {
   it("#given a dream that archives a fact ledger other notes link to #when validated #then no link dangles and each points at the archive", async () => {

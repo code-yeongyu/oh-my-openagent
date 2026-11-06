@@ -17,9 +17,6 @@ export interface DroppedEntry {
 /** The squashed commit records what it left out, so a later validation of the same tip still knows. */
 export const DROPPED_TRAILER = "Omo-Completion-Dropped"
 
-/** Marks the gate's own link-repair commit, so the run's subject, identity and drop report are read past it. */
-export const LINK_REPAIR_TRAILER = "Omo-Link-Repair"
-
 /** One line a finalizer can put in the run's detail; every path and reason is redacted here, never printed raw. */
 export function describeDroppedEntries(dropped: readonly DroppedEntry[]): string {
   const items = dropped.map((entry) => `${redactSecretLikeMaterial(entry.path)} (${redactSecretLikeMaterial(entry.reason)})`)
@@ -47,10 +44,9 @@ function parseTrailerValue(value: string): DroppedEntry | undefined {
  */
 export async function readDroppedTrailers(exec: GitExec, dir: string, baseSha: string, tipSha: string): Promise<DroppedEntry[]> {
   const run = literalPathspecRunner(exec, dir)
-  const own = await runCommit(run, baseSha, tipSha)
-  const parent = await run(["rev-parse", "--verify", `${own}^`])
+  const parent = await run(["rev-parse", "--verify", `${tipSha}^`])
   if (parent.code !== 0 || parent.stdout.trim() !== baseSha) return []
-  const body = await must(run, [...STABLE_LOG_OUTPUT, "log", "-1", "--format=%B", own])
+  const body = await must(run, [...STABLE_LOG_OUTPUT, "log", "-1", "--format=%B", tipSha])
   const entries: DroppedEntry[] = []
   for (const line of body.split("\n")) {
     if (!line.startsWith(`${DROPPED_TRAILER}: `)) continue
@@ -103,17 +99,6 @@ async function renameSources(run: Run, baseSha: string, tipSha: string): Promise
   return sources
 }
 
-/** The run's own last commit: `tipSha` itself unless it is the gate's link-repair commit, which is skipped. */
-export async function runCommit(run: Run, baseSha: string, tipSha: string): Promise<string> {
-  let sha = tipSha
-  while (sha !== baseSha) {
-    const body = await must(run, [...STABLE_LOG_OUTPUT, "log", "-1", "--format=%B", sha])
-    if (!body.split("\n").some((line) => line.startsWith(`${LINK_REPAIR_TRAILER}: `))) return sha
-    sha = (await must(run, ["rev-parse", "--verify", `${sha}^`])).trim()
-  }
-  return sha
-}
-
 export async function commitCount(exec: GitExec, dir: string, baseSha: string, tipSha: string): Promise<number> {
   const out = await must(literalPathspecRunner(exec, dir), ["rev-list", "--count", `${baseSha}..${tipSha}`])
   return Number.parseInt(out.trim(), 10)
@@ -137,7 +122,7 @@ export async function squashWithoutPaths(
 ): Promise<string> {
   const run = literalPathspecRunner(exec, dir)
   const sources = await renameSources(run, baseSha, tipSha)
-  const identity = (await must(run, [...STABLE_LOG_OUTPUT, "log", "-1", "--format=%an%n%ae%n%s", await runCommit(run, baseSha, tipSha)])).split("\n")
+  const identity = (await must(run, [...STABLE_LOG_OUTPUT, "log", "-1", "--format=%an%n%ae%n%s", tipSha])).split("\n")
   const restore = new Set(dropped)
   for (const path of dropped) {
     const source = sources.get(path)

@@ -6,15 +6,21 @@ import { FRONTMATTER_RE } from "../memfs/frontmatter-scalar"
 import { describeFrontmatterViolation } from "../memfs/frontmatter-validation"
 import { isMemoryContentPath } from "../memfs/paths"
 import { redactSecretLikeMaterial } from "../sync/redact"
-import { linkRepairOnlyPaths, repointLinksToRemovedPaths } from "./completion-links"
-import { commitCount, readDroppedTrailers, squashWithoutPaths, type DroppedEntry } from "./completion-repair"
+import { applyLinkRepair, recognizeLinkRepair } from "./completion-links"
+import { commitCount, readDroppedTrailers as readTrailersAt, squashWithoutPaths, type DroppedEntry } from "./completion-repair"
 import { findSecretLikeFailures } from "./completion-secret-scan"
 import type { ReflectionWorktree } from "./worktree"
 
 const GIT_TIMEOUT_MS = 30_000
 
 export type { DroppedEntry }
-export { describeDroppedEntries, readDroppedTrailers } from "./completion-repair"
+export { describeDroppedEntries } from "./completion-repair"
+
+/** The drop report a validated tip carries, read past the gate's own link-repair commit when one sits on top. */
+export async function readDroppedTrailers(exec: GitExec, dir: string, baseSha: string, tipSha: string): Promise<DroppedEntry[]> {
+  const repair = await recognizeLinkRepair(exec, dir, baseSha, tipSha)
+  return await readTrailersAt(exec, dir, baseSha, repair?.runTip ?? tipSha)
+}
 
 /**
  * `dropped` lists entries the gate removed so the valid ones could land; absent when nothing was dropped.
@@ -71,16 +77,17 @@ export async function validateCompletion(
     }
     if (tipSha === recordedBase) return { status: "no_changes", tipSha, changedPaths: [] }
 
-    const screened = await screenEntries(exec, worktree, recordedBase, tipSha, [])
+    // A tip that is provably the gate's own earlier link repair is set aside, so the run is screened alone and the
+    // repair is recomputed on the screened tip; the screen never sees, drops or squashes the repair.
+    const prior = await recognizeLinkRepair(exec, worktree.dir, recordedBase, tipSha)
+    if (prior !== undefined) await git(exec, worktree.dir, ["reset", "-q", "--hard", prior.runTip])
+    const screened = await screenEntries(exec, worktree, recordedBase, prior?.runTip ?? tipSha)
     if (screened.status !== "valid") return screened
-    // The repair runs on the screened tip, so it only ever points links at paths the run really lands.
-    const dropped = screened.dropped ?? []
-    const skip = new Set(dropped.map((entry) => entry.path))
-    const repaired = await repointLinksToRemovedPaths(exec, worktree.dir, recordedBase, screened.tipSha, skip)
-    const final = repaired === screened.tipSha ? screened : await screenEntries(exec, worktree, recordedBase, repaired, dropped)
-    if (final.status !== "valid") return final
-    const linkRepairs = await linkRepairOnlyPaths(exec, worktree.dir, recordedBase, final.tipSha)
-    return linkRepairs.length === 0 ? final : { ...final, linkRepairs }
+    const dropped = (screened.dropped ?? []).map((entry) => entry.path)
+    const repair = await applyLinkRepair(exec, worktree.dir, recordedBase, screened.tipSha, dropped, prior)
+    if (repair === undefined) return screened
+    const changedPaths = await listReflectionChangedPaths(exec, worktree.dir, recordedBase, repair.tipSha)
+    return { ...screened, tipSha: repair.tipSha, changedPaths, ...(repair.linkRepairs.length === 0 ? {} : { linkRepairs: repair.linkRepairs }) }
   } catch (error) {
     return { status: "failed", detail: errorMessage(error) }
   }
@@ -113,10 +120,9 @@ async function screenEntries(
   worktree: ReflectionWorktree,
   recordedBase: string,
   startTip: string,
-  alreadyDropped: readonly DroppedEntry[],
 ): Promise<CompletionValidation> {
   const dir = worktree.dir
-  const dropped = new Map<string, string>(alreadyDropped.map((entry) => [entry.path, entry.reason]))
+  const dropped = new Map<string, string>()
   const droppedList = (): { dropped?: DroppedEntry[] } =>
     dropped.size === 0 ? {} : { dropped: [...dropped].map(([path, reason]) => ({ path, reason })) }
   let tipSha = startTip
@@ -140,7 +146,7 @@ async function screenEntries(
     }
     if (secrets.length === 0 && frontmatter.size === 0) {
       if (dropped.size === 0) {
-        for (const entry of await readDroppedTrailers(exec, dir, recordedBase, tipSha)) dropped.set(entry.path, entry.reason)
+        for (const entry of await readTrailersAt(exec, dir, recordedBase, tipSha)) dropped.set(entry.path, entry.reason)
       }
       return { status: "valid", tipSha, changedPaths, ...droppedList() }
     }

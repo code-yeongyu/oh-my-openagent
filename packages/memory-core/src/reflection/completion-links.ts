@@ -1,66 +1,129 @@
-import { join } from "node:path"
-import { readFile, writeFile } from "../fs/resilient"
+import { join, posix } from "node:path"
+import { writeFile } from "../fs/resilient"
 import type { GitExec } from "../git"
 import { STABLE_LOG_OUTPUT } from "../git/stable-log-output"
 import { FRONTMATTER_RE } from "../memfs/frontmatter-scalar"
+import { describeFrontmatterViolation } from "../memfs/frontmatter-validation"
+import { isMemoryContentPath } from "../memfs/paths"
+import { scanSecretLikeMaterial } from "../sync/redact"
 import { restampContent } from "../tools/claim-frontmatter"
-import { LINK_REPAIR_TRAILER, literalPathspecRunner, runCommit, type Run } from "./completion-repair"
-import { ARCHIVE_PATH, repointLinks, type Successor } from "./link-rewrite"
+import { literalPathspecRunner, readDroppedTrailers, type Run } from "./completion-repair"
+import { listTree, must, removedPaths } from "./link-removals"
+import { repointLinks } from "./link-rewrite"
+
+/** The gate's link-repair commit sitting on a run tip, recognised by recomputing it (#12642). */
+export interface RecognizedLinkRepair {
+  readonly tipSha: string
+  readonly runTip: string
+  readonly writes: ReadonlyMap<string, string>
+}
+
+export interface LinkRepair {
+  readonly tipSha: string
+  /** Paths only the repair wrote: notes the run itself never changed. */
+  readonly linkRepairs: readonly string[]
+}
 
 /**
- * A run that deletes, archives or moves a note must not leave other notes linking to the old path (#12642). After the
- * completion screen has settled which paths the run really changes, every `[[path]]` and relative markdown link to a
- * path the run removed is rewritten in one extra commit on the run's branch, so the fix lands with the run that broke
- * it. A moved note's links follow it (and its own relative links keep their targets); a removed path that the run
- * recorded in `ARCHIVE.md` points at the archive; any other removed path (a forgotten, sensitive or junk note) becomes
- * plain text. Notes in `skip` (entries the screen dropped and restored to the base) are left as they are, so validating
- * the same tip again finds nothing to repair. Returns the new tip, or `tipSha` when nothing pointed at a removed path.
+ * Whether `tipSha` is the gate's own link repair of its parent. Nothing the run writes (a trailer, a subject, an
+ * author) is trusted: the repair is recomputed from the parent, and the tip counts only when it changes exactly the
+ * notes that recomputation rewrites, to exactly that content. A run commit that also edits anything else, or edits a
+ * note differently, is the run's own work and stays the run's.
  */
-export async function repointLinksToRemovedPaths(
+export async function recognizeLinkRepair(
   exec: GitExec,
   dir: string,
   baseSha: string,
   tipSha: string,
-  skip: ReadonlySet<string>,
-): Promise<string> {
+): Promise<RecognizedLinkRepair | undefined> {
   const run = literalPathspecRunner(exec, dir)
-  const tree = await listTree(run, tipSha)
-  const live = new Set(tree.map((entry) => entry.path))
-  const { removed, movedFrom } = await removedPaths(run, baseSha, tipSha, live)
-  if (removed.size === 0) return tipSha
-
-  const changed: string[] = []
-  for (const { path } of tree.filter((entry) => entry.regular && entry.path.endsWith(".md") && !skip.has(entry.path))) {
-    const current = await readFile(join(dir, path), "utf8")
-    const next = repointLinks(path, current, { live, removed }, movedFrom.get(path))
-    if (next === current) continue
-    await writeFile(join(dir, path), restamped(current, next), "utf8")
-    changed.push(path)
+  const parents = (await must(run, ["rev-list", "--parents", "-n", "1", tipSha])).trim().split(/\s+/).slice(1)
+  const runTip = parents[0]
+  if (parents.length !== 1 || runTip === undefined || runTip === baseSha) return undefined
+  if ((await run(["merge-base", "--is-ancestor", baseSha, runTip])).code !== 0) return undefined
+  const changed = (await must(run, ["diff", "--name-status", "--no-renames", "-z", runTip, tipSha, "--"])).split("\0").filter(Boolean)
+  const paths = changed.filter((_, index) => index % 2 === 1)
+  if (paths.length === 0 || changed.some((entry, index) => index % 2 === 0 && entry !== "M")) return undefined
+  const skip = new Set((await readDroppedTrailers(exec, dir, baseSha, runTip)).map((entry) => entry.path))
+  const writes = await planLinkRepair(run, baseSha, runTip, skip)
+  if (writes.size !== paths.length) return undefined
+  for (const path of paths) {
+    const planned = writes.get(path)
+    if (planned === undefined || (await blob(run, tipSha, path)) !== planned) return undefined
   }
-  if (changed.length === 0) return tipSha
-
-  await must(run, ["add", "--", ...changed])
-  const [name = "reflection", email = "reflection@omo.local"] =
-    (await must(run, [...STABLE_LOG_OUTPUT, "log", "-1", "--format=%an%n%ae", tipSha])).split("\n")
-  await must(run, [
-    "-c", `user.name=${name}`, "-c", `user.email=${email}`,
-    "commit", "-q", "--no-verify", "-m", `chore(memory): repoint links to removed notes\n\n${LINK_REPAIR_TRAILER}: 1`,
-  ])
-  return (await must(run, ["rev-parse", "--verify", "HEAD"])).trim()
+  return { tipSha, runTip, writes }
 }
 
 /**
- * The paths only the gate's link repair changed: written by its repair commit and untouched by the run itself. A
- * targeted run (`/dream --to <doc>`) is still judged by what the model changed, so these do not count against it.
+ * A run that deletes, archives or moves a note must not leave other notes linking to the old path (#12642). On the
+ * screened run tip (HEAD, clean), every link to a path the run removed is rewritten in one extra commit, so the fix
+ * lands with the run that broke it. The content is screened here, before it is written: a note whose rewrite would be
+ * refused (secret-like text it already held, a header the screen rejects) is left as it is, so the completion screen
+ * never runs on the repair and never drops or squashes it. `prior` is a repair already recognised on this same tip;
+ * when the plan is unchanged that commit is restored instead of recreated, so validating twice gives one result.
  */
-export async function linkRepairOnlyPaths(exec: GitExec, dir: string, baseSha: string, tipSha: string): Promise<string[]> {
+export async function applyLinkRepair(
+  exec: GitExec,
+  dir: string,
+  baseSha: string,
+  runTip: string,
+  dropped: readonly string[],
+  prior: RecognizedLinkRepair | undefined,
+): Promise<LinkRepair | undefined> {
   const run = literalPathspecRunner(exec, dir)
-  const own = await runCommit(run, baseSha, tipSha)
-  if (own === tipSha) return []
-  const names = async (range: string): Promise<string[]> =>
-    (await must(run, ["diff", "--name-only", "-z", range, "--"])).split("\0").filter(Boolean)
-  const byRun = new Set(await names(`${baseSha}..${own}`))
-  return (await names(`${own}..${tipSha}`)).filter((path) => !byRun.has(path))
+  const writes = await planLinkRepair(run, baseSha, runTip, new Set(dropped))
+  if (writes.size === 0) return undefined
+  let tipSha: string
+  if (prior !== undefined && prior.runTip === runTip && sameWrites(prior.writes, writes)) {
+    await must(run, ["reset", "-q", "--hard", prior.tipSha])
+    tipSha = prior.tipSha
+  } else {
+    for (const [path, content] of writes) await writeFile(join(dir, path), content, "utf8")
+    await must(run, ["add", "--", ...writes.keys()])
+    const [name = "reflection", email = "reflection@omo.local"] =
+      (await must(run, [...STABLE_LOG_OUTPUT, "log", "-1", "--format=%an%n%ae", runTip])).split("\n")
+    await must(run, [
+      "-c", `user.name=${name}`, "-c", `user.email=${email}`,
+      "commit", "-q", "--no-verify", "-m", "chore(memory): repoint links to removed notes",
+    ])
+    tipSha = (await must(run, ["rev-parse", "--verify", "HEAD"])).trim()
+  }
+  const byRun = new Set((await must(run, ["diff", "--name-only", "-z", `${baseSha}..${runTip}`, "--"])).split("\0").filter(Boolean))
+  return { tipSha, linkRepairs: [...writes.keys()].filter((path) => !byRun.has(path)).sort() }
+}
+
+async function planLinkRepair(run: Run, baseSha: string, runTip: string, skip: ReadonlySet<string>): Promise<Map<string, string>> {
+  const tree = await listTree(run, runTip)
+  const live = new Set(tree.map((entry) => entry.path))
+  const { removed, movedFrom } = await removedPaths(run, baseSha, runTip, live)
+  const writes = new Map<string, string>()
+  if (removed.size === 0) return writes
+  const notes = new Set(tree.filter((entry) => entry.regular && entry.path.endsWith(".md") && !skip.has(entry.path)).map((entry) => entry.path))
+  const candidates = new Set([...movedFrom.keys(), ...(await notesNaming(run, runTip, [...removed.keys()]))])
+  for (const path of [...candidates].filter((candidate) => notes.has(candidate)).sort()) {
+    const current = await blob(run, runTip, path)
+    const next = repointLinks(path, current, { live, removed }, movedFrom.get(path))
+    if (next === current) continue
+    const stamped = restamped(current, next)
+    if (screenAccepts(path, current, stamped)) writes.set(path, stamped)
+  }
+  return writes
+}
+
+/** Notes whose text holds a removed note's file name; a link to it cannot be written without that name. */
+async function notesNaming(run: Run, revision: string, removed: readonly string[]): Promise<string[]> {
+  const stems = [...new Set(removed.map((path) => posix.basename(path).replace(/\.md$/, "")).filter(Boolean))]
+  if (stems.length === 0) return []
+  const result = await run(["grep", "-l", "-z", "-F", ...stems.flatMap((stem) => ["-e", stem]), revision])
+  if (result.code === 1) return []
+  if (result.code !== 0) throw new Error(result.stderr.trim() || "git grep failed")
+  return result.stdout.split("\0").filter(Boolean).map((entry) => entry.slice(revision.length + 1))
+}
+
+function screenAccepts(path: string, before: string, after: string): boolean {
+  if (scanSecretLikeMaterial(after).length > 0) return false
+  if (!isMemoryContentPath(path) || describeFrontmatterViolation(after) === null) return true
+  return FRONTMATTER_RE.exec(after)?.[1] === FRONTMATTER_RE.exec(before)?.[1]
 }
 
 /** The same provenance rule every writer and the commit hook apply; a note whose header does not parse keeps its bytes. */
@@ -74,61 +137,8 @@ function restamped(current: string, next: string): string {
   }
 }
 
-async function listTree(run: Run, tipSha: string): Promise<{ path: string; regular: boolean }[]> {
-  const out = await must(run, ["ls-tree", "-r", "-z", "--full-tree", tipSha])
-  return out.split("\0").filter(Boolean).map((line) => {
-    const tab = line.indexOf("\t")
-    const [mode = ""] = line.slice(0, tab).split(" ")
-    return { path: line.slice(tab + 1), regular: mode === "100644" || mode === "100755" }
-  })
+function sameWrites(a: ReadonlyMap<string, string>, b: ReadonlyMap<string, string>): boolean {
+  return a.size === b.size && [...a].every(([path, content]) => b.get(path) === content)
 }
 
-async function removedPaths(
-  run: Run,
-  baseSha: string,
-  tipSha: string,
-  live: ReadonlySet<string>,
-): Promise<{ removed: Map<string, Successor>; movedFrom: Map<string, string> }> {
-  const out = await must(run, ["diff", "--name-status", "-M", "-z", `${baseSha}..${tipSha}`, "--"])
-  const parts = out.split("\0")
-  const archived = live.has(ARCHIVE_PATH) ? await archiveAdditions(run, baseSha, tipSha) : ""
-  const removed = new Map<string, Successor>()
-  const movedFrom = new Map<string, string>()
-  for (let index = 0; index < parts.length; ) {
-    const status = parts[index] ?? ""
-    if (status === "") break
-    if (status.startsWith("R") || status.startsWith("C")) {
-      const from = parts[index + 1]
-      const to = parts[index + 2]
-      if (status.startsWith("R") && from !== undefined && to !== undefined && !live.has(from)) {
-        removed.set(from, { kind: "moved", path: to })
-        movedFrom.set(to, from)
-      }
-      index += 3
-      continue
-    }
-    const path = parts[index + 1]
-    if (status === "D" && path !== undefined && !live.has(path)) {
-      removed.set(path, recordedIn(archived, path) ? { kind: "archived" } : { kind: "removed" })
-    }
-    index += 2
-  }
-  return { removed, movedFrom }
-}
-
-/** The lines this run added to `ARCHIVE.md`; only a path named there was archived rather than deleted. */
-async function archiveAdditions(run: Run, baseSha: string, tipSha: string): Promise<string> {
-  const out = await must(run, ["diff", "-U0", "--no-color", baseSha, tipSha, "--", ARCHIVE_PATH])
-  return out.split("\n").filter((line) => line.startsWith("+") && !line.startsWith("+++")).join("\n")
-}
-
-function recordedIn(archived: string, path: string): boolean {
-  const stem = path.replace(/\.md$/, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-  return new RegExp(`(^|[^\\w./-])${stem}(\\.md)?(?![\\w/-])`).test(archived)
-}
-
-async function must(run: Run, argv: readonly string[]): Promise<string> {
-  const result = await run(argv)
-  if (result.code !== 0) throw new Error(result.stderr.trim() || `git ${argv.join(" ")} failed`)
-  return result.stdout
-}
+const blob = (run: Run, revision: string, path: string): Promise<string> => must(run, ["cat-file", "blob", `${revision}:${path}`])
