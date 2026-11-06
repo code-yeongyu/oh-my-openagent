@@ -7,6 +7,7 @@ import { bootstrapDeviceService, type BootstrapDependencies, forgetDeviceService
 import { connectDeviceService, type DeviceCredential, type DeviceService } from "../src/index.ts"
 import type { AccountShowResult } from "../src/account-state.ts"
 import { writeToken } from "../src/local-api/access.ts"
+import { LocalApiError } from "../src/local-api/errors.ts"
 import { startFakeOwner, type FakeOwner } from "./local-api/conformance/fake-owner.ts"
 import { defaultWorld } from "./local-api/conformance/world.ts"
 import { testSecure } from "./local-api/support.ts"
@@ -152,6 +153,36 @@ describe("device service bootstrap", () => {
       exitCode: 3,
     })
     expect(calls.connect).toBe(0)
+  })
+
+  // #12664: a handshake that times out means a process holds the endpoint and is slow, so the running service must not
+  // be installed over and restarted; only a socket that is gone or a port that refuses means nothing runs.
+  test.each([
+    ["a handshake timeout stops as service_degraded and installs nothing", new LocalApiError("handshake_timeout", "the owner did not complete the handshake"), 0],
+    ["a refused connection still installs", Object.assign(new Error("connect ECONNREFUSED"), { code: "ECONNREFUSED" }), 1],
+  ])("%s", async (_name, failure, installs) => {
+    const stateDir = home()
+    const running = await ownerAt(stateDir, PIN)
+    let failed = false
+    const base = harness(stateDir)
+    const { deps, calls } = harness(stateDir, {
+      connect: async () => {
+        if (failed) return base.deps.connect()
+        failed = true
+        calls.connect += 1
+        throw failure
+      },
+      install: async () => {
+        calls.install += 1
+        return { ok: true }
+      },
+    })
+    const outcome = await bootstrapDeviceService(deps)
+    expect(calls.install).toBe(installs)
+    if (installs === 0) {
+      expect(outcome).toMatchObject({ kind: "stopped", state: "service_degraded", exitCode: 3 })
+      expect(running.state.adoptions).toBe(0)
+    } else expect(outcome.kind).toBe("connected")
   })
 
   test("a bad server_proof drops the connection with zero adopts and installs nothing", async () => {
