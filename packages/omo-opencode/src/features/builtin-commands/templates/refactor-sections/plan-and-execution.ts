@@ -89,7 +89,7 @@ lsp_rename(filePath, line, character, newName)  // Execute rename
 sg --pattern '[pattern]' --rewrite '[rewrite]' --lang ts path/to/file.ts
 
 // If preview looks good, execute
-python3 scripts/ast_grep_helper.py replace '[pattern]' '[rewrite]' --lang ts path/to/file.ts --apply
+python3 scripts/ast_grep_helper.py replace '[pattern]' '[rewrite]' path/to/file.ts --lang ts --apply
 \`\`\`
 
 **For Structural Changes:**

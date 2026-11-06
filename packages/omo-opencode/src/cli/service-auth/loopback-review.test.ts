@@ -10,7 +10,7 @@ for (const property of ["bind-address", "ephemeral-port", "single-use", "state-m
     const listen = spyOn(Server.prototype, "listen")
     const address = spyOn(Server.prototype, "address")
     onTestFinished(() => { listen.mockRestore(); address.mockRestore() })
-    await loginLoopback(createSession({ api, store: memorySecrets().store(api), home: await temporaryHome() }), {
+    await loginLoopback(createSession({ beforeKeysDiscarded: async () => undefined, api, store: memorySecrets().store(api), home: await temporaryHome() }), {
       accounts: "https://signin.omo.dev", name: "Test", platform: "linux", chooseDevice: async () => null,
       open: async url => {
         const ask = new URL(url)
@@ -48,7 +48,7 @@ for (const accounts of ["http://example.com", "javascript:alert(1)", "file:///tm
   test(`loopback rejects unsafe accounts override ${accounts}`, async () => {
     const api = fakeApi(() => Response.json(grant))
     let opened = false
-    await expect(loginLoopback(createSession({ api, store: memorySecrets().store(api), home: await temporaryHome() }), {
+    await expect(loginLoopback(createSession({ beforeKeysDiscarded: async () => undefined, api, store: memorySecrets().store(api), home: await temporaryHome() }), {
       accounts, name: "Test", platform: "linux", chooseDevice: async () => null,
       open: async () => { opened = true; return false },
     })).rejects.toThrow()

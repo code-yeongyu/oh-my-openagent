@@ -13,7 +13,7 @@ describe("LA11 session.command without an attach is refused", () => {
     client.onEvent((event) => kinds.push(event.kind));
     const sending = client.request("session.command", {
       attach: "never-attached",
-      command: { op: "abort" },
+      rpc: { type: "abort" },
     });
     expect(await rejectionOf(sending)).toMatchObject({ code: "not_attached" });
     expect(owner.state.bindings.size).toBe(0);
@@ -31,7 +31,7 @@ describe("LA11 session.command without an attach is refused", () => {
     });
     await snapshot;
     await client.request("session.detach", { attach });
-    expect(await rejectionOf(client.command(attach, { op: "abort" }))).toMatchObject({
+    expect(await rejectionOf(client.command(attach, { type: "abort" }))).toMatchObject({
       code: "not_attached",
     });
     expect(owner.state.bindings.size).toBe(0);
@@ -47,7 +47,7 @@ describe("LA11 session.command without an attach is refused", () => {
     });
     await snapshot;
     const stranger = await connectClient(owner);
-    expect(await rejectionOf(stranger.command(attach, { op: "abort" }))).toMatchObject({
+    expect(await rejectionOf(stranger.command(attach, { type: "abort" }))).toMatchObject({
       code: "not_attached",
     });
   });
