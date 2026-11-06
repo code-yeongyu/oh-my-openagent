@@ -110,9 +110,16 @@ const fn press_kind(kind: ScriptedPressKind) -> UserPressKind {
     }
 }
 
+/// Moves every timeline press due by `now` into the record at its own press
+/// time, so the record stays in press order however late `take` runs: a
+/// press recorded after a timeline press fell due still sorts behind it.
 fn land_due(state: &mut State, now: Instant) {
-    while state.timed.front().is_some_and(|press| press.at <= now) {
-        state.presses.extend(state.timed.pop_front());
+    let due = state.timed.partition_point(|press| press.at <= now);
+    for press in state.timed.drain(..due) {
+        let slot = state
+            .presses
+            .partition_point(|recorded| recorded.at <= press.at);
+        state.presses.insert(slot, press);
     }
 }
 
