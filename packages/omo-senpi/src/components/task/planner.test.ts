@@ -868,6 +868,11 @@ describe("createTaskChildPlanner model refusals", () => {
     if (result.kind !== "error") return
     expect(result.error.code).toBe("model_unavailable")
     expect(result.error.attempted_chain?.length).toBeGreaterThan(0)
+    // The chain branch must name a rung the chain actually carries: the pin text also names
+    // agents.explore.model and the no-spawn fact, so asserting only those let a pinned-agent
+    // regression pass as green.
+    const firstRung = result.error.attempted_chain?.[0]?.model
+    if (firstRung !== undefined) expect(result.error.message).toContain(firstRung)
     expect(result.error.message).toContain("agents.explore.model")
     expect(result.error.message).toContain("No child was spawned")
   })

@@ -18,6 +18,13 @@ function chainFixKey(target: ChainFailureTarget): string {
   return "category" in target ? `categories.${target.category}.model` : `agents.${target.agent}.model`
 }
 
+// A pin can also live in the models list the schema accepts, and that list is a different key: naming
+// `.model` would send the reader to a key they never wrote.
+function pinFixKey(target: ChainFailureTarget, pinKey: "model" | "models"): string {
+  if (pinKey === "model") return chainFixKey(target)
+  return "category" in target ? `categories.${target.category}.models` : `agents.${target.agent}.models`
+}
+
 // One entry per chain rung: the model and the providers that can serve it. The reader acts on the
 // first entry they recognize, which a single "attempted <id>" never allowed.
 function chainEntriesText(chain: readonly DelegateFallbackEntry[]): string {
@@ -61,8 +68,12 @@ export function chainUnavailableText(
  * a choice, so it is never replaced; the message names it and the two ways out, so the parent stops
  * retrying the same broken binding.
  */
-export function pinnedModelUnavailableText(target: ChainFailureTarget, pinnedModel: string): string {
-  return `${targetKind(target)} "${targetName(target)}" is pinned to "${pinnedModel}", which this machine's model registry does not serve: that provider is not connected, or it does not list that model id. Fix: connect the provider, or re-pick ${chainFixKey(target)} in Settings. No child was spawned.`
+export function pinnedModelUnavailableText(
+  target: ChainFailureTarget,
+  pinnedModel: string,
+  pinKey: "model" | "models" = "model",
+): string {
+  return `${targetKind(target)} "${targetName(target)}" is pinned to "${pinnedModel}", which this machine's model registry does not serve: that provider is not connected, or it does not list that model id. Fix: connect the provider, or re-pick ${pinFixKey(target, pinKey)} in Settings. No child was spawned.`
 }
 
 export type AgentUnavailable = {
@@ -87,8 +98,8 @@ export function categoryModelFailureText(
     return chainUnavailableText({ category }, error.attempted_chain, error.missing_providers ?? [], error.unlisted_provider_model)
   }
   // A pin can be written either way the schema allows: a scalar model or a models list.
-  const pinned = firstConfiguredPin(omoConfig.categories?.[category])
-  return pinned === undefined ? undefined : pinnedModelUnavailableText({ category }, pinned)
+  const pin = firstConfiguredPin(omoConfig.categories?.[category])
+  return pin === undefined ? undefined : pinnedModelUnavailableText({ category }, pin.model, pin.key)
 }
 
 type ModelPinConfig = {
@@ -96,11 +107,12 @@ type ModelPinConfig = {
   readonly models?: readonly (string | { readonly model: string })[] | undefined
 }
 
-function firstConfiguredPin(config: ModelPinConfig | undefined): string | undefined {
-  if (config?.model !== undefined) return config.model
+// Which field held the pin matters to the reader: the fix names that field, not one they never wrote.
+function firstConfiguredPin(config: ModelPinConfig | undefined): { readonly model: string; readonly key: "model" | "models" } | undefined {
+  if (config?.model !== undefined) return { model: config.model, key: "model" }
   const entry = config?.models?.[0]
   if (entry === undefined) return undefined
-  return typeof entry === "string" ? entry : entry.model
+  return { model: typeof entry === "string" ? entry : entry.model, key: "models" }
 }
 
 export function agentModelFailureText(
@@ -115,7 +127,7 @@ export function agentModelFailureText(
   // A pin is the cause of the failure, so it wins over the chain that the pin replaced: refusing
   // with the chain text told a pinned agent's caller to set the key it had already set.
   const pinned = firstConfiguredPin(definition)
-  if (pinned !== undefined) return pinnedModelUnavailableText({ agent }, pinned)
+  if (pinned !== undefined) return pinnedModelUnavailableText({ agent }, pinned.model, pinned.key)
   if (resolution.attempted_chain !== undefined) {
     return chainUnavailableText({ agent }, resolution.attempted_chain, resolution.missing_providers ?? [], undefined)
   }

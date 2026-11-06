@@ -108,6 +108,7 @@ describe("model refusals", () => {
     // then: the pin is the cause, so the reader is told which pin failed, not to set the key again
     expect(text).toContain("custom-proxy/gpt-6-astra")
     expect(text).toContain("is pinned to")
+    expect(text).toContain("categories.quick.models")
     expect(text).not.toContain("its chain needs")
   })
 
@@ -124,9 +125,10 @@ describe("model refusals", () => {
     // when
     const text = agentModelFailureText("omo-senpi-code-reviewer", resolution, agents as never)
 
-    // then
+    // then: the pin is the cause, so the reader is told which pin failed, and the fix names the
+    // key the pin actually lives in (the models list), not a scalar one they never wrote
     expect(text).toContain("custom-proxy/gpt-6-astra")
-    expect(text).toContain("agents.omo-native-code-reviewer.model")
+    expect(text).toContain("agents.omo-native-code-reviewer.models")
     expect(text).not.toContain("omo-senpi-code-reviewer")
   })
 })
