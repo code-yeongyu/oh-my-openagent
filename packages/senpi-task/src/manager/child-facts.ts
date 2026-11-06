@@ -27,12 +27,16 @@ export function subscribeChildFacts(input: {
   readonly onExtensionEvent: (event: ChildExtensionEvent) => void
   readonly onLiveness: (status: HostLivenessStatus) => void
   readonly onLivenessNotice: (record: TaskRecord, status: HostLivenessStatus) => void
+  readonly onUsageLimitHop?: (provider: string, modelId: string, message: string) => void
 }): () => void {
   const { handle, taskId, now, runStats } = input
   const transcript = subscribeTranscriptLog(handle, input.store, taskId)
   runStats.set(taskId, createRunStatsTracker(now(), now, currentRunStartEpoch(input.store.load(taskId))))
   const effectiveModel = subscribeEffectiveModel(handle, { store: input.store, taskId, now })
-  const refusals = observeModelRefusals({ store: input.store, taskId, now })
+  const refusals = observeModelRefusals({
+    store: input.store, taskId, now,
+    ...(input.onUsageLimitHop === undefined ? {} : { onUsageLimitHop: input.onUsageLimitHop }),
+  })
   const stats = handle.subscribe((event) => {
     if (event.type === "retry_fallback_exhausted") input.fallbackExhaustions.add(handle)
     refusals(event)

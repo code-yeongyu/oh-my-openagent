@@ -4,6 +4,7 @@ export type ManualSettlementScheduler = {
   readonly scheduler: TurnSettlementScheduler
   /** Armed, not-yet-fired confirmations (0 or 1 in practice: the settlement arms one at a time). */
   readonly pending: () => number
+  readonly nextDelay: () => number | undefined
   /** Fire the armed confirmation. Throws when none is armed. */
   readonly runNext: () => void
 }
@@ -14,11 +15,11 @@ export type ManualSettlementScheduler = {
  * instead of a wall-clock guess.
  */
 export function createManualSettlementScheduler(): ManualSettlementScheduler {
-  type Entry = { readonly run: () => void; cancelled: boolean; ran: boolean }
+  type Entry = { readonly run: () => void; readonly delay: number; cancelled: boolean; ran: boolean }
   const entries: Entry[] = []
   return {
-    scheduler: (run) => {
-      const entry: Entry = { run, cancelled: false, ran: false }
+    scheduler: (run, delay) => {
+      const entry: Entry = { run, delay, cancelled: false, ran: false }
       entries.push(entry)
       return {
         cancel: () => {
@@ -27,6 +28,7 @@ export function createManualSettlementScheduler(): ManualSettlementScheduler {
       }
     },
     pending: () => entries.filter((entry) => !entry.cancelled && !entry.ran).length,
+    nextDelay: () => entries.find((entry) => !entry.cancelled && !entry.ran)?.delay,
     runNext: () => {
       const entry = entries.find((candidate) => !candidate.cancelled && !candidate.ran)
       if (entry === undefined) throw new Error("no settle confirmation is armed")

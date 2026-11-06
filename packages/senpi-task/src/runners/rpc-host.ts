@@ -3,6 +3,7 @@ import { log } from "@oh-my-opencode/utils"
 
 import type { HostEnginePolicy } from "../lazy/senpi-barrel"
 import { RunnerError } from "./in-process/runner-error"
+import { withProbeRequestExtension } from "./probe-request"
 import {
   admitChildStore,
   ensureChildEndpoint,
@@ -171,10 +172,10 @@ export class RpcHostRunner {
   }
 
   async start(specInput: RpcRunnerSpec): Promise<RpcChildHandle> {
-    const spec =
+    const spec = withProbeRequestExtension(
       specInput.extensions === undefined && this.inheritedExtensions.length > 0
         ? { ...specInput, extensions: this.inheritedExtensions }
-        : specInput
+        : specInput)
     await this.modelAdmission(spec)
     const endpoint = resolveChildEndpoint(this.endpoint, spec)
     const keyed = endpoint.shardKey === undefined ? spec : { ...spec, treeKey: endpoint.shardKey, shardKey: endpoint.shardKey }

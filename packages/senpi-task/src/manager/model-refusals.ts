@@ -2,6 +2,7 @@ import type { ModelRefusal, ModelRefusalReason, TaskRecord, TaskRunStats } from 
 import type { TaskRecordStore } from "../store"
 import type { ManagedChildEvent } from "./child-handle"
 import { isCredentialFailure, runtimeFallbackCandidates, terminalFailureMessage, usageLimitScope } from "./credential-failure"
+import type { UsageLimitMemory } from "./usage-limit-memory"
 
 const DETAIL_MAX = 200
 const RESETS = /\bresets?\s+((?:at|in)\s+)?([^.\n;]+)/iu
@@ -91,13 +92,19 @@ export function withRefusal<Record extends Pick<TaskRecord, "model_refusals">>(r
 /**
  * Record each designated model the child's own in-session fallback walks past. The failed turn that caused
  * the hop is remembered from its error message, so the entry carries the provider's words and reset time.
+ * A usage limit the engine hopped past on a rung of this run's designated chain is also handed to
+ * `onUsageLimitHop`, so later tasks skip that rung until its reset (#11383).
  */
 export function observeModelRefusals(input: {
   readonly store: TaskRecordStore
   readonly taskId: string
   readonly now: () => number
+  readonly onUsageLimitHop?: (provider: string, modelId: string, message: string) => void
 }): (event: ManagedChildEvent) => void {
   const { store, taskId, now } = input
+  // The chain as this run starts: the hop event lands after the record already moved to the next rung.
+  const start = store.load(taskId)
+  const chain = start == null ? [] : [start.resolved_model, ...(start.fallback_models ?? [])]
   let failed: string | undefined
   return (event) => {
     if (event.type === "message_end" && isAssistant(event.message)) {
@@ -113,8 +120,15 @@ export function observeModelRefusals(input: {
       ...(failed === undefined ? {} : { message: failed }),
       at: new Date(now()).toISOString(),
     })
+    const message = failed
     failed = undefined
     store.mutate(taskId, (fresh) => withRefusal(fresh, refusal))
+    const hopped = readString(event, "from")
+    const from = hopped === undefined ? undefined : baseSelector(hopped)
+    const rung = chain.find((model) => model !== undefined && `${model.provider}/${model.model_id}` === from)
+    if (rung !== undefined && message !== undefined && usageLimitScope(message) !== undefined) {
+      input.onUsageLimitHop?.(rung.provider, rung.model_id, message)
+    }
   }
 }
 
@@ -123,19 +137,33 @@ type TerminalFields = { readonly error_message: string; readonly failure_kind?: 
 /**
  * The terminal error of a failed run. When the designated chain is spent on a recognized refusal (a usage
  * limit, a missing or rejected credential, a policy refusal, an overload) the task fails typed and lists every
- * designated model it tried and why: it never runs on any other model, the parent session's included.
+ * designated model it tried and why: it never runs on any other model, the parent session's included. The chain is
+ * judged with the same usage-limit memory the runtime walk used, so a rung the walk skipped as spent (a provider whose
+ * limit a probe confirmed) counts as spent here too and is listed with the reason it was skipped (#9711).
  */
 export function terminalFailureFields(
   record: TaskRecord,
   failure: { readonly message: string; readonly kind?: string },
   modelFailure: boolean,
+  limits?: UsageLimitMemory,
 ): TerminalFields {
   const message = terminalFailureMessage(record, failure.message)
   const final = refusalOf(record, failure.message, record.updated_at)
-  if (!modelFailure || final.reason === "error" || runtimeFallbackCandidates(record, failure.message).remaining.length > 0) {
+  const candidates = runtimeFallbackCandidates(record, failure.message, limits)
+  if (!modelFailure || final.reason === "error" || candidates.remaining.length > 0) {
     return { error_message: message, ...(failure.kind === "child-unresponsive" ? { failure_kind: failure.kind } : {}) }
   }
-  return { error_message: `${message}\n${describeExhaustedChain(record, [...(record.model_refusals ?? []), final])}`, failure_kind: MODEL_CHAIN_EXHAUSTED }
+  const skipped = candidates.skipped.map((model) => {
+    const spent = limits?.spentReason(model.provider, model.model_id)
+    return buildModelRefusal({
+      model: `${model.provider}/${model.model_id}`,
+      reason: spent === undefined ? final.reason : "usage_limit",
+      message: spent ?? failure.message,
+      at: record.updated_at,
+    })
+  })
+  const refusals = [...(record.model_refusals ?? []), final, ...skipped]
+  return { error_message: `${message}\n${describeExhaustedChain(record, refusals)}`, failure_kind: MODEL_CHAIN_EXHAUSTED }
 }
 
 export function describeExhaustedChain(record: Pick<TaskRecord, "category" | "agent_type">, refusals: readonly ModelRefusal[]): string {

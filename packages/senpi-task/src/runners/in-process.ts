@@ -56,6 +56,7 @@ export type DepthPolicy = {
 // Per-child construction spec. `model`, `authStorage`, `modelRegistry` reuse senpi's own option
 // types so the parent's auth/models resolve normally against the parent's real agentDir.
 export type ChildSpec = {
+  readonly onProviderRequest?: () => void
   readonly taskId: string
   readonly cwd: string
   // Isolated persistence dir for the child's JSONL transcript:

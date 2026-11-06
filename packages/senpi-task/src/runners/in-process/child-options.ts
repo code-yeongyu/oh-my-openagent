@@ -129,6 +129,7 @@ export function buildChildSessionOptions(input: BuildChildSessionOptionsInput): 
     cwd: spec.cwd,
     sessionManager,
     resourceLoader: createChildResourceLoader({
+      ...(spec.onProviderRequest === undefined ? {} : { onProviderRequest: spec.onProviderRequest }),
       cwd: spec.cwd,
       settingsManager,
       ...(spec.agentDir === undefined ? {} : { agentDir: spec.agentDir }),
