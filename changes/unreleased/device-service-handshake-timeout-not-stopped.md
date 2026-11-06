@@ -1,0 +1,1 @@
+Starting omo no longer reinstalls and restarts a running device service that is only slow to answer: on macOS and Linux a handshake timeout is retried once and then reported as degraded, instead of being treated as a stopped service.
