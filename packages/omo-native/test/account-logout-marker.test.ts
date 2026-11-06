@@ -54,7 +54,7 @@ function machine(initial: Credentials | null) {
     )
     return { code, out: out.map(line => JSON.parse(line) as Record<string, unknown>) }
   }
-  const session = createSession({ api, store, home })
+  const session = createSession({ api, store, home, beforeKeysDiscarded: async () => undefined })
   return { account, session, home, markerPath, markerAtClear, stop: () => server.stop(true) }
 }
 
