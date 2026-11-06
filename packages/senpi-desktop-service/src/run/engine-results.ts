@@ -243,7 +243,7 @@ function isDisposition(value: unknown): value is Disposition {
 	return matches(value, { delivery: "string", retry: "string" }) && DISPOSITIONS.has(`${value.delivery}/${value.retry}`);
 }
 
-export const isActionReport: Guard<ActionReport> = (value): value is ActionReport =>
+const isActionReport: Guard<ActionReport> = (value): value is ActionReport =>
 	matches(value, { effect: "string", focusRestoration: "string", route: "string?", note: "string?", warning: "string?" }) &&
 	isDisposition(value.disposition) &&
 	isStringArray(value.auditIds) &&
