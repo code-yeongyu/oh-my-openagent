@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
-import { ACCOUNT, createHarness, NATIVE_BUILD_BUDGET_MS, type Harness, isDarwin } from "./keychain-helper.test-support"
+import { ACCOUNT, createHarness, type Harness, isDarwin } from "./keychain-helper.test-support"
 
 const MAX_VALUE = 65_536
 const refused = (reason: string) => ({ error: "refused", reason })
@@ -16,11 +16,11 @@ describe.skipIf(!isDarwin)("omo-keychain helper refusals (#11262 design 1, Refus
 
   beforeAll(async () => {
     harness = await createHarness()
-  }, NATIVE_BUILD_BUDGET_MS)
+  })
 
   afterAll(async () => {
     await harness.dispose()
-  }, NATIVE_BUILD_BUDGET_MS)
+  })
 
   const cases: ReadonlyArray<readonly [string, object | string, string]> = [
     ["uppercase account", { v: 1, verb: "read", account: "A".repeat(64) }, "account"],

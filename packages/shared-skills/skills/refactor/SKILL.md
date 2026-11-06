@@ -724,7 +724,7 @@ While any team task is \`pending | claimed | in_progress\`:
     prompt=<files touched + verify-spec commands + instruction to return "PASS" or "FAIL:<failing test + specific error + suggested revert hunks>">
   )
   \`\`\`
-  If \`deep\` is unavailable, fall back to \`category="unspecified-high"\`. Do not create a commit checkpoint until the verifier returns PASS.
+  If \`deep-high\` is unavailable, fall back to \`category="unspecified-high"\`. Do not create a commit checkpoint until the verifier returns PASS.
 - On a verifier PASS: make the commit checkpoint for that step (see original 5.3). Proceed.
 - On a verifier FAIL: Lead decides:
   - **Retry with fix hint**: \`team_task_update(status=pending)\` on the original step + \`team_send_message(teamRunId=<id>, to=<original member>, summary="retry", body=<specific failure from verifier>)\`. Runtime reassigns.

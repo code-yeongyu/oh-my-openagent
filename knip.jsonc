@@ -67,7 +67,7 @@
       "packages/device-service-core/src/local-api/dacl.ts": ["CURRENT_USER_SID_SCRIPT"],
       "packages/device-service-core/src/local-api/limits.ts": ["LOCAL_JSON_EXPANSION_MAX"],
       "packages/device-service-core/src/local-api/transport.ts": ["readEndpointPort"],
-      "packages/device-service-core/src/local-api/validate-fields.ts": ["PATH_MAX_CHARS", "ENTRY_ID_MAX_BYTES", "NONCE_CHARS"],
+      "packages/device-service-core/src/local-api/validate-fields.ts": ["ENTRY_ID_MAX_BYTES", "NONCE_CHARS"],
       "packages/device-service-core/src/local-api/validate-shapes.ts": ["millis"],
       "packages/device-service-core/src/local-api/validate.ts": ["EVENT_KINDS"],
       "packages/device-service-core/src/local-api/vocabulary.ts": ["CLIENT_ERROR_CODES"],

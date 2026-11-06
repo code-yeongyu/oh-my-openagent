@@ -165,7 +165,7 @@ describe("LA7 correlation under interleaving", () => {
         return () => {};
       },
     });
-    const commanding = client.command("attach-1", { op: "abort" });
+    const commanding = client.command("attach-1", { type: "abort" });
     await commandSent;
     armed[armed.length - 1]?.();
     const failure = await rejectionOf(commanding);
@@ -198,7 +198,8 @@ describe("LA7 correlation under interleaving", () => {
     });
     const armedBeforeCommand = armed.length;
     const text = "x".repeat(LOCAL_INLINE_MAX);
-    const commanding = client.command("attach-1", { op: "prompt", text });
+    const rpc = { type: "prompt", message: text };
+    const commanding = client.command("attach-1", rpc);
     await heardPart;
     const partTimers = armed.slice(armedBeforeCommand);
     for (const expire of partTimers) expire();
@@ -207,7 +208,7 @@ describe("LA7 correlation under interleaving", () => {
     const sessionFrames = (await received)
       .map((message) => String(Reflect.get(Object(message), "type")))
       .filter((type) => type.startsWith("session."));
-    const expectedParts = uploadParts(text).length;
+    const expectedParts = uploadParts(JSON.stringify(rpc)).length;
     expect(expectedParts).toBeGreaterThan(1);
     expect(sessionFrames).toEqual(Array(expectedParts).fill("session.command_part"));
     expect(partTimers).toHaveLength(expectedParts);
