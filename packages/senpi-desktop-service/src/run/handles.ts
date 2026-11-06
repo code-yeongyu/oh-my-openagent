@@ -67,7 +67,7 @@ function menuItem({ title, path, enabled, checked, hasSubmenu, shortcut }: SdkMe
 }
 
 /** The run's `AxNode` shape (flat bounds) of an SDK node. */
-export function runAxNode(node: SdkAxNode): AxNode {
+function runAxNode(node: SdkAxNode): AxNode {
 	const { ref, role, nativeRole, title, value, description, enabled, focused, actions, childCount, bounds } = node;
 	return {
 		ref,
