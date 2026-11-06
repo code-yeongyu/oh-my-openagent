@@ -1,11 +1,11 @@
 import { type ChildProcess, spawn } from "node:child_process"
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
+import { copyFileSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { RpcHostRunner } from "../../runners/rpc-host"
 import { HostSessionClient } from "../../runners/rpc-host/session-client"
+import { shortSocketDir } from "../../runners/rpc-host/short-socket-dir.test-support"
 import { buildRpcSpawn } from "../../runners/rpc/spawn"
 import { RpcProcessRunner } from "../../runners/rpc-process"
 import { createRpcManagedRunner } from "../runner"
@@ -40,7 +40,10 @@ export async function startEngineRunner(kind: EngineRunnerKind, input: EngineInp
   const home = join(input.root, "home")
   const agentDir = engineAgentDir(input.root, kind)
   mkdirSync(home, { recursive: true })
-  mkdirSync(agentDir, { recursive: true })
+  // #12131: the senpi host refuses a group/other-writable agent dir
+  // (`key_publication_failed: unsafe_key_record`), so pin the mode explicitly
+  // instead of inheriting the process umask (0002 hosts failed 5/13).
+  mkdirSync(agentDir, { recursive: true, mode: 0o700 })
   const providers = startHttpProviders(input.scripts)
   copyFileSync(input.settingsPath, join(agentDir, "settings.json"))
   writeFileSync(join(agentDir, "models.json"), providers.modelsJson)
@@ -88,8 +91,7 @@ function processEngine(env: Readonly<Record<string, string>>): Engine {
 async function hostEngine(root: string, engineEnv: Readonly<Record<string, string>>): Promise<Engine> {
   // A socket host advertises `extension_events` (a capability omo requires of a task host) only for this client set.
   const env = { ...engineEnv, SENPI_RPC_CLIENT_CAPABILITIES: "extension_events" }
-  const socketDir = mkdtempSync(join(tmpdir(), "mch-"))
-  const socket = join(socketDir, "h.sock")
+  const { dir: socketDir, socket } = shortSocketDir("model-chain-host", "h.sock")
   const rpcEntry = fileURLToPath(import.meta.resolve("@code-yeongyu/senpi/rpc-entry"))
   const host = spawn(
     process.execPath,

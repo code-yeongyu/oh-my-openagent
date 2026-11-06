@@ -22,7 +22,7 @@ for (const code of notSentCodes) {
     const fetcher = spyOn(globalThis, "fetch").mockRejectedValueOnce(
       new TypeError("fetch failed", { cause: Object.assign(new Error("connection rejected"), { code }) }))
     onTestFinished(() => fetcher.mockRestore())
-    const session = createSession({ api, store, home: await temporaryHome() })
+    const session = createSession({ beforeKeysDiscarded: async () => undefined, api, store, home: await temporaryHome() })
     const error: unknown = await session.accessToken().catch(error => error)
     expect(error).toMatchObject({ notSent: true, retryable: true })
     expect(await store.read()).toEqual(persisted)
@@ -37,7 +37,7 @@ for (const code of ["ECONNRESET", "ETIMEDOUT"]) {
     await store.write(expired)
     const fetcher = spyOn(globalThis, "fetch").mockRejectedValueOnce(Object.assign(new Error("unknown phase"), { code }))
     onTestFinished(() => fetcher.mockRestore())
-    await expect(createSession({ api, store, home: await temporaryHome() }).accessToken()).rejects.toThrow()
+    await expect(createSession({ beforeKeysDiscarded: async () => undefined, api, store, home: await temporaryHome() }).accessToken()).rejects.toThrow()
     expect(await store.read()).toMatchObject({ ...expired, refreshState: "uncertain" })
   })
 }
@@ -47,7 +47,7 @@ for (const code of ["unauthorized", "account_deleted", "invalid_grant", "reauth_
     const api = fakeApi(() => refusal(code, undefined, code === "account_deleted" ? 410 : code === "invalid_grant" ? 400 : 401))
     const store = memorySecrets().store(api)
     await store.write(expired)
-    const error: unknown = await createSession({ api, store, home: await temporaryHome() }).accessToken().catch(error => error)
+    const error: unknown = await createSession({ beforeKeysDiscarded: async () => undefined, api, store, home: await temporaryHome() }).accessToken().catch(error => error)
     expect(error).toBeInstanceOf(SignInError)
     expect(await store.read()).toBeNull()
     for (const secret of [grant.accessToken, grant.refreshToken, ...Object.values(privateKeys)]) {
@@ -63,7 +63,7 @@ test("refresh 429 restores the original record and a later retry succeeds", asyn
   const store = memorySecrets().store(api)
   await store.write(expired)
   const persisted = await store.read()
-  const session = createSession({ api, store, home: await temporaryHome() })
+  const session = createSession({ beforeKeysDiscarded: async () => undefined, api, store, home: await temporaryHome() })
   const error: unknown = await session.accessToken().catch(error => error)
   expect(error).toMatchObject({ retryable: true })
   expect(await store.read()).toEqual(persisted)
@@ -85,11 +85,11 @@ test("failed legacy not-sent restoration retains the durable fence without inven
   onTestFinished(() => fetcher.mockRestore())
   const home = await temporaryHome()
   const time = clock()
-  await expect(createSession({ api, store, home, now: time.now }).accessToken()).rejects.toThrow()
+  await expect(createSession({ beforeKeysDiscarded: async () => undefined, api, store, home, now: time.now }).accessToken()).rejects.toThrow()
   const journal = await base.read()
   expect(journal).toMatchObject({ ...expired, refreshState: "uncertain" })
   await time.sleep(5_000)
-  await expect(createSession({ api, store: base, home, now: time.now }).accessToken()).rejects.toMatchObject({ code: "refresh_recovery_expired" })
+  await expect(createSession({ beforeKeysDiscarded: async () => undefined, api, store: base, home, now: time.now }).accessToken()).rejects.toMatchObject({ code: "refresh_recovery_expired" })
   expect(fetcher).toHaveBeenCalledTimes(1)
   expect(keys).toEqual([])
   expect(writes).toBe(2)
@@ -119,7 +119,7 @@ for (const outcome of ["approved", "refresh-refused", "revoke-refused", "save-fa
       if (outcome === "save-failed" && value.refreshToken === "new-refresh") throw new SignInError("OS store unavailable")
       await base.write(value)
     } }
-    expect(await createSession({ api, store, home: await temporaryHome() }).logout()).toBe(outcome === "approved")
+    expect(await createSession({ beforeKeysDiscarded: async () => undefined, api, store, home: await temporaryHome() }).logout()).toBe(outcome === "approved")
     expect(await base.read()).toBeNull()
     expect(calls).toEqual(outcome === "uncertain" ? []
       : ["POST /v1/session/refresh", ...(["refresh-refused", "save-failed"].includes(outcome) ? [] : ["DELETE /v1/devices/device-1"])])

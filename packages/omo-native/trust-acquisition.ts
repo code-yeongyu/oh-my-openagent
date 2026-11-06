@@ -9,12 +9,16 @@ import { decodeMacTrustHelperOutput } from "./macos-trust-helper"
 import { readDefaultFileCandidates } from "./openssl-default-file"
 import { selectOpenSslHashDirectory } from "./openssl-hash-dir"
 import { decodeWindowsTrustHelperOutput, encodeBundledRootsForHelper, windowsTrustHelperEnvironment } from "./windows-trust-helper"
-import type { FallbackReason, TrustDiagnosticEntry } from "./trust-diagnostics"
+import type { DefaultFileDropEntry, FallbackReason, TrustDiagnosticEntry } from "./trust-diagnostics"
 
+/** 4.4 item 6: the one OpenSSL default-file drop of a generation, as `trust ensure --json` reports it. */
+export type DefaultFileDrop = DefaultFileDropEntry
 export interface TrustAcquisition {
   readonly certificates: readonly string[]
   readonly fallbackReason: FallbackReason | null
   readonly codes: readonly TrustDiagnosticEntry[]
+  /** Present only when macOS acquisition dropped the default file under Bun's whole-file rule. */
+  readonly defaultFileDrop?: DefaultFileDrop
 }
 export interface TrustAcquisitionOptions {
   readonly deadlineMs: number
@@ -154,12 +158,16 @@ async function native(options: TrustAcquisitionOptions, signal: AbortSignal): Pr
     der.set(fact.sha256, cert.raw)
     certificates.push({ ...fact, source, settings: { user: null, admin: null, system: null } })
   }
+  let defaultFileDrop: DefaultFileDrop | undefined
   const file = await readLinuxBundle("/etc/ssl/cert.pem", fs)
   if (file.kind === "success") {
     const parsed = readDefaultFileCandidates(file.bytes, () => false)
     if (parsed.kind === "kept") {
       for (const { der: bytes } of parsed.certificates) add(new X509Certificate(bytes), "openssl-default-file")
-    } else codes.push({ code: "openssl-default-file-malformed" }, { code: parsed.cause })
+    } else {
+      defaultFileDrop = { code: "openssl-default-file-malformed", file: "/etc/ssl/cert.pem", cause: parsed.cause, blockIndex: parsed.blockIndex, narrowing: parsed.narrowing }
+      codes.push(defaultFileDrop)
+    }
   } else codes.push({ code: "openssl-default-file-malformed" })
   if (signal.aborted) return fallback("helper-timeout")
   const directory = "/etc/ssl/certs"
@@ -179,7 +187,8 @@ async function native(options: TrustAcquisitionOptions, signal: AbortSignal): Pr
     der.set(fact.sha256, cert.raw)
     allowed.push({ ...fact, source: "openssl-default-dir", settings: { user: null, admin: null, system: null } })
   }
-  return selected({ ...facts, certificates: allowed }, der, codes)
+  const result = selected({ ...facts, certificates: allowed }, der, codes)
+  return defaultFileDrop === undefined ? result : { ...result, defaultFileDrop }
 }
 
 /** A timeout discards all automatic output; a late source can never publish a partial generation. */

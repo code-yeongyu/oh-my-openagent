@@ -38,18 +38,20 @@ function longActiveRecord(): TaskRecord {
 }
 
 describe("buildWidgetRows", () => {
-  it("#given active and completed records #when selecting rows #then only resident team members follow active rows before the cap", () => {
+  it("#given completed records beside a running record #when building rows #then completed records leave the widget and the running one stays", () => {
+    // given completed members whose handles are still resident (revivable), an ordinary completed task, and a running member
     const alpha = record({ task_id: "st_alpha", name: "team:12345678-1234-1234-1234-123456789abc:alpha", task_summary: "settled alpha", status: "completed" })
     const beta = record({ task_id: "st_beta", name: "team:12345678-1234-1234-1234-123456789abc:beta", task_summary: "settled beta", status: "completed" })
     const ordinary = record({ task_id: "st_ordinary", task_summary: "ordinary task", status: "completed" })
-    const stale = record({ task_id: "st_stale", name: "team:12345678-1234-1234-1234-123456789abc:stale", task_summary: "stale member", status: "completed" })
-    const active = Array.from({ length: 4 }, (_value, index) => record({ task_id: `st_${index}`, status: "running" }))
-    const rows = buildWidgetRows([alpha, ordinary, stale, ...active, beta], new Set([alpha.task_id, beta.task_id, ordinary.task_id]))
-    expect(rows.slice(0, 4).every((row) => row.includes("running"))).toBe(true)
-    expect(rows[4]).toContain("settled alpha")
-    expect(rows[4]).toContain("completed")
-    expect(rows[5]).toBe("+1 more")
-    expect(rows.join("\n")).not.toMatch(/ordinary task|stale member/u)
+    const gamma = record({ task_id: "st_gamma", name: "team:12345678-1234-1234-1234-123456789abc:gamma", task_summary: "working gamma", status: "running" })
+
+    // when
+    const rows = buildWidgetRows([alpha, ordinary, gamma, beta])
+
+    // then completed work leaves the live widget; the running member stays
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toContain("working gamma")
+    expect(rows.join("\n")).not.toMatch(/settled alpha|settled beta|ordinary task|completed/u)
   })
 
   it("#given an active task #when building a row #then useful identity and execution context remain", () => {
@@ -147,6 +149,32 @@ describe("backgroundWidgetRows", () => {
     expect(row).toContain("category:unspec")
     expect(row).toContain("running")
     expect(row).toEndWith("1m 0s")
+  })
+})
+
+describe("run-paused children", () => {
+  it("#given a resident child held by its run's Stop #when rendering the live footer #then it reads paused with a still mark and no climbing clock", () => {
+    // given a child the parent's Stop paused hours after it was created, with no run stats yet
+    const paused = record({
+      task_id: "st_paused", task_summary: "held child", status: "paused", residency_state: "resident", execution_mode: "process",
+      category: "unspecified-high", created_at: "2026-11-03T00:02:45.000Z",
+      run_pause: { parent_session_id: "session-a", parent_pause_seq: 16, run_ref: { kind: "task", id: "st_paused" } },
+    })
+    const now = Date.parse("2026-11-03T05:54:45.000Z")
+
+    // when the footer renders it without live activity, with and without stats
+    const rows = [
+      ...backgroundWidgetRows([paused], new Map(), now, undefined, 220),
+      ...backgroundWidgetRows([paused], new Map(), now, () => ({ runtime_ms: 0, turns: 0, tool_calls: 0 }), 220),
+      ...backgroundWidgetRows([paused], new Map([["st_paused", "running"]]), now, undefined, 220),
+    ]
+
+    // then each row names the pause, never claims motion, and shows no elapsed time since creation
+    for (const row of rows) {
+      expect(row).toStartWith("‖ ")
+      expect(row).toContain("paused")
+      expect(row).not.toMatch(/starting|running|352m/u)
+    }
   })
 })
 
@@ -248,7 +276,7 @@ describe("automatic recovery residency labeling", () => {
 
     // when the full and compact rows render
     const full = formatTaskRow(finished)
-    const compact = buildWidgetRows([finished], new Set(["st_done"]))[0] ?? ""
+    const compact = buildWidgetRows([finished])[0] ?? ""
 
     // then neither calls it suspended
     expect(full).toContain(`status:${status}`)

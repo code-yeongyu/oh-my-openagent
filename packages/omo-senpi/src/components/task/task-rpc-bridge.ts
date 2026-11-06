@@ -60,6 +60,7 @@ export interface TaskRpcBridge {
   sync(): void
   resend(): void
   detach(): void
+  forgetOutputReads(sessionId: string): void
   dispose(): void
 }
 
@@ -192,7 +193,9 @@ export function wireTaskRpcBridge(
     emit(snapshotData(sessionId, selection))
   }
 
-  registerTaskHandlers(pi, engine, () => (disposed ? undefined : activeSessionId), snapshotData)
+  const forgetOutputReads = registerTaskHandlers(
+    pi, engine, () => (disposed ? undefined : activeSessionId), snapshotData,
+  )
 
   return {
     attach() {
@@ -209,6 +212,7 @@ export function wireTaskRpcBridge(
       sync()
     },
     detach,
+    forgetOutputReads,
     dispose() {
       if (disposed) return
       disposed = true
@@ -226,9 +230,16 @@ function registerTaskHandlers(
     readonly tasks: readonly unknown[]
     readonly truncated_tasks?: number
   },
-): void {
+): (sessionId: string) => void {
   const handle = pi.rpc?.handle
-  if (handle === undefined) return
+  const statusReads = new Map<string, string>()
+  const forgetSession = (sessionId: string): void => {
+    for (const key of statusReads.keys()) {
+      const parsed: unknown = JSON.parse(key)
+      if (Array.isArray(parsed) && parsed[0] === sessionId) statusReads.delete(key)
+    }
+  }
+  if (handle === undefined) return forgetSession
   handle("omo.task.list", async (data) => {
     const sessionId = currentSessionId()
     if (sessionId === undefined) return unavailable()
@@ -261,9 +272,10 @@ function registerTaskHandlers(
     const input = parseTaskOutput(data)
     if ("error" in input) return invalidArguments(input.error)
     return boundedTaskOutput((
-      await runTaskOutput({ manager: engine.manager, stateDir: engine.stateDir }, input.value, sessionId)
+      await runTaskOutput({ manager: engine.manager, stateDir: engine.stateDir }, input.value, sessionId, statusReads)
     ).details)
   })
+  return forgetSession
 }
 
 function isLive(record: TaskRecord): boolean {

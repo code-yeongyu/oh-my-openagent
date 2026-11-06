@@ -25,13 +25,13 @@
 mcporter call 'exa.web_search_exa(query: "query", numResults: 5)'
 
 # 通用网页阅读
-curl -s "https://r.jina.ai/URL"
+curl -s -H "Authorization: Bearer ${JINA_API_KEY}" "https://r.jina.ai/URL"
 
 # GitHub 搜索
 gh search repos "query" --sort stars --limit 10
 
 # Twitter 搜索
-twitter search "query" --limit 10
+twitter search "query" -n 10
 
 # YouTube/B站字幕
 yt-dlp --write-sub --skip-download -o "/tmp/%(id)s" "URL"
