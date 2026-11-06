@@ -14,7 +14,7 @@ const NAME = "h.sock"
 const LEAF_BYTES = Buffer.byteLength("s0000-XXXXXX")
 
 describe.skipIf(process.platform === "win32")("short engine socket dir (#12557)", () => {
-  const root = mkdtempSync("/tmp/omo-sk-")
+  const root = process.platform === "win32" ? "" : mkdtempSync("/tmp/omo-sk-")
   afterAll(() => rmSync(root, { recursive: true, force: true }))
   const base = (...parts: string[]): string => {
     const dir = join(root, ...parts)
