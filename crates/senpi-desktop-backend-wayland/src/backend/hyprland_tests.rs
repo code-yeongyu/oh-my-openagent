@@ -3,12 +3,15 @@
 
 use std::os::unix::net::UnixListener;
 
+use image::{Rgba, RgbaImage};
 use senpi_desktop_core::backend::{Backend, DeliveryMode, Modifiers, MouseButton, PointerEvent};
 use senpi_desktop_core::error::ErrorCode;
-use senpi_desktop_core::types::{Target, WindowInput};
+use senpi_desktop_core::types::{DesktopDisplay, Target, WindowInput};
 
 use super::tests::{backend_without_services, FR};
+use super::unplaced_frame;
 use crate::capture::layout::EisRegion;
+use crate::capture::pipewire::crop_window;
 use crate::compositor::hyprland::tests::{serve, window, CLIENTS, MONITORS};
 use crate::compositor::hyprland::{detect_from, Detection};
 use crate::test_support::fake_eis::{EisConfig, FakeEis, Recorded};
@@ -131,6 +134,121 @@ fn a_window_click_lands_at_the_hyprland_geometry_through_libei() {
         log.events.first(),
         Some(&Recorded::Motion { x: 110.0, y: 68.0 })
     );
+}
+
+/// One 1280x1080 monitor at scale 1, ScreenCast-shaped.
+fn monitor() -> DesktopDisplay {
+    DesktopDisplay {
+        id: "pipewire-0".to_owned(),
+        name: "DP-1".to_owned(),
+        x: 0,
+        y: 0,
+        width: 1280,
+        height: 1080,
+        scale: 1.0,
+        pixel_x: 0,
+        pixel_y: 0,
+        pixel_width: 1280,
+        pixel_height: 1080,
+        is_primary: true,
+    }
+}
+
+#[test]
+fn a_window_frame_and_its_click_agree_on_the_hyprland_rect() {
+    // Given: AT-SPI says the terminal (pid 1201) is at (0, 0); Hyprland places it at (10, 48),
+    // and the composite marks the pixel Hyprland shows at (10 + 100, 48 + 20)
+    let _env = env_lock();
+    let runtime = tempfile::tempdir().expect("runtime dir");
+    let ipc = serve(
+        runtime.path(),
+        "sig",
+        vec![
+            ("j/clients", CLIENTS),
+            ("j/monitors", MONITORS),
+            ("j/clients", CLIENTS),
+            ("j/monitors", MONITORS),
+        ],
+    );
+    let Detection::Ipc(hyprland) = hyprland_at(&runtime) else {
+        panic!("socket not detected");
+    };
+    let socket = runtime.path().join("eis-0");
+    let eis = FakeEis::listen_with_regions(
+        UnixListener::bind(&socket).expect("bind fake libei socket"),
+        EisConfig {
+            keymap: FR,
+            group: 0,
+        },
+        vec![DP1],
+    );
+    let _libei = LibeiSocketEnv::set(Some(&socket));
+    let atspi = window(Some(1201), "~");
+    let (px, py) = (100_u32, 20_u32);
+    let mark = Rgba([255, 0, 0, 255]);
+    let mut composite = RgbaImage::new(1280, 1080);
+    composite.put_pixel(10 + px, 48 + py, mark);
+
+    // When: the window is captured (placed, then cropped), then clicked at pixel (px, py)
+    let (windows, unplaced) = hyprland.place_in(vec![atspi.clone()], &atspi.id);
+    let (image, frame) =
+        crop_window(&composite, &[monitor()], windows, &atspi.id).expect("window cropped");
+    let (x, y) = frame
+        .map_point(f64::from(px), f64::from(py), Some(&atspi))
+        .expect("pixel maps");
+    let mut backend = backend_without_services();
+    let clicked = backend.hyprland_pointer(&hyprland, &atspi, click(x, y));
+
+    // Then: the frame is cropped at the Hyprland rect, and the click lands on the pixel it shows
+    assert!(unplaced.is_none(), "{unplaced:?}");
+    assert_eq!(image.dimensions(), (1260, 1012));
+    assert_eq!(*image.get_pixel(px, py), mark, "frame pixel (px, py) is Hyprland at + (px, py)");
+    assert_eq!(
+        frame.map_to_pixel(110.0, 68.0),
+        Ok((f64::from(px), f64::from(py))),
+        "the frame's logical origin is the Hyprland rect"
+    );
+    assert_eq!(clicked, Ok(()));
+    assert_eq!(
+        ipc.join().expect("ipc server"),
+        ["j/clients", "j/monitors", "j/clients", "j/monitors"],
+        "one clients + monitors read for the capture, one for the click"
+    );
+    let log = eis.wait_for(|log| log.bursts >= 1);
+    assert_eq!(
+        log.events.first(),
+        Some(&Recorded::Motion { x: 110.0, y: 68.0 })
+    );
+}
+
+#[test]
+fn a_window_hyprland_cannot_place_gets_a_frame_that_refuses_pointer_input() {
+    // Given: the accessibility tree reports no pid for the window
+    let _env = env_lock();
+    let runtime = tempfile::tempdir().expect("runtime dir");
+    let _ipc = serve(
+        runtime.path(),
+        "sig",
+        vec![("j/clients", CLIENTS), ("j/monitors", MONITORS)],
+    );
+    let Detection::Ipc(hyprland) = hyprland_at(&runtime) else {
+        panic!("socket not detected");
+    };
+    let atspi = window(None, "~");
+
+    // When
+    let (windows, unplaced) = hyprland.place_in(vec![atspi.clone()], &atspi.id);
+    let error = unplaced.expect("an unplaced window is reported");
+    let (image, _) = crop_window(&RgbaImage::new(1280, 1080), &[monitor()], windows.clone(), &atspi.id)
+        .expect("cropped at the AT-SPI bounds");
+    let (_, frame) = unplaced_frame(image, &error);
+
+    // Then: the window keeps its AT-SPI bounds and no pixel of its frame maps to input
+    assert_eq!(windows.as_slice(), std::slice::from_ref(&atspi));
+    assert!(error.message.contains("hyprland-window-unresolved"), "{}", error.message);
+    let refused = frame.map_point(100.0, 20.0, Some(&atspi)).expect_err("pixels only");
+    assert_eq!(refused.code, ErrorCode::InvalidCoordinateFrame);
+    assert!(refused.message.contains("Hyprland could not place"), "{}", refused.message);
 }
 
 #[test]
