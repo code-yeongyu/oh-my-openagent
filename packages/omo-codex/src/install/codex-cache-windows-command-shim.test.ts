@@ -68,3 +68,48 @@ for (const config of ["quoted-node-path", "without-node-path", "missing-config"]
     }
   }, 30_000)
 }
+
+test("generated Windows toolkit wrapper forwards ulw-loop arguments once and returns the ulw-loop exit code", async () => {
+  if (process.platform !== "win32") return
+
+  const root = await mkdtemp(join(tmpdir(), "omo windows toolkit ulw-loop "))
+  try {
+    const codexHome = join(root, "codex")
+    const binDir = join(codexHome, "bin")
+    const repoRoot = join(root, "repo")
+    const pluginRoot = join(root, "plugin")
+    await mkdir(codexHome, { recursive: true })
+    await mkdir(join(repoRoot, "dist", "cli"), { recursive: true })
+    await mkdir(pluginRoot, { recursive: true })
+    await writeFile(join(repoRoot, "dist", "cli", "index.js"), "process.exit(99)\n")
+    await writeFile(join(pluginRoot, "ulw-loop.cjs"), "console.log(JSON.stringify(process.argv.slice(2)))\nprocess.exit(7)\n")
+    await writeFile(join(pluginRoot, "package.json"), JSON.stringify({
+      name: "windows-toolkit-ulw-loop-fixture",
+      bin: { "omo-ulw-loop": "ulw-loop.cjs" },
+    }))
+    const runtime = await linkRootRuntimeBin({ repoRoot, binDir, codexHome, platform: "win32" })
+    if (runtime === null) throw new Error("expected generated runtime wrapper")
+    await linkCachedPluginBins({ pluginRoot, binDir, platform: "win32" })
+
+    const child = Bun.spawn(["cmd.exe", "/d", "/c", `${runtime.name}.cmd`, "ulw-loop", "status", "--session-id", "s1", "--json"], {
+      cwd: binDir,
+      env: { ...process.env, CODEX_HOME: codexHome },
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+    const [stdout, stderr, exitCode] = await Promise.all([
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+      child.exited,
+    ])
+
+    expect({ argv: JSON.parse(stdout.trim()), exitCode, stderr }).toEqual({
+      argv: ["ulw-loop", "status", "--session-id", "s1", "--json"],
+      exitCode: 7,
+      stderr: "",
+    })
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+}, 30_000)
+

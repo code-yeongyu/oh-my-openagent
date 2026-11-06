@@ -71,11 +71,9 @@ export function windowsRuntimeWrapper(
     `set "OMO_INVOCATION_NAME=${binName}"`,
     'set "OMO_EDITION=codex"',
     ...windowsNodeDiscoveryLines(),
-    `if "%~1"=="ulw-loop" if exist "${ulwLoopBin}" (`,
-    "  shift /1",
-    `  "${ulwLoopBin}" ulw-loop %*`,
-    "  exit /b %ERRORLEVEL%",
-    ")",
+    // %* still starts with ulw-loop (shift never changes %*), so it is forwarded as is. A batch
+    // started without call never returns, so it stays on one line: no parsed exit may follow it.
+    `if "%~1"=="ulw-loop" if exist "${ulwLoopBin}" "${ulwLoopBin}" %*`,
     `if "%OMO_RUNTIME%"=="node" if defined OMO_NODE_BINARY if exist "${nodeCliPath}" (`,
     `  "%OMO_NODE_BINARY%" "${nodeCliPath}" %*`,
     "  exit /b %ERRORLEVEL%",
