@@ -25,6 +25,7 @@ function scriptedClient() {
       return () => listeners.delete(listener)
     },
     command: async () => "c",
+    endpointCommand: async () => "c",
     list: async () => ({ query_id: "q", revision: 0, rows: [], incomplete: [], devices: {} }),
     read: async () => ({ entries: [], next_before: null }),
     oversizedLines: () => 0,

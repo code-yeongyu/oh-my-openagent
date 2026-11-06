@@ -1,16 +1,16 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { ACCOUNT, createHarness, NATIVE_BUILD_BUDGET_MS, type Harness, isDarwin, readLine } from "./keychain-helper.test-support"
+import { ACCOUNT, createHarness, type Harness, isDarwin, readLine } from "./keychain-helper.test-support"
 
 describe.skipIf(!isDarwin)("omo-keychain helper session: EOF watcher, signals, locked keychain (#11262 design 2, 3.6)", () => {
   let harness: Harness
 
   beforeAll(async () => {
     harness = await createHarness()
-  }, NATIVE_BUILD_BUDGET_MS)
+  })
 
   afterAll(async () => {
     await harness.dispose()
-  }, NATIVE_BUILD_BUDGET_MS)
+  })
 
   const spawnHeld = async (request: object) => {
     const child = Bun.spawn([harness.helper, "--keychain", harness.keychain, "--no-ui", "--hold-before-reply"], {

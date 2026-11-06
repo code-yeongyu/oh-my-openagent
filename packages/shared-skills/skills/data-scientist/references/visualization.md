@@ -1,7 +1,11 @@
 # Visualization
 
-A chart exists to answer a question at a glance. Render it with matplotlib (resident in most
-Python kernels; `uv run --with matplotlib` otherwise), then look at it before delivering —
+A chart exists to answer a question at a glance. A chart shown inline beside a reply
+(`show_html_page`, `html_preview`, `html_render`) is drawn in HTML, never as a matplotlib PNG:
+an image ignores the reader's theme and width. When the `visualize` skill is available, it builds
+that page. There this file's chart-type table, Figures and Quality bar apply, and the matplotlib
+calls do not. Everywhere else (a kernel, a file, a document) render it with matplotlib (resident
+in most Python kernels; `uv run --with matplotlib` otherwise). Either way, look at it before delivering —
 a chart nobody inspected is not evidence.
 
 ## When to chart
@@ -21,6 +25,15 @@ question — decoration dilutes the answer.
 | Is X related to Y? | scatter; add a trend line only when it aids the eye |
 | Composition of a whole? | stacked or 100% bar — pie only for four or fewer slices |
 | Many series over time? | small multiples over one spaghetti chart |
+
+## Figures — every chart
+
+- **Days start at the reader's midnight.** Cut daily, weekly and monthly buckets in the
+  reader's time zone, not UTC, and name the zone in the axis label or caption. A bucket still
+  filling (today, this week) is marked partial on its own bar, or it reads as a drop.
+- **Cross-check one figure.** Recompute a headline number from a second source (another
+  table, the system's own dashboard, a raw count) and say beside the chart whether it
+  matched, and by how much it differed if not.
 
 ## Quality bar — every chart
 
@@ -51,8 +64,10 @@ matplotlib.rcParams["axes.unicode_minus"] = False   # keeps the minus sign rende
 
 ## Output contract
 
-1. Save a PNG next to the work: `plt.savefig(path, dpi=150, bbox_inches="tight")`.
-2. Also render inline when the surface displays rich output (kernels usually do).
+1. Inline page beside a reply: no PNG. Draw the computed figures in HTML and preview them in
+   both themes, following the `visualize` skill when it is available.
+2. Otherwise save a PNG next to the work: `plt.savefig(path, dpi=150, bbox_inches="tight")`,
+   and also render it inline when the surface displays rich output (kernels usually do).
 3. Report the file path together with the answer.
 
 ## Visual QA — mandatory

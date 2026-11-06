@@ -11,6 +11,7 @@ import {
   SecretServiceUnavailableError,
 } from "../omo-opencode/src/cli/service-auth/keystore"
 import { type Credentials, credentialSchema, serviceOrigin, SignInError } from "../omo-opencode/src/cli/service-auth/protocol"
+import { registerHelperCandidates } from "../omo-opencode/src/cli/service-auth/keychain-helper/darwin-backend"
 import { type BeforeKeysDiscarded, createSession, discardedOf, type Session, SessionEnded } from "../omo-opencode/src/cli/service-auth/session"
 import { retireSyncPinOnDiscard } from "../omo-opencode/src/cli/service-auth/sync-pin-retire"
 import { retireSyncDevice } from "../memory-core/src/sync/device-retire"
@@ -227,7 +228,8 @@ export async function runAccountVerb(dependencies: AccountCommandDependencies, a
   }
 }
 
-export async function runAccountCommand(args: readonly string[]): Promise<void> {
+export async function runAccountCommand(args: readonly string[], options: { readonly helperCandidates?: readonly string[] } = {}): Promise<void> {
+  registerHelperCandidates(options.helperCandidates ?? [])
   const api = serviceOrigin(process.env.OMO_SERVICE_API_URL ?? "https://api.omo.dev")
   // One store per command: its keyring check and fallback notice are per store (#10658 review).
   let store: CredentialStore | undefined
