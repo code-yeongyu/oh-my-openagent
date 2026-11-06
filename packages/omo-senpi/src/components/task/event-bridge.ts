@@ -17,10 +17,13 @@ import { isRunHoldChange, type EngineRunPauseBridge } from "./run-pause-bridge"
 export const TASK_USAGE_HINT_FLAG = "omo-task-usage-hint"
 
 type EventBridgeState = {
-  readonly runPause?: Pick<EngineRunPauseBridge, "restore" | "reconciled" | "changed">
+  readonly runPause?: Pick<EngineRunPauseBridge, "restore" | "reconciled" | "changed" | "releaseStale">
   readonly reconcileTeamMailbox: () => Promise<void>
   readonly leadPollers: Pick<LeadPollerLifecycle, "tick" | "shutdown">
   readonly resumptionChannels: Pick<ResumptionChannelEmitter, "emitSessionStart" | "emitShutdown">
+  // Accepted compaction invalidates the task_output progress cache: the first peek after a
+  // compact must reissue the full snapshot so a rehydrated session can still read final_response.
+  readonly forgetTaskOutputReads?: (sessionId: string) => void
   // Live DAG runs veto a reload alongside running children: a reload pauses them mid-flight.
   readonly dagReloadSource?: ReloadGuardDagSource
 }
@@ -182,9 +185,14 @@ export function wireEventBridge(
     transitions.onBeforeCompact(engine.runtime.sessionId())
   })
 
-  pi.on("session_compact", (_payload, eventCtx) => {
+  pi.on("session_compact", (payload, eventCtx) => {
     engine.runtime.captureFrom(asLiveContext(eventCtx))
-    transitions.onCompact(engine.runtime.sessionId())
+    const sessionId = engine.runtime.sessionId()
+    if (isAcceptedCompaction(payload) && sessionId !== undefined) {
+      state.forgetTaskOutputReads?.(sessionId)
+      taskRpc.forgetOutputReads(sessionId)
+    }
+    transitions.onCompact(sessionId)
     statusUi.scheduleSync()
   })
 
@@ -273,8 +281,18 @@ export function wireEventBridge(
   pi.on("before_agent_start", (payload, eventCtx) => {
     if (isPreview(payload)) return undefined
     engine.runtime.captureFrom(asLiveContext(eventCtx))
+    const liveSessionId = engine.runtime.sessionId()
+    // Every real turn (person, extension or delivery) re-checks the run's Stop against the engine's live
+    // ledger, which is what proves a Stop the bridge missed was released. The release resumes children,
+    // which can take as long as their resume turns, so it runs in the background and never holds the turn;
+    // a failure is logged.
+    if (runPause !== undefined && liveSessionId !== undefined) {
+      void runPause.releaseStale(liveSessionId).catch((error: unknown) => {
+        ctx.logger.warn("omo-senpi task stale run Stop release failed", { error: String(error) })
+      })
+    }
     if (ctx.config.getFlag(TASK_USAGE_HINT_FLAG) === false) return undefined
-    const sessionId = engine.runtime.sessionId() ?? "unknown-session"
+    const sessionId = liveSessionId ?? "unknown-session"
     if (!guidanceGuard(sessionId)) return undefined
     pi.sendMessage(
       { customType: "senpi-task.usage", content: TASK_USAGE_GUIDANCE, display: false, details: {} },
@@ -315,4 +333,8 @@ function isLiveContext(value: unknown): value is LiveTaskContext {
 
 function isPreview(value: unknown): boolean {
   return typeof value === "object" && value !== null && "preview" in value && value.preview === true
+}
+
+function isAcceptedCompaction(payload: unknown): boolean {
+  return typeof payload === "object" && payload !== null && "accepted" in payload && payload.accepted === true
 }
