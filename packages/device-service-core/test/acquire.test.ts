@@ -4,7 +4,6 @@ import { sign } from "node:crypto"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import corpus from "../src/strict-ed25519/strict-ed25519-corpus.json"
-import { strictEd25519Key } from "../src/strict-ed25519/strict-ed25519.ts"
 import {
   acquireDeviceService,
   type AcquireOptions,
@@ -124,10 +123,12 @@ describe("verified acquisition of the device service", () => {
   })
 
   test("the compiled-in key set is the service's release-key.json parsed strictly: the minted operational and recovery keys, both strict, so acquisition goes past the key check", async () => {
-    const committed = JSON.parse(readFileSync(join(import.meta.dir, "../src/release/release-key.json"), "utf8"))
-    expect(DEVICE_SERVICE_RELEASE_KEYS).toEqual(committed.public_keys_hex)
-    expect(DEVICE_SERVICE_RELEASE_KEYS).toHaveLength(2)
-    expect(DEVICE_SERVICE_RELEASE_KEYS.every(hex => strictEd25519Key(bytes(hex)))).toBe(true)
+    // #12580 item 1: the published set, in order. Comparing against the same release-key.json it is parsed from passed
+    // for any other two strict keys and for a swap, so the check has to name the two hex values themselves.
+    expect(DEVICE_SERVICE_RELEASE_KEYS).toEqual([
+      "6c6781a91888e3e5be10d1b27466319a7d5adf2a7d2b254f4118eda9cbcb4465",
+      "ca9407b484a30ac7f09cb152455176f1e03fc6ca3446ff930bc7587215759016",
+    ])
     const state = stateDir()
     const served = serveRelease(new Map())
     const { releaseKeys: _unused, ...defaults } = options(state, served, "")
