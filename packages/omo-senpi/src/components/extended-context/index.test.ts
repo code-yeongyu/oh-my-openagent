@@ -101,12 +101,12 @@ describe("models.json overrides", () => {
     })
   })
 
-  it("#given a provider whose only override was the window #when cleared #then the provider entry is removed", () => {
+  it("#given a provider whose only override was the window #when cleared #then the provider is dropped and providers stays", () => {
     const { config } = clearContextWindowOverrides(
       { providers: { "chatgpt-subscription": { modelOverrides: { "gpt-6.1-sol": { contextWindow: 744_000 } } } } },
       "chatgpt-subscription",
     )
-    expect(config.providers).toBeUndefined()
+    expect(config).toEqual({ providers: {} })
   })
 })
 

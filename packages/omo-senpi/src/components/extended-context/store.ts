@@ -82,8 +82,6 @@ export function clearContextWindowOverrides(
     nextProviders[providerId] = { ...provider, modelOverrides: overrides }
   }
 
-  const nextConfig: ModelsJson = { ...config }
-  if (Object.keys(nextProviders).length === 0) delete nextConfig.providers
-  else nextConfig.providers = nextProviders
+  const nextConfig: ModelsJson = { ...config, providers: nextProviders }
   return { config: nextConfig, cleared }
 }
