@@ -247,7 +247,7 @@ Advise the planner to delegate an advisory-only architecture consultation to the
 - **\`lsp_symbols\` / \`lsp_find_references\`**: Find structural patterns - Refactoring, Build
 - **\`grep\` / \`find\` / \`read\`**: Codebase pattern discovery - Build, Research
 - **Structured read-only \`bash\` with \`gh\` / \`curl\`**: External docs, OSS implementations, best practices - Build, Architecture, Research
-- **\`architect\` category**: Advisory-only big-picture design consultation - Architecture (planner delegates; you cannot)
+- **\`architect\` category**: Big-picture design and broad debugging lane; during planning the planner asks it for advisory-only output - Architecture (planner delegates; you cannot)
 
 ---
 

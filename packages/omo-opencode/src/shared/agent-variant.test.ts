@@ -41,7 +41,7 @@ describe("resolveAgentVariant", () => {
         sisyphus: { category: "ultrabrain" },
       },
       categories: {
-        ultrabrain: { model: "openai/gpt-5.5", reasoning: "high", variant: "high" },
+        ultrabrain: { model: "openai/gpt-5.5", reasoning: "high", variant: "xhigh" },
       },
     } as OhMyOpenCodeConfig
 
@@ -214,7 +214,7 @@ describe("resolveVariantForModel", () => {
     expect(variant).toBe("max")
   })
 
-  test("returns high for Hephaestus's openai gpt-5.6-sol rung", () => {
+  test("returns medium for Hephaestus's openai gpt-5.6-sol rung", () => {
     // given
     const config = {} as OhMyOpenCodeConfig
     const model = { providerID: "openai", modelID: "gpt-5.6-sol" }
@@ -223,7 +223,7 @@ describe("resolveVariantForModel", () => {
     const variant = resolveVariantForModel(config, "hephaestus", model)
 
     // then
-    expect(variant).toBe("high")
+    expect(variant).toBe("medium")
   })
 
   test("returns undefined for gpt-5.5 after its sisyphus rung is removed", () => {
@@ -281,7 +281,7 @@ describe("resolveVariantForModel", () => {
         "custom-agent": { category: "ultrabrain" },
       },
       categories: {
-        ultrabrain: { reasoning: "high" },
+        ultrabrain: { reasoning: "medium" },
       },
     } as OhMyOpenCodeConfig
     const model = { providerID: "openai", modelID: "gpt-5.6-sol" }
@@ -290,7 +290,7 @@ describe("resolveVariantForModel", () => {
     const variant = resolveVariantForModel(config, "custom-agent", model)
 
     // then
-    expect(variant).toBe("high")
+    expect(variant).toBe("medium")
   })
 
   test("falls back to category chain when no configured reasoning or variant exists", () => {
@@ -309,7 +309,7 @@ describe("resolveVariantForModel", () => {
     expect(variant).toBe("max")
   })
 
-  test("returns high for oracle's openai GPT-5.6 Sol primary", () => {
+  test("returns xhigh for oracle's openai GPT-5.6 Sol primary", () => {
     // given
     const config = {} as OhMyOpenCodeConfig
     const model = { providerID: "openai", modelID: "gpt-5.6-sol" }
@@ -318,7 +318,7 @@ describe("resolveVariantForModel", () => {
     const variant = resolveVariantForModel(config, "oracle", model)
 
     // then
-    expect(variant).toBe("high")
+    expect(variant).toBe("xhigh")
   })
 
   test("returns correct variant for oracle agent with anthropic", () => {

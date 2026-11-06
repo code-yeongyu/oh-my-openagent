@@ -50,6 +50,7 @@ function createFakeTimers(): FakeTimers {
   return {
     advanceBy: async (ms: number): Promise<void> => {
       const target = timerNow + ms
+      let fired = 0
       while (true) {
         const next = Array.from(timers.entries())
           .filter(([, timer]) => timer.time <= target)
@@ -57,6 +58,7 @@ function createFakeTimers(): FakeTimers {
         if (!next) {
           break
         }
+        if (++fired > 10_000) throw new Error("fake clock fired more than 10000 timers in one advance: a timer keeps rescheduling itself")
         const [id, timer] = next
         timers.delete(id)
         timerNow = timer.time

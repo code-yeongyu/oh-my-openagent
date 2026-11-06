@@ -25,8 +25,6 @@ const profile = mkdtempSync(join(tmpdir(), "debug-repro-"))
 const browser = await omowright.connectPipe({ browserPath, browserArgs: ["--headless", `--user-data-dir=${profile}`], storageRoot: profile })
 const page = await browser.newTab("about:blank")
 const trace = omowright.createTrace(page, { dir: traceDir })          // trace.jsonl + trace.har + before/after screenshots
-const consoleErrors = []
-page.on("console", (entry) => { if (entry.type === "error") consoleErrors.push(entry.text) })
 try {
   await trace.step("open", () => page.goto(url, { waitUntil: "load" }))
   await trace.step("submit", async () => {
@@ -36,6 +34,7 @@ try {
     await page.waitForURL(/\/done/, { timeout: 10_000 })
   })
   await Bun.write(pngPath, await page.screenshot())
+  const consoleErrors = (await page.console.logs({ levels: ["error"] })).map((entry) => entry.message)
 } finally {
   await trace.stop()
   await browser.close()

@@ -24,7 +24,9 @@ export function trustLaunchKind(args: readonly string[]): "static" | "long-lived
   if (isSelfUpdate(args) && updateUsageAnswer(args) !== undefined) return "static"
   // While accounts are closed, every login/logout/whoami argv refuses from the build switch alone and
   // opens no connection: a static answer, the way update usage is static beside the network `update`.
-  if (!serviceAccountsOpen() && ["login", "logout", "whoami"].includes(args[0] ?? "")) return "static"
+  // #12639: the device-code login is the one closed sign-in that runs (service-auth/commands.ts).
+  const deviceLogin = args[0] === "login" && (args.includes("--device") || args.includes("--no-browser"))
+  if (!serviceAccountsOpen() && ["login", "logout", "whoami"].includes(args[0] ?? "") && !deviceLogin) return "static"
   const options = launchOptions(args)
   // 5.2: `trust ensure` imports with 1.5 s and exits; only `--wait` takes the one-shot hard cap.
   if (options[0] === "trust") return options.includes("--wait") ? "one-shot-network" : "short-host-cli"

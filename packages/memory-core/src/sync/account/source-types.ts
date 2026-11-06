@@ -4,6 +4,7 @@ import type { AccountHttp } from "./http"
 import type { PairingHttp } from "./pairing-http"
 import type { SyncOperationAuthority } from "../operation-authority"
 import type { GenesisBridge } from "../genesis/bridge.ts"
+import type { RevocationView } from "./revocation-view.ts"
 export type { SyncOperationAuthority } from "../operation-authority"
 
 /** Public selected-account identity. Credentials and private key material have no fields here. */
@@ -51,6 +52,8 @@ export interface DesktopSyncAccount extends Omit<DesktopSyncOperation, "close" |
   readonly signal: AbortSignal
   readonly transport: Transport
   isCurrent(): Promise<boolean>
+  /** The device list as a rotator reads it (rotation on revoke): the raw reply, parsed leniently. */
+  readonly revocationView?: () => Promise<RevocationView>
   boundary<T>(dispatch: () => T): Promise<T>
   forOperation(authority: SyncOperationAuthority): Promise<DesktopSyncOperation>
 }

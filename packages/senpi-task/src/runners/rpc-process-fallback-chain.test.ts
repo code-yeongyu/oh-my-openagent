@@ -236,19 +236,24 @@ describe("a process child whose prompt start is refused for missing provider cre
     const result = await manager.start({
       prompt: "work", parent_session_id: "parent-1", depth: 1, category: "unspecified-high", execution_mode: "process",
     })
-    await launchSettled(manager, result)
+    // A launch slower than start's 250 ms report window (a loaded Windows runner) is reported as still
+    // starting; either way the outcome lands on the task record, so the assertions read it from there.
+    await launchSettled(manager, result).catch(() => undefined)
 
     // then
-    if (result.kind !== "start_failed") throw new Error(`expected start_failed, got ${JSON.stringify(result)}`)
+    if (result.kind !== "start_failed" && !(result.kind === "started" && result.starting === true)) {
+      throw new Error(`expected start_failed or a still-starting start, got ${JSON.stringify(result)}`)
+    }
+    const record = store.load(result.task_id)
     expect(launched).toEqual([PRIMARY.display, OTHER_PROVIDER.display])
-    expect(result.failure_kind).toBe("model_chain_exhausted")
+    expect(record?.failure_kind).toBe("model_chain_exhausted")
     const fallbacks = taskEvents(store.stateDir, result.task_id).filter((event) => event.type === "task_model_fallback")
     expect(fallbacks.map((event) => [event.payload.from_model, event.payload.to_model, event.payload.cause_class, event.payload.cause_code, event.payload.provider])).toEqual([
       [PRIMARY.display, OTHER_PROVIDER.display, "credentials_missing", "provider_credentials_missing", "openai"],
     ])
-    expect(result.error_message).toContain(`${PRIMARY.display}: not signed in`)
-    expect(result.error_message).toContain(`${OTHER_PROVIDER.display}: not signed in`)
-    expect(store.load(result.task_id)?.status).toBe("error")
+    expect(record?.error_message).toContain(`${PRIMARY.display}: not signed in`)
+    expect(record?.error_message).toContain(`${OTHER_PROVIDER.display}: not signed in`)
+    expect(record?.status).toBe("error")
     await runner.settleTeardowns()
   })
 

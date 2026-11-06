@@ -15,6 +15,7 @@ const THREAD_TOOL_NAMES = [
 	"thread_read",
 	"thread_send",
 	"thread_interrupt",
+	"thread_close",
 	"thread_handoff",
 	"thread_rename",
 	"thread_set_model",
@@ -114,6 +115,7 @@ describe("thread tool discovery through the real tool-search service", () => {
 			["read what another session output", "thread_read"],
 			["message another session that is already running", "thread_send"],
 			["stop the turn running in another session", "thread_interrupt"],
+			["close that session, I am done with it", "thread_close"],
 			["hand this off to the old session about the payments bug", "thread_handoff"],
 			["rename this session", "thread_rename"],
 			["switch this session to a different model", "thread_set_model"],
@@ -178,7 +180,7 @@ describe("thread tool discovery through the real tool-search service", () => {
 })
 
 describe("thread family metadata shape", () => {
-	test("the family carries seventeen entries with unique names", () => {
+	test("the family carries eighteen entries with unique names", () => {
 		expect(THREAD_TOOL_SEARCH_METADATA.map((entry) => entry.name)).toEqual([...THREAD_TOOL_NAMES])
 		const names = THREAD_TOOL_SEARCH_METADATA.map((entry) => entry.name)
 		expect(new Set(names).size).toBe(names.length)
@@ -191,6 +193,7 @@ describe("thread family metadata shape", () => {
 			"Read session",
 			"Send message to session",
 			"Interrupt session turn",
+			"Close session",
 			"Hand off session",
 			"Rename session",
 			"Switch session model",
