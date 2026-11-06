@@ -535,7 +535,10 @@
       "theme": "Theme",
       "system": "Use the system theme",
       "light": "Use the light theme",
-      "dark": "Use the dark theme"
+      "dark": "Use the dark theme",
+      "manifesto": "Manifesto",
+      "openMenu": "Open menu",
+      "closeMenu": "Close menu"
     },
     "hero": {
       "title": "Your tool for real work.",
@@ -698,7 +701,8 @@
       "x": "X @justsisyphus",
       "privacy": "Privacy",
       "terms": "Terms",
-      "language": "Language"
+      "language": "Language",
+      "label": "Footer"
     }
   }
 }

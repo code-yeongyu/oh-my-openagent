@@ -208,9 +208,12 @@ test.describe("Home page", () => {
     // when
     await page.getByRole("button", { name: "Use the light theme" }).click()
 
-    // then
+    // then: the palette and the scheme the browser draws its own controls in both follow the pin
     await expect(html).toHaveAttribute("data-theme", "light")
     await expect.poll(background).toBe("rgb(251, 250, 247)")
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(
+      "light",
+    )
 
     // when
     await page.reload()
@@ -255,6 +258,37 @@ test.describe("Home page", () => {
     await expect(dag.locator("[data-dag-node]")).toHaveCount(10)
     await expect(dag.locator("[data-dag-wave]")).toHaveCount(5)
     await expect(dag.locator("[data-dag-run-summary]")).toContainText("7 models")
+  })
+
+  test("the phone menu opens a sheet with every section, the docs and the manifesto", async ({
+    page,
+  }) => {
+    // given
+    await page.setViewportSize({ width: 375, height: 800 })
+    await page.goto("/")
+    const sheet = page.locator("#mobile-nav")
+    await expect(sheet).toBeHidden()
+
+    // when
+    await page.getByRole("button", { name: "Open menu" }).click()
+
+    // then
+    await expect(sheet).toBeVisible()
+    await expect(sheet.getByRole("link", { name: "Docs", exact: true })).toBeVisible()
+    await expect(sheet.getByRole("link", { name: "Manifesto", exact: true })).toBeVisible()
+    await expect(sheet.getByRole("link", { name: "Install", exact: true })).toBeVisible()
+  })
+
+  test("a language link keeps the page the reader is on", async ({ page }) => {
+    // given
+    await page.goto("/manifesto")
+
+    // when
+    const korean = page.getByRole("contentinfo").getByRole("link", { name: "한국어" })
+
+    // then
+    await expect(korean).toHaveAttribute("href", "/ko/manifesto")
+    await expect(korean).toHaveAttribute("hreflang", "ko")
   })
 
   test("navigates to the docs from the nav and to the manifesto from the footer", async ({

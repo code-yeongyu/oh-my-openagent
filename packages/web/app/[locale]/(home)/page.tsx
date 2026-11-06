@@ -4,7 +4,6 @@ import type { JSX } from "react"
 import { setRequestLocale } from "next-intl/server"
 
 import { HomePage } from "@/components/home/home-page"
-import type { Locale } from "@/i18n/config"
 
 export default async function LocaleHomePage({
   params,
@@ -13,5 +12,5 @@ export default async function LocaleHomePage({
 }): Promise<JSX.Element> {
   const { locale } = await params
   setRequestLocale(locale)
-  return <HomePage locale={locale as Locale} />
+  return <HomePage />
 }

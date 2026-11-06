@@ -5,12 +5,12 @@ import { LiveNumbers } from "@/components/home/live-numbers"
 import type { FormattedStatsData } from "@/lib/stats"
 
 const ROWS = [
-  ["ultrawork", "#ultrawork", "Ultrawork"],
-  ["massUlw", "#mass-ulw", "Mass ulw"],
-  ["models", "#models", "Models"],
-  ["kibitzer", "#kibitzer", "Kibitzer"],
-  ["skills", "#skills", "Skills"],
-  ["crafted", "#crafted", "Crafted"],
+  ["ultrawork", "#ultrawork", "nav.ultrawork"],
+  ["massUlw", "#mass-ulw", "nav.massUlw"],
+  ["models", "#models", "nav.models"],
+  ["kibitzer", "#kibitzer", "kibitzer.eyebrow"],
+  ["skills", "#skills", "nav.skills"],
+  ["crafted", "#crafted", "crafted.eyebrow"],
 ] as const
 
 /** Live numbers in one quiet row, then herdr's numbered README index of the sections below. */
@@ -38,7 +38,7 @@ export async function IndexStrip({
             <li key={key}>
               <a href={href}>
                 <span className="n">{String(i + 1).padStart(2, "0")}</span>
-                <span className="t">{name}</span>
+                <span className="t">{t(name)}</span>
                 <span className="d">{t(`index.${key}`)}</span>
               </a>
             </li>

@@ -21,9 +21,9 @@ export function generateStaticParams(): Array<{ readonly locale: string }> {
 }
 
 /**
- * The home page's own root layout: it ships the doriterm-family stylesheet (`components/home/styles`) and fonts
- * and none of the docs site's Tailwind layer, so the first paint carries only what this page draws. Moving between
- * the home page and the docs is a full navigation, as it is between two root layouts.
+ * The home page's own root layout: the site stylesheet (the shared palette and Tailwind, which the workflow graph
+ * draws with) plus the home page's own (`components/home/styles`). Moving between the home page and the docs is a
+ * full navigation, as it is between two root layouts.
  */
 export default async function HomeLayout({
   children,

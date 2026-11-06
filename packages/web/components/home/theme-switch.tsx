@@ -4,7 +4,7 @@ import type { JSX } from "react"
 import { useState, useSyncExternalStore } from "react"
 
 import { Icon, type IconName } from "@/components/home/icons"
-import { THEME_STORAGE_KEY } from "@/components/home/theme-init"
+import { syncThemeColor, THEME_STORAGE_KEY } from "@/components/home/theme-init"
 
 type Choice = "system" | "light" | "dark"
 
@@ -27,6 +27,7 @@ function applyTheme(next: Choice): void {
   const root = document.documentElement
   if (next === "system") delete root.dataset.theme
   else root.dataset.theme = next
+  syncThemeColor(next === "system" ? null : next)
   try {
     if (next === "system") localStorage.removeItem(THEME_STORAGE_KEY)
     else localStorage.setItem(THEME_STORAGE_KEY, next)

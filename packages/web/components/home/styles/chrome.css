@@ -302,9 +302,83 @@
     height: 44px;
   }
   .install__tabs button,
-  .copy,
-  .graph__steps button {
+  .copy {
     min-height: 44px;
     min-width: 44px;
+  }
+}
+
+/* Phone menu: the toggle shows where the section links hide; the sheet drops below the pill. */
+.nav__menu-btn {
+  display: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+.nav__menu-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+}
+.nav__sheet {
+  display: none;
+  max-width: 1080px;
+  margin: var(--space-2) auto 0;
+  padding: var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-xl);
+  background: var(--bg-raised);
+  box-shadow: 0 8px 32px -16px rgb(0 0 0 / 0.35);
+}
+.nav__sheet[data-open="true"] {
+  display: block;
+}
+.nav__sheet ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.nav__sheet-link {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: var(--space-3);
+  border-radius: var(--radius-xs);
+  color: var(--ink-soft);
+  text-decoration: none;
+  font-size: 0.8125rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.nav__sheet-link:hover {
+  color: var(--ink);
+  background: var(--surface-2);
+}
+.nav__sheet-install {
+  width: 100%;
+  margin-top: var(--space-2);
+}
+@media (max-width: 859px) {
+  .nav__menu-btn {
+    display: grid;
+  }
+}
+@media (min-width: 860px) {
+  .nav__sheet {
+    display: none !important;
+  }
+}
+/* A phone header holds the mark, the theme switch and the menu; the star count moves into the footer's GitHub link. */
+@media (max-width: 639px) {
+  .nav__stars {
+    display: none;
   }
 }

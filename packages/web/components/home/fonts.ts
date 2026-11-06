@@ -15,5 +15,6 @@ export const jetBrainsMono = localFont({
   weight: "100 800",
   display: "swap",
   variable: "--font-jetbrains",
-  preload: true,
+  // Only terminal panes below the fold use it: no preload competing with the headline face.
+  preload: false,
 })

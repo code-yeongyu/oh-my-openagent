@@ -2,7 +2,7 @@ import type { JSX } from "react"
 import { getTranslations } from "next-intl/server"
 
 import { DISCORD_URL, GITHUB_URL, LEGAL_BASE, RELEASES_URL, X_URL } from "@/components/home/links"
-import { localeNames, locales, type Locale } from "@/i18n/config"
+import { LanguageLinks } from "@/components/home/language-links"
 import { Link } from "@/i18n/routing"
 
 const EXTERNAL = [
@@ -16,12 +16,10 @@ const EXTERNAL = [
 
 /** doriterm's footer: the wordmark and one row of links, then the languages and the licence line. */
 export async function HomeFooter({
-  locale,
   onHome = true,
 }: {
-  readonly locale: Locale
   readonly onHome?: boolean
-}): Promise<JSX.Element> {
+} = {}): Promise<JSX.Element> {
   const t = await getTranslations("home.footer")
   const year = new Date().getUTCFullYear().toString()
 
@@ -41,7 +39,7 @@ export async function HomeFooter({
             OmO
           </Link>
         )}
-        <nav aria-label="Footer">
+        <nav aria-label={t("label")}>
           <Link href="/docs">{t("docs")}</Link>
           <Link href="/manifesto">{t("manifesto")}</Link>
           {EXTERNAL.map(([key, href]) => (
@@ -53,19 +51,7 @@ export async function HomeFooter({
       </div>
       <div className="wrap footer__meta">
         <p>{t("copyright", { year })}</p>
-        <nav aria-label={t("language")} className="footer__langs">
-          {locales.map((code) => (
-            <Link
-              key={code}
-              href="/"
-              locale={code}
-              aria-current={code === locale ? "true" : undefined}
-              lang={code}
-            >
-              {localeNames[code]}
-            </Link>
-          ))}
-        </nav>
+        <LanguageLinks label={t("language")} />
       </div>
     </footer>
   )

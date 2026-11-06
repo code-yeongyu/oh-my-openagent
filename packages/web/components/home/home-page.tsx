@@ -17,7 +17,6 @@ import { VoicesSection } from "@/components/home/sections/voices"
 import { HomeFooter } from "@/components/home/home-footer"
 import { HomeNav } from "@/components/home/home-nav"
 import { RevealObserver } from "@/components/home/reveal-observer"
-import type { Locale } from "@/i18n/config"
 import { FALLBACK_DESCRIPTION, FALLBACK_FORMATTED_STATS, formatStats, getStats } from "@/lib/stats"
 
 export async function generateHomeMetadata(): Promise<Metadata> {
@@ -40,7 +39,7 @@ async function loadStats(): Promise<typeof FALLBACK_FORMATTED_STATS> {
   }
 }
 
-export async function HomePage({ locale }: { readonly locale: Locale }): Promise<JSX.Element> {
+export async function HomePage(): Promise<JSX.Element> {
   const t = await getTranslations("home.nav")
   const stats = await loadStats()
 
@@ -64,7 +63,7 @@ export async function HomePage({ locale }: { readonly locale: Locale }): Promise
         <MakersSection />
         <ClosingSection />
       </main>
-      <HomeFooter locale={locale} />
+      <HomeFooter />
       <RevealObserver />
     </>
   )

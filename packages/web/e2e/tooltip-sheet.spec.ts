@@ -79,3 +79,40 @@ test.describe("Icon control tooltip", () => {
     await expect(tooltip).toBeHidden()
   })
 })
+
+// The phone menu in the shared nav (components/home/mobile-menu.tsx).
+test("Escape closes the mobile nav sheet and returns focus to its toggle", async ({ page }) => {
+  // given
+  await page.setViewportSize({ width: 375, height: 800 })
+  await page.goto("/")
+  const toggle = page.getByRole("button", { name: "Open menu" })
+  await toggle.click()
+  const sheet = page.locator("#mobile-nav")
+  await expect(sheet).toBeVisible()
+  await sheet.getByRole("link", { name: "Docs", exact: true }).focus()
+
+  // when
+  await page.keyboard.press("Escape")
+
+  // then
+  await expect(sheet).toHaveAttribute("aria-hidden", "true")
+  await expect(page.getByRole("button", { name: "Open menu" })).toBeFocused()
+})
+
+test("Escape closes the sheet without stealing focus that is outside it", async ({ page }) => {
+  // given
+  await page.setViewportSize({ width: 375, height: 800 })
+  await page.goto("/")
+  await page.getByRole("button", { name: "Open menu" }).click()
+  const sheet = page.locator("#mobile-nav")
+  await expect(sheet).toBeVisible()
+  const brand = page.locator("header").getByRole("link", { name: "OmO" }).first()
+  await brand.focus()
+
+  // when
+  await page.keyboard.press("Escape")
+
+  // then
+  await expect(sheet).toHaveAttribute("aria-hidden", "true")
+  await expect(brand).toBeFocused()
+})

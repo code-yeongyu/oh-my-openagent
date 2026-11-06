@@ -2,6 +2,7 @@ import type { JSX } from "react"
 import { getTranslations } from "next-intl/server"
 
 import { Icon } from "@/components/home/icons"
+import { MobileMenu } from "@/components/home/mobile-menu"
 import { ThemeSwitch } from "@/components/home/theme-switch"
 import { Link } from "@/i18n/routing"
 import { GITHUB_URL } from "@/components/home/links"
@@ -94,6 +95,23 @@ export async function HomeNav({
           >
             {t("install")}
           </NavLink>
+          <MobileMenu
+            items={[
+              ...SECTIONS.map((key) => ({
+                label: t(key),
+                href: onHome ? ANCHORS[key] : `/${ANCHORS[key]}`,
+                local: onHome,
+              })),
+              { label: t("docs"), href: "/docs", local: false },
+              { label: t("manifesto"), href: "/manifesto", local: false },
+            ]}
+            install={{
+              label: t("install"),
+              href: onHome ? "#install" : "/docs/install",
+              local: onHome,
+            }}
+            labels={{ open: t("openMenu"), close: t("closeMenu"), nav: t("primary") }}
+          />
         </div>
       </div>
     </header>

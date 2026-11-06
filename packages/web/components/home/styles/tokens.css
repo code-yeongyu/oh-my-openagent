@@ -62,16 +62,12 @@
   --bg-raised: #141311;
   --surface: #191816;
   --surface-2: #211f1c;
-  --line: rgb(238 238 239 / 0.09);
-  --line-strong: rgb(238 238 239 / 0.16);
   --ink: #eeeeef;
   --ink-soft: #a8a49b;
   --ink-faint: #6e6a62;
-  --accent: #7fcdd6;
   --accent-wash: rgb(127 205 214 / 0.12);
   --wait: #e2b86b;
   --ok: #8fcf9a;
-  --primary: #eeeeef;
   --primary-ink: #0f0e0d;
   --dot: rgb(238 238 239 / 0.16);
   --shadow-frame: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 24px 80px -24px rgb(0 0 0 / 0.7);
@@ -87,16 +83,12 @@
     --bg-raised: #f6f5f1;
     --surface: #ffffff;
     --surface-2: #f0efea;
-    --line: rgb(27 27 30 / 0.09);
-    --line-strong: rgb(27 27 30 / 0.16);
     --ink: #1b1b1e;
     --ink-soft: #5c5850;
     --ink-faint: #9a958b;
-    --accent: #0b6e7a;
     --accent-wash: rgb(11 110 122 / 0.09);
     --wait: #8a5a00;
     --ok: #2f7a3e;
-    --primary: #1b1b1e;
     --primary-ink: #fbfaf7;
     --dot: rgb(20 19 17 / 0.14);
     --shadow-frame: 0 1px 0 rgb(255 255 255 / 0.8) inset, 0 24px 60px -28px rgb(40 32 20 / 0.28);
@@ -111,20 +103,25 @@
   --bg-raised: #f6f5f1;
   --surface: #ffffff;
   --surface-2: #f0efea;
-  --line: rgb(27 27 30 / 0.09);
-  --line-strong: rgb(27 27 30 / 0.16);
   --ink: #1b1b1e;
   --ink-soft: #5c5850;
   --ink-faint: #9a958b;
-  --accent: #0b6e7a;
   --accent-wash: rgb(11 110 122 / 0.09);
   --wait: #8a5a00;
   --ok: #2f7a3e;
-  --primary: #1b1b1e;
   --primary-ink: #fbfaf7;
   --dot: rgb(20 19 17 / 0.14);
   --shadow-frame: 0 1px 0 rgb(255 255 255 / 0.8) inset, 0 24px 60px -28px rgb(40 32 20 / 0.28);
   --term-bg: #fbfaf7;
   --term-fg: #2a2723;
   --term-dim: #6f6a61;
+}
+
+/* A pinned theme also pins the scheme the browser draws its own controls, scrollbars and autofill in. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
 }

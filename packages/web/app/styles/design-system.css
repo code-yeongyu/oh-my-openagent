@@ -343,6 +343,15 @@
   }
 }
 
+@layer base {
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+  }
+}
+
 /*
  * §8 Focus ring, the one recipe: a solid --ring outline outside the box. focus-ring-inset draws
  * the same ring inside the box for elements whose container clips (scroll viewports,

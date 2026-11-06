@@ -40,7 +40,7 @@ export async function LocalizedPageShell({
         <main id="main-content" tabIndex={-1} className="flex-1">
           {children}
         </main>
-        <HomeFooter locale={locale} onHome={false} />
+        <HomeFooter onHome={false} />
       </div>
     </NextIntlClientProvider>
   )
