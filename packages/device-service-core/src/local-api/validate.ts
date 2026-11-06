@@ -30,7 +30,7 @@ import {
   semver,
   uint,
 } from "./validate-fields.ts";
-import { endpointsData } from "./validate-delegated.ts";
+import { endpointsData, locateData } from "./validate-delegated.ts";
 import { isRequestType, REQUEST_TYPES, validateRequestFields } from "./validate-requests.ts";
 import {
   deviceRef,
@@ -199,6 +199,7 @@ const DATA: { readonly [T in RequestType]: (v: unknown) => ResponseData[T] } = {
   "enforcement.report": empty,
   "owner.shutdown_for_upgrade": empty,
   "session.endpoints": endpointsData,
+  "session.locate": locateData,
   "control.attach.get": attachState,
   "control.attach.set": attachState,
 };

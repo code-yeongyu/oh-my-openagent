@@ -101,6 +101,8 @@ export function createRemoteThreadFixture() {
         devices: async () => devices,
         sessions: async () => { if (options.failSessionsList === true) throw new Error("account list failed"); return [{ ...B_ROW, state: options.rowState ?? B_ROW.state }] },
         endpointCommand: async (device, rpc) => { sent.push({ via: "endpoint", device, rpc }); return answer(rpc) },
+        // This fake device lists a created session by the id its create reply names.
+        locate: async (_device, engineId) => ({ kind: "ok", sessionId: engineId }),
         sessionCommand: async (device, session, rpc) => { sent.push({ via: "session", device, session, rpc }); return answer(rpc, session) },
         read: async (device, session) => { sent.push({ via: "read", device, session }); return { kind: "ok", response: { entries: [{ role: "user", content: "hi b" }, { role: "assistant", content: "hello from b" }] } } },
       },
