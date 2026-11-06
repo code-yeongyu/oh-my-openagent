@@ -3,8 +3,12 @@ import { basename } from "node:path"
 import type { z } from "zod"
 import { signInRoute } from "./accounts-gate"
 import { credentialSchema, type Credentials, serviceOrigin, SignInError } from "./protocol"
+import type { HelperLease } from "./keychain-helper/client"
+import { asKeystoreError, HelperMissingForOwnedItem, type KeychainHelperOptions } from "./keychain-helper/darwin-backend"
+import { HelperOldSlotsFull, type WriteIntent } from "./keychain-helper/darwin-store"
+import { bindKeychainHelper, type LockedStore, lockedStoreView } from "./keychain-helper/store-binding"
 import { probeSecretServiceLock, type SecretServiceLockProbe } from "./secret-service-lock"
-import { withCredentialLock } from "./credential-lock"
+import { heldCredentialLease, withCredentialLock } from "./credential-lock"
 
 type SecretKey = { readonly service: string; readonly name: string }
 export type SecretApi = {
@@ -12,12 +16,23 @@ export type SecretApi = {
   readonly set: (key: SecretKey & { readonly value: string }) => Promise<void>
   readonly delete: (key: SecretKey) => Promise<boolean>
 }
+export type { LockedStore }
 export type SealedStore<T> = {
   readonly read: () => Promise<T | null>
   /** A read started now that never joins a coalesced read begun earlier; credential transactions use it under the lock. */
   readonly readAuthoritative: () => Promise<T | null>
-  readonly write: (value: T) => Promise<void>
+  /**
+   * `intent` matters only to the keychain helper: row 8b retires an unreadable item only on a fresh sign-in, and runs
+   * `beforeRetire` first so the caller can report that discard.
+   */
+  readonly write: (value: T, intent?: WriteIntent, beforeRetire?: () => Promise<void>) => Promise<void>
   readonly clear: () => Promise<void>
+  /** Before the session lock: settles any approval, so no access dialog is ever open while the lock is held. */
+  readonly prepare?: () => Promise<void>
+  /** The helper's view for this locked section (recovered first), or null when this store has no helper. */
+  readonly underLock?: (lease: HelperLease) => Promise<LockedStore<T> | null>
+  /** True while the last read came from an item the helper does not own yet: the token path then takes the lock once. */
+  readonly migrationPending?: () => Promise<boolean>
 }
 export type CredentialStore = SealedStore<Credentials>
 
@@ -84,6 +99,7 @@ export function createCredentialStore(
     readonly notice?: (message: string) => void
     readonly wait?: CredentialReadWait
     readonly home?: string
+    readonly keychainHelper?: KeychainHelperOptions
   } = {},
 ): CredentialStore {
   const store = createSealedStore(api, "omo-cli", credentialSchema, options.secrets, options.platform, options.lockProbe, options.notice, options.wait,
@@ -99,12 +115,46 @@ export function createCredentialStore(
         ...(accountId === undefined ? {} : { accountId }),
         credentialGeneration: sameIdentity ? current?.credentialGeneration ?? randomUUID() : randomUUID(),
       }
-    })
+    }, options.keychainHelper)
+  // One helper view per locked section, shared by every call in it and recovered once at its start (design 3.4, 3.6).
+  const sections = new WeakMap<HelperLease, Promise<LockedStore<Credentials> | null>>()
+  const underLock = (lease: HelperLease): Promise<LockedStore<Credentials> | null> => {
+    const known = sections.get(lease)
+    if (known !== undefined) return known
+    const view = (async () => {
+      const opened = (await store.underLock?.(lease)) ?? null
+      await opened?.recover()
+      return opened
+    })()
+    sections.set(lease, view)
+    return view
+  }
+  const held = async (): Promise<LockedStore<Credentials> | null> => {
+    const lease = heldCredentialLease(api, options.home)
+    return lease === undefined ? null : underLock(lease)
+  }
+  const locked = async (helper: (view: LockedStore<Credentials>) => Promise<void>, plain: () => Promise<void>): Promise<void> => {
+    if (heldCredentialLease(api, options.home) === undefined) await store.prepare?.()
+    await withCredentialLock(api, async lease => {
+      const view = await underLock(lease)
+      await (view === null ? plain() : helper(view))
+    }, options.home)
+  }
   return {
-    read: store.read,
-    readAuthoritative: store.readAuthoritative,
-    write: value => withCredentialLock(api, () => store.write(value), options.home),
-    clear: () => withCredentialLock(api, store.clear, options.home),
+    // Under the lock every read is the helper view's own: fresh, and never one that may open a dialog.
+    read: async () => {
+      const view = await held()
+      return view === null ? store.read() : view.read()
+    },
+    readAuthoritative: async () => {
+      const view = await held()
+      return view === null ? store.readAuthoritative() : view.read()
+    },
+    write: (value, intent, beforeRetire) => locked(view => view.write(value, intent, beforeRetire), () => store.write(value)),
+    clear: () => locked(view => view.clear(), store.clear),
+    ...(store.prepare === undefined ? {} : { prepare: store.prepare }),
+    underLock,
+    ...(store.migrationPending === undefined ? {} : { migrationPending: store.migrationPending }),
   }
 }
 
@@ -118,6 +168,7 @@ export function createSealedStore<T>(
   notice: (message: string) => void = stderrNoticeOncePerProcess,
   wait: CredentialReadWait = SESSION_READ_WAIT,
   amendWrite?: (previous: T | null, next: T) => T,
+  keychainHelper?: KeychainHelperOptions,
 ): SealedStore<T> {
   if (!secrets) throw new SignInError("OmO sign-in needs Bun 1.4 or newer with OS credential storage. No file fallback is available.")
   const platformName =
@@ -131,6 +182,18 @@ export function createSealedStore<T>(
   if (platformName === null) throw new SignInError("This platform has no supported OS credential store.")
   const key = { service: namespace, name: credentialId(api) }
   const slot = `${key.service}\n${key.name}`
+  const helper = bindKeychainHelper({
+    platform,
+    namespace,
+    secrets,
+    key,
+    background: wait.kind === "bounded",
+    origin: api,
+    notice,
+    pending: message => new KeychainApprovalPendingError(message),
+    ...(keychainHelper === undefined ? {} : { options: keychainHelper }),
+  })
+  secrets = helper.secrets
   const readsOf = (api: SecretApi): Map<string, Promise<string | null>> => {
     const known = processReads.get(api)
     if (known !== undefined) return known
@@ -157,17 +220,19 @@ export function createSealedStore<T>(
     platform === "darwin"
       ? `macOS Keychain is waiting for your approval: answer the "${basename(process.execPath)} wants to access key ${namespace}" dialog ("Always Allow" stops it asking again)`
       : `${platformName} has not answered; it may be waiting for your approval or an unlock in a system dialog`
+  const helperWaiting = `macOS Keychain is waiting for your approval: answer the "OmO's keychain helper wants to access key ${namespace}" dialog`
   const answered = async (api: SecretApi, fresh = false): Promise<string | null> => {
+    const waitingFor = helper.isHelperReader(api) ? helperWaiting : waiting
     const read = fresh ? Promise.resolve().then(() => api.get(key)) : sharedRead(api)
     let timer: ReturnType<typeof setTimeout> | undefined
     try {
       if (wait.kind === "interactive") {
-        timer = setTimeout(() => wait.notice(`omo: ${waiting}.`), wait.noticeAfterMs)
+        timer = setTimeout(() => wait.notice(`omo: ${waitingFor}.`), wait.noticeAfterMs)
         return await read
       }
       const expired = new Promise<never>((_, reject) => {
         timer = setTimeout(
-          () => reject(new KeychainApprovalPendingError(`${waiting}, then try again. Credentials are never saved to a file.`)),
+          () => reject(new KeychainApprovalPendingError(`${waitingFor}, then try again. Credentials are never saved to a file.`)),
           wait.deadlineMs,
         )
       })
@@ -204,16 +269,7 @@ export function createSealedStore<T>(
       notice("omo: could not check whether the keyring is locked (gdbus or the Secret Service did not answer); using libsecret directly.")
     }
   }
-  const parsedRead = async (fresh: boolean): Promise<T | null> => {
-    await assertUsable()
-    let value: string | null
-    try {
-      value = await answered(secrets, fresh)
-    } catch (error) {
-      if (error instanceof KeychainApprovalPendingError) throw error
-      throw unavailable(error)
-    }
-    if (value === null) return null
+  const parseStored = (value: string): T => {
     try {
       return schema.parse(JSON.parse(value))
     } catch {
@@ -222,24 +278,60 @@ export function createSealedStore<T>(
         : "The OmO sign-in saved on this computer can't be read. Run omo account forget to remove it, then sign in again in the desktop app.")
     }
   }
+  // The previous value a generation is assigned from; an invalid item is replaced, never a reason to refuse the write.
+  const previousOf = (raw: string | null): T | null => {
+    if (raw === null) return null
+    try { return schema.parse(JSON.parse(raw)) } catch { return null }
+  }
+  const rawRead = async (fresh: boolean): Promise<string | null> => {
+    await assertUsable()
+    const backend = await helper.backend()
+    try {
+      if (backend === null) await helper.guardHelperless()
+      return await answered(backend === null ? secrets : helper.reader(backend), fresh)
+    } catch (error) {
+      if (error instanceof KeychainApprovalPendingError) throw error
+      if (error instanceof HelperMissingForOwnedItem) throw new CredentialStoreError(error.message)
+      throw unavailable(error)
+    }
+  }
+  const parsedRead = async (fresh: boolean): Promise<T | null> => {
+    const value = await rawRead(fresh)
+    return value === null ? null : parseStored(value)
+  }
+  const lockedFailure = (error: unknown): unknown => {
+    const mapped = asKeystoreError(error, message => new KeychainApprovalPendingError(message))
+    if (error instanceof HelperOldSlotsFull) return new CredentialStoreError(error.message)
+    if (mapped instanceof KeychainApprovalPendingError || mapped instanceof SignInError) return mapped
+    if (mapped instanceof Error && mapped.name === "LockLeaseLostError") return mapped
+    return unavailable(mapped)
+  }
   return {
     read: () => parsedRead(false),
     readAuthoritative: () => parsedRead(true),
+    // Only the approval matters here: an unreadable value is the locked section's to report or replace (forget, --replace).
+    async prepare() {
+      if ((await helper.backend()) !== null) await rawRead(false)
+    },
+    async underLock(lease) {
+      const backend = await helper.backend()
+      if (backend === null) return null
+      const codec = {
+        parse: parseStored,
+        serialize: (value: T) => JSON.stringify(schema.parse(value)),
+        ...(amendWrite === undefined ? {} : { amend: (raw: string | null, next: T) => amendWrite(previousOf(raw), next) }),
+      }
+      return lockedStoreView(backend, lease, codec, lockedFailure, () => forget(helper.reader(backend)))
+    },
+    migrationPending: async () => (await helper.backend())?.migrationPending() ?? false,
     async write(value) {
       // One OS-store replacement commits the rotating token and its access token together.
       await assertUsable()
+      if ((await helper.backend()) !== null) throw new Error("OmO's keychain helper writes only under the session lock.")
       try {
-        let next = value
-        if (amendWrite !== undefined) {
-          // A parked/coalesced read may predate another process's write. Never use it to
-          // assign a generation, and never let it block an otherwise usable writer.
-          const raw = await answered(secrets, true)
-          let previous: T | null = null
-          if (raw !== null) {
-            try { previous = schema.parse(JSON.parse(raw)) } catch { /* replacement repairs an invalid item */ }
-          }
-          next = amendWrite(previous, value)
-        }
+        // A parked/coalesced read may predate another process's write. Never use it to
+        // assign a generation, and never let it block an otherwise usable writer.
+        const next = amendWrite === undefined ? value : amendWrite(previousOf(await answered(secrets, true)), value)
         await secrets.set({ ...key, value: JSON.stringify(schema.parse(next)) })
       } catch (error) {
         throw unavailable(error)
@@ -248,6 +340,7 @@ export function createSealedStore<T>(
     },
     async clear() {
       await assertUsable()
+      if ((await helper.backend()) !== null) throw new Error("OmO's keychain helper deletes only under the session lock.")
       try {
         await secrets.delete(key)
       } catch (error) {
