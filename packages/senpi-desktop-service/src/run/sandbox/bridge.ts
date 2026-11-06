@@ -26,7 +26,7 @@ import type { SandboxSetup } from "./protocol";
 import { BridgedJson, type SandboxBridgedCall } from "./quickjs";
 
 /** Distinct handles (by engine identity) one run may hold; past it the call that would add one rejects. */
-export const SANDBOX_MAX_HANDLES = 10_000;
+const SANDBOX_MAX_HANDLES = 10_000;
 
 /** The VM global the stubs call through; the setup replaces it with the stub namespace. */
 const BRIDGE_NAME = "computer";
