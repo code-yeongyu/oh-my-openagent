@@ -2,7 +2,7 @@ import { describe, expect, onTestFinished, test } from "bun:test"
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs"
 import { execFileSync } from "node:child_process"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { join, resolve } from "node:path"
 
 import { createNodeGitExec } from "./exec"
 import { memoryGitEnvironment } from "./exec-environment"
@@ -250,6 +250,7 @@ describe("memoryGitEnvironment (#12354)", () => {
 
     // #then
     expect(result.code).toBe(0)
-    expect(result.stdout.trim()).toBe(join(memory, ".git"))
+    // git prints forward slashes on Windows; resolve() normalizes both sides to the platform separator.
+    expect(resolve(result.stdout.trim())).toBe(resolve(join(memory, ".git")))
   })
 })
