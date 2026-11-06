@@ -20,6 +20,7 @@ const VALID_SAMPLES: Record<keyof typeof threadToolParamSchemas, unknown> = {
   thread_read: { thread: "019233a1-7c2e-7bbb", cursor: "rev12:seq40", max_bytes: 65536 },
   thread_send: { thread: "019233a1-7c2e-7bbb", message: "Continue the payments migration.", delivery: "auto" },
   thread_interrupt: { thread: "019233a1-7c2e-7bbb", turn_id: "turn-7" },
+  thread_close: { thread: "019233a1-7c2e-7bbb", idempotency_key: "close-1" },
   thread_handoff: { thread: "payments", match: "fuzzy", message: "Pick this up where it stopped.", delivery: "follow_up" },
   thread_rename: { thread: "019233a1-7c2e-7bbb", name: "payments-lane-2" },
   thread_set_model: { thread: "019233a1-7c2e-7bbb", model: "claude-opus-4" },
@@ -58,6 +59,7 @@ describe("thread tool param schemas", () => {
       "thread_read",
       "thread_send",
       "thread_interrupt",
+      "thread_close",
       "thread_handoff",
       "thread_rename",
       "thread_set_model",
@@ -110,8 +112,8 @@ describe("thread_rename params", () => {
     expect(outcome.kind).toBe("ok")
   })
 
-  test("#given a rename payload missing name #when parsed #then it returns invalid_arguments as data", () => {
-    const outcome = parseThreadParams(threadToolParamSchemas.thread_rename, { thread: "019233a1-7c2e-7bbb" })
+  test("#given a rename payload missing thread #when parsed #then it returns invalid_arguments as data", () => {
+    const outcome = parseThreadParams(threadToolParamSchemas.thread_rename, { name: "x" })
     expect(outcome).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
   })
 })
@@ -274,6 +276,9 @@ describe("thread error taxonomy", () => {
       "stale_token",
       "already_answered",
       "answer_in_progress",
+      "device_offline",
+      "relay_requires_paid_plan",
+      "alias_taken",
     ])
     expect(new Set(THREAD_ERROR_CODES).size).toBe(THREAD_ERROR_CODES.length)
   })

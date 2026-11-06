@@ -13,6 +13,7 @@ import {
   isTelemetryClientEnabled,
   recordDailyActive,
 } from "./index"
+import { TELEMETRY_INSTALL_ID_FILE_NAME } from "./install-id"
 import type {
   TelemetryCaptureMessage,
   TelemetryOsProvider,
@@ -197,6 +198,7 @@ describe("posthog telemetry client", () => {
 
       // then
       expect(capturedMessages).toHaveLength(1)
+      expect(existsSync(join(stateDir, TELEMETRY_INSTALL_ID_FILE_NAME))).toBe(true)
       const message = capturedMessages[0]
       if (message === undefined || message.properties === undefined) {
         throw new Error("expected one captured message with properties")
@@ -272,7 +274,14 @@ describe("posthog telemetry client", () => {
     expect(transportCreated).toBe(false)
   })
 
-  test("#given telemetry is disabled #when daily active records #then dedup state is not written", async () => {
+  // Privacy-notice contract (#11583): while any opt-out is set, nothing is sent and no install id file is created.
+  test.each([
+    ["DO_NOT_TRACK", { DO_NOT_TRACK: "1" }],
+    ["OMO_DISABLE_TELEMETRY", { OMO_DISABLE_TELEMETRY: "1" }],
+    ["OMO_DISABLE_POSTHOG", { OMO_DISABLE_POSTHOG: "1" }],
+    ["OMO_SEND_ANONYMOUS_TELEMETRY=0", { OMO_SEND_ANONYMOUS_TELEMETRY: "0" }],
+    ["OMO_CODEX_DISABLE_POSTHOG", { OMO_CODEX_DISABLE_POSTHOG: "1" }],
+  ] as const)("#given telemetry is disabled by %s #when daily active records #then no dedup state or install id file is written", async (_name, optOut) => {
     // given
     const capturedMessages: TelemetryCaptureMessage[] = []
     const stateDir = mkdtempSync(join(tmpdir(), "telemetry-core-disabled-"))
@@ -281,7 +290,7 @@ describe("posthog telemetry client", () => {
     try {
       // when
       await recordDailyActive({
-        env: { OMO_CODEX_DISABLE_POSTHOG: "1", POSTHOG_API_KEY: "test-key" },
+        env: { ...optOut, POSTHOG_API_KEY: "test-key" },
         now: new Date("2026-05-25T01:02:03.000Z"),
         osProvider: OS_PROVIDER,
         product: PRODUCT,
@@ -294,6 +303,7 @@ describe("posthog telemetry client", () => {
       // then
       expect(capturedMessages).toHaveLength(0)
       expect(existsSync(stateFilePath)).toBe(false)
+      expect(existsSync(join(stateDir, TELEMETRY_INSTALL_ID_FILE_NAME))).toBe(false)
     } finally {
       rmSync(stateDir, { recursive: true, force: true })
     }

@@ -247,6 +247,25 @@ jobs:
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         run: bun run script/remove-stale-self-package-tests.ts
 
+      # device-service-core's LA17 DACL tests prove that a second local user cannot read the
+      # protected token file, so the Windows leg creates that user with a fresh random password.
+      - name: Create the second local user for the DACL tests
+        if: runner.os == 'Windows' && needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
+        shell: pwsh
+        run: |
+          # Every character comes from the random bytes (no literal prefix), one per Windows complexity class.
+          $bytes = [byte[]]::new(20)
+          [System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+          $upper = [char](65 + $bytes[0] % 26)
+          $lower = [char](97 + $bytes[1] % 26)
+          $digit = [char](48 + $bytes[2] % 10)
+          $symbol = [char](35 + $bytes[3] % 3)
+          $password = "$upper$lower$digit$symbol" + [Convert]::ToHexString($bytes, 4, 16)
+          Write-Output "::add-mask::$password"
+          net user omoqa2 $password /add /y | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "net user omoqa2 /add failed with exit $LASTEXITCODE" }
+          "OMOQA2_PASSWORD=$password" >> $env:GITHUB_ENV
+
       # The full install runs the root `prepare` (`bun run build`), whose
       # `build:lsp-daemon` step already runs `npm ci && npm run build` in
       # packages/lsp-daemon, so its node_modules and dist exist before the tests.
@@ -777,6 +796,8 @@ jobs:
 
   senpi-compatibility:
     needs: [ci-mode]
+    # #11815: without a job budget a hung leg sits until GitHub's 360-minute default; healthy legs take 33-55 minutes.
+    timeout-minutes: 100
     # Preserve required matrix check names during the Ubuntu image migration.
     # Outside the full matrix a macOS/Windows leg still reports its required context, from an ubuntu
     # runner with every heavy step skipped, so it never waits for a hosted macOS/Windows slot (#10856).
@@ -858,6 +879,10 @@ jobs:
 
       - name: Run Senpi compatibility tests with Windows telemetry
         id: senpi-tests-windows
+        # #11815: this step has hung and stayed in_progress for hours under GitHub's 360-minute default job limit.
+        # Healthy runs take 31-52 minutes (21 runs, 2026-10); 75 minutes fails a hang on its own and lets the telemetry
+        # upload and the summary below still run.
+        timeout-minutes: 75
         if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         shell: pwsh
         env:
@@ -871,7 +896,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npm --prefix packages/lsp-daemon test -- test/daemon-roundtrip.test.ts
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          bunx tsgo --noEmit -p packages/omo-senpi/tsconfig.json
+          bun check --no-script --all -p packages/omo-senpi/tsconfig.json
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           bun test ./.agents/skills/senpi-qa/scripts/resolve-evidence-dir.test.mjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -1193,6 +1218,14 @@ jobs:
           rustup default "$toolchain"
           rustup target add ${{ matrix.rust-target }}
           cargo build --release -p senpi-desktop-engine --locked --target ${{ matrix.rust-target }}
+          # build-omo-binary.ts stages the engine trust helper on Darwin and Windows (omo#10762); its own call, as release builds it.
+          cargo build --release -p omo-engine-trust-helper --locked --target ${{ matrix.rust-target }}
+
+      # build-omo-binary embeds the keychain helper into darwin binaries (#11262); the release lane
+      # signs it, this parity leg embeds an unsigned build.
+      - name: Build the keychain helper the binary embeds
+        if: needs.ci-mode.outputs.run_heavy == 'true' && startsWith(matrix.target, 'darwin-')
+        run: bun packages/omo-native/keychain-helper/build.ts --out packages/omo-native/bin/darwin/omo-keychain
 
       - name: Build the standalone binary and the npm launcher payload
         if: needs.ci-mode.outputs.run_heavy == 'true'

@@ -5,14 +5,8 @@ import { isMemoryExpired, memoryExpiresAtMs } from "../memfs/expiry"
 import { parseMemoryFile } from "../memfs/frontmatter"
 import { MEMORY_AUTHORITY_RULE } from "../provenance"
 import { redactSecretLikeMaterial } from "../sync/redact"
-import {
-  DEFAULT_EXTERNAL_PROJECTION_LIMITS,
-  renderExternalProjection,
-  renderExternalProjectionStats,
-  type ExternalProjectionInput,
-  type ExternalProjectionLimits,
-  type ExternalProjectionStats,
-} from "./external-projection"
+import type { ExternalProjectionInput, ExternalProjectionStats } from "./external-projection"
+import { DEFAULT_EXTERNAL_PROJECTION_LIMITS, type ExternalProjectionLimits } from "./external-projection-limits"
 import { renderSystemTree, type CompiledSystemFile } from "./render"
 
 const PERSONA_PATH = "system/persona.md"
@@ -88,13 +82,16 @@ export async function compileMemoryBlockWithReads(
   const externalPaths = paths.filter(isExternalPath)
   const external = await projectionInput(repo, revision, externalPaths, options.projection)
   if (external.recencyUnavailable === true) reads.degraded.push(`commit times unavailable: ${external.recencyError ?? "unknown error"}`)
+  // The listing renderer is a lazy sidecar in bundles that map `#memory-external-projection` (omo-senpi's omo.js).
+  const listing = externalPaths.length === 0
+    ? ""
+    : (await import("#memory-external-projection")).renderExternalProjection(externalPaths, external)
   const projection = renderProjection(
     live(persona),
     live(identity),
     live(agreements),
     systemFiles.filter((file) => live(file) !== undefined),
-    externalPaths,
-    external,
+    listing,
   )
   const metadata = renderMetadata(options)
   return { block: [projection, metadata].filter((part) => part.length > 0).join("\n\n"), degraded: reads.degraded, expiries }
@@ -107,7 +104,8 @@ export async function externalProjectionStatsAt(
   limits: ExternalProjectionLimits = DEFAULT_EXTERNAL_PROJECTION_LIMITS,
 ): Promise<ExternalProjectionStats> {
   const externalPaths = (await repo.lsTree(revision)).filter(isExternalPath)
-  return renderExternalProjectionStats(externalPaths, await projectionInput(repo, revision, externalPaths, limits))
+  const input = await projectionInput(repo, revision, externalPaths, limits)
+  return (await import("#memory-external-projection")).renderExternalProjectionStats(externalPaths, input)
 }
 
 async function projectionInput(
@@ -170,11 +168,10 @@ function renderProjection(
   identity: CompiledSystemFile | undefined,
   agreements: CompiledSystemFile | undefined,
   systemFiles: readonly CompiledSystemFile[],
-  externalPaths: readonly string[],
-  external: ExternalProjectionInput,
+  externalListing: string,
 ): string {
   const agreementsSection = agreements === undefined ? "" : renderAgreementsSection(agreements.body)
-  if (!persona && !identity && !agreementsSection && systemFiles.length === 0 && externalPaths.length === 0) return ""
+  if (!persona && !identity && !agreementsSection && systemFiles.length === 0 && externalListing.length === 0) return ""
   const lines = [REMINDER]
   if (persona || identity) {
     lines.push("", "<self>")
@@ -193,10 +190,10 @@ function renderProjection(
     lines.push("</self>")
   }
   if (agreementsSection) lines.push("", agreementsSection)
-  if (systemFiles.length > 0 || externalPaths.length > 0) {
+  if (systemFiles.length > 0 || externalListing.length > 0) {
     lines.push("", "<memory>")
     if (systemFiles.length > 0) lines.push(renderSystemTree(systemFiles))
-    if (externalPaths.length > 0) lines.push(renderExternalProjection(externalPaths, external))
+    if (externalListing.length > 0) lines.push(externalListing)
     lines.push("</memory>")
   }
   return lines.join("\n")

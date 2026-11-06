@@ -13,7 +13,8 @@ use senpi_desktop_core::backend::PointerEvent;
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 
 use super::cgevent::{
-    button_types, click_group_id, modifier_flags, mouse_event, point, quartz_wheel, scroll_event,
+    button_types, click_group_id, is_press, modifier_flags, mouse_event, point, quartz_wheel,
+    scroll_event,
 };
 use super::held::{ButtonRoute, Held, HeldButton};
 
@@ -161,6 +162,9 @@ pub(super) fn post_global_mouse(
     button_number: i64,
     flags: CGEventFlags,
 ) -> CoreResult<()> {
+    if is_press(event_type) {
+        senpi_desktop_core::intervention::check_press()?;
+    }
     let location = point(x, y)?;
     let event = mouse_event(source, event_type, location, button)?;
     event.set_integer_value_field(EventField::MOUSE_EVENT_CLICK_STATE, click_state);

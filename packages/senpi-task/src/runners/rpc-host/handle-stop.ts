@@ -17,6 +17,7 @@ export interface HandleStopHost {
   intent(): "running" | "closed" | "terminated"
   settleClosed(): void
   settleExit(outcome: ChildExitOutcome): void
+  markHostEndAnswered(): void
   waitForExit(): Promise<ChildExitOutcome>
 }
 
@@ -43,7 +44,7 @@ export function createHandleStop(host: HandleStopHost): HandleStop {
   // still ends as the clean close it asked for.
   const endOnHost = async (client: HostSessionPort): Promise<void> => {
     const kind = requested || host.intent() !== "closed" ? "terminated" : "closed"
-    await endSessionOnHost({ taskId: host.taskId, closeGraceMs: host.closeGraceMs, port: () => client }, kind)
+    if (await endSessionOnHost({ taskId: host.taskId, closeGraceMs: host.closeGraceMs, port: () => client }, kind)) host.markHostEndAnswered()
     if (kind === "closed") host.settleClosed()
     else host.settleExit({ kind: "killed", facts: sessionExitFacts("terminated") })
   }

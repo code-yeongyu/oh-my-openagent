@@ -90,7 +90,9 @@ async function withClient<T>(
   }
   try {
     const initialized = await request("initialize", {
-      protocolVersion: "2025-03-26", capabilities: {}, clientInfo: { name: "omo-desktop-thread", version: "1" },
+      protocolVersion: "2025-03-26",
+      capabilities: { extensions: { "senpi/host-tools": {} } },
+      clientInfo: { name: "omo-desktop-thread", version: "1" },
     })
     if (typeof initialized.protocolVersion !== "string") throw new Error("missing desktop toolkit protocol version")
     headers.set("MCP-Protocol-Version", initialized.protocolVersion)
@@ -112,6 +114,34 @@ interface DesktopTool {
   readonly name: string
   readonly description?: string
   readonly inputSchema: Record<string, unknown>
+  readonly attachment?: {
+    readonly name: string
+    readonly label: string
+    readonly exposure?: "direct" | "search" | "eval" | "model-only" | "hidden"
+    readonly allowLazyActivation?: boolean
+    readonly searchKeywords?: string[]
+  }
+}
+
+function hostAttachment(value: unknown): DesktopTool["attachment"] {
+  const meta = object(value)
+  const { name, label, exposure, allowLazyActivation, searchKeywords } = object(meta["senpi/host-tool"])
+  if (typeof name !== "string" || !/^[a-zA-Z0-9_-]{1,64}$/.test(name) || typeof label !== "string") {
+    throw new Error("invalid host tool identity")
+  }
+  if (exposure !== undefined && exposure !== "direct" && exposure !== "search" && exposure !== "eval" && exposure !== "model-only" && exposure !== "hidden") {
+    throw new Error("invalid host tool exposure")
+  }
+  if (allowLazyActivation !== undefined && typeof allowLazyActivation !== "boolean") throw new Error("invalid host tool activation")
+  if (searchKeywords !== undefined && (!Array.isArray(searchKeywords) || !searchKeywords.every((word): word is string => typeof word === "string"))) {
+    throw new Error("invalid host tool search keywords")
+  }
+  return {
+    name, label,
+    ...(exposure === undefined ? {} : { exposure }),
+    ...(allowLazyActivation === undefined ? {} : { allowLazyActivation }),
+    ...(searchKeywords === undefined ? {} : { searchKeywords }),
+  }
 }
 
 export function listThreadTools(
@@ -132,7 +162,16 @@ export function listThreadTools(
           continue
         }
         const tool = object(value)
-        if (typeof tool.name !== "string" || tool.name.length === 0 || !/^[a-zA-Z0-9_-]{1,64}$/.test(`desktop_${tool.name}`)) {
+        let attachment: DesktopTool["attachment"]
+        try {
+          attachment = typeof tool._meta === "object" && tool._meta !== null && "senpi/host-tool" in tool._meta
+            ? hostAttachment(tool._meta)
+            : undefined
+        } catch {
+          onInvalid?.("invalid_descriptor")
+          continue
+        }
+        if (typeof tool.name !== "string" || tool.name.length === 0 || !/^[a-zA-Z0-9_-]{1,64}$/.test(attachment === undefined ? `desktop_${tool.name}` : tool.name)) {
           onInvalid?.("invalid_name")
           continue
         }
@@ -146,7 +185,7 @@ export function listThreadTools(
           continue
         }
         const inputSchema = object(tool.inputSchema)
-        tools.push({ name: tool.name, inputSchema, ...(tool.description === undefined ? {} : { description: tool.description }) })
+        tools.push({ name: tool.name, inputSchema, ...(tool.description === undefined ? {} : { description: tool.description }), ...(attachment === undefined ? {} : { attachment }) })
       }
       if (page.nextCursor !== undefined && typeof page.nextCursor !== "string") throw new Error("invalid desktop toolkit cursor")
       cursor = page.nextCursor
@@ -155,25 +194,47 @@ export function listThreadTools(
   }, signal)
 }
 
+/** senpi's event-bus channel that routes one host tool (`{ name, execute? }`). */
+export const HOST_TOOL_ROUTE_CHANNEL = "senpi:host-tool-route"
+/** The `Error.name` senpi's host tool wrapper reads as "run this call on the standalone tool and drop the route". */
+const HOST_TOOL_ROUTE_UNAVAILABLE = "HostToolRouteUnavailable"
+
+function routeUnavailable(): Error {
+  return Object.assign(new Error("The host could not serve this call."), { name: HOST_TOOL_ROUTE_UNAVAILABLE })
+}
+
 export async function callThreadTool(
   grant: ToolkitGrant | undefined,
   name: string,
   args: Record<string, unknown>,
   timeoutMs: number,
   signal?: AbortSignal,
+  attachment = false,
 ) {
+  if (attachment && signal?.aborted) throw new DOMException("Desktop toolkit call aborted.", "AbortError")
   if (grant === undefined) {
+    if (attachment) throw routeUnavailable()
     return { isError: true, content: [{ type: "text", text: "Desktop thread toolkit is not granted to the calling session." }], details: { reason: "no_session_grant" } }
   }
+  const deadline = AbortSignal.timeout(timeoutMs)
+  const callSignal = signal === undefined ? deadline : AbortSignal.any([deadline, signal])
   try {
     const result = await withClient(grant, timeoutMs, (request) =>
-      request("tools/call", { name, arguments: args }), signal)
+      request("tools/call", { name, arguments: args }), callSignal)
     if (!Array.isArray(result.content) || (result.isError !== undefined && typeof result.isError !== "boolean")) {
       throw new Error("invalid desktop toolkit content")
+    }
+    if (attachment) {
+      // A tool-level refusal (the SDK writer's own error) is the call's answer; only a lost host falls back.
+      if (result.isError === true) return { isError: true, content: result.content, details: {} }
+      const details = object(object(result._meta)["senpi/tool-result-details"])
+      return { content: result.content, details }
     }
     return { ...result, details: {} }
   } catch {
     // Neither transport errors nor server replies may disclose the file's bearer.
+    if (attachment && callSignal.aborted) throw new DOMException("Desktop toolkit call aborted.", "AbortError")
+    if (attachment) throw routeUnavailable()
     return { isError: true, content: [{ type: "text", text: "Desktop thread toolkit call failed." }], details: { reason: "call_failed" } }
   }
 }

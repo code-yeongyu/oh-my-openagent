@@ -9,9 +9,10 @@ use core_graphics::event::{CGEventFlags, CGEventType, CGMouseButton};
 use core_graphics::event_source::CGEventSource;
 use core_graphics::geometry::CGPoint;
 use senpi_desktop_core::error::CoreResult;
+use senpi_desktop_core::intervention::check_press;
 use senpi_desktop_core::types::DesktopWindow;
 
-use super::cgevent::{click_group_id, mouse_event, quartz_wheel, scroll_event};
+use super::cgevent::{click_group_id, is_press, mouse_event, quartz_wheel, scroll_event};
 use crate::skylight;
 
 /// The window-local point of a stamped event; `(-1, -1)` marks the synthetic
@@ -66,7 +67,7 @@ pub(super) fn scroll(target: ScrollTarget<'_>, x: f64, y: f64, dx: f64, dy: f64)
 }
 
 /// Posts one stamped pointer event to `(pid, wid)` through SkyLight and the
-/// public per-pid queue.
+/// public per-pid queue; a press or move runs the press check first.
 #[expect(
     clippy::too_many_arguments,
     reason = "the parameters are the native CGEvent fields stamped together"
@@ -86,6 +87,9 @@ pub(super) fn post_mouse(
     click_group: i64,
     flags: CGEventFlags,
 ) -> CoreResult<()> {
+    if is_press(event_type) {
+        check_press()?;
+    }
     let event = mouse_event(source, event_type, CGPoint::new(x, y), button)?;
     // Flags are exactly the caller-requested modifier set; no background bypass
     // modifier is injected.

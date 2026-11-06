@@ -25,7 +25,7 @@ import {
   categorizeTools,
 } from "../dynamic-agent-prompt-builder";
 
-export function buildTaskManagementSection(useTaskSystem: boolean): string {
+function buildTaskManagementSection(useTaskSystem: boolean): string {
   if (useTaskSystem) {
     return `<Task_Management>
 ## Task Management (CRITICAL)

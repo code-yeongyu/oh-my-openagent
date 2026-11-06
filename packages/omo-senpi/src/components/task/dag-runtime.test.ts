@@ -952,9 +952,9 @@ describe("assembled DAG runtime", () => {
   })
 
   test("#given a paused run and a non-default subscriber ring #when the assembled runtime resumes it #then the overflow is journaled and shipped RPC receives the recovered snapshot", async () => {
-    // given - the bridge attaches AFTER recovery (#7316), so recovery-window events are never
-    // pushed live; the overflow marker must be durable in the journal for history-paging viewers,
-    // and RPC's first wholesale snapshot must already carry the recovered run.
+    // given - the bridge attaches AFTER recovery installs the run (#7316, #12113), so recovery-window
+    // events are never pushed live; the overflow marker must be durable in the journal for
+    // history-paging viewers, and RPC's first wholesale snapshot must carry the recovered (live) run.
     const cwd = fs.mkdtempSync(join(tmpdir(), "omo-senpi-dag-recovery-ring-"))
     cleanupRoots.push(cwd)
     const runId = "dag-adapter-recovery-ring" as DagRunId
@@ -996,11 +996,10 @@ describe("assembled DAG runtime", () => {
     const runtime = createDagRuntime({ pi, engine, logger: logger() })
 
     // when
-    const attaching = runtime.attach()
+    await within(runtime.attach())
+    const delivered = await within(recoveredSnapshot.promise)
     await within(runner.whenStarted(1), STEP_BUDGET_MS, "runner.whenStarted(1)")
     runner.handles[0]?.settle("resumed through configured ring")
-    await within(attaching)
-    const delivered = await within(recoveredSnapshot.promise)
 
     // then the overflow survived durably for history paging, and the pushed snapshot is recovered
     const journaled = dagEvents(cwd, runId).find(
@@ -1009,8 +1008,8 @@ describe("assembled DAG runtime", () => {
     expect(journaled).toBeDefined()
     expect(journaled?.droppedCount).toBeGreaterThan(0)
     expect(journaled?.recoverAfterSeq).toBeGreaterThanOrEqual(0)
-    expect(delivered.status).toBe("completed")
-    expect(runtime.manager.snapshot(runId, sessionId).status).toBe("completed")
+    expect(delivered.status).toBe("running")
+    expect((await within(runtime.wait(runId, sessionId))).status).toBe("completed")
     runtime.dispose()
   })
 

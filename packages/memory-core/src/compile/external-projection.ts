@@ -1,15 +1,13 @@
 import { groupDirectories } from "./external-projection-dirs"
+import type { ExternalProjectionLimits } from "./external-projection-limits"
 import { NAME_LEGEND, NAME_NOTE, directoryItems, type ProjectionItem } from "./external-projection-names"
+
+// The renderer loads lazily through `#memory-external-projection` (see compile.ts); the limits stay eager.
+export { DEFAULT_EXTERNAL_PROJECTION_LIMITS, type ExternalProjectionLimits } from "./external-projection-limits"
 
 const MEMORY_DIR = "$MEMORY_DIR"
 const OPEN = "<external_projection>"
 const CLOSE = "</external_projection>"
-
-/** `0` disables a limit; both at `0` reproduces the unbounded, name-ordered listing byte for byte. */
-export interface ExternalProjectionLimits {
-  readonly maxEntriesPerDirectory: number
-  readonly maxBytes: number
-}
 
 export interface ExternalProjectionInput {
   /** Last commit time per path (epoch seconds); names without one sort after every timed name. */
@@ -29,11 +27,6 @@ export interface ExternalProjectionStats {
   /** No listing fits the budget, so the smallest one was emitted. */
   readonly overflow: boolean
   readonly recencyUnavailable: boolean
-}
-
-export const DEFAULT_EXTERNAL_PROJECTION_LIMITS: ExternalProjectionLimits = {
-  maxEntriesPerDirectory: 0,
-  maxBytes: 40_960,
 }
 
 interface DirectoryListing {

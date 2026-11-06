@@ -55,8 +55,15 @@ describe("binary/npm parity comparison", () => {
 
   test("#given distribution-specific doctor lines #when compared #then they are not differences", () => {
     const npm = run({ doctor: [...run().doctor, "PASS senpi version 2026.9.29-5", "INFO computer use engine: not installed yet"] })
-    const binary = run({ doctor: [...run().doctor, "INFO omo 5.1.4 (engine: senpi 2026.9.29-5)", "PASS computer use engine: native/senpi-desktop-engine", "INFO Claude Code 2.1.284: not downloaded yet"] })
+    const binary = run({ doctor: [...run().doctor, "INFO omo 5.1.4 (engine: senpi 2026.9.29-5)", "PASS computer use engine: native/senpi-desktop-engine", "INFO Claude Code 2.1.284: not downloaded yet", "INFO engine trust: generation 0123456789ab, default-file: kept"] })
     expect(compareRuns(binary, npm)).toEqual([])
+  })
+
+  test("#given a leftover shard running on one side and exited on the other #when compared #then it is not a difference (#12148)", () => {
+    const npm = run({ doctor: [...run().doctor, "INFO Shard p-<sha> (parent <sha>, s1.jsonl): running pid 15440 · engine 2026.11.2-1"] })
+    const binary = run({ doctor: [...run().doctor, "WARN Shard p-<sha> (parent <sha>, s2.jsonl): not running (retained state kept; run omo daemon gc)"] })
+    expect(compareRuns(binary, npm)).toEqual([])
+    expect(compareRuns(binary, run())).toEqual(['doctor: the binary prints "Shard", npm does not'])
   })
 
   test("#given an extension load failure on one side #when compared #then it is reported", () => {

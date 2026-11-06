@@ -2,7 +2,7 @@ import { createHash } from "node:crypto"
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
-import type { FeedbackDraft, FeedbackKind, UploadRedactor } from "./draft"
+import { FEEDBACK_SECTION_IDS, type FeedbackDraft, type FeedbackKind, type FeedbackSectionId, type UploadRedactor } from "./draft"
 
 export const FEEDBACK_REDACTOR_VERSION = "1.0.0"
 
@@ -59,7 +59,8 @@ export type SubmitResult =
   | { readonly kind: "sent"; readonly reportId: string }
   | { readonly kind: "saved"; readonly path: string }
   | { readonly kind: "already-sent" }
-  | { readonly kind: "refused"; readonly reason: "secret-detected" | "too-large" | "rate-limited" | "sign-in-required" | "unavailable" }
+  | { readonly kind: "refused"; readonly reason: "secret-detected"; readonly sectionId?: FeedbackSectionId }
+  | { readonly kind: "refused"; readonly reason: "too-large" | "rate-limited" | "sign-in-required" | "unavailable" }
   | {
       readonly kind: "refused"
       readonly reason: "service-rejected" | "service-unavailable"
@@ -129,11 +130,16 @@ const rememberDeleteToken = (stateDir: string, entry: SentEntry): void => {
   privateWrite(path, JSON.stringify([...entries.filter((value) => value.id !== entry.id), entry], null, 2))
 }
 
-const refusalFor = (status: number, code: unknown, requestId: unknown, redact: UploadRedactor): SubmitResult => {
+const refusalFor = (status: number, code: unknown, requestId: unknown, detail: unknown, redact: UploadRedactor): SubmitResult => {
   const request = typeof requestId === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(requestId) && redact(requestId).count === 0 ? { requestId } : {}
   if (typeof code === "string" && Object.hasOwn(SERVICE_REFUSALS, code)) {
     const known = code as ServiceErrorCode
     const reason = SERVICE_REFUSALS[known]
+    if (reason === "secret-detected") {
+      const sectionId: unknown = Reflect.get(Object(detail), "sectionId")
+      const section = FEEDBACK_SECTION_IDS.find(id => id === sectionId)
+      return { kind: "refused", reason, ...(section === undefined ? {} : { sectionId: section }) }
+    }
     return reason === "service-rejected" || reason === "service-unavailable"
       ? { kind: "refused", reason, code: known, ...request }
       : { kind: "refused", reason }
@@ -195,7 +201,7 @@ export async function submitReport(options: SubmitOptions): Promise<SubmitResult
     const error = Object(Reflect.get(Object(answer), "error"))
     const code: unknown = Reflect.get(error, "code")
     if (keptKey !== undefined && response.status === 409 && code === "conflict") return { kind: "already-sent" }
-    return refusalFor(response.status, code, Reflect.get(error, "requestId"), options.redact)
+    return refusalFor(response.status, code, Reflect.get(error, "requestId"), Reflect.get(error, "detail"), options.redact)
   }
   const reportId: unknown = Reflect.get(Object(answer), "id")
   if (typeof reportId !== "string") return { kind: "refused", reason: "unavailable" }

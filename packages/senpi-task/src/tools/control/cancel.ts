@@ -9,7 +9,7 @@ import { toolResult } from "./tool-result"
 import type { CancelManager, CancelResultDetails, CancelToolResult } from "./types"
 
 export const TaskCancelParams = Type.Object({
-  task_id: Type.Optional(Type.String({ description: "Task id (st_...) of the child to cancel. Provide exactly one of task_id or name." })),
+  task_id: Type.Optional(Type.String({ description: "Task id (st_...) of the child to cancel. Pass task_id or name; when both are given, task_id wins and name is ignored." })),
   name: Type.Optional(Type.String({ description: "Canonical task name; required if task_id is omitted." })),
   reason: Type.Optional(Type.String({ description: "Optional human-readable reason recorded on the cancelled task." })),
 })
@@ -18,7 +18,7 @@ export type TaskCancelInput = Static<typeof TaskCancelParams>
 
 const DESCRIPTION = [
   "Cancel a running child task and release its resources; the cancelled status is preserved so task_output can still report the outcome.",
-  "Cancel is terminal and NOT resumable; cancelling a child that is not running is a no-op that reports its unchanged status.",
+  "Cancel is terminal and NOT resumable. On a child that already finished it is a no-op that reports its unchanged status, except when that child still holds a resident session or queued messages: those are released, reported as kind released.",
   "Use this to end work you no longer need.",
 ].join(" ")
 
@@ -79,6 +79,8 @@ export function createTaskCancelTool(deps: TaskCancelDeps): ToolDefinition<typeo
     name: "task_cancel",
     label: "Task Cancel",
     description: DESCRIPTION,
+    // Rarely used: searchable and activated by name on first call (#11454).
+    exposure: "search", allowLazyActivation: true, searchKeywords: ["cancel child", "stop task", "abort subagent"],
     parameters: TaskCancelParams,
     execute: (_toolCallId, params) => runTaskCancel(deps.manager, params),
     renderCall: (args, theme) => renderTaskCancelCall(args, theme),

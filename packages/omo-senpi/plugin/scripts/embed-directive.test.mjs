@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test"
 
-import { parseVariantBlocks, parseVariantSections, transformDirective } from "./embed-directive.mjs"
+import { SENPI_ASTRA_ULTRAWORK_DIRECTIVE, SENPI_ULTRAWORK_DIRECTIVE } from "../../src/components/ultrawork/generated-directive.ts"
+import { joinSharedParts, parseVariantBlocks, parseVariantSections, readDirectives, splitSharedParts, transformDirective } from "./embed-directive.mjs"
 
 const skill = (body) => `---\nname: ultrawork\n---\n\n${body}`
 
@@ -39,5 +40,20 @@ describe("embed-directive astra variant", () => {
     const stripped = source.replace(/^---\n[\s\S]*?\n---\n+/, "").replace(/^<!-- omo-ultrawork-astra:[a-z0-9-]+:(?:start|end) -->\n/gm, "")
     expect(transformDirective(source)).toBe(`${stripped.trim()}\n`)
     expect(transformDirective(source, variant)).not.toBe(transformDirective(source))
+  })
+
+  it("#given two texts #when split into shared parts #then shared lines are stored once and each side rebuilds byte for byte", () => {
+    const baseline = "a\nb\nc\nd\n"
+    const astra = "a\nB\nc\nd\ne"
+    const parts = splitSharedParts(baseline, astra)
+    expect(parts).toEqual(["a\n", ["b\n", "B\n"], "c\nd\n", ["", "e"]])
+    expect(joinSharedParts(parts, 0)).toBe(baseline)
+    expect(joinSharedParts(parts, 1)).toBe(astra)
+  })
+
+  it("#given the generated module #when its directives are joined at load #then each equals its derivation from the shipped sources", () => {
+    const { baseline, astra } = readDirectives()
+    expect(SENPI_ULTRAWORK_DIRECTIVE).toBe(baseline)
+    expect(SENPI_ASTRA_ULTRAWORK_DIRECTIVE).toBe(astra)
   })
 })

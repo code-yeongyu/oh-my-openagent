@@ -17,6 +17,7 @@ import {
 	newDevice,
 	RP_ID,
 	removeWorldStateDirs,
+	rotate,
 	transportFor,
 	type World,
 } from "./testing/world.test-support.ts";
@@ -190,5 +191,30 @@ describe("removal succeeds only once its rotation is stored (#10412 review M2)",
 			await remove(world, second, transportFor(world, world.owner), events),
 		).toMatchObject({ ok: false, reason: "rotation-pending" });
 		expect(events).toEqual([]);
+	});
+});
+
+// #12280 R-A7: another member's generic rotation on revoke can be the one that completes a removal's
+// freeze (its wraps cover only the folded registry, so the removed key is excluded).
+describe("a removal completed by another member's rotation (#12280)", () => {
+	test("#given a removal whose own rotation was refused #when a generic rotation lands first #then the retry answers ok at the new epoch", async () => {
+		const { world, second } = await twoKeys();
+		world.server.refuseRotations = true;
+		expect(await remove(world, second)).toMatchObject({
+			ok: false,
+			reason: "rotation-pending",
+		});
+		world.server.refuseRotations = false;
+		await rotate(world);
+		const events: RecoveryEvent[] = [];
+		expect(
+			await remove(world, second, transportFor(world, world.owner), events),
+		).toEqual({
+			ok: true,
+			epoch: 2,
+			platformSignal: "unsupported",
+			deleteFromPasskeyManager: true,
+		});
+		expect(events).toEqual(["sync.recovery.removed"]);
 	});
 });

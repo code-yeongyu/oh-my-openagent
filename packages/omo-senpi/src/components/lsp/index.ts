@@ -130,6 +130,17 @@ function registerLspFlags(pi: SenpiExtensionAPI): void {
 	});
 }
 
+// Most sessions never call an LSP tool, so they ride in the tool-search catalog and activate on
+// their first by-name call instead of costing every request their schemas (#11454).
+const LSP_SEARCH_KEYWORDS: Readonly<Record<string, readonly string[]>> = {
+	lsp_diagnostics: ["type errors", "typecheck", "compiler errors", "lint", "diagnostics"],
+	lsp_goto_definition: ["go to definition", "where is it defined", "symbol definition"],
+	lsp_find_references: ["find usages", "callers", "references", "blast radius"],
+	lsp_symbols: ["outline", "document symbols", "workspace symbols", "symbol search"],
+	lsp_prepare_rename: ["rename check", "can rename"],
+	lsp_rename: ["rename symbol", "refactor rename"],
+};
+
 function registerLspTools(pi: SenpiExtensionAPI, cwd: string): void {
 	for (const tool of [
 		lsp_diagnostics,
@@ -139,7 +150,13 @@ function registerLspTools(pi: SenpiExtensionAPI, cwd: string): void {
 		lsp_prepare_rename,
 		lsp_rename,
 	]) {
-		pi.registerTool(withPackagedDaemonRuntime(tool, cwd));
+		pi.registerTool({
+			...withPackagedDaemonRuntime(tool, cwd),
+			exposure: "search",
+			allowLazyActivation: true,
+			searchGroup: "lsp",
+			searchKeywords: LSP_SEARCH_KEYWORDS[tool.name] ?? [],
+		});
 	}
 }
 

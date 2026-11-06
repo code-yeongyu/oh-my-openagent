@@ -190,14 +190,20 @@ describe("MemoryBlockCache persisted blocks", () => {
       // when
       const fallback = await degraded.compile(flaky, TEMPLATE, OPTIONS, revision)
       await settle(degraded)
+      const storedAfterDegraded = await storeFiles(dir)
       const relaunch = counting(repo)
-      const recompiled = await persistedCache().compile(relaunch.repo, TEMPLATE, OPTIONS, revision)
+      const relaunched = persistedCache()
+      const recompiled = await relaunched.compile(relaunch.repo, TEMPLATE, OPTIONS, revision)
+      await settle(relaunched)
 
       // then
       if (failing === "show") expect(fallback).not.toBe(full)
-      expect(await storeFiles(dir), failing).toEqual([])
+      expect(storedAfterDegraded, failing).toEqual([])
       expect(relaunch.work.lsTree, failing).toBeGreaterThan(0)
       expect(recompiled, failing).toBe(full)
+      const storedAfterRelaunch = await storeFiles(dir)
+      expect(storedAfterRelaunch.length, failing).toBe(1)
+      expect(storedAfterRelaunch.every((name) => !name.endsWith(".tmp")), failing).toBe(true)
     }
   })
 
@@ -224,12 +230,18 @@ describe("MemoryBlockCache persisted blocks", () => {
     // when
     const fallback = await degraded.compile(flaky, TEMPLATE, OPTIONS, revision)
     await settle(degraded)
-    const recompiled = await persistedCache().compile(repo, TEMPLATE, OPTIONS, revision)
+    const storedAfterDegraded = await storeFiles(dir)
+    const relaunched = persistedCache()
+    const recompiled = await relaunched.compile(repo, TEMPLATE, OPTIONS, revision)
+    await settle(relaunched)
 
     // then
     expect(fallback).not.toBe(full)
-    expect(await storeFiles(dir)).toEqual([])
+    expect(storedAfterDegraded).toEqual([])
     expect(recompiled).toBe(full)
+    const storedAfterRelaunch = await storeFiles(dir)
+    expect(storedAfterRelaunch.length).toBe(1)
+    expect(storedAfterRelaunch.every((name) => !name.endsWith(".tmp"))).toBe(true)
   })
 
   it("#given a damaged stored block #when a new process compiles #then it compiles the correct bytes and rewrites the entry for the next process", async () => {

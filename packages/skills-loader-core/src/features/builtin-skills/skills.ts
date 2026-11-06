@@ -14,6 +14,7 @@ import {
   reviewWorkSkill,
   securityResearchSkill,
   securityReviewSkill,
+  hyperplanSkill,
   visualQaSkill,
   teamModeSkill,
 } from "./skills/index"
@@ -58,6 +59,7 @@ export function createBuiltinSkills(options: CreateBuiltinSkillsOptions = {}): B
 		debuggingSkill,
 		securityResearchSkill,
 		securityReviewSkill,
+		hyperplanSkill,
 		visualQaSkill,
 	]
 

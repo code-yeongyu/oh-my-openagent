@@ -12,6 +12,7 @@ import {
   builtinSkillNameFromCanonicalPaths,
   registerOmoNativeToolTelemetry,
 } from "./omo-native-tools"
+import { AUTOMOUNT_TRIGGER_CASES, withAutomountTrap } from "../../automount-trap.test-support"
 
 type CapturedEvent = { readonly name: OmoNativeEventName; readonly properties: Readonly<Record<string, unknown>> }
 
@@ -224,5 +225,16 @@ describe("OmO Native tool telemetry", () => {
     for (const event of events) {
       expect(Object.keys(event.properties).sort()).toEqual([...OMO_NATIVE_PROPERTY_ALLOWLISTS[event.name]].sort())
     }
+  })
+})
+
+describe("skill_loaded never resolves a macOS automount trigger (#11545)", () => {
+  test.each([...AUTOMOUNT_TRIGGER_CASES])("#given a read of %s on darwin #when its tool_result arrives #then no skill is reported and the trigger is never resolved", async (path) => {
+    const { pi, events } = fixture()
+    const touched = await withAutomountTrap(async () => {
+      await pi.dispatch("tool_result", result("read", { path }), context())
+    })
+    expect(touched).toEqual([])
+    expect(events.filter((event) => event.name === "skill_loaded")).toEqual([])
   })
 })

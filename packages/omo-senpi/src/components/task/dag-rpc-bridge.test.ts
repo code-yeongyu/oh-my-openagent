@@ -375,6 +375,49 @@ describe("dag rpc bridge", () => {
   })
 
   describe("#given the omo.dag.updated snapshot channel", () => {
+    // #12113: the attach is the point a session's first turn waits on, so the snapshot it owes the
+    // client must already be on the wire when attach() returns, not on a debounce timer after it.
+    it("#when the bridge attaches #then the current snapshot is emitted before any timer fires", () => {
+      // given
+      const { bridge, emitted } = wireSnapshots([runSnapshot("dag_1")])
+
+      // when
+      bridge.attach()
+
+      // then
+      const updates = emittedNames(emitted, "omo.dag.updated")
+      expect(updates).toHaveLength(1)
+      expect((updates[0]?.data as { runs: { run_id: string }[] }).runs.map((run) => run.run_id)).toEqual(["dag_1"])
+    })
+
+    it("#when a client reattaches with nothing changed #then resend restates the snapshot exactly once", () => {
+      // given
+      const { bridge, emitted, timers } = wireSnapshots([runSnapshot("dag_1")])
+      bridge.attach()
+      timers.advance(DAG_SNAPSHOT_DEBOUNCE_MS)
+
+      // when
+      bridge.resend()
+      timers.advance(DAG_SNAPSHOT_DEBOUNCE_MS)
+
+      // then
+      const updates = emittedNames(emitted, "omo.dag.updated")
+      expect(updates).toHaveLength(2)
+      expect(updates[1]?.data).toEqual(updates[0]?.data)
+    })
+
+    it("#when resend runs while detached #then nothing is emitted", () => {
+      // given
+      const { bridge, emitted, timers } = wireSnapshots([runSnapshot("dag_1")])
+
+      // when
+      bridge.resend()
+      timers.advance(DAG_SNAPSHOT_DEBOUNCE_MS)
+
+      // then
+      expect(emittedNames(emitted, "omo.dag.updated")).toHaveLength(0)
+    })
+
     it("#when the store mutates twice with identical state #then only one snapshot is emitted", () => {
       // given
       const { bridge, emitted, timers } = wireSnapshots([runSnapshot("dag_1")])

@@ -2,6 +2,7 @@ import { frozenCopy } from "../crypto/frozen.ts"
 import { verifyRecordSig } from "../crypto/signatures.ts"
 import { jcsBytes, sha256B64 } from "../crypto/vendor/sync-format/jcs.ts"
 import type { DeviceKeyring } from "../keyring-port.ts"
+import type { SyncOperationOptions } from "../operation-authority.ts"
 import { signedAppend } from "../recovery/keyring-append.ts"
 import { GenesisBuildError, type GenesisAppend, type GenesisPrepared } from "./types.ts"
 import { validatePrepared } from "./validate.ts"
@@ -14,6 +15,7 @@ export const buildGenesis = async (
   account: string,
   keyring: DeviceKeyring,
   input: GenesisPrepared,
+  operation: SyncOperationOptions = {},
 ): Promise<{ readonly request: GenesisAppend; readonly digest: string }> => {
   const prepared = frozenCopy(input, () => false)
   const { body, wraps } = prepared
@@ -27,7 +29,7 @@ export const buildGenesis = async (
   }
   await validatePrepared(prepared)
   const digest = await sha256B64(jcsBytes(body))
-  const signed = await signedAppend(keyring, { seq: 0, link: "", keyring_link: "" }, body, wraps)
+  const signed = await signedAppend(keyring, { seq: 0, link: "", keyring_link: "" }, body, wraps, operation)
   if (!await verifyRecordSig(keys.signing, { ...signed, account, epoch: 1, digest })) throw new GenesisBuildError("bad_signature")
   return frozenCopy({ request: { ...signed, record: body, base_seq: 0, wraps }, digest }, () => false)
 }

@@ -33,6 +33,7 @@ impl AxBackend for FakeBackend {
         let reply = self.begin_write(AxWrite::AxPerform)?;
         let node = node_id(h)?;
         self.ax_tree.check_action(node, action)?;
+        self.press_check(FakeMethod::AxPerform)?;
         self.record(SinkOp::AxPerform {
             node,
             action: action.to_string(),
@@ -43,6 +44,7 @@ impl AxBackend for FakeBackend {
     fn set_value(&mut self, h: &AxHandle, value: &str) -> CoreResult<()> {
         let reply = self.begin_write(AxWrite::AxSetValue)?;
         let node = node_id(h)?;
+        self.press_check(FakeMethod::AxSetValue)?;
         self.ax_tree.set_value(node, value)?;
         self.record(SinkOp::AxSetValue {
             node,
@@ -54,6 +56,7 @@ impl AxBackend for FakeBackend {
     fn focus(&mut self, h: &AxHandle) -> CoreResult<()> {
         let reply = self.begin_write(AxWrite::AxFocus)?;
         let node = node_id(h)?;
+        self.press_check(FakeMethod::AxFocus)?;
         self.ax_tree.focus(node)?;
         self.record(SinkOp::AxFocus { node });
         reply.confirm("setting AXFocused=true")

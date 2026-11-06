@@ -52,6 +52,15 @@ describe.skipIf(process.platform === "win32")("trust generation retention sweep"
   const listing = async () => (await readdir(directory)).sort()
   const sweep = (options: { current?: string; fs?: TrustRetentionFs; bootAtMs?: number } = {}) =>
     sweepTrustRetention({ directory, bootAtMs: options.bootAtMs ?? BOOT, isPidAlive, ...options })
+  /** Node's fs, except that `call` on the path `denied` fails with EACCES. */
+  const denying = (call: "open" | "lstat", denied: string): TrustRetentionFs => {
+    const refuse = () => Promise.reject(Object.assign(new Error("denied"), { code: "EACCES" }))
+    return {
+      ...nodeFs,
+      open: (path, flags) => call === "open" && path === denied ? refuse() : nodeFs.open(path, flags),
+      lstat: (path) => call === "lstat" && path === denied ? refuse() : nodeFs.lstat(path),
+    }
+  }
 
   test("keeps the 16 most recently used generations and removes the older ones", async () => {
     // Given 20 generations with distinct mtimes and no leases.
@@ -105,16 +114,23 @@ describe.skipIf(process.platform === "win32")("trust generation retention sweep"
     expect(outcome).toEqual({ kind: "swept", removed: { generations: [oldest], leases: [entry], userExtras: [] }, failures: [] })
   })
 
-  test("treats a boot instant within senpi's rounding tolerance as this boot", async () => {
-    // Given a lease whose boot instant was computed one second off this process's (whole-second uptime).
+  test.each([
+    ["one second off", 1_000, true],
+    ["exactly at senpi's rounding tolerance", 120_000, true],
+    ["one millisecond past senpi's rounding tolerance", 120_001, false],
+    ["exactly at senpi's rounding tolerance, earlier", -120_000, true],
+    ["one millisecond past senpi's rounding tolerance, earlier", -120_001, false],
+  ] as const)("judges a lease whose boot instant is %s from this boot's", async (_, offset, pins) => {
+    // Given a live pid whose lease's boot instant was computed off this process's (whole-second uptime).
     const names = await generations(17)
     const oldest = names[0]
     if (oldest === undefined) throw new Error("fixture")
     live.add(4242)
-    await lease(oldest, 4242, { v: 1, pid: 4242, bootAtMs: BOOT + 1_000 })
-    // When the sweep runs; then the lease is live and pins.
+    const entry = await lease(oldest, 4242, { v: 1, pid: 4242, bootAtMs: BOOT + offset })
+    // When the sweep runs; then within the tolerance the lease is this boot's and pins, and past it the lease is dead.
     const outcome = await sweep()
-    expect(outcome).toEqual({ kind: "swept", removed: { generations: [], leases: [], userExtras: [] }, failures: [] })
+    const removed = pins ? { generations: [], leases: [], userExtras: [] } : { generations: [oldest], leases: [entry], userExtras: [] }
+    expect(outcome).toEqual({ kind: "swept", removed, failures: [] })
   })
 
   test("removes a dead lease even when its generation is within the 16", async () => {
@@ -130,7 +146,8 @@ describe.skipIf(process.platform === "win32")("trust generation retention sweep"
 
   test.each([
     ["not JSON", "{"],
-    ["a different version", { v: 2, pid: 4242, bootAtMs: BOOT }],
+    ["an older version", { v: 0, pid: 4242, bootAtMs: BOOT }],
+    ["a non-integer version", { v: 1.5, pid: 4242, bootAtMs: BOOT }],
     ["a pid that differs from its name", { v: 1, pid: 4343, bootAtMs: BOOT }],
     ["no boot instant", { v: 1, pid: 4242 }],
   ] as const)("treats a lease holding %s as dead", async (_, body) => {
@@ -143,6 +160,24 @@ describe.skipIf(process.platform === "win32")("trust generation retention sweep"
     // When the sweep runs; then the lease is removed and does not pin.
     const outcome = await sweep()
     expect(outcome).toEqual({ kind: "swept", removed: { generations: [oldest], leases: [entry], userExtras: [] }, failures: [] })
+  })
+
+  test("keeps a lease written by a newer schema version and its generation", async () => {
+    // Given an old generation whose only lease is v2, with fields a v1 reader would call dead.
+    const names = await generations(17)
+    const oldest = names[0]
+    if (oldest === undefined) throw new Error("fixture")
+    const entry = await lease(oldest, 9191, { v: 2, pid: 9191, bootAtMs: BOOT - 3_600_000 })
+    // When the sweep runs.
+    const outcome = await sweep()
+    // Then a lease this engine cannot interpret pins, is never deleted (keep-when-unsure), and is reported.
+    expect(outcome).toEqual({
+      kind: "swept",
+      removed: { generations: [], leases: [], userExtras: [] },
+      failures: [{ entry: `leases/${entry}`, step: "read-lease", code: "LEASE_NEWER_SCHEMA" }],
+    })
+    expect(await exists(join(directory, `${oldest}.pem`))).toBe(true)
+    expect(await exists(join(directory, "leases", entry))).toBe(true)
   })
 
   test("keeps a lease and its generation when the liveness probe fails", async () => {
@@ -160,6 +195,23 @@ describe.skipIf(process.platform === "win32")("trust generation retention sweep"
       kind: "swept", removed: { generations: [], leases: [], userExtras: [] },
       failures: [{ entry: `leases/${entry}`, step: "probe-lease", code: "EINVAL" }],
     })
+  })
+
+  test.each(["open", "lstat"] as const)("keeps a lease and its generation when the lease's %s fails", async (call) => {
+    // Given an old generation whose only lease names a gone pid and cannot be read.
+    const names = await generations(17)
+    const oldest = names[0]
+    if (oldest === undefined) throw new Error("fixture")
+    const entry = await lease(oldest, 8181)
+    // When the sweep runs.
+    const outcome = await sweep({ fs: denying(call, join(directory, "leases", entry)) })
+    // Then an unreadable lease counts as live: it pins, stays, and the failure is reported.
+    expect(outcome).toEqual({
+      kind: "swept", removed: { generations: [], leases: [], userExtras: [] },
+      failures: [{ entry: `leases/${entry}`, step: "read-lease", code: "EACCES" }],
+    })
+    expect(await exists(join(directory, `${oldest}.pem`))).toBe(true)
+    expect(await exists(join(directory, "leases", entry))).toBe(true)
   })
 
   test("keeps the generation the caller just wrote even when its mtime ranks it out", async () => {
@@ -294,25 +346,22 @@ describe.skipIf(process.platform === "win32")("trust generation retention sweep"
     expect(await exists(join(directory, `u-${extras}.pem`))).toBe(true)
   })
 
-  test("keeps every user-extras file when a remaining generation's header cannot be read", async () => {
-    // Given extras E named by nobody, and a remaining generation whose open fails.
-    const extras = await userExtras("orphan")
-    const [unreadable] = await generations(1)
-    if (unreadable === undefined) throw new Error("fixture")
-    const fs: TrustRetentionFs = {
-      ...nodeFs,
-      open: async (path, flags) => {
-        if (path.endsWith(`${unreadable}.pem`)) throw Object.assign(new Error("denied"), { code: "EACCES" })
-        return nodeFs.open(path, flags)
-      },
-    }
-    // When the sweep runs; then E survives, because that header might name it.
-    const outcome = await sweep({ fs })
+  test.each([
+    ["its header cannot be read", "open", "read-header"],
+    ["it cannot be inspected", "lstat", "inspect-generation"],
+  ] as const)("keeps every user-extras file when a generation is unknown because %s", async (_, call, step) => {
+    // Given extras N named only by one generation, extras O named by nobody, and that generation's open or lstat failing.
+    const named = await userExtras("named")
+    const orphan = await userExtras("orphan")
+    const unknown = await generation(0, named)
+    // When the sweep runs.
+    const outcome = await sweep({ fs: denying(call, join(directory, `${unknown}.pem`)) })
+    // Then every extras file survives, because a header this sweep cannot see might name it.
     expect(outcome).toEqual({
       kind: "swept", removed: { generations: [], leases: [], userExtras: [] },
-      failures: [{ entry: `${unreadable}.pem`, step: "read-header", code: "EACCES" }],
+      failures: [{ entry: `${unknown}.pem`, step, code: "EACCES" }],
     })
-    expect(await exists(join(directory, `u-${extras}.pem`))).toBe(true)
+    for (const kept of [named, orphan]) expect(await exists(join(directory, `u-${kept}.pem`))).toBe(true)
   })
 
   test("reports an unexpected failure as a skipped outcome instead of throwing", async () => {

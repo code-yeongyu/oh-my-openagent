@@ -170,9 +170,11 @@ function installFakeTimers(): FakeTimers {
     },
     async advanceBy(ms) {
       const target = now + ms
+      let fired = 0
       while (true) {
         const nextTimer = nextTimerDueBefore(target)
         if (!nextTimer) break
+        if (++fired > 10_000) throw new Error("fake clock fired more than 10000 timers in one advance: a timer keeps rescheduling itself")
         await this.run(nextTimer)
       }
       now = target

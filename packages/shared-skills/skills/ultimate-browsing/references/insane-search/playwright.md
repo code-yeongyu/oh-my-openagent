@@ -65,7 +65,7 @@ bun install
 ### 호출 (engine 내부)
 
 ```python
-from insane_search.engine.executor import run_playwright_fallback
+from engine.executor import run_playwright_fallback   # 스킬 디렉터리에서 실행 (패키지는 engine/)
 
 attempt, html = run_playwright_fallback(
     "https://example.com/path",

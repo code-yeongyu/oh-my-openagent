@@ -42,6 +42,7 @@ function toResidentHandle(handle: ManagedChildHandle | undefined): ResidentHandl
     task_id: handle.task_id,
     ...(handle.reconcileInputs === undefined ? {} : { reconcileInputs: handle.reconcileInputs }),
     ...(handle.markStopping === undefined ? {} : { markStopping: () => handle.markStopping?.() }),
+    ...(handle.hostEndAnswered === undefined ? {} : { hostEndAnswered: () => handle.hostEndAnswered?.() === true }),
     ...(handle.publishTaskStatus === undefined ? {} : { publishTaskStatus: (status) => handle.publishTaskStatus?.(status) ?? Promise.resolve() }),
     kind,
     pid: handle.pid,

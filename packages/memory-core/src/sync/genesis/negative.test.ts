@@ -61,6 +61,20 @@ describe("isolated genesis rejection vectors", () => {
     expect(signed).toBe(false)
   })
 
+  test("refuses a prepared wraps digest that disagrees with its wraps, though countersigned, before device signing", async () => {
+    const v = await vector()
+    const [device] = v.prepared.wraps
+    const wraps_digest = await sha256B64(jcsBytes([device]))
+    const countersign = await v.capabilities.countersign({
+      t: "omo-sync/v1/recovery-countersign", account: ACCOUNT, custody_root: v.prepared.body.custody_root,
+      predecessor: "", wraps_digest,
+    })
+    const prepared = { ...v.prepared, body: { ...v.prepared.body, wraps_digest, countersign } }
+    const sign = mock(v.keyring.sign)
+    await expect(buildGenesis(ACCOUNT, { ...v.keyring, sign }, prepared)).rejects.toMatchObject({ reason: "wraps_digest_mismatch" })
+    expect(sign).toHaveBeenCalledTimes(0)
+  })
+
   test("rejects a device signature under the recovery domain with correct record fields", async () => {
     const v = await vector()
     const entry = await entryOf(v.built.request, v.keyring)

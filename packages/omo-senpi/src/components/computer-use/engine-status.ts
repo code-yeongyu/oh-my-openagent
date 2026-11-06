@@ -1,4 +1,8 @@
-import { DesktopEngineAbiMismatchError, DesktopLaunchContextError } from "@oh-my-opencode/senpi-desktop-engine"
+import {
+  DesktopEngineAbiMismatchError,
+  DesktopLaunchContextError,
+  type UserFacingErrorInfo,
+} from "@oh-my-opencode/senpi-desktop-engine"
 import type { EngineMethod, PermissionDeniedData, StopPathStatus } from "@oh-my-opencode/senpi-desktop-protocol"
 import {
   type CallOptions,
@@ -22,13 +26,26 @@ export interface TrackedDesktopServiceOptions extends DesktopServiceOptions {
   readonly onPermissionRequired?: (permission: Pick<PermissionDeniedData, "permission" | "app">) => void
 }
 
+const UNAVAILABLE_MESSAGE: Readonly<Record<EngineDiagnostic, string>> = {
+  "native-unavailable": "Computer use is unavailable: no usable desktop engine was found for this host.",
+  quarantined: "Computer use is unavailable: macOS Gatekeeper has quarantined the desktop engine.",
+  "abi-mismatch": "Computer use is unavailable: the installed desktop engine does not match this omo release.",
+  "launch-context-unavailable": "Computer use cannot start safely from this host's current macOS launch context.",
+}
+
 export class ComputerEngineUnavailableError extends Error {
   readonly diagnostic: EngineDiagnostic
+  readonly userFacing: UserFacingErrorInfo
 
   constructor(diagnostic: EngineDiagnostic, cause: Error) {
     super(`Desktop engine unavailable (${diagnostic}): ${cause.message}`, { cause })
     this.name = "ComputerEngineUnavailableError"
     this.diagnostic = diagnostic
+    this.userFacing = {
+      code: "COMPUTER_ENGINE_UNAVAILABLE",
+      message: UNAVAILABLE_MESSAGE[diagnostic],
+      action: "Run /computer status to see the engine path and what is wrong with it.",
+    }
   }
 }
 

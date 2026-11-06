@@ -1,8 +1,13 @@
 import { X509Certificate } from "node:crypto"
 
 type Candidate = { readonly der: Buffer; readonly index: number }
-type DropCause = "pem-noncanonical" | "pem-read-error" | "recognized-block-has-headers" | "aux-block-unverified"
+export type DropCause = "pem-noncanonical" | "pem-read-error" | "recognized-block-has-headers" | "aux-block-unverified"
   | "ordinary-block-not-indexable" | "ordinary-block-unparseable"
+/** 4.4 item 6: whether dropping the whole file for this cause trusts less than plain Bun. */
+export const DROP_CAUSE_NARROWING: Readonly<Record<DropCause, boolean>> = {
+  "pem-noncanonical": true, "pem-read-error": false, "recognized-block-has-headers": false,
+  "ordinary-block-not-indexable": false, "ordinary-block-unparseable": true, "aux-block-unverified": true,
+}
 type DefaultFileCandidates =
   | { readonly kind: "kept"; readonly certificates: readonly Candidate[] }
   | { readonly kind: "dropped"; readonly cause: DropCause; readonly blockIndex: number; readonly narrowing: boolean }
@@ -141,18 +146,18 @@ export function readDefaultFileCandidates(
   const certificates: Candidate[] = []
   let blockIndex = 0
   const drop = (cause: DropCause, index = blockIndex): DefaultFileCandidates => ({
-    kind: "dropped", cause, blockIndex: index,
-    narrowing: {
-      "pem-noncanonical": true, "pem-read-error": false, "recognized-block-has-headers": false,
-      "ordinary-block-not-indexable": false, "ordinary-block-unparseable": true, "aux-block-unverified": true,
-    }[cause],
+    kind: "dropped", cause, blockIndex: index, narrowing: DROP_CAUSE_NARROWING[cause],
   })
   let label: string | undefined
   let headerEnd = -1
   for (let line = 0; line < lines.length; line++) {
     const current = lines[line] ?? ""
-    // ASCII makes characters equal bytes; the cap prevents BIO_gets' 253-byte splitting.
-    if (current.length > 200 || /[^\x20-\x7e]/.test(current)) return drop("pem-noncanonical")
+    // latin1 makes characters equal bytes, so the cap prevents BIO_gets' 253-byte splitting. PEM_read_bio skips
+    // text outside blocks, so bytes 0x80-0xff are allowed there (Fedora's bundle has UTF-8 comments); a block
+    // line, and control bytes anywhere, still drop the file.
+    if (current.length > 200 || (label === undefined ? /[\x00-\x1f\x7f]/ : /[^\x20-\x7e]/).test(current)) {
+      return drop("pem-noncanonical")
+    }
     const boundary = /^-----(BEGIN|END) ([A-Z0-9][A-Z0-9 ]*)-----$/.exec(current)
     if (label === undefined) {
       if (boundary?.[1] === "BEGIN") {

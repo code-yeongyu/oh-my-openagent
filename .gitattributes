@@ -13,6 +13,10 @@
 *.yaml text eol=lf
 *.py text eol=lf
 *.sh text eol=lf
+*.tmpl text eol=lf
+*.go text eol=lf
+# programming's go scaffolder copies these templates byte for byte into a project whose .editorconfig says end_of_line = lf.
+packages/shared-skills/skills/programming/scripts/go/templates/* text eol=lf
 # script/build-brand-logo.ts embeds .github/assets/omo-icon-light.svg in SENPI_BRAND; a CRLF checkout must not change it.
 *.svg text eol=lf
 
@@ -27,3 +31,7 @@ packages/telemetry-core/src/otlp-proto/** -text -whitespace
 # The engine's vendored copy of the telemetry collector's registry is pinned byte for byte by hash (schema-registry/PINS.json,
 # telemetry-artifact.test.ts): no line-ending conversion on any platform.
 packages/omo-senpi/src/components/telemetry/schema-registry/** -text
+
+# The vendored bunshin-ts build output is pinned byte for byte by vendor/PIN.json (bunshin-ts-vendor.test.ts): no line-ending
+# conversion and no whitespace checks (the upstream build output is copied as built).
+packages/omo-senpi/vendor/** -text -whitespace

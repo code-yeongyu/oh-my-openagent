@@ -15,7 +15,6 @@ export {
   buildLibrarianSection,
   buildDelegationTable,
   buildOracleSection,
-  buildFrontendGuidanceSection,
   buildNonClaudePlannerSection,
   buildParallelDelegationSection,
 } from "./dynamic-agent-core-sections"

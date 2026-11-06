@@ -26,6 +26,7 @@ import type {
   DagRpcSubscribeHandshake,
 } from "./dag-rpc-handlers"
 import { runDagTool } from "./dag-tool"
+import { wireDagLifecycle } from "./index"
 import { composeTaskEngine, type TaskEngine, type TaskRunnerFactories } from "./engine"
 import { createTeamServiceTestModelRegistry } from "./team-service-test-model-registry"
 import type { CapturedUi } from "./runtime-context"
@@ -524,17 +525,13 @@ describe("assembled DAG lifecycle end to end", () => {
       project, runner: adopterRunner, sessionId: "session-adopter", sessionFile: adopterSessionFile, awaitAttach: false,
       startEvent: { reason: "fork", previousSessionFile },
     })
-    const adopted = await Promise.race([
-      adopterRunner.whenStarted(1).then(() => true),
-      // Skipping the source resolves attach without starting its node.
-      adopter.attached.then(() => false),
-    ])
-
-    // then the adopter schedules the orphaned node instead of skipping it as foreign
-    expect(adopted).toBe(true)
-    adopterRunner.children[0]?.settle("adopted output")
     await adopter.attached
+
+    // then the adopter re-homes and schedules the orphaned node instead of skipping it as foreign
+    // (a skip leaves the run under the source session and never starts its node)
     expect(adopter.runtime.manager.list("session-adopter").some((run) => run.runId === runId)).toBe(true)
+    await within(adopterRunner.whenStarted(1), 5_000)
+    adopterRunner.children[0]?.settle("adopted output")
     const result = await adopter.runtime.wait(runId, "session-adopter")
     expect(result.status).toBe("completed")
     expect(result.nodes.resume).toEqual(expect.objectContaining({ state: "completed", output: "adopted output" }))
@@ -574,6 +571,7 @@ describe("assembled DAG lifecycle end to end", () => {
     await runner.whenStarted(1)
     runner.children[0]?.settle("first snapshot output")
     await attaching
+    await fixture.runtime.wait(runId, sessionId)
     fixture.bridgeTimers.flush(50)
 
     // then no consumer ever observed the stale pre-recovery pause, and the final snapshot is live
@@ -583,6 +581,44 @@ describe("assembled DAG lifecycle end to end", () => {
       .filter((status): status is string => status !== undefined)
     expect(statuses.length).toBeGreaterThan(0)
     expect(statuses.at(-1)).toBe("completed")
+    fixture.runtime.dispose()
+  })
+
+  // #12113 review: the first turn waits for the attach, so the attach must end once the recovered run
+  // is installed, not when the whole run finishes, and its snapshot must reach the client meanwhile.
+  test("#given a recovered run whose node is still working #when the session's first turn starts #then the turn starts and the recovered snapshot is out before the node settles", async () => {
+    // given a paused run with a dead predecessor lease, recovered through the real lifecycle wiring
+    const project = fs.mkdtempSync(join(tmpdir(), "omo-dag-lifecycle-first-turn-"))
+    cleanupRoots.push(project)
+    const runId = "dag-lifecycle-first-turn" as DagRunId
+    await seedPendingRun(project, runId)
+    const first = await runtimeFixture({ project, attach: false })
+    await pauseForShutdown(first.runtime)
+    first.runtime.dispose()
+    const store = createFileStore({ project_dir: project }, { fsync: false })
+    const paused = store.readCheckpoint<DagRunRecordV1 & { readonly previousLeaseHolderPid?: number }>(runId)
+    if (paused === null) throw new Error("expected paused checkpoint")
+    store.writeCheckpoint(runId, { ...paused, previousLeaseHolderPid: 2_147_483_647 })
+    const runner = new ControlledRunner()
+    const fixture = await runtimeFixture({ project, runner, attach: false })
+    const host = new FakeExtensionAPI()
+    wireDagLifecycle(host, fixture.runtime, () => ({ afterSessionStartReconcile: () => Promise.resolve(true) }))
+
+    // when the session starts and its first turn begins while the recovered node is still running
+    await host.dispatch("session_start", { type: "session_start" }, {})
+    await runner.whenStarted(1)
+    await within(host.dispatch("before_agent_start", { type: "before_agent_start", prompt: "continue" }, {}), 5_000)
+
+    // then the client already holds the recovered run as live, with its node unsettled
+    const statuses = fixture.rpc.events
+      .filter((event) => event.name === "omo.dag.updated")
+      .map((event) => (event.data as { readonly runs?: ReadonlyArray<{ readonly run_id?: string; readonly status?: string }> })
+        .runs?.find((run) => run.run_id === runId)?.status)
+    expect(statuses.at(-1)).toBe("running")
+    runner.children[0]?.settle("first turn output")
+    const result = await fixture.runtime.wait(runId, sessionId)
+    expect(result.status).toBe("completed")
+    expect(result.nodes.resume).toEqual(expect.objectContaining({ state: "completed", output: "first turn output" }))
     fixture.runtime.dispose()
   })
 
@@ -741,8 +777,10 @@ describe("assembled DAG lifecycle end to end", () => {
   })
 
   test("#given bursty adapter mutations with an identical final state #when the snapshot window flushes #then omo.dag.updated emits that state once", async () => {
-    // given
+    // given (the attach already put its own snapshot on the wire, #12113)
     const fixture = await runtimeFixture()
+    const updates = () => fixture.rpc.events.filter((event) => event.name === "omo.dag.updated")
+    const onAttach = updates().length
     await fixture.start("snapshot-dedup")
     await fixture.runner.whenStarted(1)
 
@@ -751,11 +789,11 @@ describe("assembled DAG lifecycle end to end", () => {
     fixture.runtime.sync()
     fixture.runtime.sync()
     fixture.bridgeTimers.flush(50)
-    const firstWindow = fixture.rpc.events.filter((event) => event.name === "omo.dag.updated")
+    const firstWindow = updates().slice(onAttach)
     fixture.runtime.sync()
     fixture.runtime.sync()
     fixture.bridgeTimers.flush(50)
-    const secondWindow = fixture.rpc.events.filter((event) => event.name === "omo.dag.updated")
+    const secondWindow = updates().slice(onAttach)
 
     // then
     expect(firstWindow).toHaveLength(1)

@@ -1,20 +1,35 @@
-//! AX mutations: named actions, `AXValue` writes, and focus.
+//! AX mutations: named actions, `AXValue` writes, and focus. The model's
+//! requests ([`perform_requested`], [`set_value`], [`focus`]) are background
+//! calls under [`reporting_partial`] and run the press check before they write;
+//! an action or an `AXValue` write the app accepted or left unanswered marks the
+//! call sent. An `AXFocused` write does not: it only prepares later input.
 
 use objc2_application_services::{AXError, AXUIElement};
 use objc2_core_foundation::{CFBoolean, CFDate, CFString, CFTimeZone, CFType};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
+use senpi_desktop_core::intervention::check_press;
 
 use super::date;
 use super::element::{self, ax_result, copy_date};
 use super::popup;
+use crate::skylight::{mark_sent, reporting_partial};
 
 pub(crate) fn perform(element: &AXUIElement, action: &str) -> CoreResult<()> {
     let native = action_name(action);
     let action = CFString::from_str(&native);
     // SAFETY: The retained element and action CFString stay valid for the
     // synchronous AX request.
-    let error = unsafe { element.perform_action(&action) };
+    let error = sent(unsafe { element.perform_action(&action) });
     ax_result(error, format!("AX action '{native}' failed"))
+}
+
+/// Marks the call sent when the app accepted the request or never answered
+/// it: either way it may have taken effect. A refusal changed nothing.
+fn sent(error: AXError) -> AXError {
+    if error == AXError::Success || error == AXError::CannotComplete {
+        mark_sent();
+    }
+    error
 }
 
 /// The AX requests an element write sends, each answered by the app's
@@ -63,16 +78,21 @@ pub(super) fn request_result(error: AXError, request: &str, failed: impl Into<St
 /// Performs a model-requested action (`ax.perform`, presses): a request the
 /// app got but did not answer is `AxUnconfirmed`.
 pub(super) fn perform_requested(element: &(impl AxRequests + ?Sized), action: &str) -> CoreResult<()> {
-    let native = action_name(action);
-    let error = element.send_action(&CFString::from_str(&native));
-    request_result(error, &format!("AX action '{native}'"), format!("AX action '{native}' failed"))
+    reporting_partial(|| {
+        check_press()?;
+        let native = action_name(action);
+        let error = sent(element.send_action(&CFString::from_str(&native)));
+        request_result(error, &format!("AX action '{native}'"), format!("AX action '{native}' failed"))
+    })
 }
 
 pub(super) fn set_value(element: &AXUIElement, value: &str) -> CoreResult<()> {
-    if element::copy_string(element, "AXRole").as_deref() == Some("AXPopUpButton") {
-        return popup::choose(element, value);
-    }
-    write_value(element, value)
+    reporting_partial(|| {
+        if element::copy_string(element, "AXRole").as_deref() == Some("AXPopUpButton") {
+            return popup::choose(element, value);
+        }
+        write_value(element, value)
+    })
 }
 
 /// Writes `AXValue` as the control publishes it: a `CFDate` for date and time
@@ -85,8 +105,9 @@ pub(super) fn write_value(element: &(impl AxRequests + ?Sized), value: &str) -> 
 }
 
 fn set_string_value(element: &(impl AxRequests + ?Sized), value: &str) -> CoreResult<()> {
+    check_press()?;
     let value = CFString::from_str(value);
-    let error = element.write_attribute(&CFString::from_str("AXValue"), &value);
+    let error = sent(element.write_attribute(&CFString::from_str("AXValue"), &value));
     request_result(
         error,
         "setting AXValue",
@@ -115,7 +136,8 @@ fn set_date_value(element: &(impl AxRequests + ?Sized), text: &str, current: f64
         .map_err(|reason| DesktopError::ax_failed(format!("{reason}; nothing was written")))?;
     let value =
         CFDate::new(None, target).ok_or_else(|| DesktopError::ax_failed("creating the CFDate to write failed"))?;
-    let error = element.write_attribute(&CFString::from_str("AXValue"), &value);
+    check_press()?;
+    let error = sent(element.write_attribute(&CFString::from_str("AXValue"), &value));
     // An unanswered write is never read back: the control may still change.
     request_result(error, "setting AXValue to a date", "setting AXValue to a date failed")?;
     match element.read_date("AXValue") {
@@ -129,8 +151,11 @@ fn set_date_value(element: &(impl AxRequests + ?Sized), text: &str, current: f64
 }
 
 pub(super) fn focus(element: &(impl AxRequests + ?Sized)) -> CoreResult<()> {
-    let error = element.write_attribute(&CFString::from_str("AXFocused"), CFBoolean::new(true));
-    request_result(error, "setting AXFocused=true", "setting AXFocused=true failed")
+    reporting_partial(|| {
+        check_press()?;
+        let error = element.write_attribute(&CFString::from_str("AXFocused"), CFBoolean::new(true));
+        request_result(error, "setting AXFocused=true", "setting AXFocused=true failed")
+    })
 }
 
 /// Sets `AXMain` and `AXFocused` to true on a window element: the restore and

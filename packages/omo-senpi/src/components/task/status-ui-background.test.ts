@@ -45,7 +45,7 @@ function fakeUi(): FakeUi {
 }
 
 describe("createTaskStatusUi.background progress", () => {
-  it("#given a completed resident team member #when syncing #then its settled row remains without a refresh timer", () => {
+  it("#given a completed resident team member #when syncing #then the widget clears without a refresh timer", () => {
     // given
     const active = new Map<number, () => void>()
     const timers: StatusUiTimers = {
@@ -70,13 +70,8 @@ describe("createTaskStatusUi.background progress", () => {
     statusUi.syncNow()
 
     // then
-    const rows = ui.widgetCalls.at(-1)?.content ?? []
     expect(active.size).toBe(0)
-    expect(rows).toHaveLength(1)
-    expect(rows[0]).toContain("settled researcher")
-    expect(rows[0]).toContain("completed")
-    expect(rows[0]).not.toStartWith("⠋ ")
-    expect(rows.join("\n")).not.toContain("ordinary task")
+    expect(ui.widgetCalls.at(-1)?.content).toBeUndefined()
   })
 
   it("#given only suspended background children #when syncing #then no repaint timer runs", () => {

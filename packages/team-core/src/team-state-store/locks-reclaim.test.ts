@@ -4,6 +4,7 @@ import { readdir, readFile, rm, unlink, utimes, writeFile } from "node:fs/promis
 import { join } from "node:path"
 
 import { createTempDirectory, startLockHolder } from "./lock-test-support"
+import { buildLockRecord, markLockRecordHeld, markLockRecordReleased } from "./lock-record"
 
 function createErrnoError(code: string): Error & { code: string } {
   return Object.assign(new Error(code), { code })
@@ -82,10 +83,13 @@ test("#given a reclaimer that observed a torn lock before another process took t
 
 test("#given a lock this process left behind after a failed release #when withLock runs #then it reclaims the leftover and acquires", async () => {
   // given
-  const { detectStaleLock, lockOwnerInstanceId, withLock } = await import("./locks")
+  const { detectStaleLock, withLock } = await import("./locks")
   const rootDirectory = await createTempDirectory("locks-reclaim-own-leftover-")
   const lockPath = join(rootDirectory, "lock")
-  await writeFile(lockPath, `owner ${crypto.randomUUID()}\n${process.pid}\n${Date.now()}\n${lockOwnerInstanceId}\n`)
+  const record = await buildLockRecord("leftover")
+  markLockRecordHeld(record)
+  await writeFile(lockPath, record)
+  markLockRecordReleased(record)
 
   // when
   const staleDetected = await detectStaleLock(lockPath, 300_000)

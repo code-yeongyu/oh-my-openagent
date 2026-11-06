@@ -8,6 +8,9 @@ import type { ComponentContext, ComponentLogger } from "../../extension/types"
 import { loadSenpiOmoConfig } from "../config-resolution"
 import { createTaskComponent } from "./index"
 
+// This suite is not about job widgets: keep the task component off the real senpi job-widget host.
+const noJobWidgetHost = async (): Promise<Record<string, never>> => ({})
+
 const tempRoots: string[] = []
 
 afterEach(() => {
@@ -41,7 +44,7 @@ describe("task component session cwd anchoring", () => {
     const anchored: (string | undefined)[] = []
 
     // when
-    await createTaskComponent({
+    await createTaskComponent({ loadJobWidgetHost: noJobWidgetHost,
       loadConfig: (options = {}) => {
         anchored.push(options.cwd)
         return loadSenpiOmoConfig(options)
@@ -59,7 +62,7 @@ describe("task component session cwd anchoring", () => {
     const anchored: (string | undefined)[] = []
 
     // when
-    await createTaskComponent({
+    await createTaskComponent({ loadJobWidgetHost: noJobWidgetHost,
       loadConfig: (options = {}) => {
         anchored.push(options.cwd)
         return loadSenpiOmoConfig(options)

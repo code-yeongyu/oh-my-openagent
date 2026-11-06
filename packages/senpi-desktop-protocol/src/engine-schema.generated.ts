@@ -46,6 +46,7 @@ export const ENGINE_METHODS = [
 	"ax.setValue",
 	"ax.focus",
 	"ax.click",
+	"ax.typeText",
 	"stopPath.start",
 	"stopPath.status",
 	"stopPath.heartbeat",
@@ -60,6 +61,7 @@ export const ENGINE_NOTIFICATIONS = [
 	"audit",
 	"stopPath.changed",
 	"engine.log",
+	"epoch.changed",
 ] as const;
 
 /** The frozen desktop error vocabulary mirrored from core `ErrorCode`. */
@@ -92,6 +94,9 @@ export const ERROR_CODES = [
 	"AxUnconfirmed",
 	"SpaceUnsupported",
 	"SpaceMoveDenied",
+	"AmbiguousTarget",
+	"CaptureConsentRequired",
+	"ProtectedProcess",
 ] as const;
 
 export type EngineMethod = (typeof ENGINE_METHODS)[number];

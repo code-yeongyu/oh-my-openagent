@@ -6,8 +6,10 @@
 
 import { isAbsolute, join, relative } from "node:path"
 import { coverageSummaryParts } from "./category-coverage.js"
+import { commandCodeGuidance } from "./setup-guidance.js"
 import { formatModelTemplate, MODEL_GUIDE_LINE } from "./setup-models.js"
 import { providerKeySource } from "./setup-providers-import.js"
+import { COMMANDCODE_PROVIDER_ID } from "./setup-commandcode.js"
 
 // The installers' disclosure (TELEMETRY_INSTALL_DISCLOSURE_LINES in telemetry-core), word for word: a
 // bare `bun add -g omo-ai` user never runs an installer, so setup is where they see it.
@@ -134,7 +136,8 @@ function sourceNames(context) {
   const configFound = assets.present || assets.refusedServers.length > 0 || assets.skippedSkills.length > 0
     || providers.present || providers.skipped.length > 0 || modelChoices.present
   if (configFound) installed.add("opencode")
-  return Object.keys(SOURCE_HARNESSES).filter((id) => installed.has(id)).map((id) => SOURCE_HARNESSES[id])
+  const names = Object.keys(SOURCE_HARNESSES).filter((id) => installed.has(id)).map((id) => SOURCE_HARNESSES[id])
+  return providers.result.added.some((provider) => provider.origin === "commandcode") ? [...names, "Command Code"] : names
 }
 
 // Every stage notice once. Of the detect notices only omo's own store is added: the credential
@@ -170,6 +173,12 @@ export function formatSetupSummary(context) {
   lines.push(...coverage)
   const noted = notes(context)
   if (noted.length > 0) lines.push("Notes:", ...noted.map((notice) => `  ${notice}`))
+  // The Command Code guidance speaks to a user the plan already has a Command Code stake for: the
+  // key env var is set (the preset is on its way into models.json) or an entry the plan carries or
+  // refused is already there. A user with neither sees no Command Code guidance at all.
+  const commandCodePlanned = context.providers.result.added.some((item) => item.id === COMMANDCODE_PROVIDER_ID)
+    || context.providers.skipped.includes(COMMANDCODE_PROVIDER_ID)
+  lines.push(...(commandCodePlanned ? commandCodeGuidance() : []))
   lines.push(MODEL_GUIDE_LINE)
   if (rows.length === 0) lines.push(...formatModelTemplate())
   return `${lines.join("\n")}\n`

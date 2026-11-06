@@ -57,7 +57,7 @@ export interface HostOpenSessionWire {
   readonly provider?: string
   readonly modelId?: string
   readonly thinkingLevel?: SenpiThinkingLevel
-  readonly kind: string
+  readonly kind: HostSessionOpenInput["kind"]
   readonly context: Readonly<Record<string, string>>
   readonly retain_on_disconnect: boolean
   readonly auto_title: boolean

@@ -7,7 +7,7 @@ import { claimReceiptTrailers, type ClaimReceipt } from "../provenance"
 import { hasLegacyUserHeader, provenanceStrippedTrailers, restampContent } from "./claim-frontmatter"
 import type { AppliedPatch } from "./patch-apply"
 import type { MemoryToolCommit, MemoryToolProvenance } from "./memory"
-import { parseMemoryFile, renderMemoryFile } from "../memfs/frontmatter"
+import { isMissingFrontmatterError, parseMemoryFile, renderMemoryFile } from "../memfs/frontmatter"
 import { describeDescriptionViolation } from "../memfs/frontmatter-validation"
 import { MemoryPathError, validateMemoryPath } from "../memfs/paths"
 import type { LockDomain } from "../locks"
@@ -220,6 +220,9 @@ function parseForTool(content: string): ReturnType<typeof parseMemoryFile> {
   try {
     return parseMemoryFile(content)
   } catch (error) {
+    if (isMissingFrontmatterError(error)) {
+      throw new Error("memory_apply_patch: target file is missing required frontmatter; add frontmatter with update_description")
+    }
     throw new Error(`memory_apply_patch: ${errorMessage(error).replace(/^frontmatter: /, "")}`)
   }
 }

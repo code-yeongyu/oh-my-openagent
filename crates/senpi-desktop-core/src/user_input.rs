@@ -4,6 +4,17 @@
 
 use std::time::Instant;
 
+/// A backend's shared feed of the user's presses: readable while the backend
+/// itself is busy sending input, so a press check mid-call sees fresh presses.
+pub trait UserInputFeed: Send + Sync {
+    /// The presses recorded since the last call.
+    fn take(&self) -> UserPresses;
+    /// When process `pid` started, in a unit stable for its lifetime, or
+    /// `None` when the platform cannot tell; a later process reusing the id
+    /// starts later.
+    fn process_started(&self, pid: u32) -> Option<u64>;
+}
+
 /// What the user pressed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UserPressKind {

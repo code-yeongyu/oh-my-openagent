@@ -104,6 +104,7 @@ function toolKinds(exe: string, rest: readonly string[]): InvokedKind[] {
   }
   if (RUNNERS.has(exe)) {
     if (exe === "bun" && first === "test") return ["test"]
+    if (exe === "bun" && first === "check") return ["typecheck"]
     if (exe === "bun" && first === "build") return ["build"]
     if (first === "run") return scriptKinds([second])
     if (exe !== "bun" && first === "test") return ["test"]
