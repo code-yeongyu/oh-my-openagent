@@ -1,6 +1,8 @@
 //! The session thread's state and request dispatch.
 
+use std::cell::Cell;
 use std::path::PathBuf;
+use std::rc::Rc;
 use std::sync::Arc;
 
 use parking_lot::Mutex;
@@ -50,6 +52,9 @@ pub(crate) struct Worker {
     pub(crate) watching_user_input: bool,
     /// The user's input into the apps this session works in (#11459).
     pub(crate) intervention: crate::intervention::Intervention,
+    /// The route and hit of the mutating request being served, for its
+    /// object-mode report.
+    pub(crate) report_extras: Rc<Cell<Option<crate::report::ReportExtras>>>,
 }
 
 /// A mutating request's reply and the audit event it emitted.
@@ -89,6 +94,7 @@ impl Worker {
             notes,
             watching_user_input: false,
             intervention: crate::intervention::Intervention::new(),
+            report_extras: Rc::default(),
         };
         worker.install_screen_probe();
         worker.refresh_capabilities();
@@ -188,19 +194,31 @@ impl Worker {
 
     fn serve(&mut self, op: Op, cancelled: &dyn Fn() -> bool) -> CoreResult<Response> {
         let mode = self.registry.report_mode();
-        let served = |audited: CoreResult<Audited>| match audited {
-            Ok((response, audit)) => Ok(crate::report::respond(mode, response, &audit)),
-            // `mutate` reports every error it returns in object mode, so an
-            // unreported one was refused before it (bad params): nothing was sent.
-            Err(error) if mode == ReportMode::Object => {
-                Err(error.with_fallback_disposition(Disposition::NOT_DELIVERED_SAFE))
+        let extras = Rc::clone(&self.report_extras);
+        let served = |audited: CoreResult<Audited>| {
+            let extras = extras.take().unwrap_or_default();
+            match audited {
+                Ok((response, audit)) => {
+                    Ok(crate::report::respond(mode, response, &audit, extras))
+                }
+                // `mutate` reports every error it returns in object mode, so an
+                // unreported one was refused before it (bad params): nothing was sent.
+                Err(error) if mode == ReportMode::Object => {
+                    Err(error.with_fallback_disposition(Disposition::NOT_DELIVERED_SAFE))
+                }
+                Err(error) => Err(error),
             }
-            Err(error) => Err(error),
         };
         // Every mutating request goes through `mutate`; reads bypass it.
         match op {
             Op::Displays => Ok(Response::Displays(self.backend()?.displays()?)),
-            Op::Windows => Ok(Response::Windows(self.backend()?.windows()?)),
+            Op::Windows => {
+                let mut windows = self.backend()?.windows()?;
+                if mode == ReportMode::Null {
+                    windows.iter_mut().for_each(|window| window.identity = None);
+                }
+                Ok(Response::Windows(windows))
+            }
             Op::Capture(params) => self.capture(&params),
             Op::Observe(params) => self.observe(&params, cancelled),
             Op::CaptureRegion(params) => self.capture_region(&params, cancelled),
