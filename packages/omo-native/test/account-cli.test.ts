@@ -10,6 +10,8 @@ import { pinTrustAnchor } from "../../memory-core/src/sync/crypto/trust-pin.ts"
 import { createWorld, removeWorldStateDirs } from "../../memory-core/src/sync/recovery/testing/world.test-support.ts"
 import { createCredentialStore, type CredentialStore, KeychainLockedError, type SecretApi } from "../../omo-opencode/src/cli/service-auth/keystore"
 import type { Credentials } from "../../omo-opencode/src/cli/service-auth/protocol"
+import type { BeforeKeysDiscarded } from "../../omo-opencode/src/cli/service-auth/session"
+import { retireSyncPinOnDiscard } from "../../omo-opencode/src/cli/service-auth/sync-pin-retire"
 import { ACCOUNT_EXIT, runAccountVerb } from "../account-cli"
 
 const homes: string[] = []
@@ -42,7 +44,7 @@ function memoryStore(initial: Credentials | null) {
   return { store, current: () => value }
 }
 
-function run(store: CredentialStore, args: string[], options: { stdin?: string; api?: string; pinDir?: string } = {}) {
+function run(store: CredentialStore, args: string[], options: { stdin?: string; api?: string; pinDir?: string; beforeKeysDiscarded?: BeforeKeysDiscarded } = {}) {
   const home = mkdtempSync(join(tmpdir(), "omo-account-cli-"))
   homes.push(home)
   const pinDir = options.pinDir ?? join(home, "sync-device")
@@ -54,6 +56,7 @@ function run(store: CredentialStore, args: string[], options: { stdin?: string; 
       store,
       home,
       pinDir: () => pinDir,
+      ...(options.beforeKeysDiscarded === undefined ? {} : { beforeKeysDiscarded: options.beforeKeysDiscarded }),
       readStdin: async () => options.stdin ?? "",
       output: line => out.push(line),
       error: line => err.push(line),
@@ -551,5 +554,57 @@ describe("omo account on Linux, where a locked Secret Service read looks empty (
     const store = linuxStore("unlocked", { ...empty, set: lockedWrite })
     const result = await run(store, ["adopt"], { stdin: JSON.stringify(credential("dev_w", 60_000)) })
     expect({ code: result.code, out: result.out }).toEqual({ code: ACCOUNT_EXIT.keychainLocked, out: [{ keychain: "locked" }] })
+  })
+})
+
+// #12280 R-B2/R-B3: every `omo account` path that discards a principal's keys retires that account's
+// memory-sync pin first (a rename), leaves other accounts' pins alone, and `show --account` then
+// reports the device as not joined.
+describe("discarding keys retires the account's sync pin (#12280)", () => {
+  const b64 = (fill: number) => Buffer.alloc(32, fill).toString("base64url")
+  const writePin = async (pinDir: string, account: string) => {
+    const { createHash } = await import("node:crypto")
+    const { mkdir, writeFile } = await import("node:fs/promises")
+    const dir = join(pinDir, "trust-anchor", createHash("sha256").update(account, "utf8").digest("base64url"))
+    await mkdir(dir, { recursive: true })
+    const pin = { version: 1, account, genesis_digest: b64(1), pinned_by: "pairing", pinned_at: { seq: 2, keyring_link: b64(2) } }
+    await writeFile(join(dir, "pin.json"), `${JSON.stringify(pin)}\n`)
+  }
+  const retiring = (pinDir: string) => ({ beforeKeysDiscarded: retireSyncPinOnDiscard({ pinDir: () => pinDir, log: () => undefined }) })
+  const shown = async (store: CredentialStore, pinDir: string, account: string) =>
+    (await run(store, ["show", "--account", account], { pinDir })).out[0]?.["sync"]
+
+  const withAccount = (deviceId: string, account: string): Credentials => ({ ...credential(deviceId, 3_600_000), accountId: account })
+
+  for (const [name, args, stdin] of [
+    ["forget --device", ["forget", "--device", "dev-1"], undefined],
+    ["adopt --replace with another device", ["adopt", "--replace"], JSON.stringify(credential("dev-2", 3_600_000))],
+  ] as const) {
+    test(`#given a joined device #when ${name} discards its keys #then its account's pin is retired, another account's is kept, and show reports not_joined`, async () => {
+      const home = mkdtempSync(join(tmpdir(), "omo-account-retire-"))
+      homes.push(home)
+      const pinDir = join(home, "sync-device")
+      await writePin(pinDir, "acct-1")
+      await writePin(pinDir, "acct-other")
+      const s = memoryStore(withAccount("dev-1", "acct-1"))
+      expect(await shown(s.store, pinDir, "acct-1")).toBe("joined")
+      const result = await run(s.store, [...args], { pinDir, ...(stdin === undefined ? {} : { stdin }), ...retiring(pinDir) })
+      expect(result.code).toBe(ACCOUNT_EXIT.ok)
+      expect(await shown(s.store, pinDir, "acct-1")).toBe("not_joined")
+      expect(await shown(s.store, pinDir, "acct-other")).toBe("joined")
+    })
+  }
+
+  test("#given a desktop-owned session's account #when retire-sync runs #then that pin is retired, idempotently", async () => {
+    const home = mkdtempSync(join(tmpdir(), "omo-account-retire-"))
+    homes.push(home)
+    const pinDir = join(home, "sync-device")
+    await writePin(pinDir, "acct-desktop")
+    const s = memoryStore(null)
+    const first = await run(s.store, ["retire-sync", "--account", "acct-desktop"], { pinDir })
+    expect(first).toMatchObject({ code: ACCOUNT_EXIT.ok, out: [{ retired: true }] })
+    expect(await shown(s.store, pinDir, "acct-desktop")).toBe("not_joined")
+    expect(await run(s.store, ["retire-sync", "--account", "acct-desktop"], { pinDir })).toMatchObject({ code: ACCOUNT_EXIT.ok })
+    expect((await run(s.store, ["retire-sync"], { pinDir })).code).toBe(ACCOUNT_EXIT.invalid)
   })
 })

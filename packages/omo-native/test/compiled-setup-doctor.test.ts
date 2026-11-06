@@ -62,6 +62,22 @@ describe("compiled omo doctor", () => {
     expect(lines).toContain("WARN task categories: 0 of 10 usable with your connected providers")
   })
 
+  test("#given a dropped default file #when doctor runs #then it names the drop as INFO and the exit code stays 0 (design r11)", async () => {
+    const root = runtimeRoot()
+    const drop = "INFO engine trust: default file /etc/ssl/cert.pem dropped: pem-noncanonical, block 0, narrowing=true"
+    let exitCode: number | undefined
+    const output = await captureLog(async () => {
+      await runCompiledLauncher(["doctor"], root, "2026.8.28", root, {
+        computerUseLines: async () => [],
+        coverageLines: async () => [],
+        trustLines: async () => [drop],
+      })
+      exitCode = Number(process.exitCode)
+    })
+    expect(output.split("\n")).toContain(drop)
+    expect(exitCode).toBe(0)
+  })
+
   test("#given a computer-use FAIL line #when doctor runs #then the exit code is 1", async () => {
     const root = runtimeRoot()
     let exitCode: number | undefined
