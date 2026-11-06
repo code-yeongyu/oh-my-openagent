@@ -16,6 +16,8 @@ import {
   withLock,
 } from "@oh-my-opencode/memory-core"
 
+import { OmoMemorySettingsSchema } from "@oh-my-opencode/omo-config-core"
+
 import { createMemoryBinding } from "./binding"
 import { createMemoryIdentityContext } from "./context"
 import { createMemoryMaintenance } from "./memory-maintenance"
@@ -564,6 +566,33 @@ describe("runtime size cap inside the maintenance pass (B08)", () => {
     expect(line?.data?.evicted).toBe(2)
     expect(line?.data?.capBytes).toBe(1)
     expect(log.warn).toEqual(["omo-senpi memory runtime cap exceeded, nothing evictable"])
+  }, 60_000)
+
+  test("#given memory settings whose agents.<id>.runtime.max_bytes caps this identity #when the pass runs #then the sidecar resolves that cap and evicts", async () => {
+    const { context, runDirs } = await identityWithYoungRuns()
+    const log = recorder()
+    const settings = OmoMemorySettingsSchema.parse({ agents: { [context.identity]: { runtime: { max_bytes: 1 } } } })
+    const maintenance = createMemoryMaintenance({ logger: log.logger, delayMs: 0, now: () => NOW, memorySettings: () => settings })
+
+    maintenance.schedule(context)
+    await maintenance.settled()
+
+    expect(runDirs.map((dir) => existsSync(dir))).toEqual([false, false, true])
+    expect(log.infoData.find((entry) => entry.message === "omo-senpi memory runtime retention")?.data?.capBytes).toBe(1)
+    expect(log.warn).toEqual(["omo-senpi memory runtime cap exceeded, nothing evictable"])
+  }, 60_000)
+
+  test("#given memory settings that cap only another identity #when the pass runs #then this identity keeps the global cap and nothing is evicted", async () => {
+    const { context, runDirs } = await identityWithYoungRuns()
+    const log = recorder()
+    const settings = OmoMemorySettingsSchema.parse({ agents: { "other-agent": { runtime: { max_bytes: 1 } } } })
+    const maintenance = createMemoryMaintenance({ logger: log.logger, delayMs: 0, now: () => NOW, memorySettings: () => settings })
+
+    maintenance.schedule(context)
+    await maintenance.settled()
+
+    expect(runDirs.map((dir) => existsSync(dir))).toEqual([true, true, true])
+    expect(log.warn).toEqual([])
   }, 60_000)
 
   test("#given the reflection-scheduler lock is busy so the journal tiers are skipped #when the over-cap pass runs #then it does not log nothing-evictable (#12538 review L4)", async () => {
