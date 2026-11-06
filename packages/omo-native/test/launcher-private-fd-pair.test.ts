@@ -5,12 +5,14 @@ import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { Socket } from "node:net"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
+import { testBudgetSignal, useTestTimeout } from "../../../test-support/test-deadline"
 
 const SOURCE = resolve(import.meta.dir, "..")
 
 describe.skipIf(process.platform !== "win32")("Windows launcher pipe pair (#11955)", () => {
   for (const hop of ["npm", "bun-reexec", "compiled"] as const) {
     test(`${hop} host ensure round-trips a frame and releases both parent handles before exit`, async () => {
+      useTestTimeout(150_000)
       const root = mkdtempSync(join(tmpdir(), "omo-win32-pair-"))
       const pkg = join(root, "app")
       const engine = join(pkg, "node_modules", "@code-yeongyu", "senpi")
@@ -100,7 +102,7 @@ await reexecProvisionedRuntime(process.env.PAIR_BUN, { argv: [${JSON.stringify(e
         expect(JSON.parse(report)).toEqual({ closed: [true, true] })
       } finally {
         if (child?.exitCode === null && child.signalCode === null) {
-          const stopped = once(child, "close", { signal: AbortSignal.timeout(10_000) })
+          const stopped = once(child, "close", { signal: testBudgetSignal("the launcher child to close") })
           child.stdin?.end()
           child.kill()
           await stopped

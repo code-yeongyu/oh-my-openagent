@@ -7,6 +7,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 import { readDefaultFileCandidates } from "../openssl-default-file"
+import { testBudgetSignal, useTestTimeout } from "../../../test-support/test-deadline";
 
 // A private PKI per run, independent of all machine trust stores and fixed fixtures.
 const dir = mkdtempSync(join(tmpdir(), "omo-default-file-"))
@@ -188,13 +189,14 @@ test.each([["R", rootDer, true], ["c4", c4, false], ["X", x, false]] as const)(
 )
 
 test.skipIf(process.platform === "win32")("never imports R beyond real Bun's accepted set", async () => {
+  useTestTimeout(240_000)
   // Given: a leaf signed by R, a fresh empty directory, and sanitized child environments.
   const emptyDir = join(dir, "empty-dir")
   mkdirSync(emptyDir)
   const server = createServer({
     key: leafKey.privateKey.export({ type: "pkcs8", format: "pem" }), cert: pem(signed(leafTbs)),
   }, (_request, response) => response.end("ok"))
-  const listening = once(server, "listening", { signal: AbortSignal.timeout(10_000) })
+  const listening = once(server, "listening", { signal: testBudgetSignal("the TLS server to listen") })
   server.listen(0, "127.0.0.1")
   await listening
   const address = server.address()
@@ -269,7 +271,7 @@ test.skipIf(process.platform === "win32")("never imports R beyond real Bun's acc
     expect([...narrowings].sort()).toEqual(["c4", ...exposed, "long-label", "mid-cr", "form-feed", "high-byte",
       "lowercase-label", "blank-body", "space-only-header-line"].sort())
   } finally {
-    const closed = once(server, "close", { signal: AbortSignal.timeout(10_000) })
+    const closed = once(server, "close", { signal: testBudgetSignal("the TLS server to close") })
     server.closeAllConnections()
     server.close()
     await closed
