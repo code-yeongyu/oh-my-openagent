@@ -6,7 +6,7 @@ import { FRONTMATTER_RE } from "../memfs/frontmatter-scalar"
 import { restampContent } from "../tools/claim-frontmatter"
 import { literalPathspecRunner, type Run } from "./completion-repair"
 
-export const ARCHIVE_PATH = "ARCHIVE.md"
+const ARCHIVE_PATH = "ARCHIVE.md"
 
 type Successor = { readonly kind: "moved"; readonly path: string } | { readonly kind: "archived" } | { readonly kind: "removed" }
 
