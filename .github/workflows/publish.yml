@@ -1439,8 +1439,10 @@ jobs:
           gh release download "v${VERSION}" --dir "$VERIFY_DIR"
           RELEASED="$(cd "$VERIFY_DIR" && printf '%s\n' * | sort)"
           # The contract floor every release carries, built in this run or not.
+          # omo-runtime-capabilities.json: every runtime this stack builds declares its contract; a release without it would
+          # ship runtimes the desktop never hands off to (RULING-77, #11613).
           FLOOR=(omo-keychain-darwin-universal SHA256SUMS senpi-desktop-engine-checksums.txt
-            senpi-desktop-engine-win32-x64.exe senpi-desktop-engine-win32-arm64.exe)
+            senpi-desktop-engine-win32-x64.exe senpi-desktop-engine-win32-arm64.exe omo-runtime-capabilities.json)
           for TARGET in darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline windows-arm64; do
             NAME="omo-${TARGET}"
             if [[ "$TARGET" == windows-* ]]; then NAME="${NAME}.exe"; fi
@@ -1467,9 +1469,7 @@ jobs:
               <(printf '%s\n' "$RELEASED")
             shasum -a 256 -c SHA256SUMS
             shasum -a 256 -c senpi-desktop-engine-checksums.txt
-            if [ -f omo-runtime-capabilities.json ]; then
-              printf '{"keychainHandoff":1}\n' | cmp - omo-runtime-capabilities.json
-            fi
+            printf '{"keychainHandoff":1}\n' | cmp - omo-runtime-capabilities.json
           )
           echo "Verified $(grep -c . <<<"$RELEASED") release assets for v${VERSION}"
 
