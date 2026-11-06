@@ -12,6 +12,7 @@ mod display_awake;
 mod epoch;
 mod grant;
 mod intervention;
+mod lock;
 mod mutate;
 mod pending;
 mod pointer;
@@ -37,6 +38,9 @@ mod worker_holds;
 mod worker_menus;
 
 pub use grant::ControlSlot;
+#[cfg(unix)]
+pub use lock::user_runtime_dir;
+pub use lock::{UserRuntimeDir, FAKE_RUNTIME_DIR_ENV};
 pub use mutate::SessionSafety;
 pub use pending::RequestMode;
 pub use request::{Op, Response};
