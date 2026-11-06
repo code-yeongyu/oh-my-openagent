@@ -20,8 +20,9 @@ pub const ABI: &str = "senpi-desktop/1";
 /// against the captured window's owning process; `frame-consume`: pointer
 /// options take `consume`; `ax-partial`: an object-mode `ax.snapshot` past its
 /// deadline (`timeoutMs`, default 3000) returns the nodes it read with
-/// `complete: false` and its `cuts`.
-pub const FEATURES: &[&str] = &["action-report", "frame-identity", "frame-consume", "ax-partial"];
+/// `complete: false` and its `cuts`; `trace`: `trace: true` adds per-stage `timings`
+/// to action reports and a redacted JSONL trace beside the audit log.
+pub const FEATURES: &[&str] = &["action-report", "frame-identity", "frame-consume", "ax-partial", "trace"];
 
 /// Standard JSON-RPC 2.0 error codes the engine emits.
 pub const PARSE_ERROR: i64 = -32_700;
