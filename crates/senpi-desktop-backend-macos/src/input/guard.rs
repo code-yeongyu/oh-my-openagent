@@ -2,12 +2,15 @@
 //! rule. Decisions only - no event posting happens here.
 
 use std::cell::Cell;
+use std::time::{Duration, Instant};
 
 use senpi_desktop_core::backend::{MouseButton, PointerEvent};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::report::ReportMode;
 use senpi_desktop_core::types::{DesktopWindow, KeyPriming};
 
+use super::priming;
+use super::user_feed_raw::RawFeed;
 use crate::capture::MacCapture;
 use crate::skylight;
 
@@ -78,18 +81,141 @@ fn key_delivery() -> KeyDelivery {
     }
 }
 
-/// Prepares background keyboard delivery for `window`, or refuses it. Both
-/// deliveries take the sole-window rule until the priming procedure lands.
+/// Background keys for `window`: makes it the key window its process routes
+/// keys to, or refuses with nothing sent, then runs `send`. `activated` is
+/// set to `(pid, wid)` once key focus moved, for the session's hand-back.
+///
+/// A process with one window takes the sole-window path. A process with
+/// several windows is refused, unless the session opted into priming
+/// ([`KeyDelivery::Primed`]): then the target is primed and proven key
+/// ([`super::priming`]) and key focus inside the app is handed back after
+/// `send`, whatever it returned.
+pub(super) fn deliver_keys<T>(
+    window: &DesktopWindow,
+    pid: libc::pid_t,
+    wid: u32,
+    capture: &MacCapture,
+    feed: Option<&RawFeed>,
+    activated: &mut Option<(libc::pid_t, u32)>,
+    send: impl FnOnce() -> CoreResult<T>,
+) -> CoreResult<T> {
+    let siblings = siblings(window, capture)?;
+    if siblings > 1 && key_delivery() == KeyDelivery::Primed {
+        let mut ops = LiveOps { pid, wid, feed };
+        let (result, moved) = priming::primed_delivery(wid, &mut ops, |_| {
+            *activated = Some((pid, wid));
+            send()
+        });
+        if moved.is_some() {
+            *activated = Some((pid, wid));
+        }
+        return result;
+    }
+    sole_window_keys(wid, siblings)?;
+    // Sole window of its process, so the target is unambiguous: make it key
+    // without raising it or changing the frontmost application. A background app
+    // otherwise has no key window and drops the keystrokes entirely.
+    skylight::activate_without_raise(pid, wid)?;
+    *activated = Some((pid, wid));
+    send()
+}
+
+/// The sole-window rule alone, for held keys: makes the target key or
+/// refuses a process with several windows.
 pub(super) fn prepare_keys(
     window: &DesktopWindow,
     pid: libc::pid_t,
     wid: u32,
     capture: &MacCapture,
 ) -> CoreResult<()> {
-    match key_delivery() {
-        KeyDelivery::SoleWindow | KeyDelivery::Primed => sole_window_keys(window, pid, wid, capture),
+    sole_window_keys(wid, siblings(window, capture)?)?;
+    skylight::activate_without_raise(pid, wid)
+}
+
+/// The windows the capture lists for `window`'s process.
+fn siblings(window: &DesktopWindow, capture: &MacCapture) -> CoreResult<usize> {
+    Ok(capture.windows()?.into_iter().filter(|candidate| candidate.pid == window.pid).count())
+}
+
+/// Priming's reads and posts on the live desktop, for `(pid, wid)`.
+struct LiveOps<'feed> {
+    pid: libc::pid_t,
+    wid: u32,
+    feed: Option<&'feed RawFeed>,
+}
+
+impl LiveOps<'_> {
+    fn window(&self, wid: u32) -> DesktopWindow {
+        DesktopWindow {
+            identity: None,
+            id: wid.to_string(),
+            title: String::new(),
+            app: String::new(),
+            pid: u32::try_from(self.pid).ok(),
+            x: 0,
+            y: 0,
+            width: 0,
+            height: 0,
+            focused: false,
+            is_on_screen: None,
+            elevated: None,
+        }
     }
 }
+
+impl priming::PrimingOps for LiveOps<'_> {
+    fn read(&mut self) -> priming::Read {
+        let listed = crate::focus::window_info().map(|windows| {
+            windows.iter().any(|window| {
+                window.window_number == self.wid && libc::pid_t::try_from(window.pid) == Ok(self.pid)
+            })
+        });
+        if listed == Ok(false) {
+            return priming::Read::Gone;
+        }
+        match super::element::focus_read(self.pid, READ_TIMEOUT) {
+            Some(read) => priming::Read::Focus(read),
+            None => priming::Read::Unreadable,
+        }
+    }
+
+    fn apply(&mut self, step: priming::Move) -> bool {
+        match step {
+            priming::Move::Short => skylight::post_key_records(self.pid, self.wid, false),
+            priming::Move::Full => skylight::post_key_records(self.pid, self.wid, true),
+            priming::Move::AxWrite => crate::ax::focus_key_window(&self.window(self.wid)).is_ok(),
+        }
+    }
+
+    fn wait(&mut self, time: Duration) {
+        std::thread::sleep(time);
+    }
+
+    fn user_active_in_target(&mut self) -> bool {
+        self.target_app_front()
+            && self.feed.is_some_and(|feed| feed.pressed_within(priming::TAKEOVER, Instant::now()))
+    }
+
+    fn target_app_front(&mut self) -> bool {
+        crate::front_app::current_front_pid() == Some(self.pid)
+    }
+
+    fn window_order(&mut self) -> Vec<u32> {
+        crate::focus::window_info()
+            .unwrap_or_default()
+            .iter()
+            .filter(|window| libc::pid_t::try_from(window.pid) == Ok(self.pid) && window.layer == 0 && window.on_screen)
+            .map(|window| window.window_number)
+            .collect()
+    }
+
+    fn make_key(&mut self, window: u32) -> bool {
+        crate::ax::focus_key_window(&self.window(window)).is_ok()
+    }
+}
+
+/// The longest one priming focus read may wait for the application.
+const READ_TIMEOUT: Duration = Duration::from_millis(250);
 
 /// The sole-window rule for background keys.
 ///
@@ -99,17 +225,7 @@ pub(super) fn prepare_keys(
 /// into another of the user's windows. `DesktopWindow::focused` cannot
 /// disambiguate: xcap reports every window owned by the active application as
 /// focused on macOS.
-fn sole_window_keys(
-    window: &DesktopWindow,
-    pid: libc::pid_t,
-    wid: u32,
-    capture: &MacCapture,
-) -> CoreResult<()> {
-    let siblings = capture
-        .windows()?
-        .into_iter()
-        .filter(|candidate| candidate.pid == window.pid)
-        .count();
+fn sole_window_keys(wid: u32, siblings: usize) -> CoreResult<()> {
     if siblings > 1 {
         return Err(DesktopError::background_unavailable(format!(
             "window {wid} is one of {siblings} windows in its application; macOS delivers \
@@ -117,10 +233,7 @@ fn sole_window_keys(
              with delivery:\"foreground\" or use ax actions",
         )));
     }
-    // Sole window of its process, so the target is unambiguous: make it key
-    // without raising it or changing the frontmost application. A background app
-    // otherwise has no key window and drops the keystrokes entirely.
-    skylight::activate_without_raise(pid, wid)
+    Ok(())
 }
 
 pub(super) const fn pointer_kind(event: &PointerEvent) -> &'static str {
