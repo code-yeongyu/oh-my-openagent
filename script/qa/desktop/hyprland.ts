@@ -82,6 +82,9 @@ function pickWindow(windows: Json): { window: JsonObject; client: JsonObject } |
 	return null;
 }
 
+/** Logical pixels the cursor may sit from the expected point (`cursorpos` rounds to whole pixels). */
+const CURSOR_TOLERANCE = 2;
+
 function cursor(): { x: number; y: number } {
 	const position = asObject(hyprctl("cursorpos"));
 	return { x: Number(position.x), y: Number(position.y) };
@@ -111,25 +114,37 @@ async function windowMove(engine: Engine): Promise<Result> {
 	const after = { cursor: cursor() };
 	const at = picked.client.at;
 	const size = picked.client.size;
-	const inside =
-		Array.isArray(at) &&
-		Array.isArray(size) &&
-		after.cursor.x >= Number(at[0]) &&
-		after.cursor.y >= Number(at[1]) &&
-		after.cursor.x < Number(at[0]) + Number(size[0]) &&
-		after.cursor.y < Number(at[1]) + Number(size[1]);
+	// The frame is cropped at the client rect, so frame pixel (x, y) is the client's `at` plus (x, y)
+	// in logical units (frame pixels scaled by size / frame size); a cursor merely inside the client
+	// would also pass with the crop and the click on different rects.
+	const expected =
+		Array.isArray(at) && Array.isArray(size)
+			? {
+					x: Number(at[0]) + (x * Number(size[0])) / Number(frame.width),
+					y: Number(at[1]) + (y * Number(size[1])) / Number(frame.height),
+				}
+			: null;
+	const atExpectedPoint =
+		expected !== null &&
+		Math.abs(after.cursor.x - expected.x) <= CURSOR_TOLERANCE &&
+		Math.abs(after.cursor.y - expected.y) <= CURSOR_TOLERANCE;
 	const checks: Record<string, boolean> = inputPath
 		? {
 				window_input_available: windowInput?.available === true,
 				move_ok: moved === "ok",
-				cursor_inside_target_client: inside,
+				cursor_at_frame_center_of_target_client: atExpectedPoint,
 			}
 		: {
 				window_input_no_eis: windowInput?.available === false && windowInput.reason === "no_eis",
 				move_refused: moved !== "ok",
 				cursor_unchanged: after.cursor.x === before.cursor.x && after.cursor.y === before.cursor.y,
 			};
-	return result("hyprland-window-move", checks, { capabilities: caps, moveMouse: moved, target }, { before, after });
+	return result(
+		"hyprland-window-move",
+		checks,
+		{ capabilities: caps, moveMouse: moved, target, expectedCursor: expected },
+		{ before, after },
+	);
 }
 
 if (process.platform !== "linux") usage(`runs on the Linux host under test, not ${process.platform}`);
