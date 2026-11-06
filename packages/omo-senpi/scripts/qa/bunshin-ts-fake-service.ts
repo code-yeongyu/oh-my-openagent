@@ -19,7 +19,14 @@ import {
 import { encodeLine, LineDecoder, parseLine } from "../../../device-service-core/src/local-api/framing.ts"
 import { listenLocal, type Transport } from "../../../device-service-core/src/local-api/transport.ts"
 
-export type FakeDevice = Readonly<{ device: string; label: string; os: string; tags: readonly string[] }>
+export type FakeDevice = Readonly<{
+  device: string
+  label: string
+  os: string
+  tags: readonly string[]
+  // The service refuses this device's machine.describe, as it does once the device has not answered for 10 s.
+  describeRefusal?: Readonly<{ code: string; reason: string }>
+}>
 
 export const FAKE_DEVICES: readonly FakeDevice[] = [
   { device: "fake-dev-builder", label: "builder", os: "linux", tags: ["builder"] },
@@ -88,7 +95,9 @@ export async function startFakeDeviceService(options: { devices?: readonly FakeD
         case "machine.events.subscribe":
           return { ok: true, data: {}, after: () => devices.forEach((d) => event("machine.changed", { device: d.device, state: "online" })) }
         case "machine.describe":
-          return device === undefined ? { ok: false, code: "peer_not_found", reason: "no such device" } : { ok: true, data: { device: device.device, description: describeDevice(device) } }
+          if (device === undefined) return { ok: false, code: "peer_not_found", reason: "no such device" }
+          if (device.describeRefusal !== undefined) return { ok: false, ...device.describeRefusal }
+          return { ok: true, data: { device: device.device, description: describeDevice(device) } }
         case "machine.batch": {
           if (device === undefined) return { ok: false, code: "peer_not_found", reason: "no such device" }
           const ops = Array.isArray(request["ops"]) ? (request["ops"] as OpRequest[]) : []

@@ -30,8 +30,12 @@ on its own microtask).
 
 ## Machines and operations
 
-`listMachines()` lists the account's other devices. A device that does not describe itself within `describeTimeoutMs`
-is reported unsupported. `listTools(machineId)` returns the operations that device advertises; this package fixes no
+`listMachines()` lists the account's other devices, then this device. Each device's describe settles on its own: a
+device that does not describe itself within `describeTimeoutMs`, or whose describe the service refuses, is reported
+unsupported with `attention` naming why and after how long (`unreachable after <ms> ms: <reason>`), and the others list
+as described; only a failure of the connection itself fails the listing. This device is listed unsupported, since the
+service runs no machine operation on its own device, so fanout skips it. `listTools()` answers `[]` at once for a device
+the latest listing could not describe. `listTools(machineId)` returns the operations that device advertises; this package fixes no
 operation list.
 
 The target device runs an op only while it is attached and this device is in its account's roster; its user can
