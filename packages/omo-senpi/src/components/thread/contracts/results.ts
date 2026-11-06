@@ -133,7 +133,7 @@ export type ThreadRenameResult =
   | ThreadDataError
 
 export type ThreadSetModelResult =
-  | { readonly kind: "ok"; readonly thread_id: string; readonly model: { readonly provider: string; readonly id: string } }
+  | { readonly kind: "ok"; readonly thread_id: string; readonly model: { readonly provider: string; readonly id: string }; readonly device?: string }
   | ThreadDataError
 
 export type ThreadSetReasoningResult =

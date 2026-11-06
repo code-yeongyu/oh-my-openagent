@@ -28,7 +28,8 @@ import { isLockWaitExceeded } from "./gateway/lock-wait"
 import { createGatewayServices } from "./tools/gateway-services"
 import { listThreads, readThread } from "./tools/read-ops"
 import { createRelayTools } from "./tools/relay-tools"
-import { crossTarget, deviceOnline, interruptRemote, listAcross, outcomeFailure, planCreate, promptRemote, readRemote, renameAlias, withAlias } from "./remote/lazy-ops"
+import { crossTarget, deviceOnline, interruptRemote, listAcross, outcomeFailure, planCreate, promptRemote, readRemote, renameAlias, setModelRemote, withAlias } from "./remote/lazy-ops"
+import { matchModel, modelPatternFailure } from "./tools/model-match"
 import { recordThreadCreator, registerExtensionTools, type ExtensionToolHost } from "./tools/extension-tools"
 export type { ThreadHost, ThreadHostSession, ThreadToolSurfaceOptions } from "./tools/ports"
 export { UNKNOWN_CALLER } from "./tools/ports"
@@ -241,20 +242,18 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
     ...metadata("thread_set_model"),
     parameters: threadToolParamSchemas.thread_set_model,
     execute: (id: string, args: ThreadSetModelInput, _signal, _onUpdate, ectx) => execute("thread_set_model", id, args, ectx, async (current, value, _operationId, callerId) => {
-      const resolved = resolution(options, resolveEntries(options, current), value.thread, callerId, value.all_scope)
+      const target = options.remote === undefined ? { kind: "local" as const, address: value.thread } : await crossTarget(options.remote, value.thread, resolution(options, resolveEntries(options, current), value.thread, callerId, true))
+      if (target.kind === "error") return target.result
+      if (target.kind === "remote" && options.remote !== undefined) return await setModelRemote(options.remote, target.row, value)
+      const resolved = resolution(options, resolveEntries(options, current), target.kind === "local" ? target.address : value.thread, callerId, value.all_scope)
       if (resolved.kind === "error") return { kind: "error", error: resolved }
       const session = targetSession(current, resolved.entry.thread_id)
       if (session === undefined) return failure("not_resumable", "The thread has no live owner.", "Retry when the target is live.")
-      const pattern = value.model.trim().toLowerCase()
-      if (pattern.length === 0) return failure("invalid_arguments", "The model pattern is empty.", "Pass a model id or display-name fragment.")
-      const catalog = await sessionPort(options, session).getAvailableModels(routingId(session))
-      const available = value.provider === undefined ? catalog : catalog.filter((model) => model.provider.toLowerCase() === value.provider?.trim().toLowerCase())
-      let matches = available.filter((model) => `${model.provider}/${model.id}`.toLowerCase() === pattern)
-      if (matches.length === 0) matches = available.filter((model) => model.id.toLowerCase() === pattern)
-      if (matches.length === 0) matches = available.filter((model) => model.id.toLowerCase().includes(pattern) || model.name?.toLowerCase().includes(pattern))
-      if (matches.length === 0) return failure("model_not_found", `No available model matches "${value.model}".`, "Choose a provider/id from the available list and retry.", { available: catalog.slice(0, 20).map((model) => `${model.provider}/${model.id}`) })
-      if (matches.length > 1) return failure("model_ambiguous", `Several available models match "${value.model}".`, "Pass an exact provider/id or narrow the pattern with provider.", { candidates: matches.slice(0, 10).map((model) => `${model.provider}/${model.id}`) })
-      const selected = await sessionPort(options, session).setModel(routingId(session), matches[0].provider, matches[0].id, resolved.entry.thread_id)
+      const empty = modelPatternFailure(value.model)
+      if (empty !== undefined) return empty
+      const matched = matchModel(await sessionPort(options, session).getAvailableModels(routingId(session)), value.model, value.provider)
+      if (matched.kind !== "match") return matched
+      const selected = await sessionPort(options, session).setModel(routingId(session), matched.model.provider, matched.model.id, resolved.entry.thread_id)
       return { kind: "ok", thread_id: resolved.entry.thread_id, model: { provider: selected.provider, id: selected.id } }
     }),
   }

@@ -41,6 +41,8 @@ function account(options: { plan?: string; online?: boolean; refuse?: string; al
     if (rpc["type"] === "get_messages") return { kind: "ok", response: { messages: [...engine.messages] } }
     if (rpc["type"] === "interrupt") return { kind: "ok", response: engine.interrupt }
     if (rpc["type"] === "prompt") return { kind: "ok", response: { turnId: "turn-b" } }
+    if (rpc["type"] === "get_available_models") return { kind: "ok", response: { models: [{ provider: "anthropic", id: "claude-opus", name: "Opus" }, { provider: "openai", id: "gpt-6" }] } }
+    if (rpc["type"] === "set_model") return { kind: "ok", response: { provider: rpc["provider"] ?? null, id: rpc["modelId"] ?? null } }
     return { kind: "ok", response: {} }
   }
   const devices: RemoteDevice[] = [{ device: "here", label: "this mac", online: true }, { device: "b", label: "studio", online: options.online ?? true }]
@@ -122,6 +124,27 @@ function surface(remote: RemoteThreadSurface | undefined, extra: { callerCause?:
   }
   return { run, openSession, store }
 }
+
+describe("thread_set_model on another device", () => {
+  test("#given a thread on b #when thread_set_model names it #then the model is matched against b's own list and set_model goes to b's session, with nothing changed on this device", async () => {
+    const a = account()
+    const { run } = surface(a.remote)
+    const result = await run("thread_set_model", { thread: "dur-on-b", model: "opus" })
+    expect(result).toEqual({ kind: "ok", thread_id: "dur-on-b", model: { provider: "anthropic", id: "claude-opus" }, device: "b" })
+    expect(a.sent.map((entry) => [entry.via, entry.device, entry.session, entry.rpc])).toEqual([
+      ["session", "b", "dur-on-b", { type: "get_available_models", sessionId: "dur-on-b" }],
+      ["session", "b", "dur-on-b", { type: "set_model", sessionId: "dur-on-b", provider: "anthropic", modelId: "claude-opus" }],
+    ])
+  })
+
+  test("#given b refuses the command #when thread_set_model targets b's thread #then the refusal is typed and set_model is never sent", async () => {
+    const a = account({ refuse: "capability_missing" })
+    const { run } = surface(a.remote)
+    const result = await run("thread_set_model", { thread: "dur-on-b", model: "opus" })
+    expect(result).toMatchObject({ kind: "error", error: { code: "scope_denied" } })
+    expect(a.sent.map((entry) => entry.rpc?.["type"])).toEqual(["get_available_models"])
+  })
+})
 
 describe("SC-R8: from this device on another (create, list, open, status, prompt, abort, fork)", () => {
   test("#given no session on device b #when thread_create names device b #then one attach-less open_session goes to b's engine endpoint and the thread is b's", async () => {
