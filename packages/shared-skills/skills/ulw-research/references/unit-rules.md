@@ -31,7 +31,7 @@ numeric guards may read `exact` values, unit selection may not. The property tes
 
 | op | arity | operand guards | context fields (persisted on the row) | result unit | malformed -> recompute ok:false |
 |---|---|---|---|---|---|
-| sum | n>=2 | non-affine units, all equal after canonicalization; if `%`: `disjoint: true` AND `reference` (one denominator id/text) equal on every operand AND rationale | disjoint, reference, rationale | the common unit (`%` stays `%`) | <2 operands; missing id; no context; unequal/affine units; `%` without disjoint, reference, or rationale |
+| sum | n>=2 | non-affine units, all equal after canonicalization; if `%`: `disjoint: true` AND `reference` (one denominator id/text) equal on every operand AND rationale | disjoint, reference (the `%` rationale goes in the row's `rationale` field, not in context) | the common unit (`%` stays `%`) | <2 operands; missing id; no context; unequal/affine units; `%` without disjoint, reference, or rationale |
 | diff | 2 | non-affine units; typed pairs only: U-U -> U (same non-% unit); %-% -> `%p`; %-%p -> `%`; %p-%p -> `%p`; %p-% REFUSED | none | per the pair rule | arity; invalid pair (`%p - %`, `m - person`); affine units; stray context |
 | growth | 2 (from,to) | equal non-affine units; same entity; two different valid_at; from.exact > 0 | none | `%` (= 100(to-from)/from) | arity; unequal/affine units; entity/valid_at; from<=0; stray context |
 | share | 2 (part,whole) | equal non-affine units; whole.exact > 0; 0 <= part <= whole | none | `%` (= 100 part/whole) | arity; units; whole<=0; part outside [0,whole]; stray context |

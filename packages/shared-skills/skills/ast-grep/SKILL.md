@@ -79,7 +79,7 @@ A single-file Python 3 stdlib wrapper. Same on every OS. The agent's default ent
 ### `search` — find all matches of a pattern
 
 ```bash
-python3 scripts/ast_grep_helper.py search 'console.log($MSG)' --lang ts src/
+python3 scripts/ast_grep_helper.py search 'console.log($MSG)' src/ --lang ts
 ```
 
 Validates the pattern offline first. If the pattern looks like regex (`\w`, `.*`, `|`, etc.) the helper exits with a hint and never calls `sg` — saves a round-trip. Pass `--force` to skip validation.
@@ -94,10 +94,10 @@ Flags:
 
 ```bash
 # Dry-run preview (default — no files mutated)
-python3 scripts/ast_grep_helper.py replace 'console.log($MSG)' 'logger.info($MSG)' --lang ts src/
+python3 scripts/ast_grep_helper.py replace 'console.log($MSG)' 'logger.info($MSG)' src/ --lang ts
 
 # Actually apply
-python3 scripts/ast_grep_helper.py replace 'console.log($MSG)' 'logger.info($MSG)' --lang ts src/ --apply
+python3 scripts/ast_grep_helper.py replace 'console.log($MSG)' 'logger.info($MSG)' src/ --lang ts --apply
 ```
 
 The helper:

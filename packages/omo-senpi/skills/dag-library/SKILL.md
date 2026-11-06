@@ -52,12 +52,12 @@ The dag engine keys idempotency on `key` + graph fingerprint: re-starting the sa
 
 ## Python cells
 
-Python cannot import the ESM library. Reproduce the same semantics with plain dicts — read the file, rotate the key, fill placeholders, call `tool.workflow`:
+Python cannot import the ESM library. Reproduce the same semantics with plain dicts — resolve the definition through the same lookup order (a path you pass, then `$PWD/.omo/dags`, then `$HOME/.omo/dags`), rotate the key, fill placeholders, call `tool.workflow`:
 
 ```python
 import json
 from datetime import datetime, timezone
-defn = json.loads(read(f"{env('HOME')}/.omo/dags/nightly-audit.json"))
+defn = json.loads(read(f"{env('PWD')}/.omo/dags/nightly-audit.json"))  # or an absolute path you pass; $HOME/.omo/dags is the last fallback
 stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
 defn["key"] = f"{defn['key']}-{stamp}"
 text = json.dumps(defn).replace("{{key}}", defn["key"]).replace("{{date}}", stamp[:8]).replace("{{datetime}}", stamp)

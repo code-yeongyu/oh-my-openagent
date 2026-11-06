@@ -28,8 +28,9 @@ Never explain from memory. Get the ground truth of what tips exist:
 1. Run the tip-listing flag of the command this product is installed as: `omo --list-tips`
    under OmO Native (omo-ai installs; the session environment carries `OMO_NATIVE=1` and
    `OMO_BIN`), or `senpi --list-tips` under a plain senpi install. Never spell it `senpi` on an
-   OmO Native machine: package managers link only the top-level `omo` bin, so `senpi` is not on
-   PATH there. If the brand command is not on PATH either (bunx/npx launches), invoke the
+   OmO Native machine: package managers link only the top-level `omo` bin into the user's shell, so
+   `senpi` is not on their PATH (inside a session the bundled engine's `.bin` is on PATH, so `senpi`
+   can resolve there — spell it `omo` anyway). If the brand command is not on PATH either (bunx/npx launches), invoke the
    launcher the `OMO_BIN` variable points at: `"$OMO_BIN" --list-tips`. The command prints JSON:
    `[{id, text, requiresCommand?}]`. Match the user's tip against this list by id or by text
    fragment.

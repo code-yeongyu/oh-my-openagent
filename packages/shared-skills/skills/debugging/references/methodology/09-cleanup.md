@@ -108,7 +108,7 @@ Last gate before reporting done. All four gates must be true, and all four must 
 
 ### The four gates
 
-1. **Red→green toggle confirmed** — show the failing test output from before the fix and passing output after. Both outputs visible in the reply or the journal.
+1. **Red→green toggle confirmed** — show the failing test output from before the fix and passing output after. Both outputs visible in the final message (the journal was removed in Phase 9).
 
 2. **Full test suite green** — show the suite's final pass line (e.g. `42 passed in 3.14s`). Not just the new test.
 

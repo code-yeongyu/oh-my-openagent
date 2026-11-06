@@ -43,9 +43,9 @@ foo === foo.bar
 
 Useful for finding redundant comparisons, double assignments, etc.
 
-### `$$$` is greedy
+### `$$$` is lazy
 
-When you write `foo($$$A, b, $$$C)`, the matcher does **not** backtrack or try every possible split. It greedily fills `$$$A` until the pattern can match `b`, then everything left goes into `$$$C`.
+When you write `foo($$$A, b, $$$C)`, the matcher does **not** backtrack or try every possible split. It fills `$$$A` only until the rest of the pattern can match — the first `b` here — then everything left goes into `$$$C`. On `foo(a, c, b, b, c)` that is `A=[a, c]` and `C=[b, c]`, never the longer `A=[a, c, b]`.
 
 ```ts
 // Pattern

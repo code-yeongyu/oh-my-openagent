@@ -73,9 +73,10 @@ The dag surface is built to be driven from an eval cell: the JS SDK is a thin pr
 
 ```js
 const sdk = await import(`${env("OMO_DAG_SDK_ROOT")}/sdk.js`)
-const targets = await glob("packages/*/src/index.ts")
+const targets = await Array.fromAsync(new Bun.Glob("packages/*/src/index.ts").scan("."))
 const slug = (path) => path.split("/")[1]   // "packages/<name>/src/index.ts" -> "<name>"
 const auditId = (t) => `audit-${slug(t)}`
+const today = new Date().toISOString().slice(0, 10)
 const dag = sdk.define({ key: `audit-${today}`, name: "Repo audit" })
 for (const t of targets) {
   dag.node({ id: auditId(t), category: "quick", prompt: `TASK: Audit ${t} for stale API references. DELIVERABLE: ... VERIFY: ... STOP WHEN: ...` })
@@ -115,7 +116,7 @@ The dag is not the only fan-out surface, and picking the wrong one strands the r
 - **A dag** when the work is stage-shaped: every stage you can already write goes into one graph and hands off through files, and runs chain only where the next stage's shape depends on what was found. Journaled resume, idempotent keys, and the `/dag` view come free.
 - **A `team_create` team** when workers must talk DURING the work: broadcasting leads the moment they surface, multi-round debate, or members accumulating investigation context across re-tasking. A dag node takes ONE prompt at dispatch; `send` can steer or revive that node's child afterwards, but the graph has no mid-run conversation between nodes.
 - **A plain ulw-research request goes to the team path.** Cross-critique and expand loops are team mechanics; use a dag for the independent harvest stages only.
-- **A MASS research request goes to the dag path, at mass scale.** When the user combines the mass trigger with research ("mass ulw research", "mulw research", "ulw mass research"), they asked for over-collection no roster of 8 members can produce: run the harvest as cluster runs under the section below, and keep a team only for the debate rounds the claim graph needs. Either path inherits ulw-research's delivery gates - rendered-page visual QA, then the proofread pass - for any report or PDF deliverable.
+- **A MASS research request goes to the dag path, at mass scale.** When the user combines the mass trigger with research ("mass ulw research", "mulw research", "ulw mass research"), they asked for over-collection no roster of 8 members can produce: run the harvest as cluster runs under the section below, and keep a team only for the debate rounds the claim graph needs. Either path inherits ulw-research's delivery gates in order - static gates, fidelity gate, layout gates, rendered-page visual QA, then the proofread pass - for any report or PDF deliverable.
 
 ## Mass research - over-collect through per-angle chains, then reduce
 

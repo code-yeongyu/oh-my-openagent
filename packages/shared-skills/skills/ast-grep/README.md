@@ -29,13 +29,13 @@ ln -s /path/to/your/clone ~/.agents/skills/ast-grep
 
 ```bash
 # Search by AST pattern (the helper validates patterns offline first)
-python3 scripts/ast_grep_helper.py search 'console.log($MSG)' --lang ts src/
+python3 scripts/ast_grep_helper.py search 'console.log($MSG)' src/ --lang ts
 
 # Rewrite (dry-run preview by default)
-python3 scripts/ast_grep_helper.py replace 'console.log($MSG)' 'logger.info($MSG)' --lang ts src/
+python3 scripts/ast_grep_helper.py replace 'console.log($MSG)' 'logger.info($MSG)' src/ --lang ts
 
 # Apply the rewrite (two-pass: preview JSON + then --update-all)
-python3 scripts/ast_grep_helper.py replace 'console.log($MSG)' 'logger.info($MSG)' --lang ts src/ --apply
+python3 scripts/ast_grep_helper.py replace 'console.log($MSG)' 'logger.info($MSG)' src/ --lang ts --apply
 
 # Run YAML lint rules from sgconfig.yml
 python3 scripts/ast_grep_helper.py scan src/

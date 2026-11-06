@@ -242,7 +242,7 @@ These two skills are not optional cosmetics. They are the recovery path for the 
 
 | Trigger | Skill to load | Why |
 |---|---|---|
-| Any [code smell](#code-smells--automatic-review-triggers) fires (250+ LOC, >3 params, redundant verification), OR the post-write loop surfaces 2+ issues, OR the user says "reshape this", "extract this", "clean this up" | `refactor` | Safe codemap-driven multi-step refactor with LSP + tests after each step. Never improvise a structural change. |
+| Any [code smell](#code-smells--automatic-review-triggers) fires (250+ LOC, >3 params, redundant verification, negative naming), OR the post-write loop surfaces more than two issues, OR the user says "reshape this", "extract this", "clean this up" | `refactor` | Safe codemap-driven multi-step refactor with LSP + tests after each step. Never improvise a structural change. |
 | Recent branch contains AI-authored patterns (broad except, dead helpers, vague comments, oversized files, redundant post-action verification, junk tests), OR the user says "remove slop", "clean AI code", "deslop" | `remove-ai-slops` | Behavior locked by gate-passing tests FIRST, then categorized parallel cleanup (junk tests included, each cut proven by a mutation), then quality gates. Behavior-preserving. |
 | Rust code touches `unsafe`, `*mut`, `*const`, `MaybeUninit`, FFI, `unsafe impl Send/Sync`, or a custom lock-free primitive | `references/rust-ub/` | Full UB taxonomy + Miri strictness escalation. Every `unsafe` block must survive Miri Level 3 (strict provenance + symbolic alignment + preemption) and the Level 4 Tree Borrows pass before it ships. |
 
