@@ -93,6 +93,7 @@ export function createRemoteThreadFixture() {
       sessions.push(created)
       return created
     })
+    const closed: Array<readonly [string, string | undefined]> = []
     const host: ThreadHost = {
       socket: "/tmp/thread-remote-test.sock",
       listSessions: async () => sessions,
@@ -106,6 +107,7 @@ export function createRemoteThreadFixture() {
       getAvailableModels: async () => [],
       setThinkingLevel: async () => {},
       getAvailableThinkingLevels: async () => [],
+      closeSession: async (sessionId, durableId) => { closed.push([sessionId, durableId]) },
     }
     const agentDir = mkdtempSync(join(tmpdir(), "thread-remote-"))
     directories.push(agentDir)
@@ -120,7 +122,7 @@ export function createRemoteThreadFixture() {
       if (tool === undefined) throw new Error(`${name} is not registered`)
       return (await tool.execute(`call-${Math.random()}`, args, undefined, undefined, { sessionManager: { getSessionId: () => caller } } as never)).details.result as ThreadToolResult
     }
-    return { run, openSession, store }
+    return { run, openSession, store, closed }
   }
 
   return { account, surface, cleanup }

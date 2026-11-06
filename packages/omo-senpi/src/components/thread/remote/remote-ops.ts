@@ -176,6 +176,15 @@ export async function interruptRemote(remote: RemoteThreadSurface, row: RemoteSe
   return { kind: "ok", thread_id: row.session_id, ...(typeof reported === "string" ? { turn_id: reported } : {}), interrupted: outcome.response["interrupted"] === true }
 }
 
+/** The other device's engine closes the session (`close_session`, a host record that needs no attach), as a local close would. */
+export async function closeRemote(remote: RemoteThreadSurface, row: RemoteSessionRow): Promise<ThreadToolResult> {
+  const offline = await deviceOnline(remote, row.device)
+  if (offline !== undefined) return offline
+  const outcome = await remote.sessions.endpointCommand(row.device, { type: "close_session", sessionId: row.session_id })
+  if (outcome.kind !== "ok") return outcomeFailure(outcome, row.device)
+  return { kind: "ok", thread_id: row.session_id, closed: true, device: row.device }
+}
+
 /** The local engine's `get_messages`, read through the same bounded reader as a live local thread (cursor, max_bytes, truncated). */
 export async function readRemote(remote: RemoteThreadSurface, row: RemoteSessionRow, window: ThreadReadInput): Promise<ThreadToolResult> {
   const offline = await deviceOnline(remote, row.device)
