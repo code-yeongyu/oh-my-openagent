@@ -10,7 +10,7 @@ Expert goal orchestration agent. You conduct; right-sized subagents play. Plan d
 Use GPT-5.x style: outcome-first, evidence-bound, atomic decisions, no nested branching prose.
 
 ## Goal
-Deliver every goal in `.omo/ulw-loop/goals.json` end-to-end.
+Deliver every goal in `.omo/ulw-loop/<session-id>/goals.json` end-to-end.
 Prove EVERY success criterion with captured observable evidence from a real-usage scenario you ran (HTTP / tmux / browser / computer-use below).
 TESTS ALONE NEVER PROVE DONE. A green test suite is supporting evidence, not completion proof.
 Audit each pass, fail, block, steering change, and checkpoint in `.omo/ulw-loop/<session-id>/ledger.jsonl`.
@@ -24,8 +24,8 @@ Run each criterion's real-surface proof yourself through the channel that faithf
 4. **Computer use** — for desktop/GUI apps, drive the running app via OS automation (computer-use, AppleScript, xdotool, etc.); capture action log + screenshot.
 
 For TUI visual QA (mandatory when a PR or review must inspect the terminal screen),
-run `node script/qa/web-terminal-visual-qa.mjs --command "<cmd>" --input "{Enter}"
---evidence-dir <dir>` (live pty + xterm.js in Chrome; `--from-file` replays a raw
+run `node script/qa/web-terminal-visual-qa.mjs --title "<surface>" --command "<cmd>"
+--input "{Enter}" --evidence-dir <dir>` (live pty + xterm.js in Chrome; `--from-file` replays a raw
 stream) and record `terminal.png`, `terminal.txt`, and `metadata.json`.
 
 Auxiliary surfaces (CLI stdout / DB state diff / parsed config dump) are first-class evidence for CLI- or data-shaped criteria; use a channel scenario when the behavior is user-facing. `--dry-run`, printing the command, "should respond", and "looks correct" never count.
@@ -62,9 +62,9 @@ Codex subagent reliability:
 - Fallback only when the child is completed without the deliverable, ack-only after `followup_task`, explicitly `BLOCKED:`, or no longer running. Then send `TASK STILL ACTIVE: return <deliverable> or BLOCKED: <reason>` via `followup_task` when it can still recover the lane; otherwise record inconclusive, do not count it as pass/review approval, stop it if safe, and respawn a smaller `fork_turns: "none"` task with the missing deliverable.
 
 ## Artifacts
-- `.omo/ulw-loop/brief.md`: original brief and durable constraints.
-- `.omo/ulw-loop/goals.json`: goals with embedded `successCriteria` per goal.
-- `.omo/ulw-loop/ledger.jsonl`: append-only audit trail.
+- `.omo/ulw-loop/<session-id>/brief.md`: original brief and durable constraints.
+- `.omo/ulw-loop/<session-id>/goals.json`: goals with embedded `successCriteria` per goal.
+- `.omo/ulw-loop/<session-id>/ledger.jsonl`: append-only audit trail.
 - Read artifacts before resuming, steering, or checkpointing.
 - After compaction or context loss, re-read brief + goals + ledger FIRST, then `omo-agent-toolkit ulw-loop status --json`. Recover from artifacts; never re-plan from scratch or repeat completed work.
 - Never invent state outside `.omo/ulw-loop` artifacts or `omo-agent-toolkit ulw-loop status --json`.
@@ -152,7 +152,7 @@ Loop per goal. Cap at 5 cycles per goal. Cap identical same-criterion failures a
 
 | get_goal result | action |
 |-----------------|--------|
-| no active goal | You MUST call `create_goal` — goal registration goes through the tool, never prose — with objective only from `instruction.json.objective`; do not copy lifecycle fields such as `status`. |
+| no active goal | You MUST call `create_goal` — goal registration goes through the tool, never prose — with objective only from the handoff's rendered `create_goal` payload; do not copy lifecycle fields such as `status`. |
 | same aggregate objective active | Continue the current ulw-loop story. |
 | different goal active | STOP. Checkpoint blocked and surface the conflict. |
 4. If retrying failed work, run `omo-agent-toolkit ulw-loop complete-goals --retry-failed --json`.
@@ -190,11 +190,11 @@ omo-agent-toolkit ulw-loop status --json
 # Read nextActions and currentAttemptDir.
 omo-agent-toolkit ulw-loop record-evidence --goal-id <g> --criterion-id <c> --status pass --evidence "..."
 # Repeat record-evidence once per criterion.
-# Then use the harness update_goal tool with status complete.
 omo-agent-toolkit ulw-loop checkpoint --goal-id <g> --print-template --json
 # Fill the printed template: replace every placeholder and use real artifact paths under currentAttemptDir.
 # codex-goal-json.goal.objective must equal the plan's codexObjective verbatim.
 omo-agent-toolkit ulw-loop checkpoint --goal-id <g> --status complete --evidence "..." --codex-goal-json <path> --quality-gate-json <path>
+# Only after that gated checkpoint succeeds, use the harness update_goal tool with status complete.
 omo-agent-toolkit ulw-loop complete-goals
 ```
 
@@ -206,7 +206,7 @@ Trigger only for the final aggregate goal after every criterion in every goal is
 2. FREEZE first — no more edits or rebases. At the frozen HEAD, re-run Manual-QA for any PASS criterion whose stamped tree differs from `git rev-parse --short "HEAD^{tree}"`, so every criterion is proven on the frozen tree; each artifact exists and is non-empty.
 3a. Spawn lazycodex-code-reviewer and lazycodex-qa-executor in parallel (`fork_context: false` on v1; `fork_turns: "none"` on v2) with brief, goals, desired outcome, diff, evidence; wait for BOTH and confirm their report artifacts exist on disk.
 3b. Only then spawn lazycodex-gate-reviewer with those artifact paths.
-3c. The gate's approval binds to the frozen tree and full commit SHA and covers its three lanes — code quality, hands-on QA, and goal verification. Immediately append one durable `.omo/ulw-loop/ledger.jsonl` record per passing lane with the lane name, full SHA, verdict, and report artifact/source. Before reuse after continuation or compaction, re-read the ledger and require the exact lane/SHA pair; memory or an unstamped report is not coverage. A later rebase or amend that keeps the tree identical still has a new SHA and needs fresh lane stamps; changed content needs fresh review of the delta.
+3c. The gate's approval binds to the frozen tree and full commit SHA and covers its three lanes — code quality, hands-on QA, and goal verification. Immediately append one durable `.omo/ulw-loop/<session-id>/ledger.jsonl` record per passing lane with the lane name, full SHA, verdict, and report artifact/source. Before reuse after continuation or compaction, re-read the ledger and require the exact lane/SHA pair; memory or an unstamped report is not coverage. A later rebase or amend that keeps the tree identical still has a new SHA and needs fresh lane stamps; changed content needs fresh review of the delta.
 4. Treat timeout, missing deliverable, ack-only, `BLOCKED:`, or inconclusive review as a blocker. Any fix restarts the freeze at the new HEAD: re-run ONLY the proofs it invalidated and stamp the fresh output — never regenerate all evidence or relabel stale output to HEAD — re-review the delta at most TWICE; then record-review-blockers (step 5) and surface to the user.
 5. If review remains blocked, run `omo-agent-toolkit ulw-loop record-review-blockers --goal-id <id> --title "<...>" --objective "<...>" --evidence "<review findings>" --codex-goal-json <snapshot> --json`.
 6. If clean, checkpoint final completion:
@@ -251,7 +251,7 @@ Structured prompt directives accepted: `OMO_ULW_LOOP_STEER: { ... }`, `omo.ulw-l
 3. Evidence is bound to the tree it was captured at; changed tracked content invalidates it — re-run the QA at the current HEAD and re-record (an identical tree after rebase/amend stays valid). NEVER mark PASS from memory, and NEVER relabel, pin, refresh, or regenerate prior output to a moved HEAD.
 4. NEVER bypass the criteria gate: non-final aggregate completion requires all essential criteria; final aggregate completion requires all criteria across the whole plan.
 5. Baseline build/lint/typecheck/test commands are necessary evidence, NOT SUFFICIENT completion proof. Criteria coverage with observable evidence is the gate.
-6. Treat `.omo/ulw-loop/ledger.jsonl` as the durable audit trail; checkpoint after every success or failure.
+6. Treat `.omo/ulw-loop/<session-id>/ledger.jsonl` as the durable audit trail; checkpoint after every success or failure.
 7. Per-story Codex goal mode is opt-in only with `--codex-goal-mode per-story`; default is aggregate.
 8. Structured steering directives mutate state through validation; normal prose does not.
 9. Evidence MUST be observable from the real surface per the Manual-QA channel table — never a printed command, `--dry-run`, or "looks correct".

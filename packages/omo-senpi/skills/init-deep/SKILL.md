@@ -58,7 +58,7 @@ N_high  = ceil(N_quick / 12)  # one reducer absorbs ~12 reports (~60k tokens) an
 Route:
 
 - **N_quick < 4** -> inline path below; a dag costs more than it saves.
-- **N_quick > `task.dag.max_nodes_per_run` (default 64)** -> raise the knob in omo config, or run one chained dag per top-level directory (multi-run composition, `mass-ulw` skill).
+- **N_quick + N_high + 2 > `task.dag.max_nodes_per_run` (default 64)** -> the cap counts every node in the run (scanners, writers, root-writer and verify), so raise the knob in omo config, or run one chained dag per top-level directory (multi-run composition, `mass-ulw` skill).
 - **Otherwise** -> dag path: emit `CHUNKS = [{id, dirs, bytes}]`, assign each writer a directory SUBTREE (disjoint - no two writers own the same directory), and `mkdir -p .omo/init-deep/reports .omo/init-deep/digests`.
 
 `--create-new`: read every existing AGENTS.md FIRST (still-true facts survive as scanner input), then delete all, then regenerate.
@@ -127,7 +127,7 @@ STOP WHEN: files and digest are written and verified.
 - **root-writer** - `category: "unspecified-high"`, `load_skills: ["init-deep"]`, dependsOn every writer. Reads ONLY `.omo/init-deep/digests/*` plus the existing root AGENTS.md; writes the root file per the template below. Never reads chunk reports.
 - **verify** - `category: "quick"`, dependsOn root-writer. Checks: every digest-declared path exists; root is 50-150 lines; subdirectory files 30-80; no child repeats a parent section block. DELIVERABLE: one `PASS` / `FAIL <path>: <reason>` line per file.
 
-The main session reads the verify node's output and nothing else. Each FAIL line -> `dag send` the owning writer with the named defect (or `retry` it), then re-run verify. Loop until all PASS. Fixing files yourself by reading reports is a defect - repair flows through the dag.
+The main session reads the verify node's output and nothing else. Each FAIL line -> `amend` the settled run with the owning writer's prompt extended by the named defect: amend re-runs that writer plus its dependents (root-writer, verify), so verify re-checks in the same run. `retry` is not the repair here, because every writer has already completed and a completed node refuses retry (`node_not_retryable`). Loop until all PASS. Fixing files yourself by reading reports is a defect - repair flows through the dag.
 
 ---
 
@@ -159,7 +159,7 @@ The main session reads the verify node's output and nothing else. Each FAIL line
 ```
 AGENTS_LOCATIONS = [
   { path: ".", type: "root" },
-  { path: "src/hooks", score: 18, reason: "high complexity" },
+  { path: "src/hooks", score: 16, reason: "high complexity" },
   { path: "src/api", score: 12, reason: "distinct domain" }
 ]
 ```

@@ -15,7 +15,7 @@ This skill may include examples copied from the OpenCode harness. In Senpi, do n
 | `call_omo_agent(subagent_type="explore", ...)` | `task` tool with `subagent_type: "explore"` |
 | `call_omo_agent(subagent_type="librarian", ...)` | `task` tool with `subagent_type: "librarian"` |
 | worker/implementation `task(...)` | `task` tool with `category` from the delegation router (`quick`, `unspecified-low`, `unspecified-high`, `deep-low`, `deep-high`, `ultrabrain`, `visual-engineering`, `writing`); honor the plan's `Recommended task executor category:` line |
-| final-review / gate-reviewer `task(...)` | fresh `task` with `category: "deep-high"` (or `"unspecified-high"`) and an adversarial-verifier prompt; `plan-reviewer`/`plan-consultant` are plan-gated curated reviewers, spawnable only while the plan gate is open |
+| final-review / gate-reviewer `task(...)` | fresh `task` with `subagent_type: "omo-native-gate-reviewer"` (the builtin gate reviewer, category-routed `deep-high` then `unspecified-high`) and the review inputs; `plan-reviewer`/`plan-consultant` are plan-gated curated reviewers, spawnable only while the plan gate is open |
 | `background_output(task_id="...")` | `task_output` tool with the task id |
 | `team_*(...)` | Lead team tools (`team_create`, `task_create`, ...); send with `task_send`, then keep working or end your turn — member and lead mail arrive as injected notifications, never poll for it |
 
@@ -25,7 +25,7 @@ If a code block below conflicts with this section, this section wins.
 
 In omo-senpi the high-accuracy review is PLAN-REVIEWER-ONLY: one round is exactly ONE native `plan-reviewer` review of the complete plan file, and a plan-reviewer approval whose remaining items are notes counts as approval. High-accuracy plan-reviewer review is the default for every plan this skill produces (CLEAR and UNCLEAR alike); the only opt-out is the user explicitly declining. It runs until unconditional approval while each round raises a new blocker-eligible finding or closes a ledger blocker, and stops on a round that does neither and still does not approve (see Bounded convergence).
 
-Only a plan file produced by this skill and recorded with `review_required` authorizes a `plan-reviewer` or `plan-consultant` review. A bare `ulw` run without that file uses notepad self-review instead, however large the work feels. Narrow `/ulw-execute` bootstrap exception: when `/ulw-execute` invoked this skill because there was no selectable plan, the plan-gate deliberately locks plan-consultant and plan-reviewer, so the bootstrap flow generates the plan WITHOUT plan-consultant gap analysis or plan-reviewer review. State this exception explicitly, recommending a follow-up ulw-plan review session if rigor is needed.
+Only a plan file produced by this skill and recorded with `review_required` authorizes a `plan-reviewer` or `plan-consultant` review. A bare `ulw` run without that file never summons either, however large the work feels; its implementation review follows the ultrawork Verification gate (notepad self-review unless that gate triggers). Narrow `/ulw-execute` bootstrap exception: when `/ulw-execute` invoked this skill because there was no selectable plan, the plan-gate deliberately locks plan-consultant and plan-reviewer, so the bootstrap flow generates the plan WITHOUT plan-consultant gap analysis or plan-reviewer review. State this exception explicitly, recommending a follow-up ulw-plan review session if rigor is needed.
 
 If a section below conflicts with this section, this section wins.
 

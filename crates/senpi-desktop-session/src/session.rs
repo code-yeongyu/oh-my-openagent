@@ -37,6 +37,7 @@ enum Message {
         op: Op,
         reply: Reply,
         signal: Arc<senpi_desktop_safety::HoldSignal>,
+        mode: crate::pending::RequestMode,
     },
     /// Drops the backend, acknowledges, and ends the thread.
     Close {
@@ -140,9 +141,9 @@ impl Session {
         self.enqueue(|reply| Message::Open { options, reply })
     }
 
-    /// The `reportMode` of the last `open` the session thread applied. A
-    /// request is served under the mode applied when the worker reaches it, so
-    /// read this when its reply is formed, not when it is submitted.
+    /// The `reportMode` of the last `open` the session thread applied. One
+    /// request's mode is [`Pending::request_mode`]: an open applied after the
+    /// request started must not re-shape its reply.
     #[must_use]
     pub fn report_mode(&self) -> ReportMode {
         *self.report_mode.lock()
@@ -154,12 +155,14 @@ impl Session {
         let is_hold = matches!(op, Op::HoldKeys(_) | Op::HoldMouse(_));
         let display = op_display(&op);
         let signal = self.supervisor.hold_signal();
+        let mode = crate::pending::RequestMode::new(self.report_mode());
         let mut pending = self.enqueue(|reply| {
             let mut holds = self.holds.lock();
             holds.retain(|hold| hold.strong_count() > 0);
             holds.push(Arc::downgrade(&signal));
-            Message::Op { op, reply, signal: Arc::clone(&signal) }
+            Message::Op { op, reply, signal: Arc::clone(&signal), mode: mode.clone() }
         });
+        pending.mode = Some(mode);
         pending.cancellation = Some(crate::cancel_on_drop::CancelOnDrop(signal));
         pending.budget = budget;
         pending.deadline = Instant::now() + budget;
@@ -245,7 +248,9 @@ fn serve(mut worker: Worker, requests: &flume::Receiver<Message>) {
                 worker.awake.finish(std::time::Instant::now());
                 (reply, opened)
             }
-            Message::Op { op, reply, signal } => {
+            Message::Op { op, reply, signal, mode } => {
+                // The mode this request is served under, fixed before it runs.
+                mode.set(worker.registry.report_mode());
                 // `$/cancel` or a deadline drops the waiter: that is the
                 // request's cancellation signal while it runs.
                 worker.hold_signal = Some(signal);

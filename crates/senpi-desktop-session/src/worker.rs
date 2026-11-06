@@ -8,7 +8,7 @@ use senpi_desktop_core::ax::{AxBackend, AxRegistry};
 use senpi_desktop_core::backend::Backend;
 use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode};
 use senpi_desktop_core::protocol_results::AuditEvent;
-use senpi_desktop_core::report::ReportMode;
+use senpi_desktop_core::report::{Disposition, ReportMode};
 use senpi_desktop_core::types::{DesktopCapabilities, DesktopSessionOptions, DesktopWindow, Target};
 
 use crate::audit::ArtifactGc;
@@ -135,7 +135,7 @@ impl Worker {
         }
         self.install_screen_probe();
         self.registry = AxRegistry::with_report_mode(options.report_mode);
-        self.frames = FrameCache::default();
+        self.frames = FrameCache::with_report_mode(options.report_mode);
         self.options = Some(options);
         self.session_id = ulid::Ulid::generate().to_string();
         self.run_id = ulid::Ulid::generate().to_string();
@@ -188,8 +188,14 @@ impl Worker {
 
     fn serve(&mut self, op: Op, cancelled: &dyn Fn() -> bool) -> CoreResult<Response> {
         let mode = self.registry.report_mode();
-        let served = |audited: CoreResult<Audited>| {
-            audited.map(|(response, audit)| crate::report::respond(mode, response, &audit))
+        let served = |audited: CoreResult<Audited>| match audited {
+            Ok((response, audit)) => Ok(crate::report::respond(mode, response, &audit)),
+            // `mutate` reports every error it returns in object mode, so an
+            // unreported one was refused before it (bad params): nothing was sent.
+            Err(error) if mode == ReportMode::Object => {
+                Err(error.with_fallback_disposition(Disposition::NOT_DELIVERED_SAFE))
+            }
+            Err(error) => Err(error),
         };
         // Every mutating request goes through `mutate`; reads bypass it.
         match op {
