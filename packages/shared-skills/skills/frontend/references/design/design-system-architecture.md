@@ -229,7 +229,7 @@ Both paths start with `grounding.md`: the guideline source read in full, the ide
 
 ### For New Projects
 
-1. **Select references before taste** — no visual reference means `_INDEX.md` shortlist of 2-3 Layer B candidates, then exactly one Layer A style skill and one Layer B brand/design-system reference. Use `open-design` only when the curated set has no fit.
+1. **Select references before taste** — no visual reference means `_INDEX.md` shortlist of 2-3 Layer B candidates, then exactly one Layer A style skill and one Layer B brand/design-system reference. Use the open-design library only when the curated set has no fit.
 2. **Assemble from references** — extract tokens, layout grammar, component anatomy, states, motion, and taste decisions, then recombine them into project-specific primitives. Customize for the user's product; never copy logos, trademarked assets, or brand-specific copy.
 3. **Define the system** — colour roles first (both themes), then atmosphere, typography, spacing, and one depth strategy, grounded in the selected references and product semantics. Sanity-check the palette and type pairing with one `ui-ux-db` domain search (CLI in `references/ui-ux-db/README.md`).
 4. **Document initial primitives** — only components you are about to build, including variants and states, starting from shadcn/ui anatomy (or the project's own kit) restyled with the tokens.

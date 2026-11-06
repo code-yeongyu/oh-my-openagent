@@ -29,7 +29,7 @@ async function tokenHarness(snapshot: Credentials, authoritative = snapshot) {
   } satisfies CredentialStore
   const lock = spyOn(credentialLock, "withCredentialLock")
   onTestFinished(() => lock.mockRestore())
-  const session = createSession({ api, store, home: await temporaryHome(), now: () => NOW })
+  const session = createSession({ beforeKeysDiscarded: async () => undefined, api, store, home: await temporaryHome(), now: () => NOW })
   return { session, store, lock, refresh, bodies }
 }
 
@@ -83,7 +83,7 @@ describe("credential lifecycle", () => {
     } })
     const lock = spyOn(credentialLock, "withCredentialLock")
     onTestFinished(() => lock.mockRestore())
-    const session = createSession({ api: "https://api.omo.dev", store, home: await temporaryHome() })
+    const session = createSession({ beforeKeysDiscarded: async () => undefined, api: "https://api.omo.dev", store, home: await temporaryHome() })
     const error = await session.accessToken(sameIdentity).catch(error => error)
     expect(error).toBeInstanceOf(InvalidCredentialState)
     expect(error.message).toBe("The OmO sign-in saved on this computer can't be read. Run omo account forget to remove it, then sign in again in the desktop app.")
@@ -101,7 +101,7 @@ describe("credential lifecycle", () => {
     const slot = [...secrets.values.keys()].find(key => JSON.parse(secrets.values.get(key) ?? "{}").device?.id === captured.device.id)
     if (slot === undefined) throw new Error("the captured account was not stored")
     secrets.values.set(slot, "{")
-    const session = createSession({ api, store, home: await temporaryHome() })
+    const session = createSession({ beforeKeysDiscarded: async () => undefined, api, store, home: await temporaryHome() })
     let actions = 0
     const forgetCaptured = () => session.update(async current => {
       actions++
@@ -140,8 +140,8 @@ describe("credential lifecycle", () => {
         await baseStore.write(value)
       },
     }
-    const first = createSession({ api, store, home })
-    const second = createSession({ api, store, home })
+    const first = createSession({ beforeKeysDiscarded: async () => undefined, api, store, home })
+    const second = createSession({ beforeKeysDiscarded: async () => undefined, api, store, home })
     let delivered = false
     const a = first.accessToken().then(value => { delivered = true; return value })
     await stored.promise
@@ -160,7 +160,7 @@ describe("credential lifecycle", () => {
       const api = fakeApi(() => refusal(code, undefined, code === "account_deleted" ? 410 : 401))
       const store = secrets.store(api)
       await store.write({ ...grant, ...privateKeys, accessTokenExpiresAt: "2000-01-01T00:00:00Z" })
-      const session = createSession({ api, store, home: await temporaryHome() })
+      const session = createSession({ beforeKeysDiscarded: async () => undefined, api, store, home: await temporaryHome() })
       const error = await session.accessToken().catch(error => error)
       expect(error).toBeInstanceOf(SessionEnded)
       expect(error).toMatchObject({ code, deviceRevoked: code !== "unauthorized" })
@@ -173,7 +173,7 @@ describe("credential lifecycle", () => {
     const api = fakeApi(() => new Response(null, { status: 204 }))
     const store = secrets.store(api)
     await store.write({ ...grant, ...privateKeys })
-    await createSession({ api, store, home: await temporaryHome() }).logout()
+    await createSession({ beforeKeysDiscarded: async () => undefined, api, store, home: await temporaryHome() }).logout()
     expect(secrets.values.size).toBe(0)
   })
 
@@ -183,7 +183,7 @@ describe("credential lifecycle", () => {
     const store = secrets.store(api)
     await store.write({ ...grant, ...privateKeys, accessTokenExpiresAt: "2000-01-01T00:00:00Z" })
     const persisted = await store.read()
-    const session = createSession({
+    const session = createSession({ beforeKeysDiscarded: async () => undefined,
       api, home: await temporaryHome(),
       store: { ...store, write: async () => { throw new Error("store unavailable") } },
     })

@@ -656,7 +656,7 @@ Record the chosen path in the TodoWrite list.
 
 **Precondition checks** (fail hard if any step fails):
 
-1. Load the \`team-mode\` skill via the \`skill\` tool for lifecycle, message protocol, and limits.
+1. When the session lists the \`team-mode\` skill, load it for lifecycle, message protocol, and limits.
 2. Call \`team_list\` and verify no active \`refactor-squad\` run exists; if one does, shutdown + delete the orphan before proceeding.
 3. If \`~/.omo/teams/refactor-squad/config.json\` is missing, write it using the spec below.
 
