@@ -1,0 +1,88 @@
+/* The mass ulw graph: ported from doriterm's fleet figure */
+.graph {
+  margin: var(--space-7) 0 0;
+  padding: var(--space-5) var(--space-5) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background: var(--bg-raised);
+}
+
+.graph__steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.graph__steps button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-ui) var(--ease-standard),
+    color var(--dur-ui) var(--ease-standard);
+}
+
+.graph__steps button:hover {
+  color: var(--ink);
+}
+
+.graph__steps button[aria-pressed="true"] {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.graph__n {
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.graph__canvas {
+  display: block;
+  width: 100%;
+  height: 380px;
+  margin-top: var(--space-4);
+}
+
+.graph__caption {
+  min-height: 3.4em;
+  margin-top: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+  color: var(--ink-2);
+  line-height: 1.6;
+}
+
+.graph__caption p {
+  max-width: 70ch;
+  margin: 0;
+}
+
+.graph__caption strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .graph {
+    padding: var(--space-4) var(--space-3) var(--space-3);
+  }
+
+  .graph__canvas {
+    height: 300px;
+  }
+
+  .graph__steps button {
+    flex: 1 1 40%;
+    justify-content: center;
+    padding: 0 8px;
+  }
+}

@@ -107,3 +107,12 @@ export const gaTrackedDomain = "omo.dev"
 
 /** The site is dark-only (DESIGN.md §2): form controls, scrollbars and autofill follow it before CSS loads. */
 export const siteViewport: Viewport = { colorScheme: "dark" }
+
+/** The home page follows the system theme (or the one pinned by its switch), so it declares both schemes. */
+export const homeViewport: Viewport = {
+  colorScheme: "light dark",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#fbfaf7" },
+    { media: "(prefers-color-scheme: dark)", color: "#0f0e0d" },
+  ],
+}
