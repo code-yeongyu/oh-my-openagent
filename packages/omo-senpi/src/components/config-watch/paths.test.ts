@@ -2,7 +2,7 @@
 
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join, resolve } from "node:path"
+import { dirname, join, resolve } from "node:path"
 import { describe, expect, it } from "bun:test"
 
 import {
@@ -56,12 +56,16 @@ function writeProjectConfig(directory: string): string {
   return path
 }
 
+function creationPaths(targets: readonly OmoConfigWatchTarget[]): readonly string[] {
+  return targets.filter((target) => target.filterGlobs.includes("/.omo")).map((target) => target.path)
+}
+
 function targetFor(paths: readonly { readonly path: string; readonly filterGlobs: readonly string[] }[], path: string, filter: string): boolean {
   return paths.some((target) => target.path === path && target.filterGlobs.includes(filter))
 }
 
 describe("resolveOmoConfigWatchTargets", () => {
-  it("#given nested project configs #when resolving targets #then watches user scope, every existing .omo directory, and each cwd-to-home ancestor", () => {
+  it("#given nested project configs #when resolving targets #then watches user scope, every existing .omo directory, and each cwd ancestor below the user config parent", () => {
     const fixture = createFixture()
     const userConfigDirectory = join(fixture.homeDir, ".omo")
     mkdirSync(userConfigDirectory, { recursive: true })
@@ -99,8 +103,78 @@ describe("resolveOmoConfigWatchTargets", () => {
       fixture.cwd,
       fixture.projectDir,
       fixture.workDir,
-      fixture.homeDir,
     ])
+  })
+
+  it("#given a project root holding .git #when resolving targets #then creation watches stop at the root while higher .omo directories stay watched", () => {
+    const fixture = createFixture()
+    mkdirSync(join(fixture.homeDir, ".omo"), { recursive: true })
+    mkdirSync(join(fixture.projectDir, ".git"))
+    writeProjectConfig(fixture.workDir)
+
+    const targets = resolveOmoConfigWatchTargets({ cwd: fixture.cwd, env: fixtureEnv(fixture), platform: "linux" })
+
+    expect(targets.filter((target) => target.filterGlobs.includes("/.omo")).map((target) => target.path)).toEqual([
+      fixture.cwd,
+      fixture.projectDir,
+    ])
+    expect(targetFor(targets, join(fixture.workDir, ".omo"), "/omo.jsonc")).toBe(true)
+  })
+
+  it("#given a .git file (worktree or submodule) #when resolving targets #then creation watches stop at that directory", () => {
+    const fixture = createFixture()
+    mkdirSync(join(fixture.homeDir, ".omo"), { recursive: true })
+    writeFileSync(join(fixture.projectDir, ".git"), "gitdir: /somewhere/else/.git/worktrees/project\n")
+
+    const targets = resolveOmoConfigWatchTargets({ cwd: fixture.cwd, env: fixtureEnv(fixture), platform: "linux" })
+
+    expect(creationPaths(targets)).toEqual([fixture.cwd, fixture.projectDir])
+  })
+
+  it("#given nested repos #when resolving targets #then creation watches stop at the nearest repo root", () => {
+    const fixture = createFixture()
+    mkdirSync(join(fixture.homeDir, ".omo"), { recursive: true })
+    mkdirSync(join(fixture.workDir, ".git"))
+    mkdirSync(join(fixture.cwd, ".git"))
+
+    const targets = resolveOmoConfigWatchTargets({ cwd: fixture.cwd, env: fixtureEnv(fixture), platform: "linux" })
+
+    expect(creationPaths(targets)).toEqual([fixture.cwd])
+  })
+
+  it("#given cwd at HOME with ~/.omo present #when resolving targets #then no ancestor creation target is added", () => {
+    const fixture = createFixture()
+    mkdirSync(join(fixture.homeDir, ".omo"), { recursive: true })
+
+    const targets = resolveOmoConfigWatchTargets({ cwd: fixture.homeDir, env: fixtureEnv(fixture), platform: "linux" })
+
+    expect(creationPaths(targets)).toEqual([])
+    expect(targetFor(targets, join(fixture.homeDir, ".omo"), "/omo.jsonc")).toBe(true)
+  })
+
+  it("#given cwd outside HOME and outside any repo #when resolving targets #then the filesystem root is never a creation target", () => {
+    const fixture = createFixture()
+    mkdirSync(join(fixture.homeDir, ".omo"), { recursive: true })
+    const outside = join(dirname(fixture.homeDir), "elsewhere", "a", "b")
+    mkdirSync(outside, { recursive: true })
+
+    const paths = creationPaths(resolveOmoConfigWatchTargets({ cwd: outside, env: fixtureEnv(fixture), platform: "linux" }))
+
+    expect(paths[0]).toBe(outside)
+    expect(paths).not.toContain(resolve("/"))
+    expect(paths.every((path) => dirname(path) !== path)).toBe(true)
+  })
+
+  it("#given cwd outside HOME under a directory that contains HOME #when resolving targets #then that directory is not a creation target", () => {
+    const fixture = createFixture()
+    mkdirSync(join(fixture.homeDir, ".omo"), { recursive: true })
+    const shared = join(dirname(fixture.homeDir), "shared", "runs", "x")
+    mkdirSync(shared, { recursive: true })
+
+    const paths = creationPaths(resolveOmoConfigWatchTargets({ cwd: shared, env: fixtureEnv(fixture), platform: "linux" }))
+
+    expect(paths).toEqual([shared, dirname(shared), dirname(dirname(shared))])
+    expect(paths).not.toContain(dirname(fixture.homeDir))
   })
 
   it("#given a newly created ancestor .omo directory #when resolving targets #then keeps watching its config files after a rejected creation", () => {
