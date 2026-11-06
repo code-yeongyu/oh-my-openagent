@@ -213,6 +213,9 @@ fn cases() -> Vec<Case> {
         }),
         case("SpaceUnsupported", fail_next_with("windows", "SpaceUnsupported"), list_windows),
         case("SpaceMoveDenied", fail_next_with("windows", "SpaceMoveDenied"), list_windows),
+        case("AmbiguousTarget", fail_next_with("windows", "AmbiguousTarget"), list_windows),
+        case("CaptureConsentRequired", fail_next_with("windows", "CaptureConsentRequired"), list_windows),
+        case("ProtectedProcess", fail_next_with("windows", "ProtectedProcess"), list_windows),
     ]
 }
 
