@@ -7,6 +7,7 @@ import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import type { AliasHolder, AliasRegistry, JsonObject, RemoteCommandOutcome, RemoteDevice, RemoteSessionRow, RemoteThreadSurface } from "./remote/ports"
 import type { ThreadTranscriptEntry } from "./reader"
 import { createThreadTools, type ThreadHost, type ThreadHostSession } from "./tools"
+import type { ThreadCloseOutcome } from "./tools/ports"
 
 export const B_ROW: RemoteSessionRow = { device: "b", session_id: "dur-on-b", title: "on b", project: "/work/b", path: "/home/b/.omo/agent/sessions/dur-on-b.jsonl", state: "idle", updated_ms: 1_700_000_000_000 }
 
@@ -29,14 +30,34 @@ export function createRemoteThreadFixture() {
     for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
   }
 
-  function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean; engine?: Engine; promptResponse?: JsonObject; failSessionsList?: boolean; failAliasesOf?: boolean; failClaim?: boolean } = {}) {
+  function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean; engine?: Engine; promptResponse?: JsonObject; failSessionsList?: boolean; failAliasesOf?: boolean; failClaim?: boolean; otherHolders?: number; unwritten?: boolean; rowState?: string; live?: readonly string[] } = {}) {
     const engine = options.engine ?? ENGINE
     const sent: Sent[] = []
     const hops: number[] = []
     const aliases = options.aliases ?? new Map<string, AliasHolder>()
-    const answer = (rpc: JsonObject): RemoteCommandOutcome => {
+    // The sessions b's engine holds. Its close rules are senpi's (2026.11.5-1): close_session from a connection that never
+    // attached is refused unknown_session (senpi#1782); an attached close releases only that hold, so the session ends
+    // only with no other holder; unload_session with force drains every hold, and refuses a session with no file yet.
+    const live = new Set(options.live ?? [B_ROW.session_id])
+    const answer = (rpc: JsonObject, attachedTo?: string): RemoteCommandOutcome => {
       if (options.refuse !== undefined) return { kind: "refused", reason: options.refuse }
-      if (rpc["type"] === "open_session") return { kind: "ok", response: { sessionId: "rpc-9", state: { durableSessionId: rpc["sessionPath"] === undefined ? "dur-new-on-b" : "dur-on-b" } } }
+      if (attachedTo !== undefined && !live.has(attachedTo)) return { kind: "refused", reason: "session_not_found" }
+      if (rpc["type"] === "close_session") {
+        if (attachedTo === undefined) return { kind: "refused", reason: "unknown_session" }
+        if ((options.otherHolders ?? 0) === 0) live.delete(attachedTo)
+        return { kind: "ok", response: {} }
+      }
+      if (rpc["type"] === "unload_session" && attachedTo !== undefined) {
+        if (options.unwritten === true) return { kind: "ok", response: { outcome: "refused", reason: "unsupported", detail: "the session has no file to reopen it by" } }
+        if ((options.otherHolders ?? 0) > 0 && rpc["force"] !== true) return { kind: "ok", response: { outcome: "refused", reason: "attached", detail: "1 other client(s) attached" } }
+        live.delete(attachedTo)
+        return { kind: "ok", response: { outcome: "unloaded", sessionPath: B_ROW.path } }
+      }
+      if (rpc["type"] === "open_session") {
+        const opened = rpc["sessionPath"] === undefined ? "dur-new-on-b" : "dur-on-b"
+        live.add(opened)
+        return { kind: "ok", response: { sessionId: "rpc-9", state: { durableSessionId: opened } } }
+      }
       if (rpc["type"] === "get_state") return { kind: "ok", response: { isStreaming: engine.streaming, pendingMessageCount: engine.pending } }
       if (rpc["type"] === "get_messages") return { kind: "ok", response: { messages: [...engine.messages] } }
       if (rpc["type"] === "interrupt") return { kind: "ok", response: engine.interrupt }
@@ -73,18 +94,18 @@ export function createRemoteThreadFixture() {
         status: async () => ({ state: options.plan ?? "connected" }),
         thisDevice: async () => "here",
         devices: async () => devices,
-        sessions: async () => { if (options.failSessionsList === true) throw new Error("account list failed"); return [B_ROW] },
+        sessions: async () => { if (options.failSessionsList === true) throw new Error("account list failed"); return [{ ...B_ROW, state: options.rowState ?? B_ROW.state }] },
         endpointCommand: async (device, rpc) => { sent.push({ via: "endpoint", device, rpc }); return answer(rpc) },
-        sessionCommand: async (device, session, rpc) => { sent.push({ via: "session", device, session, rpc }); return answer(rpc) },
+        sessionCommand: async (device, session, rpc) => { sent.push({ via: "session", device, session, rpc }); return answer(rpc, session) },
         read: async (device, session) => { sent.push({ via: "read", device, session }); return { kind: "ok", response: { entries: [{ role: "user", content: "hi b" }, { role: "assistant", content: "hello from b" }] } } },
       },
       ...(options.noRegistry === true ? {} : { aliases: registry }),
       chain: { stamp: (record, hop) => { hops.push(hop); return { ...record, chain_count: hop } } },
     }
-    return { remote, sent, hops, aliases }
+    return { remote, sent, hops, aliases, live }
   }
 
-  function surface(remote: RemoteThreadSurface | undefined, extra: { callerCause?: () => string | undefined; sessions?: ThreadHostSession[]; engine?: Engine; caller?: string; diskSessions?: readonly string[] } = {}) {
+  function surface(remote: RemoteThreadSurface | undefined, extra: { callerCause?: () => string | undefined; sessions?: ThreadHostSession[]; engine?: Engine; caller?: string; diskSessions?: readonly string[]; closeOutcome?: ThreadCloseOutcome } = {}) {
     const engine = extra.engine ?? ENGINE
     const local: ThreadHostSession = { sessionId: "route-local", durableSessionId: "dur-local", cwd: process.cwd(), name: "local peer", status: "open" }
     const sessions = extra.sessions ?? [local]
@@ -107,7 +128,7 @@ export function createRemoteThreadFixture() {
       getAvailableModels: async () => [],
       setThinkingLevel: async () => {},
       getAvailableThinkingLevels: async () => [],
-      closeSession: async (sessionId, durableId) => { closed.push([sessionId, durableId]) },
+      closeSession: async (sessionId, durableId) => { closed.push([sessionId, durableId]); return extra.closeOutcome ?? "closed" },
     }
     const agentDir = mkdtempSync(join(tmpdir(), "thread-remote-"))
     directories.push(agentDir)
