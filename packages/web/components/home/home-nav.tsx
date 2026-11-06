@@ -1,11 +1,10 @@
 import type { JSX } from "react"
 import { getTranslations } from "next-intl/server"
 
-import { Icon } from "@/components/home/icons"
 import { MobileMenu } from "@/components/home/mobile-menu"
+import { NavStars } from "@/components/home/nav-stars"
 import { ThemeSwitch } from "@/components/home/theme-switch"
 import { Link } from "@/i18n/routing"
-import { GITHUB_URL } from "@/components/home/links"
 import type { ReactNode } from "react"
 
 /** A same-page anchor on the home page; a locale-aware link from every other page. */
@@ -79,14 +78,7 @@ export async function HomeNav({
             label={t("theme")}
             labels={{ system: t("system"), light: t("light"), dark: t("dark") }}
           />
-          <a
-            className="btn btn--ghost btn--sm nav__stars"
-            href={GITHUB_URL}
-            aria-label={t("stars", { count: stars })}
-          >
-            <Icon name="github" className="btn__icon" />
-            <span className="tabular">{stars}</span>
-          </a>
+          <NavStars stars={stars} label={t.raw("stars") as string} />
           <NavLink
             className="btn btn--primary btn--sm"
             onHome={onHome}

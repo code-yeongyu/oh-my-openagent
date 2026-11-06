@@ -1,12 +1,11 @@
 /* omo.dev home: doriterm.com's landing system (doriterm docs/design/landing/DESIGN-LANDING.md) with OmO's teal
-   accent. Tokens and their use are documented in packages/web/DESIGN-HOME.md. */
+   accent. The palette itself lives in app/styles/design-system.css; this file adds the landing's type, space and motion. */
 /* Type, space, radius and motion: the whole home page, plus the shared nav and footer on every other page (scoped so
    the docs site keeps its own spacing scale). */
 :root.home,
 .nav,
 .footer,
 .skip {
-  color-scheme: light dark;
   --font-sans: var(--font-timeless), "Pretendard Variable", ui-sans-serif, system-ui, sans-serif;
   --font-term: var(--font-jetbrains), ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --text-display: clamp(2.75rem, 1.4rem + 5.6vw, 6rem);

@@ -258,6 +258,7 @@ test.describe("Home page", () => {
     await expect(dag.locator("[data-dag-node]")).toHaveCount(10)
     await expect(dag.locator("[data-dag-wave]")).toHaveCount(5)
     await expect(dag.locator("[data-dag-run-summary]")).toContainText("7 models")
+    await expect(dag.getByRole("button", { name: "Fit graph" })).toBeVisible()
   })
 
   test("the phone menu opens a sheet with every section, the docs and the manifesto", async ({
