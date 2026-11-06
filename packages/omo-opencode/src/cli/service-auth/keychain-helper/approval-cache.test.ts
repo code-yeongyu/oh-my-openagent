@@ -111,7 +111,9 @@ describe("the default clock outside Bun (#11586 review LOW: service-auth.generat
     try {
       const built = await Bun.build({ entrypoints: [new URL("./approval-cache.ts", import.meta.url).pathname], outdir, target: "node", format: "esm" })
       expect(built.success).toBe(true)
-      const node = Bun.spawn(["node", "--input-type=module", "-e", script, pathToFileURL(built.outputs[0]!.path).href], { stdout: "pipe", stderr: "pipe" })
+      const output = built.outputs[0]
+      if (!output) throw new Error("no build output")
+      const node = Bun.spawn(["node", "--input-type=module", "-e", script, pathToFileURL(output.path).href], { stdout: "pipe", stderr: "pipe" })
       const [out, err, code] = await Promise.all([new Response(node.stdout).text(), new Response(node.stderr).text(), node.exited])
       expect({ code, out, err }).toEqual({ code: 0, out: "true", err: "" })
     } finally {
