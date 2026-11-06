@@ -30,7 +30,7 @@ const setup = (minEngine?: string, exitCode = 0) => {
     stateDir,
     engineVersion: ENGINE_VERSION,
     origin: RELEASE_ORIGIN,
-    releaseKey: key.publicHex,
+    releaseKeys: [key.publicHex],
     fetch: serveRelease(buildRelease({ key, host: HOST, ...(minEngine === undefined ? {} : { minEngine }) })).fetch,
     run,
   } as const
