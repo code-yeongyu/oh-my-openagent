@@ -1,6 +1,6 @@
 import type { TaskRecord } from "../state"
 import { isSpawnSpecV1 } from "../state"
-import { nowIso, TERMINAL_STATUSES, type LifecycleContext } from "./context"
+import { reconciliationActive, TERMINAL_STATUSES, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
 import { endClosingFallbackChild } from "./fallback-closing-child"
 import { isFallbackHandoff } from "./fallback-handoff"
@@ -16,6 +16,7 @@ import { reclaimOrphanedResident } from "./residency"
 import { deferredCode, isSuspendingCode } from "./respawn-failure-code"
 import { deferred, disposeClaimed, markLost, rollbackOrDeferred, terminateOldRpc, type SuspendedResidency } from "./revive-rollback"
 import type { ReconcileOutcome } from "./types"
+import { suspendHandle } from "./shutdown"
 
 export { deferred } from "./revive-rollback"
 export type { SuspendedResidency } from "./revive-rollback"
@@ -30,6 +31,7 @@ export async function reclaimResident(
   observed: TaskRecord,
   sessionPathFor: SessionPathResolver,
 ): Promise<ReconcileOutcome> {
+  if (!reconciliationActive(context)) return deferred(observed.task_id, "session_unavailable")
   const release = beginLocalReclamation(context, observed.task_id)
   if (release === undefined) return deferred(observed.task_id, "foreign_live_owner")
   try {
@@ -106,6 +108,8 @@ export async function reviveClaimed(
   sessionPath: string | undefined,
   options: ReviveClaimedOptions = {},
 ): Promise<ReconcileOutcome> {
+  const interrupted = () => !reconciliationActive(context) || !isSameClaim(context, claimed)
+  if (interrupted()) return rollbackOrDeferred(context, claimed.task_id, rollbackResidency, "foreign_live_owner", claimed)
   if (claimed.provisional_exit !== undefined && !TERMINAL_STATUSES.has(claimed.status)) {
     return settleProvisionalExitLoss(context, claimed)
   }
@@ -132,6 +136,7 @@ export async function reviveClaimed(
   // its process running.
   if (fresh.execution_mode === "process" && fresh.pid !== undefined && !isHostSessionRecord(fresh)) {
     const terminated = await terminateOldRpc(context, fresh)
+    if (interrupted()) return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "foreign_live_owner", fresh)
     if (!terminated) {
       return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "session_unavailable", fresh)
     }
@@ -148,9 +153,10 @@ export async function reviveClaimed(
     return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "session_unavailable", fresh)
   }
   // Everything above awaited: a stop or another owner that landed meanwhile ends this revival here.
-  if (!isSameClaim(context, fresh)) return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "foreign_live_owner", fresh)
+  if (interrupted()) return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "foreign_live_owner", fresh)
 
   const reached = isHostSessionRecord(fresh) ? await reachRecordedHost(context, fresh.host_session) : "alive"
+  if (interrupted()) return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "foreign_live_owner", fresh)
   if (reached !== "alive") {
     const outcome = rollbackOrDeferred(context, fresh.task_id, rollbackResidency, reached, fresh)
     markSuspensionReason(context, fresh.task_id, parkedReason(reached))
@@ -197,6 +203,18 @@ export async function reviveClaimed(
     if (terminalAllowed || context.deferUnresumable) return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "session_unavailable", fresh)
     throw error
   }
+  if (interrupted()) {
+    reservation.release()
+    if (respawned.ok) {
+      const handle = respawned.handle
+      await suspendHandle(context, {
+        ...handle,
+        kind: handle.kind ?? (fresh.execution_mode === "process" ? "rpc" : "in-process"),
+        terminate: () => handle.terminate?.() ?? Promise.resolve(),
+      }, "revived_after_shutdown", () => isSameClaim(context, fresh))
+    }
+    return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "foreign_live_owner", fresh)
+  }
   if (!respawned.ok) {
     reservation.release()
     if (respawned.disposition === "retryable") {
@@ -222,6 +240,22 @@ export async function reviveClaimed(
     reservation.release()
     if (terminalAllowed || context.deferUnresumable) return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "session_unavailable", fresh)
     throw error
+  }
+  const ownsAttached = () => {
+    const current = context.store.load(fresh.task_id)
+    return current?.host_pid === context.hostPid && current.residency_claim === fresh.residency_claim
+  }
+  if (!reconciliationActive(context) || !ownsAttached()) {
+    reservation.release()
+    if (reattached.ok) {
+      const handle = respawned.handle
+      await suspendHandle(context, {
+        ...handle,
+        kind: handle.kind ?? (fresh.execution_mode === "process" ? "rpc" : "in-process"),
+        terminate: () => handle.terminate?.() ?? Promise.resolve(),
+      }, "revived_after_shutdown", ownsAttached)
+    }
+    return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "session_unavailable", fresh)
   }
   if (!reattached.ok) {
     reservation.release()
@@ -254,8 +288,10 @@ async function respawnThroughDrain(
   const { maxDrainAttempts, defaultRetryAfterMs, wait } = context.hostRetry
   let result = await respawn(record, sessionPath)
   for (let attempt = 1; attempt < maxDrainAttempts; attempt += 1) {
+    if (!reconciliationActive(context) || !isSameClaim(context, record)) return result
     if (result.ok || result.code !== "host_draining") return result
     await wait(result.retryAfterMs ?? defaultRetryAfterMs)
+    if (!reconciliationActive(context) || !isSameClaim(context, record)) return result
     result = await respawn(record, sessionPath)
   }
   return result

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { helloDesktopEngine } from "../src/handshake";
-import { DesktopLaunchRefusal } from "../src/launch-refusal";
+import { DesktopLaunchContextError, DesktopLaunchRefusal } from "../src/launch-refusal";
 import { legacySelf, legacyUnresolved, refusalChild, refusalRecord } from "./refusal-child";
 
 describe("legacy refusal exit contract", () => {
@@ -78,4 +78,22 @@ describe("hello helper launch refusal", () => {
 			spawnEngine: () => refusalChild({ hello: true }),
 		})).toHaveProperty("engineVersion", "fixture");
 	}, 10_000);
+});
+
+describe("user-facing contract (senpi#4990)", () => {
+	const action =
+		"Restart this host from a local terminal and keep that terminal app running, or use the OmO desktop app (Settings > Restart engine)." +
+		" Opening a new terminal or reconnecting to this same host does not repair its launch context.";
+
+	it.each([
+		["self-responsible", "Computer use cannot start safely from this host's current macOS launch context."],
+		[
+			"unresolved",
+			"Computer use cannot start safely from this host's current macOS launch context. macOS responsibility could not be resolved.",
+		],
+	] as const)("carries code, message and action for %s while keeping the message byte-identical", (reason, message) => {
+		const error = new DesktopLaunchContextError(reason, "fixture");
+		expect(error.userFacing).toEqual({ code: "COMPUTER_LAUNCH_CONTEXT_REQUIRED", message, action });
+		expect(error.message).toBe(`COMPUTER_LAUNCH_CONTEXT_REQUIRED: ${message} ${action}`);
+	});
 });

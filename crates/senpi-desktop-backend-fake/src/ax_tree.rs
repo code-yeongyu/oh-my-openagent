@@ -69,6 +69,37 @@ impl AxTree {
         id
     }
 
+    /// Appends leaf nodes under `window_id`'s root until its tree holds
+    /// `total` nodes; a tree already that large is left as scripted.
+    pub(crate) fn pad(&mut self, window_id: &str, total: u32) {
+        let Some(root) = self.roots.get(window_id).copied() else { return };
+        let mut count: u64 = 0;
+        let mut stack = vec![root];
+        while let Some(id) = stack.pop() {
+            count += 1;
+            stack.extend(self.nodes.get(&id).map(|entry| entry.children.clone()).unwrap_or_default());
+        }
+        for index in count..u64::from(total) {
+            let leaf = FakeAxNode {
+                role: "text".to_owned(),
+                native_role: Some("AXStaticText".to_owned()),
+                title: Some(format!("filler {index}")),
+                value: None,
+                description: None,
+                enabled: true,
+                focused: false,
+                bounds: None,
+                actions: Vec::new(),
+                children: Vec::new(),
+            };
+            let id = self.insert(&leaf, Some(root));
+            if let Some(entry) = self.nodes.get_mut(&root) {
+                entry.children.push(id);
+                entry.props.child_count = u32::try_from(entry.children.len()).unwrap_or(u32::MAX);
+            }
+        }
+    }
+
     pub(crate) fn root(&self, window_id: &str) -> CoreResult<u64> {
         self.roots.get(window_id).copied().ok_or_else(|| {
             DesktopError::ax_failed(format!("no accessibility tree scripted for window {window_id}"))
@@ -110,6 +141,17 @@ impl AxTree {
             .get_mut(&id)
             .ok_or_else(|| DesktopError::ax_failed(format!("unknown fake AX node {id}")))?;
         entry.props.value = Some(value.to_string());
+        Ok(())
+    }
+
+    /// Appends `text` to the node's value, as an insertion at the end of its
+    /// selection does.
+    pub(crate) fn append_value(&mut self, id: u64, text: &str) -> CoreResult<()> {
+        let entry = self
+            .nodes
+            .get_mut(&id)
+            .ok_or_else(|| DesktopError::ax_failed(format!("unknown fake AX node {id}")))?;
+        entry.props.value.get_or_insert_with(String::new).push_str(text);
         Ok(())
     }
 

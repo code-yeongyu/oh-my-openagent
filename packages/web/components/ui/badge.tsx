@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils"
 
 /** Legacy shadcn Badge, re-tokened (DESIGN.md §2/§4). Prefer `Chip` in new code. */
 const badgeVariants = cva(
-  "inline-flex items-center rounded-[2px] border px-2.5 py-0.5 text-xs font-medium transition-colors duration-[var(--dur-micro)] ease-standard focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-32",
+  "inline-flex items-center rounded-[2px] border px-2.5 py-0.5 text-xs font-medium transition-colors duration-[var(--dur-micro)] ease-standard focus-ring",
   {
     variants: {
       variant: {

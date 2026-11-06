@@ -1,4 +1,5 @@
 import { accessSync, constants, existsSync, realpathSync } from "@oh-my-opencode/memory-core/fs"
+import { isDarwinAutomountTriggerPath } from "@oh-my-opencode/utils/path-containment"
 import { basename, delimiter, dirname, isAbsolute, join } from "node:path"
 
 /**
@@ -14,6 +15,8 @@ import { basename, delimiter, dirname, isAbsolute, join } from "node:path"
  * verbatim, so the grant always names the full intended path and can never widen to an ancestor.
  */
 export function canonicalPath(path: string): string {
+  // A macOS automount trigger is granted as written: resolving it can park the host loop (#11545).
+  if (isDarwinAutomountTriggerPath(path)) return path
   const segments: string[] = []
   let current = path
   for (;;) {

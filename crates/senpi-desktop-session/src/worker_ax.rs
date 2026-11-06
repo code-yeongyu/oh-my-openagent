@@ -58,6 +58,9 @@ impl Worker {
             )
         });
         Ok(Response::Node(AxNode {
+            evidence: None,
+            subtree_truncated: false,
+            secure: false,
             ref_: reference.to_owned(),
             role: props.role,
             native_role: props.native_role,
@@ -189,3 +192,6 @@ fn truncate(value: String) -> String {
 mod click;
 #[cfg(test)]
 mod tests;
+mod type_text;
+#[cfg(test)]
+mod type_text_tests;

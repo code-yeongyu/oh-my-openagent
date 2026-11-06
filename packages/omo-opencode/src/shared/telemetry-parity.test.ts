@@ -2,7 +2,8 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import { isolateTelemetryEnv } from "../../../../test-support/telemetry-env.test-helpers"
-import { existsSync } from "node:fs"
+import { createHash } from "node:crypto"
+import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import type {
@@ -18,9 +19,6 @@ import { createOpencodeTelemetryProductConfig } from "./telemetry-product-identi
 
 type CapturedPostHogMessage = TelemetryCaptureMessage
 type PostHogModule = Awaited<ReturnType<typeof importPostHogModule>>
-
-const EXPECTED_DISTINCT_ID_FOR_PARITY_HOST =
-  "ad898a24f97bd14de34b9f3de62ab7cf1c2a77330ba41906af6e517f20e8272d"
 
 let activePostHogModule: PostHogModule | null = null
 const originalXdgDataHome = process.env.XDG_DATA_HOME
@@ -92,7 +90,7 @@ async function captureWithEnv(
   }))
 
   const client = posthogModule.createCliPostHog()
-  client.trackActive("distinct-cli", "run_started")
+  client.trackActive("run_started")
   await client.shutdown()
 
   return captured
@@ -116,7 +114,7 @@ afterEach(() => {
 })
 
 describe("telemetry before/after parity", () => {
-  it("pins event name, distinct ID prefix, state file path, env matrix, and payload keys", async () => {
+  it("pins event name, install-id distinct ID, state file path, env matrix, and payload keys", async () => {
     // given
     resetTelemetryEnv()
     const captured: CapturedPostHogMessage[] = []
@@ -133,17 +131,14 @@ describe("telemetry before/after parity", () => {
     const expectedStateFilePath = join(xdgDataHome, "oh-my-opencode", "posthog-activity.json")
 
     // when
-    const distinctId = posthogModule.getPostHogDistinctId()
     const stateFilePath = getTelemetryActivityStateFilePath(resolveTelemetryStateDir(product))
     const client = posthogModule.createCliPostHog()
-    client.trackActive(distinctId, "run_started")
+    client.trackActive("run_started")
     await client.shutdown()
 
     // then
     expect(product.eventName).toBe("omo_daily_active")
-    expect(product.machineIdPrefix).toBe("oh-my-openagent:")
     expect(product.cacheDirName).toBe("oh-my-opencode")
-    expect(distinctId).toBe(EXPECTED_DISTINCT_ID_FOR_PARITY_HOST)
     expect(stateFilePath).toBe(expectedStateFilePath)
     expect(existsSync(stateFilePath)).toBe(false)
     expect(captured).toHaveLength(1)
@@ -152,6 +147,9 @@ describe("telemetry before/after parity", () => {
       throw new Error("Expected telemetry parity event")
     }
     expect(dailyEvent.event).toBe("omo_daily_active")
+    const installId = readFileSync(join(xdgDataHome, "oh-my-opencode", "install-id"), "utf8").trim()
+    expect(installId).toMatch(/^[0-9a-f]{64}$/)
+    expect(dailyEvent.distinctId).toBe(createHash("sha256").update(installId).digest("hex"))
     const payloadKeys = Object.keys(dailyEvent.properties ?? {}).sort()
     expect(payloadKeys).toContain("plugin_name")
     expect(payloadKeys).toContain("product_name")

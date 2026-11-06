@@ -1,4 +1,5 @@
 import { lstatSync, readdirSync, realpathSync } from "@oh-my-opencode/memory-core/fs"
+import { isDarwinAutomountTriggerPath } from "@oh-my-opencode/utils/path-containment"
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
@@ -127,6 +128,8 @@ function stableRoots(paths: readonly string[]): string[] {
 }
 
 function canonicalizeFromNearestExisting(target: string): string | undefined {
+  // A macOS automount trigger stays lexical: lstat/realpath under it can park the host loop (#11545).
+  if (isDarwinAutomountTriggerPath(target)) return undefined
   let candidate = target
   const missingSegments: string[] = []
   while (true) {

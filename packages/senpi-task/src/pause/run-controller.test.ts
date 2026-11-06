@@ -87,6 +87,27 @@ describe("whole-run pause custody", () => {
     expect(h.registry.require("root").resume?.childSeqCutoffs.a).toBe(8)
   })
 
+  test("#given a child restore awaiting failure #when a newer Stop arrives #then the failed old Resume cannot release it", async () => {
+    const restoring = Promise.withResolvers<void>()
+    const failed = Promise.withResolvers<void>()
+    const h = harness({ resume: async () => {
+      restoring.resolve()
+      await failed.promise
+      throw new Error("restore failed")
+    } })
+    await h.controller.pause("root", 1)
+    const oldResume = h.controller.resume("root", 1, "resume-1")
+    await restoring.promise
+    await h.controller.pause("root", 2)
+    failed.resolve()
+    expect(await oldResume).toEqual({ kind: "superseded" })
+    expect(h.registry.require("root").pauseSeq).toBe(2)
+    expect(h.registry.require("root").participants.a?.state).toBe("held")
+    expect(h.controller.released("root", 1, "resume-1")).toBe(false)
+    expect(h.barrier.state("root")).toEqual({ kind: "closed", pauseSeq: 2 })
+    expect(h.events).not.toContain("install")
+  })
+
   test("#given a paused run #when cancelled #then ledger participants are cancelled before removal", async () => {
     const h = harness({ cancel: async entry => {
       expect(h.registry.require("root").participants[entry.key]).toBeDefined()

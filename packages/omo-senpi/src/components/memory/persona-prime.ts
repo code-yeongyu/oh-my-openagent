@@ -6,6 +6,7 @@ import {
 } from "@oh-my-opencode/memory-core"
 
 import type { ComponentLogger } from "../../extension/types"
+import { reinstallStep } from "../reinstall/reinstall-step"
 import { KIBITZER_TASK_RUNTIME_ASSET, loadKibitzerTaskRuntime } from "./kibitzer/task-runtime"
 
 export interface PersonaPrimeTarget {
@@ -39,7 +40,7 @@ export function primeMemoryPersonaAssets(input: {
     input.logger?.warn("omo-senpi memory boot asset unavailable", {
       asset: target.asset,
       error: error instanceof Error ? error.message : String(error),
-      hint: "this build's plugin payload is incomplete; reinstall omo, then start a new session",
+      hint: `part of this omo installation is missing; ${reinstallStep()}, then start a new session`,
     })
   }
   const pending: Promise<void>[] = []

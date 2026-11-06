@@ -4,17 +4,17 @@ import { describe, expect, test } from "bun:test"
 
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 
-import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { testTempDir } from "../../../test-support/temp-dir"
 import { createModelProfileComponent, MODEL_PROFILE_APPLIED_TYPE, MODEL_PROFILE_UNAVAILABLE_TYPE } from "./index"
+import { ProfileExtensionAPI, recordedOutcome } from "./profile-outcome.test-support"
 
 type FakeModel = { readonly provider: string; readonly id: string }
 
 const FABLE: FakeModel = { provider: "anthropic", id: "claude-fable-5-1" }
 const OPUS: FakeModel = { provider: "anthropic", id: "claude-opus-5-5" }
 
-async function startSession(config: OmoConfig, models: readonly FakeModel[]): Promise<FakeExtensionAPI> {
-  const pi = new FakeExtensionAPI()
+async function startSession(config: OmoConfig, models: readonly FakeModel[]): Promise<ProfileExtensionAPI> {
+  const pi = new ProfileExtensionAPI()
   createModelProfileComponent({ loadConfig: () => ({ config, diagnostics: [], layers: [], sources: [] }) }).register(pi, {
     config: { getFlag: () => undefined },
     logger: { error() {}, info() {}, warn() {} },
@@ -46,7 +46,7 @@ describe("model_profile with exclude_models", () => {
 
     // then
     expect(pi.sessionModels).toEqual([OPUS])
-    expect(pi.messages[0]?.message).toMatchObject({ customType: MODEL_PROFILE_APPLIED_TYPE, details: { model: "anthropic/claude-opus-5-5" } })
+    expect(recordedOutcome(pi)).toMatchObject({ customType: MODEL_PROFILE_APPLIED_TYPE, details: { model: "anthropic/claude-opus-5-5" } })
   })
 
   test("#given a literal pin that is excluded #when the session starts #then it is not applied", async () => {
@@ -58,6 +58,6 @@ describe("model_profile with exclude_models", () => {
 
     // then
     expect(pi.sessionModels).toEqual([])
-    expect(pi.messages[0]?.message).toMatchObject({ customType: MODEL_PROFILE_UNAVAILABLE_TYPE })
+    expect(recordedOutcome(pi)).toMatchObject({ customType: MODEL_PROFILE_UNAVAILABLE_TYPE })
   })
 })

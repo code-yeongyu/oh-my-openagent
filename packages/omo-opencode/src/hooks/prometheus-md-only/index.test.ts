@@ -1,11 +1,12 @@
 import { afterAll, describe, expect, test, beforeEach, afterEach, mock } from "bun:test"
-import { mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
 import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
 import { PLANNING_CONTEXT_OPEN } from "./constants"
 import { clearSessionAgent, setSessionAgent } from "../../features/claude-code-session-state"
+import { invokeBefore } from "./fixtures/invoke-before"
 // Force stable (JSON) mode for tests that rely on message file storage
 mock.module("../../shared/opencode-storage-detection", () => ({
   isSqliteBackend: () => false,
@@ -22,11 +23,17 @@ const { MESSAGE_STORAGE } = await import("../../features/hook-message-injector")
 describe("prometheus-md-only", () => {
   const TEST_SESSION_ID = "ses_test_prometheus"
   let testMessageDir: string
+  let workspaceRoot: string
+
+  beforeEach(() => {
+    workspaceRoot = mkdtempSync(join(tmpdir(), "prometheus-md-only-"))
+    mkdirSync(join(workspaceRoot, ".omo"))
+  })
 
   function createMockPluginInput() {
     return {
       client: {},
-      directory: "/tmp/test",
+      directory: workspaceRoot,
     } as never
   }
 
@@ -64,6 +71,7 @@ describe("prometheus-md-only", () => {
 
   afterEach(() => {
     clearSessionAgent(TEST_SESSION_ID)
+    rmSync(workspaceRoot, { recursive: true, force: true })
     if (testMessageDir) {
       try {
         rmSync(testMessageDir, { recursive: true, force: true })
@@ -89,7 +97,7 @@ describe("prometheus-md-only", () => {
 
       //#when //#then
       await expect(
-        hook["tool.execute.before"](input, output)
+        invokeBefore(hook, input, output)
       ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
     })
 
@@ -108,7 +116,7 @@ describe("prometheus-md-only", () => {
 
       //#when //#then
       await expect(
-        hook["tool.execute.before"](input, output)
+        invokeBefore(hook, input, output)
       ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
     })
 
@@ -127,7 +135,7 @@ describe("prometheus-md-only", () => {
 
       //#when //#then
       await expect(
-        hook["tool.execute.before"](input, output)
+        invokeBefore(hook, input, output)
       ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
     })
 
@@ -146,7 +154,7 @@ describe("prometheus-md-only", () => {
 
       //#when //#then
       await expect(
-        hook["tool.execute.before"](input, output)
+        invokeBefore(hook, input, output)
       ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
     })
 
@@ -165,7 +173,7 @@ describe("prometheus-md-only", () => {
 
       //#when //#then
       await expect(
-        hook["tool.execute.before"](input, output)
+        invokeBefore(hook, input, output)
       ).resolves.toBeUndefined()
     })
 
@@ -184,7 +192,7 @@ describe("prometheus-md-only", () => {
 
       //#when //#then
       await expect(
-        hook["tool.execute.before"](input, output)
+        invokeBefore(hook, input, output)
       ).resolves.toBeUndefined()
     })
   })
@@ -208,7 +216,7 @@ describe("prometheus-md-only", () => {
 
       // when / #then
       await expect(
-        hook["tool.execute.before"](input, output)
+        invokeBefore(hook, input, output)
       ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
     })
 
@@ -222,7 +230,7 @@ describe("prometheus-md-only", () => {
         const output = { args: { patchText: patch("*** Add File: .git/hooks/post-checkout", "+#!/bin/sh") } }
 
         // when / then
-        await expect(hook["tool.execute.before"](input, output)).rejects.toThrow(
+        await expect(invokeBefore(hook, input, output)).rejects.toThrow(
           "File operations restricted to .omo/*.md plan files only",
         )
       })
@@ -236,7 +244,7 @@ describe("prometheus-md-only", () => {
         }
 
         // when / then
-        await expect(hook["tool.execute.before"](input, output)).rejects.toThrow(
+        await expect(invokeBefore(hook, input, output)).rejects.toThrow(
           "File operations restricted to .omo/*.md plan files only",
         )
       })
@@ -248,7 +256,7 @@ describe("prometheus-md-only", () => {
         const output = { args: { patchText: patch("*** Add File: .omo/plans/work-plan.md", "+# Plan") } }
 
         // when / then
-        await expect(hook["tool.execute.before"](input, output)).resolves.toBeUndefined()
+        await expect(invokeBefore(hook, input, output)).resolves.toBeUndefined()
       })
 
       test("#when patch headers omit the space after the colon #then they are still checked", async () => {
@@ -261,7 +269,7 @@ describe("prometheus-md-only", () => {
           patch("*** Update File: .omo/plans/a.md", "*** Move to:src/evil.ts", "@@", "-x", "+y"),
         ]) {
           // when / then
-          await expect(hook["tool.execute.before"](input, { args: { patchText } })).rejects.toThrow(
+          await expect(invokeBefore(hook, input, { args: { patchText } })).rejects.toThrow(
             "File operations restricted to .omo/*.md plan files only",
           )
         }
@@ -277,7 +285,7 @@ describe("prometheus-md-only", () => {
           patch("   *** Add File: src/evil.ts", "+x"),
         ]) {
           // when / then
-          await expect(hook["tool.execute.before"](input, { args: { patchText } })).rejects.toThrow(
+          await expect(invokeBefore(hook, input, { args: { patchText } })).rejects.toThrow(
             "File operations restricted to .omo/*.md plan files only",
           )
         }
@@ -289,7 +297,7 @@ describe("prometheus-md-only", () => {
         const input = { tool: "apply_patch", sessionID: TEST_SESSION_ID, callID: "call-1" }
 
         // when / then
-        await expect(hook["tool.execute.before"](input, { args: { body: "*** Add File: src/x.ts" } })).rejects.toThrow(
+        await expect(invokeBefore(hook, input, { args: { body: "*** Add File: src/x.ts" } })).rejects.toThrow(
           "File operations restricted to .omo/*.md plan files only",
         )
       })
@@ -301,7 +309,7 @@ describe("prometheus-md-only", () => {
 
         // when / then
         await expect(
-          hook["tool.execute.before"](input, { args: { file_path: "/tmp/test/src/index.ts", edits: [] } }),
+          invokeBefore(hook, input, { args: { file_path: join(workspaceRoot, "src/index.ts"), edits: [] } }),
         ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
       })
 
@@ -309,10 +317,10 @@ describe("prometheus-md-only", () => {
         // given
         const hook = createPrometheusMdOnlyHook(createMockPluginInput())
         const input = { tool: "edit", sessionID: TEST_SESSION_ID, callID: "call-1" }
-        const output = { args: { filePath: "/tmp/test/.omo/plans/a.md", rename: "/tmp/test/src/a.ts", edits: [] } }
+        const output = { args: { filePath: join(workspaceRoot, ".omo/plans/a.md"), rename: join(workspaceRoot, "src/a.ts"), edits: [] } }
 
         // when / then
-        await expect(hook["tool.execute.before"](input, output)).rejects.toThrow(
+        await expect(invokeBefore(hook, input, output)).rejects.toThrow(
           "File operations restricted to .omo/*.md plan files only",
         )
       })
@@ -321,10 +329,10 @@ describe("prometheus-md-only", () => {
         // given
         const hook = createPrometheusMdOnlyHook(createMockPluginInput())
         const input = { tool: "multiedit", sessionID: TEST_SESSION_ID, callID: "call-1" }
-        const output = { args: { filePath: "/tmp/test/src/index.ts", edits: [] } }
+        const output = { args: { filePath: join(workspaceRoot, "src/index.ts"), edits: [] } }
 
         // when / then
-        await expect(hook["tool.execute.before"](input, output)).rejects.toThrow(
+        await expect(invokeBefore(hook, input, output)).rejects.toThrow(
           "File operations restricted to .omo/*.md plan files only",
         )
       })
@@ -339,12 +347,12 @@ describe("prometheus-md-only", () => {
         callID: "call-1",
       }
       const output = {
-        args: { filePath: "/tmp/test/.omo/plans/work-plan.md" },
+        args: { filePath: join(workspaceRoot, ".omo/plans/work-plan.md") },
       }
 
       // when / #then
       await expect(
-        hook["tool.execute.before"](input, output)
+        invokeBefore(hook, input, output)
       ).resolves.toBeUndefined()
     })
 
@@ -357,11 +365,11 @@ describe("prometheus-md-only", () => {
         callID: "call-1",
       }
       const output: { args: Record<string, unknown>; message?: string } = {
-        args: { filePath: "/tmp/test/.omo/plans/work-plan.md" },
+        args: { filePath: join(workspaceRoot, ".omo/plans/work-plan.md") },
       }
 
       // when
-      await hook["tool.execute.before"](input, output)
+      await invokeBefore(hook, input, output)
 
       // then
       expect(output.message).toContain(SYSTEM_DIRECTIVE_PREFIX)
@@ -376,11 +384,11 @@ describe("prometheus-md-only", () => {
         callID: "call-1",
       }
       const output: { args: Record<string, unknown>; message?: string } = {
-        args: { filePath: "/tmp/test/.omo/drafts/notes.md" },
+        args: { filePath: join(workspaceRoot, ".omo/drafts/notes.md") },
       }
 
       // when
-      await hook["tool.execute.before"](input, output)
+      await invokeBefore(hook, input, output)
 
       // then
       expect(output.message).toBeUndefined()
@@ -400,7 +408,7 @@ describe("prometheus-md-only", () => {
 
       // when / #then
       await expect(
-        hook["tool.execute.before"](input, output)
+        invokeBefore(hook, input, output)
       ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
     })
 
@@ -413,12 +421,12 @@ describe("prometheus-md-only", () => {
         callID: "call-1",
       }
       const output = {
-        args: { filePath: "/tmp/test/work.omo/plans/work-plan.md" },
+        args: { filePath: join(workspaceRoot, "work.omo/plans/work-plan.md") },
       }
 
       // when / #then
       await expect(
-        hook["tool.execute.before"](input, output)
+        invokeBefore(hook, input, output)
       ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
     })
 
@@ -431,12 +439,12 @@ describe("prometheus-md-only", () => {
         callID: "call-1",
       }
       const output = {
-        args: { filePath: "/tmp/test/.omo-backup/plans/work-plan.md" },
+        args: { filePath: join(workspaceRoot, ".omo-backup/plans/work-plan.md") },
       }
 
       // when / #then
       await expect(
-        hook["tool.execute.before"](input, output)
+        invokeBefore(hook, input, output)
       ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
     })
 
@@ -454,7 +462,7 @@ describe("prometheus-md-only", () => {
 
       // when / #then
       await expect(
-        hook["tool.execute.before"](input, output)
+        invokeBefore(hook, input, output)
       ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
     })
 
@@ -472,7 +480,7 @@ describe("prometheus-md-only", () => {
 
       // when / #then
       await expect(
-        hook["tool.execute.before"](input, output)
+        invokeBefore(hook, input, output)
       ).resolves.toBeUndefined()
     })
 
@@ -490,7 +498,7 @@ describe("prometheus-md-only", () => {
 
       // when / #then
       await expect(
-        hook["tool.execute.before"](input, output)
+        invokeBefore(hook, input, output)
       ).resolves.toBeUndefined()
     })
 
@@ -508,7 +516,7 @@ describe("prometheus-md-only", () => {
 
       // when / #then
       await expect(
-        hook["tool.execute.before"](input, output)
+        invokeBefore(hook, input, output)
       ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
     })
 
@@ -525,7 +533,7 @@ describe("prometheus-md-only", () => {
       }
 
       // when
-      await hook["tool.execute.before"](input, output)
+      await invokeBefore(hook, input, output)
 
       // then — XML tag used, not bracket directive (#4036)
       expect(output.args.prompt).toContain(PLANNING_CONTEXT_OPEN)
@@ -545,7 +553,7 @@ describe("prometheus-md-only", () => {
       }
 
       // when
-      await hook["tool.execute.before"](input, output)
+      await invokeBefore(hook, input, output)
 
       // then
       expect(output.args.prompt).toContain(PLANNING_CONTEXT_OPEN)
@@ -565,7 +573,7 @@ describe("prometheus-md-only", () => {
       }
 
       // when
-      await hook["tool.execute.before"](input, output)
+      await invokeBefore(hook, input, output)
 
       // then
       expect(output.args.prompt).toContain(PLANNING_CONTEXT_OPEN)
@@ -586,7 +594,7 @@ describe("prometheus-md-only", () => {
       }
 
       // when
-      await hook["tool.execute.before"](input, output)
+      await invokeBefore(hook, input, output)
 
       // then
       const occurrences = (output.args.prompt as string).split(PLANNING_CONTEXT_OPEN).length - 1
@@ -606,7 +614,7 @@ describe("prometheus-md-only", () => {
       }
 
       // when
-      await hook["tool.execute.before"](input, output)
+      await invokeBefore(hook, input, output)
 
       // then — the bracket-enclosed directive must NOT appear in the forwarded prompt
       // because Azure OpenAI Prompt Shield flags it as indirect prompt injection
@@ -633,7 +641,7 @@ describe("prometheus-md-only", () => {
 
       // when / #then
       await expect(
-        hook["tool.execute.before"](input, output)
+        invokeBefore(hook, input, output)
       ).resolves.toBeUndefined()
     })
 
@@ -651,7 +659,7 @@ describe("prometheus-md-only", () => {
       }
 
       // when
-      await hook["tool.execute.before"](input, output)
+      await invokeBefore(hook, input, output)
 
       // then
       expect(output.args.prompt).toBe(originalPrompt)
@@ -702,7 +710,7 @@ describe("prometheus-md-only", () => {
 
       // when / then - should NOT block because boulder says atlas, not prometheus
       await expect(
-        hook["tool.execute.before"](input, output)
+        invokeBefore(hook, input, output)
       ).resolves.toBeUndefined()
     })
 
@@ -735,7 +743,7 @@ describe("prometheus-md-only", () => {
 
       // when / then - should block because boulder says prometheus
       await expect(
-        hook["tool.execute.before"](input, output)
+        invokeBefore(hook, input, output)
       ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
     })
 
@@ -768,7 +776,7 @@ describe("prometheus-md-only", () => {
 
       // when / then - should block because falls back to message files (prometheus)
       await expect(
-        hook["tool.execute.before"](input, output)
+        invokeBefore(hook, input, output)
       ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
     })
   })
@@ -788,7 +796,7 @@ describe("prometheus-md-only", () => {
 
       // when / #then
       await expect(
-        hook["tool.execute.before"](input, output)
+        invokeBefore(hook, input, output)
       ).resolves.toBeUndefined()
     })
   })
@@ -812,9 +820,7 @@ describe("prometheus-md-only", () => {
        }
 
        // when / #then
-       await expect(
-         hook["tool.execute.before"](input, output)
-       ).resolves.toBeUndefined()
+       await expect(invokeBefore(hook, input, output)).resolves.toBeUndefined()
      })
 
      test("should allow mixed separator paths under .omo/", async () => {
@@ -831,9 +837,7 @@ describe("prometheus-md-only", () => {
        }
 
        // when / #then
-       await expect(
-         hook["tool.execute.before"](input, output)
-       ).resolves.toBeUndefined()
+       await expect(invokeBefore(hook, input, output)).resolves.toBeUndefined()
      })
 
      test("should allow uppercase .MD extension", async () => {
@@ -851,7 +855,7 @@ describe("prometheus-md-only", () => {
 
        // when / #then
        await expect(
-         hook["tool.execute.before"](input, output)
+         invokeBefore(hook, input, output)
        ).resolves.toBeUndefined()
      })
 
@@ -870,7 +874,7 @@ describe("prometheus-md-only", () => {
 
        // when / #then
        await expect(
-         hook["tool.execute.before"](input, output)
+         invokeBefore(hook, input, output)
        ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
      })
 
@@ -887,9 +891,9 @@ describe("prometheus-md-only", () => {
          args: { filePath: "src/.omo/plans/x.md" },
        }
 
-       // when / #then - should allow because .omo is in path
+       // when / #then - the nested .omo remains a planning directory
        await expect(
-         hook["tool.execute.before"](input, output)
+         invokeBefore(hook, input, output)
        ).resolves.toBeUndefined()
      })
 
@@ -908,11 +912,11 @@ describe("prometheus-md-only", () => {
 
        // when / #then
        await expect(
-         hook["tool.execute.before"](input, output)
+         invokeBefore(hook, input, output)
        ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
      })
 
-     test("should allow case-insensitive .OMO directory", async () => {
+     test("should allow .OMO only when the filesystem identifies it as .omo", async () => {
        // given
        setupMessageStorage(TEST_SESSION_ID, "prometheus")
        const hook = createPrometheusMdOnlyHook(createMockPluginInput())
@@ -925,10 +929,11 @@ describe("prometheus-md-only", () => {
          args: { filePath: ".OMO/plans/work-plan.md" },
        }
 
-       // when / #then
-       await expect(
-         hook["tool.execute.before"](input, output)
-       ).resolves.toBeUndefined()
+       // when / #then - native aliases share an entry; separate case-sensitive dirs do not.
+       const alias = join(workspaceRoot, ".OMO")
+       const sameEntry = existsSync(alias) && lstatSync(alias).ino === lstatSync(join(workspaceRoot, ".omo")).ino
+       if (sameEntry) await expect(invokeBefore(hook, input, output)).resolves.toBeUndefined()
+       else await expect(invokeBefore(hook, input, output)).rejects.toThrow("Attempted to modify: .OMO/plans/work-plan.md.")
      })
 
      test("should allow nested project path with .omo (Windows real-world case)", async () => {
@@ -947,7 +952,7 @@ describe("prometheus-md-only", () => {
 
        // when / #then
        await expect(
-         hook["tool.execute.before"](input, output)
+         invokeBefore(hook, input, output)
        ).resolves.toBeUndefined()
      })
 
@@ -966,7 +971,7 @@ describe("prometheus-md-only", () => {
 
        // when / #then
        await expect(
-         hook["tool.execute.before"](input, output)
+         invokeBefore(hook, input, output)
        ).resolves.toBeUndefined()
      })
 
@@ -985,7 +990,7 @@ describe("prometheus-md-only", () => {
 
        // when / #then
        await expect(
-         hook["tool.execute.before"](input, output)
+         invokeBefore(hook, input, output)
        ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
      })
   })

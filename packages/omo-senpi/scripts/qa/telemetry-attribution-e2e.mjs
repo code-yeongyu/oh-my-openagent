@@ -85,9 +85,7 @@ async function main() {
       cliEvents.every((event) => event.distinct_id === sha256(cliLane.persistedInstallId)
         && event.properties?.install_hash === event.distinct_id),
     noRawInstallIdShipped: [...desktopEvents, ...cliEvents].every((event) => !("install_id" in (event.properties ?? {}))),
-    machineHashIsHex64BeforeSunset: [...desktopEvents, ...cliEvents].every(
-      (event) => Date.now() >= Date.parse("2026-12-15T00:00:00Z") || HEX64.test(String(event.properties?.machine_hash)),
-    ),
+    noMachineHashShipped: [...desktopEvents, ...cliEvents].every((event) => !("machine_hash" in (event.properties ?? {}))),
     credentialIsolationClean: beforeCredential === afterCredential,
     realHomeInstallIdUntouched:
       (realInstallIdBefore === null) === (realInstallIdAfter === null) &&

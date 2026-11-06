@@ -6,6 +6,9 @@ import { OmoTaskSettingsSchema } from "@oh-my-opencode/omo-config-core"
 import { createTaskTool } from "@oh-my-opencode/senpi-task"
 
 import { EMPTY_SKILL_INVOCATIONS } from "../../../../senpi-task/src/agents/invocation-guard"
+import { loadSenpiBarrel } from "../../../../senpi-task/src/lazy/senpi-barrel"
+import { newestSessionPath } from "../../../../senpi-task/src/lifecycle/session-path"
+import { createTaskRecordStore } from "../../../../senpi-task/src/store"
 import { createBuiltinChildMachine } from "../../../../senpi-task/src/runners/in-process/__fixtures__/builtin-child"
 import { buildTaskExecute } from "../../../../senpi-task/src/tools/task/execute"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
@@ -99,8 +102,16 @@ async function runTree(maxDepth: number, hostedParent = false) {
     )
     expect(started.details.status).toBe("running")
     await engine.manager.waitFor(started.details.task_id)
+    const { SessionManager } = await loadSenpiBarrel()
+    const store = createTaskRecordStore({ project_dir: machine.cwd, task: { state_dir: join(machine.agentDir, "tasks") } })
+    const records = engine.manager.list({ scope: "all" }).map(({ record }) => record)
     return {
-      records: engine.manager.list({ scope: "all" }).map(({ record }) => record),
+      records,
+      headers: records.map((record) => {
+        const path = newestSessionPath({ store }, record.task_id)
+        if (path === undefined) throw new Error(`missing transcript for ${record.task_id}`)
+        return { record, header: SessionManager.open(path).getHeader() }
+      }),
       rootScoped: engine.manager.list({ scope: "parent-session", session_id: "tree-root" }).map(({ record }) => record),
     }
   } finally {
@@ -118,7 +129,7 @@ describe("nested in-process task ancestry (#10732)", () => {
     const offset = hostedParent ? 4 : 0
 
     // when real in-process sessions delegate through their inherited task tools
-    const { records } = await runTree(offset + 3, hostedParent)
+    const { records, headers } = await runTree(offset + 3, hostedParent)
     const child = records.find((record) => record.category === "child")
     const grandchild = records.find((record) => record.category === "grandchild")
     const greatGrandchild = records.find((record) => record.category === "great-grandchild")
@@ -132,6 +143,11 @@ describe("nested in-process task ancestry (#10732)", () => {
     expect(greatGrandchild).toMatchObject({
       parent_session_id: grandchild?.child_session_id, root_session_id: "tree-root", depth: offset + 3, status: "completed",
     })
+    for (const { record, header } of headers) {
+      expect(header?.spawnedBy).toEqual({
+        parentSessionId: record.parent_session_id, rootSessionId: "tree-root", taskId: record.task_id,
+      })
+    }
   }, 30_000)
 
   test("refuses a nested spawn at max_depth instead of treating its caller as a root", async () => {

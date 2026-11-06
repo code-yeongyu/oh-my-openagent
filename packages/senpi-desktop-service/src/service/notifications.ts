@@ -4,7 +4,7 @@ import {
 	type EngineNotification,
 	type StopPathStatus,
 } from "@oh-my-opencode/senpi-desktop-protocol";
-import { isAuditEvent, isStopPathStatus } from "./parse";
+import { isStopPathStatus, parseAuditEvent } from "./parse";
 
 export type Unsubscribe = () => void;
 export type Listener<T> = (value: T) => void;
@@ -33,7 +33,7 @@ function assertNever(value: never): never {
 
 /**
  * Fans engine notifications out to host listeners. The host only surfaces them: the engine
- * persists audit records itself, and `engine.log` has no host consumer.
+ * persists audit records itself, and `engine.log` and `epoch.changed` have no host consumer yet.
  */
 export class NotificationHub {
 	readonly #audit = new Set<Listener<AuditEvent>>();
@@ -68,13 +68,15 @@ export class NotificationHub {
 
 	#dispatchKnown(method: EngineNotification, params: unknown): void {
 		switch (method) {
-			case "audit":
-				if (isAuditEvent(params)) {
-					for (const listener of this.#audit) listener(params);
+			case "audit": {
+				const event = parseAuditEvent(params);
+				if (event !== undefined) {
+					for (const listener of this.#audit) listener(event);
 				} else {
 					this.emitError(new DesktopNotificationError(method, "is malformed"));
 				}
 				return;
+			}
 			case "stopPath.changed":
 				if (isStopPathStatus(params)) {
 					for (const listener of this.#stopPath) listener(params);
@@ -83,6 +85,7 @@ export class NotificationHub {
 				}
 				return;
 			case "engine.log":
+			case "epoch.changed":
 				return;
 			default:
 				assertNever(method);

@@ -1,7 +1,13 @@
 import { basename, dirname, join, sep } from "node:path"
 import { readFileSync } from "node:fs"
 import type { RpcSpawnSpec } from "../rpc/spawn"
-import { MEMBER_IDENTITY_ENV, MEMBER_TASK_ID_ENV, MEMBER_TEAM_CONFIG_ENV } from "../../team/member-extension/identity"
+import {
+  MEMBER_IDENTITY_ENV,
+  MEMBER_TASK_ID_ENV,
+  MEMBER_TEAM_CONFIG_ENV,
+  WORKPOOL_STATE_DIR_ENV,
+  WORKPOOL_TASK_ID_ENV,
+} from "../../team/member-extension/identity"
 import { SHARD_KEY_CONTEXT, TREE_KEY_CONTEXT } from "./shard-socket"
 
 export interface ChildSessionContext {
@@ -34,6 +40,10 @@ export function buildChildContext(spec: ChildContextSpec): ChildSessionContext {
   }
 
   if (spec.memberEnv !== undefined) {
+    const workpoolStateDir = spec.memberEnv[WORKPOOL_STATE_DIR_ENV]
+    const workpoolTaskId = spec.memberEnv[WORKPOOL_TASK_ID_ENV]
+    if (workpoolStateDir !== undefined) baseContext.workpool_state_dir = workpoolStateDir
+    if (workpoolTaskId !== undefined) baseContext.workpool_task_id = workpoolTaskId
     // Member: extract team_run_id and member_name from SENPI_TASK_MEMBER
     const identity = spec.memberEnv[MEMBER_IDENTITY_ENV]
     if (identity !== undefined) {

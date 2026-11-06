@@ -185,7 +185,7 @@ function packageLayer(path: string): keyof typeof layerRanks | undefined {
 }
 
 function extractTypecheckPackagePaths(command: string): readonly string[] {
-  return [...command.matchAll(/tsgo --noEmit -p (packages\/[^ ]+\/tsconfig\.json)/g)]
+  return [...command.matchAll(/bun check --no-script --all -p (packages\/[^ ]+\/tsconfig\.json)/g)]
     .map((match) => match[1])
     .filter((path): path is string => path !== undefined)
     .map((path) => path.slice(0, -"/tsconfig.json".length))

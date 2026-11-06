@@ -19,6 +19,13 @@ export interface SkillInfo {
   allowedTools?: string[]
 }
 
+/** One entry of OpenCode core's own skill list (Skill.all()), as returned by SkillLoadOptions.nativeSkills.all(). */
+export interface CoreListedSkill {
+  name: string
+  description?: string
+  location: string
+}
+
 export interface SkillLoadOptions {
   /** When true, only load from OpenCode paths (.opencode/skills/, ~/.config/opencode/skills/) */
   opencodeOnly?: boolean

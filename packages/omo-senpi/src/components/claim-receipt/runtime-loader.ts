@@ -3,6 +3,8 @@
 
 import type * as ClaimReceiptRuntime from "./runtime"
 
+import { reinstallStep } from "../reinstall/reinstall-step"
+
 export type ClaimReceiptRuntimeModule = Pick<typeof ClaimReceiptRuntime, "evaluateAnswer">
 export type ClaimReceiptRuntimeLoader = () => Promise<ClaimReceiptRuntimeModule>
 
@@ -24,5 +26,5 @@ export const loadClaimReceiptRuntime: ClaimReceiptRuntimeLoader = createClaimRec
 
 export function claimReceiptRuntimeLoadFailure(error: unknown): string {
   const cause = error instanceof Error ? error.message : String(error)
-  return `omo-senpi claim-receipt skipped this answer: the claim-receipt runtime (${CLAIM_RECEIPT_RUNTIME_ARTIFACT}) failed to load: ${cause}. This build's plugin payload is incomplete; reinstall omo, then start a new session.`
+  return `omo-senpi claim-receipt skipped this answer: the claim-receipt runtime (${CLAIM_RECEIPT_RUNTIME_ARTIFACT}) failed to load: ${cause}. Part of this omo installation is missing; ${reinstallStep()}, then start a new session.`
 }

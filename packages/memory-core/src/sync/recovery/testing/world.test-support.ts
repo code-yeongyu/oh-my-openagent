@@ -2,22 +2,18 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { creatorAnchor, type TrustAnchor } from "../../crypto/anchor.ts";
-import { buildBatch, signRecord } from "../../crypto/build.ts";
 import {
 	appendEntries,
 	type ChainState,
 	emptyChain,
 } from "../../crypto/chain.ts";
-import type { BatchEntry, Head, SyncAuthor } from "../../crypto/entry.ts";
-import { nextLink, wrapSetDigest } from "../../crypto/links.ts";
+import type { Head, SyncAuthor } from "../../crypto/entry.ts";
+import { wrapSetDigest } from "../../crypto/links.ts";
 import type { Principal } from "../../crypto/parse.ts";
 import { createRejectionCounter } from "../../crypto/rejection.ts";
 import { deviceIdOf, taggedHash } from "../../crypto/signatures.ts";
 import { pinTrustAnchor } from "../../crypto/trust-pin.ts";
-import {
-	b64urlEncode,
-	sha256B64,
-} from "../../crypto/vendor/sync-format/jcs.ts";
+import { b64urlEncode } from "../../crypto/vendor/sync-format/jcs.ts";
 import { signFramed } from "../../crypto/vendor/sync-format/keys.ts";
 import {
 	createDeviceKeyring,
@@ -73,7 +69,7 @@ export const newDevice = async (): Promise<Device> => {
 	};
 };
 
-const authorOf = (device: Device): SyncAuthor => ({ ...device.principal });
+export const authorOf = (device: Device): SyncAuthor => ({ ...device.principal });
 
 export type World = {
 	readonly account: string;
@@ -222,7 +218,7 @@ export const createWorld = async (
 	};
 };
 
-const headOrThrow = (state: ChainState): Head => {
+export const headOrThrow = (state: ChainState): Head => {
 	if (state.head === null || state.authority === null)
 		throw new Error("no verified head");
 	return state.head;
@@ -328,72 +324,6 @@ export const approve = async (
 		await signedAppend(by.keyring, headOrThrow(state), body, wraps),
 	);
 	if (!appended.ok) throw new Error(`approval refused: ${appended.reason}`);
-};
-
-/** Writes one encrypted batch at the current epoch and keeps its bytes as the object store would. */
-export const writeBatch = async (
-	world: World,
-	text: string,
-	by: Device = world.owner,
-): Promise<void> => {
-	const state = await verified(world, by);
-	const authority = state.authority;
-	const head = headOrThrow(state);
-	if (authority === null) throw new Error("no authority");
-	const wrap = committedWrap(
-		state,
-		authority.epoch,
-		`device:${by.principal.id}`,
-	);
-	const material =
-		wrap === null
-			? null
-			: await ownMaterial(
-					by.keyring,
-					world.account,
-					wrap,
-					expectedHistory(authority, authority.epoch),
-				);
-	if (material === null) throw new Error("the writer cannot open its own wrap");
-	const bytes = await buildBatch({
-		account: world.account,
-		kind: "ops",
-		epoch: authority.epoch,
-		epochKey: material.current,
-		keyring: by.keyring,
-		peers: ["1"],
-		batchId: crypto.getRandomValues(new Uint8Array(16)),
-		salt: crypto.getRandomValues(new Uint8Array(32)),
-		createdAt: 1_700_000_000_000,
-		records: [
-			{
-				type: 1,
-				spaceId: new Uint8Array(16),
-				itemKey: "notes/a.md",
-				body: new TextEncoder().encode(text),
-			},
-		],
-	});
-	const digest = await sha256B64(bytes);
-	const link = await nextLink(head.link, digest);
-	if (link === null) throw new Error("link");
-	const fields = {
-		account: world.account,
-		base_seq: head.seq,
-		digest,
-		epoch: authority.epoch,
-		link,
-		keyring_link: null,
-	};
-	const entry: BatchEntry = {
-		...fields,
-		seq: head.seq + 1,
-		kind: "batch",
-		author: authorOf(by),
-		record_sig: await signRecord(by.keyring, fields),
-	};
-	world.server.chain(world.account).push(entry);
-	world.objects.set(digest, { bytes, text });
 };
 
 /** Enrolls one more recovery passkey from `by` through the production client and reference bridge. */

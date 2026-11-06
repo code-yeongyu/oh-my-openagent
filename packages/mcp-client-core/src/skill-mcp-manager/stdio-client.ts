@@ -6,6 +6,7 @@ import { registerProcessCleanup, startCleanupTimer } from "./cleanup"
 import { redactSensitiveData } from "./error-redaction"
 import type { ManagedClient, McpClient, McpTransport, SkillMcpClientConnectionParams } from "./types"
 import { log } from "../logger"
+import { createProtocolTransport } from "./protocol-transport"
 import { connectWithPolicySignal, McpEnvironmentPolicyChangedError } from "./policy-connection"
 
 type StdioClientFactory = (
@@ -14,7 +15,8 @@ type StdioClientFactory = (
 ) => McpClient
 
 type StdioTransportFactory = (
-  options: ConstructorParameters<typeof StdioClientTransport>[0]
+  options: ConstructorParameters<typeof StdioClientTransport>[0],
+  client: McpClient,
 ) => McpTransport
 
 interface StdioClientDependencies {
@@ -24,7 +26,10 @@ interface StdioClientDependencies {
 
 const defaultStdioClientDependencies: StdioClientDependencies = {
   createClient: (clientInfo, options) => new Client(clientInfo, options),
-  createTransport: (options) => new StdioClientTransport(options),
+  createTransport: (options, client) => createProtocolTransport(
+    new StdioClientTransport(options), client instanceof Client ? client : undefined,
+    `stdio:${JSON.stringify([options.command, options.args ?? [], options.cwd ?? ""])}`,
+  ),
 }
 
 let stdioClientDependencies: StdioClientDependencies = defaultStdioClientDependencies
@@ -72,18 +77,17 @@ export async function createStdioClient(params: SkillMcpClientConnectionParams):
 
   registerProcessCleanup(state)
 
+  const client: McpClient = stdioClientDependencies.createClient(
+    { name: `skill-mcp-${info.skillName}-${info.serverName}`, version: "1.0.0" },
+    { capabilities: {} }
+  )
   const transport: McpTransport = stdioClientDependencies.createTransport({
     command,
     args,
     env: mergedEnv,
     stderr: "ignore",
     ...(info.directory ? { cwd: info.directory } : {}),
-  })
-
-  const client: McpClient = stdioClientDependencies.createClient(
-    { name: `skill-mcp-${info.skillName}-${info.serverName}`, version: "1.0.0" },
-    { capabilities: {} }
-  )
+  }, client)
 
   try {
     await connectWithPolicySignal(client, transport, params.policySignal)

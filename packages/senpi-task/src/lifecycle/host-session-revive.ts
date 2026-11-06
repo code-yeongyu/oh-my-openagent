@@ -1,7 +1,7 @@
 import { log } from "@oh-my-opencode/utils"
 
 import type { TaskRecord } from "../state"
-import type { LifecycleContext } from "./context"
+import { reconciliationActive, type LifecycleContext } from "./context"
 import { hostSessionResumePath, isHostSessionRecord, type HostSessionRecord } from "./host-session"
 import { parkedReason, reachRecordedHost, type HostParkedReason, type RecordedHostVerdict } from "./host-endpoint-reach"
 import { markSuspensionReason, parkHostSessionRecord } from "./host-session-record"
@@ -10,6 +10,7 @@ import { claimResidencySlot } from "./residency"
 import { retryDeferredScopedChild } from "./deferred-revival"
 import { SCOPED_RETRY_REASONS } from "./deferred-revival-reasons"
 import type { ReconcileOutcome } from "./types"
+import { holdsClaim, rollbackOrDeferred } from "./revive-rollback"
 
 /**
  * Reviving a child that lives on the shared daemon. A host session has no pid, so nothing here can
@@ -37,6 +38,10 @@ export async function reconcileHostSessionOrphan(
   record: HostSessionRecord,
 ): Promise<ReconcileOutcome> {
   const verdict = await reachRecordedHost(context, record.host_session)
+  const fresh = context.store.load(record.task_id)
+  if (!reconciliationActive(context) || fresh === null || !holdsClaim(context, fresh, record)) {
+    return rollbackOrDeferred(context, record.task_id, "rpc_detached", "foreign_live_owner", record)
+  }
   if (verdict !== "alive") {
     const reason = parkedReason(verdict)
     parkHostSessionRecord(context, record.task_id)

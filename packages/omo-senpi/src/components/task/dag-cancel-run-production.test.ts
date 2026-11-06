@@ -36,7 +36,7 @@ async function pausedWorkflow(fences: { readonly release?: (runRef: RunRef) => v
     prompt: "node b", parent_session_id: "parent-1", depth: 0, model: "omo-mock/mock-1", run_in_background: true,
   })
   if (started.kind !== "started") throw new Error(`unexpected start: ${started.kind}`)
-  await launchSettled(engine.manager, started.task_id)
+  await launchSettled(engine.manager, started.task_id, 15_000)
   await engine.manager.pauseTask(started.task_id, {
     parentSessionId: "parent-1", parentPauseSeq: 7, runRef: { kind: "dag", id: h.runId },
   })

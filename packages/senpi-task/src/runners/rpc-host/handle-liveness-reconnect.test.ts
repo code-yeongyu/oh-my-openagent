@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from "bun:test"
+import { AsyncResource } from "node:async_hooks"
 import { fakeClock } from "../rpc/__fixtures__/clock"
 import { createHostSessionHandle } from "./handle"
 import { fakeSessionPort, FAKE_SESSION } from "./handle.test-support"
@@ -13,6 +14,8 @@ test("a connection lost while unresponsive reattaches the same session before th
   const state = Promise.withResolvers<HostSessionLiveness>()
   const recovered = fakeSessionPort()
   await recovered.answerState({ sessionId: "same-child", isStreaming: true })
+  const reattachStarted = Promise.withResolvers<void>()
+  const releaseReattach = Promise.withResolvers<void>()
   let attaches = 0
   const handle = createHostSessionHandle({
     client: { ...first, getState: () => state.promise }, session: FAKE_SESSION,
@@ -21,26 +24,46 @@ test("a connection lost while unresponsive reattaches the same session before th
     reattach: async session => {
       expect(session.sessionPath).toBe(FAKE_SESSION.sessionPath)
       attaches++
+      reattachStarted.resolve()
+      await releaseReattach.promise
       return { client: recovered, session: FAKE_SESSION, attached: true }
     },
   })
-  await clock.advance(45_000)
-  expect(handle.liveness().state).toBe("unresponsive")
-  first.loseTransport()
-  state.reject(Object.assign(new Error("transport lost"), { code: "rpc_transport_gone" }))
-  await clock.advance(0)
-  await clock.advance(30_000)
-  expect(handle.hasExited()).toBe(false)
-  expect(handle.liveness().state).toBe("running")
-  await handle.steer("same task")
-  expect(attaches).toBe(1)
-  expect(recovered.sent.filter(command => command.type === "steer")).toHaveLength(1)
-  expect(recovered.sent.some(command => command.type === "prompt")).toBe(false)
-  await handle.dispose()
+  try {
+    await clock.advance(45_000)
+    expect(handle.liveness().state).toBe("unresponsive")
+    const running = Promise.withResolvers<void>()
+    const unsubscribe = handle.onLiveness(status => {
+      if (status.state === "running") running.resolve()
+    })
+    first.loseTransport()
+    state.reject(Object.assign(new Error("transport lost"), { code: "rpc_transport_gone" }))
+    await clock.advance(0)
+    await clock.advance(30_000)
+    await reattachStarted.promise
+    // Advancing the clock starts the retry; it does not acknowledge an async reattach.
+    expect(handle.liveness().state).toBe("unresponsive")
+    releaseReattach.resolve()
+    await running.promise
+    unsubscribe()
+    // Cross the original unresponsive deadline only after the recovered probe cleared it.
+    await clock.advance(120_000)
+    expect(handle.hasExited()).toBe(false)
+    expect(handle.liveness().state).toBe("running")
+    await handle.steer("same task")
+    expect(attaches).toBe(1)
+    expect(recovered.sent.filter(command => command.type === "steer")).toHaveLength(1)
+    expect(recovered.sent.some(command => command.type === "prompt")).toBe(false)
+  } finally {
+    releaseReattach.resolve()
+    await handle.dispose()
+  }
   expect(clock.pending()).toBe(0)
 })
 
 test("late state and child events cannot undo an overdue session's pending close", async () => {
+  const ambient = new AsyncResource("unrelated task")
+  let ambientTimer: ReturnType<typeof setTimeout> | undefined
   clock = fakeClock()
   const first = fakeSessionPort()
   const state = Promise.withResolvers<HostSessionLiveness>()
@@ -50,19 +73,28 @@ test("late state and child events cannot undo an overdue session's pending close
     session: FAKE_SESSION, taskId: "st_closing", heartbeatIntervalMs: 10_000,
     now: clock.now, closeGraceMs: 100, openDisposition: "attached",
   })
-  await clock.advance(170_000)
-  state.resolve({ sessionId: "same-child", isStreaming: true })
-  first.emitEvent({ type: "agent_start" })
-  await clock.advance(0)
-  expect(handle.hasExited()).toBe(false)
-  expect(handle.liveness().state).toBe("terminal-pending")
-  const send = await handle.steer("must not run").catch((error: unknown) => error)
-  expect(send).toMatchObject({ code: "unresponsive", retryable: true })
-  closed.resolve(undefined)
-  await clock.advance(0)
-  expect(handle.hasExited()).toBe(true)
-  await handle.dispose()
-  expect(clock.pending()).toBe(0)
+  try {
+    await clock.advance(170_000)
+    state.resolve({ sessionId: "same-child", isStreaming: true })
+    first.emitEvent({ type: "agent_start" })
+    await clock.advance(0)
+    expect(handle.hasExited()).toBe(false)
+    expect(handle.liveness().state).toBe("terminal-pending")
+    const send = await handle.steer("must not run").catch((error: unknown) => error)
+    expect(send).toMatchObject({ code: "unresponsive", retryable: true })
+    // Work already running in another session can schedule a timer during this close wait.
+    // It must remain real and must not count as a timer owned by this handle.
+    ambient.runInAsyncScope(() => { ambientTimer = setTimeout(() => {}, 500) })
+    closed.resolve(undefined)
+    await clock.advance(0)
+    expect(handle.hasExited()).toBe(true)
+    await handle.dispose()
+    expect(clock.pending()).toBe(0)
+  } finally {
+    clearTimeout(ambientTimer)
+    ambient.emitDestroy()
+    await handle.dispose()
+  }
 })
 
 test("a stale missing-session probe cannot confirm a later pending close", async () => {

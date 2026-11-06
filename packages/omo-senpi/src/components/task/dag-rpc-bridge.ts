@@ -173,6 +173,12 @@ export function createDagRpcBridge(pi: SenpiExtensionAPI, deps: DagRpcBridgeDeps
     snapshotFlush = undefined
   }
 
+  // A client attaching is owed the current state now, not one debounce window later (#12113).
+  const publishSnapshotNow = (): void => {
+    stopSnapshotFlush()
+    flushSnapshot()
+  }
+
   const detach = (): void => {
     attached = false
     for (const unsubscribe of subscriptions.values()) unsubscribe()
@@ -202,9 +208,15 @@ export function createDagRpcBridge(pi: SenpiExtensionAPI, deps: DagRpcBridgeDeps
       detach()
       attached = true
       sync()
+      publishSnapshotNow()
     },
     sync,
     detach,
+    resend() {
+      if (!attached) return
+      lastSnapshotFingerprint = undefined
+      publishSnapshotNow()
+    },
     notifyStoreMutation() {
       if (!attached) return
       scheduleSnapshot()

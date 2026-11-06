@@ -9,6 +9,7 @@ import { finalReading, rewriteParticle } from "./particles-ko.mjs"
 import { failureCount, markReplaced, sentenceKey } from "./fidelity-state.mjs"
 import { findPlaceholders, lead, qualifiedText, renderBlockquote, renderQuote, renderValueHtml, subSpan, valueParts } from "./placeholder.mjs"
 import { splitSentences } from "./sentence-split.mjs"
+import { CLAIM_KINDS } from "./claim-kinds.mjs"
 
 /** The output formats fill renders. */
 export const FILL_FORMATS = Object.freeze(["html", "md"])
@@ -24,7 +25,7 @@ function resolveValue(row, parsed, format) {
 	const { valueText, unitText } = valueParts(row)
 	const text = { full: row.raw, value: valueText, unit: unitText, q: qualifiedText(row) }[parsed.mode]
 	if (text === null) return { code: "quote_anchor_unresolved", message: `${row.fact_id} has qualifier ${row.qualifier}, but its quote holds no qualifier beside "${row.raw}"` }
-	return { row, parsed, visible: text, rendered: format === "html" ? renderValueHtml(row, text) : text }
+	return { row, parsed, visible: text, rendered: format === "html" ? renderValueHtml(row, text, { mode: parsed.mode, claimKind: parsed.claimKind ?? null }) : text }
 }
 
 function resolveQuote(row, parsed, format) {
@@ -33,17 +34,18 @@ function resolveQuote(row, parsed, format) {
 	if (selection === null) {
 		return { code: "quote_anchor_unresolved", message: `from "${parsed.from}" and to "${parsed.to}" must each occur exactly once in ${row.fact_id}'s quote, in that order` }
 	}
-	const rendered = renderQuote(row, parsed.selector, selection.text, format)
+	const rendered = renderQuote(row, parsed.selector, selection.text, format, parsed.claimKind)
 	return { row, parsed, visible: `[${row.source_id}]`, rendered, selector: parsed.selector, quote_span: [selection.start, selection.end] }
 }
 
 function resolve(found, rows, format) {
 	const { parsed } = found
-	if (parsed.error) return { code: "unresolved_placeholder", message: parsed.error }
+	if (parsed.error) return { code: "unresolved_placeholder", message: `${parsed.error}; for literal opening braces, write &#123;&#123; instead of {{ (including in code spans)` }
 	const row = rows.get(parsed.id)
 	if (row === undefined) return { code: "unresolved_placeholder", message: `${parsed.id} is not in the fact ledger` }
 	if (row.status !== "active") return { code: "unresolved_placeholder", message: `${parsed.id} is ${row.status}; cite its replacement` }
 	if (row.label !== parsed.label) return { code: "pointer_label_mismatch", message: `${parsed.id} has label "${row.label}", not "${parsed.label}"` }
+	if (parsed.claimKind && !CLAIM_KINDS[parsed.claimKind].rowKinds.includes(row.kind)) return { code: CLAIM_KINDS[parsed.claimKind].defect, message: `${parsed.claimKind} does not accept a ${row.kind} row (${parsed.id})` }
 	return parsed.kind === "Q" ? resolveQuote(row, parsed, format) : resolveValue(row, parsed, format)
 }
 
@@ -146,7 +148,7 @@ function assemble(text, parts, context) {
 		flush(part.start)
 		const start = context.out.length
 		if (part.parsed) {
-			const extra = part.selector === undefined ? {} : { selector: part.selector, quote_span: part.quote_span }
+			const extra = { ...(part.selector === undefined ? {} : { selector: part.selector, quote_span: part.quote_span }), ...(part.parsed.claimKind ? { claimKind: part.parsed.claimKind } : {}), ...(part.parsed.mode === "value" ? { mode: "value" } : {}) }
 			context.fillMap.push({ token: part.token, fact_id: part.row.fact_id, start, end: start + part.rendered.length, rendered: part.rendered, ...extra })
 		} else if (part.rendered !== "") {
 			context.fillMap.push({ token: null, fact_id: part.source.fact_id, replaced: part.key, start, end: start + part.rendered.length, rendered: part.rendered })

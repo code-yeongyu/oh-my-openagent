@@ -3,7 +3,7 @@ import { leaves, parseExpr } from "./fact-expr.mjs"
 import { readRow } from "./fact-ledger-kinds.mjs"
 import { addRow, nextId, validateLedger } from "./fact-ledger.mjs"
 import { recompute, verifyGraph } from "./fact-recompute.mjs"
-import { canonicalUnit, inputScale, refuse } from "./unit-algebra.mjs"
+import { canonicalUnit, inputScale, refuse, RuleError } from "./unit-algebra.mjs"
 import { refusal } from "./unit-errors.mjs"
 import { object, sameDeclared } from "./unit-metadata.mjs"
 import { display, renderValue, resultPrecision, toText } from "./unit-precision.mjs"
@@ -29,7 +29,11 @@ function declaredUnit(spec, rule) {
 	return canonicalUnit(declared)
 }
 
+/** Refused before any work, under its own code: time is the caller's (spec.now), never the clock. */
+const MISSING_NOW = Object.freeze({ error: "missing_now", shape: "missing_now", expected: "an ISO timestamp in spec.now", detail: "derive needs a caller-supplied now timestamp" })
+
 export function derive(ledger, spec) {
+	if (object(spec) && typeof spec.now !== "string") return { ...MISSING_NOW }
 	try {
 		if (!object(spec)) refuse("spec must be an object")
 		const errors = validateLedger(ledger)
@@ -54,13 +58,14 @@ export function derive(ledger, spec) {
 		const result = compute(spec.op, rows, expected, ast, context, spec.formula)
 		const row = addRow(ledger, {
 			kind: rule.kind, unit: expected, quote: "", extracted_by: "fact-derive",
-			observed_at: spec.now ?? new Date().toISOString(),
+			observed_at: spec.now,
 			label: spec.label ?? `${spec.op}-${nextId(ledger, rule.kind).toLowerCase()}`,
 			...result, operation: spec.op, operands: ids, derived_from: ids,
 			rationale: spec.rationale ?? null, context,
 		})
 		return { row, compatibility: rule.compatibility }
 	} catch (error) {
+		if (!(error instanceof RuleError)) throw error
 		return { error: "incompatible_operands", ...refusal(error) }
 	}
 }

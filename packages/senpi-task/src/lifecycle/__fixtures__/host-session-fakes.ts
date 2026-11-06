@@ -82,6 +82,8 @@ export type HostLifecycleFixture = {
   readonly daemon: FakeDaemon
   readonly waits: number[]
   readonly respawned: Array<{ readonly task_id: string; readonly sessionPath: string | undefined }>
+  /** The probe wired into `deps`, so a test can override one method and keep the rest. */
+  readonly hostSessionProbe: NonNullable<LifecycleDeps["hostSessionProbe"]>
 }
 
 export type HostLifecycleInput = {
@@ -113,6 +115,14 @@ export function hostLifecycleDeps(input: HostLifecycleInput): HostLifecycleFixtu
       ? { ok: false, disposition: "retryable", code: "respawn_failed", reason: "no respawn port" }
       : await input.respawn(record, sessionPath)
   }
+  const hostSessionProbe: HostLifecycleFixture["hostSessionProbe"] = {
+    daemonAlive: (identity) => daemon.daemonReachable(identity.socket),
+    sessionLive: async (identity) =>
+      (await daemon.liveSessionPaths(identity.socket)).includes(identity.session_path),
+    sessionLiveness: async (identity) =>
+      (await daemon.liveSessionPaths(identity.socket)).includes(identity.session_path) ? "live" : "gone",
+    refresh: () => undefined,
+  }
   const deps: LifecycleDeps = {
     hostEndpoint: NO_HOST_ENDPOINT,
     store: input.store,
@@ -129,14 +139,7 @@ export function hostLifecycleDeps(input: HostLifecycleInput): HostLifecycleFixtu
     },
     respawn,
     reattach: () => Promise.resolve({ ok: true }),
-    hostSessionProbe: {
-      daemonAlive: (identity) => daemon.daemonReachable(identity.socket),
-      sessionLive: async (identity) =>
-        (await daemon.liveSessionPaths(identity.socket)).includes(identity.session_path),
-      sessionLiveness: async (identity) =>
-        (await daemon.liveSessionPaths(identity.socket)).includes(identity.session_path) ? "live" : "gone",
-      refresh: () => undefined,
-    },
+    hostSessionProbe,
     hostSessionClose: (request) => daemon.close(request),
     hostRetry: {
       maxDrainAttempts: input.maxDrainAttempts ?? 10,
@@ -150,7 +153,7 @@ export function hostLifecycleDeps(input: HostLifecycleInput): HostLifecycleFixtu
       },
     },
   }
-  return { deps, registry, daemon, waits, respawned }
+  return { deps, registry, daemon, waits, respawned, hostSessionProbe }
 }
 
 export function hostSessionRecordInput(taskId: string, identity: HostSessionIdentity) {

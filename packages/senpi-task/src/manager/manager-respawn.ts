@@ -4,8 +4,7 @@ import { dirname, join } from "node:path"
 import { log } from "@oh-my-opencode/utils"
 
 import { hostSessionResumePath, readHostDrainingHold } from "../lifecycle/host-session"
-import type { RespawnFailureCode, RespawnResult } from "../lifecycle/port"
-import { RunnerError } from "../runners/in-process/runner-error"
+import type { RespawnResult } from "../lifecycle/port"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
 import type { AwaitingInputReason, TaskRecord } from "../state"
 import { adaptRpcHandle, discardManagedHandle, discardRpcHandle, type ManagedChildHandle } from "./child-handle"
@@ -15,6 +14,7 @@ import type { ManagedRunner, TrustedRespawnLaunchResolver } from "./types"
 import { modelSelector } from "../runners/in-process/runtime-fallback-settings"
 import { HOST_RESPAWN_CONTINUATION } from "../runners/rpc-host/reconcile-turn"
 import { reconcileDaemonTurn } from "./reconcile-daemon-turn"
+import { classifyResumeFailure, failure, hostRefusal, isTeamRuntimeUnavailable } from "./respawn-failure"
 
 const CONTINUATION_MESSAGE = HOST_RESPAWN_CONTINUATION
 const RESPAWN_CLEANUP_FAILURE_REASON = "rpc respawn cleanup failed"
@@ -75,6 +75,7 @@ async function respawnFresh(input: {
       ...(trusted?.extensions === undefined ? {} : { extensions: trusted.extensions }),
       ...(trusted?.memberEnv === undefined ? {} : { memberEnv: trusted.memberEnv }),
       depth: input.record.depth,
+      parent_session_id: input.record.parent_session_id,
       root_session_id: input.record.root_session_id,
     })
     return { ok: true, handle: adaptRpcHandle(handle) }
@@ -161,6 +162,7 @@ async function respawnProcess(input: {
       ...(trusted?.extensions === undefined ? {} : { extensions: trusted.extensions }),
       ...(trusted?.memberEnv === undefined ? {} : { memberEnv: trusted.memberEnv }),
       depth: input.record.depth,
+      parent_session_id: input.record.parent_session_id,
       root_session_id: input.record.root_session_id,
     })
     // An ATTACHED daemon session is the same live session, mid-turn and all: switching it would
@@ -286,37 +288,4 @@ async function disposeRpc(handle: RpcChildHandle): Promise<boolean> {
     log("senpi-task failed respawn cleanup rejected", { taskId: handle.task_id, error: String(error) })
     return false
   }
-}
-
-function classifyResumeFailure(error: unknown): RespawnResult {
-  if (RunnerError.is(error)) {
-    const { kind, message } = error.failure
-    if (kind === "model_unavailable" || kind === "tools_unavailable" || kind === "session_unavailable") {
-      return failure("retryable", kind, message)
-    }
-  }
-  return failure("retryable", "respawn_failed", "in-process respawn failed")
-}
-
-// Both are waits the next reconcile retries: the store index could not be written (nothing was
-// opened), or the recorded endpoint answers incompatibly (the session is never opened elsewhere).
-function hostRefusal(error: unknown): RespawnResult | undefined {
-  if (!RunnerError.is(error) || error.failure.kind !== "host_unavailable") return undefined
-  const { reason, message } = error.failure
-  if (reason !== "store_index_unavailable" && reason !== "host_incompatible") return undefined
-  return failure("retryable", reason, message)
-}
-
-function isTeamRuntimeUnavailable(error: unknown): boolean {
-  if (!(error instanceof Error) || error.name !== "TeamMemberRespawnLaunchError" || !("code" in error)) return false
-  return error.code === "runtime_unavailable" || error.code === "runtime_inactive" ||
-    error.code === "member_missing" || error.code === "task_mapping_mismatch"
-}
-
-function failure(
-  disposition: "retryable" | "unrecoverable",
-  code: RespawnFailureCode,
-  reason: string,
-): RespawnResult {
-  return { ok: false, disposition, code, reason }
 }

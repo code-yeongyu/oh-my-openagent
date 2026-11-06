@@ -49,12 +49,12 @@ function listWords(list: string): string[] {
 // A list is read as one argv, since a real argv starts with a bare executable. When its first element is itself a
 // command line (`for c in ["bun test x", "tsgo"]: sh(c)`) every element is a command line, and a [name, command] pair
 // (`["typecheck", "bun run typecheck"]`) contributes its command; a message argument inside an argv is never read.
-function listKinds(list: string): CellCheckKind[] {
+function listKinds(list: string, nestedPair: boolean): CellCheckKind[] {
   const words = listWords(list)
   const [first = "", second = ""] = words
   if (/\s/.test(first)) return words.flatMap(checkKinds)
   const argv = checkKinds(words.map(shellQuote).join(" "))
-  return words.length === 2 && /^[\w:.-]+$/.test(first) && /\s/.test(second) ? [...argv, ...checkKinds(second)] : argv
+  return nestedPair && words.length === 2 && /^[\w:.-]+$/.test(first) && /\s/.test(second) ? [...argv, ...checkKinds(second)] : argv
 }
 
 /**
@@ -73,7 +73,7 @@ export function cellInvokedKinds(code: string): { kinds: CellCheckKind[]; offset
   const inLists: Array<readonly [number, number]> = []
   for (const match of code.matchAll(LIST_OF_STRINGS)) {
     inLists.push([match.index, match.index + match[0].length])
-    if (isCommandList(code, match.index)) found(match.index, listKinds(match[0]))
+    if (isCommandList(code, match.index)) found(match.index, listKinds(match[0], NESTED_PAIR.test(before(code, match.index))))
   }
   for (const match of code.matchAll(STRING_LITERAL)) {
     if (inLists.some(([start, end]) => match.index >= start && match.index < end)) continue

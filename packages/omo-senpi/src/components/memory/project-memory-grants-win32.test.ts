@@ -21,7 +21,13 @@ function native(path: string): string {
   if (win32.basename(path) === "missing.md") throw Object.assign(new Error("missing"), { code: "ENOENT" })
   return win32.normalize(path).replace(/\\RUNNER~1\\/i, "\\runneradmin\\")
 }
-const windows = { realpath: native, platform: "win32" as const }
+// The fake volume answers lstat too: the missing-note walk checks that its ancestor is a directory
+// on the same filesystem realpath resolved, and these paths exist on no real disk.
+function nativeLstat(path: string): { isDirectory(): boolean } {
+  const resolved = native(path)
+  return { isDirectory: () => win32.extname(resolved) === "" }
+}
+const windows = { realpath: native, lstat: nativeLstat, platform: "win32" as const }
 
 describe("project memory grant Windows canonical paths", () => {
   for (const target of [

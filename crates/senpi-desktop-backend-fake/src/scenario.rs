@@ -9,9 +9,17 @@ use senpi_desktop_core::types::{DesktopCapabilities, DesktopDisplay, DesktopPoin
 use serde::Deserialize;
 use serde_json::{Map, Value};
 
-use crate::method::FakeMethod;
+use crate::method::{AxWrite, FakeMethod};
+pub use crate::scenario_nodes::{FakeAxNode, FakeBounds, FakeMenuNode};
+use crate::scripting::{
+    DisplaysChange, EpochEvent, FakeFocusRead, FakeHit, FakeWindowIdentity, FocusRecordKind, FocusRecordOutcome,
+    IdentityChange, TimedUserPress,
+};
 
 const DEFAULT_CAPTURE_COLOR: [u8; 4] = [32, 96, 160, 255];
+
+/// The farthest a `user_input_timeline` press may sit from backend creation.
+pub const MAX_TIMELINE_MS: u64 = 3_600_000;
 
 /// A parsed scenario. Loaded from JSON, whose top-level keys are snake_case
 /// while embedded core types (`displays`, `windows`, `capabilities`) keep their
@@ -38,9 +46,42 @@ pub struct FakeScenario {
     pub resize_window: Option<ResizeWindow>,
     /// Failures queued at load time, as if `fail_next` had been called.
     pub fail_next: Vec<ScriptedFailure>,
+    /// User presses that land right before the fake's next press of a method.
+    pub user_presses: Vec<crate::user_input_impl::ScriptedUserPress>,
+    /// Whether the backend exposes a user-input feed (false: a backend with no
+    /// watch, as win32, x11 and wayland, or macOS while the watch is off).
+    pub user_input_feed: bool,
+    /// AX writes left unanswered at load time, in order, as if
+    /// `Faults::cannot_complete_next` had been called.
+    pub ax_cannot_complete: Vec<AxWrite>,
     /// Marks every capture's frame geometry `legacyCapture` (B9 fallback
     /// shape), so the wire carries the flag.
     pub legacy_capture: bool,
+    /// Processes (by pid) whose windows show a remote screen, and how the
+    /// client forwards input (plan todo 22).
+    pub remote_screens: BTreeMap<u32, crate::remote_impl::FakeRemoteScreen>,
+    /// Owning-process identity per window id; absent means unknown.
+    pub identity: BTreeMap<String, FakeWindowIdentity>,
+    pub identity_changes: Vec<IdentityChange>,
+    /// Key-priming focus reads, served per window in order; once a window's
+    /// reads run out, a read reports the focused window for both.
+    pub focus_reads: Vec<FakeFocusRead>,
+    /// Outcomes of successive focus records per kind; once a kind's list
+    /// runs out, its records take effect.
+    pub focus_record_effects: BTreeMap<FocusRecordKind, Vec<FocusRecordOutcome>>,
+    pub hit_at: Vec<FakeHit>,
+    pub user_input_timeline: Vec<TimedUserPress>,
+    /// The frontmost app's pid; `None` reports the focused window's pid.
+    pub frontmost_pid: Option<u32>,
+    /// The observation deadline a partial accessibility walk honors.
+    pub ax_deadline_ms: Option<u64>,
+    /// Pads a window's accessibility tree with leaf nodes up to this many
+    /// nodes in total, for dense-tree scenarios.
+    pub ax_node_count: BTreeMap<String, u32>,
+    pub epoch_events: Vec<EpochEvent>,
+    pub displays_change: Option<DisplaysChange>,
+    /// A stop marker file present at engine start, by path.
+    pub stop_marker: Option<String>,
 }
 
 impl Default for FakeScenario {
@@ -52,12 +93,28 @@ impl Default for FakeScenario {
             ax: BTreeMap::new(),
             menus: BTreeMap::new(),
             ax_owner_unknown: false,
+            user_input_feed: true,
             cursor: default_cursor(),
             capture_color: DEFAULT_CAPTURE_COLOR,
             delay_ms: DelayMs::default(),
             resize_window: None,
             fail_next: Vec::new(),
+            user_presses: Vec::new(),
+            ax_cannot_complete: Vec::new(),
             legacy_capture: false,
+            remote_screens: BTreeMap::new(),
+            identity: BTreeMap::new(),
+            identity_changes: Vec::new(),
+            focus_reads: Vec::new(),
+            focus_record_effects: BTreeMap::new(),
+            hit_at: Vec::new(),
+            user_input_timeline: Vec::new(),
+            frontmost_pid: None,
+            ax_deadline_ms: None,
+            ax_node_count: BTreeMap::new(),
+            epoch_events: Vec::new(),
+            displays_change: None,
+            stop_marker: None,
         }
     }
 }
@@ -140,57 +197,6 @@ pub struct ScriptedFailure {
     pub reason: Option<String>,
 }
 
-/// One scripted accessibility element and its subtree.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct FakeAxNode {
-    pub role: String,
-    /// Platform role; defaults to `role`.
-    #[serde(default)]
-    pub native_role: Option<String>,
-    #[serde(default)]
-    pub title: Option<String>,
-    #[serde(default)]
-    pub value: Option<String>,
-    #[serde(default)]
-    pub description: Option<String>,
-    #[serde(default = "enabled_by_default")]
-    pub enabled: bool,
-    #[serde(default)]
-    pub focused: bool,
-    /// Global logical bounds.
-    #[serde(default)]
-    pub bounds: Option<FakeBounds>,
-    #[serde(default)]
-    pub actions: Vec<String>,
-    #[serde(default)]
-    pub children: Vec<FakeAxNode>,
-}
-
-/// One scripted menu item and its submenu.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct FakeMenuNode {
-    pub title: String,
-    #[serde(default = "enabled_by_default")]
-    pub enabled: bool,
-    #[serde(default)]
-    pub checked: bool,
-    #[serde(default)]
-    pub shortcut: Option<String>,
-    #[serde(default)]
-    pub children: Vec<FakeMenuNode>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct FakeBounds {
-    pub x: f64,
-    pub y: f64,
-    pub width: f64,
-    pub height: f64,
-}
-
 #[derive(Debug, thiserror::Error)]
 pub enum ScenarioError {
     #[error("cannot read fake scenario {path}: {source}")]
@@ -201,6 +207,12 @@ pub enum ScenarioError {
     UnknownCapability(String),
     #[error("fake scenario references unknown window '{0}'")]
     UnknownWindow(String),
+    #[error("ax_node_count names window '{0}', which has no scripted accessibility tree")]
+    UnknownAxTree(String),
+    #[error("{0}: nth counts calls from 1, so nth 0 would never fire")]
+    ZeroNth(&'static str),
+    #[error("user_input_timeline t_ms {0} is outside +/-{MAX_TIMELINE_MS} ms")]
+    TimelineOutOfRange(i64),
 }
 
 #[derive(Deserialize)]
@@ -229,7 +241,39 @@ struct RawScenario {
     #[serde(default)]
     fail_next: Vec<ScriptedFailure>,
     #[serde(default)]
+    user_presses: Vec<crate::user_input_impl::ScriptedUserPress>,
+    #[serde(default = "crate::scenario_nodes::enabled_by_default")]
+    user_input_feed: bool,
+    #[serde(default)]
+    ax_cannot_complete: Vec<AxWrite>,
+    #[serde(default)]
     legacy_capture: bool,
+    #[serde(default)]
+    remote_screens: BTreeMap<u32, crate::remote_impl::FakeRemoteScreen>,
+    #[serde(default)]
+    identity: BTreeMap<String, FakeWindowIdentity>,
+    #[serde(default)]
+    identity_changes: Vec<IdentityChange>,
+    #[serde(default)]
+    focus_reads: Vec<FakeFocusRead>,
+    #[serde(default)]
+    focus_record_effects: BTreeMap<FocusRecordKind, Vec<FocusRecordOutcome>>,
+    #[serde(default)]
+    hit_at: Vec<FakeHit>,
+    #[serde(default)]
+    user_input_timeline: Vec<TimedUserPress>,
+    #[serde(default)]
+    frontmost_pid: Option<u32>,
+    #[serde(default)]
+    ax_deadline_ms: Option<u64>,
+    #[serde(default)]
+    ax_node_count: BTreeMap<String, u32>,
+    #[serde(default)]
+    epoch_events: Vec<EpochEvent>,
+    #[serde(default)]
+    displays_change: Option<DisplaysChange>,
+    #[serde(default)]
+    stop_marker: Option<String>,
 }
 
 impl TryFrom<RawScenario> for FakeScenario {
@@ -241,9 +285,28 @@ impl TryFrom<RawScenario> for FakeScenario {
             .ax
             .keys()
             .chain(raw.menus.keys())
-            .chain(raw.resize_window.iter().map(|resize| &resize.id));
+            .chain(raw.resize_window.iter().map(|resize| &resize.id))
+            .chain(raw.identity.keys())
+            .chain(raw.identity_changes.iter().map(|change| &change.window))
+            .chain(raw.focus_reads.iter().map(|read| &read.window));
         if let Some(unknown) = referenced.find(|id| !known(id)) {
             return Err(ScenarioError::UnknownWindow(unknown.clone()));
+        }
+        if let Some(unscripted) = raw.ax_node_count.keys().find(|id| !raw.ax.contains_key(*id)) {
+            return Err(ScenarioError::UnknownAxTree(unscripted.clone()));
+        }
+        let zero_nth = raw
+            .identity_changes
+            .iter()
+            .map(|change| ("identity_changes", change.nth))
+            .chain(raw.epoch_events.iter().map(|event| ("epoch_events", event.nth)))
+            .chain(raw.displays_change.iter().map(|change| ("displays_change", change.nth)))
+            .find(|(_, nth)| *nth == 0);
+        if let Some((field, _)) = zero_nth {
+            return Err(ScenarioError::ZeroNth(field));
+        }
+        if let Some(press) = raw.user_input_timeline.iter().find(|press| press.t_ms.unsigned_abs() > MAX_TIMELINE_MS) {
+            return Err(ScenarioError::TimelineOutOfRange(press.t_ms));
         }
         let display_count = u32::try_from(raw.displays.len()).unwrap_or(u32::MAX);
         let capabilities = overlay_capabilities(fake_capabilities(display_count), raw.capabilities)?;
@@ -259,7 +322,23 @@ impl TryFrom<RawScenario> for FakeScenario {
             delay_ms: raw.delay_ms,
             resize_window: raw.resize_window,
             fail_next: raw.fail_next,
+            user_presses: raw.user_presses,
+            user_input_feed: raw.user_input_feed,
+            ax_cannot_complete: raw.ax_cannot_complete,
             legacy_capture: raw.legacy_capture,
+            remote_screens: raw.remote_screens,
+            identity: raw.identity,
+            identity_changes: raw.identity_changes,
+            focus_reads: raw.focus_reads,
+            focus_record_effects: raw.focus_record_effects,
+            hit_at: raw.hit_at,
+            user_input_timeline: raw.user_input_timeline,
+            frontmost_pid: raw.frontmost_pid,
+            ax_deadline_ms: raw.ax_deadline_ms,
+            ax_node_count: raw.ax_node_count,
+            epoch_events: raw.epoch_events,
+            displays_change: raw.displays_change,
+            stop_marker: raw.stop_marker,
         })
     }
 }
@@ -284,8 +363,4 @@ const fn default_cursor() -> Option<DesktopPoint> {
 
 const fn default_capture_color() -> [u8; 4] {
     DEFAULT_CAPTURE_COLOR
-}
-
-const fn enabled_by_default() -> bool {
-    true
 }

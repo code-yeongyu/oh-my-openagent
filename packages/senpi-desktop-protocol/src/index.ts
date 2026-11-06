@@ -45,4 +45,15 @@ export type {
 	ComputerSessionSnapshot,
 	ComputerTextDisplay,
 } from "./session";
-export type { AuditEvent, DesktopCapabilities, EngineLog, LogLevel, StopPathKind, StopPathStatus } from "./wire";
+export {
+	type AuditEvent,
+	type DesktopCapabilities,
+	type EngineLog,
+	type EpochChanged,
+	type EpochReason,
+	type LogLevel,
+	type StopPathKind,
+	type StopPathStatus,
+	UNKNOWN_AUDIT_VALUE,
+	type UnknownAuditValue,
+} from "./wire";

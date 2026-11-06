@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 
 import type { TmuxCommandResult } from "../runner"
+import { createPaneAuthDirectory } from "../pane-auth"
 import type { TmuxConfig } from "../types"
 import { activateTmuxPane } from "./pane-activate"
 import { replaceTmuxPane } from "./pane-replace"
@@ -42,7 +43,9 @@ function restoreEnvironment(): void {
 }
 
 describe("cmux authenticated pane lifecycle", () => {
+	let cleanupAuthDirectory: () => void
 	beforeEach(() => {
+		cleanupAuthDirectory = createPaneAuthDirectory()
 		delete process.env.TMUX
 		process.env.CMUX_SOCKET_PATH = "/tmp/cmux.sock"
 		process.env.OPENCODE_SERVER_USERNAME = "$(touch /tmp/omo-cmux-user-injected)"
@@ -50,6 +53,7 @@ describe("cmux authenticated pane lifecycle", () => {
 	})
 
 	afterEach(() => {
+		cleanupAuthDirectory()
 		restoreEnvironment()
 	})
 

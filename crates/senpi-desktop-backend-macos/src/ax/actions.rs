@@ -1,45 +1,124 @@
-//! AX mutations: named actions, `AXValue` writes, and focus.
+//! AX mutations: named actions, `AXValue` writes, and focus. The model's
+//! requests ([`perform_requested`], [`set_value`], [`focus`]) are background
+//! calls under [`reporting_partial`] and run the press check before they write;
+//! an action or an `AXValue` write the app accepted or left unanswered marks the
+//! call sent. An `AXFocused` write does not: it only prepares later input.
 
-use objc2_application_services::AXUIElement;
-use objc2_core_foundation::{CFBoolean, CFDate, CFString, CFTimeZone};
+use objc2_application_services::{AXError, AXUIElement};
+use objc2_core_foundation::{CFBoolean, CFDate, CFString, CFTimeZone, CFType};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
+use senpi_desktop_core::intervention::check_press;
 
 use super::date;
 use super::element::{self, ax_result, copy_date};
 use super::popup;
+use crate::skylight::{mark_sent, reporting_partial};
 
 pub(crate) fn perform(element: &AXUIElement, action: &str) -> CoreResult<()> {
     let native = action_name(action);
     let action = CFString::from_str(&native);
     // SAFETY: The retained element and action CFString stay valid for the
     // synchronous AX request.
-    let error = unsafe { element.perform_action(&action) };
+    let error = sent(unsafe { element.perform_action(&action) });
     ax_result(error, format!("AX action '{native}' failed"))
 }
 
-pub(super) fn set_value(element: &AXUIElement, value: &str) -> CoreResult<()> {
-    if element::copy_string(element, "AXRole").as_deref() == Some("AXPopUpButton") {
-        return popup::choose(element, value);
+/// Marks the call sent when the app accepted the request or never answered
+/// it: either way it may have taken effect. A refusal changed nothing.
+fn sent(error: AXError) -> AXError {
+    if error == AXError::Success || error == AXError::CannotComplete {
+        mark_sent();
     }
-    match copy_date(element, "AXValue") {
+    error
+}
+
+/// The AX requests an element write sends, each answered by the app's
+/// `AXError` reply: the seam tests script replies through.
+pub(super) trait AxRequests {
+    fn send_action(&self, action: &CFString) -> AXError;
+    fn write_attribute(&self, attribute: &CFString, value: &CFType) -> AXError;
+    fn read_date(&self, attribute: &str) -> Option<f64>;
+}
+
+impl AxRequests for AXUIElement {
+    fn send_action(&self, action: &CFString) -> AXError {
+        // SAFETY: The retained element and action CFString stay valid for the
+        // synchronous AX request.
+        unsafe { self.perform_action(action) }
+    }
+
+    fn write_attribute(&self, attribute: &CFString, value: &CFType) -> AXError {
+        // SAFETY: The element, attribute, and value stay retained for the
+        // synchronous setter call.
+        unsafe { self.set_attribute_value(attribute, value) }
+    }
+
+    fn read_date(&self, attribute: &str) -> Option<f64> {
+        copy_date(self, attribute)
+    }
+}
+
+/// The outcome of a model-requested AX write, from the app's reply.
+/// `CannotComplete` means messaging failed or the app did not reply in time,
+/// e.g. while the request runs a modal dialog: the request was made, so its
+/// outcome is unknown rather than failed (`AxUnconfirmed`, ported from
+/// oh-my-pi `element_action_result`). Every other reply keeps the
+/// [`ax_result`] mapping.
+pub(super) fn request_result(error: AXError, request: &str, failed: impl Into<String>) -> CoreResult<()> {
+    if error == AXError::CannotComplete {
+        return Err(DesktopError::ax_unconfirmed(format!(
+            "{request} was requested, but its outcome could not be confirmed: the app did not reply \
+             in time or messaging failed ({error:?}), for example because it opened a modal \
+             dialog. It may already have taken effect: observe the window before retrying"
+        )));
+    }
+    ax_result(error, failed)
+}
+
+/// Performs a model-requested action (`ax.perform`, presses): a request the
+/// app got but did not answer is `AxUnconfirmed`.
+pub(super) fn perform_requested(element: &(impl AxRequests + ?Sized), action: &str) -> CoreResult<()> {
+    reporting_partial(|| {
+        check_press()?;
+        let native = action_name(action);
+        let error = sent(element.send_action(&CFString::from_str(&native)));
+        request_result(error, &format!("AX action '{native}'"), format!("AX action '{native}' failed"))
+    })
+}
+
+pub(super) fn set_value(element: &AXUIElement, value: &str) -> CoreResult<()> {
+    reporting_partial(|| {
+        if element::copy_string(element, "AXRole").as_deref() == Some("AXPopUpButton") {
+            return popup::choose(element, value);
+        }
+        write_value(element, value)
+    })
+}
+
+/// Writes `AXValue` as the control publishes it: a `CFDate` for date and time
+/// controls, else a `CFString`.
+pub(super) fn write_value(element: &(impl AxRequests + ?Sized), value: &str) -> CoreResult<()> {
+    match element.read_date("AXValue") {
         Some(current) => set_date_value(element, value, current),
         None => set_string_value(element, value),
     }
 }
 
-fn set_string_value(element: &AXUIElement, value: &str) -> CoreResult<()> {
-    let attribute = CFString::from_str("AXValue");
+fn set_string_value(element: &(impl AxRequests + ?Sized), value: &str) -> CoreResult<()> {
+    check_press()?;
     let value = CFString::from_str(value);
-    // SAFETY: The element, attribute, and value stay retained for the
-    // synchronous setter call.
-    let error = unsafe { element.set_attribute_value(&attribute, &value) };
-    ax_result(error, "AXValue is not settable; no typing fallback was attempted")
+    let error = sent(element.write_attribute(&CFString::from_str("AXValue"), &value));
+    request_result(
+        error,
+        "setting AXValue",
+        "AXValue is not settable; no typing fallback was attempted",
+    )
 }
 
 /// Date and time controls publish `AXValue` as a `CFDate` and refuse the same
 /// date written as a `CFString`, so an ISO-8601 value is written as a `CFDate`
 /// in the system time zone the control displays, then read back as one.
-fn set_date_value(element: &AXUIElement, text: &str, current: f64) -> CoreResult<()> {
+fn set_date_value(element: &(impl AxRequests + ?Sized), text: &str, current: f64) -> CoreResult<()> {
     // CF caches the system zone per process; the target app follows changes to it.
     CFTimeZone::reset_system();
     let zone = CFTimeZone::system().ok_or_else(|| DesktopError::ax_failed("the system time zone is unavailable"))?;
@@ -57,12 +136,11 @@ fn set_date_value(element: &AXUIElement, text: &str, current: f64) -> CoreResult
         .map_err(|reason| DesktopError::ax_failed(format!("{reason}; nothing was written")))?;
     let value =
         CFDate::new(None, target).ok_or_else(|| DesktopError::ax_failed("creating the CFDate to write failed"))?;
-    let attribute = CFString::from_str("AXValue");
-    // SAFETY: The element, attribute, and date stay retained for the
-    // synchronous setter call.
-    let error = unsafe { element.set_attribute_value(&attribute, &value) };
-    ax_result(error, "setting AXValue to a date failed")?;
-    match copy_date(element, "AXValue") {
+    check_press()?;
+    let error = sent(element.write_attribute(&CFString::from_str("AXValue"), &value));
+    // An unanswered write is never read back: the control may still change.
+    request_result(error, "setting AXValue to a date", "setting AXValue to a date failed")?;
+    match element.read_date("AXValue") {
         Some(actual) if (actual - target).abs() < 1e-3 => Ok(()),
         actual => Err(DesktopError::ax_failed(format!(
             "AX accepted the date write but the control reads {} instead of {}",
@@ -72,12 +150,12 @@ fn set_date_value(element: &AXUIElement, text: &str, current: f64) -> CoreResult
     }
 }
 
-pub(super) fn focus(element: &AXUIElement) -> CoreResult<()> {
-    let attribute = CFString::from_str("AXFocused");
-    // SAFETY: The singleton CFBoolean and retained element stay valid for the
-    // synchronous setter call.
-    let error = unsafe { element.set_attribute_value(&attribute, CFBoolean::new(true)) };
-    ax_result(error, "setting AXFocused=true failed")
+pub(super) fn focus(element: &(impl AxRequests + ?Sized)) -> CoreResult<()> {
+    reporting_partial(|| {
+        check_press()?;
+        let error = element.write_attribute(&CFString::from_str("AXFocused"), CFBoolean::new(true));
+        request_result(error, "setting AXFocused=true", "setting AXFocused=true failed")
+    })
 }
 
 /// Sets `AXMain` and `AXFocused` to true on a window element: the restore and
@@ -112,3 +190,7 @@ pub(super) fn action_name(action: &str) -> String {
         _ => format!("AX{action}"),
     }
 }
+
+#[cfg(test)]
+#[path = "actions_tests.rs"]
+mod tests;

@@ -18,6 +18,12 @@ for (const catalog of catalogs) {
             params?: { cursor?: string }
           }
           if (message.id === undefined) return new Response(null, { status: 202 })
+          if (message.method !== "initialize" && message.method !== `${catalog}/list`) {
+            return Response.json({
+              jsonrpc: "2.0", id: message.id,
+              error: { code: -32601, message: "Method not found" },
+            })
+          }
           let result: unknown
           if (message.method === "initialize") {
             result = {

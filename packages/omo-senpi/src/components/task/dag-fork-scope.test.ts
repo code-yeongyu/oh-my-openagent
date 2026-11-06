@@ -44,8 +44,9 @@ function fixture(options: FixtureOptions = {}) {
       getSessionFile: () => (options.sessionFileKnown === false ? undefined : currentFile),
     },
   }
-  wireDagLifecycle(pi, runtime, () => {
+  const lifecycle = wireDagLifecycle(pi, runtime, () => {
     pi.on("session_start", () => engine.runtime.captureFrom(context))
+    return { afterSessionStartReconcile: () => Promise.resolve(true) }
   })
   const store = createDagFileStore({ project_dir: cwd }, { fsync: false })
   const manager = createDagManager({ store })
@@ -65,7 +66,11 @@ function fixture(options: FixtureOptions = {}) {
     events: store.readEvents(id, 0, { limit: 1000 }),
     result: store.readResult(id, "done"),
   })
-  const dispatch = (event: unknown) => pi.dispatch("session_start", event, context)
+  // DAG attach runs after the session-start reconcile settles (#11335), not inside the dispatch.
+  const dispatch = async (event: unknown) => {
+    await pi.dispatch("session_start", event, context)
+    await lifecycle.lastAttach()
+  }
   return { cwd, pi, runtime, store, seed, bytes, dispatch, parentFile, unrelatedFile, warnings }
 }
 

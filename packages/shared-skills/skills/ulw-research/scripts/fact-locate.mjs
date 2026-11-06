@@ -1,10 +1,12 @@
-// fact-locate.mjs - deterministic fact locators over a source snapshot.
+// fact-locate.mjs - deterministic fact locators over a source snapshot's locator text.
 //
 // Each locator returns { value, unit, raw, quote, value_span, sentence_id, qualifier, locator } or
 // { error: "fact_not_located" | "fact_ambiguous", candidates }; it never guesses. `quote` is the
-// whole containing sentence, cell, or line of text.txt, `value_span` is [start, end] inside
-// `quote` with quote.slice(...value_span) === raw, and locator.char_start/char_end place `quote`
-// in text.txt. Every call takes `sourceId` (S<n>) so sentence ids match sentences.jsonl.
+// whole containing sentence, cell, or line of the view text (source-view.mjs: the visible text
+// nodes of a page, never markup), `value_span` is [start, end] inside `quote` with
+// quote.slice(...value_span) === raw, and locator.char_start/char_end place `quote` in that text;
+// raw-locator.mjs turns them into bytes. Every call takes `sourceId` (S<n>) so sentence ids match
+// sentences.jsonl, which indexes the same text.
 // Plain Node ESM, sibling imports only; no network, no OCR.
 
 import { proseText } from "./html-lite.mjs"
@@ -101,7 +103,8 @@ export function locateFind(text, { find, unitExpected, sourceId }) {
 	return result.unit === expected ? result : { error: "unit_expected_mismatch", expected, found: result.unit, candidates: [result] }
 }
 
-function cellsOf(row) {
+/** A row's cells by visual column (a colspan cell repeats). */
+export function cellsOf(row) {
 	const cells = []
 	for (const cell of row.children.filter((child) => child.tag === "td" || child.tag === "th")) {
 		const span = Math.max(1, Number.parseInt(cell.attrs.colspan ?? "1", 10) || 1)
@@ -110,7 +113,7 @@ function cellsOf(row) {
 	return cells
 }
 
-function rowsOf(table) {
+export function rowsOf(table) {
 	const rows = []
 	const walk = (node) => {
 		for (const child of node.children) {
@@ -142,10 +145,13 @@ function tablesOf(root) {
 const cellLabel = (cell) => label(proseText(cell))
 const indexesOf = (labels, wanted) => labels.flatMap((value, index) => (value === wanted ? [index] : []))
 
-/** --table/--row/--col: the table by id, caption, or a header label; row and column by normalized label, never by index. */
-export function locateTable(sourceHtml, { table, row, col, sourceId }) {
+/**
+ * --table/--row/--col: the table by id, caption, or a header label; row and column by normalized label,
+ * never by index. `source` is page html or an extracted view ({ root, text, blocks }) of one.
+ */
+export function locateTable(source, { table, row, col, sourceId }) {
 	requireSource(sourceId)
-	const { root, text, blocks } = snapshotBlocks(sourceHtml)
+	const { root, text, blocks } = typeof source === "string" ? snapshotBlocks(source) : source
 	const key = label(table)
 	const tables = tablesOf(root).filter((entry) => entry.table.attrs.id === table || entry.caption === key || (entry.header && cellsOf(entry.header).map(cellLabel).includes(key)))
 	if (tables.length !== 1) return tables.length === 0 ? notLocated() : ambiguous(tables.map((entry) => ({ table: entry.table.attrs.id ?? entry.caption })))

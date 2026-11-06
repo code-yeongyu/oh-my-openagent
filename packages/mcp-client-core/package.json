@@ -40,6 +40,6 @@
   },
   "devDependencies": {
     "@types/proper-lockfile": "4.1.4",
-    "bun-types": "1.4.3"
+    "bun-types": "1.4.4"
   }
 }

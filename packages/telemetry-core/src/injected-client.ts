@@ -1,5 +1,6 @@
 import { getTelemetryApiKey, getTelemetryHost, hasTelemetryApiKey, shouldDisableTelemetry } from "./env"
 import { getDefaultTelemetryOsProvider } from "./machine-id"
+import { toTelemetryTerminalProgram } from "./terminal-program"
 import type {
   TelemetryCaptureProperties,
   TelemetryClient,
@@ -143,11 +144,18 @@ function getSharedProperties(input: CreateTelemetryClientInput): TelemetryCaptur
     total_memory_gb: Math.round(osProvider.totalmem() / 1024 / 1024 / 1024),
     locale: Intl.DateTimeFormat().resolvedOptions().locale,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    shell: process.env.SHELL,
+    shell: getShellName(process.env.SHELL),
     ci: Boolean(process.env.CI),
-    terminal: process.env.TERM_PROGRAM,
+    terminal: toTelemetryTerminalProgram(process.env.TERM_PROGRAM),
     ...input.product.additionalProperties,
   }
+}
+
+// The login shell's path often contains the user's name (/home/<user>/.nix-profile/bin/zsh), so only the program
+// name is sent: the last path segment, without a Windows .exe suffix.
+function getShellName(shellPath: string | undefined): string | undefined {
+  const name = shellPath?.split(/[\\/]/).pop()?.replace(/\.exe$/i, "")
+  return name ? name : undefined
 }
 
 function getSafeCpuInfo(

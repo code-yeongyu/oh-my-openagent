@@ -166,6 +166,27 @@ describe("Python computer facade", () => {
 		]);
 	});
 
+	it("sends el.type as a ref-hopped chain and returns how the text was delivered", () => {
+		// When
+		const run = runPythonFacade("el = computer.ref('e1')\nout = el.type('hello', delivery='foreground')", {
+			type: JSON.stringify({ text: "", details: { value: { method: "inserted" } }, images: [], hasError: false }),
+		});
+
+		// Then
+		expect(run.error).toBeNull();
+		expect(run.out).toEqual({ method: "inserted" });
+		expect(run.calls).toEqual([
+			{ action: "call", chain: [{ method: "ref", args: ["e1"] }] },
+			{
+				action: "call",
+				chain: [
+					{ method: "ref", args: ["e1"] },
+					{ method: "type", args: ["hello", { delivery: "foreground" }] },
+				],
+			},
+		]);
+	});
+
 	it("sends control helpers as one-step call chains (#9651 B5b)", () => {
 		// When
 		const run = runPythonFacade(

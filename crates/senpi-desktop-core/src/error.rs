@@ -1,11 +1,20 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::report::{Delivered, Disposition, FocusRestoration};
+
 /// Desktop error vocabulary shared by the engine, the wire, and the host.
 ///
 /// FROZEN: oh-my-pi's codes plus the stop-path, suspension, lock-screen,
 /// cancellation, and restore-transaction codes. Adding a code needs a plan
 /// amendment because the TS protocol and numeric JSON-RPC codes derive from it.
+/// The enum is append-only: a new code takes the next ordinal, so no existing
+/// numeric code moves. Amendment 1 (macOS shared-screen parity, #11459 /
+/// #11461) appended `UserIntervened`, `AxUnconfirmed`, `SpaceUnsupported` and
+/// `SpaceMoveDenied` (-32024..-32027) without a protocol version change.
+/// Amendment 2 (computer-use v2 P1a) appended `AmbiguousTarget`,
+/// `CaptureConsentRequired` and `ProtectedProcess` (-32028..-32030), also
+/// without a protocol version change.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub enum ErrorCode {
     PermissionDenied,
@@ -38,6 +47,29 @@ pub enum ErrorCode {
     /// The capture target exists but cannot be captured right now; `data`
     /// says why (e.g. `{ "reason": "minimized" }`).
     CaptureUnavailable,
+    /// The user was using the target app, or brought another window to the
+    /// front, before or during the action, so the action stopped; the message
+    /// says whether any input was sent. Read the window again once the user
+    /// pauses; never repeat the action blindly.
+    UserIntervened,
+    /// An accessibility request was made, but the app did not confirm its
+    /// outcome (it did not reply in time or messaging failed, e.g. while the
+    /// action opened a modal dialog). It may already have taken effect: read
+    /// the element back before any retry.
+    AxUnconfirmed,
+    /// Moving a window between Spaces is not available on this backend or OS
+    /// version.
+    SpaceUnsupported,
+    /// The window server refused the Space move, or the move could not be
+    /// verified.
+    SpaceMoveDenied,
+    /// A target description matched more than one window or element; the
+    /// caller must name one of the candidates.
+    AmbiguousTarget,
+    /// Capturing this target needs the user's consent first.
+    CaptureConsentRequired,
+    /// The target process is protected: the engine never sends it input.
+    ProtectedProcess,
 }
 
 impl ErrorCode {
@@ -67,6 +99,13 @@ impl ErrorCode {
             Self::InputBusy => "InputBusy",
             Self::ControlRequired => "ControlRequired",
             Self::CaptureUnavailable => "CaptureUnavailable",
+            Self::UserIntervened => "UserIntervened",
+            Self::AxUnconfirmed => "AxUnconfirmed",
+            Self::SpaceUnsupported => "SpaceUnsupported",
+            Self::SpaceMoveDenied => "SpaceMoveDenied",
+            Self::AmbiguousTarget => "AmbiguousTarget",
+            Self::CaptureConsentRequired => "CaptureConsentRequired",
+            Self::ProtectedProcess => "ProtectedProcess",
         }
     }
 }
@@ -95,6 +134,22 @@ pub struct CaptureUnavailableData {
     pub reason: String,
 }
 
+/// What an error adds in a session opened with `reportMode: "object"`:
+/// why it happened and whether input reached the target. Never set in a
+/// `reportMode: "null"` session.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ErrorReport {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub disposition: Option<Disposition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delivered: Option<Delivered>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub focus_restoration: Option<FocusRestoration>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[error("{}: {}", .code.as_str(), .message)]
@@ -105,6 +160,9 @@ pub struct DesktopError {
     pub permission: Option<PermissionDeniedData>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub capture_unavailable: Option<Box<CaptureUnavailableData>>,
+    /// Object-mode additions, mirrored on the wire's `EngineErrorData`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub report: Option<Box<ErrorReport>>,
 }
 
 impl DesktopError {
@@ -114,7 +172,28 @@ impl DesktopError {
             message: message.into(),
             permission: None,
             capture_unavailable: None,
+            report: None,
         }
+    }
+
+    /// Attaches the object-mode report.
+    #[must_use]
+    pub fn with_report(mut self, report: ErrorReport) -> Self {
+        self.report = Some(Box::new(report));
+        self
+    }
+
+    /// Attaches an object-mode report carrying only `disposition`, unless the
+    /// error already carries the worker's report.
+    #[must_use]
+    pub fn with_fallback_disposition(self, disposition: Disposition) -> Self {
+        if self.report.is_some() {
+            return self;
+        }
+        self.with_report(ErrorReport {
+            disposition: Some(disposition),
+            ..ErrorReport::default()
+        })
     }
 
     pub fn permission_denied(message: impl Into<String>) -> Self {
@@ -182,6 +261,22 @@ impl DesktopError {
 
     pub fn ax_failed(message: impl Into<String>) -> Self {
         Self::new(ErrorCode::AxFailed, message)
+    }
+
+    pub fn ax_unconfirmed(message: impl Into<String>) -> Self {
+        Self::new(ErrorCode::AxUnconfirmed, message)
+    }
+
+    pub fn user_intervened(message: impl Into<String>) -> Self {
+        Self::new(ErrorCode::UserIntervened, message)
+    }
+
+    pub fn space_unsupported(message: impl Into<String>) -> Self {
+        Self::new(ErrorCode::SpaceUnsupported, message)
+    }
+
+    pub fn space_move_denied(message: impl Into<String>) -> Self {
+        Self::new(ErrorCode::SpaceMoveDenied, message)
     }
 
     pub fn timeout(message: impl Into<String>) -> Self {

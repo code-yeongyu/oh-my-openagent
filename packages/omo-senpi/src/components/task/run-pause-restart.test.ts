@@ -7,6 +7,9 @@ import type { EnginePauseState } from "../../../../senpi-task/src/pause/ports"
 import { PauseRegistry, type PauseParticipant } from "../../../../senpi-task/src/pause/registry"
 import { RunPauseController, type RunPauseEffects } from "../../../../senpi-task/src/pause/run-controller"
 import { EngineRunPauseBridge } from "./run-pause-bridge"
+import { createTaskRecordStore } from "../../../../senpi-task/src/store"
+import { createTaskManager } from "../../../../senpi-task/src/manager/manager"
+import { baseSpec, categoryPlanner, FakeRunner, settings } from "../../../../senpi-task/src/manager/__fixtures__/manager-fakes"
 
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
@@ -116,6 +119,43 @@ test("design 31: a restart while the engine still holds the Stop leaves held inp
   expect(second.resumed).toEqual([])
   expect(second.calls).toEqual([])
   expect(second.barrier.state(PARENT)).toEqual({ kind: "closed", pauseSeq: 7 })
+})
+
+test("#given an acknowledged Stop persisted by the previous host #when human Resume cannot restore a held child #then admission reopens and the child stays retryable", async () => {
+  const root = stateRoot()
+  const first = hostProcess(root, { state: stopped(7) })
+  await first.bridge.changed(PARENT, { ...stopped(7), change: "paused" })
+  expect(first.registry.require(PARENT).participants.b?.state).toBe("held")
+
+  let restoreFails = true
+  const second = hostProcess(root, { state: stopped(7), effects: () => ({
+    resume: async (_participant, request) => {
+      expect(request.childSeqCutoff).toBe(8)
+      if (restoreFails) throw new Error("paused child st_b restore failed (respawn_failed): runtime unavailable")
+      return { kind: "resumed", turnId: "restored-turn" }
+    },
+  }) })
+  const runner = new FakeRunner()
+  const manager = createTaskManager({
+    cwd: root, store: createTaskRecordStore({ project_dir: root, task: { state_dir: join(root, "task-records") } }), admissionBarrier: second.barrier,
+    planner: categoryPlanner(), config: settings(), runners: { "in-process": runner, process: runner },
+  })
+  const input = baseSpec({ parent_session_id: PARENT, root_session_id: PARENT })
+  await second.restart()
+  expect(await manager.start(input)).toMatchObject({ kind: "held" })
+  second.setState(released(7))
+  await second.bridge.changed(PARENT, { ...released(7), change: "resumed" })
+  const admitted = await manager.start(input)
+  expect(admitted.kind).toBe("started")
+  if (admitted.kind === "started") await manager.cancelTask(admitted.task_id)
+  expect(second.registry.require(PARENT)).toMatchObject({
+    phase: "resumed", participants: { b: { state: "lost", lostReason: expect.stringContaining("respawn_failed") } },
+  })
+
+  restoreFails = false
+  await second.bridge.changed(PARENT, { ...released(7), change: "resumed" })
+  expect(second.registry.require(PARENT).participants.b).toMatchObject({ state: "resumed", resumeTurnId: "restored-turn" })
+  expect(second.barrier.state(PARENT)).toEqual({ kind: "open" })
 })
 
 test("design 31: a restart after the Resume was requested completes it exactly once when the engine releases", async () => {

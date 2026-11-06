@@ -8,10 +8,12 @@
 // escaped HTML projection (same line numbers) and checked with its fill map, which is the only
 // record of where its values sit; LaTeX is verified through its Markdown source.
 //
-// The locked brief is re-judged here, not only at fill: the edition's fill map (--fill-map, else
-// `<report>.fill-map.json` when present) must carry the current brief's brief_sha256
-// (brief_changed), and policyErrors re-runs over every data-fact the edition carries, so an
-// edition that violates the current derived-numbers or source-floor rule fails here too.
+// The locked brief is re-judged here, not only at fill: every edition (HTML or Markdown) needs its
+// fill map (fillMapOf: --fill-map, else whichever of `<report>.fill-map.json` and the
+// `<report>.polished.fill-map.json` polish-apply writes records the edition's bytes), and that map
+// must carry the current brief's brief_sha256; no map, or another hash, is brief_changed. policyErrors
+// re-runs over every data-fact the edition carries, so an edition that violates the current
+// derived-numbers or source-floor rule fails here too.
 //
 // The delivery barrier that reads these records (and every other fidelity record) is
 // fidelity-records.mjs.
@@ -66,8 +68,8 @@ function entryHtml(text, entry, rows) {
 	if (entry.translates) return `<span data-translates="${escapeHtml(entry.translates)}">${projectMarkdownInline(body.replace(/^<!--[\s\S]*?-->\s*/u, ""))}</span>`
 	if (!row) return `<data data-fact="${escapeHtml(entry.fact_id)}">${escapeHtml(body)}</data>`
 	const quoted = row.kind === "quote" ? parseRenderedQuote(body) : null
-	if (quoted) return renderQuote(row, entry.selector ?? "full", quoted.text, "html")
-	return row.kind === "quote" ? null : renderValueHtml(row, body)
+	if (quoted) return renderQuote(row, entry.selector ?? "full", quoted.text, "html", entry.claimKind)
+	return row.kind === "quote" ? null : renderValueHtml(row, body, { mode: entry.mode, claimKind: entry.claimKind ?? null })
 }
 
 /** [from, to) of the filled text as HTML, each intact fill-map entry rebuilt as its fill element. */
@@ -149,6 +151,17 @@ const MARKDOWN_EXTENSION = /\.(md|markdown)$/iu
 /** The edition format: the explicit flag, else md for a .md or .markdown path (any case), else html. */
 export const editionFormatOf = (path, flag) => flag ?? (MARKDOWN_EXTENSION.test(path) ? "md" : "html")
 
+/**
+ * An edition's fill map path: --fill-map, else whichever of fact fill's `<report>.fill-map.json` and
+ * polish-apply's `<report>.polished.fill-map.json` records these bytes as its artifact_sha256, else the
+ * first of them that exists; null when neither exists.
+ */
+export function fillMapOf(report, text, flag) {
+	if (flag !== undefined) return flag
+	const found = [`${report}.fill-map.json`, `${report}.polished.fill-map.json`].filter((path) => existsSync(path))
+	return found.find((path) => readJsonFile(path).artifact_sha256 === sha256Of(text)) ?? found[0] ?? null
+}
+
 /** The report's format (from --format or its extension) and, for Markdown, its fill map entries. */
 export function readEdition(report, flags) {
 	const format = editionFormatOf(report, flags.format)
@@ -174,19 +187,23 @@ export function runFactVerify(args) {
 	const briefPath = flags.brief ?? join(sessionDir, "brief.md")
 	const ledger = readLedger(sessionDir)
 	const projected = edition.format === "md" ? markdownAsHtml(edition.text, edition.entries, ledger) : null
+	// The entries whose element is in the checked HTML: an HTML edition's own map, or the projection's intact entries.
+	const ownMap = flags["fill-map"] ?? `${report}.fill-map.json`
+	const fillEntries = projected ? edition.entries.filter((entry) => !projected.stale.includes(entry)) : existsSync(ownMap) ? readJsonFile(ownMap).entries : null
 	const result = checkFidelity(projected?.html ?? edition.text, {
 		ledger,
 		sourcesDir: resolve(flags.sources ?? join(sessionDir, "sources")),
 		claims: flags.claims !== undefined || existsSync(claimsPath) ? readJsonFile(claimsPath) : null,
 		fillMap: projected?.stale ?? edition.entries,
+		fillEntries,
 		brief: existsSync(briefPath) ? readText(briefPath) : "",
 		baseDir: dirname(resolve(report)),
 		recompute,
 	})
 	const checked = projected?.html ?? edition.text
 	const pointers = [...checked.matchAll(/\bdata-fact="([^"]+)"/gu)].map((match) => ({ token: match[0], start: match.index, parsed: { id: match[1] } }))
-	const mapPath = flags["fill-map"] ?? `${report}.fill-map.json`
-	const bound = existsSync(mapPath) ? briefBindingErrors(readJsonFile(mapPath), mapPath, parsed) : []
+	const mapPath = fillMapOf(report, edition.text, flags["fill-map"])
+	const bound = briefBindingErrors(mapPath === null ? null : readJsonFile(mapPath), mapPath ?? `${report}.fill-map.json`, parsed)
 	const defects = [...bound, ...policyErrors(checked, pointers, ledger, sessionDir, policy).errors, ...result.defects]
 	const counts = countDefects(defects)
 	const status = defects.some(blocksDelivery) ? "fail" : "pass"

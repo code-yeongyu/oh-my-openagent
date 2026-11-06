@@ -9,6 +9,7 @@ export const TASK_START_FAILURE_KINDS = [
   "tools_unavailable",
   "session_unavailable",
   "host_unavailable",
+  "model_chain_exhausted",
 ] as const
 
 export type TaskStartFailureKind = (typeof TASK_START_FAILURE_KINDS)[number]

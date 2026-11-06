@@ -47,10 +47,7 @@ export async function ManifestoClosing(): Promise<JSX.Element> {
           {t.rich("legacyNote", {
             date: (chunks) => <time dateTime="2026-01-19">{chunks}</time>,
             link: (chunks) => (
-              <Link
-                href={LEGACY_MANIFESTO_PATH}
-                className="text-accent underline-grow focus-visible:outline-accent-32 focus-visible:outline-2 focus-visible:outline-offset-2"
-              >
+              <Link href={LEGACY_MANIFESTO_PATH} className="text-accent underline-grow focus-ring">
                 {chunks}
               </Link>
             ),

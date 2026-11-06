@@ -5,6 +5,7 @@ import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { detectInstallFlow, resolveInstallSnapshotPath } from "./install-flow.mjs";
+import { findTomlSection } from "./migrate-codex-config/toml-section-editor.mjs";
 import { resolveSpawnInvocation } from "./spawn-command.mjs";
 
 const DEFAULT_UPDATE_COMMAND = "npx";
@@ -59,7 +60,7 @@ export function detectMarketplaceLocalRepair(env = {}) {
 	const codexHome = resolveCodexHome(env);
 	const marketplaceRoot = join(codexHome, "plugins", "cache", SISYPHUS_MARKETPLACE_NAME);
 	const reasons = [
-		...missingCachedMarketplaceSources(marketplaceRoot),
+		...(configuredMarketplaceSourceType(codexHome) === "git" ? [] : missingCachedMarketplaceSources(marketplaceRoot)),
 		...missingManagedBinTargets({ env, marketplaceRoot }),
 	];
 	return { needsRepair: reasons.length > 0, reasons };
@@ -163,6 +164,20 @@ function resolveInstallerBinDir(env, codexHome) {
 	const defaultCodexHome = resolve(home, ".codex");
 	const resolvedCodexHome = resolve(codexHome);
 	return resolvedCodexHome === defaultCodexHome ? resolve(home, ".local", "bin") : join(resolvedCodexHome, "bin");
+}
+
+// Codex reads a Git marketplace from its own clone, so a cache-root manifest an earlier local install wrote is never read.
+function configuredMarketplaceSourceType(codexHome) {
+	let config;
+	try {
+		config = readFileSync(join(codexHome, "config.toml"), "utf8");
+	} catch (error) {
+		if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined;
+		throw error;
+	}
+	const section = findTomlSection(config, `[marketplaces.${SISYPHUS_MARKETPLACE_NAME}]`);
+	if (section === null) return undefined;
+	return /^\s*source_type\s*=\s*["']([^"']+)["']/m.exec(section.text)?.[1];
 }
 
 function missingCachedMarketplaceSources(marketplaceRoot) {

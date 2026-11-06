@@ -15,7 +15,7 @@
 // fidelity record exists, the barrier refuses the unverified edition regardless of it, and the same
 // exemption is the only way a required record may be absent.
 
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs"
 import { join } from "node:path"
 
 import { CliError, readJsonFile, sha256Of, writeJsonAtomic } from "./cli-support.mjs"
@@ -24,7 +24,10 @@ import { meaningCheckEnabled, requireLockedBrief } from "./fidelity-brief.mjs"
 import { blocksDelivery, deliveryBlockReason } from "./gates-fidelity.mjs"
 
 export const FIDELITY_RECORD = "fidelity-defects.json"
+/** The legacy session meaning record: a candidate for every edition whose bytes it claims, like any edition record (newest run wins). */
 export const MEANING_RECORD = "fidelity-meaning-defects.json"
+/** The meaning record of one delivered edition, named by its outcome format (`fact meaning-check --edition`). */
+export const meaningRecordName = (format) => `fidelity-meaning-defects.${format}.json`
 
 /** The fields every fidelity record carries, whatever its kind. */
 export const RECORD_ENVELOPE = Object.freeze(["record_kind", "artifact_sha256", "report", "written_at", "defects"])
@@ -39,13 +42,67 @@ function meaningRequired({ sessionDir }) {
 }
 
 const subjectOf = (row) => row.renderedFrom ?? row.path ?? null
+const hashOf = (path) => (existsSync(path) ? sha256Of(readFileSync(path)) : null)
 
 /** One record per delivered edition: the file its row names with --verified-by, bound to that edition's bytes. */
 const perEdition = (sessionDir, delivered) =>
 	delivered.map((row) => ({ path: row.verifiedBy ?? null, declared: row.verifiedBy !== undefined, format: row.format, at: `${row.format}: `, subjects: [subjectOf(row)].filter((subject) => subject !== null) }))
 
-/** One record per session, in the session directory, bound to any delivered edition's bytes. */
-const perSession = (file) => (sessionDir, delivered) => [{ path: join(sessionDir, file), declared: false, format: null, at: "", subjects: delivered.map(subjectOf).filter((subject) => subject !== null) }]
+const sessionTarget = (sessionDir, file) => ({ path: join(sessionDir, file), declared: false, format: null, at: "", subjects: [] })
+
+/** Include every existing session fidelity record, even when no delivered row attaches it. */
+const perEditionAndSession = (sessionDir, delivered) => [
+	...perEdition(sessionDir, delivered),
+	...(existsSync(join(sessionDir, FIDELITY_RECORD)) ? [sessionTarget(sessionDir, FIDELITY_RECORD)] : []),
+]
+
+/** Edition meaning records on disk (fidelity-meaning-defects.<format>.json). */
+const EDITION_MEANING = /^fidelity-meaning-defects\.[^.]+\.json$/u
+
+/** Verdict severity for equal times: a confirmed drift, then any other blocking defect (unverified), then clean. */
+const severityOf = (defects) =>
+	defects.some((defect) => defect?.code === "meaning_drift_confirmed") ? 2 : defects.some((defect) => typeof defect?.code === "string" && blocksDelivery(defect)) ? 1 : 0
+
+/**
+ * What selection reads from a meaning record: the bytes it claims, when it was written, how severe it is.
+ * An unreadable record matches no bytes (its own row still reads and refuses it); a record with no
+ * readable written_at sorts newest, so the barrier reads it and refuses it as malformed.
+ */
+function claimOf(path) {
+	let record
+	try {
+		record = readJsonFile(path)
+	} catch {
+		return null
+	}
+	const at = Date.parse(record?.written_at)
+	return { path, hash: record?.artifact_sha256 ?? null, at: Number.isNaN(at) ? Infinity : at, severity: severityOf(Array.isArray(record?.defects) ? record.defects : []) }
+}
+
+/** Newest written_at first; on equal times the more severe verdict first. File names never decide. */
+const newestFirst = (a, b) => (a.at === b.at ? b.severity - a.severity : b.at > a.at ? 1 : -1)
+
+/**
+ * One meaning record per delivered edition, bound to that edition's bytes. Every record whose
+ * artifact_sha256 equals the edition's current bytes (a PDF counts its --rendered-from bytes) is a
+ * candidate: its own fidelity-meaning-defects.<format>.json, another edition's record (a
+ * byte-identical copy, or the html edition a PDF renders), and the legacy session record. The
+ * newest reader run wins; on equal times the more severe verdict wins. When no record claims these
+ * bytes the target is its own record (refused as for a different edition), else the legacy record,
+ * else its own name, so the refusal names the file to write (meaning gate not run).
+ */
+function perEditionMeaning(sessionDir, delivered) {
+	if (delivered.length === 0) return [sessionTarget(sessionDir, MEANING_RECORD)]
+	const legacy = join(sessionDir, MEANING_RECORD)
+	const editions = readdirSync(sessionDir).filter((name) => EDITION_MEANING.test(name)).map((name) => join(sessionDir, name))
+	const claims = [...editions, ...(existsSync(legacy) ? [legacy] : [])].map(claimOf).filter((claim) => claim !== null)
+	return perEdition(sessionDir, delivered).map((target) => {
+		const own = join(sessionDir, meaningRecordName(target.format))
+		const bytes = target.subjects.length > 0 ? hashOf(target.subjects[0]) : null
+		const [newest] = bytes === null ? [] : claims.filter((claim) => claim.hash === bytes).sort(newestFirst)
+		return { ...target, declared: false, path: newest?.path ?? (existsSync(own) ? own : existsSync(legacy) ? legacy : own) }
+	})
+}
 
 /** Every fidelity record the barrier reads, in check order; each column is one rule the barrier applies. */
 export const FIDELITY_RECORDS = Object.freeze([
@@ -53,7 +110,7 @@ export const FIDELITY_RECORDS = Object.freeze([
 		kind: "fidelity",
 		file: FIDELITY_RECORD,
 		step: "fidelity gate",
-		targets: perEdition,
+		targets: perEditionAndSession,
 		requiredWhen: ({ hasFidelity }, target) => hasFidelity || GATED_FORMATS.includes(target.format),
 		remedy: (target) => `run fact verify on ${target.subjects[0] ?? "the edition"} and set it with --verified-by`,
 		bindsTo: "artifact_sha256",
@@ -64,17 +121,25 @@ export const FIDELITY_RECORDS = Object.freeze([
 		kind: "meaning",
 		file: MEANING_RECORD,
 		step: "meaning gate",
-		targets: perSession(MEANING_RECORD),
+		targets: perEditionMeaning,
 		requiredWhen: meaningRequired,
-		remedy: () => "run fact pairs and fact meaning-check before delivery",
+		remedy: (target) => `run fact pairs and fact meaning-check --edition ${target.format} on ${target.subjects[0] ?? "the edition"} before delivery`,
 		bindsTo: "artifact_sha256",
 		blocking: blocksDelivery,
 		payload: Object.freeze(["command", "status", "exitCode", "run_id", "pairs_sha256", "counts", "dropped", "unverified", "calibration_path", "calibration_written", "calibration_replaced", "promotion_eligibility"]),
 	}),
 ])
 
+// Collection warnings use the same envelope, but are not delivery-gate records.
+const SOURCE_RECORDS = Object.freeze([
+	Object.freeze({
+		kind: "source_conversion",
+		payload: Object.freeze(["conversion_altered_numbers", "lost", "raw_count", "converted_count"]),
+	}),
+])
+
 const entryOf = (kind) => {
-	const entry = FIDELITY_RECORDS.find((row) => row.kind === kind)
+	const entry = [...FIDELITY_RECORDS, ...SOURCE_RECORDS].find((row) => row.kind === kind)
 	if (entry === undefined) throw new CliError(`unknown fidelity record kind ${kind}`)
 	return entry
 }
@@ -124,19 +189,20 @@ export function readFidelityRecord(path, kind) {
 }
 
 const unresolved = (format, codes, path) => ({ code: "fidelity_unresolved", format, codes, message: codes.map((code) => deliveryBlockReason({ code })).join("; "), path })
-const hashOf = (path) => (existsSync(path) ? sha256Of(readFileSync(path)) : null)
 
 /** Barrier problems for `outcome verify` and `outcome finish`; empty when nothing blocks delivery. */
 export function fidelityProblems(sessionDir, manifest) {
 	const delivered = manifest.deliverables.filter((row) => row.status === "delivered")
-	const hasFidelity = existsSync(join(sessionDir, LEDGER_FILENAME)) || FIDELITY_RECORDS.some((entry) => existsSync(join(sessionDir, entry.file)))
+	const targets = FIDELITY_RECORDS.map((entry) => [entry, entry.targets(sessionDir, delivered)])
+	// Any session record a row did not name (a session fidelity record, a meaning record) is fidelity evidence.
+	const hasFidelity = existsSync(join(sessionDir, LEDGER_FILENAME)) || targets.some(([, list]) => list.some((target) => !target.declared && target.path !== null && existsSync(target.path)))
 	const lastFidelity = manifest.gateHistory?.findLast((entry) => entry.gate === "fidelity")
 	const exempt = !hasFidelity && manifest.gates.fidelity === "not_run" && lastFidelity?.status === "not_run" && Boolean(lastFidelity.reason?.trim())
 	const context = { sessionDir, hasFidelity }
 	const problems = []
 	const counted = new Set()
-	for (const entry of FIDELITY_RECORDS) {
-		for (const target of entry.targets(sessionDir, delivered)) {
+	for (const [entry, list] of targets) {
+		for (const target of list) {
 			const refuse = (message, path = target.path) => problems.push({ code: "edition_unverified", format: target.format, message: `${target.at}${message}`, path })
 			if (target.path === null || !existsSync(target.path)) {
 				if (target.declared) refuse(`${entry.kind} record ${target.path} is missing`)
@@ -151,10 +217,11 @@ export function fidelityProblems(sessionDir, manifest) {
 				continue
 			}
 			if (target.subjects.length > 0 && !target.subjects.some((subject) => hashOf(subject) === record[entry.bindsTo])) {
-				refuse(`${entry.kind} record ${target.path} is for a different edition than ${target.subjects.join(", ")}`)
+				refuse(`${entry.kind} record ${target.path} is for a different edition than ${target.subjects.join(", ")}; ${entry.remedy(target)}`)
 			}
-			if (counted.has(target.path)) continue
-			counted.add(target.path)
+			const path = realpathSync.native(target.path)
+			if (counted.has(path)) continue
+			counted.add(path)
 			const codes = [...new Set(record.defects.filter(entry.blocking).map((defect) => defect.code))].sort()
 			if (codes.length > 0) problems.push(unresolved(target.format, codes, target.path))
 		}

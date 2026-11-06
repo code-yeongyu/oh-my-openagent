@@ -3,6 +3,7 @@ import { readdirSync } from "node:fs"
 import { join, resolve } from "node:path"
 import { Command } from "commander"
 import { createMcpOAuthCommand } from "../mcp-oauth"
+import { signInRoute } from "./accounts-gate"
 import { configureServiceAuthCommands, SERVICE_ACCOUNTS_CLOSED_MESSAGE } from "./commands"
 import { fakeApi, temporaryHome } from "./test-support"
 
@@ -12,7 +13,8 @@ const entries = {
   compiled: join(root, "packages", "omo-native", "compile-entry.ts"),
 }
 const invocations = [
-  ["login"], ["login", "--device"], ["login", "--no-browser", "--api", "https://example.invalid"], ["login", "--help"],
+  // #12639: `login --device` and `login --no-browser` run the device flow while closed (closed-device-login.test.ts).
+  ["login"], ["login", "--accounts", "https://example.invalid"], ["login", "--api", "https://example.invalid"], ["login", "--help"],
   ["logout"], ["whoami"], ["whoami", "--help"],
 ]
 
@@ -51,6 +53,12 @@ for (const [name, entry] of Object.entries(entries)) {
     60_000,
   )
 }
+
+// Contract: every sign-in hint follows the same switch as the commands, so none names omo login while it refuses (#11379).
+test("#given accounts are closed #then sign-in hints route to the desktop app, and to omo login once accounts open", () => {
+  expect(signInRoute()).toBe("desktop")
+  expect(signInRoute(true)).toBe("cli")
+})
 
 test("#given accounts are closed #then the toolkit help lists no service account command", () => {
   const program = new Command("omo")

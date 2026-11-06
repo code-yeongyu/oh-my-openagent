@@ -39,8 +39,15 @@ describe("memfs hooks test support teardown (#10945)", () => {
     // teardown cannot reap it, and it can still write into the repository while the root is removed (#10945).
     const dir = await createRepo()
     const trace = join(await tempDir("memory-hooks-trace-"), "trace2.json")
+    // The test preload turns auto maintenance off globally (#11742); this global config turns it back on, so only the
+    // fixture's own repository config can keep the commit from starting it.
+    const autoMaintenanceOn = join(dir, ".git", "auto-maintenance-on.gitconfig")
+    await writeFile(autoMaintenanceOn, "[maintenance]\n\tauto = true\n")
 
-    const result = await commit(dir, { "reference/note.md": "---\ndescription: Note\n---\n\nbody\n" }, "memory write", { GIT_TRACE2_EVENT: trace })
+    const result = await commit(dir, { "reference/note.md": "---\ndescription: Note\n---\n\nbody\n" }, "memory write", {
+      GIT_TRACE2_EVENT: trace,
+      GIT_CONFIG_GLOBAL: autoMaintenanceOn,
+    })
 
     expect(result.code).toBe(0)
     const events: { event: string; argv?: string[] }[] = (await readFile(trace, "utf8"))

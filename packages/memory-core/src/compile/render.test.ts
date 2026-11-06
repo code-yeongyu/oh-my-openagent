@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test"
 import { renderExternalProjection } from "./external-projection"
+import { NAME_NOTE } from "./external-projection-names"
 import { markMemoryBlock, replaceMemoryBlock, stripMemoryBlock } from "./render"
 
 describe("renderExternalProjection", () => {
@@ -10,10 +11,11 @@ describe("renderExternalProjection", () => {
     // when / then
     expect(renderExternalProjection(paths)).toBe([
       "<external_projection>",
+      NAME_NOTE,
       "$MEMORY_DIR/",
-      "people/ann/: card.md",
-      "reference/: top.md",
-      "reference/project/: a.md, b.md",
+      "people/ann/: card",
+      "reference/: top",
+      "reference/project/: a, b",
       "</external_projection>",
     ].join("\n"))
   })

@@ -195,6 +195,14 @@ export const isObserveResult: Guard<ObserveResult> = (value): value is ObserveRe
 	isCaptureResult(value) && typeof value.coordinateWidth === "number" && typeof value.coordinateHeight === "number" &&
 	matches(value, { ax: "string", nodeCount: "number", truncated: "boolean" });
 
+/** `ax.typeText` reply: how the text reached the element. */
+export interface AxInputResult {
+	readonly method: "inserted" | "keys";
+}
+
+export const isAxInputResult: Guard<AxInputResult> = (value): value is AxInputResult =>
+	typeof value === "object" && value !== null && ((value as { method?: unknown }).method === "inserted" || (value as { method?: unknown }).method === "keys");
+
 export const isText: Guard<{ readonly text: string }> = (value): value is { readonly text: string } =>
 	isRecord(value) && typeof value.text === "string";
 

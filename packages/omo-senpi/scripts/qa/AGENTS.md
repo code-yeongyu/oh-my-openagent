@@ -21,6 +21,7 @@ Live Senpi QA harness: E2E drivers, continuation probes, scenario fixtures, and 
 | Thread | `thread-tools/` cross-surface suite: `cli-surface.mjs` (CLI session drives create/send/steer on a peer), `desktop-client.mjs` (same ops through the REAL desktop provider client), `terminal-to-ui.mjs` and `desktop-to-cli.mjs` (each surface's sessions addressable from the other), `run-all.mjs`, shared `lib/harness.mjs` |
 | Resilience | `task-14/` fault injections against a real socket host: `kill-mid-turn.mjs`, `version-capability.mjs` (incompatible unmanaged host is refused, never adopted or replaced), `run-all.mjs`, shared `common.mjs` |
 | Agent toolkit eval SDK | `agent-toolkit-eval-sdk-qa.mjs` (real-surface QA: a detached worker builds a real AgentSession from the built plugin and drives the agent toolkit eval SDK through js/py eval cells (7 checks); run `bun packages/omo-senpi/scripts/qa/agent-toolkit-eval-sdk-qa.mjs --evidence-dir <dir>`; exit 0 only on 7/7), `agent-toolkit-eval-sdk-qa-support.mjs`, `agent-toolkit-eval-sdk-docs.mjs` |
+| bunshin-ts eval SDK | `bunshin-ts-eval-sdk-qa.mjs` (real-surface QA: a detached worker builds a real AgentSession from the built plugin and drives the fleet SDK at `OMO_BUNSHIN_TS_SDK_ROOT` through js eval cells against `bunshin-ts-fake-service.ts`, a local API v1 fake on a private Unix socket with the real mutual proof and two devices; 4 session checks plus the real-agent-home digest check; run `bun packages/omo-senpi/scripts/qa/bunshin-ts-eval-sdk-qa.mjs --evidence-dir <dir>`; exit 0 only on 5/5), `bunshin-ts-fake-service.ts` (+ `.test.ts`) |
 | Infra | `drive.mjs`, `task-e2e-{analysis,process}.mjs`, `mock-completions-server.mjs`, `mock-provider/` |
 
 ## Shared hubs
@@ -66,7 +67,7 @@ bun packages/omo-senpi/scripts/qa/kibitzer-legacy-absence-probe.mjs --evidence-d
 bun packages/omo-senpi/scripts/qa/dependency-diff-check.mjs --base <sha> --head <sha> --evidence-dir <d>/dependency-diff   # exit 0 only when no dependency entry was added in any manifest or lockfile
 SENPI_BIN="$(command -v senpi)" node scripts/qa/task-e2e.mjs   # live mode; same for team-e2e.mjs
 bun test scripts/qa/task-e2e-analysis.test.mjs scripts/qa/resume-e2e-runtime.test.mjs
-bun packages/omo-senpi/scripts/qa/thread-tools/run-all.mjs        # cross-surface thread tools
+THREAD_QA_SENPI_VERSION=<engine> bun packages/omo-senpi/scripts/qa/thread-tools/run-all.mjs   # cross-surface thread tools; the variable is required
 bun packages/omo-senpi/scripts/qa/task-14/run-all.mjs             # resilience fault injections
 node packages/omo-senpi/scripts/qa/task-host-e2e-shards.mjs --bin <compiled-omo> --before-bin <R0-omo> --out <evidence-dir>
 bun run test:senpi                                             # gate: build + stage + typecheck + test

@@ -218,8 +218,8 @@ export const OmoMemoryWriteNoticeLayerSchema = z.object({
 // ---------------------------------------------------------------------------
 
 export const OmoMemoryProjectionSchema = z.object({
-  max_entries_per_directory: z.number().int().min(0).default(40),
-  max_bytes: z.number().int().min(0).default(24576),
+  max_entries_per_directory: z.number().int().min(0).default(0),
+  max_bytes: z.number().int().min(0).default(40960),
 }).strict()
 
 export const OmoMemoryProjectionLayerSchema = z.object({
@@ -299,7 +299,7 @@ export const OmoMemorySettingsSchema = z.object({
     query_expansion: false,
   }),
   project_scope: OmoMemoryProjectScopeSchema.default({ nudge: true, recall: true }),
-  projection: OmoMemoryProjectionSchema.default({ max_entries_per_directory: 40, max_bytes: 24576 }),
+  projection: OmoMemoryProjectionSchema.default({ max_entries_per_directory: 0, max_bytes: 40960 }),
   compile_warn_tokens: z.number().int().positive().default(30000),
   agents: z.record(z.string(), OmoMemoryAgentOverridesSchema).default({}),
 }).strict()

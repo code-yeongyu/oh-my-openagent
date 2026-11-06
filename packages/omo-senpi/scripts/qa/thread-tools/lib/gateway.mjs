@@ -4,8 +4,10 @@
  * The older scenarios in this directory drive the thread components from source against a senpi
  * SOURCE checkout (`lib/harness.mjs`). These drive the product the way a user runs it:
  *
- * - the engine is the RELEASED senpi from npm (`THREAD_QA_SENPI_VERSION`, default 2026.9.29-5),
- *   installed once into a kit dir (`THREAD_QA_KIT_DIR`, default `/tmp/qa-thread-tools-kit`);
+ * - the engine is the RELEASED senpi from npm (`THREAD_QA_SENPI_VERSION`, REQUIRED: the engine under
+ *   test; unset or empty, importing this module exits 2 naming the engine omo pins, before anything
+ *   is installed or created),
+ *   installed once into a kit dir (`THREAD_QA_KIT_DIR`, default `<QA tmp root>/qa-thread-tools-kit`; the root is `/tmp` on POSIX, the OS temp dir on Windows);
  * - `omo` is this checkout's launcher (`packages/omo-native/bin/omo.js`) over a COPY of this
  *   checkout's built plugin (`packages/omo-senpi/plugin`), so `omo`, `omo --session`, `omo thread`
  *   and `omo daemon adopt` are the real CLI paths;
@@ -27,16 +29,19 @@ import { EventEmitter } from "node:events"
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, watch, writeFileSync } from "node:fs"
 import { createServer } from "node:http"
 import { createConnection } from "node:net"
-import { dirname, join, resolve } from "node:path"
+import { dirname, join, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { withTelemetryOptOut } from "../../telemetry-opt-out-env.mjs"
+import { requireEngineVersion } from "./engine-version.mjs"
+import { QA_TMP_ROOT } from "./qa-tmp.mjs"
+import { sameVersion } from "../../../../../omo-native/bin/lib/same-version.js"
 
 const here = dirname(fileURLToPath(import.meta.url))
 
 export const OMO_ROOT = resolve(here, "..", "..", "..", "..", "..", "..")
-export const ENGINE_VERSION = process.env.THREAD_QA_SENPI_VERSION ?? "2026.9.29-5"
-export const KIT_DIR = process.env.THREAD_QA_KIT_DIR ?? "/tmp/qa-thread-tools-kit"
+export const ENGINE_VERSION = requireEngineVersion()
+export const KIT_DIR = process.env.THREAD_QA_KIT_DIR ?? join(QA_TMP_ROOT, "qa-thread-tools-kit")
 const KIT_DEPENDENCIES = {
   "@code-yeongyu/senpi": ENGINE_VERSION,
   "@babel/parser": "8.0.4",
@@ -228,7 +233,7 @@ export function hasFlag(name) {
 export function evidenceDir(label) {
   const explicit = flag("--evidence-dir")
   const out = flag("--out")
-  const dir = explicit ?? (out === undefined ? join("/tmp", `thread-qa-evidence-${label}-${Date.now()}`) : join(dirname(out), label))
+  const dir = explicit ?? (out === undefined ? join(QA_TMP_ROOT, `thread-qa-evidence-${label}-${Date.now()}`) : join(dirname(out), label))
   mkdirSync(dir, { recursive: true })
   return dir
 }
@@ -321,14 +326,14 @@ function kitDependenciesPresent() {
 
 /** Install the released engine (and the screen emulators) into the kit once; later calls reuse it. */
 export async function ensureKit() {
-  if (installedEngineVersion() !== ENGINE_VERSION || !kitDependenciesPresent()) {
+  if (!sameVersion(installedEngineVersion(), ENGINE_VERSION) || !kitDependenciesPresent()) {
     mkdirSync(KIT_DIR, { recursive: true })
     writeFileSync(join(KIT_DIR, "package.json"), `${JSON.stringify({ name: "qa-thread-tools-kit", private: true, type: "module", dependencies: KIT_DEPENDENCIES }, null, 2)}\n`)
     const installed = await run(process.execPath, ["install"], { cwd: KIT_DIR })
     if (installed.code !== 0) throw new Error(`kit install failed (${installed.code}):\n${installed.stderr.slice(-2000)}`)
   }
   const version = installedEngineVersion()
-  if (version !== ENGINE_VERSION) throw new Error(`kit engine is ${version}, expected ${ENGINE_VERSION}`)
+  if (!sameVersion(version, ENGINE_VERSION)) throw new Error(`kit engine is ${version}, expected ${ENGINE_VERSION}`)
   return { dir: KIT_DIR, engineVersion: version, engineDist: join(KIT_DIR, "node_modules", "@code-yeongyu", "senpi", "dist") }
 }
 
@@ -360,11 +365,11 @@ export const PATCHES = {
     from: /let ([\w$]+)=([\w$]+)\?\.config\.test_hooks\[([\w$]+)\];/,
     to: 'let $1=$2?.config.test_hooks[$3]??("afterDbCommit"===$3?process.env.THREAD_QA_AFTER_DB_COMMIT:void 0);',
   },
-  /** `loop-guard --mutant`: the cycle guard of the store worker answers "no cycle", so the scenario must FAIL. */
-  cycle_check_off: {
+  /** `loop-guard --mutant`: the store worker refuses every chain past hop 2 (a hidden count limit), so the scenario must FAIL. */
+  hop_cap_2: {
     file: "extensions/gateway-store-worker.mjs",
-    from: /([\w$]+\.sender_node,[\w$]+\.target_durable_id\))\?([\w$]+\("loop_detected","The target already leads back to the sender in this causal chain.")/,
-    to: "$1&&false?$2",
+    from: /([\w$]+)\.target_durable_id===\1\.sender_node\)return ([\w$]+)\("loop_detected","A session cannot deliver to itself through the gateway.",\{guard:"self_send"\}\);if\(!([\w$]+)\.new_root\)/,
+    to: '$1.target_durable_id===$1.sender_node||$3.hop>2)return $2("loop_detected","A session cannot deliver to itself through the gateway.",{guard:"self_send"});if(!$3.new_root)',
   },
 }
 
@@ -399,13 +404,13 @@ export async function buildOmoInstall(name, patchNames = []) {
 const PASSTHROUGH_ENV = ["PATH", "USER", "LOGNAME", "SHELL", "LANG", "LC_ALL", "LC_CTYPE"]
 
 /**
- * A hermetic sandbox under `/tmp/qa-thread-tools-<label>-<rand>`: its own HOME and agent dir (never
+ * A hermetic sandbox under `<QA tmp root>/qa-thread-tools-<label>-<rand>`: its own HOME and agent dir (never
  * the real `~/.omo`), a work dir every session of the scenario shares (one workspace), the mock
  * provider pointed at `fake`, the first-run onboarding marked done, and the task shard pre-warm off
  * so no idle task host joins the agent dir. The path stays short so every socket lands inside it.
  */
 export function makeScratch(label, fake) {
-  const dir = mkdtempSync(join("/tmp", `qa-thread-tools-${label}-`))
+  const dir = mkdtempSync(join(QA_TMP_ROOT, `qa-thread-tools-${label}-`))
   sandboxes.add(dir)
   onCleanup(() => rmSync(dir, { recursive: true, force: true }))
   const home = join(dir, "home")
@@ -425,7 +430,7 @@ export function makeScratch(label, fake) {
     HOME: home,
     OMO_CODING_AGENT_DIR: agentDir,
     SENPI_CODING_AGENT_DIR: agentDir,
-    TMPDIR: "/tmp/",
+    TMPDIR: `${QA_TMP_ROOT}${sep}`,
     TERM: "xterm-256color",
     COLORTERM: "truecolor",
     PI_OFFLINE: "1",

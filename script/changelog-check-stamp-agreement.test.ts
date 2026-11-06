@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { readdirSync, readFileSync } from "node:fs"
+import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { assembleRelease } from "./changelog-release-assembly.ts"
 import { unreleasedBody } from "./changelog-fragments.ts"
@@ -43,7 +43,8 @@ describe("the PR check accepts exactly what the release stamp can place", () => 
   })
 
   const fragmentDir = join(ROOT, "changes/unreleased")
-  const realFragments = readdirSync(fragmentDir).filter((name) => /^\d+\.md$/.test(name))
+  // A release-state tree has consumed every fragment and no longer has the directory.
+  const realFragments = existsSync(fragmentDir) ? readdirSync(fragmentDir).filter((name) => /^\d+\.md$/.test(name)) : []
   test.each(realFragments)("the real fragment %s is accepted and placed", (name) => {
     const fragment = readFileSync(join(fragmentDir, name), "utf8")
     expect(checkAccepts(fragment)).toBe(true)

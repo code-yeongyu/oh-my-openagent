@@ -14,6 +14,7 @@ import { figureGates } from "./gates-figures.mjs"
 import { structureGates } from "./gates-structure.mjs"
 import { textGates } from "./gates-text.mjs"
 import { PROSE_TAGS, proseText, selectorPath } from "./html-lite.mjs"
+import { sourcesClaims } from "./sources-citation.mjs"
 
 const CITATION_MARKER = /\[S\d+\]|\[Source\s*\d+\]|\[\uCD9C\uCC98[^\]]*\]|\[\^\d+\]/i
 const ANCHOR_HREF = /^#(?:s|src|source|ref|fn)/i
@@ -63,6 +64,11 @@ function isCitationAnchor(node) {
 /** A citation marker in the element's prose or a citation anchor below it. */
 function hasCitation(node) {
 	return CITATION_MARKER.test(proseText(node)) || descendants(node).some(isCitationAnchor)
+}
+
+function proseScope(scope, owner) {
+	if (scope.section?.kind !== "sources" || !owner || sourcesClaims(owner).length === 0) return scope
+	return { ...scope, section: { ...scope.section, kind: null } }
 }
 
 function toRegExp(pattern) {
@@ -181,7 +187,10 @@ export function checkStatic(doc, options = {}) {
 			continue
 		}
 		gatesRun.push(...gate.codes)
-		defects.push(...gate.run(ctx))
+		const context = gate.codes.includes("unsourced_number")
+			? { ...ctx, elements: ctx.elements.map(({ node, scope }) => ({ node, scope: proseScope(scope, node) })) }
+			: ctx
+		defects.push(...gate.run(context))
 	}
 	return { defects, gatesRun, gatesSkipped }
 }

@@ -89,7 +89,7 @@ describe("a timed-out git (omo #10199 field incident)", () => {
     expect(await failure).toBeInstanceOf(GitTimeoutError)
     const [file] = await readdir(diagnostics)
     const record: { pid: number; argv: string[]; timeoutMs: number; processes: string } = JSON.parse(await readFile(join(diagnostics, file ?? ""), "utf8"))
-    expect(record.argv).toEqual(["add", "-A", "--", "n000.md"])
+    expect(record.argv).toEqual(["-c", "core.fsmonitor=false", "add", "-A", "--", "n000.md"])
     expect(record.timeoutMs).toBe(2_000)
     expect(record.processes).toContain(String(record.pid))
     expect(record.processes).toContain(join(git.bin, "git"))

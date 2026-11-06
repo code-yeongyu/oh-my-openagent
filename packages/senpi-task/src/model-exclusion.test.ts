@@ -18,7 +18,7 @@ function registry(selectors: readonly string[]) {
   }
 }
 
-const CLAUDE_AND_KIMI = registry(["anthropic/claude-fable-5-1", "anthropic/claude-opus-5-5", "kimi-for-coding/k3", "openai/gpt-6.1-sol"])
+const CLAUDE_AND_KIMI = registry(["anthropic/claude-fable-5-1", "anthropic/claude-opus-5-5", "kimi-for-coding/k3.1-pro", "openai/gpt-6.1-sol"])
 const NO_FABLE: OmoConfig = { exclude_models: ["claude-fable-*"] }
 
 function resolvedChain(result: ReturnType<typeof resolveCategory>): readonly string[] {
@@ -32,7 +32,7 @@ describe("exclude_models in the spawn resolvers", () => {
     const result = resolveCategory("artistry", NO_FABLE, CLAUDE_AND_KIMI)
 
     // then
-    expect(resolvedChain(result)).toEqual(["anthropic/claude-opus-5-5", "kimi-for-coding/k3"])
+    expect(resolvedChain(result)).toEqual(["anthropic/claude-opus-5-5", "kimi-for-coding/k3.1-pro"])
   })
 
   test("#given a user pin that is itself excluded #when the category resolves #then the pin is treated like a model with no login", () => {
@@ -49,7 +49,7 @@ describe("exclude_models in the spawn resolvers", () => {
 
     // then
     expect(alone.kind).toBe("model_unavailable")
-    expect(walked).toEqual(["anthropic/claude-opus-5-5", "kimi-for-coding/k3"])
+    expect(walked).toEqual(["anthropic/claude-opus-5-5", "kimi-for-coding/k3.1-pro"])
   })
 
   test("#given a category whose every rung is excluded #when listing available categories #then it is gone", () => {

@@ -118,7 +118,7 @@ Anonymous telemetry uses the same PostHog project as oh-my-openagent but emits t
 | `install` | `install_completed` | `npx lazycodex-ai install` or `--platform=both` finishes (handled by `src/cli/install-codex/install-codex.ts`) |
 | `plugin` | `session_start` | Codex plugin `SessionStart` hook fires (handled by `plugin/components/telemetry/`) |
 
-Both sources share the same SHA256-hashed installation identifier (`sha256("omo-codex:" + hostname)`), suppress PostHog person profiles, and write the daily dedup state to `~/.local/share/omo-codex/posthog-activity.json`.
+Both sources share the same distinct id, `sha256` of a random install id stored in `~/.local/share/omo-codex/install-id`, suppress PostHog person profiles, and write the daily dedup state to `~/.local/share/omo-codex/posthog-activity.json`.
 
 The captured properties are limited to product/runtime metadata, operating-system metadata, coarse machine shape (`cpu_count`, `cpu_model`, `total_memory_gb`), locale/timezone, shell/terminal hints, `source`, `reason`, and `day_utc`. Telemetry does not send prompt contents, chat transcripts, source files, repository contents, file paths, access tokens, API keys, raw hostnames, Git remotes, usernames, email addresses, or runtime error diagnostics.
 

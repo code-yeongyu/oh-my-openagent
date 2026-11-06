@@ -1,9 +1,10 @@
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
 import { execFileSync, spawnSync } from "node:child_process"
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { markerLine, splitFragment } from "./package-log-blocks.ts"
+import { removeTempRoot } from "./remove-temp-root.ts"
 
 // Each case spawns git and bun several times (about 4 s alone), so it gets a budget above bun's 5 s default.
 const SPAWN_TIMEOUT_MS = 30_000
@@ -16,9 +17,17 @@ const commit = (cwd: string, message: string) => { git(cwd, "add", "-A"); git(cw
 const bun = (cwd: string, args: string[], env: Record<string, string> = {}) =>
   spawnSync("bun", args, { cwd, encoding: "utf8", env: { ...ENV, ...env } })
 
+const scratchDirs: string[] = []
+// A timed-out or aborted test never reaches a finally block, and scratch() itself runs git and bun after the
+// mkdtemp, so the directory is registered the moment it exists and removed here on every path (#9766).
+afterEach(() => {
+  for (const dir of scratchDirs.splice(0)) removeTempRoot(dir)
+})
+
 const scratch = () => {
   // A space makes the path differ from its file URL's pathname, as every Windows path does (see changelog-fragments-cli.test.ts).
   const dir = mkdtempSync(join(tmpdir(), "package log commands-"))
+  scratchDirs.push(dir)
   git(dir, "init", "-q", "-b", "dev")
   // A runner's global core.autocrlf=true (windows-latest) would check files out with CRLF; the expectations are bytes.
   git(dir, "config", "core.autocrlf", "false")
@@ -40,71 +49,55 @@ describe("the gate runner's release decision (#10682 review HIGH)", () => {
 
   test("a release/* branch from an ordinary author cannot edit a package log", () => {
     const dir = scratch()
-    try {
-      git(dir, "checkout", "-q", "-b", "release/x")
-      writeFileSync(join(dir, LOG), "# omo-senpi changes\n\n## 2026-10-20 - direct\n\n## 2026-10-01 - old\n")
-      writeFileSync(join(dir, "changes/unreleased/7.md"), "**p** ([#7](u))\n")
-      commit(dir, "direct edit")
-      const result = gate(dir, "release/x", "random-user")
-      expect(result.status).toBe(1)
-      expect(result.stdout).toContain("package logs FAIL")
-    } finally {
-      rmSync(dir, { recursive: true, force: true })
-    }
+    git(dir, "checkout", "-q", "-b", "release/x")
+    writeFileSync(join(dir, LOG), "# omo-senpi changes\n\n## 2026-10-20 - direct\n\n## 2026-10-01 - old\n")
+    writeFileSync(join(dir, "changes/unreleased/7.md"), "**p** ([#7](u))\n")
+    commit(dir, "direct edit")
+    const result = gate(dir, "release/x", "random-user")
+    expect(result.status).toBe(1)
+    expect(result.stdout).toContain("package logs FAIL")
   }, SPAWN_TIMEOUT_MS)
 })
 
 describe("stamp-release-changelog.ts with package-log blocks", () => {
   test("only paragraphs reach CHANGELOG.md; leftover blocks land in their logs; fragments are consumed", () => {
     const dir = scratch()
-    try {
-      writeFileSync(join(dir, "changes/unreleased/8.md"), `**eight** ([#8](u))\n\n${markerLine(LOG)}\n## 2026-10-20 - eight (#8)\n`)
-      writeFileSync(join(dir, "changes/unreleased/9.md"), `${markerLine(LOG)}\n## 2026-10-20 - nine (#9)\n`)
-      const result = bun(dir, ["script/stamp-release-changelog.ts", "9.9.9", "2026-10-20"])
-      expect(result.status).toBe(0)
-      const changelog = readFileSync(join(dir, "CHANGELOG.md"), "utf8")
-      expect(changelog).toContain("**eight**")
-      expect(changelog).not.toContain("changes-log")
-      expect(changelog).not.toContain("nine (#9)")
-      expect(readFileSync(join(dir, LOG), "utf8")).toBe("# omo-senpi changes\n\n## 2026-10-20 - nine (#9)\n\n## 2026-10-20 - eight (#8)\n\n## 2026-10-01 - old\n")
-      expect(git(dir, "status", "--porcelain", "changes/unreleased")).not.toContain("8.md\n?")
-    } finally {
-      rmSync(dir, { recursive: true, force: true })
-    }
+    writeFileSync(join(dir, "changes/unreleased/8.md"), `**eight** ([#8](u))\n\n${markerLine(LOG)}\n## 2026-10-20 - eight (#8)\n`)
+    writeFileSync(join(dir, "changes/unreleased/9.md"), `${markerLine(LOG)}\n## 2026-10-20 - nine (#9)\n`)
+    const result = bun(dir, ["script/stamp-release-changelog.ts", "9.9.9", "2026-10-20"])
+    expect(result.status).toBe(0)
+    const changelog = readFileSync(join(dir, "CHANGELOG.md"), "utf8")
+    expect(changelog).toContain("**eight**")
+    expect(changelog).not.toContain("changes-log")
+    expect(changelog).not.toContain("nine (#9)")
+    expect(readFileSync(join(dir, LOG), "utf8")).toBe("# omo-senpi changes\n\n## 2026-10-20 - nine (#9)\n\n## 2026-10-20 - eight (#8)\n\n## 2026-10-01 - old\n")
+    expect(git(dir, "status", "--porcelain", "changes/unreleased")).not.toContain("8.md\n?")
   }, SPAWN_TIMEOUT_MS)
 
   test("a release whose fragments carry no paragraph is refused and writes nothing", () => {
     const dir = scratch()
-    try {
-      writeFileSync(join(dir, "changes/unreleased/9.md"), `${markerLine(LOG)}\n## 2026-10-20 - nine (#9)\n`)
-      const before = readFileSync(join(dir, LOG), "utf8")
-      const result = bun(dir, ["script/stamp-release-changelog.ts", "9.9.9", "2026-10-20"])
-      expect(result.status).not.toBe(0)
-      expect(readFileSync(join(dir, LOG), "utf8")).toBe(before)
-    } finally {
-      rmSync(dir, { recursive: true, force: true })
-    }
+    writeFileSync(join(dir, "changes/unreleased/9.md"), `${markerLine(LOG)}\n## 2026-10-20 - nine (#9)\n`)
+    const before = readFileSync(join(dir, LOG), "utf8")
+    const result = bun(dir, ["script/stamp-release-changelog.ts", "9.9.9", "2026-10-20"])
+    expect(result.status).not.toBe(0)
+    expect(readFileSync(join(dir, LOG), "utf8")).toBe(before)
   }, SPAWN_TIMEOUT_MS)
 })
 
 describe("changelog-fragments-cli.ts from-diff on package logs", () => {
   test("from-diff converts against the merge base even after dev's log moved (#10682 review MEDIUM 2)", () => {
     const dir = scratch()
-    try {
-      git(dir, "checkout", "-q", "-b", "feat")
-      writeFileSync(join(dir, LOG), "# omo-senpi changes\n\n## 2026-10-20 - mine (#12)\n\n## 2026-10-01 - old\n")
-      commit(dir, "old-style edit")
-      git(dir, "checkout", "-q", "dev")
-      writeFileSync(join(dir, LOG), "# omo-senpi changes\n\n## 2026-10-19 - compiled on dev\n\n## 2026-10-01 - old\n")
-      commit(dir, "dev moved")
-      git(dir, "checkout", "-q", "feat")
-      const result = bun(dir, ["script/changelog-fragments-cli.ts", "from-diff", "--base", "dev", "--pr", "12"])
-      expect(result.status).toBe(0)
-      expect(splitFragment(readFileSync(join(dir, "changes/unreleased/12.md"), "utf8")).blocks).toEqual([{ log: LOG, body: "## 2026-10-20 - mine (#12)" }])
-      expect(readFileSync(join(dir, LOG), "utf8")).toBe("# omo-senpi changes\n\n## 2026-10-01 - old\n")
-    } finally {
-      rmSync(dir, { recursive: true, force: true })
-    }
+    git(dir, "checkout", "-q", "-b", "feat")
+    writeFileSync(join(dir, LOG), "# omo-senpi changes\n\n## 2026-10-20 - mine (#12)\n\n## 2026-10-01 - old\n")
+    commit(dir, "old-style edit")
+    git(dir, "checkout", "-q", "dev")
+    writeFileSync(join(dir, LOG), "# omo-senpi changes\n\n## 2026-10-19 - compiled on dev\n\n## 2026-10-01 - old\n")
+    commit(dir, "dev moved")
+    git(dir, "checkout", "-q", "feat")
+    const result = bun(dir, ["script/changelog-fragments-cli.ts", "from-diff", "--base", "dev", "--pr", "12"])
+    expect(result.status).toBe(0)
+    expect(splitFragment(readFileSync(join(dir, "changes/unreleased/12.md"), "utf8")).blocks).toEqual([{ log: LOG, body: "## 2026-10-20 - mine (#12)" }])
+    expect(readFileSync(join(dir, LOG), "utf8")).toBe("# omo-senpi changes\n\n## 2026-10-01 - old\n")
   }, SPAWN_TIMEOUT_MS)
 })
 

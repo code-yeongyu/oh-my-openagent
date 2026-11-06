@@ -1,14 +1,13 @@
 // outcome.mjs - the per-run outcome manifest (`outcome.json`) and the closing briefing. Manifest functions are pure (they return a new manifest).
 // The briefing reads only the manifest, the sources-ledger text, and an injected `now`. node: builtins only.
-
 import * as nodeFs from "node:fs"
 import { basename, dirname, join } from "node:path"
 
 import { DELIVERABLE_FORMATS, DELIVERABLE_STATUSES, GATE_NAMES, GATE_STATUSES, LANES, MANIFEST_CODES, normalizeManifest, SCHEMA_VERSION, validateOutcomeManifest } from "./contracts.mjs"
+import { runStart } from "./outcome-start.mjs"
 
 export const MANIFEST_FILENAME = "outcome.json"
 const MISSING = MANIFEST_CODES[0]
-const SESSION_STAMP = /^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})$/
 const SOURCE_LINE = /^\[(S|Source )\d+\]/
 const URL_PATTERN = /https?:\/\/[^\s)<>\]"'`]+/g
 const DRAFT_MARKER = "STATUS: draft"
@@ -33,26 +32,20 @@ function assertOneOf(code, label, value, allowed) {
 
 const clone = (manifest) => structuredClone(manifest)
 const isMissing = (error) => error?.code === "ENOENT" || error?.code === "ENOTDIR"
-
 function stamp(now) {
 	return (now ?? new Date()).toISOString()
 }
-
-/** Local wall-clock start time from a `YYYYMMDD-HHMMSS` session dir basename. */
-export function parseSessionStart(sessionDir) {
-	const match = SESSION_STAMP.exec(basename(sessionDir))
-	if (!match) throw new OutcomeError("invalid_session_dir", `session dir basename must be YYYYMMDD-HHMMSS: ${sessionDir}`)
-	const [y, mo, d, h, mi, s] = match.slice(1).map(Number)
-	const date = new Date(y, mo - 1, d, h, mi, s)
-	if (date.getMonth() !== mo - 1 || date.getDate() !== d || date.getHours() !== h) {
-		throw new OutcomeError("invalid_session_dir", `session dir basename is not a real local time: ${sessionDir}`)
+/** The run clock outcome init records (outcome-start.mjs owns the contract). */
+export function parseSessionStart(sessionDir, { startedAt, now } = {}) {
+	const fail = (message) => {
+		throw new OutcomeError("invalid_session_dir", message)
 	}
-	return date
+	return runStart({ sessionDir, startedAt, now, validManifest: (data) => validateOutcomeManifest(normalizeManifest(data)).ok, fail })
 }
 
-/** @param {{ sessionDir: string, promised: string[], lane: string|null, interview?: object|null, now?: Date }} input */
-export function initManifest({ sessionDir, promised, lane, interview = null, now }) {
-	const startedAt = parseSessionStart(sessionDir).toISOString()
+/** @param {{ sessionDir: string, promised: string[], lane: string|null, interview?: object|null, now?: Date, startedAt?: string }} input */
+export function initManifest({ sessionDir, promised, lane, interview = null, now, startedAt: recorded }) {
+	const startedAt = parseSessionStart(sessionDir, { startedAt: recorded, now }).toISOString()
 	if (lane !== null && lane !== undefined) assertOneOf("unknown_lane", "lane", lane, LANES)
 	const formats = [...new Set(promised)]
 	for (const format of formats) assertOneOf("unknown_format", "deliverable format", format, DELIVERABLE_FORMATS)
@@ -74,9 +67,7 @@ export function initManifest({ sessionDir, promised, lane, interview = null, now
 	}
 }
 
-/**
- * Set one format's row; every other row is kept as is. An unpromised format gets a new
- * row with promised=false. The row's detail fields are replaced by the ones given.
+/** Set one format's row, keeping other rows. New formats have promised=false.
  * @param {{ path?: string, reason?: string, pages?: number, bytes?: number, now?: Date }} [detail]
  */
 export function setDeliverable(manifest, format, status, detail = {}) {
@@ -143,9 +134,7 @@ export function verifyManifest(manifest, fs = nodeFs) {
 	return { ok: problems.length === 0, problems }
 }
 
-/**
- * none = missing or empty file; partial = `STATUS: draft` in the first 5 lines, or the
- * manifest (given, else a sibling outcome.json) still has a pending row; else complete.
+/** Missing/empty = none; draft marker or pending manifest = partial; else complete.
  * @returns {"none"|"partial"|"complete"}
  */
 export function deliverableState(deliverablePath, manifestOrNull) {

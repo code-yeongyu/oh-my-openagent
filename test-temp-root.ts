@@ -1,5 +1,6 @@
 /// <reference types="bun-types" />
-import { mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs"
+import { type ChildProcess, spawn } from "node:child_process"
+import { mkdtempSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { basename, join } from "node:path"
 import { removeTestRootBestEffort, skippedTestRoots } from "./test-support/held-test-root.mjs"
@@ -18,6 +19,8 @@ import { isOsCreatedTempEntry, reportOnlyOwner as ownerIn } from "./test-temp-le
 //   printed instead of failing, and that list may only shrink (script/check-temp-leak-report-only.mjs).
 const RUN_ROOT_PREFIX = "omo-test-run-"
 const OWNER_PID_FILE = ".owner-pid"
+// A run root renamed aside for a detached remover; it keeps the prefix, so the abandoned-root sweep still finds it.
+const ASIDE_SUFFIX = ".removing"
 
 function ownerIsAlive(pid: number): boolean {
   try {
@@ -52,12 +55,16 @@ function isAbandoned(root: string): boolean {
 export function removeAbandonedRunRoots(
   osTempDir: string,
   removeRoot?: (root: string) => void,
+  spawnRemover?: (path: string) => ChildProcess,
 ): void {
   for (const entry of readdirSync(osTempDir)) {
     if (!entry.startsWith(RUN_ROOT_PREFIX)) continue
     const root = join(osTempDir, entry)
     if (!isAbandoned(root)) continue
-    removeTestRootBestEffort(root, removeRoot ? { remove: removeRoot } : {})
+    // Without an injected remover the sweep is as non-blocking as the run's own teardown: an abandoned root
+    // can be as large as a live one, and a remover still deleting one is simply joined by a second.
+    if (removeRoot) removeTestRootBestEffort(root, { remove: removeRoot })
+    else removeRunRootAside(root, spawnRemover)
   }
 }
 
@@ -89,12 +96,18 @@ function leftoverEntries(): string[] {
   try {
     return readdirSync(runRoot)
       .filter((entry) => !infrastructureEntries.has(entry) && !isOsCreatedTempEntry(entry)
-        && !skippedTestRoots.has(join(runRoot, entry)))
+        && !skippedTestRoots.has(join(runRoot, entry)) && !isRootBeingRemoved(entry))
       .sort()
   } catch (error) {
     if (error instanceof Error && "code" in error && error.code === "ENOENT") return []
     throw error
   }
+}
+
+// A nested test run (a test that starts `bun test`) puts its own run root in this one and renames it aside
+// at its end; its detached remover may still be deleting it here, and this root's removal takes it anyway.
+function isRootBeingRemoved(entry: string): boolean {
+  return entry.startsWith(RUN_ROOT_PREFIX) && entry.endsWith(ASIDE_SUFFIX)
 }
 
 function reportOnlyOwner(entry: string): string | undefined {
@@ -111,6 +124,43 @@ function reportKnownLeaks(entries: readonly string[]): void {
   console.warn(`Known temp leaks, report-only until their owners are fixed (#9766):\n${lines.join("\n")}`)
 }
 
+/**
+ * Removes a run root without holding the caller for as long as the tree takes to delete (#11630).
+ *
+ * The root collects everything the run's processes wrote under the OS temp dir, child bun caches included,
+ * and a synchronous recursive remove of a large one overran the end-of-run hook budget (43 s for 1.2 GB on a
+ * loaded machine) as an unnamed hook failure. The root is renamed aside in one step, which empties its path
+ * at once, and a detached `rm` deletes the renamed tree after this process has gone. The aside name keeps
+ * the run-root prefix and the owner pid file, so a remover that dies is swept by the next run like any
+ * abandoned root. Only this run's own root is touched; nothing else in the OS temp dir is read or removed.
+ *
+ * Windows, or a root that cannot be renamed (a held handle), keeps the synchronous best-effort removal.
+ */
+export function removeRunRootAside(
+  root: string,
+  spawnRemover: (path: string) => ChildProcess = spawnDetachedRemover,
+): ChildProcess | undefined {
+  if (process.platform === "win32") {
+    removeTestRootBestEffort(root)
+    return undefined
+  }
+  if (root.endsWith(ASIDE_SUFFIX)) return spawnRemover(root)
+  const aside = `${root}${ASIDE_SUFFIX}`
+  try {
+    renameSync(root, aside)
+  } catch {
+    removeTestRootBestEffort(root)
+    return undefined
+  }
+  return spawnRemover(aside)
+}
+
+function spawnDetachedRemover(path: string): ChildProcess {
+  const remover = spawn("/bin/rm", ["-rf", path], { detached: true, stdio: "ignore" })
+  remover.unref()
+  return remover
+}
+
 // A recorded held child directory can also keep its containing run root locked.
 // Keep that removal best-effort too; neither record establishes why the handle remains open.
 function removeRunRoot(): void {
@@ -119,7 +169,7 @@ function removeRunRoot(): void {
     if (value === undefined) delete process.env[name]
     else process.env[name] = value
   }
-  removeTestRootBestEffort(runRoot)
+  removeRunRootAside(runRoot)
 }
 
 /**

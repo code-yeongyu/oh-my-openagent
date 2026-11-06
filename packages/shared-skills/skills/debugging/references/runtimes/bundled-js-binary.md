@@ -41,7 +41,7 @@ Step 3 is the unlock — once you have plaintext source on disk, the rest is nor
 
 ```bash
 # Look for runtime-specific markers in plaintext strings
-strings -n 12 ./target 2>/dev/null | rg -iE 'bun|node_modules|webpack|esbuild|deno|pkg/lib|electron|pyinstaller|nexe|NODE_SEA_FUSE|NODE_SEA_BLOB|tauri|ESZIP_V2|denort' | head -20
+strings -n 12 ./target 2>/dev/null | rg -i 'bun|node_modules|webpack|esbuild|deno|pkg/lib|electron|pyinstaller|nexe|NODE_SEA_FUSE|NODE_SEA_BLOB|tauri|ESZIP_V2|denort' | head -20
 ```
 
 | Marker pattern | Bundler | Source format |

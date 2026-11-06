@@ -72,7 +72,7 @@ export function BentoCell({
       id={id}
       data-active={active ? "true" : undefined}
       className={cn(
-        "group bg-ink-1 hover:bg-ink-2 data-[active=true]:bg-accent-8 ease-standard relative flex min-h-44 flex-col gap-3 p-6 transition-colors duration-[var(--dur-micro)] focus-within:shadow-[inset_0_0_0_1px_var(--accent-32)] data-[active=true]:shadow-[inset_0_0_0_1px_var(--accent-32)]",
+        "group bg-ink-1 hover:bg-ink-2 data-[active=true]:bg-accent-8 ease-standard relative flex min-h-44 flex-col gap-3 p-6 transition-colors duration-[var(--dur-micro)] focus-within:shadow-[inset_0_0_0_1px_var(--ring)] data-[active=true]:shadow-[inset_0_0_0_1px_var(--accent)]",
         COL_SPAN[colSpan],
         ROW_SPAN[rowSpan],
         className,

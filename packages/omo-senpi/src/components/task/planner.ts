@@ -1,7 +1,8 @@
-import { isExcludedModel, type OmoConfig } from "@oh-my-opencode/omo-config-core"
+import { createModelDistributor, isExcludedModel, type ModelDistributor, type OmoConfig } from "@oh-my-opencode/omo-config-core"
 
 import { inheritParentFastMode, type ResolveParentServiceTier } from "./fast-mode-inheritance"
 import { NO_REGISTRY_MESSAGE, resolveExplicitPin, type ResolveDefaultRoute } from "./planner-explicit-pin"
+import { agentModelFailureText, categoryModelFailureText } from "./model-error-text"
 import {
   resolveAgent,
   resolveCategory,
@@ -47,10 +48,11 @@ export function createTaskChildPlanner(
   resolveParentServiceTier: ResolveParentServiceTier = () => undefined,
   resolveDefaultRoute?: ResolveDefaultRoute,
 ): ChildPlanner {
+  const distributeModels = createModelDistributor()
   const availableAgents = listAvailableAgents(agents)
   const planChild = (spec: Parameters<ChildPlanner>[0]): PlanResolution => {
     if (spec.subagent_type !== undefined) {
-      const agentResolution = resolveAgentTarget(spec.subagent_type, spec.model, agents, resolveRegistry, omoConfig, resolveDefaultRoute)
+      const agentResolution = resolveAgentTarget(spec.subagent_type, spec.model, agents, resolveRegistry, omoConfig, distributeModels, resolveDefaultRoute)
       return agentResolution ?? unresolvableAgentTarget(spec.subagent_type, availableAgents, resolveRegistry, omoConfig)
     }
 
@@ -80,8 +82,19 @@ export function createTaskChildPlanner(
       }
     }
 
-    const resolution = resolveCategory(categoryName, omoConfig, registry)
-    return toPlanResolution(categoryName, resolution, availableAgents)
+    const resolution = resolveCategory(categoryName, omoConfig, registry, { distributeModels })
+    const plan = toPlanResolution(categoryName, resolution, availableAgents)
+    // Q's standing model rule: a chain ends in a typed failure that names each model, so the parent
+    // reads the whole chain and the fix instead of retrying a dead binding. No substitution happens.
+    if (plan.kind === "error" && plan.error.code === "model_unavailable") {
+      const message = categoryModelFailureText(
+        plan.error,
+        omoConfig,
+        resolution.kind === "model_unavailable" ? resolution.category : undefined,
+      )
+      if (message !== undefined) return { kind: "error", error: { ...plan.error, message } }
+    }
+    return plan
   }
   return (spec): PlanResolution => {
     const resolution = planChild(spec)
@@ -101,6 +114,7 @@ function resolveAgentTarget(
   agents: Readonly<Record<string, AgentDefinition>>,
   resolveRegistry: ResolveModelRegistry,
   omoConfig: OmoConfig,
+  distributeModels: ModelDistributor,
   resolveDefaultRoute?: ResolveDefaultRoute,
 ): PlanResolution | undefined {
   if (explicitModel !== undefined && explicitModel.length > 0) {
@@ -112,7 +126,7 @@ function resolveAgentTarget(
   }
 
   const registry = resolveRegistry()
-  const resolution = resolveAgent(agentName, agents, registry, { omoConfig })
+  const resolution = resolveAgent(agentName, agents, registry, { omoConfig, distributeModels })
   if (resolution.kind === "resolved") {
     return { kind: "resolved", plan: toAgentPlan(resolution, undefined) }
   }
@@ -124,8 +138,10 @@ function resolveAgentTarget(
       kind: "error",
       error: {
         code: "model_unavailable",
-        message: `No available model for agent "${agentName}" (attempted ${resolution.attemptedModel ?? "none"}).`,
+        message: agentModelFailureText(agentName, resolution, agents),
         availableAgents: resolution.availableAgents,
+        ...(resolution.attempted_chain !== undefined && { attempted_chain: resolution.attempted_chain }),
+        ...(resolution.missing_providers !== undefined && { missing_providers: resolution.missing_providers }),
       },
     }
   }

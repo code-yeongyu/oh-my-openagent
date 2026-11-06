@@ -1,6 +1,6 @@
 import { getDailyActiveCaptureState } from "./activity-state"
 import { createTelemetryClient, isTelemetryClientEnabled } from "./injected-client"
-import { getTelemetryDistinctId } from "./machine-id"
+import { getTelemetryInstallDistinctId } from "./install-id"
 import type {
   TelemetryDiagnosticInput,
   TelemetryEnv,
@@ -53,7 +53,7 @@ export async function recordDailyActive(input: RecordDailyActiveInput): Promise<
 
   client.trackActive({
     dayUTC: activityState.dayUTC,
-    distinctId: getTelemetryDistinctId(input.product.machineIdPrefix, osProvider),
+    distinctId: getTelemetryInstallDistinctId(input.stateDir),
     reason: input.reason,
   })
   try {

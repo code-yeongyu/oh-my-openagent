@@ -173,7 +173,7 @@ describe("fact polish-apply prints every rejection reason verbatim", () => {
 })
 
 describe("--changed-since stays fail-closed", () => {
-	const { pairsChangedSince } = polishCommand as unknown as { pairsChangedSince: (pairs: unknown[], mapPath: string, ledger: unknown, claims: unknown) => unknown[] }
+	const { pairsChangedSince } = polishCommand as unknown as { pairsChangedSince: (pairs: unknown[], mapPath: string, ledger: unknown, claims: unknown) => unknown }
 	const artifact = file("pre-polish.html", doc("<p>The span is 320 m [S1].</p>"))
 
 	test("#given a fill map without artifact_sha256 #when --changed-since reads it #then it refuses", () => {
@@ -181,9 +181,10 @@ describe("--changed-since stays fail-closed", () => {
 		expect(outcome(() => pairsChangedSince([], mapPath, LEDGER, null))).toContain("fill map has no artifact_sha256")
 	})
 
-	test("#given a fill map whose artifact changed since fill #when read #then it still refuses", () => {
+	test("#given a fill map whose artifact changed since fill #when read #then nothing is filtered out: every pair is re-checked", () => {
 		const mapPath = file("fill-map-stale.json", JSON.stringify({ artifact, artifact_sha256: "0".repeat(64), format: "html", entries: [] }))
-		expect(outcome(() => pairsChangedSince([], mapPath, LEDGER, null))).toContain("changed after fill")
+		const pairs = [{ kind: "quote", sentence_key: "s1", claim_id: null, sentence: "The span is 320 m [S1]." }]
+		expect(pairsChangedSince(pairs, mapPath, LEDGER, null)).toEqual({ pairs, fill_map: mapPath, narrowed: false })
 	})
 })
 

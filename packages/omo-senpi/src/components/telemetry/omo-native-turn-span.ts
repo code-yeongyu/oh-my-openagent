@@ -7,7 +7,9 @@ import {
   type TurnTracing,
 } from "@oh-my-opencode/telemetry-core"
 
+import { pinnedModelId } from "./pinned-model-ids"
 import { maskProviderAndModel } from "./product-identity"
+import type { TelemetrySessionRole } from "./session-role"
 
 /**
  * The `gen_ai.provider.name` well-known values for our provider ids (D-P VALUE table); an id with no
@@ -28,7 +30,7 @@ export type OmoNativeTurnSpansOptions = {
   readonly isConsented: () => boolean
   /** The fresh send-time consent read, taken at the moment a span would end and so be exported. */
   readonly isSendAllowed: () => boolean
-  readonly sessionRole: string
+  readonly sessionRole: TelemetrySessionRole
   readonly inheritedTraceparent: string | undefined
 }
 
@@ -56,7 +58,7 @@ function modelAttributes(model: TurnModel): TurnSpanAttributes {
   return {
     "gen_ai.provider.name": GEN_AI_PROVIDER_NAMES[masked.provider] ?? masked.provider,
     "omo.provider": masked.provider,
-    "omo.model_id": masked.model_id,
+    "omo.model_id": pinnedModelId(masked.model_id),
   }
 }
 
@@ -96,7 +98,7 @@ export function createOmoNativeTurnSpans(options: OmoNativeTurnSpansOptions): Om
           "omo.turn.index": input.turnIndex,
           ...(input.model === undefined ? {} : {
             ...modelAttributes(input.model),
-            "gen_ai.request.model": maskProviderAndModel(input.model.provider, input.model.modelId).model_id,
+            "gen_ai.request.model": pinnedModelId(maskProviderAndModel(input.model.provider, input.model.modelId).model_id),
           }),
         },
         ...(parent === undefined ? {} : { parentTraceparent: parent }),
@@ -114,8 +116,8 @@ export function createOmoNativeTurnSpans(options: OmoNativeTurnSpansOptions): Om
       if (input.response !== undefined) {
         open.handle.setAttributes({
           ...modelAttributes(input.response),
-          ...(open.requestModelSet ? {} : { "gen_ai.request.model": maskProviderAndModel(input.response.provider, input.response.modelId).model_id }),
-          "gen_ai.response.model": maskProviderAndModel(input.response.provider, input.responseModelId ?? input.response.modelId).model_id,
+          ...(open.requestModelSet ? {} : { "gen_ai.request.model": pinnedModelId(maskProviderAndModel(input.response.provider, input.response.modelId).model_id) }),
+          "gen_ai.response.model": pinnedModelId(maskProviderAndModel(input.response.provider, input.responseModelId ?? input.response.modelId).model_id),
         })
       }
       close(input.failed ? "error" : "ok")

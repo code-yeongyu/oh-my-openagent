@@ -1,12 +1,16 @@
 import { Command } from "commander"
 import { isCancel, select, confirm } from "@clack/prompts"
+import { serviceAccountsOpen } from "./accounts-gate"
 import { openSignInBrowser } from "./browser"
 import { deviceName, devicePlatform } from "./device-name"
 import { loginDevice } from "./device-flow"
 import { createCredentialStore, INTERACTIVE_READ_WAIT } from "./keystore"
 import { BrowserUnavailable, loginLoopback } from "./loopback"
 import { type ChooseDevice, type ListedDevice, RequestFailure, serviceOrigin, SignInError } from "./protocol"
+import { resolveMemoryRoot, syncPinDir } from "@oh-my-opencode/memory-core/sync-device-retire"
+
 import { createSession, type Session } from "./session"
+import { retireSyncPinOnDiscard } from "./sync-pin-retire"
 import { terminalText } from "./terminal-text"
 
 // Probe the service before anything user-visible (a browser tab, a device code) so an
@@ -61,7 +65,10 @@ async function run(action: "login" | "logout" | "whoami", options: Options): Pro
   try {
     const api = serviceOrigin(options.api ?? process.env.OMO_SERVICE_API_URL ?? "https://api.omo.dev")
     const store = createCredentialStore(api, { wait: INTERACTIVE_READ_WAIT })
-    const session = createSession({ api, store, signal: controller.signal })
+    const session = createSession({
+      api, store, signal: controller.signal,
+      beforeKeysDiscarded: retireSyncPinOnDiscard({ pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())), log: (line) => console.error(line) }),
+    })
     if (action === "logout") {
       const revoked = await session.logout()
       console.log("Signed out of OmO. Stored credentials and device keys were removed.")
@@ -100,7 +107,7 @@ async function run(action: "login" | "logout" | "whoami", options: Options): Pro
     console.log("Signed in to OmO.")
   } catch (error) {
     console.error(controller.signal.aborted ? "Sign-in cancelled."
-      : error instanceof SignInError ? error.message : "Unable to complete OmO sign-in. Check the OS credential store and try again.")
+      : error instanceof SignInError ? error.message : "OmO sign-in stopped on an unexpected error. Run the command again, and report it with /bug if it keeps failing.")
     process.exitCode = 1
   } finally {
     process.removeListener("SIGINT", cancel)
@@ -108,20 +115,12 @@ async function run(action: "login" | "logout" | "whoami", options: Options): Pro
   }
 }
 
-/** The one switch for OmO service accounts (#10262): set to true when accounts open to everyone. */
-export const SERVICE_ACCOUNTS_OPEN: boolean = false
+export { SERVICE_ACCOUNTS_OPEN } from "./accounts-gate"
 
-export const SERVICE_ACCOUNTS_CLOSED_MESSAGE = "OmO accounts aren't available yet."
+export const SERVICE_ACCOUNTS_CLOSED_MESSAGE =
+  "Signing in from the terminal isn't available yet. Sign in from the OmO desktop app on this computer; omo uses that sign-in."
 
 const SERVICE_AUTH_COMMANDS = ["login", "logout", "whoami"] as const
-
-// The sign-in suites exercise the real flow through the launcher; their in-process preload opens
-// the commands here, which nothing a user can set (no env var, flag or config) reaches.
-const testOpenKey = Symbol.for("omo.test.serviceAccountsOpen")
-
-function serviceAccountsOpen(): boolean {
-  return SERVICE_ACCOUNTS_OPEN || (globalThis as Record<symbol, unknown>)[testOpenKey] === true
-}
 
 function refuseClosedServiceAuth(): never {
   console.error(SERVICE_ACCOUNTS_CLOSED_MESSAGE)
@@ -130,6 +129,10 @@ function refuseClosedServiceAuth(): never {
 
 function configureClosedServiceAuthCommands(program: Command): void {
   for (const name of SERVICE_AUTH_COMMANDS) {
+    if (name === "login") {
+      configureClosedDeviceLogin(program)
+      continue
+    }
     const command = program.command(name, { hidden: true }).helpOption(false).allowUnknownOption().allowExcessArguments()
       .action(() => {
         console.error(SERVICE_ACCOUNTS_CLOSED_MESSAGE)
@@ -138,6 +141,23 @@ function configureClosedServiceAuthCommands(program: Command): void {
     // `omo help <name>` calls the subcommand's help() directly, bypassing its action.
     command.help = refuseClosedServiceAuth
   }
+}
+
+// While accounts are closed, the one terminal sign-in is the device code, for a computer with no browser or desktop app
+// (#12639). The approval page keeps the service's own access policy, so this admits nobody the service does not admit.
+// Every other closed argv (plain login, --accounts, a stray option or argument) refuses exactly as before.
+function configureClosedDeviceLogin(program: Command): void {
+  const command = program.command("login", { hidden: true }).helpOption(false).allowUnknownOption().allowExcessArguments()
+    .option("--device").option("--no-browser").option("--api <url>")
+    .action((options: Options) => {
+      if ((options.device !== true && options.browser !== false) || command.args.length > 0) {
+        console.error(SERVICE_ACCOUNTS_CLOSED_MESSAGE)
+        process.exitCode = 1
+        return
+      }
+      return run("login", { ...options, device: true })
+    })
+  command.help = refuseClosedServiceAuth
 }
 
 export function configureServiceAuthCommands(program: Command, open = serviceAccountsOpen()): void {

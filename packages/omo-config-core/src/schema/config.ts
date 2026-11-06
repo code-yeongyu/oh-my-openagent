@@ -7,11 +7,13 @@ import { OmoGitMasterSettingsLayerSchema, OmoGitMasterSettingsSchema } from "./g
 import { OmoHarnessIdSchema, type OmoHarnessId } from "./harness"
 import { OmoMemorySettingsLayerSchema, OmoMemorySettingsSchema } from "./memory"
 import { OmoModelCatalogLayerSchema, OmoModelCatalogSchema } from "./model-catalog"
+import { OmoModelPadSchema } from "./model-pad"
 import { OmoModelProfilesLayerSchema, OmoModelProfilesSchema } from "./model-profile"
 import { OmoSidePanelSettingsLayerSchema, OmoSidePanelSettingsSchema } from "./side-panel"
 import { OmoTaskSettingsLayerSchema, OmoTaskSettingsSchema } from "./task"
 import { OmoTeamsConfigLayerSchema, OmoTeamsConfigSchema } from "./team"
 import { OmoTelemetrySettingsLayerSchema, OmoTelemetrySettingsSchema } from "./telemetry"
+import { OmoDeviceServiceSettingsLayerSchema, OmoDeviceServiceSettingsSchema } from "./device-service"
 import { OmoFormatOnMutationLayerSchema, OmoFormatOnMutationSchema } from "./format-on-mutation"
 import { OmoProvenanceSettingsSchema } from "./provenance"
 
@@ -44,8 +46,10 @@ export const OmoTypedHarnessConfigSchema = z.object({
   models: OmoModelCatalogLayerSchema.optional(),
   model_profiles: OmoModelProfilesLayerSchema.optional(),
   model_profile: z.string().optional(),
+  model_pad: OmoModelPadSchema.optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+  device_service: OmoDeviceServiceSettingsLayerSchema.optional(),
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),
   computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
@@ -63,8 +67,10 @@ export const OmoConfigProfileSchema = z.object({
   models: OmoModelCatalogLayerSchema.optional(),
   model_profiles: OmoModelProfilesLayerSchema.optional(),
   model_profile: z.string().optional(),
+  model_pad: OmoModelPadSchema.optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+  device_service: OmoDeviceServiceSettingsLayerSchema.optional(),
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),
   computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
@@ -87,8 +93,10 @@ export const OmoConfigSchema = z.object({
   models: OmoModelCatalogSchema.optional(),
   model_profiles: OmoModelProfilesSchema.optional(),
   model_profile: z.string().optional(),
+  model_pad: OmoModelPadSchema.optional(),
   memory: OmoMemorySettingsSchema.optional(),
   telemetry: OmoTelemetrySettingsSchema.optional(),
+  device_service: OmoDeviceServiceSettingsSchema.optional(),
   side_panel: OmoSidePanelSettingsSchema.optional(),
   computer: OmoComputerSettingsSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
@@ -114,8 +122,10 @@ export const OmoConfigLayerSchema = z.object({
   models: OmoModelCatalogLayerSchema.optional(),
   model_profiles: OmoModelProfilesLayerSchema.optional(),
   model_profile: z.string().optional(),
+  model_pad: OmoModelPadSchema.optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+  device_service: OmoDeviceServiceSettingsLayerSchema.optional(),
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),
   computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),

@@ -7,7 +7,7 @@ import { describeModelChains, type ModelChainEntry } from "./index"
 const SELECTORS = [
   "anthropic/claude-fable-5-1",
   "anthropic/claude-opus-5-5",
-  "kimi-for-coding/k3",
+  "kimi-for-coding/k3.1-pro",
   "kimi-for-coding/kimi-for-coding-highspeed",
 ]
 const MODELS = SELECTORS.map((selector) => ({ provider: selector.slice(0, selector.indexOf("/")), id: selector.slice(selector.indexOf("/") + 1) }))
@@ -33,11 +33,11 @@ describe("describeModelChains", () => {
       name: "artistry",
       status: "resolved",
       primary: "anthropic/claude-fable-5-1",
-      runtime: ["anthropic/claude-fable-5-1", "anthropic/claude-opus-5-5", "kimi-for-coding/k3"],
+      runtime: ["anthropic/claude-fable-5-1", "anthropic/claude-opus-5-5", "kimi-for-coding/k3.1-pro"],
       rungs: [
         { model: "anthropic/claude-fable-5-1", source: "built-in", state: "primary" },
         { model: "anthropic/claude-opus-5-5", source: "built-in", state: "fallback" },
-        { model: "kimi-for-coding/k3", source: "built-in", state: "fallback" },
+        { model: "kimi-for-coding/k3.1-pro", source: "built-in", state: "fallback" },
       ],
     })
   })
@@ -50,11 +50,11 @@ describe("describeModelChains", () => {
     const artistry = entry(config, "categories", "artistry")
 
     // then
-    expect(artistry.runtime).toEqual(["anthropic/claude-opus-5-5", "kimi-for-coding/k3"])
+    expect(artistry.runtime).toEqual(["anthropic/claude-opus-5-5", "kimi-for-coding/k3.1-pro"])
     expect(artistry.rungs).toEqual([
       { model: "anthropic/claude-opus-5-5", source: "omo.json", state: "primary" },
       { model: "anthropic/claude-fable-5-1", source: "built-in", state: "not-reached" },
-      { model: "kimi-for-coding/k3", source: "built-in", state: "fallback" },
+      { model: "kimi-for-coding/k3.1-pro", source: "built-in", state: "fallback" },
     ])
   })
 

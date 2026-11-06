@@ -2,6 +2,7 @@ import { basename, dirname, isAbsolute, join } from "node:path"
 import { describe, expect, test } from "bun:test"
 import type { RpcSpawnSpec } from "../rpc/spawn"
 import { buildChildContext, resolveChildSessionPath } from "./session-context"
+import { WORKPOOL_STATE_DIR_ENV, WORKPOOL_TASK_ID_ENV } from "../../team/member-extension/identity"
 
 describe("buildChildContext", () => {
   const baseSpec: RpcSpawnSpec = {
@@ -83,6 +84,25 @@ describe("buildChildContext", () => {
     expect(actualKeys).toEqual(expectedMemberKeys)
   })
 
+  test("#given a workpool process launch #when building context #then its worker identity is session scoped", () => {
+    const workpoolStateDir = "/tmp/workpool-state"
+    const result = buildChildContext({
+      ...baseSpec,
+      memberEnv: {
+        [WORKPOOL_STATE_DIR_ENV]: workpoolStateDir,
+        [WORKPOOL_TASK_ID_ENV]: baseSpec.task_id,
+      },
+    })
+
+    expect(result.context).toEqual({
+      role: "member",
+      task_id: baseSpec.task_id,
+      state_dir: baseSpec.state_dir,
+      workpool_state_dir: workpoolStateDir,
+      workpool_task_id: baseSpec.task_id,
+    })
+  })
+
   test("#given a plain child spec #when building context #then the exact documented key set is present (no extras)", () => {
     // when
     const result = buildChildContext(baseSpec)
@@ -120,6 +140,13 @@ describe("buildChildContext", () => {
     const specs = [
       baseSpec,
       { ...baseSpec, treeKey: "6d410ba846ba1550", shardKey: "6d410ba846ba1550" },
+      {
+        ...baseSpec,
+        memberEnv: {
+          [WORKPOOL_STATE_DIR_ENV]: baseSpec.state_dir,
+          [WORKPOOL_TASK_ID_ENV]: baseSpec.task_id,
+        },
+      },
       {
         ...baseSpec,
         memberEnv: {

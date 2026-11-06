@@ -15,7 +15,8 @@ import {
 	TEST_TIMEOUT_MS,
 	TWO_DISPLAYS,
 } from "./support/engine";
-import { declaredErrorCodes, ERROR_CODE_CASES, INPUT_CALLS, WIRE_EXEMPT_CODES, WINDOW } from "./support/error-code-cases";
+import { declaredErrorCodes, ERROR_CODE_CASES, WIRE_EXEMPT_CODES, WINDOW } from "./support/error-code-cases";
+import { INPUT_CALLS } from "./support/input-calls";
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const scenarios = new Scenarios();

@@ -59,6 +59,7 @@ pub(crate) fn select(
     require_command(&describe(element, &actual_path, pid)?)?;
     require_key_context(pid, wid)?;
     check_stop()?;
+    senpi_desktop_core::intervention::check_press()?;
     actions::perform(element, "AXPress").map_err(|error| {
         DesktopError::ax_failed(format!(
             "{}; the menu command may already have taken effect; inspect the target before retrying",

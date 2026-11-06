@@ -127,6 +127,8 @@ describe("pre-commit hook", () => {
     const result = await commit(dir, {
       "system/persona.md": VALID,
       "reference/notes.md": "---\ndescription: Notes\nlimit: 5000\n---\n\nnotes\n",
+      "system/outage.md": "---\ndescription: Outage\nexpires: 2026-10-27T06:33Z\n---\n\noutage\n",
+      "system/freeze.md": "---\ndescription: Freeze\nexpires: \"2026-10-28\"\n---\n\nfreeze\n",
       "memory/system/legacy.md": "---\ndescription: Legacy layout\n---\n\nlegacy\n",
       "skills/deploy/SKILL.md": "---\nname: deploy\ndescription: Use when deploying\nunknown_key: fine\n---\n\nsteps\n",
       "skills/quoted/SKILL.md": "---\ndescription: \"Use when shipping: verify, merge\"\nversion: 0.2.0\n---\n\nsteps\n",

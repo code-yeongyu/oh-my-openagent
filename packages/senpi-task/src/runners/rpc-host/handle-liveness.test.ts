@@ -15,20 +15,36 @@ afterEach(() => {
   cleanupProjects()
 })
 
-function stalledSession() {
+function stalledSession(confirmClose: () => Promise<void> = () => Promise.resolve()) {
   const delivered = Promise.withResolvers<undefined>()
+  const aborted = Promise.withResolvers<undefined>()
+  const closing = Promise.withResolvers<undefined>()
+  const lifecycle: string[] = []
   const port = fakeSessionPort(async command => {
     if ("message" in command && command.message === "continue") delivered.resolve(undefined)
+    if (command.type === "abort") {
+      lifecycle.push("abort")
+      aborted.resolve(undefined)
+    }
   })
   const state = Promise.withResolvers<HostSessionLiveness>()
   const closed = Promise.withResolvers<undefined>()
   let closes = 0
   const handle = createHostSessionHandle({
-    client: { ...port, getState: () => state.promise, closeConfirmed: () => { closes++; return closed.promise } },
+    client: { ...port, getState: () => state.promise, closeConfirmed: async () => {
+      closes++
+      lifecycle.push("close")
+      closing.resolve(undefined)
+      await closed.promise
+      await confirmClose()
+    } },
     session: FAKE_SESSION, taskId: "st_00000001", heartbeatIntervalMs: 10_000,
     now: clock.now, closeGraceMs: 100, openDisposition: "attached",
   })
-  return { handle, port, state, closed, delivered: delivered.promise, closes: () => closes }
+  return {
+    handle, port, state, closed, delivered: delivered.promise, closes: () => closes,
+    aborted: aborted.promise, closing: closing.promise, lifecycle,
+  }
 }
 
 test("missed state probes keep the original child nonterminal and recover steering", async () => {
@@ -63,16 +79,29 @@ test("missed state probes keep the original child nonterminal and recover steeri
 
 test("an overdue session is aborted and closed before reporting terminal", async () => {
   clock = fakeClock()
-  const h = stalledSession()
+  const confirmation = Promise.withResolvers<undefined>()
+  const confirming = Promise.withResolvers<undefined>()
+  const h = stalledSession(() => {
+    confirming.resolve(undefined)
+    return confirmation.promise
+  })
+  const terminal = h.handle.waitForExit().then(() => { h.lifecycle.push("terminal") })
   // When the bounded unresponsive period expires but host absence is not confirmed.
   await clock.advance(170_000)
+  await h.aborted
+  await h.closing
+  expect(h.lifecycle).toEqual(["abort", "close"])
   expect(h.port.sent.some(command => command.type === "abort")).toBe(true)
   expect(h.closes()).toBeGreaterThan(0)
   expect(h.handle.hasExited()).toBe(false)
   // Then only the confirmed-close port's authoritative proof permits terminal settlement.
   h.closed.resolve(undefined)
-  await clock.advance(0)
+  await confirming.promise
+  expect(h.handle.hasExited()).toBe(false)
+  confirmation.resolve(undefined)
+  await terminal
   expect(h.handle.hasExited()).toBe(true)
+  expect(h.lifecycle).toEqual(["abort", "close", "terminal"])
   expect(await h.handle.waitForOutcome()).toMatchObject({ status: "error", failure: { kind: "child-unresponsive" } })
   await h.handle.dispose()
   expect(clock.pending()).toBe(0)

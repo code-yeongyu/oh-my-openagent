@@ -17,7 +17,7 @@ describe("Hephaestus OpenAI GPT-5.6 fast aliases", () => {
     for (const model of OPENAI_FAST_MODEL_IDS) {
       const config = createHephaestusAgent(model);
 
-      expect(getHephaestusPromptSource(model)).toBe("gpt-5-6");
+      expect(getHephaestusPromptSource(model)).toBe("gpt-5.6");
       expect(config.model).toBe(model);
     }
   });

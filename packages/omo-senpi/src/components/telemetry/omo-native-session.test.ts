@@ -244,7 +244,7 @@ describe("OmO Native session telemetry", () => {
     })
   })
 
-  it("#given a persisted install id #when native events are captured #then distinct_id is sha256(install id), install_hash mirrors it, the raw id never ships and the legacy event keeps the hostname hash", async () => {
+  it("#given a persisted install id #when native events are captured #then distinct_id is sha256(install id), install_hash mirrors it, the raw id never ships and the legacy event uses its own random install id", async () => {
     await withTempAgentDir(async (agentDir) => {
       // given
       writeInventory(agentDir)
@@ -263,11 +263,14 @@ describe("OmO Native session telemetry", () => {
         expect(message.distinctId).toBe(installHash)
         expect(message.properties?.install_hash).toBe(message.distinctId)
         expect(message.properties).not.toHaveProperty("install_id")
-        expect(String(message.properties?.machine_hash)).toMatch(/^[0-9a-f]{64}$/)
+        expect(message.properties).not.toHaveProperty("machine_hash")
         expect(message.properties?.schema_version).toBe(4)
       }
       const legacy = recorder.messages.find(({ event }) => event === SENPI_TELEMETRY_EVENT_NAME)
-      expect(legacy?.distinctId).toBe(createHash("sha256").update("omo-senpi:native-session-host").digest("hex"))
+      const legacyInstallId = readFileSync(join(getSenpiTelemetryStateDir(createEnabledEnv(agentDir)), "install-id"), "utf8").trim()
+      expect(legacyInstallId).toMatch(/^[0-9a-f]{64}$/)
+      expect(legacy?.distinctId).toBe(createHash("sha256").update(legacyInstallId).digest("hex"))
+      expect(legacy?.distinctId).not.toBe(installHash)
     })
   })
 

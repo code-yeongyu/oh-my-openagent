@@ -1,4 +1,4 @@
-import { escapeTmuxFormat, isServerRunning, runTmuxCommand, type TmuxCommandResult } from "@oh-my-opencode/tmux-core"
+import { buildPaneAuthEnvironmentArgs, withPaneAuth, escapeTmuxFormat, isServerRunning, runTmuxCommand, type TmuxCommandResult } from "@oh-my-opencode/tmux-core"
 import { log } from "../logger"
 import { shellSingleQuote } from "../shell-quote"
 import { resolveCallerTmuxSession } from "./resolve-caller-tmux-session"
@@ -52,22 +52,7 @@ function getPaneWorkingDirectory(member: TeamLayoutMember): string {
 }
 
 function buildAttachCommand(member: TeamLayoutMember, serverUrl: string): string {
-  return `opencode attach ${shellSingleQuote(serverUrl)} --session ${shellSingleQuote(member.sessionId)} --dir ${shellSingleQuote(getPaneWorkingDirectory(member))}`
-}
-
-function buildPaneEnvironmentArgs(): string[] {
-  const password = process.env.OPENCODE_SERVER_PASSWORD
-  if (!password) {
-    return []
-  }
-
-  const environmentArgs = ["-e", `OPENCODE_SERVER_PASSWORD=${password}`]
-  const username = process.env.OPENCODE_SERVER_USERNAME
-  if (username !== undefined) {
-    environmentArgs.push("-e", `OPENCODE_SERVER_USERNAME=${username}`)
-  }
-
-  return environmentArgs
+  return withPaneAuth(`opencode attach ${shellSingleQuote(serverUrl)} --session ${shellSingleQuote(member.sessionId)} --dir ${shellSingleQuote(getPaneWorkingDirectory(member))}`)
 }
 
 async function listPanesInWindow(tmuxPath: string, windowTarget: string, deps: TeamLayoutDeps): Promise<Array<string>> {
@@ -81,7 +66,7 @@ function selectExistingTeammatePane(teammatePanes: Array<string>, callerPaneId: 
 }
 
 function buildSplitArgs(callerPaneId: string, teammatePanes: Array<string>, member: TeamLayoutMember): Array<string> {
-  const environmentArgs = buildPaneEnvironmentArgs()
+  const environmentArgs = buildPaneAuthEnvironmentArgs()
   if (teammatePanes.length === 0) {
     return ["split-window", ...environmentArgs, "-t", callerPaneId, "-h", "-d", "-l", "70%", "-P", "-F", "#{pane_id}", "-c", escapeTmuxFormat(getPaneWorkingDirectory(member))]
   }

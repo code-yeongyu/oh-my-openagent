@@ -60,6 +60,8 @@ export interface EngineState {
   /** The newest head the event stream advertised; a trigger only. */
   readonly eventHead: number
   readonly refused: number
+  /** Received items dropped because their key may never reach this device's files (#12147); never pauses. */
+  readonly rejectedItems: number
   readonly cycle: CycleRecord | null
   /** The entry the pull stopped at; cleared once a later pull verifies past it. */
   readonly paused: { readonly seq: number; readonly code: RefusalCode } | null
@@ -92,6 +94,7 @@ const EMPTY_STATE: EngineState = {
   applied: 0,
   eventHead: 0,
   refused: 0,
+  rejectedItems: 0,
   cycle: null,
   paused: null,
   lastSyncedAt: null,
@@ -109,8 +112,9 @@ export class SyncJournal {
     this.tmpDir = join(this.dir, "tmp")
   }
 
-  state(): Promise<EngineState> {
-    return readJson(join(this.dir, "state.json"), EMPTY_STATE)
+  async state(): Promise<EngineState> {
+    // A state written by an older build lacks newer fields; they read as their empty value.
+    return { ...EMPTY_STATE, ...(await readJson(join(this.dir, "state.json"), EMPTY_STATE)) }
   }
 
   async updateState(patch: Partial<EngineState>): Promise<EngineState> {

@@ -48,7 +48,7 @@ export function createHostSessionOpener(input: HostSessionOpenerInput): HostSess
     fallbackProfileUnsupportedNoticed = true
     input.onWarning(
       `the task host (engine ${opened.engineVersion}) does not advertise retry_fallback_profile, so daemon-hosted ` +
-        "children switch to their fallback models only when a turn fails before any tool call until the host is upgraded",
+        "children are not held to their designated models (the host's own fallback settings apply) until the host is upgraded",
     )
   }
   const openAdmitted = async (

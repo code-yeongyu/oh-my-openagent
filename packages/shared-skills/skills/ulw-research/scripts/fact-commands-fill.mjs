@@ -13,10 +13,13 @@ import { dirname, extname, resolve } from "node:path"
 
 import { CliError, sha256Of, writeJsonAtomic } from "./cli-support.mjs"
 import { DEFECT_CODES } from "./contracts.mjs"
+import { markdownAsHtml } from "./fact-commands-verify.mjs"
 import { FILL_FORMATS, fill } from "./fact-fill.mjs"
 import { readLedger, writeLedger } from "./fact-ledger.mjs"
 import { briefHashOf, fillPolicy, lockedBrief, policyErrors } from "./fidelity-policy.mjs"
 import { readState, writeState } from "./fidelity-state.mjs"
+import { withBoundUnits } from "./fidelity-value-unit.mjs"
+import { parseMarkdown } from "./md-lite.mjs"
 import { findPlaceholders } from "./placeholder.mjs"
 import { sessionDirOf } from "./source-commands.mjs"
 
@@ -27,6 +30,13 @@ export const FILL_INPUT_FORMAT_RULES = Object.freeze({
 })
 export const FILL_INPUT_FORMATS = Object.freeze([...FILL_FORMATS, ...Object.keys(FILL_INPUT_FORMAT_RULES.aliases)])
 const fillFormatOf = (format) => FILL_INPUT_FORMAT_RULES.aliases[format] ?? format
+
+/** Value-mode entries carry the unit fill saw bound to them (unit_bound), read off the edition verify will check. */
+function boundUnits(out, entries, ledger, format) {
+	if (!entries.some((entry) => entry.mode === "value")) return entries
+	const html = fillFormatOf(format) === "html" ? out : parseMarkdown(out).problems.length === 0 ? markdownAsHtml(out, entries, ledger).html : null
+	return html === null ? entries : withBoundUnits(html, entries, new Map(ledger.rows.map((row) => [row.fact_id, row])))
+}
 
 function readText(path) {
 	try {
@@ -80,7 +90,7 @@ export function runFactFill(args) {
 	const artifact = sha256Of(out)
 	const map = `${resolve(flags.out)}.fill-map.json`
 	const brief = briefHashOf(parsed)
-	writeJsonAtomic(map, { schemaVersion: 1, format, artifact: resolve(flags.out), artifact_sha256: artifact, brief_sha256: brief, entries })
+	writeJsonAtomic(map, { schemaVersion: 1, format, artifact: resolve(flags.out), artifact_sha256: artifact, brief_sha256: brief, entries: boundUnits(out, entries, ledger, format) })
 	const data = { out: resolve(flags.out), map, artifact_sha256: artifact, brief_sha256: brief, occurrences: entries.length, warnings }
 	return { json: { command: "fact fill", status: "pass", exitCode: 0, defects: [], data }, summary: `fact fill: wrote ${flags.out} (${entries.length} pointer(s))`, exitCode: 0 }
 }

@@ -1,14 +1,16 @@
 // placeholder.mjs - the fact pointer grammar of the fill step and its render helpers.
 // Value pointers: {{F12:label}}, {{F12:label:value}}, {{F12:label:unit}}, {{F12:label:q}}.
+// Claim prefixes from CLAIM_KINDS (V, D, A) precede any one pointer: {{D:F12:label:value}}, {{V:Q7:label:lead=18}}.
 // Quote pointers: {{Q7:label}}, {{Q7:label:lead=18}}, {{Q7:label:from="x":to="y"}} (anchors are
 // JSON strings, so they may hold a colon or an escaped quote). Labels are compared exactly by the
 // caller; this module never guesses an id. Pure functions; node: builtins only.
 
 import { parseNumeral } from "./numerals.mjs"
+import { CLAIM_KINDS } from "./claim-kinds.mjs"
 
 export const ELLIPSIS = "\u2026"
 
-const ID = /^([FQ])\d+$/
+const ID = /^([FQ])[1-9]\d*$/
 const LABEL = /^[^\s:{}"]+$/
 const VALUE_MODES = new Set(["value", "unit", "q"])
 const LEAD = /^lead=([1-9]\d*)$/
@@ -45,6 +47,12 @@ function parseAnchors(tail) {
 export function parsePlaceholder(token) {
 	if (!token.startsWith("{{") || !token.endsWith("}}")) return { error: "a placeholder is {{ID:label...}}" }
 	const body = token.slice(2, -2)
+	const marked = Object.entries(CLAIM_KINDS).find(([, entry]) => entry.prefix && body.startsWith(`${entry.prefix}:`))
+	if (marked) {
+		const [claimKind, entry] = marked
+		const parsed = parsePlaceholder(`{{${body.slice(entry.prefix.length + 1)}}}`)
+		return parsed.error || parsed.claimKind ? { error: "a claim prefix must precede one fact or quote pointer" } : { ...parsed, claimKind }
+	}
 	const colon = body.indexOf(":")
 	const id = colon === -1 ? body : body.slice(0, colon)
 	const idMatch = ID.exec(id)
@@ -130,7 +138,7 @@ export function lead(quote, n) {
 /** The value and unit parts of a row's raw text ("4.2 eok won" -> value "4.2 eok", unit "won"). */
 export function valueParts(row) {
 	const unitText = parseNumeral(row.raw)?.unitRaw ?? row.unit
-	const valueText = unitText && row.raw.endsWith(unitText) ? row.raw.slice(0, -unitText.length).trimEnd() : (row.value ?? row.raw)
+	const valueText = unitText && row.raw.endsWith(unitText) ? row.raw.slice(0, -unitText.length).trimEnd() : row.raw
 	return { valueText, unitText: unitText ?? "" }
 }
 
@@ -156,15 +164,19 @@ export function escapeHtml(text) {
 /** The elements the renderers below emit as fact spans; recognizers build their patterns from this. */
 export const FACT_ELEMENT_TAGS = Object.freeze(["data", "q", "blockquote"])
 
-export function renderValueHtml(row, text) {
+/** `mode` "value" marks a bare value whose unit verify checks beside it; `claimKind` is the claim mark. */
+export function renderValueHtml(row, text, { mode = "full", claimKind = null } = {}) {
 	const unit = row.unit === null ? "" : ` data-unit="${escapeHtml(row.unit)}"`
-	return `<data class="fact" value="${escapeHtml(row.value)}" data-fact="${row.fact_id}"${unit} data-lineage="${LINEAGE[row.kind]}">${escapeHtml(text)}</data>`
+	const marker = mode === "value" ? ' data-fact-mode="value"' : ""
+	const mark = claimKind === null ? "" : ` data-claim-kind="${escapeHtml(claimKind)}"`
+	return `<data class="fact" value="${escapeHtml(row.value)}" data-fact="${row.fact_id}"${unit}${marker}${mark} data-lineage="${LINEAGE[row.kind]}">${escapeHtml(text)}</data>`
 }
 
-export function renderQuote(row, selector, text, format) {
+export function renderQuote(row, selector, text, format, claimKind = null) {
 	const marker = `[${row.source_id}]`
 	if (format === "md") return `"${text}" ${marker}`
-	return `<q data-fact="${row.fact_id}" data-quote-sel="${escapeHtml(selector)}">${escapeHtml(text)}</q> ${marker}`
+	const mark = claimKind === null ? "" : ` data-claim-kind="${escapeHtml(claimKind)}"`
+	return `<q data-fact="${row.fact_id}"${mark} data-quote-sel="${escapeHtml(selector)}">${escapeHtml(text)}</q> ${marker}`
 }
 
 const RENDERED_MD_QUOTE = /^"([\s\S]*)" (\[S\d+\])$/u

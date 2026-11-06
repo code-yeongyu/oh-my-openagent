@@ -1,9 +1,10 @@
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
 import { execFileSync, spawnSync } from "node:child_process"
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { markerLine, splitFragment } from "./package-log-blocks.ts"
+import { removeTempRoot } from "./remove-temp-root.ts"
 
 // The migration (#10841) and the bundle train both run this CLI on real branches, so every case drives a real git
 // repository and then the real PR gate, the way CI judges the converted or folded branch.
@@ -21,10 +22,18 @@ const bun = (cwd: string, args: string[], env: Record<string, string> = {}) => s
 const write = (dir: string, path: string, content: string) => { mkdirSync(join(dir, path, ".."), { recursive: true }); writeFileSync(join(dir, path), content) }
 const read = (dir: string, path: string) => readFileSync(join(dir, path), "utf8")
 
+const scratchDirs: string[] = []
+// A timed-out or aborted test never reaches withScratch's finally block, and scratch() itself runs git and bun
+// after the mkdtemp, so the directory is registered the moment it exists and removed here on every path (#9766).
+afterEach(() => {
+  for (const dir of scratchDirs.splice(0)) removeTempRoot(dir)
+})
+
 function scratch(): string {
   // The space makes the repository path differ from its file URL's pathname ("%20"), the way every Windows path
   // does ("/D:/..."): a CLI that runs git with the URL pathname as cwd fails here as it does on windows-latest.
   const dir = mkdtempSync(join(tmpdir(), "changelog fragments cli-"))
+  scratchDirs.push(dir)
   git(dir, "init", "-q", "-b", "dev")
   // A runner's global core.autocrlf=true (windows-latest) would check files out with CRLF; the expectations are bytes.
   git(dir, "config", "core.autocrlf", "false")
@@ -45,12 +54,7 @@ const gate = (dir: string, pr: number) => bun(dir, ["script/check-pr-changelog.t
 })
 
 const withScratch = (body: (dir: string) => void) => () => {
-  const dir = scratch()
-  try {
-    body(dir)
-  } finally {
-    rmSync(dir, { recursive: true, force: true })
-  }
+  body(scratch())
 }
 
 describe("from-diff converts an open branch written before fragments (#10841 migration)", () => {

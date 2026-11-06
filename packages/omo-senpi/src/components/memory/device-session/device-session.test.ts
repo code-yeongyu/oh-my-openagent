@@ -12,7 +12,7 @@ import type { AccountSessionOptions, SyncSession } from "@oh-my-opencode/memory-
 import { type CredentialStore, type Credentials, SignInError } from "@oh-my-opencode/omo-opencode/service-auth"
 
 import * as syncRuntime from "../sync-runtime"
-import { createCliAccountSource, type DeviceAccount } from "./account-source"
+import { createCliAccountSource, type CliDeviceAccount } from "./account-source"
 import { createDeviceSessionResolver } from "./resolver"
 
 const dirs: string[] = []
@@ -37,6 +37,7 @@ function memoryStore(initial: Credentials | null): CredentialStore & { clear(): 
   let value = initial
   return {
     read: async () => value,
+    readAuthoritative: async () => value,
     write: async (next) => {
       value = next
     },
@@ -48,6 +49,7 @@ function memoryStore(initial: Credentials | null): CredentialStore & { clear(): 
 
 const meReply = (accountId: string): typeof fetch =>
   Object.assign(async (input: Parameters<typeof fetch>[0]) => {
+    if (String(input).endsWith("/v1/devices")) return Response.json({ devices: [{ id: "dev_service_row", current: true, revokedAt: null }] })
     if (!String(input).endsWith("/v1/me")) return new Response("{}", { status: 404 })
     return Response.json({ user: { id: "u" }, account: { id: accountId }, deviceId: "dev_service_row" })
   }, { preconnect: fetch.preconnect })
@@ -60,6 +62,9 @@ describe("the CLI device account source", () => {
   test("a host whose OS credential store cannot be used reads as signed out, not as a failure", async () => {
     const locked: CredentialStore = {
       read: async () => {
+        throw new SignInError("Cannot access the OS credential store.")
+      },
+      readAuthoritative: async () => {
         throw new SignInError("Cannot access the OS credential store.")
       },
       write: async () => undefined,
@@ -96,9 +101,16 @@ async function repoWithRemote(): Promise<{ readonly paths: ReturnType<typeof bui
   return { paths, project }
 }
 
-function fakeAccount(overrides: Partial<DeviceAccount> = {}): DeviceAccount {
+function fakeAccount(overrides: Partial<CliDeviceAccount> = {}): CliDeviceAccount {
   const material = credentials()
   return {
+    kind: "cli",
+    descriptor: { genesis: "unsupported", rpId: null, userName: null, serviceOrigin: "http://127.0.0.1:9", accountId: "acct_7", serviceDeviceId: "service-device", syncPrincipalId: "principal", publicKeys: { signing: "signing", sealing: "sealing" }, generation: "fixture", incarnation: "cli" },
+    signal: new AbortController().signal,
+    boundary: async dispatch => dispatch(),
+    forOperation: async () => { throw new Error("unused") },
+    serviceDeviceId: "service-device",
+    isCurrent: async () => true,
     api: "http://127.0.0.1:9",
     accountId: "acct_7",
     keyring: async () => createDeviceKeyring("principal", { signingPrivatePkcs8: Buffer.from(material.signingPrivateKey, "base64").toString("base64url"), sealingPrivatePkcs8: Buffer.from(material.sealingPrivateKey, "base64").toString("base64url") }),
@@ -109,7 +121,7 @@ function fakeAccount(overrides: Partial<DeviceAccount> = {}): DeviceAccount {
 }
 
 describe("the device session resolver", () => {
-  const resolverWith = (account: DeviceAccount | null, opened: { ok: true; session: SyncSession } | { ok: false; reason: "no_pin" | "not_member" | "corrupt_pin" }) => {
+  const resolverWith = (account: CliDeviceAccount | null, opened: { ok: true; session: SyncSession } | { ok: false; reason: "no_pin" | "not_member" | "corrupt_pin" }) => {
     const calls: AccountSessionOptions[] = []
     const resolve = createDeviceSessionResolver({
       source: async () => account,

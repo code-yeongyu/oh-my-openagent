@@ -3,7 +3,7 @@
 // start does not carry the service-auth code.
 
 import { SyncSidecarUnavailableError } from "../sync-runner"
-import type { DeviceAccountSource } from "./account-source"
+import type { CliDeviceAccount } from "./account-source"
 import type * as AccountRuntime from "./account-runtime"
 
 export type DeviceAccountRuntimeModule = Pick<typeof AccountRuntime, "createCliAccountSource">
@@ -15,8 +15,8 @@ const importDeviceAccountRuntime = (): Promise<DeviceAccountRuntimeModule> => im
 export function lazyCliAccountSource(
   options: CliAccountSourceOptions,
   importRuntime: () => Promise<DeviceAccountRuntimeModule> = importDeviceAccountRuntime,
-): DeviceAccountSource {
-  let pending: Promise<DeviceAccountSource> | undefined
+): () => Promise<CliDeviceAccount | null> {
+  let pending: Promise<() => Promise<CliDeviceAccount | null>> | undefined
   return async () => {
     pending ??= importRuntime()
       .catch((error: unknown) => {

@@ -1,8 +1,12 @@
+import { join } from "node:path"
+
 import { loadPiTui } from "@oh-my-opencode/senpi-task"
+
+import { defaultCommentCheckerCacheDir } from "../components/comment-checker/resolver"
 
 import { createDagSdkRootProvisioning } from "./dag-sdk-root-provisioning"
 import { isOmoSenpiDisabledByEnv } from "./disable-env"
-import { AGENT_TOOLKIT_SDK_ROOT_ENV, createSdkRootProvisioning } from "./sdk-root-provisioning"
+import { AGENT_TOOLKIT_SDK_ROOT_ENV, BUNSHIN_TS_SDK_ROOT_ENV, createSdkRootProvisioning } from "./sdk-root-provisioning"
 import { IdleInjectionCoordinator } from "./idle-injection-coordinator"
 import { deliverItems } from "./deliver-items"
 import { publishWakeQueueBaselineOnSessionStart, publishWakeQueueChildWork } from "./wake-queue-source"
@@ -74,18 +78,22 @@ export function composeOmoSenpiExtension(
 ): (pi: unknown) => Promise<void> {
   const logger = options.logger ?? defaultLogger
   const provisionDagSdkRoot = createDagSdkRootProvisioning({ logger })
-  const provisionAgentToolkitSdkRoot = createSdkRootProvisioning({
-    envKey: AGENT_TOOLKIT_SDK_ROOT_ENV,
-    packagedRelativeDir: "../runtime/agent-toolkit-sdk",
-    sourceTreeRelativeDir: "../../plugin/runtime/agent-toolkit-sdk",
-    logger,
-  })
+  const runtimeSdkRoot = (envKey: string, dir: string, label?: string) =>
+    createSdkRootProvisioning({ envKey, packagedRelativeDir: `../runtime/${dir}`, sourceTreeRelativeDir: `../../plugin/runtime/${dir}`, logger, label })
+  const provisionAgentToolkitSdkRoot = runtimeSdkRoot(AGENT_TOOLKIT_SDK_ROOT_ENV, "agent-toolkit-sdk")
+  const provisionBunshinTsSdkRoot = runtimeSdkRoot(BUNSHIN_TS_SDK_ROOT_ENV, "bunshin-ts", "bunshin-ts")
 
   return async (pi: unknown): Promise<void> => {
     releaseHerdrAgentHint()
+    // Shell children inherit process.env: a bundled skill's Python must not write __pycache__ into a signed app (#11373),
+    // so bytecode goes to <user cache>/omo-senpi/pycache unless the user set either variable, even to an empty string.
+    if (process.env.PYTHONDONTWRITEBYTECODE === undefined) {
+      process.env.PYTHONPYCACHEPREFIX ??= join(defaultCommentCheckerCacheDir(process.platform, process.env, "omo-senpi"), "..", "pycache")
+    }
     // Publish the dag eval sdk directory so JavaScript cells can import it from OMO_DAG_SDK_ROOT.
     provisionDagSdkRoot()
     provisionAgentToolkitSdkRoot()
+    provisionBunshinTsSdkRoot()
 
     const missing = getMissingCapabilities(pi)
     if (missing.length > 0 || !isSenpiExtensionAPI(pi)) {

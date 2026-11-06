@@ -1,4 +1,5 @@
 import { realpath } from "@oh-my-opencode/memory-core/fs"
+import { isDarwinAutomountTriggerPath } from "@oh-my-opencode/utils/path-containment"
 import { isAbsolute, relative, resolve, sep } from "node:path"
 
 import type { KibitzerRejectionCode } from "./result"
@@ -38,6 +39,13 @@ export function normalizeMemoryPath(input: string): PathCheck {
 export async function resolveWorkspacePath(root: string, input: string): Promise<PathCheck> {
   const realRoot = await realpath(root)
   const lexical = resolve(realRoot, input)
+  // A macOS automount trigger that is not lexically inside the root cannot be inside it, and resolving it can park
+  // the host loop (#11545): it is rejected without resolving.
+  const lexicalRel = relative(realRoot, lexical)
+  const lexicallyInside = lexicalRel === "" || (!lexicalRel.startsWith("..") && !isAbsolute(lexicalRel))
+  if (isDarwinAutomountTriggerPath(lexical) && (!isDarwinAutomountTriggerPath(realRoot) || !lexicallyInside)) {
+    return { ok: false, code: "path_escape", message: `"${input}" resolves outside the workspace.` }
+  }
   let target: string
   try {
     target = await realpath(lexical)

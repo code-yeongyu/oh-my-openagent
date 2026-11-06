@@ -1,5 +1,6 @@
 use image::RgbaImage;
-use senpi_desktop_core::backend::{AxBackend, Backend, DeliveryMode, PointerEvent};
+use senpi_desktop_core::ax::AxHandle;
+use senpi_desktop_core::backend::{AxBackend, Backend, DeliveryMode, ElementDelivery, PointerEvent};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::frame::{FrameGeometry, MAX_COMPOSITE_PIXELS};
 use senpi_desktop_core::keys::KeyName;
@@ -75,6 +76,9 @@ impl Backend for FakeBackend {
         };
         self.begin(method)?;
         self.input_gate(target, mode)?;
+        if matches!(ev, PointerEvent::Click { .. } | PointerEvent::Drag { .. }) {
+            self.press_check(method)?;
+        }
         let event = RecordedPointer::from(ev);
         if matches!(target, Target::Desktop | Target::Display(_)) || mode == DeliveryMode::Foreground {
             self.cursor = self.cursor.and(event.end_point());
@@ -91,6 +95,10 @@ impl Backend for FakeBackend {
     fn type_text(&mut self, target: &Target, text: &str, mode: DeliveryMode) -> CoreResult<()> {
         self.begin(FakeMethod::TypeText)?;
         self.input_gate(target, mode)?;
+        if let Some((window, remote)) = self.remote_window(target) {
+            crate::remote_impl::admit_remote_text(&window, remote, text, mode)?;
+        }
+        self.press_check(FakeMethod::TypeText)?;
         self.deliver_focus(target, mode);
         self.record(SinkOp::TypeText {
             target: target.clone(),
@@ -123,6 +131,11 @@ impl Backend for FakeBackend {
         check_stop: &dyn Fn() -> CoreResult<()>,
         delivered: &mut dyn FnMut(),
     ) -> CoreResult<()> {
+        // The whole text is admitted before any chunk goes out, as the macOS
+        // port maps every character before posting.
+        if let Some((window, remote)) = self.remote_window(target) {
+            crate::remote_impl::admit_remote_text(&window, remote, text, mode)?;
+        }
         let mut start = 0;
         for end in text
             .char_indices()
@@ -141,9 +154,21 @@ impl Backend for FakeBackend {
         Ok(())
     }
 
+    fn ax_type_text(
+        &mut self,
+        h: &AxHandle,
+        text: &str,
+        mode: DeliveryMode,
+        check_stop: &dyn Fn() -> CoreResult<()>,
+        delivered: &mut dyn FnMut(),
+    ) -> CoreResult<ElementDelivery> {
+        crate::element_input_impl::ax_type_text(self, h, text, mode, check_stop, delivered)
+    }
+
     fn key_chord(&mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode) -> CoreResult<()> {
         self.begin(FakeMethod::KeyChord)?;
         self.input_gate(target, mode)?;
+        self.press_check(FakeMethod::KeyChord)?;
         self.deliver_focus(target, mode);
         self.record(SinkOp::KeyChord {
             target: target.clone(),
@@ -259,5 +284,12 @@ impl Backend for FakeBackend {
     fn screen_locked(&mut self) -> CoreResult<bool> {
         self.begin(FakeMethod::ScreenLocked)?;
         Ok(self.capabilities.screen_locked)
+    }
+
+    fn user_input_feed(&mut self) -> Option<std::sync::Arc<dyn senpi_desktop_core::user_input::UserInputFeed>> {
+        if !self.user_input_feed {
+            return None;
+        }
+        Some(self.user_input())
     }
 }

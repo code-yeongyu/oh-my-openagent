@@ -118,7 +118,7 @@ Subscription flags (`--claude`, `--openai`, etc.) only apply when `--platform` i
 
 ### Telemetry and opt-out
 
-Anonymous telemetry uses PostHog with a SHA-256 hash of a machine-ID prefix plus hostname (not an install-specific identifier). Two streams exist:
+Anonymous telemetry uses PostHog with a SHA-256 hash of a random install id created on the computer. Two streams exist:
 
 - `omo_daily_active`: fired by the main plugin when it loads (`reason: "plugin_loaded"`) and by `oh-my-openagent run` (`reason: "run_started"`).
 - `omo_codex_daily_active`: fired by `omo-agent-toolkit install --platform=codex` or `--platform=both` (`reason: "install_completed"`) and by the Codex plugin's `SessionStart` hook on every Codex session (`reason: "session_start"`). Both sources share the same UTC-day deduplication, so daily/weekly/monthly active counts reflect real Codex usage, not just install events.

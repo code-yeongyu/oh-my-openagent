@@ -13,6 +13,7 @@ import { join } from "node:path"
 
 import { readdir, readFile, rename, rm, stat, writeFile } from "../fs/resilient"
 import { isRecallTermSaveExcluded, trackRecallTermSave } from "../recall/bm25-persist-gate"
+import { decodeStoredBlock, encodeStoredBlock, type StoredBlock } from "./stored-block"
 
 export const MEMORY_BLOCK_STORE_PREFIX = "omo-memory-block-"
 const FORMAT_VERSION = 1
@@ -66,6 +67,16 @@ export class CompiledBlockStore {
       if (!isMissing(error)) this.onError(error)
       return undefined
     }
+  }
+
+  /** The compiled block stored under `key` (#11450); its codec ships here, in the lazily loaded store, not the entry. */
+  async getBlock(key: string): Promise<StoredBlock | undefined> {
+    const text = await this.get(key)
+    return text === undefined ? undefined : decodeStoredBlock(text)
+  }
+
+  putBlock(key: string, block: StoredBlock): void {
+    this.put(key, encodeStoredBlock(block))
   }
 
   /** Stores `value` under `key` in the background; skipped while a restore holds the repository's gate. */

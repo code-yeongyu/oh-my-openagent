@@ -120,8 +120,12 @@ export function createPendingSteering(port: SteeringPort, tryLoad: (taskId: stri
     const delivered = new Set<string>()
     for (const entry of queue) {
       try {
-        if (entry.deliver_as === "steer") await handle.steer(entry.message)
-        else await handle.followUp(entry.message)
+        // The entry's own id travels with it, so the child holds it under the id it was queued with and a
+        // drain repeated after a lost acknowledgment or a parent restart replays it instead of sending a
+        // second copy (#2838 step 4).
+        const identity = { clientMessageId: entry.id }
+        if (entry.deliver_as === "steer") await handle.steer(entry.message, identity)
+        else await handle.followUp(entry.message, identity)
         port.store.appendEvent(taskId, {
           type: "steered",
           payload: { delivered: entry.deliver_as, queued: true, run_epoch: fresh.notification.run_epoch },

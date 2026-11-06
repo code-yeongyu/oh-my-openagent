@@ -1,6 +1,7 @@
 import { existsSync, realpathSync } from "node:fs"
 import { delimiter, isAbsolute, join, relative, sep } from "node:path"
 import { canonicalAgentDir } from "./agent-dir.js"
+import { OMO_BRAND_LOGO } from "./brand-logo.generated.js"
 import { HERDR_AGENT_MARKER } from "./herdr-agent-hint.js"
 import { nearestNodeBin, packageManifest, packageRoot, readJson, releaseChannel, updateTarget } from "./package-paths.js"
 
@@ -27,6 +28,7 @@ function brandProfile() {
   const changelog = pluginChangelogSource()
   return {
     name: "OmO",
+    logo: OMO_BRAND_LOGO,
     command: "omo",
     displayVersion: packageManifest().version,
     configDir: ".omo",
@@ -103,6 +105,9 @@ export function senpiEnvironment(senpiRoot, overrides = {}) {
   // Anything resolving the product by name must re-enter through this launcher, otherwise it
   // would reach the engine directly and lose the brand.
   env.OMO_BIN = join(packageRoot, "bin", "omo.js")
+  // The plugin names this command when part of the install is missing (#11379). SENPI_BRAND carries it
+  // too, but the engine scrubs that at startup, before any plugin file can fail to load.
+  env.OMO_REINSTALL_COMMAND = updateTarget().command
   const merged = { ...env, ...overrides }
   // Only the interactive launch writes this record of the herdr hint it set (herdr-agent-hint.js),
   // after this function returns. No engine started here may carry one from the parent environment
