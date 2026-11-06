@@ -121,7 +121,7 @@ export const ThreadInterruptParams = Type.Object({
   all_scope: AllScope,
 })
 
-export const ThreadCloseParams = Type.Object({
+const ThreadCloseParams = Type.Object({
   thread: ThreadAddress,
   idempotency_key: IdempotencyKey,
   all_scope: AllScope,
