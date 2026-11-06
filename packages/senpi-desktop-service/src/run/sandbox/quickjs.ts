@@ -38,8 +38,8 @@ export interface QuickJsRunOptions {
 }
 
 /** The worker bundle and the wasm the omo-senpi build emits beside the bundle this module is inlined into. */
-export const SANDBOX_WORKER_BUNDLE_NAME = "omo-computer-run-worker.mjs";
-export const SANDBOX_WASM_BUNDLE_NAME = "quickjs.wasm";
+const SANDBOX_WORKER_BUNDLE_NAME = "omo-computer-run-worker.mjs";
+const SANDBOX_WASM_BUNDLE_NAME = "quickjs.wasm";
 
 // A bundler cannot inline a Worker's entry, so inside a bundle both files are its siblings; from source
 // they are worker.ts next to this file and the installed quickjs-wasi package's wasm.
