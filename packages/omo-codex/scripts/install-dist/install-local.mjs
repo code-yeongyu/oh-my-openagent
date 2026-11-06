@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:b837866f052aeaebdb29434aa060c717e1588680ac2d27dd6470c3aa46bf6ce0:339b2606b7d2b32746534d242fc03fa67d973e14ef9d15e8669dbf08c420dba7
+// omo-codex-install:070a339ca0784f519adebaef65c6e6b32c050ad3b0bcfdbc787b252144462996:465dbd1163a5b374859bad81a28226f8d85ce02ec6ddc57d37c1ee3d3ece9816
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -10957,11 +10957,7 @@ function windowsRuntimeWrapper(binName, cliPath, codexHome, binDir, nodeCliPath)
     `set "OMO_INVOCATION_NAME=${binName}"`,
     'set "OMO_EDITION=codex"',
     ...windowsNodeDiscoveryLines(),
-    `if "%~1"=="ulw-loop" if exist "${ulwLoopBin}" (`,
-    "  shift /1",
-    `  "${ulwLoopBin}" ulw-loop %*`,
-    "  exit /b %ERRORLEVEL%",
-    ")",
+    `if "%~1"=="ulw-loop" if exist "${ulwLoopBin}" "${ulwLoopBin}" %*`,
     `if "%OMO_RUNTIME%"=="node" if defined OMO_NODE_BINARY if exist "${nodeCliPath}" (`,
     `  "%OMO_NODE_BINARY%" "${nodeCliPath}" %*`,
     "  exit /b %ERRORLEVEL%",
