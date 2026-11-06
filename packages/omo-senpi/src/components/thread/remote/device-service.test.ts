@@ -182,7 +182,13 @@ describe("device-service adapter: relay round trips per thread op", () => {
         })
         return commandId
       },
-      read: async () => { frames.push("session.read"); return { entries: [{ entry_id: "e1", entry: { role: "user", content: "hi" } }], next_before: null } },
+      read: async () => {
+        frames.push("session.read")
+        const before = beforeReply
+        beforeReply = undefined
+        before?.()
+        return { entries: [{ entry_id: "e1", entry: { role: "user", content: "hi" } }], next_before: null }
+      },
       list: async () => { frames.push("sessions.list"); return { query_id: "q", revision: 1, rows: [], incomplete: [], devices: {} } },
       endpointCommand: async () => { frames.push("session.command"); return "c" },
       oversizedLines: () => 0,
@@ -203,7 +209,7 @@ describe("device-service adapter: relay round trips per thread op", () => {
     return { port, surface, take, record, frame, channelClosed, removeModel, inFlight: (event: () => void) => { beforeReply = event } }
   }
 
-  test("#given one remote session #when the thread ops run in turn #then the attach is opened once, status and view are served locally once warm, and every other op is one command", async () => {
+  test("#given one remote session #when the thread ops run in turn #then the attach is opened once, status and the transcript are read from the device every time, a held session.read page and an exact catalog model are answered here, and each command is one round trip", async () => {
     const w = relayWorld()
     const view = { thread: "s1" } as ThreadReadInput
     const steps: Array<[string, () => Promise<unknown>]> = [
@@ -228,12 +234,12 @@ describe("device-service adapter: relay round trips per thread op", () => {
     }
     expect(measured).toEqual([
       ["status (cold)", ["session.attach", "session.command"]],
-      ["status", []],
+      ["status", ["session.command"]],
       ["view (cold)", ["session.command"]],
-      ["view", []],
+      ["view", ["session.command"]],
       ["session.read (cold)", ["session.read"]],
       ["session.read", []],
-      ["send", ["session.command"]],
+      ["send", ["session.command", "session.command"]],
       ["status after send", ["session.command"]],
       ["model (cold catalog)", ["session.command", "session.command"]],
       ["model (exact provider/id)", ["session.command"]],
@@ -243,24 +249,22 @@ describe("device-service adapter: relay round trips per thread op", () => {
     ])
   })
 
-  test("#given warm status and view #when the session writes a record, or one lands while a read is in flight #then the next read goes to the other device, and the in-flight reply is not kept", async () => {
+  test("#given a held session.read page #when the session writes a record, a frame or loses its channel, or a record lands while a read is in flight #then the next read goes to the other device, and the in-flight page is not kept", async () => {
     const w = relayWorld()
-    const status = () => w.port.sessionCommand("b", "s1", { type: "get_state", sessionId: "s1" })
-    await status()
-    await w.port.read("b", "s1", 20)
+    const page = () => w.port.read("b", "s1", 20)
+    await page()
     w.take()
     for (const happened of [w.record, w.frame, w.channelClosed]) {
       happened()
-      await status()
-      await w.port.read("b", "s1", 20)
-      expect(w.take()).toEqual(["session.command", "session.read"])
+      await page()
+      expect(w.take()).toEqual(["session.read"])
     }
     w.record()
     w.inFlight(w.record)
-    await status()
-    await status()
-    expect(w.take()).toEqual(["session.command", "session.command"])
-    await status()
+    await page()
+    await page()
+    expect(w.take()).toEqual(["session.read", "session.read"])
+    await page()
     expect(w.take()).toEqual([])
   })
 

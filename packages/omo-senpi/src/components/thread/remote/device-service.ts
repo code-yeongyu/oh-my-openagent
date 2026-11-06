@@ -46,11 +46,15 @@ const notSentReason = (error: unknown): string => (error instanceof LocalApiErro
 // Like the port's read, every failure of one is a typed refusal: there is nothing that may have run.
 const READ_ONLY_RECORDS: ReadonlySet<string> = new Set(["get_state", "get_messages"])
 
-// The reads answered from the session's local mirror once one full read of them is held. A state or message read is
-// held until the session's attach shows anything happening there (a record, a frame on its channel, a new snapshot, a
-// pending or lost channel) or this device sends it a command; the model catalog changes with none of those, so it is
-// held until a new snapshot or the attach ends. Each is also bounded in age, in case the session's stream stalls.
-const MIRRORED_RECORDS: ReadonlySet<string> = new Set(["get_state", "get_messages", "get_available_models"])
+// The session's mirror holds two reads. A `session.read` page comes from the session's journal, the same journal its
+// attach streams as records, so a page is held until the attach shows anything happening there (a record, a frame on
+// its channel, a new snapshot, a pending or lost channel) or this device sends it a command. The model catalog
+// (`get_available_models`) changes with none of those; it is held until a new snapshot or the attach ends, and only
+// decides an exact provider/id that set_model then confirms (remote-controls.ts). `get_state` and `get_messages` are
+// never held: the engine's in-memory state (isStreaming, the queue, a new session's unwritten messages) changes with
+// no record on the attach (a live run held isStreaming false for 17 s of a running turn), so they always go remote.
+// Each held read is also bounded in age, in case the session's stream stalls.
+const MIRRORED_RECORDS: ReadonlySet<string> = new Set(["get_available_models"])
 const MIRROR_MAX_AGE_MS = 30_000
 const CATALOG_MAX_AGE_MS = 600_000
 
@@ -116,7 +120,7 @@ function outcomeOf(result: CommandResult): RemoteCommandOutcome {
 /**
  * The account half of the thread tools over this device's device service: one proven connection, rebuilt after it
  * closes or fails, and one attach per remote session, kept across ops and dropped when it ends (the next op attaches
- * again), with the session's read mirror on it: a command costs one round trip, and a warm status or view none.
+ * again), with the session's read mirror on it: a command costs one round trip, and a held read none.
  */
 export function createDeviceServiceSessions(options: DeviceServiceSessionsOptions): RemoteSessionsPort {
   let service: Promise<DeviceService> | undefined
