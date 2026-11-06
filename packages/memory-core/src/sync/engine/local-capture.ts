@@ -106,12 +106,10 @@ async function adoptJournaled(deps: EngineDeps, journal: SyncJournal): Promise<R
   const sendable = planBatches((await journal.pending()).items, batchBound(deps)).batches.flat()
   const withheld = new Set<string>()
   const adopted = new Set<string>()
-  let imported = false
   for (const item of sendable) {
     if (item.imported === true) continue
     if (withheld.has(item.key) || isSyncItemKey(item.key) !== null) continue
     const outcome = await deps.store.adoptJournaled(item.key, await journal.outbox.readOps(item))
-    if (outcome === "imported") imported = true
     if (outcome !== "refused") {
       adopted.add(item.digest)
       continue
@@ -119,7 +117,9 @@ async function adoptJournaled(deps: EngineDeps, journal: SyncJournal): Promise<R
     withheld.add(item.key)
     deps.log?.(`sync.item.stuck len=${keyLength(item.key)} ops=1`)
   }
-  if (imported) await deps.store.persist()
+  // An op found "held" may sit only in the in-memory doc (a capture whose persist failed), so the doc is
+  // persisted before any entry is marked: the mark promises that the doc ON DISK holds the op.
+  if (adopted.size > 0) await deps.store.persist()
   await markImported(journal, adopted)
   return withheld
 }

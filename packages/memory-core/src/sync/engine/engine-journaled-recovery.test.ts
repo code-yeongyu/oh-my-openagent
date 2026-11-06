@@ -210,3 +210,28 @@ test("an entry whose imported mark was lost is checked once against the doc, nev
   expect(await adopt.mock.results[0]?.value).toBe("held")
   expect(await device.store.version("kept.md")).toBe(versionBefore)
 }, TIMEOUT)
+
+test("an entry whose capture never reached disk is marked imported only once the doc holding it is persisted", async () => {
+  // Review of #12597 at 4647e55a6e: the store's persist fails after a capture applied the op in memory,
+  // the next cycle finds the op "held" by that in-memory doc, and a restart before any later persist
+  // must still re-import it rather than skip it as already imported.
+  const server = new FakeSyncServer()
+  const a = await makeDevice(server, "a", undefined, { realStore: true })
+  const b = await makeDevice(server, "b", undefined, { realStore: true })
+  devices.push(a, b)
+  await a.write("kept.md", note("one\ntwo\nthree\n"))
+  await a.engine.runCycle()
+  await b.engine.runCycle()
+  await a.write("kept.md", note("ONE\ntwo\nthree\n"))
+  const persist = spyOn(a.store, "persist").mockImplementationOnce(() => Promise.reject(new Error("ENOSPC")))
+  await expect(a.engine.runCycle()).rejects.toThrow()
+  persist.mockRestore()
+  server.beforeNextAppend = () => Promise.reject(new Error("offline"))
+  await expect(a.engine.runCycle()).rejects.toThrow()
+  await a.restart()
+  await a.write("kept.md", note("ONE\ntwo\nTHREE\n"))
+  await a.engine.runCycle()
+  await b.engine.runCycle()
+  expect(await b.read("kept.md")).toBe(note("ONE\ntwo\nTHREE\n"))
+  expect(await a.read("kept.md")).toBe(note("ONE\ntwo\nTHREE\n"))
+}, TIMEOUT)

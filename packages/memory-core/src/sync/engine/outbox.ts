@@ -23,7 +23,7 @@ export interface PendingItem {
   /** The segment file in `pending/` holding the ops, and their offset in it. */
   readonly segment: string
   readonly offset: number
-  /** Set once this device's doc holds the ops: capture recovery (#12284) skips it, so a cycle reads no ops it does not send (#12286). */
+  /** Set once this device's doc holds the ops on disk: capture recovery (#12284) skips it, so a cycle reads no ops it does not send (#12286). */
   readonly imported?: true
 }
 
