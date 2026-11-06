@@ -25,7 +25,8 @@
               "features": [
                 "action-report",
                 "frame-identity",
-                "frame-consume"
+                "frame-consume",
+                "ax-partial"
               ]
             }
           },
