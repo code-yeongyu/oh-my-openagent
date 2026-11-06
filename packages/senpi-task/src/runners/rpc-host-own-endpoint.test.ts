@@ -8,6 +8,7 @@ import type { RpcChildHandle } from "./types"
 import { SHARD_KEY_CONTEXT, TREE_KEY_CONTEXT, type ShardResolution } from "./rpc-host/shard-socket"
 import { childSpec, fakeFallbackRunner, hostRunnerHarness } from "./rpc-host.test-support"
 import { cleanupTempDirs, ensureRecorder, posixShardTest, shardEndpoint, tempDir, type ShardEndpoint } from "./rpc-host-endpoint.test-support"
+import { remainingTestTime } from "../../../../test-support/test-deadline"
 
 const harness = hostRunnerHarness()
 const { fakeHost, runnerOver } = harness
@@ -38,7 +39,7 @@ function answering(instanceId: string, protocolVersion = 1): () => Promise<Senpi
 function parkedOnce(handle: RpcChildHandle): Promise<HostSessionParked> {
   if (!isHostSessionHandle(handle)) throw new Error("not a host-session handle")
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("waited 5s for the child to park, it never did")), 5_000)
+    const timer = setTimeout(() => reject(new Error("waited out the test budget for the child to park, it never did")), remainingTestTime())
     handle.onParked((event) => {
       clearTimeout(timer)
       resolve(event)

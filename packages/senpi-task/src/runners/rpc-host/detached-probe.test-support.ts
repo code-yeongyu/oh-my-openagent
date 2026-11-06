@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { text } from "node:stream/consumers"
 import { fileURLToPath } from "node:url"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 export async function runDetachedProbe(scenario: string): Promise<{
   readonly exitCode: number
@@ -35,11 +36,13 @@ export async function runDetachedProbe(scenario: string): Promise<{
     child.once("error", reject)
     child.once("close", (code) => resolve(code ?? 1))
   })
-  const timeout = setTimeout(() => child.kill(), 10_000)
+  let expired = false
+  const timeout = setTimeout(() => { expired = true; child.kill() }, remainingTestTime())
   try {
     const [exitCode, stdout, stderr] = await Promise.all([
       exited, text(child.stdout), text(child.stderr),
     ])
+    if (expired) throw new Error(`the detached-process probe (${scenario}) did not exit within the test budget; stderr: ${stderr.slice(-2000)}`)
     return { exitCode, stdout, stderr, sandboxRemoved: true }
   } finally {
     clearTimeout(timeout)

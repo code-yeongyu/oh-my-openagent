@@ -14,6 +14,7 @@ import { baseSpec, cleanupProjects, FakeRunner, settings, tempProject } from "./
 import { createTaskManager } from "./manager"
 import type { ManagedStartSpec } from "./types"
 import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
+import { testBudgetSignal } from "../../../../test-support/test-deadline"
 
 // Two generations of one task coexist while runtime fallback finishes closing an old rung: a revived
 // newer run, or a second revival racing the first. Each generation owns only its own lease, handle and
@@ -90,7 +91,7 @@ describe("generations of one task during a runtime-fallback close", () => {
         try {
           // when
           if (ending === "completes") {
-            const done = manager.waitFor(task.task_id, { signal: AbortSignal.timeout(5_000) })
+            const done = manager.waitFor(task.task_id, { signal: testBudgetSignal("manager.waitFor to settle") })
             newer.settle({ status: "completed", finalResponse: "newer result" })
             await done
           } else if (ending === "is interrupted") {

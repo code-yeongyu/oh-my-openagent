@@ -5,6 +5,7 @@ import { describe, expect, test } from "bun:test"
 
 import { spawnFakeChild } from "./__fixtures__/spawn-fake"
 import { terminateRpcChild } from "./terminate"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const isWin32 = process.platform === "win32"
 const PROCESS_TREE_PATH = fileURLToPath(new URL("./__fixtures__/process-tree.mjs", import.meta.url))
@@ -107,7 +108,7 @@ describe("terminateRpcChild", () => {
 })
 
 async function waitUntilStopped(pid: number): Promise<void> {
-  const deadline = Date.now() + 2_000
+  const deadline = Date.now() + remainingTestTime()
   while (isRunning(pid) && Date.now() < deadline) {
     await new Promise<void>((resolve) => setTimeout(resolve, 10))
   }

@@ -1,5 +1,5 @@
 // allow: SIZE_OK - the scheduler acceptance matrix keeps wave ordering, failure continuation, queue reporting, and residency batching in one fake-manager fixture.
-import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import * as fs from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -21,13 +21,17 @@ import { applyDagSchedulerEvent, createDagScheduler, DagNodeControlError, type D
 import { createDagJournal } from "./journal"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagNode, DagNodeId, DagRunEvent, DagRunId } from "./types"
+import { remainingTestTime, useTestTimeout } from "../../../../test-support/test-deadline"
 
 // bunfig preloads test-setup.ts to raise the default timeout, but Bun honours a preload's
 // setDefaultTimeout only for the FIRST test file of a run; every later file silently reverts to
 // the built-in 5000ms. These wave/residency cases drive a fake manager plus a real file store,
 // which overshoots 5s on a windows runner and times out the whole barrier suite. Set the floor
 // here, where Bun does honour it.
-setDefaultTimeout(process.platform === "win32" ? 60_000 : 20_000)
+const FILE_TEST_TIMEOUT_MS = process.platform === "win32" ? 60_000 : 20_000
+setDefaultTimeout(FILE_TEST_TIMEOUT_MS)
+// Budget waits read the declared timeout, not the suite default (#10814).
+beforeEach(() => useTestTimeout(FILE_TEST_TIMEOUT_MS))
 
 const cleanupRoots: string[] = []
 const runId = "run-scheduler" as DagRunId
@@ -45,9 +49,9 @@ function deferred<T>(): {
   return { promise, resolve }
 }
 
-function within<T>(promise: Promise<T>, ms = 200): Promise<T> {
+function within<T>(promise: Promise<T>, what: string, ms = remainingTestTime()): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error(`timed out after ${ms}ms`)), ms)
+    const timeout = setTimeout(() => reject(new Error(`waited out the test budget (${ms} ms) for ${what}`)), ms)
     void promise.then(
       (value) => {
         clearTimeout(timeout)
@@ -511,9 +515,9 @@ describe("DAG scheduler owner conflict adoption", () => {
     })
 
     // when
-    await within(manager.whenStarted("A"))
+    await within(manager.whenStarted("A"), "manager.whenStarted('A')")
     manager.complete("A")
-    await within(manager.whenStarted("B"))
+    await within(manager.whenStarted("B"), "manager.whenStarted('B')")
     manager.complete("B")
     const result = await running
 
@@ -565,14 +569,14 @@ describe("#8020 scheduler quiescence", () => {
     const manager = new GatedManager({ autoComplete: false })
     const { scheduler, store } = schedulerFixture(definition([node("live"), node("next", ["live"])]), manager)
     const running = scheduler.run()
-    await within(admitted.promise, 3000)
+    await within(admitted.promise, "admitted.promise")
     let quiesced = false
     const suspending = scheduler.suspend().then(() => { quiesced = true })
     expect(quiesced).toBe(false)
     const seq = scheduler.snapshot().checkpointSeq
     release.resolve()
-    await within(suspending, 3000)
-    await within(running, 3000)
+    await within(suspending, "suspending")
+    await within(running, "running")
     manager.complete("live")
     await scheduler.whenIdle()
     expect(store.readCheckpoint<DagRunRecordV1>(runId)?.checkpointSeq).toBe(seq)
@@ -589,9 +593,9 @@ describe("#8020 scheduler quiescence", () => {
       if (event.type === "dag.node.task-attached") attached.resolve()
     })
     const running = scheduler.run()
-    await within(attached.promise, 3000)
+    await within(attached.promise, "attached.promise")
     await scheduler.suspend()
-    await within(running, 3000)
+    await within(running, "running")
     const before = scheduler.snapshot()
     manager.complete("live")
     await scheduler.whenIdle()
@@ -902,8 +906,8 @@ describe("DAG scheduler cancellation", () => {
     await manager.whenStarted("sibling")
 
     // when
-    await within(scheduler.cancel(runId, "stop after rejected admission"))
-    const result = await within(running)
+    await within(scheduler.cancel(runId, "stop after rejected admission"), "scheduler.cancel(runId, 'stop after rejected admission')")
+    const result = await within(running, "running")
 
     // then
     expect(manager.cancellations).toEqual(["sibling"])
@@ -1067,9 +1071,9 @@ describe("DAG scheduler dependency-frontier admission", () => {
     await Promise.all([manager.whenStarted("reject"), manager.whenStarted("sibling")])
 
     // when
-    await within(rejected.promise)
+    await within(rejected.promise, "rejected.promise")
     manager.complete("sibling")
-    const result = await within(running)
+    const result = await within(running, "running")
 
     // then
     expect(result.status).toBe("failed")
@@ -1135,7 +1139,7 @@ describe("DAG scheduler dependency-frontier admission", () => {
 
     // when
     const running = scheduler.run()
-    await within(attached.promise)
+    await within(attached.promise, "attached.promise")
     manager.promote("a")
 
     // then
@@ -1148,7 +1152,7 @@ describe("DAG scheduler dependency-frontier admission", () => {
     }))
     expect(scheduler.snapshot().nodes.find((entry) => entry.id === "a")?.startedAt).toBeDefined()
     manager.complete("a")
-    const result = await within(running)
+    const result = await within(running, "running")
     expect(result.nodes.find((entry) => entry.id === "a")?.state).toBe("completed")
     expect(manager.listenerCount()).toBe(0)
   })
@@ -1165,7 +1169,7 @@ describe("DAG scheduler dependency-frontier admission", () => {
 
     // when
     const running = scheduler.run()
-    await within(transitioned.promise)
+    await within(transitioned.promise, "transitioned.promise")
 
     // then
     expect(events()).toContainEqual(expect.objectContaining({
@@ -1178,7 +1182,7 @@ describe("DAG scheduler dependency-frontier admission", () => {
     expect(scheduler.snapshot().nodes.find((entry) => entry.id === "a")?.startedAt).toBeDefined()
     expect(manager.listenerCount()).toBe(0)
     manager.complete("a")
-    const result = await within(running)
+    const result = await within(running, "running")
     expect(result.nodes.find((entry) => entry.id === "a")?.state).toBe("completed")
   })
 
@@ -1193,9 +1197,9 @@ describe("DAG scheduler dependency-frontier admission", () => {
 
     // when
     const running = scheduler.run()
-    await within(attached.promise)
+    await within(attached.promise, "attached.promise")
     manager.complete("a", "error")
-    const result = await within(running)
+    const result = await within(running, "running")
 
     // then: the queued child died in the queue; a stray late event must not resurrect it
     manager.emitChild("a", { type: "message_start" })
@@ -1214,12 +1218,12 @@ describe("DAG scheduler dependency-frontier admission", () => {
       if (event.type === "dag.node.task-attached" && event.nodeId === "a") attached.resolve()
     })
     const running = scheduler.run()
-    await within(attached.promise)
+    await within(attached.promise, "attached.promise")
     expect(manager.listenerCount()).toBe(1)
 
     // when
-    await within(scheduler.cancel(runId, "test cancel"))
-    const result = await within(running)
+    await within(scheduler.cancel(runId, "test cancel"), "scheduler.cancel(runId, 'test cancel')")
+    const result = await within(running, "running")
 
     // then
     expect(result.status).toBe("cancelled")

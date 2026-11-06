@@ -7,6 +7,7 @@ import { createTaskRecordStore } from "../store"
 import { createInputEffects, InputUncertainError, InputConflictError } from "./input-effects"
 import { RpcRequestTimeout } from "./rpc/errors"
 import { mapSendOutcome } from "../tools/control/send-results"
+import { remainingTestTime } from "../../../../test-support/test-deadline"
 
 const dirs: string[] = []
 afterEach(() => { for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true }) })
@@ -295,7 +296,7 @@ async function bounded<T>(promise: Promise<T>): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
     return await Promise.race([promise, new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error("input resolution did not arrive")), 5_000)
+      timer = setTimeout(() => reject(new Error("input resolution did not arrive")), remainingTestTime())
     })])
   } finally { clearTimeout(timer) }
 }

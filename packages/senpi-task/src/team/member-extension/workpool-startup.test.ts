@@ -1,5 +1,7 @@
 import { expect, test } from "bun:test"
 import { fileURLToPath } from "node:url"
+import { useTestTimeout } from "../../../../../test-support/test-deadline";
+import { spawnTimeout } from "../../../test-support/spawn-timeout";
 
 // Use a fresh module registry: the test preload and neighboring host tests already load workpool.
 // The mock records module evaluation, not registration, so an eager import cannot hide behind
@@ -7,6 +9,7 @@ import { fileURLToPath } from "node:url"
 // SPEC CHANGE (shared daemon): the member bundle is loaded for EVERY session of the daemon, so a
 // session with no member identity registers nothing and returns - it no longer throws `missing_env`.
 test("#given a session with no member identity #when its shared extension loads #then it registers nothing, throws nothing, and never evaluates the workpool graph", async () => {
+  useTestTimeout(15000)
   const worker = fileURLToPath(new URL("../../workpool/process-worker.ts", import.meta.url))
   const entry = new URL("./index.ts", import.meta.url).href
   const child = Bun.spawn([process.execPath, "--eval", `
@@ -23,7 +26,7 @@ test("#given a session with no member identity #when its shared extension loads 
     let errorCode = null;
     try { await register({}); } catch (error) { errorCode = error.code; }
     console.log(JSON.stringify({ evaluations, errorCode }));
-  `], { cwd: import.meta.dir, stdout: "pipe", stderr: "pipe", timeout: 10000 })
+  `], { cwd: import.meta.dir, stdout: "pipe", stderr: "pipe", timeout: spawnTimeout() })
   const [exitCode, stdout, stderr] = await Promise.all([
     child.exited, new Response(child.stdout).text(), new Response(child.stderr).text(),
   ])

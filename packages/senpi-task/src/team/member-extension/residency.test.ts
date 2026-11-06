@@ -13,6 +13,7 @@ import { RpcProcessRunner } from "../../runners/rpc-process"
 import { createMemberSelfPoller } from "./self-poller"
 import { realColdRevive } from "../../lifecycle/__fixtures__/real-cold-revive"
 import { createColdReviveTrace, type ColdReviveTrace } from "../../lifecycle/__fixtures__/cold-revive-trace"
+import { useTestTimeout } from "../../../../../test-support/test-deadline"
 
 const TEAM_RUN_ID = "11111111-1111-4111-8111-111111111111"
 const MESSAGE_ID = "22222222-2222-4222-8222-222222222222"
@@ -35,6 +36,7 @@ afterEach(async () => {
 
 describe("member injection residency", () => {
   test("#given configured TTL and a real process member #when parked then messaged by task id #then detach_rpc resumes one acknowledged turn", async () => {
+    useTestTimeout(20000)
     const trace = createColdReviveTrace()
     activeTrace = trace
     const result = await realColdRevive("process", false, { idleTimeoutMs: 37, team: true, trace }).finally(() => {

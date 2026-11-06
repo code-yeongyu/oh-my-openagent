@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, jest, test } from "bun:test"
 import { setImmediate } from "node:timers/promises"
 
-import { bounded } from "../lifecycle/__fixtures__/live-parent-clock"
+import { bounded, LIVE_PARENT_TEARDOWN_BOUND_MS } from "../lifecycle/__fixtures__/live-parent-clock"
 import { readEvents } from "../lifecycle/__fixtures__/lifecycle-fakes"
 import { baseSpec, cleanupProjects, FakeRunner, makeHandle, makeManager } from "./__fixtures__/manager-fakes"
 import type { ManagedRunner } from "./types"
+import { remainingTestTime } from "../../../../test-support/test-deadline"
 
 afterEach(cleanupProjects)
 
@@ -36,7 +37,7 @@ describe("shutdown teardown failure containment", () => {
       const starting = manager.start(baseSpec({ execution_mode: "process" }))
       const taskId = await bounded(entered.promise)
       const watchdog = Promise.withResolvers<never>()
-      const timer = setTimeout(() => watchdog.reject(new Error("shutdown did not contain teardown failure")), 2_000)
+      const timer = setTimeout(() => watchdog.reject(new Error("shutdown did not contain teardown failure")), remainingTestTime())
       const shutdownBoundMs = 5_000
       jest.useFakeTimers()
       try {
@@ -60,8 +61,8 @@ describe("shutdown teardown failure containment", () => {
         jest.useRealTimers()
         clearTimeout(timer)
         release.resolve()
-        await bounded(starting)
-        await bounded(manager.whenLaunched?.(taskId) ?? Promise.resolve())
+        await bounded(starting, LIVE_PARENT_TEARDOWN_BOUND_MS)
+        await bounded(manager.whenLaunched?.(taskId) ?? Promise.resolve(), LIVE_PARENT_TEARDOWN_BOUND_MS)
       }
       expect(manager.residentTaskIds()).not.toContain(taskId)
       expect(disposed).toBe(true)

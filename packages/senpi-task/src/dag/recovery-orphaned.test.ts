@@ -18,6 +18,7 @@ import type { DagTaskOwner, OwnedStartResult } from "./owner"
 import { createDagRecovery } from "./recovery"
 import { createDagFileStore } from "./store"
 import type { DagNode, DagNodeId, DagRunId } from "./types"
+import { useTestTimeout } from "../../../../test-support/test-deadline"
 
 const cleanupRoots: string[] = []
 const parentSessionId = "session-parent"
@@ -212,6 +213,7 @@ class HoldingTaskManager implements TaskManager {
 
 describe("DAG resume liveness gate on running nodes", () => {
   test("#given running nodes whose children nobody in this host holds #when the session resumes #then they fail as resume_task_orphaned in the durable checkpoint instead of staying running", async () => {
+    useTestTimeout(30_000)
     // given - the dag_5cf0bec7 checkpoint: two running nodes, one parked daemon child, one
     // foreign-resident child, and a dependent gate behind them
     const projectDir = tempProject()
@@ -272,6 +274,7 @@ describe("DAG resume liveness gate on running nodes", () => {
   }, 30_000)
 
   test("#given a running node whose child this host holds #when the session resumes #then it is reattached and folds when the child settles", async () => {
+    useTestTimeout(30_000)
     // given - control: the same record shape as the foreign case, but this host holds the handle
     const projectDir = tempProject()
     const store = createDagFileStore({ project_dir: projectDir })
@@ -301,6 +304,7 @@ describe("DAG resume liveness gate on running nodes", () => {
   }, 30_000)
 
   test("#given a never-started node whose recovery start is queued without a handle #when the session resumes #then the fresh child is not judged orphaned", async () => {
+    useTestTimeout(30_000)
     // given - a scheduled node with no task: recovery starts it, and admission queues it (pending,
     // no resident handle yet) until a lease frees
     const projectDir = tempProject()

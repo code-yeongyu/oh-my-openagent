@@ -6,6 +6,7 @@ import type { EffectiveModelRecord, ResolvedModelRecord, TaskRecord } from "../.
 import type { TaskToolDetails } from "./types"
 import { CTX, createFakeManager, makeDeps, makeRecord } from "./__fixtures__/task-tool-fakes"
 import { buildTaskExecute } from "./execute"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 type Deferred<T> = { readonly promise: Promise<T>; resolve(value: T): void; reject(reason: unknown): void }
 
@@ -16,7 +17,7 @@ function deferred<T>(): Deferred<T> {
 }
 
 // Bounded wait on a signal: GREEN resolves through the event, RED fails with a named reason.
-function withinBudget<T>(promise: Promise<T>, reason: string, budgetMs = 2_000): Promise<T> {
+function withinBudget<T>(promise: Promise<T>, reason: string, budgetMs = remainingTestTime()): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const deadline = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new Error(reason)), budgetMs)

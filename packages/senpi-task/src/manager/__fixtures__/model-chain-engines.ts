@@ -12,9 +12,9 @@ import { createRpcManagedRunner } from "../runner"
 import type { ManagedRunner } from "../types"
 import type { Step } from "./model-chain-answers"
 import { ENGINE_MODELS, startHttpProviders } from "./model-chain-http"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const HOST_READY_LINE = "senpi rpc listening on"
-const HOST_READY_TIMEOUT_MS = 30_000
 
 export type EngineRunnerKind = "process" | "host"
 
@@ -141,7 +141,7 @@ async function hostEngine(root: string, engineEnv: Readonly<Record<string, strin
 function hostListening(host: ChildProcess): Promise<void> {
   const { promise, resolve, reject } = Promise.withResolvers<void>()
   let stderr = ""
-  const timer = setTimeout(() => reject(new Error(`senpi host did not listen within ${HOST_READY_TIMEOUT_MS} ms: ${stderr}`)), HOST_READY_TIMEOUT_MS)
+  const timer = setTimeout(() => reject(new Error(`senpi host did not listen within the test budget: ${stderr}`)), remainingTestTime())
   host.stderr?.on("data", (chunk: Buffer) => {
     stderr += chunk.toString()
     if (stderr.includes(HOST_READY_LINE)) resolve()

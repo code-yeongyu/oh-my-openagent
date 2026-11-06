@@ -7,9 +7,10 @@ import type { ManagedStartSpec } from "../../manager/types"
 import type { PendingSteeringEntry } from "../../state"
 import { fixture, fixtureHandle, poolInput, bounded, deferred } from "./admission"
 import type { WorkpoolEvent, WorkpoolYield } from "../types"
+import { testBudgetSignal } from "../../../../../test-support/test-deadline"
 
 export { bounded, deferred }
-export const signal = () => AbortSignal.timeout(5000)
+export const signal = () => testBudgetSignal("the awaited workpool event")
 export function deliveryFixture(options: {
   readonly mode?: "fresh" | "keep_alive"
   readonly agent?: string

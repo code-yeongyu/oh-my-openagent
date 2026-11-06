@@ -14,6 +14,7 @@ import { baseSpec, cleanupProjects, FakeRunner, settings, tempProject } from "./
 import { createTaskManager } from "./manager"
 import type { ManagedStartSpec } from "./types"
 import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
+import { testBudgetSignal } from "../../../../test-support/test-deadline"
 
 // Two revivals race the runtime-fallback close from the lifecycle side, where steering's closing fence
 // does not reach: a session reload that revives the task, and a cancel that lands while a dead owner's
@@ -95,7 +96,7 @@ describe("lifecycle revivals racing the runtime-fallback close", () => {
         const revivedControl = runner.handles.get(task.task_id)
         runner.finishClose.resolve()
         await oldLeaseReturned.promise
-        const done = manager.waitFor(task.task_id, { signal: AbortSignal.timeout(5_000) })
+        const done = manager.waitFor(task.task_id, { signal: testBudgetSignal("manager.waitFor to settle") })
         revivedControl?.settle({ status: "completed", finalResponse: "revived run result" })
 
         // then

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 
 import { baseSpec, cleanupProjects, makeManager, settings } from "../manager/__fixtures__/manager-fakes"
 import type { ResolvedChildPlan } from "../manager/types"
@@ -7,11 +7,15 @@ import { createDagManager } from "./manager"
 import { createDagScheduler, type DagScheduler } from "./scheduler"
 import { createDagFileStore } from "./store"
 import type { DagRunEvent } from "./types"
+import { remainingTestTime, useTestTimeout } from "../../../../test-support/test-deadline"
 
 // bunfig preloads test-setup.ts to raise the default timeout, but Bun honours a preload's
 // setDefaultTimeout only for the FIRST test file of a run; every later file silently reverts to
 // the built-in 5000ms. Set the floor here, where Bun does honour it.
-setDefaultTimeout(process.platform === "win32" ? 60_000 : 20_000)
+const FILE_TEST_TIMEOUT_MS = process.platform === "win32" ? 60_000 : 20_000
+setDefaultTimeout(FILE_TEST_TIMEOUT_MS)
+// Budget waits read the declared timeout, not the suite default (#10814).
+beforeEach(() => useTestTimeout(FILE_TEST_TIMEOUT_MS))
 
 const parentSessionId = "session-spill-parent"
 const rootSessionId = "session-spill-root"
@@ -50,9 +54,9 @@ function definition(): DagDefinition {
   }
 }
 
-function within<T>(promise: Promise<T>, ms = 2000): Promise<T> {
+function within<T>(promise: Promise<T>, what: string, ms = remainingTestTime()): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error(`wave stalled after ${ms}ms`)), ms)
+    const timeout = setTimeout(() => reject(new Error(`wave stalled: waited out the test budget (${ms} ms) for ${what}`)), ms)
     void promise.then(
       (value) => {
         clearTimeout(timeout)
@@ -105,7 +109,7 @@ describe("DAG scheduler wave spill-through", () => {
     const waveCompleted = whenEvent(scheduler, (event) => event.type === "dag.wave.completed")
     const runPromise = scheduler.run()
 
-    await within(becameRunning)
+    await within(becameRunning, "becameRunning")
 
     const node = scheduler.snapshot().nodes.find((entry) => String(entry.id) === "worker")
     expect(node?.state).toBe("running")
@@ -131,8 +135,8 @@ describe("DAG scheduler wave spill-through", () => {
     if (spilled === undefined) throw new Error("expected spilled child handle")
     spilled.settle({ status: "completed", finalResponse: "spilled" })
 
-    const snapshot = await within(runPromise)
-    await within(waveCompleted)
+    const snapshot = await within(runPromise, "runPromise")
+    await within(waveCompleted, "waveCompleted")
 
     expect(snapshot.status).toBe("completed")
     expect(snapshot.nodes).toEqual([

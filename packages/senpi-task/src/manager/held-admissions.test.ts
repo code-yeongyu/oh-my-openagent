@@ -4,13 +4,14 @@ import { PauseRegistry, type PauseParticipant } from "../pause/registry"
 import { createTaskRecordStore } from "../store"
 import { createTaskManager } from "./manager"
 import { baseSpec, categoryPlanner, cleanupProjects, FakeRunner, launchSettled, settings, tempProject } from "./__fixtures__/manager-fakes"
+import { remainingTestTime, useTestTimeout } from "../../../../test-support/test-deadline"
 
 afterEach(cleanupProjects)
 
 function bounded<T>(promise: Promise<T>): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const deadline = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(() => reject(new Error("held first launch did not settle")), 5000)
+    timer = setTimeout(() => reject(new Error("held first launch did not settle")), remainingTestTime())
   })
   return Promise.race([promise, deadline]).finally(() => { if (timer !== undefined) clearTimeout(timer) })
 }
@@ -63,6 +64,7 @@ test("Stop withdraws the queued first launch without releasing a foreign root's 
 })
 
 test.each([false, true])("held first launch resumes once with original identity and allocation (fresh manager: %s)", async freshManager => {
+  useTestTimeout(15000)
   const { make, store } = fixture()
   const barrier = new AdmissionBarrier()
   const runner = new FakeRunner()

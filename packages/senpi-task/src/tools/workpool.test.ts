@@ -9,6 +9,7 @@ import { buildWorkpoolExecute } from "./workpool"
 import { WorkpoolParams, WorkpoolYieldParams } from "./workpool-schema"
 import { registerProcessWorkpoolWorker } from "../workpool/process-worker"
 import type { TSchema } from "typebox"
+import { testBudgetSignal } from "../../../../test-support/test-deadline"
 
 function host() {
   const f = fixture()
@@ -108,7 +109,7 @@ test("#given an assigned worker #when it forges another key or parent operation 
   // given
   const f = host()
   const pool = f.manager.workpools.create(f.caller, poolInput)
-  const dispatched = f.manager.workpools.waitForEvent(pool.pool_id, "dispatched", AbortSignal.timeout(5000))
+  const dispatched = f.manager.workpools.waitForEvent(pool.pool_id, "dispatched", testBudgetSignal("f.manager.workpools.waitForEvent to settle"))
   f.manager.workpools.push(f.caller, pool.pool_id, [{ key: "a", input: 1 }])
   const event = await dispatched
   if (event.task_id === undefined) throw new Error("missing assignment")
@@ -131,7 +132,7 @@ test("#given a process worker launch #when the member bundle registers #then onl
   // given
   const f = fixture({ config: { default_execution_mode: "process" } })
   const pool = f.manager.workpools.create(f.caller, poolInput)
-  const dispatched = f.manager.workpools.waitForEvent(pool.pool_id, "dispatched", AbortSignal.timeout(5000))
+  const dispatched = f.manager.workpools.waitForEvent(pool.pool_id, "dispatched", testBudgetSignal("f.manager.workpools.waitForEvent to settle"))
   f.manager.workpools.push(f.caller, pool.pool_id, [{ key: "a", input: 1 }])
   await dispatched
   const env = f.starts[0]?.memberEnv
@@ -158,8 +159,8 @@ test("#given a queued plan-gated worker #when the host policy changes before gra
   const poolId = created.details.pool_id
   if (typeof poolId !== "string") throw new Error("missing pool ID")
   const pool = f.manager.workpools.inspect(f.caller, poolId)
-  const waiting = f.manager.workpools.waitForEvent(pool.pool_id, "waiting", AbortSignal.timeout(5000))
-  const failed = f.manager.workpools.waitForEvent(pool.pool_id, "admission_failed", AbortSignal.timeout(5000))
+  const waiting = f.manager.workpools.waitForEvent(pool.pool_id, "waiting", testBudgetSignal("f.manager.workpools.waitForEvent to settle"))
+  const failed = f.manager.workpools.waitForEvent(pool.pool_id, "admission_failed", testBudgetSignal("f.manager.workpools.waitForEvent to settle"))
   await execute({ op: "push", pool_id: pool.pool_id, items: [{ key: "a", input: 1 }] }, ctx)
   await waiting
   // when

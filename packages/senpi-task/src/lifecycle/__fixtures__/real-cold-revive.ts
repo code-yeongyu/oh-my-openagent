@@ -23,6 +23,7 @@ import { createManagerResidencyRegistry } from "../../../../omo-senpi/src/compon
 import { runTaskSend } from "../../tools/control/send"
 import type { ColdReviveTrace } from "./cold-revive-trace"
 import { NO_HOST_ENDPOINT } from "../host-session"
+import { testBudgetSignal } from "../../../../../test-support/test-deadline"
 
 // A source-graph Bun child started in a sandbox writes Bun's runtime transpiler cache into a cold
 // location. On Windows those writes block the child for seconds (measured: 13-14 s with ~2.4 s CPU, 2 of 20
@@ -141,7 +142,7 @@ export async function realColdRevive(mode: "in-process" | "process", misleading 
     assert.equal(unrefs, 1)
     now += config.resident_idle_timeout_ms - 1
     assert.deepEqual(await lifecycle.reclaimIdleResidents?.(), [])
-    const suspended = once(events, "suspended", { signal: AbortSignal.timeout(15000) })
+    const suspended = once(events, "suspended", { signal: testBudgetSignal("events to emit 'suspended'") })
     now += 1
     const parkedAt = now
     trace?.mark("park_requested")
@@ -163,7 +164,7 @@ export async function realColdRevive(mode: "in-process" | "process", misleading 
     const result = await runTaskSend(manager, { to: record.task_id, message: "CONTINUE_SENTINEL" }, "fixture-parent")
     trace?.mark("task_send_accepted", result.details)
     assert.equal(result.details.kind, "revived")
-    const terminal = manager.waitFor(record.task_id, { signal: AbortSignal.timeout(15000) })
+    const terminal = manager.waitFor(record.task_id, { signal: testBudgetSignal("manager.waitFor to settle") })
     const request = await Promise.race([requestStarted.promise, terminal.then(() => assert.fail("terminal before provider request"))])
     assert(request.includes("TRANSCRIPT_SENTINEL"))
     assert(request.includes("CONTINUE_SENTINEL"))
@@ -202,7 +203,7 @@ export async function realColdRevive(mode: "in-process" | "process", misleading 
     trace?.mark("lease_probe_requested")
     const leaseProbe = await runTaskSend(manager, { to: record.task_id, message: "LEASE_PROBE" }, "fixture-parent")
     assert.equal(leaseProbe.details.kind, "revived")
-    await manager.waitFor(record.task_id, { signal: AbortSignal.timeout(15000) })
+    await manager.waitFor(record.task_id, { signal: testBudgetSignal("manager.waitFor to settle") })
     assert.equal(calls, 2)
     const queuedRequest = providerRequests[1]
     assert(queuedRequest !== undefined)

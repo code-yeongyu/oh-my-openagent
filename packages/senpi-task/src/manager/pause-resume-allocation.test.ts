@@ -6,13 +6,14 @@ import { cleanupProjects, makeHandle, tempProject } from "./__fixtures__/manager
 import type { RunnerOutcome } from "./child-handle"
 import { TaskConcurrency } from "./concurrency"
 import { createTaskRunPause } from "./run-pause"
+import { remainingTestTime, useTestTimeout } from "../../../../test-support/test-deadline"
 
 afterEach(cleanupProjects)
 
 function bounded<T>(promise: Promise<T>): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const deadline = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(() => reject(new Error("saved Resume allocation was not granted")), 5000)
+    timer = setTimeout(() => reject(new Error("saved Resume allocation was not granted")), remainingTestTime())
   })
   return Promise.race([promise, deadline]).finally(() => { if (timer !== undefined) clearTimeout(timer) })
 }
@@ -21,6 +22,7 @@ test.each([
   { model: "anthropic/claude", laneKey: "anthropic", sequence: 0 },
   { model: "test/original", laneKey: "test", sequence: 0 },
 ])("cold Resume keeps saved allocation ahead of newer work ($model)", async allocation => {
+  useTestTimeout(15000)
   const store = createTaskRecordStore({ project_dir: tempProject() })
   const record = seedRecord(store, { task_id: "st_0a675202", status: "paused", run_epoch: 7 })
   const concurrency = new TaskConcurrency({ provider_concurrency: { anthropic: 1, test: 1 }, global_concurrency: 1 })

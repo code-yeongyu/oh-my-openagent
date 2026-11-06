@@ -8,6 +8,10 @@ import { fakeHostTransport } from "../__fixtures__/fake-host-transport"
 
 type Frame = Record<string, unknown>
 export type ContractHostOptions = {
+  /** Bounds for the server's own waits. `listen` runs in the body and may take the test budget (test bodies pass it via
+   * withBudgetedContractHost); it defaults to a fixed 2 s because the child script ask-host-default-root.ts runs this helper
+   * without a per-test budget. `closeMs` bounds the close wait in finally, so it is always a fixed teardown bound. */
+  readonly bounds?: { readonly listen?: (what: string) => AbortSignal; readonly closeMs?: number }
   readonly legacy?: boolean
   readonly auth?: boolean
   readonly durableId?: string
@@ -64,6 +68,10 @@ export const ATTACH_GATE_EXEMPT: ReadonlySet<string> = new Set([
 ])
 
 /** Enforces the public v1.1 wire contract, including connection-local attachment ownership. */
+const fixedContractHostBound = (_what: string): AbortSignal => AbortSignal.timeout(2000)
+/** Teardown bound for the close wait in finally: the test budget may already be spent there. */
+const CONTRACT_HOST_CLOSE_BOUND_MS = 2000
+
 export async function withContractHost(options: ContractHostOptions, exercise: (host: ContractHost) => Promise<void>): Promise<void> {
   const root = mkdtempSync(join(tmpdir(), "rpc-client-"))
   const socket = join(root, "rpc.sock")
@@ -211,12 +219,12 @@ export async function withContractHost(options: ContractHostOptions, exercise: (
     })
   }))
   try {
-    const listening = once(server, "listening", { signal: AbortSignal.timeout(2000) })
+    const listening = once(server, "listening", { signal: (options.bounds?.listen ?? fixedContractHostBound)("the contract host to listen") })
     server.listen(transport.listenAddress)
     await listening
     await exercise({ socket, root, recordPath, frames, mutations, permissionPreset: () => preset, drain: () => { draining = true } })
   } finally {
-    const closed = once(server, "close", { signal: AbortSignal.timeout(2000) })
+    const closed = once(server, "close", { signal: AbortSignal.timeout(options.bounds?.closeMs ?? CONTRACT_HOST_CLOSE_BOUND_MS) })
     for (const client of sockets) client.destroy()
     server.close()
     await closed

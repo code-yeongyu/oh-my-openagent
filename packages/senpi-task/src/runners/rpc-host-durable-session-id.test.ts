@@ -3,6 +3,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { isHostSessionHandle } from "./rpc-host"
 import { childSpec, hostRunnerHarness } from "./rpc-host.test-support"
 import type { RpcRunnerSpec } from "./types"
+import { remainingTestTime } from "../../../../test-support/test-deadline"
 
 const harness = hostRunnerHarness()
 afterEach(() => harness.release())
@@ -14,7 +15,7 @@ function unpinnedSpec(): RpcRunnerSpec {
 
 function durableIdHeard(handle: { onDurableSessionId(listener: (id: string) => void): () => void }): Promise<string> {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("waited 5s for a heartbeat to report the durable id; none did")), 5_000)
+    const timer = setTimeout(() => reject(new Error("waited out the test budget for a heartbeat to report the durable id; none did")), remainingTestTime())
     const stop = handle.onDurableSessionId((id) => {
       clearTimeout(timer)
       stop()

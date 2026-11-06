@@ -14,6 +14,7 @@ import { createTaskRecordStore } from "../store"
 import { createTaskLifecycle } from "./create"
 import { FakeRegistry } from "./__fixtures__/lifecycle-fakes"
 import { NO_HOST_ENDPOINT } from "./host-session"
+import { useTestTimeout } from "../../../../test-support/test-deadline"
 
 afterEach(cleanupProjects)
 
@@ -23,6 +24,7 @@ describe("idle cold revival", () => {
   })
 
   test("#given configured idle retention #when an acknowledged send refreshes updated_at #then the old boundary cannot park it", async () => {
+    useTestTimeout(20000)
     const result = await realColdRevive("in-process", false, { idleTimeoutMs: 37 })
     expect(result).toMatchObject({ cadenceMs: 37, earlyParkAfterSend: false, parked: "persisted_only", messageCount: 1 })
   }, 20000)
