@@ -1,5 +1,5 @@
 import { LOCAL_BLOB_MAX, LOCAL_CHUNK_MAX, LOCAL_INLINE_MAX, lineBytes } from "./limits.ts";
-import type { CommandBlobRef, CommandEvent, SessionEndpointsData } from "./protocol-delegated.ts";
+import type { CommandBlobRef, CommandEvent, SessionCandidate, SessionEndpointsData } from "./protocol-delegated.ts";
 import {
   base64Bytes,
   commandId,
@@ -26,12 +26,29 @@ const ENDPOINTS_MAX = 16;
 export const endpointKey = (v: unknown, what = "endpoint"): string =>
   typeof v === "string" && ENDPOINT_KEY.test(v) ? v : fail(what);
 
-export const DELEGATED_REQUEST_VALIDATORS: RequestValidators<"session.endpoints"> = {
+// #393 part B: the durable engine session id a locate carries (1-128 characters, docs/local-api.md session.locate).
+const ENGINE_ID_MAX_CHARS = 128;
+const engineId = (v: unknown): string =>
+  typeof v === "string" && v.length >= 1 && v.length <= ENGINE_ID_MAX_CHARS && v.isWellFormed()
+    ? v
+    : fail("engine_id");
+export const DELEGATED_REQUEST_VALIDATORS: RequestValidators<"session.endpoints" | "session.locate"> = {
   "session.endpoints": (v, id) => ({
     id,
     type: "session.endpoints",
     device: deviceId(requestFields(v, ["device"])["device"]),
   }),
+  "session.locate": (v, id) => {
+    const m = requestFields(v, ["device", "engine_id"]);
+    return { id, type: "session.locate", device: deviceId(m["device"]), engine_id: engineId(m["engine_id"]) };
+  },
+};
+/** session.locate's answer: the device, the stream key the device's listing names the session by, and `<device>.<key>`. */
+export const locateData = (v: unknown): SessionCandidate => {
+  const m = exactly(v, ["device", "key", "session"], [], "data");
+  const device = deviceId(m["device"]);
+  const key = endpointKey(m["key"], "key");
+  return m["session"] === `${device}.${key}` ? { device, key, session: `${device}.${key}` } : fail("session");
 };
 export const endpointsData = (v: unknown): SessionEndpointsData => {
   const endpoints = exactly(v, ["endpoints"], [], "data")["endpoints"];

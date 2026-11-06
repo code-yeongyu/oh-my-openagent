@@ -5,7 +5,13 @@ export type DeviceServiceSessionsOptions = {
   readonly version: string
   /** Test seam: the proven local API connection (the device service SDK by default). */
   readonly connect?: () => Promise<DeviceService>
+  /** Test seam: the wait between attaches of a just-created session while its device's listing catches up. */
+  readonly retryDelay?: (ms: number) => Promise<void>
 }
+
+// A device lists a session it just created only after its next listing change, and session.attach resolves against
+// that listing: live runs saw 2.5 s to 6.6 s (2026-11-06). Past this bound the create still names the session's key.
+const CREATED_ATTACH_WAIT_MS = 20_000
 
 type WireRpc = Parameters<RemoteAttach["command"]>[0]
 type WireValue = WireRpc[string]
@@ -64,6 +70,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
   let service: Promise<DeviceService> | undefined
   const attaches = new Map<string, Promise<RemoteAttach>>()
   const connect = options.connect ?? (() => connectDeviceService({ version: options.version }))
+  const retryDelay = options.retryDelay ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)))
   const svc = (): Promise<DeviceService> => service ??= connect().then(
     (connected) => {
       void connected.closed.then(() => { service = undefined; attaches.clear() })
@@ -147,6 +154,33 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       }
       const entries: JsonObject[] = page.entries.flatMap((item) => ("entry" in item && typeof item.entry === "object" && item.entry !== null && !Array.isArray(item.entry) ? [item.entry as JsonObject] : []))
       return { kind: "ok", response: { entries } }
+    },
+    locate: async (device, engineId) => {
+      let connected: DeviceService
+      try {
+        connected = await svc()
+      } catch (error) {
+        return { kind: "refused", reason: notSentReason(error) }
+      }
+      let key: string
+      try {
+        key = (await connected.locate(device, engineId)).key
+      } catch (error) {
+        return { kind: "refused", reason: error instanceof LocalApiError ? error.code : "locate_failed" }
+      }
+      // The session exists under `key` from here on; wait (bounded) until the listing names it so the next command's
+      // attach finds it, and keep that attach for it.
+      const deadline = Date.now() + CREATED_ATTACH_WAIT_MS
+      for (let wait = 250; ; wait = Math.min(wait * 2, 2_000)) {
+        try {
+          await attach(device, key)
+          break
+        } catch (error) {
+          if (!(error instanceof LocalApiError && error.code === "session_not_found") || Date.now() + wait > deadline) break
+          await retryDelay(wait)
+        }
+      }
+      return { kind: "ok", sessionId: key }
     },
   }
 }
