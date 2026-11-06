@@ -284,7 +284,8 @@ describe("omo remote bootstrap: this build's install", () => {
     const { code, result, runs, stateDir } = await bootstrapWith({ fetch: served.fetch })
     expect([code, result]).toEqual([REMOTE_EXIT.unavailable, { state: "service_degraded", notice: VERIFY_FAILED }])
     expect(served.requested.length).toBeGreaterThan(0)
-    expect([runs, existsSync(join(stateDir, "bin", DEVICE_SERVICE_VERSION))]).toEqual([[], false])
+    // #12580 item 3: the whole bin/ directory, not only bin/<version>: a staging dir left behind is a write too.
+    expect([runs, existsSync(join(stateDir, "bin"))]).toEqual([[], false])
   })
 
   test("a manifest the signed checksums do not cover is refused, writing and running nothing", async () => {
@@ -294,7 +295,7 @@ describe("omo remote bootstrap: this build's install", () => {
     const served = serveRelease(files, DEVICE_SERVICE_VERSION)
     const { code, result, runs, stateDir } = await bootstrapWith({ releaseKeys: [key.publicHex], fetch: served.fetch })
     expect([code, result]).toEqual([REMOTE_EXIT.unavailable, { state: "service_degraded", notice: VERIFY_FAILED }])
-    expect([runs, existsSync(join(stateDir, "bin", DEVICE_SERVICE_VERSION))]).toEqual([[], false])
+    expect([runs, existsSync(join(stateDir, "bin"))]).toEqual([[], false])
   })
 
   test("a release that needs a newer engine than this build bundles stops with update_required, writing nothing", async () => {
@@ -307,7 +308,7 @@ describe("omo remote bootstrap: this build's install", () => {
       REMOTE_EXIT.unavailable,
       { state: "update_required", notice: `This OmO device service needs engine ${minEngine} or later. Update OmO, then try again.` },
     ])
-    expect([runs, existsSync(join(stateDir, "bin", DEVICE_SERVICE_VERSION))]).toEqual([[], false])
+    expect([runs, existsSync(join(stateDir, "bin"))]).toEqual([[], false])
   })
 
   test("an unreachable release endpoint stops with the download notice, writing nothing", async () => {

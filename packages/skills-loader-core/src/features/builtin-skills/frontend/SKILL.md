@@ -5,7 +5,7 @@ description: "Builds, styles, and polishes anything drawn with HTML, CSS, or SVG
 
 # Frontend
 
-This file is a router over `references/`; the rules live there. The flow is ground -> brief -> build -> subtract -> verify. The bar is restraint with a visible hierarchy: one primary action, the important thing first, nothing on the screen without a job. A quiet, correct screen that holds its hierarchy at 390 and 1440 in both themes is a finish. Atmosphere, motion, and award-grade surface work are opt-in: build them when the brief asks (a named brand, "premium", "make it stunning", a marketing page), never by default for an internal tool, dashboard, admin screen, report, or figure.
+This file is a router over `references/`; the rules live there. The flow is ground -> brief -> build -> subtract -> verify. The bar is restraint with a visible hierarchy: one primary action, the important thing first, nothing on the screen without a job. A quiet, correct screen that holds its hierarchy at 390 and 1440 in both themes is a finish. Atmosphere, motion, and award-grade surface work are opt-in: build them when the brief asks (a named brand, "premium", "make it stunning", a marketing page), never by default for an internal tool, dashboard, admin screen, report, or figure. An inline page shown beside a reply (a chart, table, or diagram for `show_html_page`, `html_preview`, or `html_render`) follows the `visualize` skill when it is available; either way it is exempt from the `DESIGN.md` gate, the Lighthouse audit, and the research lanes, and keeps the build rules, the Draft guard, and the lint.
 
 ## Route: name the references, read exactly those
 
@@ -131,7 +131,7 @@ uv run $SKILL_DIR/scripts/perfection/lighthouse-audit.py https://localhost:3000
 
 ```bash
 python3 -B $SKILL_DIR/references/ui-ux-db/scripts/search.py "<query>" --design-system -p "Project"   # design-system generation
-python3 -B $SKILL_DIR/references/ui-ux-db/scripts/search.py "<query>" --domain <domain>             # product style typography color landing chart ux react web prompt
+python3 -B $SKILL_DIR/references/ui-ux-db/scripts/search.py "<query>" --domain <domain>             # product style typography color landing chart ux react web icons google-fonts
 python3 -B $SKILL_DIR/references/ui-ux-db/scripts/search.py "<query>" --stack <stack>               # html-tailwind react nextjs vue svelte astro swiftui react-native flutter shadcn jetpack-compose
 ```
 

@@ -1,7 +1,8 @@
-import { resolveModelForDelegateTask } from "@oh-my-opencode/delegate-core"
+import { resolveModelForDelegateTask, type DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 
 import type { SenpiModelPort, SenpiModelRegistryPort } from "../category"
+import { missingChainProviders } from "../category/chain-diagnostics"
 import { firstCategoryDefaultModel, resolveAgentCategoryModel } from "./resolve-agent-categories"
 import { buildRuntimeModelChain, chainRungCandidates } from "../model-chain"
 import { withoutExcludedModels } from "../model-exclusion"
@@ -12,7 +13,7 @@ import {
   parseAvailableAgentModels,
   type ParsedAgentModel,
 } from "./agent-model-registry"
-import { agentToolPolicy } from "./agent-tool-policy"
+import { agentPersona } from "./agent-persona"
 import { AGENT_FALLBACK_CHAINS } from "./builtin/fallback-chains"
 import { canonicalAgentName } from "./builtin/legacy-agent-names"
 import type { AgentDefinition } from "./types"
@@ -23,7 +24,7 @@ export type ResolveAgentOptions = {
   readonly distributeModels?: import("@oh-my-opencode/omo-config-core").ModelDistributor
 }
 
-type AgentPersona = {
+export type AgentPersona = {
   readonly agentType: string
   readonly instructions?: string
   readonly toolAllowlist?: readonly string[]
@@ -56,6 +57,10 @@ export type AgentModelUnavailableResult = {
   readonly agent: string
   readonly attemptedModel: string | undefined
   readonly availableAgents: readonly string[]
+  // The builtin chain this machine could not serve, and the chain providers it has not connected:
+  // carried so the spawn refusal can name every model instead of one "attempted" id.
+  readonly attempted_chain?: readonly DelegateFallbackEntry[]
+  readonly missing_providers?: readonly string[]
 }
 
 export type AgentResolutionResult = ResolvedAgentResult | AgentNotFoundResult | AgentModelUnavailableResult
@@ -105,7 +110,13 @@ export function resolveAgent<TModel extends SenpiModelPort>(
       ?? (fallbackHead !== undefined && fallbackProvider !== undefined
         ? `${fallbackProvider}/${fallbackHead.model}`
         : undefined)
-    return { kind: "model_unavailable", agent: name, attemptedModel, availableAgents }
+    return {
+      kind: "model_unavailable",
+      agent: name,
+      attemptedModel,
+      availableAgents,
+      ...(fallbackChain !== undefined ? { attempted_chain: fallbackChain } : {}),
+    }
   }
 
   // `find` answers from the whole catalog, so a configured model the machine has no credentials for
@@ -207,18 +218,14 @@ export function resolveAgent<TModel extends SenpiModelPort>(
     }
   }
 
-  return { kind: "model_unavailable", agent: name, attemptedModel, availableAgents }
-}
-
-function agentPersona(name: string, definition: AgentDefinition): AgentPersona {
-  const agentExecutionMode = toExecutionMode(definition.executionMode)
   return {
-    agentType: name,
-    ...(definition.prompt !== undefined ? { instructions: definition.prompt } : {}),
-    ...agentToolPolicy(definition),
-    ...(agentExecutionMode !== undefined ? { agentExecutionMode } : {}),
-    ...(definition.allowedSubagents !== undefined ? { allowedSubagents: definition.allowedSubagents } : {}),
-    ...(definition.maxDepth !== undefined ? { maxDepth: definition.maxDepth } : {}),
+    kind: "model_unavailable",
+    agent: name,
+    attemptedModel,
+    availableAgents,
+    ...(fallbackChain !== undefined && availableModels !== undefined
+      ? { attempted_chain: fallbackChain, missing_providers: missingChainProviders(fallbackChain, availableModels) }
+      : {}),
   }
 }
 
@@ -258,12 +265,3 @@ function resolvedAgent(
   }
 }
 
-function toExecutionMode(value: string | undefined): AgentPersona["agentExecutionMode"] {
-  switch (value) {
-    case "in-process":
-    case "process":
-      return value
-    default:
-      return undefined
-  }
-}

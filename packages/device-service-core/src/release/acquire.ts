@@ -123,7 +123,10 @@ const install = async (
 export const acquireDeviceService = async (options: AcquireOptions): Promise<AcquireResult> => {
   const keys = releaseKeySetBytes(options.releaseKeys ?? DEVICE_SERVICE_RELEASE_KEYS)
   if (keys === undefined)
-    return refuse("release_key_invalid", "This omo build cannot verify device service releases. Update OmO.")
+    return refuse(
+      "release_key_invalid",
+      "This omo build carries no usable device service release key, so it cannot verify device service releases. That is a defect in this build: report it with /bug.",
+    )
   const get = downloader(
     options.fetch ?? globalThis.fetch,
     `${options.origin ?? DEVICE_SERVICE_ORIGIN}/${options.channel ?? "stable"}/device-service/${options.version}/`,
