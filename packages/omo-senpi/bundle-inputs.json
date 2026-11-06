@@ -75,6 +75,7 @@
     "packages/device-service-core/src/registrant.ts",
     "packages/device-service-core/src/release/acquire.ts",
     "packages/device-service-core/src/release/release-assets.ts",
+    "packages/device-service-core/src/release/release-key.json",
     "packages/device-service-core/src/release/release-signature.ts",
     "packages/device-service-core/src/release/version.ts",
     "packages/device-service-core/src/remote-attach.ts",

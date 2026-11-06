@@ -1,25 +1,59 @@
 import { spawnSync } from "node:child_process"
 import { strictEd25519Key, strictEd25519Verify } from "../strict-ed25519/strict-ed25519.ts"
+import committedReleaseKey from "./release-key.json"
 
-// The public key that signs device service releases, as 64 hex characters. Until the release key is published this is
-// the all-zeros value, which strictEd25519Key refuses, so every acquisition stops with release_key_invalid before it
-// downloads anything.
-export const DEVICE_SERVICE_RELEASE_KEY = "00".repeat(32)
+const HEX_KEY = /^[0-9a-f]{64}$/
+
+// release-key.json is a byte copy of the device service's own packages/relayd/release-key.json: the release key SET
+// (an operational and a recovery key, verified any-of). Parsed by the same rules as the service's parseReleaseKey, so
+// a file the service would refuse never becomes a different set here. A set that fails strictEd25519Key (the old
+// all-zeros placeholder did) stops every acquisition with release_key_invalid before it downloads anything.
+export const parseReleaseKeySet = (value: unknown): readonly string[] => {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error("release key: not an object")
+  if (Object.keys(value).toSorted().join(",") !== "alg,public_keys_hex")
+    throw new Error("release key: fields must be exactly alg and public_keys_hex")
+  const alg: unknown = Reflect.get(value, "alg")
+  const hexes: unknown = Reflect.get(value, "public_keys_hex")
+  if (alg !== "Ed25519") throw new Error("release key: alg must be Ed25519")
+  if (!Array.isArray(hexes)) throw new Error("release key: public_keys_hex must be an array")
+  if (new Set(hexes).size !== hexes.length) throw new Error("release key: public_keys_hex must not repeat a key")
+  return hexes.map((hex: unknown) => {
+    if (typeof hex !== "string" || !HEX_KEY.test(hex))
+      throw new Error("release key: each public_keys_hex entry must be 64 lowercase hex characters")
+    return hex
+  })
+}
+
+export const DEVICE_SERVICE_RELEASE_KEYS: readonly string[] = parseReleaseKeySet(committedReleaseKey)
 
 export type SignatureVerdict = { readonly ok: true } | { readonly ok: false; readonly refusal: "malformed" | "signature" }
 
 /**
- * The release check: the key must pass strictEd25519Key, then the signature must pass strictEd25519Verify over the
- * exact checksums.txt bytes. Nothing else decides, so inputs the runtime's own verifier accepts (the identity point,
- * S >= L) are refused here.
+ * The release check: every key of the set must pass strictEd25519Key, then the signature must pass
+ * strictEd25519Verify over the exact checksums.txt bytes under any one of them. Nothing else decides, so inputs the
+ * runtime's own verifier accepts (the identity point, S >= L) are refused here, and a set holding the placeholder
+ * next to a real key is refused as a whole.
  */
-export const verifyReleaseSignature = async (releaseKey: Uint8Array, signature: Uint8Array, checksums: Uint8Array): Promise<SignatureVerdict> => {
-  if (!strictEd25519Key(releaseKey)) return { ok: false, refusal: "malformed" }
-  return strictEd25519Verify(releaseKey, signature, checksums)
+export const verifyReleaseSignature = async (
+  releaseKeys: readonly Uint8Array[],
+  signature: Uint8Array,
+  checksums: Uint8Array,
+): Promise<SignatureVerdict> => {
+  if (releaseKeys.length === 0 || !releaseKeys.every(key => strictEd25519Key(key))) return { ok: false, refusal: "malformed" }
+  let verdict: SignatureVerdict = { ok: false, refusal: "signature" }
+  for (const key of releaseKeys) {
+    verdict = await strictEd25519Verify(key, signature, checksums)
+    if (verdict.ok || verdict.refusal === "malformed") return verdict
+  }
+  return verdict
 }
 
-export const releaseKeyBytes = (hex: string): Uint8Array | undefined =>
-  /^[0-9a-f]{64}$/.test(hex) ? new Uint8Array(Buffer.from(hex, "hex")) : undefined
+/** The key set as bytes, or undefined when it is empty, repeats a key, or holds an entry that is not a strict key. */
+export const releaseKeySetBytes = (hexes: readonly string[]): readonly Uint8Array[] | undefined => {
+  if (hexes.length === 0 || new Set(hexes).size !== hexes.length || !hexes.every(hex => HEX_KEY.test(hex))) return undefined
+  const keys = hexes.map(hex => new Uint8Array(Buffer.from(hex, "hex")))
+  return keys.every(key => strictEd25519Key(key)) ? keys : undefined
+}
 
 // The macOS signing identity of the release binary. The identifier is not published yet, so no binary passes until it is.
 const SIGNING_IDENTIFIER = ""
