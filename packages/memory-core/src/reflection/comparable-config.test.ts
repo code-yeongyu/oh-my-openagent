@@ -50,4 +50,44 @@ describe("stripOmoMaintenanceStamp", () => {
   it("#given no config at all #when filtered #then the result stays null", () => {
     expect(stripOmoMaintenanceStamp(null)).toBeNull()
   })
+
+  it("#given a backslash inside a trailing semicolon comment #when filtered #then the next line stays a real key", () => {
+    const config = "[omo]\n\tagentId = a\n\tmaintenanceAt = 1 ;\\\n\tagentId = evil\n"
+    expect(stripOmoMaintenanceStamp(config)).toBe("[omo]\n\tagentId = a\n\tagentId = evil\n")
+  })
+
+  it("#given a backslash inside a trailing hash comment #when filtered #then the next line stays a real key", () => {
+    const config = "[omo]\n\tmaintenanceAt = 1 #\\\n\tagentId = evil\n"
+    expect(stripOmoMaintenanceStamp(config)).toBe("[omo]\n\tagentId = evil\n")
+  })
+
+  it("#given a stamp value ending in an escaped backslash #when filtered #then the next line is not dropped as a continuation", () => {
+    const config = "[omo]\n\tmaintenanceAt = 1\\\\\n\tagentId = evil\n"
+    expect(stripOmoMaintenanceStamp(config)).toBe("[omo]\n\tagentId = evil\n")
+  })
+
+  it("#given a stamp on the header line ending in an escaped backslash #when filtered #then the next line stays a real key", () => {
+    const config = "[omo] maintenanceAt = 1\\\\\n\tagentId = evil\n"
+    expect(stripOmoMaintenanceStamp(config)).toBe("[omo]\n\tagentId = evil\n")
+  })
+
+  it("#given a continuation line ending in an escaped backslash #when filtered #then the value ends and the next key survives", () => {
+    const config = "[omo]\n\tmaintenanceAt = 1\\\n\t2\\\\\n\tagentId = evil\n"
+    expect(stripOmoMaintenanceStamp(config)).toBe("[omo]\n\tagentId = evil\n")
+  })
+
+  it("#given a continuation line whose trailing comment ends in a backslash #when filtered #then the next key survives", () => {
+    const config = "[omo]\n\tmaintenanceAt = 1\\\n\t2 ;\\\n\tagentId = evil\n"
+    expect(stripOmoMaintenanceStamp(config)).toBe("[omo]\n\tagentId = evil\n")
+  })
+
+  it("#given a stamp value with trailing whitespace after the backslash #when filtered #then the next line is not dropped as a continuation", () => {
+    const config = "[omo]\n\tmaintenanceAt = 1\\ \n\tagentId = evil\n"
+    expect(stripOmoMaintenanceStamp(config)).toBe("[omo]\n\tagentId = evil\n")
+  })
+
+  it("#given a quoted stamp value whose backslash sits inside the quotes at end of line #when filtered #then the next line still continues the value", () => {
+    const config = "[omo]\n\tmaintenanceAt = \"1\\\n\t2\"\n\tagentId = agent-one\n"
+    expect(stripOmoMaintenanceStamp(config)).toBe("[omo]\n\tagentId = agent-one\n")
+  })
 })
