@@ -1,4 +1,5 @@
 import type { EventOf, JsonObject, JsonValue, Status } from "./protocol.ts";
+import type { DelegatedEvent } from "./protocol-delegated.ts";
 import type {
   AttachPendingReason,
   BlobAbortReason,
@@ -24,6 +25,14 @@ export type ListingRow = {
   readonly updated_ms: number;
   readonly source: ListingSource;
   readonly as_of: number;
+  /**
+   * Only on rows of a `sessions.list` with `rows: 2` (#316). `kind`: as the host reports it (`interactive`, `worker`,
+   * or a kind this client does not know); absent means unknown, not interactive. `parent`: the session_id of the
+   * session this one was started from, on the same device; `parent_listed` says whether that row is in the listing.
+   */
+  readonly kind?: string;
+  readonly parent?: string;
+  readonly parent_listed?: boolean;
 };
 export type StatusChanged = EventOf<"status.changed", { readonly status: Status }>;
 export type SessionsRound = EventOf<
@@ -179,5 +188,6 @@ export type LocalEvent =
   | Detached
   | CommandStateEvent
   | ReadResult
-  | UploadAbort;
+  | UploadAbort
+  | DelegatedEvent;
 export type EventKind = LocalEvent["kind"];
