@@ -5,6 +5,30 @@ import { ENGINE, comparable, createRemoteThreadFixture } from "./thread-remote-f
 const { account, surface, cleanup } = createRemoteThreadFixture()
 afterEach(cleanup)
 
+describe("authoritative prompt admission", () => {
+  test("#given b was busy at preflight but starts this input #when admission names its turn #then the send and its retry are confirmed", async () => {
+    const a = account({ engine: { ...ENGINE, streaming: true }, promptResponse: { disposition: "started", turnId: "2" } })
+    const { run } = surface(a.remote)
+    const input = { thread: "dur-on-b", message: "once", idempotency_key: "admitted-turn" }
+    expect(await run("thread_send", input)).toMatchObject({ kind: "ok", delivery: { kind: "started", turn_id: "2" }, deduplicated: false })
+    expect(await run("thread_send", input)).toMatchObject({ kind: "ok", delivery: { kind: "started", turn_id: "2" }, deduplicated: true })
+    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "prompt")).toHaveLength(1)
+  })
+
+  test.each([
+    ["absent", { disposition: "started" }],
+    ["empty", { disposition: "started", turnId: "" }],
+    ["not started", { disposition: "handled", turnId: "2" }],
+  ] as const)("#given an %s authoritative admission identity #when sent and retried #then the existing uncertain result is preserved", async (_name, promptResponse) => {
+    const a = account({ promptResponse })
+    const { run } = surface(a.remote)
+    const input = { thread: "dur-on-b", message: "once", idempotency_key: "uncertain-turn" }
+    expect(await run("thread_send", input)).toMatchObject({ kind: "error", error: { code: "idempotency_uncertain" } })
+    expect(await run("thread_send", input)).toMatchObject({ kind: "error", error: { code: "idempotency_uncertain" } })
+    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "prompt")).toHaveLength(1)
+  })
+})
+
 describe("SC-R8: from this device on another (create, list, open, status, prompt, abort, fork)", () => {
 
   test("#given a running thread on b #when thread_read, thread_send and thread_interrupt name it #then messages, state, prompt and interrupt reach b's session", async () => {
