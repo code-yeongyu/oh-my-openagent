@@ -4,11 +4,12 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
 import { Duplex } from "node:stream"
 import { readFrames, writeFrame } from "./desktop-sync/framing"
 
 const senpiCli = join(dirname(createRequire(import.meta.url).resolve("@code-yeongyu/senpi/package.json")), "dist", "bundle", "cli.js")
-const fixture = new URL("./index-engine.fixture.ts", import.meta.url).pathname
+const fixture = fileURLToPath(new URL("./index-engine.fixture.ts", import.meta.url))
 
 type Frame = { readonly id: number; readonly op: string; readonly capability?: string; readonly request?: { readonly op: string } }
 type RpcLine = { readonly id?: string; readonly type?: string; readonly success?: boolean; readonly data?: unknown }

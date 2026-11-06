@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { spawn } from "node:child_process"
+import { fileURLToPath } from "node:url"
 import { Duplex } from "node:stream"
 import { readFrames, writeFrame } from "./desktop-sync/framing"
 
@@ -15,7 +16,7 @@ async function registration(scenario: string): Promise<{
   const fixture = scenario.startsWith("observer-")
     ? new URL("./index-observer.fixture.ts", import.meta.url)
     : new URL("./index-selection.fixture.ts", import.meta.url)
-  const child = spawn(process.execPath, [fixture.pathname, scenario], {
+  const child = spawn(process.execPath, [fileURLToPath(fixture), scenario], {
     env, stdio: ["ignore", "pipe", "pipe", "ignore", "ignore", "pipe"],
   })
   let output = ""
