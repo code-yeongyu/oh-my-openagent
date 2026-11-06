@@ -3,7 +3,6 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, renameSync, rmSync, writ
 import { join } from "node:path"
 import { posixSecureFile, type SecureFile } from "../local-api/access.ts"
 import { currentUserSid, windowsSecureFile } from "../local-api/dacl.ts"
-import { strictEd25519Key } from "../strict-ed25519/strict-ed25519.ts"
 import {
   BINARY_MAX_BYTES,
   CHECKSUMS,
@@ -17,11 +16,11 @@ import {
   SIGNATURE,
   SIGNATURE_BYTES,
 } from "./release-assets.ts"
-import { codeSignaturePasses, DEVICE_SERVICE_RELEASE_KEY, releaseKeyBytes, verifyReleaseSignature } from "./release-signature.ts"
+import { codeSignaturePasses, DEVICE_SERVICE_RELEASE_KEYS, releaseKeySetBytes, verifyReleaseSignature } from "./release-signature.ts"
 import { compareVersions } from "./version.ts"
 
 export { type DeviceServiceHost, deviceServiceAssetName, deviceServiceHost } from "./release-assets.ts"
-export { DEVICE_SERVICE_RELEASE_KEY, verifyReleaseSignature } from "./release-signature.ts"
+export { DEVICE_SERVICE_RELEASE_KEYS, verifyReleaseSignature } from "./release-signature.ts"
 
 const DEVICE_SERVICE_ORIGIN = "https://get.omo.dev"
 
@@ -36,8 +35,8 @@ export type AcquireOptions = {
   readonly engineVersion: string
   readonly channel?: string
   readonly origin?: string
-  /** Hex release key; the compiled-in DEVICE_SERVICE_RELEASE_KEY by default. */
-  readonly releaseKey?: string
+  /** Hex release key set, verified any-of; the compiled-in DEVICE_SERVICE_RELEASE_KEYS by default. */
+  readonly releaseKeys?: readonly string[]
   readonly fetch?: FetchRelease
   readonly verifyCodeSignature?: (path: string) => boolean
   readonly secure?: SecureFile
@@ -122,8 +121,8 @@ const install = async (
  * then latest.json against the pinned version and the bundled engine.
  */
 export const acquireDeviceService = async (options: AcquireOptions): Promise<AcquireResult> => {
-  const key = releaseKeyBytes(options.releaseKey ?? DEVICE_SERVICE_RELEASE_KEY)
-  if (key === undefined || !strictEd25519Key(key))
+  const keys = releaseKeySetBytes(options.releaseKeys ?? DEVICE_SERVICE_RELEASE_KEYS)
+  if (keys === undefined)
     return refuse("release_key_invalid", "This omo build cannot verify device service releases. Update OmO.")
   const get = downloader(
     options.fetch ?? globalThis.fetch,
@@ -132,7 +131,7 @@ export const acquireDeviceService = async (options: AcquireOptions): Promise<Acq
   const [checksums, signature] = await Promise.all([get(CHECKSUMS, CHECKSUMS_MAX_BYTES), get(SIGNATURE, SIGNATURE_BYTES)])
   if (typeof checksums === "string") return downloadRefusal(checksums)
   if (typeof signature === "string") return downloadRefusal(signature)
-  const verdict = await verifyReleaseSignature(key, signature, checksums)
+  const verdict = await verifyReleaseSignature(keys, signature, checksums)
   if (!verdict.ok) return refuse(verdict.refusal)
   const digests = parseChecksums(checksums)
   const binaryName = deviceServiceAssetName(options.host)

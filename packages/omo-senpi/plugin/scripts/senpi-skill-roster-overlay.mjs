@@ -6,13 +6,19 @@ const REFACTOR_ORACLE_PROSE = [
   ["Do not put \\`oracle\\` / \\`librarian\\` / a deep lane into the team spec: oracle/librarian are team-ineligible", "Do not put \\`librarian\\` / a deep lane into the team spec: librarian is team-ineligible"],
 ]
 
-// Each pair must match the synced text exactly once, so a reworded shared skill fails the sync instead of shipping the old name.
+// Applied per file: a pair replaces its text wherever it appears. The sync then requires each pair's REPLACEMENT to
+// occur exactly once across the whole skill (assertSenpiSkillRosterOverlay), so a reworded shared skill fails the
+// sync instead of shipping the old name, and a skill file without these lines is not an error.
 function replaceExactly(content, pairs) {
-  return pairs.reduce((text, [from, to]) => {
-    const count = text.split(from).length - 1
-    if (count !== 1) throw new Error(`senpi roster overlay: expected one "${from}", found ${count}`)
-    return text.replace(from, to)
-  }, content)
+  return pairs.reduce((text, [from, to]) => text.split(from).join(to), content)
+}
+
+export function assertSenpiSkillRosterOverlay(skillName, contents) {
+  if (skillName !== "refactor") return
+  for (const [from, to] of REFACTOR_ORACLE_PROSE) {
+    const count = contents.reduce((total, text) => total + text.split(to).length - 1, 0)
+    if (count !== 1) throw new Error(`senpi roster overlay: expected one "${from}" in skill ${skillName}, found ${count}`)
+  }
 }
 
 function routeNamedAgent(content, agentName, categoryName) {
