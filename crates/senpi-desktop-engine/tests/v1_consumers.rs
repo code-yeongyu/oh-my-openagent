@@ -152,7 +152,8 @@ struct DaemonDir(PathBuf);
 impl DaemonDir {
     fn new(index: usize) -> Self {
         let dir = std::env::temp_dir().join(format!("senpi-v1c-{}-{index}", std::process::id()));
-        std::fs::create_dir_all(&dir).expect("temp dir");
+        let _ = std::fs::remove_dir_all(&dir);
+        private_dir(&dir);
         Self(dir)
     }
 
@@ -163,6 +164,18 @@ impl DaemonDir {
             .expect("utf-8 path")
             .to_owned()
     }
+}
+
+/// The daemon refuses an endpoint directory group or other can enter (#12229).
+#[cfg(unix)]
+fn private_dir(dir: &std::path::Path) {
+    use std::os::unix::fs::DirBuilderExt;
+    std::fs::DirBuilder::new().mode(0o700).create(dir).expect("private temp dir");
+}
+
+#[cfg(not(unix))]
+fn private_dir(dir: &std::path::Path) {
+    std::fs::create_dir_all(dir).expect("temp dir");
 }
 
 impl Drop for DaemonDir {

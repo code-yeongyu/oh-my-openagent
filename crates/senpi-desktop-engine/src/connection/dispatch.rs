@@ -1,5 +1,5 @@
 //! Session admission and cancellation, shared by NDJSON and XPC connections.
-use super::{deliver, InFlight, Queued};
+use super::{deliver, InFlight, Outbound, Queued};
 use crate::{
     engine::Engine,
     rpc::{reply_line, Failure},
@@ -16,7 +16,7 @@ use tokio::{sync::mpsc, task::JoinSet};
 pub(super) async fn dispatch(
     engine: Arc<Engine>,
     mut queued: mpsc::UnboundedReceiver<Queued>,
-    out: mpsc::Sender<String>,
+    out: Outbound,
     in_flight: InFlight,
 ) {
     let mut waiters = JoinSet::new();
