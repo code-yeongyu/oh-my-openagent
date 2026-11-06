@@ -1,11 +1,11 @@
 # Visualization
 
 A chart exists to answer a question at a glance. A chart shown inline beside a reply
-(`show_html_page`, `html_preview`, `html_render`) is drawn in HTML through the `visualize`
-skill, never as a matplotlib PNG: an image ignores the reader's theme and width; there this
-file's chart-type table, Figures and Quality bar apply, and the matplotlib calls do not.
-Everywhere else (a kernel, a file, a document) render it with matplotlib (resident in most Python
-kernels; `uv run --with matplotlib` otherwise). Either way, look at it before delivering —
+(`show_html_page`, `html_preview`, `html_render`) is drawn in HTML, never as a matplotlib PNG:
+an image ignores the reader's theme and width. When the `visualize` skill is available, it builds
+that page. There this file's chart-type table, Figures and Quality bar apply, and the matplotlib
+calls do not. Everywhere else (a kernel, a file, a document) render it with matplotlib (resident
+in most Python kernels; `uv run --with matplotlib` otherwise). Either way, look at it before delivering —
 a chart nobody inspected is not evidence.
 
 ## When to chart
@@ -64,8 +64,8 @@ matplotlib.rcParams["axes.unicode_minus"] = False   # keeps the minus sign rende
 
 ## Output contract
 
-1. Inline page beside a reply: no PNG. Hand the computed figures to `visualize`, which draws
-   them in HTML and previews them in both themes.
+1. Inline page beside a reply: no PNG. Draw the computed figures in HTML and preview them in
+   both themes, following the `visualize` skill when it is available.
 2. Otherwise save a PNG next to the work: `plt.savefig(path, dpi=150, bbox_inches="tight")`,
    and also render it inline when the surface displays rich output (kernels usually do).
 3. Report the file path together with the answer.

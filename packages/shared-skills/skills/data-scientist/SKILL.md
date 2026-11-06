@@ -43,8 +43,8 @@ Per-surface patterns and pitfalls: read `references/execution-surfaces.md` befor
 - **numpy** when numeric work goes beyond SQL/DataFrame aggregation: statistical tests,
   linear algebra, FFT, random sampling.
 - **matplotlib** for charts in a kernel, a file or a document; a chart shown inline beside a
-  reply is drawn in HTML through the `visualize` skill. Read `references/visualization.md`
-  first either way; it carries the quality bar and a mandatory visual check.
+  reply is drawn in HTML instead. Read `references/visualization.md` first either way; it
+  carries the quality bar, the inline case and a mandatory visual check.
 
 Performance folklore ("X is Nx faster at filtering") varies with data shape, cardinality,
 and hardware. When the engine choice materially matters, measure on the actual data instead
@@ -69,8 +69,8 @@ a direct scan. Then place the work:
   question needs, never the whole file. When data sits in a database, run the aggregation
   there in its own SQL and pull back the result rows, never a table dump. When data sits on
   another machine you can execute on, ship the query to the data and return the small
-  result. Rule: result much smaller than data — move the query; repeated local iteration planned — move a pruned copy of the
-  data once.
+  result. Rule: result much smaller than data — move the query; repeated local iteration
+  planned — move a pruned copy of the data once.
 
 Sizing heuristics and recipes: `references/placement.md`.
 
