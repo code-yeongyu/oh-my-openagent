@@ -358,6 +358,30 @@ fn user_input_timeline_lands_past_presses_and_holds_future_ones() {
 }
 
 #[test]
+fn user_input_timeline_press_keeps_press_order_when_taken_late() {
+    let fake = backend(r#"{"user_input_timeline":[{"t_ms":50,"pid":2,"kind":"key"}]}"#);
+    let scripted = std::time::Instant::now();
+    let feed = fake.user_input();
+    feed.press(1, UserPressKind::Click);
+    // The timeline press is due at most 50 ms after `scripted`; wait past that
+    // so it falls due before the next direct press, then take once.
+    std::thread::sleep(std::time::Duration::from_millis(51).saturating_sub(scripted.elapsed()));
+    feed.press(3, UserPressKind::Click);
+    let presses = feed.take().presses;
+    let pids: Vec<u32> = presses.iter().map(|press| press.pid).collect();
+    assert!(
+        presses.windows(2).all(|pair| pair[0].at <= pair[1].at),
+        "record out of press order: {pids:?}"
+    );
+    assert_eq!(pids.len(), 3);
+    assert_eq!(
+        pids.last(),
+        Some(&3),
+        "timeline press landed behind a later press: {pids:?}"
+    );
+}
+
+#[test]
 fn user_input_timeline_beyond_an_hour_is_rejected() {
     for t_ms in [3_600_001_i64, -3_600_001, i64::MIN] {
         let err = FakeScenario::from_json(&format!(
