@@ -48,6 +48,16 @@ function sendToEndpoint(client: LocalApiClient, device: string, endpoint: string
   })
 }
 
+const markNotSent = (error: unknown): unknown =>
+  error instanceof LocalApiError
+    ? new LocalApiError(error.code, error.reason, {
+        action: error.action,
+        ...(error.limit_chars === undefined ? {} : { limit_chars: error.limit_chars }),
+        ...(error.path_refusal === undefined ? {} : { path_refusal: error.path_refusal }),
+        not_sent: true,
+      })
+    : error
+
 export type { ListingResult, ListingRevision, ReadPage, ReadPageEntry } from "./local-api/client-assembly.ts"
 export { LocalApiError } from "./local-api/errors.ts"
 export type {
@@ -118,7 +128,9 @@ export type DeviceService = {
    * attach: relay daemon #393's `session.command {device, endpoint, rpc}`, on the key `session.endpoints` lists first.
    * Settles like an attach's command: the first command state that is not a progress state, plus the engine's reply.
    * Rejects with the local API's refusal (`unsupported` when the device lists no endpoint, before anything is sent), or
-   * when the connection closes or no final state arrives within ENDPOINT_COMMAND_WAIT_MS.
+   * when the connection closes or no final state arrives within ENDPOINT_COMMAND_WAIT_MS. Every failure before
+   * `session.command` is written (the `session.endpoints` lookup, whatever its code) is a `LocalApiError` with
+   * `not_sent: true`; a `session.command` that times out after sending carries its `command_id` instead.
    */
   readonly endpointCommand: (device: string, rpc: CommandRpc) => Promise<CommandResult>
   readonly close: () => void
@@ -192,8 +204,15 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
     sessions: (filter, onRevision) => client.list(filter, onRevision),
     attach: (device, sessionId) => openAttach(client, device, sessionId),
     endpointCommand: async (device, rpc) => {
-      const endpoint = (await client.request("session.endpoints", { device })).endpoints[0]
-      if (endpoint === undefined) throw new LocalApiError("unsupported", "the device lists no engine endpoint")
+      // The endpoint lookup runs before any session.command is written, so whatever fails it (a timeout, a closed
+      // connection, a refusal) dispatched nothing: it is marked not_sent, unlike a timeout after sending.
+      let endpoint: string | undefined
+      try {
+        endpoint = (await client.request("session.endpoints", { device })).endpoints[0]
+      } catch (error) {
+        throw markNotSent(error)
+      }
+      if (endpoint === undefined) throw new LocalApiError("unsupported", "the device lists no engine endpoint", { not_sent: true })
       return await sendToEndpoint(client, device, endpoint, rpc)
     },
     close: () => client.close(),
