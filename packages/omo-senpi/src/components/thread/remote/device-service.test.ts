@@ -35,11 +35,21 @@ describe("device-service adapter of the thread tools' account surface", () => {
     expect(await port.read("b", "s1", 10)).toEqual({ kind: "ok", response: { entries: [{ role: "user", content: "hi" }] } })
   })
 
-  test("#given the client without relay daemon #393's attach-less endpoint command #when a session-less record targets b #then it is refused typed and nothing is sent", async () => {
+  test("#given b's engine endpoint #when create/open/fork send a session-less record to b #then it goes through the device service's endpoint command and its outcome maps to the port", async () => {
     const sent: unknown[] = []
-    const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: async () => fakeService([], sent) })
-    expect(await port.endpointCommand("b", { type: "open_session" })).toEqual({ kind: "refused", reason: "endpoint_command_unavailable" })
-    expect(sent).toEqual([])
+    const answers: Array<() => Promise<CommandResult>> = [
+      async () => state({ state: "engine_applied" }, { type: "response", command: "open_session", success: true, data: { sessionId: "s-new" } }),
+      async () => state({ state: "engine_refused", reason: "route_unlisted", retryable: false }),
+      async () => { throw new LocalApiError("peer_not_found", "no such device") },
+      async () => { throw new LocalApiError("request_timeout", "no answer", { command_id: "c" }) },
+    ]
+    const service = { ...fakeService([], []), endpointCommand: async (device: string, rpc: unknown) => { sent.push({ device, rpc }); const next = answers.shift(); if (next === undefined) throw new Error("no scripted answer"); return await next() } } as unknown as DeviceService
+    const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: async () => service })
+    expect(await port.endpointCommand("b", { type: "open_session", cwd: "/p", parent: undefined })).toEqual({ kind: "ok", response: { type: "response", command: "open_session", success: true, data: { sessionId: "s-new" } } })
+    expect(sent).toEqual([{ device: "b", rpc: { type: "open_session", cwd: "/p" } }])
+    expect(await port.endpointCommand("b", { type: "open_session" })).toEqual({ kind: "refused", reason: "route_unlisted" })
+    expect(await port.endpointCommand("b", { type: "open_session" })).toEqual({ kind: "refused", reason: "peer_not_found" })
+    expect(await port.endpointCommand("b", { type: "open_session" })).toEqual({ kind: "uncertain", reason: "reply_lost" })
   })
 
   test("#given the default surface #when the sidecar fails to load #then the call rejects, the failure is not cached, and the next call loads again", async () => {

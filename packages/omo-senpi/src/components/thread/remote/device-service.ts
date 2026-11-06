@@ -79,9 +79,28 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
     thisDevice: async () => (await (await svc()).thisDevice())?.id ?? null,
     devices: async () => (await (await svc()).devices()).map((row) => ({ device: row.device, label: row.label, online: row.online })),
     sessions: async () => (await (await svc()).sessions()).rows.map((row) => ({ device: row.device, session_id: row.session_id, title: row.title, project: row.project, path: row.path, state: row.state, updated_ms: row.updated_ms })),
-    // Relay daemon #393 adds the attach-less `session.command {device, endpoint, rpc}`; until this client carries it,
-    // a session-less record on another device is refused typed instead of being sent through an unrelated attach.
-    endpointCommand: async () => ({ kind: "refused", reason: "endpoint_command_unavailable" }),
+    // create / open / fork on another device: relay daemon #393's attach-less `session.command {device, endpoint, rpc}`.
+    // The endpoint lookup and every refusal answered before sending ran nothing; anything after sending may have.
+    endpointCommand: async (device, rpc) => {
+      let record: WireRpc
+      try {
+        record = wireRecord(rpc)
+      } catch {
+        return { kind: "refused", reason: "invalid_record" }
+      }
+      let connected: DeviceService
+      try {
+        connected = await svc()
+      } catch (error) {
+        return { kind: "refused", reason: notSentReason(error) }
+      }
+      try {
+        return outcomeOf(await connected.endpointCommand(device, record))
+      } catch (error) {
+        if (error instanceof LocalApiError && error.command_id === undefined && REFUSED_BEFORE_SENDING.has(error.code)) return { kind: "refused", reason: error.code }
+        return { kind: "uncertain", reason: "reply_lost" }
+      }
+    },
     sessionCommand: async (device, sessionId, rpc) => {
       // Before the command goes out nothing can have run: an attach that fails (session_not_found, peer_not_found,
       // host_not_answering, a lost connection) or a record that is not JSON is refused with its code, typed.

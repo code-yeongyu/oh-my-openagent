@@ -202,3 +202,35 @@ describe("DeviceService", () => {
     expect((error as LocalApiError).code).toBe("session_not_found")
   })
 })
+
+describe("DeviceService.endpointCommand (relay daemon #393's attach-less session.command)", () => {
+  const ENDPOINT = "ZW5kcG9pbnQta2V5LTAwMD"
+  const endpointWorld = (): World => ({
+    ...defaultWorld(),
+    endpoints: { [PEER]: [ENDPOINT] },
+    endpointCommand: {
+      data: { sessionId: "bmV3LXNlc3Npb24tMDAwMQ" },
+      outcome: [
+        { state: "queued", retryable: false },
+        { state: "engine_applied", retryable: false },
+      ],
+    },
+  })
+
+  test("#given the peer lists an engine endpoint #when a session-less record is sent to it #then it travels as session.command {device, endpoint, rpc} with no attach and settles with the engine's reply", async () => {
+    const { owner, service } = await serviceFor(endpointWorld())
+    const result = await within(service.endpointCommand(PEER, { type: "open_session", cwd: "/p" }), "the endpoint command")
+    expect(result.outcome.state).toBe("engine_applied")
+    expect(result.response).toEqual({ type: "response", id: null, command: "open_session", success: true, data: { sessionId: "bmV3LXNlc3Npb24tMDAwMQ" } })
+    expect(owner.state.commands).toEqual([{ type: "open_session", cwd: "/p" }])
+  })
+
+  test("#given the peer lists no engine endpoint #when a session-less record is sent to it #then it is refused before any command goes out", async () => {
+    const { owner, service } = await serviceFor({ ...endpointWorld(), endpoints: { [PEER]: [] } })
+    const error = await service.endpointCommand(PEER, { type: "open_session" }).catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(LocalApiError)
+    expect((error as LocalApiError).code).toBe("unsupported")
+    expect((error as LocalApiError).command_id).toBeUndefined()
+    expect(owner.state.commands).toEqual([])
+  })
+})
