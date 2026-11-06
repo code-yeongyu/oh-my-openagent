@@ -169,6 +169,23 @@ describe("LspRequestContext", () => {
 		});
 	});
 
+	it("#given a project config dir linked outside cwd #when standalone context is created #then that path is skipped instead of failing startup", () => {
+		const root = tempRoot("lsp-context-linked-dir-");
+		const outside = tempRoot("lsp-context-linked-target-");
+		symlinkSync(outside, join(root, ".omo"), "junction");
+		const insidePath = join(root, ".opencode", "lsp.json");
+
+		const context = createStandaloneMcpRequestContext({
+			cwd: root,
+			homeDir: root,
+			env: {
+				LSP_TOOLS_MCP_PROJECT_CONFIG: [insidePath, join(root, ".omo", "lsp.json")].join(delimiter),
+			},
+		});
+
+		expect(context.projectConfigPaths).toEqual([insidePath]);
+	});
+
 	it("#given an injected LSP cwd #when standalone context is created #then it wins over process cwd without reading global env", () => {
 		const sessionRoot = tempRoot("lsp-context-session-");
 		const processRoot = tempRoot("lsp-context-process-");
