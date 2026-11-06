@@ -1,11 +1,21 @@
 import { expect, test } from "bun:test"
+import { closeSync, constants, openSync } from "node:fs"
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { commitPathProblem, prepareLanding } from "./landing"
+import { commitPathProblem, prepareLanding, readRegularWorking } from "./landing"
 
 const posix = process.platform === "win32" ? test.skip : test
+
+/** Opens a writer so a read stuck on `fifo` finishes; ENXIO means no reader was waiting. */
+function releaseBlockedReader(fifo: string): void {
+  try {
+    closeSync(openSync(fifo, constants.O_WRONLY | constants.O_NONBLOCK))
+  } catch (error) {
+    if (!(error instanceof Error && "code" in error && error.code === "ENXIO")) throw error
+  }
+}
 
 const GIT_WINDOWS_MAX_PATH_CHARS = 260
 const GIT_WINDOWS_ROOT = "C:\\Users\\ann\\AppData\\Roaming\\omo\\memory"
@@ -89,6 +99,41 @@ test("an existing directory at a received key's path is refused as a non-regular
     const key = "memory/note.md"
     await mkdir(join(root, key), { recursive: true })
     expect(await prepareLanding(root, key)).toEqual({ refused: "non-regular-file" })
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+posix("a FIFO reached past every lstat check opens without blocking and is refused by the handle's fstat", async () => {
+  const root = await mkdtemp(join(tmpdir(), "omo-sync-landing-"))
+  const fifo = join(root, "note.md")
+  try {
+    const made = Bun.spawn(["mkfifo", fifo])
+    expect(await made.exited).toBe(0)
+    // readRegularWorking runs no lstat of its own, so this is the leaf a swap after the lstat
+    // check would hand it. A blocking open waits here for a writer; the bounded race reports that.
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+    const timeout = new Promise<{ kind: "timed-out" }>((resolve) => {
+      timeoutId = setTimeout(() => resolve({ kind: "timed-out" }), 5_000)
+    })
+    try {
+      const settled = await Promise.race([readRegularWorking(root, "note.md").then((result) => ({ kind: "read" as const, result })), timeout])
+      expect(settled).toEqual({ kind: "read", result: { refused: "non-regular-file" } })
+    } finally {
+      if (timeoutId !== undefined) clearTimeout(timeoutId)
+      releaseBlockedReader(fifo)
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+}, 10_000)
+
+test("a regular file reads through the non-blocking handle unchanged, and an absent one reads as null", async () => {
+  const root = await mkdtemp(join(tmpdir(), "omo-sync-landing-"))
+  try {
+    await writeFile(join(root, "note.md"), "hello\n", "utf8")
+    expect(await readRegularWorking(root, "note.md")).toEqual({ text: "hello\n" })
+    expect(await readRegularWorking(root, "gone.md")).toEqual({ text: null })
   } finally {
     await rm(root, { recursive: true, force: true })
   }

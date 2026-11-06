@@ -10,7 +10,7 @@
 
 import { dirname, isAbsolute, join, relative, sep } from "node:path"
 
-import { existsSync, lstat, mkdir, readFile, realpath } from "../../fs/resilient"
+import { constants, existsSync, lstat, mkdir, open, readFile, realpath } from "../../fs/resilient"
 import { caseFold } from "../item/casefold"
 
 const FS_REFUSALS = new Set(["EISDIR", "ENOTDIR", "ENAMETOOLONG", "EACCES", "EPERM", "ELOOP", "EEXIST", "EINVAL"])
@@ -48,6 +48,25 @@ export const readWorking = (root: string, path: string): Promise<string | null> 
     if (error instanceof Error && "code" in error && error.code === "ENOENT") return null
     throw error
   })
+
+/**
+ * The working text at `path` (null: absent), read only when the opened leaf is a regular file. The
+ * open is non-blocking, so a FIFO swapped in after an lstat check opens at once instead of waiting
+ * for a writer, and the handle's own fstat decides, so no swap after the open changes what is read.
+ */
+export async function readRegularWorking(root: string, path: string): Promise<{ readonly text: string | null } | { readonly refused: "non-regular-file" }> {
+  const handle = await open(join(root, path), constants.O_RDONLY | constants.O_NONBLOCK).catch((error: unknown) => {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return null
+    throw error
+  })
+  if (handle === null) return { text: null }
+  try {
+    if (!(await handle.stat()).isFile()) return { refused: "non-regular-file" }
+    return { text: await handle.readFile({ encoding: "utf8" }) }
+  } finally {
+    await handle.close()
+  }
+}
 
 type Landing = { readonly path: string; readonly working: string | null } | { readonly refused: string }
 
