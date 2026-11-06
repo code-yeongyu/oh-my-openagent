@@ -13,7 +13,7 @@ python3 -c "import feedparser" 2>/dev/null || pip install feedparser -q
 Jina Reader JSON 모드로 사이트의 RSS URL을 자동 탐지:
 
 ```bash
-curl -sH "Accept: application/json" "https://r.jina.ai/{URL}" | \
+curl -s -H "Authorization: Bearer ${JINA_API_KEY}" -H "Accept: application/json" "https://r.jina.ai/{URL}" | \
   python3 -c "import sys,json; print(json.load(sys.stdin)['data'].get('external',{}).get('alternate',[]))"
 ```
 

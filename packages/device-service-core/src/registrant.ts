@@ -7,7 +7,8 @@ import { type EndpointWatch, watchEndpointFile } from "./registrant-watch.ts"
 // each proof, and again whenever the status names a device it has not registered for on that connection. A
 // signed-out status, a refused register and a transport error reset that, so the next device id registers again. A
 // new connection comes from the endpoint file appearing (watched before the first existence check) or from the
-// previous connection closing; nothing polls. The only timers are the bounded connect retries.
+// previous connection closing; nothing polls. The only timers are the bounded connect retries and the watch's one
+// settle re-check after each arm (see registrant-watch.ts).
 
 const REGISTRANT_RETRY_DELAYS_MS: readonly number[] = [250, 1_000, 4_000]
 

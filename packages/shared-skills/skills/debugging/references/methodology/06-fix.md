@@ -100,6 +100,8 @@ Only cleanup directly related to the fix. Do not re-architect.
 
 If the code around the fix is rough, note it in the journal as a follow-up for the user; do not expand scope here. Refactoring during a bugfix is how one-line fixes turn into hundred-line diffs nobody can review.
 
+**The one carve-out, and it runs before step 2, not after green:** if the fix must add lines to a file that already exceeds the `programming` skill's 250 pure-LOC ceiling (its DEFECT row forbids new lines in that file), first extract the unit you are touching into its own file as a separate, behavior-preserving move (the red test still fails for the same reason, every other test still passes), journal it, then make the minimal fix in the extracted file. The `programming` skill's SIZE_OK and pure-data-table exceptions still apply. That split ships with the fix; any other rough code stays a follow-up.
+
 ### 4. Regression — full suite green
 
 Run the full test suite for the affected package (not just the one new test). Existing tests must still pass.
