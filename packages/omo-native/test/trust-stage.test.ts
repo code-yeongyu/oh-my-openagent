@@ -71,8 +71,13 @@ async function child(env: NodeJS.ProcessEnv, dir: string, mode?: string) {
   ])
   return { code, stdout, stderr }
 }
+// A missing log is no records, so a stage that skips its write fails the caller's assertion, not a thrown ENOENT.
 async function records(dir: string) {
-  return (await readFile(join(dir, "diagnostics.jsonl"), "utf8")).trim().split("\n").map((line) => JSON.parse(line))
+  const text = await readFile(join(dir, "diagnostics.jsonl"), "utf8").catch((error: unknown) => {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return ""
+    throw error
+  })
+  return text.trim().split("\n").filter((line) => line !== "").map((line) => JSON.parse(line))
 }
 async function launch(dir: string, env: NodeJS.ProcessEnv = cleanEnv(), fault?: (env: NodeJS.ProcessEnv) => Promise<void>) {
   let output: Awaited<ReturnType<typeof child>> | undefined
@@ -85,6 +90,8 @@ async function launch(dir: string, env: NodeJS.ProcessEnv = cleanEnv(), fault?: 
       output = await child(next, dir)
     },
   })
+  // Every launch reaches the child: a stage that refuses or never execs fails here as an assertion, not a throw.
+  expect(result.action).toBe("import-exec")
   return { result, output: required(output, "compiled child output") }
 }
 
