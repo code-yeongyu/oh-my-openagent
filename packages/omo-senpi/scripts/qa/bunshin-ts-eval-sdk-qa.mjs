@@ -64,21 +64,25 @@ async function runSession(sandbox) {
       assert.deepEqual(out.names, ["bunshin", "connect", "createRelayTransport", "pickTransport", "BunshinSessionError", "SDK_VERSION"])
       assert.match(session.agent.removedToolHints.bunshin ?? "", /OMO_BUNSHIN_TS_SDK_ROOT/)
     })
-    await check(2, "listMachines() returns the 2 fake devices with transport relay", async () => {
-      const out = await cellJson(`${SDK_IMPORT} const machines = await sdk.bunshin.listMachines(); print(JSON.stringify({ machines: machines.map(m => ({ alias: m.alias, transport: m.transport, os: m.os })) }))`)
-      assert.deepEqual(out.machines, [
-        { alias: "builder", transport: "relay", os: "linux" },
-        { alias: "laptop", transport: "relay", os: "darwin" },
+    await check(2, "listMachines() lists every device although one describe is refused: that one and this device unsupported", async () => {
+      const out = await cellJson(`${SDK_IMPORT} const machines = await sdk.bunshin.listMachines(); print(JSON.stringify({ machines: machines.map(m => ({ alias: m.alias, transport: m.transport, os: m.os, unsupported: m.unsupported === true, attention: m.attention ?? null })) }))`)
+      assert.deepEqual(out.machines.map(({ attention, ...machine }) => machine), [
+        { alias: "builder", transport: "relay", os: "linux", unsupported: false },
+        { alias: "laptop", transport: "relay", os: "darwin", unsupported: false },
+        { alias: "stalled", transport: "relay", os: "unknown", unsupported: true },
+        { alias: "QA device", transport: "relay", os: "unknown", unsupported: true },
       ])
+      assert.match(out.machines[2].attention, /^unreachable after \d+ ms: unsupported: fake-dev-stalled did not answer machine\.describe within 10 s$/)
     })
-    await check(3, 'fanout over "all" yields 2 fulfilled outcomes in settle order and the FanoutResult in input order', async () => {
+    await check(3, 'fanout over "all" yields 2 fulfilled outcomes in settle order, skips the refused device and this device, and the FanoutResult in input order', async () => {
       const out = await cellJson(`${SDK_IMPORT} const run = sdk.bunshin.fanout("all", m => m.shell("hostname")); const settled = []; for await (const o of run) settled.push({ kind: o.kind, alias: o.machine.alias, index: o.index }); const result = await run; print(JSON.stringify({ settled, fulfilled: result.fulfilled.map(f => [f.machine.alias, f.value.stdout]), rejected: result.rejected.length, skipped: (result.skipped ?? []).length }))`)
-      assert.equal(out.settled.length, 2)
-      assert.ok(out.settled.every(outcome => outcome.kind === "fulfilled"), JSON.stringify(out.settled))
-      assert.deepEqual(out.settled.map(outcome => outcome.alias).sort(), ["builder", "laptop"])
+      assert.equal(out.settled.length, 4)
+      const aliasesOf = kind => out.settled.filter(outcome => outcome.kind === kind).map(outcome => outcome.alias).sort()
+      assert.deepEqual(aliasesOf("fulfilled"), ["builder", "laptop"], JSON.stringify(out.settled))
+      assert.deepEqual(aliasesOf("skipped"), ["QA device", "stalled"], JSON.stringify(out.settled))
       assert.deepEqual(out.fulfilled, [["builder", "builder: hostname"], ["laptop", "laptop: hostname"]])
       assert.equal(out.rejected, 0)
-      assert.equal(out.skipped, 0)
+      assert.equal(out.skipped, 2)
     })
     await check(4, "BUNSHIN_TS_TRANSPORT=relay forces relay", async () => {
       const out = await cellJson(`${SDK_IMPORT} const base = { OMO_DEVICE_SERVICE_STATE_DIR: env("OMO_DEVICE_SERVICE_STATE_DIR") }; const relay = await sdk.pickTransport({ ...base, BUNSHIN_TS_TRANSPORT: "relay" }); const hub = await sdk.pickTransport({ ...base, BUNSHIN_TS_TRANSPORT: "hub" }).then(() => "picked", e => e.code); const auto = await sdk.pickTransport(base); print(JSON.stringify({ relay: relay.kind, auto: auto.kind, hub }))`)
@@ -110,12 +114,13 @@ async function supervise() {
   const log = text => { appendFileSync(transcript, text); process.stdout.write(text) }
   const { isolatedEnvironment, processGroupMembers } = await import("./agent-toolkit-eval-sdk-qa-support.mjs")
   const { credentialDigest } = await import("./isolation-state.mjs")
-  const { startFakeDeviceService } = await import("./bunshin-ts-fake-service.ts")
+  const { FAKE_DEVICES, startFakeDeviceService } = await import("./bunshin-ts-fake-service.ts")
   const realHomes = [join(homedir(), ".senpi", "agent"), join(homedir(), ".omo", "agent")]
   const before = realHomes.map(home => credentialDigest(home))
   const sandbox = mkdtempSync(join(tmpdir(), "omo-bunshin-ts-qa-"))
   for (const directory of ["agent", "project", "home", "tmp"]) mkdirSync(join(sandbox, directory))
-  const service = await startFakeDeviceService()
+  const stalled = { device: "fake-dev-stalled", label: "stalled", os: "linux", tags: [], describeRefusal: { code: "unsupported", reason: "fake-dev-stalled did not answer machine.describe within 10 s" } }
+  const service = await startFakeDeviceService({ devices: [...FAKE_DEVICES, stalled] })
   log(`BOOTSTRAP sandbox=${sandbox} fakeStateDir=${service.stateDir} devices=${service.devices.length}\n`)
   let child
   let deadline
