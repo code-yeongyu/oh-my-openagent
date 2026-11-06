@@ -1,6 +1,7 @@
 import { LOCAL_CHUNK_MAX } from "./limits.ts";
 import type { CommandRpc, DelegatedRoute, LocalRequest, RequestType } from "./protocol.ts";
 import { endpointKey } from "./validate-delegated.ts";
+import { deviceId } from "./validate-shapes.ts";
 import { LOCAL_UPLOAD_PARTS_MAX } from "./upload.ts";
 import {
   base64Bytes,
@@ -44,6 +45,18 @@ export const COMMAND_REQUEST_VALIDATORS: RequestValidators<
   "session.command" | "session.command_part"
 > = {
   "session.command": (v, id) => {
+    if (Object.hasOwn(v, "device")) {
+      // #393: {device, endpoint, rpc} with no attach; `device` without `endpoint` is invalid_request.
+      const m = requestFields(v, ["device", "endpoint", "rpc"], ["command_id"]);
+      return {
+        id,
+        type: "session.command",
+        device: deviceId(m["device"]),
+        endpoint: endpointKey(m["endpoint"]),
+        ...commandIdField(m["command_id"]),
+        rpc: commandRpcOf(m["rpc"]),
+      };
+    }
     if (Object.hasOwn(v, "upload_id")) {
       const m = requestFields(v, ["attach", "upload_id"], ROUTE_FIELDS);
       return {
