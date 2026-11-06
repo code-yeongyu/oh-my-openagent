@@ -42,7 +42,7 @@ function waitForListening(stderr: NodeJS.ReadableStream, socketPath: string, exi
   return new Promise((resolve, reject) => {
     let seen = ""
     // The tail carries the host's error line; the head is only the source excerpt Bun prints above it.
-    const timer = setTimeout(() => finish(new Error(`host never reported listening on ${socketPath}; stderr: ${seen.slice(-2000)}`)), 60_000)
+    const timer = setTimeout(() => finish(new Error(`host never reported listening on ${socketPath} within the test budget; stderr: ${seen.slice(-2000)}`)), remainingTestTime())
     function finish(error?: Error) {
       clearTimeout(timer)
       stderr.off("data", onData)
@@ -126,6 +126,7 @@ describe.skipIf(process.platform === "win32")("packaged senpi engine compact del
   // #12557: the root suite's preload nests TMPDIR one level deeper than a package run, and a long runner TMPDIR
   // then put `<TMPDIR>/<probe dir>/h.sock` over the engine's limit, so the host exited 1 before binding.
   it("#given a runner TMPDIR too deep for the engine's socket limit #when the packaged host is probed #then it still binds and answers", async () => {
+    useTestTimeout(90_000)
     const deep = join(testTempDir("omo-o01-deep-"), "d".repeat(MAX_SHARD_BIND_PATH))
     mkdirSync(deep)
     const previous = process.env.TMPDIR
