@@ -15,6 +15,22 @@ export type SessionEndpoints = {
   readonly device: string;
 };
 export type SessionEndpointsData = { readonly endpoints: readonly string[] };
+/**
+ * #393 part B (decision 0005, amended 2026-11-04): the id of a session this client just created over an engine
+ * endpoint, found by the durable engine session id in the create reply. Answered {device, key, session}: `key` is the
+ * listing row's session_id, which session.attach takes.
+ */
+export type SessionLocate = {
+  readonly id: string;
+  readonly type: "session.locate";
+  readonly device: string;
+  readonly engine_id: string;
+};
+export type SessionCandidate = {
+  readonly device: string;
+  readonly key: string;
+  readonly session: string;
+};
 
 export type CommandBlobRef = {
   readonly id: string;
