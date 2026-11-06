@@ -1,12 +1,12 @@
 import { homedir } from "node:os"
 import { join } from "node:path"
 
-import { formatStaleLockFixLines, reclaimDeadOwnerLocks, runStaleLockReaper } from "@oh-my-opencode/memory-core"
 import type { MemoryBlockCache, ReservedRun, TranscriptProjection } from "@oh-my-opencode/memory-core"
 
 import type { ComponentContext, SenpiExtensionAPI, SettleObserver } from "../../extension/types"
 import { hasMemoryCapabilities } from "./capabilities"
 import { registerMemoryCommands } from "./commands/register"
+import { loadMemoryCommandsRuntime } from "./commands/runtime-loader"
 import type { MemoryCommandIdentity, MemoryCommandSettings } from "./commands/types"
 import type { DreamTriggerWiring } from "./dream-trigger"
 import type { MemoryFactsWiring } from "./facts-wiring"
@@ -222,6 +222,7 @@ export function registerMemoryStatic(input: {
       const identity = resolveContext(sessionId)
       if (identity === undefined) return []
       const runtime = runtimeFor(identity)
+      const { formatStaleLockFixLines, reclaimDeadOwnerLocks, runStaleLockReaper } = await loadMemoryCommandsRuntime()
       const report = await runStaleLockReaper({
         runtimeDir: identity.identityPaths.runtime,
         // Interactive: like the per-turn pass, never wait on another run's deadline here.
