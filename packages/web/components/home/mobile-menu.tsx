@@ -1,6 +1,6 @@
 "use client"
 
-import type { JSX } from "react"
+import type { JSX, ReactNode } from "react"
 import { useEffect, useRef, useState } from "react"
 
 import { Link } from "@/i18n/routing"
@@ -20,10 +20,13 @@ export function MobileMenu({
   items,
   install,
   labels,
+  children,
 }: {
   readonly items: readonly MenuItem[]
   readonly install: MenuItem
   readonly labels: { readonly open: string; readonly close: string; readonly nav: string }
+  /** Shown at the top of the sheet on narrow phones, where the header has no room for it. */
+  readonly children?: ReactNode
 }): JSX.Element {
   const [open, setOpen] = useState(false)
   const toggle = useRef<HTMLButtonElement | null>(null)
@@ -79,6 +82,7 @@ export function MobileMenu({
         </svg>
       </button>
       <div id="mobile-nav" ref={sheet} className="nav__sheet" data-open={open} aria-hidden={!open}>
+        {children ? <div className="nav__sheet-theme">{children}</div> : null}
         <nav aria-label={labels.nav}>
           <ul>
             {items.map((entry) => (

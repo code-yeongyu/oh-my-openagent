@@ -103,7 +103,12 @@ export async function HomeNav({
               local: onHome,
             }}
             labels={{ open: t("openMenu"), close: t("closeMenu"), nav: t("primary") }}
-          />
+          >
+            <ThemeSwitch
+              label={t("theme")}
+              labels={{ system: t("system"), light: t("light"), dark: t("dark") }}
+            />
+          </MobileMenu>
         </div>
       </div>
     </header>

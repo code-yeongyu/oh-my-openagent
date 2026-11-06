@@ -273,8 +273,15 @@ test.describe("Home page", () => {
     // when
     await page.getByRole("button", { name: "Open menu" }).click()
 
-    // then
+    // then: the whole sheet sits inside the viewport, below the pill
     await expect(sheet).toBeVisible()
+    const box = await sheet.boundingBox()
+    expect(box).not.toBeNull()
+    if (box) {
+      expect(box.x).toBeGreaterThanOrEqual(0)
+      expect(box.y).toBeGreaterThan(56)
+      expect(box.x + box.width).toBeLessThanOrEqual(375)
+    }
     await expect(sheet.getByRole("link", { name: "Docs", exact: true })).toBeVisible()
     await expect(sheet.getByRole("link", { name: "Manifesto", exact: true })).toBeVisible()
     await expect(sheet.getByRole("link", { name: "Install", exact: true })).toBeVisible()

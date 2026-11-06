@@ -39,14 +39,6 @@
   height: 28px;
 }
 
-.brand .mark-dark {
-  display: var(--mark-dark);
-}
-
-.brand .mark-light {
-  display: var(--mark-light);
-}
-
 .nav__inner > nav {
   margin-inline: auto;
 }
@@ -330,8 +322,15 @@
 }
 .nav__sheet {
   display: none;
+  /* Anchored to the sticky .nav (its containing block), below the 56 px pill, inset by the page gutter. */
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  left: var(--gutter);
+  right: var(--gutter);
   max-width: 1080px;
-  margin: var(--space-2) auto 0;
+  max-height: calc(100dvh - 96px);
+  overflow-y: auto;
+  margin-inline: auto;
   padding: var(--space-3);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-xl);
@@ -380,5 +379,19 @@
 @media (max-width: 639px) {
   .nav__stars {
     display: none;
+  }
+}
+
+/* Narrow phones: the theme switch moves into the menu sheet so the header (mark, menu) fits at 320 px. */
+.nav__sheet-theme {
+  display: none;
+  margin-bottom: var(--space-2);
+}
+@media (max-width: 479px) {
+  .nav__end > .theme-switch {
+    display: none;
+  }
+  .nav__sheet-theme {
+    display: flex;
   }
 }
