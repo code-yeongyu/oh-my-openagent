@@ -11,7 +11,8 @@ import { MAX_SHARD_BIND_PATH } from "./shard-socket"
 // runner TMPDIR broke such tests only in the whole-suite run (#12557). Every such test takes its socket from here:
 // a short parent (the runner's TMPDIR when the path fits, else /tmp) plus a short hashed, unique leaf.
 
-export function fitsEngineBind(path: string): boolean {
+// not exported: only this module (and shortSocketParent's default) uses it; knip flags an unused export
+function fitsEngineBind(path: string): boolean {
   return Buffer.byteLength(path) <= MAX_SHARD_BIND_PATH
 }
 
