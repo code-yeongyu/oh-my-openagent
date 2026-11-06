@@ -90,7 +90,7 @@ Senpi already exposes its real subagent spawn surface through the omo-senpi `tas
 | --- | --- |
 | Spawn one worker | `task({ prompt, subagent_type | category, run_in_background: true })` |
 | Fan out independent workers | `task({ tasks: [{ prompt, subagent_type | category }, ...], run_in_background: true })` |
-| Send context or correction | `task_send({ task_id, message })` |
+| Send context or correction | `task_send({ to, message })` (`to` is the task id or name) |
 | Inspect one midpoint | `task_output({ task_id, mode: "tail" })` |
 | Stop a runaway worker | `task_cancel({ task_id })` |
 | Coordinate overlapping work | `team_create`, `task_create`, `task_get`, `task_list`, `task_update`; communicate with `task_send` |
@@ -99,4 +99,4 @@ Every worker prompt starts with `TASK:` and names `DELIVERABLE`, `SCOPE`, `VERIF
 
 ## Driver goal lifecycle
 
-The session goal you create with `create_goal` is a DRIVER the loop instructs, never a gate. A checkpoint accepts an optional driver snapshot, records it verbatim, and never rejects on its status or objective; the advice comes back in `nextActions`. The snapshot is filled from this session's goal store automatically, so pass `codexGoal` only to override it. If the driver was completed early, the advice tells you to `create_goal` again with the plan's objective verbatim - a completed goal is replaced, not reused. If the driver is paused or usage/budget limited, the advice tells you to resume it. A different objective is a warning, not a refusal, and it is reported once: the first checkpoint under that driver records the objective in the plan (`acknowledgedDriverObjectives`) and later calls stay quiet; `status().result.driver` shows the relation at any time. `create_goal` is advised only when the goal store really holds no goal.
+The session goal you create with `create_goal` is a DRIVER the loop instructs, never a gate. A checkpoint accepts an optional driver snapshot, records it verbatim, and never rejects on its status or objective; the advice comes back in `nextActions`. The snapshot is filled from this session's goal store automatically, so pass `codexGoalJson` only to override it. If the driver was completed early, the advice tells you to `create_goal` again with the plan's objective verbatim - a completed goal is replaced, not reused. If the driver is paused or usage/budget limited, the advice tells you to resume it. A different objective is a warning, not a refusal, and it is reported once: the first checkpoint under that driver records the objective in the plan (`acknowledgedDriverObjectives`) and later calls stay quiet; `status().result.driver` shows the relation at any time. `create_goal` is advised only when the goal store really holds no goal.

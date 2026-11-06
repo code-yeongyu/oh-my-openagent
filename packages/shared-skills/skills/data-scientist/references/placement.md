@@ -8,13 +8,17 @@ ten times) or kills the machine (loading a dataset larger than RAM and swapping)
 Three facts, one cell or script:
 
 ```python
-import os, shutil, subprocess, sys
+import os, re, shutil, subprocess, sys
 size = os.path.getsize("data.csv")            # bytes on disk
 disk_free = shutil.disk_usage(".").free       # spill headroom
-if sys.platform == "darwin":
-    ram = int(subprocess.run(["sysctl", "-n", "hw.memsize"], capture_output=True, text=True).stdout)
-else:
-    ram = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
+if sys.platform == "darwin":                  # free RAM = free + inactive + speculative pages
+    vm = subprocess.run(["vm_stat"], capture_output=True, text=True).stdout
+    page = int(re.search(r"page size of (\d+)", vm).group(1))
+    ram_free = page * sum(int(re.search(rf"{k}:\s+(\d+)", vm).group(1))
+                          for k in ("Pages free", "Pages inactive", "Pages speculative"))
+else:                                         # Linux: MemAvailable
+    ram_free = next(int(line.split()[1]) * 1024 for line in open("/proc/meminfo")
+                    if line.startswith("MemAvailable:"))
 # row estimate without loading (DuckDB streams the scan):
 # duckdb.sql("SELECT count(*) FROM 'data.csv'")
 ```
