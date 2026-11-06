@@ -3524,6 +3524,10 @@
         "test/fake-engine.mjs",
         "test/global-input-harness.ts",
         "test/harness.ts",
+        // run by path as a Worker by test/sandbox.test.ts, never imported
+        "test/fixtures/quickjs-crash-worker.mjs",
+        // run by path as the computer.run QuickJS sandbox Worker (src/run/sandbox/quickjs.ts), never imported
+        "src/run/sandbox/worker.ts",
         "vitest.config.ts",
       ],
     },
@@ -4213,6 +4217,8 @@
       "ignoreFiles": [
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "extensions/gateway-store-worker.mjs",
+        // the bundled computer.run QuickJS sandbox Worker, loaded by path by senpi-desktop-service src/run/sandbox/quickjs.ts
+        "extensions/omo-computer-run-worker.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "extensions/omo-init-deep-advisor.js",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
