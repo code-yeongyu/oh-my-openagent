@@ -23,8 +23,19 @@ pub const ABI: &str = "senpi-desktop/1";
 /// `complete: false` and its `cuts`; `trace`: `trace: true` adds per-stage `timings`
 /// to action reports and a redacted JSONL trace beside the audit log; `epoch`: an
 /// object-mode session supersedes its frames and refs and announces
-/// `epoch.changed` when the desktop changes.
-pub const FEATURES: &[&str] = &["action-report", "frame-identity", "frame-consume", "ax-partial", "trace", "key-priming", "epoch"];
+/// `epoch.changed` when the desktop changes; `interaction-lock`: input from this
+/// user's engines in every process is serialized by a machine-wide lock, and a lock
+/// held past its wait budget answers `InputBusy`.
+pub const FEATURES: &[&str] = &[
+    "action-report",
+    "frame-identity",
+    "frame-consume",
+    "ax-partial",
+    "trace",
+    "key-priming",
+    "epoch",
+    "interaction-lock",
+];
 
 /// Standard JSON-RPC 2.0 error codes the engine emits.
 pub const PARSE_ERROR: i64 = -32_700;

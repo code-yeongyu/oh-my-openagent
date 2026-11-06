@@ -2605,6 +2605,7 @@ version = "0.0.0"
 dependencies = [
  "flume",
  "image",
+ "libc",
  "parking_lot",
  "senpi-desktop-backend-fake",
  "senpi-desktop-backend-macos",
@@ -2620,6 +2621,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "ulid",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

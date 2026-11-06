@@ -27,7 +27,8 @@
                 "ax-partial",
                 "trace",
                 "key-priming",
-                "epoch"
+                "epoch",
+                "interaction-lock"
               ]
             }
           },
@@ -62,7 +63,8 @@
                 "ax-partial",
                 "trace",
                 "key-priming",
-                "epoch"
+                "epoch",
+                "interaction-lock"
               ]
             }
           },
