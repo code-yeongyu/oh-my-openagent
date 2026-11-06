@@ -4,6 +4,7 @@ use std::ptr::null_mut;
 use std::time::{Duration, Instant};
 
 use windows_sys::Win32::Foundation::{HANDLE, INVALID_HANDLE_VALUE, WAIT_OBJECT_0, WAIT_TIMEOUT};
+use windows_sys::Win32::System::SystemServices::JOB_OBJECT_MSG_NEW_PROCESS;
 use windows_sys::Win32::System::Threading::{
     GetCurrentProcess, GetCurrentProcessId, GetExitCodeProcess, TerminateProcess,
     WaitForSingleObject, INFINITE,
@@ -14,17 +15,28 @@ use crate::cli::{Exit, OpId, LINGER_KILL_CODE};
 use crate::control::{self, Control};
 use crate::frames::{ExecRequest, Frame, FrameReader};
 use crate::job::{self, JobError, JoinedJob};
+use crate::members::{MemberWaits, MEMBER_KEY};
 use crate::security;
 use crate::spawn::{self, Root};
 use crate::win::{creation_time, last_error, Owned};
 
 const JOB_KEY: usize = 1;
 const PIPE_KEY: usize = 2;
-/// Job notifications are documented as not guaranteed, so a running operation re-checks its state this often.
+/// Job notifications are documented as not guaranteed, so a running operation re-checks its state this often. It is
+/// only the safety net: member exits wake the loop through `MemberWaits`.
 const RECHECK_MS: u32 = 250;
 
 enum Event {
-    Pipe { ok: bool, transferred: u32 },
+    Pipe {
+        ok: bool,
+        transferred: u32,
+    },
+    /// A job message: its id and the process id it names.
+    Job {
+        message: u32,
+        pid: usize,
+    },
+    MemberExited,
     Other,
     PortFailed,
 }
@@ -44,6 +56,13 @@ fn next_event(port: HANDLE, control: &Control, timeout: u32) -> Event {
     }
     if key == PIPE_KEY && control.is_read(overlapped) {
         Event::Pipe { ok, transferred }
+    } else if key == MEMBER_KEY {
+        Event::MemberExited
+    } else if key == JOB_KEY {
+        Event::Job {
+            message: transferred,
+            pid: overlapped.addr(),
+        }
     } else {
         Event::Other
     }
@@ -70,7 +89,7 @@ fn await_go(control: &mut Control, port: HANDLE, reader: &mut FrameReader) -> En
             } if transferred > 0 => reader.push(control.received(transferred)),
             Event::Pipe { .. } => return Ended::Eof,
             Event::PortFailed => return Ended::PortFailed,
-            Event::Other => continue,
+            Event::Job { .. } | Event::MemberExited | Event::Other => continue,
         }
         while let Some(frame) = reader.next_frame() {
             match frame {
@@ -174,7 +193,9 @@ fn root_exit_code(root: &Root) -> Option<u32> {
     Some(code)
 }
 
-/// RUNNING and LINGERING (section 7.2): never waits on the writer; reports go out best-effort.
+/// RUNNING and LINGERING (section 7.2): never waits on the writer; reports go out best-effort. A member's
+/// `EXIT_PROCESS` message is dequeued before F's count drops (kernel exit ordering row), so the count is re-read when
+/// each member's process handle signals instead.
 fn running(
     control: &mut Control,
     floor: &JoinedJob,
@@ -183,6 +204,8 @@ fn running(
     reader: &mut FrameReader,
     linger_ms: u32,
 ) -> Exit {
+    let mut members = MemberWaits::new(port);
+    members.watch(root.pid);
     handle_frames(reader, root);
     control.start_read();
     let mut exited = false;
@@ -197,7 +220,16 @@ fn running(
                 handle_frames(reader, root);
                 control.start_read();
             }
-            Event::Pipe { .. } | Event::Other => {}
+            Event::Job {
+                message: JOB_OBJECT_MSG_NEW_PROCESS,
+                pid,
+            } => {
+                if let Some(pid) = u32::try_from(pid).ok().filter(|&pid| pid != root.pid) {
+                    members.watch(pid);
+                }
+            }
+            Event::MemberExited => members.settle(floor),
+            Event::Pipe { .. } | Event::Job { .. } | Event::Other => {}
             Event::PortFailed => {
                 // Ends the operation and this process with the PortFailed code. Should the call fail, the return
                 // below exits with that code and process rundown closes F, whose kill-on-close ends the rest.

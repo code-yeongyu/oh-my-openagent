@@ -1,10 +1,11 @@
 name: Git job helper
 
 # The memory-core git floor-job helper (omo#10391, design v4.2): the native contract rows N1..N10 plus the run-mode
-# rows on real Windows, on both architectures. N2(b) is the release gate for any `win32-job-v1` claim.
+# rows on real Windows, on both architectures. N2(b) is the release gate for any `win32-job-v1` claim. PRs stacked
+# on the helper PR's branch target it, so it is listed to give them this run.
 on:
   pull_request:
-    branches: [master, dev]
+    branches: [master, dev, fix/10391-windows-job-helper-native]
     paths:
       - "crates/omo-git-job-helper/**"
       - "Cargo.toml"
@@ -76,7 +77,7 @@ jobs:
             --test n1_control --test n2_kill_on_close --test n3_ordering --test n4_fresh_creation \
             --test n5_limits --test n6_handle_hygiene --test n7_classification --test n8_n9_tokens \
             --test n10_await_go --test run_mode --test join_verify_failure --test port_failure \
-            --test control_pipe -- --nocapture
+            --test control_pipe --test done_latency --test kernel_exit_ordering -- --nocapture
 
       - name: N2(b) in-flight creation at kill (release gate, >= 200 iterations)
         shell: bash
