@@ -1,8 +1,6 @@
 import { spawnSync } from "node:child_process"
 import { strictEd25519Key, strictEd25519Verify } from "../strict-ed25519/strict-ed25519.ts"
-// #12580 item 4: the import attribute is what the sibling reader (packages/omo-native/remote-bootstrap.ts) uses; without
-// it the source only loads under Bun and in the generated bundles, never unbundled by Node.
-import committedReleaseKey from "./release-key.json" with { type: "json" }
+import committedReleaseKey from "./release-key.json"
 
 const HEX_KEY = /^[0-9a-f]{64}$/
 
