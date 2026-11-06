@@ -1,6 +1,6 @@
 {
   "name": "@oh-my-opencode/omo-senpi",
-  "version": "5.1.61",
+  "version": "5.1.62",
   "type": "module",
   "private": true,
   "description": "Senpi harness adapter for oh-my-openagent.",
@@ -86,6 +86,7 @@
   },
   "devDependencies": {
     "@code-yeongyu/senpi": "2026.11.5-1",
+    "@code-yeongyu/senpi-agent-core": "2026.11.5-1",
     "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.11.5-1",
     "@types/node": "26.6.2",
     "bun-types": "1.4.4",

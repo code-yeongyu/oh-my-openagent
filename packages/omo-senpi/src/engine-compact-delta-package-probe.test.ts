@@ -1,10 +1,12 @@
 import { spawn } from "node:child_process"
-import { mkdirSync, readFileSync } from "node:fs"
+import { mkdirSync, readFileSync, rmSync } from "node:fs"
 import { createRequire } from "node:module"
 import { createConnection } from "node:net"
 import { dirname, join } from "node:path"
-import { describe, expect, it } from "bun:test"
+import { describe, expect, it, onTestFinished } from "bun:test"
 
+import { MAX_SHARD_BIND_PATH } from "../../senpi-task/src/runners/rpc-host/shard-socket"
+import { shortSocketDir } from "../../senpi-task/src/runners/rpc-host/short-socket-dir.test-support"
 import { testTempDir } from "../test-support/temp-dir"
 
 // O01 package probe (senpi#4272, PLAN rows X06/T7): the senpi engine omo actually ships, launched from its
@@ -26,13 +28,20 @@ const pinnedVersion = omoSenpi.devDependencies["@code-yeongyu/senpi"]
 
 type ProtocolInfo = { readonly serverVersion: string; readonly capabilities: readonly string[] }
 
+function probeSocketPath(): string {
+  const { dir, socket } = shortSocketDir("o01-probe", "h.sock")
+  onTestFinished(() => rmSync(dir, { recursive: true, force: true }))
+  return socket
+}
+
 // Readiness is the host's own signal: it prints `senpi rpc listening on unix://<path>` once the socket is bound.
 // A directory watch is not one: macOS does not report a bound socket as a change event, so the wait never ended.
 function waitForListening(stderr: NodeJS.ReadableStream, socketPath: string, exited: Promise<number | null>): Promise<void> {
   const ready = `senpi rpc listening on unix://${socketPath}`
   return new Promise((resolve, reject) => {
     let seen = ""
-    const timer = setTimeout(() => finish(new Error(`host never reported listening on ${socketPath}; stderr: ${seen.slice(0, 2000)}`)), 60_000)
+    // The tail carries the host's error line; the head is only the source excerpt Bun prints above it.
+    const timer = setTimeout(() => finish(new Error(`host never reported listening on ${socketPath}; stderr: ${seen.slice(-2000)}`)), 60_000)
     function finish(error?: Error) {
       clearTimeout(timer)
       stderr.off("data", onData)
@@ -44,7 +53,7 @@ function waitForListening(stderr: NodeJS.ReadableStream, socketPath: string, exi
       if (seen.includes(ready)) finish()
     }
     stderr.on("data", onData)
-    void exited.then((code) => finish(new Error(`host exited (${code}) before listening; stderr: ${seen.slice(0, 2000)}`)))
+    void exited.then((code) => finish(new Error(`host exited (${code}) before listening; stderr: ${seen.slice(-2000)}`)))
   })
 }
 
@@ -76,7 +85,7 @@ async function probePackagedHost(compactFlag: "1" | undefined): Promise<Protocol
   const root = testTempDir("omo-o01-probe-")
   const agentDir = join(root, "agent")
   mkdirSync(agentDir, { mode: 0o755 })
-  const socketPath = join(root, "h.sock")
+  const socketPath = probeSocketPath()
   // The runner's own session (PI_SESSION_FILE, SENPI_RUNTIME, OMO_* roots) must not reach the probed host.
   const inherited = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^(PI_|SENPI_|OMO_)/.test(key)))
   const env: NodeJS.ProcessEnv = {
@@ -112,6 +121,23 @@ describe.skipIf(process.platform === "win32")("packaged senpi engine compact del
   it("#given the pinned senpi package #when its bin is resolved #then it is the exact pinned version", () => {
     expect(packaged.version).toBe(pinnedVersion)
   })
+
+  // #12557: the root suite's preload nests TMPDIR one level deeper than a package run, and a long runner TMPDIR
+  // then put `<TMPDIR>/<probe dir>/h.sock` over the engine's limit, so the host exited 1 before binding.
+  it("#given a runner TMPDIR too deep for the engine's socket limit #when the packaged host is probed #then it still binds and answers", async () => {
+    const deep = join(testTempDir("omo-o01-deep-"), "d".repeat(MAX_SHARD_BIND_PATH))
+    mkdirSync(deep)
+    const previous = process.env.TMPDIR
+    process.env.TMPDIR = deep
+    try {
+      const info = await probePackagedHost(undefined)
+
+      expect(info.serverVersion).toBe(pinnedVersion)
+    } finally {
+      if (previous === undefined) delete process.env.TMPDIR
+      else process.env.TMPDIR = previous
+    }
+  }, 90_000)
 
   it("#given SENPI_ENGINE_SOCKET_COMPACT_UPDATES=1 #when the packaged host answers get_protocol_info #then it advertises the compact delta pair", async () => {
     const info = await probePackagedHost("1")
