@@ -21,6 +21,7 @@ const builtMemoryCommandsExtensionPath = join(packageRoot, "plugin", "extensions
 const builtDeviceAccountExtensionPath = join(packageRoot, "plugin", "extensions", "omo-device-account.js")
 const builtSessionHistoryExtensionPath = join(packageRoot, "plugin", "extensions", "omo-session-history.js")
 const builtRecallStoreExtensionPath = join(packageRoot, "plugin", "extensions", "omo-recall-store.js")
+const builtDeviceServiceExtensionPath = join(packageRoot, "plugin", "extensions", "omo-device-service.js")
 const builtTelemetryPosthogExtensionPath = join(packageRoot, "plugin", "extensions", "omo-telemetry-posthog.js")
 const builtTelemetryOtlpExtensionPath = join(packageRoot, "plugin", "extensions", "omo-telemetry-otlp.js")
 const builtComputerUseExtensionPath = join(packageRoot, "plugin", "extensions", "omo-computer-use.js")
@@ -75,7 +76,7 @@ describe("omo-senpi bundle purity", () => {
 
   it("#given built extension artifacts #when static imports are inspected #then only senpi peers and node builtins remain external", () => {
     const allowed = new Set<string>(SENPI_LOADER_ALIASES)
-    for (const path of [builtExtensionPath, builtTaskExtensionPath, builtComputerUseExtensionPath, builtMemoryDoctorExtensionPath, builtMemoryMemfsExtensionPath, builtMemoryPalaceExtensionPath, builtMemoryCommandsExtensionPath, builtDeviceAccountExtensionPath, builtSessionHistoryExtensionPath, builtRecallStoreExtensionPath, builtTelemetryPosthogExtensionPath, builtTelemetryOtlpExtensionPath, builtThreadClientExtensionPath, builtTelemetryRecoveryExtensionPath, builtFeedbackExtensionPath, builtDesktopToolkitExtensionPath, builtClaimReceiptExtensionPath]) {
+    for (const path of [builtExtensionPath, builtTaskExtensionPath, builtComputerUseExtensionPath, builtMemoryDoctorExtensionPath, builtMemoryMemfsExtensionPath, builtMemoryPalaceExtensionPath, builtMemoryCommandsExtensionPath, builtDeviceAccountExtensionPath, builtSessionHistoryExtensionPath, builtRecallStoreExtensionPath, builtDeviceServiceExtensionPath, builtTelemetryPosthogExtensionPath, builtTelemetryOtlpExtensionPath, builtThreadClientExtensionPath, builtTelemetryRecoveryExtensionPath, builtFeedbackExtensionPath, builtDesktopToolkitExtensionPath, builtClaimReceiptExtensionPath]) {
       expect(existsSync(path), `missing built extension at ${path}`).toBe(true)
       const imports = collectStaticImportSpecifiers(readFileSync(path, "utf8"))
       const forbidden = imports.filter((specifier) => !specifier.startsWith("node:") && !allowed.has(specifier))
