@@ -5,7 +5,7 @@ import { isProvisionedExecutable } from "./compile-runtime"
 
 export const RELEASES_URL = "https://github.com/code-yeongyu/oh-my-openagent/releases"
 const RELEASES_API = "https://api.github.com/repos/code-yeongyu/oh-my-openagent/releases?per_page=100"
-const RELEASE_VERSION = /^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$/
+export const RELEASE_VERSION = /^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$/
 const RELEASE_TARGET = /^(?:darwin|linux|windows)-(?:x64|arm64)(?:-musl)?(?:-baseline)?$/
 
 export type FetchReleases = () => Promise<unknown>
