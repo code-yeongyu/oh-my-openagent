@@ -52,7 +52,7 @@ function chordKeys(chord: string | readonly string[]): readonly string[] {
 }
 
 /** Facade `method` sending one exec request; its reply must be `null` or an `ActionReport`. */
-export function send(method: FacadeMethod, name: string, engineMethod: EngineMethod, params: object): Promise<void> {
+function send(method: FacadeMethod, name: string, engineMethod: EngineMethod, params: object): Promise<void> {
 	return method(name, async ({ call }) => {
 		expectResult(engineMethod, await call(engineMethod, params), isExecResult);
 	});
