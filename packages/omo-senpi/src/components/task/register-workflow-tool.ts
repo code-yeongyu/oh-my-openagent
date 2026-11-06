@@ -22,5 +22,6 @@ export function registerDagTool(pi: SenpiExtensionAPI, engine: TaskEngine, runti
       amend: runtime.amend,
       guide: runtime.guide,
     }),
+    runs: "brain",
   })
 }
