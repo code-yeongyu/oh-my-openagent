@@ -1,7 +1,7 @@
 import type { ThreadToolResult } from "../contracts"
 import { matchModel, modelPatternFailure, type ModelChoice } from "../tools/model-match"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "./ports"
-import { deviceOnline, outcomeFailure } from "./remote-ops"
+import { deviceOnline, outcomeFailure, replyData } from "./remote-ops"
 
 const isObject = (value: unknown): value is JsonObject => typeof value === "object" && value !== null && !Array.isArray(value)
 
@@ -26,11 +26,12 @@ export async function setModelRemote(remote: RemoteThreadSurface, row: RemoteSes
   if (empty !== undefined) return empty
   const listed = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_available_models", sessionId: row.session_id })
   if (listed.kind !== "ok") return outcomeFailure(listed, row.device)
-  const matched = matchModel(modelsOf(listed.response["models"]), request.model, request.provider)
+  const matched = matchModel(modelsOf(replyData(listed.response)["models"]), request.model, request.provider)
   if (matched.kind !== "match") return matched
   const set = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "set_model", sessionId: row.session_id, provider: matched.model.provider, modelId: matched.model.id })
   if (set.kind !== "ok") return outcomeFailure(set, row.device)
-  const provider = set.response["provider"]
-  const id = set.response["id"]
+  const applied = replyData(set.response)
+  const provider = applied["provider"]
+  const id = applied["id"]
   return { kind: "ok", thread_id: row.session_id, model: { provider: typeof provider === "string" ? provider : matched.model.provider, id: typeof id === "string" ? id : matched.model.id }, device: row.device }
 }

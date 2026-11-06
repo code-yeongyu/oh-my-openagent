@@ -60,6 +60,15 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     expect(await run("thread_create", { fork_from: "dur-on-b" })).toMatchObject({ kind: "ok", thread: { thread_id: "dur-new-on-b", device: "b" } })
     expect(a.sent[0]).toEqual({ via: "endpoint", device: "b", rpc: { type: "open_session", retain_on_disconnect: true, forkFrom: "dur-on-b" } })
   })
+
+  test("#given b's engine answers open_session with its real envelope (ids under data) #when thread_create creates and forks on b #then each succeeds with the durable id, falling back to data.sessionId when no durable id is named", async () => {
+    const a = account()
+    const { run } = surface(a.remote)
+    expect(await run("thread_create", { device: "studio" })).toMatchObject({ kind: "ok", thread: { thread_id: "dur-new-on-b", device: "b" } })
+    expect(await run("thread_create", { fork_from: "dur-on-b" })).toMatchObject({ kind: "ok", thread: { thread_id: "dur-new-on-b", device: "b" } })
+    const bare = account({ openData: { sessionId: "bmV3LXNlc3Npb24tMDAwMQ" } })
+    expect(await surface(bare.remote).run("thread_create", { device: "studio" })).toMatchObject({ kind: "ok", thread: { thread_id: "bmV3LXNlc3Npb24tMDAwMQ", device: "b" } })
+  })
 })
 
 describe("A3: an existing thread is named by id or alias only; a device only to create", () => {

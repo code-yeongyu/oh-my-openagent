@@ -29,21 +29,26 @@ export function createRemoteThreadFixture() {
     for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
   }
 
-  function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean; engine?: Engine; promptResponse?: JsonObject; failSessionsList?: boolean; failAliasesOf?: boolean; failClaim?: boolean } = {}) {
+  function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean; engine?: Engine; promptResponse?: JsonObject; openData?: JsonObject; failSessionsList?: boolean; failAliasesOf?: boolean; failClaim?: boolean } = {}) {
     const engine = options.engine ?? ENGINE
     const sent: Sent[] = []
     const hops: number[] = []
     const aliases = options.aliases ?? new Map<string, AliasHolder>()
+    const data = (rpc: JsonObject): JsonObject => {
+      if (rpc["type"] === "open_session") return options.openData ?? { sessionId: "rpc-9", state: { durableSessionId: rpc["sessionPath"] === undefined ? "dur-new-on-b" : "dur-on-b" } }
+      if (rpc["type"] === "get_state") return { isStreaming: engine.streaming, pendingMessageCount: engine.pending }
+      if (rpc["type"] === "get_messages") return { messages: [...engine.messages] }
+      if (rpc["type"] === "interrupt") return engine.interrupt
+      if (rpc["type"] === "prompt") return options.promptResponse ?? (engine.streaming ? { disposition: "queued" } : { disposition: "started", turnId: "turn-b" })
+      if (rpc["type"] === "get_available_models") return { models: [{ provider: "anthropic", id: "claude-opus", name: "Opus" }, { provider: "openai", id: "gpt-6" }] }
+      if (rpc["type"] === "set_model") return { provider: rpc["provider"] ?? null, id: rpc["modelId"] ?? null }
+      return {}
+    }
+    // The engine's real reply envelope, as the device service hands it back (device-service-core's CommandResult.response):
+    // every field the tools read lives under `data`.
     const answer = (rpc: JsonObject): RemoteCommandOutcome => {
       if (options.refuse !== undefined) return { kind: "refused", reason: options.refuse }
-      if (rpc["type"] === "open_session") return { kind: "ok", response: { sessionId: "rpc-9", state: { durableSessionId: rpc["sessionPath"] === undefined ? "dur-new-on-b" : "dur-on-b" } } }
-      if (rpc["type"] === "get_state") return { kind: "ok", response: { isStreaming: engine.streaming, pendingMessageCount: engine.pending } }
-      if (rpc["type"] === "get_messages") return { kind: "ok", response: { messages: [...engine.messages] } }
-      if (rpc["type"] === "interrupt") return { kind: "ok", response: engine.interrupt }
-      if (rpc["type"] === "prompt") return { kind: "ok", response: options.promptResponse ?? (engine.streaming ? { disposition: "queued" } : { disposition: "started", turnId: "turn-b" }) }
-      if (rpc["type"] === "get_available_models") return { kind: "ok", response: { models: [{ provider: "anthropic", id: "claude-opus", name: "Opus" }, { provider: "openai", id: "gpt-6" }] } }
-      if (rpc["type"] === "set_model") return { kind: "ok", response: { provider: rpc["provider"] ?? null, id: rpc["modelId"] ?? null } }
-      return { kind: "ok", response: {} }
+      return { kind: "ok", response: { type: "response", id: null, command: rpc["type"] ?? null, success: true, data: data(rpc) } }
     }
     const devices: RemoteDevice[] = [{ device: "here", label: "this mac", online: true }, { device: "b", label: "studio", online: options.online ?? true }]
     const registry: AliasRegistry = {
