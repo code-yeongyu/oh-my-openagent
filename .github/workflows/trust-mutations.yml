@@ -1,0 +1,59 @@
+name: Engine trust mutations
+
+# Design 9.7 of the engine CA importer (omo#10762): each mutation is a source patch applied to a disposable copy of
+# packages/omo-native, and its named test must turn red there while the unpatched copy stays green. Rows owned by
+# senpi, the desktop or the macOS/Windows adapters run in their owners' pipelines.
+on:
+  pull_request:
+    branches: [master, dev]
+    paths:
+      - "packages/omo-native/**"
+      - "script/omo-native-trust-mutations.ts"
+      - ".github/workflows/trust-mutations.yml"
+  push:
+    branches: [master, dev]
+    paths:
+      - "packages/omo-native/**"
+      - "script/omo-native-trust-mutations.ts"
+      - ".github/workflows/trust-mutations.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  mutations:
+    name: engine trust mutations (linux)
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - name: Install JavaScript dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      # The hash-directory fixtures take their subject hashes from the OpenSSL CLI.
+      - name: Run the mutation table
+        shell: bash
+        run: openssl version && bun script/omo-native-trust-mutations.ts
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Engine trust mutations
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Every design 9.7 row whose code and test live in packages/omo-native, patched into a disposable copy.
+            - Each row must turn its named test red, and the same test must pass on the unpatched copy.
+          JOB_SUMMARY_NEXT: A survived row means its test no longer pins that rule; a control failure means the test is red without the mutation.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

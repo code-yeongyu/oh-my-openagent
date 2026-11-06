@@ -12,7 +12,7 @@ computer.windows({ app?, title? }?) → ComputerWindowInfo[]
 computer.window(idOrFilter) → ComputerWindow
     Exactly one window; zero or several matches throw listing candidates. Handle fields: id, app, title, pid, bounds, focused.
 computer.focusedWindow() → ComputerWindow | null
-computer.screenshot({ silent? }?) / win.screenshot({ silent? }?) → { target, frameId, width, height, sourceWidth, sourceHeight, scale, path? }
+computer.screenshot({ silent? }?) / win.screenshot({ silent? }?) → { target, frameId, width, height, sourceWidth, sourceHeight, coordinateWidth, coordinateHeight, scale, path? }
     The root captures the focused monitor by default (primary fallback), not the all-display composite. Auto-displays the image unless `silent: true`. Wayland uses the first display the portal reports, not a known compositor primary.
 computer.zoom({ x, y, width, height }, { silent?, frameId? }?) / win.zoom(...) → { target, frameId, width, height, sourceWidth, sourceHeight, coordinateWidth, coordinateHeight, region, scale, path? }
     Fresh native-detail crop of a region in the SAME target's last full screenshot. Desktop/display zoom pins the displays that full frame captured, even after focus moves. Zoom pixels are NOT input coordinates: later clicks still use the last full screenshot's coordinateWidth/coordinateHeight and frameId. A missing/stale full frame or invalid rectangle throws InvalidCoordinateFrame; take a new full screenshot. Same helper on display handles.
@@ -53,8 +53,8 @@ computer.control.release() → None
 computer.control.state() → { active, reason?, grantedAt? }
 computer.run(fnOrCode, { args?, read_only?, timeout? }?) → value
     One multi-step JS run in the persistent desktop session. Functions receive `{ desktop, wait, assert }` (`desktop` = same helpers) and cannot capture cell closures; `args` pass JSON data, functions, RegExp. Python passes a JS code string only. `read_only: true` needs `computer:read` and blocks mutation; `timeout` is seconds. Not sandboxed.
-computer.capabilities() → { backend, capture, input, ax, backgroundWindowInput, cursorOverlay, deliveryModes, *Permission, stopPath, stopReason?, focusGuard, screenLocked, … }
-    `stopPath` is `global` when the user's stop chord is armed; with `none`, input is refused. `focusGuard` says whether foreground delivery restores the previous front window and cursor.
+computer.capabilities() → { backend, capture, input, ax, backgroundWindowInput, cursorOverlay, deliveryModes, *Permission, stopPath, stopReason?, focusGuard, screenLocked, displayAsleep, … }
+    `stopPath` is `global` when the user's stop chord is armed; with `none`, input is refused. `focusGuard` says whether foreground delivery restores the previous front window and cursor. `displayAsleep` (macOS) is true when every display of the session sleeps; the engine keeps the display awake while you act, and a failure that ends `(the screen is locked)` or `(the display is asleep)` needs the user to unlock or wake the Mac, not a retry.
 computer.close() → None
     Ends the desktop session; later calls fail.
 Rules:
