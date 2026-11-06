@@ -53,14 +53,17 @@ export function parseReportedWindows(payload: unknown): ReportedWindow[] {
   return windows
 }
 
-/** Longest match wins, so `gpt-6.1-sol-fast` cannot be claimed by a shorter unrelated slug. */
+const VARIANT_SUFFIXES = ["-fast", "-ultrafast"] as const
+
+/** Only the catalog's own variant suffixes map to a base slug, so an unrelated sibling is left alone. */
 export function matchReportedSlug(modelId: string, slugs: readonly string[]): string | undefined {
-  let best: string | undefined
-  for (const slug of slugs) {
-    if (modelId !== slug && !modelId.startsWith(`${slug}-`)) continue
-    if (best === undefined || slug.length > best.length) best = slug
+  if (slugs.includes(modelId)) return modelId
+  for (const suffix of VARIANT_SUFFIXES) {
+    if (!modelId.endsWith(suffix)) continue
+    const base = modelId.slice(0, -suffix.length)
+    if (slugs.includes(base)) return base
   }
-  return best
+  return undefined
 }
 
 /** Raise only: a catalog value above what the endpoint reports is a deliberate tier choice. */

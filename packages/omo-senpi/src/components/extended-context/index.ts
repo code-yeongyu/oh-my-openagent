@@ -1,20 +1,22 @@
+import { existsSync } from "node:fs"
+
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import {
   applyContextWindowOverrides,
   clearContextWindowOverrides,
-  contextWindowOverrideIds,
+  clearWrittenWindows,
   modelsJsonPath,
   readModelsJsonConfig,
+  readWrittenWindows,
+  recordPath,
   writeModelsJsonConfig,
+  writeWrittenWindows,
 } from "./store"
 import { computeWidenedWindows, parseReportedWindows, type CatalogRow } from "./windows"
 
 const PROVIDER_ID = "chatgpt-subscription"
 const MODELS_ENDPOINT = "https://chatgpt.com/backend-api/codex/models"
-// Below 0.160.0 the endpoint answers with a truncated catalog that omits every gpt-6.1 model, so a
-// lower version would silently leave the model this command exists for untouched.
-const CLIENT_VERSION = "0.200.0"
 const REQUEST_TIMEOUT_MS = 15_000
 
 type CatalogModel = {
@@ -27,6 +29,7 @@ type CatalogModel = {
 type ModelRegistryPort = {
   getAll(): readonly CatalogModel[]
   getApiKeyForProvider(providerId: string): Promise<string | undefined> | string | undefined
+  refresh?(): unknown
 }
 
 export type ExtendedContextCommandContext = {
@@ -36,8 +39,18 @@ export type ExtendedContextCommandContext = {
   readonly modelRegistry?: unknown
 }
 
+export type ExtendedContextDeps = {
+  readonly fetchImpl?: typeof fetch
+  readonly hostVersion?: string
+}
+
 function respond(ctx: ExtendedContextCommandContext, text: string, level: "info" | "warning" | "error" = "info"): string {
-  ctx.ui?.notify(text, level)
+  if (ctx.hasUI === true) {
+    ctx.ui?.notify(text, level)
+    return text
+  }
+  const stream = level === "info" ? process.stdout : process.stderr
+  stream.write(`${text}\n`)
   return text
 }
 
@@ -54,12 +67,16 @@ function catalogRows(models: readonly CatalogModel[]): CatalogRow[] {
     .map((model) => ({ id: model.id, contextWindow: model.contextWindow, maxTokens: model.maxTokens }))
 }
 
-async function fetchReportedWindows(token: string): Promise<unknown> {
-  const response = await fetch(`${MODELS_ENDPOINT}?client_version=${CLIENT_VERSION}`, {
+/**
+ * The endpoint requires a client version and serves the catalog that version is entitled to, so the
+ * request carries the running engine's own version rather than identifying itself as another CLI.
+ */
+async function fetchReportedWindows(token: string, hostVersion: string, fetchImpl: typeof fetch): Promise<unknown> {
+  const response = await fetchImpl(`${MODELS_ENDPOINT}?client_version=${encodeURIComponent(hostVersion)}`, {
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: "application/json",
-      "User-Agent": `codex-cli/${CLIENT_VERSION}`,
+      "User-Agent": `omo/${hostVersion}`,
     },
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
@@ -69,10 +86,18 @@ async function fetchReportedWindows(token: string): Promise<unknown> {
   return response.json()
 }
 
-async function widen(ctx: ExtendedContextCommandContext, path: string): Promise<string> {
+async function widen(
+  ctx: ExtendedContextCommandContext,
+  deps: ExtendedContextDeps,
+  agentDir: string,
+): Promise<string> {
   const registry = registryOf(ctx.modelRegistry)
   if (registry === undefined) {
     return respond(ctx, "extended-context needs an interactive session with a model registry.", "error")
+  }
+  const hostVersion = deps.hostVersion
+  if (hostVersion === undefined || hostVersion === "") {
+    return respond(ctx, "This engine does not report its version, so the subscription catalog cannot be read honestly.", "warning")
   }
 
   const token = await Promise.resolve(registry.getApiKeyForProvider(PROVIDER_ID))
@@ -85,35 +110,68 @@ async function widen(ctx: ExtendedContextCommandContext, path: string): Promise<
     return respond(ctx, `No ${PROVIDER_ID} models are available in this session.`, "warning")
   }
 
-  const widened = computeWidenedWindows(rows, parseReportedWindows(await fetchReportedWindows(token)))
+  const path = modelsJsonPath(agentDir)
+  const read = readModelsJsonConfig(path, existsSync(path))
+  if (read.kind === "invalid") {
+    return respond(ctx, `${path} does not parse, so nothing was written. Fix or move it first.`, "error")
+  }
+
+  const reported = parseReportedWindows(await fetchReportedWindows(token, hostVersion, deps.fetchImpl ?? fetch))
+  const widened = computeWidenedWindows(rows, reported)
   if (widened.length === 0) {
     return respond(ctx, "Every ChatGPT subscription model already uses the window the subscription reports.")
   }
 
-  const config = readModelsJsonConfig(path)
-  await writeModelsJsonConfig(path, applyContextWindowOverrides(config, PROVIDER_ID, widened))
+  const { config, written } = applyContextWindowOverrides(read.config, PROVIDER_ID, widened)
+  await writeModelsJsonConfig(path, config)
+  await writeWrittenWindows(recordPath(agentDir), PROVIDER_ID, written)
+  await Promise.resolve(registry.refresh?.()).catch(() => undefined)
+
   const lines = widened.map((window) => `${window.id}: ${window.from} -> ${window.to}`)
   return respond(ctx, `Extended ${widened.length} model window(s) in ${path}\n${lines.join("\n")}`)
 }
 
-async function restore(ctx: ExtendedContextCommandContext, path: string): Promise<string> {
-  const { config, cleared } = clearContextWindowOverrides(readModelsJsonConfig(path), PROVIDER_ID)
-  if (cleared.length === 0) return respond(ctx, "No extended context windows to restore.")
+async function restore(ctx: ExtendedContextCommandContext, agentDir: string): Promise<string> {
+  const path = modelsJsonPath(agentDir)
+  const read = readModelsJsonConfig(path, existsSync(path))
+  if (read.kind === "invalid") {
+    return respond(ctx, `${path} does not parse, so nothing was written. Fix or move it first.`, "error")
+  }
 
+  const written = await readWrittenWindows(recordPath(agentDir))
+  if (Object.keys(written).length === 0) {
+    return respond(ctx, "No extended context windows were written here, so nothing was restored.")
+  }
+
+  const { config, cleared } = clearContextWindowOverrides(read.config, PROVIDER_ID, written)
   await writeModelsJsonConfig(path, config)
-  return respond(ctx, `Restored the shipped windows for ${cleared.length} model(s): ${cleared.join(", ")}`)
+  await clearWrittenWindows(recordPath(agentDir))
+  const registry = registryOf(ctx.modelRegistry)
+  await Promise.resolve(registry?.refresh?.()).catch(() => undefined)
+
+  return respond(
+    ctx,
+    cleared.length === 0
+      ? "Nothing to restore: those windows are already gone or were changed by hand."
+      : `Restored the shipped windows for ${cleared.length} model(s): ${cleared.join(", ")}`,
+  )
 }
 
-export function registerExtendedContextCommand(pi: SenpiExtensionAPI): void {
+export function registerExtendedContextCommand(pi: SenpiExtensionAPI, deps: ExtendedContextDeps = {}): void {
+  const hostVersion = deps.hostVersion ?? (pi as { hostVersion?: string }).hostVersion
+  const resolved: ExtendedContextDeps = { ...deps, ...(hostVersion === undefined ? {} : { hostVersion }) }
   pi.registerCommand("extended-context", {
-    description: "Toggle ChatGPT subscription model windows between the shipped values and the reported maximum",
+    description: "Toggle or set ChatGPT subscription model windows (on | off)",
     handler: async (args: string, ctx: ExtendedContextCommandContext): Promise<string> => {
-      const path = modelsJsonPath(ctx.agentDir ?? resolveAgentHome({ env: process.env }))
+      const agentDir = ctx.agentDir ?? resolveAgentHome({ env: process.env })
       const command = (args ?? "").trim().toLowerCase()
       try {
         const wantsRestore = command === "off" || command === "restore" || command === "reset"
-        const hasOverrides = contextWindowOverrideIds(readModelsJsonConfig(path), PROVIDER_ID).length > 0
-        return wantsRestore || hasOverrides ? await restore(ctx, path) : await widen(ctx, path)
+        const wantsWiden = command === "on"
+        const written = await readWrittenWindows(recordPath(agentDir))
+        const isOn = Object.keys(written).length > 0
+        const shouldWiden = wantsWiden || (!wantsRestore && !isOn)
+        return shouldWiden ? await widen(ctx, resolved, agentDir) : await restore(ctx, agentDir)
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         return respond(ctx, `extended-context failed: ${message}`, "error")
@@ -122,11 +180,11 @@ export function registerExtendedContextCommand(pi: SenpiExtensionAPI): void {
   })
 }
 
-export function createExtendedContextComponent(): OmoSenpiComponent {
+export function createExtendedContextComponent(deps: ExtendedContextDeps = {}): OmoSenpiComponent {
   return {
     name: "extended-context",
     register(pi: SenpiExtensionAPI, _ctx: ComponentContext): void {
-      registerExtendedContextCommand(pi)
+      registerExtendedContextCommand(pi, deps)
     },
   }
 }
