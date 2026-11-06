@@ -55,7 +55,7 @@ const KOREAN_TEXT = "안녕하세요 컴퓨터 사용 평가"
 const TWO_WINDOW_TEXT = "only the second window"
 
 /** Audit lines of `action` that succeeded on `target`. */
-export function auditCount(audit, action, target) {
+function auditCount(audit, action, target) {
   return audit.filter((line) => line.action === action && line.status === "success" && (target === undefined || line.target === target)).length
 }
 
@@ -400,8 +400,7 @@ export const TASKS = [
   },
 ]
 
-export function digits(value) {
+function digits(value) {
   return typeof value === "string" ? value.replace(/[^0-9.-]/g, "") : null
 }
 
-export const TASK_IDS = TASKS.map((task) => task.id)

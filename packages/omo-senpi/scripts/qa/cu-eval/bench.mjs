@@ -34,7 +34,7 @@ const core = await import("./eval-core.mjs")
 const { locateEngine } = await import("./run.mjs")
 
 /** One window with a text area and a button: every op below has a target. */
-export const BENCH_SCENARIO = {
+const BENCH_SCENARIO = {
   displays: [
     { id: "1", name: "Built-in Display", x: 0, y: 0, width: 1920, height: 1080, scale: 1, pixelX: 0, pixelY: 0, pixelWidth: 1920, pixelHeight: 1080, isPrimary: true },
   ],
@@ -83,7 +83,7 @@ function load() {
   return { load1: Math.round(one * 100) / 100, load5: Math.round(five * 100) / 100, load15: Math.round(fifteen * 100) / 100, cpus: cpus().length }
 }
 
-export function hostKey(live) {
+function hostKey(live) {
   return `${platform()}-${process.arch}-${live ? "live" : "fake"}`
 }
 
@@ -102,7 +102,7 @@ export function foldSamples(samples) {
   return ops
 }
 
-export async function runBench({ enginePath, live, runs, warmup }) {
+async function runBench({ enginePath, live, runs, warmup }) {
   const scratch = mkdtempSync(join(tmpdir(), "cu-bench-"))
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^(OMO|SENPI|PI)_/.test(key)))
   delete env.SENPI_DESKTOP_BACKEND
