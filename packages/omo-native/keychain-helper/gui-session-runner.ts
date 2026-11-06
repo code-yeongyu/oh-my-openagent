@@ -57,10 +57,12 @@ async function main(reportPath: string): Promise<void> {
 
   try {
     await fx("create")
-    await fx("add", ACCOUNT, "dummy-gui")
+    const added = await fx("add", ACCOUNT, "dummy-gui")
+    if (!added.includes("status 0")) throw new Error(`The fixture could not add the test item; stop: ${added}`)
     const partition = await helperCall({ v: 1, verb: "read", account: ACCOUNT }, ["--no-ui"])
-    // Precondition (design 9): the claims below are only meaningful where items get a partition entry.
-    if (partition.includes('"partition":"none"')) throw new Error(`No partition entry was created in this session; stop: ${partition}`)
+    // Precondition (design 9): the claims below are only meaningful where the item got a partition entry naming a
+    // team ("ours" or "other"); "none", "unknown", "missing" or an error reply all stop the run.
+    if (!/"partition":"(ours|other)"/.test(partition)) throw new Error(`No usable partition entry in this session; stop: ${partition}`)
     observations.push({ step: "partition-at-creation", automatic: partition, observed: "checked automatically" })
     await step("own-identity-with-partition", "The creator reads and deletes its own item. Expect no dialog.", async () =>
       `${await fx("read", ACCOUNT)} | ${await fx("delete", ACCOUNT)}`)

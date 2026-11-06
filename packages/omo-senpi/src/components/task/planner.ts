@@ -2,6 +2,7 @@ import { createModelDistributor, isExcludedModel, type ModelDistributor, type Om
 
 import { inheritParentFastMode, type ResolveParentServiceTier } from "./fast-mode-inheritance"
 import { NO_REGISTRY_MESSAGE, resolveExplicitPin, type ResolveDefaultRoute } from "./planner-explicit-pin"
+import { agentModelFailureText, categoryModelFailureText } from "./model-error-text"
 import {
   resolveAgent,
   resolveCategory,
@@ -82,7 +83,18 @@ export function createTaskChildPlanner(
     }
 
     const resolution = resolveCategory(categoryName, omoConfig, registry, { distributeModels })
-    return toPlanResolution(categoryName, resolution, availableAgents)
+    const plan = toPlanResolution(categoryName, resolution, availableAgents)
+    // Q's standing model rule: a chain ends in a typed failure that names each model, so the parent
+    // reads the whole chain and the fix instead of retrying a dead binding. No substitution happens.
+    if (plan.kind === "error" && plan.error.code === "model_unavailable") {
+      const message = categoryModelFailureText(
+        plan.error,
+        omoConfig,
+        resolution.kind === "model_unavailable" ? resolution.category : undefined,
+      )
+      if (message !== undefined) return { kind: "error", error: { ...plan.error, message } }
+    }
+    return plan
   }
   return (spec): PlanResolution => {
     const resolution = planChild(spec)
@@ -126,8 +138,10 @@ function resolveAgentTarget(
       kind: "error",
       error: {
         code: "model_unavailable",
-        message: `No available model for agent "${agentName}" (attempted ${resolution.attemptedModel ?? "none"}).`,
+        message: agentModelFailureText(agentName, resolution, agents),
         availableAgents: resolution.availableAgents,
+        ...(resolution.attempted_chain !== undefined && { attempted_chain: resolution.attempted_chain }),
+        ...(resolution.missing_providers !== undefined && { missing_providers: resolution.missing_providers }),
       },
     }
   }
