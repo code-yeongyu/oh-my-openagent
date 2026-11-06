@@ -1,4 +1,4 @@
-import { InFlightReads, MemoryBlockCache, runStaleLockReaper } from "@oh-my-opencode/memory-core"
+import { InFlightReads, MemoryBlockCache } from "@oh-my-opencode/memory-core"
 
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import { buildDreamTriggerWiring } from "./dream-runtime-wiring"
@@ -22,6 +22,7 @@ import { createProjectMemoryScope } from "./project-memory-nudge"
 import { readUi, branchEntryCount, sessionIdFrom } from "./wiring-context"
 import { createMemoryUserActivity } from "./user-activity"
 import { logBindReconcileFailure } from "./bind-reconcile-log"
+import { loadMemoryCommandsRuntime } from "./commands/runtime-loader"
 import {
   createMemoryReflectionLiveWiring,
   createReflectionCompletionApi,
@@ -277,6 +278,7 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
             await userActivity.reconcileOnce(sessionId, async () => {
               try {
                 // The reaper moves a torn active.lock aside first (reconciliation cannot read past it), then reconciles.
+                const { runStaleLockReaper } = await loadMemoryCommandsRuntime()
                 await runStaleLockReaper({
                   runtimeDir: identity.identityPaths.runtime,
                   settle: () => runtimeFor(identity).reconcile(observer?.signal),

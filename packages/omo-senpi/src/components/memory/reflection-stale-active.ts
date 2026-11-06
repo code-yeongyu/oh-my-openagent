@@ -9,11 +9,12 @@
 
 import {
   classifyReflectionLockHolder,
-  runStaleLockReaper,
   type ReflectionLockVerdict,
   type StaleLockProbe,
 } from "@oh-my-opencode/memory-core"
 import { dirname } from "node:path"
+
+import { loadMemoryCommandsRuntime } from "./commands/runtime-loader"
 
 export type ActiveHolderVerdict = ReflectionLockVerdict
 export type ActiveHolderSeams = StaleLockProbe
@@ -40,6 +41,11 @@ export async function recoverStaleReflectionHolder(input: {
   /** False once this session already tried to settle the run: report it instead of reconciling again. */
   readonly shouldReconcile?: (runId: string) => boolean
 }): Promise<{ readonly verdict: ActiveHolderVerdict; readonly notice?: string; readonly recoveredRunId?: string }> {
+  // No lock or a live holder is the reaper's "nothing to decide"; answering it here keeps the per-turn
+  // check from loading the commands sidecar while no reflection lock needs recovery.
+  const current = await classifyReflectionLockHolder(input.reflectionDir, input.seams ?? {})
+  if (current.state === "none" || current.state === "live") return { verdict: current }
+  const { runStaleLockReaper } = await loadMemoryCommandsRuntime()
   const report = await runStaleLockReaper({
     runtimeDir: dirname(input.reflectionDir),
     settle: input.reconcile,

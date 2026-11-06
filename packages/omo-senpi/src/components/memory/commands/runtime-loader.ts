@@ -27,7 +27,10 @@ export function createMemoryCommandsRuntimeLoader<Module>(importRuntime: () => P
   }
 }
 
-export const loadMemoryCommandsRuntime: () => Promise<MemoryCommandsRuntimeModule & DreamSelectionRuntimeModule> =
+/** The stale reflection-lock reaper the session and /doctor fix load from the same sidecar. */
+export type ReflectionLockRuntimeModule = Pick<typeof CommandsRuntime, "formatStaleLockFixLines" | "reclaimDeadOwnerLocks" | "runStaleLockReaper">
+
+export const loadMemoryCommandsRuntime: () => Promise<MemoryCommandsRuntimeModule & DreamSelectionRuntimeModule & ReflectionLockRuntimeModule> =
   createMemoryCommandsRuntimeLoader(() => import("#omo-memory-commands-runtime"))
 
 export function memoryCommandsRuntimeLoadFailure(command: string, error: unknown): string {
