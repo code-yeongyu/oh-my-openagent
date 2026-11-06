@@ -43,6 +43,10 @@ import {
   stageCompiledEngineTrustHelper,
 } from "./release-desktop-engine-target"
 import { EMBEDDED_PAYLOAD_ROOT, RUNTIME_MANIFEST_REL_PATH } from "./embedded-payload-naming"
+import {
+  RUNTIME_CAPABILITIES_FILE,
+  runtimeCapabilitiesText,
+} from "../packages/omo-opencode/src/cli/service-auth/keychain-helper/runtime-capabilities"
 import { reportEmbeddedPayload } from "./embedded-payload-probe"
 
 export { compileDefinesForOmoBinary, reportEmbeddedPayload }
@@ -625,6 +629,9 @@ export async function buildReleaseBinary(
     writeFileSync(join(stageDir, RUNTIME_MANIFEST_REL_PATH), runtimeManifestFileContent(manifest, target.target), "utf8")
 
     mkdirSync(outDir, { recursive: true })
+    // RULING-74: every runtime ships its declared capabilities beside it; the desktop bundles this file with the
+    // runtime and its keychain helper, and the CLI hands off only to a runtime that declares the contract.
+    writeFileSync(join(outDir, RUNTIME_CAPABILITIES_FILE), runtimeCapabilitiesText(), "utf8")
     const binaryPath = join(outDir, target.binaryName)
 
     // Probe BEFORE the expensive target compile: a bun that predates the
