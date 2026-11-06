@@ -119,7 +119,7 @@ Layer A (pick AT MOST ONE style skill; they encode opposing philosophies):
 | `layout-skill.md` / `interaction-skill.md` / `ambience-skill.md` | Stack on any style skill; mechanics only, no visual direction. |
 | `imagegen-frontend-web.md` / `imagegen-frontend-mobile.md` / `imagegen-brandkit.md` | Image-only output; never code. |
 
-Layer B: when the user names a brand or site ("Linear-style", "like Stripe's landing", "Aside-style browser agent"), load `references/design/<brand>.md` as the token source of truth: `aside` `apple` `stripe` `linear.app` `notion` `vercel` `claude` `figma` `airbnb` `nike` `tesla` `spotify` `raycast` `revolut` and ~56 more in `_INDEX.md`. Extract the tokens and apply them to the project's own content; never copy logos or trademarked imagery. A missing brand falls back to a Layer A mood match or the `open-design` skill.
+Layer B: when the user names a brand or site ("Linear-style", "like Stripe's landing", "Aside-style browser agent"), load `references/design/<brand>.md` as the token source of truth: `aside` `apple` `stripe` `linear.app` `notion` `vercel` `claude` `figma` `airbnb` `nike` `tesla` `spotify` `raycast` `revolut` and ~56 more in `_INDEX.md`. Extract the tokens and apply them to the project's own content; never copy logos or trademarked imagery. A missing brand falls back to a Layer A mood match or to the nexu-io/open-design library (https://github.com/nexu-io/open-design).
 
 `perfection/`: `README.md` (the seven tenets: real-browser audits only, 100 in every category, fix at the architecture, never weaken UX for points, design-system compliance, the audit report format) and `react-perf-tooling.md` (Playwright + `playwright-lighthouse` + `react-scan/lite` injection, per-route render budgets). Audit CLI, production build only, mobile and desktop presets, 3-5 runs, take the median:
 
@@ -131,7 +131,7 @@ uv run $SKILL_DIR/scripts/perfection/lighthouse-audit.py https://localhost:3000
 
 ```bash
 python3 -B $SKILL_DIR/references/ui-ux-db/scripts/search.py "<query>" --design-system -p "Project"   # design-system generation
-python3 -B $SKILL_DIR/references/ui-ux-db/scripts/search.py "<query>" --domain <domain>             # product style typography color landing chart ux react web prompt
+python3 -B $SKILL_DIR/references/ui-ux-db/scripts/search.py "<query>" --domain <domain>             # product style typography color landing chart ux react web icons google-fonts
 python3 -B $SKILL_DIR/references/ui-ux-db/scripts/search.py "<query>" --stack <stack>               # html-tailwind react nextjs vue svelte astro swiftui react-native flutter shadcn jetpack-compose
 ```
 
@@ -141,7 +141,7 @@ python3 -B $SKILL_DIR/references/ui-ux-db/scripts/search.py "<query>" --stack <s
 
 | Situation | Load |
 |---|---|
-| Brand/style not among the 70 in `references/design/`, or the user says "Open Design" | `open-design` skill: the local nexu-io/open-design library (137+ design skills, 150+ design systems) |
+| Brand/style not among the 70 in `references/design/`, or the user says "Open Design" | The nexu-io/open-design library (https://github.com/nexu-io/open-design; 137+ design skills, 150+ design systems) |
 | Driving a browser for captures | `visual-qa` skill: omowright from js eval (owned engine for renders, attached engine for signed-in pages) |
 | Pure TypeScript/logic work with zero visual surface | `programming` skill alone; this skill adds nothing there |
 

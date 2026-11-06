@@ -234,6 +234,17 @@ describe("team e2e crash liveness detector", () => {
 })
 
 describe("team e2e process cleanup", () => {
+  // #12129: the fake root pid must never equal the test runner's own pid —
+  // `windowsTreeKillArgs` refuses `rootPid === process.pid` (self-kill guard),
+  // so the literal 4242 failed whenever the runner happened to get pid 4242.
+  // It also failed when the runner got pid 4243 or 4245: the taskkill cases
+  // build their mock tree as root+1/+2/+3, so the runner's own pid landed
+  // inside it, and the ancestor guard in `windows-process-tree.mjs:52-58`
+  // strips the runner and its ancestors from the kill list, changing the
+  // expected taskkill args. `process.pid + 1` keeps the whole mock tree
+  // clear of the runner's pid.
+  const FAKE_ROOT_PID = process.pid + 1
+
   it("#given a Windows npm senpi shim #when the spawn invocation is resolved #then Node launches the package CLI without cmd shell forwarding", () => {
     // given
     const shim = "C:\\Users\\qa\\AppData\\Roaming\\npm\\senpi"
@@ -335,14 +346,18 @@ describe("team e2e process cleanup", () => {
   it("#given taskkill reports success before pid visibility settles #when its process tree is terminated #then command completion is authoritative", async () => {
     // given
     const calls: Array<{ command: string; args: readonly string[] }> = []
+    const root = FAKE_ROOT_PID
+    const child = root + 1
+    const unrelated = root + 2
+    const grandchild = root + 3
 
     // when
-    const result = await runtime.terminateProcessTree(4242, {
+    const result = await runtime.terminateProcessTree(root, {
       platform: "win32",
       isProcessAlive: () => true,
       spawnSync: (command: string, args: readonly string[]) => {
         if (command === "powershell.exe") {
-          return { status: 0, stdout: "4242 1 200 bun.exe\n4243 4242 210 node.exe\n4244 4243 100 unrelated.exe\n4245 4243 220 child.exe\n", stderr: "" }
+          return { status: 0, stdout: `${root} 1 200 bun.exe\n${child} ${root} 210 node.exe\n${unrelated} ${child} 100 unrelated.exe\n${grandchild} ${child} 220 child.exe\n`, stderr: "" }
         }
         calls.push({ command, args })
         return { status: 0, stdout: "SUCCESS", stderr: "" }
@@ -352,14 +367,14 @@ describe("team e2e process cleanup", () => {
     // then
     expect(calls).toEqual([{
       command: "taskkill.exe",
-      args: ["/F", "/PID", "4242", "/PID", "4243", "/PID", "4245"],
+      args: ["/F", "/PID", String(root), "/PID", String(child), "/PID", String(grandchild)],
     }])
-    expect(result).toEqual({ kind: "terminated", pid: 4242, platform: "win32" })
+    expect(result).toEqual({ kind: "terminated", pid: root, platform: "win32" })
   })
 
   it("#given taskkill returns nonzero after the root disappears #when termination is evaluated #then status and stderr remain a failure", async () => {
     const aliveReads = [true, false]
-    const result = await runtime.terminateProcessTree(4242, {
+    const result = await runtime.terminateProcessTree(FAKE_ROOT_PID, {
       platform: "win32",
       isProcessAlive: () => aliveReads.shift() ?? false,
       spawnSync: () => ({ status: 1, stdout: "", stderr: "partial tree kill" }),
@@ -367,11 +382,32 @@ describe("team e2e process cleanup", () => {
 
     expect(result).toEqual({
       kind: "failed",
-      pid: 4242,
+      pid: FAKE_ROOT_PID,
       platform: "win32",
       status: 1,
       error: "partial tree kill",
     })
+  })
+
+  it("#given the root pid equals the runner's own pid #when its process tree is terminated #then the self-kill guard refuses without calling taskkill", async () => {
+    // given: #12129 — the guard `windowsTreeKillArgs` applies must hold even
+    // when the runner's pid collides with the target, and the fake root pid
+    // used above must never be that pid.
+    const calls: Array<{ command: string; args: readonly string[] }> = []
+
+    // when
+    const result = await runtime.terminateProcessTree(process.pid, {
+      platform: "win32",
+      isProcessAlive: () => true,
+      spawnSync: (command: string, args: readonly string[]) => {
+        calls.push({ command, args })
+        return { status: 0, stdout: "SUCCESS", stderr: "" }
+      },
+    })
+
+    // then
+    expect(calls).toEqual([])
+    expect(result).toEqual({ kind: "already-exited", pid: process.pid, platform: "win32" })
   })
 
   it("#given a POSIX group is briefly alive after SIGKILL #when survivor polling observes it die #then termination succeeds", async () => {

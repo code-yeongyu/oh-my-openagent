@@ -8,6 +8,8 @@ argument-hint: "[plan-name] [--worktree <absolute-path>] [--make-pr] [--ship]"
 
 **YOU DO NOT WRITE CODE. YOU DO NOT EDIT PRODUCT FILES. YOU DO NOT RUN QA YOURSELF. EVERY unit of implementation, test, QA, and review work MUST be delegated to a spawned subagent. NO EXCEPTIONS.** Your hands touch only plan selection, `.omo/` state (Boulder, ledger, plan checkboxes), decomposition, dispatch, verdicts, and evidence records. About to edit a product file or run an implementation command yourself? **STOP. SPAWN A WORKER INSTEAD.** Orchestrate at **MAXIMUM PARALLELISM**: every independent unit runs concurrently; only named dependencies serialize.
 
+This rule binds the root of a ulw-execute run, including its Final Verification Wave and any `review-work` pass run inside it: a worker runs every QA scenario, and you judge the artifacts it captured. Outside a ulw-execute run (a bare ultrawork run, a ulw-loop final gate, a standalone `review-work`), the session that owns the run runs the final real-surface QA itself.
+
 ## Codex Harness Tool Compatibility
 
 Translate any OpenCode-only tool name in an inherited example to its Codex equivalent:
@@ -103,7 +105,7 @@ Every phase (plan wave) runs in its own task-owned worktree with its own goal: b
 Solo orchestration with parallel background workers is the default topology. Decide once, when the wave's lanes are known, and record the verdict in the ledger:
 
 - **Independent lanes -> parallel workers.** Separate files, no shared contract: one parallel spawn burst; no team.
-- **Dependency-ordered lanes -> one `workflow` run per wave.** Sub-tasks with real ordering between them (C needs A and B finished first) and a harness with a native `workflow` tool: dispatch the wave as ONE run (one producer node per lane plus a verification node); recover inside it with `retry`/`amend`/`send`; let the run's settle wake you instead of arming per-lane watchers; the next wave is a NEW run (or `amend` when only the definition changed) — never one graph for the whole plan. Read the `mass-ulw` skill's `SKILL.md` and `references/planning.md` IN FULL before defining any graph.
+- **Dependency-ordered lanes -> one `workflow` run per wave.** Sub-tasks with real ordering between them (C needs A and B finished first) and a harness with a native `workflow` tool: dispatch the wave as ONE run (one producer node per lane plus a verification node); recover inside it with `retry`/`amend`/`send`; let the run's settle wake you instead of arming per-lane watchers; the next wave is a NEW run (use `amend` only to re-run the current wave after its definition changed) — never one graph for the whole plan. When the harness lists the `mass-ulw` skill, read its `SKILL.md` and `references/planning.md` IN FULL before defining any graph.
 - **Overlapping lanes -> a team.** The lanes touch the same module or contract AND running them concurrently actually finishes sooner: stand up a team (where the harness has one) so one lane's discoveries relay through you mid-flight.
 - **PR-mode independent lanes -> a worktree per lane.** Under `--make-pr`/`--ship`, when a wave holds independent checkboxes, give each lane its own branch and task-owned worktree, delivered as its own PR.
 
@@ -143,7 +145,6 @@ When the plan annotates a todo with `Recommended task executor category:`, follo
 | `unspecified-high` (medium) | standard features across a few files with known patterns |
 | `visual-engineering` (medium) | frontend, UI/UX, styling, animation |
 | `writing` (low) | documentation and prose |
-| `git` (low) | git operations |
 | `deep-low` (medium) | hairy debugging, research-heavy or subtle cross-module work the worker can settle from what it reads |
 | `deep-high` (high) | the same, when the central decision cannot be settled from evidence: a trade-off, a cross-package contract, or correctness argued from invariants |
 | `ultrabrain` (high) | ONE genuinely hard, logic-heavy problem — hand it the goal, not step-by-step instructions |
@@ -152,6 +153,8 @@ Sizing is a two-branch decision made per checkbox, before dispatch:
 
 - **Splittable work splits.** When the checkbox decomposes into independent pieces, dispatch them as a swarm of `quick`/`unspecified-low` workers in ONE parallel burst — many small cheap workers in parallel beat one large delegation.
 - **Cohesive hard work stays whole.** When splitting would sever shared reasoning (one algorithm, one migration, one subtle bug), send the WHOLE problem to `deep-low`, `deep-high` or `ultrabrain` as ONE delegation. Never force-split work whose parts share one insight.
+
+Git operations are not a category: route them to a `quick` worker and name the `git-master` skill in its brief (`load_skills` where the spawn tool takes it).
 
 Each sub-task message must include:
 
@@ -164,7 +167,7 @@ Each sub-task message must include:
    - Terminal / TUI: drive a real pty; `tmux send-keys` is fine for a boot/behavior smoke, but color/layout/CJK evidence goes through the xterm.js web terminal below, NEVER `tmux capture-pane`.
    - Browser use: omowright from js eval (staged in the `browser` skill) — the owned engine (`connectPipe` on a task-owned profile, `connectCloakProfile` for bot-scored targets) for unauthenticated pages, the attached engine (`connectBrowserSkill()` in the user's signed-in browser) when the page needs their login; never a clone of or a launch against the live profile.
    - Computer use: OS-level GUI automation against the running desktop app when the surface is not a page.
-   - TUI visual evidence: when a TUI claim needs visual QA or PR proof, run `bun script/qa/web-terminal-visual-qa.mjs --command "<cmd>" --input "{Enter}" --evidence-dir <dir>` (real pty rendered through xterm.js in Chrome) and attach `terminal.png` plus `metadata.json`.
+   - TUI visual evidence: when a TUI claim needs visual QA or PR proof, run `bun script/qa/web-terminal-visual-qa.mjs --title "<surface>" --command "<cmd>" --input "{Enter}" --evidence-dir <dir>` (real pty rendered through xterm.js in Chrome) and attach `terminal.png` plus `metadata.json`.
 6. The adversarial classes that apply to this sub-task (from the 9 ultraqa classes) and how each is probed.
 7. Required artifact path and cleanup receipt.
 8. Tool-use expectations: batch independent tool calls in parallel; when the harness exposes a code-execution surface (eval), use it for multi-call steps instead of one-by-one calls.
@@ -209,10 +212,10 @@ A worker done claim is never final: each implementation sub-task returns a `Done
 
 Rules:
 - `confirmed` is the only pass verdict. `false-positive`, `needs-fix`, and `needs-human-review` all block checkbox completion.
-- The verifier must be independent from the executor: use the harness's gate reviewer (see the harness compatibility section) or a fresh reviewer worker on a strong model, or root only when root did not implement or materially rewrite that task.
+- The verifier must be independent from the executor: use the harness's gate reviewer (see the harness compatibility section) or a fresh reviewer worker on a strong model. Root never verifies; it records the verifier's verdict.
 - A worker done claim must be independently verified before it becomes checkbox completion.
 - On a non-confirmed verdict, append the feedback to the ledger with the attempt number and its failure signature (the failing check plus its first error line, with volatile values stripped: temp-dir paths, timestamps, process and run ids, durations). Attempts count per checkbox across all its sub-tasks and re-splits, timed from its first dispatch (`checkpoint_opened_at`). STOP when the same signature repeats on consecutive attempts, on the third failed attempt, or 4 hours after the first dispatch (a plan may change these numbers, never remove the stop). Check the 4-hour bound also when a lane's watcher fires or the turn resumes without a verdict; when it has passed, cancel that lane and stop the same way: mark the checkbox `- [~]` (the plan grammar's blocked state) with a one-line gap naming what is unmet and the last evidence, mark every checkbox that depends on it, directly or through another `[~]` row, `- [~]` with the gap `blocked by <id>`, close the todo of every row marked `[~]` here labelled `blocked: <gap>`, append an `unmet` ledger entry listing what each attempt changed, and continue in the same turn with the next checkpoint that depends on none of them, or with Completion when none remains. Otherwise leave the checkbox `- [ ]` and re-dispatch the executor with the exact failure.
-- A `[~]` row counts as closed, never as a met dependency: Phase 3 skips it, Completion starts once every top-level row is `[x]` or `[~]`, and the `ORCHESTRATION COMPLETE` block names each `[~]` row with its gap. Final Verification Wave rows are never dependents of a `[~]` row: they verify the landed work and report each `[~]` row as a known gap, which alone never fails a final-wave row. A `[~]` gap is never re-queued as a new checkbox in this run, by the blast-radius rule or by a final-wave verdict; the one harness-repair follow-up in the next rule is the only exception.
+- A `[~]` row counts as closed, never as a met dependency: Phase 3 skips it, Completion starts once every top-level row is `[x]` or `[~]`, and the `ORCHESTRATION COMPLETE` block names each `[~]` row with its gap; a block with any `[~]` row is a partial-delivery report, never a success claim, and the run's goal is reported unmet. Final Verification Wave rows are never dependents of a `[~]` row: they verify the landed work and report each `[~]` row as a known gap, which alone never fails a final-wave row. A `[~]` gap is never re-queued as a new checkbox in this run, by the blast-radius rule or by a final-wave verdict; the one harness-repair follow-up in the next rule is the only exception.
 - The verifier sets `failure_class`. A `harness` failure (the runner, fixture, CI job or environment failed and the product behavior was never exercised) gets one repair dispatch inside the checkpoint, which does not count as an attempt; when it recurs, stop as above with the harness gap named and append the harness repair once as a follow-up checkbox; a harness-repair follow-up that stops is reported, not re-appended.
 - The verifier must probe the applicable adversarial keys, including `stale_state`, `dirty_worktree`, and `misleading_success_output`, before allowing `FullyDone`.
 
@@ -230,7 +233,7 @@ Only after verification passes:
 When all top-level checkboxes in `## TODOs` and `## Final Verification Wave` are complete:
 
 1. Run the plan's final verification commands.
-2. For PR/branch work, finish the lifecycle from the last phase's worktree: sync `.omo/` state back to the main repo, create or update the PR, wait for review/verification gates, merge by default unless explicitly opted out, and remove the worktree only after successful merge or explicit handoff. Finish directory teardown per Task resources and record its receipts.
+2. Under `--make-pr` or `--ship`, finish the lifecycle from the last phase's worktree: sync `.omo/` state back to the main repo, create or update the PR, and wait for review/verification gates. Then follow the delivery mode: `--ship` merges per the repository's merge policy; `--make-pr` hands off with the PR URL and merges only if the user asks. Remove the worktree only after a successful merge or that explicit handoff. Finish directory teardown per Task resources and record its receipts.
 3. Remove or mark the Boulder work as completed.
 4. Print an `ORCHESTRATION COMPLETE` block with the plan path, verification commands, artifacts, and cleanup receipts.
 
