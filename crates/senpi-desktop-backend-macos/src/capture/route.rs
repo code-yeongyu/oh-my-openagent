@@ -268,15 +268,22 @@ impl MacCapture {
         if excluded.contains(&window_id) {
             return Err(DesktopError::capture_failed("cursor-helper windows are not capture targets"));
         }
-        let cause = match skylight_capture::capture(window_id) {
-            Ok((image, window)) if !fully_transparent(&image) => {
+        // B9 before any read of the backing store: SkyLight returns the last
+        // drawn contents of a minimized window, which the contract refuses.
+        let cause = match skylight_capture::listing(window_id) {
+            Ok(window) => {
                 if window_is_minimized(window.pid.and_then(|pid| i32::try_from(pid).ok()), window_id) {
                     return Err(minimized(id));
                 }
-                let geometry = FrameGeometry::for_window(&window, image.width(), image.height());
-                return Ok(Some((image, geometry)));
+                match skylight_capture::capture(window_id) {
+                    Ok(image) if !fully_transparent(&image) => {
+                        let geometry = FrameGeometry::for_window(&window, image.width(), image.height());
+                        return Ok(Some((image, geometry)));
+                    },
+                    Ok(_) => "SkyLight returned a fully transparent image".to_owned(),
+                    Err(error) => error.message,
+                }
             },
-            Ok(_) => "SkyLight returned a fully transparent image".to_owned(),
             Err(error) => error.message,
         };
         if route == WindowRoute::SkyLightOnly {
@@ -366,10 +373,18 @@ impl MacCapture {
                 {
                     return Err(minimized(id));
                 }
-                // Off screen, not minimized, and nothing drawn: another Space
-                // that only SkyLight could have read.
+                // Off screen, not minimized, and nothing drawn. Only a window the
+                // Space listing places elsewhere is reported as off-Space; a hidden
+                // app or an unanswered AXMinimized gets the plain refusal.
                 if frame.is_on_screen == Some(false) && fully_transparent(&frame.image) {
-                    return Err(off_space(id, "ScreenCaptureKit returned a fully transparent image"));
+                    return Err(if spaces::placement(window_id) == SpacePlacement::Other {
+                        off_space(id, "ScreenCaptureKit returned a fully transparent image")
+                    } else {
+                        DesktopError::capture_unavailable(
+                            "off-screen",
+                            format!("window '{id}' is off screen and drew nothing; bring it on screen, or read it through accessibility"),
+                        )
+                    });
                 }
                 let (width, height) = (frame.image.width(), frame.image.height());
                 let (x, y, logical_width, logical_height) = frame.bounds;
