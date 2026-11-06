@@ -92,7 +92,7 @@ for target in TARGETS:
         session = requests.Session(impersonate=target)
         session.headers.update(HEADERS)
         resp = session.get("{URL}", timeout=20)
-        if resp.status_code == 200 and len(resp.text) > 300:
+        if resp.status_code == 200 and len(resp.text) >= 3072 and not any(m in resp.text for m in ("Access Denied", "Just a moment...", "DataDome", "sec-if-cpt-container")):
             # 성공 — JSON-LD도 같이 추출
             break
     except:

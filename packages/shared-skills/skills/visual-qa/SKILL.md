@@ -322,7 +322,7 @@ USE THE EVIDENCE:
 - TUI (tui-check): inspect maxWidth vs expectedColumns, every overflowLines[] entry, borderMisaligned, and wideCharColumns[].
 
 CHECK:
-1. Checklist sections A-F, item by item, on the 390 AND 1440 captures in BOTH themes and on the scrolled-to-end shots: PASS, FAIL or N/A with the capture that proves it. Every FAIL is BLOCKING.
+1. Checklist sections A-F, item by item, on the 390, 1440 and (for page layouts) 1920 captures in BOTH themes and on the scrolled-to-end shots: PASS, FAIL or N/A with the capture that proves it. Every FAIL is BLOCKING.
 2. When a reference packet exists, compare ACTUAL against REFERENCE pixel-perfectly, region by region: page bounds, header/nav, hero, cards, grids, charts, media, typography, copy, color tokens, radius, shadow, border, icon size, spacing, alignment, scroll position, and state. Anything off beyond unavoidable rasterization/rounding is a finding. The overview text is part of the target: missing or rearranged reference content is a finding even if the screenshot looks plausible.
 3. When before/after pairs exist, judge each pair side by side: the after must show the brief's primary action and priorities more legibly than the before, carry fewer elements without a job, and lose nothing from the required-content list. A pair with no change a reader can point to, or a required input, datum, or copy present in before and missing or merged in after, is a BLOCKING [defect].
 4. CJK precision:

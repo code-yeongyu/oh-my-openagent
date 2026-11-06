@@ -16,7 +16,7 @@ Classify the request first:
 - `HISTORY`: answer when, where, who, why, or which commit changed something.
 - `STATUS`: inspect branch, diff, or working-tree state without changing it.
 
-Do not commit, rebase, push, force-push, reset, stash-pop, or delete anything unless the user explicitly asked for that operation. If the request is only investigative, report findings and stop.
+Do not commit, rebase, push, force-push, reset, stash-pop, or delete anything unless the user explicitly asked for that operation. When a workflow the user started mandates one of them (ulw-loop commits each verified unit, ulw-execute lands its branches), that workflow's instruction is the ask. If the request is only investigative, report findings and stop.
 
 ## Ground Truth
 

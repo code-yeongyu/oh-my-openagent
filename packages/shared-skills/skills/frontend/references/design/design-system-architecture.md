@@ -60,7 +60,7 @@ rather than borders, creating layers you feel more than see."
 | Status/info | --status-info | #2563EB | #3B82F6 | Informational |
 
 ### Rules
-- Accent marks the one or two most likely actions on a screen, on the control's background rather than its glyph or label. Peer choices differ by style, never by size. Nothing decorative carries accent.
+- Accent marks the screen's one primary action, on the control's background rather than its glyph or label; a second likely action takes a quieter style. Peer choices differ by style, never by size. Nothing decorative carries accent.
 - Never introduce a color not in this table. Extend the table first.
 
 ## 3. Typography

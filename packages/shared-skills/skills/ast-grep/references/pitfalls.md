@@ -126,9 +126,9 @@ If you actually want two independent captures, name them differently: `$X = $Y`.
 
 ---
 
-## 6. `$$$` is greedy then commits
+## 6. `$$$` is lazy and never backtracks
 
-`$$$` does **not** backtrack. It captures as much as possible, then commits. If your pattern needs a non-greedy match, structure it differently:
+`$$$` does **not** backtrack. It stops at the first node that lets the rest of the pattern match, then commits — on `foo($$$A, b, $$$C)` against `foo(a, c, b, b, c)`, `$$$A` is `[a, c]`, not `[a, c, b]`. If your pattern needs more to land in `$$$A`, structure it differently:
 
 ```ts
 // You want "match foo($X), where $X is any single arg"

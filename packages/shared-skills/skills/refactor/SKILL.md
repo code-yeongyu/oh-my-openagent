@@ -169,8 +169,8 @@ lsp_diagnostics(filePath)  // Errors, warnings before we start
 ### AST-Grep Skill for Pattern Analysis:
 
 \`\`\`bash
-// Find structural patterns
-python3 scripts/ast_grep_helper.py search 'function $NAME($$$) { $$$ }' --lang ts src/
+// Find structural patterns — run this from the ast-grep skill's directory; this skill ships no scripts/
+python3 scripts/ast_grep_helper.py search 'function $NAME($$$) { $$$ }' src/ --lang ts
 
 # Preview refactoring first
 sg --pattern '[old_pattern]' --rewrite '[new_pattern]' --lang ts src/
@@ -425,8 +425,8 @@ lsp_rename(filePath, line, character, newName)  // Execute rename
 // Preview first
 sg --pattern '[pattern]' --rewrite '[rewrite]' --lang ts path/to/file.ts
 
-// If preview looks good, execute
-python3 scripts/ast_grep_helper.py replace '[pattern]' '[rewrite]' --lang ts path/to/file.ts --apply
+// If preview looks good, execute (from the ast-grep skill's directory)
+python3 scripts/ast_grep_helper.py replace '[pattern]' '[rewrite]' path/to/file.ts --lang ts --apply
 \`\`\`
 
 **For Structural Changes:**

@@ -159,7 +159,7 @@ The main session reads the verify node's output and nothing else. Each FAIL line
 ```
 AGENTS_LOCATIONS = [
   { path: ".", type: "root" },
-  { path: "src/hooks", score: 18, reason: "high complexity" },
+  { path: "src/hooks", score: 16, reason: "high complexity" },
   { path: "src/api", score: 12, reason: "distinct domain" }
 ]
 ```
