@@ -2,7 +2,7 @@ import { existsSync } from "../fs/resilient"
 import { mkdir, readFile, rm } from "../fs/resilient"
 import { basename, isAbsolute, join, resolve } from "node:path"
 import { GitMemoryRepo, createNodeGitExec, type GitExec } from "../git"
-import { describeDroppedEntries, validateCompletion } from "./completion-validation"
+import { describeDroppedEntries, pathsOutsideTarget, validateCompletion } from "./completion-validation"
 import { preflightReflectionDescriptions, type DescriptionPreflightWarn } from "./description-preflight"
 import { cleanupReflectionWorktree, integrateValidatedReflection } from "./worktree-integration"
 
@@ -120,7 +120,7 @@ export async function finalizeReflectionWorktree(
       status = validation.status
       detail = "detail" in validation ? validation.detail : droppedNote
     } else if (options.mode === "auto" && options.allowedPaths !== undefined
-      && validation.changedPaths.some((path) => !options.allowedPaths?.includes(path))) {
+      && pathsOutsideTarget(validation, options.allowedPaths).length > 0) {
       detail = `Dream document maintenance changed paths outside its target: ${validation.changedPaths.join(", ")}`
     } else {
       const integrated = await integrateValidatedReflection(worktree, {

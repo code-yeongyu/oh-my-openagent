@@ -6,7 +6,7 @@ import { FRONTMATTER_RE } from "../memfs/frontmatter-scalar"
 import { describeFrontmatterViolation } from "../memfs/frontmatter-validation"
 import { isMemoryContentPath } from "../memfs/paths"
 import { redactSecretLikeMaterial } from "../sync/redact"
-import { repointLinksToRemovedPaths } from "./completion-links"
+import { linkRepairOnlyPaths, repointLinksToRemovedPaths } from "./completion-links"
 import { commitCount, readDroppedTrailers, squashWithoutPaths, type DroppedEntry } from "./completion-repair"
 import { findSecretLikeFailures } from "./completion-secret-scan"
 import type { ReflectionWorktree } from "./worktree"
@@ -16,9 +16,12 @@ const GIT_TIMEOUT_MS = 30_000
 export type { DroppedEntry }
 export { describeDroppedEntries, readDroppedTrailers } from "./completion-repair"
 
-/** `dropped` lists entries the gate removed so the valid ones could land; absent when nothing was dropped. */
+/**
+ * `dropped` lists entries the gate removed so the valid ones could land; absent when nothing was dropped.
+ * `linkRepairs` lists the changed paths only the gate's own link repair wrote (#12642); absent when there are none.
+ */
 export type CompletionValidation =
-  | { status: "valid"; tipSha: string; changedPaths: readonly string[]; dropped?: readonly DroppedEntry[] }
+  | { status: "valid"; tipSha: string; changedPaths: readonly string[]; dropped?: readonly DroppedEntry[]; linkRepairs?: readonly string[] }
   | { status: "no_changes"; tipSha: string; changedPaths: readonly []; dropped?: readonly DroppedEntry[] }
   | { status: "dirty_uncommitted"; detail: string }
   | { status: "failed"; detail: string }
@@ -68,10 +71,28 @@ export async function validateCompletion(
     }
     if (tipSha === recordedBase) return { status: "no_changes", tipSha, changedPaths: [] }
 
-    return await screenEntries(exec, worktree, recordedBase, await repointLinksToRemovedPaths(exec, worktree.dir, recordedBase, tipSha))
+    const screened = await screenEntries(exec, worktree, recordedBase, tipSha, [])
+    if (screened.status !== "valid") return screened
+    // The repair runs on the screened tip, so it only ever points links at paths the run really lands.
+    const dropped = screened.dropped ?? []
+    const skip = new Set(dropped.map((entry) => entry.path))
+    const repaired = await repointLinksToRemovedPaths(exec, worktree.dir, recordedBase, screened.tipSha, skip)
+    const final = repaired === screened.tipSha ? screened : await screenEntries(exec, worktree, recordedBase, repaired, dropped)
+    if (final.status !== "valid") return final
+    const linkRepairs = await linkRepairOnlyPaths(exec, worktree.dir, recordedBase, final.tipSha)
+    return linkRepairs.length === 0 ? final : { ...final, linkRepairs }
   } catch (error) {
     return { status: "failed", detail: errorMessage(error) }
   }
+}
+
+/** The changed paths a run restricted to `allowed` may not land; the gate's own link repairs never count against it. */
+export function pathsOutsideTarget(
+  validation: { readonly changedPaths: readonly string[]; readonly linkRepairs?: readonly string[] },
+  allowed: readonly string[],
+): string[] {
+  const repairs = new Set(validation.linkRepairs ?? [])
+  return validation.changedPaths.filter((path) => !allowed.includes(path) && !repairs.has(path))
 }
 
 const MAX_REPAIR_ROUNDS = 3
@@ -92,9 +113,10 @@ async function screenEntries(
   worktree: ReflectionWorktree,
   recordedBase: string,
   startTip: string,
+  alreadyDropped: readonly DroppedEntry[],
 ): Promise<CompletionValidation> {
   const dir = worktree.dir
-  const dropped = new Map<string, string>()
+  const dropped = new Map<string, string>(alreadyDropped.map((entry) => [entry.path, entry.reason]))
   const droppedList = (): { dropped?: DroppedEntry[] } =>
     dropped.size === 0 ? {} : { dropped: [...dropped].map(([path, reason]) => ({ path, reason })) }
   let tipSha = startTip
