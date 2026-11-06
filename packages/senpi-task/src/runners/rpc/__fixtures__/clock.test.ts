@@ -32,3 +32,29 @@ test("#given work another test left running #when it arms a timer under this clo
   await clock.advance(1)
   expect(clock.pending()).toBe(0)
 })
+
+// The clock only fakes work started after it, so it must be created before the objects under test. A timer
+// armed from an async context created before this call keeps the real clock and is recorded as untracked
+// instead of counted; assertNoUntrackedTimers() makes that ordering failure loud.
+test("#given the clock is created before the objects under test #when they arm timers #then every timer is tracked and none is untracked", async () => {
+  clock = fakeClock()
+  let fired = false
+  setTimeout(() => { fired = true }, 25)
+  expect(clock.pending()).toBe(1)
+  clock.assertNoUntrackedTimers()
+  await clock.advance(25)
+  expect(fired).toBe(true)
+  expect(clock.pending()).toBe(0)
+})
+
+test("#given a timer armed from an async context created before the clock #when the clock checks for untracked timers #then it names the untracked timer", async () => {
+  let resume!: () => void
+  const gate = new Promise<void>((resolve) => { resume = resolve })
+  const armAfterClock = gate.then(() => { setTimeout(() => {}, 25) })
+  clock = fakeClock()
+  resume()
+  await armAfterClock
+  await new Promise<void>((resolve) => setImmediate(resolve))
+  expect(() => clock?.assertNoUntrackedTimers()).toThrow(/delay=25ms/)
+  expect(clock.pending()).toBe(0)
+})
