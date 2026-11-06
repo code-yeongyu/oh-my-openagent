@@ -60,6 +60,8 @@ const gatewayStoreWorkerEntryPath = join(packageRoot, "src", "components", "thre
 const gatewayStoreWorkerOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", GATEWAY_STORE_WORKER_NAME)
 const toolkitSdkEntryPath = join(packageRoot, "src", "extension", "agent-toolkit-sdk.ts")
 const toolkitSdkOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "runtime", "agent-toolkit-sdk", "sdk.js")
+const bunshinTsEntryPath = join(packageRoot, "src", "extension", "bunshin-ts-sdk.ts")
+const bunshinTsOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "runtime", "bunshin-ts", "sdk.js")
 // The `omo thread` CLI and connector scripts import this SDK without an agent session; it points
 // the gateway store at the worker sidecar in `extensions/` (two levels up from its own file).
 export const THREAD_SDK_RELATIVE_PATH = join("runtime", "thread-sdk", "sdk.js")
@@ -153,6 +155,7 @@ const externalSpecifiers = [
   "#omo-feedback-runtime",
   "#omo-claim-receipt-runtime",
   "#omo-agent-toolkit-sdk",
+  "#bunshin-ts",
   ...SENPI_LOADER_ALIASES,
   ...builtinModuleNames,
   ...builtinModuleNames.map((moduleName) => `node:${moduleName}`),
@@ -178,6 +181,7 @@ export const extensionBuildPaths = {
   memberOutputPath,
   supervisorOutputPath,
   toolkitSdkOutputPath,
+  bunshinTsOutputPath,
   threadSdkOutputPath,
   advisorRuntimeOutputPath,
   sidePanelRuntimeOutputPath,
@@ -217,6 +221,7 @@ export function resolveOutputs(options) {
     sidePanelRuntimeOutput: sibling(options.sidePanelRuntimeOutputPath, sidePanelRuntimeOutputPath, "omo-side-panel.js"),
     onboardingScanRuntimeOutput: sibling(options.onboardingScanRuntimeOutputPath, onboardingScanRuntimeOutputPath, "omo-onboarding-scan.js"),
     toolkitSdkOutput: sibling(options.toolkitSdkOutputPath, toolkitSdkOutputPath, join("runtime", "agent-toolkit-sdk", "sdk.js")),
+    bunshinTsOutput: sibling(options.bunshinTsOutputPath, bunshinTsOutputPath, join("runtime", "bunshin-ts", "sdk.js")),
     threadSdkOutput: sibling(options.threadSdkOutputPath, threadSdkOutputPath, THREAD_SDK_RELATIVE_PATH),
     rollbackRuntimeOutput: sibling(options.rollbackRuntimeOutputPath, rollbackRuntimeOutputPath, join("runtime", "rollback-migrate.js")),
     memoryDoctorOutput: sibling(options.memoryDoctorOutputPath, memoryDoctorOutputPath, "omo-memory-doctor.js"),
@@ -258,6 +263,7 @@ export async function buildExtension(options = {}) {
     sidePanelRuntimeOutput,
     onboardingScanRuntimeOutput,
     toolkitSdkOutput,
+    bunshinTsOutput,
     threadSdkOutput,
     rollbackRuntimeOutput,
     computerUseOutput,
@@ -280,6 +286,7 @@ export async function buildExtension(options = {}) {
     gatewayStoreWorkerOutput,
   } = resolveOutputs(options)
   const toolkitSdkInputs = await buildEntry(toolkitSdkEntryPath, toolkitSdkOutput, buildDefines, sdkExternalSpecifiers)
+  const bunshinTsInputs = await buildEntry(bunshinTsEntryPath, bunshinTsOutput, buildDefines, sdkExternalSpecifiers)
   const mainInputs = await buildEntry(entryPath, output, buildDefines)
   const taskInputs = await buildEntry(taskEntryPath, taskOutput, buildDefines)
   const memberInputs = await buildEntry(memberEntryPath, memberOutput, buildDefines)
@@ -322,6 +329,7 @@ export async function buildExtension(options = {}) {
     sidePanelRuntimeInputs,
     onboardingScanRuntimeInputs,
     toolkitSdkInputs,
+    bunshinTsInputs,
     rollbackRuntimeInputs,
     computerUseInputs,
     memoryDoctorInputs,

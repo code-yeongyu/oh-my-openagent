@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { LocalApiError, type CommandResult, type DeviceService, type RemoteAttach } from "@oh-my-opencode/device-service-core"
 import { createDeviceServiceSessions } from "./device-service"
 import { createLazyRemoteSurface } from "./lazy-remote"
+import { openRemote } from "./remote-ops"
 
 function fakeService(results: CommandResult[], sent: unknown[]): DeviceService {
   const attach = {
@@ -69,6 +70,41 @@ describe("device-service adapter of the thread tools' account surface", () => {
     expect(String(first)).toContain("sidecar missing")
     expect(await surface.sessions.status()).toEqual({ state: "connected" })
     expect(loads).toBe(2)
+  })
+})
+
+describe("device-service adapter: a session created on another device is addressable right after create", () => {
+  // The shapes a live relay run returned (2026-11-06): open_session answers the engine's session id (a UUID), while
+  // the device's listing, and so session.attach, knows the session only by its stream key, which session.locate maps.
+  const ENGINE_ID = "01a1b113-e083-7e39-a563-a85d700e9f66"
+  const KEY = "r-hHna8ULeiwDYWgZggvPg"
+  const opened = { type: "response", command: "open_session", success: true, data: { state: { sessionId: ENGINE_ID, cwd: "/home/u/.omo/hand", sessionFile: `/home/u/.omo/hand/agent/sessions/x/2026-11-06T13-37-13-110Z_${ENGINE_ID}.jsonl` }, sessionId: ENGINE_ID } }
+
+  test("#given open_session answers the engine id and the listing lags the new key #when create then get_state run on that thread #then create names the listing key and the get_state succeeds", async () => {
+    const attached: string[] = []
+    let listed = false
+    const service = {
+      ...fakeService([], []),
+      devices: async () => [{ device: "b", label: "studio", kind: "cli", platform: "linux", last_seen_ms: 1, online: true }],
+      endpointCommand: async () => state({ state: "engine_applied" }, opened),
+      locate: async (device: string, engineId: string) => {
+        if (engineId !== ENGINE_ID) throw new LocalApiError("session_not_found", "no session with that engine id")
+        return { device, key: KEY, session: `${device}.${KEY}` }
+      },
+      attach: async (device: string, sessionId: string) => {
+        attached.push(sessionId)
+        // The listing has the new key only after its next change: the first attach of the key is refused.
+        if (sessionId !== KEY || !listed) { listed = sessionId === KEY; throw new LocalApiError("session_not_found", "no such session in that device's listing") }
+        return { command: async (rpc: Record<string, unknown>) => state({ state: "engine_applied" }, { type: "response", command: rpc["type"], success: true, data: { isStreaming: false, sessionId: ENGINE_ID } }), read: async () => ({ entries: [], next_before: null }), detached: new Promise(() => {}) } as unknown as RemoteAttach
+      },
+    } as unknown as DeviceService
+    const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: async () => service, retryDelay: async () => {} })
+    const created = await openRemote({ sessions: port, chain: { stamp: (record) => record } }, { kind: "create", device: "b" })
+    if (created.kind !== "ok" || !("thread" in created)) throw new Error(`create failed: ${JSON.stringify(created)}`)
+    expect(created.thread.thread_id).toBe(KEY)
+    const status = await port.sessionCommand("b", created.thread.thread_id, { type: "get_state", sessionId: created.thread.thread_id })
+    expect(status.kind).toBe("ok")
+    expect(attached.every((id) => id === KEY)).toBe(true)
   })
 })
 

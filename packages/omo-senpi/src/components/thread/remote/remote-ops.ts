@@ -111,9 +111,9 @@ export function replyData(response: JsonObject): JsonObject {
 
 const nonEmpty = (value: unknown): string | undefined => (typeof value === "string" && value.length > 0 ? value : undefined)
 
-// The opened thread's id is its durable session id (the id every other tool addresses it by); the engine's relay
-// session id is used only when the reply names no durable id.
-function openedId(response: JsonObject): string | undefined {
+// The engine session id the open_session reply names: its durable session id, else the relay session id. It is in no
+// listing row, so it is never the thread id itself; session.locate maps it to the key the device lists it by.
+function openedEngineId(response: JsonObject): string | undefined {
   const data = replyData(response)
   const state = data["state"]
   const fromState = typeof state === "object" && state !== null && !Array.isArray(state) ? (state as JsonObject) : {}
@@ -138,8 +138,16 @@ export async function openRemote(remote: RemoteThreadSurface, request: RemoteOpe
       : { type: "open_session", retain_on_disconnect: true, forkFrom: request.row.session_id, ...(request.cwd === undefined ? {} : { cwd: request.cwd }) }
   const outcome = await remote.sessions.endpointCommand(device, { ...opened, ...skills })
   if (outcome.kind !== "ok") return outcomeFailure(outcome, device)
-  const threadId = request.kind === "open" ? request.row.session_id : openedId(outcome.response)
-  if (threadId === undefined) return fail("internal_error", `Device ${device} opened a session but did not name it.`, "Call thread_list with all_scope to find the new thread.", { device })
+  // An opened row is already addressed by its listing id; a created or forked session is located by its engine id.
+  let threadId: string
+  if (request.kind === "open") threadId = request.row.session_id
+  else {
+    const engineId = openedEngineId(outcome.response)
+    if (engineId === undefined) return fail("internal_error", `Device ${device} opened a session but did not name it.`, "Call thread_list with all_scope to find the new thread.", { device })
+    const located = await remote.sessions.locate(device, engineId)
+    if (located.kind !== "ok") return fail("unsupported", `Device ${device} created a session but its id there could not be found (${located.reason}).`, "Call thread_list with all_scope to find the new thread, or update omo on that device.", { device, reason: located.reason })
+    threadId = located.sessionId
+  }
   const name = request.kind === "open" ? undefined : request.name
   if (name !== undefined) {
     const named = await remote.sessions.sessionCommand(device, threadId, { type: "set_session_name", sessionId: threadId, name })
@@ -197,7 +205,11 @@ export async function promptRemote(remote: RemoteThreadSurface, row: RemoteSessi
   const turnId = reply["turnId"]
   if (reply["disposition"] === "started" && typeof turnId === "string" && turnId.length > 0) return { kind: "ok", thread_id: row.session_id, link: threadLink(row.session_id, row.title), delivery: { kind: "started", turn_id: turnId }, deduplicated: false, device: row.device }
   const after = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_state", sessionId: row.session_id })
-  const pending = after.kind === "ok" ? replyData(after.response)["pendingMessageCount"] : undefined
+  const settled = after.kind === "ok" ? replyData(after.response) : {}
+  // An engine that predates turnId in the prompt reply (senpi 2026.11.2) still reports the running turn in get_state.
+  const current = settled["currentTurnId"]
+  if (reply["disposition"] === "started" && typeof current === "string" && current.length > 0) return { kind: "ok", thread_id: row.session_id, link: threadLink(row.session_id, row.title), delivery: { kind: "started", turn_id: current }, deduplicated: false, device: row.device }
+  const pending = settled["pendingMessageCount"]
   if (typeof pending !== "number" || !Number.isInteger(pending) || pending < 1) return fail("idempotency_uncertain", `Device ${row.device} accepted the message but did not report where it waits.`, "Read the thread before deciding whether to send again.", { device: row.device })
   return { kind: "ok", thread_id: row.session_id, link: threadLink(row.session_id, row.title), delivery: { kind: "queued", queue_position: pending }, deduplicated: false, device: row.device }
 }

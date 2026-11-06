@@ -22,6 +22,14 @@ export interface EngineLog {
 	readonly message: string;
 }
 
+/** Why earlier frames, refs and beliefs about the desktop no longer hold. */
+export type EpochReason = "display" | "lock" | "sleep" | "space" | "engine_restarted" | "idle_flush";
+
+/** The `epoch.changed` notification payload. */
+export interface EpochChanged {
+	readonly reason: EpochReason;
+}
+
 /**
  * What a host reads for an audit `action` or `code` it does not know, sent by a newer engine: the event is kept,
  * never dropped.
