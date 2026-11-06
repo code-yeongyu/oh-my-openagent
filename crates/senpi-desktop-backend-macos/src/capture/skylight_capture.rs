@@ -71,16 +71,24 @@ pub(crate) fn available() -> bool {
     crate::skylight::capture_spi().is_some_and(|spi| spi.hw_capture.is_some())
 }
 
-/// One SkyLight capture of `window_id` with the window's current listing.
-pub(crate) fn capture(window_id: u32) -> CoreResult<(RgbaImage, DesktopWindow)> {
+/// The window's current listing, read before a capture so a refusal can be
+/// decided without touching the backing store.
+pub(crate) fn listing(window_id: u32) -> CoreResult<DesktopWindow> {
+    #[cfg(test)]
+    if TEST_CAPTURE.with(std::cell::Cell::get).is_some() {
+        return Ok(test_window(window_id));
+    }
+    window_info(window_id)
+}
+
+/// One SkyLight capture of `window_id`.
+pub(crate) fn capture(window_id: u32) -> CoreResult<RgbaImage> {
     #[cfg(test)]
     if let Some(fake) = TEST_CAPTURE.with(std::cell::Cell::get) {
         let fake = fake.ok_or_else(|| DesktopError::capture_failed("SkyLight capture is unavailable"))?;
-        return fake(window_id).map(|image| (image, test_window(window_id)));
+        return fake(window_id);
     }
-    let window = window_info(window_id)?;
-    let image = capture_image(window_id)?;
-    Ok((image, window))
+    capture_image(window_id)
 }
 
 /// True for an empty image or one whose every pixel has zero alpha, the frame
@@ -437,15 +445,24 @@ mod route_tests {
         assert_eq!(sck_route, CaptureRoute::Sck as u8);
     }
 
-    #[test]
-    fn a_transparent_off_screen_sck_frame_is_refused_as_off_space() {
+    fn transparent_off_screen_sck_reason(placement: SpacePlacement) -> Option<String> {
         override_availability(Some(Ok(())));
         sck::override_capture(Some(transparent_off_screen_sck));
         override_probe(Some(|_, _| Some(false)));
+        override_placement(Some(placement));
         let result = capture().capture_via_sck(&Target::Window("42".to_owned()), &[], &[]);
+        override_placement(Some(SpacePlacement::Unknown));
         override_probe(None);
         sck::override_capture(None);
         override_availability(None);
-        assert_eq!(off_space_reason(result.unwrap_err()).as_deref(), Some("off-space"));
+        off_space_reason(result.unwrap_err())
+    }
+
+    #[test]
+    fn a_transparent_off_screen_sck_frame_is_refused_as_off_space_only_when_placed_elsewhere() {
+        assert_eq!(transparent_off_screen_sck_reason(SpacePlacement::Other).as_deref(), Some("off-space"));
+        for placement in [SpacePlacement::Current, SpacePlacement::Unknown] {
+            assert_eq!(transparent_off_screen_sck_reason(placement).as_deref(), Some("off-screen"), "{placement:?}");
+        }
     }
 }
