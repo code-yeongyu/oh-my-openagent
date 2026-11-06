@@ -151,7 +151,38 @@ const commandOf = (state: OwnerState, request: SessionCommand): Resolved => {
 
 // A command_id binds once to (session, payload sha256): a repeat with the same binding answers the same id and
 // dispatches nothing; any other repeat is command_id_conflict.
+// #393: an endpoint command names the host device and an engine endpoint key it lists, and needs no attach.
+const endpointCommand = (
+  state: OwnerState,
+  conn: Conn,
+  request: Extract<SessionCommand, { readonly device: string }>,
+): Outcome => {
+  const listed = state.world.endpoints?.[request.device];
+  if (listed === undefined) return refuse("unsupported", "that device names no engine endpoints");
+  const answer = state.world.endpointCommand;
+  if (!listed.includes(request.endpoint) || answer === undefined)
+    return refuse("unsupported", "that endpoint takes no commands");
+  const command_id = request.command_id ?? state.mint();
+  const binding = {
+    target: `${request.device}/endpoint/${request.endpoint}`,
+    sha256: sha256Hex(utf8(sortedJson(request.rpc))),
+  };
+  const bound = state.bindings.get(command_id);
+  if (bound !== undefined && (bound.target !== binding.target || bound.sha256 !== binding.sha256))
+    return refuse("command_id_conflict", "the command_id is bound to another target or payload");
+  if (bound !== undefined) return ok({ command_id });
+  state.bindings.set(command_id, binding);
+  state.commands.push(request.rpc);
+  return ok({ command_id }, () => {
+    const response = { type: "response", id: request.rpc["id"] ?? null, command: request.rpc["type"] ?? null, success: true, data: answer.data };
+    sendCommandEvent(conn, state.mint, request.device, { command_id, response });
+    for (const outcome of answer.outcome)
+      conn.send(eventOf("session.command_state", { command_id, ...outcome }));
+  });
+};
+
 const command = (state: OwnerState, conn: Conn, request: SessionCommand): Outcome => {
+  if ("device" in request) return endpointCommand(state, conn, request);
   const session = state.attaches.get(request.attach);
   if (session === undefined || !conn.attaches.has(request.attach))
     return refuse("not_attached", "attach first");
