@@ -45,6 +45,7 @@ function remedyFor(state, report, outdated) {
   }
 }
 
+/** @param {{ omowright: any, entry: string | undefined, browser?: string, doctorOptions?: Record<string, unknown> }} options */
 export async function runBrowserDoctor({ omowright, entry, browser, doctorOptions = {} }) {
   const report = await omowright.bskDoctor({ waitForBrowserMs: 0, browser, ...doctorOptions })
   const outdated = report.browsersConnected.filter((connected) => connected.extension_version === TAB_GROUPING_EXTENSION_VERSION)
