@@ -132,6 +132,7 @@ describe("#given test files with mechanically detectable junk", () => {
       ["0", false],
       ["0 ", false],
       ["0, value", false],
+      ["0\n", false],
     ] as const) {
       writeFileSync(join(root, "src", "delay.test.ts"), [
         `await new Promise(resolve => setTimeout(resolve, ${delay}))`,
