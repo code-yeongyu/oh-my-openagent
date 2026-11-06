@@ -835,7 +835,6 @@ describe("createTaskChildPlanner architect tool contract", () => {
   })
 })
 
-// A desktop model picker writes ONLY the session model (set_model), so a user whose whole setup is a
 // Q's standing model rule: a chain with no connected provider ends in a TYPED failure that names
 // each model and the fix; nothing is substituted and no child is spawned.
 describe("createTaskChildPlanner model refusals", () => {
@@ -871,6 +870,23 @@ describe("createTaskChildPlanner model refusals", () => {
     expect(result.error.attempted_chain?.length).toBeGreaterThan(0)
     expect(result.error.message).toContain("agents.explore.model")
     expect(result.error.message).toContain("No child was spawned")
+  })
+
+  test("#given explore pinned to a model the registry does not serve #when planned #then the refusal names the pin, not its chain", () => {
+    // given
+    const explore = BUILTIN_AGENTS.explore
+    if (explore === undefined) throw new Error("explore must ship as a builtin agent")
+    const planner = createTaskChildPlanner({}, { explore: { ...explore, model: "openai/gpt-5.5" } }, proxyOnly)
+
+    // when
+    const result = planner({ prompt: "Find the auth flow.", parent_session_id: "parent-1", depth: 0, subagent_type: "explore" })
+
+    // then
+    expect(result.kind).toBe("error")
+    if (result.kind !== "error") return
+    expect(result.error.message).toContain("openai/gpt-5.5")
+    expect(result.error.message).toContain("agents.explore.model")
+    expect(result.error.message).not.toContain("Chain, in order:")
   })
 
   test("#given a category pinned to a model the registry does not serve #when planned #then the refusal names the pin and the Settings key", () => {

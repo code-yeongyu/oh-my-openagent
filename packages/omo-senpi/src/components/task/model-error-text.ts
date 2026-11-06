@@ -46,9 +46,14 @@ export function chainUnavailableText(
   missingProviders: readonly string[],
   unlistedModel: string | undefined,
 ): string {
-  const providers = missingProviders.length === 0 ? "none" : missingProviders.join(", ")
   const models = chain.length === 0 ? "none" : chainEntriesText(chain)
-  return `${targetKind(target)} "${targetName(target)}" has no usable model: its chain needs providers this machine has not connected (${providers}). Chain, in order: ${models}.${unlistedOptInText(unlistedModel, target)} Fix: connect one of those providers, or set ${chainFixKey(target)} in Settings to a model you already run. No child was spawned.`
+  const reason = missingProviders.length === 0
+    ? "its chain's providers are connected but none of them lists these model ids"
+    : `its chain needs providers this machine has not connected (${missingProviders.join(", ")})`
+  const fix = missingProviders.length === 0
+    ? `set ${chainFixKey(target)} in Settings to a model you already run`
+    : `connect one of those providers, or set ${chainFixKey(target)} in Settings to a model you already run`
+  return `${targetKind(target)} "${targetName(target)}" has no usable model: ${reason}. Chain, in order: ${models}.${unlistedOptInText(unlistedModel, target)} Fix: ${fix}. No child was spawned.`
 }
 
 /**
@@ -68,8 +73,14 @@ export type AgentUnavailable = {
 
 // A category refusal: a dead chain names every model and the fix, a pin the registry cannot serve
 // names the pin. Any other model_unavailable keeps the resolver's own text.
-export function categoryModelFailureText(error: PlanResolutionError, omoConfig: OmoConfig): string | undefined {
-  const category = error.category
+export function categoryModelFailureText(
+  error: PlanResolutionError,
+  omoConfig: OmoConfig,
+  canonicalCategory?: string,
+): string | undefined {
+  // The resolver canonicalizes a retired alias; the Settings key and the pin live under the
+  // canonical name, so the refusal must name that one.
+  const category = canonicalCategory ?? error.category
   if (category === undefined) return undefined
   if (error.attempted_chain !== undefined) {
     return chainUnavailableText({ category }, error.attempted_chain, error.missing_providers ?? [], error.unlisted_provider_model)
@@ -78,16 +89,24 @@ export function categoryModelFailureText(error: PlanResolutionError, omoConfig: 
   return pinned === undefined ? undefined : pinnedModelUnavailableText({ category }, pinned)
 }
 
+function firstModelEntry(definition: AgentDefinition | undefined): string | undefined {
+  const entry = definition?.models?.[0]
+  if (entry === undefined) return undefined
+  return typeof entry === "string" ? entry : entry.model
+}
+
 export function agentModelFailureText(
   agentName: string,
   resolution: AgentUnavailable,
   agents: Readonly<Record<string, AgentDefinition>>,
 ): string {
+  const definition = Object.hasOwn(agents, agentName) ? agents[agentName] : undefined
+  // A pin is the cause of the failure, so it wins over the chain that the pin replaced: refusing
+  // with the chain text told a pinned agent's caller to set the key it had already set.
+  const pinned = definition?.model ?? firstModelEntry(definition)
+  if (pinned !== undefined) return pinnedModelUnavailableText({ agent: agentName }, pinned)
   if (resolution.attempted_chain !== undefined) {
     return chainUnavailableText({ agent: agentName }, resolution.attempted_chain, resolution.missing_providers ?? [], undefined)
   }
-  const pinned = Object.hasOwn(agents, agentName) ? agents[agentName]?.model : undefined
-  return pinned === undefined
-    ? `No available model for agent "${agentName}" (attempted ${resolution.attemptedModel ?? "none"}).`
-    : pinnedModelUnavailableText({ agent: agentName }, pinned)
+  return `No available model for agent "${agentName}" (attempted ${resolution.attemptedModel ?? "none"}).`
 }

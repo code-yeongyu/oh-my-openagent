@@ -111,13 +111,13 @@ export function resolveAgent<TModel extends SenpiModelPort>(
       ?? (fallbackHead !== undefined && fallbackProvider !== undefined
         ? `${fallbackProvider}/${fallbackHead.model}`
         : undefined)
-      return {
-        kind: "model_unavailable",
-        agent: name,
-        attemptedModel,
-        availableAgents,
-        ...(fallbackChain !== undefined ? { attempted_chain: fallbackChain } : {}),
-      }
+    return {
+      kind: "model_unavailable",
+      agent: name,
+      attemptedModel,
+      availableAgents,
+      ...(fallbackChain !== undefined ? { attempted_chain: fallbackChain } : {}),
+    }
   }
 
   // `find` answers from the whole catalog, so a configured model the machine has no credentials for

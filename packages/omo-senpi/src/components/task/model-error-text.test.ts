@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import type { DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
 
-import { chainUnavailableText, pinnedModelUnavailableText } from "./model-error-text"
+import { categoryModelFailureText, chainUnavailableText, pinnedModelUnavailableText } from "./model-error-text"
 
 const CHAIN: readonly DelegateFallbackEntry[] = [
   { providers: ["kimi-coding", "kimi-for-coding"], model: "kimi-for-coding-highspeed" },
@@ -62,5 +62,33 @@ describe("model refusals", () => {
     expect(text).toContain(pinned)
     expect(text).toContain("categories.quick.model")
     expect(text).toContain("No child was spawned")
+  })
+
+  test("#given connected providers that simply do not list the rung models #when rendered #then it does not claim a provider is missing", () => {
+    // when
+    const text = chainUnavailableText({ category: "quick" }, CHAIN, [], undefined)
+
+    // then
+    expect(text).not.toContain("not connected")
+    expect(text).toContain("none of them lists these model ids")
+    expect(text).toContain("categories.quick.model")
+  })
+
+  test("#given a retired category alias #when the refusal names the fix #then it uses the canonical key", () => {
+    // given
+    const error = {
+      code: "model_unavailable" as const,
+      message: "resolver text",
+      category: "old-alias",
+      attempted_chain: CHAIN,
+      missing_providers: ["openai"],
+    }
+
+    // when
+    const text = categoryModelFailureText(error, {}, "quick")
+
+    // then
+    expect(text).toContain("categories.quick.model")
+    expect(text).not.toContain("old-alias")
   })
 })

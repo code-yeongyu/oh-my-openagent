@@ -87,7 +87,11 @@ export function createTaskChildPlanner(
     // Q's standing model rule: a chain ends in a typed failure that names each model, so the parent
     // reads the whole chain and the fix instead of retrying a dead binding. No substitution happens.
     if (plan.kind === "error" && plan.error.code === "model_unavailable") {
-      const message = categoryModelFailureText(plan.error, omoConfig)
+      const message = categoryModelFailureText(
+        plan.error,
+        omoConfig,
+        resolution.kind === "model_unavailable" ? resolution.category : undefined,
+      )
       if (message !== undefined) return { kind: "error", error: { ...plan.error, message } }
     }
     return plan
@@ -198,7 +202,8 @@ function toAgentPlan(resolution: ResolvedAgentResult, explicitModel: ResolvedMod
   }
 }
 
-function listAvailableAgents(agents: Readonly<Record<string, AgentDefinition>>): readonly string[] {  return Object.entries(agents)
+function listAvailableAgents(agents: Readonly<Record<string, AgentDefinition>>): readonly string[] {
+  return Object.entries(agents)
     .filter(([, definition]) => definition.disable !== true)
     .map(([name]) => name)
     .sort()
