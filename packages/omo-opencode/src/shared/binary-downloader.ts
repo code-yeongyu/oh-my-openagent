@@ -36,12 +36,14 @@ export async function extractTarGz(
   destDir: string,
   options?: { args?: string[]; cwd?: string }
 ): Promise<void> {
-  const entries = await listTarEntries(archivePath, options?.cwd)
+  const env = tarEnvironment()
+  const entries = await listTarEntries(archivePath, env, options?.cwd)
   validateArchiveEntries(entries, destDir)
 
   const args = options?.args ?? ["tar", "-xzf", archivePath, "-C", destDir];
   const proc = spawn(args, {
     cwd: options?.cwd,
+    env,
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -114,12 +116,24 @@ function parseTarEntry(line: string): ArchiveEntry | null {
   }
 }
 
-async function listTarEntries(archivePath: string, cwd?: string): Promise<ArchiveEntry[]> {
-  // GNU tar reads extra options from TAR_OPTIONS (--block-number prefixes every line) and translates
-  // " link to " in the message locale, so the listing runs in the C locale without them. bsdtar ignores
-  // both; Windows bsdtar keeps the system locale regardless, hence the localized date forms above.
-  const env: NodeJS.ProcessEnv = { ...process.env, LC_ALL: "C" }
+// The validated listing and the extraction run with this one environment. GNU tar reads extra options
+// from TAR_OPTIONS (--block-number prefixes every line) and translates " link to " in the message locale,
+// so neither run sees TAR_OPTIONS and both use the C locale for messages and dates. Preserve the effective
+// character locale in LC_CTYPE and use C for the other categories: a category-only character locale
+// is not a valid LANG. Windows bsdtar keeps the system locale regardless.
+function tarEnvironment(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env }
+  const characterLocale = env.LC_ALL || env.LC_CTYPE || env.LANG
+  env.LANG = "C"
+  for (const key of Object.keys(env)) if (key.startsWith("LC_")) delete env[key]
+  if (characterLocale) env.LC_CTYPE = characterLocale
+  env.LC_MESSAGES = "C"
+  env.LC_TIME = "C"
   delete env.TAR_OPTIONS
+  return env
+}
+
+async function listTarEntries(archivePath: string, env: NodeJS.ProcessEnv, cwd?: string): Promise<ArchiveEntry[]> {
   // Owner and group names are stored as-is and can contain spaces, so both tars list them as numbers.
   const proc = spawn(["tar", "--numeric-owner", "-tvzf", archivePath], {
     cwd,
