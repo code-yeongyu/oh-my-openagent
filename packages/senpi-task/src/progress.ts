@@ -1,7 +1,8 @@
 import type { ManagedChildEvent } from "./manager/child-handle"
 import { HOST_TURN_RESUMED_EVENT, TASK_AWAITING_INPUT_EVENT } from "./manager/host-turn-resumed"
 import { createRunStatsTracker } from "./run-stats"
-import type { ResolvedModelRecord } from "./state"
+import { effectiveModelFromEvent } from "./manager/runtime-fallback-event"
+import type { EffectiveModelRecord, ResolvedModelRecord } from "./state"
 import { composeStatusLine, formatStatusTarget, taskIdentityLabel } from "./status-line"
 
 export type ToolProgressDetails = {
@@ -24,6 +25,8 @@ export type ChildProgressTarget = {
   readonly category?: string
   readonly agentType?: string
   readonly resolvedModel?: ResolvedModelRecord
+  // The record's live route when the line starts after a fallback or switch; events keep it current.
+  readonly effectiveModel?: EffectiveModelRecord
   readonly model?: string
   readonly name?: string
   readonly description?: string
@@ -52,6 +55,7 @@ export function createChildProgress(
   let lastTotalTokens: number | undefined
   let resolvedModel = target.resolvedModel
   let model = target.model
+  let effectiveModel = target.effectiveModel
   let fallbackCount = 0
   let turnResumed = false
   let awaitingInput = options?.awaitingInput === true
@@ -63,6 +67,7 @@ export function createChildProgress(
         category: target.category,
         agentType: target.agentType,
         resolvedModel,
+        effectiveModel,
         model,
         fallbackCount,
       }),
@@ -85,8 +90,13 @@ export function createChildProgress(
         resolvedModel = undefined
         model = event.to
         fallbackCount += 1
+      }
+      const moved = effectiveModelFromEvent(event)
+      if (moved !== undefined) {
+        effectiveModel = moved
         return true
       }
+      if (event.type === "retry_fallback_applied" && event.to !== undefined) return true
       if (event.type === "tool_execution_start" && typeof event.toolName === "string") {
         currentTool = formatToolActivity(event.toolName, event.args ?? event.input)
         return true
