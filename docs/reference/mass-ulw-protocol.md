@@ -179,6 +179,11 @@ of accepted amendments and is absent on runs that were never amended.
   treated as replayable.
 - `omo.dag.updated` is derived state. It can lag or skip intermediate states (debounce plus
   dedupe); do not use it for event-level bookkeeping.
+- Every attach delivers the current state. When a session starts or resumes, the bridge emits the
+  recovered snapshot immediately (no debounce, and `runs: []` when there are none). The session's
+  first turn starts only after that, so a client attached at that point has it before
+  `turn_start`. A client reattaching to a retained session (`session_resumed`) gets the current
+  snapshot restated even when nothing changed.
 
 ## Request methods
 
