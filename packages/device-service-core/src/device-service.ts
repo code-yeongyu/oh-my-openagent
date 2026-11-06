@@ -9,6 +9,7 @@ import { type CommandResult, openAttach, PROGRESS_STATES, type RemoteAttach } fr
 import { followDelegatedChannel } from "./delegated-channel.ts"
 import { LocalApiError } from "./local-api/errors.ts"
 import type { CommandRpc } from "./local-api/protocol.ts"
+import type { SessionCandidate } from "./local-api/protocol-delegated.ts"
 import { randomBytes } from "node:crypto"
 
 // A host sends no command state at all for a route it does not list toward a sender it does not grant (docs/local-api.md
@@ -122,6 +123,12 @@ export type DeviceService = {
   readonly endpointCommand: (device: string, rpc: CommandRpc) => Promise<CommandResult>
   readonly close: () => void
   readonly closed: Promise<void>
+  /**
+   * #393 part B's `session.locate {device, engine_id}`: the session a create over `device`'s engine endpoint made,
+   * found by the durable engine session id in the create reply. `key` is the session's id in the device's listing,
+   * the one `attach` takes; the engine id itself is in no listing row.
+   */
+  readonly locate: (device: string, engineId: string) => Promise<SessionCandidate>
 }
 
 export type DeviceCredential = {
@@ -191,5 +198,6 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
     },
     close: () => client.close(),
     closed: client.closed,
+    locate: (device, engineId) => client.request("session.locate", { device, engine_id: engineId }),
   }
 }
