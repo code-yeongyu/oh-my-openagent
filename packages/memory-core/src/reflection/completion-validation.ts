@@ -6,6 +6,7 @@ import { FRONTMATTER_RE } from "../memfs/frontmatter-scalar"
 import { describeFrontmatterViolation } from "../memfs/frontmatter-validation"
 import { isMemoryContentPath } from "../memfs/paths"
 import { redactSecretLikeMaterial } from "../sync/redact"
+import { repointLinksToRemovedPaths } from "./completion-links"
 import { commitCount, readDroppedTrailers, squashWithoutPaths, type DroppedEntry } from "./completion-repair"
 import { findSecretLikeFailures } from "./completion-secret-scan"
 import type { ReflectionWorktree } from "./worktree"
@@ -67,7 +68,7 @@ export async function validateCompletion(
     }
     if (tipSha === recordedBase) return { status: "no_changes", tipSha, changedPaths: [] }
 
-    return await screenEntries(exec, worktree, recordedBase, tipSha)
+    return await screenEntries(exec, worktree, recordedBase, await repointLinksToRemovedPaths(exec, worktree.dir, recordedBase, tipSha))
   } catch (error) {
     return { status: "failed", detail: errorMessage(error) }
   }
