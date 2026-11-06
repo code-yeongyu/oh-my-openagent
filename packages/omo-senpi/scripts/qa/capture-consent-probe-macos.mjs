@@ -19,6 +19,8 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { inflateSync } from "node:zlib";
 
+import { withTelemetryOptOut } from "./telemetry-opt-out-env.mjs";
+
 const APPROVALS = join(
 	homedir(),
 	"Library/Group Containers/group.com.apple.replayd/ScreenCaptureApprovals.plist",
@@ -45,7 +47,8 @@ if (evidenceDir === undefined) {
 }
 mkdirSync(evidenceDir, { recursive: true });
 
-const text = (command, args) => spawnSync(command, args, { encoding: "utf8" }).stdout?.trim() ?? "";
+const text = (command, args) =>
+	spawnSync(command, args, { encoding: "utf8", env: withTelemetryOptOut(process.env) }).stdout?.trim() ?? "";
 
 // The read runs in a child so a prompt that blocks it can be photographed instead of hanging this script.
 async function measureRead() {
@@ -53,7 +56,7 @@ async function measureRead() {
 	const child = spawn(process.execPath, [
 		"-e",
 		`const fs=require("node:fs");try{fs.readFileSync(${JSON.stringify(APPROVALS)});console.log("present")}catch(e){console.log(e.code==="ENOENT"?"absent":"unreadable:"+e.code)}`,
-	]);
+	], { env: withTelemetryOptOut(process.env) });
 	let out = "";
 	child.stdout.on("data", (chunk) => {
 		out += chunk;
@@ -80,7 +83,7 @@ function plistKeys() {
 
 // One `--stdio` engine; `call` resolves with the reply to the request it sent.
 function startEngine(env) {
-	const child = spawn(enginePath, ["--stdio"], { env: { ...process.env, ...env } });
+	const child = spawn(enginePath, ["--stdio"], { env: withTelemetryOptOut({ ...process.env, ...env }) });
 	let buffered = "";
 	let stderr = "";
 	const pending = new Map();
