@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process"
 import { homedir } from "node:os"
 import { join } from "node:path"
+import { gatedSecrets } from "../service-auth/keychain-helper/secrets-gate"
 
 export type KeyStore = {
   readonly read: () => Promise<string | null>
@@ -58,7 +59,7 @@ export function createOsKeyStore(
   const resolved = secrets === undefined ? (run === defaultRun && typeof Bun !== "undefined" ? Bun.secrets : null) : secrets
   switch (platform) {
     case "darwin":
-      return resolved !== null ? createBunSecretsKeyStore(name, resolved) : createMacOsKeychainKeyStore(name, run)
+      return resolved !== null ? createBunSecretsKeyStore(name, gateRealSecrets(resolved)) : createMacOsKeychainKeyStore(name, run)
     case "linux":
       return resolved !== null ? createBunSecretsKeyStore(name, resolved) : createLibsecretKeyStore(name, run)
     case "win32":
@@ -93,6 +94,15 @@ async function guarded(
     throw fail()
   }
 }
+
+// The process's Bun.secrets calls share one queue with the sign-in store's silent reads (#11262 design 3.2 step 2).
+const gateRealSecrets = (secrets: SecretApi): SecretApi =>
+  typeof Bun !== "undefined" && secrets === Bun.secrets
+    ? {
+        get: key => gatedSecrets(() => secrets.get(key)),
+        set: entry => gatedSecrets(() => secrets.set(entry)),
+      }
+    : secrets
 
 function createBunSecretsKeyStore(name: string, secrets: SecretApi): KeyStore {
   const key = { service: DEFAULT_SERVICE, name }
