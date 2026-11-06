@@ -42,10 +42,16 @@ const ACCOUNT_STOP: Readonly<Record<Exclude<AccountState["kind"], "signed_in">, 
 
 const stopped = (state: BootstrapStopState, notice: string): BootstrapOutcome => ({ kind: "stopped", state, notice, exitCode: BOOTSTRAP_STOPPED_EXIT })
 
-/** A service that is not running: its socket is gone (POSIX) or its loopback port refuses or never answers (Windows). */
-const isServiceStopped = (error: unknown): boolean =>
+const isHandshakeTimeout = (error: unknown): boolean => error instanceof LocalApiError && error.code === "handshake_timeout"
+
+/**
+ * A service that is not running: its socket is gone (POSIX) or its loopback port refuses or never answers (Windows).
+ * On POSIX a handshake timeout is NOT a stopped service: the socket accepted the connection, so the owner is alive but
+ * slow (for example busy right after a restart), and reinstalling it would restart a working service.
+ */
+const isServiceStopped = (error: unknown, platform: NodeJS.Platform = process.platform): boolean =>
   (error instanceof Error && "code" in error && ["ENOENT", "ECONNREFUSED", "ECONNRESET"].includes(String(error.code))) ||
-  (error instanceof LocalApiError && error.code === "handshake_timeout")
+  (platform === "win32" && isHandshakeTimeout(error))
 
 const failureNotice = (error: unknown): string =>
   error instanceof LocalApiError
@@ -59,8 +65,16 @@ const connectCurrent = async (deps: BootstrapDependencies): Promise<DeviceServic
   let service: DeviceService
   try {
     service = await deps.connect()
-  } catch (error) {
-    return isServiceStopped(error) ? "absent" : stopped("service_degraded", failureNotice(error))
+  } catch (first) {
+    // A slow owner (POSIX handshake timeout) gets one more try before the bootstrap stops as degraded.
+    if (!isHandshakeTimeout(first) || isServiceStopped(first)) {
+      return isServiceStopped(first) ? "absent" : stopped("service_degraded", failureNotice(first))
+    }
+    try {
+      service = await deps.connect()
+    } catch (error) {
+      return isServiceStopped(error) ? "absent" : stopped("service_degraded", failureNotice(error))
+    }
   }
   if (compareVersions(service.serviceVersion, deps.pinVersion) >= 0) return service
   service.close()
