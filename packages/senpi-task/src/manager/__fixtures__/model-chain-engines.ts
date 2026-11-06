@@ -1,11 +1,11 @@
 import { type ChildProcess, spawn } from "node:child_process"
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
+import { copyFileSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { RpcHostRunner } from "../../runners/rpc-host"
 import { HostSessionClient } from "../../runners/rpc-host/session-client"
+import { shortSocketDir } from "../../runners/rpc-host/short-socket-dir.test-support"
 import { buildRpcSpawn } from "../../runners/rpc/spawn"
 import { RpcProcessRunner } from "../../runners/rpc-process"
 import { createRpcManagedRunner } from "../runner"
@@ -91,8 +91,7 @@ function processEngine(env: Readonly<Record<string, string>>): Engine {
 async function hostEngine(root: string, engineEnv: Readonly<Record<string, string>>): Promise<Engine> {
   // A socket host advertises `extension_events` (a capability omo requires of a task host) only for this client set.
   const env = { ...engineEnv, SENPI_RPC_CLIENT_CAPABILITIES: "extension_events" }
-  const socketDir = mkdtempSync(join(tmpdir(), "mch-"))
-  const socket = join(socketDir, "h.sock")
+  const { dir: socketDir, socket } = shortSocketDir("model-chain-host", "h.sock")
   const rpcEntry = fileURLToPath(import.meta.resolve("@code-yeongyu/senpi/rpc-entry"))
   const host = spawn(
     process.execPath,
