@@ -34,10 +34,7 @@ setDefaultTimeout(90_000)
 
 // Each external stage of the packed-sidecar test has its own cap, and the test's own timeout is derived from
 // them with room for the build, copies and cleanup, so a stalled stage always fails by name (#10911).
-// `npm pack` prints its tarball name before it exits, and a loaded windows-latest runner has taken longer than
-// 25 s to finish writing and closing the 3.4 MB wasm tarball (run 42142934964, packed-sidecar test). The bound
-// is longer on that platform; a genuinely stalled pack still fails by name.
-const PACKED_STAGE_CAPS = { pack: process.platform === "win32" ? 60_000 : 25_000, untar: 10_000, probe: 20_000 }
+const PACKED_STAGE_CAPS = { pack: 25_000, untar: 10_000, probe: 20_000 }
 const PACKED_TEST_TIMEOUT_MS = Object.values(PACKED_STAGE_CAPS).reduce((sum, cap) => sum + cap, 0) + 35_000
 
 afterEach(fixture.cleanupTest)
