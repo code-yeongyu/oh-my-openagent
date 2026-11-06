@@ -16,7 +16,8 @@ const remove = async () => {
   await fetch(fakeStoreUrl, { method: "DELETE", proxy: "" })
   return true
 }
-Object.defineProperty(Bun, "secrets", { value: { get, set, delete: remove } })
+// Marked as injected: the sign-in store must treat it as a stand-in, never as the real macOS store (store-binding.ts).
+Object.defineProperty(Bun, "secrets", { value: { get, set, delete: remove, [Symbol.for("omo.test.injectedSecrets")]: true } })
 // The fake keystore stands in for an unlocked keyring; on Linux the CLI asks the Secret Service over D-Bus
 // whether the default collection is locked before any secret call, so answer that probe the same way.
 if (process.platform === "linux") {

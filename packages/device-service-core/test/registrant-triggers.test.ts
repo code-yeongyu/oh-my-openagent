@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { spawn } from "node:child_process"
 import { mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
+import { deviceServiceEndpointPath } from "../src/device-service.ts"
 import type { RegistrantSchedule } from "../src/registrant.ts"
 import type { FakeOwner } from "./local-api/conformance/fake-owner.ts"
 import { AGENT_DIR, ownerAt, recorder, registeredFor, registers, root, SELF, start, stopOwner, useRegistrantWorld, within } from "./registrant-support.ts"
@@ -104,8 +105,9 @@ describe("agent dir registrant: service starts (#12379)", () => {
   test("schedules nothing without a trigger, and only the 250 ms / 1 s / 4 s connect retries for a dead endpoint", async () => {
     const stateDir = join(root(), "device-service")
     mkdirSync(stateDir, { mode: 0o700 })
-    // A socket path nobody listens on: what a relayd that crashed leaves behind.
-    writeFileSync(join(stateDir, "service.sock"), "")
+    // An endpoint nobody listens on: what a relayd that crashed leaves behind. It must be the platform's own
+    // endpoint path (a socket on POSIX, endpoint.json on Windows), or the registrant never sees an endpoint at all.
+    writeFileSync(deviceServiceEndpointPath(stateDir), "")
     const scheduled: number[] = []
     let onScheduled: ((run: () => void) => void) | undefined
     const nextScheduled = (what: string): Promise<() => void> =>

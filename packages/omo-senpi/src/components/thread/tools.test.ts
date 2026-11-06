@@ -82,12 +82,12 @@ describe("thread tool registration", () => {
     expect(f.setModel.mock.calls[0]).toEqual(["route-peer", "openai", "gpt-x", "dur-peer"])
   })
 
-  test("registers exactly the seventeen contract tools with search metadata", () => {
+  test("registers exactly the eighteen contract tools with search metadata", () => {
     const tools: Record<string, unknown>[] = []
     const f = fixture()
     registerThreadTools({ registerTool: (tool) => tools.push(tool) }, { ...f, callerSessionId: () => "caller", callerWorkspaceRoot: () => process.cwd() })
     expect(tools.map((tool) => tool.name)).toEqual([
-      "thread_create", "thread_list", "thread_read", "thread_send", "thread_interrupt", "thread_handoff", "thread_rename", "thread_set_model", "thread_set_reasoning",
+      "thread_create", "thread_list", "thread_read", "thread_send", "thread_interrupt", "thread_close", "thread_handoff", "thread_rename", "thread_set_model", "thread_set_reasoning",
       "thread_bind", "thread_unbind", "thread_rebind", "thread_bindings", "thread_report", "thread_outbox", "thread_outbox_ack", "thread_answer",
     ])
     expect(tools.every((tool) => tool.exposure === "search" && tool.searchGroup === "threads")).toBe(true)
