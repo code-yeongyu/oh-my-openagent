@@ -68,6 +68,15 @@ export async function throughSymlink(root: string, path: string): Promise<boolea
   return false
 }
 
+/** Whether `path` exists under `root` as anything but a regular file, decided by lstat without opening it. */
+export async function nonRegularLeaf(root: string, path: string): Promise<boolean> {
+  const leaf = await lstat(join(root, path)).catch((error: unknown) => {
+    if (missing(error)) return null
+    throw error
+  })
+  return leaf !== null && !leaf.isFile()
+}
+
 const nearestExisting = (root: string, dir: string): string => {
   let at = dir
   while (at !== root && !existsSync(at)) at = dirname(at)
@@ -92,11 +101,7 @@ export async function prepareLanding(root: string, path: string | null): Promise
     const realRoot = await realpath(root)
     const parent = await realpath(nearestExisting(root, dirname(target)))
     if (!staysInside(realRoot, parent)) return { refused: "outside-root" }
-    const leaf = await lstat(target).catch((error: unknown) => {
-      if (missing(error)) return null
-      throw error
-    })
-    if (leaf !== null && !leaf.isFile()) return { refused: "non-regular-file" }
+    if (await nonRegularLeaf(root, path)) return { refused: "non-regular-file" }
     const working = await readWorking(root, path)
     await mkdir(dirname(target), { recursive: true })
     return { path, working }

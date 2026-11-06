@@ -26,7 +26,7 @@ import { removeAtomic, writeAtomic } from "./atomic"
 import type { EngineDeps } from "./engine-deps"
 import { acceptedItems, acceptedKeys, rejectItem } from "./item-keys"
 import { type CycleRecord, fromBase64, type RenderRecord, type SyncJournal, toBase64, type WireItem } from "./journal"
-import { fsRefusal, prepareLanding, readWorking, throughSymlink } from "./landing"
+import { fsRefusal, nonRegularLeaf, prepareLanding, readWorking, throughSymlink } from "./landing"
 import { adoptLegacyRenders } from "./legacy-cycle"
 import { diskLister, type ItemPaths, itemPaths, landingPath, scanWorkingTree } from "./working-tree"
 
@@ -56,12 +56,18 @@ async function workingFiles(deps: EngineDeps, journal: SyncJournal): Promise<Ite
 
 /**
  * The working text at `path`, or undefined (reported) when this device cannot read that path at all
- * or, for a known item the walk did not list, when its path goes through a symlink.
+ * or, for a known item the walk did not list, when its path goes through a symlink or names a
+ * non-regular file. The walk lists only regular files, so an unlisted key can name a FIFO left by a
+ * refused landing (#12158); opening one blocks until a writer appears, so it is refused unread.
  */
 async function readCaptured(deps: EngineDeps, journal: SyncJournal, key: string, path: string, listed: boolean): Promise<string | null | undefined> {
   try {
     if (!listed && (await throughSymlink(deps.repo.root, path))) {
       await rejectItem(deps, journal, "capture", key, "symlink")
+      return undefined
+    }
+    if (!listed && (await nonRegularLeaf(deps.repo.root, path))) {
+      await rejectItem(deps, journal, "capture", key, "non-regular-file")
       return undefined
     }
     return await readWorking(deps.repo.root, path)
