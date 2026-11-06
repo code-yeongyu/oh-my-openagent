@@ -215,7 +215,6 @@
     "@oh-my-opencode/senpi-desktop-engine": "workspace:*",
     "@oh-my-opencode/senpi-desktop-prelude": "workspace:*",
     "@oh-my-opencode/senpi-desktop-protocol": "workspace:*",
-    "@oh-my-opencode/senpi-desktop-sdk": "workspace:*",
     "@oh-my-opencode/senpi-desktop-service": "workspace:*",
     "@oh-my-opencode/senpi-desktop-tool": "workspace:*",
     "@oh-my-opencode/senpi-task": "workspace:*",

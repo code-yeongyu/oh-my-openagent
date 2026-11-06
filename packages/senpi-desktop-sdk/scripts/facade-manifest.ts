@@ -4,7 +4,7 @@
 // signatures) and throws on anything else, so an unsupported edit fails generation instead of dropping a method.
 import { ENGINE_METHODS, ENGINE_NOTIFICATIONS } from "@oh-my-opencode/senpi-desktop-protocol";
 
-export const FACADE_SOURCE = "packages/senpi-desktop-sdk/src/facade.ts";
+const FACADE_SOURCE = "packages/senpi-desktop-sdk/src/facade.ts";
 
 export type FacadeTier = "read" | "exec";
 export type FacadePolicy = "none" | "semantic" | "background" | "foreground";

@@ -51,7 +51,7 @@ function aim(target: TargetId, point: FramePoint): { readonly x: number; readonl
 	return { x, y, frameId: frame.id };
 }
 
-export class InputPointer implements Pointer {
+class InputPointer implements Pointer {
 	readonly #link: Link;
 	readonly #target: TargetId;
 
@@ -108,7 +108,7 @@ export class InputPointer implements Pointer {
 	}
 }
 
-export class InputKeyboard implements Keyboard {
+class InputKeyboard implements Keyboard {
 	readonly #link: Link;
 	readonly #target: TargetId;
 

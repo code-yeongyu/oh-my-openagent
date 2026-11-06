@@ -10,7 +10,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 const SCOPE = "@oh-my-opencode/"
 const DESKTOP = "senpi-desktop-"
 
-export const ALLOWED_EDGES = {
+const ALLOWED_EDGES = {
   "senpi-desktop-protocol": [],
   "senpi-desktop-prelude": [],
   "senpi-desktop-engine": ["senpi-desktop-protocol"],
@@ -35,7 +35,7 @@ const SOURCE = /\.(?:[cm]?ts|[cm]?js)$/
 const SPECIFIER =
   /(?:\bimport\s+(?:type\s+)?(?:[\w*{}\s,$]+\s+from\s+)?|\bexport\s+(?:type\s+)?(?:\*(?:\s+as\s+\w+)?|\{[^}]*\})\s+from\s+|\bimport\s*\(\s*|\brequire\s*\(\s*)["']([^"']+)["']/g
 
-export function importSpecifiers(text) {
+function importSpecifiers(text) {
   const withoutComments = text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/.*$/gm, "$1")
   return [...withoutComments.matchAll(SPECIFIER)].map((match) => match[1])
 }
@@ -63,7 +63,7 @@ function sourceFiles(dir) {
 }
 
 /** Every edge violation of one package: `{ file, specifier, why }`. */
-export function violationsOf(pkg, root = ROOT) {
+function violationsOf(pkg, root = ROOT) {
   const allowed = new Set([pkg, ...ALLOWED_EDGES[pkg]])
   const dir = join(root, "packages", pkg)
   const manifest = JSON.parse(readFileSync(join(dir, "package.json"), "utf8"))
