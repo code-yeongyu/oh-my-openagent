@@ -179,7 +179,10 @@ fn handle_line(
 ) -> Option<String> {
     let request = match parse_request(text) {
         Ok(request) => request,
-        Err((id, failure)) => return Some(failure_line(id, failure)),
+        Err(failure) => {
+            let (id, failure) = *failure;
+            return Some(failure_line(id, failure));
+        }
     };
     let Some(method) = Method::from_name(&request.method) else {
         return request
@@ -220,17 +223,17 @@ fn handle_line(
     }
 }
 
-type ParseFailure = (Option<RequestId>, Failure);
+type ParseFailure = Box<(Option<RequestId>, Failure)>;
 
 pub(crate) fn parse_request(text: &[u8]) -> Result<RpcRequest, ParseFailure> {
     let value: Value = serde_json::from_slice(text)
-        .map_err(|error| (None, Failure::Parse(format!("parse error: {error}"))))?;
+        .map_err(|error| Box::new((None, Failure::Parse(format!("parse error: {error}")))))?;
     // An unreadable id is answered with `null`, as JSON-RPC 2.0 requires.
     let id = value
         .get("id")
         .and_then(|id| serde_json::from_value(id.clone()).ok());
     serde_json::from_value(value)
-        .map_err(|error| (id, Failure::InvalidRequest(format!("invalid request: {error}"))))
+        .map_err(|error| Box::new((id, Failure::InvalidRequest(format!("invalid request: {error}")))))
 }
 
 /// Writes `reply`, then every notification queued so far.

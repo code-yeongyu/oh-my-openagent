@@ -9,7 +9,8 @@
   // Remove an entry when its finding is fixed. Root-workspace file ignores live at the top level (knip reads the root
   // workspace's ignoreIssues only there).
   // Third-party projects vendored as git submodules; the build materializes them, they are not this repository's code.
-  "ignore": ["packages/shared-skills/upstreams/**"],
+  // The bunshin-ts build output vendored byte for byte (pinned by packages/omo-senpi/vendor/PIN.json) is upstream code too.
+  "ignore": ["packages/shared-skills/upstreams/**", "packages/omo-senpi/vendor/**"],
   // Unused exports already present at origin dev 4686e425b5, named per symbol. knip has no per-symbol ignore and a file-wide
   // ignoreIssues "exports" entry would also hide a new unused export in that file, so script/knip-preexisting-exports.ts
   // (shared byte for byte with omo-relay-daemon, sha256-pinned by script/knip-coverage.test.ts) drops exactly these names, and
@@ -2918,6 +2919,8 @@
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
         "scripts/qa/fused-equivalence-e2e.mjs",
+        // run by path as the bunshin-ts eval SDK's live QA driver (scripts/qa/AGENTS.md)
+        "scripts/qa/bunshin-ts-eval-sdk-qa.mjs",
         "src/components/claim-receipt/runtime.ts",
         "src/components/computer-use/runtime.ts",
         "src/components/device-service/runtime.ts",
