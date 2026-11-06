@@ -6,6 +6,7 @@ import { threadLink } from "../thread-link"
 import type { ThreadReadInput } from "../contracts"
 import type { ThreadTranscriptEntry } from "../reader"
 import { liveReadResult } from "../tools/read-ops"
+import type { CommandResult } from "@oh-my-opencode/device-service-core"
 import type { AliasError, AliasHolder, JsonObject, RemoteCommandOutcome, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 
 type Failure = { readonly kind: "error"; readonly error: ThreadToolFailure }
@@ -24,10 +25,31 @@ export async function remoteAvailable(remote: RemoteThreadSurface): Promise<Fail
   return undefined
 }
 
+type UncertainReason = Extract<CommandResult["outcome"], { readonly state: "uncertain" }>["reason"]
+
+// How each reason a read-only record can end uncertain with is answered once device-service.ts has refused it (nothing
+// can have changed). Typed over the device service's whole uncertain vocabulary, so a new reason fails the typecheck
+// here instead of falling through to "update omo".
+const READ_UNCERTAIN: Readonly<Record<UncertainReason, "retry" | "too_large">> = {
+  request_gone: "retry", no_receipt: "retry", engine_restarted: "retry", recipient_revoked: "retry", transport_expired: "retry",
+  unconfirmed: "retry", lease_expired: "retry", cancelled: "retry", hand_restarted: "retry", result_expired: "retry", record_too_large: "too_large",
+}
+
+// Refusals after which this call changed nothing on the other device: a command that never reached its engine (a lost
+// connection, a failed attach) or a read-only record that failed either way. Retrying is safe, and nothing about that
+// device needs updating.
+const UNANSWERED: ReadonlySet<string> = new Set([
+  "closed", "protocol_violation", "internal", "read_failed", "request_timeout", "handshake_timeout", "attach_failed", "reply_lost",
+  "host_not_answering", "peer_not_found", "engine_stale",
+  ...Object.entries(READ_UNCERTAIN).filter(([, answer]) => answer === "retry").map(([reason]) => reason),
+])
+
 export function outcomeFailure(outcome: Exclude<RemoteCommandOutcome, { readonly kind: "ok" }>, device: string): Failure {
   if (outcome.kind === "uncertain") return fail("idempotency_uncertain", `The command to device ${device} may or may not have run (${outcome.reason}).`, "Read the thread before deciding whether to retry.", { device, reason: outcome.reason })
   if (outcome.reason === "capability_missing") return fail("scope_denied", `Device ${device} does not grant this command.`, "Allow commands from this device on the other device, then retry.", { device, reason: outcome.reason })
   if (outcome.reason === "host_detached") return fail("host_unavailable", `Device ${device} is not attached to the relay.`, "Retry when that device is signed in and online.", { device, reason: outcome.reason })
+  if (UNANSWERED.has(outcome.reason)) return fail("host_unavailable", `Device ${device} did not answer (${outcome.reason}); this call changed nothing there.`, "Retry; nothing needs to be checked first.", { device, reason: outcome.reason })
+  if (outcome.reason === "record_too_large") return fail("unsupported", `The thread on device ${device} is too large to send back in one relay record (record_too_large).`, "Read it on that device, or ask that thread for a summary with thread_send.", { device, reason: outcome.reason })
   return fail("unsupported", `Device ${device} refused the command (${outcome.reason}).`, "Update omo on that device, or address a thread on this device.", { device, reason: outcome.reason })
 }
 
@@ -78,12 +100,24 @@ export async function deviceOnline(remote: RemoteThreadSurface, device: string):
   return undefined
 }
 
+/**
+ * The engine's reply payload. The device service hands back senpi's whole response envelope
+ * (`{type: "response", command, success, data}`), and every field a tool reads lives under `data`.
+ */
+export function replyData(response: JsonObject): JsonObject {
+  const data = response["data"]
+  return typeof data === "object" && data !== null && !Array.isArray(data) ? data as JsonObject : {}
+}
+
+const nonEmpty = (value: unknown): string | undefined => (typeof value === "string" && value.length > 0 ? value : undefined)
+
+// The opened thread's id is its durable session id (the id every other tool addresses it by); the engine's relay
+// session id is used only when the reply names no durable id.
 function openedId(response: JsonObject): string | undefined {
-  const state = response["state"]
-  const fromState = typeof state === "object" && state !== null ? (Reflect.get(state, "durableSessionId") ?? Reflect.get(state, "sessionId")) : undefined
-  if (typeof fromState === "string" && fromState.length > 0) return fromState
-  const id = response["sessionId"]
-  return typeof id === "string" && id.length > 0 ? id : undefined
+  const data = replyData(response)
+  const state = data["state"]
+  const fromState = typeof state === "object" && state !== null && !Array.isArray(state) ? (state as JsonObject) : {}
+  return nonEmpty(fromState["durableSessionId"]) ?? nonEmpty(data["durableSessionId"]) ?? nonEmpty(fromState["sessionId"]) ?? nonEmpty(data["sessionId"])
 }
 
 export type RemoteOpen =
@@ -145,11 +179,12 @@ export async function promptRemote(remote: RemoteThreadSurface, row: RemoteSessi
   if (offline !== undefined) return offline
   const state = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_state", sessionId: row.session_id })
   if (state.kind !== "ok") return outcomeFailure(state, row.device)
-  const streaming = state.response["isStreaming"] === true
+  const engineState = replyData(state.response)
+  const streaming = engineState["isStreaming"] === true
   if (request.delivery === "steer") {
     // gateway/decision.ts: a steer needs a running turn; a compacting session or one waiting on a question is not one.
-    const pendingQuestions = state.response["pendingQuestions"]
-    const midTurn = streaming && state.response["isCompacting"] !== true && !(Array.isArray(pendingQuestions) && pendingQuestions.length > 0)
+    const pendingQuestions = engineState["pendingQuestions"]
+    const midTurn = streaming && engineState["isCompacting"] !== true && !(Array.isArray(pendingQuestions) && pendingQuestions.length > 0)
     if (!midTurn) return fail(REFUSAL_CODES.not_steerable.code, `A steer to ${row.session_id} was refused: not_steerable.`, REFUSAL_CODES.not_steerable.next, { device: row.device })
     // The other device's engine reports no turn id, so the caller's expected_turn_id cannot be checked there yet.
     return fail(REFUSAL_CODES.turn_conflict.code, `Turn ${request.expected_turn_id} of ${row.session_id} cannot be confirmed on device ${row.device}.`, REFUSAL_CODES.turn_conflict.next, { device: row.device, reason: "remote_turn_not_verifiable" })
@@ -158,10 +193,11 @@ export async function promptRemote(remote: RemoteThreadSurface, row: RemoteSessi
   const record = remote.chain.stamp({ type: "prompt", sessionId: row.session_id, message, ...(streaming ? { streamingBehavior: "followUp" } : {}) }, hop)
   const sent = await remote.sessions.sessionCommand(row.device, row.session_id, record)
   if (sent.kind !== "ok") return outcomeFailure(sent, row.device)
-  const turnId = sent.response["turnId"]
-  if (sent.response["disposition"] === "started" && typeof turnId === "string" && turnId.length > 0) return { kind: "ok", thread_id: row.session_id, link: threadLink(row.session_id, row.title), delivery: { kind: "started", turn_id: turnId }, deduplicated: false, device: row.device }
+  const reply = replyData(sent.response)
+  const turnId = reply["turnId"]
+  if (reply["disposition"] === "started" && typeof turnId === "string" && turnId.length > 0) return { kind: "ok", thread_id: row.session_id, link: threadLink(row.session_id, row.title), delivery: { kind: "started", turn_id: turnId }, deduplicated: false, device: row.device }
   const after = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_state", sessionId: row.session_id })
-  const pending = after.kind === "ok" ? after.response["pendingMessageCount"] : undefined
+  const pending = after.kind === "ok" ? replyData(after.response)["pendingMessageCount"] : undefined
   if (typeof pending !== "number" || !Number.isInteger(pending) || pending < 1) return fail("idempotency_uncertain", `Device ${row.device} accepted the message but did not report where it waits.`, "Read the thread before deciding whether to send again.", { device: row.device })
   return { kind: "ok", thread_id: row.session_id, link: threadLink(row.session_id, row.title), delivery: { kind: "queued", queue_position: pending }, deduplicated: false, device: row.device }
 }
@@ -172,8 +208,9 @@ export async function interruptRemote(remote: RemoteThreadSurface, row: RemoteSe
   if (offline !== undefined) return offline
   const outcome = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "interrupt", sessionId: row.session_id, ...(turnId === undefined ? {} : { turnId }) })
   if (outcome.kind !== "ok") return outcomeFailure(outcome, row.device)
-  const reported = outcome.response["turnId"]
-  return { kind: "ok", thread_id: row.session_id, ...(typeof reported === "string" ? { turn_id: reported } : {}), interrupted: outcome.response["interrupted"] === true }
+  const reply = replyData(outcome.response)
+  const reported = reply["turnId"]
+  return { kind: "ok", thread_id: row.session_id, ...(typeof reported === "string" ? { turn_id: reported } : {}), interrupted: reply["interrupted"] === true }
 }
 
 // The refusals that mean the session was no longer on the other device's engine when the command reached it.
@@ -193,10 +230,11 @@ export async function closeRemote(remote: RemoteThreadSurface, row: RemoteSessio
   const unload = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "unload_session", sessionId: row.session_id, force: true, interrupt: true, children: "detach" })
   if (unload.kind === "refused" && SESSION_GONE.has(unload.reason)) return closed(false)
   if (unload.kind !== "ok") return outcomeFailure(unload, row.device)
-  const reason = unload.response["reason"]
-  if (unload.response["outcome"] === "unloaded") return closed(true)
+  const unloaded = replyData(unload.response)
+  const reason = unloaded["reason"]
+  if (unloaded["outcome"] === "unloaded") return closed(true)
   if (reason === "session_closing") return closed(false)
-  if (reason !== "unsupported") return fail("unsupported", `Device ${row.device} refused to close ${row.session_id} (${String(reason)}).`, "Read the thread on that device and retry once its work settles.", { device: row.device, reason, detail: unload.response["detail"] })
+  if (reason !== "unsupported") return fail("unsupported", `Device ${row.device} refused to close ${row.session_id} (${String(reason)}).`, "Read the thread on that device and retry once its work settles.", { device: row.device, reason, detail: unloaded["detail"] })
   const close = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "close_session", sessionId: row.session_id })
   if (close.kind === "refused" && SESSION_GONE.has(close.reason)) return closed(false)
   if (close.kind !== "ok") return outcomeFailure(close, row.device)
@@ -212,7 +250,8 @@ export async function readRemote(remote: RemoteThreadSurface, row: RemoteSession
   if (offline !== undefined) return offline
   const outcome = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_messages", sessionId: row.session_id })
   if (outcome.kind !== "ok") return outcomeFailure(outcome, row.device)
-  const messages = Array.isArray(outcome.response["messages"]) ? outcome.response["messages"] as ThreadTranscriptEntry[] : []
+  const listed = replyData(outcome.response)["messages"]
+  const messages = Array.isArray(listed) ? listed as ThreadTranscriptEntry[] : []
   const result = liveReadResult(row.session_id, row.title, messages, window)
   return result.kind === "ok" ? { ...result, device: row.device } as ThreadToolResult : result
 }

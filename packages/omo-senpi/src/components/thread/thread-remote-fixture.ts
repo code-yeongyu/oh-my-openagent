@@ -30,7 +30,7 @@ export function createRemoteThreadFixture() {
     for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
   }
 
-  function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean; engine?: Engine; promptResponse?: JsonObject; failSessionsList?: boolean; failAliasesOf?: boolean; failClaim?: boolean; otherHolders?: number; unwritten?: boolean; rowState?: string; live?: readonly string[] } = {}) {
+  function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean; engine?: Engine; promptResponse?: JsonObject; openData?: JsonObject; failSessionsList?: boolean; failAliasesOf?: boolean; failClaim?: boolean; otherHolders?: number; unwritten?: boolean; rowState?: string; live?: readonly string[] } = {}) {
     const engine = options.engine ?? ENGINE
     const sent: Sent[] = []
     const hops: number[] = []
@@ -40,29 +40,34 @@ export function createRemoteThreadFixture() {
     // only with no other holder; unload_session with force drains every hold, and refuses a session with no file yet.
     const live = new Set(options.live ?? [B_ROW.session_id])
     const answer = (rpc: JsonObject, attachedTo?: string): RemoteCommandOutcome => {
+      // The engine's real reply envelope, as the device service hands it back (device-service-core's CommandResult.response):
+      // every field the tools read lives under `data`.
+      const ok = (data: JsonObject): RemoteCommandOutcome => ({ kind: "ok", response: { type: "response", id: null, command: rpc["type"] ?? null, success: true, data } })
       if (options.refuse !== undefined) return { kind: "refused", reason: options.refuse }
       if (attachedTo !== undefined && !live.has(attachedTo)) return { kind: "refused", reason: "session_not_found" }
       if (rpc["type"] === "close_session") {
         if (attachedTo === undefined) return { kind: "refused", reason: "unknown_session" }
         if ((options.otherHolders ?? 0) === 0) live.delete(attachedTo)
-        return { kind: "ok", response: {} }
+        return ok({})
       }
       if (rpc["type"] === "unload_session" && attachedTo !== undefined) {
-        if (options.unwritten === true) return { kind: "ok", response: { outcome: "refused", reason: "unsupported", detail: "the session has no file to reopen it by" } }
-        if ((options.otherHolders ?? 0) > 0 && rpc["force"] !== true) return { kind: "ok", response: { outcome: "refused", reason: "attached", detail: "1 other client(s) attached" } }
+        if (options.unwritten === true) return ok({ outcome: "refused", reason: "unsupported", detail: "the session has no file to reopen it by" })
+        if ((options.otherHolders ?? 0) > 0 && rpc["force"] !== true) return ok({ outcome: "refused", reason: "attached", detail: "1 other client(s) attached" })
         live.delete(attachedTo)
-        return { kind: "ok", response: { outcome: "unloaded", sessionPath: B_ROW.path } }
+        return ok({ outcome: "unloaded", sessionPath: B_ROW.path })
       }
       if (rpc["type"] === "open_session") {
         const opened = rpc["sessionPath"] === undefined ? "dur-new-on-b" : "dur-on-b"
         live.add(opened)
-        return { kind: "ok", response: { sessionId: "rpc-9", state: { durableSessionId: opened } } }
+        return ok(options.openData ?? { sessionId: "rpc-9", state: { durableSessionId: opened } })
       }
-      if (rpc["type"] === "get_state") return { kind: "ok", response: { isStreaming: engine.streaming, pendingMessageCount: engine.pending } }
-      if (rpc["type"] === "get_messages") return { kind: "ok", response: { messages: [...engine.messages] } }
-      if (rpc["type"] === "interrupt") return { kind: "ok", response: engine.interrupt }
-      if (rpc["type"] === "prompt") return { kind: "ok", response: options.promptResponse ?? (engine.streaming ? { disposition: "queued" } : { disposition: "started", turnId: "turn-b" }) }
-      return { kind: "ok", response: {} }
+      if (rpc["type"] === "get_state") return ok({ isStreaming: engine.streaming, pendingMessageCount: engine.pending })
+      if (rpc["type"] === "get_messages") return ok({ messages: [...engine.messages] })
+      if (rpc["type"] === "interrupt") return ok(engine.interrupt)
+      if (rpc["type"] === "prompt") return ok(options.promptResponse ?? (engine.streaming ? { disposition: "queued" } : { disposition: "started", turnId: "turn-b" }))
+      if (rpc["type"] === "get_available_models") return ok({ models: [{ provider: "anthropic", id: "claude-opus", name: "Opus" }, { provider: "openai", id: "gpt-6" }] })
+      if (rpc["type"] === "set_model") return ok({ provider: rpc["provider"] ?? null, id: rpc["modelId"] ?? null })
+      return ok({})
     }
     const devices: RemoteDevice[] = [{ device: "here", label: "this mac", online: true }, { device: "b", label: "studio", online: options.online ?? true }]
     const registry: AliasRegistry = {

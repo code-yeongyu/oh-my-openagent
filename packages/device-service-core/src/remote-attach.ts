@@ -74,7 +74,7 @@ const attachEvent = (event: LocalEvent): AttachEvent | undefined => {
 }
 
 // The sender ledger's progress states (local API command_state): every other state ends the command.
-const PROGRESS_STATES: ReadonlySet<CommandStateEvent["state"]> = new Set(["queued", "transport_confirmed", "engine_dispatched"])
+export const PROGRESS_STATES: ReadonlySet<CommandStateEvent["state"]> = new Set(["queued", "transport_confirmed", "engine_dispatched"])
 
 const toRemote = (event: AttachEvent): RemoteAttachEvent => {
   switch (event.kind) {
