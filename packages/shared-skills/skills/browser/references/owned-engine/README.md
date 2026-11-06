@@ -58,5 +58,5 @@ or text), not a timer; `goto(url, { waitUntil: "commit" })` is the escape hatch 
 - [network.md](network.md) — `createNetworkSnoop`, `collectWhileScrolling`, `createTrace`, `createRoutes`
 - [frames-and-humans.md](frames-and-humans.md) — `snapshotWithFrames`, `describeLayers`, dialog policy, `emulate`, `requestHuman`
 
-The library's own skill (`skills/omowright/SKILL.md` and `presets/*` in the omowright repository)
+The omowright repository's own agent guide and its `presets/*`
 is the authoritative, longer treatment of each; these pages are the routing summary.
