@@ -13,6 +13,7 @@ import {
   dispatchInternalPrompt,
   releaseAllPromptAsyncReservationsForTesting,
 } from "../../shared/prompt-async-gate"
+import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
 
 function makeRecordingSession() {
   const calls: string[] = []
@@ -239,6 +240,7 @@ describe("dispatchInternalPrompt live-server-route routing", () => {
   }, 5_000)
 
   test("#given live route active and queueBehavior enqueue #when session is initially busy then becomes idle #then queued entry dispatches via live client", async () => {
+    useTestTimeout(5_000)
     //#given
     let status = "busy"
     let liveCalls = 0
@@ -282,7 +284,7 @@ describe("dispatchInternalPrompt live-server-route routing", () => {
     })
     status = "idle"
     await new Promise<void>((resolve, reject) => {
-      const timeoutId = setTimeout(() => reject(new Error("timed out waiting for queued prompt")), 2_000)
+      const timeoutId = setTimeout(() => reject(new Error("waited out the test budget for the queued prompt")), remainingTestTime())
       promptSeen.then(() => {
         clearTimeout(timeoutId)
         resolve()

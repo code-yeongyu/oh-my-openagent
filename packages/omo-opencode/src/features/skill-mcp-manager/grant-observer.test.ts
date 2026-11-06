@@ -2,6 +2,7 @@ import { afterEach, expect, mock, test } from "bun:test"
 import { SkillMcpManager } from "./manager"
 import { setStdioClientDependenciesForTesting } from "./stdio-client"
 import type { McpClient } from "./types"
+import { testBudgetSignal } from "../../../../../test-support/test-deadline"
 
 type Grant = { label: { project: string; skill: string; server: string }; names: readonly string[] }
 function latestStore() {
@@ -107,8 +108,8 @@ test.each(["store", "manager"])("%s invalidation rejects a pending materializati
     () => Promise.reject(new Error("Pending materialization resolved instead of failing on the policy change")),
     (error: unknown) => { expect(error instanceof Error ? error.message : String(error)).toContain("policy changed") },
   )
-  const deadline = AbortSignal.timeout(5000)
-  const onTimeout = () => started.reject(new Error("No pending handshake within 5 seconds"))
+  const deadline = testBudgetSignal("a pending handshake")
+  const onTimeout = () => started.reject(new Error("No pending handshake within the test budget"))
   deadline.addEventListener("abort", onTimeout, { once: true })
   try {
     await started.promise

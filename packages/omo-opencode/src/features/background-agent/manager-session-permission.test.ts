@@ -8,6 +8,7 @@ import type { BackgroundTask } from "./types"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import { releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt-async-gate"
 import { resetLiveServerRouteForTesting } from "../../shared/live-server-route"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 beforeEach(() => {
   releaseAllPromptAsyncReservationsForTesting()
@@ -161,8 +162,8 @@ describe("BackgroundManager session permission", () => {
     const manager = new BackgroundManager({ pluginContext: unsafeTestValue<PluginInput>({ client, directory: tmpdir() }) })
     const timeout = Promise.withResolvers<never>()
     const timeoutID = setTimeout(
-      () => timeout.reject(new Error("waited 1s for categorized child session prompt")),
-      1_000,
+      () => timeout.reject(new Error("waited out the test budget for categorized child session prompt")),
+      remainingTestTime(),
     )
 
     // when
