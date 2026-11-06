@@ -216,3 +216,60 @@ describe("the provider ids senpi renamed", () => {
     expect(resolveUsageCredentialFrom({ "some-other-provider": node([]) }, undefined, IDS, NOW)).toBeUndefined()
   })
 })
+
+describe("claude CLI accounts (senpi#4436)", () => {
+  const SENTINEL = "claude-sdk-oauth-managed"
+  const cliAuth = (pinned: string, accounts: readonly Record<string, unknown>[]): Record<string, unknown> => ({
+    "anthropic-subscription": { type: "oauth", access: SENTINEL, refresh: SENTINEL, accounts, pinned },
+  })
+  const cli = (name: string, extra: Record<string, unknown> = {}): Record<string, unknown> => ({
+    name,
+    source: "login",
+    store: "claude-cli",
+    dirId: name.padEnd(32, "0"),
+    ...extra,
+  })
+
+  test("#given claude CLI accounts and a pinned one in cooldown #when resolved #then the healthy one is named as the failover", () => {
+    // given the accounts hold no token in auth.json: the claude CLI keeps it in its own store
+    const file = cliAuth("work", [cli("my"), cli("work", { blockedUntil: NOW + 60_000, blockReason: "rate_limit" })])
+
+    // when
+    const credential = resolveUsageCredentialFrom(file, undefined, ["anthropic-subscription"], NOW)
+
+    // then
+    expect(credential).toEqual({ state: "ok", account: "my", pinnedAccount: "work" })
+  })
+
+  test("#given a healthy pinned claude CLI account #when resolved #then it is named, never a nameless default", () => {
+    // given
+    const file = cliAuth("my", [cli("my"), cli("work")])
+
+    // when
+    const credential = resolveUsageCredentialFrom(file, undefined, ["anthropic-subscription"], NOW)
+
+    // then
+    expect(credential).toEqual({ state: "ok", account: "my" })
+  })
+
+  test("#given a claude CLI account that still has to sign in again #when resolved #then it does not serve", () => {
+    // given
+    const file = cliAuth("old", [cli("old", { signInRequired: "legacy_sign_in_retired" }), cli("my")])
+
+    // when
+    const credential = resolveUsageCredentialFrom(file, undefined, ["anthropic-subscription"], NOW)
+
+    // then
+    expect(credential).toEqual({ state: "ok", account: "my", pinnedAccount: "old" })
+  })
+  test("#given a pinned env token account next to claude CLI accounts #when resolved #then no stored account is named for it", () => {
+    // given the engine pins the env slot, which never appears in auth.json accounts[]
+    const file = cliAuth("env", [cli("my"), cli("work")])
+
+    // when
+    const credential = resolveUsageCredentialFrom(file, undefined, ["anthropic-subscription"], NOW)
+
+    // then the engine-source falls back to the env record or the latest one
+    expect(credential).toBeUndefined()
+  })
+})
