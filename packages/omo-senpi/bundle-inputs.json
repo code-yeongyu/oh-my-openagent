@@ -697,6 +697,7 @@
     "packages/omo-opencode/src/cli/service-auth/credential-owner.ts",
     "packages/omo-opencode/src/cli/service-auth/index.ts",
     "packages/omo-opencode/src/cli/service-auth/keystore.ts",
+    "packages/omo-opencode/src/cli/service-auth/presenter/account-record.ts",
     "packages/omo-opencode/src/cli/service-auth/protocol.ts",
     "packages/omo-opencode/src/cli/service-auth/secret-service-lock.ts",
     "packages/omo-opencode/src/cli/service-auth/session.ts",
