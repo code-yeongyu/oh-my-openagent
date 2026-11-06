@@ -14,7 +14,7 @@ import { randomBytes } from "node:crypto"
 
 // A host sends no command state at all for a route it does not list toward a sender it does not grant (docs/local-api.md
 // "Delegated commands"), so the client bounds its own wait.
-export const ENDPOINT_COMMAND_WAIT_MS = 120_000
+const ENDPOINT_COMMAND_WAIT_MS = 120_000
 
 function sendToEndpoint(client: LocalApiClient, device: string, endpoint: string, rpc: CommandRpc): Promise<CommandResult> {
   return new Promise<CommandResult>((resolve, reject) => {
