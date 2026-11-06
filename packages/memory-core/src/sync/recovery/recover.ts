@@ -3,8 +3,6 @@ import type { RejectionCounter } from "../crypto/rejection.ts";
 import { deviceIdOf } from "../crypto/signatures.ts";
 import {
 	loadTrustAnchor,
-	pinTrustAnchor,
-	TrustPinError,
 } from "../crypto/trust-pin.ts";
 import type { DeviceKeyring } from "../keyring-port.ts";
 import { openBridgeSealedWrap } from "./key-material.ts";
@@ -18,7 +16,7 @@ import type {
 	RecoveryTransport,
 	TransportRefusal,
 } from "./ports.ts";
-import { appendAndConfirmJoin, rotationStored } from "./recover-join.ts";
+import { appendAndConfirmJoin, pinRecoveredRoot, rotationStored } from "./recover-join.ts";
 import { servedSaltInputs } from "./salt-inputs.ts";
 import { loadServedChain, recoveryCandidates } from "./served-chain.ts";
 import { holdWrites, releaseWriteHold } from "./write-hold.ts";
@@ -41,11 +39,13 @@ export type RecoverOutcome =
 			readonly state: "recovered";
 			readonly epoch: number;
 			readonly credentialId: string;
+			readonly rootChanged?: true;
 	  }
 	| {
 			readonly ok: true;
 			readonly state: "joined-read-only";
 			readonly credentialId: string;
+			readonly rootChanged?: true;
 	  }
 	| { readonly ok: false; readonly reason: RecoverRefusalReason }
 	| {
@@ -197,13 +197,9 @@ const recoverWithHandle = async (
 		recovered,
 	);
 	if (!confirmed.ok) return refuse(confirmed.reason);
-	try {
-		await pinTrustAnchor(input.stateDir, input.account, confirmed.pin);
-	} catch (error) {
-		if (error instanceof TrustPinError && error.problem === "pin_conflict")
-			return refusePin("pin-conflict");
-		throw error;
-	}
+	const pinnedRoot = await pinRecoveredRoot(input, confirmed.pin);
+	if (!pinnedRoot.ok) return refusePin("pin-conflict");
+	const changed = pinnedRoot.changed;
 	const expected = [...confirmed.authority.epochOrigins].filter(
 		([epoch, origin]) =>
 			epoch < authority.epoch && !confirmed.authority.cancelled.has(origin),
@@ -243,6 +239,7 @@ const recoverWithHandle = async (
 			ok: true,
 			state: "joined-read-only",
 			credentialId: recovered.credentialId,
+			...changed,
 		};
 	};
 	if (!rotated.ok) return readOnly();
@@ -263,5 +260,6 @@ const recoverWithHandle = async (
 		state: "recovered",
 		epoch: confirmed.authority.epoch + 1,
 		credentialId: recovered.credentialId,
+		...changed,
 	};
 };

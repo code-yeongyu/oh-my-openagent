@@ -127,7 +127,9 @@ export async function runSyncRpcOperation(
       const result = await options.runtime.enableSync(input)
       auth.admit(() => undefined)
       switch (result.kind) {
-        case "joined": record.enable = { kind: result.created === true ? "first_device_created" : "joined" }; break
+        case "joined":
+          record.enable = { kind: result.created === true ? "first_device_created" : "joined", ...(result.rootChanged && { rootChanged: true }) }
+          break
         case "needs_first_device": record.enable = result; break
         case "join_required":
           record.enable = await options.runtime.joinAccount({

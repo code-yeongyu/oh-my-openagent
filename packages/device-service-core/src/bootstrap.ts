@@ -6,7 +6,13 @@ import { compareVersions } from "./release/version.ts"
 
 const BOOTSTRAP_STOPPED_EXIT = 3
 
-export type BootstrapStopState = "signed_out" | "keychain_locked" | "service_degraded" | "account_unavailable" | "update_required"
+export type BootstrapStopState =
+  | "signed_out"
+  | "keychain_locked"
+  | "store_unavailable"
+  | "service_degraded"
+  | "account_unavailable"
+  | "update_required"
 
 export type BootstrapOutcome =
   | { readonly kind: "connected"; readonly status: Status; readonly service: DeviceService }
@@ -29,16 +35,23 @@ export type BootstrapDependencies = {
 const ACCOUNT_STOP: Readonly<Record<Exclude<AccountState["kind"], "signed_in">, BootstrapStopState>> = {
   signed_out: "signed_out",
   keychain_locked: "keychain_locked",
-  store_unavailable: "service_degraded",
+  // No credential store means no proof of a sign-in either: its own state, so a caller can tell it from a broken service.
+  store_unavailable: "store_unavailable",
   account_unavailable: "account_unavailable",
 }
 
 const stopped = (state: BootstrapStopState, notice: string): BootstrapOutcome => ({ kind: "stopped", state, notice, exitCode: BOOTSTRAP_STOPPED_EXIT })
 
-/** A service that is not running: its socket is gone (POSIX) or its loopback port refuses or never answers (Windows). */
-const isServiceStopped = (error: unknown): boolean =>
+const isHandshakeTimeout = (error: unknown): boolean => error instanceof LocalApiError && error.code === "handshake_timeout"
+
+/**
+ * A service that is not running: its socket is gone (POSIX) or its loopback port refuses or never answers (Windows).
+ * On POSIX a handshake timeout is NOT a stopped service: the socket accepted the connection, so the owner is alive but
+ * slow (for example busy right after a restart), and reinstalling it would restart a working service.
+ */
+const isServiceStopped = (error: unknown, platform: NodeJS.Platform = process.platform): boolean =>
   (error instanceof Error && "code" in error && ["ENOENT", "ECONNREFUSED", "ECONNRESET"].includes(String(error.code))) ||
-  (error instanceof LocalApiError && error.code === "handshake_timeout")
+  (platform === "win32" && isHandshakeTimeout(error))
 
 const failureNotice = (error: unknown): string =>
   error instanceof LocalApiError
@@ -52,8 +65,16 @@ const connectCurrent = async (deps: BootstrapDependencies): Promise<DeviceServic
   let service: DeviceService
   try {
     service = await deps.connect()
-  } catch (error) {
-    return isServiceStopped(error) ? "absent" : stopped("service_degraded", failureNotice(error))
+  } catch (first) {
+    // A slow owner (POSIX handshake timeout) gets one more try before the bootstrap stops as degraded.
+    if (!isHandshakeTimeout(first) || isServiceStopped(first)) {
+      return isServiceStopped(first) ? "absent" : stopped("service_degraded", failureNotice(first))
+    }
+    try {
+      service = await deps.connect()
+    } catch (error) {
+      return isServiceStopped(error) ? "absent" : stopped("service_degraded", failureNotice(error))
+    }
   }
   if (compareVersions(service.serviceVersion, deps.pinVersion) >= 0) return service
   service.close()

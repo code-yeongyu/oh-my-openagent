@@ -217,9 +217,6 @@
   "packages/omo-opencode/src/hooks/ralph-loop/oracle-double-fire-race.test.ts": {
     "typescript/no-non-null-assertion": 1
   },
-  "packages/omo-opencode/src/hooks/ulw-execute/index.test.ts": {
-    "typescript/no-non-null-assertion": 1
-  },
   "packages/omo-opencode/src/hooks/zauc-sync-mocks/sync-package-json.test.ts": {
     "typescript/no-non-null-assertion": 1
   },

@@ -108,6 +108,19 @@ export const THREAD_TOOL_SEARCH_METADATA: readonly ThreadToolSearchEntry[] = [
 		allowLazyActivation: true,
 	},
 	{
+		name: "thread_close",
+		label: "Close session",
+		description:
+			"Closes another session on this device or on another of the account's devices, for when the user is done with that session and wants it shut down" +
+			ROUTE_TO_TASK,
+		searchText:
+			"close a session the user no longer needs, shut down a finished session, end that conversation on the other machine",
+		searchKeywords: ["close that session", "shut down a session", "end the session", "done with that session"],
+		group: THREAD_TOOL_SEARCH_GROUP,
+		exposure: "search",
+		allowLazyActivation: true,
+	},
+	{
 		name: "thread_handoff",
 		label: "Hand off session",
 		description:

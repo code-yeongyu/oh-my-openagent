@@ -117,9 +117,8 @@ changing the extension's automation settings.
   out everywhere. No flow here needs it.
 - **`focused: false` by default.** The browser belongs to someone who is probably using it.
 - **One short, named session per task,** always stopped.
-- **Bot-scored or WAF targets go to the owned engine**, in the terminal and inside OmO Desktop alike. The attached engine's daemon enables console
-  capture on every tab it drives, which is a known automation signal; CloakBrowser through
-  `connectCloakProfile()` is the stealth path.
+- **Bot-scored or WAF targets never go through the attached engine** — route them to the `ultimate-browsing` skill, whose browser tier is the owned engine (`connectCloakProfile()`). The attached engine's daemon enables console
+  capture on every tab it drives, which is a known automation signal.
 
 ## Where the rest lives
 

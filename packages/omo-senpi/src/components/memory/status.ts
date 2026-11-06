@@ -155,7 +155,8 @@ export function formatMemoryStatusLine(
 async function readSyncBlocked(context: MemoryIdentityContext, syncStatus: SyncStatusReader | undefined): Promise<boolean> {
   if (syncStatus === undefined) return false
   try {
-    return (await syncStatus(context.identityPaths.repo))?.kind === "failing"
+    const kind = (await syncStatus(context.identityPaths.repo))?.kind
+    return kind === "failing" || kind === "frozen"
   } catch {
     return false
   }
