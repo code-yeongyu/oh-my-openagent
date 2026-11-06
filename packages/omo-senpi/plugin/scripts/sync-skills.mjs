@@ -6,7 +6,7 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 import { createSkillSourceCopyFilter } from "@oh-my-opencode/shared-skills/skill-source-filter"
 import { createNativeSkillSources } from "./native-skill-sources.mjs"
 import { insertSenpiCompatibilityGuidance } from "./senpi-compatibility-guidance.mjs"
-import { applySenpiSkillRosterOverlay } from "./senpi-skill-roster-overlay.mjs"
+import { applySenpiSkillRosterOverlay, assertSenpiSkillRosterOverlay } from "./senpi-skill-roster-overlay.mjs"
 
 const pluginRoot = dirname(dirname(fileURLToPath(import.meta.url)))
 const repoRoot = dirname(dirname(pluginRoot))
@@ -238,6 +238,8 @@ export async function syncSkills() {
     const destination = join(skillsRoot, skillName)
     await cp(source, destination, { filter: createSkillSourceCopyFilter(source, senpiFilterOptions), recursive: true })
     await adaptSkillTree(destination, (content) => applySharedTierAdaptation(skillName, content))
+    const texts = await Promise.all((await listFiles(destination)).filter(isTextFile).map((file) => readFile(file, "utf8")))
+    assertSenpiSkillRosterOverlay(skillName, texts)
   }
 
   console.log(`synced omo-senpi skills to ${skillsRoot}`)

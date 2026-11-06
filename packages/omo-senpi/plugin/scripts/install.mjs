@@ -302,6 +302,7 @@ var REQUIRED_PLUGIN_ARTIFACTS = [
   join4("extensions", "omo-memory-commands.js"),
   join4("extensions", "omo-session-history.js"),
   join4("extensions", "omo-recall-store.js"),
+  join4("extensions", "omo-device-service.js"),
   join4("extensions", "omo-telemetry-posthog.js"),
   join4("extensions", "omo-telemetry-otlp.js"),
   join4("extensions", "omo-memory-sync.js"),

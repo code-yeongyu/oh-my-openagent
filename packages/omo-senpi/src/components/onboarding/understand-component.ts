@@ -21,7 +21,7 @@ export interface OnboardingUnderstandRegistration {
   readonly modelRegistry: () => ChildModelRegistry | undefined
   /** Shared by every session of the process: one understanding per scan at a time. */
   readonly busyScans: Map<string, symbol>
-  /** The shell's retained scans: an expired one is dropped here, an evicted or applied one is already gone. */
+  /** The shell's retained scans, applied ones included: an expired one is dropped here, an evicted one is already gone. */
   readonly scans: Map<string, OnboardingRetainedScan>
   readonly expired: (scan: OnboardingRetainedScan) => boolean
   readonly seams?: OnboardingUnderstandingSeams
@@ -43,7 +43,7 @@ export interface OnboardingUnderstandingHandlers {
 export function createOnboardingUnderstandingHandlers(pi: SenpiExtensionAPI, deps: OnboardingUnderstandRegistration): OnboardingUnderstandingHandlers {
   const runs = new Map<string, OnboardingUnderstandingStarted["control"]>()
   const { busyScans, scans } = deps
-  // The digests exist only in memory, with the retained scan: an expired, evicted or applied scan has none.
+  // The digests exist only in memory, with the retained scan: an expired or evicted scan has none.
   const scanForUnderstanding = async (scanId: string) => {
     const held = scans.get(scanId)
     const outcome = await held?.outcome
@@ -75,7 +75,7 @@ export function createOnboardingUnderstandingHandlers(pi: SenpiExtensionAPI, dep
     try {
       const scan = await scanForUnderstanding(scanId)
       if (scan === undefined) {
-        return { kind: "unavailable", reason: "No retained scan with this id: it never ran, failed, expired after ten minutes, or was applied. Run omo.onboarding.scan again." }
+        return { kind: "unavailable", reason: "No retained scan with this id: it never ran, failed, or expired after ten minutes. Run omo.onboarding.scan again." }
       }
       const environment = deps.environment()
       const emit = (event: OnboardingUnderstandEvent): void => {

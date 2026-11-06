@@ -30,6 +30,7 @@ import {
   semver,
   uint,
 } from "./validate-fields.ts";
+import { endpointsData, locateData } from "./validate-delegated.ts";
 import { isRequestType, REQUEST_TYPES, validateRequestFields } from "./validate-requests.ts";
 import {
   deviceRef,
@@ -38,7 +39,13 @@ import {
   snapshotBlobOf,
   statusOf,
 } from "./validate-shapes.ts";
-import { CAPABILITIES, CLIENT_NAMES, LOCAL_API_VERSION, REFUSED_REASONS } from "./vocabulary.ts";
+import {
+  CAPABILITIES,
+  CLIENT_NAMES,
+  LOCAL_API_VERSION,
+  OPTIONAL_CAPABILITIES,
+  REFUSED_REASONS,
+} from "./vocabulary.ts";
 
 export { EVENT_KINDS, isRequestType, REQUEST_TYPES };
 
@@ -120,7 +127,9 @@ export const validateWelcome = (v: unknown): Welcome | Refused =>
       owner: "service",
       server_proof: nonce(m["server_proof"], "server_proof"),
       server_nonce: nonce(m["server_nonce"], "server_nonce"),
-      capabilities: capabilities.map((c) => oneOf(CAPABILITIES, c, "capability")),
+      capabilities: capabilities.map((c) =>
+        oneOf([...CAPABILITIES, ...OPTIONAL_CAPABILITIES], c, "capability"),
+      ),
       state: statusOf(m["state"]),
     };
   });
@@ -156,6 +165,14 @@ const empty = (v: unknown): Empty => {
   return {};
 };
 const one = (v: unknown, name: string): unknown => exactly(v, [name], [], "data")[name];
+const attachState = (v: unknown) => {
+  const m = exactly(v, ["attached", "changedAt"], [], "data");
+  const changedAt = m["changedAt"];
+  return {
+    attached: bool(m["attached"], "attached"),
+    changedAt: typeof changedAt === "string" ? changedAt : fail("changedAt"),
+  };
+};
 const DATA: { readonly [T in RequestType]: (v: unknown) => ResponseData[T] } = {
   authenticate: empty,
   "status.get": statusOf,
@@ -181,6 +198,10 @@ const DATA: { readonly [T in RequestType]: (v: unknown) => ResponseData[T] } = {
   "session.read": (v) => ({ query_id: localId(one(v, "query_id"), "query_id") }),
   "enforcement.report": empty,
   "owner.shutdown_for_upgrade": empty,
+  "session.endpoints": endpointsData,
+  "session.locate": locateData,
+  "control.attach.get": attachState,
+  "control.attach.set": attachState,
 };
 
 export type ValidResponse<T extends RequestType> =

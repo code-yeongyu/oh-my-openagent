@@ -18,6 +18,7 @@ export const REQUIRED_PLUGIN_ARTIFACTS: readonly string[] = [
   join("extensions", "omo-memory-commands.js"),
   join("extensions", "omo-session-history.js"),
   join("extensions", "omo-recall-store.js"),
+  join("extensions", "omo-device-service.js"),
   join("extensions", "omo-telemetry-posthog.js"),
   join("extensions", "omo-telemetry-otlp.js"),
   // The sync engine sidecar and the Loro wasm it loads from beside itself.

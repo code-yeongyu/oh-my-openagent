@@ -96,6 +96,18 @@ describe("device service bootstrap", () => {
     expect([...(owner?.state.endpoints ?? [])]).toEqual([AGENT_DIR])
   })
 
+  // D1 (#12051): the per-device opt-out belongs to the user; starting omo must never turn remote control back on.
+  test("a connected bootstrap leaves a detached host detached", async () => {
+    const stateDir = home()
+    const owner = await ownerAt(stateDir, PIN)
+    const { deps } = harness(stateDir)
+    const setter = await deps.connect()
+    await setter.setAttachControl(false)
+    expect(await bootstrapDeviceService(deps)).toMatchObject({ kind: "connected" })
+    expect(owner.state.attach.attached).toBe(false)
+    expect(owner.state.log.filter(type => type === "control.attach.set")).toHaveLength(1)
+  })
+
   test("acquisition runs again when welcome.service_version is older than the pin", async () => {
     const stateDir = home()
     const old = await ownerAt(stateDir, "1.3.9")
@@ -116,7 +128,10 @@ describe("device service bootstrap", () => {
   test.each([
     ["signedIn false stops with omo login hint", { exitCode: 0, stdout: JSON.stringify({ signedIn: false }) }, "signed_out", "omo login"],
     ["locked store reports keychain_locked and installs nothing", { exitCode: 7, stdout: JSON.stringify({ keychain: "locked" }) }, "keychain_locked", "Unlock"],
-    ["store unavailable reports service_degraded", { exitCode: 9, stdout: JSON.stringify({ error: "store-unavailable" }) }, "service_degraded", "credential store"],
+    // No store means no proof of a sign-in: its own state, which the start-up component keeps quiet (a never-signed-in
+    // machine without a keyring must not warn at every start).
+    ["store unavailable reports store_unavailable", { exitCode: 9, stdout: JSON.stringify({ error: "store-unavailable" }) }, "store_unavailable", "credential store"],
+    ["keychain unavailable (exit 8) reports store_unavailable", { exitCode: 8, stdout: JSON.stringify({ keychain: "unavailable" }) }, "store_unavailable", "credential store"],
     ["invalid json is account_unavailable", { exitCode: 0, stdout: "{signedIn: true" }, "account_unavailable", "omo login"],
   ])("%s", async (_name, account, state, hint) => {
     const { deps, calls } = harness(home(), { accountShow: async () => account })
