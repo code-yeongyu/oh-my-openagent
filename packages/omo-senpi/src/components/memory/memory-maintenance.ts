@@ -2,7 +2,6 @@ import { existsSync } from "@oh-my-opencode/memory-core/fs"
 import { dirname } from "node:path"
 
 import {
-  DEFAULT_RUNTIME_RETENTION,
   readHostSweepState,
   type ForeignMemoryRuntimeSettings,
   RETENTION_STAMP_CONFIG_KEY,
@@ -49,8 +48,6 @@ export interface MemoryMaintenanceOptions {
   readonly hostSweep?: () => { readonly settings?: ForeignMemoryRuntimeSettings } | undefined
 }
 
-const HOST_SWEEP_IDENTITIES_PER_PASS = 25
-const HOST_SWEEP_SLICE_MS = 30_000
 const HOST_SWEEP_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000
 
 export interface MemoryMaintenance {
@@ -133,24 +130,20 @@ export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}):
 
   async function retain(context: MemoryIdentityContext, repo: GitMemoryRepo, signal: AbortSignal): Promise<void> {
     try {
-      const { runRuntimeRetention, summarizeRuntimeRetention } = await loadMemoryCommandsRuntime()
+      const { runMaintenanceRetention } = await loadMemoryCommandsRuntime()
       signal.throwIfAborted()
-      const report = await runRuntimeRetention({
+      await runMaintenanceRetention({
+        identity: context.identity,
         paths: context.identityPaths,
-        policy: options.resolveRetention?.(context) ?? DEFAULT_RUNTIME_RETENTION,
-        now,
+        repo,
         signal,
+        now,
+        ...(options.resolveRetention === undefined ? {} : { policy: options.resolveRetention(context) }),
         reflectionEnabled: options.reflectionEnabled?.(context) ?? true,
         ...(options.isLiveSession === undefined ? {} : { isLiveSession: options.isLiveSession }),
         ...(options.ownedSidecars === undefined ? {} : { ownedSidecars: options.ownedSidecars() }),
-        warn: (message, fields) => options.logger?.warn(message, { identity: context.identity, ...fields }),
+        ...(options.logger === undefined ? {} : { info: options.logger.info.bind(options.logger), warn: options.logger.warn.bind(options.logger) }),
       })
-      const summary = summarizeRuntimeRetention(report)
-      if (summary.removed > 0 || report.skipped.length > 0 || report.cursor !== undefined) {
-        options.logger?.info("omo-senpi memory runtime retention", { identity: context.identity, ...summary })
-      }
-      // The completion stamp is written after the work, so an interrupted pass resumes at the next bind.
-      if (report.cursor === undefined) await repo.configSet(RETENTION_STAMP_CONFIG_KEY, String(now()))
     } catch (error) {
       if (signal.aborted) throw error
       options.logger?.warn("omo-senpi memory runtime retention failed", {
@@ -173,20 +166,16 @@ export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}):
     const state = await readHostSweepState(memoryRoot)
     const completedAt = state.completedAt === undefined ? Number.NaN : Date.parse(state.completedAt)
     if (state.cursor === undefined && Number.isFinite(completedAt) && now() - completedAt < HOST_SWEEP_INTERVAL_MS) return
-    const { createRetentionHostSweepStep, sweepHostIdentities } = await loadMemoryCommandsRuntime()
+    const { runMaintenanceHostSweep } = await loadMemoryCommandsRuntime()
     signal.throwIfAborted()
-    const deadline = now() + HOST_SWEEP_SLICE_MS
-    const result = await sweepHostIdentities({
+    await runMaintenanceHostSweep({
       memoryRoot,
-      steps: [createRetentionHostSweepStep({ ...(host.settings === undefined ? {} : { settings: host.settings }), isHostedIdentity: (name) => hosted.has(name), now, signal, deadline })],
-      maxIdentities: HOST_SWEEP_IDENTITIES_PER_PASS,
-      budgetMs: HOST_SWEEP_SLICE_MS,
-      now,
+      ...(host.settings === undefined ? {} : { settings: host.settings }),
+      isHostedIdentity: (name) => hosted.has(name),
       signal,
+      now,
+      ...(options.logger === undefined ? {} : { info: options.logger.info.bind(options.logger) }),
     })
-    if (result.status === "swept" && result.lines.length > 0) {
-      options.logger?.info("omo-senpi memory host sweep", { visited: result.visited.length, completed: result.completed, lines: result.lines })
-    }
   }
 
   async function run(context: MemoryIdentityContext, signal: AbortSignal): Promise<void> {

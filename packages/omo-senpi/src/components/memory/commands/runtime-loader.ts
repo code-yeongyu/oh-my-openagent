@@ -16,7 +16,7 @@ export type DreamSelectionRuntimeModule = Pick<
 /** The runtime retention pass and host sweep the maintenance pass loads from the same sidecar (`memory-maintenance.ts`). */
 export type MemoryRetentionRuntimeModule = Pick<
   typeof CommandsRuntime,
-  "createRetentionHostSweepStep" | "runRuntimeRetention" | "summarizeRuntimeRetention" | "sweepHostIdentities"
+  "runMaintenanceHostSweep" | "runMaintenanceRetention"
 >
 
 export const MEMORY_COMMANDS_RUNTIME_ARTIFACT = "extensions/omo-memory-commands.js"
