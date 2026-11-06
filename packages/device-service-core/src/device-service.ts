@@ -11,10 +11,13 @@ export type { ListingResult, ListingRevision, ReadPage, ReadPageEntry } from "./
 export { LocalApiError } from "./local-api/errors.ts"
 export type {
   Capability,
+  CommandRpc,
+  CommandStateEvent,
   ControlAttachState,
   DetachReason,
   DeviceRef,
   DeviceRow,
+  JsonObject,
   ListingRow,
   RoundDeviceState,
   SessionFilter,
@@ -24,7 +27,7 @@ export type {
   StatusState,
 } from "./local-api/protocol.ts"
 export { SESSION_ROW_STATES } from "./local-api/protocol.ts"
-export type { AttachEnd, RemoteAttach, RemoteAttachEvent } from "./remote-attach.ts"
+export type { AttachEnd, CommandResult, RemoteAttach, RemoteAttachEvent } from "./remote-attach.ts"
 
 type Env = Readonly<Record<string, string | undefined>>
 

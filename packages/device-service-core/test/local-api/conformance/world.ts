@@ -27,6 +27,9 @@ export type WorldSession = {
   readonly records: readonly JsonObject[];
   readonly pages: readonly WorldPage[];
   readonly outcome: readonly CommandOutcome[];
+  // Decision 0018: a host that takes delegated commands. A delegated command gets these frames, then the engine's reply
+  // {type: "response", id, command, success: true, data} as session.command_event, before its outcome states.
+  readonly delegated?: { readonly data: JsonObject; readonly frames: readonly JsonObject[] };
 };
 export type WorldRevision = {
   readonly rows: readonly ListingRow[];
@@ -41,6 +44,8 @@ export type World = {
     readonly devices: { readonly [device: string]: RoundDeviceState };
   };
   readonly sessions: readonly WorldSession[];
+  // Decision 0018: the engine endpoint keys of the devices whose host takes delegated commands; others answer unsupported.
+  readonly endpoints?: { readonly [device: string]: readonly string[] };
 };
 
 export const PEER = "dev-peer-1";
