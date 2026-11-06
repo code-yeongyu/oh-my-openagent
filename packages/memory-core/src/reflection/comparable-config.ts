@@ -7,7 +7,8 @@
  * `[core] key = value` after the omo section is never mistaken for an omo key. Value continuation
  * follows git as well: a value line continues onto the next only when it ends in an odd number of
  * backslashes outside a trailing comment, so a backslash inside a comment or an escaped `\\`
- * never swallows the next key.
+ * never swallows the next key. The quote state carries across continuation lines the way git
+ * carries it, so a quote opened before a continuation closes where git closes it.
  */
 export function stripOmoMaintenanceStamp(config: string | null): string | null {
   if (config === null) return null
@@ -16,12 +17,16 @@ export function stripOmoMaintenanceStamp(config: string | null): string | null {
   const kept: string[] = []
   let inOmoSection = false
   let droppingValue = false
+  let inQuotes = false
   for (const line of lines) {
     if (droppingValue) {
       if (line.trim() === "" || !/^\s/.test(line) || /^\s*\[/.test(line)) {
         droppingValue = false
+        inQuotes = false
       } else {
-        droppingValue = valueContinuesToNextLine(line)
+        const scan = valueContinuesToNextLine(line, inQuotes)
+        inQuotes = scan.inQuotes
+        droppingValue = scan.continues
         continue
       }
     }
@@ -32,7 +37,9 @@ export function stripOmoMaintenanceStamp(config: string | null): string | null {
       if (rest && !/^\s*(?:[;#]|$)/.test(rest)) {
         const key = /^([A-Za-z][A-Za-z0-9-]*)\s*(?:=|$)/.exec(rest)
         if (inOmoSection && key && key[1].toLowerCase() === "maintenanceat") {
-          droppingValue = valueContinuesToNextLine(rest)
+          const scan = valueContinuesToNextLine(rest, false)
+          inQuotes = scan.inQuotes
+          droppingValue = scan.continues
           kept.push(`[${header[1]}]`)
           continue
         }
@@ -43,7 +50,9 @@ export function stripOmoMaintenanceStamp(config: string | null): string | null {
     if (inOmoSection) {
       const key = /^\s*([A-Za-z][A-Za-z0-9-]*)\s*(?:=|$)/.exec(line)
       if (key && key[1].toLowerCase() === "maintenanceat") {
-        droppingValue = valueContinuesToNextLine(line)
+        const scan = valueContinuesToNextLine(line, false)
+        inQuotes = scan.inQuotes
+        droppingValue = scan.continues
         continue
       }
     }
@@ -58,15 +67,17 @@ export function stripOmoMaintenanceStamp(config: string | null): string | null {
  * in an odd number of backslashes (an even run is literal escaped backslashes); a `;` or `#`
  * outside quotes starts a trailing comment, and a backslash inside that comment never continues
  * the line; quotes toggle on unescaped `"` so a comment character inside a quoted value does not
- * end the line. Trailing whitespace after the backslashes is escaped away instead of continuing
- * the value: git rejects a backslash followed by anything but its known escapes or a newline.
+ * end the line. `inQuotes` carries the state in from the previous continuation line - git rejects
+ * a line that ends inside an unterminated quote without a trailing backslash, so a quote can only
+ * span lines through a continuation - and the outgoing state is returned for the next line.
+ * Trailing whitespace after the backslashes is escaped away instead of continuing the value: git
+ * rejects a backslash followed by anything but its known escapes or a newline.
  */
-function valueContinuesToNextLine(line: string): boolean {
-  let inQuotes = false
+function valueContinuesToNextLine(line: string, inQuotes: boolean): { continues: boolean; inQuotes: boolean } {
   for (let i = 0; i < line.length; i++) {
     const c = line[i]
     if (c === "\\") {
-      if (i + 1 === line.length) return true
+      if (i + 1 === line.length) return { continues: true, inQuotes }
       i++
       continue
     }
@@ -74,7 +85,7 @@ function valueContinuesToNextLine(line: string): boolean {
       inQuotes = !inQuotes
       continue
     }
-    if (!inQuotes && (c === ";" || c === "#")) return false
+    if (!inQuotes && (c === ";" || c === "#")) return { continues: false, inQuotes }
   }
-  return false
+  return { continues: false, inQuotes }
 }

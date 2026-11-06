@@ -90,4 +90,9 @@ describe("stripOmoMaintenanceStamp", () => {
     const config = "[omo]\n\tmaintenanceAt = \"1\\\n\t2\"\n\tagentId = agent-one\n"
     expect(stripOmoMaintenanceStamp(config)).toBe("[omo]\n\tagentId = agent-one\n")
   })
+
+  it("#given a quote closed on a continuation line followed by a comment backslash #when filtered #then the next key survives", () => {
+    const config = "[omo]\n\tmaintenanceAt = \"1\\\n\t2\" ;\\\n\tagentId = evil\n"
+    expect(stripOmoMaintenanceStamp(config)).toBe("[omo]\n\tagentId = evil\n")
+  })
 })
