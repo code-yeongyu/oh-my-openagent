@@ -69,7 +69,7 @@ async function git(repo: GitMemoryRepo, args: string[]): Promise<string> {
   return String(result.stdout).trim()
 }
 
-setDefaultTimeout(process.platform === "win32" ? 30000 : 5000)
+if (process.platform === "win32") setDefaultTimeout(30000)
 
 describe("runMemoryTool", () => {
   it("#given read_only frontmatter #when update_description runs #then it rejects without changing HEAD", async () => {

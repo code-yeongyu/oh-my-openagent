@@ -7,7 +7,6 @@ import { GitMemoryRepo } from "../git"
 import { projectedChangesBetween, revisionExists } from "./changes"
 import { removeTree } from "../../../../test-support/remove-tree"
 
-const TIMEOUT = process.platform === "win32" ? 20_000 : 5_000
 const AUTHOR = { agentId: "changes-agent", authorName: "Changes Agent" }
 const tempDirs: string[] = []
 
@@ -51,7 +50,7 @@ describe("projectedChangesBetween", () => {
 
     // then
     expect(changes).toEqual({ added: ["reference/new.md"], updated: ["system/persona.md"], removed: ["reference/old.md"] })
-  }, TIMEOUT)
+  })
 
   it("#given commits from the excluded session and from another writer #when summarized #then only the other writer's paths remain", async () => {
     // given
@@ -65,7 +64,7 @@ describe("projectedChangesBetween", () => {
 
     // then
     expect(changes).toEqual({ added: ["reference/theirs.md"], updated: [], removed: [] })
-  }, TIMEOUT)
+  })
 
   it("#given base equal to head #when summarized #then git is not asked and nothing changed", async () => {
     // given
@@ -84,7 +83,7 @@ describe("projectedChangesBetween", () => {
     // then
     expect(changes).toEqual({ added: [], updated: [], removed: [] })
     expect(logCalls).toBe(0)
-  }, TIMEOUT)
+  })
 })
 
 describe("revisionExists", () => {
@@ -97,5 +96,5 @@ describe("revisionExists", () => {
     expect(head).not.toBeNull()
     expect(await revisionExists(repo, head ?? "")).toBe(true)
     expect(await revisionExists(repo, "0123456789abcdef0123456789abcdef01234567")).toBe(false)
-  }, TIMEOUT)
+  })
 })

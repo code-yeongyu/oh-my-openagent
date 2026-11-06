@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, setDefaultTimeout } from "bun:test"
+import { afterEach, describe, expect, it } from "bun:test"
 import { realpathSync } from "node:fs"
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -14,7 +14,6 @@ const AUTHOR = { agentId: "agent-one", authorName: "Reflection Agent" }
 const LEDGER = "---\ndescription: Agreements\n---\n\n- [global] Never filter the monitor <!-- id: 3f9a1c0b2e; by: human; n: 1; status: active -->\n"
 const roots: string[] = []
 
-setDefaultTimeout(process.platform === "win32" ? 20_000 : 5_000)
 
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 })))

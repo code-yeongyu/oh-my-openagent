@@ -11,7 +11,7 @@ import {
 
 // Each case drives a real git repository through commit and patch application; the 5s default is not
 // a budget those subprocesses fit on a loaded Windows runner.
-setDefaultTimeout(process.platform === "win32" ? 30_000 : 5_000)
+if (process.platform === "win32") setDefaultTimeout(30_000)
 const { fixture, cleanup } = createPatchFixtureHarness()
 
 afterEach(cleanup)
