@@ -122,6 +122,13 @@ pub trait Backend: Send {
 
     fn capabilities(&mut self) -> DesktopCapabilities;
 
+    /// The accessibility element at a global logical point, read just before
+    /// coordinate input (the object-mode `hit`); `None` where the backend
+    /// cannot tell.
+    fn hit_at(&mut self, _x: f64, _y: f64) -> CoreResult<Option<crate::frame::PointHit>> {
+        Ok(None)
+    }
+
     /// Updates the display-only virtual cursor without changing admission.
     fn set_show_cursor(&mut self, _enabled: bool) {}
 
