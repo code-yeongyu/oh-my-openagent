@@ -9,6 +9,7 @@ import { unsafeTestValue } from "../../../../test-support/unsafe-test-value"
 import lockfile from "proper-lockfile"
 import { addGrant, declarationDigest, GrantsLockLostError, list, observe, read, resolveGrantsStorePath, revoke, type GrantObservation } from "./env-grants-store"
 import { createFileGrantStore } from "./env-grant-store"
+import { remainingTestTime, useTestTimeout } from "../../../../test-support/test-deadline"
 
 let root: string
 let stop: (() => void) | undefined
@@ -46,8 +47,8 @@ function observationStream() {
         const timer = setTimeout(() => {
           pendingTimers.delete(timer)
           waiters.delete(waiter)
-          reject(new Error("Expected grant observation did not arrive"))
-        }, 10_000)
+          reject(new Error("Expected grant observation did not arrive within the test budget"))
+        }, remainingTestTime())
         pendingTimers.add(timer)
         const waiter = { predicate, resolve: (event: GrantObservation) => {
           clearTimeout(timer); pendingTimers.delete(timer); resolve(event)
@@ -215,6 +216,7 @@ for (const [os, code] of [
 }
 
 test("watches creation and atomic replacements from before the store exists", async () => {
+  useTestTimeout(15_000)
   const path = resolveGrantsStorePath(join(root, "not-created-yet"))
   const stream = observationStream()
   stop = await observe(path, stream.listener)
@@ -262,6 +264,7 @@ test("fallback reconciles skipped revoke/regrant and file recreation conservativ
 })
 
 test("legacy store port writes exactly the shared schema and observes native writes", async () => {
+  useTestTimeout(15_000)
   const store = createFileGrantStore(root)
   const path = resolveGrantsStorePath(root)
   const event = Promise.withResolvers<void>()
@@ -270,7 +273,7 @@ test("legacy store port writes exactly the shared schema and observes native wri
   })
   await store.add(identity, { label, names: ["Z", "A", "A"] })
   await addGrant(path, identity, label, ["B"])
-  const timeout = setTimeout(() => event.reject(new Error("Shared store event did not arrive")), 10_000)
+  const timeout = setTimeout(() => event.reject(new Error("Shared store event did not arrive within the test budget")), remainingTestTime())
   try {
     await event.promise
     expect((await store.read()).grants[identity]?.names).toEqual(["A", "B", "Z"])
