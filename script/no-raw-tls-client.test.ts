@@ -28,7 +28,7 @@ import {
 // destructuring; variable/const-folded module specifiers; Reflect.get(Bun, "connect").
 // This is a regression guard, not a complete data-flow or evasion detector.
 const ALLOWLIST: AllowlistEntry[] = [
-  ...["omo-codex", "omo-senpi"].flatMap((edition) => ["https", "tls"].map((module) => ({
+  ...["omo-codex", "omo-senpi", "omo-native"].flatMap((edition) => ["https", "tls"].map((module) => ({
     file: `packages/${edition}/plugin/skills/browser/runtime/omowright/index.js`,
     call: `__require("${module}")`,
     count: 1,
@@ -72,6 +72,12 @@ const ALLOWLIST: AllowlistEntry[] = [
   },
   {
     file: "packages/omo-senpi/plugin/skills/browser/runtime/omowright/index.js",
+    call: "tls.connect(options)",
+    count: 1,
+    reason: "bundled ws@8.21.3 WebSocket client: host and servername come from new URL(address).hostname (ws/lib/websocket.js:703-758,1083-1090); verified on Bun 1.4.2 in omowright#40",
+  },
+  {
+    file: "packages/omo-native/plugin/skills/browser/runtime/omowright/index.js",
     call: "tls.connect(options)",
     count: 1,
     reason: "bundled ws@8.21.3 WebSocket client: host and servername come from new URL(address).hostname (ws/lib/websocket.js:703-758,1083-1090); verified on Bun 1.4.2 in omowright#40",
