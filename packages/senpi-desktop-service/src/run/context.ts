@@ -126,7 +126,7 @@ export async function openSdk(scope: RunScope, guards: Readonly<Partial<Record<E
  * The run's own error for an SDK failure: an engine or channel failure is the original error the SDK wrapped, and
  * a reply only the SDK's stricter parser rejects is the malformed-result error of `method`.
  */
-export function runErrorOf(error: unknown, method: EngineMethod): unknown {
+function runErrorOf(error: unknown, method: EngineMethod): unknown {
 	if (!(error instanceof ComputerError)) return error;
 	if (error.cause !== undefined) return error.cause;
 	if (error.data.reason === "malformed_result") {

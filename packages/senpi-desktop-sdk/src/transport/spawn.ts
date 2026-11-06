@@ -17,7 +17,7 @@ export interface SpawnTransport {
 }
 
 /** Set to `"1"` by the host inside its kernels (the generated prelude): code there is already inside an omo session. */
-export const IN_SESSION_MARKER = "SENPI_DESKTOP_HOST";
+const IN_SESSION_MARKER = "SENPI_DESKTOP_HOST";
 
 /**
  * Launches the engine through `transport.launch`. Inside an omo session it refuses before `launch` runs: a second
