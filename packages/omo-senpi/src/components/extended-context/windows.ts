@@ -1,3 +1,5 @@
+import { isPlainRecord } from "@oh-my-opencode/utils"
+
 /**
  * `contextWindow` is a prompt budget, not a total window: the Responses API rejects a prompt above
  * (documented window - max output), the split senpi's own `applyOpenAiInputCap` applies when it
@@ -27,19 +29,13 @@ function positiveInteger(value: unknown): number | undefined {
   return typeof value === "number" && Number.isSafeInteger(value) && value > 0 ? value : undefined
 }
 
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : undefined
-}
-
 export function parseReportedWindows(payload: unknown): ReportedWindow[] {
-  const container = asRecord(payload)
+  const container = isPlainRecord(payload) ? payload : undefined
   const raw = Array.isArray(payload) ? payload : Array.isArray(container?.models) ? container.models : []
 
   const windows: ReportedWindow[] = []
   for (const entry of raw) {
-    const record = asRecord(entry)
+    const record = isPlainRecord(entry) ? entry : undefined
     if (record === undefined) continue
     const slug = typeof record.slug === "string" ? record.slug.trim() : ""
     const maxContextWindow = positiveInteger(record.max_context_window)

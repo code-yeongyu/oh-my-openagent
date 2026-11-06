@@ -1,7 +1,9 @@
+import { readFileSync, statSync } from "node:fs"
 import { readFile, rm } from "node:fs/promises"
 import { join } from "node:path"
+import { isDeepStrictEqual } from "node:util"
 
-import { readJsoncFile, writeFileAtomically } from "@oh-my-opencode/utils"
+import { applyEdits, createScanner, isPlainRecord, modify, parseJsonc, readJsoncFile, SyntaxKind, writeFileAtomically } from "@oh-my-opencode/utils"
 
 import type { WidenedWindow } from "./windows"
 
@@ -30,34 +32,112 @@ export function recordPath(agentDir: string): string {
   return join(agentDir, RECORD_FILE)
 }
 
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : undefined
-}
-
 export function readModelsJsonConfig(path: string, exists: boolean): ModelsJsonRead {
-  const parsed = asRecord(readJsoncFile<unknown>(path))
-  if (parsed !== undefined) return { kind: "ok", config: parsed as ModelsJson }
+  const parsed = readJsoncFile<unknown>(path)
+  if (isPlainRecord(parsed)) {
+    if (parsed.providers !== undefined && !isPlainRecord(parsed.providers)) return { kind: "invalid" }
+    const providers = parsed.providers
+    if (isPlainRecord(providers)) {
+      for (const provider of Object.values(providers)) {
+        if (!isPlainRecord(provider)) return { kind: "invalid" }
+        if (provider.modelOverrides !== undefined && !isPlainRecord(provider.modelOverrides)) return { kind: "invalid" }
+        if (isPlainRecord(provider.modelOverrides) && Object.values(provider.modelOverrides).some((value) => !isPlainRecord(value))) {
+          return { kind: "invalid" }
+        }
+      }
+    }
+    return { kind: "ok", config: parsed as ModelsJson }
+  }
   return exists ? { kind: "invalid" } : { kind: "missing", config: {} }
 }
 
-export async function writeModelsJsonConfig(path: string, config: ModelsJson): Promise<void> {
-  writeFileAtomically(path, `${JSON.stringify(config, null, 2)}\n`)
+function comments(content: string): string[] {
+  const scanner = createScanner(content)
+  const result: string[] = []
+  for (let token = scanner.scan(); token !== SyntaxKind.EOF; token = scanner.scan()) {
+    if (token === SyntaxKind.LineCommentTrivia || token === SyntaxKind.BlockCommentTrivia) {
+      result.push(scanner.getTokenValue())
+    }
+  }
+  return result
+}
+
+export async function writeModelsJsonConfig(path: string, config: ModelsJson, expected: ModelsJson): Promise<void> {
+  let original: string
+  try {
+    original = readFileSync(path, "utf8")
+  } catch (error) {
+    if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") throw error
+    original = "{}\n"
+  }
+  const old = parseJsonc<ModelsJson>(original)
+  if (!isDeepStrictEqual(old, expected)) {
+    throw new Error(`${path} changed while the command was running; try again`)
+  }
+  let next = original
+  const oldProvider = old.providers?.["chatgpt-subscription"]
+  const newProvider = config.providers?.["chatgpt-subscription"]
+  if (old.providers === undefined) {
+    next = applyEdits(next, modify(next, ["providers"], config.providers ?? {}, {}))
+  } else if (newProvider === undefined) {
+    next = applyEdits(next, modify(next, ["providers", "chatgpt-subscription"], undefined, {}))
+  } else if (oldProvider === undefined) {
+    next = applyEdits(next, modify(next, ["providers", "chatgpt-subscription"], newProvider, {}))
+  } else {
+    const oldOverrides = oldProvider.modelOverrides ?? {}
+    const newOverrides = newProvider.modelOverrides ?? {}
+    for (const id of new Set([...Object.keys(oldOverrides), ...Object.keys(newOverrides)])) {
+      if (JSON.stringify(oldOverrides[id]) === JSON.stringify(newOverrides[id])) continue
+      const before = oldOverrides[id]
+      const after = newOverrides[id]
+      const editPath = ["providers", "chatgpt-subscription", "modelOverrides", id]
+      if (before !== undefined && after !== undefined) {
+        next = applyEdits(next, modify(next, [...editPath, CONTEXT_WINDOW_KEY], after.contextWindow, {}))
+      } else {
+        next = applyEdits(next, modify(next, editPath, after, {}))
+      }
+    }
+    if (newProvider.modelOverrides === undefined && oldProvider.modelOverrides !== undefined) {
+      next = applyEdits(next, modify(next, ["providers", "chatgpt-subscription", "modelOverrides"], undefined, {}))
+    }
+  }
+  if (JSON.stringify(comments(original)) !== JSON.stringify(comments(next))) {
+    throw new Error(`Cannot update ${path} without removing comments`)
+  }
+  if (!isDeepStrictEqual(parseJsonc<ModelsJson>(next), config)) {
+    throw new Error(`Cannot safely update ${path}`)
+  }
+  const mode = (() => {
+    try {
+      return statSync(path).mode & 0o777
+    } catch (error) {
+      if (error instanceof Error && "code" in error && error.code === "ENOENT") return 0o600
+      throw error
+    }
+  })()
+  writeFileAtomically(path, next, { mode })
 }
 
 export async function readWrittenWindows(path: string): Promise<WrittenWindows> {
-  const parsed = asRecord(await readFile(path, "utf8").then(
-    (text) => JSON.parse(text) as unknown,
-    () => undefined,
-  ))
-  const windows = asRecord(parsed?.windows)
-  if (parsed?.version !== RECORD_VERSION || typeof parsed?.provider !== "string" || windows === undefined) {
-    return {}
+  let text: string
+  try {
+    text = await readFile(path, "utf8")
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return {}
+    throw error
+  }
+  const value: unknown = JSON.parse(text)
+  const parsed = isPlainRecord(value) ? value : undefined
+  const windows = isPlainRecord(parsed?.windows) ? parsed.windows : undefined
+  if (parsed?.version !== RECORD_VERSION || parsed?.provider !== "chatgpt-subscription" || windows === undefined) {
+    throw new Error(`Invalid extended context record: ${path}`)
   }
   const written: WrittenWindows = {}
   for (const [id, value] of Object.entries(windows)) {
-    if (typeof value === "number" && Number.isSafeInteger(value)) written[id] = value
+    if (typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0) {
+      throw new Error(`Invalid extended context record: ${path}`)
+    }
+    written[id] = value
   }
   return written
 }
@@ -95,12 +175,6 @@ export function applyContextWindowOverrides(
   return { config: { ...config, providers }, written }
 }
 
-const PROVIDER_FIELDS = ["baseUrl", "headers", "apiKey", "api", "models", "modelOverrides", "compat", "authHeader"]
-
-function providerIsEmpty(provider: Record<string, unknown>): boolean {
-  return PROVIDER_FIELDS.every((field) => provider[field] === undefined)
-}
-
 export function clearContextWindowOverrides(
   config: ModelsJson,
   providerId: string,
@@ -114,8 +188,8 @@ export function clearContextWindowOverrides(
   const nextOverrides: Record<string, ModelOverride> = {}
   const cleared: string[] = []
   for (const [id, override] of Object.entries(overrides)) {
-    const recoredValue = written[id]
-    const matchesWritten = recoredValue !== undefined && override[CONTEXT_WINDOW_KEY] === recoredValue
+    const recordedValue = written[id]
+    const matchesWritten = recordedValue !== undefined && override[CONTEXT_WINDOW_KEY] === recordedValue
     if (!matchesWritten) {
       nextOverrides[id] = override
       continue
@@ -130,8 +204,14 @@ export function clearContextWindowOverrides(
   else nextProvider.modelOverrides = nextOverrides
 
   const nextProviders = { ...providers }
-  if (providerIsEmpty(nextProvider)) delete nextProviders[providerId]
-  else nextProviders[providerId] = nextProvider
+  if (Object.keys(nextProvider).length === 0) delete nextProviders[providerId]
+  else {
+    const validFields = ["baseUrl", "headers", "apiKey", "api", "models", "modelOverrides", "compat", "authHeader"]
+    if (!validFields.some((field) => nextProvider[field] !== undefined)) {
+      throw new Error(`Cannot remove the last override without leaving an invalid ${providerId} provider`)
+    }
+    nextProviders[providerId] = nextProvider
+  }
 
   return { config: { ...config, providers: nextProviders }, cleared }
 }

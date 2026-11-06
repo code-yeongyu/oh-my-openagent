@@ -1,4 +1,8 @@
 import { existsSync } from "node:fs"
+import { mkdir } from "node:fs/promises"
+import { join } from "node:path"
+
+import { acquireLock, createLockRecord, releaseLock } from "@oh-my-opencode/memory-core"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
@@ -40,7 +44,7 @@ export type ExtendedContextCommandContext = {
 }
 
 export type ExtendedContextDeps = {
-  readonly fetchImpl?: typeof fetch
+  readonly fetchImpl?: (input: string, init?: RequestInit) => Promise<Response>
   readonly hostVersion?: string
 }
 
@@ -67,11 +71,22 @@ function catalogRows(models: readonly CatalogModel[]): CatalogRow[] {
     .map((model) => ({ id: model.id, contextWindow: model.contextWindow, maxTokens: model.maxTokens }))
 }
 
+async function refreshNotice(registry: ModelRegistryPort | undefined): Promise<string> {
+  if (registry?.refresh === undefined) return "\nReload the model registry to apply these changes."
+  try {
+    await registry.refresh()
+    return ""
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return `\nThe file was updated, but the registry refresh failed: ${message}. Reload the registry to apply it.`
+  }
+}
+
 /**
  * The endpoint requires a client version and serves the catalog that version is entitled to, so the
  * request carries the running engine's own version rather than identifying itself as another CLI.
  */
-async function fetchReportedWindows(token: string, hostVersion: string, fetchImpl: typeof fetch): Promise<unknown> {
+async function fetchReportedWindows(token: string, hostVersion: string, fetchImpl: NonNullable<ExtendedContextDeps["fetchImpl"]>): Promise<unknown> {
   const response = await fetchImpl(`${MODELS_ENDPOINT}?client_version=${encodeURIComponent(hostVersion)}`, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -90,6 +105,7 @@ async function widen(
   ctx: ExtendedContextCommandContext,
   deps: ExtendedContextDeps,
   agentDir: string,
+  previous: Record<string, number>,
 ): Promise<string> {
   const registry = registryOf(ctx.modelRegistry)
   if (registry === undefined) {
@@ -117,18 +133,21 @@ async function widen(
   }
 
   const reported = parseReportedWindows(await fetchReportedWindows(token, hostVersion, deps.fetchImpl ?? fetch))
-  const widened = computeWidenedWindows(rows, reported)
+  const overrides = read.config.providers?.[PROVIDER_ID]?.modelOverrides ?? {}
+  const widened = computeWidenedWindows(rows, reported).filter((window) => {
+    const current = overrides[window.id]?.contextWindow
+    return current === undefined || current === previous[window.id]
+  })
   if (widened.length === 0) {
-    return respond(ctx, "Every ChatGPT subscription model already uses the window the subscription reports.")
+    return respond(ctx, "No eligible windows to extend. Existing user overrides are left unchanged.")
   }
 
   const { config, written } = applyContextWindowOverrides(read.config, PROVIDER_ID, widened)
-  await writeModelsJsonConfig(path, config)
-  await writeWrittenWindows(recordPath(agentDir), PROVIDER_ID, written)
-  await Promise.resolve(registry.refresh?.()).catch(() => undefined)
-
+  await writeWrittenWindows(recordPath(agentDir), PROVIDER_ID, { ...previous, ...written })
+  await writeModelsJsonConfig(path, config, read.config)
   const lines = widened.map((window) => `${window.id}: ${window.from} -> ${window.to}`)
-  return respond(ctx, `Extended ${widened.length} model window(s) in ${path}\n${lines.join("\n")}`)
+  const reload = await refreshNotice(registry)
+  return respond(ctx, `Extended ${widened.length} model window(s) in ${path}\n${lines.join("\n")}${reload}`)
 }
 
 async function restore(ctx: ExtendedContextCommandContext, agentDir: string): Promise<string> {
@@ -144,16 +163,15 @@ async function restore(ctx: ExtendedContextCommandContext, agentDir: string): Pr
   }
 
   const { config, cleared } = clearContextWindowOverrides(read.config, PROVIDER_ID, written)
-  await writeModelsJsonConfig(path, config)
+  await writeModelsJsonConfig(path, config, read.config)
   await clearWrittenWindows(recordPath(agentDir))
   const registry = registryOf(ctx.modelRegistry)
-  await Promise.resolve(registry?.refresh?.()).catch(() => undefined)
-
+  const reload = cleared.length === 0 ? "" : await refreshNotice(registry)
   return respond(
     ctx,
     cleared.length === 0
       ? "Nothing to restore: those windows are already gone or were changed by hand."
-      : `Restored the shipped windows for ${cleared.length} model(s): ${cleared.join(", ")}`,
+      : `Restored the shipped windows for ${cleared.length} model(s): ${cleared.join(", ")}${reload}`,
   )
 }
 
@@ -166,12 +184,24 @@ export function registerExtendedContextCommand(pi: SenpiExtensionAPI, deps: Exte
       const agentDir = ctx.agentDir ?? resolveAgentHome({ env: process.env })
       const command = (args ?? "").trim().toLowerCase()
       try {
-        const wantsRestore = command === "off" || command === "restore" || command === "reset"
-        const wantsWiden = command === "on"
-        const written = await readWrittenWindows(recordPath(agentDir))
-        const isOn = Object.keys(written).length > 0
-        const shouldWiden = wantsWiden || (!wantsRestore && !isOn)
-        return shouldWiden ? await widen(ctx, resolved, agentDir) : await restore(ctx, agentDir)
+        if (!["", "on", "off", "restore", "reset"].includes(command)) {
+          return respond(ctx, "Usage: /extended-context [on|off]", "warning")
+        }
+        const lockDir = join(agentDir, "extended-context-locks")
+        await mkdir(lockDir, { recursive: true })
+        const lockPath = join(lockDir, "models.lock")
+        const owner = await createLockRecord("extended-context")
+        await acquireLock(lockPath, owner, { waitTimeoutMs: 0 })
+        try {
+          const wantsRestore = command === "off" || command === "restore" || command === "reset"
+          const wantsWiden = command === "on"
+          const written = await readWrittenWindows(recordPath(agentDir))
+          const isOn = Object.keys(written).length > 0
+          const shouldWiden = wantsWiden || (!wantsRestore && !isOn)
+          return shouldWiden ? await widen(ctx, resolved, agentDir, written) : await restore(ctx, agentDir)
+        } finally {
+          await releaseLock(lockPath, owner)
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         return respond(ctx, `extended-context failed: ${message}`, "error")
