@@ -76,9 +76,9 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
 
       // The runner reports sync status transitions to the wiring, which exists only after the runner.
       const syncStatusChanged: { current?: (repo: string) => void } = {}
-      const deviceAccount = options.deviceAccount ?? lazyCliAccountSource({ env })
       const memoryRoot = resolveMemoryRoot(env, cwd)
       const pinDir = syncPinDir(memoryRoot)
+      const deviceAccount = options.deviceAccount ?? lazyCliAccountSource({ env, pinDir, logger: ctx.logger })
       const syncRunner = options.syncRunner ?? createSyncRunner({
         logger: ctx.logger,
         onStatusChange: (repo) => syncStatusChanged.current?.(repo),

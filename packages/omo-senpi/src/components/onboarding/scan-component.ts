@@ -82,6 +82,8 @@ type Scan = Promise<Awaited<ReturnType<typeof runOnboardingScan>> | undefined>
 interface HeldScan {
   outcome: Scan
   finishedAt: number | undefined
+  /** Set by the one apply a scan allows; the scan stays retained for understanding until it expires. */
+  applied: boolean
 }
 
 /**
@@ -169,7 +171,7 @@ export function createOnboardingScanComponent(deps: OnboardingScanComponentDepen
       handle(ONBOARDING_SCAN_RPC_METHOD, (request): OnboardingScanResponse => {
         const scanId = randomUUID()
         const includeCustomProviders = isRecord(request) && request["includeCustomProviders"] === true
-        const held: HeldScan = { outcome: Promise.resolve(undefined), finishedAt: undefined }
+        const held: HeldScan = { outcome: Promise.resolve(undefined), finishedAt: undefined, applied: false }
         // The client learns the id from this response, so no event may precede it. The clock is
         // read when the final `done` event is emitted - inside the scan - so an apply racing in
         // right after the events never sees a stale-or-missing finish time.
@@ -209,16 +211,25 @@ export function createOnboardingScanComponent(deps: OnboardingScanComponentDepen
         const unknown = stages.filter((stage) => !isApplyStage(stage))
         if (unknown.length > 0) return { kind: "invalid", reason: `unknown stages: ${unknown.map(String).join(", ")}` }
         const held = scans.get(scanId)
-        if (held === undefined) return { kind: "unavailable", reason: "No scan with this id; it finished long ago or was already applied." }
-        // One apply per scan: its plans describe the files as they were when the scan read them.
-        scans.delete(scanId)
+        if (held === undefined || held.applied) return { kind: "unavailable", reason: "No scan with this id; it finished long ago or was already applied." }
+        // One apply per scan: its plans describe the files as they were when the scan read them. The
+        // scan itself stays retained, so the desktop's understanding step can still read its digests
+        // after About you applies (#12508); it leaves the store when it expires or is evicted.
+        held.applied = true
+        const drop = (): void => {
+          if (scans.get(scanId) === held) scans.delete(scanId)
+        }
         const plans = await held.outcome
-        if (plans === undefined) return { kind: "unavailable", reason: "The scan failed before it planned anything." }
+        if (plans === undefined) {
+          drop()
+          return { kind: "unavailable", reason: "The scan failed before it planned anything." }
+        }
         if (held.finishedAt === undefined || expired(held)) {
+          drop()
           return { kind: "stale", reason: "The scan expired; retained scans live ten minutes. Run omo.onboarding.scan again.", paths: [] }
         }
         // Everything past the expiry check needs the runtime, so it ships there: the auth checks and the writers.
-        // The scan was taken out of the store above, synchronously, so two applies racing on one scan never both run.
+        // The scan was marked applied above, synchronously, so two applies racing on one scan never both run.
         return await (await loadRuntime()).applyRetainedScan(scanId, plans.plans, stages.filter(isApplyStage), authStore)
       })
     },

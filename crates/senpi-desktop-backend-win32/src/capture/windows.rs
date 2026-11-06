@@ -47,6 +47,7 @@ pub(crate) fn enumerate(displays: &[DesktopDisplay], own: IntegrityRid) -> CoreR
         }
         let pid = process_id(id);
         result.push(DesktopWindow {
+            identity: None,
             id: id.to_string(),
             title,
             app,
@@ -97,6 +98,7 @@ pub(crate) fn focused() -> CoreResult<Option<DesktopWindow>> {
         return Ok(None);
     };
     Ok(Some(DesktopWindow {
+        identity: None,
         id, pid, x, y, width, height,
         title: String::new(), app: String::new(), focused: true,
         is_on_screen: None, elevated: None,

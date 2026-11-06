@@ -5,14 +5,15 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { buildTrustLaunchEnvironment, type EngineTrustMarker } from "@code-yeongyu/senpi/engine-trust"
 import { trustLaunchKind } from "../compile-args"
-import { runTrustStage } from "../trust-stage"
+import { selectEngineTrust, type CertificateId, type EnhancedKeyUsage, type WindowsCertificate } from "../engine-trust-policy"
+import { runTrustStage, type TrustStageOptions } from "../trust-stage"
 import { issueCertificates } from "./trust-certificate-fixtures"
 
 let root: string
 let executable: string
 let ca: string
 let other: string
-let leaf: string
+const issued = new Map<string, X509Certificate>()
 function required<T>(value: T | null | undefined, name: string): T {
   if (value === undefined || value === null) throw new Error(`${name} is missing`)
   return value
@@ -28,11 +29,20 @@ beforeAll(async () => {
   })), {
     name: "leaf", subject: "/CN=localhost", issuer: "root", days: 2,
     extensions: "basicConstraints=critical,CA:FALSE\nextendedKeyUsage=serverAuth\nsubjectAltName=IP:127.0.0.1,DNS:localhost",
+  }, {
+    name: "chain-root", subject: "/CN=synthetic-chain-root", days: 2,
+    extensions: "basicConstraints=critical,CA:TRUE\nkeyUsage=critical,keyCertSign,cRLSign",
+  }, {
+    name: "chain-intermediate", subject: "/CN=synthetic-chain-intermediate", issuer: "chain-root", days: 2,
+    extensions: "basicConstraints=critical,CA:TRUE\nkeyUsage=critical,keyCertSign,cRLSign",
+  }, {
+    name: "chain-leaf", subject: "/CN=localhost", issuer: "chain-intermediate", days: 2,
+    extensions: "basicConstraints=critical,CA:FALSE\nextendedKeyUsage=serverAuth\nsubjectAltName=IP:127.0.0.1,DNS:localhost",
   }])
-  const pem = (name: string) => new X509Certificate(required(certs.get(name), `synthetic ${name} certificate`)).toString()
+  for (const [name, der] of certs) issued.set(name, new X509Certificate(der))
+  const pem = (name: string) => required(issued.get(name), `synthetic ${name} certificate`).toString()
   ca = pem("root")
   other = pem("other")
-  leaf = pem("leaf")
   executable = join(root, process.platform === "win32" ? "probe.exe" : "probe")
   const build = await Bun.build({
     entrypoints: [join(import.meta.dir, "fixtures/trust-stage-probe.ts")],
@@ -265,10 +275,69 @@ test.each(["native-child", "shell-child"] as const)("compiled %s preserves the n
   expect(log.flatMap((record) => record.codes).filter((entry) => entry.code === "trust-marker-foreign")).toEqual([])
 })
 
-test.each([null, "helper-missing"] as const)("native TLS uses only the selected generation, including fallback %s", async (fallbackReason) => {
+const identity = (name: string): CertificateId => {
+  const raw = required(issued.get(name), `synthetic ${name} certificate`).raw
+  return { sha256: createHash("sha256").update(raw).digest("hex"), sha1: createHash("sha1").update(raw).digest("hex") }
+}
+const pemOf = (name: string) => required(issued.get(name), `synthetic ${name} certificate`).toString().trim()
+
+/**
+ * Windows store facts run through the production policy, so the generation holds exactly the selected S and I.
+ * The intermediate's chain fact never flags explicit distrust: the D snapshot alone has to exclude it.
+ */
+function windowsStore(store: {
+  readonly roots: readonly string[]
+  readonly intermediate?: { readonly name: string; readonly eku: EnhancedKeyUsage }
+  readonly disallowed?: readonly string[]
+}): NonNullable<TrustStageOptions["acquire"]> {
+  const fact = (name: string, kind: "ROOT" | "CA", eku: EnhancedKeyUsage): WindowsCertificate => ({
+    ...identity(name), selfSigned: kind === "ROOT", ca: true, eku,
+    store: kind, location: "LOCAL_MACHINE", physicalStore: ".Default",
+  })
+  return async () => {
+    const certificates = store.roots.map((name) => fact(name, "ROOT", { kind: "unrestricted" }))
+    if (store.intermediate) {
+      const { name, eku } = store.intermediate
+      certificates.push({ ...fact(name, "CA", eku), chain: {
+        anchor: identity("chain-root"), path: [identity(name), identity("chain-root")], explicitDistrust: false,
+      } })
+    }
+    const selection = selectEngineTrust({
+      os: "windows", complete: true, certificates, ctlSha1: [], bundledRoots: [],
+      disallowed: (store.disallowed ?? []).map((name) => ({ ...identity(name), location: "LOCAL_MACHINE" as const, physicalStore: ".Default" })),
+    })
+    const pems = new Map([...issued.keys()].map((name) => [identity(name).sha256, pemOf(name)]))
+    return {
+      certificates: [...selection.S, ...selection.I].map((sha256) => required(pems.get(sha256), "selected synthetic certificate")),
+      fallbackReason: null, codes: [],
+    }
+  }
+}
+// A channel that hangs reports "timeout", so it never equals `false` and never passes for a TLS rejection.
+const everyPath = (accepted: boolean | "timeout") =>
+  ({ native: accepted, bunFetch: accepted, saved: accepted, worker: accepted, https: accepted, websocket: accepted })
+
+/** One compiled engine, exec'd through the trust stage, probes `url` over every TLS path. */
+async function compiledTls(acquire: NonNullable<TrustStageOptions["acquire"]>, url: string) {
+  const dir = await directory()
+  let output: Awaited<ReturnType<typeof child>> | undefined
+  await runTrustStage({
+    args: ["-p"], env: cleanEnv(), directory: dir, loadedExtra: () => [], acquire,
+    exec: async (_file, _argv, env) => { output = await child(env, dir, url) },
+  })
+  const compiled = required(output, "compiled child output")
+  expect(compiled.code).toBe(0)
+  return JSON.parse(compiled.stdout)
+}
+
+/** One compiled engine, exec'd through the trust stage, connects to a local server over every TLS path. */
+async function tlsThrough(acquire: NonNullable<TrustStageOptions["acquire"]>, served: { readonly leaf: string; readonly chain?: string }) {
   const server = Bun.serve({
     hostname: "127.0.0.1", port: 0,
-    tls: { cert: leaf, key: await readFile(join(root, "leaf.key"), "utf8") },
+    tls: {
+      cert: `${pemOf(served.leaf)}\n${served.chain ? `${pemOf(served.chain)}\n` : ""}`,
+      key: await readFile(join(root, `${served.leaf}.key`), "utf8"),
+    },
     fetch(request, server) {
       if (server.upgrade(request)) return
       return new Response("synthetic TLS")
@@ -276,19 +345,65 @@ test.each([null, "helper-missing"] as const)("native TLS uses only the selected 
     websocket: { message() {} },
   })
   try {
-    const dir = await directory()
-    let output: Awaited<ReturnType<typeof child>> | undefined
-    await runTrustStage({
-      args: ["-p"], env: cleanEnv(), directory: dir, loadedExtra: () => [],
-      acquire: async () => ({ certificates: [ca], fallbackReason, codes: [] }),
-      exec: async (_file, _argv, env) => { output = await child(env, dir, `https://127.0.0.1:${server.port}`) },
-    })
-    const compiled = required(output, "compiled child output")
-    expect(compiled.code).toBe(0)
-    expect(JSON.parse(compiled.stdout).tls).toEqual({
-      native: fallbackReason === null, https: fallbackReason === null, websocket: fallbackReason === null,
-    })
+    const value = await compiledTls(acquire, `https://127.0.0.1:${server.port}`)
+    return { tls: value.tls, generation: await readFile(value.marker.file, "utf8") }
   } finally { await server.stop(true) }
+}
+
+// A server that accepts TCP and never answers the handshake: every channel hangs, none is rejected.
+test("a hanging server reports a timeout, never a rejection, on every compiled TLS path", async () => {
+  const server = Bun.listen({ hostname: "127.0.0.1", port: 0, socket: { data() {} } })
+  try {
+    const { tls } = await compiledTls(windowsStore({ roots: ["root"] }), `https://127.0.0.1:${server.port}`)
+    expect(tls).toEqual(everyPath("timeout"))
+  } finally { server.stop(true) }
+}, 30_000)
+
+// Design 9.5 P1: global, Bun.fetch, a saved module-scope fetch, a Worker fetch, node:https and WebSocket.
+test.each([
+  ["accepts a server trusted only by a synthetic S root", windowsStore({ roots: ["root"] }), true],
+  ["rejects a root that is not in S", windowsStore({ roots: ["other"] }), false],
+  ["rejects the automatic root under fallback", async () => ({ certificates: [ca], fallbackReason: "helper-missing" as const, codes: [] }), false],
+] as const)("every compiled TLS path %s", async (_name, acquire, accepted) => {
+  expect((await tlsThrough(acquire, { leaf: "leaf" })).tls).toEqual(everyPath(accepted))
+})
+
+// Design 9.5 P2: root R in S, intermediate X in D, the server presents its leaf with X.
+test("a denied root fails on every compiled TLS path", async () => {
+  const { tls, generation } = await tlsThrough(windowsStore({
+    roots: ["chain-root"], intermediate: { name: "chain-intermediate", eku: { kind: "unrestricted" } }, disallowed: ["chain-root"],
+  }), { leaf: "chain-leaf", chain: "chain-intermediate" })
+  expect(generation).not.toContain(pemOf("chain-root"))
+  expect(generation).not.toContain(pemOf("chain-intermediate"))
+  expect(tls).toEqual(everyPath(false))
+})
+
+// Limitation pin, not a requirement. v1 contract (design "The v1 contract in plain words"):
+// "Distrusted intermediate certificates under an allowed root are not yet blocked; tracked upstream."
+// Bun's fetch and WebSocket give checkServerIdentity only the leaf, so no per-chain check exists without a
+// runtime change. Upstream: the Bun issue filed from bun-issue-chain.md (tracked on omo#10762,
+// https://github.com/code-yeongyu/oh-my-openagent/issues/10762). When a runtime change makes this red, change
+// this pin and the release-note sentence together.
+test("limitation-pin: a denied intermediate the server presents under an allowed root is accepted on every compiled TLS path", async () => {
+  const { tls, generation } = await tlsThrough(windowsStore({
+    roots: ["chain-root"], intermediate: { name: "chain-intermediate", eku: { kind: "unrestricted" } }, disallowed: ["chain-intermediate"],
+  }), { leaf: "chain-leaf", chain: "chain-intermediate" })
+  expect(generation).toContain(pemOf("chain-root"))
+  expect(generation).not.toContain(pemOf("chain-intermediate"))
+  expect(tls).toEqual(everyPath(true))
+})
+
+// Design 9.5 P3: a leaf-only server needs the store's intermediate; its filtered facts decide.
+test.each([
+  ["succeeds with the filtered store intermediate", { kind: "unrestricted" }, [], true],
+  ["fails when its EKU property excludes server auth", { kind: "oids", oids: ["1.3.6.1.5.5.7.3.2"] }, [], false],
+  ["fails when the intermediate is in D", { kind: "unrestricted" }, ["chain-intermediate"], false],
+] as const)("a leaf-only server %s on every compiled TLS path", async (_name, eku, disallowed, accepted) => {
+  const { tls, generation } = await tlsThrough(windowsStore({
+    roots: ["chain-root"], intermediate: { name: "chain-intermediate", eku }, disallowed,
+  }), { leaf: "chain-leaf" })
+  expect(generation.includes(pemOf("chain-intermediate"))).toBe(accepted)
+  expect(tls).toEqual(everyPath(accepted))
 })
 
 test.each(["missing", "directory"] as const)("an addressed generation replaced with %s never promotes cached automatic roots to U", async (replacement) => {

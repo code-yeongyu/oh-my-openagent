@@ -16,7 +16,6 @@
 # 3. Run:
 #      uv run lighthouse-audit.py https://example.com
 #      uv run lighthouse-audit.py https://example.com --desktop-only
-#      uv run lighthouse-audit.py https://example.com --threshold 95
 # ──────────────────
 
 """Lighthouse audit via real Playwright Chrome.
