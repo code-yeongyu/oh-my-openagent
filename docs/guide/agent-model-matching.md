@@ -152,7 +152,7 @@ When the main agent delegates implementation work, it doesn't pick a model name.
 
 | Category | Used for | Default | Chain |
 | --- | --- | --- | --- |
-| `architect` | Big-picture system design; proposes, doesn't implement (the architect consult lane) | `anthropic/claude-fable-5-1 (max)` | `anthropic-subscription\|anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (max)` |
+| `architect` | Big-picture system design and broad debugging across many sources; implements when the task needs changes, advisory-only on request | `anthropic/claude-fable-5-1 (max)` | `anthropic-subscription\|anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (max)` |
 | `visual-engineering` | Frontend, UI/UX, CSS, animation, design systems | `google/gemini-4-argon (low)` | `google\|google-vertex\|opencode/gemini-4-argon (low)` -> `claude-fable-5-1 (max)` -> `claude-opus-5-5 (max)` -> `kimi-coding\|kimi-for-coding\|moonshotai\|opencode-go/kimi-k3.1-pro (max)`; the Argon rung resolves once the engine catalog carries the model |
 | `ultrabrain` | Genuinely hard, logic-heavy tasks; goals only, no step-by-step | `chatgpt-subscription/gpt-6-astra (max)` | `gpt-6-astra (max)` across `chatgpt-subscription`, `openai`, `github-copilot`, `opencode` -> `gpt-5.6-sol (max)` across the same providers |
 | `deep-low` | Default deep lane: 3D graphics, computer use, browser use, backend, algorithms, multimodal work; decisions settled from evidence | `chatgpt-subscription/gpt-6.1-sol (medium)` | `chatgpt-subscription\|openai/gpt-6.1-sol (medium)` -> `chatgpt-subscription\|openai/gpt-6.1-sol-fast (medium)` -> `chatgpt-subscription\|openai\|github-copilot\|opencode/gpt-5.6-sol (medium)` -> `chatgpt-subscription\|openai/gpt-5.6-sol-fast (medium)` |

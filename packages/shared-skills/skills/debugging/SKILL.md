@@ -26,7 +26,7 @@ The rest of this file is a map. **The knowledge is in `references/`.** This file
 
 ## Runtime Setup — MANDATORY READING BEFORE ATTACHING
 
-The methodology is language-agnostic. The commands to launch, attach, breakpoint, and inspect are not. **Open the matching reference before Phase 0. Not during. Not after.**
+The methodology is language-agnostic. The commands to launch, attach, breakpoint, and inspect are not. **Open the matching reference the moment you know the runtime (Phase 0, step 2) and before you attach anything. Not after.**
 
 | Your runtime is… | Open this before attaching anything | Non-negotiable because… |
 |---|---|---|
@@ -39,7 +39,7 @@ The methodology is language-agnostic. The commands to launch, attach, breakpoint
 
 **If you cannot honestly say you just opened the reference for your runtime, open it now.**
 
-> 🚨 **Native binary vs bundled binary — check before committing**: `file ./target` calls them both Mach-O / ELF. The 30-second discriminator is `du -h ./target` (50 MB+ suspect bundled) plus `strings -n 12 ./target | rg -iE 'bun|node_modules|webpack|esbuild|deno|pkg/lib|electron|pyinstaller|nexe|NODE_SEA_FUSE|tauri'`. If hits → bundled-js-binary.md. If clean → native-binary.md.
+> 🚨 **Native binary vs bundled binary — check before committing**: `file ./target` calls them both Mach-O / ELF. The 30-second discriminator is `du -h ./target` (50 MB+ suspect bundled) plus `strings -n 12 ./target | rg -i 'bun|node_modules|webpack|esbuild|deno|pkg/lib|electron|pyinstaller|nexe|NODE_SEA_FUSE|tauri'`. If hits → bundled-js-binary.md. If clean → native-binary.md.
 
 ---
 
@@ -56,7 +56,7 @@ These are not "optional extras". They are the correct tool in their domain, and 
 | **Frida** | Any running process you must instrument live without source or symbols — hook a function and print real argument values, trace calls, stub a return. Complements Ghidra: Ghidra reads the bytes, Frida watches them execute. **If Ghidra's static decompile has hit its limit, reach for Frida.** | 📖 **[references/tools/frida.md](references/tools/frida.md)** |
 | **DAP client (`dap.mjs`)** | Any time you would drive a debugger through a PTY and screen-scrape its text. Debuggers already speak the machine-readable Debug Adapter Protocol (debugpy, `dlv dap`, lldb-dap, js-debug); this bundled script drives it with bounded, monitorable output. **Prefer it over scraping `gdb`/`pdb` whenever the debugger speaks DAP.** Design modeled on oh-my-pi's `debug` tool (github.com/can1357/oh-my-pi). | 📖 **[references/tools/dap.md](references/tools/dap.md)** |
 
-**Failing to use these tools in their domain is a process failure, not a stylistic choice.** If the bug is in a browser and you did Phase 8 without Playwright, you are doing it wrong. If the bug is in a stripped binary and you read hex with `xxd`, you are doing it wrong. The references tell you how. Read them.
+**Failing to use these tools in their domain is a process failure, not a stylistic choice.** If the bug is in a browser and you did Phase 8 without omowright, you are doing it wrong. If the bug is in a stripped binary and you read hex with `xxd`, you are doing it wrong. The references tell you how. Read them.
 
 ---
 
@@ -74,8 +74,8 @@ Each phase has exactly one reference. Read it as you enter the phase — not in 
 | 5 | **User decision escalation** — only when evidence exhausted and the call has policy implications | [references/methodology/05-escalate.md](references/methodology/05-escalate.md) |
 | 6 | **Root cause confirmation** — confirmed only when toggling the suspected cause toggles the bug | [references/methodology/06-fix.md](references/methodology/06-fix.md) |
 | 7 | **Fix locked by a failing proof** — reuse the owner test that already fails or add one regression that fails on the pre-fix code, minimal green, no scope expansion | [references/methodology/06-fix.md](references/methodology/06-fix.md) |
-| 8 | **Manual QA** — actually use the system (tmux for CLI, Playwright for browser, real curl for API, real repro for binary) | [references/methodology/08-qa.md](references/methodology/08-qa.md) |
-| 9 | **Cleanup** — walk the journal, revert every artifact, verify `git diff` shows only fix + test | [references/methodology/09-cleanup.md](references/methodology/09-cleanup.md) |
+| 8 | **Manual QA** — actually use the system (tmux for CLI, omowright for browser, real curl for API, real repro for binary) | [references/methodology/08-qa.md](references/methodology/08-qa.md) |
+| 9 | **Cleanup** — walk the journal, revert every artifact, verify `git diff` shows only fix + test (plus any Phase 7 oversized-file split) | [references/methodology/09-cleanup.md](references/methodology/09-cleanup.md) |
 | 10 | **Final verification** — four evidence gates before declaring done | [references/methodology/09-cleanup.md](references/methodology/09-cleanup.md) |
 
 **Phase references are short by design.** Reading one takes a minute. Skipping one costs an hour.

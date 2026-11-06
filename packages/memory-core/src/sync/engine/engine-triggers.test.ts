@@ -215,3 +215,19 @@ test("a request queued during a failing cycle never starts a cycle after stop() 
   expect(loads).toBe(1)
   load.mockRestore()
 }, GIT_TEST_TIMEOUT)
+
+// #12280 R-A9: `sync.state.changed` (a rotation became pending) starts a cycle that settles the freeze.
+test("#given a started engine #when the stream announces a state change #then one cycle runs and settles the freeze", async () => {
+  const server = new FakeSyncServer()
+  let settles = 0
+  const a = await makeDevice(server, "a", undefined, { freeze: { settle: async () => { settles += 1; return { kind: "clear" } } } })
+  devices.push(a)
+  const startup = a.engine.nextCycle()
+  a.engine.start()
+  await startup
+  const afterStartup = settles
+  const next = a.engine.nextCycle()
+  server.stateChanged()
+  await next
+  expect(settles).toBe(afterStartup + 1)
+}, GIT_TEST_TIMEOUT)
