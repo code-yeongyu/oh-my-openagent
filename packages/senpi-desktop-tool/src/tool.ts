@@ -5,7 +5,7 @@ import {
 	type ComputerScreenshot,
 	isReadOnlyComputerCall,
 } from "@oh-my-opencode/senpi-desktop-protocol";
-import { DesktopEngineRpcError, type ExecuteTool, runComputerCode } from "@oh-my-opencode/senpi-desktop-service";
+import { DesktopEngineRpcError, DesktopLaunchContextError, type ExecuteTool, runComputerCode } from "@oh-my-opencode/senpi-desktop-service";
 import type { ComputerHandle } from "./activation";
 import { Check } from "typebox/value";
 import { actionBranches, argumentsError } from "./action-schema";
@@ -17,12 +17,23 @@ import {
 } from "./params";
 import { type ComputerHostContext, runSnapshot } from "./session";
 import { computerToolDefinition } from "./tool-definition";
-import { computerFailure } from "./cua-errors";
+import { computerFailure, launchContextFailure } from "./cua-errors";
+
+/** One `desktop.control.acquire` confirmation request, carried to the host component (#9651 B5b). */
+export interface ControlConfirmRequest {
+	readonly context: ComputerHostContext;
+	readonly reason: string;
+	readonly signal: AbortSignal;
+	/** How long the run can still wait for the answer; the confirm must settle within it. */
+	readonly budgetMs?: number;
+}
 
 export interface ComputerToolDeps {
 	readonly handle: ComputerHandle;
 	/** The host tool pipeline (`pi.executeTool`) behind `tool.<name>()` inside `run` code. */
 	readonly executeTool: ExecuteTool;
+	/** The host component's human confirm for the foreground-control grant; absent: never grants. */
+	readonly confirmControl?: (request: ControlConfirmRequest) => Promise<boolean>;
 }
 
 /** `details` of every `computer` result; `value` is what the eval-kernel `computer` facade returns. */
@@ -60,6 +71,16 @@ function renderCallChain(chain: readonly ComputerCallStep[]): string {
 		: `return await (await desktop.${call(root)}).${call(hop)};`;
 }
 
+const SHOWN_ABOVE = "[shown above]";
+
+/** The return value without repeating observe's AX tree when the run already displayed it verbatim. */
+function stringifyReturn(value: unknown, shown: ReadonlySet<string>): string {
+	if (typeof value === "string") return value;
+	const replacer = (key: string, field: unknown) =>
+		key === "ax" && typeof field === "string" && shown.has(field) ? SHOWN_ABOVE : field;
+	return JSON.stringify(value, replacer, 2) ?? String(value);
+}
+
 function stringify(value: unknown): string {
 	return typeof value === "string" ? value : (JSON.stringify(value, null, 2) ?? String(value));
 }
@@ -84,12 +105,23 @@ export async function runComputer(
 	await handle.activate(context);
 	const snapshot = runSnapshot(handle.settings(), context, request.readOnly);
 	const timeoutMs = request.timeoutSeconds * 1000;
+	const confirmControl = deps.confirmControl;
 	const outcome = await runComputerCode(
 		{ code: request.code, snapshot, timeoutMs, ...(signal === undefined ? {} : { signal }) },
-		{ service: handle.service, executeTool },
+		{
+			service: handle.service,
+			executeTool,
+			...(confirmControl === undefined
+				? {}
+				: {
+						confirmControl: (reason: string, runSignal: AbortSignal, budgetMs: number) =>
+							confirmControl({ context, reason, signal: runSignal, budgetMs }),
+					}),
+		},
 	);
 	const content = [...outcome.displays];
-	if (outcome.returnValue !== undefined) content.push({ type: "text", text: stringify(outcome.returnValue) });
+	const shown = new Set(content.flatMap((part) => (part.type === "text" && part.text !== "" ? [part.text] : [])));
+	if (outcome.returnValue !== undefined) content.push({ type: "text", text: stringifyReturn(outcome.returnValue, shown) });
 	if (content.length === 0) content.push({ type: "text", text: "Done." });
 	return {
 		content,
@@ -137,8 +169,11 @@ export function createComputerTool(deps: ComputerToolDeps) {
 					return permissionResult(run(context, { code: params.code, readOnly: params.read_only === true, timeoutSeconds }, signal), handle);
 				}
 				case "capabilities":
-					await handle.activate(context);
-					return valueResult(await handle.service.capabilities(), "capabilities unavailable");
+					// Like call/run, activation and capability-query permission failures are structured tool results.
+					return permissionResult((async () => {
+						await handle.activate(context);
+						return valueResult(await handle.service.capabilities(), "capabilities unavailable");
+					})(), handle);
 				case "close":
 					await handle.close();
 					return valueResult(undefined, "Closed the desktop session.");
@@ -153,8 +188,17 @@ async function permissionResult(result: Promise<ComputerToolResult>, handle: Com
 	try {
 		return await result;
 	} catch (error) {
+		if (error instanceof DesktopLaunchContextError) {
+			const failure = launchContextFailure(error);
+			return {
+				content: [{ type: "text", text: error.message }],
+				details: { value: failure, isError: true },
+				isError: true,
+			};
+		}
 		if (!(error instanceof DesktopEngineRpcError) || error.data === null || !("code" in error.data) ||
-			error.data.code !== "PermissionDenied") throw error;
+			(error.data.code !== "PermissionDenied" && error.data.code !== "ControlRequired" &&
+				error.data.code !== "InputBusy" && error.data.code !== "Suspended")) throw error;
 		const failure = computerFailure(error.data.code, error.message, handle.settings().stopHotkey, error.data.permission);
 		return {
 			content: [{ type: "text", text: JSON.stringify(failure, null, 2) }],

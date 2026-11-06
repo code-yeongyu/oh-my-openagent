@@ -132,6 +132,7 @@ export function fakeChild(input: KibitzerSidecarChildInput, sessionId = `kibitze
   const handle: ChildHandle = {
     task_id: `kibitzer-${input.sessionId}`,
     sessionId,
+    effectiveModel: () => undefined,
     async steer(text) {
       steers.push(text)
     },

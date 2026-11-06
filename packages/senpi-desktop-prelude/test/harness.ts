@@ -151,7 +151,13 @@ export function runPythonFacade(script: string, responders: Readonly<Record<stri
 		responders,
 	});
 	const startedAt = performance.now();
-	const result = spawnSync(PYTHON_COMMAND, ["-c", PYTHON_HARNESS], { input, encoding: "utf8", timeout: 30_000 });
+	// UTF-8 mode: Windows Python otherwise decodes the piped payload with the ANSI code page (cp1252),
+	// turning non-ASCII labels such as "Export…" into mojibake before the facade sees them.
+	const result = spawnSync(PYTHON_COMMAND, ["-X", "utf8", "-c", PYTHON_HARNESS], {
+		input,
+		encoding: "utf8",
+		timeout: 30_000,
+	});
 	if (PYTHON_DIAGNOSTICS) {
 		console.error(
 			`PYTHON_FACADE_DIAG ${JSON.stringify({

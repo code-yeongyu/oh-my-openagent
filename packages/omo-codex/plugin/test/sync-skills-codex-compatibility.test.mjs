@@ -15,7 +15,9 @@ import {
 	reviewWorkAnchor,
 	ulwExecuteOriginalCompletion,
 	ulwExecuteOriginalHardRule,
+	ulwExecuteOriginalRootScope,
 } from "../scripts/sync-skills.mjs";
+import { removeCodexSkillOverlays } from "./sync-skills-test-support.mjs";
 
 const frontmatter = "---\nname: fixture-sentinel\n---\n\n";
 const opencodeExample = "# SENTINEL_SECTION\ntask(SENTINEL_INPUT)\n";
@@ -39,6 +41,7 @@ test("#given shared skill source anchors #when Codex overlays are applied #then 
 
 	assert.ok(ulwExecuteSource.includes(ulwExecuteOriginalCompletion), "ulw-execute completion anchor drifted from shared source");
 	assert.ok(ulwExecuteSource.includes(ulwExecuteOriginalHardRule), "ulw-execute hard-rule anchor drifted from shared source");
+	assert.ok(ulwExecuteSource.includes(ulwExecuteOriginalRootScope), "ulw-execute root-scope anchor drifted from shared source");
 	assert.ok(reviewWorkSource.includes(reviewWorkAnchor), "review-work anchor drifted from shared source");
 
 	for (const [skillName, source] of [["ulw-execute", ulwExecuteSource], ["review-work", reviewWorkSource]]) {
@@ -176,4 +179,22 @@ test("#given the shared ulw-research skill #when the Codex overlay runs #then th
 
 	// then
 	assert.notEqual(actual, shared, "the ulw-research overlay anchor no longer matches the shared SKILL.md");
+});
+
+test("#given the ulw-research delivery gates are renumbered #when the Codex overlay runs #then only the proofread gate is dropped", async () => {
+	// given
+	const shared = await readFile(join(sharedSkillsRoot, "ulw-research", "SKILL.md"), "utf8");
+	const renumbered = shared
+		.replace(/^(\d+)(\. \*\*Proofread gate:)/m, (_, numeral, rest) => `${Number(numeral) + 1}${rest}`)
+		.replace(/^(\d+)(\. \*\*Visual QA\.\*\*)/m, (_, numeral, rest) => `${Number(numeral) + 1}${rest}`);
+	assert.notEqual(renumbered, shared, "the renumbering fixture must change the delivery gates");
+
+	// when
+	const actual = applyCodexSkillOverlays("ulw-research", renumbered);
+
+	// then: generated Codex edition contract (no `task(category="writing")` gate; tool-based gates kept)
+	assert.doesNotMatch(actual, /\*\*Proofread gate:/);
+	assert.match(actual, /\*\*Fidelity gate\.\*\*/);
+	assert.match(actual, /inspect the pixels\.\n\n/);
+	assert.equal(removeCodexSkillOverlays("ulw-research", actual), renumbered);
 });

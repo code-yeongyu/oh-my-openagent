@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto"
 import { dirname, join, posix } from "node:path"
 import { parseJsoncSafe } from "../internal/jsonc-parse"
-import { applyEdits, modify } from "jsonc-parser/lib/esm/main.js"
 import { resolveUserOmoConfigPath } from "../loader"
+import { applyOmoConfigEdit } from "./surgical-edit"
 import {
   DEFAULT_WRITE_FILE_SYSTEM,
   OmoConfigWriteError,
@@ -14,12 +14,6 @@ const EMPTY_OMO_CONFIG = `// OMO configuration
 {
 }
 `
-
-const FORMATTING_OPTIONS = {
-  eol: "\n",
-  insertSpaces: true,
-  tabSize: 2,
-}
 
 function backupSuffix(): string {
   return new Date().toISOString().replace(/[:.]/g, "-")
@@ -33,8 +27,23 @@ function backupCandidate(basePath: string, attempt: number): string {
   return attempt === 0 ? basePath : `${basePath}.${attempt}`
 }
 
+/**
+ * A planned backup that already holds these exact bytes is the copy a crashed run made before it
+ * could write the target, so it is reused. Any other file at that name is left alone and the copy
+ * takes the next free name, so a resumed migration can never get stuck on its own leftover (#8187).
+ */
+function writePlannedBackup(plannedPath: string, content: string, fileSystem: typeof DEFAULT_WRITE_FILE_SYSTEM): string {
+  try {
+    if (fileSystem.existsSync(plannedPath) && fileSystem.readFileSync(plannedPath, "utf-8") === content) return plannedPath
+  } catch {}
+  return writeBackupFrom(plannedPath, content, fileSystem)
+}
+
 function writeBackup(path: string, content: string, fileSystem: typeof DEFAULT_WRITE_FILE_SYSTEM): string {
-  const basePath = `${path}.bak.${backupSuffix()}`
+  return writeBackupFrom(`${path}.bak.${backupSuffix()}`, content, fileSystem)
+}
+
+function writeBackupFrom(basePath: string, content: string, fileSystem: typeof DEFAULT_WRITE_FILE_SYSTEM): string {
   let attempt = 0
 
   while (true) {
@@ -144,7 +153,9 @@ export function updateOmoConfig(options: UpdateOmoConfigOptions): UpdateOmoConfi
   if (existed) {
     try {
       assertConfigPathIsSafe(path, fileSystem)
-      backupPath = writeBackup(path, content, fileSystem)
+      backupPath = options.backupPath === undefined
+        ? writeBackup(path, content, fileSystem)
+        : writePlannedBackup(options.backupPath, content, fileSystem)
     } catch (error) {
       if (error instanceof OmoConfigWriteError) throw error
       throw new OmoConfigWriteError(path, "backup", error)
@@ -153,10 +164,7 @@ export function updateOmoConfig(options: UpdateOmoConfigOptions): UpdateOmoConfi
 
   let nextContent = content
   for (const edit of options.edits) {
-    nextContent = applyEdits(
-      nextContent,
-      modify(nextContent, [...edit.path], edit.value, { formattingOptions: FORMATTING_OPTIONS }),
-    )
+    nextContent = applyOmoConfigEdit(nextContent, edit)
   }
 
   writeAtomically(path, nextContent, fileSystem)

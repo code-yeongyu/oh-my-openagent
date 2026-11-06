@@ -12,45 +12,21 @@ use crate::WINDOW;
 
 const ERROR_RS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../senpi-desktop-core/src/error.rs");
 
-/// The variants of `enum ErrorCode`, in declaration order.
+/// The variants of `enum ErrorCode`, in declaration order. The body ends at
+/// the enum's own closing line, not at the first `}`: a doc comment may hold
+/// braces (`CaptureUnavailable`'s does).
 fn declared_codes() -> Vec<String> {
     let source = std::fs::read_to_string(ERROR_RS).expect("error.rs is readable");
     let body = source
         .split("pub enum ErrorCode {")
         .nth(1)
-        .and_then(|rest| rest.split('}').next())
         .expect("error.rs declares enum ErrorCode");
     body.lines()
         .map(str::trim)
+        .take_while(|line| *line != "}")
         .filter(|line| !line.is_empty() && !line.starts_with("//") && !line.starts_with('#'))
         .map(|line| line.trim_end_matches(',').to_owned())
         .collect()
-}
-
-/// Every mutating method (pointer, keyboard, window, AX, clipboard write)
-/// with parseable params.
-pub fn input_calls() -> [(&'static str, Value); 12] {
-    let at = json!({"target": "desktop", "x": 10.0, "y": 10.0});
-    [
-        ("click", at.clone()),
-        ("moveMouse", at),
-        (
-            "drag",
-            json!({"target": "desktop", "path": [{"x": 1.0, "y": 1.0}, {"x": 5.0, "y": 5.0}]}),
-        ),
-        (
-            "scroll",
-            json!({"target": "desktop", "x": 10.0, "y": 10.0, "dx": 0.0, "dy": 3.0}),
-        ),
-        ("typeText", json!({"target": WINDOW, "text": "hi"})),
-        ("keyChord", json!({"target": WINDOW, "keys": ["ctrl", "a"]})),
-        ("raiseWindow", json!({"windowId": WINDOW})),
-        ("ax.perform", json!({"ref": "e1", "action": "press"})),
-        ("ax.setValue", json!({"ref": "e1", "value": "hi"})),
-        ("ax.focus", json!({"ref": "e1"})),
-        ("ax.click", json!({"ref": "e1"})),
-        ("clipboard.write", json!({"text": "hi"})),
-    ]
 }
 
 struct Case {
@@ -74,15 +50,34 @@ fn open(engine: &mut Engine) {
 fn foreground_click(engine: &mut Engine) -> Value {
     make_stop_path_live(engine);
     capture(engine, WINDOW);
-    let opts = json!({"deliveryMode": "foreground"});
     engine.invoke(
-        "click",
-        json!({"target": WINDOW, "x": 10.0, "y": 10.0, "opts": opts}),
-    )
+        "control.grant",
+        json!({"reason": "restore failure cases", "confirmationId": "confirm-1"}),
+    );
+    let opts = json!({"deliveryMode": "foreground"});
+    engine.invoke("click", json!({"target": WINDOW, "x": 10.0, "y": 10.0, "opts": opts}))
 }
 
 fn fail_next(method: &str) -> Value {
-    json!({"fail_next": [{"method": method, "code": "InputFailed"}]})
+    fail_next_with(method, "InputFailed")
+}
+
+/// The fake fails the next `method` call with `code`: the wire path of a code
+/// no fake scenario raises on its own yet.
+fn fail_next_with(method: &str, code: &str) -> Value {
+    json!({"fail_next": [{"method": method, "code": code}]})
+}
+
+/// A background click on the captured window.
+fn window_click(engine: &mut Engine) -> Value {
+    make_stop_path_live(engine);
+    capture(engine, WINDOW);
+    click(engine, WINDOW)
+}
+
+fn list_windows(engine: &mut Engine) -> Value {
+    open(engine);
+    engine.invoke("windows", json!({}))
 }
 
 const SHORT_DEADLINE: &[(&str, &str)] = &[("SENPI_DESKTOP_OPERATION_TIMEOUT_MS", "500")];
@@ -103,14 +98,10 @@ fn cases() -> Vec<Case> {
                 click(e, "desktop")
             },
         ),
-        case(
-            "CaptureFailed",
-            json!({"capabilities": {"capture": false}}),
-            |e| {
-                open(e);
-                e.invoke("capture", json!({"target": "desktop"}))
-            },
-        ),
+        case("CaptureFailed", json!({"capabilities": {"capture": false}}), |e| {
+            open(e);
+            e.invoke("capture", json!({"target": "desktop"}))
+        }),
         case("InputFailed", json!({"capabilities": {"input": false}}), |e| {
             make_stop_path_live(e);
             capture(e, WINDOW);
@@ -139,7 +130,7 @@ fn cases() -> Vec<Case> {
         }),
         case("InvalidCoordinateFrame", json!({}), |e| {
             make_stop_path_live(e);
-            click(e, "desktop")
+            click(e, WINDOW)
         }),
         case("StaleRef", json!({}), |e| {
             open(e);
@@ -183,14 +174,10 @@ fn cases() -> Vec<Case> {
             e.invoke("stopPath.stop", json!({"source": "api"}));
             click(e, "desktop")
         }),
-        case(
-            "ScreenLocked",
-            json!({"capabilities": {"screenLocked": true}}),
-            |e| {
-                make_stop_path_live(e);
-                click(e, "desktop")
-            },
-        ),
+        case("ScreenLocked", json!({"capabilities": {"screenLocked": true}}), |e| {
+            make_stop_path_live(e);
+            click(e, "desktop")
+        }),
         case("Cancelled", json!({"delay_ms": {"capture": 5000}}), |e| {
             open(e);
             e.request(10, "capture", json!({"target": WINDOW}));
@@ -204,6 +191,28 @@ fn cases() -> Vec<Case> {
             foreground_click,
         ),
         case("TransactionFailed", fail_next("front_window"), foreground_click),
+        case("ControlRequired", json!({}), |e| {
+            make_stop_path_live(e);
+            capture(e, WINDOW);
+            let opts = json!({"deliveryMode": "foreground"});
+            e.invoke("click", json!({"target": WINDOW, "x": 10.0, "y": 10.0, "opts": opts}))
+        }),
+        case(
+            "CaptureUnavailable",
+            json!({"fail_next": [{"method": "capture", "code": "CaptureUnavailable", "reason": "minimized"}]}),
+            |e| {
+                open(e);
+                e.invoke("capture", json!({"target": WINDOW}))
+            },
+        ),
+        case("UserIntervened", fail_next_with("click", "UserIntervened"), window_click),
+        case("AxUnconfirmed", fail_next_with("ax_perform", "AxUnconfirmed"), |e| {
+            make_stop_path_live(e);
+            let textarea = snapshot_ref(e, WINDOW, "textarea");
+            e.invoke("ax.perform", json!({"ref": textarea, "action": "press"}))
+        }),
+        case("SpaceUnsupported", fail_next_with("windows", "SpaceUnsupported"), list_windows),
+        case("SpaceMoveDenied", fail_next_with("windows", "SpaceMoveDenied"), list_windows),
     ]
 }
 
@@ -214,6 +223,13 @@ fn spawn(case: Case) -> thread::JoinHandle<Value> {
         let mut engine = headless(scenario.backend(), case.env);
         (case.drive)(&mut engine)
     })
+}
+
+/// Every code driven over the wire. `InputBusy` is not among them: one engine
+/// process holds one session, so a second session's grant cannot be driven
+/// here; the session crate drives it with two sessions sharing one slot.
+fn driven_codes() -> Vec<String> {
+    cases().into_iter().map(|case| case.code.to_owned()).collect()
 }
 
 #[test]
@@ -234,8 +250,7 @@ fn every_error_code_reaches_the_wire_with_its_numeric_code() {
             };
             let expected = numeric(code).map(|numeric| (json!(code), json!(numeric)));
             let actual = (error_code(&reply).clone(), reply["error"]["code"].clone());
-            (expected.as_ref() != Some(&actual))
-                .then(|| format!("{code}: expected {expected:?}, got {reply}"))
+            (expected.as_ref() != Some(&actual)).then(|| format!("{code}: expected {expected:?}, got {reply}"))
         })
         .collect();
     // Then
@@ -245,7 +260,8 @@ fn every_error_code_reaches_the_wire_with_its_numeric_code() {
 #[test]
 fn the_code_table_drives_every_error_code_declared_in_error_rs() {
     let mut declared = declared_codes();
-    let mut driven: Vec<String> = cases().into_iter().map(|case| case.code.to_owned()).collect();
+    declared.retain(|code| code != "InputBusy");
+    let mut driven = driven_codes();
     declared.sort();
     driven.sort();
     assert_eq!(driven, declared);

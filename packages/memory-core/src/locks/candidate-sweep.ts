@@ -1,6 +1,7 @@
 import path from "node:path"
 
 import { readdir, stat, unlink } from "../fs/resilient"
+import { getPidLiveness } from "./process-identity"
 
 export const CANDIDATE_STALE_AGE_MS = 60 * 60 * 1000
 export const CANDIDATE_UNLINK_ATTEMPTS = 3
@@ -23,10 +24,16 @@ export interface CandidateSweepOptions {
 }
 
 // Lock DOMAIN names may legally contain ".candidate-" (runFinalizationLockPath permits dots
-// and hyphens in run ids), so only the exact UUID-suffixed shape publishExclusive generates
-// is ever treated as sweepable garbage.
+// and hyphens in run ids), so only the exact shape publishExclusive generates is ever treated as
+// sweepable garbage: `.candidate-<pid>-<uuid>`, or the older `.candidate-<uuid>` without the pid.
 const LEAKED_CANDIDATE_NAME =
-  /\.candidate-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  /\.candidate-(?:(\d+)-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** A candidate whose creator is gone can never be published or cleaned up by it. */
+function isCreatorDead(name: string): boolean {
+  const pid = LEAKED_CANDIDATE_NAME.exec(name)?.[1]
+  return pid !== undefined && getPidLiveness(Number(pid)) === "dead"
+}
 
 function errorCode(error: unknown): string | undefined {
   if (!(error instanceof Error) || !("code" in error)) return undefined
@@ -47,10 +54,10 @@ function isSharingError(error: unknown): boolean {
   return code === "EBUSY" || code === "EPERM" || code === "EACCES"
 }
 
-// Crashed contenders leak `<lock>.candidate-<uuid>` files: publishExclusive unlinks its
-// candidate in a finally block, but SIGKILL mid-publish skips it. Nothing ever reads a
-// candidate after publish, so age is the only liveness signal the sweeper needs; live lock
-// and recovery files never contain ".candidate-" and are never touched.
+// Crashed contenders leak `<lock>.candidate-<pid>-<uuid>` files: publishExclusive unlinks its
+// candidate in a finally block, but SIGKILL mid-publish skips it. Nothing ever reads a candidate
+// after publish, so a dead creator pid or old age is all the sweeper needs; live lock and recovery
+// files never contain ".candidate-" and are never touched.
 export async function sweepStaleLockCandidates(
   lockDirectory: string,
   now: () => number = Date.now,
@@ -74,7 +81,8 @@ export async function sweepStaleLockCandidates(
     const candidatePath = path.join(lockDirectory, name)
     try {
       const status = await stat(candidatePath)
-      if (!knownLeakedCandidates.has(candidatePath) && now() - status.mtimeMs <= CANDIDATE_STALE_AGE_MS) continue
+      const stale = knownLeakedCandidates.has(candidatePath) || isCreatorDead(name) || now() - status.mtimeMs > CANDIDATE_STALE_AGE_MS
+      if (!stale) continue
       let removed = false
       for (let attempt = 0; attempt < CANDIDATE_UNLINK_ATTEMPTS; attempt += 1) {
         try {

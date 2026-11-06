@@ -33,7 +33,7 @@ function relayFor(handOff: HandOff) {
           return await handOff(answer.fields, answer.ui_request_id)
         },
       },
-      locate: async () => ({ kind: "rpc_host", socket: "fake:B", routing_id: "rpc-1" }),
+      locate: async () => ({ kind: "rpc_host", socket: "fake:B", routing_id: "rpc-1", durable_session_id: "B" }),
       now: () => h.clock.now,
     })
   }
@@ -77,6 +77,9 @@ function downgradeToV2(agentDir: string, before: (db: Database) => void = () => 
     db.run("ALTER TABLE deliveries DROP COLUMN actor_user_id")
     db.run("DROP TABLE extension_schema")
     db.run("DROP TABLE extension_objects")
+    db.run("DROP TABLE thread_creations")
+    db.run("DROP TABLE extension_registrations")
+    db.run("DROP TABLE toolkit_replay_receipts")
     db.run("PRAGMA user_version = 2")
   } finally {
     db.close()
@@ -155,7 +158,7 @@ describe("answer_while_another_answer_is_in_flight", () => {
       store: stalledStore,
       engine: h.engineFor(stalledStore),
       endpoints: { wake: async () => ({ admitted: [] }), respondUi: () => { reached.resolve(); return new Promise<UiAnswerReply>(() => {}) } },
-      locate: async () => ({ kind: "rpc_host", socket: "fake:B", routing_id: "rpc-1" }),
+      locate: async () => ({ kind: "rpc_host", socket: "fake:B", routing_id: "rpc-1", durable_session_id: "B" }),
       now: () => h.clock.now,
     })
     void stalled.answer({ binding_id: q.bindingId, reply_token: q.token, answer: "first" })
@@ -187,7 +190,7 @@ describe("answer_while_another_answer_is_in_flight", () => {
         store: stalledStore,
         engine: h.engineFor(stalledStore),
         endpoints: { wake: async () => ({ admitted: [] }), respondUi: () => { reached.resolve(); return pending } },
-        locate: async () => ({ kind: "rpc_host", socket: "fake:B", routing_id: "rpc-1" }),
+        locate: async () => ({ kind: "rpc_host", socket: "fake:B", routing_id: "rpc-1", durable_session_id: "B" }),
         now: () => h.clock.now,
       })
       const first = stalled.answer({ binding_id: q.bindingId, reply_token: q.token, answer: "from A" })
@@ -220,7 +223,7 @@ describe("answer_while_another_answer_is_in_flight", () => {
         store: stalledStore,
         engine: h.engineFor(stalledStore),
         endpoints: { wake: async () => ({ admitted: [] }), respondUi: () => { reached.resolve(); return late.promise } },
-        locate: async () => ({ kind: "rpc_host", socket: "fake:B", routing_id: "rpc-1" }),
+        locate: async () => ({ kind: "rpc_host", socket: "fake:B", routing_id: "rpc-1", durable_session_id: "B" }),
         now: () => h.clock.now,
       })
       const first = stalled.answer({ binding_id: q.bindingId, reply_token: q.token, answer: "from A" })
@@ -257,7 +260,7 @@ describe("a_late_confirmation_is_the_fact_that_the_session_took_that_answer", ()
       store: stalledStore,
       engine: h.engineFor(stalledStore),
       endpoints: { wake: async () => ({ admitted: [] }), respondUi: () => { reached.resolve(); return late.promise } },
-      locate: async () => ({ kind: "rpc_host", socket: "fake:B", routing_id: "rpc-1" }),
+      locate: async () => ({ kind: "rpc_host", socket: "fake:B", routing_id: "rpc-1", durable_session_id: "B" }),
       now: () => h.clock.now,
     })
     const first = stalled.answer({ binding_id: q.bindingId, reply_token: q.token, answer: "from A" })
@@ -452,7 +455,7 @@ describe("an_answer_that_took_over_a_question_the_session_already_resolved", () 
       store: deadStore,
       engine: h.engineFor(deadStore),
       endpoints: { wake: async () => ({ admitted: [] }), respondUi: (_endpoint, answer) => { session.resolved.add(answer.ui_request_id); reached.resolve(); return new Promise<UiAnswerReply>(() => {}) } },
-      locate: async () => ({ kind: "rpc_host", socket: "fake:B", routing_id: "rpc-1" }),
+      locate: async () => ({ kind: "rpc_host", socket: "fake:B", routing_id: "rpc-1", durable_session_id: "B" }),
       now: () => h.clock.now,
     })
     void dead.answer({ binding_id: q.bindingId, reply_token: q.token, answer: "from the dead claimant" })

@@ -353,12 +353,15 @@ function main() {
 					: "FAIL";
 		}
 
+		const scenario = runScenarioFile(resolvedSenpi, sandbox);
 		result =
 			ultraworkInjected &&
-			(commentChecker === "PASS" || commentChecker === "SKIPPED-no-binary")
+			(commentChecker === "PASS" || commentChecker === "SKIPPED-no-binary") &&
+			(scenario === null || scenario.result === "PASS")
 				? "PASS"
 				: "FAIL";
 		return printResult({
+			scenario,
 			result,
 			reason,
 			ultraworkInjected,
@@ -373,7 +376,28 @@ function main() {
 	}
 }
 
+// `--scenario <file.json>` = {prompt, steps, expect: string[], transcriptOut?}: one extra scripted
+// session in the same sandbox (for example a prompt that loads a bundled skill and runs its scripts);
+// PASS when it exits 0 and every expected string appears in the sandbox agent-dir text.
+function runScenarioFile(senpiBin, sandbox) {
+	const index = process.argv.indexOf("--scenario");
+	if (index < 0) return null;
+	const spec = JSON.parse(readFileSync(process.argv[index + 1], "utf8"));
+	const run = runSenpi(senpiBin, sandbox, spec.prompt, { steps: spec.steps });
+	const text = readSandboxText(sandbox.agentDir);
+	if (spec.transcriptOut) writeFileSync(spec.transcriptOut, text);
+	const missing = spec.expect.filter((needle) => !text.includes(needle));
+	return {
+		result: run.status === 0 && missing.length === 0 ? "PASS" : "FAIL",
+		exitStatus: run.status,
+		expected: spec.expect,
+		missing,
+		...(spec.transcriptOut ? { transcriptOut: spec.transcriptOut } : {}),
+	};
+}
+
 function printResult({
+	scenario = null,
 	result,
 	reason,
 	ultraworkInjected,
@@ -427,6 +451,7 @@ function printResult({
 		...(reason ? { reason } : {}),
 		ultraworkInjected,
 		commentChecker,
+		...(scenario ? { scenario } : {}),
 		isolationCertified:
 			result === "PASS" &&
 			environmentObserved &&

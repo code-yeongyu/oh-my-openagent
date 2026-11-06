@@ -13,7 +13,7 @@ import type { ChildFactory } from "@oh-my-opencode/senpi-desktop-service"
 
 import type { ComponentContext, ComponentLogger } from "../../extension/types"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import { COMPUTER_UNAVAILABLE, createComputerUseComponent } from "./index"
+import { COMPUTER_UNAVAILABLE_MESSAGE, createComputerUseComponent } from "./index"
 
 const FAKE_ENGINE = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -181,23 +181,23 @@ describe("computer-use component", () => {
     expect(engine.methods).toEqual([])
   })
 
-  test("#given an unsupported host #when registered #then no tool exists and /computer reports it unavailable", async () => {
+  test("#given an unsupported host #when registered #then no tool exists and /computer names the unsupported system", async () => {
     // given / when
     const { pi } = register({ platform: "freebsd" })
 
     // then
     expect(pi.tools).toEqual([])
-    expect(await runCommand(pi, "on")).toEqual([COMPUTER_UNAVAILABLE])
+    expect(await runCommand(pi, "on")).toEqual([COMPUTER_UNAVAILABLE_MESSAGE.unsupported_host])
   })
 
-  test("#given computer.enabled false #when registered #then no tool, no skill, and /computer reports it unavailable", async () => {
+  test("#given computer.enabled false #when registered #then no tool, no skill, and /computer names the off switch", async () => {
     // given / when
     const { pi } = register({ block: { enabled: false } })
 
     // then
     expect(pi.tools).toEqual([])
     expect(await pi.dispatch("resources_discover", {})).toEqual([])
-    expect(await runCommand(pi, "status")).toEqual([COMPUTER_UNAVAILABLE])
+    expect(await runCommand(pi, "status")).toEqual([COMPUTER_UNAVAILABLE_MESSAGE.disabled])
   })
 
   test("#given cua_adapter #when registered #then computer_actions exists with its own tiers, and not otherwise", async () => {
@@ -219,6 +219,9 @@ describe("computer-use component", () => {
     // then
     expect(pi.tools).toEqual([])
     expect(log.warnings.some((message) => message.includes("computer-use skipped"))).toBe(true)
+    const notices = await runCommand(pi, "on")
+    expect(notices).toEqual([COMPUTER_UNAVAILABLE_MESSAGE.host_api_missing])
+    expect(notices[0]?.match(/`([^`]+)`/)?.[1]).toBe("omo update")
   })
 
   test("#given an invalid computer block #when registered #then it warns and registers nothing", async () => {
@@ -228,6 +231,7 @@ describe("computer-use component", () => {
     // then
     expect(pi.tools).toEqual([])
     expect(log.warnings.some((message) => message.includes("invalid computer settings"))).toBe(true)
+    expect(await runCommand(pi, "on")).toEqual([COMPUTER_UNAVAILABLE_MESSAGE.invalid_settings])
   })
 
   test("#given the tool is activated #when tool_activated fires #then the engine session opens, the stop chord arms, and the tool stays active", async () => {

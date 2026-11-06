@@ -1,3 +1,4 @@
+import { configureSharedSubunitLogger } from "@oh-my-opencode/utils"
 import { afterEach, describe, expect, test } from "bun:test"
 import { mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -6,6 +7,7 @@ import { join } from "node:path"
 import {
   createTaskRecord,
   SUSPENSION_REASONS,
+  TASK_START_FAILURE_KINDS,
   TASK_START_FAILURE_REASONS,
   type TaskStartFailureReason,
 } from "../state"
@@ -21,6 +23,7 @@ import {
   R0_SUSPENSION_REASONS,
   R0_TASK_START_FAILURE_REASONS,
 } from "./__fixtures__/r0-ebd01f84e-reasons"
+import { isSuspensionExpiry } from "../lifecycle/suspended-expiry"
 
 const roots: string[] = []
 
@@ -44,6 +47,100 @@ function storeFixture() {
 }
 
 describe("rollback host-session migration", () => {
+  test("#given an open strict obligation #when rollback prepares #then its report and warning log disclose lost close retries", () => {
+    const { storeDir, store, base } = storeFixture()
+    const messages: Array<{ message: string; data: unknown }> = []
+    const closing = {
+      host_session: {
+        socket: "/tmp/rpc.sock",
+        routing_id: "r",
+        session_path: "/tmp/s.jsonl",
+        instance_id: "i",
+      },
+      requires_confirmation: true,
+    }
+    store.save({
+      ...base,
+      failure_kind: "suspended_unresumable",
+      fallback_closing_child: closing,
+    })
+    store.save({
+      ...base,
+      task_id: "st_00000099",
+      fallback_closing_child: { host_session: closing.host_session },
+    })
+    configureSharedSubunitLogger((message, data) => messages.push({ message, data }))
+    try {
+      const result = migrateHostSessionSockets(storeDir, {
+        to: "/tmp/rpc.sock",
+        deadEndpoints: new Set(),
+      })
+      expect(result).toMatchObject({
+        warnings: [
+          {
+            code: "strict_closure_not_retried",
+            task_ids: [base.task_id],
+          },
+        ],
+      })
+      expect(messages).toContainEqual({
+        message: expect.stringContaining("may still be running"),
+        data: expect.objectContaining({
+          level: "warn",
+          code: "strict_closure_not_retried",
+          task_ids: [base.task_id],
+        }),
+      })
+      expect(messages[0]?.message).toContain("no longer be retried")
+    } finally {
+      configureSharedSubunitLogger(undefined)
+    }
+  })
+  for (const status of ["running", "error"] as const) {
+    test(`#given ${status} suspension expiry #when rollback prepares #then R0 reads the record and its closing obligation`, () => {
+      const { storeDir, store, base } = storeFixture()
+      const target = "/tmp/rpc.sock"
+      const obligation = {
+        host_session: {
+          socket: target,
+          routing_id: "old",
+          session_path: "/tmp/old.jsonl",
+          instance_id: "old-instance",
+        },
+        requires_confirmation: true,
+      }
+      store.save({
+        ...base,
+        status,
+        killed: true,
+        residency_state: "rpc_detached",
+        failure_kind: "suspended_unresumable",
+        error_message: "suspended_unresumable:host_unreachable",
+        fallback_closing_child: obligation,
+      })
+      migrateHostSessionSockets(storeDir, {
+        to: target,
+        deadEndpoints: new Set(),
+      })
+      const raw = JSON.parse(readFileSync(join(storeDir, "tasks", `${base.task_id}.json`), "utf8"))
+      expect(() => parseR0PersistedReasons(raw)).not.toThrow()
+      expect(raw.failure_kind).toBe("session_unavailable")
+      expect(raw.error_message).toBe("suspended_unresumable:host_unreachable")
+      expect(raw.fallback_closing_child).toEqual(obligation)
+      expect(store.list().records).toHaveLength(1)
+      const restored = store.load(base.task_id)
+      if (restored === null) throw new Error("rollback lost the record")
+      expect(isSuspensionExpiry(restored)).toBe(true)
+      expect(store.load(base.task_id)?.fallback_closing_child).toEqual(obligation)
+      expect(
+        migrateHostSessionSockets(storeDir, {
+          to: target,
+          deadEndpoints: new Set(),
+        }).migrated,
+      ).toBe(0)
+    })
+  }
+
   test("#given shard and rpc records #when migration runs #then only shard sockets move and one event is appended", () => {
     const { storeDir, store, base } = storeFixture()
     const shard = "/tmp/p-aaaaaaaaaaaaaaaa.sock"
@@ -122,6 +219,11 @@ describe("rollback host-session migration", () => {
     const knownRecordPaths: string[] = []
     const r0SuspensionReasons = new Set<string>(R0_SUSPENSION_REASONS)
     const r0FailureReasons = new Set<string>(R0_TASK_START_FAILURE_REASONS)
+    for (const failureKind of TASK_START_FAILURE_KINDS) {
+      const taskId = `st_${ordinal.toString(16).padStart(8, "0")}`
+      store.save({ ...base, task_id: taskId, failure_kind: failureKind })
+      ordinal += 1
+    }
     for (const suspensionReason of SUSPENSION_REASONS) {
       const taskId = `st_${ordinal.toString(16).padStart(8, "0")}`
       store.save({

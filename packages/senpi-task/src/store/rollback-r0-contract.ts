@@ -1,5 +1,19 @@
 // Persisted vocabulary of the rollback target R0 (the #9027 merge on dev, commit ebd01f84e).
 // Rollback preparation may remove only values outside these closed sets.
+export const R0_FAILURE_KINDS = [
+  "child-prompt-failed",
+  "child-turn-failed",
+  "session-create-failed",
+  "depth-exceeded",
+  "model_unavailable",
+  "tools_unavailable",
+  "session_unavailable",
+  "host_unavailable",
+] as const
+
+// R0 reads run_stats.cost_status from this closed set; rollback rewrites a newer "partial" to "reported".
+export const R0_COST_STATUSES = ["reported", "unavailable", "invalid"] as const
+
 export const R0_SUSPENSION_REASONS = [
   "daemon_unavailable",
   "host_draining",

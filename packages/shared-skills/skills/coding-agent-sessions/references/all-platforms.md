@@ -60,8 +60,8 @@ Do not add these as default transcript platforms without a separate prompt-recon
 The finder scans selected platforms concurrently, parses transcript files concurrently, joins OpenCode message/part files concurrently, and evaluates repeated `--query` values concurrently. Increase `--workers` for large local stores:
 
 ```bash
-python3 scripts/find-agent-sessions.py search --query "commit" --query "deploy" --workers 64
-python3 scripts/find-agent-sessions.py search --query "commit" --platform senpi --platform opencode --workers 64
+python3 -B scripts/find-agent-sessions.py search --query "commit" --query "deploy" --workers 64
+python3 -B scripts/find-agent-sessions.py search --query "commit" --platform senpi --platform opencode --workers 64
 ```
 
 Omit `--platform` for the full multi-platform search. Add repeated platform flags such as `--platform openclaw --platform droid` only when the user already knows the likely stores. Comma-separated platform values are intentionally unsupported.

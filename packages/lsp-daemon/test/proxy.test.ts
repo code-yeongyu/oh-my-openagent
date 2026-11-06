@@ -65,7 +65,7 @@ describe("mcp stdio proxy", () => {
 		});
 
 		const responses = parseResponses(out);
-		expect((responses[0]?.["result"] as { serverInfo?: unknown }).serverInfo).toBeDefined();
+		expect((responses[0]?.["result"] as { serverInfo?: unknown } | undefined)?.serverInfo).toBeDefined();
 		const toolResult = responses[1]?.["result"] as { content: Array<{ text: string }> };
 		expect(toolResult.content[0]?.text).toContain("Configured LSP servers");
 	});
@@ -164,7 +164,7 @@ describe("mcp stdio proxy", () => {
 		});
 
 		const responses = parseResponses(out);
-		expect((responses[0]?.["error"] as { code: number }).code).toBe(-32700);
+		expect((responses[0]?.["error"] as { code: number } | undefined)?.code).toBe(-32700);
 	});
 
 	it("#given an initialized idle proxy #when the next request arrives after ten minutes #then it still responds", async () => {
@@ -186,8 +186,8 @@ describe("mcp stdio proxy", () => {
 			await server;
 
 			const responses = parseResponses(out);
-			expect((responses[0]?.["result"] as { serverInfo?: unknown }).serverInfo).toBeDefined();
-			expect((responses[1]?.["result"] as { serverInfo?: unknown }).serverInfo).toBeDefined();
+			expect((responses[0]?.["result"] as { serverInfo?: unknown } | undefined)?.serverInfo).toBeDefined();
+			expect((responses[1]?.["result"] as { serverInfo?: unknown } | undefined)?.serverInfo).toBeDefined();
 		} finally {
 			vi.useRealTimers();
 		}

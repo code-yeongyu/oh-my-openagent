@@ -158,4 +158,14 @@ npm i -g --prefix "$HOME/.local" omo-ai
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
+## Arch Linux: community AUR package
+
+[`omo-bin`](https://aur.archlinux.org/packages/omo-bin) is a community package for Arch Linux and its derivatives, maintained by [@sTiKyt](https://github.com/sTiKyt), not by the OmO team. It downloads the official Linux binary for its version from our [GitHub Releases](https://github.com/code-yeongyu/oh-my-openagent/releases) (`omo-linux-x64`, `omo-linux-x64-baseline` on CPUs without AVX2, or `omo-linux-arm64`), checks it against the SHA-256 in that release's `SHA256SUMS`, and installs it as `/usr/bin/omo`.
+
+```bash
+yay -S omo-bin   # or paru, or your AUR helper of choice
+```
+
+Update it with your AUR helper. `omo update` and the install command don't know about pacman yet: the install command would put a second `omo` in `~/.local/bin` instead of updating `/usr/bin/omo`. New releases reach the package when its maintainer updates it, so it can trail the `latest` channel. As with any AUR package, read the PKGBUILD before you build it. Uninstall with `sudo pacman -R omo-bin`.
+
 Looking for the OpenCode or Codex plugin editions instead? See [Installation](installation.md).

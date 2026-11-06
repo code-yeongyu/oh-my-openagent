@@ -55,7 +55,9 @@ describe("per-file test timeout budget", () => {
   })
 
   test("#given ci.yml #when a POSIX job runs bun test over more than one file #then the invocation carries --timeout 20000", () => {
-    const multiFileRuns = workflow
+    const sharedScripts = ["ci-root-shard-2.sh", "ci-senpi-posix.sh"]
+      .map((file) => readFileSync(join(repoRoot, ".github", "scripts", file), "utf8")).join("\n")
+    const multiFileRuns = (workflow + "\n" + sharedScripts)
       .split("\n")
       .map((line) => line.trim())
       .filter((line) => /^(run: )?bun (--config=\S+ )?test\b/.test(line))
@@ -73,5 +75,6 @@ describe("per-file test timeout budget", () => {
 
   test("#given test-setup.ts #when it sets the preload budget #then it matches the explicit CI budgets", () => {
     expect(preload).toMatch(/setDefaultTimeout\(process\.platform === "win32" \? 30_000 : 20_000\)/)
+    expect(readFileSync(join(repoRoot, "test-support/test-deadline.ts"), "utf8")).toMatch(/export const DEFAULT_TEST_TIMEOUT_MS = process\.platform === "win32" \? 30_000 : 20_000/)
   })
 })

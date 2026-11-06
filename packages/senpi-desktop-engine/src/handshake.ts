@@ -1,6 +1,7 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { ENGINE_ABI, PROTOCOL_VERSION } from "@oh-my-opencode/senpi-desktop-protocol";
+import { DesktopLaunchRefusal } from "./launch-refusal";
 
 /** The `engine.hello` reply of an engine this package accepts. */
 export interface EngineHello {
@@ -87,6 +88,7 @@ function requestHello(enginePath: string, options: HelloOptions): Promise<unknow
 	return new Promise((resolve, reject) => {
 		let outcome: Outcome | undefined;
 		let stderrTail = "";
+		const refusal = new DesktopLaunchRefusal();
 		// The first outcome wins; ending stdin then lets the engine exit at EOF.
 		const settle = (next: Outcome) => {
 			if (outcome !== undefined) return;
@@ -94,19 +96,32 @@ function requestHello(enginePath: string, options: HelloOptions): Promise<unknow
 			child.stdin.end();
 		};
 		const timer = setTimeout(() => {
+			refusal.disable();
 			settle({ ok: false, reason: `no engine.hello reply and exit within ${timeoutMs} ms` });
 			child.kill("SIGKILL");
 		}, timeoutMs);
 
 		child.stderr.setEncoding("utf8");
 		child.stderr.on("data", (chunk: string) => {
+			refusal.push(chunk);
 			stderrTail = (stderrTail + chunk).slice(-STDERR_TAIL_BYTES);
 		});
-		createInterface({ input: child.stdout }).on("line", (line) => settleFromLine(line, settle));
+		createInterface({ input: child.stdout }).on("line", (line) => settleFromLine(line, (next) => {
+			refusal.disable();
+			settle(next);
+		}));
 		child.stdin.on("error", (error) => settle({ ok: false, reason: `stdin: ${error.message}` }));
-		child.on("error", (error) => settle({ ok: false, reason: `spawn: ${error.message}` }));
+		child.on("error", (error) => {
+			refusal.disable();
+			settle({ ok: false, reason: `spawn: ${error.message}` });
+		});
 		child.on("close", (code, signal) => {
 			clearTimeout(timer);
+			const launchError = refusal.finish(code, signal, stderrTail);
+			if (launchError !== undefined) {
+				reject(launchError);
+				return;
+			}
 			const final = outcome ?? {
 				ok: false,
 				reason: `engine exited (code ${code ?? "null"}, signal ${signal ?? "null"}) before replying; stderr: ${stderrTail.trim() || "<empty>"}`,

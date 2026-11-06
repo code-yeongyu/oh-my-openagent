@@ -57,7 +57,6 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
   const pollers = new Map<string, OwnedPoller>()
   const createPoller = deps.createPoller ?? createLeadPoller
   const readMap = deps.readMemberTaskMap ?? readMemberTaskMap
-  const sink = createInjectionSink(deps)
   let stopped = false
   let syncInFlight: Promise<readonly ActiveTeamSummary[]> | undefined
   let tickInFlight: Promise<void> | undefined
@@ -96,7 +95,7 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
       const poller = createPoller({
         teamRunId: team.teamRunId,
         config: deps.config,
-        coordinator: sink,
+        coordinator: createInjectionSink(deps, team.teamRunId),
         ...(deps.deliveryJournal !== undefined ? { deliveryJournal: deps.deliveryJournal } : {}),
         appendEvent: deps.appendTaskEvent,
         eventTaskId: (message) => memberTaskMap[message.from],
@@ -225,7 +224,7 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
     },
   }
 
-  function createInjectionSink(input: LeadPollerLifecycleDeps): LeadInjectionSink {
+  function createInjectionSink(input: LeadPollerLifecycleDeps, teamRunId: string): LeadInjectionSink {
     return {
       enqueue(injection) {
         if (input.coordinator === undefined) {
@@ -234,6 +233,7 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
               customType: "senpi-task:team-message",
               content: injection.content,
               display: false,
+              details: { runRef: { kind: "team", id: teamRunId } },
             },
             { triggerTurn: true, deliverAs: "steer" },
           )
@@ -245,6 +245,7 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
         // leaving it reserved-but-never-flushed.
         const accepted = input.coordinator.enqueue({
           ...injection,
+          runRef: { kind: "team", id: teamRunId },
           customType: "senpi-task:team-message",
           display: false,
         })

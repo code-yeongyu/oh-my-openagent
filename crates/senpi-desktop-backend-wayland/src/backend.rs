@@ -12,6 +12,7 @@ use senpi_desktop_core::backend::{Backend, DeliveryMode, PointerEvent};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::frame::FrameGeometry;
 use senpi_desktop_core::keys::KeyName;
+use senpi_desktop_core::menus::MenuItem;
 use senpi_desktop_core::types::{
     CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopWindow, DisplaySelector, Target,
 };
@@ -148,7 +149,7 @@ impl Backend for WaylandBackend {
     /// Reads the layout of an already connected libei session only; capture
     /// never opens an input session. A layout that cannot be read leaves the
     /// geometry unproven, so the frame refuses coordinate input.
-    fn capture(&mut self, target: &Target, _caps: &CaptureCaps) -> CoreResult<(RgbaImage, FrameGeometry)> {
+    fn capture(&mut self, target: &Target, _caps: &CaptureCaps, _exclude_window_titles: &[String]) -> CoreResult<(RgbaImage, FrameGeometry)> {
         let layout = match &mut self.input {
             Input::Connected(libei) => libei.regions().ok(),
             Input::Untried | Input::Failed(_) => None,
@@ -205,12 +206,53 @@ impl Backend for WaylandBackend {
     fn key_chord(&mut self, target: &Target, keys: &[KeyName], _mode: DeliveryMode) -> CoreResult<()> {
         self.prepare_input(target, "keyboard input")?.key_chord(keys)
     }
+    fn hold_keys(
+        &mut self, target: &Target, keys: &[KeyName], _mode: DeliveryMode,
+        control: &senpi_desktop_core::holds::HoldControl<'_>,
+    ) -> CoreResult<()> {
+        self.prepare_input(target, "bounded keyboard input")?.hold_keys(keys, control)
+    }
+    fn hold_mouse(
+        &mut self, target: &Target, hold: &senpi_desktop_core::holds::MouseHold<'_>,
+        _mode: DeliveryMode, control: &senpi_desktop_core::holds::HoldControl<'_>,
+    ) -> CoreResult<()> {
+        let layout = self.frame_layout.clone();
+        let libei = self.prepare_input(target, "bounded pointer input")?;
+        if let Some(layout) = layout {
+            if libei.regions()? != layout {
+                return Err(DesktopError::invalid_coordinate_frame(LAYOUT_CHANGED));
+            }
+        }
+        libei.hold_mouse(hold, control)
+    }
 
     fn raise_window(&mut self, id: &str) -> CoreResult<()> {
         Err(DesktopError::background_unavailable(format!(
             "window {id} wayland-compositor-focus-only: Wayland cannot programmatically activate a \
              non-focused window; only the currently focused surface is reachable"
         )))
+    }
+
+    fn menu_items(&mut self, window: &DesktopWindow, path: &[String]) -> CoreResult<Vec<MenuItem>> {
+        match &mut self.ax {
+            Ok(ax) => ax.menu_items(window, &[], path),
+            Err(error) => Err(error.clone()),
+        }
+    }
+
+    /// The command runs through its own AT-SPI action, which needs no focus,
+    /// so it reaches a non-focused surface Wayland input cannot target.
+    fn menu_select(
+        &mut self,
+        window: &DesktopWindow,
+        path: &[String],
+        _delivery: DeliveryMode,
+        check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<()> {
+        match &mut self.ax {
+            Ok(ax) => ax.menu_select(window, &[], &|| Ok(Vec::new()), path, check_stop),
+            Err(error) => Err(error.clone()),
+        }
     }
 
     fn ax(&mut self) -> Option<&mut dyn AxBackend> {

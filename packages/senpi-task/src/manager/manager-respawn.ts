@@ -4,18 +4,19 @@ import { dirname, join } from "node:path"
 import { log } from "@oh-my-opencode/utils"
 
 import { hostSessionResumePath, readHostDrainingHold } from "../lifecycle/host-session"
-import type { RespawnFailureCode, RespawnResult } from "../lifecycle/port"
-import { RunnerError } from "../runners/in-process/runner-error"
+import type { RespawnResult } from "../lifecycle/port"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
-import type { TaskRecord } from "../state"
+import type { AwaitingInputReason, TaskRecord } from "../state"
 import { adaptRpcHandle, discardManagedHandle, discardRpcHandle, type ManagedChildHandle } from "./child-handle"
-import { sessionTailFinishedText, sessionTailNeedsContinuation } from "./interrupted-turn"
+import { sessionTailContinuationBlocker, sessionTailFinishedText, sessionTailNeedsContinuation } from "./interrupted-turn"
 import { buildRespawnManagedSpec, isTerminalRecord } from "./manager-helpers"
 import type { ManagedRunner, TrustedRespawnLaunchResolver } from "./types"
 import { modelSelector } from "../runners/in-process/runtime-fallback-settings"
+import { HOST_RESPAWN_CONTINUATION } from "../runners/rpc-host/reconcile-turn"
+import { reconcileDaemonTurn } from "./reconcile-daemon-turn"
+import { classifyResumeFailure, failure, hostRefusal, isTeamRuntimeUnavailable } from "./respawn-failure"
 
-const CONTINUATION_MESSAGE =
-  "Your previous turn was interrupted by a host process restart. Resume your task from its current state and finish it - do not restart from scratch, and do not repeat work already recorded in this session."
+const CONTINUATION_MESSAGE = HOST_RESPAWN_CONTINUATION
 const RESPAWN_CLEANUP_FAILURE_REASON = "rpc respawn cleanup failed"
 
 type RpcRespawnRunner = { start(spec: RpcRunnerSpec): Promise<RpcChildHandle> }
@@ -28,6 +29,9 @@ export async function respawnManagedTask(input: {
   readonly runners: Readonly<Record<"in-process" | "process", ManagedRunner>>
   readonly rpcRunner: RpcRespawnRunner
   readonly trustedLaunch?: TrustedRespawnLaunchResolver
+  // Restoring a paused child (senpi#3811): rebuild it from its transcript and start no turn; the run
+  // re-holds it before anything else reaches it.
+  readonly paused?: boolean
 }): Promise<RespawnResult> {
   if (input.sessionPath === undefined) return respawnFresh(input)
   if (input.record.execution_mode === "in-process") return respawnInProcess({ ...input, sessionPath: input.sessionPath })
@@ -71,6 +75,7 @@ async function respawnFresh(input: {
       ...(trusted?.extensions === undefined ? {} : { extensions: trusted.extensions }),
       ...(trusted?.memberEnv === undefined ? {} : { memberEnv: trusted.memberEnv }),
       depth: input.record.depth,
+      parent_session_id: input.record.parent_session_id,
       root_session_id: input.record.root_session_id,
     })
     return { ok: true, handle: adaptRpcHandle(handle) }
@@ -92,16 +97,18 @@ async function respawnInProcess(input: {
   readonly sessionPath: string
   readonly stateDir: string
   readonly runners: Readonly<Record<"in-process" | "process", ManagedRunner>>
+  readonly paused?: boolean
 }): Promise<RespawnResult> {
   const rebuilt = buildRespawnManagedSpec(input.record, input.stateDir)
   if (!rebuilt.ok) return failure("unrecoverable", rebuilt.code, rebuilt.reason)
-  const resume = input.runners["in-process"].resume
-  if (resume === undefined) return failure("unrecoverable", "respawn_failed", "in-process runner cannot resume sessions")
+  const runner = input.runners["in-process"]
+  if (runner.resume === undefined) return failure("unrecoverable", "respawn_failed", "in-process runner cannot resume sessions")
   let handle: ManagedChildHandle | undefined
   try {
     input.beforeLaunch()
-    handle = await resume(rebuilt.spec, input.sessionPath)
-    await continueInterruptedTurn(input.record, input.sessionPath, handle)
+    // Called on the runner: a runner whose resume reads its own state must keep its receiver.
+    handle = await runner.resume(rebuilt.spec, input.sessionPath)
+    if (input.paused !== true) await continueInterruptedTurn(input.record, input.sessionPath, handle)
     return { ok: true, handle }
   } catch (error) {
     if (handle !== undefined) {
@@ -125,6 +132,7 @@ async function respawnProcess(input: {
   readonly stateDir: string
   readonly rpcRunner: RpcRespawnRunner
   readonly trustedLaunch?: TrustedRespawnLaunchResolver
+  readonly paused?: boolean
 }): Promise<RespawnResult> {
   const spawnSpec = input.record.spawn_spec
   if (spawnSpec === undefined) return failure("unrecoverable", "spawn_spec_unavailable", "persisted spawn spec unavailable")
@@ -143,6 +151,7 @@ async function respawnProcess(input: {
       task_id: input.record.task_id,
       cwd: spawnSpec.cwd,
       state_dir: join(input.stateDir, "children", input.record.task_id),
+      taskStoreDir: input.stateDir,
       prompt: "",
       resumeSessionPath: sessionPath,
       // The recorded endpoint, never a re-derived one: a pre-migration child keeps living where it was.
@@ -153,12 +162,24 @@ async function respawnProcess(input: {
       ...(trusted?.extensions === undefined ? {} : { extensions: trusted.extensions }),
       ...(trusted?.memberEnv === undefined ? {} : { memberEnv: trusted.memberEnv }),
       depth: input.record.depth,
+      parent_session_id: input.record.parent_session_id,
       root_session_id: input.record.root_session_id,
     })
     // An ATTACHED daemon session is the same live session, mid-turn and all: switching it would
     // reopen what is already open, and a continuation nudge would inject a second prompt into a
     // turn that never stopped. A session the host reopened from its JSONL still gets both.
-    if (joinedLiveHostSession(handle)) return { ok: true, handle: adaptRpcHandle(handle) }
+    // The exception: a session whose last turn ENDED while no parent was attached. An aborted or
+    // unanswered turn that sits IDLE can never move again, and the abort may have been deliberate,
+    // so nothing is nudged - the task is flagged "resumed, waiting for input" instead (senpi#3266).
+    // Every other re-joined session is reconciled with the host's own turn state (a finished turn is
+    // adopted, a deadline or failure settles, a turn the host interrupted continues).
+    if (joinedLiveHostSession(handle)) {
+      const awaitingInput = await resumedSessionAwaitingInput(handle, sessionPath)
+      const adapted = adaptRpcHandle(handle)
+      if (awaitingInput !== undefined) return { ok: true, handle: adapted, awaitingInput }
+      if (input.paused !== true) await reconcileDaemonTurn(input.record, handle)
+      return { ok: true, handle: adapted }
+    }
     // A host session with nothing live to re-join and its session directory gone lost its work:
     // report that child by itself instead of resuming an empty session under its task id.
     if (isHostSessionHandle(handle) && !sessionDirPresent) {
@@ -168,8 +189,14 @@ async function respawnProcess(input: {
     if (handle.switchSession === undefined) return cleanupFailure(handle, "respawned RPC handle cannot switch sessions")
     const switched = await handle.switchSession(sessionPath)
     if (switched.cancelled) return cleanupFailure(handle, "switch_session was cancelled")
-    await continueInterruptedTurn(input.record, sessionPath, adaptRpcHandle(handle))
-    await adoptFinishedTurn(input.record, sessionPath, handle)
+    if (input.paused === true) {
+      // Nothing is continued or adopted: the restored child waits for its run's Resume.
+    } else if (handle.reconcileTurn !== undefined) {
+      await reconcileDaemonTurn(input.record, handle)
+    } else {
+      await continueInterruptedTurn(input.record, sessionPath, adaptRpcHandle(handle))
+      await adoptFinishedTurn(input.record, sessionPath, handle)
+    }
     return { ok: true, handle: adaptRpcHandle(handle) }
   } catch (error) {
     const cleaned = handle === undefined || await disposeRpc(handle)
@@ -197,6 +224,20 @@ async function respawnProcess(input: {
 
 function isHostSessionHandle(handle: RpcChildHandle): boolean {
   return "kind" in handle && handle.kind === "host-session"
+}
+
+// The flag read for a re-joined daemon session (senpi#3266): only a PROVEN-idle session whose
+// transcript tail blocks continuation is waiting. A busy session is live and never flagged; an
+// unreadable state is not proof of idleness, so it never flags either.
+async function resumedSessionAwaitingInput(
+  handle: RpcChildHandle,
+  sessionPath: string,
+): Promise<{ readonly reason: AwaitingInputReason } | undefined> {
+  const idle = await handle.sessionIdle?.()
+  if (idle !== true) return undefined
+  const blocker = await sessionTailContinuationBlocker(sessionPath)
+  if (blocker === undefined) return undefined
+  return { reason: blocker === "aborted" ? "resumed_turn_aborted" : "resumed_turn_unfinished" }
 }
 
 /**
@@ -247,37 +288,4 @@ async function disposeRpc(handle: RpcChildHandle): Promise<boolean> {
     log("senpi-task failed respawn cleanup rejected", { taskId: handle.task_id, error: String(error) })
     return false
   }
-}
-
-function classifyResumeFailure(error: unknown): RespawnResult {
-  if (RunnerError.is(error)) {
-    const { kind, message } = error.failure
-    if (kind === "model_unavailable" || kind === "tools_unavailable" || kind === "session_unavailable") {
-      return failure("retryable", kind, message)
-    }
-  }
-  return failure("retryable", "respawn_failed", "in-process respawn failed")
-}
-
-// Both are waits the next reconcile retries: the store index could not be written (nothing was
-// opened), or the recorded endpoint answers incompatibly (the session is never opened elsewhere).
-function hostRefusal(error: unknown): RespawnResult | undefined {
-  if (!RunnerError.is(error) || error.failure.kind !== "host_unavailable") return undefined
-  const { reason, message } = error.failure
-  if (reason !== "store_index_unavailable" && reason !== "host_incompatible") return undefined
-  return failure("retryable", reason, message)
-}
-
-function isTeamRuntimeUnavailable(error: unknown): boolean {
-  if (!(error instanceof Error) || error.name !== "TeamMemberRespawnLaunchError" || !("code" in error)) return false
-  return error.code === "runtime_unavailable" || error.code === "runtime_inactive" ||
-    error.code === "member_missing" || error.code === "task_mapping_mismatch"
-}
-
-function failure(
-  disposition: "retryable" | "unrecoverable",
-  code: RespawnFailureCode,
-  reason: string,
-): RespawnResult {
-  return { ok: false, disposition, code, reason }
 }

@@ -106,7 +106,7 @@ function bindingFrom(record: SqlRow): BindingRecord {
   }
 }
 
-function selectBindings(ctx: StoreContext, where: string, params: readonly SqlValue[], page?: { readonly orderBy: string; readonly limit: number }): BindingRecord[] {
+export function selectBindings(ctx: StoreContext, where: string, params: readonly SqlValue[], page?: { readonly orderBy: string; readonly limit: number }): BindingRecord[] {
   const sql = `SELECT ${BINDING_COLUMNS.join(", ")} FROM bindings WHERE ${where}${page === undefined ? "" : ` ORDER BY ${page.orderBy} LIMIT ?`}`
   return ctx.sql.all(BINDING_COLUMNS, sql, page === undefined ? params : [...params, page.limit], page?.orderBy).map(bindingFrom)
 }

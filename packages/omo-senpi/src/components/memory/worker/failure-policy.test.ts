@@ -40,6 +40,7 @@ describe("reflection failure classification for the park policy", () => {
     ["dirty_uncommitted", "completion_validation", "worktree has uncommitted changes"],
     ["failed", "missing_validated_tip", undefined],
     ["failed", "missing_worktree", undefined],
+    ["failed", "secret_like_content", "secret_like_content: reference/y.md (pem_block) @abc1234"],
   ] as const)("#given %s/%s with detail %p #when classified #then the failure is not retryable", (outcome, reason, detail) => {
     const signal = classifyReflectionFailure({ outcome, reason, detail })
     expect(signal?.retryable).toBe(false)

@@ -2,6 +2,32 @@ import { describe, expect, it } from "bun:test"
 import { TaskHistory } from "./task-history"
 
 describe("TaskHistory", () => {
+  describe("restoreEntry", () => {
+    it("restores exact prior fields without changing another task", () => {
+      // given
+      const history = new TaskHistory()
+      const prior = { id: "t1", agent: "explore", description: "task", status: "completed" as const }
+      history.record("parent", prior)
+      history.record("parent", { ...prior, id: "t2" })
+      history.record("parent", { ...prior, status: "running", startedAt: new Date() })
+      // when
+      history.restoreEntry("parent", "t1", prior)
+      // then
+      expect(history.getByParentSession("parent")).toEqual([prior, { ...prior, id: "t2" }])
+    })
+
+    it("removes a temporary entry without removing another task", () => {
+      // given
+      const history = new TaskHistory()
+      const entry = { id: "t1", agent: "explore", description: "task", status: "pending" as const }
+      history.record("parent", entry)
+      history.record("parent", { ...entry, id: "t2" })
+      // when
+      history.restoreEntry("parent", "t1", undefined)
+      // then
+      expect(history.getByParentSession("parent")).toEqual([{ ...entry, id: "t2" }])
+    })
+  })
   describe("record", () => {
     it("stores an entry for a parent session", () => {
       //#given

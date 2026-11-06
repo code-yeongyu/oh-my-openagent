@@ -274,7 +274,7 @@ describe("codex components doctor check", () => {
     expect(result.status).toBe("pass")
     expect(result.issues).toEqual([])
     expect(
-      result.details?.some((detail) => detail.includes("bootstrap pending — start a Codex session")),
+      result.details?.some((detail) => detail.includes("bootstrap pending: start a Codex session")),
     ).toBe(true)
     expect(result.details?.some((detail) => detail.includes("state none"))).toBe(true)
   })
@@ -290,7 +290,7 @@ describe("codex components doctor check", () => {
 
     // then
     expect(result.status).toBe("pass")
-    const pending = result.details?.find((detail) => detail.includes("bootstrap pending — start a Codex session"))
+    const pending = result.details?.find((detail) => detail.includes("bootstrap pending: start a Codex session"))
     expect(pending).toBeDefined()
     expect(pending).toContain(`installed ${PLUGIN_VERSION}`)
     expect(pending).toContain("state 4.0.0")
@@ -333,7 +333,7 @@ describe("codex components doctor check", () => {
     // then
     expect(result.status).toBe("pass")
     expect(
-      result.details?.some((detail) => detail.includes("bootstrap pending — start a Codex session")),
+      result.details?.some((detail) => detail.includes("bootstrap pending: start a Codex session")),
     ).toBe(true)
   })
 

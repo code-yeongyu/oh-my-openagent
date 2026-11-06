@@ -254,7 +254,7 @@ describe("acquireDesktopEngine", () => {
 
 	it("never fetches an unsupported host", async () => {
 		const { fetch, requests } = releaseFetch();
-		const absent = await acquire({ version, host: "linux-arm64", cacheDir, fetch });
+		const absent = await acquire({ version, host: "win32-ia32", cacheDir, fetch });
 
 		expect(absent.path).toBeNull();
 		expect(requests).toEqual([]);

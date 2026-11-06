@@ -7,7 +7,7 @@ import { hostRunnerHarness } from "../runners/rpc-host.test-support"
 import type { ResolvedModelRecord } from "../state"
 import { createTaskRecordStore } from "../store"
 import { adaptRpcHandle, type ManagedChildHandle } from "./child-handle"
-import { baseSpec, cleanupProjects, FakeRunner, settings, tempProject } from "./__fixtures__/manager-fakes"
+import { baseSpec, cleanupProjects, FakeRunner, launchSettled, settings, tempProject } from "./__fixtures__/manager-fakes"
 import { createTaskManager } from "./manager"
 import type { ManagedRunner } from "./types"
 
@@ -50,6 +50,7 @@ test("#given the parent dies before the failed rung's session closes #when anoth
   })
   const task = await owner.start(baseSpec({ execution_mode: "process" }))
   if (task.kind !== "started") throw new Error("expected the task to start")
+  await launchSettled(owner, task.task_id)
   const [original] = host.sessions()
   if (original === undefined) throw new Error("expected the failed rung's session")
   const message = { role: "assistant", content: [], stopReason: "error", errorMessage: "500 overloaded" }
@@ -60,7 +61,7 @@ test("#given the parent dies before the failed rung's session closes #when anoth
   const disconnected = host.waitForConnections(0)
   await failedRung?.dispose()
   await disconnected
-  owner.forget(task.task_id)
+  owner.forget(task.task_id, { path: "park" })
   owner.workpools.dispose()
   const sweeper = createTaskManager({
     store,
@@ -90,7 +91,7 @@ test("#given the parent dies before the failed rung's session closes #when anoth
     expect(store.load(task.task_id)?.fallback_closing_child).toBeUndefined()
   } finally {
     await sweeper.getResidentHandle(task.task_id)?.dispose()
-    sweeper.forget(task.task_id)
+    sweeper.forget(task.task_id, { path: "end" })
     sweeper.workpools.dispose()
     lifecycle.dispose?.()
   }

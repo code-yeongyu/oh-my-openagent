@@ -20,6 +20,7 @@ that plus strict wire contracts. Parent: [`packages/memory-core/AGENTS.md`](../.
 | `mutation-plan.ts` | `planFactsMutation()` + `factsRecordsHash()` — dirty-parent guard, deterministic ops |
 | `recovery*.ts` | `applyFactsRecovery()`, ownership/reservation finalization, setter-race handling |
 | `person-index.ts`, `assets/facts-persona.md` | Person index + extraction persona prompt |
+| `agreements-target.ts` | Renders `system/agreements.md` for a batch's `agreements` records (from the adapter's `record_agreement` tool) inside the same facts commit; `factsRecordsHash` covers them only when present, so older recovery envelopes still validate |
 
 ## CONVENTIONS
 

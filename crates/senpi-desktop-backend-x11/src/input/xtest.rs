@@ -93,7 +93,7 @@ impl<S: InputServer> X11Input<S> {
         self.server.flush()
     }
 
-    fn approach(&mut self, x: i16, y: i16, over: Option<Window>) -> CoreResult<()> {
+    pub(super) fn approach(&mut self, x: i16, y: i16, over: Option<Window>) -> CoreResult<()> {
         self.motion_xtest(x, y)?;
         over.map_or(Ok(()), |window| self.await_pointer_within(window, (x, y)))
     }

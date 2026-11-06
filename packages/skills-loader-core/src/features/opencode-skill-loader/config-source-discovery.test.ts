@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs"
 import { join } from "path"
 import { homedir, tmpdir } from "os"
 import { SkillsConfigSchema } from "../../config/skills"
-import { discoverConfigSourceSkills, normalizePathForGlob } from "./config-source-discovery"
+import { discoverConfigSourceSkills, normalizePathForGlob, setSkillSourceProvenance } from "./config-source-discovery"
 
 // mkdtempSync, never a Date.now()-derived name: consecutive Date.now() calls in one
 // process return the same millisecond, so sibling suites collided on one directory and
@@ -79,6 +79,10 @@ describe("config source discovery", () => {
     writeSkill(join(homeSkillsDir, "tilde-skill"), "tilde-skill", "Loaded from tilde path")
     const config = SkillsConfigSchema.parse({
       sources: [{ path: `~/${homeSkillsDir.split(homedir())[1]?.replace(/^\//, "")}`, recursive: true }],
+    })
+    // A ~/ source only comes from the user's own config file; config validation tags it the same way (#10693).
+    setSkillSourceProvenance(config, {
+      kind: "user", selectedRoot: join(TEST_DIR, "config"), projectRoot: TEST_DIR, userRoots: [homeSkillsDir],
     })
 
     try {

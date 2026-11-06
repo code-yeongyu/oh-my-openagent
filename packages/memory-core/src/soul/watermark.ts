@@ -9,10 +9,12 @@
 // `notice` lock so concurrent sessions bound to the same identity cannot both
 // emit and both advance.
 
-import { mkdir, readFile, rename, writeFile } from "../fs/resilient"
+import { randomUUID } from "node:crypto"
+import { mkdir, readFileSync, rename, rm, writeFile } from "../fs/resilient"
 import { join } from "node:path"
 
 import { GitCommandError, type GitMemoryRepo } from "../git"
+import { syncJournalDirectory } from "../journal/fsync"
 import { LockContentionError, createLockRecord, noticeLockPath, withLock } from "../locks"
 import { SOUL_PATHS } from "./paths"
 
@@ -28,6 +30,8 @@ export interface ConsumeSoulNoticeOptions {
   readonly locksDir: string
   /** Lock wait budget; defaults to 2000ms. Contention defers the notice to the next compile. */
   readonly waitTimeoutMs?: number
+  /** Receives non-fatal warnings; defaults to a no-op so a host TUI is never written to. */
+  readonly onWarn?: (message: string, detail?: unknown) => void
 }
 
 interface SoulHeadWatermark {
@@ -50,12 +54,16 @@ export async function consumeSoulNoticeDelta(
   repo: GitMemoryRepo,
   options: ConsumeSoulNoticeOptions,
 ): Promise<SoulNotice | undefined> {
+  // The immutable HEAD has already been consumed. Read the small atomic watermark without
+  // yielding to a detached recall build; any change still gets rechecked under the notice lock.
+  const head = await repo.head()
+  if (head !== null && readWatermark(options.noticesDir)?.lastNotifiedHead === head) return undefined
   const record = await createLockRecord("soul notice watermark")
   try {
     return await withLock(
       noticeLockPath(options.locksDir),
       record,
-      () => consumeUnderLock(repo, options.noticesDir),
+      () => consumeUnderLock(repo, options.noticesDir, options.onWarn),
       { waitTimeoutMs: options.waitTimeoutMs ?? 2_000 },
     )
   } catch (error) {
@@ -67,12 +75,13 @@ export async function consumeSoulNoticeDelta(
 async function consumeUnderLock(
   repo: GitMemoryRepo,
   noticesDir: string,
+  onWarn?: ConsumeSoulNoticeOptions["onWarn"],
 ): Promise<SoulNotice | undefined> {
   const head = await repo.head()
   if (head === null) return undefined
-  const watermark = await readWatermark(noticesDir)
+  const watermark = readWatermark(noticesDir)
   if (watermark === undefined) {
-    await writeWatermark(noticesDir, head)
+    await writeWatermark(noticesDir, head, onWarn)
     return undefined
   }
   if (watermark.lastNotifiedHead === head) return undefined
@@ -83,28 +92,28 @@ async function consumeUnderLock(
     // page that already contains one is the same answer an unbounded scan gives. Only a page that is
     // entirely memory-tool commits has to look underneath it. Over a long-lived identity the range is
     // thousands of commits and the unbounded form costs hundreds of milliseconds on every prompt.
-    commits = await repo.log({ range: `${watermark.lastNotifiedHead}..HEAD`, paths: SOUL_PATHS, limit: SOUL_SCAN_PAGE })
+    commits = await repo.log({ range: `${watermark.lastNotifiedHead}..${head}`, paths: SOUL_PATHS, limit: SOUL_SCAN_PAGE })
     if (commits.length === SOUL_SCAN_PAGE && commits.every(isInBand)) {
-      commits = await repo.log({ range: `${watermark.lastNotifiedHead}..HEAD`, paths: SOUL_PATHS })
+      commits = await repo.log({ range: `${watermark.lastNotifiedHead}..${head}`, paths: SOUL_PATHS })
     }
   } catch (error) {
     if (!(error instanceof GitCommandError)) throw error
     // The recorded head left history (rewritten by an external sync): re-establish
     // silently rather than replay a range that can no longer be computed.
-    await writeWatermark(noticesDir, head)
+    await writeWatermark(noticesDir, head, onWarn)
     return undefined
   }
 
   const newest = commits.find((commit) => !isInBand(commit))
   if (newest === undefined) return undefined
-  await writeWatermark(noticesDir, head)
+  await writeWatermark(noticesDir, head, onWarn)
   return { sha: newest.sha, subject: newest.subject }
 }
 
-async function readWatermark(noticesDir: string): Promise<SoulHeadWatermark | undefined> {
+function readWatermark(noticesDir: string): SoulHeadWatermark | undefined {
   let parsed: unknown
   try {
-    parsed = JSON.parse(await readFile(join(noticesDir, SOUL_NOTICE_WATERMARK_FILENAME), "utf8"))
+    parsed = JSON.parse(readFileSync(join(noticesDir, SOUL_NOTICE_WATERMARK_FILENAME), "utf8"))
   } catch {
     return undefined
   }
@@ -120,11 +129,24 @@ function isWatermark(value: unknown): value is SoulHeadWatermark {
     && /^[0-9a-f]{40}$/.test(record.lastNotifiedHead)
 }
 
-async function writeWatermark(noticesDir: string, head: string): Promise<void> {
+async function writeWatermark(noticesDir: string, head: string, onWarn?: ConsumeSoulNoticeOptions["onWarn"]): Promise<void> {
   await mkdir(noticesDir, { recursive: true, mode: 0o700 })
   const target = join(noticesDir, SOUL_NOTICE_WATERMARK_FILENAME)
-  const temporary = `${target}.tmp-${process.pid}`
+  const temporary = `${target}.tmp-${process.pid}-${randomUUID()}`
   const watermark: SoulHeadWatermark = { version: 1, lastNotifiedHead: head }
-  await writeFile(temporary, `${JSON.stringify(watermark)}\n`, { encoding: "utf8", mode: 0o600 })
-  await rename(temporary, target)
+  try {
+    await writeFile(temporary, `${JSON.stringify(watermark)}\n`, { encoding: "utf8", mode: 0o600, flag: "wx", flush: true })
+    await rename(temporary, target)
+  } catch (error) {
+    // Cleanup is best-effort: a failing rm must not replace the original write/rename error.
+    await rm(temporary, { force: true }).catch(() => undefined)
+    throw error
+  }
+  try {
+    await syncJournalDirectory(noticesDir)
+  } catch (error) {
+    if (!(error instanceof Error) || !("code" in error)) throw error
+    // Rename already consumed this notice. A durability failure must not discard its announcement.
+    onWarn?.("[memory] Published soul watermark directory sync failed:", error.code)
+  }
 }

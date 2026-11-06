@@ -217,6 +217,41 @@ describe("createTranscriptMentionIndex", () => {
     expect(excluded.has("reference/weird},name.md")).toBe(true)
   })
 
+  test("#given a cached window #when memory HEAD moves without adding a path #then no cached entry is serialized or scanned again", () => {
+    // given: every serialization of an entry goes through its toJSON, so the count is the scan work
+    let serialized = 0
+    const entries = branchEntries().map((entry) => ({ ...entry, toJSON: () => { serialized += 1; return entry } }))
+    const index = createTranscriptMentionIndex()
+    const first = index.excludedPaths({ sessionId: SESSION_ID, entries, documents: corpusDocuments() })
+    serialized = 0
+
+    // when: a commit edits a note, so the corpus is a new array carrying the same paths
+    const again = index.excludedPaths({ sessionId: SESSION_ID, entries, documents: corpusDocuments() })
+
+    // then: only the entries that are never cached (id-less ones and the newest) are serialized again
+    const window = branchEntries().slice(-RECALL_PATH_ENTRY_WINDOW)
+    const uncached = window.slice(0, -1).filter((entry) => typeof entry.id !== "string").length + 1
+    expect(uncached).toBeLessThan(window.length / 10)
+    expect(serialized).toBe(uncached)
+    expect([...again].sort()).toEqual([...first].sort())
+  }, 30_000)
+
+  test("#given a cached window #when memory HEAD moves and adds a mentioned path #then the result equals the whole-window scan", () => {
+    // given
+    const entries = [...branchEntries(), userEntry("late", "later I wrote notes/added-later.md"), assistantEntry("tail", "ok")]
+    const index = createTranscriptMentionIndex()
+    index.excludedPaths({ sessionId: SESSION_ID, entries, documents: corpusDocuments() })
+
+    // when: the new HEAD adds a note the window already mentions and drops another mentioned one
+    const moved = [...corpusDocuments().filter((document) => document.path !== path(53)), { path: "notes/added-later.md" }]
+    const excluded = index.excludedPaths({ sessionId: SESSION_ID, entries, documents: moved })
+
+    // then
+    expect(excluded.has("notes/added-later.md")).toBe(true)
+    expect(excluded.has(path(53))).toBe(false)
+    expect([...excluded].sort()).toEqual([...excludedPathsByWindowScan(entries.slice(-RECALL_PATH_ENTRY_WINDOW), moved)].sort())
+  }, 30_000)
+
   test("#given a window that drops old entries #when collection repeats #then evicted ids are recomputed, not remembered", () => {
     // given
     const documents = corpusDocuments()

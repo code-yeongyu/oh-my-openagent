@@ -168,6 +168,59 @@ describe("/facts", () => {
     expect(deps.retryTriggers).toEqual(["reconcile"])
   })
 
+  test("#given a parked record #when retrying #then the report says the retry started and leaves the outcome to the next read", async () => {
+    // given: production reconcile only launches the extractor and does not wait for it,
+    // so the retry report must not claim anything about the outcome
+    const identity = await seededIdentity()
+    await seedFailures(identity)
+    const deps = factsDeps(identity)
+
+    // when
+    const text = await invokeFacts(deps, "retry")
+
+    // then
+    expect(text).toContain("1 parked batch unparked")
+    expect(text).toContain("one retry attempt was started")
+    expect(text).toContain("run /facts again to check whether any batch parked again")
+    expect(text).not.toContain("none had parked again")
+    expect(text).not.toContain("parked again (")
+  })
+
+  test("#given a relaunch that fails again synchronously in the test double #when retrying #then the report still claims no outcome, and the next read shows the re-park", async () => {
+    // given: the double re-parks during reconcile, but that timing is not a production
+    // outcome signal, so the retry report must stay silent about it
+    const identity = await seededIdentity()
+    const store = await seedFailures(identity)
+    const deps = Object.assign(
+      fakeDeps(identity, {
+        now: () => NOW.getTime(),
+        factsSink: {
+          reconcile: async () => {
+            for (let attempt = 0; attempt < 5; attempt += 1) {
+              await store.recordFailure({
+                targets: [{ conversationId: "conv-a", endMessageId: "msg-a", endSnapshotLine: 4 }],
+                failureId: `run-a-retry-${attempt}`,
+                reason: "deadline_exceeded",
+              })
+            }
+          },
+        },
+      }),
+      { retryTriggers: [] as string[] },
+    )
+
+    // when
+    const text = await invokeFacts(deps, "retry")
+
+    // then
+    expect(text).toContain("1 parked batch unparked")
+    expect(text).not.toContain("parked again (")
+    expect(text).not.toContain("none had parked again")
+    const reread = await invokeFacts(deps, "")
+    expect(reread).toContain("parked: 1")
+    expect(reread).toContain("conv-a")
+  })
+
   test("#given no records for the requested conversation #when retrying #then it is a no-op with a clear message", async () => {
     // given
     const identity = await seededIdentity()

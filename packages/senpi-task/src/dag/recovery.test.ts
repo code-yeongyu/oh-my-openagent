@@ -198,7 +198,7 @@ class RecoveryTaskManager implements TaskManager {
   interruptTask(): Promise<never> { throw new Error("not implemented") }
   cancelTask(): Promise<never> { throw new Error("not implemented") }
   list(): readonly [] { return [] }
-  forget(): void {}
+  forget(_taskId: string, _options: Parameters<TaskManager["forget"]>[1]): void {}
   // The real manager settles `waitFor` only for a child it holds resident, so this fake answers
   // "held" from the same map its completions come from: a task it can still complete is held here.
   getResidentHandle(taskId: string): ManagedChildHandle | undefined {
@@ -257,6 +257,35 @@ describe("RecoveryTaskManager owner identity", () => {
 })
 
 describe("DAG crash recovery", () => {
+  test("#given a paused graph with live work #when Resume installs it #then installation returns before graph settlement", async () => {
+    const store = createDagFileStore({ project_dir: tempProject() })
+    const checkpoint = recoverableRecord(definition([node("only")]), {
+      only: { state: "paused", taskId: "held-child", attempt: 1 },
+    }, { pause: { reason: "user_stop", pauseSeq: 2 } })
+    store.writeCheckpoint(runId, checkpoint)
+    const manager = new RecoveryTaskManager()
+    manager.add(taskRecord(owner("only"), "running", "held-child"))
+    const recovery = createDagRecovery({ store, taskManager: manager, hostPid: 101 })
+    expect(typeof recovery.installResumedRun).toBe("function")
+    const installed = await recovery.installResumedRun(runId, parentSessionId, 2)
+    if (installed.kind !== "installed") throw new Error("expected installed graph")
+    expect(installed.scheduler.snapshot().status).toBe("running")
+    expect(installed.scheduler.snapshot().nodes[0]?.taskId).toBe("held-child")
+    manager.complete("held-child")
+    expect((await installed.settled).record?.status).toBe("completed")
+  })
+
+  test("#given a user-stop checkpoint #when session recovery runs #then it does not claim or restart the graph", async () => {
+    const store = createDagFileStore({ project_dir: tempProject() })
+    const checkpoint = recoverableRecord(definition([node("only")]), {
+      only: { state: "paused", taskId: "held-child" },
+    }, { pause: { reason: "user_stop", pauseSeq: 2 } })
+    store.writeCheckpoint(runId, checkpoint)
+    const recovery = createDagRecovery({ store, taskManager: new RecoveryTaskManager(), hostPid: 101 })
+    expect(await recovery.resumePausedRuns(parentSessionId)).toEqual([])
+    expect(store.readCheckpoint(runId)).toEqual(checkpoint)
+  })
+
   test("#given a paused run after wave one #when the session restarts #then completed work is reused, the running child folds, and the incomplete wave resumes", async () => {
     // given
     const projectDir = tempProject()

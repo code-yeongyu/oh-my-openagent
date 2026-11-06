@@ -411,7 +411,7 @@ class FakeTaskManager implements TaskManager {
     return { kind: "cancelled", task_id: taskId, previous_status: previousStatus }
   }
   list(): readonly [] { return [] }
-  forget(): void {}
+  forget(_taskId: string, _options: Parameters<TaskManager["forget"]>[1]): void {}
   getResidentHandle(): undefined { return undefined }
   subscribeChild(taskId: string, listener: ManagedChildListener): () => void {
     const listeners = this.#childListeners.get(taskId) ?? new Set<ManagedChildListener>()

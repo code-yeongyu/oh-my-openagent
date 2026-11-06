@@ -34,6 +34,7 @@ fn two_window_backend() -> FakeBackend {
         width: 600,
         height: 400,
         focused: false,
+        is_on_screen: None,
         elevated: None,
     });
     FakeBackend::new(scenario)

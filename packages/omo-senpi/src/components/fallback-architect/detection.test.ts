@@ -118,6 +118,8 @@ describe("fallback-architect detection", () => {
         expect(isFableFiveSelector("anthropic/claude-fable-5")).toBe(true)
         expect(isFableFiveSelector("anthropic-api/claude-fable-5-1")).toBe(true)
         expect(isFableFiveSelector("claude-fable-5-1")).toBe(true)
+        expect(isFableFiveSelector("anthropic-subscription/claude-fable-5-5")).toBe(true)
+        expect(isFableFiveSelector("claude-fable-5-5")).toBe(true)
       })
     })
 

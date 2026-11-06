@@ -13,6 +13,9 @@ export const DagToolParams = Type.Object({
       Type.Literal("retry"),
       Type.Literal("send"),
       Type.Literal("amend"),
+      Type.Literal("resume"),
+      Type.Literal("cancel_node"),
+      Type.Literal("guide"),
     ],
     {
       description: [
@@ -20,6 +23,7 @@ export const DagToolParams = Type.Object({
         "retry gives failed, cancelled, or skipped nodes a FRESH attempt on the same run (completed nodes keep their results and are never re-run); it requires the run to have settled.",
         "send delivers a message to ONE node's child: a running child is steered in place, a finished resident child is revived with its context intact; a child that cannot be continued is refused with node_not_continuable, and retry is then the remedy.",
         "amend submits an edited definition for the SAME run: unchanged completed nodes are cache-reused, and only changed or added nodes plus their transitive dependents re-run.",
+        "On a run the user stopped: guide adds, edits, or removes guidance its nodes receive when the user resumes it; cancel_node cancels one node and its child while the run stays paused; resume is refused, because only the user's Resume restarts a stopped run.",
       ].join(" "),
     },
   ),
@@ -54,6 +58,9 @@ export const DagToolParams = Type.Object({
   node_ids: Type.Optional(Type.Array(Type.String(), { description: "Node ids to retry. retry only, mutually exclusive with node_id; omit both to retry every failed or cancelled node plus the dependents they skipped." })),
   message: Type.Optional(Type.String({ description: "Message delivered to the node's child. Required for send, ignored otherwise." })),
   prompt: Type.Optional(Type.String({ description: "Replacement prompt for a retried node. retry only, and only with exactly one node id." })),
+  guidance_id: Type.Optional(Type.String()),
+  text: Type.Optional(Type.String()),
+  remove: Type.Optional(Type.Boolean()),
 })
 
 export type DagToolInput = Static<typeof DagToolParams>

@@ -205,6 +205,54 @@ describe("facts wiring settle enqueue", () => {
 })
 
 describe("facts wiring session_start reconcile", () => {
+  test("#given an inherited queue and default debounce #when the first settled turn arrives #then the backlog launches immediately", async () => {
+    const paths = await fixture()
+    await seedJournal(paths, 2)
+    await wiringFor(paths, true).enqueueSettled(SESSION)
+    let launches = 0
+    const recovered = createMemoryFactsWiring({
+      identity: IDENTITY,
+      identityPaths: paths,
+      factsEnabled: () => true,
+      extractor: {
+        launchPending: async () => { launches += 1 },
+        reconcilePending: async () => undefined,
+      },
+    })
+    recovered.reconcileExtractor(SESSION)
+    expect(launches).toBe(0)
+
+    await recovered.onSettled(SESSION)
+
+    expect(launches).toBe(1)
+    await recovered.onSettled(SESSION)
+    expect(launches).toBe(1)
+  }, 30_000)
+
+  test("#given backlog remains after a first-turn launch #when the same session rebinds and its next real turn settles #then backlog launches again", async () => {
+    const paths = await fixture()
+    await seedJournal(paths, 2)
+    await wiringFor(paths, true).enqueueSettled(SESSION)
+    let launches = 0
+    const recovered = createMemoryFactsWiring({
+      identity: IDENTITY,
+      identityPaths: paths,
+      factsEnabled: () => true,
+      extractor: {
+        launchPending: async () => { launches += 1 },
+        reconcilePending: async () => undefined,
+      },
+    })
+    await recovered.onSettled(SESSION)
+    expect(launches).toBe(1)
+
+    recovered.reconcileExtractor(SESSION)
+    expect(launches).toBe(1)
+    await recovered.onSettled(SESSION)
+
+    expect(launches).toBe(2)
+  }, 30_000)
+
   test("#given a leftover queue file from a crashed run #when reconcile runs #then it is reported launchable", async () => {
     // given: a settle published an entry that no extractor ever consumed
     const paths = await fixture()

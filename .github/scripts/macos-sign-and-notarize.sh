@@ -3,7 +3,13 @@
 # (hardened runtime, secure timestamp, stable identifier), notarizes them in one
 # notarytool submission, and verifies the result the way Gatekeeper will.
 #
-#   macos-sign-and-notarize.sh --identifier <id> [--entitlements <plist>] <file>...
+#   macos-sign-and-notarize.sh [--sign-only] --identifier <id> [--entitlements <plist>] <file>...
+#
+# --sign-only signs and verifies (team, hardened runtime) without notarizing, for code that is
+# never assessed by Gatekeeper, such as a helper written unquarantined at runtime. That holds
+# only while neither the engine nor the app that launches it opts into quarantine (quarantine
+# opt-in is inherited by child processes); if either sets LSFileQuarantineEnabled, the helper
+# needs notarization again.
 #
 # Signing material comes from the environment (GitHub Actions secrets):
 #   CSC_LINK          base64 of the Developer ID Application .p12
@@ -19,9 +25,11 @@ set -euo pipefail
 
 identifier=""
 entitlements=""
+sign_only=false
 files=()
 while [ "$#" -gt 0 ]; do
   case "$1" in
+    --sign-only) sign_only=true; shift ;;
     --identifier) identifier="${2:?--identifier needs a value}"; shift 2 ;;
     --entitlements) entitlements="${2:?--entitlements needs a value}"; shift 2 ;;
     -*) echo "unknown option: $1" >&2; exit 2 ;;
@@ -29,7 +37,7 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 if [ -z "$identifier" ] || [ "${#files[@]}" -eq 0 ]; then
-  echo "usage: $0 --identifier <id> [--entitlements <plist>] <file>..." >&2
+  echo "usage: $0 [--sign-only] --identifier <id> [--entitlements <plist>] <file>..." >&2
   exit 2
 fi
 for file in "${files[@]}"; do
@@ -105,6 +113,10 @@ for file in "${files[@]}"; do
   grep -q "TeamIdentifier=${team}" <<<"$details" || { echo "::error::${file} is not signed by team ${team}" >&2; exit 1; }
   grep -q "flags=0x10000(runtime)" <<<"$details" || { echo "::error::${file} lacks the hardened runtime" >&2; exit 1; }
 done
+if [ "$sign_only" = true ]; then
+  echo "signed ${#files[@]} file(s) as ${identifier} without notarization (--sign-only)"
+  exit 0
+fi
 
 key_file="$work/AuthKey_${APPLE_API_KEY_ID}.p8"
 printf '%s' "$APPLE_API_KEY" > "$key_file"
@@ -151,11 +163,26 @@ if [ "$status" != "Accepted" ]; then
   exit 1
 fi
 
+# Apple's ticket reaches Gatekeeper a little after notarytool reports Accepted, so a
+# fresh binary can read "Unnotarized Developer ID" for a few minutes. Only that answer
+# is polled; any other assessment fails at once, and nothing is re-signed or resubmitted.
+gatekeeper_timeout="${GATEKEEPER_TIMEOUT_SECONDS:-600}"
 for file in "${files[@]}"; do
-  assessment="$(spctl --assess -vvv --type open --context context:primary-signature "$file" 2>&1 || true)"
-  echo "$assessment"
-  grep -q "source=Notarized Developer ID" <<<"$assessment" || {
-    echo "::error::Gatekeeper does not accept ${file} as notarized" >&2
-    exit 1
-  }
+  gatekeeper_deadline=$(( $(date +%s) + gatekeeper_timeout ))
+  attempt=1
+  while :; do
+    assessment="$(spctl --assess -vvv --type open --context context:primary-signature "$file" 2>&1 || true)"
+    echo "$assessment"
+    if grep -q "source=Notarized Developer ID" <<<"$assessment"; then
+      echo "Gatekeeper accepts ${file} as notarized (attempt ${attempt})"
+      break
+    fi
+    if ! grep -q "source=Unnotarized Developer ID" <<<"$assessment" || [ "$(date +%s)" -ge "$gatekeeper_deadline" ]; then
+      echo "::error::Gatekeeper does not accept ${file} as notarized" >&2
+      exit 1
+    fi
+    echo "Gatekeeper has not seen the notarization ticket for ${file} yet (attempt ${attempt}); retrying" >&2
+    attempt=$((attempt + 1))
+    sleep "${GATEKEEPER_POLL_SECONDS:-20}"
+  done
 done

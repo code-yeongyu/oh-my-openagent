@@ -2,6 +2,7 @@ import { log } from "@oh-my-opencode/utils"
 
 import type { HostSessionIdentity } from "../state"
 import type { LifecycleContext } from "./context"
+import type { IdleReclaimerTimer } from "./port"
 
 /**
  * How a close this process asked for ended. `pending`: the daemon had not answered within
@@ -24,6 +25,7 @@ export async function closeHostSession(
   taskId: string,
   hostSession: HostSessionIdentity,
   cwd: string | undefined,
+  timeoutMs: number = context.hostCloseTimeoutMs,
 ): Promise<HostSessionCloseOutcome> {
   const close = context.hostSessionClose
   if (close === undefined) return { kind: "refused" }
@@ -33,7 +35,7 @@ export async function closeHostSession(
       try {
         context.store.appendEvent(taskId, {
           type: "host_session_closed",
-          payload: { session_path: hostSession.session_path, socket: hostSession.socket },
+          payload: { session_path: hostSession.session_path, socket: hostSession.socket, via: "close_session" },
         })
       } catch (error) {
         log("senpi-task could not record a confirmed host session close", { taskId, error: String(error) })
@@ -45,13 +47,13 @@ export async function closeHostSession(
       return false
     },
   )
-  let timer: ReturnType<typeof setTimeout> | undefined
+  let timer: IdleReclaimerTimer | undefined
   const timedOut = new Promise<"timeout">((resolve) => {
-    timer = setTimeout(() => resolve("timeout"), context.hostCloseTimeoutMs)
+    timer = context.hostCloseScheduler.setInterval(() => resolve("timeout"), Math.max(0, timeoutMs))
     timer.unref?.()
   })
   const first = await Promise.race([settled, timedOut])
-  clearTimeout(timer)
+  if (timer !== undefined) context.hostCloseScheduler.clearInterval(timer)
   if (first === "timeout") {
     log("senpi-task host session close not confirmed in time", { taskId, sessionPath: hostSession.session_path })
     return { kind: "pending", settled }

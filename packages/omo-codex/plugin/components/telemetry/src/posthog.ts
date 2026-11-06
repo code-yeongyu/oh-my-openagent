@@ -2,7 +2,7 @@ import {
 	createTelemetryClient,
 	getDailyActiveCaptureState,
 	getDefaultTelemetryOsProvider,
-	getTelemetryDistinctId,
+	getTelemetryInstallDistinctId,
 	type PostHogActivityCaptureState,
 	type TelemetryOsProvider,
 	type TelemetryTransportFactory,
@@ -12,7 +12,6 @@ import {
 	createComponentTelemetryProductConfig,
 	getComponentTelemetryStateDir,
 	getComponentVersion,
-	MACHINE_ID_PREFIX,
 	writeComponentTelemetryDiagnostic,
 } from "./product-identity.js";
 
@@ -22,7 +21,7 @@ export { getComponentVersion };
 export type PostHogActivityReason = "session_start";
 
 export type PostHogClient = {
-	readonly trackActive: (distinctId: string, reason: PostHogActivityReason) => void;
+	readonly trackActive: (reason: PostHogActivityReason) => void;
 	readonly shutdown: () => Promise<void>;
 };
 
@@ -102,7 +101,7 @@ function createPluginPostHogClient(options: CreatePluginPostHogOptions = {}): Po
 	const activityStateProvider = resolveActivityStateProvider(options);
 
 	return {
-		trackActive: (distinctId, reason) => {
+		trackActive: (reason) => {
 			const activityState = activityStateProvider();
 			if (!activityState.captureDaily) {
 				return;
@@ -110,7 +109,7 @@ function createPluginPostHogClient(options: CreatePluginPostHogOptions = {}): Po
 
 			client.trackActive({
 				dayUTC: activityState.dayUTC,
-				distinctId,
+				distinctId: getTelemetryInstallDistinctId(options.stateDir ?? getComponentTelemetryStateDir()),
 				reason,
 			});
 		},
@@ -124,14 +123,6 @@ export async function createPluginPostHog(): Promise<PostHogClient> {
 	return createPluginPostHogClient();
 }
 
-export function getPostHogDistinctId(): string {
-	return getTelemetryDistinctId(MACHINE_ID_PREFIX, getDefaultTelemetryOsProvider());
-}
-
 export function __createPluginPostHogForTesting(options: CreatePluginPostHogOptions): PostHogClient {
 	return createPluginPostHogClient(options);
-}
-
-export function getPostHogDistinctIdForTesting(osProvider: TelemetryOsProvider): string {
-	return getTelemetryDistinctId(MACHINE_ID_PREFIX, osProvider);
 }

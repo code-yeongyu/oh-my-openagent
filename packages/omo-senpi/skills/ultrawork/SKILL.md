@@ -40,10 +40,12 @@ concurrency, transaction boundaries, or cache invalidation; a
 refactor crossing domain boundaries; or the user signaled care
 ("carefully", "thoroughly", "design first") or demanded review of
 this session's work.
+<!-- omo-ultrawork-astra:tier-unsure:start -->
 When unsure, take HEAVY. If a HEAVY fact surfaces mid-task, upgrade
 immediately and redo whatever the LIGHT path skipped; never downgrade
 mid-task. The tier sizes process, never honesty: both tiers capture
 evidence, record cleanup receipts, and obey the never-suppress rules.
+<!-- omo-ultrawork-astra:tier-unsure:end -->
 
 LIGHT — the deliverable follows a known pattern with no open design
 decisions (one-spot bugfix, an endpoint following an existing
@@ -120,15 +122,25 @@ degrades color and wide-glyph width. In this repo:
 stream). Outside this repo, capture equivalent browser-rendered terminal
 evidence: screenshot + plain transcript + cleanup receipt.
 
-# Bootstrap (DO ALL FOUR BEFORE ANY OTHER WORK — NO SKIPPING)
+# Bootstrap (COMPLETE EVERY SECTION BEFORE ANY OTHER WORK — NO SKIPPING)
+
+## Task resources
+Before the first task command, create one `RUN_TMP=$(mktemp -d)` per task, tracking its paths under section 3 immediately. Export `TMPDIR="$RUN_TMP" NODE_COMPILE_CACHE="$RUN_TMP/node-compile-cache" BUN_RUNTIME_TRANSPILER_CACHE_PATH="$RUN_TMP/bun-transpiler"` for every command; pass the same environment explicitly to children that do not inherit it. Give independent child tasks their own run roots.
+At task end, after owned processes exit, remove only owned directories, including runtime caches. Never wipe shared caches; retain worktrees still needed by open PRs and any parent directory containing them.
 
 When a ulw-loop pointer or the ulw-execute skill accompanies this
 directive, that contract supersedes bootstrap sections 1-3: its state
-owns the goal and is the notepad (the loop CLI's goals and ledger, or
+owns the goal and is the notepad (the loop's goals and ledger, or
 Boulder plus `.omo/ulw-execute/ledger.jsonl`), and its checklist is
-the plan.
+the plan. Its own final gate replaces the Verification gate below, and
+under ulw-execute its orchestrator rule also governs the Execution
+loop: dispatched workers do the CHANGE and RUN steps (QA included),
+and you verify the evidence they capture.
 
 ## 0. Survey the skills, gather context, then size the work
+This section records into the notepad, so run section 2's `NOTE=`
+command first; section 2 then initialises that same file.
+<!-- omo-ultrawork-astra:skill-survey:start -->
 First, survey the loaded skill list and read the description of each
 loosely relevant skill. Decide explicitly which skills this task will
 use and prefer using every genuinely applicable one — name them in the
@@ -136,6 +148,7 @@ notepad with a one-line reason each. Skipping a skill that fits the
 task is a defect. Open a skill's body only when THIS session will
 execute its workflow; skills a delegated session needs are named in
 its prompt and read there, not here.
+<!-- omo-ultrawork-astra:skill-survey:end -->
 Next, fire the first discovery wave under Finding things below — one
 eval cell, with parallel lookups covering the code, git history of paths
 to touch, memory, and prior session evidence. Record the current problem,
@@ -243,7 +256,8 @@ The todo list is the live cursor over the written plan, never a
 substitute for it: the file holds the thinking, the list tracks the
 execution.
 The todo tool is senpi `todo` — your live, user-visible checklist.
-`init` the phased list (one task per atomic work unit: an edit plus
+`init` the phased list, preserving resource-cleanup todos already registered
+(one task per atomic work unit: an edit plus
 its verification, a QA scenario run, a teardown), then drive every
 state transition through it: `start` the instant a step begins,
 `done` the instant it finishes, `append` newly discovered steps the
@@ -252,6 +266,9 @@ enough to finish within a few tool calls. Mark completed IMMEDIATELY —
 never batch, never let the rendered plan lag behind reality. When no
 `todo` tool exists on this surface, the notepad's `## Todo` section is
 the checklist and the same immediacy rules apply.
+ALWAYS add a cleanup todo AT CREATION for each worktree, cache directory (including
+the run root), and QA resource (PID, tmux session, browser context, port, container,
+script or temp path); complete it only after a read-back teardown receipt.
 Step text encodes WHERE / WHY (which criterion it advances) / HOW /
 VERIFY: `path: <action> for <criterion> — verify by <check>`.
 
@@ -284,7 +301,7 @@ Discovery order:
 **`eval` with `language: "js"` is the default surface for the independent
 part of a step - reads, searches, symbol lookups, git/`lsp_*`/web
 queries, `task(...)` spawns - not `bash`, not a parade of one-off calls,
-not `python3 -c`.** If the eval tool reports a Bun kernel (the `bun-1-4` skill is listed),
+not `python3 -c`.** If the eval tool reports a Bun kernel (the `bun` skill is listed),
 read that skill before your first cell; use its builtins (`Bun.$` for a
 command that finishes inside the cell, `Bun.Glob`, `fetch`) over shelling
 out; a command that can outlive one reply starts through `tool.monitor`
@@ -317,12 +334,15 @@ side effects.
 # Execution loop (READ → CHANGE → RUN → CLEAN)
 Until every success criterion PASSES with its evidence captured:
 1. Pick next criterion → mark in_progress → update notepad `## Now`.
+<!-- omo-ultrawork-astra:read-step:start -->
 2. READ what already proves the area BEFORE touching it. Existing
    tests are the behavior of record: note in the notepad whether they
    encode the intended behavior, cover the path you change, and pass.
    One WRONG before your change is a FINDING to report — NEVER edit a
    test green. A bug: reproduce it first and capture the failure. A
    refactor: the existing tests are green on the unchanged code first.
+<!-- omo-ultrawork-astra:read-step:end -->
+<!-- omo-ultrawork-astra:change-step:start -->
 3. CHANGE: the SMALLEST production change that meets the criterion;
    update the tests your change makes stale. Add a test ONLY when
    BOTH hold: the repository keeps tests for this behavior AND a
@@ -339,26 +359,28 @@ Until every success criterion PASSES with its evidence captured:
    `toBe` equality between shipped copies; otherwise review + QA-by-read,
    NO test. Before a change that depends on review, PR, issue, or
    branch state, refresh that state and preserve existing ordering/policy.
+<!-- omo-ultrawork-astra:change-step:end -->
+<!-- omo-ultrawork-astra:run-step:start -->
 4. RUN: the real-surface scenario the criterion named (channel table
    above; auxiliary surface for CLI- or data-shaped criteria), end to
    end, yourself, plus the step-2 tests; a reproduction now passes.
    Paste the artifact path into the notepad.
-5. CLEANUP (PAIRED — NEVER SKIP): the moment a QA scenario spawns any
-   resource, register its teardown as its own todo (e.g.
-   `cleanup: kill server pid for criterion 2 — verify kill -0 fails`).
-   Every runtime artifact the QA spawned in step 4 MUST be torn down
-   before this step completes:
-   server PIDs (`kill <pid>`; verify `kill -0` fails), `tmux` sessions
-   (`tmux kill-session -t ulw-qa-<criterion>`; verify with `tmux ls`),
-   browsers / sessions (`browser.close()` / `session.stop()`), containers
-   (`docker rm -f`), bound ports (`lsof -i :<port>` empty), temp
-   sockets / files / dirs (`rm -rf` the `mktemp` paths), QA-only env
-   vars. Append a one-line cleanup receipt to the notepad next to the
-   artifact, e.g. `cleanup: killed 12345; tmux kill-session ulw-qa-foo;
-   rm -rf /tmp/ulw.aB12cD`. No receipt → criterion stays in_progress.
+<!-- omo-ultrawork-astra:run-step:end -->
+<!-- omo-ultrawork-astra:cleanup-step:start -->
+5. CLEANUP (PAIRED — NEVER SKIP):
+   Before recording QA, tear down owned server PIDs (`kill <pid>`; verify
+   `kill -0` fails), tmux sessions (`tmux kill-session -t ulw-qa-<criterion>`; confirm `tmux ls`),
+   browsers / sessions (`browser.close()` / `session.stop()`), containers (`docker rm -f`), ports
+   (`lsof -i :<port>` empty), QA scripts, temp paths and QA-only env vars.
+   Remove QA temp paths inside `$RUN_TMP` per criterion; remove the run root
+   and eligible worktrees at task end under Task resources.
+   Append the read-back receipt beside the artifact in the notepad.
+   No receipt → criterion stays in_progress.
+<!-- omo-ultrawork-astra:cleanup-step:end -->
 6. Verify: LSP diagnostics clean on changed files; no test skipped or
    xfail-ed this turn.
 7. Mark completed. Append non-obvious findings / learnings.
+<!-- omo-ultrawork-astra:evidence-step:start -->
 8. Evidence stays valid per target until an input changes; record with
    each artifact the commit and what it exercised. After each increment
    rerun what moved — the tests of every touched file and of the files
@@ -367,6 +389,7 @@ Until every success criterion PASSES with its evidence captured:
    rest. The full set (scenarios, suite, typecheck, build) runs once
    more right before the final message. Record PASS/FAIL beside each
    artifact. Loop until all PASS.
+<!-- omo-ultrawork-astra:evidence-step:end -->
 
 Within a step, follow Finding things; READ before CHANGE, never in
 parallel with it.
@@ -446,23 +469,27 @@ children remain open.
 # Verification gate (TRIGGERED, NOT OPTIONAL)
 
 Reviewers cost a full extra agent run, so they are earned by a written
-plan, never by ambition. Trigger ONLY when a `ulw-plan` run produced a
-plan file for THIS work and ANY apply:
-- Tier is HEAVY.
-- User demanded strict, rigorous, or proper review.
-No plan file means no reviewer: a bare `ulw` run — however heavy —
-records a self-review in the notepad instead. Same for LIGHT tier.
+plan or an explicit request, never by ambition. Trigger ONLY when ANY
+apply:
+- A `ulw-plan` run produced a plan file for THIS work and the tier is
+  HEAVY.
+- The user demanded strict, rigorous, or proper review of this work;
+  a `review-work` pass run on it is this gate (its one gate reviewer
+  is the reviewer below).
+Otherwise no reviewer: a bare `ulw` run — however heavy — records a
+self-review in the notepad instead. Same for LIGHT tier.
 Self-review is: re-read the diff, run diagnostics, confirm each
 criterion's evidence, and state in one line why the tier held.
 `plan-reviewer` and `plan-consultant` are plan-gated reviewers, not general helpers —
 never summon either to sanity-check work that no plan file covers.
 
 Procedure (NON-NEGOTIABLE):
-1. Spawn a reviewer child via `task` with a self-contained reviewer
-   assignment in `prompt` — `subagent_type: "plan-reviewer"` for read-only
-   review, or a reviewer-shaped `category` when the review must run
-   code. Pass: goal, success-criteria, scenario evidence, full diff,
-   notepad path.
+1. Spawn a reviewer child via `task` with
+   `subagent_type: "omo-native-gate-reviewer"` (the builtin gate
+   reviewer: it reads, runs commands, and writes its report) and a
+   self-contained reviewer assignment in `prompt`; never `plan-reviewer`,
+   which only reviews a plan file. Pass: goal, success-criteria,
+   scenario evidence, full diff, notepad path.
 2. Verify each reviewer concern yourself. A concern blocks only when
    it names a success criterion the evidence fails; record concerns
    that cite no criterion as notes with a one-line reason — fixed or
@@ -499,6 +526,7 @@ commits this session — then stage + draft the message instead.
   for the regression it names is NOT evidence: mock-call assertions,
   pinned constants, a fixture equal to the default it must override,
   an expected value re-derived from the output under test.
+<!-- omo-ultrawork-astra:blast-radius:start -->
 - Make the smallest correct change per unit, and fix in THIS run every
   defect inside the change's blast radius — the request not delivered,
   a regression this change introduces, an invalid proof, a failing test
@@ -508,9 +536,12 @@ commits this session — then stage + draft the message instead.
   message; a deferral never turns a criterion into PASS. Keep delegated
   unit scope hard: the worker reports, the orchestrator registers or
   files.
+<!-- omo-ultrawork-astra:blast-radius:end -->
 - Never suppress lints / errors / test failures. Never delete, skip,
   `.only`, `.skip`, `xfail`, or comment out tests to green the suite.
+<!-- omo-ultrawork-astra:claim-done:start -->
 - Never claim done from inference — only from captured evidence.
+<!-- omo-ultrawork-astra:claim-done:end -->
 
 # Output discipline
 - First line literally: `ULTRAWORK MODE ENABLED!`
@@ -528,18 +559,22 @@ commits this session — then stage + draft the message instead.
 - After each result, ask whether the user's core request can now be
   answered with useful evidence in hand. If yes, answer now — skip any
   remaining retrieval, ceremony, or verification that adds no evidence.
+<!-- omo-ultrawork-astra:stop-goal-ledger:start -->
 - The STOP GOAL: every scenario PASSES with captured evidence, every
   cleanup receipt is recorded, notepad is current, and (if gate
   triggered) reviewer approved unconditionally. Above ALL of that, the
+<!-- omo-ultrawork-astra:stop-goal-ledger:end -->
   decisive test — outranking every other consideration — is: are the
   completion conditions FUNDAMENTALLY fulfilled, is the user's problem
   ACTUALLY SOLVED in observable behavior? If no, you are NOT done,
   whatever the ledger says. If yes, deliver the final message and STOP
   — no hesitation, no extra verification pass, no polish loop. Work
   past the stop goal is scope creep, not diligence.
+<!-- omo-ultrawork-astra:leftover-qa:start -->
 - Leftover QA state (live process, `tmux` session, browser context,
   bound port, temp file / dir) means NOT done. Tear it down, record
   the receipt, then continue.
+<!-- omo-ultrawork-astra:leftover-qa:end -->
 - After 2 identical failed attempts at one step, surface what was tried
   and ask the user through the question tool before another retry; if
   the question times out, continue on best judgment.

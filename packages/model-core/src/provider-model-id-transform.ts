@@ -11,7 +11,7 @@ function inferSubProvider(model: string): string | undefined {
 }
 
 const CLAUDE_VERSION_DOT = /claude-(\w+)-(\d+)-(\d+)/g
-const GEMINI_31_PRO_PREVIEW = /gemini-3\.1-pro(?!-)/g
+const GEMINI_31_PRO_PREVIEW = /(?<!antigravity-)gemini-3\.1-pro(?!-)/g
 const GEMINI_3_FLASH_PREVIEW = /(?<!antigravity-)gemini-3-flash(?!-)/g
 
 function claudeVersionDot(model: string): string {
@@ -58,6 +58,8 @@ function transformModelForProviderUsingAnthropicBehavior(
 	if (provider === "kimi-coding" || provider === "kimi-for-coding") {
 		if (model === "kimi-k3") return "k3"
 		if (model === "kimi-k3-256k") return "k3-256k"
+		if (model === "kimi-k3.1-pro") return "k3.1-pro"
+		if (model === "kimi-k3.1-pro-highspeed") return "k3.1-pro-highspeed"
 	}
 	return model
 }

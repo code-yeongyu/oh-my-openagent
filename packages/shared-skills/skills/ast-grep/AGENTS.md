@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-Vendored skill teaching agents ast-grep (`sg`) structural search/rewrite, plus a stdlib-Python helper CLI that wraps the `sg` binary. Vendoring pin in `SOURCE`: upstream `code-yeongyu/ast-grep-skill @ 3148c69` (ast-grep 0.45.0), "vendored as a sync; do not fork-drift". Earned this file: own executable surface (749-LOC helper + installers + smoke tests) and a no-fork-drift upstream contract that has no analogue elsewhere in `shared-skills`.
+Vendored skill teaching agents ast-grep (`sg`) structural search/rewrite, plus a stdlib-Python helper CLI that wraps the `sg` binary. Upstream pin in `SOURCE`: upstream `code-yeongyu/ast-grep-skill @ 3148c69` (ast-grep 0.45.0), "vendored as a sync; do not fork-drift". Earned this file: own executable surface (749-LOC helper + installers + smoke tests) and a no-fork-drift upstream contract that has no analogue elsewhere in `shared-skills`.
 
 ## STRUCTURE
 
@@ -41,11 +41,11 @@ Subcommands: `search`, `replace` (dry-run; `--apply` to write), `scan`, `test`, 
 
 ```bash
 # from packages/shared-skills/skills/ast-grep/
-python3 scripts/ast_grep_helper.py search '<PATTERN>' --lang ts [path]
+python3 scripts/ast_grep_helper.py search '<PATTERN>' [path] --lang <LANG>
 python3 scripts/ast_grep_helper.py replace '<PATTERN>' '<REWRITE>' --lang ts   # dry-run; add --apply
 python3 scripts/ast_grep_helper.py doctor
 bash tests/smoke.sh          # or: pwsh tests/smoke.ps1
 # direct:  sg run -p '<PATTERN>' --lang ts path
 ```
 
-- Parent: [`packages/shared-skills/AGENTS.md`](../../AGENTS.md).
+- Parent (source checkout only, not shipped with the installed skill): `packages/shared-skills/AGENTS.md`.

@@ -1,12 +1,14 @@
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { DEFAULT_TEST_TIMEOUT_MS, remainingTestTime } from "../../../../../test-support/test-deadline"
 
 import { OmoTaskSettingsSchema, type OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 
 import type { RunnerOutcome } from "../../runners/in-process/child-handle"
 import type { SuspensionReason } from "../../state"
 import type { ManagedChildEvent, ManagedChildListener } from "../child-handle"
+import type { StartResult, TaskManager } from "../types"
 import { createTaskRecordStore } from "../../store"
 import type { TaskRecordStore } from "../../store"
 import type { ManagedChildHandle } from "../child-handle"
@@ -45,7 +47,7 @@ export type FakeHandle = {
   selfResume(): void
 }
 
-export function makeHandle(taskId: string, pid?: number): FakeHandle {
+export function makeHandle(taskId: string, pid?: number, effectiveModel?: { readonly provider: string; readonly id: string }): FakeHandle {
   let resolveOutcome: (outcome: RunnerOutcome) => void = () => {}
   // Re-armable: each settle resolves the current cycle's promise and arms a fresh one for the next
   // tracking cycle, so a revived task (re-tracked under a new epoch) awaits its OWN completion.
@@ -65,6 +67,7 @@ export function makeHandle(taskId: string, pid?: number): FakeHandle {
     task_id: taskId,
     sessionId: `sess-${taskId}`,
     pid,
+    ...(effectiveModel === undefined ? {} : { effectiveModel: () => effectiveModel }),
     steer: async (text) => {
       steerCalls.push(text)
     },
@@ -135,12 +138,15 @@ export class FakeRunner implements ManagedRunner {
   // When set, every handle this runner produces reports this pid (an rpc-style child with a real OS
   // process). Left undefined it mimics an in-process child with no pid.
   childPid: number | undefined = undefined
+  // The model every produced child reports as its own effective route (#9722); left undefined the
+  // handle observes none.
+  childEffectiveModel: { readonly provider: string; readonly id: string } | undefined = undefined
 
   start(spec: ManagedStartSpec): Promise<ManagedChildHandle> {
     this.startedSpecs.push(spec)
     if (this.startError !== undefined) throw this.startError
     if (this.throwOnStart) throw new Error("runner boom")
-    const fake = makeHandle(spec.taskId, this.childPid)
+    const fake = makeHandle(spec.taskId, this.childPid, this.childEffectiveModel)
     this.handles.set(spec.taskId, fake)
     return Promise.resolve(fake.handle)
   }
@@ -190,6 +196,48 @@ export function makeManager(options: {
     ...(options.executionModeGate !== undefined && { executionModeGate: options.executionModeGate }),
   })
   return { manager, store, inProcess, process: processRunner, project }
+}
+
+/**
+ * Waits until a started task's launch settled: its child is up and the manager tracks the live handle.
+ * `start` reports a launch slower than its report window as still starting, so a test that uses the
+ * child's session or emits records to it right after `start` must wait here first.
+ */
+type LaunchObserver = { whenLaunched?(taskId: string): Promise<void>; get?: TaskManager["get"] }
+
+export function launchSettled(manager: LaunchObserver, taskId: string, testTimeoutMs?: number): Promise<void>
+export function launchSettled(manager: LaunchObserver, result: StartResult, testTimeoutMs?: number): Promise<string>
+export async function launchSettled(
+  manager: LaunchObserver,
+  input: string | StartResult,
+  testTimeoutMs = DEFAULT_TEST_TIMEOUT_MS,
+): Promise<void | string> {
+  if (typeof input !== "string" && (input.kind !== "started" || input.starting !== true)) return input.kind
+  if (manager.whenLaunched === undefined) throw new Error("the manager exposes no whenLaunched")
+  const taskId = typeof input === "string" ? input : input.task_id
+  // This is the manager's latched in-flight promise, not a next-event listener: even a launch
+  // that settled before `start` returned cannot be missed. Subscribe before arming the deadline.
+  const launched = manager.whenLaunched(taskId)
+  // All launches in a test share its budget; each child must not start a new stopwatch.
+  const remainingMs = remainingTestTime(testTimeoutMs)
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    await Promise.race([
+      launched,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(
+          `awaited whenLaunched(${taskId}); exhausted launch settlement share of ${testTimeoutMs} ms test budget`,
+        )), remainingMs)
+      }),
+    ])
+  } finally {
+    clearTimeout(timer)
+  }
+  if (typeof input !== "string") {
+    const record = manager.get?.(taskId)
+    if (record === undefined) throw new Error(`settled launch has no record: ${taskId}`)
+    return record.status
+  }
 }
 
 export function baseSpec(overrides: Partial<ManagerStartSpec> = {}): ManagerStartSpec {

@@ -22,6 +22,8 @@ import { createConfigHandler } from "./plugin-handlers"
 import { log } from "./shared"
 import { markServerRunningInProcess } from "./shared/tmux/tmux-utils/server-health"
 import type { ModelFallbackControllerAccessor } from "./hooks/model-fallback"
+import { subscribeSkillDiagnostics } from "@oh-my-opencode/skills-loader-core/opencode-skill-loader"
+import { showSkillSecurityNotice } from "./plugin/skill-security-notice"
 
 type CreateManagersDeps = {
   BackgroundManagerClass: typeof BackgroundManager
@@ -70,6 +72,7 @@ export function createManagers(args: {
 }): Managers {
   const { ctx, pluginConfig, tmuxConfig, modelCacheState, backgroundNotificationHookEnabled, runtimeSkillSourceUrl } = args
   const deps = { ...defaultCreateManagersDeps, ...args.deps }
+  const unsubscribeSkillDiagnostics = subscribeSkillDiagnostics((diagnostic) => showSkillSecurityNotice(ctx, diagnostic.message, diagnostic.category))
 
   // Only mark the server as in-process when the SDK actually exposes a
   // serverUrl. `tmuxConfig.enabled` alone is not proof of a running server —
@@ -117,6 +120,7 @@ export function createManagers(args: {
 
   deps.registerManagerForCleanupFn({
     shutdown: async () => {
+      unsubscribeSkillDiagnostics()
       tuiStateMirror?.stop()
       await cleanupTeamModeRuns().catch((error) => {
         log("[create-managers] team-mode cleanup error during process shutdown:", error)
@@ -207,7 +211,9 @@ export function createManagers(args: {
 
   deps.initTaskToastManagerFn(ctx.client)
 
-  const skillMcpManager = new deps.SkillMcpManagerClass()
+  const skillMcpManager = new deps.SkillMcpManagerClass({
+    onEnvironmentNotice: (message) => showSkillSecurityNotice(ctx, message),
+  })
 
   const configHandler = deps.createConfigHandlerFn({
     ctx: { directory: ctx.directory, client: ctx.client },

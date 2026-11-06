@@ -38,18 +38,20 @@ function longActiveRecord(): TaskRecord {
 }
 
 describe("buildWidgetRows", () => {
-  it("#given active and completed records #when selecting rows #then only resident team members follow active rows before the cap", () => {
+  it("#given completed records beside a running record #when building rows #then completed records leave the widget and the running one stays", () => {
+    // given completed members whose handles are still resident (revivable), an ordinary completed task, and a running member
     const alpha = record({ task_id: "st_alpha", name: "team:12345678-1234-1234-1234-123456789abc:alpha", task_summary: "settled alpha", status: "completed" })
     const beta = record({ task_id: "st_beta", name: "team:12345678-1234-1234-1234-123456789abc:beta", task_summary: "settled beta", status: "completed" })
     const ordinary = record({ task_id: "st_ordinary", task_summary: "ordinary task", status: "completed" })
-    const stale = record({ task_id: "st_stale", name: "team:12345678-1234-1234-1234-123456789abc:stale", task_summary: "stale member", status: "completed" })
-    const active = Array.from({ length: 4 }, (_value, index) => record({ task_id: `st_${index}`, status: "running" }))
-    const rows = buildWidgetRows([alpha, ordinary, stale, ...active, beta], new Set([alpha.task_id, beta.task_id, ordinary.task_id]))
-    expect(rows.slice(0, 4).every((row) => row.includes("running"))).toBe(true)
-    expect(rows[4]).toContain("settled alpha")
-    expect(rows[4]).toContain("completed")
-    expect(rows[5]).toBe("+1 more")
-    expect(rows.join("\n")).not.toMatch(/ordinary task|stale member/u)
+    const gamma = record({ task_id: "st_gamma", name: "team:12345678-1234-1234-1234-123456789abc:gamma", task_summary: "working gamma", status: "running" })
+
+    // when
+    const rows = buildWidgetRows([alpha, ordinary, gamma, beta])
+
+    // then completed work leaves the live widget; the running member stays
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toContain("working gamma")
+    expect(rows.join("\n")).not.toMatch(/settled alpha|settled beta|ordinary task|completed/u)
   })
 
   it("#given an active task #when building a row #then useful identity and execution context remain", () => {
@@ -150,16 +152,59 @@ describe("backgroundWidgetRows", () => {
   })
 })
 
-describe("suspended residency labeling", () => {
-  it("#given a persisted_only record #when formatting a full row #then the status shows suspended", () => {
+describe("run-paused children", () => {
+  it("#given a resident child held by its run's Stop #when rendering the live footer #then it reads paused with a still mark and no climbing clock", () => {
+    // given a child the parent's Stop paused hours after it was created, with no run stats yet
+    const paused = record({
+      task_id: "st_paused", task_summary: "held child", status: "paused", residency_state: "resident", execution_mode: "process",
+      category: "unspecified-high", created_at: "2026-11-03T00:02:45.000Z",
+      run_pause: { parent_session_id: "session-a", parent_pause_seq: 16, run_ref: { kind: "task", id: "st_paused" } },
+    })
+    const now = Date.parse("2026-11-03T05:54:45.000Z")
+
+    // when the footer renders it without live activity, with and without stats
+    const rows = [
+      ...backgroundWidgetRows([paused], new Map(), now, undefined, 220),
+      ...backgroundWidgetRows([paused], new Map(), now, () => ({ runtime_ms: 0, turns: 0, tool_calls: 0 }), 220),
+      ...backgroundWidgetRows([paused], new Map([["st_paused", "running"]]), now, undefined, 220),
+    ]
+
+    // then each row names the pause, never claims motion, and shows no elapsed time since creation
+    for (const row of rows) {
+      expect(row).toStartWith("‖ ")
+      expect(row).toContain("paused")
+      expect(row).not.toMatch(/starting|running|352m/u)
+    }
+  })
+})
+
+describe("automatic recovery residency labeling", () => {
+  it("every unfinished parked record shape renders recovery without a cancel hint", () => {
+    for (const status of ["pending", "running"] as const) {
+      for (const residency_state of ["resident", "persisted_only", "rpc_detached", "evicted", "disposed"] as const) {
+        for (const suspension_reason of [undefined, "daemon_unavailable", "handoff_parked", "host_draining", "host_incompatible", "idle_evicted", "own_host_unreachable", "revival_deferred", "store_index_unavailable"] as const) {
+          if (residency_state === "resident" && suspension_reason === undefined) continue
+          const parked = record({ task_id: "st_recovery", status, residency_state, suspension_reason })
+          const rows = [formatTaskRow(parked), ...buildWidgetRows([parked]),
+            ...backgroundWidgetRows([parked], new Map(), 0, undefined, 90),
+            ...backgroundWidgetRows([parked], new Map(), 0, undefined, 220)]
+          for (const row of rows) {
+            expect(row).toContain(suspension_reason === "host_incompatible" ? "ending" : "resuming")
+            expect(row).not.toMatch(/suspended|\/task-kill/u)
+          }
+        }
+      }
+    }
+  })
+  it("#given a persisted_only record #when formatting a full row #then the status shows resuming", () => {
     const row = formatTaskRow(record({ task_id: "st_susp", status: "running", residency_state: "persisted_only" }))
-    expect(row).toContain("suspended")
+    expect(row).toContain("resuming")
     expect(row).not.toContain("status:running")
   })
 
-  it("#given an rpc_detached record #when formatting a full row #then the status shows suspended", () => {
+  it("#given an rpc_detached record #when formatting a full row #then the status shows resuming", () => {
     const row = formatTaskRow(record({ task_id: "st_susp", status: "running", residency_state: "rpc_detached" }))
-    expect(row).toContain("suspended")
+    expect(row).toContain("resuming")
     expect(row).not.toContain("status:running")
   })
 
@@ -169,22 +214,136 @@ describe("suspended residency labeling", () => {
     expect(row).not.toContain("suspended")
   })
 
-  it("#given a persisted_only record #when building a widget row #then it contains suspended", () => {
+  it("#given a persisted_only record #when building a widget row #then it contains resuming", () => {
     const row = buildWidgetRows([record({ task_id: "st_susp", status: "running", residency_state: "persisted_only" })])
     expect(row.length).toBeGreaterThan(0)
-    expect(row[0]).toContain("suspended")
+    expect(row[0]).toContain("resuming")
   })
 
-  it("#given an rpc_detached record #when building a widget row #then it contains suspended", () => {
+  it("#given an rpc_detached record #when building a widget row #then it contains resuming", () => {
     const row = buildWidgetRows([record({ task_id: "st_susp", status: "running", residency_state: "rpc_detached" })])
     expect(row.length).toBeGreaterThan(0)
-    expect(row[0]).toContain("suspended")
+    expect(row[0]).toContain("resuming")
   })
 
-  it("#given a persisted_only record #when building a background widget row #then it contains suspended", () => {
+  it("#given a suspended background child #when the live row repaints over time #then it neither spins nor counts", () => {
+    // given a child parked since 00:05 that the parent restarted away from
+    const parked = record({
+      task_id: "st_parked",
+      task_summary: "parked child",
+      status: "running",
+      residency_state: "rpc_detached",
+      created_at: "2026-07-07T00:00:00.000Z",
+      updated_at: "2026-07-07T00:05:00.000Z",
+    })
+    const at = (iso: string) => backgroundWidgetRows([parked], new Map(), Date.parse(iso), () => undefined, 220)[0] ?? ""
+
+    // when it repaints a quarter second later, and again hours later
+    const first = at("2026-07-07T06:00:00.000Z")
+    const later = at("2026-07-07T06:00:00.250Z")
+    const muchLater = at("2026-07-07T09:30:00.000Z")
+
+    // then the row is static, shows no running time, and says why and what to do
+    expect(later).toBe(first)
+    expect(muchLater).toBe(first)
+    expect(first).toStartWith("‖ ")
+    expect(first).not.toMatch(/\d+m \d+s|\b\d+s\b/u)
+    expect(first).toContain("parent session restarted")
+    expect(first).toContain("resuming")
+    expect(first).not.toMatch(/suspended|\/task-kill|resumes on session restart/u)
+  })
+
+  it("#given a recovering child on a 118-column terminal #when building the live row #then no user action is needed", () => {
+    // given a parked child and a common terminal width
+    const parked = record({ task_id: "st_narrow", task_summary: "parked child", status: "running", residency_state: "persisted_only" })
+
+    // when the live row renders at 118 columns
+    const row = backgroundWidgetRows([parked], new Map(), Date.parse("2026-07-07T01:00:00.000Z"), () => undefined, 118)[0] ?? ""
+
+    // then the recovery state survives the width budget without a user action
+    expect(rendererVisibleWidth(row)).toBeLessThanOrEqual(118)
+    expect(row).toContain("resuming (parent session restarted)")
+    expect(row).not.toMatch(/suspended|\/task-kill/u)
+  })
+
+  it.each([
+    ["cancelled", "disposed"],
+    ["completed", "evicted"],
+    ["error", "disposed"],
+  ] as const)("#given a %s task whose residency is %s #when formatting rows #then it keeps its own status", (status, residency) => {
+    // given a finished child, released from memory as finished children are
+    const finished = record({ task_id: "st_done", status, residency_state: residency })
+
+    // when the full and compact rows render
+    const full = formatTaskRow(finished)
+    const compact = buildWidgetRows([finished])[0] ?? ""
+
+    // then neither calls it suspended
+    expect(full).toContain(`status:${status}`)
+    expect(full).not.toContain("suspended")
+    expect(compact).not.toContain("suspended")
+  })
+
+  it.each([
+    ["an in-process child left by a parent restart", { residency_state: "persisted_only" }, "resumes on session restart"],
+    ["a pending daemon-hosted child", { status: "pending", residency_state: "rpc_detached", runner_kind: "host-session", host_session: { socket: "/tmp/host.sock", routing_id: "route-1", session_path: "/tmp/child.jsonl", instance_id: "inst-1" }, suspension_reason: "own_host_unreachable" }, "resumes on session restart"],
+    ["a running daemon-hosted child whose host was lost", { residency_state: "rpc_detached", runner_kind: "host-session", host_session: { socket: "/tmp/host.sock", routing_id: "route-1", session_path: "/tmp/child.jsonl", instance_id: "inst-1" }, suspension_reason: "own_host_unreachable" }, "resumes on session restart or a message"],
+    ["a running daemon-hosted child evicted while idle", { residency_state: "rpc_detached", runner_kind: "host-session", host_session: { socket: "/tmp/host.sock", routing_id: "route-1", session_path: "/tmp/child.jsonl", instance_id: "inst-1" }, suspension_reason: "idle_evicted" }, "resumes on a message"],
+    ["a child on an incompatible host", { residency_state: "rpc_detached", suspension_reason: "host_incompatible" }, "will not resume"],
+    ["an in-process child whose deferred revival ends in lost", { residency_state: "persisted_only", suspension_reason: "revival_deferred", revival_deferred_reason: "model_unavailable" }, "retried a few times, then marked lost"],
+    ["a child deferred for capacity", { residency_state: "persisted_only", suspension_reason: "revival_deferred", revival_deferred_reason: "capacity" }, "retried when a running child ends, else on session restart"],
+  ] as const)("#given %s #when building the live row #then recovery needs no manual action", (_label, overrides) => {
+    // given a parked child of that kind
+    const parked = record({ task_id: "st_promise", status: "running", ...overrides })
+
+    // when the live row renders on a wide line
+    const row = backgroundWidgetRows([parked], new Map(), Date.parse("2026-07-07T01:00:00.000Z"), () => undefined, 220)[0] ?? ""
+
+    // then every public row uses a transient state, never an instruction to the user
+    for (const rendered of [row, formatTaskRow(parked), ...buildWidgetRows([parked])]) {
+      expect(rendered).toContain(parked.suspension_reason === "host_incompatible" ? "ending" : "resuming")
+      expect(rendered).not.toMatch(/suspended|\/task-kill|resumes on session restart/u)
+    }
+  })
+
+  it.each([
+    ["own_host_unreachable", "host lost"],
+    ["daemon_unavailable", "task daemon unavailable"],
+    ["idle_evicted", "evicted while idle"],
+  ] as const)("#given a %s suspension #when building the live row #then it names the cause", (reason, phrase) => {
+    // given a child the host parked for that reason, still marked resident in the store
+    const parked = record({ task_id: "st_reason", status: "running", residency_state: "resident", suspension_reason: reason })
+
+    // when the live row renders
+    const row = backgroundWidgetRows([parked], new Map(), Date.parse("2026-07-07T01:00:00.000Z"), () => undefined, 220)[0] ?? ""
+
+    // then it reads as suspended for that cause, not as running
+    expect(row).toStartWith("‖ ")
+    expect(row).toContain(phrase)
+    expect(row).not.toContain("running")
+  })
+
+  it("#given a revival deferred for a named reason #when building the live row #then the deferral reason is shown", () => {
+    // given a child whose revival the reconcile deferred for capacity
+    const parked = record({
+      task_id: "st_deferred",
+      status: "running",
+      residency_state: "persisted_only",
+      suspension_reason: "revival_deferred",
+      revival_deferred_reason: "capacity",
+    })
+
+    // when the live row renders
+    const row = backgroundWidgetRows([parked], new Map(), Date.parse("2026-07-07T01:00:00.000Z"), () => undefined, 220)[0] ?? ""
+
+    // then the row names the deferral and its reason
+    expect(row).toContain("revival deferred: capacity")
+  })
+
+  it("#given a persisted_only record #when building a background widget row #then it contains resuming", () => {
     const now = Date.parse("2026-07-07T00:01:00.000Z")
     const row = backgroundWidgetRows([record({ task_id: "st_susp", status: "running", residency_state: "persisted_only" })], new Map([]), now, () => undefined, 220)[0] ?? ""
-    expect(row).toContain("suspended")
+    expect(row).toContain("resuming")
   })
 })
 

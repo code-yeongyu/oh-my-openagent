@@ -5,6 +5,7 @@ export function toComputerSettingsInput(block: OmoComputerSettings | undefined):
   if (block === undefined) return undefined
   const input: Record<string, unknown> = {
     enabled: block.enabled,
+    showCursor: block.showCursor,
     display: block.display,
     maxWidth: block.max_width,
     maxHeight: block.max_height,

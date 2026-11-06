@@ -65,6 +65,7 @@ async function fixture() {
     attempt: 1,
     kind: "reflection",
     command: process.execPath,
+    memoryRoot: root,
     args: [childPath, runDir],
     cwd: worktree.dir,
     env: { ...process.env },

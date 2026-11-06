@@ -46,6 +46,7 @@ export type CreateHostSessionChannel = (socketPath: string) => HostSessionChanne
 /** The per-child runner this one delegates to when the daemon cannot host a child. */
 export interface FallbackChildRunner {
   start(spec: RpcRunnerSpec): Promise<RpcChildHandle>
+  settleTeardowns?(): Promise<void>
 }
 
 export type RpcHostRunnerOptions = {
@@ -216,6 +217,10 @@ export class RpcHostRunner {
       waitMs: this.admissionWaitMs,
       onWarning: this.onWarning,
     })
+  }
+
+  async settleTeardowns(): Promise<void> {
+    await Promise.all([this.sessionOpener.settleTeardowns(), this.options.fallback?.settleTeardowns?.()])
   }
 
   /**

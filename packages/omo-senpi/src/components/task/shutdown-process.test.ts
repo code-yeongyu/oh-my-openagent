@@ -54,6 +54,7 @@ for (const path of ["park", "missing-session", "normal", "missing-session-runnin
         ...base, lifecycle,
         manager: {
           ...base.manager,
+          list: (scope: Parameters<typeof base.manager.list>[0]) => base.manager.list(scope),
           residentTaskIds: () => registry.entries().map(handle => handle.task_id),
           get: (id: string) => store.load(id) ?? undefined,
         },
@@ -62,7 +63,7 @@ for (const path of ["park", "missing-session", "normal", "missing-session-runnin
         logger: { info() {}, warn() {}, error() {} },
         config: { getFlag: () => false },
         getCapturedTools: () => [],
-      }, engine, { scheduleSync() {}, syncNow() {}, dispose() {} },
+      }, engine, { scheduleSync() {}, syncNow() {}, observeRecord() {}, dispose() {} },
       createSessionTransitionBridge({ runtime: engine.runtime, notifier: engine.notifier }), {
         reconcileTeamMailbox: async () => {},
         leadPollers: { tick: async () => {}, shutdown() {} },

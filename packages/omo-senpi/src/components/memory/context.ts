@@ -1,6 +1,6 @@
 import { mkdir } from "@oh-my-opencode/memory-core/fs"
 
-import type { MemoryIdentityPaths } from "@oh-my-opencode/memory-core"
+import type { AutoIdentityMode, MemoryIdentityPaths } from "@oh-my-opencode/memory-core"
 
 import type { MemorySessionBinding } from "./binding"
 
@@ -26,6 +26,7 @@ export interface MemoryIdentityContext {
   readonly repoAccess: MemoryRepoAccess
   readonly binding: MemorySessionBinding
   readonly ledger: MemoryPendingLedger
+  readonly projectScope?: { readonly memoryRoot: string; readonly autoIdentity: AutoIdentityMode }
 }
 
 export function createMemoryIdentityContext(input: {
@@ -33,6 +34,7 @@ export function createMemoryIdentityContext(input: {
   readonly identityPaths: MemoryIdentityPaths
   readonly binding: MemorySessionBinding
   readonly durableRoot?: string
+  readonly projectScope?: { readonly memoryRoot: string; readonly autoIdentity: AutoIdentityMode }
 }): MemoryIdentityContext {
   let repoAccess: MemoryRepoAccess | undefined
   return {
@@ -41,6 +43,7 @@ export function createMemoryIdentityContext(input: {
     durableRoot: input.durableRoot ?? input.identityPaths.root,
     binding: input.binding,
     ledger: { pendingCompaction: false, configRestartNotified: false },
+    ...(input.projectScope === undefined ? {} : { projectScope: input.projectScope }),
     get repoAccess(): MemoryRepoAccess {
       repoAccess ??= {
         path: input.identityPaths.repo,
@@ -68,5 +71,5 @@ export async function ensureIdentityRuntimeDirs(paths: MemoryIdentityPaths): Pro
     paths.factsQueue,
     paths.facts,
     paths.notices,
-  ].map((path) => mkdir(path, { recursive: true })))
+  ].map((path) => mkdir(path, { recursive: true, mode: 0o700 })))
 }

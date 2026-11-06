@@ -51,6 +51,9 @@ export async function hangAfterEnqueue(tx, binding) {
   if (bound.kind !== "ok") throw new Error(JSON.stringify(bound))
   const result = await tx.enqueue({ binding_id: bound.binding.binding_id, event_id: binding.binding.chat_id, text: "hello" })
   if (result.kind !== "ok") throw new Error(JSON.stringify(result))
+  // The enqueue wrote the wake marker before it returned, and COMMIT never runs: tell the parent on stdout,
+  // which cannot miss the line the way a cross-process file watch can miss the marker's creation.
+  console.log("ENQUEUED")
   return new Promise(() => {})
 }
 
@@ -70,4 +73,13 @@ export function lateThrow() {
 export function lateReject() {
   void Promise.reject(new Error("late extension rejection"))
   return null
+}
+
+export async function execDuringEnqueue(tx, request) {
+  const pending = tx.enqueue(request)
+  let refused
+  try { tx.exec("INSERT INTO alpha_items VALUES (7, 'inside-savepoint')") }
+  catch (error) { refused = error.code }
+  await pending.catch(() => undefined)
+  return { refused }
 }

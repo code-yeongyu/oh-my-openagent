@@ -11,7 +11,7 @@ import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto
 import type { ExternalAuthor, StoreRefusal } from "./types"
 
 export const BINDING_SCHEMA_VERSION = 1
-export const BINDING_PLATFORMS = ["discord", "telegram", "slack", "notion", "feishu", "herdr", "custom"] as const
+export const BINDING_PLATFORMS = ["discord", "telegram", "slack", "notion", "feishu", "herdr", "custom", "whatsapp"] as const
 export const OUTBOUND_EVENTS = ["milestone", "report", "question", "completion"] as const
 export const BINDING_STATUSES = ["active", "detached", "expired"] as const
 export const INBOUND_MODES = ["auto", "follow_up"] as const

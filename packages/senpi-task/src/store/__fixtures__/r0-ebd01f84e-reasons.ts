@@ -2,7 +2,20 @@
 // - packages/senpi-task/src/state/types.ts
 // - packages/senpi-task/src/state/start-failure.ts
 
+import { validateR0Enums } from "./r0-ebd01f84e-enums"
+
 export const R0_SOURCE_COMMIT = "ebd01f84e"
+
+export const R0_FAILURE_KINDS = [
+  "child-prompt-failed",
+  "child-turn-failed",
+  "session-create-failed",
+  "depth-exceeded",
+  "model_unavailable",
+  "tools_unavailable",
+  "session_unavailable",
+  "host_unavailable",
+] as const
 
 export const R0_SUSPENSION_REASONS = [
   "daemon_unavailable",
@@ -50,8 +63,14 @@ export const R0_TASK_START_FAILURE_REASONS = [
 
 const suspensionReasons = new Set<string>(R0_SUSPENSION_REASONS)
 const failureReasons = new Set<string>(R0_TASK_START_FAILURE_REASONS)
+const failureKinds = new Set<string>(R0_FAILURE_KINDS)
 
 export function parseR0PersistedReasons(record: Record<string, unknown>): void {
+  validateR0Enums(record)
+  const failureKind = record["failure_kind"]
+  if (failureKind !== undefined && (typeof failureKind !== "string" || !failureKinds.has(failureKind))) {
+    throw new Error(`R0 rejects failure_kind ${String(failureKind)}`)
+  }
   const suspensionReason = record["suspension_reason"]
   if (suspensionReason !== undefined && !suspensionReasons.has(String(suspensionReason))) {
     throw new Error(`R0 rejects suspension_reason ${String(suspensionReason)}`)

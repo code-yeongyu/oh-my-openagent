@@ -9,6 +9,7 @@
 // Approach adapted from birkin-mnemosyne (https://github.com/ashmoonori-afk/birkin-mnemosyne),
 // a zero-dependency BM25 memory store with Korean-aware bigram tokenization.
 
+import { type DocumentTerms, type DocumentTermsInput, recallBm25IndexFor, termCount } from "./bm25-index"
 import { stemEnglishToken } from "./english-stem"
 import type { RecallDocument } from "./provider"
 
@@ -32,13 +33,6 @@ export interface RankedRecallDocument {
   readonly score: number
   /** Set in a widened ranking on the documents that hold every unit of the queries. */
   readonly fullMatch?: true
-}
-
-interface RecallBm25Index {
-  readonly termFrequencies: readonly ReadonlyMap<string, number>[]
-  readonly lengths: readonly number[]
-  readonly documentFrequency: ReadonlyMap<string, number>
-  readonly averageLength: number
 }
 
 interface RecallTokens {
@@ -100,40 +94,13 @@ export function recallTerms(text: string): string[] {
   return tokenizeRecallText(text).map(stemEnglishToken)
 }
 
-/**
- * One index per document array. RecallCorpusCache hands out the same array for as long as HEAD has
- * not moved, so the index is built once per corpus revision and a moved HEAD (a fresh array) drops it.
- * The array must not be mutated after it is first ranked: an in-place change keeps the stale index.
- */
-const INDEXES = new WeakMap<readonly RecallDocument[], RecallBm25Index>()
-
-function indexFor(documents: readonly RecallDocument[]): RecallBm25Index {
-  const cached = INDEXES.get(documents)
-  if (cached !== undefined) return cached
-
-  const termFrequencies: Map<string, number>[] = []
-  const lengths: number[] = []
-  const documentFrequency = new Map<string, number>()
-  for (const document of documents) {
-    const frequencies = new Map<string, number>()
-    const { tokens, standaloneHanCharacters } = tokenize(`${document.description}\n${document.body}`)
-    for (const token of tokens.map(stemEnglishToken)) frequencies.set(token, (frequencies.get(token) ?? 0) + 1)
-    for (const token of frequencies.keys()) documentFrequency.set(token, (documentFrequency.get(token) ?? 0) + 1)
-    termFrequencies.push(frequencies)
-    // The stand-alone Han characters repeat text the run and its bigrams already count. Leaving them out
-    // keeps every length as it was, so planned queries that hold no Han character after NFKC rank and
-    // score exactly as before.
-    lengths.push(tokens.length - standaloneHanCharacters)
-  }
-  const totalLength = lengths.reduce((sum, length) => sum + length, 0)
-  const index: RecallBm25Index = {
-    termFrequencies,
-    lengths,
-    documentFrequency,
-    averageLength: documents.length === 0 ? 0 : totalLength / documents.length,
-  }
-  INDEXES.set(documents, index)
-  return index
+/** A document's index terms and BM25 length: what the index and the persisted term store hold. */
+export function recallDocumentTerms(document: RecallDocument): DocumentTermsInput {
+  const { tokens, standaloneHanCharacters } = tokenize(`${document.description}\n${document.body}`)
+  // The stand-alone Han characters repeat text the run and its bigrams already count. Leaving them out
+  // keeps every length as it was, so planned queries that hold no Han character after NFKC rank and
+  // score exactly as before.
+  return { terms: tokens.map(stemEnglishToken), length: tokens.length - standaloneHanCharacters }
 }
 
 /**
@@ -206,34 +173,38 @@ export function rankRecallDocumentsBm25(
   const queryTerms = [...new Set(queries.flatMap(recallTerms))]
   if (queryTerms.length === 0 || documents.length === 0) return []
 
-  const index = indexFor(documents)
+  const index = recallBm25IndexFor(documents, recallDocumentTerms)
   const averageLength = index.averageLength > 0 ? index.averageLength : 1
-  const termScore = (term: string, frequencies: ReadonlyMap<string, number>, length: number): number => {
-    const frequency = frequencies.get(term)
-    if (frequency === undefined) return 0
-    const documentFrequency = index.documentFrequency.get(term) ?? 0
+  const termScore = (id: number | undefined, terms: DocumentTerms): number => {
+    if (id === undefined) return 0
+    const frequency = termCount(terms, id)
+    if (frequency === 0) return 0
+    const length = terms.length
+    const documentFrequency = index.documentFrequency[id] ?? 0
     const idf = Math.log(1 + (documents.length - documentFrequency + 0.5) / (documentFrequency + 0.5))
     return (idf * frequency * (K1 + 1)) / (frequency + K1 * (1 - B + (B * length) / averageLength))
   }
   const byScore = (left: RankedRecallDocument, right: RankedRecallDocument): number =>
     right.score - left.score || left.document.path.localeCompare(right.document.path)
 
-  const added = recallExpansionWeights(expansions, new Set(queryTerms))
-  const units = added.size === 0 ? [] : queryUnits(queries)
+  const added = [...recallExpansionWeights(expansions, new Set(queryTerms))].map(
+    ([term, weight]) => [index.termId(term), weight] as const,
+  )
+  const queryIds = queryTerms.map(index.termId)
+  const unitIds = added.length === 0 ? [] : queryUnits(queries).map(index.termId)
   const ranked: RankedRecallDocument[] = []
   const fullMatches: RankedRecallDocument[] = []
   documents.forEach((document, position) => {
-    const frequencies = index.termFrequencies[position]
-    const length = index.lengths[position] ?? 0
-    if (frequencies === undefined) return
+    const terms = index.documents[position]
+    if (terms === undefined) return
     let score = 0
-    for (const term of queryTerms) score += termScore(term, frequencies, length)
-    if (added.size > 0) {
-      if (units.every((unit) => frequencies.has(unit))) {
+    for (const id of queryIds) score += termScore(id, terms)
+    if (added.length > 0) {
+      if (unitIds.every((id) => id !== undefined && termCount(terms, id) > 0)) {
         fullMatches.push({ document, score })
         return
       }
-      for (const [term, weight] of added) score += weight * termScore(term, frequencies, length)
+      for (const [id, weight] of added) score += weight * termScore(id, terms)
     }
     if (score > 0) ranked.push({ document, score })
   })

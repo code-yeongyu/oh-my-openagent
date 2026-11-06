@@ -11,13 +11,13 @@ use super::keymap;
 use super::preflight;
 use super::{EiDevice, Libei};
 
-fn missing(kind: &str) -> DesktopError {
+pub(super) fn missing(kind: &str) -> DesktopError {
     DesktopError::permission_denied(format!(
         "RemoteDesktop portal did not provide a libei {kind}"
     ))
 }
 
-fn start(devices: &[Option<&EiDevice>], sequence: &mut u32) {
+pub(super) fn start(devices: &[Option<&EiDevice>], sequence: &mut u32) {
     for device in devices.iter().flatten() {
         device
             .device
@@ -28,7 +28,7 @@ fn start(devices: &[Option<&EiDevice>], sequence: &mut u32) {
 }
 
 /// Ends the burst on `devices` and sends it; the action's own error wins.
-fn finish(
+pub(super) fn finish(
     context: &ei::Context,
     devices: &[Option<&EiDevice>],
     result: CoreResult<()>,

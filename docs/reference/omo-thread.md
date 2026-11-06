@@ -127,11 +127,11 @@ Every send is checked against fixed budgets, which no setting raises:
 | Backlog of one target | 128 undelivered messages or 1 MiB | `queue_full` |
 | One sender to one target | bursts of 8, then one every 5 s; a binding sender is keyed by binding and author (`binding:<id>#author:<platform user id>`), or by the binding alone when the message names no author | `overloaded` with `retry_after_ms` |
 | One turn | reaches at most 16 sessions | `overloaded` |
-| One causal chain (a message and the messages it caused) | 4 hops, 64 deliveries, 7 days | `loop_detected` |
-| Replies | a direct reply to the session that messaged this one, or a send to itself | `loop_detected` |
+| One causal chain (a message and the messages it caused) | no count limit; each delivery records its hop | - |
+| A send to itself | always refused | `loop_detected` |
 | An undelivered message | expires after 24 hours (or when its binding expires) | the row ends `refused` |
 
-Answers to another session flow back through `read`, `report` and `answer`, not through a reply.
+A session may message the session that messaged it, so A to B to A is delivered; answers also flow back through `read`, `report` and `answer`.
 
 A connector treats `overloaded` as back-pressure, not as a lost message: nothing was written, so
 it queues the message and retries the same `send` (same `--idempotency-key`) after
@@ -181,7 +181,13 @@ Operations run in one `BEGIN IMMEDIATE`. The transaction surface is:
 - `all(columns, sql, params?, orderBy?)`, `one(columns, sql, params?)`, and `exec(sql, params?)`:
   one SQLite statement per call, using `?` parameters (`string | number | null`). Reads return
   records keyed by the explicit columns; `one` returns `undefined` when absent; `exec` returns
-  the changed-row count. Use `orderBy` for ordered reads. Only anonymous parameter tokens are
+  the changed-row count. Use `orderBy` for ordered reads: it lists the statement's output columns,
+  each optionally with `COLLATE BINARY|NOCASE|RTRIM`, `ASC`/`DESC` or `NULLS FIRST`/`NULLS LAST`
+  (`"created_at, id"`). Each name must match a column the statement returns (ASCII
+  case-insensitively), and the ORDER BY is rebuilt from that column's name and the fixed keywords.
+  Anything else, such as a `LIMIT`, an `OFFSET`, a table-qualified, quoted or unknown column, is
+  refused with `extension_schema_violation`; put a `LIMIT` in the statement itself
+  (`... ORDER BY created_at, id LIMIT ?`). Only anonymous parameter tokens are
   replaced; literal question marks in SQL strings, quoted identifiers and comments are preserved.
   `exec` can also create, alter and drop the extension's own objects during an operation, not
   just during migration. Identifiers and schema qualifiers follow SQLite's ASCII case folding.
@@ -359,7 +365,7 @@ that such a question closed only from a refused answer: `already_answered` after
 
 A binding attaches one session to one external thread, named by `(platform, account, chat,
 thread)`; `--thread` defaults to `@chat` (the chat itself). `--platform` is one of `discord`,
-`telegram`, `slack`, `notion`, `feishu`, `herdr` or `custom` (any other connector). Nothing here talks to a chat platform:
+`telegram`, `slack`, `notion`, `feishu`, `herdr`, `custom` or `whatsapp`. Nothing here talks to a chat platform:
 a connector drives the binding.
 
 - At most one `active` binding holds a thread. Binding a thread that is already held is
@@ -508,7 +514,7 @@ per table, so it never adds a write when nothing else writes.
 | A delivered (`applied`) or refused message, with its body | 30 days after its last change, and longer while its idempotency receipt is kept |
 | An undelivered, admitting or admitted message | until it is delivered, refused or expires (never pruned) |
 | Idempotency receipts | 30 days |
-| A causal chain's loop-guard record | until the chain's 7-day lifetime ends; a later continuation is refused `loop_detected` either way |
+| A causal chain's root record | 7 days; a continuation after that is delivered under a fresh root and keeps its hop count |
 | A sender's rate bucket | until it is idle for a full refill (40 s), which is exactly a fresh bucket |
 | Acked outbox rows | 30 days after their ack |
 | Unacked outbox rows | as long as their binding, plus 30 days after it closes |

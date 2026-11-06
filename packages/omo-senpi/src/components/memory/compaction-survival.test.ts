@@ -102,10 +102,14 @@ async function compactionFixture(): Promise<CompactionFixture> {
           launches.push(run.request)
         },
         reconcile: async () => {},
+        settled: async () => {},
       } as unknown as MemoryIdentityRuntime
     },
   }).register(pi, ctx)
   await pi.dispatch("session_start", { type: "session_start" }, sessionEventContext())
+  expect(boundLedger).toBeUndefined()
+  await pi.dispatch("input", { source: "interactive", inputId: "compaction-input", text: "Continue." }, sessionEventContext())
+  await pi.dispatch("input_disposition", { inputId: "compaction-input", disposition: "started" }, sessionEventContext())
 
   cleanups.push(async () => {
     await pi.dispatch("session_shutdown", { type: "session_shutdown" }, sessionEventContext())

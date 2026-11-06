@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 
 import type { TmuxCommandResult } from "../runner"
+import { createPaneAuthDirectory } from "../pane-auth"
 import type { TmuxConfig } from "../types"
 import { activateTmuxPane } from "./pane-activate"
 import { replaceTmuxPane } from "./pane-replace"
@@ -82,7 +83,8 @@ function setAuthEnv(password?: string, username?: string): void {
 
 function expectAuthEnvArgs(args: readonly string[]): void {
 	expect(args).toContain("-e")
-	expect(args).toContain("OPENCODE_SERVER_PASSWORD=pa ss word")
+	expect(args.some((arg) => arg.includes("pa ss word"))).toBe(false)
+	expect(args.some((arg) => arg.startsWith("OPENCODE_SERVER_PASSWORD_FILE="))).toBe(true)
 	expect(args).toContain("OPENCODE_SERVER_USERNAME=user name")
 }
 
@@ -93,12 +95,15 @@ function expectNoAuthEnvArgs(args: readonly string[]): void {
 }
 
 describe("tmux pane auth environment propagation", () => {
+	let cleanupAuthDirectory: () => void
 	beforeEach(() => {
+		cleanupAuthDirectory = createPaneAuthDirectory()
 		process.env.TMUX = "/tmp/tmux-1000/default,1234,0"
 		delete process.env.CMUX_SOCKET_PATH
 	})
 
 	afterEach(() => {
+		cleanupAuthDirectory()
 		setAuthEnv()
 		if (originalTmux === undefined) delete process.env.TMUX
 		else process.env.TMUX = originalTmux
@@ -123,8 +128,8 @@ describe("tmux pane auth environment propagation", () => {
 		const args = recorder.getCall(0)[1]
 		expect(args.slice(0, 2)).toEqual(["respawn-pane", "-k"])
 		expectAuthEnvArgs(args)
-		expect(args.at(-1)).toBe(
-			`/bin/sh -c "opencode attach 'http://127.0.0.1:4321/path with spaces' --session 'session with spaces' --dir '/tmp/project with spaces'"`,
+		expect(args.at(-1)).toContain(
+			`opencode attach 'http://127.0.0.1:4321/path with spaces' --session 'session with spaces' --dir '/tmp/project with spaces'`,
 		)
 	})
 

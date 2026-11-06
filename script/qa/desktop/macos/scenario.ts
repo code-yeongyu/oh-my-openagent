@@ -59,8 +59,12 @@ export function onWindow(title: string, body: string): Json {
 export const warmUp = (session: AgentSession, title: string): Promise<ToolOutcome> =>
   session.call(onWindow(title, 'await w.move(Math.round(s.width / 2), Math.round(s.height / 2)); return "warm";'))
 
+// A foreground click needs the human-confirmed grant first (#9651 B5); background needs none.
+const acquireFor = (delivery: string): string =>
+  delivery === "foreground" ? 'await desktop.control.acquire({ reason: "macOS QA foreground click" }); ' : ""
+
 export const clickCode = (title: string, delivery: string): Json =>
-  onWindow(title, `await w.click(Math.round(s.width / 2), Math.round(s.height * 0.8), { delivery: ${JSON.stringify(delivery)} }); return "clicked";`)
+  onWindow(title, `${acquireFor(delivery)}await w.click(Math.round(s.width / 2), Math.round(s.height * 0.8), { delivery: ${JSON.stringify(delivery)} }); return "clicked";`)
 
 export const toolError = (result: ToolOutcome): string | null => result.isError ? result.text : null
 

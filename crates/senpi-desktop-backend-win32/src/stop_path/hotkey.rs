@@ -1,12 +1,17 @@
-//! One registration lifetime of the kill switch, on the listener thread:
-//! `RegisterHotKey` with a null window posts `WM_HOTKEY` to this thread's
-//! queue, and a `MsgWaitForMultipleObjects` loop drains the queue and beats
-//! every 500 ms while the registration holds.
+//! One lifetime of the kill switch, on the listener thread: a
+//! `WH_KEYBOARD_LL` hook ([`super::hook`]) decides physical chords, a
+//! `RegisterHotKey` registration (when this process gets it) backs the hook
+//! up while an elevated window blinds it, and a `MsgWaitForMultipleObjects`
+//! loop services both and beats every 500 ms while the hook is installed.
+//! The hook is re-installed on every beat (the new one before the old one is
+//! removed), so a hook the system silently dropped is back within a beat.
 
 use std::time::{Duration, Instant};
 
 use senpi_desktop_safety::HEARTBEAT_INTERVAL_MS;
-use windows_sys::Win32::Foundation::{GetLastError, ERROR_HOTKEY_ALREADY_REGISTERED, WAIT_FAILED};
+use std::sync::Arc;
+
+use windows_sys::Win32::Foundation::WAIT_FAILED;
 use windows_sys::Win32::System::Threading::GetCurrentThreadId;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{RegisterHotKey, UnregisterHotKey};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
@@ -15,23 +20,24 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 };
 
 use super::chord::{Hotkey, MOD_NOREPEAT};
+use super::hook::{self, Hook};
 use super::listener::Shared;
 
-/// `stopReason` when another registration (any process) holds the chord.
-pub(crate) const CHORD_TAKEN: &str = "hotkey-chord-taken";
-/// `stopReason` when `RegisterHotKey` refused for any other reason.
+/// `stopReason` when the system refused the keyboard hook.
+pub(crate) const HOOK_FAILED: &str = "keyboard-hook-failed";
+/// `stopReason` before any attempt settled.
 pub(crate) const REGISTRATION_FAILED: &str = "hotkey-registration-failed";
 
 /// The registration id (applications use 0x0000..=0xBFFF).
 const HOTKEY_ID: i32 = 0x5E01;
 /// Posted by the owner to wake the loop for a restart or shutdown request.
 const WM_WAKE: u32 = WM_APP + 0x5E;
-const HEARTBEAT: Duration = Duration::from_millis(HEARTBEAT_INTERVAL_MS);
+pub(super) const HEARTBEAT: Duration = Duration::from_millis(HEARTBEAT_INTERVAL_MS);
 
 /// How one registration lifetime ended.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum Run {
-    /// `RegisterHotKey` refused the chord.
+    /// The system refused the keyboard hook.
     Refused,
     /// The wait failed while registered.
     Died,
@@ -63,38 +69,37 @@ pub(super) fn wake(thread_id: Option<u32>) {
     }
 }
 
-/// Registers `hotkey`, runs the wait loop while it holds, and unregisters.
-/// The `Global` path is live exactly while registered.
-pub(super) fn run(shared: &Shared, hotkey: Hotkey) -> Run {
+/// Installs the hook and, when available, the hotkey backstop, runs the wait
+/// loop, and removes both. The `Global` path is live exactly while the hook
+/// is installed; another process holding the hotkey only costs the backstop.
+pub(super) fn run(shared: &Arc<Shared>, hotkey: Hotkey) -> Run {
     if let Some(exit) = pending(shared) {
         return exit;
     }
+    hook::arm(shared, hotkey);
+    let Some(installed) = Hook::install() else {
+        hook::disarm();
+        shared.settled(Some(HOOK_FAILED));
+        return Run::Refused;
+    };
     // SAFETY: [FFI] a null window binds the hotkey to this thread's queue;
     // the rest are scalars.
-    let registered = unsafe {
+    let backstop = unsafe {
         RegisterHotKey(
             std::ptr::null_mut(),
             HOTKEY_ID,
             hotkey.modifiers | MOD_NOREPEAT,
             hotkey.vk,
         )
-    };
-    if registered == 0 {
-        // SAFETY: [FFI] read immediately after the failed call.
-        let error = unsafe { GetLastError() };
-        let reason = if error == ERROR_HOTKEY_ALREADY_REGISTERED {
-            CHORD_TAKEN
-        } else {
-            REGISTRATION_FAILED
-        };
-        shared.settled(Some(reason));
-        return Run::Refused;
-    }
+    } != 0;
     shared.settled(None);
-    let exit = pump(shared);
-    // SAFETY: [FFI] releases the registration this thread made above; a
-    // failure leaves nothing to clean up (the thread's hotkeys die with it).
-    unsafe { UnregisterHotKey(std::ptr::null_mut(), HOTKEY_ID) };
+    let exit = pump(shared, installed);
+    if backstop {
+        // SAFETY: [FFI] releases the registration this thread made above; a
+        // failure leaves nothing to clean up (the thread's hotkeys die with it).
+        unsafe { UnregisterHotKey(std::ptr::null_mut(), HOTKEY_ID) };
+    }
+    hook::disarm();
     shared.unregistered();
     exit
 }
@@ -108,14 +113,21 @@ fn pending(shared: &Shared) -> Option<Run> {
     std::mem::take(&mut control.restart).then_some(Run::Restart)
 }
 
-fn pump(shared: &Shared) -> Run {
+fn pump(shared: &Shared, mut installed: Hook) -> Run {
     let mut next_beat = Instant::now() + HEARTBEAT;
     loop {
         if let Some(exit) = pending(shared) {
+            drop(installed);
             return exit;
         }
         let now = Instant::now();
         if now >= next_beat {
+            // The new hook goes in before the old one comes out, so there is
+            // no instant without one.
+            let Some(fresh) = Hook::install() else {
+                return Run::Died;
+            };
+            installed = fresh;
             shared.heartbeat();
             next_beat = now + HEARTBEAT;
         }
@@ -130,15 +142,15 @@ fn pump(shared: &Shared) -> Run {
     }
 }
 
-/// Removes every queued message; a `WM_HOTKEY` for this registration
-/// latches the supervisor.
+/// Removes every queued message (the hook runs inside these calls); a
+/// `WM_HOTKEY` the hook did not already account for latches the supervisor.
 fn drain(shared: &Shared) {
     let mut message = MSG::default();
     // SAFETY: [FFI] `message` is a valid out slot; a null window selects all
     // of this thread's messages.
     while unsafe { PeekMessageW(&raw mut message, std::ptr::null_mut(), 0, 0, PM_REMOVE) } != 0 {
-        if message.message == WM_HOTKEY && i32::try_from(message.wParam) == Ok(HOTKEY_ID) {
-            shared.chord_pressed();
+        if message.message == WM_HOTKEY && i32::try_from(message.wParam) == Ok(HOTKEY_ID) && hook::take_hotkey_decision() {
+            shared.request_stop();
         }
     }
 }

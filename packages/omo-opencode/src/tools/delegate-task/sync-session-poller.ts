@@ -4,6 +4,8 @@ import { getDefaultSyncPollTimeoutMs, getTimingConfig } from "./timing"
 import { getTerminalSessionError, isSessionComplete } from "./sync-session-turns"
 import { log } from "../../shared/logger"
 import { normalizeSDKResponse } from "../../shared"
+import { MIN_SESSION_GONE_POLLS } from "../../features/background-agent/session-existence"
+import { formatDeletedSyncSessionError, isSyncSessionDeleted } from "./sync-session-existence"
 
 export { isSessionComplete } from "./sync-session-turns"
 
@@ -81,6 +83,7 @@ export async function pollSyncSession(
   let lastStatusRevision: string | undefined
   let hasFetchedNonActiveMessages = false
   let timedOut = false
+  let consecutiveDeletedChecks = 0
   let assistantTurnCount = 0
   let lastSeenAssistantId: string | undefined
   let lastObservedAssistantId: string | undefined
@@ -167,10 +170,12 @@ export async function pollSyncSession(
     pollCount++
 
     let sessionStatus: ({ type: string; updatedAt?: string | number; revision?: string | number; messageCount?: number } & Record<string, unknown>) | undefined
+    let statusFetched = false
     try {
       const statusResult = await client.session.status()
       const allStatuses = normalizeSDKResponse(statusResult, {} as Record<string, { type: string }>)
       sessionStatus = allStatuses[input.sessionID] as typeof sessionStatus
+      statusFetched = true
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
@@ -185,6 +190,19 @@ export async function pollSyncSession(
         inactiveElapsed: Math.floor(inactiveElapsedMs / 1000) + "s",
         sessionStatus: sessionStatus?.type ?? "not_in_status",
       })
+    }
+
+    // Idle sessions are also absent from the status map, so absence alone is not terminal;
+    // a session that the server repeatedly reports as not found is gone and can never finish.
+    if (statusFetched && sessionStatus === undefined) {
+      consecutiveDeletedChecks = await isSyncSessionDeleted(client, input.sessionID) ? consecutiveDeletedChecks + 1 : 0
+      if (consecutiveDeletedChecks >= MIN_SESSION_GONE_POLLS) {
+        log("[task] Poll stopped - session no longer exists", { sessionID: input.sessionID, pollCount })
+        if (input.toastManager && input.taskId) input.toastManager.removeTask(input.taskId)
+        return formatDeletedSyncSessionError(input.sessionID)
+      }
+    } else {
+      consecutiveDeletedChecks = 0
     }
 
     const isActive = isActiveSessionStatus(sessionStatus)

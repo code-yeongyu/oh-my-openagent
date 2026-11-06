@@ -68,9 +68,6 @@ function engineFixture(source = rpcSource) {
   const rpcPath = join(root, "dist", "modes", "rpc", "rpc-mode.js")
   mkdirSync(join(root, "dist", "modes", "rpc"), { recursive: true })
   writeFileSync(rpcPath, source)
-  const apiDir = join(root, "node_modules", "@earendil-works", "pi-ai", "dist", "api")
-  mkdirSync(apiDir, { recursive: true })
-  writeFileSync(join(apiDir, "anthropic-messages.js"), 'const claudeCodeVersion = "2.1.251";\n')
   return { root, rpcPath }
 }
 

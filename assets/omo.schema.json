@@ -5,6 +5,45 @@
   "description": "Configuration schema for the omo.json / omo.jsonc harness-neutral config surface",
   "type": "object",
   "properties": {
+    "provenance": {
+      "type": "object",
+      "properties": {
+        "workspaces": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              },
+              "git_owners": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "\\S"
+                }
+              },
+              "paths": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "\\S"
+                }
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "formatOnMutation": {
       "type": "object",
       "properties": {
@@ -40,14 +79,6 @@
         }
       },
       "additionalProperties": false
-    },
-    "gateway": {
-      "type": "object",
-      "propertyNames": {
-        "type": "string"
-      },
-      "additionalProperties": {},
-      "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
     },
     "$schema": {
       "type": "string"
@@ -189,6 +220,13 @@
                 }
               ]
             }
+          },
+          "models_distribution": {
+            "type": "string",
+            "enum": [
+              "sequential",
+              "round_robin"
+            ]
           },
           "reasoning": {
             "anyOf": [
@@ -710,6 +748,13 @@
               ]
             }
           },
+          "models_distribution": {
+            "type": "string",
+            "enum": [
+              "sequential",
+              "round_robin"
+            ]
+          },
           "reasoning": {
             "anyOf": [
               {
@@ -899,8 +944,12 @@
           ]
         },
         "include_co_authored_by": {
-          "default": false,
+          "default": true,
           "type": "boolean"
+        },
+        "git_env_prefix": {
+          "default": "GIT_MASTER=1",
+          "type": "string"
         }
       },
       "additionalProperties": false
@@ -1438,6 +1487,9 @@
           "display_name": {
             "type": "string"
           },
+          "caution": {
+            "type": "string"
+          },
           "family": {
             "type": "string",
             "enum": [
@@ -1583,6 +1635,30 @@
     "model_profile": {
       "type": "string"
     },
+    "model_pad": {
+      "type": "object",
+      "properties": {
+        "labels": {
+          "type": "object",
+          "properties": {
+            "daily": {
+              "type": "string"
+            },
+            "geeky": {
+              "type": "string"
+            },
+            "normal": {
+              "type": "string"
+            },
+            "heavy": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "memory": {
       "type": "object",
       "properties": {
@@ -1595,6 +1671,14 @@
           "type": "string",
           "minLength": 1
         },
+        "auto_identity": {
+          "default": "path",
+          "type": "string",
+          "enum": [
+            "path",
+            "git"
+          ]
+        },
         "reflection": {
           "default": {
             "enabled": true,
@@ -1605,6 +1689,7 @@
             "merge": "auto",
             "category": "quick",
             "timeout_minutes": 15,
+            "max_concurrent_runs": 1,
             "sandbox": "auto"
           },
           "type": "object",
@@ -1648,6 +1733,12 @@
             },
             "timeout_minutes": {
               "default": 15,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "max_concurrent_runs": {
+              "default": 1,
               "type": "integer",
               "exclusiveMinimum": 0,
               "maximum": 9007199254740991
@@ -1700,6 +1791,10 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 9007199254740991
+            },
+            "model": {
+              "type": "string",
+              "minLength": 1
             }
           },
           "additionalProperties": false
@@ -1773,6 +1868,33 @@
               "type": "integer",
               "minimum": 50,
               "maximum": 500
+            }
+          },
+          "additionalProperties": false
+        },
+        "agreements": {
+          "default": {
+            "enabled": true,
+            "needs_human_threshold": 3,
+            "max_items": 64
+          },
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "needs_human_threshold": {
+              "default": 3,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "max_items": {
+              "default": 64,
+              "type": "integer",
+              "minimum": 8,
+              "maximum": 256
             }
           },
           "additionalProperties": false
@@ -1927,6 +2049,46 @@
           },
           "additionalProperties": false
         },
+        "project_scope": {
+          "default": {
+            "nudge": true,
+            "recall": true
+          },
+          "type": "object",
+          "properties": {
+            "nudge": {
+              "default": true,
+              "type": "boolean"
+            },
+            "recall": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "projection": {
+          "default": {
+            "max_entries_per_directory": 0,
+            "max_bytes": 40960
+          },
+          "type": "object",
+          "properties": {
+            "max_entries_per_directory": {
+              "default": 0,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "max_bytes": {
+              "default": 40960,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
         "compile_warn_tokens": {
           "default": 30000,
           "type": "integer",
@@ -2020,6 +2182,10 @@
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 9007199254740991
+                  },
+                  "model": {
+                    "type": "string",
+                    "minLength": 1
                   }
                 },
                 "additionalProperties": false
@@ -2071,6 +2237,25 @@
                     "type": "integer",
                     "minimum": 50,
                     "maximum": 500
+                  }
+                },
+                "additionalProperties": false
+              },
+              "agreements": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "needs_human_threshold": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "max_items": {
+                    "type": "integer",
+                    "minimum": 8,
+                    "maximum": 256
                   }
                 },
                 "additionalProperties": false
@@ -2177,6 +2362,22 @@
                 },
                 "additionalProperties": false
               },
+              "projection": {
+                "type": "object",
+                "properties": {
+                  "max_entries_per_directory": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "max_bytes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false
+              },
               "compile_warn_tokens": {
                 "type": "integer",
                 "exclusiveMinimum": 0,
@@ -2195,6 +2396,109 @@
         "enabled": {
           "default": true,
           "type": "boolean"
+        },
+        "rawTurnSampleRate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "device_service": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": true,
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "side_panel": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "type": "boolean"
+        },
+        "width": {
+          "default": "26%",
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 24,
+              "maximum": 160
+            },
+            {
+              "type": "string",
+              "pattern": "^(?:1\\d|[2-4]\\d|50)%$"
+            }
+          ]
+        },
+        "min_columns": {
+          "default": 120,
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 400
+        },
+        "clickable": {
+          "default": true,
+          "type": "boolean"
+        },
+        "usage_poll_seconds": {
+          "default": 150,
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 3600
+        },
+        "sections": {
+          "default": {
+            "session": true,
+            "goal": true,
+            "context": true,
+            "usage": false,
+            "agents": true,
+            "tools": true,
+            "files": true,
+            "memory": true
+          },
+          "type": "object",
+          "properties": {
+            "session": {
+              "default": true,
+              "type": "boolean"
+            },
+            "goal": {
+              "default": true,
+              "type": "boolean"
+            },
+            "context": {
+              "default": true,
+              "type": "boolean"
+            },
+            "usage": {
+              "default": false,
+              "type": "boolean"
+            },
+            "agents": {
+              "default": true,
+              "type": "boolean"
+            },
+            "tools": {
+              "default": true,
+              "type": "boolean"
+            },
+            "files": {
+              "default": true,
+              "type": "boolean"
+            },
+            "memory": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
@@ -2209,6 +2513,10 @@
         "display": {
           "type": "string",
           "minLength": 1
+        },
+        "showCursor": {
+          "type": "boolean",
+          "description": "Show the display-only macOS cursor overlay (default: true; false hides it)"
         },
         "max_width": {
           "type": "integer",
@@ -2284,12 +2592,57 @@
         "type": "string"
       }
     },
+    "exclude_models": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "[opencode]": {
       "$ref": "#/definitions/opencode"
     },
     "[native]": {
       "type": "object",
       "properties": {
+        "provenance": {
+          "type": "object",
+          "properties": {
+            "workspaces": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "\\S"
+                  },
+                  "git_owners": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    }
+                  },
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    }
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        },
         "formatOnMutation": {
           "type": "object",
           "properties": {
@@ -2322,14 +2675,6 @@
             }
           },
           "additionalProperties": false
-        },
-        "gateway": {
-          "type": "object",
-          "propertyNames": {
-            "type": "string"
-          },
-          "additionalProperties": {},
-          "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
         },
         "categories": {
           "type": "object",
@@ -2468,6 +2813,13 @@
                     }
                   ]
                 }
+              },
+              "models_distribution": {
+                "type": "string",
+                "enum": [
+                  "sequential",
+                  "round_robin"
+                ]
               },
               "reasoning": {
                 "anyOf": [
@@ -2989,6 +3341,13 @@
                   ]
                 }
               },
+              "models_distribution": {
+                "type": "string",
+                "enum": [
+                  "sequential",
+                  "round_robin"
+                ]
+              },
               "reasoning": {
                 "anyOf": [
                   {
@@ -3178,6 +3537,9 @@
             },
             "include_co_authored_by": {
               "type": "boolean"
+            },
+            "git_env_prefix": {
+              "type": "string"
             }
           },
           "additionalProperties": false
@@ -3658,6 +4020,9 @@
               "display_name": {
                 "type": "string"
               },
+              "caution": {
+                "type": "string"
+              },
               "family": {
                 "type": "string",
                 "enum": [
@@ -3803,6 +4168,30 @@
         "model_profile": {
           "type": "string"
         },
+        "model_pad": {
+          "type": "object",
+          "properties": {
+            "labels": {
+              "type": "object",
+              "properties": {
+                "daily": {
+                  "type": "string"
+                },
+                "geeky": {
+                  "type": "string"
+                },
+                "normal": {
+                  "type": "string"
+                },
+                "heavy": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
         "memory": {
           "type": "object",
           "properties": {
@@ -3812,6 +4201,13 @@
             "agent": {
               "type": "string",
               "minLength": 1
+            },
+            "auto_identity": {
+              "type": "string",
+              "enum": [
+                "path",
+                "git"
+              ]
             },
             "reflection": {
               "type": "object",
@@ -3845,6 +4241,11 @@
                   "minLength": 1
                 },
                 "timeout_minutes": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "max_concurrent_runs": {
                   "type": "integer",
                   "exclusiveMinimum": 0,
                   "maximum": 9007199254740991
@@ -3884,6 +4285,10 @@
                   "type": "integer",
                   "minimum": 1,
                   "maximum": 9007199254740991
+                },
+                "model": {
+                  "type": "string",
+                  "minLength": 1
                 }
               },
               "additionalProperties": false
@@ -3935,6 +4340,25 @@
                   "type": "integer",
                   "minimum": 50,
                   "maximum": 500
+                }
+              },
+              "additionalProperties": false
+            },
+            "agreements": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "needs_human_threshold": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "max_items": {
+                  "type": "integer",
+                  "minimum": 8,
+                  "maximum": 256
                 }
               },
               "additionalProperties": false
@@ -4041,6 +4465,34 @@
               },
               "additionalProperties": false
             },
+            "project_scope": {
+              "type": "object",
+              "properties": {
+                "nudge": {
+                  "type": "boolean"
+                },
+                "recall": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
+            "projection": {
+              "type": "object",
+              "properties": {
+                "max_entries_per_directory": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "max_bytes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            },
             "compile_warn_tokens": {
               "type": "integer",
               "exclusiveMinimum": 0,
@@ -4132,6 +4584,10 @@
                         "type": "integer",
                         "minimum": 1,
                         "maximum": 9007199254740991
+                      },
+                      "model": {
+                        "type": "string",
+                        "minLength": 1
                       }
                     },
                     "additionalProperties": false
@@ -4183,6 +4639,25 @@
                         "type": "integer",
                         "minimum": 50,
                         "maximum": 500
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "agreements": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "needs_human_threshold": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "max_items": {
+                        "type": "integer",
+                        "minimum": 8,
+                        "maximum": 256
                       }
                     },
                     "additionalProperties": false
@@ -4289,6 +4764,22 @@
                     },
                     "additionalProperties": false
                   },
+                  "projection": {
+                    "type": "object",
+                    "properties": {
+                      "max_entries_per_directory": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "max_bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "compile_warn_tokens": {
                     "type": "integer",
                     "exclusiveMinimum": 0,
@@ -4306,6 +4797,85 @@
           "properties": {
             "enabled": {
               "type": "boolean"
+            },
+            "rawTurnSampleRate": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "device_service": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "side_panel": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "width": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 24,
+                  "maximum": 160
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?:1\\d|[2-4]\\d|50)%$"
+                }
+              ]
+            },
+            "min_columns": {
+              "type": "integer",
+              "minimum": 60,
+              "maximum": 400
+            },
+            "clickable": {
+              "type": "boolean"
+            },
+            "usage_poll_seconds": {
+              "type": "integer",
+              "minimum": 60,
+              "maximum": 3600
+            },
+            "sections": {
+              "type": "object",
+              "properties": {
+                "session": {
+                  "type": "boolean"
+                },
+                "goal": {
+                  "type": "boolean"
+                },
+                "context": {
+                  "type": "boolean"
+                },
+                "usage": {
+                  "type": "boolean"
+                },
+                "agents": {
+                  "type": "boolean"
+                },
+                "tools": {
+                  "type": "boolean"
+                },
+                "files": {
+                  "type": "boolean"
+                },
+                "memory": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -4320,6 +4890,10 @@
             "display": {
               "type": "string",
               "minLength": 1
+            },
+            "showCursor": {
+              "type": "boolean",
+              "description": "Show the display-only macOS cursor overlay (default: true; false hides it)"
             },
             "max_width": {
               "type": "integer",
@@ -4390,6 +4964,12 @@
           "description": "Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host."
         },
         "disabled_skills": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "exclude_models": {
           "type": "array",
           "items": {
             "type": "string"
@@ -4401,6 +4981,45 @@
     "[senpi]": {
       "type": "object",
       "properties": {
+        "provenance": {
+          "type": "object",
+          "properties": {
+            "workspaces": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "\\S"
+                  },
+                  "git_owners": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    }
+                  },
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    }
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        },
         "formatOnMutation": {
           "type": "object",
           "properties": {
@@ -4433,14 +5052,6 @@
             }
           },
           "additionalProperties": false
-        },
-        "gateway": {
-          "type": "object",
-          "propertyNames": {
-            "type": "string"
-          },
-          "additionalProperties": {},
-          "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
         },
         "categories": {
           "type": "object",
@@ -4579,6 +5190,13 @@
                     }
                   ]
                 }
+              },
+              "models_distribution": {
+                "type": "string",
+                "enum": [
+                  "sequential",
+                  "round_robin"
+                ]
               },
               "reasoning": {
                 "anyOf": [
@@ -5100,6 +5718,13 @@
                   ]
                 }
               },
+              "models_distribution": {
+                "type": "string",
+                "enum": [
+                  "sequential",
+                  "round_robin"
+                ]
+              },
               "reasoning": {
                 "anyOf": [
                   {
@@ -5289,6 +5914,9 @@
             },
             "include_co_authored_by": {
               "type": "boolean"
+            },
+            "git_env_prefix": {
+              "type": "string"
             }
           },
           "additionalProperties": false
@@ -5769,6 +6397,9 @@
               "display_name": {
                 "type": "string"
               },
+              "caution": {
+                "type": "string"
+              },
               "family": {
                 "type": "string",
                 "enum": [
@@ -5914,6 +6545,30 @@
         "model_profile": {
           "type": "string"
         },
+        "model_pad": {
+          "type": "object",
+          "properties": {
+            "labels": {
+              "type": "object",
+              "properties": {
+                "daily": {
+                  "type": "string"
+                },
+                "geeky": {
+                  "type": "string"
+                },
+                "normal": {
+                  "type": "string"
+                },
+                "heavy": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
         "memory": {
           "type": "object",
           "properties": {
@@ -5923,6 +6578,13 @@
             "agent": {
               "type": "string",
               "minLength": 1
+            },
+            "auto_identity": {
+              "type": "string",
+              "enum": [
+                "path",
+                "git"
+              ]
             },
             "reflection": {
               "type": "object",
@@ -5956,6 +6618,11 @@
                   "minLength": 1
                 },
                 "timeout_minutes": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "max_concurrent_runs": {
                   "type": "integer",
                   "exclusiveMinimum": 0,
                   "maximum": 9007199254740991
@@ -5995,6 +6662,10 @@
                   "type": "integer",
                   "minimum": 1,
                   "maximum": 9007199254740991
+                },
+                "model": {
+                  "type": "string",
+                  "minLength": 1
                 }
               },
               "additionalProperties": false
@@ -6046,6 +6717,25 @@
                   "type": "integer",
                   "minimum": 50,
                   "maximum": 500
+                }
+              },
+              "additionalProperties": false
+            },
+            "agreements": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "needs_human_threshold": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "max_items": {
+                  "type": "integer",
+                  "minimum": 8,
+                  "maximum": 256
                 }
               },
               "additionalProperties": false
@@ -6152,6 +6842,34 @@
               },
               "additionalProperties": false
             },
+            "project_scope": {
+              "type": "object",
+              "properties": {
+                "nudge": {
+                  "type": "boolean"
+                },
+                "recall": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
+            "projection": {
+              "type": "object",
+              "properties": {
+                "max_entries_per_directory": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "max_bytes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            },
             "compile_warn_tokens": {
               "type": "integer",
               "exclusiveMinimum": 0,
@@ -6243,6 +6961,10 @@
                         "type": "integer",
                         "minimum": 1,
                         "maximum": 9007199254740991
+                      },
+                      "model": {
+                        "type": "string",
+                        "minLength": 1
                       }
                     },
                     "additionalProperties": false
@@ -6294,6 +7016,25 @@
                         "type": "integer",
                         "minimum": 50,
                         "maximum": 500
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "agreements": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "needs_human_threshold": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "max_items": {
+                        "type": "integer",
+                        "minimum": 8,
+                        "maximum": 256
                       }
                     },
                     "additionalProperties": false
@@ -6400,6 +7141,22 @@
                     },
                     "additionalProperties": false
                   },
+                  "projection": {
+                    "type": "object",
+                    "properties": {
+                      "max_entries_per_directory": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "max_bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "compile_warn_tokens": {
                     "type": "integer",
                     "exclusiveMinimum": 0,
@@ -6417,6 +7174,85 @@
           "properties": {
             "enabled": {
               "type": "boolean"
+            },
+            "rawTurnSampleRate": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "device_service": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "side_panel": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "width": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 24,
+                  "maximum": 160
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?:1\\d|[2-4]\\d|50)%$"
+                }
+              ]
+            },
+            "min_columns": {
+              "type": "integer",
+              "minimum": 60,
+              "maximum": 400
+            },
+            "clickable": {
+              "type": "boolean"
+            },
+            "usage_poll_seconds": {
+              "type": "integer",
+              "minimum": 60,
+              "maximum": 3600
+            },
+            "sections": {
+              "type": "object",
+              "properties": {
+                "session": {
+                  "type": "boolean"
+                },
+                "goal": {
+                  "type": "boolean"
+                },
+                "context": {
+                  "type": "boolean"
+                },
+                "usage": {
+                  "type": "boolean"
+                },
+                "agents": {
+                  "type": "boolean"
+                },
+                "tools": {
+                  "type": "boolean"
+                },
+                "files": {
+                  "type": "boolean"
+                },
+                "memory": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -6431,6 +7267,10 @@
             "display": {
               "type": "string",
               "minLength": 1
+            },
+            "showCursor": {
+              "type": "boolean",
+              "description": "Show the display-only macOS cursor overlay (default: true; false hides it)"
             },
             "max_width": {
               "type": "integer",
@@ -6505,6 +7345,12 @@
           "items": {
             "type": "string"
           }
+        },
+        "exclude_models": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false
@@ -6512,6 +7358,45 @@
     "[codex]": {
       "type": "object",
       "properties": {
+        "provenance": {
+          "type": "object",
+          "properties": {
+            "workspaces": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "\\S"
+                  },
+                  "git_owners": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    }
+                  },
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    }
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        },
         "formatOnMutation": {
           "type": "object",
           "properties": {
@@ -6544,14 +7429,6 @@
             }
           },
           "additionalProperties": false
-        },
-        "gateway": {
-          "type": "object",
-          "propertyNames": {
-            "type": "string"
-          },
-          "additionalProperties": {},
-          "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
         },
         "categories": {
           "type": "object",
@@ -6690,6 +7567,13 @@
                     }
                   ]
                 }
+              },
+              "models_distribution": {
+                "type": "string",
+                "enum": [
+                  "sequential",
+                  "round_robin"
+                ]
               },
               "reasoning": {
                 "anyOf": [
@@ -7211,6 +8095,13 @@
                   ]
                 }
               },
+              "models_distribution": {
+                "type": "string",
+                "enum": [
+                  "sequential",
+                  "round_robin"
+                ]
+              },
               "reasoning": {
                 "anyOf": [
                   {
@@ -7400,6 +8291,9 @@
             },
             "include_co_authored_by": {
               "type": "boolean"
+            },
+            "git_env_prefix": {
+              "type": "string"
             }
           },
           "additionalProperties": false
@@ -7880,6 +8774,9 @@
               "display_name": {
                 "type": "string"
               },
+              "caution": {
+                "type": "string"
+              },
               "family": {
                 "type": "string",
                 "enum": [
@@ -8025,6 +8922,30 @@
         "model_profile": {
           "type": "string"
         },
+        "model_pad": {
+          "type": "object",
+          "properties": {
+            "labels": {
+              "type": "object",
+              "properties": {
+                "daily": {
+                  "type": "string"
+                },
+                "geeky": {
+                  "type": "string"
+                },
+                "normal": {
+                  "type": "string"
+                },
+                "heavy": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
         "memory": {
           "type": "object",
           "properties": {
@@ -8034,6 +8955,13 @@
             "agent": {
               "type": "string",
               "minLength": 1
+            },
+            "auto_identity": {
+              "type": "string",
+              "enum": [
+                "path",
+                "git"
+              ]
             },
             "reflection": {
               "type": "object",
@@ -8067,6 +8995,11 @@
                   "minLength": 1
                 },
                 "timeout_minutes": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "max_concurrent_runs": {
                   "type": "integer",
                   "exclusiveMinimum": 0,
                   "maximum": 9007199254740991
@@ -8106,6 +9039,10 @@
                   "type": "integer",
                   "minimum": 1,
                   "maximum": 9007199254740991
+                },
+                "model": {
+                  "type": "string",
+                  "minLength": 1
                 }
               },
               "additionalProperties": false
@@ -8157,6 +9094,25 @@
                   "type": "integer",
                   "minimum": 50,
                   "maximum": 500
+                }
+              },
+              "additionalProperties": false
+            },
+            "agreements": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "needs_human_threshold": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "max_items": {
+                  "type": "integer",
+                  "minimum": 8,
+                  "maximum": 256
                 }
               },
               "additionalProperties": false
@@ -8263,6 +9219,34 @@
               },
               "additionalProperties": false
             },
+            "project_scope": {
+              "type": "object",
+              "properties": {
+                "nudge": {
+                  "type": "boolean"
+                },
+                "recall": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
+            "projection": {
+              "type": "object",
+              "properties": {
+                "max_entries_per_directory": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "max_bytes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            },
             "compile_warn_tokens": {
               "type": "integer",
               "exclusiveMinimum": 0,
@@ -8354,6 +9338,10 @@
                         "type": "integer",
                         "minimum": 1,
                         "maximum": 9007199254740991
+                      },
+                      "model": {
+                        "type": "string",
+                        "minLength": 1
                       }
                     },
                     "additionalProperties": false
@@ -8405,6 +9393,25 @@
                         "type": "integer",
                         "minimum": 50,
                         "maximum": 500
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "agreements": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "needs_human_threshold": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "max_items": {
+                        "type": "integer",
+                        "minimum": 8,
+                        "maximum": 256
                       }
                     },
                     "additionalProperties": false
@@ -8511,6 +9518,22 @@
                     },
                     "additionalProperties": false
                   },
+                  "projection": {
+                    "type": "object",
+                    "properties": {
+                      "max_entries_per_directory": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "max_bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "compile_warn_tokens": {
                     "type": "integer",
                     "exclusiveMinimum": 0,
@@ -8528,6 +9551,85 @@
           "properties": {
             "enabled": {
               "type": "boolean"
+            },
+            "rawTurnSampleRate": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "device_service": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "side_panel": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "width": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 24,
+                  "maximum": 160
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?:1\\d|[2-4]\\d|50)%$"
+                }
+              ]
+            },
+            "min_columns": {
+              "type": "integer",
+              "minimum": 60,
+              "maximum": 400
+            },
+            "clickable": {
+              "type": "boolean"
+            },
+            "usage_poll_seconds": {
+              "type": "integer",
+              "minimum": 60,
+              "maximum": 3600
+            },
+            "sections": {
+              "type": "object",
+              "properties": {
+                "session": {
+                  "type": "boolean"
+                },
+                "goal": {
+                  "type": "boolean"
+                },
+                "context": {
+                  "type": "boolean"
+                },
+                "usage": {
+                  "type": "boolean"
+                },
+                "agents": {
+                  "type": "boolean"
+                },
+                "tools": {
+                  "type": "boolean"
+                },
+                "files": {
+                  "type": "boolean"
+                },
+                "memory": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -8542,6 +9644,10 @@
             "display": {
               "type": "string",
               "minLength": 1
+            },
+            "showCursor": {
+              "type": "boolean",
+              "description": "Show the display-only macOS cursor overlay (default: true; false hides it)"
             },
             "max_width": {
               "type": "integer",
@@ -8612,6 +9718,12 @@
           "description": "Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host."
         },
         "disabled_skills": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "exclude_models": {
           "type": "array",
           "items": {
             "type": "string"
@@ -8629,6 +9741,45 @@
       "additionalProperties": {
         "type": "object",
         "properties": {
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "workspaces": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    },
+                    "git_owners": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "pattern": "\\S"
+                      }
+                    },
+                    "paths": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "pattern": "\\S"
+                      }
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          },
           "formatOnMutation": {
             "type": "object",
             "properties": {
@@ -8799,6 +9950,13 @@
                       }
                     ]
                   }
+                },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
                 },
                 "reasoning": {
                   "anyOf": [
@@ -9320,6 +10478,13 @@
                     ]
                   }
                 },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
+                },
                 "reasoning": {
                   "anyOf": [
                     {
@@ -9509,6 +10674,9 @@
               },
               "include_co_authored_by": {
                 "type": "boolean"
+              },
+              "git_env_prefix": {
+                "type": "string"
               }
             },
             "additionalProperties": false
@@ -9989,6 +11157,9 @@
                 "display_name": {
                   "type": "string"
                 },
+                "caution": {
+                  "type": "string"
+                },
                 "family": {
                   "type": "string",
                   "enum": [
@@ -10134,6 +11305,30 @@
           "model_profile": {
             "type": "string"
           },
+          "model_pad": {
+            "type": "object",
+            "properties": {
+              "labels": {
+                "type": "object",
+                "properties": {
+                  "daily": {
+                    "type": "string"
+                  },
+                  "geeky": {
+                    "type": "string"
+                  },
+                  "normal": {
+                    "type": "string"
+                  },
+                  "heavy": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          },
           "memory": {
             "type": "object",
             "properties": {
@@ -10143,6 +11338,13 @@
               "agent": {
                 "type": "string",
                 "minLength": 1
+              },
+              "auto_identity": {
+                "type": "string",
+                "enum": [
+                  "path",
+                  "git"
+                ]
               },
               "reflection": {
                 "type": "object",
@@ -10176,6 +11378,11 @@
                     "minLength": 1
                   },
                   "timeout_minutes": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "max_concurrent_runs": {
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
@@ -10215,6 +11422,10 @@
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 9007199254740991
+                  },
+                  "model": {
+                    "type": "string",
+                    "minLength": 1
                   }
                 },
                 "additionalProperties": false
@@ -10266,6 +11477,25 @@
                     "type": "integer",
                     "minimum": 50,
                     "maximum": 500
+                  }
+                },
+                "additionalProperties": false
+              },
+              "agreements": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "needs_human_threshold": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "max_items": {
+                    "type": "integer",
+                    "minimum": 8,
+                    "maximum": 256
                   }
                 },
                 "additionalProperties": false
@@ -10372,6 +11602,34 @@
                 },
                 "additionalProperties": false
               },
+              "project_scope": {
+                "type": "object",
+                "properties": {
+                  "nudge": {
+                    "type": "boolean"
+                  },
+                  "recall": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "projection": {
+                "type": "object",
+                "properties": {
+                  "max_entries_per_directory": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "max_bytes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false
+              },
               "compile_warn_tokens": {
                 "type": "integer",
                 "exclusiveMinimum": 0,
@@ -10463,6 +11721,10 @@
                           "type": "integer",
                           "minimum": 1,
                           "maximum": 9007199254740991
+                        },
+                        "model": {
+                          "type": "string",
+                          "minLength": 1
                         }
                       },
                       "additionalProperties": false
@@ -10514,6 +11776,25 @@
                           "type": "integer",
                           "minimum": 50,
                           "maximum": 500
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "agreements": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "needs_human_threshold": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "max_items": {
+                          "type": "integer",
+                          "minimum": 8,
+                          "maximum": 256
                         }
                       },
                       "additionalProperties": false
@@ -10620,6 +11901,22 @@
                       },
                       "additionalProperties": false
                     },
+                    "projection": {
+                      "type": "object",
+                      "properties": {
+                        "max_entries_per_directory": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "max_bytes": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "additionalProperties": false
+                    },
                     "compile_warn_tokens": {
                       "type": "integer",
                       "exclusiveMinimum": 0,
@@ -10637,6 +11934,85 @@
             "properties": {
               "enabled": {
                 "type": "boolean"
+              },
+              "rawTurnSampleRate": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "device_service": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "side_panel": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "width": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 24,
+                    "maximum": 160
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^(?:1\\d|[2-4]\\d|50)%$"
+                  }
+                ]
+              },
+              "min_columns": {
+                "type": "integer",
+                "minimum": 60,
+                "maximum": 400
+              },
+              "clickable": {
+                "type": "boolean"
+              },
+              "usage_poll_seconds": {
+                "type": "integer",
+                "minimum": 60,
+                "maximum": 3600
+              },
+              "sections": {
+                "type": "object",
+                "properties": {
+                  "session": {
+                    "type": "boolean"
+                  },
+                  "goal": {
+                    "type": "boolean"
+                  },
+                  "context": {
+                    "type": "boolean"
+                  },
+                  "usage": {
+                    "type": "boolean"
+                  },
+                  "agents": {
+                    "type": "boolean"
+                  },
+                  "tools": {
+                    "type": "boolean"
+                  },
+                  "files": {
+                    "type": "boolean"
+                  },
+                  "memory": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
               }
             },
             "additionalProperties": false
@@ -10651,6 +12027,10 @@
               "display": {
                 "type": "string",
                 "minLength": 1
+              },
+              "showCursor": {
+                "type": "boolean",
+                "description": "Show the display-only macOS cursor overlay (default: true; false hides it)"
               },
               "max_width": {
                 "type": "integer",
@@ -10726,12 +12106,57 @@
               "type": "string"
             }
           },
+          "exclude_models": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "[opencode]": {
             "$ref": "#/definitions/opencode"
           },
           "[native]": {
             "type": "object",
             "properties": {
+              "provenance": {
+                "type": "object",
+                "properties": {
+                  "workspaces": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "\\S"
+                        },
+                        "git_owners": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "\\S"
+                          }
+                        },
+                        "paths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "\\S"
+                          }
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
               "formatOnMutation": {
                 "type": "object",
                 "properties": {
@@ -10764,14 +12189,6 @@
                   }
                 },
                 "additionalProperties": false
-              },
-              "gateway": {
-                "type": "object",
-                "propertyNames": {
-                  "type": "string"
-                },
-                "additionalProperties": {},
-                "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
               },
               "categories": {
                 "type": "object",
@@ -10910,6 +12327,13 @@
                           }
                         ]
                       }
+                    },
+                    "models_distribution": {
+                      "type": "string",
+                      "enum": [
+                        "sequential",
+                        "round_robin"
+                      ]
                     },
                     "reasoning": {
                       "anyOf": [
@@ -11431,6 +12855,13 @@
                         ]
                       }
                     },
+                    "models_distribution": {
+                      "type": "string",
+                      "enum": [
+                        "sequential",
+                        "round_robin"
+                      ]
+                    },
                     "reasoning": {
                       "anyOf": [
                         {
@@ -11620,6 +13051,9 @@
                   },
                   "include_co_authored_by": {
                     "type": "boolean"
+                  },
+                  "git_env_prefix": {
+                    "type": "string"
                   }
                 },
                 "additionalProperties": false
@@ -12100,6 +13534,9 @@
                     "display_name": {
                       "type": "string"
                     },
+                    "caution": {
+                      "type": "string"
+                    },
                     "family": {
                       "type": "string",
                       "enum": [
@@ -12245,6 +13682,30 @@
               "model_profile": {
                 "type": "string"
               },
+              "model_pad": {
+                "type": "object",
+                "properties": {
+                  "labels": {
+                    "type": "object",
+                    "properties": {
+                      "daily": {
+                        "type": "string"
+                      },
+                      "geeky": {
+                        "type": "string"
+                      },
+                      "normal": {
+                        "type": "string"
+                      },
+                      "heavy": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              },
               "memory": {
                 "type": "object",
                 "properties": {
@@ -12254,6 +13715,13 @@
                   "agent": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "auto_identity": {
+                    "type": "string",
+                    "enum": [
+                      "path",
+                      "git"
+                    ]
                   },
                   "reflection": {
                     "type": "object",
@@ -12287,6 +13755,11 @@
                         "minLength": 1
                       },
                       "timeout_minutes": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "max_concurrent_runs": {
                         "type": "integer",
                         "exclusiveMinimum": 0,
                         "maximum": 9007199254740991
@@ -12326,6 +13799,10 @@
                         "type": "integer",
                         "minimum": 1,
                         "maximum": 9007199254740991
+                      },
+                      "model": {
+                        "type": "string",
+                        "minLength": 1
                       }
                     },
                     "additionalProperties": false
@@ -12377,6 +13854,25 @@
                         "type": "integer",
                         "minimum": 50,
                         "maximum": 500
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "agreements": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "needs_human_threshold": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "max_items": {
+                        "type": "integer",
+                        "minimum": 8,
+                        "maximum": 256
                       }
                     },
                     "additionalProperties": false
@@ -12483,6 +13979,34 @@
                     },
                     "additionalProperties": false
                   },
+                  "project_scope": {
+                    "type": "object",
+                    "properties": {
+                      "nudge": {
+                        "type": "boolean"
+                      },
+                      "recall": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "projection": {
+                    "type": "object",
+                    "properties": {
+                      "max_entries_per_directory": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "max_bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "compile_warn_tokens": {
                     "type": "integer",
                     "exclusiveMinimum": 0,
@@ -12574,6 +14098,10 @@
                               "type": "integer",
                               "minimum": 1,
                               "maximum": 9007199254740991
+                            },
+                            "model": {
+                              "type": "string",
+                              "minLength": 1
                             }
                           },
                           "additionalProperties": false
@@ -12625,6 +14153,25 @@
                               "type": "integer",
                               "minimum": 50,
                               "maximum": 500
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "agreements": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "needs_human_threshold": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "max_items": {
+                              "type": "integer",
+                              "minimum": 8,
+                              "maximum": 256
                             }
                           },
                           "additionalProperties": false
@@ -12731,6 +14278,22 @@
                           },
                           "additionalProperties": false
                         },
+                        "projection": {
+                          "type": "object",
+                          "properties": {
+                            "max_entries_per_directory": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "max_bytes": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "additionalProperties": false
+                        },
                         "compile_warn_tokens": {
                           "type": "integer",
                           "exclusiveMinimum": 0,
@@ -12748,6 +14311,85 @@
                 "properties": {
                   "enabled": {
                     "type": "boolean"
+                  },
+                  "rawTurnSampleRate": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "device_service": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "side_panel": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "width": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 24,
+                        "maximum": 160
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^(?:1\\d|[2-4]\\d|50)%$"
+                      }
+                    ]
+                  },
+                  "min_columns": {
+                    "type": "integer",
+                    "minimum": 60,
+                    "maximum": 400
+                  },
+                  "clickable": {
+                    "type": "boolean"
+                  },
+                  "usage_poll_seconds": {
+                    "type": "integer",
+                    "minimum": 60,
+                    "maximum": 3600
+                  },
+                  "sections": {
+                    "type": "object",
+                    "properties": {
+                      "session": {
+                        "type": "boolean"
+                      },
+                      "goal": {
+                        "type": "boolean"
+                      },
+                      "context": {
+                        "type": "boolean"
+                      },
+                      "usage": {
+                        "type": "boolean"
+                      },
+                      "agents": {
+                        "type": "boolean"
+                      },
+                      "tools": {
+                        "type": "boolean"
+                      },
+                      "files": {
+                        "type": "boolean"
+                      },
+                      "memory": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
                   }
                 },
                 "additionalProperties": false
@@ -12762,6 +14404,10 @@
                   "display": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "showCursor": {
+                    "type": "boolean",
+                    "description": "Show the display-only macOS cursor overlay (default: true; false hides it)"
                   },
                   "max_width": {
                     "type": "integer",
@@ -12832,6 +14478,12 @@
                 "description": "Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host."
               },
               "disabled_skills": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "exclude_models": {
                 "type": "array",
                 "items": {
                   "type": "string"
@@ -12843,6 +14495,45 @@
           "[senpi]": {
             "type": "object",
             "properties": {
+              "provenance": {
+                "type": "object",
+                "properties": {
+                  "workspaces": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "\\S"
+                        },
+                        "git_owners": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "\\S"
+                          }
+                        },
+                        "paths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "\\S"
+                          }
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
               "formatOnMutation": {
                 "type": "object",
                 "properties": {
@@ -12875,14 +14566,6 @@
                   }
                 },
                 "additionalProperties": false
-              },
-              "gateway": {
-                "type": "object",
-                "propertyNames": {
-                  "type": "string"
-                },
-                "additionalProperties": {},
-                "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
               },
               "categories": {
                 "type": "object",
@@ -13021,6 +14704,13 @@
                           }
                         ]
                       }
+                    },
+                    "models_distribution": {
+                      "type": "string",
+                      "enum": [
+                        "sequential",
+                        "round_robin"
+                      ]
                     },
                     "reasoning": {
                       "anyOf": [
@@ -13542,6 +15232,13 @@
                         ]
                       }
                     },
+                    "models_distribution": {
+                      "type": "string",
+                      "enum": [
+                        "sequential",
+                        "round_robin"
+                      ]
+                    },
                     "reasoning": {
                       "anyOf": [
                         {
@@ -13731,6 +15428,9 @@
                   },
                   "include_co_authored_by": {
                     "type": "boolean"
+                  },
+                  "git_env_prefix": {
+                    "type": "string"
                   }
                 },
                 "additionalProperties": false
@@ -14211,6 +15911,9 @@
                     "display_name": {
                       "type": "string"
                     },
+                    "caution": {
+                      "type": "string"
+                    },
                     "family": {
                       "type": "string",
                       "enum": [
@@ -14356,6 +16059,30 @@
               "model_profile": {
                 "type": "string"
               },
+              "model_pad": {
+                "type": "object",
+                "properties": {
+                  "labels": {
+                    "type": "object",
+                    "properties": {
+                      "daily": {
+                        "type": "string"
+                      },
+                      "geeky": {
+                        "type": "string"
+                      },
+                      "normal": {
+                        "type": "string"
+                      },
+                      "heavy": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              },
               "memory": {
                 "type": "object",
                 "properties": {
@@ -14365,6 +16092,13 @@
                   "agent": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "auto_identity": {
+                    "type": "string",
+                    "enum": [
+                      "path",
+                      "git"
+                    ]
                   },
                   "reflection": {
                     "type": "object",
@@ -14398,6 +16132,11 @@
                         "minLength": 1
                       },
                       "timeout_minutes": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "max_concurrent_runs": {
                         "type": "integer",
                         "exclusiveMinimum": 0,
                         "maximum": 9007199254740991
@@ -14437,6 +16176,10 @@
                         "type": "integer",
                         "minimum": 1,
                         "maximum": 9007199254740991
+                      },
+                      "model": {
+                        "type": "string",
+                        "minLength": 1
                       }
                     },
                     "additionalProperties": false
@@ -14488,6 +16231,25 @@
                         "type": "integer",
                         "minimum": 50,
                         "maximum": 500
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "agreements": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "needs_human_threshold": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "max_items": {
+                        "type": "integer",
+                        "minimum": 8,
+                        "maximum": 256
                       }
                     },
                     "additionalProperties": false
@@ -14594,6 +16356,34 @@
                     },
                     "additionalProperties": false
                   },
+                  "project_scope": {
+                    "type": "object",
+                    "properties": {
+                      "nudge": {
+                        "type": "boolean"
+                      },
+                      "recall": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "projection": {
+                    "type": "object",
+                    "properties": {
+                      "max_entries_per_directory": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "max_bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "compile_warn_tokens": {
                     "type": "integer",
                     "exclusiveMinimum": 0,
@@ -14685,6 +16475,10 @@
                               "type": "integer",
                               "minimum": 1,
                               "maximum": 9007199254740991
+                            },
+                            "model": {
+                              "type": "string",
+                              "minLength": 1
                             }
                           },
                           "additionalProperties": false
@@ -14736,6 +16530,25 @@
                               "type": "integer",
                               "minimum": 50,
                               "maximum": 500
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "agreements": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "needs_human_threshold": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "max_items": {
+                              "type": "integer",
+                              "minimum": 8,
+                              "maximum": 256
                             }
                           },
                           "additionalProperties": false
@@ -14842,6 +16655,22 @@
                           },
                           "additionalProperties": false
                         },
+                        "projection": {
+                          "type": "object",
+                          "properties": {
+                            "max_entries_per_directory": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "max_bytes": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "additionalProperties": false
+                        },
                         "compile_warn_tokens": {
                           "type": "integer",
                           "exclusiveMinimum": 0,
@@ -14859,6 +16688,85 @@
                 "properties": {
                   "enabled": {
                     "type": "boolean"
+                  },
+                  "rawTurnSampleRate": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "device_service": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "side_panel": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "width": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 24,
+                        "maximum": 160
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^(?:1\\d|[2-4]\\d|50)%$"
+                      }
+                    ]
+                  },
+                  "min_columns": {
+                    "type": "integer",
+                    "minimum": 60,
+                    "maximum": 400
+                  },
+                  "clickable": {
+                    "type": "boolean"
+                  },
+                  "usage_poll_seconds": {
+                    "type": "integer",
+                    "minimum": 60,
+                    "maximum": 3600
+                  },
+                  "sections": {
+                    "type": "object",
+                    "properties": {
+                      "session": {
+                        "type": "boolean"
+                      },
+                      "goal": {
+                        "type": "boolean"
+                      },
+                      "context": {
+                        "type": "boolean"
+                      },
+                      "usage": {
+                        "type": "boolean"
+                      },
+                      "agents": {
+                        "type": "boolean"
+                      },
+                      "tools": {
+                        "type": "boolean"
+                      },
+                      "files": {
+                        "type": "boolean"
+                      },
+                      "memory": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
                   }
                 },
                 "additionalProperties": false
@@ -14873,6 +16781,10 @@
                   "display": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "showCursor": {
+                    "type": "boolean",
+                    "description": "Show the display-only macOS cursor overlay (default: true; false hides it)"
                   },
                   "max_width": {
                     "type": "integer",
@@ -14947,6 +16859,12 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "exclude_models": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
               }
             },
             "additionalProperties": false
@@ -14954,6 +16872,45 @@
           "[codex]": {
             "type": "object",
             "properties": {
+              "provenance": {
+                "type": "object",
+                "properties": {
+                  "workspaces": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "\\S"
+                        },
+                        "git_owners": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "\\S"
+                          }
+                        },
+                        "paths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "\\S"
+                          }
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
               "formatOnMutation": {
                 "type": "object",
                 "properties": {
@@ -14986,14 +16943,6 @@
                   }
                 },
                 "additionalProperties": false
-              },
-              "gateway": {
-                "type": "object",
-                "propertyNames": {
-                  "type": "string"
-                },
-                "additionalProperties": {},
-                "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
               },
               "categories": {
                 "type": "object",
@@ -15132,6 +17081,13 @@
                           }
                         ]
                       }
+                    },
+                    "models_distribution": {
+                      "type": "string",
+                      "enum": [
+                        "sequential",
+                        "round_robin"
+                      ]
                     },
                     "reasoning": {
                       "anyOf": [
@@ -15653,6 +17609,13 @@
                         ]
                       }
                     },
+                    "models_distribution": {
+                      "type": "string",
+                      "enum": [
+                        "sequential",
+                        "round_robin"
+                      ]
+                    },
                     "reasoning": {
                       "anyOf": [
                         {
@@ -15842,6 +17805,9 @@
                   },
                   "include_co_authored_by": {
                     "type": "boolean"
+                  },
+                  "git_env_prefix": {
+                    "type": "string"
                   }
                 },
                 "additionalProperties": false
@@ -16322,6 +18288,9 @@
                     "display_name": {
                       "type": "string"
                     },
+                    "caution": {
+                      "type": "string"
+                    },
                     "family": {
                       "type": "string",
                       "enum": [
@@ -16467,6 +18436,30 @@
               "model_profile": {
                 "type": "string"
               },
+              "model_pad": {
+                "type": "object",
+                "properties": {
+                  "labels": {
+                    "type": "object",
+                    "properties": {
+                      "daily": {
+                        "type": "string"
+                      },
+                      "geeky": {
+                        "type": "string"
+                      },
+                      "normal": {
+                        "type": "string"
+                      },
+                      "heavy": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              },
               "memory": {
                 "type": "object",
                 "properties": {
@@ -16476,6 +18469,13 @@
                   "agent": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "auto_identity": {
+                    "type": "string",
+                    "enum": [
+                      "path",
+                      "git"
+                    ]
                   },
                   "reflection": {
                     "type": "object",
@@ -16509,6 +18509,11 @@
                         "minLength": 1
                       },
                       "timeout_minutes": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "max_concurrent_runs": {
                         "type": "integer",
                         "exclusiveMinimum": 0,
                         "maximum": 9007199254740991
@@ -16548,6 +18553,10 @@
                         "type": "integer",
                         "minimum": 1,
                         "maximum": 9007199254740991
+                      },
+                      "model": {
+                        "type": "string",
+                        "minLength": 1
                       }
                     },
                     "additionalProperties": false
@@ -16599,6 +18608,25 @@
                         "type": "integer",
                         "minimum": 50,
                         "maximum": 500
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "agreements": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "needs_human_threshold": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "max_items": {
+                        "type": "integer",
+                        "minimum": 8,
+                        "maximum": 256
                       }
                     },
                     "additionalProperties": false
@@ -16705,6 +18733,34 @@
                     },
                     "additionalProperties": false
                   },
+                  "project_scope": {
+                    "type": "object",
+                    "properties": {
+                      "nudge": {
+                        "type": "boolean"
+                      },
+                      "recall": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "projection": {
+                    "type": "object",
+                    "properties": {
+                      "max_entries_per_directory": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "max_bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "compile_warn_tokens": {
                     "type": "integer",
                     "exclusiveMinimum": 0,
@@ -16796,6 +18852,10 @@
                               "type": "integer",
                               "minimum": 1,
                               "maximum": 9007199254740991
+                            },
+                            "model": {
+                              "type": "string",
+                              "minLength": 1
                             }
                           },
                           "additionalProperties": false
@@ -16847,6 +18907,25 @@
                               "type": "integer",
                               "minimum": 50,
                               "maximum": 500
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "agreements": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "needs_human_threshold": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "max_items": {
+                              "type": "integer",
+                              "minimum": 8,
+                              "maximum": 256
                             }
                           },
                           "additionalProperties": false
@@ -16953,6 +19032,22 @@
                           },
                           "additionalProperties": false
                         },
+                        "projection": {
+                          "type": "object",
+                          "properties": {
+                            "max_entries_per_directory": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "max_bytes": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "additionalProperties": false
+                        },
                         "compile_warn_tokens": {
                           "type": "integer",
                           "exclusiveMinimum": 0,
@@ -16970,6 +19065,85 @@
                 "properties": {
                   "enabled": {
                     "type": "boolean"
+                  },
+                  "rawTurnSampleRate": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "device_service": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "side_panel": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "width": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 24,
+                        "maximum": 160
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^(?:1\\d|[2-4]\\d|50)%$"
+                      }
+                    ]
+                  },
+                  "min_columns": {
+                    "type": "integer",
+                    "minimum": 60,
+                    "maximum": 400
+                  },
+                  "clickable": {
+                    "type": "boolean"
+                  },
+                  "usage_poll_seconds": {
+                    "type": "integer",
+                    "minimum": 60,
+                    "maximum": 3600
+                  },
+                  "sections": {
+                    "type": "object",
+                    "properties": {
+                      "session": {
+                        "type": "boolean"
+                      },
+                      "goal": {
+                        "type": "boolean"
+                      },
+                      "context": {
+                        "type": "boolean"
+                      },
+                      "usage": {
+                        "type": "boolean"
+                      },
+                      "agents": {
+                        "type": "boolean"
+                      },
+                      "tools": {
+                        "type": "boolean"
+                      },
+                      "files": {
+                        "type": "boolean"
+                      },
+                      "memory": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
                   }
                 },
                 "additionalProperties": false
@@ -16984,6 +19158,10 @@
                   "display": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "showCursor": {
+                    "type": "boolean",
+                    "description": "Show the display-only macOS cursor overlay (default: true; false hides it)"
                   },
                   "max_width": {
                     "type": "integer",
@@ -17054,6 +19232,12 @@
                 "description": "Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host."
               },
               "disabled_skills": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "exclude_models": {
                 "type": "array",
                 "items": {
                   "type": "string"
@@ -17275,6 +19459,13 @@
                       }
                     ]
                   }
+                },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
                 },
                 "fallback_models": {
                   "anyOf": [
@@ -17828,6 +20019,13 @@
                     ]
                   }
                 },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
+                },
                 "fallback_models": {
                   "anyOf": [
                     {
@@ -18380,6 +20578,13 @@
                     ]
                   }
                 },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
+                },
                 "fallback_models": {
                   "anyOf": [
                     {
@@ -18931,6 +21136,13 @@
                       }
                     ]
                   }
+                },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
                 },
                 "fallback_models": {
                   "anyOf": [
@@ -19487,6 +21699,13 @@
                     ]
                   }
                 },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
+                },
                 "fallback_models": {
                   "anyOf": [
                     {
@@ -20038,6 +22257,13 @@
                       }
                     ]
                   }
+                },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
                 },
                 "fallback_models": {
                   "anyOf": [
@@ -20591,6 +22817,13 @@
                     ]
                   }
                 },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
+                },
                 "fallback_models": {
                   "anyOf": [
                     {
@@ -21142,6 +23375,13 @@
                       }
                     ]
                   }
+                },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
                 },
                 "fallback_models": {
                   "anyOf": [
@@ -21695,6 +23935,13 @@
                     ]
                   }
                 },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
+                },
                 "fallback_models": {
                   "anyOf": [
                     {
@@ -22246,6 +24493,13 @@
                       }
                     ]
                   }
+                },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
                 },
                 "fallback_models": {
                   "anyOf": [
@@ -22799,6 +25053,13 @@
                     ]
                   }
                 },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
+                },
                 "fallback_models": {
                   "anyOf": [
                     {
@@ -23350,6 +25611,13 @@
                       }
                     ]
                   }
+                },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
                 },
                 "fallback_models": {
                   "anyOf": [
@@ -23903,6 +26171,13 @@
                     ]
                   }
                 },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
+                },
                 "fallback_models": {
                   "anyOf": [
                     {
@@ -24454,6 +26729,13 @@
                       }
                     ]
                   }
+                },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
                 },
                 "fallback_models": {
                   "anyOf": [
@@ -25007,6 +27289,13 @@
                     }
                   ]
                 }
+              },
+              "models_distribution": {
+                "type": "string",
+                "enum": [
+                  "sequential",
+                  "round_robin"
+                ]
               },
               "fallback_models": {
                 "anyOf": [
@@ -25568,6 +27857,13 @@
                     }
                   ]
                 }
+              },
+              "models_distribution": {
+                "type": "string",
+                "enum": [
+                  "sequential",
+                  "round_robin"
+                ]
               },
               "fallback_models": {
                 "anyOf": [
@@ -26685,7 +28981,7 @@
         "git_master": {
           "default": {
             "commit_footer": false,
-            "include_co_authored_by": false,
+            "include_co_authored_by": true,
             "git_env_prefix": "GIT_MASTER=1"
           },
           "type": "object",
@@ -26698,7 +28994,7 @@
               ]
             },
             "include_co_authored_by": {
-              "default": false,
+              "default": true,
               "type": "boolean"
             },
             "git_env_prefix": {

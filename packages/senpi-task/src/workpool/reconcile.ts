@@ -1,5 +1,5 @@
 import type { TaskRecordStore } from "../store"
-import { isSpawnSpecV1, type TaskRecord } from "../state"
+import { isSpawnSpecV1, nextRunEpoch, type TaskRecord } from "../state"
 import { isTerminalRecord } from "../manager/manager-helpers"
 import { messageSha256 } from "../steering/engine-policy"
 import type { WorkpoolStore } from "./store"
@@ -23,6 +23,7 @@ export function uncertainItem(item: WorkpoolItem, pool: WorkpoolRecord, task: Ta
 export function reconcileWorkerTurn(stores: Stores, turn: WorkerTurn): void {
   const events = readYieldEvents(stores.tasks, turn)
   const record = stores.tasks.load(turn.task_id)
+  if (record?.status === "paused") return
   const terminal = record !== null && record.notification.run_epoch === turn.run_epoch && isTerminalRecord(record)
   stores.pools.mutate(turn.pool_id, pool => {
     if (pool.generation !== turn.generation || pool.status === "cancelled") return pool
@@ -43,6 +44,7 @@ export function reconcileWorkerTurn(stores: Stores, turn: WorkerTurn): void {
 
 export function reconcileWorkpool(stores: Stores, poolId: PoolId, observed: (taskId: string, epoch: number) => boolean): void {
   const pool = stores.pools.load(poolId)
+  if (pool.hold !== undefined) return
   if (pool.status === "cancelled") return
   const turns = new Map<string, WorkerTurn>()
   for (const item of pool.items) if (item.binding !== undefined && item.binding.generation === pool.generation) {
@@ -54,7 +56,7 @@ export function reconcileWorkpool(stores: Stores, poolId: PoolId, observed: (tas
     const task = stores.tasks.load(turn.task_id)
     const queued = pool.items.some(item => belongsToTurn(item, turn) && item.status === "assigned" && item.delivery?.phase === "queued")
     if (queued && task !== null && task.revive_delivery_uncertain === undefined &&
-      ((isTerminalRecord(task) && task.notification.run_epoch + 1 === turn.run_epoch) || (task.status === "pending" && task.started_at === undefined && turn.run_epoch === 0))) {
+      ((isTerminalRecord(task) && nextRunEpoch(task) === turn.run_epoch) || (task.status === "pending" && task.started_at === undefined && turn.run_epoch === 0))) {
       appendAssignedMessages(stores, turn)
     } else if (queued) {
       stores.pools.mutate(poolId, latest => ({ ...latest, items: latest.items.map(item => belongsToTurn(item, turn) && item.status === "assigned" ? uncertainItem(item, latest, task) : item) }))

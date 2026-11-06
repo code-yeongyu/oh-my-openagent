@@ -113,7 +113,7 @@ async function poolWorkerGrant(env: ChildEnv, kernel: ProducerKernel): Promise<R
   assert.equal(details.error, undefined)
   assert.ok(details.pool_id)
   const poolId = details.pool_id
-  const record = env.manager.workpools.inspect({ sessionId: "omp-item6-parent", rootSessionId: "omp-item6-parent", depth: 0, cwd: env.root }, poolId)
+  const record = env.manager.workpools.inspect({ sessionId: "omp-item6-parent" }, poolId)
   assert.deepEqual(record.kernel_tool_names, ["fixture_lookup"])
   assert.ok(env.kernelToolBindings.get(poolId), "the pool binding is runtime state")
   const dispatched = env.manager.workpools.waitForEvent(poolId, "dispatched", AbortSignal.timeout(20_000))

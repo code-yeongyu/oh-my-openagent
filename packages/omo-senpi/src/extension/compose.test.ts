@@ -1,6 +1,9 @@
 /// <reference types="bun-types" />
 
 import { afterEach, describe, expect, it, jest, spyOn } from "bun:test"
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
 import { FakeExtensionAPI } from "../../test-support/fake-extension-api"
 import { composeOmoSenpiExtension } from "./compose"
@@ -26,8 +29,24 @@ class ReloadingFakeExtensionAPI extends FakeExtensionAPI {
   }
 }
 
+const pythonCacheEnv = {
+  PYTHONDONTWRITEBYTECODE: process.env.PYTHONDONTWRITEBYTECODE,
+  PYTHONPYCACHEPREFIX: process.env.PYTHONPYCACHEPREFIX,
+  XDG_CACHE_HOME: process.env.XDG_CACHE_HOME,
+  LOCALAPPDATA: process.env.LOCALAPPDATA,
+}
+
+// Read through a call: after `delete process.env.X`, TypeScript narrows a direct `process.env.X` read to undefined.
+function readPythonCacheEnv(): Record<"PYTHONDONTWRITEBYTECODE" | "PYTHONPYCACHEPREFIX", string | undefined> {
+  return { PYTHONDONTWRITEBYTECODE: process.env.PYTHONDONTWRITEBYTECODE, PYTHONPYCACHEPREFIX: process.env.PYTHONPYCACHEPREFIX }
+}
+
 afterEach(() => {
   jest.useRealTimers()
+  for (const [name, value] of Object.entries(pythonCacheEnv)) {
+    if (value === undefined) delete process.env[name]
+    else process.env[name] = value
+  }
 })
 
 function createRecordingLogger(): ComponentLogger & { entries: Array<{ level: string; message: string; details?: unknown }> } {
@@ -131,6 +150,54 @@ describe("composeOmoSenpiExtension", () => {
 
     // then
     expect(pi.tools).toEqual([])
+  })
+
+  it("#given no user Python cache setting #when composed #then Python bytecode is cached under the OmO prefix and never next to a project's code (#11373)", async () => {
+    // given
+    const work = mkdtempSync(join(tmpdir(), "omo-pycache-"))
+    const project = join(work, "project")
+    mkdirSync(project)
+    writeFileSync(join(project, "helper.py"), "VALUE = 7\n")
+    writeFileSync(join(project, "main.py"), "import helper\nprint(helper.VALUE)\n")
+    process.env.XDG_CACHE_HOME = work
+    process.env.LOCALAPPDATA = work
+    delete process.env.PYTHONDONTWRITEBYTECODE
+    delete process.env.PYTHONPYCACHEPREFIX
+
+    try {
+      // when
+      await composeOmoSenpiExtension([])(new FakeExtensionAPI())
+      const child = Bun.spawn([process.platform === "win32" ? "python" : "python3", "main.py"], { cwd: project, env: process.env, stdout: "pipe", stderr: "pipe" })
+      const [stdout, exitCode] = await Promise.all([new Response(child.stdout).text(), child.exited])
+
+      // then
+      const prefix = join(work, "omo-senpi", "pycache")
+      expect(readPythonCacheEnv()).toEqual({ PYTHONDONTWRITEBYTECODE: undefined, PYTHONPYCACHEPREFIX: prefix })
+      expect({ exitCode, stdout: stdout.trim() }).toEqual({ exitCode: 0, stdout: "7" })
+      expect(readdirSync(prefix, { recursive: true, encoding: "utf8" }).some((path) => path.includes("helper.") && path.endsWith(".pyc"))).toBe(true)
+      expect(readdirSync(project).sort()).toEqual(["helper.py", "main.py"])
+    } finally {
+      rmSync(work, { recursive: true, force: true })
+    }
+  }, 30_000)
+
+  it("#given the user set either Python cache variable, even empty #when composed #then both are left exactly as they were (#11373)", async () => {
+    for (const choice of [{ PYTHONDONTWRITEBYTECODE: "1" }, { PYTHONDONTWRITEBYTECODE: "" }, { PYTHONPYCACHEPREFIX: "/mine" }, { PYTHONPYCACHEPREFIX: "" }]) {
+      // given
+      delete process.env.PYTHONDONTWRITEBYTECODE
+      delete process.env.PYTHONPYCACHEPREFIX
+      Object.assign(process.env, choice)
+
+      // when
+      await composeOmoSenpiExtension([])(new FakeExtensionAPI())
+
+      // then
+      expect(readPythonCacheEnv()).toEqual({
+        PYTHONDONTWRITEBYTECODE: undefined,
+        PYTHONPYCACHEPREFIX: undefined,
+        ...choice,
+      })
+    }
   })
 
   it("#given a component throws #when composed #then logs the error and registers later components", async () => {
@@ -444,3 +511,38 @@ async function captureDefaultLoggerOutput(
     else process.env.OMO_DEBUG = previous
   }
 }
+
+describe("idle-injection retire on session_shutdown (#10782)", () => {
+  it("#given a queued injection whose failure receipt throws #when session_shutdown fires #then the error is logged and later shutdown handlers still run", async () => {
+    // given a component that queues an injection with a throwing receipt and also listens for shutdown
+    const pi = new FakeExtensionAPI()
+    const logger = createRecordingLogger()
+    let laterHandlerRan = false
+    const components: OmoSenpiComponent[] = [
+      {
+        name: "throwing-receipt",
+        register(api, ctx) {
+          ctx.idleCoordinator?.enqueue({
+            key: "task:st_24",
+            source: "task-completion",
+            content: "st_24 completed",
+            onDeliveryFailed: () => {
+              throw new Error("receipt failed")
+            },
+          })
+          api.on("session_shutdown", () => {
+            laterHandlerRan = true
+          })
+        },
+      },
+    ]
+    await composeOmoSenpiExtension(components, { logger })(pi)
+
+    // when
+    await pi.dispatch("session_shutdown", { type: "session_shutdown", reason: "reload" })
+
+    // then
+    expect(laterHandlerRan).toBe(true)
+    expect(logger.entries.some((entry) => entry.level === "warn" && entry.message.includes("receipt failed on shutdown"))).toBe(true)
+  })
+})

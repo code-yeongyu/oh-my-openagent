@@ -2,6 +2,7 @@ import type { CreatedHooks } from "../create-hooks"
 
 export function createToolDefinitionHandler(args: {
   hooks: CreatedHooks
+  onDefinition?: (name: string, description: string) => void
 }): (
   input: { toolID: string },
   output: { description: string; parameters: unknown },
@@ -12,5 +13,6 @@ export function createToolDefinitionHandler(args: {
     if (overrideHook) {
       await overrideHook["tool.definition"](input, output)
     }
+    args.onDefinition?.(input.toolID, output.description)
   }
 }

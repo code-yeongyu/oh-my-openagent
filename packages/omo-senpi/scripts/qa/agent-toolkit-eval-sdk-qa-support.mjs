@@ -2,6 +2,9 @@ import { execFileSync } from "node:child_process"
 import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 
+import { OMO_BRAND_LOGO } from "../../../omo-native/bin/lib/brand-logo.generated.js"
+import { withTelemetryOptOut } from "./telemetry-opt-out-env.mjs"
+
 // Set identity before importing senpi: core/brand consumes SENPI_BRAND once, then scrubs it.
 // Mirrors omo-native/bin/lib/launcher.js; the isolated agent home is the only substitution.
 export function isolatedEnvironment(sandbox, packageRoot) {
@@ -13,7 +16,7 @@ export function isolatedEnvironment(sandbox, packageRoot) {
   const manifest = JSON.parse(readFileSync(join(nativeRoot, "package.json"), "utf8"))
   const changelogPath = join(nativeRoot, "plugin/CHANGELOG.md")
   const brand = {
-    name: "OmO", command: "omo", displayVersion: manifest.version, configDir: ".omo", flatLayout: false,
+    name: "OmO", logo: OMO_BRAND_LOGO, command: "omo", displayVersion: manifest.version, configDir: ".omo", flatLayout: false,
     envPrefix: "OMO", userAgent: "omo", originator: "omo",
     update: { packageName: "omo-ai", distTag: "beta", command: "npm i -g omo-ai@beta", changelogUrl: "https://github.com/code-yeongyu/oh-my-openagent/releases" },
   }
@@ -30,8 +33,7 @@ export function isolatedEnvironment(sandbox, packageRoot) {
   env.OMO_BIN = join(nativeRoot, "bin/omo.js")
   for (const key of ["TMPDIR", "TMP", "TEMP"]) env[key] = join(sandbox, "tmp")
   env.PI_OFFLINE = "1"
-  env.DO_NOT_TRACK = "1"
-  return env
+  return withTelemetryOptOut(env)
 }
 
 export function processGroupMembers(groupId) {

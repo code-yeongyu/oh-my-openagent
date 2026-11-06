@@ -27,6 +27,7 @@ const mockRunOpenCodeStartupMigration = mock(() => ({
   reloadRequired: false,
   results: [],
   skippedConflictCount: 0,
+  targetBackupPaths: [] as string[],
 }))
 const mockLoadPluginConfig = mock(() => ({}))
 const mockLoadConfigChain = mock((directory: string) => ({
@@ -137,6 +138,7 @@ describe("createPluginModule()", () => {
       reloadRequired: false,
       results: [],
       skippedConflictCount: 0,
+      targetBackupPaths: [] as string[],
     })
     mockDetectDuplicateOmoPlugin.mockReturnValue({
       detected: false,
@@ -405,6 +407,7 @@ describe("createPluginModule()", () => {
         reloadRequired: true,
         results: [],
         skippedConflictCount: 2,
+        targetBackupPaths: [] as string[],
       }))
       const showToast = mock(async () => ({}))
       const pluginModule = createTestPluginModule({ runOpenCodeStartupMigration })
@@ -428,6 +431,59 @@ describe("createPluginModule()", () => {
       })
       expect(mockLoadPluginConfig).toHaveBeenCalledTimes(1)
     })
+
+    it("#then a failed migration's toast still names the backup it kept (#8187)", async () => {
+      // given
+      const runOpenCodeStartupMigration = mock(() => ({
+        error: "Migration backup path already exists",
+        journalResumed: true,
+        migratedFrom: [],
+        reloadRequired: false,
+        results: [],
+        skippedConflictCount: 0,
+        targetBackupPaths: ["/home/alice/.omo/omo.jsonc.bak.kept"],
+      }))
+      const showToast = mock(async () => ({}))
+      const pluginModule = createTestPluginModule({ runOpenCodeStartupMigration })
+      mockLoadPluginConfig.mockReturnValue({})
+
+      // when
+      await pluginModule.server({
+        directory: "/tmp/project",
+        client: { tui: { showToast } },
+      } as Parameters<typeof pluginModule.server>[0])
+
+      // then
+      expect(showToast.mock.calls[0]?.[0]).toMatchObject({
+        body: { title: "Configuration migration failed", message: expect.stringContaining("/home/alice/.omo/omo.jsonc.bak.kept") },
+      })
+    })
+
+    it("#then the toast names the backup of a rewritten config (#8187)", async () => {
+      // given
+      const runOpenCodeStartupMigration = mock(() => ({
+        journalResumed: false,
+        migratedFrom: ["/home/alice/.config/opencode/omo.json"],
+        reloadRequired: true,
+        results: [],
+        skippedConflictCount: 0,
+        targetBackupPaths: ["/home/alice/.omo/omo.jsonc.bak.2026-10-15T09-00-00-000Z"],
+      }))
+      const showToast = mock(async () => ({}))
+      const pluginModule = createTestPluginModule({ runOpenCodeStartupMigration })
+      mockLoadPluginConfig.mockReturnValue({})
+
+      // when
+      await pluginModule.server({
+        directory: "/tmp/project",
+        client: { tui: { showToast } },
+      } as Parameters<typeof pluginModule.server>[0])
+
+      // then
+      expect(showToast.mock.calls[0]?.[0]).toMatchObject({
+        body: { message: expect.stringContaining("/home/alice/.omo/omo.jsonc.bak.2026-10-15T09-00-00-000Z") },
+      })
+    })
   })
 
   describe("#given serverPlugin is initialized twice in one process", () => {
@@ -439,6 +495,7 @@ describe("createPluginModule()", () => {
         reloadRequired: false,
         results: [],
         skippedConflictCount: 0,
+        targetBackupPaths: [] as string[],
       }))
       const pluginModule = createTestPluginModule({ runOpenCodeStartupMigration })
       const input = { directory: "/tmp/project", client: {} } as Parameters<typeof pluginModule.server>[0]
@@ -462,6 +519,7 @@ describe("createPluginModule()", () => {
         reloadRequired: false,
         results: [],
         skippedConflictCount: 0,
+        targetBackupPaths: [] as string[],
       }))
       const loadConfigChain = mock(() => ({ config: {}, messages: ["invalid config"], path: null, valid: false }))
       const showToast = mock(async () => ({}))

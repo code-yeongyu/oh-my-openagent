@@ -9,6 +9,7 @@ import { GitMemoryRepo, buildIdentityPaths } from "@oh-my-opencode/memory-core"
 import { createMemoryIdentityContext } from "./context"
 import {
   MEMORY_STATUS_KEY,
+  SYNC_BLOCKED_SEGMENT,
   estimateSystemTokens,
   estimateSystemTokensCached,
   refreshMemoryStatus,
@@ -324,6 +325,59 @@ describe("refreshMemoryStatus segments", () => {
     expect(recorder.statusCalls).toEqual([
       { key: MEMORY_STATUS_KEY, text: `mem:${identity} 1m ago` },
     ])
+  }, 30_000)
+
+  test("#given memory sync failing #when refresh runs #then the footer says sync blocked, kept even when other segments drop (omo #10637)", async () => {
+    const identity = "a".repeat(32)
+    const context = segmentContext({ identity, sessionId: "session-a", backlogSteps: 7, failures: 3 })
+    const recorder = recordingUi()
+    const repos: string[] = []
+    const failing = { kind: "failing", since: 0, attempts: 1, failure: { kind: "offline", reason: "r", action: "a" } } as const
+
+    await refreshMemoryStatus({
+      context,
+      ui: recorder.ui,
+      compileWarnTokens: 30_000,
+      alreadyNotified: false,
+      gitRepo: segmentRepo({ status: async () => "?? scratch.md\n" }),
+      now: () => SEGMENT_NOW,
+      checkAdvisory: false,
+      sessionId: "session-a",
+      syncStatus: async (repo) => {
+        repos.push(repo)
+        return failing
+      },
+    })
+
+    expect(repos).toEqual([context.identityPaths.repo])
+    expect(recorder.statusCalls).toEqual([
+      { key: MEMORY_STATUS_KEY, text: `mem:${identity} 1m ago*${SYNC_BLOCKED_SEGMENT}` },
+    ])
+    expect(recorder.statusCalls[0]?.text?.length).toBeLessThanOrEqual(60)
+  }, 30_000)
+
+  test("#given memory sync synced, idle, or a reader that throws #when refresh runs #then no sync segment renders (omo #10637)", async () => {
+    const context = segmentContext({})
+    for (const syncStatus of [
+      async () => ({ kind: "synced", at: 1, updatedWhileOffline: 0 }) as const,
+      async () => null,
+      async () => {
+        throw new Error("runner gone")
+      },
+    ]) {
+      const recorder = recordingUi()
+      await refreshMemoryStatus({
+        context,
+        ui: recorder.ui,
+        compileWarnTokens: 30_000,
+        alreadyNotified: false,
+        gitRepo: segmentRepo(),
+        now: () => SEGMENT_NOW,
+        checkAdvisory: false,
+        syncStatus,
+      })
+      expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago" }])
+    }
   }, 30_000)
 
   test("#given a repo with no HEAD #when refresh runs #then no git status work happens", async () => {

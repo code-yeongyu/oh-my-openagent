@@ -13,6 +13,8 @@
 pub mod delivery;
 pub mod input;
 pub mod stop_path;
+#[cfg(any(test, target_os = "windows"))]
+mod menus;
 
 #[cfg(target_os = "windows")]
 mod ax;

@@ -2,6 +2,8 @@ import { existsSync } from "../fs/resilient"
 import { rm } from "../fs/resilient"
 import { resolve } from "node:path"
 import type { GitExec, GitExecResult } from "../git"
+import { NO_AUTO_MAINTENANCE } from "../git/no-auto-maintenance"
+import { STABLE_LOG_OUTPUT } from "../git/stable-log-output"
 import type { ReflectionCleanupReceipt, ReflectionWorktree } from "./worktree"
 
 const GIT_TIMEOUT_MS = 30_000
@@ -108,7 +110,7 @@ export async function integrateValidatedReflection(
     }
 
     const merge = await run(worktree.exec, worktree.parent.dir, [
-      "merge", "--no-ff", input.validated.tipSha,
+      ...NO_AUTO_MAINTENANCE, "merge", "--no-ff", input.validated.tipSha,
       "-m", `merge(reflection): ${input.summary}`,
       "-m", `Omo-Run: ${input.runId}`,
     ])
@@ -164,7 +166,7 @@ async function findExactRunReceipt(
 }
 
 async function hasExactRunReceipt(exec: GitExec, cwd: string, commit: string, runId: string): Promise<boolean> {
-  const trailers = await run(exec, cwd, ["show", "-s", "--format=%(trailers:key=Omo-Run,valueonly)", commit])
+  const trailers = await run(exec, cwd, [...STABLE_LOG_OUTPUT, "show", "-s", "--format=%(trailers:key=Omo-Run,valueonly)", commit])
   return trailers.code === 0 && trailers.stdout.split(/\r?\n/).some((value) => value === runId)
 }
 

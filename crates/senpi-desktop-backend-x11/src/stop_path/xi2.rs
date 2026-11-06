@@ -1,7 +1,8 @@
 //! One XI2 connection lifetime of the kill switch: a dedicated x11rb
 //! connection selects `XI_RawKeyPress`/`XI_RawKeyRelease` on the root for
 //! every master device (raw events reach it regardless of focus or grabs),
-//! and a heartbeat round trip every 500 ms proves the connection answers.
+//! counts only those from a physical source device, and a heartbeat round
+//! trip every 500 ms proves the connection answers.
 
 use std::thread;
 
@@ -16,6 +17,7 @@ use x11rb::protocol::Event;
 use x11rb::rust_connection::RustConnection;
 
 use super::chord::{Hotkey, Pressed};
+use super::source::Sources;
 use super::Shared;
 use crate::input::Keymap;
 
@@ -53,6 +55,12 @@ fn unavailable(reason: &str) -> StopPathError {
     }
 }
 
+/// XI 2.0 withholds raw events while another client grabs the keyboard, so
+/// an app holding a grab would swallow the chord; XI 2.1 delivers them anyway.
+pub(super) const fn raw_events_survive_grabs(major: u16, minor: u16) -> bool {
+    major > 2 || (major == 2 && minor >= 1)
+}
+
 impl Session {
     fn open(hotkey: &Hotkey) -> Result<Self, StopPathError> {
         let (conn, screen) = x11rb::connect(None).map_err(|_| unavailable(CONNECTION_FAILED))?;
@@ -68,14 +76,20 @@ impl Session {
             .map_err(|_| xi2())?
             .reply()
             .map_err(|_| xi2())?;
-        if version.major_version < 2 {
+        if !raw_events_survive_grabs(version.major_version, version.minor_version) {
             return Err(xi2());
         }
-        let mask = xinput::EventMask {
+        let keys = xinput::EventMask {
             deviceid: Device::ALL_MASTER.into(),
             mask: vec![XIEventMask::RAW_KEY_PRESS | XIEventMask::RAW_KEY_RELEASE],
         };
-        conn.xinput_xi_select_events(root, &[mask])
+        // Device ids are reused after a hot-unplug, so a hierarchy change
+        // drops every cached source classification.
+        let hierarchy = xinput::EventMask {
+            deviceid: Device::ALL.into(),
+            mask: vec![XIEventMask::HIERARCHY],
+        };
+        conn.xinput_xi_select_events(root, &[keys, hierarchy])
             .map_err(|_| xi2())?
             .check()
             .map_err(|_| xi2())?;
@@ -105,8 +119,14 @@ impl Session {
     /// arrives.
     fn listen(&self, shared: &Shared) {
         let mut pressed = Pressed::default();
+        let mut sources = Sources::default();
         while let Ok(event) = self.conn.wait_for_event() {
             match event {
+                Event::XinputRawKeyPress(raw) if !sources.is_physical(&self.conn, raw.sourceid) => {
+                    shared.xtest_ignored();
+                }
+                Event::XinputRawKeyRelease(raw) if !sources.is_physical(&self.conn, raw.sourceid) => {}
+                Event::XinputHierarchy(_) => sources.clear(),
                 Event::XinputRawKeyPress(raw) => {
                     // Resolved per press, so a chord replaced by a later
                     // `start()` applies to the running connection.

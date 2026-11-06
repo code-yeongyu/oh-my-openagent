@@ -60,8 +60,19 @@ export function signalRecordedProcessGroup(pid: number, signal: NodeJS.Signals):
   }
 }
 
-export async function waitUntil(deadlineAt: number, now: () => number): Promise<void> {
+export async function waitUntil(deadlineAt: number, now: () => number, signal?: AbortSignal): Promise<void> {
+  signal?.throwIfAborted()
   const delay = Math.max(0, deadlineAt - now())
   if (delay === 0) return
-  await new Promise<void>((resolve) => setTimeout(resolve, delay))
+  await new Promise<void>((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(timer)
+      reject(signal?.reason)
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort)
+      resolve()
+    }, delay)
+    signal?.addEventListener("abort", onAbort, { once: true })
+  })
 }

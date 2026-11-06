@@ -3,6 +3,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { availableParallelism } from "node:os";
 import { fileURLToPath } from "node:url";
 import { BUILD_NODES, selectBuildNodes, type BuildNode } from "./build-nodes";
+import { windowsTreeKillArgs } from "../packages/memory-core/src/concurrency/windows-process-tree.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const isWindows = process.platform === "win32";
@@ -11,12 +12,13 @@ const isWindows = process.platform === "win32";
 // group (child + any grandchildren it spawned, e.g. `npm ci` / `bun build` sub-processes) on
 // abort. A plain child.kill() only signals the immediate child, so grandchildren survive and a
 // failed build would otherwise wait out a slow sibling. On Windows there is no process group;
-// killTree falls back to `taskkill /T /F`, which is best-effort tree termination.
+// killTree computes a creation-time-checked tree and names each PID explicitly.
 function killTree(child: ReturnType<typeof spawn>): void {
 	const pid = child.pid;
 	if (pid === undefined) return;
 	if (isWindows) {
-		spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore" });
+		const args = windowsTreeKillArgs(pid);
+		if (args.length > 0) spawnSync("taskkill", args, { stdio: "ignore", windowsHide: true });
 		return;
 	}
 	try {
@@ -104,7 +106,7 @@ function runNode(node: BuildNode, env: NodeJS.ProcessEnv, liveChildren?: Set<Ret
 			env,
 			shell: isWindows,
 			// POSIX: lead a new process group so killTree can SIGKILL the whole subtree on abort.
-			// Windows has no process groups; taskkill /T handles the tree there.
+			// Windows has no process groups; killTree checks the process table there.
 			detached: !isWindows,
 			stdio: ["ignore", "pipe", "pipe"],
 		});

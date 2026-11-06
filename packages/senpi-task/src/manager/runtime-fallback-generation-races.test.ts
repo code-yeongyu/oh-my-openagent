@@ -113,7 +113,7 @@ describe("generations of one task during a runtime-fallback close", () => {
           runner.finishClose.resolve()
           manager.workpools.dispose()
           lifecycle.dispose?.()
-          for (const id of manager.residentTaskIds()) manager.forget(id)
+          for (const id of manager.residentTaskIds()) manager.forget(id, { path: "end" })
         }
       })
     }
@@ -176,7 +176,7 @@ describe("generations of one task during a runtime-fallback close", () => {
     } finally {
       finishClose.resolve()
       await manager.getResidentHandle(taskId)?.dispose()
-      manager.forget(taskId)
+      manager.forget(taskId, { path: "end" })
       manager.workpools.dispose()
       lifecycle.dispose?.()
     }

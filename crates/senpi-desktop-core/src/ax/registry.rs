@@ -6,6 +6,7 @@ use crate::error::{CoreResult, DesktopError};
 /// Hard ceiling on live refs across all targets.
 const MAX_ENTRIES: usize = 5_000;
 
+#[derive(Clone)]
 struct Registered {
     handle: AxHandle,
     target_key: String,
@@ -14,6 +15,7 @@ struct Registered {
 
 /// Maps `eN` refs to handles. Each target keeps its current and previous
 /// snapshot generation alive; anything older resolves to `StaleRef`.
+#[derive(Clone)]
 pub struct AxRegistry {
     next_ref: u64,
     generations: HashMap<String, u64>,
@@ -31,6 +33,12 @@ impl Default for AxRegistry {
 }
 
 impl AxRegistry {
+    /// Restores delivered generations without recycling refs from an abandoned reply.
+    pub fn restore(&mut self, mut delivered: Self) {
+        delivered.next_ref = delivered.next_ref.max(self.next_ref);
+        *self = delivered;
+    }
+
     /// Starts a new generation for `target`, dropping refs two generations old.
     pub fn begin_snapshot(&mut self, target: &str) -> u64 {
         let generation = self.generations.entry(target.to_string()).or_default();

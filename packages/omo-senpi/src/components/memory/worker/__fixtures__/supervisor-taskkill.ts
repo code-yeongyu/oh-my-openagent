@@ -7,6 +7,14 @@ const args = process.argv.slice(2)
 const runDir = process.env.OMO_MEMORY_SUPERVISOR_TASKKILL_RUN_DIR
 if (runDir === undefined) throw new Error("termination fixture requires a run directory")
 const child = JSON.parse(readFileSync(join(runDir, "child-started.json"), "utf8")) as { readonly pid: number }
+// taskkill /T kills the model's descendants too; mirror that for the optional fixture grandchild.
+let descendantPids: number[] = []
+try {
+  const grandchild = JSON.parse(readFileSync(join(runDir, "grandchild.json"), "utf8")) as { readonly pid: number }
+  descendantPids = [grandchild.pid]
+} catch {
+  descendantPids = []
+}
 const kill = (pid: number, signal: NodeJS.Signals): void => {
   try {
     process.kill(pid, signal)
@@ -29,5 +37,5 @@ if (signalGroupIndex >= 0) {
   const targetPid = Number(args[pidIndex + 1])
   if (!Number.isInteger(targetPid)) throw new Error("taskkill fixture requires a pid")
   await writeFile(join(runDir, "taskkill-invocation.json"), `${JSON.stringify({ args })}\n`, "utf8")
-  for (const pid of [child.pid, targetPid]) kill(pid, "SIGKILL")
+  for (const pid of [child.pid, targetPid, ...descendantPids]) kill(pid, "SIGKILL")
 }

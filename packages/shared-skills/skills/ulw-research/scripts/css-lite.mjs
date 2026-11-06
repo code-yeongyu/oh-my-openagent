@@ -57,8 +57,9 @@ function parseDeclarations(text) {
 }
 
 /**
- * @returns {{ selector: string, declarations: { prop: string, value: string }[], atRule?: string }[]}
- * atRule is the chain of enclosing grouping at-rule preludes joined by a space.
+ * @returns {{ selector: string, declarations: { prop: string, value: string }[], atRule?: string, nested?: true }[]}
+ * atRule is the chain of enclosing grouping at-rule preludes joined by a space; nested is true for a
+ * rule written inside another style rule (CSS nesting).
  */
 export function scanRules(css) {
 	if (typeof css !== "string") return []
@@ -88,6 +89,7 @@ export function scanRules(css) {
 				const atChain = stack.filter((entry) => entry.group).map((entry) => entry.prelude)
 				const rule = { selector: frame.prelude, declarations: parseDeclarations(frame.body + buffer) }
 				if (atChain.length) rule.atRule = atChain.join(" ")
+				if (stack.some((entry) => !entry.group)) rule.nested = true
 				slots[frame.slot] = rule
 			}
 			buffer = ""

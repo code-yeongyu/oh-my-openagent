@@ -11,9 +11,11 @@ export {
   LOCK_DOMAINS,
   factsQueueLockPath,
   factsRunsLockPath,
+  memoryMaintenanceLockPath,
   memoryWriterLockPath,
   memoryUsageLockPath,
   noticeLockPath,
+  receiptsLockPath,
   reflectionSchedulerLockPath,
   runFinalizationLockPath,
   skillsUsageLockPath,
@@ -33,3 +35,4 @@ export {
   withRecallWakeLease,
 } from "./recall-wake-domain"
 export type { RecallWakeLease, RecallWakeLeaseOptions } from "./recall-wake-domain"
+export { acquireReflectionRunLease } from "./reflection-run-domain"

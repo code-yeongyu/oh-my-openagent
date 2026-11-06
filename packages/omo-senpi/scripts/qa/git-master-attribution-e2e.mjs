@@ -11,12 +11,16 @@ import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const mockProviderEntry = join(scriptDir, "mock-provider", "index.ts")
 const realAgentDirs = [join(homedir(), ".senpi", "agent"), join(homedir(), ".omo", "agent")]
-// The shipped contract (omo#7832) is that NO GitHub-resolvable co-author identity is ever
-// injected, so this driver looks for any Co-authored-by trailer rather than one known address:
-// pinning a single string would pass again the moment a different identity was introduced.
+// omo#10713: the default directive passes exactly this trailer once, as a `--trailer` argument.
+// The payload is JSON-serialized, so the argument's opening quote appears escaped.
+const TRAILER = "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"
+const TRAILER_ARGUMENT_MARKER = `--trailer \\"${TRAILER}`
 const CO_AUTHOR_MARKER = "Co-authored-by:"
 const FOOTER_MARKER = "Ultraworked with"
 const SKILL_BODY_MARKER = "GIT MASTER LIVE QA BODY"
+const PREFIX_SECTION_MARKER = "GIT COMMAND PREFIX (MANDATORY)"
+// Only the rewrite of the seeded bash block can produce this line; the injected section has no `git add -A .`.
+const PREFIXED_COMMAND_MARKER = "GIT_MASTER=1 git add -A ."
 
 function findOnPath(bin) {
   if (bin.includes("/")) return existsSync(bin) ? bin : null
@@ -61,7 +65,7 @@ function seedScenario(sandbox, gitMasterConfig) {
   const skillPath = join(skillDir, "SKILL.md")
   writeFileSync(
     skillPath,
-    `---\nname: git-master\ndescription: Isolated live QA git-master skill\n---\n${SKILL_BODY_MARKER}\n`,
+    `---\nname: git-master\ndescription: Isolated live QA git-master skill\n---\n${SKILL_BODY_MARKER}\n\n\`\`\`bash\ngit add -A .\ngit commit -m "qa"\n\`\`\`\n`,
   )
   writeFileSync(join(sandbox.cwd, "mock-script.json"), `${JSON.stringify({
     steps: [
@@ -105,7 +109,10 @@ function runScenario(senpiBin, gitMasterConfig) {
       readEventCount: count,
       bodyPresent: payload.includes(SKILL_BODY_MARKER),
       trailerPresent: payload.includes(CO_AUTHOR_MARKER),
+      trailerArgumentCount: payload.split(TRAILER_ARGUMENT_MARKER).length - 1,
       footerPresent: payload.includes(FOOTER_MARKER),
+      prefixSectionPresent: payload.includes(PREFIX_SECTION_MARKER),
+      prefixedCommandPresent: payload.includes(PREFIXED_COMMAND_MARKER),
       sandboxAgentDir: sandbox.agentDir,
       stdout,
       stderr: run.stderr ?? "",
@@ -122,6 +129,8 @@ function selfTest() {
   const { count, payload } = readToolEventsPayload(events)
   if (count !== 1) throw new Error("read event filter failed")
   if (!payload.includes(FOOTER_MARKER)) throw new Error("payload serialization failed")
+  const trailerPayload = JSON.stringify([{ text: `git commit -m "x" --trailer "${TRAILER}"` }])
+  if (trailerPayload.split(TRAILER_ARGUMENT_MARKER).length - 1 !== 1) throw new Error("trailer marker does not match the serialized argument")
   console.log("SELF-TEST OK")
 }
 
@@ -144,9 +153,11 @@ function main() {
   }
   const outDir = process.env.GIT_MASTER_ATTRIBUTION_E2E_OUT_DIR?.trim()
   const snapshots = realAgentDirs.map((dir) => ({ dir, before: credentialDigest(dir) }))
-  // Default install: nothing is injected. Opt-in: the body footer only, never a trailer.
+  // Default install: the GIT_MASTER=1 prefix plus one sisyphus-dev-ai trailer. Footer opt-in adds the footer.
   const defaultOff = runScenario(senpiBin, undefined)
   const optedIn = runScenario(senpiBin, { commit_footer: true })
+  const prefixOff = runScenario(senpiBin, { git_env_prefix: "" })
+  const coAuthorOff = runScenario(senpiBin, { include_co_authored_by: false })
   const changedRealDirs = snapshots
     .filter(({ dir, before }) => before !== credentialDigest(dir))
     .map(({ dir }) => dir)
@@ -154,11 +165,22 @@ function main() {
     default_process_exit: defaultOff.exitStatus === 0 ? "PASS" : "FAIL",
     default_read_event: defaultOff.readEventCount >= 1 && defaultOff.bodyPresent ? "PASS" : "FAIL",
     default_footer_absent: defaultOff.footerPresent ? "FAIL" : "PASS",
-    default_trailer_absent: defaultOff.trailerPresent ? "FAIL" : "PASS",
+    default_trailer_once: defaultOff.trailerArgumentCount === 1 ? "PASS" : "FAIL",
+    default_prefix_section: defaultOff.prefixSectionPresent ? "PASS" : "FAIL",
+    default_git_commands_prefixed: defaultOff.prefixedCommandPresent ? "PASS" : "FAIL",
     opt_in_process_exit: optedIn.exitStatus === 0 ? "PASS" : "FAIL",
     opt_in_read_event: optedIn.readEventCount >= 1 && optedIn.bodyPresent ? "PASS" : "FAIL",
     opt_in_footer_injected: optedIn.footerPresent ? "PASS" : "FAIL",
-    opt_in_trailer_absent: optedIn.trailerPresent ? "FAIL" : "PASS",
+    opt_in_trailer_once: optedIn.trailerArgumentCount === 1 ? "PASS" : "FAIL",
+    prefix_off_process_exit: prefixOff.exitStatus === 0 ? "PASS" : "FAIL",
+    prefix_off_read_event: prefixOff.readEventCount >= 1 && prefixOff.bodyPresent ? "PASS" : "FAIL",
+    prefix_off_section_absent: prefixOff.prefixSectionPresent ? "FAIL" : "PASS",
+    prefix_off_commands_unprefixed: prefixOff.prefixedCommandPresent ? "FAIL" : "PASS",
+    prefix_off_trailer_once: prefixOff.trailerArgumentCount === 1 ? "PASS" : "FAIL",
+    co_author_off_process_exit: coAuthorOff.exitStatus === 0 ? "PASS" : "FAIL",
+    co_author_off_read_event: coAuthorOff.readEventCount >= 1 && coAuthorOff.bodyPresent ? "PASS" : "FAIL",
+    co_author_off_trailer_absent: coAuthorOff.trailerPresent ? "FAIL" : "PASS",
+    co_author_off_prefix_kept: coAuthorOff.prefixedCommandPresent ? "PASS" : "FAIL",
     real_agent_dirs_untouched: changedRealDirs.length === 0 ? "PASS" : "FAIL",
   }
   const result = Object.values(checks).every((value) => value === "PASS") ? "PASS" : "FAIL"
@@ -167,9 +189,19 @@ function main() {
     checks,
     realAgentDirsUntouched: changedRealDirs.length === 0,
     changedRealDirs,
-    sandboxAgentDirs: { default: defaultOff.sandboxAgentDir, optIn: optedIn.sandboxAgentDir },
+    sandboxAgentDirs: {
+      default: defaultOff.sandboxAgentDir,
+      optIn: optedIn.sandboxAgentDir,
+      prefixOff: prefixOff.sandboxAgentDir,
+      coAuthorOff: coAuthorOff.sandboxAgentDir,
+    },
   }
-  writeEvidence(outDir ? resolve(outDir) : undefined, payload, { default: defaultOff, "opt-in": optedIn })
+  writeEvidence(outDir ? resolve(outDir) : undefined, payload, {
+    default: defaultOff,
+    "opt-in": optedIn,
+    "prefix-off": prefixOff,
+    "co-author-off": coAuthorOff,
+  })
   console.log(JSON.stringify(payload))
   process.exitCode = result === "PASS" ? 0 : 1
 }

@@ -27,9 +27,11 @@ export interface ReflectionOrphanSweepContext {
   readonly now: () => number
   readonly logger?: ReflectionSweepLogger
   readonly deferOnSchedulerContention?: boolean
+  readonly signal?: AbortSignal
 }
 
 export async function sweepReflectionRunOrphans(context: ReflectionOrphanSweepContext): Promise<void> {
+  context.signal?.throwIfAborted()
   let liveRunIds: ReadonlySet<string>
   try {
     liveRunIds = await collectLiveRunIds(context)
@@ -37,6 +39,7 @@ export async function sweepReflectionRunOrphans(context: ReflectionOrphanSweepCo
     if (context.deferOnSchedulerContention && error instanceof LockContentionError) return
     throw error
   }
+  context.signal?.throwIfAborted()
   const repo = new GitMemoryRepo({ dir: context.identity.paths.repo, agentId: context.identity.id })
   try {
     const receipts = await sweepReflectionOrphans(repo, context.identity.paths.worktrees, {

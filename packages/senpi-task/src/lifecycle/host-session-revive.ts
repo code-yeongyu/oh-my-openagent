@@ -1,13 +1,16 @@
 import { log } from "@oh-my-opencode/utils"
 
 import type { TaskRecord } from "../state"
-import type { LifecycleContext } from "./context"
+import { reconciliationActive, type LifecycleContext } from "./context"
 import { hostSessionResumePath, isHostSessionRecord, type HostSessionRecord } from "./host-session"
 import { parkedReason, reachRecordedHost, type HostParkedReason, type RecordedHostVerdict } from "./host-endpoint-reach"
 import { markSuspensionReason, parkHostSessionRecord } from "./host-session-record"
 import { deferred, reviveClaimed } from "./reconcile-reclamation"
 import { claimResidencySlot } from "./residency"
+import { retryDeferredScopedChild } from "./deferred-revival"
+import { SCOPED_RETRY_REASONS } from "./deferred-revival-reasons"
 import type { ReconcileOutcome } from "./types"
+import { holdsClaim, rollbackOrDeferred } from "./revive-rollback"
 
 /**
  * Reviving a child that lives on the shared daemon. A host session has no pid, so nothing here can
@@ -35,6 +38,10 @@ export async function reconcileHostSessionOrphan(
   record: HostSessionRecord,
 ): Promise<ReconcileOutcome> {
   const verdict = await reachRecordedHost(context, record.host_session)
+  const fresh = context.store.load(record.task_id)
+  if (!reconciliationActive(context) || fresh === null || !holdsClaim(context, fresh, record)) {
+    return rollbackOrDeferred(context, record.task_id, "rpc_detached", "foreign_live_owner", record)
+  }
   if (verdict !== "alive") {
     const reason = parkedReason(verdict)
     parkHostSessionRecord(context, record.task_id)
@@ -57,7 +64,7 @@ export async function parkHostSessionOnDaemonLoss(
 ): Promise<HostSessionParkOutcome> {
   const parked = context.store.load(taskId)
   if (!isHostSessionRecord(parked)) return { kind: "suspended", reason: "daemon_unavailable" }
-  context.registry.forget(taskId)
+  context.registry.forget(taskId, { path: "park" })
   parkHostSessionRecord(context, taskId)
   context.store.appendEvent(taskId, { type: "suspended", payload: { reason: "daemon_unavailable" } })
 
@@ -108,14 +115,24 @@ const retrying = new WeakMap<LifecycleContext, Set<string>>()
  * single-flight revival a reconcile uses, against its RECORDED session; it stops as soon as the
  * record is revived, terminal, killed, or claimed elsewhere.
  */
-export function retryDeferredHostSessions(context: LifecycleContext, outcomes: readonly ReconcileOutcome[]): void {
+export function retryDeferredHostSessions(
+  context: LifecycleContext,
+  outcomes: readonly ReconcileOutcome[],
+  parentSessionId?: string,
+): void {
   const active = retrying.get(context) ?? new Set<string>()
   retrying.set(context, active)
   for (const outcome of outcomes) {
-    if (outcome.kind !== "deferred" || !DEFERRED_REASONS.has(outcome.reason ?? "")) continue
-    if (active.has(outcome.task_id) || !isHostSessionRecord(context.store.load(outcome.task_id))) continue
+    if (outcome.kind !== "deferred") continue
+    const record = context.store.load(outcome.task_id)
+    const scoped = parentSessionId !== undefined && record?.parent_session_id === parentSessionId
+      && SCOPED_RETRY_REASONS.has(outcome.reason ?? "")
+    const host = DEFERRED_REASONS.has(outcome.reason ?? "") && isHostSessionRecord(record)
+    if ((!scoped && !host) || active.has(outcome.task_id)) continue
     active.add(outcome.task_id)
-    void retryDeferredHostSession(context, outcome.task_id)
+    void (scoped && parentSessionId !== undefined && outcome.reason !== undefined
+      ? retryDeferredScopedChild(context, outcome.task_id, parentSessionId, outcome.reason)
+      : retryDeferredHostSession(context, outcome.task_id))
       .catch((error: unknown) => log("senpi-task deferred host session retry failed", { taskId: outcome.task_id, error: String(error) }))
       .finally(() => active.delete(outcome.task_id))
   }

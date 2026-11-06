@@ -28,6 +28,7 @@ export type SqlRow = Readonly<Record<string, unknown>>
 export class Sql {
   private params: readonly SqlValue[] = []
   private sinkRows: unknown[][] = []
+  private authorizer: SqlAuthorizer | null = null
   private readonly db: SqliteConnection
 
   constructor(db: SqliteConnection) {
@@ -43,13 +44,32 @@ export class Sql {
     this.db.exec(sql)
   }
 
-  authorized<T>(authorizer: SqlAuthorizer, body: () => T): T {
+  authorized<T>(authorizer: SqlAuthorizer | null, body: () => T): T {
+    const previous = this.authorizer
+    this.authorizer = authorizer
     this.db.setAuthorizer(authorizer)
     try {
       return body()
     } finally {
-      this.db.setAuthorizer(null)
+      this.authorizer = previous
+      this.db.setAuthorizer(previous)
     }
+  }
+
+  /**
+   * The output column names of a SELECT, as `sqlite3_column_name` would report them, read without
+   * `prepare()`: a temp view's `table_info` (duplicate names come back as `name:1`). The view is only
+   * compiled, never run, and it runs with no authorizer, so authorize the statement before calling this.
+   */
+  resultColumns(sql: string): string[] {
+    return this.authorized(null, () => {
+      this.db.exec(`CREATE TEMP VIEW gw_result_columns AS ${bind(sql)}\n`)
+      try {
+        return this.all(["name"], "SELECT cid, name FROM pragma_table_info('gw_result_columns', 'temp')", [], "cid").map((row) => String(row.name))
+      } finally {
+        this.db.exec("DROP VIEW temp.gw_result_columns")
+      }
+    })
   }
 
   run(sql: string, params: readonly SqlValue[] = []): number {

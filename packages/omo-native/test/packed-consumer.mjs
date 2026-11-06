@@ -4,6 +4,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { sameVersion } from "../bin/lib/same-version.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const packageDir = join(repoRoot, "packages/omo-native");
@@ -114,13 +115,13 @@ async function main() {
 		const senpiManifest = readJson(
 			join(consumerDir, "node_modules/@code-yeongyu/senpi/package.json"),
 		);
-		if (senpiManifest.version !== expectedSenpiVersion) {
+		if (!sameVersion(senpiManifest.version, expectedSenpiVersion)) {
 			throw new Error(
 				`Packed omo-ai resolved Senpi ${senpiManifest.version}; expected published ${expectedSenpiVersion}`,
 			);
 		}
 		if (
-			senpiLock.version !== expectedSenpiVersion ||
+			!sameVersion(senpiLock.version, expectedSenpiVersion) ||
 			senpiLock.resolved !== expectedSenpiTarball
 		) {
 			throw new Error(

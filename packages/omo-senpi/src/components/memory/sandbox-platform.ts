@@ -1,5 +1,8 @@
-import { existsSync, mkdirSync } from "@oh-my-opencode/memory-core/fs"
+import { existsSync, lstatSync, mkdirSync, realpathSync } from "@oh-my-opencode/memory-core/fs"
+import { homedir } from "node:os"
 import { dirname, join } from "node:path"
+
+import { attestUsernsRoots, inheritedTrustPaths, USERNS_ROOTS_ENV } from "../../../../omo-native/trust-userns"
 
 import type { ReflectionSpawnArgs } from "./worker/spawn"
 
@@ -136,18 +139,53 @@ export function buildPathSandboxTransform<T extends SandboxableSpawnArgs>(
     return identityTransform(`${input.surface} sandbox unavailable: inner command "${input.command}" is not absolute and could not be resolved; running unsandboxed`)
   }
 
-  const buildTransform = (spawnArgs: T): T => ({
-    ...spawnArgs,
-    command: executable,
-    args: [
-      "--ro-bind", "/", "/",
-      "--dev-bind", "/dev", "/dev",
-      "--tmpfs", "/tmp",
-      ...writableDirs.flatMap((writableDir) => ["--bind", writableDir, writableDir]),
-      "--chdir", spawnArgs.cwd,
-      "--", innerCommand, ...spawnArgs.args,
-    ],
-  })
+  const buildTransform = (spawnArgs: T): T => {
+    // bwrap --bind source target dies child_exit when source does not exist. Reflection runtime
+    // dirs are granted before anything creates them; mkdir the declared path (0700) so the bind
+    // names that exact directory instead of dying or widening to an existing ancestor. Only here,
+    // when bwrap will actually bind it: an off or unavailable sandbox must not create the path.
+    for (const writableDir of writableDirs) createPlannedDirNoFollow(writableDir, input.surface)
+    // The child's own TMPDIR is the sandbox's private tmpfs; the parent's would be read-only inside.
+    // The engine trust stage inside the user namespace sees root as the overflow uid, so it trusts
+    // only the root-owned ancestors attested here by inode (senpi#5334).
+    return {
+      ...spawnArgs,
+      env: {
+        ...spawnArgs.env,
+        TMPDIR: "/tmp",
+        [USERNS_ROOTS_ENV]: attestUsernsRoots([
+          join(spawnArgs.env.HOME ?? homedir(), ".omo", "engine-trust"),
+          ...inheritedTrustPaths(spawnArgs.env.SENPI_ENGINE_TRUST),
+        ]),
+      },
+      command: executable,
+      args: [
+        "--ro-bind", "/", "/",
+        "--dev-bind", "/dev", "/dev",
+        "--tmpfs", "/tmp",
+        ...writableDirs.flatMap((writableDir) => ["--bind", writableDir, writableDir]),
+        "--chdir", spawnArgs.cwd,
+        "--", innerCommand, ...spawnArgs.args,
+      ],
+    }
+  }
+
+  // A deferred probe decides per spawn, so the degradation state describes the latest spawn.
+  let spawnWarning = linuxProbeWarning
+  const applyUsability = (spawnArgs: T, usability: SandboxUsability): T => {
+    if (usability.usable) {
+      spawnWarning = undefined
+      return buildTransform(spawnArgs)
+    }
+    const reason = `bwrap cannot create a sandbox: ${usability.reason}`
+    if (input.policy === "required") {
+      const error = new SandboxUnavailableError(platform, reason)
+      if (input.errorRethrow !== undefined) input.errorRethrow(error)
+      throw error
+    }
+    spawnWarning = `${input.surface} sandbox unavailable on ${platform}: ${reason}; running unsandboxed because policy is auto`
+    return spawnArgs
+  }
 
   const linuxTransform = (spawnArgs: T): T | Promise<T> => {
     // If probe error was detected at build time, throw it now
@@ -162,44 +200,18 @@ export function buildPathSandboxTransform<T extends SandboxableSpawnArgs>(
     if (deferAsyncProbe) {
       const probeResult = (input.probe ?? defaultProbe)(executable)
       if (probeResult instanceof Promise) {
-        return probeResult.then((usability) => {
-          if (!usability.usable) {
-            const reason = `bwrap cannot create a sandbox: ${usability.reason}`
-            if (input.policy === "required") {
-              const error = new SandboxUnavailableError(platform, reason)
-              if (input.errorRethrow !== undefined) input.errorRethrow(error)
-              throw error
-            }
-            // Policy is auto - return unsandboxed
-            return spawnArgs
-          }
-          // Sandbox is usable - apply the bwrap transform
-          return buildTransform(spawnArgs)
-        })
-      } else {
-        // Should not happen - we already checked this at build time
-        // But handle it gracefully
-        if (!probeResult.usable) {
-          const reason = `bwrap cannot create a sandbox: ${probeResult.reason}`
-          if (input.policy === "required") {
-            const error = new SandboxUnavailableError(platform, reason)
-            if (input.errorRethrow !== undefined) input.errorRethrow(error)
-            throw error
-          }
-          return spawnArgs
-        }
-        return buildTransform(spawnArgs)
+        return probeResult.then((usability) => applyUsability(spawnArgs, usability))
       }
+      return applyUsability(spawnArgs, probeResult)
     }
     // Synchronous probe already checked and usable
     return buildTransform(spawnArgs)
   }
 
-  const props: { wasSandboxed: boolean; warning?: string } = { wasSandboxed: linuxProbeWarning === undefined }
-  if (linuxProbeWarning !== undefined) {
-    props.warning = linuxProbeWarning
-  }
-  return Object.assign(linuxTransform, props) as GenericSandboxTransform<T>
+  return Object.defineProperties(linuxTransform, {
+    wasSandboxed: { enumerable: true, get: () => spawnWarning === undefined },
+    warning: { enumerable: true, get: () => spawnWarning },
+  }) as GenericSandboxTransform<T>
 }
 
 function buildDarwinProfile(input: {
@@ -303,4 +315,47 @@ function guardedSandboxedTransform<T extends SandboxableSpawnArgs>(
     return identityTransform(`${surface} sandbox unavailable: inner command "${command}" is not absolute and could not be resolved; running unsandboxed`)
   }
   return Object.assign((spawnArgs: T) => transform(spawnArgs, innerCommand), { wasSandboxed: true })
+}
+
+// Create a planned writable dir one missing segment at a time without following links: the existing
+// prefix must still be the canonical path planned earlier, and each created (or raced-in) segment must
+// be a real directory, so a link planted on any missing segment is refused before anything is written
+// through it. The final realpath equality also refuses a link anywhere on the path.
+function createPlannedDirNoFollow(dir: string, surface: string): void {
+  const refuse = (resolved: string): never => {
+    throw new Error(`${surface} sandbox refused to bind ${dir}: it now resolves to ${resolved} (a symlink appeared on the path after the sandbox was planned); remove the link and run again`)
+  }
+  const missing: string[] = []
+  let cursor = dir
+  while (!lexists(cursor)) {
+    missing.unshift(cursor)
+    const parent = dirname(cursor)
+    if (parent === cursor) break
+    cursor = parent
+  }
+  if (lexists(cursor) && realpathSync(cursor) !== cursor) refuse(realpathSync(cursor))
+  // Documented residual (accepted, #10329): each segment is lstat-checked and the next one created in a
+  // separate step, so a link swapped in between those two calls could still get one directory made through
+  // it. Node has no mkdirat / O_NOFOLLOW directory walk to close that, and planting the link needs write
+  // access to the identity's own 0700 runtime root, which already means owning this user.
+  for (const segment of missing) {
+    try {
+      mkdirSync(segment, { mode: 0o700 })
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error
+    }
+    if (lstatSync(segment).isSymbolicLink()) refuse(realpathSync(segment))
+  }
+  const resolved = realpathSync(dir)
+  if (resolved !== dir) refuse(resolved)
+}
+
+function lexists(path: string): boolean {
+  try {
+    lstatSync(path)
+    return true
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return false
+    throw error
+  }
 }

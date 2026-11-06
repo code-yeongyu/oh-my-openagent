@@ -44,7 +44,12 @@ describe("team member liveness notifier", () => {
     const pi = new FakeExtensionAPI()
     const scheduled: Array<() => void> = []
     const coordinator = new IdleInjectionCoordinator(
-      (message, options) => pi.sendMessage(message, { triggerTurn: true, deliverAs: options.deliverAs }),
+      (message, options) => {
+        expect(options.items.every(item => item.runRef?.kind === "team"
+          && item.runRef.id === "11111111-1111-4111-8111-111111111111")).toBe(true)
+        pi.sendMessage({ ...message, content: options.items.map(item => item.content).join("\n\n") },
+          { triggerTurn: true, deliverAs: options.deliverAs })
+      },
       { scheduleFlush: (flush) => { scheduled.push(flush) } },
     )
     const notifier = createTeamMemberLivenessNotifier({ pi, coordinator, isStreaming: () => true })

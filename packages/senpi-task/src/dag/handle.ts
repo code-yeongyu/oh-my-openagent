@@ -1,5 +1,6 @@
 // allow: SIZE_OK - the wait/attach contract keeps ownership checks, terminal projection, and waiter bookkeeping on one surface so no caller can observe a half-applied terminal state.
 import type { TaskRunStats } from "../state/types"
+import { countDagNodes as countNodes } from "./counts"
 import { subscribeDagJournal, type DagJournalListener } from "./journal"
 import type { DagRunRecordV1 } from "./manager"
 import type { DagFileStore } from "./store"
@@ -12,8 +13,8 @@ import type {
   DagRunSnapshot,
   DagRunStatus,
 } from "./types"
+import { TERMINAL_DAG_RUN_STATUSES } from "./types"
 
-const TERMINAL_RUN_STATUSES = new Set<DagRunStatus>(["completed", "failed", "cancelled"])
 const CANCEL_REASON_PAGE_LIMIT = 64
 const DEFAULT_CANCEL_REASON = "cancelled"
 
@@ -130,7 +131,7 @@ export function createDagWaitSurface(options: DagWaitSurfaceOptions): DagWaitSur
     waiters.set(runId, entry)
     const onJournalEvent = (): void => {
       const current = store.readCheckpoint<DagRunRecordV1>(runId)
-      if (current === null || !TERMINAL_RUN_STATUSES.has(current.status)) return
+      if (current === null || !TERMINAL_DAG_RUN_STATUSES.has(current.status)) return
       settleWaiters(runId, projectResult(current, store, readOutput))
     }
     // The durable journal channel covers scheduler instances that are distinct from the adapter's
@@ -139,7 +140,7 @@ export function createDagWaitSurface(options: DagWaitSurfaceOptions): DagWaitSur
     addSubscription(runId, entry, options.subscribe(runId, onJournalEvent))
     // The run may have gone terminal between the ownership read and the subscription.
     const now = store.readCheckpoint<DagRunRecordV1>(runId)
-    if (now !== null && TERMINAL_RUN_STATUSES.has(now.status)) {
+    if (now !== null && TERMINAL_DAG_RUN_STATUSES.has(now.status)) {
       settleWaiters(runId, projectResult(now, store, readOutput))
     }
   }
@@ -148,7 +149,7 @@ export function createDagWaitSurface(options: DagWaitSurfaceOptions): DagWaitSur
     // async so every pre-dispatch rejection reaches the caller as a rejected promise.
     wait: async (runId, parentSessionId) => {
       const record = ownedRecord(runId, parentSessionId)
-      if (TERMINAL_RUN_STATUSES.has(record.status)) return projectResult(record, store, readOutput)
+      if (TERMINAL_DAG_RUN_STATUSES.has(record.status)) return projectResult(record, store, readOutput)
       return new Promise<DagRunResult>((resolve) => {
         register(runId, resolve)
       })
@@ -241,6 +242,7 @@ function readCancelReason(store: DagFileStore, runId: DagRunId): string {
 
 function projectSnapshot(record: DagRunRecordV1): DagRunSnapshot {
   return {
+    ...(record.pause === undefined ? {} : { pause: record.pause }),
     schemaVersion: 1,
     runId: record.runId,
     runKey: record.runKey,
@@ -263,20 +265,4 @@ function projectSnapshot(record: DagRunRecordV1): DagRunSnapshot {
     counts: countNodes(record.nodes),
     ...(record.leaseHolderPid === undefined ? {} : { leaseHolderPid: record.leaseHolderPid }),
   }
-}
-
-function countNodes(nodes: readonly DagNode[]): DagNodeCounts {
-  const counts = {
-    total: nodes.length,
-    pending: 0,
-    blocked: 0,
-    scheduled: 0,
-    running: 0,
-    completed: 0,
-    failed: 0,
-    cancelled: 0,
-    skipped: 0,
-  }
-  for (const node of nodes) counts[node.state] += 1
-  return counts
 }

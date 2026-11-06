@@ -23,7 +23,7 @@ describe("legacy migration maps", () => {
   test("#given a retired model and its recorded migration #when transforming #then the recorded value remains user-controlled", () => {
     const migrated = migrateModelVersions(
       { oracle: { model: "anthropic/claude-opus-4-4" } },
-      new Set(["model-version:anthropic/claude-opus-4-4->anthropic/claude-opus-4-8"]),
+      new Set(["model-version:anthropic/claude-opus-4-4->anthropic/claude-opus-5-5"]),
     )
 
     expect(migrated.changed).toBe(false)

@@ -1,7 +1,9 @@
-import * as fs from "node:fs/promises"
 import { join } from "path"
+import { lstatSync } from "node:fs"
 import * as yaml from "js-yaml"
 import type { SkillMcpConfig } from "../../types"
+import { readSkillFileChecked } from "./checked-skill-read"
+import { reportSkillLoadError, type SkillProvenance, type SkillDiagnosticSink } from "./skill-provenance"
 
 export function parseSkillMcpConfigFromFrontmatter(content: string): SkillMcpConfig | undefined {
   const frontmatterMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/)
@@ -21,11 +23,19 @@ export function parseSkillMcpConfigFromFrontmatter(content: string): SkillMcpCon
   return undefined
 }
 
-export async function loadMcpJsonFromDir(skillDir: string): Promise<SkillMcpConfig | undefined> {
+export async function loadMcpJsonFromDir(skillDir: string, provenance: SkillProvenance = { kind: "user", selectedRoot: skillDir }, onDiagnostic?: SkillDiagnosticSink): Promise<SkillMcpConfig | undefined> {
+  return readMcpJsonFromDirChecked(skillDir, provenance, onDiagnostic)
+}
+
+export function readMcpJsonFromDirChecked(skillDir: string, provenance: SkillProvenance, onDiagnostic?: SkillDiagnosticSink): SkillMcpConfig | undefined {
   const mcpJsonPath = join(skillDir, "mcp.json")
 
   try {
-    const content = await fs.readFile(mcpJsonPath, "utf-8")
+    try { lstatSync(mcpJsonPath) } catch (error) {
+      if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined
+      throw error
+    }
+    const content = readSkillFileChecked(mcpJsonPath, provenance)
     const parsed = JSON.parse(content) as Record<string, unknown>
 
     if (parsed && typeof parsed === "object" && "mcpServers" in parsed && parsed.mcpServers) {
@@ -41,6 +51,7 @@ export async function loadMcpJsonFromDir(skillDir: string): Promise<SkillMcpConf
       }
     }
   } catch (error) {
+    reportSkillLoadError(error, mcpJsonPath, onDiagnostic)
     if (!(error instanceof Error)) {
       throw error
     }

@@ -258,7 +258,7 @@ describe("thread component steer into a session waiting on a question", () => {
       createThreadComponent({ host: host(), stateDirectory: join(agentDir, "state"), agentDir: () => agentDir, store }).register(f.pi as never, context([]) as never)
       await f.dispatch("session_start", ctx)
       await within(endpointReady, 10_000, "the control endpoint to register")
-      const target: GatewayAddressEntry = { thread_id: "dur-1", name: "lane", status: "live", cwd: agentDir, created_at: new Date(0).toISOString(), updated_at: new Date(0).toISOString(), endpoint: { kind: "tui", socket, routing_id: null }, liveness: "routable" }
+      const target: GatewayAddressEntry = { thread_id: "dur-1", name: "lane", status: "live", cwd: agentDir, created_at: new Date(0).toISOString(), updated_at: new Date(0).toISOString(), endpoint: { kind: "tui", socket, routing_id: null, durable_session_id: "dur-1" }, liveness: "routable" }
       const engine = createGatewayEngine({
         store,
         endpoints: {
@@ -585,27 +585,34 @@ describe("thread component settle never waits on the gateway store", () => {
   })
 })
 
-const SEVENTEEN = [
-  "thread_create", "thread_list", "thread_read", "thread_send", "thread_interrupt", "thread_handoff", "thread_rename", "thread_set_model", "thread_set_reasoning",
+const EIGHTEEN = [
+  "thread_create", "thread_list", "thread_read", "thread_send", "thread_interrupt", "thread_close", "thread_handoff", "thread_rename", "thread_set_model", "thread_set_reasoning",
   "thread_bind", "thread_unbind", "thread_rebind", "thread_bindings", "thread_report", "thread_outbox", "thread_outbox_ack", "thread_answer",
 ]
 
 describe("thread component production registration", () => {
-  test("registers all seventeen tools when a test host is supplied", () => {
+  test("registers all eighteen tools when a test host is supplied", () => {
     const f = api()
     createThreadComponent({ host: host(), stateDirectory: "/tmp/thread-test-state" }).register(f.pi as never, context([]) as never)
-    expect(f.tools.map((tool) => tool.name)).toEqual(SEVENTEEN)
+    expect(f.tools.map((tool) => tool.name)).toEqual(EIGHTEEN)
+  })
+
+  // Placement contract (engine `ToolDefinition.runs`): thread tools run on the loop side of a split session.
+  test("declares every thread tool for the loop side of a split session", () => {
+    const f = api()
+    createThreadComponent({ host: host(), stateDirectory: "/tmp/thread-test-state" }).register(f.pi as never, context([]) as never)
+    expect(f.tools.filter((tool) => tool.runs !== "brain").map((tool) => tool.name)).toEqual([])
   })
 
   test("registers the family regardless of the context flag", () => {
     const f = api()
     createThreadComponent({ host: host(), stateDirectory: "/tmp/thread-test-state" }).register(f.pi as never, context([]) as never)
-    expect(f.tools.map((tool) => tool.name)).toEqual(SEVENTEEN)
+    expect(f.tools.map((tool) => tool.name)).toEqual(EIGHTEEN)
   })
 
-  test("registers all seventeen tools when a test host is supplied and no host flag exists", () => {
+  test("registers all eighteen tools when a test host is supplied and no host flag exists", () => {
     const f = api()
     createThreadComponent({ host: host(), stateDirectory: "/tmp/thread-test-state" }).register(f.pi as never, context([]) as never)
-    expect(f.tools).toHaveLength(17)
+    expect(f.tools).toHaveLength(18)
   })
 })

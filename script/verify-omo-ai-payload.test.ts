@@ -2,7 +2,7 @@
 
 import { describe, expect, setDefaultTimeout, test } from "bun:test"
 import { spawnSync } from "node:child_process"
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -28,6 +28,8 @@ const PACKED_ARTIFACTS = [
   "plugin/CHANGELOG.md",
   "plugin/extensions/omo.js",
   "plugin/extensions/gateway-store-worker.mjs",
+  "plugin/extensions/omo-device-account.js",
+  "plugin/extensions/omo-feedback.js",
   "plugin/skills-conditional/x-search/SKILL.md",
   "plugin/runtime/lsp-daemon/dist/cli.js",
   "plugin/runtime/ast-grep-mcp/cli.js",
@@ -49,6 +51,8 @@ const MINIFIED_SIBLING_READ = 'const a=t(i(o(import.meta.url)),"assets.generated
 
 const PACKED_SKILL_COUNT = 23
 
+const KEYCHAIN_HELPER = "bin/darwin/omo-keychain"
+
 interface VerifierRun {
   readonly exitCode: number
   readonly output: string
@@ -63,6 +67,7 @@ function writeFixtureFile(packageDir: string, relativePath: string, content: str
 function runVerifierOnPayload(
   payloadPaths: readonly string[],
   contents: Readonly<Record<string, string>> = {},
+  options: { readonly args?: readonly string[]; readonly modes?: Readonly<Record<string, number>> } = {},
 ): VerifierRun {
   const fakeRepoRoot = mkdtempSync(join(tmpdir(), "omo-ai-payload-guard-"))
   try {
@@ -83,11 +88,13 @@ function runVerifierOnPayload(
     )
     for (const relativePath of payloadPaths) {
       writeFixtureFile(packageDir, relativePath, contents[relativePath] ?? "// fixture\n")
+      const mode = options.modes?.[relativePath]
+      if (mode !== undefined) chmodSync(join(packageDir, relativePath), mode)
     }
 
     const result = spawnSync(
       process.execPath,
-      [join(fakeRepoRoot, "script", "verify-omo-ai-payload.mjs")],
+      [join(fakeRepoRoot, "script", "verify-omo-ai-payload.mjs"), ...(options.args ?? [])],
       { cwd: fakeRepoRoot, encoding: "utf8", timeout: guardTimeoutMs },
     )
     return {
@@ -108,6 +115,40 @@ describe("omo-ai payload verifier", () => {
     const run = runVerifierOnPayload([...PACKED_ARTIFACTS.filter(path => path !== "plugin/runtime/agent-toolkit-sdk/sdk.js"), ...skillPaths(PACKED_SKILL_COUNT)])
     expect(run.exitCode).toBe(1)
     expect(run.output).toContain("missing artifact: plugin/runtime/agent-toolkit-sdk/sdk.js")
+  })
+
+  test("#given a payload missing only the device-account extension #when verified #then it fails naming that artifact", () => {
+    const run = runVerifierOnPayload([...PACKED_ARTIFACTS.filter(path => path !== "plugin/extensions/omo-device-account.js"), ...skillPaths(PACKED_SKILL_COUNT)])
+    expect(run.exitCode).toBe(1)
+    expect(run.output).toContain("missing artifact: plugin/extensions/omo-device-account.js")
+  })
+
+  describe("#given the release payload gate (--release) for the signed keychain helper", () => {
+    const complete = [...PACKED_ARTIFACTS, ...skillPaths(PACKED_SKILL_COUNT)]
+
+    test("#when the helper is absent #then it fails naming bin/darwin/omo-keychain", () => {
+      const run = runVerifierOnPayload(complete, {}, { args: ["--release"] })
+      expect(run.output).toContain(`missing artifact: ${KEYCHAIN_HELPER}`)
+      expect(run.exitCode).toBe(1)
+    })
+
+    test.skipIf(process.platform === "win32")("#when the helper is packed without u+x #then it fails on the execute bit", () => {
+      const run = runVerifierOnPayload([...complete, KEYCHAIN_HELPER], {}, { args: ["--release"], modes: { [KEYCHAIN_HELPER]: 0o644 } })
+      expect(run.output).toContain(`not executable (u+x): ${KEYCHAIN_HELPER}`)
+      expect(run.exitCode).toBe(1)
+    })
+
+    test.skipIf(process.platform === "win32")("#when the helper is packed with mode 0755 #then it passes", () => {
+      const run = runVerifierOnPayload([...complete, KEYCHAIN_HELPER], {}, { args: ["--release"], modes: { [KEYCHAIN_HELPER]: 0o755 } })
+      expect(run.output).not.toContain(KEYCHAIN_HELPER)
+      expect(run.exitCode).toBe(0)
+    })
+
+    test("#when the PR lane verifies without --release #then the helper is not required", () => {
+      const run = runVerifierOnPayload(complete)
+      expect(run.output).not.toContain(KEYCHAIN_HELPER)
+      expect(run.exitCode).toBe(0)
+    })
   })
 
   test("#given a payload missing only the omo daemon task-config runtime #when verified #then it fails naming that artifact", () => {

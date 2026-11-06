@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process"
+import { windowsTreeKillArgs } from "../../../memory-core/src/concurrency/windows-process-tree.mjs"
 
 export function killProcess(pid) {
   try {
@@ -20,7 +21,9 @@ export async function terminateProcessTree(pid, operations = {}) {
 
   if (platform === "win32") {
     const run = operations.spawnSync ?? spawnSync
-    const result = run("taskkill.exe", ["/PID", String(pid), "/T", "/F"], { encoding: "utf8" })
+    const args = windowsTreeKillArgs(pid, run)
+    if (args.length === 0) return { kind: "already-exited", pid, platform }
+    const result = run("taskkill.exe", args, { encoding: "utf8", windowsHide: true })
     if (result.status === 0) return { kind: "terminated", pid, platform }
     return { kind: "failed", pid, platform, status: result.status ?? null, error: processTreeError(result) }
   }

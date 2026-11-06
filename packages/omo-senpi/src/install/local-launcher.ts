@@ -2,6 +2,8 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync }
 import { homedir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 
+import { OMO_BRAND_LOGO } from "../../../omo-native/bin/lib/brand-logo.generated.js"
+
 /**
  * Local `omo` launcher for a sibling-store install.
  *
@@ -40,6 +42,7 @@ export function renderLocalLauncher(options: LocalLauncherOptions): string {
   const updateCommand = channel === "beta" ? "bun add -g omo-ai@beta" : "bun add -g omo-ai"
   const brand = {
     name: "OmO",
+    logo: OMO_BRAND_LOGO,
     command: "omo",
     displayVersion: options.version ?? "local",
     configDir: ".omo",

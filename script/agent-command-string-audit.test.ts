@@ -8,7 +8,7 @@ import { collectHits } from "./agent-command-string-scan"
 
 const WORKSPACE_ROOT = resolve(import.meta.dir, "..")
 const ALLOWLIST_PATH = resolve(WORKSPACE_ROOT, "script/agent-command-string-audit.allowlist.json")
-const ALLOWLIST_CATEGORIES = ["emit-migrate", "test-expectation", "input-compat-preserve", "docs"] as const
+const ALLOWLIST_CATEGORIES = ["emit-migrate", "test-expectation", "input-compat-preserve", "docs", "literal-label"] as const
 
 type AllowlistCategory = (typeof ALLOWLIST_CATEGORIES)[number]
 type Allowlist = Record<AllowlistCategory, string[]>

@@ -27,6 +27,7 @@
   --color-line-strong: var(--line-strong);
   --color-line: var(--line);
   --color-line-faint: var(--line-faint);
+  --color-line-input: var(--line-input);
 
   --color-accent: var(--accent);
   --color-accent-hot: var(--accent-hot);
@@ -145,6 +146,9 @@
 
 @layer base {
   :root {
+    /* §2 The site is dark-only: UA controls, scrollbars and autofill render dark too. */
+    color-scheme: dark;
+
     /* §2 Ink (elevation is luminance, never shadow) */
     --ink-0: #09090b;
     --ink-1: #0e0e11;
@@ -161,6 +165,8 @@
     --line-strong: rgba(255, 255, 255, 0.12);
     --line: rgba(255, 255, 255, 0.08);
     --line-faint: rgba(255, 255, 255, 0.04);
+    /* Form control boundary: 3:1 or better on every ink (WCAG 1.4.11, lib/input-boundary.test.ts). */
+    --line-input: rgba(255, 255, 255, 0.4);
 
     /* §2 Accent — cyan means live */
     --accent: #00d4ff;
@@ -192,6 +198,9 @@
     --space-16: 64px;
     --space-24: 96px;
     --space-40: 160px;
+
+    /* §5 Nav: sticky header height; the document scroll padding keeps focus clear of it (WCAG 2.4.11). */
+    --nav-h: 60px;
 
     /* §4 Radius (panel radius; controls use --radius-control from @theme) */
     --radius: 0px;
@@ -264,8 +273,10 @@
     --destructive: var(--status-err);
     --destructive-foreground: var(--text-hi);
     --border: var(--line);
-    --input: var(--line-strong);
-    --ring: var(--accent-32);
+    --input: var(--line-input);
+    --ring: var(--accent);
+    --focus-ring-width: 2px;
+    --focus-ring-offset: 2px;
 
     /* Typography families */
     --font-geist-sans: var(--font-geist-sans);
@@ -276,9 +287,36 @@
   }
 }
 
+/*
+ * §8 Focus ring, the one recipe: a solid --ring outline outside the box. focus-ring-inset draws
+ * the same ring inside the box for elements whose container clips (scroll viewports,
+ * overflow-hidden frames, full-width rows). --ring must hold 3:1 against every ink
+ * (lib/focus-ring.test.ts); swapping the ring colour is a one-line change to --ring.
+ */
+@utility focus-ring {
+  &:focus-visible {
+    outline: var(--focus-ring-width) solid var(--ring);
+    outline-offset: var(--focus-ring-offset);
+  }
+}
+
+@utility focus-ring-inset {
+  &:focus-visible {
+    outline: var(--focus-ring-width) solid var(--ring);
+    outline-offset: calc(-1 * var(--focus-ring-width));
+  }
+}
+
 @layer base {
   * {
     @apply border-border;
+    /* The resting outline colour is already --ring, so transition-colors never fades the ring in from currentColor. */
+    outline-color: var(--ring);
+  }
+  /* Elements without a focus-ring class (prose links, third-party markup) get the same ring. */
+  :focus-visible {
+    outline: var(--focus-ring-width) solid var(--ring);
+    outline-offset: var(--focus-ring-offset);
   }
   body {
     @apply bg-background text-foreground;
@@ -337,6 +375,27 @@
 
   html {
     scroll-behavior: auto;
+    scroll-padding-top: calc(var(--nav-h) + var(--space-2));
+  }
+
+  /* §8 Skip link: first stop in the tab order, visible only while focused, above the sticky nav. */
+  .skip-link {
+    position: fixed;
+    top: var(--space-2);
+    left: var(--space-2);
+    z-index: 60;
+    padding: var(--space-3) var(--space-4);
+    background-color: var(--ink-3);
+    color: var(--text-hi);
+    font-size: 0.875rem;
+    transform: translateY(calc(-100% - var(--space-4)));
+  }
+  .skip-link:focus {
+    transform: none;
+  }
+  /* The skip target takes programmatic focus only; the landing point is the content, not a ring around the page. */
+  #main-content:focus {
+    outline: none;
   }
 
   ::selection {
@@ -429,7 +488,8 @@
   @supports (animation-timeline: view()) {
     .reveal {
       animation: reveal-in var(--dur-reveal) var(--ease-out-quart) both;
-      animation-timeline: view();
+      /* Inset 0, not auto: auto adopts the root scroll-padding-top (--nav-h), which would shift every reveal. */
+      animation-timeline: view(block 0px);
       animation-range: entry 0% entry 40%;
     }
   }
@@ -858,6 +918,8 @@
   .lit-text {
     white-space: pre-line;
     view-timeline: --lit-body block;
+    /* Inset 0, not auto: auto adopts the root scroll-padding-top, which would move the reading sweep. */
+    view-timeline-inset: 0px;
   }
   @supports (animation-timeline: view()) {
     .lit-progress.lit-scroll {

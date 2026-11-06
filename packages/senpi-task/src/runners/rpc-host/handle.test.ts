@@ -6,6 +6,7 @@ import { openHostSessionHandle } from "./handle.test-support"
 import type { HostSessionParked } from "./session-client"
 import { sessionClientHarness } from "./session-client.test-support"
 import { TRANSPORT_LOST_REASON } from "./transport-recovery"
+import { InputUncertainError } from "../input-effects"
 
 const harness = sessionClientHarness()
 const { fakeHost, hostClient } = harness
@@ -130,11 +131,12 @@ describe("createHostSessionHandle over a daemon session", () => {
     const handle = await openHostSessionHandle({ client, sessionPath: "/tmp/sessions/b.jsonl" })
     const parked: HostSessionParked[] = []
     handle.onParked((park) => parked.push(park))
+    const released = host.waitForConnections(0)
 
     // when
     host.evict("/tmp/sessions/b.jsonl")
-    // A reply on the SAME connection cannot overtake the park record that preceded it.
-    await client.getState()
+    // The park releases this session's client (#10062): its connection closing proves the park was handled.
+    await released
 
     // then
     expect(parked).toEqual([{ sessionId: "routing-1", sessionPath: "/tmp/sessions/b.jsonl", reason: "idle_evicted" }])
@@ -150,13 +152,13 @@ describe("createHostSessionHandle over a daemon session", () => {
     const handle = await openHostSessionHandle({ client, sessionPath: "/tmp/sessions/c.jsonl" })
     const parked: HostSessionParked[] = []
     handle.onParked((park) => parked.push(park))
+    const released = host.waitForConnections(0)
     host.evict("/tmp/sessions/c.jsonl")
-    await client.getState()
+    await released
     expect(parked).toHaveLength(1)
 
-    // when
+    // when: the park already released the client, so the crash reaches no connection of this handle
     host.crash()
-    await client.transportGone
 
     // then
     expect(handle.exitOutcome()).toBeUndefined()
@@ -178,7 +180,7 @@ describe("createHostSessionHandle over a daemon session", () => {
     host.crash()
 
     // then
-    await expect(started).rejects.toMatchObject({ code: "rpc_transport_gone" })
+    await expect(started).rejects.toBeInstanceOf(InputUncertainError)
     expect(await handle.waitForExit()).toEqual({ kind: "crashed", facts: facts(TRANSPORT_LOST_REASON) })
     expect((await handle.waitForOutcome()).status).toBe("error")
     expect(handle.attached).toBe(false)
@@ -209,8 +211,12 @@ describe("createHostSessionHandle over a daemon session", () => {
     await handle.close()
 
     // then
+    // The probe sends get_protocol_info; on macOS and Linux the session connection sends one too, because the
+    // engine client authenticates every new connection with it since senpi 2026.10.25-1 (senpi#3815).
+    const authFrame = process.platform === "win32" ? [] : ["get_protocol_info"]
     expect(host.commands.map((command) => command.type)).toEqual([
       "get_protocol_info",
+      ...authFrame,
       "open_session",
       "close_session",
     ])
@@ -234,6 +240,7 @@ describe("createHostSessionHandle over a daemon session", () => {
       .filter((type) => type === "abort" || type === "close_session")
     expect(issued).toEqual(["abort", "close_session"])
     expect(handle.exitOutcome()).toEqual({ kind: "killed", facts: facts("terminated") })
+    expect(handle.hostEndAnswered()).toBe(true)
     await handle.dispose()
   })
 
@@ -255,6 +262,7 @@ describe("createHostSessionHandle over a daemon session", () => {
     expect(elapsedMs).toBeLessThan(closeGraceMs + 2_000 + 1_000)
     expect(host.commands.filter((command) => command.type === "close_session")).toHaveLength(1)
     expect(handle.exitOutcome()).toEqual({ kind: "killed", facts: facts("terminated") })
+    expect(handle.hostEndAnswered()).toBe(false)
     await handle.dispose()
   })
 
@@ -263,8 +271,9 @@ describe("createHostSessionHandle over a daemon session", () => {
     const host = await fakeHost()
     const client = hostClient(host)
     const handle = await openHostSessionHandle({ client, sessionPath: "/tmp/sessions/j.jsonl", closeGraceMs: 50 })
+    const released = host.waitForConnections(0)
     host.evict("/tmp/sessions/j.jsonl")
-    await client.getState()
+    await released
     expect(handle.exitOutcome()).toBeUndefined()
 
     // when
@@ -273,8 +282,28 @@ describe("createHostSessionHandle over a daemon session", () => {
     // then
     expect(handle.exitOutcome()).toEqual({ kind: "killed", facts: facts("terminated") })
     expect(handle.attached).toBe(false)
+    expect(handle.hostEndAnswered()).toBe(false)
     await handle.dispose()
   })
+
+  for (const [reason, answered] of [["client_close", true], ["error", true], ["handoff_parked", false], ["idle_evicted", false]] as const) {
+    test(`#given the host closes the session with reason ${reason} #when the cancel asks whether the host ended it #then it answers ${answered}`, async () => {
+      // given
+      const host = await fakeHost()
+      const client = hostClient(host)
+      const handle = await openHostSessionHandle({ client, sessionPath: `/tmp/sessions/answered-${reason}.jsonl` })
+
+      const settled = answered ? handle.waitForExit() : new Promise<void>((resolve) => { handle.onParked(() => resolve()) })
+
+      // when
+      host.closeSession(handle.hostSession.routingId, reason)
+      await settled
+
+      // then
+      expect(handle.hostEndAnswered()).toBe(answered)
+      await handle.dispose()
+    })
+  }
 
   test("#given a parent shutting down #when the handle detaches #then the session stays open on the daemon with no exit", async () => {
     // given

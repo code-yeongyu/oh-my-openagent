@@ -29,6 +29,39 @@ pub struct SessionOpenResult {
     pub resume_token: String,
 }
 
+/// `control.grant` and `control.state` reply: this session's live foreground
+/// control grant. `reason` and `granted_at` are present exactly when
+/// `active` is true.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ControlStateResult {
+    pub active: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    /// RFC 3339 UTC with milliseconds, matching the audit timestamps.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub granted_at: Option<String>,
+}
+
+/// How `ax.typeText` delivered its text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum AxInputMethod {
+    /// Written through the element's own selection (`AXSelectedText` on
+    /// macOS) and read back exactly; no key was sent and no focus moved.
+    Inserted,
+    /// Sent as keystrokes once the element held its application's keyboard
+    /// focus.
+    Keys,
+}
+
+/// `ax.typeText` reply.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AxInputResult {
+    pub method: AxInputMethod,
+}
+
 /// Which stop path currently guards input.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]

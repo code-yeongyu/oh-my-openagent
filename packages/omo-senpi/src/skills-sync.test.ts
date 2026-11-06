@@ -16,6 +16,7 @@ const expectedSkillNames = [
   "dag-library",
   "data-scientist",
   "debugging",
+  "eval-integrity",
   "frontend",
   "git-master",
   "give-me-tips",
@@ -35,6 +36,7 @@ const expectedSkillNames = [
   "ulw-plan",
   "ulw-research",
   "visual-qa",
+  "visualize",
 ] as const
 
 const CODEX_DERIVED_SKILL_NAMES: Record<string, true> = {}
@@ -50,6 +52,7 @@ const NATIVE_SENPI_SKILL_NAMES: Record<string, true> = {
   ultrawork: true,
   "ulw-loop": true,
   "ulw-research": true,
+  visualize: true,
 }
 const namePattern = /^[a-z0-9-]{1,64}$/
 const forbiddenTokenPattern = /\b(?:codex|multi_agent|spawn_agent|update_plan)\b/i
@@ -79,8 +82,6 @@ const pendingPersonaNameRetirements: readonly {
   readonly linePattern: RegExp
 }[] = [
   { pathSuffix: "coding-agent-sessions/references/opencode.md", linePattern: /`Sisyphus-Junior`/ },
-  { pathSuffix: "frontend/references/designpowers/lane-a-direction.md", linePattern: /\bPrometheus\b/ },
-  { pathSuffix: "frontend/references/designpowers/routing.md", linePattern: /\bPrometheus\b/ },
 ]
 
 function listDirectoryNames(path: string): string[] {
@@ -136,7 +137,7 @@ describe("OMO Senpi scoped skill sync", () => {
     expect([...telemetrySkillNames].sort()).toEqual(listDirectoryNames(skillsRoot))
   })
 
-  test("#given synced skill output #when inspected #then exactly 25 roots exist with valid names", () => {
+  test("#given synced skill output #when inspected #then exactly 27 roots exist with valid names", () => {
     const actualNames = listDirectoryNames(skillsRoot)
     expect(actualNames).toEqual([...expectedSkillNames].sort())
 
@@ -331,4 +332,13 @@ describe("OMO Senpi scoped skill sync", () => {
     const refsDir = join(skillsRoot, "frontend", "references", "design")
     expect(existsSync(refsDir), "frontend/references/design must exist after materialization").toBe(true)
   })
+})
+
+
+test("#given the Native execution skill #when shipped #then the absolute rule scopes the root and dispatch step assigns an executor", () => {
+  const skill = readFileSync(join(skillsRoot, "ulw-execute", "SKILL.md"), "utf8")
+  expect(skill).toContain("## ABSOLUTE RULE (root session): YOU ARE AN ORCHESTRATOR — NEVER THE IMPLEMENTER")
+  expect(skill).toContain("NO EXCEPTIONS for the root session that owns the Boulder work; a dispatched executor does its assigned unit itself and does not delegate it again.")
+  expect(skill).toContain("7. Give every dispatched sub-task its completion condition and its role: the brief names the unit, allowed files, acceptance evidence, and states that the worker is its executor, does it itself, and does not delegate it.")
+  expect(skill).not.toContain("## ABSOLUTE RULE:")
 })

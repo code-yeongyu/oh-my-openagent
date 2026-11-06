@@ -16,7 +16,7 @@ This skill is compact by design: the run contract below is the whole bootstrap. 
 
 1. Create goals from a JS eval cell: `agentToolkit.createGoals({ brief })` after the SDK import below. The SDK binds this session from the host env, so never pass a session id or a plan path. If the envelope reports `ULW_LOOP_PLAN_EXISTS_COMPLETE` (this session's aggregate is already complete), unrelated new work needs a fresh session; `createGoals({ brief, force: true })` is only for deliberately overwriting completed evidence.
 2. Register the aggregate objective from the returned handoff with `create_goal`, shaped by `references/define-goal.md`. Goal creation is NEVER skipped.
-3. Mirror every atomic step into the live `todo` checklist: one granular step per action, exactly one in_progress, transitions marked the instant they happen.
+3. Mirror every atomic step into the live `todo` checklist: one granular step per action, exactly one in_progress, transitions marked the instant they happen. Use the ultrawork directive’s Task resources and todo rules; read those sections of the bundled `ultrawork` skill if absent from context.
 4. Treat each goal as a phase: create its own worktree off the integration base; dispatch its dependency-ordered lanes as ONE `workflow` run (read the mass-ulw skill first; ordering-free lanes stay a `task` batch); verify every criterion with real-surface evidence; land the worktree on the integration base at `agentToolkit.checkpoint({ goalId, status: "complete", evidence })` per the repository's flow (direct merge or merged PR); define the next goal's run from what this one proved. Tests alone never prove done. When a mass-ulw pointer accompanies this skill, this contract still owns goals, criteria, evidence, and checkpoints.
 5. Stop when the goal's WHEN-TO-STOP line holds with evidence in hand.
 
@@ -74,23 +74,23 @@ Stand up a team when BOTH hold:
 1. **The units' scopes overlap in a way you cannot cleanly cut.** They touch the same module, contract, or migration, so one unit's discovery changes what another should do. Fire-and-forget workers cannot exchange that mid-flight; teammates can, because the lead relays it.
 2. **Running them at the same time actually finishes sooner.** The units are each substantial and none is merely waiting on another's output. Two units where the second only consumes the first's result are a sequence, not a team.
 
-When the units are genuinely independent — separate files, no shared contract — spawn parallel background `task` workers instead and avoid the team coordination overhead entirely. When the work is one cohesive unit, do it yourself. Overlap alone is not enough: near-identical units that would collide on the same lines are faster done in sequence by one worker.
+When the units are genuinely independent — separate files, no shared contract — spawn parallel background `task` workers instead and avoid the team coordination overhead entirely. When the work is one cohesive unit, keep it in this session — delegating only the code edits, test writes, fixes, and QA executions the rule above requires. Overlap alone is not enough: near-identical units that would collide on the same lines are faster done in sequence by one worker.
 
 Under team mode, isolate and land per unit:
 
-- **One git worktree per member**, never a shared checkout — concurrent members editing one working tree corrupt each other's diffs and evidence. Give each member its own branch off the base and its own worktree path.
+- **One git worktree per member**, never a shared checkout — concurrent members editing one working tree corrupt each other's diffs and evidence. Give each member its own branch off the base and its own worktree path. Apply the same resource rules when creating member worktrees.
 - **Merge per work unit, as each unit is verified.** A member's unit lands when its own evidence is captured and its gates are green; it does not wait for the slowest sibling. Integrate each merged unit back into the base the others branch from, so overlapping members rebase onto real merged work rather than guessing at it.
 - **Conflicts are the lead's job.** When two members' units touch the same lines, the lead decides the order they land and tells the later member what changed; members never resolve a sibling's conflict blind.
 
 ## Native Senpi Task Contract
 
-Senpi already exposes its real subagent spawn surface through the omo-senpi `task` component. Use it directly. Do not route delegation through external app-server threads or another harness.
+Senpi already exposes its real subagent spawn surface through the omo-senpi `task` component. Use it directly. Do not route delegation through external agent-protocol threads or another harness.
 
 | Intent | Native Senpi tool |
 | --- | --- |
 | Spawn one worker | `task({ prompt, subagent_type | category, run_in_background: true })` |
 | Fan out independent workers | `task({ tasks: [{ prompt, subagent_type | category }, ...], run_in_background: true })` |
-| Send context or correction | `task_send({ task_id, message })` |
+| Send context or correction | `task_send({ to, message })` (`to` is the task id or name) |
 | Inspect one midpoint | `task_output({ task_id, mode: "tail" })` |
 | Stop a runaway worker | `task_cancel({ task_id })` |
 | Coordinate overlapping work | `team_create`, `task_create`, `task_get`, `task_list`, `task_update`; communicate with `task_send` |
@@ -99,4 +99,4 @@ Every worker prompt starts with `TASK:` and names `DELIVERABLE`, `SCOPE`, `VERIF
 
 ## Driver goal lifecycle
 
-The session goal you create with `create_goal` is a DRIVER the loop instructs, never a gate. A checkpoint accepts an optional driver snapshot, records it verbatim, and never rejects on its status or objective; the advice comes back in `nextActions`. The snapshot is filled from this session's goal store automatically, so pass `codexGoal` only to override it. If the driver was completed early, the advice tells you to `create_goal` again with the plan's objective verbatim - a completed goal is replaced, not reused. If the driver is paused or usage/budget limited, the advice tells you to resume it. A different objective is a warning, not a refusal, and it is reported once: the first checkpoint under that driver records the objective in the plan (`acknowledgedDriverObjectives`) and later calls stay quiet; `status().result.driver` shows the relation at any time. `create_goal` is advised only when the goal store really holds no goal.
+The session goal you create with `create_goal` is a DRIVER the loop instructs, never a gate. A checkpoint accepts an optional driver snapshot, records it verbatim, and never rejects on its status or objective; the advice comes back in `nextActions`. The snapshot is filled from this session's goal store automatically, so pass `codexGoalJson` only to override it. If the driver was completed early, the advice tells you to `create_goal` again with the plan's objective verbatim - a completed goal is replaced, not reused. If the driver is paused or usage/budget limited, the advice tells you to resume it. A different objective is a warning, not a refusal, and it is reported once: the first checkpoint under that driver records the objective in the plan (`acknowledgedDriverObjectives`) and later calls stay quiet; `status().result.driver` shows the relation at any time. `create_goal` is advised only when the goal store really holds no goal. That is the SDK's behavior only: the loop policy still treats a different active goal as a blocker — stop and surface the conflict (references/full-workflow.md, step 3).

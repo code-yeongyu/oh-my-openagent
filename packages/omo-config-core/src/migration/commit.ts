@@ -5,6 +5,7 @@ import { toPosixPath } from "../internal/posix-path"
 import { resolveHomeDir } from "../loader"
 import { OMO_CONFIG_HARNESS_IDS, OMO_CONFIG_LEGACY_HARNESS_IDS, OmoConfigSchema, harnessBlockKey } from "../schema"
 import { updateOmoConfig } from "../writer"
+import { diffEdits, withoutMarker } from "./diff-edits"
 import { collectMigrationEdits, mergeWithoutClobber } from "./merge"
 import { hasMigrationMarker } from "./predicate"
 import { MigrationTransactionError, MigrationValidationError, type MigrationEnvironment, type MigrationFileSystem, type MigrationTargetWriter } from "./types"
@@ -103,10 +104,11 @@ function sameResolvedPath(a: string, b: string): boolean {
   return toPosixPath(resolve(a)) === toPosixPath(resolve(b))
 }
 
-export const writeOmoMigrationTarget: MigrationTargetWriter = (input): void => {
+export const writeOmoMigrationTarget: MigrationTargetWriter = (input) => {
   const options = writerInput(input.targetPath, input.env)
   const result = updateOmoConfig({
     ...options,
+    ...(input.backupPath === undefined ? {} : { backupPath: input.backupPath }),
     edits: input.edits,
     env: input.env,
     fileSystem: input.fileSystem,
@@ -115,6 +117,7 @@ export const writeOmoMigrationTarget: MigrationTargetWriter = (input): void => {
   if (!sameResolvedPath(result.path, input.targetPath)) {
     throw new MigrationTransactionError(`Migration writer resolved ${result.path} instead of ${input.targetPath}`)
   }
+  return result.backupPath === undefined ? {} : { backupPath: result.backupPath }
 }
 
 export type PreparedTargetWrite = {
@@ -162,16 +165,11 @@ export function prepareTargetReplacement(input: {
   const marker = markerValue(input.target, input.migrationId, input.targetPath)
   const document = { ...documentCleanup.document, _migrations: marker }
   validateTarget(input.targetPath, document)
-  const edits: { path: readonly string[]; value: unknown }[] = [...targetCleanup.edits]
-  for (const key of Object.keys(targetCleanup.document)) {
-    if (key !== "_migrations" && !Object.prototype.hasOwnProperty.call(documentCleanup.document, key)) {
-      edits.push({ path: [key], value: undefined })
-    }
-  }
-  for (const [key, value] of Object.entries(documentCleanup.document)) {
-    if (key !== "_migrations") edits.push({ path: [key], value })
-  }
-  edits.push({ path: ["_migrations"], value: marker })
+  const edits: { path: readonly string[]; value: unknown }[] = [
+    ...targetCleanup.edits,
+    ...diffEdits(withoutMarker(targetCleanup.document), withoutMarker(documentCleanup.document)),
+    { path: ["_migrations"], value: marker },
+  ]
   return {
     diagnostics: uniqueDiagnostics([...targetCleanup.diagnostics, ...documentCleanup.diagnostics]),
     document,
@@ -180,18 +178,21 @@ export function prepareTargetReplacement(input: {
 }
 
 export function writePreparedTarget(input: {
+  readonly backupPath?: string
   readonly env: MigrationEnvironment
   readonly fileSystem: MigrationFileSystem
   readonly prepared: PreparedTargetWrite
   readonly targetPath: string
   readonly writeTarget: MigrationTargetWriter
-}): void {
-  input.writeTarget({
+}): string | undefined {
+  const written = input.writeTarget({
+    ...(input.backupPath === undefined ? {} : { backupPath: input.backupPath }),
     edits: input.prepared.edits,
     env: input.env,
     fileSystem: input.fileSystem,
     targetPath: input.targetPath,
   })
+  return written?.backupPath
 }
 
 export { parseDocument, targetDocument }

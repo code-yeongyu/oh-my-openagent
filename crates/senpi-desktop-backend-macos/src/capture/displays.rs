@@ -45,7 +45,7 @@ pub(crate) fn enumerate(selector: &DisplaySelector) -> CoreResult<Vec<DesktopDis
     }
     if displays.is_empty() {
         return Err(match selector {
-            DisplaySelector::All => DesktopError::capture_failed("Quartz reported no active displays"),
+            DisplaySelector::Active | DisplaySelector::All => DesktopError::capture_failed("Quartz reported no active displays"),
             DisplaySelector::Id(id) => {
                 DesktopError::invalid_target(format!("selected display id '{id}' is not active"))
             }

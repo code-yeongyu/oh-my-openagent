@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it, onTestFinished } from "bun:test";
 
 import { processFilePathForAgentsInjection } from "./injector";
 
@@ -84,6 +84,7 @@ describe("processFilePathForAgentsInjection", () => {
     // given
     rootDirectory = join(tmpdir(), `agents-md-core-injector-${randomUUID()}`);
     const outsideRoot = join(tmpdir(), `agents-md-core-outside-${randomUUID()}`);
+    onTestFinished(() => rmSync(outsideRoot, { recursive: true, force: true }));
     mkdirSync(rootDirectory, { recursive: true });
     mkdirSync(outsideRoot, { recursive: true });
     writeFileSync(join(outsideRoot, "AGENTS.md"), "# outside");
@@ -114,6 +115,7 @@ describe("processFilePathForAgentsInjection", () => {
     // given
     rootDirectory = join(tmpdir(), `agents-md-core-injector-${randomUUID()}`);
     const outsideRoot = join(tmpdir(), `agents-md-core-outside-${randomUUID()}`);
+    onTestFinished(() => rmSync(outsideRoot, { recursive: true, force: true }));
     mkdirSync(rootDirectory, { recursive: true });
     mkdirSync(outsideRoot, { recursive: true });
     writeFileSync(join(outsideRoot, "AGENTS.md"), "# outside symlink");

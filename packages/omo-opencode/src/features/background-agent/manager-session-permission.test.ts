@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { beforeEach, describe, expect, test } from "bun:test"
 import { tmpdir } from "node:os"
 
 import type { PluginInput } from "@opencode-ai/plugin"
@@ -6,17 +6,26 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { BackgroundManager } from "./manager"
 import type { BackgroundTask } from "./types"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
+import { releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt-async-gate"
+import { resetLiveServerRouteForTesting } from "../../shared/live-server-route"
+
+beforeEach(() => {
+  releaseAllPromptAsyncReservationsForTesting()
+  resetLiveServerRouteForTesting()
+})
 
 describe("BackgroundManager session permission", () => {
   test("passes parent directory route when prompting the child session", async () => {
     // given
     const promptCalls: Array<Record<string, unknown>> = []
+    const promptStarted = Promise.withResolvers<void>()
     const client = {
       session: {
         get: async () => ({ data: { directory: "/parent" } }),
         create: async () => ({ data: { id: "ses_child" } }),
         promptAsync: async (input: Record<string, unknown>) => {
           promptCalls.push(input)
+          promptStarted.resolve()
           return {}
         },
         abort: async () => ({}),
@@ -32,8 +41,8 @@ describe("BackgroundManager session permission", () => {
       parentSessionId: "ses_parent",
       parentMessageId: "msg_parent",
     })
-    await new Promise(resolve => setTimeout(resolve, 50))
-    manager.shutdown()
+    await promptStarted.promise
+    await manager.shutdown()
 
     // then
     expect(promptCalls).toHaveLength(1)
@@ -43,6 +52,7 @@ describe("BackgroundManager session permission", () => {
   test("passes query directory when loading the parent session", async () => {
     // given
     const getCalls: Array<Record<string, unknown>> = []
+    const promptStarted = Promise.withResolvers<void>()
     const client = {
       session: {
         get: async (input: Record<string, unknown>) => {
@@ -50,7 +60,10 @@ describe("BackgroundManager session permission", () => {
           return { data: { directory: "/parent" } }
         },
         create: async () => ({ data: { id: "ses_child" } }),
-        promptAsync: async () => ({}),
+        promptAsync: async () => {
+          promptStarted.resolve()
+          return {}
+        },
         abort: async () => ({}),
       },
     }
@@ -65,8 +78,8 @@ describe("BackgroundManager session permission", () => {
       parentSessionId: "ses_parent",
       parentMessageId: "msg_parent",
     })
-    await new Promise((resolve) => setTimeout(resolve, 50))
-    manager.shutdown()
+    await promptStarted.promise
+    await manager.shutdown()
 
     // then
     expect(getCalls).toHaveLength(2)
@@ -85,6 +98,7 @@ describe("BackgroundManager session permission", () => {
   test("passes explicit session permission rules to child session creation", async () => {
     // given
     const createCalls: Array<Record<string, unknown>> = []
+    const promptStarted = Promise.withResolvers<void>()
     const client = {
       session: {
         get: async () => ({ data: { directory: "/parent" } }),
@@ -92,7 +106,10 @@ describe("BackgroundManager session permission", () => {
           createCalls.push(input)
           return { data: { id: "ses_child" } }
         },
-        promptAsync: async () => ({}),
+        promptAsync: async () => {
+          promptStarted.resolve()
+          return {}
+        },
         abort: async () => ({}),
       },
     }
@@ -109,8 +126,8 @@ describe("BackgroundManager session permission", () => {
         { permission: "question", action: "deny", pattern: "*" },
       ],
     })
-    await new Promise(resolve => setTimeout(resolve, 50))
-    manager.shutdown()
+    await promptStarted.promise
+    await manager.shutdown()
 
     // then
     expect(createCalls).toHaveLength(1)
@@ -122,12 +139,60 @@ describe("BackgroundManager session permission", () => {
       ],
     })
   })
+
+  test("prefixes the category in the child session title", async () => {
+    // given
+    const createCalls: Array<Record<string, unknown>> = []
+    const promptStarted = Promise.withResolvers<void>()
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: "/parent" } }),
+        create: async (input: Record<string, unknown>) => {
+          createCalls.push(input)
+          return { data: { id: "ses_child" } }
+        },
+        promptAsync: async () => {
+          promptStarted.resolve()
+          return {}
+        },
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: unsafeTestValue<PluginInput>({ client, directory: tmpdir() }) })
+    const timeout = Promise.withResolvers<never>()
+    const timeoutID = setTimeout(
+      () => timeout.reject(new Error("waited 1s for categorized child session prompt")),
+      1_000,
+    )
+
+    // when
+    try {
+      await manager.launch({
+        description: "Test task",
+        prompt: "Do something",
+        agent: "explore",
+        parentSessionId: "ses_parent",
+        parentMessageId: "msg_parent",
+        category: "quick",
+      })
+      await Promise.race([promptStarted.promise, timeout.promise])
+
+      // then
+      expect(createCalls).toHaveLength(1)
+      const body = createCalls[0]?.body as Record<string, unknown> | undefined
+      expect(body?.title).toBe("[quick] Test task (@explore subagent)")
+    } finally {
+      clearTimeout(timeoutID)
+      await manager.shutdown()
+    }
+  })
 })
 
 describe("BackgroundManager child session directory", () => {
   function createRecordingClient() {
     const createCalls: Array<Record<string, unknown>> = []
     const promptCalls: Array<Record<string, unknown>> = []
+    const promptStarted = Promise.withResolvers<void>()
     const client = {
       session: {
         get: async () => ({ data: { directory: "/parent" } }),
@@ -137,17 +202,18 @@ describe("BackgroundManager child session directory", () => {
         },
         promptAsync: async (input: Record<string, unknown>) => {
           promptCalls.push(input)
+          promptStarted.resolve()
           return {}
         },
         abort: async () => ({}),
       },
     }
-    return { client, createCalls, promptCalls }
+    return { client, createCalls, promptCalls, promptStarted: promptStarted.promise }
   }
 
   test("uses input.cwd for the child session create and prompt directory", async () => {
     // given
-    const { client, createCalls, promptCalls } = createRecordingClient()
+    const { client, createCalls, promptCalls, promptStarted } = createRecordingClient()
     const manager = new BackgroundManager({ pluginContext: unsafeTestValue<PluginInput>({ client, directory: tmpdir() }) })
 
     // when
@@ -159,8 +225,8 @@ describe("BackgroundManager child session directory", () => {
       parentMessageId: "msg_parent",
       cwd: "/parent-fix-1",
     })
-    await new Promise(resolve => setTimeout(resolve, 50))
-    manager.shutdown()
+    await promptStarted
+    await manager.shutdown()
 
     // then
     expect(createCalls).toHaveLength(1)
@@ -171,7 +237,7 @@ describe("BackgroundManager child session directory", () => {
 
   test("falls back to the parent directory when cwd is absent", async () => {
     // given
-    const { client, createCalls, promptCalls } = createRecordingClient()
+    const { client, createCalls, promptCalls, promptStarted } = createRecordingClient()
     const manager = new BackgroundManager({ pluginContext: unsafeTestValue<PluginInput>({ client, directory: tmpdir() }) })
 
     // when
@@ -182,8 +248,8 @@ describe("BackgroundManager child session directory", () => {
       parentSessionId: "ses_parent",
       parentMessageId: "msg_parent",
     })
-    await new Promise(resolve => setTimeout(resolve, 50))
-    manager.shutdown()
+    await promptStarted
+    await manager.shutdown()
 
     // then
     expect(createCalls).toHaveLength(1)
@@ -194,7 +260,7 @@ describe("BackgroundManager child session directory", () => {
 
   test("persists cwd on the task record", async () => {
     // given
-    const { client } = createRecordingClient()
+    const { client, promptStarted } = createRecordingClient()
     const manager = new BackgroundManager({ pluginContext: unsafeTestValue<PluginInput>({ client, directory: tmpdir() }) })
 
     // when
@@ -206,8 +272,8 @@ describe("BackgroundManager child session directory", () => {
       parentMessageId: "msg_parent",
       cwd: "/parent-fix-1",
     })
-    await new Promise(resolve => setTimeout(resolve, 50))
-    manager.shutdown()
+    await promptStarted
+    await manager.shutdown()
 
     // then
     expect(task.cwd).toBe("/parent-fix-1")
@@ -215,7 +281,7 @@ describe("BackgroundManager child session directory", () => {
 
   test("resume prompts the continuation in the task cwd", async () => {
     // given
-    const { client, promptCalls } = createRecordingClient()
+    const { client, promptCalls, promptStarted } = createRecordingClient()
     const manager = new BackgroundManager({ pluginContext: unsafeTestValue<PluginInput>({ client, directory: tmpdir() }) })
     const tasks = unsafeTestValue<{ tasks: Map<string, BackgroundTask> }>(manager).tasks
     tasks.set("bg_worktree", {
@@ -237,8 +303,8 @@ describe("BackgroundManager child session directory", () => {
       parentSessionId: "ses_parent",
       parentMessageId: "msg_parent_2",
     })
-    await new Promise(resolve => setTimeout(resolve, 50))
-    manager.shutdown()
+    await promptStarted
+    await manager.shutdown()
 
     // then
     expect(promptCalls).toHaveLength(1)

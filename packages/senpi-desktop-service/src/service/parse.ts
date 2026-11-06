@@ -7,6 +7,7 @@ import {
 	type MethodRejection,
 	type PermissionDeniedData,
 	type StopPathStatus,
+	UNKNOWN_AUDIT_VALUE,
 } from "@oh-my-opencode/senpi-desktop-protocol";
 
 // Engine stdout is the trust boundary: every payload the service hands out is shape-checked here.
@@ -14,8 +15,6 @@ import {
 type FieldKind = "string" | "boolean" | "number";
 export type FieldSpec = Readonly<Record<string, FieldKind | `${FieldKind}?`>>;
 
-const METHOD_NAMES: ReadonlySet<string> = new Set(ENGINE_METHODS);
-const ERROR_CODE_NAMES: ReadonlySet<string> = new Set(ERROR_CODES);
 const STOP_PATH_KINDS: ReadonlySet<string> = new Set(["global", "host-relay", "none"]);
 const METHOD_REJECTIONS = ["unknown", "hostOnly", "testOnly"] as const satisfies readonly MethodRejection[];
 
@@ -35,6 +34,10 @@ const CAPABILITIES: FieldSpec = {
 	input: "boolean",
 	ax: "boolean",
 	backgroundWindowInput: "boolean",
+	cursorOverlay: "boolean?",
+	// Optional so this host still opens an engine from before or after their release (macOS shared-screen parity).
+	interventionWatch: "string?",
+	displayAsleep: "boolean?",
 	capturePermission: "string",
 	inputPermission: "string",
 	axPermission: "string",
@@ -84,17 +87,32 @@ export function isStopPathStatus(value: unknown): value is StopPathStatus {
 	return matches(value, STOP_PATH_STATUS) && isMember(value.stopPath, STOP_PATH_KINDS);
 }
 
-export function isDesktopCapabilities(value: unknown): value is DesktopCapabilities {
-	return matches(value, CAPABILITIES) && isStringArray(value.deliveryModes);
+export function isDesktopCapabilities(
+	value: unknown,
+): value is Omit<DesktopCapabilities, "cursorOverlay"> & { readonly cursorOverlay?: boolean } {
+	return matches(value, CAPABILITIES) && isStringArray(value.deliveryModes)
+		&& (value.cursorOverlay === undefined || typeof value.cursorOverlay === "boolean");
 }
 
-export function isAuditEvent(value: unknown): value is AuditEvent {
-	return (
-		matches(value, AUDIT_EVENT) &&
-		isMember(value.action, METHOD_NAMES) &&
-		(value.code === undefined || value.code === null || isMember(value.code, ERROR_CODE_NAMES)) &&
-		(value.keys === undefined || value.keys === null || isStringArray(value.keys))
-	);
+type AuditEventShape = Omit<AuditEvent, "action" | "code"> & {
+	readonly action: string;
+	readonly code?: string | null;
+};
+
+function isAuditEventShape(value: unknown): value is AuditEventShape {
+	return matches(value, AUDIT_EVENT) && (value.keys === undefined || value.keys === null || isStringArray(value.keys));
+}
+
+/**
+ * An `audit` payload, or `undefined` when it is malformed. An action or code this host does not know (sent by a
+ * newer engine) reads as `"unknown"`: the event is kept, never dropped, so the audit trail stays complete.
+ */
+export function parseAuditEvent(value: unknown): AuditEvent | undefined {
+	if (!isAuditEventShape(value)) return undefined;
+	const action = ENGINE_METHODS.find((name) => name === value.action) ?? UNKNOWN_AUDIT_VALUE;
+	const { code } = value;
+	if (code === undefined || code === null) return { ...value, action, code };
+	return { ...value, action, code: ERROR_CODES.find((name) => name === code) ?? UNKNOWN_AUDIT_VALUE };
 }
 
 /** The contract fields of an `engine.hello` result, or `undefined` when it is malformed. */
@@ -112,7 +130,10 @@ export function parseSessionOpened(value: unknown): SessionOpened | undefined {
 	if (!isRecord(value) || typeof value.resumeToken !== "string" || !isDesktopCapabilities(value.capabilities)) {
 		return undefined;
 	}
-	return { capabilities: value.capabilities, resumeToken: value.resumeToken };
+	return {
+		capabilities: { ...value.capabilities, cursorOverlay: value.capabilities.cursorOverlay ?? false },
+		resumeToken: value.resumeToken,
+	};
 }
 
 /** `data` of an engine error: an `ErrorCode` failure, a `-32601` rejection, or nothing this host knows. */

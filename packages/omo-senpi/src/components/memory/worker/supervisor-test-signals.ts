@@ -2,36 +2,27 @@ import { watch } from "@oh-my-opencode/memory-core/fs"
 import { mkdir, readdir, writeFile } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
-const FILESYSTEM_RECHECK_INTERVAL_MS = 25
-
-export async function waitForFilesystemState<T>(
-  directory: string,
+export function waitForTestState<T>(
+  subscribe: (check: () => void) => () => void,
   probe: () => T | undefined | Promise<T | undefined>,
   timeoutMs: number,
   description: string,
 ): Promise<T> {
-  const initial = await probe()
-  if (initial !== undefined) return initial
-  return await new Promise<T>((resolve, reject) => {
+  return new Promise<T>((resolve, reject) => {
     let settled = false
     let checking = false
     let pending = false
-    const timeout = setTimeout(() => finish(new Error(`waited ${timeoutMs}ms for ${description}`)), timeoutMs)
-    const watcher = watch(directory, () => { void check() })
+    let timeout: ReturnType<typeof setTimeout> | undefined
+    let unsubscribe: (() => void) | undefined
     const finish = (error?: Error, value?: T) => {
       if (settled) return
       settled = true
       clearTimeout(timeout)
-      watcher.close()
-      clearInterval(recheck)
+      unsubscribe?.()
       if (error !== undefined) reject(error)
       else resolve(value as T)
     }
-    // An event arriving while a probe is in flight used to be dropped outright, and the state this
-    // waits for is usually the last thing written to the directory - so that dropped event was
-    // never followed by another and the wait hung until its ceiling. Recording the event and
-    // re-probing after the in-flight one settles keeps every notification meaningful, and the
-    // interval re-read makes arrival depend on the state itself rather than on event delivery.
+    // Replay notifications received during an asynchronous probe so the final transition is not lost.
     const check = async () => {
       if (settled) return
       if (checking) {
@@ -54,9 +45,24 @@ export async function waitForFilesystemState<T>(
         checking = false
       }
     }
-    const recheck = setInterval(() => { void check() }, FILESYSTEM_RECHECK_INTERVAL_MS)
+    unsubscribe = subscribe(() => { void check() })
+    timeout = setTimeout(() => finish(new Error(`waited ${timeoutMs}ms for ${description}`)), timeoutMs)
     void check()
   })
+}
+
+export function waitForFilesystemState<T>(
+  directory: string,
+  probe: () => T | undefined | Promise<T | undefined>,
+  timeoutMs: number,
+  description: string,
+): Promise<T> {
+  return waitForTestState((check) => {
+    const watcher = watch(directory, check)
+    // The macOS watcher can lose an event immediately after registration.
+    const recheck = setInterval(check, 25)
+    return () => { watcher.close(); clearInterval(recheck) }
+  }, probe, timeoutMs, description)
 }
 
 export async function createTestClock(runDir: string, initial: number): Promise<string> {

@@ -1,46 +1,50 @@
 import { spawn } from "node:child_process"
-import { mkdirSync, rmSync, watch, writeFileSync } from "node:fs"
+import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { isolatedChildEnv, sandboxStateDir } from "./sandbox-child-env.mjs"
 
+import { readRecordsLenient, waitForRecord, waitForRunningRpcChild } from "./task-rpc-record-wait.mjs"
+export { waitForProcessCompletion, waitForRunningRpcChild } from "./task-rpc-record-wait.mjs"
+export { runReconcileCheck } from "./task-rpc-reconcile.mjs"
+
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const { createSandbox, seedSandbox } = await import(pathToFileURL(join(scriptDir, "drive.mjs")).href)
-const { readRecords, readTaskEventTypes, pidAlive } = await import(pathToFileURL(join(scriptDir, "task-rpc-e2e-helpers.mjs")).href)
+const { readRecords } = await import(pathToFileURL(join(scriptDir, "task-rpc-e2e-helpers.mjs")).href)
 const { killProcessGroup } = await import(pathToFileURL(join(scriptDir, "team-e2e-process.mjs")).href)
 
 const mockProviderEntry = join(scriptDir, "task-rpc-e2e-mock-provider.ts")
 const CHILD_FINAL_TEXT = "omo rpc child mock work complete"
 const PROJECT_OMO_CONFIG = {
-  task: { default_execution_mode: "process" },
+  task: { default_execution_mode: "process", process_runner: "child-process" },
   categories: { proc: { description: "Process-mode mock category.", model: "omo-mock/mock-1" } },
-}
-const RECONCILE_PROJECT_OMO_CONFIG = {
-  ...PROJECT_OMO_CONFIG,
-  task: { ...PROJECT_OMO_CONFIG.task, reattach_on_reconcile: false },
 }
 const CHILD_STEPS_COMPLETE = [{ type: "text", text: CHILD_FINAL_TEXT }]
 const CHILD_STEPS_HANG = [{ type: "hang" }]
+
+const TASKS_DIR_PLACEHOLDER = "<tasks-dir>"
+
+/** Binds the scenario's await_task steps to this run's task store. */
+export function bindTasksDir(steps, stateDir) {
+  return steps.map((step) => step.type === "await_task" ? { ...step, tasksDir: join(stateDir, "tasks") } : step)
+}
 
 export const SCENARIO_A_STEPS = [
   { type: "tool_call", name: "task", arguments: { category: "proc", run_in_background: true, name: "p1", prompt: "Do the rpc child work and stop." } },
   { type: "tool_call", name: "task_send", arguments: { to: "p1", message: "steer: keep going" } },
   { type: "tool_call", name: "task_output", arguments: { name: "p1", mode: "status" } },
   { type: "tool_call", name: "task_output", arguments: { name: "p1", mode: "status" } },
-  { type: "text", text: "rpc-process scenario A complete" },
+  // The background start returns before the host admits the child (#10042), so the parent waits for
+  // the child's terminal record instead of ending its turn first; the completion check then proves the
+  // completion lands while the parent is alive, not that the child happened to beat the parent's steps.
+  { type: "await_task", name: "p1", tasksDir: TASKS_DIR_PLACEHOLDER, timeoutMs: 60_000, text: "rpc-process scenario A complete" },
 ]
 
-const RECONCILE_RELAUNCH_STEPS = [
-  { type: "text", text: "reconcile relaunch complete" },
-]
-
-const hangingChildSteps = (name) => [
+export const hangingChildSteps = (name) => [
   { type: "tool_call", name: "task", arguments: { category: "proc", run_in_background: true, name, prompt: "hang until signalled" } },
   { type: "tool_call", name: "task_output", arguments: { name, mode: "status" } },
   { type: "hang" },
 ]
-
-const runningRpcChild = (r) => r.execution_mode === "process" && r.status === "running" && typeof r.pid === "number"
 
 function childArgv(sessionDir, prompt) {
   return ["-e", mockProviderEntry, "-p", "--mode", "json", "--provider", "omo-mock", "--model", "mock-1", "--session-dir", sessionDir, prompt]
@@ -103,16 +107,17 @@ export async function driveSenpi(senpiBin, sandbox, sessionDir, parentSteps, chi
     child.once("close", (code, closeSignal) => resolve([code, closeSignal]))
     child.once("error", () => resolve([null, null]))
   })
-  return { status, signal, stdout, stderr }
+  return { status, signal, stdout, stderr, pid: child.pid }
 }
 
-function driveSenpiAsync(senpiBin, sandbox, sessionDir, parentSteps, childSteps, prompt) {
+export function driveSenpiAsync(senpiBin, sandbox, sessionDir, parentSteps, childSteps, prompt, capture = false) {
   writeScript(sandbox, parentSteps, childSteps)
-  return spawn(senpiBin, childArgv(sessionDir, prompt), {
+  const pinnedBun = process.env.OMO_QA_BUN_BIN
+  return spawn(pinnedBun ?? senpiBin, [...(pinnedBun ? [senpiBin] : []), ...childArgv(sessionDir, prompt)], {
     cwd: sandbox.cwd,
     env: childEnv(sandbox, sessionDir, senpiBin),
     detached: true,
-    stdio: ["ignore", "ignore", "ignore"],
+    stdio: ["ignore", capture ? "pipe" : "ignore", capture ? "pipe" : "ignore"],
   })
 }
 
@@ -136,78 +141,7 @@ function waitForChildClose(child, timeoutMs) {
   })
 }
 
-// The task state may not exist yet, or a record may be mid-write: neither is a harness failure.
-function readRecordsLenient(stateDir) {
-  try {
-    return readRecords(stateDir)
-  } catch (error) {
-    if (error?.code === "ENOENT" || error instanceof SyntaxError) return []
-    throw error
-  }
-}
-
-const RECORD_RECHECK_MS = 250
-
-function waitForRecord(stateDir, predicate, timeoutMs) {
-  const tasksDir = join(stateDir, "tasks")
-  const logsDir = join(stateDir, "logs")
-  const find = () => readRecordsLenient(stateDir).find(predicate)
-  const existing = find()
-  if (existing !== undefined) return Promise.resolve(existing)
-  return new Promise((resolve, reject) => {
-    let settled = false
-    const watchers = [tasksDir, logsDir].map((dir) => watch(dir, { persistent: false }, () => {
-      const match = find()
-      if (match !== undefined) finish(match)
-    }))
-    // File watchers drop events under load (macOS FSEvents, Windows runners), and a dropped create
-    // event would read as a missing child. A short re-read backs the watchers up until the wait ends.
-    const recheck = setInterval(() => {
-      const match = find()
-      if (match !== undefined) finish(match)
-    }, RECORD_RECHECK_MS)
-    recheck.unref?.()
-    const closeWatchers = () => {
-      clearInterval(recheck)
-      watchers.forEach((watcher) => watcher.close())
-    }
-    const finish = (match) => {
-      if (settled) return
-      settled = true
-      clearTimeout(timeout)
-      closeWatchers()
-      resolve(match)
-    }
-    const timeout = setTimeout(() => finish(undefined), timeoutMs)
-    for (const watcher of watchers) {
-      watcher.on("error", (error) => {
-        if (settled) return
-        settled = true
-        clearTimeout(timeout)
-        closeWatchers()
-        reject(error)
-      })
-    }
-    // The producer may have completed an atomic write between the initial read and watch setup.
-    const match = find()
-    if (match !== undefined) finish(match)
-  })
-}
-
-// The parent Senpi host starts cold on every scenario: on a loaded Windows runner its startup alone
-// can take most of a minute before it even creates the task. Give that phase its own budget, then
-// time the child spawn separately, so a slow parent start is not misread as a missing child.
-const PARENT_TASK_CREATE_MS = 120_000
-const CHILD_SPAWN_MS = 40_000
-
-export async function waitForRunningRpcChild(stateDir, name, budgets = {}) {
-  const { parentTaskCreateMs = PARENT_TASK_CREATE_MS, childSpawnMs = CHILD_SPAWN_MS } = budgets
-  const created = await waitForRecord(stateDir, (r) => r.name === name, parentTaskCreateMs)
-  if (created === undefined) return undefined
-  return waitForRecord(stateDir, (r) => r.name === name && runningRpcChild(r), childSpawnMs)
-}
-
-async function cleanupSenpiHost(child) {
+export async function cleanupSenpiHost(child) {
   const terminated = await killSenpiHost(child)
   if (!terminated) throw new Error(`could not terminate Senpi host pid=${child.pid ?? "unknown"}`)
   await waitForChildClose(child, 15_000)
@@ -266,57 +200,6 @@ export async function runKillCheck(senpiBin) {
     }
   } finally {
     await cleanupSenpiHost(parent)
-    rmSync(sandbox.root, { recursive: true, force: true })
-  }
-}
-
-export async function runReconcileCheck(senpiBin) {
-  const { sandbox, sessionDir, stateDir } = prepareScenarioSandbox(RECONCILE_PROJECT_OMO_CONFIG)
-  const parent = driveSenpiAsync(senpiBin, sandbox, sessionDir, hangingChildSteps("pr"), CHILD_STEPS_HANG, "drive the reconcile scenario")
-  let orphanPid
-  try {
-    const running = await waitForRunningRpcChild(stateDir, "pr")
-    if (running === undefined) {
-      return { check: "reconcile_lost_terminates_orphan", verdict: "FAIL", reason: "no running rpc child appeared to reconcile" }
-    }
-    orphanPid = running.pid
-    if (parent.exitCode !== null || parent.signalCode !== null) {
-      return {
-        check: "reconcile_lost_terminates_orphan",
-        verdict: "FAIL",
-        reason: "parent exited before crash injection",
-      }
-    }
-    await cleanupSenpiHost(parent)
-    const relaunch = await driveSenpi(senpiBin, sandbox, sessionDir, RECONCILE_RELAUNCH_STEPS, CHILD_STEPS_COMPLETE, "relaunch for reconcile")
-    const lost = readRecords(stateDir).find((r) => r.task_id === running.task_id && r.status === "lost")
-    const eventTypes = readTaskEventTypes(stateDir, running.task_id)
-    const lostEvent = eventTypes.includes("reconcile_lost")
-    const orphanDead = pidAlive(orphanPid) === false
-    const pass = relaunch.status === 0 && lost !== undefined && lostEvent && orphanDead
-    return {
-      check: "reconcile_lost_terminates_orphan",
-      verdict: pass ? "PASS" : "FAIL",
-      ...(pass ? {} : {
-        reason: `relaunchOk=${relaunch.status === 0} lostRecord=${lost !== undefined} lostEvent=${lostEvent} orphanDead=${orphanDead}`,
-      }),
-      facts: {
-        orphanPid,
-        orphanDead,
-        status: lost?.status,
-        eventTypes,
-        breadcrumb: (lost?.error_message ?? "").slice(0, 120),
-      },
-    }
-  } finally {
-    await cleanupSenpiHost(parent)
-    if (typeof orphanPid === "number" && pidAlive(orphanPid)) {
-      try {
-        process.kill(orphanPid, "SIGKILL")
-      } catch {
-        // already dead
-      }
-    }
     rmSync(sandbox.root, { recursive: true, force: true })
   }
 }

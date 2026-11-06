@@ -130,6 +130,35 @@ export type HostSessionCloseRequest = {
 export type HostSessionCloser = (request: HostSessionCloseRequest) => Promise<void>
 
 /**
+ * Read-only view of the endpoint's daemon state a cancel needs once the serving generation does not list a
+ * child: whether the generation the record names still exists, and whether a drain parked the session for
+ * its successor. An unreadable answer is `true`, the conservative one: it never proves an end.
+ */
+export type HostGenerationView = {
+  generationPresent(hostSession: HostSessionIdentity): Promise<boolean>
+  parkedEntryPresent(hostSession: HostSessionIdentity): Promise<boolean>
+}
+
+/** How a daemon-hosted child's end was confirmed; `not_listed` is the reading of a lifecycle with no generation view. */
+export type HostSessionEndVia = "close_session" | "generation_exited" | "not_listed"
+
+export type HostSessionEnd =
+  | { readonly kind: "ended"; readonly via: HostSessionEndVia }
+  | { readonly kind: "pending"; readonly settled: Promise<boolean> }
+  | { readonly kind: "not_ended"; readonly reason: string }
+
+/** What a cancel driver reports back to its steering owner: the confirmed end, and the one settlement of its stop. */
+export type HostSessionCancelSink = {
+  ended(): Promise<void>
+  settle(): void
+}
+
+export type HostSessionCancelPort = {
+  end(record: TaskRecord): Promise<HostSessionEnd>
+  drive(record: TaskRecord, sink: HostSessionCancelSink): void
+}
+
+/**
  * The two bounded waits the daemon path owns. Draining: an old generation still holds the session
  * path after a handoff, so revival retries instead of losing the child. Daemon loss: the host died,
  * so the child parks and the reconcile is retried on a fixed backoff before giving up.

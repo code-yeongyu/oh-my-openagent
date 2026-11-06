@@ -151,7 +151,7 @@ function writeText(target, text) {
 
 // Every edit is an insertion into the file's own text (comments, order and formatting survive);
 // a file the edit cannot reproduce exactly is left untouched and reported.
-function writeTarget(target, items) {
+function writeTarget(target, items, report) {
   try {
     let text = target.text ?? "{}\n"
     for (const item of items) {
@@ -160,7 +160,7 @@ function writeTarget(target, items) {
     writeText(target, text)
     return items.map((item) => item.label)
   } catch (error) {
-    process.stdout.write(`WARN senpi: could not edit ${target.path} safely (${error.message}); these model choices were not written: ${items.map((item) => item.label).join(", ")}\n`)
+    report(`WARN senpi: could not edit ${target.path} safely (${error.message}); these model choices were not written: ${items.map((item) => item.label).join(", ")}`)
     return []
   }
 }
@@ -177,7 +177,11 @@ export async function planModelChoices(stage) {
   if (!hasModelChoices(raw)) return empty
   let registry
   try {
-    registry = await (stage.loadRegistry ?? loadEngineModels)({ agentDir: stage.agentDir, customProviders: stage.customProviders })
+    registry = await (stage.loadRegistry ?? loadEngineModels)({
+      agentDir: stage.agentDir,
+      customProviders: stage.customProviders,
+      loadCatalog: stage.runtime.loadModelCatalog,
+    })
   } catch (error) {
     return { ...empty, notices: [...raw.notices, `WARN senpi: could not read the engine's model list (${error.message}); model choices were not carried`] }
   }
@@ -194,9 +198,12 @@ export async function planModelChoices(stage) {
   }
 }
 
-/** The stage's one writer; records what it wrote as `plan.carried` for the counts. */
-export function applyModelChoices(plan) {
+/** The stage's one writer; records what it wrote as `plan.carried` for the counts. `options.report`
+ * receives the warning when a target cannot be edited (the CLI prints it; callers inside the
+ * engine route it to their own reply). */
+export function applyModelChoices(plan, options = {}) {
+  const report = options.report ?? ((line) => process.stdout.write(`${line}\n`))
   const pending = plan.items.filter((item) => item.state === "pending")
   const targets = [...new Set(pending.map((item) => item.target))]
-  plan.carried = targets.flatMap((target) => writeTarget(target, pending.filter((item) => item.target === target)))
+  plan.carried = targets.flatMap((target) => writeTarget(target, pending.filter((item) => item.target === target), report))
 }

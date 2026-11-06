@@ -1,3 +1,5 @@
+import { PROVENANCE_MIGRATION } from "./provenance-record"
+
 export class GatewaySchemaVersionError extends Error {
   readonly code = "gateway_schema_too_new"
   constructor(readonly found: number, readonly supported: number, scope = "Gateway") {
@@ -89,7 +91,7 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
       schema_version INTEGER NOT NULL DEFAULT 1,
       revision INTEGER NOT NULL CHECK (revision >= 1),
       status TEXT NOT NULL CHECK (status IN ('active', 'detached', 'expired')),
-      platform TEXT NOT NULL CHECK (platform IN ('discord', 'telegram', 'slack', 'notion', 'feishu', 'herdr', 'custom')),
+      platform TEXT NOT NULL CHECK (platform IN ('discord', 'telegram', 'slack', 'notion', 'feishu', 'herdr', 'custom', 'whatsapp')),
       account_id TEXT NOT NULL,
       chat_id TEXT NOT NULL,
       thread_id TEXT NOT NULL,
@@ -192,6 +194,87 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
     "CREATE TABLE extension_objects (type TEXT NOT NULL, name TEXT NOT NULL, owner TEXT, PRIMARY KEY (type, name))",
     "INSERT INTO extension_objects (type, name, owner) SELECT type, name, NULL FROM sqlite_schema",
   ],
+  // v7: `whatsapp` is a binding platform (a WhatsApp connector binds its chats here).
+  // SQLite cannot widen a CHECK in place, so `bindings` is rebuilt with the widened list; every
+  // column is carried over verbatim and the two indexes are recreated before the old table drops.
+  // This step runs with foreign_keys OFF (set in migrate()): a table drop would otherwise fire
+  // foreign-key actions from any extension table referencing `bindings`. The AUTOINCREMENT
+  // high-water mark is carried over so a deleted newest row's key is never reused. Before the
+  // version bump commits, migrate() runs PRAGMA foreign_key_check from TypeScript and throws
+  // (rolling back to v6) if the step introduced a violation referencing `bindings`.
+  [
+    `CREATE TABLE bindings_v7 (
+      seq INTEGER PRIMARY KEY AUTOINCREMENT,
+      binding_id TEXT NOT NULL UNIQUE,
+      schema_version INTEGER NOT NULL DEFAULT 1,
+      revision INTEGER NOT NULL CHECK (revision >= 1),
+      status TEXT NOT NULL CHECK (status IN ('active', 'detached', 'expired')),
+      platform TEXT NOT NULL CHECK (platform IN ('discord', 'telegram', 'slack', 'notion', 'feishu', 'herdr', 'custom', 'whatsapp')),
+      account_id TEXT NOT NULL,
+      chat_id TEXT NOT NULL,
+      thread_id TEXT NOT NULL,
+      root_message_id TEXT,
+      progress_message_id TEXT,
+      session_realm_id TEXT NOT NULL,
+      session_durable_id TEXT NOT NULL,
+      direction_inbound INTEGER NOT NULL CHECK (direction_inbound IN (0, 1)),
+      direction_outbound INTEGER NOT NULL CHECK (direction_outbound IN (0, 1)),
+      inbound_mode TEXT NOT NULL CHECK (inbound_mode IN ('auto', 'follow_up')),
+      outbound_events TEXT NOT NULL,
+      policy_id TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      lease_started_at TEXT NOT NULL,
+      ttl_seconds INTEGER,
+      expires_at TEXT,
+      CHECK (direction_inbound = 1 OR direction_outbound = 1)
+    )`,
+    "INSERT INTO bindings_v7 SELECT seq, binding_id, schema_version, revision, status, platform, account_id, chat_id, thread_id, root_message_id, progress_message_id, session_realm_id, session_durable_id, direction_inbound, direction_outbound, inbound_mode, outbound_events, policy_id, created_at, updated_at, lease_started_at, ttl_seconds, expires_at FROM bindings",
+    "UPDATE sqlite_sequence SET seq = (SELECT seq FROM sqlite_sequence WHERE name = 'bindings') WHERE name = 'bindings_v7'",
+    "DROP TABLE bindings",
+    "ALTER TABLE bindings_v7 RENAME TO bindings",
+    "CREATE UNIQUE INDEX bindings_one_active_thread ON bindings (platform, account_id, chat_id, thread_id) WHERE status = 'active'",
+    "CREATE INDEX bindings_session ON bindings (session_durable_id, status)",
+  ],
+  // v8: new deliveries require sender provenance; old envelopes are not rewritten.
+  PROVENANCE_MIGRATION,
+
+  // v9 (todo 14): who thread_create'd which session (`thread_creations`, durable so a parent is still
+  // recognised after a host handoff or restart), and each store extension's persisted descriptor
+  // (`extension_registrations`: module URL, migrations, session-callable ops, wake dir), upserted by
+  // name, so an engine process lists the session tools another process registered.
+  // A store a build from before the renumber migrated already sits at v8 with these tables but without
+  // the provenance trigger, so this step replays v8 (idempotent) and creates only what is missing.
+  [
+    ...PROVENANCE_MIGRATION,
+    `CREATE TABLE IF NOT EXISTS thread_creations (
+      creator_durable_id TEXT NOT NULL,
+      created_durable_id TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      PRIMARY KEY (creator_durable_id, created_durable_id)
+    )`,
+    "CREATE TABLE IF NOT EXISTS extension_registrations (name TEXT PRIMARY KEY, descriptor_json TEXT NOT NULL, updated_at INTEGER NOT NULL)",
+    `INSERT OR IGNORE INTO extension_objects (type, name, owner)
+     SELECT s.type, s.name, NULL FROM sqlite_schema s
+     WHERE NOT EXISTS (SELECT 1 FROM extension_objects e WHERE e.type = s.type AND e.name = s.name COLLATE NOCASE)`,
+  ],
+
+  // v10: a receipts table (kept for existing stores; no longer written).
+  [
+    ...PROVENANCE_MIGRATION,
+    `CREATE TABLE IF NOT EXISTS toolkit_replay_receipts (
+      replay_key TEXT PRIMARY KEY,
+      op TEXT NOT NULL,
+      args_sha256 TEXT NOT NULL,
+      result_json TEXT NOT NULL,
+      turn_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL
+    )`,
+    "CREATE INDEX IF NOT EXISTS toolkit_replay_receipts_turn_at ON toolkit_replay_receipts (turn_at)",
+    `INSERT OR IGNORE INTO extension_objects (type, name, owner)
+     SELECT s.type, s.name, NULL FROM sqlite_schema s
+     WHERE NOT EXISTS (SELECT 1 FROM extension_objects e WHERE e.type = s.type AND e.name = s.name COLLATE NOCASE)`,
+  ],
 ]
 
-export const GATEWAY_TABLES = ["deliveries", "receipts", "causal_roots", "causal_edges", "rate_buckets", "session_meta", "bindings", "outbox", "gateway_meta", "outbox_cursors", "completion_arms", "extension_schema", "extension_objects"] as const
+export const GATEWAY_TABLES = ["deliveries", "receipts", "causal_roots", "causal_edges", "rate_buckets", "session_meta", "bindings", "outbox", "gateway_meta", "outbox_cursors", "completion_arms", "extension_schema", "extension_objects", "thread_creations", "extension_registrations", "toolkit_replay_receipts"] as const

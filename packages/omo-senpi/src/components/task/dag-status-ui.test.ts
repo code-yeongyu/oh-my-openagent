@@ -270,7 +270,7 @@ describe("createDagStatusUi.syncNow", () => {
     const ui = fakeUi()
     const dagUi = createDagStatusUi({
       manager: fakeManager([snapshot({ runId: "dag_1", nodes: [node({ id: "a", state: "running" })] })]),
-      runtime: { ui: () => ui, sessionId: () => "session-a", mode: () => "app-server" },
+      runtime: { ui: () => ui, sessionId: () => "session-a", mode: () => "rpc" },
       timers: fakeTimers(),
     })
 

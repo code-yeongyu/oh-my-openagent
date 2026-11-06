@@ -16,7 +16,7 @@ import {
 } from "./fields"
 
 const BINDING_PLATFORM = Type.Union(
-  [Type.Literal("discord"), Type.Literal("telegram"), Type.Literal("slack"), Type.Literal("notion"), Type.Literal("feishu"), Type.Literal("herdr"), Type.Literal("custom")],
+  [Type.Literal("discord"), Type.Literal("telegram"), Type.Literal("slack"), Type.Literal("notion"), Type.Literal("feishu"), Type.Literal("herdr"), Type.Literal("custom"), Type.Literal("whatsapp")],
   { description: "Chat platform of the external conversation; custom covers any other connector." },
 )
 
@@ -29,6 +29,26 @@ const BoundSession = Type.Optional(
 )
 
 export const ThreadCreateParams = Type.Object({
+  thread: Type.Optional(
+    Type.String({
+      minLength: 1,
+      description:
+        "Id or alias of an EXISTING thread to open, on whichever of the account's devices holds it; leave unset to create a new thread. Never combined with device.",
+    }),
+  ),
+  device: Type.Optional(
+    Type.String({
+      minLength: 1,
+      description: "Account device to create the new thread on (from thread_list with all_scope); leave unset to create it on this device. Only for a new thread.",
+    }),
+  ),
+  alias: Type.Optional(
+    Type.String({
+      minLength: 1,
+      maxLength: 64,
+      description: "Account-wide alias for the new thread, usable instead of its id in every thread tool; an alias another thread holds returns alias_taken naming the holder.",
+    }),
+  ),
   name: Type.Optional(
     Type.String({
       description:
@@ -43,6 +63,13 @@ export const ThreadCreateParams = Type.Object({
   fork_from: Type.Optional(
     Type.String({
       description: "Durable id of an existing thread to fork; the new thread starts with that transcript as prior context.",
+    }),
+  ),
+  skills: Type.Optional(
+    Type.Array(Type.String({ minLength: 1, maxLength: 64 }), {
+      minItems: 1,
+      maxItems: 16,
+      description: "Names of installed skills the new thread follows from its first turn, as if each were loaded with /skill. A path or text that is not a skill name refuses the create. The new session applies each name its own skill registry holds and logs any it does not; the result's thread.requested_skills echoes the names passed.",
     }),
   ),
   idempotency_key: IdempotencyKey,
@@ -94,6 +121,12 @@ export const ThreadInterruptParams = Type.Object({
   all_scope: AllScope,
 })
 
+export const ThreadCloseParams = Type.Object({
+  thread: ThreadAddress,
+  idempotency_key: IdempotencyKey,
+  all_scope: AllScope,
+})
+
 export const ThreadHandoffParams = Type.Object({
   thread: Type.String({
     description:
@@ -115,12 +148,21 @@ export const ThreadHandoffParams = Type.Object({
 
 export const ThreadRenameParams = Type.Object({
   thread: ThreadAddress,
-  name: Type.String({
-    minLength: 1,
-    maxLength: 200,
-    description:
-      "New display label for the thread; the thread keeps its id as its address, and a label already used by another visible thread returns name_conflict.",
-  }),
+  name: Type.Optional(
+    Type.String({
+      minLength: 1,
+      maxLength: 200,
+      description:
+        "New display label for the thread; the thread keeps its id as its address, and a label already used by another visible thread returns name_conflict.",
+    }),
+  ),
+  alias: Type.Optional(
+    Type.String({
+      minLength: 1,
+      maxLength: 64,
+      description: "New account-wide alias for the thread; an alias another thread holds returns alias_taken naming the holder, and the old alias is freed.",
+    }),
+  ),
   all_scope: AllScope,
   idempotency_key: IdempotencyKey,
 })
@@ -280,6 +322,7 @@ export type ThreadListInput = Static<typeof ThreadListParams>
 export type ThreadReadInput = Static<typeof ThreadReadParams>
 export type ThreadSendInput = Static<typeof ThreadSendParams>
 export type ThreadInterruptInput = Static<typeof ThreadInterruptParams>
+export type ThreadCloseInput = Static<typeof ThreadCloseParams>
 export type ThreadHandoffInput = Static<typeof ThreadHandoffParams>
 export type ThreadRenameInput = Static<typeof ThreadRenameParams>
 export type ThreadSetModelInput = Static<typeof ThreadSetModelParams>
@@ -299,6 +342,7 @@ export const threadToolParamSchemas = {
   thread_read: ThreadReadParams,
   thread_send: ThreadSendParams,
   thread_interrupt: ThreadInterruptParams,
+  thread_close: ThreadCloseParams,
   thread_handoff: ThreadHandoffParams,
   thread_rename: ThreadRenameParams,
   thread_set_model: ThreadSetModelParams,

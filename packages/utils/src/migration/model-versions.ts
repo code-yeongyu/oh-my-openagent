@@ -1,3 +1,5 @@
+import { LATEST_MODEL_BY_FAMILY } from "@oh-my-opencode/model-core/latest-models"
+
 /**
  * Model version migration map: old full model strings → new full model strings.
  * Used to auto-upgrade hardcoded model versions in user configs when the plugin
@@ -15,7 +17,7 @@
  * (#3777, #4527).
  */
 export const MODEL_VERSION_MAP: Record<string, string> = {
-  "anthropic/claude-opus-4-4": "anthropic/claude-opus-4-8",
+  "anthropic/claude-opus-4-4": `anthropic/${LATEST_MODEL_BY_FAMILY.claudeOpus}`,
 }
 
 const CURRENT_USER_SELECTABLE_MODELS = new Set([
@@ -25,7 +27,20 @@ const CURRENT_USER_SELECTABLE_MODELS = new Set([
 ])
 
 function migrationKey(oldModel: string, newModel: string): string {
-  return `model-version:${oldModel}->${newModel}`
+  return `${MIGRATION_KEY_PREFIX}${oldModel}->${newModel}`
+}
+
+const MIGRATION_KEY_PREFIX = "model-version:"
+
+/** Sources that already have a recorded migration away from them, whatever the target was. */
+function appliedMigrationSources(appliedMigrations: Set<string> | undefined): Set<string> {
+  const sources = new Set<string>()
+  for (const key of appliedMigrations ?? []) {
+    if (!key.startsWith(MIGRATION_KEY_PREFIX)) continue
+    const arrow = key.indexOf("->", MIGRATION_KEY_PREFIX.length)
+    if (arrow >= 0) sources.add(key.slice(MIGRATION_KEY_PREFIX.length, arrow))
+  }
+  return sources
 }
 
 export function migrateModelVersions(
@@ -35,6 +50,7 @@ export function migrateModelVersions(
   const migrated: Record<string, unknown> = {}
   let changed = false
   const newMigrations: string[] = []
+  const migratedSources = appliedMigrationSources(appliedMigrations)
 
   for (const [key, value] of Object.entries(configs)) {
     if (value && typeof value === "object" && !Array.isArray(value)) {
@@ -46,17 +62,17 @@ export function migrateModelVersions(
       ) {
         const oldModel = config.model
         const newModel = MODEL_VERSION_MAP[oldModel]
-        const mKey = migrationKey(oldModel, newModel)
 
-        // Skip if this migration was already applied (user may have reverted)
-        if (appliedMigrations?.has(mKey)) {
+        // Any recorded migration away from this source means the user's current choice
+        // stands, even when the map now points somewhere else (they may have reverted).
+        if (migratedSources.has(oldModel)) {
           migrated[key] = value
           continue
         }
 
         migrated[key] = { ...config, model: newModel }
         changed = true
-        newMigrations.push(mKey)
+        newMigrations.push(migrationKey(oldModel, newModel))
         continue
       }
     }

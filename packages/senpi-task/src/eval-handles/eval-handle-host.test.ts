@@ -1,11 +1,12 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import type { EvalHandleHost, HandleRef, HandleSnapshot, HandleWatch } from "@code-yeongyu/senpi"
 
 import type { ManagedChildHandle } from "../manager/child-handle"
 import type { SendOutcome } from "../steering/types"
 import { FakeRunner, baseSpec, cleanupProjects, flush, makeManager } from "../manager/__fixtures__/manager-fakes"
 import type { ManagedStartSpec } from "../manager/types"
-import { SEND_HOST_STATUS } from "./control"
+import { SEND_HOST_STATUS } from "./run-after-engine"
+import { WATCH_HOST_STATUS } from "./watch"
 import { createEvalHandleHost } from "./host"
 import { fixture as poolFixture, poolInput } from "../workpool/__fixtures__/admission"
 
@@ -98,8 +99,12 @@ describe("EvalHandleHost over real task children", () => {
     watch.close()
 
     expect((await updates).map((s) => s.ref.id)).toEqual([b.task_id, a.task_id])
-    const values = await Promise.all(refs.map(async (ref) => (await host.result(ref, OWNER)) as { value: unknown }))
-    expect(values.map((outcome) => outcome.value)).toEqual(["value a", "value b"])
+    const values = await Promise.all(refs.map(async (ref) => {
+      const outcome = await host.result(ref, OWNER)
+      if (outcome.status !== "fulfilled") throw new Error(`expected a fulfilled outcome, got ${JSON.stringify(outcome)}`)
+      return outcome.value
+    }))
+    expect(values).toEqual(["value a", "value b"])
   })
 
   test("a run that already finished before the watch shows up once, in initial, with no update", async () => {
@@ -402,7 +407,7 @@ describe("EvalHandleHost over real task children", () => {
     await flush()
     watch.close()
 
-    expect((await updates).map((s) => s.phase)).toEqual(["lost"])
+    expect((await updates).map((s) => [s.phase, s.host_status])).toEqual([["lost", WATCH_HOST_STATUS.runGone]])
     await expect(host.result(successor, OWNER)).rejects.toMatchObject({ code: "eval_handle_not_found" })
   })
 
@@ -437,21 +442,13 @@ describe("EvalHandleHost over real task children", () => {
   test("each status read leaves no abort listener behind on the cell's signal", async () => {
     const { host, ref } = await harness()
     const signal = new AbortController().signal
-    const added: unknown[] = []
-    const removed: unknown[] = []
-    const add = signal.addEventListener.bind(signal)
-    const remove = signal.removeEventListener.bind(signal)
-    signal.addEventListener = ((type: string, listener: EventListener, options?: AddEventListenerOptions) => {
-      added.push(listener)
-      add(type, listener, options)
-    }) as typeof signal.addEventListener
-    signal.removeEventListener = ((type: string, listener: EventListener) => {
-      removed.push(listener)
-      remove(type, listener)
-    }) as typeof signal.removeEventListener
+    const addSpy = spyOn(signal, "addEventListener")
+    const removeSpy = spyOn(signal, "removeEventListener")
 
     for (let index = 0; index < 5; index += 1) (await host.watch([ref], { ...OWNER, signal })).close()
 
+    const added = addSpy.mock.calls.map((call) => call[1])
+    const removed = removeSpy.mock.calls.map((call) => call[1])
     expect(added).toHaveLength(5)
     expect(removed).toEqual(added)
   })
@@ -549,7 +546,7 @@ describe("every send and cancel reply is checked against the run after the engin
   test.each([
     { outcome: "cancelled" as const, expect: { cancelled: true, phase: "cancelled" } },
     { outcome: "noop" as const, expect: "eval_handle_stale" },
-    { outcome: "cancel_pending" as const, expect: "eval_handle_stale" },
+  // No cancel_pending row: a pending cancel blocks revive and steer, so a newer run cannot start under one.
   ])("a cancel the engine answers $outcome, with a newer run started before the re-read, never reports that run", async (row) => {
     const { manager, store, ref } = await harness()
     const host = createEvalHandleHost({
@@ -561,8 +558,7 @@ describe("every send and cancel reply is checked against the run after the engin
           startFollowUpRun({ store, taskId: id, epoch: 1 })
           const status = store.load(id)?.status ?? "running"
           if (row.outcome === "cancelled") return { kind: "cancelled", task_id: id, previous_status: "running" }
-          if (row.outcome === "noop") return { kind: "noop", task_id: id, status, reason: "already ended" }
-          return { kind: "cancel_pending", task_id: id, previous_status: "running", reason: "unreachable" }
+          return { kind: "noop", task_id: id, status, reason: "already ended" }
         },
       },
       workpools: NO_POOLS,

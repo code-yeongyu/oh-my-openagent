@@ -9,6 +9,7 @@ import {
   type LegacyHarnessRename,
   type OmoConfig,
 } from "../schema"
+import { collectExcludedModels } from "./disabled-skills"
 import { invalidValueDiagnostics, validateConfigLayer, validationDiagnostic } from "./layer-validation"
 import { mergeOmoConfigRecords } from "./merge"
 import { resolveOmoConfigPaths } from "./paths"
@@ -180,9 +181,17 @@ export function loadOmoConfig(options: LoadOmoConfigOptions = {}): LoadOmoConfig
   })
   const finalInput = mergeOmoConfigRecords(DEFAULT_RAW_CONFIG, resolved.config)
   const finalConfig = OmoConfigSchema.safeParse(finalInput)
+  // The generic merge lets a later array replace an earlier one; the model denylist is a union.
+  const excludeModels = collectExcludedModels({
+    layers,
+    ...(options.harness === undefined ? {} : { harness: options.harness }),
+    ...(resolved.profile === undefined ? {} : { profile: resolved.profile }),
+  })
+  const withExcludedModels = (config: OmoConfig): OmoConfig =>
+    excludeModels.length === 0 ? config : { ...config, exclude_models: [...excludeModels] }
   if (finalConfig.success) {
     return {
-      config: stripResolutionControlKeys(finalConfig.data),
+      config: withExcludedModels(stripResolutionControlKeys(finalConfig.data)),
       diagnostics: [...diagnostics, ...resolved.diagnostics],
       layers,
       ...(resolved.profile === undefined ? {} : { profile: resolved.profile }),
@@ -198,7 +207,7 @@ export function loadOmoConfig(options: LoadOmoConfigOptions = {}): LoadOmoConfig
   })
   if (pruned.ok) {
     return {
-      config: stripResolutionControlKeys(OmoConfigSchema.parse(pruned.config)),
+      config: withExcludedModels(stripResolutionControlKeys(OmoConfigSchema.parse(pruned.config))),
       diagnostics: [...diagnostics, ...resolved.diagnostics, ...invalidValueDiagnostics(MERGED_OMO_CONFIG_PATH, pruned.dropped)],
       layers,
       ...(resolved.profile === undefined ? {} : { profile: resolved.profile }),

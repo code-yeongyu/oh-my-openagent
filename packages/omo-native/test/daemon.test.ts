@@ -1,5 +1,5 @@
-import { describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
+import { describe, expect, onTestFinished, test } from "bun:test"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { daemonReportLines, runDaemonCommand } from "../bin/lib/daemon.js"
@@ -28,6 +28,7 @@ function fakeEngine(result: { exitCode: number; stdout?: string; stderr?: string
 
 function workspace(config?: Record<string, unknown>): { pluginRoot: string; agentDir: string } {
   const root = mkdtempSync(join(tmpdir(), "omo-daemon-cli-"))
+  onTestFinished(() => rmSync(root, { recursive: true, force: true }))
   const pluginRoot = join(root, "plugin")
   const agentDir = join(root, "agent")
   mkdirSync(pluginRoot, { recursive: true })

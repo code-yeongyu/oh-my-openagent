@@ -54,6 +54,7 @@ fn xid(id: &str, title: &str, pid: u32, rect: Extents) -> DesktopWindow {
         width: rect.width.unsigned_abs(),
         height: rect.height.unsigned_abs(),
         focused: false,
+        is_on_screen: None,
         elevated: None,
     }
 }

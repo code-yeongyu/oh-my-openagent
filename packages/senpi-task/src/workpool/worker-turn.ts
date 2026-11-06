@@ -53,14 +53,15 @@ export function beginWorkerTurn(stores: { readonly pools: WorkpoolStore; readonl
       : canonical ? prefix : [prefix, ...entries.map(entry => entry.message)].join("\n\n")
     captured = { entries, message }
     return { ...pool, items: pool.items.map(item => belongsToTurn(item, turn) && item.status === "assigned"
-      ? { ...item, delivery: { phase: "dispatching", message_sha256: messageSha256(message) } } : item) }
+      ? { ...item, delivery: { phase: "dispatching", message_sha256: messageSha256(message), entry_ids: entries.map(entry => entry.id) } } : item) }
   })
   return captured
 }
 
 export function acknowledgeWorkerTurn(stores: { readonly pools: WorkpoolStore; readonly tasks: TaskRecordStore }, turn: WorkerTurn, entries?: readonly PendingSteeringEntry[]): void {
-  if (entries !== undefined) {
-    const ids = new Set(entries.map(entry => entry.id))
+  const frozen = stores.pools.load(turn.pool_id).items.find(item => belongsToTurn(item, turn))?.delivery?.entry_ids
+  if (entries !== undefined || frozen !== undefined) {
+    const ids = new Set(entries?.map(entry => entry.id) ?? frozen)
     stores.tasks.mutate(turn.task_id, task => task.notification.run_epoch !== turn.run_epoch ? task : {
       ...task, pending_steering: (task.pending_steering ?? []).filter(entry => !ids.has(entry.id)),
     })

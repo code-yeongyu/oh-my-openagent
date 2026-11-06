@@ -1,5 +1,7 @@
 export const CODE_BLOCK_PATTERN = /```[\s\S]*?```/g
 export const INLINE_CODE_PATTERN = /`[^`]+`/g
+// `ulw-plan`, `ulw-research` and other ulw-* skill names are not the ultrawork keyword.
+export const ULTRAWORK_PATTERN = /\b(?:ultrawork|ulw(?!-\w))\b/i
 
 import type { KeywordType } from "../../config/schema/keyword-detector"
 import { getUltraworkMessage, isPlannerAgent, isNonOmoAgent } from "./ultrawork"
@@ -12,12 +14,12 @@ export { HYPERPLAN_PATTERN, HYPERPLAN_MESSAGE }
 
 // Hyperplan-ultrawork combo: strict adjacency, both word orders
 export const HYPERPLAN_ULTRAWORK_PATTERN =
-  /\b(?:hpp|hyperplan)\s+(?:ulw|ultrawork)\b|\b(?:ulw|ultrawork)\s+(?:hpp|hyperplan)\b/i
+  /\b(?:hpp|hyperplan)\s+(?:ultrawork|ulw(?!-\w))\b|\b(?:ultrawork|ulw(?!-\w))\s+(?:hpp|hyperplan)\b/i
 
 const HYPERPLAN_ULTRAWORK_BANNER = `<hyperplan-ultrawork-mode>
 **MANDATORY**: Say "HYPERPLAN ULTRAWORK MODE ENABLED!" exactly once as your first response. Do NOT say the standalone "ULTRAWORK MODE ENABLED!" or "HYPERPLAN MODE ENABLED!" banners.
 
-Apply the ultrawork protocol below as your execution framework. You MUST ALSO load the hyperplan skill immediately via \`skill(name="hyperplan")\` and follow its full adversarial workflow — do NOT improvise, do NOT skip rounds, do NOT write the plan yourself.
+Apply the ultrawork protocol below as your execution framework. You MUST ALSO load the hyperplan skill immediately via \`skill(name="hyperplan")\` and follow its full adversarial workflow: do NOT improvise, do NOT skip rounds, do NOT write the plan yourself.
 </hyperplan-ultrawork-mode>`
 
 export function getHyperplanUltraworkMessage(agentName?: string, modelID?: string): string {
@@ -33,7 +35,7 @@ export type KeywordDetector = {
 export const KEYWORD_DETECTORS: KeywordDetector[] = [
   {
     type: "ultrawork",
-    pattern: /\b(ultrawork|ulw)\b/i,
+    pattern: ULTRAWORK_PATTERN,
     message: getUltraworkMessage,
   },
   {

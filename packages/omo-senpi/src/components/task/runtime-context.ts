@@ -1,11 +1,12 @@
 import type { ChildModelRegistry, ParentState } from "@oh-my-opencode/senpi-task"
+import { RELEASE_RUN_FENCE, type EnginePauseState, type EngineRunHoldContext, type RunRef } from "../../../../senpi-task/src/pause/ports"
 
 // Structural slice of senpi's ExtensionContext the task runtime reads. ExtensionContext satisfies it;
 // tests pass a tiny fake. `ui` lives on ExtensionContext (event/command contexts), NOT ExtensionAPI,
 // so it is captured here on entry and cleared on switch/shutdown (the todo-18 bridge constraint).
 // modelRegistry is the CONCRETE senpi ModelRegistry: the planner reads it through its structural port,
 // and in-process children reuse this exact instance so they inherit the parent's live provider set.
-export interface LiveTaskContext {
+export interface LiveTaskContext extends EngineRunHoldContext {
   readonly cwd?: string
   readonly modelRegistry?: ChildModelRegistry
   readonly loadedExtensionPaths?: readonly string[]
@@ -31,6 +32,8 @@ export interface LiveTaskContext {
 export interface CapturedUi {
   notify(message: string, type?: "info" | "warning" | "error"): void
   setStatus(key: string, text: string | undefined): void
+  // senpi#2471: absent on engines before it, so the footer simply shows no subagent figure there.
+  setSubagentCost?(costUsd: number | undefined): void
   setWidget(key: string, content: string[] | undefined, options?: { placement?: "belowEditor" | "aboveEditor" }): void
   select(title: string, options: string[], opts?: { signal?: unknown; timeout?: number }): Promise<string | undefined>
   confirm(title: string, message: string, opts?: { signal?: unknown; timeout?: number }): Promise<boolean>
@@ -56,6 +59,7 @@ function asParentServiceTier(value: unknown): ParentServiceTier | undefined {
 export class TaskRuntimeContext {
   #cwd: string
   #modelRegistry: ChildModelRegistry | undefined
+  #modelContext: Pick<LiveTaskContext, "model" | "getPauseState" | "fenceRun" | typeof RELEASE_RUN_FENCE> | undefined
   #loadedExtensionPaths: readonly string[] = []
   #parentServiceTier: ParentServiceTier | undefined
   #idle = true
@@ -71,6 +75,7 @@ export class TaskRuntimeContext {
   }
 
   captureFrom(ctx: LiveTaskContext): void {
+    this.#modelContext = ctx
     if (typeof ctx.cwd === "string" && ctx.cwd.length > 0) this.#cwd = ctx.cwd
     if (ctx.modelRegistry !== undefined) this.#modelRegistry = ctx.modelRegistry
     if (ctx.loadedExtensionPaths !== undefined) this.#loadedExtensionPaths = ctx.loadedExtensionPaths
@@ -101,6 +106,33 @@ export class TaskRuntimeContext {
 
   modelRegistry(): ChildModelRegistry | undefined {
     return this.#modelRegistry
+  }
+
+  // Retain the host context's live getter: fallback can replace its model before a queued wake lands.
+  parentModel(): string | undefined {
+    const model = this.#modelContext?.model
+    if (typeof model === "string") return model
+    if (typeof model !== "object" || model === null || !("id" in model)) return undefined
+    return typeof model.id === "string" ? model.id : undefined
+  }
+
+  getPauseState(): EnginePauseState | undefined {
+    return this.#modelContext?.getPauseState?.()
+  }
+
+  fenceRun(runRef: RunRef): void {
+    const context = this.#modelContext
+    if (context?.fenceRun === undefined) throw new Error("engine run fences are unavailable")
+    context.fenceRun(runRef)
+  }
+
+  // Feature-detected: an engine without it keeps the fence until the next human input or
+  // resume_session. Answers whether the engine released it.
+  releaseRunFence(runRef: RunRef): boolean {
+    const release = this.#modelContext?.[RELEASE_RUN_FENCE]
+    if (release === undefined) return false
+    release(runRef)
+    return true
   }
 
   loadedExtensionPaths(): readonly string[] {

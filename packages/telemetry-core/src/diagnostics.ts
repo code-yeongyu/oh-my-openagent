@@ -63,11 +63,14 @@ export function cleanupTelemetryDiagnostics(options: WriteTelemetryDiagnosticOpt
   }
 }
 
-function toDiagnosticRecord(input: TelemetryDiagnosticInput, now: Date): Record<string, string> {
+function toDiagnosticRecord(input: TelemetryDiagnosticInput, now: Date): Record<string, string | number> {
   return {
     timestamp: now.toISOString(),
     event: input.event,
     source: input.source,
+    ...(input.entryKind === undefined ? {} : { entry_kind: input.entryKind }),
+    ...(input.errorCode === undefined ? {} : { error_code: input.errorCode }),
+    ...(input.count === undefined ? {} : { count: input.count }),
     ...serializeError(input.error, input.errorKind),
   }
 }

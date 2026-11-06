@@ -40,7 +40,7 @@ unsafe extern "C" {
     fn responsibility_get_pid_responsible_for_pid(pid: libc::pid_t) -> libc::pid_t;
 }
 
-fn responsible_pid(pid: libc::pid_t) -> Option<libc::pid_t> {
+pub(crate) fn responsible_pid(pid: libc::pid_t) -> Option<libc::pid_t> {
     // SAFETY: the responsibility API takes and returns scalar pid_t values;
     // no pointers or retained resources cross this boundary.
     let responsible = unsafe { responsibility_get_pid_responsible_for_pid(pid) };

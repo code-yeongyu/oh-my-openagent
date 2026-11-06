@@ -62,7 +62,7 @@ async function expectParked(child: Child, reason: SuspensionReason, status: Task
   expect(concurrencyOf(parent).getCount(HOST_CHILD_MODEL)).toBe(0)
   const output = await runTaskOutput({ manager: parent.manager, stateDir: parent.store.stateDir }, { task_id: record.task_id }, parent.sessionId)
   expect(output.details).toMatchObject({ kind: "status", snapshot: { residency_state: "rpc_detached", status } })
-  expect(output.details.kind === "status" ? output.details.snapshot.suspended : undefined).toBeDefined()
+  expect(output.details.kind === "status" && output.details.snapshot.suspended !== undefined).toBe(status === "running" || status === "pending")
 }
 
 describe("a session the host parks parks its task record", () => {
@@ -122,7 +122,8 @@ describe("a session the host parks parks its task record", () => {
     expect(revived.outcomes.map((outcome) => outcome.kind)).toEqual(["resumed"])
     expect(child.parent.store.load(child.record.task_id)).toMatchObject({ residency_state: "resident", status: "running" })
     expect(child.parent.store.load(child.record.task_id)?.host_session?.instance_id).toBe(child.world.host.instanceId)
-    expect(child.world.prompts()).toHaveLength(1)
+    expect(child.world.prompts()).toHaveLength(2)
+    expect(child.world.host.commands.filter(command => command.type === "prompt" && command.payload.streamingBehavior === "followUp")).toHaveLength(1)
   })
 
   test("#given a child whose turn completed while it stayed resident #when the idle sweep parks its session #then the completed record parks idle_evicted instead of keeping a dead handle", async () => {

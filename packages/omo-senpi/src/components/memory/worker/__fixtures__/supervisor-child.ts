@@ -23,6 +23,16 @@ if (mode === "inspect") {
 if (mode === "model-not-found") {
   console.error('Error: Model "extension-only/primary" not found. Use --list-models to see available models.')
   process.exit(1)
+} else if (mode === "with-grandchild") {
+  // Mirror the real reflection CLI: it owns tool/agent descendants, not just its own pid.
+  const { spawn } = await import("node:child_process")
+  const grandchild = spawn(process.execPath, ["-e", "setInterval(() => undefined, 60_000)"], {
+    detached: true,
+    stdio: "ignore",
+    windowsHide: true,
+  })
+  grandchild.unref()
+  await writeMarker("grandchild.json", { pid: grandchild.pid })
 } else if (mode === "graceful") {
   let terminating = false
   process.on("SIGTERM", () => {

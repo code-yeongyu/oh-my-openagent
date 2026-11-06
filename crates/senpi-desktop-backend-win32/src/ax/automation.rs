@@ -18,7 +18,7 @@ impl Automation {
     /// The first call initialises COM (multithreaded) on the calling thread;
     /// later calls create the client directly, as oh-my-pi does. The client
     /// is not cached: `IUIAutomation` is not `Send`, the backend is.
-    fn client(&mut self) -> CoreResult<UIAutomation> {
+    pub(super) fn client(&mut self) -> CoreResult<UIAutomation> {
         if self.com_initialized {
             return UIAutomation::new_direct().map_err(uia_error);
         }

@@ -4,7 +4,7 @@
 // the suite reads) and return the rendered text; every user-visible line is ALSO
 // pushed through ctx.ui.notify so read-only output never enters model context.
 
-import type { GitExec, MemoryIdentityPaths } from "@oh-my-opencode/memory-core"
+import { redactSecretLikeMaterial, type GitExec, type MemoryIdentityPaths } from "@oh-my-opencode/memory-core"
 import type { OmoConfig, OmoMemorySettings } from "@oh-my-opencode/omo-config-core"
 
 import type { PeopleAskRunner } from "./people-ask"
@@ -47,6 +47,10 @@ export interface ManualReflectionRequest {
 export interface ReflectionRequestReceipt {
   readonly disposition: "reserved" | "pending"
   readonly runId: string
+  /** A dead run that held the reflection lock was settled, so this request runs next (#10377). */
+  readonly recoveredRunId?: string
+  /** The lock is held by a run whose liveness cannot be proven; shown with the next step (#10377). */
+  readonly stuck?: string
 }
 
 export interface ReflectionRequestSink {
@@ -106,8 +110,9 @@ export interface MemoryCommandDeps {
 
 /** Notify (when a UI is present) and return the same text for headless consumers. */
 export function respond(ctx: MemoryCommandContext, text: string, level: NotifyLevel = "info"): string {
-  ctx.ui?.notify(text, level)
-  return text
+  const safe = redactSecretLikeMaterial(text)
+  ctx.ui?.notify(safe, level)
+  return safe
 }
 
 export function sessionIdOf(ctx: MemoryCommandContext): string | undefined {

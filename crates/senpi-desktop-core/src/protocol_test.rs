@@ -6,6 +6,7 @@ use serde_json::{json, Value};
 
 use super::*;
 use crate::engine_schema;
+use crate::error::DesktopError;
 use crate::methods::{Effect, Exposure, Method, Notification, METHODS};
 
 const SCHEMA_PATH: &str = "schema/engine.schema.json";
@@ -62,10 +63,7 @@ fn method_enum_lists_exactly_the_table_in_order() {
     // Then
     let table: Vec<&str> = METHODS.iter().map(|spec| spec.name).collect();
     assert_eq!(schema["definitions"]["Method"]["enum"], json!(table));
-    assert_eq!(
-        schema["methods"].as_object().unwrap().keys().collect::<Vec<_>>(),
-        table
-    );
+    assert_eq!(schema["methods"].as_object().unwrap().keys().collect::<Vec<_>>(), table);
 }
 
 #[test]
@@ -89,6 +87,8 @@ fn only_session_and_stop_path_controls_are_host_only() {
         string_set([
             "session.open",
             "session.close",
+            "control.grant",
+            "control.revoke",
             "stopPath.start",
             "stopPath.heartbeat",
             "stopPath.resume"
@@ -114,21 +114,50 @@ fn error_table_lists_every_error_code_in_ordinal_order() {
     let names = string_set(ERROR_CODES.iter().map(|code| code.as_str()));
     assert_eq!(enum_names(&schema["definitions"]["ErrorCode"]), names);
     let codes: Vec<i64> = ERROR_CODES.into_iter().map(rpc_error_code).collect();
-    assert_eq!(
-        codes,
-        (0..21).map(|ordinal| -32_000 - ordinal).collect::<Vec<i64>>()
-    );
+    assert_eq!(codes, (0..28).map(|ordinal| -32_000 - ordinal).collect::<Vec<i64>>());
     assert_eq!(schema["errors"]["Cancelled"], json!(-32_017));
+    assert_eq!(schema["errors"]["CaptureUnavailable"], json!(-32_023));
+}
+
+/// Amendment 1 appends four codes; every earlier numeric code stays put.
+#[test]
+fn amendment_one_codes_follow_the_frozen_table() {
+    use crate::error::ErrorCode;
+    let appended = [
+        (ErrorCode::UserIntervened, -32_024),
+        (ErrorCode::AxUnconfirmed, -32_025),
+        (ErrorCode::SpaceUnsupported, -32_026),
+        (ErrorCode::SpaceMoveDenied, -32_027),
+    ];
+    for (code, numeric) in appended {
+        assert_eq!(rpc_error_code(code), numeric, "{}", code.as_str());
+        assert_eq!(engine_schema()["errors"][code.as_str()], json!(numeric));
+    }
+    assert_eq!(ERROR_CODES[24..], appended.map(|(code, _)| code));
+    assert_eq!(rpc_error_code(ErrorCode::PermissionDenied), -32_000);
+    assert_eq!(rpc_error_code(ErrorCode::CaptureUnavailable), -32_023);
+    assert_eq!(PROTOCOL_VERSION, "1");
+    assert_eq!(ABI, "senpi-desktop/1");
+}
+
+#[test]
+fn capture_unavailable_carries_its_reason_on_the_wire() {
+    // Given
+    let error = DesktopError::capture_unavailable("minimized", "window is minimized");
+    // When
+    let value = serde_json::to_value(&error).unwrap();
+    // Then
+    assert_eq!(value["code"], "CaptureUnavailable");
+    assert_eq!(value["captureUnavailable"], json!({"reason": "minimized"}));
+    assert_eq!(rpc_error_code(error.code), -32_023);
+    assert!(ERROR_CODES.contains(&crate::error::ErrorCode::CaptureUnavailable));
 }
 
 #[test]
 fn notification_names_are_their_wire_form() {
     let schema = engine_schema();
     for notification in Notification::ALL {
-        assert_eq!(
-            serde_json::to_value(notification).unwrap(),
-            json!(notification.name())
-        );
+        assert_eq!(serde_json::to_value(notification).unwrap(), json!(notification.name()));
         assert!(schema["notifications"][notification.name()]["params"].is_object());
     }
 }
@@ -197,7 +226,10 @@ fn protocol_doc() -> String {
         "\n## Errors\n\n\
          An engine error is `{code, message, data: {code: <ErrorCode>, hint}}`. A method-level rejection \
          is the standard `-32601 Method not found` with `data: {reason: \"unknown\" | \"hostOnly\" | \
-         \"testOnly\"}`. Malformed input uses the standard `-32700`, `-32600`, and `-32602`.\n\n\
+         \"testOnly\"}`. Malformed input uses the standard `-32700`, `-32600`, and `-32602`. \
+         `CaptureUnavailable` also carries `data: {captureUnavailable: {reason}}`; B9 defines the \
+         reason `\"minimized\"` for a window that exists but is minimized. The table is append-only: \
+         a new code takes the next ordinal, so no existing numeric code moves.\n\n\
          | ErrorCode | JSON-RPC code |\n|---|---|\n",
     );
     for code in ERROR_CODES {

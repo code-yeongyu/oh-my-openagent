@@ -6,6 +6,9 @@ import { loadSenpiBarrel } from "../../lazy/senpi-barrel"
 import type { ChildSpec } from "../in-process"
 
 export const PROVIDER = "caller-settings-test"
+// A second account: senpi 2026.10.12 (#3131) skips every model on a provider whose account hit its usage
+// limit, so a fallback past an account-wide quota error has to live on another provider.
+export const ALT_PROVIDER = "caller-settings-test-alt"
 
 export type ProviderCall = {
   readonly modelId: string
@@ -51,9 +54,9 @@ export async function createCallerSettingsWorld(
   const calls: ProviderCall[] = []
   let reportFirst: (call: ProviderCall) => void = () => {}
   const firstCall = new Promise<ProviderCall>((resolve) => { reportFirst = resolve })
-  const provider = {
+  const providerFor = (name: string) => ({
     api: "openai-completions",
-    baseUrl: "file://caller-settings-test",
+    baseUrl: `file://${name}`,
     apiKey: "test-key",
     models: Object.keys(behaviors).map(testModel),
     streamSimple(model: { readonly id: string }, _context: unknown, options: { readonly timeoutMs?: unknown; readonly signal?: AbortSignal }) {
@@ -62,18 +65,18 @@ export async function createCallerSettingsWorld(
         options.signal?.addEventListener("abort", () => {
           const reason: unknown = options.signal?.reason
           resolve(reason instanceof Error ? reason.message : String(reason))
-          stream.end(assistant(model.id, "aborted"))
+          stream.end(assistant(name, model.id, "aborted"))
         }, { once: true })
       })
       const call = { modelId: model.id, timeoutMs: options.timeoutMs, aborted }
       calls.push(call)
       reportFirst(call)
       const behavior = behaviors[model.id] ?? "complete"
-      if (behavior !== "hang") queueMicrotask(() => stream.end(assistant(model.id, behavior === "quota" ? "error" : "stop")))
+      if (behavior !== "hang") queueMicrotask(() => stream.end(assistant(name, model.id, behavior === "quota" ? "error" : "stop")))
       return stream
     },
-  }
-  Reflect.apply(modelRegistry.registerProvider, modelRegistry, [PROVIDER, provider])
+  })
+  for (const name of [PROVIDER, ALT_PROVIDER]) Reflect.apply(modelRegistry.registerProvider, modelRegistry, [name, providerFor(name)])
   return {
     root,
     agentDir,
@@ -108,12 +111,12 @@ export async function createCallerSettingsWorld(
 
 type Message = ReturnType<typeof assistant>
 
-function assistant(model: string, outcome: "stop" | "error" | "aborted") {
+function assistant(provider: string, model: string, outcome: "stop" | "error" | "aborted") {
   return {
     role: "assistant" as const,
     content: outcome === "stop" ? [{ type: "text" as const, text: `${model} completed` }] : [],
     api: "openai-completions" as const,
-    provider: PROVIDER,
+    provider,
     model,
     usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: 0 },
     stopReason: outcome,

@@ -193,12 +193,12 @@ fn selecting_one_monitor_by_name_or_id_rebases_its_pixels_to_zero() {
 }
 
 #[test]
-fn an_inactive_display_selector_is_capture_failed() {
+fn an_inactive_display_selector_is_invalid_target() {
     let server = FakeServer::new(1280, 800).monitor("DP-1", (0, 0, 1280, 800), true);
 
     let error = displays(&server, &DisplaySelector::Id("999".into())).unwrap_err();
 
-    assert_eq!(error.code, ErrorCode::CaptureFailed);
+    assert_eq!(error.code, ErrorCode::InvalidTarget);
     assert_eq!(error.message, "configured X11 display was not found");
 }
 
