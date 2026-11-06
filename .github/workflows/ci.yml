@@ -1220,6 +1220,10 @@ jobs:
           cargo build --release -p senpi-desktop-engine --locked --target ${{ matrix.rust-target }}
           # build-omo-binary.ts stages the engine trust helper on Darwin and Windows (omo#10762); its own call, as release builds it.
           cargo build --release -p omo-engine-trust-helper --locked --target ${{ matrix.rust-target }}
+          # It stages the git job helper on Windows only (omo#10391); its own call, static CRT as released.
+          if [[ "${{ matrix.target }}" == windows-* ]]; then
+            RUSTFLAGS="-C target-feature=+crt-static" cargo build --release -p omo-git-job-helper --locked --target ${{ matrix.rust-target }}
+          fi
 
       # build-omo-binary embeds the keychain helper into darwin binaries (#11262); the release lane
       # signs it, this parity leg embeds an unsigned build.
