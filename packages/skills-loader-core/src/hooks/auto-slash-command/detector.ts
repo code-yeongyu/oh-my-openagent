@@ -1,39 +1,68 @@
 import { isRealUserTextPart } from "../../shared/internal-initiator-marker"
 import {
   EXCLUDED_COMMANDS,
-  SLASH_COMMAND_PATTERN_ANYWHERE,
 } from "./constants"
 import type { ParsedSlashCommand } from "./types"
 
-const CODE_BLOCK_PATTERN = /```[\s\S]*?```/g
-const INLINE_CODE_PATTERN = /`[^`\n]*`/g
+const TRIPLE_BACKTICK_FENCE_PATTERN = /```[\s\S]*?(?:```|$)/g
+const TILDE_FENCE_PATTERN = /~~~[\s\S]*?(?:~~~|$)/g
+const DOUBLE_BACKTICK_INLINE_PATTERN = /``[^`\n]*``/g
+const SINGLE_BACKTICK_INLINE_PATTERN = /`[^`\n]*`/g
 
 export function removeCodeBlocks(text: string): string {
-  return text.replace(CODE_BLOCK_PATTERN, "")
+  return text.replace(TRIPLE_BACKTICK_FENCE_PATTERN, "")
 }
 
 function getIgnoredRanges(text: string): Array<{ start: number; end: number }> {
   const ranges: Array<{ start: number; end: number }> = []
-  CODE_BLOCK_PATTERN.lastIndex = 0
-  let m: RegExpExecArray | null
-  while ((m = CODE_BLOCK_PATTERN.exec(text)) !== null) {
-    ranges.push({ start: m.index, end: m.index + m[0].length })
-    if (m[0].length === 0) {
-      CODE_BLOCK_PATTERN.lastIndex += 1
+  const fenceRanges: Array<{ start: number; end: number }> = []
+
+  for (const pattern of [TRIPLE_BACKTICK_FENCE_PATTERN, TILDE_FENCE_PATTERN]) {
+    pattern.lastIndex = 0
+    let m: RegExpExecArray | null
+    while ((m = pattern.exec(text)) !== null) {
+      const start = m.index
+      const end = start + m[0].length
+      fenceRanges.push({ start, end })
+      if (m[0].length === 0) {
+        pattern.lastIndex += 1
+      }
     }
   }
-  INLINE_CODE_PATTERN.lastIndex = 0
-  while ((m = INLINE_CODE_PATTERN.exec(text)) !== null) {
-    const start = m.index
-    const end = start + m[0].length
-    const insideFence = ranges.some((r) => start >= r.start && start < r.end)
-    if (!insideFence) {
-      ranges.push({ start, end })
-    }
-    if (m[0].length === 0) {
-      INLINE_CODE_PATTERN.lastIndex += 1
+
+  // Merge overlapping fence ranges.
+  fenceRanges.sort((a, b) => a.start - b.start)
+  for (const r of fenceRanges) {
+    const last = ranges.length > 0 ? ranges[ranges.length - 1] : null
+    if (last && r.start <= last.end) {
+      last.end = Math.max(last.end, r.end)
+    } else {
+      ranges.push({ start: r.start, end: r.end })
     }
   }
+
+  const fenceOnly = ranges.slice()
+
+  const addInline = (pattern: RegExp): void => {
+    pattern.lastIndex = 0
+    let m: RegExpExecArray | null
+    while ((m = pattern.exec(text)) !== null) {
+      const start = m.index
+      const end = start + m[0].length
+      const insideFence = fenceOnly.some((r) => start >= r.start && start < r.end)
+      const overlaps = ranges.some((r) => start < r.end && end > r.start)
+      if (!insideFence && !overlaps) {
+        ranges.push({ start, end })
+      }
+      if (m[0].length === 0) {
+        pattern.lastIndex += 1
+      }
+    }
+  }
+
+  addInline(DOUBLE_BACKTICK_INLINE_PATTERN)
+  addInline(SINGLE_BACKTICK_INLINE_PATTERN)
+
   return ranges
 }
 
@@ -43,7 +72,7 @@ function isIgnored(index: number, ranges: Array<{ start: number; end: number }>)
 
 export function parseAllSlashCommands(text: string): ParsedSlashCommand[] {
   const ignored = getIgnoredRanges(text)
-  const pattern = /(?:^|(?<=\s))\/([a-zA-Z@][\w.:@/-]*)/g
+  const pattern = /(?:^|(?<=\s))\/([a-zA-Z@][\w:@/-]*(?:\.[\w:@/-]+)*)/g
   const results: ParsedSlashCommand[] = []
   let match: RegExpExecArray | null
   while ((match = pattern.exec(text)) !== null) {

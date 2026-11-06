@@ -57,6 +57,13 @@ describe("createAutoSlashCommandHook leak prevention", () => {
     mock.restore()
     executeSlashCommandMock.mockClear()
     spyOn(executorModule, "executeSlashCommand").mockImplementation(executeSlashCommandMock)
+    spyOn(executorModule, "discoverAllCommands").mockImplementation(async () => {
+      const names = ["leak-chat", "leak-command", "leak-oldest", "leak-newest"]
+      for (let index = 0; index < 10000; index += 1) {
+        names.push(`leak-${index}`)
+      }
+      return names.map((name) => ({ name }))
+    })
     spyOn(shared, "log").mockImplementation(() => {})
 
     const autoSlashCommandModule = await import(`../hook?test=${Date.now()}-${Math.random()}`)

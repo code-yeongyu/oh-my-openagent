@@ -8,7 +8,7 @@ import {
   parseSlashCommand,
 } from "./detector"
 import { isRealUserTextPart } from "../../shared/internal-initiator-marker"
-import { executeSlashCommand, type ExecutorOptions } from "./executor"
+import { discoverAllCommands, executeSlashCommand, type ExecutorOptions } from "./executor"
 import { log } from "../../shared"
 import { resolveSessionEventID } from "../../shared/event-session-id"
 import {
@@ -86,6 +86,7 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
   }
   const sessionProcessedCommands = createProcessedCommandStore()
   const sessionProcessedCommandExecutions = createProcessedCommandStore()
+  let discoveredCommandNames: Set<string> | null = null
 
   const dispose = (): void => {
     sessionProcessedCommands.clear()
@@ -126,7 +127,25 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
         sessionID: input.sessionID,
       }
 
-      for (const parsed of candidates) {
+      // Resolve candidate names against a single discovery pass so that a
+      // pasted log full of absolute paths does not trigger one filesystem
+      // scan per path.
+      if (!discoveredCommandNames) {
+        const discoveredCommands = await discoverAllCommands(executionOptions)
+        discoveredCommandNames = new Set(
+          discoveredCommands.map((cmd) => cmd.name.toLowerCase())
+        )
+      }
+      const availableCommandNames = discoveredCommandNames
+      const resolvingCandidates = candidates.filter((parsed) =>
+        availableCommandNames.has(parsed.command)
+      )
+
+      if (resolvingCandidates.length === 0) {
+        return
+      }
+
+      for (const parsed of resolvingCandidates) {
         const commandKey = input.messageID
           ? `${input.sessionID}:${input.messageID}:${parsed.command}`
           : `${input.sessionID}:${parsed.command}`
