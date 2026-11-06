@@ -30,7 +30,8 @@ export const THIS_DEVICE_STATES = [
 ] as const;
 export type ThisDeviceState = (typeof THIS_DEVICE_STATES)[number];
 
-export const CLIENT_NAMES = ["desktop", "omo", "installer"] as const;
+// "sdk": a program built on the machine SDK (design 8.4); like "omo", it carries no data_home.
+export const CLIENT_NAMES = ["desktop", "omo", "installer", "sdk"] as const;
 export type ClientName = (typeof CLIENT_NAMES)[number];
 export const CAPABILITIES = ["sessions", "devices", "enforcement", "upgrade", "control"] as const;
 // A service that also serves machine operations lists "machine"; this client uses none of them but accepts the word.
@@ -84,16 +85,18 @@ export const DETACH_REASONS = [
   "stream_key_pending",
   "peer_detached",
   "blob_failed",
+  // 0013 amendment 2026-11-03: the host's engine closed or replaced the attached session (attach_ended). Gated by
+  // client version (event-gate.ts): an older client gets peer_detached.
+  "session_closed",
+  "session_replaced",
 ] as const;
 export type DetachReason = (typeof DETACH_REASONS)[number];
 export const ATTACH_PENDING_REASONS = ["stream_key_pending"] as const;
 export type AttachPendingReason = (typeof ATTACH_PENDING_REASONS)[number];
 
-// Commands: the ops, the sender-ledger states with the evidence rule, and the reasons (equal to the shared
-// command contract's lists; a drift test pins them). A command_id is exactly 22 base64url characters.
+// Commands: the sender-ledger states with the evidence rule, and the reasons (each one the shared command contract's;
+// a drift test pins them). A command_id is exactly 22 base64url characters.
 export const COMMAND_ID_CHARS = 22;
-export const COMMAND_OPS = ["prompt", "steer", "abort", "permission", "question"] as const;
-export type CommandOp = (typeof COMMAND_OPS)[number];
 export const COMMAND_STATES = [
   "queued",
   "transport_confirmed",
@@ -113,12 +116,32 @@ export const COMMAND_UNCERTAIN_REASONS = [
   "recipient_revoked",
   "transport_expired",
   "unconfirmed",
+  // Decision 0010 (tool calls on a hand) and 0018 (an engine reply over RECORD_MAX_BYTES): every host reason travels.
+  "lease_expired",
+  "cancelled",
+  "hand_restarted",
+  "result_expired",
+  "record_too_large",
 ] as const;
 export const COMMAND_REFUSAL_REASONS = [
   "parts_conflict",
   "peer_unauthorized",
   "message_too_long",
   "engine_capability_missing",
+  // Decision 0011: the receiving endpoint's refusals of a forwarded engine RPC record, in its order (#105).
+  "malformed",
+  "method_unclassified",
+  "method_local_only",
+  "capability_missing",
+  // Decisions 0010, #123 and SP6: every refusal reason the spec defines reaches the client as itself.
+  "schema_stale",
+  "tool_unknown",
+  "cancelled",
+  "hand_restarted",
+  "scope_unknown",
+  "scope_closed",
+  "epoch_fenced",
+  "epoch_step_exceeded",
 ] as const;
 export type CommandUncertainReason = (typeof COMMAND_UNCERTAIN_REASONS)[number];
 export type CommandRefusalReason = (typeof COMMAND_REFUSAL_REASONS)[number];
@@ -157,6 +180,14 @@ export const ERROR_CODES = [
   "command_id_conflict",
   "message_too_long",
   "upload_incomplete",
+  // The receiver refusals the service can decide before anything leaves the device (#105).
+  "malformed",
+  "method_unclassified",
+  "method_local_only",
+  // Decision 0013: a held session.attach whose host did not answer within its bound. Retryable; see error-gate.ts.
+  "host_not_answering",
+  // #267: this service defines the request but does not serve it yet (machine operations before their executor).
+  "unsupported",
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 // Errors the client library raises itself, before or instead of a server answer.
@@ -172,3 +203,28 @@ export const CLIENT_ERROR_CODES = [
   "request_timeout",
 ] as const;
 export type ClientErrorCode = (typeof CLIENT_ERROR_CODES)[number];
+// Why the refresher path rule refused a refresher.register; travels as path_refusal on a forbidden answer only.
+export const PATH_REFUSAL_PROBLEMS = [
+  "not_absolute",
+  "not_found",
+  "not_regular_file",
+  "not_executable",
+  "foreign_owner",
+  "group_writable",
+  "world_writable",
+  "windows_acl",
+] as const;
+export type PathRefusalProblem = (typeof PATH_REFUSAL_PROBLEMS)[number];
+
+// Decision 0018: why a delegated command channel ended: the host's conn_reset reasons, or event_gap (this device held
+// more than 64 events ahead of a missing one, or a gap stayed unrepaired past the host's own loss bound: 30 s of
+// re-acks with no progress, conn-channels.ts GAP_RE_ACKS_MAX).
+export const CHANNEL_CLOSED_REASONS = [
+  "event_overflow",
+  "event_too_large",
+  "idle",
+  "engine_closed",
+  "event_lost",
+  "event_gap",
+] as const;
+export type ChannelClosedReason = (typeof CHANNEL_CLOSED_REASONS)[number];
