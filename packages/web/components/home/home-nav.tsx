@@ -5,6 +5,32 @@ import { Icon } from "@/components/home/icons"
 import { ThemeSwitch } from "@/components/home/theme-switch"
 import { Link } from "@/i18n/routing"
 import { GITHUB_URL } from "@/components/home/links"
+import type { ReactNode } from "react"
+
+/** A same-page anchor on the home page; a locale-aware link from every other page. */
+function NavLink({
+  onHome,
+  hash,
+  path,
+  className,
+  children,
+}: {
+  readonly onHome: boolean
+  readonly hash: string
+  readonly path: string
+  readonly className?: string
+  readonly children: ReactNode
+}): JSX.Element {
+  return onHome ? (
+    <a className={className} href={hash}>
+      {children}
+    </a>
+  ) : (
+    <Link className={className} href={path}>
+      {children}
+    </Link>
+  )
+}
 
 const SECTIONS = ["ultrawork", "massUlw", "models", "skills"] as const
 const ANCHORS: Readonly<Record<(typeof SECTIONS)[number], string>> = {
@@ -15,22 +41,31 @@ const ANCHORS: Readonly<Record<(typeof SECTIONS)[number], string>> = {
 }
 
 /** A floating pill bar: the mark, the section links, the theme switch, GitHub stars and the one solid button. */
-export async function HomeNav({ stars }: { readonly stars: string }): Promise<JSX.Element> {
+export async function HomeNav({
+  stars,
+  onHome = true,
+}: {
+  readonly stars: string
+  /** On the home page the links jump to sections; elsewhere they go back to them on the home page. */
+  readonly onHome?: boolean
+}): Promise<JSX.Element> {
   const t = await getTranslations("home.nav")
 
   return (
     <header className="nav">
       <div className="nav__inner">
-        <a className="brand" href="#top">
+        <NavLink className="brand" onHome={onHome} hash="#top" path="/">
           {/* eslint-disable-next-line @next/next/no-img-element -- a 28 px static SVG mark; next/image adds nothing */}
           <img src="/brand/omo-mark.svg" alt="" width={28} height={28} />
           OmO
-        </a>
+        </NavLink>
         <nav aria-label={t("primary")}>
           <ul className="nav__links">
             {SECTIONS.map((key) => (
               <li key={key}>
-                <a href={ANCHORS[key]}>{t(key)}</a>
+                <NavLink onHome={onHome} hash={ANCHORS[key]} path={`/${ANCHORS[key]}`}>
+                  {t(key)}
+                </NavLink>
               </li>
             ))}
             <li>
@@ -51,9 +86,14 @@ export async function HomeNav({ stars }: { readonly stars: string }): Promise<JS
             <Icon name="github" className="btn__icon" />
             <span className="tabular">{stars}</span>
           </a>
-          <a className="btn btn--primary btn--sm" href="#install">
+          <NavLink
+            className="btn btn--primary btn--sm"
+            onHome={onHome}
+            hash="#install"
+            path="/docs/install"
+          >
             {t("install")}
-          </a>
+          </NavLink>
         </div>
       </div>
     </header>

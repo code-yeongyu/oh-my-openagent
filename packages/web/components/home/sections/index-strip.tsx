@@ -1,6 +1,7 @@
 import type { JSX } from "react"
 import { getTranslations } from "next-intl/server"
 
+import { LiveNumbers } from "@/components/home/live-numbers"
 import type { FormattedStatsData } from "@/lib/stats"
 
 const ROWS = [
@@ -22,21 +23,16 @@ export async function IndexStrip({
 
   return (
     <div className="wrap index">
-      <dl className="stats reveal" aria-label={t("stats.label")}>
-        <div>
-          <dt>{t("stats.stars")}</dt>
-          <dd>{stats.stars}</dd>
-        </div>
-        <div>
-          <dt>{t("stats.total")}</dt>
-          <dd>{stats.totalDownloads}</dd>
-        </div>
-        <div>
-          <dt>{t("stats.monthly")}</dt>
-          <dd>{stats.monthlyDownloads}</dd>
-        </div>
-      </dl>
-      <nav aria-label={t("index.label")} className="reveal">
+      <LiveNumbers
+        stats={stats}
+        labels={{
+          label: t("stats.label"),
+          stars: t("stats.stars"),
+          total: t("stats.total"),
+          monthly: t("stats.monthly"),
+        }}
+      />
+      <nav aria-label={t("index.label")} className="rise">
         <ol>
           {ROWS.map(([key, href, name], i) => (
             <li key={key}>

@@ -1908,10 +1908,10 @@
       "packages/web/app/[locale]/(site)/not-found.tsx": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
       "packages/web/app/[locale]/(home)/page.tsx": ["default"],
+      // re-exported as the home page's generateMetadata (app/[locale]/(home)/page.tsx), which knip does not follow
+      "packages/web/components/home/home-page.tsx": ["generateHomeMetadata"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
       "packages/web/app/[locale]/(site)/support/page.tsx": ["default"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) generateLandingMetadata
-      "packages/web/app/_components/landing-page.tsx": ["generateLandingMetadata"],
       // pre-existing at origin dev 4686e425b5: unused export(s) GET
       "packages/web/app/api/downloads/route.ts": ["GET"],
       // pre-existing at origin dev 4686e425b5: unused export(s) GET
@@ -1939,16 +1939,12 @@
       "packages/web/app/twitter-image.tsx": ["default", "alt", "size", "contentType"],
       // pre-existing at origin dev 4686e425b5: unused export(s) findHashSectionId
       "packages/web/components/docs/use-docs-navigation.ts": ["findHashSectionId"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) STAGE_STATES
-      "packages/web/components/landing/crafted/stage-states.ts": ["STAGE_STATES"],
       // pre-existing at origin dev 4686e425b5: unused export(s) ROW_GAP, WAVE_HEADER_HEIGHT
       "packages/web/components/landing/dag/layout.ts": ["ROW_GAP", "WAVE_HEADER_HEIGHT"],
       // pre-existing at origin dev 4686e425b5: unused export(s) eventIndexAt
       "packages/web/components/landing/dag/scenario.ts": ["eventIndexAt"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
       "packages/web/components/landing/graph/graph-hero.tsx": ["default"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) TerminalTypewriter
-      "packages/web/components/landing/motion-wrappers.tsx": ["TerminalTypewriter"],
       // pre-existing at origin dev 4686e425b5: unused export(s) KIBITZER_STEP_COUNT
       "packages/web/components/landing/story-data.ts": ["KIBITZER_STEP_COUNT"],
       // pre-existing at origin dev 4686e425b5: unused export(s) LEGACY_MANIFESTO_PATH

@@ -546,21 +546,6 @@
       "download": "Download the desktop app",
       "makers": "From <team>Sisyphus Labs</team>, the people who made <dori>Dori</dori> and <term>doriterm</term>."
     },
-    "window": {
-      "label": "OmO running a mass ulw workflow in a terminal, with sample data",
-      "title": "omo · ~/research",
-      "meta": "7 models",
-      "workflow": "Workflow · market research, 12,000 sources",
-      "progress": "{done}/10 done · 7 models",
-      "wave": "Wave {n}",
-      "pending": "pending",
-      "running": "running",
-      "completed": "completed",
-      "blocked": "blocked",
-      "footChecked": "every result checked before done",
-      "footBlocked": "blocked work says why",
-      "footSource": "Sample run of OmO's demo workflow"
-    },
     "stats": {
       "label": "Live numbers",
       "stars": "GitHub stars",
@@ -592,18 +577,7 @@
       "eyebrow": "Mass ulw",
       "title": "One keyword, hundreds of agents.",
       "soft": "Each part on the model that fits it.",
-      "body": "Type mass ulw and the whole job becomes a graph of agents: deep research over thousands of sources, a full machine-learning pipeline, a migration nobody wants to do. Each part runs on the model that fits it, in parallel, and gets checked before anything is called done.",
-      "steps": "Steps of the run",
-      "step1": "Plan",
-      "step2": "Fan out",
-      "step3": "Finish",
-      "step4": "Check",
-      "cap1": "<b>The plan comes first.</b> plan-interview turns the prompt into ten nodes over five waves, each with a category and a model.",
-      "cap2": "<b>Waves run in parallel.</b> Sources are swept, claims are graphed and the dataset is built side by side, on four different models.",
-      "cap3": "<b>Blocked work says why.</b> The deck and the report are done; model-train waits on its GPU quota instead of guessing.",
-      "cap4": "<b>Nothing is called done unchecked.</b> gate-review reads every result, and the run waits for model-train instead of skipping it.",
-      "hub": "orchestrator · mass ulw",
-      "figure": "The sample run drawn as a graph: an orchestrator dispatches ten agents over five waves"
+      "body": "Type mass ulw and the whole job becomes a graph of agents: deep research over thousands of sources, a full machine-learning pipeline, a migration nobody wants to do. Each part runs on the model that fits it, in parallel, and gets checked before anything is called done."
     },
     "models": {
       "eyebrow": "Models",
@@ -710,7 +684,9 @@
       "copy": "Copy",
       "copied": "Copied",
       "copyAria": "Copy install command",
-      "copiedStatus": "Install command copied"
+      "copiedStatus": "Install command copied",
+      "windows": "Windows",
+      "onComputer": "Run this on your Mac, Linux or Windows computer."
     },
     "footer": {
       "copyright": "© {year} Sisyphus Labs · Source-available under SUL-1.0",

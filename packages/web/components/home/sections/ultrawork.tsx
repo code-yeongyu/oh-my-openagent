@@ -10,18 +10,24 @@ export async function UltraworkSection(): Promise<JSX.Element> {
   const steps = [t("step1"), t("step2"), t("step3")]
 
   return (
-    <section className="section" id="ultrawork" aria-labelledby="ultrawork-title">
+    <section
+      className="section"
+      id="ultrawork"
+      data-section="ultrawork"
+      aria-labelledby="ultrawork-title"
+    >
       <div className="wrap split">
         <SectionHead
           id="ultrawork-title"
           num="01"
           eyebrow={t("eyebrow")}
+          dot="accent"
           title={t("title")}
           soft={t("soft")}
         >
           {t("body")}
         </SectionHead>
-        <figure className="frame reveal">
+        <figure className="win rise">
           <div className="frame__bar">
             <span className="frame__dots" aria-hidden="true">
               <i />
@@ -39,7 +45,7 @@ export async function UltraworkSection(): Promise<JSX.Element> {
               {steps.map((step, i) => (
                 <li
                   key={step}
-                  className="reveal"
+                  className="rise"
                   style={{ ["--delay" as string]: `${300 + i * 260}ms` }}
                 >
                   <Icon name="check" className="steps__mark" />

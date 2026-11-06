@@ -9,7 +9,7 @@ export async function ModelsSection(): Promise<JSX.Element> {
   const t = await getTranslations("home.models")
 
   return (
-    <section className="section" id="models" aria-labelledby="models-title">
+    <section className="section" id="models" data-section="models" aria-labelledby="models-title">
       <div className="wrap">
         <SectionHead
           id="models-title"
@@ -20,7 +20,7 @@ export async function ModelsSection(): Promise<JSX.Element> {
         >
           {t("body")}
         </SectionHead>
-        <ul className="chips reveal" aria-label={t("caption")}>
+        <ul className="chips rise" data-testid="model-marquee" aria-label={t("caption")}>
           {MODEL_PROFILES.map((profile) => (
             <li key={profile} className="chip">
               <span className="dot" aria-hidden="true" />
@@ -28,7 +28,7 @@ export async function ModelsSection(): Promise<JSX.Element> {
             </li>
           ))}
         </ul>
-        <p className="caption reveal">{t("caption")}</p>
+        <p className="caption rise">{t("caption")}</p>
       </div>
     </section>
   )

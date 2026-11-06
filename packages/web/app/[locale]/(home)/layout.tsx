@@ -5,12 +5,12 @@ import { hasLocale, NextIntlClientProvider } from "next-intl"
 import { setRequestLocale } from "next-intl/server"
 
 import { HomeDocument } from "@/components/home/home-document"
-import { generateSiteMetadata, homeViewport } from "@/app/_components/site-metadata"
+import { generateSiteMetadata, siteViewport } from "@/app/_components/site-metadata"
 import { languageTag } from "@/i18n/config"
 import { routing } from "@/i18n/routing"
 
 export const revalidate = 3600
-export const viewport = homeViewport
+export const viewport = siteViewport
 
 export function generateMetadata(): Promise<Metadata> {
   return generateSiteMetadata()

@@ -7,9 +7,12 @@ import { Link } from "@/i18n/routing"
 
 const LABEL_KEYS = [
   "label",
+  "windows",
   "unix",
   "powershell",
   "cmd",
+  "next",
+  "onComputer",
   "copy",
   "copied",
   "copyAria",
@@ -26,17 +29,16 @@ export async function ClosingSection(): Promise<JSX.Element> {
   >
 
   return (
-    <section className="closing" aria-labelledby="closing-title">
+    <section data-section="install" className="closing" aria-labelledby="closing-title">
       <div className="wrap closing__inner">
-        <h2 id="closing-title" className="h2 reveal">
+        <h2 id="closing-title" className="h2 rise">
           {t("title")} <span className="soft">{t("soft")}</span>
         </h2>
-        <p className="section__lede reveal">{t("body")}</p>
-        <div className="reveal closing__install">
+        <p className="section__lede rise">{t("body")}</p>
+        <div className="rise closing__install">
           <InstallBlock labels={labels} />
-          <p className="caption">{i("next")}</p>
         </div>
-        <div className="cta-row reveal">
+        <div className="cta-row rise">
           <Link className="btn btn--primary" href="/docs">
             {t("docs")}
           </Link>

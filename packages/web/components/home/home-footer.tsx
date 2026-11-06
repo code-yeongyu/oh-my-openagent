@@ -15,18 +15,32 @@ const EXTERNAL = [
 ] as const
 
 /** doriterm's footer: the wordmark and one row of links, then the languages and the licence line. */
-export async function HomeFooter({ locale }: { readonly locale: Locale }): Promise<JSX.Element> {
+export async function HomeFooter({
+  locale,
+  onHome = true,
+}: {
+  readonly locale: Locale
+  readonly onHome?: boolean
+}): Promise<JSX.Element> {
   const t = await getTranslations("home.footer")
   const year = new Date().getUTCFullYear().toString()
 
   return (
     <footer className="footer">
       <div className="wrap footer__inner">
-        <a className="brand" href="#top">
-          {/* eslint-disable-next-line @next/next/no-img-element -- a static SVG mark */}
-          <img src="/brand/omo-mark.svg" alt="" width={24} height={24} />
-          OmO
-        </a>
+        {onHome ? (
+          <a className="brand" href="#top">
+            {/* eslint-disable-next-line @next/next/no-img-element -- a static SVG mark */}
+            <img src="/brand/omo-mark.svg" alt="" width={24} height={24} />
+            OmO
+          </a>
+        ) : (
+          <Link className="brand" href="/">
+            {/* eslint-disable-next-line @next/next/no-img-element -- a static SVG mark */}
+            <img src="/brand/omo-mark.svg" alt="" width={24} height={24} />
+            OmO
+          </Link>
+        )}
         <nav aria-label="Footer">
           <Link href="/docs">{t("docs")}</Link>
           <Link href="/manifesto">{t("manifesto")}</Link>

@@ -73,16 +73,6 @@ pre kbd {
   white-space: nowrap;
 }
 
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
-
 .skip {
   position: absolute;
   left: var(--space-4);
@@ -99,13 +89,6 @@ pre kbd {
   top: var(--space-4);
 }
 
-.wrap {
-  width: 100%;
-  max-width: calc(var(--page-max) + 2 * var(--gutter));
-  margin-inline: auto;
-  padding-inline: var(--gutter);
-}
-
 .tabular {
   font-variant-numeric: tabular-nums;
 }
@@ -115,7 +98,7 @@ main:focus {
 .caption {
   margin: var(--space-4) 0 0;
   font-size: var(--text-sm);
-  color: var(--ink-2);
+  color: var(--ink-soft);
 }
 .caption a {
   color: var(--ink);
@@ -128,7 +111,4 @@ main:focus {
 
 figure {
   margin: 0;
-}
-.omowin {
-  margin-top: var(--space-8);
 }

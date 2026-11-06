@@ -5,6 +5,8 @@ import { gaMeasurementId, gaTrackedDomain, jsonLd } from "@/app/_components/site
 import { jetBrainsMono, timelessSans } from "@/components/home/fonts"
 import { themeInitScript } from "@/components/home/theme-init"
 import { installDetectScript } from "@/lib/install-targets"
+// The site stylesheet first (Tailwind, the shared palette the workflow graph draws from), then the home page's own.
+import "../../app/globals.css"
 import "./styles/index.css"
 
 /** The home page's <html>/<body>: its own fonts and stylesheet, the same analytics and JSON-LD as the docs shell. */
@@ -20,7 +22,7 @@ export function HomeDocument({
   return (
     <html
       lang={lang}
-      className={`${timelessSans.variable} ${jetBrainsMono.variable}`}
+      className={`home ${timelessSans.variable} ${jetBrainsMono.variable}`}
       data-omo-build={process.env.OMO_WEB_BUILD_ID || undefined}
       suppressHydrationWarning
     >

@@ -2,7 +2,7 @@
 
 import { useEffect } from "react"
 
-/** One observer for the whole page: each `.reveal` rises in once as it enters the screen (DESIGN 4, --dur-enter). */
+/** One observer for the whole page: each `.rise` rises in once as it enters the screen (DESIGN 4, --dur-enter). */
 export function RevealObserver(): null {
   useEffect(() => {
     const root = document.documentElement
@@ -17,7 +17,7 @@ export function RevealObserver(): null {
       },
       { rootMargin: "0px 0px -8% 0px" },
     )
-    for (const item of document.querySelectorAll(".reveal")) observer.observe(item)
+    for (const item of document.querySelectorAll(".rise")) observer.observe(item)
     return () => observer.disconnect()
   }, [])
   return null

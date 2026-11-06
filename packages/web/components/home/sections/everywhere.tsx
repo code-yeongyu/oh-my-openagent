@@ -16,7 +16,12 @@ export async function EverywhereSection(): Promise<JSX.Element> {
   const t = await getTranslations("home.everywhere")
 
   return (
-    <section className="section" id="everywhere" aria-labelledby="everywhere-title">
+    <section
+      className="section"
+      id="everywhere"
+      data-section="everywhere"
+      aria-labelledby="everywhere-title"
+    >
       <div className="wrap">
         <SectionHead
           id="everywhere-title"
@@ -28,7 +33,7 @@ export async function EverywhereSection(): Promise<JSX.Element> {
           {CARDS.map(([key, icon], i) => (
             <article
               key={key}
-              className="card reveal"
+              className="card rise"
               style={{ ["--delay" as string]: `${i * 80}ms` }}
             >
               <span className="card__icon" aria-hidden="true">
@@ -37,7 +42,7 @@ export async function EverywhereSection(): Promise<JSX.Element> {
               <h3>{t(`${key}Title`)}</h3>
               <p>{t(`${key}Body`)}</p>
               {key === "chat" ? (
-                <ul className="mini-chips">
+                <ul className="mini-chips" data-testid="platform-list">
                   {PLATFORMS.map((p) => (
                     <li key={p}>{p}</li>
                   ))}

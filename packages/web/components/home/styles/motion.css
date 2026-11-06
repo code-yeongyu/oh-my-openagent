@@ -31,42 +31,11 @@
   justify-content: center;
 }
 
-/* 3.10 Footer */
-.footer {
-  border-top: 1px solid var(--line);
-  padding-block: var(--space-7);
-  color: var(--ink-2);
-  font-size: var(--text-sm);
-}
-
-.footer__inner {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-5);
-}
-
-.footer nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-5);
-}
-
-.footer a {
-  text-decoration: none;
-  color: var(--ink-2);
-}
-
-.footer a:hover {
-  color: var(--ink);
-}
-
 /* Loops run only while their scene is on screen and the tab is visible: main.js sets .is-running. */
 
 /* ---------- 5. Reveal on scroll ---------- */
 
-.reveal {
+.rise {
   opacity: 0;
   transform: translateY(var(--reveal-shift));
   transition:
@@ -75,13 +44,13 @@
   transition-delay: var(--delay, 0ms);
 }
 
-.reveal.in {
+.rise.in {
   opacity: 1;
   transform: none;
 }
 
 /* no JavaScript: show everything */
-html:not(.js) .reveal {
+html:not(.js) .rise {
   opacity: 1;
   transform: none;
 }
@@ -93,7 +62,7 @@ html:not(.js) .reveal {
     display: inline;
     margin-left: auto;
     font-size: var(--text-sm);
-    color: var(--ink-2);
+    color: var(--ink-soft);
   }
 }
 
@@ -109,22 +78,7 @@ html:not(.js) .reveal {
   }
 }
 
-/* The section links need about 860 px beside the brand, the theme switch and Open the app. */
-@media (max-width: 859px) {
-  .nav__links {
-    display: none;
-  }
-
-  .nav__end {
-    margin-left: auto;
-  }
-}
-
 @media (max-width: 760px) {
-  .nav .btn--sm {
-    display: none;
-  }
-
   .index ol {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -153,7 +107,7 @@ html:not(.js) .reveal {
     transition-duration: 0.001ms !important;
   }
 
-  .reveal {
+  .rise {
     opacity: 1;
     transform: none;
   }

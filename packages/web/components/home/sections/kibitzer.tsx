@@ -8,18 +8,24 @@ export async function KibitzerSection(): Promise<JSX.Element> {
   const t = await getTranslations("home.kibitzer")
 
   return (
-    <section className="section" id="kibitzer" aria-labelledby="kibitzer-title">
+    <section
+      className="section"
+      id="kibitzer"
+      data-section="kibitzer"
+      aria-labelledby="kibitzer-title"
+    >
       <div className="wrap">
         <SectionHead
           id="kibitzer-title"
           num="04"
           eyebrow={t("eyebrow")}
+          dot="busy"
           title={t("title")}
           soft={t("soft")}
         >
           {t("body")}
         </SectionHead>
-        <figure className="frame kib reveal" aria-label={t("figure")}>
+        <figure className="win kib rise" aria-label={t("figure")}>
           <div className="kib__pane">
             <p className="kib__who">{t("sidecar")}</p>
             <p className="kib__loop">{t("cheapLoop")}</p>
@@ -39,7 +45,7 @@ export async function KibitzerSection(): Promise<JSX.Element> {
             <ol className="kib__steps">
               <li>{t("plan")}</li>
               <li>{t("act")}</li>
-              <li className="kib__nudge reveal" style={{ ["--delay" as string]: "400ms" }}>
+              <li className="kib__nudge rise" style={{ ["--delay" as string]: "400ms" }}>
                 <span className="kib__tag">{t("nudge")}</span>
                 {t("reason")}
               </li>

@@ -29,7 +29,7 @@
   gap: var(--space-4);
   padding: var(--space-5) var(--space-2) var(--space-5) 0;
   text-decoration: none;
-  color: var(--ink-2);
+  color: var(--ink-soft);
   transition: color var(--dur-ui) var(--ease-standard);
 }
 
@@ -61,18 +61,18 @@
   gap: var(--space-5);
   margin: 0 0 var(--space-7);
   padding: 0;
+  list-style: none;
 }
-.stats div {
+.stats li {
   display: flex;
-  flex-direction: column-reverse;
+  flex-direction: column;
   gap: 2px;
 }
-.stats dt {
+.stats span {
   font-size: var(--text-sm);
-  color: var(--ink-2);
+  color: var(--ink-soft);
 }
-.stats dd {
-  margin: 0;
+.stats strong {
   font-size: clamp(1.75rem, 1.2rem + 1.6vw, 2.5rem);
   font-weight: 560;
   letter-spacing: -0.03em;
@@ -152,7 +152,7 @@
   align-items: baseline;
   padding: var(--space-4) 0;
   border-bottom: 1px solid var(--line);
-  color: var(--ink-2);
+  color: var(--ink-soft);
   font-size: 0.9375rem;
 }
 .rows code {
@@ -182,7 +182,7 @@
 .kib__loop {
   margin: 2px 0 var(--space-5);
   font-size: var(--text-sm);
-  color: var(--ink-2);
+  color: var(--ink-soft);
 }
 .kib__steps {
   display: grid;
@@ -191,7 +191,7 @@
   padding: 0;
   list-style: none;
   font-size: 0.9375rem;
-  color: var(--ink-2);
+  color: var(--ink-soft);
   counter-reset: k;
 }
 .kib__steps li {
@@ -216,7 +216,7 @@
   font-size: var(--text-xs);
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--ink-2);
+  color: var(--ink-soft);
 }
 .kib__nudge {
   background: var(--accent-wash);
@@ -240,7 +240,7 @@
   padding: var(--space-6) 0 0;
   border-top: 1px solid var(--line);
   list-style: none;
-  color: var(--ink-2);
+  color: var(--ink-soft);
   line-height: 1.6;
 }
 .facts li {
@@ -276,7 +276,7 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-pill);
   font-size: var(--text-xs);
-  color: var(--ink-2);
+  color: var(--ink-soft);
 }
 
 /* Quotes */
@@ -300,7 +300,7 @@
 }
 .quote figcaption {
   font-size: var(--text-sm);
-  color: var(--ink-2);
+  color: var(--ink-soft);
 }
 
 /* 4.7 Makers */
@@ -335,7 +335,7 @@
 }
 
 .maker__what {
-  color: var(--ink-2);
+  color: var(--ink-soft);
   line-height: 1.6;
   max-width: 52ch;
 }
@@ -375,7 +375,7 @@
   border: 0;
   border-radius: var(--radius-xs);
   background: transparent;
-  color: var(--ink-2);
+  color: var(--ink-soft);
   font: inherit;
   font-size: var(--text-xs);
   cursor: pointer;
@@ -417,25 +417,6 @@
 .install .dim {
   color: var(--term-dim);
 }
-.footer__meta {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: var(--space-4);
-  margin-top: var(--space-6);
-  font-size: var(--text-xs);
-}
-.footer__meta p {
-  margin: 0;
-}
-.footer__langs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2) var(--space-4);
-}
-.footer__langs [aria-current] {
-  color: var(--ink);
-}
 
 @media (min-width: 640px) {
   .rows--two {
@@ -462,7 +443,7 @@
   .stats {
     gap: var(--space-3);
   }
-  .stats dt {
+  .stats span {
     font-size: var(--text-xs);
   }
   .rows code {
@@ -471,5 +452,93 @@
   .rows li {
     flex-direction: column;
     gap: 2px;
+  }
+}
+
+/* Install panels: until a tab is picked (data-show), the target the <head> detect script set on <html> (data-install)
+   picks the panel; no JavaScript shows every panel with its label (noscript style in install-block.tsx). */
+[data-install-tabs] [data-panel],
+[data-install-tabs] [data-panel-label] {
+  display: none;
+}
+:root:not([data-install]) [data-install-tabs]:not([data-show]) [data-panel="unix"],
+:root[data-install="unix"] [data-install-tabs]:not([data-show]) [data-panel="unix"],
+:root[data-install="powershell"] [data-install-tabs]:not([data-show]) [data-panel="powershell"],
+:root[data-install="cmd"] [data-install-tabs]:not([data-show]) [data-panel="cmd"],
+[data-install-tabs][data-show="unix"] [data-panel="unix"],
+[data-install-tabs][data-show="powershell"] [data-panel="powershell"],
+[data-install-tabs][data-show="cmd"] [data-panel="cmd"] {
+  display: block;
+}
+.install__panel-label {
+  margin: 0;
+  padding: var(--space-3) var(--space-5) 0;
+  font-size: var(--text-xs);
+  color: var(--ink-soft);
+}
+.install__caption {
+  margin: 0;
+  padding: 0 var(--space-5) var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+}
+.install__caption > [data-caption="computer"],
+:root[data-install-hint="computer"] .install__caption > [data-caption="next"] {
+  display: none;
+}
+:root[data-install-hint="computer"] .install__caption > [data-caption="computer"] {
+  display: inline;
+}
+@media (max-width: 640px) {
+  .install__windows {
+    display: none;
+  }
+}
+
+/* Eyebrow status dot (current omo.dev): pulses unless reduced motion. */
+.eyebrow__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: eyebrow-pulse 2.2s var(--ease-standard) infinite;
+}
+.eyebrow__dot--busy {
+  background: var(--wait);
+}
+@keyframes eyebrow-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* Sticky aside: the title column stays beside the desktop window while it scrolls (current omo.dev 02). */
+.aside {
+  display: grid;
+  gap: var(--space-7);
+}
+@media (min-width: 1024px) {
+  .aside {
+    grid-template-columns: minmax(0, 26rem) minmax(0, 1fr);
+    gap: var(--space-6);
+    align-items: start;
+  }
+  .aside__head {
+    position: sticky;
+    top: 96px;
+  }
+}
+.hero__graph {
+  width: 100%;
+  margin-top: var(--space-8);
+  text-align: left;
+}
+
+/* Touch-width hit targets for the install block (after its desktop sizes above). */
+@media (max-width: 767px) {
+  .install__tabs button,
+  .copy {
+    min-height: 44px;
+    min-width: 44px;
   }
 }

@@ -11,7 +11,12 @@ export async function CraftedSection(): Promise<JSX.Element> {
   const t = await getTranslations("home.crafted")
 
   return (
-    <section className="section" id="crafted" aria-labelledby="crafted-title">
+    <section
+      className="section"
+      id="crafted"
+      data-section="crafted"
+      aria-labelledby="crafted-title"
+    >
       <div className="wrap">
         <SectionHead
           id="crafted-title"
@@ -22,7 +27,7 @@ export async function CraftedSection(): Promise<JSX.Element> {
         >
           {t("body")}
         </SectionHead>
-        <ol className="facts reveal">
+        <ol className="facts rise">
           {ITEMS.map((i) => (
             <li key={i}>
               <span className="n">{String(i).padStart(2, "0")}</span>
@@ -33,7 +38,7 @@ export async function CraftedSection(): Promise<JSX.Element> {
             </li>
           ))}
         </ol>
-        <p className="caption reveal">
+        <p className="caption rise">
           <Link href="/docs">{t("docs")}</Link>
         </p>
       </div>

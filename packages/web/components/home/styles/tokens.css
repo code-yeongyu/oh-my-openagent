@@ -1,6 +1,11 @@
 /* omo.dev home: doriterm.com's landing system (doriterm docs/design/landing/DESIGN-LANDING.md) with OmO's teal
    accent. Tokens and their use are documented in packages/web/DESIGN-HOME.md. */
-:root {
+/* Type, space, radius and motion: the whole home page, plus the shared nav and footer on every other page (scoped so
+   the docs site keeps its own spacing scale). */
+:root.home,
+.nav,
+.footer,
+.skip {
   color-scheme: light dark;
   --font-sans: var(--font-timeless), "Pretendard Variable", ui-sans-serif, system-ui, sans-serif;
   --font-term: var(--font-jetbrains), ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -60,8 +65,8 @@
   --line: rgb(238 238 239 / 0.09);
   --line-strong: rgb(238 238 239 / 0.16);
   --ink: #eeeeef;
-  --ink-2: #a8a49b;
-  --ink-3: #6e6a62;
+  --ink-soft: #a8a49b;
+  --ink-faint: #6e6a62;
   --accent: #7fcdd6;
   --accent-wash: rgb(127 205 214 / 0.12);
   --wait: #e2b86b;
@@ -85,8 +90,8 @@
     --line: rgb(27 27 30 / 0.09);
     --line-strong: rgb(27 27 30 / 0.16);
     --ink: #1b1b1e;
-    --ink-2: #5c5850;
-    --ink-3: #9a958b;
+    --ink-soft: #5c5850;
+    --ink-faint: #9a958b;
     --accent: #0b6e7a;
     --accent-wash: rgb(11 110 122 / 0.09);
     --wait: #8a5a00;
@@ -109,8 +114,8 @@
   --line: rgb(27 27 30 / 0.09);
   --line-strong: rgb(27 27 30 / 0.16);
   --ink: #1b1b1e;
-  --ink-2: #5c5850;
-  --ink-3: #9a958b;
+  --ink-soft: #5c5850;
+  --ink-faint: #9a958b;
   --accent: #0b6e7a;
   --accent-wash: rgb(11 110 122 / 0.09);
   --wait: #8a5a00;
