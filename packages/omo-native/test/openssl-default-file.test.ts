@@ -84,6 +84,8 @@ const fixtures = [
   { id: "bad-padding", text: rootPem + pem(hex("3000"), "OTHER").replace("MAA=", "MAA"), expected: dropped("pem-read-error") },
   { id: "blank-body", text: rootPem.replace("\n", "\n\n"), expected: dropped("pem-noncanonical", 0, true) },
   { id: "bom", text: `\uFEFF${rootPem}`, expected: dropped("pem-noncanonical", 0, true) },
+  // Any high byte on a BEGIN line drops the file, not only a BOM: a UTF-8 e-acute is no byte-order mark.
+  { id: "high-byte-begin", text: `\u00e9${rootPem}`, expected: dropped("pem-noncanonical", 0, true) },
   { id: "space-only-header-line", text: rootPem.replace(/^(-----BEGIN CERTIFICATE-----\n)([A-Za-z0-9+/=]+\n)/, "$1   \n$2\n"), expected: dropped("pem-noncanonical", 0, true) },
   { id: "mismatched-end", text: rootPem + "-----BEGIN OTHER-----\nMAA=\n-----END WRONG-----\n", expected: dropped("pem-noncanonical", 1, true) },
 ]
