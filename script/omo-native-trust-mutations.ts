@@ -101,8 +101,8 @@ const MUTATIONS: readonly Mutation[] = [
     id: "macos-path-eku",
     designRow: "Skip the macOS intermediate EKU rule (revision 12)",
     file: POLICY,
-    find: 'facts.os !== "macos" || path.every(',
-    replace: "true || path.every(",
+    find: 'facts.os !== "macos" ||\n    path.every(',
+    replace: "true ||\n    path.every(",
     test: POLICY_TEST,
     testNamePattern: "macOS path member clientAuth-only EKU",
   },
@@ -110,8 +110,8 @@ const MUTATIONS: readonly Mutation[] = [
     id: "empty-eku",
     designRow: "Treat an empty EKU as unrestricted",
     file: POLICY,
-    find: 'case "oids": return eku.oids.includes(',
-    replace: 'case "oids": return eku.oids.length === 0 || eku.oids.includes(',
+    find: 'case "oids":\n      return eku.oids.includes(',
+    replace: 'case "oids":\n      return eku.oids.length === 0 || eku.oids.includes(',
     test: POLICY_TEST,
     testNamePattern: "empty OID usage is excluded",
   },
@@ -138,7 +138,7 @@ const MUTATIONS: readonly Mutation[] = [
     id: "denied-path",
     designRow: "Include a denied intermediate, or skip the path check",
     file: POLICY,
-    find: " && !chain.path.some(isDenied)",
+    find: "      !chain.path.some(isDenied) &&\n",
     replace: "",
     test: POLICY_TEST,
     testNamePattern: "(Windows|macOS) denied path #when",
@@ -255,7 +255,7 @@ const MUTATIONS: readonly Mutation[] = [
     id: "skip-record-write",
     designRow: "Skip the diagnostics record write",
     file: STAGE,
-    find: "try { await appendTrustDiagnostic(directory, { ...input, codes: unique }) } catch {}",
+    find: "try {\n      await appendTrustDiagnostic(directory, { ...input, codes: unique })\n    } catch {}",
     replace: "void unique",
     test: STAGE_TEST,
     testNamePattern: "foreign marker has no authority without a hop",
@@ -344,11 +344,11 @@ const MUTATIONS: readonly Mutation[] = [
     file: HASH_DIR_TEST,
     designRow:
       "Require every lookup order to end in the same accepted set (revision 7's convergence claim, revision 8)",
-    find: '      history.forEach((id, index) => { if (outcomes[index] === "OK") accepted.add(id) })\n',
+    find: '        history.forEach((id, index) => {\n          if (outcomes[index] === "OK") accepted.add(id)\n        })\n',
     replace:
-      '      const final = history.filter((id, index) => history.lastIndexOf(id) === index && outcomes[index] === "OK").sort()\n' +
-      "      if (accepted.size > 0) expect(final).toEqual([...accepted].sort())\n" +
-      '      history.forEach((id, index) => { if (outcomes[index] === "OK") accepted.add(id) })\n',
+      '        const final = history.filter((id, index) => history.lastIndexOf(id) === index && outcomes[index] === "OK").sort()\n' +
+      "        if (accepted.size > 0) expect(final).toEqual([...accepted].sort())\n" +
+      '        history.forEach((id, index) => {\n          if (outcomes[index] === "OK") accepted.add(id)\n        })\n',
     test: HASH_DIR_TEST,
     testNamePattern: "matches the union of accepted histories",
   },
