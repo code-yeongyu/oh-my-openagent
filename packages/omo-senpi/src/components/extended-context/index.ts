@@ -63,7 +63,7 @@ function registryOf(value: unknown): ModelRegistryPort | undefined {
 
 function catalogRows(models: readonly CatalogModel[]): CatalogRow[] {
   return models
-    .filter((model) => model.provider === PROVIDER_ID)
+    .filter((model) => model.provider === PROVIDER_ID && model.maxTokens > 0)
     .map((model) => ({ id: model.id, contextWindow: model.contextWindow, maxTokens: model.maxTokens }))
 }
 

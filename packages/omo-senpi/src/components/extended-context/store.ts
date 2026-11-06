@@ -1,7 +1,7 @@
-import { readFile, rename, rm, writeFile } from "node:fs/promises"
+import { readFile, rm } from "node:fs/promises"
 import { join } from "node:path"
 
-import { readJsoncFile } from "@oh-my-opencode/utils"
+import { readJsoncFile, writeFileAtomically } from "@oh-my-opencode/utils"
 
 import type { WidenedWindow } from "./windows"
 
@@ -43,9 +43,7 @@ export function readModelsJsonConfig(path: string, exists: boolean): ModelsJsonR
 }
 
 export async function writeModelsJsonConfig(path: string, config: ModelsJson): Promise<void> {
-  const temporary = `${path}.${process.pid}.tmp`
-  await writeFile(temporary, `${JSON.stringify(config, null, 2)}\n`, "utf8")
-  await rename(temporary, path)
+  writeFileAtomically(path, `${JSON.stringify(config, null, 2)}\n`)
 }
 
 export async function readWrittenWindows(path: string): Promise<WrittenWindows> {
@@ -69,10 +67,8 @@ export async function writeWrittenWindows(
   providerId: string,
   windows: WrittenWindows,
 ): Promise<void> {
-  const temporary = `${path}.${process.pid}.tmp`
   const record = { version: RECORD_VERSION, provider: providerId, windows }
-  await writeFile(temporary, `${JSON.stringify(record, null, 2)}\n`, "utf8")
-  await rename(temporary, path)
+  writeFileAtomically(path, `${JSON.stringify(record, null, 2)}\n`)
 }
 
 export async function clearWrittenWindows(path: string): Promise<void> {
