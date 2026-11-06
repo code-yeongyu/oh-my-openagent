@@ -183,8 +183,12 @@ export async function runTrustStage(options: TrustStageOptions): Promise<TrustSt
     } else {
       codes.push({ code: "trust-standalone-opt-in" })
     }
+    const { codes: written, ...file } = await writeTrustGeneration(
+      directory, imported.fallbackReason === null ? imported.certificates : [], extras, user.certificates,
+    )
+    codes.push(...written)
     const generation = {
-      ...await writeTrustGeneration(directory, imported.fallbackReason === null ? imported.certificates : [], extras, user.certificates),
+      ...file,
       automatic: imported.fallbackReason === null ? "os" as const : "fallback" as const,
       fallbackReason: imported.fallbackReason, defaults,
     }

@@ -1,6 +1,6 @@
 {
   "name": "omo-ai",
-  "version": "5.1.61",
+  "version": "5.1.62",
   "type": "module",
   "description": "OmO Native - the standalone omo command with the OMO extension built in: bun add -g omo-ai",
   "bin": {
@@ -17,7 +17,7 @@
     "postinstall": "node bin/senpi-patch.mjs"
   },
   "dependencies": {
-    "@code-yeongyu/senpi": "2026.11.3-3"
+    "@code-yeongyu/senpi": "2026.11.5-1"
   },
   "repository": {
     "type": "git",

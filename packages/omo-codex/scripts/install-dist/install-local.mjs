@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:8d81b2fc55958c373709f0d10bf77d2381adbc2dc6a561e3fef000989f9688f1:0ff593233f60c3fd060cdc3d90fa08785a4fe723f97ff26a3cbda2d50b9aafa7
+// omo-codex-install:b837866f052aeaebdb29434aa060c717e1588680ac2d27dd6470c3aa46bf6ce0:339b2606b7d2b32746534d242fc03fa67d973e14ef9d15e8669dbf08c420dba7
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -10205,7 +10205,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "5.1.61",
+    version: "5.1.62",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -19902,20 +19902,6 @@ var OmoMemoryProjectionLayerSchema = object({
   max_entries_per_directory: number2().int().min(0).optional(),
   max_bytes: number2().int().min(0).optional()
 }).strict();
-var OmoMemoryRuntimeSchema = object({
-  retention_days: number2().int().min(1).default(7),
-  abandoned_journal_days: number2().int().min(1).default(14),
-  completions_days: number2().int().min(1).default(30),
-  pass_budget_ms: number2().int().min(1).default(60000),
-  discard_unreflected_journals: boolean2().default(false)
-}).strict();
-var OmoMemoryRuntimeLayerSchema = object({
-  retention_days: number2().int().min(1).optional(),
-  abandoned_journal_days: number2().int().min(1).optional(),
-  completions_days: number2().int().min(1).optional(),
-  pass_budget_ms: number2().int().min(1).optional(),
-  discard_unreflected_journals: boolean2().optional()
-}).strict();
 var OmoMemoryAgentOverridesSchema = object({
   enabled: boolean2().optional(),
   agent: string2().min(1).optional(),
@@ -19931,7 +19917,6 @@ var OmoMemoryAgentOverridesSchema = object({
   search: OmoMemorySearchLayerSchema.optional(),
   recall: OmoMemoryRecallLayerSchema.optional(),
   projection: OmoMemoryProjectionLayerSchema.optional(),
-  runtime: OmoMemoryRuntimeLayerSchema.optional(),
   compile_warn_tokens: number2().int().positive().optional()
 }).strict();
 var OmoMemoryAutoIdentitySchema = _enum(["path", "git"]);
@@ -19976,7 +19961,6 @@ var OmoMemorySettingsSchema = object({
   }),
   project_scope: OmoMemoryProjectScopeSchema.default({ nudge: true, recall: true }),
   projection: OmoMemoryProjectionSchema.default({ max_entries_per_directory: 0, max_bytes: 40960 }),
-  runtime: OmoMemoryRuntimeSchema.default({ retention_days: 7, abandoned_journal_days: 14, completions_days: 30, pass_budget_ms: 60000, discard_unreflected_journals: false }),
   compile_warn_tokens: number2().int().positive().default(30000),
   agents: record(string2(), OmoMemoryAgentOverridesSchema).default({})
 }).strict();
@@ -19997,7 +19981,6 @@ var OmoMemorySettingsLayerSchema = object({
   recall: OmoMemoryRecallLayerSchema.optional(),
   project_scope: OmoMemoryProjectScopeLayerSchema.optional(),
   projection: OmoMemoryProjectionLayerSchema.optional(),
-  runtime: OmoMemoryRuntimeLayerSchema.optional(),
   compile_warn_tokens: number2().int().positive().optional(),
   agents: record(string2(), OmoMemoryAgentOverridesSchema).optional()
 }).strict();

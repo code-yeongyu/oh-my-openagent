@@ -105,7 +105,7 @@ twitter likes
 
 ```bash
 # 使用 Jina Reader 读取
-curl -s "https://r.jina.ai/https://weibo.com/USER_ID/POST_ID"
+curl -s -H "Authorization: Bearer ${JINA_API_KEY}" "https://r.jina.ai/https://weibo.com/USER_ID/POST_ID"
 ```
 
 > 微博主要通过网页抓取，推荐使用通用网页读取方式。
