@@ -80,7 +80,7 @@ test("claimTask reaps a stale claim lock before claiming", async () => {
     const task = await createTask(fixture.teamRunId, createTaskInput(), fixture.config)
     const tasksDirectory = getTasksDir(resolveBaseDir(fixture.config), fixture.teamRunId)
     const staleLockPath = path.join(tasksDirectory, "claims", `${task.id}.lock`)
-    await writeFile(staleLockPath, `member-z\n999999\n${Date.now() - 600_000}\n`)
+    await writeFile(staleLockPath, `member-z\n999999999\n${Date.now() - 600_000}\n`)
 
     // when
     const claimedTask = await claimTask(fixture.teamRunId, task.id, "member-a", fixture.config)
