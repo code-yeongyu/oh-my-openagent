@@ -32,6 +32,10 @@ const { loadPiTui } = await import("./packages/senpi-task/src/lazy/pi-tui")
 const { loadSenpiBarrel } = await import("./packages/senpi-task/src/lazy/senpi-barrel")
 await Promise.all([loadPiTui(), loadSenpiBarrel()])
 
+// Binds the vendored bunshin-ts SDK to @sinclair/typebox 0.34 before an in-process extension load can make the
+// engine claim that name for typebox 1.x process-wide; the mechanism is in the preload file.
+await import("./packages/omo-senpi/test-support/bunshin-ts-typebox.preload")
+
 // This raises the floor for the FIRST test file of a sequential run only: Bun (1.4.0/1.4.1) resets
 // the default to its built-in 5000ms for every later file, and only the CLI flag reaches all of them
 // (bunfig [test] timeout and a beforeEach re-assert were both measured not to). CI therefore passes
