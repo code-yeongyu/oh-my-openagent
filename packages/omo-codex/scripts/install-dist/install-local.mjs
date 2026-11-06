@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:9aecb10f21cd4163e36377dbcb4fb7c34aefdfe7b7233b54b30289e8b2aceef8:93aba3c30c3d141f73a35fd0d155a1381ee592cc63e1465a7e1c3a2d7ba40ef7
+// omo-codex-install:00c6555e19aa50b7da95d0517ebcb2b399a14e66ba00a2475989288da1da7a87:12456544567afd35d04d0f80e911295baa27f05df815c372991b27766f00ccee
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -19718,7 +19718,7 @@ var OmoComputerSettingsLayerSchema = object({
   engine_path: string2().min(1),
   cua_adapter: boolean2(),
   run_sandbox: _enum(["vm", "quickjs"]).describe("Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"),
-  intervention: _enum(["continue", "pause"]).describe("What a background action does while the user uses the target app (default: pause)"),
+  intervention: _enum(["continue", "pause"]).describe("What a background action does while the user uses the target app (default: continue)"),
   macos_key_priming: _enum(["on", "off"]).describe("macOS background keys first make the target window key (default: off)"),
   trace: boolean2().describe("Per-request timing traces (default: false)")
 }).partial().strict().describe("Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host.");
