@@ -240,7 +240,7 @@ fn test_window(window_id: u32) -> DesktopWindow {
         id: window_id.to_string(),
         title: String::new(),
         app: String::new(),
-        pid: None,
+        pid: Some(7),
         x: 10,
         y: 20,
         width: 40,
@@ -291,10 +291,26 @@ mod route_tests {
     ) -> CoreResult<Option<(RgbaImage, senpi_desktop_core::frame::FrameGeometry)>> {
         override_capture(Some(shot));
         override_placement(Some(placement));
+        override_probe(Some(|_, _| None));
         let result = capture().capture_via_skylight(&Target::Window("42".to_owned()), &[]);
+        override_probe(None);
         override_capture(Some(None));
         override_placement(Some(SpacePlacement::Unknown));
         result
+    }
+
+    #[test]
+    fn a_minimized_window_is_refused_on_the_skylight_route_too() {
+        override_capture(Some(Some(opaque)));
+        override_placement(Some(SpacePlacement::Current));
+        override_probe(Some(|pid, window| (pid == 7 && window == 42).then_some(true)));
+        let result = capture().capture_via_skylight(&Target::Window("42".to_owned()), &[]);
+        override_probe(None);
+        override_capture(Some(None));
+        override_placement(Some(SpacePlacement::Unknown));
+        let error = result.unwrap_err();
+        assert_eq!(error.code, ErrorCode::CaptureUnavailable, "{}", error.message);
+        assert_eq!(error.capture_unavailable.map(|data| data.reason).as_deref(), Some("minimized"));
     }
 
     fn off_space_reason(error: DesktopError) -> Option<String> {
@@ -404,11 +420,13 @@ mod route_tests {
         sck::override_capture(Some(sck_frames));
         override_placement(Some(SpacePlacement::Current));
         override_capture(Some(Some(opaque)));
+        override_probe(Some(|_, _| None));
         let skylight = capture().capture_with_exclusions(&Target::Window("42".to_owned()), &[]);
         let skylight_route = last_route();
         override_capture(Some(Some(transparent)));
         let sck = capture().capture_with_exclusions(&Target::Window("42".to_owned()), &[]);
         let sck_route = last_route();
+        override_probe(None);
         override_capture(Some(None));
         override_placement(Some(SpacePlacement::Unknown));
         sck::override_capture(None);

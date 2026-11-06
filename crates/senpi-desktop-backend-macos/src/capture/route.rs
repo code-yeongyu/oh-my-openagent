@@ -79,6 +79,19 @@ pub(crate) fn plan_window_route(skylight: bool, placement: SpacePlacement) -> Wi
     }
 }
 
+fn minimized(id: &str) -> DesktopError {
+    DesktopError::capture_unavailable(
+        "minimized",
+        format!("window '{id}' is minimized; restore it, or read it through accessibility"),
+    )
+}
+
+/// B9: a minimized window is refused on every route, and only on a definite
+/// `AXMinimized == true`; an unknown answer keeps the capture.
+fn window_is_minimized(pid: Option<i32>, window_id: u32) -> bool {
+    pid.and_then(|pid| super::minimized::window_minimized(pid, window_id)) == Some(true)
+}
+
 fn off_space(id: &str, cause: &str) -> DesktopError {
     DesktopError::capture_unavailable(
         "off-space",
@@ -257,6 +270,9 @@ impl MacCapture {
         }
         let cause = match skylight_capture::capture(window_id) {
             Ok((image, window)) if !fully_transparent(&image) => {
+                if window_is_minimized(window.pid.and_then(|pid| i32::try_from(pid).ok()), window_id) {
+                    return Err(minimized(id));
+                }
                 let geometry = FrameGeometry::for_window(&window, image.width(), image.height());
                 return Ok(Some((image, geometry)));
             },
@@ -346,18 +362,9 @@ impl MacCapture {
                     )
                 })?;
                 if frame.is_on_screen == Some(false)
-                    && frame
-                        .pid
-                        .and_then(|pid| super::minimized::window_minimized(pid, window_id))
-                        == Some(true)
+                    && window_is_minimized(frame.pid, window_id)
                 {
-                    return Err(DesktopError::capture_unavailable(
-                        "minimized",
-                        format!(
-                            "window '{id}' is minimized; restore it, \
-                             or read it through accessibility"
-                        ),
-                    ));
+                    return Err(minimized(id));
                 }
                 // Off screen, not minimized, and nothing drawn: another Space
                 // that only SkyLight could have read.
