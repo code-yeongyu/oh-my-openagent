@@ -6,7 +6,7 @@ import { FRONTMATTER_RE } from "../memfs/frontmatter-scalar"
 import { describeFrontmatterViolation } from "../memfs/frontmatter-validation"
 import { isMemoryContentPath } from "../memfs/paths"
 import { redactSecretLikeMaterial } from "../sync/redact"
-import { stripOmoConfigSection } from "./comparable-config"
+import { stripOmoMaintenanceStamp } from "./comparable-config"
 import { commitCount, readDroppedTrailers, squashWithoutPaths, type DroppedEntry } from "./completion-repair"
 import { findSecretLikeFailures } from "./completion-secret-scan"
 import type { ReflectionWorktree } from "./worktree"
@@ -50,7 +50,7 @@ export async function validateCompletion(
 ): Promise<CompletionValidation> {
   try {
     const gitFile = await readFile(worktree.gitFilePath, "utf8")
-    const commonConfig = stripOmoConfigSection(await readOptional(worktree.commonConfigPath))
+    const commonConfig = stripOmoMaintenanceStamp(await readOptional(worktree.commonConfigPath))
     if (gitFile !== worktree.gitFileSnapshot || commonConfig !== worktree.commonConfigSnapshot) {
       return { status: "failed", detail: "Git administration files were modified" }
     }

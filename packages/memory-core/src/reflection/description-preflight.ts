@@ -7,7 +7,7 @@ import { FRONTMATTER_RE, renderStringScalar } from "../memfs/frontmatter-scalar"
 import { describeFrontmatterViolation, MAX_DESCRIPTION_LENGTH } from "../memfs/frontmatter-validation"
 import { isMemoryContentPath } from "../memfs/paths"
 import { redactSecretLikeMaterial } from "../sync/redact"
-import { stripOmoConfigSection } from "./comparable-config"
+import { stripOmoMaintenanceStamp } from "./comparable-config"
 import { frontmatterBlock, listReflectionChangedPaths } from "./completion-validation"
 import type { ReflectionWorktree } from "./worktree"
 
@@ -61,7 +61,7 @@ async function trimDescriptions(
 ): Promise<readonly TrimmedDescription[]> {
   // Leave dirty or tampered runs to the gate; never commit their unrelated changes.
   if (await readFile(worktree.gitFilePath, "utf8") !== worktree.gitFileSnapshot) return []
-  const config = stripOmoConfigSection(await readFile(worktree.commonConfigPath, "utf8").catch((error: unknown) => {
+  const config = stripOmoMaintenanceStamp(await readFile(worktree.commonConfigPath, "utf8").catch((error: unknown) => {
     if (error instanceof Error && "code" in error && error.code === "ENOENT") return null
     throw error
   }))
