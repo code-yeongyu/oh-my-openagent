@@ -113,6 +113,11 @@ export type ThreadInterruptResult =
   | { readonly kind: "ok"; readonly thread_id: string; readonly turn_id?: string; readonly interrupted: boolean }
   | ThreadDataError
 
+/** `closed` is false when no live owner held the thread, so there was nothing to close. */
+export type ThreadCloseResult =
+  | { readonly kind: "ok"; readonly thread_id: string; readonly closed: boolean; readonly device?: string }
+  | ThreadDataError
+
 export type ThreadHandoffResult =
   | ({
       readonly kind: "ok"
@@ -214,6 +219,7 @@ export type ThreadToolResult =
   | ThreadReadResult
   | ThreadSendResult
   | ThreadInterruptResult
+  | ThreadCloseResult
   | ThreadHandoffResult
   | ThreadRenameResult
   | ThreadSetModelResult

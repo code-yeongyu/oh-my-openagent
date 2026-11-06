@@ -121,6 +121,12 @@ export const ThreadInterruptParams = Type.Object({
   all_scope: AllScope,
 })
 
+export const ThreadCloseParams = Type.Object({
+  thread: ThreadAddress,
+  idempotency_key: IdempotencyKey,
+  all_scope: AllScope,
+})
+
 export const ThreadHandoffParams = Type.Object({
   thread: Type.String({
     description:
@@ -316,6 +322,7 @@ export type ThreadListInput = Static<typeof ThreadListParams>
 export type ThreadReadInput = Static<typeof ThreadReadParams>
 export type ThreadSendInput = Static<typeof ThreadSendParams>
 export type ThreadInterruptInput = Static<typeof ThreadInterruptParams>
+export type ThreadCloseInput = Static<typeof ThreadCloseParams>
 export type ThreadHandoffInput = Static<typeof ThreadHandoffParams>
 export type ThreadRenameInput = Static<typeof ThreadRenameParams>
 export type ThreadSetModelInput = Static<typeof ThreadSetModelParams>
@@ -335,6 +342,7 @@ export const threadToolParamSchemas = {
   thread_read: ThreadReadParams,
   thread_send: ThreadSendParams,
   thread_interrupt: ThreadInterruptParams,
+  thread_close: ThreadCloseParams,
   thread_handoff: ThreadHandoffParams,
   thread_rename: ThreadRenameParams,
   thread_set_model: ThreadSetModelParams,

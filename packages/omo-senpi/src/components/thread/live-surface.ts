@@ -351,6 +351,7 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
     getAvailableThinkingLevels: async (sessionId) => (await send<{ levels: string[] }>("get_available_thinking_levels", { sessionId })).levels,
     wake: async (sessionId, deliveryIds, durableId) => wakeReply(await send<{ admitted?: unknown }>("wake", { sessionId, delivery_ids: [...deliveryIds] }, durableId)),
     releaseSession: async (sessionId, release, durableId) => releaseReply(await callFrame(socket ?? legacy, "release_session", { sessionId, ...release }, undefined, durableId)),
+    closeSession: async (sessionId, durableId) => { await send("close_session", { sessionId }, durableId) },
   })
 
   const liveness = async (endpoint: GatewayEndpointRef): Promise<EndpointLiveness> => {
@@ -458,5 +459,5 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
 
 export { createDeviceServiceSessions } from "./remote/device-service"
 export { crossTarget, listAcross, planCreate, renameAlias, withAlias } from "./remote/cross-device"
-export { deviceOnline, interruptRemote, outcomeFailure, promptRemote, readRemote } from "./remote/remote-ops"
+export { closeRemote, deviceOnline, interruptRemote, outcomeFailure, promptRemote, readRemote } from "./remote/remote-ops"
 export { setModelRemote } from "./remote/remote-controls"

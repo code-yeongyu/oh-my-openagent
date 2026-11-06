@@ -36,7 +36,7 @@ export type ThreadHostSession = {
 /** The per-session half of the host surface, bound to the ONE endpoint that holds the session. */
 export type ThreadSessionPort = Pick<
   ThreadHost,
-  "getMessages" | "getState" | "prompt" | "interrupt" | "setSessionName" | "setModel" | "getAvailableModels" | "setThinkingLevel" | "getAvailableThinkingLevels" | "wake" | "releaseSession"
+  "getMessages" | "getState" | "prompt" | "interrupt" | "setSessionName" | "setModel" | "getAvailableModels" | "setThinkingLevel" | "getAvailableThinkingLevels" | "wake" | "releaseSession" | "closeSession"
 >
 
 /**
@@ -76,6 +76,8 @@ export type ThreadHost = {
   readonly wake?: (sessionId: string, deliveryIds: readonly string[], durable_session_id?: string) => Promise<GatewayWakeReply>
   /** Hands a quiet host session to another runtime (`release_session`); hosts only. */
   readonly releaseSession?: (sessionId: string, request: ReleaseSessionRequest, durable_session_id?: string) => Promise<ReleaseSessionReply>
+  /** Closes one session on its host (`close_session`); hosts only, a terminal keeps its own session. */
+  readonly closeSession?: (sessionId: string, durable_session_id?: string) => Promise<void>
   /** Every endpoint at once; absent on a single-endpoint host, whose `listSessions` is the view. */
   readonly listView?: (request?: ThreadHostViewRequest) => Promise<ThreadHostView>
   /** Fresh identity validation on exactly one published endpoint, without enumeration. */

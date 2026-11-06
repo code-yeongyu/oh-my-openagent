@@ -181,7 +181,7 @@ export async function promptRemote(remote: RemoteThreadSurface, row: RemoteSessi
   const sent = await remote.sessions.sessionCommand(row.device, row.session_id, record)
   if (sent.kind !== "ok") return outcomeFailure(sent, row.device)
   const turnId = sent.response["turnId"]
-  if (!streaming && typeof turnId === "string" && turnId.length > 0) return { kind: "ok", thread_id: row.session_id, link: threadLink(row.session_id, row.title), delivery: { kind: "started", turn_id: turnId }, deduplicated: false, device: row.device }
+  if (sent.response["disposition"] === "started" && typeof turnId === "string" && turnId.length > 0) return { kind: "ok", thread_id: row.session_id, link: threadLink(row.session_id, row.title), delivery: { kind: "started", turn_id: turnId }, deduplicated: false, device: row.device }
   const after = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_state", sessionId: row.session_id })
   const pending = after.kind === "ok" ? after.response["pendingMessageCount"] : undefined
   if (typeof pending !== "number" || !Number.isInteger(pending) || pending < 1) return fail("idempotency_uncertain", `Device ${row.device} accepted the message but did not report where it waits.`, "Read the thread before deciding whether to send again.", { device: row.device })
@@ -196,6 +196,15 @@ export async function interruptRemote(remote: RemoteThreadSurface, row: RemoteSe
   if (outcome.kind !== "ok") return outcomeFailure(outcome, row.device)
   const reported = outcome.response["turnId"]
   return { kind: "ok", thread_id: row.session_id, ...(typeof reported === "string" ? { turn_id: reported } : {}), interrupted: outcome.response["interrupted"] === true }
+}
+
+/** The other device's engine closes the session (`close_session`, a host record that needs no attach), as a local close would. */
+export async function closeRemote(remote: RemoteThreadSurface, row: RemoteSessionRow): Promise<ThreadToolResult> {
+  const offline = await deviceOnline(remote, row.device)
+  if (offline !== undefined) return offline
+  const outcome = await remote.sessions.endpointCommand(row.device, { type: "close_session", sessionId: row.session_id })
+  if (outcome.kind !== "ok") return outcomeFailure(outcome, row.device)
+  return { kind: "ok", thread_id: row.session_id, closed: true, device: row.device }
 }
 
 /** The local engine's `get_messages`, read through the same bounded reader as a live local thread (cursor, max_bytes, truncated). */
