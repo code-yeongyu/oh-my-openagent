@@ -6,14 +6,15 @@
  *
  * Two suites:
  * - `gateway` (todo 16): real pty OmO TUIs, shard hosts and the `omo` CLI on the RELEASED engine
- *   (`lib/gateway.mjs`; `THREAD_QA_SENPI_VERSION`, default 2026.9.29-5). Needs only bun, node and the
- *   network for the first kit install.
+ *   (`lib/gateway.mjs`). `THREAD_QA_SENPI_VERSION` is REQUIRED for this suite and for `all`: the engine
+ *   under test. Unset or empty, run-all exits 2 before running anything and names the engine omo pins.
+ *   Needs only bun, node and the network for the first kit install.
  * - `legacy` (task 13/14): the thread components driven from source against a senpi SOURCE checkout
  *   (`THREAD_QA_SENPI_ROOT`) and a desktop checkout (`THREAD_QA_DESKTOP_ROOT`), via `lib/harness.mjs`.
  *   A legacy scenario whose checkouts are unset, absent, not installed or not built is reported
  *   `SKIP` with the missing path, never silently dropped.
  *
- * Usage: bun packages/omo-senpi/scripts/qa/thread-tools/run-all.mjs [--suite gateway|legacy|all]
+ * Usage: THREAD_QA_SENPI_VERSION=<engine> bun packages/omo-senpi/scripts/qa/thread-tools/run-all.mjs [--suite gateway|legacy|all]
  *        [--out-dir <dir>] [--with-mutant] [--keep-kit]
  *   --with-mutant  also run `loop-guard.mjs --mutant` (cycle check disabled) and require it to FAIL
  *   --keep-kit     keep the released-engine kit dir (default: removed after the gateway suite)
@@ -25,13 +26,15 @@ import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { withTelemetryOptOut } from "../telemetry-opt-out-env.mjs"
+import { requireEngineVersion } from "./lib/engine-version.mjs"
+import { QA_TMP_ROOT } from "./lib/qa-tmp.mjs"
 
 const here = dirname(fileURLToPath(import.meta.url))
 const omoRoot = resolve(here, "..", "..", "..", "..", "..")
 // The legacy checkouts have no portable default location; the legacy suite is SKIPPED until both are set.
 const senpiRoot = process.env.THREAD_QA_SENPI_ROOT
 const desktopRoot = process.env.THREAD_QA_DESKTOP_ROOT
-const kitDir = process.env.THREAD_QA_KIT_DIR ?? "/tmp/qa-thread-tools-kit"
+const kitDir = process.env.THREAD_QA_KIT_DIR ?? join(QA_TMP_ROOT, "qa-thread-tools-kit")
 
 const gateway = [
   ["tui-to-tui", "tui-to-tui.mjs"],
@@ -71,6 +74,7 @@ if (!SUITES.includes(suite)) {
   process.stderr.write(`run-all: unknown --suite ${JSON.stringify(suite)}; expected one of ${SUITES.join(", ")}\n`)
   process.exit(2)
 }
+if (suite === "gateway" || suite === "all") requireEngineVersion()
 const outDir = option("--out-dir")
 if (outDir !== undefined) mkdirSync(outDir, { recursive: true })
 

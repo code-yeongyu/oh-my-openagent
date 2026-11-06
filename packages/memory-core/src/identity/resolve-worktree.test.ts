@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process"
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { disableFixtureAutoMaintenance } from "../git/test-repo-config.test-support"
 import { MEMORY_ROOT_ENV_VAR } from "./layout"
 import { resolveAutoIdentity, resolveMemoryIdentity } from "./resolve"
 
@@ -30,6 +31,7 @@ beforeAll(() => {
   mkdirSync(plain)
   mkdirSync(join(main, "packages", "api"), { recursive: true })
   git(main, ["init", "--quiet", "--initial-branch=main"])
+  disableFixtureAutoMaintenance(main)
   git(main, ["commit", "--quiet", "--allow-empty", "-m", "init"])
   git(main, ["worktree", "add", "--quiet", "-b", "feature", worktree])
   mkdirSync(join(worktree, "packages", "api"), { recursive: true })
@@ -89,6 +91,7 @@ describe("resolveAutoIdentity with real git layouts", () => {
     const sepWorktree = join(root, "wt")
     mkdirSync(root)
     git(root, ["init", "--quiet", "--initial-branch=main", `--separate-git-dir=${join(root, "sep.git")}`, sepMain])
+    disableFixtureAutoMaintenance(sepMain)
     git(sepMain, ["commit", "--quiet", "--allow-empty", "-m", "init"])
     git(sepMain, ["worktree", "add", "--quiet", "-b", "feature", sepWorktree])
     // when
@@ -105,6 +108,7 @@ describe("resolveAutoIdentity with real git layouts", () => {
     const bare = join(root, "lib.git")
     mkdirSync(root)
     git(root, ["clone", "--quiet", "--bare", main, bare])
+    disableFixtureAutoMaintenance(bare, true)
     git(bare, ["worktree", "add", "--quiet", "-b", "one", join(root, "one")])
     git(bare, ["worktree", "add", "--quiet", "-b", "two", join(root, "two")])
     // when
@@ -120,6 +124,7 @@ describe("resolveAutoIdentity with real git layouts", () => {
     const library = join(parent, "library")
     mkdirSync(library)
     git(library, ["init", "--quiet", "--initial-branch=main"])
+    disableFixtureAutoMaintenance(library)
     git(library, ["commit", "--quiet", "--allow-empty", "-m", "lib"])
     const hostWorktree = join(parent, "project-submodule")
     git(main, ["worktree", "add", "--quiet", "-b", "with-submodule", hostWorktree])

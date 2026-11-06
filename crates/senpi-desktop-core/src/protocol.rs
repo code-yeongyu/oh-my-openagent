@@ -25,8 +25,8 @@ pub const INVALID_PARAMS: i64 = -32_602;
 /// `ENGINE_ERROR_BASE - n`.
 pub const ENGINE_ERROR_BASE: i64 = -32_000;
 
-/// Every `ErrorCode`, in declaration (ordinal) order.
-pub const ERROR_CODES: [ErrorCode; 24] = [
+/// Every `ErrorCode`, in declaration (ordinal) order. Append-only, like the enum.
+pub const ERROR_CODES: [ErrorCode; 28] = [
     ErrorCode::PermissionDenied,
     ErrorCode::CaptureFailed,
     ErrorCode::InputFailed,
@@ -51,6 +51,10 @@ pub const ERROR_CODES: [ErrorCode; 24] = [
     ErrorCode::InputBusy,
     ErrorCode::ControlRequired,
     ErrorCode::CaptureUnavailable,
+    ErrorCode::UserIntervened,
+    ErrorCode::AxUnconfirmed,
+    ErrorCode::SpaceUnsupported,
+    ErrorCode::SpaceMoveDenied,
 ];
 
 /// The numeric JSON-RPC error code for `code`: `-32000 - ordinal`.

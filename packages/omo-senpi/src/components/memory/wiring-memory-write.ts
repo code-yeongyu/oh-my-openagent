@@ -32,6 +32,7 @@ export function registerMemoryWriteListener(
         checkAdvisory: false,
         sessionId,
         ...(options.now === undefined ? {} : { now: options.now }),
+        ...(options.syncStatus === undefined ? {} : { syncStatus: options.syncStatus }),
       })
       state.memoryStatusAttempted = result.footerShown
     } catch (error) {

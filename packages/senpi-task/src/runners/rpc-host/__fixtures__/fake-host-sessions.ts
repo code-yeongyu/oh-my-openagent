@@ -55,6 +55,7 @@ interface LiveSession {
   readonly sessionPath: string
   readonly kind: unknown
   readonly context: unknown
+  readonly contextOverlay: Record<string, unknown>
   readonly retainOnDisconnect: unknown
   readonly autoTitle: unknown
   readonly attachments: Set<Socket>
@@ -100,6 +101,17 @@ export class FakeSessionTable {
     session.parked = false
     this.#sessions.set(sessionPath, session)
     return { kind: "opened", routingId: session.routingId, attached: existing !== undefined }
+  }
+
+  /** `set_session_context`: only a connection attached to the session may patch it; `null` deletes a key. */
+  patchContext(socket: Socket, routingId: string, patch: Readonly<Record<string, unknown>>): boolean {
+    const session = this.#byRouting(routingId)
+    if (session === undefined || !session.attachments.has(socket)) return false
+    for (const [key, value] of Object.entries(patch)) {
+      if (value === null) delete session.contextOverlay[key]
+      else session.contextOverlay[key] = value
+    }
+    return true
   }
 
   attachmentsOf(routingId: string): readonly Socket[] {
@@ -184,7 +196,7 @@ export class FakeSessionTable {
     return [...this.#sessions.values()].flatMap((session) =>
       session.parked || (session.kind === "worker" && !includeWorkers)
         ? []
-        : [{ sessionId: session.routingId, sessionPath: session.sessionPath, kind: session.kind, context: session.context }],
+        : [{ sessionId: session.routingId, sessionPath: session.sessionPath, kind: session.kind, context: publishedContext(session) }],
     )
   }
 
@@ -193,7 +205,7 @@ export class FakeSessionTable {
       routingId: session.routingId,
       sessionPath: session.sessionPath,
       kind: session.kind,
-      context: session.context,
+      context: publishedContext(session),
       retainOnDisconnect: session.retainOnDisconnect,
       autoTitle: session.autoTitle,
       attachments: session.attachments.size,
@@ -218,6 +230,7 @@ export class FakeSessionTable {
       sessionPath,
       kind: payload.kind,
       context: payload.context,
+      contextOverlay: {},
       retainOnDisconnect: payload.retain_on_disconnect,
       autoTitle: payload.auto_title,
       attachments: new Set<Socket>(),
@@ -254,6 +267,13 @@ function endSessionProcess(session: LiveSession): void {
   session.process?.kill("SIGKILL")
   session.process = undefined
   session.processExit = undefined
+}
+
+// The host publishes the open's context with every later patch laid over it.
+function publishedContext(session: LiveSession): unknown {
+  if (Object.keys(session.contextOverlay).length === 0) return session.context
+  const opened = typeof session.context === "object" && session.context !== null ? session.context : {}
+  return { ...opened, ...session.contextOverlay }
 }
 
 function drained(session: LiveSession): FakeDrainedSession {

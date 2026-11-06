@@ -1,3 +1,6 @@
+import { withPaneAuth } from "../pane-auth"
+export { buildPaneAuthEnvironmentArgs } from "../pane-auth"
+
 const TMUX_COMMAND_SHELL = "/bin/sh"
 
 function shellQuoteForNestedCommand(value: string): string {
@@ -12,7 +15,8 @@ export function buildTmuxAttachCommand(serverUrl: string, sessionId: string, dir
   const escapedUrl = shellQuoteForNestedCommand(serverUrl)
   const escapedSessionId = shellQuoteForNestedCommand(sessionId)
   const escapedDirectory = shellQuoteForNestedCommand(directory || process.cwd())
-  return `${TMUX_COMMAND_SHELL} -c "opencode attach ${escapedUrl} --session ${escapedSessionId} --dir ${escapedDirectory}"`
+  const authPrefix = withPaneAuth("").replaceAll("\\", "\\\\").replaceAll("$", "\\$").replaceAll('"', '\\"')
+  return `${TMUX_COMMAND_SHELL} -c "${authPrefix}opencode attach ${escapedUrl} --session ${escapedSessionId} --dir ${escapedDirectory}"`
 }
 
 const PLACEHOLDER_DESCRIPTION_LIMIT = 2_000
@@ -36,20 +40,6 @@ export function buildTmuxPlaceholderCommand(description: string): string {
   const shown = clean.length > PLACEHOLDER_DESCRIPTION_LIMIT ? `${clean.slice(0, PLACEHOLDER_DESCRIPTION_LIMIT)}…` : clean
   const banner = shellQuoteForNestedCommand(`OMO subagent pane ready: ${shown}`)
   const hint = shellQuoteForNestedCommand("Focus this pane to attach.")
-  return `${TMUX_COMMAND_SHELL} -c "printf '%s\\n%s\\n' ${banner} ${hint}; while :; do sleep 86400; done"`
-}
-
-export function buildPaneAuthEnvironmentArgs(): string[] {
-  const password = process.env.OPENCODE_SERVER_PASSWORD
-  if (!password) {
-    return []
-  }
-
-  const args = ["-e", `OPENCODE_SERVER_PASSWORD=${password}`]
-  const username = process.env.OPENCODE_SERVER_USERNAME
-  if (username !== undefined) {
-    args.push("-e", `OPENCODE_SERVER_USERNAME=${username}`)
-  }
-
-  return args
+  const authPrefix = withPaneAuth("").replaceAll("\\", "\\\\").replaceAll("$", "\\$").replaceAll('"', '\\"')
+  return `${TMUX_COMMAND_SHELL} -c "${authPrefix}printf '%s\\n%s\\n' ${banner} ${hint}; while :; do sleep 86400; done"`
 }

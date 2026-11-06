@@ -1,12 +1,16 @@
 import { Command } from "commander"
 import { isCancel, select, confirm } from "@clack/prompts"
+import { serviceAccountsOpen } from "./accounts-gate"
 import { openSignInBrowser } from "./browser"
 import { deviceName, devicePlatform } from "./device-name"
 import { loginDevice } from "./device-flow"
-import { createCredentialStore } from "./keystore"
+import { createCredentialStore, INTERACTIVE_READ_WAIT } from "./keystore"
 import { BrowserUnavailable, loginLoopback } from "./loopback"
 import { type ChooseDevice, type ListedDevice, RequestFailure, serviceOrigin, SignInError } from "./protocol"
+import { resolveMemoryRoot, syncPinDir } from "@oh-my-opencode/memory-core/sync-device-retire"
+
 import { createSession, type Session } from "./session"
+import { retireSyncPinOnDiscard } from "./sync-pin-retire"
 import { terminalText } from "./terminal-text"
 
 // Probe the service before anything user-visible (a browser tab, a device code) so an
@@ -60,8 +64,11 @@ async function run(action: "login" | "logout" | "whoami", options: Options): Pro
   process.once("SIGTERM", cancel)
   try {
     const api = serviceOrigin(options.api ?? process.env.OMO_SERVICE_API_URL ?? "https://api.omo.dev")
-    const store = createCredentialStore(api)
-    const session = createSession({ api, store, signal: controller.signal })
+    const store = createCredentialStore(api, { wait: INTERACTIVE_READ_WAIT })
+    const session = createSession({
+      api, store, signal: controller.signal,
+      beforeKeysDiscarded: retireSyncPinOnDiscard({ pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())), log: (line) => console.error(line) }),
+    })
     if (action === "logout") {
       const revoked = await session.logout()
       console.log("Signed out of OmO. Stored credentials and device keys were removed.")
@@ -100,7 +107,7 @@ async function run(action: "login" | "logout" | "whoami", options: Options): Pro
     console.log("Signed in to OmO.")
   } catch (error) {
     console.error(controller.signal.aborted ? "Sign-in cancelled."
-      : error instanceof SignInError ? error.message : "Unable to complete OmO sign-in. Check the OS credential store and try again.")
+      : error instanceof SignInError ? error.message : "OmO sign-in stopped on an unexpected error. Run the command again, and report it with /bug if it keeps failing.")
     process.exitCode = 1
   } finally {
     process.removeListener("SIGINT", cancel)
@@ -108,20 +115,12 @@ async function run(action: "login" | "logout" | "whoami", options: Options): Pro
   }
 }
 
-/** The one switch for OmO service accounts (#10262): set to true when accounts open to everyone. */
-export const SERVICE_ACCOUNTS_OPEN: boolean = false
+export { SERVICE_ACCOUNTS_OPEN } from "./accounts-gate"
 
-export const SERVICE_ACCOUNTS_CLOSED_MESSAGE = "OmO accounts aren't available yet."
+export const SERVICE_ACCOUNTS_CLOSED_MESSAGE =
+  "Signing in from the terminal isn't available yet. Sign in from the OmO desktop app on this computer; omo uses that sign-in."
 
 const SERVICE_AUTH_COMMANDS = ["login", "logout", "whoami"] as const
-
-// The sign-in suites exercise the real flow through the launcher; their in-process preload opens
-// the commands here, which nothing a user can set (no env var, flag or config) reaches.
-const testOpenKey = Symbol.for("omo.test.serviceAccountsOpen")
-
-function serviceAccountsOpen(): boolean {
-  return SERVICE_ACCOUNTS_OPEN || (globalThis as Record<symbol, unknown>)[testOpenKey] === true
-}
 
 function refuseClosedServiceAuth(): never {
   console.error(SERVICE_ACCOUNTS_CLOSED_MESSAGE)

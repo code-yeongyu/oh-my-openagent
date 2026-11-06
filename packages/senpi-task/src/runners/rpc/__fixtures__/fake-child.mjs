@@ -8,6 +8,8 @@
 //   FAKE_COMMAND_LOG=path append every received command as one JSON line
 //   FAKE_RETRY_FALLBACK=refuse|hang|exit answer set_retry_fallback with an error, never answer it, or exit on it
 //   FAKE_PROTOCOL_INFO=after-prompt hold the get_protocol_info answer until a prompt arrives (a probe answered late)
+//   FAKE_PROMPT_REFUSAL=<json> refuse every prompt with this payload merged into the failed response
+//                        (e.g. {"error":"...","errorCode":"provider_credentials_missing","errorData":{...}})
 import { appendFileSync } from "node:fs"
 import { createInterface } from "node:readline"
 import { kill } from "node:process"
@@ -52,6 +54,10 @@ function handlePrompt(cmd) {
       emit({ type: "agent_end", willRetry: false, messages: [] })
       emit({ type: "agent_idle" })
     }
+    return
+  }
+  if (process.env.FAKE_PROMPT_REFUSAL) {
+    emit({ type: "response", command: "prompt", id: cmd.id, success: false, ...JSON.parse(process.env.FAKE_PROMPT_REFUSAL) })
     return
   }
   if (message.startsWith("delay:")) {

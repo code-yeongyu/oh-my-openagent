@@ -258,7 +258,7 @@ describe("thread component steer into a session waiting on a question", () => {
       createThreadComponent({ host: host(), stateDirectory: join(agentDir, "state"), agentDir: () => agentDir, store }).register(f.pi as never, context([]) as never)
       await f.dispatch("session_start", ctx)
       await within(endpointReady, 10_000, "the control endpoint to register")
-      const target: GatewayAddressEntry = { thread_id: "dur-1", name: "lane", status: "live", cwd: agentDir, created_at: new Date(0).toISOString(), updated_at: new Date(0).toISOString(), endpoint: { kind: "tui", socket, routing_id: null }, liveness: "routable" }
+      const target: GatewayAddressEntry = { thread_id: "dur-1", name: "lane", status: "live", cwd: agentDir, created_at: new Date(0).toISOString(), updated_at: new Date(0).toISOString(), endpoint: { kind: "tui", socket, routing_id: null, durable_session_id: "dur-1" }, liveness: "routable" }
       const engine = createGatewayEngine({
         store,
         endpoints: {
@@ -595,6 +595,13 @@ describe("thread component production registration", () => {
     const f = api()
     createThreadComponent({ host: host(), stateDirectory: "/tmp/thread-test-state" }).register(f.pi as never, context([]) as never)
     expect(f.tools.map((tool) => tool.name)).toEqual(SEVENTEEN)
+  })
+
+  // Placement contract (engine `ToolDefinition.runs`): thread tools run on the loop side of a split session.
+  test("declares every thread tool for the loop side of a split session", () => {
+    const f = api()
+    createThreadComponent({ host: host(), stateDirectory: "/tmp/thread-test-state" }).register(f.pi as never, context([]) as never)
+    expect(f.tools.filter((tool) => tool.runs !== "brain").map((tool) => tool.name)).toEqual([])
   })
 
   test("registers the family regardless of the context flag", () => {

@@ -128,6 +128,20 @@ describe("omo doctor", () => {
       expect(result.stdout).toContain("FAIL senpi version")
       expect(result.stdout).toContain("expected 2026.8.9, found 2026.8.8")
     })
+
+    test("#then a zero-padded spelling of the pinned release still passes", () => {
+      const fixture = createFixture()
+      const manifestPath = join(fixture.packageRoot, "node_modules", "@code-yeongyu", "senpi", "package.json")
+      writeFile(manifestPath, JSON.stringify({
+        name: "@code-yeongyu/senpi",
+        version: "2026.08.09",
+        type: "module",
+        exports: { ".": "./dist/index.js" },
+      }))
+      const result = run(fixture)
+      expect(result.stdout).toContain("PASS senpi version 2026.08.09")
+      expect(result.stdout).not.toContain("FAIL senpi version")
+    })
   })
 
   describe("#given settings contain the legacy package entry", () => {

@@ -1,4 +1,4 @@
-import type { TaskRecordStore } from "@oh-my-opencode/senpi-task"
+import type { TaskRecord, TaskRecordStore } from "@oh-my-opencode/senpi-task"
 
 import { watchStatusEdge } from "./store-status-edge"
 import type { TaskTerminalObservers } from "./terminal-observers"
@@ -10,9 +10,12 @@ import type { TaskTerminalObservers } from "./terminal-observers"
 // The same wrapper is the ONE seam that sees every status-bearing write, so an optional terminal
 // observer ledger is notified here on each nonterminal -> terminal status edge. `transition` alone
 // would miss reconciliation, which writes `lost` through replace/mutate.
+// The record a mutation left behind (null once removed), so a listener can update in place.
+export type StoreMutation = { readonly taskId: string; readonly record: TaskRecord | null }
+
 export function createMutationNotifyingStore(
   backing: TaskRecordStore,
-  onMutation: () => void,
+  onMutation: (change: StoreMutation) => void,
   terminalObservers?: TaskTerminalObservers,
 ): TaskRecordStore {
   const watch = (taskId: string) => watchStatusEdge({ backing, observers: terminalObservers, taskId })
@@ -21,19 +24,19 @@ export function createMutationNotifyingStore(
     save: (record) => {
       const edge = watch(record.task_id)
       backing.save(record)
-      onMutation()
+      onMutation({ taskId: record.task_id, record })
       edge.settle(record)
     },
     replace: (record) => {
       const edge = watch(record.task_id)
       backing.replace(record)
-      onMutation()
+      onMutation({ taskId: record.task_id, record })
       edge.settle(record)
     },
     mutate: (taskId, mutation) => {
       const edge = watch(taskId)
       const result = backing.mutate(taskId, mutation)
-      onMutation()
+      onMutation({ taskId, record: result })
       edge.settle(result)
       return result
     },
@@ -42,30 +45,30 @@ export function createMutationNotifyingStore(
     appendEvent: (taskId, event) => backing.appendEvent(taskId, event),
     remove: (taskId) => {
       backing.remove(taskId)
-      onMutation()
+      onMutation({ taskId, record: null })
     },
     transition: (taskId, transition) => {
       const edge = watch(taskId)
       const result = backing.transition(taskId, transition)
-      onMutation()
+      onMutation({ taskId, record: result.applied ? result.record : backing.load(taskId) })
       if (result.applied) edge.settle(result.record)
       return result
     },
     tombstoneIfExpired: (taskId, shouldRetain, owner) => {
       const result = backing.tombstoneIfExpired(taskId, shouldRetain, owner)
-      if (result.kind === "tombstoned") onMutation()
+      if (result.kind === "tombstoned") onMutation({ taskId, record: null })
       return result
     },
     completeExpunge: (taskId, owner) => {
       const deleted = backing.completeExpunge(taskId, owner)
-      onMutation()
+      onMutation({ taskId, record: null })
       return deleted
     },
     listExpunging: () => backing.listExpunging(),
     loadExpunging: (taskId) => backing.loadExpunging(taskId),
     restoreExpunging: (taskId, owner) => {
       backing.restoreExpunging(taskId, owner)
-      onMutation()
+      onMutation({ taskId, record: backing.load(taskId) })
     },
     readExpungeOwner: (taskId) => backing.readExpungeOwner(taskId),
     takeOverExpunging: (taskId, from, to) => backing.takeOverExpunging(taskId, from, to),

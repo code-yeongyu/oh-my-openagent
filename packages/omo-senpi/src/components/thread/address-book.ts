@@ -51,6 +51,7 @@ export type AddressEndpoint = {
   readonly kind: EndpointKind
   readonly socket: string
   readonly routing_id: string | null
+  readonly durable_session_id: string
 }
 
 /** Where a thread runs: a terminal, a Desktop thread shard, a task child, or the shared daemon. */
@@ -160,7 +161,7 @@ function validTimestamp<T extends string | null>(value: unknown, fallback: T): s
 }
 
 function fromDisk(session: DiskSession, host: AddressBookHost | undefined, failure?: string): AddressEntry {
-  const endpoint = session.source_host === null ? null : { kind: host?.endpoint_kind ?? "rpc_host", socket: session.source_host, routing_id: null }
+  const endpoint = session.source_host === null ? null : { kind: host?.endpoint_kind ?? "rpc_host", socket: session.source_host, routing_id: null, durable_session_id: session.durable_id }
   return {
     durable_id: session.durable_id,
     routing_id: null,
@@ -235,7 +236,7 @@ export function assembleAddressBook(
         created_at: createdAt,
         updated_at: updatedAt,
         thread_id: durableId,
-        endpoint: { kind: host.endpoint_kind ?? "rpc_host", socket: host.socket, routing_id: session.sessionId },
+        endpoint: { kind: host.endpoint_kind ?? "rpc_host", socket: host.socket, routing_id: session.sessionId, durable_session_id: durableId },
         surface: deriveSurface(host.endpoint_kind, session.kind, host.socket),
         alive: host.alive !== false,
         title: threadTitle(name, facts?.first_user_text) ?? disk?.title ?? null,

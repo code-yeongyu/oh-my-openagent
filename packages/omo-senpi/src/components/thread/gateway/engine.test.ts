@@ -217,21 +217,27 @@ describe("lost_ack_and_durable_recovery", () => {
 })
 
 describe("causal_cycle_hop_rate_and_fanout_budgets", () => {
-  test("#given A->B->C under one root #when C sends back to A #then it is loop_detected and A receives nothing from C", async () => {
+  // K8: A->B->A thread chains are allowed and no count limit applies unless the user sets one; only a
+  // session sending to itself is refused.
+  test("#given A->B->C under one root #when C sends back to A and A answers B directly #then both are delivered and carry the chain's hop count", async () => {
     const h = open()
     for (const id of ["A", "B", "C"]) h.session(id)
     const ab = okId(await send(h, "A", "B", "to B"))
     await h.quiesce()
     const bc = okId(await send(h, "B", "C", "to C", { cause_delivery_id: ab }))
     await h.quiesce()
-    const ca = await send(h, "C", "A", "back to A", { cause_delivery_id: bc })
-    expect(ca.kind === "error" && { code: ca.error.code, guard: ca.error.details?.guard }).toEqual({ code: "loop_detected", guard: "cycle" })
-    expect(await h.get("A").store.list({ target_durable_id: "A" })).toEqual([])
+    const ca = okId(await send(h, "C", "A", "back to A", { cause_delivery_id: bc }))
+    await h.quiesce()
+    const ab2 = okId(await send(h, "A", "B", "answer to B", { cause_delivery_id: ca }))
+    await h.quiesce()
+    const views = await Promise.all([ca, ab2].map((id) => h.get("A").store.deliveryView(id)))
+    // B may still be in the turn A's first message started, so the answer is admitted (queued) or applied; never refused
+    expect(views.map((view) => [view?.row.state === "admitted" || view?.row.state === "applied", view?.row.hop])).toEqual([[true, 3], [true, 4]])
     const self = await send(h, "A", "A", "me")
     expect(self.kind === "error" && self.error.details?.guard).toBe("self_send")
   })
 
-  test("#given P and Q under one root #when P->Q and Q->P are sent concurrently from two processes #then exactly one is accepted", async () => {
+  test("#given P and Q under one root #when P->Q and Q->P are sent concurrently from two processes #then both are accepted", async () => {
     const h = open()
     for (const id of ["W", "X", "P", "Q"]) h.session(id)
     const wx = okId(await send(h, "W", "X", "seed"))
@@ -240,20 +246,54 @@ describe("causal_cycle_hop_rate_and_fanout_budgets", () => {
     const xq = okId(await send(h, "X", "Q", "q", { cause_delivery_id: wx, turn_id: "x1" }))
     await h.quiesce()
     const results = await Promise.all([send(h, "P", "Q", "p->q", { cause_delivery_id: xp }), send(h, "Q", "P", "q->p", { cause_delivery_id: xq })])
-    expect(results.map(summary).toSorted()).toEqual(["error:loop_detected", "queued"])
+    expect(results.map((result) => result.kind)).toEqual(["ok", "ok"])
   })
 
-  test("#given a chain of fresh sessions #when each forwards what it received #then hop 4 is accepted and hop 5 is refused", async () => {
+  test("#given a chain of fresh sessions #when each forwards what it received twelve times #then every hop is accepted and the twelfth carries hop 12", async () => {
     const h = open()
-    for (let index = 0; index <= 5; index++) h.session(`H${index}`)
+    for (let index = 0; index <= 12; index++) h.session(`H${index}`)
     let cause: string | undefined
-    for (let hop = 1; hop <= 4; hop++) {
+    for (let hop = 1; hop <= 12; hop++) {
       cause = okId(await send(h, `H${hop - 1}`, `H${hop}`, `hop ${hop}`, cause === undefined ? {} : { cause_delivery_id: cause }))
       await h.quiesce()
     }
-    const fifth = await send(h, "H4", "H5", "hop 5", { cause_delivery_id: cause })
-    expect(fifth.kind === "error" && { code: fifth.error.code, guard: fifth.error.details?.guard }).toEqual({ code: "loop_detected", guard: "hop_limit" })
-  })
+    expect((await h.get("H0").store.deliveryView(cause ?? ""))?.row.hop).toBe(12)
+  }, 30_000)
+
+  test("#given two sessions answering each other #when the chain passes 64 deliveries #then every delivery is accepted", async () => {
+    const h = open()
+    h.session("A")
+    h.session("B")
+    let cause: string | undefined
+    for (let hop = 1; hop <= 70; hop++) {
+      const [from, to] = hop % 2 === 1 ? ["A", "B"] : ["B", "A"]
+      cause = okId(await send(h, from, to, `hop ${hop}`, cause === undefined ? {} : { cause_delivery_id: cause }))
+      await h.quiesce()
+      // the pair bucket (a rate, not a count) refills one token per 5 s
+      h.clock.now += 5_000
+    }
+    expect((await h.get("A").store.deliveryView(cause ?? ""))?.row.hop).toBe(70)
+  }, 60_000)
+
+  test("#given a chain of 70 hops #when each delivery is stored #then its envelope stays the size of the first one (storage grows linearly with the chain, not with its square) and still records its hop", async () => {
+    const h = open()
+    h.session("A")
+    h.session("B")
+    const sizes: number[] = []
+    let cause: string | undefined
+    for (let hop = 1; hop <= 70; hop++) {
+      const [from, to] = hop % 2 === 1 ? ["A", "B"] : ["B", "A"]
+      cause = okId(await send(h, from, to, "x", cause === undefined ? {} : { cause_delivery_id: cause }))
+      const row = (await h.get(to).store.deliveryView(cause))?.row
+      if (row === undefined) throw new Error(`delivery ${cause} was not stored`)
+      sizes.push(JSON.stringify(row.envelope).length)
+      expect(row.hop).toBe(hop)
+      await h.quiesce()
+      h.clock.now += 5_000
+    }
+    // Ids and hop digits differ by a few bytes between rows; a stored path would add one durable id per hop.
+    expect(Math.max(...sizes) - Math.min(...sizes)).toBeLessThan(16)
+  }, 60_000)
 
   test("#given one sender turn #when it reaches a 17th distinct session #then that send is refused while a second send to a known target passes", async () => {
     const h = open()
@@ -280,7 +320,7 @@ describe("causal_cycle_hop_rate_and_fanout_budgets", () => {
     expect(summary(await send(h, "R", "S", "m10", { idempotency_key: "r10" }))).toBe("error:overloaded")
   })
 
-  test("#given roots are minted by the gateway #when a caller names its own root, continues a delivery it never received, or continues past the root lifetime #then each is refused", async () => {
+  test("#given roots are minted by the gateway #when a caller names its own root or continues a delivery it never received #then each is refused, and a chain continued past the root lifetime is delivered under a fresh root", async () => {
     const h = open()
     for (const id of ["A", "B", "C"]) h.session(id)
     const forged = await send(h, "A", "B", "x", { root_id: "root-mine" })
@@ -289,24 +329,26 @@ describe("causal_cycle_hop_rate_and_fanout_budgets", () => {
     const stolen = await send(h, "C", "A", "not mine", { cause_delivery_id: ab })
     expect(stolen.kind === "error" && stolen.error.details?.guard).toBe("unknown_cause")
     await h.quiesce()
+    // an expired root is bookkeeping only: the chain goes on under a fresh root and keeps its hop count
     h.clock.now += ROOT_LIFETIME_MS + 1
-    const late = await send(h, "B", "C", "too late", { cause_delivery_id: ab })
-    expect(late.kind === "error" && late.error.details?.guard).toBe("root_expired")
+    const late = okId(await send(h, "B", "C", "after the root lifetime", { cause_delivery_id: ab }))
+    const lateView = await h.get("B").store.deliveryView(late)
+    const firstView = await h.get("A").store.deliveryView(ab)
+    expect({ hop: lateView?.row.hop, sameRoot: lateView?.row.root_id === firstView?.row.root_id }).toEqual({ hop: 2, sameRoot: false })
   })
 
-  test("#given one root #when a session keeps fanning out under it across turns #then the 64th delivery of the root is refused", async () => {
+  test("#given one root #when a session keeps fanning out under it across turns #then the 64th and later deliveries of the root are still accepted", async () => {
     const h = open()
     h.session("A")
     h.session("F")
     const seed = okId(await send(h, "A", "F", "seed"))
     await h.quiesce()
     const outcomes: string[] = []
-    for (let index = 0; index < 64; index++) {
+    for (let index = 0; index < 65; index++) {
       h.phantom(`N${index}`)
       outcomes.push(summary(await send(h, "F", `N${index}`, "fan", { cause_delivery_id: seed, turn_id: `t${Math.floor(index / 16)}` })))
     }
-    expect(outcomes.filter((outcome) => outcome === "queued_offline")).toHaveLength(63)
-    expect(outcomes[63]).toBe("error:loop_detected")
+    expect(outcomes.filter((outcome) => outcome === "queued_offline")).toHaveLength(65)
     // 65 sequential fsync'd (`synchronous=FULL`) transactions: measured 5.2-5.3 s at load ~370 and
     // 8.8-13.7 s at load ~450 on a heavily loaded 14-core host, so bun's 5 s default cannot hold it.
   }, 60_000)
@@ -348,9 +390,10 @@ describe("cli_sender_principal", () => {
       origin: { external: { platform: "cli", account_id: "tester", chat_id: "@cli", thread_id: "@chat", message_id: id } },
     })
     const text = b.runtime.textOf(id) ?? ""
+    expect(text.split("\n")[0]).toStartWith("From unclassified / ")
     expect(text.split("\n")[0]).toContain("source=external")
     expect(text.split("\n")[2]).toBe(JSON.stringify("from the shell"))
-    expect(b.runtime.senderOf(id)).toEqual({ sender: { kind: "command_line", user: "tester" }, display_text: "from the shell" })
+    expect(b.runtime.senderOf(id)).toEqual({ sender: { kind: "command_line", user: "tester" }, display_text: "From unclassified / fixture\nfrom the shell" })
   })
 
   test("#given a named session sends to another #when it lands #then the receiver is told the sending session's id and name and the message as written, apart from the provenance header the model reads", async () => {
@@ -361,12 +404,13 @@ describe("cli_sender_principal", () => {
     const result = await named.deliver({ sender: { kind: "session", durable_id: "A", name: "planner" }, target: "B", text: "review the diff" })
     const id = okId(result)
     await h.quiesce()
-    expect(b.runtime.senderOf(id)).toEqual({ sender: { kind: "agent", session_id: "A", name: "planner" }, display_text: "review the diff" })
+    expect(b.runtime.senderOf(id)).toEqual({ sender: { kind: "agent", session_id: "A", name: "planner" }, display_text: 'From unclassified / fixture / session "planner"\nreview the diff' })
+    expect((b.runtime.textOf(id) ?? "").split("\n")[0]).toContain('/ session "planner" [OMO_GATEWAY v=1 ')
     expect((b.runtime.textOf(id) ?? "").split("\n")[0]).toContain("source=peer_agent")
 
     const unnamed = await named.deliver({ sender: { kind: "session", durable_id: "A" }, target: "B", text: "and the tests" })
     await h.quiesce()
-    expect(b.runtime.senderOf(okId(unnamed))).toEqual({ sender: { kind: "agent", session_id: "A" }, display_text: "and the tests" })
+    expect(b.runtime.senderOf(okId(unnamed))).toEqual({ sender: { kind: "agent", session_id: "A" }, display_text: "From unclassified / fixture\nand the tests" })
   })
 })
 

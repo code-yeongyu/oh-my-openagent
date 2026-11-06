@@ -49,7 +49,7 @@ Understand the current memory landscape before changing anything. Start with the
 Read `$AUDIT_PATH` and repair findings before consolidation:
 - `link_dangling`: point at the file now holding the content, or remove a link whose target is gone for good; report which.
 - `content_duplicate`: merge into the more specific home and leave a one-line pointer in the other.
-- `path_orphan`: use `git mv` into the home its content belongs to.
+- `path_orphan`: use `git mv` into the home its content belongs to. If the file has no frontmatter (the finding says so), add a one-line `description:` frontmatter in the same commit as the move; a bare move of such a file is refused by completion validation and would be dropped. If you cannot write an honest description, leave the file where it is.
 - `frontmatter_invalid`: leave to the writer owning the file unless only the description is missing.
 
 Never touch `system/boundaries.md` or `system/agreements.md`, and never delete evidence. Report unresolved findings with reasons.
@@ -64,6 +64,7 @@ This is the dream's core duty: make memory smaller, better placed, and less redu
 - An external file the agent keeps fetching turn after turn is hot: promote it to `system/` (trimmed to what's needed every turn, verbose detail stays external). Use the ledger as primary evidence: a file with high `count` and recent `lastUsedAt` is a strong promote candidate.
 - A `system/` file nothing recent has needed is stale: demote it to `reference/` so it stops costing context on every turn. A `system/` file that never appears in the ledger and has no recent transcript references is a strong demote candidate.
 - Demotion is reversible: it MOVES the file to `reference/` with a `[[path]]` cross-reference at the former point of use. It never deletes content.
+- A `system/` file whose frontmatter `expires` instant has passed is already out of context (the compiler skips it): demote it to `reference/` with its dates, and move any durable line inside it to the right `system/` file first. A temporary section inside a durable `system/` file has no machine expiry: split it into its own file with `expires: <ISO 8601>` (a UTC date or an instant with `Z` or an offset), or demote it when its stated end has passed.
 
 **Fact archiving**: entries in `notes/facts/` older than 6 months get summarized into `ARCHIVE.md`, the single non-system root archive file. Compress them into concise dated summary entries, append those to `ARCHIVE.md`, and remove the summarized originals. Keep anything younger, and keep anything old that's still clearly load-bearing. Delete (don't archive) content the user asked to forget, sensitive or wrong content, and junk with no future-reference value.
 
@@ -75,7 +76,7 @@ Read `$SYSTEM_TOKENS_PATH` before consolidating. When its `totalTokens` is great
 
 **Contradiction handling**: when files disagree, never silently pick a winner. Keep both versions, mark the disagreement on each entry (a contradiction comment naming the other file and the evidence dates), and surface the conflict in your final report so a human decides. Identical duplicates may still be deduped; genuinely conflicting content may not.
 
-Throughout, edit surgically. Persona and behavioral files are load-bearing: append, modify specific entries, adjust wording. Never rewrite them wholesale or silently overwrite established identity. Keep description frontmatter and `[[path]]` cross-references accurate as content moves.
+Throughout, edit surgically. Persona and behavioral files are load-bearing: append, modify specific entries, adjust wording. Never rewrite them wholesale or silently overwrite established identity. Keep `[[path]]` cross-references accurate as content moves. A `description` is one line of at most 1024 characters saying what the note is and when to read it. Keep history, changelogs, and topic lists in the body, never append them to the description.
 Never write or copy a `provenance:` frontmatter line; only the memory tool writes one, and the commit hook refuses a hand-written one. When you move or merge a note, leave that line out of the new file. When you edit a note whose `provenance:` line starts with `user said`, delete that line (it is a legacy header that no longer means anything) and add the trailer `Omo-Provenance-Stripped: <path>` to your commit message, one per note.
 
 

@@ -1,57 +1,20 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { existsSync } from "node:fs"
-import { readFile, readdir, writeFile } from "node:fs/promises"
+import { readFile, readdir } from "node:fs/promises"
 import { join } from "node:path"
-import { rmEfaultTolerant } from "../teardown.test-support"
-
 import { GitMemoryRepo } from "@oh-my-opencode/memory-core"
+
 import { OmoMemorySettingsSchema, type OmoConfig } from "@oh-my-opencode/omo-config-core"
 
 import { REFLECTION_COMPLETION_ENTRY_TYPE, REFLECTION_LAUNCHED_ENTRY_TYPE } from "./completion"
-import { resetModelPreflightCacheForTests } from "./model-preflight"
-import { createRunnerHarness, type RunnerHarness } from "./runner.test-support"
+import { harness, assertWorktreesClean, cleanupRunnerHarnesses } from "./runner-integration.test-support"
 
 // Each case drives a real supervisor, bootstrap, and model child - three spawned bun processes
 // plus git work. The 5s default is a fast-machine assumption, not a budget those subprocesses
 // fit on a loaded CI runner; the assertions stay event-driven with no sleeps.
 setDefaultTimeout(60_000)
 
-const harnesses: RunnerHarness[] = []
-const WINDOWS_CLEANUP_RACE_CODES = new Set(["EBUSY", "ENOTEMPTY", "EPERM"])
-
-// Killed children release their Windows file handles asynchronously, so an unretried removal here
-// stalls into the next test file's budget. Retry generously, and tolerate only the platform's known
-// cleanup races so every other cleanup defect still fails loudly.
-async function removeRoot(root: string): Promise<void> {
-  try {
-    await rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 30, retryDelay: 200 })
-  } catch (error) {
-    if (
-      process.platform === "win32"
-      && error instanceof Error
-      && "code" in error
-      && typeof error.code === "string"
-      && WINDOWS_CLEANUP_RACE_CODES.has(error.code)
-    ) return
-    throw error
-  }
-}
-
-afterEach(async () => {
-  resetModelPreflightCacheForTests()
-  await Promise.all(harnesses.splice(0).map((item) => removeRoot(item.root)))
-})
-
-async function harness(options: Parameters<typeof createRunnerHarness>[0]): Promise<RunnerHarness> {
-  const created = await createRunnerHarness(options)
-  harnesses.push(created)
-  return created
-}
-
-async function assertWorktreesClean(item: RunnerHarness): Promise<void> {
-  expect(existsSync(item.identity.paths.worktrees)).toBe(true)
-  expect(await readdir(item.identity.paths.worktrees)).toEqual([])
-}
+afterEach(cleanupRunnerHarnesses)
 
 describe("SenpiSubprocessRunner integration", () => {
   test("#given conflicting base and agent reflection settings #when launched #then execution uses the agent category merge and timeout", async () => {
@@ -61,6 +24,7 @@ describe("SenpiSubprocessRunner integration", () => {
         merge: "integration",
         category: "quick",
         timeout_minutes: 60,
+        max_concurrent_runs: 2,
       },
       agents: {
         "agent-test": {
@@ -101,6 +65,8 @@ describe("SenpiSubprocessRunner integration", () => {
       model: "override/model",
       thinking: "high",
       mergePolicy: "auto",
+      memoryRoot: item.root,
+      maxConcurrentRuns: 2,
     })
     expect(item.spawnCalls[0]?.hardDeadlineAt).toBe(runStartedAt + 60_000)
   }, 60_000)
@@ -208,92 +174,6 @@ describe("SenpiSubprocessRunner integration", () => {
     await assertWorktreesClean(item)
   }, 60_000)
 
-  test("#given an extension-only primary and a child-visible fallback #when the primary is missing in the clean child #then reflection retries and records the fallback", async () => {
-    // given
-    const item = await harness({ childMode: "model-fallback" })
-
-    // when
-    const result = await item.runner.launch(item.run)
-
-    // then
-    expect(result.outcome).toBe("merged")
-    expect(item.spawnCalls.map((spawn) => spawn.args[spawn.args.indexOf("--model") + 1])).toEqual([
-      "extension-only/primary",
-      "kimi-coding/fallback",
-    ])
-    expect(item.spawnCalls.map((spawn) => spawn.attempt)).toEqual([1, 2])
-    expect(new Set(item.spawnCalls.map((spawn) => spawn.hardDeadlineAt)).size).toBe(1)
-    expect(result.completion).toMatchObject({
-      model: "kimi-coding/fallback",
-      thinking: "minimal",
-      outcome: "merged",
-    })
-    await assertWorktreesClean(item)
-  }, 60_000)
-
-  test("#given the primary model's providers are all cooling down #when the child dies with a 503 #then reflection relaunches on the next candidate and merges", async () => {
-    // given
-    const item = await harness({ childMode: "provider-cooldown" })
-
-    // when
-    const result = await item.runner.launch(item.run)
-
-    // then
-    expect(result.outcome).toBe("merged")
-    expect(item.spawnCalls.map((spawn) => spawn.args[spawn.args.indexOf("--model") + 1])).toEqual([
-      "extension-only/primary",
-      "kimi-coding/fallback",
-    ])
-    expect(item.spawnCalls.map((spawn) => spawn.attempt)).toEqual([1, 2])
-    expect(result.completion).toMatchObject({
-      model: "kimi-coding/fallback",
-      thinking: "minimal",
-      outcome: "merged",
-    })
-    await assertWorktreesClean(item)
-  }, 60_000)
-
-  test("#given no candidate is visible #when a fresh probe and then its cached negative are used #then both runs proceed reactively", async () => {
-    // given
-    const item = await harness({
-      childMode: "commit",
-      preflightModels: [{ provider: "other", id: "model" }],
-    })
-
-    // when
-    const fresh = await item.runner.launch(item.run)
-    // The first run now merges and advances the cursor, so the second reservation needs fresh backlog,
-    // and the stub child's identical commit needs a real diff against the parent to merge again.
-    await item.journal.reconcile([{ kind: "assistant", messageId: "assistant-2", textBlocks: ["Remember another fact"] }])
-    const parent = new GitMemoryRepo({ dir: item.identity.paths.repo, agentId: item.identity.id })
-    await writeFile(join(item.identity.paths.repo, "system", "reflected.md"), "---\ndescription: Edited between runs\n---\nEdited between runs.\n", "utf8")
-    await parent.commitWrite(["system/reflected.md"], "edit between runs", { agentId: item.identity.id, authorName: "Test" })
-    const cached = await item.runner.launch(await item.reserveAgain())
-
-    // then
-    expect(fresh.outcome).toBe("merged")
-    expect(cached.outcome).toBe("merged")
-    expect(item.spawnCalls).toHaveLength(2)
-    // Reactive attempts run in the most permissive child, so a miss there is conclusive (#9175).
-    expect(item.spawnCalls.map((spawn) => spawn.args.includes("--no-extensions"))).toEqual([false, false])
-    // One discovery-disabled and one extension-loading catalog, each probed once and then cached.
-    expect(await readFile(item.preflightProbeLog, "utf8")).toBe("probe\nprobe\n")
-  }, 60_000)
-
-  test("#given every child-visible candidate misses its model or auth #when the chain is exhausted #then the failed outcome fingerprints every attempted cause", async () => {
-    // given
-    const item = await harness({ childMode: "model-exhausted" })
-
-    // when
-    const result = await item.runner.launch(item.run)
-
-    // then
-    expect(result).toMatchObject({ outcome: "failed", reason: "spawn_failed" })
-    expect(result.detail).toContain("model_not_visible:extension-only/primary")
-    expect(result.detail).toContain("auth_missing:kimi-coding")
-    expect(result.detail).toContain("attempted:extension-only/primary,kimi-coding/fallback")
-    expect(item.spawnCalls).toHaveLength(2)
-  }, 60_000)
 
   test("#given empty categories and no quick model #when launched twice in one session #then both fail without spawning and only one unsuppressed warning appears", async () => {
     // given

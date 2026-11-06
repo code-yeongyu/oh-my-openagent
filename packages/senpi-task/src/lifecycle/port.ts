@@ -3,11 +3,11 @@ import type { TeardownStepDeadline } from "./teardown-budget"
 
 import type { ManagedChildHandle } from "../manager/child-handle"
 import type { ForgetOptions } from "../manager/types"
-import type { AwaitingInputReason, TaskRecord } from "../state"
+import type { AwaitingInputReason, TaskRecord, TaskStatus } from "../state"
 import type { IsolationRuntime, OwnerProbe } from "../isolation"
 import type { TaskRecordStore } from "../store"
 import type { KernelToolBindingRegistry } from "../kernel-tools/bindings"
-import type { HostEndpointPort, HostSessionCloser, HostSessionProbe, HostSessionRetryPolicy } from "./host-session"
+import type { HostEndpointPort, HostGenerationView, HostSessionCloser, HostSessionProbe, HostSessionRetryPolicy } from "./host-session"
 import type { BatchAdmissionOptions } from "./residency"
 import type { RevivePolicyPort } from "./revive-policy"
 
@@ -46,6 +46,12 @@ export type ResidentHandle = {
   terminate(): Promise<void>
   // From here no transport recovery may bring the child back; a host reached again only ends it (omo#9403).
   markStopping?(): void
+  // Host-session: the host ANSWERED this handle's end of the session (its close_session, or a close it
+  // reported itself). A released port - park, detach, transport loss - never counts (omo#11765).
+  hostEndAnswered?(): boolean
+  // Host-session: publish `task_status` in the session's context while still attached, so a successor
+  // host drops a finished session's park instead of reopening it unattended (omo#10778).
+  publishTaskStatus?(status: TaskStatus): Promise<void>
 }
 
 // The live view of which handles are resident in THIS process, plus pending-mail state. Records
@@ -91,6 +97,8 @@ export type RespawnFailureCode =
   // was opened nowhere and waits for the next reconcile.
   | "store_index_unavailable"
   | "host_incompatible"
+  // The child's run is stopped: nothing launches until its Resume (which respawns it paused).
+  | "run_paused"
   | "respawn_failed"
 
 export type RespawnResult =
@@ -231,6 +239,9 @@ export type LifecycleDeps = {
   // never reach a daemon, so a deployment without one behaves exactly as it does today.
   readonly hostSessionProbe?: HostSessionProbe
   readonly hostSessionClose?: HostSessionCloser
+  // What a cancel reads once the serving generation does not list a child (omo#11765). Absent: "not listed"
+  // keeps reading as ended, as it did before the view existed.
+  readonly hostGenerationView?: HostGenerationView
   readonly hostRetry?: HostSessionRetryPolicy
   // REQUIRED so a composition cannot silently drop the revival ensure and the own-host guard. A
   // lifecycle without a task host passes `NO_HOST_ENDPOINT` explicitly.

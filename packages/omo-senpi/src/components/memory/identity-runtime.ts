@@ -1,4 +1,4 @@
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 
 import {
   ReflectionReservationStore,
@@ -51,7 +51,7 @@ export interface MemoryIdentityRuntime {
   readonly reservationPort: ReflectionReservationPort
   readonly runner: SenpiSubprocessRunner
   launch(run: ReservedRun): Promise<void>
-  reconcile(): Promise<void>
+  reconcile(signal?: AbortSignal): Promise<void>
   /** Resolves once every launch started in this process has returned (a detached child may still be running). */
   settled(): Promise<void>
 }
@@ -79,6 +79,19 @@ export function createIdentityRuntime(
   })
 
   let sandboxState: { readonly transform: SandboxTransform; readonly agentDir: string } | undefined
+  // A deferred bwrap probe can degrade one spawn and not the next, so the state is reported per
+  // spawn, but only when it changes: a run of degraded spawns logs once, not once per spawn.
+  let reportedSandboxWarning: string | undefined
+  const reportSandboxState = (transform: SandboxTransform, runId: string | undefined): void => {
+    const warning = transform.warning
+    if (warning === reportedSandboxWarning) return
+    if (warning !== undefined) {
+      deps.logger?.warn("memory reflection sandbox degraded", { identity: identity.identity, runId, warning })
+    } else {
+      deps.logger?.info("memory reflection sandbox restored", { identity: identity.identity, runId })
+    }
+    reportedSandboxWarning = warning
+  }
   const resolveAgentDir = deps.resolveAgentDir ?? (() => resolveAgentHome({ env: process.env }))
   const lazySandbox = async (spawnArgs: ReflectionSpawnArgs): Promise<ReflectionSpawnArgs> => {
     if (sandboxState === undefined) {
@@ -97,23 +110,18 @@ export function createIdentityRuntime(
         command: spawnArgs.command,
         env: spawnArgs.env,
       })
-      if (transform.warning !== undefined) {
-        deps.logger?.warn("memory reflection sandbox degraded", {
-          identity: identity.identity,
-          runId: spawnArgs.runId,
-          warning: transform.warning,
-        })
-      }
       // The grant and the pin below come from ONE resolution, so the directory the child locks
       // its credentials in can never drift away from the directory the sandbox granted.
       sandboxState = { transform, agentDir }
     }
     const transformed = await sandboxState.transform(spawnArgs)
+    reportSandboxState(sandboxState.transform, spawnArgs.runId)
     return { ...transformed, env: { ...transformed.env, ...pinnedAgentDirEnv(sandboxState.agentDir) } }
   }
 
   const runner = new SenpiSubprocessRunner({
     identity: asMemoryIdentity(identity),
+    memoryRoot: dirname(dirname(identity.durableRoot)),
     reservation: store,
     logger: deps.logger,
     resolveModelRegistry: deps.resolveModelRegistry,
@@ -167,6 +175,7 @@ export function createIdentityRuntime(
     return tracked
   }
 
+  let reconciliation: { readonly promise: Promise<void>; readonly signal: AbortSignal | undefined } | undefined
   const runtime: MemoryIdentityRuntime = {
     identity,
     store,
@@ -176,13 +185,30 @@ export function createIdentityRuntime(
     async settled(): Promise<void> {
       while (inFlight.size > 0) await Promise.all([...inFlight])
     },
-    async reconcile(): Promise<void> {
-      await reconcileReflectionRuns({
-        identity: asMemoryIdentity(identity),
-        reservation: store,
-        launch,
-        deferOnSchedulerContention: true,
-      })
+    async reconcile(signal?: AbortSignal): Promise<void> {
+      // One identity-wide pass, including any already-admitted durable transition. Its first
+      // observer owns cancellation; an independent caller retries a foreign abort once.
+      // Never clear the flight on timeout alone: a committed transition may still be finishing.
+      for (let attempt = 0; ; attempt += 1) {
+        signal?.throwIfAborted()
+        const flight = reconciliation ??= {
+          signal,
+          promise: reconcileReflectionRuns({
+            identity: asMemoryIdentity(identity), reservation: store, launch,
+            deferOnSchedulerContention: true,
+            ...(signal === undefined ? {} : { signal }),
+          }).then(() => undefined).finally(() => { reconciliation = undefined }),
+        }
+        try {
+          await flight.promise
+        } catch (error) {
+          if (signal !== flight.signal) signal?.throwIfAborted()
+          if (attempt !== 0 || flight.signal === signal || !flight.signal?.aborted || error !== flight.signal.reason) throw error
+          continue
+        }
+        signal?.throwIfAborted()
+        return
+      }
     },
   }
   return runtime

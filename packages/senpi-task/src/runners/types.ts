@@ -4,6 +4,7 @@ import type { ChildExtensionListener } from "./child-extension-events"
 import type { EffectiveModel } from "./pinned-model-equivalence"
 import type { TaskRecord } from "../state"
 import type { HostTurnReconciliation } from "./rpc-host/reconcile-turn"
+import type { NativeRunPause } from "../pause/native-child-pause"
 
 export type RpcSwitchSessionResult = { readonly cancelled: boolean }
 
@@ -51,20 +52,28 @@ export type RpcRunnerSpec = {
   // The child's own place in the task tree. A process child boots its own task engine, which reads
   // these back (per-child env or daemon session context) so ITS spawns count from here, not from 0.
   readonly depth?: number
+  readonly parent_session_id?: string
   readonly root_session_id?: string
+  // The delegating turn's W3C traceparent, read back the same two ways (per-child env or daemon session
+  // context) so the child's turn spans continue the parent's trace.
+  readonly traceparent?: string
 }
 
 export type ChildEventListener = (event: AgentSessionEvent) => void
 
+/** The durable id an input is sent under: the child holds it under this id (#2838 step 4). */
+export type InputIdentity = { readonly clientMessageId: string }
+
 export type ChildHandle = {
   reconcileInputs?(): Promise<void>
   readonly task_id: string
+  readonly runPause?: NativeRunPause
   readonly sessionId: string | undefined
   readonly pid: number | undefined
   /** The model the child actually opened on, when its open path observed one (host get_state; #9722). */
   readonly reportedModel?: EffectiveModel
-  steer(text: string): Promise<void>
-  followUp(text: string): Promise<void>
+  steer(text: string, identity?: InputIdentity): Promise<void>
+  followUp(text: string, identity?: InputIdentity): Promise<void>
   abort(): Promise<void>
   subscribe(listener: ChildEventListener): () => void
   subscribeExtensionEvents?(listener: ChildExtensionListener): () => void

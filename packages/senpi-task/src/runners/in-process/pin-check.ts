@@ -16,7 +16,7 @@ export function assertPinnedModelHonoured(spec: ChildSpec, session: ChildSession
   if (selected === undefined) return
   const effective = session.model
   if (effective === undefined) return
-  if (startedOnPinnedModel(effective, { provider: selected.provider, id: selected.model_id }, spec.model)) return
+  if (startedOnPinnedModel(effective, { provider: selected.provider, id: selected.model_id }, spec.model, spec.modelRegistry)) return
   throw new RunnerError({
     kind: "model_unavailable",
     message: `the child session started on ${effective.provider}/${effective.id} instead of the pinned ${selected.provider}/${selected.model_id}; refusing the substitution`,

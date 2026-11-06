@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import { existsSync, realpathSync, statSync } from "node:fs"
 import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -17,6 +17,51 @@ const roots: string[] = []
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))))
 
 describe("memory identity runtime", () => {
+  test.each(["manual", "different", "aborted", "shared", "success", "failure"] as const)("#given overlapping identity observers (%s) #when the owner settles #then cancellation belongs to each caller", async (kind) => {
+    const root = await mkdtemp(join(tmpdir(), "omo-reconcile-flight-"))
+    roots.push(root)
+    const identity = createMemoryIdentityContext({
+      identity: "agent-test", identityPaths: buildIdentityPaths(root, "agent-test"),
+      binding: { identity: "agent-test", repoPathHash: "hash", boundAt: 1 },
+    })
+    const runtime = createIdentityRuntime(identity, {
+      loadConfig: () => loadedMemoryConfig(memorySettings()), cwd: () => root,
+      resolveModelRegistry: () => undefined,
+    })
+    const state = await runtime.store.readState()
+    const readState = runtime.store.readState.bind(runtime.store)
+    const entered = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<typeof state>()
+    const probe = spyOn(runtime.store, "readState").mockImplementationOnce(() => {
+      entered.resolve()
+      return release.promise
+    }).mockImplementation(readState)
+    const controller = new AbortController()
+    const joiner = new AbortController()
+    const reason = new DOMException("Settle observer budget exhausted", "TimeoutError")
+    const ownReason = new Error("joining observer retired")
+    const failure = new Error("reservation read failed")
+    const first = runtime.reconcile(controller.signal).catch((error: unknown) => error)
+    const second = runtime.reconcile(kind === "manual" ? undefined : kind === "shared" ? controller.signal : joiner.signal).catch((error: unknown) => error)
+    try {
+      await entered.promise
+      expect(probe).toHaveBeenCalledTimes(1)
+      if (kind === "aborted") joiner.abort(ownReason)
+      if (kind !== "success") controller.abort(reason)
+      if (kind === "failure") release.reject(failure)
+      else release.resolve(state)
+      expect(await first).toBe(kind === "success" ? undefined : kind === "failure" ? failure : reason)
+      expect(await second).toBe(kind === "shared" ? reason : kind === "aborted" ? ownReason : kind === "failure" ? failure : undefined)
+      expect(probe).toHaveBeenCalledTimes(kind === "manual" || kind === "different" ? 3 : kind === "success" ? 2 : 1)
+      probe.mockRestore()
+      await runtime.reconcile()
+    } finally {
+      release.resolve(state)
+      await Promise.all([first, second])
+      probe.mockRestore()
+    }
+  })
+
   test.skipIf(process.platform !== "darwin" && process.platform !== "linux")(
     "#given an unresolved reflection child command #when the real lazy sandbox is constructed #then the unsandboxed escape reaches the injected logger",
     async () => {
@@ -90,6 +135,95 @@ describe("memory identity runtime", () => {
             warning: 'reflection sandbox unavailable: inner command "missing-senpi" is not absolute and could not be resolved; running unsandboxed',
           },
         })
+      } finally {
+        if (previousPath === undefined) delete process.env.PATH
+        else process.env.PATH = previousPath
+        if (previousAgentDir === undefined) delete process.env.SENPI_CODING_AGENT_DIR
+        else process.env.SENPI_CODING_AGENT_DIR = previousAgentDir
+      }
+    },
+    30_000,
+  )
+
+  test.skipIf(process.platform !== "linux")(
+    "#given auto policy and a bwrap whose smoke is denied at spawn time #when three reflection spawns run #then each runs unsandboxed and the degradation is logged once",
+    async () => {
+      // given
+      const root = await mkdtemp(join(tmpdir(), "omo-memory-identity-runtime-deferred-"))
+      roots.push(root)
+      const paths = buildIdentityPaths(root, "agent-test")
+      await Promise.all([
+        paths.repo,
+        paths.transcripts,
+        paths.reflection,
+        paths.reflectionSessions,
+        paths.worktrees,
+      ].map((path) => mkdir(path, { recursive: true })))
+      const binDir = join(root, "bin")
+      await mkdir(binDir)
+      const bwrap = join(binDir, "bwrap")
+      await writeFile(bwrap, "#!/bin/sh\necho 'bwrap: setting up uid map: Permission denied' >&2\nexit 1\n")
+      await chmod(bwrap, 0o755)
+      const innerCommand = join(binDir, "senpi-fake")
+      await writeFile(innerCommand, "#!/bin/sh\nexit 0\n")
+      await chmod(innerCommand, 0o755)
+      const identity = createMemoryIdentityContext({
+        identity: "agent-test",
+        identityPaths: paths,
+        binding: { identity: "agent-test", repoPathHash: "hash", boundAt: 1 },
+      })
+      const ctx = componentContext()
+      const previousPath = process.env.PATH
+      const previousAgentDir = process.env.SENPI_CODING_AGENT_DIR
+      process.env.PATH = `${binDir}:${previousPath ?? ""}`
+      process.env.SENPI_CODING_AGENT_DIR = paths.runtime
+
+      try {
+        const runtime = createIdentityRuntime(identity, {
+          loadConfig: () => loadedMemoryConfig(memorySettings()),
+          cwd: () => root,
+          resolveModelRegistry: () => undefined,
+          logger: ctx.logger,
+        })
+        const sandbox = (runtime.runner as unknown as { options: { sandbox: ReflectionSandbox } }).options.sandbox
+        const spawnArgs = (runId: string): ReflectionSpawnArgs => ({
+          runId,
+          attempt: 1,
+          hardDeadlineAt: Date.now() + 10_000,
+          category: "quick",
+          conversationIds: ["conversation-a"],
+          model: "fixture/model",
+          command: innerCommand,
+          args: [],
+          cwd: paths.worktrees,
+          env: { PATH: binDir },
+          detached: true,
+          paths: {
+            sessionDir: paths.reflectionSessions,
+            worktree: paths.worktrees,
+            gitCommonDir: paths.repo,
+            transcript: join(paths.transcripts, "transcript.json"),
+            persona: join(paths.reflectionSessions, "persona.md"),
+            prompt: join(paths.reflectionSessions, "prompt.md"),
+          },
+        })
+
+        // when
+        const transformed = [
+          await sandbox(spawnArgs("reflection-run-1")),
+          await sandbox(spawnArgs("reflection-run-2")),
+          await sandbox(spawnArgs("reflection-run-3")),
+        ]
+
+        // then
+        expect(transformed.map((args) => args.command)).toEqual([innerCommand, innerCommand, innerCommand])
+        const degraded = ctx.logs.filter((entry) => entry.message === "memory reflection sandbox degraded")
+        expect(degraded).toHaveLength(1)
+        expect(degraded[0]).toMatchObject({
+          level: "warn",
+          details: { identity: "agent-test", runId: "reflection-run-1" },
+        })
+        expect(JSON.stringify(degraded[0]?.details)).toContain("setting up uid map: Permission denied")
       } finally {
         if (previousPath === undefined) delete process.env.PATH
         else process.env.PATH = previousPath
@@ -467,4 +601,3 @@ describe("memory identity runtime binds every launch to its own run (#10339)", (
     expect(seen).toEqual([{ conversationIds: ["conversation-a"] }])
   }, 30_000)
 })
-

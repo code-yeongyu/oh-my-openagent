@@ -14,9 +14,9 @@ describe("keyring fallback notice", () => {
     spyOn(process.stderr, "write").mockImplementation((chunk: string | Uint8Array) => { written.push(String(chunk)); return true })
     const unknownLock = async () => "unknown" as const
 
-    await createCredentialStore("https://api.omo.dev", memorySecrets().api, "linux", unknownLock, () => {}).read()
-    await createCredentialStore("https://api.omo.dev", memorySecrets().api, "linux", unknownLock).read()
-    await createCredentialStore("https://api.omo.dev", memorySecrets().api, "linux", unknownLock).read()
+    await createCredentialStore("https://api.omo.dev", { secrets: memorySecrets().api, platform: "linux", lockProbe: unknownLock, notice: () => {} }).read()
+    await createCredentialStore("https://api.omo.dev", { secrets: memorySecrets().api, platform: "linux", lockProbe: unknownLock }).read()
+    await createCredentialStore("https://api.omo.dev", { secrets: memorySecrets().api, platform: "linux", lockProbe: unknownLock }).read()
 
     expect(written.filter(line => line.includes("using libsecret directly"))).toHaveLength(1)
   })
@@ -27,9 +27,9 @@ describe("keyring fallback notice", () => {
     spyOn(process.stderr, "write").mockImplementation((chunk: string | Uint8Array) => { written.push(String(chunk)); return true })
     const unknownLock = async () => "unknown" as const
 
-    await createCredentialStore("https://api.omo.dev", memorySecrets().api, "linux", unknownLock).read()
-    await createCredentialStore("https://api.omo.dev", memorySecrets().api, "linux", unknownLock, () => {}).read()
-    await createCredentialStore("https://api.omo.dev", memorySecrets().api, "linux", unknownLock).read()
+    await createCredentialStore("https://api.omo.dev", { secrets: memorySecrets().api, platform: "linux", lockProbe: unknownLock }).read()
+    await createCredentialStore("https://api.omo.dev", { secrets: memorySecrets().api, platform: "linux", lockProbe: unknownLock, notice: () => {} }).read()
+    await createCredentialStore("https://api.omo.dev", { secrets: memorySecrets().api, platform: "linux", lockProbe: unknownLock }).read()
 
     expect(written.filter(line => line.includes("using libsecret directly"))).toHaveLength(1)
   })

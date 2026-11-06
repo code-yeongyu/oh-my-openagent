@@ -19,6 +19,7 @@ import {
 } from "./fallback-chain-resolution"
 import { transformModelForProvider } from "./provider-model-id-transform"
 import { isExcludedFallbackLaneModel } from "./fallback-lane-policy"
+import { LATEST_MODEL_BY_FAMILY } from "@oh-my-opencode/model-core/latest-models"
 
 export type { GeneratedOmoConfig } from "./model-fallback-types"
 
@@ -200,9 +201,9 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     if (role === "explore") {
       let agentConfig: AgentConfig
       if (avail.native.openai) {
-        agentConfig = { model: "openai/gpt-6-luna-fast", variant: "low" }
+        agentConfig = { model: `openai/${LATEST_MODEL_BY_FAMILY.gptLunaFast}`, variant: "low" }
       } else if (avail.native.claude) {
-        agentConfig = { model: "anthropic/claude-haiku-5-5", variant: "medium" }
+        agentConfig = { model: `anthropic/${LATEST_MODEL_BY_FAMILY.claudeHaiku}`, variant: "medium" }
       } else if (avail.opencodeZen) {
         agentConfig = { model: "opencode/gpt-5-nano" }
       } else if (avail.opencodeGo) {

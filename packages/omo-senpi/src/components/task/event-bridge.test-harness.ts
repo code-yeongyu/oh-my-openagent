@@ -31,6 +31,10 @@ type HarnessOptions = {
   readonly taskRpcTimers?: TaskRpcTimers
   // What the lifecycle's session-shutdown suspension reports (defaults to an empty summary).
   readonly summary?: SuspendSummary
+  // This engine's task store directory (`engine.stateDir`).
+  readonly stateDir?: string
+  // The run-pause bridge the event bridge drives (absent: run-pause wiring is off).
+  readonly runPause?: Parameters<typeof wireEventBridge>[5]["runPause"]
 }
 
 export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
@@ -153,7 +157,7 @@ export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
     agents: {},
     omoConfig: {} as TaskEngine["omoConfig"],
     settings: {} as TaskEngine["settings"],
-    stateDir: "",
+    stateDir: options.stateDir ?? "",
     memberLiveness: { acknowledgePersisted: async () => {} } as unknown as TaskEngine["memberLiveness"],
     notifyOwnedMemberLiveness: async (record: TaskRecord) => {
       livenessCalls.push(record.task_id)
@@ -188,7 +192,11 @@ export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
     },
   } as unknown as SessionTransitionBridge
 
+  const forgottenTaskOutputSessions: string[] = []
   const state = {
+    forgetTaskOutputReads: (sessionId: string) => {
+      forgottenTaskOutputSessions.push(sessionId)
+    },
     reconcileTeamMailbox: async () => {
       order.push("reclaim")
     },
@@ -200,6 +208,7 @@ export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
         order.push("leadShutdown")
       },
     },
+    ...(options.runPause === undefined ? {} : { runPause: options.runPause }),
     resumptionChannels: {
       emitSessionStart: async () => {
         const count = options.resumptionChannelCount ?? 0
@@ -226,14 +235,23 @@ export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
     config: { getFlag: () => undefined },
   } as unknown as ComponentContext
 
-  wireEventBridge(pi, ctx, engine, statusUi, transitions, state, {
+  const bridge = wireEventBridge(pi, ctx, engine, statusUi, transitions, state, {
     ...(options.taskRpcTimers === undefined ? {} : { taskRpc: { timers: options.taskRpcTimers } }),
   })
+  // Session-start recovery runs in the background (#11335): a dispatch here returns once that chain
+  // has ended too, so the chain tests read its settled order rather than a moment in it.
+  const dispatch = pi.dispatch.bind(pi)
+  pi.dispatch = async (...args: Parameters<typeof pi.dispatch>) => {
+    const result = await dispatch(...args)
+    if (args[0] === "session_start") await bridge.sessionStartRecovered()
+    return result
+  }
 
   return {
     pi,
     calls,
     order,
+    forgottenTaskOutputSessions,
     warnings,
     infos,
     reconcileCalls,

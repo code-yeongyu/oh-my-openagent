@@ -1,3 +1,27 @@
+## 2026-10-31 - Drop the Claude Code UA floor rewrite of the installed engine (#11964, part of senpi#5131)
+
+`packages/omo-native/bin/lib/claude-code-floor.js` is deleted and `engine-prepare.js` `prepareInstalledEngine` no longer calls `floorClaudeCodeVersion`. senpi#5131 removes the `anthropic` provider's Claude Code OAuth impersonation path and with it the `claudeCodeVersion` declaration in `@earendil-works/pi-ai/dist/api/anthropic-messages.js` and the engine bundle; against such an engine the floor step threw `omo-ai: unsupported Senpi ...: no claudeCodeVersion declaration` on every launch (reported, never fatal) and had nothing left to protect. `senpi-patch.test.ts` (floor-only) is deleted; `engine-prepare-on-launch.test.ts` proves the stamp and the RPC guard without the UA fixture, and the other fixtures stop writing a fake `anthropic-messages.js`. knip entries for the deleted file are removed. Merge order: this lands before omo pins an engine that contains senpi#5131.
+
+## 2026-10-31 - Forward Windows private pipe pairs (#11955)
+
+The shared private descriptor inspector accepts two distinct open pipe descriptors in 5..64 on Windows, refusing aliases (including those in malformed arrays), non-pipes, and runtime IPC descriptors atomically. Pipe detection checks the file-type mode bits because Node's Windows `Stats.isFIFO()` returns false even for an open pipe. The first launcher import captures and removes the table before helper children run. Explicit engine hops preserve the pair's stdio slots, including when capturing stderr, and close owned Windows copies immediately after spawn or a synchronous spawn failure. Shells receive null declarations without either private slot. Receipt-side inherit clearing stays in senpi; the POSIX socket path from #11786 is unchanged.
+
+## 2026-10-29 - Recover corrupt account credentials (#11832)
+
+Unscoped forget clears the stored credential under the session lock without a read. Scoped forget compares the current device under that lock and reports unreadable ownership as a JSON refusal. Only a well-formed target argument can select scoped deletion; malformed flags are rejected before store access. Explicit adopt replacement tolerates invalid data but not OS storage failures.
+
+## 2026-10-29 - Private descriptors survive the launcher hop (#11772)
+
+`bin/lib/private-fd-table.js` decides whether a launch carries private descriptors: a valid `SENPI_PRIVATE_FDS` table whose integer entries are open, unshared sockets in 5..15 that are not the runtime's IPC channel; every other entry still travels as `null` so the engine keeps the name declared, and named sockets the launcher cannot forward are closed on all three paths (the npm launcher at its first import, the Bun re-exec, and the compiled provisioned-runtime handoff before it spawns), never on Windows. `bin/lib/private-fds.js` captures and removes the table at the npm launcher's first import, so its helper children never see it. `spawnSenpi`, `maybeReexecUnderBun` and `reexecProvisionedRuntime` hand off through the existing signal-aware child with those descriptors in stdio when a table is present, and keep `execve` otherwise. `reexecProvisionedRuntime` reads the table without removing it, because the compiled entry runs the engine in-process and the engine's own capture must still see it. Measured: `execve` does not keep inherited descriptors on Node 24.22 or Bun 1.4.4 in any hop/target pairing, which also dropped fd 4 presenter enrollment through the npm launcher.
+
+## 2026-10-27 - SENPI_BRAND carries the OmO logo (#11445)
+
+`bin/lib/brand-logo.generated.js` (written by `bun script/build-brand-logo.ts` from `.github/assets/omo-icon-light.svg`) exports `OMO_BRAND_LOGO`, the icon as a base64 SVG data URI. `engine-environment.js` `brandProfile()` and `compiled-environment.ts` put it in `SENPI_BRAND.logo`, which the engine renders on the provider sign-in result page once the pinned senpi includes senpi#4432/#4434 (2026.10.27-1 ignores it). `bun run brand-logo:check` (also in CI's committed-bundle step) fails when the module is stale; the generator normalizes the icon to LF and `.gitattributes` keeps `*.svg` LF, so a Windows checkout produces the same module.
+
+## 2026-10-26 - Reinstall and sign-in guidance (#11390)
+
+The launcher sets `OMO_REINSTALL_COMMAND` (`updateTarget().command`) for the engine so the plugin can name the reinstall command after `SENPI_BRAND` is scrubbed. `runThreadCommand` takes a `reinstall` step from its caller (npm: the reinstall command; compiled: the releases page). `omo update` on an install already at the channel version whose engine tree cannot be resolved exits 1 with the reinstall command. `omo sync` reads the account refusal body's code through `ApiRefusal`, using the shared guidance and falling back to HTTP status for unknown or malformed bodies. Forbidden accounts are not told to sign in again; deleted accounts get the account-deleted action both here and during session refresh.
+
 Review #10496 round 2 (#10478). `applySetupStages` now tracks the files its own earlier stages wrote and passes them to `staleGuard`; `staleSetupTargets(plans, ids, written)` ignores those paths. Before this, an apply of every stage with a custom-provider key stopped halfway: the credentials stage rewrote auth.json, then the provider stage compared auth.json against the scan-time bytes and answered `stale` after credentials were written. A skill directory planned as new is now stale when anything exists at its path (it was read as a file, so the check never fired). `omo setup` passes no guard and is unchanged.
 
 ## 2026-10-18 - Onboarding apply refuses stale targets and rides the engine's credential store (#10496)
@@ -92,17 +116,6 @@ so an unrelated failed leg cannot block the arm64 publishes. Both publish decisi
 via env), and `script/publish-platform-smoke-gate.test.ts` runs those exact step bodies: an empty download dir fails with
 the reason, a present payload passes, and the arm64 gate refuses on a failed or skipped smoke for arm64 legs only.
 
-## 2026-10-01 - The gateway hook's integrity check and its tests agree on Windows paths (follow-up to #9243)
-
-`verifyGatewayPackage` (`bin/lib/gateway.js`) resolves the package directory and its host entry with
-`realpathSync.native` instead of `realpathSync`. On Windows, `realpathSync` can keep an 8.3 short name
-(`C:\Users\RUNNER~1\...`) while the module loader hands back the long name for the same directory. That made the
-two sides of the containment check spell one directory two ways, which can falsely refuse a valid install reached
-through a short path. `.native` returns the canonical long name on both sides, and on POSIX it changes nothing. The test
-fixtures (`test/gateway.test-support.ts`) create their temp roots with `realpathSync.native` too, so the paths they
-expect match what the hook reports. That fixes the eight Windows-only failures in `test/gateway.test.ts` and
-`test/gateway-integrity.test.ts` on dev.
-
 ## 2026-10-01 - A `bun add -g` update leaves an `omo` that starts without node (#9293)
 
 `bun add -g omo-ai` links `<bun root>/bin/omo` (and `install/global/node_modules/.bin/omo`) back to `bin/omo.js`,
@@ -185,44 +198,6 @@ cannot repair an asset absent from that payload or enforce a gate on another rel
 ### Expected merge conflict zones
 
 The engine-sidecar resolver, binary staging fixture, and release smoke workflow.
-
-## 2026-09-30 - The gateway host receives omo's plugin root and the thread SDK URL (#9243)
-
-`runGatewayCommand` and the doctor call into the installed gateway now also pass `pluginRoot`, omo's staged plugin
-payload (`<packageRoot>/plugin`, from `package-paths.js` as doctor resolves it), and `threadSdkUrl`, the `file:` URL of
-`<pluginRoot>/runtime/thread-sdk/sdk.js`, so the gateway neither derives the install from `argv[1]` nor knows the
-payload layout. Both come from the hook's own module URL, so a symlinked install hands over the real install's paths.
-The SDK file ships with the thread SDK (#9222); until then the URL names a file that does not exist yet, and omo does
-not check it, so `omo gateway` behaves as before. `test/gateway.test.ts` covers the command (plain and symlinked
-install) and the doctor call; each case fails with its field removed.
-
-## 2026-09-30 - The gateway hook verifies the installed package before importing it (#9243)
-
-Before `bin/lib/gateway.js` imports `@oh-my-opencode/omo-gateway/host`, `verifyGatewayPackage` finds the package's
-`package.json` on the same resolver search paths the import walks and refuses the package, as `broken` with a reason that
-names its directory, unless the manifest `name` is exactly `@oh-my-opencode/omo-gateway`, it declares
-`omoGateway.hostContract` equal to 1 (the runtime `HOST_CONTRACT_VERSION` check stays), and the host entry the import
-resolves stays inside the package directory once symlinks are resolved on both sides. A refused package never runs:
-`omo gateway` prints the reason and exits 1, the doctor gateway row is `FAIL`. No package directory is still `missing`, and
-nothing changes for an install without the package. `test/gateway-integrity.test.ts` (5 cases) covers a foreign name, a
-missing and a mismatched manifest contract, a host entry symlinked out of the package, and a verified package reached
-through a symlinked package directory; each fails with its check removed.
-
-## 2026-09-30 - `omo gateway` and the doctor gateway rows load a separately installed gateway package (#9243)
-
-`bin/lib/gateway.js` is a hook, not a gateway: `omo gateway <args>` imports `@oh-my-opencode/omo-gateway/host` by bare
-name from omo's own install (the resolution the gateway itself uses for adapter packages), checks its
-`HOST_CONTRACT_VERSION` (1), and calls its `runGatewayCommand` with argv, stdio, env, cwd, the canonical agent dir,
-home and the argv that relaunches `omo gateway connect`. Without the package it prints one line, `omo gateway: the omo
-gateway is not installed: ...`, and exits 1; a package that fails to load or speaks another contract is named as
-such and also exits 1. `omo doctor` adds gateway rows only when the user config (`~/.omo/omo.jsonc` or `omo.json`) sets
-`gateway` at its top level or in `[native]`: one `WARN gateway:` row when the package is missing, `FAIL gateway:` when
-it is broken, otherwise `PASS gateway: installed` followed by the package's own rows, and a package `FAIL` row fails
-doctor. Without a `gateway` section nothing is imported and doctor output is unchanged. The launcher imports the hook
-lazily, so the startup path does not load it. `omo-config-core` accepts `gateway` as an open object in the root, layer
-and harness-block schemas so a config carrying it loads without an unknown-key diagnostic; omo never reads it.
-`test/gateway.test.ts` (9 cases) drives a packaged copy of `bin/` with and without a fixture package installed beside it;
-`omo-config-core` `src/schema/gateway.test.ts` (3 cases) fails on dev.
 
 ## 2026-09-30 - The compiled binary hands a downloaded Claude Code to the engine at startup (#9276)
 

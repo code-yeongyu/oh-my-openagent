@@ -16,6 +16,26 @@ export type ReadClassifier = (input: {
 
 export interface BeforeAgentStartHandlerOptions {
   previewSafe?: boolean
+  /** Stable omo subscriber name, retained in bundled settle diagnostics. */
+  hookLabel?: string
+  /** Required read-only status delivery before host settlement; never journal writes, reflection or recovery. */
+  settleDelivery?: boolean
+}
+
+export interface SettleObserver {
+  readonly signal: AbortSignal
+  /** Names the current await and refuses to begin another phase after retirement. */
+  phase(label: string): void
+}
+
+/** Figures for one section of senpi's on-demand memory report. */
+export type MemoryReporter = () => Readonly<Record<string, number>>
+
+/** Structural transport capability; absent on internal calls and older hosts. */
+export interface ExtensionRpcRequestContext {
+  readonly ownerId: string
+  readonly disconnectSignal: AbortSignal
+  readonly admit: <T>(dispatch: () => T) => T
 }
 
 export interface SenpiExtensionAPI {
@@ -35,18 +55,23 @@ export interface SenpiExtensionAPI {
   readonly sessionContext?: unknown
   on(
     event: string,
-    handler: (payload: unknown, ctx?: unknown) => unknown | Promise<unknown>,
+    handler: (payload: unknown, ctx?: unknown, observer?: SettleObserver) => unknown | Promise<unknown>,
     options?: BeforeAgentStartHandlerOptions,
   ): void
   rpc?: {
     emit(name: string, data: unknown): void
-    handle?(name: string, handler: (data: unknown) => unknown | Promise<unknown>): void
+    handle?(name: string, handler: (data: unknown, context?: ExtensionRpcRequestContext) => unknown | Promise<unknown>): void
   }
   events?: {
     emit(name: string, data: unknown): void
     on(name: string, handler: (payload: unknown) => void): () => void
   }
   registerTool(tool: Record<string, unknown>): void
+  /**
+   * Adds figures to senpi's on-demand memory report (`SENPI_MEMORY_REPORT=1`), read only when a report
+   * is taken. Optional: hosts older than the release that added the report do not have it.
+   */
+  registerMemoryReporter?(name: string, reporter: MemoryReporter): void
   registerCommand(name: string, options: Record<string, unknown>): void
   registerFlag(
     name: string,
@@ -79,6 +104,12 @@ export interface SenpiExtensionAPI {
   /** `options.startupBookkeeping` (senpi#3329): older hosts ignore the third argument. */
   appendEntry?(customType: string, data?: unknown, options?: { readonly startupBookkeeping?: boolean }): void
   registerMcpServer?(name: string, config: Record<string, unknown>): void
+  /**
+   * Every subscription account's latest limit windows, polled and kept by the engine (senpi#3684).
+   * Feature-detected: older hosts expose nothing, and the panel then shows no usage section.
+   */
+  getSubscriptionLimits?(): readonly SenpiAccountLimits[]
+  onSubscriptionLimits?(listener: (limits: SenpiAccountLimits) => void): () => void
   /** The running senpi version (code-yeongyu/senpi#3674); hosts before it report none. */
   readonly hostVersion?: string
   /**
@@ -89,12 +120,36 @@ export interface SenpiExtensionAPI {
     text: string,
     options?: { readonly extraLiterals?: readonly string[] },
   ): { readonly text: string; readonly counts: Readonly<Record<string, number>> }
+  /**
+   * The engine's session lifecycle (senpi#3864). `markRunCompleted` tells it a workflow run finished inside the
+   * current epoch, so the epoch's `done` reads `completion.kind = "run"`. Feature-detected: hosts before senpi
+   * 2026.10.23-1 expose nothing.
+   */
+  readonly lifecycle?: {
+    markRunCompleted(run: { readonly runId: string }): void
+  }
   /** Run a command. Feature-detected: hosts older than the release that added it expose nothing. */
   exec?(
     command: string,
     args: string[],
     options?: { cwd?: string; timeout?: number },
   ): Promise<{ stdout: string; stderr: string; code: number }>
+}
+
+/** One account's record in senpi's subscription-limit store, as `get_subscription_limits` serves it. */
+export interface SenpiAccountLimits {
+  readonly provider: string
+  readonly account: string
+  readonly windows: readonly {
+    readonly id: string
+    readonly label: string
+    readonly windowMinutes?: number
+    readonly usedPercent: number
+    readonly resetsAt?: string
+  }[]
+  readonly reportedAt: string
+  readonly plan?: string
+  readonly error?: string
 }
 
 export interface ComponentLogger {

@@ -24,7 +24,7 @@ export function renderNudgeBlock(nudge: RecallNudge): string {
     .replaceAll('"', "&quot;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
-  const path = escapeMarkup(redactSecretLikeMaterial(nudge.path))
+  const path = escapeMarkup(redactSecretLikeMaterial(nudge.source ?? nudge.path))
   const hint = escapeMarkup(redactSecretLikeMaterial(nudge.hint))
   return [
     `<recalled-memory source="[[${path}]]">`,

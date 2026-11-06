@@ -7,7 +7,7 @@ import { dirname, join } from "node:path"
 import { senpiWorkerCompileArgs } from "./senpi-worker-compile"
 import { removeTreeSync } from "../test-support/remove-tree"
 
-test.each(["directory", "bun-link", "external-link"])("#given a %s worker engine #when compiled and relocated #then two workers start without source files", (layout) => {
+test.each(["directory", "bun-link", "external-link"])("#given a %s worker engine #when compiled and relocated #then two workers start and the kill-guard judge imports without source files", (layout) => {
   const scratch = mkdtempSync(join(tmpdir(), "omo-worker-compile-"))
   try {
     // given: mirror the published engine layout and compile-time worker contract.
@@ -18,22 +18,32 @@ test.each(["directory", "bun-link", "external-link"])("#given a %s worker engine
       ? join(root, "node_modules/.bun/senpi/node_modules/@code-yeongyu/senpi")
       : join(buildRoot, "engine")
     mkdirSync(join(physicalPackage, "dist/modes/rpc"), { recursive: true })
+    mkdirSync(join(physicalPackage, "dist/core/kill-guard"), { recursive: true })
     if (layout !== "directory") {
       mkdirSync(dirname(packagePath), { recursive: true })
       symlinkSync(physicalPackage, packagePath, "junction")
     }
     const worker = join(packagePath, "dist/modes/rpc/session-worker.js")
     writeFileSync(worker, `import { parentPort } from "node:worker_threads"; parentPort.postMessage("ready");`)
+    // The judge a codemode kernel imports by URL (senpi#5358 host.ts judgeModuleUrl), never through the bundle graph.
+    writeFileSync(join(packagePath, "dist/core/kill-guard/index.js"), `export const KILL_GUARD_TAG = "judge-ok";`)
     const entry = join(root, "entry.ts")
     writeFileSync(entry, `import { Worker } from "node:worker_threads";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+const judgePath = typeof SENPI_KILL_GUARD_ENTRY === "string" ? SENPI_KILL_GUARD_ENTRY : "./src/core/kill-guard/index.ts";
+const judge = await import(pathToFileURL(fileURLToPath(new URL(judgePath, import.meta.url))).href);
 const path = typeof SENPI_RPC_SESSION_WORKER_ENTRY === "string" ? SENPI_RPC_SESSION_WORKER_ENTRY : "./src/modes/rpc/session-worker.ts";
 await Promise.all([1, 2].map(() => new Promise((resolve, reject) => {
   const worker = new Worker(fileURLToPath(new URL(path, import.meta.url)).replaceAll("\\\\", "/"));
   worker.once("error", reject);
-  worker.once("message", async (message) => { await worker.terminate(); resolve(message); });
+  // The worker posts once and exits on its own. Awaiting terminate() from its message handler races
+  // that exit: Bun 1.4.4 re-emits queued messages from #onClose before it records the exit code, and a
+  // terminate() issued there never settles, pinning the process (#11940). Wait for the exit instead.
+  let message;
+  worker.once("message", (value) => { message = value; });
+  worker.once("exit", (code) => code === 0 && message !== undefined ? resolve(message) : reject(new Error(\`worker exited \${code} before ready\`)));
 })));
-console.log("two-workers-ready");`)
+console.log("two-workers-ready " + judge.KILL_GUARD_TAG);`)
     const binary = join(scratch, process.platform === "win32" ? "omo.exe" : "omo")
     // when: use the same args as the release builder, then remove the entire source.
     const built = spawnSync(process.execPath, ["build", "--compile", entry, ...senpiWorkerCompileArgs(root), "--outfile", binary], { cwd: root, encoding: "utf8", timeout: 30_000 })
@@ -46,8 +56,8 @@ console.log("two-workers-ready");`)
     removeTreeSync(buildRoot, { maxRetries: 10, retryDelay: 100 })
     const result = spawnSync(moved, [], { cwd: relocated, encoding: "utf8", timeout: 10_000 })
     // then
-    expect(result.status, result.stderr).toBe(0)
-    expect(result.stdout.trim()).toBe("two-workers-ready")
+    expect(result.status, `signal=${result.signal} error=${result.error?.message} stderr=${result.stderr}`).toBe(0)
+    expect(result.stdout.trim()).toBe("two-workers-ready judge-ok")
   } finally {
     // Windows keeps a just-executed image locked briefly after the process exits; allow the same
     // bounded release window the isolation-core fixtures use for this EBUSY family.

@@ -1,4 +1,5 @@
 import type { WorkpoolAdmission } from "./ports"
+import type { ResumeCredential } from "../pause/admission-barrier"
 import { reconcileWorkerTurn, reconcileWorkpool, uncertainItem } from "./reconcile"
 import type { WorkpoolStore } from "./store"
 import { WorkpoolError, type PoolId, type WorkpoolEvent, type WorkpoolRecord, type WorkpoolWorker } from "./types"
@@ -17,6 +18,7 @@ export function createWorkpoolDispatcher(ports: {
   const scheduled = new Map<PoolId, ReturnType<typeof setImmediate>>()
   const pending = new Map<string, { readonly poolId: PoolId; readonly workerId?: string; cancel(): void }>()
   const completions = new Map<string, AbortController>()
+  const credentials = new Map<PoolId, ResumeCredential>()
   let disposed = false
 
   function schedule(poolId: PoolId): void {
@@ -34,14 +36,17 @@ export function createWorkpoolDispatcher(ports: {
   }
   function pump(poolId: PoolId): void {
     const pool = store.load(poolId)
+    if (pool.hold !== undefined) return
     if (pool.status !== "open" && pool.status !== "closing") return
     const reservedWorkers = new Set([...pending.values()].flatMap(value => value.workerId === undefined ? [] : [value.workerId]))
     for (const snapshot of pool.items) {
       const fresh = store.load(poolId)
+      if (fresh.hold !== undefined) return
       const item = fresh.items.find(candidate => candidate.item_id === snapshot.item_id)
       if (item === undefined || pending.has(item.item_id)) continue
       const recovery = item.status === "assigned" && item.delivery?.phase === "queued" ? item.binding : undefined
       if (item.status !== "queued" && recovery === undefined) continue
+      if (recovery !== undefined && admission.get(recovery.task_id)?.status === "paused") continue
       // A recovered turn's worker is the task as it is now: its predecessor epoch is the task's own run_epoch, not
       // binding - 1, because a rollback may have burnt the epochs in between (#9562).
       const recoveredTask = recovery !== undefined && recovery.run_epoch > 0 ? stores.tasks.load(recovery.task_id) : null
@@ -55,11 +60,12 @@ export function createWorkpoolDispatcher(ports: {
       let boundTask: string | undefined = recovery?.task_id
       const current = (): boolean => {
         const latest = store.load(poolId)
-        return !disposed && latest.generation === pool.generation && (latest.status === "open" || latest.status === "closing") &&
+        return !disposed && latest.hold === undefined && latest.generation === pool.generation && (latest.status === "open" || latest.status === "closing") &&
           latest.items.some(candidate => candidate.item_id === item.item_id && (candidate.status === "queued" ||
             (candidate.binding?.task_id === boundTask && (candidate.status === "assigned" || candidate.yield_sha256 !== undefined))))
       }
       const request = admission.request({ pool, item, ...(idle === undefined ? {} : { worker: idle }), current,
+        ...(credentials.get(poolId) === undefined ? {} : { resumeCredential: credentials.get(poolId) }),
         authorize: () => ports.authorize(store.load(poolId)),
         bind: (taskId, epoch) => {
           let bound = false
@@ -87,6 +93,7 @@ export function createWorkpoolDispatcher(ports: {
         event: event => {
           if (event.kind === "admission_failed") {
             pending.delete(item.item_id)
+            if (store.load(poolId).hold !== undefined) return
             store.mutate(poolId, latest => latest.generation !== pool.generation ? latest : { ...latest, items: latest.items.map(candidate => {
               const affected = candidate.item_id === item.item_id || (boundTask !== undefined && candidate.binding?.task_id === boundTask && candidate.binding.run_epoch === event.run_epoch)
               if (!affected || (candidate.status !== "queued" && candidate.status !== "assigned")) return candidate
@@ -103,6 +110,7 @@ export function createWorkpoolDispatcher(ports: {
           emit(event)
         },
       })
+      if (request.kind === "held") return
       pending.set(item.item_id, { poolId, workerId: idle?.task_id, cancel: request.cancel })
       emit({ kind: "waiting", pool_id: poolId, item_id: item.item_id })
       admission.drain()
@@ -116,6 +124,7 @@ export function createWorkpoolDispatcher(ports: {
     void admission.waitFor(taskId, controller.signal).then(record => {
       completions.delete(identity)
       if (disposed || record.notification.run_epoch !== epoch) return
+      if (record.status === "paused" || store.load(pool.pool_id).hold !== undefined) return
       reconcileWorkerTurn(stores, { pool_id: pool.pool_id, generation: pool.generation, task_id: taskId, run_epoch: epoch })
       store.mutate(pool.pool_id, latest => {
         if (latest.generation !== pool.generation) return latest
@@ -131,11 +140,16 @@ export function createWorkpoolDispatcher(ports: {
         error: { code: "store_corrupt", message: error instanceof Error ? error.message : "Worker reconciliation failed." } })
     })
   }
-  function attach(poolId: PoolId): void {
+  function attach(poolId: PoolId, credential?: ResumeCredential): void {
+    if (credential !== undefined) credentials.set(poolId, credential)
+    const pool = store.load(poolId)
+    if (pool.hold !== undefined) return
     reconcileWorkpool(stores, poolId, (taskId, epoch) => completions.has(`${taskId}:${epoch}`) || [...pending.values()].some(request => request.workerId === taskId))
+    for (const worker of store.load(poolId).workers) if (worker.status === "busy" || worker.status === "paused") observeCompletion(pool, worker.task_id, worker.run_epoch)
     schedule(poolId)
   }
   function cancel(poolId: PoolId): void {
+    credentials.delete(poolId)
     const immediate = scheduled.get(poolId)
     if (immediate !== undefined) clearImmediate(immediate)
     scheduled.delete(poolId)
@@ -154,6 +168,7 @@ export function createWorkpoolDispatcher(ports: {
     pending.clear()
     for (const controller of completions.values()) controller.abort()
     completions.clear()
+    credentials.clear()
   }
   return { schedule, attach, cancel, stopScheduling }
 }

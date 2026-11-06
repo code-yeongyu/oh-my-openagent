@@ -20,6 +20,17 @@ export const COMMANDS = Object.freeze([
 	"outcome finish",
 	"outcome briefing",
 	"format-extract",
+	"fact add",
+	"fact quote",
+	"fact retract",
+	"fact export",
+	"fact fill",
+	"fact verify",
+	"fact derive",
+	"source snapshot",
+	"source refresh",
+	"source probe-conversion",
+	"claims index",
 ])
 
 export async function run(argv) {
@@ -36,9 +47,19 @@ export async function run(argv) {
 			return runOutcome(rest)
 		case "format-extract":
 			return runFormatExtract(rest)
+		case "fact":
+			return (await import("./fact-commands.mjs")).runFact(rest)
+		case "source":
+			return (await import("./source-commands.mjs")).runSource(rest)
+		case "claims":
+			return (await import("./source-commands.mjs")).runClaims(rest)
 		case "--help":
 		case "help":
-			if (rest.includes("--json")) return { json: { commands: COMMANDS }, exitCode: 0 }
+			if (rest.includes("--json")) {
+				const { SNAPSHOT_USAGE } = await import("./source-commands.mjs")
+				const { REFRESH_USAGE } = await import("./source-refresh.mjs")
+				return { json: { commands: COMMANDS, usage: { "source snapshot": SNAPSHOT_USAGE, "source refresh": REFRESH_USAGE } }, exitCode: 0 }
+			}
 			return { text: `report-tools <command>\n${COMMANDS.map((name) => `  ${name}`).join("\n")}`, exitCode: 0 }
 		default:
 			throw new CliError(`usage: report-tools <${COMMANDS.join(" | ")}> (run --help)`)

@@ -3,7 +3,7 @@
 // memory module supervisor and the end-to-end encrypted sync runner for durable sessions.
 
 import type { OmoMemorySettings } from "@oh-my-opencode/omo-config-core"
-import { isAutoAgentValue, resolveAutoIdentity, resolveMemoryIdentity, resolveMemoryRoot } from "@oh-my-opencode/memory-core"
+import { isAutoAgentValue, resolveAutoIdentity, resolveMemoryIdentity, resolveMemoryRoot, type InFlightReads } from "@oh-my-opencode/memory-core"
 
 import type { ComponentContext } from "../../extension/types"
 import type { SenpiOmoConfigResult } from "../config-resolution"
@@ -12,6 +12,7 @@ import { logBindReconcileFailure } from "./bind-reconcile-log"
 import type { MemoryExtensionAPI } from "./capabilities"
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
 import { adoptSessionIdentity } from "./identity-adoption"
+import { revokeProjectMemoryReads } from "./project-memory-grants"
 import { memoryModuleSupervisor } from "./supervisor"
 import type { SyncRunner } from "./sync-runner"
 import { isOneShotSurface, resolveIdentityRunPaths, type IdentityRunPaths } from "./transient-identity"
@@ -54,6 +55,8 @@ export interface SessionBinderDeps {
   readonly loadConfig: (options?: { readonly cwd?: string }) => SenpiOmoConfigResult
   readonly sessions: Map<string, SessionState>
   readonly wiring: Pick<ReturnType<typeof createMemoryWiring>, "afterBind">
+  /** The memory work the session_shutdown drain awaits; the bind-time reconcile floats past the bind, so it is tracked here. */
+  readonly work: InFlightReads
   readonly syncRunner: SyncRunner
   readonly isEnabled: (config: OmoMemorySettings) => boolean
   readonly resolveConfig: (loaded: SenpiOmoConfigResult) => OmoMemorySettings
@@ -136,6 +139,7 @@ export function createSessionBinder(deps: SessionBinderDeps): SessionBinder {
       identityPaths: run.paths,
       durableRoot: run.durableRoot,
       binding,
+      projectScope: { memoryRoot, autoIdentity: sessionConfig.auto_identity },
     })
     memoryModuleSupervisor.acquire()
     if (!oneShot) {
@@ -146,7 +150,8 @@ export function createSessionBinder(deps: SessionBinderDeps): SessionBinder {
     pi.appendEntry(MEMORY_BINDING_CUSTOM_TYPE, binding, { startupBookkeeping: true })
     // Bind-time reconcile floats past the bind by design, but its rejection must not
     // float: an unhandled rejection is attributed to whatever code is running when it lands.
-    void wiring.afterBind(pi, surface.id, state.context, eventCtx).catch((error: unknown) => {
+    const context = state.context
+    void deps.work.track(() => wiring.afterBind(pi, surface.id, context, eventCtx)).catch((error: unknown) => {
       logBindReconcileFailure(ctx.logger, error)
     })
   }
@@ -154,6 +159,7 @@ export function createSessionBinder(deps: SessionBinderDeps): SessionBinder {
 
 export function releaseSession(state: SessionState | undefined, syncRunner?: SyncRunner): void {
   if (state?.context === undefined) return
+  revokeProjectMemoryReads(state.context)
   memoryModuleSupervisor.release()
   state.context = undefined
   if (state.syncRepo !== undefined && syncRunner !== undefined) void syncRunner.release(state.syncRepo)

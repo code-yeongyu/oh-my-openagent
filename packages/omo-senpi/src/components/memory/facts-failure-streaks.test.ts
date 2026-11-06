@@ -303,7 +303,8 @@ describe("facts terminal failure recording", () => {
     const state = await store.readFailures()
     expect(state.entries).toHaveLength(1)
     expect(state.entries[0]).toMatchObject({ state: "parked", streak: 5, nextEligibleAt: null })
-    expect(await queue.listPending()).toHaveLength(1)
+    expect(await queue.listPending()).toHaveLength(0)
+    expect(await readdir(factsQueuePaths(identity.paths).parkedDir)).toHaveLength(1)
   }, 60_000)
 
   test("#given retention keeps freeing the attempt name #when six launches fail #then the streak still parks the endpoint", async () => {

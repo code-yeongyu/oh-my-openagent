@@ -8,6 +8,7 @@ import { KIBITZER_SUMMARY_SCHEMA } from "./kibitzer-schema"
 import { KNOWN_MODELS, KNOWN_PROVIDERS } from "./model-vocabulary"
 import { PARALLELISM_SUMMARY_SCHEMA } from "./parallelism-schema"
 import { SESSION_SUMMARY_SCHEMA } from "./session-summary-schema"
+import { TELEMETRY_SESSION_ROLES } from "./session-role"
 
 export type OmoNativePropertyType = "boolean" | "number" | "string"
 
@@ -30,7 +31,8 @@ function enumProperty<const Values extends readonly string[]>(values: Values): R
 export const CURATED_AGENTS = Object.freeze([...CURATED_READONLY_AGENT_NAMES])
 export const BUILTIN_CATEGORY_NAMES = Object.freeze(BUILTIN_CATEGORY_DEFAULTS.map(({ name }) => name))
 export const BUILTIN_SKILL_NAMES = Object.freeze([
-  "ast-grep", "browser", "coding-agent-sessions", "dag-library", "data-scientist", "debugging", "frontend", "git-master",
+  "ast-grep", "browser", "coding-agent-sessions", "dag-library", "data-scientist", "debugging", "eval-integrity",
+  "frontend", "git-master",
   "give-me-tips", "hyperplan", "init-deep", "lsp-setup", "mass-ulw", "onboarding", "programming", "refactor",
   "remove-ai-slops",
   "review-work", "ulw-execute", "ultimate-browsing", "ultrawork", "ulw-loop", "ulw-plan", "ulw-research",
@@ -78,6 +80,7 @@ export const OMO_NATIVE_EVENT_SCHEMAS = Object.freeze({
     signed_in_provider_count: NUMBER_PROPERTY,
     providers: STRING_PROPERTY,
     reason: enumProperty(["startup", "reload", "new", "resume", "fork"] as const),
+    session_role: enumProperty(TELEMETRY_SESSION_ROLES),
     // Device-reported IANA zone. A timezone signal, never a country signal: countries share zones,
     // span zones, and users override them. Country comes from PostHog's server-side GeoIP.
     timezone: STRING_PROPERTY,
@@ -105,6 +108,7 @@ export const OMO_NATIVE_EVENT_SCHEMAS = Object.freeze({
     "$session_id": STRING_PROPERTY,
     cache_read_tokens: NUMBER_PROPERTY,
     cache_write_tokens: NUMBER_PROPERTY,
+    cost_1e4: NUMBER_PROPERTY,
     cost_usd: NUMBER_PROPERTY,
     input_tokens: NUMBER_PROPERTY,
     model_id: enumProperty([...new Set(Object.values(KNOWN_MODELS).flat()), "custom"] as const),
@@ -112,6 +116,7 @@ export const OMO_NATIVE_EVENT_SCHEMAS = Object.freeze({
     provider: enumProperty([...KNOWN_PROVIDERS, "custom"] as const),
     reasoning_tokens: NUMBER_PROPERTY,
     sample_rate: NUMBER_PROPERTY,
+    session_role: enumProperty(TELEMETRY_SESSION_ROLES),
     total_tokens: NUMBER_PROPERTY,
     turn_index: NUMBER_PROPERTY,
   }),
@@ -179,7 +184,6 @@ export const OMO_NATIVE_COMMON_PROPERTY_SCHEMAS = Object.freeze({
   ci: BOOLEAN_PROPERTY,
   event_id: STRING_PROPERTY,
   install_hash: STRING_PROPERTY,
-  machine_hash: STRING_PROPERTY,
   package_version: STRING_PROPERTY,
   platform: enumProperty(["omo-senpi"] as const),
   product_name: enumProperty(["omo-native"] as const),

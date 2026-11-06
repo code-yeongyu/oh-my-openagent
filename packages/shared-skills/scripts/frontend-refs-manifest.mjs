@@ -15,6 +15,7 @@ export const designOriginals = [
 	"clone-from-url.md",
 	"component-catalogs.md",
 	"design-system-architecture.md",
+	"grounding.md",
 	"interaction-skill.md",
 	"layout-skill.md",
 	"lazyweb.md",

@@ -45,17 +45,23 @@ export async function auditMemoryRepo(
 
   for (const path of files.filter((file) => file.endsWith(".md"))) {
     const homePath = path.startsWith(LEGACY_PREFIX) ? path.slice(LEGACY_PREFIX.length) : path
-    if (!HOMES.has(homePath.split("/")[0] ?? "") && !ROOT_FILES.has(path)) {
-      issues.push({ code: "path_orphan", path, detail: "outside memory homes" })
-    }
+    const orphan = !HOMES.has(homePath.split("/")[0] ?? "") && !ROOT_FILES.has(path)
     let content: string
     try {
       content = new TextDecoder("utf-8", { fatal: true }).decode(await readFile(join(repoDir, path)))
     } catch (error) {
       if (!(error instanceof Error)) throw error
       if (!(error instanceof TypeError) && !("code" in error)) throw error
+      if (orphan) issues.push({ code: "path_orphan", path, detail: "outside memory homes" })
       issues.push({ code: "file_unreadable", path, detail: error instanceof TypeError ? "invalid UTF-8" : "cannot read file" })
       continue
+    }
+    if (orphan) {
+      // A bare move of a frontmatter-less file lands it in a content path that validation refuses, so say so.
+      const detail = FRONTMATTER_RE.test(content)
+        ? "outside memory homes"
+        : "outside memory homes; no frontmatter (add a description in the same commit as the move, or leave it)"
+      issues.push({ code: "path_orphan", path, detail })
     }
     if (isMemoryContentPath(path)) {
       const violation = describeFrontmatterViolation(content)

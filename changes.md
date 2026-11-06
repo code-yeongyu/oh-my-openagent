@@ -1,3 +1,146 @@
+## 2026-11-01 - Give a timed-out or cancelled browser template a graceful quit (fixes #12067)
+
+The ultimate-browsing executor runs each Playwright template in its own session. On timeout, and when the run is cancelled (KeyboardInterrupt or SystemExit during the wait), it sends SIGTERM to the template's process group and waits up to 5 s, so the template's `ctx.close()` and Chrome's clean quit can run, before sending SIGKILL to the group; a cancellation is re-raised after the teardown. Previously only the node process was SIGKILLed, which orphaned Chrome and leaked its macOS code-sign clone and temp profile. POSIX only: on Windows `terminate()` is an immediate kill. The omowright dependency moves to code-yeongyu/omowright@73c4898ca4 (omowright#83), which applies the same SIGTERM-then-SIGKILL grace to the browser it spawns over a pipe.
+
+## 2026-10-30 - Distribute model starts per task child (#11905)
+
+Add the category and agent distribution option to the OpenCode schema and spawn resolvers. Round-robin children retain their resolved chain for reactive fallback, including per-model settings.
+
+## 2026-10-30 - Simplify agent-usage reminder state (#11890)
+
+Return cached or newly loaded reminder state directly and pass unknown event properties to the existing session-ID parser. Remove the non-null assertion and redundant cast, and lower only this hook's lint baseline.
+
+## 2026-10-29 - Name the corrupt credential recovery command (#11832)
+
+The keystore message names `omo account forget`; session mutation keeps locking and permits corrupt-state replacement only when explicitly requested.
+
+## 2026-10-26 - Share Native model prompt builders with OpenCode (#9856, fixes #9851)
+
+OpenCode imports the public generation facade from the senpi version OmO Native pins, applies one documented host-tool transform, and appends explicit agent roles instead of maintaining duplicate model bodies; the local Sisyphus and Sisyphus-Junior model files, including the Kimi K3.1 copies, are removed because senpi's `kimi-k3-1` preset now carries them. Runtime model switches preserve task mode and Hephaestus model eligibility, with catalog-wide byte parity and mutation checks covering both construction and reconciliation. Session tool permissions are cached per session and refreshed from `session.updated` / `session.deleted` events; the Native toast keeps dev's interactive gating and show records.
+
+## 2026-10-29 - Use Bun for repository type-check gates (#11771)
+
+The root `typecheck`, `typecheck:script`, `typecheck:packages` and `test:senpi` commands use `bun check --no-script --all -p` with their existing projects. Both POSIX and Windows Senpi compatibility checks use the same command. Command-contract tests still enforce script coverage, package registration and execution order.
+
+`--no-script` prevents package-script dispatch, and `--all` preserves complete diagnostics. Keep the full project list, the copy check, test orchestration and emit/build commands intact.
+
+## 2026-10-29 - First-device genesis construction (#11747)
+
+Add preparation and finishing builders under memory-core's sync/genesis modules,
+with a builder-produced golden vector, creator-anchored verification, both
+epoch-key unwraps and independently re-signed negative vectors.
+
+## 2026-10-26 - Native path traversal before containment (#11339)
+
+The shared containment helper sends the original child and parent paths to native realpath before lexical normalization. Project-memory grants preserve that component sequence, resolve the deepest existing ancestor for missing notes and append the missing segments verbatim, refuse a missing remainder that holds a `.`, `..` or empty segment, and reject non-missing lookup failures. The external-tool soft guard uses the raw target while built-ins keep the resolved target they open. Regression coverage includes the temporary-HOME caller and existing Windows path semantics.
+
+## 2026-10-26 - A failed paused-child restore cannot wedge parent admission (#11401)
+
+An acknowledged child could fail to restore after the parent quit and reopened. Its resume exception escaped before the parent installed its Resume and reopened admission, leaving subsequent task calls held even after the native Stop was released. Record that participant as lost with the restore failure, finish the parent transaction, and retain its acknowledged cutoff for retries when no live child handle exists yet.
+
+## 2026-10-25 - Atomic stop-authority admission (#11333)
+
+Add an opt-in, suspended-by-default authority supervisor with one combined
+generation/stopped atomic word, exact-word activation, monotonic durable
+coverage and idempotent drain. Opaque activation proofs have no production
+constructor until the authenticated broker integration. Deterministic tests
+cover callback/activation interleavings, the real input gate, replay, coalescing,
+exhaustion and legacy reset compatibility. This does not yet select the new
+authority for O2 or address marker deletion by a same-user process (#10238);
+that is tracked in protected-stop-record design issue #11340.
+
+The Win32 callback and worker now share a host-testable pending-stop handoff.
+Its deterministic physical-chord simulation checks one committed generation,
+trigger auto-repeat and duplicate worker drains without a Windows VM or sleeps.
+
+## 2026-10-26 - Keep installed Codex plugins fingerprintable (#11328)
+
+Materialize dependency links and remove unsupported npm executable links while preserving regular third-party shims before activating the installed plugin. Reject unsupported filesystem entries before replacing an existing cache.
+
+## 2026-10-25 - Recover hosted task liveness (#11317)
+
+Keep probe failures nonterminal and close only the affected session after a bounded recovery window. Preserve ownership while closure is unconfirmed.
+
+## 2026-10-21 - Launch-gated Fable 5.5 routing preparation (#10798)
+
+Every builtin Fable 5.1 chain/profile rung gains a provisional Fable 5.5 rung
+immediately ahead of it, with the same providers and max/xhigh effort. The 5.1
+rung stays available, including the architect gate, and gateway copies cannot
+satisfy builtin rungs. Routing remains a separate final commit from recognition;
+launch requires verified catalog values, evaluation and adoption of a senpi
+release listing the model. No release date, price or unverified limit is assumed.
+
+While `FABLE_55_RELEASED` is false, `launchRungs` drops the 5.5 rung from every
+builtin chain and profile, `launchDefaultModelId` keeps the artistry/architect
+defaults on 5.1, the architect gate lists only 5.1, and the resolution pipeline
+skips a launch-gated default or rung. `fable-55-launch-gate.test.ts` walks every
+agent and category through model-core, delegate-core and getFirstFallbackModel on
+cold, null and warm caches and asserts none resolves to the provisional id.
+`FABLE_55_EFFORTS` records that the xhigh/max efforts on the 5.5 rungs are carried
+over from 5.1 (`measured: false`); once released, `launchRungs` throws on a 5.5 rung
+whose effort is not in `accepted`, and a test fails while `measured` is still false.
+The agent-model-matching guide shows today's 5.1 routing.
+
+## 2026-10-21 - Launch-gated Fable 5.5 recognition (#10798)
+
+Recognize the provisional `claude-fable-5-5` ID in supplemental model capabilities
+and the telemetry vocabulary, with family and refusal detection covered by the
+existing Fable predicates. `FABLE_55_LAUNCH` holds the provisional ID and all
+unverified capability and context values; limits remain unknown until the live
+listing is available, and runtime metadata takes precedence. Recognition alone
+does not change any routing defaults.
+
+## 2026-10-25 - Bun 1.4.4 type declarations (#11311)
+
+All 11 package manifests that declare `bun-types` or `@types/bun` now pin 1.4.4, matching the CI/runtime update in #10895. The six affected lockfiles change only Bun type entries (including the `../mcp-stdio-core` entries in the `lsp-tools-mcp` and `lsp-daemon` package-locks). The teammode and web manifests move from `^1.4.3` to an exact `1.4.4` on purpose, matching every other manifest. The Codex installer bundle was regenerated in the canonical Linux container; the Senpi bundles and bundle-inputs map remain unchanged.
+
+## 2026-10-25 - Bun 1.4.4 in CI, release workflows and the devcontainer (#10895)
+
+Every `oven-sh/setup-bun` step in `.github/workflows` installs Bun 1.4.4 instead of 1.4.3, and the Bun install-cache keys move from `bun-1.4.3-` to `bun-1.4.4-`, so no job restores a cache built by 1.4.3. `.devcontainer/Dockerfile` installs `bun-v1.4.4`, `script/agent/setup.sh` expects 1.4.4, and AGENTS.md, CONTRIBUTING.md and the devcontainer README name 1.4.4. `bun-types` and `@types/bun` stay at 1.4.3: moving them regenerates the lockfiles and the committed Codex installer bundle, which inlines `packages/omo-codex/package.json`. `bun install --frozen-lockfile` under 1.4.4 leaves every lockfile unchanged.
+
+## 2026-10-23 - Inside OmO Desktop the browser skill is the terminal's, plus the app's built-in browser (sisyphuslabs/omo-desktop-app#4227)
+
+Under `OMO_BROWSER_ENGINE` (the desktop sets it for every session) `loadOmowright()` used to return a guarded library: on the default engine (`builtin`) it refused `connectBrowserSkill()` and every owned creator (`connectPipe`, `connectCloakProfile`, `connect`), refused every export outside an allowlist, and wrapped the user's-browser session with state events, Stop and an ask-before-irreversible question (#9486). An agent on default settings had no browser unless it knew to call `connectBuiltinBrowser()`, the app showed nothing, and agents went looking for a way around it. Product direction (2026-10-23): inside the app the agent's browser path is the same as in the terminal, and the app's built-in browser is offered in addition.
+
+`browser-engine-guard.mjs` now returns the raw library (every export the terminal's own object) plus `connectBuiltinBrowser()` (#10602: acquire the thread's in-app tab through `omo_desktop_toolkit`, an OmOWright connection with a refreshing token authorizer) for any engine value; without `OMO_BROWSER_ENGINE` it returns the raw library itself. When the app does not offer the built-in browser, `connectBuiltinBrowser()` throws `BuiltinBrowserUnavailableError` (`browser_builtin_unavailable`, `reason`) saying the other browsers work as usual. Removed: every refusal, the allowlist, the session wrapper and its state events, Stop checks and confirmation question, and their exported error classes. SKILL.md Step 0, `references/commands.md` and `references/install.md` say the same.
+
+The omo-senpi `browser-bridge` component (`omo_browser_bridge`, `omo.browser.state`, `omo.browser.stop`) has no producer in the skill after this change: the app gets no browser state or Stop from the skill for any engine, which is what terminal parity means. It stays registered so an app that still calls the stop RPC gets an answer; removing it is a follow-up, and the desktop must not rely on those events. Must not break: terminal use (no `OMO_BROWSER_ENGINE`) returns the raw library itself; inside the app every raw export stays the identical function, so nothing the agent asks for is changed; the built-in browser's token is read from the grant's file and never appears in a tool result. Tests: `packages/shared-skills/browser-skill-engine.test.ts`.
+
+## 2026-10-23 - The engine publishes its OTel telemetry schema artifact, decoupled from the PostHog schema
+
+`packages/omo-senpi/src/components/telemetry/telemetry-artifact.ts` generates `telemetry-schema.json` (omo-senpi) and `telemetry-schema.omo-cloud.json` from the event schemas, the constraints sidecar (`event-schema-constraints.ts`) and the collector registry files vendored byte-identical from omo-telemetry (`schema-registry/`, pinned in PINS.json to omo-telemetry main b6c77b812f). Both are written to the telemetry component and to the plugin package (`plugin/package.json` ships them) by `scripts/telemetry-schema-artifact.ts`; `--check` and `telemetry-artifact.test.ts` keep them byte-exact. The artifact describes what an OTel client sends and is DECOUPLED from the direct PostHog schema, so no live PostHog property is renamed: five direct names that break the collector's field-name rule get OTel-only names (`OTEL_NAME_OVERRIDES`: reason and start_reason -> start_trigger, user_category_count -> custom_category_count, suppression_reason -> suppression_cause, is_real_user_prompt -> is_real_user), four values that fit no collector safe shape stay off the wire (`OTEL_EXCLUDED_PROPERTIES`: connected_account_count, providers, timezone, non_eval_wave_size_histogram), category and kibitzer model slots use the model enum, the turn cost travels as the integer `omo.cost.usd_1e4` with `cost_usd` derived by the relay, and `turn_completed` carries the optional `omo.session.role` (the session-role vocabulary from `session-role.ts`). Both artifacts validate under omo-telemetry's own `validate-artifact.ts`, and omo-telemetry's canary probe bodies (protobuf and JSON, spans and logs) pass its ingest validators against the omo-senpi artifact. The collector pins it in a follow-up omo-telemetry PR.
+
+## 2026-10-23 - Temp-home detection no longer reads the account home from HOME itself; an unresolvable HOME fails safe (#10935)
+
+The batch #3 Windows leg failed install-identity.test.ts :101/:138 (a temp USERPROFILE was not classified as ephemeral, so automated Windows runs kept telemetry on). Root cause (review H1): the "a temp dir that holds the account's real home is misconfigured" guard took the account home from `os.userInfo().homedir`, which under Bun reads HOME/USERPROFILE, the very value being classified; whenever HOME sat inside the temp dir the guard dropped that temp root, and on Windows os.tmpdir() is the only root. The earlier text here blamed 8.3 short names; that was wrong. `isInsideTempDir` now (1) treats a HOME that cannot be resolved as ephemeral, so the check fails toward telemetry OFF; (2) treats a real account profile, a direct child of the OS users directory (`/Users/<name>`, `/home/<name>`, `C:\Users\<name>`) or root's home, as never ephemeral, judged from the path's shape instead of os.userInfo(); (3) otherwise classifies by containment in os.tmpdir() (and the fixed POSIX temp roots, not on win32) through `isPathInside` from `@oh-my-opencode/utils/path-containment` (#10982: native realpath on both sides, case-insensitive on win32), ignoring a temp root that resolves to a filesystem root. `isOmoNativeTelemetryEnabled` takes an optional `automationDeps` test seam. Tests: 5 of the new or reworked cases fail against the previous head (the Windows CI shape with `os.userInfo().homedir` = the test home, an unresolvable HOME, TMPDIR=/ or =/home or =the home with a real profile, the real Windows profile in any case, and a POSIX symlink whose '..' target leaves the temp root); the prefix-sibling case fails under a naive case-insensitive startsWith mutation. The install-id 0600 mode is asserted only where POSIX modes exist. Unchanged: a HOME outside every temp root that is not a profile shape (e.g. /srv/someone) stays not-ephemeral.
+## 2026-10-22 - One anonymous telemetry id per user, and no telemetry from automated runs (#10934)
+
+Since 5.1.35 the anonymous `distinct_id` was read from the install-id file under the agent home a process resolved, so every agent-dir override (an orchestrator's isolated agent dir per run), a temporary HOME, or the pre-unification flat `~/.omo` layout minted a new id, and one person counted as many (new ids rose from about 350 to about 2,000 a day from 10-18). `product-identity.ts` now keeps one id per user at `~/.omo/agent/omo-senpi/omo-native/install-id` (the path OmO Desktop already uses), whatever agent home is resolved; `OMO_NATIVE_INSTALL_ID` still wins. An id an older release wrote under the agent home is copied once into that file (mode 0600, exclusive create), so existing installs keep their id; where the CLI and Desktop already held two different ids, the CLI takes the Desktop's once. `omo-native-session.ts` turns telemetry off by default for runs that cannot hold a stable id (`automatedRunReason`: `CI` set, a test runner, or a HOME inside the OS temp dir); `OMO_TELEMETRY_ALLOW_AUTOMATION=1` opts back in. The telemetry tests isolate HOME so no test reads or writes the real per-user file. `docs/reference/senpi-telemetry.md` documents both.
+
+## 2026-10-20 - Session tools page through the message API and a timed-out search stops reading (#10738)
+
+`sdk-storage.ts` gains `getSdkSessionMessagePage` (one `GET /session/:id/message?limit=N[&before=cursor]`, reading `X-Next-Cursor`), `forEachSdkSessionMessagePage` (pages of `SDK_MESSAGE_PAGE_SIZE` = 100, newest first, each ascending) and `getSdkSessionMessageWindow`. `sdkSessionExists` asks for `limit: 1`. `storage.ts` `readSessionMessages(sessionID, { limit, fromEnd, signal })` reads only the window, `forEachSessionMessagePage` walks with a file-storage fallback that runs only when no SDK page was visited, and `getSessionInfo` counts page by page. `searchInSession` scans newest first and stops at its result limit. `getSessionInfo(sessionID, signal)` takes the call's abort signal, and so do `formatSessionList` and `filterSessionsByDate` (`session_list`) and the file-storage metadata reads behind `getFileSessionInfo`; a cancelled list rethrows instead of reporting every session as skipped, so in all four session tools every page loop stops at the next page boundary on abort. The cursor is read from any response with `headers.get`, and a full page whose headers cannot be read fails loudly (`Cannot page session ...`) instead of ending the walk early. `tools.ts` replaces `withTimeout` with `runWithAbortableTimeout`, which aborts the signal handed to every read (linked with the tool call's abort); `fetchSdkResponse` never retries an aborted read, and an aborted read never falls back to files. `file-storage.ts` reads message metadata first and parts only for returned or scanned messages. The server has no oldest-first order, so `from_end: false` with a limit walks back from the newest page and keeps the oldest `limit` messages. Covered by `session-paging.test.ts` (5 RED on the old sources); the bench is on the PR.
+
+## 2026-10-22 - Address skill containment review findings (#10693)
+
+Task discovery preserves SKILL.md stopping rules and repository-wide link
+boundaries. I/O failures remain unloaded and report their real errno; only actual
+escapes use the security notice. Global OpenCode skill sources retain user
+authority, and pending MCP grants are bounded and invalidate superseded handles.
+The vendored grants-store header identifies both formatting and Windows retry
+source commits. The PR's existing Unreleased paragraph records these behaviors.
+
+Allowed-path walks remain uncached: a session cache could keep a removed or
+retargeted user link authorized, while a safe per-operation cache would require
+threading an explicit lifetime through discovery and declaration revalidation.
+The optional optimization is deferred rather than changing the trust lifetime.
+
+## 2026-10-20 - Contain legacy and task skill links and scope skill MCP environments (#10693)
+
+Legacy discovery keeps the spelled project path and its provenance through config sources, directory traversal, native fallback and invocation. Project reads use a canonical containment check and a checked descriptor, including MCP sidecars; user skill roots and sibling skill aliases remain supported. Task skill loading uses the same boundary and reports rejected links in its result.
+
+Project-policy MCP servers receive the finite safe environment base, declared values, caller-supplied values and per-declaration grants. User-policy servers keep the previous environment filter and expansion. Withheld names appear in the tool output, OpenCode toast and log with the exact `/omo-mcp-env-grant` command. The grant boundary vendors the native atomic store and declaration identity protocol with the same configured-directory resolver and file format; generation gaps and store recreation invalidate project connections, including pending handshakes. This boundary assumes a filesystem stable during loading; descriptor checks detect some concurrent replacements, not every ancestor swap.
+
 ## 2026-10-22 - Telemetry counts how many accounts you have linked per provider (#10919)
 
 `session_started` gains `connected_account_count`: per provider kind, the number of accounts the engine itself lists for that provider (senpi `getCredentialAccounts`, the list the app's account list shows), used or not. For Claude (`anthropic-subscription`) that is the stored `accounts` list (the managed sign-in sentinel without a list counts zero) plus every `CLAUDE_CODE_OAUTH_TOKEN` env slot; for other providers it is the stored list when non-empty, else the flat credential as one, and env-key slots only when nothing is stored. It is a `kind:count` list over the shipped provider kinds; any other provider is summed into `custom`, and each count is capped at `10_plus`. senpi does not export its listing function, so `account-inventory.ts` (`packages/omo-senpi/src/components/telemetry`) mirrors its rules through the engine's own `@earendil-works/pi-ai` provider and env-variable tables, and `account-inventory.test.ts` asserts parity with the real engine function from the installed senpi dist on every fixture. Only lengths and whether a variable is set are read. An unreadable `auth.json` counts nothing here; the provider inventory reports it once. `docs/reference/senpi-telemetry.md` regenerates the schema block and adds the disclosure row.
@@ -546,6 +689,15 @@ On Windows, renaming a temporary file over a target that another handle holds op
 `packages/memory-core/src/fs/rename-contention.ts` retries those three codes on win32 only, with a bounded backoff of about 0.8 s in total, and `fs/resilient.ts` routes the memory boundary's `rename` through it. Every atomic memory write gets the retry. POSIX keeps failing at once, because EPERM/EACCES there are real permission errors. `journal/store.ts` now removes the temporary state file when the rename finally fails, and takes an optional `renameFile` so a test can simulate a refused rename. The kill classifier is unchanged.
 
 `fs/rename-contention.test.ts` drives the retry with an injected rename and clock: two refusals then success; a refusal that never clears gives up after the budget; POSIX EPERM fails at once; ENOENT is not retried. `journal/store.test.ts` shows that a refused state rename rejects and leaves no temporary file; it fails on `dev`.
+
+## 2026-10-04 - Store extensions declare session-callable ops whose caller the store stamps from the engine
+
+A store extension can now declare ops a session calls through its own named tool (`sessionCallable` on `registerStoreExtension`: `{op, toolName, description, parameters, targetArg?, await?, wake?}`, plus `wakeDir`). A session sees each op as `ext_<extension>_<toolName>`, so no declaration can replace a core or omo tool, and a session skips (and logs once) a name it already has. The caller an op sees is never an argument: the tool takes the engine's session id, which is the session's durable id, and requires exactly that id in the address book (`caller_context_missing` otherwise; a host routing id never resolves), and the store worker stamps `caller_session_durable_id` into the op's args inside the op's own transaction, with `caller_created_target: true` only when that caller `thread_create`d the op's `targetArg` session (omitted otherwise, never false). Args that already carry either field are refused `invalid_arguments` before validation, and the public `extensionCall` (connectors, CLI, SDK) refuses every declared op, its `statusOp` and its `expireOp` with `caller_not_allowed`.
+
+- Schema v8 adds `thread_creations` (written by `thread_create` after the host opened the session, so a parent is recognised after a restart) and `extension_registrations` (each registration's descriptor, upserted by name). A process that never registered an extension lists its session tools from these rows at `session_start` without importing anything, and its store worker imports the module lazily on a call, on the public channel as well (a restarted worker never overwrites a newer descriptor with the one its process registered earlier), with the same `file:` .js/.mjs/.cjs and namespace checks; a missing module answers `extension_import_failed` for that call only. Tools for a declaration made after a session started appear from that session's next start.
+- `parameters` is a plain JSON Schema object with `additionalProperties: false`, checked with typebox `Value.Check`; `toolName` is a short name (`^[a-z][a-z0-9_]{1,40}$`, composed name at most 64 characters); registration refuses a composed name another extension already declares (before any migration runs), two entries for one op, a `targetArg` outside `parameters`, a `timeoutMs` outside 1..120000, a missing export and an invalid `wake`/`wakeDir`.
+- A committed successful call touches `<agentDir>/gateway/<wakeDir>/<wake>` (temp + rename); a refused or rolled-back call touches nothing, and a touch failure is logged without failing the call. When the result carries `await_request_id` (`^tor_[a-f0-9]{32}$`), the tool arms a watch on `<wakeDir>/<id>` and its directory, runs `statusOp`, re-checks on every wake, and at `timeoutMs` runs `expireOp` and a final `statusOp`. Only a final status ends the wait; when expiring or the final read is refused the answer is `await_unresolved`, saying the request may still complete. There is no polling.
+- `tx.bindingsForSession(id)` gives an op the session's active bindings inside its transaction.
 
 ## 2026-10-03 - Task kills are recorded from the runner, not guessed from stderr (#9471)
 

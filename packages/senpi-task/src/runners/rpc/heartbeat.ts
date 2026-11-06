@@ -1,12 +1,13 @@
 import { RpcRequestTimeout } from "./errors"
 
 export const HEARTBEAT_DEADLINE_MS = 10_000
+const STOPPED = Symbol("heartbeat stopped")
 
 export function unresponsiveMessage(taskId: string): string {
   return `ended: the child stopped answering for 30 s (3 heartbeats). Action: inspect task_output ${taskId}; run it again with task`
 }
 
-/** One probe at a time; only an answer resets consecutive misses, never content or a late reply. */
+/** One probe at a time; a state answer or session event is evidence of life. */
 export function startHeartbeat<T>(input: {
   readonly intervalMs: number
   paused(): boolean
@@ -14,10 +15,11 @@ export function startHeartbeat<T>(input: {
   onState(state: T): void
   onFailure(error: unknown): void
   onUnresponsive(): void
-}): () => void {
+}): (() => void) & { activity(): void } {
   let pending = false
   let stopped = false
   let failures = 0
+  let lastActivity = Number.NEGATIVE_INFINITY
   let deadline: ReturnType<typeof setTimeout> | undefined
   const tick = (): void => {
     if (stopped || pending || input.paused()) return
@@ -37,6 +39,11 @@ export function startHeartbeat<T>(input: {
     }
     const miss = (): void => {
       if (stopped || input.paused()) return
+      const quietFor = Date.now() - lastActivity
+      if (quietFor < HEARTBEAT_DEADLINE_MS) {
+        deadline = setTimeout(miss, HEARTBEAT_DEADLINE_MS - quietFor)
+        return
+      }
       missed = true
       fail(new RpcRequestTimeout("get_state", HEARTBEAT_DEADLINE_MS))
       // The daemon client's request has its own deadline. Keep that request single-flight
@@ -44,10 +51,11 @@ export function startHeartbeat<T>(input: {
       if (!stopped) deadline = setTimeout(miss, HEARTBEAT_DEADLINE_MS)
     }
     deadline = setTimeout(miss, HEARTBEAT_DEADLINE_MS)
-    // A detached port can throw synchronously; Promise adoption keeps the same failure path.
-    const work = Promise.resolve().then(input.probe)
+    // A detached port can throw synchronously; Promise adoption keeps the same failure path. A stop that
+    // settles before this launch (a teardown continuation queued ahead of it) sends no probe (#11673).
+    const work = Promise.resolve().then<T | typeof STOPPED>(() => (stopped ? STOPPED : input.probe()))
     void work.then((state) => {
-      if (stopped || input.paused()) return
+      if (state === STOPPED || stopped || input.paused()) return
       failures = 0
       input.onState(state)
     }, (error: unknown) => {
@@ -64,9 +72,16 @@ export function startHeartbeat<T>(input: {
   }
   const interval = setInterval(tick, input.intervalMs)
   interval.unref?.()
-  return () => {
+  const stop = () => {
     stopped = true
     clearInterval(interval)
     clearTimeout(deadline)
   }
+  return Object.assign(stop, {
+    activity: () => {
+      if (stopped || input.paused()) return
+      failures = 0
+      lastActivity = Date.now()
+    },
+  })
 }

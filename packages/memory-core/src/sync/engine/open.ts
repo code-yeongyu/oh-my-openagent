@@ -14,7 +14,7 @@ import { createLockRecord } from "../../locks/lock-record"
 import { createDeviceItemStore } from "./adapters/device-item-store"
 import { createGitSyncRepo } from "./adapters/git-sync-repo"
 import { type EngineStatus, SyncEngine } from "./engine"
-import type { Clock, Sealer, Transport, Verifier, WriterLock } from "./ports"
+import type { Clock, FreezeSettler, Sealer, Transport, Verifier, WriterLock } from "./ports"
 
 /** How long an apply waits for a memory tool write to finish before the cycle is retried. */
 const WRITER_WAIT_MS = 30_000
@@ -23,6 +23,7 @@ export interface SyncSession {
   readonly transport: Transport
   readonly verifier: Verifier
   readonly sealer: Sealer
+  readonly freeze?: FreezeSettler
 }
 
 export interface OpenDeviceSyncOptions {
@@ -34,6 +35,8 @@ export interface OpenDeviceSyncOptions {
   readonly session: SyncSession
   readonly machineId?: string
   readonly log?: (line: string) => void
+  /** Called when the failure the status shows appears, changes kind or clears. */
+  readonly onStatusChange?: () => void
 }
 
 export interface DeviceSync {
@@ -82,6 +85,7 @@ export async function openDeviceSync(options: OpenDeviceSyncOptions): Promise<De
       lock: writer,
       clock: systemClock,
       ...(options.log === undefined ? {} : { log: options.log }),
+      ...(options.onStatusChange === undefined ? {} : { onStatusChange: options.onStatusChange }),
     })
     let closed = false
     return {

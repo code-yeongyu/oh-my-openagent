@@ -23,6 +23,22 @@ export class SyncHttpError extends Error {
   }
 }
 
+/** The device's bearer token could not be read or refreshed: its sign-in has expired or was refused. */
+export class SyncAuthError extends Error {
+  override readonly name = "SyncAuthError"
+  constructor(cause: unknown) {
+    super("the device's sign-in token could not be read or refreshed", { cause })
+  }
+}
+
+/** The sync service could not be reached at all: no network, DNS, a refused or reset connection. */
+export class SyncNetworkError extends Error {
+  override readonly name = "SyncNetworkError"
+  constructor(cause: unknown) {
+    super("the sync service could not be reached", { cause })
+  }
+}
+
 export interface HttpTransportOptions {
   readonly baseUrl: string
   /** The device's bearer token, read per request so a refresh takes effect. */
@@ -45,12 +61,22 @@ interface WireState {
   readonly snapshot: { readonly covers_seq: number; readonly chunk_object_ids: readonly string[] } | null
 }
 
+async function bearer(options: HttpTransportOptions): Promise<string> {
+  try {
+    return await options.token()
+  } catch (error) {
+    throw new SyncAuthError(error)
+  }
+}
+
 export function createHttpTransport(options: HttpTransportOptions): Transport {
   const doFetch = options.fetch ?? fetch
   const request = async (method: string, path: string, body?: string | Uint8Array, json = true): Promise<Response> => {
-    const headers: Record<string, string> = { authorization: `Bearer ${await options.token()}` }
+    const headers: Record<string, string> = { authorization: `Bearer ${await bearer(options)}` }
     if (body !== undefined && json) headers["content-type"] = "application/json"
-    const response = await doFetch(`${options.baseUrl}${path}`, { method, headers, ...(body === undefined ? {} : { body }) })
+    const response = await doFetch(`${options.baseUrl}${path}`, { method, headers, ...(body === undefined ? {} : { body }) }).catch((error: unknown) => {
+      throw new SyncNetworkError(error)
+    })
     if (response.ok) return response
     const code = await response.json().then(
       (b: unknown) => (b as { error?: { code?: string } }).error?.code ?? "unknown",
@@ -119,7 +145,7 @@ async function streamLoop(options: HttpTransportOptions, doFetch: typeof fetch, 
     let up = false
     try {
       const response = await doFetch(`${options.baseUrl}/v1/me/events`, {
-        headers: { authorization: `Bearer ${await options.token()}`, accept: "text/event-stream" },
+        headers: { authorization: `Bearer ${await bearer(options)}`, accept: "text/event-stream" },
         signal,
       })
       if (!response.ok || response.body === null) throw new SyncHttpError("stream", response.status, true)
@@ -131,8 +157,9 @@ async function streamLoop(options: HttpTransportOptions, doFetch: typeof fetch, 
         buffer += decoder.decode(chunk, { stream: true })
         let end = buffer.indexOf("\n\n")
         while (end >= 0) {
-          const head = advancedHead(buffer.slice(0, end))
-          if (head !== null) handlers.onAdvanced(head)
+          const event = streamEvent(buffer.slice(0, end))
+          if (event?.kind === "advanced") handlers.onAdvanced(event.head)
+          else if (event?.kind === "state") handlers.onStateChanged()
           buffer = buffer.slice(end + 2)
           end = buffer.indexOf("\n\n")
         }
@@ -147,7 +174,9 @@ async function streamLoop(options: HttpTransportOptions, doFetch: typeof fetch, 
   }
 }
 
-function advancedHead(frame: string): number | null {
+type StreamEvent = { readonly kind: "advanced"; readonly head: number } | { readonly kind: "state" }
+
+function streamEvent(frame: string): StreamEvent | null {
   const data = frame
     .split("\n")
     .filter((line) => line.startsWith("data:"))
@@ -155,6 +184,7 @@ function advancedHead(frame: string): number | null {
     .join("\n")
   if (data === "") return null
   const event = JSON.parse(data) as { type?: string; head?: { seq?: number } }
+  if (event.type === "sync.state.changed") return { kind: "state" }
   if (event.type !== "sync.advanced" && event.type !== "sync.keyring.changed") return null
-  return typeof event.head?.seq === "number" ? event.head.seq : null
+  return typeof event.head?.seq === "number" ? { kind: "advanced", head: event.head.seq } : null
 }

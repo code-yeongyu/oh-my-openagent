@@ -19,7 +19,7 @@
 import { createHash } from "node:crypto"
 import { basename, join, resolve as resolvePath } from "node:path"
 import { existsSync } from "../fs/resilient"
-import { resolveLinkedWorktreeSource } from "./git-layout"
+import { resolveLinkedWorktreeSource, type GitLayoutProbe } from "./git-layout"
 import { AGENTS_DIRNAME, buildIdentityPaths, resolveMemoryRoot, type MemoryIdentityPaths } from "./layout"
 
 export const AUTO_AGENT_VALUE = "auto"
@@ -37,6 +37,8 @@ export interface MemoryIdentity {
 
 export interface DirectoryProbe {
   readonly exists: (path: string) => boolean
+  /** Reads the git layout in `"git"` mode; the synchronous filesystem probe when absent. */
+  readonly gitLayout?: GitLayoutProbe
 }
 
 const defaultDirectoryProbe: DirectoryProbe = { exists: existsSync }
@@ -95,9 +97,9 @@ function derive(hashSource: string, slugSource: string): DerivedIdentity {
   }
 }
 
-function deriveAutoId(cwd: string, mode: AutoIdentityMode): DerivedIdentity {
+function deriveAutoId(cwd: string, mode: AutoIdentityMode, gitLayout: GitLayoutProbe | undefined): DerivedIdentity {
   if (mode === "git") {
-    const linked = resolveLinkedWorktreeSource(cwd)
+    const linked = resolveLinkedWorktreeSource(cwd, gitLayout)
     if (linked !== undefined) return derive(linked.hashSource, linked.slugSource)
   }
   const normalizedRoot = resolvePath(cwd)
@@ -140,7 +142,7 @@ export function resolveAutoIdentity(
   probe: DirectoryProbe = defaultDirectoryProbe,
 ): MemoryIdentity {
   assertCwd(cwd, "resolveAutoIdentity")
-  return toIdentity(deriveAutoId(cwd, mode), cwd, env, probe)
+  return toIdentity(deriveAutoId(cwd, mode, probe.gitLayout), cwd, env, probe)
 }
 
 export function resolveMemoryIdentity(

@@ -134,6 +134,8 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
     runId: input.run.runId,
     attempt: input.attempt ?? 1,
     hardDeadlineAt: input.hardDeadlineAt ?? Date.now() + 15 * 60_000,
+    memoryRoot: input.memoryRoot,
+    maxConcurrentRuns: input.maxConcurrentRuns,
     category: input.category,
     conversationIds: input.run.request.conversationIds,
     model: input.model,

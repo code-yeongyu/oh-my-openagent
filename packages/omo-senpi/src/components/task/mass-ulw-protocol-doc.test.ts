@@ -50,7 +50,7 @@ describe("mass-ulw protocol doc", () => {
   })
 
   describe("#given every backticked dag.* journaled event type in the doc", () => {
-    const docTypes = extract(/`(dag\.[a-z]+\.[a-z-]+)`/g)
+    const docTypes = extract(/`(dag\.[a-z]+\.[a-z_-]+)`/g)
 
     describe("#when compared with DAG_RUN_EVENT_TYPES", () => {
       it("#then each doc type is a shipped type and every shipped type is documented", () => {

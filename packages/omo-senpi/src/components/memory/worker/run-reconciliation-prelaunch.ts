@@ -26,11 +26,14 @@ export interface PrelaunchReconcile {
 }
 
 export async function reconcilePrelaunch(context: ReconcileContext): Promise<PrelaunchReconcile> {
+  context.signal?.throwIfAborted()
   const active = (await context.reservation.readState(
     context.deferOnSchedulerContention ? { waitTimeoutMs: 0 } : undefined,
   )).active
+  context.signal?.throwIfAborted()
   if (active === undefined) return {}
   const ghost = await classifyGhostActive({ identity: context.identity, active })
+  context.signal?.throwIfAborted()
   if (ghost.ghost && ghost.reason === "missing-identity") {
     if (active.launcherPid !== undefined && active.launcherHostname !== undefined) {
       if (active.launcherHostname !== context.hostname()) return {}
@@ -85,11 +88,13 @@ export async function reconcilePrelaunch(context: ReconcileContext): Promise<Pre
   if (retiredGeneration) return { result: await releaseReservationAsFailed(context, active.runId), retiredRunId: active.runId }
   if (existsSync(prelaunchPath)) {
     const prelaunch = parseRunPrelaunchArtifact(await readRunJson<unknown>(prelaunchPath))
+    context.signal?.throwIfAborted()
     if (prelaunch.runId !== active.runId) throw new Error("Reflection prelaunch run id does not match reservation")
     const repo = new GitMemoryRepo({ dir: context.identity.paths.repo, agentId: context.identity.id })
     const cleanup = await discardReflectionWorktree(repo, prelaunch.worktreeDir, prelaunch.worktreeBranch)
     if (!cleanup.worktreeRemoved || !cleanup.branchRemoved) return {}
   }
+  context.signal?.throwIfAborted()
   await recordInterruptedLaunch(context, runDir, active)
   return { result: await releaseReservationAsFailed(context, active.runId) }
 }
@@ -186,6 +191,7 @@ export async function quarantineRun(
     startedAt: generation,
   }
   const evidence = [...(await readdir(runDir)).sort(), ...(active === undefined ? [] : [RESERVATION_EVIDENCE_FILENAME])]
+  context.signal?.throwIfAborted()
   await writeQuarantine(runDir, {
     version: 1,
     runId,
@@ -202,6 +208,7 @@ export async function quarantineRun(
 }
 
 async function releaseReservationAsFailed(context: ReconcileContext, runId: string): Promise<ReflectionRunReconcileResult> {
+  context.signal?.throwIfAborted()
   const transition = await context.reservation.complete(
     runId,
     "failed",

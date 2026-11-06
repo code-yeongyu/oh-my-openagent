@@ -1,4 +1,6 @@
 import type { BuiltinCategoryDefinition } from "./types"
+import { LATEST_MODEL_BY_FAMILY } from "@oh-my-opencode/model-core/latest-models"
+import { launchDefaultModelId } from "@oh-my-opencode/model-core"
 
 // Ported from packages/omo-opencode/src/tools/delegate-task/google-categories.ts.
 const VISUAL_CATEGORY_PROMPT_APPEND = `<Category_Context>
@@ -114,13 +116,13 @@ Approach:
 export const GOOGLE_CATEGORIES = [
   {
     name: "visual-engineering",
-    config: { model: "google/gemini-4-argon", variant: "low" },
+    config: { model: `google/${LATEST_MODEL_BY_FAMILY.geminiPro}`, variant: "low" },
     description: "Visual design, UI/UX, frontend, styling, animation, and design systems",
     promptAppend: VISUAL_CATEGORY_PROMPT_APPEND,
   },
   {
     name: "artistry",
-    config: { model: "anthropic/claude-fable-5-1", variant: "max" },
+    config: { model: `anthropic/${launchDefaultModelId()}`, variant: "max" },
     description: "Complex problem-solving with unconventional, creative approaches - beyond standard patterns",
     promptAppend: ARTISTRY_CATEGORY_PROMPT_APPEND,
   },

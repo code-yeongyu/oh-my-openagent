@@ -38,6 +38,9 @@ export type DagRetryOptions = {
  */
 export function reenterDagRun(options: DagSchedulerOptions): DagRunReentry {
   const current = readRecord(options.store, options.initialRecord.runId) ?? options.initialRecord
+  if (current.pause?.reason === "user_stop") {
+    throw new DagNodeControlError({ code: "run_paused_by_user", message: "only the user's Resume may restart this run", runId: current.runId })
+  }
   const record = withRevivalCapacity(options, current, () => resumeIfSettled(options, current))
   return startReentry(options, record)
 }
@@ -103,6 +106,13 @@ export function retryDagNodes(
   let current = record
   if (retryOptions?.prompt !== undefined) {
     for (const target of targets) current = amendRetryPrompt(options, record, target, retryOptions.prompt)
+  }
+  if (record.status === "paused" && record.pause?.reason === "user_stop") {
+    const journal = controlJournal(options, current)
+    journal.append({ type: "dag.node.retry-staged", nodeIds: targets })
+    const staged = journal.snapshot()
+    const scheduler = createDagScheduler({ ...options, initialRecord: staged })
+    return { record: staged, scheduler, run: Promise.resolve(staged) }
   }
   // The node mutations and the resume share one cap check, so a refused retry leaves every node as it was.
   const resumed = withRevivalCapacity(options, current, () => {

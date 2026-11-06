@@ -11,6 +11,8 @@ use senpi_desktop_core::protocol_results::AuditEvent;
 use senpi_desktop_core::types::{DesktopCapabilities, DesktopSessionOptions, DesktopWindow, Target};
 
 use crate::audit::ArtifactGc;
+use crate::display_awake::DisplayAwake;
+use crate::screen_notes::ScreenNotes;
 use crate::mutate::SessionSafety;
 use crate::pointer::FrameCache;
 use crate::request::{Op, Response};
@@ -39,6 +41,12 @@ pub(crate) struct Worker {
     pub(crate) instance: u64,
     /// This session's live foreground control grant, when it holds the slot.
     pub(crate) control: Option<crate::grant::ControlGrant>,
+    pub(crate) awake: Arc<DisplayAwake>,
+    pub(crate) notes: ScreenNotes,
+    /// Whether this backend's watch of the user's own input was started.
+    pub(crate) watching_user_input: bool,
+    /// The user's input into the apps this session works in (#11459).
+    pub(crate) intervention: crate::intervention::Intervention,
 }
 
 /// A mutating request's reply and the audit event it emitted.
@@ -51,6 +59,7 @@ impl Worker {
         factory: Box<dyn BackendFactory>,
         capabilities: Arc<Mutex<DesktopCapabilities>>,
         safety: SessionSafety,
+        (awake, notes): (Arc<DisplayAwake>, ScreenNotes),
     ) -> Self {
         let backend = factory.create(&DesktopSessionOptions {
             show_cursor: false,
@@ -71,9 +80,24 @@ impl Worker {
             gc: ArtifactGc::default(),
             instance: crate::grant::next_instance(),
             control: None,
+            awake,
+            notes,
+            watching_user_input: false,
+            intervention: crate::intervention::Intervention::new(),
         };
+        worker.install_screen_probe();
         worker.refresh_capabilities();
         worker
+    }
+
+    /// Takes the display-awake hold for an activity request.
+    pub(crate) fn begin_activity(&mut self) {
+        let backend = self.backend.as_mut().ok();
+        self.awake.begin(|| backend.and_then(|backend| backend.hold_display_awake()));
+    }
+
+    fn install_screen_probe(&self) {
+        self.notes.install(self.backend.as_ref().ok().and_then(|backend| backend.screen_probe()));
     }
 
     /// Applies cursor-only display changes in place; every other change
@@ -95,12 +119,15 @@ impl Worker {
             return self.refresh_capabilities();
         }
         self.backend = self.factory.create(&options);
+        self.watching_user_input = false;
+        self.intervention = crate::intervention::Intervention::new();
         self.emergency = self.backend.as_ref().ok().and_then(|backend| backend.emergency_release());
         if let Some(release) = &self.emergency {
             if let Err(error) = self.safety.supervisor.register_emergency_release(release) {
                 self.backend = Err(error);
             }
         }
+        self.install_screen_probe();
         self.registry = AxRegistry::default();
         self.frames = FrameCache::default();
         self.options = Some(options);
@@ -138,6 +165,15 @@ impl Worker {
         }
         self.reconcile_grant();
         self.maybe_gc();
+        if crate::user_input_watch::reads_or_acts_on_an_app(&op) {
+            self.watch_user_input();
+            self.attach_user_input_feed();
+            self.drain_user_input();
+        }
+        self.serve(op, cancelled)
+    }
+
+    fn serve(&mut self, op: Op, cancelled: &dyn Fn() -> bool) -> CoreResult<Response> {
         let served = |audited: CoreResult<Audited>| audited.map(|(response, _audit)| response);
         // Every mutating request goes through `mutate`; reads bypass it.
         match op {
@@ -167,6 +203,7 @@ impl Worker {
             Op::AxSetValue(params) => served(self.ax_set_value(&params.ref_, &params.value, cancelled)),
             Op::AxFocus(params) => served(self.ax_focus(&params.ref_, cancelled)),
             Op::AxClick(params) => served(self.ax_click(&params, cancelled)),
+            Op::AxTypeText(params) => served(self.ax_type_text(&params, cancelled)),
             Op::ClipboardRead => self.clipboard_read(),
             Op::ClipboardWrite(params) => served(self.clipboard_write(&params, cancelled)),
             Op::ControlGrant(params) => self.control_grant(&params),

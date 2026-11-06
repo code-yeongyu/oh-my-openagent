@@ -7,7 +7,7 @@ import type { KernelToolGrant } from "../../kernel-tools/resolve"
 import { buildStartSpec } from "./execute-spec"
 import type { ForegroundWaitOptions } from "./foreground-wait"
 import { waitForForegroundTask } from "./foreground-wait"
-import { partialDetails, recordDetails, startedDetails, type SingleSpawnParams } from "./result-details"
+import { partialDetails, recordDetails, startedDetails, withLiveSpawnFacts, type SingleSpawnParams } from "./result-details"
 import { appendMissingSkills } from "./skill-result"
 import { evaluateSpawnPolicy } from "./spawn-policy"
 import { backgroundConversionText, backgroundStartText, type StartLabels } from "./start-presentation"
@@ -76,7 +76,7 @@ export async function runSpawn(
   // The default skill discovery inside buildStartSpec reads the senpi barrel synchronously, so the
   // barrel is warmed here (memoized: a cache hit once the engine barrel is loaded).
   await loadSenpiBarrel()
-  const spec = buildStartSpec(effectiveParams, target, ctx.sessionManager.getSessionId(), deps, ctx.cwd, input.kernelTools, ctx.model)
+  const spec = buildStartSpec(effectiveParams, target, ctx.sessionManager.getSessionId(), deps, ctx.cwd, input.kernelTools)
   const started = await deps.manager.start(spec)
   if (started.kind === "plan_unresolved") {
     const agents = started.error.availableAgents
@@ -84,7 +84,7 @@ export async function runSpawn(
     const agentSuffix = agents && agents.length > 0 ? ` Available agents: ${agents.join(", ")}.` : ""
     const categorySuffix = categories && categories.length > 0
       ? started.error.code === "model_unavailable"
-        ? ` Valid category names: ${categories.join(", ")}. Retry one of these, or configure categories.<name>.models in omo.json — model overrides cannot be combined with category.`
+        ? ` Valid category names: ${categories.join(", ")}. Retry one of these, or configure categories.<name>.models in omo.json: model overrides cannot be combined with category.`
         : ` Available categories: ${categories.join(", ")}.`
       : ""
     return result(started.error.message + agentSuffix + categorySuffix, {
@@ -94,6 +94,9 @@ export async function runSpawn(
       reason: started.error.message,
     })
   }
+  if (started.kind === "held") return result("Task admission is held by your Stop. Resume the run to continue.", {
+    task_id: started.task_id, status: "paused", mode: "spawn", pause_seq: started.pauseSeq,
+  })
   if (started.kind === "depth_denied") {
     return result(started.reason, { task_id: "", status: "denied", mode: "spawn", reason: started.reason })
   }
@@ -146,16 +149,18 @@ export async function runSpawn(
   let emittedAt = 0
   let receivedChildEvent = false
   let closed = false
+  const launch = started.starting === true ? deps.manager.whenLaunched?.(started.task_id) : undefined
+  let launching = launch !== undefined
   const emit = (): void => {
-    if (closed || onUpdate === undefined) return
+    if (closed || launching || onUpdate === undefined) return
     emittedAt = Date.now()
     onUpdate({
       content: [{ type: "text", text: progress.contentText() }],
-      details: partialDetails(started, params, executionMode, progress.details(), spec.skills),
+      details: partialDetails(withLiveSpawnFacts(started, deps.manager.get(started.task_id)), params, executionMode, progress.details(), spec.skills),
     })
   }
   const schedule = (): void => {
-    if (closed || onUpdate === undefined) return
+    if (closed || launching || onUpdate === undefined) return
     if (!receivedChildEvent) {
       receivedChildEvent = true
       emit()
@@ -178,7 +183,7 @@ export async function runSpawn(
   if (started.status === "pending") {
     onUpdate?.({
       content: [{ type: "text", text: "" }],
-      details: partialDetails(started, params, executionMode, {
+      details: partialDetails(withLiveSpawnFacts(started, deps.manager.get(started.task_id)), params, executionMode, {
         progress: { activity: "queued · waiting for slot", startedAt },
         childId: started.task_id,
         turns: 0,
@@ -186,6 +191,15 @@ export async function runSpawn(
     })
   } else {
     emit()
+  }
+  // Do not publish running partials with incomplete facts while the launch is still in flight.
+  // whenLaunched is optional and may reject: a failed launch releases the partials too, and the wait below reports it.
+  if (launch !== undefined) {
+    const launchSettled = (): void => {
+      launching = false
+      emit()
+    }
+    void launch.then(launchSettled, launchSettled)
   }
   const parent = deps.manager.findTaskByChildSession?.(ctx.sessionManager.getSessionId())
   const parked = parent === undefined ? undefined : deps.manager.concurrency?.park(parent.task_id, parent.notification.run_epoch)

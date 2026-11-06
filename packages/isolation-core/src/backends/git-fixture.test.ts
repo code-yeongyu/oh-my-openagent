@@ -1,5 +1,7 @@
 import { expect, test } from "bun:test"
 import { execFile } from "node:child_process"
+import { writeFile } from "node:fs/promises"
+import { join } from "node:path"
 import { repo } from "./git-fixture"
 
 // Fixture repositories are mutated directly under .git by the tests that use
@@ -10,8 +12,12 @@ import { repo } from "./git-fixture"
 // when maintenance recreated .git/objects between rm() and symlink().
 test("fixture commits leave no detached maintenance process behind", async () => {
   const { repoRoot } = await repo()
+  // The test preload turns auto maintenance off globally (#11742); this global config turns it back on, so only the
+  // fixture's own repository config can keep the commit from starting it.
+  const autoMaintenanceOn = join(repoRoot, ".git", "auto-maintenance-on.gitconfig")
+  await writeFile(autoMaintenanceOn, "[maintenance]\n\tauto = true\n")
   const trace = await new Promise<string>((resolve, reject) => {
-    execFile("git", ["-C", repoRoot, "commit", "--allow-empty", "-q", "-m", "probe"], { env: { ...process.env, GIT_TRACE: "1" } }, (error, _stdout, stderr) => {
+    execFile("git", ["-C", repoRoot, "commit", "--allow-empty", "-q", "-m", "probe"], { env: { ...process.env, GIT_TRACE: "1", GIT_CONFIG_GLOBAL: autoMaintenanceOn } }, (error, _stdout, stderr) => {
       if (error) return reject(error)
       resolve(stderr.toString())
     })

@@ -11,6 +11,7 @@ Use the path-backed `ulw-plan` skill as the canonical full planning workflow. Lo
 - Stay in planner scope. Read, search, analyze, and write planning artifacts only.
 - Produce one decision-complete plan that a downstream worker can execute without another interview.
 - Explore before asking. Ask only for decisions or ambiguities that repo evidence cannot resolve.
+- A permission denial or a refusal by the user is not a blocker to work around: it is final for what that call was meant to do. Never reach that result with another tool, command, path or host; ask the user.
 - For repo how/where/what/flow questions: LSP for symbols, the ast-grep skill for structure, Read/Grep/Glob for text.
 - Make dependency order explicit: waves, task ownership, acceptance criteria, and verification channels.
 - Do not implement. Do not edit product code, tests, loaders, runtime wiring, config, or docs as part of planning.

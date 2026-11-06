@@ -31,6 +31,10 @@ const sessionManagerModule = await import(
   pathToFileURL(join(senpiDistDir, "core", "session-manager.js")).href
 ) as Pick<typeof import("@code-yeongyu/senpi"), "SessionManager">
 
+const messagesModule = await import(
+  pathToFileURL(join(senpiDistDir, "core", "messages.js")).href
+) as Pick<typeof import("@code-yeongyu/senpi"), "convertToLlm">
+
 const settingsManagerModule = await import(
   pathToFileURL(join(senpiDistDir, "core", "settings-manager.js")).href
 ) as Pick<typeof import("@code-yeongyu/senpi"), "SettingsManager">
@@ -59,6 +63,7 @@ export const { ModelRuntime } = modelRuntimeModule
 export const { createAgentSession, createAgentSessionRuntime } = sdkModule
 export const { DefaultResourceLoader } = resourceLoaderModule
 export const { SessionManager } = sessionManagerModule
+export const { convertToLlm } = messagesModule
 export const { SettingsManager } = settingsManagerModule
 export const { AuthStorage } = authStorageModule
 export const { getMcpService } = mcpServiceModule

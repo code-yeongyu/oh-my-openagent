@@ -183,7 +183,7 @@ async function world(): Promise<World> {
     cwd: agentDir,
     created_at: new Date(clock.now).toISOString(),
     updated_at: new Date(clock.now).toISOString(),
-    endpoint: { kind: "tui", socket: "fake:tui", routing_id: "B" },
+    endpoint: { kind: "tui", socket: "fake:tui", routing_id: "B", durable_session_id: "B" },
     liveness: liveness.value,
   }]
   const endpoints: GatewayEndpointPort = {

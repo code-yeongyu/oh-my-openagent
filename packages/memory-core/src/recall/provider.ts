@@ -10,14 +10,14 @@
 // reading it one `git show` per file from every live session was a machine-wide git storm.
 
 import type { CompiledBlockStoreModule } from "../compile/cache"
-import { join } from "node:path"
-
-import { readFile, realpathSync, stat } from "../fs/resilient"
+import { InFlightReads } from "../compile/in-flight-reads"
+import { realpathSync } from "../fs/resilient"
 import type { GitMemoryRepo } from "../git"
 import { parseMemoryFile } from "../memfs"
 import { recallDocumentTerms } from "./bm25"
-import { onRecallDocumentsEncoded, recallTermAccess } from "./bm25-index"
+import { onRecallDocumentsEncoded, recallTermAccess, recallTermFigures } from "./bm25-index"
 import type { RecallTermIndex, RecallTermPersistence } from "./bm25-persist"
+import { headSignature } from "./head-signature"
 
 export interface RecallDocument {
   readonly path: string
@@ -164,42 +164,39 @@ function acquireSharedCache(dir: string, options: RecallCorpusCacheOptions): Rec
   return cache
 }
 
-const REF_NAME = /^refs\/[A-Za-z0-9._\-/]+$/
+// Every cache in the process, read only when a memory report is taken (oh-my-openagent#9442).
+const liveCaches = new Set<WeakRef<RecallCorpusCache>>()
+const releaseLiveCache = new FinalizationRegistry<WeakRef<RecallCorpusCache>>((ref) => {
+  liveCaches.delete(ref)
+})
 
-/**
- * Filesystem fingerprint of what `git rev-parse --verify HEAD` would read: the HEAD file's content
- * plus (mtimeMs,size) of HEAD, of the branch ref HEAD points at, and of packed-refs. Absent ref
- * files are recorded as absent, so packing or unpacking a ref changes the fingerprint too.
- * `undefined` means "cannot be fingerprinted" and always falls open to the git call.
- */
-async function headSignature(dir: string): Promise<string | undefined> {
-  try {
-    const gitDir = join(dir, ".git")
-    // A worktree or submodule checkout has a `.git` FILE pointing elsewhere: not fingerprinted here.
-    if (!(await stat(gitDir)).isDirectory()) return undefined
-    const headPath = join(gitDir, "HEAD")
-    const headStat = await stat(headPath)
-    const head = (await readFile(headPath, "utf8")).trim()
-    const parts = [`head=${head}`, `head-stat=${headStat.mtimeMs}:${headStat.size}`]
-    if (head.startsWith("ref:")) {
-      const ref = head.slice("ref:".length).trim()
-      if (!REF_NAME.test(ref)) return undefined
-      parts.push(`ref=${await fileSignature(join(gitDir, ...ref.split("/")))}`)
-      parts.push(`packed=${await fileSignature(join(gitDir, "packed-refs"))}`)
-    }
-    return parts.join("|")
-  } catch {
-    return undefined
-  }
+/** The recall layer's figures in the on-demand memory report. */
+export interface RecallMemoryFigures {
+  /** Caches holding a parsed corpus; a shared corpus counts once however many sessions hold it. */
+  readonly corpusCaches: number
+  readonly documents: number
+  /** UTF-16 size of every held document's path, description and body. */
+  readonly documentTextBytes: number
+  /** Term id and count arrays the BM25 index keeps for those documents. */
+  readonly termArrayBytes: number
+  /** Terms in the process-wide BM25 dictionary. */
+  readonly vocabularyTerms: number
 }
 
-async function fileSignature(path: string): Promise<string> {
-  try {
-    const info = await stat(path)
-    return `${info.mtimeMs}:${info.size}`
-  } catch {
-    return "absent"
+export function recallMemoryFigures(): RecallMemoryFigures {
+  const documents = new Set<RecallDocument>()
+  let corpusCaches = 0
+  for (const ref of liveCaches) {
+    const held = ref.deref()?.heldDocuments()
+    if (held === undefined) continue
+    corpusCaches += 1
+    for (const document of held) documents.add(document)
   }
+  let documentTextBytes = 0
+  for (const document of documents) {
+    documentTextBytes += 2 * (document.path.length + document.description.length + document.body.length)
+  }
+  return { corpusCaches, documents: documents.size, documentTextBytes, ...recallTermFigures(documents) }
 }
 
 /**
@@ -219,14 +216,28 @@ export class RecallCorpusCache {
   private readonly options: RecallCorpusCacheOptions
   /** Shared mode only: the process-wide caches this instance keeps alive, one per repository. */
   private readonly held = new Map<string, RecallCorpusCache>()
+  private readonly reads = new InFlightReads()
 
   constructor(options: RecallCorpusCacheOptions = {}) {
     this.options = options
     this.resolveHead = options.head ?? ((repo) => repo.head())
+    const ref = new WeakRef<RecallCorpusCache>(this)
+    liveCaches.add(ref)
+    releaseLiveCache.register(this, ref)
   }
 
-  async load(repo: GitMemoryRepo): Promise<RecallCorpus> {
+  /** The parsed documents this cache holds itself, `undefined` before its first load (memory report only). */
+  heldDocuments(): Iterable<RecallDocument> | undefined {
+    if (this.blobs === undefined) return undefined
+    return [...this.blobs.loaded.values()].flatMap((blob) => (blob.document === undefined ? [] : [blob.document]))
+  }
+
+  load(repo: GitMemoryRepo): Promise<RecallCorpus> {
     if (this.options.shared === true) return this.sharedFor(repo.dir).load(repo)
+    return this.reads.track(() => this.loadOwn(repo))
+  }
+
+  private async loadOwn(repo: GitMemoryRepo): Promise<RecallCorpus> {
     const signature = await headSignature(repo.dir)
     if (
       this.entry !== undefined &&
@@ -262,8 +273,13 @@ export class RecallCorpusCache {
     }
   }
 
-  /** Settles once no persisted-terms save started by this cache, or a shared cache it holds, is running. */
+  /**
+   * Settles once no corpus load (its HEAD read and git reads included) or persisted-terms save started by this cache,
+   * or a shared cache it holds, is running. A session shutdown waits on this before the identity directory may be
+   * removed (#11135).
+   */
   async settled(): Promise<void> {
+    await this.reads.settled()
     await Promise.all([
       ...[...this.attached].map((terms) => terms.settled()),
       ...[...this.held.values()].map((cache) => cache.settled()),

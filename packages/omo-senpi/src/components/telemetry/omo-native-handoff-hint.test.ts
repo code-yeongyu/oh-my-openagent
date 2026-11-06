@@ -35,6 +35,13 @@ describe("OmO Native handoff-hint telemetry (senpi#3230)", () => {
     // when
     for (const action of ["shown", "accepted", "dismissed"]) emitFakeExtensionEvent(pi, SENPI_HANDOFF_HINT_EVENT, { ...payload, action })
     emitFakeExtensionEvent(pi, SENPI_HANDOFF_HINT_EVENT, { ...payload, action: "clicked" })
+    const { savingUsd: _omitted, ...missingField } = payload
+    for (const malformed of [
+      { ...missingField, action: "shown" },
+      { ...payload, action: "shown", savingUsd: Number.NaN },
+      { ...payload, action: "shown", contextTokens: Number.POSITIVE_INFINITY },
+      { ...payload, action: "shown", subscription: "false" },
+    ]) emitFakeExtensionEvent(pi, SENPI_HANDOFF_HINT_EVENT, malformed)
     emitFakeExtensionEvent(pi, SENPI_HANDOFF_HINT_EVENT, { ...payload, action: "shown", model: "my-private-finetune", provider: "my-gateway" })
 
     // then

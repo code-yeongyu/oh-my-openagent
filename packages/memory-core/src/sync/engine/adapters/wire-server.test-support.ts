@@ -3,10 +3,13 @@
 // and links as 43-char base64url, `{ entries }` pages of PAGE rows, the state route carrying the
 // head and the latest snapshot, `{ error: { code } }` refusals. It holds bytes, not crypto: the
 // header checks and signatures belong to the real server. Also run as a separate process by
-// the two-process QA (`bun wire-server.test-support.ts <port-file>`).
+// the two-process QA (`bun wire-server.test-support.ts <port-file>`). The service's revoke freeze is
+// the shared FreezeModel (every device here counts as a member), reached through the real revoke routes.
 
 import { randomBytes } from "node:crypto"
 import { writeFile } from "node:fs/promises"
+
+import { FreezeModel } from "../../account/testing/freeze-model.test-support.ts"
 
 type Row = { seq: number; digest: string; objectId: string; author: string; batchId: string }
 
@@ -25,6 +28,7 @@ export interface WireServer {
   tokenOf(device: string): string
   compactTo(coversSeq: number, chunkIds: readonly string[]): void
   untilStreamsClosed(): Promise<number>
+  readonly freeze: FreezeModel
   stop(): Promise<void>
 }
 
@@ -51,28 +55,38 @@ export function startWireServer(options: WireServerOptions): WireServer {
   const streams = new Set<ReadableStreamDefaultController<Uint8Array>>()
   let snapshot: { covers: number; chunks: readonly string[] } | null = null
   let closedWaiters: (() => void)[] = []
-  const notify = (seq: number) => {
-    const frame = new TextEncoder().encode(`data: ${JSON.stringify({ type: "sync.advanced", head: { seq, link: "A".repeat(43) } })}\n\n`)
+  const broadcast = (event: Record<string, unknown>) => {
+    const frame = new TextEncoder().encode(`data: ${JSON.stringify(event)}\n\n`)
     for (const c of streams) c.enqueue(frame)
   }
+  const notify = (seq: number) => broadcast({ type: "sync.advanced", head: { seq, link: "A".repeat(43) } })
+  const freeze = new FreezeModel(() => true)
+  for (const id of Object.values(options.devices)) freeze.addDevice({ id, kind: "cli", principal: id, signingKey: id })
+  freeze.onStateChanged(() => broadcast({ type: "sync.state.changed" }))
   const state = {
     pageSize: 500,
     refuseNext: null as string | null,
     failNext: null as number | null,
   }
   const server = Bun.serve({
+    // Bound to the exact address the client dials: on a wildcard bind another process may bind
+    // 127.0.0.1 on the same port and answer this fixture's requests.
+    hostname: "127.0.0.1",
     port: options.port ?? 0,
     idleTimeout: 0,
     async fetch(req) {
       const url = new URL(req.url)
       const device = tokens.get((req.headers.get("authorization") ?? "").replace(/^Bearer /, ""))
       if (device === undefined) return refusal("unauthorized")
+      if (freeze.isRevokedDevice(device)) return freeze.revokedRefusal()
       if (state.failNext !== null) {
         const status = state.failNext
         state.failNext = null
         return error(status, "unavailable")
       }
       const path = url.pathname
+      const routed = freeze.route(req.method, path, device)
+      if (routed !== null) return routed
       if (req.method === "GET" && path === "/v1/me/events") {
         let self: ReadableStreamDefaultController<Uint8Array> | null = null
         const body = new ReadableStream<Uint8Array>({
@@ -93,7 +107,7 @@ export function startWireServer(options: WireServerOptions): WireServer {
         return Response.json({
           head: { seq: head, link: "A".repeat(43), keyring_link: "A".repeat(43) },
           current_epoch: 1,
-          rotation_pending: false,
+          rotation_pending: freeze.pending,
           oldest_retained_seq: (snapshot?.covers ?? 0) + 1,
           snapshot: snapshot === null ? null : { covers_seq: snapshot.covers, author: { kind: "device", id: "x" }, chunk_object_ids: snapshot.chunks, link: "A".repeat(43), keyring_head: "A".repeat(43), record_sig: "S" },
           min_client_format: 1,
@@ -136,6 +150,7 @@ export function startWireServer(options: WireServerOptions): WireServer {
         if (up === undefined || up.data === null || up.device !== device) return refusal("not_found")
         const replay = rows.find((r) => r.batchId === body.idempotency_key)
         if (replay !== undefined) return Response.json({ seq: replay.seq })
+        if (freeze.pending) return freeze.staleRefusal()
         if (body.base_seq !== (rows.at(-1)?.seq ?? 0)) return refusal("stale_base")
         objects.set(up.objectId, up.data)
         const seq = body.base_seq + 1
@@ -167,6 +182,7 @@ export function startWireServer(options: WireServerOptions): WireServer {
       state.failNext = status
     },
     tokenOf: (name) => `${options.token}.${name}`,
+    freeze,
     compactTo(coversSeq, chunkIds) {
       snapshot = { covers: coversSeq, chunks: chunkIds }
     },

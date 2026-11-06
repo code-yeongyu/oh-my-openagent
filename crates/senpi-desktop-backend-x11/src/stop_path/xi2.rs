@@ -55,6 +55,12 @@ fn unavailable(reason: &str) -> StopPathError {
     }
 }
 
+/// XI 2.0 withholds raw events while another client grabs the keyboard, so
+/// an app holding a grab would swallow the chord; XI 2.1 delivers them anyway.
+pub(super) const fn raw_events_survive_grabs(major: u16, minor: u16) -> bool {
+    major > 2 || (major == 2 && minor >= 1)
+}
+
 impl Session {
     fn open(hotkey: &Hotkey) -> Result<Self, StopPathError> {
         let (conn, screen) = x11rb::connect(None).map_err(|_| unavailable(CONNECTION_FAILED))?;
@@ -70,7 +76,7 @@ impl Session {
             .map_err(|_| xi2())?
             .reply()
             .map_err(|_| xi2())?;
-        if version.major_version < 2 {
+        if !raw_events_survive_grabs(version.major_version, version.minor_version) {
             return Err(xi2());
         }
         let keys = xinput::EventMask {

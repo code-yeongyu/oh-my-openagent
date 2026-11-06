@@ -12,7 +12,7 @@ import {
 } from "@oh-my-opencode/telemetry-core"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { getSenpiTelemetryStateDir, SENPI_TELEMETRY_EVENT_NAME } from "./index"
-import { OMO_NATIVE_COMMON_PROPERTY_SCHEMAS, OMO_NATIVE_PROPERTY_ALLOWLISTS, getOmoNativeStateDir } from "./product-identity"
+import { OMO_NATIVE_COMMON_PROPERTY_SCHEMAS, OMO_NATIVE_PROPERTY_ALLOWLISTS, getOmoNativeStateDir, getOmoNativeInstallIdPath } from "./product-identity"
 import { createOmoNativeSessionComponent } from "./omo-native-session"
 import {
   FIXED_NOW,
@@ -244,7 +244,7 @@ describe("OmO Native session telemetry", () => {
     })
   })
 
-  it("#given a persisted install id #when native events are captured #then distinct_id is sha256(install id), install_hash mirrors it, the raw id never ships and the legacy event keeps the hostname hash", async () => {
+  it("#given a persisted install id #when native events are captured #then distinct_id is sha256(install id), install_hash mirrors it, the raw id never ships and the legacy event uses its own random install id", async () => {
     await withTempAgentDir(async (agentDir) => {
       // given
       writeInventory(agentDir)
@@ -255,7 +255,7 @@ describe("OmO Native session telemetry", () => {
       await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, sessionCtx("identity"))
 
       // then
-      const installId = readFileSync(join(getOmoNativeStateDir(createEnabledEnv(agentDir)), "install-id"), "utf8").trim()
+      const installId = readFileSync(getOmoNativeInstallIdPath(createEnabledEnv(agentDir)), "utf8").trim()
       const installHash = createHash("sha256").update(installId).digest("hex")
       const native = recorder.messages.filter(({ event }) => event !== SENPI_TELEMETRY_EVENT_NAME)
       expect(native.length).toBeGreaterThan(0)
@@ -263,11 +263,14 @@ describe("OmO Native session telemetry", () => {
         expect(message.distinctId).toBe(installHash)
         expect(message.properties?.install_hash).toBe(message.distinctId)
         expect(message.properties).not.toHaveProperty("install_id")
-        expect(String(message.properties?.machine_hash)).toMatch(/^[0-9a-f]{64}$/)
+        expect(message.properties).not.toHaveProperty("machine_hash")
         expect(message.properties?.schema_version).toBe(4)
       }
       const legacy = recorder.messages.find(({ event }) => event === SENPI_TELEMETRY_EVENT_NAME)
-      expect(legacy?.distinctId).toBe(createHash("sha256").update("omo-senpi:native-session-host").digest("hex"))
+      const legacyInstallId = readFileSync(join(getSenpiTelemetryStateDir(createEnabledEnv(agentDir)), "install-id"), "utf8").trim()
+      expect(legacyInstallId).toMatch(/^[0-9a-f]{64}$/)
+      expect(legacy?.distinctId).toBe(createHash("sha256").update(legacyInstallId).digest("hex"))
+      expect(legacy?.distinctId).not.toBe(installHash)
     })
   })
 
@@ -277,7 +280,7 @@ describe("OmO Native session telemetry", () => {
       writeInventory(agentDir)
       const recorder = createRecorder()
       const env = createEnabledEnv(agentDir)
-      const installIdPath = join(getOmoNativeStateDir(env), "install-id")
+      const installIdPath = getOmoNativeInstallIdPath(env)
       await register(agentDir, recorder).dispatch("session_start", { type: "session_start", reason: "startup" }, sessionCtx("before"))
       const firstId = readFileSync(installIdPath, "utf8").trim()
       rmSync(installIdPath)

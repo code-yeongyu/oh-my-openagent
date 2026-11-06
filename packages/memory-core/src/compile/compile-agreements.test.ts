@@ -5,6 +5,8 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { AGREEMENTS_PATH } from "../agreements/types"
+import { parseAgreementsLedger } from "../agreements/format"
+import { parseMemoryFile } from "../memfs"
 import { GitMemoryRepo } from "../git"
 import { removeTree } from "../../../../test-support/remove-tree"
 import { compileMemoryBlockAtRevision } from "./compile"
@@ -16,6 +18,7 @@ const LEDGER = [
   "",
   "- [project] Run bun test before claiming done. <!-- id: 7b1d000000; by: agent; n: 1; since: 2026-10-20; last: 2026-10-20; status: active -->",
   "- [global] Never filter the message monitor output. <!-- id: 3f9a1c0b2e; by: human; n: 3; since: 2026-10-14; last: 2026-10-21; status: needs-human -->",
+  `<!-- agreement-event: ${"a".repeat(64)} -->`,
   "",
 ].join("\n")
 const roots: string[] = []
@@ -61,6 +64,23 @@ describe("compiled memory block: the <agreements> section (prompt-byte contract)
       "- [project] [agent] [broken x1] Run bun test before claiming done.",
     ])
     expect(block).not.toContain("<!-- id:")
+    expect(block).not.toContain("<!-- agreement-event:")
+    expect(block).not.toContain("a".repeat(64))
+  })
+
+  it("a malformed event receipt is diagnosed without preventing memory compilation", async () => {
+    const malformed = "<!-- agreement-event: damaged -->"
+    const content = `${LEDGER}\n${malformed}\n`
+    const repo = await repoWith({ [AGREEMENTS_PATH]: content })
+
+    const parsed = parseAgreementsLedger(parseMemoryFile(content).body)
+    const block = await compileMemoryBlockAtRevision(repo, await repo.head(), { agentId: "agent-one" })
+
+    expect(parsed.diagnostics).toHaveLength(1)
+    expect(parsed.unparsed).toEqual([malformed])
+    expect(parsed.items).toHaveLength(2)
+    expect(block).toContain("<agreements>")
+    expect(block).not.toContain(malformed)
   })
 
   it("#given an unchanged revision #when compiled twice #then the bytes are identical", async () => {

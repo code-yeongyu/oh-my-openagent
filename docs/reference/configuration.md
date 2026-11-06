@@ -148,7 +148,7 @@ Here's a practical starting `~/.omo/omo.jsonc`. OpenCode plugin settings live in
       // writing - docs/prose
       "writing": { "model": "anthropic/claude-opus-5-5", "reasoning": "low" },
 
-      // visual-engineering - Fable 5.1 max, then Opus 5 max and Kimi K3 max
+      // visual-engineering - Fable 5.1 max, then Opus 5 max and Kimi K3.1 Pro max
       "visual-engineering": {
         "model": "anthropic/claude-opus-5-5",
         "reasoning": "max",
@@ -211,6 +211,7 @@ This table is the `[opencode].agents` surface only. Shared-base agents use the c
 | ----------------- | ----------------------- | --------------------------------------------------------------- |
 | `model`           | string                  | Model override (`provider/model`)                               |
 | `models`          | array                   | Ordered model chain; entries are strings or per-model objects   |
+| `models_distribution` | `sequential \| round_robin` | Starting model policy for new children; defaults to `sequential` |
 | `fallback_models` | string\|array           | Deprecated compatibility fallback chain                         |
 | `reasoning`       | string                  | Canonical reasoning level or harness-native preset token        |
 | `temperature`     | number                  | Sampling temperature                                            |
@@ -360,6 +361,7 @@ Domain-specific model delegation used by the `task()` tool. When the main agent 
 | ------------------- | ------------- | ------- | ------------------------------------------------------------------- |
 | `model`             | string        | -       | Model override                                                      |
 | `models`            | array         | -       | Ordered model chain; entries are strings or per-model objects       |
+| `models_distribution` | `sequential \| round_robin` | `sequential` | Rotate the starting entry per new child with `round_robin` |
 | `fallback_models`   | string\|array | -       | Deprecated compatibility fallback chain                            |
 | `reasoning`         | string        | -       | Canonical reasoning level or harness-native preset token            |
 | `temperature`       | number        | -       | Sampling temperature                                                |
@@ -428,7 +430,7 @@ The main agent has no chain of its own: it runs on your session model (Claude Op
 | --- | --- | --- |
 | **explore** | `kimi-for-coding-highspeed` | `kimi-coding\|kimi-for-coding/kimi-for-coding-highspeed (off)` → `openai\|chatgpt-subscription/gpt-6-luna-fast (low)` → `anthropic\|github-copilot/claude-haiku-5-5 (medium)` → `deepseek/deepseek-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `opencode-go/minimax-m2.7`
 | **librarian** | `kimi-for-coding-highspeed` | `kimi-coding\|kimi-for-coding/kimi-for-coding-highspeed (off)` → `openai\|chatgpt-subscription/gpt-6-luna-fast (low)` → `anthropic\|github-copilot/claude-haiku-5-5 (medium)` → `deepseek/deepseek-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `opencode-go/minimax-m2.7`
-| **plan-consultant** | `claude-fable-5-1` | `anthropic\|github-copilot\|opencode/claude-fable-5-1 (max)` → `anthropic\|github-copilot\|opencode/claude-opus-5-5 (max)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode/kimi-k3 (max)`
+| **plan-consultant** | `claude-fable-5-1` | `anthropic\|github-copilot\|opencode/claude-fable-5-1 (max)` → `anthropic\|github-copilot\|opencode/claude-opus-5-5 (max)` → `opencode-go\|kimi-for-coding\|moonshotai/kimi-k3.1-pro (max)` → `opencode/kimi-k3 (max)`
 | **plan-reviewer** | `gpt-6-astra` | `openai\|chatgpt-subscription/gpt-6-astra (xhigh)` → `github-copilot/gpt-6-astra (high)` → `openai\|chatgpt-subscription\|opencode/gpt-6-astra (high)` → `anthropic\|github-copilot\|opencode/claude-opus-5-5 (max)` → `google\|google-vertex\|opencode/gemini-4-argon (high)` → `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `opencode-go/glm-5.2`
 
 #### Category Provider Chains
@@ -437,14 +439,14 @@ This table mirrors the authoritative hardcoded category fallback chains: the cha
 
 | Category | Provider Chain Primary | Provider Priority |
 | --- | --- | --- |
-| **Visual Engineering** | `claude-fable-5-1` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (max)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (max)` → `kimi-for-coding\|moonshotai\|opencode-go\|opencode/kimi-k3 (max)` |
+| **Visual Engineering** | `claude-fable-5-1` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (max)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (max)` → `kimi-for-coding\|moonshotai\|opencode-go/kimi-k3.1-pro (max)` → `opencode/kimi-k3 (max)` |
 | **Ultrabrain** | `gpt-6-astra` | `openai\|chatgpt-subscription/gpt-6-astra (max)` → `github-copilot/gpt-6-astra (max)` → `openai\|chatgpt-subscription\|opencode/gpt-6-astra (max)` → `openai\|chatgpt-subscription/gpt-5.6-sol (max)` → `github-copilot/gpt-5.6-sol (max)` → `openai\|chatgpt-subscription\|opencode/gpt-5.6-sol (max)` |
 | **Deep Low** | `gpt-6.1-sol` | `openai\|chatgpt-subscription/gpt-6.1-sol (medium)` → `openai\|chatgpt-subscription/gpt-6.1-sol-fast (medium)` → `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-5.6-sol (medium)` → `openai\|chatgpt-subscription/gpt-5.6-sol-fast (medium)` |
 | **Deep High** | `gpt-6-astra` | `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-6-astra (high)` |
-| **Artistry** | `claude-fable-5-1` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (max)` → `kimi-for-coding\|moonshotai\|opencode-go\|opencode/kimi-k3 (max)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (max)` |
+| **Artistry** | `claude-fable-5-1` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (max)` → `kimi-for-coding\|moonshotai\|opencode-go/kimi-k3.1-pro (max)` → `opencode/kimi-k3 (max)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (max)` |
 | **Quick** | `gpt-6-luna-fast` | `chatgpt-subscription/gpt-6-luna-fast (low)` → `anthropic\|anthropic-api\|github-copilot/claude-haiku-5-5 (medium)` → `deepseek/deepseek-flash (off)` → `qwen-token-plan\|alibaba-token-plan\|bailian-coding-plan/qwen3.6-flash (low)` → `opencode-go/minimax-m3 (max)` → `opencode-go/minimax-m2.7 (max)` → `xai/grok-4.20-0309-non-reasoning` → `zai-coding-plan/glm-5.3-flash (low)` → `xiaomi/mimo-v2.6-flash (low)` |
 | **Unspecified Low** | `claude-sonnet-5-5` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-sonnet-5-5 (medium)` → `xiaomi\|opencode-go/mimo-v2.6-pro (max)` → `xai\|github-copilot\|opencode-go/grok-4.7 (xhigh)` → `zai-coding-plan\|opencode-go/glm-5.3 (high)` → `openai\|chatgpt-subscription/gpt-6.1-sol (medium)` → `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-5.6-sol (medium)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-sonnet-5 (low)` → `qwen-token-plan\|alibaba-token-plan\|qwen-token-plan-cn\|alibaba-token-plan-cn/qwen3.8-max-preview (max)` → `deepseek\|opencode-go/deepseek-v4-pro (max)` → `xiaomi\|opencode-go/mimo-v2.5-pro (max)` |
-| **Unspecified High** | `claude-opus-5-5` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (medium)` → `zai-coding-plan\|opencode-go/glm-5.3 (max)` → `kimi-for-coding\|moonshotai\|opencode-go\|opencode/kimi-k3 (max)` |
+| **Unspecified High** | `claude-opus-5-5` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (medium)` → `zai-coding-plan\|opencode-go/glm-5.3 (max)` → `kimi-for-coding\|moonshotai\|opencode-go/kimi-k3.1-pro (max)` → `opencode/kimi-k3 (max)` |
 | **Writing** | `claude-opus-5-5` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (low)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-4-6 (max)` |
 
 Run `bunx oh-my-openagent doctor --verbose` to see effective model resolution for your config.
@@ -478,7 +480,7 @@ Control parallel agent execution and concurrency limits. `background_task` (came
 | `messageStalenessTimeoutMs` | `3600000` | Timeout when no progress update was ever received (min: 60000)        |
 | `taskTtlMs`                 | `1800000` | Absolute non-terminal task TTL (min: 300000)                          |
 | `sessionGoneTimeoutMs`      | `60000`   | Timeout when a task session disappears (min: 10000)                   |
-| `taskCleanupDelayMs`        | `600000`  | Delay before terminal tasks are removed (min: 60000)                  |
+| `taskCleanupDelayMs`        | `600000`  | Delay before terminal tasks and completed sync subagent sessions are removed (min: 60000) |
 | `syncPollTimeoutMs`         | -         | Synchronous polling timeout in milliseconds (min: 60000)             |
 | `maxToolCalls`              | `4000`    | Maximum tool calls per subagent task (min: 10)                        |
 | `circuitBreaker`            | -         | Circuit-breaker object: `enabled` (default `true`), `maxToolCalls`, `consecutiveThreshold` |
@@ -588,19 +590,52 @@ path still maps to its main checkout. Git records the real path of the main chec
 main checkout opened through a symlinked path resolves differently from its worktrees; use an
 explicit `agent` name in that case.
 
+#### Memory from projects the session touches
+
+After a successful `read`, `edit` or `write` under a child project with existing memory, the tool
+result lists up to 30 of that project's note paths and descriptions, not their bodies. The nudge
+appears once per project and is re-armed after accepted compaction. A non-git workspace can link
+projects in through directory symlinks; links committed inside a git repository do not extend its
+scope. Links to an ancestor, home or a directory containing the memory root never widen scope.
+Linked worktrees use the session's bound `auto_identity` mode and absolute memory root.
+
+Kibitzer considers up to three recently touched projects. It ranks each project's committed notes
+apart from the session's own corpus and reserves up to half the available seats, rounded up, for
+projects in touch order. Unused seats go to the other side. Each repository uses the same persisted
+search-term cache as the session's own memory; an unreadable or unwritable cache is logged and recall
+continues. Project note keys are `@project/<identity>/<path>` so ledgers cannot confuse two projects'
+notes with the same name; delivered hints name the readable file path.
+
+| Option                 | Default | Description |
+| ---------------------- | ------- | ----------- |
+| `project_scope.nudge`   | `true`  | List a touched project's note paths and descriptions |
+| `project_scope.recall`  | `true`  | Include touched projects in Kibitzer recall and its memory tool |
+
+These switches belong to the root `memory` block and its harness/profile layers, not `agents`
+overrides. Turning both off revokes grants on the next file touch. Project access is read-only:
+enumeration, writes, the repository root itself, git metadata and the reserved `system/` tree stay
+denied. The exclusions are case-insensitive on every platform; symlinks cannot escape a granted
+repository, and grants are revoked when the session shuts down.
+
 #### Memory file list in the prompt
 
 Every turn the compiled memory block ends with `<external_projection>`, one line per directory
-naming the memory files outside `system/`. Two limits keep it small on a large corpus. Each
-directory lists its most recently committed files first (ties by name). Names that do not fit are
-counted as `(+N more; read $MEMORY_DIR/<dir>/ to list)`, and every directory keeps its line.
+naming the memory files outside `system/`, most recently committed first (ties by name). Names drop
+`.md` (other files stay quoted and exact), and markdown names sharing a `-YYYYMMDD` suffix are
+grouped as `{a, b}-YYYYMMDD`. Names that carry no hint fold into one entry: runs of at least three
+names that differ only by a date, month chunk, clock time or part (`2026-06-p1 … 2026-10-p11 (91
+files)`), generated-id names (`<id> (N files)`), sibling directories named by generated ids
+(`jobs/<id>/ (72 dirs)`), and sibling directories holding the same file names
+(`people/{ann, bob, cy}/`). A legend line at the top says how an entry maps back to its file.
+Names that do not fit a limit are counted as `(+N more; read $MEMORY_DIR/<dir>/ to list)`, and
+every directory keeps its line.
 
 | Option                                 | Default | Description                                                                   |
 | -------------------------------------- | ------- | ----------------------------------------------------------------------------- |
-| `projection.max_entries_per_directory` | `40`    | Names listed per directory, newest first                                       |
-| `projection.max_bytes`                 | `24576` | Byte budget for the whole list; the largest directory gives up names first     |
+| `projection.max_entries_per_directory` | `0`     | Entries listed per directory, newest first; `0` lists every entry              |
+| `projection.max_bytes`                 | `40960` | Byte budget for the whole list; the largest directory gives up entries first   |
 
-`0` disables a limit; both at `0` list every name in name order, as before. A budget smaller
+`0` disables a limit; both at `0` list every entry in name order. A budget smaller
 than one line per directory cannot be met: the list then shows only the directory lines with
 their counts, and `/doctor` reports the overflow. Both keys can be set per harness, per profile
 and per agent under `agents.<name>.projection`. `/doctor` prints a `projection` line with the
@@ -647,7 +682,17 @@ successful reflection clears the backoff. `/reflect` ignores it, so you can alwa
 | `reflection.merge`         | `"auto"` | `auto` or `integration` merge strategy                     |
 | `reflection.category`      | `"quick"`| Task executor category for the reflection child            |
 | `reflection.timeout_minutes`| `15`    | Hard timeout for a reflection run                          |
+| `reflection.max_concurrent_runs` | `1` | Concurrent reflection/dream children across memory identities |
 | `reflection.sandbox`       | `"auto"` | `auto`, `required`, or `off`                               |
+
+Reflection and dream supervisors share FIFO slots under
+`<OMO_MEMORY_HOME>/runtime/locks` (the default memory home is `~/.omo/memory`).
+Queued work waits without a timeout and is not dropped. Queue time does not
+consume the execution budget: admission shifts both durable deadlines before
+starting the child; model fallback attempts share the remaining execution budget.
+Set `max_concurrent_runs` consistently in the shared user configuration for all
+sessions using that memory home. This machine setting cannot be overridden for an
+individual identity. Separate memory homes have separate queues.
 
 #### Nudge
 
@@ -890,7 +935,7 @@ Disable built-in hooks via `disabled_hooks`:
 { "disabled_hooks": ["comment-checker"] }
 ```
 
-Available hooks: `todo-continuation-enforcer`, `session-notification`, `comment-checker`, `tool-output-truncator`, `question-label-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `model-fallback`, `anthropic-context-window-limit-recovery`, `preemptive-compaction`, `rules-injector`, `background-notification`, `auto-update-checker`, `ast-grep-sg-provision`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `tool-pair-validator`, `monitor-status-injector`, `goal`, `category-skill-reminder`, `compaction-context-injector`, `compaction-todo-preserver`, `claude-code-hooks`, `auto-slash-command`, `edit-error-recovery`, `json-error-recovery`, `delegate-task-retry`, `team-tool-gating`, `ulw-execute`, `unstable-agent-babysitter`, `task-resume-info`, `stop-continuation-guard`, `tasks-todowrite-disabler`, `runtime-fallback`, `write-existing-file-guard`, `notepad-write-guard`, `bash-file-read-guard`, `hashline-read-enhancer`, `read-image-resizer`, `todo-description-override`, `webfetch-redirect-guard`, `fsync-skip-warning`, `plan-format-validator`, `legacy-plugin-toast`
+Available hooks: `todo-continuation-enforcer`, `session-notification`, `comment-checker`, `tool-output-truncator`, `question-label-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `model-fallback`, `anthropic-context-window-limit-recovery`, `preemptive-compaction`, `rules-injector`, `background-notification`, `auto-update-checker`, `ast-grep-sg-provision`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `tool-pair-validator`, `monitor-status-injector`, `goal`, `category-skill-reminder`, `compaction-context-injector`, `compaction-todo-preserver`, `claude-code-hooks`, `auto-slash-command`, `edit-error-recovery`, `json-error-recovery`, `delegate-task-retry`, `team-tool-gating`, `ulw-execute`, `unstable-agent-babysitter`, `task-resume-info`, `stop-continuation-guard`, `tasks-todowrite-disabler`, `runtime-fallback`, `write-existing-file-guard`, `notepad-write-guard`, `bash-file-read-guard`, `hashline-read-enhancer`, `read-image-resizer`, `todo-description-override`, `webfetch-redirect-guard`, `fsync-skip-warning`, `plan-format-validator`, `legacy-plugin-toast`, `momus-review-persistence`
 
 Hooks that exist only in the OpenCode edition are listed on the legacy page linked from [Agents](#agents).
 
@@ -965,10 +1010,10 @@ Run background subagents in separate tmux panes. Requires running inside tmux wi
 Configure git commit behavior:
 
 ```json
-{ "git_master": { "commit_footer": false, "git_env_prefix": "GIT_MASTER=1" } }
+{ "git_master": { "include_co_authored_by": true, "commit_footer": false, "git_env_prefix": "GIT_MASTER=1" } }
 ```
 
-`commit_footer` (default `false`) opts in to an "Ultraworked with Sisyphus" footer in the commit body; a string replaces the builtin text. Commits keep your own git author and committer, and omo never adds a `Co-authored-by` trailer; `include_co_authored_by` is a deprecated no-op kept so existing configs still validate.
+`include_co_authored_by` (default `true`) adds `Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>` to every commit git-master writes, exactly once: it is passed with `git -c trailer.ifexists=addIfDifferent commit --trailer`, so amending or rewording a commit that already has it does not add a second copy, and after a squash git-master rewrites the joined message once. It needs git 2.32 or newer. Set it to `false` to keep the trailer out of your history. `commit_footer` (default `false`) opts in to an "Ultraworked with Sisyphus" footer in the commit body; a string replaces the builtin text. Either way, commits keep your own git author and committer.
 
 This key configures the OpenCode plugin inside `[opencode]`. The Senpi harness reads the typed shared `git_master` section instead, documented in the [omo.json reference](./omo-json.md#git_master-native-harness).
 

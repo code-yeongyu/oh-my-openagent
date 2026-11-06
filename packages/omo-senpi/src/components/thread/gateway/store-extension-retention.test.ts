@@ -15,7 +15,7 @@ afterEach(async () => { await harness?.dispose(); harness = undefined })
 
 function insertDelivery(db: Database, id: string, seq: number, updatedAt: number): void {
   db.run(
-    "INSERT INTO deliveries (delivery_id, target_durable_id, seq, sender, envelope, body, bytes, mode_requested, state, root_id, hop, created_at, updated_at, expires_at) VALUES (?, 'B', ?, 'session:A', '{}', 'body', 4, 'auto', 'applied', 'root-x', 1, ?, ?, ?)",
+    "INSERT INTO deliveries (delivery_id, target_durable_id, seq, sender, envelope, body, bytes, mode_requested, state, root_id, hop, created_at, updated_at, expires_at) VALUES (?, 'B', ?, 'session:A', '{\"provenance\":{\"workspace\":\"Example\",\"project\":\"project\"}}', 'body', 4, 'auto', 'applied', 'root-x', 1, ?, ?, ?)",
     [id, seq, updatedAt, updatedAt, updatedAt + DAY],
   )
 }

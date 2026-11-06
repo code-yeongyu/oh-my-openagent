@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync,
 import { tmpdir } from "node:os"
 import { delimiter, dirname, join, parse, relative } from "node:path"
 import { migrationReport, resolveMigrationEnvironment, scanOmoBins, shadowingOmoBins } from "../bin/lib/doctor-migration.js"
+import { posixRuntimeWrapper } from "../../omo-codex/src/install/codex-cache-runtime-wrapper"
 import { runDoctor } from "../bin/lib/doctor.js"
 import { updateTarget } from "../bin/lib/package-paths.js"
 
@@ -227,12 +228,95 @@ describe("omo doctor migration checks", () => {
     })
   })
 
+  describe("#given a dead Codex Light wrapper whose cached runtime is gone (#12110)", () => {
+    const cacheTarget = (sandbox: Sandbox, version = "4.16.2"): string =>
+      join(sandbox.home, ".codex", "plugins", "cache", "sisyphuslabs", "omo", version, "dist", "cli", "index.js")
+    const nodeFallbackTarget = (sandbox: Sandbox, version = "4.16.2"): string =>
+      join(sandbox.home, ".codex", "plugins", "cache", "sisyphuslabs", "omo", version, "dist", "cli-node", "index.js")
+
+    function installDeadWrapper(sandbox: Sandbox): { localBin: string; target: string } {
+      const localBin = join(sandbox.home, ".local", "bin")
+      const target = cacheTarget(sandbox)
+      // The fixture is a real generated wrapper: its bun line runs dist/cli/index.js and its
+      // node fallback lines name dist/cli-node/index.js.
+      writeFile(join(localBin, "omo"), posixRuntimeWrapper("omo", target, join(sandbox.home, ".codex"), localBin, nodeFallbackTarget(sandbox)))
+      return { localBin, target }
+    }
+
+    function installBunNativeVersion(sandbox: Sandbox, version: string): void {
+      installPackage(join(sandbox.bunRoot, "install", "global", "node_modules"), sandbox.bunBin, "omo-ai", version)
+    }
+
+    function installNpmNative(sandbox: Sandbox, version: string): void {
+      installPackage(join(sandbox.npmPrefix, "lib", "node_modules"), sandbox.npmBin, "omo-ai", version)
+    }
+
+    // The dead-wrapper target comes out of the POSIX wrapper with forward slashes
+    // (toPosixPath), so doctor-migration normalizes it to the platform form before
+    // reporting it, and these cases run on Windows too: CI run 42027565394 showed
+    // the wrapper is classified and reported broken there, the only mismatch was
+    // the separator format. The Windows `.cmd` wrapper gap stays filed as #12560.
+    test("#then it is reported as broken and the repair installer is not offered for it", () => {
+      const sandbox = createSandbox()
+      const { localBin, target } = installDeadWrapper(sandbox)
+      installBunNativeVersion(sandbox, "5.0.1")
+      installNpmNative(sandbox, "5.0.0-0.beta.7")
+
+      const lines = report(sandbox, [localBin, sandbox.bunBin, sandbox.npmBin])
+
+      const broken = lines.find((line) => line.startsWith("WARN broken omo on PATH:"))
+      expect(broken).toBe(`WARN broken omo on PATH: ${join(localBin, "omo")} launches ${target}; remove it`)
+      expect(lines.some((line) => line.includes(REPAIR))).toBe(false)
+      const duplicate = lines.find((line) => line.startsWith("WARN more than one OmO install is on PATH:"))
+      expect(duplicate).toContain("(omo-ai@5.0.1) runs when you type omo")
+      expect(duplicate).toContain("(omo-ai@5.0.0-0.beta.7) never runs")
+    })
+
+    test("#then it is still reported when it sits after both omo-ai installs", () => {
+      const sandbox = createSandbox()
+      const { localBin, target } = installDeadWrapper(sandbox)
+      installBunNativeVersion(sandbox, "5.0.1")
+      installNpmNative(sandbox, "5.0.0-0.beta.7")
+
+      const lines = report(sandbox, [sandbox.bunBin, sandbox.npmBin, localBin])
+
+      expect(lines.some((line) => line === `WARN broken omo on PATH: ${join(localBin, "omo")} launches ${target}; remove it`)).toBe(true)
+    })
+
+    test("#then a wrapper whose bun target exists while its node fallback is gone keeps the repair line and is not reported broken", () => {
+      const sandbox = createSandbox()
+      const { localBin } = installDeadWrapper(sandbox)
+      writeFile(cacheTarget(sandbox), "#!/usr/bin/env node\n")
+      installBunNative(sandbox)
+
+      const lines = report(sandbox, [localBin, sandbox.bunBin])
+
+      expect(lines).toHaveLength(1)
+      expect(lines[0]).toContain("(lazycodex@4.16.2)")
+      expect(lines[0]).toContain(REPAIR)
+      expect(lines.some((line) => line.startsWith("WARN broken omo on PATH:"))).toBe(false)
+    })
+
+    test("#then a wrapper whose node fallback exists but whose bun target is gone is reported broken", () => {
+      const sandbox = createSandbox()
+      const { localBin, target } = installDeadWrapper(sandbox)
+      writeFile(nodeFallbackTarget(sandbox), "#!/usr/bin/env node\n")
+      installBunNative(sandbox)
+
+      const lines = report(sandbox, [localBin, sandbox.bunBin])
+
+      expect(lines.some((line) => line === `WARN broken omo on PATH: ${join(localBin, "omo")} launches ${target}; remove it`)).toBe(true)
+    })
+  })
+
   describe("#given a pre-rename Codex Light wrapper in ~/.local/bin ahead of omo-ai", () => {
     test("#then it is owned by lazycodex at the cached version and the installer repair is named", () => {
       const sandbox = createSandbox()
       installBunNative(sandbox)
       const localBin = join(sandbox.home, ".local", "bin")
       const cli = join(sandbox.home, ".codex", "plugins", "cache", "sisyphuslabs", "omo", "4.19.4", "dist", "cli", "index.js")
+      // No writeFile(cli): the `exec node` line below never matches the wrapper parser,
+      // so the target file is dead setup and the wrapper is classified by its marker.
       writeFile(join(localBin, "omo"), `#!/bin/sh\n# OMO_GENERATED_RUNTIME_WRAPPER\nexec node "${cli}" "$@"\n`)
 
       const lines = report(sandbox, [localBin, sandbox.bunBin])

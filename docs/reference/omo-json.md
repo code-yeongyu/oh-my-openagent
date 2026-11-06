@@ -105,8 +105,9 @@ No default profiles ship. A profile exists only when you write one under `profil
   "model_profiles": {}, // record<string, ModelProfile>, named model chains picked by intent (Native harness)
   "model_profile": "",  // active profile id or a literal provider/model pin (Native harness)
   "memory": {},         // MemorySettings (Native harness)
-  "git_master": { "commit_footer": false }, // opt-in commit footer (Native harness); no Co-authored-by trailer is ever emitted
+  "git_master": { "include_co_authored_by": true, "commit_footer": false }, // sisyphus-dev-ai co-author trailer (on by default) and opt-in commit footer (Native harness)
   "telemetry": { "enabled": true }, // telemetry (Native harness), enabled by default
+  "device_service": { "enabled": true }, // the device service start-up bootstrap (Native harness), enabled by default
   "disabled_skills": [], // skill names hidden on every harness, unioned across layers
   "exclude_models": [], // models no category, agent, profile or task pin may run, unioned across layers (Native harness)
   "[opencode]": {},     // OpenCode plugin config, freeform (see configuration.md)
@@ -162,6 +163,8 @@ Security invariant: the OpenCode plugin honors `mcp_env_allowlist` and `browser_
 
 The optional `telemetry` block controls OmO Native product telemetry in Senpi. `telemetry.enabled` is a boolean and defaults to `true`, so telemetry ships enabled. Set it to `false` to turn telemetry off. This setting applies only to OmO Native.
 
+`telemetry.rawTurnSampleRate` is a number from `0` to `1`: the share of sessions that also send one `turn_completed` event per assistant turn. Every session always sends its exact totals in `session_summary`. When unset it is `0.05`; the `OMO_TELEMETRY_RAW_TURN_SAMPLE_RATE` environment variable overrides it, and a value outside `0..1` is ignored. Turns a session does not send are never recoverable, so lower it only on purpose.
+
 ```jsonc
 {
   "[native]": {
@@ -174,6 +177,20 @@ The optional `telemetry` block controls OmO Native product telemetry in Senpi. `
 
 The block may also appear at the shared top level or in profile layers and follows the normal resolution order. Because typed config objects are strict, an older `@oh-my-opencode/omo-config-core` version that predates this key rejects a file containing `telemetry` instead of ignoring it. See [Mixed-version compatibility](#mixed-version-compatibility) before sharing one config across versions.
 
+### `device_service` (Native harness)
+
+Every interactive `omo` start, once you are signed in, makes sure this device's OmO device service is installed at the version this build pins, connected, and holding your signed-in device, so your other signed-in devices can see and command its sessions. It runs in the background after the screen is up, never delays the start, and says something only when it stops on a problem you can fix (a locked keychain, an update to install); a signed-out start is silent. `device_service.enabled` is a boolean and defaults to `true`. Set it to `false` to skip the bootstrap entirely: nothing is installed and nothing connects.
+
+Whether your other devices may control this one is a separate, per-device setting held by the running service: `omo remote control` prints it, and `omo remote control off` / `omo remote control on` change it. The bootstrap never changes that setting.
+
+```jsonc
+{
+  "device_service": {
+    "enabled": false
+  }
+}
+```
+
 ### `memory` (Native harness)
 
 The optional `memory` block configures the Senpi memory subsystem (`schema/memory.ts` `OmoMemorySettingsSchema`). Keys: `enabled` (default `true`), `agent` (default `"auto"`), `auto_identity` (default `"path"`; `"git"` makes the auto identity of a linked git worktree the main checkout's, so every worktree of one clone shares that memory - set it in `~/.omo/omo.jsonc` when worktrees live outside the main checkout), the sub-blocks `reflection`, `nudge`, `recall` (the resident, read-only Kibitzer sidecar behind `recalled memory:` notices - one per main session, prompt and tool-call triggered, nudge-only output, no memory writes: `enabled` as the only off switch, `max_items` per wake, `category` defaulting to `quick`, `event_caps` defaulting to `{ tool_args: 400, result_head: 600, assistant: 1500, prompt: 4000 }` for its redacted event feed, `sidecar_max_tokens` defaulting to `48000` with a proactive reseed at 60%, `max_concurrent_wakes` defaulting to `2` as the machine-wide wake lease, `tool_budget` defaulting to `8` read-only tool calls per wake, and `query_expansion` defaulting to `false` for letting the sidecar add discounted synonyms, keywords and related terms to its own memory searches), `facts`, `dream`, `people`, `soul`, `write_notice`, `sync`, `search`, plus `compile_warn_tokens` and per-agent overrides under `agents`. These recall keys can be set at the shared root, harness/profile layer, or per-agent override; layer values are deep-partial and later layers win.
@@ -184,16 +201,25 @@ Facts extraction does not launch or drain pending work at startup or relaunch. A
 
 `memory.facts.model` optionally selects a fully qualified `provider/model` for extraction, with a per-identity override at `memory.agents.<identity>.facts.model`. Without it, an explicitly configured `categories.quick` model or model list keeps its existing meaning for facts; otherwise extraction inherits the live session's selected model. Facts never use built-in quick candidates or arbitrary registry fallbacks. A missing or unavailable selection skips extraction with one warning and leaves the queue pending without adding a failure streak.
 
+`memory.project_scope` has two independent switches, `nudge` and `recall`, both defaulting to `true`.
+A successful read, edit or write under a child project with existing memory lists its note paths
+and descriptions once per project, re-armed after accepted compaction. Kibitzer ranks up to three
+recently touched projects separately from the own corpus, with reserved project seats and the same
+persisted term store per repository. Project notes are read-only; git metadata, `system/`, writes
+and enumeration stay denied. The switches accept harness/profile layers but no per-agent override.
+See [Memory from projects the session touches](configuration.md#memory-from-projects-the-session-touches)
+for scope and symlink rules.
+
 ### `git_master` (Native harness)
 
-The optional `git_master` block controls how the `git-master` skill runs git in Senpi (`schema/git-master.ts`). When the agent works with the skill — reading it in the main session or loading it into a task child via `load_skills` — omo adds a mandatory "GIT COMMAND PREFIX" section and prefixes every `git` command in the skill's bash blocks with `git_env_prefix`, so your own git hooks can tell git-master is acting (for example, a hook that checks `GIT_MASTER`). The prefix always uses the bash form (`GIT_MASTER=1 git ...`), because Senpi's bash tool runs bash (Git Bash on Windows) whatever your login shell is. It also appends a commit-footer directive when you opt in.
+The optional `git_master` block controls how the `git-master` skill runs git in Senpi (`schema/git-master.ts`). When the agent works with the skill — reading it in the main session or loading it into a task child via `load_skills` — omo adds a mandatory "GIT COMMAND PREFIX" section and prefixes every `git` command in the skill's bash blocks with `git_env_prefix`, so your own git hooks can tell git-master is acting (for example, a hook that checks `GIT_MASTER`). The prefix always uses the bash form (`GIT_MASTER=1 git ...`), because Senpi's bash tool runs bash (Git Bash on Windows) whatever your login shell is. It also appends a commit-attribution directive: the co-author trailer by default, plus the body footer when you opt in.
 
-Commit-identity contract: commits omo causes in your repository carry your own git `user.name` / `user.email` as author and committer, and omo never adds a `Co-authored-by` trailer or any other GitHub-resolvable automation identity. A default install adds only the git command prefix.
+Commit identity: commits omo causes in your repository carry your own git `user.name` / `user.email` as author and committer. By default git-master also adds `Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>` once per commit, which GitHub shows as a co-author; set `include_co_authored_by: false` to leave it out.
 
 | Field | Type | Default | Notes |
 |-------|------|---------|-------|
 | `commit_footer` | boolean \| string | `false` | Opt in to the "Ultraworked with [omo](https://github.com/code-yeongyu/oh-my-openagent)" footer in the commit body. A string replaces the builtin footer text. |
-| `include_co_authored_by` | boolean | `false` | Deprecated no-op, accepted so existing configs keep validating. omo does not emit a `Co-authored-by` trailer regardless of this value. |
+| `include_co_authored_by` | boolean | `true` | Adds `Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>` to every commit git-master writes. It goes through `git -c trailer.ifexists=addIfDifferent commit --trailer`, so a commit message that already carries it (an amend or a reworded commit) keeps a single copy; after a squash git-master rewrites the joined message once so it keeps one. Needs git 2.32 or newer (`git commit --trailer`). `false` leaves it out. |
 | `git_env_prefix` | string | `"GIT_MASTER=1"` | Space-separated `NAME=value` assignments (letters, digits, `_`, `-`) put before every git command git-master runs. `""` turns the prefix off. Same key and default as the OpenCode plugin's `git_master.git_env_prefix`. |
 
 To opt in to the body footer:
@@ -206,23 +232,35 @@ To opt in to the body footer:
 }
 ```
 
+To leave the co-author trailer out:
+
+```jsonc
+{
+  "git_master": {
+    "include_co_authored_by": false
+  }
+}
+```
+
 The block may live at the shared top level, in `[native]`, or in profile layers, and follows the normal resolution order. The OpenCode plugin keeps its own `git_master` key inside the freeform `[opencode]` block (see [configuration.md](./configuration.md)); this typed section applies to the Native harness.
 
 ### `side_panel` (Senpi harness)
 
 The optional `side_panel` block controls the omo side panel (`schema/side-panel.ts`): a right-hand
 column in the Senpi TUI carrying session, goal, context, usage, subagent, tool, git and memory
-state. The transcript reflows into the remaining width instead of being covered. The panel is **off by
-default** because it rearranges the whole screen.
+state. The transcript reflows into the remaining width instead of being covered. The column
+needs the **fullscreen TUI** (`--tui-mode fullscreen`, or `tuiMode: "fullscreen"` in senpi's
+settings); in the default regular mode the same sections render as a block above the editor
+instead. The panel is **off by default** because it rearranges the whole screen.
 
 | Field | Type | Default | Notes |
 |-------|------|---------|-------|
-| `enabled` | boolean | `false` | Render the panel. |
+| `enabled` | boolean | `false` | Render the panel. The side-by-side column needs the fullscreen TUI; in the default regular mode the sections render as a block above the editor. |
 | `width` | number \| string | `"26%"` | Column count, or a percentage of the terminal width between `10%` and `50%`. Clamped to 32-80 columns, and further reduced so the transcript keeps at least 60 columns. |
-| `min_columns` | integer | `120` | Terminals narrower than this keep the classic single-column layout; the panel hides itself rather than squeezing the transcript. |
+| `min_columns` | integer | `120` | In fullscreen mode, terminals narrower than this keep the classic single-column layout; the panel hides itself rather than squeezing the transcript. |
 | `clickable` | boolean | `true` | Paint file and subagent rows as OSC 8 links, so a mouse click opens the same viewer a command would. Set it to `false` on a terminal that mangles hyperlinks. |
-| `usage_poll_seconds` | integer | `150` | Subscription usage refresh interval, and a floor rather than a ceiling: each provider keeps its own freshness window (five minutes for Anthropic, two and a half for Codex), so a smaller value does not poll faster than that. The cache is shared across sessions on one machine, so this is per machine, not per session. Minimum `60`. |
-| `sections` | object | all `true` except `usage` | Per-section switches: `session`, `goal`, `context`, `usage`, `agents`, `tools`, `files`, `memory`. `usage` is `false` by default: it is the one section that reads credentials and contacts a vendor, so it is its own opt-in (see below). |
+| `usage_poll_seconds` | integer | `150` | Retired. The engine now reads subscription usage itself, on each provider's own cadence, so this value is ignored. It is still accepted so an existing file keeps loading. |
+| `sections` | object | all `true` except `usage` | Per-section switches: `session`, `goal`, `context`, `usage`, `agents`, `tools`, `files`, `memory`. `usage` is `false` by default (see below). |
 
 Rows are clickable because the fullscreen renderer already captures the mouse and activates OSC 8
 hyperlinks; the panel paints its rows as links to a private scheme and claims the renderer's URL
@@ -272,16 +310,14 @@ block is read on a five-second floor rather than a watcher, because a park takes
 reflection runs and the queue drains per reflection - nothing here can change between two tool
 calls of one turn.
 
-The `usage` section is **off by default** and is the only part of the panel that reaches the
-network. Turning it on (`"sections": { "usage": true }`) makes the panel read, from the agent
-directory, `auth.json` (the OAuth access token of the subscription the session is serving from) and
-`credential-pool-state.json` (which pooled account is pinned or rotated in), and send that token as a
-bearer to the vendor's own usage endpoint: `api.anthropic.com/api/oauth/usage` for a Claude
-subscription, `chatgpt.com/backend-api/wham/usage` for Codex. Nothing else is read or sent, and no
-API key is ever used. While it is off the poller is never created: no credential read, no timer,
-no request. The answers land in one cache file
-per machine (`$XDG_CACHE_HOME/omo-senpi/side-panel-usage.json`), so parallel sessions share both
-the numbers and the backoff instead of each asking on its own.
+The `usage` section is **off by default**. Turning it on (`"sections": { "usage": true }`) draws the
+subscription limits the engine already keeps: senpi reads each signed-in Claude and ChatGPT
+subscription's usage endpoint itself (about every five minutes for Claude and two and a half for
+ChatGPT, one request per account per machine however many sessions are open) and updates the same
+numbers from every turn, so they are there before the first message. The panel makes no network
+request of its own. It reads `auth.json` and `credential-pool-state.json` from the agent directory
+only to decide which pooled account is serving, so the numbers it shows belong to that account. On
+an engine too old to report limits the section stays empty.
 
 ```jsonc
 {
@@ -344,7 +380,7 @@ Four builtin lanes ship (`packages/omo-senpi/src/components/model-profile/builti
 
 | Id | Display name | Chain |
 |----|--------------|-------|
-| `daily-normal` | Daily · Normal | `claude-opus-5-5` (medium) -> `kimi-k3` (max) -> `glm-5.3` (max) |
+| `daily-normal` | Daily · Normal | `claude-opus-5-5` (medium) -> `kimi-k3.1-pro` (max) -> `glm-5.3` (max) |
 | `daily-heavy` | Daily · Heavy | `claude-fable-5-1` (xhigh) |
 | `geeky-normal` | Obsessive · Normal | `gpt-6-astra` (medium, ChatGPT subscription/API/Copilot/OpenCode), then `gpt-6.1-sol-fast` (medium, ChatGPT subscription/API), then `gpt-6.1-sol` (medium, ChatGPT subscription/API), then `gpt-5.6-sol` (medium, ChatGPT subscription/API/Copilot/OpenCode) |
 | `geeky-heavy` | Obsessive · Heavy | `gpt-6-astra` (high) |
@@ -383,6 +419,26 @@ Override semantics: a `model_profiles.<name>` entry that matches a builtin repla
 }
 ```
 
+### `model_pad`
+
+How clients draw the four builtin lanes as a 2x2 pad (OmO Desktop's Profile pad and its Settings > Models > Model pad section). The engine never reads it; it lives in `omo.json` so every client and device shows the same words (`schema/model-pad.ts`). A square's own name and model are its `model_profiles.<lane id>` entry (`display_name`, `models`), not part of this block.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `labels.daily` | string | Left column word; unset keeps "Daily". |
+| `labels.geeky` | string | Right column word; unset keeps "Obsessive". |
+| `labels.heavy` | string | Top row word; unset keeps "Heavy". |
+| `labels.normal` | string | Bottom row word; unset keeps "Normal". |
+
+```jsonc
+{
+  "model_pad": { "labels": { "daily": "Claude", "geeky": "GPT" } },
+  "model_profiles": {
+    "daily-normal": { "display_name": "Claude Normal", "models": [{ "model": "anthropic-subscription/claude-opus-5-5", "reasoning": "medium" }] }
+  }
+}
+```
+
 ### `agents`
 
 A record of agent name to definition (`schema/agent.ts`).
@@ -393,6 +449,7 @@ A record of agent name to definition (`schema/agent.ts`).
 | `prompt` | string | |
 | `model` | string | Sugar for a single-entry `models` list. |
 | `models` | model entries | Ordered chain; each entry is a bare string or `{ model, reasoning?, temperature?, top_p?, max_tokens?, provider_options? }`. |
+| `models_distribution` | `sequential \| round_robin` | Starting model policy for new tasks; defaults to `sequential`. Also supported on categories. |
 | `reasoning` | `off \| minimal \| low \| medium \| high \| xhigh \| max \| auto` \| string | Canonical reasoning field. |
 | `tools` | record<string, boolean> | |
 | `execution_mode` | `in-process \| process` | overrides `task.default_execution_mode`; curated builtin agents remain in-process |
@@ -403,6 +460,38 @@ A record of agent name to definition (`schema/agent.ts`).
 | `max_turns` | int >= 0 | |
 | `temperature` | number 0..2 | |
 | `disable` | boolean | |
+
+#### Distributing task models
+
+Set `models_distribution` next to `models` on a category or agent.
+`sequential` (the default) preserves the existing order. `round_robin` starts
+successive new children at successive entries: `[A, B, C]`, then `[B, C, A]`,
+then `[C, A, B]`. Parallel spawns reserve separate turns. Each category and agent
+has its own in-memory cursor within the task planner; restarting it resets the
+cursor. Inspection does not advance it.
+
+The choice is made once at spawn, not between messages or when resuming a
+child, so prompt caching is not disturbed. Unavailable models are still skipped,
+and error fallback and cooldowns still apply in the rotated order, without
+trying a model twice. This distributes model entries, not accounts within a
+provider.
+
+```jsonc
+{
+  "categories": {
+    "distributed": {
+      "models": ["provider-a/model-a", "provider-b/model-b", "provider-c/model-c"],
+      "models_distribution": "round_robin"
+    }
+  },
+  "agents": {
+    "researcher": {
+      "models": ["provider-a/model-a", "provider-b/model-b"],
+      "models_distribution": "round_robin"
+    }
+  }
+}
+```
 
 Deprecated keys accepted for back-compat and rewritten by migration:
 

@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test"
 
-import { b64urlOfHex, createHttpTransport, hexOfB64url } from "./http-transport"
+import { b64urlOfHex, createHttpTransport, hexOfB64url, SyncAuthError, SyncHttpError, SyncNetworkError } from "./http-transport"
 import { startWireServer, type WireServer } from "./wire-server.test-support"
 
 const servers: WireServer[] = []
@@ -51,6 +51,27 @@ test("reserve, upload and append land a batch the other device pulls and downloa
   expect(await b.download(entry.objectId)).toEqual(bytes)
 })
 
+test("a token that cannot be refreshed fails the request as SyncAuthError, and a token the server refuses as a 401 (omo #10637)", async () => {
+  const { server } = await pair()
+  const refused = new Error("refresh refused")
+  const unrefreshable = createHttpTransport({ baseUrl: server.url, token: () => Promise.reject(refused) })
+  const failure = await unrefreshable.pull(0, 500).then(() => null, (error: unknown) => error)
+  expect(failure).toBeInstanceOf(SyncAuthError)
+  expect((failure as SyncAuthError).cause).toBe(refused)
+  const unknownDevice = createHttpTransport({ baseUrl: server.url, token: () => "not-a-device-token" })
+  const refusal = await unknownDevice.pull(0, 500).then(() => null, (error: unknown) => error)
+  expect(refusal).toBeInstanceOf(SyncHttpError)
+  expect(refusal).toMatchObject({ code: "unauthorized", status: 401, transient: false })
+})
+
+test("a sync service that cannot be reached fails the request as SyncNetworkError, keeping the fetch error (omo #10637)", async () => {
+  const refused = new TypeError("fetch failed")
+  const unreachable = createHttpTransport({ baseUrl: "http://sync.invalid", token: () => "tok", fetch: (() => Promise.reject(refused)) as unknown as typeof fetch })
+  const failure = await unreachable.pull(0, 500).then(() => null, (error: unknown) => error)
+  expect(failure).toBeInstanceOf(SyncNetworkError)
+  expect((failure as SyncNetworkError).cause).toBe(refused)
+})
+
 test("a stale base answers stale_base with the server's head", async () => {
   const { a, b } = await pair()
   await pushOne(a, new TextEncoder().encode("one"), 0)
@@ -96,6 +117,7 @@ test("the event stream delivers sync.advanced heads and reports the connection",
         connected.push(up)
         if (up) void pushOne(a, new TextEncoder().encode("live"), 0)
       },
+      onStateChanged: () => undefined,
     })
   })
   await first
@@ -103,4 +125,29 @@ test("the event stream delivers sync.advanced heads and reports the connection",
   expect(heads).toEqual([1])
   expect(connected[0]).toBe(true)
   expect(await server.untilStreamsClosed()).toBe(0)
+})
+
+// #12280 R-A9 (wire): a revoke through the real route freezes the account; the stream announces it as
+// `sync.state.changed`, the state route shows the flag, and a push is refused `stale_base`.
+test("#given a subscribed device #when another device is signed out through the sign-out route #then the stream delivers a state change and pushes are refused stale_base", async () => {
+  const { server, a, b } = await pair()
+  let stop: () => void = () => undefined
+  const changed = new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("waited 10s for sync.state.changed, never fired")), 10_000)
+    stop = a.subscribe({
+      onAdvanced: () => undefined,
+      onConnected: (up) => {
+        if (up) void fetch(`${server.url}/v1/session/sign-out`, { method: "POST", headers: { authorization: `Bearer ${server.tokenOf("b")}` } })
+      },
+      onStateChanged: () => {
+        clearTimeout(timer)
+        resolve()
+      },
+    })
+  })
+  await changed
+  stop()
+  expect(server.freeze.pending).toBe(true)
+  expect(await pushOne(a, new TextEncoder().encode("frozen"), 0)).toMatchObject({ ok: false, error: "stale_base" })
+  await expect(b.pull(0, 500)).rejects.toMatchObject({ code: "device_revoked", status: 401 })
 })

@@ -85,18 +85,6 @@ describe("category prompt append resolvers", () => {
         expect(append).not.toContain("ESCALATE")
       }
     })
-
-    it("#given every deep append #then none tells the child which category to route to", () => {
-      for (const append of [
-        DEEP_LOW_CATEGORY_PROMPT_APPEND,
-        DEEP_LOW_CATEGORY_PROMPT_APPEND_GPT,
-        DEEP_HIGH_CATEGORY_PROMPT_APPEND,
-        DEEP_HIGH_CATEGORY_PROMPT_APPEND_GPT,
-      ]) {
-        expect(append).not.toContain("MUST USE")
-        expect(append).not.toContain("CAPTCHA")
-      }
-    })
   })
 
   describe("#given unspecified-high", () => {

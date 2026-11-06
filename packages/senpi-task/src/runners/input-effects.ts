@@ -6,8 +6,16 @@ export type InputCommand = {
   readonly type: "prompt" | "steer" | "follow_up"
   readonly message: string
   readonly streamingBehavior?: "steer" | "followUp"
+  /** The caller's own durable id for this input (a queued steer's entry id); omitted, one is minted. */
+  readonly clientMessageId?: string
 }
-export type IdentifiedInput = InputCommand & { readonly clientMessageId: string }
+/** The wire input; an uncertain one is stored with the run it was sent in (`run_epoch`). */
+export type IdentifiedInput = InputCommand & { readonly clientMessageId: string; readonly run_epoch?: number }
+
+/** What the child engine holds for one id (`get_pending_inputs` outcomes, senpi#3549). */
+export type InputAdmission = "admitted" | "not_admitted"
+/** Reads each id's admission from the child, or `undefined` where the child cannot answer that read. */
+export type InputAdmissionRead = (ids: readonly string[]) => Promise<ReadonlyMap<string, InputAdmission> | undefined>
 
 export class InputUncertainError extends Error {
   constructor(readonly effectId: string, override readonly cause: Error) {
@@ -37,6 +45,12 @@ export function createInputEffects(input: {
   readonly taskId: string
   readonly store?: TaskRecordStore
   readonly send: (command: IdentifiedInput) => Promise<void>
+  /**
+   * The child's admission read (#2838 step 4). With it, an unacknowledged input is resolved by its id before
+   * anything is resent: admitted settles it, not_admitted resends the SAME id, an unreadable answer keeps it
+   * uncertain. Without it (a child that cannot answer), the same-id resend runs as before.
+   */
+  readonly read?: InputAdmissionRead
 }) {
   let localSeq = 0
   const pending = new Map<string, IdentifiedInput>()
@@ -67,17 +81,36 @@ export function createInputEffects(input: {
       ...extra,
     } })
   }
+  const settled = (command: IdentifiedInput): void => {
+    forget(command)
+    event(command.type === "prompt" && command.streamingBehavior === undefined ? "started" : "steered", command,
+      { delivered: command.type === "steer" || command.streamingBehavior === "steer" ? "steer" : "followUp" })
+  }
+  /** The child's answer for these ids; `"unreadable"` when the read failed, `undefined` when there is no read. */
+  const admissions = async (ids: readonly string[]): Promise<ReadonlyMap<string, InputAdmission> | "unreadable" | undefined> => {
+    if (input.read === undefined || ids.length === 0) return undefined
+    try {
+      return await input.read(ids)
+    } catch (error) {
+      log("senpi-task input admission read failed", { taskId, error: String(error) })
+      return "unreadable"
+    }
+  }
   const retry = (command: IdentifiedInput): Promise<void> => {
     if (!retrying) return Promise.resolve()
     const active = retries.get(command.clientMessageId)
     if (active !== undefined) return active
     const work = (async () => {
       try {
-        await input.send(command)
+        const read = await admissions([command.clientMessageId])
+        if (!retrying || read === "unreadable") return
+        if (read?.get(command.clientMessageId) === "admitted") {
+          settled(command)
+          return
+        }
+        await input.send(wireOf(command))
         if (!retrying) return
-        forget(command)
-        event(command.type === "prompt" && command.streamingBehavior === undefined ? "started" : "steered", command,
-          { delivered: command.type === "steer" || command.streamingBehavior === "steer" ? "steer" : "followUp" })
+        settled(command)
       } catch (error) {
         if (!retrying) return
         if (isUnacknowledged(error)) return
@@ -94,20 +127,25 @@ export function createInputEffects(input: {
 
   return {
     async send(command: InputCommand, write = input.send): Promise<void> {
-      let id = `${taskId}:0:${++localSeq}`
+      const own = command.clientMessageId
+      let id = own ?? `${taskId}:0:${++localSeq}`
+      let runEpoch: number | undefined
       store?.mutate(taskId, record => {
+        runEpoch = record.notification.run_epoch
+        // A caller's own id (a queued steer's entry id) is sent as it is: the child holds the input under it.
+        if (own !== undefined) return { ...record, last_effect_id: own }
         const seq = Math.max(record.effect_seq ?? 0, record.host_session?.effect_seq ?? 0) + 1
         id = `${taskId}:${record.notification.run_epoch}:${seq}`
         return { ...record, effect_seq: seq, last_effect_id: id,
           ...(record.host_session === undefined ? {} : { host_session: { ...record.host_session, effect_seq: seq } }) }
       })
-      const identified = { ...command, clientMessageId: id }
+      const identified: IdentifiedInput = { ...command, clientMessageId: id }
       try {
         await write(identified)
       } catch (error) {
         if (isConflict(error)) throw new InputConflictError(id)
         if (!isUnacknowledged(error)) throw error
-        remember(identified)
+        remember(runEpoch === undefined ? identified : { ...identified, run_epoch: runEpoch })
         event("effect_uncertain", identified)
         // Yield to the caller's uncertain result before the one automatic retry is issued.
         if (retrying) {
@@ -127,7 +165,15 @@ export function createInputEffects(input: {
       // An id whose retry is already in flight is settled by that retry, so the log never records it both ways.
       const stale = currentEpoch === undefined ? [] : commands.filter(command =>
         epochOf(command) !== currentEpoch && !retries.has(command.clientMessageId))
+      // An earlier run's input is never sent into a later run. Where the child can answer, its read decides
+      // what happened to it: admitted is settled, not_admitted fails as superseded, unreadable stays uncertain.
+      const read = await admissions(stale.map(command => command.clientMessageId))
       for (const command of stale) {
+        if (read === "unreadable") continue
+        if (read?.get(command.clientMessageId) === "admitted") {
+          settled(command)
+          continue
+        }
         forget(command)
         event("effect_failed", command, {
           reason: "superseded_by_new_run",
@@ -146,7 +192,13 @@ export function createInputEffects(input: {
 }
 
 function epochOf(command: IdentifiedInput): number {
-  return Number(command.clientMessageId.split(":").at(-2))
+  return command.run_epoch ?? Number(command.clientMessageId.split(":").at(-2))
+}
+
+/** The input as the child receives it: the run it was sent in stays in omo's own record. */
+function wireOf(command: IdentifiedInput): IdentifiedInput {
+  const { run_epoch: _runEpoch, ...wire } = command
+  return wire
 }
 
 function isConflict(error: unknown): boolean {

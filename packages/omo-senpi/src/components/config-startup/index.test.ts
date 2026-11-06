@@ -19,6 +19,7 @@ import {
   type SenpiStartupMigrationResult,
 } from "./index"
 
+
 function fileError(code: string, message: string): Error {
   return Object.assign(new Error(message), { code })
 }
@@ -207,7 +208,7 @@ describe("createConfigStartupComponent", () => {
       layers: [],
       sources: [],
     }
-    createConfigStartupComponent({
+    await createConfigStartupComponent({
       loadConfig: () => config,
       resolveCwd: () => "/project",
       runMigration: () => migration,
@@ -238,7 +239,7 @@ describe("createConfigStartupComponent", () => {
     const migration = runSenpiStartupMigration(migrationOptions(fileSystem))
     const pi = new FakeExtensionAPI()
     const logs: string[] = []
-    createConfigStartupComponent({
+    await createConfigStartupComponent({
       loadConfig: () => ({ config: {}, diagnostics: [], layers: [], sources: [] }),
       resolveCwd: () => "/project",
       runMigration: () => migration,
@@ -274,7 +275,7 @@ describe("createConfigStartupComponent", () => {
       layers: [],
       sources: [],
     }
-    createConfigStartupComponent({
+    await createConfigStartupComponent({
       loadConfig: () => config,
       resolveCwd: () => "/project",
       runMigration: () => ({ journalResumed: false, migratedFrom: [], results: [] }),
@@ -298,7 +299,7 @@ describe("createConfigStartupComponent", () => {
       layers: [],
       sources: [],
     }
-    createConfigStartupComponent({
+    await createConfigStartupComponent({
       loadConfig: () => config,
       resolveCwd: () => "/project",
       runMigration: () => ({ journalResumed: false, migratedFrom: [], results: [] }),

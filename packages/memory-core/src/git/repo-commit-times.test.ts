@@ -4,6 +4,7 @@ import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { createNodeGitExec, GitMemoryRepo, type GitExec } from "./index"
+import { disableFixtureAutoMaintenance } from "./test-repo-config.test-support"
 import { removeTree } from "../../../../test-support/remove-tree"
 
 const tempDirs: string[] = []
@@ -37,6 +38,7 @@ async function repoWithHistory(
   tempDirs.push(dir)
   const repo = new GitMemoryRepo({ dir, agentId: "agent", ...(exec === undefined ? {} : { exec }) })
   await repo.init()
+  disableFixtureAutoMaintenance(dir)
   const git = createNodeGitExec()
   const heads: string[] = []
   for (const step of steps) {

@@ -11,6 +11,9 @@ export const R0_FAILURE_KINDS = [
   "host_unavailable",
 ] as const
 
+// R0 reads run_stats.cost_status from this closed set; rollback rewrites a newer "partial" to "reported".
+export const R0_COST_STATUSES = ["reported", "unavailable", "invalid"] as const
+
 export const R0_SUSPENSION_REASONS = [
   "daemon_unavailable",
   "host_draining",

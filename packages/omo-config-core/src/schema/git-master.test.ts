@@ -8,7 +8,7 @@ import {
 } from "../index"
 
 describe("omo config git_master section", () => {
-  test("#given an empty git_master section #when parsed #then attribution defaults are off", () => {
+  test("#given an empty git_master section #when parsed #then the co-author is on and the footer is off", () => {
     // given
     const config = { git_master: {} }
 
@@ -18,7 +18,7 @@ describe("omo config git_master section", () => {
     // then
     expect(result.success).toBe(true)
     if (!result.success) return
-    expect(result.data.git_master?.include_co_authored_by).toBe(false)
+    expect(result.data.git_master?.include_co_authored_by).toBe(true)
     expect(result.data.git_master?.commit_footer).toBe(false)
   })
 
