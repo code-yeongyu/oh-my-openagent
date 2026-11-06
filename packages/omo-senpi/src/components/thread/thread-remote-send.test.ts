@@ -15,6 +15,13 @@ describe("authoritative prompt admission", () => {
     expect(a.sent.filter((entry) => entry.rpc?.["type"] === "prompt")).toHaveLength(1)
   })
 
+  test("#given an engine that answers started without a turnId (senpi 2026.11.2) #when get_state names the running turn #then the send is confirmed with that turn", async () => {
+    const a = account({ engine: { ...ENGINE, streaming: true, currentTurnId: "7" }, promptResponse: { disposition: "started" } })
+    const { run } = surface(a.remote)
+    expect(await run("thread_send", { thread: "dur-on-b", message: "once", idempotency_key: "older-engine-turn" })).toMatchObject({ kind: "ok", delivery: { kind: "started", turn_id: "7" }, deduplicated: false })
+    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "prompt")).toHaveLength(1)
+  })
+
   test.each([
     ["absent", { disposition: "started" }],
     ["empty", { disposition: "started", turnId: "" }],
