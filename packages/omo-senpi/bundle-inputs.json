@@ -1550,6 +1550,7 @@
     "packages/omo-senpi/src/extension/dag-sdk-root-provisioning.ts",
     "packages/omo-senpi/src/extension/deliver-items.ts",
     "packages/omo-senpi/src/extension/disable-env.ts",
+    "packages/omo-senpi/src/extension/external-user-input.ts",
     "packages/omo-senpi/src/extension/herdr-agent-hint.ts",
     "packages/omo-senpi/src/extension/idle-injection-coordinator.ts",
     "packages/omo-senpi/src/extension/idle-injection-items.ts",

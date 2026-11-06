@@ -5,6 +5,7 @@ import { loadPiTui } from "@oh-my-opencode/senpi-task"
 import { defaultCommentCheckerCacheDir } from "../components/comment-checker/resolver"
 
 import { createDagSdkRootProvisioning } from "./dag-sdk-root-provisioning"
+import { installExternalUserInputApi } from "./external-user-input"
 import { isOmoSenpiDisabledByEnv } from "./disable-env"
 import { AGENT_TOOLKIT_SDK_ROOT_ENV, createSdkRootProvisioning } from "./sdk-root-provisioning"
 import { IdleInjectionCoordinator } from "./idle-injection-coordinator"
@@ -126,6 +127,7 @@ export function composeOmoSenpiExtension(
 
     // Install the capture registry and idle coordinator BEFORE the component loop so every component
     // (lsp registers earlier than task) has its tools captured and shares one injection arbiter.
+    installExternalUserInputApi(pi)
     const captureRegistry = installToolCaptureRegistry(pi)
     const prewarmDiagnostics = createPrewarmDiagnostics(pi, logger)
     // The 200ms batch window: every delivered notification (completions, team messages, the ulw
