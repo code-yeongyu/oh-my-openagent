@@ -1,10 +1,12 @@
 // An in-process HTTP server for one account whose rows are real signed chain entries: the same
 // array the recovery world's FakeSyncServer appends keyring records to. It speaks the contract
 // 1.17.0 wire for the routes a signed-in device uses (state, entries, keys, batches, uploads,
-// objects, keyring appends) and verifies nothing beyond the base check, so every crypto check in
-// a test is the client's own. `/entries` serves the contract `SyncPullEntry` row minus `object_id`
-// and `bytes`: `batch_id` on batch rows, null on keyring rows. With `entriesBatchId: false` it
-// serves rows without the key, as the service does since it dropped that field from `/entries`.
+// objects, keyring appends) and verifies nothing beyond the base check and, as the service does
+// before it (#12280), that a batch's record signature is the calling device's own, so every other
+// crypto check in a test is the client's own.
+// `/entries` serves the contract `SyncPullEntry` row minus `object_id` and `bytes`: `batch_id` on
+// batch rows, null on keyring rows. With `entriesBatchId: false` it serves rows without the key, as
+// the service does since it dropped that field from `/entries`.
 // The service's revoke freeze is the shared FreezeModel: a revoke through
 // `DELETE /v1/devices/:id` or `POST /v1/session/sign-out` sets `rotation_pending`, and the rotation
 // admission refuses a rotation that keeps a revoked key.
@@ -12,6 +14,7 @@
 import { createHash, randomBytes } from "node:crypto"
 
 import type { KeyringEntry, SyncAuthor, SyncEntry } from "../../crypto/entry.ts"
+import { verifyRecordSig } from "../../crypto/signatures.ts"
 import { jcsBytes, sha256B64 } from "../../crypto/vendor/sync-format/jcs.ts"
 import type { KeyringAppendRequest } from "../../recovery/ports.ts"
 import { servedBatchId, type StoredBatchRow } from "../../recovery/testing/fake-server.test-support.ts"
@@ -165,6 +168,8 @@ export function startChainWireServer(account: string, chain: SyncEntry[], option
         if (up === undefined || up.data === null) return refusal(404, "not_found")
         const replay = [...objects.entries()].find(([, o]) => o.batchId === body.idempotency_key)
         if (replay !== undefined) return Response.json({ seq: replay[0] })
+        const fields = { account, base_seq: body.base_seq, digest: body.digest, epoch: body.epoch, link: body.link, keyring_link: null, record_sig: body.record_sig }
+        if (author.kind === "device" && !(await verifyRecordSig(author.signing_public_key, fields))) return refusal(400, "invalid_request")
         if (freeze.pending) return freeze.staleRefusal()
         if (body.base_seq !== chain.length) return refusal(409, "stale_base")
         const entry: StoredBatchRow = {
