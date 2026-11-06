@@ -22,14 +22,13 @@ import { createProjectMemoryScope } from "./project-memory-nudge"
 import { readUi, branchEntryCount, sessionIdFrom } from "./wiring-context"
 import { createMemoryUserActivity } from "./user-activity"
 import { logBindReconcileFailure } from "./bind-reconcile-log"
-import { loadMemoryCommandsRuntime } from "./commands/runtime-loader"
 import {
   createMemoryReflectionLiveWiring,
   createReflectionCompletionApi,
 } from "./wiring-reflection-live"
 import { createMemoryRuntimeWiring } from "./wiring-runtime"
 import { registerMemoryStatic } from "./wiring-static"
-import { recoverStaleReflectionHolder } from "./reflection-stale-active"
+import { reconcileThroughStaleLockReaper, recoverStaleReflectionHolder } from "./reflection-stale-active"
 import { runMemorySessionShutdown } from "./wiring-shutdown"
 import type { MemoryCommandSettings } from "./commands/types"
 import type { MemoryWiring, MemoryWiringOptions } from "./wiring-types"
@@ -277,12 +276,12 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
             observer?.phase("onSettled.reflection.reconcile")
             await userActivity.reconcileOnce(sessionId, async () => {
               try {
-                // The reaper moves a torn active.lock aside first (reconciliation cannot read past it), then reconciles.
-                const { runStaleLockReaper } = await loadMemoryCommandsRuntime()
-                await runStaleLockReaper({
+                await reconcileThroughStaleLockReaper({
                   runtimeDir: identity.identityPaths.runtime,
-                  settle: () => runtimeFor(identity).reconcile(observer?.signal),
-                  settleAlways: true,
+                  reconcile: () => runtimeFor(identity).reconcile(observer?.signal),
+                  onLoadFailure: (error) => {
+                    if (options.logger !== undefined) logBindReconcileFailure(options.logger, error)
+                  },
                   ...(options.reflectionHolderSeams === undefined ? {} : { probe: options.reflectionHolderSeams }),
                 })
                 observer?.signal.throwIfAborted()
