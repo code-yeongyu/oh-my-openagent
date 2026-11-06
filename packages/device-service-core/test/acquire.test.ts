@@ -199,10 +199,15 @@ describe("verified acquisition of the device service", () => {
     expect(existsSync(state)).toBe(false)
   })
 
-  test("a half-published release (signed checksums present, binary 404) is download_failed, not not_published", async () => {
+  // not_published needs BOTH signed entry files to answer 404; a 404 on only one of them is a broken release.
+  test.each([
+    ["the binary", deviceServiceAssetName(HOST)],
+    ["only checksums.txt", "checksums.txt"],
+    ["only checksums.txt.sig", "checksums.txt.sig"],
+  ])("a half-published release (%s 404) is download_failed, not not_published", async (_name, missing) => {
     const key = releaseKey()
     const files = buildRelease({ key, host: HOST })
-    files.delete(deviceServiceAssetName(HOST))
+    files.delete(missing)
     const state = stateDir()
     expect(await acquireDeviceService(options(state, serveRelease(files), key.publicHex))).toMatchObject({ ok: false, refusal: "download_failed" })
     expect(existsSync(state)).toBe(false)
