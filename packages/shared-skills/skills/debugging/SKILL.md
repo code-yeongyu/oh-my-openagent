@@ -39,7 +39,7 @@ The methodology is language-agnostic. The commands to launch, attach, breakpoint
 
 **If you cannot honestly say you just opened the reference for your runtime, open it now.**
 
-> 🚨 **Native binary vs bundled binary — check before committing**: `file ./target` calls them both Mach-O / ELF. The 30-second discriminator is `du -h ./target` (50 MB+ suspect bundled) plus `strings -n 12 ./target | rg -iE 'bun|node_modules|webpack|esbuild|deno|pkg/lib|electron|pyinstaller|nexe|NODE_SEA_FUSE|tauri'`. If hits → bundled-js-binary.md. If clean → native-binary.md.
+> 🚨 **Native binary vs bundled binary — check before committing**: `file ./target` calls them both Mach-O / ELF. The 30-second discriminator is `du -h ./target` (50 MB+ suspect bundled) plus `strings -n 12 ./target | rg -i 'bun|node_modules|webpack|esbuild|deno|pkg/lib|electron|pyinstaller|nexe|NODE_SEA_FUSE|tauri'`. If hits → bundled-js-binary.md. If clean → native-binary.md.
 
 ---
 

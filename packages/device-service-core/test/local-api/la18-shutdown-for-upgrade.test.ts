@@ -54,7 +54,9 @@ describe("LA18 owner.shutdown_for_upgrade only from an installer after its proof
   });
 
   test("docs/local-api.md names every message type of protocol.ts", () => {
-    const protocol = readFileSync(join(SRC, "protocol.ts"), "utf8");
+    const protocol = ["protocol.ts", "protocol-command.ts", "protocol-delegated.ts"]
+      .map((f) => readFileSync(join(SRC, f), "utf8"))
+      .join("\n");
     const types = [
       ...new Set([...protocol.matchAll(/type: "([a-z._]*)"/g)].map((m) => m[1] ?? "")),
     ];

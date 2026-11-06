@@ -3,14 +3,29 @@ import { randomUUID } from "node:crypto"
 import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { createConnection, type Socket } from "node:net"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
 
 import { connectDeviceService, type DeviceService } from "../../device-service-core/src/index.ts"
 import { startFakeOwner, type FakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
-import { defaultWorld, PEER, SESSION_ID } from "../../device-service-core/test/local-api/conformance/world.ts"
-import { LOCAL_SESSION_ID, pipeAddress, REMOTE_INPUT_OFF, type RemoteAttachEndpoint, serveRemoteAttach } from "../remote-attach"
+import { defaultWorld, PEER, SESSION_ID, type World } from "../../device-service-core/test/local-api/conformance/world.ts"
+import { LOCAL_SESSION_ID, pipeAddress, type RemoteAttachEndpoint, serveRemoteAttach } from "../remote-attach"
+
+// Every inbound record type the pinned engine knows, from its own method table (senpi#4319), never a list kept here.
+const engineDist = dirname(fileURLToPath(import.meta.resolve("@code-yeongyu/senpi")))
+const { RPC_METHOD_CLASS } = (await import(join(engineDist, "modes/rpc/method-classes.js"))) as { RPC_METHOD_CLASS: Record<string, unknown> }
+const ENGINE_TYPES = Object.keys(RPC_METHOD_CLASS)
+// The attach TUI's own handshake (senpi modes/interactive/attach.ts): the only records the endpoint answers itself.
+const PLUMBING = new Set(["set_client_info", "list_sessions", "attach_session", "subscribe_sessions", "get_state", "get_entries", "release_attachment"])
+// The hand list the endpoint used to keep (remote-attach.ts:24 at 72a6bae47e); the forwarded set must reach past it.
+const OLD_INPUT_COMMANDS = new Set(["prompt", "steer", "follow_up", "abort", "bash", "compact", "new_session", "switch_session"])
 
 const owners: FakeOwner[] = []
+let lastOwner: FakeOwner | undefined
+const ownerState = () => {
+  if (lastOwner === undefined) throw new Error("no owner started")
+  return lastOwner.state
+}
 const services: DeviceService[] = []
 const endpoints: RemoteAttachEndpoint[] = []
 const dirs: string[] = []
@@ -77,10 +92,15 @@ class TuiPeer {
   }
 
   request(command: Line): Promise<Line> {
-    const id = randomUUID()
+    return this.answer({ ...command, id: randomUUID() })
+  }
+
+  /** Sends `record` exactly as given (its own id) and waits for the response on that id. */
+  answer(record: Line): Promise<Line> {
+    const id = String(record.id)
     const answered = new Promise<Line>(resolve => this.waiting.set(id, resolve))
-    this.socket.write(`${JSON.stringify({ ...command, id })}\n`)
-    return within(answered, `the ${String(command.type)} response`)
+    this.socket.write(`${JSON.stringify(record)}\n`)
+    return within(answered, `the ${String(record.type)} response`)
   }
 
   record(match: (line: Line) => boolean, what: string): Promise<Line> {
@@ -90,9 +110,10 @@ class TuiPeer {
   }
 }
 
-async function endpointFor(world = defaultWorld()): Promise<RemoteAttachEndpoint> {
+async function endpointFor(world: World = defaultWorld()): Promise<RemoteAttachEndpoint> {
   const owner = await startFakeOwner({ stateDir: privateDir("ra-svc-"), world })
   owners.push(owner)
+  lastOwner = owner
   const service = await connectDeviceService({ version: "5.1.52", stateDir: owner.stateDir })
   services.push(service)
   const attach = await service.attach(PEER, SESSION_ID)
@@ -103,7 +124,7 @@ async function endpointFor(world = defaultWorld()): Promise<RemoteAttachEndpoint
 }
 
 describe.skipIf(process.platform === "win32")("omo remote attach endpoint", () => {
-  test("answers the attach TUI's sequence from the device service's attach and refuses every input", async () => {
+  test("answers the attach TUI's handshake itself and sends none of it to the host", async () => {
     const endpoint = await endpointFor()
     const tui = await TuiPeer.connect(endpoint.socketPath)
     expect((await tui.request({ type: "set_client_info", width: 80, capabilities: ["interactive_user"] })).success).toBe(true)
@@ -126,15 +147,87 @@ describe.skipIf(process.platform === "win32")("omo remote attach endpoint", () =
     await tui.record(line => line.method === "notify" && String(line.message).includes("too large"), "the too-large notice")
 
     expect(await tui.record(line => line.type === "message_update", "the forwarded record")).toEqual({ type: "message_update", text: "hi", sessionId: LOCAL_SESSION_ID })
-    expect(tui.records.find(line => line.method === "notify")).toMatchObject({ type: "extension_ui_request", method: "notify", message: `Observing Studio/${SESSION_ID}: ${REMOTE_INPUT_OFF}` })
-
-    for (const type of ["prompt", "steer", "abort"]) {
-      const refused = await tui.request({ type, sessionId: LOCAL_SESSION_ID, message: "hi" })
-      expect([type, refused.success, refused.error]).toEqual([type, false, REMOTE_INPUT_OFF])
-    }
-    const answer = await tui.request({ type: "extension_ui_response", sessionId: LOCAL_SESSION_ID, confirmed: true })
-    expect([answer.success, answer.error]).toEqual([false, REMOTE_INPUT_OFF])
+    expect(tui.records.find(line => line.method === "notify")).toMatchObject({ type: "extension_ui_request", method: "notify", message: `Attached to Studio/${SESSION_ID}` })
     expect((await tui.request({ type: "release_attachment", sessionId: LOCAL_SESSION_ID })).success).toBe(true)
+    expect(ownerState().commands).toEqual([])
+    expect(ownerState().log).not.toContain("session.command")
+  })
+
+  test("forwards every other engine record to the host unchanged and answers it on the same request id", async () => {
+    const forwarded = ENGINE_TYPES.filter(type => !PLUMBING.has(type))
+    expect(forwarded.filter(type => !OLD_INPUT_COMMANDS.has(type)).length).toBeGreaterThan(0)
+    const endpoint = await endpointFor()
+    const tui = await TuiPeer.connect(endpoint.socketPath)
+    const sent: Line[] = []
+    for (const type of forwarded) {
+      const id = randomUUID()
+      const record = { id, type, sessionId: LOCAL_SESSION_ID, probe: type }
+      sent.push(record)
+      const answer = await tui.answer(record)
+      expect([type, answer.id, answer.command, answer.success, answer.error]).toEqual([type, id, type, true, undefined])
+    }
+    // LOCAL_SESSION_ID names the attached session, so it reaches the host as the route's session id (H1).
+    expect(ownerState().commands).toEqual(sent.map(record => ({ ...record, sessionId: SESSION_ID })))
+  })
+
+  test("forwards a session-less record without a sessionId, and another session's id as it is, for the host to decide", async () => {
+    const endpoint = await endpointFor()
+    const tui = await TuiPeer.connect(endpoint.socketPath)
+    const bare = { id: randomUUID(), type: "get_protocol_info" }
+    const foreign = { id: randomUUID(), type: "get_commands", sessionId: "another-session" }
+    expect((await tui.answer(bare)).success).toBe(true)
+    expect((await tui.answer(foreign)).success).toBe(true)
+    expect(ownerState().commands).toEqual([bare, foreign])
+  })
+
+  test("returns a delegated host's engine reply verbatim, with its data, on the request's own id", async () => {
+    const base = defaultWorld()
+    const [session] = base.sessions
+    if (session === undefined) throw new Error("the default world has a session")
+    const data = { commands: [{ name: "review", source: "extension" }] }
+    const endpoint = await endpointFor({ ...base, sessions: [{ ...session, delegated: { data, frames: [] } }] })
+    const tui = await TuiPeer.connect(endpoint.socketPath)
+    const id = randomUUID()
+    const answer = await tui.answer({ id, type: "get_commands", sessionId: LOCAL_SESSION_ID })
+    expect(answer).toEqual({ type: "response", id, command: "get_commands", success: true, data })
+  })
+
+  test("reassembles a delegated reply too large for one line from its blob", async () => {
+    const base = defaultWorld()
+    const [session] = base.sessions
+    if (session === undefined) throw new Error("the default world has a session")
+    const data = { text: "x".repeat(700_000) }
+    const endpoint = await endpointFor({ ...base, sessions: [{ ...session, delegated: { data, frames: [] } }] })
+    const tui = await TuiPeer.connect(endpoint.socketPath)
+    const answer = await tui.request({ type: "get_last_assistant_text", sessionId: LOCAL_SESSION_ID })
+    expect([answer.success, answer.data]).toEqual([true, data])
+  })
+
+  test("relays the frames the engine writes on the delegated connection, as the presented session", async () => {
+    const base = defaultWorld()
+    const [session] = base.sessions
+    if (session === undefined) throw new Error("the default world has a session")
+    const dialog = { type: "extension_ui_request", id: "dialog-1", method: "confirm", title: "Run it?", sessionId: "rpc-1" }
+    const endpoint = await endpointFor({ ...base, sessions: [{ ...session, delegated: { data: {}, frames: [dialog] } }] })
+    const tui = await TuiPeer.connect(endpoint.socketPath)
+    // Like the attach's records, frames reach the TUI once it subscribed, as the attach TUI does in its handshake.
+    await tui.request({ type: "subscribe_sessions", sessions: { ids: [LOCAL_SESSION_ID] }, mirror: "all" })
+    expect((await tui.request({ type: "prompt", sessionId: LOCAL_SESSION_ID, message: "go" })).success).toBe(true)
+    expect(await tui.record(line => line.id === "dialog-1", "the relayed dialog frame")).toEqual({ ...dialog, sessionId: LOCAL_SESSION_ID })
+  })
+
+  test("shows the host's refusal verbatim", async () => {
+    const base = defaultWorld()
+    const [session] = base.sessions
+    if (session === undefined) throw new Error("the default world has a session")
+    const world: World = {
+      ...base,
+      sessions: [{ ...session, outcome: [{ state: "queued", retryable: false }, { state: "engine_refused", reason: "capability_missing", retryable: false }] }],
+    }
+    const endpoint = await endpointFor(world)
+    const tui = await TuiPeer.connect(endpoint.socketPath)
+    const answer = await tui.request({ type: "bash", sessionId: LOCAL_SESSION_ID, command: "ls" })
+    expect([answer.command, answer.success, answer.error]).toEqual(["bash", false, "engine_refused: capability_missing"])
   })
 
   test("closes a connection that does not prove the secret before answering anything", async () => {
