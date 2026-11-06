@@ -26,6 +26,10 @@ export type RemoteCommandOutcome =
 
 export type RemoteServiceState = { readonly state: string }
 
+export type RemoteLocateOutcome =
+  | { readonly kind: "ok"; readonly sessionId: string }
+  | { readonly kind: "refused"; readonly reason: string }
+
 export type RemoteSessionsPort = {
   /** The device service state; `plan_required` means the account's plan has no relay (A5: paid only). */
   readonly status: () => Promise<RemoteServiceState>
@@ -37,6 +41,11 @@ export type RemoteSessionsPort = {
    * attach: the attach-less `session.command {device, endpoint, rpc}` shape (relay daemon #393).
    */
   readonly endpointCommand: (device: string, rpc: JsonObject) => Promise<RemoteCommandOutcome>
+  /**
+   * The id a session just created on `device` is addressed by (its listing row's `session_id`, the key an attach
+   * takes), from the durable engine session id the create reply names; settles once that id attaches.
+   */
+  readonly locate: (device: string, engineId: string) => Promise<RemoteLocateOutcome>
   /** An engine record for one session on `device` (`prompt`, `abort`, `get_state`), through an attach. */
   readonly sessionCommand: (device: string, sessionId: string, rpc: JsonObject) => Promise<RemoteCommandOutcome>
   readonly read: (device: string, sessionId: string, tail: number) => Promise<RemoteCommandOutcome>
