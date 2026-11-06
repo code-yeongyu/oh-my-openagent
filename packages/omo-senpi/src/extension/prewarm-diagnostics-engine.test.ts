@@ -5,8 +5,10 @@ import { join } from "node:path"
 import { z } from "zod"
 import { DefaultResourceLoader, ModelRegistry, ModelRuntime, SessionManager, SettingsManager, createAgentSession } from "../senpi-test-runtime"
 import { composeOmoSenpiExtension } from "./compose"
+import { testBudgetSignal, useTestTimeout } from "../../../../test-support/test-deadline"
 
 test("#given a real session with a late unsafe component #when draft prewarm skips #then the recorded result warns once with component attribution", async () => {
+  useTestTimeout(30_000)
   // given
   const root = mkdtempSync(join(tmpdir(), "omo-prewarm-diagnostic-"))
   const agentDir = join(root, "agent")
@@ -45,7 +47,7 @@ test("#given a real session with a late unsafe component #when draft prewarm ski
   const manager = SessionManager.inMemory(root)
   let session: Awaited<ReturnType<typeof createAgentSession>>["session"] | undefined
   let unsubscribe: (() => void) | undefined
-  const signal = AbortSignal.timeout(10_000)
+  const signal = testBudgetSignal("the prewarm diagnostics entry")
   const recorded = Promise.withResolvers<void>()
   const onAbort = () => recorded.reject(new Error("prewarm did not append its entry"))
   signal.addEventListener("abort", onAbort, { once: true })

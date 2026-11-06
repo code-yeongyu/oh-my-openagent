@@ -7,6 +7,7 @@ import { join } from "node:path"
 import { Worker } from "node:worker_threads"
 
 import { claimOnboardingOwned, readOnboardingState, type ClaimOwnerSeams } from "./claim-owner"
+import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
 
 // A dead claim taken over by N claimants at once (#10481 review LOW 1). Two claimants run on this
 // thread with every fs step they make in the state dir intercepted; the others run the real claim on
@@ -14,7 +15,6 @@ import { claimOnboardingOwned, readOnboardingState, type ClaimOwnerSeams } from 
 // step. Sweeping the gap over every step makes each interleaving deterministic.
 const NOW = Date.parse("2026-10-19T00:00:00.000Z")
 const DEAD_OWNER = 4242
-const SIGNAL_TIMEOUT_MS = 10_000
 const contenderPath = new URL("./claim-takeover-contender.ts", import.meta.url).href
 
 const realFs = {
@@ -72,7 +72,7 @@ function runToCompletion(contender: ThreadContender): boolean {
   Atomics.store(contender.signal, 0, 1)
   Atomics.notify(contender.signal, 0)
   while (Atomics.load(contender.signal, 1) === 0) {
-    if (Atomics.wait(contender.signal, 1, 0, SIGNAL_TIMEOUT_MS) === "timed-out") throw new Error(`contender ${contender.pid} did not finish`)
+    if (Atomics.wait(contender.signal, 1, 0, remainingTestTime()) === "timed-out") throw new Error(`contender ${contender.pid} did not finish within the test budget`)
   }
   return Atomics.load(contender.signal, 1) === 1
 }
@@ -170,11 +170,13 @@ async function sweep(inThread: readonly number[], threaded: readonly number[], s
 
 describe("dead onboarding claim takeover by many claimants", () => {
   test("#given a dead claim #when three processes claim at once, the third landing at any step of the others' takeover #then exactly one wins and its claim is never removed or replaced", async () => {
+    useTestTimeout(60_000)
     const failures = await sweep([5101, 5102], [5103], (gap) => [gap])
     expect(failures).toEqual([])
   }, 60_000)
 
   test("#given a dead claim #when five processes claim at once, three landing together or one after another at any step #then exactly one wins and its claim is never removed or replaced", async () => {
+    useTestTimeout(120_000)
     const together = await sweep([5201, 5202], [5203, 5204, 5205], (gap) => [gap, gap, gap])
     const staggered = await sweep([5301, 5302], [5303, 5304, 5305], (gap) => [gap, gap + 1, gap + 2])
     expect([...together, ...staggered]).toEqual([])

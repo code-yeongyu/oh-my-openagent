@@ -13,6 +13,7 @@ import {
 import { createMemoryFactsWiring } from "./facts-wiring"
 import { realpathSync } from "node:fs"
 import { rmEfaultTolerant } from "./teardown.test-support"
+import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
 
 const IDENTITY = "facts-wiring-agent"
 const SESSION = "session-alpha"
@@ -66,6 +67,7 @@ function wiringFor(paths: MemoryIdentityPaths, enabled: boolean) {
 
 describe("facts wiring settle enqueue", () => {
   test("#given debounce four #when four settles complete #then exactly one all-pending extractor launch fires", async () => {
+    useTestTimeout(30_000)
     // given
     const paths = await fixture()
     await seedJournal(paths, 2)
@@ -94,7 +96,7 @@ describe("facts wiring settle enqueue", () => {
     await wiring.onSettled(SESSION)
     await Promise.race([
       launched,
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("facts launch did not fire")), 2_000)),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("facts launch did not fire")), remainingTestTime())),
     ])
 
     // then

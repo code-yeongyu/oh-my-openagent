@@ -3,11 +3,14 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
+import { useTestTimeout } from "../../../test-support/test-deadline"
+import { spawnTimeout } from "../test-support/spawn-timeout"
 
 const packageRoot = fileURLToPath(new URL("..", import.meta.url))
 
 for (const mode of ["no-key", "missing-chunk", "unused", "legacy-event", "opted-out", "unsupported-platform"] as const) {
   test(`#given ${mode} #when the default telemetry transport runs #then OTLP import stays gated and PostHog is independent`, async () => {
+    useTestTimeout(45_000)
     // A fresh runtime prevents the suite's other imports or mocks from hiding an eager exporter.
     const probe = `
 import { mock } from "bun:test"
@@ -59,7 +62,7 @@ console.log(JSON.stringify({ resolved, captured, diagnostics, error }))
       const child = Bun.spawn([process.execPath, "--eval", probe], {
         cwd: packageRoot,
         env: { PATH: process.env.PATH, HOME: home, TMPDIR: process.env.TMPDIR, OMO_TELEMETRY_INGEST_KEY: "" },
-        stdout: "pipe", stderr: "pipe", timeout: 30_000,
+        stdout: "pipe", stderr: "pipe", timeout: spawnTimeout(),
       })
       ;[exitCode, stdout, stderr] = await Promise.all([
         child.exited, new Response(child.stdout).text(), new Response(child.stderr).text(),

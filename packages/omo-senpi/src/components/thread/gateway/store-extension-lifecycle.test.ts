@@ -7,16 +7,18 @@ import type { Worker } from "node:worker_threads"
 
 import type { GatewayResolution } from "./engine"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
+import { remainingTestTime, useTestTimeout } from "../../../../../../test-support/test-deadline"
 
 let harness: GatewayHarness | undefined
 afterEach(async () => { await harness?.dispose(); harness = undefined })
 const moduleUrl = new URL("./testing/extension-lifecycle.mjs", import.meta.url).href
 
 test.each(["hang", "staleTimer", "uncloneable-function", "uncloneable-symbol"])("#given an extension %s #when called #then the worker and write lock remain usable", async (scenario) => {
+  useTestTimeout(20_000)
   // A separate client process lets the watchdog reap a regressed, wedged worker as well.
   const agentDir = mkdtempSync(join(tmpdir(), "gateway-lifecycle-"))
   const child = Bun.spawn([process.execPath, fileURLToPath(new URL("./testing/extension-lifecycle-driver.mjs", import.meta.url)), scenario, agentDir], { stdout: "pipe", stderr: "pipe" })
-  const watchdog = setTimeout(() => child.kill(), 10_000)
+  const watchdog = setTimeout(() => { console.error("the store-extension child did not exit within the test budget; killing it"); child.kill() }, remainingTestTime())
   try {
     const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
     expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
@@ -34,9 +36,10 @@ test.each(["hang", "staleTimer", "uncloneable-function", "uncloneable-symbol"])(
 }, 20_000)
 
 test.each(["lateThrow", "lateReject"])("#given an extension that fails after returning (%s) #when the worker absorbs the late error #then the same worker keeps serving with the error as an event", async (scenario) => {
+  useTestTimeout(20_000)
   const agentDir = mkdtempSync(join(tmpdir(), "gateway-late-"))
   const child = Bun.spawn([process.execPath, fileURLToPath(new URL("./testing/extension-wake-driver.mjs", import.meta.url)), scenario, agentDir], { stdout: "pipe", stderr: "pipe" })
-  const watchdog = setTimeout(() => child.kill(), 10_000)
+  const watchdog = setTimeout(() => { console.error("the store-extension child did not exit within the test budget; killing it"); child.kill() }, remainingTestTime())
   try {
     const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
     expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
@@ -68,12 +71,12 @@ test.each(["lateThrow", "lateReject"])("#given an extension that fails after ret
       off = store.onEvent((value) => { if (value.kind === "extension_error" && value.phase === "async") resolve("event") })
     }),
     new Promise<"exit">((resolve) => worker?.once("exit", () => resolve("exit"))),
-    new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 10_000)),
+    new Promise<"no worker exit within the test budget">((resolve) => setTimeout(() => resolve("no worker exit within the test budget"), remainingTestTime())),
   ])
   expect(await store.extensionCall("alpha", scenario, null)).toEqual({ kind: "ok", value: null })
   const outcome = await signaled
   off()
-  expect(outcome).not.toBe("timeout")
+  expect(outcome).not.toBe("no worker exit within the test budget")
   expect(await store.extensionCall("alpha", "rows", { name: "alpha" })).toEqual({ kind: "ok", value: [] })
   expect(await store.list()).toEqual([])
   // Under plain runtimes the worker absorbs the late error and survives; a runner that never

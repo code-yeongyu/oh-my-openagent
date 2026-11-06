@@ -17,6 +17,7 @@ import { abandonReservationRun } from "./run-finalization"
 import { reconcileReflectionRuns } from "./run-reconciliation"
 import { writeRunJsonAtomic } from "./run-artifacts"
 import { waitForFilesystemState } from "./supervisor-test-signals"
+import { remainingTestTime, useTestTimeout } from "../../../../../../test-support/test-deadline"
 
 const supervisorPath = join(import.meta.dir, "../../../../plugin/extensions/memory-run-supervisor.mjs")
 const childPath = join(import.meta.dir, "__fixtures__", "supervisor-finished-child.ts")
@@ -104,6 +105,7 @@ afterEach(async () => {
 
 describe("run terminal precedence", () => {
   test("#given abandonment owns the gate when the shipped supervisor child finishes successfully #when publication follows #then the matching outcome wins", async () => {
+    useTestTimeout(30_000)
     const item = await fixture()
     let releaseStateRead!: () => void
     const stateReadRelease = new Promise<void>((resolve) => { releaseStateRead = resolve })
@@ -137,7 +139,7 @@ describe("run terminal precedence", () => {
     await waitForFilesystemState(
       item.runDir,
       () => existsSync(join(item.runDir, "publishing.json")) ? true : undefined,
-      30_000,
+      remainingTestTime(),
       "outcome publication claim",
     )
     releaseStateRead()

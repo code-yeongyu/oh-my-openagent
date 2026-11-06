@@ -11,6 +11,7 @@ import {
   TEAM_MEMBER_LIVENESS_MESSAGE_TYPE,
   createTeamMemberLivenessNotifier,
 } from "./member-liveness"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const roots: string[] = []
 
@@ -110,7 +111,7 @@ describe("team member liveness notifier", () => {
       details: { deliveryKey: "team-member-liveness:st_00000001:0" },
     })}\n`)
     retries.shift()?.()
-    await withTimeout(persistedSignal, 1_000)
+    await withTimeout(persistedSignal, remainingTestTime(), "persistedSignal")
 
     expect(persisted).toEqual([0])
   })
@@ -132,7 +133,7 @@ describe("team member liveness notifier", () => {
     })
 
     notifier.notifyTerminal(memberRecord())
-    await withTimeout(retryQueued.promise, 1000)
+    await withTimeout(retryQueued.promise, remainingTestTime(), "retryQueued.promise")
     expect(attempts).toEqual(["send"])
     expect(retries).toHaveLength(1)
 
@@ -158,7 +159,7 @@ describe("team member liveness notifier", () => {
 
     notifier.notifyTerminal(memberRecord())
     coordinator.flushOnIdle()
-    await withTimeout(retryQueued.promise, 1000)
+    await withTimeout(retryQueued.promise, remainingTestTime(), "retryQueued.promise")
     expect(retries).toHaveLength(1)
 
     retries.shift()?.()
@@ -262,10 +263,10 @@ describe("team member liveness notifier", () => {
   })
 })
 
-async function withTimeout<T>(signal: Promise<T>, timeoutMs: number): Promise<T> {
+async function withTimeout<T>(signal: Promise<T>, timeoutMs: number, what: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const timeout = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(() => reject(new Error(`timed out after ${timeoutMs}ms`)), timeoutMs)
+    timer = setTimeout(() => reject(new Error(`${what} did not arrive within ${timeoutMs}ms`)), timeoutMs)
   })
   try {
     return await Promise.race([signal, timeout])

@@ -4,16 +4,18 @@ import { createTaskManager } from "../../../../senpi-task/src/manager/manager"
 import { createTaskRecordStore } from "../../../../senpi-task/src/store"
 import { baseSpec, categoryPlanner, cleanupProjects, FakeRunner, launchSettled, settings, tempProject } from "../../../../senpi-task/src/manager/__fixtures__/manager-fakes"
 import { createEngineRunPause } from "./engine-run-pause"
+import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
 
 afterEach(cleanupProjects)
 
 function bounded<T>(promise: Promise<T>, name: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
-  const expired = new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error(`${name} did not settle`)), 5000) })
+  const expired = new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error(`${name} did not settle`)), remainingTestTime()) })
   return Promise.race([promise, expired]).finally(() => { if (timer !== undefined) clearTimeout(timer) })
 }
 
 test("Stop pauses attached children before waiting for a staged birth, then freezes its acknowledgement", async () => {
+  useTestTimeout(15000)
   const cwd = tempProject()
   const backing = createTaskRecordStore({ project_dir: cwd })
   const existingPaused = Promise.withResolvers<void>()

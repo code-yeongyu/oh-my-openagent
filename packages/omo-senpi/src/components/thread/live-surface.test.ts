@@ -8,6 +8,7 @@ import { TASK_HOST_SOCKET_ENV_NAMES } from "../../../../senpi-task/src/runners/r
 import { fakeHostTransport } from "../../../../senpi-task/src/runners/rpc-host/__fixtures__/fake-host-transport"
 import { createLiveThreadSurface, resolveThreadSocket, THREAD_SOCKET_ENV_NAMES } from "./live-surface"
 import type { ThreadHost } from "./tools"
+import { testBudgetSignal } from "../../../../../test-support/test-deadline"
 
 /** An engine that cannot enumerate endpoints: the surface reaches the legacy socket alone. */
 const NO_ENUMERATION = async () => undefined
@@ -46,7 +47,7 @@ async function withRpc(
     })
   }))
   try {
-    const listening = once(server, "listening", { signal: AbortSignal.timeout(2000) })
+    const listening = once(server, "listening", { signal: testBudgetSignal("server to emit 'listening'") })
     server.listen(transport.listenAddress)
     await listening
     await exercise(createLiveThreadSurface({} as never, { env: { SENPI_RPC_SOCKET: socketPath }, statusAll: NO_ENUMERATION, registry: NO_REGISTRY }), frames)

@@ -6,6 +6,7 @@ import { dirname, join } from "node:path"
 import { describe, expect, it } from "bun:test"
 
 import { testTempDir } from "../test-support/temp-dir"
+import { remainingTestTime, useTestTimeout } from "../../../test-support/test-deadline"
 
 // O01 package probe (senpi#4272, PLAN rows X06/T7): the senpi engine omo actually ships, launched from its
 // packaged bin at the pinned version, must advertise the engine-socket compact delta pair in get_protocol_info
@@ -52,7 +53,7 @@ function requestProtocolInfo(socketPath: string): Promise<ProtocolInfo> {
   return new Promise((resolve, reject) => {
     const socket = createConnection(socketPath)
     let buffer = ""
-    const timer = setTimeout(() => done(new Error("get_protocol_info timed out")), 20_000)
+    const timer = setTimeout(() => done(new Error("get_protocol_info did not answer within the test budget")), remainingTestTime())
     function done(error: Error | undefined, info?: ProtocolInfo) {
       clearTimeout(timer)
       socket.destroy()
@@ -114,6 +115,7 @@ describe.skipIf(process.platform === "win32")("packaged senpi engine compact del
   })
 
   it("#given SENPI_ENGINE_SOCKET_COMPACT_UPDATES=1 #when the packaged host answers get_protocol_info #then it advertises the compact delta pair", async () => {
+    useTestTimeout(90_000)
     const info = await probePackagedHost("1")
 
     expect(info.serverVersion).toBe(pinnedVersion)
@@ -121,6 +123,7 @@ describe.skipIf(process.platform === "win32")("packaged senpi engine compact del
   }, 90_000)
 
   it("#given the compact flag unset #when the packaged host answers get_protocol_info #then no compact name is advertised", async () => {
+    useTestTimeout(90_000)
     const info = await probePackagedHost(undefined)
 
     expect(info.capabilities.filter((capability) => (COMPACT_NAMES as readonly string[]).includes(capability))).toEqual([])

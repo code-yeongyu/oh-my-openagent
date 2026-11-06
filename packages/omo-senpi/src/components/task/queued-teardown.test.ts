@@ -1,6 +1,7 @@
 import { afterEach, expect, spyOn, test } from "bun:test"
 import { coldReviveHarness } from "../../../../senpi-task/src/lifecycle/__fixtures__/cold-revive-harness"
 import { cleanupProjects } from "../../../../senpi-task/src/manager/__fixtures__/manager-fakes"
+import { testBudgetSignal } from "../../../../../test-support/test-deadline"
 
 afterEach(cleanupProjects)
 
@@ -15,7 +16,7 @@ for (const path of ["LRU eviction", "interrupted idle reclaim", "completion", "r
     try {
       expect((await h.send()).kind).toBe("revived")
       h.store.mutate(h.record.task_id, record => ({ ...record, pending_steering: pending }))
-      const terminal = h.manager.waitFor(h.record.task_id, { signal: AbortSignal.timeout(5000) })
+      const terminal = h.manager.waitFor(h.record.task_id, { signal: testBudgetSignal("h.manager.waitFor to settle") })
       if (path === "interrupted idle reclaim") await h.manager.interruptTask(h.record.task_id)
       h.fake.settle({ status: "completed", finalResponse: "DONE" })
       await terminal

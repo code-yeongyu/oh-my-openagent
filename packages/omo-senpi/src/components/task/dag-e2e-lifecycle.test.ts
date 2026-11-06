@@ -31,6 +31,7 @@ import { composeTaskEngine, type TaskEngine, type TaskRunnerFactories } from "./
 import { createTeamServiceTestModelRegistry } from "./team-service-test-model-registry"
 import type { CapturedUi } from "./runtime-context"
 import { createSessionTransitionBridge } from "./session-transition-bridge"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const cleanupRoots: string[] = []
 const sessionId = "session-dag-lifecycle"
@@ -51,11 +52,11 @@ function deferred<T>() {
 
 // Failure ceiling, not synchronization: proves a promise settles promptly (or fails for blocking),
 // matching the bounded-wait convention from senpi-task.
-function within<T>(promise: Promise<T>, ms: number): Promise<T> {
+function within<T>(promise: Promise<T>, ms: number, what: string): Promise<T> {
   return Promise.race([
     promise,
     new Promise<T>((_resolve, reject) => {
-      setTimeout(() => reject(new Error(`did not settle within ${ms}ms`)), ms)
+      setTimeout(() => reject(new Error(`${what} did not settle within ${ms}ms`)), ms)
     }),
   ])
 }
@@ -530,7 +531,7 @@ describe("assembled DAG lifecycle end to end", () => {
     // then the adopter re-homes and schedules the orphaned node instead of skipping it as foreign
     // (a skip leaves the run under the source session and never starts its node)
     expect(adopter.runtime.manager.list("session-adopter").some((run) => run.runId === runId)).toBe(true)
-    await within(adopterRunner.whenStarted(1), 5_000)
+    await within(adopterRunner.whenStarted(1), remainingTestTime(), "adopterRunner.whenStarted(1)")
     adopterRunner.children[0]?.settle("adopted output")
     const result = await adopter.runtime.wait(runId, "session-adopter")
     expect(result.status).toBe("completed")
@@ -607,7 +608,7 @@ describe("assembled DAG lifecycle end to end", () => {
     // when the session starts and its first turn begins while the recovered node is still running
     await host.dispatch("session_start", { type: "session_start" }, {})
     await runner.whenStarted(1)
-    await within(host.dispatch("before_agent_start", { type: "before_agent_start", prompt: "continue" }, {}), 5_000)
+    await within(host.dispatch("before_agent_start", { type: "before_agent_start", prompt: "continue" }, {}), remainingTestTime(), "before_agent_start dispatch while the recovered node runs")
 
     // then the client already holds the recovered run as live, with its node unsettled
     const statuses = fixture.rpc.events
@@ -721,7 +722,7 @@ describe("assembled DAG lifecycle end to end", () => {
 
     // when the model-facing default wait runs against a live run
     const waiting = runDagTool(toolDeps(fixture.runtime), { action: "wait", run_id: runId })
-    const outcome = await within(waiting, 250).then(
+    const outcome = await within(waiting, 250, "waiting").then(
       (result) => ({ kind: "resolved" as const, result }),
       () => ({ kind: "blocked" as const }),
     )

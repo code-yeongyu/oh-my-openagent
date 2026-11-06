@@ -10,6 +10,7 @@ import { lockWaitExceeded } from "./gateway/lock-wait"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { createThreadSdk } from "./sdk"
 import type { ThreadHost, ThreadHostSession } from "./tools"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 /**
  * A session bound to two chat threads reports (or arms its completion) without naming a binding. The
@@ -23,7 +24,6 @@ import type { ThreadHost, ThreadHostSession } from "./tools"
  */
 
 const HOST_SOCKET = "/tmp/i-fedcba9876543210.sock"
-const EVENT_WAIT_MS = 10_000
 const directories: string[] = []
 const cleanups: (() => Promise<void>)[] = []
 afterEach(async () => {
@@ -79,7 +79,7 @@ const finalAnswer: EngineMessage = { role: "assistant", content: [{ type: "text"
 function within<T>(work: Promise<T>, what: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const expired = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`waited ${EVENT_WAIT_MS} ms for ${what}`)), EVENT_WAIT_MS)
+    timer = setTimeout(() => reject(new Error(`waited out the test budget for ${what}`)), remainingTestTime())
   })
   return Promise.race([work, expired]).finally(() => clearTimeout(timer))
 }

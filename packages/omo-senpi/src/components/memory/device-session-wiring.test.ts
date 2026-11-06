@@ -16,6 +16,7 @@ import { createMemoryComponent } from "./index"
 import { MemoryFakeExtensionAPI, componentContext, loadedMemoryConfig, memorySettings } from "./memory.test-support"
 import { SYNC_IDLE_NO_DEVICE_SESSION, SYNC_IDLE_NOT_JOINED } from "./sync-runner"
 import { rmEfaultTolerant } from "./teardown.test-support"
+import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
 
 const SESSION_ID = "session-device-session"
 const roots: string[] = []
@@ -75,18 +76,20 @@ async function syncLinesAfterBind(source: DeviceAccountSource): Promise<{ readon
     })
     void pi.dispatch("session_start", { type: "session_start" }, sessionEventContext())
   })
-  await Promise.race([settled, new Promise((_, reject) => setTimeout(() => reject(new Error("waited 20s for a 'sync idle' line, none was logged")), 20_000))])
+  await Promise.race([settled, new Promise((_, reject) => setTimeout(() => reject(new Error("waited out the test budget for a 'sync idle' line, none was logged")), remainingTestTime()))])
   return lines.filter((line) => line.message.startsWith("sync idle"))
 }
 
 describe("the production device-session resolver, through the real memory component", () => {
   test("#given a signed-in device that never joined the account's memory #when a session binds #then sync reports not-joined, not 'no device session'", async () => {
+    useTestTimeout(30_000)
     const lines = await syncLinesAfterBind(signedIn)
     expect(lines.map((line) => line.message)).toEqual([SYNC_IDLE_NOT_JOINED])
     expect(lines[0]?.fields).toMatchObject({ reason: "no_pin" })
   }, 30_000)
 
   test("#given a signed-out device #when a session binds #then sync stays idle with no device session", async () => {
+    useTestTimeout(30_000)
     const lines = await syncLinesAfterBind(async () => null)
     expect(lines.map((line) => line.message)).toEqual([SYNC_IDLE_NO_DEVICE_SESSION])
   }, 30_000)

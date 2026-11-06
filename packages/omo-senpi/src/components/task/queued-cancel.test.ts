@@ -4,6 +4,7 @@ import { cleanupProjects } from "../../../../senpi-task/src/manager/__fixtures__
 import { runTaskCancel } from "../../../../senpi-task/src/tools/control/cancel"
 import { renderTaskCancelResult } from "../../../../senpi-task/src/tools/control/renderers"
 import { withDroppedSteeringNotice } from "../../../../senpi-task/src/state/queued-steering"
+import { testBudgetSignal } from "../../../../../test-support/test-deadline"
 
 afterEach(cleanupProjects)
 
@@ -14,7 +15,7 @@ for (const resident of [true, false]) {
     try {
       if (resident) {
         await h.send()
-        const terminal = h.manager.waitFor(h.record.task_id, { signal: AbortSignal.timeout(2000) })
+        const terminal = h.manager.waitFor(h.record.task_id, { signal: testBudgetSignal("h.manager.waitFor to settle") })
         h.fake.settle({ status: "completed", finalResponse: "DONE" })
         await terminal
       }

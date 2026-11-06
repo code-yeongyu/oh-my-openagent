@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { Worker } from "node:worker_threads"
+import { remainingTestTime } from "../../../../../../test-support/test-deadline"
 
 const bundle = fileURLToPath(new URL("../../../../plugin/runtime/agent-toolkit-sdk/sdk.js", import.meta.url))
 const roots: string[] = []
@@ -33,7 +34,7 @@ for (const sessionId of ["worker-session", undefined]) {
     const worker = new Worker(script)
     try {
       const result = await new Promise<unknown>((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error("worker result timeout")), 10_000)
+        const timeout = setTimeout(() => reject(new Error("worker result timeout")), remainingTestTime())
         worker.once("message", value => { clearTimeout(timeout); resolve(value) })
         worker.once("error", error => { clearTimeout(timeout); reject(error) })
         worker.once("exit", code => { if (code !== 0) { clearTimeout(timeout); reject(new Error(`worker exit ${code}`)) } })

@@ -10,6 +10,7 @@ import { createMemoryIdentityContext } from "./context"
 import { MemoryFakeExtensionAPI, componentContext, loadedMemoryConfig, memorySettings } from "./memory.test-support"
 import { rmWhenReleased } from "./teardown.test-support"
 import { createMemoryWiring } from "./wiring"
+import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
 
 const roots: string[] = []
 afterEach(async () => {
@@ -18,6 +19,7 @@ afterEach(async () => {
 
 describe("memory pressure dream wiring", () => {
   test("#given committed system memory above pressure #when the first accepted turn settles #then one pressure dream launches after input and never before it", async () => {
+    useTestTimeout(30_000)
     const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-pressure-dream-wiring-")))
     roots.push(root)
     const identityName = "pressure-dream-agent"
@@ -66,7 +68,7 @@ describe("memory pressure dream wiring", () => {
     const boundedAdvisory = Promise.race([
       advisory,
       new Promise<never>((_resolve, reject) => {
-        advisoryTimeout = setTimeout(() => reject(new Error("pressure advisory was not observed")), 5_000)
+        advisoryTimeout = setTimeout(() => reject(new Error("pressure advisory was not observed")), remainingTestTime())
       }),
     ])
 
@@ -82,7 +84,7 @@ describe("memory pressure dream wiring", () => {
     const boundedReservation = Promise.race([
       reservation,
       new Promise<never>((_resolve, reject) => {
-        reservationTimeout = setTimeout(() => reject(new Error("pressure reservation was not observed after accepted input")), 5_000)
+        reservationTimeout = setTimeout(() => reject(new Error("pressure reservation was not observed after accepted input")), remainingTestTime())
       }),
     ])
     try {

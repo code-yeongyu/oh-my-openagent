@@ -7,6 +7,7 @@ import { createNodeGitExec, GitMemoryRepo } from "@oh-my-opencode/memory-core"
 
 import { runReflectionChild } from "./spawn-supervisor"
 import { waitForRunSentinel } from "./run-sentinel"
+import { remainingTestTime, useTestTimeout } from "../../../../../../test-support/test-deadline"
 
 const roots: string[] = []
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))))
@@ -117,6 +118,7 @@ describe("supervised child outcome authority", () => {
   }, 30_000)
 
   test("#given a matching durable outcome while the supervisor stays alive #when the parent completes #then the outcome wins without waiting for close", async () => {
+    useTestTimeout(5_000)
     // given
     const runDir = await mkdtemp(join(tmpdir(), "supervisor-outcome-linger-"))
     roots.push(runDir)
@@ -164,7 +166,7 @@ describe("supervised child outcome authority", () => {
       supervisorPath: join(import.meta.dir, "__fixtures__", "supervisor-outcome-then-linger.ts"),
     })
     await writeFile(join(runDir, "release"), "")
-    expect(await waitForRunSentinel(join(runDir, "released.json"), Date.now() + 5_000, Date.now)).toBe("present")
+    expect(await waitForRunSentinel(join(runDir, "released.json"), Date.now() + remainingTestTime(), Date.now)).toBe("present")
 
     // then
     expect(result).toMatchObject({ code: 0, signal: null, timedOut: false })

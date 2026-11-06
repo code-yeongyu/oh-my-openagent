@@ -8,6 +8,7 @@ import { createInboxDrain } from "./drain"
 import { createGatewayRelay, type GatewayRelay } from "./relay"
 import type { GatewayStore } from "./store"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
+import { remainingTestTime } from "../../../../../../test-support/test-deadline"
 
 /** The arm a completion report made: its sequence number is the watermark the tracker's settle passes. */
 function armSeqOf(reported: { readonly arm_seq: number | null }): number {
@@ -17,7 +18,7 @@ function armSeqOf(reported: { readonly arm_seq: number | null }): number {
 
 let harness: GatewayHarness | undefined
 
-function within<T>(promise: Promise<T>, label: string, ms = 10_000): Promise<T> {
+function within<T>(promise: Promise<T>, label: string, ms = remainingTestTime()): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   return Promise.race([promise, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error(`waited ${ms} ms for ${label}`)), ms) })]).finally(() => clearTimeout(timer))
 }

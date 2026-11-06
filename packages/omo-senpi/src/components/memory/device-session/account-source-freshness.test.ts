@@ -9,6 +9,7 @@ import { deviceKeyringFromMaterial } from "@oh-my-opencode/memory-core/sync-engi
 import { createCredentialStore, type Credentials } from "@oh-my-opencode/omo-opencode/service-auth"
 import type { DeviceKeyring } from "@oh-my-opencode/memory-core/keyring"
 import { createCliAccountSource } from "./account-source"
+import { remainingTestTime, useTestTimeout } from "../../../../../../test-support/test-deadline"
 
 // Security contract (account-transport-api v7 sections 2 and 3): a credential transaction never trusts a read that
 // began before it, and a capture never binds an identity resolved for another generation.
@@ -74,7 +75,7 @@ async function siblingCommitsAba(origin: string, home: string, secretFile: strin
   const child = Bun.spawn([process.execPath, join(import.meta.dirname, "sibling-writer.fixture.ts"), origin, home, secretFile], {
     stdout: "pipe", stderr: "pipe", env: { ...process.env, HOME: home },
   })
-  const deadline = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("the sibling writer did not exit within 20s")), 20_000))
+  const deadline = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("the sibling writer did not exit within the test budget")), remainingTestTime()))
   const code = await Promise.race([child.exited, deadline])
   const out = await new Response(child.stdout).text()
   if (code !== 0 || !out.includes("SIBLING_COMMITTED_ABA")) throw new Error(`sibling writer failed (${code}): ${await new Response(child.stderr).text()}`)
@@ -83,6 +84,7 @@ async function siblingCommitsAba(origin: string, home: string, secretFile: strin
 describe("authoritative credential reads under the shared lock", () => {
   for (const barrier of ["signing", "service mutation", "pin rename"] as const) {
     test(`#given a read parked before a real sibling's A-B-A #when ${barrier} runs after it committed #then nothing bound to A1 is admitted`, async () => {
+      useTestTimeout(30_000)
       const f = await fixture()
       await f.store.write(credential("device-a"))
       const served: string[] = []
@@ -110,7 +112,7 @@ describe("authoritative credential reads under the shared lock", () => {
           : account.boundary(() => renameSync(pinFrom, pinTo))
       // The pre-writer read stays parked until the attempt settles: an operation whose read joins it never settles.
       let breaker: ReturnType<typeof setTimeout> | undefined
-      const joined = new Promise<string>(resolve => { breaker = setTimeout(() => resolve("joined the parked read"), 10_000) })
+      const joined = new Promise<string>(resolve => { breaker = setTimeout(() => resolve("joined the parked read"), remainingTestTime()) })
       const outcome = await Promise.race([attempt.then(() => "admitted", () => "refused"), joined])
       clearTimeout(breaker)
       f.release()

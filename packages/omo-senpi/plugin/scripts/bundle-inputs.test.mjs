@@ -7,6 +7,7 @@ import { join, sep, win32 } from "node:path"
 import { pathToFileURL } from "node:url"
 
 import * as bundleInputs from "./bundle-inputs.mjs"
+import { spawnTimeout } from "../../test-support/spawn-timeout"
 
 const { BUNDLE_INPUTS_PATH, mapFromTrace, renderBundleInputs } = bundleInputs
 const repoRoot = join(import.meta.dir, "..", "..", "..", "..")
@@ -181,7 +182,7 @@ describe("under an install lifecycle", () => {
           cwd: repoRoot,
           env: { ...process.env, npm_lifecycle_event: lifecycle, TMPDIR: tmp, TMP: tmp, TEMP: tmp },
           encoding: "utf8",
-          timeout: 20000,
+          timeout: spawnTimeout(),
         })
         expect(result.status).not.toBe(0)
         expect(result.status).not.toBeNull()

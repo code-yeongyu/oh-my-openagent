@@ -13,6 +13,7 @@ import type { KibitzerWakeOutcome } from "./sidecar-outcome"
 import { createKibitzerSidecarNudgeTool } from "./tools/nudge"
 import type { KibitzerToolResult } from "./tools/result"
 import type { KibitzerWakeAdmission, KibitzerWakeLease, KibitzerWakeSlot } from "./wake-slot"
+import { remainingTestTime } from "../../../../../../test-support/test-deadline"
 
 export const SESSION_ID = "parent-session-1"
 
@@ -26,7 +27,7 @@ export function branchOf(length: number): unknown[] {
 }
 
 /** Rejects after `ms` so a test that waits for a signal that never comes fails with a name, not a hang. */
-export function withinMs<T>(promise: Promise<T>, label: string, ms = 2_000): Promise<T> {
+export function withinMs<T>(promise: Promise<T>, label: string, ms = remainingTestTime()): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const deadline = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new Error(`timed out after ${ms}ms waiting for ${label}`)), ms)

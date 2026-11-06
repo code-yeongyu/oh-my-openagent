@@ -23,11 +23,10 @@ import {
   type OnboardingScanResponse,
   type OnboardingScanStore,
 } from "./scan-component"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const roots: string[] = []
 const SECRET = "SK-SENTINEL-ONBOARDING-SCAN"
-const EVENT_TIMEOUT_MS = 20_000
-
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
@@ -112,8 +111,8 @@ function fakeHost() {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         listeners.delete(listener)
-        reject(new Error(`waited ${EVENT_TIMEOUT_MS}ms for the done event of scan ${scanId}, never fired`))
-      }, EVENT_TIMEOUT_MS)
+        reject(new Error(`waited out the test budget for the done event of scan ${scanId}, never fired`))
+      }, remainingTestTime())
       const listener = (event: OnboardingScanEvent) => {
         if (event.scanId !== scanId || event.kind !== "done") return
         clearTimeout(timer)

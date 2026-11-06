@@ -10,6 +10,7 @@ import { createGatewayStore } from "./gateway/store"
 import { FakeSessionRuntime } from "./gateway/testing/fake-runtime"
 import { createThreadTools } from "./tools"
 import { createThreadSdk } from "./sdk"
+import { testBudgetSignal } from "../../../../../test-support/test-deadline"
 
 export async function publishedWorld() {
   const dir = mkdtempSync("/tmp/sgown-test-")
@@ -88,7 +89,7 @@ export async function publishedWorld() {
         }
       })
     }))
-    const listening = once(server, "listening", { signal: AbortSignal.timeout(5000) })
+    const listening = once(server, "listening", { signal: testBudgetSignal("the published endpoint to listen") })
     server.listen(transport?.listenAddress ?? socketPath)
     await listening
     calls.push(socketPath)
@@ -118,7 +119,7 @@ export async function publishedWorld() {
     await start()
     releases.push(async () => { await registrant.stop(); await crash() })
     return { frames, runtime, crash, stop: registrant.stop, start, socketPath, sessionPath, listing,
-      connected: () => once(server, "connection", { signal: AbortSignal.timeout(5000) }),
+      connected: () => once(server, "connection", { signal: testBudgetSignal("a connection to the published endpoint") }),
     }
   }
   const sdk = createThreadSdk({ agentDir: dir, cwd: dir, uid: 123, user: "test", host: surface, store })
