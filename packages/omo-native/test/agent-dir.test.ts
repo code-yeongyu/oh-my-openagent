@@ -1,13 +1,15 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import {
   ADOPTION_MARKER,
   AGENT_DIR_MODE,
   adoptLegacyFlatState,
+  agentDirRemedy,
   canonicalAgentDir,
   legacyFlatAgentDir,
+  prepareAgentDir,
 } from "../bin/lib/agent-dir.js"
 
 const roots: string[] = []
@@ -50,6 +52,94 @@ describe("omo agent directory", () => {
         }
         const mode = statSync(canonicalAgentDir({}, home)).mode & 0o777
         expect(mode).toBe(AGENT_DIR_MODE)
+      })
+    })
+  })
+
+  describe("#given a host umask of 0002 and no agent directory yet", () => {
+    describe("#when the launch prepares the agent directory", () => {
+      test.skipIf(process.platform === "win32")("#then it is created owner-only before the engine can create it", () => {
+        const home = createHome()
+        const previous = process.umask(0o002)
+        let preparation
+        try {
+          preparation = prepareAgentDir({}, home)
+        } finally {
+          process.umask(previous)
+        }
+        expect(preparation.action).toBe("created")
+        expect(statSync(canonicalAgentDir({}, home)).mode & 0o777).toBe(AGENT_DIR_MODE)
+        expect(agentDirRemedy(preparation)).toBeUndefined()
+      })
+    })
+  })
+
+  describe("#given a host umask of 0002 and an agent directory it already left group-writable", () => {
+    describe("#when the launch prepares the agent directory", () => {
+      test.skipIf(process.platform === "win32")("#then the group and world write bits are removed", () => {
+        const home = createHome()
+        const agentDir = canonicalAgentDir({}, home)
+        mkdirSync(agentDir, { recursive: true })
+        chmodSync(agentDir, 0o775)
+        const previous = process.umask(0o002)
+        let preparation
+        try {
+          preparation = prepareAgentDir({}, home)
+        } finally {
+          process.umask(previous)
+        }
+        expect(preparation).toMatchObject({ action: "normalized", from: 0o775, to: 0o755 })
+        expect(statSync(agentDir).mode & 0o777).toBe(0o755)
+      })
+    })
+  })
+
+  describe("#given an owner-only agent directory", () => {
+    describe("#when the launch prepares the agent directory", () => {
+      test.skipIf(process.platform === "win32")("#then its mode is left unchanged", () => {
+        const home = createHome()
+        const agentDir = canonicalAgentDir({}, home)
+        mkdirSync(agentDir, { recursive: true, mode: 0o700 })
+        chmodSync(agentDir, 0o700)
+        expect(prepareAgentDir({}, home).action).toBe("unchanged")
+        expect(statSync(agentDir).mode & 0o777).toBe(0o700)
+      })
+    })
+  })
+
+  describe("#given a group-writable agent directory owned by another user", () => {
+    describe("#when the launch prepares the agent directory", () => {
+      test.skipIf(process.platform === "win32")("#then it is left alone and the remedy names chmod go-w", () => {
+        const home = createHome()
+        const agentDir = canonicalAgentDir({}, home)
+        mkdirSync(agentDir, { recursive: true })
+        chmodSync(agentDir, 0o775)
+        let chmodCalls = 0
+        const preparation = prepareAgentDir({}, home, {
+          getuid: () => lstatSync(agentDir).uid + 1,
+          chmod: () => { chmodCalls += 1 },
+        })
+        expect(preparation).toMatchObject({ action: "left", reason: "foreign_owner" })
+        expect(chmodCalls).toBe(0)
+        expect(agentDirRemedy(preparation)).toContain(`chmod go-w ${agentDir}`)
+      })
+    })
+  })
+
+  describe("#given an agent directory that is a symlink to a group-writable directory", () => {
+    describe("#when the launch prepares the agent directory", () => {
+      test.skipIf(process.platform === "win32")("#then the link is not followed and the remedy names chmod go-w", () => {
+        const home = createHome()
+        const target = join(home, "elsewhere")
+        mkdirSync(target)
+        chmodSync(target, 0o775)
+        const agentDir = canonicalAgentDir({}, home)
+        mkdirSync(dirname(agentDir), { recursive: true })
+        symlinkSync(target, agentDir)
+        const preparation = prepareAgentDir({}, home)
+        expect(preparation).toMatchObject({ action: "left", reason: "not_directory" })
+        expect(statSync(target).mode & 0o777).toBe(0o775)
+        expect(agentDirRemedy(preparation)).toContain(`chmod go-w ${agentDir}`)
       })
     })
   })

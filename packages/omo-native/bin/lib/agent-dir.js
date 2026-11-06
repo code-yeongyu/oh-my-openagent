@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 
@@ -56,6 +56,65 @@ export const AGENT_DIR_MODE = 0o700
 
 function ensureAgentDir(path) {
   mkdirSync(path, { recursive: true, mode: AGENT_DIR_MODE })
+}
+
+// The RPC socket host refuses a key directory any other user could write to.
+const WRITABLE_BY_OTHERS = 0o022
+
+function isMissing(error) {
+  return error instanceof Error && "code" in error && (error.code === "ENOENT" || error.code === "ENOTDIR")
+}
+
+/** The mode the host sees through a symlink, for the remedy only; never used to chmod. */
+function followedDirMode(path, io) {
+  try {
+    const followed = (io.stat ?? statSync)(path)
+    return followed.isDirectory() ? followed.mode & 0o7777 : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** @typedef {{ action: "created" | "normalized" | "unchanged" | "left" | "skipped", path: string, reason?: string, from?: number, to?: number }} AgentDirPreparation */
+
+/**
+ * Makes the agent directory one the RPC socket host accepts before the engine starts (#12546).
+ *
+ * The engine creates the directory with the process umask when it is missing, so a fresh install
+ * on a umask 0002 host gets a group-writable directory; omo creates it owner-only first instead.
+ * An existing directory keeps its mode except for the group/world write bits, which are removed
+ * only on a real directory this user owns. A symlink is never followed and a directory owned by
+ * someone else is left as it is; `agentDirRemedy` then names the fix.
+ *
+ * @returns {AgentDirPreparation}
+ */
+export function prepareAgentDir(env = process.env, home = runtimeHome(env), io = {}) {
+  const path = canonicalAgentDir(env, home)
+  if ((io.platform ?? process.platform) === "win32") return { action: "skipped", path, reason: "win32" }
+  let stat
+  try {
+    stat = (io.lstat ?? lstatSync)(path)
+  } catch (error) {
+    if (!isMissing(error)) throw error
+    ensureAgentDir(path)
+    return { action: "created", path }
+  }
+  if (!stat.isDirectory()) return { action: "left", path, reason: "not_directory", from: followedDirMode(path, io) }
+  const uid = io.getuid === undefined ? process.getuid?.() : io.getuid()
+  const from = stat.mode & 0o7777
+  if (uid !== undefined && stat.uid !== uid) return { action: "left", path, reason: "foreign_owner", from }
+  if ((from & WRITABLE_BY_OTHERS) === 0) return { action: "unchanged", path }
+  const to = from & ~WRITABLE_BY_OTHERS
+  ;(io.chmod ?? chmodSync)(path, to)
+  return { action: "normalized", path, from, to }
+}
+
+/** The fix to print when `prepareAgentDir` had to leave a directory the host will refuse. */
+export function agentDirRemedy(preparation) {
+  if (preparation.action !== "left" || preparation.from === undefined) return undefined
+  if ((preparation.from & WRITABLE_BY_OTHERS) === 0) return undefined
+  const mode = (preparation.from & 0o777).toString(8)
+  return `omo: ${preparation.path} is group/world-writable (${mode}) and was left as it is (${preparation.reason}); the RPC socket host refuses it. Fix: chmod go-w ${preparation.path}`
 }
 
 function timestamp() {

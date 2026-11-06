@@ -16,7 +16,7 @@ import { parseBuildInfo, parseEngineBuildStamp, versionLines } from "./build-inf
 import { compiledUpdate, fetchGitHubReleases, probePackageOwner, releaseAssetName, RELEASES_URL } from "./compiled-update"
 import { migrateLegacyBunGlobalManifest } from "./bin/lib/legacy-bun-global-migration.js"
 import { removeLegacyServiceCredentials } from "./bin/lib/legacy-service-credentials.js"
-import { adoptLegacyFlatState, canonicalAgentDir } from "./bin/lib/agent-dir.js"
+import { adoptLegacyFlatState, agentDirRemedy, canonicalAgentDir, prepareAgentDir } from "./bin/lib/agent-dir.js"
 import { readJson, releaseBanner } from "./bin/lib/package-paths.js"
 import { remapSenpiEnvironment } from "./compiled-environment"
 import { runServiceAuthCommand, SERVICE_ACCOUNTS_OPEN } from "../omo-opencode/src/cli/service-auth/commands"
@@ -166,6 +166,13 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
   }
   const packageJson = readJson(join(execDir, "package.json")) as { version: string; omoBuild?: unknown }
   migrateLegacyBunGlobalManifest(execDir)
+  // Before the engine can create the agent dir with the umask, which the RPC socket host refuses (#12546).
+  try {
+    const remedy = agentDirRemedy(prepareAgentDir())
+    if (remedy) process.stderr.write(`${remedy}\n`)
+  } catch (error) {
+    process.stderr.write(`omo: could not prepare the agent directory: ${error instanceof Error ? error.message : String(error)}\n`)
+  }
   adoptLegacyFlatState()
   const command = args[0]
   // The toolkit CLI is no longer shipped in the Native payload: the loop runs in-process behind the
