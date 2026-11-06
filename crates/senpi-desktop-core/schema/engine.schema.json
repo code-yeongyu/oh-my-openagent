@@ -3718,7 +3718,7 @@
       "required": [
         "reason"
       ],
-      "description": "Why a `CaptureUnavailable` capture was refused. `reason` is an open token\nset: B9 introduces `\"minimized\"` and later waves add more.",
+      "description": "Why a `CaptureUnavailable` capture was refused. `reason` is an open token\nset: B9 introduces `\"minimized\"`; P8 adds `\"off-space\"` and `\"off-screen\"`; later waves add more.",
       "additionalProperties": false
     },
     "MethodRejectionData": {
