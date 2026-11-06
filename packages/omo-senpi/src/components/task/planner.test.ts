@@ -508,7 +508,8 @@ describe("createTaskChildPlanner", () => {
     // then
     if (result.kind !== "error") throw new Error(`Expected error resolution, got ${result.kind}`)
     expect(result.error.code).toBe("model_unavailable")
-    expect(result.error.message).toContain('No available model for agent "explore"')
+    expect(result.error.message).toContain('Agent "explore"')
+    expect(result.error.message).toContain("agents.explore.model")
     expect(result.error.availableAgents).toEqual([
       "explore",
       "librarian",
@@ -831,5 +832,59 @@ describe("createTaskChildPlanner architect tool contract", () => {
     expect(result.plan.toolAllowlist).toBeUndefined()
     expect(result.plan.toolDenylist).toBeUndefined()
     expect(result.plan.promptAppend).toBeDefined()
+  })
+})
+
+// A desktop model picker writes ONLY the session model (set_model), so a user whose whole setup is a
+// Q's standing model rule: a chain with no connected provider ends in a TYPED failure that names
+// each model and the fix; nothing is substituted and no child is spawned.
+describe("createTaskChildPlanner model refusals", () => {
+  const proxyOnly = () => registry([model("proxy-router", "gpt-6-astra")])
+
+  test("#given every provider of a category chain is unconnected #when planned #then the refusal carries the chain and the Settings fix", () => {
+    // given
+    const planner = createTaskChildPlanner({}, {}, proxyOnly)
+
+    // when
+    const result = planner({ prompt: "Find the hard bug.", parent_session_id: "parent-1", depth: 0, category: "quick" })
+
+    // then
+    expect(result.kind).toBe("error")
+    if (result.kind !== "error") return
+    expect(result.error.code).toBe("model_unavailable")
+    expect(result.error.attempted_chain?.length).toBeGreaterThan(0)
+    expect(result.error.message).toContain("categories.quick.model")
+    expect(result.error.message).toContain("No child was spawned")
+  })
+
+  test("#given explore's chain has no connected provider #when planned #then the refusal carries the agent chain and agents.explore.model", () => {
+    // given
+    const planner = createTaskChildPlanner({}, BUILTIN_AGENTS, proxyOnly)
+
+    // when
+    const result = planner({ prompt: "Find the auth flow.", parent_session_id: "parent-1", depth: 0, subagent_type: "explore" })
+
+    // then
+    expect(result.kind).toBe("error")
+    if (result.kind !== "error") return
+    expect(result.error.code).toBe("model_unavailable")
+    expect(result.error.attempted_chain?.length).toBeGreaterThan(0)
+    expect(result.error.message).toContain("agents.explore.model")
+    expect(result.error.message).toContain("No child was spawned")
+  })
+
+  test("#given a category pinned to a model the registry does not serve #when planned #then the refusal names the pin and the Settings key", () => {
+    // given
+    const planner = createTaskChildPlanner({ categories: { quick: { model: "openai/gpt-5.5" } } }, {}, proxyOnly)
+
+    // when
+    const result = planner({ prompt: "Find the hard bug.", parent_session_id: "parent-1", depth: 0, category: "quick" })
+
+    // then
+    expect(result.kind).toBe("error")
+    if (result.kind !== "error") return
+    expect(result.error.code).toBe("model_unavailable")
+    expect(result.error.message).toContain("openai/gpt-5.5")
+    expect(result.error.message).toContain("categories.quick.model")
   })
 })
