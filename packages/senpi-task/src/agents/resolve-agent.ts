@@ -13,7 +13,6 @@ import {
   parseAvailableAgentModels,
   type ParsedAgentModel,
 } from "./agent-model-registry"
-import { agentToolPolicy } from "./agent-tool-policy"
 import { agentPersona } from "./agent-persona"
 import { AGENT_FALLBACK_CHAINS } from "./builtin/fallback-chains"
 import { canonicalAgentName } from "./builtin/legacy-agent-names"
