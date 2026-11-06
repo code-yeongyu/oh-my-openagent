@@ -1,6 +1,6 @@
 import type { ThreadToolResult } from "../contracts"
 import { matchModel, modelPatternFailure, type ModelChoice } from "../tools/model-match"
-import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "./ports"
+import type { JsonObject, RemoteCommandOutcome, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 import { deviceOnline, outcomeFailure, replyData } from "./remote-ops"
 
 const isObject = (value: unknown): value is JsonObject => typeof value === "object" && value !== null && !Array.isArray(value)
@@ -15,10 +15,20 @@ const modelsOf = (value: unknown): ModelChoice[] =>
       })
     : []
 
+// The one model a catalog's exact `provider/id` names (matchModel's first rung, within `provider` when given): a match
+// no later catalog change can make ambiguous, so a held catalog may decide it; the engine's set_model still confirms it.
+function exactModel(catalog: readonly ModelChoice[], model: string, provider: string | undefined): ModelChoice | undefined {
+  const pattern = model.trim().toLowerCase()
+  const named = catalog.filter((choice) => `${choice.provider}/${choice.id}`.toLowerCase() === pattern && (provider === undefined || choice.provider.toLowerCase() === provider.trim().toLowerCase()))
+  return named.length === 1 ? named[0] : undefined
+}
+
 /**
  * thread_set_model on another device: the same rule as here, matched against that thread's own catalog
- * (`get_available_models`, held by the session's mirror after its first read, and read again when the held one has no
- * match), then its engine's `set_model` on the session, whose reply confirms the model: one round trip once warm.
+ * (`get_available_models`), then its engine's `set_model` on the session, whose reply confirms the model. The
+ * session's mirror holds the catalog after its first read: an exact provider/id it lists is set at once (one round
+ * trip), and when that set fails the catalog is read again so the answer is the one a fresh catalog gives; any other
+ * pattern is matched against a fresh catalog, exactly as before.
  */
 export async function setModelRemote(remote: RemoteThreadSurface, row: RemoteSessionRow, request: { readonly model: string; readonly provider?: string | undefined }): Promise<ThreadToolResult> {
   const offline = await deviceOnline(remote, row.device)
@@ -26,19 +36,31 @@ export async function setModelRemote(remote: RemoteThreadSurface, row: RemoteSes
   const empty = modelPatternFailure(request.model)
   if (empty !== undefined) return empty
   const catalog = { type: "get_available_models", sessionId: row.session_id }
+  const fresh = async (): Promise<ThreadToolResult | { readonly kind: "match"; readonly model: ModelChoice }> => {
+    const listed = await remote.sessions.sessionCommand(row.device, row.session_id, catalog, { fresh: true })
+    if (listed.kind !== "ok") return outcomeFailure(listed, row.device)
+    return matchModel(modelsOf(replyData(listed.response)["models"]), request.model, request.provider)
+  }
+  const set = (model: ModelChoice) => remote.sessions.sessionCommand(row.device, row.session_id, { type: "set_model", sessionId: row.session_id, provider: model.provider, modelId: model.id })
+  const applied = (outcome: Extract<RemoteCommandOutcome, { readonly kind: "ok" }>, model: ModelChoice): ThreadToolResult => {
+    const reply = replyData(outcome.response)
+    const provider = reply["provider"]
+    const id = reply["id"]
+    return { kind: "ok", thread_id: row.session_id, model: { provider: typeof provider === "string" ? provider : model.provider, id: typeof id === "string" ? id : model.id }, device: row.device }
+  }
   const listed = await remote.sessions.sessionCommand(row.device, row.session_id, catalog)
   if (listed.kind !== "ok") return outcomeFailure(listed, row.device)
-  let matched = matchModel(modelsOf(replyData(listed.response)["models"]), request.model, request.provider)
-  if (matched.kind !== "match" && listed.local === true) {
-    const relisted = await remote.sessions.sessionCommand(row.device, row.session_id, catalog, { fresh: true })
-    if (relisted.kind !== "ok") return outcomeFailure(relisted, row.device)
-    matched = matchModel(modelsOf(replyData(relisted.response)["models"]), request.model, request.provider)
+  const held = listed.local === true ? exactModel(modelsOf(replyData(listed.response)["models"]), request.model, request.provider) : undefined
+  if (held !== undefined) {
+    const tried = await set(held)
+    if (tried.kind === "ok") return applied(tried, held)
+    // The held catalog may predate the model leaving that device: answer as a fresh catalog would.
+    const rematched = await fresh()
+    return rematched.kind === "match" ? outcomeFailure(tried, row.device) : rematched
   }
+  const matched = listed.local === true ? await fresh() : matchModel(modelsOf(replyData(listed.response)["models"]), request.model, request.provider)
   if (matched.kind !== "match") return matched
-  const set = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "set_model", sessionId: row.session_id, provider: matched.model.provider, modelId: matched.model.id })
-  if (set.kind !== "ok") return outcomeFailure(set, row.device)
-  const applied = replyData(set.response)
-  const provider = applied["provider"]
-  const id = applied["id"]
-  return { kind: "ok", thread_id: row.session_id, model: { provider: typeof provider === "string" ? provider : matched.model.provider, id: typeof id === "string" ? id : matched.model.id }, device: row.device }
+  const outcome = await set(matched.model)
+  if (outcome.kind !== "ok") return outcomeFailure(outcome, row.device)
+  return applied(outcome, matched.model)
 }

@@ -140,7 +140,7 @@ describe("device-service adapter: relay round trips per thread op", () => {
     const frames: string[] = []
     const listeners = new Set<(event: JsonObject) => void>()
     const emit = (event: JsonObject) => { for (const listener of [...listeners]) listener(event) }
-    const models = [{ provider: "a", id: "m1" }, { provider: "a", id: "m2" }]
+    const models: Array<{ provider: string; id: string }> = [{ provider: "a", id: "m1" }, { provider: "a", id: "m2" }]
     const engine = { model: models[0], streaming: false }
     // Runs before the command's reply when set: an event of the session that lands while the command is in flight.
     let beforeReply: (() => void) | undefined
@@ -148,7 +148,7 @@ describe("device-service adapter: relay round trips per thread op", () => {
       switch (rpc["type"]) {
         case "get_state": return { isStreaming: engine.streaming, model: engine.model, pendingMessageCount: 0 }
         case "get_messages": return { messages: [{ role: "user", content: [{ type: "text", text: "hi" }], timestamp: 1 }] }
-        case "get_available_models": return { models }
+        case "get_available_models": return { models: models.map((model) => ({ ...model })) }
         case "set_model": engine.model = models.find((model) => model.id === rpc["modelId"]) ?? engine.model; return { ...engine.model }
         case "prompt": return { disposition: "started", turnId: "7" }
         case "interrupt": return { interrupted: false }
@@ -171,7 +171,8 @@ describe("device-service adapter: relay round trips per thread op", () => {
       onEvent: (listener: (event: JsonObject) => void) => { listeners.add(listener); return () => listeners.delete(listener) },
       command: async (_attach: string, rpc: JsonObject, commandId: string) => {
         frames.push("session.command")
-        const response = { type: "response", command: rpc["type"], success: true, data: data(rpc) }
+        const known = rpc["type"] !== "set_model" || models.some((model) => model.provider === rpc["provider"] && model.id === rpc["modelId"])
+        const response = known ? { type: "response", command: rpc["type"], success: true, data: data(rpc) } : { type: "response", command: "set_model", success: false, error: "Model not found" }
         const before = beforeReply
         beforeReply = undefined
         queueMicrotask(() => {
@@ -197,7 +198,9 @@ describe("device-service adapter: relay round trips per thread op", () => {
     // An engine event on the session's delegated channel, and that channel closing.
     const frame = () => emit({ type: "event", kind: "session.command_event", device: "b", frame: { type: "agent_start" } })
     const channelClosed = () => emit({ type: "event", kind: "session.channel_closed", device: "b", reason: "idle" })
-    return { port, surface, take, record, frame, channelClosed, inFlight: (event: () => void) => { beforeReply = event } }
+    // The device's catalog loses a model after this device read it.
+    const removeModel = (id: string) => { models.splice(models.findIndex((model) => model.id === id), 1) }
+    return { port, surface, take, record, frame, channelClosed, removeModel, inFlight: (event: () => void) => { beforeReply = event } }
   }
 
   test("#given one remote session #when the thread ops run in turn #then the attach is opened once, status and view are served locally once warm, and every other op is one command", async () => {
@@ -213,7 +216,8 @@ describe("device-service adapter: relay round trips per thread op", () => {
       ["send", () => promptRemote(w.surface, row, { message: "x" }, 0)],
       ["status after send", () => w.port.sessionCommand("b", "s1", { type: "get_state", sessionId: "s1" })],
       ["model (cold catalog)", () => setModelRemote(w.surface, row, { model: "m2" })],
-      ["model", () => setModelRemote(w.surface, row, { model: "m1" })],
+      ["model (exact provider/id)", () => setModelRemote(w.surface, row, { model: "a/m1" })],
+      ["model (by id)", () => setModelRemote(w.surface, row, { model: "m2" })],
       ["interrupt", () => interruptRemote(w.surface, row, undefined)],
       ["close", () => closeRemote(w.surface, row)],
     ]
@@ -232,7 +236,8 @@ describe("device-service adapter: relay round trips per thread op", () => {
       ["send", ["session.command"]],
       ["status after send", ["session.command"]],
       ["model (cold catalog)", ["session.command", "session.command"]],
-      ["model", ["session.command"]],
+      ["model (exact provider/id)", ["session.command"]],
+      ["model (by id)", ["session.command", "session.command"]],
       ["interrupt", ["session.command"]],
       ["close", ["session.command"]],
     ])
@@ -259,13 +264,17 @@ describe("device-service adapter: relay round trips per thread op", () => {
     expect(w.take()).toEqual([])
   })
 
-  test("#given a cached catalog without the requested model #when the model is set #then the catalog is read again before the answer, and a model in neither is refused model_not_found", async () => {
+  test.each([
+    ["a pattern the held catalog lacks", (_w: ReturnType<typeof relayWorld>) => {}, "zz", ["session.command"], "model_not_found"],
+    ["an exact provider/id the device dropped since the catalog was held", (w: ReturnType<typeof relayWorld>) => w.removeModel("m1"), "a/m1", ["session.command", "session.command"], "model_not_found"],
+  ] as const)("#given a held catalog and %s #when the model is set #then the answer is the one a fresh catalog gives", async (_label, change, model, frames, code) => {
     const w = relayWorld()
     await setModelRemote(w.surface, row, { model: "m2" })
     w.take()
-    const missing = await setModelRemote(w.surface, row, { model: "zz" })
-    expect(missing.kind === "error" ? missing.error.code : missing.kind).toBe("model_not_found")
-    expect(w.take()).toEqual(["session.command"])
+    change(w)
+    const result = await setModelRemote(w.surface, row, { model })
+    expect(result.kind === "error" ? result.error.code : result.kind).toBe(code)
+    expect(w.take()).toEqual([...frames])
   })
 })
 
