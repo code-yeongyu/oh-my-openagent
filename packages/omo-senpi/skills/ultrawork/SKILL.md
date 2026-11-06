@@ -296,7 +296,7 @@ Discovery order:
 **`eval` with `language: "js"` is the default surface for the independent
 part of a step - reads, searches, symbol lookups, git/`lsp_*`/web
 queries, `task(...)` spawns - not `bash`, not a parade of one-off calls,
-not `python3 -c`.** If the eval tool reports a Bun kernel (the `bun-1-4` skill is listed),
+not `python3 -c`.** If the eval tool reports a Bun kernel (the `bun` skill is listed),
 read that skill before your first cell; use its builtins (`Bun.$` for a
 command that finishes inside the cell, `Bun.Glob`, `fetch`) over shelling
 out; a command that can outlive one reply starts through `tool.monitor`

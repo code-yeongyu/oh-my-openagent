@@ -46,7 +46,7 @@
 - Claude는 그 사이 foreground에서 MCP Playwright 정찰 루트를 진행
 - engine이 먼저 성공해도 좋고, MCP 정찰로 얻은 API가 먼저 성공해도 좋음. 빠른 쪽 결과 채택
 
-**MCP 정찰 루트**:
+**MCP 정찰 루트** (Playwright MCP가 로드된 세션 전용. 없으면 the `browser` skill's `references/owned-engine/network.md` 로 같은 XHR/fetch 목록을 모은다):
 1. `mcp__playwright__browser_navigate` → 대상 페이지 로드 (브라우저 렌더링)
 2. `mcp__playwright__browser_network_requests` → XHR/fetch 호출 목록 수집, `/api/`·`/graphql`·`\.json` 필터로 내부 엔드포인트 식별
 3. 식별된 JSON API URL을 `python3 -B -m engine <API_URL>`로 재호출 (백그라운드 engine과는 별개 호출). 대부분 API 레이어는 페이지 HTML보다 WAF 보호가 얕아 curl_cffi로 바로 수집됨

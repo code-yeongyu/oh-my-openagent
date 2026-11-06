@@ -258,7 +258,7 @@ if __name__ == "__main__":
 | `python -m venv .venv && ...` | `uv run --script` handles it |
 | Script without usage comment | Always include the "How to run" block |
 | `import asyncio; asyncio.run(main())` | `import anyio; anyio.run(main)` |
-| Bare `httpx2.AsyncClient()` | Full production defaults (see `references/httpx2-optimization.md`) |
+| Bare `httpx2.AsyncClient()` | Full production defaults (see `references/python/httpx2-optimization.md`) |
 
 ## Sources
 
