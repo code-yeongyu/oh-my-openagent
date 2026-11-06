@@ -4,6 +4,7 @@ import { readSessionRole } from "@oh-my-opencode/senpi-task"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { getBuiltinSkillsRoot } from "../telemetry/product-identity"
 import { resolveUlwLoopSessionScope } from "../ulw-loop/session-scope"
+import { BUNSHIN_TS_CELL_HINT } from "../../extension/sdk-root-provisioning"
 import { NOT_AFTER_IDENTIFIER, NOT_BEFORE_PATH, NOT_INTO_IDENTIFIER, stripQuotedRegions } from "./strip-quoted-regions"
 
 export const MASS_ULW_CUSTOM_TYPE = "omo-mass-ulw:skill-pointer"
@@ -12,6 +13,7 @@ export const ULW_LOOP_CUSTOM_TYPE = "omo-ulw-loop:skill-pointer"
 export const ULW_RESEARCH_CUSTOM_TYPE = "omo-ulw-research:skill-pointer"
 export const BROWSER_CUSTOM_TYPE = "omo-browser:skill-pointer"
 export const ULTIMATE_BROWSING_CUSTOM_TYPE = "omo-ultimate-browsing:skill-pointer"
+export const BUNSHIN_CUSTOM_TYPE = "omo-bunshin:skill-pointer"
 export const SKILL_POINTERS_DISABLED_FLAG = "omo-senpi-skill-pointers-disabled"
 
 const SKILL_COMMAND_PREFIX = "/skill:"
@@ -30,6 +32,8 @@ interface SkillPointerTarget {
   // question about the skill, a relayed report, the plain-word alias `meth`) keeps the conditional
   // pointer, because forcing a workflow run onto it is the wrong answer.
   readonly bindingPattern?: RegExp
+  // A target with no packaged skill: the pointer is this text instead of a SKILL.md read.
+  readonly pointer?: string
 }
 
 // A companion is a skill the parent workflow runs on. It has no keyword of its own: it rides on
@@ -147,6 +151,15 @@ const TARGETS: readonly SkillPointerTarget[] = [
     companions: [BROWSER_COMPANION, ULTIMATE_BROWSING_COMPANION],
     bindingPattern: bindingForms(String.raw`(?:ulw-research|(?:mass-ulw|mulw)\s+research)`, String.raw`(?:ulw|${MASS_KEYWORD})[\s-]*research`),
   },
+  {
+    skillName: "bunshin",
+    customType: BUNSHIN_CUSTOM_TYPE,
+    pattern: skillNamePattern(String.raw`(?:bunshin|fleet|machine[\s-]*mesh)`),
+    expandedBlockPattern: /<skill\s+name="bunshin"/i,
+    instruction: "",
+    // The SDK ships inside the plugin, so the pointer teaches the eval import instead of a skill read.
+    pointer: `<omo-bunshin-pointer>${BUNSHIN_TS_CELL_HINT}</omo-bunshin-pointer>`,
+  },
 ]
 
 interface SenpiInputEvent {
@@ -217,7 +230,7 @@ function handleInput(
     .filter((target) => binds(target) || !alreadyLoaded(target.skillName, target.expandedBlockPattern))
     .map((target) => ({
       customType: target.customType,
-      content: binds(target) ? skillMode(target, massMode, sessionScope) : skillPointer(target, sessionScope),
+      content: binds(target) ? skillMode(target, massMode, sessionScope) : target.pointer ?? skillPointer(target, sessionScope),
     }))
   for (const parent of invoked) {
     for (const companion of parent.companions ?? []) {
