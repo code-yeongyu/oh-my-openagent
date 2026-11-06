@@ -17,6 +17,7 @@ use crate::test_support::{
 
 fn chord(mode: &str) -> Op {
     Op::KeyChord(KeyChordParams {
+        force: false,
         target: "101".to_owned(),
         keys: vec!["enter".to_owned(), "tab".to_owned()],
         opts: delivery(mode),
