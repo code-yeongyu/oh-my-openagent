@@ -19,7 +19,7 @@ export function dispositionHistogram(reports) {
   return histogram
 }
 
-export function mergeHistograms(histograms) {
+function mergeHistograms(histograms) {
   const merged = {}
   for (const histogram of histograms) for (const [key, count] of Object.entries(histogram)) merged[key] = (merged[key] ?? 0) + count
   return merged
@@ -40,8 +40,8 @@ export function stats(samples) {
 }
 
 /** Regression rule of DESIGN section 9: p50 above baseline x 1.3 fails, under an absolute floor for noise. */
-export const REGRESSION_RATIO = 1.3
-export const REGRESSION_FLOOR_MS = 0.5
+const REGRESSION_RATIO = 1.3
+const REGRESSION_FLOOR_MS = 0.5
 
 /**
  * Compares a bench result with a baseline of the same host key. Every op's wall p50 is checked; a missing op is
@@ -91,7 +91,7 @@ function named(node, name) {
 }
 
 /** One element of `win` by `{ role, name }`; `last` picks the last match (a calculator's result line). */
-export async function findElement(win, { role, name }, { last = false } = {}) {
+async function findElement(win, { role, name }, { last = false } = {}) {
   const matches = (await win.find({ role })).filter((element) => element.node?.role === role && named(element.node, name))
   const element = last ? matches.at(-1) : matches[0]
   if (element === undefined) throw new Error(`no ${role} named ${JSON.stringify(name)} in ${win.app} ${JSON.stringify(win.title)}`)

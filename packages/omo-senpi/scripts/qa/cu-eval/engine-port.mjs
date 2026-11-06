@@ -7,13 +7,13 @@ import { spawn } from "node:child_process"
 import { createInterface } from "node:readline"
 
 /** The stop chord the eval arms; the host relay heartbeat below keeps the stop path live. */
-export const STOP_CHORD = "ctrl+alt+shift+escape"
+const STOP_CHORD = "ctrl+alt+shift+escape"
 /** Same cadence as the desktop service (`HEARTBEAT_MS`). */
-export const HEARTBEAT_MS = 500
+const HEARTBEAT_MS = 500
 const CLOSE_GRACE_MS = 3_000
 
 /** An `RpcPort` over one engine child. `options` (signal, timeoutMs) are not honoured: this port never cancels. */
-export function createEnginePort(child, { onReply } = {}) {
+function createEnginePort(child, { onReply } = {}) {
   let nextId = 0
   let closed = false
   const pending = new Map()

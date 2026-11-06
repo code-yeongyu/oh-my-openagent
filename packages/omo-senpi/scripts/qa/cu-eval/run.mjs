@@ -43,14 +43,14 @@ const { engineLauncher } = await import("./engine-port.mjs")
 const core = await import("./eval-core.mjs")
 const { TASKS } = await import("./tasks.mjs")
 
-export const ARMS = ["sdk-direct", "model-tool", "model-cua"]
+const ARMS = ["sdk-direct", "model-tool", "model-cua"]
 
 function argValue(argv, name) {
   const index = argv.indexOf(name)
   return index === -1 ? undefined : argv[index + 1]
 }
 
-export function parseArgs(argv) {
+function parseArgs(argv) {
   const arm = argValue(argv, "--arm") ?? "sdk-direct"
   const arms = arm === "all" ? ARMS : [arm]
   const only = argValue(argv, "--tasks")?.split(",").filter(Boolean)
@@ -457,7 +457,7 @@ export function traceDisposition(line) {
  * The fake server reports no usage, so tokens are estimated from request size (chars / 4), labeled as such.
  * `own` lists the requests whose answer was one of the arm's own steps (the rest are the harness readback).
  */
-export function tokenEstimate(requests, own) {
+function tokenEstimate(requests, own) {
   const size = (body) => JSON.stringify(body?.messages ?? []).length
   const chars = requests.reduce((sum, body) => sum + size(body), 0)
   const ownChars = own.reduce((sum, index) => sum + size(requests[index]), 0)
@@ -474,7 +474,7 @@ export function tokenEstimate(requests, own) {
 
 // ---------------------------------------------------------------- main
 
-export async function runEval(options) {
+async function runEval(options) {
   const enginePath = locateEngine(options.engine)
   const scratch = mkdtempSync(join(tmpdir(), "cu-eval-"))
   const rows = []
