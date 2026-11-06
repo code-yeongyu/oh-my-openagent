@@ -23,6 +23,7 @@ mod session;
 #[cfg(test)]
 mod test_support;
 mod timeouts;
+mod timings;
 mod user_input_watch;
 mod worker;
 mod worker_ax;
