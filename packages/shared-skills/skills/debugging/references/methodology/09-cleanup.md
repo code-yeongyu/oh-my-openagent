@@ -114,7 +114,7 @@ Last gate before reporting done. All four gates must be true, and all four must 
 
 3. **Manual QA reproduced the fix** — show the command or scenario that originally failed and its now-correct output. Verbatim, not paraphrased.
 
-4. **Working tree clean of debug artifacts** — show `git diff --stat` output containing only fix + test, plus `git status` clean of untracked debug files.
+4. **Working tree clean of debug artifacts** — show `git diff --stat` output containing only fix + test (plus the Phase 7 oversized-file split, if one was required), plus `git status` clean of untracked debug files.
 
 If any of the four lacks evidence, you have not finished — return to the appropriate phase.
 

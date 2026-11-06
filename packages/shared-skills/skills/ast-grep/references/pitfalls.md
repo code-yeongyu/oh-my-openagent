@@ -1,6 +1,6 @@
 # Pitfalls — what breaks patterns and how to fix them
 
-This is the failure-mode field guide. The `scripts/ast_grep_helper.py validate` subcommand mechanically checks for the items in §1 before calling `sg`; the rest are lower-frequency but still common.
+This is the failure-mode field guide. The `scripts/ast_grep_helper.py validate` subcommand mechanically checks the §1 items for backslash escapes, `.*`/`.+`, character classes, and `|` alternation before calling `sg` (it does not detect `^`/`$` anchors), plus the missing-body and trailing-colon cases from §2; the rest are lower-frequency but still common.
 
 ---
 
